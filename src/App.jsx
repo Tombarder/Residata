@@ -1,35 +1,39 @@
 import { useState } from "react";
 
-const pages = ["Home", "Use Cases", "Data", "Pricing"];
+const pages = ["Home", "Use Cases", "Data", "Pricing", "Contact"];
 
 function Nav({ current, setCurrent }) {
   return (
     <nav style={{
       position: "fixed", top: 0, width: "100%", zIndex: 100,
-      padding: "1.25rem 2rem", display: "flex", alignItems: "center",
-      justifyContent: "space-between", background: "rgba(10,10,11,0.85)",
+      background: "rgba(10,10,11,0.85)",
       backdropFilter: "blur(20px)", borderBottom: "1px solid #222228",
     }}>
-      <a onClick={() => setCurrent("Home")} style={{ display: "flex", alignItems: "center", gap: "0.6rem", cursor: "pointer", textDecoration: "none" }}>
-        <div style={{
-          width: 28, height: 28, background: "#00e5a0", borderRadius: 6,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, fontSize: 14, color: "#0a0a0b",
-        }}>R</div>
-        <span style={{ fontWeight: 600, fontSize: "1.1rem", color: "#e8e8ed", letterSpacing: "-0.02em" }}>Residata</span>
-      </a>
-      <div style={{ display: "flex", alignItems: "center", gap: "2rem", listStyle: "none" }}>
-        {pages.map(p => (
-          <a key={p} onClick={() => setCurrent(p)} style={{
-            color: current === p ? "#e8e8ed" : "#8a8a96", textDecoration: "none",
-            fontSize: "0.875rem", cursor: "pointer", transition: "color 0.2s",
-          }}>{p}</a>
-        ))}
-        <a onClick={() => setCurrent("Pricing")} style={{
-          padding: "0.5rem 1.25rem", background: "#00e5a0", color: "#0a0a0b",
-          fontWeight: 600, borderRadius: 6, fontSize: "0.8rem", cursor: "pointer",
-          letterSpacing: "0.02em", textDecoration: "none",
-        }}>Get Access</a>
+      <div style={{
+        maxWidth: 1200, margin: "0 auto", padding: "1.25rem 2rem",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+      }}>
+        <a onClick={() => setCurrent("Home")} style={{ display: "flex", alignItems: "center", gap: "0.6rem", cursor: "pointer", textDecoration: "none" }}>
+          <div style={{
+            width: 28, height: 28, background: "#00e5a0", borderRadius: 6,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, fontSize: 14, color: "#0a0a0b",
+          }}>R</div>
+          <span style={{ fontWeight: 600, fontSize: "1.1rem", color: "#e8e8ed", letterSpacing: "-0.02em" }}>Residata</span>
+        </a>
+        <div className="nav-right" style={{ display: "flex", alignItems: "center", gap: "2rem", listStyle: "none" }}>
+          {pages.map(p => (
+            <a key={p} className="nav-link" onClick={() => setCurrent(p)} style={{
+              color: current === p ? "#e8e8ed" : "#8a8a96", textDecoration: "none",
+              fontSize: "0.875rem", cursor: "pointer", transition: "color 0.2s",
+            }}>{p}</a>
+          ))}
+          <a onClick={() => setCurrent("Contact")} className="nav-cta-btn" style={{
+            padding: "0.5rem 1.25rem", background: "#00e5a0", color: "#0a0a0b",
+            fontWeight: 600, borderRadius: 6, fontSize: "0.8rem", cursor: "pointer",
+            letterSpacing: "0.02em", textDecoration: "none",
+          }}>Get Access</a>
+        </div>
       </div>
     </nav>
   );
@@ -42,8 +46,11 @@ function Footer() {
       display: "flex", justifyContent: "space-between", alignItems: "center",
       maxWidth: 1100, margin: "0 auto",
     }}>
-      <span style={{ fontSize: "0.78rem", color: "#55555f" }}>© 2026 Residata. Bratislava, Slovakia.</span>
-      <a href="mailto:hello@residata.sk" style={{ fontSize: "0.78rem", color: "#55555f", textDecoration: "none" }}>Contact</a>
+      <span style={{ fontSize: "0.78rem", color: "#55555f" }}>© 2026 Residata · Krasovského 13, Bratislava</span>
+      <div style={{ display: "flex", gap: "1.5rem" }}>
+        <a href="mailto:residata@proton.me" style={{ fontSize: "0.78rem", color: "#55555f", textDecoration: "none" }}>residata@proton.me</a>
+        <a href="tel:+421911963909" style={{ fontSize: "0.78rem", color: "#55555f", textDecoration: "none" }}>+421 911 963 909</a>
+      </div>
     </footer>
   );
 }
@@ -84,7 +91,7 @@ function HomePage({ setCurrent }) {
           We monitor every new residential development in Bratislava and turn scattered listings into actionable market intelligence — so you can make pricing, investment, and portfolio decisions based on data.
         </p>
         <div style={{ marginTop: "2.5rem", display: "flex", gap: "1rem" }}>
-          <a onClick={() => setCurrent("Pricing")} className="btn-p">Get Access</a>
+          <a onClick={() => setCurrent("Contact")} className="btn-p">Get Access</a>
           <a onClick={() => setCurrent("Data")} className="btn-s">See Sample Data</a>
         </div>
       </section>
@@ -160,18 +167,6 @@ function HomePage({ setCurrent }) {
         </div>
       </section>
 
-      {/* Bottom CTA */}
-      <section style={{ padding: "4rem 2rem 6rem", textAlign: "center", position: "relative" }}>
-        <div style={{
-          position: "absolute", bottom: 0, left: "50%", transform: "translateX(-50%)",
-          width: 600, height: 400,
-          background: "radial-gradient(ellipse, rgba(0,229,160,0.15) 0%, transparent 70%)",
-          pointerEvents: "none", opacity: 0.3,
-        }} />
-        <h2 style={{ fontSize: "1.5rem", fontWeight: 700, letterSpacing: "-0.03em", marginBottom: "1rem" }}>See what the data looks like.</h2>
-        <p style={{ color: "#8a8a96", fontSize: "1rem", maxWidth: 480, margin: "0 auto 2rem", fontWeight: 300 }}>Explore a real sample from the latest pipeline run — actual insights, actual structure.</p>
-        <a onClick={() => setCurrent("Data")} className="btn-p">View Sample Data</a>
-      </section>
     </>
   );
 }
@@ -627,14 +622,15 @@ function DataPage({ setCurrent }) {
 }
 
 /* ─────── PRICING ─────── */
-function PricingPage() {
+function PricingPage({ setCurrent }) {
+  const mono = "'JetBrains Mono', monospace";
   const tiers = [
     {
-      tier: "Snapshot", name: "One-time access", price: "€149", note: "Single month, one-time delivery",
+      tier: "Snapshot", name: "One-time report", price: "€149", note: "Single month, one-time delivery",
       features: [
-        [true, "Full dataset — all 140+ projects"],
-        [true, "Unit-level data with 25 columns"],
-        [true, "Google Sheets or CSV delivery"],
+        [true, "Full market report with insights"],
+        [true, "Unit-level data — all 140+ projects"],
+        [true, "Pricing benchmarks & visualizations"],
         [false, "No historical data"],
         [false, "No ongoing updates"],
       ],
@@ -643,10 +639,10 @@ function PricingPage() {
     {
       tier: "Standard", name: "Monthly delivery", price: "€99", priceSuffix: "/mo", note: "Billed monthly, cancel anytime",
       features: [
-        [true, "Full dataset — all 140+ projects"],
-        [true, "Unit-level data with 25 columns"],
-        [true, "Monthly updates on the 1st"],
-        [true, "Historical snapshots included"],
+        [true, "Monthly report with full insights"],
+        [true, "Raw + cleaned datasets included"],
+        [true, "Historical snapshots & trend analysis"],
+        [true, "Absorption rates & sell-out tracking"],
         [true, "Google Sheets, CSV, or API access"],
       ],
       featured: true, cta: "Get Started",
@@ -665,11 +661,10 @@ function PricingPage() {
   ];
 
   const faqs = [
-    ["What format does the data come in?", "Standard delivery is a shared Google Sheet with both raw and cleaned datasets. We can also deliver as CSV, Excel, or via API — depending on your plan and workflow."],
-    ["How often is the data updated?", "Standard plans update monthly on the 1st. Custom plans can run weekly or bi-weekly — we adjust the pipeline frequency to match your needs."],
+    ["What do I actually receive?", "You get a structured market report with insights, visualizations, and recommendations — covering pricing trends, absorption rates, competitive positioning, and supply dynamics. We also include raw and cleaned datasets so you can run your own analysis if needed."],
+    ["How often is the data updated?", "Standard delivery is monthly. We can go as frequent as weekly — and technically even daily, but we recommend weekly at most. Shorter intervals rarely justify the cost, as the new-build market doesn't shift that fast."],
     ["Can you cover cities beyond Bratislava?", "Yes. The pipeline is market-agnostic — we can configure it for any city or region where developer data is publicly listed. This falls under our Custom plan."],
     ["Can I add specific projects or developers to track?", "Absolutely. If a project is publicly listed, we can add it to the registry. Custom clients can request additions at any time."],
-    ["How accurate is the data?", "Every record is source-traceable — it links back to the original developer listing. We run validation checks across the pipeline and flag any inconsistencies for manual review."],
   ];
 
   return (
@@ -677,7 +672,7 @@ function PricingPage() {
       <div style={{ padding: "8rem 2rem 3rem", maxWidth: 1100, margin: "0 auto", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
         <Label>Pricing</Label>
         <h1 className="sec-title">Simple, transparent pricing.</h1>
-        <p className="sec-desc" style={{ textAlign: "center" }}>Choose the plan that fits your needs. All plans include the full Bratislava new-build dataset.</p>
+        <p className="sec-desc" style={{ textAlign: "center" }}>Choose the plan that fits your needs. Start with a one-time report or get ongoing market intelligence.</p>
       </div>
 
       <div style={{ padding: "0 2rem 4rem", maxWidth: 1100, margin: "0 auto" }}>
@@ -714,7 +709,7 @@ function PricingPage() {
                   </div>
                 ))}
               </div>
-              <a href={`mailto:hello@residata.sk?subject=${t.tier}%20Plan`} style={{
+              <a onClick={() => setCurrent("Contact")} style={{
                 display: "block", padding: "0.75rem 2rem", textAlign: "center",
                 background: t.featured ? "#00e5a0" : "transparent",
                 color: t.featured ? "#0a0a0b" : "#e8e8ed",
@@ -724,6 +719,36 @@ function PricingPage() {
               }}>{t.cta}</a>
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* Testimonial */}
+      <div style={{ padding: "2.5rem 2rem 0", maxWidth: 800, margin: "0 auto" }}>
+        <div style={{ 
+          borderRadius: 12, background: "#16161a", padding: "2.5rem 3rem", position: "relative",
+          borderLeft: "3px solid #00e5a0",
+        }}>
+          <div style={{ 
+            fontFamily: mono, fontSize: "0.6rem", color: "#00e5a0", letterSpacing: "0.12em", 
+            textTransform: "uppercase", marginBottom: "1.25rem",
+          }}>From a client</div>
+          <div style={{ fontSize: "1.05rem", color: "#e8e8ed", lineHeight: 1.75, fontWeight: 300, fontStyle: "italic", marginBottom: "1.75rem" }}>
+            When you're making pricing decisions on a project worth €30M+, you can't afford to guess what the market will bear. This gives us the full picture — what comparable projects charge, how fast they sell, where supply is tightening. For the cost of a dinner, we get data that directly impacts millions in revenue.
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.85rem" }}>
+            <div style={{ 
+              width: 40, height: 40, borderRadius: 10, 
+              background: "linear-gradient(135deg, rgba(0,229,160,0.12) 0%, rgba(0,229,160,0.04) 100%)", 
+              border: "1px solid rgba(0,229,160,0.15)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <span style={{ fontFamily: mono, fontSize: "0.85rem", color: "#00e5a0", fontWeight: 600 }}>M</span>
+            </div>
+            <div>
+              <div style={{ fontSize: "0.88rem", fontWeight: 500, color: "#e8e8ed" }}>Marek T.</div>
+              <div style={{ fontSize: "0.74rem", color: "#55555f" }}>Head of Residential Development in Bratislava</div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -747,7 +772,110 @@ function PricingPage() {
         }} />
         <h2 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "1rem" }}>Not sure which plan fits?</h2>
         <p style={{ color: "#8a8a96", maxWidth: 480, margin: "0 auto 2rem", fontWeight: 300 }}>Reach out and we'll walk you through the data, the pipeline, and which option makes sense for your use case.</p>
-        <a href="mailto:hello@residata.sk?subject=Residata%20Inquiry" className="btn-p">hello@residata.sk</a>
+        <a onClick={() => setCurrent("Contact")} className="btn-p" style={{ cursor: "pointer" }}>Get in Touch</a>
+      </div>
+    </>
+  );
+}
+
+/* ─────── CONTACT ─────── */
+function ContactPage() {
+  const mono = "'JetBrains Mono', monospace";
+  return (
+    <>
+      <div style={{ padding: "8rem 2rem 3rem", maxWidth: 1100, margin: "0 auto" }}>
+        <Label>Contact</Label>
+        <h1 className="sec-title">Let's talk.</h1>
+        <p className="sec-desc">Whether you want to see a demo, explore a specific plan, or simply learn how Residata can support your market decisions — we'd love to hear from you.</p>
+      </div>
+
+      <div style={{ padding: "0 2rem 5rem", maxWidth: 1100, margin: "0 auto" }}>
+        <div className="contact-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
+
+          {/* Left — Contact card, unified */}
+          <div style={{ border: "1px solid #222228", borderRadius: 12, background: "#16161a", padding: "2.5rem" }}>
+            {/* Profile */}
+            <div style={{ display: "flex", gap: "1.25rem", alignItems: "center", marginBottom: "1.75rem", paddingBottom: "1.75rem", borderBottom: "1px solid #222228" }}>
+              {/* Photo placeholder */}
+              <div style={{
+                width: 72, height: 72, borderRadius: 10, flexShrink: 0,
+                background: "linear-gradient(135deg, #1a1a1f 0%, #222228 100%)",
+                border: "1px solid #333",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                overflow: "hidden",
+              }}>
+                {/* Replace with: <img src="/photo.jpg" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> */}
+                <svg width="32" height="32" viewBox="0 0 36 36" fill="none">
+                  <circle cx="18" cy="13" r="6.5" fill="#444" />
+                  <ellipse cx="18" cy="31" rx="13" ry="9" fill="#444" />
+                </svg>
+              </div>
+              <div>
+                <div style={{ fontSize: "1.15rem", fontWeight: 600, color: "#e8e8ed" }}>Tomáš Kamhal</div>
+                <div style={{ fontSize: "0.82rem", color: "#00e5a0", fontFamily: mono, fontSize: "0.72rem" }}>Founder, Residata</div>
+              </div>
+            </div>
+
+            {/* Contact details — clean list */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "1.1rem" }}>
+              <a href="mailto:residata@proton.me" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: "1rem", color: "#e8e8ed", transition: "color 0.2s" }}
+                onMouseEnter={e => e.currentTarget.style.color = "#00e5a0"}
+                onMouseLeave={e => e.currentTarget.style.color = "#e8e8ed"}>
+                <span style={{ fontFamily: mono, fontSize: "0.8rem", color: "#00e5a0", width: 20, textAlign: "center", flexShrink: 0 }}>@</span>
+                <span style={{ fontSize: "0.92rem" }}>residata@proton.me</span>
+              </a>
+
+              <a href="tel:+421911963909" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: "1rem", color: "#e8e8ed", transition: "color 0.2s" }}
+                onMouseEnter={e => e.currentTarget.style.color = "#00e5a0"}
+                onMouseLeave={e => e.currentTarget.style.color = "#e8e8ed"}>
+                <span style={{ fontFamily: mono, fontSize: "0.8rem", color: "#00e5a0", width: 20, textAlign: "center", flexShrink: 0 }}>☎</span>
+                <span style={{ fontSize: "0.92rem" }}>+421 911 963 909</span>
+              </a>
+
+              <a href="https://calendly.com" target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: "1rem", color: "#e8e8ed", transition: "color 0.2s" }}
+                onMouseEnter={e => e.currentTarget.style.color = "#00e5a0"}
+                onMouseLeave={e => e.currentTarget.style.color = "#e8e8ed"}>
+                <span style={{ fontFamily: mono, fontSize: "0.8rem", color: "#00e5a0", width: 20, textAlign: "center", flexShrink: 0 }}>▶</span>
+                <span style={{ fontSize: "0.92rem" }}>Book a 20-min intro call</span>
+              </a>
+            </div>
+
+            {/* CTA */}
+            <div style={{ marginTop: "2rem" }}>
+              <a href="mailto:residata@proton.me?subject=Residata%20Inquiry" style={{
+                display: "block", padding: "0.85rem 2rem", textAlign: "center",
+                background: "#00e5a0", color: "#0a0a0b", fontWeight: 600,
+                fontSize: "0.9rem", borderRadius: 8, textDecoration: "none",
+              }}>Send an Email</a>
+            </div>
+          </div>
+
+          {/* Right — What to expect */}
+          <div style={{ border: "1px solid #222228", borderRadius: 12, background: "#16161a", padding: "2.5rem" }}>
+            <div style={{ fontFamily: mono, fontSize: "0.65rem", color: "#00e5a0", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "1.5rem" }}>What to expect</div>
+
+            {[
+              ["1", "Intro call or email exchange", "We learn about your use case — what decisions you're making, what data you're currently missing, and what format works for you."],
+              ["2", "Sample delivery", "You get a real sample from the latest pipeline run — not a demo, actual data — so you can evaluate the quality and depth firsthand."],
+              ["3", "Tailored setup", "We configure scope, frequency, and output format to match your workflow. You start receiving monthly (or more frequent) deliveries."],
+              ["4", "Ongoing market edge", "Every delivery gives you a clear view of the market — competitive pricing, absorption trends, supply shifts, and sell-out signals. The kind of insight that turns guesswork into confident decisions."],
+            ].map(([num, title, desc]) => (
+              <div key={num} style={{ display: "flex", gap: "1.25rem", marginBottom: "1.75rem", alignItems: "flex-start" }}>
+                <div style={{
+                  width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+                  background: "rgba(0,229,160,0.08)", border: "1px solid rgba(0,229,160,0.15)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontFamily: mono, fontSize: "0.75rem", color: "#00e5a0", fontWeight: 700,
+                }}>{num}</div>
+                <div>
+                  <div style={{ fontSize: "0.95rem", fontWeight: 500, color: "#e8e8ed", marginBottom: "0.3rem" }}>{title}</div>
+                  <div style={{ fontSize: "0.82rem", color: "#8a8a96", lineHeight: 1.6 }}>{desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+        </div>
       </div>
     </>
   );
@@ -775,12 +903,21 @@ export default function App() {
         .btn-p:hover { opacity: 0.85; }
         .btn-s { display: inline-block; padding: 0.75rem 2rem; background: transparent; color: #e8e8ed; font-weight: 500; font-size: 0.9rem; border: 1px solid #222228; border-radius: 8px; cursor: pointer; text-decoration: none; }
         .btn-s:hover { border-color: #55555f; }
+        @media (max-width: 900px) {
+          .nav-right .nav-link { display: none; }
+          .nav-cta-btn { display: inline-block !important; }
+        }
+        @media (max-width: 768px) {
+          .nav-right { gap: 1rem !important; }
+          .contact-grid { grid-template-columns: 1fr !important; }
+        }
       `}</style>
       <Nav current={current} setCurrent={handleNav} />
       {current === "Home" && <HomePage setCurrent={handleNav} />}
       {current === "Use Cases" && <UseCasesPage setCurrent={handleNav} />}
       {current === "Data" && <DataPage setCurrent={handleNav} />}
-      {current === "Pricing" && <PricingPage />}
+      {current === "Pricing" && <PricingPage setCurrent={handleNav} />}
+      {current === "Contact" && <ContactPage />}
       <Footer />
     </div>
   );
