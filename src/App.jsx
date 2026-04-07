@@ -1,6 +1,114 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 const pages = ["Home", "Use Cases", "Data", "Pricing", "Contact"];
+
+/* ─── Animation hooks ─── */
+function useScrollReveal() {
+  const ref = useRef(null);
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setVisible(true); obs.disconnect(); } }, { threshold: 0.15 });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+  return [ref, visible];
+}
+
+function FadeIn({ children, delay = 0, style = {} }) {
+  const [ref, visible] = useScrollReveal();
+  return (
+    <div ref={ref} style={{
+      ...style,
+      opacity: visible ? 1 : 0,
+      transform: visible ? "translateY(0)" : "translateY(24px)",
+      transition: `opacity 0.6s ease ${delay}s, transform 0.6s ease ${delay}s`,
+    }}>{children}</div>
+  );
+}
+
+function AnimatedCounter({ end, suffix = "", prefix = "" }) {
+  const [ref, visible] = useScrollReveal();
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    if (!visible) return;
+    const num = parseInt(end.replace(/[^0-9]/g, ""));
+    const duration = 1200;
+    const steps = 40;
+    const increment = num / steps;
+    let current = 0;
+    const timer = setInterval(() => {
+      current += increment;
+      if (current >= num) { setCount(num); clearInterval(timer); }
+      else setCount(Math.floor(current));
+    }, duration / steps);
+    return () => clearInterval(timer);
+  }, [visible, end]);
+  const formatted = count.toLocaleString();
+  return <span ref={ref}>{prefix}{formatted}{suffix}</span>;
+}
+
+/* ─── Rising Particles (JS-driven, scroll-independent) ─── */
+function RisingParticles() {
+  const canvasRef = useRef(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    let raf;
+    const dpr = window.devicePixelRatio || 1;
+    
+    const resize = () => {
+      canvas.width = window.innerWidth * dpr;
+      canvas.height = window.innerHeight * dpr;
+      canvas.style.width = window.innerWidth + "px";
+      canvas.style.height = window.innerHeight + "px";
+      ctx.scale(dpr, dpr);
+    };
+    resize();
+    window.addEventListener("resize", resize);
+
+    const particles = Array.from({ length: 20 }, (_, i) => ({
+      x: Math.random() * window.innerWidth,
+      y: window.innerHeight + Math.random() * window.innerHeight,
+      size: 1.5 + Math.random() * 2,
+      speed: 0.15 + Math.random() * 0.3,
+      opacity: 0.12 + Math.random() * 0.12,
+    }));
+
+    const draw = () => {
+      ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+      const fadeStart = window.innerHeight * 0.45;
+      const fadeEnd = window.innerHeight * 0.2;
+      for (const p of particles) {
+        p.y -= p.speed;
+        if (p.y < -20) {
+          p.y = window.innerHeight + 20;
+          p.x = Math.random() * window.innerWidth;
+        }
+        let alpha = p.opacity;
+        if (p.y < fadeStart) {
+          alpha *= Math.max(0, (p.y - fadeEnd) / (fadeStart - fadeEnd));
+        }
+        if (alpha < 0.002) continue;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(0, 229, 160, ${alpha})`;
+        ctx.fill();
+      }
+      raf = requestAnimationFrame(draw);
+    };
+    draw();
+
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", resize);
+    };
+  }, []);
+  
+  return <canvas ref={canvasRef} style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0 }} />;
+}
 
 function Nav({ current, setCurrent }) {
   return (
@@ -55,6 +163,38 @@ function Footer() {
   );
 }
 
+/* ─────── Terminal Animation ─────── */
+function TerminalLines() {
+  const [ref, visible] = useScrollReveal();
+  const mono = "'JetBrains Mono', monospace";
+  const lines = [
+    [["$", "#00e5a0"], [" residata run --region bratislava --month 2026-03", "#e8e8ed"]],
+    [["// Loading registry... 142 projects found", "#55555f"]],
+    [["→ Parsing ", "#8a8a96"], ["Slnečnice Viladomy", "#00e5a0"], [" ... 48 units", "#8a8a96"]],
+    [["→ Parsing ", "#8a8a96"], ["Nový Ružinov II", "#00e5a0"], [" ... 126 units", "#8a8a96"]],
+    [["→ Parsing ", "#8a8a96"], ["RNDZ Residence", "#00e5a0"], [" ... 64 units", "#8a8a96"]],
+    [["// Processing complete.", "#55555f"]],
+    [["✓ Total: ", "#8a8a96"], ["4,218", "#f5a623"], [" units across ", "#8a8a96"], ["142", "#f5a623"], [" projects", "#8a8a96"]],
+    [["✓ Pushed to ", "#8a8a96"], ["residata-clean-master", "#00e5a0"]],
+  ];
+  return (
+    <div ref={ref} style={{ padding: "1.5rem", fontFamily: mono, fontSize: "0.78rem", lineHeight: 1.9 }}>
+      {lines.map((line, i) => (
+        <div key={i} style={{
+          display: "flex",
+          opacity: visible ? 1 : 0,
+          transform: visible ? "translateX(0)" : "translateX(-8px)",
+          transition: `opacity 0.4s ease ${i * 0.2}s, transform 0.4s ease ${i * 0.2}s`,
+        }}>
+          {line.map(([text, color], j) => (
+            <span key={j} style={{ color }}>{text}</span>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /* ─────── HOME ─────── */
 function HomePage({ setCurrent }) {
   return (
@@ -63,47 +203,90 @@ function HomePage({ setCurrent }) {
       <section style={{
         minHeight: "100vh", display: "flex", flexDirection: "column",
         justifyContent: "center", alignItems: "center", textAlign: "center",
-        padding: "8rem 2rem 4rem", position: "relative",
+        padding: "8rem 2rem 4rem", position: "relative", overflow: "hidden",
       }}>
-        <div style={{
-          position: "absolute", top: "-40%", left: "50%", transform: "translateX(-50%)",
-          width: 800, height: 800,
-          background: "radial-gradient(ellipse, rgba(0,229,160,0.15) 0%, transparent 70%)",
-          pointerEvents: "none", opacity: 0.4,
+        {/* Animated dot grid */}
+        <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
+          <svg width="100%" height="100%" style={{ opacity: 0.25 }}>
+            <defs>
+              <pattern id="dotgrid" width="32" height="32" patternUnits="userSpaceOnUse">
+                <circle cx="1" cy="1" r="0.8" fill="#333" />
+              </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#dotgrid)" />
+          </svg>
+        </div>
+        {/* Breathing glow */}
+        <div className="breathing-glow-1" style={{
+          position: "absolute", top: "-30%", left: "50%", transform: "translateX(-50%)",
+          width: 900, height: 900,
+          background: "radial-gradient(ellipse, rgba(0,229,160,0.12) 0%, transparent 65%)",
+          pointerEvents: "none",
         }} />
-        <div style={{
+        <div className="breathing-glow-2" style={{
+          position: "absolute", top: "-10%", left: "30%", transform: "translateX(-50%)",
+          width: 600, height: 600,
+          background: "radial-gradient(ellipse, rgba(0,229,160,0.12) 0%, transparent 70%)",
+          pointerEvents: "none",
+        }} />
+        <div className="breathing-glow-3" style={{
+          position: "absolute", top: "10%", left: "70%", transform: "translateX(-50%)",
+          width: 500, height: 500,
+          background: "radial-gradient(ellipse, rgba(0,229,160,0.12) 0%, transparent 70%)",
+          pointerEvents: "none",
+        }} />
+        <div className="hero-anim-1" style={{
           display: "inline-flex", alignItems: "center", gap: "0.5rem",
           padding: "0.4rem 1rem", border: "1px solid #222228", borderRadius: 100,
           fontSize: "0.75rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace",
           marginBottom: "2.5rem", background: "#111113",
         }}>
-          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#00e5a0" }} />
+          <span className="pulse-dot" style={{ width: 6, height: 6, borderRadius: "50%", background: "#00e5a0" }} />
           Live — tracking 140+ developments
         </div>
-        <h1 style={{ fontSize: "clamp(2.8rem, 6vw, 5rem)", fontWeight: 700, letterSpacing: "-0.04em", lineHeight: 1.05, maxWidth: 800 }}>
+        <h1 className="hero-anim-2" style={{ fontSize: "clamp(2.8rem, 6vw, 5rem)", fontWeight: 700, letterSpacing: "-0.04em", lineHeight: 1.05, maxWidth: 800 }}>
           Bratislava residential market,<br />
           <span style={{
             background: "linear-gradient(135deg, #00e5a0 0%, #00b880 100%)",
             WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
           }}>fully transparent.</span>
         </h1>
-        <p style={{ marginTop: "1.5rem", fontSize: "1.15rem", color: "#8a8a96", maxWidth: 560, fontWeight: 300, lineHeight: 1.7 }}>
+        <p className="hero-anim-3" style={{ marginTop: "1.5rem", fontSize: "1.15rem", color: "#8a8a96", maxWidth: 560, fontWeight: 300, lineHeight: 1.7 }}>
           We monitor every new residential development in Bratislava and turn scattered listings into actionable market intelligence — so you can make pricing, investment, and portfolio decisions based on data.
         </p>
-        <div style={{ marginTop: "2.5rem", display: "flex", gap: "1rem" }}>
+        <div className="hero-anim-4" style={{ marginTop: "2.5rem", display: "flex", gap: "1rem" }}>
           <a onClick={() => setCurrent("Contact")} className="btn-p">Get Access</a>
           <a onClick={() => setCurrent("Data")} className="btn-s">See Sample Data</a>
         </div>
       </section>
 
+      {/* Terminal */}
+      <FadeIn style={{ padding: "0 2rem 5rem", display: "flex", justifyContent: "center" }}>
+        <div style={{
+          width: "100%", maxWidth: 860, background: "#16161a",
+          border: "1px solid #222228", borderRadius: 12, overflow: "hidden",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.875rem 1.25rem", background: "#111113", borderBottom: "1px solid #222228" }}>
+            <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#ff5f57" }} />
+            <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#ffbd2e" }} />
+            <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#28c840" }} />
+            <span style={{ flex: 1, textAlign: "center", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.7rem", color: "#55555f", marginRight: "2rem" }}>residata — pipeline run</span>
+          </div>
+          <TerminalLines />
+        </div>
+      </FadeIn>
+
       {/* Value Prop — Questions left, What you get right */}
-      <section style={{ padding: "5rem 2rem", maxWidth: 1100, margin: "0 auto" }}>
+      <FadeIn style={{ padding: "5rem 2rem 0", maxWidth: 1100, margin: "0 auto" }}>
         <Label>What We Deliver</Label>
         <h2 className="sec-title">Not just data. Answers.</h2>
         <p className="sec-desc" style={{ marginBottom: "3rem" }}>
           Every month you get a full snapshot of the Bratislava new-build market — unit-level data across 140+ projects, plus the insights you need to act on it.
         </p>
+      </FadeIn>
 
+      <FadeIn delay={0.1} style={{ padding: "0 2rem 0", maxWidth: 1100, margin: "0 auto" }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
           {/* Left — Questions */}
           <div style={{ border: "1px solid #222228", borderRadius: 12, background: "#16161a", padding: "2rem" }}>
@@ -144,10 +327,10 @@ function HomePage({ setCurrent }) {
             ))}
           </div>
         </div>
-      </section>
+      </FadeIn>
 
       {/* Flexible Scope — standalone */}
-      <section style={{ padding: "0 2rem 5rem", maxWidth: 1100, margin: "0 auto" }}>
+      <FadeIn style={{ padding: "1.5rem 2rem 5rem", maxWidth: 1100, margin: "0 auto" }}>
         <div style={{
           border: "1px solid #222228", borderRadius: 12, background: "#16161a",
           padding: "2.5rem", display: "grid", gridTemplateColumns: "auto 1fr", gap: "2rem", alignItems: "center",
@@ -165,8 +348,7 @@ function HomePage({ setCurrent }) {
             </p>
           </div>
         </div>
-      </section>
-
+      </FadeIn>
     </>
   );
 }
@@ -221,7 +403,8 @@ function UseCasesPage({ setCurrent }) {
       </div>
       <div style={{ padding: "0 2rem 5rem", maxWidth: 1100, margin: "0 auto" }}>
         {cases.map(c => (
-          <div key={c.tag} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", border: "1px solid #222228", borderRadius: 12, overflow: "hidden", marginBottom: "1.5rem" }}>
+          <FadeIn key={c.tag} delay={0.1}>
+          <div className="card-hover" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", border: "1px solid #222228", borderRadius: 12, overflow: "hidden", marginBottom: "1.5rem" }}>
             <div style={{ padding: "2.5rem", background: "#16161a" }}>
               <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem", color: "#00e5a0", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.75rem" }}>{c.title}</div>
               <h3 style={{ fontSize: "1.3rem", fontWeight: 600, letterSpacing: "-0.02em", marginBottom: "0.75rem" }}>{c.tag}</h3>
@@ -237,6 +420,7 @@ function UseCasesPage({ setCurrent }) {
               ))}
             </div>
           </div>
+          </FadeIn>
         ))}
       </div>
       <div style={{ padding: "4rem 2rem", textAlign: "center" }}>
@@ -347,13 +531,15 @@ function DataPage({ setCurrent }) {
       <div style={{ padding: "0 2rem 2rem", maxWidth: 1100, margin: "0 auto" }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 1, background: "#222228", border: "1px solid #222228", borderRadius: 12, overflow: "hidden" }}>
           {[
-            ["4,218", "Units Tracked", "Total units across all projects", "+312 vs Feb", true],
-            ["142", "Active Projects", "Developments currently selling", "+6 new this month", true],
-            ["€3,840", "Avg. Price per m²", "Weighted across all unit types", "+12% YoY", true],
-            ["263", "Units Sold in March", "Across all tracked projects", "+14% vs Feb", true],
-          ].map(([n, l, sub, d, up]) => (
+            ["4,218", "Units Tracked", "Total units across all projects", "+312 vs Feb", true, ""],
+            ["142", "Active Projects", "Developments currently selling", "+6 new this month", true, ""],
+            ["3,840", "Avg. Price per m²", "Weighted across all unit types", "+12% YoY", true, "€"],
+            ["263", "Units Sold in March", "Across all tracked projects", "+14% vs Feb", true, ""],
+          ].map(([n, l, sub, d, up, pre]) => (
             <div key={l} style={{ background: "#16161a", padding: "1.75rem 1.5rem", textAlign: "center" }}>
-              <div style={{ fontFamily: mono, fontSize: "2rem", fontWeight: 700, color: "#00e5a0" }}>{n}</div>
+              <div style={{ fontFamily: mono, fontSize: "2rem", fontWeight: 700, color: "#00e5a0" }}>
+                <AnimatedCounter end={n} prefix={pre} />
+              </div>
               <div style={{ fontSize: "0.8rem", color: "#e8e8ed", marginTop: "0.25rem", fontWeight: 500 }}>{l}</div>
               <div style={{ fontSize: "0.68rem", color: "#55555f", marginTop: "0.15rem" }}>{sub}</div>
               <span style={{
@@ -894,15 +1080,32 @@ export default function App() {
   };
 
   return (
-    <div style={{ background: "#0a0a0b", color: "#e8e8ed", fontFamily: "'Outfit', -apple-system, sans-serif", minHeight: "100vh", WebkitFontSmoothing: "antialiased" }}>
+    <div style={{ background: "#0a0a0b", color: "#e8e8ed", fontFamily: "'Outfit', -apple-system, sans-serif", minHeight: "100vh", WebkitFontSmoothing: "antialiased", position: "relative" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@300;400;500;600;700&display=swap');
         .sec-title { font-size: clamp(1.8rem, 3.5vw, 2.6rem); font-weight: 700; letter-spacing: -0.03em; margin-bottom: 1rem; line-height: 1.15; }
         .sec-desc { font-size: 1.05rem; color: #8a8a96; max-width: 600px; font-weight: 300; line-height: 1.7; }
-        .btn-p { display: inline-block; padding: 0.75rem 2rem; background: #00e5a0; color: #0a0a0b; font-weight: 600; font-size: 0.9rem; border: none; border-radius: 8px; cursor: pointer; text-decoration: none; }
-        .btn-p:hover { opacity: 0.85; }
-        .btn-s { display: inline-block; padding: 0.75rem 2rem; background: transparent; color: #e8e8ed; font-weight: 500; font-size: 0.9rem; border: 1px solid #222228; border-radius: 8px; cursor: pointer; text-decoration: none; }
-        .btn-s:hover { border-color: #55555f; }
+        .btn-p { display: inline-block; padding: 0.75rem 2rem; background: #00e5a0; color: #0a0a0b; font-weight: 600; font-size: 0.9rem; border: none; border-radius: 8px; cursor: pointer; text-decoration: none; transition: all 0.2s; }
+        .btn-p:hover { opacity: 0.85; transform: translateY(-1px); }
+        .btn-s { display: inline-block; padding: 0.75rem 2rem; background: transparent; color: #e8e8ed; font-weight: 500; font-size: 0.9rem; border: 1px solid #222228; border-radius: 8px; cursor: pointer; text-decoration: none; transition: all 0.2s; }
+        .btn-s:hover { border-color: #55555f; transform: translateY(-1px); }
+        
+        @keyframes heroFadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+        @keyframes breathe1 { 0%, 100% { opacity: 0.5; transform: translateX(-50%) scale(1); } 50% { opacity: 0.9; transform: translateX(-50%) scale(1.15); } }
+        @keyframes breathe2 { 0%, 100% { opacity: 0.4; transform: translateX(-50%) scale(1.05); } 50% { opacity: 0.7; transform: translateX(-50%) scale(0.9); } }
+        @keyframes breathe3 { 0%, 100% { opacity: 0.4; transform: translateX(-50%) scale(0.95); } 50% { opacity: 0.7; transform: translateX(-50%) scale(1.1); } }
+        .breathing-glow-1 { animation: breathe1 8s ease-in-out infinite; }
+        .breathing-glow-2 { animation: breathe2 11s ease-in-out infinite; }
+        .breathing-glow-3 { animation: breathe3 14s ease-in-out infinite; }
+        .hero-anim-1 { animation: heroFadeIn 0.8s ease both; }
+        .hero-anim-2 { animation: heroFadeIn 0.8s ease 0.15s both; }
+        .hero-anim-3 { animation: heroFadeIn 0.8s ease 0.3s both; }
+        .hero-anim-4 { animation: heroFadeIn 0.8s ease 0.45s both; }
+        .pulse-dot { animation: pulse 2s ease-in-out infinite; }
+        
+        .card-hover { transition: border-color 0.3s, transform 0.3s, box-shadow 0.3s; }
+        .card-hover:hover { border-color: #333 !important; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.2); }
         @media (max-width: 900px) {
           .nav-right .nav-link { display: none; }
           .nav-cta-btn { display: inline-block !important; }
@@ -912,6 +1115,8 @@ export default function App() {
           .contact-grid { grid-template-columns: 1fr !important; }
         }
       `}</style>
+      <RisingParticles />
+      <div style={{ position: "relative", zIndex: 1 }}>
       <Nav current={current} setCurrent={handleNav} />
       {current === "Home" && <HomePage setCurrent={handleNav} />}
       {current === "Use Cases" && <UseCasesPage setCurrent={handleNav} />}
@@ -919,6 +1124,7 @@ export default function App() {
       {current === "Pricing" && <PricingPage setCurrent={handleNav} />}
       {current === "Contact" && <ContactPage />}
       <Footer />
+      </div>
     </div>
   );
 }
