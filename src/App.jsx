@@ -1,6 +1,255 @@
 import { useState, useEffect, useRef } from "react";
 
-const pages = ["Home", "Use Cases", "Data", "Pricing", "Contact"];
+const pagesEN = ["Home", "Use Cases", "Data", "Pricing", "Contact"];
+const pagesSK = ["Domov", "Využitie", "Dáta", "Cenník", "Kontakt"];
+const pageMap = { "Domov": "Home", "Využitie": "Use Cases", "Dáta": "Data", "Cenník": "Pricing", "Kontakt": "Contact" };
+
+const t = {
+  en: {
+    // Nav
+    getAccess: "Get Access",
+    // Hero
+    heroBadge: "Live — tracking 140+ developments",
+    heroTitle1: "Bratislava residential market,",
+    heroTitle2: "fully transparent.",
+    heroSub: "We monitor every new residential development in Bratislava and turn scattered listings into actionable market intelligence — so you can make pricing, investment, and portfolio decisions based on data.",
+    heroBtn1: "Get Access",
+    heroBtn2: "See Sample Data",
+    // Value prop
+    valueLabel: "What We Deliver",
+    valueTitle: "Not just data. Answers.",
+    valueDesc: "Every month you get a full snapshot of the Bratislava new-build market — unit-level data across 140+ projects, plus the insights you need to act on it.",
+    questionsLabel: "Questions we help you answer",
+    questions: [
+      "What should I price my 2-bedroom units at in Ružinov to stay competitive?",
+      "If I build in Záhorská Bystrica, how long until I sell out based on current absorption?",
+      "My project costs €50M to build — are market prices high enough to cover costs and deliver 20% margin?",
+      "How fast is Bory selling compared to last quarter — is momentum building or slowing?",
+      "Where is supply running low? Which districts will have no new inventory within 6 months?",
+      "What's the realistic price range for 60m² in Petržalka — and where does 90% of demand sit?",
+      "Which competitor projects are about to sell out — what can I learn from their pricing?",
+    ],
+    deliveryLabel: "Every month you get",
+    deliveryItems: [
+      ["Competitive pricing intelligence", "Know exactly what every project charges per m² — by district, unit type, and phase. Benchmark your own pricing against the entire market."],
+      ["Sell-through velocity", "See which projects are selling fast and which are stalling. Spot momentum shifts before the market does."],
+      ["Supply & pipeline tracking", "Track new launches, upcoming phases, and total inventory — know what's coming so you're never caught off guard."],
+      ["Absorption analysis", "Understand how fast the market absorbs new units by district and segment. Critical for launch timing and feasibility."],
+      ["Historical trends", "Month-over-month snapshots let you track pricing direction and velocity — not just where the market is, but where it's heading."],
+    ],
+    flexTitle: "On-Demand plan — we adapt to your needs.",
+    flexDesc: "Need weekly updates instead of monthly? Want to cover Košice, Brno, or Prague? Need a custom output format for your internal tools or a different property segment? The pipeline is built to be reconfigured — we adapt scope, frequency, and delivery to match your workflow.",
+    // Use Cases
+    useCasesLabel: "Use Cases",
+    useCasesTitle: "Built for anyone who needs\nto understand the market.",
+    useCasesDesc: "Different roles, same problem — you need reliable, current data on the Bratislava residential market. Here's how each team uses Residata.",
+    useCases: [
+      { tag: "Developers & Sales Teams", title: "Know exactly where to price.",
+        desc: "You're launching a new phase and need to set prices. But what are comparable projects actually charging? How fast are they selling? Are you leaving money on the table — or pricing yourself out?",
+        benefits: [["Side-by-side competitor pricing", "see €/m² across every comparable project in your district — broken down by unit type, floor, and phase"], ["Sell-through velocity ranking", "know which projects moved the most units last month — and which ones are sitting still"], ["Inventory countdown", "track how many units your competitors have left — time your launches to hit gaps in supply"]] },
+      { tag: "Investors & Private Equity", title: "Underwrite with market reality.",
+        desc: "You're evaluating a resi development deal. The developer says demand is strong and prices are rising. But is that true — and is it true for this specific district, unit mix, and price point?",
+        benefits: [["Absorption rates by segment", "how many units actually sell per month in each district — the number that makes or breaks your IRR"], ["Historical price trajectories", "6–12 months of €/m² movement so you can model scenarios based on real trends, not assumptions"], ["Feasibility stress test", "compare your target sell price against what the market is actually paying — by m², type, and location"]] },
+      { tag: "Banks & Valuers", title: "Comparable data, ready to use.",
+        desc: "You need market comparables for a valuation or collateral assessment — but gathering them manually from 50+ developer websites takes days. We've already done it.",
+        benefits: [["Structured comparable listings", "pricing by location, unit type, floor area, and availability — filterable and exportable"], ["Market depth overview", "how many active projects and units exist in a given district — essential context for any valuation"], ["Monthly refresh", "your comparables are never more than 30 days old — no more working with stale data from last quarter"]] },
+      { tag: "Consultants & Analysts", title: "Hours of research, done for you.",
+        desc: "Your client needs a market overview for Bratislava residential. You can spend 2–4 weeks clicking through developer websites, copy-pasting into spreadsheets, fighting inconsistent formats, chasing down broken links, and cleaning messy data — or open a single sheet with everything already structured, normalized, and ready to analyze.",
+        benefits: [["Presentation-ready data", "25 normalized columns across 140+ projects — drop straight into models, charts, or client decks"], ["Trend analysis built in", "monthly snapshots mean you can show pricing direction and market shifts without extra work"], ["Full market coverage", "apartments, houses, retail, semidetached — across every active district. No gaps to fill manually"]] },
+    ],
+    useCasesCta: "Different need?",
+    useCasesCtaDesc: "The pipeline is flexible. If your use case isn't listed, reach out — we likely already have what you need, or can configure it.",
+    useCasesCtaBtn: "See Pricing",
+    whatYouGet: "What you get",
+    // Data page
+    dataLabel: "Sample Output",
+    dataTitle: "This is what you get.",
+    dataDesc: "Real data, real insights. Same depth every month.",
+    dataContext: "Bratislava New-Build Market — March 2026",
+    dataContextSub: "Monthly snapshot · all active residential projects",
+    stats: [
+      ["4,218", "Units Tracked", "Total units across all projects", "+312 vs Feb"],
+      ["142", "Active Projects", "Developments currently selling", "+6 new this month"],
+      ["5,482", "Avg. Price per m²", "Weighted across all unit types", "+12% YoY"],
+      ["263", "Units Sold in March", "Across all tracked projects", "+14% vs Feb"],
+    ],
+    insightsLabel: "Market Insights",
+    insightsTitle: "What the data tells you.",
+    insightsDesc: "Examples of the insights you can extract from each monthly delivery. The kind of edge that's hard to build in-house — and expensive to live without.",
+    insightsBadge: "Sample data for illustration",
+    rawLabel: "Raw Data",
+    unitSample: "Unit-level sample",
+    showing: "Showing 8 of 4,218 records",
+    schemaLabel: "Schema",
+    schemaTitle: "Up to 25 columns per unit — key fields below.",
+    schemaDesc: "Additional fields include orientation, balcony area, parking, storage, and project-level metadata.",
+    schemaNote: "Note: Field availability varies by project. Not all developers publish all data points.",
+    wantFull: "Want the full dataset?",
+    wantFullDesc: "This is a sample. The full output covers 4,200+ units across 140+ projects, updated monthly.",
+    // Pricing
+    pricingLabel: "Pricing",
+    pricingTitle: "Simple, transparent pricing.",
+    pricingDesc: "Choose the plan that fits your needs. Start with a one-time report or get ongoing market intelligence.",
+    testimonial: "When you're making pricing decisions on a project worth €30M+, you can't afford to guess what the market will bear. Residata gives us the full picture — what comparable projects charge, how fast they sell, where supply is tightening. For the cost of a dinner, we get data that directly impacts millions in revenue.",
+    testimonialFrom: "From a client",
+    testimonialName: "Marek T.",
+    testimonialRole: "Head of Residential Development in Bratislava",
+    commonQ: "Common questions",
+    faqs: [
+      ["What do I actually receive?", "You get a structured market report with insights, visualizations, and recommendations — covering pricing trends, absorption rates, competitive positioning, and supply dynamics. We also include raw and cleaned datasets so you can run your own analysis if needed."],
+      ["How often is the data updated?", "Standard delivery is monthly. We can go as frequent as weekly — and technically even daily, but we recommend weekly at most. Shorter intervals rarely justify the cost, as the new-build market doesn't shift that fast."],
+      ["Can you cover cities beyond Bratislava?", "Yes. The pipeline is market-agnostic — we can configure it for any city or region where developer data is publicly listed. This falls under our Custom plan."],
+      ["Can I add specific projects or developers to track?", "Absolutely. If a project is publicly listed, we can add it to the registry. Custom clients can request additions at any time."],
+    ],
+    notSure: "Not sure which plan fits?",
+    notSureDesc: "Reach out and we'll walk you through the data, the pipeline, and which option makes sense for your use case.",
+    getInTouch: "Get in Touch",
+    // Contact
+    contactLabel: "Contact",
+    contactTitle: "Let's talk.",
+    contactDesc: "Whether you want to see a demo, explore a specific plan, or simply learn how Residata can support your market decisions — we'd love to hear from you.",
+    emailDesc: "Detailed inquiries & data requests",
+    phoneDesc: "Quick questions or scheduling a call",
+    bookCall: "Book a 20-min intro call",
+    sendEmail: "Send an Email",
+    whatToExpect: "What to expect",
+    steps: [
+      ["1", "Intro call or email exchange", "We learn about your use case — what decisions you're making, what data you're currently missing, and what format works for you."],
+      ["2", "Sample delivery", "You get a real sample from the latest pipeline run — not a demo, actual data — so you can evaluate the quality and depth firsthand."],
+      ["3", "Tailored setup", "We configure scope, frequency, and output format to match your workflow. You start receiving monthly (or more frequent) deliveries."],
+      ["4", "Ongoing market edge", "Every delivery gives you a clear view of the market — competitive pricing, absorption trends, supply shifts, and sell-out signals. The kind of insight that turns guesswork into confident decisions."],
+    ],
+    // Tiers
+    tiers: [
+      { tier: "Snapshot", name: "One-time report", price: "€149", note: "Single month, one-time delivery",
+        features: [[true, "Full market report with insights"], [true, "Unit-level data — all 140+ projects"], [true, "Pricing benchmarks & visualizations"], [false, "No historical data"], [false, "No ongoing updates"]], cta: "Get Started" },
+      { tier: "Standard", name: "Monthly delivery", price: "€99", priceSuffix: "/mo", note: "Billed monthly, cancel anytime",
+        features: [[true, "Monthly report with full insights"], [true, "Raw + cleaned datasets included"], [true, "Historical snapshots & trend analysis"], [true, "Absorption rates & sell-out tracking"], [true, "Google Sheets, CSV, or API access"]], featured: true, cta: "Get Started" },
+      { tier: "Custom", name: "On-Demand & Enterprise", price: "Let's talk.", isCustom: true, note: "Tailored scope, frequency, and delivery",
+        features: [[true, "Everything in Standard"], [true, "Weekly or bi-weekly updates"], [true, "Coverage beyond Bratislava"], [true, "Additional markets or property types"], [true, "Custom integrations and output formats"]], cta: "Contact Us" },
+    ],
+    mostPopular: "Most Popular",
+    seePricing: "See Pricing",
+  },
+  sk: {
+    getAccess: "Kontakt",
+    heroBadge: "Live — sledujeme 140+ projektov",
+    heroTitle1: "Novostavby v Bratislave.",
+    heroTitle2: "Celý trh v jednom prehľade.",
+    heroSub: "Ceny, dostupnosť, rýchlosť predaja. Všetko v prehľadných reportoch, na základe ktorých môžete robiť dátami podložené rozhodnutia.",
+    heroBtn1: "Kontaktujte nás",
+    heroBtn2: "Ukážka dát",
+    valueLabel: "Čo dodávame",
+    valueTitle: "Nie len dáta. Odpovede.",
+    valueDesc: "Každý mesiac dostanete kompletný prehľad trhu novostavieb v Bratislave — každý byt, každý projekt. A to aj s insightmi, na základe ktorých viete hneď konať.",
+    questionsLabel: "Otázky, na ktoré vám Residata odpovie",
+    questions: [
+      "Ako naceniť 2-izbáky v Ružinove, aby boli konkurencieschopné?",
+      "Ak staviam bytovku v Záhorskej Bystrici, ako rýchlo sa vypredá na základe aktuálnych predajných trendov?",
+      "Náklady na potenciálny projekt sú €50M — unesie trh ceny, ktoré potrebujem na dosiahnutie 20% marže?",
+      "Predávajú sa Bory rýchlejšie alebo pomalšie ako v minulom kvartáli?",
+      "Kde dochádza ponuka? Kde nebudú nové byty do pol roka?",
+      "Za koľko sa reálne predáva 60m² byt v Petržalke?",
+      "Ktoré projekty sú takmer vypredané a čo sa vieme naučiť z ich cenotvorby?",
+    ],
+    deliveryLabel: "Každý mesiac dostanete",
+    deliveryItems: [
+      ["Ceny konkurencie", "Koľko si účtuje každý projekt za m² — podľa časti mesta, typu bytu alebo kľudne aj poschodia."],
+      ["Rýchlosť predaja", "Ktoré projekty sa hýbu a ktoré stoja. Zachytíte zmenu trendu skôr ako ostatní."],
+      ["Nová ponuka na trhu", "Čo sa chystá, čo sa práve spustilo, koľko bytov je celkovo v ponuke."],
+      ["Absorpcia", "Koľko bytov sa reálne predá mesačne — za daný projekt, mestskú časť, alebo aj celkovo."],
+      ["Cenové trendy", "Kam smerujú ceny a akou rýchlosťou sa menia. Nielen aktuálny stav, ale aj vývoj."],
+    ],
+    flexTitle: "On-Demand plán — prispôsobíme sa vašim potrebám.",
+    flexDesc: "Týždenné aktualizácie? Pokrytie Košíc, Brna alebo Prahy? Iný formát? Žiadny problém — rozsah, frekvenciu aj doručenie nastavíme podľa vašich preferencií.",
+    useCasesLabel: "Residata",
+    useCasesTitle: "Pre každého, kto potrebuje\nrozumieť trhu.",
+    useCasesDesc: "Rôzne role, rovnaká potreba — aktuálne a spoľahlivé dáta o bratislavských novostavbách.",
+    useCases: [
+      { tag: "Developeri a obchodné tímy", title: "Spoľahlivé podklady na nacenenie.",
+        desc: "Spúšťate novú fázu a riešite ceny. Koľko si účtuje konkurencia? Ako rýchlo sa podobný projekt predáva? Naceňujete byty správne?",
+        benefits: [["Prehľady cien konkurencie", "€/m² za každý porovnateľný projekt vo vami zvolenej lokalite — podľa typu, poschodia a fázy"], ["Kto predáva najrýchlejšie", "ktoré projekty predali najviac bytov minulý mesiac — a ktoré stoja"], ["Koľko kapacity zostáva u konkurencie voľnej?", "sledujte voľné jednotky a medzery na trhu"]] },
+      { tag: "Investori a Private Equity", title: "Investícia podložená dátami.",
+        desc: "Posudzujete development deal. Developer tvrdí, že dopyt je silný a ceny rastú. Platí to aj pre tento okres a cenovú hladinu?",
+        benefits: [["Absorpcia podľa segmentu", "koľko bytov sa reálne predá mesačne v každom okrese — číslo, na ktorom stojí vaše IRR"], ["Vývoj cien za 6–12 mesiacov", "reálne trendy €/m² pre modelovanie scenárov — nie odhady, ale dáta"], ["Stress test feasibility", "porovnajte cieľovú cenu s tým, čo trh reálne platí"]] },
+      { tag: "Banky a znalci", title: "Komparatívy hotové na použitie.",
+        desc: "Potrebujete trhové komparatívy na ocenenie alebo kolaterál — ale zbierať ich ručne z 50+ webov trvá dni až týždne. Residata robí túto prácu za vás.",
+        benefits: [["Štruktúrované ponuky", "ceny podľa lokality, typu, plochy a dostupnosti — filtrovateľné a exportovateľné"], ["Hĺbka trhu", "koľko projektov a bytov je v okrese aktívnych — kontext pre každé ocenenie"], ["Vždy aktuálne", "komparatívy nikdy nie sú staršie ako 30 dní"]] },
+      { tag: "Konzultanti a analytici", title: "Hodiny práce, hotové za vás.",
+        desc: "Klient chce prehľad bratislavského trhu. Buď strávite týždne zbieraním dát po weboch — alebo otvoríte jeden sheet, kde je všetko pripravené.",
+        benefits: [["Dáta na prezentáciu", "25 stĺpcov naprieč 140+ projektmi — rovno do modelov, grafov alebo klientskych prezentácií"], ["Trendy zahrnuté", "cenový smer a trhové posuny ukážete bez ďalšej práce"], ["Kompletné pokrytie", "byty, domy, apartmány — žiadne medzery"]] },
+    ],
+    useCasesCta: "Hľadáte riešenie na mieru?",
+    useCasesCtaDesc: "Systém je flexibilný. Ak tu nevidíte riešenie na svoj špecifický problém, ozvite sa — veľmi pravdepodobne vám vieme pomôcť riešením na mieru.",
+    useCasesCtaBtn: "Pozrieť cenník",
+    whatYouGet: "Čo dostanete",
+    dataLabel: "Ukážka výstupu",
+    dataTitle: "Takto vyzerá výstup.",
+    dataDesc: "Reálne dáta, reálne insighty. Rovnaká hĺbka každý mesiac.",
+    dataContext: "Trh novostavieb Bratislava — Marec 2026",
+    dataContextSub: "Mesačný prehľad · všetky aktívne projekty",
+    stats: [
+      ["4,218", "Sledovaných bytov", "Celkom naprieč všetkými projektmi", "+312 vs Feb"],
+      ["142", "Aktívnych projektov", "Projekty aktuálne v predaji", "+6 nových"],
+      ["5,482", "Priem. cena za m²", "Vážený priemer všetkých jednotiek", "+12% medziročne"],
+      ["263", "Predaných jednotiek v marci", "Naprieč všetkými projektmi", "+14% vs Feb"],
+    ],
+    insightsLabel: "Trhové insighty",
+    insightsTitle: "Čo z toho vidíte.",
+    insightsDesc: "Príklady insightov z mesačnej dodávky. Informačná výhoda proti konkurencii.",
+    insightsBadge: "Ilustračné dáta",
+    rawLabel: "Surové dáta",
+    unitSample: "Ukážka na úrovni bytov",
+    showing: "Zobrazených 8 z 4 218 záznamov",
+    schemaLabel: "Schéma",
+    schemaTitle: "Až 25 stĺpcov na byt — kľúčové polia nižšie.",
+    schemaDesc: "Ďalšie polia: orientácia, balkón, parkovanie, sklad a metadáta projektu.",
+    schemaNote: "Poznámka: Nie všetci developeri zverejňujú všetky údaje — dostupnosť polí sa líši.",
+    wantFull: "Máte záujem o kompletný dataset?",
+    wantFullDesc: "Toto je ukážka. Celý výstup pokrýva 4 200+ bytov v 140+ projektoch, aktualizovaný každý mesiac.",
+    pricingLabel: "Cenník",
+    pricingTitle: "Transparentný a jednoduchý.",
+    pricingDesc: "Vyberte si plán, ktorý sedí vám.",
+    testimonial: "Keď naceňujete projekt za €30M+, nemôžete hádať čo trh unesie. Residata nám dáva kompletný obraz o trhu — čo si účtuje konkurencia, ako rýchlo predáva, kde sa ponuka zužuje, kde rastie dopyt a po akom type nehnuteľnosti. Za cenu jednej večere máme dáta, na základe ktorých robíme rozhodnutia za stovky tisíc eur.",
+    testimonialFrom: "Od klienta",
+    testimonialName: "Marek T.",
+    testimonialRole: "Head of Residential Development v Bratislave",
+    commonQ: "Časté otázky",
+    faqs: [
+      ["Čo presne dostanem?", "Trhovú správu s insightmi, vizualizáciami a odporúčaniami — cenové trendy, absorpcia, konkurenčné porovnanie, dynamika ponuky. Súčasťou sú aj surové a vyčistené datasety pre vlastnú analýzu."],
+      ["Ako často sa dáta aktualizujú?", "Štandardne mesačne. Dataset a vývoj vieme aktualizovať aj každých 5 minút, ale odporúčame max. raz týždenne — trh novostavieb sa tak rýchlo nemení a cena by bola zbytočne vysoká."],
+      ["Pokrývate aj iné mestá?", "Áno. Systém funguje pre akékoľvek mesto s verejne dostupnými dátami. Táto služba spadá pod Custom plán a nacenenie záleží na požadovaných špecifikách."],
+      ["Dá sa pridať konkrétny projekt?", "Samozrejme. Ak je verejne dostupný a nie je v našom datasete, prosím ozvite sa nám a radi ho pridáme. Custom klienti môžu požiadať aj o pridanie alebo analýzu projektu mimo Bratislavy."],
+    ],
+    notSure: "Neviete ktoré riešenie je pre vás vhodné?",
+    notSureDesc: "Radi vám pomôžeme počas bezplatnej konzultácie.",
+    getInTouch: "Napíšte nám",
+    contactLabel: "Kontakt",
+    contactTitle: "Ozvite sa.",
+    contactDesc: "Chcete demo, máte otázky, alebo chcete vedieť či vám Residata pomôže — radi sa porozprávame.",
+    emailDesc: "Podrobné otázky a žiadosti o dáta",
+    phoneDesc: "Rýchle otázky alebo dohodnutie hovoru",
+    bookCall: "Dohodnúť si 20-min hovor",
+    sendEmail: "Napísať email",
+    whatToExpect: "Ako to prebieha",
+    steps: [
+      ["1", "Úvodný hovor alebo email", "Zistíme čo riešite, aké dáta vám chýbajú a v akom formáte ich chcete."],
+      ["2", "Ukážka na reálnych dátach", "Pošleme vám ukážku z posledného behu — reálne dáta, nie demo."],
+      ["3", "Nastavenie na mieru", "Nastavíme rozsah, frekvenciu a formát podľa vás. Začnete dostávať pravidelné dodávky."],
+      ["4", "Priebežná výhoda", "Každá dodávka = jasný pohľad na trh. Ceny, absorpcia, ponuka, signály vypredania. Rozhodujete sa na dátach, nie na pocite."],
+    ],
+    tiers: [
+      { tier: "Snapshot trhu", name: "Jednorazový prehľad", price: "€149", note: "Jeden mesiac, jednorazové doručenie",
+        features: [[true, "Kompletný trhový prehľad s insightmi"], [true, "Dáta za každý byt — 140+ projektov"], [true, "Cenové porovnania a vizualizácie"], [false, "Bez historických dát"], [false, "Bez priebežných aktualizácií"]], cta: "Mám záujem" },
+      { tier: "Standard", name: "Mesačné doručenie", price: "€99", priceSuffix: "/mes", note: "Fakturované mesačne, zrušenie kedykoľvek",
+        features: [[true, "Mesačná správa s kompletnými insightmi"], [true, "Surové + vyčistené datasety"], [true, "Historické dáta a vývoj trendov"], [true, "Absorpcia a sledovanie vypredania"], [true, "Google Sheets, CSV alebo API"]], featured: true, cta: "Mám záujem" },
+      { tier: "Custom", name: "On-Demand & Enterprise", price: "Ozvite sa.", isCustom: true, note: "Rozsah a frekvencia podľa vás",
+        features: [[true, "Všetko v Standard"], [true, "Týždenné alebo dvojtýždenné aktualizácie"], [true, "Pokrytie akejkoľvek lokality (aj mimo Slovenska)"], [true, "Ďalšie trhy alebo typy nehnuteľností"], [true, "Vlastné integrácie a formáty"]], cta: "Kontaktovať" },
+    ],
+    mostPopular: "Najobľúbenejší",
+    seePricing: "Pozrieť cenník",
+  },
+};
 
 /* ─── Animation hooks ─── */
 function useScrollReveal() {
@@ -71,7 +320,7 @@ function RisingParticles() {
 
     const particles = Array.from({ length: 20 }, (_, i) => ({
       x: Math.random() * window.innerWidth,
-      y: window.innerHeight + Math.random() * window.innerHeight,
+      y: Math.random() * window.innerHeight * 1.5,
       size: 1.5 + Math.random() * 2,
       speed: 0.15 + Math.random() * 0.3,
       opacity: 0.12 + Math.random() * 0.12,
@@ -110,7 +359,9 @@ function RisingParticles() {
   return <canvas ref={canvasRef} style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0 }} />;
 }
 
-function Nav({ current, setCurrent }) {
+function Nav({ current, setCurrent, lang, setLang }) {
+  const pages = lang === "sk" ? pagesSK : pagesEN;
+  const l = t[lang];
   return (
     <nav style={{
       position: "fixed", top: 0, width: "100%", zIndex: 100,
@@ -130,17 +381,40 @@ function Nav({ current, setCurrent }) {
           <span style={{ fontWeight: 600, fontSize: "1.1rem", color: "#e8e8ed", letterSpacing: "-0.02em" }}>Residata</span>
         </a>
         <div className="nav-right" style={{ display: "flex", alignItems: "center", gap: "2rem", listStyle: "none" }}>
-          {pages.map(p => (
-            <a key={p} className="nav-link" onClick={() => setCurrent(p)} style={{
-              color: current === p ? "#e8e8ed" : "#8a8a96", textDecoration: "none",
-              fontSize: "0.875rem", cursor: "pointer", transition: "color 0.2s",
-            }}>{p}</a>
-          ))}
+          {pages.map((p, i) => {
+            const key = pagesEN[i];
+            return (
+              <a key={key} className="nav-link" onClick={() => setCurrent(key)} style={{
+                color: current === key ? "#e8e8ed" : "#8a8a96", textDecoration: "none",
+                fontSize: "0.875rem", cursor: "pointer", transition: "color 0.2s",
+              }}>{p}</a>
+            );
+          })}
+          {/* Language toggle */}
+          <div style={{
+            display: "flex", borderRadius: 6, overflow: "hidden",
+            border: "1px solid #222228", fontSize: "0.72rem",
+            fontFamily: "'JetBrains Mono', monospace",
+          }}>
+            <button onClick={() => setLang("en")} style={{
+              padding: "0.3rem 0.6rem", border: "none", cursor: "pointer",
+              background: lang === "en" ? "#222228" : "transparent",
+              color: lang === "en" ? "#e8e8ed" : "#55555f",
+              fontFamily: "inherit", fontSize: "inherit", transition: "all 0.2s",
+            }}>EN</button>
+            <button onClick={() => setLang("sk")} style={{
+              padding: "0.3rem 0.6rem", border: "none", cursor: "pointer",
+              borderLeft: "1px solid #222228",
+              background: lang === "sk" ? "#222228" : "transparent",
+              color: lang === "sk" ? "#e8e8ed" : "#55555f",
+              fontFamily: "inherit", fontSize: "inherit", transition: "all 0.2s",
+            }}>SK</button>
+          </div>
           <a onClick={() => setCurrent("Contact")} className="nav-cta-btn" style={{
             padding: "0.5rem 1.25rem", background: "#00e5a0", color: "#0a0a0b",
             fontWeight: 600, borderRadius: 6, fontSize: "0.8rem", cursor: "pointer",
             letterSpacing: "0.02em", textDecoration: "none",
-          }}>Get Access</a>
+          }}>{l.getAccess}</a>
         </div>
       </div>
     </nav>
@@ -196,7 +470,7 @@ function TerminalLines() {
 }
 
 /* ─────── HOME ─────── */
-function HomePage({ setCurrent }) {
+function HomePage({ setCurrent, l }) {
   return (
     <>
       {/* Hero */}
@@ -245,18 +519,18 @@ function HomePage({ setCurrent }) {
           Live — tracking 140+ developments
         </div>
         <h1 className="hero-anim-2" style={{ fontSize: "clamp(2.8rem, 6vw, 5rem)", fontWeight: 700, letterSpacing: "-0.04em", lineHeight: 1.05, maxWidth: 800 }}>
-          Bratislava residential market,<br />
+          {l.heroTitle1}<br />
           <span style={{
             background: "linear-gradient(135deg, #00e5a0 0%, #00b880 100%)",
             WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-          }}>fully transparent.</span>
+          }}>{l.heroTitle2}</span>
         </h1>
         <p className="hero-anim-3" style={{ marginTop: "1.5rem", fontSize: "1.15rem", color: "#8a8a96", maxWidth: 560, fontWeight: 300, lineHeight: 1.7 }}>
-          We monitor every new residential development in Bratislava and turn scattered listings into actionable market intelligence — so you can make pricing, investment, and portfolio decisions based on data.
+          {l.heroSub}
         </p>
         <div className="hero-anim-4" style={{ marginTop: "2.5rem", display: "flex", gap: "1rem" }}>
-          <a onClick={() => setCurrent("Contact")} className="btn-p">Get Access</a>
-          <a onClick={() => setCurrent("Data")} className="btn-s">See Sample Data</a>
+          <a onClick={() => setCurrent("Contact")} className="btn-p">{l.heroBtn1}</a>
+          <a onClick={() => setCurrent("Data")} className="btn-s">{l.heroBtn2}</a>
         </div>
       </section>
 
@@ -279,27 +553,19 @@ function HomePage({ setCurrent }) {
 
       {/* Value Prop — Questions left, What you get right */}
       <FadeIn style={{ padding: "5rem 2rem 0", maxWidth: 1100, margin: "0 auto" }}>
-        <Label>What We Deliver</Label>
-        <h2 className="sec-title">Not just data. Answers.</h2>
+        <Label>{l.valueLabel}</Label>
+        <h2 className="sec-title">{l.valueTitle}</h2>
         <p className="sec-desc" style={{ marginBottom: "3rem" }}>
-          Every month you get a full snapshot of the Bratislava new-build market — unit-level data across 140+ projects, plus the insights you need to act on it.
+          {l.valueDesc}
         </p>
       </FadeIn>
 
       <FadeIn delay={0.1} style={{ padding: "0 2rem 0", maxWidth: 1100, margin: "0 auto" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
+        <div className="value-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
           {/* Left — Questions */}
           <div style={{ border: "1px solid #222228", borderRadius: 12, background: "#16161a", padding: "2rem" }}>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem", color: "#00e5a0", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "1.25rem" }}>Questions we help you answer</div>
-            {[
-              "What should I price my 2-bedroom units at in Ružinov to stay competitive?",
-              "If I build in Záhorská Bystrica, how long until I sell out based on current absorption?",
-              "My project costs €50M to build — are market prices high enough to cover costs and deliver 20% margin?",
-              "How fast is Bory selling compared to last quarter — is momentum building or slowing?",
-              "Where is supply running low? Which districts will have no new inventory within 6 months?",
-              "What's the realistic price range for 60m² in Petržalka — and where does 90% of demand sit?",
-              "Which competitor projects are about to sell out — what can I learn from their pricing?",
-            ].map((q, i) => (
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem", color: "#00e5a0", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "1.25rem" }}>{l.questionsLabel}</div>
+            {l.questions.map((q, i) => (
               <div key={i} style={{ display: "flex", gap: "0.75rem", marginBottom: "0.85rem", alignItems: "flex-start" }}>
                 <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.72rem", color: "#00e5a0", marginTop: "0.15rem", flexShrink: 0 }}>→</span>
                 <span style={{ fontSize: "0.84rem", color: "#8a8a96", lineHeight: 1.55 }}>{q}</span>
@@ -309,14 +575,8 @@ function HomePage({ setCurrent }) {
 
           {/* Right — What you get */}
           <div style={{ border: "1px solid #222228", borderRadius: 12, background: "#16161a", padding: "2rem" }}>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem", color: "#00e5a0", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "1.25rem" }}>Every month you get</div>
-            {[
-              ["Competitive pricing intelligence", "Know exactly what every project charges per m² — by district, unit type, and phase. Benchmark your own pricing against the entire market."],
-              ["Sell-through velocity", "See which projects are selling fast and which are stalling. Spot momentum shifts before the market does."],
-              ["Supply & pipeline tracking", "Track new launches, upcoming phases, and total inventory — know what's coming so you're never caught off guard."],
-              ["Absorption analysis", "Understand how fast the market absorbs new units by district and segment. Critical for launch timing and feasibility."],
-              ["Historical trends", "Month-over-month snapshots let you track pricing direction and velocity — not just where the market is, but where it's heading."],
-            ].map(([title, desc]) => (
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem", color: "#00e5a0", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "1.25rem" }}>{l.deliveryLabel}</div>
+            {l.deliveryItems.map(([title, desc]) => (
               <div key={title} style={{ display: "flex", gap: "0.75rem", marginBottom: "1.25rem", alignItems: "flex-start" }}>
                 <span style={{ color: "#00e5a0", fontSize: "0.85rem", marginTop: "0.15rem", flexShrink: 0 }}>✓</span>
                 <div>
@@ -331,7 +591,7 @@ function HomePage({ setCurrent }) {
 
       {/* Flexible Scope — standalone */}
       <FadeIn style={{ padding: "1.5rem 2rem 5rem", maxWidth: 1100, margin: "0 auto" }}>
-        <div style={{
+        <div className="flex-scope" style={{
           border: "1px solid #222228", borderRadius: 12, background: "#16161a",
           padding: "2.5rem", display: "grid", gridTemplateColumns: "auto 1fr", gap: "2rem", alignItems: "center",
         }}>
@@ -342,9 +602,9 @@ function HomePage({ setCurrent }) {
             fontFamily: "'JetBrains Mono', monospace", fontSize: "1.1rem", color: "#00e5a0", fontWeight: 700,
           }}>↗</div>
           <div>
-            <div style={{ fontSize: "1.05rem", fontWeight: 600, color: "#e8e8ed", marginBottom: "0.4rem" }}>Flexible scope — we adapt to your needs.</div>
+            <div style={{ fontSize: "1.05rem", fontWeight: 600, color: "#e8e8ed", marginBottom: "0.4rem" }}>{l.flexTitle}</div>
             <p style={{ fontSize: "0.85rem", color: "#8a8a96", lineHeight: 1.65, maxWidth: 700 }}>
-              Need weekly updates instead of monthly? Want to cover Košice, Brno, or Prague? Need a custom output format for your internal tools or a different property segment? The pipeline is built to be reconfigured — we adapt scope, frequency, and delivery to match your workflow.
+              {l.flexDesc}
             </p>
           </div>
         </div>
@@ -354,64 +614,25 @@ function HomePage({ setCurrent }) {
 }
 
 /* ─────── USE CASES ─────── */
-function UseCasesPage({ setCurrent }) {
-  const cases = [
-    {
-      tag: "Developers & Sales Teams", title: "Know exactly where to price.",
-      desc: "You're launching a new phase and need to set prices. But what are comparable projects actually charging? How fast are they selling? Are you leaving money on the table — or pricing yourself out?",
-      benefits: [
-        ["Side-by-side competitor pricing", "see €/m² across every comparable project in your district — broken down by unit type, floor, and phase"],
-        ["Sell-through velocity ranking", "know which projects moved the most units last month — and which ones are sitting still"],
-        ["Inventory countdown", "track how many units your competitors have left — time your launches to hit gaps in supply"],
-      ],
-    },
-    {
-      tag: "Investors & Private Equity", title: "Underwrite with market reality.",
-      desc: "You're evaluating a resi development deal. The developer says demand is strong and prices are rising. But is that true — and is it true for this specific district, unit mix, and price point?",
-      benefits: [
-        ["Absorption rates by segment", "how many units actually sell per month in each district — the number that makes or breaks your IRR"],
-        ["Historical price trajectories", "6–12 months of €/m² movement so you can model scenarios based on real trends, not assumptions"],
-        ["Feasibility stress test", "compare your target sell price against what the market is actually paying — by m², type, and location"],
-      ],
-    },
-    {
-      tag: "Banks & Valuers", title: "Comparable data, ready to use.",
-      desc: "You need market comparables for a valuation or collateral assessment — but gathering them manually from 50+ developer websites takes days. We've already done it.",
-      benefits: [
-        ["Structured comparable listings", "pricing by location, unit type, floor area, and availability — filterable and exportable"],
-        ["Market depth overview", "how many active projects and units exist in a given district — essential context for any valuation"],
-        ["Monthly refresh", "your comparables are never more than 30 days old — no more working with stale data from last quarter"],
-      ],
-    },
-    {
-      tag: "Consultants & Analysts", title: "Hours of research, done for you.",
-      desc: "Your client needs a market overview for Bratislava residential. You can spend 2–4 weeks clicking through developer websites, copy-pasting into spreadsheets, fighting inconsistent formats, chasing down broken links, and cleaning messy data — or open a single sheet with everything already structured, normalized, and ready to analyze.",
-      benefits: [
-        ["Presentation-ready data", "25 normalized columns across 140+ projects — drop straight into models, charts, or client decks"],
-        ["Trend analysis built in", "monthly snapshots mean you can show pricing direction and market shifts without extra work"],
-        ["Full market coverage", "apartments, houses, retail, semidetached — across every active district. No gaps to fill manually"],
-      ],
-    },
-  ];
-
+function UseCasesPage({ setCurrent, l }) {
   return (
     <>
       <div style={{ padding: "8rem 2rem 3rem", maxWidth: 1100, margin: "0 auto" }}>
-        <Label>Use Cases</Label>
-        <h1 className="sec-title">Built for anyone who needs<br/>to understand the market.</h1>
-        <p className="sec-desc">Different roles, same problem — you need reliable, current data on the Bratislava residential market. Here's how each team uses Residata.</p>
+        <Label>{l.useCasesLabel}</Label>
+        <h1 className="sec-title" style={{ whiteSpace: "pre-line" }}>{l.useCasesTitle}</h1>
+        <p className="sec-desc">{l.useCasesDesc}</p>
       </div>
       <div style={{ padding: "0 2rem 5rem", maxWidth: 1100, margin: "0 auto" }}>
-        {cases.map(c => (
+        {l.useCases.map(c => (
           <FadeIn key={c.tag} delay={0.1}>
-          <div className="card-hover" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", border: "1px solid #222228", borderRadius: 12, overflow: "hidden", marginBottom: "1.5rem" }}>
+          <div className="card-hover case-card-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", border: "1px solid #222228", borderRadius: 12, overflow: "hidden", marginBottom: "1.5rem" }}>
             <div style={{ padding: "2.5rem", background: "#16161a" }}>
               <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem", color: "#00e5a0", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.75rem" }}>{c.title}</div>
               <h3 style={{ fontSize: "1.3rem", fontWeight: 600, letterSpacing: "-0.02em", marginBottom: "0.75rem" }}>{c.tag}</h3>
               <p style={{ fontSize: "0.9rem", color: "#8a8a96", lineHeight: 1.65, fontWeight: 300 }}>{c.desc}</p>
             </div>
             <div style={{ padding: "2.5rem", background: "#111113", borderLeft: "1px solid #222228" }}>
-              <h4 style={{ fontSize: "0.8rem", fontWeight: 600, marginBottom: "1rem" }}>What you get</h4>
+              <h4 style={{ fontSize: "0.8rem", fontWeight: 600, marginBottom: "1rem" }}>{l.whatYouGet}</h4>
               {c.benefits.map(([b, d]) => (
                 <div key={b} style={{ display: "flex", gap: "0.75rem", marginBottom: "1rem", alignItems: "flex-start" }}>
                   <span style={{ color: "#00e5a0", fontSize: "0.85rem", marginTop: "0.15rem" }}>✓</span>
@@ -424,16 +645,16 @@ function UseCasesPage({ setCurrent }) {
         ))}
       </div>
       <div style={{ padding: "4rem 2rem", textAlign: "center" }}>
-        <h2 style={{ fontSize: "1.5rem", fontWeight: 700, letterSpacing: "-0.03em", marginBottom: "1rem" }}>Different need?</h2>
-        <p style={{ color: "#8a8a96", maxWidth: 480, margin: "0 auto 2rem", fontWeight: 300 }}>The pipeline is flexible. If your use case isn't listed, reach out — we likely already have what you need, or can configure it.</p>
-        <a onClick={() => setCurrent("Pricing")} className="btn-p">See Pricing</a>
+        <h2 style={{ fontSize: "1.5rem", fontWeight: 700, letterSpacing: "-0.03em", marginBottom: "1rem" }}>{l.useCasesCta}</h2>
+        <p style={{ color: "#8a8a96", maxWidth: 480, margin: "0 auto 2rem", fontWeight: 300 }}>{l.useCasesCtaDesc}</p>
+        <a onClick={() => setCurrent("Pricing")} className="btn-p">{l.useCasesCtaBtn}</a>
       </div>
     </>
   );
 }
 
 /* ─────── DATA ─────── */
-function DataPage({ setCurrent }) {
+function DataPage({ setCurrent, l }) {
   const mono = "'JetBrains Mono', monospace";
   const rows = [
     ["Slnečnice Viladomy", "Petržalka", "byt", "A2-304", "68.4", "249,660", "3,650", "3", "V"],
@@ -454,7 +675,7 @@ function DataPage({ setCurrent }) {
     { month: "Dec", value: 3610 },
     { month: "Jan", value: 3690 },
     { month: "Feb", value: 3760 },
-    { month: "Mar", value: 3840 },
+    { month: "Mar", value: 5482 },
   ];
   const minV = 3350; const maxV = 3980;
   const chartW = 520; const chartH = 180;
@@ -518,35 +739,30 @@ function DataPage({ setCurrent }) {
       `}</style>
 
       <div style={{ padding: "8rem 2rem 3rem", maxWidth: 1100, margin: "0 auto" }}>
-        <Label>Sample Output</Label>
-        <h1 className="sec-title">This is what you get.</h1>
-        <p className="sec-desc">Real data, real insights. Same depth every month.</p>
+        <Label>{l.dataLabel}</Label>
+        <h1 className="sec-title">{l.dataTitle}</h1>
+        <p className="sec-desc">{l.dataDesc}</p>
       </div>
 
       {/* Stats */}
       <div style={{ padding: "0 2rem 0.75rem", maxWidth: 1100, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-        <div style={{ fontSize: "0.85rem", fontWeight: 500, color: "#e8e8ed" }}>Bratislava New-Build Market — March 2026</div>
-        <div style={{ fontFamily: mono, fontSize: "0.68rem", color: "#55555f" }}>Monthly snapshot · all active residential projects</div>
+        <div style={{ fontSize: "0.85rem", fontWeight: 500, color: "#e8e8ed" }}>{l.dataContext}</div>
+        <div style={{ fontFamily: mono, fontSize: "0.68rem", color: "#55555f" }}>{l.dataContextSub}</div>
       </div>
       <div style={{ padding: "0 2rem 2rem", maxWidth: 1100, margin: "0 auto" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 1, background: "#222228", border: "1px solid #222228", borderRadius: 12, overflow: "hidden" }}>
-          {[
-            ["4,218", "Units Tracked", "Total units across all projects", "+312 vs Feb", true, ""],
-            ["142", "Active Projects", "Developments currently selling", "+6 new this month", true, ""],
-            ["3,840", "Avg. Price per m²", "Weighted across all unit types", "+12% YoY", true, "€"],
-            ["263", "Units Sold in March", "Across all tracked projects", "+14% vs Feb", true, ""],
-          ].map(([n, l, sub, d, up, pre]) => (
-            <div key={l} style={{ background: "#16161a", padding: "1.75rem 1.5rem", textAlign: "center" }}>
+        <div className="stats-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 1, background: "#222228", border: "1px solid #222228", borderRadius: 12, overflow: "hidden" }}>
+          {l.stats.map(([n, label, sub, d], idx) => (
+            <div key={label} style={{ background: "#16161a", padding: "1.75rem 1.5rem", textAlign: "center" }}>
               <div style={{ fontFamily: mono, fontSize: "2rem", fontWeight: 700, color: "#00e5a0" }}>
-                <AnimatedCounter end={n} prefix={pre} />
+                <AnimatedCounter end={n} prefix={idx === 2 ? "€" : ""} />
               </div>
-              <div style={{ fontSize: "0.8rem", color: "#e8e8ed", marginTop: "0.25rem", fontWeight: 500 }}>{l}</div>
+              <div style={{ fontSize: "0.8rem", color: "#e8e8ed", marginTop: "0.25rem", fontWeight: 500 }}>{label}</div>
               <div style={{ fontSize: "0.68rem", color: "#55555f", marginTop: "0.15rem" }}>{sub}</div>
               <span style={{
                 fontFamily: mono, fontSize: "0.65rem", marginTop: "0.6rem",
                 padding: "0.15rem 0.5rem", borderRadius: 4, display: "inline-block",
-                color: up ? "#00e5a0" : "#ff4d4d",
-                background: up ? "rgba(0,229,160,0.08)" : "rgba(255,77,77,0.08)",
+                color: d.startsWith("-") || d.startsWith("−") ? "#ff4d4d" : "#00e5a0",
+                background: d.startsWith("-") || d.startsWith("−") ? "rgba(255,77,77,0.08)" : "rgba(0,229,160,0.08)",
               }}>{d}</span>
             </div>
           ))}
@@ -555,7 +771,7 @@ function DataPage({ setCurrent }) {
 
       {/* Trend Chart + District */}
       <div style={{ padding: "1rem 2rem 2rem", maxWidth: 1100, margin: "0 auto" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
+        <div className="chart-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
           <div style={{ border: "1px solid #222228", borderRadius: 12, background: "#16161a", padding: "1.5rem 1.5rem 1rem" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
               <div>
@@ -601,15 +817,15 @@ function DataPage({ setCurrent }) {
 
       {/* ═══ INSIGHTS ═══ */}
       <div style={{ padding: "2rem 2rem 1rem", maxWidth: 1100, margin: "0 auto" }}>
-        <Label>Market Insights</Label>
-        <h2 className="sec-title" style={{ marginBottom: "0.5rem" }}>What the data tells you.</h2>
+        <Label>{l.insightsLabel}</Label>
+        <h2 className="sec-title" style={{ marginBottom: "0.5rem" }}>{l.insightsTitle}</h2>
         <div style={{ display: "flex", alignItems: "center", gap: "1.5rem", marginBottom: "2rem" }}>
-          <p className="sec-desc" style={{ marginBottom: 0 }}>Examples of the insights you can extract from each monthly delivery. The kind of edge that's hard to build in-house — and expensive to live without.</p>
-          <span style={{ fontFamily: mono, fontSize: "0.6rem", color: "#55555f", background: "#111113", border: "1px solid #222228", padding: "0.3rem 0.75rem", borderRadius: 6, whiteSpace: "nowrap", flexShrink: 0 }}>Sample data for illustration</span>
+          <p className="sec-desc" style={{ marginBottom: 0 }}>{l.insightsDesc}</p>
+          <span style={{ fontFamily: mono, fontSize: "0.6rem", color: "#55555f", background: "#111113", border: "1px solid #222228", padding: "0.3rem 0.75rem", borderRadius: 6, whiteSpace: "nowrap", flexShrink: 0 }}>{l.insightsBadge}</span>
         </div>
       </div>
 
-      <div style={{ padding: "0 2rem 2rem", maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1rem" }}>
+      <div className="insight-grid" style={{ padding: "0 2rem 2rem", maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1rem" }}>
 
         {/* 1 — Top Seller */}
         <InsightCard label="Top Seller — March" title="Bory Bývanie sold 34 units last month.">
@@ -719,10 +935,10 @@ function DataPage({ setCurrent }) {
       <div style={{ padding: "2rem 2rem 2rem", maxWidth: 1100, margin: "0 auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "1rem" }}>
           <div>
-            <Label>Raw Data</Label>
-            <h3 style={{ fontSize: "1.1rem", fontWeight: 600 }}>Unit-level sample</h3>
+            <Label>{l.rawLabel}</Label>
+            <h3 style={{ fontSize: "1.1rem", fontWeight: 600 }}>{l.unitSample}</h3>
           </div>
-          <span style={{ fontFamily: mono, fontSize: "0.7rem", color: "#55555f" }}>Showing 8 of 4,218 records</span>
+          <span style={{ fontFamily: mono, fontSize: "0.7rem", color: "#55555f" }}>{l.showing}</span>
         </div>
         <div className="dark-scroll" style={{ border: "1px solid #222228", borderRadius: 12, overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.8rem", minWidth: 900 }}>
@@ -762,9 +978,9 @@ function DataPage({ setCurrent }) {
 
       {/* Schema — Terminal (tech flex at bottom) */}
       <div style={{ padding: "2rem 2rem 5rem", maxWidth: 1100, margin: "0 auto" }}>
-        <Label>Schema</Label>
-        <h3 style={{ fontSize: "1.1rem", fontWeight: 600, marginBottom: "0.5rem" }}>Up to 25 columns per unit — key fields below.</h3>
-        <p className="sec-desc" style={{ marginBottom: "1.5rem" }}>Additional fields include orientation, balcony area, parking, storage, and project-level metadata.</p>
+        <Label>{l.schemaLabel}</Label>
+        <h3 style={{ fontSize: "1.1rem", fontWeight: 600, marginBottom: "0.5rem" }}>{l.schemaTitle}</h3>
+        <p className="sec-desc" style={{ marginBottom: "1.5rem" }}>{l.schemaDesc}</p>
 
         <div style={{ border: "1px solid #222228", borderRadius: 12, overflow: "hidden", boxShadow: "0 8px 32px rgba(0,0,0,0.3)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.75rem 1.25rem", background: "#111113", borderBottom: "1px solid #222228" }}>
@@ -794,75 +1010,35 @@ function DataPage({ setCurrent }) {
           </div>
         </div>
         <div style={{ marginTop: "0.75rem", fontFamily: mono, fontSize: "0.62rem", color: "#55555f", lineHeight: 1.6 }}>
-          Note: Field availability varies by project. Not all developers publish all data points.
+          {l.schemaNote}
         </div>
       </div>
 
       <div style={{ padding: "4rem 2rem", textAlign: "center" }}>
-        <h2 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "1rem" }}>Want the full dataset?</h2>
-        <p style={{ color: "#8a8a96", maxWidth: 480, margin: "0 auto 2rem", fontWeight: 300 }}>This is a sample. The full output covers 4,200+ units across 140+ projects, updated monthly.</p>
-        <a onClick={() => setCurrent("Pricing")} className="btn-p">See Pricing</a>
+        <h2 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "1rem" }}>{l.wantFull}</h2>
+        <p style={{ color: "#8a8a96", maxWidth: 480, margin: "0 auto 2rem", fontWeight: 300 }}>{l.wantFullDesc}</p>
+        <a onClick={() => setCurrent("Pricing")} className="btn-p">{l.seePricing}</a>
       </div>
     </>
   );
 }
 
 /* ─────── PRICING ─────── */
-function PricingPage({ setCurrent }) {
+function PricingPage({ setCurrent, l }) {
   const mono = "'JetBrains Mono', monospace";
-  const tiers = [
-    {
-      tier: "Snapshot", name: "One-time report", price: "€149", note: "Single month, one-time delivery",
-      features: [
-        [true, "Full market report with insights"],
-        [true, "Unit-level data — all 140+ projects"],
-        [true, "Pricing benchmarks & visualizations"],
-        [false, "No historical data"],
-        [false, "No ongoing updates"],
-      ],
-      featured: false, cta: "Get Started",
-    },
-    {
-      tier: "Standard", name: "Monthly delivery", price: "€99", priceSuffix: "/mo", note: "Billed monthly, cancel anytime",
-      features: [
-        [true, "Monthly report with full insights"],
-        [true, "Raw + cleaned datasets included"],
-        [true, "Historical snapshots & trend analysis"],
-        [true, "Absorption rates & sell-out tracking"],
-        [true, "Google Sheets, CSV, or API access"],
-      ],
-      featured: true, cta: "Get Started",
-    },
-    {
-      tier: "Custom", name: "Enterprise & On-Demand", price: "Let's talk.", isCustom: true, note: "Tailored scope, frequency, and delivery",
-      features: [
-        [true, "Everything in Standard"],
-        [true, "Weekly or bi-weekly updates"],
-        [true, "Coverage beyond Bratislava"],
-        [true, "Additional markets or property types"],
-        [true, "Custom integrations and output formats"],
-      ],
-      featured: false, cta: "Contact Us",
-    },
-  ];
-
-  const faqs = [
-    ["What do I actually receive?", "You get a structured market report with insights, visualizations, and recommendations — covering pricing trends, absorption rates, competitive positioning, and supply dynamics. We also include raw and cleaned datasets so you can run your own analysis if needed."],
-    ["How often is the data updated?", "Standard delivery is monthly. We can go as frequent as weekly — and technically even daily, but we recommend weekly at most. Shorter intervals rarely justify the cost, as the new-build market doesn't shift that fast."],
-    ["Can you cover cities beyond Bratislava?", "Yes. The pipeline is market-agnostic — we can configure it for any city or region where developer data is publicly listed. This falls under our Custom plan."],
-    ["Can I add specific projects or developers to track?", "Absolutely. If a project is publicly listed, we can add it to the registry. Custom clients can request additions at any time."],
-  ];
+  const tiers = l.tiers;
+  const faqs = l.faqs;
 
   return (
     <>
       <div style={{ padding: "8rem 2rem 3rem", maxWidth: 1100, margin: "0 auto", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
-        <Label>Pricing</Label>
-        <h1 className="sec-title">Simple, transparent pricing.</h1>
-        <p className="sec-desc" style={{ textAlign: "center" }}>Choose the plan that fits your needs. Start with a one-time report or get ongoing market intelligence.</p>
+        <Label>{l.pricingLabel}</Label>
+        <h1 className="sec-title">{l.pricingTitle}</h1>
+        <p className="sec-desc" style={{ textAlign: "center" }}>{l.pricingDesc}</p>
       </div>
 
       <div style={{ padding: "0 2rem 4rem", maxWidth: 1100, margin: "0 auto" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1.5rem" }}>
+        <div className="pricing-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1.5rem" }}>
           {tiers.map(t => (
             <div key={t.tier} style={{
               border: `1px solid ${t.featured ? "#00e5a0" : "#222228"}`,
@@ -875,7 +1051,7 @@ function PricingPage({ setCurrent }) {
                   padding: "0.2rem 0.75rem", background: "#00e5a0", color: "#0a0a0b",
                   fontFamily: "'JetBrains Mono', monospace", fontSize: "0.6rem", fontWeight: 700,
                   letterSpacing: "0.08em", textTransform: "uppercase", borderRadius: 4,
-                }}>Most Popular</div>
+                }}>{l.mostPopular}</div>
               )}
               <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.7rem", color: "#00e5a0", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.75rem" }}>{t.tier}</div>
               <h3 style={{ fontSize: "1.3rem", fontWeight: 600, marginBottom: "0.5rem" }}>{t.name}</h3>
@@ -917,9 +1093,9 @@ function PricingPage({ setCurrent }) {
           <div style={{ 
             fontFamily: mono, fontSize: "0.6rem", color: "#00e5a0", letterSpacing: "0.12em", 
             textTransform: "uppercase", marginBottom: "1.25rem",
-          }}>From a client</div>
+          }}>{l.testimonialFrom}</div>
           <div style={{ fontSize: "1.05rem", color: "#e8e8ed", lineHeight: 1.75, fontWeight: 300, fontStyle: "italic", marginBottom: "1.75rem" }}>
-            When you're making pricing decisions on a project worth €30M+, you can't afford to guess what the market will bear. This gives us the full picture — what comparable projects charge, how fast they sell, where supply is tightening. For the cost of a dinner, we get data that directly impacts millions in revenue.
+            {l.testimonial}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "0.85rem" }}>
             <div style={{ 
@@ -931,8 +1107,8 @@ function PricingPage({ setCurrent }) {
               <span style={{ fontFamily: mono, fontSize: "0.85rem", color: "#00e5a0", fontWeight: 600 }}>M</span>
             </div>
             <div>
-              <div style={{ fontSize: "0.88rem", fontWeight: 500, color: "#e8e8ed" }}>Marek T.</div>
-              <div style={{ fontSize: "0.74rem", color: "#55555f" }}>Head of Residential Development in Bratislava</div>
+              <div style={{ fontSize: "0.88rem", fontWeight: 500, color: "#e8e8ed" }}>{l.testimonialName}</div>
+              <div style={{ fontSize: "0.74rem", color: "#55555f" }}>{l.testimonialRole}</div>
             </div>
           </div>
         </div>
@@ -940,7 +1116,7 @@ function PricingPage({ setCurrent }) {
 
       {/* FAQ */}
       <div style={{ padding: "3rem 2rem 5rem", maxWidth: 800, margin: "0 auto" }}>
-        <h3 style={{ fontSize: "1.3rem", fontWeight: 600, marginBottom: "2rem" }}>Common questions</h3>
+        <h3 style={{ fontSize: "1.3rem", fontWeight: 600, marginBottom: "2rem" }}>{l.commonQ}</h3>
         {faqs.map(([q, a], i) => (
           <div key={i} style={{ borderTop: "1px solid #222228", padding: "1.5rem 0", borderBottom: i === faqs.length - 1 ? "1px solid #222228" : "none" }}>
             <div style={{ fontSize: "0.95rem", fontWeight: 500, marginBottom: "0.5rem" }}>{q}</div>
@@ -956,54 +1132,55 @@ function PricingPage({ setCurrent }) {
           background: "radial-gradient(ellipse, rgba(0,229,160,0.15) 0%, transparent 70%)",
           pointerEvents: "none", opacity: 0.3,
         }} />
-        <h2 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "1rem" }}>Not sure which plan fits?</h2>
-        <p style={{ color: "#8a8a96", maxWidth: 480, margin: "0 auto 2rem", fontWeight: 300 }}>Reach out and we'll walk you through the data, the pipeline, and which option makes sense for your use case.</p>
-        <a onClick={() => setCurrent("Contact")} className="btn-p" style={{ cursor: "pointer" }}>Get in Touch</a>
+        <h2 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "1rem" }}>{l.notSure}</h2>
+        <p style={{ color: "#8a8a96", maxWidth: 480, margin: "0 auto 2rem", fontWeight: 300 }}>{l.notSureDesc}</p>
+        <a onClick={() => setCurrent("Contact")} className="btn-p" style={{ cursor: "pointer" }}>{l.getInTouch}</a>
       </div>
     </>
   );
 }
 
 /* ─────── CONTACT ─────── */
-function ContactPage() {
+function ContactPage({ l }) {
   const mono = "'JetBrains Mono', monospace";
   return (
     <>
       <div style={{ padding: "8rem 2rem 3rem", maxWidth: 1100, margin: "0 auto" }}>
-        <Label>Contact</Label>
-        <h1 className="sec-title">Let's talk.</h1>
-        <p className="sec-desc">Whether you want to see a demo, explore a specific plan, or simply learn how Residata can support your market decisions — we'd love to hear from you.</p>
+        <Label>{l.contactLabel}</Label>
+        <h1 className="sec-title">{l.contactTitle}</h1>
+        <p className="sec-desc">{l.contactDesc}</p>
       </div>
 
       <div style={{ padding: "0 2rem 5rem", maxWidth: 1100, margin: "0 auto" }}>
         <div className="contact-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
 
-          {/* Left — Contact card, unified */}
+          {/* Left — Contact card */}
           <div style={{ border: "1px solid #222228", borderRadius: 12, background: "#16161a", padding: "2.5rem" }}>
             {/* Profile */}
-            <div style={{ display: "flex", gap: "1.25rem", alignItems: "center", marginBottom: "1.75rem", paddingBottom: "1.75rem", borderBottom: "1px solid #222228" }}>
+            <div style={{ display: "flex", gap: "1.5rem", alignItems: "center", marginBottom: "2rem" }}>
               {/* Photo placeholder */}
               <div style={{
-                width: 72, height: 72, borderRadius: 10, flexShrink: 0,
-                background: "linear-gradient(135deg, #1a1a1f 0%, #222228 100%)",
+                width: 80, height: 80, borderRadius: 12, flexShrink: 0,
                 border: "1px solid #333",
-                display: "flex", alignItems: "center", justifyContent: "center",
                 overflow: "hidden",
               }}>
-                {/* Replace with: <img src="/photo.jpg" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> */}
-                <svg width="32" height="32" viewBox="0 0 36 36" fill="none">
-                  <circle cx="18" cy="13" r="6.5" fill="#444" />
-                  <ellipse cx="18" cy="31" rx="13" ry="9" fill="#444" />
-                </svg>
+                <img src="/photo.jpg" style={{ width: "100%", height: "100%", objectFit: "cover" }} alt="Tomáš Kamhal" />
               </div>
               <div>
-                <div style={{ fontSize: "1.15rem", fontWeight: 600, color: "#e8e8ed" }}>Tomáš Kamhal</div>
-                <div style={{ fontSize: "0.82rem", color: "#00e5a0", fontFamily: mono, fontSize: "0.72rem" }}>Founder, Residata</div>
+                <div style={{ fontSize: "1.25rem", fontWeight: 600, color: "#e8e8ed", marginBottom: "0.2rem" }}>Tomáš Kamhal</div>
+                <div style={{ fontFamily: mono, fontSize: "0.72rem", color: "#00e5a0", marginBottom: "0.5rem" }}>Founder, Residata</div>
+                <a href="https://www.linkedin.com/in/tomaskamhal/" target="_blank" rel="noopener noreferrer" style={{
+                  display: "inline-flex", alignItems: "center", gap: "0.4rem",
+                  fontSize: "0.72rem", color: "#8a8a96", textDecoration: "none", transition: "color 0.2s",
+                }} onMouseEnter={e => e.currentTarget.style.color = "#00e5a0"} onMouseLeave={e => e.currentTarget.style.color = "#8a8a96"}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+                  LinkedIn
+                </a>
               </div>
             </div>
 
-            {/* Contact details — clean list */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "1.1rem" }}>
+            {/* Contact methods */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
               <a href="mailto:residata@proton.me" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: "1rem", color: "#e8e8ed", transition: "color 0.2s" }}
                 onMouseEnter={e => e.currentTarget.style.color = "#00e5a0"}
                 onMouseLeave={e => e.currentTarget.style.color = "#e8e8ed"}>
@@ -1018,34 +1195,29 @@ function ContactPage() {
                 <span style={{ fontSize: "0.92rem" }}>+421 911 963 909</span>
               </a>
 
-              <a href="https://calendly.com" target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: "1rem", color: "#e8e8ed", transition: "color 0.2s" }}
+              <a href="https://calendar.app.google/x6vKBohYsVjNKL1A9" target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: "1rem", color: "#e8e8ed", transition: "color 0.2s" }}
                 onMouseEnter={e => e.currentTarget.style.color = "#00e5a0"}
                 onMouseLeave={e => e.currentTarget.style.color = "#e8e8ed"}>
                 <span style={{ fontFamily: mono, fontSize: "0.8rem", color: "#00e5a0", width: 20, textAlign: "center", flexShrink: 0 }}>▶</span>
-                <span style={{ fontSize: "0.92rem" }}>Book a 20-min intro call</span>
+                <span style={{ fontSize: "0.92rem" }}>{l.bookCall}</span>
               </a>
             </div>
 
             {/* CTA */}
-            <div style={{ marginTop: "2rem" }}>
+            <div style={{ marginTop: "1.5rem" }}>
               <a href="mailto:residata@proton.me?subject=Residata%20Inquiry" style={{
                 display: "block", padding: "0.85rem 2rem", textAlign: "center",
                 background: "#00e5a0", color: "#0a0a0b", fontWeight: 600,
                 fontSize: "0.9rem", borderRadius: 8, textDecoration: "none",
-              }}>Send an Email</a>
+              }}>{l.sendEmail}</a>
             </div>
           </div>
 
           {/* Right — What to expect */}
           <div style={{ border: "1px solid #222228", borderRadius: 12, background: "#16161a", padding: "2.5rem" }}>
-            <div style={{ fontFamily: mono, fontSize: "0.65rem", color: "#00e5a0", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "1.5rem" }}>What to expect</div>
+            <div style={{ fontFamily: mono, fontSize: "0.65rem", color: "#00e5a0", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "1.5rem" }}>{l.whatToExpect}</div>
 
-            {[
-              ["1", "Intro call or email exchange", "We learn about your use case — what decisions you're making, what data you're currently missing, and what format works for you."],
-              ["2", "Sample delivery", "You get a real sample from the latest pipeline run — not a demo, actual data — so you can evaluate the quality and depth firsthand."],
-              ["3", "Tailored setup", "We configure scope, frequency, and output format to match your workflow. You start receiving monthly (or more frequent) deliveries."],
-              ["4", "Ongoing market edge", "Every delivery gives you a clear view of the market — competitive pricing, absorption trends, supply shifts, and sell-out signals. The kind of insight that turns guesswork into confident decisions."],
-            ].map(([num, title, desc]) => (
+            {l.steps.map(([num, title, desc]) => (
               <div key={num} style={{ display: "flex", gap: "1.25rem", marginBottom: "1.75rem", alignItems: "flex-start" }}>
                 <div style={{
                   width: 32, height: 32, borderRadius: 8, flexShrink: 0,
@@ -1073,9 +1245,12 @@ function Label({ children }) {
 
 export default function App() {
   const [current, setCurrent] = useState("Home");
+  const [lang, setLang] = useState("en");
+  const l = t[lang];
 
   const handleNav = (page) => {
-    setCurrent(page);
+    const resolved = pageMap[page] || page;
+    setCurrent(resolved);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -1106,23 +1281,43 @@ export default function App() {
         
         .card-hover { transition: border-color 0.3s, transform 0.3s, box-shadow 0.3s; }
         .card-hover:hover { border-color: #333 !important; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.2); }
-        @media (max-width: 900px) {
+        @media (max-width: 768px) {
           .nav-right .nav-link { display: none; }
           .nav-cta-btn { display: inline-block !important; }
         }
-        @media (max-width: 768px) {
-          .nav-right { gap: 1rem !important; }
+        @media (max-width: 640px) {
+          .nav-right { gap: 0.75rem !important; }
           .contact-grid { grid-template-columns: 1fr !important; }
+        }
+        /* Responsive grids */
+        @media (max-width: 900px) {
+          .contact-grid { grid-template-columns: 1fr !important; }
+          .value-grid { grid-template-columns: 1fr !important; }
+          .case-card-grid { grid-template-columns: 1fr !important; }
+          .stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          .insight-grid { grid-template-columns: 1fr 1fr !important; }
+          .pricing-grid { grid-template-columns: 1fr !important; max-width: 420px; margin-left: auto !important; margin-right: auto !important; }
+          .chart-grid { grid-template-columns: 1fr !important; }
+          .schema-grid { grid-template-columns: 1fr !important; }
+          .flex-scope { grid-template-columns: 1fr !important; text-align: center; }
+        }
+        @media (max-width: 640px) {
+          .stats-grid { grid-template-columns: 1fr 1fr !important; }
+          .insight-grid { grid-template-columns: 1fr !important; }
+          .insight-span2 { grid-column: span 1 !important; }
+        }
+        @media (max-width: 768px) {
+          .hero-actions-wrap { flex-direction: column; align-items: center; }
         }
       `}</style>
       <RisingParticles />
       <div style={{ position: "relative", zIndex: 1 }}>
-      <Nav current={current} setCurrent={handleNav} />
-      {current === "Home" && <HomePage setCurrent={handleNav} />}
-      {current === "Use Cases" && <UseCasesPage setCurrent={handleNav} />}
-      {current === "Data" && <DataPage setCurrent={handleNav} />}
-      {current === "Pricing" && <PricingPage setCurrent={handleNav} />}
-      {current === "Contact" && <ContactPage />}
+      <Nav current={current} setCurrent={handleNav} lang={lang} setLang={setLang} />
+      {current === "Home" && <HomePage setCurrent={handleNav} l={l} />}
+      {current === "Use Cases" && <UseCasesPage setCurrent={handleNav} l={l} />}
+      {current === "Data" && <DataPage setCurrent={handleNav} l={l} />}
+      {current === "Pricing" && <PricingPage setCurrent={handleNav} l={l} />}
+      {current === "Contact" && <ContactPage l={l} />}
       <Footer />
       </div>
     </div>
