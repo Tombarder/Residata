@@ -121,9 +121,9 @@ const t = {
     ],
     // Tiers
     tiers: [
-      { tier: "Snapshot", name: "One-time report", price: "€149", note: "Single month, one-time delivery",
+      { tier: "Snapshot", name: "One-time report", price: "€249", note: "Single month, one-time delivery",
         features: [[true, "Full market report with insights"], [true, "Unit-level data — all 140+ projects"], [true, "Pricing benchmarks & visualizations"], [false, "No historical data"], [false, "No ongoing updates"]], cta: "Get Started" },
-      { tier: "Standard", name: "Monthly delivery", price: "€99", priceSuffix: "/mo", note: "Billed monthly, cancel anytime",
+      { tier: "Standard", name: "Monthly delivery", price: "€349", priceSuffix: "/mo", note: "Billed monthly, cancel anytime",
         features: [[true, "Monthly report with full insights"], [true, "Raw + cleaned datasets included"], [true, "Historical snapshots & trend analysis"], [true, "Absorption rates & sell-out tracking"], [true, "Google Sheets, CSV, or API access"]], featured: true, cta: "Get Started" },
       { tier: "Custom", name: "On-Demand & Enterprise", price: "Let's talk.", isCustom: true, note: "Tailored scope, frequency, and delivery",
         features: [[true, "Everything in Standard"], [true, "Weekly or bi-weekly updates"], [true, "Coverage beyond Bratislava"], [true, "Additional markets or property types"], [true, "Custom integrations and output formats"]], cta: "Contact Us" },
@@ -239,9 +239,9 @@ const t = {
       ["4", "Priebežná výhoda", "Každá dodávka = jasný pohľad na trh. Ceny, absorpcia, ponuka, signály vypredania. Rozhodujete sa na dátach, nie na pocite."],
     ],
     tiers: [
-      { tier: "Snapshot trhu", name: "Jednorazový prehľad", price: "€149", note: "Jeden mesiac, jednorazové doručenie",
+      { tier: "Snapshot trhu", name: "Jednorazový prehľad", price: "€249", note: "Jeden mesiac, jednorazové doručenie",
         features: [[true, "Kompletný trhový prehľad s insightmi"], [true, "Dáta za každý byt — 140+ projektov"], [true, "Cenové porovnania a vizualizácie"], [false, "Bez historických dát"], [false, "Bez priebežných aktualizácií"]], cta: "Mám záujem" },
-      { tier: "Standard", name: "Mesačné doručenie", price: "€99", priceSuffix: "/mes", note: "Fakturované mesačne, zrušenie kedykoľvek",
+      { tier: "Standard", name: "Mesačné doručenie", price: "€349", priceSuffix: "/mes", note: "Fakturované mesačne, zrušenie kedykoľvek",
         features: [[true, "Mesačná správa s kompletnými insightmi"], [true, "Surové + vyčistené datasety"], [true, "Historické dáta a vývoj trendov"], [true, "Absorpcia a sledovanie vypredania"], [true, "Google Sheets, CSV alebo API"]], featured: true, cta: "Mám záujem" },
       { tier: "Custom", name: "On-Demand & Enterprise", price: "Ozvite sa.", isCustom: true, note: "Rozsah a frekvencia podľa vás",
         features: [[true, "Všetko v Standard"], [true, "Týždenné alebo dvojtýždenné aktualizácie"], [true, "Pokrytie akejkoľvek lokality (aj mimo Slovenska)"], [true, "Ďalšie trhy alebo typy nehnuteľností"], [true, "Vlastné integrácie a formáty"]], cta: "Kontaktovať" },
