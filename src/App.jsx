@@ -4,6 +4,7 @@ import LoginModal from "./components/LoginModal";
 import CompleteProfile from "./components/CompleteProfile";
 import PendingGate from "./components/PendingGate";
 import { LiveDashboard, LiveProjectDetail, LiveAnalytics, LiveAdmin, EarlyAccessBadge } from "./pages/LivePages";
+import { MarketPulse, DistrictPulse, HowItWorksFlow } from "./pages/HomeExtras";
 import { useAuth } from "./lib/useAuth";
 
 const pagesEN = ["Home", "Live", "Use Cases", "Pricing", "Contact"];
@@ -497,7 +498,7 @@ function TerminalLines() {
 }
 
 /* ─────── HOME ─────── */
-function HomePage({ setCurrent, l }) {
+function HomePage({ setCurrent, l, lang }) {
   return (
     <>
       {/* Hero */}
@@ -576,6 +577,21 @@ function HomePage({ setCurrent, l }) {
           </div>
           <TerminalLines />
         </div>
+      </FadeIn>
+
+      {/* Live market data — real numbers from Supabase */}
+      <FadeIn delay={0.1}>
+        <MarketPulse lang={lang} setCurrent={setCurrent} />
+      </FadeIn>
+
+      {/* Bratislava pricing map */}
+      <FadeIn delay={0.15}>
+        <DistrictPulse lang={lang} setCurrent={setCurrent} />
+      </FadeIn>
+
+      {/* How it works — animated pipeline */}
+      <FadeIn delay={0.2}>
+        <HowItWorksFlow lang={lang} />
       </FadeIn>
 
       {/* Value Prop — Questions left, What you get right */}
@@ -1337,6 +1353,21 @@ export default function App() {
         .btn-s:hover { border-color: #55555f; transform: translateY(-1px); }
         
         @keyframes ticker-slide { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+        @keyframes flowDot {
+          0% { left: -10px; opacity: 0; }
+          10% { opacity: 1; }
+          90% { opacity: 1; }
+          100% { left: 100%; opacity: 0; }
+        }
+        @keyframes barFill {
+          from { width: 0%; }
+        }
+        @media (max-width: 760px) {
+          .flow-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 1.5rem !important; row-gap: 2rem !important; }
+          .flow-grid > div > div:last-child { display: none !important; }
+          .district-row { grid-template-columns: 1fr 70px !important; font-size: 0.85rem; }
+          .district-row > div:nth-child(2) { display: none; }
+        }
         @keyframes heroFadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
         @keyframes breathe1 { 0%, 100% { opacity: 0.5; transform: translateX(-50%) scale(1); } 50% { opacity: 0.9; transform: translateX(-50%) scale(1.15); } }
@@ -1388,7 +1419,7 @@ export default function App() {
       <Ticker lang={lang} />
       {/* Spacer for fixed Nav (72px) + Ticker (36px) */}
       <div style={{ height: 36 }} />
-      {current === "Home" && <HomePage setCurrent={handleNav} l={l} />}
+      {current === "Home" && <HomePage setCurrent={handleNav} l={l} lang={lang} />}
       {current === "Live" && (
         auth.user && auth.profile?.tier === "pending"
           ? <PendingGate setCurrent={handleNav} lang={lang} />
