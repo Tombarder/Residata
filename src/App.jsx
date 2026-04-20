@@ -1,7 +1,11 @@
 import { useState, useEffect, useRef } from "react";
+import Ticker from "./components/Ticker";
+import LoginModal from "./components/LoginModal";
+import { LiveDashboard, LiveProjectDetail, LiveAnalytics, LiveAdmin, EarlyAccessBadge } from "./pages/LivePages";
+import { useAuth } from "./lib/useAuth";
 
-const pagesEN = ["Home", "Use Cases", "Data", "Pricing", "Contact"];
-const pagesSK = ["Domov", "Využitie", "Dáta", "Cenník", "Kontakt"];
+const pagesEN = ["Home", "Live", "Use Cases", "Pricing", "Contact"];
+const pagesSK = ["Domov", "Live", "Využitie", "Cenník", "Kontakt"];
 const pageMap = { "Domov": "Home", "Využitie": "Use Cases", "Dáta": "Data", "Cenník": "Pricing", "Kontakt": "Contact" };
 
 const t = {
@@ -359,9 +363,11 @@ function RisingParticles() {
   return <canvas ref={canvasRef} style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0 }} />;
 }
 
-function Nav({ current, setCurrent, lang, setLang }) {
+function Nav({ current, setCurrent, lang, setLang, auth, onLogin }) {
   const pages = lang === "sk" ? pagesSK : pagesEN;
   const l = t[lang];
+  const user = auth?.user;
+  const isAdmin = auth?.isAdmin;
   return (
     <nav style={{
       position: "fixed", top: 0, width: "100%", zIndex: 100,
@@ -410,11 +416,30 @@ function Nav({ current, setCurrent, lang, setLang }) {
               fontFamily: "inherit", fontSize: "inherit", transition: "all 0.2s",
             }}>SK</button>
           </div>
-          <a onClick={() => setCurrent("Contact")} className="nav-cta-btn" style={{
-            padding: "0.5rem 1.25rem", background: "#00e5a0", color: "#0a0a0b",
-            fontWeight: 600, borderRadius: 6, fontSize: "0.8rem", cursor: "pointer",
-            letterSpacing: "0.02em", textDecoration: "none",
-          }}>{l.getAccess}</a>
+          {user ? (
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+              {isAdmin && (
+                <a onClick={() => setCurrent("Admin")} style={{
+                  color: current === "Admin" ? "#f5a623" : "#8a8a96", textDecoration: "none",
+                  fontSize: "0.8rem", cursor: "pointer", fontFamily: "'JetBrains Mono', monospace",
+                }}>ADMIN</a>
+              )}
+              <span style={{ fontSize: "0.75rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace" }}>
+                {user.email}
+              </span>
+              <button onClick={() => auth.signOut()} style={{
+                padding: "0.4rem 0.9rem", background: "transparent", color: "#e8e8ed",
+                fontWeight: 500, borderRadius: 6, fontSize: "0.75rem", cursor: "pointer",
+                border: "1px solid #222228", fontFamily: "inherit",
+              }}>Sign out</button>
+            </div>
+          ) : (
+            <a onClick={onLogin} className="nav-cta-btn" style={{
+              padding: "0.5rem 1.25rem", background: "#00e5a0", color: "#0a0a0b",
+              fontWeight: 600, borderRadius: 6, fontSize: "0.8rem", cursor: "pointer",
+              letterSpacing: "0.02em", textDecoration: "none",
+            }}>{l.getAccess}</a>
+          )}
         </div>
       </div>
     </nav>
@@ -1032,9 +1057,29 @@ function PricingPage({ setCurrent, l }) {
   return (
     <>
       <div style={{ padding: "8rem 2rem 3rem", maxWidth: 1100, margin: "0 auto", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
+        <div style={{ marginBottom: "1rem" }}><EarlyAccessBadge /></div>
         <Label>{l.pricingLabel}</Label>
         <h1 className="sec-title">{l.pricingTitle}</h1>
         <p className="sec-desc" style={{ textAlign: "center" }}>{l.pricingDesc}</p>
+
+        {/* Early access CTA block */}
+        <div style={{
+          marginTop: "2rem", padding: "1.5rem 2rem", maxWidth: 680,
+          background: "linear-gradient(135deg, rgba(0,229,160,0.08), rgba(0,229,160,0.02))",
+          border: "1px solid rgba(0,229,160,0.25)", borderRadius: 12, width: "100%",
+        }}>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem", color: "#00e5a0", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "0.5rem" }}>
+            🔥 Early access — 5 min a máš prístup
+          </div>
+          <p style={{ fontSize: "0.95rem", color: "#e8e8ed", lineHeight: 1.6, marginBottom: "1rem" }}>
+            Prvých <strong style={{ color: "#00e5a0" }}>9 zákazníkov</strong> dostane <strong style={{ color: "#00e5a0" }}>50 % zľavu prvé 3 mesiace</strong>.
+            Žiadne formuláre — krátky 5-minútový call, dohodneme sa, prístup máš hneď.
+          </p>
+          <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center", flexWrap: "wrap" }}>
+            <a href="tel:+421911963909" className="btn-p">📞 Zavolať +421 911 963 909</a>
+            <a href="mailto:residata@proton.me?subject=Early%20access%20-%205%20min%20call" className="btn-s">✉️ Booknuť 5-min call</a>
+          </div>
+        </div>
       </div>
 
       <div style={{ padding: "0 2rem 4rem", maxWidth: 1100, margin: "0 auto" }}>
@@ -1246,12 +1291,26 @@ function Label({ children }) {
 export default function App() {
   const [current, setCurrent] = useState("Home");
   const [lang, setLang] = useState("en");
+  const [loginOpen, setLoginOpen] = useState(false);
   const l = t[lang];
+  const auth = useAuth();
 
   const handleNav = (page) => {
+    // Project detail route: "Project:slug"
+    if (typeof page === "string" && page.startsWith("Project:")) {
+      setCurrent(page);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
     const resolved = pageMap[page] || page;
     setCurrent(resolved);
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // "Get Access" button → login modal if anon, or go to Pricing if logged in
+  const handleGetAccess = () => {
+    if (auth.user) handleNav("Pricing");
+    else setLoginOpen(true);
   };
 
   return (
@@ -1265,6 +1324,7 @@ export default function App() {
         .btn-s { display: inline-block; padding: 0.75rem 2rem; background: transparent; color: #e8e8ed; font-weight: 500; font-size: 0.9rem; border: 1px solid #222228; border-radius: 8px; cursor: pointer; text-decoration: none; transition: all 0.2s; }
         .btn-s:hover { border-color: #55555f; transform: translateY(-1px); }
         
+        @keyframes ticker-slide { from { transform: translateX(0); } to { transform: translateX(-50%); } }
         @keyframes heroFadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
         @keyframes breathe1 { 0%, 100% { opacity: 0.5; transform: translateX(-50%) scale(1); } 50% { opacity: 0.9; transform: translateX(-50%) scale(1.15); } }
@@ -1312,13 +1372,23 @@ export default function App() {
       `}</style>
       <RisingParticles />
       <div style={{ position: "relative", zIndex: 1 }}>
-      <Nav current={current} setCurrent={handleNav} lang={lang} setLang={setLang} />
+      <Nav current={current} setCurrent={handleNav} lang={lang} setLang={setLang} auth={auth} onLogin={() => setLoginOpen(true)} />
+      <Ticker />
+      {/* Spacer for fixed Nav (72px) + Ticker (36px) */}
+      <div style={{ height: 36 }} />
       {current === "Home" && <HomePage setCurrent={handleNav} l={l} />}
+      {current === "Live" && <LiveDashboard setCurrent={handleNav} openLogin={() => setLoginOpen(true)} />}
       {current === "Use Cases" && <UseCasesPage setCurrent={handleNav} l={l} />}
       {current === "Data" && <DataPage setCurrent={handleNav} l={l} />}
       {current === "Pricing" && <PricingPage setCurrent={handleNav} l={l} />}
       {current === "Contact" && <ContactPage l={l} />}
+      {current === "Analytics" && <LiveAnalytics setCurrent={handleNav} openLogin={() => setLoginOpen(true)} />}
+      {current === "Admin" && <LiveAdmin setCurrent={handleNav} />}
+      {typeof current === "string" && current.startsWith("Project:") && (
+        <LiveProjectDetail projectId={current.slice(8)} setCurrent={handleNav} openLogin={() => setLoginOpen(true)} />
+      )}
       <Footer />
+      <LoginModal open={loginOpen} onClose={() => setLoginOpen(false)} />
       </div>
     </div>
   );
