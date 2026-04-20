@@ -148,6 +148,7 @@ export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en
         reloadProfile={reloadProfile}
         setCurrent={setCurrent}
         t={t}
+        lang={lang}
       />
     );
   }
@@ -234,35 +235,88 @@ function FlatsTable({ flats, t, lang }) {
   );
 }
 
-function ChooseProjectGate({ projectId, projectName, profile, reloadProfile, setCurrent, t }) {
+function ChooseProjectGate({ projectId, projectName, profile, reloadProfile, setCurrent, t, lang }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
+  const locked = profile?.chosen_project_id && profile.chosen_project_id !== projectId;
+  const alreadyThis = profile?.chosen_project_id === projectId;
+
   const assign = async () => {
     setBusy(true); setErr(null);
-    const { error } = await supabase.from("user_profiles").update({ chosen_project_id: projectId }).eq("id", profile.id);
+    const { data, error } = await supabase.from("user_profiles")
+      .update({ chosen_project_id: projectId })
+      .eq("id", profile.id)
+      .select()
+      .maybeSingle();
     setBusy(false);
-    if (error) setErr(error.message);
-    else reloadProfile();
+    if (error) { setErr(error.message); return; }
+    if (!data) {
+      setErr(lang === "sk"
+        ? "Aktualizácia zlyhala — skús sa odhlásiť a prihlásiť znova."
+        : "Update failed — try signing out and back in.");
+      return;
+    }
+    await reloadProfile();
   };
+
+  // Already chose a DIFFERENT project → locked, show explanation
+  if (locked) {
+    return (
+      <main style={{ padding: "6rem 2rem 4rem", maxWidth: 560, margin: "0 auto", textAlign: "center" }}>
+        <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>🔒</div>
+        <h1 style={{ fontSize: "1.8rem", fontWeight: 700, marginBottom: "0.75rem" }}>
+          {lang === "sk" ? "Projekt už vybraný" : "Project already chosen"}
+        </h1>
+        <p style={{ color: dim, lineHeight: 1.6, marginBottom: "0.75rem" }}>
+          {lang === "sk"
+            ? <>Tvoj free účet je napojený na projekt <strong style={{ color: green }}>{profile.chosen_project_id}</strong>. Tento výber je uzamknutý — jeden projekt, jeden snapshot.</>
+            : <>Your free account is linked to project <strong style={{ color: green }}>{profile.chosen_project_id}</strong>. This choice is locked — one project, one snapshot.</>}
+        </p>
+        <p style={{ color: dim, fontSize: "0.85rem", marginBottom: "1.5rem" }}>
+          {lang === "sk"
+            ? <>Pre prístup ku všetkým 60 projektom potrebuješ <button onClick={() => setCurrent("Pricing")} style={linkBtn}>paid tier</button>.</>
+            : <>For access to all 60 projects, <button onClick={() => setCurrent("Pricing")} style={linkBtn}>upgrade to paid</button>.</>}
+        </p>
+        <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center" }}>
+          <button className="btn-p" onClick={() => setCurrent(`Project:${profile.chosen_project_id}`)}>
+            {lang === "sk" ? "Ísť na môj projekt" : "Go to my project"}
+          </button>
+          <button className="btn-s" onClick={() => setCurrent("Live")}>{t.back_to_dashboard}</button>
+        </div>
+      </main>
+    );
+  }
+
+  if (alreadyThis) {
+    // Shouldn't normally reach here (canViewDetail would be true), but safety net
+    return null;
+  }
+
+  // First assignment — allow
   return (
-    <main style={{ padding: "5rem 2rem 4rem", maxWidth: 720, margin: "0 auto" }}>
+    <main style={{ padding: "5rem 2rem 4rem", maxWidth: 640, margin: "0 auto" }}>
       <Label>{t.choose_label}</Label>
       <h1 className="sec-title">{t.choose_title}</h1>
-      <p className="sec-desc" style={{ marginBottom: "1.5rem" }}>
-        {t.choose_body_prefix} <strong style={{ color: green }}>{t.choose_body_suffix === "one project. Want to track" ? "1 project" : "1 projektu"}</strong>. {t.choose_body_suffix.replace("one project. Want to track", "").replace("1 projektu. Chceš sledovať", "")} <strong style={{ color: green }}>{projectName}</strong>?
+      <p className="sec-desc" style={{ marginBottom: "1.25rem" }}>
+        {lang === "sk"
+          ? <>Free účet ti odomkne plný detail <strong style={{ color: green }}>1 projektu</strong>. Chceš sledovať <strong style={{ color: green }}>{projectName}</strong>?</>
+          : <>Your free account unlocks full detail of <strong style={{ color: green }}>1 project</strong>. Do you want to track <strong style={{ color: green }}>{projectName}</strong>?</>}
       </p>
-      {profile?.chosen_project_id && (
-        <div style={{ padding: "1rem", background: "#1a1a1f", border: `1px solid ${border}`, borderRadius: 8, marginBottom: "1rem", fontSize: "0.85rem", color: dim }}>
-          {t.choose_current_prefix} <strong style={{ color: "#e8e8ed" }}>{profile.chosen_project_id}</strong>. {t.choose_current_suffix}
-        </div>
-      )}
-      <div style={{ display: "flex", gap: "0.75rem", marginTop: "1rem" }}>
-        <button className="btn-p" onClick={assign} disabled={busy}>{busy ? t.saving : ll(t.choose_watch, { name: projectName })}</button>
-        <button className="btn-s" onClick={() => setCurrent && setCurrent("Live")}>{t.choose_back}</button>
+      <div style={{ padding: "1rem 1.25rem", background: "rgba(245,166,35,0.08)", border: "1px solid rgba(245,166,35,0.3)", borderRadius: 8, marginBottom: "1.25rem", fontSize: "0.85rem", color: "#e8e8ed" }}>
+        <strong style={{ color: "#f5a623" }}>⚠ {lang === "sk" ? "Pozor" : "Heads up"}:</strong>{" "}
+        {lang === "sk"
+          ? "výber je po potvrdení uzamknutý. Budeš vidieť len tento jeden projekt. Pre viac projektov je potrebný paid tier."
+          : "this choice is locked once confirmed. You'll only see this one project. More projects require paid tier."}
+      </div>
+      <div style={{ display: "flex", gap: "0.75rem" }}>
+        <button className="btn-p" onClick={assign} disabled={busy}>
+          {busy ? t.saving : ll(t.choose_watch, { name: projectName })}
+        </button>
+        <button className="btn-s" onClick={() => setCurrent("Live")}>{t.choose_back}</button>
       </div>
       {err && <div style={{ color: "#ff6b6b", marginTop: "0.75rem" }}>{err}</div>}
       <p style={{ fontSize: "0.8rem", color: dim, marginTop: "2rem" }}>
-        {t.choose_upgrade_hint} <button onClick={() => setCurrent && setCurrent("Pricing")} style={linkBtn}>{t.upgrade_to_paid}</button>.
+        {t.choose_upgrade_hint} <button onClick={() => setCurrent("Pricing")} style={linkBtn}>{t.upgrade_to_paid}</button>.
       </p>
     </main>
   );
@@ -325,32 +379,93 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
   const t = liveT[lang] || liveT.en;
   const { isAdmin, loading } = useAuth();
   const [users, setUsers] = useState([]);
+  const [events, setEvents] = useState([]);
   const [err, setErr] = useState(null);
 
   useEffect(() => {
     if (!isAdmin) return;
     supabase.from("user_profiles").select("*").order("created_at", { ascending: false })
       .then(({ data, error }) => { setUsers(data || []); if (error) setErr(error.message); });
+    supabase.from("events").select("*").like("event_type", "new_signup%").order("detected_at", { ascending: false }).limit(20)
+      .then(({ data }) => setEvents(data || []));
   }, [isAdmin]);
 
   if (loading) return <main style={{ padding: "5rem 2rem" }}><div style={{ color: dim }}>{t.loading_generic}</div></main>;
   if (!isAdmin) return <main style={{ padding: "5rem 2rem", textAlign: "center" }}><h1>{t.admin_403_title}</h1><p style={{ color: dim }}>{t.admin_403_body}</p></main>;
 
   const setTier = async (id, tier) => {
-    const { error } = await supabase.from("user_profiles").update({ tier }).eq("id", id);
-    if (error) alert(error.message); else setUsers(u => u.map(x => x.id === id ? { ...x, tier } : x));
+    const patch = { tier };
+    if (tier === "free" || tier === "paid") patch.approved_at = new Date().toISOString();
+    const { error } = await supabase.from("user_profiles").update(patch).eq("id", id);
+    if (error) alert(error.message); else setUsers(u => u.map(x => x.id === id ? { ...x, ...patch } : x));
   };
 
+  const pending = users.filter(u => u.tier === "pending");
+  const rest = users.filter(u => u.tier !== "pending");
+
   return (
-    <main style={{ padding: "5rem 2rem 4rem", maxWidth: 900, margin: "0 auto" }}>
+    <main style={{ padding: "5rem 2rem 4rem", maxWidth: 1100, margin: "0 auto" }}>
       <Label>{t.admin_label}</Label>
       <h1 className="sec-title">{t.admin_title}</h1>
       {err && <div style={{ color: "#ff6b6b" }}>{err}</div>}
-      <div style={{ border: `1px solid ${border}`, borderRadius: 12, overflow: "hidden", marginTop: "1.5rem" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
+
+      {/* Pending approvals */}
+      <SectionHeader>{t.admin_pending_section} {pending.length > 0 && <CountBadge n={pending.length} />}</SectionHeader>
+      {pending.length === 0 ? (
+        <div style={{ color: dim, padding: "1rem", fontSize: "0.9rem" }}>{t.admin_no_pending}</div>
+      ) : (
+        <UserTable users={pending} setTier={setTier} showApprove t={t} lang={lang} />
+      )}
+
+      {/* Signup events feed */}
+      {events.length > 0 && (
+        <>
+          <SectionHeader>{t.admin_events_section}</SectionHeader>
+          <div style={{ border: `1px solid ${border}`, borderRadius: 12, overflow: "hidden", marginBottom: "2rem" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
+              <thead style={{ background: "#0e0e10" }}>
+                <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                  <th style={th}>When</th>
+                  <th style={th}>Event</th>
+                  <th style={th}>Email</th>
+                  <th style={th}>Domain</th>
+                  <th style={th}>Org count</th>
+                </tr>
+              </thead>
+              <tbody>
+                {events.map(e => (
+                  <tr key={e.id} style={{ borderTop: `1px solid ${border}` }}>
+                    <td style={{ ...td, color: dim, fontFamily: mono, fontSize: "0.75rem" }}>{e.detected_at?.slice(0, 16).replace("T", " ")}</td>
+                    <td style={td}><EventBadge type={e.event_type} /></td>
+                    <td style={td}>{e.new_value?.email || "—"}</td>
+                    <td style={{ ...td, color: dim, fontFamily: mono }}>{e.new_value?.domain || "—"}</td>
+                    <td style={{ ...td, fontFamily: mono, color: (e.new_value?.org_count || 0) > 3 ? "#f5a623" : dim }}>{e.new_value?.org_count ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
+      {/* All users */}
+      <SectionHeader>{t.admin_new_section}</SectionHeader>
+      <UserTable users={rest} setTier={setTier} t={t} lang={lang} />
+    </main>
+  );
+}
+
+function UserTable({ users, setTier, showApprove, t, lang }) {
+  return (
+    <div style={{ border: `1px solid ${border}`, borderRadius: 12, overflow: "hidden", marginBottom: "2rem" }}>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
           <thead style={{ background: "#0e0e10" }}>
             <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
               <th style={th}>{t.admin_email}</th>
+              <th style={th}>Name</th>
+              <th style={th}>Company</th>
+              <th style={th}>Position</th>
               <th style={th}>{t.admin_tier}</th>
               <th style={th}>{t.admin_project}</th>
               <th style={th}>{t.admin_created}</th>
@@ -358,32 +473,70 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
             </tr>
           </thead>
           <tbody>
-            {users.map(u => (
-              <tr key={u.id} style={{ borderTop: `1px solid ${border}` }}>
-                <td style={td}>{u.email}</td>
-                <td style={td}><TierBadge tier={u.tier} /></td>
-                <td style={{ ...td, color: dim }}>{u.chosen_project_id || "—"}</td>
-                <td style={{ ...td, color: dim, fontFamily: mono }}>{u.created_at?.slice(0, 10)}</td>
-                <td style={td}>
-                  <select defaultValue={u.tier} onChange={e => setTier(u.id, e.target.value)}
-                    style={{ background: "#0e0e10", color: "#e8e8ed", border: `1px solid ${border}`, padding: "0.3rem 0.5rem", borderRadius: 4, fontSize: "0.8rem" }}>
-                    <option value="free">free</option>
-                    <option value="paid">paid</option>
-                    <option value="admin">admin</option>
-                  </select>
-                </td>
-              </tr>
-            ))}
+            {users.map(u => {
+              const isPersonal = u.email_domain && ["gmail.com","outlook.com","hotmail.com","yahoo.com","icloud.com","proton.me","protonmail.com"].includes(u.email_domain);
+              return (
+                <tr key={u.id} style={{ borderTop: `1px solid ${border}`, background: isPersonal ? "rgba(245,166,35,0.04)" : "transparent" }}>
+                  <td style={td}>
+                    {u.email}{" "}
+                    {isPersonal && <span title="Personal email" style={{ color: "#f5a623", fontSize: "0.7rem" }}>⚠</span>}
+                  </td>
+                  <td style={{ ...td, color: dim }}>{u.full_name || "—"}</td>
+                  <td style={{ ...td, color: dim }}>{u.company || "—"}</td>
+                  <td style={{ ...td, color: dim, fontFamily: mono, fontSize: "0.75rem" }}>{u.position || "—"}</td>
+                  <td style={td}><TierBadge tier={u.tier} /></td>
+                  <td style={{ ...td, color: dim, fontFamily: mono, fontSize: "0.75rem" }}>{u.chosen_project_id || "—"}</td>
+                  <td style={{ ...td, color: dim, fontFamily: mono, fontSize: "0.75rem" }}>{u.created_at?.slice(0, 10)}</td>
+                  <td style={td}>
+                    {showApprove ? (
+                      <button className="btn-p" style={{ padding: "0.3rem 0.75rem", fontSize: "0.75rem" }} onClick={() => setTier(u.id, "free")}>{t.admin_approve}</button>
+                    ) : (
+                      <select defaultValue={u.tier} onChange={e => setTier(u.id, e.target.value)}
+                        style={{ background: "#0e0e10", color: "#e8e8ed", border: `1px solid ${border}`, padding: "0.3rem 0.5rem", borderRadius: 4, fontSize: "0.75rem" }}>
+                        <option value="pending">pending</option>
+                        <option value="free">free</option>
+                        <option value="paid">paid</option>
+                        <option value="admin">admin</option>
+                      </select>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
-    </main>
+    </div>
   );
 }
 
+function SectionHeader({ children }) {
+  return <h2 style={{ fontSize: "1rem", fontWeight: 600, color: "#8a8a96", letterSpacing: "0.04em", textTransform: "uppercase", marginTop: "2.5rem", marginBottom: "1rem", fontFamily: mono, display: "flex", alignItems: "center", gap: "0.6rem" }}>{children}</h2>;
+}
+
+function CountBadge({ n }) {
+  return <span style={{ background: "#f5a623", color: "#0a0a0b", fontSize: "0.7rem", padding: "1px 7px", borderRadius: 10, fontWeight: 700 }}>{n}</span>;
+}
+
 function TierBadge({ tier }) {
-  const c = tier === "paid" ? "#00e5a0" : tier === "admin" ? "#f5a623" : dim;
+  const map = {
+    paid: "#00e5a0",
+    admin: "#f5a623",
+    pending: "#888",
+    free: "#c0c0c8",
+  };
+  const c = map[tier] || dim;
   return <span style={{ fontFamily: mono, fontSize: "0.7rem", color: c, border: `1px solid ${c}`, padding: "2px 8px", borderRadius: 4, textTransform: "uppercase", fontWeight: 600 }}>{tier}</span>;
+}
+
+function EventBadge({ type }) {
+  const m = {
+    new_signup: { color: "#00e5a0", label: "NEW" },
+    new_signup_personal_email: { color: "#f5a623", label: "PERSONAL EMAIL" },
+    new_signup_suspicious_org: { color: "#ff6b6b", label: "SUSPICIOUS ORG" },
+  };
+  const x = m[type] || { color: dim, label: type };
+  return <span style={{ fontFamily: mono, fontSize: "0.65rem", color: x.color, border: `1px solid ${x.color}`, padding: "1px 6px", borderRadius: 3, fontWeight: 700, letterSpacing: "0.05em" }}>{x.label}</span>;
 }
 
 /* ───────────────────── EARLY ACCESS BADGE ───────────────────── */

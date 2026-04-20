@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "../lib/useAuth";
 import { liveT } from "../lib/liveLang";
+import { validateBusinessEmail } from "../lib/emailValidation";
 
 export default function LoginModal({ open, onClose, lang = "en" }) {
   const t = liveT[lang] || liveT.en;
@@ -12,8 +13,12 @@ export default function LoginModal({ open, onClose, lang = "en" }) {
 
   if (!open) return null;
 
+  const emailError = email ? validateBusinessEmail(email, lang) : null;
+
   const submit = async (e) => {
     e.preventDefault();
+    const err = validateBusinessEmail(email, lang);
+    if (err) { setError(err); return; }
     setError(null); setBusy(true);
     const { error } = await signIn(email);
     setBusy(false);
@@ -49,16 +54,20 @@ export default function LoginModal({ open, onClose, lang = "en" }) {
                 placeholder={t.login_placeholder}
                 style={{
                   width: "100%", padding: "0.75rem 1rem", background: "#0e0e10",
-                  border: "1px solid #222228", borderRadius: 8, color: "#e8e8ed",
-                  fontSize: "0.95rem", fontFamily: "inherit", marginBottom: "0.75rem",
-                  boxSizing: "border-box",
+                  border: `1px solid ${emailError ? "#ff6b6b" : "#222228"}`, borderRadius: 8, color: "#e8e8ed",
+                  fontSize: "0.95rem", fontFamily: "inherit", marginBottom: "0.25rem",
+                  boxSizing: "border-box", outline: "none",
                 }}
               />
+              <div style={{ fontSize: "0.7rem", color: emailError ? "#ff6b6b" : "#55555f", marginBottom: "0.75rem", minHeight: "1rem" }}>
+                {emailError || t.login_biz_email_hint}
+              </div>
               {error && <div style={{ color: "#ff6b6b", fontSize: "0.8rem", marginBottom: "0.75rem" }}>{error}</div>}
-              <button type="submit" disabled={busy || !email} style={{
+              <button type="submit" disabled={busy || !email || !!emailError} style={{
                 width: "100%", padding: "0.75rem", background: "#00e5a0", color: "#0a0a0b",
-                fontWeight: 600, borderRadius: 8, border: "none", cursor: busy ? "wait" : "pointer",
-                fontSize: "0.9rem", opacity: busy ? 0.6 : 1,
+                fontWeight: 600, borderRadius: 8, border: "none",
+                cursor: (busy || emailError) ? "not-allowed" : "pointer",
+                fontSize: "0.9rem", opacity: (busy || emailError) ? 0.4 : 1,
               }}>{busy ? t.login_sending : t.login_send}</button>
             </form>
             <p style={{ fontSize: "0.7rem", color: "#55555f", marginTop: "1rem", textAlign: "center" }}>

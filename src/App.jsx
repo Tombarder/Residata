@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import Ticker from "./components/Ticker";
 import LoginModal from "./components/LoginModal";
+import CompleteProfile from "./components/CompleteProfile";
+import PendingGate from "./components/PendingGate";
 import { LiveDashboard, LiveProjectDetail, LiveAnalytics, LiveAdmin, EarlyAccessBadge } from "./pages/LivePages";
 import { useAuth } from "./lib/useAuth";
 
@@ -1387,18 +1389,32 @@ export default function App() {
       {/* Spacer for fixed Nav (72px) + Ticker (36px) */}
       <div style={{ height: 36 }} />
       {current === "Home" && <HomePage setCurrent={handleNav} l={l} />}
-      {current === "Live" && <LiveDashboard setCurrent={handleNav} openLogin={() => setLoginOpen(true)} lang={lang} />}
+      {current === "Live" && (
+        auth.user && auth.profile?.tier === "pending"
+          ? <PendingGate setCurrent={handleNav} lang={lang} />
+          : <LiveDashboard setCurrent={handleNav} openLogin={() => setLoginOpen(true)} lang={lang} />
+      )}
       {current === "Use Cases" && <UseCasesPage setCurrent={handleNav} l={l} />}
       {current === "Data" && <DataPage setCurrent={handleNav} l={l} />}
       {current === "Pricing" && <PricingPage setCurrent={handleNav} l={l} lang={lang} />}
       {current === "Contact" && <ContactPage l={l} />}
-      {current === "Analytics" && <LiveAnalytics setCurrent={handleNav} openLogin={() => setLoginOpen(true)} lang={lang} />}
+      {current === "Analytics" && (
+        auth.user && auth.profile?.tier === "pending"
+          ? <PendingGate setCurrent={handleNav} lang={lang} />
+          : <LiveAnalytics setCurrent={handleNav} openLogin={() => setLoginOpen(true)} lang={lang} />
+      )}
       {current === "Admin" && <LiveAdmin setCurrent={handleNav} lang={lang} />}
       {typeof current === "string" && current.startsWith("Project:") && (
-        <LiveProjectDetail projectId={current.slice(8)} setCurrent={handleNav} openLogin={() => setLoginOpen(true)} lang={lang} />
+        auth.user && auth.profile?.tier === "pending"
+          ? <PendingGate setCurrent={handleNav} lang={lang} />
+          : <LiveProjectDetail projectId={current.slice(8)} setCurrent={handleNav} openLogin={() => setLoginOpen(true)} lang={lang} />
       )}
       <Footer />
       <LoginModal open={loginOpen} onClose={() => setLoginOpen(false)} lang={lang} />
+      {/* Force profile completion after login */}
+      {auth.user && auth.profile && !auth.profile.profile_completed && (
+        <CompleteProfile lang={lang} />
+      )}
       </div>
     </div>
   );
