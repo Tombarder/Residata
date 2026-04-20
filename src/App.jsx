@@ -1049,15 +1049,26 @@ function DataPage({ setCurrent, l }) {
 }
 
 /* ─────── PRICING ─────── */
-function PricingPage({ setCurrent, l }) {
+function PricingPage({ setCurrent, l, lang }) {
   const mono = "'JetBrains Mono', monospace";
   const tiers = l.tiers;
   const faqs = l.faqs;
+  const ea = lang === "sk" ? {
+    badge: "🔥 Early access — 5 min a máš prístup",
+    body: <>Prvých <strong style={{ color: "#00e5a0" }}>9 zákazníkov</strong> dostane <strong style={{ color: "#00e5a0" }}>50 % zľavu prvé 3 mesiace</strong>. Žiadne formuláre — krátky 5-minútový call, dohodneme sa, prístup máš hneď.</>,
+    cta1: "📞 Zavolať +421 911 963 909",
+    cta2: "✉️ Booknuť 5-min call",
+  } : {
+    badge: "🔥 Early access — 5 minutes to full access",
+    body: <>First <strong style={{ color: "#00e5a0" }}>9 customers</strong> get <strong style={{ color: "#00e5a0" }}>50% off for the first 3 months</strong>. No forms — a quick 5-minute call, we agree, you're in.</>,
+    cta1: "📞 Call +421 911 963 909",
+    cta2: "✉️ Book a 5-min call",
+  };
 
   return (
     <>
       <div style={{ padding: "8rem 2rem 3rem", maxWidth: 1100, margin: "0 auto", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
-        <div style={{ marginBottom: "1rem" }}><EarlyAccessBadge /></div>
+        <div style={{ marginBottom: "1rem" }}><EarlyAccessBadge lang={lang} /></div>
         <Label>{l.pricingLabel}</Label>
         <h1 className="sec-title">{l.pricingTitle}</h1>
         <p className="sec-desc" style={{ textAlign: "center" }}>{l.pricingDesc}</p>
@@ -1069,15 +1080,14 @@ function PricingPage({ setCurrent, l }) {
           border: "1px solid rgba(0,229,160,0.25)", borderRadius: 12, width: "100%",
         }}>
           <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem", color: "#00e5a0", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "0.5rem" }}>
-            🔥 Early access — 5 min a máš prístup
+            {ea.badge}
           </div>
           <p style={{ fontSize: "0.95rem", color: "#e8e8ed", lineHeight: 1.6, marginBottom: "1rem" }}>
-            Prvých <strong style={{ color: "#00e5a0" }}>9 zákazníkov</strong> dostane <strong style={{ color: "#00e5a0" }}>50 % zľavu prvé 3 mesiace</strong>.
-            Žiadne formuláre — krátky 5-minútový call, dohodneme sa, prístup máš hneď.
+            {ea.body}
           </p>
           <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center", flexWrap: "wrap" }}>
-            <a href="tel:+421911963909" className="btn-p">📞 Zavolať +421 911 963 909</a>
-            <a href="mailto:residata@proton.me?subject=Early%20access%20-%205%20min%20call" className="btn-s">✉️ Booknuť 5-min call</a>
+            <a href="tel:+421911963909" className="btn-p">{ea.cta1}</a>
+            <a href="mailto:residata@proton.me?subject=Early%20access%20-%205%20min%20call" className="btn-s">{ea.cta2}</a>
           </div>
         </div>
       </div>
@@ -1373,22 +1383,22 @@ export default function App() {
       <RisingParticles />
       <div style={{ position: "relative", zIndex: 1 }}>
       <Nav current={current} setCurrent={handleNav} lang={lang} setLang={setLang} auth={auth} onLogin={() => setLoginOpen(true)} />
-      <Ticker />
+      <Ticker lang={lang} />
       {/* Spacer for fixed Nav (72px) + Ticker (36px) */}
       <div style={{ height: 36 }} />
       {current === "Home" && <HomePage setCurrent={handleNav} l={l} />}
-      {current === "Live" && <LiveDashboard setCurrent={handleNav} openLogin={() => setLoginOpen(true)} />}
+      {current === "Live" && <LiveDashboard setCurrent={handleNav} openLogin={() => setLoginOpen(true)} lang={lang} />}
       {current === "Use Cases" && <UseCasesPage setCurrent={handleNav} l={l} />}
       {current === "Data" && <DataPage setCurrent={handleNav} l={l} />}
-      {current === "Pricing" && <PricingPage setCurrent={handleNav} l={l} />}
+      {current === "Pricing" && <PricingPage setCurrent={handleNav} l={l} lang={lang} />}
       {current === "Contact" && <ContactPage l={l} />}
-      {current === "Analytics" && <LiveAnalytics setCurrent={handleNav} openLogin={() => setLoginOpen(true)} />}
-      {current === "Admin" && <LiveAdmin setCurrent={handleNav} />}
+      {current === "Analytics" && <LiveAnalytics setCurrent={handleNav} openLogin={() => setLoginOpen(true)} lang={lang} />}
+      {current === "Admin" && <LiveAdmin setCurrent={handleNav} lang={lang} />}
       {typeof current === "string" && current.startsWith("Project:") && (
-        <LiveProjectDetail projectId={current.slice(8)} setCurrent={handleNav} openLogin={() => setLoginOpen(true)} />
+        <LiveProjectDetail projectId={current.slice(8)} setCurrent={handleNav} openLogin={() => setLoginOpen(true)} lang={lang} />
       )}
       <Footer />
-      <LoginModal open={loginOpen} onClose={() => setLoginOpen(false)} />
+      <LoginModal open={loginOpen} onClose={() => setLoginOpen(false)} lang={lang} />
       </div>
     </div>
   );

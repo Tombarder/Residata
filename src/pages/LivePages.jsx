@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../lib/useAuth";
 import { useProjects, useProjectFlats, useEarlyAccessStats } from "../lib/useData";
 import { supabase } from "../lib/supabase";
+import { liveT, ll } from "../lib/liveLang";
 
 const mono = "'JetBrains Mono', monospace";
 const green = "#00e5a0";
@@ -10,53 +11,50 @@ const border = "#222228";
 const bg = "#16161a";
 
 /* ───────────────────── LIVE DASHBOARD ───────────────────── */
-export function LiveDashboard({ setCurrent, openLogin }) {
+export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
+  const t = liveT[lang] || liveT.en;
   const { user, isPaid } = useAuth();
   const { projects, loading } = useProjects();
   const shown = user ? projects : projects.slice(0, 20);
 
-  const stavLabel = { V: "voľné", P: "predané", R: "rezerv.", PR: "predrez." };
-
   return (
     <main style={{ padding: "5rem 2rem 4rem", maxWidth: 1200, margin: "0 auto" }}>
-      <Label>Live dashboard</Label>
-      <h1 className="sec-title">Aktuálny stav trhu</h1>
+      <Label>{t.live_label}</Label>
+      <h1 className="sec-title">{t.live_title}</h1>
       <p className="sec-desc" style={{ marginBottom: "2.5rem" }}>
-        Dáta aktualizované každý deň. Filtruj, preklikni, porovnaj.
-        {!user && <> Registrácia odomkne plný detail 1 projektu (zadarmo).</>}
-        {user && !isPaid && <> <button onClick={() => setCurrent && setCurrent("Pricing")} style={linkBtn}>Upgrade na paid</button> pre prístup ku všetkým 60 projektom.</>}
+        {t.live_desc_base}{" "}
+        {!user && <>{t.live_desc_anon}</>}
+        {user && !isPaid && <> <button onClick={() => setCurrent && setCurrent("Pricing")} style={linkBtn}>{t.upgrade_to_paid}</button> — {t.live_desc_free}</>}
       </p>
 
-      {/* Top summary cards */}
-      <SummaryCards projects={projects} />
+      <SummaryCards projects={projects} t={t} />
 
-      {/* Projects list */}
       <div style={{ marginTop: "3rem" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "1rem" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "1rem", flexWrap: "wrap", gap: "1rem" }}>
           <div>
-            <div style={labelStyle}>Projects</div>
+            <div style={labelStyle}>{t.projects_section_label}</div>
             <h2 style={{ fontSize: "1.6rem", fontWeight: 700 }}>
-              {user ? `${projects.length} projektov` : `Top ${Math.min(20, projects.length)} z ${projects.length}`}
+              {user ? ll(t.projects_title_all, { n: projects.length }) : ll(t.projects_title_top, { n: Math.min(20, projects.length), total: projects.length })}
             </h2>
           </div>
-          {!user && <button className="btn-p" onClick={openLogin}>Registrovať pre plný zoznam</button>}
+          {!user && <button className="btn-p" onClick={openLogin}>{t.register_for_full}</button>}
         </div>
 
         {loading ? (
-          <div style={{ color: dim, padding: "2rem", textAlign: "center" }}>Načítavam…</div>
+          <div style={{ color: dim, padding: "2rem", textAlign: "center" }}>{t.loading_generic}</div>
         ) : (
           <div style={{ border: `1px solid ${border}`, borderRadius: 12, overflow: "hidden" }}>
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
                 <thead style={{ background: "#0e0e10" }}>
                   <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                    <th style={th}>Projekt</th>
-                    <th style={th}>Okres</th>
-                    <th style={{ ...th, textAlign: "right" }}>Bytov</th>
-                    <th style={{ ...th, textAlign: "right" }}>Voľné</th>
-                    <th style={{ ...th, textAlign: "right" }}>Vypredané</th>
-                    <th style={{ ...th, textAlign: "right" }}>% predané</th>
-                    <th style={{ ...th, textAlign: "right" }}>€/m²</th>
+                    <th style={th}>{t.tbl_project}</th>
+                    <th style={th}>{t.tbl_district}</th>
+                    <th style={{ ...th, textAlign: "right" }}>{t.tbl_units}</th>
+                    <th style={{ ...th, textAlign: "right" }}>{t.tbl_available}</th>
+                    <th style={{ ...th, textAlign: "right" }}>{t.tbl_sold}</th>
+                    <th style={{ ...th, textAlign: "right" }}>{t.tbl_sold_pct}</th>
+                    <th style={{ ...th, textAlign: "right" }}>{t.tbl_eur_m2}</th>
                     <th style={th}></th>
                   </tr>
                 </thead>
@@ -69,9 +67,9 @@ export function LiveDashboard({ setCurrent, openLogin }) {
                       <td style={{ ...td, textAlign: "right", fontFamily: mono, color: green }}>{p.available_units}</td>
                       <td style={{ ...td, textAlign: "right", fontFamily: mono, color: "#f5a623" }}>{p.sold_units}</td>
                       <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{p.sold_percentage != null ? `${p.sold_percentage}%` : "—"}</td>
-                      <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{p.avg_price_eur_m2 ? `${Math.round(p.avg_price_eur_m2).toLocaleString("sk-SK")}` : "—"}</td>
+                      <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{p.avg_price_eur_m2 ? `${Math.round(p.avg_price_eur_m2).toLocaleString(lang === "sk" ? "sk-SK" : "en-US")}` : "—"}</td>
                       <td style={{ ...td, textAlign: "right" }}>
-                        <button onClick={() => setCurrent && setCurrent(`Project:${p.id}`)} style={miniBtn}>Detail →</button>
+                        <button onClick={() => setCurrent && setCurrent(`Project:${p.id}`)} style={miniBtn}>{t.tbl_detail}</button>
                       </td>
                     </tr>
                   ))}
@@ -83,7 +81,7 @@ export function LiveDashboard({ setCurrent, openLogin }) {
 
         {!user && projects.length > 20 && (
           <div style={{ textAlign: "center", padding: "1.5rem", color: dim, fontSize: "0.85rem" }}>
-            Skrytých {projects.length - 20} projektov. <button onClick={openLogin} style={linkBtn}>Zaregistruj sa zadarmo</button> pre plný zoznam.
+            {ll(t.hidden_projects, { n: projects.length - 20 })} <button onClick={openLogin} style={linkBtn}>{t.register_free}</button> {t.for_full_list}
           </div>
         )}
       </div>
@@ -91,7 +89,7 @@ export function LiveDashboard({ setCurrent, openLogin }) {
   );
 }
 
-function SummaryCards({ projects }) {
+function SummaryCards({ projects, t }) {
   const totals = projects.reduce((acc, p) => {
     acc.total += p.total_units || 0;
     acc.available += p.available_units || 0;
@@ -99,6 +97,7 @@ function SummaryCards({ projects }) {
     return acc;
   }, { total: 0, available: 0, sold: 0 });
   const soldOut = projects.filter(p => p.sold_percentage === 100).length;
+  const fmt = n => n.toLocaleString(t === liveT.sk ? "sk-SK" : "en-US");
 
   const Card = ({ label, value, sub }) => (
     <div style={{ border: `1px solid ${border}`, borderRadius: 12, background: bg, padding: "1.5rem" }}>
@@ -109,17 +108,18 @@ function SummaryCards({ projects }) {
   );
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem" }}>
-      <Card label="Projektov" value={projects.length} sub="aktívne na trhu" />
-      <Card label="Bytov celkom" value={totals.total.toLocaleString("sk-SK")} sub="naprieč všetkými projektmi" />
-      <Card label="Voľné" value={totals.available.toLocaleString("sk-SK")} sub="aktuálne na trhu" />
-      <Card label="Predané" value={totals.sold.toLocaleString("sk-SK")} sub={`vypredaných projektov: ${soldOut}`} />
+      <Card label={t.card_projects} value={projects.length} sub={t.card_projects_sub} />
+      <Card label={t.card_total_units} value={fmt(totals.total)} sub={t.card_total_units_sub} />
+      <Card label={t.card_available} value={fmt(totals.available)} sub={t.card_available_sub} />
+      <Card label={t.card_sold} value={fmt(totals.sold)} sub={`${t.card_sold_sub_prefix} ${soldOut}`} />
     </div>
   );
 }
 
 /* ───────────────────── PROJECT DETAIL (gated) ───────────────────── */
-export function LiveProjectDetail({ projectId, setCurrent, openLogin }) {
-  const { user, profile, tier, isPaid, reloadProfile } = useAuth();
+export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en" }) {
+  const t = liveT[lang] || liveT.en;
+  const { user, profile, isPaid, reloadProfile } = useAuth();
   const { flats, loading, error } = useProjectFlats(projectId);
   const { projects } = useProjects();
   const project = projects.find(p => p.id === projectId);
@@ -127,16 +127,16 @@ export function LiveProjectDetail({ projectId, setCurrent, openLogin }) {
   if (!user) {
     return (
       <GateMessage
-        title="Prihlás sa pre detail projektu"
-        body="Free účet ti odomkne plný detail ľubovoľného 1 projektu. Paid účet má prístup ku všetkým."
-        cta="Prihlásiť sa (free)"
+        title={t.gate_login_title}
+        body={t.gate_login_body}
+        cta={t.gate_login_cta}
+        backLabel={t.back_to_dashboard}
         onCta={openLogin}
         setCurrent={setCurrent}
       />
     );
   }
 
-  // Logged in but not paid and hasn't chosen this project
   const canViewDetail = isPaid || profile?.chosen_project_id === projectId;
 
   if (!canViewDetail) {
@@ -147,55 +147,58 @@ export function LiveProjectDetail({ projectId, setCurrent, openLogin }) {
         profile={profile}
         reloadProfile={reloadProfile}
         setCurrent={setCurrent}
+        t={t}
       />
     );
   }
 
   return (
     <main style={{ padding: "5rem 2rem 4rem", maxWidth: 1200, margin: "0 auto" }}>
-      <button onClick={() => setCurrent && setCurrent("Live")} style={{ ...linkBtn, marginBottom: "1rem" }}>← Späť na projekty</button>
+      <button onClick={() => setCurrent && setCurrent("Live")} style={{ ...linkBtn, marginBottom: "1rem" }}>{t.back_to_projects}</button>
 
       <Label>{project?.district || "Bratislava"}</Label>
       <h1 className="sec-title">{project?.name || projectId}</h1>
       <p className="sec-desc" style={{ marginBottom: "2rem" }}>
-        {project ? `${project.total_units} bytov · ${project.available_units} voľných · ${project.sold_percentage ?? "?"}% predané` : ""}
+        {project ? `${project.total_units} ${t.tbl_units.toLowerCase()} · ${project.available_units} ${t.tbl_available.toLowerCase()} · ${project.sold_percentage ?? "?"}% ${t.tbl_sold.toLowerCase()}` : ""}
         {!isPaid && <span style={{ display: "block", marginTop: "0.5rem", color: dim, fontSize: "0.85rem" }}>
-          ⓘ Zobrazujeme aktuálny snapshot. História a analytika sú súčasťou <button onClick={() => setCurrent && setCurrent("Pricing")} style={linkBtn}>paid tier-u</button>.
+          {t.snapshot_notice}{" "}
+          <button onClick={() => setCurrent && setCurrent("Pricing")} style={linkBtn}>{t.paid_tier}</button>.
         </span>}
       </p>
 
-      {loading ? <div style={{ color: dim }}>Načítavam byty…</div> :
-        error ? <div style={{ color: "#ff6b6b" }}>Chyba: {error.message}</div> :
-        flats.length === 0 ? <div style={{ color: dim }}>Žiadne dáta.</div> :
-        <FlatsTable flats={flats} />}
+      {loading ? <div style={{ color: dim }}>{t.loading_generic}</div> :
+        error ? <div style={{ color: "#ff6b6b" }}>Error: {error.message}</div> :
+        flats.length === 0 ? <div style={{ color: dim }}>{t.no_data}</div> :
+        <FlatsTable flats={flats} t={t} lang={lang} />}
     </main>
   );
 }
 
-function FlatsTable({ flats }) {
+function FlatsTable({ flats, t, lang }) {
   const stavStyle = {
     V: { color: "#00e5a0", bg: "rgba(0,229,160,0.08)" },
     P: { color: "#f5a623", bg: "rgba(245,166,35,0.08)" },
     R: { color: "#888", bg: "rgba(136,136,136,0.08)" },
     PR: { color: "#aaa", bg: "rgba(170,170,170,0.08)" },
   };
+  const locale = lang === "sk" ? "sk-SK" : "en-US";
   return (
     <div style={{ border: `1px solid ${border}`, borderRadius: 12, overflow: "hidden" }}>
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
           <thead style={{ background: "#0e0e10" }}>
             <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-              <th style={th}>Byt</th>
-              <th style={th}>Budova</th>
-              <th style={th}>Posch.</th>
-              <th style={th}>Izby</th>
-              <th style={{ ...th, textAlign: "right" }}>Interiér</th>
-              <th style={{ ...th, textAlign: "right" }}>Exteriér</th>
-              <th style={{ ...th, textAlign: "right" }}>Celk.</th>
-              <th style={{ ...th, textAlign: "right" }}>Cena</th>
-              <th style={th}>Orient.</th>
-              <th style={th}>Kolaud.</th>
-              <th style={th}>Stav</th>
+              <th style={th}>{t.tbl_flat}</th>
+              <th style={th}>{t.tbl_building}</th>
+              <th style={th}>{t.tbl_floor}</th>
+              <th style={th}>{t.tbl_rooms}</th>
+              <th style={{ ...th, textAlign: "right" }}>{t.tbl_interior}</th>
+              <th style={{ ...th, textAlign: "right" }}>{t.tbl_exterior}</th>
+              <th style={{ ...th, textAlign: "right" }}>{t.tbl_total}</th>
+              <th style={{ ...th, textAlign: "right" }}>{t.tbl_price}</th>
+              <th style={th}>{t.tbl_orientation}</th>
+              <th style={th}>{t.tbl_handover}</th>
+              <th style={th}>{t.tbl_status}</th>
             </tr>
           </thead>
           <tbody>
@@ -206,10 +209,10 @@ function FlatsTable({ flats }) {
                 <td style={{ ...td, fontFamily: mono }}>{f.poschodie ?? "—"}</td>
                 <td style={{ ...td, fontFamily: mono }}>{f.izby ?? "—"}</td>
                 <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{f.obytna_plocha ? `${f.obytna_plocha} m²` : "—"}</td>
-                <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{f.exterier_plocha ? `${f.exterier_plocha}` : "—"}</td>
-                <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{f.celkova_plocha ? `${f.celkova_plocha}` : "—"}</td>
+                <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{f.exterier_plocha ?? "—"}</td>
+                <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{f.celkova_plocha ?? "—"}</td>
                 <td style={{ ...td, textAlign: "right", fontFamily: mono }}>
-                  {f.cena_s_dph != null ? `${Math.round(f.cena_s_dph).toLocaleString("sk-SK")} €` :
+                  {f.cena_s_dph != null ? `${Math.round(f.cena_s_dph).toLocaleString(locale)} €` :
                     f.cena_s_dph_text ? <span style={{ color: dim }}>{f.cena_s_dph_text}</span> : "—"}
                 </td>
                 <td style={{ ...td, fontFamily: mono, color: dim }}>{f.orientacia || "—"}</td>
@@ -231,7 +234,7 @@ function FlatsTable({ flats }) {
   );
 }
 
-function ChooseProjectGate({ projectId, projectName, profile, reloadProfile, setCurrent }) {
+function ChooseProjectGate({ projectId, projectName, profile, reloadProfile, setCurrent, t }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
   const assign = async () => {
@@ -243,29 +246,29 @@ function ChooseProjectGate({ projectId, projectName, profile, reloadProfile, set
   };
   return (
     <main style={{ padding: "5rem 2rem 4rem", maxWidth: 720, margin: "0 auto" }}>
-      <Label>Free tier gate</Label>
-      <h1 className="sec-title">Vyber si 1 projekt</h1>
+      <Label>{t.choose_label}</Label>
+      <h1 className="sec-title">{t.choose_title}</h1>
       <p className="sec-desc" style={{ marginBottom: "1.5rem" }}>
-        Free účet ti odomkne plný detail <strong style={{ color: green }}>1 projektu</strong>. Chceš sledovať <strong style={{ color: green }}>{projectName}</strong>?
+        {t.choose_body_prefix} <strong style={{ color: green }}>{t.choose_body_suffix === "one project. Want to track" ? "1 project" : "1 projektu"}</strong>. {t.choose_body_suffix.replace("one project. Want to track", "").replace("1 projektu. Chceš sledovať", "")} <strong style={{ color: green }}>{projectName}</strong>?
       </p>
       {profile?.chosen_project_id && (
         <div style={{ padding: "1rem", background: "#1a1a1f", border: `1px solid ${border}`, borderRadius: 8, marginBottom: "1rem", fontSize: "0.85rem", color: dim }}>
-          Momentálne máš priradený projekt: <strong style={{ color: "#e8e8ed" }}>{profile.chosen_project_id}</strong>. Touto akciou ho zmeníš.
+          {t.choose_current_prefix} <strong style={{ color: "#e8e8ed" }}>{profile.chosen_project_id}</strong>. {t.choose_current_suffix}
         </div>
       )}
       <div style={{ display: "flex", gap: "0.75rem", marginTop: "1rem" }}>
-        <button className="btn-p" onClick={assign} disabled={busy}>{busy ? "Ukladám…" : `Sledovať ${projectName}`}</button>
-        <button className="btn-s" onClick={() => setCurrent && setCurrent("Live")}>Späť</button>
+        <button className="btn-p" onClick={assign} disabled={busy}>{busy ? t.saving : ll(t.choose_watch, { name: projectName })}</button>
+        <button className="btn-s" onClick={() => setCurrent && setCurrent("Live")}>{t.choose_back}</button>
       </div>
       {err && <div style={{ color: "#ff6b6b", marginTop: "0.75rem" }}>{err}</div>}
       <p style={{ fontSize: "0.8rem", color: dim, marginTop: "2rem" }}>
-        Chceš sledovať všetkých 60 projektov naraz? <button onClick={() => setCurrent && setCurrent("Pricing")} style={linkBtn}>Upgrade na paid</button>.
+        {t.choose_upgrade_hint} <button onClick={() => setCurrent && setCurrent("Pricing")} style={linkBtn}>{t.upgrade_to_paid}</button>.
       </p>
     </main>
   );
 }
 
-function GateMessage({ title, body, cta, onCta, setCurrent }) {
+function GateMessage({ title, body, cta, backLabel, onCta, setCurrent }) {
   return (
     <main style={{ padding: "6rem 2rem 4rem", maxWidth: 600, margin: "0 auto", textAlign: "center" }}>
       <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>🔒</div>
@@ -273,45 +276,53 @@ function GateMessage({ title, body, cta, onCta, setCurrent }) {
       <p style={{ color: dim, fontSize: "1rem", lineHeight: 1.6, marginBottom: "1.5rem" }}>{body}</p>
       <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center" }}>
         <button className="btn-p" onClick={onCta}>{cta}</button>
-        <button className="btn-s" onClick={() => setCurrent && setCurrent("Live")}>Späť na dashboard</button>
+        <button className="btn-s" onClick={() => setCurrent && setCurrent("Live")}>{backLabel}</button>
       </div>
     </main>
   );
 }
 
 /* ───────────────────── ANALYTICS (paid only) ───────────────────── */
-export function LiveAnalytics({ setCurrent, openLogin }) {
+export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
+  const t = liveT[lang] || liveT.en;
   const { user, isPaid } = useAuth();
   if (!user) {
-    return <GateMessage title="Prihlás sa pre analytiku" body="Analytika a trendy sú súčasťou paid účtu." cta="Prihlásiť sa" onCta={openLogin} setCurrent={setCurrent} />;
+    return <GateMessage
+      title={t.analytics_gate_title}
+      body={t.analytics_gate_body}
+      cta={t.gate_login_cta}
+      backLabel={t.back_to_dashboard}
+      onCta={openLogin}
+      setCurrent={setCurrent}
+    />;
   }
   if (!isPaid) {
     return (
       <main style={{ padding: "5rem 2rem 4rem", maxWidth: 600, margin: "0 auto", textAlign: "center" }}>
         <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>📊</div>
-        <h1 style={{ fontSize: "1.8rem", fontWeight: 700 }}>Analytika je pre paid tier</h1>
+        <h1 style={{ fontSize: "1.8rem", fontWeight: 700 }}>{t.analytics_paid_title}</h1>
         <p style={{ color: dim, lineHeight: 1.6, marginTop: "0.75rem", marginBottom: "1.5rem" }}>
-          Cenové trendy naprieč mesiacmi, heat mapy okresov, top developers, absorption rate,
-          monthly PDF reporty — to všetko v paid tier-e.
+          {t.analytics_paid_body}
         </p>
-        <button className="btn-p" onClick={() => setCurrent && setCurrent("Pricing")}>Zobraziť cenník</button>
+        <button className="btn-p" onClick={() => setCurrent && setCurrent("Pricing")}>{t.analytics_see_pricing}</button>
       </main>
     );
   }
   return (
     <main style={{ padding: "5rem 2rem 4rem", maxWidth: 1000, margin: "0 auto" }}>
-      <Label>Analytics</Label>
-      <h1 className="sec-title">Trendy a insights</h1>
-      <p className="sec-desc">Čoskoro: grafy cien v čase, heat mapy okresov, export dát, monthly reporty.</p>
+      <Label>{t.analytics_label}</Label>
+      <h1 className="sec-title">{t.analytics_title}</h1>
+      <p className="sec-desc">{t.analytics_desc}</p>
       <div style={{ marginTop: "2rem", padding: "3rem", border: `1px dashed ${border}`, borderRadius: 12, textAlign: "center", color: dim }}>
-        Detailné grafy a trend analytika v príprave — pre včasný prístup napíš na residata@proton.me
+        {t.analytics_placeholder}
       </div>
     </main>
   );
 }
 
 /* ───────────────────── ADMIN ───────────────────── */
-export function LiveAdmin({ setCurrent }) {
+export function LiveAdmin({ setCurrent, lang = "en" }) {
+  const t = liveT[lang] || liveT.en;
   const { isAdmin, loading } = useAuth();
   const [users, setUsers] = useState([]);
   const [err, setErr] = useState(null);
@@ -322,8 +333,8 @@ export function LiveAdmin({ setCurrent }) {
       .then(({ data, error }) => { setUsers(data || []); if (error) setErr(error.message); });
   }, [isAdmin]);
 
-  if (loading) return <main style={{ padding: "5rem 2rem" }}><div style={{ color: dim }}>Loading…</div></main>;
-  if (!isAdmin) return <main style={{ padding: "5rem 2rem", textAlign: "center" }}><h1>403</h1><p style={{ color: dim }}>Admin only.</p></main>;
+  if (loading) return <main style={{ padding: "5rem 2rem" }}><div style={{ color: dim }}>{t.loading_generic}</div></main>;
+  if (!isAdmin) return <main style={{ padding: "5rem 2rem", textAlign: "center" }}><h1>{t.admin_403_title}</h1><p style={{ color: dim }}>{t.admin_403_body}</p></main>;
 
   const setTier = async (id, tier) => {
     const { error } = await supabase.from("user_profiles").update({ tier }).eq("id", id);
@@ -332,18 +343,18 @@ export function LiveAdmin({ setCurrent }) {
 
   return (
     <main style={{ padding: "5rem 2rem 4rem", maxWidth: 900, margin: "0 auto" }}>
-      <Label>Admin</Label>
-      <h1 className="sec-title">User tier management</h1>
+      <Label>{t.admin_label}</Label>
+      <h1 className="sec-title">{t.admin_title}</h1>
       {err && <div style={{ color: "#ff6b6b" }}>{err}</div>}
       <div style={{ border: `1px solid ${border}`, borderRadius: 12, overflow: "hidden", marginTop: "1.5rem" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
           <thead style={{ background: "#0e0e10" }}>
             <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-              <th style={th}>Email</th>
-              <th style={th}>Tier</th>
-              <th style={th}>Project</th>
-              <th style={th}>Created</th>
-              <th style={th}>Actions</th>
+              <th style={th}>{t.admin_email}</th>
+              <th style={th}>{t.admin_tier}</th>
+              <th style={th}>{t.admin_project}</th>
+              <th style={th}>{t.admin_created}</th>
+              <th style={th}>{t.admin_actions}</th>
             </tr>
           </thead>
           <tbody>
@@ -376,9 +387,11 @@ function TierBadge({ tier }) {
 }
 
 /* ───────────────────── EARLY ACCESS BADGE ───────────────────── */
-export function EarlyAccessBadge() {
+export function EarlyAccessBadge({ lang = "en" }) {
+  const t = liveT[lang] || liveT.en;
   const { remaining_slots } = useEarlyAccessStats();
   if (remaining_slots <= 0) return null;
+  const tmpl = remaining_slots === 1 ? t.ea_badge_one : t.ea_badge;
   return (
     <div style={{
       display: "inline-flex", alignItems: "center", gap: "0.5rem",
@@ -387,7 +400,7 @@ export function EarlyAccessBadge() {
       fontFamily: mono, fontSize: "0.7rem", color: green, fontWeight: 600,
     }}>
       <span style={{ width: 6, height: 6, borderRadius: "50%", background: green }}></span>
-      Early Access — zostáva {remaining_slots} {remaining_slots === 1 ? "miesto" : remaining_slots < 5 ? "miesta" : "miest"} z 9
+      {ll(tmpl, { n: remaining_slots })}
     </div>
   );
 }

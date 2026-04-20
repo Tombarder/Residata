@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useAuth } from "../lib/useAuth";
+import { liveT } from "../lib/liveLang";
 
-export default function LoginModal({ open, onClose }) {
+export default function LoginModal({ open, onClose, lang = "en" }) {
+  const t = liveT[lang] || liveT.en;
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [error, setError] = useState(null);
@@ -35,16 +37,16 @@ export default function LoginModal({ open, onClose }) {
 
         {!sent ? (
           <>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem", color: "#00e5a0", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "0.75rem" }}>Sign in</div>
-            <h2 style={{ fontSize: "1.4rem", fontWeight: 700, letterSpacing: "-0.02em", marginBottom: "0.5rem" }}>Get instant access</h2>
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem", color: "#00e5a0", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "0.75rem" }}>{t.login_label}</div>
+            <h2 style={{ fontSize: "1.4rem", fontWeight: 700, letterSpacing: "-0.02em", marginBottom: "0.5rem" }}>{t.login_title}</h2>
             <p style={{ fontSize: "0.85rem", color: "#8a8a96", lineHeight: 1.6, marginBottom: "1.25rem" }}>
-              Enter your email — we'll send you a magic link. No password, no spam.
+              {t.login_desc}
             </p>
             <form onSubmit={submit}>
               <input
                 type="email" required autoFocus
                 value={email} onChange={e => setEmail(e.target.value)}
-                placeholder="you@example.com"
+                placeholder={t.login_placeholder}
                 style={{
                   width: "100%", padding: "0.75rem 1rem", background: "#0e0e10",
                   border: "1px solid #222228", borderRadius: 8, color: "#e8e8ed",
@@ -57,24 +59,24 @@ export default function LoginModal({ open, onClose }) {
                 width: "100%", padding: "0.75rem", background: "#00e5a0", color: "#0a0a0b",
                 fontWeight: 600, borderRadius: 8, border: "none", cursor: busy ? "wait" : "pointer",
                 fontSize: "0.9rem", opacity: busy ? 0.6 : 1,
-              }}>{busy ? "Sending…" : "Send magic link"}</button>
+              }}>{busy ? t.login_sending : t.login_send}</button>
             </form>
             <p style={{ fontSize: "0.7rem", color: "#55555f", marginTop: "1rem", textAlign: "center" }}>
-              By signing in you agree to our basic terms. Free tier includes access to 1 full project snapshot.
+              {t.login_terms}
             </p>
           </>
         ) : (
           <>
             <div style={{ fontSize: "2rem", textAlign: "center", marginBottom: "0.5rem" }}>✉️</div>
-            <h2 style={{ fontSize: "1.3rem", fontWeight: 700, textAlign: "center", marginBottom: "0.75rem" }}>Check your email</h2>
+            <h2 style={{ fontSize: "1.3rem", fontWeight: 700, textAlign: "center", marginBottom: "0.75rem" }}>{t.login_check_title}</h2>
             <p style={{ fontSize: "0.85rem", color: "#8a8a96", textAlign: "center", lineHeight: 1.6 }}>
-              We sent a sign-in link to <strong style={{ color: "#e8e8ed" }}>{email}</strong>. Click the link to continue.
+              {t.login_check_body_prefix} <strong style={{ color: "#e8e8ed" }}>{email}</strong>{t.login_check_body_suffix}
             </p>
             <button onClick={onClose} style={{
               width: "100%", padding: "0.75rem", background: "transparent", color: "#e8e8ed",
               fontWeight: 500, borderRadius: 8, border: "1px solid #222228", cursor: "pointer",
               fontSize: "0.9rem", marginTop: "1.25rem",
-            }}>Close</button>
+            }}>{t.login_close}</button>
           </>
         )}
       </div>

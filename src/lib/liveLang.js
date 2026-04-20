@@ -1,0 +1,233 @@
+/**
+ * Translations for live/Supabase-backed pages (Dashboard, ProjectDetail, Analytics, Admin, LoginModal).
+ * Complements the main `t` dict in App.jsx which handles marketing pages.
+ */
+export const liveT = {
+  en: {
+    // Nav / badges
+    ticker_loading: "Loading live data…",
+    ticker_connecting: "Connecting to data source…",
+    live: "LIVE",
+
+    // Dashboard
+    live_label: "Live dashboard",
+    live_title: "Current market snapshot",
+    live_desc_base: "Data refreshed daily. Filter, explore, compare.",
+    live_desc_anon: "Sign in for full detail on any single project (free).",
+    live_desc_free: "Upgrade to paid for access to all 60 projects.",
+    upgrade_to_paid: "Upgrade to paid",
+
+    card_projects: "Projects",
+    card_projects_sub: "currently on market",
+    card_total_units: "Total units",
+    card_total_units_sub: "across all projects",
+    card_available: "Available",
+    card_available_sub: "actively on sale",
+    card_sold: "Sold",
+    card_sold_sub_prefix: "sold-out projects:",
+
+    projects_section_label: "Projects",
+    projects_title_all: "{n} projects",
+    projects_title_top: "Top {n} of {total}",
+    register_for_full: "Register for full list",
+    loading_generic: "Loading…",
+
+    tbl_project: "Project",
+    tbl_district: "District",
+    tbl_units: "Units",
+    tbl_available: "Available",
+    tbl_sold: "Sold",
+    tbl_sold_pct: "Sold %",
+    tbl_eur_m2: "€/m²",
+    tbl_detail: "Detail →",
+    hidden_projects: "Hidden {n} more projects.",
+    register_free: "Register free",
+    for_full_list: "for the full list.",
+
+    // Project detail
+    back_to_projects: "← Back to projects",
+    snapshot_notice: "ⓘ Showing current snapshot. History and analytics are part of the",
+    paid_tier: "paid tier",
+    no_data: "No data available.",
+
+    tbl_flat: "Flat",
+    tbl_building: "Building",
+    tbl_floor: "Floor",
+    tbl_rooms: "Rooms",
+    tbl_interior: "Interior",
+    tbl_exterior: "Exterior",
+    tbl_total: "Total",
+    tbl_price: "Price",
+    tbl_orientation: "Orient.",
+    tbl_handover: "Handover",
+    tbl_status: "Status",
+
+    // Gates
+    gate_login_title: "Sign in to view project detail",
+    gate_login_body: "A free account unlocks full detail of any 1 project you choose. Paid gets you all.",
+    gate_login_cta: "Sign in (free)",
+    back_to_dashboard: "Back to dashboard",
+
+    choose_label: "Free tier gate",
+    choose_title: "Choose 1 project",
+    choose_body_prefix: "Your free account unlocks full detail of",
+    choose_body_suffix: "one project. Want to track",
+    choose_current_prefix: "You're currently tracking:",
+    choose_current_suffix: "This action will replace it.",
+    choose_watch: "Track {name}",
+    choose_back: "Back",
+    choose_upgrade_hint: "Want access to all 60 projects?",
+    saving: "Saving…",
+
+    // Analytics
+    analytics_gate_title: "Sign in for analytics",
+    analytics_gate_body: "Analytics and trends are part of the paid account.",
+    analytics_paid_title: "Analytics is a paid feature",
+    analytics_paid_body: "Monthly price trends, district heat maps, top developers, absorption rate, monthly PDF reports — all in paid tier.",
+    analytics_see_pricing: "See pricing",
+    analytics_label: "Analytics",
+    analytics_title: "Trends & insights",
+    analytics_desc: "Coming soon: price trends over time, district heat maps, data export, monthly reports.",
+    analytics_placeholder: "Detailed charts and trend analytics in preparation — for early access email residata@proton.me",
+
+    // Admin
+    admin_label: "Admin",
+    admin_title: "User tier management",
+    admin_email: "Email",
+    admin_tier: "Tier",
+    admin_project: "Project",
+    admin_created: "Created",
+    admin_actions: "Actions",
+    admin_403_title: "403",
+    admin_403_body: "Admin only.",
+
+    // Early access badge
+    ea_badge: "Early Access — {n} of 9 slots remaining",
+    ea_badge_one: "Early Access — {n} of 9 slots remaining",
+
+    // LoginModal
+    login_label: "Sign in",
+    login_title: "Get instant access",
+    login_desc: "Enter your email — we'll send you a magic link. No password, no spam.",
+    login_placeholder: "you@example.com",
+    login_send: "Send magic link",
+    login_sending: "Sending…",
+    login_check_title: "Check your email",
+    login_check_body_prefix: "We sent a sign-in link to",
+    login_check_body_suffix: ". Click the link to continue.",
+    login_close: "Close",
+    login_terms: "By signing in you agree to our basic terms. Free tier includes access to 1 full project snapshot.",
+  },
+  sk: {
+    ticker_loading: "Načítavam dáta…",
+    ticker_connecting: "Pripájame sa k dátam…",
+    live: "LIVE",
+
+    live_label: "Live dashboard",
+    live_title: "Aktuálny stav trhu",
+    live_desc_base: "Dáta aktualizované každý deň. Filtruj, preklikni, porovnaj.",
+    live_desc_anon: "Registrácia odomkne plný detail 1 projektu (zadarmo).",
+    live_desc_free: "Upgrade na paid pre prístup ku všetkým 60 projektom.",
+    upgrade_to_paid: "Upgrade na paid",
+
+    card_projects: "Projektov",
+    card_projects_sub: "aktívne na trhu",
+    card_total_units: "Bytov celkom",
+    card_total_units_sub: "naprieč všetkými projektmi",
+    card_available: "Voľné",
+    card_available_sub: "aktuálne na trhu",
+    card_sold: "Predané",
+    card_sold_sub_prefix: "vypredaných projektov:",
+
+    projects_section_label: "Projekty",
+    projects_title_all: "{n} projektov",
+    projects_title_top: "Top {n} z {total}",
+    register_for_full: "Registrovať pre plný zoznam",
+    loading_generic: "Načítavam…",
+
+    tbl_project: "Projekt",
+    tbl_district: "Okres",
+    tbl_units: "Bytov",
+    tbl_available: "Voľné",
+    tbl_sold: "Vypredané",
+    tbl_sold_pct: "% predané",
+    tbl_eur_m2: "€/m²",
+    tbl_detail: "Detail →",
+    hidden_projects: "Skrytých {n} projektov.",
+    register_free: "Zaregistruj sa zadarmo",
+    for_full_list: "pre plný zoznam.",
+
+    back_to_projects: "← Späť na projekty",
+    snapshot_notice: "ⓘ Zobrazujeme aktuálny snapshot. História a analytika sú súčasťou",
+    paid_tier: "paid tier-u",
+    no_data: "Žiadne dáta.",
+
+    tbl_flat: "Byt",
+    tbl_building: "Budova",
+    tbl_floor: "Posch.",
+    tbl_rooms: "Izby",
+    tbl_interior: "Interiér",
+    tbl_exterior: "Exteriér",
+    tbl_total: "Celk.",
+    tbl_price: "Cena",
+    tbl_orientation: "Orient.",
+    tbl_handover: "Kolaud.",
+    tbl_status: "Stav",
+
+    gate_login_title: "Prihlás sa pre detail projektu",
+    gate_login_body: "Free účet ti odomkne plný detail ľubovoľného 1 projektu. Paid účet má prístup ku všetkým.",
+    gate_login_cta: "Prihlásiť sa (free)",
+    back_to_dashboard: "Späť na dashboard",
+
+    choose_label: "Free tier gate",
+    choose_title: "Vyber si 1 projekt",
+    choose_body_prefix: "Free účet ti odomkne plný detail",
+    choose_body_suffix: "1 projektu. Chceš sledovať",
+    choose_current_prefix: "Momentálne sleduješ projekt:",
+    choose_current_suffix: "Touto akciou ho zmeníš.",
+    choose_watch: "Sledovať {name}",
+    choose_back: "Späť",
+    choose_upgrade_hint: "Chceš sledovať všetkých 60 projektov naraz?",
+    saving: "Ukladám…",
+
+    analytics_gate_title: "Prihlás sa pre analytiku",
+    analytics_gate_body: "Analytika a trendy sú súčasťou paid účtu.",
+    analytics_paid_title: "Analytika je pre paid tier",
+    analytics_paid_body: "Cenové trendy naprieč mesiacmi, heat mapy okresov, top developers, absorption rate, monthly PDF reporty — všetko v paid tier-e.",
+    analytics_see_pricing: "Zobraziť cenník",
+    analytics_label: "Analytics",
+    analytics_title: "Trendy a insights",
+    analytics_desc: "Čoskoro: grafy cien v čase, heat mapy okresov, export dát, monthly reporty.",
+    analytics_placeholder: "Detailné grafy a trend analytika v príprave — pre včasný prístup napíš na residata@proton.me",
+
+    admin_label: "Admin",
+    admin_title: "Správa tier-ov užívateľov",
+    admin_email: "Email",
+    admin_tier: "Tier",
+    admin_project: "Projekt",
+    admin_created: "Created",
+    admin_actions: "Akcie",
+    admin_403_title: "403",
+    admin_403_body: "Len pre admin.",
+
+    ea_badge: "Early Access — zostáva {n} miest z 9",
+    ea_badge_one: "Early Access — zostáva {n} miesto z 9",
+
+    login_label: "Prihlásenie",
+    login_title: "Okamžitý prístup",
+    login_desc: "Zadaj email — pošleme ti magic link. Bez hesla, bez spamu.",
+    login_placeholder: "ty@priklad.sk",
+    login_send: "Poslať magic link",
+    login_sending: "Posielam…",
+    login_check_title: "Skontroluj email",
+    login_check_body_prefix: "Poslali sme ti prihlasovací link na",
+    login_check_body_suffix: ". Klikni naň pre pokračovanie.",
+    login_close: "Zavrieť",
+    login_terms: "Prihlásením súhlasíš s našimi základnými podmienkami. Free verzia zahŕňa plný prístup k 1 projektu.",
+  },
+};
+
+/** Jednoduchá interpolácia {placeholder}. */
+export function ll(str, params = {}) {
+  return str.replace(/\{(\w+)\}/g, (_, k) => params[k] ?? `{${k}}`);
+}

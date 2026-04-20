@@ -1,26 +1,27 @@
 import { useMetrics } from "../lib/useData";
+import { liveT } from "../lib/liveLang";
 
 /**
  * Bloomberg-terminal style ticker.
  * Sliding right-to-left, pause on hover, monospace, subtle.
- * Visible on every page, pod navom.
+ * Visible on every page, below nav.
  */
-export default function Ticker() {
+export default function Ticker({ lang = "en" }) {
+  const t = liveT[lang] || liveT.en;
   const { metrics, loading } = useMetrics();
 
-  // Fallback metrics ak Supabase ešte nepripravený / prázdny
-  const items = (metrics.length > 0 ? metrics : FALLBACK_METRICS)
-    .filter(m => m.value_text)
-    .map(m => m.value_text);
+  // Fallback ak Supabase ešte nepripravený / prázdny
+  const items = (metrics.length > 0
+    ? metrics.filter(m => m.value_text).map(m => m.value_text)
+    : [t.ticker_connecting]);
 
-  // Duplikujeme content aby bol seamless loop
   const loopItems = [...items, ...items];
 
   if (loading && !items.length) {
     return (
       <div style={styles.wrapper}>
         <div style={styles.fadeLeft} />
-        <div style={{...styles.content, color: "#55555f"}}>Načítavam dáta…</div>
+        <div style={{...styles.content, color: "#55555f"}}>{t.ticker_loading}</div>
         <div style={styles.fadeRight} />
       </div>
     );
@@ -28,7 +29,7 @@ export default function Ticker() {
 
   return (
     <div style={styles.wrapper} aria-label="Live market ticker">
-      <div style={styles.badge}>LIVE</div>
+      <div style={styles.badge}>{t.live}</div>
       <div style={styles.fadeLeft} />
       <div style={styles.track}>
         <div style={styles.slide}>
@@ -44,10 +45,6 @@ export default function Ticker() {
     </div>
   );
 }
-
-const FALLBACK_METRICS = [
-  { value_text: "Pripájame sa k dátam…" },
-];
 
 const styles = {
   wrapper: {
