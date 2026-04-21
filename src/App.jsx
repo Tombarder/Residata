@@ -426,6 +426,14 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
           </div>
           {user ? (
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+              {/* Debug badge — ukáže aktuálny tier + profile load stav, viditeľné aj v prod kým ladíme */}
+              <span title={`tier=${caps.tier} profile=${auth.profile ? "loaded" : "MISSING"} err=${auth.profileError || "none"}`} style={{
+                fontFamily: "'JetBrains Mono', monospace", fontSize: "0.6rem",
+                padding: "2px 6px", borderRadius: 3,
+                background: auth.profile ? "rgba(0,229,160,0.15)" : "rgba(245,166,35,0.2)",
+                color: auth.profile ? "#00e5a0" : "#f5a623",
+                fontWeight: 700, letterSpacing: "0.05em",
+              }}>{caps.tier}</span>
               {showAdminLink && (
                 <a onClick={() => setCurrent("Admin")} style={{
                   color: current === "Admin" ? "#f5a623" : "#8a8a96", textDecoration: "none",
