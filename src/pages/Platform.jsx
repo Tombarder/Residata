@@ -177,7 +177,10 @@ export default function PlatformShell({ page, projectId, lang = "en", setCurrent
       }} className="platform-main">
         <TopBar page={page} lang={lang} tier={tier} />
 
-        <div style={{ flex: 1 }}>
+        {/* Content area. key={page} makes the fade animation replay on nav,
+            but hook state (useProjects etc) survives remount via module-
+            level cache — so we don't see the "zeros flash". */}
+        <div style={{ flex: 1 }} key={page} className="page-transition">
           <PageContent
             page={page}
             projectId={projectId}
@@ -300,7 +303,13 @@ function Sidebar({ page, lang, can, tier, email, onNavigate, onSignOut, mobileOp
             </div>
           </div>
           <button
-            onClick={onSignOut}
+            onClick={async () => {
+              // Defensive: try the real sign-out, but fall back to a hard
+              // navigation either way. That makes the button impossible to
+              // "not work" — worst case the page just reloads anon.
+              try { await onSignOut(); } catch (e) { console.error("signOut", e); }
+              window.location.href = "/";
+            }}
             style={{
               width: "100%", padding: "0.55rem", background: "transparent",
               border: `1px solid ${border}`, color: "#c0c0c8",

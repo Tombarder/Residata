@@ -1603,30 +1603,37 @@ export default function App() {
         </>
       )}
 
-      {/* Keyed wrapper — re-mounts on route change so CSS animation replays */}
-      <div key={current} className="page-transition">
-        {/*
-          "profile-loading" gate — only show spinner during the INITIAL auth
-          hydration (`auth.loading === true`). Previously we kept the spinner
-          visible whenever `user && !profile && !profileError`, but that state
-          can also be permanent (stale session after DB user-delete). useAuth
-          now detects stale sessions and force-signs out, so by the time
-          loading flips to false we have either a real profile or the user is
-          cleanly anon.
-        */}
-        {auth.loading && auth.user ? (
+      {/*
+        "profile-loading" gate — only show spinner during the INITIAL auth
+        hydration (`auth.loading === true`). Previously we kept the spinner
+        visible whenever `user && !profile && !profileError`, but that state
+        can also be permanent (stale session after DB user-delete). useAuth
+        now detects stale sessions and force-signs out, so by the time
+        loading flips to false we have either a real profile or the user is
+        cleanly anon.
+
+        Important: when inside the platform shell we DON'T wrap in a
+        key={current} remount-on-nav div — PlatformShell itself stays
+        mounted across /app/* navigation, which keeps the sidebar stable
+        and stops hooks (useProjects, useMetrics…) from re-firing from a
+        cold "zeros" state on every page change. The platform's own content
+        area handles the page-fade animation internally.
+      */}
+      {auth.loading && auth.user ? (
+        <div key={current} className="page-transition">
           <AuthLoadingSpinner />
-        ) : isAppPage(current) ? (
-          // Platform mode: sidebar shell takes over the whole viewport.
-          <PlatformShell
-            page={current}
-            projectId={typeof current === "string" && current.startsWith("App:ProjectDetail:")
-              ? current.slice("App:ProjectDetail:".length) : null}
-            lang={lang}
-            setCurrent={handleNav}
-            openLogin={() => setLoginOpen(true)}
-          />
-        ) : (
+        </div>
+      ) : isAppPage(current) ? (
+        <PlatformShell
+          page={current}
+          projectId={typeof current === "string" && current.startsWith("App:ProjectDetail:")
+            ? current.slice("App:ProjectDetail:".length) : null}
+          lang={lang}
+          setCurrent={handleNav}
+          openLogin={() => setLoginOpen(true)}
+        />
+      ) : (
+        <div key={current} className="page-transition">
           <>
             {current === "Home" && <HomePage setCurrent={handleNav} l={l} lang={lang} onLogin={() => setLoginOpen(true)} />}
 
@@ -1656,8 +1663,8 @@ export default function App() {
                 : <LiveProjectDetail projectId={current.slice(8)} setCurrent={handleNav} openLogin={() => setLoginOpen(true)} lang={lang} />
             )}
           </>
-        )}
-      </div>
+        </div>
+      )}
       {!isAppPage(current) && <Footer />}
       <LoginModal open={loginOpen} onClose={() => setLoginOpen(false)} lang={lang} />
       {/* Force profile completion after login */}
