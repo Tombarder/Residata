@@ -1644,14 +1644,47 @@ export default function App() {
               </Feature>
             )}
 
-            {/* Admin — admin only, inak 403 / redirect */}
+            {/* Admin — admin only. Two distinct fallback cases:
+                 - anon (no session): show sign-in prompt, NOT 403. Very common
+                   when admin clicks "Open admin panel" from an email in a new
+                   browser tab that doesn't carry a session.
+                 - logged in but tier ≠ admin: keep the 403 (this is a real
+                   access-denied). */}
             {current === "Admin" && (
               <Feature
                 requires="manage_users"
-                fallback={<main style={{ padding: "5rem 2rem", textAlign: "center" }}>
-                  <h1 style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>403</h1>
-                  <p style={{ color: "#8a8a96" }}>{lang === "sk" ? "Prístup zamietnutý." : "Access denied."}</p>
-                </main>}
+                fallback={
+                  !auth.user ? (
+                    <main style={{ padding: "6rem 2rem 4rem", maxWidth: 520, margin: "0 auto", textAlign: "center" }}>
+                      <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>🔐</div>
+                      <h1 style={{ fontSize: "1.8rem", fontWeight: 700, letterSpacing: "-0.02em", marginBottom: "0.75rem" }}>
+                        {lang === "sk" ? "Prihlás sa ako admin" : "Sign in as admin"}
+                      </h1>
+                      <p style={{ color: "#8a8a96", fontSize: "0.95rem", lineHeight: 1.6, marginBottom: "1.5rem" }}>
+                        {lang === "sk"
+                          ? "Admin panel vyžaduje prihlásenie. Po kliknutí nižšie dostaneš magic link na email admina."
+                          : "Admin panel requires a session. Click below to receive a magic link on the admin email."}
+                      </p>
+                      <button onClick={() => setLoginOpen(true)} className="btn-p">
+                        {lang === "sk" ? "Prihlásiť sa" : "Sign in"}
+                      </button>
+                      <p style={{ color: "#55555f", fontSize: "0.8rem", marginTop: "1.5rem" }}>
+                        {lang === "sk"
+                          ? "Tip: ak si schvaľoval usera z mailu v inej záložke, tam nie je session. Prihlás sa sem, potom môžeš spravovať userov."
+                          : "Tip: if you approved a user from an email link in another tab, that tab has no session. Sign in here, then you can manage users."}
+                      </p>
+                    </main>
+                  ) : (
+                    <main style={{ padding: "5rem 2rem", textAlign: "center" }}>
+                      <h1 style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>403</h1>
+                      <p style={{ color: "#8a8a96" }}>
+                        {lang === "sk"
+                          ? `Prístup zamietnutý. Tvoj tier: ${caps.tier}`
+                          : `Access denied. Your tier: ${caps.tier}`}
+                      </p>
+                    </main>
+                  )
+                }
               >
                 <LiveAdmin setCurrent={handleNav} lang={lang} />
               </Feature>
