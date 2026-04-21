@@ -379,9 +379,14 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
         <div className="nav-right" style={{ display: "flex", alignItems: "center", gap: "2rem", listStyle: "none" }}>
           {pages.map((p, i) => {
             const key = pagesEN[i];
+            // "Sample" in the nav maps to the "Data" page key internally
+            // (see pageMap). Resolve it the same way so the active-state
+            // highlight picks up the glow when we're on /sample.
+            const internalKey = pageMap[key] || key;
+            const isActive = current === internalKey;
             return (
               <a key={key} className="nav-link" onClick={() => setCurrent(key)} style={{
-                color: current === key ? "#e8e8ed" : "#8a8a96", textDecoration: "none",
+                color: isActive ? "#e8e8ed" : "#8a8a96", textDecoration: "none",
                 fontSize: "0.875rem", cursor: "pointer", transition: "color 0.2s",
               }}>{p}</a>
             );
