@@ -83,7 +83,12 @@ export function useAuth() {
   // Helpers ako isPaid/isAdmin sú deprecated a odstránené; namiesto nich:
   //   const { can } = useCapabilities();
   //   can("has_paid_access"), can("manage_users"), atď.
-  const tier = profile?.tier || (user ? "free" : "anon");
+  //
+  // DÔLEŽITÉ: ak user je prihlásený ale profile ešte nie je načítaný (alebo
+  // fetch zlyhal kvôli RLS), NESMIE sa fallbackovať na "free" — to by dočasne
+  // udelilo free capabilities čomukoľvek čo useAuth konzumuje priamo.
+  // useCapabilities() má svoj vlastný "anon kým loading" handler.
+  const tier = profile?.tier || (user ? "pending" : "anon");
 
   return { user, profile, tier, loading, profileError, signIn, signOut, reloadProfile: () => user && loadProfile(user.id) };
 }

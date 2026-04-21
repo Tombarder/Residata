@@ -717,7 +717,9 @@ const USE_CASE_IMAGES = [
   { url: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=1200&q=80&auto=format&fit=crop", credit: "Analytics consulting" },
 ];
 
-function UseCasesPage({ setCurrent, l }) {
+function UseCasesPage({ setCurrent, l, lang }) {
+  const { can } = useCapabilities();
+  const isPaid = can("has_paid_access");
   return (
     <>
       <div style={{ padding: "8rem 2rem 3rem", maxWidth: 1100, margin: "0 auto", textAlign: "center" }}>
@@ -879,17 +881,37 @@ function UseCasesPage({ setCurrent, l }) {
       </div>
 
       <div style={{ padding: "4rem 2rem", textAlign: "center" }}>
-        <h2 style={{ fontSize: "1.5rem", fontWeight: 700, letterSpacing: "-0.03em", marginBottom: "1rem" }}>{l.useCasesCta}</h2>
-        <p style={{ color: "#8a8a96", maxWidth: 480, margin: "0 auto 2rem", fontWeight: 300 }}>{l.useCasesCtaDesc}</p>
-        <a onClick={() => setCurrent("Pricing")} className="btn-p">{l.useCasesCtaBtn}</a>
+        {isPaid ? (
+          <>
+            <h2 style={{ fontSize: "1.5rem", fontWeight: 700, letterSpacing: "-0.03em", marginBottom: "1rem" }}>
+              {lang === "sk" ? "Tvoj use case je pokrytý?" : "Your use case covered?"}
+            </h2>
+            <p style={{ color: "#8a8a96", maxWidth: 480, margin: "0 auto 2rem", fontWeight: 300 }}>
+              {lang === "sk"
+                ? "Otvor dashboard a začni pracovať s reálnymi dátami. Ak niečo chýba, napíš — doladíme."
+                : "Open the dashboard and work with real data. If something's missing, reach out — we'll tailor it."}
+            </p>
+            <a onClick={() => setCurrent("Live")} className="btn-p">
+              {lang === "sk" ? "Otvoriť dashboard" : "Open dashboard"}
+            </a>
+          </>
+        ) : (
+          <>
+            <h2 style={{ fontSize: "1.5rem", fontWeight: 700, letterSpacing: "-0.03em", marginBottom: "1rem" }}>{l.useCasesCta}</h2>
+            <p style={{ color: "#8a8a96", maxWidth: 480, margin: "0 auto 2rem", fontWeight: 300 }}>{l.useCasesCtaDesc}</p>
+            <a onClick={() => setCurrent("Pricing")} className="btn-p">{l.useCasesCtaBtn}</a>
+          </>
+        )}
       </div>
     </>
   );
 }
 
 /* ─────── DATA ─────── */
-function DataPage({ setCurrent, l }) {
+function DataPage({ setCurrent, l, lang }) {
   const mono = "'JetBrains Mono', monospace";
+  const { can } = useCapabilities();
+  const isPaid = can("has_paid_access");
   const rows = [
     ["Slnečnice Viladomy", "Petržalka", "byt", "A2-304", "68.4", "249,660", "3,650", "3", "V"],
     ["Slnečnice Viladomy", "Petržalka", "byt", "A2-412", "45.2", "167,240", "3,700", "4", "P"],
@@ -1249,9 +1271,27 @@ function DataPage({ setCurrent, l }) {
       </div>
 
       <div style={{ padding: "4rem 2rem", textAlign: "center" }}>
-        <h2 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "1rem" }}>{l.wantFull}</h2>
-        <p style={{ color: "#8a8a96", maxWidth: 480, margin: "0 auto 2rem", fontWeight: 300 }}>{l.wantFullDesc}</p>
-        <a onClick={() => setCurrent("Pricing")} className="btn-p">{l.seePricing}</a>
+        {isPaid ? (
+          <>
+            <h2 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "1rem" }}>
+              {lang === "sk" ? "Toto je ukážka. Ty máš prístup ku všetkému." : "This is a sample. You have access to everything."}
+            </h2>
+            <p style={{ color: "#8a8a96", maxWidth: 480, margin: "0 auto 2rem", fontWeight: 300 }}>
+              {lang === "sk"
+                ? "Otvor live dashboard pre reálne aktuálne dáta zo všetkých 140+ projektov."
+                : "Open the live dashboard for real, current data across all 140+ projects."}
+            </p>
+            <a onClick={() => setCurrent("Live")} className="btn-p">
+              {lang === "sk" ? "Otvoriť dashboard" : "Open dashboard"}
+            </a>
+          </>
+        ) : (
+          <>
+            <h2 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "1rem" }}>{l.wantFull}</h2>
+            <p style={{ color: "#8a8a96", maxWidth: 480, margin: "0 auto 2rem", fontWeight: 300 }}>{l.wantFullDesc}</p>
+            <a onClick={() => setCurrent("Pricing")} className="btn-p">{l.seePricing}</a>
+          </>
+        )}
       </div>
     </>
   );
@@ -1351,14 +1391,28 @@ function PricingPage({ setCurrent, l, lang }) {
                   </div>
                 ))}
               </div>
-              <a
-                onClick={() => setCurrent("Contact")}
-                className={t.featured ? "btn-p" : "btn-s"}
-                style={{
+              {isAlreadyPaid ? (
+                <div style={{
                   display: "block", textAlign: "center",
-                  fontSize: "0.9rem", padding: "0.85rem 2rem",
-                }}
-              >{t.cta}</a>
+                  fontSize: "0.85rem", padding: "0.85rem 1rem",
+                  color: "#8a8a96",
+                  border: "1px dashed #2a2a32",
+                  borderRadius: 8,
+                  fontFamily: "'JetBrains Mono', monospace",
+                  letterSpacing: "0.03em",
+                }}>
+                  {lang === "sk" ? "Už máš prístup" : "You're subscribed"}
+                </div>
+              ) : (
+                <a
+                  onClick={() => setCurrent("Contact")}
+                  className={t.featured ? "btn-p" : "btn-s"}
+                  style={{
+                    display: "block", textAlign: "center",
+                    fontSize: "0.9rem", padding: "0.85rem 2rem",
+                  }}
+                >{t.cta}</a>
+              )}
             </div>
           ))}
         </div>
@@ -1523,6 +1577,19 @@ function Label({ children }) {
   return <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.7rem", color: "#00e5a0", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "1rem" }}>{children}</div>;
 }
 
+// Shown when user is authenticated but profile hasn't finished loading.
+// Prevents the "flash of free content" race when tier defaults to anon/pending
+// before the real profile arrives.
+function AuthLoadingSpinner() {
+  return (
+    <main style={{ padding: "8rem 2rem 4rem", textAlign: "center", color: "#8a8a96" }}>
+      <div style={{ fontSize: "0.8rem", fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+        Loading…
+      </div>
+    </main>
+  );
+}
+
 export default function App() {
   // Init page from current URL (so direct link / refresh works)
   const [current, setCurrent] = useState(() =>
@@ -1564,11 +1631,9 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // "Get Access" button → login modal if anon, or go to Pricing if logged in
-  const handleGetAccess = () => {
-    if (auth.user) handleNav("Pricing");
-    else setLoginOpen(true);
-  };
+  // Note: the main Nav hides the "Get Access" button once logged in, and
+  // the Home hero has its own per-tier button set (see HomePage.heroButtons).
+  // So no standalone handleGetAccess is needed here.
 
   return (
     <div style={{ background: "#0a0a0b", color: "#e8e8ed", fontFamily: "'Outfit', -apple-system, sans-serif", minHeight: "100vh", WebkitFontSmoothing: "antialiased", position: "relative" }}>
@@ -1668,60 +1733,76 @@ export default function App() {
 
       {/* Keyed wrapper — re-mounts on route change so CSS animation replays */}
       <div key={current} className="page-transition">
-        {current === "Home" && <HomePage setCurrent={handleNav} l={l} lang={lang} onLogin={() => setLoginOpen(true)} />}
+        {/*
+          IMPORTANT — "profile-loading" gate:
+          Ak je user prihlásený ale profile ešte nie je naservírovaný, nesmieme
+          renderovať gated stránky (Live, Analytics, Admin, ProjectDetail), lebo
+          tier by bol dočasne "pending" (fallback v useAuth) a user by na moment
+          videl PendingGate aj keď je v skutočnosti paid. Pre public stránky
+          (Home, Use Cases, Pricing, Contact, Data) to nevadí — majú rovnaký
+          obsah pre všetky tiere (len CTAs sa menia, tie sa prepnú keď profile
+          dotečie).
+        */}
+        {auth.user && !auth.profile && !auth.profileError ? (
+          <AuthLoadingSpinner />
+        ) : (
+          <>
+            {current === "Home" && <HomePage setCurrent={handleNav} l={l} lang={lang} onLogin={() => setLoginOpen(true)} />}
 
-        {/* Live dashboard — pending gets stopped, ostatní vidia (verejnú alebo plnú verziu podľa tier-u) */}
-        {current === "Live" && (
-          caps.tier === "pending"
-            ? <PendingGate setCurrent={handleNav} lang={lang} />
-            : <LiveDashboard setCurrent={handleNav} openLogin={() => setLoginOpen(true)} lang={lang} />
-        )}
-
-        {current === "Use Cases" && <UseCasesPage setCurrent={handleNav} l={l} />}
-        {current === "Data" && <DataPage setCurrent={handleNav} l={l} />}
-        {current === "Pricing" && <PricingPage setCurrent={handleNav} l={l} lang={lang} />}
-        {current === "Contact" && <ContactPage l={l} />}
-
-        {/* Analytics — paid only, inak UpgradePrompt */}
-        {current === "Analytics" && (
-          <Feature
-            requires="view_analytics"
-            fallback={
+            {/* Live dashboard — pending gets stopped, ostatní vidia (verejnú alebo plnú verziu podľa tier-u) */}
+            {current === "Live" && (
               caps.tier === "pending"
                 ? <PendingGate setCurrent={handleNav} lang={lang} />
-                : <main style={{ padding: "5rem 2rem" }}>
-                    <UpgradePrompt
-                      feature={lang === "sk" ? "analytika a trendy" : "analytics & trends"}
-                      variant="card"
-                      lang={lang}
-                      onLogin={() => setLoginOpen(true)}
-                      onGoPricing={() => handleNav("Pricing")}
-                    />
-                  </main>
-            }
-          >
-            <LiveAnalytics setCurrent={handleNav} openLogin={() => setLoginOpen(true)} lang={lang} />
-          </Feature>
-        )}
+                : <LiveDashboard setCurrent={handleNav} openLogin={() => setLoginOpen(true)} lang={lang} />
+            )}
 
-        {/* Admin — admin only, inak 403 / redirect */}
-        {current === "Admin" && (
-          <Feature
-            requires="manage_users"
-            fallback={<main style={{ padding: "5rem 2rem", textAlign: "center" }}>
-              <h1 style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>403</h1>
-              <p style={{ color: "#8a8a96" }}>{lang === "sk" ? "Prístup zamietnutý." : "Access denied."}</p>
-            </main>}
-          >
-            <LiveAdmin setCurrent={handleNav} lang={lang} />
-          </Feature>
-        )}
+            {current === "Use Cases" && <UseCasesPage setCurrent={handleNav} l={l} lang={lang} />}
+            {current === "Data" && <DataPage setCurrent={handleNav} l={l} lang={lang} />}
+            {current === "Pricing" && <PricingPage setCurrent={handleNav} l={l} lang={lang} />}
+            {current === "Contact" && <ContactPage l={l} />}
 
-        {/* Project detail */}
-        {typeof current === "string" && current.startsWith("Project:") && (
-          caps.tier === "pending"
-            ? <PendingGate setCurrent={handleNav} lang={lang} />
-            : <LiveProjectDetail projectId={current.slice(8)} setCurrent={handleNav} openLogin={() => setLoginOpen(true)} lang={lang} />
+            {/* Analytics — paid only, inak UpgradePrompt */}
+            {current === "Analytics" && (
+              <Feature
+                requires="view_analytics"
+                fallback={
+                  caps.tier === "pending"
+                    ? <PendingGate setCurrent={handleNav} lang={lang} />
+                    : <main style={{ padding: "5rem 2rem" }}>
+                        <UpgradePrompt
+                          feature={lang === "sk" ? "analytika a trendy" : "analytics & trends"}
+                          variant="card"
+                          lang={lang}
+                          onLogin={() => setLoginOpen(true)}
+                          onGoPricing={() => handleNav("Pricing")}
+                        />
+                      </main>
+                }
+              >
+                <LiveAnalytics setCurrent={handleNav} openLogin={() => setLoginOpen(true)} lang={lang} />
+              </Feature>
+            )}
+
+            {/* Admin — admin only, inak 403 / redirect */}
+            {current === "Admin" && (
+              <Feature
+                requires="manage_users"
+                fallback={<main style={{ padding: "5rem 2rem", textAlign: "center" }}>
+                  <h1 style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>403</h1>
+                  <p style={{ color: "#8a8a96" }}>{lang === "sk" ? "Prístup zamietnutý." : "Access denied."}</p>
+                </main>}
+              >
+                <LiveAdmin setCurrent={handleNav} lang={lang} />
+              </Feature>
+            )}
+
+            {/* Project detail */}
+            {typeof current === "string" && current.startsWith("Project:") && (
+              caps.tier === "pending"
+                ? <PendingGate setCurrent={handleNav} lang={lang} />
+                : <LiveProjectDetail projectId={current.slice(8)} setCurrent={handleNav} openLogin={() => setLoginOpen(true)} lang={lang} />
+            )}
+          </>
         )}
       </div>
       <Footer />

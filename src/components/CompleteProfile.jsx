@@ -93,7 +93,7 @@ export default function CompleteProfile({ lang = "en" }) {
         padding: "2.25rem 2rem", maxWidth: 480, width: "100%",
       }}>
         <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem", color: "#00e5a0", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "0.75rem" }}>
-          Step 2 of 2
+          {lang === "sk" ? "Krok 2 z 2" : "Step 2 of 2"}
         </div>
         <h2 style={{ fontSize: "1.5rem", fontWeight: 700, letterSpacing: "-0.02em", marginBottom: "0.5rem", color: "#e8e8ed" }}>{t.cp_title}</h2>
         <p style={{ fontSize: "0.85rem", color: "#8a8a96", lineHeight: 1.6, marginBottom: "1.5rem" }}>

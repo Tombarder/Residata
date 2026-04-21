@@ -5,6 +5,7 @@ import { useProjects, useProjectFlats, useEarlyAccessStats } from "../lib/useDat
 import { supabase } from "../lib/supabase";
 import { liveT, ll } from "../lib/liveLang";
 import { track } from "../lib/track";
+import { isPersonalEmail } from "../lib/emailValidation";
 import UpgradePrompt from "../components/UpgradePrompt";
 
 const mono = "'JetBrains Mono', monospace";
@@ -540,9 +541,11 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
 
       {/* Tabs */}
       <div style={{ display: "flex", gap: "0.5rem", marginTop: "2rem", borderBottom: `1px solid ${border}`, marginBottom: "1.5rem" }}>
-        <TabBtn active={tab === "users"} onClick={() => setTab("users")}>Users {pending.length > 0 && <CountBadge n={pending.length} />}</TabBtn>
-        <TabBtn active={tab === "activity"} onClick={() => setTab("activity")}>Activity</TabBtn>
-        <TabBtn active={tab === "domains"} onClick={() => setTab("domains")}>Premium domains</TabBtn>
+        <TabBtn active={tab === "users"} onClick={() => setTab("users")}>
+          {lang === "sk" ? "Užívatelia" : "Users"} {pending.length > 0 && <CountBadge n={pending.length} />}
+        </TabBtn>
+        <TabBtn active={tab === "activity"} onClick={() => setTab("activity")}>{lang === "sk" ? "Aktivita" : "Activity"}</TabBtn>
+        <TabBtn active={tab === "domains"} onClick={() => setTab("domains")}>{lang === "sk" ? "Prémiové domény" : "Premium domains"}</TabBtn>
       </div>
 
       {tab === "users" && (
@@ -755,7 +758,10 @@ function UserTable({ users, setTier, approveSmart, showApprove, t, lang, premium
           <tbody>
             {users.map(u => {
               const domain = (u.email_domain || "").toLowerCase();
-              const isPersonal = domain && ["gmail.com","outlook.com","hotmail.com","yahoo.com","icloud.com","proton.me","protonmail.com"].includes(domain);
+              // Reuse single-source-of-truth from emailValidation — pri zmene
+              // providerov sa upraví iba tam. `isPersonalEmail` očakáva celý
+              // email; namočíme domain do dummy lokálnej časti.
+              const isPersonal = domain && isPersonalEmail(`x@${domain}`);
               const isPremium = premiumSet.has(domain);
               const rowBg = isPremium ? "rgba(0,229,160,0.05)" : isPersonal ? "rgba(245,166,35,0.04)" : "transparent";
               return (
