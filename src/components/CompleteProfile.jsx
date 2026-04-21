@@ -25,23 +25,52 @@ export default function CompleteProfile({ lang = "en" }) {
       return;
     }
     setBusy(true); setErr(null);
-    const { error } = await supabase.from("user_profiles").update({
-      full_name: form.full_name.trim(),
-      company: form.company.trim(),
-      position: form.position,
-      linkedin_url: form.linkedin_url.trim() || null,
-      phone: form.phone.trim() || null,
-      profile_completed: true,
-    }).eq("id", user.id).select().maybeSingle();
-    setBusy(false);
-    if (error) { setErr(error.message); return; }
-    track("profile_completed", {
-      company: form.company.trim(),
-      position: form.position,
-      has_linkedin: !!form.linkedin_url.trim(),
-      has_phone: !!form.phone.trim(),
-    });
-    await reloadProfile();
+    console.log("[CompleteProfile] submitting for", user?.id, form);
+
+    try {
+      // Timeout safety — ak Supabase nemá odozvu do 10s, bail out
+      const updatePromise = supabase.from("user_profiles").update({
+        full_name: form.full_name.trim(),
+        company: form.company.trim(),
+        position: form.position,
+        linkedin_url: form.linkedin_url.trim() || null,
+        phone: form.phone.trim() || null,
+        profile_completed: true,
+      }).eq("id", user.id).select();
+
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Timeout — server took too long")), 10000)
+      );
+
+      const result = await Promise.race([updatePromise, timeoutPromise]);
+      console.log("[CompleteProfile] update result:", result);
+      setBusy(false);
+
+      if (result.error) {
+        console.error("[CompleteProfile] ERROR", result.error);
+        setErr(`${result.error.message}${result.error.details ? " — " + result.error.details : ""}`);
+        return;
+      }
+      if (!result.data || result.data.length === 0) {
+        setErr(lang === "sk"
+          ? "Update sa nezapísal (RLS / prihlasovací token). Skús sa odhlásiť a znova prihlásiť."
+          : "Update didn't persist (RLS / session issue). Try signing out and back in.");
+        return;
+      }
+
+      track("profile_completed", {
+        company: form.company.trim(),
+        position: form.position,
+        has_linkedin: !!form.linkedin_url.trim(),
+        has_phone: !!form.phone.trim(),
+      });
+      console.log("[CompleteProfile] success, reloading profile");
+      await reloadProfile();
+    } catch (e) {
+      console.error("[CompleteProfile] exception", e);
+      setBusy(false);
+      setErr(e.message || String(e));
+    }
   };
 
   const positions = [
