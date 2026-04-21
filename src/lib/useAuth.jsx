@@ -97,7 +97,12 @@ function useAuthInternal() {
   };
 
   const signOut = async () => {
-    if (!isSupabaseReady()) return;
+    if (!isSupabaseReady()) {
+      // Even without Supabase reachable, clear the UI
+      window.location.replace("/");
+      return;
+    }
+    log("signOut: clearing session");
     // scope:'local' — clears localStorage session without calling the Supabase
     // server. Default scope:'global' no-ops when access token is expired
     // (magic-link tokens are 1h), leaving the user stuck "logged in".
@@ -109,6 +114,10 @@ function useAuthInternal() {
     setUser(null);
     setProfile(null);
     setProfileError(null);
+    // Hard reload — guarantees no stale in-memory state, no cached React trees,
+    // no dangling onAuthStateChange listener race. Lands the user on the public
+    // home page as a clean anon. Belt-and-suspenders; reliability > elegance.
+    window.location.replace("/");
   };
 
   // DÔLEŽITÉ: fallback tier 'pending' (nie 'free'), nech anon/loading nemá free caps.

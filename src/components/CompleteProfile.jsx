@@ -3,7 +3,6 @@ import { supabase } from "../lib/supabase";
 import { useAuth } from "../lib/useAuth";
 import { liveT } from "../lib/liveLang";
 import { track } from "../lib/track";
-import { pushRoute } from "../lib/routing";
 
 /**
  * Povinný post-login krok. Full-screen overlay ak user je authenticated +
@@ -43,7 +42,16 @@ export default function CompleteProfile({ lang = "en" }) {
     }
     setErr(null);
     setState("saving");
-    console.log("[CompleteProfile] submit for", user?.id);
+    const t0 = performance.now();
+    console.log(`[CompleteProfile] submit start`, { user: user?.id });
+
+    // Hard-reload fallback — if for any reason the in-app re-render path fails
+    // (stale closure, race, network hiccup), force a full page reload to /live
+    // after a timeout. Guarantees the user doesn't sit stuck forever.
+    const hardReloadFallback = setTimeout(() => {
+      console.warn("[CompleteProfile] slow submit — forcing hard reload to /live");
+      window.location.replace("/live");
+    }, 10000);
 
     try {
       const { data, error } = await supabase.from("user_profiles").update({
@@ -55,13 +63,17 @@ export default function CompleteProfile({ lang = "en" }) {
         profile_completed: true,
       }).eq("id", user.id).select();
 
+      console.log(`[CompleteProfile] update returned after ${Math.round(performance.now() - t0)}ms`, { hasData: !!data?.length, error });
+
       if (error) {
+        clearTimeout(hardReloadFallback);
         console.error("[CompleteProfile] ERROR", error);
         setState("error");
         setErr(`${error.message}${error.details ? " — " + error.details : ""}`);
         return;
       }
       if (!data || data.length === 0) {
+        clearTimeout(hardReloadFallback);
         setState("error");
         setErr(lang === "sk"
           ? "Update sa nezapísal (RLS / prihlasovací token). Skús sa odhlásiť a prihlásiť znova."
@@ -75,16 +87,21 @@ export default function CompleteProfile({ lang = "en" }) {
         has_linkedin: !!form.linkedin_url.trim(),
         has_phone: !!form.phone.trim(),
       });
-      console.log("[CompleteProfile] success, pushing profile to context", data[0]);
+      console.log(`[CompleteProfile] success · ${Math.round(performance.now() - t0)}ms · hard-redirect to /live`, data[0]);
 
-      // Direct context update — no DB round-trip. The UPDATE already returned
-      // the new row (with tier='free' and approved_at set by the BEFORE trigger).
-      // Parent re-renders immediately, this overlay unmounts, dashboard appears.
+      // Update shared context first so in-memory state matches DB.
       setProfile(data[0]);
-      // Extra insurance: explicit route push to /live so even if something
-      // delayed re-render the user lands on the right page.
-      pushRoute("Live");
+
+      // Hard redirect to /live — reliable unmount + clean state. The previous
+      // approach (setProfile + pushRoute, relying on React re-render to unmount
+      // CompleteProfile) sometimes stalled in practice (stale closure race).
+      // A full page reload here is overkill for a happy path but cheap and
+      // 100 % reliable, and the user sees "Saving…" → dashboard without any
+      // "Loading profile…" limbo state.
+      clearTimeout(hardReloadFallback);
+      window.location.replace("/live");
     } catch (e) {
+      clearTimeout(hardReloadFallback);
       console.error("[CompleteProfile] exception", e);
       setState("error");
       setErr(e.message || String(e));
