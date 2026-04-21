@@ -15,8 +15,9 @@ import { useCapabilities } from "../lib/useCapabilities";
  *   onGoPricing: () => void — pre free tier, prechod na Pricing
  */
 export default function UpgradePrompt({ feature, variant = "block", onLogin, onGoPricing, lang = "en" }) {
-  const { tier } = useCapabilities();
-  if (tier === "paid" || tier === "admin") return null;
+  const { can, tier } = useCapabilities();
+  // Paid/admin nepotrebujú upgrade CTA — capability check pre budúcu udržateľnosť
+  if (can("has_paid_access")) return null;
 
   const t = translations[lang] || translations.en;
 

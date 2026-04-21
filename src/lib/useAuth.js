@@ -61,9 +61,11 @@ export function useAuth() {
     await supabase.auth.signOut();
   };
 
+  // `tier` vraciame ako raw hodnotu — pre capability checky používaj useCapabilities().
+  // Helpers ako isPaid/isAdmin sú deprecated a odstránené; namiesto nich:
+  //   const { can } = useCapabilities();
+  //   can("has_paid_access"), can("manage_users"), atď.
   const tier = profile?.tier || (user ? "free" : "anon");
-  const isPaid = tier === "paid" || tier === "admin";
-  const isAdmin = tier === "admin";
 
-  return { user, profile, tier, isPaid, isAdmin, loading, signIn, signOut, reloadProfile: () => user && loadProfile(user.id) };
+  return { user, profile, tier, loading, signIn, signOut, reloadProfile: () => user && loadProfile(user.id) };
 }

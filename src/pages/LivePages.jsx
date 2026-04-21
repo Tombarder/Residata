@@ -443,7 +443,8 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
 
   const setTier = async (id, tier) => {
     const patch = { tier };
-    if (tier === "free" || tier === "paid") patch.approved_at = new Date().toISOString();
+    // Mark approved_at timestamp pre všetky non-pending tiery (tracking kedy admin schválil)
+    if (tier !== "pending") patch.approved_at = new Date().toISOString();
     const { error } = await supabase.from("user_profiles").update(patch).eq("id", id);
     if (error) alert(error.message); else setUsers(u => u.map(x => x.id === id ? { ...x, ...patch } : x));
   };

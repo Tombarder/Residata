@@ -1110,9 +1110,9 @@ function PricingPage({ setCurrent, l, lang }) {
   const mono = "'JetBrains Mono', monospace";
   const tiers = l.tiers;
   const faqs = l.faqs;
-  const { can, tier } = useCapabilities();
+  const { can } = useCapabilities();
   const showEarlyAccessBlock = can("see_early_access_badge");
-  const isAlreadyPaid = tier === "paid" || tier === "admin";
+  const isAlreadyPaid = can("has_paid_access");
   const ea = lang === "sk" ? {
     badge: "🔥 Early access — 5 min a máš prístup",
     body: <>Prvých <strong style={{ color: "#00e5a0" }}>9 zákazníkov</strong> dostane <strong style={{ color: "#00e5a0" }}>50 % zľavu prvé 3 mesiace</strong>. Žiadne formuláre — krátky 5-minútový call, dohodneme sa, prístup máš hneď.</>,

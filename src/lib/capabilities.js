@@ -64,6 +64,9 @@ export const CAPABILITY_KEYS = [
   'prompt_signup',               // "Sign up / Get Access" CTA — len pre anonymných
   'prompt_upgrade_to_paid',      // "Upgrade to paid" CTA — len pre free (nie pending/paid)
   'see_early_access_badge',      // "X slots remaining" — všetci okrem paid/admin
+
+  // Meta / convenience
+  'has_paid_access',             // paid+admin — pre generické "user platí" checky
 ];
 
 // === TIER → CAPABILITIES MAPPING ===
@@ -113,6 +116,7 @@ const FREE_CAPS = [
 const PAID_CAPS = [
   'change_own_profile',
   'export_data',
+  'has_paid_access',
   'view_all_projects_list',
   'view_analytics',
   'view_any_project_detail',
