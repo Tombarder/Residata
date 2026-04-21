@@ -76,7 +76,22 @@ export function useAuth() {
 
   const signOut = async () => {
     if (!isSupabaseReady()) return;
-    await supabase.auth.signOut();
+    // scope:'local' — clears localStorage session without calling the Supabase
+    // server. The default scope:'global' tries to revoke the session server-side
+    // and silently no-ops if the access token is already expired (magic-link
+    // tokens are 1h), leaving the user stuck "logged in". Local is what we
+    // actually want here — always works, instant.
+    try {
+      await supabase.auth.signOut({ scope: "local" });
+    } catch (e) {
+      log("signOut error (ignored)", e);
+    }
+    // Belt-and-suspenders: if for any reason the onAuthStateChange listener
+    // doesn't fire (e.g. it was unsubscribed), force-clear state so the UI
+    // reflects signed-out immediately.
+    setUser(null);
+    setProfile(null);
+    setProfileError(null);
   };
 
   // `tier` vraciame ako raw hodnotu — pre capability checky používaj useCapabilities().
