@@ -696,36 +696,180 @@ function HomePage({ setCurrent, l, lang, onLogin }) {
 }
 
 /* ─────── USE CASES ─────── */
+// Hero photos per use case (Unsplash CDN — stable, free licence).
+// Poradie musí matchovať poradiu v t[*].useCases.
+const USE_CASE_IMAGES = [
+  // 0 Developers & Sales — modern construction / architecture
+  { url: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1200&q=80&auto=format&fit=crop", credit: "Modern skyline" },
+  // 1 Investors & PE — data / financial analytics
+  { url: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=1200&q=80&auto=format&fit=crop", credit: "Financial analytics" },
+  // 2 Banks & Valuers — professional office / institution
+  { url: "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=1200&q=80&auto=format&fit=crop", credit: "Banking & valuation" },
+  // 3 Consultants & Analysts — laptop + charts
+  { url: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=1200&q=80&auto=format&fit=crop", credit: "Analytics consulting" },
+];
+
 function UseCasesPage({ setCurrent, l }) {
   return (
     <>
-      <div style={{ padding: "8rem 2rem 3rem", maxWidth: 1100, margin: "0 auto" }}>
+      <div style={{ padding: "8rem 2rem 3rem", maxWidth: 1100, margin: "0 auto", textAlign: "center" }}>
         <Label>{l.useCasesLabel}</Label>
         <h1 className="sec-title" style={{ whiteSpace: "pre-line" }}>{l.useCasesTitle}</h1>
-        <p className="sec-desc">{l.useCasesDesc}</p>
+        <p className="sec-desc" style={{ margin: "0 auto" }}>{l.useCasesDesc}</p>
       </div>
-      <div style={{ padding: "0 2rem 5rem", maxWidth: 1100, margin: "0 auto" }}>
-        {l.useCases.map(c => (
-          <FadeIn key={c.tag} delay={0.1}>
-          <div className="card-hover case-card-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", border: "1px solid #222228", borderRadius: 12, overflow: "hidden", marginBottom: "1.5rem" }}>
-            <div style={{ padding: "2.5rem", background: "#16161a" }}>
-              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem", color: "#00e5a0", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.75rem" }}>{c.title}</div>
-              <h3 style={{ fontSize: "1.3rem", fontWeight: 600, letterSpacing: "-0.02em", marginBottom: "0.75rem" }}>{c.tag}</h3>
-              <p style={{ fontSize: "0.9rem", color: "#8a8a96", lineHeight: 1.65, fontWeight: 300 }}>{c.desc}</p>
-            </div>
-            <div style={{ padding: "2.5rem", background: "#111113", borderLeft: "1px solid #222228" }}>
-              <h4 style={{ fontSize: "0.8rem", fontWeight: 600, marginBottom: "1rem" }}>{l.whatYouGet}</h4>
-              {c.benefits.map(([b, d]) => (
-                <div key={b} style={{ display: "flex", gap: "0.75rem", marginBottom: "1rem", alignItems: "flex-start" }}>
-                  <span style={{ color: "#00e5a0", fontSize: "0.85rem", marginTop: "0.15rem" }}>✓</span>
-                  <p style={{ fontSize: "0.82rem", color: "#8a8a96", lineHeight: 1.55 }}><strong style={{ color: "#e8e8ed", fontWeight: 500 }}>{b}</strong> — {d}</p>
+
+      <div style={{ padding: "0 2rem 5rem", maxWidth: 1150, margin: "0 auto" }}>
+        {l.useCases.map((c, i) => {
+          const img = USE_CASE_IMAGES[i] || USE_CASE_IMAGES[0];
+          const imageLeft = i % 2 === 0;  // even index → image left
+          const num = String(i + 1).padStart(2, "0");
+          return (
+            <FadeIn key={c.tag} delay={0.05}>
+              <article className="use-case-card" style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                border: "1px solid #222228",
+                borderRadius: 16,
+                overflow: "hidden",
+                marginBottom: "2rem",
+                background: "#0e0e10",
+                minHeight: 420,
+              }}>
+                {/* Image side */}
+                <div style={{
+                  position: "relative",
+                  gridColumn: imageLeft ? 1 : 2,
+                  gridRow: 1,
+                  minHeight: 320,
+                  overflow: "hidden",
+                }}>
+                  <img
+                    src={img.url}
+                    alt={c.tag}
+                    loading="lazy"
+                    style={{
+                      position: "absolute", inset: 0, width: "100%", height: "100%",
+                      objectFit: "cover",
+                      filter: "saturate(0.85) brightness(0.65) contrast(1.05)",
+                      transition: "transform 0.6s ease, filter 0.3s",
+                    }}
+                    className="use-case-img"
+                  />
+                  {/* Dark gradient overlay — blend do témy */}
+                  <div style={{
+                    position: "absolute", inset: 0,
+                    background: `linear-gradient(${imageLeft ? "90deg" : "-90deg"}, rgba(10,10,11,0.15) 0%, rgba(10,10,11,0.85) 100%)`,
+                    pointerEvents: "none",
+                  }} />
+                  {/* Green accent glow */}
+                  <div style={{
+                    position: "absolute",
+                    ...(imageLeft ? { right: 0, bottom: 0 } : { left: 0, bottom: 0 }),
+                    width: 180, height: 180,
+                    background: "radial-gradient(circle, rgba(0,229,160,0.18) 0%, transparent 70%)",
+                    pointerEvents: "none",
+                  }} />
+                  {/* Tag + number in top corner */}
+                  <div style={{
+                    position: "absolute", top: "1.5rem", left: "1.5rem",
+                    display: "flex", alignItems: "center", gap: "0.75rem",
+                  }}>
+                    <span style={{
+                      fontFamily: "'JetBrains Mono', monospace",
+                      fontSize: "0.75rem",
+                      color: "#00e5a0",
+                      background: "rgba(0,229,160,0.1)",
+                      border: "1px solid rgba(0,229,160,0.3)",
+                      padding: "0.25rem 0.6rem",
+                      borderRadius: 4,
+                      fontWeight: 700,
+                      letterSpacing: "0.1em",
+                    }}>{num}</span>
+                    <span style={{
+                      fontFamily: "'JetBrains Mono', monospace",
+                      fontSize: "0.7rem",
+                      color: "#c0c0c8",
+                      letterSpacing: "0.1em",
+                      textTransform: "uppercase",
+                      textShadow: "0 2px 8px rgba(0,0,0,0.8)",
+                    }}>{c.title}</span>
+                  </div>
+                  {/* Big title overlaid */}
+                  <div style={{
+                    position: "absolute", bottom: "1.5rem", left: "1.5rem", right: "1.5rem",
+                  }}>
+                    <h3 style={{
+                      fontSize: "1.75rem",
+                      fontWeight: 700,
+                      letterSpacing: "-0.025em",
+                      color: "#ffffff",
+                      lineHeight: 1.2,
+                      textShadow: "0 2px 16px rgba(0,0,0,0.9)",
+                      margin: 0,
+                    }}>{c.tag}</h3>
+                  </div>
                 </div>
-              ))}
-            </div>
-          </div>
-          </FadeIn>
-        ))}
+
+                {/* Content side */}
+                <div style={{
+                  gridColumn: imageLeft ? 2 : 1,
+                  gridRow: 1,
+                  padding: "2.5rem 2.5rem 2rem",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "center",
+                }}>
+                  <p style={{
+                    fontSize: "0.95rem",
+                    color: "#c0c0c8",
+                    lineHeight: 1.65,
+                    fontWeight: 300,
+                    marginBottom: "1.75rem",
+                  }}>{c.desc}</p>
+
+                  <div style={{
+                    fontSize: "0.7rem",
+                    color: "#00e5a0",
+                    fontFamily: "'JetBrains Mono', monospace",
+                    letterSpacing: "0.12em",
+                    textTransform: "uppercase",
+                    marginBottom: "0.9rem",
+                    fontWeight: 600,
+                  }}>{l.whatYouGet}</div>
+
+                  <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
+                    {c.benefits.map(([b, d]) => (
+                      <li key={b} style={{
+                        display: "flex",
+                        gap: "0.75rem",
+                        marginBottom: "0.9rem",
+                        alignItems: "flex-start",
+                      }}>
+                        <span style={{
+                          color: "#00e5a0",
+                          fontSize: "0.85rem",
+                          marginTop: "0.15rem",
+                          flexShrink: 0,
+                          fontFamily: "'JetBrains Mono', monospace",
+                        }}>→</span>
+                        <p style={{
+                          fontSize: "0.83rem",
+                          color: "#8a8a96",
+                          lineHeight: 1.55,
+                          margin: 0,
+                        }}>
+                          <strong style={{ color: "#e8e8ed", fontWeight: 500 }}>{b}</strong> — {d}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </article>
+            </FadeIn>
+          );
+        })}
       </div>
+
       <div style={{ padding: "4rem 2rem", textAlign: "center" }}>
         <h2 style={{ fontSize: "1.5rem", fontWeight: 700, letterSpacing: "-0.03em", marginBottom: "1rem" }}>{l.useCasesCta}</h2>
         <p style={{ color: "#8a8a96", maxWidth: 480, margin: "0 auto 2rem", fontWeight: 300 }}>{l.useCasesCtaDesc}</p>
@@ -1435,6 +1579,18 @@ export default function App() {
           to { opacity: 1; transform: translateY(0); }
         }
         .page-transition { animation: pageFade 0.35s ease-out both; }
+
+        /* Use Cases cards — hover zoom on image + border glow */
+        .use-case-card { transition: border-color 0.3s, box-shadow 0.3s; }
+        .use-case-card:hover { border-color: rgba(0,229,160,0.35) !important; box-shadow: 0 8px 32px rgba(0,229,160,0.08); }
+        .use-case-card:hover .use-case-img { transform: scale(1.05); filter: saturate(1) brightness(0.7) contrast(1.05) !important; }
+
+        /* Responsive — stackuj image nad content */
+        @media (max-width: 820px) {
+          .use-case-card { grid-template-columns: 1fr !important; }
+          .use-case-card > div:first-child { min-height: 240px !important; grid-column: 1 !important; grid-row: 1 !important; }
+          .use-case-card > div:last-child { grid-column: 1 !important; grid-row: 2 !important; padding: 2rem !important; }
+        }
         @keyframes flowDot {
           0% { left: -10px; opacity: 0; }
           10% { opacity: 1; }
