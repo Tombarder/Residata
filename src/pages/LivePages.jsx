@@ -74,12 +74,13 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
                 <tbody>
                   {clearRows.map(p => <ProjectRow key={p.id} p={p} t={t} lang={lang} setCurrent={setCurrent} />)}
 
-                  {/* Blurred teaser rows — anon only */}
-                  {blurredRows.length > 0 && blurredRows.map((p, i) => (
+                  {/* Blurred teaser rows — anon only. Vyššia opacity + mäkkší blur,
+                      nech je viditeľné že sú tam reálne dáta. */}
+                  {blurredRows.length > 0 && blurredRows.map((p) => (
                     <tr key={`blur-${p.id}`} style={{
                       borderTop: `1px solid ${border}`,
-                      filter: "blur(4px)",
-                      opacity: 0.55,
+                      filter: "blur(5px)",
+                      opacity: 0.85,
                       userSelect: "none",
                       pointerEvents: "none",
                       transition: "filter 0.3s",
@@ -100,41 +101,34 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
               </table>
             </div>
 
-            {/* Teaser overlay — len ak sú blurred rows */}
+            {/* Floating CTA card — bez tmavého full-height gradientu, nech je blur viditeľný */}
             {blurredRows.length > 0 && (
               <div style={{
                 position: "absolute",
-                left: 0, right: 0, bottom: 0,
-                height: `${blurredRows.length * 49 + 60}px`,
-                background: "linear-gradient(to bottom, rgba(16,16,18,0) 0%, rgba(16,16,18,0.85) 40%, rgba(16,16,18,0.98) 100%)",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "flex-end",
-                padding: "0 1rem 1.5rem",
-                pointerEvents: "none",
+                left: "50%",
+                bottom: "1.25rem",
+                transform: "translateX(-50%)",
+                pointerEvents: "auto",
+                textAlign: "center",
+                background: "rgba(16,16,18,0.92)",
+                backdropFilter: "blur(8px)",
+                border: `1px solid rgba(0,229,160,0.3)`,
+                borderRadius: 12,
+                padding: "1.15rem 1.75rem",
+                boxShadow: "0 10px 40px rgba(0,0,0,0.6), 0 0 32px rgba(0,229,160,0.08)",
+                maxWidth: "calc(100% - 2rem)",
               }}>
-                <div style={{
-                  pointerEvents: "auto",
-                  textAlign: "center",
-                  background: "rgba(16,16,18,0.95)",
-                  border: `1px solid ${border}`,
-                  borderRadius: 12,
-                  padding: "1.25rem 1.75rem",
-                  boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
-                }}>
-                  <div style={{ fontSize: "0.95rem", color: "#e8e8ed", marginBottom: "0.5rem", fontWeight: 500 }}>
-                    {lang === "sk"
-                      ? <>🔒 Ďalších <strong style={{ color: green }}>{projects.length - ANON_VISIBLE}</strong> projektov dostupných po registrácii</>
-                      : <>🔒 <strong style={{ color: green }}>{projects.length - ANON_VISIBLE}</strong> more projects unlocked with a free account</>}
-                  </div>
-                  <div style={{ fontSize: "0.78rem", color: dim, marginBottom: "1rem" }}>
-                    {lang === "sk" ? "30 sekúnd. Žiadna kreditka." : "Takes 30 seconds. No credit card."}
-                  </div>
-                  <button onClick={openLogin} className="btn-p" style={{ fontSize: "0.85rem" }}>
-                    {lang === "sk" ? "Zaregistrovať zadarmo →" : "Sign up for free →"}
-                  </button>
+                <div style={{ fontSize: "0.95rem", color: "#e8e8ed", marginBottom: "0.4rem", fontWeight: 500 }}>
+                  {lang === "sk"
+                    ? <>🔒 Ďalších <strong style={{ color: green }}>{projects.length - ANON_VISIBLE}</strong> projektov po registrácii</>
+                    : <>🔒 <strong style={{ color: green }}>{projects.length - ANON_VISIBLE}</strong> more projects with a free account</>}
                 </div>
+                <div style={{ fontSize: "0.75rem", color: dim, marginBottom: "0.85rem" }}>
+                  {lang === "sk" ? "30 sekúnd. Žiadna kreditka." : "Takes 30 seconds. No credit card."}
+                </div>
+                <button onClick={openLogin} className="btn-p" style={{ fontSize: "0.85rem" }}>
+                  {lang === "sk" ? "Zaregistrovať zadarmo →" : "Sign up for free →"}
+                </button>
               </div>
             )}
           </div>
