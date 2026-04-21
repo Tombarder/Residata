@@ -12,7 +12,8 @@ import { MarketPulse, DistrictPulse, PipelineFlow } from "./pages/HomeExtras";
 import HeroLabPage from "./pages/HeroVariants";
 import { useAuth } from "./lib/useAuth";
 import { useCapabilities } from "./lib/useCapabilities";
-import { pushRoute, pathToPage } from "./lib/routing";
+import { pushRoute, pathToPage, isAppPage } from "./lib/routing";
+import PlatformShell from "./pages/Platform";
 import { track } from "./lib/track";
 
 const pagesEN = ["Home", "Live", "Sample", "Use Cases", "Pricing", "Contact"];
@@ -407,6 +408,12 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
           </div>
           {user ? (
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+              {/* Primary CTA for logged-in users on marketing pages: jump to platform. */}
+              <a onClick={() => setCurrent("App:Dashboard")} className="nav-cta-btn" style={{
+                padding: "0.45rem 1rem", background: "#00e5a0", color: "#0a0a0b",
+                fontWeight: 600, borderRadius: 6, fontSize: "0.78rem", cursor: "pointer",
+                textDecoration: "none",
+              }}>{lang === "sk" ? "Otvoriť platformu →" : "Open platform →"}</a>
               {/* Debug badge — ukáže aktuálny tier + profile load stav, viditeľné aj v prod kým ladíme */}
               <span title={`tier=${caps.tier} profile=${auth.profile ? "loaded" : "MISSING"} err=${auth.profileError || "none"}`} style={{
                 fontFamily: "'JetBrains Mono', monospace", fontSize: "0.6rem",
@@ -415,17 +422,11 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
                 color: auth.profile ? "#00e5a0" : "#f5a623",
                 fontWeight: 700, letterSpacing: "0.05em",
               }}>{caps.tier}</span>
-              {showAdminLink && (
-                <a onClick={() => setCurrent("Admin")} style={{
-                  color: current === "Admin" ? "#f5a623" : "#8a8a96", textDecoration: "none",
-                  fontSize: "0.8rem", cursor: "pointer", fontFamily: "'JetBrains Mono', monospace",
-                }}>ADMIN</a>
-              )}
-              <span style={{ fontSize: "0.75rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <span style={{ fontSize: "0.75rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace", maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {user.email}
               </span>
               <button onClick={() => auth.signOut()} style={{
-                padding: "0.4rem 0.9rem", background: "transparent", color: "#e8e8ed",
+                padding: "0.4rem 0.85rem", background: "transparent", color: "#e8e8ed",
                 fontWeight: 500, borderRadius: 6, fontSize: "0.75rem", cursor: "pointer",
                 border: "1px solid #222228", fontFamily: "inherit",
               }}>{lang === "sk" ? "Odhlásiť" : "Sign out"}</button>
@@ -473,26 +474,27 @@ function HomePage({ setCurrent, l, lang, onLogin }) {
       </>
     );
   } else if (tier === "pending") {
+    // Logged-in but not yet approved (freemium edge case).
     heroButtons = (
       <>
-        <a onClick={() => setCurrent("Live")} className="btn-p">{lang === "sk" ? "Pozrieť dashboard" : "Open dashboard"}</a>
+        <a onClick={() => setCurrent("App:Dashboard")} className="btn-p">{lang === "sk" ? "Otvoriť platformu" : "Open platform"}</a>
         <a onClick={() => setCurrent("Pricing")} className="btn-s">{lang === "sk" ? "Cenník" : "See pricing"}</a>
       </>
     );
   } else if (can("prompt_upgrade_to_paid")) {
-    // free — upgrade prompt
+    // Logged-in free user — route to platform, offer upgrade as secondary.
     heroButtons = (
       <>
-        <a onClick={() => setCurrent("Live")} className="btn-p">{lang === "sk" ? "Pozrieť dashboard" : "Open dashboard"}</a>
-        <a onClick={() => setCurrent("Pricing")} className="btn-s">{lang === "sk" ? "Upgrade na paid" : "Upgrade to paid"}</a>
+        <a onClick={() => setCurrent("App:Dashboard")} className="btn-p">{lang === "sk" ? "Otvoriť platformu" : "Open platform"}</a>
+        <a onClick={() => setCurrent("App:Billing")} className="btn-s">{lang === "sk" ? "Upgrade na paid" : "Upgrade to paid"}</a>
       </>
     );
   } else {
-    // paid / admin — ideme rovno do dashboardu
+    // paid / admin — primary = platform, secondary = Analytics (platform).
     heroButtons = (
       <>
-        <a onClick={() => setCurrent("Live")} className="btn-p">{lang === "sk" ? "Pozrieť dashboard" : "Open dashboard"}</a>
-        {can("view_analytics") && <a onClick={() => setCurrent("Analytics")} className="btn-s">{lang === "sk" ? "Analytika" : "Analytics"}</a>}
+        <a onClick={() => setCurrent("App:Dashboard")} className="btn-p">{lang === "sk" ? "Otvoriť platformu" : "Open platform"}</a>
+        {can("view_analytics") && <a onClick={() => setCurrent("App:Analytics")} className="btn-s">{lang === "sk" ? "Analytika" : "Analytics"}</a>}
       </>
     );
   }
@@ -1585,10 +1587,16 @@ export default function App() {
       `}</style>
       <RisingParticles />
       <div style={{ position: "relative", zIndex: 1 }}>
-      <Nav current={current} setCurrent={handleNav} lang={lang} setLang={setLang} auth={auth} onLogin={() => setLoginOpen(true)} caps={caps} />
-      <Ticker lang={lang} />
-      {/* Spacer for fixed Nav (72px) + Ticker (36px) */}
-      <div style={{ height: 36 }} />
+      {/* Platform pages (/app/*) render their own full-height shell with
+          sidebar — skip the marketing Nav/Ticker/Footer chrome. */}
+      {!isAppPage(current) && (
+        <>
+          <Nav current={current} setCurrent={handleNav} lang={lang} setLang={setLang} auth={auth} onLogin={() => setLoginOpen(true)} caps={caps} />
+          <Ticker lang={lang} />
+          {/* Spacer for fixed Nav (72px) + Ticker (36px) */}
+          <div style={{ height: 36 }} />
+        </>
+      )}
 
       {/* Keyed wrapper — re-mounts on route change so CSS animation replays */}
       <div key={current} className="page-transition">
@@ -1603,6 +1611,16 @@ export default function App() {
         */}
         {auth.loading && auth.user ? (
           <AuthLoadingSpinner />
+        ) : isAppPage(current) ? (
+          // Platform mode: sidebar shell takes over the whole viewport.
+          <PlatformShell
+            page={current}
+            projectId={typeof current === "string" && current.startsWith("App:ProjectDetail:")
+              ? current.slice("App:ProjectDetail:".length) : null}
+            lang={lang}
+            setCurrent={handleNav}
+            openLogin={() => setLoginOpen(true)}
+          />
         ) : (
           <>
             {current === "Home" && <HomePage setCurrent={handleNav} l={l} lang={lang} onLogin={() => setLoginOpen(true)} />}
@@ -1621,73 +1639,10 @@ export default function App() {
             {/* Hidden hero-variant preview page — not in Nav, only reachable via /hero-lab URL */}
             {current === "HeroLab" && <HeroLabPage setCurrent={handleNav} lang={lang} />}
 
-            {/* Analytics — paid only, inak UpgradePrompt */}
-            {current === "Analytics" && (
-              <Feature
-                requires="view_analytics"
-                fallback={
-                  caps.tier === "pending"
-                    ? <PendingGate setCurrent={handleNav} lang={lang} />
-                    : <main style={{ padding: "5rem 2rem" }}>
-                        <UpgradePrompt
-                          feature={lang === "sk" ? "analytika a trendy" : "analytics & trends"}
-                          variant="card"
-                          lang={lang}
-                          onLogin={() => setLoginOpen(true)}
-                          onGoPricing={() => handleNav("Pricing")}
-                        />
-                      </main>
-                }
-              >
-                <LiveAnalytics setCurrent={handleNav} openLogin={() => setLoginOpen(true)} lang={lang} />
-              </Feature>
-            )}
-
-            {/* Admin — admin only. Two distinct fallback cases:
-                 - anon (no session): show sign-in prompt, NOT 403. Very common
-                   when admin clicks "Open admin panel" from an email in a new
-                   browser tab that doesn't carry a session.
-                 - logged in but tier ≠ admin: keep the 403 (this is a real
-                   access-denied). */}
-            {current === "Admin" && (
-              <Feature
-                requires="manage_users"
-                fallback={
-                  !auth.user ? (
-                    <main style={{ padding: "6rem 2rem 4rem", maxWidth: 520, margin: "0 auto", textAlign: "center" }}>
-                      <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>🔐</div>
-                      <h1 style={{ fontSize: "1.8rem", fontWeight: 700, letterSpacing: "-0.02em", marginBottom: "0.75rem" }}>
-                        {lang === "sk" ? "Prihlás sa ako admin" : "Sign in as admin"}
-                      </h1>
-                      <p style={{ color: "#8a8a96", fontSize: "0.95rem", lineHeight: 1.6, marginBottom: "1.5rem" }}>
-                        {lang === "sk"
-                          ? "Admin panel vyžaduje prihlásenie. Po kliknutí nižšie dostaneš magic link na email admina."
-                          : "Admin panel requires a session. Click below to receive a magic link on the admin email."}
-                      </p>
-                      <button onClick={() => setLoginOpen(true)} className="btn-p">
-                        {lang === "sk" ? "Prihlásiť sa" : "Sign in"}
-                      </button>
-                      <p style={{ color: "#55555f", fontSize: "0.8rem", marginTop: "1.5rem" }}>
-                        {lang === "sk"
-                          ? "Tip: ak si schvaľoval usera z mailu v inej záložke, tam nie je session. Prihlás sa sem, potom môžeš spravovať userov."
-                          : "Tip: if you approved a user from an email link in another tab, that tab has no session. Sign in here, then you can manage users."}
-                      </p>
-                    </main>
-                  ) : (
-                    <main style={{ padding: "5rem 2rem", textAlign: "center" }}>
-                      <h1 style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>403</h1>
-                      <p style={{ color: "#8a8a96" }}>
-                        {lang === "sk"
-                          ? `Prístup zamietnutý. Tvoj tier: ${caps.tier}`
-                          : `Access denied. Your tier: ${caps.tier}`}
-                      </p>
-                    </main>
-                  )
-                }
-              >
-                <LiveAdmin setCurrent={handleNav} lang={lang} />
-              </Feature>
-            )}
+            {/* /admin and /analytics are handled by the PlatformShell branch above.
+                pathToPage() maps those legacy URLs to App:Admin / App:Analytics
+                so admin links from emails land users inside the platform shell
+                with proper sidebar + sign-in prompt for anon. */}
 
             {/* Project detail */}
             {typeof current === "string" && current.startsWith("Project:") && (
@@ -1698,7 +1653,7 @@ export default function App() {
           </>
         )}
       </div>
-      <Footer />
+      {!isAppPage(current) && <Footer />}
       <LoginModal open={loginOpen} onClose={() => setLoginOpen(false)} lang={lang} />
       {/* Force profile completion after login */}
       {auth.user && auth.profile && !auth.profile.profile_completed && (

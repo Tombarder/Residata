@@ -21,6 +21,7 @@ const ANON_TEASER = 8;  // navyše zobrazíme blurred — dokopy 20 riadkov s bl
 export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
   const t = liveT[lang] || liveT.en;
   const { can } = useCapabilities();
+  const { user } = useAuth();
   const { projects, loading } = useProjects();
   const hasFullAccess = can("view_all_projects_list");
   // Anon: 12 plne, ďalších 8 blurred. Logged-in: všetko.
@@ -28,9 +29,30 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
   const blurredRows = hasFullAccess ? [] : projects.slice(ANON_VISIBLE, ANON_VISIBLE + ANON_TEASER);
   const showUpgradeToPaid = can("prompt_upgrade_to_paid");
   const showSignupPrompt = can("prompt_signup");
+  // When a logged-in user lands on /live (the marketing teaser) they don't
+  // need the teaser — push them into the platform via a small banner.
+  const showPlatformHint = !!user && hasFullAccess;
 
   return (
     <main style={{ padding: "5rem 2rem 4rem", maxWidth: 1200, margin: "0 auto" }}>
+      {showPlatformHint && (
+        <div style={{
+          marginBottom: "1.25rem", padding: "0.85rem 1.1rem",
+          background: "rgba(0,229,160,0.08)",
+          border: "1px solid rgba(0,229,160,0.3)",
+          borderRadius: 10,
+          display: "flex", alignItems: "center", gap: "1rem", flexWrap: "wrap",
+        }}>
+          <span style={{ fontSize: "0.88rem", color: "#e8e8ed", flex: 1, lineHeight: 1.4 }}>
+            {lang === "sk"
+              ? <>Si prihlásený. Toto je verejný náhľad — tvoj plný dashboard je v platforme.</>
+              : <>You're signed in. This is the public teaser — your full dashboard lives in the platform.</>}
+          </span>
+          <button onClick={() => setCurrent && setCurrent("App:Dashboard")} className="btn-p" style={{ fontSize: "0.82rem", padding: "0.55rem 1.1rem" }}>
+            {lang === "sk" ? "Otvoriť platformu →" : "Open platform →"}
+          </button>
+        </div>
+      )}
       <Label>{t.live_label}</Label>
       <h1 className="sec-title">{t.live_title}</h1>
       <p className="sec-desc" style={{ marginBottom: "2.5rem" }}>

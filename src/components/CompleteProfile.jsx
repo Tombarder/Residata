@@ -46,11 +46,11 @@ export default function CompleteProfile({ lang = "en" }) {
     console.log(`[CompleteProfile] submit start`, { user: user?.id });
 
     // Hard-reload fallback — if for any reason the in-app re-render path fails
-    // (stale closure, race, network hiccup), force a full page reload to /live
+    // (stale closure, race, network hiccup), force a full page reload to /app
     // after a timeout. Guarantees the user doesn't sit stuck forever.
     const hardReloadFallback = setTimeout(() => {
-      console.warn("[CompleteProfile] slow submit — forcing hard reload to /live");
-      window.location.replace("/live");
+      console.warn("[CompleteProfile] slow submit — forcing hard reload to /app");
+      window.location.replace("/app");
     }, 10000);
 
     try {
@@ -87,19 +87,18 @@ export default function CompleteProfile({ lang = "en" }) {
         has_linkedin: !!form.linkedin_url.trim(),
         has_phone: !!form.phone.trim(),
       });
-      console.log(`[CompleteProfile] success · ${Math.round(performance.now() - t0)}ms · hard-redirect to /live`, data[0]);
+      console.log(`[CompleteProfile] success · ${Math.round(performance.now() - t0)}ms · hard-redirect to /app`, data[0]);
 
       // Update shared context first so in-memory state matches DB.
       setProfile(data[0]);
 
-      // Hard redirect to /live — reliable unmount + clean state. The previous
-      // approach (setProfile + pushRoute, relying on React re-render to unmount
-      // CompleteProfile) sometimes stalled in practice (stale closure race).
+      // Hard redirect to /app (platform dashboard) — reliable unmount + clean
+      // state. The previous approach (setProfile + pushRoute, relying on React
+      // re-render to unmount CompleteProfile) sometimes stalled in practice.
       // A full page reload here is overkill for a happy path but cheap and
-      // 100 % reliable, and the user sees "Saving…" → dashboard without any
-      // "Loading profile…" limbo state.
+      // 100 % reliable. New users land directly in the platform, as they should.
       clearTimeout(hardReloadFallback);
-      window.location.replace("/live");
+      window.location.replace("/app");
     } catch (e) {
       clearTimeout(hardReloadFallback);
       console.error("[CompleteProfile] exception", e);

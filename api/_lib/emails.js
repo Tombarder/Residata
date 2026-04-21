@@ -107,7 +107,7 @@ export function adminDigestHtml(user, webUrl, supabaseUrl, hmacSecret) {
       </div>
     </div>
     <p style="${S.p};font-size:13px;color:${textDim}">Full user list + manual controls:</p>
-    <a href="${webUrl}/admin" style="${S.btnOutline}">Open admin panel →</a>
+    <a href="${webUrl}/app/admin" style="${S.btnOutline}">Open admin panel →</a>
   </div>
   <div style="${S.footer}">Residata · real-time FYI · sign-ups are auto-approved as free</div>
 </div>

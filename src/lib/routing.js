@@ -13,8 +13,29 @@
  *   "Project:foo" → "/project/foo"
  */
 
+// ─── Platform (logged-in) page <-> URL mapping ───
+// Platform pages use keys like "App:Dashboard", "App:Projects",
+// "App:ProjectDetail:<id>" etc. URLs live under /app/*.
+const APP_PAGE_TO_PATH = {
+  "App:Dashboard": "/app",
+  "App:Projects":  "/app/projects",
+  "App:Analytics": "/app/analytics",
+  "App:Reports":   "/app/reports",
+  "App:Exports":   "/app/exports",
+  "App:Billing":   "/app/billing",
+  "App:Settings":  "/app/settings",
+  "App:Admin":     "/app/admin",
+};
+const APP_PATH_TO_PAGE = Object.fromEntries(
+  Object.entries(APP_PAGE_TO_PATH).map(([k, v]) => [v, k])
+);
+
 export function pageToPath(page) {
   if (!page || page === "Home") return "/";
+  if (typeof page === "string" && page.startsWith("App:ProjectDetail:")) {
+    return "/app/projects/" + page.slice("App:ProjectDetail:".length);
+  }
+  if (APP_PAGE_TO_PATH[page]) return APP_PAGE_TO_PATH[page];
   if (typeof page === "string" && page.startsWith("Project:")) {
     return "/project/" + page.slice(8);
   }
@@ -28,6 +49,17 @@ export function pageToPath(page) {
 export function pathToPage(pathname) {
   const clean = (pathname || "/").toLowerCase().replace(/\/+$/, "");
   if (!clean || clean === "/") return "Home";
+
+  // Platform project detail — /app/projects/<id>
+  if (clean.startsWith("/app/projects/")) {
+    const id = clean.slice("/app/projects/".length);
+    if (id) return "App:ProjectDetail:" + id;
+    return "App:Projects";
+  }
+  // Fixed app paths
+  if (APP_PATH_TO_PAGE[clean]) return APP_PATH_TO_PAGE[clean];
+
+  // Public project detail — /project/<id>
   if (clean.startsWith("/project/")) return "Project:" + clean.slice(9);
 
   const map = {
@@ -38,11 +70,18 @@ export function pathToPage(pathname) {
     "/contact": "Contact",
     "/sample": "Data",    // nový primárny URL
     "/data": "Data",      // spätná kompatibilita (pôvodný URL)
-    "/analytics": "Analytics",
-    "/admin": "Admin",
+    // Legacy URLs → new platform pages (for backward compat of email links etc)
+    "/analytics": "App:Analytics",
+    "/admin": "App:Admin",
     "/hero-lab": "HeroLab",   // hidden — page picker pre Home hero variant
   };
   return map[clean] || "Home";
+}
+
+/** True if the page key belongs to the platform shell (/app/*). */
+export function isAppPage(page) {
+  if (!page) return false;
+  return typeof page === "string" && page.startsWith("App:");
 }
 
 export function pushRoute(page, replace = false) {
