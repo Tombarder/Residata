@@ -3,25 +3,35 @@ import { supabase } from "../lib/supabase";
 import { useAuth } from "../lib/useAuth";
 import { liveT } from "../lib/liveLang";
 import { track } from "../lib/track";
+import { pushRoute } from "../lib/routing";
 
 /**
- * Povinný post-login krok. Renderuje sa ako full-screen overlay ak
- * user je authenticated + profile.profile_completed === false.
- * Nemá close button — musí sa vyplniť alebo odhlásiť.
+ * Povinný post-login krok. Full-screen overlay ak user je authenticated +
+ * profile.profile_completed === false. Žiadny close button.
  *
- * OPTIMISTIC UI: po kliku Save hneď prepneme na "Application received ✓"
- * obrazovku. Ukladanie beží na pozadí. Ak reálne zlyhá, vrátime formulár
- * a ukážeme chybu. Tým odstraňujeme pocit "Saving... 10-15s" delay.
- * Reálne merania ukazujú server-side ~200 ms, takže v 99 % prípadov user
- * uvidí success screen a hneď po nej PendingGate (app re-render).
+ * FLOW (freemium + direct context update):
+ *   1. Klik Save → state='saving' (form disabled, tiny spinner on button)
+ *   2. supabase UPDATE profile_completed=true  → DB trigger auto-sets
+ *      tier='free' and approved_at=NOW() synchronously.
+ *   3. UPDATE returns the fresh row. We push it DIRECTLY into AuthContext
+ *      via setProfile(). No round-trip reloadProfile() needed, no wait.
+ *   4. App.jsx sees profile_completed=true → unmounts us → dashboard shows.
+ *   5. We also pushRoute("Live") so the URL + page match explicitly, even
+ *      if something delays the re-render.
+ *
+ * Before this: we had an "optimistic success" screen that sat at "Loading
+ * profile…" for N seconds because reloadProfile() was causing a stale-
+ * closure race. The direct setProfile approach makes the transition
+ * instant — the form submit resolves, the new profile hits context, and
+ * the parent unmounts the overlay in the same render tick.
  */
 export default function CompleteProfile({ lang = "en" }) {
   const t = liveT[lang] || liveT.en;
-  const { user, reloadProfile, signOut } = useAuth();
+  const { user, setProfile, signOut } = useAuth();
   const [form, setForm] = useState({
     full_name: "", company: "", position: "", linkedin_url: "", phone: "",
   });
-  // "form" (initial) | "submitted" (optimistic success) | "error" (rollback)
+  // "form" (initial) | "saving" (button disabled) | "error" (rollback)
   const [state, setState] = useState("form");
   const [err, setErr] = useState(null);
 
@@ -32,9 +42,8 @@ export default function CompleteProfile({ lang = "en" }) {
       return;
     }
     setErr(null);
-    // OPTIMISTIC — switch to success screen immediately, do save in background.
-    setState("submitted");
-    console.log("[CompleteProfile] optimistic submit for", user?.id, form);
+    setState("saving");
+    console.log("[CompleteProfile] submit for", user?.id);
 
     try {
       const { data, error } = await supabase.from("user_profiles").update({
@@ -66,11 +75,15 @@ export default function CompleteProfile({ lang = "en" }) {
         has_linkedin: !!form.linkedin_url.trim(),
         has_phone: !!form.phone.trim(),
       });
-      console.log("[CompleteProfile] success, reloading profile");
-      // Once reloadProfile finishes, App.jsx re-renders — profile.profile_completed=true
-      // means this component unmounts and PendingGate takes over. The success screen
-      // below is only visible for the duration of the actual save (~500ms typically).
-      await reloadProfile();
+      console.log("[CompleteProfile] success, pushing profile to context", data[0]);
+
+      // Direct context update — no DB round-trip. The UPDATE already returned
+      // the new row (with tier='free' and approved_at set by the BEFORE trigger).
+      // Parent re-renders immediately, this overlay unmounts, dashboard appears.
+      setProfile(data[0]);
+      // Extra insurance: explicit route push to /live so even if something
+      // delayed re-render the user lands on the right page.
+      pushRoute("Live");
     } catch (e) {
       console.error("[CompleteProfile] exception", e);
       setState("error");
@@ -102,44 +115,7 @@ export default function CompleteProfile({ lang = "en" }) {
         background: "#16161a", border: "1px solid #222228", borderRadius: 14,
         padding: "2.25rem 2rem", maxWidth: 480, width: "100%",
       }}>
-        {state === "submitted" ? (
-          // OPTIMISTIC SUCCESS SCREEN — shown immediately after click.
-          // Freemium: DB auto-trigger flips tier → 'free' synchronously with
-          // the profile-completed UPDATE. By the time reloadProfile() returns,
-          // the App.jsx render sees the real profile and swaps us out for the
-          // free-tier dashboard. Usually visible <500ms.
-          <div style={{ textAlign: "center", padding: "1rem 0" }}>
-            <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>🎉</div>
-            <div style={{
-              fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem",
-              color: "#00e5a0", letterSpacing: "0.15em", textTransform: "uppercase",
-              marginBottom: "0.75rem",
-            }}>
-              {lang === "sk" ? "Vitaj" : "Welcome"}
-            </div>
-            <h2 style={{ fontSize: "1.5rem", fontWeight: 700, letterSpacing: "-0.02em", marginBottom: "0.75rem", color: "#e8e8ed" }}>
-              {lang === "sk" ? "Si v hre!" : "You're in!"}
-            </h2>
-            <p style={{ fontSize: "0.9rem", color: "#8a8a96", lineHeight: 1.6, marginBottom: "1rem" }}>
-              {lang === "sk"
-                ? "Free účet aktivovaný. Presmerovávam na dashboard…"
-                : "Free account activated. Redirecting you to the dashboard…"}
-            </p>
-            <div style={{
-              display: "inline-flex", alignItems: "center", gap: "0.5rem",
-              fontSize: "0.75rem", color: "#8a8a96",
-              fontFamily: "'JetBrains Mono', monospace", marginTop: "0.5rem",
-            }}>
-              <span style={{
-                width: 10, height: 10, border: "2px solid #00e5a0",
-                borderTopColor: "transparent", borderRadius: "50%",
-                animation: "cp-spin 0.8s linear infinite",
-              }} />
-              {lang === "sk" ? "načítavam profil…" : "loading profile…"}
-            </div>
-            <style>{`@keyframes cp-spin { to { transform: rotate(360deg); } }`}</style>
-          </div>
-        ) : state === "error" ? (
+        {state === "error" ? (
           // ROLLBACK — something went wrong, let user retry
           <div style={{ padding: "0.5rem 0" }}>
             <div style={{ fontSize: "2.5rem", marginBottom: "0.75rem", textAlign: "center" }}>⚠</div>
@@ -193,17 +169,37 @@ export default function CompleteProfile({ lang = "en" }) {
 
               {err && <div style={{ color: "#ff6b6b", fontSize: "0.8rem", marginBottom: "0.75rem" }}>{err}</div>}
 
-              <button type="submit" style={{
-                width: "100%", padding: "0.85rem", background: "#00e5a0", color: "#0a0a0b",
-                fontWeight: 600, borderRadius: 8, border: "none", cursor: "pointer",
-                fontSize: "0.95rem", marginTop: "0.5rem",
-              }}>{t.cp_submit}</button>
+              <button
+                type="submit"
+                disabled={state === "saving"}
+                style={{
+                  width: "100%", padding: "0.85rem", background: "#00e5a0", color: "#0a0a0b",
+                  fontWeight: 600, borderRadius: 8, border: "none",
+                  cursor: state === "saving" ? "wait" : "pointer",
+                  fontSize: "0.95rem", marginTop: "0.5rem",
+                  opacity: state === "saving" ? 0.7 : 1,
+                  display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "0.5rem",
+                }}
+              >
+                {state === "saving" && (
+                  <span style={{
+                    width: 14, height: 14,
+                    border: "2px solid #0a0a0b",
+                    borderTopColor: "transparent",
+                    borderRadius: "50%",
+                    animation: "cp-spin 0.7s linear infinite",
+                  }} />
+                )}
+                {state === "saving" ? (lang === "sk" ? "Ukladám…" : "Saving…") : t.cp_submit}
+              </button>
 
-              <button type="button" onClick={signOut} style={{
+              <button type="button" onClick={signOut} disabled={state === "saving"} style={{
                 width: "100%", padding: "0.5rem", background: "transparent", color: "#55555f",
-                border: "none", fontSize: "0.75rem", cursor: "pointer", marginTop: "0.75rem",
+                border: "none", fontSize: "0.75rem", cursor: state === "saving" ? "wait" : "pointer", marginTop: "0.75rem",
+                opacity: state === "saving" ? 0.5 : 1,
               }}>{t.cp_signout} ({user?.email})</button>
             </form>
+            <style>{`@keyframes cp-spin { to { transform: rotate(360deg); } }`}</style>
           </>
         )}
       </div>

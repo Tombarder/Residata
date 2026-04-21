@@ -118,6 +118,10 @@ function useAuthInternal() {
     user, profile, tier, loading, profileError,
     signIn, signOut,
     reloadProfile: () => user && loadProfile(user.id),
+    // Lets callers push a locally-updated profile straight into context
+    // without a DB round-trip. Useful right after an UPDATE that already
+    // returned the new row (no need to refetch).
+    setProfile,
   };
 }
 
