@@ -1,21 +1,18 @@
 // Vercel serverless endpoint: admin-notify
 //
-// Fires from a Postgres trigger (via pg_net) whenever user_profiles is
-// updated in a way that should notify the admin — specifically when:
-//   - tier = 'pending'
-//   - profile_completed = true
-//   - admin_notified_at IS NULL
+// FREEMIUM MODEL — no admin gate:
+// Fires from the AFTER-INSERT/UPDATE trigger on user_profiles when a new
+// signup completes their profile. By the time this endpoint runs, the
+// BEFORE-UPDATE trigger has already auto-approved them (tier='free',
+// approved_at=now()). So this email is purely FYI — "new free signup,
+// here's who they are, optionally bump to paid if you know them".
 //
-// The trigger sends a JSON body { user_id } and a secret header.
 // This endpoint:
-//   1. Validates the shared secret
-//   2. Loads the full user profile from Supabase (via service role)
-//   3. Re-checks conditions (guards against race / stale triggers)
-//   4. Sends admin digest email via Gmail SMTP
+//   1. Validates shared secret
+//   2. Loads user profile (service role — bypasses RLS)
+//   3. Skips if already notified (idempotency)
+//   4. Sends FYI email via Gmail SMTP
 //   5. Marks admin_notified_at = now()
-//
-// Replaces the 15-min cron for admin notifications. User-submit → admin
-// email in ~2-3 seconds.
 
 import { adminDigestHtml, sendEmail } from "../_lib/emails.js";
 
@@ -67,10 +64,7 @@ export default async function handler(req, res) {
   }
   const user = users[0];
 
-  // ─── Re-check conditions (idempotency + race guard) ───
-  if (user.tier !== "pending") {
-    return res.status(200).json({ skipped: "tier not pending", tier: user.tier });
-  }
+  // ─── Re-check conditions (idempotency only; no tier gate in freemium) ───
   if (!user.profile_completed) {
     return res.status(200).json({ skipped: "profile not completed yet" });
   }
@@ -78,11 +72,11 @@ export default async function handler(req, res) {
     return res.status(200).json({ skipped: "admin already notified", at: user.admin_notified_at });
   }
 
-  // ─── Send email ───
+  // ─── Send email (FYI about new free signup) ───
   try {
     await sendEmail({
       to: ADMIN_EMAIL,
-      subject: `[Residata] New signup: ${user.email}`,
+      subject: `[Residata] New free signup: ${user.email}`,
       html: adminDigestHtml(user, WEB_URL, SUPABASE_URL, APPROVAL_HMAC_SECRET),
       from: GMAIL_FROM,
       gmailUser: GMAIL_FROM,

@@ -104,24 +104,26 @@ export default function CompleteProfile({ lang = "en" }) {
       }}>
         {state === "submitted" ? (
           // OPTIMISTIC SUCCESS SCREEN — shown immediately after click.
-          // Usually visible for a few hundred ms, until reloadProfile()
-          // completes and App.jsx swaps us out for the PendingGate.
+          // Freemium: DB auto-trigger flips tier → 'free' synchronously with
+          // the profile-completed UPDATE. By the time reloadProfile() returns,
+          // the App.jsx render sees the real profile and swaps us out for the
+          // free-tier dashboard. Usually visible <500ms.
           <div style={{ textAlign: "center", padding: "1rem 0" }}>
-            <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>✓</div>
+            <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>🎉</div>
             <div style={{
               fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem",
               color: "#00e5a0", letterSpacing: "0.15em", textTransform: "uppercase",
               marginBottom: "0.75rem",
             }}>
-              {lang === "sk" ? "Hotovo" : "Done"}
+              {lang === "sk" ? "Vitaj" : "Welcome"}
             </div>
             <h2 style={{ fontSize: "1.5rem", fontWeight: 700, letterSpacing: "-0.02em", marginBottom: "0.75rem", color: "#e8e8ed" }}>
-              {lang === "sk" ? "Žiadosť prijatá" : "Application received"}
+              {lang === "sk" ? "Si v hre!" : "You're in!"}
             </h2>
             <p style={{ fontSize: "0.9rem", color: "#8a8a96", lineHeight: 1.6, marginBottom: "1rem" }}>
               {lang === "sk"
-                ? "Spracovávame ju. Email s potvrdením dostaneš do pár minút."
-                : "We're processing it. You'll get a confirmation email in a few minutes."}
+                ? "Free účet aktivovaný. Presmerovávam na dashboard…"
+                : "Free account activated. Redirecting you to the dashboard…"}
             </p>
             <div style={{
               display: "inline-flex", alignItems: "center", gap: "0.5rem",
@@ -133,7 +135,7 @@ export default function CompleteProfile({ lang = "en" }) {
                 borderTopColor: "transparent", borderRadius: "50%",
                 animation: "cp-spin 0.8s linear infinite",
               }} />
-              {lang === "sk" ? "ukladám na pozadí…" : "saving in background…"}
+              {lang === "sk" ? "načítavam profil…" : "loading profile…"}
             </div>
             <style>{`@keyframes cp-spin { to { transform: rotate(360deg); } }`}</style>
           </div>

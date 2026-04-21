@@ -62,8 +62,7 @@ export function approveUrl(userId, tier, supabaseUrl, hmacSecret, ttlSec = 7 * 8
 }
 
 // ──────────────────────────────────────────────────────────
-// Admin digest email (1 user per call — we notify per-signup now,
-// not batched, because webhook fires per event)
+// Admin FYI email — new free signup (freemium model, no approval gate)
 // ──────────────────────────────────────────────────────────
 export function adminDigestHtml(user, webUrl, supabaseUrl, hmacSecret) {
   const domain = emailDomain(user.email);
@@ -72,11 +71,9 @@ export function adminDigestHtml(user, webUrl, supabaseUrl, hmacSecret) {
     ? `<span style="${S.badgeWarn}">⚠ personal</span>`
     : `<span style="${S.badgeOk}">✓ business</span>`;
 
-  const rec = isPersonal ? "free" : "paid ⭐";
-  const recTier = isPersonal ? "free" : "paid";
-
-  const urlFree = approveUrl(user.id, "free", supabaseUrl, hmacSecret);
-  const urlPaid = approveUrl(user.id, "paid", supabaseUrl, hmacSecret);
+  // Only surface "Upgrade to paid" as an action — they're already free.
+  // Makes sense for users the admin recognises and wants to bump.
+  const upgradeUrl = approveUrl(user.id, "paid", supabaseUrl, hmacSecret);
 
   const rows = [];
   if (user.full_name)
@@ -92,35 +89,27 @@ export function adminDigestHtml(user, webUrl, supabaseUrl, hmacSecret) {
   if (user.created_at)
     rows.push(`<div style="${S.row}"><span style="${S.rowLabel}">Registered</span>${user.created_at.slice(0, 16).replace("T", " ")}</div>`);
 
-  const btnPrimary = recTier === "paid"
-    ? `<a href="${urlPaid}" style="${S.btnGreen}">✓ Approve as paid ⭐</a>`
-    : `<a href="${urlFree}" style="${S.btnGreen}">✓ Approve as free</a>`;
-  const btnSecondary = recTier === "paid"
-    ? `<a href="${urlFree}" style="${S.btnOutline}">Approve as free</a>`
-    : `<a href="${urlPaid}" style="${S.btnOutline}">Approve as paid ⭐</a>`;
-
   return `<!DOCTYPE html>
 <html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="${S.body}">
 <div style="${S.wrap}">
   <div><span style="${S.logoBox}">R</span><span style="${S.logoText}">Residata</span></div>
   <div style="${S.card}">
-    <div style="${S.hello}">New signup · waiting for approval</div>
-    <h1 style="${S.h1}">A new user is waiting</h1>
-    <p style="${S.p}">Jeden klik = schválené. Zelený = odporúčaný tier (paid pre business maily, free pre personal). Druhý button = alternatíva.</p>
+    <div style="${S.hello}">New free signup · FYI</div>
+    <h1 style="${S.h1}">Someone just signed up</h1>
+    <p style="${S.p}">Auto-approved as <strong style="color:${green}">free</strong>. No action needed — they already have access to the free tier.</p>
     <div style="${S.userBox}">
       <div style="${S.emailLine}">${user.email}${badge}</div>
       ${rows.join("")}
       <div style="${S.actions}">
-        <div style="font-size:11px;color:${textDim};font-family:'JetBrains Mono',Consolas,monospace;letter-spacing:0.05em;text-transform:uppercase;margin-bottom:8px">Recommendation: ${rec}</div>
-        ${btnPrimary}
-        ${btnSecondary}
+        <div style="font-size:11px;color:${textDim};font-family:'JetBrains Mono',Consolas,monospace;letter-spacing:0.05em;text-transform:uppercase;margin-bottom:8px">Optional · only if you know them</div>
+        <a href="${upgradeUrl}" style="${S.btnGreen}">⭐ Upgrade to paid</a>
       </div>
     </div>
-    <p style="${S.p};font-size:13px;color:${textDim}">Manuálny override cez admin panel:</p>
-    <a href="${webUrl}/admin" style="${S.btnOutline}">Open Admin Panel →</a>
+    <p style="${S.p};font-size:13px;color:${textDim}">Full user list + manual controls:</p>
+    <a href="${webUrl}/admin" style="${S.btnOutline}">Open admin panel →</a>
   </div>
-  <div style="${S.footer}">Residata · real-time notification · triggered by Supabase webhook</div>
+  <div style="${S.footer}">Residata · real-time FYI · sign-ups are auto-approved as free</div>
 </div>
 </body></html>`;
 }
