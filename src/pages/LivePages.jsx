@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../lib/useAuth";
+import { useCapabilities } from "../lib/useCapabilities";
 import { useProjects, useProjectFlats, useEarlyAccessStats } from "../lib/useData";
 import { supabase } from "../lib/supabase";
 import { liveT, ll } from "../lib/liveLang";
 import { track } from "../lib/track";
+import UpgradePrompt from "../components/UpgradePrompt";
 
 const mono = "'JetBrains Mono', monospace";
 const green = "#00e5a0";
@@ -14,9 +16,12 @@ const bg = "#16161a";
 /* ───────────────────── LIVE DASHBOARD ───────────────────── */
 export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
   const t = liveT[lang] || liveT.en;
-  const { user, isPaid } = useAuth();
+  const { can } = useCapabilities();
   const { projects, loading } = useProjects();
-  const shown = user ? projects : projects.slice(0, 20);
+  // Ak má cap na "view_all_projects_list" → vidí všetkých. Inak top 20.
+  const shown = can("view_all_projects_list") ? projects : projects.slice(0, 20);
+  const showUpgradeToPaid = can("prompt_upgrade_to_paid");
+  const showSignupPrompt = can("prompt_signup");
 
   return (
     <main style={{ padding: "5rem 2rem 4rem", maxWidth: 1200, margin: "0 auto" }}>
@@ -24,8 +29,8 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
       <h1 className="sec-title">{t.live_title}</h1>
       <p className="sec-desc" style={{ marginBottom: "2.5rem" }}>
         {t.live_desc_base}{" "}
-        {!user && <>{t.live_desc_anon}</>}
-        {user && !isPaid && <> <button onClick={() => setCurrent && setCurrent("Pricing")} style={linkBtn}>{t.upgrade_to_paid}</button> — {t.live_desc_free}</>}
+        {showSignupPrompt && <>{t.live_desc_anon}</>}
+        {showUpgradeToPaid && <> <button onClick={() => setCurrent && setCurrent("Pricing")} style={linkBtn}>{t.upgrade_to_paid}</button> — {t.live_desc_free}</>}
       </p>
 
       <SummaryCards projects={projects} t={t} />
@@ -35,10 +40,12 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
           <div>
             <div style={labelStyle}>{t.projects_section_label}</div>
             <h2 style={{ fontSize: "1.6rem", fontWeight: 700 }}>
-              {user ? ll(t.projects_title_all, { n: projects.length }) : ll(t.projects_title_top, { n: Math.min(20, projects.length), total: projects.length })}
+              {can("view_all_projects_list")
+                ? ll(t.projects_title_all, { n: projects.length })
+                : ll(t.projects_title_top, { n: Math.min(20, projects.length), total: projects.length })}
             </h2>
           </div>
-          {!user && <button className="btn-p" onClick={openLogin}>{t.register_for_full}</button>}
+          {showSignupPrompt && <button className="btn-p" onClick={openLogin}>{t.register_for_full}</button>}
         </div>
 
         {loading ? (
@@ -76,7 +83,13 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
                         <td style={{ ...td, textAlign: "right", fontFamily: mono }}>
                           {soldDataUnavailable ? <span style={{ color: dim }}>n/a</span> : (p.sold_percentage != null ? `${p.sold_percentage}%` : "—")}
                         </td>
-                        <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{p.avg_price_eur_m2 ? `${Math.round(p.avg_price_eur_m2).toLocaleString(lang === "sk" ? "sk-SK" : "en-US")}` : "—"}</td>
+                        <td style={{ ...td, textAlign: "right", fontFamily: mono }}>
+                          {p.avg_price_eur_m2
+                            ? Math.round(p.avg_price_eur_m2).toLocaleString(lang === "sk" ? "sk-SK" : "en-US")
+                            : <span title={lang === "sk" ? "Developer nezverejňuje ceny" : "Developer doesn't publish prices"} style={{ color: dim, fontStyle: "italic", fontSize: "0.75rem" }}>
+                                {lang === "sk" ? "nezverejnené" : "not published"}
+                              </span>}
+                        </td>
                         <td style={{ ...td, textAlign: "right" }}>
                           <button onClick={() => setCurrent && setCurrent(`Project:${p.id}`)} style={miniBtn}>{t.tbl_detail}</button>
                         </td>
@@ -89,7 +102,7 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
           </div>
         )}
 
-        {!user && projects.length > 20 && (
+        {showSignupPrompt && projects.length > 20 && (
           <div style={{ textAlign: "center", padding: "1.5rem", color: dim, fontSize: "0.85rem" }}>
             {ll(t.hidden_projects, { n: projects.length - 20 })} <button onClick={openLogin} style={linkBtn}>{t.register_free}</button> {t.for_full_list}
           </div>
@@ -129,7 +142,8 @@ function SummaryCards({ projects, t }) {
 /* ───────────────────── PROJECT DETAIL (gated) ───────────────────── */
 export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en" }) {
   const t = liveT[lang] || liveT.en;
-  const { user, profile, isPaid, loading: authLoading, reloadProfile } = useAuth();
+  const { user, profile, loading: authLoading, reloadProfile } = useAuth();
+  const { can } = useCapabilities();
   const { flats, loading, error } = useProjectFlats(projectId);
   const { projects } = useProjects();
   const project = projects.find(p => p.id === projectId);
@@ -140,7 +154,7 @@ export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en
   }, [projectId, project?.name]);
 
   // Auth session still loading — show spinner, not gate
-  if (authLoading) {
+  if (authLoading || (user && !profile)) {
     return (
       <main style={{ padding: "6rem 2rem 4rem", textAlign: "center", color: dim }}>
         <div style={{ fontSize: "0.85rem", fontFamily: mono }}>Loading…</div>
@@ -148,15 +162,7 @@ export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en
     );
   }
 
-  // User logged in but profile fetch still pending — show spinner, not gate
-  if (user && !profile) {
-    return (
-      <main style={{ padding: "6rem 2rem 4rem", textAlign: "center", color: dim }}>
-        <div style={{ fontSize: "0.85rem", fontFamily: mono }}>Loading your profile…</div>
-      </main>
-    );
-  }
-
+  // Anon → login prompt
   if (!user) {
     return (
       <GateMessage
@@ -170,18 +176,38 @@ export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en
     );
   }
 
-  const canViewDetail = isPaid || profile?.chosen_project_id === projectId;
+  // Paid / admin → plný prístup k akémukoľvek projektu
+  // Free → detail iba svojho vybraného, inak ChooseProjectGate
+  const canViewAnyDetail = can("view_any_project_detail");
+  const canViewChosen = can("view_chosen_project_detail");
+  const isOwnChosenProject = profile?.chosen_project_id === projectId;
+  const canView = canViewAnyDetail || (canViewChosen && isOwnChosenProject);
 
-  if (!canViewDetail) {
+  if (!canView) {
+    // Free user a nevybral si ešte žiadny projekt → ponúkni výber tohto
+    // Free user už vybral iný → locked state
+    if (can("choose_project")) {
+      return (
+        <ChooseProjectGate
+          projectId={projectId}
+          projectName={project?.name || projectId}
+          profile={profile}
+          reloadProfile={reloadProfile}
+          setCurrent={setCurrent}
+          t={t}
+          lang={lang}
+        />
+      );
+    }
+    // Inak (pending) — ale ten už bol odchytený vyššie, safety fallback
     return (
-      <ChooseProjectGate
-        projectId={projectId}
-        projectName={project?.name || projectId}
-        profile={profile}
-        reloadProfile={reloadProfile}
+      <GateMessage
+        title={t.gate_login_title}
+        body={t.gate_login_body}
+        cta={t.gate_login_cta}
+        backLabel={t.back_to_dashboard}
+        onCta={openLogin}
         setCurrent={setCurrent}
-        t={t}
-        lang={lang}
       />
     );
   }
@@ -194,7 +220,7 @@ export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en
       <h1 className="sec-title">{project?.name || projectId}</h1>
       <p className="sec-desc" style={{ marginBottom: "2rem" }}>
         {project ? `${project.total_units} ${t.tbl_units.toLowerCase()} · ${project.available_units} ${t.tbl_available.toLowerCase()} · ${project.sold_percentage ?? "?"}% ${t.tbl_sold.toLowerCase()}` : ""}
-        {!isPaid && <span style={{ display: "block", marginTop: "0.5rem", color: dim, fontSize: "0.85rem" }}>
+        {!can("view_historical_data") && <span style={{ display: "block", marginTop: "0.5rem", color: dim, fontSize: "0.85rem" }}>
           {t.snapshot_notice}{" "}
           <button onClick={() => setCurrent && setCurrent("Pricing")} style={linkBtn}>{t.paid_tier}</button>.
         </span>}
@@ -369,32 +395,9 @@ function GateMessage({ title, body, cta, backLabel, onCta, setCurrent }) {
   );
 }
 
-/* ───────────────────── ANALYTICS (paid only) ───────────────────── */
+/* ───────────────────── ANALYTICS (paid only — guarded v App.jsx cez Feature) ───────────────────── */
 export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
   const t = liveT[lang] || liveT.en;
-  const { user, isPaid } = useAuth();
-  if (!user) {
-    return <GateMessage
-      title={t.analytics_gate_title}
-      body={t.analytics_gate_body}
-      cta={t.gate_login_cta}
-      backLabel={t.back_to_dashboard}
-      onCta={openLogin}
-      setCurrent={setCurrent}
-    />;
-  }
-  if (!isPaid) {
-    return (
-      <main style={{ padding: "5rem 2rem 4rem", maxWidth: 600, margin: "0 auto", textAlign: "center" }}>
-        <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>📊</div>
-        <h1 style={{ fontSize: "1.8rem", fontWeight: 700 }}>{t.analytics_paid_title}</h1>
-        <p style={{ color: dim, lineHeight: 1.6, marginTop: "0.75rem", marginBottom: "1.5rem" }}>
-          {t.analytics_paid_body}
-        </p>
-        <button className="btn-p" onClick={() => setCurrent && setCurrent("Pricing")}>{t.analytics_see_pricing}</button>
-      </main>
-    );
-  }
   return (
     <main style={{ padding: "5rem 2rem 4rem", maxWidth: 1000, margin: "0 auto" }}>
       <Label>{t.analytics_label}</Label>
@@ -407,10 +410,9 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
   );
 }
 
-/* ───────────────────── ADMIN ───────────────────── */
+/* ───────────────────── ADMIN (guarded v App.jsx cez Feature) ───────────────────── */
 export function LiveAdmin({ setCurrent, lang = "en" }) {
   const t = liveT[lang] || liveT.en;
-  const { isAdmin, loading } = useAuth();
   const [users, setUsers] = useState([]);
   const [events, setEvents] = useState([]);
   const [activity, setActivity] = useState([]);
@@ -419,7 +421,6 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
   const [tab, setTab] = useState("users");   // users | activity | domains
 
   useEffect(() => {
-    if (!isAdmin) return;
     supabase.from("user_profiles").select("*").order("created_at", { ascending: false })
       .then(({ data, error }) => { setUsers(data || []); if (error) setErr(error.message); });
     supabase.from("events").select("*").like("event_type", "new_signup%").order("detected_at", { ascending: false }).limit(20)
@@ -428,10 +429,7 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
       .then(({ data }) => setActivity(data || []));
     supabase.from("premium_domains").select("*").order("domain")
       .then(({ data }) => setPremiumDomains(data || []));
-  }, [isAdmin]);
-
-  if (loading) return <main style={{ padding: "5rem 2rem" }}><div style={{ color: dim }}>{t.loading_generic}</div></main>;
-  if (!isAdmin) return <main style={{ padding: "5rem 2rem", textAlign: "center" }}><h1>{t.admin_403_title}</h1><p style={{ color: dim }}>{t.admin_403_body}</p></main>;
+  }, []);
 
   const premiumSet = new Set(premiumDomains.map(d => d.domain.toLowerCase()));
 
@@ -754,7 +752,10 @@ function EventBadge({ type }) {
 /* ───────────────────── EARLY ACCESS BADGE ───────────────────── */
 export function EarlyAccessBadge({ lang = "en" }) {
   const t = liveT[lang] || liveT.en;
+  const { can } = useCapabilities();
   const { remaining_slots } = useEarlyAccessStats();
+  // Skry pre paid/admin — nepotrebujú vidieť "early access" marketing.
+  if (!can("see_early_access_badge")) return null;
   if (remaining_slots <= 0) return null;
   const tmpl = remaining_slots === 1 ? t.ea_badge_one : t.ea_badge;
   return (

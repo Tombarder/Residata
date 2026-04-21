@@ -3,9 +3,12 @@ import Ticker from "./components/Ticker";
 import LoginModal from "./components/LoginModal";
 import CompleteProfile from "./components/CompleteProfile";
 import PendingGate from "./components/PendingGate";
+import Feature from "./components/Feature";
+import UpgradePrompt from "./components/UpgradePrompt";
 import { LiveDashboard, LiveProjectDetail, LiveAnalytics, LiveAdmin, EarlyAccessBadge } from "./pages/LivePages";
 import { MarketPulse, DistrictPulse, HowItWorksFlow } from "./pages/HomeExtras";
 import { useAuth } from "./lib/useAuth";
+import { useCapabilities } from "./lib/useCapabilities";
 import { pushRoute, pathToPage } from "./lib/routing";
 import { track } from "./lib/track";
 
@@ -368,11 +371,11 @@ function RisingParticles() {
   return <canvas ref={canvasRef} style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0 }} />;
 }
 
-function Nav({ current, setCurrent, lang, setLang, auth, onLogin }) {
+function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
   const pages = lang === "sk" ? pagesSK : pagesEN;
   const l = t[lang];
   const user = auth?.user;
-  const isAdmin = auth?.isAdmin;
+  const showAdminLink = caps.can("view_admin_nav");
   return (
     <nav style={{
       position: "fixed", top: 0, width: "100%", zIndex: 100,
@@ -423,20 +426,20 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin }) {
           </div>
           {user ? (
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-              {isAdmin && (
+              {showAdminLink && (
                 <a onClick={() => setCurrent("Admin")} style={{
                   color: current === "Admin" ? "#f5a623" : "#8a8a96", textDecoration: "none",
                   fontSize: "0.8rem", cursor: "pointer", fontFamily: "'JetBrains Mono', monospace",
                 }}>ADMIN</a>
               )}
-              <span style={{ fontSize: "0.75rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace" }}>
+              <span style={{ fontSize: "0.75rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {user.email}
               </span>
               <button onClick={() => auth.signOut()} style={{
                 padding: "0.4rem 0.9rem", background: "transparent", color: "#e8e8ed",
                 fontWeight: 500, borderRadius: 6, fontSize: "0.75rem", cursor: "pointer",
                 border: "1px solid #222228", fontFamily: "inherit",
-              }}>Sign out</button>
+              }}>{lang === "sk" ? "Odhlásiť" : "Sign out"}</button>
             </div>
           ) : (
             <a onClick={onLogin} className="nav-cta-btn" style={{
@@ -500,7 +503,42 @@ function TerminalLines() {
 }
 
 /* ─────── HOME ─────── */
-function HomePage({ setCurrent, l, lang }) {
+function HomePage({ setCurrent, l, lang, onLogin }) {
+  const { can, tier } = useCapabilities();
+  // Hero CTA logika podľa tier-u
+  let heroButtons;
+  if (can("prompt_signup")) {
+    // anon — hlavný CTA = signup
+    heroButtons = (
+      <>
+        <a onClick={onLogin} className="btn-p">{l.heroBtn1}</a>
+        <a onClick={() => setCurrent("Live")} className="btn-s">{l.heroBtn2}</a>
+      </>
+    );
+  } else if (tier === "pending") {
+    heroButtons = (
+      <>
+        <a onClick={() => setCurrent("Live")} className="btn-p">{lang === "sk" ? "Pozrieť dashboard" : "Open dashboard"}</a>
+        <a onClick={() => setCurrent("Pricing")} className="btn-s">{lang === "sk" ? "Cenník" : "See pricing"}</a>
+      </>
+    );
+  } else if (can("prompt_upgrade_to_paid")) {
+    // free — upgrade prompt
+    heroButtons = (
+      <>
+        <a onClick={() => setCurrent("Live")} className="btn-p">{lang === "sk" ? "Pozrieť dashboard" : "Open dashboard"}</a>
+        <a onClick={() => setCurrent("Pricing")} className="btn-s">{lang === "sk" ? "Upgrade na paid" : "Upgrade to paid"}</a>
+      </>
+    );
+  } else {
+    // paid / admin — ideme rovno do dashboardu
+    heroButtons = (
+      <>
+        <a onClick={() => setCurrent("Live")} className="btn-p">{lang === "sk" ? "Pozrieť dashboard" : "Open dashboard"}</a>
+        {can("view_analytics") && <a onClick={() => setCurrent("Analytics")} className="btn-s">{lang === "sk" ? "Analytika" : "Analytics"}</a>}
+      </>
+    );
+  }
   return (
     <>
       {/* Hero */}
@@ -558,9 +596,8 @@ function HomePage({ setCurrent, l, lang }) {
         <p className="hero-anim-3" style={{ marginTop: "1.5rem", fontSize: "1.15rem", color: "#8a8a96", maxWidth: 560, fontWeight: 300, lineHeight: 1.7 }}>
           {l.heroSub}
         </p>
-        <div className="hero-anim-4" style={{ marginTop: "2.5rem", display: "flex", gap: "1rem" }}>
-          <a onClick={() => setCurrent("Contact")} className="btn-p">{l.heroBtn1}</a>
-          <a onClick={() => setCurrent("Live")} className="btn-s">{l.heroBtn2}</a>
+        <div className="hero-anim-4 hero-actions-wrap" style={{ marginTop: "2.5rem", display: "flex", gap: "1rem" }}>
+          {heroButtons}
         </div>
       </section>
 
@@ -1073,6 +1110,9 @@ function PricingPage({ setCurrent, l, lang }) {
   const mono = "'JetBrains Mono', monospace";
   const tiers = l.tiers;
   const faqs = l.faqs;
+  const { can, tier } = useCapabilities();
+  const showEarlyAccessBlock = can("see_early_access_badge");
+  const isAlreadyPaid = tier === "paid" || tier === "admin";
   const ea = lang === "sk" ? {
     badge: "🔥 Early access — 5 min a máš prístup",
     body: <>Prvých <strong style={{ color: "#00e5a0" }}>9 zákazníkov</strong> dostane <strong style={{ color: "#00e5a0" }}>50 % zľavu prvé 3 mesiace</strong>. Žiadne formuláre — krátky 5-minútový call, dohodneme sa, prístup máš hneď.</>,
@@ -1088,28 +1128,41 @@ function PricingPage({ setCurrent, l, lang }) {
   return (
     <>
       <div style={{ padding: "8rem 2rem 3rem", maxWidth: 1100, margin: "0 auto", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
-        <div style={{ marginBottom: "1rem" }}><EarlyAccessBadge lang={lang} /></div>
+        {showEarlyAccessBlock && <div style={{ marginBottom: "1rem" }}><EarlyAccessBadge lang={lang} /></div>}
+        {isAlreadyPaid && (
+          <div style={{ marginBottom: "1rem",
+            display: "inline-flex", alignItems: "center", gap: "0.5rem",
+            padding: "0.4rem 0.9rem", background: "rgba(0,229,160,0.1)",
+            border: "1px solid rgba(0,229,160,0.3)", borderRadius: 999,
+            fontFamily: "'JetBrains Mono', monospace", fontSize: "0.7rem", color: "#00e5a0", fontWeight: 600,
+          }}>
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#00e5a0" }}></span>
+            {lang === "sk" ? "Máš aktívny paid prístup" : "You have active paid access"}
+          </div>
+        )}
         <Label>{l.pricingLabel}</Label>
         <h1 className="sec-title">{l.pricingTitle}</h1>
         <p className="sec-desc" style={{ textAlign: "center" }}>{l.pricingDesc}</p>
 
-        {/* Early access CTA block */}
-        <div style={{
-          marginTop: "2rem", padding: "1.5rem 2rem", maxWidth: 680,
-          background: "linear-gradient(135deg, rgba(0,229,160,0.08), rgba(0,229,160,0.02))",
-          border: "1px solid rgba(0,229,160,0.25)", borderRadius: 12, width: "100%",
-        }}>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem", color: "#00e5a0", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "0.5rem" }}>
-            {ea.badge}
+        {/* Early access CTA — len pre tých ktorí ešte nie sú paid */}
+        {showEarlyAccessBlock && (
+          <div style={{
+            marginTop: "2rem", padding: "1.5rem 2rem", maxWidth: 680,
+            background: "linear-gradient(135deg, rgba(0,229,160,0.08), rgba(0,229,160,0.02))",
+            border: "1px solid rgba(0,229,160,0.25)", borderRadius: 12, width: "100%",
+          }}>
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem", color: "#00e5a0", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "0.5rem" }}>
+              {ea.badge}
+            </div>
+            <p style={{ fontSize: "0.95rem", color: "#e8e8ed", lineHeight: 1.6, marginBottom: "1rem" }}>
+              {ea.body}
+            </p>
+            <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center", flexWrap: "wrap" }}>
+              <a href="tel:+421911963909" className="btn-p">{ea.cta1}</a>
+              <a href="https://calendar.app.google/x6vKBohYsVjNKL1A9" target="_blank" rel="noopener noreferrer" className="btn-s">{ea.cta2}</a>
+            </div>
           </div>
-          <p style={{ fontSize: "0.95rem", color: "#e8e8ed", lineHeight: 1.6, marginBottom: "1rem" }}>
-            {ea.body}
-          </p>
-          <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center", flexWrap: "wrap" }}>
-            <a href="tel:+421911963909" className="btn-p">{ea.cta1}</a>
-            <a href="https://calendar.app.google/x6vKBohYsVjNKL1A9" target="_blank" rel="noopener noreferrer" className="btn-s">{ea.cta2}</a>
-          </div>
-        </div>
+        )}
       </div>
 
       <div style={{ padding: "0 2rem 4rem", maxWidth: 1100, margin: "0 auto" }}>
@@ -1327,6 +1380,7 @@ export default function App() {
   const [loginOpen, setLoginOpen] = useState(false);
   const l = t[lang];
   const auth = useAuth();
+  const caps = useCapabilities();
 
   // Listen to browser back/forward — sync state with URL
   useEffect(() => {
@@ -1443,31 +1497,65 @@ export default function App() {
       `}</style>
       <RisingParticles />
       <div style={{ position: "relative", zIndex: 1 }}>
-      <Nav current={current} setCurrent={handleNav} lang={lang} setLang={setLang} auth={auth} onLogin={() => setLoginOpen(true)} />
+      <Nav current={current} setCurrent={handleNav} lang={lang} setLang={setLang} auth={auth} onLogin={() => setLoginOpen(true)} caps={caps} />
       <Ticker lang={lang} />
       {/* Spacer for fixed Nav (72px) + Ticker (36px) */}
       <div style={{ height: 36 }} />
 
       {/* Keyed wrapper — re-mounts on route change so CSS animation replays */}
       <div key={current} className="page-transition">
-        {current === "Home" && <HomePage setCurrent={handleNav} l={l} lang={lang} />}
+        {current === "Home" && <HomePage setCurrent={handleNav} l={l} lang={lang} onLogin={() => setLoginOpen(true)} />}
+
+        {/* Live dashboard — pending gets stopped, ostatní vidia (verejnú alebo plnú verziu podľa tier-u) */}
         {current === "Live" && (
-          auth.user && auth.profile?.tier === "pending"
+          caps.tier === "pending"
             ? <PendingGate setCurrent={handleNav} lang={lang} />
             : <LiveDashboard setCurrent={handleNav} openLogin={() => setLoginOpen(true)} lang={lang} />
         )}
+
         {current === "Use Cases" && <UseCasesPage setCurrent={handleNav} l={l} />}
         {current === "Data" && <DataPage setCurrent={handleNav} l={l} />}
         {current === "Pricing" && <PricingPage setCurrent={handleNav} l={l} lang={lang} />}
         {current === "Contact" && <ContactPage l={l} />}
+
+        {/* Analytics — paid only, inak UpgradePrompt */}
         {current === "Analytics" && (
-          auth.user && auth.profile?.tier === "pending"
-            ? <PendingGate setCurrent={handleNav} lang={lang} />
-            : <LiveAnalytics setCurrent={handleNav} openLogin={() => setLoginOpen(true)} lang={lang} />
+          <Feature
+            requires="view_analytics"
+            fallback={
+              caps.tier === "pending"
+                ? <PendingGate setCurrent={handleNav} lang={lang} />
+                : <main style={{ padding: "5rem 2rem" }}>
+                    <UpgradePrompt
+                      feature={lang === "sk" ? "analytika a trendy" : "analytics & trends"}
+                      variant="card"
+                      lang={lang}
+                      onLogin={() => setLoginOpen(true)}
+                      onGoPricing={() => handleNav("Pricing")}
+                    />
+                  </main>
+            }
+          >
+            <LiveAnalytics setCurrent={handleNav} openLogin={() => setLoginOpen(true)} lang={lang} />
+          </Feature>
         )}
-        {current === "Admin" && <LiveAdmin setCurrent={handleNav} lang={lang} />}
+
+        {/* Admin — admin only, inak 403 / redirect */}
+        {current === "Admin" && (
+          <Feature
+            requires="manage_users"
+            fallback={<main style={{ padding: "5rem 2rem", textAlign: "center" }}>
+              <h1 style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>403</h1>
+              <p style={{ color: "#8a8a96" }}>{lang === "sk" ? "Prístup zamietnutý." : "Access denied."}</p>
+            </main>}
+          >
+            <LiveAdmin setCurrent={handleNav} lang={lang} />
+          </Feature>
+        )}
+
+        {/* Project detail */}
         {typeof current === "string" && current.startsWith("Project:") && (
-          auth.user && auth.profile?.tier === "pending"
+          caps.tier === "pending"
             ? <PendingGate setCurrent={handleNav} lang={lang} />
             : <LiveProjectDetail projectId={current.slice(8)} setCurrent={handleNav} openLogin={() => setLoginOpen(true)} lang={lang} />
         )}
