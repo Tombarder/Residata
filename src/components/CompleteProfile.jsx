@@ -127,6 +127,18 @@ export default function CompleteProfile({ lang = "en" }) {
             fontSize: "0.95rem", opacity: busy ? 0.6 : 1, marginTop: "0.5rem",
           }}>{busy ? t.cp_submitting : t.cp_submit}</button>
 
+          {busy && (
+            <div style={{
+              textAlign: "center", fontSize: "0.75rem", color: "#8a8a96",
+              marginTop: "0.6rem", fontFamily: "'JetBrains Mono', monospace",
+              letterSpacing: "0.02em", lineHeight: 1.5,
+            }}>
+              {lang === "sk"
+                ? "⏳ Môže to trvať 10–15 sekúnd (server sa prebúdza)"
+                : "⏳ This may take 10–15 seconds (server wake-up)"}
+            </div>
+          )}
+
           <button type="button" onClick={signOut} style={{
             width: "100%", padding: "0.5rem", background: "transparent", color: "#55555f",
             border: "none", fontSize: "0.75rem", cursor: "pointer", marginTop: "0.75rem",

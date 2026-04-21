@@ -24,8 +24,23 @@ const PERSONAL_DOMAINS = new Set([
   "mailinator.com", "tempmail.com", "10minutemail.com", "guerrillamail.com",
 ]);
 
+/**
+ * Whitelist — these personal emails bypass the business-only check.
+ * Keep this list minimal. Intended for founders/admins who legitimately
+ * need access through a personal account.
+ */
+const EMAIL_WHITELIST = new Set([
+  "tkamhal@gmail.com",
+]);
+
+export function isWhitelistedEmail(email) {
+  if (!email) return false;
+  return EMAIL_WHITELIST.has(email.toLowerCase().trim());
+}
+
 export function isPersonalEmail(email) {
   if (!email || !email.includes("@")) return false;
+  if (isWhitelistedEmail(email)) return false;
   const domain = email.split("@")[1].toLowerCase().trim();
   return PERSONAL_DOMAINS.has(domain);
 }
