@@ -6,7 +6,7 @@ import PendingGate from "./components/PendingGate";
 import Feature from "./components/Feature";
 import UpgradePrompt from "./components/UpgradePrompt";
 import { LiveDashboard, LiveProjectDetail, LiveAnalytics, LiveAdmin, EarlyAccessBadge } from "./pages/LivePages";
-import { MarketPulse, DistrictPulse, HowItWorksFlow } from "./pages/HomeExtras";
+import { MarketPulse, DistrictPulse, HowItWorksFlow, PipelineFlow } from "./pages/HomeExtras";
 import HeroLabPage from "./pages/HeroVariants";
 import { useAuth } from "./lib/useAuth";
 import { useCapabilities } from "./lib/useCapabilities";
@@ -457,38 +457,6 @@ function Footer() {
   );
 }
 
-/* ─────── Terminal Animation ─────── */
-function TerminalLines() {
-  const [ref, visible] = useScrollReveal();
-  const mono = "'JetBrains Mono', monospace";
-  const lines = [
-    [["$", "#00e5a0"], [" residata run --region bratislava --month 2026-03", "#e8e8ed"]],
-    [["// Loading registry... 142 projects found", "#55555f"]],
-    [["→ Parsing ", "#8a8a96"], ["Slnečnice Viladomy", "#00e5a0"], [" ... 48 units", "#8a8a96"]],
-    [["→ Parsing ", "#8a8a96"], ["Nový Ružinov II", "#00e5a0"], [" ... 126 units", "#8a8a96"]],
-    [["→ Parsing ", "#8a8a96"], ["RNDZ Residence", "#00e5a0"], [" ... 64 units", "#8a8a96"]],
-    [["// Processing complete.", "#55555f"]],
-    [["✓ Total: ", "#8a8a96"], ["4,218", "#f5a623"], [" units across ", "#8a8a96"], ["142", "#f5a623"], [" projects", "#8a8a96"]],
-    [["✓ Pushed to ", "#8a8a96"], ["residata-clean-master", "#00e5a0"]],
-  ];
-  return (
-    <div ref={ref} style={{ padding: "1.5rem", fontFamily: mono, fontSize: "0.78rem", lineHeight: 1.9 }}>
-      {lines.map((line, i) => (
-        <div key={i} style={{
-          display: "flex",
-          opacity: visible ? 1 : 0,
-          transform: visible ? "translateX(0)" : "translateX(-8px)",
-          transition: `opacity 0.4s ease ${i * 0.2}s, transform 0.4s ease ${i * 0.2}s`,
-        }}>
-          {line.map(([text, color], j) => (
-            <span key={j} style={{ color }}>{text}</span>
-          ))}
-        </div>
-      ))}
-    </div>
-  );
-}
-
 /* ─────── HOME ─────── */
 function HomePage({ setCurrent, l, lang, onLogin }) {
   const { can, tier } = useCapabilities();
@@ -588,21 +556,10 @@ function HomePage({ setCurrent, l, lang, onLogin }) {
         </div>
       </section>
 
-      {/* Terminal */}
-      <FadeIn style={{ padding: "0 2rem 5rem", display: "flex", justifyContent: "center" }}>
-        <div style={{
-          width: "100%", maxWidth: 860, background: "#16161a",
-          border: "1px solid #222228", borderRadius: 12, overflow: "hidden",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.875rem 1.25rem", background: "#111113", borderBottom: "1px solid #222228" }}>
-            <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#ff5f57" }} />
-            <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#ffbd2e" }} />
-            <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#28c840" }} />
-            <span style={{ flex: 1, textAlign: "center", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.7rem", color: "#55555f", marginRight: "2rem" }}>residata — pipeline run</span>
-          </div>
-          <TerminalLines />
-        </div>
+      {/* Pipeline visualisation — rich 3-stage flow with LIVE counts from DB.
+          Replaces the old static "Terminal pipeline run" decorative card. */}
+      <FadeIn delay={0.05}>
+        <PipelineFlow lang={lang} />
       </FadeIn>
 
       {/* Live market data — real numbers from Supabase */}
