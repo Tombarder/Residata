@@ -6,7 +6,9 @@ import PendingGate from "./components/PendingGate";
 import Feature from "./components/Feature";
 import UpgradePrompt from "./components/UpgradePrompt";
 import { LiveDashboard, LiveProjectDetail, LiveAnalytics, LiveAdmin, EarlyAccessBadge } from "./pages/LivePages";
-import { MarketPulse, DistrictPulse, HowItWorksFlow, PipelineFlow } from "./pages/HomeExtras";
+// HowItWorksFlow export z HomeExtras už na Home nepoužívame (PipelineFlow ho
+// pokrýva), ale komponent ostáva v HomeExtras pre prípad budúceho návratu.
+import { MarketPulse, DistrictPulse, PipelineFlow } from "./pages/HomeExtras";
 import HeroLabPage from "./pages/HeroVariants";
 import { useAuth } from "./lib/useAuth";
 import { useCapabilities } from "./lib/useCapabilities";
@@ -572,10 +574,9 @@ function HomePage({ setCurrent, l, lang, onLogin }) {
         <DistrictPulse lang={lang} setCurrent={setCurrent} />
       </FadeIn>
 
-      {/* How it works — animated pipeline */}
-      <FadeIn delay={0.2}>
-        <HowItWorksFlow lang={lang} />
-      </FadeIn>
+      {/* (Odstránený pôvodný HowItWorksFlow — nový PipelineFlow vyššie
+          pokrýva rovnaký príbeh bohatšie. Komponent ostal v HomeExtras
+          pre prípad budúceho návratu.) */}
 
       {/* Value Prop — Questions left, What you get right */}
       <FadeIn style={{ padding: "5rem 2rem 0", maxWidth: 1100, margin: "0 auto" }}>

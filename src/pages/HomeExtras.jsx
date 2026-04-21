@@ -8,362 +8,474 @@ const border = "#222228";
 const bg = "#16161a";
 
 /* ──────────────────────────────────────────────────────────
-   0. PIPELINE FLOW — rich hero-replacement visualisation
-      3 fázy podľa user-stories:
-        1. Collect   — "data collected from X developers and Y projects" (LIVE z DB)
-        2. Standardize & Validate
-        3. Deliver   — "real-time market intelligence for data-driven decisions"
-      (Vedome sme nepoužili "real-time market data for data-driven decisions" —
-       znie to ako "data data" v jednej vete. "Intelligence" je stronger beat.)
+   0. PIPELINE FLOW — dynamic single-canvas visualisation
    ────────────────────────────────────────────────────────── */
 
-// Stage config je teraz function of (devCount, projCount) aby headline caption
-// mohol obsahovať LIVE čísla z DB. Bullets sú statické.
-function buildPipelineStages(lang, devCount, projCount) {
-  const en = [
-    {
-      key: "collect",
-      title: "Collect",
-      subtitle: `from ${devCount} developers · ${projCount} projects`,
-      lead: `Data collected from ${devCount} developers across ${projCount.toLocaleString("en-US")} active Bratislava projects. The moment a price list updates, we catch it.`,
-      bullets: [
-        "YIT · Penta · JTRE · HB Reavis · Lucron · Skanska · +50 more",
-        "No omissions: if it's published, it's in the dataset",
-        "Runs unattended on a schedule — no human clicks required",
-      ],
-    },
-    {
-      key: "normalize",
-      title: "Standardize & Validate",
-      subtitle: "25 unified fields per unit",
-      lead: "Every developer formats differently. We extract, deduplicate, and normalize everything into one clean, validated schema so comparisons actually work.",
-      bullets: [
-        "HTML → structured rows — one record per flat",
-        "Project · unit · m² · €/m² · floor · orientation · status",
-        "Dedup + district normalization + €/m² consistency checks",
-      ],
-    },
-    {
-      key: "publish",
-      title: "Deliver",
-      subtitle: "for data-driven decisions",
-      lead: "Real-time market intelligence for your data-driven decisions. Delivered into wherever you already work — Google Sheets, CSV, or straight into your stack via API.",
-      bullets: [
-        "Google Sheets — live link, auto-refresh",
-        "CSV / XLSX — into Excel, Power BI, Tableau",
-        "REST API + webhooks — feed directly into your models",
-      ],
-    },
-  ];
-  const sk = [
-    {
-      key: "collect",
-      title: "Zbierame",
-      subtitle: `z ${devCount} developerov · ${projCount} projektov`,
-      lead: `Dáta zbierame od ${devCount} developerov naprieč ${projCount.toLocaleString("sk-SK")} aktívnymi projektmi v Bratislave. Hneď ako developer zmení cenník, máme to.`,
-      bullets: [
-        "YIT · Penta · JTRE · HB Reavis · Lucron · Skanska · +50 ďalších",
-        "Žiadne výnimky — ak je to verejne dostupné, je to v datasete",
-        "Beží automaticky podľa plánu — žiaden manuálny zásah",
-      ],
-    },
-    {
-      key: "normalize",
-      title: "Normalizácia a validácia",
-      subtitle: "25 unifikovaných polí na byt",
-      lead: "Každý developer formátuje inak. Extrahujeme, deduplikujeme a mapujeme všetko do jednej čistej validovanej schémy, aby porovnania dávali zmysel.",
-      bullets: [
-        "HTML → riadky — jeden záznam na byt",
-        "Projekt · označenie · m² · €/m² · poschodie · orientácia · stav",
-        "Dedup + zjednotené okresy + kontrola konzistencie €/m²",
-      ],
-    },
-    {
-      key: "publish",
-      title: "Doručujeme",
-      subtitle: "pre rozhodnutia podložené dátami",
-      lead: "Živé trhové insighty pre vaše rozhodnutia podložené dátami. Doručíme tam, kde reálne pracujete — Google Sheets, CSV, alebo rovno do vášho systému cez API.",
-      bullets: [
-        "Google Sheets — live odkaz, auto-refresh",
-        "CSV / XLSX — rovno do Excelu, Power BI, Tableau",
-        "REST API + webhooks — napojené priamo do vašich modelov",
-      ],
-    },
-  ];
-  return lang === "sk" ? sk : en;
-}
+// (Predchádzajúca 3-karta grid verzia odstránená — user chcel naspäť dynamický
+// V2 single-canvas koncept z /hero-lab. Nová implementácia nižšie.)
 
-// ── Small SVG illustrations per stage (internal to PipelineFlow) ──
-function StageCollect({ color }) {
-  // 3×3 mriežka izometrických budov
+// ── IsoBuildingsCluster — 10 izometrických budov (cluster) ──
+// Stable seed-based windows aby to nemrcalo pri re-render.
+function IsoBuildingsCluster() {
+  // [x, y, w, h, seed]
   const buildings = [
-    [30, 90, 24, 50], [62, 82, 24, 58], [94, 92, 24, 48],
-    [30, 130, 24, 40], [62, 116, 24, 54], [94, 128, 24, 42],
-    [30, 166, 24, 32], [62, 156, 24, 42], [94, 164, 24, 34],
+    [20,  110, 46, 120, 3],
+    [70,   70, 46, 160, 5],
+    [120, 100, 46, 130, 7],
+    [170,  86, 46, 144, 2],
+    [220, 118, 46, 112, 9],
+    [35,  200, 46,  60, 4],
+    [100, 210, 46,  50, 6],
+    [165, 206, 46,  54, 8],
+    [235, 212, 46,  48, 1],
+    [-25,  96, 38, 134, 11],
   ];
+  // Deterministic "lit window" pattern based on seed
+  const litPattern = (seed, row, col) => ((seed * 37 + row * 13 + col * 7) % 10) > 6;
   return (
-    <svg viewBox="0 0 170 200" style={{ width: "100%", height: "100%" }}>
-      <defs>
-        <linearGradient id="c-wall" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0" stopColor="#2a2a32" />
-          <stop offset="1" stopColor="#14141a" />
-        </linearGradient>
-      </defs>
-      {buildings.map(([x, y, w, h], i) => (
-        <g key={i}>
-          <rect x={x} y={y} width={w} height={h} fill="url(#c-wall)" stroke="#333" strokeWidth="0.4" />
-          <polygon points={`${x},${y} ${x + 6},${y - 4} ${x + w + 6},${y - 4} ${x + w},${y}`} fill="#3a3a44" stroke="#444" strokeWidth="0.4" />
-          <polygon points={`${x + w},${y} ${x + w + 6},${y - 4} ${x + w + 6},${y + h - 4} ${x + w},${y + h}`} fill="#0e0e10" stroke="#222" strokeWidth="0.4" />
-          {Array.from({ length: Math.floor(h / 8) }).map((_, row) => (
-            <rect key={row} x={x + 4} y={y + 4 + row * 8} width={w - 8} height={3} fill={Math.random() > 0.6 ? color : "#1a1a20"} opacity="0.7" />
-          ))}
-        </g>
-      ))}
-      {/* subtle ground shadow */}
-      <ellipse cx="85" cy="200" rx="70" ry="6" fill="#000" opacity="0.3" />
-    </svg>
+    <g>
+      {buildings.map(([x, y, w, h, seed], i) => {
+        const depth = 14;
+        const cols = 3;
+        const rows = Math.floor(h / 16);
+        return (
+          <g key={i}>
+            {/* Top face (parallelogram) */}
+            <polygon
+              points={`${x},${y} ${x + depth * 0.8},${y - depth * 0.5} ${x + w + depth * 0.8},${y - depth * 0.5} ${x + w},${y}`}
+              fill="#3a3a44"
+              stroke="#4a4a54" strokeWidth="0.4"
+            />
+            {/* Right side face (dark) */}
+            <polygon
+              points={`${x + w},${y} ${x + w + depth * 0.8},${y - depth * 0.5} ${x + w + depth * 0.8},${y + h - depth * 0.5} ${x + w},${y + h}`}
+              fill="#0d0d11"
+              stroke="#1a1a20" strokeWidth="0.4"
+            />
+            {/* Front face with subtle gradient */}
+            <rect x={x} y={y} width={w} height={h} fill="url(#iso-wall)" stroke="#2a2a32" strokeWidth="0.5" />
+            {/* Windows — 3 cols × N rows */}
+            {Array.from({ length: rows }).map((_, r) =>
+              Array.from({ length: cols }).map((_, c) => {
+                const wx = x + 4 + c * ((w - 8) / cols);
+                const wy = y + 6 + r * 16;
+                const lit = litPattern(seed, r, c);
+                return (
+                  <rect
+                    key={`${r}-${c}`}
+                    x={wx} y={wy}
+                    width={(w - 8) / cols - 2} height="6"
+                    fill={lit ? "url(#iso-lit)" : "#161620"}
+                    opacity={lit ? 0.9 : 0.6}
+                  />
+                );
+              })
+            )}
+            {/* Rooftop antenna for tallest */}
+            {h > 140 && (
+              <line x1={x + w / 2} y1={y - depth * 0.5} x2={x + w / 2} y2={y - depth * 0.5 - 10} stroke="#00e5a0" strokeWidth="0.6" opacity="0.7" />
+            )}
+          </g>
+        );
+      })}
+      {/* Ground shadow */}
+      <ellipse cx="125" cy="270" rx="160" ry="10" fill="#000" opacity="0.4" />
+    </g>
   );
 }
 
-function StageNormalize({ color }) {
-  // Table look: 5 headers + 4 rows
-  const headers = ["projekt", "m²", "€/m²", "stav"];
-  const rows = [
-    ["Slnečnice", "68.4", "3,650", "V"],
-    ["Ružinov",   "82.1", "4,120", "V"],
-    ["Zwirn",     "95.6", "5,200", "P"],
-    ["RNDZ",      "34.8", "4,580", "R"],
-  ];
-  const colX = [14, 74, 100, 138];
-  const statusColor = { V: color, P: "#f5a623", R: "#888" };
+// ── Center Hub — hexagonal processor with rotating rings + pulsing core ──
+function CenterHub({ subtitle }) {
   return (
-    <svg viewBox="0 0 170 200" style={{ width: "100%", height: "100%" }}>
-      <rect x="8" y="24" width="154" height="162" rx="6" fill="#0a0a0b" stroke="#222" strokeWidth="0.6" />
-      {/* header row */}
-      <rect x="8" y="24" width="154" height="22" fill="#111113" />
-      {headers.map((h, i) => (
-        <text key={h} x={colX[i]} y="38" fill={dim} fontFamily={mono} fontSize="8" letterSpacing="0.05em">
-          {h}
-        </text>
-      ))}
-      {/* rows */}
-      {rows.map((r, ri) => (
-        <g key={ri}>
-          <line x1="8" y1={46 + ri * 28} x2="162" y2={46 + ri * 28} stroke="#1a1a1f" strokeWidth="0.5" />
-          {r.map((cell, ci) => (
-            <text key={ci} x={colX[ci]} y={62 + ri * 28}
-              fill={ci === 3 ? statusColor[cell] : "#e8e8ed"}
-              fontFamily={ci === 0 ? "'Outfit', sans-serif" : mono}
-              fontSize={ci === 0 ? "9" : "8.5"}
-              fontWeight={ci === 3 ? 700 : 400}
-            >{cell}</text>
-          ))}
+    <g>
+      {/* Outer glow halo */}
+      <circle cx="0" cy="0" r="140" fill="url(#hub-halo)" opacity="0.6" />
+
+      {/* Outer rotating ring — dashed */}
+      <g>
+        <circle cx="0" cy="0" r="100" fill="none" stroke="#00e5a0" strokeOpacity="0.35" strokeWidth="1" strokeDasharray="3 6" />
+        <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="22s" repeatCount="indefinite" />
+      </g>
+
+      {/* Inner counter-rotating ring */}
+      <g>
+        <circle cx="0" cy="0" r="80" fill="none" stroke="#00e5a0" strokeOpacity="0.5" strokeWidth="1.2" strokeDasharray="14 4" />
+        <animateTransform attributeName="transform" type="rotate" from="360" to="0" dur="14s" repeatCount="indefinite" />
+      </g>
+
+      {/* Hexagonal core — 6-sided pipeline processor */}
+      <g>
+        <polygon
+          points="0,-56 48,-28 48,28 0,56 -48,28 -48,-28"
+          fill="#0e0e10"
+          stroke="#00e5a0"
+          strokeWidth="1.8"
+        >
+          <animate attributeName="stroke-opacity" values="0.5;1;0.5" dur="2.6s" repeatCount="indefinite" />
+        </polygon>
+        {/* Inner hex fill with gradient */}
+        <polygon
+          points="0,-40 34,-20 34,20 0,40 -34,20 -34,-20"
+          fill="url(#hub-core)"
+          opacity="0.85"
+        />
+        {/* Icon: three horizontal bars (schema bars) */}
+        <g fill="#00e5a0">
+          <rect x="-20" y="-12" width="40" height="3.2" rx="1.2" />
+          <rect x="-20" y="-2"  width="28" height="3.2" rx="1.2" opacity="0.7" />
+          <rect x="-20" y="8"   width="34" height="3.2" rx="1.2" opacity="0.85" />
+        </g>
+      </g>
+
+      {/* Surrounding micro-dots orbiting */}
+      {[0, 72, 144, 216, 288].map((deg, i) => (
+        <g key={i} transform={`rotate(${deg})`}>
+          <circle cx="90" cy="0" r="2.5" fill="#00e5a0">
+            <animate attributeName="opacity" values="0.3;1;0.3" dur="2.4s" begin={`${i * 0.2}s`} repeatCount="indefinite" />
+          </circle>
         </g>
       ))}
-      {/* schema badge */}
-      <rect x="8" y="170" width="154" height="18" fill={color} opacity="0.08" />
-      <text x="14" y="182" fill={color} fontFamily={mono} fontSize="8" letterSpacing="0.06em">25 fields · deduped · indexed</text>
-    </svg>
+
+      {/* Subtitle tag underneath */}
+      <rect x="-92" y="78" width="184" height="24" rx="12" fill="#0e0e10" stroke="#00e5a0" strokeOpacity="0.4" strokeWidth="0.8" />
+      <text x="0" y="94" textAnchor="middle" fill="#00e5a0" fontFamily={mono} fontSize="11" fontWeight="700" letterSpacing="0.06em">
+        {subtitle}
+      </text>
+    </g>
   );
 }
 
-function StagePublish({ color }) {
+// ── Dashboard panel — right-side terminal/dashboard target ──
+function DashboardPanel({ captionRow1, captionRow2, chipLabels }) {
   return (
-    <svg viewBox="0 0 170 200" style={{ width: "100%", height: "100%" }}>
-      {/* Mini dashboard */}
-      <rect x="14" y="24" width="142" height="90" rx="6" fill="#0a0a0b" stroke="#222" strokeWidth="0.6" />
-      {/* mini chart line */}
-      <polyline points="22,95 42,75 62,82 82,55 102,60 122,38 148,52" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
-      {[22, 42, 62, 82, 102, 122, 148].map((x, i) => (
-        <circle key={i} cx={x} cy={[95,75,82,55,60,38,52][i]} r="1.8" fill="#0a0a0b" stroke={color} strokeWidth="1" />
-      ))}
-      <text x="22" y="44" fill={dim} fontFamily={mono} fontSize="7" letterSpacing="0.04em">€/M² · 6M TREND</text>
-      <text x="22" y="110" fill={dim} fontFamily={mono} fontSize="7">+12% YoY</text>
+    <g>
+      {/* Panel frame with glow */}
+      <rect x="0" y="0" width="310" height="260" rx="14" fill="#0e0e10" stroke="#00e5a0" strokeOpacity="0.45" strokeWidth="1.3" />
+      <rect x="0" y="0" width="310" height="260" rx="14" fill="none" stroke="#00e5a0" strokeOpacity="0.12" strokeWidth="4" />
+
+      {/* Header bar */}
+      <rect x="0" y="0" width="310" height="32" rx="14" fill="#111113" />
+      <rect x="0" y="18" width="310" height="14" fill="#111113" />
+      <circle cx="14" cy="16" r="4" fill="#ff5f57" />
+      <circle cx="28" cy="16" r="4" fill="#ffbd2e" />
+      <circle cx="42" cy="16" r="4" fill="#28c840" />
+      <text x="155" y="20" textAnchor="middle" fill="#55555f" fontFamily={mono} fontSize="9" letterSpacing="0.08em">
+        residata — live dashboard
+      </text>
+
+      {/* Chart card — €/m² trend */}
+      <g transform="translate(16, 46)">
+        <rect x="0" y="0" width="278" height="100" rx="8" fill="#0a0a0b" stroke="#1a1a1f" strokeWidth="0.6" />
+        <text x="10" y="16" fill="#8a8a96" fontFamily={mono} fontSize="8" letterSpacing="0.06em">AVG €/M² · 6 MONTHS</text>
+        <text x="268" y="16" textAnchor="end" fill="#00e5a0" fontFamily={mono} fontSize="8" fontWeight="700">+12% YoY</text>
+
+        {/* Area under curve */}
+        <path
+          d="M 12 80 L 52 62 L 92 68 L 132 44 L 172 50 L 212 28 L 262 40 L 262 92 L 12 92 Z"
+          fill="url(#chart-area)" opacity="0.5"
+        />
+        {/* Line */}
+        <path
+          d="M 12 80 L 52 62 L 92 68 L 132 44 L 172 50 L 212 28 L 262 40"
+          fill="none" stroke="#00e5a0" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
+        />
+        {/* Line draw-in animation */}
+        <path
+          d="M 12 80 L 52 62 L 92 68 L 132 44 L 172 50 L 212 28 L 262 40"
+          fill="none" stroke="#00e5a0" strokeWidth="2.5" strokeLinecap="round"
+          strokeDasharray="400" strokeDashoffset="400"
+        >
+          <animate attributeName="stroke-dashoffset" from="400" to="0" dur="1.6s" fill="freeze" />
+        </path>
+        {/* Dots */}
+        {[[12,80],[52,62],[92,68],[132,44],[172,50],[212,28],[262,40]].map(([x, y], i) => (
+          <circle key={i} cx={x} cy={y} r="2.2" fill="#0a0a0b" stroke="#00e5a0" strokeWidth="1.3" />
+        ))}
+        {/* Current-period marker (rightmost) */}
+        <circle cx="262" cy="40" r="4" fill="#00e5a0">
+          <animate attributeName="opacity" values="1;0.3;1" dur="1.4s" repeatCount="indefinite" />
+        </circle>
+      </g>
+
+      {/* Mini table row */}
+      <g transform="translate(16, 160)">
+        <rect x="0" y="0" width="278" height="50" rx="6" fill="#0a0a0b" stroke="#1a1a1f" strokeWidth="0.6" />
+        {/* Row 1 */}
+        <text x="10" y="18" fill="#e8e8ed" fontFamily="'Outfit', sans-serif" fontSize="10" fontWeight="600">Slnečnice Viladomy</text>
+        <text x="150" y="18" fill="#8a8a96" fontFamily={mono} fontSize="9">Petržalka</text>
+        <text x="225" y="18" fill="#00e5a0" fontFamily={mono} fontSize="9" fontWeight="700">3,650 €/m²</text>
+        {/* Row 2 */}
+        <line x1="8" y1="26" x2="270" y2="26" stroke="#1a1a1f" strokeWidth="0.5" />
+        <text x="10" y="42" fill="#e8e8ed" fontFamily="'Outfit', sans-serif" fontSize="10" fontWeight="600">Eurovea City</text>
+        <text x="150" y="42" fill="#8a8a96" fontFamily={mono} fontSize="9">Ružinov</text>
+        <text x="225" y="42" fill="#00e5a0" fontFamily={mono} fontSize="9" fontWeight="700">5,510 €/m²</text>
+      </g>
 
       {/* Export chips */}
-      {[
-        { x: 14, label: "Sheets" },
-        { x: 64, label: "CSV" },
-        { x: 104, label: "API" },
-      ].map((c, i) => (
-        <g key={c.label}>
-          <rect x={c.x} y="130" width={i === 0 ? 46 : i === 1 ? 36 : 52} height="22" rx="4"
-            fill="#0e0e10" stroke={color} strokeWidth="0.8" strokeOpacity="0.6" />
-          <text x={c.x + 6} y="145" fill={color} fontFamily={mono} fontSize="8" fontWeight="700" letterSpacing="0.05em">
-            {c.label}
-          </text>
-        </g>
-      ))}
-      {/* delivery note */}
-      <text x="14" y="172" fill={dim} fontFamily={mono} fontSize="7" letterSpacing="0.04em">MONTHLY · AUTO-REFRESH</text>
-      <text x="14" y="184" fill={dim} fontFamily={mono} fontSize="7" letterSpacing="0.04em">or WEEKLY on demand</text>
-    </svg>
+      <g transform="translate(16, 222)">
+        {chipLabels.map((label, i) => {
+          const widths = [62, 48, 54];
+          const xs = [0, 72, 128];
+          return (
+            <g key={label}>
+              <rect x={xs[i]} y="0" width={widths[i]} height="24" rx="5"
+                fill="#0a0a0b" stroke="#00e5a0" strokeOpacity="0.55" strokeWidth="0.9" />
+              <text x={xs[i] + widths[i] / 2} y="16" textAnchor="middle"
+                fill="#00e5a0" fontFamily={mono} fontSize="9" fontWeight="700" letterSpacing="0.08em">
+                {label}
+              </text>
+            </g>
+          );
+        })}
+        {/* Caption next to chips */}
+        <text x="196" y="10" fill="#8a8a96" fontFamily={mono} fontSize="7" letterSpacing="0.05em">{captionRow1}</text>
+        <text x="196" y="20" fill="#55555f" fontFamily={mono} fontSize="7" letterSpacing="0.05em">{captionRow2}</text>
+      </g>
+    </g>
   );
 }
 
-// Middle stage (Standardize & Validate) kombinuje dovtedajšie Parse + Normalize.
-// Vizuálne použijeme "Normalize" kartu — ukazuje tabuľku s unified fields,
-// čo je najlepší reprezentant oboch krokov. Parse kartu vyhradíme pre budúce
-// iterácie (napr. detailný breakdown na sub-stránke).
-const STAGE_RENDER = {
-  collect: StageCollect,
-  normalize: StageNormalize,   // slúži ako "Standardize & Validate"
-  publish: StagePublish,
-};
+// ── FlowStream — multi-dot animated stream between x1,y and x2,y ──
+function FlowStream({ x1, y, x2, count = 5, delayOffset = 0, duration = 3.2 }) {
+  return (
+    <>
+      {/* Static track */}
+      <line x1={x1} y1={y} x2={x2} y2={y} stroke="#222228" strokeWidth="1" strokeDasharray="2 4" />
+      <line x1={x1} y1={y} x2={x2} y2={y} stroke="url(#flow-gradient)" strokeWidth="2" opacity="0.4" />
+
+      {/* Animated dots */}
+      {Array.from({ length: count }).map((_, i) => (
+        <circle key={i} r="3.2" fill="#00e5a0" filter="url(#dot-glow)">
+          <animateMotion
+            dur={`${duration}s`}
+            begin={`${delayOffset + (i * duration) / count}s`}
+            repeatCount="indefinite"
+            path={`M ${x1} ${y} L ${x2} ${y}`}
+          />
+          <animate
+            attributeName="opacity"
+            values="0;1;1;0"
+            keyTimes="0;0.15;0.85;1"
+            dur={`${duration}s`}
+            begin={`${delayOffset + (i * duration) / count}s`}
+            repeatCount="indefinite"
+          />
+        </circle>
+      ))}
+    </>
+  );
+}
 
 export function PipelineFlow({ lang = "en" }) {
-  // Live čísla z DB — developer count je derived z unique `developer` fieldu
-  // v projects tabuľke. Ak field chýba / je null, fallback na konštantu (60),
-  // aby sme neukazovali "0 developers" počas loading-u alebo pri prázdnej DB.
+  // LIVE čísla z DB — fallbacks iba pre initial loading / DB hiccup.
   const { projects } = useProjects();
   const uniqueDevs = new Set(projects.map(p => p.developer).filter(Boolean)).size;
   const devCount = uniqueDevs > 0 ? uniqueDevs : 60;
   const projCount = projects.length > 0 ? projects.length : 142;
 
-  const stages = buildPipelineStages(lang, devCount, projCount);
-  const label = lang === "sk" ? "Ako to celé funguje" : "How the pipeline works";
-  const title = lang === "sk"
-    ? "Od rozhádzaných webov k živému trhovému prehľadu."
-    : "From scattered sites to live market intelligence.";
-  const sub = lang === "sk"
-    ? "Plne automatizovaná pipeline. 3 fázy, každý mesiac, bez výnimiek — reálne čísla, žiadne kliky."
-    : "Fully automated pipeline. 3 stages, every month, no exceptions — real numbers, zero clicks.";
-  const statsLabel = lang === "sk"
-    ? ["developerov sledovaných", "aktívnych projektov", "bytov v datasete", "polí na byt"]
-    : ["developers tracked", "active projects", "units in dataset", "fields per unit"];
+  // Short + rich texts. Každé slovo nesie význam — žiadne buzzwordy.
+  const T = lang === "sk" ? {
+    label: "Ako to funguje",
+    title: "Od webov developerov k živému trhovému prehľadu.",
+    sub: "3-krokový automatizovaný flow. Každý mesiac, bez výnimky.",
+
+    z1Line1: "Dáta zbierame",
+    z1Live: `z ${devCount} developerov · ${projCount.toLocaleString("sk-SK")} projektov`,
+    z1Foot: "každý mesiac, bez výnimiek",
+
+    z2Line1: "Normalizácia a validácia",
+    z2Chip: "25 POLÍ · DEDUPLIKOVANÉ",
+
+    z3Line1: "Živý trhový prehľad",
+    z3Foot: "pre vaše rozhodnutia podložené dátami",
+    z3Chips: ["Sheets", "CSV", "API"],
+    z3Cap1: "MONTHLY AUTO-REFRESH",
+    z3Cap2: "alebo weekly on demand",
+
+    statsLabel: ["developerov", "aktívnych projektov", "bytov v datasete", "polí na byt"],
+  } : {
+    label: "How it works",
+    title: "From scattered developer sites to live market intelligence.",
+    sub: "3-step automated flow. Every month, no exceptions.",
+
+    z1Line1: "Data collected",
+    z1Live: `from ${devCount} developers · ${projCount.toLocaleString("en-US")} projects`,
+    z1Foot: "every month, no exceptions",
+
+    z2Line1: "Standardize & validate",
+    z2Chip: "25 FIELDS · DEDUPED",
+
+    z3Line1: "Real-time market intelligence",
+    z3Foot: "for your data-driven decisions",
+    z3Chips: ["Sheets", "CSV", "API"],
+    z3Cap1: "MONTHLY AUTO-REFRESH",
+    z3Cap2: "or weekly on demand",
+
+    statsLabel: ["developers", "active projects", "units in dataset", "fields per unit"],
+  };
 
   return (
     <section style={{ padding: "3rem 2rem 5rem", maxWidth: 1280, margin: "0 auto" }}>
-      {/* Header */}
+      {/* Header — krátky a vecný */}
       <div style={{ textAlign: "center", marginBottom: "2.5rem" }}>
         <div style={{ fontFamily: mono, fontSize: "0.7rem", color: green, letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "0.75rem" }}>
-          {label}
+          {T.label}
         </div>
-        <h2 style={{ fontSize: "clamp(1.8rem, 3.2vw, 2.4rem)", fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1.15, color: "#e8e8ed", margin: 0 }}>
-          {title}
+        <h2 style={{ fontSize: "clamp(1.8rem, 3.2vw, 2.5rem)", fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1.15, color: "#e8e8ed", margin: 0 }}>
+          {T.title}
         </h2>
-        <p style={{ color: dim, fontSize: "1rem", marginTop: "0.9rem", maxWidth: 700, margin: "0.9rem auto 0", lineHeight: 1.65 }}>
-          {sub}
+        <p style={{ color: dim, fontSize: "1rem", marginTop: "0.8rem", maxWidth: 640, margin: "0.8rem auto 0", lineHeight: 1.6 }}>
+          {T.sub}
         </p>
       </div>
 
-      {/* Stage cards grid + connecting flow lines */}
-      <div className="pipeline-grid" style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(3, 1fr)",
-        gap: "1rem",
+      {/* Scene canvas — single cohesive SVG */}
+      <div style={{
         position: "relative",
-        marginBottom: "2rem",
+        background: "linear-gradient(180deg, #0a0a0b 0%, #101014 100%)",
+        border: `1px solid ${border}`, borderRadius: 16, overflow: "hidden",
+        marginBottom: "1.5rem",
       }}>
-        {stages.map((st, i) => {
-          const Illustration = STAGE_RENDER[st.key];
-          return (
-            <div key={st.key} style={{
-              position: "relative",
-              background: "#0e0e10",
-              border: `1px solid ${border}`,
-              borderRadius: 12,
-              padding: "1.25rem 1.25rem 1.1rem",
-              display: "flex", flexDirection: "column",
-              transition: "border-color 0.3s, transform 0.3s, box-shadow 0.3s",
-            }}
-              onMouseEnter={e => {
-                e.currentTarget.style.borderColor = green;
-                e.currentTarget.style.transform = "translateY(-3px)";
-                e.currentTarget.style.boxShadow = "0 10px 32px rgba(0,229,160,0.08)";
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.borderColor = border;
-                e.currentTarget.style.transform = "";
-                e.currentTarget.style.boxShadow = "";
-              }}
-            >
-              {/* Stage number badge */}
-              <div style={{
-                position: "absolute", top: "0.85rem", right: "0.95rem",
-                fontFamily: mono, fontSize: "0.6rem",
-                color: green, letterSpacing: "0.08em",
-                border: `1px solid ${green}`, borderRadius: 4,
-                padding: "0.1rem 0.4rem",
-                background: "rgba(0,229,160,0.08)",
-                fontWeight: 700,
-              }}>{String(i + 1).padStart(2, "0")}</div>
+        <svg viewBox="0 0 1400 520" style={{ width: "100%", height: "auto", display: "block" }}>
+          <defs>
+            {/* Building gradient */}
+            <linearGradient id="iso-wall" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#2d2d36" />
+              <stop offset="100%" stopColor="#15151c" />
+            </linearGradient>
+            {/* Lit window gradient */}
+            <linearGradient id="iso-lit" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#f5a623" stopOpacity="0.9" />
+              <stop offset="100%" stopColor="#00e5a0" stopOpacity="0.7" />
+            </linearGradient>
+            {/* Hub halo */}
+            <radialGradient id="hub-halo">
+              <stop offset="0%" stopColor="#00e5a0" stopOpacity="0.35" />
+              <stop offset="60%" stopColor="#00e5a0" stopOpacity="0.08" />
+              <stop offset="100%" stopColor="#00e5a0" stopOpacity="0" />
+            </radialGradient>
+            {/* Hub core fill */}
+            <linearGradient id="hub-core" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#1a2a24" />
+              <stop offset="100%" stopColor="#0a0a0b" />
+            </linearGradient>
+            {/* Flow line gradient */}
+            <linearGradient id="flow-gradient" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="#00e5a0" stopOpacity="0" />
+              <stop offset="50%" stopColor="#00e5a0" stopOpacity="0.7" />
+              <stop offset="100%" stopColor="#00e5a0" stopOpacity="0" />
+            </linearGradient>
+            {/* Dashboard chart area */}
+            <linearGradient id="chart-area" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#00e5a0" stopOpacity="0.25" />
+              <stop offset="100%" stopColor="#00e5a0" stopOpacity="0" />
+            </linearGradient>
+            {/* Glow filter for flow dots */}
+            <filter id="dot-glow" x="-100%" y="-100%" width="300%" height="300%">
+              <feGaussianBlur stdDeviation="3" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+            {/* Dot-grid pattern backdrop */}
+            <pattern id="dot-grid" width="26" height="26" patternUnits="userSpaceOnUse">
+              <circle cx="1" cy="1" r="0.8" fill="#2a2a32" />
+            </pattern>
+          </defs>
 
-              {/* SVG illustration */}
-              <div style={{ height: 160, marginBottom: "0.6rem" }}>
-                <Illustration color={green} />
-              </div>
+          {/* Subtle dot-grid backdrop */}
+          <rect x="0" y="0" width="1400" height="520" fill="url(#dot-grid)" opacity="0.35" />
 
-              {/* Title */}
-              <div style={{ fontSize: "1.05rem", fontWeight: 700, color: "#fff", letterSpacing: "-0.01em" }}>
-                {st.title}
-              </div>
-              <div style={{ fontFamily: mono, fontSize: "0.7rem", color: green, marginTop: "0.2rem", letterSpacing: "0.04em" }}>
-                {st.subtitle}
-              </div>
+          {/* Radial glow centered on hub */}
+          <circle cx="700" cy="260" r="260" fill="url(#hub-halo)" opacity="0.4" />
 
-              {/* Lead sentence */}
-              <p style={{ fontSize: "0.84rem", color: "#c0c0c8", lineHeight: 1.55, marginTop: "0.7rem", marginBottom: "0.8rem" }}>
-                {st.lead}
-              </p>
+          {/* ═══ ZONE 1: Iso buildings cluster (x: 40–340) ═══ */}
+          <g transform="translate(60, 100)">
+            <IsoBuildingsCluster />
 
-              {/* Bullets */}
-              <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
-                {st.bullets.map((b, bi) => (
-                  <li key={bi} style={{ display: "flex", gap: "0.4rem", fontSize: "0.75rem", color: dim, lineHeight: 1.5, marginBottom: "0.3rem", alignItems: "flex-start" }}>
-                    <span style={{ color: green, flexShrink: 0, marginTop: "0.05rem" }}>→</span>
-                    <span>{b}</span>
-                  </li>
-                ))}
-              </ul>
+            {/* Zone 1 label — text top-left */}
+            <g transform="translate(-10, -70)">
+              <text x="0" y="0" fill="#00e5a0" fontFamily={mono} fontSize="11" letterSpacing="0.14em" fontWeight="700">01 · COLLECT</text>
+              <text x="0" y="22" fill="#fff" fontFamily="'Outfit', sans-serif" fontSize="20" fontWeight="700" letterSpacing="-0.01em">
+                {T.z1Line1}
+              </text>
+              <text x="0" y="42" fill="#00e5a0" fontFamily={mono} fontSize="11.5" fontWeight="600" letterSpacing="0.02em">
+                {T.z1Live}
+              </text>
+              <text x="0" y="58" fill={dim} fontFamily="'Outfit', sans-serif" fontSize="11">
+                {T.z1Foot}
+              </text>
+            </g>
+          </g>
 
-              {/* Forward arrow (between cards — hidden on last) */}
-              {i < stages.length - 1 && (
-                <div className="pipeline-arrow" style={{
-                  position: "absolute",
-                  right: "-1.4rem", top: "45%",
-                  width: "1.6rem", height: "2px",
-                  background: `linear-gradient(90deg, ${border}, ${green})`,
-                  zIndex: 2,
-                }}>
-                  <div style={{
-                    position: "absolute", right: "-4px", top: "-3px",
-                    width: 8, height: 8, borderRadius: "50%", background: green,
-                    boxShadow: `0 0 10px ${green}`,
-                    animation: `pipelineDot 2.4s ease-in-out ${i * 0.3}s infinite`,
-                  }} />
-                </div>
-              )}
-            </div>
-          );
-        })}
+          {/* ═══ FLOW 1 → 2 ═══ */}
+          <FlowStream x1={360} y={260} x2={540} count={5} delayOffset={0} duration={2.8} />
+
+          {/* ═══ ZONE 2: Central hub (x: 540–860) ═══ */}
+          <g transform="translate(700, 260)">
+            <CenterHub subtitle={T.z2Chip} />
+
+            {/* Zone 2 label — above hub */}
+            <g transform="translate(0, -190)">
+              <text x="0" y="0" textAnchor="middle" fill="#00e5a0" fontFamily={mono} fontSize="11" letterSpacing="0.14em" fontWeight="700">02 · PROCESS</text>
+              <text x="0" y="22" textAnchor="middle" fill="#fff" fontFamily="'Outfit', sans-serif" fontSize="20" fontWeight="700" letterSpacing="-0.01em">
+                {T.z2Line1}
+              </text>
+            </g>
+          </g>
+
+          {/* ═══ FLOW 2 → 3 ═══ */}
+          <FlowStream x1={860} y={260} x2={1040} count={5} delayOffset={0.6} duration={2.8} />
+
+          {/* ═══ ZONE 3: Dashboard panel (x: 1040–1350) ═══ */}
+          <g transform="translate(1040, 130)">
+            <DashboardPanel
+              captionRow1={T.z3Cap1}
+              captionRow2={T.z3Cap2}
+              chipLabels={T.z3Chips}
+            />
+
+            {/* Zone 3 label — above panel */}
+            <g transform="translate(0, -70)">
+              <text x="0" y="0" fill="#00e5a0" fontFamily={mono} fontSize="11" letterSpacing="0.14em" fontWeight="700">03 · DELIVER</text>
+              <text x="0" y="22" fill="#fff" fontFamily="'Outfit', sans-serif" fontSize="20" fontWeight="700" letterSpacing="-0.01em">
+                {T.z3Line1}
+              </text>
+              <text x="0" y="42" fill={dim} fontFamily="'Outfit', sans-serif" fontSize="11.5">
+                {T.z3Foot}
+              </text>
+            </g>
+          </g>
+        </svg>
       </div>
 
-      {/* Stats strip */}
+      {/* Stats strip — LIVE numbers, full-width band */}
       <div style={{
         display: "grid",
         gridTemplateColumns: "repeat(4, 1fr)",
-        gap: "0.75rem",
-        padding: "1.25rem 1.5rem",
-        background: "linear-gradient(180deg, #0e0e10, #16161a)",
+        gap: 1,
+        padding: 0,
+        background: border,
         border: `1px solid ${border}`,
         borderRadius: 12,
+        overflow: "hidden",
       }} className="pipeline-stats">
         {[
-          { n: String(devCount),  label: statsLabel[0] },
-          { n: projCount.toLocaleString(lang === "sk" ? "sk-SK" : "en-US"), label: statsLabel[1] },
-          { n: "4,218",            label: statsLabel[2] },
-          { n: "25",               label: statsLabel[3] },
+          { n: String(devCount),  label: T.statsLabel[0] },
+          { n: projCount.toLocaleString(lang === "sk" ? "sk-SK" : "en-US"), label: T.statsLabel[1] },
+          { n: "4,218", label: T.statsLabel[2] },
+          { n: "25",    label: T.statsLabel[3] },
         ].map((s, i) => (
           <div key={i} style={{
             textAlign: "center",
-            borderRight: i < 3 ? `1px solid ${border}` : "none",
-            padding: "0 0.5rem",
+            padding: "1.25rem 0.5rem",
+            background: "linear-gradient(180deg, #0e0e10, #16161a)",
           }}>
             <div style={{ fontFamily: mono, fontSize: "clamp(1.6rem, 3vw, 2.2rem)", fontWeight: 700, color: green, letterSpacing: "-0.02em", lineHeight: 1 }}>
               {s.n}
             </div>
-            <div style={{ fontSize: "0.72rem", color: dim, marginTop: "0.4rem", textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: mono }}>
+            <div style={{ fontSize: "0.7rem", color: dim, marginTop: "0.45rem", textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: mono }}>
               {s.label}
             </div>
           </div>
@@ -371,20 +483,8 @@ export function PipelineFlow({ lang = "en" }) {
       </div>
 
       <style>{`
-        @keyframes pipelineDot {
-          0%   { transform: translateX(-1.4rem); opacity: 0; }
-          20%  { opacity: 1; }
-          80%  { opacity: 1; }
-          100% { transform: translateX(0); opacity: 0; }
-        }
-        /* Mobile — stack stages + hide inline arrows (they'd point down not right) */
-        @media (max-width: 860px) {
-          .pipeline-grid { grid-template-columns: 1fr !important; }
-          .pipeline-arrow { display: none !important; }
-        }
         @media (max-width: 560px) {
           .pipeline-stats { grid-template-columns: 1fr 1fr !important; }
-          .pipeline-stats > div { border-right: none !important; padding: 0.5rem 0.5rem !important; }
         }
       `}</style>
     </section>
