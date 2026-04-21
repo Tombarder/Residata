@@ -68,11 +68,16 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
                     <th style={{ ...th, textAlign: "right" }}>{t.tbl_sold}</th>
                     <th style={{ ...th, textAlign: "right" }}>{t.tbl_sold_pct}</th>
                     <th style={{ ...th, textAlign: "right" }}>{t.tbl_eur_m2}</th>
+                    {/* Sold velocity — header viditeľný vždy, obsah blurred pre non-paid */}
+                    <th style={{ ...th, textAlign: "right" }} title={can("view_sold_velocity") ? t.tbl_sold_30d_tooltip_paid : t.tbl_sold_30d_tooltip_locked}>
+                      {t.tbl_sold_30d}
+                      {!can("view_sold_velocity") && <span style={{ marginLeft: 4, color: green, fontSize: "0.6rem" }}>🔒</span>}
+                    </th>
                     <th style={th}></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {clearRows.map(p => <ProjectRow key={p.id} p={p} t={t} lang={lang} setCurrent={setCurrent} />)}
+                  {clearRows.map(p => <ProjectRow key={p.id} p={p} t={t} lang={lang} setCurrent={setCurrent} canVelocity={can("view_sold_velocity")} />)}
 
                   {/* Blurred teaser rows — anon only. Vyššia opacity + mäkkší blur,
                       nech je viditeľné že sú tam reálne dáta. */}
@@ -94,6 +99,7 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
                       <td style={{ ...td, textAlign: "right", fontFamily: mono }}>
                         {p.avg_price_eur_m2 ? Math.round(p.avg_price_eur_m2).toLocaleString("en-US") : "—"}
                       </td>
+                      <td style={{ ...td, textAlign: "right", fontFamily: mono, color: green }}>+{Math.max(1, Math.min(18, Math.round((p.sold_units || 0) * 0.08) || 5))}</td>
                       <td style={{ ...td, textAlign: "right" }}>—</td>
                     </tr>
                   ))}
@@ -138,8 +144,27 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
   );
 }
 
-function ProjectRow({ p, t, lang, setCurrent }) {
+function ProjectRow({ p, t, lang, setCurrent, canVelocity }) {
   const soldDataUnavailable = (p.sold_units || 0) === 0 && (p.reserved_units || 0) === 0 && (p.prereserved_units || 0) === 0;
+
+  // Sold velocity cell — paid vidí reálnu hodnotu, ostatní blurred placeholder
+  // (detail pod blurom nemá význam čítať, preto len deterministicky-vyzerajúce číslo).
+  // Deterministic fake = stabilné medzi renderingmi, nevznikajú novém čísla na refresh.
+  const fakeVelocity = Math.max(1, Math.min(18, Math.round((p.sold_units || 0) * 0.08) || (p.id?.charCodeAt(0) % 12) + 2));
+  const velocityCell = canVelocity
+    ? (p.sold_last_month != null
+        ? <span style={{ color: green, fontWeight: 600 }}>+{p.sold_last_month}</span>
+        : <span style={{ color: dim, fontStyle: "italic", fontSize: "0.75rem" }} title={t.tbl_sold_30d_no_data_yet}>—</span>)
+    : <span style={{
+        filter: "blur(5px)",
+        opacity: 0.85,
+        userSelect: "none",
+        pointerEvents: "none",
+        color: green,
+        fontWeight: 600,
+        display: "inline-block",
+      }} aria-hidden="true">+{fakeVelocity}</span>;
+
   return (
     <tr style={{ borderTop: `1px solid ${border}` }}>
       <td style={td}><strong>{p.name}</strong></td>
@@ -159,6 +184,7 @@ function ProjectRow({ p, t, lang, setCurrent }) {
               {lang === "sk" ? "nezverejnené" : "not published"}
             </span>}
       </td>
+      <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{velocityCell}</td>
       <td style={{ ...td, textAlign: "right" }}>
         <button onClick={() => setCurrent && setCurrent(`Project:${p.id}`)} style={miniBtn}>{t.tbl_detail}</button>
       </td>

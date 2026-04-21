@@ -47,6 +47,7 @@ export const CAPABILITY_KEYS = [
   // Paid features
   'view_analytics',              // grafy, trendy
   'view_historical_data',        // mesiac-na-mesiac
+  'view_sold_velocity',          // sold_last_month column (kľúčová metrika rýchlosti predaja)
   'export_data',                 // CSV / JSON download
   'view_monthly_reports',        // PDF reporty
 
@@ -128,6 +129,7 @@ const PAID_CAPS = [
   'view_market_pulse',
   'view_monthly_reports',
   'view_public_content',
+  'view_sold_velocity',
   'view_ticker',
   // NIE: prompt_signup, prompt_upgrade_to_paid, see_early_access_badge, access_pending_gate
 ];
