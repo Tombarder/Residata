@@ -391,8 +391,8 @@ function PageContent({ page, projectId, lang, setCurrent, openLogin }) {
   if (page === "App:Dashboard")  return <PlatformDashboard lang={lang} setCurrent={setCurrent} />;
   if (page === "App:Projects")   return <PlatformProjects lang={lang} setCurrent={setCurrent} openLogin={openLogin} />;
   if (page === "App:Analytics")  return <Gated require="view_analytics"       lang={lang} setCurrent={setCurrent}><LiveAnalytics lang={lang} setCurrent={setCurrent} openLogin={openLogin} /></Gated>;
-  if (page === "App:Reports")    return <Gated require="view_monthly_reports" lang={lang} setCurrent={setCurrent}><PlaceholderPage lang={lang} title={lang === "sk" ? "Mesačné reporty" : "Monthly reports"} copy={lang === "sk" ? "PDF reporty každý mesiac priamo do tvojho inboxu a do tejto sekcie na stiahnutie." : "Monthly PDF reports delivered to your inbox and downloadable here."} /></Gated>;
-  if (page === "App:Exports")    return <Gated require="export_data"          lang={lang} setCurrent={setCurrent}><PlaceholderPage lang={lang} title={lang === "sk" ? "Exporty a API" : "Exports & API"} copy={lang === "sk" ? "CSV / XLSX exporty a REST API pre napojenie do tvojho dátového stacku." : "CSV / XLSX exports and a REST API to wire into your data stack."} /></Gated>;
+  if (page === "App:Reports")    return <Gated require="view_monthly_reports" lang={lang} setCurrent={setCurrent}><PlatformReports lang={lang} setCurrent={setCurrent} /></Gated>;
+  if (page === "App:Exports")    return <Gated require="export_data"          lang={lang} setCurrent={setCurrent}><PlatformExports lang={lang} setCurrent={setCurrent} /></Gated>;
   if (page === "App:Billing")    return <PlatformBilling lang={lang} setCurrent={setCurrent} />;
   if (page === "App:Settings")   return <PlatformSettings lang={lang} />;
   if (page === "App:Admin")      return <Gated require="manage_users" lang={lang} setCurrent={setCurrent}><LiveAdmin lang={lang} setCurrent={setCurrent} /></Gated>;
@@ -818,17 +818,240 @@ const inputStyle = {
   boxSizing: "border-box", outline: "none",
 };
 
-// ─── Placeholder page for Reports / Exports (not yet built) ─────
-function PlaceholderPage({ lang, title, copy }) {
+// ─── Reports page — executive summary from live DB + download ────
+function PlatformReports({ lang, setCurrent }) {
+  const { projects, loading } = useProjects();
+
+  if (loading && projects.length === 0) {
+    return <div style={{ padding: "3rem 2rem", color: dim, fontFamily: mono, fontSize: "0.85rem" }}>
+      {lang === "sk" ? "Načítavam report…" : "Loading report…"}
+    </div>;
+  }
+
+  const lastSync = projects[0]?.last_updated?.slice(0, 10) || new Date().toISOString().slice(0, 10);
+  const monthName = (() => {
+    const m = new Date();
+    return m.toLocaleDateString(lang === "sk" ? "sk-SK" : "en-US", { month: "long", year: "numeric" });
+  })();
+
+  // Numbers
+  const total = projects.reduce((a, p) => a + (p.total_units || 0), 0);
+  const avail = projects.reduce((a, p) => a + (p.available_units || 0), 0);
+  const sold = projects.reduce((a, p) => a + (p.sold_units || 0), 0);
+  const sold30 = projects.reduce((a, p) => a + (p.sold_last_month || 0), 0);
+  const prices = projects.filter(p => p.avg_price_eur_m2 && p.total_units > 0);
+  const weightedAvg = prices.length
+    ? Math.round(prices.reduce((a, p) => a + p.avg_price_eur_m2 * p.total_units, 0) / prices.reduce((a, p) => a + p.total_units, 0))
+    : null;
+
+  const topSellers = [...projects].filter(p => (p.sold_last_month || 0) > 0).sort((a, b) => (b.sold_last_month || 0) - (a.sold_last_month || 0)).slice(0, 5);
+  const soldOutWatch = projects.filter(p => (p.sold_percentage || 0) >= 85 && (p.sold_percentage || 0) < 100).sort((a, b) => (b.sold_percentage || 0) - (a.sold_percentage || 0)).slice(0, 5);
+  const priciestDistrict = (() => {
+    const map = {};
+    for (const p of projects) {
+      if (!p.district || !p.avg_price_eur_m2) continue;
+      const d = map[p.district] ||= { sum: 0, count: 0 };
+      d.sum += p.avg_price_eur_m2; d.count += 1;
+    }
+    return Object.entries(map).map(([k, v]) => ({ name: k, avg: Math.round(v.sum / v.count) })).sort((a, b) => b.avg - a.avg)[0];
+  })();
+
+  // CSV download
+  const downloadCSV = () => {
+    const headers = ["id", "name", "district", "total_units", "available_units", "sold_units", "sold_last_month", "sold_percentage", "avg_price_eur_m2", "min_price", "max_price", "developer", "last_updated"];
+    const rows = projects.map(p => headers.map(h => {
+      const v = p[h];
+      if (v == null) return "";
+      const s = String(v);
+      return s.includes(",") || s.includes("\"") ? `"${s.replace(/"/g, '""')}"` : s;
+    }).join(","));
+    const csv = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `residata-${lastSync}.csv`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const ReportSection = ({ label, title, children }) => (
+    <div style={{ marginBottom: "2rem" }}>
+      <div style={{ fontFamily: mono, fontSize: "0.62rem", color: green, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.5rem" }}>{label}</div>
+      <h3 style={{ fontSize: "1.1rem", fontWeight: 600, color: textLight, margin: "0 0 0.75rem", letterSpacing: "-0.01em" }}>{title}</h3>
+      {children}
+    </div>
+  );
+
   return (
-    <div style={{ padding: "3rem 2rem", maxWidth: 680 }}>
-      <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 12, padding: "2.5rem 2.25rem", textAlign: "center" }}>
-        <div style={{ fontSize: "2rem", marginBottom: "1rem", opacity: 0.5 }}>🚧</div>
-        <h2 style={{ fontSize: "1.3rem", fontWeight: 700, color: textLight, margin: 0, marginBottom: "0.75rem" }}>{title}</h2>
-        <p style={{ color: dim, fontSize: "0.9rem", lineHeight: 1.6, margin: 0 }}>{copy}</p>
-        <p style={{ color: "#55555f", fontSize: "0.78rem", marginTop: "1.25rem", fontFamily: mono }}>
-          {lang === "sk" ? "v príprave · napíš ak chceš early access" : "coming soon · email us for early access"}
+    <div style={{ padding: "1rem 2rem 4rem", maxWidth: 880, margin: "0 auto" }}>
+      {/* Header card */}
+      <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 12, padding: "2rem 2.25rem", marginBottom: "1.5rem" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem", flexWrap: "wrap" }}>
+          <div>
+            <div style={{ fontFamily: mono, fontSize: "0.65rem", color: dim, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.4rem" }}>
+              {lang === "sk" ? "Mesačný report" : "Monthly report"}
+            </div>
+            <h2 style={{ fontSize: "1.5rem", fontWeight: 700, color: textLight, margin: 0, letterSpacing: "-0.02em", textTransform: "capitalize" }}>
+              {monthName}
+            </h2>
+            <p style={{ color: dim, fontSize: "0.85rem", margin: "0.5rem 0 0", fontFamily: mono }}>
+              {lang === "sk" ? "Snapshot k" : "Snapshot as of"} {lastSync} · {projects.length} {lang === "sk" ? "projektov" : "projects"}
+            </p>
+          </div>
+          <button onClick={downloadCSV} className="btn-p" style={{ fontSize: "0.82rem", padding: "0.55rem 1.1rem" }}>
+            ⬇ {lang === "sk" ? "Stiahnuť CSV" : "Download CSV"}
+          </button>
+        </div>
+      </div>
+
+      {/* Executive summary */}
+      <ReportSection label={lang === "sk" ? "Prehľad" : "Executive summary"} title={lang === "sk" ? "Kde je trh práve teraz" : "Where the market stands"}>
+        <p style={{ color: "#c0c0c8", fontSize: "0.95rem", lineHeight: 1.7, margin: 0 }}>
+          {lang === "sk"
+            ? <>Residata sleduje <strong style={{ color: textLight }}>{projects.length}</strong> aktívnych projektov v Bratislave s kapacitou <strong style={{ color: textLight }}>{total.toLocaleString("sk-SK")}</strong> bytov. Aktuálne je na trhu <strong style={{ color: green }}>{avail.toLocaleString("sk-SK")}</strong> voľných jednotiek, kumulatívne predaných <strong style={{ color: "#f5a623" }}>{sold.toLocaleString("sk-SK")}</strong>. Za posledných 30 dní pribudlo <strong style={{ color: "#f5a623" }}>{sold30}</strong> predajov. {weightedAvg && <>Priemerná cena naprieč trhom je <strong style={{ color: textLight }}>{weightedAvg.toLocaleString("sk-SK")} €/m²</strong> (vážené podľa veľkosti projektov).</>} {priciestDistrict && <>Najdrahší okres zostáva <strong style={{ color: textLight }}>{priciestDistrict.name}</strong> ({priciestDistrict.avg.toLocaleString("sk-SK")} €/m²).</>}</>
+            : <>Residata tracks <strong style={{ color: textLight }}>{projects.length}</strong> active Bratislava projects holding <strong style={{ color: textLight }}>{total.toLocaleString("en-US")}</strong> units in total. Currently <strong style={{ color: green }}>{avail.toLocaleString("en-US")}</strong> units are available, cumulatively <strong style={{ color: "#f5a623" }}>{sold.toLocaleString("en-US")}</strong> sold. Last 30 days saw <strong style={{ color: "#f5a623" }}>{sold30}</strong> new sales. {weightedAvg && <>The market-wide weighted average sits at <strong style={{ color: textLight }}>{weightedAvg.toLocaleString("en-US")} €/m²</strong>.</>} {priciestDistrict && <>The priciest district is <strong style={{ color: textLight }}>{priciestDistrict.name}</strong> ({priciestDistrict.avg.toLocaleString("en-US")} €/m²).</>}</>}
         </p>
+      </ReportSection>
+
+      {/* Top sellers */}
+      <ReportSection label={lang === "sk" ? "Top predajcovia" : "Top sellers"} title={lang === "sk" ? "Najaktívnejšie projekty minulý mesiac" : "Most active projects last month"}>
+        {topSellers.length === 0 ? (
+          <div style={{ color: dim, fontSize: "0.85rem" }}>{lang === "sk" ? "Predajné dáta sa naplnia po ďalšom mesačnom behu." : "Velocity data populates after the next monthly run."}</div>
+        ) : (
+          <ol style={{ paddingLeft: "1.25rem", margin: 0, color: "#c0c0c8", fontSize: "0.88rem", lineHeight: 1.8 }}>
+            {topSellers.map(p => (
+              <li key={p.id}>
+                <strong style={{ color: textLight }}>{p.name}</strong> ({p.district || "—"}) — <span style={{ color: green, fontFamily: mono, fontWeight: 700 }}>+{p.sold_last_month}</span> {lang === "sk" ? "predaných" : "sold"}
+                {p.avg_price_eur_m2 && <span style={{ color: dim, fontFamily: mono }}> · {Math.round(p.avg_price_eur_m2).toLocaleString("en-US").replace(/,/g, " ")} €/m²</span>}
+              </li>
+            ))}
+          </ol>
+        )}
+      </ReportSection>
+
+      {/* Sold-out watch */}
+      <ReportSection label={lang === "sk" ? "Dopredáva sa" : "Selling out"} title={lang === "sk" ? "Projekty nad 85 % predané" : "Projects over 85% sold"}>
+        {soldOutWatch.length === 0 ? (
+          <div style={{ color: dim, fontSize: "0.85rem" }}>{lang === "sk" ? "Žiadny projekt nie je blízko vypredaniu." : "No project is close to sold-out."}</div>
+        ) : (
+          <ol style={{ paddingLeft: "1.25rem", margin: 0, color: "#c0c0c8", fontSize: "0.88rem", lineHeight: 1.8 }}>
+            {soldOutWatch.map(p => (
+              <li key={p.id}>
+                <strong style={{ color: textLight }}>{p.name}</strong> ({p.district || "—"}) — <span style={{ color: "#ff6b6b", fontFamily: mono, fontWeight: 700 }}>{p.sold_percentage.toFixed(0)}%</span> {lang === "sk" ? "predané" : "sold"}, {p.available_units} {lang === "sk" ? "zostáva" : "left"}
+              </li>
+            ))}
+          </ol>
+        )}
+      </ReportSection>
+
+      {/* Notes + PDF future */}
+      <div style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 10, padding: "1rem 1.25rem", marginTop: "1.5rem" }}>
+        <div style={{ fontFamily: mono, fontSize: "0.65rem", color: dim, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.4rem" }}>
+          {lang === "sk" ? "Čo bude ďalej" : "What's next"}
+        </div>
+        <p style={{ color: "#c0c0c8", fontSize: "0.82rem", lineHeight: 1.6, margin: 0 }}>
+          {lang === "sk"
+            ? "PDF export (brandovaný report), historická časová rada a per-district mesačný e-mail prídu v ďalšej iterácii. Ak niečo konkrétne potrebuješ, napíš — vieme pridať."
+            : "PDF export (branded report), historical time series and per-district monthly email drops are coming next. If you need a specific angle, email us — we can add it."}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ─── Exports page — CSV downloads + API hint ──────────────
+function PlatformExports({ lang }) {
+  const { projects } = useProjects();
+  const { user } = useAuth();
+
+  const csvFromProjects = () => {
+    const headers = ["id", "name", "district", "total_units", "available_units", "sold_units", "sold_last_month", "sold_percentage", "avg_price_eur_m2", "min_price", "max_price", "developer", "last_updated"];
+    const rows = projects.map(p => headers.map(h => {
+      const v = p[h]; if (v == null) return "";
+      const s = String(v); return s.includes(",") || s.includes("\"") ? `"${s.replace(/"/g, '""')}"` : s;
+    }).join(","));
+    const csv = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url;
+    a.download = `residata-projects-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const csvFromFlats = async () => {
+    const { supabase } = await import("../lib/supabase");
+    const { data, error } = await supabase.from("flats").select("*").limit(10000);
+    if (error) { alert(`Export failed: ${error.message}`); return; }
+    if (!data || data.length === 0) { alert("No flats available."); return; }
+    const headers = Object.keys(data[0]);
+    const rows = data.map(r => headers.map(h => {
+      const v = r[h]; if (v == null) return "";
+      const s = String(v); return s.includes(",") || s.includes("\"") ? `"${s.replace(/"/g, '""')}"` : s;
+    }).join(","));
+    const csv = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url;
+    a.download = `residata-flats-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  return (
+    <div style={{ padding: "1rem 2rem 4rem", maxWidth: 720 }}>
+      <p style={{ color: dim, fontSize: "0.9rem", lineHeight: 1.6, marginTop: 0, marginBottom: "1.5rem" }}>
+        {lang === "sk"
+          ? "Stiahni si celý dataset ako CSV, alebo ho ťahaj priamo cez REST API do tvojho stacku."
+          : "Download the full dataset as CSV, or pull it via the REST API straight into your stack."}
+      </p>
+
+      <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 12, padding: "1.5rem 1.75rem", marginBottom: "1rem" }}>
+        <div style={{ fontFamily: mono, fontSize: "0.65rem", color: green, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.5rem" }}>CSV</div>
+        <h3 style={{ fontSize: "1.05rem", fontWeight: 600, color: textLight, margin: 0, marginBottom: "1rem" }}>
+          {lang === "sk" ? "Okamžitý export" : "Instant export"}
+        </h3>
+        <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+          <button onClick={csvFromProjects} className="btn-p" style={{ fontSize: "0.85rem" }}>
+            ⬇ {lang === "sk" ? "Projekty" : "Projects"} ({projects.length})
+          </button>
+          <button onClick={csvFromFlats} className="btn-s" style={{ fontSize: "0.85rem" }}>
+            ⬇ {lang === "sk" ? "Všetky byty" : "All flats"}
+          </button>
+        </div>
+        <p style={{ color: dim, fontSize: "0.75rem", marginTop: "0.85rem", lineHeight: 1.5 }}>
+          {lang === "sk"
+            ? "CSV sa vytvorí v tvojom prehliadači — nič neodchádza mimo tvoj počítač. Pre Excel stačí dvojklik."
+            : "CSV is generated in your browser — nothing leaves your machine. Double-click opens in Excel."}
+        </p>
+      </div>
+
+      <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 12, padding: "1.5rem 1.75rem" }}>
+        <div style={{ fontFamily: mono, fontSize: "0.65rem", color: green, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.5rem" }}>API</div>
+        <h3 style={{ fontSize: "1.05rem", fontWeight: 600, color: textLight, margin: 0, marginBottom: "0.75rem" }}>
+          {lang === "sk" ? "REST API cez Supabase" : "REST API via Supabase"}
+        </h3>
+        <p style={{ color: "#c0c0c8", fontSize: "0.85rem", lineHeight: 1.6, marginBottom: "1rem" }}>
+          {lang === "sk"
+            ? "Dataset je dostupný priamo cez Supabase REST endpoint (gated cez tvoju session). Ak potrebuješ dedikovaný API kľúč pre server-to-server integráciu, napíš na "
+            : "The dataset is available directly through Supabase REST (gated by your session). For a dedicated server-to-server API key, email "}
+          <a href="mailto:residata@proton.me" style={{ color: green }}>residata@proton.me</a>.
+        </p>
+        <pre style={{
+          margin: 0, padding: "0.75rem 1rem", background: bg2, borderRadius: 6,
+          fontSize: "0.75rem", color: "#c0c0c8", fontFamily: mono, overflowX: "auto",
+        }}>
+{`GET https://mtclsrswxtjseewyrcbx.supabase.co/rest/v1/projects
+  Headers:
+    apikey: <anon key>
+    Authorization: Bearer <your session token>`}
+        </pre>
+        {user && (
+          <p style={{ fontSize: "0.72rem", color: dim, marginTop: "0.85rem", fontFamily: mono }}>
+            user_id: {user.id}
+          </p>
+        )}
       </div>
     </div>
   );

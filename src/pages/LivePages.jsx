@@ -499,17 +499,296 @@ function GateMessage({ title, body, cta, backLabel, onCta, setCurrent }) {
 }
 
 /* ───────────────────── ANALYTICS (paid only — guarded v App.jsx cez Feature) ───────────────────── */
+/* Full analytics page — 100% live from Supabase `projects` table, refreshes
+   automatically on the monthly sync run. No static/demo numbers anywhere. */
 export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
-  const t = liveT[lang] || liveT.en;
+  const { projects, loading } = useProjects();
+
+  if (loading && projects.length === 0) {
+    return (
+      <main style={{ padding: "5rem 2rem 4rem", maxWidth: 1200, margin: "0 auto", color: dim, fontFamily: mono, fontSize: "0.85rem" }}>
+        {lang === "sk" ? "Načítavam analytiku…" : "Loading analytics…"}
+      </main>
+    );
+  }
+
+  // ─── KPIs ────────────────────────────────────────────────
+  const totalUnits  = projects.reduce((a, p) => a + (p.total_units || 0), 0);
+  const totalAvail  = projects.reduce((a, p) => a + (p.available_units || 0), 0);
+  const totalSold   = projects.reduce((a, p) => a + (p.sold_units || 0), 0);
+  const totalSold30 = projects.reduce((a, p) => a + (p.sold_last_month || 0), 0);
+  const priceEntries = projects.filter(p => p.avg_price_eur_m2 && p.total_units > 0);
+  const weightedAvg = priceEntries.length > 0
+    ? Math.round(priceEntries.reduce((a, p) => a + p.avg_price_eur_m2 * p.total_units, 0)
+                 / priceEntries.reduce((a, p) => a + p.total_units, 0))
+    : null;
+  const soldOutCount = projects.filter(p => (p.sold_percentage || 0) >= 100).length;
+  const absorptionPct = totalAvail > 0 ? Math.round((totalSold30 / (totalAvail + totalSold30)) * 1000) / 10 : 0;
+
+  // ─── Aggregations ────────────────────────────────────────
+  const byDistrict = {};
+  for (const p of projects) {
+    if (!p.district) continue;
+    const d = byDistrict[p.district] ||= { district: p.district, count: 0, units: 0, avail: 0, sold: 0, sold30: 0, priceSum: 0, priceN: 0 };
+    d.count += 1;
+    d.units  += p.total_units || 0;
+    d.avail  += p.available_units || 0;
+    d.sold   += p.sold_units || 0;
+    d.sold30 += p.sold_last_month || 0;
+    if (p.avg_price_eur_m2) { d.priceSum += p.avg_price_eur_m2; d.priceN += 1; }
+  }
+  const districts = Object.values(byDistrict)
+    .map(d => ({ ...d, avgPrice: d.priceN ? Math.round(d.priceSum / d.priceN) : null,
+                 absorption: d.avail + d.sold30 > 0 ? (d.sold30 / (d.avail + d.sold30)) * 100 : 0 }))
+    .sort((a, b) => (b.avgPrice || 0) - (a.avgPrice || 0));
+
+  const byDeveloper = {};
+  for (const p of projects) {
+    if (!p.developer) continue;
+    const d = byDeveloper[p.developer] ||= { developer: p.developer, count: 0, units: 0, sold: 0, sold30: 0, avail: 0 };
+    d.count += 1;
+    d.units  += p.total_units || 0;
+    d.sold   += p.sold_units || 0;
+    d.sold30 += p.sold_last_month || 0;
+    d.avail  += p.available_units || 0;
+  }
+  const topDevelopers = Object.values(byDeveloper).sort((a, b) => b.units - a.units).slice(0, 10);
+
+  const topVelocity = [...projects]
+    .filter(p => (p.sold_last_month || 0) > 0)
+    .sort((a, b) => (b.sold_last_month || 0) - (a.sold_last_month || 0))
+    .slice(0, 10);
+
+  const soldOutWatch = projects
+    .filter(p => (p.sold_percentage || 0) >= 85 && (p.sold_percentage || 0) < 100 && (p.available_units || 0) > 0)
+    .sort((a, b) => (b.sold_percentage || 0) - (a.sold_percentage || 0))
+    .slice(0, 8);
+
+  const byRooms = { "1": 0, "2": 0, "3": 0, "4+": 0 };
+  // Projects don't store per-room breakdown directly; skip room-level chart
+  // without fetching flats. Placeholder: can be added via a PostgreSQL view later.
+
+  // ─── Render ──────────────────────────────────────────────
   return (
-    <main style={{ padding: "5rem 2rem 4rem", maxWidth: 1000, margin: "0 auto" }}>
-      <Label>{t.analytics_label}</Label>
-      <h1 className="sec-title">{t.analytics_title}</h1>
-      <p className="sec-desc">{t.analytics_desc}</p>
-      <div style={{ marginTop: "2rem", padding: "3rem", border: `1px dashed ${border}`, borderRadius: 12, textAlign: "center", color: dim }}>
-        {t.analytics_placeholder}
+    <main style={{ padding: "1rem 2rem 4rem", maxWidth: 1240, margin: "0 auto" }}>
+      <p style={{ color: dim, fontSize: "0.95rem", lineHeight: 1.65, marginTop: 0, marginBottom: "1.5rem", maxWidth: 760 }}>
+        {lang === "sk"
+          ? <>Všetko čo vidíš nižšie je <strong style={{ color: "#e8e8ed" }}>živé</strong> — tiahnuté zo Supabase projektového datasetu. Pri každom mesačnom behu pipeline sa čísla preklopia automaticky.</>
+          : <>Everything below is <strong style={{ color: "#e8e8ed" }}>live</strong> from the Supabase project dataset. Every monthly pipeline run refreshes these numbers automatically.</>}
+      </p>
+
+      {/* ═══ KPI STRIP ═══ */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.85rem", marginBottom: "2rem" }}>
+        <AKpi label={lang === "sk" ? "Sledované byty" : "Units tracked"}   value={totalUnits.toLocaleString(lang === "sk" ? "sk-SK" : "en-US")} />
+        <AKpi label={lang === "sk" ? "Voľné byty" : "Available"}            value={totalAvail.toLocaleString(lang === "sk" ? "sk-SK" : "en-US")} accent={green} />
+        <AKpi label={lang === "sk" ? "Predané (30d)" : "Sold (30d)"}        value={totalSold30 ? `+${totalSold30}` : "—"} accent="#f5a623"
+              sub={lang === "sk" ? `${absorptionPct}% absorpcia` : `${absorptionPct}% absorption`} />
+        <AKpi label={lang === "sk" ? "Priem. €/m²" : "Avg €/m²"}            value={weightedAvg ? weightedAvg.toLocaleString(lang === "sk" ? "sk-SK" : "en-US") : "—"} />
+        <AKpi label={lang === "sk" ? "Vypredané" : "Sold out"}              value={soldOutCount} accent="#ff6b6b"
+              sub={lang === "sk" ? `z ${projects.length} projektov` : `of ${projects.length} projects`} />
       </div>
+
+      {/* ═══ DISTRICT BREAKDOWN — richer than home DistrictPulse ═══ */}
+      <ASection
+        label={lang === "sk" ? "Okresy" : "Districts"}
+        title={lang === "sk" ? "Ceny, aktivita a absorpcia podľa okresu" : "Prices, activity and absorption by district"}>
+        <div style={{ border: `1px solid ${border}`, borderRadius: 12, overflow: "hidden" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
+            <thead style={{ background: "#0e0e10" }}>
+              <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.68rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                <th style={th}>{lang === "sk" ? "Okres" : "District"}</th>
+                <th style={{ ...th, textAlign: "right" }}>€/m²</th>
+                <th style={{ ...th, textAlign: "right" }}>{lang === "sk" ? "Projektov" : "Projects"}</th>
+                <th style={{ ...th, textAlign: "right" }}>{lang === "sk" ? "Bytov" : "Units"}</th>
+                <th style={{ ...th, textAlign: "right" }}>{lang === "sk" ? "Voľné" : "Avail"}</th>
+                <th style={{ ...th, textAlign: "right" }}>{lang === "sk" ? "Predané 30d" : "Sold 30d"}</th>
+                <th style={{ ...th, textAlign: "right" }}>{lang === "sk" ? "Absorpcia" : "Absorption"}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {districts.map(d => (
+                <tr key={d.district} style={{ borderTop: `1px solid ${border}` }}>
+                  <td style={{ ...td, fontWeight: 600 }}>{d.district}</td>
+                  <td style={{ ...td, textAlign: "right", fontFamily: mono, color: d.avgPrice && d.avgPrice >= 5500 ? "#f5a623" : d.avgPrice && d.avgPrice >= 4200 ? green : "#4a90e2", fontWeight: 600 }}>
+                    {d.avgPrice ? d.avgPrice.toLocaleString("en-US").replace(/,/g, " ") : "—"}
+                  </td>
+                  <td style={{ ...td, textAlign: "right", fontFamily: mono, color: dim }}>{d.count}</td>
+                  <td style={{ ...td, textAlign: "right", fontFamily: mono, color: dim }}>{d.units.toLocaleString("en-US").replace(/,/g, " ")}</td>
+                  <td style={{ ...td, textAlign: "right", fontFamily: mono, color: green }}>{d.avail.toLocaleString("en-US").replace(/,/g, " ")}</td>
+                  <td style={{ ...td, textAlign: "right", fontFamily: mono, color: d.sold30 > 0 ? "#f5a623" : dim }}>
+                    {d.sold30 > 0 ? `+${d.sold30}` : "—"}
+                  </td>
+                  <td style={{ ...td, textAlign: "right", fontFamily: mono, color: d.absorption > 5 ? green : dim }}>
+                    {d.absorption.toFixed(1)}%
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </ASection>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(480px, 1fr))", gap: "1.25rem" }}>
+        {/* ═══ TOP VELOCITY ═══ */}
+        <ASection
+          label={lang === "sk" ? "Rýchlosť predaja" : "Sales velocity"}
+          title={lang === "sk" ? "Top 10 projektov · posledných 30 dní" : "Top 10 projects · last 30 days"}
+          inline>
+          {topVelocity.length === 0 ? (
+            <div style={{ color: dim, fontSize: "0.85rem", padding: "0.5rem 0" }}>
+              {lang === "sk" ? "Zatiaľ žiadne dáta o rýchlosti predaja (populujú sa pri ďalšom behu pipeline)." : "No velocity data yet (populates on the next pipeline run)."}
+            </div>
+          ) : (
+            <RankBarList
+              rows={topVelocity.map(p => ({ key: p.id, label: p.name, sub: p.district, value: p.sold_last_month }))}
+              setCurrent={setCurrent}
+              suffix={lang === "sk" ? " predaných" : " sold"}
+              color={green}
+            />
+          )}
+        </ASection>
+
+        {/* ═══ TOP ABSORPTION (% sold) ═══ */}
+        <ASection
+          label={lang === "sk" ? "Vypredanosť" : "Sell-through"}
+          title={lang === "sk" ? "Top 10 podľa % predaných" : "Top 10 by % sold"}
+          inline>
+          <RankBarList
+            rows={[...projects]
+              .filter(p => (p.sold_percentage || 0) > 0)
+              .sort((a, b) => (b.sold_percentage || 0) - (a.sold_percentage || 0))
+              .slice(0, 10)
+              .map(p => ({ key: p.id, label: p.name, sub: p.district, value: p.sold_percentage, pct: p.sold_percentage, suffix: "%" }))}
+            setCurrent={setCurrent}
+            suffix="%"
+            color="#f5a623"
+          />
+        </ASection>
+
+        {/* ═══ TOP DEVELOPERS ═══ */}
+        <ASection
+          label={lang === "sk" ? "Developeri" : "Developers"}
+          title={lang === "sk" ? "Top 10 podľa objemu" : "Top 10 by volume"}
+          inline>
+          {topDevelopers.length === 0 ? (
+            <div style={{ color: dim, fontSize: "0.85rem", padding: "0.5rem 0" }}>
+              {lang === "sk" ? "Pole 'developer' zatiaľ nie je vyplnené v DB." : "The `developer` field isn't populated in the DB yet."}
+            </div>
+          ) : (
+            <RankBarList
+              rows={topDevelopers.map(d => ({ key: d.developer, label: d.developer, sub: `${d.count} projektov`, value: d.units }))}
+              suffix={lang === "sk" ? " bytov" : " units"}
+              color="#4a90e2"
+            />
+          )}
+        </ASection>
+
+        {/* ═══ SOLD-OUT WATCH ═══ */}
+        <ASection
+          label={lang === "sk" ? "Dopredáva sa" : "Selling out"}
+          title={lang === "sk" ? "85-99% predaných — posledná šanca" : "85-99% sold — last chance"}
+          inline>
+          {soldOutWatch.length === 0 ? (
+            <div style={{ color: dim, fontSize: "0.85rem", padding: "0.5rem 0" }}>
+              {lang === "sk" ? "Žiadny projekt nie je blízko vypredaniu (< 85%)." : "No project is close to sold-out (< 85%)."}
+            </div>
+          ) : (
+            <div>
+              {soldOutWatch.map(p => (
+                <div key={p.id}
+                  onClick={() => setCurrent && setCurrent(`App:ProjectDetail:${p.id}`)}
+                  style={{
+                    display: "grid", gridTemplateColumns: "1fr auto", gap: "1rem", alignItems: "center",
+                    padding: "0.6rem 0.75rem", borderBottom: `1px solid ${border}`, cursor: "pointer",
+                    transition: "background 0.15s",
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = "rgba(255,107,107,0.05)"}
+                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                >
+                  <div>
+                    <div style={{ fontSize: "0.88rem", fontWeight: 600, color: "#e8e8ed" }}>{p.name}</div>
+                    <div style={{ fontSize: "0.7rem", color: dim, fontFamily: mono, marginTop: 2 }}>
+                      {p.district || "—"} · {p.available_units} {lang === "sk" ? "voľných z" : "left of"} {p.total_units}
+                    </div>
+                  </div>
+                  <div style={{ fontFamily: mono, fontSize: "0.85rem", color: "#ff6b6b", fontWeight: 700 }}>
+                    {p.sold_percentage.toFixed(0)}%
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </ASection>
+      </div>
+
+      <p style={{ color: "#55555f", fontSize: "0.72rem", marginTop: "2rem", fontFamily: mono, textAlign: "center" }}>
+        {lang === "sk"
+          ? `Zdroj: ${projects.length} projektov · posledný sync ${projects[0]?.last_updated?.slice(0, 10) || "—"}`
+          : `Source: ${projects.length} projects · last sync ${projects[0]?.last_updated?.slice(0, 10) || "—"}`}
+      </p>
     </main>
+  );
+}
+
+// ─── Analytics primitives ────────────────────────────────
+function AKpi({ label, value, accent = "#e8e8ed", sub }) {
+  return (
+    <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 10, padding: "1.1rem 1.2rem" }}>
+      <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.4rem" }}>{label}</div>
+      <div style={{ fontFamily: mono, fontSize: "1.8rem", fontWeight: 700, color: accent, letterSpacing: "-0.02em", lineHeight: 1 }}>{value}</div>
+      {sub && <div style={{ fontSize: "0.7rem", color: dim, marginTop: "0.4rem" }}>{sub}</div>}
+    </div>
+  );
+}
+
+function ASection({ label, title, children, inline = false }) {
+  return (
+    <section style={{ marginBottom: inline ? 0 : "2rem" }}>
+      <div style={{ marginBottom: "0.85rem" }}>
+        <div style={{ fontFamily: mono, fontSize: "0.65rem", color: green, letterSpacing: "0.12em", textTransform: "uppercase" }}>{label}</div>
+        <h2 style={{ fontSize: "1.1rem", fontWeight: 600, color: "#e8e8ed", margin: "0.2rem 0 0", letterSpacing: "-0.01em" }}>{title}</h2>
+      </div>
+      <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 12, padding: "1rem 1.1rem" }}>
+        {children}
+      </div>
+    </section>
+  );
+}
+
+function RankBarList({ rows, setCurrent, suffix = "", color = green }) {
+  if (!rows || rows.length === 0) return null;
+  const max = Math.max(...rows.map(r => r.value));
+  return (
+    <div>
+      {rows.map((r, i) => {
+        const pct = max > 0 ? (r.value / max) * 100 : 0;
+        const clickable = setCurrent && r.key && typeof r.key === "string" && r.key !== r.label;
+        return (
+          <div key={r.key}
+            onClick={clickable ? () => setCurrent(`App:ProjectDetail:${r.key}`) : undefined}
+            style={{
+              display: "grid", gridTemplateColumns: "24px 1fr 72px", gap: "0.75rem", alignItems: "center",
+              padding: "0.5rem 0", borderBottom: i < rows.length - 1 ? `1px solid ${border}` : "none",
+              cursor: clickable ? "pointer" : "default",
+            }}
+          >
+            <span style={{ fontFamily: mono, fontSize: "0.7rem", color: dim, textAlign: "right" }}>{i + 1}.</span>
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.2rem" }}>
+                <span style={{ fontSize: "0.83rem", color: "#e8e8ed", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.label}</span>
+                {r.sub && <span style={{ fontSize: "0.68rem", color: dim, fontFamily: mono, flexShrink: 0, marginLeft: "0.5rem" }}>{r.sub}</span>}
+              </div>
+              <div style={{ height: 4, background: "#0a0a0b", borderRadius: 2, overflow: "hidden" }}>
+                <div style={{ width: `${pct}%`, height: "100%", background: color, transition: "width 0.8s ease" }} />
+              </div>
+            </div>
+            <div style={{ fontFamily: mono, fontSize: "0.85rem", color: color, fontWeight: 700, textAlign: "right" }}>
+              {typeof r.value === "number" ? (r.value % 1 !== 0 ? r.value.toFixed(1) : r.value) : r.value}{suffix}
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
