@@ -270,8 +270,9 @@ export function PipelineFlow({ lang = "en" }) {
   // LIVE čísla z DB — fallbacks iba pre initial loading / DB hiccup.
   const { projects } = useProjects();
   const uniqueDevs = new Set(projects.map(p => p.developer).filter(Boolean)).size;
-  const devCount = uniqueDevs > 0 ? uniqueDevs : 60;
+  const devCount  = uniqueDevs > 0 ? uniqueDevs : 60;
   const projCount = projects.length > 0 ? projects.length : 142;
+  const unitsInDataset = projects.reduce((a, p) => a + (p.total_units || 0), 0) || 4218;
 
   // Short + rich texts. Každé slovo nesie význam — žiadne buzzwordy.
   const T = lang === "sk" ? {
@@ -462,10 +463,10 @@ export function PipelineFlow({ lang = "en" }) {
         overflow: "hidden",
       }} className="pipeline-stats">
         {[
-          { n: String(devCount),  label: T.statsLabel[0] },
-          { n: projCount.toLocaleString(lang === "sk" ? "sk-SK" : "en-US"), label: T.statsLabel[1] },
-          { n: "4,218", label: T.statsLabel[2] },
-          { n: "25",    label: T.statsLabel[3] },
+          { n: String(devCount),                                                   label: T.statsLabel[0] },
+          { n: projCount.toLocaleString(lang === "sk" ? "sk-SK" : "en-US"),        label: T.statsLabel[1] },
+          { n: unitsInDataset.toLocaleString(lang === "sk" ? "sk-SK" : "en-US"),   label: T.statsLabel[2] },
+          { n: "25",                                                               label: T.statsLabel[3] },
         ].map((s, i) => (
           <div key={i} style={{
             textAlign: "center",

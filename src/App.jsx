@@ -12,6 +12,7 @@ import { MarketPulse, DistrictPulse, PipelineFlow } from "./pages/HomeExtras";
 import HeroLabPage from "./pages/HeroVariants";
 import { useAuth } from "./lib/useAuth";
 import { useCapabilities } from "./lib/useCapabilities";
+import { useProjects } from "./lib/useData";
 import { pushRoute, pathToPage, isAppPage } from "./lib/routing";
 import PlatformShell from "./pages/Platform";
 import { track } from "./lib/track";
@@ -468,6 +469,15 @@ function Footer() {
 /* ─────── HOME ─────── */
 function HomePage({ setCurrent, l, lang, onLogin }) {
   const { can, tier } = useCapabilities();
+  // Hero badge count — live from DB, rounded down to a "140+" style number
+  // so the copy stays marketing-friendly but never drifts behind reality.
+  const { projects } = useProjects();
+  const liveProjCount = projects.length;
+  const heroBadgeText = liveProjCount > 0
+    ? (lang === "sk"
+        ? `Live — sledujeme ${Math.floor(liveProjCount / 10) * 10}+ projektov`
+        : `Live — tracking ${Math.floor(liveProjCount / 10) * 10}+ developments`)
+    : (lang === "sk" ? "Live — sledujeme 140+ projektov" : "Live — tracking 140+ developments");
   // Hero CTA logika podľa tier-u
   let heroButtons;
   if (can("prompt_signup")) {
@@ -548,7 +558,7 @@ function HomePage({ setCurrent, l, lang, onLogin }) {
           marginBottom: "2.5rem", background: "#111113",
         }}>
           <span className="pulse-dot" style={{ width: 6, height: 6, borderRadius: "50%", background: "#00e5a0" }} />
-          Live — tracking 140+ developments
+          {heroBadgeText}
         </div>
         <h1 className="hero-anim-2" style={{ fontSize: "clamp(2.8rem, 6vw, 5rem)", fontWeight: 700, letterSpacing: "-0.04em", lineHeight: 1.05, maxWidth: 800 }}>
           {l.heroTitle1}<br />
