@@ -12,9 +12,18 @@ import { useCapabilities } from "./lib/useCapabilities";
 import { pushRoute, pathToPage } from "./lib/routing";
 import { track } from "./lib/track";
 
-const pagesEN = ["Home", "Live", "Use Cases", "Pricing", "Contact"];
-const pagesSK = ["Domov", "Live", "Využitie", "Cenník", "Kontakt"];
-const pageMap = { "Domov": "Home", "Využitie": "Use Cases", "Dáta": "Data", "Cenník": "Pricing", "Kontakt": "Contact" };
+const pagesEN = ["Home", "Live", "Sample", "Use Cases", "Pricing", "Contact"];
+const pagesSK = ["Domov", "Live", "Ukážka", "Využitie", "Cenník", "Kontakt"];
+// SK-label → EN-key (routing + render je EN-keyed; SK je len UI nadpis v Nave)
+const pageMap = {
+  "Domov": "Home",
+  "Ukážka": "Data",     // pôvodne "Dáta" — teraz jednotne "Ukážka" / "Sample"
+  "Využitie": "Use Cases",
+  "Cenník": "Pricing",
+  "Kontakt": "Contact",
+  // EN-ové aliasy pre prípad že nav dostane rovno EN label (defensive)
+  "Sample": "Data",
+};
 
 const t = {
   en: {
@@ -73,18 +82,14 @@ const t = {
     useCasesCtaDesc: "The pipeline is flexible. If your use case isn't listed, reach out — we likely already have what you need, or can configure it.",
     useCasesCtaBtn: "See Pricing",
     whatYouGet: "What you get",
-    // Data page
+    // Data / Sample page — focuses on INSIGHTS + RAW SAMPLE + SCHEMA.
+    // Live market numbers (totals, trends, district prices) are shown on Home
+    // via MarketPulse / DistrictPulse — we don't duplicate them here.
     dataLabel: "Sample Output",
     dataTitle: "This is what you get.",
-    dataDesc: "Real data, real insights. Same depth every month.",
+    dataDesc: "Five concrete insight types, a raw unit-level sample, and the full schema. Same depth, every month.",
     dataContext: "Bratislava New-Build Market — March 2026",
     dataContextSub: "Monthly snapshot · all active residential projects",
-    stats: [
-      ["4,218", "Units Tracked", "Total units across all projects", "+312 vs Feb"],
-      ["142", "Active Projects", "Developments currently selling", "+6 new this month"],
-      ["5,482", "Avg. Price per m²", "Weighted across all unit types", "+12% YoY"],
-      ["263", "Units Sold in March", "Across all tracked projects", "+14% vs Feb"],
-    ],
     insightsLabel: "Market Insights",
     insightsTitle: "What the data tells you.",
     insightsDesc: "Examples of the insights you can extract from each monthly delivery. The kind of edge that's hard to build in-house — and expensive to live without.",
@@ -197,15 +202,9 @@ const t = {
     whatYouGet: "Čo dostanete",
     dataLabel: "Ukážka výstupu",
     dataTitle: "Takto vyzerá výstup.",
-    dataDesc: "Reálne dáta, reálne insighty. Rovnaká hĺbka každý mesiac.",
+    dataDesc: "Päť konkrétnych typov insightov, ukážka dát na úrovni bytu, a kompletná schéma výstupu. Rovnaká hĺbka, každý mesiac.",
     dataContext: "Trh novostavieb Bratislava — Marec 2026",
     dataContextSub: "Mesačný prehľad · všetky aktívne projekty",
-    stats: [
-      ["4,218", "Sledovaných bytov", "Celkom naprieč všetkými projektmi", "+312 vs Feb"],
-      ["142", "Aktívnych projektov", "Projekty aktuálne v predaji", "+6 nových"],
-      ["5,482", "Priem. cena za m²", "Vážený priemer všetkých jednotiek", "+12% medziročne"],
-      ["263", "Predaných jednotiek v marci", "Naprieč všetkými projektmi", "+14% vs Feb"],
-    ],
     insightsLabel: "Trhové insighty",
     insightsTitle: "Čo z toho vidíte.",
     insightsDesc: "Príklady insightov z mesačnej dodávky. Informačná výhoda proti konkurencii.",
@@ -287,27 +286,6 @@ function FadeIn({ children, delay = 0, style = {} }) {
       transition: `opacity 0.6s ease ${delay}s, transform 0.6s ease ${delay}s`,
     }}>{children}</div>
   );
-}
-
-function AnimatedCounter({ end, suffix = "", prefix = "" }) {
-  const [ref, visible] = useScrollReveal();
-  const [count, setCount] = useState(0);
-  useEffect(() => {
-    if (!visible) return;
-    const num = parseInt(end.replace(/[^0-9]/g, ""));
-    const duration = 1200;
-    const steps = 40;
-    const increment = num / steps;
-    let current = 0;
-    const timer = setInterval(() => {
-      current += increment;
-      if (current >= num) { setCount(num); clearInterval(timer); }
-      else setCount(Math.floor(current));
-    }, duration / steps);
-    return () => clearInterval(timer);
-  }, [visible, end]);
-  const formatted = count.toLocaleString();
-  return <span ref={ref}>{prefix}{formatted}{suffix}</span>;
 }
 
 /* ─── Rising Particles (JS-driven, scroll-independent) ─── */
@@ -924,27 +902,6 @@ function DataPage({ setCurrent, l, lang }) {
   ];
   const statusStyle = { V: { color: "#00e5a0", bg: "rgba(0,229,160,0.08)" }, P: { color: "#f5a623", bg: "rgba(245,166,35,0.08)" }, R: { color: "#55555f", bg: "rgba(85,85,95,0.15)" } };
 
-  // Trend data — 12% YoY, roughly 1% per month
-  const trendData = [
-    { month: "Oct", value: 3480 },
-    { month: "Nov", value: 3540 },
-    { month: "Dec", value: 3610 },
-    { month: "Jan", value: 3690 },
-    { month: "Feb", value: 3760 },
-    { month: "Mar", value: 5482 },
-  ];
-  const minV = 3350; const maxV = 3980;
-  const chartW = 520; const chartH = 180;
-  const padL = 50; const padR = 20; const padT = 20; const padB = 30;
-  const innerW = chartW - padL - padR; const innerH = chartH - padT - padB;
-  const points = trendData.map((d, i) => ({
-    x: padL + (i / (trendData.length - 1)) * innerW,
-    y: padT + innerH - ((d.value - minV) / (maxV - minV)) * innerH,
-    ...d,
-  }));
-  const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
-  const areaPath = linePath + ` L${points[points.length-1].x},${padT + innerH} L${points[0].x},${padT + innerH} Z`;
-
   // Insight card component
   const InsightCard = ({ label, title, children, span2 }) => (
     <div style={{
@@ -994,80 +951,23 @@ function DataPage({ setCurrent, l, lang }) {
         .dark-scroll { scrollbar-width: thin; scrollbar-color: #333 #111113; }
       `}</style>
 
-      <div style={{ padding: "8rem 2rem 3rem", maxWidth: 1100, margin: "0 auto" }}>
+      <div style={{ padding: "8rem 2rem 2rem", maxWidth: 1100, margin: "0 auto" }}>
         <Label>{l.dataLabel}</Label>
         <h1 className="sec-title">{l.dataTitle}</h1>
         <p className="sec-desc">{l.dataDesc}</p>
-      </div>
-
-      {/* Stats */}
-      <div style={{ padding: "0 2rem 0.75rem", maxWidth: 1100, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-        <div style={{ fontSize: "0.85rem", fontWeight: 500, color: "#e8e8ed" }}>{l.dataContext}</div>
-        <div style={{ fontFamily: mono, fontSize: "0.68rem", color: "#55555f" }}>{l.dataContextSub}</div>
-      </div>
-      <div style={{ padding: "0 2rem 2rem", maxWidth: 1100, margin: "0 auto" }}>
-        <div className="stats-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 1, background: "#222228", border: "1px solid #222228", borderRadius: 12, overflow: "hidden" }}>
-          {l.stats.map(([n, label, sub, d], idx) => (
-            <div key={label} style={{ background: "#16161a", padding: "1.75rem 1.5rem", textAlign: "center" }}>
-              <div style={{ fontFamily: mono, fontSize: "2rem", fontWeight: 700, color: "#00e5a0" }}>
-                <AnimatedCounter end={n} prefix={idx === 2 ? "€" : ""} />
-              </div>
-              <div style={{ fontSize: "0.8rem", color: "#e8e8ed", marginTop: "0.25rem", fontWeight: 500 }}>{label}</div>
-              <div style={{ fontSize: "0.68rem", color: "#55555f", marginTop: "0.15rem" }}>{sub}</div>
-              <span style={{
-                fontFamily: mono, fontSize: "0.65rem", marginTop: "0.6rem",
-                padding: "0.15rem 0.5rem", borderRadius: 4, display: "inline-block",
-                color: d.startsWith("-") || d.startsWith("−") ? "#ff4d4d" : "#00e5a0",
-                background: d.startsWith("-") || d.startsWith("−") ? "rgba(255,77,77,0.08)" : "rgba(0,229,160,0.08)",
-              }}>{d}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Trend Chart + District */}
-      <div style={{ padding: "1rem 2rem 2rem", maxWidth: 1100, margin: "0 auto" }}>
-        <div className="chart-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
-          <div style={{ border: "1px solid #222228", borderRadius: 12, background: "#16161a", padding: "1.5rem 1.5rem 1rem" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-              <div>
-                <div style={{ fontSize: "0.85rem", fontWeight: 600 }}>Avg. €/m² Trend</div>
-                <div style={{ fontSize: "0.72rem", color: "#55555f", marginTop: "0.15rem" }}>Bratislava — last 6 months</div>
-              </div>
-              <span style={{ fontFamily: mono, fontSize: "0.65rem", color: "#00e5a0", background: "rgba(0,229,160,0.08)", padding: "0.15rem 0.5rem", borderRadius: 4 }}>+12% YoY</span>
-            </div>
-            <svg viewBox={`0 0 ${chartW} ${chartH}`} style={{ width: "100%", height: "auto" }}>
-              {[3500, 3600, 3700, 3800, 3900].map(v => {
-                const y = padT + innerH - ((v - minV) / (maxV - minV)) * innerH;
-                return (<g key={v}><line x1={padL} y1={y} x2={chartW - padR} y2={y} stroke="#1a1a1f" strokeWidth="1" /><text x={padL - 8} y={y + 3} textAnchor="end" fill="#55555f" fontSize="9" fontFamily={mono}>{(v/1000).toFixed(1)}k</text></g>);
-              })}
-              <path d={areaPath} fill="url(#areaGrad2)" />
-              <defs><linearGradient id="areaGrad2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#00e5a0" stopOpacity="0.15" /><stop offset="100%" stopColor="#00e5a0" stopOpacity="0" /></linearGradient></defs>
-              <path d={linePath} fill="none" stroke="#00e5a0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              {points.map((p, i) => (<g key={i}><circle cx={p.x} cy={p.y} r="3.5" fill="#0a0a0b" stroke="#00e5a0" strokeWidth="2" /><text x={p.x} y={padT + innerH + 18} textAnchor="middle" fill="#55555f" fontSize="9" fontFamily={mono}>{p.month}</text></g>))}
-            </svg>
+        {/* Kontext čoho sa to týka + odkaz na Home pre live čísla.
+            Predtým tu bol Stats blok (4 counter karty) + Trend chart +
+            By District tabuľka — tie sú teraz len raz, na Home, ako
+            MarketPulse / DistrictPulse s REÁLNYMI dátami. Sample page
+            sa nemá s nimi duplikovať. */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: "1.5rem", paddingTop: "1.25rem", borderTop: "1px solid #222228", gap: "1rem", flexWrap: "wrap" }}>
+          <div>
+            <div style={{ fontSize: "0.85rem", fontWeight: 500, color: "#e8e8ed" }}>{l.dataContext}</div>
+            <div style={{ fontFamily: mono, fontSize: "0.68rem", color: "#55555f", marginTop: "0.2rem" }}>{l.dataContextSub}</div>
           </div>
-
-          <div style={{ border: "1px solid #222228", borderRadius: 12, background: "#16161a", padding: "1.5rem" }}>
-            <div style={{ fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.15rem" }}>By District</div>
-            <div style={{ fontSize: "0.72rem", color: "#55555f", marginBottom: "1.25rem" }}>Average €/m² — last 3 months change</div>
-            {[
-              ["Staré Mesto", "5,200", "+4.1%", true],
-              ["Ružinov", "4,580", "+3.6%", true],
-              ["Nové Mesto", "4,320", "+2.9%", true],
-              ["Petržalka", "3,650", "+2.4%", true],
-              ["Dúbravka", "3,300", "+1.8%", true],
-              ["Lamač", "3,380", "+1.2%", true],
-            ].map(([district, price, delta, up]) => (
-              <div key={district} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.55rem 0", borderBottom: "1px solid #1a1a1f" }}>
-                <span style={{ fontSize: "0.8rem", color: "#e8e8ed" }}>{district}</span>
-                <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
-                  <span style={{ fontFamily: mono, fontSize: "0.73rem", color: "#8a8a96" }}>€{price}</span>
-                  <span style={{ fontFamily: mono, fontSize: "0.62rem", color: up ? "#00e5a0" : "#ff4d4d", minWidth: 42, textAlign: "right" }}>{delta}</span>
-                </div>
-              </div>
-            ))}
-          </div>
+          <button onClick={() => setCurrent("Home")} style={{ background: "none", border: "none", color: "#00e5a0", fontSize: "0.8rem", cursor: "pointer", fontFamily: "inherit" }}>
+            {lang === "sk" ? "Živé čísla na Home →" : "Live numbers on Home →"}
+          </button>
         </div>
       </div>
 

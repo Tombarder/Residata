@@ -18,6 +18,9 @@ export function pageToPath(page) {
   if (typeof page === "string" && page.startsWith("Project:")) {
     return "/project/" + page.slice(8);
   }
+  // "Data" page je v Nav-e prezentovaná ako "Sample" — preto /sample URL
+  // (čitateľnejšie a odráža to marketing-preview charakter stránky).
+  if (page === "Data") return "/sample";
   return "/" + page.toLowerCase().replace(/\s+/g, "-");
 }
 
@@ -32,7 +35,8 @@ export function pathToPage(pathname) {
     "/use-cases": "Use Cases",
     "/pricing": "Pricing",
     "/contact": "Contact",
-    "/data": "Data",
+    "/sample": "Data",    // nový primárny URL
+    "/data": "Data",      // spätná kompatibilita (pôvodný URL)
     "/analytics": "Analytics",
     "/admin": "Admin",
   };
