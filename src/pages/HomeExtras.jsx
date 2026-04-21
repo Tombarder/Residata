@@ -84,6 +84,7 @@ function Stat({ value, label, prefix = "", suffix = "", accent = "#e8e8ed" }) {
 }
 
 function ProjectMini({ project, setCurrent, lang }) {
+  const soldDataUnavailable = (project.sold_units || 0) === 0 && (project.reserved_units || 0) === 0 && (project.prereserved_units || 0) === 0;
   const pct = project.sold_percentage ?? 0;
   const barColor = pct >= 80 ? "#ff6b6b" : pct >= 50 ? "#f5a623" : green;
   return (
@@ -101,17 +102,27 @@ function ProjectMini({ project, setCurrent, lang }) {
         <div style={{ fontSize: "0.7rem", color: dim, fontFamily: mono }}>{project.district || "—"}</div>
       </div>
       <div style={{ fontSize: "0.75rem", color: dim, marginBottom: "0.6rem" }}>
-        {project.available_units} {lang === "sk" ? "voľných" : "avail"} · {project.sold_units} {lang === "sk" ? "predaných" : "sold"}{project.avg_price_eur_m2 ? ` · ${Math.round(project.avg_price_eur_m2).toLocaleString("en-US").replace(/,/g, " ")} €/m²` : ""}
+        {project.available_units} {lang === "sk" ? "voľných" : "avail"}
+        {!soldDataUnavailable && <> · {project.sold_units} {lang === "sk" ? "predaných" : "sold"}</>}
+        {project.avg_price_eur_m2 ? ` · ${Math.round(project.avg_price_eur_m2).toLocaleString("en-US").replace(/,/g, " ")} €/m²` : ""}
       </div>
-      <div style={{ height: 3, background: "#0e0e10", borderRadius: 2, overflow: "hidden" }}>
-        <div style={{
-          width: `${pct}%`, height: "100%", background: barColor,
-          transition: "width 0.6s ease",
-        }} />
-      </div>
-      <div style={{ fontSize: "0.65rem", color: dim, fontFamily: mono, marginTop: "0.3rem", letterSpacing: "0.05em" }}>
-        {pct.toFixed(0)}% {lang === "sk" ? "predané" : "sold"}
-      </div>
+      {soldDataUnavailable ? (
+        <div style={{ fontSize: "0.65rem", color: dim, fontFamily: mono, letterSpacing: "0.05em", fontStyle: "italic" }}>
+          {lang === "sk" ? "developer nezverejňuje predajnosť" : "developer doesn't publish sales data"}
+        </div>
+      ) : (
+        <>
+          <div style={{ height: 3, background: "#0e0e10", borderRadius: 2, overflow: "hidden" }}>
+            <div style={{
+              width: `${pct}%`, height: "100%", background: barColor,
+              transition: "width 0.6s ease",
+            }} />
+          </div>
+          <div style={{ fontSize: "0.65rem", color: dim, fontFamily: mono, marginTop: "0.3rem", letterSpacing: "0.05em" }}>
+            {pct.toFixed(0)}% {lang === "sk" ? "predané" : "sold"}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -229,26 +240,54 @@ function colorForPrice(avg) {
 /* ──────────────────────────────────────────────────────────
    3. HOW IT WORKS — animated data flow pipeline
    ────────────────────────────────────────────────────────── */
+const IconGlobe = () => (
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="9"/>
+    <path d="M3 12h18M12 3a13 13 0 0 1 0 18M12 3a13 13 0 0 0 0 18"/>
+  </svg>
+);
+const IconCapture = () => (
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+    <path d="M7 10l5 5 5-5"/>
+    <path d="M12 15V3"/>
+  </svg>
+);
+const IconNormalize = () => (
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 6h18M6 12h12M9 18h6"/>
+    <circle cx="19.5" cy="6" r="1.5" fill="currentColor"/>
+  </svg>
+);
+const IconDashboard = () => (
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="7" height="9" rx="1"/>
+    <rect x="14" y="3" width="7" height="5" rx="1"/>
+    <rect x="14" y="12" width="7" height="9" rx="1"/>
+    <rect x="3" y="16" width="7" height="5" rx="1"/>
+  </svg>
+);
+
 export function HowItWorksFlow({ lang = "en" }) {
   const t = lang === "sk" ? {
     label: "Ako to funguje",
     title: "Od 60+ developer webov k jednému dashboardu.",
     desc: "Plne automatizovaná pipeline. Každý mesiac.",
     stages: [
-      { icon: "🌐", title: "60 webov", desc: "Monitorujeme každú novostavbu v BA" },
-      { icon: "⚡", title: "Zachytenie", desc: "Cenníky, plochy, stavy — raw data" },
-      { icon: "🧹", title: "Normalizácia", desc: "Štandardizácia, dedup, validácia" },
-      { icon: "📊", title: "Dashboard", desc: "Štruktúrované dáta, porovnateľné" },
+      { Icon: IconGlobe,    title: "60 webov",      desc: "Monitorujeme každú novostavbu v BA" },
+      { Icon: IconCapture,  title: "Zachytenie",    desc: "Cenníky, plochy, stavy — raw dáta" },
+      { Icon: IconNormalize, title: "Normalizácia", desc: "Štandardizácia, dedup, validácia" },
+      { Icon: IconDashboard, title: "Dashboard",    desc: "Štruktúrované, porovnateľné dáta" },
     ],
   } : {
     label: "How it works",
     title: "From 60+ developer sites to one dashboard.",
     desc: "Fully automated pipeline. Every month.",
     stages: [
-      { icon: "🌐", title: "60 sites", desc: "We watch every new-build in Bratislava" },
-      { icon: "⚡", title: "Capture", desc: "Prices, sizes, status — raw data" },
-      { icon: "🧹", title: "Normalize", desc: "Standardize, dedup, validate" },
-      { icon: "📊", title: "Dashboard", desc: "Structured, comparable data" },
+      { Icon: IconGlobe,    title: "60 sites",      desc: "We watch every new-build in Bratislava" },
+      { Icon: IconCapture,  title: "Capture",       desc: "Prices, sizes, status — raw data" },
+      { Icon: IconNormalize, title: "Normalize",    desc: "Standardize, dedup, validate" },
+      { Icon: IconDashboard, title: "Dashboard",    desc: "Structured, comparable data" },
     ],
   };
 
@@ -266,12 +305,15 @@ export function HowItWorksFlow({ lang = "en" }) {
         {t.stages.map((stage, i) => (
           <div key={i} style={{ padding: "0 1rem", textAlign: "center", position: "relative" }}>
             <div style={{
-              width: 70, height: 70, background: bg, border: `1px solid ${border}`,
+              width: 72, height: 72,
+              background: "linear-gradient(135deg, #1a1a20 0%, #101014 100%)",
+              border: `1px solid ${border}`,
               borderRadius: "50%", margin: "0 auto 1rem",
               display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: "1.75rem", position: "relative", zIndex: 2,
+              color: green, position: "relative", zIndex: 2,
+              boxShadow: "0 4px 14px rgba(0, 229, 160, 0.06), inset 0 1px 0 rgba(255,255,255,0.03)",
             }}>
-              {stage.icon}
+              <stage.Icon />
             </div>
             <div style={{ fontSize: "0.95rem", fontWeight: 600, color: "#e8e8ed", marginBottom: "0.3rem" }}>{stage.title}</div>
             <div style={{ fontSize: "0.8rem", color: dim, lineHeight: 1.5 }}>{stage.desc}</div>
@@ -279,7 +321,7 @@ export function HowItWorksFlow({ lang = "en" }) {
             {/* Connector + animated dot (not after last) */}
             {i < t.stages.length - 1 && (
               <div style={{
-                position: "absolute", top: 35, left: "calc(50% + 35px)", right: "calc(-50% + 35px)",
+                position: "absolute", top: 36, left: "calc(50% + 36px)", right: "calc(-50% + 36px)",
                 height: 1, background: `linear-gradient(90deg, ${border}, ${green}, ${border})`, zIndex: 1,
                 overflow: "hidden",
               }}>

@@ -59,20 +59,29 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {shown.map(p => (
-                    <tr key={p.id} style={{ borderTop: `1px solid ${border}` }}>
-                      <td style={td}><strong>{p.name}</strong></td>
-                      <td style={{ ...td, color: dim }}>{p.district || "—"}</td>
-                      <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{p.total_units}</td>
-                      <td style={{ ...td, textAlign: "right", fontFamily: mono, color: green }}>{p.available_units}</td>
-                      <td style={{ ...td, textAlign: "right", fontFamily: mono, color: "#f5a623" }}>{p.sold_units}</td>
-                      <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{p.sold_percentage != null ? `${p.sold_percentage}%` : "—"}</td>
-                      <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{p.avg_price_eur_m2 ? `${Math.round(p.avg_price_eur_m2).toLocaleString(lang === "sk" ? "sk-SK" : "en-US")}` : "—"}</td>
-                      <td style={{ ...td, textAlign: "right" }}>
-                        <button onClick={() => setCurrent && setCurrent(`Project:${p.id}`)} style={miniBtn}>{t.tbl_detail}</button>
-                      </td>
-                    </tr>
-                  ))}
+                  {shown.map(p => {
+                    // Ak projekt nezverejňuje predané (sold=0 AND reserved=0 AND prereserved=0),
+                    // % predaných nie je zmysluplné — zobrazíme "n/a" namiesto nepravdivých 0%.
+                    const soldDataUnavailable = (p.sold_units || 0) === 0 && (p.reserved_units || 0) === 0 && (p.prereserved_units || 0) === 0;
+                    return (
+                      <tr key={p.id} style={{ borderTop: `1px solid ${border}` }}>
+                        <td style={td}><strong>{p.name}</strong></td>
+                        <td style={{ ...td, color: dim }}>{p.district || "—"}</td>
+                        <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{p.total_units}</td>
+                        <td style={{ ...td, textAlign: "right", fontFamily: mono, color: green }}>{p.available_units}</td>
+                        <td style={{ ...td, textAlign: "right", fontFamily: mono, color: soldDataUnavailable ? dim : "#f5a623" }}>
+                          {soldDataUnavailable ? "—" : p.sold_units}
+                        </td>
+                        <td style={{ ...td, textAlign: "right", fontFamily: mono }}>
+                          {soldDataUnavailable ? <span style={{ color: dim }}>n/a</span> : (p.sold_percentage != null ? `${p.sold_percentage}%` : "—")}
+                        </td>
+                        <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{p.avg_price_eur_m2 ? `${Math.round(p.avg_price_eur_m2).toLocaleString(lang === "sk" ? "sk-SK" : "en-US")}` : "—"}</td>
+                        <td style={{ ...td, textAlign: "right" }}>
+                          <button onClick={() => setCurrent && setCurrent(`Project:${p.id}`)} style={miniBtn}>{t.tbl_detail}</button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
