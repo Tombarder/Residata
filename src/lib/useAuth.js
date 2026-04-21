@@ -32,6 +32,17 @@ export function useAuth() {
     return () => unsub();
   }, []);
 
+  // Reload profile keď user vráti do tab-u (napr. admin v Supabase dashboarde zmenil tier)
+  useEffect(() => {
+    if (!isSupabaseReady()) return;
+    const onFocus = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) await loadProfile(session.user.id);
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, []);
+
   async function loadProfile(userId) {
     const { data } = await supabase.from("user_profiles").select("*").eq("id", userId).maybeSingle();
     setProfile(data);

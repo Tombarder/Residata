@@ -129,7 +129,7 @@ function SummaryCards({ projects, t }) {
 /* ───────────────────── PROJECT DETAIL (gated) ───────────────────── */
 export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en" }) {
   const t = liveT[lang] || liveT.en;
-  const { user, profile, isPaid, reloadProfile } = useAuth();
+  const { user, profile, isPaid, loading: authLoading, reloadProfile } = useAuth();
   const { flats, loading, error } = useProjectFlats(projectId);
   const { projects } = useProjects();
   const project = projects.find(p => p.id === projectId);
@@ -138,6 +138,24 @@ export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en
   useEffect(() => {
     if (projectId) track("project_view", { project_id: projectId, project_name: project?.name });
   }, [projectId, project?.name]);
+
+  // Auth session still loading — show spinner, not gate
+  if (authLoading) {
+    return (
+      <main style={{ padding: "6rem 2rem 4rem", textAlign: "center", color: dim }}>
+        <div style={{ fontSize: "0.85rem", fontFamily: mono }}>Loading…</div>
+      </main>
+    );
+  }
+
+  // User logged in but profile fetch still pending — show spinner, not gate
+  if (user && !profile) {
+    return (
+      <main style={{ padding: "6rem 2rem 4rem", textAlign: "center", color: dim }}>
+        <div style={{ fontSize: "0.85rem", fontFamily: mono }}>Loading your profile…</div>
+      </main>
+    );
+  }
 
   if (!user) {
     return (
