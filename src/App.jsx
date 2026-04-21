@@ -6,6 +6,7 @@ import PendingGate from "./components/PendingGate";
 import { LiveDashboard, LiveProjectDetail, LiveAnalytics, LiveAdmin, EarlyAccessBadge } from "./pages/LivePages";
 import { MarketPulse, DistrictPulse, HowItWorksFlow } from "./pages/HomeExtras";
 import { useAuth } from "./lib/useAuth";
+import { pushRoute, pathToPage } from "./lib/routing";
 
 const pagesEN = ["Home", "Live", "Use Cases", "Pricing", "Contact"];
 const pagesSK = ["Domov", "Live", "Využitie", "Cenník", "Kontakt"];
@@ -558,7 +559,7 @@ function HomePage({ setCurrent, l, lang }) {
         </p>
         <div className="hero-anim-4" style={{ marginTop: "2.5rem", display: "flex", gap: "1rem" }}>
           <a onClick={() => setCurrent("Contact")} className="btn-p">{l.heroBtn1}</a>
-          <a onClick={() => setCurrent("Data")} className="btn-s">{l.heroBtn2}</a>
+          <a onClick={() => setCurrent("Live")} className="btn-s">{l.heroBtn2}</a>
         </div>
       </section>
 
@@ -1105,7 +1106,7 @@ function PricingPage({ setCurrent, l, lang }) {
           </p>
           <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center", flexWrap: "wrap" }}>
             <a href="tel:+421911963909" className="btn-p">{ea.cta1}</a>
-            <a href="mailto:residata@proton.me?subject=Early%20access%20-%205%20min%20call" className="btn-s">{ea.cta2}</a>
+            <a href="https://calendar.app.google/x6vKBohYsVjNKL1A9" target="_blank" rel="noopener noreferrer" className="btn-s">{ea.cta2}</a>
           </div>
         </div>
       </div>
@@ -1144,14 +1145,14 @@ function PricingPage({ setCurrent, l, lang }) {
                   </div>
                 ))}
               </div>
-              <a onClick={() => setCurrent("Contact")} style={{
-                display: "block", padding: "0.75rem 2rem", textAlign: "center",
-                background: t.featured ? "#00e5a0" : "transparent",
-                color: t.featured ? "#0a0a0b" : "#e8e8ed",
-                border: t.featured ? "none" : "1px solid #222228",
-                fontWeight: t.featured ? 600 : 500, fontSize: "0.9rem",
-                borderRadius: 8, textDecoration: "none",
-              }}>{t.cta}</a>
+              <a
+                onClick={() => setCurrent("Contact")}
+                className={t.featured ? "btn-p" : "btn-s"}
+                style={{
+                  display: "block", textAlign: "center",
+                  fontSize: "0.9rem", padding: "0.85rem 2rem",
+                }}
+              >{t.cta}</a>
             </div>
           ))}
         </div>
@@ -1317,21 +1318,36 @@ function Label({ children }) {
 }
 
 export default function App() {
-  const [current, setCurrent] = useState("Home");
+  // Init page from current URL (so direct link / refresh works)
+  const [current, setCurrent] = useState(() =>
+    typeof window !== "undefined" ? pathToPage(window.location.pathname) : "Home"
+  );
   const [lang, setLang] = useState("en");
   const [loginOpen, setLoginOpen] = useState(false);
   const l = t[lang];
   const auth = useAuth();
 
-  const handleNav = (page) => {
-    // Project detail route: "Project:slug"
-    if (typeof page === "string" && page.startsWith("Project:")) {
-      setCurrent(page);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      return;
+  // Listen to browser back/forward — sync state with URL
+  useEffect(() => {
+    const onPop = () => {
+      setCurrent(pathToPage(window.location.pathname));
+      window.scrollTo({ top: 0, behavior: "instant" });
+    };
+    window.addEventListener("popstate", onPop);
+    // Initial state marker so first back doesn't leave site
+    if (!window.history.state) {
+      window.history.replaceState({ page: current }, "");
     }
-    const resolved = pageMap[page] || page;
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  const handleNav = (page) => {
+    const resolved = typeof page === "string" && page.startsWith("Project:")
+      ? page
+      : (pageMap[page] || page);
+    if (resolved === current) return;
     setCurrent(resolved);
+    pushRoute(resolved);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -1353,6 +1369,11 @@ export default function App() {
         .btn-s:hover { border-color: #55555f; transform: translateY(-1px); }
         
         @keyframes ticker-slide { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+        @keyframes pageFade {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .page-transition { animation: pageFade 0.35s ease-out both; }
         @keyframes flowDot {
           0% { left: -10px; opacity: 0; }
           10% { opacity: 1; }
@@ -1419,27 +1440,31 @@ export default function App() {
       <Ticker lang={lang} />
       {/* Spacer for fixed Nav (72px) + Ticker (36px) */}
       <div style={{ height: 36 }} />
-      {current === "Home" && <HomePage setCurrent={handleNav} l={l} lang={lang} />}
-      {current === "Live" && (
-        auth.user && auth.profile?.tier === "pending"
-          ? <PendingGate setCurrent={handleNav} lang={lang} />
-          : <LiveDashboard setCurrent={handleNav} openLogin={() => setLoginOpen(true)} lang={lang} />
-      )}
-      {current === "Use Cases" && <UseCasesPage setCurrent={handleNav} l={l} />}
-      {current === "Data" && <DataPage setCurrent={handleNav} l={l} />}
-      {current === "Pricing" && <PricingPage setCurrent={handleNav} l={l} lang={lang} />}
-      {current === "Contact" && <ContactPage l={l} />}
-      {current === "Analytics" && (
-        auth.user && auth.profile?.tier === "pending"
-          ? <PendingGate setCurrent={handleNav} lang={lang} />
-          : <LiveAnalytics setCurrent={handleNav} openLogin={() => setLoginOpen(true)} lang={lang} />
-      )}
-      {current === "Admin" && <LiveAdmin setCurrent={handleNav} lang={lang} />}
-      {typeof current === "string" && current.startsWith("Project:") && (
-        auth.user && auth.profile?.tier === "pending"
-          ? <PendingGate setCurrent={handleNav} lang={lang} />
-          : <LiveProjectDetail projectId={current.slice(8)} setCurrent={handleNav} openLogin={() => setLoginOpen(true)} lang={lang} />
-      )}
+
+      {/* Keyed wrapper — re-mounts on route change so CSS animation replays */}
+      <div key={current} className="page-transition">
+        {current === "Home" && <HomePage setCurrent={handleNav} l={l} lang={lang} />}
+        {current === "Live" && (
+          auth.user && auth.profile?.tier === "pending"
+            ? <PendingGate setCurrent={handleNav} lang={lang} />
+            : <LiveDashboard setCurrent={handleNav} openLogin={() => setLoginOpen(true)} lang={lang} />
+        )}
+        {current === "Use Cases" && <UseCasesPage setCurrent={handleNav} l={l} />}
+        {current === "Data" && <DataPage setCurrent={handleNav} l={l} />}
+        {current === "Pricing" && <PricingPage setCurrent={handleNav} l={l} lang={lang} />}
+        {current === "Contact" && <ContactPage l={l} />}
+        {current === "Analytics" && (
+          auth.user && auth.profile?.tier === "pending"
+            ? <PendingGate setCurrent={handleNav} lang={lang} />
+            : <LiveAnalytics setCurrent={handleNav} openLogin={() => setLoginOpen(true)} lang={lang} />
+        )}
+        {current === "Admin" && <LiveAdmin setCurrent={handleNav} lang={lang} />}
+        {typeof current === "string" && current.startsWith("Project:") && (
+          auth.user && auth.profile?.tier === "pending"
+            ? <PendingGate setCurrent={handleNav} lang={lang} />
+            : <LiveProjectDetail projectId={current.slice(8)} setCurrent={handleNav} openLogin={() => setLoginOpen(true)} lang={lang} />
+        )}
+      </div>
       <Footer />
       <LoginModal open={loginOpen} onClose={() => setLoginOpen(false)} lang={lang} />
       {/* Force profile completion after login */}
