@@ -1593,16 +1593,15 @@ export default function App() {
       {/* Keyed wrapper — re-mounts on route change so CSS animation replays */}
       <div key={current} className="page-transition">
         {/*
-          IMPORTANT — "profile-loading" gate:
-          Ak je user prihlásený ale profile ešte nie je naservírovaný, nesmieme
-          renderovať gated stránky (Live, Analytics, Admin, ProjectDetail), lebo
-          tier by bol dočasne "pending" (fallback v useAuth) a user by na moment
-          videl PendingGate aj keď je v skutočnosti paid. Pre public stránky
-          (Home, Use Cases, Pricing, Contact, Data) to nevadí — majú rovnaký
-          obsah pre všetky tiere (len CTAs sa menia, tie sa prepnú keď profile
-          dotečie).
+          "profile-loading" gate — only show spinner during the INITIAL auth
+          hydration (`auth.loading === true`). Previously we kept the spinner
+          visible whenever `user && !profile && !profileError`, but that state
+          can also be permanent (stale session after DB user-delete). useAuth
+          now detects stale sessions and force-signs out, so by the time
+          loading flips to false we have either a real profile or the user is
+          cleanly anon.
         */}
-        {auth.user && !auth.profile && !auth.profileError ? (
+        {auth.loading && auth.user ? (
           <AuthLoadingSpinner />
         ) : (
           <>

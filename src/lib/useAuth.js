@@ -41,6 +41,21 @@ export function useAuth() {
       setUser(session?.user || null);
       if (session?.user) {
         await loadProfile(session.user.id);
+        // STALE-SESSION DETECTION
+        // If the session says we're authenticated but the profile read
+        // came back empty with no error, the underlying auth.users row
+        // was probably deleted while we still have a stale refresh token
+        // in localStorage. Force sign-out so the UI snaps back to anon
+        // instead of rendering a forever-Loading shell.
+        const { data: check } = await supabase.from("user_profiles")
+          .select("id").eq("id", session.user.id).maybeSingle();
+        if (!check) {
+          log("stale session — user exists in localStorage but not in DB. signing out.");
+          try { await supabase.auth.signOut({ scope: "local" }); } catch {}
+          setUser(null);
+          setProfile(null);
+          setProfileError(null);
+        }
       }
       setLoading(false);
 
