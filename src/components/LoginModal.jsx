@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useAuth } from "../lib/useAuth";
 import { liveT } from "../lib/liveLang";
 import { validateBusinessEmail } from "../lib/emailValidation";
+import { track } from "../lib/track";
 
 export default function LoginModal({ open, onClose, lang = "en" }) {
   const t = liveT[lang] || liveT.en;
@@ -18,12 +19,21 @@ export default function LoginModal({ open, onClose, lang = "en" }) {
   const submit = async (e) => {
     e.preventDefault();
     const err = validateBusinessEmail(email, lang);
-    if (err) { setError(err); return; }
+    if (err) {
+      setError(err);
+      track("login_rejected_personal_email", { domain: email.split("@")[1] });
+      return;
+    }
     setError(null); setBusy(true);
+    track("login_magic_link_requested", { domain: email.split("@")[1] });
     const { error } = await signIn(email);
     setBusy(false);
-    if (error) setError(error.message || String(error));
-    else setSent(true);
+    if (error) {
+      setError(error.message || String(error));
+      track("login_magic_link_error", { message: String(error.message || error).slice(0, 200) });
+    } else {
+      setSent(true);
+    }
   };
 
   return (

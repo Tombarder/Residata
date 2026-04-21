@@ -7,6 +7,7 @@ import { LiveDashboard, LiveProjectDetail, LiveAnalytics, LiveAdmin, EarlyAccess
 import { MarketPulse, DistrictPulse, HowItWorksFlow } from "./pages/HomeExtras";
 import { useAuth } from "./lib/useAuth";
 import { pushRoute, pathToPage } from "./lib/routing";
+import { track } from "./lib/track";
 
 const pagesEN = ["Home", "Live", "Use Cases", "Pricing", "Contact"];
 const pagesSK = ["Domov", "Live", "Využitie", "Cenník", "Kontakt"];
@@ -1340,6 +1341,12 @@ export default function App() {
     }
     return () => window.removeEventListener("popstate", onPop);
   }, []);
+
+  // Track page views
+  useEffect(() => {
+    track("page_view", { page: current, lang });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current]);
 
   const handleNav = (page) => {
     const resolved = typeof page === "string" && page.startsWith("Project:")

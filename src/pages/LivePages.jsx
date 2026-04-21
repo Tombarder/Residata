@@ -3,6 +3,7 @@ import { useAuth } from "../lib/useAuth";
 import { useProjects, useProjectFlats, useEarlyAccessStats } from "../lib/useData";
 import { supabase } from "../lib/supabase";
 import { liveT, ll } from "../lib/liveLang";
+import { track } from "../lib/track";
 
 const mono = "'JetBrains Mono', monospace";
 const green = "#00e5a0";
@@ -132,6 +133,11 @@ export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en
   const { flats, loading, error } = useProjectFlats(projectId);
   const { projects } = useProjects();
   const project = projects.find(p => p.id === projectId);
+
+  // Track project open
+  useEffect(() => {
+    if (projectId) track("project_view", { project_id: projectId, project_name: project?.name });
+  }, [projectId, project?.name]);
 
   if (!user) {
     return (
@@ -389,7 +395,10 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
   const { isAdmin, loading } = useAuth();
   const [users, setUsers] = useState([]);
   const [events, setEvents] = useState([]);
+  const [activity, setActivity] = useState([]);
+  const [premiumDomains, setPremiumDomains] = useState([]);
   const [err, setErr] = useState(null);
+  const [tab, setTab] = useState("users");   // users | activity | domains
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -397,10 +406,24 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
       .then(({ data, error }) => { setUsers(data || []); if (error) setErr(error.message); });
     supabase.from("events").select("*").like("event_type", "new_signup%").order("detected_at", { ascending: false }).limit(20)
       .then(({ data }) => setEvents(data || []));
+    supabase.from("user_activity").select("*").order("created_at", { ascending: false }).limit(100)
+      .then(({ data }) => setActivity(data || []));
+    supabase.from("premium_domains").select("*").order("domain")
+      .then(({ data }) => setPremiumDomains(data || []));
   }, [isAdmin]);
 
   if (loading) return <main style={{ padding: "5rem 2rem" }}><div style={{ color: dim }}>{t.loading_generic}</div></main>;
   if (!isAdmin) return <main style={{ padding: "5rem 2rem", textAlign: "center" }}><h1>{t.admin_403_title}</h1><p style={{ color: dim }}>{t.admin_403_body}</p></main>;
+
+  const premiumSet = new Set(premiumDomains.map(d => d.domain.toLowerCase()));
+
+  // Smart approve: premium doména → paid, ostatní → free
+  const approveSmart = async (user) => {
+    const domain = (user.email_domain || "").toLowerCase();
+    const premium = premiumDomains.find(d => d.domain.toLowerCase() === domain);
+    const tier = premium?.default_tier || "free";
+    await setTier(user.id, tier);
+  };
 
   const setTier = async (id, tier) => {
     const patch = { tier };
@@ -418,53 +441,204 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
       <h1 className="sec-title">{t.admin_title}</h1>
       {err && <div style={{ color: "#ff6b6b" }}>{err}</div>}
 
-      {/* Pending approvals */}
-      <SectionHeader>{t.admin_pending_section} {pending.length > 0 && <CountBadge n={pending.length} />}</SectionHeader>
-      {pending.length === 0 ? (
-        <div style={{ color: dim, padding: "1rem", fontSize: "0.9rem" }}>{t.admin_no_pending}</div>
-      ) : (
-        <UserTable users={pending} setTier={setTier} showApprove t={t} lang={lang} />
-      )}
+      {/* Tabs */}
+      <div style={{ display: "flex", gap: "0.5rem", marginTop: "2rem", borderBottom: `1px solid ${border}`, marginBottom: "1.5rem" }}>
+        <TabBtn active={tab === "users"} onClick={() => setTab("users")}>Users {pending.length > 0 && <CountBadge n={pending.length} />}</TabBtn>
+        <TabBtn active={tab === "activity"} onClick={() => setTab("activity")}>Activity</TabBtn>
+        <TabBtn active={tab === "domains"} onClick={() => setTab("domains")}>Premium domains</TabBtn>
+      </div>
 
-      {/* Signup events feed */}
-      {events.length > 0 && (
+      {tab === "users" && (
         <>
-          <SectionHeader>{t.admin_events_section}</SectionHeader>
-          <div style={{ border: `1px solid ${border}`, borderRadius: 12, overflow: "hidden", marginBottom: "2rem" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
-              <thead style={{ background: "#0e0e10" }}>
-                <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                  <th style={th}>When</th>
-                  <th style={th}>Event</th>
-                  <th style={th}>Email</th>
-                  <th style={th}>Domain</th>
-                  <th style={th}>Org count</th>
-                </tr>
-              </thead>
-              <tbody>
-                {events.map(e => (
-                  <tr key={e.id} style={{ borderTop: `1px solid ${border}` }}>
-                    <td style={{ ...td, color: dim, fontFamily: mono, fontSize: "0.75rem" }}>{e.detected_at?.slice(0, 16).replace("T", " ")}</td>
-                    <td style={td}><EventBadge type={e.event_type} /></td>
-                    <td style={td}>{e.new_value?.email || "—"}</td>
-                    <td style={{ ...td, color: dim, fontFamily: mono }}>{e.new_value?.domain || "—"}</td>
-                    <td style={{ ...td, fontFamily: mono, color: (e.new_value?.org_count || 0) > 3 ? "#f5a623" : dim }}>{e.new_value?.org_count ?? "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <SectionHeader>{t.admin_pending_section} {pending.length > 0 && <CountBadge n={pending.length} />}</SectionHeader>
+          {pending.length === 0 ? (
+            <div style={{ color: dim, padding: "1rem", fontSize: "0.9rem" }}>{t.admin_no_pending}</div>
+          ) : (
+            <UserTable users={pending} setTier={setTier} approveSmart={approveSmart} showApprove t={t} lang={lang} premiumSet={premiumSet} />
+          )}
+
+          {events.length > 0 && (
+            <>
+              <SectionHeader>{t.admin_events_section}</SectionHeader>
+              <div style={{ border: `1px solid ${border}`, borderRadius: 12, overflow: "hidden", marginBottom: "2rem" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
+                  <thead style={{ background: "#0e0e10" }}>
+                    <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                      <th style={th}>When</th>
+                      <th style={th}>Event</th>
+                      <th style={th}>Email</th>
+                      <th style={th}>Domain</th>
+                      <th style={th}>Org count</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {events.map(e => (
+                      <tr key={e.id} style={{ borderTop: `1px solid ${border}` }}>
+                        <td style={{ ...td, color: dim, fontFamily: mono, fontSize: "0.75rem" }}>{e.detected_at?.slice(0, 16).replace("T", " ")}</td>
+                        <td style={td}><EventBadge type={e.event_type} /></td>
+                        <td style={td}>{e.new_value?.email || "—"}</td>
+                        <td style={{ ...td, color: dim, fontFamily: mono }}>{e.new_value?.domain || "—"}</td>
+                        <td style={{ ...td, fontFamily: mono, color: (e.new_value?.org_count || 0) > 3 ? "#f5a623" : dim }}>{e.new_value?.org_count ?? "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+
+          <SectionHeader>{t.admin_new_section}</SectionHeader>
+          <UserTable users={rest} setTier={setTier} t={t} lang={lang} premiumSet={premiumSet} />
         </>
       )}
 
-      {/* All users */}
-      <SectionHeader>{t.admin_new_section}</SectionHeader>
-      <UserTable users={rest} setTier={setTier} t={t} lang={lang} />
+      {tab === "activity" && <ActivityPanel activity={activity} users={users} />}
+      {tab === "domains" && (
+        <PremiumDomainsPanel
+          domains={premiumDomains}
+          reload={() => supabase.from("premium_domains").select("*").order("domain").then(({ data }) => setPremiumDomains(data || []))}
+        />
+      )}
     </main>
   );
 }
 
-function UserTable({ users, setTier, showApprove, t, lang }) {
+function TabBtn({ active, onClick, children }) {
+  return (
+    <button onClick={onClick} style={{
+      background: "none", border: "none", padding: "0.6rem 1rem",
+      cursor: "pointer", color: active ? "#e8e8ed" : dim,
+      fontSize: "0.88rem", fontWeight: active ? 600 : 500,
+      borderBottom: `2px solid ${active ? green : "transparent"}`,
+      marginBottom: -1, fontFamily: "inherit",
+      display: "inline-flex", alignItems: "center", gap: "0.4rem",
+      transition: "color 0.15s",
+    }}>{children}</button>
+  );
+}
+
+function ActivityPanel({ activity, users }) {
+  const userById = Object.fromEntries(users.map(u => [u.id, u]));
+  // Group by session_id for readability
+  return (
+    <>
+      <SectionHeader>Recent activity (last 100 events)</SectionHeader>
+      <div style={{ border: `1px solid ${border}`, borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
+            <thead style={{ background: "#0e0e10" }}>
+              <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                <th style={th}>When</th>
+                <th style={th}>User</th>
+                <th style={th}>Event</th>
+                <th style={th}>Page</th>
+                <th style={th}>Data</th>
+              </tr>
+            </thead>
+            <tbody>
+              {activity.map(e => {
+                const u = e.user_id ? userById[e.user_id] : null;
+                return (
+                  <tr key={e.id} style={{ borderTop: `1px solid ${border}` }}>
+                    <td style={{ ...td, color: dim, fontFamily: mono, fontSize: "0.72rem" }}>{e.created_at?.slice(5, 16).replace("T", " ")}</td>
+                    <td style={td}>{u?.email || <span style={{ color: dim, fontSize: "0.75rem" }}>anon · {e.session_id?.slice(0, 8)}</span>}</td>
+                    <td style={{ ...td, fontFamily: mono, fontSize: "0.72rem", color: "#e8e8ed" }}>{e.event_type}</td>
+                    <td style={{ ...td, color: dim, fontFamily: mono, fontSize: "0.72rem" }}>{e.page_path || "—"}</td>
+                    <td style={{ ...td, color: dim, fontSize: "0.7rem", fontFamily: mono, maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {e.event_data ? JSON.stringify(e.event_data) : "—"}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {activity.length === 0 && <div style={{ color: dim, padding: "1.5rem", textAlign: "center" }}>No activity yet.</div>}
+    </>
+  );
+}
+
+function PremiumDomainsPanel({ domains, reload }) {
+  const [newDomain, setNewDomain] = useState("");
+  const [newTier, setNewTier] = useState("paid");
+  const [newNote, setNewNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+
+  const add = async () => {
+    if (!newDomain.trim()) return;
+    setBusy(true); setErr(null);
+    const { error } = await supabase.from("premium_domains").insert({
+      domain: newDomain.trim().toLowerCase(),
+      default_tier: newTier,
+      note: newNote.trim() || null,
+    });
+    setBusy(false);
+    if (error) setErr(error.message);
+    else { setNewDomain(""); setNewNote(""); reload(); }
+  };
+
+  const remove = async (domain) => {
+    if (!confirm(`Remove ${domain}?`)) return;
+    const { error } = await supabase.from("premium_domains").delete().eq("domain", domain);
+    if (error) alert(error.message); else reload();
+  };
+
+  return (
+    <>
+      <SectionHeader>Premium domains — auto-tier on approval</SectionHeader>
+      <p style={{ color: dim, fontSize: "0.85rem", marginBottom: "1rem", lineHeight: 1.5 }}>
+        When you approve a pending user, the system checks their email domain here. If found → auto-sets the chosen tier. Otherwise defaults to <code style={{ color: "#e8e8ed" }}>free</code>.
+      </p>
+
+      {/* Add form */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 140px 1fr auto", gap: "0.5rem", alignItems: "center", marginBottom: "1.5rem" }}>
+        <input placeholder="example.com" value={newDomain} onChange={e => setNewDomain(e.target.value)}
+          style={{ padding: "0.55rem 0.75rem", background: "#0e0e10", border: `1px solid ${border}`, borderRadius: 6, color: "#e8e8ed", fontSize: "0.85rem", fontFamily: "inherit" }} />
+        <select value={newTier} onChange={e => setNewTier(e.target.value)}
+          style={{ padding: "0.55rem 0.75rem", background: "#0e0e10", border: `1px solid ${border}`, borderRadius: 6, color: "#e8e8ed", fontSize: "0.85rem" }}>
+          <option value="paid">paid</option>
+          <option value="free">free</option>
+          <option value="admin">admin</option>
+        </select>
+        <input placeholder="note (e.g. Owner org)" value={newNote} onChange={e => setNewNote(e.target.value)}
+          style={{ padding: "0.55rem 0.75rem", background: "#0e0e10", border: `1px solid ${border}`, borderRadius: 6, color: "#e8e8ed", fontSize: "0.85rem", fontFamily: "inherit" }} />
+        <button onClick={add} disabled={busy || !newDomain.trim()} className="btn-p" style={{ fontSize: "0.8rem", padding: "0.55rem 1.25rem" }}>Add</button>
+      </div>
+      {err && <div style={{ color: "#ff6b6b", marginBottom: "1rem" }}>{err}</div>}
+
+      {/* Existing */}
+      <div style={{ border: `1px solid ${border}`, borderRadius: 12, overflow: "hidden" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
+          <thead style={{ background: "#0e0e10" }}>
+            <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+              <th style={th}>Domain</th>
+              <th style={th}>Default tier</th>
+              <th style={th}>Note</th>
+              <th style={th}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {domains.map(d => (
+              <tr key={d.domain} style={{ borderTop: `1px solid ${border}` }}>
+                <td style={{ ...td, fontFamily: mono, fontWeight: 600 }}>{d.domain}</td>
+                <td style={td}><TierBadge tier={d.default_tier} /></td>
+                <td style={{ ...td, color: dim }}>{d.note || "—"}</td>
+                <td style={td}>
+                  <button onClick={() => remove(d.domain)} style={{ background: "none", border: `1px solid ${border}`, color: "#ff6b6b", padding: "0.25rem 0.65rem", borderRadius: 4, fontSize: "0.72rem", cursor: "pointer" }}>Remove</button>
+                </td>
+              </tr>
+            ))}
+            {domains.length === 0 && <tr><td colSpan={4} style={{ ...td, textAlign: "center", color: dim, padding: "1.5rem" }}>No premium domains yet.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
+
+function UserTable({ users, setTier, approveSmart, showApprove, t, lang, premiumSet = new Set() }) {
   return (
     <div style={{ border: `1px solid ${border}`, borderRadius: 12, overflow: "hidden", marginBottom: "2rem" }}>
       <div style={{ overflowX: "auto" }}>
@@ -483,11 +657,15 @@ function UserTable({ users, setTier, showApprove, t, lang }) {
           </thead>
           <tbody>
             {users.map(u => {
-              const isPersonal = u.email_domain && ["gmail.com","outlook.com","hotmail.com","yahoo.com","icloud.com","proton.me","protonmail.com"].includes(u.email_domain);
+              const domain = (u.email_domain || "").toLowerCase();
+              const isPersonal = domain && ["gmail.com","outlook.com","hotmail.com","yahoo.com","icloud.com","proton.me","protonmail.com"].includes(domain);
+              const isPremium = premiumSet.has(domain);
+              const rowBg = isPremium ? "rgba(0,229,160,0.05)" : isPersonal ? "rgba(245,166,35,0.04)" : "transparent";
               return (
-                <tr key={u.id} style={{ borderTop: `1px solid ${border}`, background: isPersonal ? "rgba(245,166,35,0.04)" : "transparent" }}>
+                <tr key={u.id} style={{ borderTop: `1px solid ${border}`, background: rowBg }}>
                   <td style={td}>
                     {u.email}{" "}
+                    {isPremium && <span title="Premium domain → auto-paid on approve" style={{ color: green, fontSize: "0.7rem" }}>⭐</span>}
                     {isPersonal && <span title="Personal email" style={{ color: "#f5a623", fontSize: "0.7rem" }}>⚠</span>}
                   </td>
                   <td style={{ ...td, color: dim }}>{u.full_name || "—"}</td>
@@ -498,7 +676,14 @@ function UserTable({ users, setTier, showApprove, t, lang }) {
                   <td style={{ ...td, color: dim, fontFamily: mono, fontSize: "0.75rem" }}>{u.created_at?.slice(0, 10)}</td>
                   <td style={td}>
                     {showApprove ? (
-                      <button className="btn-p" style={{ padding: "0.3rem 0.75rem", fontSize: "0.75rem" }} onClick={() => setTier(u.id, "free")}>{t.admin_approve}</button>
+                      <button
+                        className="btn-p"
+                        style={{ padding: "0.3rem 0.75rem", fontSize: "0.75rem" }}
+                        onClick={() => approveSmart ? approveSmart(u) : setTier(u.id, "free")}
+                        title={isPremium ? "Premium domain → will set to paid" : "Will set to free"}
+                      >
+                        {isPremium ? "Approve → paid ⭐" : t.admin_approve}
+                      </button>
                     ) : (
                       <select defaultValue={u.tier} onChange={e => setTier(u.id, e.target.value)}
                         style={{ background: "#0e0e10", color: "#e8e8ed", border: `1px solid ${border}`, padding: "0.3rem 0.5rem", borderRadius: 4, fontSize: "0.75rem" }}>

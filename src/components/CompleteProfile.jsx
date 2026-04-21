@@ -2,6 +2,7 @@ import { useState } from "react";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../lib/useAuth";
 import { liveT } from "../lib/liveLang";
+import { track } from "../lib/track";
 
 /**
  * Povinný post-login krok. Renderuje sa ako full-screen overlay ak
@@ -34,6 +35,12 @@ export default function CompleteProfile({ lang = "en" }) {
     }).eq("id", user.id).select().maybeSingle();
     setBusy(false);
     if (error) { setErr(error.message); return; }
+    track("profile_completed", {
+      company: form.company.trim(),
+      position: form.position,
+      has_linkedin: !!form.linkedin_url.trim(),
+      has_phone: !!form.phone.trim(),
+    });
     await reloadProfile();
   };
 
