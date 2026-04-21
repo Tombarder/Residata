@@ -14,12 +14,17 @@ const border = "#222228";
 const bg = "#16161a";
 
 /* ───────────────────── LIVE DASHBOARD ───────────────────── */
+const ANON_VISIBLE = 12;
+const ANON_TEASER = 8;  // navyše zobrazíme blurred — dokopy 20 riadkov s blurom
+
 export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
   const t = liveT[lang] || liveT.en;
   const { can } = useCapabilities();
   const { projects, loading } = useProjects();
-  // Ak má cap na "view_all_projects_list" → vidí všetkých. Inak top 20.
-  const shown = can("view_all_projects_list") ? projects : projects.slice(0, 20);
+  const hasFullAccess = can("view_all_projects_list");
+  // Anon: 12 plne, ďalších 8 blurred. Logged-in: všetko.
+  const clearRows = hasFullAccess ? projects : projects.slice(0, ANON_VISIBLE);
+  const blurredRows = hasFullAccess ? [] : projects.slice(ANON_VISIBLE, ANON_VISIBLE + ANON_TEASER);
   const showUpgradeToPaid = can("prompt_upgrade_to_paid");
   const showSignupPrompt = can("prompt_signup");
 
@@ -40,9 +45,9 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
           <div>
             <div style={labelStyle}>{t.projects_section_label}</div>
             <h2 style={{ fontSize: "1.6rem", fontWeight: 700 }}>
-              {can("view_all_projects_list")
+              {hasFullAccess
                 ? ll(t.projects_title_all, { n: projects.length })
-                : ll(t.projects_title_top, { n: Math.min(20, projects.length), total: projects.length })}
+                : ll(t.projects_title_top, { n: ANON_VISIBLE, total: projects.length })}
             </h2>
           </div>
           {showSignupPrompt && <button className="btn-p" onClick={openLogin}>{t.register_for_full}</button>}
@@ -51,7 +56,7 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
         {loading ? (
           <div style={{ color: dim, padding: "2rem", textAlign: "center" }}>{t.loading_generic}</div>
         ) : (
-          <div style={{ border: `1px solid ${border}`, borderRadius: 12, overflow: "hidden" }}>
+          <div style={{ border: `1px solid ${border}`, borderRadius: 12, overflow: "hidden", position: "relative" }}>
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
                 <thead style={{ background: "#0e0e10" }}>
@@ -67,48 +72,103 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {shown.map(p => {
-                    // Ak projekt nezverejňuje predané (sold=0 AND reserved=0 AND prereserved=0),
-                    // % predaných nie je zmysluplné — zobrazíme "n/a" namiesto nepravdivých 0%.
-                    const soldDataUnavailable = (p.sold_units || 0) === 0 && (p.reserved_units || 0) === 0 && (p.prereserved_units || 0) === 0;
-                    return (
-                      <tr key={p.id} style={{ borderTop: `1px solid ${border}` }}>
-                        <td style={td}><strong>{p.name}</strong></td>
-                        <td style={{ ...td, color: dim }}>{p.district || "—"}</td>
-                        <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{p.total_units}</td>
-                        <td style={{ ...td, textAlign: "right", fontFamily: mono, color: green }}>{p.available_units}</td>
-                        <td style={{ ...td, textAlign: "right", fontFamily: mono, color: soldDataUnavailable ? dim : "#f5a623" }}>
-                          {soldDataUnavailable ? "—" : p.sold_units}
-                        </td>
-                        <td style={{ ...td, textAlign: "right", fontFamily: mono }}>
-                          {soldDataUnavailable ? <span style={{ color: dim }}>n/a</span> : (p.sold_percentage != null ? `${p.sold_percentage}%` : "—")}
-                        </td>
-                        <td style={{ ...td, textAlign: "right", fontFamily: mono }}>
-                          {p.avg_price_eur_m2
-                            ? Math.round(p.avg_price_eur_m2).toLocaleString(lang === "sk" ? "sk-SK" : "en-US")
-                            : <span title={lang === "sk" ? "Developer nezverejňuje ceny" : "Developer doesn't publish prices"} style={{ color: dim, fontStyle: "italic", fontSize: "0.75rem" }}>
-                                {lang === "sk" ? "nezverejnené" : "not published"}
-                              </span>}
-                        </td>
-                        <td style={{ ...td, textAlign: "right" }}>
-                          <button onClick={() => setCurrent && setCurrent(`Project:${p.id}`)} style={miniBtn}>{t.tbl_detail}</button>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {clearRows.map(p => <ProjectRow key={p.id} p={p} t={t} lang={lang} setCurrent={setCurrent} />)}
+
+                  {/* Blurred teaser rows — anon only */}
+                  {blurredRows.length > 0 && blurredRows.map((p, i) => (
+                    <tr key={`blur-${p.id}`} style={{
+                      borderTop: `1px solid ${border}`,
+                      filter: "blur(4px)",
+                      opacity: 0.55,
+                      userSelect: "none",
+                      pointerEvents: "none",
+                      transition: "filter 0.3s",
+                    }} aria-hidden="true">
+                      <td style={td}><strong>{p.name}</strong></td>
+                      <td style={{ ...td, color: dim }}>{p.district || "—"}</td>
+                      <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{p.total_units}</td>
+                      <td style={{ ...td, textAlign: "right", fontFamily: mono, color: green }}>{p.available_units}</td>
+                      <td style={{ ...td, textAlign: "right", fontFamily: mono, color: "#f5a623" }}>{p.sold_units}</td>
+                      <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{p.sold_percentage != null ? `${p.sold_percentage}%` : "—"}</td>
+                      <td style={{ ...td, textAlign: "right", fontFamily: mono }}>
+                        {p.avg_price_eur_m2 ? Math.round(p.avg_price_eur_m2).toLocaleString("en-US") : "—"}
+                      </td>
+                      <td style={{ ...td, textAlign: "right" }}>—</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
-          </div>
-        )}
 
-        {showSignupPrompt && projects.length > 20 && (
-          <div style={{ textAlign: "center", padding: "1.5rem", color: dim, fontSize: "0.85rem" }}>
-            {ll(t.hidden_projects, { n: projects.length - 20 })} <button onClick={openLogin} style={linkBtn}>{t.register_free}</button> {t.for_full_list}
+            {/* Teaser overlay — len ak sú blurred rows */}
+            {blurredRows.length > 0 && (
+              <div style={{
+                position: "absolute",
+                left: 0, right: 0, bottom: 0,
+                height: `${blurredRows.length * 49 + 60}px`,
+                background: "linear-gradient(to bottom, rgba(16,16,18,0) 0%, rgba(16,16,18,0.85) 40%, rgba(16,16,18,0.98) 100%)",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "flex-end",
+                padding: "0 1rem 1.5rem",
+                pointerEvents: "none",
+              }}>
+                <div style={{
+                  pointerEvents: "auto",
+                  textAlign: "center",
+                  background: "rgba(16,16,18,0.95)",
+                  border: `1px solid ${border}`,
+                  borderRadius: 12,
+                  padding: "1.25rem 1.75rem",
+                  boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+                }}>
+                  <div style={{ fontSize: "0.95rem", color: "#e8e8ed", marginBottom: "0.5rem", fontWeight: 500 }}>
+                    {lang === "sk"
+                      ? <>🔒 Ďalších <strong style={{ color: green }}>{projects.length - ANON_VISIBLE}</strong> projektov dostupných po registrácii</>
+                      : <>🔒 <strong style={{ color: green }}>{projects.length - ANON_VISIBLE}</strong> more projects unlocked with a free account</>}
+                  </div>
+                  <div style={{ fontSize: "0.78rem", color: dim, marginBottom: "1rem" }}>
+                    {lang === "sk" ? "30 sekúnd. Žiadna kreditka." : "Takes 30 seconds. No credit card."}
+                  </div>
+                  <button onClick={openLogin} className="btn-p" style={{ fontSize: "0.85rem" }}>
+                    {lang === "sk" ? "Zaregistrovať zadarmo →" : "Sign up for free →"}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
     </main>
+  );
+}
+
+function ProjectRow({ p, t, lang, setCurrent }) {
+  const soldDataUnavailable = (p.sold_units || 0) === 0 && (p.reserved_units || 0) === 0 && (p.prereserved_units || 0) === 0;
+  return (
+    <tr style={{ borderTop: `1px solid ${border}` }}>
+      <td style={td}><strong>{p.name}</strong></td>
+      <td style={{ ...td, color: dim }}>{p.district || "—"}</td>
+      <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{p.total_units}</td>
+      <td style={{ ...td, textAlign: "right", fontFamily: mono, color: green }}>{p.available_units}</td>
+      <td style={{ ...td, textAlign: "right", fontFamily: mono, color: soldDataUnavailable ? dim : "#f5a623" }}>
+        {soldDataUnavailable ? "—" : p.sold_units}
+      </td>
+      <td style={{ ...td, textAlign: "right", fontFamily: mono }}>
+        {soldDataUnavailable ? <span style={{ color: dim }}>n/a</span> : (p.sold_percentage != null ? `${p.sold_percentage}%` : "—")}
+      </td>
+      <td style={{ ...td, textAlign: "right", fontFamily: mono }}>
+        {p.avg_price_eur_m2
+          ? Math.round(p.avg_price_eur_m2).toLocaleString(lang === "sk" ? "sk-SK" : "en-US")
+          : <span title={lang === "sk" ? "Developer nezverejňuje ceny" : "Developer doesn't publish prices"} style={{ color: dim, fontStyle: "italic", fontSize: "0.75rem" }}>
+              {lang === "sk" ? "nezverejnené" : "not published"}
+            </span>}
+      </td>
+      <td style={{ ...td, textAlign: "right" }}>
+        <button onClick={() => setCurrent && setCurrent(`Project:${p.id}`)} style={miniBtn}>{t.tbl_detail}</button>
+      </td>
+    </tr>
   );
 }
 
