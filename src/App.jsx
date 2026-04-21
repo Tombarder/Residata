@@ -1539,6 +1539,10 @@ export default function App() {
         @keyframes barFill {
           from { width: 0%; }
         }
+        @keyframes dp-shimmer {
+          0% { transform: translateX(-120%); }
+          100% { transform: translateX(220%); }
+        }
         @media (max-width: 760px) {
           .flow-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 1.5rem !important; row-gap: 2rem !important; }
           .flow-grid > div > div:last-child { display: none !important; }

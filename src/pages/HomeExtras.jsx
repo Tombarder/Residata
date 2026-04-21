@@ -611,36 +611,63 @@ function ProjectMini({ project, setCurrent, lang }) {
   );
 }
 
-function useAnimatedNumber(target) {
+function useAnimatedNumber(target, dur = 1200, delayMs = 0) {
   const [value, setValue] = useState(0);
-  const ref = useRef({ raf: 0, from: 0 });
+  const ref = useRef({ raf: 0, from: 0, timer: 0 });
   useEffect(() => {
     if (target == null) return;
     const from = ref.current.from;
     const to = target;
-    const dur = 1200;
-    const start = performance.now();
-    cancelAnimationFrame(ref.current.raf);
-    const step = (t) => {
-      const p = Math.min(1, (t - start) / dur);
-      const eased = 1 - Math.pow(1 - p, 3); // easeOutCubic
-      setValue(Math.round(from + (to - from) * eased));
-      if (p < 1) ref.current.raf = requestAnimationFrame(step);
-      else ref.current.from = to;
+    const run = () => {
+      const start = performance.now();
+      cancelAnimationFrame(ref.current.raf);
+      const step = (t) => {
+        const p = Math.min(1, (t - start) / dur);
+        const eased = 1 - Math.pow(1 - p, 3); // easeOutCubic
+        setValue(Math.round(from + (to - from) * eased));
+        if (p < 1) ref.current.raf = requestAnimationFrame(step);
+        else ref.current.from = to;
+      };
+      ref.current.raf = requestAnimationFrame(step);
     };
-    ref.current.raf = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(ref.current.raf);
-  }, [target]);
+    clearTimeout(ref.current.timer);
+    if (delayMs > 0) ref.current.timer = setTimeout(run, delayMs);
+    else run();
+    return () => { cancelAnimationFrame(ref.current.raf); clearTimeout(ref.current.timer); };
+  }, [target, dur, delayMs]);
   return value;
 }
 
 /* ──────────────────────────────────────────────────────────
-   2. DISTRICT PULSE — horizontal bar chart of avg €/m² per district
+   2. DISTRICT PULSE — horizontal bar chart of avg €/m² per district.
+   Data: live from Supabase (useProjects → aggregate by district).
+   Animation: each row plays in when the section scrolls into view
+   — bar fills left→right, number counts up 0→avg, small shimmer
+   sweep, staggered by row. 300-400ms each, cascade 80ms offset.
    ────────────────────────────────────────────────────────── */
-export function DistrictPulse({ lang = "en", setCurrent }) {
-  const { projects } = useProjects();
 
-  // Aggregate by district
+function useInView(rootMargin = "0px") {
+  const ref = useRef(null);
+  const [inView, setInView] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || inView) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { setInView(true); obs.disconnect(); } },
+      { rootMargin, threshold: 0.15 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [inView, rootMargin]);
+  return [ref, inView];
+}
+
+export function DistrictPulse({ lang = "en", setCurrent }) {
+  const { projects, loading } = useProjects();
+  const [sectionRef, inView] = useInView();
+
+  // Aggregate by district (real DB data — refreshes whenever the monthly
+  // sync_to_supabase run updates the `projects` table).
   const byDistrict = {};
   for (const p of projects) {
     if (!p.district || !p.avg_price_eur_m2) continue;
@@ -655,62 +682,110 @@ export function DistrictPulse({ lang = "en", setCurrent }) {
     .map(([d, s]) => ({ district: d, avg: s.sum / s.count, ...s }))
     .sort((a, b) => b.avg - a.avg);
 
-  if (rows.length === 0) return null;
-
-  const max = Math.max(...rows.map(r => r.avg));
+  const max = rows.length > 0 ? Math.max(...rows.map(r => r.avg)) : 1;
 
   const label = lang === "sk" ? "Cenová mapa Bratislavy" : "Bratislava pricing map";
   const title = lang === "sk" ? "Priemerná cena €/m² podľa okresu" : "Average €/m² by district";
   const desc = lang === "sk"
-    ? "Skutočné dáta z aktívnych projektov. Farba indikuje cenový tier."
-    : "Real data from active projects. Color indicates price tier.";
+    ? "Skutočné dáta z aktívnych projektov. Updatuje sa každý mesiac po novom run-e."
+    : "Real data from active projects. Refreshes every month after a new pipeline run.";
 
   return (
-    <section style={{ padding: "5rem 2rem", maxWidth: 1100, margin: "0 auto", borderTop: `1px solid ${border}` }}>
+    <section ref={sectionRef} style={{ padding: "5rem 2rem", maxWidth: 1100, margin: "0 auto", borderTop: `1px solid ${border}` }}>
       <div style={{ fontFamily: mono, fontSize: "0.7rem", color: green, letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "0.75rem" }}>
         {label}
       </div>
       <h2 className="sec-title" style={{ marginBottom: "0.5rem" }}>{title}</h2>
       <p className="sec-desc" style={{ marginBottom: "2.5rem" }}>{desc}</p>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem" }}>
-        {rows.map((r, i) => {
-          const pct = (r.avg / max) * 100;
-          const color = colorForPrice(r.avg);
-          return (
-            <div key={r.district} style={{ display: "grid", gridTemplateColumns: "180px 1fr 120px", gap: "1rem", alignItems: "center" }}
-              className="district-row">
-              <div style={{ fontSize: "0.9rem", color: "#e8e8ed", fontWeight: 500 }}>{r.district}</div>
-              <div style={{
-                height: 32, background: "#0e0e10", borderRadius: 6, overflow: "hidden", position: "relative",
-                border: `1px solid ${border}`,
-              }}>
-                <div style={{
-                  width: `${pct}%`, height: "100%",
-                  background: `linear-gradient(90deg, ${color}33, ${color})`,
-                  borderRight: `2px solid ${color}`,
-                  transition: "width 0.8s ease",
-                  animation: "barFill 1s ease-out",
-                }} />
-                <div style={{
-                  position: "absolute", left: "0.75rem", top: 0, bottom: 0,
-                  display: "flex", alignItems: "center",
-                  fontSize: "0.7rem", color: dim, fontFamily: mono,
-                }}>
-                  {r.count} {lang === "sk" ? "projektov" : "projects"} · {r.units} {lang === "sk" ? "bytov" : "units"}
-                </div>
-              </div>
-              <div style={{
-                fontFamily: mono, fontSize: "0.95rem", fontWeight: 600, color,
-                textAlign: "right",
-              }}>
-                {Math.round(r.avg).toLocaleString("en-US").replace(/,/g, " ")} €
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      {loading && rows.length === 0 ? (
+        <div style={{ color: dim, fontFamily: mono, fontSize: "0.85rem", padding: "2rem 0" }}>
+          {lang === "sk" ? "Načítavam…" : "Loading…"}
+        </div>
+      ) : rows.length === 0 ? (
+        <div style={{ color: dim, fontSize: "0.9rem" }}>
+          {lang === "sk" ? "Žiadne dáta zatiaľ." : "No data yet."}
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem" }}>
+          {rows.map((r, i) => (
+            <DistrictRow
+              key={r.district}
+              row={r}
+              index={i}
+              max={max}
+              animate={inView}
+              lang={lang}
+            />
+          ))}
+        </div>
+      )}
     </section>
+  );
+}
+
+function DistrictRow({ row, index, max, animate, lang }) {
+  const pct = (row.avg / max) * 100;
+  const color = colorForPrice(row.avg);
+  // Stagger the row entrance by index. Kick off the number counter only
+  // after the row has started sliding in so the digits land alongside
+  // the filling bar.
+  const delay = 0.08 * index;
+  const animatedAvg = useAnimatedNumber(animate ? Math.round(row.avg) : 0, 1100, delay * 1000);
+
+  return (
+    <div
+      style={{
+        display: "grid", gridTemplateColumns: "180px 1fr 120px", gap: "1rem", alignItems: "center",
+        opacity: animate ? 1 : 0,
+        transform: animate ? "translateY(0)" : "translateY(8px)",
+        transition: `opacity 0.5s ease ${delay}s, transform 0.5s ease ${delay}s`,
+      }}
+      className="district-row"
+    >
+      <div style={{ fontSize: "0.9rem", color: "#e8e8ed", fontWeight: 500 }}>{row.district}</div>
+
+      <div style={{
+        height: 32, background: "#0e0e10", borderRadius: 6, overflow: "hidden", position: "relative",
+        border: `1px solid ${border}`,
+      }}>
+        {/* Filled bar */}
+        <div style={{
+          width: animate ? `${pct}%` : "0%",
+          height: "100%",
+          background: `linear-gradient(90deg, ${color}33, ${color})`,
+          borderRight: `2px solid ${color}`,
+          transition: `width 1.1s cubic-bezier(0.2, 0.85, 0.25, 1) ${delay}s`,
+          position: "relative",
+        }}>
+          {/* Shimmer sweep inside the bar */}
+          {animate && (
+            <div style={{
+              position: "absolute", inset: 0,
+              background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent)",
+              animation: `dp-shimmer 1.6s ease-out ${delay + 0.2}s 1`,
+              pointerEvents: "none",
+            }} />
+          )}
+        </div>
+        {/* Inline label on the bar — projects & units count */}
+        <div style={{
+          position: "absolute", left: "0.75rem", top: 0, bottom: 0,
+          display: "flex", alignItems: "center",
+          fontSize: "0.7rem", color: "#c0c0c8", fontFamily: mono,
+          mixBlendMode: "difference", pointerEvents: "none",
+        }}>
+          {row.count} {lang === "sk" ? "projektov" : "projects"} · {row.units} {lang === "sk" ? "bytov" : "units"}
+        </div>
+      </div>
+
+      <div style={{
+        fontFamily: mono, fontSize: "0.95rem", fontWeight: 600, color,
+        textAlign: "right", fontVariantNumeric: "tabular-nums",
+      }}>
+        {animatedAvg.toLocaleString("en-US").replace(/,/g, " ")} €
+      </div>
+    </div>
   );
 }
 
