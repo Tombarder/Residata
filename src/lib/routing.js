@@ -21,6 +21,7 @@ export function pageToPath(page) {
   // "Data" page je v Nav-e prezentovaná ako "Sample" — preto /sample URL
   // (čitateľnejšie a odráža to marketing-preview charakter stránky).
   if (page === "Data") return "/sample";
+  if (page === "HeroLab") return "/hero-lab";
   return "/" + page.toLowerCase().replace(/\s+/g, "-");
 }
 
@@ -39,6 +40,7 @@ export function pathToPage(pathname) {
     "/data": "Data",      // spätná kompatibilita (pôvodný URL)
     "/analytics": "Analytics",
     "/admin": "Admin",
+    "/hero-lab": "HeroLab",   // hidden — page picker pre Home hero variant
   };
   return map[clean] || "Home";
 }

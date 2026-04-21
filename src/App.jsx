@@ -7,6 +7,7 @@ import Feature from "./components/Feature";
 import UpgradePrompt from "./components/UpgradePrompt";
 import { LiveDashboard, LiveProjectDetail, LiveAnalytics, LiveAdmin, EarlyAccessBadge } from "./pages/LivePages";
 import { MarketPulse, DistrictPulse, HowItWorksFlow } from "./pages/HomeExtras";
+import HeroLabPage from "./pages/HeroVariants";
 import { useAuth } from "./lib/useAuth";
 import { useCapabilities } from "./lib/useCapabilities";
 import { pushRoute, pathToPage } from "./lib/routing";
@@ -1660,6 +1661,8 @@ export default function App() {
             {current === "Data" && <DataPage setCurrent={handleNav} l={l} lang={lang} />}
             {current === "Pricing" && <PricingPage setCurrent={handleNav} l={l} lang={lang} />}
             {current === "Contact" && <ContactPage l={l} />}
+            {/* Hidden hero-variant preview page — not in Nav, only reachable via /hero-lab URL */}
+            {current === "HeroLab" && <HeroLabPage setCurrent={handleNav} lang={lang} />}
 
             {/* Analytics — paid only, inak UpgradePrompt */}
             {current === "Analytics" && (
