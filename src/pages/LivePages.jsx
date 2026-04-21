@@ -491,19 +491,32 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
   );
 }
 
-/* ───────────────────── ADMIN (guarded v App.jsx cez Feature) ───────────────────── */
+/* ───────────────────── ADMIN (guarded v App.jsx cez Feature) ─────────────────────
+   Freemium-era admin panel. Signups auto-approve to 'free' so the old
+   "approve pending" workflow is mostly vestigial. This panel focuses on
+   day-to-day ops:
+     - Stats strip (total / free / paid / admin / pending)
+     - Search (email / company / name / position)
+     - Full user table with inline tier change + delete
+     - Self-protection (can't tier-change or delete yourself from UI)
+     - Premium domains + activity tabs unchanged from before
+*/
 export function LiveAdmin({ setCurrent, lang = "en" }) {
   const t = liveT[lang] || liveT.en;
+  const { user: self } = useAuth();
   const [users, setUsers] = useState([]);
   const [events, setEvents] = useState([]);
   const [activity, setActivity] = useState([]);
   const [premiumDomains, setPremiumDomains] = useState([]);
   const [err, setErr] = useState(null);
-  const [tab, setTab] = useState("users");   // users | activity | domains
+  const [tab, setTab] = useState("users");
+  const [search, setSearch] = useState("");
+
+  const reloadUsers = () => supabase.from("user_profiles").select("*").order("created_at", { ascending: false })
+    .then(({ data, error }) => { setUsers(data || []); if (error) setErr(error.message); });
 
   useEffect(() => {
-    supabase.from("user_profiles").select("*").order("created_at", { ascending: false })
-      .then(({ data, error }) => { setUsers(data || []); if (error) setErr(error.message); });
+    reloadUsers();
     supabase.from("events").select("*").like("event_type", "new_signup%").order("detected_at", { ascending: false }).limit(20)
       .then(({ data }) => setEvents(data || []));
     supabase.from("user_activity").select("*").order("created_at", { ascending: false }).limit(100)
@@ -514,35 +527,96 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
 
   const premiumSet = new Set(premiumDomains.map(d => d.domain.toLowerCase()));
 
-  // Smart approve: premium doména → paid, ostatní → free
-  const approveSmart = async (user) => {
-    const domain = (user.email_domain || "").toLowerCase();
-    const premium = premiumDomains.find(d => d.domain.toLowerCase() === domain);
-    const tier = premium?.default_tier || "free";
-    await setTier(user.id, tier);
-  };
-
   const setTier = async (id, tier) => {
+    if (id === self?.id) {
+      alert(lang === "sk" ? "Nemôžeš meniť svoj vlastný tier odtiaľto." : "Can't change your own tier from here.");
+      return;
+    }
     const patch = { tier };
-    // Mark approved_at timestamp pre všetky non-pending tiery (tracking kedy admin schválil)
     if (tier !== "pending") patch.approved_at = new Date().toISOString();
     const { error } = await supabase.from("user_profiles").update(patch).eq("id", id);
-    if (error) alert(error.message); else setUsers(u => u.map(x => x.id === id ? { ...x, ...patch } : x));
+    if (error) alert(error.message);
+    else setUsers(u => u.map(x => x.id === id ? { ...x, ...patch } : x));
   };
 
-  const pending = users.filter(u => u.tier === "pending");
-  const rest = users.filter(u => u.tier !== "pending");
+  const deleteUser = async (u) => {
+    if (u.id === self?.id) {
+      alert(lang === "sk" ? "Nemôžeš vymazať sám seba." : "Can't delete yourself.");
+      return;
+    }
+    const confirmText = lang === "sk"
+      ? `Vymazať ${u.email} natrvalo? Táto akcia je nezvratná — stratí účet aj všetky dáta.`
+      : `Delete ${u.email} permanently? This can't be undone — the account and all their data go.`;
+    if (!confirm(confirmText)) return;
+
+    // Needs service-role on backend — calls /api/admin/delete-user with caller's bearer token
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      alert("No session — sign in first.");
+      return;
+    }
+    try {
+      const resp = await fetch("/api/admin/delete-user", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ user_id: u.id }),
+      });
+      const json = await resp.json();
+      if (!resp.ok) {
+        alert(`Delete failed: ${json.error || resp.status}`);
+        return;
+      }
+      setUsers(us => us.filter(x => x.id !== u.id));
+    } catch (e) {
+      alert(`Delete failed: ${String(e.message || e)}`);
+    }
+  };
+
+  // Filter + stats (memoised via plain consts — small N)
+  const q = search.trim().toLowerCase();
+  const visibleUsers = !q ? users : users.filter(u => (
+    (u.email || "").toLowerCase().includes(q) ||
+    (u.full_name || "").toLowerCase().includes(q) ||
+    (u.company || "").toLowerCase().includes(q) ||
+    (u.position || "").toLowerCase().includes(q)
+  ));
+  const tierCount = users.reduce((a, u) => { a[u.tier] = (a[u.tier] || 0) + 1; return a; }, {});
 
   return (
-    <main style={{ padding: "5rem 2rem 4rem", maxWidth: 1100, margin: "0 auto" }}>
+    <main style={{ padding: "5rem 2rem 4rem", maxWidth: 1200, margin: "0 auto" }}>
       <Label>{t.admin_label}</Label>
       <h1 className="sec-title">{t.admin_title}</h1>
       {err && <div style={{ color: "#ff6b6b" }}>{err}</div>}
 
+      {/* Tier stats strip */}
+      <div style={{
+        display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+        gap: "0.75rem", marginTop: "1.5rem", marginBottom: "1rem",
+      }}>
+        {[
+          { k: "total",   label: lang === "sk" ? "Celkom" : "Total",   n: users.length,             color: "#e8e8ed" },
+          { k: "free",    label: "Free",                               n: tierCount.free    || 0,    color: "#c0c0c8" },
+          { k: "paid",    label: "Paid",                               n: tierCount.paid    || 0,    color: green },
+          { k: "admin",   label: "Admin",                              n: tierCount.admin   || 0,    color: "#f5a623" },
+          { k: "pending", label: "Pending",                            n: tierCount.pending || 0,    color: "#888" },
+        ].map(s => (
+          <div key={s.k} style={{
+            background: bg, border: `1px solid ${border}`, borderRadius: 10,
+            padding: "0.9rem 1.1rem",
+          }}>
+            <div style={{ fontFamily: mono, fontSize: "0.65rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.3rem" }}>{s.label}</div>
+            <div style={{ fontFamily: mono, fontSize: "1.6rem", fontWeight: 700, color: s.color, lineHeight: 1 }}>{s.n}</div>
+          </div>
+        ))}
+      </div>
+
       {/* Tabs */}
-      <div style={{ display: "flex", gap: "0.5rem", marginTop: "2rem", borderBottom: `1px solid ${border}`, marginBottom: "1.5rem" }}>
+      <div style={{ display: "flex", gap: "0.5rem", marginTop: "1.5rem", borderBottom: `1px solid ${border}`, marginBottom: "1.5rem" }}>
         <TabBtn active={tab === "users"} onClick={() => setTab("users")}>
-          {lang === "sk" ? "Užívatelia" : "Users"} {pending.length > 0 && <CountBadge n={pending.length} />}
+          {lang === "sk" ? "Užívatelia" : "Users"}
         </TabBtn>
         <TabBtn active={tab === "activity"} onClick={() => setTab("activity")}>{lang === "sk" ? "Aktivita" : "Activity"}</TabBtn>
         <TabBtn active={tab === "domains"} onClick={() => setTab("domains")}>{lang === "sk" ? "Prémiové domény" : "Premium domains"}</TabBtn>
@@ -550,12 +624,47 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
 
       {tab === "users" && (
         <>
-          <SectionHeader>{t.admin_pending_section} {pending.length > 0 && <CountBadge n={pending.length} />}</SectionHeader>
-          {pending.length === 0 ? (
-            <div style={{ color: dim, padding: "1rem", fontSize: "0.9rem" }}>{t.admin_no_pending}</div>
+          {/* Search */}
+          <div style={{ marginBottom: "1rem", display: "flex", gap: "0.75rem", alignItems: "center" }}>
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder={lang === "sk" ? "🔍 Hľadať podľa emailu, mena, firmy, pozície…" : "🔍 Search by email, name, company, position…"}
+              style={{
+                flex: 1, padding: "0.6rem 0.9rem", background: "#0e0e10",
+                border: `1px solid ${border}`, borderRadius: 8, color: "#e8e8ed",
+                fontSize: "0.85rem", fontFamily: "inherit", outline: "none",
+              }}
+            />
+            {search && (
+              <button onClick={() => setSearch("")} style={{
+                background: "transparent", color: dim, border: `1px solid ${border}`,
+                borderRadius: 6, padding: "0.5rem 0.85rem", fontSize: "0.75rem",
+                cursor: "pointer", fontFamily: "inherit",
+              }}>
+                {lang === "sk" ? "Zrušiť" : "Clear"}
+              </button>
+            )}
+            <div style={{ fontSize: "0.75rem", color: dim, fontFamily: mono, whiteSpace: "nowrap" }}>
+              {visibleUsers.length} / {users.length}
+            </div>
+          </div>
+
+          {visibleUsers.length === 0 ? (
+            <div style={{ color: dim, padding: "1.5rem", fontSize: "0.9rem", textAlign: "center", border: `1px solid ${border}`, borderRadius: 12 }}>
+              {search
+                ? (lang === "sk" ? `Nikto nevyhovuje hľadaniu "${search}".` : `No users match "${search}".`)
+                : (lang === "sk" ? "Žiadni užívatelia zatiaľ." : "No users yet.")}
+            </div>
           ) : (
-            <UserTable users={pending} setTier={setTier} approveSmart={approveSmart} showApprove t={t} lang={lang} premiumSet={premiumSet} />
+            <UserTable users={visibleUsers} setTier={setTier} deleteUser={deleteUser} selfId={self?.id} t={t} lang={lang} premiumSet={premiumSet} />
           )}
+
+          <p style={{ color: dim, fontSize: "0.78rem", marginTop: "1.25rem", lineHeight: 1.5, fontStyle: "italic" }}>
+            {lang === "sk"
+              ? "Freemium: noví užívatelia sa automaticky stanú free hneď po vyplnení profilu. Tento panel je hlavne na: bump free → paid, občasné vymazanie testovacích účtov, downgrade do pending (efektívny ban)."
+              : "Freemium: new sign-ups auto-approve to free. This panel is mostly for: bumping free → paid, occasional test-account deletion, downgrading to pending (de-facto ban)."}
+          </p>
 
           {events.length > 0 && (
             <>
@@ -586,9 +695,6 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
               </div>
             </>
           )}
-
-          <SectionHeader>{t.admin_new_section}</SectionHeader>
-          <UserTable users={rest} setTier={setTier} t={t} lang={lang} premiumSet={premiumSet} />
         </>
       )}
 
@@ -738,7 +844,7 @@ function PremiumDomainsPanel({ domains, reload }) {
   );
 }
 
-function UserTable({ users, setTier, approveSmart, showApprove, t, lang, premiumSet = new Set() }) {
+function UserTable({ users, setTier, deleteUser, selfId, t, lang, premiumSet = new Set() }) {
   return (
     <div style={{ border: `1px solid ${border}`, borderRadius: 12, overflow: "hidden", marginBottom: "2rem" }}>
       <div style={{ overflowX: "auto" }}>
@@ -750,52 +856,65 @@ function UserTable({ users, setTier, approveSmart, showApprove, t, lang, premium
               <th style={th}>Company</th>
               <th style={th}>Position</th>
               <th style={th}>{t.admin_tier}</th>
-              <th style={th}>{t.admin_project}</th>
               <th style={th}>{t.admin_created}</th>
-              <th style={th}>{t.admin_actions}</th>
+              <th style={{ ...th, textAlign: "right" }}>{t.admin_actions}</th>
             </tr>
           </thead>
           <tbody>
             {users.map(u => {
               const domain = (u.email_domain || "").toLowerCase();
-              // Reuse single-source-of-truth from emailValidation — pri zmene
-              // providerov sa upraví iba tam. `isPersonalEmail` očakáva celý
-              // email; namočíme domain do dummy lokálnej časti.
               const isPersonal = domain && isPersonalEmail(`x@${domain}`);
               const isPremium = premiumSet.has(domain);
-              const rowBg = isPremium ? "rgba(0,229,160,0.05)" : isPersonal ? "rgba(245,166,35,0.04)" : "transparent";
+              const isSelf = u.id === selfId;
+              const rowBg = isSelf
+                ? "rgba(245,166,35,0.08)"
+                : isPremium ? "rgba(0,229,160,0.05)"
+                : isPersonal ? "rgba(245,166,35,0.04)" : "transparent";
               return (
                 <tr key={u.id} style={{ borderTop: `1px solid ${border}`, background: rowBg }}>
                   <td style={td}>
                     {u.email}{" "}
-                    {isPremium && <span title="Premium domain → auto-paid on approve" style={{ color: green, fontSize: "0.7rem" }}>⭐</span>}
-                    {isPersonal && <span title="Personal email" style={{ color: "#f5a623", fontSize: "0.7rem" }}>⚠</span>}
+                    {isSelf && <span title="That's you" style={{ color: "#f5a623", fontSize: "0.7rem", marginLeft: 4, fontFamily: mono }}>YOU</span>}
+                    {isPremium && !isSelf && <span title="Premium domain" style={{ color: green, fontSize: "0.7rem", marginLeft: 4 }}>⭐</span>}
+                    {isPersonal && !isSelf && <span title="Personal email" style={{ color: "#f5a623", fontSize: "0.7rem", marginLeft: 4 }}>⚠</span>}
                   </td>
                   <td style={{ ...td, color: dim }}>{u.full_name || "—"}</td>
                   <td style={{ ...td, color: dim }}>{u.company || "—"}</td>
                   <td style={{ ...td, color: dim, fontFamily: mono, fontSize: "0.75rem" }}>{u.position || "—"}</td>
                   <td style={td}><TierBadge tier={u.tier} /></td>
-                  <td style={{ ...td, color: dim, fontFamily: mono, fontSize: "0.75rem" }}>{u.chosen_project_id || "—"}</td>
                   <td style={{ ...td, color: dim, fontFamily: mono, fontSize: "0.75rem" }}>{u.created_at?.slice(0, 10)}</td>
-                  <td style={td}>
-                    {showApprove ? (
-                      <button
-                        className="btn-p"
-                        style={{ padding: "0.3rem 0.75rem", fontSize: "0.75rem" }}
-                        onClick={() => approveSmart ? approveSmart(u) : setTier(u.id, "free")}
-                        title={isPremium ? "Premium domain → will set to paid" : "Will set to free"}
-                      >
-                        {isPremium ? "Approve → paid ⭐" : t.admin_approve}
-                      </button>
-                    ) : (
-                      <select defaultValue={u.tier} onChange={e => setTier(u.id, e.target.value)}
-                        style={{ background: "#0e0e10", color: "#e8e8ed", border: `1px solid ${border}`, padding: "0.3rem 0.5rem", borderRadius: 4, fontSize: "0.75rem" }}>
-                        <option value="pending">pending</option>
-                        <option value="free">free</option>
-                        <option value="paid">paid</option>
-                        <option value="admin">admin</option>
-                      </select>
-                    )}
+                  <td style={{ ...td, textAlign: "right", whiteSpace: "nowrap" }}>
+                    <select
+                      value={u.tier}
+                      onChange={e => setTier(u.id, e.target.value)}
+                      disabled={isSelf}
+                      title={isSelf ? "Can't change your own tier" : ""}
+                      style={{
+                        background: "#0e0e10", color: "#e8e8ed",
+                        border: `1px solid ${border}`, padding: "0.3rem 0.5rem",
+                        borderRadius: 4, fontSize: "0.75rem", marginRight: "0.4rem",
+                        opacity: isSelf ? 0.4 : 1, cursor: isSelf ? "not-allowed" : "pointer",
+                      }}>
+                      <option value="pending">pending</option>
+                      <option value="free">free</option>
+                      <option value="paid">paid</option>
+                      <option value="admin">admin</option>
+                    </select>
+                    <button
+                      onClick={() => deleteUser && deleteUser(u)}
+                      disabled={isSelf}
+                      title={isSelf ? "Can't delete yourself" : "Delete user (permanent)"}
+                      style={{
+                        background: "transparent",
+                        color: isSelf ? "#55555f" : "#ff6b6b",
+                        border: `1px solid ${isSelf ? border : "rgba(255,107,107,0.4)"}`,
+                        padding: "0.3rem 0.65rem", borderRadius: 4,
+                        fontSize: "0.75rem",
+                        cursor: isSelf ? "not-allowed" : "pointer",
+                        opacity: isSelf ? 0.4 : 1, fontFamily: "inherit",
+                      }}>
+                      {lang === "sk" ? "Vymazať" : "Delete"}
+                    </button>
                   </td>
                 </tr>
               );
