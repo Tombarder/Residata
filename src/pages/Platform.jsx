@@ -376,6 +376,29 @@ function TopBar({ page, lang, tier }) {
           {title}
         </h1>
       </div>
+
+      {/* Back-to-marketing button — always visible top-right of the platform.
+          Uses a full navigation (window.location) so the marketing bundle
+          loads cleanly without React trying to reconcile platform state. */}
+      <a
+        href="/"
+        onClick={e => { e.preventDefault(); window.location.assign("/"); }}
+        style={{
+          display: "inline-flex", alignItems: "center", gap: "0.45rem",
+          padding: "0.5rem 0.95rem", borderRadius: 8,
+          background: "transparent", border: `1px solid ${border}`,
+          color: "#c0c0c8", fontSize: "0.8rem", fontFamily: "inherit",
+          textDecoration: "none", cursor: "pointer",
+          transition: "border-color 0.15s, color 0.15s",
+        }}
+        onMouseEnter={e => { e.currentTarget.style.borderColor = green; e.currentTarget.style.color = green; }}
+        onMouseLeave={e => { e.currentTarget.style.borderColor = border; e.currentTarget.style.color = "#c0c0c8"; }}
+        title={lang === "sk" ? "Otvoriť webstránku" : "Open website"}
+      >
+        <span style={{ fontSize: "0.9rem", lineHeight: 1 }}>←</span>
+        <span>{lang === "sk" ? "Webstránka" : "Website"}</span>
+      </a>
+
       <style>{`
         @media (min-width: 841px) {
           .platform-topbar-inner { padding-left: 0 !important; }

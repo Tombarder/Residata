@@ -1141,54 +1141,213 @@ function AnalyticsPivot({ snapshots, projects, lang }) {
       </div>
 
       {/* ── CHART / TABLE ── */}
-      {rows.length === 0 ? (
-        <div style={{ color: dim, fontSize: "0.85rem", padding: "2rem", textAlign: "center", border: `1px dashed ${border}`, borderRadius: 8 }}>
-          {lang === "sk" ? "Žiadne výsledky pre aktuálny filter." : "No results for current filter."}
-        </div>
-      ) : chartType === "bar" ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-          {rows.map(r => (
-            <div key={r.key} style={{ display: "grid", gridTemplateColumns: "minmax(140px, 240px) 1fr 140px", gap: "0.85rem", alignItems: "center" }}>
-              <div style={{ fontSize: "0.83rem", color: "#e8e8ed", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={r.key}>{r.key}</div>
-              <div style={{ height: 22, background: "#0e0e10", borderRadius: 4, overflow: "hidden", border: `1px solid ${border}` }}>
-                <div style={{
-                  width: `${maxValue > 0 ? (r.value / maxValue) * 100 : 0}%`, height: "100%",
-                  background: `linear-gradient(90deg, ${green}40, ${green})`,
-                  transition: "width 0.5s ease",
-                }} />
-              </div>
-              <div style={{ fontFamily: mono, fontSize: "0.85rem", color: green, fontWeight: 700, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-                {fmtValue(r.value)}
-              </div>
+      {(() => {
+        if (rows.length === 0) {
+          return (
+            <div style={{ color: dim, fontSize: "0.85rem", padding: "2rem", textAlign: "center", border: `1px dashed ${border}`, borderRadius: 8 }}>
+              {lang === "sk" ? "Žiadne výsledky pre aktuálny filter." : "No results for current filter."}
             </div>
-          ))}
-        </div>
-      ) : (
-        <div style={{ border: `1px solid ${border}`, borderRadius: 8, overflow: "auto", maxHeight: 520 }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
-            <thead style={{ background: "#0e0e10", position: "sticky", top: 0 }}>
-              <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                {groupBys.map(g => <th key={g} style={th}>{t(PIVOT_COLUMNS[g]?.label)}</th>)}
-                <th style={{ ...th, textAlign: "right" }}>{lang === "sk" ? "Projektov" : "Projects"}</th>
-                <th style={{ ...th, textAlign: "right", color: green }}>{measureLabelText}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(r => (
-                <tr key={r.key} style={{ borderTop: `1px solid ${border}` }}>
-                  {r.parts.map((part, i) => (
-                    <td key={i} style={{ ...td, fontWeight: i === 0 ? 600 : 400, color: i === 0 ? "#e8e8ed" : dim }}>{part}</td>
+          );
+        }
+
+        // Build primary-group buckets when we have ≥ 2 group-by dimensions.
+        // Each bucket holds its sub-rows + a roll-up aggregate (computed from
+        // all the underlying records so avg/min/max/median are correct, not
+        // just mechanical sums of sub-bucket values).
+        const hierarchical = groupBys.length >= 2;
+        const buckets = (() => {
+          if (!hierarchical) return null;
+          const map = new Map();
+          for (const r of rows) {
+            const primary = r.parts[0];
+            if (!map.has(primary)) map.set(primary, { label: primary, subRows: [], underlying: [] });
+            const b = map.get(primary);
+            b.subRows.push(r);
+            b.underlying.push(...r.rows);
+          }
+          const out = [];
+          for (const b of map.values()) {
+            const bucketValue = computeMeasure(b.underlying);
+            out.push({ ...b, count: b.underlying.length, value: bucketValue });
+          }
+          // Sort buckets per the global sort direction (primary level)
+          out.sort((a, b) => {
+            if (sortBy === "value_desc") return b.value - a.value;
+            if (sortBy === "value_asc")  return a.value - b.value;
+            if (sortBy === "key_asc")    return String(a.label).localeCompare(String(b.label));
+            if (sortBy === "key_desc")   return String(b.label).localeCompare(String(a.label));
+            return 0;
+          });
+          return out;
+        })();
+
+        // ── BAR CHART ──
+        if (chartType === "bar") {
+          const maxBucketValue = hierarchical ? Math.max(...buckets.map(b => b.value)) : maxValue;
+          if (!hierarchical) {
+            return (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                {rows.map(r => (
+                  <div key={r.key} style={{ display: "grid", gridTemplateColumns: "minmax(140px, 240px) 1fr 140px", gap: "0.85rem", alignItems: "center" }}>
+                    <div style={{ fontSize: "0.83rem", color: "#e8e8ed", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={r.key}>{r.key}</div>
+                    <div style={{ height: 22, background: "#0e0e10", borderRadius: 4, overflow: "hidden", border: `1px solid ${border}` }}>
+                      <div style={{
+                        width: `${maxValue > 0 ? (r.value / maxValue) * 100 : 0}%`, height: "100%",
+                        background: `linear-gradient(90deg, ${green}40, ${green})`,
+                        transition: "width 0.5s ease",
+                      }} />
+                    </div>
+                    <div style={{ fontFamily: mono, fontSize: "0.85rem", color: green, fontWeight: 700, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                      {fmtValue(r.value)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          }
+          // Hierarchical bar chart — each primary group is a section with its
+          // own roll-up bar on top, then child bars indented below.
+          return (
+            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+              {buckets.map(bk => {
+                const subMax = Math.max(...bk.subRows.map(r => r.value));
+                return (
+                  <div key={bk.label} style={{ background: "rgba(255,255,255,0.02)", borderRadius: 6, padding: "0.6rem 0.75rem" }}>
+                    {/* Primary header row — roll-up */}
+                    <div style={{ display: "grid", gridTemplateColumns: "minmax(140px, 240px) 1fr 140px", gap: "0.85rem", alignItems: "center", marginBottom: "0.45rem", borderBottom: `1px solid ${border}`, paddingBottom: "0.4rem" }}>
+                      <div style={{ fontSize: "0.9rem", color: "#e8e8ed", fontWeight: 700 }} title={bk.label}>{bk.label}</div>
+                      <div style={{ height: 22, background: "#0e0e10", borderRadius: 4, overflow: "hidden", border: `1px solid ${border}` }}>
+                        <div style={{
+                          width: `${maxBucketValue > 0 ? (bk.value / maxBucketValue) * 100 : 0}%`, height: "100%",
+                          background: `linear-gradient(90deg, ${green}60, ${green})`,
+                          transition: "width 0.5s ease",
+                        }} />
+                      </div>
+                      <div style={{ fontFamily: mono, fontSize: "0.9rem", color: green, fontWeight: 800, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                        {fmtValue(bk.value)}
+                      </div>
+                    </div>
+                    {/* Sub-rows — children (dimmer, indented) */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
+                      {bk.subRows.map(sr => (
+                        <div key={sr.key} style={{ display: "grid", gridTemplateColumns: "minmax(140px, 240px) 1fr 140px", gap: "0.85rem", alignItems: "center", paddingLeft: "0.85rem" }}>
+                          <div style={{ fontSize: "0.78rem", color: "#c0c0c8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={sr.parts.slice(1).join(" · ")}>
+                            <span style={{ color: dim, marginRight: "0.3rem" }}>↳</span>
+                            {sr.parts.slice(1).join(" · ")}
+                          </div>
+                          <div style={{ height: 14, background: "#0e0e10", borderRadius: 3, overflow: "hidden", border: `1px solid ${border}` }}>
+                            <div style={{
+                              width: `${subMax > 0 ? (sr.value / subMax) * 100 : 0}%`, height: "100%",
+                              background: `linear-gradient(90deg, ${green}20, ${green}80)`,
+                              transition: "width 0.5s ease",
+                            }} />
+                          </div>
+                          <div style={{ fontFamily: mono, fontSize: "0.78rem", color: "#c0c0c8", fontWeight: 600, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                            {fmtValue(sr.value)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        }
+
+        // ── TABLE ──
+        // Flat: no hierarchy, render rows plainly.
+        if (!hierarchical) {
+          return (
+            <div style={{ border: `1px solid ${border}`, borderRadius: 8, overflow: "auto", maxHeight: 520 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
+                <thead style={{ background: "#0e0e10", position: "sticky", top: 0 }}>
+                  <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                    {groupBys.map(g => <th key={g} style={th}>{t(PIVOT_COLUMNS[g]?.label)}</th>)}
+                    <th style={{ ...th, textAlign: "right" }}>{lang === "sk" ? "Projektov" : "Projects"}</th>
+                    <th style={{ ...th, textAlign: "right", color: green }}>{measureLabelText}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map(r => (
+                    <tr key={r.key} style={{ borderTop: `1px solid ${border}` }}>
+                      {r.parts.map((part, i) => (
+                        <td key={i} style={{ ...td, fontWeight: 600, color: "#e8e8ed" }}>{part}</td>
+                      ))}
+                      <td style={{ ...td, textAlign: "right", fontFamily: mono, color: dim }}>{r.count}</td>
+                      <td style={{ ...td, textAlign: "right", fontFamily: mono, color: green, fontWeight: 700 }}>
+                        {fmtValue(r.value)}
+                      </td>
+                    </tr>
                   ))}
-                  <td style={{ ...td, textAlign: "right", fontFamily: mono, color: dim }}>{r.count}</td>
-                  <td style={{ ...td, textAlign: "right", fontFamily: mono, color: green, fontWeight: 700 }}>
-                    {fmtValue(r.value)}
-                  </td>
+                </tbody>
+              </table>
+            </div>
+          );
+        }
+        // Hierarchical: first column merged via rowSpan per primary group.
+        // Header shows primary group label once, spanning all its sub-rows;
+        // that cell also carries the roll-up aggregate as a sub-label.
+        return (
+          <div style={{ border: `1px solid ${border}`, borderRadius: 8, overflow: "auto", maxHeight: 640 }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
+              <thead style={{ background: "#0e0e10", position: "sticky", top: 0 }}>
+                <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                  {groupBys.map(g => <th key={g} style={th}>{t(PIVOT_COLUMNS[g]?.label)}</th>)}
+                  <th style={{ ...th, textAlign: "right" }}>{lang === "sk" ? "Projektov" : "Projects"}</th>
+                  <th style={{ ...th, textAlign: "right", color: green }}>{measureLabelText}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </thead>
+              <tbody>
+                {buckets.map(bk => bk.subRows.map((sr, i) => (
+                  <tr key={sr.key} style={{
+                    borderTop: i === 0 ? `2px solid ${border}` : `1px solid #1a1a20`,
+                    background: i % 2 ? "transparent" : "rgba(255,255,255,0.01)",
+                  }}>
+                    {/* Merged primary cell — renders once per bucket, spans all sub-rows */}
+                    {i === 0 && (
+                      <td
+                        rowSpan={bk.subRows.length}
+                        style={{
+                          ...td,
+                          background: "#0e0e10",
+                          fontWeight: 700,
+                          color: "#e8e8ed",
+                          verticalAlign: "top",
+                          borderRight: `1px solid ${border}`,
+                          minWidth: 160,
+                        }}>
+                        <div style={{ fontSize: "0.92rem" }}>{bk.label}</div>
+                        <div style={{ fontSize: "0.66rem", color: dim, fontFamily: mono, marginTop: "0.3rem", letterSpacing: "0.04em" }}>
+                          {bk.subRows.length} {lang === "sk" ? "skupín" : "groups"} · {bk.count} {lang === "sk" ? "proj." : "proj."}
+                        </div>
+                        <div style={{ fontSize: "0.78rem", color: green, fontFamily: mono, marginTop: "0.3rem", fontWeight: 700 }}>
+                          Σ {fmtValue(bk.value)}
+                        </div>
+                      </td>
+                    )}
+                    {/* Sub-level cells (columns 2..N) */}
+                    {sr.parts.slice(1).map((part, idx) => (
+                      <td key={idx} style={{
+                        ...td,
+                        color: idx === sr.parts.length - 2 ? "#e8e8ed" : dim,
+                        paddingLeft: idx === 0 ? "1.1rem" : td.padding,
+                      }}>
+                        {idx === 0 && <span style={{ color: dim, marginRight: "0.4rem" }}>↳</span>}
+                        {part}
+                      </td>
+                    ))}
+                    <td style={{ ...td, textAlign: "right", fontFamily: mono, color: dim }}>{sr.count}</td>
+                    <td style={{ ...td, textAlign: "right", fontFamily: mono, color: green, fontWeight: 700 }}>
+                      {fmtValue(sr.value)}
+                    </td>
+                  </tr>
+                )))}
+              </tbody>
+            </table>
+          </div>
+        );
+      })()}
 
       <style>{`
         @media (max-width: 760px) { .pivot-grid { grid-template-columns: 1fr !important; } }
