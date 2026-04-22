@@ -1009,11 +1009,15 @@ function RowsZone({
               label={t(PIVOT_COLUMNS[g]?.label)}
               level={i}
               hasFilter={activeFiltersByCol.has(g)}
+              canMoveUp={i > 0}
+              canMoveDown={i < chips.length - 1}
               onDragStart={() => setDragState({ source: "rows", column: g })}
               onDragEnd={() => { setDragState(null); setDropIdx(null); }}
               onDragOver={(e) => { if (dragState) { e.preventDefault(); const rect = e.currentTarget.getBoundingClientRect(); const mid = rect.left + rect.width / 2; setDropIdx(e.clientX < mid ? i : i + 1); } }}
               onRemove={() => onRemove(g)}
               onOpenFilter={(anchorEl) => onOpenFilter(g, anchorEl)}
+              onMoveUp={() => onReorder(i, i - 1)}
+              onMoveDown={() => onReorder(i, i + 1)}
               lang={lang}
             />
           </span>
@@ -1048,7 +1052,13 @@ function DropCaret({ active, onDragOver }) {
 }
 
 /* Draggable chip — supports drag + per-chip autofilter button + remove. */
-function DraggableChip({ column, label, level, hasFilter, onDragStart, onDragEnd, onDragOver, onRemove, onOpenFilter, lang }) {
+function DraggableChip({ column, label, level, hasFilter, canMoveUp, canMoveDown, onDragStart, onDragEnd, onDragOver, onRemove, onOpenFilter, onMoveUp, onMoveDown, lang }) {
+  const btnStyle = (enabled) => ({
+    background: "transparent", border: "none",
+    color: enabled ? green : "#2a2a30",
+    cursor: enabled ? "pointer" : "not-allowed",
+    padding: "0 2px", fontSize: "0.7rem", lineHeight: 1, fontFamily: "inherit",
+  });
   return (
     <span
       draggable
@@ -1061,8 +1071,8 @@ function DraggableChip({ column, label, level, hasFilter, onDragStart, onDragEnd
       onDragEnd={onDragEnd}
       onDragOver={onDragOver}
       style={{
-        display: "inline-flex", alignItems: "center", gap: "0.35rem",
-        padding: "0.3rem 0.5rem 0.3rem 0.6rem", borderRadius: 100,
+        display: "inline-flex", alignItems: "center", gap: "0.3rem",
+        padding: "0.3rem 0.4rem 0.3rem 0.55rem", borderRadius: 100,
         background: hasFilter ? "rgba(0,229,160,0.22)" : "rgba(0,229,160,0.12)",
         border: `1px solid ${hasFilter ? green : green + "cc"}`,
         color: green, fontSize: "0.74rem", fontFamily: mono, cursor: "grab",
@@ -1070,10 +1080,17 @@ function DraggableChip({ column, label, level, hasFilter, onDragStart, onDragEnd
       }}
       onMouseDown={(e) => e.currentTarget.style.cursor = "grabbing"}
       onMouseUp={(e) => e.currentTarget.style.cursor = "grab"}
-      title={lang === "sk" ? `Level ${level + 1} hierarchie · ťahaj pre posun` : `Hierarchy level ${level + 1} · drag to move`}
+      title={lang === "sk" ? `Level ${level + 1} hierarchie` : `Hierarchy level ${level + 1}`}
     >
       <span style={{ fontFamily: mono, fontSize: "0.62rem", opacity: 0.7 }}>L{level + 1}</span>
       <span style={{ fontWeight: 600 }}>{label}</span>
+      {/* Reorder arrows (click-based — drag is bonus when it works) */}
+      <button onClick={(e) => { e.stopPropagation(); canMoveUp && onMoveUp(); }} disabled={!canMoveUp}
+        title={lang === "sk" ? "Posunúť hore (vyšší level)" : "Move up (higher level)"}
+        style={btnStyle(canMoveUp)}>◂</button>
+      <button onClick={(e) => { e.stopPropagation(); canMoveDown && onMoveDown(); }} disabled={!canMoveDown}
+        title={lang === "sk" ? "Posunúť dole (nižší level)" : "Move down (lower level)"}
+        style={btnStyle(canMoveDown)}>▸</button>
       {/* Filter icon — shows filled when an autofilter is active */}
       <button
         onClick={(e) => { e.stopPropagation(); onOpenFilter(e.currentTarget); }}
@@ -1083,7 +1100,7 @@ function DraggableChip({ column, label, level, hasFilter, onDragStart, onDragEnd
           border: `1px solid ${hasFilter ? green : green + "66"}`,
           color: hasFilter ? "#0a0a0b" : green,
           borderRadius: 3, cursor: "pointer", padding: "2px 4px",
-          fontSize: "0.7rem", lineHeight: 1, fontFamily: "inherit",
+          fontSize: "0.68rem", lineHeight: 1, fontFamily: "inherit", marginLeft: "0.1rem",
         }}
       >⚑</button>
       <button
@@ -1130,7 +1147,7 @@ function FieldPalette({ available, chipsInRows, dragState, setDragState, onAdd, 
             {lang === "sk" ? "Všetky polia už používaš." : "All fields in use."}
           </span>
         ) : available.map(k => (
-          <span
+          <button
             key={k}
             draggable
             onDragStart={(e) => {
@@ -1139,11 +1156,11 @@ function FieldPalette({ available, chipsInRows, dragState, setDragState, onAdd, 
               setDragState({ source: "palette", column: k });
             }}
             onDragEnd={() => setDragState(null)}
-            onDoubleClick={() => onAdd(k)}
-            title={lang === "sk" ? "Ťahaj do riadkov (alebo 2× klik)" : "Drag into rows (or double-click)"}
+            onClick={() => onAdd(k)}
+            title={lang === "sk" ? "Pridať do riadkov (alebo ťahaj)" : "Add to rows (or drag)"}
             style={{
               fontFamily: "inherit", fontSize: "0.72rem",
-              padding: "0.3rem 0.6rem", borderRadius: 100, cursor: "grab",
+              padding: "0.3rem 0.6rem", borderRadius: 100, cursor: "pointer",
               background: "transparent", border: `1px solid ${border}`, color: dim,
               display: "inline-flex", alignItems: "center", gap: "0.25rem",
               userSelect: "none",
@@ -1151,9 +1168,9 @@ function FieldPalette({ available, chipsInRows, dragState, setDragState, onAdd, 
             onMouseEnter={e => { e.currentTarget.style.borderColor = green; e.currentTarget.style.color = green; }}
             onMouseLeave={e => { e.currentTarget.style.borderColor = border; e.currentTarget.style.color = dim; }}
           >
-            <span style={{ opacity: 0.55, fontFamily: mono, fontSize: "0.6rem" }}>⋮⋮</span>
+            <span style={{ opacity: 0.7, fontFamily: mono, fontSize: "0.6rem" }}>+</span>
             {t(PIVOT_COLUMNS[k]?.label)}
-          </span>
+          </button>
         ))}
       </div>
     </div>
@@ -1783,65 +1800,82 @@ function AnalyticsPivot({ snapshots, projects, lang }) {
           );
         }
 
-        // TABLE (tree) — one column per group-by level + count + measure.
-        // Intermediate nodes are emphasised subtotal rows; leaves are regular.
-        // Each non-leaf node has a chevron (▸/▾) to collapse/expand.
+        // TABLE (tree) — one merged "group" column with indentation per level.
+        // This keeps the table compact regardless of hierarchy depth (no empty
+        // whitespace stretching across L1-L5 for leaf rows). Subtotals are
+        // bolder / slightly tinted, leaves are regular. Each non-leaf node has
+        // a chevron (▸/▾) to collapse/expand.
         return (
           <div style={{ border: `1px solid ${border}`, borderRadius: 8, overflow: "auto", maxHeight: 720 }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
               <thead style={{ background: "#0e0e10", position: "sticky", top: 0, zIndex: 2 }}>
                 <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.64rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                  {rowGroups.map((g, i) => (
-                    <th key={g} style={{ ...th, color: i === 0 ? green : dim, minWidth: 120 }}>
-                      <span style={{ opacity: 0.65, marginRight: "0.35rem" }}>L{i + 1}</span>{t(PIVOT_COLUMNS[g]?.label)}
-                    </th>
-                  ))}
-                  <th style={{ ...th, textAlign: "right", minWidth: 70 }}>{lang === "sk" ? "Proj." : "Proj."}</th>
-                  <th style={{ ...th, textAlign: "right", color: green, minWidth: 110 }}>{measureLabelText}</th>
+                  <th style={{ ...th, color: green }}>
+                    {rowGroups.map((g, i) => (
+                      <span key={g}>
+                        {i > 0 && <span style={{ color: dim, opacity: 0.5, margin: "0 0.3rem" }}>›</span>}
+                        <span style={{ color: i === 0 ? green : dim }}>{t(PIVOT_COLUMNS[g]?.label)}</span>
+                      </span>
+                    ))}
+                  </th>
+                  <th style={{ ...th, textAlign: "right", minWidth: 60, width: 80 }}>{lang === "sk" ? "Proj." : "Proj."}</th>
+                  <th style={{ ...th, textAlign: "right", color: green, minWidth: 90, width: 140 }}>{measureLabelText}</th>
                 </tr>
               </thead>
               <tbody>
                 {flatTreeRows.map((n, idx) => {
                   const isSubtotal = !n.isLeaf;
-                  const shadeForLevel = ["#0f0f12", "#0c0c0e", "#0a0a0b", "#090909"][Math.min(n.level, 3)];
+                  const shadeForLevel = ["#12121a", "#0f0f14", "#0c0c0f", "#0a0a0c"][Math.min(n.level, 3)];
+                  // Indentation: when subtotals are ON, we visualise hierarchy
+                  // through indent + parent rows (context comes from above).
+                  // When subtotals are OFF, we render leaves as a flat list
+                  // with the FULL path inline ("District › Project") — so
+                  // there's no need to indent deeper levels.
+                  const indent = showSubtotals ? 0.4 + n.level * 0.75 : 0.4;
+                  // Leaves without subtotals → show full path inline so user
+                  // sees the context (district, developer, project) all in
+                  // one cell. With subtotals ON, parent rows carry context,
+                  // so just the leaf's own label is sufficient.
+                  const displayText = (!showSubtotals && n.isLeaf && rowGroups.length > 1)
+                    ? n.path.join(" › ")
+                    : n.label;
                   return (
                     <tr
                       key={n.pathKey + "|" + idx}
                       style={{
                         background: isSubtotal ? shadeForLevel : (idx % 2 ? "transparent" : "rgba(255,255,255,0.015)"),
-                        borderTop: n.level === 0 ? `2px solid ${border}` : `1px solid #1a1a20`,
+                        borderTop: n.level === 0 ? `1px solid ${border}` : `1px solid #16161a`,
                       }}
                     >
-                      {rowGroups.map((g, i) => {
-                        if (i < n.level) {
-                          // Above the node's own level — empty "indentation" cell
-                          return <td key={g} style={{ ...td, background: "transparent" }} />;
-                        }
-                        if (i === n.level) {
-                          const pad = 0.4 + n.level * 0.6;
-                          return (
-                            <td key={g} style={{ ...td, paddingLeft: `${pad}rem`, fontWeight: isSubtotal ? 700 : 500, color: isSubtotal ? "#e8e8ed" : "#c4c4cc" }}>
-                              {n.hasChildren ? (
-                                <button
-                                  onClick={() => toggleNode(n.pathKey)}
-                                  style={{ background: "transparent", border: "none", color: green, cursor: "pointer", padding: 0, marginRight: "0.35rem", fontSize: "0.7rem", width: 14, display: "inline-block" }}
-                                  title={n.isCollapsed ? (lang === "sk" ? "Rozbaliť" : "Expand") : (lang === "sk" ? "Zbaliť" : "Collapse")}
-                                >{n.isCollapsed ? "▸" : "▾"}</button>
-                              ) : (
-                                <span style={{ display: "inline-block", width: 14, marginRight: "0.35rem" }} />
-                              )}
-                              <span title={n.label} style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{n.label}</span>
-                              {isSubtotal && n.isCollapsed && (
-                                <span style={{ marginLeft: "0.5rem", fontSize: "0.64rem", color: dim, fontFamily: mono, opacity: 0.7 }}>
-                                  ({n.children.length}{lang === "sk" ? " pod" : " sub"})
-                                </span>
-                              )}
-                            </td>
-                          );
-                        }
-                        // Below node's level — blank (children will fill these deeper columns)
-                        return <td key={g} style={{ ...td, background: "transparent" }} />;
-                      })}
+                      <td style={{
+                        ...td,
+                        paddingLeft: `${indent}rem`,
+                        fontWeight: isSubtotal ? 700 : 400,
+                        color: isSubtotal ? "#e8e8ed" : "#c4c4cc",
+                        whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                      }}>
+                        {/* Level pill — tiny, only on subtotal rows as a visual anchor */}
+                        {isSubtotal && (
+                          <span style={{ fontFamily: mono, fontSize: "0.55rem", color: green, opacity: 0.7, marginRight: "0.4rem", padding: "1px 4px", border: `1px solid ${green}33`, borderRadius: 3, verticalAlign: "middle" }}>
+                            L{n.level + 1}
+                          </span>
+                        )}
+                        {n.hasChildren ? (
+                          <button
+                            onClick={() => toggleNode(n.pathKey)}
+                            style={{ background: "transparent", border: "none", color: green, cursor: "pointer", padding: 0, marginRight: "0.35rem", fontSize: "0.7rem", width: 12, display: "inline-block", verticalAlign: "middle" }}
+                            title={n.isCollapsed ? (lang === "sk" ? "Rozbaliť" : "Expand") : (lang === "sk" ? "Zbaliť" : "Collapse")}
+                          >{n.isCollapsed ? "▸" : "▾"}</button>
+                        ) : (
+                          <span style={{ display: "inline-block", width: 12, marginRight: "0.35rem" }} />
+                        )}
+                        <span title={displayText}>{displayText}</span>
+                        {isSubtotal && n.isCollapsed && (
+                          <span style={{ marginLeft: "0.5rem", fontSize: "0.64rem", color: dim, fontFamily: mono, opacity: 0.7 }}>
+                            ({n.children.length}{lang === "sk" ? " pod" : " sub"})
+                          </span>
+                        )}
+                      </td>
                       <td style={{ ...td, textAlign: "right", fontFamily: mono, color: isSubtotal ? "#c4c4cc" : dim, fontWeight: isSubtotal ? 600 : 400 }}>
                         {n.count}
                       </td>
@@ -1854,7 +1888,7 @@ function AnalyticsPivot({ snapshots, projects, lang }) {
                 })}
                 {/* Grand total */}
                 <tr style={{ background: "#0a0a0b", borderTop: `2px solid ${green}66` }}>
-                  <td colSpan={rowGroups.length} style={{ ...td, fontWeight: 800, color: green, fontFamily: mono, letterSpacing: "0.06em", textTransform: "uppercase", fontSize: "0.74rem" }}>
+                  <td style={{ ...td, fontWeight: 800, color: green, fontFamily: mono, letterSpacing: "0.06em", textTransform: "uppercase", fontSize: "0.74rem" }}>
                     Σ {lang === "sk" ? "CELKOM" : "TOTAL"}
                   </td>
                   <td style={{ ...td, textAlign: "right", fontFamily: mono, color: green, fontWeight: 700 }}>{rawTree.count}</td>
