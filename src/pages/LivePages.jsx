@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
 import { useProjects, useProjectFlats, useEarlyAccessStats, useProjectSnapshots } from "../lib/useData";
@@ -1664,51 +1664,72 @@ function AnalyticsPivot({ snapshots, projects, lang }) {
             {lang === "sk" ? "Metrika + agregácia" : "Measure + aggregation"}
           </div>
           <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
-            <select value={measure.agg} onChange={e => setMeasure(m => ({ ...m, agg: e.target.value }))} style={{ ...pvtInput, marginTop: 0, flex: "0 0 130px" }}>
-              <option value="count">count</option>
-              <option value="count_distinct">count distinct</option>
-              <option value="sum">sum</option>
-              <option value="avg">avg</option>
-              <option value="min">min</option>
-              <option value="max">max</option>
-              <option value="median">median</option>
-            </select>
+            <StyledSelect
+              value={measure.agg}
+              onChange={(v) => setMeasure(m => ({ ...m, agg: v }))}
+              style={{ flex: "0 0 140px" }}
+              options={[
+                { value: "count",          label: "count" },
+                { value: "count_distinct", label: "count distinct" },
+                { value: "sum",            label: "sum" },
+                { value: "avg",            label: "avg" },
+                { value: "min",            label: "min" },
+                { value: "max",            label: "max" },
+                { value: "median",         label: "median" },
+              ]}
+            />
             <span style={{ color: dim, fontSize: "0.82rem" }}>{lang === "sk" ? "z" : "of"}</span>
-            <select value={measure.column} onChange={e => setMeasure(m => ({ ...m, column: e.target.value }))} style={{ ...pvtInput, marginTop: 0, flex: 1 }}>
-              <option value="__count__">* (all rows)</option>
-              {measure.agg === "count_distinct"
-                ? Object.keys(PIVOT_COLUMNS).map(k => (
-                    <option key={k} value={k}>{t(PIVOT_COLUMNS[k].label)}</option>
-                  ))
-                : numericColumnKeys.map(k => (
-                    <option key={k} value={k}>{t(PIVOT_COLUMNS[k].label)}</option>
-                  ))}
-            </select>
+            <StyledSelect
+              value={measure.column}
+              onChange={(v) => setMeasure(m => ({ ...m, column: v }))}
+              style={{ flex: 1 }}
+              options={[
+                { value: "__count__", label: "* (all rows)" },
+                ...(measure.agg === "count_distinct"
+                    ? Object.keys(PIVOT_COLUMNS).map(k => ({ value: k, label: t(PIVOT_COLUMNS[k].label) }))
+                    : numericColumnKeys.map(k => ({ value: k, label: t(PIVOT_COLUMNS[k].label) }))),
+              ]}
+            />
           </div>
 
           <div style={{ marginTop: "0.6rem", display: "flex", gap: "0.4rem" }}>
-            <select value={chartType} onChange={e => setChartType(e.target.value)} style={{ ...pvtInput, marginTop: 0, flex: 1 }}>
-              <option value="table">🗂️ {lang === "sk" ? "tabuľka (strom)" : "table (tree)"}</option>
-              <option value="bar">📊 {lang === "sk" ? "bar (top-level)" : "bar (top-level)"}</option>
-            </select>
-            <select value={sortBy} onChange={e => setSortBy(e.target.value)} style={{ ...pvtInput, marginTop: 0, flex: 1 }}>
-              <option value="value_desc">↓ {lang === "sk" ? "podľa hodnoty (najväčšie)" : "by value (desc)"}</option>
-              <option value="value_asc">↑ {lang === "sk" ? "podľa hodnoty (najmenšie)" : "by value (asc)"}</option>
-              <option value="key_asc">A–Z</option>
-              <option value="key_desc">Z–A</option>
-            </select>
+            <StyledSelect
+              value={chartType}
+              onChange={setChartType}
+              style={{ flex: 1 }}
+              options={[
+                { value: "table", label: `🗂️ ${lang === "sk" ? "tabuľka (strom)" : "table (tree)"}` },
+                { value: "bar",   label: `📊 ${lang === "sk" ? "bar (top-level)"  : "bar (top-level)"}` },
+              ]}
+            />
+            <StyledSelect
+              value={sortBy}
+              onChange={setSortBy}
+              style={{ flex: 1 }}
+              options={[
+                { value: "value_desc", label: `↓ ${lang === "sk" ? "podľa hodnoty (najväčšie)" : "by value (desc)"}` },
+                { value: "value_asc",  label: `↑ ${lang === "sk" ? "podľa hodnoty (najmenšie)" : "by value (asc)"}` },
+                { value: "key_asc",    label: "A–Z" },
+                { value: "key_desc",   label: "Z–A" },
+              ]}
+            />
           </div>
 
           <div style={{ marginTop: "0.6rem", display: "flex", gap: "0.55rem", alignItems: "center", flexWrap: "wrap" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
               <span style={{ fontSize: "0.72rem", color: dim, fontFamily: mono }}>Top-N:</span>
-              <select value={topN} onChange={e => setTopN(Number(e.target.value))} style={{ ...pvtInput, marginTop: 0, flex: "0 0 80px", padding: "0.4rem 0.5rem" }}>
-                <option value={0}>{lang === "sk" ? "Všetko" : "All"}</option>
-                <option value={5}>5</option>
-                <option value={10}>10</option>
-                <option value={20}>20</option>
-                <option value={50}>50</option>
-              </select>
+              <StyledSelect
+                value={topN}
+                onChange={(v) => setTopN(Number(v))}
+                style={{ flex: "0 0 90px" }}
+                options={[
+                  { value: 0,  label: lang === "sk" ? "Všetko" : "All" },
+                  { value: 5,  label: "5" },
+                  { value: 10, label: "10" },
+                  { value: 20, label: "20" },
+                  { value: 50, label: "50" },
+                ]}
+              />
             </div>
             <label style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem", cursor: "pointer", fontSize: "0.74rem", color: "#e8e8ed" }}
               title={!pctOfTotalValid ? (lang === "sk" ? "Pre avg/min/max/medián nie je sčítateľné" : "Not additive for avg/min/max/median") : ""}>
@@ -1925,6 +1946,135 @@ function AnalyticsPivot({ snapshots, projects, lang }) {
 
 /* FilterRow — one row in the multi-filter list. Column dropdown +
    operator dropdown (context-aware) + value input (context-aware). */
+/* StyledSelect — a drop-in replacement for <select> that fully respects the
+   dark theme. Native <select> drops back to the OS-rendered options list,
+   which on macOS is a pale grey popover that clashes with everything. This
+   custom component renders a button + a styled popover list, matching
+   pvtInput exactly so the visual parity with other inputs is preserved.
+
+   Options can be passed as strings or {value, label} pairs. onChange receives
+   the raw value (not an event). Outside-click and Esc close the popover. */
+function StyledSelect({ value, onChange, options, style = {}, disabled = false, title, placeholder, ariaLabel, flex }) {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef(null);
+  const popRef = useRef(null);
+  const opts = (options || []).map(o => (typeof o === "string" || typeof o === "number") ? { value: o, label: String(o) } : o);
+  const selected = opts.find(o => o.value === value);
+  const displayLabel = selected?.label ?? placeholder ?? "";
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e) => {
+      if (popRef.current && popRef.current.contains(e.target)) return;
+      if (btnRef.current && btnRef.current.contains(e.target)) return;
+      setOpen(false);
+    };
+    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div style={{ position: "relative", flex, minWidth: 0, ...style }}>
+      <button
+        ref={btnRef}
+        type="button"
+        disabled={disabled}
+        onClick={() => !disabled && setOpen(o => !o)}
+        title={title}
+        aria-label={ariaLabel}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        style={{
+          ...pvtInput,
+          marginTop: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "0.5rem",
+          cursor: disabled ? "not-allowed" : "pointer",
+          opacity: disabled ? 0.5 : 1,
+          textAlign: "left",
+          width: "100%",
+          color: "#e8e8ed",
+        }}
+        onMouseEnter={e => { if (!disabled) e.currentTarget.style.borderColor = green + "88"; }}
+        onMouseLeave={e => { e.currentTarget.style.borderColor = border; }}
+      >
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{displayLabel}</span>
+        <span style={{ color: green, fontSize: "0.62rem", opacity: 0.8, fontFamily: mono, flexShrink: 0 }}>
+          {open ? "▴" : "▾"}
+        </span>
+      </button>
+      {open && (
+        <div
+          ref={popRef}
+          role="listbox"
+          style={{
+            position: "absolute",
+            top: "calc(100% + 4px)",
+            left: 0,
+            minWidth: "100%",
+            maxWidth: "min(420px, 85vw)",
+            background: "#0a0a0b",
+            border: `1px solid ${green}55`,
+            borderRadius: 6,
+            boxShadow: "0 12px 32px rgba(0,0,0,0.75)",
+            maxHeight: 280,
+            overflowY: "auto",
+            zIndex: 500,
+            padding: "0.25rem",
+          }}
+        >
+          {opts.length === 0 ? (
+            <div style={{ padding: "0.4rem 0.65rem", color: dim, fontSize: "0.78rem", fontStyle: "italic" }}>—</div>
+          ) : opts.map(o => {
+            const isSelected = o.value === value;
+            return (
+              <button
+                key={String(o.value)}
+                type="button"
+                role="option"
+                aria-selected={isSelected}
+                onClick={() => { onChange(o.value); setOpen(false); }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  width: "100%",
+                  textAlign: "left",
+                  background: isSelected ? "rgba(0,229,160,0.14)" : "transparent",
+                  border: "none",
+                  borderLeft: `2px solid ${isSelected ? green : "transparent"}`,
+                  color: isSelected ? green : "#e8e8ed",
+                  padding: "0.4rem 0.65rem",
+                  fontSize: "0.82rem",
+                  fontFamily: "inherit",
+                  cursor: "pointer",
+                  borderRadius: 3,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+                onMouseEnter={e => { if (!isSelected) { e.currentTarget.style.background = "rgba(255,255,255,0.045)"; e.currentTarget.style.color = green; } }}
+                onMouseLeave={e => { if (!isSelected) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#e8e8ed"; } }}
+              >
+                <span style={{ width: 14, display: "inline-block", marginRight: "0.25rem", color: green, fontSize: "0.75rem" }}>
+                  {isSelected ? "✓" : ""}
+                </span>
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{o.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function FilterRow({ f, projects, lang, t, onChange, onRemove }) {
   const col = PIVOT_COLUMNS[f.column] || {};
   const colType = col.type;
@@ -1954,16 +2104,18 @@ function FilterRow({ f, projects, lang, t, onChange, onRemove }) {
       gap: "0.4rem", alignItems: "center",
     }}>
       {/* Column */}
-      <select value={f.column} onChange={e => setCol(e.target.value)} style={{ ...pvtInput, marginTop: 0 }}>
-        {Object.entries(PIVOT_COLUMNS).map(([k, c]) => (
-          <option key={k} value={k}>{t(c.label)}</option>
-        ))}
-      </select>
+      <StyledSelect
+        value={f.column}
+        onChange={setCol}
+        options={Object.entries(PIVOT_COLUMNS).map(([k, c]) => ({ value: k, label: t(c.label) }))}
+      />
 
       {/* Operator */}
-      <select value={f.op} onChange={e => onChange({ op: e.target.value })} style={{ ...pvtInput, marginTop: 0 }}>
-        {ops.map(op => <option key={op} value={op}>{op}</option>)}
-      </select>
+      <StyledSelect
+        value={f.op}
+        onChange={(v) => onChange({ op: v })}
+        options={ops.map(op => ({ value: op, label: op }))}
+      />
 
       {/* Value(s) */}
       <div>
