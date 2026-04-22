@@ -1512,7 +1512,14 @@ function normGroupKey(v) {
 
 // Filter evaluation
 const FILTER_OPS_TEXT = ["is", "is not", "contains", "starts with", "ends with", "in", "not in", "is empty", "not empty"];
-const FILTER_OPS_NUM  = ["=", "≠", "<", "≤", ">", "≥", "between", "is empty", "not empty"];
+// Number ops include in / not in too so the user can pick multiple specific
+// numeric values (e.g. izby in {1, 2, 3}) or exclude a set (cena_s_dph not in
+// a few outliers). Same multi-select chip UX as text columns.
+const FILTER_OPS_NUM  = ["=", "≠", "<", "≤", ">", "≥", "between", "in", "not in", "is empty", "not empty"];
+
+// Sentinel for "empty" entries in chip multi-select. Stored in `f.values`
+// so the filter survives serialize/deserialize. matchesFilter recognises it.
+const EMPTY_SENTINEL = "__EMPTY__";
 
 /* A filter is "incomplete" when the user picked an operator but hasn't
    supplied a value yet. This is the intermediate state right after
@@ -1535,9 +1542,39 @@ function matchesFilter(row, f) {
   if (isIncompleteFilter(f)) return true;
   const v = cellValue(row, f.column);
   const colType = PIVOT_COLUMNS[f.column]?.type;
-  if (f.op === "is empty") return v == null || v === "";
-  if (f.op === "not empty") return v != null && v !== "";
-  if (v == null || v === "") return false;
+  const isEmpty = v == null || v === "";
+
+  // Explicit empty / not-empty filters always win — check first.
+  if (f.op === "is empty") return isEmpty;
+  if (f.op === "not empty") return !isEmpty;
+
+  // in / not in — available for BOTH text and number columns. Uses chip
+  // multi-select (f.values = array). Values are stored as strings; we
+  // compare by trimmed-lowercased string for text, and by numeric equality
+  // for numbers so "44.7" picks match "44.7" in data even if representation
+  // differs slightly. EMPTY_SENTINEL picks empty rows.
+  if (f.op === "in" || f.op === "not in") {
+    const vals = f.values || [];
+    const wantsEmpty = vals.includes(EMPTY_SENTINEL);
+    const otherVals = vals.filter(x => x !== EMPTY_SENTINEL);
+    let matches;
+    if (isEmpty) {
+      matches = wantsEmpty;
+    } else if (colType === "number") {
+      const num = Number(v);
+      matches = otherVals.some(x => {
+        const xn = Number(x);
+        return Number.isFinite(xn) && xn === num;
+      });
+    } else {
+      const s = String(v).trim().toLowerCase();
+      matches = otherVals.map(x => String(x).trim().toLowerCase()).includes(s);
+    }
+    return f.op === "in" ? matches : !matches;
+  }
+
+  // From here on, rest of ops require a non-empty value — short-circuit.
+  if (isEmpty) return false;
 
   if (colType === "number") {
     const num = Number(v);
@@ -1552,8 +1589,7 @@ function matchesFilter(row, f) {
     }
     return true;
   }
-  // text + derived (bands are strings). Trim+lowercase for comparison so
-  // "YIT " and "YIT" are equivalent, but display preserves original case.
+  // text + derived
   const s = String(v).trim().toLowerCase();
   const q = String(f.value || "").trim().toLowerCase();
   if (f.op === "is")           return s === q;
@@ -1561,15 +1597,79 @@ function matchesFilter(row, f) {
   if (f.op === "contains")     return s.includes(q);
   if (f.op === "starts with")  return s.startsWith(q);
   if (f.op === "ends with")    return s.endsWith(q);
-  if (f.op === "in") {
-    const normValues = (f.values || []).map(x => String(x).trim().toLowerCase());
-    return normValues.includes(s);
-  }
-  if (f.op === "not in") {
-    const normValues = (f.values || []).map(x => String(x).trim().toLowerCase());
-    return !normValues.includes(s);
-  }
   return true;
+}
+
+/* Distinct values for a column, returned as a sorted array suitable for
+   chip / checkbox multi-select. Numeric columns sort ascending numerically;
+   text/derived columns sort alphanumerically (locale-aware). Empties (null
+   / "") are surfaced as a separate sentinel entry at the top of the list
+   if they exist so the user can include/exclude them explicitly. */
+function distinctValuesForColumn(rows, column) {
+  const colType = PIVOT_COLUMNS[column]?.type;
+  let hasEmpty = false;
+  const seen = new Set();
+  const outNums = [];
+  const outStrs = [];
+  for (const r of rows) {
+    const v = cellValue(r, column);
+    if (v == null || v === "") { hasEmpty = true; continue; }
+    if (colType === "number" || (colType === "derived" && typeof v === "number")) {
+      const n = Number(v);
+      if (!Number.isFinite(n)) continue;
+      if (seen.has(n)) continue;
+      seen.add(n);
+      outNums.push(n);
+    } else {
+      const s = String(v);
+      const key = s.trim().toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      outStrs.push(s);
+    }
+  }
+  let values;
+  if (outNums.length > 0 && outStrs.length === 0) {
+    values = outNums.sort((a, b) => a - b).map(String);
+  } else if (outStrs.length > 0 && outNums.length === 0) {
+    values = outStrs.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  } else {
+    // Mixed (rare) — coerce to strings, natural sort
+    values = [...outNums.map(String), ...outStrs].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  }
+  return { values, hasEmpty };
+}
+
+/* Quick summary stats for numeric columns — shown at the top of the
+   value picker so the user sees the shape of the data before they
+   pick. count = non-empty rows, min/max/median = numeric summary,
+   distinct = distinct-non-empty count, emptyN = rows with empty value. */
+function columnQuickStats(rows, column) {
+  const nums = [];
+  let emptyN = 0;
+  const distinct = new Set();
+  for (const r of rows) {
+    const v = cellValue(r, column);
+    if (v == null || v === "") { emptyN += 1; continue; }
+    distinct.add(typeof v === "number" ? v : String(v).trim().toLowerCase());
+    const n = Number(v);
+    if (Number.isFinite(n)) nums.push(n);
+  }
+  if (nums.length === 0) {
+    return { isNumeric: false, count: rows.length - emptyN, emptyN, distinct: distinct.size };
+  }
+  nums.sort((a, b) => a - b);
+  const mid = Math.floor(nums.length / 2);
+  const median = nums.length % 2 ? nums[mid] : (nums[mid - 1] + nums[mid]) / 2;
+  return {
+    isNumeric: true,
+    count: nums.length,
+    emptyN,
+    distinct: distinct.size,
+    min: nums[0],
+    max: nums[nums.length - 1],
+    median,
+  };
 }
 
 /* ── Tree helpers (module scope) ───────────────────────────
@@ -2001,17 +2101,26 @@ function FieldPalette({ available, chipsInRows, dragState, setDragState, onAdd, 
    we always store `in` for simpler reasoning). Real-time: the filtered
    dataset recomputes as soon as state updates, so pivot redraws
    immediately. */
-function ColumnAutofilter({ column, anchorEl, allValues, filter, onApply, onClear, onClose, lang }) {
+function ColumnAutofilter({ column, anchorEl, allValues, hasEmpty, stats, filter, onApply, onClear, onClose, lang }) {
   const [search, setSearch] = useState("");
+  const colType = PIVOT_COLUMNS[column]?.type;
+  // Keys used for equality: string values get trim+lowercase, numbers keep
+  // original string, EMPTY_SENTINEL kept as-is. Storing *keys* (not values)
+  // in the selected Set so comparisons are cheap and consistent.
+  const keyOf = (v) => v === EMPTY_SENTINEL ? EMPTY_SENTINEL
+                    : (colType === "number" ? String(v) : String(v).trim().toLowerCase());
+  const allKeys = () => {
+    const ks = allValues.map(keyOf);
+    if (hasEmpty) ks.unshift(EMPTY_SENTINEL);
+    return ks;
+  };
   const [selected, setSelected] = useState(() => {
-    if (filter && filter.op === "in") return new Set((filter.values || []).map(v => String(v).trim().toLowerCase()));
-    // Default: all values selected (no filter applied)
-    return new Set(allValues.map(v => String(v).trim().toLowerCase()));
+    if (filter && filter.op === "in") return new Set((filter.values || []).map(keyOf));
+    return new Set(allKeys());
   });
-  // Re-sync if column/filter change (reopening for a different chip)
   useEffect(() => {
-    if (filter && filter.op === "in") setSelected(new Set((filter.values || []).map(v => String(v).trim().toLowerCase())));
-    else setSelected(new Set(allValues.map(v => String(v).trim().toLowerCase())));
+    if (filter && filter.op === "in") setSelected(new Set((filter.values || []).map(keyOf)));
+    else setSelected(new Set(allKeys()));
   }, [column, filter?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Close on outside click / Esc
@@ -2031,42 +2140,71 @@ function ColumnAutofilter({ column, anchorEl, allValues, filter, onApply, onClea
     };
   }, [anchorEl, onClose]);
 
-  // Popup position — directly below anchor
+  // Popup position — directly below anchor. Width 340 to fit stats line.
   const rect = anchorEl?.getBoundingClientRect();
   const style = rect ? {
     position: "fixed",
     top: rect.bottom + 6,
-    left: Math.max(8, Math.min(rect.left, window.innerWidth - 320)),
+    left: Math.max(8, Math.min(rect.left, window.innerWidth - 360)),
     zIndex: 1000,
   } : { display: "none" };
 
+  // Label formatter — numbers get locale spacing, sentinel gets friendly label
+  const labelFor = (v) => {
+    if (v === EMPTY_SENTINEL) return lang === "sk" ? "(prázdne)" : "(empty)";
+    if (colType === "number") {
+      const n = Number(v);
+      if (Number.isFinite(n)) {
+        return Number.isInteger(n) ? n.toLocaleString("en-US").replace(/,/g, " ")
+                                   : (Math.round(n * 100) / 100).toLocaleString("en-US").replace(/,/g, " ");
+      }
+    }
+    return String(v);
+  };
+
   const q = search.trim().toLowerCase();
-  const shown = q ? allValues.filter(v => String(v).toLowerCase().includes(q)) : allValues;
-  const allChecked = shown.every(v => selected.has(String(v).trim().toLowerCase()));
+  const filteredValues = q
+    ? allValues.filter(v => String(v).toLowerCase().includes(q))
+    : allValues;
+  const shown = hasEmpty && (!q || "empty".includes(q) || "prázdne".includes(q))
+    ? [EMPTY_SENTINEL, ...filteredValues]
+    : filteredValues;
 
   const toggle = (v) => {
-    const key = String(v).trim().toLowerCase();
+    const k = keyOf(v);
     setSelected(prev => {
       const n = new Set(prev);
-      if (n.has(key)) n.delete(key); else n.add(key);
+      if (n.has(k)) n.delete(k); else n.add(k);
       return n;
     });
   };
   const apply = () => {
-    // If all selected → remove filter entirely.
-    if (selected.size === allValues.length) { onClear(); onClose(); return; }
-    // Store values preserving original casing (match against trimmed lowercase at filter eval time)
-    const selectedOriginal = allValues.filter(v => selected.has(String(v).trim().toLowerCase()));
+    const totalKeys = allKeys().length;
+    // If everything selected → clear filter (no-op = show all)
+    if (selected.size === totalKeys) { onClear(); onClose(); return; }
+    // Preserve original casing for display; EMPTY_SENTINEL stays literal
+    const selectedOriginal = [];
+    if (selected.has(EMPTY_SENTINEL)) selectedOriginal.push(EMPTY_SENTINEL);
+    for (const v of allValues) {
+      if (selected.has(keyOf(v))) selectedOriginal.push(v);
+    }
     onApply({ op: "in", values: selectedOriginal });
     onClose();
   };
+
+  const fmtStat = (n) => {
+    if (!Number.isFinite(n)) return "—";
+    return Number.isInteger(n) ? n.toLocaleString("en-US").replace(/,/g, " ")
+                                : (Math.round(n * 100) / 100).toLocaleString("en-US").replace(/,/g, " ");
+  };
+  const totalKeys = allValues.length + (hasEmpty ? 1 : 0);
 
   return (
     <div
       id="pivot-autofilter-pop"
       style={{
         ...style,
-        width: 300,
+        width: 340,
         background: "#0b0b0e", border: `1px solid ${green}`, borderRadius: 8,
         boxShadow: "0 20px 48px rgba(0,0,0,0.9), 0 0 0 1px rgba(0,229,160,0.12)",
         padding: "0.7rem", fontFamily: "inherit", color: "#e8e8ed",
@@ -2075,6 +2213,17 @@ function ColumnAutofilter({ column, anchorEl, allValues, filter, onApply, onClea
       <div style={{ fontFamily: mono, fontSize: "0.62rem", color: green, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.5rem" }}>
         ⚑ {lang === "sk" ? "Filtrovať hodnoty" : "Filter values"}
       </div>
+      {/* Quick stats — numeric cols only; gives the user the data shape at a glance */}
+      {stats?.isNumeric && (
+        <div style={{ fontSize: "0.66rem", color: dim, fontFamily: mono, marginBottom: "0.5rem", padding: "0.3rem 0.45rem", background: "#0a0a0b", border: `1px solid ${border}`, borderRadius: 4, letterSpacing: "0.03em" }}>
+          min <strong style={{ color: "#e8e8ed" }}>{fmtStat(stats.min)}</strong>
+          {"  · "} med <strong style={{ color: "#e8e8ed" }}>{fmtStat(stats.median)}</strong>
+          {"  · "} max <strong style={{ color: "#e8e8ed" }}>{fmtStat(stats.max)}</strong>
+          <br />
+          {stats.distinct} {lang === "sk" ? "unikátnych" : "distinct"} · {stats.count} {lang === "sk" ? "s hodnotou" : "with value"}
+          {stats.emptyN > 0 && <> · <span style={{ color: "#ff9b6b" }}>{stats.emptyN} {lang === "sk" ? "prázdnych" : "empty"}</span></>}
+        </div>
+      )}
       <input
         autoFocus
         value={search}
@@ -2084,7 +2233,7 @@ function ColumnAutofilter({ column, anchorEl, allValues, filter, onApply, onClea
       />
       <div style={{ display: "flex", gap: "0.35rem", marginBottom: "0.4rem" }}>
         <button
-          onClick={() => setSelected(new Set(allValues.map(v => String(v).trim().toLowerCase())))}
+          onClick={() => setSelected(new Set(allKeys()))}
           style={{ flex: 1, padding: "0.3rem 0.4rem", background: "transparent", border: `1px solid ${border}`, color: dim, borderRadius: 4, cursor: "pointer", fontSize: "0.7rem", fontFamily: "inherit" }}
         >
           {lang === "sk" ? "Vybrať všetko" : "Select all"}
@@ -2097,13 +2246,9 @@ function ColumnAutofilter({ column, anchorEl, allValues, filter, onApply, onClea
         </button>
         <button
           onClick={() => {
-            // Invert
             setSelected(prev => {
               const inv = new Set();
-              for (const v of allValues) {
-                const k = String(v).trim().toLowerCase();
-                if (!prev.has(k)) inv.add(k);
-              }
+              for (const k of allKeys()) if (!prev.has(k)) inv.add(k);
               return inv;
             });
           }}
@@ -2118,21 +2263,31 @@ function ColumnAutofilter({ column, anchorEl, allValues, filter, onApply, onClea
             {lang === "sk" ? "Žiadne hodnoty." : "No values."}
           </div>
         ) : shown.map(v => {
-          const key = String(v).trim().toLowerCase();
-          const checked = selected.has(key);
+          const k = keyOf(v);
+          const checked = selected.has(k);
+          const isEmptyItem = v === EMPTY_SENTINEL;
           return (
-            <label key={v} style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.25rem 0.45rem", cursor: "pointer", fontSize: "0.78rem", color: checked ? "#e8e8ed" : dim, borderRadius: 3 }}
+            <label key={String(v)} style={{
+              display: "flex", alignItems: "center", gap: "0.4rem",
+              padding: "0.25rem 0.45rem", cursor: "pointer",
+              fontSize: "0.78rem",
+              color: checked ? (isEmptyItem ? "#ff9b6b" : "#e8e8ed") : dim,
+              fontStyle: isEmptyItem ? "italic" : "normal",
+              fontVariantNumeric: "tabular-nums",
+              borderRadius: 3,
+            }}
               onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.04)"}
               onMouseLeave={e => e.currentTarget.style.background = "transparent"}
             >
-              <input type="checkbox" checked={checked} onChange={() => toggle(v)} style={{ accentColor: green, width: 13, height: 13 }} />
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={String(v)}>{String(v)}</span>
+              <input type="checkbox" checked={checked} onChange={() => toggle(v)}
+                style={{ accentColor: isEmptyItem ? "#ff9b6b" : green, width: 13, height: 13 }} />
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={labelFor(v)}>{labelFor(v)}</span>
             </label>
           );
         })}
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "0.55rem", fontSize: "0.68rem", color: dim, fontFamily: mono }}>
-        <span>{selected.size}/{allValues.length} {lang === "sk" ? "vybraných" : "selected"}</span>
+        <span>{selected.size}/{totalKeys} {lang === "sk" ? "vybraných" : "selected"}</span>
         <div style={{ display: "flex", gap: "0.35rem" }}>
           {filter && (
             <button onClick={() => { onClear(); onClose(); }}
@@ -2430,13 +2585,15 @@ function AnalyticsPivot({ snapshots, projects, allFlats, lang }) {
   // footgun that Excel itself has).
   const distinctForColumn = (col) => {
     const others = filters.filter(f => f.column !== col);
-    const base = scoped.filter(p => others.every(f => matchesFilter(p, f)));
-    const set = new Set();
-    for (const p of base) {
-      const v = cellValue(p, col);
-      if (v != null && v !== "") set.add(String(v));
-    }
-    return Array.from(set).sort();
+    // statusScoped already has month + status scope applied; narrow by
+    // all other filters so only THIS column's filter is excluded.
+    const base = statusScoped.filter(p => others.every(f => matchesFilter(p, f)));
+    return distinctValuesForColumn(base, col);
+  };
+  const statsForColumn = (col) => {
+    const others = filters.filter(f => f.column !== col);
+    const base = statusScoped.filter(p => others.every(f => matchesFilter(p, f)));
+    return columnQuickStats(base, col);
   };
 
   const maxLeafValue = Math.max(1, ...flatTreeRows.filter(r => r.isLeaf).map(r => Math.abs(r.value || 0)));
@@ -2607,7 +2764,7 @@ function AnalyticsPivot({ snapshots, projects, allFlats, lang }) {
         {filters.length > 0 && (
           <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
             {filters.map(f => (
-              <FilterRow key={f.id} f={f} projects={projects} lang={lang} t={t}
+              <FilterRow key={f.id} f={f} sourceRows={rawSource} lang={lang} t={t}
                 onChange={(patch) => updateFilter(f.id, patch)}
                 onRemove={() => removeFilter(f.id)} />
             ))}
@@ -2944,18 +3101,24 @@ function AnalyticsPivot({ snapshots, projects, allFlats, lang }) {
       </ProtectedData>
 
       {/* ── Per-chip autofilter popup (portal-style absolute) ── */}
-      {filterPopup && (
-        <ColumnAutofilter
-          column={filterPopup.column}
-          anchorEl={filterPopup.anchorEl}
-          allValues={distinctForColumn(filterPopup.column)}
-          filter={quickFilterForCol(filterPopup.column)}
-          onApply={(patch) => applyQuickFilter(filterPopup.column, patch)}
-          onClear={() => clearQuickFilter(filterPopup.column)}
-          onClose={() => setFilterPopup(null)}
-          lang={lang}
-        />
-      )}
+      {filterPopup && (() => {
+        const { values, hasEmpty } = distinctForColumn(filterPopup.column);
+        const stats = statsForColumn(filterPopup.column);
+        return (
+          <ColumnAutofilter
+            column={filterPopup.column}
+            anchorEl={filterPopup.anchorEl}
+            allValues={values}
+            hasEmpty={hasEmpty}
+            stats={stats}
+            filter={quickFilterForCol(filterPopup.column)}
+            onApply={(patch) => applyQuickFilter(filterPopup.column, patch)}
+            onClear={() => clearQuickFilter(filterPopup.column)}
+            onClose={() => setFilterPopup(null)}
+            lang={lang}
+          />
+        );
+      })()}
 
       <style>{`
         @media (max-width: 760px) { .pivot-grid { grid-template-columns: 1fr !important; } }
@@ -3259,21 +3422,16 @@ function AutocompleteInput({ value, onChange, suggestions, placeholder, lang }) 
   );
 }
 
-function FilterRow({ f, projects, lang, t, onChange, onRemove }) {
+function FilterRow({ f, sourceRows, lang, t, onChange, onRemove }) {
   const col = PIVOT_COLUMNS[f.column] || {};
   const colType = col.type;
   const ops = colType === "number" ? FILTER_OPS_NUM : FILTER_OPS_TEXT;
 
-  // For `in` / `not in` we offer a chip multi-select of distinct values.
-  const distinctValues = (() => {
-    if (colType !== "text" && colType !== "derived") return [];
-    const set = new Set();
-    for (const p of projects) {
-      const v = cellValue(p, f.column);
-      if (v != null && v !== "") set.add(String(v));
-    }
-    return Array.from(set).sort();
-  })();
+  // Full distinct-value list + empty detection for the chip multi-select.
+  // Works for text, derived, AND numeric columns. Numbers are surfaced
+  // sorted ascending so the user sees the data shape at a glance.
+  const { values: distinctValues, hasEmpty } = distinctValuesForColumn(sourceRows || [], f.column);
+  const stats = columnQuickStats(sourceRows || [], f.column);
 
   const setCol = (column) => {
     // Reset op / value when column changes (types may differ)
@@ -3285,6 +3443,22 @@ function FilterRow({ f, projects, lang, t, onChange, onRemove }) {
   // Visual cue: filter is incomplete = no value yet = currently a no-op
   const incomplete = isIncompleteFilter(f);
 
+  // Formatter for a chip label. Numbers rendered with locale spacing; text as-is.
+  const labelFor = (v) => {
+    if (v === EMPTY_SENTINEL) return lang === "sk" ? "(prázdne)" : "(empty)";
+    if (colType === "number") {
+      const n = Number(v);
+      if (Number.isFinite(n)) {
+        // Integers: no decimals; floats: up to 2
+        return Number.isInteger(n) ? n.toLocaleString("en-US").replace(/,/g, " ")
+                                   : (Math.round(n * 100) / 100).toLocaleString("en-US").replace(/,/g, " ");
+      }
+    }
+    return String(v);
+  };
+
+  const isInMode = f.op === "in" || f.op === "not in";
+
   return (
     /* NOTE: we deliberately do NOT use CSS `opacity` on this container to
        signal "inactive" — `opacity` cascades to descendants, and the
@@ -3293,7 +3467,7 @@ function FilterRow({ f, projects, lang, t, onChange, onRemove }) {
        the inactive/active badge + dim text color instead. */
     <div style={{
       display: "grid", gridTemplateColumns: "minmax(140px, 180px) minmax(90px, 120px) 1fr auto 28px",
-      gap: "0.4rem", alignItems: "center",
+      gap: "0.4rem", alignItems: "start",
     }}>
       {/* Column */}
       <StyledSelect
@@ -3320,27 +3494,94 @@ function FilterRow({ f, projects, lang, t, onChange, onRemove }) {
             <input type="number" value={f.max ?? ""} onChange={e => onChange({ max: e.target.value })}
               placeholder={lang === "sk" ? "do" : "to"} style={{ ...pvtInput, marginTop: 0 }} />
           </div>
-        ) : (f.op === "in" || f.op === "not in") && (colType === "text" || colType === "derived") ? (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.25rem", maxHeight: 90, overflowY: "auto", padding: "0.25rem", border: `1px solid ${border}`, borderRadius: 6, background: "#0e0e10" }}>
-            {distinctValues.length === 0 ? (
-              <span style={{ color: dim, fontSize: "0.72rem" }}>{lang === "sk" ? "žiadne hodnoty v dátach" : "no values in data"}</span>
-            ) : distinctValues.map(v => {
-              const active = (f.values || []).includes(v);
-              return (
-                <button key={v}
-                  onClick={() => {
-                    const cur = f.values || [];
-                    onChange({ values: active ? cur.filter(x => x !== v) : [...cur, v] });
-                  }}
-                  style={{
-                    fontFamily: "inherit", fontSize: "0.68rem",
-                    padding: "0.15rem 0.45rem", borderRadius: 100, cursor: "pointer",
-                    background: active ? "rgba(0,229,160,0.15)" : "transparent",
-                    border: `1px solid ${active ? green : border}`,
-                    color: active ? green : dim,
-                  }}>{v}</button>
-              );
-            })}
+        ) : isInMode ? (
+          /* Chip multi-select — works for ALL column types. Shows every
+             distinct value sorted. If the column has null/empty rows, an
+             "(empty)" chip appears FIRST so the user can include/exclude
+             blanks explicitly. Select-all / Invert / Clear shortcuts at
+             the top. Stats strip (numeric cols only) gives the data shape. */
+          <div>
+            {/* Stats strip — numeric only */}
+            {colType === "number" && stats.isNumeric && (
+              <div style={{ fontSize: "0.66rem", color: dim, fontFamily: mono, marginBottom: "0.3rem", letterSpacing: "0.03em" }}>
+                min <strong style={{ color: "#e8e8ed" }}>{labelFor(stats.min)}</strong>
+                {"  · "} med <strong style={{ color: "#e8e8ed" }}>{labelFor(stats.median)}</strong>
+                {"  · "} max <strong style={{ color: "#e8e8ed" }}>{labelFor(stats.max)}</strong>
+                {"  · "} {stats.distinct} {lang === "sk" ? "unikátnych" : "distinct"}
+                {stats.emptyN > 0 && <>{"  · "} <span style={{ color: "#ff9b6b" }}>{stats.emptyN} {lang === "sk" ? "prázdnych" : "empty"}</span></>}
+              </div>
+            )}
+            {/* Shortcut row */}
+            <div style={{ display: "flex", gap: "0.35rem", marginBottom: "0.3rem", fontSize: "0.62rem", color: dim, fontFamily: mono, alignItems: "center" }}>
+              <button type="button"
+                onClick={() => onChange({ values: [...distinctValues, ...(hasEmpty ? [EMPTY_SENTINEL] : [])] })}
+                style={{ background: "transparent", border: `1px solid ${border}`, color: dim, borderRadius: 4, padding: "0.2rem 0.45rem", cursor: "pointer", fontSize: "0.62rem", fontFamily: "inherit" }}>
+                {lang === "sk" ? "Všetko" : "All"}
+              </button>
+              <button type="button"
+                onClick={() => {
+                  const all = [...distinctValues, ...(hasEmpty ? [EMPTY_SENTINEL] : [])];
+                  const cur = new Set(f.values || []);
+                  onChange({ values: all.filter(v => !cur.has(v)) });
+                }}
+                style={{ background: "transparent", border: `1px solid ${border}`, color: dim, borderRadius: 4, padding: "0.2rem 0.45rem", cursor: "pointer", fontSize: "0.62rem", fontFamily: "inherit" }}>
+                {lang === "sk" ? "Invertovať" : "Invert"}
+              </button>
+              <button type="button" onClick={() => onChange({ values: [] })}
+                style={{ background: "transparent", border: `1px solid ${border}`, color: dim, borderRadius: 4, padding: "0.2rem 0.45rem", cursor: "pointer", fontSize: "0.62rem", fontFamily: "inherit" }}>
+                {lang === "sk" ? "Žiadne" : "None"}
+              </button>
+              <span style={{ marginLeft: "auto", color: dim }}>
+                {(f.values || []).length}/{distinctValues.length + (hasEmpty ? 1 : 0)} {lang === "sk" ? "zvolených" : "selected"}
+              </span>
+            </div>
+            {/* Chip list */}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.25rem", maxHeight: 140, overflowY: "auto", padding: "0.3rem", border: `1px solid ${border}`, borderRadius: 6, background: "#0e0e10" }}>
+              {distinctValues.length === 0 && !hasEmpty ? (
+                <span style={{ color: dim, fontSize: "0.72rem" }}>{lang === "sk" ? "žiadne hodnoty v dátach" : "no values in data"}</span>
+              ) : (
+                <>
+                  {hasEmpty && (() => {
+                    const active = (f.values || []).includes(EMPTY_SENTINEL);
+                    return (
+                      <button key="__empty__"
+                        onClick={() => {
+                          const cur = f.values || [];
+                          onChange({ values: active ? cur.filter(x => x !== EMPTY_SENTINEL) : [...cur, EMPTY_SENTINEL] });
+                        }}
+                        style={{
+                          fontFamily: "inherit", fontSize: "0.68rem", fontStyle: "italic",
+                          padding: "0.15rem 0.55rem", borderRadius: 100, cursor: "pointer",
+                          background: active ? "rgba(255,155,107,0.18)" : "transparent",
+                          border: `1px solid ${active ? "#ff9b6b" : border}`,
+                          color: active ? "#ff9b6b" : dim,
+                        }}
+                        title={lang === "sk" ? "Prázdne / null hodnoty" : "Empty / null values"}>
+                        {lang === "sk" ? "(prázdne)" : "(empty)"}
+                      </button>
+                    );
+                  })()}
+                  {distinctValues.map(v => {
+                    const active = (f.values || []).includes(v);
+                    return (
+                      <button key={String(v)}
+                        onClick={() => {
+                          const cur = f.values || [];
+                          onChange({ values: active ? cur.filter(x => x !== v) : [...cur, v] });
+                        }}
+                        style={{
+                          fontFamily: "inherit", fontSize: "0.68rem",
+                          padding: "0.15rem 0.55rem", borderRadius: 100, cursor: "pointer",
+                          background: active ? "rgba(0,229,160,0.15)" : "transparent",
+                          border: `1px solid ${active ? green : border}`,
+                          color: active ? green : dim,
+                          fontVariantNumeric: "tabular-nums",
+                        }}>{labelFor(v)}</button>
+                    );
+                  })}
+                </>
+              )}
+            </div>
           </div>
         ) : colType === "number" ? (
           <input type="number" value={f.value ?? ""} onChange={e => onChange({ value: e.target.value })}
