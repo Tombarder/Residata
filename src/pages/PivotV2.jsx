@@ -1612,14 +1612,18 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
     return Math.min(100, (Math.abs(raw) / m) * 100);
   };
 
-  // Build a map pathKey → parent node (for pct_parent mode)
+  // Build a map pathKey → parent node (for pct_parent mode).
+  // First pass: index flatRows by pathKey (O(n)). Second pass: lookup
+  // parents (O(n)). Was O(n²) via Array.find — fine for 100 rows but
+  // user could have 5000+ flat rows once cross-tab × deep hierarchies.
   const parentByPath = (() => {
+    const byKey = new Map();
+    for (const n of flatRows) byKey.set(n.pathKey, n);
     const m = {};
     for (const n of flatRows) {
       if (!n.path.length) continue;
-      const parentPath = n.path.slice(0, -1);
-      const parentKey = parentPath.join(SEP);
-      m[n.pathKey] = flatRows.find(x => x.pathKey === parentKey) || grandTotal;
+      const parentKey = n.path.slice(0, -1).join(SEP);
+      m[n.pathKey] = byKey.get(parentKey) || grandTotal;
     }
     return m;
   })();
@@ -1826,10 +1830,18 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
               </tr>
             );
           })}
-          {/* Grand total */}
+          {/* Grand total — shows raw absolute numbers regardless of pct
+              mode. In pct_total mode we COULD show "100%" everywhere but
+              that's just visual noise; user wants to see the actual
+              total they're percenting against. */}
           <tr style={{ background: bg, borderTop: `2px solid ${green}66` }}>
             <td style={{ ...td, fontWeight: 700, color: green, fontSize: "0.85rem" }}>
               Σ {lang === "sk" ? "Spolu" : "Total"}
+              {valueMode !== "raw" && (
+                <span style={{ fontSize: "0.65rem", color: dim, marginLeft: "0.4rem", fontWeight: 400 }}>
+                  ({lang === "sk" ? "absolútne" : "absolute"})
+                </span>
+              )}
             </td>
             <td style={{ ...td, textAlign: "right", fontFamily: mono, color: green, fontWeight: 700 }}>
               {grandTotal.count.toLocaleString("en-US").replace(/,/g, " ")}
