@@ -469,15 +469,15 @@ function Footer() {
 /* ─────── HOME ─────── */
 function HomePage({ setCurrent, l, lang, onLogin }) {
   const { can, tier } = useCapabilities();
-  // Hero badge count — live from DB, rounded down to a "140+" style number
-  // so the copy stays marketing-friendly but never drifts behind reality.
+  // Hero badge count — exact live count from DB, no rounding. User wants
+  // the real number (e.g. "157 projektov"), not a marketing approximation.
   const { projects } = useProjects();
   const liveProjCount = projects.length;
   const heroBadgeText = liveProjCount > 0
     ? (lang === "sk"
-        ? `Live — sledujeme ${Math.floor(liveProjCount / 10) * 10}+ projektov`
-        : `Live — tracking ${Math.floor(liveProjCount / 10) * 10}+ developments`)
-    : (lang === "sk" ? "Live — sledujeme 140+ projektov" : "Live — tracking 140+ developments");
+        ? `Live — sledujeme ${liveProjCount} projektov`
+        : `Live — tracking ${liveProjCount} developments`)
+    : (lang === "sk" ? "Live — načítavam projekty…" : "Live — loading projects…");
   // Hero CTA logika podľa tier-u
   let heroButtons;
   if (can("prompt_signup")) {
