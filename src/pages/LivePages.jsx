@@ -2346,27 +2346,46 @@ function AnalyticsPivot({ snapshots, projects, lang }) {
 
           {/* Status scope — Active default, switchable to Sold out / Paused /
               Archived / All. Active-only default prevents polluted KPIs from
-              dead projects on first load. */}
-          <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginTop: "0.2rem" }}>
-            {lang === "sk" ? "Status" : "Status"}
-          </div>
-          <div style={{ display: "inline-flex", background: "#0a0a0b", border: `1px solid ${border}`, borderRadius: 6, overflow: "hidden", flexWrap: "wrap" }}>
-            {[
-              { v: "active",    sk: "Aktívne",    en: "Active" },
-              { v: "sold_out",  sk: "Vypredané",  en: "Sold out" },
-              { v: "paused",    sk: "Pozastavené",en: "Paused" },
-              { v: "archived",  sk: "Archív",     en: "Archived" },
-              { v: "all",       sk: "Všetko",     en: "All" },
-            ].map(opt => {
-              const active = statusScope === opt.v;
-              return (
-                <button key={opt.v} onClick={() => setStatusScope(opt.v)}
-                  style={{ padding: "0.35rem 0.65rem", fontSize: "0.72rem", cursor: "pointer", background: active ? green : "transparent", color: active ? "#0a0a0b" : dim, border: "none", fontFamily: "inherit", fontWeight: 600 }}>
-                  {lang === "sk" ? opt.sk : opt.en}
-                </button>
-              );
-            })}
-          </div>
+              dead projects on first load. We only render buttons for
+              categories that actually contain projects (+ Active + All as
+              constants), so an empty category like Archived doesn't clutter
+              the strip when you never have archived projects. */}
+          {(() => {
+            // Count how many projects fall in each status. Source is `projects`
+            // (not the filtered snapshot view) so counts reflect the full
+            // registry, not the current month slice.
+            const statusCounts = {};
+            for (const p of (projects || [])) {
+              const s = p.status || "active";
+              statusCounts[s] = (statusCounts[s] || 0) + 1;
+            }
+            const opts = [
+              { v: "active",   sk: "Aktívne",    en: "Active",   alwaysShow: true },
+              { v: "sold_out", sk: "Vypredané",  en: "Sold out", alwaysShow: false },
+              { v: "paused",   sk: "Pozastavené",en: "Paused",   alwaysShow: false },
+              { v: "archived", sk: "Archív",     en: "Archived", alwaysShow: false },
+              { v: "all",      sk: "Všetko",     en: "All",      alwaysShow: true },
+            ].filter(o => o.alwaysShow || (statusCounts[o.v] || 0) > 0);
+            return (
+              <>
+                <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginTop: "0.2rem" }}>
+                  {lang === "sk" ? "Status" : "Status"}
+                </div>
+                <div style={{ display: "inline-flex", background: "#0a0a0b", border: `1px solid ${border}`, borderRadius: 6, overflow: "hidden", flexWrap: "wrap" }}>
+                  {opts.map(opt => {
+                    const active = statusScope === opt.v;
+                    const n = opt.v === "all" ? Object.values(statusCounts).reduce((a, b) => a + b, 0) : (statusCounts[opt.v] || 0);
+                    return (
+                      <button key={opt.v} onClick={() => setStatusScope(opt.v)}
+                        style={{ padding: "0.35rem 0.65rem", fontSize: "0.72rem", cursor: "pointer", background: active ? green : "transparent", color: active ? "#0a0a0b" : dim, border: "none", fontFamily: "inherit", fontWeight: 600 }}>
+                        {lang === "sk" ? opt.sk : opt.en} <span style={{ opacity: 0.6, marginLeft: "0.25rem", fontFamily: mono }}>{n}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            );
+          })()}
           {statusScope !== "active" && (
             <div style={{ fontSize: "0.65rem", color: "#ff9b6b", fontFamily: mono, textAlign: "right", maxWidth: 220 }}>
               {lang === "sk" ? "⚠ Historické dáta — KPIs nemusia odrážať trh" : "⚠ Historical — KPIs may not reflect live market"}
