@@ -7,6 +7,7 @@ import { liveT, ll } from "../lib/liveLang";
 import { track } from "../lib/track";
 import { isPersonalEmail } from "../lib/emailValidation";
 import UpgradePrompt from "../components/UpgradePrompt";
+import PivotV2 from "./PivotV2";
 
 const mono = "'JetBrains Mono', monospace";
 const green = "#00e5a0";
@@ -1182,7 +1183,19 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
               sub={lang === "sk" ? `z ${projects.length} projektov` : `of ${projects.length} projects`} />
       </div>
 
-      {/* ═══ PIVOT BUILDER — prominent, right after KPIs ═══ */}
+      {/* ═══ PIVOT v2 — Excel-style drag & drop skeleton ═══
+          WIP redesign. Lives above the classic AnalyticsPivot during
+          iteration; when the new UI is ready we'll remove v1. */}
+      <div style={{ marginBottom: "2.5rem" }}>
+        <PivotV2 lang={lang} />
+      </div>
+
+      {/* ═══ PIVOT BUILDER (v1 classic) — kept alive for comparison ═══ */}
+      <div style={{ marginBottom: "0.75rem" }}>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem", padding: "3px 10px", background: "#16161a", border: `1px solid ${border}`, borderRadius: 4, fontFamily: mono, fontSize: "0.62rem", color: dim, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+          Pivot v1 · legacy (kept during v2 iteration)
+        </div>
+      </div>
       <AnalyticsPivot snapshots={snapshots} projects={projects} allFlats={allFlats} lang={lang} />
 
       {/* ═══ DISTRICT BREAKDOWN — richer than home DistrictPulse ═══ */}
