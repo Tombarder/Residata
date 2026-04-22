@@ -21,7 +21,6 @@ const ANON_TEASER = 8;  // navyše zobrazíme blurred — dokopy 20 riadkov s bl
 export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
   const t = liveT[lang] || liveT.en;
   const { can } = useCapabilities();
-  const { user } = useAuth();
   const { projects, loading } = useProjects();
   const hasFullAccess = can("view_all_projects_list");
   // Anon: 12 plne, ďalších 8 blurred. Logged-in: všetko.
@@ -29,30 +28,13 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
   const blurredRows = hasFullAccess ? [] : projects.slice(ANON_VISIBLE, ANON_VISIBLE + ANON_TEASER);
   const showUpgradeToPaid = can("prompt_upgrade_to_paid");
   const showSignupPrompt = can("prompt_signup");
-  // When a logged-in user lands on /live (the marketing teaser) they don't
-  // need the teaser — push them into the platform via a small banner.
-  const showPlatformHint = !!user && hasFullAccess;
+  // (Previously we showed a "you're signed in, go to platform" banner here
+  //  but it was noise — admin/paid users on /live already know they have
+  //  access, and the nav already has an "Open platform →" button. If someone
+  //  on /live wants the platform, they click that.)
 
   return (
     <main style={{ padding: "5rem 2rem 4rem", maxWidth: 1200, margin: "0 auto" }}>
-      {showPlatformHint && (
-        <div style={{
-          marginBottom: "1.25rem", padding: "0.85rem 1.1rem",
-          background: "rgba(0,229,160,0.08)",
-          border: "1px solid rgba(0,229,160,0.3)",
-          borderRadius: 10,
-          display: "flex", alignItems: "center", gap: "1rem", flexWrap: "wrap",
-        }}>
-          <span style={{ fontSize: "0.88rem", color: "#e8e8ed", flex: 1, lineHeight: 1.4 }}>
-            {lang === "sk"
-              ? <>Si prihlásený. Toto je verejný náhľad — tvoj plný dashboard je v platforme.</>
-              : <>You're signed in. This is the public teaser — your full dashboard lives in the platform.</>}
-          </span>
-          <button onClick={() => setCurrent && setCurrent("App:Dashboard")} className="btn-p" style={{ fontSize: "0.82rem", padding: "0.55rem 1.1rem" }}>
-            {lang === "sk" ? "Otvoriť platformu →" : "Open platform →"}
-          </button>
-        </div>
-      )}
       <Label>{t.live_label}</Label>
       <h1 className="sec-title">{t.live_title}</h1>
       <p className="sec-desc" style={{ marginBottom: "2.5rem" }}>
@@ -573,8 +555,8 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
     <main style={{ padding: "1rem 2rem 4rem", maxWidth: 1240, margin: "0 auto" }}>
       <p style={{ color: dim, fontSize: "0.95rem", lineHeight: 1.65, marginTop: 0, marginBottom: "1.5rem", maxWidth: 760 }}>
         {lang === "sk"
-          ? <>Všetko čo vidíš nižšie je <strong style={{ color: "#e8e8ed" }}>živé</strong> — tiahnuté zo Supabase projektového datasetu. Pri každom mesačnom behu pipeline sa čísla preklopia automaticky.</>
-          : <>Everything below is <strong style={{ color: "#e8e8ed" }}>live</strong> from the Supabase project dataset. Every monthly pipeline run refreshes these numbers automatically.</>}
+          ? <>Všetko je <strong style={{ color: "#e8e8ed" }}>živé</strong> zo Supabase. Dole máš <strong style={{ color: green }}>Pivot</strong> — skladaj si vlastné pohľady na dáta (filter · group · measure · graf) a stiahni slice ako CSV.</>
+          : <>Everything's <strong style={{ color: "#e8e8ed" }}>live</strong> from Supabase. Scroll down for the <strong style={{ color: green }}>Pivot</strong> — compose your own views (filter · group · measure · chart) and export the slice as CSV.</>}
       </p>
 
       {/* ═══ KPI STRIP ═══ */}
@@ -721,6 +703,11 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
         </ASection>
       </div>
 
+      {/* ═══ PIVOT BUILDER ═══ */}
+      <div style={{ marginTop: "2.5rem" }}>
+        <AnalyticsPivot projects={projects} lang={lang} />
+      </div>
+
       <p style={{ color: "#55555f", fontSize: "0.72rem", marginTop: "2rem", fontFamily: mono, textAlign: "center" }}>
         {lang === "sk"
           ? `Zdroj: ${projects.length} projektov · posledný sync ${projects[0]?.last_updated?.slice(0, 10) || "—"}`
@@ -729,6 +716,328 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
     </main>
   );
 }
+
+// ═════════════ PIVOT / QUERY BUILDER ═════════════
+// Interactive "pick a filter, group, measure, chart type" tool inspired by
+// Excel pivot tables. Keeps paid users engaged — they can answer their own
+// questions rather than staring at fixed charts. All computation is
+// client-side over the already-loaded projects array (fast for ~200 rows).
+function AnalyticsPivot({ projects, lang }) {
+  const [districtFilter, setDistrictFilter] = useState([]);
+  const [minSoldPct, setMinSoldPct] = useState(0);
+  const [maxSoldPct, setMaxSoldPct] = useState(100);
+  const [groupBy, setGroupBy] = useState("district");
+  const [measure, setMeasure] = useState("count");
+  const [chartType, setChartType] = useState("bar");
+  const [search, setSearch] = useState("");
+
+  // Distinct district options (sorted)
+  const allDistricts = Array.from(new Set(projects.map(p => p.district).filter(Boolean))).sort();
+
+  // Apply filters
+  const filtered = projects.filter(p => {
+    if (districtFilter.length > 0 && !districtFilter.includes(p.district)) return false;
+    const sp = p.sold_percentage || 0;
+    if (sp < minSoldPct || sp > maxSoldPct) return false;
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      if (!(p.name || "").toLowerCase().includes(q)
+          && !(p.district || "").toLowerCase().includes(q)
+          && !(p.developer || "").toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+
+  // Group
+  const groupKey = (p) => {
+    if (groupBy === "district")   return p.district || "—";
+    if (groupBy === "developer")  return p.developer || "—";
+    if (groupBy === "kolaudacia") return p.kolaudacia || "—";
+    if (groupBy === "price_band") {
+      const v = p.avg_price_eur_m2;
+      if (!v) return "—";
+      if (v < 3500) return "< 3.5k";
+      if (v < 4500) return "3.5–4.5k";
+      if (v < 6000) return "4.5–6k";
+      return "6k+";
+    }
+    if (groupBy === "sold_band") {
+      const s = p.sold_percentage || 0;
+      if (s < 25) return "0–25%";
+      if (s < 50) return "25–50%";
+      if (s < 75) return "50–75%";
+      if (s < 100) return "75–99%";
+      return "sold out";
+    }
+    return "All";
+  };
+
+  const groups = {};
+  for (const p of filtered) {
+    const k = groupKey(p);
+    const g = groups[k] ||= { key: k, count: 0, total: 0, avail: 0, sold: 0, sold30: 0, priceSum: 0, priceN: 0, soldPctSum: 0, soldPctN: 0 };
+    g.count += 1;
+    g.total   += p.total_units || 0;
+    g.avail   += p.available_units || 0;
+    g.sold    += p.sold_units || 0;
+    g.sold30  += p.sold_last_month || 0;
+    if (p.avg_price_eur_m2)  { g.priceSum   += p.avg_price_eur_m2;   g.priceN   += 1; }
+    if (p.sold_percentage != null) { g.soldPctSum += p.sold_percentage; g.soldPctN += 1; }
+  }
+
+  const measureValue = (g) => {
+    switch (measure) {
+      case "count":               return g.count;
+      case "total_units":         return g.total;
+      case "available_units":     return g.avail;
+      case "sold_units":          return g.sold;
+      case "sold_last_month":     return g.sold30;
+      case "avg_price_eur_m2":    return g.priceN   ? g.priceSum   / g.priceN   : 0;
+      case "avg_sold_percentage": return g.soldPctN ? g.soldPctSum / g.soldPctN : 0;
+      case "absorption":
+        return g.avail + g.sold30 > 0 ? (g.sold30 / (g.avail + g.sold30)) * 100 : 0;
+      default: return g.count;
+    }
+  };
+
+  const rows = Object.values(groups)
+    .map(g => ({ ...g, value: measureValue(g) }))
+    .sort((a, b) => b.value - a.value);
+  const maxValue = rows.length ? Math.max(...rows.map(r => r.value)) : 1;
+
+  // Format
+  const fmtValue = (v) => {
+    if (measure === "avg_price_eur_m2") return Math.round(v).toLocaleString("en-US").replace(/,/g, " ") + " €/m²";
+    if (measure === "avg_sold_percentage" || measure === "absorption") return v.toFixed(1) + "%";
+    return Math.round(v).toLocaleString("en-US").replace(/,/g, " ");
+  };
+
+  const measureLabel = {
+    count:               lang === "sk" ? "Počet projektov"      : "Project count",
+    total_units:         lang === "sk" ? "Celkom bytov"         : "Total units",
+    available_units:     lang === "sk" ? "Voľné byty"           : "Available units",
+    sold_units:          lang === "sk" ? "Predané byty"         : "Sold units",
+    sold_last_month:     lang === "sk" ? "Predané (30d)"        : "Sold (30d)",
+    avg_price_eur_m2:    lang === "sk" ? "Priem. €/m²"          : "Avg €/m²",
+    avg_sold_percentage: lang === "sk" ? "Priem. % predaných"   : "Avg sold %",
+    absorption:          lang === "sk" ? "Absorpcia"            : "Absorption",
+  };
+  const groupByLabel = {
+    district:   lang === "sk" ? "Okres"             : "District",
+    developer:  lang === "sk" ? "Developer"         : "Developer",
+    kolaudacia: lang === "sk" ? "Rok kolaudácie"    : "Completion year",
+    price_band: lang === "sk" ? "Cenové pásmo"      : "Price band",
+    sold_band:  lang === "sk" ? "% predaných pásmo" : "Sold % band",
+  };
+
+  const exportCSV = () => {
+    const headers = [groupByLabel[groupBy], "count", "total_units", "available_units", "sold_units", "sold_last_month", "avg_price_eur_m2", "avg_sold_percentage", measureLabel[measure]];
+    const out = rows.map(r => [
+      r.key, r.count, r.total, r.avail, r.sold, r.sold30,
+      r.priceN ? Math.round(r.priceSum / r.priceN) : "",
+      r.soldPctN ? (r.soldPctSum / r.soldPctN).toFixed(2) : "",
+      measure === "avg_price_eur_m2" ? Math.round(r.value) : (measure === "avg_sold_percentage" || measure === "absorption" ? r.value.toFixed(2) : r.value),
+    ]);
+    const csv = [headers, ...out].map(row =>
+      row.map(c => {
+        const s = String(c ?? "");
+        return s.includes(",") || s.includes("\"") ? `"${s.replace(/"/g, '""')}"` : s;
+      }).join(",")
+    ).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url;
+    a.download = `residata-pivot-${groupBy}-${measure}-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  return (
+    <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 12, padding: "1.5rem" }}>
+      <div style={{ marginBottom: "1.25rem" }}>
+        <div style={{ fontFamily: mono, fontSize: "0.65rem", color: green, letterSpacing: "0.12em", textTransform: "uppercase" }}>
+          {lang === "sk" ? "Pivot / Query builder" : "Pivot / Query builder"}
+        </div>
+        <h2 style={{ fontSize: "1.2rem", fontWeight: 600, color: "#e8e8ed", margin: "0.2rem 0 0" }}>
+          {lang === "sk" ? "Postav si vlastný pohľad" : "Compose your own view"}
+        </h2>
+        <p style={{ color: dim, fontSize: "0.82rem", margin: "0.4rem 0 0", lineHeight: 1.5, maxWidth: 640 }}>
+          {lang === "sk"
+            ? "Filter vľavo, group & measure vpravo, graf sa prepočíta live. CSV export vyhrá ten presný slice, ktorý si teraz vidíš."
+            : "Filter on the left, group & measure on the right, the chart recomputes live. CSV export grabs exactly the slice you see."}
+        </p>
+      </div>
+
+      {/* CONTROLS ROW */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.25rem", marginBottom: "1.25rem" }} className="pivot-grid">
+        {/* Filters */}
+        <div style={{ background: "#0a0a0b", border: `1px solid ${border}`, borderRadius: 8, padding: "1rem" }}>
+          <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.6rem" }}>
+            {lang === "sk" ? "Filter" : "Filter"}
+          </div>
+
+          <label style={pvtLabel}>{lang === "sk" ? "Hľadaj" : "Search"}</label>
+          <input value={search} onChange={e => setSearch(e.target.value)}
+            placeholder={lang === "sk" ? "meno, okres, developer…" : "name, district, developer…"}
+            style={pvtInput} />
+
+          <label style={{ ...pvtLabel, marginTop: "0.8rem" }}>{lang === "sk" ? "Okresy" : "Districts"} ({districtFilter.length || "všetky"})</label>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem", marginTop: "0.3rem" }}>
+            {allDistricts.map(d => {
+              const active = districtFilter.includes(d);
+              return (
+                <button key={d}
+                  onClick={() => setDistrictFilter(f => active ? f.filter(x => x !== d) : [...f, d])}
+                  style={{
+                    fontFamily: "inherit", fontSize: "0.68rem",
+                    padding: "0.25rem 0.55rem", borderRadius: 100, cursor: "pointer",
+                    background: active ? "rgba(0,229,160,0.15)" : "transparent",
+                    border: `1px solid ${active ? green : border}`,
+                    color: active ? green : dim,
+                    transition: "all 0.15s",
+                  }}>{d}</button>
+              );
+            })}
+            {districtFilter.length > 0 && (
+              <button onClick={() => setDistrictFilter([])}
+                style={{ fontFamily: "inherit", fontSize: "0.68rem", padding: "0.25rem 0.55rem", borderRadius: 100, cursor: "pointer", background: "transparent", border: `1px dashed ${border}`, color: "#ff6b6b" }}>
+                {lang === "sk" ? "× vyčistiť" : "× clear"}
+              </button>
+            )}
+          </div>
+
+          <label style={{ ...pvtLabel, marginTop: "0.8rem" }}>{lang === "sk" ? "% predaných" : "Sold %"} · {minSoldPct}–{maxSoldPct}%</label>
+          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginTop: "0.3rem" }}>
+            <input type="range" min="0" max="100" value={minSoldPct} onChange={e => setMinSoldPct(Math.min(+e.target.value, maxSoldPct))} style={{ flex: 1 }} />
+            <input type="range" min="0" max="100" value={maxSoldPct} onChange={e => setMaxSoldPct(Math.max(+e.target.value, minSoldPct))} style={{ flex: 1 }} />
+          </div>
+        </div>
+
+        {/* Group & Measure */}
+        <div style={{ background: "#0a0a0b", border: `1px solid ${border}`, borderRadius: 8, padding: "1rem" }}>
+          <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.6rem" }}>
+            {lang === "sk" ? "Skladba" : "Composition"}
+          </div>
+
+          <label style={pvtLabel}>{lang === "sk" ? "Group by (stĺpec)" : "Group by"}</label>
+          <select value={groupBy} onChange={e => setGroupBy(e.target.value)} style={pvtInput}>
+            {Object.entries(groupByLabel).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select>
+
+          <label style={{ ...pvtLabel, marginTop: "0.8rem" }}>{lang === "sk" ? "Measure (metrika)" : "Measure"}</label>
+          <select value={measure} onChange={e => setMeasure(e.target.value)} style={pvtInput}>
+            {Object.entries(measureLabel).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select>
+
+          <label style={{ ...pvtLabel, marginTop: "0.8rem" }}>{lang === "sk" ? "Graf" : "Chart"}</label>
+          <div style={{ display: "flex", gap: "0.4rem", marginTop: "0.3rem" }}>
+            {["bar", "table"].map(c => (
+              <button key={c}
+                onClick={() => setChartType(c)}
+                style={{
+                  flex: 1, padding: "0.5rem 0.75rem", borderRadius: 6, cursor: "pointer",
+                  background: chartType === c ? "rgba(0,229,160,0.12)" : "transparent",
+                  border: `1px solid ${chartType === c ? green : border}`,
+                  color: chartType === c ? green : dim,
+                  fontFamily: "inherit", fontSize: "0.78rem",
+                  textTransform: "capitalize",
+                }}>{c === "bar" ? (lang === "sk" ? "📊 bar graf" : "📊 bar chart") : (lang === "sk" ? "🗂️ tabuľka" : "🗂️ table")}</button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* RESULTS HEADER + EXPORT */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.75rem", flexWrap: "wrap", gap: "0.75rem" }}>
+        <div>
+          <div style={{ fontSize: "0.78rem", color: dim, fontFamily: mono }}>
+            {lang === "sk" ? "Filtered" : "Filtered"}: <strong style={{ color: "#e8e8ed" }}>{filtered.length}</strong>/{projects.length} projektov ·
+            {" "}<strong style={{ color: "#e8e8ed" }}>{rows.length}</strong> {lang === "sk" ? "skupín" : "groups"}
+          </div>
+          <div style={{ fontSize: "0.82rem", color: "#e8e8ed", marginTop: "0.15rem" }}>
+            <span style={{ color: dim }}>{measureLabel[measure]} by {groupByLabel[groupBy]}</span>
+          </div>
+        </div>
+        <button onClick={exportCSV} className="btn-s" style={{ fontSize: "0.78rem", padding: "0.45rem 1rem" }}>
+          ⬇ CSV
+        </button>
+      </div>
+
+      {/* CHART / TABLE */}
+      {rows.length === 0 ? (
+        <div style={{ color: dim, fontSize: "0.85rem", padding: "2rem", textAlign: "center", border: `1px dashed ${border}`, borderRadius: 8 }}>
+          {lang === "sk" ? "Žiadne výsledky pre aktuálny filter." : "No results for current filter."}
+        </div>
+      ) : chartType === "bar" ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+          {rows.map(r => (
+            <div key={r.key} style={{ display: "grid", gridTemplateColumns: "180px 1fr 150px", gap: "0.85rem", alignItems: "center" }}>
+              <div style={{ fontSize: "0.85rem", color: "#e8e8ed", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.key}</div>
+              <div style={{ height: 22, background: "#0e0e10", borderRadius: 4, overflow: "hidden", border: `1px solid ${border}` }}>
+                <div style={{
+                  width: `${maxValue > 0 ? (r.value / maxValue) * 100 : 0}%`, height: "100%",
+                  background: `linear-gradient(90deg, ${green}40, ${green})`,
+                  transition: "width 0.5s ease",
+                }} />
+              </div>
+              <div style={{ fontFamily: mono, fontSize: "0.88rem", color: green, fontWeight: 700, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                {fmtValue(r.value)}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ border: `1px solid ${border}`, borderRadius: 8, overflow: "hidden" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
+            <thead style={{ background: "#0e0e10" }}>
+              <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                <th style={th}>{groupByLabel[groupBy]}</th>
+                <th style={{ ...th, textAlign: "right" }}>{lang === "sk" ? "Projektov" : "Projects"}</th>
+                <th style={{ ...th, textAlign: "right" }}>{lang === "sk" ? "Bytov" : "Units"}</th>
+                <th style={{ ...th, textAlign: "right" }}>{lang === "sk" ? "Voľné" : "Avail"}</th>
+                <th style={{ ...th, textAlign: "right" }}>{lang === "sk" ? "Predané" : "Sold"}</th>
+                <th style={{ ...th, textAlign: "right" }}>€/m²</th>
+                <th style={{ ...th, textAlign: "right", color: green }}>{measureLabel[measure]}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(r => (
+                <tr key={r.key} style={{ borderTop: `1px solid ${border}` }}>
+                  <td style={{ ...td, fontWeight: 600 }}>{r.key}</td>
+                  <td style={{ ...td, textAlign: "right", fontFamily: mono, color: dim }}>{r.count}</td>
+                  <td style={{ ...td, textAlign: "right", fontFamily: mono, color: dim }}>{r.total.toLocaleString("en-US").replace(/,/g, " ")}</td>
+                  <td style={{ ...td, textAlign: "right", fontFamily: mono, color: green }}>{r.avail.toLocaleString("en-US").replace(/,/g, " ")}</td>
+                  <td style={{ ...td, textAlign: "right", fontFamily: mono, color: "#f5a623" }}>{r.sold.toLocaleString("en-US").replace(/,/g, " ")}</td>
+                  <td style={{ ...td, textAlign: "right", fontFamily: mono, color: dim }}>
+                    {r.priceN ? Math.round(r.priceSum / r.priceN).toLocaleString("en-US").replace(/,/g, " ") : "—"}
+                  </td>
+                  <td style={{ ...td, textAlign: "right", fontFamily: mono, color: green, fontWeight: 700 }}>
+                    {fmtValue(r.value)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <style>{`
+        @media (max-width: 760px) { .pivot-grid { grid-template-columns: 1fr !important; } }
+      `}</style>
+    </div>
+  );
+}
+
+const pvtLabel = {
+  display: "block", fontSize: "0.68rem", color: "#8a8a96",
+  fontFamily: mono, letterSpacing: "0.04em", textTransform: "uppercase",
+};
+const pvtInput = {
+  width: "100%", padding: "0.5rem 0.7rem",
+  background: "#0e0e10", border: `1px solid ${border}`, borderRadius: 6,
+  color: "#e8e8ed", fontSize: "0.85rem", fontFamily: "inherit",
+  boxSizing: "border-box", outline: "none", marginTop: "0.3rem",
+};
 
 // ─── Analytics primitives ────────────────────────────────
 function AKpi({ label, value, accent = "#e8e8ed", sub }) {

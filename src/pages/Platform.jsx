@@ -494,35 +494,10 @@ function PlatformDashboard({ lang, setCurrent }) {
         <KpiCard label={lang === "sk" ? "Priem. €/m²" : "Avg €/m²"} value={avgEurM2 ? avgEurM2.toLocaleString(lang === "sk" ? "sk-SK" : "en-US") : "—"} />
       </div>
 
-      {/* Quick actions */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "0.85rem", marginBottom: "2rem" }}>
-        <ActionCard
-          title={lang === "sk" ? "Otvoriť zoznam projektov" : "Open project list"}
-          desc={lang === "sk" ? "Všetkých 140+ projektov s filtrami a detailom." : "All 140+ projects, filters and detail."}
-          onClick={() => setCurrent("App:Projects")}
-        />
-        {can("view_analytics") ? (
-          <ActionCard
-            title={lang === "sk" ? "Pozrieť analytiku" : "Open analytics"}
-            desc={lang === "sk" ? "Trendy cien, heat mapy okresov, absorpcia." : "Price trends, district heat maps, absorption."}
-            onClick={() => setCurrent("App:Analytics")}
-          />
-        ) : (
-          <ActionCard
-            title={lang === "sk" ? "Upgrade na paid" : "Upgrade to paid"}
-            desc={lang === "sk" ? "Odomkni analytiku, exporty, reporty + históriu." : "Unlock analytics, exports, reports + history."}
-            onClick={() => setCurrent("App:Billing")}
-            accent
-          />
-        )}
-        {tier === "admin" && (
-          <ActionCard
-            title={lang === "sk" ? "Admin panel" : "Admin panel"}
-            desc={lang === "sk" ? "Správa užívateľov a domén." : "Manage users + domains."}
-            onClick={() => setCurrent("App:Admin")}
-          />
-        )}
-      </div>
+      {/* Market highlights — replaces the old duplicate-of-sidebar action
+          buttons. Every card is a live data-driven "huh interesting"
+          moment, computed from the same projects array. */}
+      <MarketHighlights projects={projects} lang={lang} setCurrent={setCurrent} showUpgrade={!can("view_analytics")} />
 
       {/* Top projects */}
       <div>
@@ -591,6 +566,109 @@ function ActionCard({ title, desc, onClick, accent = false }) {
       <div style={{ fontSize: "0.95rem", fontWeight: 600, color: textLight, marginBottom: "0.25rem" }}>{title} <span style={{ color: green }}>→</span></div>
       <div style={{ fontSize: "0.78rem", color: dim, lineHeight: 1.45 }}>{desc}</div>
     </button>
+  );
+}
+
+/**
+ * MarketHighlights — 3 live-data cards that tell the user something
+ * interesting the instant they land on the dashboard. No duplicate
+ * navigation, no "go to X" buttons. Values are recomputed each time
+ * projects changes.
+ */
+function MarketHighlights({ projects, lang, setCurrent, showUpgrade }) {
+  if (!projects || projects.length === 0) return null;
+
+  const withVelocity = projects.filter(p => (p.sold_last_month || 0) > 0);
+  const topSeller = withVelocity.sort((a, b) => (b.sold_last_month || 0) - (a.sold_last_month || 0))[0];
+
+  const soldOutSoon = projects
+    .filter(p => (p.sold_percentage || 0) >= 85 && (p.sold_percentage || 0) < 100 && (p.available_units || 0) > 0)
+    .sort((a, b) => (b.sold_percentage || 0) - (a.sold_percentage || 0))[0];
+
+  const priciest = projects
+    .filter(p => p.avg_price_eur_m2)
+    .sort((a, b) => b.avg_price_eur_m2 - a.avg_price_eur_m2)[0];
+
+  const cheapest = projects
+    .filter(p => p.avg_price_eur_m2 && p.available_units > 0)
+    .sort((a, b) => a.avg_price_eur_m2 - b.avg_price_eur_m2)[0];
+
+  const cards = [];
+  if (topSeller) cards.push({
+    tag: lang === "sk" ? "Top predajca (30d)" : "Top seller (30d)",
+    title: topSeller.name,
+    sub: `${topSeller.district || "—"} · ${topSeller.avg_price_eur_m2 ? Math.round(topSeller.avg_price_eur_m2).toLocaleString("en-US").replace(/,/g, " ") + " €/m²" : "—"}`,
+    stat: `+${topSeller.sold_last_month}`,
+    statSub: lang === "sk" ? "predaných" : "sold",
+    statColor: green,
+    onClick: () => setCurrent(`App:ProjectDetail:${topSeller.id}`),
+  });
+  if (soldOutSoon) cards.push({
+    tag: lang === "sk" ? "Dopredáva sa" : "Selling out",
+    title: soldOutSoon.name,
+    sub: `${soldOutSoon.district || "—"} · ${soldOutSoon.available_units} ${lang === "sk" ? "zostáva" : "left"}`,
+    stat: `${Math.round(soldOutSoon.sold_percentage)}%`,
+    statSub: lang === "sk" ? "predané" : "sold",
+    statColor: "#ff6b6b",
+    onClick: () => setCurrent(`App:ProjectDetail:${soldOutSoon.id}`),
+  });
+  if (showUpgrade) {
+    cards.push({
+      tag: lang === "sk" ? "Paid tier" : "Paid tier",
+      title: lang === "sk" ? "Odomkni analytiku" : "Unlock analytics",
+      sub: lang === "sk" ? "Trendy · exporty · reporty" : "Trends · exports · reports",
+      stat: "⭐",
+      statSub: lang === "sk" ? "upgrade" : "upgrade",
+      statColor: "#f5a623",
+      onClick: () => setCurrent("App:Billing"),
+      accent: true,
+    });
+  } else if (priciest) {
+    cards.push({
+      tag: lang === "sk" ? "Najdrahší €/m²" : "Priciest €/m²",
+      title: priciest.name,
+      sub: `${priciest.district || "—"}`,
+      stat: Math.round(priciest.avg_price_eur_m2).toLocaleString("en-US").replace(/,/g, " "),
+      statSub: "€/m²",
+      statColor: "#f5a623",
+      onClick: () => setCurrent(`App:ProjectDetail:${priciest.id}`),
+    });
+  }
+
+  return (
+    <div style={{ marginBottom: "2rem" }}>
+      <div style={{ fontFamily: mono, fontSize: "0.65rem", color: green, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.6rem" }}>
+        {lang === "sk" ? "Aktuálne" : "Right now"}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "0.85rem" }}>
+        {cards.map((c, i) => (
+          <button
+            key={i}
+            onClick={c.onClick}
+            style={{
+              textAlign: "left", cursor: "pointer", fontFamily: "inherit",
+              background: c.accent ? "rgba(0,229,160,0.06)" : bg,
+              border: `1px solid ${c.accent ? "rgba(0,229,160,0.35)" : border}`,
+              borderRadius: 10, padding: "1rem 1.1rem",
+              display: "flex", justifyContent: "space-between", gap: "0.75rem",
+              transition: "transform 0.15s, border-color 0.15s",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = green; e.currentTarget.style.transform = "translateY(-1px)"; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = c.accent ? "rgba(0,229,160,0.35)" : border; e.currentTarget.style.transform = ""; }}
+          >
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.3rem" }}>{c.tag}</div>
+              <div style={{ fontSize: "0.92rem", fontWeight: 600, color: textLight, marginBottom: "0.15rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.title}</div>
+              <div style={{ fontSize: "0.72rem", color: dim, fontFamily: mono }}>{c.sub}</div>
+            </div>
+            <div style={{ textAlign: "right", flexShrink: 0 }}>
+              <div style={{ fontFamily: mono, fontSize: "1.35rem", fontWeight: 700, color: c.statColor, lineHeight: 1 }}>{c.stat}</div>
+              <div style={{ fontFamily: mono, fontSize: "0.62rem", color: dim, marginTop: "0.3rem", letterSpacing: "0.08em" }}>{c.statSub}</div>
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 

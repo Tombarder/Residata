@@ -728,29 +728,35 @@ export function DistrictPulse({ lang = "en", setCurrent }) {
 function DistrictRow({ row, index, max, animate, lang }) {
   const pct = (row.avg / max) * 100;
   const color = colorForPrice(row.avg);
-  // Stagger the row entrance by index. Kick off the number counter only
-  // after the row has started sliding in so the digits land alongside
-  // the filling bar.
   const delay = 0.08 * index;
   const animatedAvg = useAnimatedNumber(animate ? Math.round(row.avg) : 0, 1100, delay * 1000);
 
   return (
     <div
       style={{
-        display: "grid", gridTemplateColumns: "180px 1fr 120px", gap: "1rem", alignItems: "center",
+        display: "grid", gridTemplateColumns: "180px 1fr 160px", gap: "1rem", alignItems: "center",
         opacity: animate ? 1 : 0,
         transform: animate ? "translateY(0)" : "translateY(8px)",
         transition: `opacity 0.5s ease ${delay}s, transform 0.5s ease ${delay}s`,
       }}
       className="district-row"
     >
-      <div style={{ fontSize: "0.9rem", color: "#e8e8ed", fontWeight: 500 }}>{row.district}</div>
+      {/* Left: district name + count subtitle (was INSIDE the bar with
+          mixBlendMode — which cost paint and was hard to read). Moving
+          it out of the bar kills the perf cost and fixes contrast. */}
+      <div>
+        <div style={{ fontSize: "0.92rem", color: "#e8e8ed", fontWeight: 500, lineHeight: 1.25 }}>{row.district}</div>
+        <div style={{ fontSize: "0.68rem", color: "#8a8a96", fontFamily: mono, marginTop: 2, letterSpacing: "0.02em" }}>
+          {row.count} {lang === "sk" ? "proj" : "proj"} · {row.units.toLocaleString("en-US").replace(/,/g, " ")} {lang === "sk" ? "bytov" : "units"}
+        </div>
+      </div>
 
+      {/* Bar — cleaner, no overlay text so the fill color stays readable
+          and no mix-blend-mode paint cost. */}
       <div style={{
-        height: 32, background: "#0e0e10", borderRadius: 6, overflow: "hidden", position: "relative",
+        height: 28, background: "#0e0e10", borderRadius: 6, overflow: "hidden", position: "relative",
         border: `1px solid ${border}`,
       }}>
-        {/* Filled bar */}
         <div style={{
           width: animate ? `${pct}%` : "0%",
           height: "100%",
@@ -758,31 +764,24 @@ function DistrictRow({ row, index, max, animate, lang }) {
           borderRight: `2px solid ${color}`,
           transition: `width 1.1s cubic-bezier(0.2, 0.85, 0.25, 1) ${delay}s`,
           position: "relative",
+          willChange: "width",
         }}>
-          {/* Shimmer sweep inside the bar */}
           {animate && (
             <div style={{
               position: "absolute", inset: 0,
-              background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent)",
+              background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.22), transparent)",
               animation: `dp-shimmer 1.6s ease-out ${delay + 0.2}s 1`,
               pointerEvents: "none",
             }} />
           )}
         </div>
-        {/* Inline label on the bar — projects & units count */}
-        <div style={{
-          position: "absolute", left: "0.75rem", top: 0, bottom: 0,
-          display: "flex", alignItems: "center",
-          fontSize: "0.7rem", color: "#c0c0c8", fontFamily: mono,
-          mixBlendMode: "difference", pointerEvents: "none",
-        }}>
-          {row.count} {lang === "sk" ? "projektov" : "projects"} · {row.units} {lang === "sk" ? "bytov" : "units"}
-        </div>
       </div>
 
+      {/* Right: animated €/m² — the main figure, high contrast colored. */}
       <div style={{
-        fontFamily: mono, fontSize: "0.95rem", fontWeight: 600, color,
+        fontFamily: mono, fontSize: "1.05rem", fontWeight: 700, color,
         textAlign: "right", fontVariantNumeric: "tabular-nums",
+        textShadow: `0 0 8px ${color}22`,
       }}>
         {animatedAvg.toLocaleString("en-US").replace(/,/g, " ")} €
       </div>

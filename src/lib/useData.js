@@ -61,19 +61,54 @@ export function useProjectFlats(projectId) {
   useEffect(() => {
     if (!isSupabaseReady() || !projectId) { setLoading(false); return; }
     setLoading(true);
-    // Pre-warm auth session — ensures access_token is attached to the REST
-    // call. Without this, a freshly-mounted component whose parent just
-    // hydrated the session can fire the query before the token is wired in,
-    // causing RLS to treat the user as anon and return zero rows silently.
-    (async () => {
-      try { await supabase.auth.getSession(); } catch { /* ignore */ }
-      const { data, error } = await supabase.from("flats")
+    let cancelled = false;
+
+    const fetchFlats = async () => {
+      return supabase.from("flats")
         .select("*").eq("project_id", projectId)
         .order("poschodie", { ascending: true });
+    };
+
+    (async () => {
+      // Make sure the supabase client has a current session before firing
+      // any RLS-gated read. getSession is a pure local read; if the access
+      // token is close to expiry we actively refresh. Without this, a
+      // freshly-mounted ProjectDetail (the user clicks a project right
+      // after page load) can fire the flats query before the token has
+      // been attached to the supabase client, and RLS treats the user as
+      // anonymous. Real-world symptom: "No data available" on the first
+      // click; the second click works.
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          const expSoon = session.expires_at && (session.expires_at * 1000) < Date.now() + 120000;
+          if (expSoon) await supabase.auth.refreshSession();
+        }
+      } catch { /* ignore — we'll still attempt the fetch */ }
+
+      if (cancelled) return;
+      let { data, error: err } = await fetchFlats();
+      if (cancelled) return;
+
+      // Empty result with no error could be a) no flats in DB (edge case
+      // since project shows unit count) or b) RLS evaluated the caller as
+      // unauthenticated. Retry once with an explicit session refresh to
+      // rule out (b).
+      if ((!data || data.length === 0) && !err) {
+        try { await supabase.auth.refreshSession(); } catch { /* ignore */ }
+        if (cancelled) return;
+        const retry = await fetchFlats();
+        if (cancelled) return;
+        data = retry.data;
+        err = retry.error;
+      }
+
       setFlats(data || []);
-      setError(error);
+      setError(err);
       setLoading(false);
     })();
+
+    return () => { cancelled = true; };
   }, [projectId]);
   return { flats, loading, error };
 }
