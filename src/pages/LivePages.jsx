@@ -404,6 +404,9 @@ export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en
   const { can } = useCapabilities();
   const { flats, loading, error } = useProjectFlats(projectId);
   const { projects } = useProjects();
+  // Snapshots drive the MoM time-series charts (timeline, takeup). Cached
+  // at module level so nav-ing between projects doesn't refetch.
+  const { snapshots } = useProjectSnapshots();
   const project = projects.find(p => p.id === projectId);
 
   // Track project open
@@ -487,9 +490,414 @@ export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en
       {loading ? <div style={{ color: dim }}>{t.loading_generic}</div> :
         error ? <div style={{ color: "#ff6b6b" }}>Error: {error.message}</div> :
         flats.length === 0 ? <div style={{ color: dim }}>{t.no_data}</div> :
-        <FlatsTable flats={flats} t={t} lang={lang} />}
+        <>
+          {project && <ProjectInsights project={project} flats={flats} snapshots={snapshots} lang={lang} />}
+          <FlatsTable flats={flats} t={t} lang={lang} />
+        </>}
     </main>
   );
+}
+
+/* ═══ ProjectInsights ═══ Rich analytics on the per-project detail
+   page. Renders a KPI strip + a set of inline-SVG charts computed
+   client-side from whatever flats / snapshots we already load — no
+   extra backend work. Every chart is self-contained (no deps, just
+   React + SVG) so bundle stays small. */
+function ProjectInsights({ project, flats, snapshots, lang }) {
+  const locale = lang === "sk" ? "sk-SK" : "en-US";
+  const fmtEur = (v) => v == null || !Number.isFinite(v) ? "—" : `${Math.round(v).toLocaleString("en-US").replace(/,/g, " ")} €`;
+  const fmtPct = (v) => v == null || !Number.isFinite(v) ? "—" : `${(Math.round(v * 10) / 10).toFixed(1)}%`;
+  const L = (sk, en) => lang === "sk" ? sk : en;
+
+  // ── Data prep ─────────────────────────────────────────────────
+  const projectSnaps = (snapshots || [])
+    .filter(s => s.project_id === project.id)
+    .sort((a, b) => String(a.snapshot_month).localeCompare(String(b.snapshot_month)));
+  const latestSnap = projectSnaps.at(-1);
+  const prevSnap = projectSnaps.length >= 2 ? projectSnaps.at(-2) : null;
+
+  // Price-per-m² MoM delta (if we have ≥ 2 months)
+  const pricemomDelta = latestSnap && prevSnap && latestSnap.avg_price_eur_m2 && prevSnap.avg_price_eur_m2
+    ? latestSnap.avg_price_eur_m2 - prevSnap.avg_price_eur_m2 : null;
+
+  // Flats numeric helpers
+  const availFlats = flats.filter(f => f.stav === "V");
+  const availPrices = availFlats.map(f => Number(f.cena_s_dph)).filter(Number.isFinite);
+  const topPrice = availPrices.length ? Math.max(...availPrices) : null;
+
+  // Room-type breakdown — group by izby, compute sold % per group.
+  // "Fastest-moving" = highest sold/total ratio (signals market validation).
+  const byRoom = {};
+  for (const f of flats) {
+    const k = f.izby == null ? "?" : String(f.izby);
+    byRoom[k] = byRoom[k] || { room: k, total: 0, sold: 0, avail: 0, reserved: 0 };
+    byRoom[k].total += 1;
+    if (f.stav === "P")  byRoom[k].sold += 1;
+    else if (f.stav === "V") byRoom[k].avail += 1;
+    else if (f.stav === "R" || f.stav === "PR") byRoom[k].reserved += 1;
+  }
+  const roomRows = Object.values(byRoom)
+    .filter(r => r.room !== "?" && r.total >= 2)
+    .sort((a, b) => Number(a.room) - Number(b.room));
+  const fastestRoom = [...roomRows]
+    .filter(r => r.total >= 3)
+    .sort((a, b) => (b.sold / b.total) - (a.sold / a.total))[0];
+
+  // ── KPI strip ─────────────────────────────────────────────────
+  const kpis = [
+    {
+      label: L("Voľné byty", "Available units"),
+      value: project.available_units ?? "—",
+      sub: project.total_units ? `${fmtPct(((project.available_units || 0) / project.total_units) * 100)} ${L("z celku", "of total")}` : null,
+      tint: green,
+    },
+    {
+      label: L("Priem. €/m²", "Avg €/m²"),
+      value: project.avg_price_eur_m2 ? Math.round(project.avg_price_eur_m2).toLocaleString("en-US").replace(/,/g, " ") : "—",
+      sub: pricemomDelta != null
+        ? (pricemomDelta > 0
+            ? <span style={{ color: "#f5a623" }}>+{Math.round(pricemomDelta)} €/m² {L("MoM", "MoM")}</span>
+            : pricemomDelta < 0
+              ? <span style={{ color: green }}>{Math.round(pricemomDelta)} €/m² {L("MoM", "MoM")}</span>
+              : <span style={{ color: dim }}>{L("bez zmeny", "no change")} MoM</span>)
+        : L("žiadna história", "no history yet"),
+      tint: "#e8e8ed",
+    },
+    {
+      label: L("Najrýchlejšie sa predáva", "Fastest moving"),
+      value: fastestRoom ? `${fastestRoom.room}-${L("izb", "room")}` : "—",
+      sub: fastestRoom ? `${fmtPct((fastestRoom.sold / fastestRoom.total) * 100)} ${L("predané", "sold")}` : null,
+      tint: "#f5a623",
+    },
+    {
+      label: L("Najdrahší voľný", "Priciest available"),
+      value: topPrice ? fmtEur(topPrice) : "—",
+      sub: availPrices.length ? `${availPrices.length} ${L("voľných s cenou", "with price")}` : null,
+      tint: "#e8e8ed",
+    },
+  ];
+
+  return (
+    <section style={{ marginBottom: "2rem" }}>
+      <div style={{ fontFamily: mono, fontSize: "0.65rem", color: green, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.85rem" }}>
+        {L("Prehľad projektu", "Project insights")}
+      </div>
+
+      {/* KPI strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "0.8rem", marginBottom: "1.5rem" }}>
+        {kpis.map((k, i) => (
+          <div key={i} style={{
+            background: bg, border: `1px solid ${border}`, borderRadius: 10,
+            padding: "1rem 1.1rem",
+          }}>
+            <div style={{ fontFamily: mono, fontSize: "0.58rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.45rem" }}>
+              {k.label}
+            </div>
+            <div style={{ fontFamily: mono, fontSize: "1.65rem", fontWeight: 700, color: k.tint, letterSpacing: "-0.02em", lineHeight: 1 }}>
+              {k.value}
+            </div>
+            {k.sub && <div style={{ fontSize: "0.72rem", color: dim, marginTop: "0.45rem" }}>{k.sub}</div>}
+          </div>
+        ))}
+      </div>
+
+      {/* Charts grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1.25rem" }} className="insights-grid">
+        {projectSnaps.length >= 2 && (
+          <ChartCard title={L("Timeline — voľné vs. predané", "Timeline — available vs sold")}
+            subtitle={L(`${projectSnaps.length} mesiacov histórie`, `${projectSnaps.length} months of history`)}>
+            <TimelineChart snaps={projectSnaps} lang={lang} />
+          </ChartCard>
+        )}
+        {projectSnaps.length >= 2 && (
+          <ChartCard title={L("Mesačná absorpcia (take-up)", "Monthly take-up")}
+            subtitle={L("Δ predaných v každom mesiaci", "Δ sold units per month")}>
+            <TakeupChart snaps={projectSnaps} lang={lang} />
+          </ChartCard>
+        )}
+        {roomRows.length > 0 && (
+          <ChartCard title={L("Mix po izbách", "Room-type mix")}
+            subtitle={L("Predané / rezervované / voľné", "Sold / reserved / available")}>
+            <RoomMixChart rows={roomRows} lang={lang} />
+          </ChartCard>
+        )}
+        {availPrices.length >= 5 && (
+          <ChartCard title={L("Rozdelenie cien voľných bytov", "Price distribution — available units")}
+            subtitle={L(`Medián ${fmtEur(median(availPrices))}`, `Median ${fmtEur(median(availPrices))}`)}>
+            <PriceHistogram prices={availPrices} lang={lang} />
+          </ChartCard>
+        )}
+      </div>
+
+      {flats.length >= 5 && (
+        <ChartCard title={L("Plocha × cena (všetky byty)", "Area × price (all units)")}
+          subtitle={L("Každý bod = 1 byt · sklon ~ priemerná €/m²", "Each dot = 1 unit · slope ≈ avg €/m²")}>
+          <AreaPriceScatter flats={flats} lang={lang} />
+        </ChartCard>
+      )}
+
+      <style>{`
+        @media (max-width: 760px) { .insights-grid { grid-template-columns: 1fr !important; } }
+      `}</style>
+    </section>
+  );
+}
+
+function ChartCard({ title, subtitle, children }) {
+  return (
+    <div style={{
+      background: bg, border: `1px solid ${border}`, borderRadius: 10,
+      padding: "1rem 1.1rem",
+    }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.85rem", gap: "0.5rem" }}>
+        <div style={{ fontSize: "0.88rem", color: "#e8e8ed", fontWeight: 600 }}>{title}</div>
+        {subtitle && <div style={{ fontSize: "0.7rem", color: dim, fontFamily: mono }}>{subtitle}</div>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+/* ── Timeline: two lines over months (available ↓, sold ↑) ─── */
+function TimelineChart({ snaps, lang }) {
+  const W = 460, H = 180, pad = { l: 36, r: 10, t: 10, b: 28 };
+  const innerW = W - pad.l - pad.r, innerH = H - pad.t - pad.b;
+  const xs = snaps.map(s => s.snapshot_month);
+  const avail = snaps.map(s => s.available_units || 0);
+  const sold = snaps.map(s => s.sold_units || 0);
+  const yMax = Math.max(1, ...avail, ...sold);
+  const xAt = (i) => pad.l + (innerW * i) / Math.max(1, snaps.length - 1);
+  const yAt = (v) => pad.t + innerH - (innerH * v) / yMax;
+
+  const lineAvail = avail.map((v, i) => `${i === 0 ? "M" : "L"} ${xAt(i)} ${yAt(v)}`).join(" ");
+  const lineSold  = sold.map((v, i) => `${i === 0 ? "M" : "L"} ${xAt(i)} ${yAt(v)}`).join(" ");
+  const areaAvail = `${lineAvail} L ${xAt(snaps.length - 1)} ${pad.t + innerH} L ${xAt(0)} ${pad.t + innerH} Z`;
+
+  // Y-axis ticks — 4 gridlines
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map(t => ({
+    y: pad.t + innerH - innerH * t,
+    label: Math.round(yMax * t),
+  }));
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block", overflow: "visible" }}>
+      {ticks.map((t, i) => (
+        <g key={i}>
+          <line x1={pad.l} x2={W - pad.r} y1={t.y} y2={t.y} stroke={border} strokeWidth={1} />
+          <text x={pad.l - 6} y={t.y + 3} textAnchor="end" fill={dim} fontFamily={mono} fontSize={9}>{t.label}</text>
+        </g>
+      ))}
+      {/* X-axis labels — first, middle, last */}
+      {[0, Math.floor((snaps.length - 1) / 2), snaps.length - 1].filter((v, i, a) => a.indexOf(v) === i).map(i => (
+        <text key={i} x={xAt(i)} y={H - 8} textAnchor={i === 0 ? "start" : i === snaps.length - 1 ? "end" : "middle"}
+          fill={dim} fontFamily={mono} fontSize={10}>{xs[i]}</text>
+      ))}
+      {/* Area under available */}
+      <path d={areaAvail} fill={green} opacity={0.08} />
+      {/* Lines */}
+      <path d={lineAvail} fill="none" stroke={green} strokeWidth={2} />
+      <path d={lineSold}  fill="none" stroke="#f5a623" strokeWidth={2} />
+      {/* Dots */}
+      {avail.map((v, i) => (<circle key={`a${i}`} cx={xAt(i)} cy={yAt(v)} r={3} fill={green} />))}
+      {sold.map((v, i) => (<circle key={`s${i}`} cx={xAt(i)} cy={yAt(v)} r={3} fill="#f5a623" />))}
+      {/* Legend */}
+      <g transform={`translate(${pad.l}, ${pad.t - 2})`}>
+        <circle cx={4} cy={4} r={3} fill={green} /><text x={12} y={7} fill={dim} fontFamily={mono} fontSize={10}>{lang === "sk" ? "voľné" : "available"}</text>
+        <circle cx={72} cy={4} r={3} fill="#f5a623" /><text x={80} y={7} fill={dim} fontFamily={mono} fontSize={10}>{lang === "sk" ? "predané" : "sold"}</text>
+      </g>
+    </svg>
+  );
+}
+
+/* ── Takeup: bar chart of Δsold per month ──────────────────── */
+function TakeupChart({ snaps, lang }) {
+  const W = 460, H = 180, pad = { l: 36, r: 10, t: 10, b: 28 };
+  const innerW = W - pad.l - pad.r, innerH = H - pad.t - pad.b;
+  // Δ = sold[i] - sold[i-1] for i >= 1
+  const deltas = [];
+  for (let i = 1; i < snaps.length; i++) {
+    const d = (snaps[i].sold_units || 0) - (snaps[i - 1].sold_units || 0);
+    deltas.push({ month: snaps[i].snapshot_month, delta: d });
+  }
+  if (deltas.length === 0) return <div style={{ color: dim, fontSize: "0.8rem", textAlign: "center", padding: "1rem" }}>—</div>;
+  const yMax = Math.max(1, ...deltas.map(d => Math.abs(d.delta)));
+  const barW = innerW / deltas.length * 0.7;
+  const gapW = innerW / deltas.length * 0.3;
+  const zeroY = pad.t + innerH / 2;
+  const yAt = (v) => zeroY - (innerH / 2) * (v / yMax);
+  const avg = deltas.reduce((a, d) => a + d.delta, 0) / deltas.length;
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block", overflow: "visible" }}>
+      {/* Zero line */}
+      <line x1={pad.l} x2={W - pad.r} y1={zeroY} y2={zeroY} stroke={border} strokeWidth={1} />
+      {/* Average line (dashed) */}
+      <line x1={pad.l} x2={W - pad.r} y1={yAt(avg)} y2={yAt(avg)} stroke={dim} strokeWidth={1} strokeDasharray="3,3" opacity={0.5} />
+      <text x={W - pad.r - 3} y={yAt(avg) - 3} textAnchor="end" fill={dim} fontFamily={mono} fontSize={9}>∅ {avg.toFixed(1)}</text>
+      {/* Bars */}
+      {deltas.map((d, i) => {
+        const x = pad.l + (innerW * i) / deltas.length + gapW / 2;
+        const isBest = d.delta === Math.max(...deltas.map(x => x.delta)) && d.delta > 0;
+        const color = d.delta > 0 ? (isBest ? green : `${green}aa`) : d.delta < 0 ? "#ff9b6b" : dim;
+        const y = Math.min(zeroY, yAt(d.delta));
+        const height = Math.abs(yAt(d.delta) - zeroY);
+        return (
+          <g key={i}>
+            <rect x={x} y={y} width={barW} height={Math.max(1, height)} fill={color} rx={2} />
+            <text x={x + barW / 2} y={zeroY + 12} textAnchor="middle" fill={dim} fontFamily={mono} fontSize={8}>
+              {d.month.slice(5)}
+            </text>
+            {Math.abs(d.delta) >= 2 && (
+              <text x={x + barW / 2} y={d.delta > 0 ? y - 3 : y + height + 9} textAnchor="middle" fill={color} fontFamily={mono} fontSize={9} fontWeight={700}>
+                {d.delta > 0 ? `+${d.delta}` : d.delta}
+              </text>
+            )}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+/* ── Room mix: horizontal stacked bars per room type ──────── */
+function RoomMixChart({ rows, lang }) {
+  const W = 460, rowH = 26, gap = 6, labelW = 60, valueW = 80;
+  const barW = W - labelW - valueW - 20;
+  const H = rows.length * (rowH + gap) + 8;
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}>
+      {rows.map((r, i) => {
+        const y = i * (rowH + gap);
+        const pct = r.total > 0 ? {
+          sold: r.sold / r.total * 100,
+          reserved: r.reserved / r.total * 100,
+          avail: r.avail / r.total * 100,
+        } : { sold: 0, reserved: 0, avail: 0 };
+        const soldW = (pct.sold / 100) * barW;
+        const resvW = (pct.reserved / 100) * barW;
+        const availW = (pct.avail / 100) * barW;
+        return (
+          <g key={r.room}>
+            <text x={0} y={y + rowH / 2 + 4} fill="#e8e8ed" fontFamily={mono} fontSize={11} fontWeight={700}>
+              {r.room}-{lang === "sk" ? "izb" : "room"}
+            </text>
+            <rect x={labelW} y={y} width={barW} height={rowH} fill="#0a0a0b" stroke={border} />
+            {soldW > 0 && <rect x={labelW} y={y} width={soldW} height={rowH} fill="#f5a623" />}
+            {resvW > 0 && <rect x={labelW + soldW} y={y} width={resvW} height={rowH} fill="#888" />}
+            {availW > 0 && <rect x={labelW + soldW + resvW} y={y} width={availW} height={rowH} fill={green} />}
+            <text x={W - 4} y={y + rowH / 2 + 4} textAnchor="end" fill={dim} fontFamily={mono} fontSize={10}>
+              {r.sold}/{r.total} · {Math.round(pct.sold)}%
+            </text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+/* ── Price histogram — 10 bins of available flat prices ──── */
+function PriceHistogram({ prices }) {
+  const W = 460, H = 180, pad = { l: 36, r: 10, t: 10, b: 28 };
+  const innerW = W - pad.l - pad.r, innerH = H - pad.t - pad.b;
+  const min = Math.min(...prices), max = Math.max(...prices);
+  const bins = 10;
+  const binW = (max - min) / bins || 1;
+  const counts = Array(bins).fill(0);
+  for (const p of prices) {
+    const i = Math.min(bins - 1, Math.floor((p - min) / binW));
+    counts[i] += 1;
+  }
+  const yMax = Math.max(...counts);
+  const med = median(prices);
+  const medX = pad.l + (innerW * (med - min)) / (max - min || 1);
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block", overflow: "visible" }}>
+      {counts.map((c, i) => {
+        const x = pad.l + (innerW * i) / bins;
+        const w = (innerW / bins) - 2;
+        const h = (c / yMax) * innerH;
+        const y = pad.t + innerH - h;
+        return <rect key={i} x={x + 1} y={y} width={w} height={h} fill={green} opacity={0.6} rx={2} />;
+      })}
+      {/* Median vertical line */}
+      <line x1={medX} x2={medX} y1={pad.t} y2={pad.t + innerH} stroke="#f5a623" strokeWidth={2} strokeDasharray="4,3" />
+      <text x={medX + 5} y={pad.t + 10} fill="#f5a623" fontFamily={mono} fontSize={10}>medián</text>
+      {/* Axis labels */}
+      <text x={pad.l} y={H - 8} fill={dim} fontFamily={mono} fontSize={10}>{`${Math.round(min / 1000)}k €`}</text>
+      <text x={W - pad.r} y={H - 8} textAnchor="end" fill={dim} fontFamily={mono} fontSize={10}>{`${Math.round(max / 1000)}k €`}</text>
+    </svg>
+  );
+}
+
+/* ── Scatter: area_m² (X) × price_€ (Y), dot per unit ──── */
+function AreaPriceScatter({ flats, lang }) {
+  const W = 940, H = 260, pad = { l: 50, r: 16, t: 12, b: 36 };
+  const innerW = W - pad.l - pad.r, innerH = H - pad.t - pad.b;
+  const points = flats
+    .map(f => ({
+      x: Number(f.obytna_plocha || f.celkova_plocha),
+      y: Number(f.cena_s_dph),
+      stav: f.stav,
+    }))
+    .filter(p => Number.isFinite(p.x) && Number.isFinite(p.y) && p.x > 0 && p.y > 0);
+  if (points.length === 0) return <div style={{ color: dim, fontSize: "0.8rem", textAlign: "center", padding: "1rem" }}>—</div>;
+
+  const xMin = Math.min(...points.map(p => p.x)), xMax = Math.max(...points.map(p => p.x));
+  const yMin = Math.min(...points.map(p => p.y)), yMax = Math.max(...points.map(p => p.y));
+  const xAt = (v) => pad.l + ((v - xMin) / (xMax - xMin || 1)) * innerW;
+  const yAt = (v) => pad.t + innerH - ((v - yMin) / (yMax - yMin || 1)) * innerH;
+
+  // Fit: avg €/m² line — from (xMin, xMin * avg_per_m2) to (xMax, xMax * avg_per_m2)
+  const sumPrice = points.reduce((a, p) => a + p.y, 0);
+  const sumArea  = points.reduce((a, p) => a + p.x, 0);
+  const avgPerM2 = sumArea > 0 ? sumPrice / sumArea : 0;
+
+  const colorFor = (stav) => stav === "V" ? green : stav === "P" ? "#f5a623" : stav === "R" || stav === "PR" ? "#888" : dim;
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block", overflow: "visible" }}>
+      {/* Grid: 3 vertical + 3 horizontal */}
+      {[0.25, 0.5, 0.75].map((t, i) => (
+        <g key={i}>
+          <line x1={pad.l + innerW * t} x2={pad.l + innerW * t} y1={pad.t} y2={pad.t + innerH} stroke={border} strokeWidth={1} />
+          <line x1={pad.l} x2={pad.l + innerW} y1={pad.t + innerH * t} y2={pad.t + innerH * t} stroke={border} strokeWidth={1} />
+        </g>
+      ))}
+      {/* Fit line */}
+      {avgPerM2 > 0 && (
+        <line x1={xAt(xMin)} x2={xAt(xMax)} y1={yAt(xMin * avgPerM2)} y2={yAt(xMax * avgPerM2)}
+          stroke="#e8e8ed" strokeWidth={1.5} strokeDasharray="5,4" opacity={0.5} />
+      )}
+      {/* Points */}
+      {points.map((p, i) => (
+        <circle key={i} cx={xAt(p.x)} cy={yAt(p.y)} r={4} fill={colorFor(p.stav)} opacity={0.75}>
+          <title>{`${p.x} m² · ${Math.round(p.y).toLocaleString("en-US").replace(/,/g, " ")} € · ${p.stav || "?"}`}</title>
+        </circle>
+      ))}
+      {/* Axis labels */}
+      <text x={pad.l} y={H - 12} fill={dim} fontFamily={mono} fontSize={10}>{`${Math.round(xMin)} m²`}</text>
+      <text x={W - pad.r} y={H - 12} textAnchor="end" fill={dim} fontFamily={mono} fontSize={10}>{`${Math.round(xMax)} m²`}</text>
+      <text x={pad.l - 6} y={pad.t + 10} textAnchor="end" fill={dim} fontFamily={mono} fontSize={10} transform={`rotate(-90 ${pad.l - 6} ${pad.t + 10})`}>
+        {`${Math.round(yMax / 1000)}k €`}
+      </text>
+      <text x={pad.l - 6} y={pad.t + innerH} textAnchor="end" fill={dim} fontFamily={mono} fontSize={10} transform={`rotate(-90 ${pad.l - 6} ${pad.t + innerH})`}>
+        {`${Math.round(yMin / 1000)}k €`}
+      </text>
+      {/* Legend */}
+      <g transform={`translate(${pad.l + 8}, ${pad.t + 12})`}>
+        <circle cx={4} cy={4} r={3} fill={green} /><text x={12} y={7} fill={dim} fontFamily={mono} fontSize={10}>{lang === "sk" ? "voľné" : "available"}</text>
+        <circle cx={72} cy={4} r={3} fill="#f5a623" /><text x={80} y={7} fill={dim} fontFamily={mono} fontSize={10}>{lang === "sk" ? "predané" : "sold"}</text>
+        <circle cx={132} cy={4} r={3} fill="#888" /><text x={140} y={7} fill={dim} fontFamily={mono} fontSize={10}>{lang === "sk" ? "rezervované" : "reserved"}</text>
+      </g>
+    </svg>
+  );
+}
+
+function median(arr) {
+  if (!arr.length) return null;
+  const s = [...arr].sort((a, b) => a - b);
+  const m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 }
 
 function FlatsTable({ flats, t, lang }) {
