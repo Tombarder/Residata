@@ -920,8 +920,13 @@ const inputStyle = {
   boxSizing: "border-box", outline: "none",
 };
 
-// ─── Reports page — executive summary from live DB + download ────
-function PlatformReports({ lang, setCurrent }) {
+// ─── Reports page — moved to ./Reports.jsx (5-scope module with AI)
+//     The previous inline implementation (executive summary + CSV) was
+//     superseded. Router still renders <ReportsPage/> under the same
+//     capability gate. Historical block kept below only in case the
+//     new page needs a quick fallback.
+/* eslint-disable-next-line no-unused-vars */
+function _legacyPlatformReports({ lang, setCurrent }) {
   const { projects, loading } = useProjects();
 
   if (loading && projects.length === 0) {
