@@ -21,6 +21,7 @@ import { track } from "../lib/track";
 import {
   LiveDashboard, LiveProjectDetail, LiveAnalytics, LiveAdmin,
 } from "./LivePages";
+import ReportsPage from "./Reports";
 
 const mono = "'JetBrains Mono', monospace";
 const green = "#00e5a0";
@@ -414,7 +415,7 @@ function PageContent({ page, projectId, lang, setCurrent, openLogin }) {
   if (page === "App:Dashboard")  return <PlatformDashboard lang={lang} setCurrent={setCurrent} />;
   if (page === "App:Projects")   return <PlatformProjects lang={lang} setCurrent={setCurrent} openLogin={openLogin} />;
   if (page === "App:Analytics")  return <Gated require="view_analytics"       lang={lang} setCurrent={setCurrent}><LiveAnalytics lang={lang} setCurrent={setCurrent} openLogin={openLogin} /></Gated>;
-  if (page === "App:Reports")    return <Gated require="view_monthly_reports" lang={lang} setCurrent={setCurrent}><PlatformReports lang={lang} setCurrent={setCurrent} /></Gated>;
+  if (page === "App:Reports")    return <Gated require="view_monthly_reports" lang={lang} setCurrent={setCurrent}><ReportsPage lang={lang} /></Gated>;
   if (page === "App:Exports")    return <Gated require="export_data"          lang={lang} setCurrent={setCurrent}><PlatformExports lang={lang} setCurrent={setCurrent} /></Gated>;
   if (page === "App:Billing")    return <PlatformBilling lang={lang} setCurrent={setCurrent} />;
   if (page === "App:Settings")   return <PlatformSettings lang={lang} />;

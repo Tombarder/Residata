@@ -1,0 +1,897 @@
+/**
+ * Reports layer — from "3%" to a real module.
+ *
+ * Five scopes, each its own view but sharing primitives:
+ *   · Market     — nationwide snapshot (every active project)
+ *   · Mesto      — one city (Bratislava / Košice / …)
+ *   · Časť mesta — one district (Staré Mesto, Petržalka, Ružinov, …)
+ *   · Projekt    — deep-dive on one project
+ *   · Developer  — developer portfolio overview
+ *
+ * Every scope renders the same section taxonomy so a user's mental
+ * model stays stable as they drill down:
+ *     KPI strip → Executive summary (optional AI) → Top/Bottom lists
+ *     → Price distribution → Absorption & supply → Downloads (CSV + PDF)
+ *
+ * Data source: the same projects + flats hooks as the rest of the app.
+ * No new fetches; all aggregation happens client-side on cached data.
+ *
+ * PDF: browser print. A dedicated print stylesheet strips chrome and
+ * cleanly paginates the report so `Cmd-P → Save as PDF` gives a
+ * brand-clean document without a PDF library.
+ *
+ * AI: optional per-report summary. Calls `/api/ai/summary` (Vercel
+ * serverless). The function is a thin proxy that fans the page's
+ * KPI summary → Claude and returns Slovak prose. Missing API key →
+ * the button is disabled with a helpful hint.
+ */
+import { useState, useMemo, useEffect } from "react";
+import { useProjects, useAllFlats } from "../lib/useData";
+
+// ── Visual language (mirrors Platform.jsx) ───────────────────────
+const mono = "'JetBrains Mono', monospace";
+const green = "#00e5a0";
+const dim = "#8a8a96";
+const text = "#e8e8ed";
+const border = "#222228";
+const bg = "#0a0a0b";
+const bg2 = "#0e0e10";
+const panel = "#14141a";
+const red = "#ff6b6b";
+const orange = "#f5a623";
+
+// ── Scope definitions ────────────────────────────────────────────
+const SCOPES = [
+  { key: "market",     label: { sk: "Trh",          en: "Market" } },
+  { key: "mesto",      label: { sk: "Mesto",        en: "City" } },
+  { key: "cast",       label: { sk: "Časť mesta",   en: "District" } },
+  { key: "projekt",    label: { sk: "Projekt",      en: "Project" } },
+  { key: "developer",  label: { sk: "Developer",    en: "Developer" } },
+];
+
+/* ══════════════════════════════════════════════════════════════════
+   Top-level Reports page. Hosts scope tabs + the picked-scope view.
+   ══════════════════════════════════════════════════════════════════ */
+export default function PlatformReports({ lang = "sk" }) {
+  const { projects, loading: loadingProjects } = useProjects();
+  const { flats,    loading: loadingFlats }    = useAllFlats();
+
+  const [scope, setScope]         = useState("market");
+  const [cityPick, setCityPick]   = useState(null);
+  const [distPick, setDistPick]   = useState(null);
+  const [projPick, setProjPick]   = useState(null);
+  const [devPick,  setDevPick]    = useState(null);
+
+  // Derive pickers from data
+  const cities = useMemo(() => uniqueSorted(projects.map(p => p.city).filter(Boolean)), [projects]);
+  const districts = useMemo(() => uniqueSorted(projects.map(p => p.district).filter(Boolean)), [projects]);
+  const developers = useMemo(() => uniqueSorted(projects.map(p => p.developer).filter(Boolean)), [projects]);
+
+  // Initialise pickers once data arrives
+  useEffect(() => {
+    if (!cityPick && cities[0])       setCityPick(cities[0]);
+    if (!distPick && districts[0])    setDistPick(districts[0]);
+    if (!projPick && projects[0])     setProjPick(projects[0].id);
+    if (!devPick  && developers[0])   setDevPick(developers[0]);
+  }, [cities, districts, projects, developers]); // eslint-disable-line
+
+  const loading = loadingProjects || loadingFlats;
+
+  if (loading && projects.length === 0) {
+    return (
+      <div style={{ padding: "3rem 2rem", color: dim, fontFamily: mono, fontSize: "0.85rem" }}>
+        {lang === "sk" ? "Načítavam report…" : "Loading report…"}
+      </div>
+    );
+  }
+
+  return (
+    <div className="residata-report-root" style={{ padding: "1rem 2rem 4rem", maxWidth: 1100, margin: "0 auto" }}>
+      <ReportHeader projects={projects} flats={flats} lang={lang} scope={scope} />
+
+      {/* Scope tabs */}
+      <div className="no-print" style={{
+        display: "flex", gap: "0.3rem", flexWrap: "wrap",
+        padding: "0.55rem 0.6rem", background: bg2, border: `1px solid ${border}`,
+        borderRadius: 8, marginBottom: "1rem",
+      }}>
+        {SCOPES.map(s => (
+          <ScopeTab key={s.key} active={scope === s.key} onClick={() => setScope(s.key)}>
+            {s.label[lang] || s.label.sk}
+          </ScopeTab>
+        ))}
+      </div>
+
+      {/* Picker for the current scope */}
+      {scope === "mesto" && (
+        <PickerRow label={lang === "sk" ? "Mesto" : "City"} value={cityPick} options={cities} onChange={setCityPick} />
+      )}
+      {scope === "cast" && (
+        <PickerRow label={lang === "sk" ? "Časť mesta" : "District"} value={distPick} options={districts} onChange={setDistPick} />
+      )}
+      {scope === "projekt" && (
+        <PickerRow
+          label={lang === "sk" ? "Projekt" : "Project"}
+          value={projPick}
+          options={projects.map(p => ({ value: p.id, label: p.name + (p.district ? ` (${p.district})` : "") }))}
+          onChange={setProjPick}
+        />
+      )}
+      {scope === "developer" && (
+        <PickerRow label={lang === "sk" ? "Developer" : "Developer"} value={devPick} options={developers} onChange={setDevPick} />
+      )}
+
+      {/* Scope bodies */}
+      {scope === "market" && (
+        <MarketReport projects={projects} flats={flats} lang={lang} />
+      )}
+      {scope === "mesto" && cityPick && (
+        <FilteredReport
+          scopeLabel={cityPick}
+          scopeType={lang === "sk" ? "Mesto" : "City"}
+          projects={projects.filter(p => p.city === cityPick)}
+          flats={flats.filter(f => projectCity(f, projects) === cityPick)}
+          allProjects={projects}
+          lang={lang}
+          breakdownBy="district"
+          breakdownLabel={lang === "sk" ? "podľa časti mesta" : "by district"}
+        />
+      )}
+      {scope === "cast" && distPick && (
+        <FilteredReport
+          scopeLabel={distPick}
+          scopeType={lang === "sk" ? "Časť mesta" : "District"}
+          projects={projects.filter(p => p.district === distPick)}
+          flats={flats.filter(f => projectDistrict(f, projects) === distPick)}
+          allProjects={projects}
+          lang={lang}
+          breakdownBy="developer"
+          breakdownLabel={lang === "sk" ? "podľa developera" : "by developer"}
+        />
+      )}
+      {scope === "projekt" && projPick && (
+        <ProjectReport
+          project={projects.find(p => p.id === projPick)}
+          flats={flats.filter(f => f.project_id === projPick)}
+          siblings={projects}
+          lang={lang}
+        />
+      )}
+      {scope === "developer" && devPick && (
+        <FilteredReport
+          scopeLabel={devPick}
+          scopeType={lang === "sk" ? "Developer" : "Developer"}
+          projects={projects.filter(p => p.developer === devPick)}
+          flats={flats.filter(f => {
+            const p = projects.find(x => x.id === f.project_id);
+            return p && p.developer === devPick;
+          })}
+          allProjects={projects}
+          lang={lang}
+          breakdownBy="project_name"
+          breakdownLabel={lang === "sk" ? "podľa projektu" : "by project"}
+        />
+      )}
+
+      {/* Print stylesheet — strips nav + scope picker, widens margins,
+          renders each major section on its own page-break boundary. */}
+      <style>{`
+        @media print {
+          @page { size: A4; margin: 14mm 12mm; }
+          body, html { background: #fff !important; }
+          .residata-report-root { max-width: 100% !important; padding: 0 !important; color: #111 !important; }
+          .residata-report-root * { color: #111 !important; background: transparent !important; border-color: #ccc !important; }
+          .residata-report-root .report-section { page-break-inside: avoid; }
+          .residata-report-root .report-pagebreak { page-break-before: always; }
+          .residata-report-root .report-accent { color: #006b48 !important; }
+          .no-print { display: none !important; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+/* ─── Header card: title + month + print + scope-aware subtitle ─── */
+function ReportHeader({ projects, flats, lang, scope }) {
+  const month = new Date().toLocaleDateString(lang === "sk" ? "sk-SK" : "en-US", { month: "long", year: "numeric" });
+  const lastSync = projects[0]?.last_updated?.slice(0, 10) || new Date().toISOString().slice(0, 10);
+  const scopeLabel = SCOPES.find(s => s.key === scope)?.label[lang] || "";
+  return (
+    <div style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 12, padding: "1.5rem 1.75rem", marginBottom: "1rem" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem", flexWrap: "wrap" }}>
+        <div>
+          <div style={{ fontFamily: mono, fontSize: "0.62rem", color: dim, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.4rem" }}>
+            Residata · {lang === "sk" ? "Report" : "Report"} · {scopeLabel}
+          </div>
+          <h2 style={{ fontSize: "1.6rem", fontWeight: 700, color: text, margin: 0, letterSpacing: "-0.02em", textTransform: "capitalize" }}>
+            {month}
+          </h2>
+          <p style={{ color: dim, fontSize: "0.82rem", margin: "0.4rem 0 0", fontFamily: mono }}>
+            {lang === "sk" ? "Dáta k" : "Data as of"} {lastSync} · {projects.length} {lang === "sk" ? "projektov" : "projects"} · {flats.length} {lang === "sk" ? "bytov" : "units"}
+          </p>
+        </div>
+        <div className="no-print" style={{ display: "flex", gap: "0.5rem" }}>
+          <button onClick={() => window.print()} className="btn-p" style={{ fontSize: "0.78rem", padding: "0.5rem 0.9rem" }}>
+            🖨  {lang === "sk" ? "Stiahnuť PDF" : "Save as PDF"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ScopeTab({ active, onClick, children }) {
+  return (
+    <button onClick={onClick}
+      style={{
+        background: active ? "rgba(0,229,160,0.14)" : "transparent",
+        border: `1px solid ${active ? green : border}`,
+        color: active ? green : dim,
+        padding: "0.4rem 0.85rem", borderRadius: 4,
+        fontFamily: mono, fontSize: "0.72rem", cursor: "pointer",
+        letterSpacing: "0.04em",
+      }}>
+      {children}
+    </button>
+  );
+}
+
+function PickerRow({ label, value, options, onChange }) {
+  const opts = options.map(o => (typeof o === "string" ? { value: o, label: o } : o));
+  return (
+    <div className="no-print" style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "1rem", padding: "0.55rem 0.7rem", background: bg2, border: `1px solid ${border}`, borderRadius: 6 }}>
+      <span style={{ fontFamily: mono, fontSize: "0.62rem", color: dim, letterSpacing: "0.08em", textTransform: "uppercase" }}>{label}</span>
+      <select value={value || ""} onChange={(e) => onChange(e.target.value)}
+        style={{
+          background: bg, border: `1px solid ${border}`, color: text,
+          padding: "0.35rem 0.6rem", borderRadius: 4,
+          fontFamily: mono, fontSize: "0.78rem", minWidth: 200,
+        }}>
+        {opts.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+      <span style={{ fontFamily: mono, fontSize: "0.62rem", color: dim }}>{opts.length} {`⋮`}</span>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Market report — global, "where the Slovak new-build market stands"
+   ══════════════════════════════════════════════════════════════════ */
+function MarketReport({ projects, flats, lang }) {
+  const summary = useMemo(() => summariseProjects(projects), [projects]);
+  const priceSeries = useMemo(() => priceDistribution(flats, 12), [flats]);
+  const districts = useMemo(() => groupAggregates(projects, "district", lang), [projects, lang]);
+  const developers = useMemo(() => groupAggregates(projects, "developer", lang).slice(0, 8), [projects, lang]);
+
+  const title = lang === "sk" ? "Slovenský trh novostavieb" : "Slovak new-build market";
+  const aiCtx = buildAiContext({ scope: "market", summary, districts, developers, priceSeries });
+
+  return (
+    <>
+      <KpiStrip summary={summary} lang={lang} />
+
+      <ReportSection label={lang === "sk" ? "Executive summary" : "Executive summary"} title={title}>
+        <ExecSummary summary={summary} lang={lang} extraDistrict={districts[0]} />
+        <AiSummaryBlock context={aiCtx} lang={lang} />
+      </ReportSection>
+
+      <ReportSection label={lang === "sk" ? "Rozloženie cien" : "Price distribution"} title={lang === "sk" ? "€/m² cez všetky byty" : "€/m² across all units"}>
+        <Histogram bins={priceSeries} lang={lang} unit="€/m²" />
+      </ReportSection>
+
+      <ReportSection label={lang === "sk" ? "Časti mesta" : "Districts"} title={lang === "sk" ? "Kde je dopyt a ceny najvyššie" : "Where demand and prices concentrate"}>
+        <AggregateTable rows={districts} lang={lang} nameLabel={lang === "sk" ? "Časť" : "District"} />
+      </ReportSection>
+
+      <ReportSection label={lang === "sk" ? "Top developeri" : "Top developers"} title={lang === "sk" ? "Podľa objemu jednotiek" : "By total inventory"}>
+        <AggregateTable rows={developers} lang={lang} nameLabel="Developer" />
+      </ReportSection>
+
+      <ReportSection label={lang === "sk" ? "Najaktívnejší mesiac" : "Most active last month"} title={lang === "sk" ? "Predaje za posledných 30 dní" : "Sales in the last 30 days"}>
+        <TopSellerList projects={projects} lang={lang} />
+      </ReportSection>
+
+      <FooterCard lang={lang} />
+    </>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Filtered report — reused for City / District / Developer scopes.
+   Signs: `scopeLabel` + `scopeType` identify what's narrowed;
+          `projects` + `flats` are already filtered to that slice.
+   ══════════════════════════════════════════════════════════════════ */
+function FilteredReport({ scopeLabel, scopeType, projects, flats, allProjects, lang, breakdownBy, breakdownLabel }) {
+  const summary = useMemo(() => summariseProjects(projects), [projects]);
+  const globalSummary = useMemo(() => summariseProjects(allProjects), [allProjects]);
+  const priceSeries = useMemo(() => priceDistribution(flats, 12), [flats]);
+  const breakdown = useMemo(() => groupAggregates(projects, breakdownBy, lang), [projects, breakdownBy, lang]);
+  const siblings = useMemo(() => groupAggregates(allProjects, breakdownBy === "developer" ? "district" : "developer", lang).slice(0, 6), [allProjects, breakdownBy, lang]);
+
+  if (projects.length === 0) {
+    return (
+      <div style={{ padding: "2rem", color: dim, fontSize: "0.9rem", textAlign: "center", fontStyle: "italic", background: bg2, border: `1px dashed ${border}`, borderRadius: 8 }}>
+        {lang === "sk" ? `Pre výber "${scopeLabel}" nemáme dáta.` : `No data available for "${scopeLabel}".`}
+      </div>
+    );
+  }
+
+  const title = lang === "sk" ? `${scopeType}: ${scopeLabel}` : `${scopeType}: ${scopeLabel}`;
+  const aiCtx = buildAiContext({ scope: scopeType, scopeLabel, summary, globalSummary, breakdown, priceSeries });
+
+  return (
+    <>
+      <KpiStrip summary={summary} lang={lang} />
+
+      <ReportSection label={scopeType} title={title}>
+        <ExecSummary summary={summary} lang={lang} compared={{ label: lang === "sk" ? "trh" : "market", summary: globalSummary }} />
+        <AiSummaryBlock context={aiCtx} lang={lang} />
+      </ReportSection>
+
+      {priceSeries.some(b => b.count > 0) && (
+        <ReportSection label={lang === "sk" ? "Rozloženie cien" : "Price distribution"} title={lang === "sk" ? "Kde sedí väčšina ponuky" : "Where the bulk of supply sits"}>
+          <Histogram bins={priceSeries} lang={lang} unit="€/m²" />
+        </ReportSection>
+      )}
+
+      {breakdown.length > 0 && (
+        <ReportSection label={lang === "sk" ? "Rozklad" : "Breakdown"} title={lang === "sk" ? `Ponuka ${breakdownLabel}` : `Supply ${breakdownLabel}`}>
+          <AggregateTable rows={breakdown} lang={lang} nameLabel={breakdownLabel} />
+        </ReportSection>
+      )}
+
+      <ReportSection label={lang === "sk" ? "Kontext" : "Context"} title={lang === "sk" ? "Porovnanie so širším trhom" : "Benchmark against wider market"}>
+        <BenchmarkCard local={summary} global={globalSummary} scopeLabel={scopeLabel} lang={lang} />
+      </ReportSection>
+
+      <ReportSection label={lang === "sk" ? "Projekty v scope" : "Projects in scope"} title={lang === "sk" ? `Kompletný zoznam (${projects.length})` : `Full list (${projects.length})`}>
+        <ProjectTable projects={projects} lang={lang} />
+      </ReportSection>
+
+      <FooterCard lang={lang} />
+    </>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Project report — single-project deep dive.
+   ══════════════════════════════════════════════════════════════════ */
+function ProjectReport({ project, flats, siblings, lang }) {
+  if (!project) {
+    return <div style={{ color: dim, padding: "2rem" }}>{lang === "sk" ? "Nevybraný projekt." : "No project selected."}</div>;
+  }
+
+  const summary = useMemo(() => summariseProjects([project]), [project]);
+  const districtSiblings = useMemo(
+    () => siblings.filter(p => p.district === project.district && p.id !== project.id),
+    [siblings, project]
+  );
+  const districtSummary = useMemo(() => summariseProjects(districtSiblings), [districtSiblings]);
+  const byTyp = useMemo(() => groupAggregatesFromFlats(flats, "typ"), [flats]);
+  const byIzby = useMemo(() => groupAggregatesFromFlats(flats, "izby"), [flats]);
+  const byPoschodie = useMemo(() => groupAggregatesFromFlats(flats, "poschodie"), [flats]);
+  const priceSeries = useMemo(() => priceDistribution(flats, 10), [flats]);
+
+  const title = project.name;
+  const aiCtx = buildAiContext({
+    scope: "project", scopeLabel: project.name, summary,
+    globalSummary: districtSummary, breakdown: byIzby, priceSeries,
+    meta: { developer: project.developer, district: project.district },
+  });
+
+  return (
+    <>
+      <KpiStrip summary={summary} lang={lang} extra={[
+        { label: "Developer",   value: project.developer || "—" },
+        { label: lang === "sk" ? "Časť" : "District", value: project.district || "—" },
+      ]} />
+
+      <ReportSection label={lang === "sk" ? "Profil projektu" : "Project profile"} title={title}>
+        <p style={{ color: "#c4c4cc", lineHeight: 1.7, margin: 0 }}>
+          {lang === "sk" ? (
+            <><strong style={{ color: text }}>{project.name}</strong> od developera <strong style={{ color: text }}>{project.developer || "—"}</strong> v časti <strong style={{ color: text }}>{project.district || "—"}</strong>.
+            Celkovo {summary.totalUnits} bytov, {summary.soldPct.toFixed(0)}% predaných.
+            {summary.wavgM2 && <> Vážený priemer <strong style={{ color: text }}>{Math.round(summary.wavgM2).toLocaleString("sk-SK")} €/m²</strong>.</>}</>
+          ) : (
+            <><strong style={{ color: text }}>{project.name}</strong> by <strong style={{ color: text }}>{project.developer || "—"}</strong> in <strong style={{ color: text }}>{project.district || "—"}</strong>.
+            {summary.totalUnits} units, {summary.soldPct.toFixed(0)}% sold.
+            {summary.wavgM2 && <> Weighted avg <strong style={{ color: text }}>{Math.round(summary.wavgM2).toLocaleString("en-US")} €/m²</strong>.</>}</>
+          )}
+        </p>
+        <AiSummaryBlock context={aiCtx} lang={lang} />
+      </ReportSection>
+
+      {byIzby.length > 0 && (
+        <ReportSection label={lang === "sk" ? "Mix dispozícií" : "Unit mix"} title={lang === "sk" ? "Ponuka podľa počtu izieb" : "Supply by bedrooms"}>
+          <AggregateTable rows={byIzby} lang={lang} nameLabel={lang === "sk" ? "Izby" : "Bedrooms"} />
+        </ReportSection>
+      )}
+
+      {byTyp.length > 0 && (
+        <ReportSection label={lang === "sk" ? "Mix typov" : "Unit types"} title={lang === "sk" ? "Ponuka podľa typu" : "Supply by type"}>
+          <AggregateTable rows={byTyp} lang={lang} nameLabel="Typ" />
+        </ReportSection>
+      )}
+
+      {byPoschodie.length > 0 && byPoschodie.length < 30 && (
+        <ReportSection label={lang === "sk" ? "Po poschodiach" : "By floor"} title={lang === "sk" ? "Dostupnosť po výške" : "Availability by floor"}>
+          <AggregateTable rows={byPoschodie} lang={lang} nameLabel={lang === "sk" ? "Poschodie" : "Floor"} />
+        </ReportSection>
+      )}
+
+      {priceSeries.some(b => b.count > 0) && (
+        <ReportSection label={lang === "sk" ? "Distribúcia cien" : "Price distribution"} title={lang === "sk" ? "€/m² naprieč bytmi" : "€/m² across units"}>
+          <Histogram bins={priceSeries} lang={lang} unit="€/m²" />
+        </ReportSection>
+      )}
+
+      <ReportSection label={lang === "sk" ? "Benchmark" : "Benchmark"} title={lang === "sk" ? `Projekt vs. časť mesta (${project.district || "—"})` : `Project vs. its district (${project.district || "—"})`}>
+        <BenchmarkCard local={summary} global={districtSummary} scopeLabel={project.name} lang={lang} />
+      </ReportSection>
+
+      <FooterCard lang={lang} />
+    </>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Shared report primitives
+   ══════════════════════════════════════════════════════════════════ */
+function ReportSection({ label, title, children }) {
+  return (
+    <div className="report-section" style={{ marginBottom: "2rem" }}>
+      <div style={{ fontFamily: mono, fontSize: "0.62rem", color: green, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.5rem" }}>{label}</div>
+      <h3 style={{ fontSize: "1.1rem", fontWeight: 600, color: text, margin: "0 0 0.75rem", letterSpacing: "-0.01em" }}>{title}</h3>
+      {children}
+    </div>
+  );
+}
+
+function KpiStrip({ summary, lang, extra = [] }) {
+  const items = [
+    { label: lang === "sk" ? "Projektov"   : "Projects",   value: summary.projectCount.toLocaleString("en-US").replace(/,/g, " ") },
+    { label: lang === "sk" ? "Bytov"       : "Units",      value: summary.totalUnits.toLocaleString("en-US").replace(/,/g, " ") },
+    { label: lang === "sk" ? "Voľných"     : "Available",  value: summary.available.toLocaleString("en-US").replace(/,/g, " "), color: green },
+    { label: lang === "sk" ? "Predaných"   : "Sold",       value: summary.sold.toLocaleString("en-US").replace(/,/g, " "), color: orange },
+    { label: lang === "sk" ? "Predaných %" : "Sold %",     value: `${summary.soldPct.toFixed(0)}%`, color: orange },
+    ...(summary.wavgM2 ? [{
+      label: lang === "sk" ? "Ø €/m² (vážené)" : "Ø €/m² (wtd)",
+      value: Math.round(summary.wavgM2).toLocaleString("en-US").replace(/,/g, " "),
+    }] : []),
+    ...extra,
+  ];
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fit, minmax(130px, 1fr))`, gap: "0.5rem", marginBottom: "1.25rem" }}>
+      {items.map((k, i) => (
+        <div key={i} style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8, padding: "0.65rem 0.9rem" }}>
+          <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.3rem" }}>{k.label}</div>
+          <div className="report-accent" style={{ fontSize: "1.15rem", fontWeight: 700, color: k.color || text }}>{k.value}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ExecSummary({ summary, lang, extraDistrict, compared }) {
+  // Compact Slovak summary paragraph
+  return (
+    <p style={{ color: "#c0c0c8", fontSize: "0.95rem", lineHeight: 1.7, margin: 0 }}>
+      {lang === "sk" ? (
+        <>V tomto výbere sledujeme <strong style={{ color: text }}>{summary.projectCount}</strong> projektov s kapacitou <strong style={{ color: text }}>{summary.totalUnits.toLocaleString("sk-SK")}</strong> bytov.
+        Aktuálne je voľných <strong style={{ color: green }}>{summary.available.toLocaleString("sk-SK")}</strong>, predaných <strong style={{ color: orange }}>{summary.sold.toLocaleString("sk-SK")}</strong>.
+        {summary.sold30 > 0 && <> Za posledných 30 dní pribudlo <strong style={{ color: orange }}>{summary.sold30}</strong> nových predajov.</>}
+        {summary.wavgM2 && <> Priemerná cena v scope-e je <strong style={{ color: text }}>{Math.round(summary.wavgM2).toLocaleString("sk-SK")} €/m²</strong> (vážené veľkosťou projektu).</>}
+        {extraDistrict && <> Najdrahšia časť: <strong style={{ color: text }}>{extraDistrict.name}</strong>{extraDistrict.wavgM2 && <> ({Math.round(extraDistrict.wavgM2).toLocaleString("sk-SK")} €/m²)</>}.</>}
+        {compared && compared.summary.wavgM2 && summary.wavgM2 && (() => {
+          const delta = ((summary.wavgM2 / compared.summary.wavgM2) - 1) * 100;
+          const sign = delta >= 0 ? "+" : "";
+          const color = Math.abs(delta) < 2 ? dim : (delta > 0 ? red : green);
+          return <> Oproti {compared.label}u je to <strong style={{ color }}>{sign}{delta.toFixed(1)}%</strong>.</>;
+        })()}
+        </>
+      ) : (
+        <>This scope contains <strong style={{ color: text }}>{summary.projectCount}</strong> projects holding <strong style={{ color: text }}>{summary.totalUnits.toLocaleString("en-US")}</strong> units.
+        Currently <strong style={{ color: green }}>{summary.available.toLocaleString("en-US")}</strong> available, <strong style={{ color: orange }}>{summary.sold.toLocaleString("en-US")}</strong> sold.
+        {summary.sold30 > 0 && <> Last 30 days saw <strong style={{ color: orange }}>{summary.sold30}</strong> new sales.</>}
+        {summary.wavgM2 && <> Weighted avg <strong style={{ color: text }}>{Math.round(summary.wavgM2).toLocaleString("en-US")} €/m²</strong>.</>}
+        </>
+      )}
+    </p>
+  );
+}
+
+/* ─── AI summary — calls /api/ai/summary. Handles no-key gracefully ─── */
+function AiSummaryBlock({ context, lang }) {
+  const [status, setStatus] = useState("idle"); // idle | loading | ok | err | missing_key
+  const [text,   setText]   = useState(null);
+  const [error,  setError]  = useState(null);
+
+  const run = async () => {
+    setStatus("loading");
+    setText(null); setError(null);
+    try {
+      const r = await fetch("/api/ai/summary", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ context, lang }),
+      });
+      if (r.status === 501) { setStatus("missing_key"); return; }
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const j = await r.json();
+      setText(j.text || "");
+      setStatus("ok");
+    } catch (e) {
+      setError(String(e?.message || e));
+      setStatus("err");
+    }
+  };
+
+  return (
+    <div className="no-print" style={{ marginTop: "0.9rem", padding: "0.75rem 0.9rem", background: bg2, border: `1px dashed ${green}55`, borderRadius: 6 }}>
+      {status === "idle" && (
+        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", fontSize: "0.78rem" }}>
+          <span style={{ fontFamily: mono, color: green, fontSize: "0.62rem", letterSpacing: "0.1em", textTransform: "uppercase" }}>AI</span>
+          <span style={{ color: dim }}>{lang === "sk" ? "Dáš si aj AI zhrnutie z týchto dát?" : "Want an AI summary of this scope?"}</span>
+          <button onClick={run} style={{ marginLeft: "auto", background: green, color: "#0a0a0c", border: "none", borderRadius: 4, padding: "0.35rem 0.8rem", cursor: "pointer", fontFamily: mono, fontSize: "0.7rem", fontWeight: 700 }}>
+            ✨ {lang === "sk" ? "Vygenerovať" : "Generate"}
+          </button>
+        </div>
+      )}
+      {status === "loading" && (
+        <div style={{ color: dim, fontSize: "0.82rem", fontFamily: mono }}>{lang === "sk" ? "AI píše zhrnutie…" : "AI drafting…"}</div>
+      )}
+      {status === "ok" && text && (
+        <div>
+          <div style={{ fontFamily: mono, fontSize: "0.6rem", color: green, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.4rem" }}>
+            ✨ AI {lang === "sk" ? "zhrnutie" : "summary"}
+          </div>
+          <div style={{ color: "#c4c4cc", fontSize: "0.88rem", lineHeight: 1.65, whiteSpace: "pre-wrap" }}>{text}</div>
+          <div className="no-print" style={{ marginTop: "0.4rem", fontFamily: mono, fontSize: "0.6rem", color: dim }}>
+            {lang === "sk" ? "AI môže robiť chyby — čísla vyššie sú zdrojom pravdy." : "AI can err — the numbers above are the source of truth."}
+          </div>
+        </div>
+      )}
+      {status === "missing_key" && (
+        <div style={{ color: orange, fontSize: "0.8rem" }}>
+          {lang === "sk"
+            ? "AI ešte nie je zapnuté. Pridaj ANTHROPIC_API_KEY do Vercel env a zbuduj deploy."
+            : "AI not enabled. Add ANTHROPIC_API_KEY to Vercel env and redeploy."}
+        </div>
+      )}
+      {status === "err" && (
+        <div style={{ color: red, fontSize: "0.8rem" }}>
+          {lang === "sk" ? "AI zlyhalo: " : "AI failed: "} {error}
+          <button onClick={run} style={{ marginLeft: "0.6rem", background: "transparent", color: green, border: `1px solid ${green}55`, borderRadius: 3, padding: "0.15rem 0.5rem", fontFamily: mono, fontSize: "0.68rem", cursor: "pointer" }}>↻</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── Histogram — SVG/HTML horizontal bars per bin ─── */
+function Histogram({ bins, lang, unit }) {
+  if (!bins || bins.length === 0) return null;
+  const max = Math.max(...bins.map(b => b.count), 1);
+  return (
+    <div style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8, padding: "0.75rem 0.9rem" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "140px 1fr 40px", gap: "0.3rem", alignItems: "center" }}>
+        {bins.map((b, i) => (
+          <RowBin key={i} bin={b} max={max} unit={unit} />
+        ))}
+      </div>
+      <div style={{ fontFamily: mono, fontSize: "0.62rem", color: dim, marginTop: "0.55rem", textAlign: "center" }}>
+        {lang === "sk" ? "Osa: počet bytov v cenovom pásme." : "Axis: unit count per price band."}
+      </div>
+    </div>
+  );
+}
+function RowBin({ bin, max, unit }) {
+  const w = (bin.count / max) * 100;
+  return (
+    <>
+      <span style={{ fontFamily: mono, fontSize: "0.68rem", color: dim, textAlign: "right" }}>
+        {bin.label}{unit ? " " + unit : ""}
+      </span>
+      <div style={{ position: "relative", height: 14, background: bg, border: `1px solid ${border}`, borderRadius: 3 }}>
+        <div style={{ position: "absolute", inset: 0, width: `${w}%`, background: `linear-gradient(90deg, ${green}22, ${green})`, borderRadius: 3 }} />
+      </div>
+      <span style={{ fontFamily: mono, fontSize: "0.68rem", color: green, fontWeight: 700, textAlign: "right" }}>
+        {bin.count}
+      </span>
+    </>
+  );
+}
+
+/* ─── AggregateTable — generic "group name + KPIs + bar" table ─── */
+function AggregateTable({ rows, lang, nameLabel }) {
+  if (!rows.length) return <div style={{ color: dim, fontSize: "0.85rem" }}>{lang === "sk" ? "Žiadne dáta." : "No data."}</div>;
+  const maxUnits = Math.max(...rows.map(r => r.totalUnits), 1);
+  return (
+    <div style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8, overflow: "hidden" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
+        <thead>
+          <tr style={{ background: bg, textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+            <th style={tdh}>{nameLabel}</th>
+            <th style={tdhR}>{lang === "sk" ? "Projekty" : "Projects"}</th>
+            <th style={tdhR}>{lang === "sk" ? "Bytov"    : "Units"}</th>
+            <th style={tdhR}>{lang === "sk" ? "Voľných"  : "Available"}</th>
+            <th style={tdhR}>{lang === "sk" ? "Pred. %"  : "Sold %"}</th>
+            <th style={tdhR}>Ø €/m²</th>
+            <th style={{ ...tdh, minWidth: 90 }}>{lang === "sk" ? "Relatívne" : "Relative"}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={r.name + i} style={{ borderTop: `1px solid ${border}` }}>
+              <td style={tdc} title={r.name}>{r.name}</td>
+              <td style={tdcR}>{r.projectCount}</td>
+              <td style={tdcR}>{r.totalUnits.toLocaleString("en-US").replace(/,/g, " ")}</td>
+              <td style={{ ...tdcR, color: green }}>{r.available.toLocaleString("en-US").replace(/,/g, " ")}</td>
+              <td style={{ ...tdcR, color: orange }}>{r.soldPct.toFixed(0)}%</td>
+              <td style={tdcR}>{r.wavgM2 ? Math.round(r.wavgM2).toLocaleString("en-US").replace(/,/g, " ") : "—"}</td>
+              <td style={{ ...tdc, padding: "0.35rem 0.75rem" }}>
+                <div style={{ position: "relative", height: 10, background: bg, border: `1px solid ${border}`, borderRadius: 2 }}>
+                  <div style={{ position: "absolute", inset: 0, width: `${(r.totalUnits / maxUnits) * 100}%`, background: `linear-gradient(90deg, ${green}33, ${green})`, borderRadius: 2 }} />
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+const tdh  = { padding: "0.55rem 0.75rem", fontWeight: 700, textAlign: "left" };
+const tdhR = { ...tdh, textAlign: "right" };
+const tdc  = { padding: "0.45rem 0.75rem", color: "#c4c4cc", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 240 };
+const tdcR = { ...tdc, textAlign: "right", fontFamily: mono, color: text };
+
+/* ─── BenchmarkCard — compares scope vs market ─── */
+function BenchmarkCard({ local, global, scopeLabel, lang }) {
+  if (!global || !global.totalUnits) return null;
+  const delta = (metric) => {
+    if (local[metric] == null || global[metric] == null || !global[metric]) return null;
+    return ((local[metric] / global[metric]) - 1) * 100;
+  };
+  const rows = [
+    { label: lang === "sk" ? "Ø €/m² (vážené)" : "Ø €/m² (weighted)", local: local.wavgM2, global: global.wavgM2, delta: delta("wavgM2"), unit: "€/m²", lowerIsGood: true },
+    { label: lang === "sk" ? "Predaných %"    : "Sold %",             local: local.soldPct, global: global.soldPct, delta: (local.soldPct || 0) - (global.soldPct || 0), unit: "%",    lowerIsGood: false, absolute: true },
+    { label: lang === "sk" ? "Voľných na projekt" : "Avail / project", local: local.projectCount > 0 ? local.available / local.projectCount : 0, global: global.projectCount > 0 ? global.available / global.projectCount : 0, delta: null, unit: "", lowerIsGood: false },
+  ];
+  return (
+    <div style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8, padding: "0.85rem 1.1rem" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.84rem" }}>
+        <thead>
+          <tr style={{ color: dim, fontFamily: mono, fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.08em", textAlign: "left" }}>
+            <th style={tdh}></th>
+            <th style={tdhR}>{scopeLabel}</th>
+            <th style={tdhR}>{lang === "sk" ? "Porovnanie" : "Benchmark"}</th>
+            <th style={tdhR}>{lang === "sk" ? "Odchýlka" : "Delta"}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => {
+            let deltaColor = dim;
+            if (r.delta != null && Math.abs(r.delta) > 1) {
+              const goodIfPositive = !r.lowerIsGood;
+              deltaColor = (r.delta > 0) === goodIfPositive ? green : red;
+            }
+            const sign = r.delta == null ? "" : (r.delta >= 0 ? "+" : "");
+            return (
+              <tr key={r.label} style={{ borderTop: i > 0 ? `1px solid ${border}` : "none" }}>
+                <td style={tdc}>{r.label}</td>
+                <td style={tdcR}>{r.local == null ? "—" : Math.round(r.local).toLocaleString("en-US").replace(/,/g, " ") + (r.unit ? " " + r.unit : "")}</td>
+                <td style={tdcR}>{r.global == null ? "—" : Math.round(r.global).toLocaleString("en-US").replace(/,/g, " ") + (r.unit ? " " + r.unit : "")}</td>
+                <td style={{ ...tdcR, color: deltaColor, fontWeight: 700 }}>
+                  {r.delta == null ? "—" : `${sign}${r.delta.toFixed(1)}${r.absolute ? " pp" : "%"}`}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/* ─── Project table (used inside City / District / Developer scopes) ─── */
+function ProjectTable({ projects, lang }) {
+  const sorted = [...projects].sort((a, b) => (b.total_units || 0) - (a.total_units || 0));
+  return (
+    <div style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8, overflow: "auto" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
+        <thead>
+          <tr style={{ background: bg, textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+            <th style={tdh}>{lang === "sk" ? "Projekt" : "Project"}</th>
+            <th style={tdh}>Developer</th>
+            <th style={tdh}>{lang === "sk" ? "Časť" : "District"}</th>
+            <th style={tdhR}>{lang === "sk" ? "Bytov" : "Units"}</th>
+            <th style={tdhR}>{lang === "sk" ? "Voľných" : "Available"}</th>
+            <th style={tdhR}>{lang === "sk" ? "Pred %" : "Sold %"}</th>
+            <th style={tdhR}>€/m²</th>
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.slice(0, 100).map((p, i) => (
+            <tr key={p.id} style={{ borderTop: i > 0 ? `1px solid ${border}` : "none" }}>
+              <td style={tdc} title={p.name}>{p.name}</td>
+              <td style={tdc}>{p.developer || "—"}</td>
+              <td style={tdc}>{p.district || "—"}</td>
+              <td style={tdcR}>{(p.total_units || 0).toLocaleString("en-US").replace(/,/g, " ")}</td>
+              <td style={{ ...tdcR, color: green }}>{(p.available_units || 0).toLocaleString("en-US").replace(/,/g, " ")}</td>
+              <td style={{ ...tdcR, color: orange }}>{p.sold_percentage ? p.sold_percentage.toFixed(0) + "%" : "—"}</td>
+              <td style={tdcR}>{p.avg_price_eur_m2 ? Math.round(p.avg_price_eur_m2).toLocaleString("en-US").replace(/,/g, " ") : "—"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {sorted.length > 100 && (
+        <div style={{ padding: "0.6rem", color: dim, fontSize: "0.75rem", textAlign: "center", fontFamily: mono }}>
+          {lang === "sk" ? `Zobrazených prvých 100 z ${sorted.length}.` : `Showing top 100 of ${sorted.length}.`}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── Top-seller list (Market scope) ─── */
+function TopSellerList({ projects, lang }) {
+  const tops = [...projects]
+    .filter(p => (p.sold_last_month || 0) > 0)
+    .sort((a, b) => (b.sold_last_month || 0) - (a.sold_last_month || 0))
+    .slice(0, 6);
+  if (tops.length === 0) {
+    return <div style={{ color: dim, fontSize: "0.85rem" }}>{lang === "sk" ? "Predajné dáta sa naplnia po ďalšom mesačnom behu." : "Velocity data populates after the next monthly run."}</div>;
+  }
+  return (
+    <ol style={{ paddingLeft: "1.25rem", margin: 0, color: "#c0c0c8", fontSize: "0.88rem", lineHeight: 1.8 }}>
+      {tops.map(p => (
+        <li key={p.id}>
+          <strong style={{ color: text }}>{p.name}</strong> ({p.district || "—"}) — <span style={{ color: green, fontFamily: mono, fontWeight: 700 }}>+{p.sold_last_month}</span> {lang === "sk" ? "predaných" : "sold"}
+          {p.avg_price_eur_m2 && <span style={{ color: dim, fontFamily: mono }}> · {Math.round(p.avg_price_eur_m2).toLocaleString("en-US").replace(/,/g, " ")} €/m²</span>}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/* ─── Footer card ─── */
+function FooterCard({ lang }) {
+  return (
+    <div className="no-print" style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8, padding: "0.85rem 1.1rem", marginTop: "1.5rem" }}>
+      <div style={{ fontFamily: mono, fontSize: "0.62rem", color: dim, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.3rem" }}>
+        {lang === "sk" ? "Čo ďalej" : "What's next"}
+      </div>
+      <p style={{ color: "#c0c0c8", fontSize: "0.82rem", lineHeight: 1.6, margin: 0 }}>
+        {lang === "sk"
+          ? "Potrebuješ špecifický uhol (časová rada, porovnanie dvoch projektov, e-mail report)? Napíš na residata@proton.me — vieme pridať."
+          : "Need a specific angle (time series, side-by-side, email report)? Email residata@proton.me."}
+      </p>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Analytics helpers — pure functions
+   ══════════════════════════════════════════════════════════════════ */
+function uniqueSorted(arr) {
+  return Array.from(new Set(arr)).sort((a, b) => String(a).localeCompare(String(b), "sk"));
+}
+function projectCity(flat, projects) {
+  const p = projects.find(pp => pp.id === flat.project_id);
+  return p?.city || null;
+}
+function projectDistrict(flat, projects) {
+  const p = projects.find(pp => pp.id === flat.project_id);
+  return p?.district || null;
+}
+function summariseProjects(projects) {
+  const totalUnits = projects.reduce((a, p) => a + (p.total_units || 0), 0);
+  const available  = projects.reduce((a, p) => a + (p.available_units || 0), 0);
+  const sold       = projects.reduce((a, p) => a + (p.sold_units || 0), 0);
+  const sold30     = projects.reduce((a, p) => a + (p.sold_last_month || 0), 0);
+  const soldPct    = totalUnits > 0 ? (sold / totalUnits) * 100 : 0;
+  // Weighted average €/m² — weight by project's total_units so large
+  // projects pull the mean more than boutique ones.
+  const priced = projects.filter(p => p.avg_price_eur_m2 && (p.total_units || 0) > 0);
+  const wavgM2 = priced.length
+    ? priced.reduce((a, p) => a + p.avg_price_eur_m2 * p.total_units, 0) /
+      priced.reduce((a, p) => a + p.total_units, 0)
+    : null;
+  return { projectCount: projects.length, totalUnits, available, sold, sold30, soldPct, wavgM2 };
+}
+function groupAggregates(projects, key, lang) {
+  const buckets = {};
+  for (const p of projects) {
+    const k = p[key] || (lang === "sk" ? "(neznáme)" : "(unknown)");
+    (buckets[k] = buckets[k] || []).push(p);
+  }
+  return Object.entries(buckets)
+    .map(([name, ps]) => ({ name, ...summariseProjects(ps) }))
+    .sort((a, b) => b.totalUnits - a.totalUnits);
+}
+/* Group aggregates from raw flats (for Project report's by-izby/typ/poschodie) */
+function groupAggregatesFromFlats(flats, key) {
+  const buckets = {};
+  for (const f of flats) {
+    const k = f[key] == null || f[key] === "" ? "(—)" : String(f[key]);
+    (buckets[k] = buckets[k] || []).push(f);
+  }
+  const sumPriceM2 = (rows) => {
+    let sp = 0, sm = 0;
+    for (const r of rows) {
+      const p = Number(r.cena_s_dph), m = Number(r.obytna_plocha);
+      if (!Number.isFinite(p) || !Number.isFinite(m) || m <= 0) continue;
+      sp += p; sm += m;
+    }
+    return sm > 0 ? sp / sm : null;
+  };
+  return Object.entries(buckets)
+    .map(([name, rows]) => {
+      const sold = rows.filter(r => (r.stav || "").trim().toUpperCase() === "P").length;
+      const avail = rows.filter(r => (r.stav || "").trim().toUpperCase() === "V").length;
+      const totalUnits = rows.length;
+      return {
+        name, projectCount: new Set(rows.map(r => r.project_id)).size,
+        totalUnits, available: avail, sold, soldPct: totalUnits ? (sold / totalUnits) * 100 : 0,
+        wavgM2: sumPriceM2(rows),
+      };
+    })
+    .sort((a, b) => b.totalUnits - a.totalUnits);
+}
+/* Price distribution — bin units by €/m² */
+function priceDistribution(flats, nBins) {
+  const values = flats
+    .map(f => {
+      const p = Number(f.cena_s_dph), m = Number(f.obytna_plocha);
+      return (Number.isFinite(p) && Number.isFinite(m) && m > 0) ? p / m : null;
+    })
+    .filter(v => v != null && v >= 500 && v <= 20000); // sanity clip
+  if (values.length === 0) return [];
+  let lo = Math.min(...values), hi = Math.max(...values);
+  // Round bins to 500s for readability
+  lo = Math.floor(lo / 500) * 500;
+  hi = Math.ceil(hi  / 500) * 500;
+  const step = Math.max(500, Math.ceil((hi - lo) / nBins / 500) * 500);
+  const bins = [];
+  for (let b = lo; b < hi; b += step) {
+    bins.push({ from: b, to: b + step, label: `${b.toLocaleString("sk-SK")}–${(b + step).toLocaleString("sk-SK")}`, count: 0 });
+  }
+  for (const v of values) {
+    const idx = Math.min(bins.length - 1, Math.floor((v - lo) / step));
+    if (bins[idx]) bins[idx].count++;
+  }
+  return bins;
+}
+/* Build the compact JSON context that gets sent to AI */
+function buildAiContext({ scope, scopeLabel, summary, globalSummary, breakdown, priceSeries, districts, developers, meta }) {
+  const slim = (rows) => (rows || []).slice(0, 8).map(r => ({
+    name: r.name, projects: r.projectCount, units: r.totalUnits,
+    available: r.available, soldPct: Math.round(r.soldPct),
+    wavgM2: r.wavgM2 ? Math.round(r.wavgM2) : null,
+  }));
+  const slimBins = (priceSeries || []).filter(b => b.count > 0).map(b => ({ band: b.label, count: b.count }));
+  return {
+    scope: scope || "market",
+    scopeLabel: scopeLabel || null,
+    meta: meta || null,
+    summary: {
+      projects: summary?.projectCount ?? 0,
+      units: summary?.totalUnits ?? 0,
+      available: summary?.available ?? 0,
+      sold: summary?.sold ?? 0,
+      sold30d: summary?.sold30 ?? 0,
+      soldPct: Math.round(summary?.soldPct ?? 0),
+      wavgM2: summary?.wavgM2 ? Math.round(summary.wavgM2) : null,
+    },
+    benchmark: globalSummary ? {
+      projects: globalSummary.projectCount,
+      units: globalSummary.totalUnits,
+      wavgM2: globalSummary.wavgM2 ? Math.round(globalSummary.wavgM2) : null,
+      soldPct: Math.round(globalSummary.soldPct),
+    } : null,
+    breakdown: slim(breakdown),
+    districts: slim(districts),
+    developers: slim(developers),
+    priceBins: slimBins,
+  };
+}
