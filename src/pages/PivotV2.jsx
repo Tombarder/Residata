@@ -91,6 +91,72 @@ const FIELDS = {
                         const p = num(r.cena_s_dph), m = num(r.obytna_plocha);
                         return (p != null && m != null && m > 0) ? p / m : null;
                       }},
+
+  /* ─ Special MEASURES ─
+     These aren't per-record values but group-level calculations.
+     `type: "measure"` → only valid in Values zone, single fixed agg.
+     `measureCompute(records)` runs on the group's record set. */
+  abs_rate: {
+    label: "Absorption rate",
+    group: "measure", type: "measure", unit: "%", derived: true,
+    // Accessor unused for measure types but kept for parity
+    accessor: () => null,
+    measureCompute: (records) => {
+      // Absorption = sold / (sold + available) — ignore R/PR/other noise.
+      // Sold ~ "P", Available ~ "V". Keeps the denominator meaningful.
+      let sold = 0, denom = 0;
+      for (const r of records) {
+        const s = (r.stav || "").trim().toUpperCase();
+        if (s === "P") { sold++; denom++; }
+        else if (s === "V") { denom++; }
+      }
+      if (denom === 0) return null;
+      return (sold / denom) * 100;
+    },
+  },
+  wavg_m2_price: {
+    label: "Priem. €/m² (vážené)",
+    group: "measure", type: "measure", unit: "€/m²", derived: true,
+    accessor: () => null,
+    measureCompute: (records) => {
+      // Weighted by m² — each € of price contributes proportionally to
+      // the m² it covers. Σ price / Σ plocha. Far more meaningful than
+      // simple mean(price/m²), which would double-count small units.
+      let sumPrice = 0, sumPlocha = 0;
+      for (const r of records) {
+        const p = Number(r.cena_s_dph);
+        const m = Number(r.obytna_plocha);
+        if (!Number.isFinite(p) || !Number.isFinite(m) || m <= 0) continue;
+        sumPrice  += p;
+        sumPlocha += m;
+      }
+      return sumPlocha > 0 ? sumPrice / sumPlocha : null;
+    },
+  },
+  sold_count: {
+    label: "Predaných",
+    group: "measure", type: "measure", unit: "", derived: true,
+    accessor: () => null,
+    measureCompute: (records) => {
+      let n = 0;
+      for (const r of records) {
+        if ((r.stav || "").trim().toUpperCase() === "P") n++;
+      }
+      return n;
+    },
+  },
+  available_count: {
+    label: "Voľných",
+    group: "measure", type: "measure", unit: "", derived: true,
+    accessor: () => null,
+    measureCompute: (records) => {
+      let n = 0;
+      for (const r of records) {
+        if ((r.stav || "").trim().toUpperCase() === "V") n++;
+      }
+      return n;
+    },
+  },
 };
 
 /* Order of fields in the palette. Mirrors Clean Master column order so the
@@ -105,12 +171,15 @@ const FIELD_ORDER = [
   "stav", "kolaudacia", "orientacia",
   "cast_mesta_kod", "cast", "interna_klas_zona", "ulica_detail", "budova_stav", "standard",
   "cena_na_m2_obytnej",
+  // Measures — group-level calculations, Values zone only
+  "abs_rate", "wavg_m2_price", "sold_count", "available_count",
 ];
 
 /* Which aggregations are valid per field type. Numbers get the full numeric
    suite; text columns only count / count_distinct. */
-const AGGS_TEXT   = ["count", "count_distinct"];
-const AGGS_NUMBER = ["count", "count_distinct", "sum", "avg", "min", "max", "median"];
+const AGGS_TEXT    = ["count", "count_distinct"];
+const AGGS_NUMBER  = ["count", "count_distinct", "sum", "avg", "min", "max", "median"];
+const AGGS_MEASURE = ["measure"];
 const AGG_LABEL = {
   count:          "count",
   count_distinct: "count distinct",
@@ -119,6 +188,7 @@ const AGG_LABEL = {
   min:            "min",
   max:            "max",
   median:         "median",
+  measure:        "výpočet",
 };
 
 /* Max row hierarchy depth — Excel lets you go deep but the UI breaks
@@ -280,6 +350,10 @@ function summariseFilter(filter, fieldType) {
 
 function compute(field, agg, records) {
   if (!field) return null;
+  // Measure fields carry their own single calculation
+  if (field.type === "measure" && typeof field.measureCompute === "function") {
+    return field.measureCompute(records);
+  }
   if (agg === "count") return records.length;
 
   // Accessor is needed beyond count — returns field value per record
@@ -423,9 +497,18 @@ function formatValue(value, fieldKey, agg) {
   const f = FIELDS[fieldKey];
   const unit = f?.unit ? ` ${f.unit}` : "";
 
-  // Counts — always integer, no unit
+  // Counts — always integer, no unit (unless the measure defines one,
+  // e.g. sold_count has unit="")
   if (agg === "count" || agg === "count_distinct") {
     return Math.round(value).toLocaleString("en-US").replace(/,/g, " ");
+  }
+  // Measures — 1 decimal for % units, integer otherwise, always with unit
+  if (agg === "measure") {
+    if (f?.unit === "%") {
+      return `${(Math.round(value * 10) / 10).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).replace(/,/g, " ")}${unit}`;
+    }
+    const rounded = Math.round(value);
+    return `${rounded.toLocaleString("en-US").replace(/,/g, " ")}${unit}`;
   }
   // AVG / MEDIAN of small-range numbers (izby, poschodie) → 1 decimal
   const oneDecAggs = new Set(["avg", "median"]);
@@ -448,8 +531,10 @@ function aggLabel(v) {
 
 /* Sensible default aggregation for a field just dropped into Values.
    User asked for COUNT default across the board — numbers start there
-   too, then the user upgrades to avg/sum when they're ready. */
-function defaultAggFor(_field) {
+   too, then the user upgrades to avg/sum when they're ready. Measures
+   have their own single fixed "measure" calculation. */
+function defaultAggFor(field) {
+  if (field && field.type === "measure") return "measure";
   return "count";
 }
 
@@ -502,6 +587,20 @@ export default function PivotV2({ lang = "sk" }) {
   // { key, anchorEl } — anchor used to position the popover next to the chip.
   const [filterPopup, setFilterPopup] = useState(null);
 
+  // Display / analysis options (toolbar above result table).
+  //  valueMode: "raw" | "pct_total" | "pct_parent"  — how to render each cell
+  //  heatmap:   boolean                             — heatmap coloring of cells
+  //  dataBars:  boolean                             — inline horizontal bar per cell
+  //  chart:     boolean                             — render pivot chart next to table
+  const [valueMode, setValueMode] = useState("raw");
+  const [heatmap,   setHeatmap]   = useState(false);
+  const [dataBars,  setDataBars]  = useState(true);
+  const [chart,     setChart]     = useState(false);
+
+  // Drill-down modal: clicked cell → shows underlying records
+  // { title, records }  or null when closed
+  const [drillDown, setDrillDown] = useState(null);
+
   // Palette "used" greying: a field is "in use" only when it's in Rows
   // or Values. Being in Filters doesn't count — because Filters coexist
   // with either, the user may still want to drag the same field into
@@ -518,6 +617,11 @@ export default function PivotV2({ lang = "sk" }) {
     // it's a tautology). But Filters can COEXIST with either:
     // e.g. `cena_s_dph` in Values with agg=avg, AND in Filters between
     // 100k-500k to exclude outliers. User explicitly asked for this.
+    const fld = FIELDS[fieldKey];
+    // Measures are Values-only — calculated at group level, can't group-by.
+    if (fld && fld.type === "measure" && zone !== "values" && zone !== "palette") {
+      zone = "values";
+    }
     if (zone === "rows") {
       setValues(v => v.filter(x => x.key !== fieldKey));
       setRows(r => {
@@ -665,17 +769,56 @@ export default function PivotV2({ lang = "sk" }) {
         />
       </div>
 
-      {/* Result table */}
-      <ResultTable
-        rowFields={rows}
-        effectiveValues={effectiveValues}
-        flatRows={flatRows}
-        collapsed={collapsed}
-        onToggle={toggleCollapse}
-        sort={sort} setSort={setSort}
-        grandTotal={sortedTree}
-        lang={lang}
-      />
+      {/* Analysis toolbar: value-mode + formatting toggles + export */}
+      {rows.length > 0 && (
+        <AnalysisToolbar
+          valueMode={valueMode} setValueMode={setValueMode}
+          heatmap={heatmap}     setHeatmap={setHeatmap}
+          dataBars={dataBars}   setDataBars={setDataBars}
+          chart={chart}         setChart={setChart}
+          onExportCSV={() => exportPivotCSV(flatRows, sortedTree, rows, effectiveValues, valueMode)}
+          lang={lang}
+        />
+      )}
+
+      {/* Result table + optional chart side-by-side */}
+      <div style={{ display: chart ? "grid" : "block", gridTemplateColumns: chart ? "1fr 340px" : "1fr", gap: "0.75rem" }}>
+        <ResultTable
+          rowFields={rows}
+          effectiveValues={effectiveValues}
+          flatRows={flatRows}
+          collapsed={collapsed}
+          onToggle={toggleCollapse}
+          sort={sort} setSort={setSort}
+          grandTotal={sortedTree}
+          valueMode={valueMode}
+          heatmap={heatmap}
+          dataBars={dataBars}
+          onDrillDown={(node) => setDrillDown({
+            title: node.path.length ? node.path.join(" › ") : (lang === "sk" ? "Všetky záznamy" : "All records"),
+            records: node.records,
+          })}
+          lang={lang}
+        />
+        {chart && (
+          <PivotChart
+            flatRows={flatRows}
+            effectiveValues={effectiveValues}
+            grandTotal={sortedTree}
+            lang={lang}
+          />
+        )}
+      </div>
+
+      {/* Drill-down modal */}
+      {drillDown && (
+        <DrillDownModal
+          title={drillDown.title}
+          records={drillDown.records}
+          onClose={() => setDrillDown(null)}
+          lang={lang}
+        />
+      )}
 
       {/* Filter popover — floats over the rest of the UI, positioned next
           to the clicked filter chip. Uses `records` (pre-filtering) so
@@ -849,7 +992,9 @@ function DropZone({ zoneKey, title, hint, icon, chips, drag, hoverZone, setHover
    dropdown directly — click to cycle or pick from a menu. */
 function ChipInZone({ label, type, agg, filter, level, onDragStart, onDragStartPayload, onRemove, onChangeAgg, onClick }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const aggs = type === "number" ? AGGS_NUMBER : AGGS_TEXT;
+  const aggs = type === "measure" ? AGGS_MEASURE
+             : type === "number" ? AGGS_NUMBER
+             : AGGS_TEXT;
 
   // Filter chips get a summary badge based on their current config.
   // Idle (= just dropped, not configured yet) renders in dim/grey; active
@@ -861,6 +1006,7 @@ function ChipInZone({ label, type, agg, filter, level, onDragStart, onDragStartP
   return (
     <span
       draggable
+      title={isFilterChip ? (active ? "Klikni pre úpravu filtra · alebo presuň" : "Klikni pre nastavenie filtra · alebo presuň") : undefined}
       onDragStart={(e) => {
         e.dataTransfer.effectAllowed = "move";
         e.dataTransfer.setData("text/plain", label);
@@ -872,6 +1018,8 @@ function ChipInZone({ label, type, agg, filter, level, onDragStart, onDragStartP
       onClick={(e) => {
         // Clicking a filter chip opens its configuration popover. We guard
         // with stopPropagation so it doesn't also trigger the zone's drag.
+        // If the click originated from the × remove button or the agg menu,
+        // those have their own stopPropagation so this handler never sees it.
         if (onClick) { e.stopPropagation(); onClick(e); }
       }}
       style={{
@@ -1099,12 +1247,105 @@ function groupLabel(g, lang) {
     status:   lang === "sk" ? "Stav"              : "Status",
     location: lang === "sk" ? "Lokalita"          : "Location",
     derived:  lang === "sk" ? "Vypočítané"        : "Derived",
+    measure:  lang === "sk" ? "Merače (len do Hodnôt)" : "Measures (Values only)",
   };
   return labels[g] || g;
 }
 
+/* ─── ANALYSIS TOOLBAR ────────────────────────────────────────── */
+function AnalysisToolbar({ valueMode, setValueMode, heatmap, setHeatmap, dataBars, setDataBars, chart, setChart, onExportCSV, lang }) {
+  const btnBase = {
+    background: "transparent",
+    border: `1px solid ${border}`,
+    color: dim, padding: "0.32rem 0.65rem", borderRadius: 4,
+    fontFamily: mono, fontSize: "0.7rem", cursor: "pointer",
+  };
+  const btnActive = { ...btnBase, background: "rgba(0,229,160,0.14)", color: green, borderColor: green };
+  const btnPill = (active) => (active ? btnActive : btnBase);
+
+  return (
+    <div style={{
+      display: "flex", flexWrap: "wrap", gap: "0.4rem", alignItems: "center",
+      margin: "0 0 0.6rem", padding: "0.55rem 0.7rem",
+      background: panel, border: `1px solid ${border}`, borderRadius: 6,
+    }}>
+      <span style={{ fontFamily: mono, fontSize: "0.62rem", color: dim, letterSpacing: "0.08em", textTransform: "uppercase", marginRight: "0.3rem" }}>
+        {lang === "sk" ? "Zobraziť" : "Show"}
+      </span>
+      <button style={btnPill(valueMode === "raw")}        onClick={() => setValueMode("raw")}>abs</button>
+      <button style={btnPill(valueMode === "pct_total")}  onClick={() => setValueMode("pct_total")}>% z celku</button>
+      <button style={btnPill(valueMode === "pct_parent")} onClick={() => setValueMode("pct_parent")}>% z rodiča</button>
+
+      <span style={{ width: 1, height: 16, background: border, margin: "0 0.35rem" }} />
+
+      <button style={btnPill(dataBars)} onClick={() => setDataBars(x => !x)}>▮ bars</button>
+      <button style={btnPill(heatmap)}  onClick={() => setHeatmap(x => !x)}>▨ heatmap</button>
+      <button style={btnPill(chart)}    onClick={() => setChart(x => !x)}>▦ graf</button>
+
+      <button style={{ ...btnBase, marginLeft: "auto", color: green, borderColor: `${green}55` }}
+              onClick={onExportCSV}>
+        ⬇ CSV
+      </button>
+    </div>
+  );
+}
+
+/* ─── CSV EXPORT ──────────────────────────────────────────────── */
+function exportPivotCSV(flatRows, grandTotal, rowFields, effectiveValues, valueMode) {
+  const esc = (v) => {
+    if (v == null) return "";
+    const s = String(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const valueHeader = (v) => v.key === "__count__"
+    ? "Count"
+    : `${AGG_LABEL[v.agg]}(${FIELDS[v.field]?.label || v.field})`;
+
+  const cols = [
+    ...rowFields.map((f, i) => `L${i + 1}·${FIELDS[f]?.label || f}`),
+    "Count",
+    ...effectiveValues.map(valueHeader),
+  ];
+
+  const fmt = (v) => (v == null || !Number.isFinite(v)) ? "" :
+    Number.isInteger(v) ? String(v) : String(Math.round(v * 100) / 100);
+
+  const lines = [cols.map(esc).join(",")];
+
+  const grandForCol = (i) => grandTotal.rollups[i];
+
+  for (const n of flatRows) {
+    const labelCols = rowFields.map((_, i) => i <= n.level ? (n.path[i] || "") : "");
+    const vals = effectiveValues.map((v, i) => {
+      const raw = n.rollups[i];
+      if (valueMode === "pct_total") {
+        const g = grandForCol(i);
+        if (raw == null || !g) return "";
+        return `${((raw / g) * 100).toFixed(1)}%`;
+      }
+      return fmt(raw);
+    });
+    lines.push([...labelCols, String(n.count), ...vals].map(esc).join(","));
+  }
+  // Grand total row
+  const grandVals = effectiveValues.map((_, i) => fmt(grandTotal.rollups[i]));
+  lines.push([...rowFields.map(() => ""), String(grandTotal.count), ...grandVals].map(esc).join(","));
+  lines[lines.length - 1] = `TOTAL,${lines[lines.length - 1].split(",").slice(1).join(",")}`;
+
+  const csv = lines.join("\n");
+  const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `residata-pivot-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 /* ─── RESULT TABLE ────────────────────────────────────────────── */
-function ResultTable({ rowFields, effectiveValues, flatRows, collapsed, onToggle, sort, setSort, grandTotal, lang }) {
+function ResultTable({ rowFields, effectiveValues, flatRows, collapsed, onToggle, sort, setSort, grandTotal, lang, valueMode = "raw", heatmap = false, dataBars = false, onDrillDown }) {
   if (!rowFields.length) {
     return (
       <div style={{
@@ -1123,7 +1364,9 @@ function ResultTable({ rowFields, effectiveValues, flatRows, collapsed, onToggle
 
   const valueHeaderText = (v) => {
     if (v.key === "__count__") return lang === "sk" ? "Počet" : "Count";
-    return `${AGG_LABEL[v.agg]} · ${FIELDS[v.field]?.label || v.field}`;
+    const fld = FIELDS[v.field];
+    if (fld && fld.type === "measure") return fld.label + (fld.unit ? ` (${fld.unit})` : "");
+    return `${AGG_LABEL[v.agg]} · ${fld?.label || v.field}`;
   };
 
   const clickSort = (col) => {
@@ -1136,6 +1379,83 @@ function ResultTable({ rowFields, effectiveValues, flatRows, collapsed, onToggle
     if (sort.col !== col) return null;
     return <span style={{ marginLeft: 4, color: green }}>{sort.dir === "desc" ? "▾" : "▴"}</span>;
   };
+
+  // Per-column min/max (across LEAF nodes only — subtotals would skew scale)
+  // Used for heatmap coloring and data bars.
+  const scaleByCol = (() => {
+    const out = [];
+    for (let i = 0; i < effectiveValues.length; i++) {
+      let lo = Infinity, hi = -Infinity;
+      for (const n of flatRows) {
+        if (!n.isLeaf) continue;
+        const v = n.rollups[i];
+        if (v == null || !Number.isFinite(v)) continue;
+        if (v < lo) lo = v;
+        if (v > hi) hi = v;
+      }
+      if (!Number.isFinite(lo) || !Number.isFinite(hi)) { out.push(null); continue; }
+      out.push({ lo, hi });
+    }
+    return out;
+  })();
+
+  // Render one cell's value given raw + column index + parent rollup
+  // (parent used for pct_parent mode).
+  const renderCellValue = (raw, valIdx, parentRaw) => {
+    if (raw == null || !Number.isFinite(raw)) return "—";
+    const v = effectiveValues[valIdx];
+    if (valueMode === "pct_total") {
+      const g = grandTotal.rollups[valIdx];
+      if (!g || g === 0) return "—";
+      return `${((raw / g) * 100).toFixed(1)}%`;
+    }
+    if (valueMode === "pct_parent") {
+      if (parentRaw == null || !parentRaw) return formatValue(raw, v.field, v.agg);
+      return `${((raw / parentRaw) * 100).toFixed(1)}%`;
+    }
+    return formatValue(raw, v.field, v.agg);
+  };
+
+  // Heatmap color for a cell (green → red gradient by rank in column).
+  // For "cena" (price) metrics we flip polarity so LOW = green (good buy),
+  // HIGH = red. For others high = green by default.
+  const heatColor = (raw, valIdx) => {
+    const s = scaleByCol[valIdx];
+    if (!s || raw == null || !Number.isFinite(raw)) return null;
+    const range = s.hi - s.lo;
+    if (range <= 0) return null;
+    const t = (raw - s.lo) / range; // 0..1
+    const vf = effectiveValues[valIdx];
+    const fld = FIELDS[vf.field];
+    // Price metrics: low is "good" (green). Otherwise high = green.
+    const flip = fld && (fld.unit === "€" || fld.unit === "€/m²") && (vf.agg === "avg" || vf.agg === "median" || vf.agg === "min" || vf.agg === "max");
+    const score = flip ? 1 - t : t;
+    // 0 = red, 0.5 = amber, 1 = green
+    const r = score < 0.5 ? 230 : Math.round(230 - (score - 0.5) * 2 * 230);
+    const g = score > 0.5 ? 229 : Math.round(score * 2 * 229);
+    const alpha = 0.18;
+    return `rgba(${r}, ${g}, 120, ${alpha})`;
+  };
+
+  // Data bar width (%) — proportional to |value| / colMax
+  const barWidth = (raw, valIdx) => {
+    const s = scaleByCol[valIdx];
+    if (!s || raw == null || !Number.isFinite(raw)) return 0;
+    const m = Math.max(Math.abs(s.hi), Math.abs(s.lo), 1e-9);
+    return Math.min(100, (Math.abs(raw) / m) * 100);
+  };
+
+  // Build a map pathKey → parent node (for pct_parent mode)
+  const parentByPath = (() => {
+    const m = {};
+    for (const n of flatRows) {
+      if (!n.path.length) continue;
+      const parentPath = n.path.slice(0, -1);
+      const parentKey = parentPath.join(SEP);
+      m[n.pathKey] = flatRows.find(x => x.pathKey === parentKey) || grandTotal;
+    }
+    return m;
+  })();
 
   return (
     <div style={{
@@ -1203,15 +1523,35 @@ function ResultTable({ rowFields, effectiveValues, flatRows, collapsed, onToggle
                     </span>
                   )}
                 </td>
-                <td style={{ ...td, textAlign: "right", fontFamily: mono, color: isSubtotal ? "#c4c4cc" : dim, fontWeight: isSubtotal ? 600 : 400 }}>
+                <td style={{ ...td, textAlign: "right", fontFamily: mono, color: isSubtotal ? "#c4c4cc" : dim, fontWeight: isSubtotal ? 600 : 400, cursor: onDrillDown ? "zoom-in" : "default" }}
+                    title={onDrillDown ? "Zobraziť záznamy v tejto skupine" : undefined}
+                    onClick={onDrillDown ? () => onDrillDown(n) : undefined}>
                   {n.count.toLocaleString("en-US").replace(/,/g, " ")}
                 </td>
-                {effectiveValues.map((v, i) => (
-                  <td key={v.key} style={{ ...td, textAlign: "right", fontFamily: mono, color: green, fontWeight: isSubtotal ? 800 : 600 }}>
-                    {isSubtotal && <span style={{ opacity: 0.5, marginRight: "0.3rem" }}>Σ</span>}
-                    {formatValue(n.rollups[i], v.field, v.agg)}
-                  </td>
-                ))}
+                {effectiveValues.map((v, i) => {
+                  const raw = n.rollups[i];
+                  const parent = parentByPath[n.pathKey];
+                  const parentRaw = parent ? parent.rollups[i] : null;
+                  const bw = dataBars && n.isLeaf ? barWidth(raw, i) : 0;
+                  const hc = heatmap && n.isLeaf ? heatColor(raw, i) : null;
+                  return (
+                    <td key={v.key} style={{
+                      ...td, textAlign: "right", fontFamily: mono,
+                      color: green, fontWeight: isSubtotal ? 800 : 600,
+                      position: "relative", background: hc || undefined,
+                    }}>
+                      {bw > 0 && (
+                        <span aria-hidden style={{
+                          position: "absolute", right: 0, bottom: 0, height: 3,
+                          width: `${bw}%`, background: `linear-gradient(90deg, ${green}33, ${green})`,
+                          borderBottomRightRadius: 2, pointerEvents: "none",
+                        }} />
+                      )}
+                      {isSubtotal && <span style={{ opacity: 0.5, marginRight: "0.3rem" }}>Σ</span>}
+                      {renderCellValue(raw, i, parentRaw)}
+                    </td>
+                  );
+                })}
               </tr>
             );
           })}
@@ -1290,13 +1630,18 @@ function FilterPopover({ fieldKey, filter, anchorEl, records, onChange, onClear,
     };
   }, [anchorEl, onClose]);
 
+  // Viewport-clamped anchor positioning. If the chip is near the bottom of
+  // the viewport, flip the popover above it. Width 360 + 20 margin = 380.
   const rect = anchorEl?.getBoundingClientRect();
-  const style = rect ? {
-    position: "fixed",
-    top: rect.bottom + 8,
-    left: Math.max(8, Math.min(rect.left, window.innerWidth - 380)),
-    zIndex: 1000,
-  } : { display: "none" };
+  const popW = 360, popMaxH = Math.min(560, Math.floor(window.innerHeight * 0.75));
+  const style = (() => {
+    if (!rect) return { display: "none" };
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const flipAbove  = spaceBelow < popMaxH && rect.top > popMaxH;
+    const top  = flipAbove ? Math.max(8, rect.top - popMaxH - 8) : rect.bottom + 8;
+    const left = Math.max(8, Math.min(rect.left, window.innerWidth - popW - 8));
+    return { position: "fixed", top, left, zIndex: 1000 };
+  })();
 
   const q = search.trim().toLowerCase();
   const shown = q ? distinct.filter(v => String(v).toLowerCase().includes(q)) : distinct;
@@ -1533,5 +1878,187 @@ function CheckboxRow({ checked, onChange, label }) {
       <input type="checkbox" checked={checked} onChange={onChange} style={{ accentColor: green }} />
       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
     </label>
+  );
+}
+
+/* ─── PIVOT CHART ─────────────────────────────────────────────────
+   Renders a horizontal bar chart of the first value column, using the
+   top-level (L1) rows of the pivot. Pure SVG — no chart lib dependency. */
+function PivotChart({ flatRows, effectiveValues, grandTotal, lang }) {
+  // Top-level nodes = level 0 (first row field's buckets)
+  const tops = flatRows.filter(n => n.level === 0);
+  const valIdx = 0;
+  const v = effectiveValues[valIdx];
+  if (!v || tops.length === 0) {
+    return (
+      <div style={{ border: `1px solid ${border}`, borderRadius: 8, padding: "1rem", background: panel, color: dim, fontSize: "0.78rem" }}>
+        {lang === "sk" ? "Graf bude tu po pridaní Riadkov a Hodnôt." : "Chart appears after adding Rows and Values."}
+      </div>
+    );
+  }
+  const data = tops
+    .map(n => ({ label: n.label, value: n.rollups[valIdx], count: n.count }))
+    .filter(d => d.value != null && Number.isFinite(d.value))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 14);
+  const max = Math.max(...data.map(d => d.value), 1);
+  const title = v.key === "__count__"
+    ? (lang === "sk" ? "Počet po L1" : "Count by L1")
+    : `${AGG_LABEL[v.agg]} · ${FIELDS[v.field]?.label || v.field}`;
+  return (
+    <div style={{ border: `1px solid ${border}`, borderRadius: 8, background: panel, padding: "0.75rem", maxHeight: 720, overflow: "auto" }}>
+      <div style={{ fontFamily: mono, fontSize: "0.62rem", color: green, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.6rem" }}>
+        {lang === "sk" ? "Graf" : "Chart"} · <span style={{ color: dim }}>{title}</span>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+        {data.map((d, i) => (
+          <div key={d.label + i} style={{ display: "grid", gridTemplateColumns: "90px 1fr 60px", alignItems: "center", gap: "0.4rem" }}>
+            <span title={d.label} style={{ fontSize: "0.72rem", color: "#c4c4cc", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.label}</span>
+            <div style={{ position: "relative", height: 16, background: "#0a0a0c", border: `1px solid ${border}`, borderRadius: 3 }}>
+              <div style={{
+                position: "absolute", inset: 0, width: `${(d.value / max) * 100}%`,
+                background: `linear-gradient(90deg, ${green}33, ${green})`, borderRadius: 3,
+              }} />
+            </div>
+            <span style={{ fontFamily: mono, fontSize: "0.7rem", color: green, textAlign: "right", fontWeight: 700 }}>
+              {formatValue(d.value, v.field, v.agg)}
+            </span>
+          </div>
+        ))}
+        {data.length === 0 && (
+          <div style={{ color: dim, fontSize: "0.78rem", textAlign: "center", padding: "1rem 0" }}>
+            {lang === "sk" ? "Žiadne dáta na vykreslenie." : "No data to plot."}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─── DRILL-DOWN MODAL ────────────────────────────────────────────
+   Click a count or subtotal to see the underlying flat records that
+   contributed to that cell. Showing 12 cols by default, scrollable. */
+function DrillDownModal({ title, records, onClose, lang }) {
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
+  }, [onClose]);
+
+  // Columns shown in drill-down — the most-useful flat-level fields
+  const DRILL_COLS = [
+    { key: "project_name", label: "Projekt" },
+    { key: "unit_id",      label: "Byt" },
+    { key: "typ",          label: "Typ" },
+    { key: "izby",         label: "Izby" },
+    { key: "poschodie",    label: "Posch." },
+    { key: "obytna_plocha",label: "Plocha" },
+    { key: "cena_s_dph",   label: "Cena" },
+    { key: "stav",         label: "Stav" },
+    { key: "district",     label: "Časť" },
+    { key: "developer",    label: "Developer" },
+  ];
+
+  const cena_m2 = (r) => {
+    const p = Number(r.cena_s_dph), m = Number(r.obytna_plocha);
+    return (Number.isFinite(p) && Number.isFinite(m) && m > 0) ? Math.round(p / m) : null;
+  };
+
+  const downloadCSV = () => {
+    const esc = (v) => {
+      if (v == null) return "";
+      const s = String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const headers = [...DRILL_COLS.map(c => c.label), "€/m²"];
+    const lines = [headers.map(esc).join(",")];
+    for (const r of records) {
+      lines.push([...DRILL_COLS.map(c => r[c.key] ?? ""), cena_m2(r) ?? ""].map(esc).join(","));
+    }
+    const blob = new Blob(["\ufeff" + lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `drilldown-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)", zIndex: 1200,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: "2rem",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "#0a0a0c", border: `1px solid ${green}55`, borderRadius: 10,
+          width: "min(1200px, 96vw)", maxHeight: "88vh", display: "flex", flexDirection: "column",
+          boxShadow: "0 20px 64px rgba(0,0,0,0.9)",
+        }}
+      >
+        <div style={{ padding: "0.9rem 1.1rem", borderBottom: `1px solid ${border}`, display: "flex", alignItems: "center", gap: "0.6rem" }}>
+          <span style={{ fontFamily: mono, fontSize: "0.62rem", color: green, letterSpacing: "0.12em", textTransform: "uppercase" }}>
+            {lang === "sk" ? "Záznamy" : "Records"}
+          </span>
+          <strong style={{ color: text, fontSize: "0.9rem" }}>{title}</strong>
+          <span style={{ color: dim, fontFamily: mono, fontSize: "0.72rem", marginLeft: "auto" }}>
+            {records.length.toLocaleString("en-US").replace(/,/g, " ")}
+          </span>
+          <button onClick={downloadCSV} style={{
+            background: "transparent", border: `1px solid ${green}55`, color: green,
+            borderRadius: 4, padding: "0.3rem 0.6rem", cursor: "pointer",
+            fontFamily: mono, fontSize: "0.7rem",
+          }}>⬇ CSV</button>
+          <button onClick={onClose} style={{
+            background: "transparent", border: `1px solid ${border}`, color: dim,
+            borderRadius: 4, padding: "0.3rem 0.6rem", cursor: "pointer",
+            fontFamily: mono, fontSize: "0.7rem",
+          }}>✕</button>
+        </div>
+        <div style={{ overflow: "auto", flex: 1 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.78rem" }}>
+            <thead style={{ position: "sticky", top: 0, background: "#0e0e10", zIndex: 1 }}>
+              <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                {DRILL_COLS.map(c => (
+                  <th key={c.key} style={{ padding: "0.55rem 0.7rem", fontWeight: 700, borderBottom: `1px solid ${border}`, whiteSpace: "nowrap" }}>{c.label}</th>
+                ))}
+                <th style={{ padding: "0.55rem 0.7rem", fontWeight: 700, borderBottom: `1px solid ${border}`, color: green, textAlign: "right" }}>€/m²</th>
+              </tr>
+            </thead>
+            <tbody>
+              {records.slice(0, 1000).map((r, i) => (
+                <tr key={(r.id ?? i) + "|" + i} style={{ background: i % 2 ? "transparent" : "rgba(255,255,255,0.015)" }}>
+                  {DRILL_COLS.map(c => (
+                    <td key={c.key} style={{ padding: "0.35rem 0.7rem", color: "#c4c4cc", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 180 }}
+                        title={r[c.key] == null ? "" : String(r[c.key])}>
+                      {r[c.key] == null || r[c.key] === "" ? <span style={{ color: dim, opacity: 0.6 }}>—</span> : String(r[c.key])}
+                    </td>
+                  ))}
+                  <td style={{ padding: "0.35rem 0.7rem", textAlign: "right", fontFamily: mono, color: green }}>
+                    {cena_m2(r) != null ? cena_m2(r).toLocaleString("en-US").replace(/,/g, " ") : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {records.length > 1000 && (
+            <div style={{ padding: "0.75rem 1rem", color: dim, fontSize: "0.72rem", textAlign: "center", fontFamily: mono }}>
+              {lang === "sk" ? `Zobrazených prvých 1 000 z ${records.length} (stiahni CSV pre kompletný výber).` : `Showing first 1,000 of ${records.length} (download CSV for the full set).`}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
