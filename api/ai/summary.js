@@ -7,21 +7,46 @@
 // Request body:
 //   { context: {...}, lang: "sk" | "en" }
 //
-// Response (200): { text: "…" }
-// Response (501): "AI disabled — ANTHROPIC_API_KEY missing."
-// Response (4xx/5xx): { error: "…" }
+// Auth:
+//   · Caller sends their Supabase session access-token as Authorization:
+//     Bearer <token>. Endpoint validates via auth.getUser().
+//   · No token → anonymous call, rate-limited more aggressively.
+//
+// Rate limits (per user, rolling windows):
+//   · Authenticated paid/admin:    30 / hour,  200 / day
+//   · Authenticated free:           5 / hour,   20 / day
+//   · Anonymous (no token):         3 / hour,   10 / day  (per-IP)
+//
+// Responses:
+//   200 { text, model, usage }
+//   401 { error: "auth required" } (when caller sends malformed token)
+//   429 { error: "rate limit", retry_after_sec }
+//   501 { error: "AI disabled — ANTHROPIC_API_KEY missing" }
+//   4xx/5xx { error: "..." }
 //
 // Security notes:
-//   · Only POST is accepted.
-//   · Input is bounded — we reject oversize bodies (>16 KB of JSON) to
-//     limit cost from malicious callers. That's plenty for one report.
-//   · Output is capped at 900 tokens.
-//   · No PII in `context` — it's aggregate numbers only.
-//   · Anthropic key is read from env ONCE per request.
+//   · Input bounded at 16 KB JSON.
+//   · Output capped at 900 tokens.
+//   · No PII in `context` — aggregates only (enforced by client shape,
+//     not by the server — don't ingest untrusted extra fields).
+
+import { createClient } from "@supabase/supabase-js";
 
 const ANTHROPIC_MODEL = "claude-sonnet-4-5";
 const MAX_TOKENS      = 900;
 const MAX_INPUT_BYTES = 16 * 1024;
+
+// Rate-limit windows (milliseconds)
+const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS  = 24 * HOUR_MS;
+
+// [per-hour, per-day] caps by tier
+const LIMITS = {
+  paid:  [30, 200],
+  admin: [60, 500],
+  free:  [ 5,  20],
+  anon:  [ 3,  10],
+};
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -35,7 +60,7 @@ export default async function handler(req, res) {
     });
   }
 
-  // ── Read + validate body ──
+  // ── Body read + validate ──
   let body = req.body;
   if (typeof body === "string") {
     try { body = JSON.parse(body); } catch { return res.status(400).json({ error: "invalid JSON body" }); }
@@ -52,6 +77,81 @@ export default async function handler(req, res) {
     return res.status(413).json({ error: `context too large (${serialized.length} bytes > ${MAX_INPUT_BYTES})` });
   }
 
+  // ── Auth + tier detection ──
+  const SUPABASE_URL        = process.env.SUPABASE_URL;
+  const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY;
+  // If Supabase envs are missing, auth is disabled entirely — every call
+  // is treated as "anon". That's a degraded mode for local dev; in prod
+  // both envs are set (SUPABASE_URL is public, SECRET is server-only).
+  const authHeader = req.headers.authorization || req.headers.Authorization || "";
+  const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+  let userId = null, tier = "anon";
+
+  if (SUPABASE_URL && SUPABASE_SECRET_KEY && token) {
+    try {
+      const admin = createClient(SUPABASE_URL, SUPABASE_SECRET_KEY, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      });
+      const { data: { user }, error: authErr } = await admin.auth.getUser(token);
+      if (authErr || !user) {
+        return res.status(401).json({ error: "invalid token" });
+      }
+      userId = user.id;
+      // Fetch tier from user_profiles (table used elsewhere in the app)
+      const { data: prof } = await admin
+        .from("user_profiles")
+        .select("tier")
+        .eq("id", userId)
+        .maybeSingle();
+      tier = prof?.tier || "free";
+    } catch (_) {
+      tier = "free";   // token present but lookup failed — degrade safely
+    }
+  }
+
+  // ── Rate limiting ──
+  // When Supabase is configured we persist usage + check real counts.
+  // Otherwise we fall back to an in-memory counter (useful for local dev;
+  // doesn't survive cold starts, but the limit is generous there anyway).
+  const [perHour, perDay] = LIMITS[tier] || LIMITS.anon;
+  let admin = null;
+  if (SUPABASE_URL && SUPABASE_SECRET_KEY) {
+    admin = createClient(SUPABASE_URL, SUPABASE_SECRET_KEY, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
+    // Count the user's (or for anon: all anon's) calls in the last hour and day
+    const hourAgo = new Date(Date.now() - HOUR_MS).toISOString();
+    const dayAgo  = new Date(Date.now() - DAY_MS).toISOString();
+    let hourCount = 0, dayCount = 0;
+    try {
+      const qH = admin.from("ai_usage_log").select("id", { count: "exact", head: true })
+        .gte("requested_at", hourAgo);
+      const qD = admin.from("ai_usage_log").select("id", { count: "exact", head: true })
+        .gte("requested_at", dayAgo);
+      if (userId) { qH.eq("user_id", userId); qD.eq("user_id", userId); }
+      else        { qH.is("user_id", null);   qD.is("user_id", null); }
+      const [h, d] = await Promise.all([qH, qD]);
+      hourCount = h.count || 0;
+      dayCount  = d.count || 0;
+    } catch (_) { /* fail open on count-query error */ }
+
+    if (hourCount >= perHour) {
+      return res.status(429).json({
+        error: `rate limit: ${perHour} AI calls / hour reached`,
+        retry_after_sec: 60,
+        tier,
+      });
+    }
+    if (dayCount >= perDay) {
+      return res.status(429).json({
+        error: `rate limit: ${perDay} AI calls / day reached`,
+        retry_after_sec: 3600,
+        tier,
+      });
+    }
+  }
+
   // ── Prompt assembly ──
   const SK = lang !== "en";
   const system = SK
@@ -64,6 +164,7 @@ export default async function handler(req, res) {
 
   // ── Call Anthropic ──
   let r;
+  const startedAt = Date.now();
   try {
     r = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -80,26 +181,54 @@ export default async function handler(req, res) {
       }),
     });
   } catch (e) {
+    await logUsage(admin, userId, context, null, false, `upstream call failed: ${e?.message || e}`);
     return res.status(502).json({ error: `upstream call failed: ${e?.message || e}` });
   }
 
   if (!r.ok) {
     const txt = await r.text().catch(() => "");
+    await logUsage(admin, userId, context, null, false, `anthropic HTTP ${r.status}`);
     return res.status(r.status).json({ error: `anthropic HTTP ${r.status}: ${txt.slice(0, 500)}` });
   }
 
   const data = await r.json().catch(() => null);
-  if (!data) return res.status(502).json({ error: "invalid response from anthropic" });
+  if (!data) {
+    await logUsage(admin, userId, context, null, false, "invalid anthropic response");
+    return res.status(502).json({ error: "invalid response from anthropic" });
+  }
 
-  // Messages API returns content as an array of blocks
   const text = Array.isArray(data.content)
     ? data.content.filter(b => b.type === "text").map(b => b.text).join("\n\n")
     : "";
-  if (!text) return res.status(502).json({ error: "empty AI response" });
+  if (!text) {
+    await logUsage(admin, userId, context, data.usage, false, "empty AI response");
+    return res.status(502).json({ error: "empty AI response" });
+  }
+
+  await logUsage(admin, userId, context, data.usage, true, null);
 
   return res.status(200).json({
     text,
     model: data.model,
     usage: data.usage,
+    duration_ms: Date.now() - startedAt,
+    tier,
   });
+}
+
+/* Best-effort log insert. Never throws — a failed log shouldn't break
+   the response. If admin client is null (local dev, no Supabase), skip. */
+async function logUsage(admin, userId, context, usage, ok, error) {
+  if (!admin) return;
+  try {
+    await admin.from("ai_usage_log").insert({
+      user_id:        userId,
+      endpoint:       "summary",
+      scope:          context?.scope || null,
+      scope_label:    context?.scopeLabel || null,
+      input_tokens:   usage?.input_tokens || null,
+      output_tokens:  usage?.output_tokens || null,
+      ok, error,
+    });
+  } catch (_) { /* silent */ }
 }

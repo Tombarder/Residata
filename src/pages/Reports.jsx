@@ -27,6 +27,7 @@
  */
 import { useState, useMemo, useEffect } from "react";
 import { useProjects, useAllFlats, useProjectSnapshots } from "../lib/useData";
+import { supabase } from "../lib/supabase";
 
 // ── Visual language (mirrors Platform.jsx) ───────────────────────
 const mono = "'JetBrains Mono', monospace";
@@ -216,7 +217,8 @@ function ReportHeader({ projects, flats, lang, scope }) {
             {lang === "sk" ? "Dáta k" : "Data as of"} {lastSync} · {projects.length} {lang === "sk" ? "projektov" : "projects"} · {flats.length} {lang === "sk" ? "bytov" : "units"}
           </p>
         </div>
-        <div className="no-print" style={{ display: "flex", gap: "0.5rem" }}>
+        <div className="no-print" style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+          <SubscribeButton scope={scope} lang={lang} />
           <button onClick={() => downloadScopeCSV(projects, flats, lang)}
             style={{
               background: "transparent", color: green, border: `1px solid ${green}55`,
@@ -231,6 +233,74 @@ function ReportHeader({ projects, flats, lang, scope }) {
         </div>
       </div>
     </div>
+  );
+}
+
+/* ─── Monthly email subscribe toggle ─────────────────────────────
+   Upserts a row in `report_subscriptions` for the logged-in user.
+   The Vercel cron endpoint (/api/cron/monthly-reports, 1st of month)
+   emails everyone who's enabled=true. */
+function SubscribeButton({ scope, lang }) {
+  const [state, setState] = useState("loading"); // loading | off | on | saving | err
+  const [email, setEmail] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) { if (!cancelled) setState("off"); return; }
+        if (!cancelled) setEmail(user.email);
+        const { data } = await supabase.from("report_subscriptions")
+          .select("enabled").eq("user_id", user.id).maybeSingle();
+        if (!cancelled) setState(data?.enabled ? "on" : "off");
+      } catch (_) { if (!cancelled) setState("off"); }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const toggle = async () => {
+    setState("saving");
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { setState("off"); return; }
+      const want = state !== "on";
+      const { error } = await supabase.from("report_subscriptions").upsert({
+        user_id: user.id,
+        email:   user.email,
+        scope,
+        scope_label: null,
+        lang,
+        enabled: want,
+      }, { onConflict: "user_id" });
+      if (error) throw error;
+      setState(want ? "on" : "off");
+    } catch (e) {
+      setState("err");
+      setTimeout(() => setState("off"), 3000);
+    }
+  };
+
+  const label = {
+    loading: "…",
+    off:     "📧 " + (lang === "sk" ? "Odoberať mesačne" : "Subscribe monthly"),
+    on:      "✓ " + (lang === "sk" ? "Odoberá sa"       : "Subscribed"),
+    saving:  "…",
+    err:     "⚠ chyba",
+  }[state];
+  const isOn = state === "on";
+  return (
+    <button onClick={toggle} disabled={state === "saving" || state === "loading"}
+      title={email ? `Posielame na ${email}` : ""}
+      style={{
+        background: isOn ? "rgba(0,229,160,0.14)" : "transparent",
+        color: isOn ? green : dim,
+        border: `1px solid ${isOn ? green : border}`,
+        borderRadius: 4, padding: "0.5rem 0.9rem", fontFamily: mono,
+        fontSize: "0.78rem", fontWeight: 700, cursor: "pointer",
+      }}>
+      {label}
+    </button>
   );
 }
 
@@ -548,11 +618,25 @@ function AiSummaryBlock({ context, lang }) {
     setStatus("loading");
     setText(null); setError(null);
     try {
+      // Attach the user's Supabase session token so the endpoint can
+      // identify them (for rate-limit bucketing by tier + user).
+      const headers = { "Content-Type": "application/json" };
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+      } catch (_) { /* anon fallback — endpoint applies stricter limit */ }
+
       const r = await fetch("/api/ai/summary", {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST", headers,
         body: JSON.stringify({ context, lang }),
       });
       if (r.status === 501) { setStatus("missing_key"); return; }
+      if (r.status === 429) {
+        const j = await r.json().catch(() => ({}));
+        setStatus("rate_limited");
+        setError(j.error || "rate limit reached");
+        return;
+      }
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const j = await r.json();
       setText(j.text || "");
@@ -599,6 +683,12 @@ function AiSummaryBlock({ context, lang }) {
         <div style={{ color: red, fontSize: "0.8rem" }}>
           {lang === "sk" ? "AI zlyhalo: " : "AI failed: "} {error}
           <button onClick={run} style={{ marginLeft: "0.6rem", background: "transparent", color: green, border: `1px solid ${green}55`, borderRadius: 3, padding: "0.15rem 0.5rem", fontFamily: mono, fontSize: "0.68rem", cursor: "pointer" }}>↻</button>
+        </div>
+      )}
+      {status === "rate_limited" && (
+        <div style={{ color: orange, fontSize: "0.82rem" }}>
+          {lang === "sk" ? "Dosiahnutý limit AI volaní. " : "AI rate limit reached. "}
+          <span style={{ color: dim, fontSize: "0.76rem" }}>{error}</span>
         </div>
       )}
     </div>
