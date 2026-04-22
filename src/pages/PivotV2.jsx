@@ -195,6 +195,8 @@ const AGG_LABEL = {
    down quickly past 6 columns in the result table. */
 const MAX_ROWS = 6;
 const MAX_VALUES = 4;
+const MAX_COLS = 1;    // cross-tab: 1 column field for now (keeps header legible)
+const MAX_COL_VALUES = 12; // cap distinct column values so table stays readable
 
 /* Path separator: unicode char unlikely to appear in any real value. */
 const SEP = "\u2016";
@@ -349,12 +351,16 @@ function summariseFilter(filter, fieldType) {
 }
 
 function compute(field, agg, records) {
+  // count doesn't need a field — it's just the record count. This path
+  // also serves the default "__count__" measure (values.length===0) where
+  // field is null. Used to return null here, which made the default
+  // Count column render as "—" on first drop.
+  if (agg === "count") return records.length;
   if (!field) return null;
   // Measure fields carry their own single calculation
   if (field.type === "measure" && typeof field.measureCompute === "function") {
     return field.measureCompute(records);
   }
-  if (agg === "count") return records.length;
 
   // Accessor is needed beyond count — returns field value per record
   const acc = field.accessor;
@@ -391,19 +397,64 @@ function compute(field, agg, records) {
   }
 }
 
+/* Distinct values of a column field across the dataset, ordered by
+   frequency desc. Capped to MAX_COL_VALUES so the header stays legible.
+   Empty values get folded into the (prázdne) bucket. */
+function distinctColValues(records, colField) {
+  const f = FIELDS[colField];
+  if (!f) return [];
+  const counts = new Map();
+  for (const r of records) {
+    const v = normKey(f.accessor(r));
+    counts.set(v, (counts.get(v) || 0) + 1);
+  }
+  const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  return sorted.slice(0, MAX_COL_VALUES).map(([k]) => k);
+}
+
 /* Build the pivot tree. Rolls up rollups[] per node from its own records
    — NOT from children — so every aggregation stays mathematically
-   correct (avg of 10k flats ≠ avg of group averages). */
-function buildTree(records, rowFields, valueDefs) {
+   correct (avg of 10k flats ≠ avg of group averages).
+
+   Cross-tab (Columns zone) support:
+     If colFields has a field, each node gets `colRollups: { colKey: [values] }`
+     in addition to the flat `rollups: [values]` (total across all cols).
+     `colKeys` is attached to the root so the header can enumerate
+     columns consistently (including the "Σ" grand-col).
+*/
+function buildTree(records, rowFields, colFields, valueDefs) {
+  // Enumerate distinct column values globally — same axis across all rows.
+  const colKeys = colFields.length
+    ? distinctColValues(records, colFields[0])
+    : null;
+  const colAcc = colFields.length ? FIELDS[colFields[0]]?.accessor : null;
+
   const rollupsFor = (recs) =>
     valueDefs.map((v) => compute(FIELDS[v.field], v.agg, recs));
+
+  // Per-column rollups: partition `recs` by col key, compute values for each.
+  const colRollupsFor = (recs) => {
+    if (!colKeys) return null;
+    const byKey = {};
+    for (const ck of colKeys) byKey[ck] = [];
+    // Other bucket: rows whose col-value isn't in the top-MAX — we ignore
+    // them for the per-col cells but they still contribute to totals.
+    for (const r of recs) {
+      const ck = normKey(colAcc(r));
+      if (byKey[ck]) byKey[ck].push(r);
+    }
+    const out = {};
+    for (const ck of colKeys) out[ck] = rollupsFor(byKey[ck]);
+    return out;
+  };
 
   if (rowFields.length === 0) {
     return {
       label: "Total", path: [], pathKey: "",
-      level: -1,
+      level: -1, colKeys,
       records, count: records.length,
       rollups: rollupsFor(records),
+      colRollups: colRollupsFor(records),
       children: [],
       isLeaf: true,
     };
@@ -429,6 +480,7 @@ function buildTree(records, rowFields, valueDefs) {
         records: items,
         count: items.length,
         rollups: rollupsFor(items),
+        colRollups: colRollupsFor(items),
         children: isDeepest ? [] : rec(items, depth + 1, path),
         isLeaf: isDeepest,
       });
@@ -438,9 +490,10 @@ function buildTree(records, rowFields, valueDefs) {
 
   return {
     label: "Total", path: [], pathKey: "",
-    level: -1,
+    level: -1, colKeys,
     records, count: records.length,
     rollups: rollupsFor(records),
+    colRollups: colRollupsFor(records),
     children: rec(records, 0, []),
     isLeaf: false,
   };
@@ -575,6 +628,7 @@ export default function PivotV2({ lang = "sk" }) {
   // Pre-filled demo: Cast → Developer → Project name in Rows, Count only.
   // First-time visitors see the pivot computing real numbers immediately.
   const [rows,    setRows]    = useState(["cast", "developer", "project_name"]);
+  const [cols,    setCols]    = useState([]);   // cross-tab axis (≤ 1 field)
   const [values,  setValues]  = useState([]);
   const [filters, setFilters] = useState([]);
   const [search,  setSearch]  = useState("");
@@ -601,14 +655,15 @@ export default function PivotV2({ lang = "sk" }) {
   // { title, records }  or null when closed
   const [drillDown, setDrillDown] = useState(null);
 
-  // Palette "used" greying: a field is "in use" only when it's in Rows
-  // or Values. Being in Filters doesn't count — because Filters coexist
-  // with either, the user may still want to drag the same field into
-  // Rows/Values while it's filtering.
+  // Palette "used" greying: a field is "in use" only when it's in Rows,
+  // Cols or Values. Being in Filters doesn't count — because Filters
+  // coexist with any of those (user might want cena in Values AND in
+  // Filters to exclude outliers).
   const usedKeys = useMemo(() => new Set([
     ...rows,
+    ...cols,
     ...values.map(v => v.key),
-  ]), [rows, values]);
+  ]), [rows, cols, values]);
 
   // ── Actions ───────────────────────────────────────────────────
   const addToZone = (fieldKey, zone) => {
@@ -623,14 +678,29 @@ export default function PivotV2({ lang = "sk" }) {
       zone = "values";
     }
     if (zone === "rows") {
+      // Rows ⇄ Cols ⇄ Values are mutually exclusive — same field can't
+      // group a row AND a column AND be aggregated.
       setValues(v => v.filter(x => x.key !== fieldKey));
+      setCols(c => c.filter(k => k !== fieldKey));
       setRows(r => {
         if (r.includes(fieldKey)) return r;
         if (r.length >= MAX_ROWS) return r;
         return [...r, fieldKey];
       });
+    } else if (zone === "cols") {
+      // Cross-tab axis: drop mutually exclusive with rows/values.
+      // Measures can't be col-headers.
+      if (fld && fld.type === "measure") return;
+      setRows(r => r.filter(k => k !== fieldKey));
+      setValues(v => v.filter(x => x.key !== fieldKey));
+      setCols(c => {
+        if (c.includes(fieldKey)) return c;
+        if (c.length >= MAX_COLS) return [fieldKey]; // replace existing (cap=1)
+        return [...c, fieldKey];
+      });
     } else if (zone === "values") {
       setRows(r => r.filter(k => k !== fieldKey));
+      setCols(c => c.filter(k => k !== fieldKey));
       setValues(v => {
         if (v.find(x => x.key === fieldKey)) return v;
         if (v.length >= MAX_VALUES) return v;
@@ -638,7 +708,7 @@ export default function PivotV2({ lang = "sk" }) {
         return [...v, { key: fieldKey, field: fieldKey, agg: defaultAggFor(fld) }];
       });
     } else if (zone === "filters") {
-      // Filters coexist with Rows / Values — no mutual-exclusion cleanup.
+      // Filters coexist with Rows / Cols / Values — no mutual-exclusion.
       setFilters(f => {
         if (f.find(x => x.key === fieldKey)) return f;
         return [...f, { key: fieldKey }];
@@ -646,6 +716,7 @@ export default function PivotV2({ lang = "sk" }) {
     } else if (zone === "palette") {
       // Drag back to palette = full remove from wherever it was.
       setRows(r => r.filter(k => k !== fieldKey));
+      setCols(c => c.filter(k => k !== fieldKey));
       setValues(v => v.filter(x => x.key !== fieldKey));
       setFilters(f => f.filter(x => x.key !== fieldKey));
     }
@@ -653,6 +724,7 @@ export default function PivotV2({ lang = "sk" }) {
 
   const removeFromZone = (zone, fieldKey) => {
     if (zone === "rows")    setRows(r => r.filter(k => k !== fieldKey));
+    if (zone === "cols")    setCols(c => c.filter(k => k !== fieldKey));
     if (zone === "values")  setValues(v => v.filter(x => x.key !== fieldKey));
     if (zone === "filters") setFilters(f => f.filter(x => x.key !== fieldKey));
   };
@@ -706,8 +778,8 @@ export default function PivotV2({ lang = "sk" }) {
   );
 
   const rawTree = useMemo(
-    () => buildTree(filteredRecords, rows, effectiveValues),
-    [filteredRecords, rows, effectiveValues]
+    () => buildTree(filteredRecords, rows, cols, effectiveValues),
+    [filteredRecords, rows, cols, effectiveValues]
   );
 
   const sortedTree = useMemo(() => ({
@@ -748,7 +820,7 @@ export default function PivotV2({ lang = "sk" }) {
         marginBottom: "1rem",
       }} className="pivotv2-grid">
         <LeftPanel
-          rows={rows} values={values} filters={filters}
+          rows={rows} cols={cols} values={values} filters={filters}
           drag={drag} setDrag={setDrag}
           hoverZone={hoverZone} setHoverZone={setHoverZone}
           onDropToZone={(zone) => { if (!drag) return; addToZone(drag.fieldKey, zone); setDrag(null); setHoverZone(null); }}
@@ -776,7 +848,7 @@ export default function PivotV2({ lang = "sk" }) {
           heatmap={heatmap}     setHeatmap={setHeatmap}
           dataBars={dataBars}   setDataBars={setDataBars}
           chart={chart}         setChart={setChart}
-          onExportCSV={() => exportPivotCSV(flatRows, sortedTree, rows, effectiveValues, valueMode)}
+          onExportCSV={() => exportPivotCSV(flatRows, sortedTree, rows, cols, effectiveValues, valueMode)}
           lang={lang}
         />
       )}
@@ -785,6 +857,7 @@ export default function PivotV2({ lang = "sk" }) {
       <div style={{ display: chart ? "grid" : "block", gridTemplateColumns: chart ? "1fr 340px" : "1fr", gap: "0.75rem" }}>
         <ResultTable
           rowFields={rows}
+          colFields={cols}
           effectiveValues={effectiveValues}
           flatRows={flatRows}
           collapsed={collapsed}
@@ -888,7 +961,7 @@ const miniBtn = {
 };
 
 /* ─── LEFT PANEL ─────────────────────────────────────────────── */
-function LeftPanel({ rows, values, filters, drag, setDrag, hoverZone, setHoverZone, onDropToZone, removeFromZone, changeValueAgg, lang }) {
+function LeftPanel({ rows, cols, values, filters, drag, setDrag, hoverZone, setHoverZone, onDropToZone, removeFromZone, changeValueAgg, lang }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
       <DropZone
@@ -901,6 +974,19 @@ function LeftPanel({ rows, values, filters, drag, setDrag, hoverZone, setHoverZo
         hoverZone={hoverZone} setHoverZone={setHoverZone}
         onDrop={() => onDropToZone("rows")}
         onRemove={(k) => removeFromZone("rows", k)}
+      />
+      <DropZone
+        zoneKey="cols"
+        title={lang === "sk" ? "Stĺpce" : "Columns"}
+        hint={lang === "sk"
+          ? "Potiahni text-pole sem — každá hodnota dostane vlastný stĺpec (cross-tab, napr. Stav: V/P/R)."
+          : "Drop a text field here — each value becomes its own column (cross-tab)."}
+        icon="→"
+        chips={cols.map(k => ({ key: k, label: FIELDS[k]?.label || k, type: FIELDS[k]?.type }))}
+        drag={drag} setDrag={setDrag}
+        hoverZone={hoverZone} setHoverZone={setHoverZone}
+        onDrop={() => onDropToZone("cols")}
+        onRemove={(k) => removeFromZone("cols", k)}
       />
       <DropZone
         zoneKey="values"
@@ -1291,7 +1377,7 @@ function AnalysisToolbar({ valueMode, setValueMode, heatmap, setHeatmap, dataBar
 }
 
 /* ─── CSV EXPORT ──────────────────────────────────────────────── */
-function exportPivotCSV(flatRows, grandTotal, rowFields, effectiveValues, valueMode) {
+function exportPivotCSV(flatRows, grandTotal, rowFields, colFields, effectiveValues, valueMode) {
   const esc = (v) => {
     if (v == null) return "";
     const s = String(v);
@@ -1301,36 +1387,75 @@ function exportPivotCSV(flatRows, grandTotal, rowFields, effectiveValues, valueM
     ? "Count"
     : `${AGG_LABEL[v.agg]}(${FIELDS[v.field]?.label || v.field})`;
 
-  const cols = [
-    ...rowFields.map((f, i) => `L${i + 1}·${FIELDS[f]?.label || f}`),
-    "Count",
-    ...effectiveValues.map(valueHeader),
-  ];
-
   const fmt = (v) => (v == null || !Number.isFinite(v)) ? "" :
     Number.isInteger(v) ? String(v) : String(Math.round(v * 100) / 100);
 
-  const lines = [cols.map(esc).join(",")];
+  const crossTab = colFields.length > 0;
+  const colKeys = crossTab ? (grandTotal.colKeys || []) : [];
 
+  // Build header
+  const header = [
+    ...rowFields.map((f, i) => `L${i + 1}·${FIELDS[f]?.label || f}`),
+    "Count",
+  ];
+  if (crossTab) {
+    for (const ck of colKeys) {
+      for (const v of effectiveValues) header.push(`${ck} · ${valueHeader(v)}`);
+    }
+    for (const v of effectiveValues) header.push(`TOTAL · ${valueHeader(v)}`);
+  } else {
+    for (const v of effectiveValues) header.push(valueHeader(v));
+  }
+
+  const lines = [header.map(esc).join(",")];
   const grandForCol = (i) => grandTotal.rollups[i];
 
   for (const n of flatRows) {
     const labelCols = rowFields.map((_, i) => i <= n.level ? (n.path[i] || "") : "");
-    const vals = effectiveValues.map((v, i) => {
-      const raw = n.rollups[i];
-      if (valueMode === "pct_total") {
-        const g = grandForCol(i);
-        if (raw == null || !g) return "";
-        return `${((raw / g) * 100).toFixed(1)}%`;
+    const row = [...labelCols, String(n.count)];
+    if (crossTab) {
+      for (const ck of colKeys) {
+        for (let i = 0; i < effectiveValues.length; i++) {
+          const raw = n.colRollups?.[ck]?.[i];
+          if (valueMode === "pct_total") {
+            const g = grandForCol(i);
+            row.push(raw == null || !g ? "" : `${((raw / g) * 100).toFixed(1)}%`);
+          } else row.push(fmt(raw));
+        }
       }
-      return fmt(raw);
-    });
-    lines.push([...labelCols, String(n.count), ...vals].map(esc).join(","));
+      // Σ total columns
+      for (let i = 0; i < effectiveValues.length; i++) {
+        const raw = n.rollups[i];
+        if (valueMode === "pct_total") {
+          const g = grandForCol(i);
+          row.push(raw == null || !g ? "" : `${((raw / g) * 100).toFixed(1)}%`);
+        } else row.push(fmt(raw));
+      }
+    } else {
+      for (let i = 0; i < effectiveValues.length; i++) {
+        const raw = n.rollups[i];
+        if (valueMode === "pct_total") {
+          const g = grandForCol(i);
+          row.push(raw == null || !g ? "" : `${((raw / g) * 100).toFixed(1)}%`);
+        } else row.push(fmt(raw));
+      }
+    }
+    lines.push(row.map(esc).join(","));
   }
+
   // Grand total row
-  const grandVals = effectiveValues.map((_, i) => fmt(grandTotal.rollups[i]));
-  lines.push([...rowFields.map(() => ""), String(grandTotal.count), ...grandVals].map(esc).join(","));
-  lines[lines.length - 1] = `TOTAL,${lines[lines.length - 1].split(",").slice(1).join(",")}`;
+  const gt = ["TOTAL", ...rowFields.slice(1).map(() => ""), String(grandTotal.count)];
+  if (crossTab) {
+    for (const ck of colKeys) {
+      for (let i = 0; i < effectiveValues.length; i++) {
+        gt.push(fmt(grandTotal.colRollups?.[ck]?.[i]));
+      }
+    }
+    for (let i = 0; i < effectiveValues.length; i++) gt.push(fmt(grandTotal.rollups[i]));
+  } else {
+    for (let i = 0; i < effectiveValues.length; i++) gt.push(fmt(grandTotal.rollups[i]));
+  }
+  lines.push(gt.map(esc).join(","));
 
   const csv = lines.join("\n");
   const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" });
@@ -1345,7 +1470,12 @@ function exportPivotCSV(flatRows, grandTotal, rowFields, effectiveValues, valueM
 }
 
 /* ─── RESULT TABLE ────────────────────────────────────────────── */
-function ResultTable({ rowFields, effectiveValues, flatRows, collapsed, onToggle, sort, setSort, grandTotal, lang, valueMode = "raw", heatmap = false, dataBars = false, onDrillDown }) {
+function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, collapsed, onToggle, sort, setSort, grandTotal, lang, valueMode = "raw", heatmap = false, dataBars = false, onDrillDown }) {
+  // Cross-tab columns come from the tree's top-level colKeys so every
+  // row shares the same horizontal axis (otherwise leaves could have
+  // different col sets and the table would be ragged).
+  const colKeys = colFields.length ? (grandTotal.colKeys || []) : null;
+  const crossTab = !!colKeys;
   if (!rowFields.length) {
     return (
       <div style={{
@@ -1464,6 +1594,23 @@ function ResultTable({ rowFields, effectiveValues, flatRows, collapsed, onToggle
     }}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
         <thead style={{ background: "#0e0e10", position: "sticky", top: 0, zIndex: 2 }}>
+          {crossTab && (
+            /* Top header row: col-field name spanning all per-col groups */
+            <tr style={{ textAlign: "center", color: dim, fontFamily: mono, fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+              <th style={{ ...th, borderBottom: "none" }} colSpan={2}></th>
+              {colKeys.map(ck => (
+                <th key={"ctop:" + ck} colSpan={effectiveValues.length}
+                    style={{ ...th, color: green, borderLeft: `1px solid ${border}`, borderBottom: `1px solid ${border}` }}>
+                  <span style={{ opacity: 0.65 }}>{FIELDS[colFields[0]]?.label}:</span> <strong style={{ color: green }}>{ck}</strong>
+                </th>
+              ))}
+              {/* Grand totals across columns */}
+              <th colSpan={effectiveValues.length}
+                  style={{ ...th, color: dim, borderLeft: `2px solid ${green}55` }}>
+                Σ {lang === "sk" ? "spolu" : "total"}
+              </th>
+            </tr>
+          )}
           <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.64rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
             {/* Hierarchy label column — spans the row-fields, labelled with the
                 chain (L1 Cast › L2 Developer › …) */}
@@ -1479,11 +1626,39 @@ function ResultTable({ rowFields, effectiveValues, flatRows, collapsed, onToggle
             <th style={{ ...th, textAlign: "right", minWidth: 60, cursor: "pointer" }} onClick={() => clickSort("count")}>
               #{sortIndicator("count")}
             </th>
-            {effectiveValues.map((v, i) => (
-              <th key={v.key} style={{ ...th, textAlign: "right", minWidth: 100, color: green, cursor: "pointer" }} onClick={() => clickSort(i)}>
-                {valueHeaderText(v)}{sortIndicator(i)}
-              </th>
-            ))}
+            {crossTab ? (
+              <>
+                {colKeys.map((ck, cidx) => (
+                  effectiveValues.map((v, i) => (
+                    <th key={`h:${ck}:${v.key}`}
+                        style={{
+                          ...th, textAlign: "right", minWidth: 80, color: green,
+                          borderLeft: i === 0 ? `1px solid ${border}` : undefined,
+                        }}>
+                      {valueHeaderText(v)}
+                    </th>
+                  ))
+                ))}
+                {/* Σ total columns (across all col values) */}
+                {effectiveValues.map((v, i) => (
+                  <th key={`sum:${v.key}`}
+                      style={{
+                        ...th, textAlign: "right", minWidth: 90, color: dim,
+                        borderLeft: i === 0 ? `2px solid ${green}55` : undefined,
+                        cursor: "pointer",
+                      }}
+                      onClick={() => clickSort(i)}>
+                    Σ {valueHeaderText(v)}{sortIndicator(i)}
+                  </th>
+                ))}
+              </>
+            ) : (
+              effectiveValues.map((v, i) => (
+                <th key={v.key} style={{ ...th, textAlign: "right", minWidth: 100, color: green, cursor: "pointer" }} onClick={() => clickSort(i)}>
+                  {valueHeaderText(v)}{sortIndicator(i)}
+                </th>
+              ))
+            )}
           </tr>
         </thead>
         <tbody>
@@ -1528,30 +1703,68 @@ function ResultTable({ rowFields, effectiveValues, flatRows, collapsed, onToggle
                     onClick={onDrillDown ? () => onDrillDown(n) : undefined}>
                   {n.count.toLocaleString("en-US").replace(/,/g, " ")}
                 </td>
-                {effectiveValues.map((v, i) => {
-                  const raw = n.rollups[i];
-                  const parent = parentByPath[n.pathKey];
-                  const parentRaw = parent ? parent.rollups[i] : null;
-                  const bw = dataBars && n.isLeaf ? barWidth(raw, i) : 0;
-                  const hc = heatmap && n.isLeaf ? heatColor(raw, i) : null;
-                  return (
-                    <td key={v.key} style={{
-                      ...td, textAlign: "right", fontFamily: mono,
-                      color: green, fontWeight: isSubtotal ? 800 : 600,
-                      position: "relative", background: hc || undefined,
-                    }}>
-                      {bw > 0 && (
-                        <span aria-hidden style={{
-                          position: "absolute", right: 0, bottom: 0, height: 3,
-                          width: `${bw}%`, background: `linear-gradient(90deg, ${green}33, ${green})`,
-                          borderBottomRightRadius: 2, pointerEvents: "none",
-                        }} />
-                      )}
-                      {isSubtotal && <span style={{ opacity: 0.5, marginRight: "0.3rem" }}>Σ</span>}
-                      {renderCellValue(raw, i, parentRaw)}
-                    </td>
-                  );
-                })}
+                {crossTab ? (
+                  <>
+                    {colKeys.map((ck, cidx) => (
+                      effectiveValues.map((v, i) => {
+                        const raw = n.colRollups ? n.colRollups[ck]?.[i] : null;
+                        const parent = parentByPath[n.pathKey];
+                        const parentRaw = parent?.colRollups ? parent.colRollups[ck]?.[i] : (parent?.rollups?.[i] ?? null);
+                        return (
+                          <td key={`c:${ck}:${v.key}`} style={{
+                            ...td, textAlign: "right", fontFamily: mono,
+                            color: green, fontWeight: isSubtotal ? 800 : 600,
+                            borderLeft: i === 0 ? `1px solid ${border}` : undefined,
+                          }}>
+                            {renderCellValue(raw, i, parentRaw)}
+                          </td>
+                        );
+                      })
+                    ))}
+                    {/* Σ total across cols — shows overall rollup */}
+                    {effectiveValues.map((v, i) => {
+                      const raw = n.rollups[i];
+                      const parent = parentByPath[n.pathKey];
+                      const parentRaw = parent ? parent.rollups[i] : null;
+                      return (
+                        <td key={`sum:${v.key}`} style={{
+                          ...td, textAlign: "right", fontFamily: mono,
+                          color: green, fontWeight: isSubtotal ? 800 : 700,
+                          borderLeft: i === 0 ? `2px solid ${green}55` : undefined,
+                          background: "rgba(0,229,160,0.03)",
+                        }}>
+                          {isSubtotal && <span style={{ opacity: 0.5, marginRight: "0.3rem" }}>Σ</span>}
+                          {renderCellValue(raw, i, parentRaw)}
+                        </td>
+                      );
+                    })}
+                  </>
+                ) : (
+                  effectiveValues.map((v, i) => {
+                    const raw = n.rollups[i];
+                    const parent = parentByPath[n.pathKey];
+                    const parentRaw = parent ? parent.rollups[i] : null;
+                    const bw = dataBars && n.isLeaf ? barWidth(raw, i) : 0;
+                    const hc = heatmap && n.isLeaf ? heatColor(raw, i) : null;
+                    return (
+                      <td key={v.key} style={{
+                        ...td, textAlign: "right", fontFamily: mono,
+                        color: green, fontWeight: isSubtotal ? 800 : 600,
+                        position: "relative", background: hc || undefined,
+                      }}>
+                        {bw > 0 && (
+                          <span aria-hidden style={{
+                            position: "absolute", right: 0, bottom: 0, height: 3,
+                            width: `${bw}%`, background: `linear-gradient(90deg, ${green}33, ${green})`,
+                            borderBottomRightRadius: 2, pointerEvents: "none",
+                          }} />
+                        )}
+                        {isSubtotal && <span style={{ opacity: 0.5, marginRight: "0.3rem" }}>Σ</span>}
+                        {renderCellValue(raw, i, parentRaw)}
+                      </td>
+                    );
+                  })
+                )}
               </tr>
             );
           })}
@@ -1563,11 +1776,37 @@ function ResultTable({ rowFields, effectiveValues, flatRows, collapsed, onToggle
             <td style={{ ...td, textAlign: "right", fontFamily: mono, color: green, fontWeight: 700 }}>
               {grandTotal.count.toLocaleString("en-US").replace(/,/g, " ")}
             </td>
-            {effectiveValues.map((v, i) => (
-              <td key={v.key} style={{ ...td, textAlign: "right", fontFamily: mono, color: green, fontWeight: 900, fontSize: "0.9rem" }}>
-                {formatValue(grandTotal.rollups[i], v.field, v.agg)}
-              </td>
-            ))}
+            {crossTab ? (
+              <>
+                {colKeys.map((ck, cidx) => (
+                  effectiveValues.map((v, i) => (
+                    <td key={`gt:${ck}:${v.key}`} style={{
+                      ...td, textAlign: "right", fontFamily: mono, color: green,
+                      fontWeight: 900, fontSize: "0.9rem",
+                      borderLeft: i === 0 ? `1px solid ${border}` : undefined,
+                    }}>
+                      {formatValue(grandTotal.colRollups?.[ck]?.[i], v.field, v.agg)}
+                    </td>
+                  ))
+                ))}
+                {effectiveValues.map((v, i) => (
+                  <td key={`gsum:${v.key}`} style={{
+                    ...td, textAlign: "right", fontFamily: mono, color: green,
+                    fontWeight: 900, fontSize: "0.9rem",
+                    borderLeft: i === 0 ? `2px solid ${green}55` : undefined,
+                    background: "rgba(0,229,160,0.06)",
+                  }}>
+                    {formatValue(grandTotal.rollups[i], v.field, v.agg)}
+                  </td>
+                ))}
+              </>
+            ) : (
+              effectiveValues.map((v, i) => (
+                <td key={v.key} style={{ ...td, textAlign: "right", fontFamily: mono, color: green, fontWeight: 900, fontSize: "0.9rem" }}>
+                  {formatValue(grandTotal.rollups[i], v.field, v.agg)}
+                </td>
+              ))
+            )}
           </tr>
         </tbody>
       </table>
