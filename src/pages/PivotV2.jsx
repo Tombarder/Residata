@@ -129,6 +129,10 @@ const MAX_VALUES = 4;
 /* Path separator: unicode char unlikely to appear in any real value. */
 const SEP = "\u2016";
 
+/* Sentinel used in `filter.values` to mean "the (prázdne) / null bucket".
+   Lets the user include or exclude records with missing values explicitly. */
+const EMPTY_SENTINEL = "__EMPTY__";
+
 /* ───────────────────────── Helpers ───────────────────────── */
 function num(v) {
   if (v == null || v === "") return null;
@@ -143,6 +147,137 @@ function normKey(v) {
 
 /* Compute one aggregated value from a set of records. Returns a number
    (or null when the aggregation has no defined value, e.g., avg of empty). */
+/* ────────────── Filters ──────────────
+   A filter is `{ key, mode, values?, min?, max?, includeEmpty? }`:
+     mode === "in"       → include only records where value ∈ values
+     mode === "not_in"   → exclude records where value ∈ values
+     mode === "between"  → numeric range (min..max)
+     mode === "empty"    → only records with null/empty value
+     mode === "not_empty"→ only records with a non-empty value
+     mode undefined / no values & no range → inactive (pass-through).
+                                              Keeps a freshly-dropped
+                                              filter chip from nuking the
+                                              dataset until user configures.
+*/
+function isFilterActive(f) {
+  if (!f) return false;
+  if (f.mode === "empty" || f.mode === "not_empty") return true;
+  if (f.mode === "between") return f.min != null || f.max != null;
+  return Array.isArray(f.values) && f.values.length > 0;
+}
+
+function passesFilter(record, filter) {
+  if (!isFilterActive(filter)) return true;
+  const field = FIELDS[filter.key];
+  if (!field) return true;
+  const v = field.accessor(record);
+  const isEmpty = v == null || v === "";
+
+  if (filter.mode === "empty")     return isEmpty;
+  if (filter.mode === "not_empty") return !isEmpty;
+
+  // Numeric range
+  if (filter.mode === "between") {
+    if (isEmpty) return !!filter.includeEmpty;
+    const n = Number(v);
+    if (!Number.isFinite(n)) return false;
+    if (filter.min != null && n < Number(filter.min)) return false;
+    if (filter.max != null && n > Number(filter.max)) return false;
+    return true;
+  }
+
+  // Value-set inclusion / exclusion
+  const vals = filter.values || [];
+  const wantsEmpty = vals.includes(EMPTY_SENTINEL);
+  const otherVals = vals.filter(x => x !== EMPTY_SENTINEL);
+
+  let hit;
+  if (isEmpty) {
+    hit = wantsEmpty;
+  } else if (field.type === "number") {
+    const n = Number(v);
+    hit = otherVals.some(x => {
+      const xn = Number(x);
+      return Number.isFinite(xn) && xn === n;
+    });
+  } else {
+    const s = String(v).trim().toLowerCase();
+    hit = otherVals.some(x => String(x).trim().toLowerCase() === s);
+  }
+  return filter.mode === "not_in" ? !hit : hit;
+}
+
+/* Return sorted distinct values + empty flag + quick stats for a given
+   field across a record set. Used by the filter popover to render a
+   correctly-sized picker.                                              */
+function distinctValuesForField(records, fieldKey) {
+  const field = FIELDS[fieldKey];
+  if (!field) return { values: [], hasEmpty: false, isNumber: false, stats: null };
+
+  let hasEmpty = false;
+  const seen = new Set();
+  const nums = [], strs = [];
+  for (const r of records) {
+    const v = field.accessor(r);
+    if (v == null || v === "") { hasEmpty = true; continue; }
+    if (field.type === "number") {
+      const n = Number(v);
+      if (!Number.isFinite(n) || seen.has(n)) continue;
+      seen.add(n); nums.push(n);
+    } else {
+      const s = String(v);
+      const key = s.trim().toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key); strs.push(s);
+    }
+  }
+  let values;
+  if (field.type === "number") {
+    values = nums.sort((a, b) => a - b).map(String);
+  } else {
+    values = strs.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  }
+
+  // Stats for numeric
+  let stats = null;
+  if (field.type === "number" && nums.length) {
+    const sorted = [...nums].sort((a, b) => a - b);
+    const m = Math.floor(sorted.length / 2);
+    const median = sorted.length % 2 ? sorted[m] : (sorted[m - 1] + sorted[m]) / 2;
+    stats = {
+      min: sorted[0], max: sorted[sorted.length - 1],
+      median, distinct: values.length, count: nums.length,
+    };
+  }
+
+  return { values, hasEmpty, isNumber: field.type === "number", stats };
+}
+
+/* Short human summary of a filter's state, for rendering on the chip. */
+function summariseFilter(filter, fieldType) {
+  if (!isFilterActive(filter)) return "";
+  if (filter.mode === "empty")     return "je prázdne";
+  if (filter.mode === "not_empty") return "má hodnotu";
+  if (filter.mode === "between") {
+    const parts = [];
+    if (filter.min != null) parts.push(`≥ ${filter.min}`);
+    if (filter.max != null) parts.push(`≤ ${filter.max}`);
+    return parts.join(" · ");
+  }
+  const vals = filter.values || [];
+  const n = vals.length;
+  const prefix = filter.mode === "not_in" ? "≠" : "=";
+  if (n === 0) return "";
+  if (n === 1) {
+    const v = vals[0] === EMPTY_SENTINEL ? "(prázdne)" : String(vals[0]);
+    return `${prefix} ${v}`;
+  }
+  if (n <= 3) {
+    return `${prefix} ${vals.map(v => v === EMPTY_SENTINEL ? "(prázdne)" : v).join(", ")}`;
+  }
+  return `${prefix} ${n} hodnôt`;
+}
+
 function compute(field, agg, records) {
   if (!field) return null;
   if (agg === "count") return records.length;
@@ -363,6 +498,9 @@ export default function PivotV2({ lang = "sk" }) {
   const [collapsed, setCollapsed] = useState(() => new Set());
   // Sort state: { col: "label" | "count" | valueIdx (0..n-1), dir: "asc"|"desc" }
   const [sort, setSort] = useState({ col: "count", dir: "desc" });
+  // Which filter chip's popover is currently open (null = none).
+  // { key, anchorEl } — anchor used to position the popover next to the chip.
+  const [filterPopup, setFilterPopup] = useState(null);
 
   const usedKeys = useMemo(() => new Set([
     ...rows,
@@ -406,6 +544,16 @@ export default function PivotV2({ lang = "sk" }) {
     setValues(vs => vs.map(v => v.key === fieldKey ? { ...v, agg: newAgg } : v));
   };
 
+  /* Patch a filter in-place by its `key`. `patch` is a partial object —
+     passing `null` wipes the filter to "inactive" (pass-through). */
+  const updateFilter = (fieldKey, patch) => {
+    setFilters(fs => fs.map(f => {
+      if (f.key !== fieldKey) return f;
+      if (patch === null) return { key: fieldKey };   // reset to inactive
+      return { ...f, ...patch };
+    }));
+  };
+
   const toggleCollapse = (pathKey) => {
     setCollapsed(s => {
       const n = new Set(s);
@@ -433,9 +581,16 @@ export default function PivotV2({ lang = "sk" }) {
     ? values
     : [{ key: "__count__", field: null, agg: "count" }];
 
+  // Apply filters BEFORE tree build. Inactive filters (chip dropped but not
+  // yet configured) pass everything through — see isFilterActive.
+  const filteredRecords = useMemo(
+    () => records.filter(r => filters.every(f => passesFilter(r, f))),
+    [records, filters]
+  );
+
   const rawTree = useMemo(
-    () => buildTree(records, rows, effectiveValues),
-    [records, rows, effectiveValues]
+    () => buildTree(filteredRecords, rows, effectiveValues),
+    [filteredRecords, rows, effectiveValues]
   );
 
   const sortedTree = useMemo(() => ({
@@ -509,6 +664,59 @@ export default function PivotV2({ lang = "sk" }) {
         lang={lang}
       />
 
+      {/* Filter popover — floats over the rest of the UI, positioned next
+          to the clicked filter chip. Uses `records` (pre-filtering) so
+          distinct-value list is stable regardless of other filters; if
+          we ever want contextual filtering (distinct values from the set
+          filtered by OTHER filters), pass filteredRecords instead. */}
+      {filterPopup && (() => {
+        const current = filters.find(f => f.key === filterPopup.key);
+        // Use records filtered by OTHER filters so the user sees options
+        // in the context of what's already narrowed. This avoids the
+        // "I just filtered X, now X is gone from list" Excel footgun.
+        const otherFilters = filters.filter(f => f.key !== filterPopup.key);
+        const contextual = records.filter(r => otherFilters.every(f => passesFilter(r, f)));
+        return (
+          <FilterPopover
+            fieldKey={filterPopup.key}
+            filter={current}
+            anchorEl={filterPopup.anchorEl}
+            records={contextual}
+            onChange={(patch) => updateFilter(filterPopup.key, patch)}
+            onClear={() => updateFilter(filterPopup.key, null)}
+            onClose={() => setFilterPopup(null)}
+            lang={lang}
+          />
+        );
+      })()}
+
+      {/* Active filters summary strip — only shows when any filter has an
+          effect. Gives the user a one-glance view of what's narrowing the
+          dataset, with a "clear all" escape hatch. */}
+      {filters.some(isFilterActive) && (
+        <div style={{
+          marginTop: "0.8rem", padding: "0.5rem 0.75rem",
+          background: "rgba(0,229,160,0.06)", border: `1px solid ${green}55`,
+          borderRadius: 6, display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap",
+          fontFamily: mono, fontSize: "0.72rem",
+        }}>
+          <span style={{ color: green, fontWeight: 700, letterSpacing: "0.08em" }}>⚑ APLIKOVANÉ</span>
+          <span style={{ color: dim }}>
+            {filteredRecords.length.toLocaleString("en-US").replace(/,/g, " ")} /
+            {" "}{records.length.toLocaleString("en-US").replace(/,/g, " ")} {lang === "sk" ? "bytov" : "units"}
+          </span>
+          {filters.filter(isFilterActive).map(f => (
+            <span key={f.key} style={{ color: text }}>
+              <span style={{ color: dim }}>{FIELDS[f.key]?.label}:</span> {summariseFilter(f, FIELDS[f.key]?.type)}
+            </span>
+          ))}
+          <button onClick={() => setFilters(fs => fs.map(f => ({ key: f.key })))}
+            style={{ marginLeft: "auto", background: "transparent", border: `1px solid ${border}`, color: dim, borderRadius: 4, padding: "0.2rem 0.5rem", cursor: "pointer", fontFamily: "inherit", fontSize: "0.68rem" }}>
+            vymazať všetky
+          </button>
+        </div>
+      )}
+
       <style>{`
         @media (max-width: 820px) { .pivotv2-grid { grid-template-columns: 1fr !important; } }
       `}</style>
@@ -553,19 +761,28 @@ function LeftPanel({ rows, values, filters, drag, setDrag, hoverZone, setHoverZo
       <DropZone
         zoneKey="filters"
         title={lang === "sk" ? "Filtre" : "Filters"}
-        hint={lang === "sk" ? "Potiahni pole sem — filtre prídu v ďalšom kroku." : "Drop a field here — filter UI coming next."}
+        hint={lang === "sk"
+          ? "Potiahni pole sem — vylúč / zahrň konkrétne hodnoty. Platí na celý pivot (pred agregáciou)."
+          : "Drop a field here — include / exclude specific values. Applied before aggregation."}
         icon="⚑"
-        chips={filters.map(f => ({ key: f.key, label: FIELDS[f.key]?.label || f.key, type: FIELDS[f.key]?.type }))}
+        chips={filters.map(f => ({
+          key: f.key,
+          label: FIELDS[f.key]?.label || f.key,
+          type: FIELDS[f.key]?.type,
+          // Full filter object passed through so the chip can render its summary
+          filter: f,
+        }))}
         drag={drag} setDrag={setDrag}
         hoverZone={hoverZone} setHoverZone={setHoverZone}
         onDrop={() => onDropToZone("filters")}
         onRemove={(k) => removeFromZone("filters", k)}
+        onChipClick={(key, el) => setFilterPopup({ key, anchorEl: el })}
       />
     </div>
   );
 }
 
-function DropZone({ zoneKey, title, hint, icon, chips, drag, hoverZone, setHoverZone, onDrop, onRemove, onChangeAgg }) {
+function DropZone({ zoneKey, title, hint, icon, chips, drag, hoverZone, setHoverZone, onDrop, onRemove, onChangeAgg, onChipClick }) {
   const isHover = hoverZone === zoneKey && drag;
   const isDragging = drag != null;
   return (
@@ -600,11 +817,13 @@ function DropZone({ zoneKey, title, hint, icon, chips, drag, hoverZone, setHover
               label={c.label}
               type={c.type}
               agg={c.agg}
+              filter={c.filter}
               level={zoneKey === "rows" ? idx : null}
               onDragStart={() => setHoverZone(null)}
               onDragStartPayload={() => ({ fromZone: zoneKey, fieldKey: c.key })}
               onRemove={() => onRemove(c.key)}
               onChangeAgg={onChangeAgg ? (a) => onChangeAgg(c.key, a) : null}
+              onClick={onChipClick ? (e) => onChipClick(c.key, e.currentTarget) : null}
             />
           ))}
         </div>
@@ -615,9 +834,17 @@ function DropZone({ zoneKey, title, hint, icon, chips, drag, hoverZone, setHover
 
 /* A chip inside a drop zone. In Values zone the chip carries an agg
    dropdown directly — click to cycle or pick from a menu. */
-function ChipInZone({ label, type, agg, level, onDragStart, onDragStartPayload, onRemove, onChangeAgg }) {
+function ChipInZone({ label, type, agg, filter, level, onDragStart, onDragStartPayload, onRemove, onChangeAgg, onClick }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const aggs = type === "number" ? AGGS_NUMBER : AGGS_TEXT;
+
+  // Filter chips get a summary badge based on their current config.
+  // Idle (= just dropped, not configured yet) renders in dim/grey; active
+  // filter gets the normal green chip color.
+  const isFilterChip = filter !== undefined;
+  const active = isFilterChip ? isFilterActive(filter) : true;
+  const filterSummary = isFilterChip ? summariseFilter(filter, type) : null;
+
   return (
     <span
       draggable
@@ -625,25 +852,38 @@ function ChipInZone({ label, type, agg, level, onDragStart, onDragStartPayload, 
         e.dataTransfer.effectAllowed = "move";
         e.dataTransfer.setData("text/plain", label);
         const payload = onDragStartPayload();
-        // Expose via parent callback — we mutate via onDragStart side effect
         if (onDragStart) onDragStart();
-        // Use global state — set via parent through drag dispatch
         window.__pivotv2_drag = payload;
-        // Trigger the parent state by re-dispatching via custom event
         window.dispatchEvent(new CustomEvent("pivotv2-drag-start", { detail: payload }));
+      }}
+      onClick={(e) => {
+        // Clicking a filter chip opens its configuration popover. We guard
+        // with stopPropagation so it doesn't also trigger the zone's drag.
+        if (onClick) { e.stopPropagation(); onClick(e); }
       }}
       style={{
         display: "inline-flex", alignItems: "center", gap: "0.35rem",
         padding: "0.3rem 0.45rem 0.3rem 0.55rem", borderRadius: 100,
-        background: "rgba(0,229,160,0.14)", border: `1px solid ${green}`,
-        color: green, fontFamily: mono, fontSize: "0.72rem",
-        cursor: "grab", userSelect: "none", position: "relative",
+        background: active ? "rgba(0,229,160,0.14)" : "rgba(138,138,150,0.10)",
+        border: `1px solid ${active ? green : "#3a3a44"}`,
+        color: active ? green : dim,
+        fontFamily: mono, fontSize: "0.72rem",
+        cursor: onClick ? "pointer" : "grab",
+        userSelect: "none", position: "relative",
       }}
     >
       {level != null && (
         <span style={{ opacity: 0.65, fontSize: "0.58rem", padding: "0 2px" }}>L{level + 1}</span>
       )}
       <span style={{ fontWeight: 600 }}>{label}</span>
+      {/* Filter chip summary — shows what's currently configured */}
+      {isFilterChip && (
+        <span style={{ opacity: 0.85, fontSize: "0.62rem", fontFamily: mono, whiteSpace: "nowrap" }}>
+          {active
+            ? (<><span style={{ color: dim, opacity: 0.5, fontSize: "0.58rem" }}>·</span> {filterSummary}</>)
+            : (<span style={{ fontStyle: "italic", opacity: 0.7 }}> · klikni pre nastavenie</span>)}
+        </span>
+      )}
       {agg != null && onChangeAgg && (
         <>
           <span style={{ color: dim, opacity: 0.5, fontSize: "0.58rem" }}>·</span>
@@ -984,3 +1224,301 @@ function ResultTable({ rowFields, effectiveValues, flatRows, collapsed, onToggle
 
 const th = { padding: "0.65rem 0.75rem", fontWeight: 700, borderBottom: `1px solid ${border}` };
 const td = { padding: "0.45rem 0.75rem", borderBottom: "none" };
+
+
+/* ─── FILTER POPOVER ─────────────────────────────────────────────
+   Floats next to the clicked filter chip. Two render modes driven by
+   the field type:
+     · text / date → checkbox list of distinct values + include/exclude
+     · number      → range inputs + "include (prázdne)" toggle + optional
+                     checkbox list when cardinality is small (<=40).
+   Closes on Esc / outside click.                                   */
+function FilterPopover({ fieldKey, filter, anchorEl, records, onChange, onClear, onClose, lang }) {
+  const field = FIELDS[fieldKey];
+  const { values: distinct, hasEmpty, isNumber, stats } = useMemo(
+    () => distinctValuesForField(records, fieldKey),
+    [records, fieldKey]
+  );
+
+  // Local draft state so Apply commits and Cancel discards
+  const initialMode = filter?.mode || (isNumber ? "between" : "in");
+  const [mode, setMode]           = useState(initialMode);
+  const [selected, setSelected]   = useState(() => new Set(filter?.values || []));
+  const [minV, setMinV]           = useState(filter?.min ?? "");
+  const [maxV, setMaxV]           = useState(filter?.max ?? "");
+  const [inclEmpty, setInclEmpty] = useState(!!filter?.includeEmpty);
+  const [search, setSearch]       = useState("");
+
+  // Re-sync if user re-opens on a different field
+  useEffect(() => {
+    setMode(filter?.mode || (isNumber ? "between" : "in"));
+    setSelected(new Set(filter?.values || []));
+    setMinV(filter?.min ?? "");
+    setMaxV(filter?.max ?? "");
+    setInclEmpty(!!filter?.includeEmpty);
+    setSearch("");
+  }, [fieldKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Close on outside click / Esc
+  useEffect(() => {
+    const onDown = (e) => {
+      const pop = document.getElementById("pivotv2-filter-pop");
+      if (!pop) return;
+      if (pop.contains(e.target)) return;
+      if (anchorEl && anchorEl.contains(e.target)) return;
+      onClose();
+    };
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [anchorEl, onClose]);
+
+  const rect = anchorEl?.getBoundingClientRect();
+  const style = rect ? {
+    position: "fixed",
+    top: rect.bottom + 8,
+    left: Math.max(8, Math.min(rect.left, window.innerWidth - 380)),
+    zIndex: 1000,
+  } : { display: "none" };
+
+  const q = search.trim().toLowerCase();
+  const shown = q ? distinct.filter(v => String(v).toLowerCase().includes(q)) : distinct;
+
+  const toggle = (v) => {
+    setSelected(prev => {
+      const n = new Set(prev);
+      if (n.has(v)) n.delete(v); else n.add(v);
+      return n;
+    });
+  };
+
+  const apply = () => {
+    const modeIsRange = isNumber && mode === "between";
+    const modeIsValueList = mode === "in" || mode === "not_in";
+    if (mode === "empty" || mode === "not_empty") {
+      onChange({ mode, values: [], min: null, max: null });
+    } else if (modeIsRange) {
+      const min = minV === "" ? null : Number(minV);
+      const max = maxV === "" ? null : Number(maxV);
+      onChange({ mode: "between", min, max, includeEmpty: inclEmpty, values: [] });
+    } else if (modeIsValueList) {
+      onChange({ mode, values: Array.from(selected), min: null, max: null });
+    }
+    onClose();
+  };
+
+  // Use a range-specific quick-select: "top 25%" range bounds from stats
+  const quickRange = (lo, hi) => { setMinV(lo); setMaxV(hi); };
+
+  const fmt = (n) => {
+    if (!Number.isFinite(n)) return "—";
+    return Number.isInteger(n)
+      ? n.toLocaleString("en-US").replace(/,/g, " ")
+      : (Math.round(n * 100) / 100).toLocaleString("en-US").replace(/,/g, " ");
+  };
+
+  return (
+    <div
+      id="pivotv2-filter-pop"
+      style={{
+        ...style, width: 360, maxHeight: "70vh", overflow: "auto",
+        background: "#0b0b0e", border: `1px solid ${green}`, borderRadius: 8,
+        boxShadow: "0 20px 48px rgba(0,0,0,0.9), 0 0 0 1px rgba(0,229,160,0.12)",
+        padding: "0.8rem 0.9rem",
+        fontFamily: mono, color: text, fontSize: "0.8rem",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.6rem" }}>
+        <span style={{ fontSize: "0.62rem", color: green, letterSpacing: "0.1em", textTransform: "uppercase" }}>⚑ FILTER</span>
+        <span style={{ fontWeight: 700, fontSize: "0.88rem", color: text }}>{field?.label || fieldKey}</span>
+        <span style={{ marginLeft: "auto", fontSize: "0.62rem", color: dim }}>
+          {isNumber ? "číslo" : "text"}
+        </span>
+      </div>
+
+      {/* Mode picker */}
+      <div style={{ display: "flex", gap: "0.25rem", marginBottom: "0.6rem", flexWrap: "wrap" }}>
+        {isNumber && (
+          <ModeBtn active={mode === "between"} onClick={() => setMode("between")}>rozsah</ModeBtn>
+        )}
+        <ModeBtn active={mode === "in"} onClick={() => setMode("in")}>
+          {isNumber ? "konkrétne ≡" : "zahrnúť ≡"}
+        </ModeBtn>
+        <ModeBtn active={mode === "not_in"} onClick={() => setMode("not_in")}>vylúčiť ≠</ModeBtn>
+        <ModeBtn active={mode === "empty"} onClick={() => setMode("empty")}>prázdne</ModeBtn>
+        <ModeBtn active={mode === "not_empty"} onClick={() => setMode("not_empty")}>má hodnotu</ModeBtn>
+      </div>
+
+      {/* Stats strip (numbers only) */}
+      {isNumber && stats && (
+        <div style={{ fontSize: "0.66rem", color: dim, marginBottom: "0.55rem", padding: "0.35rem 0.5rem", background: "#0a0a0c", border: `1px solid ${border}`, borderRadius: 4 }}>
+          min <strong style={{ color: text }}>{fmt(stats.min)}</strong>
+          {" · "}med <strong style={{ color: text }}>{fmt(stats.median)}</strong>
+          {" · "}max <strong style={{ color: text }}>{fmt(stats.max)}</strong>
+          {" · "}{stats.distinct} unikátnych, {stats.count} s hodnotou
+          {hasEmpty && <>, <span style={{ color: "#ff9b6b" }}>{records.length - stats.count} prázdnych</span></>}
+        </div>
+      )}
+
+      {/* Range inputs */}
+      {mode === "between" && isNumber && (
+        <div style={{ marginBottom: "0.55rem" }}>
+          <div style={{ display: "flex", gap: "0.35rem", alignItems: "center" }}>
+            <label style={{ fontSize: "0.68rem", color: dim }}>od</label>
+            <input type="number" value={minV} onChange={(e) => setMinV(e.target.value)}
+              placeholder={stats ? fmt(stats.min) : ""}
+              style={inpS} />
+            <label style={{ fontSize: "0.68rem", color: dim }}>do</label>
+            <input type="number" value={maxV} onChange={(e) => setMaxV(e.target.value)}
+              placeholder={stats ? fmt(stats.max) : ""}
+              style={inpS} />
+          </div>
+          {stats && (
+            <div style={{ marginTop: "0.4rem", display: "flex", gap: "0.25rem", flexWrap: "wrap" }}>
+              <QuickBtn onClick={() => quickRange(stats.min, stats.median)}>spodná ½</QuickBtn>
+              <QuickBtn onClick={() => quickRange(stats.median, stats.max)}>horná ½</QuickBtn>
+              <QuickBtn onClick={() => quickRange("", "")}>vyčisti rozsah</QuickBtn>
+            </div>
+          )}
+          {hasEmpty && (
+            <label style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginTop: "0.5rem", cursor: "pointer", fontSize: "0.76rem", color: text }}>
+              <input type="checkbox" checked={inclEmpty} onChange={(e) => setInclEmpty(e.target.checked)}
+                style={{ accentColor: "#ff9b6b" }} />
+              zahrnúť aj záznamy bez hodnoty (<span style={{ color: "#ff9b6b" }}>prázdne</span>)
+            </label>
+          )}
+        </div>
+      )}
+
+      {/* Value list — for in/not_in */}
+      {(mode === "in" || mode === "not_in") && (
+        <div>
+          <input
+            autoFocus
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="hľadať…"
+            style={{ ...inpS, width: "100%", marginBottom: "0.5rem" }}
+          />
+          <div style={{ display: "flex", gap: "0.3rem", marginBottom: "0.45rem", fontSize: "0.66rem" }}>
+            <QuickBtn onClick={() => {
+              const all = [...distinct];
+              if (hasEmpty) all.push(EMPTY_SENTINEL);
+              setSelected(new Set(all));
+            }}>vybrať všetko</QuickBtn>
+            <QuickBtn onClick={() => setSelected(new Set())}>zrušiť</QuickBtn>
+            <QuickBtn onClick={() => {
+              setSelected(prev => {
+                const all = [...distinct];
+                if (hasEmpty) all.push(EMPTY_SENTINEL);
+                const inv = new Set();
+                for (const v of all) if (!prev.has(v)) inv.add(v);
+                return inv;
+              });
+            }}>invertovať</QuickBtn>
+            <span style={{ marginLeft: "auto", color: dim }}>
+              {selected.size} vybraných
+            </span>
+          </div>
+          <div style={{
+            maxHeight: 280, overflowY: "auto",
+            border: `1px solid ${border}`, borderRadius: 4, background: "#0a0a0c",
+            padding: "0.2rem",
+          }}>
+            {hasEmpty && (
+              <CheckboxRow
+                checked={selected.has(EMPTY_SENTINEL)}
+                onChange={() => toggle(EMPTY_SENTINEL)}
+                label={<span style={{ fontStyle: "italic", color: "#ff9b6b" }}>(prázdne)</span>}
+              />
+            )}
+            {shown.length === 0 ? (
+              <div style={{ padding: "0.5rem 0.6rem", fontSize: "0.74rem", color: dim, textAlign: "center" }}>
+                žiadne zhody
+              </div>
+            ) : shown.map(v => (
+              <CheckboxRow
+                key={String(v)}
+                checked={selected.has(v)}
+                onChange={() => toggle(v)}
+                label={String(v)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Footer: Clear / Apply */}
+      <div style={{ display: "flex", justifyContent: "space-between", marginTop: "0.7rem", gap: "0.4rem" }}>
+        <button onClick={() => { onClear(); onClose(); }}
+          style={{ background: "transparent", border: `1px solid ${border}`, color: "#ff6b6b", borderRadius: 4, padding: "0.4rem 0.7rem", cursor: "pointer", fontSize: "0.74rem", fontFamily: "inherit" }}>
+          vymazať filter
+        </button>
+        <div style={{ display: "flex", gap: "0.35rem" }}>
+          <button onClick={onClose}
+            style={{ background: "transparent", border: `1px solid ${border}`, color: dim, borderRadius: 4, padding: "0.4rem 0.8rem", cursor: "pointer", fontSize: "0.74rem", fontFamily: "inherit" }}>
+            zrušiť
+          </button>
+          <button onClick={apply}
+            style={{ background: green, border: "none", color: "#0a0a0c", borderRadius: 4, padding: "0.4rem 1rem", cursor: "pointer", fontSize: "0.74rem", fontFamily: "inherit", fontWeight: 700 }}>
+            použiť
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const inpS = {
+  padding: "0.35rem 0.5rem",
+  background: "#0a0a0c", border: `1px solid ${border}`, borderRadius: 4,
+  color: text, fontSize: "0.78rem", fontFamily: "inherit",
+  outline: "none", flex: 1, minWidth: 0,
+};
+
+function ModeBtn({ active, onClick, children }) {
+  return (
+    <button onClick={onClick}
+      style={{
+        background: active ? "rgba(0,229,160,0.18)" : "transparent",
+        border: `1px solid ${active ? green : border}`,
+        color: active ? green : dim,
+        padding: "0.25rem 0.55rem", borderRadius: 3,
+        cursor: "pointer", fontFamily: mono, fontSize: "0.7rem",
+      }}>
+      {children}
+    </button>
+  );
+}
+function QuickBtn({ onClick, children }) {
+  return (
+    <button onClick={onClick}
+      style={{
+        background: "transparent", border: `1px solid ${border}`,
+        color: dim, padding: "0.2rem 0.45rem", borderRadius: 3,
+        cursor: "pointer", fontFamily: mono, fontSize: "0.66rem",
+      }}
+      onMouseEnter={(e) => e.currentTarget.style.borderColor = green}
+      onMouseLeave={(e) => e.currentTarget.style.borderColor = border}>
+      {children}
+    </button>
+  );
+}
+function CheckboxRow({ checked, onChange, label }) {
+  return (
+    <label style={{
+      display: "flex", alignItems: "center", gap: "0.4rem",
+      padding: "0.25rem 0.45rem", cursor: "pointer", borderRadius: 3,
+      fontSize: "0.78rem", color: checked ? text : dim,
+    }}
+      onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.04)"}
+      onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
+      <input type="checkbox" checked={checked} onChange={onChange} style={{ accentColor: green }} />
+      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+    </label>
+  );
+}
