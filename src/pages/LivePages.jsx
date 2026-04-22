@@ -1408,7 +1408,9 @@ const PIVOT_COLUMNS_FLATS = {
   cena_s_dph_text:  { label: { en: "Price label (text)", sk: "Cena popis (text)"   }, type: "text" },
   cennikova_cena:   { label: { en: "List price",        sk: "Cenníková cena"      }, type: "number" },
   // Derived
-  price_per_m2:    { label: { en: "Price / m²",         sk: "Cena / m²"            }, type: "derived" },
+  // numeric: true → included in measure-column dropdown even though type
+  // is 'derived'. bandFor returns a real number for price_per_m2.
+  price_per_m2:    { label: { en: "Price / m²",         sk: "Cena / m²"            }, type: "derived", numeric: true },
   room_band:       { label: { en: "Room band",          sk: "Izbové pásmo"         }, type: "derived" },
   flat_price_band: { label: { en: "Price band (flat)",  sk: "Cenové pásmo (byt)"   }, type: "derived" },
   flat_size_band:  { label: { en: "Size band (m²)",     sk: "Veľkostné pásmo (m²)" }, type: "derived" },
@@ -2420,8 +2422,11 @@ function AnalyticsPivot({ snapshots, projects, allFlats, lang }) {
       }
       return set.size;
     }
+    // Use cellValue() so derived-numeric columns (price_per_m2) work too.
+    // For raw numeric columns it's a no-op; for derived it runs the computed
+    // getter (e.g. cena_s_dph / obytna_plocha) and returns a real number.
     const nums = rows
-      .map(r => Number(r[measure.column]))
+      .map(r => Number(cellValue(r, measure.column)))
       .filter(n => Number.isFinite(n));
     if (nums.length === 0) return 0;
     switch (measure.agg) {
@@ -2527,7 +2532,13 @@ function AnalyticsPivot({ snapshots, projects, allFlats, lang }) {
   };
 
   // ── UI helpers ──
-  const numericColumnKeys = Object.keys(PIVOT_COLUMNS).filter(k => PIVOT_COLUMNS[k].type === "number");
+  // Measurable columns = raw numeric + derived-numeric (flagged with numeric:true).
+  // Order: raw numerics first, derived appended — matches user expectation
+  // that "real" columns come before computed ones.
+  const numericColumnKeys = [
+    ...Object.keys(PIVOT_COLUMNS).filter(k => PIVOT_COLUMNS[k].type === "number"),
+    ...Object.keys(PIVOT_COLUMNS).filter(k => PIVOT_COLUMNS[k].type === "derived" && PIVOT_COLUMNS[k].numeric),
+  ];
   const groupableKeys = Object.keys(PIVOT_COLUMNS).filter(k => PIVOT_COLUMNS[k].type === "text" || PIVOT_COLUMNS[k].type === "derived");
 
   const addFilter = () => setFilters(fs => [...fs, { id: Math.random().toString(36).slice(2, 9), column: "district", op: "is", value: "", values: [] }]);
