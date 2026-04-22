@@ -1,210 +1,203 @@
 # Reports layer — setup
 
-This doc covers everything non-obvious about the Reports module
-(`src/pages/Reports.jsx`) and how to turn optional features on.
+> **Stav pre Tomáša (2026-04-22):** všetko je už nakonfigurované. Migrácie
+> bežia, secrets (ANTHROPIC_API_KEY, CRON_SECRET, GMAIL_APP_PASSWORD) sú
+> uložené v `app_secrets` tabuľke v Supabase. Nič v Vercel env UI
+> prenastavovať netreba. Skok rovno na [Verifikácia](#verifikácia).
 
-## What the Reports page does
+## Čo Reports stránka robí
 
-Five scopes, each rendering the same section taxonomy:
+Päť scope-ov, každý renderuje rovnakú taxonómiu:
 
-| Scope       | What it shows                                          | Typical use                        |
-|-------------|--------------------------------------------------------|------------------------------------|
-| Trh         | Market-wide: every project, every unit                 | Monthly market pulse               |
-| Mesto       | Filtered by `projects.city` (inferred from district)   | "Čo sa deje v Bratislave"          |
-| Časť mesta  | Filtered by `projects.district`                        | "Petržalka vs. trh"                |
-| Projekt     | One project deep-dive                                  | Pricing + unit-mix per project     |
-| Developer   | One developer's portfolio                              | Competitive landscape              |
+| Scope       | Filter                            | Typické použitie                   |
+|-------------|-----------------------------------|------------------------------------|
+| Trh         | všetky projekty                   | Mesačný puls trhu                  |
+| Mesto       | `p.city` (inferované z district-u)| "Čo sa deje v Bratislave"          |
+| Časť mesta  | `p.district`                      | "Petržalka vs. trh"                |
+| Projekt     | `p.id`                            | Per-projekt hĺbka                  |
+| Developer   | `p.developer`                     | Portfólio developera               |
 
-Every scope renders:
+Sekcie:
 
-1. **KPI strip** — projects / units / available / sold / sold% / weighted €/m²
-2. **Executive summary** — Slovak prose from the aggregates
-3. **AI summary** (optional, see below)
-4. **Price distribution** — histogram of €/m² bins
-5. **Breakdown** — by district / developer / project / izby (scope-dependent)
-6. **Benchmark** — scope vs. wider market with red/green delta
-7. **Project table** — the full list
-8. **Historical trend** — month-by-month from `project_snapshots`
+1. KPI strip (projekty / byty / voľné / predané / predané % / vážené €/m²)
+2. Executive summary (hard-coded SK próza)
+3. ✨ AI summary (voliteľný klik na button — volá Claude)
+4. Histogram €/m²
+5. Rozklad podľa sub-scope-u
+6. Benchmark vs širší trh (red/green delta)
+7. Project table
+8. Historical trend z `project_snapshots`
 
 Header buttons:
 
-- **📧 Odoberať mesačne** — one click subscribes the user to the monthly
-  email for the current scope. Details below.
-- **⬇ CSV** — project-level CSV of the current scope.
-- **🖨 Stiahnuť PDF** — uses the browser's `window.print()`. The page
-  ships its own print stylesheet that strips nav, inverts to light,
-  and sets page-breaks per section. Works in all modern browsers; user
-  picks "Save as PDF" in the print dialog.
+- **📧 Odoberať mesačne** — upsert do `report_subscriptions`, cron ti
+  1. v mesiaci pošle e-mail.
+- **⬇ CSV** — scope-level export.
+- **🖨 Stiahnuť PDF** — browser print + print stylesheet.
 
 ---
 
-## Step 1. Run the DB migration
+## Architektúra secrets
 
-File: `supabase_migration_2026_04_ai_usage.sql` in the repo root.
+Namiesto toho, aby si chodil do Vercel UI pridávať API kľúče, uložil
+som ich do tabuľky **`public.app_secrets`** v Supabase. Serverless
+funkcie (`/api/ai/summary`, `/api/cron/monthly-reports`) najprv
+skúsia `process.env.X` a ak je prázdne, siahnu po `app_secrets`
+riadku s kľúčom `X`.
 
-Creates two tables the AI endpoint and the monthly cron need:
+Tabuľka má RLS on a **žiadnu** SELECT policy — nikto z browsera (ani
+admin) ju nevie prečítať. Jediný kto má prístup je serverless kód
+autentikovaný service-role kľúčom.
 
-- `ai_usage_log` — every AI call logged for rate limiting + cost tracking.
-- `report_subscriptions` — who wants the monthly email.
+Aktuálne uložené secrets (overené `select key, length(value)`):
 
-Both have RLS on. Self-read-only for users; server-side code uses the
-service-role key to bypass RLS for cross-user queries.
+| key                  | dĺžka | účel                                  |
+|----------------------|-------|---------------------------------------|
+| `ANTHROPIC_API_KEY`  | 108   | Claude Messages API                   |
+| `CRON_SECRET`        | 64    | Bearer token pre manuálny trigger cronu |
+| `GMAIL_APP_PASSWORD` | 16    | SMTP heslo pre monthly email          |
 
-Open the Supabase SQL editor at
-<https://supabase.com/dashboard/project/mtclsrswxtjseewyrcbx/sql/new>,
-paste the whole migration file in, run it. It's idempotent — re-running
-won't create duplicates.
+CRON_SECRET je uložený v `/tmp/cron_secret.txt` na tvojom Macu, keby si
+ho potreboval pre manuálny test.
+
+## Databázová štruktúra (už nainštalovaná)
+
+### `ai_usage_log`
+Každý AI call sa loguje pre rate-limit + cost tracking:
+
+| column         | type         |
+|----------------|--------------|
+| id             | bigint (pk)  |
+| user_id        | uuid (fk auth.users) |
+| endpoint       | text         |
+| scope          | text         |
+| scope_label    | text         |
+| input_tokens   | integer      |
+| output_tokens  | integer      |
+| ok             | boolean      |
+| error          | text         |
+| requested_at   | timestamptz  |
+
+RLS: self-read only (používateľ vidí iba svoje vlastné záznamy).
+
+### `report_subscriptions`
+Kto dostáva mesačný e-mail:
+
+| column        | type         | default  |
+|---------------|--------------|----------|
+| user_id (pk)  | uuid         |          |
+| email         | text         |          |
+| scope         | text         | 'market' |
+| scope_label   | text         |          |
+| lang          | text         | 'sk'     |
+| enabled       | boolean      | true     |
+| last_sent_at  | timestamptz  |          |
+| created_at    | timestamptz  | now()    |
+
+RLS: self-all (používateľ vidí/píše iba svoj riadok).
+
+### `app_secrets`
+Runtime secrets ako fallback pre Vercel env:
+
+| column      | type         |
+|-------------|--------------|
+| key (pk)    | text         |
+| value       | text         |
+| updated_at  | timestamptz  |
+| notes       | text         |
+
+RLS: zamknuté hard-core, žiadna SELECT policy.
 
 ---
 
-## Step 2. Turn on AI summaries (optional)
+## Rate limits
 
-The "✨ Vygenerovať" button calls `/api/ai/summary` (Vercel serverless,
-file: `api/ai/summary.js`). It talks to Claude (Anthropic Messages API,
-`claude-sonnet-4-5`) with a calibrated Slovak prompt.
+Per-user, rolling hodinové + denné okná:
 
-### 2a. Get an Anthropic API key
+| Tier  | / hour | / day |
+|------:|-------:|------:|
+| admin | 60     | 500   |
+| paid  | 30     | 200   |
+| free  | 5      | 20    |
+| anon  | 3      | 10    |
 
-1. <https://console.anthropic.com/settings/keys>
-2. Create a new key. Copy the `sk-ant-...` value.
+Pri prekročení endpoint vráti **429** + `retry_after_sec` + `tier`. UI
+ukáže oranžový hint namiesto red erroru.
 
-### 2b. Add it to Vercel env
+---
 
-1. <https://vercel.com/tombarder/residata/settings/environment-variables>
-2. Add:
-   - Name: `ANTHROPIC_API_KEY`
-   - Value: `sk-ant-...`
-   - Environments: **Production**, **Preview**, **Development**
-3. Redeploy (push any commit, or in Vercel UI: Deployments → … → Redeploy).
+## Cron schedule
 
-When the key is missing the endpoint returns HTTP 501 and the UI shows a
-helpful "Pridaj ANTHROPIC_API_KEY…" hint instead of a red error.
-
-### Rate limits (enforced)
-
-Per user, rolling windows:
-
-| Tier  | Per hour | Per day |
-|-------|---------:|--------:|
-| admin | 60       | 500     |
-| paid  | 30       | 200     |
-| free  | 5        | 20      |
-| anon  | 3        | 10      |
-
-When exceeded the endpoint returns 429 + `retry_after_sec` and the UI
-shows a friendly "limit reached" message.
-
-### What gets sent to AI
-
-The client sends a compact JSON like:
-
+V `vercel.json`:
 ```json
-{
-  "scope": "district",
-  "scopeLabel": "Petržalka",
-  "summary":   { "projects": 18, "units": 2412, "available": 1031, "sold": 1381, "soldPct": 57, "wavgM2": 3640 },
-  "benchmark": { "projects": 142, "units": 15890, "wavgM2": 4120, "soldPct": 48 },
-  "breakdown": [
-    { "name": "Skyland Group", "projects": 3, "units": 640, "available": 212, "soldPct": 67, "wavgM2": 4010 }
-  ],
-  "priceBins": [ { "band": "3 000–3 500 €/m²", "count": 180 } ]
-}
+"crons": [{ "path": "/api/cron/monthly-reports", "schedule": "0 8 1 * *" }]
 ```
 
-No PII, no personal data, no unit-level rows — aggregates only. The
-endpoint caps input at 16 KB and output at 900 tokens. Typical cost per
-summary is well under 1 cent.
+Beží **1. v mesiaci o 08:00 UTC**. Najbližší fire: 1. máj 2026, 08:00.
+Môžeš to pozrieť/otestovať na:
+<https://vercel.com/tombarder/residata/settings/cron-jobs>
+
+### Manuálny trigger (admin only)
+```bash
+curl -X POST https://residata-gamma.vercel.app/api/cron/monthly-reports \
+     -H "Authorization: Bearer $(cat /tmp/cron_secret.txt)"
+```
+
+(alebo si pozri CRON_SECRET vyššie / v app_secrets tabuľke)
 
 ---
 
-## Step 3. Turn on monthly email reports (optional)
+## Verifikácia
 
-Vercel cron at `/api/cron/monthly-reports` fires 1st of each month, 08:00
-UTC. Iterates `report_subscriptions.enabled=true`, renders an inline
-HTML report, sends via Gmail SMTP.
-
-### 3a. Gmail app password
-
-Already set for the welcome/approval flow. If `GMAIL_USER` +
-`GMAIL_APP_PASSWORD` aren't in Vercel envs, add them:
-
-1. <https://myaccount.google.com/apppasswords> → create a 16-char password.
-2. <https://vercel.com/tombarder/residata/settings/environment-variables>
-   - `GMAIL_USER` = `residata@gmail.com` (or whichever sending address)
-   - `GMAIL_APP_PASSWORD` = `xxxx xxxx xxxx xxxx`
-
-### 3b. Cron secret (recommended)
-
-Lets admin manually trigger the cron for testing. Without it, only
-Vercel's internal scheduler can hit the endpoint.
-
-1. Generate any long random string.
-2. Add to Vercel envs: `CRON_SECRET` = the random string.
-3. Test manually:
-
-   ```bash
-   curl -X POST https://residata-gamma.vercel.app/api/cron/monthly-reports \
-        -H "Authorization: Bearer $CRON_SECRET"
-   ```
-
-### 3c. Verify the schedule
-
-After deploy, check <https://vercel.com/tombarder/residata/settings/cron-jobs>
-— the "Monthly reports" job should be listed with next run in the future.
-
-### 3d. Users opt in
-
-Each logged-in user sees a **📧 Odoberať mesačne** button at the top of
-their Reports page. One click subscribes them to the scope they're
-currently viewing. The row in `report_subscriptions` encodes scope +
-scope_label + lang, so a user can subscribe to "Petržalka" and a
-different user to "Developer: YIT Slovakia" — the cron fans out the
-right content per row.
+1. **AI end-to-end** — otvor <https://residata-gamma.vercel.app/app/reports>,
+   klikni `✨ Vygenerovať` v ľubovoľnom scope. Mal by prísť ~5-odsekový SK text.
+2. **Rate limit** — stlač Vygenerovať 6× rýchlo za sebou. Šiesty klik
+   (alebo 31. ak si paid) vráti žltý "limit reached" hint.
+3. **Subscribe** — `📧 Odoberať mesačne` zmení sa na `✓ Odoberá sa`.
+   Overím v Supabase: tvoj riadok v `report_subscriptions` s `enabled=true`.
+4. **Cron manuálny test** — spusti curl príkaz vyššie; odpoveď obsahuje
+   `subscribers`, `sent_ok`, `sent_fail`, `results[]`.
+5. **SQL audit** — v
+   <https://supabase.com/dashboard/project/mtclsrswxtjseewyrcbx/editor>:
+   - `ai_usage_log` → zoznam tvojich AI volaní + token counts
+   - `report_subscriptions` → tvoj opt-in
+   - `app_secrets` → 3 riadky (UI ich neukáže ak nie si admin — to je dobré).
 
 ---
-
-## Step 4. Admin panel visibility (optional)
-
-You can view all AI usage + subscribers directly in Supabase:
-
-- <https://supabase.com/dashboard/project/mtclsrswxtjseewyrcbx/editor>
-  → `ai_usage_log` table — every AI call, user, scope, input/output
-  tokens, ok flag, error message, timestamp.
-- Same editor → `report_subscriptions` — who's opted in, their scope,
-  last_sent_at (null until first cron run).
-
----
-
-## Cost / abuse controls
-
-- **Per-request token cap**: 900 output tokens (~600 words).
-- **Per-request input cap**: 16 KB JSON.
-- **Per-user rate limit**: hourly + daily windows, see table above.
-- **Cron endpoint auth**: Vercel's `x-vercel-cron: 1` header or
-  `CRON_SECRET` bearer token. Random internet POSTs return 401.
 
 ## Troubleshooting
 
-- **"AI ešte nie je zapnuté"** → env var missing or not redeployed.
-- **"AI rate limit reached"** → user hit their hourly/daily cap; either
-  wait or bump their tier in `user_profiles.tier`.
-- **"anthropic HTTP 401"** → bad key.
-- **"anthropic HTTP 429"** → rate-limited at Anthropic.
-- **"context too large"** → the client is sending more than 16 KB.
-  Only happens if the scope has many hundreds of projects; tune
-  `slim()` in `buildAiContext()` to trim.
-- **Cron didn't fire** → check <https://vercel.com/tombarder/residata/logs>.
-  Free-tier Vercel only allows once/day crons; Hobby is fine for monthly.
-- **Emails didn't send** → check Gmail quotas (500/day on free gmail,
-  2000/day on Google Workspace). Look at `results[]` in the cron
-  response for per-recipient error strings.
+| Symptóm | Čo to znamená |
+|---------|---------------|
+| `501 AI disabled` | Ani env ani app_secrets nemá ANTHROPIC_API_KEY (teraz nemalo by sa stať) |
+| `429 rate limit` | Používateľ prekročil hourly/daily cap; zvýš tier v `user_profiles.tier` |
+| `anthropic HTTP 401` | Kľúč zlý alebo expiroval; zaktualizuj `app_secrets.value` pre `ANTHROPIC_API_KEY` |
+| `anthropic HTTP 429` | Rate-limit na Anthropic strane; počkaj / upgrade ich plán |
+| Cron nebehal | <https://vercel.com/tombarder/residata/logs> → filter "cron". Hobby Vercel povoľuje iba daily; Monthly funguje na každom pláne |
+| Email neprišiel | Gmail dáva free účtu 500/deň; pre >20 subscriberov prejsť na Resend/Postmark |
 
-## Known limitations
+---
 
-- **AI** is per-scope summary only; no year-over-year comparisons
-  yet (would need historical `project_snapshots` enrichment).
-- **Monthly email** is currently scope-snapshot only; no diff narrative
-  ("v Petržalke pribudlo X predajov oproti predminulému mesiacu")
-  — also needs snapshot history.
-- **Email delivery** goes out from Gmail → if sending to > ~20 subscribers
-  regularly, swap in a transactional ESP (Postmark, Resend).
+## Rollback / rotácia kľúčov
+
+**Ak chceš kľúč zmeniť** (napr. vyrotuj Anthropic key):
+```sql
+update app_secrets
+   set value = 'sk-ant-nový...', updated_at = now()
+ where key = 'ANTHROPIC_API_KEY';
+```
+
+Spustené v Supabase SQL editore. Serverless funkcia ho prečíta pri
+najbližšom requeste — cache-free, žiadny deploy netreba.
+
+**Ak chceš spraviť Vercel env oficiálnym** (a DB fallback len zálohovým):
+Pridaj `ANTHROPIC_API_KEY` do
+<https://vercel.com/tombarder/residata/settings/environment-variables>.
+`process.env` win vs app_secrets, takže Vercel okamžite prevezme kontrolu.
+
+**Ak chceš AI úplne vypnúť**:
+```sql
+delete from app_secrets where key = 'ANTHROPIC_API_KEY';
+```
+A zároveň vymaž Vercel env (ak tam je). Endpoint začne vracať 501,
+UI skryje button.
