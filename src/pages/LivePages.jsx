@@ -80,7 +80,17 @@ const ANON_TEASER = 8;  // navyše zobrazíme blurred — dokopy 20 riadkov s bl
 export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
   const t = liveT[lang] || liveT.en;
   const { can } = useCapabilities();
-  const { projects, loading } = useProjects();
+  const { projects: allProjects, loading } = useProjects();
+  // Partition projects by status — active goes in the main table, the rest
+  // (sold_out / paused / archived) drops into an expandable "Historické"
+  // section below so live market numbers aren't diluted. Rows without a
+  // status field (legacy) default to 'active' for backward compat with
+  // pre-migration data.
+  const isActive = (p) => (p.status || "active") === "active";
+  const projects = allProjects.filter(isActive);
+  const historicalProjects = allProjects.filter(p => !isActive(p));
+  const [showHistorical, setShowHistorical] = useState(false);
+
   const hasFullAccess = can("view_all_projects_list");
   // Anon: 12 plne, ďalších 8 blurred. Logged-in: všetko.
   const clearRows = hasFullAccess ? projects : projects.slice(0, ANON_VISIBLE);
@@ -203,8 +213,112 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
             )}
           </ProtectedData>
         )}
+
+        {/* Historical projects (sold_out / paused / archived) — collapsed by
+            default so the live list stays the focus. Only show for users
+            with full access (anon teaser doesn't need another wall). */}
+        {hasFullAccess && historicalProjects.length > 0 && (
+          <div style={{ marginTop: "1.25rem" }}>
+            <button
+              onClick={() => setShowHistorical(s => !s)}
+              style={{
+                width: "100%", padding: "0.7rem 1rem",
+                background: "#0e0e10", border: `1px solid ${border}`,
+                borderRadius: 8, color: dim, fontFamily: "inherit",
+                fontSize: "0.82rem", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                transition: "border-color 0.15s, color 0.15s",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = dim; e.currentTarget.style.color = "#e8e8ed"; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = border; e.currentTarget.style.color = dim; }}
+            >
+              <span>
+                <span style={{ fontFamily: mono, fontSize: "0.7rem", color: green, letterSpacing: "0.08em", textTransform: "uppercase", marginRight: "0.75rem" }}>
+                  {showHistorical ? "▾" : "▸"} {lang === "sk" ? "Historické" : "Historical"}
+                </span>
+                {(() => {
+                  const so = historicalProjects.filter(p => p.status === "sold_out").length;
+                  const pa = historicalProjects.filter(p => p.status === "paused").length;
+                  const ar = historicalProjects.filter(p => p.status === "archived").length;
+                  const parts = [];
+                  if (so) parts.push(`${so} ${lang === "sk" ? "vypredané" : "sold out"}`);
+                  if (pa) parts.push(`${pa} ${lang === "sk" ? "pozastavené" : "paused"}`);
+                  if (ar) parts.push(`${ar} ${lang === "sk" ? "archív" : "archived"}`);
+                  return parts.join(" · ");
+                })()}
+              </span>
+              <span style={{ fontFamily: mono, fontSize: "0.72rem", color: dim }}>
+                {historicalProjects.length} {lang === "sk" ? "projektov" : "projects"}
+              </span>
+            </button>
+            {showHistorical && (
+              <ProtectedData lang={lang} style={{
+                marginTop: "0.6rem", border: `1px solid ${border}`, borderRadius: 12, overflow: "hidden", opacity: 0.92,
+              }}>
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
+                    <thead style={{ background: "#0e0e10" }}>
+                      <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.68rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                        <th style={th}>{t.tbl_project}</th>
+                        <th style={th}>{lang === "sk" ? "Developer" : "Developer"}</th>
+                        <th style={th}>{t.tbl_district}</th>
+                        <th style={th}>Status</th>
+                        <th style={{ ...th, textAlign: "right" }}>{t.tbl_units}</th>
+                        <th style={{ ...th, textAlign: "right" }}>{t.tbl_sold_pct}</th>
+                        <th style={{ ...th, textAlign: "right" }}>{t.tbl_eur_m2}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {historicalProjects.map(p => (
+                        <tr key={p.id}
+                          onClick={() => setCurrent && p.status !== "paused" && setCurrent(`Project:${p.id}`)}
+                          style={{
+                            borderTop: `1px solid ${border}`,
+                            cursor: p.status !== "paused" ? "pointer" : "default",
+                            color: dim,
+                          }}>
+                          <td style={td}><strong style={{ color: "#c4c4cc" }}>{p.name}</strong></td>
+                          <td style={td}>{p.developer || "—"}</td>
+                          <td style={td}>{p.district || "—"}</td>
+                          <td style={td}>
+                            <StatusBadge status={p.status} lang={lang} />
+                          </td>
+                          <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{p.total_units || "—"}</td>
+                          <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{p.sold_percentage != null ? `${p.sold_percentage}%` : "—"}</td>
+                          <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{p.avg_price_eur_m2 ? Math.round(p.avg_price_eur_m2).toLocaleString("en-US") : "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </ProtectedData>
+            )}
+          </div>
+        )}
       </div>
     </main>
+  );
+}
+
+/* StatusBadge — 3-state label (sold_out / paused / archived). Active gets no
+   badge in the main table — that's the implicit default. Colours:
+     sold_out = orange (signals "was live, now done")
+     paused   = dim    (signals "data broken, we know about it")
+     archived = red-ish (signals "removed from registry") */
+function StatusBadge({ status, lang }) {
+  const cfg = {
+    sold_out: { bg: "rgba(245,166,35,0.12)", fg: "#f5a623", label: lang === "sk" ? "Vypredané" : "Sold out" },
+    paused:   { bg: "rgba(138,138,150,0.12)", fg: "#a0a0aa", label: lang === "sk" ? "Pauza"     : "Paused" },
+    archived: { bg: "rgba(255,107,107,0.10)", fg: "#ff6b6b", label: lang === "sk" ? "Archív"    : "Archived" },
+    active:   { bg: "rgba(0,229,160,0.10)",   fg: green,     label: lang === "sk" ? "Aktívne"   : "Active" },
+  };
+  const c = cfg[status] || cfg.active;
+  return (
+    <span style={{
+      display: "inline-block", padding: "2px 8px", borderRadius: 4,
+      fontFamily: mono, fontSize: "0.65rem", fontWeight: 700, letterSpacing: "0.04em",
+      color: c.fg, background: c.bg, border: `1px solid ${c.fg}33`,
+    }}>{c.label}</span>
   );
 }
 
@@ -783,6 +897,10 @@ const PIVOT_COLUMNS = {
   // Snapshot month — YYYY-MM. Defaults to latest; full history
   // automatically grows as monthly syncs append new rows.
   snapshot_month: { label: { en: "Month (snapshot)", sk: "Mesiac (snapshot)" }, type: "text" },
+  // Status — active / sold_out / paused / archived. Defaults applied at
+  // the top of AnalyticsPivot as a filter with value "active" so users
+  // don't get KPI pollution from historical rows on first open.
+  status:       { label: { en: "Status",           sk: "Status"           }, type: "text" },
   // Text
   district:     { label: { en: "District",         sk: "Okres"            }, type: "text" },
   sub_district: { label: { en: "Sub-district",     sk: "Mestská časť"     }, type: "text" },
@@ -1507,6 +1625,12 @@ function AnalyticsPivot({ snapshots, projects, lang }) {
   const [sortCol, setSortCol] = useState("value");   // "value" | "count" | "name"
   const [sortDir, setSortDir] = useState("desc");    // "desc" | "asc"
   const [monthScope, setMonthScope] = useState("latest");
+  // Status scope — default is "active" so KPIs (avg price, total units, etc.)
+  // don't get polluted by paused/sold_out projects on first load. User can
+  // switch to "all" / "sold_out" / "paused" / "archived" to see historical
+  // data. Mirrors monthScope — a lightweight top-level filter that doesn't
+  // need a full FilterRow entry.
+  const [statusScope, setStatusScope] = useState("active");
   const [topN, setTopN] = useState(0);
   const [percentOfTotal, setPercentOfTotal] = useState(false);
   // Tree state
@@ -1524,11 +1648,17 @@ function AnalyticsPivot({ snapshots, projects, lang }) {
   const groupBys = rowGroups;
   const MAX_LEVELS = 6;
 
-  // ── Apply month scope then filters ──
+  // ── Apply month scope then status scope then filters ──
+  // Status scope is applied BEFORE user filters so the pivot's count of
+  // "X / Y projects" matches the visible scope. Missing status values
+  // (legacy rows from before the 2026-04 migration) default to 'active'.
   const scoped = (monthScope === "latest" && latestMonth)
     ? rawSource.filter(r => !r.snapshot_month || r.snapshot_month === latestMonth)
     : rawSource;
-  const filtered = scoped.filter(p => filters.every(f => matchesFilter(p, f)));
+  const statusScoped = statusScope === "all"
+    ? scoped
+    : scoped.filter(p => (p.status || "active") === statusScope);
+  const filtered = statusScoped.filter(p => filters.every(f => matchesFilter(p, f)));
 
   // ── Measure ──
   const computeMeasure = (rows) => {
@@ -1740,28 +1870,57 @@ function AnalyticsPivot({ snapshots, projects, lang }) {
           </p>
         </div>
 
-        {latestMonth && (
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem", alignItems: "flex-end" }}>
-            <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase" }}>
-              {lang === "sk" ? "Rozsah" : "Scope"}
-            </div>
-            <div style={{ display: "inline-flex", background: "#0a0a0b", border: `1px solid ${border}`, borderRadius: 6, overflow: "hidden" }}>
-              <button onClick={() => setMonthScope("latest")}
-                style={{ padding: "0.4rem 0.8rem", fontSize: "0.75rem", cursor: "pointer", background: monthScope === "latest" ? green : "transparent", color: monthScope === "latest" ? "#0a0a0b" : dim, border: "none", fontFamily: "inherit", fontWeight: 600 }}>
-                {lang === "sk" ? `Najnovší (${latestMonth})` : `Latest (${latestMonth})`}
-              </button>
-              <button onClick={() => setMonthScope("all")}
-                style={{ padding: "0.4rem 0.8rem", fontSize: "0.75rem", cursor: "pointer", background: monthScope === "all" ? green : "transparent", color: monthScope === "all" ? "#0a0a0b" : dim, border: "none", fontFamily: "inherit", fontWeight: 600 }}>
-                {lang === "sk" ? `Všetky mesiace (${allMonths.length})` : `All months (${allMonths.length})`}
-              </button>
-            </div>
-            {allMonths.length > 1 && (
-              <div style={{ fontSize: "0.68rem", color: "#55555f", fontFamily: mono, textAlign: "right" }}>
-                {lang === "sk" ? `${allMonths.length} mesiacov v datasete` : `${allMonths.length} months in dataset`}
+        {/* Scope column — two top-level filters that gate the whole pivot
+            (month + status). Applied BEFORE user filters, so "Filtered X/Y"
+            reflects the scope too. */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", alignItems: "flex-end" }}>
+          {latestMonth && (
+            <>
+              <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                {lang === "sk" ? "Mesiac" : "Month"}
               </div>
-            )}
+              <div style={{ display: "inline-flex", background: "#0a0a0b", border: `1px solid ${border}`, borderRadius: 6, overflow: "hidden" }}>
+                <button onClick={() => setMonthScope("latest")}
+                  style={{ padding: "0.35rem 0.7rem", fontSize: "0.72rem", cursor: "pointer", background: monthScope === "latest" ? green : "transparent", color: monthScope === "latest" ? "#0a0a0b" : dim, border: "none", fontFamily: "inherit", fontWeight: 600 }}>
+                  {lang === "sk" ? `Najnovší (${latestMonth})` : `Latest (${latestMonth})`}
+                </button>
+                <button onClick={() => setMonthScope("all")}
+                  style={{ padding: "0.35rem 0.7rem", fontSize: "0.72rem", cursor: "pointer", background: monthScope === "all" ? green : "transparent", color: monthScope === "all" ? "#0a0a0b" : dim, border: "none", fontFamily: "inherit", fontWeight: 600 }}>
+                  {lang === "sk" ? `Všetky (${allMonths.length})` : `All (${allMonths.length})`}
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* Status scope — Active default, switchable to Sold out / Paused /
+              Archived / All. Active-only default prevents polluted KPIs from
+              dead projects on first load. */}
+          <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginTop: "0.2rem" }}>
+            {lang === "sk" ? "Status" : "Status"}
           </div>
-        )}
+          <div style={{ display: "inline-flex", background: "#0a0a0b", border: `1px solid ${border}`, borderRadius: 6, overflow: "hidden", flexWrap: "wrap" }}>
+            {[
+              { v: "active",    sk: "Aktívne",    en: "Active" },
+              { v: "sold_out",  sk: "Vypredané",  en: "Sold out" },
+              { v: "paused",    sk: "Pozastavené",en: "Paused" },
+              { v: "archived",  sk: "Archív",     en: "Archived" },
+              { v: "all",       sk: "Všetko",     en: "All" },
+            ].map(opt => {
+              const active = statusScope === opt.v;
+              return (
+                <button key={opt.v} onClick={() => setStatusScope(opt.v)}
+                  style={{ padding: "0.35rem 0.65rem", fontSize: "0.72rem", cursor: "pointer", background: active ? green : "transparent", color: active ? "#0a0a0b" : dim, border: "none", fontFamily: "inherit", fontWeight: 600 }}>
+                  {lang === "sk" ? opt.sk : opt.en}
+                </button>
+              );
+            })}
+          </div>
+          {statusScope !== "active" && (
+            <div style={{ fontSize: "0.65rem", color: "#ff9b6b", fontFamily: mono, textAlign: "right", maxWidth: 220 }}>
+              {lang === "sk" ? "⚠ Historické dáta — KPIs nemusia odrážať trh" : "⚠ Historical — KPIs may not reflect live market"}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── FILTERS (prominent card) ── */}
