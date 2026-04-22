@@ -854,7 +854,25 @@ function normGroupKey(v) {
 const FILTER_OPS_TEXT = ["is", "is not", "contains", "starts with", "ends with", "in", "not in", "is empty", "not empty"];
 const FILTER_OPS_NUM  = ["=", "≠", "<", "≤", ">", "≥", "between", "is empty", "not empty"];
 
+/* A filter is "incomplete" when the user picked an operator but hasn't
+   supplied a value yet. This is the intermediate state right after
+   clicking "Add filter" — we treat it as a no-op (pass every row through)
+   so data doesn't vanish from under the user. The filter only starts
+   excluding rows once it has something to match against. */
+function isIncompleteFilter(f) {
+  if (f.op === "is empty" || f.op === "not empty") return false;
+  if (f.op === "between") {
+    return (f.min == null || f.min === "") && (f.max == null || f.max === "");
+  }
+  if (f.op === "in" || f.op === "not in") {
+    return !f.values || f.values.length === 0;
+  }
+  return f.value == null || f.value === "";
+}
+
 function matchesFilter(row, f) {
+  // Pass-through for incomplete filters (see isIncompleteFilter comment)
+  if (isIncompleteFilter(f)) return true;
   const v = cellValue(row, f.column);
   const colType = PIVOT_COLUMNS[f.column]?.type;
   if (f.op === "is empty") return v == null || v === "";
@@ -2461,10 +2479,15 @@ function FilterRow({ f, projects, lang, t, onChange, onRemove }) {
     onChange({ column, op: defaultOp, value: "", values: [], min: "", max: "" });
   };
 
+  // Visual cue: filter is incomplete = no value yet = currently a no-op
+  const incomplete = isIncompleteFilter(f);
+
   return (
     <div style={{
-      display: "grid", gridTemplateColumns: "minmax(140px, 180px) minmax(90px, 120px) 1fr 28px",
+      display: "grid", gridTemplateColumns: "minmax(140px, 180px) minmax(90px, 120px) 1fr auto 28px",
       gap: "0.4rem", alignItems: "center",
+      opacity: incomplete ? 0.75 : 1,
+      transition: "opacity 0.15s",
     }}>
       {/* Column */}
       <StyledSelect
@@ -2530,6 +2553,29 @@ function FilterRow({ f, projects, lang, t, onChange, onRemove }) {
           />
         )}
       </div>
+
+      {/* Status badge — explains why adding a blank filter doesn't hide data. */}
+      {incomplete ? (
+        <span style={{
+          fontFamily: mono, fontSize: "0.6rem", color: dim,
+          padding: "3px 7px", border: `1px solid ${border}`, borderRadius: 4,
+          letterSpacing: "0.04em", textTransform: "uppercase",
+          whiteSpace: "nowrap",
+        }}
+          title={lang === "sk" ? "Zadaj hodnotu, inak sa nič nefiltruje" : "Enter a value; otherwise nothing is filtered"}>
+          {lang === "sk" ? "· neaktívny" : "· inactive"}
+        </span>
+      ) : (
+        <span style={{
+          fontFamily: mono, fontSize: "0.6rem", color: green,
+          padding: "3px 7px", background: "rgba(0,229,160,0.1)",
+          border: `1px solid ${green}55`, borderRadius: 4,
+          letterSpacing: "0.04em", textTransform: "uppercase",
+          whiteSpace: "nowrap",
+        }}>
+          {lang === "sk" ? "✓ aktívny" : "✓ active"}
+        </span>
+      )}
 
       <button onClick={onRemove}
         title={lang === "sk" ? "Odstrániť filter" : "Remove filter"}
