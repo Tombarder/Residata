@@ -799,14 +799,11 @@ export default function PivotV2({ lang = "sk" }) {
       border: `1px solid ${green}40`, borderRadius: 12, padding: "1.25rem",
       boxShadow: "0 0 28px rgba(0,229,160,0.05)",
     }}>
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.1rem", flexWrap: "wrap", gap: "0.5rem" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.7rem" }}>
-          <span style={{ padding: "3px 8px", background: green, color: bg, borderRadius: 3, fontSize: "0.68rem", fontWeight: 800, fontFamily: mono, letterSpacing: "0.1em" }}>PIVOT v2</span>
-          <span style={{ fontSize: "0.74rem", color: dim, fontFamily: mono, letterSpacing: "0.05em" }}>
-            {records.length.toLocaleString("en-US").replace(/,/g, " ")} {lang === "sk" ? "bytov v datasete" : "units in dataset"}
-          </span>
-        </div>
+      {/* Header — plain, no loud product badge */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
+        <span style={{ fontSize: "0.78rem", color: dim }}>
+          {records.length.toLocaleString("en-US").replace(/,/g, " ")} {lang === "sk" ? "bytov" : "units"}
+        </span>
         {rows.length >= 2 && (
           <div style={{ display: "flex", gap: "0.4rem" }}>
             <button onClick={expandAll}   style={miniBtn}>▾ {lang === "sk" ? "Rozbaliť" : "Expand"}</button>
@@ -922,20 +919,17 @@ export default function PivotV2({ lang = "sk" }) {
         );
       })()}
 
-      {/* Active filters summary strip — only shows when any filter has an
-          effect. Gives the user a one-glance view of what's narrowing the
-          dataset, with a "clear all" escape hatch. */}
+      {/* Active filters summary — calm strip, no shouting uppercase. */}
       {filters.some(isFilterActive) && (
         <div style={{
-          marginTop: "0.8rem", padding: "0.5rem 0.75rem",
-          background: "rgba(0,229,160,0.06)", border: `1px solid ${green}55`,
+          marginTop: "0.75rem", padding: "0.5rem 0.75rem",
+          background: "transparent", border: `1px dashed ${green}40`,
           borderRadius: 6, display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap",
-          fontFamily: mono, fontSize: "0.72rem",
+          fontSize: "0.75rem",
         }}>
-          <span style={{ color: green, fontWeight: 700, letterSpacing: "0.08em" }}>⚑ APLIKOVANÉ</span>
           <span style={{ color: dim }}>
-            {filteredRecords.length.toLocaleString("en-US").replace(/,/g, " ")} /
-            {" "}{records.length.toLocaleString("en-US").replace(/,/g, " ")} {lang === "sk" ? "bytov" : "units"}
+            Filtrovaných <strong style={{ color: text }}>{filteredRecords.length.toLocaleString("en-US").replace(/,/g, " ")}</strong>
+            {" "}z {records.length.toLocaleString("en-US").replace(/,/g, " ")}
           </span>
           {filters.filter(isFilterActive).map(f => (
             <span key={f.key} style={{ color: text }}>
@@ -943,8 +937,8 @@ export default function PivotV2({ lang = "sk" }) {
             </span>
           ))}
           <button onClick={() => setFilters(fs => fs.map(f => ({ key: f.key })))}
-            style={{ marginLeft: "auto", background: "transparent", border: `1px solid ${border}`, color: dim, borderRadius: 4, padding: "0.2rem 0.5rem", cursor: "pointer", fontFamily: "inherit", fontSize: "0.68rem" }}>
-            vymazať všetky
+            style={{ marginLeft: "auto", background: "transparent", border: "none", color: dim, cursor: "pointer", fontSize: "0.72rem", textDecoration: "underline" }}>
+            vymazať
           </button>
         </div>
       )}
@@ -1144,13 +1138,30 @@ function ChipInZone({ label, type, agg, filter, level, onDragStart, onDragStartP
       >
         {label}
       </span>
-      {/* Filter chip summary — shows what's currently configured */}
+      {/* Filter chip: always show a dedicated settings button so the
+          drag-vs-click ambiguity on the outer draggable span can never
+          block the user. Click this button → opens the config popover.
+          Summary text (or "nastaviť" hint) sits next to it as a label. */}
       {isFilterChip && (
-        <span style={{ opacity: 0.85, fontSize: "0.62rem", fontFamily: mono, whiteSpace: "nowrap" }}>
-          {active
-            ? (<><span style={{ color: dim, opacity: 0.5, fontSize: "0.58rem" }}>·</span> {filterSummary}</>)
-            : (<span style={{ fontStyle: "italic", opacity: 0.7 }}> · klikni pre nastavenie</span>)}
-        </span>
+        <button
+          type="button"
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (onClick) onClick({ currentTarget: e.currentTarget.parentElement });
+          }}
+          title={active ? "Upraviť filter" : "Nastaviť filter"}
+          style={{
+            background: active ? "transparent" : "rgba(245,166,35,0.12)",
+            border: active ? "none" : "1px solid #f5a62355",
+            color: active ? green : "#f5a623",
+            borderRadius: 3, padding: active ? "0 0.25rem" : "0.15rem 0.45rem",
+            cursor: "pointer", fontFamily: "inherit", fontSize: "0.68rem",
+            whiteSpace: "nowrap", fontWeight: active ? 600 : 700,
+          }}
+        >
+          {active ? filterSummary : "nastaviť ⚙"}
+        </button>
       )}
       {/* Agg picker. Hidden for measure fields (single fixed calculation,
           no alternative aggs to choose from — the dropdown would be a
@@ -1313,25 +1324,32 @@ function RightPanel({ usedKeys, search, setSearch, drag, setDrag, hoverZone, set
 function PaletteField({ field, used, onDragStart }) {
   const typeBadge = field.type === "number" ? "#" : (field.type === "date" ? "📅" : "T");
   const typeColor = field.type === "number" ? orange : green;
+  // Palette fields are ALWAYS draggable now — even when the field is
+  // already in Rows / Cols / Values. The "used" flag is a visual hint
+  // (check mark + slight dim), not a hard lock. This is what unblocks
+  // the "same field in Values + in Filters" flow: user drags `cena s
+  // DPH` to Values, then drags the SAME palette entry to Filters to
+  // exclude outliers. The mutex logic in addToZone still prevents
+  // duplicates in Rows / Cols / Values themselves.
   return (
     <div
-      draggable={!used}
+      draggable
       onDragStart={(e) => {
-        if (used) { e.preventDefault(); return; }
         e.dataTransfer.effectAllowed = "move";
         e.dataTransfer.setData("text/plain", field.key);
         onDragStart();
       }}
-      title={used ? "Už v jednej zo zón" : "Potiahni do Riadky / Hodnoty / Filtre"}
+      title={used
+        ? "Už v niektorej zóne · potiahni do Filtrov pre coexistenciu"
+        : "Potiahni do Riadky / Stĺpce / Hodnoty / Filtre"}
       style={{
         display: "flex", alignItems: "center", gap: "0.45rem",
         padding: "0.32rem 0.55rem", borderRadius: 4,
-        color: used ? "#4a4a55" : text, fontSize: "0.78rem",
-        cursor: used ? "not-allowed" : "grab", userSelect: "none",
+        color: used ? "#8a8a96" : text, fontSize: "0.78rem",
+        cursor: "grab", userSelect: "none",
         borderLeft: "2px solid transparent", transition: "background 0.1s, border-color 0.1s",
       }}
       onMouseEnter={(e) => {
-        if (used) return;
         e.currentTarget.style.background = panelHi;
         e.currentTarget.style.borderLeftColor = green;
       }}
@@ -1340,11 +1358,11 @@ function PaletteField({ field, used, onDragStart }) {
         e.currentTarget.style.borderLeftColor = "transparent";
       }}
     >
-      <span style={{ fontFamily: mono, fontSize: "0.62rem", width: 16, textAlign: "center", color: typeColor, opacity: used ? 0.35 : 1, fontWeight: 700 }}>
+      <span style={{ fontFamily: mono, fontSize: "0.62rem", width: 16, textAlign: "center", color: typeColor, opacity: used ? 0.45 : 1, fontWeight: 700 }}>
         {typeBadge}
       </span>
       <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{field.label}</span>
-      {used && <span style={{ fontFamily: mono, fontSize: "0.58rem", color: dim, opacity: 0.6 }}>✓</span>}
+      {used && <span style={{ fontFamily: mono, fontSize: "0.58rem", color: green, opacity: 0.65 }} title="Už použité inde">✓</span>}
     </div>
   );
 }

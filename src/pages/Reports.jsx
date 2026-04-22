@@ -270,14 +270,13 @@ function ReportHeader({ projects, flats, lang, scope, scopeLabel }) {
     <div style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 12, padding: "1.5rem 1.75rem", marginBottom: "1rem" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem", flexWrap: "wrap" }}>
         <div>
-          <div style={{ fontFamily: mono, fontSize: "0.62rem", color: dim, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.4rem" }}>
-            Residata · {lang === "sk" ? "Report" : "Report"} · {scopeName}
-            {scopeLabelDisplay && <span style={{ color: text, marginLeft: "0.25rem" }}>: {scopeLabelDisplay}</span>}
+          <div style={{ fontSize: "0.78rem", color: dim, marginBottom: "0.3rem" }}>
+            {scopeName}{scopeLabelDisplay && <span style={{ color: text }}> · {scopeLabelDisplay}</span>}
           </div>
           <h2 style={{ fontSize: "1.6rem", fontWeight: 700, color: text, margin: 0, letterSpacing: "-0.02em", textTransform: "capitalize" }}>
             {month}
           </h2>
-          <p style={{ color: dim, fontSize: "0.82rem", margin: "0.4rem 0 0", fontFamily: mono }}>
+          <p style={{ color: dim, fontSize: "0.82rem", margin: "0.4rem 0 0" }}>
             {lang === "sk" ? "Dáta k" : "Data as of"} {lastSync} · {projects.length} {lang === "sk" ? "projektov" : "projects"} · {flats.length} {lang === "sk" ? "bytov" : "units"}
           </p>
         </div>
@@ -623,9 +622,14 @@ function ProjectReport({ project, flats, siblings, lang }) {
    Shared report primitives
    ══════════════════════════════════════════════════════════════════ */
 function ReportSection({ label, title, children }) {
+  // One-line subtitle in muted gray above the H3 — previously a loud
+  // small-caps green uppercase badge, which made every section scream
+  // for attention. Now reads as a calm eyebrow.
   return (
     <div className="report-section" style={{ marginBottom: "2rem" }}>
-      <div style={{ fontFamily: mono, fontSize: "0.62rem", color: green, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.5rem" }}>{label}</div>
+      {label && (
+        <div style={{ fontSize: "0.72rem", color: dim, marginBottom: "0.2rem" }}>{label}</div>
+      )}
       <h3 style={{ fontSize: "1.1rem", fontWeight: 600, color: text, margin: "0 0 0.75rem", letterSpacing: "-0.01em" }}>{title}</h3>
       {children}
     </div>
@@ -649,7 +653,7 @@ function KpiStrip({ summary, lang, extra = [] }) {
     <div className="rep-kpi-strip" style={{ display: "grid", gridTemplateColumns: `repeat(auto-fit, minmax(130px, 1fr))`, gap: "0.5rem", marginBottom: "1.25rem" }}>
       {items.map((k, i) => (
         <div key={i} style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8, padding: "0.65rem 0.9rem" }}>
-          <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.3rem" }}>{k.label}</div>
+          <div style={{ fontSize: "0.7rem", color: dim, marginBottom: "0.2rem" }}>{k.label}</div>
           <div className="report-accent" style={{ fontSize: "1.15rem", fontWeight: 700, color: k.color || text }}>{k.value}</div>
         </div>
       ))}
