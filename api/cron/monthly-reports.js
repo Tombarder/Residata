@@ -118,15 +118,20 @@ export default async function handler(req, res) {
   });
 }
 
-/* ─── Scope filter (mirrors Reports.jsx) ─── */
+/* ─── Scope filter (mirrors Reports.jsx) ───
+   Accepts both English and Slovak scope keys — the UI tab uses Slovak
+   ("mesto","cast","projekt") but we also accept the English variants
+   for backwards-compat + future API callers. */
 function filterByScope(projects, scope, label) {
-  if (!scope || scope === "market") return projects;
-  if (scope === "developer") return projects.filter(p => p.developer === label);
-  if (scope === "district")  return projects.filter(p => p.district === label);
-  if (scope === "city") {
+  const s = String(scope || "").toLowerCase();
+  if (!s || s === "market" || s === "trh") return projects;
+  if (s === "developer") return projects.filter(p => p.developer === label);
+  if (s === "district" || s === "cast" || s === "cast mesta")
+    return projects.filter(p => p.district === label);
+  if (s === "city" || s === "mesto")
     return projects.filter(p => inferCity(p.district) === label || p.city === label);
-  }
-  if (scope === "project")   return projects.filter(p => p.id === label);
+  if (s === "project" || s === "projekt")
+    return projects.filter(p => p.id === label);
   return projects;
 }
 function inferCity(district) {
@@ -143,8 +148,14 @@ function inferCity(district) {
   return s;
 }
 function scopeTitle(scope, lang) {
-  const sk = { market: "Trh", city: "Mesto", district: "Časť mesta", developer: "Developer", project: "Projekt" };
-  return sk[scope] || scope;
+  const sk = {
+    market: "Trh", trh: "Trh",
+    city: "Mesto", mesto: "Mesto",
+    district: "Časť mesta", cast: "Časť mesta", "cast mesta": "Časť mesta",
+    developer: "Developer",
+    project: "Projekt", projekt: "Projekt",
+  };
+  return sk[String(scope || "").toLowerCase()] || scope || "";
 }
 function capitalize(s) { return s ? s[0].toUpperCase() + s.slice(1) : s; }
 
