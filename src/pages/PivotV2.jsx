@@ -1131,7 +1131,11 @@ function ChipInZone({ label, type, agg, filter, level, onDragStart, onDragStartP
             : (<span style={{ fontStyle: "italic", opacity: 0.7 }}> · klikni pre nastavenie</span>)}
         </span>
       )}
-      {agg != null && onChangeAgg && (
+      {/* Agg picker. Hidden for measure fields (single fixed calculation,
+          no alternative aggs to choose from — the dropdown would be a
+          one-item menu). For measures we still show a small static label
+          so the user sees what's computed. */}
+      {agg != null && onChangeAgg && aggs.length > 1 && (
         <>
           <span style={{ color: dim, opacity: 0.5, fontSize: "0.58rem" }}>·</span>
           <button

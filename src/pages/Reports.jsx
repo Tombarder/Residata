@@ -236,13 +236,22 @@ export default function PlatformReports({ lang = "sk" }) {
 function ReportHeader({ projects, flats, lang, scope, scopeLabel }) {
   const month = new Date().toLocaleDateString(lang === "sk" ? "sk-SK" : "en-US", { month: "long", year: "numeric" });
   const lastSync = projects[0]?.last_updated?.slice(0, 10) || new Date().toISOString().slice(0, 10);
-  const scopeLabel = SCOPES.find(s => s.key === scope)?.label[lang] || "";
+  // Display name of the scope tab ("Trh", "Mesto", "Projekt", …).
+  const scopeName = SCOPES.find(s => s.key === scope)?.label[lang] || "";
+  // For Project scope, scopeLabel is a UUID — resolve to human name for
+  // the crumb. For other scopes, it's already the human label.
+  let scopeLabelDisplay = scopeLabel;
+  if (scope === "projekt" && scopeLabel) {
+    const p = projects.find(pp => pp.id === scopeLabel);
+    if (p) scopeLabelDisplay = p.name;
+  }
   return (
     <div style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 12, padding: "1.5rem 1.75rem", marginBottom: "1rem" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem", flexWrap: "wrap" }}>
         <div>
           <div style={{ fontFamily: mono, fontSize: "0.62rem", color: dim, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.4rem" }}>
-            Residata · {lang === "sk" ? "Report" : "Report"} · {scopeLabel}
+            Residata · {lang === "sk" ? "Report" : "Report"} · {scopeName}
+            {scopeLabelDisplay && <span style={{ color: text, marginLeft: "0.25rem" }}>: {scopeLabelDisplay}</span>}
           </div>
           <h2 style={{ fontSize: "1.6rem", fontWeight: 700, color: text, margin: 0, letterSpacing: "-0.02em", textTransform: "capitalize" }}>
             {month}
@@ -655,6 +664,85 @@ function ExecSummary({ summary, lang, extraDistrict, compared }) {
   );
 }
 
+/* Strip the lightweight markdown Claude occasionally produces (despite
+   the system prompt telling it not to) and render as proper paragraphs.
+   Kept deliberately narrow — don't try to be a full markdown parser:
+     · `# H1`, `## H2`, `### H3` at line start → bolded paragraph
+     · `**bold**`, `__bold__` → <strong>
+     · `*italic*`, `_italic_` → <em>
+     · `- ` / `* ` list items → bulleted <li>
+     · blank line → paragraph break
+
+   Any other markdown (code blocks, tables, links) renders as plain text.
+   This is XSS-safe because we build React elements — never set
+   innerHTML. */
+function AiParagraphs({ text }) {
+  // Split into blocks by blank lines
+  const blocks = String(text || "").split(/\n\s*\n/).map(b => b.trim()).filter(Boolean);
+  return (
+    <div style={{ color: "#c4c4cc", fontSize: "0.88rem", lineHeight: 1.65 }}>
+      {blocks.map((b, i) => renderAiBlock(b, i))}
+    </div>
+  );
+}
+function renderAiBlock(b, key) {
+  // Heading at start of block
+  const h = b.match(/^(#{1,4})\s+(.*)$/m);
+  if (h && b.split("\n")[0].startsWith("#")) {
+    const rest = b.replace(/^(#{1,4})\s+.*(\n|$)/, "").trim();
+    return (
+      <div key={key} style={{ marginBottom: "0.85rem" }}>
+        <div style={{ fontWeight: 700, color: text, fontSize: "0.92rem", marginBottom: rest ? "0.3rem" : 0 }}>
+          {renderInline(h[2])}
+        </div>
+        {rest && <div>{renderInline(rest)}</div>}
+      </div>
+    );
+  }
+  // Bulleted list
+  const lines = b.split("\n");
+  if (lines.every(l => /^\s*[-*]\s+/.test(l))) {
+    return (
+      <ul key={key} style={{ margin: "0 0 0.85rem", paddingLeft: "1.25rem" }}>
+        {lines.map((l, j) => <li key={j} style={{ marginBottom: "0.25rem" }}>{renderInline(l.replace(/^\s*[-*]\s+/, ""))}</li>)}
+      </ul>
+    );
+  }
+  return <p key={key} style={{ margin: "0 0 0.85rem" }}>{renderInline(b)}</p>;
+}
+// Inline markdown → array of React nodes. Handles nested ** and * via
+// token sweep. Order matters: **x** before *x*.
+function renderInline(s) {
+  const out = [];
+  let remaining = String(s).replace(/\n/g, " ");
+  let k = 0;
+  const patterns = [
+    { re: /\*\*(.+?)\*\*/,   tag: "strong" },
+    { re: /__([^_]+)__/,     tag: "strong" },
+    { re: /\*([^*\n]+)\*/,   tag: "em" },
+    { re: /(?<![a-z0-9])_([^_\n]+)_(?![a-z0-9])/i, tag: "em" },
+  ];
+  while (remaining) {
+    let earliest = null, earliestMatch = null;
+    for (const p of patterns) {
+      const m = remaining.match(p.re);
+      if (m && (earliest == null || m.index < earliest)) {
+        earliest = m.index; earliestMatch = { m, tag: p.tag };
+      }
+    }
+    if (!earliestMatch) {
+      out.push(remaining);
+      break;
+    }
+    if (earliest > 0) out.push(remaining.slice(0, earliest));
+    const { m, tag } = earliestMatch;
+    const Tag = tag;
+    out.push(<Tag key={k++} style={tag === "strong" ? { color: text, fontWeight: 700 } : {}}>{m[1]}</Tag>);
+    remaining = remaining.slice(earliest + m[0].length);
+  }
+  return out;
+}
+
 /* ─── AI summary — calls /api/ai/summary. Handles no-key gracefully ─── */
 function AiSummaryBlock({ context, lang }) {
   const [status, setStatus] = useState("idle"); // idle | loading | ok | err | missing_key
@@ -706,14 +794,26 @@ function AiSummaryBlock({ context, lang }) {
         </div>
       )}
       {status === "loading" && (
-        <div style={{ color: dim, fontSize: "0.82rem", fontFamily: mono }}>{lang === "sk" ? "AI píše zhrnutie…" : "AI drafting…"}</div>
+        <div style={{ color: dim, fontSize: "0.82rem", fontFamily: mono, display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <span aria-hidden style={{
+            display: "inline-block", width: 10, height: 10, borderRadius: "50%",
+            background: green, animation: "pv2-pulse 1s ease-in-out infinite",
+          }} />
+          {lang === "sk" ? "AI píše zhrnutie…" : "AI drafting…"}
+          <style>{`
+            @keyframes pv2-pulse {
+              0%, 100% { opacity: 0.35; transform: scale(0.9); }
+              50%      { opacity: 1;    transform: scale(1.1); }
+            }
+          `}</style>
+        </div>
       )}
       {status === "ok" && text && (
         <div>
           <div style={{ fontFamily: mono, fontSize: "0.6rem", color: green, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.4rem" }}>
             ✨ AI {lang === "sk" ? "zhrnutie" : "summary"}
           </div>
-          <div style={{ color: "#c4c4cc", fontSize: "0.88rem", lineHeight: 1.65, whiteSpace: "pre-wrap" }}>{text}</div>
+          <AiParagraphs text={text} />
           <div className="no-print" style={{ marginTop: "0.4rem", fontFamily: mono, fontSize: "0.6rem", color: dim }}>
             {lang === "sk" ? "AI môže robiť chyby — čísla vyššie sú zdrojom pravdy." : "AI can err — the numbers above are the source of truth."}
           </div>
@@ -1065,7 +1165,9 @@ function groupAggregates(projects, key, lang) {
     .map(([name, ps]) => ({ name, ...summariseProjects(ps) }))
     .sort((a, b) => b.totalUnits - a.totalUnits);
 }
-/* Group aggregates from raw flats (for Project report's by-izby/typ/poschodie) */
+/* Group aggregates from raw flats (for Project report's by-izby/typ/poschodie).
+   For numeric-looking keys (izby, poschodie) we sort numerically so
+   1,2,3,4,10 doesn't come back as 1,10,2,3,4. */
 function groupAggregatesFromFlats(flats, key) {
   const buckets = {};
   for (const f of flats) {
@@ -1081,6 +1183,9 @@ function groupAggregatesFromFlats(flats, key) {
     }
     return sm > 0 ? sp / sm : null;
   };
+  // Numeric keys (izby, poschodie) should sort naturally (1, 2, 3, 10) —
+  // otherwise string sort gives the Excel-y 1, 10, 11, 2 pattern.
+  const isNumeric = ["izby", "poschodie"].includes(key);
   return Object.entries(buckets)
     .map(([name, rows]) => {
       const sold = rows.filter(r => (r.stav || "").trim().toUpperCase() === "P").length;
@@ -1092,7 +1197,17 @@ function groupAggregatesFromFlats(flats, key) {
         wavgM2: sumPriceM2(rows),
       };
     })
-    .sort((a, b) => b.totalUnits - a.totalUnits);
+    .sort((a, b) => {
+      if (isNumeric) {
+        const na = parseFloat(a.name), nb = parseFloat(b.name);
+        // NaN names (like "(—)") drop to the end regardless of direction
+        if (Number.isNaN(na) && Number.isNaN(nb)) return 0;
+        if (Number.isNaN(na)) return 1;
+        if (Number.isNaN(nb)) return -1;
+        return na - nb;
+      }
+      return b.totalUnits - a.totalUnits;
+    });
 }
 /* Price distribution — bin units by €/m² */
 function priceDistribution(flats, nBins) {

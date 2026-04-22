@@ -109,11 +109,20 @@ export default async function handler(req, res) {
     }
   }
 
+  // Prune old ai_usage_log rows (retention 90 days). Best-effort — a
+  // prune failure shouldn't affect the email delivery report.
+  let pruned = null;
+  try {
+    const { data, error } = await admin.rpc("prune_ai_usage_log", { retention_days: 90 });
+    if (!error) pruned = data;
+  } catch (_) { /* ignore */ }
+
   return res.status(200).json({
     month,
     subscribers: subs?.length || 0,
     sent_ok:   results.filter(r => r.ok).length,
     sent_fail: results.filter(r => !r.ok).length,
+    pruned_usage_rows: pruned,
     results,
   });
 }
@@ -185,18 +194,32 @@ function summariseProjects(projects) {
   };
 }
 
+/* HTML-escape user-supplied strings so project names / districts / emails
+   that happen to contain < > & " ' don't break the email markup or
+   inject active content. Keep this tight — the email is inline-styled
+   HTML rendered by Gmail/Outlook; any stray quote breaks layout. */
+function escHtml(s) {
+  if (s == null) return "";
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 /* ─── Email HTML template ─── */
 function renderReportEmailHtml({ subscriberEmail, month, scope, scopeLabel, summary, webUrl, lang }) {
   const fmt = (n) => n == null ? "—" : Math.round(n).toLocaleString("sk-SK");
-  const title = scopeLabel ? `${scopeTitle(scope)} · ${scopeLabel}` : scopeTitle(scope);
-  const cap = capitalize(month);
+  const title = scopeLabel ? `${escHtml(scopeTitle(scope))} · ${escHtml(scopeLabel)}` : escHtml(scopeTitle(scope));
+  const cap = escHtml(capitalize(month));
 
   const topList = summary.topSellers.length
-    ? summary.topSellers.map(p => `<li style="margin:4px 0"><strong style="color:${textLight}">${p.name}</strong> <span style="color:${textDim}">(${p.district || "—"})</span> — <span style="color:${green};font-weight:700">+${p.sold_last_month}</span> predaných</li>`).join("")
+    ? summary.topSellers.map(p => `<li style="margin:4px 0"><strong style="color:${textLight}">${escHtml(p.name)}</strong> <span style="color:${textDim}">(${escHtml(p.district || "—")})</span> — <span style="color:${green};font-weight:700">+${p.sold_last_month}</span> predaných</li>`).join("")
     : `<li style="color:${textDim};list-style:none">Žiadne predajné dáta za posledný mesiac.</li>`;
 
   const soldOutList = summary.soldOutWatch.length
-    ? summary.soldOutWatch.map(p => `<li style="margin:4px 0"><strong style="color:${textLight}">${p.name}</strong> — <span style="color:#ff6b6b;font-weight:700">${Math.round(p.sold_percentage)}%</span> predané, ${p.available_units} zostáva</li>`).join("")
+    ? summary.soldOutWatch.map(p => `<li style="margin:4px 0"><strong style="color:${textLight}">${escHtml(p.name)}</strong> — <span style="color:#ff6b6b;font-weight:700">${Math.round(p.sold_percentage)}%</span> predané, ${p.available_units} zostáva</li>`).join("")
     : `<li style="color:${textDim};list-style:none">Nikto nad 85%.</li>`;
 
   return `<!DOCTYPE html>
@@ -243,7 +266,7 @@ function renderReportEmailHtml({ subscriberEmail, month, scope, scopeLabel, summ
     </div>
   </div>
   <div style="margin-top:24px;font-size:11px;color:#55555f;text-align:center;line-height:1.6">
-    Dostávaš tento mesačný e-mail pretože si sa prihlásil na ${subscriberEmail}.
+    Dostávaš tento mesačný e-mail pretože si sa prihlásil na ${escHtml(subscriberEmail)}.
     <br/>Residata · <a href="${webUrl}" style="color:#55555f">${webUrl}</a>
   </div>
 </div>

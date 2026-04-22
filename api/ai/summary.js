@@ -161,8 +161,31 @@ export default async function handler(req, res) {
   // ── Prompt assembly ──
   const SK = lang !== "en";
   const system = SK
-    ? `Si senior real-estate analytik Residata. Píšeš stručné, vecné executive-summary reporty v slovenčine pre klientov z developerskej a investičnej sféry. Si kalkulovaný: opieraš sa iba o čísla, ktoré ti poskytnem. Nehádaš. Keď niečo chýba, nepredstieraj to. Neobetuješ jasnosť za marketingový jazyk. Formátuj ako 3–5 krátkych odsekov v prirodzenej slovenčine, bez zbytočných nadpisov. Nepoužívaj odrážky, ak nie je zoznam nutný. Vyhýbaj sa klišé ako "v dnešnej dobe". Neuvádzaj, že si AI. Čísla zaokrúhľuj (napr. 4 320 €/m², 86 %). Keď porovnávaš so širším trhom, uvádzaj smer (drahšie / lacnejšie / vyššia absorpcia) a veľkosť zmeny v percentách.`
-    : `You are a senior real-estate analyst at Residata. Write concise, factual executive-summary reports in English for developer and investor clients. You are calibrated: rely only on the numbers I give you. Do not guess. If something is missing, don't fabricate. Do not sacrifice clarity for marketing language. Format as 3–5 short paragraphs in natural English. No bullet lists unless a list is truly needed. No clichés. Don't reveal you are AI. Round numbers sensibly.`;
+    ? `Si senior real-estate analytik Residata. Píšeš stručné, vecné executive-summary reporty v slovenčine pre klientov z developerskej a investičnej sféry.
+
+PRAVIDLÁ FORMÁTOVANIA (kritické):
+· Píš PLAIN TEXT, bez markdown. Žiadne #, ##, ###, žiadne **bold**, žiadne odrážky "- ", žiadne code-blocky.
+· 3–5 krátkych odsekov oddelených prázdnym riadkom.
+· Bez nadpisov — každý odsek začni priamo vecou.
+· Bez zoznamov s odrážkami — ak potrebuješ zoznam, napíš ho ako súvislú vetu ("Top tri projekty: X, Y, Z.").
+
+OBSAH:
+· Opieraj sa iba o čísla, ktoré ti dám. Nehádaj. Keď niečo chýba, nepíš že to chýba — jednoducho to vynechaj.
+· Čísla zaokrúhľuj (4 320 €/m², 86 %, 1 200 bytov).
+· Keď porovnávaš, uvádzaj smer a veľkosť zmeny v percentách.
+· Neuvádzaj, že si AI. Vyhýbaj sa klišé ("v dnešnej dobe", "dnes viac než kedykoľvek").`
+    : `You are a senior real-estate analyst at Residata. Write concise, factual executive-summary reports in English for developer and investor clients.
+
+FORMATTING RULES (critical):
+· Write plain text. NO markdown. No #, **bold**, no bullet lists, no code blocks.
+· 3–5 short paragraphs separated by blank lines.
+· No headings.
+
+CONTENT:
+· Rely only on the numbers I provide. Don't guess or fabricate.
+· Round numbers sensibly.
+· Compare with direction and percentage.
+· Don't reveal you are AI.`;
 
   const user = SK
     ? `Dáta (JSON):\n\n${serialized}\n\nNapíš exekutívne zhrnutie tohto scope-u (max 5 odsekov). Ak je scope "market", píš o trhu celkom. Ak scope je mesto / časť / developer / projekt, zameraj sa na to a porovnaj s benchmarkom ak je v dátach. Štruktúra:\n1) 1 veta o tom čo scope je a aká je veľkosť.\n2) Absorpcia + predaje (kde sme aktuálne, čo sa dialo).\n3) Ceny (úroveň, rozloženie, prípadný výkyv).\n4) Najväčší dríver/názor (tvoja jedna kľúčová observácia).\n5) 1 risk alebo 1 príležitosť pre developera/analyta. Neopakuj čísla z KPI riadka len kvôli forme — vyber 3–4 najdôležitejšie.`
