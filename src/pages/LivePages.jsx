@@ -1407,8 +1407,8 @@ function ColumnAutofilter({ column, anchorEl, allValues, filter, onApply, onClea
       style={{
         ...style,
         width: 300,
-        background: "#0e0e10", border: `1px solid ${green}66`, borderRadius: 8,
-        boxShadow: "0 20px 40px rgba(0,0,0,0.7)",
+        background: "#0b0b0e", border: `1px solid ${green}`, borderRadius: 8,
+        boxShadow: "0 20px 48px rgba(0,0,0,0.9), 0 0 0 1px rgba(0,229,160,0.12)",
         padding: "0.7rem", fontFamily: "inherit", color: "#e8e8ed",
       }}
     >
@@ -2237,10 +2237,10 @@ function StyledSelect({ value, onChange, options, style = {}, disabled = false, 
             left: 0,
             minWidth: "100%",
             maxWidth: "min(420px, 85vw)",
-            background: "#0a0a0b",
-            border: `1px solid ${green}55`,
+            background: "#0b0b0e",
+            border: `1px solid ${green}`,
             borderRadius: 6,
-            boxShadow: "0 12px 32px rgba(0,0,0,0.75)",
+            boxShadow: "0 20px 48px rgba(0,0,0,0.9), 0 0 0 1px rgba(0,229,160,0.12)",
             maxHeight: 280,
             overflowY: "auto",
             zIndex: 500,
@@ -2393,10 +2393,10 @@ function AutocompleteInput({ value, onChange, suggestions, placeholder, lang }) 
             position: "absolute",
             top: "calc(100% + 4px)",
             left: 0, right: 0,
-            background: "#0a0a0b",
-            border: `1px solid ${green}55`,
+            background: "#0b0b0e",
+            border: `1px solid ${green}`,
             borderRadius: 6,
-            boxShadow: "0 12px 32px rgba(0,0,0,0.75)",
+            boxShadow: "0 20px 48px rgba(0,0,0,0.9), 0 0 0 1px rgba(0,229,160,0.12)",
             maxHeight: 240,
             overflowY: "auto",
             zIndex: 600,
@@ -2483,11 +2483,14 @@ function FilterRow({ f, projects, lang, t, onChange, onRemove }) {
   const incomplete = isIncompleteFilter(f);
 
   return (
+    /* NOTE: we deliberately do NOT use CSS `opacity` on this container to
+       signal "inactive" — `opacity` cascades to descendants, and the
+       StyledSelect popups render inside this row, so the whole dropdown
+       became translucent when the filter was inactive. Visual cue moved to
+       the inactive/active badge + dim text color instead. */
     <div style={{
       display: "grid", gridTemplateColumns: "minmax(140px, 180px) minmax(90px, 120px) 1fr auto 28px",
       gap: "0.4rem", alignItems: "center",
-      opacity: incomplete ? 0.75 : 1,
-      transition: "opacity 0.15s",
     }}>
       {/* Column */}
       <StyledSelect
