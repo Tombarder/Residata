@@ -26,7 +26,7 @@
  * the button is disabled with a helpful hint.
  */
 import { useState, useMemo, useEffect } from "react";
-import { useProjects, useAllFlats } from "../lib/useData";
+import { useProjects, useAllFlats, useProjectSnapshots } from "../lib/useData";
 
 // ── Visual language (mirrors Platform.jsx) ───────────────────────
 const mono = "'JetBrains Mono', monospace";
@@ -211,8 +211,16 @@ function ReportHeader({ projects, flats, lang, scope }) {
           </p>
         </div>
         <div className="no-print" style={{ display: "flex", gap: "0.5rem" }}>
+          <button onClick={() => downloadScopeCSV(projects, flats, lang)}
+            style={{
+              background: "transparent", color: green, border: `1px solid ${green}55`,
+              borderRadius: 4, padding: "0.5rem 0.9rem", fontFamily: mono,
+              fontSize: "0.78rem", fontWeight: 700, cursor: "pointer",
+            }}>
+            ⬇ CSV
+          </button>
           <button onClick={() => window.print()} className="btn-p" style={{ fontSize: "0.78rem", padding: "0.5rem 0.9rem" }}>
-            🖨  {lang === "sk" ? "Stiahnuť PDF" : "Save as PDF"}
+            🖨 {lang === "sk" ? "Stiahnuť PDF" : "Save as PDF"}
           </button>
         </div>
       </div>
@@ -258,6 +266,7 @@ function PickerRow({ label, value, options, onChange }) {
    Market report — global, "where the Slovak new-build market stands"
    ══════════════════════════════════════════════════════════════════ */
 function MarketReport({ projects, flats, lang }) {
+  const { snapshots } = useProjectSnapshots();
   const summary = useMemo(() => summariseProjects(projects), [projects]);
   const priceSeries = useMemo(() => priceDistribution(flats, 12), [flats]);
   const districts = useMemo(() => groupAggregates(projects, "district", lang), [projects, lang]);
@@ -291,6 +300,12 @@ function MarketReport({ projects, flats, lang }) {
         <TopSellerList projects={projects} lang={lang} />
       </ReportSection>
 
+      {snapshots && snapshots.length > 0 && (
+        <ReportSection label={lang === "sk" ? "Historický trend" : "Historical trend"} title={lang === "sk" ? "Vývoj po mesiacoch" : "Month-by-month"}>
+          <TrendChart snapshots={snapshots} scopePredicate={null} lang={lang} />
+        </ReportSection>
+      )}
+
       <FooterCard lang={lang} />
     </>
   );
@@ -302,11 +317,13 @@ function MarketReport({ projects, flats, lang }) {
           `projects` + `flats` are already filtered to that slice.
    ══════════════════════════════════════════════════════════════════ */
 function FilteredReport({ scopeLabel, scopeType, projects, flats, allProjects, lang, breakdownBy, breakdownLabel }) {
+  const { snapshots } = useProjectSnapshots();
   const summary = useMemo(() => summariseProjects(projects), [projects]);
   const globalSummary = useMemo(() => summariseProjects(allProjects), [allProjects]);
   const priceSeries = useMemo(() => priceDistribution(flats, 12), [flats]);
   const breakdown = useMemo(() => groupAggregates(projects, breakdownBy, lang), [projects, breakdownBy, lang]);
   const siblings = useMemo(() => groupAggregates(allProjects, breakdownBy === "developer" ? "district" : "developer", lang).slice(0, 6), [allProjects, breakdownBy, lang]);
+  const scopeProjectIds = useMemo(() => new Set(projects.map(p => p.id)), [projects]);
 
   if (projects.length === 0) {
     return (
@@ -348,6 +365,12 @@ function FilteredReport({ scopeLabel, scopeType, projects, flats, allProjects, l
         <ProjectTable projects={projects} lang={lang} />
       </ReportSection>
 
+      {snapshots && snapshots.length > 0 && (
+        <ReportSection label={lang === "sk" ? "Historický trend" : "Historical trend"} title={lang === "sk" ? `Vývoj v scope: ${scopeLabel}` : `Trend in scope: ${scopeLabel}`}>
+          <TrendChart snapshots={snapshots} scopePredicate={(s) => scopeProjectIds.has(s.project_id)} lang={lang} />
+        </ReportSection>
+      )}
+
       <FooterCard lang={lang} />
     </>
   );
@@ -357,13 +380,12 @@ function FilteredReport({ scopeLabel, scopeType, projects, flats, allProjects, l
    Project report — single-project deep dive.
    ══════════════════════════════════════════════════════════════════ */
 function ProjectReport({ project, flats, siblings, lang }) {
-  if (!project) {
-    return <div style={{ color: dim, padding: "2rem" }}>{lang === "sk" ? "Nevybraný projekt." : "No project selected."}</div>;
-  }
-
-  const summary = useMemo(() => summariseProjects([project]), [project]);
+  // Hoist all hooks before any early return to keep hook ordering stable
+  // across renders (rules-of-hooks).
+  const { snapshots } = useProjectSnapshots();
+  const summary = useMemo(() => project ? summariseProjects([project]) : null, [project]);
   const districtSiblings = useMemo(
-    () => siblings.filter(p => p.district === project.district && p.id !== project.id),
+    () => project ? siblings.filter(p => p.district === project.district && p.id !== project.id) : [],
     [siblings, project]
   );
   const districtSummary = useMemo(() => summariseProjects(districtSiblings), [districtSiblings]);
@@ -371,6 +393,10 @@ function ProjectReport({ project, flats, siblings, lang }) {
   const byIzby = useMemo(() => groupAggregatesFromFlats(flats, "izby"), [flats]);
   const byPoschodie = useMemo(() => groupAggregatesFromFlats(flats, "poschodie"), [flats]);
   const priceSeries = useMemo(() => priceDistribution(flats, 10), [flats]);
+
+  if (!project) {
+    return <div style={{ color: dim, padding: "2rem" }}>{lang === "sk" ? "Nevybraný projekt." : "No project selected."}</div>;
+  }
 
   const title = project.name;
   const aiCtx = buildAiContext({
@@ -428,6 +454,12 @@ function ProjectReport({ project, flats, siblings, lang }) {
       <ReportSection label={lang === "sk" ? "Benchmark" : "Benchmark"} title={lang === "sk" ? `Projekt vs. časť mesta (${project.district || "—"})` : `Project vs. its district (${project.district || "—"})`}>
         <BenchmarkCard local={summary} global={districtSummary} scopeLabel={project.name} lang={lang} />
       </ReportSection>
+
+      {snapshots && snapshots.length > 0 && (
+        <ReportSection label={lang === "sk" ? "Historický trend" : "Historical trend"} title={lang === "sk" ? `Vývoj projektu ${project.name}` : `Trend of ${project.name}`}>
+          <TrendChart snapshots={snapshots} scopePredicate={(s) => s.project_id === project.id} lang={lang} />
+        </ReportSection>
+      )}
 
       <FooterCard lang={lang} />
     </>
@@ -733,6 +765,71 @@ function ProjectTable({ projects, lang }) {
   );
 }
 
+/* ─── Historical trend — sparkline from project_snapshots ─── */
+function TrendChart({ snapshots, scopePredicate, lang }) {
+  // Group by snapshot_month, compute total units + sold + avail + wavg per month
+  const byMonth = {};
+  for (const s of snapshots) {
+    if (scopePredicate && !scopePredicate(s)) continue;
+    const m = s.snapshot_month;
+    if (!m) continue;
+    (byMonth[m] = byMonth[m] || []).push(s);
+  }
+  const months = Object.keys(byMonth).sort();
+  if (months.length < 2) {
+    return (
+      <div style={{ color: dim, fontSize: "0.82rem", padding: "0.5rem 0", fontStyle: "italic" }}>
+        {lang === "sk" ? "Historická séria zatiaľ obsahuje jeden mesiac — trend bude viditeľný po ďalšom behu." : "Historical series has only one month — trend emerges after the next run."}
+      </div>
+    );
+  }
+  const series = months.map(m => {
+    const rows = byMonth[m];
+    const totalUnits = rows.reduce((a, r) => a + (r.total_units || 0), 0);
+    const sold       = rows.reduce((a, r) => a + (r.sold_units || 0), 0);
+    const avail      = rows.reduce((a, r) => a + (r.available_units || 0), 0);
+    const priced = rows.filter(r => r.avg_price_eur_m2 && (r.total_units || 0) > 0);
+    const wavg = priced.length
+      ? priced.reduce((a, r) => a + r.avg_price_eur_m2 * r.total_units, 0) /
+        priced.reduce((a, r) => a + r.total_units, 0)
+      : null;
+    return { m, totalUnits, sold, avail, wavg };
+  });
+  const maxUnits = Math.max(...series.map(s => s.totalUnits), 1);
+  return (
+    <div style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8, padding: "0.85rem 1rem" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.78rem" }}>
+        <thead>
+          <tr style={{ color: dim, fontFamily: mono, fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.08em", textAlign: "left" }}>
+            <th style={tdh}>{lang === "sk" ? "Mesiac" : "Month"}</th>
+            <th style={tdhR}>{lang === "sk" ? "Bytov"    : "Units"}</th>
+            <th style={tdhR}>{lang === "sk" ? "Voľných"  : "Available"}</th>
+            <th style={tdhR}>{lang === "sk" ? "Predaných" : "Sold"}</th>
+            <th style={tdhR}>€/m²</th>
+            <th style={{ ...tdh, minWidth: 80 }}>{lang === "sk" ? "Trend" : "Trend"}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {series.map((s, i) => (
+            <tr key={s.m} style={{ borderTop: i > 0 ? `1px solid ${border}` : "none" }}>
+              <td style={tdc}>{s.m}</td>
+              <td style={tdcR}>{s.totalUnits.toLocaleString("en-US").replace(/,/g, " ")}</td>
+              <td style={{ ...tdcR, color: green }}>{s.avail.toLocaleString("en-US").replace(/,/g, " ")}</td>
+              <td style={{ ...tdcR, color: orange }}>{s.sold.toLocaleString("en-US").replace(/,/g, " ")}</td>
+              <td style={tdcR}>{s.wavg ? Math.round(s.wavg).toLocaleString("en-US").replace(/,/g, " ") : "—"}</td>
+              <td style={{ ...tdc, padding: "0.35rem 0.75rem" }}>
+                <div style={{ position: "relative", height: 8, background: bg, border: `1px solid ${border}`, borderRadius: 2 }}>
+                  <div style={{ position: "absolute", inset: 0, width: `${(s.totalUnits / maxUnits) * 100}%`, background: `linear-gradient(90deg, ${green}33, ${green})`, borderRadius: 2 }} />
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 /* ─── Top-seller list (Market scope) ─── */
 function TopSellerList({ projects, lang }) {
   const tops = [...projects]
@@ -862,6 +959,31 @@ function priceDistribution(flats, nBins) {
   }
   return bins;
 }
+/* CSV download for the current scope — project-level. */
+function downloadScopeCSV(projects, flats, lang) {
+  const headers = [
+    "id", "name", "developer", "city", "district",
+    "total_units", "available_units", "sold_units", "sold_last_month", "sold_percentage",
+    "avg_price_eur_m2", "min_price", "max_price", "last_updated",
+  ];
+  const esc = (v) => {
+    if (v == null) return "";
+    const s = String(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const lines = [headers.join(",")];
+  for (const p of projects) lines.push(headers.map(h => esc(p[h])).join(","));
+  const blob = new Blob(["\ufeff" + lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `residata-report-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 /* Build the compact JSON context that gets sent to AI */
 function buildAiContext({ scope, scopeLabel, summary, globalSummary, breakdown, priceSeries, districts, developers, meta }) {
   const slim = (rows) => (rows || []).slice(0, 8).map(r => ({
