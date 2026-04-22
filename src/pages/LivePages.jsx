@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
-import { useProjects, useProjectFlats, useEarlyAccessStats } from "../lib/useData";
+import { useProjects, useProjectFlats, useEarlyAccessStats, useProjectSnapshots } from "../lib/useData";
 import { supabase } from "../lib/supabase";
 import { liveT, ll } from "../lib/liveLang";
 import { track } from "../lib/track";
@@ -481,10 +481,13 @@ function GateMessage({ title, body, cta, backLabel, onCta, setCurrent }) {
 }
 
 /* ───────────────────── ANALYTICS (paid only — guarded v App.jsx cez Feature) ───────────────────── */
-/* Full analytics page — 100% live from Supabase `projects` table, refreshes
-   automatically on the monthly sync run. No static/demo numbers anywhere. */
+/* Full analytics page — 100% live from Supabase, refreshes automatically
+   on the monthly sync run. KPI strip + aggregate tables use projects
+   (current snapshot). The Pivot builder uses project_snapshots so users
+   can filter / group by month across the whole time-series. */
 export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
   const { projects, loading } = useProjects();
+  const { snapshots } = useProjectSnapshots();
 
   if (loading && projects.length === 0) {
     return (
@@ -569,6 +572,9 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
         <AKpi label={lang === "sk" ? "Vypredané" : "Sold out"}              value={soldOutCount} accent="#ff6b6b"
               sub={lang === "sk" ? `z ${projects.length} projektov` : `of ${projects.length} projects`} />
       </div>
+
+      {/* ═══ PIVOT BUILDER — prominent, right after KPIs ═══ */}
+      <AnalyticsPivot snapshots={snapshots} projects={projects} lang={lang} />
 
       {/* ═══ DISTRICT BREAKDOWN — richer than home DistrictPulse ═══ */}
       <ASection
@@ -703,11 +709,6 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
         </ASection>
       </div>
 
-      {/* ═══ PIVOT BUILDER ═══ */}
-      <div style={{ marginTop: "2.5rem" }}>
-        <AnalyticsPivot projects={projects} lang={lang} />
-      </div>
-
       <p style={{ color: "#55555f", fontSize: "0.72rem", marginTop: "2rem", fontFamily: mono, textAlign: "center" }}>
         {lang === "sk"
           ? `Zdroj: ${projects.length} projektov · posledný sync ${projects[0]?.last_updated?.slice(0, 10) || "—"}`
@@ -726,6 +727,9 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
 // always matches what the table shows.
 
 const PIVOT_COLUMNS = {
+  // Snapshot month — YYYY-MM. Defaults to latest; full history
+  // automatically grows as monthly syncs append new rows.
+  snapshot_month: { label: { en: "Month (snapshot)", sk: "Mesiac (snapshot)" }, type: "text" },
   // Text
   district:     { label: { en: "District",         sk: "Okres"            }, type: "text" },
   sub_district: { label: { en: "Sub-district",     sk: "Mestská časť"     }, type: "text" },
@@ -776,6 +780,9 @@ function bandFor(column, row) {
 
 function cellValue(row, column) {
   if (PIVOT_COLUMNS[column]?.type === "derived") return bandFor(column, row);
+  // snapshots store the project name in project_name, projects uses name —
+  // alias so "name" column works regardless of source.
+  if (column === "name") return row.name ?? row.project_name;
   return row[column];
 }
 
@@ -820,21 +827,36 @@ function matchesFilter(row, f) {
   return true;
 }
 
-function AnalyticsPivot({ projects, lang }) {
-  // Multi-filter list — user clicks "+ Add filter", picks a column, operator, value(s).
+function AnalyticsPivot({ snapshots, projects, lang }) {
+  // Source data = project_snapshots if we have any, falling back to the
+  // current-state projects table so the pivot still works before the
+  // first monthly sync has run. snapshots includes the same fields plus
+  // snapshot_month, so filters and group-bys that reference month just
+  // work.
+  const allMonths = Array.from(new Set((snapshots || []).map(s => s.snapshot_month).filter(Boolean))).sort().reverse();
+  const latestMonth = allMonths[0] || null;
+  const rawSource = snapshots && snapshots.length > 0 ? snapshots : projects;
+
   const [filters, setFilters] = useState([]);
-  // Multiple group-bys — composite key (row label joins them with " · ").
+  // Default group-by district; month joins automatically when relevant
   const [groupBys, setGroupBys] = useState(["district"]);
-  // Measure = which numeric column + aggregation.  "__count__" is a special
-  // measure meaning COUNT(*) — works on any group.
   const [measure, setMeasure] = useState({ column: "__count__", agg: "count" });
   const [chartType, setChartType] = useState("bar");
-  const [sortBy, setSortBy] = useState("value_desc");   // value_asc | value_desc | key_asc | key_desc
+  const [sortBy, setSortBy] = useState("value_desc");
+  // "Month scope": by default we look at the latest snapshot only so the
+  // pivot matches the KPI strip above. User can flip to "All months" to
+  // get the full time series, or use filters for specific months.
+  const [monthScope, setMonthScope] = useState("latest");   // "latest" | "all"
 
   const t = (obj) => obj?.[lang] || obj?.en || "";
 
+  // ── Apply month scope (before other filters) ──
+  const scoped = (monthScope === "latest" && latestMonth)
+    ? rawSource.filter(r => !r.snapshot_month || r.snapshot_month === latestMonth)
+    : rawSource;
+
   // ── Apply filters ──
-  const filtered = projects.filter(p => filters.every(f => matchesFilter(p, f)));
+  const filtered = scoped.filter(p => filters.every(f => matchesFilter(p, f)));
 
   // ── Build group rows with composite keys ──
   const groups = {};
@@ -947,19 +969,60 @@ function AnalyticsPivot({ projects, lang }) {
   const removeGroupBy = (col) => setGroupBys(gs => gs.length === 1 ? gs : gs.filter(g => g !== col));
 
   return (
-    <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 12, padding: "1.5rem" }}>
-      <div style={{ marginBottom: "1.25rem" }}>
-        <div style={{ fontFamily: mono, fontSize: "0.65rem", color: green, letterSpacing: "0.12em", textTransform: "uppercase" }}>
-          {lang === "sk" ? "Pivot / Query builder" : "Pivot / Query builder"}
+    <div style={{
+      background: "linear-gradient(135deg, #16161a 0%, #0e0e10 100%)",
+      border: `1px solid ${green}40`, borderRadius: 12, padding: "1.5rem",
+      boxShadow: `0 0 32px rgba(0,229,160,0.04)`,
+    }}>
+      <div style={{ marginBottom: "1.25rem", display: "flex", justifyContent: "space-between", gap: "1rem", alignItems: "flex-start", flexWrap: "wrap" }}>
+        <div style={{ flex: 1, minWidth: 280 }}>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem", fontFamily: mono, fontSize: "0.65rem", color: green, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.3rem" }}>
+            <span style={{ padding: "2px 6px", background: green, color: "#0a0a0b", borderRadius: 3, fontWeight: 700 }}>PIVOT</span>
+            {lang === "sk" ? "Query builder" : "Query builder"}
+          </div>
+          <h2 style={{ fontSize: "1.25rem", fontWeight: 700, color: "#e8e8ed", margin: "0.2rem 0 0", letterSpacing: "-0.01em" }}>
+            {lang === "sk" ? "Postav si vlastný pohľad na dáta" : "Compose your own view of the data"}
+          </h2>
+          <p style={{ color: dim, fontSize: "0.82rem", margin: "0.45rem 0 0", lineHeight: 1.55, maxWidth: 720 }}>
+            {lang === "sk"
+              ? <>Ľubovoľný počet filtrov (<strong style={{ color: "#e8e8ed" }}>okres · developer · cena · mesiac · …</strong>), vyber group-by (viac = krížový pohľad), metriku + agregáciu (count · sum · avg · min · max · medián). Všetko prepočíta live, CSV export vráti presne ten slice.</>
+              : <>Any number of filters (<strong style={{ color: "#e8e8ed" }}>district · developer · price · month · …</strong>), pick group-by (stack for cross-breakdown), measure + aggregation (count · sum · avg · min · max · median). All live, CSV export grabs the exact slice.</>}
+          </p>
         </div>
-        <h2 style={{ fontSize: "1.2rem", fontWeight: 600, color: "#e8e8ed", margin: "0.2rem 0 0" }}>
-          {lang === "sk" ? "Postav si vlastný pohľad" : "Compose your own view"}
-        </h2>
-        <p style={{ color: dim, fontSize: "0.82rem", margin: "0.4rem 0 0", lineHeight: 1.5, maxWidth: 720 }}>
-          {lang === "sk"
-            ? "Pridávaj ľubovoľný počet filtrov cez „+ filter", zmeň group-by (viac ako jeden = krížový pohľad), vyber metriku + agregáciu (count · sum · avg · min · max · medián). Všetko prepočíta live. CSV export vrátí presne ten slice, ktorý vidíš."
-            : "Stack as many filters as you want via \"+ filter\", change group-by (more than one = cross-breakdown), pick a measure + aggregation (count · sum · avg · min · max · median). All live. CSV export grabs exactly what you see."}
-        </p>
+
+        {/* Month scope toggle — shown when we actually have snapshot data */}
+        {latestMonth && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem", alignItems: "flex-end" }}>
+            <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase" }}>
+              {lang === "sk" ? "Rozsah" : "Scope"}
+            </div>
+            <div style={{ display: "inline-flex", background: "#0a0a0b", border: `1px solid ${border}`, borderRadius: 6, overflow: "hidden" }}>
+              <button onClick={() => setMonthScope("latest")}
+                style={{
+                  padding: "0.4rem 0.8rem", fontSize: "0.75rem", cursor: "pointer",
+                  background: monthScope === "latest" ? green : "transparent",
+                  color: monthScope === "latest" ? "#0a0a0b" : dim,
+                  border: "none", fontFamily: "inherit", fontWeight: 600,
+                }}>
+                {lang === "sk" ? `Najnovší (${latestMonth})` : `Latest (${latestMonth})`}
+              </button>
+              <button onClick={() => setMonthScope("all")}
+                style={{
+                  padding: "0.4rem 0.8rem", fontSize: "0.75rem", cursor: "pointer",
+                  background: monthScope === "all" ? green : "transparent",
+                  color: monthScope === "all" ? "#0a0a0b" : dim,
+                  border: "none", fontFamily: "inherit", fontWeight: 600,
+                }}>
+                {lang === "sk" ? `Všetky mesiace (${allMonths.length})` : `All months (${allMonths.length})`}
+              </button>
+            </div>
+            <div style={{ fontSize: "0.68rem", color: "#55555f", fontFamily: mono, textAlign: "right" }}>
+              {allMonths.length === 1
+                ? (lang === "sk" ? "Ďalšie mesiace pribudnú po ďalšom sync behu" : "New months will appear after the next sync run")
+                : (lang === "sk" ? `${allMonths.length} mesiacov v datasete` : `${allMonths.length} months in dataset`)}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── FILTERS ── */}
@@ -1477,33 +1540,6 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
               ? "Freemium: noví užívatelia sa automaticky stanú free hneď po vyplnení profilu. Tento panel je hlavne na: bump free → paid, občasné vymazanie testovacích účtov, downgrade do pending (efektívny ban)."
               : "Freemium: new sign-ups auto-approve to free. This panel is mostly for: bumping free → paid, occasional test-account deletion, downgrading to pending (de-facto ban)."}
           </p>
-
-          {/* ─── Data refresh tools ─── */}
-          <SectionHeader>
-            {lang === "sk" ? "Obnova dát zo sheetu" : "Data refresh from sheet"}
-          </SectionHeader>
-          <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 10, padding: "1.25rem 1.5rem", marginBottom: "2rem" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap", alignItems: "flex-start" }}>
-              <div style={{ flex: 1, minWidth: 280 }}>
-                <div style={{ fontSize: "0.95rem", fontWeight: 600, color: "#e8e8ed", marginBottom: "0.3rem" }}>
-                  {lang === "sk" ? "Aktualizovať developerov" : "Refresh developers"}
-                </div>
-                <p style={{ color: dim, fontSize: "0.82rem", margin: 0, lineHeight: 1.55 }}>
-                  {lang === "sk"
-                    ? <>Po doplnení stĺpca <strong style={{ color: "#e8e8ed" }}>Developer</strong> v &quot;Prehlad projektov&quot; sheete klikni nižšie. Otvorí sa GitHub Actions s pripraveným workflow &quot;Sync registry metadata&quot; — klikni <strong>Run workflow</strong>, počkaj ~15 sekúnd, refreshni platformu. Žiadny scrape, žiadne prerušenie ostatných dát.</>
-                    : <>Once the <strong style={{ color: "#e8e8ed" }}>Developer</strong> column in the &quot;Prehlad projektov&quot; sheet is filled, click below. Opens GitHub Actions with the &quot;Sync registry metadata&quot; workflow — click <strong>Run workflow</strong>, wait ~15 seconds, refresh the platform. No scraping, no disruption to other data.</>}
-                </p>
-              </div>
-              <a
-                href="https://github.com/Tombarder/novostavby-scraper/actions/workflows/sync_registry.yml"
-                target="_blank" rel="noopener noreferrer"
-                className="btn-p"
-                style={{ fontSize: "0.85rem", padding: "0.6rem 1.2rem", whiteSpace: "nowrap" }}
-              >
-                ↗ {lang === "sk" ? "Otvoriť GitHub Actions" : "Open GitHub Actions"}
-              </a>
-            </div>
-          </div>
 
           {events.length > 0 && (
             <>

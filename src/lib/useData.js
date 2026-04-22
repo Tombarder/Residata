@@ -113,6 +113,29 @@ export function useProjectFlats(projectId) {
   return { flats, loading, error };
 }
 
+/** Monthly project snapshots — full time-series of the projects table.
+ *  One row per project per snapshot_month ('YYYY-MM'). New months appear
+ *  automatically on every sync_to_supabase run. The Analytics pivot reads
+ *  from here so the user can filter / group by month too.
+ */
+let _snapshotsCache = null;
+export function useProjectSnapshots() {
+  const [snapshots, setSnapshots] = useState(_snapshotsCache || []);
+  const [loading, setLoading] = useState(_snapshotsCache === null);
+  useEffect(() => {
+    if (!isSupabaseReady()) { setLoading(false); return; }
+    supabase.from("project_snapshots").select("*")
+      .order("snapshot_month", { ascending: false })
+      .then(({ data }) => {
+        const arr = data || [];
+        _snapshotsCache = arr;
+        setSnapshots(arr);
+        setLoading(false);
+      });
+  }, []);
+  return { snapshots, loading };
+}
+
 /** Early access slot count for the marketing badge. */
 export function useEarlyAccessStats() {
   const [stats, setStats] = useState({ paid_count: 0, remaining_slots: 9 });
