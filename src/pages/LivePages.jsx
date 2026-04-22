@@ -786,8 +786,19 @@ function cellValue(row, column) {
   return row[column];
 }
 
+/** Normalised group key for text / derived columns.
+ *  - Trims whitespace so "YIT " and "YIT" merge
+ *  - Preserves original case (user is source of truth for typography)
+ *  - Empty / null / whitespace-only → "—" sentinel so NULLs cluster
+ */
+function normGroupKey(v) {
+  if (v == null) return "—";
+  const s = String(v).trim();
+  return s === "" ? "—" : s;
+}
+
 // Filter evaluation
-const FILTER_OPS_TEXT = ["is", "is not", "contains", "in", "not in", "is empty", "not empty"];
+const FILTER_OPS_TEXT = ["is", "is not", "contains", "starts with", "ends with", "in", "not in", "is empty", "not empty"];
 const FILTER_OPS_NUM  = ["=", "≠", "<", "≤", ">", "≥", "between", "is empty", "not empty"];
 
 function matchesFilter(row, f) {
@@ -810,45 +821,54 @@ function matchesFilter(row, f) {
     }
     return true;
   }
-  // text + derived (bands are strings)
-  const s = String(v).toLowerCase();
-  const q = String(f.value || "").toLowerCase();
-  if (f.op === "is")        return s === q;
-  if (f.op === "is not")    return s !== q;
-  if (f.op === "contains")  return s.includes(q);
+  // text + derived (bands are strings). Trim+lowercase for comparison so
+  // "YIT " and "YIT" are equivalent, but display preserves original case.
+  const s = String(v).trim().toLowerCase();
+  const q = String(f.value || "").trim().toLowerCase();
+  if (f.op === "is")           return s === q;
+  if (f.op === "is not")       return s !== q;
+  if (f.op === "contains")     return s.includes(q);
+  if (f.op === "starts with")  return s.startsWith(q);
+  if (f.op === "ends with")    return s.endsWith(q);
   if (f.op === "in") {
-    const vals = Array.isArray(f.values) ? f.values : String(f.value || "").split(",").map(x => x.trim().toLowerCase()).filter(Boolean);
-    return vals.includes(s) || (Array.isArray(f.values) && f.values.some(x => x.toLowerCase() === s));
+    const normValues = (f.values || []).map(x => String(x).trim().toLowerCase());
+    return normValues.includes(s);
   }
   if (f.op === "not in") {
-    const vals = Array.isArray(f.values) ? f.values : String(f.value || "").split(",").map(x => x.trim().toLowerCase()).filter(Boolean);
-    return !vals.includes(s) && !(Array.isArray(f.values) && f.values.some(x => x.toLowerCase() === s));
+    const normValues = (f.values || []).map(x => String(x).trim().toLowerCase());
+    return !normValues.includes(s);
   }
   return true;
 }
 
 function AnalyticsPivot({ snapshots, projects, lang }) {
-  // Source data = project_snapshots if we have any, falling back to the
-  // current-state projects table so the pivot still works before the
-  // first monthly sync has run. snapshots includes the same fields plus
-  // snapshot_month, so filters and group-bys that reference month just
-  // work.
   const allMonths = Array.from(new Set((snapshots || []).map(s => s.snapshot_month).filter(Boolean))).sort().reverse();
   const latestMonth = allMonths[0] || null;
   const rawSource = snapshots && snapshots.length > 0 ? snapshots : projects;
 
   const [filters, setFilters] = useState([]);
-  // Default group-by district; month joins automatically when relevant
-  const [groupBys, setGroupBys] = useState(["district"]);
+  // Now split across row axis and column axis for cross-tab mode.
+  // Empty colGroups → nested-row mode (as before). colGroups.length > 0 → matrix.
+  const [rowGroups, setRowGroups] = useState(["district"]);
+  const [colGroups, setColGroups] = useState([]);
   const [measure, setMeasure] = useState({ column: "__count__", agg: "count" });
   const [chartType, setChartType] = useState("bar");
   const [sortBy, setSortBy] = useState("value_desc");
-  // "Month scope": by default we look at the latest snapshot only so the
-  // pivot matches the KPI strip above. User can flip to "All months" to
-  // get the full time series, or use filters for specific months.
-  const [monthScope, setMonthScope] = useState("latest");   // "latest" | "all"
+  const [monthScope, setMonthScope] = useState("latest");
+  const [topN, setTopN] = useState(0);                 // 0 = all, else top N rows
+  const [percentOfTotal, setPercentOfTotal] = useState(false);
 
   const t = (obj) => obj?.[lang] || obj?.en || "";
+
+  // Combined group-bys (for backward compat with flat-mode code paths)
+  const groupBys = [...rowGroups, ...colGroups];
+
+  // Matrix mode = cross-tab (Rows × Columns). In matrix mode we ignore the
+  // nested row hierarchy and the bar chart — it's strictly a grid of measure
+  // cells. Switch chart to table automatically so the user never sees a
+  // confusing empty bar chart.
+  const isMatrix = colGroups.length > 0;
+  const effectiveChartType = isMatrix ? "table" : chartType;
 
   // ── Apply month scope (before other filters) ──
   const scoped = (monthScope === "latest" && latestMonth)
@@ -858,21 +878,26 @@ function AnalyticsPivot({ snapshots, projects, lang }) {
   // ── Apply filters ──
   const filtered = scoped.filter(p => filters.every(f => matchesFilter(p, f)));
 
-  // ── Build group rows with composite keys ──
+  // ── Build group rows with composite keys (trimmed, NULLs → "—") ──
   const groups = {};
   for (const p of filtered) {
-    const keyParts = groupBys.map(g => {
-      const v = cellValue(p, g);
-      return v == null || v === "" ? "—" : String(v);
-    });
+    const keyParts = groupBys.map(g => normGroupKey(cellValue(p, g)));
     const k = keyParts.join(" · ");
-    const g = groups[k] ||= { key: k, parts: keyParts, rows: [] };
-    g.rows.push(p);
+    const grp = groups[k] ||= { key: k, parts: keyParts, rows: [] };
+    grp.rows.push(p);
   }
 
   // ── Apply measure ──
   const computeMeasure = (rows) => {
-    if (measure.agg === "count" || measure.column === "__count__") return rows.length;
+    if (measure.column === "__count__" || measure.agg === "count") return rows.length;
+    if (measure.agg === "count_distinct") {
+      const set = new Set();
+      for (const r of rows) {
+        const v = cellValue(r, measure.column);
+        if (v != null && v !== "") set.add(String(v).trim());
+      }
+      return set.size;
+    }
     const nums = rows
       .map(r => Number(r[measure.column]))
       .filter(n => Number.isFinite(n));
@@ -898,7 +923,7 @@ function AnalyticsPivot({ snapshots, projects, lang }) {
   }));
 
   // Sort
-  const rows = [...rowsWithValues].sort((a, b) => {
+  let rows = [...rowsWithValues].sort((a, b) => {
     if (sortBy === "value_desc") return b.value - a.value;
     if (sortBy === "value_asc")  return a.value - b.value;
     if (sortBy === "key_asc")    return String(a.key).localeCompare(String(b.key));
@@ -906,53 +931,141 @@ function AnalyticsPivot({ snapshots, projects, lang }) {
     return 0;
   });
 
+  // Apply Top-N limit AFTER sort — shows top N groups, ignores rest.
+  if (topN > 0 && rows.length > topN) {
+    rows = rows.slice(0, topN);
+  }
+
+  const totalSum = rows.reduce((a, r) => a + (Number.isFinite(r.value) ? r.value : 0), 0);
+  // % of total transforms every value to share of total (0..100). Only
+  // meaningful for sum-like measures (count, sum, count_distinct). For avg/
+  // min/max/median it's mathematically nonsense so we still allow it but
+  // surface a warning in the UI.
+  const pctOfTotalValid = ["count", "sum", "count_distinct"].includes(measure.agg) || measure.column === "__count__";
+  if (percentOfTotal && totalSum > 0) {
+    rows = rows.map(r => ({ ...r, valueRaw: r.value, value: (r.value / totalSum) * 100 }));
+  }
+
   const maxValue = rows.length ? Math.max(...rows.map(r => r.value)) : 1;
 
   // Display helpers
   const measureLabelText = (() => {
-    if (measure.column === "__count__") return lang === "sk" ? "Počet projektov" : "Count of projects";
-    const col = t(PIVOT_COLUMNS[measure.column]?.label);
-    const ag = { count: lang === "sk" ? "Počet" : "Count",
-                 sum:   lang === "sk" ? "Súčet"  : "Sum",
-                 avg:   lang === "sk" ? "Priem." : "Avg",
-                 min:   "Min", max: "Max",
-                 median: lang === "sk" ? "Medián" : "Median" }[measure.agg];
-    return `${ag} · ${col}`;
+    let base;
+    if (measure.column === "__count__") {
+      base = lang === "sk" ? "Počet projektov" : "Count of projects";
+    } else {
+      const col = t(PIVOT_COLUMNS[measure.column]?.label);
+      const ag = {
+        count:          lang === "sk" ? "Počet"           : "Count",
+        count_distinct: lang === "sk" ? "Počet unikátnych" : "Count distinct",
+        sum:            lang === "sk" ? "Súčet"           : "Sum",
+        avg:            lang === "sk" ? "Priem."          : "Avg",
+        min:            "Min",
+        max:            "Max",
+        median:         lang === "sk" ? "Medián"          : "Median",
+      }[measure.agg] || measure.agg;
+      base = `${ag} · ${col}`;
+    }
+    return percentOfTotal ? `${base} · % z celku` : base;
   })();
 
-  const groupLabelText = groupBys.map(g => t(PIVOT_COLUMNS[g]?.label)).join(" × ");
+  const rowLabelText = rowGroups.map(g => t(PIVOT_COLUMNS[g]?.label)).join(" × ");
+  const colLabelText = colGroups.map(g => t(PIVOT_COLUMNS[g]?.label)).join(" × ");
+  const groupLabelText = colGroups.length > 0
+    ? `${rowLabelText}  vs  ${colLabelText}`
+    : rowLabelText;
 
   const fmtValue = (v) => {
     if (typeof v !== "number" || !Number.isFinite(v)) return "—";
+    if (percentOfTotal) return (Math.round(v * 10) / 10).toFixed(1) + "%";
     // Price-like measures: show as integer with € style spacing
     if (measure.column === "avg_price_eur_m2" || measure.column === "min_price" || measure.column === "max_price") {
       return Math.round(v).toLocaleString("en-US").replace(/,/g, " ");
     }
-    // Percentage-like
+    // Percentage-like underlying column
     if (measure.column === "sold_percentage") {
       return (Math.round(v * 10) / 10).toFixed(1) + "%";
     }
-    // Default: integer for count/sum, 1 decimal for avg/median
-    const intish = measure.agg === "count" || measure.agg === "sum" || measure.column === "__count__";
+    // Default: integer for count/sum/distinct, 1 decimal for avg/median
+    const intish = measure.agg === "count" || measure.agg === "sum" || measure.agg === "count_distinct" || measure.column === "__count__";
     return intish ? Math.round(v).toLocaleString("en-US").replace(/,/g, " ")
                   : (Math.round(v * 100) / 100).toLocaleString("en-US").replace(/,/g, " ");
   };
 
-  // CSV export of current slice
+  // CSV export of current slice. Two shapes depending on mode:
+  //   - Flat / nested rows: one column per group-by, + count, + measure.
+  //   - Matrix: row-headers × col-headers grid with row totals and col totals.
   const exportCSV = () => {
-    const headers = [...groupBys.map(g => t(PIVOT_COLUMNS[g]?.label)), lang === "sk" ? "Počet projektov" : "Count", measureLabelText];
-    const out = rows.map(r => [...r.parts, r.count, r.value]);
-    const csv = [headers, ...out].map(row =>
-      row.map(c => {
-        const s = String(c ?? "");
-        return s.includes(",") || s.includes("\"") ? `"${s.replace(/"/g, '""')}"` : s;
-      }).join(",")
-    ).join("\n");
+    const escape = (c) => {
+      const s = String(c ?? "");
+      return s.includes(",") || s.includes("\"") || s.includes("\n") ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    let csv;
+    if (isMatrix) {
+      const rKey = (row) => rowGroups.map(g => normGroupKey(cellValue(row, g))).join(" · ");
+      const cKey = (row) => colGroups.map(g => normGroupKey(cellValue(row, g))).join(" · ");
+      const rowKeySet = new Set(filtered.map(rKey));
+      const colKeySet = new Set(filtered.map(cKey));
+      const byRowCol = new Map();
+      for (const p of filtered) {
+        const rk = rKey(p), ck = cKey(p);
+        if (!byRowCol.has(rk)) byRowCol.set(rk, new Map());
+        const m = byRowCol.get(rk);
+        if (!m.has(ck)) m.set(ck, []);
+        m.get(ck).push(p);
+      }
+      const sortedRowKeys = [...rowKeySet].sort((a, b) => {
+        const av = computeMeasure([...(byRowCol.get(a)?.values() || [])].flat());
+        const bv = computeMeasure([...(byRowCol.get(b)?.values() || [])].flat());
+        if (sortBy === "value_desc") return bv - av;
+        if (sortBy === "value_asc")  return av - bv;
+        if (sortBy === "key_asc")    return String(a).localeCompare(String(b));
+        if (sortBy === "key_desc")   return String(b).localeCompare(String(a));
+        return 0;
+      });
+      const sortedColKeys = [...colKeySet].sort((a, b) => String(a).localeCompare(String(b)));
+      const limitedRowKeys = topN > 0 ? sortedRowKeys.slice(0, topN) : sortedRowKeys;
+      const pctDen = percentOfTotal
+        ? limitedRowKeys.reduce((a, rk) => a + computeMeasure([...(byRowCol.get(rk)?.values() || [])].flat()), 0)
+        : 1;
+      const fmtCell = (v) => {
+        if (v == null || !Number.isFinite(v)) return "";
+        if (percentOfTotal) return (Math.round(v * 10) / 10).toFixed(1);
+        return String(v);
+      };
+      const header = [rowLabelText || "row", ...sortedColKeys, lang === "sk" ? "Σ Riadok" : "Σ Row"];
+      const body = limitedRowKeys.map(rk => {
+        const cells = sortedColKeys.map(ck => {
+          const recs = byRowCol.get(rk)?.get(ck);
+          if (!recs) return "";
+          const v = computeMeasure(recs);
+          return fmtCell(percentOfTotal && pctDen > 0 ? (v / pctDen) * 100 : v);
+        });
+        const rt = computeMeasure([...(byRowCol.get(rk)?.values() || [])].flat());
+        const rtOut = fmtCell(percentOfTotal && pctDen > 0 ? (rt / pctDen) * 100 : rt);
+        return [rk, ...cells, rtOut];
+      });
+      const totalRow = [
+        lang === "sk" ? "Σ Stĺpec" : "Σ Col",
+        ...sortedColKeys.map(ck => {
+          const recs = limitedRowKeys.map(rk => byRowCol.get(rk)?.get(ck) || []).flat();
+          if (recs.length === 0) return "";
+          const v = computeMeasure(recs);
+          return fmtCell(percentOfTotal && pctDen > 0 ? (v / pctDen) * 100 : v);
+        }),
+        percentOfTotal && pctDen > 0 ? "100.0" : fmtCell(computeMeasure(filtered)),
+      ];
+      csv = [header, ...body, totalRow].map(row => row.map(escape).join(",")).join("\n");
+    } else {
+      const headers = [...groupBys.map(g => t(PIVOT_COLUMNS[g]?.label)), lang === "sk" ? "Počet projektov" : "Count", measureLabelText];
+      const out = rows.map(r => [...r.parts, r.count, r.value]);
+      csv = [headers, ...out].map(row => row.map(escape).join(",")).join("\n");
+    }
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href = url;
     const name = [...groupBys, measure.column].filter(x => x !== "__count__").join("-") || "pivot";
-    a.download = `residata-pivot-${name}-${new Date().toISOString().slice(0,10)}.csv`;
+    a.download = `residata-pivot-${isMatrix ? "matrix-" : ""}${name}-${new Date().toISOString().slice(0,10)}.csv`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
@@ -965,8 +1078,30 @@ function AnalyticsPivot({ snapshots, projects, lang }) {
   const updateFilter = (id, patch) => setFilters(fs => fs.map(f => f.id === id ? { ...f, ...patch } : f));
   const removeFilter = (id) => setFilters(fs => fs.filter(f => f.id !== id));
 
-  const addGroupBy = (col) => setGroupBys(gs => gs.includes(col) ? gs : [...gs, col].slice(0, 3));
-  const removeGroupBy = (col) => setGroupBys(gs => gs.length === 1 ? gs : gs.filter(g => g !== col));
+  // Add a column to an axis (row / col). Cap each axis at 3 dims so composite
+  // keys stay readable. Ignores columns that already appear on either axis.
+  const addGroupBy = (col, axis = "row") => {
+    if (rowGroups.includes(col) || colGroups.includes(col)) return;
+    if (axis === "row") setRowGroups(gs => [...gs, col].slice(0, 3));
+    else                setColGroups(gs => [...gs, col].slice(0, 3));
+  };
+  // Remove — but always keep at least one row dimension.
+  const removeGroupBy = (col) => {
+    if (rowGroups.length === 1 && rowGroups[0] === col) return;
+    setRowGroups(gs => gs.filter(g => g !== col));
+    setColGroups(gs => gs.filter(g => g !== col));
+  };
+  // Move between axes. Same "at least one row" guard.
+  const moveGroupBy = (col, toAxis) => {
+    if (toAxis === "col" && rowGroups.length === 1 && rowGroups[0] === col) return;
+    if (toAxis === "row") {
+      setColGroups(cs => cs.filter(g => g !== col));
+      setRowGroups(rs => rs.includes(col) ? rs : [...rs, col]);
+    } else {
+      setRowGroups(rs => rs.filter(g => g !== col));
+      setColGroups(cs => cs.includes(col) ? cs : [...cs, col]);
+    }
+  };
 
   return (
     <div style={{
@@ -1048,53 +1183,79 @@ function AnalyticsPivot({ snapshots, projects, lang }) {
         </button>
       </div>
 
-      {/* ── GROUP BY + MEASURE + CHART ── */}
+      {/* ── GROUP BY (Rows + Columns) + MEASURE + OPTIONS ── */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1.25rem" }} className="pivot-grid">
-        {/* Group by (multi) */}
+        {/* ── Rows + Columns zones (Excel-style pivot axes) ── */}
         <div style={{ background: "#0a0a0b", border: `1px solid ${border}`, borderRadius: 8, padding: "0.9rem 1rem" }}>
-          <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.4rem" }}>
-            {lang === "sk" ? "Group by" : "Group by"}
+          <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.55rem" }}>
+            {lang === "sk" ? "Group by — Riadky × Stĺpce" : "Group by — Rows × Columns"}
           </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem", marginBottom: "0.5rem" }}>
-            {groupBys.map((g, i) => (
-              <span key={g} style={{
-                display: "inline-flex", alignItems: "center", gap: "0.3rem",
-                padding: "0.25rem 0.55rem", borderRadius: 100,
-                background: "rgba(0,229,160,0.12)", border: `1px solid ${green}`,
-                color: green, fontSize: "0.72rem", fontFamily: mono,
-              }}>
-                {i > 0 && "×"} {t(PIVOT_COLUMNS[g]?.label)}
-                {groupBys.length > 1 && (
-                  <button onClick={() => removeGroupBy(g)}
-                    style={{ background: "transparent", border: "none", color: green, cursor: "pointer", padding: 0, fontSize: "0.9rem", lineHeight: 1 }}>×</button>
-                )}
-              </span>
-            ))}
+
+          {/* Rows zone */}
+          <PivotAxisZone
+            label={lang === "sk" ? "Riadky" : "Rows"}
+            icon="↓"
+            chips={rowGroups}
+            otherAxisChips={colGroups}
+            moveLabel={lang === "sk" ? "→ presuň do stĺpcov" : "→ move to columns"}
+            onRemove={removeGroupBy}
+            onMove={(col) => moveGroupBy(col, "col")}
+            lang={lang} t={t}
+            canRemoveLast={false}
+          />
+
+          {/* Columns zone */}
+          <div style={{ marginTop: "0.55rem" }}>
+            <PivotAxisZone
+              label={lang === "sk" ? "Stĺpce (cross-tab)" : "Columns (cross-tab)"}
+              icon="→"
+              chips={colGroups}
+              otherAxisChips={rowGroups}
+              moveLabel={lang === "sk" ? "↓ presuň do riadkov" : "↓ move to rows"}
+              onRemove={removeGroupBy}
+              onMove={(col) => moveGroupBy(col, "row")}
+              lang={lang} t={t}
+              canRemoveLast={true}
+              emptyHint={lang === "sk" ? "Prázdne = zoznam. Pridaj stĺpec = cross-tab matrix." : "Empty = list. Add a column = cross-tab matrix."}
+            />
           </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.25rem" }}>
-            {groupableKeys.filter(k => !groupBys.includes(k)).map(k => (
-              <button key={k} onClick={() => addGroupBy(k)}
-                style={{
-                  fontFamily: "inherit", fontSize: "0.68rem",
-                  padding: "0.22rem 0.5rem", borderRadius: 100, cursor: "pointer",
-                  background: "transparent", border: `1px solid ${border}`, color: dim,
-                }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = green; e.currentTarget.style.color = green; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = border; e.currentTarget.style.color = dim; }}>
-                + {t(PIVOT_COLUMNS[k]?.label)}
-              </button>
-            ))}
+
+          {/* Available columns — adds to Rows by default; Shift+click adds to Columns */}
+          <div style={{ marginTop: "0.7rem", paddingTop: "0.55rem", borderTop: `1px dashed ${border}` }}>
+            <div style={{ fontFamily: mono, fontSize: "0.58rem", color: dim, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.35rem" }}>
+              {lang === "sk" ? "Pridaj pole" : "Add field"} <span style={{ opacity: 0.6 }}>· {lang === "sk" ? "klik = riadok, Shift+klik = stĺpec" : "click = row, Shift+click = col"}</span>
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.25rem" }}>
+              {groupableKeys.filter(k => !groupBys.includes(k)).map(k => (
+                <button key={k} onClick={(e) => addGroupBy(k, e.shiftKey ? "col" : "row")}
+                  style={{
+                    fontFamily: "inherit", fontSize: "0.68rem",
+                    padding: "0.22rem 0.5rem", borderRadius: 100, cursor: "pointer",
+                    background: "transparent", border: `1px solid ${border}`, color: dim,
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = green; e.currentTarget.style.color = green; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = border; e.currentTarget.style.color = dim; }}>
+                  + {t(PIVOT_COLUMNS[k]?.label)}
+                </button>
+              ))}
+              {groupableKeys.filter(k => !groupBys.includes(k)).length === 0 && (
+                <span style={{ color: dim, fontSize: "0.72rem", fontStyle: "italic" }}>
+                  {lang === "sk" ? "Všetky polia už používaš." : "All fields in use."}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Measure */}
+        {/* ── Measure + agg + options ── */}
         <div style={{ background: "#0a0a0b", border: `1px solid ${border}`, borderRadius: 8, padding: "0.9rem 1rem" }}>
           <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.4rem" }}>
             {lang === "sk" ? "Metrika + agregácia" : "Measure + aggregation"}
           </div>
           <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
-            <select value={measure.agg} onChange={e => setMeasure(m => ({ ...m, agg: e.target.value }))} style={{ ...pvtInput, marginTop: 0, flex: "0 0 110px" }}>
+            <select value={measure.agg} onChange={e => setMeasure(m => ({ ...m, agg: e.target.value }))} style={{ ...pvtInput, marginTop: 0, flex: "0 0 130px" }}>
               <option value="count">count</option>
+              <option value="count_distinct">count distinct</option>
               <option value="sum">sum</option>
               <option value="avg">avg</option>
               <option value="min">min</option>
@@ -1104,13 +1265,21 @@ function AnalyticsPivot({ snapshots, projects, lang }) {
             <span style={{ color: dim, fontSize: "0.82rem" }}>{lang === "sk" ? "z" : "of"}</span>
             <select value={measure.column} onChange={e => setMeasure(m => ({ ...m, column: e.target.value }))} style={{ ...pvtInput, marginTop: 0, flex: 1 }}>
               <option value="__count__">* (all rows)</option>
-              {numericColumnKeys.map(k => (
-                <option key={k} value={k}>{t(PIVOT_COLUMNS[k].label)}</option>
-              ))}
+              {/* count_distinct works on any column (text or number); sum/avg/min/max/median only on numbers */}
+              {measure.agg === "count_distinct"
+                ? Object.keys(PIVOT_COLUMNS).map(k => (
+                    <option key={k} value={k}>{t(PIVOT_COLUMNS[k].label)}</option>
+                  ))
+                : numericColumnKeys.map(k => (
+                    <option key={k} value={k}>{t(PIVOT_COLUMNS[k].label)}</option>
+                  ))}
             </select>
           </div>
+
           <div style={{ marginTop: "0.6rem", display: "flex", gap: "0.4rem" }}>
-            <select value={chartType} onChange={e => setChartType(e.target.value)} style={{ ...pvtInput, marginTop: 0, flex: 1 }}>
+            <select value={chartType} onChange={e => setChartType(e.target.value)} disabled={isMatrix}
+              title={isMatrix ? (lang === "sk" ? "Matrix režim = tabuľka" : "Matrix mode = table only") : ""}
+              style={{ ...pvtInput, marginTop: 0, flex: 1, opacity: isMatrix ? 0.5 : 1 }}>
               <option value="bar">📊 {lang === "sk" ? "bar graf" : "bar chart"}</option>
               <option value="table">🗂️ {lang === "sk" ? "tabuľka" : "table"}</option>
             </select>
@@ -1120,6 +1289,31 @@ function AnalyticsPivot({ snapshots, projects, lang }) {
               <option value="key_asc">A–Z</option>
               <option value="key_desc">Z–A</option>
             </select>
+          </div>
+
+          {/* Top-N + % of total */}
+          <div style={{ marginTop: "0.6rem", display: "flex", gap: "0.4rem", alignItems: "center", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+              <span style={{ fontSize: "0.72rem", color: dim, fontFamily: mono }}>Top-N:</span>
+              <select value={topN} onChange={e => setTopN(Number(e.target.value))} style={{ ...pvtInput, marginTop: 0, flex: "0 0 80px", padding: "0.4rem 0.5rem" }}>
+                <option value={0}>{lang === "sk" ? "Všetko" : "All"}</option>
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+              </select>
+            </div>
+            <label style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem", cursor: "pointer", fontSize: "0.78rem", color: "#e8e8ed" }}
+              title={!pctOfTotalValid ? (lang === "sk" ? "Počíta sa, ale pre avg/min/max/medián nedáva zmysel" : "Works, but meaningless for avg/min/max/median") : ""}>
+              <input type="checkbox" checked={percentOfTotal} onChange={e => setPercentOfTotal(e.target.checked)}
+                style={{ accentColor: green, width: 14, height: 14, cursor: "pointer" }} />
+              <span style={{ color: percentOfTotal ? green : "#e8e8ed" }}>
+                {lang === "sk" ? "% z celku" : "% of total"}
+              </span>
+              {percentOfTotal && !pctOfTotalValid && (
+                <span style={{ fontSize: "0.65rem", color: "#ff9b6b", fontFamily: mono }} title={lang === "sk" ? "Agregácia nie je sčítateľná" : "Aggregation is not additive"}>⚠</span>
+              )}
+            </label>
           </div>
         </div>
       </div>
@@ -1146,6 +1340,154 @@ function AnalyticsPivot({ snapshots, projects, lang }) {
           return (
             <div style={{ color: dim, fontSize: "0.85rem", padding: "2rem", textAlign: "center", border: `1px dashed ${border}`, borderRadius: 8 }}>
               {lang === "sk" ? "Žiadne výsledky pre aktuálny filter." : "No results for current filter."}
+            </div>
+          );
+        }
+
+        // ── MATRIX (cross-tab) ──
+        // Row headers = distinct values of rowGroups (composite key).
+        // Col headers = distinct values of colGroups (composite key).
+        // Each cell = measure computed from the slice of `filtered` that
+        // matches both the row's key AND the column's key. Empty cells
+        // (no matching records) render as blank, not 0, so the user can
+        // distinguish "no data" from "zero". Bottom/right totals are
+        // computed from the underlying records (not mechanical sums).
+        if (isMatrix) {
+          const rKey = (row) => rowGroups.map(g => normGroupKey(cellValue(row, g))).join(" · ");
+          const cKey = (row) => colGroups.map(g => normGroupKey(cellValue(row, g))).join(" · ");
+          // Bucket filtered records by row-key and col-key.
+          const byRowCol = new Map(); // rowKey → (colKey → records[])
+          const rowKeySet = new Set();
+          const colKeySet = new Set();
+          for (const p of filtered) {
+            const rk = rKey(p), ck = cKey(p);
+            rowKeySet.add(rk); colKeySet.add(ck);
+            if (!byRowCol.has(rk)) byRowCol.set(rk, new Map());
+            const rowMap = byRowCol.get(rk);
+            if (!rowMap.has(ck)) rowMap.set(ck, []);
+            rowMap.get(ck).push(p);
+          }
+          // Row totals (across all columns) and col totals (across all rows)
+          const rowTotals = new Map();
+          for (const rk of rowKeySet) {
+            const allForRow = [...(byRowCol.get(rk)?.values() || [])].flat();
+            rowTotals.set(rk, { val: computeMeasure(allForRow), count: allForRow.length });
+          }
+          const colTotals = new Map();
+          for (const ck of colKeySet) {
+            const all = filtered.filter(p => cKey(p) === ck);
+            colTotals.set(ck, { val: computeMeasure(all), count: all.length });
+          }
+          const grandTotal = { val: computeMeasure(filtered), count: filtered.length };
+
+          // Sort row keys per global sort direction (by row total)
+          const sortedRowKeys = [...rowKeySet].sort((a, b) => {
+            const av = rowTotals.get(a).val, bv = rowTotals.get(b).val;
+            if (sortBy === "value_desc") return bv - av;
+            if (sortBy === "value_asc")  return av - bv;
+            if (sortBy === "key_asc")    return String(a).localeCompare(String(b));
+            if (sortBy === "key_desc")   return String(b).localeCompare(String(a));
+            return 0;
+          });
+          // Col keys sorted alphabetically so the order is stable when
+          // users toggle filters (value_desc on cols is confusing in a matrix).
+          const sortedColKeys = [...colKeySet].sort((a, b) => String(a).localeCompare(String(b)));
+
+          // Apply Top-N to rows only (columns are axis keys — slicing them
+          // loses cells, which users don't expect in Excel either).
+          const limitedRowKeys = topN > 0 ? sortedRowKeys.slice(0, topN) : sortedRowKeys;
+
+          // % of total denominator = grand total when Top-N not applied;
+          // otherwise uses the limited subset so percentages add up visually.
+          const pctDen = percentOfTotal
+            ? limitedRowKeys.reduce((a, rk) => a + (rowTotals.get(rk)?.val || 0), 0)
+            : 1;
+
+          const cellVal = (rk, ck) => {
+            const recs = byRowCol.get(rk)?.get(ck);
+            if (!recs || recs.length === 0) return null;
+            const v = computeMeasure(recs);
+            if (percentOfTotal && pctDen > 0) return (v / pctDen) * 100;
+            return v;
+          };
+          const rowTotalVal = (rk) => {
+            const v = rowTotals.get(rk).val;
+            if (percentOfTotal && pctDen > 0) return (v / pctDen) * 100;
+            return v;
+          };
+          const colTotalVal = (ck) => {
+            const filteredRows = limitedRowKeys.map(rk => byRowCol.get(rk)?.get(ck) || []).flat();
+            if (filteredRows.length === 0) return null;
+            const v = computeMeasure(filteredRows);
+            if (percentOfTotal && pctDen > 0) return (v / pctDen) * 100;
+            return v;
+          };
+          const grand = percentOfTotal && pctDen > 0 ? 100 : grandTotal.val;
+
+          return (
+            <div style={{ border: `1px solid ${border}`, borderRadius: 8, overflow: "auto", maxHeight: 640 }}>
+              <table style={{ borderCollapse: "collapse", fontSize: "0.82rem", minWidth: "100%" }}>
+                <thead style={{ background: "#0e0e10", position: "sticky", top: 0, zIndex: 2 }}>
+                  <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.64rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                    <th style={{ ...th, minWidth: 160, position: "sticky", left: 0, background: "#0e0e10", zIndex: 3, borderRight: `2px solid ${border}` }}>
+                      <div style={{ color: green, fontSize: "0.62rem" }}>↓ {rowLabelText}</div>
+                      <div style={{ fontSize: "0.6rem", marginTop: 2, color: dim }}>→ {colLabelText}</div>
+                    </th>
+                    {sortedColKeys.map(ck => (
+                      <th key={ck} style={{ ...th, textAlign: "right", color: "#e8e8ed", minWidth: 90 }}>{ck}</th>
+                    ))}
+                    <th style={{ ...th, textAlign: "right", color: green, background: "#0a0a0b", borderLeft: `2px solid ${border}`, minWidth: 100 }}>
+                      {lang === "sk" ? "Σ Riadok" : "Σ Row"}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {limitedRowKeys.map((rk, i) => (
+                    <tr key={rk} style={{
+                      borderTop: `1px solid ${border}`,
+                      background: i % 2 ? "transparent" : "rgba(255,255,255,0.015)",
+                    }}>
+                      <td style={{ ...td, fontWeight: 600, color: "#e8e8ed", position: "sticky", left: 0, background: i % 2 ? "#0a0a0b" : "#111114", zIndex: 1, borderRight: `2px solid ${border}` }}>
+                        {rk}
+                      </td>
+                      {sortedColKeys.map(ck => {
+                        const v = cellVal(rk, ck);
+                        return (
+                          <td key={ck} style={{ ...td, textAlign: "right", fontFamily: mono, color: v == null ? "#3a3a42" : "#e8e8ed" }}>
+                            {v == null ? "·" : fmtValue(v)}
+                          </td>
+                        );
+                      })}
+                      <td style={{ ...td, textAlign: "right", fontFamily: mono, color: green, fontWeight: 700, background: "#0e0e10", borderLeft: `2px solid ${border}` }}>
+                        {fmtValue(rowTotalVal(rk))}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot style={{ position: "sticky", bottom: 0, background: "#0a0a0b" }}>
+                  <tr style={{ borderTop: `2px solid ${border}` }}>
+                    <td style={{ ...td, fontWeight: 700, color: green, position: "sticky", left: 0, background: "#0a0a0b", zIndex: 1, borderRight: `2px solid ${border}` }}>
+                      {lang === "sk" ? "Σ Stĺpec" : "Σ Col"}
+                    </td>
+                    {sortedColKeys.map(ck => {
+                      const v = colTotalVal(ck);
+                      return (
+                        <td key={ck} style={{ ...td, textAlign: "right", fontFamily: mono, color: green, fontWeight: 700 }}>
+                          {v == null ? "·" : fmtValue(v)}
+                        </td>
+                      );
+                    })}
+                    <td style={{ ...td, textAlign: "right", fontFamily: mono, color: green, fontWeight: 800, background: "#111114", borderLeft: `2px solid ${border}` }}>
+                      {fmtValue(grand)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+              {topN > 0 && sortedRowKeys.length > topN && (
+                <div style={{ padding: "0.5rem 0.75rem", background: "#0e0e10", borderTop: `1px solid ${border}`, fontSize: "0.7rem", color: dim, fontFamily: mono }}>
+                  {lang === "sk" ? `Zobrazených ${topN} z ${sortedRowKeys.length} riadkov` : `Showing ${topN} of ${sortedRowKeys.length} rows`}
+                </div>
+              )}
             </div>
           );
         }
@@ -1182,7 +1524,7 @@ function AnalyticsPivot({ snapshots, projects, lang }) {
         })();
 
         // ── BAR CHART ──
-        if (chartType === "bar") {
+        if (effectiveChartType === "bar") {
           const maxBucketValue = hierarchical ? Math.max(...buckets.map(b => b.value)) : maxValue;
           if (!hierarchical) {
             return (
@@ -1352,6 +1694,56 @@ function AnalyticsPivot({ snapshots, projects, lang }) {
       <style>{`
         @media (max-width: 760px) { .pivot-grid { grid-template-columns: 1fr !important; } }
       `}</style>
+    </div>
+  );
+}
+
+/* PivotAxisZone — one zone (Rows or Columns) in the pivot group-by panel.
+   Shows chips for the fields assigned to this axis, each with × (remove)
+   and ↔ (move to the other axis). Empty zone shows a hint. */
+function PivotAxisZone({ label, icon, chips, otherAxisChips, moveLabel, onRemove, onMove, lang, t, canRemoveLast, emptyHint }) {
+  return (
+    <div style={{
+      background: "rgba(255,255,255,0.025)", border: `1px dashed ${border}`,
+      borderRadius: 6, padding: "0.5rem 0.6rem", minHeight: 52,
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", marginBottom: chips.length ? "0.35rem" : 0 }}>
+        <span style={{ fontFamily: mono, fontSize: "0.62rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700 }}>
+          <span style={{ color: green, marginRight: "0.25rem" }}>{icon}</span>{label}
+        </span>
+        <span style={{ fontSize: "0.62rem", color: dim, fontFamily: mono }}>({chips.length})</span>
+      </div>
+      {chips.length === 0 && emptyHint && (
+        <div style={{ fontSize: "0.7rem", color: dim, fontStyle: "italic" }}>{emptyHint}</div>
+      )}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem" }}>
+        {chips.map((g, i) => {
+          const isLastRow = !canRemoveLast && chips.length === 1;
+          return (
+            <span key={g} style={{
+              display: "inline-flex", alignItems: "center", gap: "0.25rem",
+              padding: "0.25rem 0.55rem", borderRadius: 100,
+              background: "rgba(0,229,160,0.12)", border: `1px solid ${green}`,
+              color: green, fontSize: "0.72rem", fontFamily: mono,
+            }}>
+              {i > 0 && <span style={{ opacity: 0.5 }}>×</span>}
+              {t(PIVOT_COLUMNS[g]?.label)}
+              <button onClick={() => onMove(g)}
+                title={moveLabel}
+                style={{ background: "transparent", border: "none", color: green, cursor: "pointer", padding: 0, fontSize: "0.8rem", lineHeight: 1, opacity: 0.7 }}
+                onMouseEnter={e => e.currentTarget.style.opacity = 1}
+                onMouseLeave={e => e.currentTarget.style.opacity = 0.7}>
+                ↔
+              </button>
+              {!isLastRow && (
+                <button onClick={() => onRemove(g)}
+                  title={lang === "sk" ? "Odstrániť" : "Remove"}
+                  style={{ background: "transparent", border: "none", color: green, cursor: "pointer", padding: 0, fontSize: "0.9rem", lineHeight: 1 }}>×</button>
+              )}
+            </span>
+          );
+        })}
+      </div>
     </div>
   );
 }
