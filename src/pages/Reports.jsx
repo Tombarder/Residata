@@ -91,7 +91,17 @@ export default function PlatformReports({ lang = "sk" }) {
 
   return (
     <div className="residata-report-root" style={{ padding: "1rem 2rem 4rem", maxWidth: 1100, margin: "0 auto" }}>
-      <ReportHeader projects={projects} flats={flats} lang={lang} scope={scope} />
+      <ReportHeader
+        projects={projects} flats={flats} lang={lang}
+        scope={scope}
+        scopeLabel={
+          scope === "mesto"     ? cityPick  :
+          scope === "cast"      ? distPick  :
+          scope === "developer" ? devPick   :
+          scope === "projekt"   ? projPick  :  // project ID
+          null
+        }
+      />
 
       {/* Scope tabs */}
       <div className="no-print" style={{
@@ -180,18 +190,42 @@ export default function PlatformReports({ lang = "sk" }) {
         />
       )}
 
-      {/* Print stylesheet — strips nav + scope picker, widens margins,
-          renders each major section on its own page-break boundary. */}
+      {/* Print stylesheet — strips the platform shell (sidebar + top nav)
+          around the report, inverts the dark theme to light, widens
+          margins, and marks page-break boundaries per section.
+
+          Key tricks:
+            · `visibility:hidden` on body + unhide only the report root
+              is more reliable than trying to display:none every chrome
+              element by class — works even if the platform shell adds
+              new wrappers later.
+            · Data bars / histograms use linear-gradient backgrounds —
+              we override JUST the accent text color to dark-green and
+              strip backgrounds, but keep the bar SHAPES by re-enabling
+              backgrounds on the `.print-keep-bg` elements. */}
       <style>{`
         @media print {
           @page { size: A4; margin: 14mm 12mm; }
-          body, html { background: #fff !important; }
-          .residata-report-root { max-width: 100% !important; padding: 0 !important; color: #111 !important; }
-          .residata-report-root * { color: #111 !important; background: transparent !important; border-color: #ccc !important; }
-          .residata-report-root .report-section { page-break-inside: avoid; }
+          html, body { background: #fff !important; color: #111 !important; }
+
+          /* Hide everything, then unhide the report root */
+          body * { visibility: hidden; }
+          .residata-report-root, .residata-report-root * { visibility: visible; }
+
+          /* Take the report out of the platform-shell layout */
+          .residata-report-root {
+            position: absolute; left: 0; top: 0; right: 0;
+            max-width: 100% !important; padding: 0 !important;
+            color: #111 !important; background: #fff !important;
+          }
+          .residata-report-root * {
+            color: #111 !important; background: transparent !important;
+            border-color: #ccc !important; box-shadow: none !important;
+          }
+          .residata-report-root .report-section { page-break-inside: avoid; margin-bottom: 14mm; }
           .residata-report-root .report-pagebreak { page-break-before: always; }
           .residata-report-root .report-accent { color: #006b48 !important; }
-          .no-print { display: none !important; }
+          .no-print, .no-print * { display: none !important; visibility: hidden !important; }
         }
       `}</style>
     </div>
@@ -199,7 +233,7 @@ export default function PlatformReports({ lang = "sk" }) {
 }
 
 /* ─── Header card: title + month + print + scope-aware subtitle ─── */
-function ReportHeader({ projects, flats, lang, scope }) {
+function ReportHeader({ projects, flats, lang, scope, scopeLabel }) {
   const month = new Date().toLocaleDateString(lang === "sk" ? "sk-SK" : "en-US", { month: "long", year: "numeric" });
   const lastSync = projects[0]?.last_updated?.slice(0, 10) || new Date().toISOString().slice(0, 10);
   const scopeLabel = SCOPES.find(s => s.key === scope)?.label[lang] || "";
@@ -218,7 +252,7 @@ function ReportHeader({ projects, flats, lang, scope }) {
           </p>
         </div>
         <div className="no-print" style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-          <SubscribeButton scope={scope} lang={lang} />
+          <SubscribeButton scope={scope} scopeLabel={scopeLabel} lang={lang} />
           <button onClick={() => downloadScopeCSV(projects, flats, lang)}
             style={{
               background: "transparent", color: green, border: `1px solid ${green}55`,
@@ -239,11 +273,18 @@ function ReportHeader({ projects, flats, lang, scope }) {
 /* ─── Monthly email subscribe toggle ─────────────────────────────
    Upserts a row in `report_subscriptions` for the logged-in user.
    The Vercel cron endpoint (/api/cron/monthly-reports, 1st of month)
-   emails everyone who's enabled=true. */
-function SubscribeButton({ scope, lang }) {
+   emails everyone who's enabled=true.
+
+   scope_label travels with the upsert so a user subscribing on
+   "Projekt: X" actually gets reports on X (not an empty-payload
+   project=null fallback). Same for city / district / developer. */
+function SubscribeButton({ scope, scopeLabel, lang }) {
   const [state, setState] = useState("loading"); // loading | off | on | saving | err
   const [email, setEmail] = useState(null);
 
+  // Re-check subscription state when scope changes (might have a
+  // different row for the new scope? — no, PK is user_id so only ever
+  // one subscription per user — but this keeps the re-check honest).
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -252,12 +293,18 @@ function SubscribeButton({ scope, lang }) {
         if (!user) { if (!cancelled) setState("off"); return; }
         if (!cancelled) setEmail(user.email);
         const { data } = await supabase.from("report_subscriptions")
-          .select("enabled").eq("user_id", user.id).maybeSingle();
-        if (!cancelled) setState(data?.enabled ? "on" : "off");
+          .select("enabled, scope, scope_label").eq("user_id", user.id).maybeSingle();
+        if (cancelled) return;
+        // "on" only when subscribed AND the current scope matches — lets
+        // the user move between tabs and see "on" only on their subbed one.
+        const isOn = !!(data?.enabled
+          && data.scope === scope
+          && (data.scope_label || null) === (scopeLabel || null));
+        setState(isOn ? "on" : "off");
       } catch (_) { if (!cancelled) setState("off"); }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [scope, scopeLabel]);
 
   const toggle = async () => {
     setState("saving");
@@ -269,7 +316,7 @@ function SubscribeButton({ scope, lang }) {
         user_id: user.id,
         email:   user.email,
         scope,
-        scope_label: null,
+        scope_label: scopeLabel || null,
         lang,
         enabled: want,
       }, { onConflict: "user_id" });

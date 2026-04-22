@@ -1510,8 +1510,9 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
     return <span style={{ marginLeft: 4, color: green }}>{sort.dir === "desc" ? "▾" : "▴"}</span>;
   };
 
-  // Per-column min/max (across LEAF nodes only — subtotals would skew scale)
-  // Used for heatmap coloring and data bars.
+  // Per-value-column min/max (across LEAF nodes only — subtotals would
+  // skew scale). Used for heatmap + data bars on the NON-crosstab cells
+  // and on the Σ-total columns of cross-tab.
   const scaleByCol = (() => {
     const out = [];
     for (let i = 0; i < effectiveValues.length; i++) {
@@ -1527,6 +1528,30 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
       out.push({ lo, hi });
     }
     return out;
+  })();
+
+  // Per-(colKey × value) min/max for cross-tab heatmap/data bars.
+  // Scoping per column means "hot" cells compete only against peers in
+  // the same col bucket, so user can instantly see who leads in each
+  // status / izby / whatever. Falls back to scaleByCol when no col field.
+  const scaleByCellKey = (() => {
+    if (!crossTab) return {};
+    const m = {};
+    for (const ck of colKeys) {
+      for (let i = 0; i < effectiveValues.length; i++) {
+        let lo = Infinity, hi = -Infinity;
+        for (const n of flatRows) {
+          if (!n.isLeaf) continue;
+          const v = n.colRollups?.[ck]?.[i];
+          if (v == null || !Number.isFinite(v)) continue;
+          if (v < lo) lo = v;
+          if (v > hi) hi = v;
+        }
+        m[`${ck}::${i}`] = (Number.isFinite(lo) && Number.isFinite(hi))
+          ? { lo, hi } : null;
+      }
+    }
+    return m;
   })();
 
   // Render one cell's value given raw + column index + parent rollup
@@ -1548,28 +1573,27 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
 
   // Heatmap color for a cell (green → red gradient by rank in column).
   // For "cena" (price) metrics we flip polarity so LOW = green (good buy),
-  // HIGH = red. For others high = green by default.
-  const heatColor = (raw, valIdx) => {
-    const s = scaleByCol[valIdx];
+  // HIGH = red. For others high = green by default. Optional `scale`
+  // override lets cross-tab cells compete within their own col bucket.
+  const heatColor = (raw, valIdx, scale) => {
+    const s = scale || scaleByCol[valIdx];
     if (!s || raw == null || !Number.isFinite(raw)) return null;
     const range = s.hi - s.lo;
     if (range <= 0) return null;
     const t = (raw - s.lo) / range; // 0..1
     const vf = effectiveValues[valIdx];
     const fld = FIELDS[vf.field];
-    // Price metrics: low is "good" (green). Otherwise high = green.
     const flip = fld && (fld.unit === "€" || fld.unit === "€/m²") && (vf.agg === "avg" || vf.agg === "median" || vf.agg === "min" || vf.agg === "max");
     const score = flip ? 1 - t : t;
-    // 0 = red, 0.5 = amber, 1 = green
     const r = score < 0.5 ? 230 : Math.round(230 - (score - 0.5) * 2 * 230);
     const g = score > 0.5 ? 229 : Math.round(score * 2 * 229);
     const alpha = 0.18;
     return `rgba(${r}, ${g}, 120, ${alpha})`;
   };
 
-  // Data bar width (%) — proportional to |value| / colMax
-  const barWidth = (raw, valIdx) => {
-    const s = scaleByCol[valIdx];
+  // Data bar width (%) — proportional to |value| / peer-max
+  const barWidth = (raw, valIdx, scale) => {
+    const s = scale || scaleByCol[valIdx];
     if (!s || raw == null || !Number.isFinite(raw)) return 0;
     const m = Math.max(Math.abs(s.hi), Math.abs(s.lo), 1e-9);
     return Math.min(100, (Math.abs(raw) / m) * 100);
@@ -1710,12 +1734,23 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                         const raw = n.colRollups ? n.colRollups[ck]?.[i] : null;
                         const parent = parentByPath[n.pathKey];
                         const parentRaw = parent?.colRollups ? parent.colRollups[ck]?.[i] : (parent?.rollups?.[i] ?? null);
+                        const scale = scaleByCellKey[`${ck}::${i}`];
+                        const bw = dataBars && n.isLeaf ? barWidth(raw, i, scale) : 0;
+                        const hc = heatmap && n.isLeaf ? heatColor(raw, i, scale) : null;
                         return (
                           <td key={`c:${ck}:${v.key}`} style={{
                             ...td, textAlign: "right", fontFamily: mono,
                             color: green, fontWeight: isSubtotal ? 800 : 600,
                             borderLeft: i === 0 ? `1px solid ${border}` : undefined,
+                            position: "relative", background: hc || undefined,
                           }}>
+                            {bw > 0 && (
+                              <span aria-hidden style={{
+                                position: "absolute", right: 0, bottom: 0, height: 3,
+                                width: `${bw}%`, background: `linear-gradient(90deg, ${green}33, ${green})`,
+                                borderBottomRightRadius: 2, pointerEvents: "none",
+                              }} />
+                            )}
                             {renderCellValue(raw, i, parentRaw)}
                           </td>
                         );
@@ -1726,13 +1761,23 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                       const raw = n.rollups[i];
                       const parent = parentByPath[n.pathKey];
                       const parentRaw = parent ? parent.rollups[i] : null;
+                      const bw = dataBars && n.isLeaf ? barWidth(raw, i) : 0;
+                      const hc = heatmap && n.isLeaf ? heatColor(raw, i) : null;
                       return (
                         <td key={`sum:${v.key}`} style={{
                           ...td, textAlign: "right", fontFamily: mono,
                           color: green, fontWeight: isSubtotal ? 800 : 700,
                           borderLeft: i === 0 ? `2px solid ${green}55` : undefined,
-                          background: "rgba(0,229,160,0.03)",
+                          background: hc || "rgba(0,229,160,0.03)",
+                          position: "relative",
                         }}>
+                          {bw > 0 && (
+                            <span aria-hidden style={{
+                              position: "absolute", right: 0, bottom: 0, height: 3,
+                              width: `${bw}%`, background: `linear-gradient(90deg, ${green}33, ${green})`,
+                              borderBottomRightRadius: 2, pointerEvents: "none",
+                            }} />
+                          )}
                           {isSubtotal && <span style={{ opacity: 0.5, marginRight: "0.3rem" }}>Σ</span>}
                           {renderCellValue(raw, i, parentRaw)}
                         </td>
