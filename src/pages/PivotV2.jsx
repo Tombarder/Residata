@@ -502,36 +502,49 @@ export default function PivotV2({ lang = "sk" }) {
   // { key, anchorEl } — anchor used to position the popover next to the chip.
   const [filterPopup, setFilterPopup] = useState(null);
 
+  // Palette "used" greying: a field is "in use" only when it's in Rows
+  // or Values. Being in Filters doesn't count — because Filters coexist
+  // with either, the user may still want to drag the same field into
+  // Rows/Values while it's filtering.
   const usedKeys = useMemo(() => new Set([
     ...rows,
     ...values.map(v => v.key),
-    ...filters.map(f => f.key),
-  ]), [rows, values, filters]);
+  ]), [rows, values]);
 
   // ── Actions ───────────────────────────────────────────────────
   const addToZone = (fieldKey, zone) => {
-    const removeEverywhere = () => {
-      setRows(r => r.filter(k => k !== fieldKey));
-      setValues(v => v.filter(x => x.key !== fieldKey));
-      setFilters(f => f.filter(x => x.key !== fieldKey));
-    };
-    removeEverywhere();
+    // Rows ↔ Values are mutually exclusive (same field can't be a
+    // group-by AND a measure at the same time — that's not a pivot,
+    // it's a tautology). But Filters can COEXIST with either:
+    // e.g. `cena_s_dph` in Values with agg=avg, AND in Filters between
+    // 100k-500k to exclude outliers. User explicitly asked for this.
     if (zone === "rows") {
+      setValues(v => v.filter(x => x.key !== fieldKey));
       setRows(r => {
         if (r.includes(fieldKey)) return r;
         if (r.length >= MAX_ROWS) return r;
         return [...r, fieldKey];
       });
     } else if (zone === "values") {
+      setRows(r => r.filter(k => k !== fieldKey));
       setValues(v => {
+        if (v.find(x => x.key === fieldKey)) return v;
         if (v.length >= MAX_VALUES) return v;
         const fld = FIELDS[fieldKey];
         return [...v, { key: fieldKey, field: fieldKey, agg: defaultAggFor(fld) }];
       });
     } else if (zone === "filters") {
-      setFilters(f => [...f, { key: fieldKey }]);
+      // Filters coexist with Rows / Values — no mutual-exclusion cleanup.
+      setFilters(f => {
+        if (f.find(x => x.key === fieldKey)) return f;
+        return [...f, { key: fieldKey }];
+      });
+    } else if (zone === "palette") {
+      // Drag back to palette = full remove from wherever it was.
+      setRows(r => r.filter(k => k !== fieldKey));
+      setValues(v => v.filter(x => x.key !== fieldKey));
+      setFilters(f => f.filter(x => x.key !== fieldKey));
     }
-    // zone === "palette" → just removal (done above)
   };
 
   const removeFromZone = (zone, fieldKey) => {
