@@ -2051,7 +2051,10 @@ function ColumnAutofilter({ column, anchorEl, allValues, filter, onApply, onClea
 function AnalyticsPivot({ snapshots, projects, lang }) {
   const allMonths = Array.from(new Set((snapshots || []).map(s => s.snapshot_month).filter(Boolean))).sort().reverse();
   const latestMonth = allMonths[0] || null;
-  const rawSource = snapshots && snapshots.length > 0 ? snapshots : projects;
+  // rawSource is chosen dynamically from statusScope (declared below) so
+  // inactive projects — which don't exist in snapshots yet, only in
+  // `projects` — are actually visible when the user picks Sold out /
+  // Paused / Archived / All. See the `rawSource` derivation further down.
 
   const [filters, setFilters] = useState([]);
   const [rowGroups, setRowGroups] = useState(["district"]);
@@ -2085,6 +2088,17 @@ function AnalyticsPivot({ snapshots, projects, lang }) {
   // Kept for compatibility w/ existing code paths (legacy "groupBys" name)
   const groupBys = rowGroups;
   const MAX_LEVELS = 6;
+
+  // ── Pick the raw dataset based on status scope ──
+  // Snapshots today only contain active projects (sync hasn't yet been
+  // updated to also snapshot inactive ones). So when the user wants to
+  // see historical / paused / archived projects, switch to the `projects`
+  // table which is the source of truth for non-active statuses. We lose
+  // the month dimension on that branch, but that's fine — inactive
+  // projects don't have meaningful month-over-month movement anyway.
+  const rawSource = (statusScope === "active" && snapshots && snapshots.length > 0)
+    ? snapshots
+    : projects;
 
   // ── Apply month scope then status scope then filters ──
   // Status scope is applied BEFORE user filters so the pivot's count of
