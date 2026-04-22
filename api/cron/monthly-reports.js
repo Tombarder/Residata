@@ -25,8 +25,30 @@ const textDim = "#8a8a96";
 const orange = "#f5a623";
 
 export default async function handler(req, res) {
+  // ── Env (needed early so we can resolve secrets from app_secrets
+  //    if they aren't in the Vercel env) ──
+  const SUPABASE_URL        = process.env.SUPABASE_URL;
+  const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY;
+  const WEB_URL             = process.env.WEB_URL || "https://residata-gamma.vercel.app";
+  if (!SUPABASE_URL || !SUPABASE_SECRET_KEY) {
+    return res.status(500).json({ error: "SUPABASE envs missing" });
+  }
+
+  const admin = createClient(SUPABASE_URL, SUPABASE_SECRET_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
+  // Resolve secret with DB fallback
+  const secretOrFallback = async (envKey) => {
+    if (process.env[envKey]) return process.env[envKey];
+    try {
+      const { data } = await admin.from("app_secrets").select("value").eq("key", envKey).maybeSingle();
+      return data?.value || null;
+    } catch (_) { return null; }
+  };
+
   // ── Auth ──
-  const secret = process.env.CRON_SECRET;
+  const secret = await secretOrFallback("CRON_SECRET");
   const authHeader = req.headers.authorization || req.headers.Authorization || "";
   const isVercelCron = req.headers["x-vercel-cron"] === "1";
   const tokenOk = secret && authHeader === `Bearer ${secret}`;
@@ -34,22 +56,13 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: "unauthorized" });
   }
 
-  // ── Env ──
-  const SUPABASE_URL        = process.env.SUPABASE_URL;
-  const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY;
-  const GMAIL_USER          = process.env.GMAIL_USER;
-  const GMAIL_APP_PASSWORD  = process.env.GMAIL_APP_PASSWORD;
-  const WEB_URL             = process.env.WEB_URL || "https://residata-gamma.vercel.app";
-  if (!SUPABASE_URL || !SUPABASE_SECRET_KEY) {
-    return res.status(500).json({ error: "SUPABASE envs missing" });
+  // Matches the existing welcome-user webhook convention: GMAIL_FROM +
+  // GMAIL_APP_PASSWORD, with a hard-coded default sender.
+  const GMAIL_FROM         = (await secretOrFallback("GMAIL_FROM")) || "tkamhal@gmail.com";
+  const GMAIL_APP_PASSWORD = await secretOrFallback("GMAIL_APP_PASSWORD");
+  if (!GMAIL_APP_PASSWORD) {
+    return res.status(500).json({ error: "GMAIL_APP_PASSWORD missing (neither Vercel env nor app_secrets row found)" });
   }
-  if (!GMAIL_USER || !GMAIL_APP_PASSWORD) {
-    return res.status(500).json({ error: "GMAIL envs missing" });
-  }
-
-  const admin = createClient(SUPABASE_URL, SUPABASE_SECRET_KEY, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
 
   // ── Load subscribers ──
   const { data: subs, error: subErr } = await admin
@@ -83,8 +96,8 @@ export default async function handler(req, res) {
         to: sub.email,
         subject: `Residata · ${capitalize(month)} · ${sub.scope_label || scopeTitle(sub.scope, sub.lang)}`,
         html,
-        from: GMAIL_USER,
-        gmailUser: GMAIL_USER,
+        from: GMAIL_FROM,
+        gmailUser: GMAIL_FROM,
         gmailPassword: GMAIL_APP_PASSWORD,
       });
       await admin.from("report_subscriptions")

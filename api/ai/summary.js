@@ -53,7 +53,13 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "method not allowed" });
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  // Resolve ANTHROPIC_API_KEY — env var wins; otherwise fall back to
+  // the app_secrets table in Supabase (populated by the agent so the
+  // user didn't have to copy-paste into Vercel envs manually).
+  let apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    apiKey = await readSecret("ANTHROPIC_API_KEY");
+  }
   if (!apiKey) {
     return res.status(501).json({
       error: "AI disabled on the server (ANTHROPIC_API_KEY missing).",
@@ -214,6 +220,27 @@ export default async function handler(req, res) {
     duration_ms: Date.now() - startedAt,
     tier,
   });
+}
+
+/* Read one secret from app_secrets. Returns null if Supabase isn't
+   configured or the row doesn't exist. Service-role client bypasses
+   RLS so the table stays locked down to other callers. */
+async function readSecret(key) {
+  const URL = process.env.SUPABASE_URL;
+  const SK  = process.env.SUPABASE_SECRET_KEY;
+  if (!URL || !SK) return null;
+  try {
+    const admin = createClient(URL, SK, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const { data, error } = await admin
+      .from("app_secrets")
+      .select("value")
+      .eq("key", key)
+      .maybeSingle();
+    if (error) return null;
+    return data?.value || null;
+  } catch (_) { return null; }
 }
 
 /* Best-effort log insert. Never throws — a failed log shouldn't break
