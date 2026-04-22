@@ -556,12 +556,6 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
   // ─── Render ──────────────────────────────────────────────
   return (
     <main style={{ padding: "1rem 2rem 4rem", maxWidth: 1240, margin: "0 auto" }}>
-      <p style={{ color: dim, fontSize: "0.95rem", lineHeight: 1.65, marginTop: 0, marginBottom: "1.5rem", maxWidth: 760 }}>
-        {lang === "sk"
-          ? <>Všetko je <strong style={{ color: "#e8e8ed" }}>živé</strong> zo Supabase. Dole máš <strong style={{ color: green }}>Pivot</strong> — skladaj si vlastné pohľady na dáta (filter · group · measure · graf) a stiahni slice ako CSV.</>
-          : <>Everything's <strong style={{ color: "#e8e8ed" }}>live</strong> from Supabase. Scroll down for the <strong style={{ color: green }}>Pivot</strong> — compose your own views (filter · group · measure · chart) and export the slice as CSV.</>}
-      </p>
-
       {/* ═══ KPI STRIP ═══ */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.85rem", marginBottom: "2rem" }}>
         <AKpi label={lang === "sk" ? "Sledované byty" : "Units tracked"}   value={totalUnits.toLocaleString(lang === "sk" ? "sk-SK" : "en-US")} />
@@ -1596,39 +1590,68 @@ function AnalyticsPivot({ snapshots, projects, lang }) {
                 {lang === "sk" ? `Všetky mesiace (${allMonths.length})` : `All months (${allMonths.length})`}
               </button>
             </div>
-            <div style={{ fontSize: "0.68rem", color: "#55555f", fontFamily: mono, textAlign: "right" }}>
-              {allMonths.length === 1
-                ? (lang === "sk" ? "Ďalšie mesiace pribudnú po ďalšom sync behu" : "New months will appear after the next sync run")
-                : (lang === "sk" ? `${allMonths.length} mesiacov v datasete` : `${allMonths.length} months in dataset`)}
-            </div>
+            {allMonths.length > 1 && (
+              <div style={{ fontSize: "0.68rem", color: "#55555f", fontFamily: mono, textAlign: "right" }}>
+                {lang === "sk" ? `${allMonths.length} mesiacov v datasete` : `${allMonths.length} months in dataset`}
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* ── FILTERS (advanced) ── */}
-      <div style={{ marginBottom: "1rem" }}>
-        <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.4rem" }}>
-          {lang === "sk" ? "Filtre" : "Filters"} ({filters.length})
-          <span style={{ marginLeft: "0.6rem", color: "#55555f", textTransform: "none", fontSize: "0.65rem", letterSpacing: "0.02em" }}>
-            {lang === "sk" ? "(pre kvantitatívne / rozsahy; rýchle hodnotové filtre sú na chipoch cez ⚑)" : "(for ranges / operators; quick value filters are on chips via ⚑)"}
-          </span>
+      {/* ── FILTERS (prominent card) ── */}
+      <div style={{
+        marginBottom: "1.1rem",
+        background: filters.length > 0 ? "rgba(0,229,160,0.05)" : "#0a0a0b",
+        border: `1px solid ${filters.length > 0 ? green + "55" : border}`,
+        borderRadius: 8, padding: "0.85rem 1rem",
+        transition: "background 0.2s, border-color 0.2s",
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: filters.length > 0 ? "0.65rem" : "0.3rem", flexWrap: "wrap", gap: "0.5rem" }}>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: "0.55rem" }}>
+            <span style={{
+              display: "inline-flex", alignItems: "center", justifyContent: "center",
+              width: 22, height: 22, borderRadius: 4,
+              background: filters.length > 0 ? green : "#16161a",
+              color: filters.length > 0 ? "#0a0a0b" : dim,
+              fontSize: "0.78rem", fontWeight: 700,
+            }}>⚑</span>
+            <span style={{ fontFamily: mono, fontSize: "0.72rem", color: filters.length > 0 ? green : "#e8e8ed", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700 }}>
+              {lang === "sk" ? "FILTRE" : "FILTERS"}
+            </span>
+            <span style={{ fontFamily: mono, fontSize: "0.72rem", color: dim }}>
+              {filters.length === 0
+                ? (lang === "sk" ? "žiadne · zobrazuje sa všetko" : "none · showing everything")
+                : (lang === "sk" ? `${filters.length} aktívny${filters.length > 1 ? "ch" : ""}` : `${filters.length} active`)}
+            </span>
+          </div>
+          <button onClick={addFilter} style={{
+            background: green, border: "none",
+            color: "#0a0a0b", padding: "0.4rem 0.85rem", borderRadius: 5, cursor: "pointer",
+            fontFamily: "inherit", fontSize: "0.76rem", fontWeight: 700,
+            boxShadow: "0 2px 8px rgba(0,229,160,0.2)",
+          }}
+            onMouseEnter={e => { e.currentTarget.style.filter = "brightness(1.1)"; }}
+            onMouseLeave={e => { e.currentTarget.style.filter = "none"; }}>
+            + {lang === "sk" ? "Pridať filter" : "Add filter"}
+          </button>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-          {filters.map(f => (
-            <FilterRow key={f.id} f={f} projects={projects} lang={lang} t={t}
-              onChange={(patch) => updateFilter(f.id, patch)}
-              onRemove={() => removeFilter(f.id)} />
-          ))}
-        </div>
-        <button onClick={addFilter} style={{
-          marginTop: "0.5rem", background: "transparent", border: `1px dashed ${border}`,
-          color: dim, padding: "0.5rem 0.85rem", borderRadius: 6, cursor: "pointer",
-          fontFamily: "inherit", fontSize: "0.78rem",
-        }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor = green; e.currentTarget.style.color = green; }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor = border; e.currentTarget.style.color = dim; }}>
-          + {lang === "sk" ? "pridať filter" : "add filter"}
-        </button>
+        {filters.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+            {filters.map(f => (
+              <FilterRow key={f.id} f={f} projects={projects} lang={lang} t={t}
+                onChange={(patch) => updateFilter(f.id, patch)}
+                onRemove={() => removeFilter(f.id)} />
+            ))}
+          </div>
+        )}
+        {filters.length === 0 && (
+          <div style={{ fontSize: "0.74rem", color: dim, lineHeight: 1.45 }}>
+            {lang === "sk"
+              ? <>Pridaj filter pre operátory (<code style={{ color: "#e8e8ed" }}>contains</code>, <code style={{ color: "#e8e8ed" }}>between</code>, <code style={{ color: "#e8e8ed" }}>≥</code>…) alebo klikni ⚑ na chipe v Riadkoch pre rýchly výber hodnôt.</>
+              : <>Add a filter for operators (<code style={{ color: "#e8e8ed" }}>contains</code>, <code style={{ color: "#e8e8ed" }}>between</code>, <code style={{ color: "#e8e8ed" }}>≥</code>…) or click ⚑ on a chip in Rows for a quick value picker.</>}
+          </div>
+        )}
       </div>
 
       {/* ── ROWS (DnD) + MEASURE ── */}
@@ -2075,6 +2098,170 @@ function StyledSelect({ value, onChange, options, style = {}, disabled = false, 
   );
 }
 
+/* AutocompleteInput — combobox-style input for filter values.
+   - Focus (or type) → dropdown appears with all / matching suggestions
+   - Click suggestion → auto-fills and closes
+   - Arrow keys navigate; Enter picks highlighted; Esc closes
+   - Typing raw text still works (for patterns that don't match any value) */
+function AutocompleteInput({ value, onChange, suggestions, placeholder, lang }) {
+  const [open, setOpen] = useState(false);
+  const [highlight, setHighlight] = useState(-1);
+  const wrapRef = useRef(null);
+  const popRef = useRef(null);
+  const inputRef = useRef(null);
+
+  const q = String(value || "").trim().toLowerCase();
+  const filtered = q === ""
+    ? suggestions
+    : suggestions.filter(s => String(s).toLowerCase().includes(q));
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e) => {
+      if (wrapRef.current?.contains(e.target)) return;
+      setOpen(false);
+      setHighlight(-1);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+
+  // Scroll the highlighted option into view on keyboard nav
+  useEffect(() => {
+    if (highlight < 0 || !popRef.current) return;
+    const el = popRef.current.querySelector(`[data-ac-idx="${highlight}"]`);
+    if (el) el.scrollIntoView({ block: "nearest" });
+  }, [highlight]);
+
+  const pick = (v) => {
+    onChange(v);
+    setOpen(false);
+    setHighlight(-1);
+  };
+
+  const onKey = (e) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (!open) setOpen(true);
+      setHighlight(h => Math.min(h + 1, filtered.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlight(h => Math.max(h - 1, 0));
+    } else if (e.key === "Enter") {
+      if (open && highlight >= 0 && filtered[highlight] != null) {
+        e.preventDefault();
+        pick(String(filtered[highlight]));
+      } else {
+        setOpen(false);
+      }
+    } else if (e.key === "Escape") {
+      setOpen(false);
+      setHighlight(-1);
+    } else if (e.key === "Tab") {
+      setOpen(false);
+    }
+  };
+
+  // Visual: split the option text around the matched substring to highlight it
+  const renderLabel = (s) => {
+    const str = String(s);
+    if (!q) return str;
+    const lower = str.toLowerCase();
+    const idx = lower.indexOf(q);
+    if (idx === -1) return str;
+    return (
+      <>
+        {str.slice(0, idx)}
+        <mark style={{ background: "rgba(0,229,160,0.28)", color: green, borderRadius: 2, padding: "0 1px" }}>
+          {str.slice(idx, idx + q.length)}
+        </mark>
+        {str.slice(idx + q.length)}
+      </>
+    );
+  };
+
+  return (
+    <div ref={wrapRef} style={{ position: "relative", width: "100%" }}>
+      <input
+        ref={inputRef}
+        value={value ?? ""}
+        onChange={e => { onChange(e.target.value); setOpen(true); setHighlight(-1); }}
+        onFocus={() => { setOpen(true); setHighlight(-1); }}
+        onKeyDown={onKey}
+        placeholder={placeholder}
+        autoComplete="off"
+        style={{ ...pvtInput, marginTop: 0 }}
+      />
+      {open && (
+        <div
+          ref={popRef}
+          style={{
+            position: "absolute",
+            top: "calc(100% + 4px)",
+            left: 0, right: 0,
+            background: "#0a0a0b",
+            border: `1px solid ${green}55`,
+            borderRadius: 6,
+            boxShadow: "0 12px 32px rgba(0,0,0,0.75)",
+            maxHeight: 240,
+            overflowY: "auto",
+            zIndex: 600,
+            padding: "0.25rem",
+          }}
+        >
+          {filtered.length === 0 ? (
+            <div style={{ padding: "0.45rem 0.6rem", color: dim, fontSize: "0.76rem", fontStyle: "italic" }}>
+              {suggestions.length === 0
+                ? (lang === "sk" ? "žiadne hodnoty v dátach" : "no values in data")
+                : (lang === "sk" ? "žiadna zhoda — ale môžeš dopísať vlastnú hodnotu" : "no match — type a custom value")}
+            </div>
+          ) : (
+            <>
+              <div style={{ padding: "0.2rem 0.6rem 0.3rem", fontSize: "0.62rem", color: dim, fontFamily: mono, letterSpacing: "0.05em", textTransform: "uppercase" }}>
+                {filtered.length > 100
+                  ? (lang === "sk" ? `${filtered.length} možností · zobrazených prvých 100` : `${filtered.length} matches · showing first 100`)
+                  : (lang === "sk" ? `${filtered.length} ${filtered.length === 1 ? "možnosť" : "možností"}` : `${filtered.length} ${filtered.length === 1 ? "match" : "matches"}`)}
+              </div>
+              {filtered.slice(0, 100).map((s, i) => {
+                const str = String(s);
+                const isExact = str.toLowerCase() === q && q !== "";
+                const isHighlight = i === highlight;
+                return (
+                  <button
+                    key={str + "|" + i}
+                    data-ac-idx={i}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}  /* prevent input blur before click fires */
+                    onMouseEnter={() => setHighlight(i)}
+                    onClick={() => pick(str)}
+                    style={{
+                      display: "flex", alignItems: "center", width: "100%",
+                      textAlign: "left",
+                      background: isHighlight ? "rgba(0,229,160,0.14)" : "transparent",
+                      border: "none",
+                      borderLeft: `2px solid ${isExact || isHighlight ? green : "transparent"}`,
+                      color: isHighlight || isExact ? green : "#e8e8ed",
+                      padding: "0.35rem 0.6rem",
+                      fontSize: "0.82rem",
+                      fontFamily: "inherit",
+                      cursor: "pointer",
+                      borderRadius: 3,
+                      whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                    }}
+                  >
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{renderLabel(str)}</span>
+                    {isExact && <span style={{ marginLeft: "auto", color: green, fontSize: "0.68rem", fontFamily: mono, opacity: 0.8 }}>✓ exact</span>}
+                  </button>
+                );
+              })}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function FilterRow({ f, projects, lang, t, onChange, onRemove }) {
   const col = PIVOT_COLUMNS[f.column] || {};
   const colType = col.type;
@@ -2154,9 +2341,17 @@ function FilterRow({ f, projects, lang, t, onChange, onRemove }) {
           <input type="number" value={f.value ?? ""} onChange={e => onChange({ value: e.target.value })}
             style={{ ...pvtInput, marginTop: 0 }} />
         ) : (
-          <input value={f.value ?? ""} onChange={e => onChange({ value: e.target.value })}
-            placeholder={lang === "sk" ? "hodnota…" : "value…"}
-            style={{ ...pvtInput, marginTop: 0 }} />
+          /* Text / derived value → combobox with autocomplete over distinct
+             values from the current dataset. User can click to pick or type
+             a custom value; both work for is / is not / contains / starts
+             with / ends with. */
+          <AutocompleteInput
+            value={f.value ?? ""}
+            onChange={(v) => onChange({ value: v })}
+            suggestions={distinctValues}
+            placeholder={lang === "sk" ? "klikni pre zoznam · alebo píš…" : "click for list · or type…"}
+            lang={lang}
+          />
         )}
       </div>
 
