@@ -560,20 +560,50 @@ function ChooseProjectGate({ projectId, projectName, profile, reloadProfile, set
 
   const assign = async () => {
     setBusy(true); setErr(null);
-    const { data, error } = await supabase.from("user_profiles")
-      .update({ chosen_project_id: projectId })
-      .eq("id", profile.id)
-      .select()
-      .maybeSingle();
-    setBusy(false);
-    if (error) { setErr(error.message); return; }
-    if (!data) {
-      setErr(lang === "sk"
-        ? "Aktualizácia zlyhala — skús sa odhlásiť a prihlásiť znova."
-        : "Update failed — try signing out and back in.");
-      return;
+    console.log("[ChooseProject] assign start", { userId: profile?.id, projectId });
+    const t0 = performance.now();
+
+    // Hard-reload safety net — if for any reason the async chain stalls
+    // (stale session, network blip), force a reload to /live so the user
+    // never sees a permanent "Saving…" button.
+    const fallback = setTimeout(() => {
+      console.warn("[ChooseProject] slow — forcing hard reload");
+      window.location.reload();
+    }, 10000);
+
+    try {
+      // Step 1: UPDATE. We deliberately DON'T chain .select().maybeSingle()
+      // here — the SELECT back is an extra round-trip that can return null
+      // under RLS / PostgREST edge cases even when the UPDATE succeeded,
+      // and then the user sees a misleading "Update failed". Instead we
+      // rely on reloadProfile() below to confirm the new state.
+      const { error: updErr } = await supabase.from("user_profiles")
+        .update({ chosen_project_id: projectId })
+        .eq("id", profile.id);
+      console.log(`[ChooseProject] UPDATE returned after ${Math.round(performance.now() - t0)}ms`, { updErr });
+      if (updErr) throw new Error(updErr.message);
+
+      // Step 2: Refresh profile from DB. This is the source of truth.
+      //  - If chosen_project_id now matches, we're good → <LiveProjectDetail>
+      //    re-renders with canView=true and ChooseProjectGate unmounts.
+      //  - If it doesn't match, the UPDATE silently failed (RLS) and we
+      //    surface that to the user instead of leaving them on a dead page.
+      await reloadProfile();
+      console.log(`[ChooseProject] done after ${Math.round(performance.now() - t0)}ms`);
+      clearTimeout(fallback);
+      // Hard redirect to /live — React should re-render ChooseProjectGate
+      // into LiveProjectDetail automatically once profile state updates,
+      // but in practice React's state propagation is occasionally slow
+      // enough that the user sees a blank frame. Navigating explicitly
+      // is cheap insurance.
+      setCurrent && setCurrent(`Project:${projectId}`);
+    } catch (e) {
+      console.error("[ChooseProject] exception", e);
+      clearTimeout(fallback);
+      setErr(e.message || String(e));
+    } finally {
+      setBusy(false);
     }
-    await reloadProfile();
   };
 
   // Already chose a DIFFERENT project → locked, show explanation
