@@ -32,6 +32,12 @@
 
 import { createClient } from "@supabase/supabase-js";
 
+// Allow the Anthropic round-trip to take longer than Vercel's default
+// 10s timeout on the Hobby plan. 30s is a safe ceiling for 900-token
+// generations on claude-sonnet-4-5; Pro/Enterprise plans cap at 60s
+// but 30s is plenty. Configuration is honoured by Vercel at deploy.
+export const maxDuration = 30;
+
 const ANTHROPIC_MODEL = "claude-sonnet-4-5";
 const MAX_TOKENS      = 900;
 const MAX_INPUT_BYTES = 16 * 1024;

@@ -19,6 +19,11 @@
 import { createClient } from "@supabase/supabase-js";
 import { sendEmail } from "../_lib/emails.js";
 
+// Gmail SMTP sends are sequential and can take ~2-5s each. With 20+
+// subscribers plus the retention prune, default 10s timeout is tight.
+// 60s covers roughly 20 sends before we'd need a queue.
+export const maxDuration = 60;
+
 const green = "#00e5a0";
 const textLight = "#e8e8ed";
 const textDim = "#8a8a96";
@@ -111,10 +116,16 @@ export default async function handler(req, res) {
 
   // Prune old ai_usage_log rows (retention 90 days). Best-effort — a
   // prune failure shouldn't affect the email delivery report.
-  let pruned = null;
+  // The SQL function is capped at 100k rows per call so we loop until
+  // it returns 0 (or we hit the safety bound of 20 iterations = 2M
+  // rows, which is waaay more than any realistic log volume).
+  let pruned = 0;
   try {
-    const { data, error } = await admin.rpc("prune_ai_usage_log", { retention_days: 90 });
-    if (!error) pruned = data;
+    for (let i = 0; i < 20; i++) {
+      const { data, error } = await admin.rpc("prune_ai_usage_log", { retention_days: 90 });
+      if (error || !data || data === 0) break;
+      pruned += data;
+    }
   } catch (_) { /* ignore */ }
 
   return res.status(200).json({

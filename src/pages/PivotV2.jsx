@@ -1122,7 +1122,16 @@ function ChipInZone({ label, type, agg, filter, level, onDragStart, onDragStartP
       {level != null && (
         <span style={{ opacity: 0.65, fontSize: "0.58rem", padding: "0 2px" }}>L{level + 1}</span>
       )}
-      <span style={{ fontWeight: 600 }}>{label}</span>
+      <span
+        title={label}
+        style={{
+          fontWeight: 600,
+          maxWidth: 180, overflow: "hidden",
+          textOverflow: "ellipsis", whiteSpace: "nowrap",
+        }}
+      >
+        {label}
+      </span>
       {/* Filter chip summary — shows what's currently configured */}
       {isFilterChip && (
         <span style={{ opacity: 0.85, fontSize: "0.62rem", fontFamily: mono, whiteSpace: "nowrap" }}>

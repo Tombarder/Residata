@@ -699,13 +699,22 @@ function renderAiBlock(b, key) {
       </div>
     );
   }
-  // Bulleted list
+  // Bulleted list — `- item` or `* item`
   const lines = b.split("\n");
   if (lines.every(l => /^\s*[-*]\s+/.test(l))) {
     return (
       <ul key={key} style={{ margin: "0 0 0.85rem", paddingLeft: "1.25rem" }}>
         {lines.map((l, j) => <li key={j} style={{ marginBottom: "0.25rem" }}>{renderInline(l.replace(/^\s*[-*]\s+/, ""))}</li>)}
       </ul>
+    );
+  }
+  // Numbered list — `1. item`, `2. item`. Accept any digits so Claude
+  // can emit `10.` without us falling back to paragraph.
+  if (lines.every(l => /^\s*\d+[.)]\s+/.test(l))) {
+    return (
+      <ol key={key} style={{ margin: "0 0 0.85rem", paddingLeft: "1.35rem" }}>
+        {lines.map((l, j) => <li key={j} style={{ marginBottom: "0.25rem" }}>{renderInline(l.replace(/^\s*\d+[.)]\s+/, ""))}</li>)}
+      </ol>
     );
   }
   return <p key={key} style={{ margin: "0 0 0.85rem" }}>{renderInline(b)}</p>;
