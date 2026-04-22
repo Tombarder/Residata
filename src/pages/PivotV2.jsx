@@ -1744,8 +1744,11 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                   color: isSubtotal ? text : "#c4c4cc",
                   whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                 }}>
+                  {/* Subtotal level indicator — was a bordered mono badge,
+                      now a barely-visible superscript so the row still
+                      reads "Developer X" not "L2 Developer X". */}
                   {isSubtotal && (
-                    <span style={{ fontFamily: mono, fontSize: "0.55rem", color: green, opacity: 0.7, marginRight: "0.4rem", padding: "1px 4px", border: `1px solid ${green}33`, borderRadius: 3, verticalAlign: "middle" }}>
+                    <span style={{ color: dim, fontSize: "0.62rem", marginRight: "0.35rem", verticalAlign: "middle" }}>
                       L{n.level + 1}
                     </span>
                   )}
@@ -1858,8 +1861,8 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
           })}
           {/* Grand total */}
           <tr style={{ background: bg, borderTop: `2px solid ${green}66` }}>
-            <td style={{ ...td, fontWeight: 800, color: green, fontFamily: mono, letterSpacing: "0.06em", textTransform: "uppercase", fontSize: "0.74rem" }}>
-              Σ {lang === "sk" ? "CELKOM" : "TOTAL"}
+            <td style={{ ...td, fontWeight: 700, color: green, fontSize: "0.85rem" }}>
+              Σ {lang === "sk" ? "Spolu" : "Total"}
             </td>
             <td style={{ ...td, textAlign: "right", fontFamily: mono, color: green, fontWeight: 700 }}>
               {grandTotal.count.toLocaleString("en-US").replace(/,/g, " ")}
