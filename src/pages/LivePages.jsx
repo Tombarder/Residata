@@ -883,17 +883,25 @@ function buildRowTree(records, groupCols, computeMeasure) {
   };
 }
 
-function sortTree(nodes, sortBy) {
+function sortTree(nodes, sortCol, sortDir) {
   const cmp = (a, b) => {
-    if (sortBy === "value_desc") return b.value - a.value;
-    if (sortBy === "value_asc")  return a.value - b.value;
-    if (sortBy === "key_asc")    return String(a.label).localeCompare(String(b.label));
-    if (sortBy === "key_desc")   return String(b.label).localeCompare(String(a.label));
-    return 0;
+    if (sortCol === "count") {
+      const av = a.count || 0, bv = b.count || 0;
+      return sortDir === "desc" ? bv - av : av - bv;
+    }
+    if (sortCol === "name") {
+      return sortDir === "asc"
+        ? String(a.label).localeCompare(String(b.label), undefined, { numeric: true })
+        : String(b.label).localeCompare(String(a.label), undefined, { numeric: true });
+    }
+    // Default: value
+    const av = Number.isFinite(a.value) ? a.value : 0;
+    const bv = Number.isFinite(b.value) ? b.value : 0;
+    return sortDir === "desc" ? bv - av : av - bv;
   };
   const sorted = [...nodes].sort(cmp);
   for (const n of sorted) {
-    if (n.children.length) n.children = sortTree(n.children, sortBy);
+    if (n.children.length) n.children = sortTree(n.children, sortCol, sortDir);
   }
   return sorted;
 }
@@ -924,6 +932,82 @@ function getAllPathKeys(nodes, { leavesToo = false } = {}) {
   };
   for (const n of nodes) walk(n);
   return out;
+}
+
+/* ── Tiny inline SVG icons, monochrome, inherit currentColor ───
+   Using SVG instead of emoji so they visually match the dark/green
+   theme (emoji render with their own garish color palette that clashes
+   with everything else). 14×14 with 1.5px stroke reads crisp at
+   dropdown row height. */
+const svgProps = {
+  width: 14, height: 14, viewBox: "0 0 14 14",
+  fill: "none", stroke: "currentColor", strokeWidth: 1.5,
+  strokeLinecap: "round", strokeLinejoin: "round",
+  style: { flexShrink: 0 },
+};
+const IconTree  = () => (<svg {...svgProps}><path d="M3 2 L3 11 M3 4 L7 4 M3 7 L7 7 M3 10 L7 10 M7 4 L7 10 M7 4 L11 4 M7 10 L11 10" /></svg>);
+const IconBars  = () => (<svg {...svgProps}><rect x="2" y="8" width="2.5" height="4" rx="0.3" fill="currentColor" opacity="0.8"/><rect x="5.75" y="5" width="2.5" height="7" rx="0.3" fill="currentColor" opacity="0.9"/><rect x="9.5" y="2" width="2.5" height="10" rx="0.3" fill="currentColor"/></svg>);
+const IconSigma = () => (<svg {...svgProps}><path d="M11 2 L3 2 L7 7 L3 12 L11 12" /></svg>);
+const IconHash  = () => (<svg {...svgProps}><path d="M4 2 L3 12 M10 2 L9 12 M2 5 L11 5 M2 9 L10 9" /></svg>);
+const IconAZ    = () => (<svg {...svgProps}><path d="M2 12 L4 4 L6 12 M2.7 9 L5.3 9 M8 12 L12 4 M8 12 L12 12 M12 4 L8 4" /></svg>);
+const IconArrUp = () => (<svg {...svgProps}><path d="M7 2 L7 12 M3 6 L7 2 L11 6" /></svg>);
+const IconArrDn = () => (<svg {...svgProps}><path d="M7 2 L7 12 M3 8 L7 12 L11 8" /></svg>);
+
+/* A tiny icon-label pair used inside StyledSelect option labels. */
+const IconLabel = ({ icon, children }) => (
+  <span style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
+    <span style={{ display: "inline-flex", color: "currentColor", opacity: 0.85 }}>{icon}</span>
+    <span>{children}</span>
+  </span>
+);
+
+/* StyledCheckbox — replaces native <input type="checkbox"/> which renders as
+   a stark white OS square that clashes with the dark theme. This version is
+   a rounded dark square with a soft border and a green check when on. Click
+   target is the whole label for easy targeting. */
+function StyledCheckbox({ checked, onChange, label, warn, title, disabled }) {
+  return (
+    <label
+      title={title}
+      style={{
+        display: "inline-flex", alignItems: "center", gap: "0.45rem",
+        cursor: disabled ? "not-allowed" : "pointer",
+        fontSize: "0.76rem", color: checked ? green : "#e8e8ed",
+        userSelect: "none", opacity: disabled ? 0.55 : 1,
+        padding: "0.25rem 0.1rem",
+      }}
+    >
+      <span
+        role="checkbox"
+        aria-checked={checked}
+        onClick={(e) => { if (!disabled) { e.preventDefault(); onChange(!checked); } }}
+        style={{
+          display: "inline-flex", alignItems: "center", justifyContent: "center",
+          width: 16, height: 16, borderRadius: 4,
+          background: checked ? green : "#0e0e10",
+          border: `1.5px solid ${checked ? green : "#3a3a44"}`,
+          boxShadow: checked ? `0 0 0 2px rgba(0,229,160,0.15)` : "none",
+          transition: "background 0.15s, border-color 0.15s, box-shadow 0.15s",
+          flexShrink: 0,
+        }}
+      >
+        {checked && (
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="#0a0a0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M1.5 5.25 L4 7.75 L8.5 2.25" />
+          </svg>
+        )}
+      </span>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        disabled={disabled}
+        style={{ position: "absolute", opacity: 0, pointerEvents: "none", width: 0, height: 0 }}
+      />
+      <span>{label}</span>
+      {warn && <span style={{ fontSize: "0.65rem", color: "#ff9b6b", marginLeft: "0.15rem" }} title={typeof warn === "string" ? warn : ""}>⚠</span>}
+    </label>
+  );
 }
 
 /* ── RowsZone — drop zone for the row-axis field chips ──────
@@ -1340,7 +1424,11 @@ function AnalyticsPivot({ snapshots, projects, lang }) {
   const [rowGroups, setRowGroups] = useState(["district"]);
   const [measure, setMeasure] = useState({ column: "__count__", agg: "count" });
   const [chartType, setChartType] = useState("table");  // default table — tree is the killer feature
-  const [sortBy, setSortBy] = useState("value_desc");
+  // Sort is now two-axis: WHICH column to sort by (value / count / name) + direction.
+  // Gives the user the Excel pivot-experience: "sort by count ascending" is different
+  // from "sort by measure value ascending" and we want both to be first-class.
+  const [sortCol, setSortCol] = useState("value");   // "value" | "count" | "name"
+  const [sortDir, setSortDir] = useState("desc");    // "desc" | "asc"
   const [monthScope, setMonthScope] = useState("latest");
   const [topN, setTopN] = useState(0);
   const [percentOfTotal, setPercentOfTotal] = useState(false);
@@ -1396,7 +1484,7 @@ function AnalyticsPivot({ snapshots, projects, lang }) {
 
   // ── Build tree ──
   const rawTree = buildRowTree(filtered, rowGroups, computeMeasure);
-  let sortedTopNodes = sortTree(rawTree.children, sortBy);
+  let sortedTopNodes = sortTree(rawTree.children, sortCol, sortDir);
   // Top-N applies only at top level (Excel semantics — filter the axis, not sub-levels)
   const topNLimited = topN > 0 ? sortedTopNodes.slice(0, topN) : sortedTopNodes;
 
@@ -1715,32 +1803,62 @@ function AnalyticsPivot({ snapshots, projects, lang }) {
             />
           </div>
 
-          <div style={{ marginTop: "0.6rem", display: "flex", gap: "0.4rem" }}>
+          {/* Chart type — single row */}
+          <div style={{ marginTop: "0.6rem" }}>
+            <div style={{ fontSize: "0.62rem", color: dim, fontFamily: mono, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.25rem" }}>
+              {lang === "sk" ? "Zobrazenie" : "View"}
+            </div>
             <StyledSelect
               value={chartType}
               onChange={setChartType}
-              style={{ flex: 1 }}
               options={[
-                { value: "table", label: `🗂️ ${lang === "sk" ? "tabuľka (strom)" : "table (tree)"}` },
-                { value: "bar",   label: `📊 ${lang === "sk" ? "bar (top-level)"  : "bar (top-level)"}` },
-              ]}
-            />
-            <StyledSelect
-              value={sortBy}
-              onChange={setSortBy}
-              style={{ flex: 1 }}
-              options={[
-                { value: "value_desc", label: `↓ ${lang === "sk" ? "podľa hodnoty (najväčšie)" : "by value (desc)"}` },
-                { value: "value_asc",  label: `↑ ${lang === "sk" ? "podľa hodnoty (najmenšie)" : "by value (asc)"}` },
-                { value: "key_asc",    label: "A–Z" },
-                { value: "key_desc",   label: "Z–A" },
+                { value: "table", label: <IconLabel icon={<IconTree/>}>{lang === "sk" ? "Tabuľka (strom s hierarchiou)" : "Table (tree with hierarchy)"}</IconLabel> },
+                { value: "bar",   label: <IconLabel icon={<IconBars/>}>{lang === "sk" ? "Bar graf (top-level)"          : "Bar chart (top-level)"}</IconLabel> },
               ]}
             />
           </div>
 
-          <div style={{ marginTop: "0.6rem", display: "flex", gap: "0.55rem", alignItems: "center", flexWrap: "wrap" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
-              <span style={{ fontSize: "0.72rem", color: dim, fontFamily: mono }}>Top-N:</span>
+          {/* Sort — two dropdowns: column + direction */}
+          <div style={{ marginTop: "0.65rem" }}>
+            <div style={{ fontSize: "0.62rem", color: dim, fontFamily: mono, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.25rem" }}>
+              {lang === "sk" ? "Zoradenie" : "Sort"}
+            </div>
+            <div style={{ display: "flex", gap: "0.4rem" }}>
+              <StyledSelect
+                value={sortCol}
+                onChange={setSortCol}
+                style={{ flex: 1 }}
+                options={[
+                  { value: "value", label: <IconLabel icon={<IconSigma/>}>{lang === "sk" ? "Podľa hodnoty metriky" : "By measure value"}</IconLabel> },
+                  { value: "count", label: <IconLabel icon={<IconHash/>}>{lang  === "sk" ? "Podľa počtu projektov" : "By project count"}</IconLabel> },
+                  { value: "name",  label: <IconLabel icon={<IconAZ/>}>{lang    === "sk" ? "Podľa názvu skupiny"   : "By group name"}</IconLabel> },
+                ]}
+              />
+              <StyledSelect
+                value={sortDir}
+                onChange={setSortDir}
+                style={{ flex: "0 0 180px" }}
+                options={sortCol === "name"
+                  ? [
+                      { value: "asc",  label: <IconLabel icon={<IconArrUp/>}>A → Z</IconLabel> },
+                      { value: "desc", label: <IconLabel icon={<IconArrDn/>}>Z → A</IconLabel> },
+                    ]
+                  : [
+                      { value: "desc", label: <IconLabel icon={<IconArrDn/>}>{lang === "sk" ? "Najväčšie prvé" : "Largest first"}</IconLabel> },
+                      { value: "asc",  label: <IconLabel icon={<IconArrUp/>}>{lang === "sk" ? "Najmenšie prvé" : "Smallest first"}</IconLabel> },
+                    ]}
+              />
+            </div>
+          </div>
+
+          {/* Top-N + checkboxes — grouped toggles row */}
+          <div style={{
+            marginTop: "0.75rem", paddingTop: "0.6rem",
+            borderTop: `1px dashed ${border}`,
+            display: "flex", gap: "0.65rem", alignItems: "center", flexWrap: "wrap",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+              <span style={{ fontSize: "0.68rem", color: dim, fontFamily: mono, letterSpacing: "0.05em", textTransform: "uppercase" }}>Top-N</span>
               <StyledSelect
                 value={topN}
                 onChange={(v) => setTopN(Number(v))}
@@ -1754,29 +1872,23 @@ function AnalyticsPivot({ snapshots, projects, lang }) {
                 ]}
               />
             </div>
-            <label style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem", cursor: "pointer", fontSize: "0.74rem", color: "#e8e8ed" }}
-              title={!pctOfTotalValid ? (lang === "sk" ? "Pre avg/min/max/medián nie je sčítateľné" : "Not additive for avg/min/max/median") : ""}>
-              <input type="checkbox" checked={percentOfTotal} onChange={e => setPercentOfTotal(e.target.checked)}
-                style={{ accentColor: green, width: 13, height: 13, cursor: "pointer" }} />
-              <span style={{ color: percentOfTotal ? green : "#e8e8ed" }}>
-                {lang === "sk" ? "% z celku" : "% of total"}
-              </span>
-              {percentOfTotal && !pctOfTotalValid && <span style={{ fontSize: "0.65rem", color: "#ff9b6b" }} title={lang === "sk" ? "Agregácia nie je sčítateľná" : "Aggregation not additive"}>⚠</span>}
-            </label>
-            <label style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem", cursor: "pointer", fontSize: "0.74rem", color: "#e8e8ed" }}>
-              <input type="checkbox" checked={showSubtotals} onChange={e => setShowSubtotals(e.target.checked)}
-                style={{ accentColor: green, width: 13, height: 13, cursor: "pointer" }} />
-              <span style={{ color: showSubtotals ? green : "#e8e8ed" }}>
-                {lang === "sk" ? "Subtotaly" : "Subtotals"}
-              </span>
-            </label>
-            <label style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem", cursor: "pointer", fontSize: "0.74rem", color: "#e8e8ed" }}>
-              <input type="checkbox" checked={hideEmpty} onChange={e => setHideEmpty(e.target.checked)}
-                style={{ accentColor: green, width: 13, height: 13, cursor: "pointer" }} />
-              <span style={{ color: hideEmpty ? green : "#e8e8ed" }}>
-                {lang === "sk" ? "Skryť prázdne" : "Hide empty"}
-              </span>
-            </label>
+            <StyledCheckbox
+              checked={percentOfTotal}
+              onChange={setPercentOfTotal}
+              label={lang === "sk" ? "% z celku" : "% of total"}
+              warn={percentOfTotal && !pctOfTotalValid ? (lang === "sk" ? "Pre avg/min/max/medián nie je sčítateľné" : "Not additive for avg/min/max/median") : false}
+              title={!pctOfTotalValid ? (lang === "sk" ? "Pre avg/min/max/medián nie je sčítateľné" : "Not additive for avg/min/max/median") : undefined}
+            />
+            <StyledCheckbox
+              checked={showSubtotals}
+              onChange={setShowSubtotals}
+              label={lang === "sk" ? "Subtotaly" : "Subtotals"}
+            />
+            <StyledCheckbox
+              checked={hideEmpty}
+              onChange={setHideEmpty}
+              label={lang === "sk" ? "Skryť prázdne" : "Hide empty"}
+            />
           </div>
         </div>
       </div>
