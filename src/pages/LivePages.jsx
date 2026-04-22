@@ -14,6 +14,65 @@ const dim = "#8a8a96";
 const border = "#222228";
 const bg = "#16161a";
 
+/* ── ProtectedData ─────────────────────────────────────────
+   Wraps a data region (tables, pivot output, etc.) to discourage
+   casual Ctrl+C scraping. This is NOT real DRM — determined users
+   can still screenshot, open devtools, view source, etc. The goal
+   is to raise the bar enough that competitors can't just paste the
+   live dataset into Excel, and to nudge users to the proper CSV
+   export channel which respects tier-based limits. Apply SPARINGLY,
+   only to the actual data grids — never to nav / headings / KPIs,
+   which would hurt legitimate usability. */
+function ProtectedData({ children, lang = "en", style, ...rest }) {
+  const [toast, setToast] = useState(false);
+  const timerRef = useRef(null);
+  const show = () => {
+    setToast(true);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setToast(false), 2800);
+  };
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
+  const block = (e) => { e.preventDefault(); show(); };
+  return (
+    <div
+      onCopy={block}
+      onCut={block}
+      onDragStart={(e) => e.preventDefault()}
+      style={{
+        userSelect: "none",
+        WebkitUserSelect: "none",
+        MozUserSelect: "none",
+        msUserSelect: "none",
+        position: "relative",
+        ...style,
+      }}
+      {...rest}
+    >
+      {children}
+      {toast && (
+        <div style={{
+          position: "fixed", bottom: "1.5rem", left: "50%", transform: "translateX(-50%)",
+          background: "#0e0e10", border: `1px solid ${green}`, color: "#e8e8ed",
+          padding: "0.7rem 1.1rem", borderRadius: 8, fontSize: "0.82rem",
+          boxShadow: `0 12px 32px rgba(0,0,0,0.75), 0 0 22px rgba(0,229,160,0.2)`,
+          zIndex: 99999, fontFamily: "inherit",
+          display: "flex", alignItems: "center", gap: "0.55rem",
+          pointerEvents: "none",
+          animation: "fadeInUp 0.2s ease",
+        }}>
+          <span style={{ color: green, fontWeight: 700, fontSize: "0.95rem" }}>⬇</span>
+          <span>
+            {lang === "sk"
+              ? <>Dáta sú chránené. Pre Excel použi <strong style={{ color: green }}>CSV export</strong>.</>
+              : <>Data is copy-protected. For Excel use the <strong style={{ color: green }}>CSV export</strong>.</>}
+          </span>
+          <style>{`@keyframes fadeInUp { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }`}</style>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ───────────────────── LIVE DASHBOARD ───────────────────── */
 const ANON_VISIBLE = 12;
 const ANON_TEASER = 8;  // navyše zobrazíme blurred — dokopy 20 riadkov s blurom
@@ -61,7 +120,7 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
         {loading ? (
           <div style={{ color: dim, padding: "2rem", textAlign: "center" }}>{t.loading_generic}</div>
         ) : (
-          <div style={{ border: `1px solid ${border}`, borderRadius: 12, overflow: "hidden", position: "relative" }}>
+          <ProtectedData lang={lang} style={{ border: `1px solid ${border}`, borderRadius: 12, overflow: "hidden", position: "relative" }}>
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
                 <thead style={{ background: "#0e0e10" }}>
@@ -142,7 +201,7 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
                 </button>
               </div>
             )}
-          </div>
+          </ProtectedData>
         )}
       </div>
     </main>
@@ -328,7 +387,7 @@ function FlatsTable({ flats, t, lang }) {
   };
   const locale = lang === "sk" ? "sk-SK" : "en-US";
   return (
-    <div style={{ border: `1px solid ${border}`, borderRadius: 12, overflow: "hidden" }}>
+    <ProtectedData lang={lang} style={{ border: `1px solid ${border}`, borderRadius: 12, overflow: "hidden" }}>
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
           <thead style={{ background: "#0e0e10" }}>
@@ -375,7 +434,7 @@ function FlatsTable({ flats, t, lang }) {
           </tbody>
         </table>
       </div>
-    </div>
+    </ProtectedData>
   );
 }
 
@@ -1922,7 +1981,11 @@ function AnalyticsPivot({ snapshots, projects, lang }) {
         </div>
       </div>
 
-      {/* ── CHART / TABLE ── */}
+      {/* ── CHART / TABLE ──
+          Wrapped in ProtectedData so casual Ctrl+C → Excel doesn't work.
+          CSV export button (above) is the legit path — it respects tier
+          limits and sends the exact slice the user sees. */}
+      <ProtectedData lang={lang}>
       {(() => {
         if (flatTreeRows.length === 0) {
           return (
@@ -2057,6 +2120,7 @@ function AnalyticsPivot({ snapshots, projects, lang }) {
           </div>
         );
       })()}
+      </ProtectedData>
 
       {/* ── Per-chip autofilter popup (portal-style absolute) ── */}
       {filterPopup && (
