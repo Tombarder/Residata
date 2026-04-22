@@ -3502,7 +3502,9 @@ function FilterRow({ f, sourceRows, lang, t, onChange, onRemove }) {
              the top. Stats strip (numeric cols only) gives the data shape. */
           <div>
             {/* Stats strip — numeric only */}
-            {colType === "number" && stats.isNumeric && (
+            {/* Stats strip for any column that has numeric values — covers
+                `number` type AND derived-numeric cols like price_per_m2. */}
+            {stats.isNumeric && (
               <div style={{ fontSize: "0.66rem", color: dim, fontFamily: mono, marginBottom: "0.3rem", letterSpacing: "0.03em" }}>
                 min <strong style={{ color: "#e8e8ed" }}>{labelFor(stats.min)}</strong>
                 {"  · "} med <strong style={{ color: "#e8e8ed" }}>{labelFor(stats.median)}</strong>
