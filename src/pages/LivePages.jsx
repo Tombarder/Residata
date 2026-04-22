@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
-import { useProjects, useProjectFlats, useEarlyAccessStats, useProjectSnapshots } from "../lib/useData";
+import { useProjects, useProjectFlats, useAllFlats, useEarlyAccessStats, useProjectSnapshots } from "../lib/useData";
 import { supabase } from "../lib/supabase";
 import { liveT, ll } from "../lib/liveLang";
 import { track } from "../lib/track";
@@ -1099,6 +1099,10 @@ function GateMessage({ title, body, cta, backLabel, onCta, setCurrent }) {
 export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
   const { projects, loading } = useProjects();
   const { snapshots } = useProjectSnapshots();
+  // Flats for the unit-level pivot surface. Lazy — cache kicks in on first
+  // pivot open, no extra round-trip on page load. RLS gates visibility by
+  // tier (anon=0, free=chosen_project only, paid/admin=all).
+  const { flats: allFlats } = useAllFlats();
 
   if (loading && projects.length === 0) {
     return (
@@ -1179,7 +1183,7 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
       </div>
 
       {/* ═══ PIVOT BUILDER — prominent, right after KPIs ═══ */}
-      <AnalyticsPivot snapshots={snapshots} projects={projects} lang={lang} />
+      <AnalyticsPivot snapshots={snapshots} projects={projects} allFlats={allFlats} lang={lang} />
 
       {/* ═══ DISTRICT BREAKDOWN — richer than home DistrictPulse ═══ */}
       <ASection
@@ -1331,36 +1335,92 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
 // fields. Multiple group-bys stack into composite keys. CSV export
 // always matches what the table shows.
 
-const PIVOT_COLUMNS = {
-  // Snapshot month — YYYY-MM. Defaults to latest; full history
-  // automatically grows as monthly syncs append new rows.
-  snapshot_month: { label: { en: "Month (snapshot)", sk: "Mesiac (snapshot)" }, type: "text" },
-  // Status — active / sold_out / paused / archived. Defaults applied at
-  // the top of AnalyticsPivot as a filter with value "active" so users
-  // don't get KPI pollution from historical rows on first open.
-  status:       { label: { en: "Status",           sk: "Status"           }, type: "text" },
-  // Text
-  district:     { label: { en: "District",         sk: "Okres"            }, type: "text" },
-  sub_district: { label: { en: "Sub-district",     sk: "Mestská časť"     }, type: "text" },
-  developer:    { label: { en: "Developer",        sk: "Developer"        }, type: "text" },
-  kolaudacia:   { label: { en: "Completion",       sk: "Kolaudácia"       }, type: "text" },
-  name:         { label: { en: "Project",          sk: "Projekt"          }, type: "text" },
-  // Number
-  total_units:       { label: { en: "Total units",       sk: "Celkom bytov"        }, type: "number" },
-  available_units:   { label: { en: "Available",         sk: "Voľné"               }, type: "number" },
-  sold_units:        { label: { en: "Sold (total)",      sk: "Predané (celkom)"    }, type: "number" },
-  sold_last_month:   { label: { en: "Sold 30d",          sk: "Predané 30d"         }, type: "number" },
-  avg_price_eur_m2:  { label: { en: "Avg €/m²",          sk: "Priem. €/m²"         }, type: "number" },
-  min_price:         { label: { en: "Min price",         sk: "Min cena"            }, type: "number" },
-  max_price:         { label: { en: "Max price",         sk: "Max cena"            }, type: "number" },
-  sold_percentage:   { label: { en: "% sold",            sk: "% predané"           }, type: "number" },
-  // Derived (computed)
-  price_band:   { label: { en: "Price band",    sk: "Cenové pásmo"        }, type: "derived", from: "avg_price_eur_m2" },
-  sold_band:    { label: { en: "% sold band",   sk: "% predaných pásmo"   }, type: "derived", from: "sold_percentage" },
-  size_band:    { label: { en: "Size band",     sk: "Veľkostné pásmo"     }, type: "derived", from: "total_units" },
+// ─── Schema per data source ────────────────────────────────
+// Pivot can run over PROJECTS (one row per project) or FLATS (one row per
+// unit). Each surface has its own column inventory. User picks via a toggle
+// at the top of the pivot panel.
+const PIVOT_COLUMNS_PROJECTS = {
+  // Snapshot month — YYYY-MM. Defaults to latest; full history grows on
+  // every monthly sync.
+  snapshot_month: { label: { en: "Month (snapshot)",  sk: "Mesiac (snapshot)" }, type: "text" },
+  status:         { label: { en: "Status",            sk: "Status"            }, type: "text" },
+  // Identity & location
+  district:       { label: { en: "District",          sk: "Okres"             }, type: "text" },
+  sub_district:   { label: { en: "Sub-district",      sk: "Mestská časť"      }, type: "text" },
+  developer:      { label: { en: "Developer",         sk: "Developer"         }, type: "text" },
+  name:           { label: { en: "Project",           sk: "Projekt"           }, type: "text" },
+  kolaudacia:     { label: { en: "Completion",        sk: "Kolaudácia"        }, type: "text" },
+  // Unit-count breakdown — now all five cohorts, not just total/avail/sold
+  total_units:         { label: { en: "Total units",      sk: "Celkom bytov"       }, type: "number" },
+  available_units:     { label: { en: "Available (V)",    sk: "Voľné (V)"          }, type: "number" },
+  sold_units:          { label: { en: "Sold total (P)",   sk: "Predané celkom (P)" }, type: "number" },
+  reserved_units:      { label: { en: "Reserved (R)",     sk: "Rezervované (R)"    }, type: "number" },
+  prereserved_units:   { label: { en: "Pre-reserved (PR)",sk: "Predrezerv. (PR)"   }, type: "number" },
+  future_units:        { label: { en: "Not yet offered",  sk: "Ešte nie v ponuke"  }, type: "number" },
+  error_units:         { label: { en: "Error rows",       sk: "Error riadky"       }, type: "number" },
+  sold_last_month:     { label: { en: "Sold 30d",         sk: "Predané 30d"        }, type: "number" },
+  // Prices
+  avg_price_eur_m2:    { label: { en: "Avg €/m²",         sk: "Priem. €/m²"        }, type: "number" },
+  min_price:           { label: { en: "Min price (proj.)",sk: "Min cena (proj.)"   }, type: "number" },
+  max_price:           { label: { en: "Max price (proj.)",sk: "Max cena (proj.)"   }, type: "number" },
+  sold_percentage:     { label: { en: "% sold",           sk: "% predané"          }, type: "number" },
+  // Metadata (useful as filter dimensions)
+  project_url:         { label: { en: "Project URL",      sk: "URL projektu"       }, type: "text" },
+  is_top20:            { label: { en: "Top-20 flag",      sk: "Top-20 flag"        }, type: "text" },
+  // Derived bands
+  price_band:   { label: { en: "Price band",    sk: "Cenové pásmo"        }, type: "derived" },
+  sold_band:    { label: { en: "% sold band",   sk: "% predaných pásmo"   }, type: "derived" },
+  size_band:    { label: { en: "Size band",     sk: "Veľkostné pásmo"     }, type: "derived" },
 };
 
+const PIVOT_COLUMNS_FLATS = {
+  // Identity & location (joined from projects at data-fetch time)
+  district:       { label: { en: "District (proj.)",   sk: "Okres (proj.)"        }, type: "text" },
+  sub_district:   { label: { en: "Sub-district (proj.)",sk: "Mestská časť (proj.)"}, type: "text" },
+  developer:      { label: { en: "Developer (proj.)",  sk: "Developer (proj.)"    }, type: "text" },
+  project_name:   { label: { en: "Project",            sk: "Projekt"              }, type: "text" },
+  project_status: { label: { en: "Project status",     sk: "Status projektu"      }, type: "text" },
+  // Flat-level categorical
+  typ:            { label: { en: "Type",               sk: "Typ"                  }, type: "text" },
+  etapa:          { label: { en: "Stage",              sk: "Etapa"                }, type: "text" },
+  budova:         { label: { en: "Building",           sk: "Budova"               }, type: "text" },
+  unit_id:        { label: { en: "Unit ID",            sk: "Unit ID"              }, type: "text" },
+  unit_detail:    { label: { en: "Unit detail",        sk: "Detail"               }, type: "text" },
+  stav:           { label: { en: "Status (V/P/R…)",    sk: "Stav (V/P/R…)"        }, type: "text" },
+  kolaudacia:     { label: { en: "Completion",         sk: "Kolaudácia"           }, type: "text" },
+  orientacia:     { label: { en: "Orientation",        sk: "Orientácia"           }, type: "text" },
+  // Flat-level numeric
+  poschodie:        { label: { en: "Floor",             sk: "Poschodie"           }, type: "number" },
+  izby:             { label: { en: "Rooms",             sk: "Izby"                }, type: "number" },
+  obytna_plocha:    { label: { en: "Interior m²",       sk: "Obytná m²"           }, type: "number" },
+  balkon_plocha:    { label: { en: "Balcony m²",        sk: "Balkón m²"           }, type: "number" },
+  loggia_plocha:    { label: { en: "Loggia m²",         sk: "Loggia m²"           }, type: "number" },
+  terasa_plocha:    { label: { en: "Terrace m²",        sk: "Terasa m²"           }, type: "number" },
+  zahrada_plocha:   { label: { en: "Garden m²",         sk: "Záhrada m²"          }, type: "number" },
+  exterier_plocha:  { label: { en: "Exterior m²",       sk: "Exteriér m²"         }, type: "number" },
+  kobka_plocha:     { label: { en: "Storage m²",        sk: "Kobka m²"            }, type: "number" },
+  celkova_plocha:   { label: { en: "Total m²",          sk: "Celková m²"          }, type: "number" },
+  cena_bez_dph:     { label: { en: "Price excl. VAT",   sk: "Cena bez DPH"        }, type: "number" },
+  cena_s_dph:       { label: { en: "Price incl. VAT",   sk: "Cena s DPH"          }, type: "number" },
+  // "Na vyžiadanie" label when price is non-numeric. Useful for filtering
+  // out unit-under-request-only units (`is empty` → flats with a real
+  // price; `not empty` → flats with text-only / "on request" price).
+  cena_s_dph_text:  { label: { en: "Price label (text)", sk: "Cena popis (text)"   }, type: "text" },
+  cennikova_cena:   { label: { en: "List price",        sk: "Cenníková cena"      }, type: "number" },
+  // Derived
+  price_per_m2:    { label: { en: "Price / m²",         sk: "Cena / m²"            }, type: "derived" },
+  room_band:       { label: { en: "Room band",          sk: "Izbové pásmo"         }, type: "derived" },
+  flat_price_band: { label: { en: "Price band (flat)",  sk: "Cenové pásmo (byt)"   }, type: "derived" },
+  flat_size_band:  { label: { en: "Size band (m²)",     sk: "Veľkostné pásmo (m²)" }, type: "derived" },
+};
+
+// Default (used by existing code paths) — AnalyticsPivot rebinds based on
+// the dataSource toggle, but filters / other helpers reach for PIVOT_COLUMNS
+// as a module global.
+let PIVOT_COLUMNS = PIVOT_COLUMNS_PROJECTS;
+
 function bandFor(column, row) {
+  // ── Project-level bands ──
   if (column === "price_band") {
     const v = row.avg_price_eur_m2;
     if (v == null) return "—";
@@ -1378,17 +1438,61 @@ function bandFor(column, row) {
     return "sold out (100%)";
   }
   if (column === "size_band") {
+    // Works for both projects (total_units) and flats (celkova_plocha).
+    // Projects bucket by unit count; flats bucket by square metres.
+    if (row.celkova_plocha != null || row.obytna_plocha != null) {
+      const m = Number(row.celkova_plocha ?? row.obytna_plocha ?? 0);
+      if (m < 30)  return "< 30 m²";
+      if (m < 50)  return "30–50 m²";
+      if (m < 80)  return "50–80 m²";
+      if (m < 120) return "80–120 m²";
+      return "120+ m²";
+    }
     const t = row.total_units ?? 0;
     if (t < 50) return "< 50";
     if (t < 100) return "50–100";
     if (t < 200) return "100–200";
     return "200+";
   }
+  // ── Flat-level derived ──
+  if (column === "price_per_m2") {
+    const p = Number(row.cena_s_dph);
+    const m = Number(row.obytna_plocha ?? row.celkova_plocha);
+    if (!Number.isFinite(p) || !Number.isFinite(m) || m <= 0) return null;
+    return Math.round(p / m);
+  }
+  if (column === "room_band") {
+    const r = Number(row.izby);
+    if (!Number.isFinite(r)) return "—";
+    if (r <= 1) return "1-izb";
+    if (r <= 2) return "2-izb";
+    if (r <= 3) return "3-izb";
+    return "4+ izb";
+  }
+  if (column === "flat_price_band") {
+    const p = Number(row.cena_s_dph);
+    if (!Number.isFinite(p)) return "—";
+    if (p < 150000) return "< 150k €";
+    if (p < 250000) return "150–250k €";
+    if (p < 400000) return "250–400k €";
+    if (p < 700000) return "400–700k €";
+    return "700k+ €";
+  }
   return null;
 }
 
 function cellValue(row, column) {
-  if (PIVOT_COLUMNS[column]?.type === "derived") return bandFor(column, row);
+  if (PIVOT_COLUMNS[column]?.type === "derived") {
+    // `price_per_m2` is numeric-derived — caller may pass it through a
+    // numeric sum/avg/min/max, so we return the computed number here rather
+    // than a band label. Other derived cols return band strings.
+    if (column === "price_per_m2") {
+      const p = Number(row.cena_s_dph);
+      const m = Number(row.obytna_plocha ?? row.celkova_plocha);
+      return (Number.isFinite(p) && Number.isFinite(m) && m > 0) ? p / m : null;
+    }
+    return bandFor(column, row);
+  }
   // snapshots store the project name in project_name, projects uses name —
   // alias so "name" column works regardless of source.
   if (column === "name") return row.name ?? row.project_name;
@@ -2048,7 +2152,7 @@ function ColumnAutofilter({ column, anchorEl, allValues, filter, onApply, onClea
   );
 }
 
-function AnalyticsPivot({ snapshots, projects, lang }) {
+function AnalyticsPivot({ snapshots, projects, allFlats, lang }) {
   const allMonths = Array.from(new Set((snapshots || []).map(s => s.snapshot_month).filter(Boolean))).sort().reverse();
   const latestMonth = allMonths[0] || null;
   // rawSource is chosen dynamically from statusScope (declared below) so
@@ -2072,6 +2176,11 @@ function AnalyticsPivot({ snapshots, projects, lang }) {
   // data. Mirrors monthScope — a lightweight top-level filter that doesn't
   // need a full FilterRow entry.
   const [statusScope, setStatusScope] = useState("active");
+  // Data source — Projects (default, macro-level) vs Flats (unit-level
+  // drilldown). Switching this flips the whole column inventory + data
+  // pool. Pivot machinery below is generic over (PIVOT_COLUMNS, rawSource)
+  // so it works identically for both.
+  const [dataSource, setDataSource] = useState("projects"); // "projects" | "flats"
   const [topN, setTopN] = useState(0);
   const [percentOfTotal, setPercentOfTotal] = useState(false);
   // Tree state
@@ -2089,27 +2198,60 @@ function AnalyticsPivot({ snapshots, projects, lang }) {
   const groupBys = rowGroups;
   const MAX_LEVELS = 6;
 
-  // ── Pick the raw dataset based on status scope ──
-  // Snapshots today only contain active projects (sync hasn't yet been
-  // updated to also snapshot inactive ones). So when the user wants to
-  // see historical / paused / archived projects, switch to the `projects`
-  // table which is the source of truth for non-active statuses. We lose
-  // the month dimension on that branch, but that's fine — inactive
-  // projects don't have meaningful month-over-month movement anyway.
-  const rawSource = (statusScope === "active" && snapshots && snapshots.length > 0)
-    ? snapshots
-    : projects;
+  // ── Rebind PIVOT_COLUMNS to the active schema ──
+  // The module-level `PIVOT_COLUMNS` var is used by every helper (filters,
+  // cellValue, bandFor). Switching dataSource swaps which schema they see
+  // for the duration of this render. This is a deliberate mutable rebinding —
+  // we want FilterRow / StyledSelect / quick-filter popups to ALL read from
+  // the same source-of-truth column inventory.
+  PIVOT_COLUMNS = dataSource === "flats" ? PIVOT_COLUMNS_FLATS : PIVOT_COLUMNS_PROJECTS;
+
+  // ── Pick the raw dataset based on data source + status scope ──
+  //  PROJECTS branch: prefer snapshots (for month dim) when scope=active.
+  //    For inactive/all scope, snapshots may lack those rows, fall to projects.
+  //  FLATS branch: `allFlats` is joined to `projects` metadata here so the
+  //    pivot can filter/group by district/developer/project_status inline.
+  //    Status scope is applied via project-status lookup below.
+  const projectById = (() => {
+    const m = {};
+    for (const p of (projects || [])) m[p.id] = p;
+    return m;
+  })();
+
+  let rawSource;
+  if (dataSource === "flats") {
+    // Enrich each flat with its project's district / developer / name /
+    // status. Done once here so every downstream operation (filters,
+    // groupBy, measures) sees a flat row with those fields present.
+    rawSource = (allFlats || []).map(f => {
+      const p = projectById[f.project_id];
+      return {
+        ...f,
+        project_name: p?.name || f.project_id,
+        project_status: p?.status || "active",
+        district: p?.district || null,
+        sub_district: p?.sub_district || null,
+        developer: p?.developer || null,
+      };
+    });
+  } else {
+    rawSource = (statusScope === "active" && snapshots && snapshots.length > 0)
+      ? snapshots
+      : projects;
+  }
 
   // ── Apply month scope then status scope then filters ──
   // Status scope is applied BEFORE user filters so the pivot's count of
-  // "X / Y projects" matches the visible scope. Missing status values
-  // (legacy rows from before the 2026-04 migration) default to 'active'.
-  const scoped = (monthScope === "latest" && latestMonth)
+  // "X / Y items" matches the visible scope. In FLATS mode, status lives
+  // on the enriched `project_status` field; in PROJECTS mode it's `status`.
+  // Missing status values default to 'active' for backward compat.
+  const scoped = (dataSource !== "flats" && monthScope === "latest" && latestMonth)
     ? rawSource.filter(r => !r.snapshot_month || r.snapshot_month === latestMonth)
     : rawSource;
+  const statusField = dataSource === "flats" ? "project_status" : "status";
   const statusScoped = statusScope === "all"
     ? scoped
-    : scoped.filter(p => (p.status || "active") === statusScope);
+    : scoped.filter(p => (p[statusField] || "active") === statusScope);
   const filtered = statusScoped.filter(p => filters.every(f => matchesFilter(p, f)));
 
   // ── Measure ──
@@ -2322,11 +2464,42 @@ function AnalyticsPivot({ snapshots, projects, lang }) {
           </p>
         </div>
 
-        {/* Scope column — two top-level filters that gate the whole pivot
-            (month + status). Applied BEFORE user filters, so "Filtered X/Y"
-            reflects the scope too. */}
+        {/* Scope column — top-level data source + filters that gate the
+            whole pivot (source · month · status). Applied BEFORE user
+            filters, so "Filtered X/Y" reflects the scope too. */}
         <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", alignItems: "flex-end" }}>
-          {latestMonth && (
+          {/* Data source toggle — Projects (macro) / Flats (unit-level) */}
+          <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase" }}>
+            {lang === "sk" ? "Zdroj dát" : "Data source"}
+          </div>
+          <div style={{ display: "inline-flex", background: "#0a0a0b", border: `1px solid ${border}`, borderRadius: 6, overflow: "hidden" }}>
+            {[
+              { v: "projects", sk: "Projekty", en: "Projects" },
+              { v: "flats",    sk: "Byty",     en: "Flats" },
+            ].map(opt => {
+              const active = dataSource === opt.v;
+              const count = opt.v === "flats" ? (allFlats?.length || 0) : (projects?.length || 0);
+              return (
+                <button key={opt.v}
+                  onClick={() => {
+                    setDataSource(opt.v);
+                    // Reset filter state on source switch — filters from the
+                    // old schema don't mean anything in the new one (column
+                    // names differ).
+                    setFilters([]);
+                    // Reset group-bys to a sensible default for each source.
+                    setRowGroups(opt.v === "flats" ? ["project_name"] : ["district"]);
+                    setMeasure({ column: "__count__", agg: "count" });
+                    setCollapsed(new Set());
+                  }}
+                  style={{ padding: "0.35rem 0.7rem", fontSize: "0.72rem", cursor: "pointer", background: active ? green : "transparent", color: active ? "#0a0a0b" : dim, border: "none", fontFamily: "inherit", fontWeight: 600 }}>
+                  {lang === "sk" ? opt.sk : opt.en} <span style={{ opacity: 0.6, marginLeft: "0.25rem", fontFamily: mono }}>{count.toLocaleString("en-US").replace(/,/g, " ")}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {latestMonth && dataSource !== "flats" && (
             <>
               <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase" }}>
                 {lang === "sk" ? "Mesiac" : "Month"}

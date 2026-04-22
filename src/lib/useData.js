@@ -136,6 +136,66 @@ export function useProjectSnapshots() {
   return { snapshots, loading };
 }
 
+/** All flats (every unit across every project) — for the unit-level pivot.
+ *
+ *  Rows come back with the full scalar column inventory from `public.flats`.
+ *  RLS on the table gates access by tier:
+ *    - anonymous  → 0 rows
+ *    - free       → flats of the user's chosen_project_id only
+ *    - paid/admin → every flat in every active/sold_out project
+ *
+ *  Cached at module scope with a paging loop (Supabase caps at 1000 rows per
+ *  request; we have ~5100+). Cache invalidates only on full page reload —
+ *  same pattern as projects/snapshots to avoid "zeros flash" on nav.
+ */
+let _flatsCache = null;
+export function useAllFlats() {
+  const [flats, setFlats] = useState(_flatsCache || []);
+  const [loading, setLoading] = useState(_flatsCache === null);
+  useEffect(() => {
+    if (!isSupabaseReady()) { setLoading(false); return; }
+    if (_flatsCache) { setLoading(false); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        // Same session pre-warm as useProjectFlats — prevents RLS from
+        // evaluating as anon on a freshly mounted component that beats the
+        // access-token attachment.
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          const expSoon = session.expires_at && (session.expires_at * 1000) < Date.now() + 120000;
+          if (expSoon) await supabase.auth.refreshSession();
+        }
+      } catch { /* ignore */ }
+      if (cancelled) return;
+
+      // Pull all flats via pagination (1000-row chunks).
+      const all = [];
+      const PAGE = 1000;
+      for (let offset = 0; ; offset += PAGE) {
+        const { data, error } = await supabase
+          .from("flats")
+          .select("*")
+          .range(offset, offset + PAGE - 1)
+          .order("id", { ascending: true });
+        if (cancelled) return;
+        if (error) {
+          console.error("[useAllFlats]", error);
+          break;
+        }
+        all.push(...(data || []));
+        if (!data || data.length < PAGE) break;
+      }
+      if (cancelled) return;
+      _flatsCache = all;
+      setFlats(all);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+  return { flats, loading };
+}
+
 /** Early access slot count for the marketing badge. */
 export function useEarlyAccessStats() {
   const [stats, setStats] = useState({ paid_count: 0, remaining_slots: 9 });
