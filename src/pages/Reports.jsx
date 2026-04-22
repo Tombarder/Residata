@@ -91,6 +91,27 @@ export default function PlatformReports({ lang = "sk" }) {
 
   return (
     <div className="residata-report-root" style={{ padding: "1rem 2rem 4rem", maxWidth: 1100, margin: "0 auto" }}>
+      {/* Responsive breakpoints for the whole report module — tightens
+          side padding, swaps table / histogram layouts, shrinks fonts
+          on narrow viewports. Declared once here so nested components
+          inherit without re-declaring. */}
+      <style>{`
+        @media (max-width: 640px) {
+          .residata-report-root { padding: 0.75rem 0.85rem 3rem !important; }
+          .rep-hist-row { grid-template-columns: 1fr 40px !important; }
+          .rep-hist-row .rep-hist-label { grid-column: 1 / -1; text-align: left !important; }
+          .rep-hist-row .rep-hist-bar { grid-column: 1 / -1; }
+          .rep-hist-row .rep-hist-count { grid-column: 1 / -1; text-align: right !important; }
+        }
+        @media (max-width: 520px) {
+          .rep-kpi-strip { grid-template-columns: repeat(2, 1fr) !important; }
+          .rep-picker-row { flex-direction: column; align-items: stretch !important; }
+          .rep-picker-row select { min-width: 0 !important; width: 100%; }
+        }
+        /* Table wrappers: always horizontal-scroll if content overflows,
+           so the page layout never breaks even with long project names. */
+        .rep-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      `}</style>
       <ReportHeader
         projects={projects} flats={flats} lang={lang}
         scope={scope}
@@ -379,7 +400,7 @@ function ScopeTab({ active, onClick, children }) {
 function PickerRow({ label, value, options, onChange }) {
   const opts = options.map(o => (typeof o === "string" ? { value: o, label: o } : o));
   return (
-    <div className="no-print" style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "1rem", padding: "0.55rem 0.7rem", background: bg2, border: `1px solid ${border}`, borderRadius: 6 }}>
+    <div className="no-print rep-picker-row" style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "1rem", padding: "0.55rem 0.7rem", background: bg2, border: `1px solid ${border}`, borderRadius: 6 }}>
       <span style={{ fontFamily: mono, fontSize: "0.62rem", color: dim, letterSpacing: "0.08em", textTransform: "uppercase" }}>{label}</span>
       <select value={value || ""} onChange={(e) => onChange(e.target.value)}
         style={{
@@ -625,7 +646,7 @@ function KpiStrip({ summary, lang, extra = [] }) {
     ...extra,
   ];
   return (
-    <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fit, minmax(130px, 1fr))`, gap: "0.5rem", marginBottom: "1.25rem" }}>
+    <div className="rep-kpi-strip" style={{ display: "grid", gridTemplateColumns: `repeat(auto-fit, minmax(130px, 1fr))`, gap: "0.5rem", marginBottom: "1.25rem" }}>
       {items.map((k, i) => (
         <div key={i} style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8, padding: "0.65rem 0.9rem" }}>
           <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.3rem" }}>{k.label}</div>
@@ -857,7 +878,9 @@ function Histogram({ bins, lang, unit }) {
   const max = Math.max(...bins.map(b => b.count), 1);
   return (
     <div style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8, padding: "0.75rem 0.9rem" }}>
-      <div style={{ display: "grid", gridTemplateColumns: "140px 1fr 40px", gap: "0.3rem", alignItems: "center" }}>
+      {/* rep-hist-row class is targeted by the page-level @media query
+          to stack the 3 columns on narrow viewports (< 640px). */}
+      <div className="rep-hist-row" style={{ display: "grid", gridTemplateColumns: "140px 1fr 40px", gap: "0.3rem 0.3rem", alignItems: "center" }}>
         {bins.map((b, i) => (
           <RowBin key={i} bin={b} max={max} unit={unit} />
         ))}
@@ -872,13 +895,13 @@ function RowBin({ bin, max, unit }) {
   const w = (bin.count / max) * 100;
   return (
     <>
-      <span style={{ fontFamily: mono, fontSize: "0.68rem", color: dim, textAlign: "right" }}>
+      <span className="rep-hist-label" style={{ fontFamily: mono, fontSize: "0.68rem", color: dim, textAlign: "right", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
         {bin.label}{unit ? " " + unit : ""}
       </span>
-      <div style={{ position: "relative", height: 14, background: bg, border: `1px solid ${border}`, borderRadius: 3 }}>
+      <div className="rep-hist-bar" style={{ position: "relative", height: 14, background: bg, border: `1px solid ${border}`, borderRadius: 3 }}>
         <div style={{ position: "absolute", inset: 0, width: `${w}%`, background: `linear-gradient(90deg, ${green}22, ${green})`, borderRadius: 3 }} />
       </div>
-      <span style={{ fontFamily: mono, fontSize: "0.68rem", color: green, fontWeight: 700, textAlign: "right" }}>
+      <span className="rep-hist-count" style={{ fontFamily: mono, fontSize: "0.68rem", color: green, fontWeight: 700, textAlign: "right" }}>
         {bin.count}
       </span>
     </>
@@ -890,8 +913,8 @@ function AggregateTable({ rows, lang, nameLabel }) {
   if (!rows.length) return <div style={{ color: dim, fontSize: "0.85rem" }}>{lang === "sk" ? "Žiadne dáta." : "No data."}</div>;
   const maxUnits = Math.max(...rows.map(r => r.totalUnits), 1);
   return (
-    <div style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8, overflow: "hidden" }}>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
+    <div className="rep-table-wrap" style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8 }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem", minWidth: 560 }}>
         <thead>
           <tr style={{ background: bg, textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
             <th style={tdh}>{nameLabel}</th>
@@ -942,8 +965,8 @@ function BenchmarkCard({ local, global, scopeLabel, lang }) {
     { label: lang === "sk" ? "Voľných na projekt" : "Avail / project", local: local.projectCount > 0 ? local.available / local.projectCount : 0, global: global.projectCount > 0 ? global.available / global.projectCount : 0, delta: null, unit: "", lowerIsGood: false },
   ];
   return (
-    <div style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8, padding: "0.85rem 1.1rem" }}>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.84rem" }}>
+    <div className="rep-table-wrap" style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8, padding: "0.85rem 1.1rem" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.84rem", minWidth: 440 }}>
         <thead>
           <tr style={{ color: dim, fontFamily: mono, fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.08em", textAlign: "left" }}>
             <th style={tdh}></th>
@@ -981,8 +1004,8 @@ function BenchmarkCard({ local, global, scopeLabel, lang }) {
 function ProjectTable({ projects, lang }) {
   const sorted = [...projects].sort((a, b) => (b.total_units || 0) - (a.total_units || 0));
   return (
-    <div style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8, overflow: "auto" }}>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
+    <div className="rep-table-wrap" style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8 }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem", minWidth: 680 }}>
         <thead>
           <tr style={{ background: bg, textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
             <th style={tdh}>{lang === "sk" ? "Projekt" : "Project"}</th>
@@ -1049,8 +1072,8 @@ function TrendChart({ snapshots, scopePredicate, lang }) {
   });
   const maxUnits = Math.max(...series.map(s => s.totalUnits), 1);
   return (
-    <div style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8, padding: "0.85rem 1rem" }}>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.78rem" }}>
+    <div className="rep-table-wrap" style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8, padding: "0.85rem 1rem" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.78rem", minWidth: 480 }}>
         <thead>
           <tr style={{ color: dim, fontFamily: mono, fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.08em", textAlign: "left" }}>
             <th style={tdh}>{lang === "sk" ? "Mesiac" : "Month"}</th>

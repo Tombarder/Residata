@@ -853,8 +853,11 @@ export default function PivotV2({ lang = "sk" }) {
         />
       )}
 
-      {/* Result table + optional chart side-by-side */}
-      <div style={{ display: chart ? "grid" : "block", gridTemplateColumns: chart ? "1fr 340px" : "1fr", gap: "0.75rem" }}>
+      {/* Result table + optional chart side-by-side.
+          Below 900px the chart stacks BELOW the table — squeezing the
+          pivot to 260-ish pixels for a chart next to it would make
+          numbers illegible. Media query in the page-level <style>. */}
+      <div className={`pivotv2-table-chart ${chart ? "has-chart" : ""}`} style={{ display: chart ? "grid" : "block", gridTemplateColumns: chart ? "1fr 340px" : "1fr", gap: "0.75rem" }}>
         <ResultTable
           rowFields={rows}
           colFields={cols}
@@ -947,7 +950,15 @@ export default function PivotV2({ lang = "sk" }) {
       )}
 
       <style>{`
-        @media (max-width: 820px) { .pivotv2-grid { grid-template-columns: 1fr !important; } }
+        @media (max-width: 820px) {
+          .pivotv2-grid { grid-template-columns: 1fr !important; }
+          .pivotv2-table-chart.has-chart { grid-template-columns: 1fr !important; }
+        }
+        @media (max-width: 540px) {
+          /* Tighter chip padding + font on phone so the drop zones
+             don't eat all vertical space before the pivot table */
+          .pivotv2-chip { font-size: 0.68rem !important; padding: 0.25rem 0.4rem !important; }
+        }
       `}</style>
     </div>
   );
@@ -1091,6 +1102,7 @@ function ChipInZone({ label, type, agg, filter, level, onDragStart, onDragStartP
 
   return (
     <span
+      className="pivotv2-chip"
       draggable
       title={isFilterChip ? (active ? "Klikni pre úpravu filtra · alebo presuň" : "Klikni pre nastavenie filtra · alebo presuň") : undefined}
       onDragStart={(e) => {
@@ -1928,9 +1940,13 @@ function FilterPopover({ fieldKey, filter, anchorEl, records, onChange, onClear,
   }, [anchorEl, onClose]);
 
   // Viewport-clamped anchor positioning. If the chip is near the bottom of
-  // the viewport, flip the popover above it. Width 360 + 20 margin = 380.
+  // the viewport, flip the popover above it. The popover shrinks to fit
+  // tight viewports (smaller than 376px) — on iPhone SE the clamped 360px
+  // would have leaked off-screen. We use min() so it's never wider than
+  // the viewport minus a 16px gutter.
   const rect = anchorEl?.getBoundingClientRect();
-  const popW = 360, popMaxH = Math.min(560, Math.floor(window.innerHeight * 0.75));
+  const popW = Math.min(360, (typeof window !== "undefined" ? window.innerWidth : 400) - 16);
+  const popMaxH = Math.min(560, Math.floor((typeof window !== "undefined" ? window.innerHeight : 600) * 0.75));
   const style = (() => {
     if (!rect) return { display: "none" };
     const spaceBelow = window.innerHeight - rect.bottom;
@@ -1980,7 +1996,7 @@ function FilterPopover({ fieldKey, filter, anchorEl, records, onChange, onClear,
     <div
       id="pivotv2-filter-pop"
       style={{
-        ...style, width: 360, maxHeight: "70vh", overflow: "auto",
+        ...style, width: popW, maxHeight: "70vh", overflow: "auto",
         background: "#0b0b0e", border: `1px solid ${green}`, borderRadius: 8,
         boxShadow: "0 20px 48px rgba(0,0,0,0.9), 0 0 0 1px rgba(0,229,160,0.12)",
         padding: "0.8rem 0.9rem",
@@ -2293,18 +2309,18 @@ function DrillDownModal({ title, records, onClose, lang }) {
       style={{
         position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)", zIndex: 1200,
         display: "flex", alignItems: "center", justifyContent: "center",
-        padding: "2rem",
+        padding: "clamp(0.5rem, 2vw, 2rem)",
       }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
           background: "#0a0a0c", border: `1px solid ${green}55`, borderRadius: 10,
-          width: "min(1200px, 96vw)", maxHeight: "88vh", display: "flex", flexDirection: "column",
+          width: "min(1200px, 100%)", maxHeight: "88vh", display: "flex", flexDirection: "column",
           boxShadow: "0 20px 64px rgba(0,0,0,0.9)",
         }}
       >
-        <div style={{ padding: "0.9rem 1.1rem", borderBottom: `1px solid ${border}`, display: "flex", alignItems: "center", gap: "0.6rem" }}>
+        <div style={{ padding: "0.9rem 1.1rem", borderBottom: `1px solid ${border}`, display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap" }}>
           <span style={{ fontFamily: mono, fontSize: "0.62rem", color: green, letterSpacing: "0.12em", textTransform: "uppercase" }}>
             {lang === "sk" ? "Záznamy" : "Records"}
           </span>
