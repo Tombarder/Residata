@@ -641,18 +641,15 @@ export default function PivotV2({ lang = "sk" }) {
   // { key, anchorEl } — anchor used to position the popover next to the chip.
   const [filterPopup, setFilterPopup] = useState(null);
 
-  // Display / analysis options (toolbar above result table).
-  //  valueMode: "raw" | "pct_total" | "pct_parent"  — how to render each cell
-  //  heatmap:   boolean                             — heatmap coloring of cells
-  //  dataBars:  boolean                             — inline horizontal bar per cell
-  //  chart:     boolean                             — render pivot chart next to table
+  // Display / analysis options.
+  //  valueMode: "raw" | "pct_total" | "pct_parent"
+  //  dataBars:  inline horizontal bar per leaf cell
+  // (heatmap + chart toggles were removed — heatmap added noise, chart
+  //  users can build themselves by copying the CSV into Excel.)
   const [valueMode, setValueMode] = useState("raw");
-  const [heatmap,   setHeatmap]   = useState(false);
   const [dataBars,  setDataBars]  = useState(true);
-  const [chart,     setChart]     = useState(false);
 
   // Drill-down modal: clicked cell → shows underlying records
-  // { title, records }  or null when closed
   const [drillDown, setDrillDown] = useState(null);
 
   // Palette "used" greying: a field is "in use" only when it's in Rows,
@@ -838,50 +835,33 @@ export default function PivotV2({ lang = "sk" }) {
         />
       </div>
 
-      {/* Analysis toolbar: value-mode + formatting toggles + export */}
+      {/* Analysis toolbar: value-mode + data bars toggle + CSV export */}
       {rows.length > 0 && (
         <AnalysisToolbar
           valueMode={valueMode} setValueMode={setValueMode}
-          heatmap={heatmap}     setHeatmap={setHeatmap}
           dataBars={dataBars}   setDataBars={setDataBars}
-          chart={chart}         setChart={setChart}
           onExportCSV={() => exportPivotCSV(flatRows, sortedTree, rows, cols, effectiveValues, valueMode)}
           lang={lang}
         />
       )}
 
-      {/* Result table + optional chart side-by-side.
-          Below 900px the chart stacks BELOW the table — squeezing the
-          pivot to 260-ish pixels for a chart next to it would make
-          numbers illegible. Media query in the page-level <style>. */}
-      <div className={`pivotv2-table-chart ${chart ? "has-chart" : ""}`} style={{ display: chart ? "grid" : "block", gridTemplateColumns: chart ? "1fr 340px" : "1fr", gap: "0.75rem" }}>
-        <ResultTable
-          rowFields={rows}
-          colFields={cols}
-          effectiveValues={effectiveValues}
-          flatRows={flatRows}
-          collapsed={collapsed}
-          onToggle={toggleCollapse}
-          sort={sort} setSort={setSort}
-          grandTotal={sortedTree}
-          valueMode={valueMode}
-          heatmap={heatmap}
-          dataBars={dataBars}
-          onDrillDown={(node) => setDrillDown({
-            title: node.path.length ? node.path.join(" › ") : (lang === "sk" ? "Všetky záznamy" : "All records"),
-            records: node.records,
-          })}
-          lang={lang}
-        />
-        {chart && (
-          <PivotChart
-            flatRows={flatRows}
-            effectiveValues={effectiveValues}
-            grandTotal={sortedTree}
-            lang={lang}
-          />
-        )}
-      </div>
+      <ResultTable
+        rowFields={rows}
+        colFields={cols}
+        effectiveValues={effectiveValues}
+        flatRows={flatRows}
+        collapsed={collapsed}
+        onToggle={toggleCollapse}
+        sort={sort} setSort={setSort}
+        grandTotal={sortedTree}
+        valueMode={valueMode}
+        dataBars={dataBars}
+        onDrillDown={(node) => setDrillDown({
+          title: node.path.length ? node.path.join(" › ") : (lang === "sk" ? "Všetky záznamy" : "All records"),
+          records: node.records,
+        })}
+        lang={lang}
+      />
 
       {/* Drill-down modal */}
       {drillDown && (
@@ -946,11 +926,8 @@ export default function PivotV2({ lang = "sk" }) {
       <style>{`
         @media (max-width: 820px) {
           .pivotv2-grid { grid-template-columns: 1fr !important; }
-          .pivotv2-table-chart.has-chart { grid-template-columns: 1fr !important; }
         }
         @media (max-width: 540px) {
-          /* Tighter chip padding + font on phone so the drop zones
-             don't eat all vertical space before the pivot table */
           .pivotv2-chip { font-size: 0.68rem !important; padding: 0.25rem 0.4rem !important; }
         }
       `}</style>
@@ -1094,24 +1071,26 @@ function ChipInZone({ label, type, agg, filter, level, onDragStart, onDragStartP
   const active = isFilterChip ? isFilterActive(filter) : true;
   const filterSummary = isFilterChip ? summariseFilter(filter, type) : null;
 
+  // Filter chips are NOT draggable — the browser's dragstart vs click
+  // dance on a draggable element was swallowing clicks in some cases
+  // (Tomáš reported it twice). Filter chips are configured via a click,
+  // removed via ×; no drag needed. Other zones (Rows/Cols/Values) keep
+  // drag to allow re-ordering / moving between zones.
+  const canDrag = !isFilterChip;
   return (
     <span
       className="pivotv2-chip"
-      draggable
-      title={isFilterChip ? (active ? "Klikni pre úpravu filtra · alebo presuň" : "Klikni pre nastavenie filtra · alebo presuň") : undefined}
-      onDragStart={(e) => {
+      draggable={canDrag}
+      title={isFilterChip ? (active ? "Klikni pre úpravu filtra" : "Klikni pre nastavenie filtra") : undefined}
+      onDragStart={canDrag ? (e) => {
         e.dataTransfer.effectAllowed = "move";
         e.dataTransfer.setData("text/plain", label);
         const payload = onDragStartPayload();
         if (onDragStart) onDragStart();
         window.__pivotv2_drag = payload;
         window.dispatchEvent(new CustomEvent("pivotv2-drag-start", { detail: payload }));
-      }}
+      } : undefined}
       onClick={(e) => {
-        // Clicking a filter chip opens its configuration popover. We guard
-        // with stopPropagation so it doesn't also trigger the zone's drag.
-        // If the click originated from the × remove button or the agg menu,
-        // those have their own stopPropagation so this handler never sees it.
         if (onClick) { e.stopPropagation(); onClick(e); }
       }}
       style={{
@@ -1120,7 +1099,7 @@ function ChipInZone({ label, type, agg, filter, level, onDragStart, onDragStartP
         background: active ? "rgba(0,229,160,0.14)" : "rgba(138,138,150,0.10)",
         border: `1px solid ${active ? green : "#3a3a44"}`,
         color: active ? green : dim,
-        fontFamily: mono, fontSize: "0.72rem",
+        fontSize: "0.75rem",
         cursor: onClick ? "pointer" : "grab",
         userSelect: "none", position: "relative",
       }}
@@ -1382,12 +1361,12 @@ function groupLabel(g, lang) {
 }
 
 /* ─── ANALYSIS TOOLBAR ────────────────────────────────────────── */
-function AnalysisToolbar({ valueMode, setValueMode, heatmap, setHeatmap, dataBars, setDataBars, chart, setChart, onExportCSV, lang }) {
+function AnalysisToolbar({ valueMode, setValueMode, dataBars, setDataBars, onExportCSV, lang }) {
   const btnBase = {
     background: "transparent",
     border: `1px solid ${border}`,
-    color: dim, padding: "0.32rem 0.65rem", borderRadius: 4,
-    fontFamily: mono, fontSize: "0.7rem", cursor: "pointer",
+    color: dim, padding: "0.35rem 0.7rem", borderRadius: 4,
+    fontSize: "0.75rem", cursor: "pointer",
   };
   const btnActive = { ...btnBase, background: "rgba(0,229,160,0.14)", color: green, borderColor: green };
   const btnPill = (active) => (active ? btnActive : btnBase);
@@ -1395,21 +1374,19 @@ function AnalysisToolbar({ valueMode, setValueMode, heatmap, setHeatmap, dataBar
   return (
     <div style={{
       display: "flex", flexWrap: "wrap", gap: "0.4rem", alignItems: "center",
-      margin: "0 0 0.6rem", padding: "0.55rem 0.7rem",
+      margin: "0 0 0.6rem", padding: "0.5rem 0.7rem",
       background: panel, border: `1px solid ${border}`, borderRadius: 6,
     }}>
-      <span style={{ fontFamily: mono, fontSize: "0.62rem", color: dim, letterSpacing: "0.08em", textTransform: "uppercase", marginRight: "0.3rem" }}>
+      <span style={{ fontSize: "0.75rem", color: dim, marginRight: "0.3rem" }}>
         {lang === "sk" ? "Zobraziť" : "Show"}
       </span>
-      <button style={btnPill(valueMode === "raw")}        onClick={() => setValueMode("raw")}>abs</button>
+      <button style={btnPill(valueMode === "raw")}        onClick={() => setValueMode("raw")}>{lang === "sk" ? "absolútne" : "absolute"}</button>
       <button style={btnPill(valueMode === "pct_total")}  onClick={() => setValueMode("pct_total")}>% z celku</button>
       <button style={btnPill(valueMode === "pct_parent")} onClick={() => setValueMode("pct_parent")}>% z rodiča</button>
 
       <span style={{ width: 1, height: 16, background: border, margin: "0 0.35rem" }} />
 
-      <button style={btnPill(dataBars)} onClick={() => setDataBars(x => !x)}>▮ bars</button>
-      <button style={btnPill(heatmap)}  onClick={() => setHeatmap(x => !x)}>▨ heatmap</button>
-      <button style={btnPill(chart)}    onClick={() => setChart(x => !x)}>▦ graf</button>
+      <button style={btnPill(dataBars)} onClick={() => setDataBars(x => !x)}>{lang === "sk" ? "▮ stĺpčeky" : "▮ bars"}</button>
 
       <button style={{ ...btnBase, marginLeft: "auto", color: green, borderColor: `${green}55` }}
               onClick={onExportCSV}>
@@ -1513,7 +1490,7 @@ function exportPivotCSV(flatRows, grandTotal, rowFields, colFields, effectiveVal
 }
 
 /* ─── RESULT TABLE ────────────────────────────────────────────── */
-function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, collapsed, onToggle, sort, setSort, grandTotal, lang, valueMode = "raw", heatmap = false, dataBars = false, onDrillDown }) {
+function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, collapsed, onToggle, sort, setSort, grandTotal, lang, valueMode = "raw", dataBars = false, onDrillDown }) {
   // Cross-tab columns come from the tree's top-level colKeys so every
   // row shares the same horizontal axis (otherwise leaves could have
   // different col sets and the table would be ragged).
@@ -1554,8 +1531,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
   };
 
   // Per-value-column min/max (across LEAF nodes only — subtotals would
-  // skew scale). Used for heatmap + data bars on the NON-crosstab cells
-  // and on the Σ-total columns of cross-tab.
+  // skew scale). Used for inline data bars in the Σ-total cells.
   const scaleByCol = (() => {
     const out = [];
     for (let i = 0; i < effectiveValues.length; i++) {
@@ -1573,10 +1549,9 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
     return out;
   })();
 
-  // Per-(colKey × value) min/max for cross-tab heatmap/data bars.
-  // Scoping per column means "hot" cells compete only against peers in
-  // the same col bucket, so user can instantly see who leads in each
-  // status / izby / whatever. Falls back to scaleByCol when no col field.
+  // Per-(colKey × value) min/max for cross-tab data bars. Scoping per
+  // column means each cell's bar is sized against peers in the same
+  // column bucket — visually "who's biggest in V" / "who's biggest in P".
   const scaleByCellKey = (() => {
     if (!crossTab) return {};
     const m = {};
@@ -1597,45 +1572,40 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
     return m;
   })();
 
-  // Render one cell's value given raw + column index + parent rollup
-  // (parent used for pct_parent mode).
+  // ── Render one cell's display value with valueMode applied ──
+  // Modes:
+  //   raw         → formatValue(raw)         (e.g. "1 200 €", "57.3 %")
+  //   pct_total   → raw / grand-total[i] × 100  (cell as % of grand total)
+  //   pct_parent  → raw / parent[i]      × 100  (cell as % of parent row)
+  //
+  // pct_parent edge case: at level 0 there's no real parent — we fall
+  // back to the grand total, which makes pct_parent equivalent to
+  // pct_total there. For deeper rows the parent is the row's L-(n-1)
+  // subtotal. Show "—" only when both raw and parent are missing — show
+  // raw as fallback when parent is 0 (avoids /0 looking like "—").
   const renderCellValue = (raw, valIdx, parentRaw) => {
     if (raw == null || !Number.isFinite(raw)) return "—";
     const v = effectiveValues[valIdx];
     if (valueMode === "pct_total") {
       const g = grandTotal.rollups[valIdx];
-      if (!g || g === 0) return "—";
+      if (g == null || !Number.isFinite(g) || g === 0) return formatValue(raw, v.field, v.agg);
       return `${((raw / g) * 100).toFixed(1)}%`;
     }
     if (valueMode === "pct_parent") {
-      if (parentRaw == null || !parentRaw) return formatValue(raw, v.field, v.agg);
+      if (parentRaw == null || !Number.isFinite(parentRaw) || parentRaw === 0) {
+        // parent missing or 0 — show raw so user sees the value rather
+        // than a confusing "—".
+        return formatValue(raw, v.field, v.agg);
+      }
       return `${((raw / parentRaw) * 100).toFixed(1)}%`;
     }
     return formatValue(raw, v.field, v.agg);
   };
 
-  // Heatmap color for a cell (green → red gradient by rank in column).
-  // For "cena" (price) metrics we flip polarity so LOW = green (good buy),
-  // HIGH = red. For others high = green by default. Optional `scale`
-  // override lets cross-tab cells compete within their own col bucket.
-  const heatColor = (raw, valIdx, scale) => {
-    const s = scale || scaleByCol[valIdx];
-    if (!s || raw == null || !Number.isFinite(raw)) return null;
-    const range = s.hi - s.lo;
-    if (range <= 0) return null;
-    const t = (raw - s.lo) / range; // 0..1
-    const vf = effectiveValues[valIdx];
-    const fld = FIELDS[vf.field];
-    const flip = fld && (fld.unit === "€" || fld.unit === "€/m²") && (vf.agg === "avg" || vf.agg === "median" || vf.agg === "min" || vf.agg === "max");
-    const score = flip ? 1 - t : t;
-    const r = score < 0.5 ? 230 : Math.round(230 - (score - 0.5) * 2 * 230);
-    const g = score > 0.5 ? 229 : Math.round(score * 2 * 229);
-    const alpha = 0.18;
-    return `rgba(${r}, ${g}, 120, ${alpha})`;
-  };
-
-  // Data bar width (%) — proportional to |value| / peer-max
+  // Data bar width (%) — proportional to |value| / peer-max. Only
+  // shown in raw mode; in pct modes the % itself is the visual.
   const barWidth = (raw, valIdx, scale) => {
+    if (valueMode !== "raw") return 0;
     const s = scale || scaleByCol[valIdx];
     if (!s || raw == null || !Number.isFinite(raw)) return 0;
     const m = Math.max(Math.abs(s.hi), Math.abs(s.lo), 1e-9);
@@ -1782,13 +1752,12 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                         const parentRaw = parent?.colRollups ? parent.colRollups[ck]?.[i] : (parent?.rollups?.[i] ?? null);
                         const scale = scaleByCellKey[`${ck}::${i}`];
                         const bw = dataBars && n.isLeaf ? barWidth(raw, i, scale) : 0;
-                        const hc = heatmap && n.isLeaf ? heatColor(raw, i, scale) : null;
                         return (
                           <td key={`c:${ck}:${v.key}`} style={{
                             ...td, textAlign: "right", fontFamily: mono,
                             color: green, fontWeight: isSubtotal ? 800 : 600,
                             borderLeft: i === 0 ? `1px solid ${border}` : undefined,
-                            position: "relative", background: hc || undefined,
+                            position: "relative",
                           }}>
                             {bw > 0 && (
                               <span aria-hidden style={{
@@ -1808,13 +1777,12 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                       const parent = parentByPath[n.pathKey];
                       const parentRaw = parent ? parent.rollups[i] : null;
                       const bw = dataBars && n.isLeaf ? barWidth(raw, i) : 0;
-                      const hc = heatmap && n.isLeaf ? heatColor(raw, i) : null;
                       return (
                         <td key={`sum:${v.key}`} style={{
                           ...td, textAlign: "right", fontFamily: mono,
                           color: green, fontWeight: isSubtotal ? 800 : 700,
                           borderLeft: i === 0 ? `2px solid ${green}55` : undefined,
-                          background: hc || "rgba(0,229,160,0.03)",
+                          background: "rgba(0,229,160,0.03)",
                           position: "relative",
                         }}>
                           {bw > 0 && (
@@ -1836,12 +1804,11 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                     const parent = parentByPath[n.pathKey];
                     const parentRaw = parent ? parent.rollups[i] : null;
                     const bw = dataBars && n.isLeaf ? barWidth(raw, i) : 0;
-                    const hc = heatmap && n.isLeaf ? heatColor(raw, i) : null;
                     return (
                       <td key={v.key} style={{
                         ...td, textAlign: "right", fontFamily: mono,
                         color: green, fontWeight: isSubtotal ? 800 : 600,
-                        position: "relative", background: hc || undefined,
+                        position: "relative",
                       }}>
                         {bw > 0 && (
                           <span aria-hidden style={{
@@ -2215,59 +2182,6 @@ function CheckboxRow({ checked, onChange, label }) {
   );
 }
 
-/* ─── PIVOT CHART ─────────────────────────────────────────────────
-   Renders a horizontal bar chart of the first value column, using the
-   top-level (L1) rows of the pivot. Pure SVG — no chart lib dependency. */
-function PivotChart({ flatRows, effectiveValues, grandTotal, lang }) {
-  // Top-level nodes = level 0 (first row field's buckets)
-  const tops = flatRows.filter(n => n.level === 0);
-  const valIdx = 0;
-  const v = effectiveValues[valIdx];
-  if (!v || tops.length === 0) {
-    return (
-      <div style={{ border: `1px solid ${border}`, borderRadius: 8, padding: "1rem", background: panel, color: dim, fontSize: "0.78rem" }}>
-        {lang === "sk" ? "Graf bude tu po pridaní Riadkov a Hodnôt." : "Chart appears after adding Rows and Values."}
-      </div>
-    );
-  }
-  const data = tops
-    .map(n => ({ label: n.label, value: n.rollups[valIdx], count: n.count }))
-    .filter(d => d.value != null && Number.isFinite(d.value))
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 14);
-  const max = Math.max(...data.map(d => d.value), 1);
-  const title = v.key === "__count__"
-    ? (lang === "sk" ? "Počet po L1" : "Count by L1")
-    : `${AGG_LABEL[v.agg]} · ${FIELDS[v.field]?.label || v.field}`;
-  return (
-    <div style={{ border: `1px solid ${border}`, borderRadius: 8, background: panel, padding: "0.75rem", maxHeight: 720, overflow: "auto" }}>
-      <div style={{ fontFamily: mono, fontSize: "0.62rem", color: green, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.6rem" }}>
-        {lang === "sk" ? "Graf" : "Chart"} · <span style={{ color: dim }}>{title}</span>
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
-        {data.map((d, i) => (
-          <div key={d.label + i} style={{ display: "grid", gridTemplateColumns: "90px 1fr 60px", alignItems: "center", gap: "0.4rem" }}>
-            <span title={d.label} style={{ fontSize: "0.72rem", color: "#c4c4cc", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.label}</span>
-            <div style={{ position: "relative", height: 16, background: "#0a0a0c", border: `1px solid ${border}`, borderRadius: 3 }}>
-              <div style={{
-                position: "absolute", inset: 0, width: `${(d.value / max) * 100}%`,
-                background: `linear-gradient(90deg, ${green}33, ${green})`, borderRadius: 3,
-              }} />
-            </div>
-            <span style={{ fontFamily: mono, fontSize: "0.7rem", color: green, textAlign: "right", fontWeight: 700 }}>
-              {formatValue(d.value, v.field, v.agg)}
-            </span>
-          </div>
-        ))}
-        {data.length === 0 && (
-          <div style={{ color: dim, fontSize: "0.78rem", textAlign: "center", padding: "1rem 0" }}>
-            {lang === "sk" ? "Žiadne dáta na vykreslenie." : "No data to plot."}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
 
 /* ─── DRILL-DOWN MODAL ────────────────────────────────────────────
    Click a count or subtotal to see the underlying flat records that
