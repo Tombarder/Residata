@@ -62,8 +62,11 @@ export default function PlatformReports({ lang = "sk" }) {
   const [projPick, setProjPick]   = useState(null);
   const [devPick,  setDevPick]    = useState(null);
 
-  // Derive pickers from data
-  const cities = useMemo(() => uniqueSorted(projects.map(p => p.city).filter(Boolean)), [projects]);
+  // Derive pickers from data. The DB schema doesn't currently carry a
+  // city column — infer it from the district prefix: "Bratislava I..V"
+  // all collapse to "Bratislava", others pass through (district = city).
+  const cityOf = (p) => p.city || inferCity(p.district) || null;
+  const cities = useMemo(() => uniqueSorted(projects.map(cityOf).filter(Boolean)), [projects]);
   const districts = useMemo(() => uniqueSorted(projects.map(p => p.district).filter(Boolean)), [projects]);
   const developers = useMemo(() => uniqueSorted(projects.map(p => p.developer).filter(Boolean)), [projects]);
 
@@ -129,8 +132,11 @@ export default function PlatformReports({ lang = "sk" }) {
         <FilteredReport
           scopeLabel={cityPick}
           scopeType={lang === "sk" ? "Mesto" : "City"}
-          projects={projects.filter(p => p.city === cityPick)}
-          flats={flats.filter(f => projectCity(f, projects) === cityPick)}
+          projects={projects.filter(p => cityOf(p) === cityPick)}
+          flats={flats.filter(f => {
+            const p = projects.find(x => x.id === f.project_id);
+            return p && cityOf(p) === cityPick;
+          })}
           allProjects={projects}
           lang={lang}
           breakdownBy="district"
@@ -168,7 +174,7 @@ export default function PlatformReports({ lang = "sk" }) {
           })}
           allProjects={projects}
           lang={lang}
-          breakdownBy="project_name"
+          breakdownBy="name"
           breakdownLabel={lang === "sk" ? "podľa projektu" : "by project"}
         />
       )}
@@ -873,9 +879,25 @@ function FooterCard({ lang }) {
 function uniqueSorted(arr) {
   return Array.from(new Set(arr)).sort((a, b) => String(a).localeCompare(String(b), "sk"));
 }
+/* DB carries `district` but not `city`. Fold Bratislava's five okresy
+   ("Bratislava I…V") back into a single city label; everything else
+   passes through unchanged (city == district when not Bratislava). */
+function inferCity(district) {
+  if (!district) return null;
+  const s = String(district).trim();
+  if (/^Bratislava\b/i.test(s)) return "Bratislava";
+  if (/^Košice\b/i.test(s))     return "Košice";
+  if (/^Prešov\b/i.test(s))     return "Prešov";
+  if (/^Žilina\b/i.test(s))     return "Žilina";
+  if (/^Nitra\b/i.test(s))      return "Nitra";
+  if (/^Trnava\b/i.test(s))     return "Trnava";
+  if (/^Banská Bystrica\b/i.test(s)) return "Banská Bystrica";
+  if (/^Trenčín\b/i.test(s))    return "Trenčín";
+  return s;
+}
 function projectCity(flat, projects) {
   const p = projects.find(pp => pp.id === flat.project_id);
-  return p?.city || null;
+  return p ? (p.city || inferCity(p.district)) : null;
 }
 function projectDistrict(flat, projects) {
   const p = projects.find(pp => pp.id === flat.project_id);
