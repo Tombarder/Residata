@@ -717,127 +717,209 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
   );
 }
 
-// ═════════════ PIVOT / QUERY BUILDER ═════════════
-// Interactive "pick a filter, group, measure, chart type" tool inspired by
-// Excel pivot tables. Keeps paid users engaged — they can answer their own
-// questions rather than staring at fixed charts. All computation is
-// client-side over the already-loaded projects array (fast for ~200 rows).
-function AnalyticsPivot({ projects, lang }) {
-  const [districtFilter, setDistrictFilter] = useState([]);
-  const [minSoldPct, setMinSoldPct] = useState(0);
-  const [maxSoldPct, setMaxSoldPct] = useState(100);
-  const [groupBy, setGroupBy] = useState("district");
-  const [measure, setMeasure] = useState("count");
-  const [chartType, setChartType] = useState("bar");
-  const [search, setSearch] = useState("");
+// ═════════════ PIVOT / QUERY BUILDER (FLEXIBLE) ═════════════
+// "Any column for filter/group/measure" pivot over the projects table.
+// Text columns → string ops (is / contains / in). Number columns → range
+// and comparison ops. Derived "band" columns (price_band, sold_band,
+// size_band) are computed at group time from the underlying numeric
+// fields. Multiple group-bys stack into composite keys. CSV export
+// always matches what the table shows.
 
-  // Distinct district options (sorted)
-  const allDistricts = Array.from(new Set(projects.map(p => p.district).filter(Boolean))).sort();
+const PIVOT_COLUMNS = {
+  // Text
+  district:     { label: { en: "District",         sk: "Okres"            }, type: "text" },
+  sub_district: { label: { en: "Sub-district",     sk: "Mestská časť"     }, type: "text" },
+  developer:    { label: { en: "Developer",        sk: "Developer"        }, type: "text" },
+  kolaudacia:   { label: { en: "Completion",       sk: "Kolaudácia"       }, type: "text" },
+  name:         { label: { en: "Project",          sk: "Projekt"          }, type: "text" },
+  // Number
+  total_units:       { label: { en: "Total units",       sk: "Celkom bytov"        }, type: "number" },
+  available_units:   { label: { en: "Available",         sk: "Voľné"               }, type: "number" },
+  sold_units:        { label: { en: "Sold (total)",      sk: "Predané (celkom)"    }, type: "number" },
+  sold_last_month:   { label: { en: "Sold 30d",          sk: "Predané 30d"         }, type: "number" },
+  avg_price_eur_m2:  { label: { en: "Avg €/m²",          sk: "Priem. €/m²"         }, type: "number" },
+  min_price:         { label: { en: "Min price",         sk: "Min cena"            }, type: "number" },
+  max_price:         { label: { en: "Max price",         sk: "Max cena"            }, type: "number" },
+  sold_percentage:   { label: { en: "% sold",            sk: "% predané"           }, type: "number" },
+  // Derived (computed)
+  price_band:   { label: { en: "Price band",    sk: "Cenové pásmo"        }, type: "derived", from: "avg_price_eur_m2" },
+  sold_band:    { label: { en: "% sold band",   sk: "% predaných pásmo"   }, type: "derived", from: "sold_percentage" },
+  size_band:    { label: { en: "Size band",     sk: "Veľkostné pásmo"     }, type: "derived", from: "total_units" },
+};
 
-  // Apply filters
-  const filtered = projects.filter(p => {
-    if (districtFilter.length > 0 && !districtFilter.includes(p.district)) return false;
-    const sp = p.sold_percentage || 0;
-    if (sp < minSoldPct || sp > maxSoldPct) return false;
-    if (search.trim()) {
-      const q = search.trim().toLowerCase();
-      if (!(p.name || "").toLowerCase().includes(q)
-          && !(p.district || "").toLowerCase().includes(q)
-          && !(p.developer || "").toLowerCase().includes(q)) return false;
+function bandFor(column, row) {
+  if (column === "price_band") {
+    const v = row.avg_price_eur_m2;
+    if (v == null) return "—";
+    if (v < 3500) return "< 3.5k €/m²";
+    if (v < 4500) return "3.5–4.5k €/m²";
+    if (v < 6000) return "4.5–6k €/m²";
+    return "6k+ €/m²";
+  }
+  if (column === "sold_band") {
+    const s = row.sold_percentage ?? 0;
+    if (s < 25) return "0–25%";
+    if (s < 50) return "25–50%";
+    if (s < 75) return "50–75%";
+    if (s < 100) return "75–99%";
+    return "sold out (100%)";
+  }
+  if (column === "size_band") {
+    const t = row.total_units ?? 0;
+    if (t < 50) return "< 50";
+    if (t < 100) return "50–100";
+    if (t < 200) return "100–200";
+    return "200+";
+  }
+  return null;
+}
+
+function cellValue(row, column) {
+  if (PIVOT_COLUMNS[column]?.type === "derived") return bandFor(column, row);
+  return row[column];
+}
+
+// Filter evaluation
+const FILTER_OPS_TEXT = ["is", "is not", "contains", "in", "not in", "is empty", "not empty"];
+const FILTER_OPS_NUM  = ["=", "≠", "<", "≤", ">", "≥", "between", "is empty", "not empty"];
+
+function matchesFilter(row, f) {
+  const v = cellValue(row, f.column);
+  const colType = PIVOT_COLUMNS[f.column]?.type;
+  if (f.op === "is empty") return v == null || v === "";
+  if (f.op === "not empty") return v != null && v !== "";
+  if (v == null || v === "") return false;
+
+  if (colType === "number") {
+    const num = Number(v);
+    if (f.op === "=")  return num === +f.value;
+    if (f.op === "≠")  return num !== +f.value;
+    if (f.op === "<")  return num < +f.value;
+    if (f.op === "≤")  return num <= +f.value;
+    if (f.op === ">")  return num > +f.value;
+    if (f.op === "≥")  return num >= +f.value;
+    if (f.op === "between") {
+      return num >= (+f.min || 0) && num <= (+f.max || Infinity);
     }
     return true;
-  });
+  }
+  // text + derived (bands are strings)
+  const s = String(v).toLowerCase();
+  const q = String(f.value || "").toLowerCase();
+  if (f.op === "is")        return s === q;
+  if (f.op === "is not")    return s !== q;
+  if (f.op === "contains")  return s.includes(q);
+  if (f.op === "in") {
+    const vals = Array.isArray(f.values) ? f.values : String(f.value || "").split(",").map(x => x.trim().toLowerCase()).filter(Boolean);
+    return vals.includes(s) || (Array.isArray(f.values) && f.values.some(x => x.toLowerCase() === s));
+  }
+  if (f.op === "not in") {
+    const vals = Array.isArray(f.values) ? f.values : String(f.value || "").split(",").map(x => x.trim().toLowerCase()).filter(Boolean);
+    return !vals.includes(s) && !(Array.isArray(f.values) && f.values.some(x => x.toLowerCase() === s));
+  }
+  return true;
+}
 
-  // Group
-  const groupKey = (p) => {
-    if (groupBy === "district")   return p.district || "—";
-    if (groupBy === "developer")  return p.developer || "—";
-    if (groupBy === "kolaudacia") return p.kolaudacia || "—";
-    if (groupBy === "price_band") {
-      const v = p.avg_price_eur_m2;
-      if (!v) return "—";
-      if (v < 3500) return "< 3.5k";
-      if (v < 4500) return "3.5–4.5k";
-      if (v < 6000) return "4.5–6k";
-      return "6k+";
-    }
-    if (groupBy === "sold_band") {
-      const s = p.sold_percentage || 0;
-      if (s < 25) return "0–25%";
-      if (s < 50) return "25–50%";
-      if (s < 75) return "50–75%";
-      if (s < 100) return "75–99%";
-      return "sold out";
-    }
-    return "All";
-  };
+function AnalyticsPivot({ projects, lang }) {
+  // Multi-filter list — user clicks "+ Add filter", picks a column, operator, value(s).
+  const [filters, setFilters] = useState([]);
+  // Multiple group-bys — composite key (row label joins them with " · ").
+  const [groupBys, setGroupBys] = useState(["district"]);
+  // Measure = which numeric column + aggregation.  "__count__" is a special
+  // measure meaning COUNT(*) — works on any group.
+  const [measure, setMeasure] = useState({ column: "__count__", agg: "count" });
+  const [chartType, setChartType] = useState("bar");
+  const [sortBy, setSortBy] = useState("value_desc");   // value_asc | value_desc | key_asc | key_desc
 
+  const t = (obj) => obj?.[lang] || obj?.en || "";
+
+  // ── Apply filters ──
+  const filtered = projects.filter(p => filters.every(f => matchesFilter(p, f)));
+
+  // ── Build group rows with composite keys ──
   const groups = {};
   for (const p of filtered) {
-    const k = groupKey(p);
-    const g = groups[k] ||= { key: k, count: 0, total: 0, avail: 0, sold: 0, sold30: 0, priceSum: 0, priceN: 0, soldPctSum: 0, soldPctN: 0 };
-    g.count += 1;
-    g.total   += p.total_units || 0;
-    g.avail   += p.available_units || 0;
-    g.sold    += p.sold_units || 0;
-    g.sold30  += p.sold_last_month || 0;
-    if (p.avg_price_eur_m2)  { g.priceSum   += p.avg_price_eur_m2;   g.priceN   += 1; }
-    if (p.sold_percentage != null) { g.soldPctSum += p.sold_percentage; g.soldPctN += 1; }
+    const keyParts = groupBys.map(g => {
+      const v = cellValue(p, g);
+      return v == null || v === "" ? "—" : String(v);
+    });
+    const k = keyParts.join(" · ");
+    const g = groups[k] ||= { key: k, parts: keyParts, rows: [] };
+    g.rows.push(p);
   }
 
-  const measureValue = (g) => {
-    switch (measure) {
-      case "count":               return g.count;
-      case "total_units":         return g.total;
-      case "available_units":     return g.avail;
-      case "sold_units":          return g.sold;
-      case "sold_last_month":     return g.sold30;
-      case "avg_price_eur_m2":    return g.priceN   ? g.priceSum   / g.priceN   : 0;
-      case "avg_sold_percentage": return g.soldPctN ? g.soldPctSum / g.soldPctN : 0;
-      case "absorption":
-        return g.avail + g.sold30 > 0 ? (g.sold30 / (g.avail + g.sold30)) * 100 : 0;
-      default: return g.count;
+  // ── Apply measure ──
+  const computeMeasure = (rows) => {
+    if (measure.agg === "count" || measure.column === "__count__") return rows.length;
+    const nums = rows
+      .map(r => Number(r[measure.column]))
+      .filter(n => Number.isFinite(n));
+    if (nums.length === 0) return 0;
+    switch (measure.agg) {
+      case "sum":    return nums.reduce((a, b) => a + b, 0);
+      case "avg":    return nums.reduce((a, b) => a + b, 0) / nums.length;
+      case "min":    return Math.min(...nums);
+      case "max":    return Math.max(...nums);
+      case "median": {
+        const sorted = [...nums].sort((a, b) => a - b);
+        const m = Math.floor(sorted.length / 2);
+        return sorted.length % 2 ? sorted[m] : (sorted[m - 1] + sorted[m]) / 2;
+      }
+      default: return 0;
     }
   };
 
-  const rows = Object.values(groups)
-    .map(g => ({ ...g, value: measureValue(g) }))
-    .sort((a, b) => b.value - a.value);
+  const rowsWithValues = Object.values(groups).map(g => ({
+    ...g,
+    value: computeMeasure(g.rows),
+    count: g.rows.length,
+  }));
+
+  // Sort
+  const rows = [...rowsWithValues].sort((a, b) => {
+    if (sortBy === "value_desc") return b.value - a.value;
+    if (sortBy === "value_asc")  return a.value - b.value;
+    if (sortBy === "key_asc")    return String(a.key).localeCompare(String(b.key));
+    if (sortBy === "key_desc")   return String(b.key).localeCompare(String(a.key));
+    return 0;
+  });
+
   const maxValue = rows.length ? Math.max(...rows.map(r => r.value)) : 1;
 
-  // Format
+  // Display helpers
+  const measureLabelText = (() => {
+    if (measure.column === "__count__") return lang === "sk" ? "Počet projektov" : "Count of projects";
+    const col = t(PIVOT_COLUMNS[measure.column]?.label);
+    const ag = { count: lang === "sk" ? "Počet" : "Count",
+                 sum:   lang === "sk" ? "Súčet"  : "Sum",
+                 avg:   lang === "sk" ? "Priem." : "Avg",
+                 min:   "Min", max: "Max",
+                 median: lang === "sk" ? "Medián" : "Median" }[measure.agg];
+    return `${ag} · ${col}`;
+  })();
+
+  const groupLabelText = groupBys.map(g => t(PIVOT_COLUMNS[g]?.label)).join(" × ");
+
   const fmtValue = (v) => {
-    if (measure === "avg_price_eur_m2") return Math.round(v).toLocaleString("en-US").replace(/,/g, " ") + " €/m²";
-    if (measure === "avg_sold_percentage" || measure === "absorption") return v.toFixed(1) + "%";
-    return Math.round(v).toLocaleString("en-US").replace(/,/g, " ");
+    if (typeof v !== "number" || !Number.isFinite(v)) return "—";
+    // Price-like measures: show as integer with € style spacing
+    if (measure.column === "avg_price_eur_m2" || measure.column === "min_price" || measure.column === "max_price") {
+      return Math.round(v).toLocaleString("en-US").replace(/,/g, " ");
+    }
+    // Percentage-like
+    if (measure.column === "sold_percentage") {
+      return (Math.round(v * 10) / 10).toFixed(1) + "%";
+    }
+    // Default: integer for count/sum, 1 decimal for avg/median
+    const intish = measure.agg === "count" || measure.agg === "sum" || measure.column === "__count__";
+    return intish ? Math.round(v).toLocaleString("en-US").replace(/,/g, " ")
+                  : (Math.round(v * 100) / 100).toLocaleString("en-US").replace(/,/g, " ");
   };
 
-  const measureLabel = {
-    count:               lang === "sk" ? "Počet projektov"      : "Project count",
-    total_units:         lang === "sk" ? "Celkom bytov"         : "Total units",
-    available_units:     lang === "sk" ? "Voľné byty"           : "Available units",
-    sold_units:          lang === "sk" ? "Predané byty"         : "Sold units",
-    sold_last_month:     lang === "sk" ? "Predané (30d)"        : "Sold (30d)",
-    avg_price_eur_m2:    lang === "sk" ? "Priem. €/m²"          : "Avg €/m²",
-    avg_sold_percentage: lang === "sk" ? "Priem. % predaných"   : "Avg sold %",
-    absorption:          lang === "sk" ? "Absorpcia"            : "Absorption",
-  };
-  const groupByLabel = {
-    district:   lang === "sk" ? "Okres"             : "District",
-    developer:  lang === "sk" ? "Developer"         : "Developer",
-    kolaudacia: lang === "sk" ? "Rok kolaudácie"    : "Completion year",
-    price_band: lang === "sk" ? "Cenové pásmo"      : "Price band",
-    sold_band:  lang === "sk" ? "% predaných pásmo" : "Sold % band",
-  };
-
+  // CSV export of current slice
   const exportCSV = () => {
-    const headers = [groupByLabel[groupBy], "count", "total_units", "available_units", "sold_units", "sold_last_month", "avg_price_eur_m2", "avg_sold_percentage", measureLabel[measure]];
-    const out = rows.map(r => [
-      r.key, r.count, r.total, r.avail, r.sold, r.sold30,
-      r.priceN ? Math.round(r.priceSum / r.priceN) : "",
-      r.soldPctN ? (r.soldPctSum / r.soldPctN).toFixed(2) : "",
-      measure === "avg_price_eur_m2" ? Math.round(r.value) : (measure === "avg_sold_percentage" || measure === "absorption" ? r.value.toFixed(2) : r.value),
-    ]);
+    const headers = [...groupBys.map(g => t(PIVOT_COLUMNS[g]?.label)), lang === "sk" ? "Počet projektov" : "Count", measureLabelText];
+    const out = rows.map(r => [...r.parts, r.count, r.value]);
     const csv = [headers, ...out].map(row =>
       row.map(c => {
         const s = String(c ?? "");
@@ -847,10 +929,22 @@ function AnalyticsPivot({ projects, lang }) {
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href = url;
-    a.download = `residata-pivot-${groupBy}-${measure}-${new Date().toISOString().slice(0,10)}.csv`;
+    const name = [...groupBys, measure.column].filter(x => x !== "__count__").join("-") || "pivot";
+    a.download = `residata-pivot-${name}-${new Date().toISOString().slice(0,10)}.csv`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
+
+  // ── UI helpers ──
+  const numericColumnKeys = Object.keys(PIVOT_COLUMNS).filter(k => PIVOT_COLUMNS[k].type === "number");
+  const groupableKeys = Object.keys(PIVOT_COLUMNS).filter(k => PIVOT_COLUMNS[k].type === "text" || PIVOT_COLUMNS[k].type === "derived");
+
+  const addFilter = () => setFilters(fs => [...fs, { id: Math.random().toString(36).slice(2, 9), column: "district", op: "is", value: "", values: [] }]);
+  const updateFilter = (id, patch) => setFilters(fs => fs.map(f => f.id === id ? { ...f, ...patch } : f));
+  const removeFilter = (id) => setFilters(fs => fs.filter(f => f.id !== id));
+
+  const addGroupBy = (col) => setGroupBys(gs => gs.includes(col) ? gs : [...gs, col].slice(0, 3));
+  const removeGroupBy = (col) => setGroupBys(gs => gs.length === 1 ? gs : gs.filter(g => g !== col));
 
   return (
     <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 12, padding: "1.5rem" }}>
@@ -861,101 +955,121 @@ function AnalyticsPivot({ projects, lang }) {
         <h2 style={{ fontSize: "1.2rem", fontWeight: 600, color: "#e8e8ed", margin: "0.2rem 0 0" }}>
           {lang === "sk" ? "Postav si vlastný pohľad" : "Compose your own view"}
         </h2>
-        <p style={{ color: dim, fontSize: "0.82rem", margin: "0.4rem 0 0", lineHeight: 1.5, maxWidth: 640 }}>
+        <p style={{ color: dim, fontSize: "0.82rem", margin: "0.4rem 0 0", lineHeight: 1.5, maxWidth: 720 }}>
           {lang === "sk"
-            ? "Filter vľavo, group & measure vpravo, graf sa prepočíta live. CSV export vyhrá ten presný slice, ktorý si teraz vidíš."
-            : "Filter on the left, group & measure on the right, the chart recomputes live. CSV export grabs exactly the slice you see."}
+            ? "Pridávaj ľubovoľný počet filtrov cez „+ filter", zmeň group-by (viac ako jeden = krížový pohľad), vyber metriku + agregáciu (count · sum · avg · min · max · medián). Všetko prepočíta live. CSV export vrátí presne ten slice, ktorý vidíš."
+            : "Stack as many filters as you want via \"+ filter\", change group-by (more than one = cross-breakdown), pick a measure + aggregation (count · sum · avg · min · max · median). All live. CSV export grabs exactly what you see."}
         </p>
       </div>
 
-      {/* CONTROLS ROW */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.25rem", marginBottom: "1.25rem" }} className="pivot-grid">
-        {/* Filters */}
-        <div style={{ background: "#0a0a0b", border: `1px solid ${border}`, borderRadius: 8, padding: "1rem" }}>
-          <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.6rem" }}>
-            {lang === "sk" ? "Filter" : "Filter"}
+      {/* ── FILTERS ── */}
+      <div style={{ marginBottom: "1rem" }}>
+        <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.4rem" }}>
+          {lang === "sk" ? "Filtre" : "Filters"} ({filters.length})
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+          {filters.map(f => (
+            <FilterRow key={f.id} f={f} projects={projects} lang={lang} t={t}
+              onChange={(patch) => updateFilter(f.id, patch)}
+              onRemove={() => removeFilter(f.id)} />
+          ))}
+        </div>
+        <button onClick={addFilter} style={{
+          marginTop: "0.5rem", background: "transparent", border: `1px dashed ${border}`,
+          color: dim, padding: "0.5rem 0.85rem", borderRadius: 6, cursor: "pointer",
+          fontFamily: "inherit", fontSize: "0.78rem",
+        }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = green; e.currentTarget.style.color = green; }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = border; e.currentTarget.style.color = dim; }}>
+          + {lang === "sk" ? "pridať filter" : "add filter"}
+        </button>
+      </div>
+
+      {/* ── GROUP BY + MEASURE + CHART ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1.25rem" }} className="pivot-grid">
+        {/* Group by (multi) */}
+        <div style={{ background: "#0a0a0b", border: `1px solid ${border}`, borderRadius: 8, padding: "0.9rem 1rem" }}>
+          <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.4rem" }}>
+            {lang === "sk" ? "Group by" : "Group by"}
           </div>
-
-          <label style={pvtLabel}>{lang === "sk" ? "Hľadaj" : "Search"}</label>
-          <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder={lang === "sk" ? "meno, okres, developer…" : "name, district, developer…"}
-            style={pvtInput} />
-
-          <label style={{ ...pvtLabel, marginTop: "0.8rem" }}>{lang === "sk" ? "Okresy" : "Districts"} ({districtFilter.length || "všetky"})</label>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem", marginTop: "0.3rem" }}>
-            {allDistricts.map(d => {
-              const active = districtFilter.includes(d);
-              return (
-                <button key={d}
-                  onClick={() => setDistrictFilter(f => active ? f.filter(x => x !== d) : [...f, d])}
-                  style={{
-                    fontFamily: "inherit", fontSize: "0.68rem",
-                    padding: "0.25rem 0.55rem", borderRadius: 100, cursor: "pointer",
-                    background: active ? "rgba(0,229,160,0.15)" : "transparent",
-                    border: `1px solid ${active ? green : border}`,
-                    color: active ? green : dim,
-                    transition: "all 0.15s",
-                  }}>{d}</button>
-              );
-            })}
-            {districtFilter.length > 0 && (
-              <button onClick={() => setDistrictFilter([])}
-                style={{ fontFamily: "inherit", fontSize: "0.68rem", padding: "0.25rem 0.55rem", borderRadius: 100, cursor: "pointer", background: "transparent", border: `1px dashed ${border}`, color: "#ff6b6b" }}>
-                {lang === "sk" ? "× vyčistiť" : "× clear"}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem", marginBottom: "0.5rem" }}>
+            {groupBys.map((g, i) => (
+              <span key={g} style={{
+                display: "inline-flex", alignItems: "center", gap: "0.3rem",
+                padding: "0.25rem 0.55rem", borderRadius: 100,
+                background: "rgba(0,229,160,0.12)", border: `1px solid ${green}`,
+                color: green, fontSize: "0.72rem", fontFamily: mono,
+              }}>
+                {i > 0 && "×"} {t(PIVOT_COLUMNS[g]?.label)}
+                {groupBys.length > 1 && (
+                  <button onClick={() => removeGroupBy(g)}
+                    style={{ background: "transparent", border: "none", color: green, cursor: "pointer", padding: 0, fontSize: "0.9rem", lineHeight: 1 }}>×</button>
+                )}
+              </span>
+            ))}
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.25rem" }}>
+            {groupableKeys.filter(k => !groupBys.includes(k)).map(k => (
+              <button key={k} onClick={() => addGroupBy(k)}
+                style={{
+                  fontFamily: "inherit", fontSize: "0.68rem",
+                  padding: "0.22rem 0.5rem", borderRadius: 100, cursor: "pointer",
+                  background: "transparent", border: `1px solid ${border}`, color: dim,
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = green; e.currentTarget.style.color = green; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = border; e.currentTarget.style.color = dim; }}>
+                + {t(PIVOT_COLUMNS[k]?.label)}
               </button>
-            )}
-          </div>
-
-          <label style={{ ...pvtLabel, marginTop: "0.8rem" }}>{lang === "sk" ? "% predaných" : "Sold %"} · {minSoldPct}–{maxSoldPct}%</label>
-          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginTop: "0.3rem" }}>
-            <input type="range" min="0" max="100" value={minSoldPct} onChange={e => setMinSoldPct(Math.min(+e.target.value, maxSoldPct))} style={{ flex: 1 }} />
-            <input type="range" min="0" max="100" value={maxSoldPct} onChange={e => setMaxSoldPct(Math.max(+e.target.value, minSoldPct))} style={{ flex: 1 }} />
+            ))}
           </div>
         </div>
 
-        {/* Group & Measure */}
-        <div style={{ background: "#0a0a0b", border: `1px solid ${border}`, borderRadius: 8, padding: "1rem" }}>
-          <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.6rem" }}>
-            {lang === "sk" ? "Skladba" : "Composition"}
+        {/* Measure */}
+        <div style={{ background: "#0a0a0b", border: `1px solid ${border}`, borderRadius: 8, padding: "0.9rem 1rem" }}>
+          <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.4rem" }}>
+            {lang === "sk" ? "Metrika + agregácia" : "Measure + aggregation"}
           </div>
-
-          <label style={pvtLabel}>{lang === "sk" ? "Group by (stĺpec)" : "Group by"}</label>
-          <select value={groupBy} onChange={e => setGroupBy(e.target.value)} style={pvtInput}>
-            {Object.entries(groupByLabel).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-          </select>
-
-          <label style={{ ...pvtLabel, marginTop: "0.8rem" }}>{lang === "sk" ? "Measure (metrika)" : "Measure"}</label>
-          <select value={measure} onChange={e => setMeasure(e.target.value)} style={pvtInput}>
-            {Object.entries(measureLabel).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-          </select>
-
-          <label style={{ ...pvtLabel, marginTop: "0.8rem" }}>{lang === "sk" ? "Graf" : "Chart"}</label>
-          <div style={{ display: "flex", gap: "0.4rem", marginTop: "0.3rem" }}>
-            {["bar", "table"].map(c => (
-              <button key={c}
-                onClick={() => setChartType(c)}
-                style={{
-                  flex: 1, padding: "0.5rem 0.75rem", borderRadius: 6, cursor: "pointer",
-                  background: chartType === c ? "rgba(0,229,160,0.12)" : "transparent",
-                  border: `1px solid ${chartType === c ? green : border}`,
-                  color: chartType === c ? green : dim,
-                  fontFamily: "inherit", fontSize: "0.78rem",
-                  textTransform: "capitalize",
-                }}>{c === "bar" ? (lang === "sk" ? "📊 bar graf" : "📊 bar chart") : (lang === "sk" ? "🗂️ tabuľka" : "🗂️ table")}</button>
-            ))}
+          <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
+            <select value={measure.agg} onChange={e => setMeasure(m => ({ ...m, agg: e.target.value }))} style={{ ...pvtInput, marginTop: 0, flex: "0 0 110px" }}>
+              <option value="count">count</option>
+              <option value="sum">sum</option>
+              <option value="avg">avg</option>
+              <option value="min">min</option>
+              <option value="max">max</option>
+              <option value="median">median</option>
+            </select>
+            <span style={{ color: dim, fontSize: "0.82rem" }}>{lang === "sk" ? "z" : "of"}</span>
+            <select value={measure.column} onChange={e => setMeasure(m => ({ ...m, column: e.target.value }))} style={{ ...pvtInput, marginTop: 0, flex: 1 }}>
+              <option value="__count__">* (all rows)</option>
+              {numericColumnKeys.map(k => (
+                <option key={k} value={k}>{t(PIVOT_COLUMNS[k].label)}</option>
+              ))}
+            </select>
+          </div>
+          <div style={{ marginTop: "0.6rem", display: "flex", gap: "0.4rem" }}>
+            <select value={chartType} onChange={e => setChartType(e.target.value)} style={{ ...pvtInput, marginTop: 0, flex: 1 }}>
+              <option value="bar">📊 {lang === "sk" ? "bar graf" : "bar chart"}</option>
+              <option value="table">🗂️ {lang === "sk" ? "tabuľka" : "table"}</option>
+            </select>
+            <select value={sortBy} onChange={e => setSortBy(e.target.value)} style={{ ...pvtInput, marginTop: 0, flex: 1 }}>
+              <option value="value_desc">↓ {lang === "sk" ? "podľa hodnoty (najväčšie)" : "by value (desc)"}</option>
+              <option value="value_asc">↑ {lang === "sk" ? "podľa hodnoty (najmenšie)" : "by value (asc)"}</option>
+              <option value="key_asc">A–Z</option>
+              <option value="key_desc">Z–A</option>
+            </select>
           </div>
         </div>
       </div>
 
-      {/* RESULTS HEADER + EXPORT */}
+      {/* ── RESULTS HEADER + EXPORT ── */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.75rem", flexWrap: "wrap", gap: "0.75rem" }}>
         <div>
           <div style={{ fontSize: "0.78rem", color: dim, fontFamily: mono }}>
-            {lang === "sk" ? "Filtered" : "Filtered"}: <strong style={{ color: "#e8e8ed" }}>{filtered.length}</strong>/{projects.length} projektov ·
+            {lang === "sk" ? "Filtered" : "Filtered"}: <strong style={{ color: "#e8e8ed" }}>{filtered.length}</strong>/{projects.length} {lang === "sk" ? "projektov" : "projects"} ·
             {" "}<strong style={{ color: "#e8e8ed" }}>{rows.length}</strong> {lang === "sk" ? "skupín" : "groups"}
           </div>
           <div style={{ fontSize: "0.82rem", color: "#e8e8ed", marginTop: "0.15rem" }}>
-            <span style={{ color: dim }}>{measureLabel[measure]} by {groupByLabel[groupBy]}</span>
+            <span style={{ color: dim }}>{measureLabelText} · by {groupLabelText}</span>
           </div>
         </div>
         <button onClick={exportCSV} className="btn-s" style={{ fontSize: "0.78rem", padding: "0.45rem 1rem" }}>
@@ -963,7 +1077,7 @@ function AnalyticsPivot({ projects, lang }) {
         </button>
       </div>
 
-      {/* CHART / TABLE */}
+      {/* ── CHART / TABLE ── */}
       {rows.length === 0 ? (
         <div style={{ color: dim, fontSize: "0.85rem", padding: "2rem", textAlign: "center", border: `1px dashed ${border}`, borderRadius: 8 }}>
           {lang === "sk" ? "Žiadne výsledky pre aktuálny filter." : "No results for current filter."}
@@ -971,8 +1085,8 @@ function AnalyticsPivot({ projects, lang }) {
       ) : chartType === "bar" ? (
         <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
           {rows.map(r => (
-            <div key={r.key} style={{ display: "grid", gridTemplateColumns: "180px 1fr 150px", gap: "0.85rem", alignItems: "center" }}>
-              <div style={{ fontSize: "0.85rem", color: "#e8e8ed", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.key}</div>
+            <div key={r.key} style={{ display: "grid", gridTemplateColumns: "minmax(140px, 240px) 1fr 140px", gap: "0.85rem", alignItems: "center" }}>
+              <div style={{ fontSize: "0.83rem", color: "#e8e8ed", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={r.key}>{r.key}</div>
               <div style={{ height: 22, background: "#0e0e10", borderRadius: 4, overflow: "hidden", border: `1px solid ${border}` }}>
                 <div style={{
                   width: `${maxValue > 0 ? (r.value / maxValue) * 100 : 0}%`, height: "100%",
@@ -980,37 +1094,29 @@ function AnalyticsPivot({ projects, lang }) {
                   transition: "width 0.5s ease",
                 }} />
               </div>
-              <div style={{ fontFamily: mono, fontSize: "0.88rem", color: green, fontWeight: 700, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+              <div style={{ fontFamily: mono, fontSize: "0.85rem", color: green, fontWeight: 700, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
                 {fmtValue(r.value)}
               </div>
             </div>
           ))}
         </div>
       ) : (
-        <div style={{ border: `1px solid ${border}`, borderRadius: 8, overflow: "hidden" }}>
+        <div style={{ border: `1px solid ${border}`, borderRadius: 8, overflow: "auto", maxHeight: 520 }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
-            <thead style={{ background: "#0e0e10" }}>
+            <thead style={{ background: "#0e0e10", position: "sticky", top: 0 }}>
               <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                <th style={th}>{groupByLabel[groupBy]}</th>
+                {groupBys.map(g => <th key={g} style={th}>{t(PIVOT_COLUMNS[g]?.label)}</th>)}
                 <th style={{ ...th, textAlign: "right" }}>{lang === "sk" ? "Projektov" : "Projects"}</th>
-                <th style={{ ...th, textAlign: "right" }}>{lang === "sk" ? "Bytov" : "Units"}</th>
-                <th style={{ ...th, textAlign: "right" }}>{lang === "sk" ? "Voľné" : "Avail"}</th>
-                <th style={{ ...th, textAlign: "right" }}>{lang === "sk" ? "Predané" : "Sold"}</th>
-                <th style={{ ...th, textAlign: "right" }}>€/m²</th>
-                <th style={{ ...th, textAlign: "right", color: green }}>{measureLabel[measure]}</th>
+                <th style={{ ...th, textAlign: "right", color: green }}>{measureLabelText}</th>
               </tr>
             </thead>
             <tbody>
               {rows.map(r => (
                 <tr key={r.key} style={{ borderTop: `1px solid ${border}` }}>
-                  <td style={{ ...td, fontWeight: 600 }}>{r.key}</td>
+                  {r.parts.map((part, i) => (
+                    <td key={i} style={{ ...td, fontWeight: i === 0 ? 600 : 400, color: i === 0 ? "#e8e8ed" : dim }}>{part}</td>
+                  ))}
                   <td style={{ ...td, textAlign: "right", fontFamily: mono, color: dim }}>{r.count}</td>
-                  <td style={{ ...td, textAlign: "right", fontFamily: mono, color: dim }}>{r.total.toLocaleString("en-US").replace(/,/g, " ")}</td>
-                  <td style={{ ...td, textAlign: "right", fontFamily: mono, color: green }}>{r.avail.toLocaleString("en-US").replace(/,/g, " ")}</td>
-                  <td style={{ ...td, textAlign: "right", fontFamily: mono, color: "#f5a623" }}>{r.sold.toLocaleString("en-US").replace(/,/g, " ")}</td>
-                  <td style={{ ...td, textAlign: "right", fontFamily: mono, color: dim }}>
-                    {r.priceN ? Math.round(r.priceSum / r.priceN).toLocaleString("en-US").replace(/,/g, " ") : "—"}
-                  </td>
                   <td style={{ ...td, textAlign: "right", fontFamily: mono, color: green, fontWeight: 700 }}>
                     {fmtValue(r.value)}
                   </td>
@@ -1024,6 +1130,102 @@ function AnalyticsPivot({ projects, lang }) {
       <style>{`
         @media (max-width: 760px) { .pivot-grid { grid-template-columns: 1fr !important; } }
       `}</style>
+    </div>
+  );
+}
+
+/* FilterRow — one row in the multi-filter list. Column dropdown +
+   operator dropdown (context-aware) + value input (context-aware). */
+function FilterRow({ f, projects, lang, t, onChange, onRemove }) {
+  const col = PIVOT_COLUMNS[f.column] || {};
+  const colType = col.type;
+  const ops = colType === "number" ? FILTER_OPS_NUM : FILTER_OPS_TEXT;
+
+  // For `in` / `not in` we offer a chip multi-select of distinct values.
+  const distinctValues = (() => {
+    if (colType !== "text" && colType !== "derived") return [];
+    const set = new Set();
+    for (const p of projects) {
+      const v = cellValue(p, f.column);
+      if (v != null && v !== "") set.add(String(v));
+    }
+    return Array.from(set).sort();
+  })();
+
+  const setCol = (column) => {
+    // Reset op / value when column changes (types may differ)
+    const newType = PIVOT_COLUMNS[column]?.type;
+    const defaultOp = newType === "number" ? "=" : "is";
+    onChange({ column, op: defaultOp, value: "", values: [], min: "", max: "" });
+  };
+
+  return (
+    <div style={{
+      display: "grid", gridTemplateColumns: "minmax(140px, 180px) minmax(90px, 120px) 1fr 28px",
+      gap: "0.4rem", alignItems: "center",
+    }}>
+      {/* Column */}
+      <select value={f.column} onChange={e => setCol(e.target.value)} style={{ ...pvtInput, marginTop: 0 }}>
+        {Object.entries(PIVOT_COLUMNS).map(([k, c]) => (
+          <option key={k} value={k}>{t(c.label)}</option>
+        ))}
+      </select>
+
+      {/* Operator */}
+      <select value={f.op} onChange={e => onChange({ op: e.target.value })} style={{ ...pvtInput, marginTop: 0 }}>
+        {ops.map(op => <option key={op} value={op}>{op}</option>)}
+      </select>
+
+      {/* Value(s) */}
+      <div>
+        {f.op === "is empty" || f.op === "not empty" ? (
+          <div style={{ color: dim, fontSize: "0.8rem", padding: "0.5rem 0.25rem", fontStyle: "italic" }}>—</div>
+        ) : f.op === "between" && colType === "number" ? (
+          <div style={{ display: "flex", gap: "0.4rem" }}>
+            <input type="number" value={f.min ?? ""} onChange={e => onChange({ min: e.target.value })}
+              placeholder={lang === "sk" ? "od" : "from"} style={{ ...pvtInput, marginTop: 0 }} />
+            <input type="number" value={f.max ?? ""} onChange={e => onChange({ max: e.target.value })}
+              placeholder={lang === "sk" ? "do" : "to"} style={{ ...pvtInput, marginTop: 0 }} />
+          </div>
+        ) : (f.op === "in" || f.op === "not in") && (colType === "text" || colType === "derived") ? (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.25rem", maxHeight: 90, overflowY: "auto", padding: "0.25rem", border: `1px solid ${border}`, borderRadius: 6, background: "#0e0e10" }}>
+            {distinctValues.length === 0 ? (
+              <span style={{ color: dim, fontSize: "0.72rem" }}>{lang === "sk" ? "žiadne hodnoty v dátach" : "no values in data"}</span>
+            ) : distinctValues.map(v => {
+              const active = (f.values || []).includes(v);
+              return (
+                <button key={v}
+                  onClick={() => {
+                    const cur = f.values || [];
+                    onChange({ values: active ? cur.filter(x => x !== v) : [...cur, v] });
+                  }}
+                  style={{
+                    fontFamily: "inherit", fontSize: "0.68rem",
+                    padding: "0.15rem 0.45rem", borderRadius: 100, cursor: "pointer",
+                    background: active ? "rgba(0,229,160,0.15)" : "transparent",
+                    border: `1px solid ${active ? green : border}`,
+                    color: active ? green : dim,
+                  }}>{v}</button>
+              );
+            })}
+          </div>
+        ) : colType === "number" ? (
+          <input type="number" value={f.value ?? ""} onChange={e => onChange({ value: e.target.value })}
+            style={{ ...pvtInput, marginTop: 0 }} />
+        ) : (
+          <input value={f.value ?? ""} onChange={e => onChange({ value: e.target.value })}
+            placeholder={lang === "sk" ? "hodnota…" : "value…"}
+            style={{ ...pvtInput, marginTop: 0 }} />
+        )}
+      </div>
+
+      <button onClick={onRemove}
+        title={lang === "sk" ? "Odstrániť filter" : "Remove filter"}
+        style={{
+          background: "transparent", border: `1px solid ${border}`, color: "#ff6b6b",
+          borderRadius: 6, cursor: "pointer", padding: "0.35rem",
+          fontSize: "0.85rem", lineHeight: 1,
+        }}>×</button>
     </div>
   );
 }
@@ -1275,6 +1477,33 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
               ? "Freemium: noví užívatelia sa automaticky stanú free hneď po vyplnení profilu. Tento panel je hlavne na: bump free → paid, občasné vymazanie testovacích účtov, downgrade do pending (efektívny ban)."
               : "Freemium: new sign-ups auto-approve to free. This panel is mostly for: bumping free → paid, occasional test-account deletion, downgrading to pending (de-facto ban)."}
           </p>
+
+          {/* ─── Data refresh tools ─── */}
+          <SectionHeader>
+            {lang === "sk" ? "Obnova dát zo sheetu" : "Data refresh from sheet"}
+          </SectionHeader>
+          <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 10, padding: "1.25rem 1.5rem", marginBottom: "2rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap", alignItems: "flex-start" }}>
+              <div style={{ flex: 1, minWidth: 280 }}>
+                <div style={{ fontSize: "0.95rem", fontWeight: 600, color: "#e8e8ed", marginBottom: "0.3rem" }}>
+                  {lang === "sk" ? "Aktualizovať developerov" : "Refresh developers"}
+                </div>
+                <p style={{ color: dim, fontSize: "0.82rem", margin: 0, lineHeight: 1.55 }}>
+                  {lang === "sk"
+                    ? <>Po doplnení stĺpca <strong style={{ color: "#e8e8ed" }}>Developer</strong> v &quot;Prehlad projektov&quot; sheete klikni nižšie. Otvorí sa GitHub Actions s pripraveným workflow &quot;Sync registry metadata&quot; — klikni <strong>Run workflow</strong>, počkaj ~15 sekúnd, refreshni platformu. Žiadny scrape, žiadne prerušenie ostatných dát.</>
+                    : <>Once the <strong style={{ color: "#e8e8ed" }}>Developer</strong> column in the &quot;Prehlad projektov&quot; sheet is filled, click below. Opens GitHub Actions with the &quot;Sync registry metadata&quot; workflow — click <strong>Run workflow</strong>, wait ~15 seconds, refresh the platform. No scraping, no disruption to other data.</>}
+                </p>
+              </div>
+              <a
+                href="https://github.com/Tombarder/novostavby-scraper/actions/workflows/sync_registry.yml"
+                target="_blank" rel="noopener noreferrer"
+                className="btn-p"
+                style={{ fontSize: "0.85rem", padding: "0.6rem 1.2rem", whiteSpace: "nowrap" }}
+              >
+                ↗ {lang === "sk" ? "Otvoriť GitHub Actions" : "Open GitHub Actions"}
+              </a>
+            </div>
+          </div>
 
           {events.length > 0 && (
             <>
