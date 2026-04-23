@@ -15,6 +15,7 @@ import { useCapabilities } from "./lib/useCapabilities";
 import { useProjects, useMetrics } from "./lib/useData";
 import { pushRoute, pathToPage, isAppPage } from "./lib/routing";
 import { applySeo } from "./lib/seo";
+import { startPageEngagement, stopPageEngagement } from "./lib/engagement";
 import PlatformShell from "./pages/Platform";
 import { track } from "./lib/track";
 
@@ -413,13 +414,13 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
             border: "1px solid #222228", fontSize: "0.72rem",
             fontFamily: "'JetBrains Mono', monospace",
           }}>
-            <button onClick={() => setLang("en")} style={{
+            <button onClick={() => { if (lang !== "en") { track("language_switched", { from: lang, to: "en" }); setLang("en"); } }} style={{
               padding: "0.3rem 0.6rem", border: "none", cursor: "pointer",
               background: lang === "en" ? "#222228" : "transparent",
               color: lang === "en" ? "#e8e8ed" : "#55555f",
               fontFamily: "inherit", fontSize: "inherit", transition: "all 0.2s",
             }}>EN</button>
-            <button onClick={() => setLang("sk")} style={{
+            <button onClick={() => { if (lang !== "sk") { track("language_switched", { from: lang, to: "sk" }); setLang("sk"); } }} style={{
               padding: "0.3rem 0.6rem", border: "none", cursor: "pointer",
               borderLeft: "1px solid #222228",
               background: lang === "sk" ? "#222228" : "transparent",
@@ -1578,9 +1579,23 @@ export default function App() {
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
-  // Track page views
+  // Track page views + engagement.
+  // On every route change: emit page_view for the new page, start an
+  // engagement tracker for it. The useEffect cleanup (runs BEFORE the
+  // next effect on nav) stops the previous page's tracker, which
+  // emits a page_leave event carrying dwell/active/visible/scroll
+  // stats. This gives us at-a-glance 'did the user actually use this
+  // page or just tab-opened and left' intelligence.
   useEffect(() => {
     track("page_view", { page: current, lang });
+    startPageEngagement(typeof current === "string" ? current : "unknown", { lang });
+    return () => {
+      // When route changes, cleanup runs before the next effect's body,
+      // so at this point `current` is still the OLD page. Passing the
+      // incoming nav target would be nicer but we don't have it here —
+      // the next page_view contains the to_page anyway.
+      stopPageEngagement();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current]);
 

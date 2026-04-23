@@ -404,6 +404,7 @@ export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en
   const [highlightedFlatId, setHighlightedFlatId] = useState(null);
   const onSelectFlat = (flatId) => {
     if (!flatId) return;
+    track("scatter_dot_clicked", { project_id: projectId, flat_id: flatId });
     setHighlightedFlatId(flatId);
     // Scroll the actual row into view (not the whole table) — handled
     // inside FlatsTable via its own useEffect on the ID.
@@ -668,10 +669,10 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
             mixSubtitle = L("Voľné / rezervované", "Available / reserved");
             mixNote = L("Developer nezverejňuje predané byty.", "Developer doesn't publish sold units.");
           } else if (mixHasV) {
-            mixSubtitle = L("Len voľné byty", "Available units only");
+            mixSubtitle = L("Voľné byty · šírka = objem", "Available units · width = volume");
             mixNote = L(
-              "Developer zverejňuje iba voľné byty — predané a rezervované tu nie sú započítané.",
-              "Developer only publishes available units — sold / reserved aren't tracked here.",
+              "Developer zverejňuje iba voľné byty. Šírka bary ukazuje počet voľných oproti najväčšej izbovosti — inak by boli všetky rovnako dlhé a nepovedali by nič.",
+              "Developer only publishes available units. Bar width is scaled to the largest segment so you see which room type dominates supply — otherwise every bar would be full-width green and tell you nothing.",
             );
           } else if (mixHasP && !mixHasV) {
             mixSubtitle = L("Rezervované / predané", "Reserved / sold");
@@ -897,24 +898,30 @@ function TakeupChart({ snaps, lang }) {
 /* ── Room mix: horizontal stacked bars per room type ──────── */
 /* ── Room-type mix — horizontal stacked bars per room type ──
  *
- * Layout (left → right): AVAILABLE (green) → RESERVED (gray) → SOLD (orange).
+ * Two rendering modes:
  *
- *   1-room  [■■■■■■■■■■■■■■■■□□□□□□□■■■■■■]    22 · 50% S
- *            11 F              8 R      3 S
+ *  A) Mixed data (project has at least two of V/R/P):
+ *     Each row's bar fills 100 % and is split proportionally into
+ *     AVAILABLE (green, left) → RESERVED (gray) → SOLD (orange, right).
+ *     Reading left→right mirrors the customer journey.
  *
- * Rationale for this order: 'available' is the buyer's starting
- * point (what's still free), reserved is the in-between, sold is
- * the tail. Reading left→right mirrors the customer journey.
+ *  B) V-only data (project publishes only available units):
+ *     Every row would be 100 % green under mode A — misleading
+ *     because a 1-room group with 11 units would look visually
+ *     identical to a 2-room group with 72 units. In this mode we
+ *     scale bar width by r.total / max(all totals) so the chart
+ *     becomes a honest 'which segment dominates supply' view.
+ *     Still all-green (the only colour we have) but the widths now
+ *     carry signal.
  *
  * Stav codes in labels translate to the user's language:
  *   · SK: V (voľné)  · R (rezervované)   · P (predané)
  *   · EN: F (free)   · R (reserved)      · S (sold)
- *
- * The chart-card subtitle above shows the active codes in the same
- * left→right order as the bar segments — see the enclosing switch
- * in ProjectInsights.
  */
 function RoomMixChart({ rows, lang }) {
+  // Detect V-only mode: no row has any sold or reserved
+  const vOnly = rows.every(r => (r.sold || 0) === 0 && (r.reserved || 0) === 0);
+  const maxTotal = rows.reduce((m, r) => Math.max(m, r.total || 0), 0) || 1;
   const W = 560;
   const barH = 22;
   const underH = 14;
@@ -944,17 +951,21 @@ function RoomMixChart({ rows, lang }) {
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}>
       {rows.map((r, i) => {
         const y = i * (rowH + gap);
+
+        // vOnly mode: bar width = r.total / maxTotal of all rows.
+        // Mixed mode: bar is always full width, segments split it.
+        const rowBarW = vOnly ? (r.total / maxTotal) * barW : barW;
+
         const pct = r.total > 0 ? {
           sold: r.sold / r.total,
           reserved: r.reserved / r.total,
           avail: r.avail / r.total,
         } : { sold: 0, reserved: 0, avail: 0 };
-        const soldW = pct.sold * barW;
-        const resvW = pct.reserved * barW;
-        const availW = pct.avail * barW;
+        const soldW = pct.sold * rowBarW;
+        const resvW = pct.reserved * rowBarW;
+        const availW = pct.avail * rowBarW;
         const underY = y + barH + underH - 2;
 
-        // Left→right x-offsets for each segment under the new order
         const xAvail = labelW;
         const xResv  = labelW + availW;
         const xSold  = labelW + availW + resvW;
@@ -1252,9 +1263,13 @@ function FlatsTable({ flats, t, lang, highlightedFlatId }) {
   const [openFilterCol, setOpenFilterCol] = useState(null);
 
   const onHeaderClick = (col) => {
-    setSort(prev => prev.key === col.key
-      ? { key: col.key, dir: prev.dir === "asc" ? "desc" : "asc" }
-      : { key: col.key, dir: col.def });
+    setSort(prev => {
+      const next = prev.key === col.key
+        ? { key: col.key, dir: prev.dir === "asc" ? "desc" : "asc" }
+        : { key: col.key, dir: col.def };
+      track("flat_sort_applied", { column: col.key, direction: next.dir });
+      return next;
+    });
   };
 
   // ── Apply filters ────────────────────────────────────────────
@@ -1414,7 +1429,11 @@ function FlatsTable({ flats, t, lang, highlightedFlatId }) {
                         col={col}
                         flats={flats}
                         filter={columnFilters[col.key]}
-                        onApply={(patch) => { updateColumnFilter(col.key, patch); setOpenFilterCol(null); }}
+                        onApply={(patch) => {
+                          track("flat_filter_applied", { column: col.key, kind: col.kind, cleared: patch == null });
+                          updateColumnFilter(col.key, patch);
+                          setOpenFilterCol(null);
+                        }}
                         onClose={() => setOpenFilterCol(null)}
                         lang={lang}
                         locale={locale}
