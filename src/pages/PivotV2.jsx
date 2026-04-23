@@ -821,6 +821,7 @@ export default function PivotV2({ lang = "sk" }) {
           onDropToZone={(zone) => { if (!drag) return; addToZone(drag.fieldKey, zone); setDrag(null); setHoverZone(null); }}
           removeFromZone={removeFromZone}
           changeValueAgg={changeValueAgg}
+          openFilter={(key, anchorEl) => setFilterPopup({ key, anchorEl })}
           lang={lang}
         />
         <RightPanel
@@ -944,7 +945,7 @@ const miniBtn = {
 };
 
 /* ─── LEFT PANEL ─────────────────────────────────────────────── */
-function LeftPanel({ rows, cols, values, filters, drag, setDrag, hoverZone, setHoverZone, onDropToZone, removeFromZone, changeValueAgg, lang }) {
+function LeftPanel({ rows, cols, values, filters, drag, setDrag, hoverZone, setHoverZone, onDropToZone, removeFromZone, changeValueAgg, openFilter, lang }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
       <DropZone
@@ -1001,7 +1002,7 @@ function LeftPanel({ rows, cols, values, filters, drag, setDrag, hoverZone, setH
         hoverZone={hoverZone} setHoverZone={setHoverZone}
         onDrop={() => onDropToZone("filters")}
         onRemove={(k) => removeFromZone("filters", k)}
-        onChipClick={(key, el) => setFilterPopup({ key, anchorEl: el })}
+        onChipClick={openFilter}
       />
     </div>
   );
@@ -1118,30 +1119,19 @@ function ChipInZone({ label, type, agg, filter, level, onDragStart, onDragStartP
       >
         {label}
       </span>
-      {/* Filter chip: always show a dedicated settings button so the
-          drag-vs-click ambiguity on the outer draggable span can never
-          block the user. Click this button → opens the config popover.
-          Summary text (or "nastaviť" hint) sits next to it as a label. */}
+      {/* Filter chip meta: inline summary when configured, subtle hint
+          when idle. Whole chip is clickable (span's onClick handles it),
+          so no loud orange pseudo-button is needed. */}
       {isFilterChip && (
-        <button
-          type="button"
-          onMouseDown={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.stopPropagation();
-            if (onClick) onClick({ currentTarget: e.currentTarget.parentElement });
-          }}
-          title={active ? "Upraviť filter" : "Nastaviť filter"}
-          style={{
-            background: active ? "transparent" : "rgba(245,166,35,0.12)",
-            border: active ? "none" : "1px solid #f5a62355",
-            color: active ? green : "#f5a623",
-            borderRadius: 3, padding: active ? "0 0.25rem" : "0.15rem 0.45rem",
-            cursor: "pointer", fontFamily: "inherit", fontSize: "0.68rem",
-            whiteSpace: "nowrap", fontWeight: active ? 600 : 700,
-          }}
-        >
-          {active ? filterSummary : "nastaviť ⚙"}
-        </button>
+        <span style={{
+          fontSize: "0.7rem",
+          color: active ? green : dim,
+          opacity: active ? 1 : 0.8,
+          fontStyle: active ? "normal" : "italic",
+          whiteSpace: "nowrap",
+        }}>
+          {active ? filterSummary : "nastaviť…"}
+        </span>
       )}
       {/* Agg picker. Hidden for measure fields (single fixed calculation,
           no alternative aggs to choose from — the dropdown would be a
