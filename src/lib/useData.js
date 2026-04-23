@@ -82,26 +82,36 @@ export function useProjectFlats(projectId) {
 
     (async () => {
       // 1. Prime the session BEFORE the first fetch.
+      //    `hadValidSession` is the key heuristic for the retry loop below:
+      //    if we had a live session going in, an empty result = truly empty
+      //    (no retries, instant "no data" UX). If we had NO session at t=0,
+      //    an empty result could be the RLS-as-anon race and is worth a
+      //    refresh + retry.
+      let hadValidSession = false;
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
+          hadValidSession = true;
           const expSoon = session.expires_at && (session.expires_at * 1000) < Date.now() + 120000;
           if (expSoon) await supabase.auth.refreshSession();
         }
       } catch { /* ignore — we'll still attempt the fetch */ }
 
-      // 2. Try up to 5 times with backoff when the result comes back empty
-      //    AND no explicit error. (A real error = stop immediately; empty
-      //    = could be RLS-as-anon race, try again after session refresh.)
-      //    Delays: 0, 250, 600, 1200, 2500 ms — total max ~4.5s.
+      // 2. Retry strategy:
+      //    - explicit error → stop immediately (real problem, not a race)
+      //    - got rows → stop (happy path)
+      //    - empty + had valid session at t=0 → stop (truly empty; no
+      //      point waiting — RLS wouldn't paradoxically lie for a
+      //      session-bearing caller)
+      //    - empty + session was null at t=0 → retry with backoff and
+      //      re-refresh (classic race Tomáš hit: nav fires before token
+      //      attaches). Delays: 0, 250, 600, 1200, 2500 ms.
       const delays = [0, 250, 600, 1200, 2500];
       let data = null, err = null;
       for (let i = 0; i < delays.length; i++) {
         if (cancelled) return;
         if (delays[i] > 0) await sleep(delays[i]);
         if (cancelled) return;
-        // On retries, re-refresh the session in case the first getSession()
-        // returned null for a race reason.
         if (i > 0) {
           try { await supabase.auth.refreshSession(); } catch {/* ignore */}
         }
@@ -111,8 +121,8 @@ export function useProjectFlats(projectId) {
         err = res.error;
         if (err) break;                              // explicit error — stop
         if (data && data.length > 0) break;          // got rows — stop
-        // else empty + no error → try again (maybe RLS race, maybe truly
-        // empty; one more refresh-and-try handles both cheaply).
+        if (hadValidSession) break;                  // empty is truthful — stop
+        // else empty + no session → retry with refresh.
       }
 
       setFlats(data || []);

@@ -305,7 +305,11 @@ export function PipelineFlow({ lang = "en" }) {
 
     // 4 KPI karty pod SVG-scénou. 4. karta je "ako často" namiesto
     // internej schema-metriky "25 polí" čo kupujúcemu nič nehovorí.
-    statsLabel: ["developerov", "aktívnych projektov", "bytov v datasete", "aktualizácia"],
+    // "sledovaných projektov" (not "aktívnych") — projects.length returns
+    // 90 = everything we track, incl. sold-out and paused. Only ~57 of
+    // those are currently "active" (status='active'). Using the word
+    // "aktívnych" alongside 90 would be factually wrong.
+    statsLabel: ["developerov", "sledovaných projektov", "bytov v datasete", "aktualizácia"],
   } : {
     label: "How it works",
     title: "From scattered developer sites to live market intelligence.",
@@ -324,7 +328,8 @@ export function PipelineFlow({ lang = "en" }) {
     z3Cap1: "MONTHLY AUTO-REFRESH",
     z3Cap2: "or weekly on demand",
 
-    statsLabel: ["developers", "active projects", "units in dataset", "refresh cadence"],
+    // "projects tracked" (not "active projects") — see Slovak comment above.
+    statsLabel: ["developers", "projects tracked", "units in dataset", "refresh cadence"],
   };
 
   return (

@@ -691,6 +691,14 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
               "Developer zverejňuje iba voľné byty — predané a rezervované tu nie sú započítané.",
               "Developer only publishes available units — sold / reserved aren't tracked here.",
             );
+          } else if (mixHasP && !mixHasV) {
+            // Sold-out or near-sold-out: chart shows which room types were
+            // ever absorbed, not a live offer. Call that out.
+            mixSubtitle = L("Predané / rezervované", "Sold / reserved");
+            mixNote = L(
+              "Projekt je vypredaný — graf ukazuje historický mix po izbách, nie aktuálnu ponuku.",
+              "Project is sold out — the chart shows historical room-type mix, not current inventory.",
+            );
           } else {
             mixSubtitle = L("Predané / rezervované", "Sold / reserved");
             mixNote = null;
@@ -749,6 +757,20 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
           scopeNote = L(
             `Developer zverejňuje iba voľné byty. Predané a rezervované v grafe nie sú, lebo ich nemáme.`,
             `Developer publishes only available units. Sold / reserved aren't plotted because we don't have them.`,
+          );
+        } else if (hasP && !hasV) {
+          // Sold-out scenario — every plotted unit is already sold. Worth
+          // calling out explicitly so the chart isn't read as "current market".
+          title = L("Plocha × cena (predané byty)", "Area × price (sold units)");
+          scopeNote = L(
+            `Projekt je vypredaný / takmer vypredaný — v grafe vidíte historické predajné ceny, nie aktuálnu ponuku.`,
+            `Project is sold out (or nearly) — the chart shows historical sold prices, not currently available inventory.`,
+          );
+        } else if (hasR && !hasV && !hasP) {
+          title = L("Plocha × cena (rezervované byty)", "Area × price (reserved units)");
+          scopeNote = L(
+            `V ponuke sú momentálne iba rezervácie — voľné ani predané v grafe nie sú.`,
+            `Only reservations are currently listed — neither available nor sold units are plotted.`,
           );
         } else {
           title = L("Plocha × cena", "Area × price");
@@ -1060,15 +1082,27 @@ function AreaPriceScatter({ flats, lang, onSelectFlat }) {
 
       {/* HTML tooltip — richer than SVG <title>, styleable, follows cursor.
           Positioned via wrapper rect so it tracks the pointer inside the
-          chart. pointer-events:none so it doesn't steal hover from dots. */}
+          chart. pointer-events:none so it doesn't steal hover from dots.
+          Edge guard: if the pointer is in the right half of the chart we
+          flip the tooltip to the LEFT of the cursor (same for bottom) so
+          it doesn't overflow the chart area on narrow viewports. */}
       {hover && (() => {
         const f = hover.flat;
         const m2 = (f.cena_s_dph != null && f.obytna_plocha != null && Number(f.obytna_plocha) > 0)
           ? Math.round(Number(f.cena_s_dph) / Number(f.obytna_plocha)) : null;
+        // Chart wrapper width/height for flipping the tooltip near edges.
+        // We don't have exact dims here (the SVG scales), but viewport-based
+        // heuristic works: if hover.x is past ~65% of a 900px-ish chart we
+        // anchor right; similarly for y.
+        const flipX = hover.x > 600;
+        const flipY = hover.y > 240;
         return (
           <div style={{
             position: "absolute",
-            left: hover.x + 14, top: hover.y + 14,
+            left: flipX ? undefined : hover.x + 14,
+            right: flipX ? `calc(100% - ${hover.x - 14}px)` : undefined,
+            top: flipY ? undefined : hover.y + 14,
+            bottom: flipY ? `calc(100% - ${hover.y - 14}px)` : undefined,
             background: "#0b0b0e",
             border: `1px solid ${border}`,
             borderLeft: `3px solid ${colorFor(f.stav)}`,
@@ -1082,16 +1116,16 @@ function AreaPriceScatter({ flats, lang, onSelectFlat }) {
               {f.unit_detail || f.unit_id || "—"}
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "0.2rem 0.6rem", fontSize: "0.76rem" }}>
-              <span style={{ color: dim }}>Interiér</span>
+              <span style={{ color: dim }}>{lang === "sk" ? "Interiér" : "Interior"}</span>
               <span style={{ fontFamily: mono }}>{f.obytna_plocha ? `${f.obytna_plocha} m²` : "—"}</span>
-              <span style={{ color: dim }}>Cena</span>
+              <span style={{ color: dim }}>{lang === "sk" ? "Cena" : "Price"}</span>
               <span style={{ fontFamily: mono }}>{f.cena_s_dph != null ? `${Math.round(f.cena_s_dph).toLocaleString(locale)} €` : "—"}</span>
-              <span style={{ color: dim }}>Cena/m²</span>
+              <span style={{ color: dim }}>{lang === "sk" ? "Cena/m²" : "€/m²"}</span>
               <span style={{ fontFamily: mono, color: green }}>{m2 != null ? `${m2.toLocaleString(locale)} €` : "—"}</span>
             </div>
             {onSelectFlat && (
               <div style={{ marginTop: "0.4rem", fontSize: "0.68rem", color: dim, fontStyle: "italic" }}>
-                klikni pre zobrazenie v tabuľke →
+                {lang === "sk" ? "klikni pre zobrazenie v tabuľke →" : "click to reveal in the table →"}
               </div>
             )}
           </div>
@@ -1215,17 +1249,29 @@ function FlatsTable({ flats, t, lang, highlightedFlatId }) {
   };
 
   // ── Highlight row from scatter click ────────────────────────
-  // Scroll matching row into view when highlightedFlatId changes; the
-  // pulse animation picks up via a className match in render.
+  // Scroll matching row into view when highlightedFlatId changes. If the
+  // row is filtered out by the user's active column filters we auto-clear
+  // those filters first — otherwise clicking a dot in the scatter would
+  // silently do nothing (the row wouldn't exist in the DOM to scroll to),
+  // which reads as "click is broken".
   useEffect(() => {
     if (!highlightedFlatId) return;
-    // defer by a frame so the row is rendered before we scroll
+    const targetInData = flats.some(f => f.id === highlightedFlatId);
+    const targetInView = sortedFlats.some(f => f.id === highlightedFlatId);
+    if (targetInData && !targetInView && Object.keys(columnFilters).length > 0) {
+      setColumnFilters({});
+      // Let the next render pass do the scroll — rAF below re-runs once the
+      // row is in the DOM.
+      return;
+    }
     const id = requestAnimationFrame(() => {
       const row = document.getElementById(`flat-row-${highlightedFlatId}`);
       row?.scrollIntoView({ behavior: "smooth", block: "center" });
     });
     return () => cancelAnimationFrame(id);
-  }, [highlightedFlatId]);
+    // sortedFlats + columnFilters are intentionally in deps: when we clear
+    // filters, this effect re-fires with the row now visible and scrolls.
+  }, [highlightedFlatId, sortedFlats, columnFilters, flats]);
 
   const totalCount = flats.length;
   const visibleCount = sortedFlats.length;

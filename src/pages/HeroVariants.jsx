@@ -788,7 +788,7 @@ const CLI_COMMANDS = {
   stats: () => [
     { t: "Bratislava new-build market — snapshot:", c: "#e8e8ed" },
     { t: "", c: "#fff" },
-    { t: "  active projects       90", c: "#8a8a96" },
+    { t: "  projects tracked      90", c: "#8a8a96" },
     { t: "  total units           5,101", c: "#8a8a96" },
     { t: "  available             2,238", c: green },
     { t: "  sold (cumulative)     2,528", c: "#f5a623" },
