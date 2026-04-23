@@ -931,11 +931,11 @@ function DataPage({ setCurrent, l, lang }) {
             borderRadius: 14, overflow: "hidden",
             border: "1px solid #222228",
             aspectRatio: "4 / 3", minHeight: 280,
-            // Modern geometric architecture — sleek, premium, upward
-            // perspective. Avoids the dated-brick-building feel of the
-            // previous pick and doesn't duplicate any Use Cases photo.
-            background: `linear-gradient(135deg, rgba(0,229,160,0.06), rgba(0,0,0,0.1)), url("https://images.unsplash.com/photo-1487958449943-2429e8be8625?w=1400&q=85&auto=format&fit=crop") center/cover`,
-          }} aria-label="Modern architecture" />
+            // Modern residential building — clean lines, premium feel,
+            // matches the "new-build / contemporary living" vibe of the
+            // product without duplicating any Use Cases photo.
+            background: `linear-gradient(135deg, rgba(0,229,160,0.06), rgba(0,0,0,0.1)), url("https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1400&q=85&auto=format&fit=crop") center/cover`,
+          }} aria-label="Modern residential architecture" />
         </div>
       </div>
 
