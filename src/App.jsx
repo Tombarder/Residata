@@ -914,12 +914,11 @@ function DataPage({ setCurrent, l, lang }) {
             borderRadius: 14, overflow: "hidden",
             border: "1px solid #222228",
             aspectRatio: "4 / 3", minHeight: 280,
-            // Modern residential architecture — matches the actual subject
-            // (Bratislava new-build market) better than the dashboard
-            // laptop that was here (it duplicated the Use Cases Investors
-            // card photo, giving the site a recycled feel).
-            background: `linear-gradient(135deg, rgba(0,229,160,0.08), rgba(0,0,0,0.15)), url("https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=1400&q=85&auto=format&fit=crop") center/cover`,
-          }} aria-label="Residential market" />
+            // Modern geometric architecture — sleek, premium, upward
+            // perspective. Avoids the dated-brick-building feel of the
+            // previous pick and doesn't duplicate any Use Cases photo.
+            background: `linear-gradient(135deg, rgba(0,229,160,0.06), rgba(0,0,0,0.1)), url("https://images.unsplash.com/photo-1487958449943-2429e8be8625?w=1400&q=85&auto=format&fit=crop") center/cover`,
+          }} aria-label="Modern architecture" />
         </div>
       </div>
 
