@@ -987,25 +987,6 @@ function DataPage({ setCurrent, l, lang }) {
         </div>
       </div>
 
-      {/* ═══ SAMPLE — concrete output the client actually receives ═══ */}
-      <div style={{ padding: "2rem 2rem 2rem", maxWidth: 1100, margin: "0 auto" }}>
-        <div style={{ borderTop: "1px solid #222228", paddingTop: "2.5rem" }}>
-          <Label>{l.dataLabel}</Label>
-          <h2 className="sec-title">{l.dataTitle}</h2>
-          <p className="sec-desc">{l.dataDesc}</p>
-        </div>
-
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: "1.5rem", paddingTop: "1.25rem", borderTop: "1px solid #222228", gap: "1rem", flexWrap: "wrap" }}>
-          <div>
-            <div style={{ fontSize: "0.85rem", fontWeight: 500, color: "#e8e8ed" }}>{l.dataContext}</div>
-            <div style={{ fontFamily: mono, fontSize: "0.68rem", color: "#55555f", marginTop: "0.2rem" }}>{l.dataContextSub}</div>
-          </div>
-          <button onClick={() => setCurrent("Home")} style={{ background: "none", border: "none", color: "#00e5a0", fontSize: "0.8rem", cursor: "pointer", fontFamily: "inherit" }}>
-            {lang === "sk" ? "Živé čísla na Home →" : "Live numbers on Home →"}
-          </button>
-        </div>
-      </div>
-
       {/* ═══ INSIGHTS ═══ */}
       <div style={{ padding: "2rem 2rem 1rem", maxWidth: 1100, margin: "0 auto" }}>
         <Label>{l.insightsLabel}</Label>

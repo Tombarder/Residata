@@ -291,7 +291,7 @@ export function PipelineFlow({ lang = "en" }) {
   const T = lang === "sk" ? {
     label: "Ako to funguje",
     title: "Od webov developerov k živému trhovému prehľadu.",
-    sub: "3-krokový automatizovaný flow. Každý mesiac, bez výnimky.",
+    sub: "3-krokový automatizovaný flow",
 
     z1Line1: "Dáta zbierame",
     z1Live: `z ${fmt(devCount, "sk-SK")} developerov · ${fmt(projCount, "sk-SK")} projektov`,
@@ -316,7 +316,7 @@ export function PipelineFlow({ lang = "en" }) {
   } : {
     label: "How it works",
     title: "From scattered developer sites to live market intelligence.",
-    sub: "3-step automated flow. Every month, no exceptions.",
+    sub: "3-step automated flow",
 
     z1Line1: "Data collected",
     z1Live: `from ${fmt(devCount, "en-US")} developers · ${fmt(projCount, "en-US")} projects`,
