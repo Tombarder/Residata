@@ -66,8 +66,42 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "refusing to delete yourself" });
   }
 
+  // ── Capture target details BEFORE deletion for the audit log ──
+  // Once auth.admin.deleteUser() fires, cascade wipes user_profiles too.
+  // We want the audit trail to show who was deleted, not just their uuid.
+  const { data: targetProfile } = await sb
+    .from("user_profiles")
+    .select("email, tier, full_name, company")
+    .eq("id", targetId)
+    .maybeSingle();
+
+  // Actor details for the log (caller is the admin performing the action)
+  const actorEmail = callerData.user.email || null;
+  const clientIp =
+    (req.headers["x-forwarded-for"] || "").split(",")[0].trim() ||
+    req.headers["x-real-ip"] ||
+    null;
+  const userAgent = req.headers["user-agent"] || null;
+
   // ── Delete ──
   const { error: delErr } = await sb.auth.admin.deleteUser(targetId);
+
+  // ── Audit log — ALWAYS records attempt (success or failure) ──
+  // Best-effort: a failing audit write shouldn't mask the real result.
+  try {
+    await sb.from("admin_audit_log").insert({
+      actor_id:    callerId,
+      actor_email: actorEmail,
+      action:      "delete_user",
+      target_id:   targetId,
+      payload:     targetProfile || null,
+      ip:          clientIp,
+      user_agent:  userAgent,
+      success:     !delErr,
+      error:       delErr?.message || null,
+    });
+  } catch (_) { /* never let logging break the response */ }
+
   if (delErr) {
     return res.status(500).json({ error: `delete failed: ${delErr.message}` });
   }

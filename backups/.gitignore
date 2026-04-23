@@ -1,0 +1,3 @@
+# Backups are private — never commit
+*.sql
+*.sql.gz

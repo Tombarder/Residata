@@ -1,0 +1,78 @@
+# CI — runs on every PR and push to main.
+#
+# Primary goals:
+#   · Catch syntax / import errors BEFORE they reach Vercel
+#   · Catch dependency audit issues (npm audit) on every PR
+#   · Ensure the bundle builds at all (`vite build` would fail on
+#     unresolved imports, missing modules, etc.)
+#
+# Secondary goals:
+#   · Block accidentally-committed secrets (trivial regex scan)
+#   · Block bundle-size explosions (warn if main bundle > 2MB)
+#
+# Minimal effort, zero cost — GitHub Actions free tier is generous
+# for this scope.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies (frozen lockfile)
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build (Vite)
+        run: npm run build
+
+      - name: Dependency audit (high severity only)
+        # `--audit-level=high` = fail the job only on high/critical CVEs.
+        # Warnings for low/moderate don't block the PR — they show up
+        # in the audit-api output for reference without being noise.
+        run: npm audit --audit-level=high --production
+        continue-on-error: false
+
+      - name: Secret scan (simple regex)
+        # Catches the most obvious "oops committed my API key" cases.
+        # Not a replacement for git-leaks but stops the biggest foot-guns.
+        run: |
+          if grep -rE --include='*.{js,jsx,ts,tsx,json,env}' \
+             'sk-ant-api[0-9]{2}-[A-Za-z0-9_-]{80,}|sb_secret_|sbp_|xoxb-[0-9]+-[0-9]+' \
+             src/ api/ public/ *.json *.html 2>/dev/null; then
+            echo "::error::Possible secret committed — check grep hits above"
+            exit 1
+          fi
+          echo "No obvious secrets detected"
+
+      - name: Bundle size check
+        # After `npm run build`, dist/assets/index-*.js should be reasonable.
+        # Hard-fail if it grows past 2 MB (current is ~800 KB).
+        run: |
+          size=$(find dist/assets -name 'index-*.js' -exec stat -c '%s' {} \; | sort -nr | head -1)
+          size_kb=$((size / 1024))
+          echo "Main bundle: ${size_kb} KB"
+          if [ "$size" -gt 2097152 ]; then
+            echo "::error::Main bundle ${size_kb} KB exceeds 2 MB threshold"
+            exit 1
+          fi

@@ -1,0 +1,33 @@
+# Dependabot — opens a PR the moment a security advisory lands on any
+# of our deps. Free, runs on GitHub's side, requires no maintenance.
+# Auto-applies to the default branch; we can choose to merge or defer.
+#
+# Why weekly (not daily): at 4 runtime deps this is plenty. Daily creates
+# PR noise from version-number patch bumps that aren't security-relevant.
+# Weekly keeps up with real advisories without drowning the inbox.
+
+version: 2
+updates:
+  # npm packages
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+      timezone: "Europe/Bratislava"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "security"
+    # Security advisories always open a PR regardless of the interval.
+    # Version bumps honour the schedule above.
+
+  # GitHub Actions versions (the CI workflow itself — see .github/workflows)
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    labels:
+      - "dependencies"
+      - "ci"
