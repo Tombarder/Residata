@@ -12,7 +12,7 @@ import { MarketPulse, DistrictPulse, PipelineFlow } from "./pages/HomeExtras";
 import HeroLabPage from "./pages/HeroVariants";
 import { useAuth } from "./lib/useAuth";
 import { useCapabilities } from "./lib/useCapabilities";
-import { useProjects } from "./lib/useData";
+import { useProjects, useMetrics } from "./lib/useData";
 import { pushRoute, pathToPage, isAppPage } from "./lib/routing";
 import PlatformShell from "./pages/Platform";
 import { track } from "./lib/track";
@@ -88,7 +88,7 @@ const t = {
         benefits: [["Structured comparable listings", "pricing by location, unit type, floor area, and availability — filterable and exportable"], ["Market depth overview", "how many active projects and units exist in a given district — essential context for any valuation"], ["Monthly refresh", "your comparables are never more than 30 days old — no more working with stale data from last quarter"]] },
       { tag: "Consultants & Analysts", title: "Hours of research, done for you.",
         desc: "Your client needs a market overview for Bratislava residential. You can spend 2–4 weeks clicking through developer websites, copy-pasting into spreadsheets, fighting inconsistent formats, chasing down broken links, and cleaning messy data — or open a single sheet with everything already structured, normalized, and ready to analyze.",
-        benefits: [["Presentation-ready data", "25 normalized columns across every active project — drop straight into models, charts, or client decks"], ["Trend analysis built in", "monthly snapshots mean you can show pricing direction and market shifts without extra work"], ["Full market coverage", "apartments, houses, retail, semidetached — across every active district. No gaps to fill manually"]] },
+        benefits: [["Presentation-ready data", "normalized columns across every active project — drop straight into models, charts, or client decks"], ["Trend analysis built in", "monthly snapshots mean you can show pricing direction and market shifts without extra work"], ["Full market coverage", "apartments, houses, retail, semidetached — across every active district. No gaps to fill manually"]] },
     ],
     useCasesCta: "Different need?",
     useCasesCtaDesc: "The pipeline is flexible. If your use case isn't listed, reach out — we likely already have what you need, or can configure it.",
@@ -108,9 +108,12 @@ const t = {
     insightsBadge: "Sample data for illustration",
     rawLabel: "Raw Data",
     unitSample: "Unit-level sample",
-    showing: "Showing 8 of 4,218 records",
+    // `showing` is overridden per render in DataPage with live units-tracked
+    // count from the metrics table. This static fallback only shows in the
+    // ~100ms before the hook resolves (graceful "…" number).
+    showing: "Showing 8 of … records",
     schemaLabel: "Schema",
-    schemaTitle: "Up to 25 columns per unit — key fields below.",
+    schemaTitle: "Every data point per unit — key fields below.",
     schemaDesc: "Additional fields include orientation, balcony area, parking, storage, and project-level metadata.",
     schemaNote: "Note: Field availability varies by project. Not all developers publish all data points.",
     wantFull: "Want the full dataset?",
@@ -207,7 +210,7 @@ const t = {
         benefits: [["Štruktúrované ponuky", "ceny podľa lokality, typu, plochy a dostupnosti — filtrovateľné a exportovateľné"], ["Hĺbka trhu", "koľko projektov a bytov je v okrese aktívnych — kontext pre každé ocenenie"], ["Vždy aktuálne", "komparatívy nikdy nie sú staršie ako 30 dní"]] },
       { tag: "Konzultanti a analytici", title: "Hodiny práce, hotové za vás.",
         desc: "Klient chce prehľad bratislavského trhu. Buď strávite týždne zbieraním dát po weboch — alebo otvoríte jeden sheet, kde je všetko pripravené.",
-        benefits: [["Dáta na prezentáciu", "25 stĺpcov naprieč každým aktívnym projektom — rovno do modelov, grafov alebo klientskych prezentácií"], ["Trendy zahrnuté", "cenový smer a trhové posuny ukážete bez ďalšej práce"], ["Kompletné pokrytie", "byty, domy, apartmány — žiadne medzery"]] },
+        benefits: [["Dáta na prezentáciu", "normalizované stĺpce naprieč každým aktívnym projektom — rovno do modelov, grafov alebo klientskych prezentácií"], ["Trendy zahrnuté", "cenový smer a trhové posuny ukážete bez ďalšej práce"], ["Kompletné pokrytie", "byty, domy, apartmány — žiadne medzery"]] },
     ],
     useCasesCta: "Hľadáte riešenie na mieru?",
     useCasesCtaDesc: "Systém je flexibilný. Ak tu nevidíte riešenie na svoj špecifický problém, ozvite sa — veľmi pravdepodobne vám vieme pomôcť riešením na mieru.",
@@ -224,9 +227,10 @@ const t = {
     insightsBadge: "Ilustračné dáta",
     rawLabel: "Surové dáta",
     unitSample: "Ukážka na úrovni bytov",
-    showing: "Zobrazených 8 z 4 218 záznamov",
+    // Prepisujeme live v DataPage cez useMetrics; fallback kým sa načíta.
+    showing: "Zobrazených 8 z … záznamov",
     schemaLabel: "Schéma",
-    schemaTitle: "Až 25 stĺpcov na byt — kľúčové polia nižšie.",
+    schemaTitle: "Každý dátový bod na byt — kľúčové polia nižšie.",
     schemaDesc: "Ďalšie polia: orientácia, balkón, parkovanie, sklad a metadáta projektu.",
     schemaNote: "Poznámka: Nie všetci developeri zverejňujú všetky údaje — dostupnosť polí sa líši.",
     wantFull: "Máte záujem o kompletný dataset?",
@@ -838,6 +842,19 @@ function DataPage({ setCurrent, l, lang }) {
   const mono = "'JetBrains Mono', monospace";
   const { can } = useCapabilities();
   const isPaid = can("has_paid_access");
+  // Live count nad "Unit-level sample" tabulkou — nesmie byt hardcoded (kedysi
+  // bolo "4 218" z davna exportu, co uz davno neplati a kupujucemu to lame
+  // ukazuje ako mrtve cislo). Cita total_units_tracked z metrics tabulky,
+  // rovnaky zdroj ako PipelineFlow a MarketPulse → vsetko na stranke je
+  // unified.
+  const { metrics } = useMetrics();
+  const unitsTracked = metrics.find(m => m.metric_key === "total_units_tracked")?.value_numeric || null;
+  const locale = lang === "sk" ? "sk-SK" : "en-US";
+  const showingLive = unitsTracked == null
+    ? (lang === "sk" ? "Zobrazených 8 z … záznamov" : "Showing 8 of … records")
+    : (lang === "sk"
+        ? `Zobrazených 8 z ${Number(unitsTracked).toLocaleString(locale)} záznamov`
+        : `Showing 8 of ${Number(unitsTracked).toLocaleString(locale)} records`);
   const rows = [
     ["Slnečnice Viladomy", "Petržalka", "byt", "A2-304", "68.4", "249,660", "3,650", "3", "V"],
     ["Slnečnice Viladomy", "Petržalka", "byt", "A2-412", "45.2", "167,240", "3,700", "4", "P"],
@@ -1112,7 +1129,7 @@ function DataPage({ setCurrent, l, lang }) {
             <Label>{l.rawLabel}</Label>
             <h3 style={{ fontSize: "1.1rem", fontWeight: 600 }}>{l.unitSample}</h3>
           </div>
-          <span style={{ fontFamily: mono, fontSize: "0.7rem", color: "#55555f" }}>{l.showing}</span>
+          <span style={{ fontFamily: mono, fontSize: "0.7rem", color: "#55555f" }}>{showingLive}</span>
         </div>
         <div className="dark-scroll" style={{ border: "1px solid #222228", borderRadius: 12, overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.8rem", minWidth: 900 }}>
@@ -1165,7 +1182,9 @@ function DataPage({ setCurrent, l, lang }) {
           </div>
           <div style={{ background: "#0d0d0f", padding: "1.25rem 1.5rem", fontFamily: mono, fontSize: "0.74rem", lineHeight: 1.85 }}>
             <div style={{ color: "#55555f", marginBottom: "0.25rem" }}># residata output schema v2.4</div>
-            <div style={{ color: "#55555f", marginBottom: "0.75rem" }}># 25 fields per unit — key fields shown</div>
+            <div style={{ color: "#55555f", marginBottom: "0.75rem" }}>
+              {lang === "sk" ? "# každý dátový bod ktorý pre vás extrahujeme" : "# every data point we extract per unit"}
+            </div>
             <div style={{ color: "#55555f", marginBottom: "0.5rem" }}>---</div>
             <div style={{ marginBottom: "0.25rem" }}><span style={{ color: "#f5a623" }}>fields</span><span style={{ color: "#55555f" }}>:</span></div>
             {schemaLines.map((s, i) => (
@@ -1178,7 +1197,7 @@ function DataPage({ setCurrent, l, lang }) {
               </div>
             ))}
             <div style={{ marginTop: "0.75rem", color: "#55555f" }}>---</div>
-            <div style={{ marginTop: "0.25rem" }}><span style={{ color: "#f5a623" }}>total_fields</span><span style={{ color: "#55555f" }}>: </span><span style={{ color: "#e8e8ed" }}>25</span></div>
+            <div style={{ marginTop: "0.25rem" }}><span style={{ color: "#f5a623" }}>refresh</span><span style={{ color: "#55555f" }}>: </span><span style={{ color: "#e8e8ed" }}>monthly</span></div>
             <div><span style={{ color: "#f5a623" }}>output</span><span style={{ color: "#55555f" }}>: </span><span style={{ color: "#e8e8ed" }}>google_sheets | csv | xlsx</span></div>
             <div><span style={{ color: "#f5a623" }}>encoding</span><span style={{ color: "#55555f" }}>: </span><span style={{ color: "#e8e8ed" }}>utf-8</span></div>
           </div>

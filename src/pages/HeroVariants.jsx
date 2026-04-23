@@ -197,7 +197,7 @@ export function V2_IsometricFlow({ lang = "en" }) {
         </g>
 
         {/* Labels for left cluster */}
-        <text x="150" y="180" fill={green} fontFamily={mono} fontSize="14" letterSpacing="0.08em">60 developer.sk</text>
+        <text x="150" y="180" fill={green} fontFamily={mono} fontSize="14" letterSpacing="0.08em">72 developer.sk</text>
         <text x="150" y="200" fill={dim} fontFamily={mono} fontSize="11">cennik, plochy, stavy</text>
 
         {/* Flow lines — buildings → pipeline hub */}
@@ -245,12 +245,12 @@ export function V2_IsometricFlow({ lang = "en" }) {
             <line key={x} x1={15 + x * 1.3} y1="115" x2={15 + x * 1.3} y2="120" stroke={dim} strokeWidth="0.5" />
           ))}
           <text x="90" y="140" textAnchor="middle" fill="#fff" fontFamily={mono} fontSize="14" fontWeight="600">dashboard.csv</text>
-          <text x="90" y="155" textAnchor="middle" fill={dim} fontFamily={mono} fontSize="10">4,218 rows · 25 cols</text>
+          <text x="90" y="155" textAnchor="middle" fill={dim} fontFamily={mono} fontSize="10">5,101 rows · monthly</text>
         </g>
 
         {/* Top banner */}
         <text x="600" y="60" textAnchor="middle" fill="#fff" fontFamily="'Outfit', sans-serif" fontSize="30" fontWeight="700" letterSpacing="-0.02em">
-          {lang === "sk" ? "60 webov → 1 dashboard" : "60 sites → 1 dashboard"}
+          {lang === "sk" ? "72 webov → 1 dashboard" : "72 sites → 1 dashboard"}
         </text>
         <text x="600" y="85" textAnchor="middle" fill={dim} fontFamily="'Outfit', sans-serif" fontSize="14">
           {lang === "sk" ? "Plne automatizovaná pipeline, každý mesiac" : "Fully automated pipeline, every month"}
@@ -535,8 +535,8 @@ export function V4_MatrixRain({ lang = "en" }) {
           </h2>
           <p style={{ color: "#c0c0c8", fontSize: "1rem", marginTop: "1rem", lineHeight: 1.6, maxWidth: 480, margin: "1rem auto 0", textShadow: "0 2px 16px rgba(0,0,0,0.9)" }}>
             {lang === "sk"
-              ? "25 stĺpcov na byt. 4,218 záznamov. Export do Google Sheets, CSV, alebo priamo do vášho systému cez API."
-              : "25 columns per unit. 4,218 rows. Export to Google Sheets, CSV, or straight into your stack via API."}
+              ? "Každý byt každého aktívneho projektu. Mesačne. Export do Google Sheets, CSV, alebo priamo do vášho systému cez API."
+              : "Every unit of every active project. Monthly. Export to Google Sheets, CSV, or straight into your stack via API."}
           </p>
         </div>
       </div>
@@ -788,12 +788,12 @@ const CLI_COMMANDS = {
   stats: () => [
     { t: "Bratislava new-build market — snapshot:", c: "#e8e8ed" },
     { t: "", c: "#fff" },
-    { t: "  active projects       142", c: "#8a8a96" },
-    { t: "  total units           4,218", c: "#8a8a96" },
-    { t: "  available             2,964", c: green },
-    { t: "  sold (cumulative)     1,254", c: "#f5a623" },
-    { t: "  sold last month       263  (+14% vs Feb)", c: "#f5a623" },
-    { t: "  avg €/m²              5,482  (+12% YoY)", c: green },
+    { t: "  active projects       90", c: "#8a8a96" },
+    { t: "  total units           5,101", c: "#8a8a96" },
+    { t: "  available             2,238", c: green },
+    { t: "  sold (cumulative)     2,528", c: "#f5a623" },
+    { t: "  reserved              335", c: "#f5a623" },
+    { t: "  avg €/m²              5,715", c: green },
     { t: "  fastest absorption    Staré Mesto (8.2%)", c: green },
     { t: "", c: "#fff" },
   ],
