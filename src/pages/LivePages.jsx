@@ -946,27 +946,85 @@ function FlatsTable({ flats, t, lang }) {
     PR: { color: "#aaa", bg: "rgba(170,170,170,0.08)" },
   };
   const locale = lang === "sk" ? "sk-SK" : "en-US";
+
+  // ── Sortable columns ─────────────────────────────────────────
+  // Each column declares: its label, value accessor, kind (num vs text),
+  // and default direction on first click. Clicking the same header again
+  // toggles direction. Nulls always sort to the end regardless of dir so
+  // an "asc by cena" view doesn't front-load the un-priced flats.
+  const COLS = [
+    { key: "unit",      label: t.tbl_flat,        align: "left",  kind: "text", def: "asc",  get: f => f.unit_detail || f.unit_id || "" },
+    { key: "budova",    label: t.tbl_building,    align: "left",  kind: "text", def: "asc",  get: f => f.budova || "" },
+    { key: "poschodie", label: t.tbl_floor,       align: "left",  kind: "num",  def: "asc",  get: f => f.poschodie },
+    { key: "izby",      label: t.tbl_rooms,       align: "left",  kind: "num",  def: "asc",  get: f => f.izby },
+    { key: "interior",  label: t.tbl_interior,    align: "right", kind: "num",  def: "asc",  get: f => f.obytna_plocha },
+    { key: "exterior",  label: t.tbl_exterior,    align: "right", kind: "num",  def: "asc",  get: f => f.exterier_plocha },
+    { key: "total",     label: t.tbl_total,       align: "right", kind: "num",  def: "asc",  get: f => f.celkova_plocha },
+    { key: "price",     label: t.tbl_price,       align: "right", kind: "num",  def: "asc",  get: f => f.cena_s_dph },
+    { key: "orient",    label: t.tbl_orientation, align: "left",  kind: "text", def: "asc",  get: f => f.orientacia || "" },
+    { key: "handover",  label: t.tbl_handover,    align: "left",  kind: "text", def: "asc",  get: f => f.kolaudacia || "" },
+    { key: "stav",      label: t.tbl_status,      align: "left",  kind: "text", def: "asc",  get: f => f.stav || "" },
+  ];
+
+  // Default: by flat id, ascending — same order users got before.
+  const [sort, setSort] = useState({ key: "unit", dir: "asc" });
+  const onHeaderClick = (col) => {
+    setSort(prev => prev.key === col.key
+      ? { key: col.key, dir: prev.dir === "asc" ? "desc" : "asc" }
+      : { key: col.key, dir: col.def });
+  };
+
+  const sortedFlats = (() => {
+    const col = COLS.find(c => c.key === sort.key) || COLS[0];
+    const dir = sort.dir === "desc" ? -1 : 1;
+    const copy = [...flats];
+    copy.sort((a, b) => {
+      const av = col.get(a);
+      const bv = col.get(b);
+      // null/undefined → sort to end regardless of dir
+      const ae = av == null || av === "";
+      const be = bv == null || bv === "";
+      if (ae && be) return 0;
+      if (ae) return 1;
+      if (be) return -1;
+      if (col.kind === "num") return (Number(av) - Number(bv)) * dir;
+      return String(av).localeCompare(String(bv), locale, { numeric: true }) * dir;
+    });
+    return copy;
+  })();
+
+  const sortArrow = (col) => {
+    if (sort.key !== col.key) {
+      // subtle hint that the column is sortable — two faded chevrons
+      return <span style={{ opacity: 0.25, marginLeft: 4, fontSize: "0.62rem" }}>↕</span>;
+    }
+    return <span style={{ color: green, marginLeft: 4, fontSize: "0.7rem" }}>{sort.dir === "asc" ? "▴" : "▾"}</span>;
+  };
+
   return (
     <ProtectedData lang={lang} style={{ border: `1px solid ${border}`, borderRadius: 12, overflow: "hidden" }}>
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
           <thead style={{ background: "#0e0e10" }}>
             <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-              <th style={th}>{t.tbl_flat}</th>
-              <th style={th}>{t.tbl_building}</th>
-              <th style={th}>{t.tbl_floor}</th>
-              <th style={th}>{t.tbl_rooms}</th>
-              <th style={{ ...th, textAlign: "right" }}>{t.tbl_interior}</th>
-              <th style={{ ...th, textAlign: "right" }}>{t.tbl_exterior}</th>
-              <th style={{ ...th, textAlign: "right" }}>{t.tbl_total}</th>
-              <th style={{ ...th, textAlign: "right" }}>{t.tbl_price}</th>
-              <th style={th}>{t.tbl_orientation}</th>
-              <th style={th}>{t.tbl_handover}</th>
-              <th style={th}>{t.tbl_status}</th>
+              {COLS.map(col => (
+                <th key={col.key}
+                    onClick={() => onHeaderClick(col)}
+                    style={{
+                      ...th, textAlign: col.align, cursor: "pointer", userSelect: "none",
+                      color: sort.key === col.key ? "#e8e8ed" : dim,
+                      transition: "color 0.12s",
+                    }}
+                    onMouseEnter={e => { if (sort.key !== col.key) e.currentTarget.style.color = "#c4c4cc"; }}
+                    onMouseLeave={e => { if (sort.key !== col.key) e.currentTarget.style.color = dim; }}
+                    title={lang === "sk" ? "Klikni pre zoradenie" : "Click to sort"}>
+                  {col.label}{sortArrow(col)}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
-            {flats.map(f => (
+            {sortedFlats.map(f => (
               <tr key={f.id} style={{ borderTop: `1px solid ${border}` }}>
                 <td style={td}><strong>{f.unit_detail || f.unit_id}</strong></td>
                 <td style={{ ...td, color: dim }}>{f.budova || "—"}</td>
