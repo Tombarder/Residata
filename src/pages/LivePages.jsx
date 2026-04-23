@@ -2263,6 +2263,7 @@ function TabBtn({ active, onClick, children }) {
  *   · Are people using it at all? (events total, this week, this month)
  *   · Who's active vs. signed-up-and-gone? (per-user summary table)
  *   · What's the retention pattern? (active days, first/last seen)
+ *   · Trend over the last 30 days — daily charts
  *
  * All aggregation is client-side JS — fine for the small N we have
  * now. If the activity table grows past ~10k rows, migrate to a
@@ -2281,6 +2282,34 @@ function OverviewPanel({ activity, users, lang }) {
   // Active users = had at least one event in the window
   const activeWeek  = new Set(weekEvents.map(e => e.user_id).filter(Boolean)).size;
   const activeMonth = new Set(monthEvents.map(e => e.user_id).filter(Boolean)).size;
+
+  // ── Build 30-day daily buckets (for the 3 trend charts) ──
+  // One row per day, so gaps show up as zero bars — honest view of
+  // quiet periods without interpolation.
+  const days = [];
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(now - i * DAY);
+    const key = d.toISOString().slice(0, 10);
+    days.push({ date: key, users: new Set(), events: 0, signups: 0 });
+  }
+  const byDate = Object.fromEntries(days.map(d => [d.date, d]));
+  for (const e of activity) {
+    const key = e.created_at?.slice(0, 10);
+    if (byDate[key]) {
+      byDate[key].events += 1;
+      if (e.user_id) byDate[key].users.add(e.user_id);
+    }
+  }
+  for (const u of users) {
+    const key = u.created_at?.slice(0, 10);
+    if (byDate[key]) byDate[key].signups += 1;
+  }
+  const daily = days.map(d => ({
+    date: d.date,
+    users: d.users.size,
+    events: d.events,
+    signups: d.signups,
+  }));
 
   // Per-user rollup
   const byUser = {};
@@ -2366,26 +2395,71 @@ function OverviewPanel({ activity, users, lang }) {
         {card(L("Eventy celkom", "Events total"), activity.length, L("v poslednom 1000 okne", "in last 1000 window"), dim)}
       </div>
 
-      {/* ── Event-type breakdown ── */}
-      {topEventTypes.length > 0 && (
-        <>
-          <SectionHeader>{L("Najčastejšie eventy", "Most frequent event types")}</SectionHeader>
-          <div style={{
-            display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-            gap: "0.5rem", marginBottom: "2rem",
-          }}>
-            {topEventTypes.map(([type, n]) => (
-              <div key={type} style={{
-                background: bg, border: `1px solid ${border}`, borderRadius: 8,
-                padding: "0.6rem 0.85rem", display: "flex", justifyContent: "space-between", alignItems: "center",
-              }}>
-                <span style={{ fontFamily: mono, fontSize: "0.76rem", color: "#e8e8ed" }}>{type}</span>
-                <span style={{ fontFamily: mono, fontSize: "0.9rem", fontWeight: 700, color: green }}>{n}</span>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
+      {/* ── Trend charts (last 30 days) ── */}
+      <SectionHeader>{L("Trendy za posledných 30 dní", "Trends — last 30 days")}</SectionHeader>
+      <div style={{
+        display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+        gap: "0.85rem", marginBottom: "2rem",
+      }}>
+        <MiniBarChart
+          title={L("Denná aktivita", "Daily active users")}
+          subtitle={L("distinct user_id / deň", "distinct user_id / day")}
+          data={daily}
+          field="users"
+          colour={green}
+          highlightLast
+        />
+        <MiniBarChart
+          title={L("Eventy za deň", "Events per day")}
+          subtitle={L("všetky track() volania", "all track() events")}
+          data={daily}
+          field="events"
+          colour="#4a90e2"
+          highlightLast
+        />
+        <MiniBarChart
+          title={L("Nové registrácie", "New signups")}
+          subtitle={L("podľa dátumu vzniku účtu", "by account creation date")}
+          data={daily}
+          field="signups"
+          colour="#f5a623"
+          highlightLast
+        />
+      </div>
+
+      {/* ── Event-type breakdown (horizontal bar chart) ── */}
+      {topEventTypes.length > 0 && (() => {
+        const maxN = topEventTypes[0][1];
+        return (
+          <>
+            <SectionHeader>{L("Najčastejšie eventy", "Most frequent event types")}</SectionHeader>
+            <div style={{
+              background: bg, border: `1px solid ${border}`, borderRadius: 10,
+              padding: "1rem 1.2rem", marginBottom: "2rem",
+            }}>
+              {topEventTypes.map(([type, n]) => (
+                <div key={type} style={{
+                  display: "grid", gridTemplateColumns: "150px 1fr 50px",
+                  gap: "0.75rem", alignItems: "center",
+                  padding: "0.4rem 0",
+                  borderBottom: `1px solid ${border}`,
+                }}>
+                  <span style={{ fontFamily: mono, fontSize: "0.74rem", color: "#e8e8ed", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{type}</span>
+                  <div style={{ height: 8, background: "rgba(255,255,255,0.04)", borderRadius: 4, overflow: "hidden" }}>
+                    <div style={{
+                      height: "100%",
+                      width: `${(n / maxN) * 100}%`,
+                      background: green,
+                      opacity: 0.85,
+                    }} />
+                  </div>
+                  <span style={{ fontFamily: mono, fontSize: "0.78rem", fontWeight: 700, color: green, textAlign: "right" }}>{n}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        );
+      })()}
 
       {/* ── Per-user summary ── */}
       <SectionHeader>{L("Per-user aktivita", "Per-user activity")}</SectionHeader>
@@ -2448,6 +2522,98 @@ function OverviewPanel({ activity, users, lang }) {
         )}
       </p>
     </>
+  );
+}
+
+/* ── MiniBarChart — pure SVG 30-day bar chart for OverviewPanel ──
+ *
+ * Design choices:
+ *  · Pure SVG, no chart library. Same pattern as PriceHistogram,
+ *    TakeupChart etc. — keeps dep surface tight.
+ *  · Latest day on right, highlighted (primary colour); earlier days
+ *    dim to signal "past".
+ *  · Tooltip via <title> — browser-native, no JS hover handling.
+ *  · Max value auto-scales; empty window still renders a flat row.
+ *  · X-axis shows 3 marker dates (first, middle, last) for orientation
+ *    without cluttering the 30 bars with labels.
+ */
+function MiniBarChart({ title, subtitle, data, field, colour, highlightLast }) {
+  const W = 280, H = 100, pad = 4;
+  const bottomPadding = 16;
+  const barArea = H - bottomPadding;
+  const n = data.length;
+  const values = data.map(d => d[field] || 0);
+  const max = Math.max(1, ...values);
+  const barSlot = (W - 2 * pad) / n;
+  const barW = Math.max(1, barSlot - 1);
+  const total = values.reduce((a, b) => a + b, 0);
+  const last = values[n - 1] || 0;
+
+  // X-axis anchors: first / middle / last date, formatted as DD.MM
+  const formatDate = (iso) => {
+    if (!iso) return "";
+    const [y, m, d] = iso.split("-");
+    return `${d}.${m}`;
+  };
+
+  return (
+    <div style={{
+      background: bg, border: `1px solid ${border}`, borderRadius: 10,
+      padding: "1rem 1.1rem",
+    }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.35rem" }}>
+        <div>
+          <div style={{ fontSize: "0.78rem", fontWeight: 600, color: "#e8e8ed" }}>{title}</div>
+          {subtitle && <div style={{ fontSize: "0.68rem", color: dim, fontFamily: mono, marginTop: "0.15rem" }}>{subtitle}</div>}
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <div style={{ fontFamily: mono, fontSize: "0.98rem", fontWeight: 700, color: colour }}>{last}</div>
+          <div style={{ fontSize: "0.62rem", color: dim, fontFamily: mono }}>
+            today · Σ {total}
+          </div>
+        </div>
+      </div>
+
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}>
+        {/* Baseline — subtle horizontal line at bottom of bar area */}
+        <line x1={pad} y1={barArea} x2={W - pad} y2={barArea} stroke={border} strokeWidth="0.5" />
+
+        {data.map((d, i) => {
+          const v = d[field] || 0;
+          const h = v > 0 ? Math.max(1, (v / max) * (barArea - 2)) : 0;
+          const isLast = highlightLast && i === n - 1;
+          return (
+            <rect
+              key={i}
+              x={pad + i * barSlot}
+              y={barArea - h}
+              width={barW}
+              height={h}
+              fill={colour}
+              opacity={isLast ? 1 : 0.55}
+              rx="0.5"
+            >
+              <title>{`${d.date}: ${v}`}</title>
+            </rect>
+          );
+        })}
+
+        {/* X-axis labels at first / middle / last positions */}
+        {[0, Math.floor(n / 2), n - 1].map((i) => (
+          <text
+            key={i}
+            x={pad + i * barSlot + barW / 2}
+            y={H - 3}
+            textAnchor={i === 0 ? "start" : i === n - 1 ? "end" : "middle"}
+            fill={dim}
+            fontFamily={mono}
+            fontSize="7"
+          >
+            {formatDate(data[i]?.date)}
+          </text>
+        ))}
+      </svg>
+    </div>
   );
 }
 
