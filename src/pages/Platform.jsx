@@ -764,7 +764,7 @@ function PlatformBilling({ lang, setCurrent }) {
             {lang === "sk" ? "Odomkni celý produkt za €349 / mesiac" : "Unlock the whole product for €349 / month"}
           </h3>
           <ul style={{ color: "#c0c0c8", fontSize: "0.88rem", lineHeight: 1.7, paddingLeft: "1.1rem", margin: "0.5rem 0 1.25rem" }}>
-            <li>{lang === "sk" ? "Plný detail všetkých 140+ projektov" : "Full detail of all 140+ projects"}</li>
+            <li>{lang === "sk" ? "Plný detail každého aktívneho projektu" : "Full detail of every active project"}</li>
             <li>{lang === "sk" ? "Analytika, trendy, heat mapy" : "Analytics, trends, district heat maps"}</li>
             <li>{lang === "sk" ? "Mesačné PDF reporty" : "Monthly PDF reports"}</li>
             <li>{lang === "sk" ? "CSV exporty + REST API" : "CSV exports + REST API"}</li>

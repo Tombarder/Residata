@@ -53,7 +53,7 @@ export function V1_PanoramaPins({ lang = "en" }) {
           {lang === "sk" ? "Živý trh Bratislavy" : "Bratislava, live"}
         </div>
         <h2 style={{ fontSize: "clamp(1.8rem, 3.5vw, 2.8rem)", fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1.1, color: "#fff", margin: 0, textShadow: "0 2px 16px rgba(0,0,0,0.6)" }}>
-          {lang === "sk" ? "140+ projektov. Jeden prehľad." : "140+ projects. One view."}
+          {lang === "sk" ? "Celý trh. Jeden prehľad." : "Whole market. One view."}
         </h2>
       </div>
 
