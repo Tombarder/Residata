@@ -1,34 +1,46 @@
 // Vercel serverless endpoint: /api/ai/summary
 //
 // Generates a Slovak (or English) executive summary from a report
-// context passed by the client. Uses the Anthropic Messages API —
-// the client never sees the key.
+// context. Hits Anthropic Messages API — this is our main paid-API
+// cost exposure, so it's hardened accordingly.
 //
 // Request body:
 //   { context: {...}, lang: "sk" | "en" }
 //
-// Auth:
-//   · Caller sends their Supabase session access-token as Authorization:
-//     Bearer <token>. Endpoint validates via auth.getUser().
-//   · No token → anonymous call, rate-limited more aggressively.
+// === Cost-abuse protection layers (defence in depth) ===
 //
-// Rate limits (per user, rolling windows):
-//   · Authenticated paid/admin:    30 / hour,  200 / day
-//   · Authenticated free:           5 / hour,   20 / day
-//   · Anonymous (no token):         3 / hour,   10 / day  (per-IP)
+// 1. **Authenticated callers only** — no anon tier.
+//    Previous anon-allowed design meant random internet traffic could
+//    burn up to 10 Anthropic calls/day. Changed to require a valid
+//    Supabase session. Forces abusers to create an account (rate
+//    limited by email domain validation) before spending any credit.
 //
-// Responses:
+// 2. **Server-side Origin / Referer check** — CORS is browser-only.
+//    Curl, Postman, server-side scripts bypass CORS entirely. We also
+//    check Origin + Referer headers on the server and reject calls
+//    that don't claim to come from an allowed origin.
+//
+// 3. **Per-IP rate limit** (10 req/min, in-memory) — absorbs bursts
+//    before they hit the DB counter or burn credit.
+//
+// 4. **Tier-based DB counter** (rolling hour + day windows) —
+//    paid=30h/200d, free=5h/20d, admin=60h/500d. Persists across
+//    serverless cold starts via ai_usage_log table.
+//
+// 5. **Bounded input** — 16 KB JSON. Bounded output — 900 tokens.
+//    Worst-case single call cost ≈ $0.025.
+//
+// 6. **Monthly hard cap on Anthropic side** — MUST be configured in
+//    the Anthropic dashboard (Usage Limits → Monthly Spend Cap).
+//    Set to $50-100/month as a last-resort backstop. Documented in
+//    docs/SECURITY.md.
+//
+// === Responses ===
 //   200 { text, model, usage }
-//   401 { error: "auth required" } (when caller sends malformed token)
-//   429 { error: "rate limit", retry_after_sec }
+//   401 { error: "authentication required" } — no or invalid token
+//   403 { error: "untrusted origin" } — Origin/Referer check failed
+//   429 { error: "rate limit: ...", retry_after_sec }
 //   501 { error: "AI disabled — ANTHROPIC_API_KEY missing" }
-//   4xx/5xx { error: "..." }
-//
-// Security notes:
-//   · Input bounded at 16 KB JSON.
-//   · Output capped at 900 tokens.
-//   · No PII in `context` — aggregates only (enforced by client shape,
-//     not by the server — don't ingest untrusted extra fields).
 
 import { createClient } from "@supabase/supabase-js";
 
@@ -46,13 +58,33 @@ const MAX_INPUT_BYTES = 16 * 1024;
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS  = 24 * HOUR_MS;
 
-// [per-hour, per-day] caps by tier
+// [per-hour, per-day] caps by tier. anon is intentionally absent —
+// the endpoint now requires a valid session.
 const LIMITS = {
   paid:  [30, 200],
   admin: [60, 500],
   free:  [ 5,  20],
-  anon:  [ 3,  10],
 };
+
+// Origin check — allowlist for server-side verification. Distinct from
+// CORS which is browser-enforced; this catches curl/Postman/bot calls
+// that don't care about CORS.
+const TRUSTED_ORIGINS = [
+  "https://residata-gamma.vercel.app",
+  "https://residata.sk",
+  "https://www.residata.sk",
+  "http://localhost:5173",
+  "http://localhost:3000",
+];
+
+function isTrustedOrigin(req) {
+  const origin = req.headers?.origin;
+  const referer = req.headers?.referer || "";
+  if (origin && TRUSTED_ORIGINS.includes(origin)) return true;
+  // Some browsers omit Origin on same-site requests; fall back to Referer prefix
+  if (referer && TRUSTED_ORIGINS.some(o => referer.startsWith(o + "/"))) return true;
+  return false;
+}
 
 // Allowed origins for CORS. Anything else gets no Access-Control-Allow-Origin
 // header and the browser blocks the request at the preflight stage.
@@ -133,6 +165,18 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "method not allowed" });
   }
 
+  // ── Server-side Origin / Referer gate ──
+  // CORS alone is not enough — it's enforced by browsers, not servers.
+  // Anyone using curl / Postman / a script bypasses CORS entirely and
+  // hits the endpoint. We reject here if neither Origin nor Referer
+  // claims one of our trusted domains. Note: Origin/Referer can be
+  // spoofed by a determined attacker, so this is a speed bump, not a
+  // fortress — it stops casual script-kiddie abuse cold, while auth
+  // below is the actual gate.
+  if (!isTrustedOrigin(req)) {
+    return res.status(403).json({ error: "untrusted origin" });
+  }
+
   // Per-IP rate limit (belt-and-suspenders; authenticated callers also
   // get tier limits below from the ai_usage_log counter).
   const ip = clientIp(req);
@@ -175,79 +219,86 @@ export default async function handler(req, res) {
     return res.status(413).json({ error: `context too large (${serialized.length} bytes > ${MAX_INPUT_BYTES})` });
   }
 
-  // ── Auth + tier detection ──
+  // ── Auth — REQUIRED. Anon tier removed. ──
+  // Anyone who wants AI summary has to be logged in. This closes the
+  // biggest cost-abuse vector (random internet traffic burning credit).
+  // Creating an account still costs the attacker time — email domain
+  // validation blocks disposable addresses (see emailValidation.js),
+  // and manual admin approval gates tier upgrades.
   const SUPABASE_URL        = process.env.SUPABASE_URL;
   const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY;
-  // If Supabase envs are missing, auth is disabled entirely — every call
-  // is treated as "anon". That's a degraded mode for local dev; in prod
-  // both envs are set (SUPABASE_URL is public, SECRET is server-only).
+  if (!SUPABASE_URL || !SUPABASE_SECRET_KEY) {
+    return res.status(500).json({ error: "server misconfigured: SUPABASE envs missing" });
+  }
   const authHeader = req.headers.authorization || req.headers.Authorization || "";
   const token = authHeader.replace(/^Bearer\s+/i, "").trim();
-  let userId = null, tier = "anon";
-
-  if (SUPABASE_URL && SUPABASE_SECRET_KEY && token) {
-    try {
-      const admin = createClient(SUPABASE_URL, SUPABASE_SECRET_KEY, {
-        auth: { autoRefreshToken: false, persistSession: false },
-      });
-      const { data: { user }, error: authErr } = await admin.auth.getUser(token);
-      if (authErr || !user) {
-        return res.status(401).json({ error: "invalid token" });
-      }
-      userId = user.id;
-      // Fetch tier from user_profiles (table used elsewhere in the app)
-      const { data: prof } = await admin
-        .from("user_profiles")
-        .select("tier")
-        .eq("id", userId)
-        .maybeSingle();
-      tier = prof?.tier || "free";
-    } catch (_) {
-      tier = "free";   // token present but lookup failed — degrade safely
-    }
+  if (!token) {
+    return res.status(401).json({ error: "authentication required" });
   }
 
-  // ── Rate limiting ──
-  // When Supabase is configured we persist usage + check real counts.
-  // Otherwise we fall back to an in-memory counter (useful for local dev;
-  // doesn't survive cold starts, but the limit is generous there anyway).
-  const [perHour, perDay] = LIMITS[tier] || LIMITS.anon;
-  let admin = null;
-  if (SUPABASE_URL && SUPABASE_SECRET_KEY) {
-    admin = createClient(SUPABASE_URL, SUPABASE_SECRET_KEY, {
+  let userId, tier;
+  try {
+    const authAdmin = createClient(SUPABASE_URL, SUPABASE_SECRET_KEY, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
-
-    // Count the user's (or for anon: all anon's) calls in the last hour and day
-    const hourAgo = new Date(Date.now() - HOUR_MS).toISOString();
-    const dayAgo  = new Date(Date.now() - DAY_MS).toISOString();
-    let hourCount = 0, dayCount = 0;
-    try {
-      const qH = admin.from("ai_usage_log").select("id", { count: "exact", head: true })
-        .gte("requested_at", hourAgo);
-      const qD = admin.from("ai_usage_log").select("id", { count: "exact", head: true })
-        .gte("requested_at", dayAgo);
-      if (userId) { qH.eq("user_id", userId); qD.eq("user_id", userId); }
-      else        { qH.is("user_id", null);   qD.is("user_id", null); }
-      const [h, d] = await Promise.all([qH, qD]);
-      hourCount = h.count || 0;
-      dayCount  = d.count || 0;
-    } catch (_) { /* fail open on count-query error */ }
-
-    if (hourCount >= perHour) {
-      return res.status(429).json({
-        error: `rate limit: ${perHour} AI calls / hour reached`,
-        retry_after_sec: 60,
-        tier,
-      });
+    const { data: { user }, error: authErr } = await authAdmin.auth.getUser(token);
+    if (authErr || !user) {
+      return res.status(401).json({ error: "invalid or expired token" });
     }
-    if (dayCount >= perDay) {
-      return res.status(429).json({
-        error: `rate limit: ${perDay} AI calls / day reached`,
-        retry_after_sec: 3600,
-        tier,
-      });
+    userId = user.id;
+    const { data: prof } = await authAdmin
+      .from("user_profiles")
+      .select("tier")
+      .eq("id", userId)
+      .maybeSingle();
+    tier = prof?.tier || "free";
+    // Hard-block pending users — account created but not yet approved.
+    // They shouldn't be able to spend Anthropic credit.
+    if (tier === "pending") {
+      return res.status(403).json({ error: "account pending approval" });
     }
+  } catch (_) {
+    return res.status(401).json({ error: "auth verification failed" });
+  }
+
+  // ── Rate limiting (per-user, rolling hour + day) ──
+  // Counters live in ai_usage_log so they persist across cold starts.
+  const [perHour, perDay] = LIMITS[tier] || LIMITS.free;
+  const admin = createClient(SUPABASE_URL, SUPABASE_SECRET_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
+  const hourAgo = new Date(Date.now() - HOUR_MS).toISOString();
+  const dayAgo  = new Date(Date.now() - DAY_MS).toISOString();
+  let hourCount = 0, dayCount = 0;
+  try {
+    const [h, d] = await Promise.all([
+      admin.from("ai_usage_log").select("id", { count: "exact", head: true })
+        .gte("requested_at", hourAgo).eq("user_id", userId),
+      admin.from("ai_usage_log").select("id", { count: "exact", head: true })
+        .gte("requested_at", dayAgo).eq("user_id", userId),
+    ]);
+    hourCount = h.count || 0;
+    dayCount  = d.count || 0;
+  } catch (_) {
+    // If the counter lookup fails, fail CLOSED (not open) — refusing
+    // a call is cheaper than double-spending credit.
+    return res.status(503).json({ error: "rate limit lookup failed, try again" });
+  }
+
+  if (hourCount >= perHour) {
+    return res.status(429).json({
+      error: `rate limit: ${perHour} AI calls / hour reached`,
+      retry_after_sec: 60,
+      tier,
+    });
+  }
+  if (dayCount >= perDay) {
+    return res.status(429).json({
+      error: `rate limit: ${perDay} AI calls / day reached`,
+      retry_after_sec: 3600,
+      tier,
+    });
   }
 
   // ── Prompt assembly ──

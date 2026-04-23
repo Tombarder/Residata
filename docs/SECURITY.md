@@ -3,221 +3,371 @@
 Last reviewed: 2026-04-23
 
 This document captures the security-relevant decisions and state of
-the Residata application so it can be audited, improved, or handed to
-a third-party reviewer without having to re-derive context.
+the Residata application. Structured around the three pillars the
+founder considers mission-critical:
+
+1. **Cost abuse** — nobody drains our paid APIs (Anthropic, SMTP, Supabase)
+2. **Data theft** — nobody sees paid data without paying
+3. **Takedown / hack** — nobody takes the site down, steals user data,
+   hijacks Google Sheets, or modifies code
 
 ---
 
-## TL;DR
+## TL;DR scorecard
 
-| Layer | State | Notes |
+| Pillar | Protection | State |
 |---|---|---|
-| **Transport** | ✅ HTTPS enforced, HSTS preloadable | `Strict-Transport-Security` header set to 2y with `includeSubDomains; preload` |
-| **Auth** | ✅ Magic-link (passwordless) via Supabase | No passwords to steal. Short-lived session tokens. |
-| **Row security** | ✅ RLS enabled; anon tested per-table | See [RLS section](#rls-row-level-security) below |
-| **Admin ops** | ✅ Token + role verified server-side | `api/admin/delete-user.js` double-checks tier=admin |
-| **Rate limits** | ✅ Tier-based DB counter + per-IP in-memory | On `/api/ai/summary` |
-| **CORS** | ✅ Allowlist of known origins | Wildcard `*` removed |
-| **Input sanitization** | ✅ Client-side at intake | `src/lib/sanitize.js` handles CompleteProfile form |
-| **Security headers** | ✅ CSP, X-Frame, Referrer, Permissions, HSTS | See [Headers section](#security-headers) |
-| **Dependency surface** | ✅ 4 runtime deps, all current majors | See [Dependencies section](#dependencies) |
-| **Penetration test** | ❌ Not done | Recommended before first enterprise customer |
-| **GDPR audit** | ⚠️ Not formalized | Personal data stored (names, emails) — needs Privacy Policy + DPA |
-| **SOC 2 / ISO** | ❌ Not done | Only needed when selling to regulated institutions |
+| **1. Cost abuse** | `/api/ai/summary` requires auth (no anon) | ✅ Done |
+| | Server-side Origin check (not just CORS) | ✅ Done |
+| | Per-IP rate limit (10/min) | ✅ Done |
+| | Per-user tier limits (hour + day) | ✅ Done |
+| | Input/output token caps | ✅ Done |
+| | **Hard monthly cap in Anthropic dashboard** | ⚠️ **YOU MUST CONFIGURE** |
+| **2. Data theft** | Supabase RLS on flats / user_profiles / app_secrets | ✅ Verified |
+| | Publishable key is safe in browser | ✅ By design |
+| | Service-role key server-side only | ✅ Verified |
+| | No PII in URL params or client logs | ✅ Verified |
+| **3. Takedown / hack** | HTTPS + HSTS preload | ✅ Done |
+| | CSP + X-Frame + Referrer + Permissions headers | ✅ Done |
+| | Input sanitization (XSS, CSV injection) | ✅ Done |
+| | Admin endpoint server-side role check | ✅ Done |
+| | CORS allowlist + Origin check | ✅ Done |
+| | **2FA on GitHub, Vercel, Supabase, Google, Anthropic** | ⚠️ **YOU MUST ENABLE** |
+| | Backups of Supabase + Google Sheets | ⚠️ See [backups](#backups-and-recovery) |
 
 ---
 
-## Threat model
+# Pillar 1 — Cost abuse
 
-Residata's attack surface:
+## What paid APIs we use
 
-1. **Anonymous web traffic** on public pages — everything under `/`, `/live`, `/sample`, `/use-cases`, `/pricing`, `/contact`
-2. **Authenticated users** with `tier` in `{ pending, free, paid, admin }`
-3. **API endpoints** at `/api/ai/summary`, `/api/admin/delete-user`, `/api/cron/monthly-reports`, `/api/webhooks/*`
-4. **Supabase project** (Postgres DB + Auth + Storage)
-5. **Scheduled job** (Vercel Cron → `/api/cron/monthly-reports`) triggered 1st of month
+| API | What for | Current cost exposure |
+|---|---|---|
+| **Anthropic** (`claude-sonnet-4-5`) | AI exec-summary on `/api/ai/summary` | ~$0.025 per call, capped per user |
+| **Supabase** (Postgres + Auth + Storage) | DB, auth, RLS | Usage-based, generous free tier |
+| **Gmail SMTP** (via `nodemailer`) | Transactional emails (welcome, monthly reports) | Free up to 500/day; abuse risks account suspension not $$ |
+| **Google Sheets API** (in scraper) | Source of truth for data pipeline | Free tier generous; runs on GitHub Actions |
 
-Who might attack:
-- Opportunistic internet scanners (credential stuffing bots, XSS fuzzers)
-- Competitors trying to scrape data
-- A user abusing AI endpoint for free compute
-- A disgruntled beta tester trying to escalate privileges
+**Firecrawl, OpenAI, Stripe are NOT used.** No other paid APIs in the codebase.
 
-Assets to protect:
-- **User accounts and PII** (names, emails, company, LinkedIn)
-- **Flats / projects dataset** (the product itself)
-- **OpenAI/Anthropic API credit** (cost)
-- **Founder brand** (a public breach would be worse than the data loss)
+## `/api/ai/summary` — Anthropic cost protection (detailed)
 
----
+This is the only endpoint that spends money per call. Hardening stack:
 
-## RLS (Row-Level Security)
+### Layer 1 — Auth required (NO anon tier)
+No session token → `401 authentication required`. Closes the biggest
+vector: random internet traffic burning credit without creating an
+account. Attackers have to sign up first, and sign-up is gated by:
+- Email domain validation (blocks disposable addresses)
+- Manual admin approval before `tier` upgrade to anything useful
 
-Tested by direct probe against the REST API with anon key on 2026-04-23.
+### Layer 2 — Server-side Origin / Referer check
+CORS is browser-only. curl / Postman / server-side scripts bypass CORS
+entirely. We check `Origin` and `Referer` headers server-side; if
+neither claims one of our trusted domains, response is `403 untrusted
+origin`. Can be spoofed by a determined attacker, but stops casual
+script abuse cold.
 
-| Table | Anon read | Anon write | Policy intent |
+### Layer 3 — Per-IP rate limit (in-memory)
+10 requests/minute per IP. Ephemeral (survives only within a warm
+function instance) but absorbs burst attacks before they hit Anthropic.
+
+### Layer 4 — Per-user tier limits (DB-backed, persistent)
+| Tier | Per hour | Per day | Worst-case daily cost |
 |---|---|---|---|
-| `projects` | ✅ yes | ❌ no | Public registry — marketing pages read |
-| `project_snapshots` | ✅ yes | ❌ no | Public time-series — Analytics page reads |
-| `metrics` | ✅ yes | ❌ no | Public KPIs — Ticker + MarketPulse read |
-| `early_access_stats` | ✅ yes | ❌ no | Public marketing stat |
-| `flats` | ❌ 0 rows | ❌ no | Unit-level data is paid — RLS blocks anon |
-| `user_profiles` | ❌ 0 rows | ❌ no | Never readable except own row |
-| `ai_usage_log` | ❌ 0 rows | ❌ no | Service-role only |
-| `app_secrets` | ❌ 0 rows | ❌ no | Service-role only (API keys) |
+| `admin` | 60 | 500 | $12.50 |
+| `paid` | 30 | 200 | $5.00 |
+| `free` | 5 | 20 | $0.50 |
+| `pending` | 0 | 0 | $0 — hard-blocked |
 
-Probed with:
-```bash
-curl "https://mtclsrswxtjseewyrcbx.supabase.co/rest/v1/<table>?select=*&limit=1" \
-     -H "apikey: <publishable>"
-```
+Counters live in `ai_usage_log` table. Lookup failure = fail-CLOSED
+(reject call) not fail-open.
+
+### Layer 5 — Input/output bounds
+- Input: 16 KB JSON max
+- Output: 900 tokens max
+- Worst-case single call: ~$0.025
+
+### Layer 6 — **HARD MONTHLY CAP IN ANTHROPIC DASHBOARD** ⚠️ Manual
+
+This is the ONLY absolute backstop. Application-level limits fail open
+if there's a bug. Anthropic's dashboard-level cap does NOT.
+
+**Action required — you must do this once:**
+
+1. Log in to https://console.anthropic.com
+2. Usage → Limits → Monthly spend cap
+3. Set to a dollar value (recommendation: **€50/month**
+   while beta, **€200/month** once paying customers exist)
+4. Enable email alerts at 50%, 80%, 100% of cap
+
+Without this, a bug or successful attack could theoretically run up
+$1000s of credit before anyone notices. With it, the cap is hard —
+Anthropic stops serving requests.
+
+## Gmail SMTP (monthly reports)
+
+Gmail free tier: 500 emails/day. Residata sends at most ~20/month (one
+per report subscriber). No abuse risk unless SMTP credentials leak
+(credential rotation section below).
+
+## Supabase quota
+
+Free tier limits: 500 MB database, 5 GB bandwidth, 50k monthly active
+users. Residata well under all. Usage alert is set in Supabase dash —
+configure if not already (Project Settings → Billing → Alerts).
+
+## What I CANNOT protect against
+
+- Distributed attack from 1000s of IPs with 1000s of free accounts
+  created automatically. Mitigation requires adding a CAPTCHA on signup
+  and/or payment at signup. Not yet needed at current scale.
+- Insider abuse (your own admin account being misused). Mitigation is
+  the audit log — see [Pillar 3](#pillar-3--full-takedown-protection).
+
+---
+
+# Pillar 2 — Data theft prevention
+
+## Public vs private data
+
+### Public (anon + AI crawlers see this — intended)
+| Data | Why public |
+|---|---|
+| Project names, district, developer | Registry is marketing |
+| Project-level aggregates (% sold, avg €/m²) | Proof of product |
+| Homepage hero metrics (5,101 units, 90 projects) | Marketing claim |
+| Sample insight cards | Demo what we deliver |
+| Historical project_snapshots (aggregate level) | Public time-series |
+
+### Private (auth + RLS gated — only paid can access)
+| Data | Protection layer | Verified |
+|---|---|---|
+| `flats` (unit-level: prices, areas, unit IDs) | Supabase RLS by tier | ✅ anon returns 0 rows (probed) |
+| `user_profiles` (names, emails, company, LinkedIn) | Supabase RLS own-row only | ✅ anon returns 0 rows |
+| `app_secrets` (API keys) | Service-role only | ✅ anon blocked |
+| `ai_usage_log` | Service-role only | ✅ anon blocked |
+| Custom reports, PDFs | Auth-gated + personalized generation | ✅ behind login |
+| Historical unit-level time-series | RLS-gated same as `flats` | ✅ anon blocked |
+
+## RLS audit (probed 2026-04-23)
+
+| Table | Anon read | Anon write |
+|---|---|---|
+| `projects` | ✅ yes | ❌ no |
+| `project_snapshots` | ✅ yes | ❌ no |
+| `metrics` | ✅ yes | ❌ no |
+| `early_access_stats` | ✅ yes | ❌ no |
+| `flats` | ❌ 0 rows | ❌ no |
+| `user_profiles` | ❌ 0 rows | ❌ no |
+| `ai_usage_log` | ❌ 0 rows | ❌ no |
+| `app_secrets` | ❌ 0 rows | ❌ no |
 
 All policies behave as intended.
 
-**TODO** — not yet verified:
-- `flats` access for `tier=free` with chosen_project_id (should see only that project's flats)
-- `flats` access for `tier=paid` (should see all)
-- `user_profiles` own-row access for authenticated users (should be writable, other rows not)
-- Admin-role access to `user_profiles.tier` column mutations
+### TODO (not yet verified — needs session tokens to probe)
+- `flats` access for `tier=free` with `chosen_project_id` (should see ONLY that project)
+- `flats` access for `tier=paid` (should see everything)
+- `user_profiles` own-row read for authenticated user (should see own + NO others)
+- `user_profiles.tier` column — admin only?
 
-These require real session tokens to probe; can be done by signing in as each tier and walking the API with the browser devtools.
+These need interactive session testing. Not currently automated.
+
+## API data exposure
+
+All data endpoints return 401/403 for unauthorized:
+- `/api/ai/summary` — auth required (enforced 2026-04-23)
+- `/api/admin/delete-user` — auth + `tier=admin` required server-side
+- `/api/cron/monthly-reports` — secret bearer token OR Vercel cron header
+- `/api/webhooks/*` — internal only, no user-callable surface
+
+## Publishable key in browser — intended
+
+`VITE_SUPABASE_PUBLISHABLE_KEY` is safe to ship to browsers. It's what
+RLS evaluates. RLS does the actual gating — the key alone gives you
+nothing sensitive.
+
+Service-role key is server-side only (Vercel env var), never bundled
+into the browser.
 
 ---
 
-## Security headers
+# Pillar 3 — Full takedown protection
 
-Applied via `vercel.json` on every response:
+This is the pillar YOU have the most control over, because most attack
+vectors are account-level and can't be mitigated in code.
 
-| Header | Value | Protects against |
+## What can go wrong — attack tree
+
+```
+Someone wants to destroy Residata. Paths:
+  │
+  ├─ Compromise your GitHub → push malicious commit → Vercel deploys it
+  │    Mitigation: 2FA + hardware key on GitHub
+  │
+  ├─ Compromise your Vercel → redeploy malicious build, steal env vars
+  │    Mitigation: 2FA on Vercel
+  │
+  ├─ Compromise your Supabase → access full DB with service-role key
+  │    Mitigation: 2FA on Supabase + env var rotation
+  │
+  ├─ Compromise your Google account → delete source Sheets, steal data
+  │    Mitigation: 2FA on Google + sharing audit + backup Sheets
+  │
+  ├─ Compromise your Anthropic / email account → rotate keys, block
+  │    Mitigation: 2FA + unique password manager entry
+  │
+  ├─ Compromise domain registrar → redirect residata.sk elsewhere
+  │    Mitigation: registrar 2FA + domain lock
+  │
+  ├─ Supply chain attack on npm package → code shipped in build
+  │    Mitigation: Dependabot alerts + minimal dep surface (4 runtime)
+  │
+  ├─ XSS / CSRF / SQLi from the application itself
+  │    Mitigation: CSP, sanitize.js, Bearer auth, parameterized queries (all done)
+  │
+  └─ Physical theft of your laptop with logged-in sessions
+       Mitigation: FileVault / BitLocker + short session lifetimes
+```
+
+## Account 2FA — this is the #1 ask of you
+
+Enable 2FA on EVERY account listed below. Preferably hardware key
+(YubiKey) on the most critical ones; authenticator app otherwise.
+SMS 2FA is weak — avoid if possible (SIM swap attack).
+
+| Account | Why critical | Current state |
 |---|---|---|
-| `Strict-Transport-Security` | `max-age=63072000; includeSubDomains; preload` | Protocol downgrade attacks |
-| `Content-Security-Policy` | Allowlist of sources (see vercel.json) | XSS, data exfiltration |
-| `X-Frame-Options` | `DENY` | Clickjacking via iframe embedding |
-| `X-Content-Type-Options` | `nosniff` | MIME confusion attacks |
-| `Referrer-Policy` | `strict-origin-when-cross-origin` | Leak of URL query params to third parties |
-| `Permissions-Policy` | Camera, mic, geolocation, payment, USB disabled | Unintended browser API access |
-| `Cross-Origin-Opener-Policy` | `same-origin` | Process isolation (Spectre / COOP) |
+| **GitHub** (Tombarder) | Controls code → deploys | ⚠️ verify |
+| **Vercel** | Controls what's live, holds env vars | ⚠️ verify |
+| **Supabase** | DB access + service-role key | ⚠️ verify |
+| **Google** (Gmail) | Sheets source data + SMTP | ⚠️ verify |
+| **Anthropic** | Pays for AI + holds API key | ⚠️ verify |
+| **Domain registrar** (if residata.sk registered) | DNS control | ⚠️ verify |
+| **1Password / password manager** | Root of trust for above | ⚠️ verify |
 
-Plus for API paths:
-- `X-Robots-Tag: noindex, nofollow`
-- `Cache-Control: no-store`
+**Your task this week:** audit all these, enable 2FA, save recovery codes.
 
----
+## What's already hardened in code
 
-## Rate limiting
+### Transport
+- `Strict-Transport-Security: max-age=63072000; includeSubDomains; preload`
+- HTTPS enforced by Vercel (automatic)
 
-`/api/ai/summary` is the main cost exposure (calls Anthropic API).
+### Browser-side attacks
+- `Content-Security-Policy` — tight allowlist (self + fonts + Unsplash + Supabase)
+- `X-Frame-Options: DENY` — no iframe embedding
+- `X-Content-Type-Options: nosniff`
+- `Referrer-Policy: strict-origin-when-cross-origin`
+- `Permissions-Policy` — camera, mic, geo, payment, USB all disabled
+- `Cross-Origin-Opener-Policy: same-origin`
 
-Two stacked layers:
+### Application attacks
+- Input sanitization (`src/lib/sanitize.js`): strips HTML tags, control
+  chars, CSV formula triggers, non-http(s) URL schemes
+- CompleteProfile form wired through sanitization at intake
+- LoginModal email through `validateBusinessEmail`
+- XSS-safe rendering (React auto-escapes JSX)
+- SQL injection-safe (Supabase client parameterizes)
+- CSRF-safe (Bearer token auth, not cookies; SameSite not relevant)
 
-### Layer 1 — per-IP (in-memory, serverless)
-- 10 requests / minute per client IP
-- Lives in the function instance — ephemeral across cold starts
-- Primary purpose: absorb bursts before they reach the DB
+### API attacks
+- CORS allowlist (wildcard removed)
+- Server-side Origin check
+- Admin endpoint: `auth.getUser()` + tier check + self-delete block
+- Rate limits on AI endpoint
+- Cron endpoint: secret + `x-vercel-cron` fallback
 
-### Layer 2 — per-user (DB-backed, persistent)
-- `tier = admin`: 60/hour, 500/day
-- `tier = paid`: 30/hour, 200/day
-- `tier = free`: 5/hour, 20/day
-- `tier = anon`: 3/hour, 10/day (bucketed against all anon combined)
-- Counters in `ai_usage_log` table
+### Infrastructure
+- Vercel: HTTPS automatic, DDoS protection at platform level
+- Supabase: EU region (GDPR-friendly), RLS on all sensitive tables
+- Dependencies: only 4 runtime (react, react-dom, @supabase/supabase-js,
+  nodemailer), all current majors, no known CVEs at review time
 
-Other API endpoints:
-- `/api/admin/delete-user` — no rate limit; token+role-gated and low call volume
-- `/api/cron/monthly-reports` — invoked only by Vercel Cron, secret-gated
-- `/api/webhooks/*` — internal, no user-callable surface
+## Google Sheets — specific notes
 
----
+The new-build data pipeline reads from Google Sheets (`1OHb9eddPYCYfqmw81fOVIqWybVtnkIvc2YGgG9ZT3Rc`).
+This is your **single source of truth** — if it's deleted or corrupted,
+the monthly sync breaks.
 
-## Input sanitization
+### Sheets hardening — you must do
+1. **Sharing audit**: Who has edit access? Aim for editors = you only.
+   Everyone else: viewer or no access.
+2. **No "anyone with link"** access. Explicit invitees only.
+3. **Version history enabled** (default Google behaviour — keep it).
+4. **Export backup monthly**: automate a daily export to a separate
+   Google Drive folder or local backup. Can be done with:
+   - Apps Script: scheduled trigger creates `.xlsx` copy
+   - Or Takeout export monthly
+5. **Service account used by scraper** has read-only scope if possible.
+   Currently: verify the credentials.json permissions in
+   `~/novostavby/credentials.json`.
 
-`src/lib/sanitize.js` provides four helpers used at intake:
+## Backups and recovery
 
-- `cleanText(raw, {max})` — strips `<`, `>`, control chars, leading CSV formula triggers (`=+@`), collapses whitespace, enforces max length
-- `cleanUrl(raw, {max})` — rejects non-http(s) schemes (blocks `javascript:`, `data:`, `file:`)
-- `cleanPhone(raw, {max})` — keeps digits, +, spaces, parentheses, dashes only
-- `cleanEmail(raw, {max})` — lowercase + regex validation
+Current state: **fragile**. Single source of truth in Sheets; no
+automated DB backup beyond Supabase's internal point-in-time recovery.
 
-Applied in `CompleteProfile.jsx` to name, company, position, LinkedIn URL, phone.
+### Supabase
+Supabase Pro plan has daily auto-backups with 7-day retention. Free
+tier: backup is on you.
 
-Email input on `LoginModal.jsx` goes through `validateBusinessEmail()` which also enforces business-email domain rules.
+**Action**: once subscription starts, export DB weekly:
+```sh
+pg_dump "postgresql://postgres:[PASSWORD]@db.mtclsrswxtjseewyrcbx.supabase.co:5432/postgres" \
+  > backup-$(date +%Y%m%d).sql
+```
+Store in encrypted off-site location.
 
----
+### Google Sheets
+See [Google Sheets section](#google-sheets--specific-notes) above.
 
-## CORS
+### Code
+GitHub is the backup. But you should have a **local working clone** at
+all times so that if GitHub goes down or account is compromised, you
+can restart from somewhere.
 
-`/api/ai/summary` echoes `Access-Control-Allow-Origin` only for origins in the explicit allowlist:
-- `https://residata-gamma.vercel.app`
-- `https://residata.sk` (reserved for future custom domain)
-- `https://www.residata.sk`
-- `http://localhost:5173` (Vite dev)
-- `http://localhost:3000` (alt dev)
+## Secrets rotation schedule
 
-Any other Origin: no ACAO header → browser blocks the call.
+These should rotate at least every 90 days, sooner on any suspicion:
 
----
+| Secret | Where stored | Rotation effort |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | Vercel env + `app_secrets` table | Low — regenerate in Anthropic dash, update Vercel |
+| `SUPABASE_SECRET_KEY` (service-role) | Vercel env | Medium — regen in Supabase, update all places |
+| `GMAIL_APP_PASSWORD` | Vercel env + `app_secrets` | Low — Google account → App passwords |
+| `CRON_SECRET` | Vercel env | Low — generate new random string, update |
 
-## Dependencies
+## Audit log (not yet implemented)
 
-Runtime (shipped to production):
+Currently no record of admin actions (`delete-user`, tier changes).
+Should be added before first paying customer who depends on auditable
+access control.
 
-| Package | Version | Role | Known issues |
-|---|---|---|---|
-| `@supabase/supabase-js` | ^2.45.4 | DB client, auth | None current |
-| `nodemailer` | ^6.9.16 | Email sender (server-only) | None current |
-| `react` | ^19.2.4 | UI framework | None current |
-| `react-dom` | ^19.2.4 | UI framework | None current |
-
-**Attack surface: 4 runtime deps.** No `lodash`, no `moment`, no transitive chains known for supply-chain attacks. This is an unusually tight dep tree for a production SPA, and it's deliberate.
-
-Dev dependencies (not shipped): `vite`, `eslint`, `@vitejs/plugin-react`, `globals`, `@types/*`. Irrelevant to runtime security.
-
-**Periodic action**: run `npm audit` on package-lock changes (or enable Dependabot). Not yet automated.
-
----
-
-## Known remaining risks
-
-### Must address before first enterprise customer
-
-1. **Penetration test** — No third-party pentest has been done. Estimate €2–5k for a small-scope test covering auth flow, API endpoints, and Supabase integration. Deliverable is a report with findings you can show to enterprise procurement.
-
-2. **GDPR / legal** — Personal data (name, email, company, LinkedIn) is stored on EU-hosted infra (Supabase EU region). Minimum needed:
-   - Privacy Policy page
-   - Cookie banner (if any tracking beyond analytics is added)
-   - Data Processing Agreement (DPA) with Supabase — template exists, just needs signing
-   - Retention policy (auto-delete old `ai_usage_log` after N days?)
-   - Right-to-be-forgotten procedure (delete-user endpoint exists but needs documented SLA)
-
-### Nice-to-have hardening
-
-3. **Audit log** — No record of admin-panel actions (`delete-user` calls). Add `admin_audit_log` table + insert on every admin action.
-
-4. **Session rotation** — Currently relying on Supabase defaults (1 hour access token, 30-day refresh). No forced rotation on password change (N/A — passwordless) or on suspicious activity.
-
-5. **Anomaly alerts** — No alert on spikes in `ai_usage_log`, failed-login rates, or 403s. Simple Slack webhook would catch abuse early.
-
-6. **Secrets rotation** — Anthropic API key, SMTP password, Supabase service-role key live in Vercel environment variables. No rotation schedule. Should rotate every 90 days as policy.
-
-7. **Dependabot / Snyk** — Not configured. CVE alerts would land in GitHub Issues automatically.
-
-### Out of scope (won't fix)
-
-- **Email account hijack** — if someone's email is compromised they can receive magic links and log in. Standard limitation of email-based auth. Mitigation: user's responsibility.
-- **DDoS** — Vercel's platform-level protection is the only layer. Adequate for current scale.
-- **Physical security** — Not applicable (SaaS, no physical infra).
-
----
+### Proposed schema
+```sql
+CREATE TABLE admin_audit_log (
+  id          bigserial primary key,
+  actor_id    uuid references auth.users(id),
+  action      text not null,         -- 'delete_user', 'grant_admin', etc.
+  target_id   uuid,                  -- user affected
+  payload     jsonb,
+  ip          inet,
+  user_agent  text,
+  created_at  timestamptz default now()
+);
+```
 
 ## Incident response
 
-Not formalized. Minimum plan if a breach is suspected:
+If you suspect a breach:
 
-1. Rotate Anthropic API key and Supabase service-role key in Vercel env
-2. Revoke all active sessions via Supabase Dashboard → Auth → Users → Sign out all
-3. Snapshot the `ai_usage_log` and auth logs before they roll off
-4. Email affected users within 72 hours (GDPR notification requirement)
-5. Retrospective — write up root cause, add mitigation to this doc
+1. **Change all passwords** for accounts listed in [2FA section](#account-2fa--this-is-the-1-ask-of-you).
+2. **Rotate all secrets** listed in [secrets rotation](#secrets-rotation-schedule).
+3. **Supabase → Auth → Users → Sign out all users** (revokes active sessions).
+4. **Snapshot logs**: `ai_usage_log`, Supabase auth events, Vercel deployment history, Google Sheets version history. Before anything rolls off.
+5. **Notify affected users within 72 hours** (GDPR requirement).
+6. **Write a retrospective**: add findings to this doc's change log.
 
 Contact: residata@proton.me
 
@@ -225,4 +375,5 @@ Contact: residata@proton.me
 
 ## Change log
 
-- 2026-04-23: Initial security posture documented. Applied: security headers in vercel.json, CORS allowlist + per-IP rate limit on `/api/ai/summary`, input sanitization in `CompleteProfile`, RLS probe across 8 tables.
+- **2026-04-23**: Hardened `/api/ai/summary` to require auth (removed anon tier), added server-side Origin check, fail-closed on rate-limit lookup error, hard-block pending users. Documented three-pillar posture.
+- **2026-04-23**: Initial security posture. Security headers via vercel.json, input sanitization (`src/lib/sanitize.js`), RLS probe across 8 tables, dependency audit.
