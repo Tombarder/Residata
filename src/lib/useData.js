@@ -1,24 +1,54 @@
 import { useEffect, useState } from "react";
 import { supabase, isSupabaseReady } from "./supabase";
+import { useAuth } from "./useAuth";
 
 /**
- * Module-level caches for data that's safe to share across components.
+ * Data hooks — the one source of truth for reading from Supabase.
  *
- * Problem this solves: the app's top-level layout remounts on every route
- * change (for the page-fade animation), which blows away every hook's
- * useState including useProjects / useMetrics. On each navigation the user
- * would see a brief "0 projects / 0 units / €— / 0 sold" flash while the
- * refetch was in flight — a "zeros on nav" bug.
+ * ## Module-level caches (why they exist)
+ *
+ * Problem: the app's top-level layout remounts on every route change (for
+ * the page-fade animation). Without cache, every hook's useState resets,
+ * so on each navigation the user would see a brief "0 projects / 0 units
+ * / €— / 0 sold" flash while the refetch was in flight — a "zeros on nav"
+ * bug.
  *
  * Now: first load populates the cache, subsequent mounts get the cached
- * data as their initial state immediately. A background refetch still fires
- * so the data stays fresh; the user never sees zeros unless the app is
- * genuinely on its very first load this session.
+ * data as their initial state immediately. Background refetch still fires
+ * so the data stays fresh.
+ *
+ * ## Auth-readiness gate (the real fix for the "No data" bug)
+ *
+ * Previously this file had a 5-retry exponential backoff in
+ * `useProjectFlats` to work around a race: the flats query would fire at
+ * component mount, but at that moment the Supabase client sometimes
+ * hadn't finished applying the user's session to outgoing HTTP headers.
+ * RLS evaluated the caller as anonymous → 0 rows → "No data" in the UI.
+ * F5 "fixed" it because the hard reload gave auth time to resolve
+ * before any component mounted.
+ *
+ * Root cause: data hooks were firing WITHOUT checking whether auth
+ * context had finished initializing. Retry was treating a symptom.
+ *
+ * Real fix: the hooks that depend on RLS (useProjectFlats, useAllFlats)
+ * now read `loading` from useAuth and don't fire their fetch until
+ * auth is confirmed resolved. This means:
+ *   - Session from localStorage has been loaded AND applied to the
+ *     Supabase client
+ *   - onAuthStateChange has fired its first event
+ *   - useAuth's `loading` has flipped to false
+ * The next fetch then has a session (or confirmed no session for anon
+ * users) — no race possible.
+ *
+ * Hooks hitting public tables (metrics, projects, snapshots,
+ * early_access_stats) don't need the gate — those return the same data
+ * to anon and authenticated callers, so racing the token attachment
+ * doesn't affect the result.
  */
 let _projectsCache = null;
 let _metricsCache = null;
 
-/** Live metrics for the ticker (KPI strip). */
+/** Live metrics for the ticker (KPI strip). Public table — no auth gate. */
 export function useMetrics() {
   const [metrics, setMetrics] = useState(_metricsCache || []);
   const [loading, setLoading] = useState(_metricsCache === null);
@@ -35,7 +65,8 @@ export function useMetrics() {
   return { metrics, loading };
 }
 
-/** Project list. Anon gets ~top 20 (if limit requested), logged-in gets all. */
+/** Project list. Public data; anon and authenticated see the same rows
+ *  (differences come from what the UI chooses to render, not from RLS). */
 export function useProjects(limit) {
   const [projects, setProjects] = useState(_projectsCache || []);
   const [loading, setLoading] = useState(_projectsCache === null);
@@ -55,91 +86,55 @@ export function useProjects(limit) {
 
 /** Units (flats) for one project — gated by RLS on the flats table.
  *
- *  Race-condition resilience: clicking a project immediately after a
- *  client-side nav can fire the flats query before Supabase has attached
- *  the session token. RLS then evaluates the caller as anonymous and
- *  returns an empty result (no error). Symptom Tomáš hit: first click
- *  shows "No data", F5 works. Fix: poll with exponential backoff, up to
- *  5 attempts, refreshing the session between tries. Every attempt
- *  checks `cancelled` so navigation-away doesn't leak setState.
+ *  Auth-readiness gate: we wait for useAuth().loading to flip to false
+ *  before firing the fetch. This guarantees the Supabase client has
+ *  applied the session token (or confirmed none) to outgoing HTTP
+ *  headers. Without this gate, the race described at the top of the
+ *  file manifests as "No data" on first click-through after navigation.
+ *
+ *  Empty state interpretation (after auth is resolved):
+ *    - Caller has no permission for this project → RLS returns 0 rows
+ *      → UI renders the appropriate gate (ChooseProjectGate / login).
+ *      Not this hook's problem.
+ *    - Project has 0 flats in DB → 0 rows → UI renders "no data yet"
+ *      message explaining sync gap vs. developer-no-listing.
+ *  Either way: 0 rows here means 0 rows for real. No retries.
  */
 export function useProjectFlats(projectId) {
+  const { loading: authLoading } = useAuth();
   const [flats, setFlats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
   useEffect(() => {
-    if (!isSupabaseReady() || !projectId) { setLoading(false); return; }
+    // Guard: no Supabase, no projectId, or auth still initializing →
+    // stay in "loading" state; effect will re-run when authLoading flips.
+    if (!isSupabaseReady() || !projectId || authLoading) {
+      return;
+    }
     setLoading(true);
+    setError(null);
     let cancelled = false;
 
-    const fetchFlats = async () => {
-      return supabase.from("flats")
-        .select("*").eq("project_id", projectId)
-        .order("poschodie", { ascending: true });
-    };
-
-    const sleep = (ms) => new Promise(res => setTimeout(res, ms));
-
     (async () => {
-      // 1. Prime the session BEFORE the first fetch.
-      //    `hadValidSession` is the key heuristic for the retry loop below:
-      //    if we had a live session going in, an empty result = truly empty
-      //    (no retries, instant "no data" UX). If we had NO session at t=0,
-      //    an empty result could be the RLS-as-anon race and is worth a
-      //    refresh + retry.
-      let hadValidSession = false;
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          hadValidSession = true;
-          const expSoon = session.expires_at && (session.expires_at * 1000) < Date.now() + 120000;
-          if (expSoon) await supabase.auth.refreshSession();
-        }
-      } catch { /* ignore — we'll still attempt the fetch */ }
-
-      // 2. Retry strategy:
-      //    - explicit error → stop immediately (real problem, not a race)
-      //    - got rows → stop (happy path)
-      //    - empty + had valid session at t=0 → stop (truly empty; no
-      //      point waiting — RLS wouldn't paradoxically lie for a
-      //      session-bearing caller)
-      //    - empty + session was null at t=0 → retry with backoff and
-      //      re-refresh (classic race Tomáš hit: nav fires before token
-      //      attaches). Delays: 0, 250, 600, 1200, 2500 ms.
-      const delays = [0, 250, 600, 1200, 2500];
-      let data = null, err = null;
-      for (let i = 0; i < delays.length; i++) {
-        if (cancelled) return;
-        if (delays[i] > 0) await sleep(delays[i]);
-        if (cancelled) return;
-        if (i > 0) {
-          try { await supabase.auth.refreshSession(); } catch {/* ignore */}
-        }
-        const res = await fetchFlats();
-        if (cancelled) return;
-        data = res.data;
-        err = res.error;
-        if (err) break;                              // explicit error — stop
-        if (data && data.length > 0) break;          // got rows — stop
-        if (hadValidSession) break;                  // empty is truthful — stop
-        // else empty + no session → retry with refresh.
-      }
-
+      const { data, error: err } = await supabase.from("flats")
+        .select("*")
+        .eq("project_id", projectId)
+        .order("poschodie", { ascending: true });
+      if (cancelled) return;
       setFlats(data || []);
-      setError(err);
+      setError(err || null);
       setLoading(false);
     })();
 
     return () => { cancelled = true; };
-  }, [projectId]);
+  }, [projectId, authLoading]);
+
   return { flats, loading, error };
 }
 
 /** Monthly project snapshots — full time-series of the projects table.
- *  One row per project per snapshot_month ('YYYY-MM'). New months appear
- *  automatically on every sync_to_supabase run. The Analytics pivot reads
- *  from here so the user can filter / group by month too.
- */
+ *  Public historical data (same shape for anon + auth callers). */
 let _snapshotsCache = null;
 export function useProjectSnapshots() {
   const [snapshots, setSnapshots] = useState(_snapshotsCache || []);
@@ -158,40 +153,36 @@ export function useProjectSnapshots() {
   return { snapshots, loading };
 }
 
-/** All flats (every unit across every project) — for the unit-level pivot.
+/** All flats across every project — for the unit-level pivot on Analytics.
  *
- *  Rows come back with the full scalar column inventory from `public.flats`.
- *  RLS on the table gates access by tier:
- *    - anonymous  → 0 rows
- *    - free       → flats of the user's chosen_project_id only
- *    - paid/admin → every flat in every active/sold_out project
+ *  RLS tier behaviour:
+ *    - anonymous          → 0 rows
+ *    - free               → flats of user's chosen_project_id only
+ *    - paid/admin         → every flat in every active/sold_out project
  *
- *  Cached at module scope with a paging loop (Supabase caps at 1000 rows per
- *  request; we have ~5100+). Cache invalidates only on full page reload —
- *  same pattern as projects/snapshots to avoid "zeros flash" on nav.
+ *  Auth-readiness gate: identical reasoning to useProjectFlats. Without
+ *  it, the Analytics page used to flash "no data" for paid users on
+ *  first client-side nav — RLS was evaluating the caller as anonymous
+ *  before the session token caught up.
+ *
+ *  Caching: result cached at module scope (invalidates on full page
+ *  reload). Paged fetch because Supabase caps single queries at 1000
+ *  rows and we have ~5,100 flats.
  */
 let _flatsCache = null;
 export function useAllFlats() {
+  const { loading: authLoading } = useAuth();
   const [flats, setFlats] = useState(_flatsCache || []);
   const [loading, setLoading] = useState(_flatsCache === null);
+
   useEffect(() => {
     if (!isSupabaseReady()) { setLoading(false); return; }
     if (_flatsCache) { setLoading(false); return; }
+    // Wait for auth to resolve before fetching — see module doc.
+    if (authLoading) { return; }
+
     let cancelled = false;
     (async () => {
-      try {
-        // Same session pre-warm as useProjectFlats — prevents RLS from
-        // evaluating as anon on a freshly mounted component that beats the
-        // access-token attachment.
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          const expSoon = session.expires_at && (session.expires_at * 1000) < Date.now() + 120000;
-          if (expSoon) await supabase.auth.refreshSession();
-        }
-      } catch { /* ignore */ }
-      if (cancelled) return;
-
-      // Pull all flats via pagination (1000-row chunks).
       const all = [];
       const PAGE = 1000;
       for (let offset = 0; ; offset += PAGE) {
@@ -214,11 +205,12 @@ export function useAllFlats() {
       setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [authLoading]);
+
   return { flats, loading };
 }
 
-/** Early access slot count for the marketing badge. */
+/** Early access slot count for the marketing badge. Public table. */
 export function useEarlyAccessStats() {
   const [stats, setStats] = useState({ paid_count: 0, remaining_slots: 9 });
   useEffect(() => {
