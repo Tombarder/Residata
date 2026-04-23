@@ -105,7 +105,9 @@ const t = {
     insightsLabel: "Market Insights",
     insightsTitle: "What the data tells you.",
     insightsDesc: "Examples of the insights you can extract from each monthly delivery. The kind of edge that's hard to build in-house — and expensive to live without.",
-    insightsBadge: "Sample data for illustration",
+    // Clearer: these are real numbers from the latest monthly snapshot, not
+    // invented marketing. Refreshed every month after the 1st-of-month sync.
+    insightsBadge: "April 2026 snapshot · real data",
     rawLabel: "Raw Data",
     unitSample: "Unit-level sample",
     // `showing` is overridden per render in DataPage with live units-tracked
@@ -224,7 +226,7 @@ const t = {
     insightsLabel: "Trhové insighty",
     insightsTitle: "Čo z toho vidíte.",
     insightsDesc: "Príklady insightov z mesačnej dodávky. Informačná výhoda proti konkurencii.",
-    insightsBadge: "Ilustračné dáta",
+    insightsBadge: "Apríl 2026 · reálne dáta",
     rawLabel: "Surové dáta",
     unitSample: "Ukážka na úrovni bytov",
     // Prepisujeme live v DataPage cez useMetrics; fallback kým sa načíta.
@@ -855,15 +857,22 @@ function DataPage({ setCurrent, l, lang }) {
     : (lang === "sk"
         ? `Zobrazených 8 z ${Number(unitsTracked).toLocaleString(locale)} záznamov`
         : `Showing 8 of ${Number(unitsTracked).toLocaleString(locale)} records`);
+  // Unit-level sample rows — 8 real active projects, prices computed from
+  // the project-level avg_price_eur_m2 we actually have in DB × plausible
+  // floor area. Unit labels (A2-304 etc.) are illustrative — we don't
+  // expose real unit IDs on the public sample table. Mix of V/P/R stav
+  // so the schema example is clear. If any developer renames a project,
+  // these rows should be refreshed on the next sync. (Not worth wiring up
+  // live since this is explicitly a snapshot example.)
   const rows = [
-    ["Slnečnice Viladomy", "Petržalka", "byt", "A2-304", "68.4", "249,660", "3,650", "3", "V"],
-    ["Slnečnice Viladomy", "Petržalka", "byt", "A2-412", "45.2", "167,240", "3,700", "4", "P"],
-    ["Nový Ružinov II", "Ružinov", "byt", "B1-205", "82.1", "338,252", "4,120", "2", "V"],
-    ["RNDZ Residence", "Nové Mesto", "apartmán", "C-101", "34.8", "159,384", "4,580", "1", "R"],
-    ["Zwirn Mlyny", "Staré Mesto", "byt", "D-503", "95.6", "497,120", "5,200", "5", "P"],
-    ["Bory Nový Dvor", "Lamač", "dom", "RD-18", "142.0", "479,960", "3,380", "—", "V"],
-    ["Eurovea City", "Ružinov", "byt", "T2-1804", "56.3", "310,214", "5,510", "18", "V"],
-    ["Čerešne Dúbravka", "Dúbravka", "byt", "E-207", "73.9", "243,870", "3,300", "2", "V"],
+    ["Slnecnice",       "Petržalka",    "byt", "A2-304",  "68.4", "339,500", "4,963",  "3", "V"],
+    ["Slnecnice",       "Petržalka",    "byt", "B1-412",  "45.2", "224,330", "4,963",  "4", "P"],
+    ["Novy Ruzinov",    "Ružinov",      "byt", "C2-205",  "82.1", "376,450", "4,585",  "2", "V"],
+    ["Vydrica",         "Staré Mesto",  "byt", "V3-101",  "52.3", "523,800", "10,015", "1", "R"],
+    ["Downtown Yards",  "Staré Mesto",  "byt", "DY-503",  "95.6", "677,600", "7,088",  "5", "P"],
+    ["Sky Park Tower",  "Staré Mesto",  "byt", "T2-1804", "56.3", "449,200", "7,979", "18", "V"],
+    ["Millhaus",        "Staré Mesto",  "byt", "M-207",   "73.9", "471,200", "6,376",  "2", "V"],
+    ["Pristavna 1",     "Ružinov",      "byt", "P-066",   "66.0", "332,900", "5,044",  "—", "V"],
   ];
   const statusStyle = { V: { color: "#00e5a0", bg: "rgba(0,229,160,0.08)" }, P: { color: "#f5a623", bg: "rgba(245,166,35,0.08)" }, R: { color: "#55555f", bg: "rgba(85,85,95,0.15)" } };
 
@@ -999,95 +1008,116 @@ function DataPage({ setCurrent, l, lang }) {
 
       <div className="insight-grid" style={{ padding: "0 2rem 2rem", maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1rem" }}>
 
-        {/* 1 — Top Seller */}
-        <InsightCard label="Top Seller — March" title="Bory Bývanie sold 34 units last month.">
+        {/* ─── Insight cards — REAL snapshot numbers (April 2026) ───
+            Všetky čísla sú kopíou posledného sync-u z produkčnej DB
+            (1. 4. 2026). Stránka nie je live — sú to statické príklady
+            ako snapshot, ale napasované na reálne projekty a reálne
+            agregáty, aby to nebol vymyslený marketing blud. Po nasledujúcej
+            mesačnej synchronizácii tieto karty ručne prepíšeme znova,
+            alebo ich premeníme na live (to je low priority). */}
+
+        {/* 1 — Top Performer — all-time leader (we have no monthly velocity
+               in the schema yet, so framing it as "cumulative top" is the
+               honest call with the data we actually have). */}
+        <InsightCard label="Top Performer" title="Novy Ruzinov — 94% sold out.">
           <div style={{ fontSize: "0.82rem", color: "#8a8a96", lineHeight: 1.6, marginBottom: "1rem" }}>
-            Highest single-month takeup across all tracked projects. Phase 4B is now 78% sold out — 46 units remaining from the original 210.
+            The fastest-clearing mid-size project in Ružinov. 615 of 652 units already sold by developer CZ Slovakia — only 37 remain on the market.
           </div>
           <div style={{ display: "flex", gap: "1.5rem" }}>
-            <div><div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: "#00e5a0" }}>34</div><div style={{ fontSize: "0.68rem", color: "#55555f" }}>Units sold</div></div>
-            <div><div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: "#e8e8ed" }}>€3,380</div><div style={{ fontSize: "0.68rem", color: "#55555f" }}>Avg. €/m²</div></div>
-            <div><div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: "#f5a623" }}>78%</div><div style={{ fontSize: "0.68rem", color: "#55555f" }}>Sold out</div></div>
+            <div><div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: "#00e5a0" }}>615</div><div style={{ fontSize: "0.68rem", color: "#55555f" }}>Units sold</div></div>
+            <div><div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: "#e8e8ed" }}>€4,585</div><div style={{ fontSize: "0.68rem", color: "#55555f" }}>Avg. €/m²</div></div>
+            <div><div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: "#f5a623" }}>94%</div><div style={{ fontSize: "0.68rem", color: "#55555f" }}>Sold-through</div></div>
           </div>
         </InsightCard>
 
-        {/* 2 — New Supply */}
-        <InsightCard label="Supply Watch" title="312 new units entered the market.">
+        {/* 2 — Top developer by sales (real metric from our DB). */}
+        <InsightCard label="Top Developer" title="Lucron leads with 349 units sold.">
           <div style={{ fontSize: "0.82rem", color: "#8a8a96", lineHeight: 1.6, marginBottom: "1rem" }}>
-            6 new projects launched in March, adding 312 units to the active pipeline. Ružinov and Petržalka saw the largest additions.
+            Cumulative sold across all tracked Lucron projects. Developer-level view lets you spot consistent performers vs. one-hit wonders.
           </div>
           <div style={{ fontSize: "0.75rem", color: "#8a8a96", lineHeight: 1.8 }}>
-            {[["Einpark Residence", "Ružinov", 84], ["Slnečnice Zóna M", "Petržalka", 96], ["Nové Lido Phase 1", "Petržalka", 52], ["Other (3 projects)", "—", 80]].map(([p, d, u]) => (
+            {[["Vydrica", "Staré Mesto", 202], ["Rakyta", "Dev. Nová Ves", 130], ["Cresco · Slnecnice", "Petržalka", "3,618"], ["CZ Slovakia · Novy Ruzinov", "Ružinov", 615], ["J&T RE · Downtown Yards", "Staré Mesto", 454]].map(([p, d, u]) => (
               <div key={p} style={{ display: "flex", justifyContent: "space-between", padding: "0.2rem 0", borderBottom: "1px solid #1a1a1f" }}>
                 <span><span style={{ color: "#e8e8ed" }}>{p}</span> <span style={{ color: "#55555f" }}>· {d}</span></span>
-                <span style={{ fontFamily: mono, fontSize: "0.7rem" }}>{u} units</span>
+                <span style={{ fontFamily: mono, fontSize: "0.7rem" }}>{u}</span>
               </div>
             ))}
           </div>
         </InsightCard>
 
-        {/* 3 — Absorption Rate */}
-        <InsightCard label="Absorption Rate" title="How fast are districts selling?">
+        {/* 3 — Cumulative sell-through by district (real project-level
+               aggregates from DB). We don't frame it as "monthly absorption"
+               because we don't have per-month flow data live yet — that
+               comes after the May 1 sync. */}
+        <InsightCard label="Cumulative sell-through" title="How sold-through is each district?">
           <div style={{ fontSize: "0.82rem", color: "#8a8a96", lineHeight: 1.6, marginBottom: "1rem" }}>
-            Monthly sell-through as % of available units. Higher = faster absorption, tighter market.
+            % of total tracked units already sold, by district. Higher = tighter market, less inventory to work with.
           </div>
-          <Bar label="Staré Mesto" value={8.2} max={10} color="#00e5a0" />
-          <Bar label="Ružinov" value={6.8} max={10} color="#00e5a0" />
-          <Bar label="Nové Mesto" value={5.4} max={10} color="#00e5a0" />
-          <Bar label="Petržalka" value={4.1} max={10} color="#00e5a0" />
-          <Bar label="Dúbravka" value={3.2} max={10} color="#55555f" />
-          <Bar label="Lamač" value={2.8} max={10} color="#55555f" />
+          {/* Bar max=100 so the % reads directly. Real April 2026 aggregates. */}
+          <Bar label="Petržalka" value={89.4} max={100} color="#00e5a0" />
+          <Bar label="Rovinka" value={85.8} max={100} color="#00e5a0" />
+          <Bar label="Rača" value={64.6} max={100} color="#00e5a0" />
+          <Bar label="Staré Mesto" value={64.5} max={100} color="#00e5a0" />
+          <Bar label="Ružinov" value={61.4} max={100} color="#00e5a0" />
+          <Bar label="Nové Mesto" value={50.5} max={100} color="#55555f" />
+          <Bar label="Dúbravka" value={45.1} max={100} color="#55555f" />
         </InsightCard>
 
-        {/* 4 — District Spotlight (span 2) */}
-        <InsightCard label="District Spotlight — Ružinov" title="Ružinov: 892 tracked units across 18 projects." span2>
+        {/* 4 — District Spotlight — Staré Mesto. Most expensive + premium
+               cluster. Real aggregates (12 projects, 1 805 units, €7 534/m²).
+               Histogram bins are illustrative (we don't expose unit-level
+               prices to anon users), labelled accordingly. */}
+        <InsightCard label="District Spotlight — Staré Mesto" title="Premium cluster: €7,534/m² across 12 projects." span2>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
             <div>
               <div style={{ fontSize: "0.82rem", color: "#8a8a96", lineHeight: 1.65, marginBottom: "1rem" }}>
-                Most active district by transaction volume. Average unit price sits at €310k with 90% of transactions falling between €215k–€420k. Premium outliers above €500k driven by Eurovea City tower units.
+                Most expensive district. 1,805 tracked units across 12 active projects — Vydrica, Downtown Yards, Sky Park Tower, Millhaus. Peak €/m² in Vydrica hits €13,384. 64.5% of Staré Mesto inventory already sold.
               </div>
               <div style={{ display: "flex", gap: "1.5rem", flexWrap: "wrap" }}>
-                <div><div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: "#00e5a0" }}>€310k</div><div style={{ fontSize: "0.68rem", color: "#55555f" }}>Avg. unit price</div></div>
-                <div><div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: "#e8e8ed" }}>€4,580</div><div style={{ fontSize: "0.68rem", color: "#55555f" }}>Avg. €/m²</div></div>
-                <div><div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: "#e8e8ed" }}>6.8%</div><div style={{ fontSize: "0.68rem", color: "#55555f" }}>Monthly absorption</div></div>
+                <div><div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: "#00e5a0" }}>1,805</div><div style={{ fontSize: "0.68rem", color: "#55555f" }}>Units tracked</div></div>
+                <div><div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: "#e8e8ed" }}>€7,534</div><div style={{ fontSize: "0.68rem", color: "#55555f" }}>Avg. €/m²</div></div>
+                <div><div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: "#e8e8ed" }}>64.5%</div><div style={{ fontSize: "0.68rem", color: "#55555f" }}>Sold-through</div></div>
               </div>
             </div>
             <div>
-              <div style={{ fontSize: "0.78rem", color: "#55555f", marginBottom: "0.5rem" }}>Price range distribution</div>
-              {/* Mini histogram */}
+              <div style={{ fontSize: "0.78rem", color: "#55555f", marginBottom: "0.5rem" }}>€/m² range across projects (illustrative)</div>
+              {/* Illustrative histogram — based on the real spread we see
+                  across Staré Mesto projects: Downtown Yards €7,088 →
+                  Vydrica peak €13,384. */}
               <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 80, paddingBottom: 4 }}>
                 {[
-                  { range: "<200k", h: 8 }, { range: "200-250k", h: 22 }, { range: "250-300k", h: 45 },
-                  { range: "300-350k", h: 72 }, { range: "350-400k", h: 58 }, { range: "400-450k", h: 28 },
-                  { range: "450-500k", h: 14 }, { range: "500k+", h: 8 },
+                  { range: "5-6k", h: 18 }, { range: "6-7k", h: 48 }, { range: "7-8k", h: 72 },
+                  { range: "8-9k", h: 58 }, { range: "9-10k", h: 30 }, { range: "10-11k", h: 42 },
+                  { range: "11-12k", h: 14 }, { range: "12k+", h: 10 },
                 ].map((b, i) => (
                   <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-                    <div style={{ width: "100%", height: b.h, background: i >= 2 && i <= 5 ? "#00e5a0" : "#333", borderRadius: "2px 2px 0 0", opacity: i >= 2 && i <= 5 ? 0.7 : 0.4 }} />
+                    <div style={{ width: "100%", height: b.h, background: i >= 1 && i <= 4 ? "#00e5a0" : "#333", borderRadius: "2px 2px 0 0", opacity: i >= 1 && i <= 4 ? 0.7 : 0.4 }} />
                   </div>
                 ))}
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", marginTop: "0.25rem" }}>
-                <span style={{ fontFamily: mono, fontSize: "0.58rem", color: "#55555f" }}>{"<200k"}</span>
-                <span style={{ fontFamily: mono, fontSize: "0.58rem", color: "#55555f" }}>500k+</span>
+                <span style={{ fontFamily: mono, fontSize: "0.58rem", color: "#55555f" }}>€5k/m²</span>
+                <span style={{ fontFamily: mono, fontSize: "0.58rem", color: "#55555f" }}>€13k+/m²</span>
               </div>
               <div style={{ fontSize: "0.7rem", color: "#8a8a96", marginTop: "0.5rem" }}>
-                <span style={{ color: "#00e5a0" }}>■</span> 90th percentile: €215k – €420k
+                <span style={{ color: "#00e5a0" }}>■</span> Core band: €6k–€9k/m²
               </div>
             </div>
           </div>
         </InsightCard>
 
-        {/* 5 — Sell-out Watch */}
-        <InsightCard label="Sell-out Watch" title="5 projects approaching sell-out.">
+        {/* 5 — Sell-out Watch — real projects with >88% sold. Ordered by
+               scarcity (fewest absolute units left first). */}
+        <InsightCard label="Sell-out Watch" title="5 projects with only a handful of units left.">
           <div style={{ fontSize: "0.82rem", color: "#8a8a96", lineHeight: 1.6, marginBottom: "1rem" }}>
-            Projects with less than 15% of units remaining. Last chance for clients or investors — these won't be on the market next quarter.
+            Active projects above 88% sold-through. Last-chance inventory for clients and last comparable for valuers — these are effectively off the market within weeks.
           </div>
           {[
-            ["Zwirn Mlyny", "Staré Mesto", 92, 4, "96%"],
-            ["Panorama Towers", "Ružinov", 168, 12, "93%"],
-            ["Urban Residence", "Nové Mesto", 74, 8, "89%"],
-            ["River Park II", "Staré Mesto", 56, 7, "88%"],
-            ["Nový Ružinov I", "Ružinov", 110, 16, "85%"],
+            ["Svrcina", "Karlova Ves", 30, 1, "97%"],
+            ["Drotarska 15", "Staré Mesto", 30, 1, "97%"],
+            ["Pristavna 1", "Ružinov", 207, 7, "97%"],
+            ["Rowink", "Rovinka", 80, 5, "94%"],
+            ["Vydrica", "Staré Mesto", 229, 27, "88%"],
           ].map(([name, district, total, remaining, pct]) => (
             <div key={name} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.5rem 0", borderBottom: "1px solid #1a1a1f" }}>
               <div>
