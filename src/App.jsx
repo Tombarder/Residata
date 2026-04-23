@@ -14,6 +14,7 @@ import { useAuth } from "./lib/useAuth";
 import { useCapabilities } from "./lib/useCapabilities";
 import { useProjects, useMetrics } from "./lib/useData";
 import { pushRoute, pathToPage, isAppPage } from "./lib/routing";
+import { applySeo } from "./lib/seo";
 import PlatformShell from "./pages/Platform";
 import { track } from "./lib/track";
 
@@ -1582,6 +1583,14 @@ export default function App() {
     track("page_view", { page: current, lang });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current]);
+
+  // SEO — update <title>, <meta>, canonical, hreflang on every route/lang
+  // change. SPAs without this end up with every URL sharing the homepage
+  // metadata, which makes Google unable to rank /pricing vs /use-cases
+  // separately. See src/lib/seo.js for what gets set.
+  useEffect(() => {
+    applySeo(current, lang);
+  }, [current, lang]);
 
   const handleNav = (page) => {
     const resolved = typeof page === "string" && page.startsWith("Project:")

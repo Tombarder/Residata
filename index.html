@@ -2,22 +2,212 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Residata — Residential Market Intelligence</title>
-    <meta name="description" content="Automated intelligence on new residential developments across Bratislava. Pricing, availability, and project status — delivered monthly." />
-    
-    <!-- Open Graph / LinkedIn -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <!-- Color scheme + brand -->
+    <meta name="theme-color" content="#0a0a0b" />
+    <meta name="color-scheme" content="dark" />
+
+    <!-- Primary meta (overridden per-route at runtime via useSeoMeta) -->
+    <title>Residata — New-Build Market Intelligence for Bratislava</title>
+    <meta name="description" content="Automated market intelligence on every new residential development in Bratislava. Pricing, availability, absorption rate, and trends — structured and refreshed monthly. Built for developers, banks, valuers, and investors." />
+    <meta name="keywords" content="novostavby Bratislava, trh novostavieb, real estate market intelligence, residential development data, new-build pricing, absorption rate, property data Slovakia, market analytics real estate" />
+    <meta name="author" content="Residata" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+    <meta name="googlebot" content="index, follow" />
+
+    <!-- Canonical + language alternates (updated per-route at runtime) -->
+    <link rel="canonical" href="https://residata-gamma.vercel.app/" />
+    <link rel="alternate" hreflang="en" href="https://residata-gamma.vercel.app/" />
+    <link rel="alternate" hreflang="sk" href="https://residata-gamma.vercel.app/" />
+    <link rel="alternate" hreflang="x-default" href="https://residata-gamma.vercel.app/" />
+
+    <!-- Open Graph / LinkedIn / Facebook -->
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="Residata — Residential Market Intelligence" />
-    <meta property="og:description" content="We monitor every new residential development in Bratislava and deliver structured market intelligence — pricing, availability, absorption, and trends." />
-    <meta property="og:image" content="/og-image.png" />
-    <meta property="og:url" content="https://residata.vercel.app" />
+    <meta property="og:site_name" content="Residata" />
+    <meta property="og:title" content="Residata — New-Build Market Intelligence for Bratislava" />
+    <meta property="og:description" content="Every new residential development in Bratislava, structured and refreshed monthly. Pricing, availability, absorption, trends — built for developers, banks, and investors." />
+    <meta property="og:image" content="https://residata-gamma.vercel.app/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Residata — Bratislava new-build market intelligence dashboard" />
+    <meta property="og:url" content="https://residata-gamma.vercel.app/" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:locale:alternate" content="sk_SK" />
+
+    <!-- Twitter / X -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Residata — Residential Market Intelligence" />
-    <meta name="twitter:description" content="Bratislava residential market data, structured and real-time." />
+    <meta name="twitter:title" content="Residata — Bratislava New-Build Market Intelligence" />
+    <meta name="twitter:description" content="Every new residential development, structured and refreshed monthly. Pricing, availability, absorption — for developers, banks, investors." />
+    <meta name="twitter:image" content="https://residata-gamma.vercel.app/og-image.png" />
+    <meta name="twitter:image:alt" content="Residata dashboard preview" />
+
+    <!-- App-specific meta (helps parsers + LLM ingestion) -->
+    <meta name="application-name" content="Residata" />
+    <meta name="apple-mobile-web-app-title" content="Residata" />
+
+    <!-- Favicons -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Crect width='28' height='28' rx='6' fill='%2300e5a0'/%3E%3Ctext x='14' y='20' text-anchor='middle' font-family='monospace' font-weight='700' font-size='16' fill='%230a0a0b'%3ER%3C/text%3E%3C/svg%3E" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+
+    <!-- Preconnect to third-parties actually used on first paint -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://mtclsrswxtjseewyrcbx.supabase.co" crossorigin />
+    <link rel="preconnect" href="https://images.unsplash.com" crossorigin />
+    <link rel="dns-prefetch" href="https://images.unsplash.com" />
+
+    <!-- Structured data: Organization — helps Google + LLMs understand who we are.
+         Multi-schema @graph so one block covers Organization + WebSite + SoftwareApplication.
+         SoftwareApplication price reflects the current pricing page (€249 one-time / €349 monthly).
+         offers → AggregateOffer so range is expressible without committing to a single SKU. -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Organization",
+          "@id": "https://residata-gamma.vercel.app/#org",
+          "name": "Residata",
+          "url": "https://residata-gamma.vercel.app/",
+          "logo": "https://residata-gamma.vercel.app/favicon.svg",
+          "slogan": "New-build market data you can act on.",
+          "description": "Residata delivers structured market intelligence on every new residential development in Bratislava, Slovakia. Pricing, availability, absorption rate, and trends — refreshed monthly.",
+          "email": "residata@proton.me",
+          "areaServed": {
+            "@type": "City",
+            "name": "Bratislava",
+            "addressCountry": "SK"
+          },
+          "foundingDate": "2026",
+          "knowsAbout": [
+            "Residential real estate market",
+            "New-build development data",
+            "Property market analytics",
+            "Absorption rate analysis",
+            "Price per square meter trends",
+            "Sales velocity tracking"
+          ]
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://residata-gamma.vercel.app/#website",
+          "url": "https://residata-gamma.vercel.app/",
+          "name": "Residata",
+          "description": "New-build market intelligence for Bratislava",
+          "publisher": { "@id": "https://residata-gamma.vercel.app/#org" },
+          "inLanguage": ["en", "sk"]
+        },
+        {
+          "@type": "SoftwareApplication",
+          "@id": "https://residata-gamma.vercel.app/#software",
+          "name": "Residata Market Intelligence Platform",
+          "applicationCategory": "BusinessApplication",
+          "applicationSubCategory": "Real Estate Market Intelligence",
+          "operatingSystem": "Web (any modern browser)",
+          "description": "Monthly-refreshed dataset and dashboard covering every new residential development in Bratislava: pricing, availability, absorption, €/m², sell-out forecasts.",
+          "publisher": { "@id": "https://residata-gamma.vercel.app/#org" },
+          "offers": {
+            "@type": "AggregateOffer",
+            "priceCurrency": "EUR",
+            "lowPrice": "249",
+            "highPrice": "349",
+            "offerCount": "2"
+          },
+          "featureList": [
+            "Every new-build residential project in Bratislava",
+            "Monthly refresh",
+            "Unit-level pricing and availability",
+            "Absorption rate by district and project",
+            "Developer comparison",
+            "Export to Google Sheets, CSV, XLSX"
+          ]
+        },
+        {
+          "@type": "Service",
+          "@id": "https://residata-gamma.vercel.app/#service",
+          "serviceType": "Real estate market intelligence",
+          "provider": { "@id": "https://residata-gamma.vercel.app/#org" },
+          "areaServed": { "@type": "City", "name": "Bratislava" },
+          "audience": {
+            "@type": "BusinessAudience",
+            "audienceType": "Developers, banks, valuers, investors, real estate consultants"
+          },
+          "description": "Monthly-refreshed intelligence on the Bratislava new-build residential market — covering pricing, availability, absorption, and trends across every active project."
+        }
+      ]
+    }
+    </script>
+
+    <!-- FAQ structured data — helps LLMs quote Residata when users ask about it.
+         Questions are real ones buyers ask; answers are factual and citable. -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What is Residata?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Residata is a market intelligence platform that tracks every new residential development in Bratislava, Slovakia. It delivers structured data on pricing, availability, absorption rate, and sales velocity — refreshed monthly — to developers, banks, valuers, and investors."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What data does Residata cover?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Every active new-build residential project in Bratislava: unit counts, prices and price per square meter, availability, sold and reserved status, floor, orientation, handover date, developer, district. Roughly 5,100 units across 90 projects as of April 2026."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How often is the data updated?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Monthly. A full synchronization runs on the first of each month, refreshing prices, availability, and project status across all tracked developments. Weekly refresh available on request."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Who uses Residata?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Residential developers (pricing, positioning, absorption benchmarks), banks and valuers (comparable transactions), real estate investors (pipeline and deal discovery), consultants and analysts (market reports)."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Where is Residata's data sourced from?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Every developer's public listing site across 72 developers in Bratislava. Residata normalizes and validates the data centrally, so buyers get a single consistent schema instead of 72 different formats."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How much does Residata cost?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "€249 for a one-time market snapshot report, or €349 monthly for ongoing access with fresh data every month."
+          }
+        }
+      ]
+    }
+    </script>
   </head>
   <body>
+    <!-- Noscript fallback — for crawlers that don't run JS and for
+         accessibility. Provides a minimum description of the site. -->
+    <noscript>
+      <div style="padding:2rem;font-family:sans-serif;color:#e8e8ed;background:#0a0a0b;">
+        <h1>Residata</h1>
+        <p>New-build residential market intelligence for Bratislava, Slovakia. Monthly-refreshed data on pricing, availability, absorption, and trends across every active development.</p>
+        <p>This app requires JavaScript. Please enable it or contact <a href="mailto:residata@proton.me" style="color:#00e5a0;">residata@proton.me</a> for the static report.</p>
+      </div>
+    </noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

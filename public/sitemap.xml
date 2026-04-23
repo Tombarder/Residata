@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Residata sitemap.
+  Only public, index-worthy routes listed. /app/* (authenticated platform)
+  and /project/<id> (login-gated detail pages) are explicitly NOT here —
+  they're marked noindex at runtime in src/lib/seo.js.
+
+  lastmod uses a rolling date so Google sees fresh content after monthly
+  data refresh. Bump this on any significant content change.
+
+  Both SK and EN versions live at the same URL (language is state-driven,
+  not URL-prefixed), so each URL carries both xhtml:link hreflang entries
+  as recommended by https://developers.google.com/search/docs/specialty/international/localized-versions
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+
+  <url>
+    <loc>https://residata-gamma.vercel.app/</loc>
+    <lastmod>2026-04-23</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://residata-gamma.vercel.app/" />
+    <xhtml:link rel="alternate" hreflang="sk" href="https://residata-gamma.vercel.app/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata-gamma.vercel.app/" />
+  </url>
+
+  <url>
+    <loc>https://residata-gamma.vercel.app/live</loc>
+    <lastmod>2026-04-23</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://residata-gamma.vercel.app/live" />
+    <xhtml:link rel="alternate" hreflang="sk" href="https://residata-gamma.vercel.app/live" />
+  </url>
+
+  <url>
+    <loc>https://residata-gamma.vercel.app/sample</loc>
+    <lastmod>2026-04-23</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://residata-gamma.vercel.app/sample" />
+    <xhtml:link rel="alternate" hreflang="sk" href="https://residata-gamma.vercel.app/sample" />
+  </url>
+
+  <url>
+    <loc>https://residata-gamma.vercel.app/use-cases</loc>
+    <lastmod>2026-04-23</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://residata-gamma.vercel.app/use-cases" />
+    <xhtml:link rel="alternate" hreflang="sk" href="https://residata-gamma.vercel.app/use-cases" />
+  </url>
+
+  <url>
+    <loc>https://residata-gamma.vercel.app/pricing</loc>
+    <lastmod>2026-04-23</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://residata-gamma.vercel.app/pricing" />
+    <xhtml:link rel="alternate" hreflang="sk" href="https://residata-gamma.vercel.app/pricing" />
+  </url>
+
+  <url>
+    <loc>https://residata-gamma.vercel.app/contact</loc>
+    <lastmod>2026-04-23</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.5</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://residata-gamma.vercel.app/contact" />
+    <xhtml:link rel="alternate" hreflang="sk" href="https://residata-gamma.vercel.app/contact" />
+  </url>
+
+</urlset>

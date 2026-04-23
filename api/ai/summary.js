@@ -54,9 +54,95 @@ const LIMITS = {
   anon:  [ 3,  10],
 };
 
+// Allowed origins for CORS. Anything else gets no Access-Control-Allow-Origin
+// header and the browser blocks the request at the preflight stage.
+// Add domains here if/when a custom domain is introduced.
+const ALLOWED_ORIGINS = new Set([
+  "https://residata-gamma.vercel.app",
+  "https://residata.sk",
+  "https://www.residata.sk",
+  "http://localhost:5173",  // Vite dev
+  "http://localhost:3000",  // alt dev
+]);
+
+/**
+ * In-memory per-IP rate limiter for anon callers. Belt-and-suspenders
+ * layer on top of the ai_usage_log tier limits — stops a burst attack
+ * before it even hits the DB counter. Ephemeral (cold-start loses it),
+ * which is fine: it's a speed bump, not a fortress.
+ * Window: 1 minute. Cap: 10 anon calls/min per IP.
+ */
+const IP_BUCKET = new Map(); // ip → { count, resetAt }
+const IP_WINDOW_MS = 60 * 1000;
+const IP_CAP = 10;
+
+function ipRateCheck(ip) {
+  if (!ip) return { ok: true };
+  const now = Date.now();
+  const bucket = IP_BUCKET.get(ip);
+  if (!bucket || bucket.resetAt < now) {
+    IP_BUCKET.set(ip, { count: 1, resetAt: now + IP_WINDOW_MS });
+    // Best-effort prune — keep the map from growing unbounded during
+    // a long-lived function instance.
+    if (IP_BUCKET.size > 1000) {
+      for (const [k, v] of IP_BUCKET) {
+        if (v.resetAt < now) IP_BUCKET.delete(k);
+      }
+    }
+    return { ok: true };
+  }
+  bucket.count += 1;
+  if (bucket.count > IP_CAP) {
+    return {
+      ok: false,
+      retryAfterSec: Math.ceil((bucket.resetAt - now) / 1000),
+    };
+  }
+  return { ok: true };
+}
+
+function clientIp(req) {
+  const h = req.headers || {};
+  const fwd = h["x-forwarded-for"];
+  if (typeof fwd === "string" && fwd) return fwd.split(",")[0].trim();
+  return h["x-real-ip"] || req.socket?.remoteAddress || null;
+}
+
+function applyCors(req, res) {
+  const origin = req.headers?.origin;
+  if (origin && ALLOWED_ORIGINS.has(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
+    res.setHeader("Access-Control-Max-Age", "86400");
+  }
+  // If origin isn't allowed we simply omit the ACAO header — the
+  // browser enforces same-origin and blocks the call client-side.
+  // (This is safer than echoing the request origin back, which
+  // effectively means "allow everything".)
+}
+
 export default async function handler(req, res) {
+  // CORS preflight
+  applyCors(req, res);
+  if (req.method === "OPTIONS") {
+    return res.status(204).end();
+  }
   if (req.method !== "POST") {
     return res.status(405).json({ error: "method not allowed" });
+  }
+
+  // Per-IP rate limit (belt-and-suspenders; authenticated callers also
+  // get tier limits below from the ai_usage_log counter).
+  const ip = clientIp(req);
+  const gate = ipRateCheck(ip);
+  if (!gate.ok) {
+    res.setHeader("Retry-After", String(gate.retryAfterSec));
+    return res.status(429).json({
+      error: "rate limit: too many requests from this IP",
+      retry_after_sec: gate.retryAfterSec,
+    });
   }
 
   // Resolve ANTHROPIC_API_KEY — env var wins; otherwise fall back to

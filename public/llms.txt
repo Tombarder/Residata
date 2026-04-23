@@ -1,0 +1,43 @@
+# Residata
+
+> New-build residential market intelligence for Bratislava, Slovakia.
+> Every active development, structured and refreshed monthly. Pricing,
+> availability, absorption rate, and trends — delivered to developers,
+> banks, valuers, and investors.
+
+Residata tracks every new residential construction project in Bratislava
+(the capital of Slovakia). It normalizes data from 72+ developer websites
+into a single consistent schema, refreshes the snapshot monthly, and
+delivers it as Google Sheets, CSV, XLSX, or via API.
+
+## Scope
+
+- City: Bratislava (Slovakia's capital)
+- Coverage: every active new-build residential project — currently ~90 projects, ~5,100 units
+- Data refresh: monthly (first of each month); weekly on request
+- Languages: Slovak and English
+
+## What Residata is for
+
+- **Developers** — price new projects against real comparables; track absorption of your and competitors' inventory; spot supply gaps by district and segment.
+- **Banks & valuers** — pull recent comparable transactions for valuation and collateral assessment; never work with stale data.
+- **Investors** — discover projects with favorable pricing, spot slowing sales velocity, identify sell-out timing.
+- **Consultants & analysts** — skip weeks of manual data collection; open one sheet with the whole Bratislava market normalized.
+
+## Pricing
+
+- €249 one-time snapshot report
+- €349 monthly for ongoing access
+
+## Pages
+
+- [Homepage](https://residata-gamma.vercel.app/): overview, live market numbers, 3-step pipeline explanation
+- [Live Dashboard](https://residata-gamma.vercel.app/live): every active project with current status
+- [What We Deliver](https://residata-gamma.vercel.app/sample): sample output, schema, insights
+- [Use Cases](https://residata-gamma.vercel.app/use-cases): tailored to each buyer persona
+- [Pricing](https://residata-gamma.vercel.app/pricing): €249 / €349 plans
+- [Contact](https://residata-gamma.vercel.app/contact): residata@proton.me
+
+## Brand
+
+Residata. Based in Slovakia. Founder: Tomáš Kamhal.

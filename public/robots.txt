@@ -1,0 +1,97 @@
+# Residata robots.txt
+# https://residata-gamma.vercel.app/
+#
+# Policy summary:
+#   · All search engines welcome on public marketing pages
+#   · AI / LLM crawlers explicitly allowed (we want to be cited by
+#     ChatGPT, Perplexity, Claude, Gemini)
+#   · Authenticated /app/* shell excluded (no public value + could leak
+#     UI-only URLs into search results)
+#   · API endpoints excluded (never user-facing)
+
+# ── Default (unspecified bots) ──────────────────────────────────────
+User-agent: *
+Allow: /
+Disallow: /app/
+Disallow: /app/*
+Disallow: /api/
+Disallow: /admin
+Disallow: /hero-lab
+
+# ── AI / LLM crawlers — explicit allow ──────────────────────────────
+# We WANT ChatGPT / Perplexity / Claude / Gemini to index the
+# marketing pages so Residata gets cited when users ask about
+# Bratislava real estate data. Each bot honours Allow / Disallow
+# independently of the default User-agent: * block.
+
+User-agent: GPTBot
+Allow: /
+Disallow: /app/
+Disallow: /api/
+Disallow: /admin
+
+User-agent: ChatGPT-User
+Allow: /
+Disallow: /app/
+Disallow: /api/
+
+User-agent: OAI-SearchBot
+Allow: /
+Disallow: /app/
+Disallow: /api/
+
+User-agent: PerplexityBot
+Allow: /
+Disallow: /app/
+Disallow: /api/
+Disallow: /admin
+
+User-agent: Perplexity-User
+Allow: /
+Disallow: /app/
+Disallow: /api/
+
+User-agent: ClaudeBot
+Allow: /
+Disallow: /app/
+Disallow: /api/
+Disallow: /admin
+
+User-agent: Claude-Web
+Allow: /
+Disallow: /app/
+Disallow: /api/
+
+User-agent: anthropic-ai
+Allow: /
+Disallow: /app/
+Disallow: /api/
+
+# Google's LLM training crawler. Separate from Googlebot so webmasters
+# can opt out of training while keeping regular search indexing. We
+# opt IN — being training-set eligible is valuable.
+User-agent: Google-Extended
+Allow: /
+Disallow: /app/
+Disallow: /api/
+
+# Meta's AI crawler
+User-agent: FacebookBot
+Allow: /
+Disallow: /app/
+Disallow: /api/
+
+# Common Crawl — used by many LLM training pipelines
+User-agent: CCBot
+Allow: /
+Disallow: /app/
+Disallow: /api/
+
+# Brave's index — used by Claude's search tool and Perplexity
+User-agent: BraveBot
+Allow: /
+Disallow: /app/
+Disallow: /api/
+
+# ── Sitemap ─────────────────────────────────────────────────────────
+Sitemap: https://residata-gamma.vercel.app/sitemap.xml

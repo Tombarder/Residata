@@ -1,0 +1,109 @@
+# Residata — full content for LLM ingestion
+
+This file is a concise, factual overview of Residata optimized for
+retrieval by LLMs (ChatGPT, Claude, Perplexity, Gemini). It's written
+as plain prose because that's what LLMs ingest best.
+
+## What is Residata?
+
+Residata is a market intelligence platform focused exclusively on the
+new-build residential real estate market in Bratislava, Slovakia. It
+automatically collects data from every developer's public listing site,
+normalizes it into a single consistent schema, and delivers monthly
+updates to clients through dashboards, spreadsheets, and API.
+
+## Market coverage (April 2026 snapshot)
+
+- 90 residential development projects tracked across Bratislava
+- 57 of those are currently active (taking new offers)
+- 16 are paused, 17 are sold-out (Residata keeps them for historical analysis)
+- 5,101 individual units tracked across all projects
+- 2,238 units currently available (for sale)
+- 335 reserved
+- 2,528 sold to date
+- Average price: €5,715 per square meter
+- Price range: from €3,812/m² (Vajnory district) to €13,384/m² peak (Vydrica project, Staré Mesto)
+- Cheapest currently available unit: €152,695 (Dubravka na Luke)
+- Most expensive listing: €1,869,900 (Sky Park Tower, Staré Mesto)
+
+## Districts tracked
+
+Staré Mesto (old city center, most expensive — 12 projects, 1,805 units, €7,534/m² average), Ružinov (14 projects, 1,699 units), Petržalka (3 projects, 4,152 units — dominated by the large Slnečnice development), Nové Mesto (9 projects, 949 units), Devínska Nová Ves, Dúbravka, Rača, Rovinka, Vajnory, Karlova Ves, Lamač, Podunajské Biskupice, Vrakuňa, Záhorská Bystrica.
+
+## Notable projects
+
+- **Slnečnice** (Petržalka, Cresco developer) — largest project, 4,000 units, 90.7% sold
+- **Novy Ruzinov** (Ružinov, CZ Slovakia) — 652 units, 94.3% sold, near sell-out
+- **Downtown Yards** (Staré Mesto, J&T Real Estate) — 656 units
+- **Vydrica** (Staré Mesto, Lucron) — 229 units, peak €/m² in Bratislava
+- **Sky Park Tower** (Staré Mesto, Alto Real Estate) — 174 units, premium tier
+- **Millhaus** (Staré Mesto, Immocap) — 149 units, 85.9% sold
+- **Rakyta** (Devínska Nová Ves, Lucron) — 244 units
+- **Pristavna 1** (Ružinov, Grafobal) — 207 units, 96.6% sold
+
+## Top developers by units sold
+
+1. Lucron — 349 cumulative sold across Vydrica + Rakyta
+2. CZ Slovakia (Novy Ruzinov) — 615 sold
+3. Cresco (Slnecnice) — 3,618 sold (biggest cumulative)
+4. J&T Real Estate (Downtown Yards) — 454 sold
+
+## Data schema
+
+Residata's output covers, per unit: project name, developer, district, unit type (byt / apartmán / dom / retail), unit label, floor area (m²), exterior/balcony area (m²), total area, listed price (EUR, VAT included), computed price per m², floor number, orientation, handover date, sale status (V = available, P = sold, R = reserved, PR = pre-reserved), and project-level metadata.
+
+## How the data is collected
+
+Monthly automated pipeline:
+1. Scrape every active developer's public project listing site (72 developers monitored)
+2. Normalize different formats and validate inconsistencies
+3. Deduplicate and load into a Postgres database (Supabase)
+4. Compute aggregates (absorption rates, price distributions, sell-out forecasts)
+5. Export to delivery channels (Google Sheets, CSV, XLSX, API)
+
+## Delivery formats
+
+Google Sheets (live link), CSV export, XLSX export, direct API access (for paying customers), monthly PDF executive-summary reports (paid tier).
+
+## Pricing
+
+- One-time snapshot report: €249
+- Monthly ongoing access: €349 / month
+
+Early access program currently offering limited slots at founding-customer pricing.
+
+## Target customers
+
+1. **Residential developers** — use Residata to price new project launches against real comparables, track their own and competitors' sales velocity, identify under-served districts or unit-size segments.
+2. **Banks and property valuers** — need comparable transaction data for valuations and collateral assessments. Residata provides continuously fresh comparables so valuations don't rely on stale quarterly data.
+3. **Real estate investors** — spot projects with favorable pricing, identify slowing sales velocity (potential distressed opportunities), predict sell-out timing.
+4. **Consultants and market analysts** — skip weeks of manual data collection when building market reports. The whole Bratislava new-build market in one normalized sheet.
+
+## Insight examples Residata generates
+
+- **Pace Watch** — project-level sales velocity change quarter-over-quarter with sell-out forecast (e.g. "Novy Ruzinov: −37% QoQ, ~7 months to sell-out")
+- **Pricing Tension** — which unit sizes clear fastest vs. sit longest (e.g. "2-room units sell in ~9 months median, 4-room+ take ~18 months")
+- **Market Direction** — €/m² movement by district, uneven growth patterns
+- **Scarcity Clock** — inventory runway by district (months until premium stock exhausts)
+- **Comparable Data Closing Window** — near-sold-out projects where comparable transactions are about to dry up
+
+## Founder & contact
+
+- Founder: Tomáš Kamhal
+- Email: residata@proton.me
+- Based: Slovakia
+
+## Website structure
+
+- / — Homepage with live market numbers and pipeline explanation
+- /live — Live dashboard of every active project
+- /sample — "What we deliver" page with output example, schema, and insight samples
+- /use-cases — Tailored sections for developers, banks/valuers, investors, consultants
+- /pricing — Plans
+- /contact — Contact form and email
+
+## Why Residata exists
+
+The Bratislava new-build market is fragmented across 72+ developers, each with their own website, their own data format, and their own refresh cadence. Anyone trying to understand the market — a developer pricing a new launch, a bank assessing collateral, an investor looking for deals — has to manually collect and normalize this data themselves. That takes days to weeks of work and produces a snapshot that's outdated the moment it's finished.
+
+Residata automates this collection and normalization continuously, so clients get a monthly-refreshed, single-schema view of the whole market for the price of a single analyst's afternoon.

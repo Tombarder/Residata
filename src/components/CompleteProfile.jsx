@@ -3,6 +3,7 @@ import { supabase } from "../lib/supabase";
 import { useAuth } from "../lib/useAuth";
 import { liveT } from "../lib/liveLang";
 import { track } from "../lib/track";
+import { cleanText, cleanUrl, cleanPhone } from "../lib/sanitize";
 
 /**
  * Povinný post-login krok. Full-screen overlay ak user je authenticated +
@@ -54,12 +55,32 @@ export default function CompleteProfile({ lang = "en" }) {
     }, 10000);
 
     try {
+      // Sanitize at the intake boundary — see src/lib/sanitize.js for why.
+      // cleanText strips HTML tag chars, control chars, and leading CSV-
+      // formula triggers (=, +, @). cleanUrl rejects non-http(s) schemes
+      // (no javascript:, data:, etc). cleanPhone trims to digit-like chars.
+      const cleanedName    = cleanText(form.full_name, { max: 120 });
+      const cleanedCompany = cleanText(form.company,   { max: 120 });
+      const cleanedPosition = cleanText(form.position, { max: 60 });
+      const cleanedLinkedIn = cleanUrl(form.linkedin_url, { max: 500 });
+      const cleanedPhone    = cleanPhone(form.phone, { max: 32 });
+
+      // Re-validate after sanitization — if someone tries to submit only
+      // dangerous characters, cleanedName ends up empty and we reject.
+      if (!cleanedName || !cleanedCompany || !cleanedPosition) {
+        setState("form");
+        setErr(lang === "sk"
+          ? "Meno, spoločnosť a pozícia nesmú byť prázdne ani obsahovať iba špeciálne znaky."
+          : "Name, company and position cannot be empty or only special characters.");
+        return;
+      }
+
       const { data, error } = await supabase.from("user_profiles").update({
-        full_name: form.full_name.trim(),
-        company: form.company.trim(),
-        position: form.position,
-        linkedin_url: form.linkedin_url.trim() || null,
-        phone: form.phone.trim() || null,
+        full_name: cleanedName,
+        company: cleanedCompany,
+        position: cleanedPosition,
+        linkedin_url: cleanedLinkedIn || null,
+        phone: cleanedPhone || null,
         profile_completed: true,
       }).eq("id", user.id).select();
 
@@ -82,10 +103,10 @@ export default function CompleteProfile({ lang = "en" }) {
       }
 
       track("profile_completed", {
-        company: form.company.trim(),
-        position: form.position,
-        has_linkedin: !!form.linkedin_url.trim(),
-        has_phone: !!form.phone.trim(),
+        company: cleanedCompany,
+        position: cleanedPosition,
+        has_linkedin: !!cleanedLinkedIn,
+        has_phone: !!cleanedPhone,
       });
       console.log(`[CompleteProfile] success · ${Math.round(performance.now() - t0)}ms · hard-redirect to /app`, data[0]);
 
@@ -166,10 +187,10 @@ export default function CompleteProfile({ lang = "en" }) {
 
             <form onSubmit={submit}>
               <Field label={t.cp_name} required>
-                <input value={form.full_name} onChange={e => setForm({...form, full_name: e.target.value})} placeholder={t.cp_name_ph} style={fieldStyle} />
+                <input value={form.full_name} maxLength={120} autoComplete="name" onChange={e => setForm({...form, full_name: e.target.value})} placeholder={t.cp_name_ph} style={fieldStyle} />
               </Field>
               <Field label={t.cp_company} required>
-                <input value={form.company} onChange={e => setForm({...form, company: e.target.value})} placeholder={t.cp_company_ph} style={fieldStyle} />
+                <input value={form.company} maxLength={120} autoComplete="organization" onChange={e => setForm({...form, company: e.target.value})} placeholder={t.cp_company_ph} style={fieldStyle} />
               </Field>
               <Field label={t.cp_position} required>
                 <select value={form.position} onChange={e => setForm({...form, position: e.target.value})} style={fieldStyle}>
@@ -177,10 +198,10 @@ export default function CompleteProfile({ lang = "en" }) {
                 </select>
               </Field>
               <Field label={t.cp_linkedin}>
-                <input type="url" value={form.linkedin_url} onChange={e => setForm({...form, linkedin_url: e.target.value})} placeholder={t.cp_linkedin_ph} style={fieldStyle} />
+                <input type="url" value={form.linkedin_url} maxLength={500} autoComplete="url" onChange={e => setForm({...form, linkedin_url: e.target.value})} placeholder={t.cp_linkedin_ph} style={fieldStyle} />
               </Field>
               <Field label={t.cp_phone}>
-                <input type="tel" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} placeholder={t.cp_phone_ph} style={fieldStyle} />
+                <input type="tel" value={form.phone} maxLength={32} autoComplete="tel" onChange={e => setForm({...form, phone: e.target.value})} placeholder={t.cp_phone_ph} style={fieldStyle} />
               </Field>
 
               {err && <div style={{ color: "#ff6b6b", fontSize: "0.8rem", marginBottom: "0.75rem" }}>{err}</div>}
