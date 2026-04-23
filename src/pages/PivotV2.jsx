@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useAllFlats, useProjects } from "../lib/useData";
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -1992,7 +1993,15 @@ function FilterPopover({ fieldKey, filter, anchorEl, records, onChange, onClear,
       : (Math.round(n * 100) / 100).toLocaleString("en-US").replace(/,/g, " ");
   };
 
-  return (
+  // Render through a portal attached to document.body so the popover
+  // escapes any transform'd ancestor (.page-transition uses animation:
+  // pageFade which leaves a transform on the wrapper — that creates a
+  // containing block for position:fixed descendants, and our popover
+  // was getting positioned relative to the wrong origin). Portal puts
+  // the popover as a direct child of <body>, where position:fixed
+  // resolves against the viewport as intended.
+  if (typeof document === "undefined") return null;
+  return createPortal(
     <div
       id="pivotv2-filter-pop"
       style={{
@@ -2140,7 +2149,8 @@ function FilterPopover({ fieldKey, filter, anchorEl, records, onChange, onClear,
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -2250,7 +2260,11 @@ function DrillDownModal({ title, records, onClose, lang }) {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
-  return (
+  // Portal to <body> so the fullscreen overlay escapes any ancestor
+  // that has `transform` (creates a new containing block for fixed).
+  // Without this the modal can be clipped / shifted by .page-transition.
+  if (typeof document === "undefined") return null;
+  return createPortal(
     <div
       onClick={onClose}
       style={{
@@ -2319,6 +2333,7 @@ function DrillDownModal({ title, records, onClose, lang }) {
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
