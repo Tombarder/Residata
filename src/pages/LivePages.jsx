@@ -961,6 +961,11 @@ function FlatsTable({ flats, t, lang }) {
     { key: "exterior",  label: t.tbl_exterior,    align: "right", kind: "num",  def: "asc",  get: f => f.exterier_plocha },
     { key: "total",     label: t.tbl_total,       align: "right", kind: "num",  def: "asc",  get: f => f.celkova_plocha },
     { key: "price",     label: t.tbl_price,       align: "right", kind: "num",  def: "asc",  get: f => f.cena_s_dph },
+    // Cena na m² obytnej — rovnaký vzorec ako v Sheets: cena_s_dph / obytna_plocha
+    // (NIE celková plocha — inak by sa do menovateľa rátali aj balkóny).
+    { key: "price_m2",  label: t.tbl_eur_m2,      align: "right", kind: "num",  def: "asc",
+      get: f => (f.cena_s_dph != null && f.obytna_plocha != null && Number(f.obytna_plocha) > 0)
+                ? Number(f.cena_s_dph) / Number(f.obytna_plocha) : null },
     { key: "orient",    label: t.tbl_orientation, align: "left",  kind: "text", def: "asc",  get: f => f.orientacia || "" },
     { key: "handover",  label: t.tbl_handover,    align: "left",  kind: "text", def: "asc",  get: f => f.kolaudacia || "" },
     { key: "stav",      label: t.tbl_status,      align: "left",  kind: "text", def: "asc",  get: f => f.stav || "" },
@@ -1036,6 +1041,11 @@ function FlatsTable({ flats, t, lang }) {
                 <td style={{ ...td, textAlign: "right", fontFamily: mono }}>
                   {f.cena_s_dph != null ? `${Math.round(f.cena_s_dph).toLocaleString(locale)} €` :
                     f.cena_s_dph_text ? <span style={{ color: dim }}>{f.cena_s_dph_text}</span> : "—"}
+                </td>
+                <td style={{ ...td, textAlign: "right", fontFamily: mono, color: dim }}>
+                  {(f.cena_s_dph != null && f.obytna_plocha != null && Number(f.obytna_plocha) > 0)
+                    ? Math.round(Number(f.cena_s_dph) / Number(f.obytna_plocha)).toLocaleString(locale)
+                    : "—"}
                 </td>
                 <td style={{ ...td, fontFamily: mono, color: dim }}>{f.orientacia || "—"}</td>
                 <td style={{ ...td, fontFamily: mono, color: dim }}>{f.kolaudacia || "—"}</td>
