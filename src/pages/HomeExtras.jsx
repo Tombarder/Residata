@@ -524,8 +524,27 @@ export function MarketPulse({ lang = "en", setCurrent }) {
   const topTitle = lang === "sk" ? "Najaktívnejšie projekty" : "Most active projects";
   const openAll = lang === "sk" ? "Všetky projekty →" : "View all projects →";
 
-  // Top 6 by available units (most "alive" market activity)
-  const top = [...projects].sort((a, b) => (b.available_units || 0) - (a.available_units || 0)).slice(0, 6);
+  // "Most active" = most units sold in the last month. This is a per-
+  // project delta the sync script fills in as `sold_last_month` (count
+  // of P flats that flipped since last batch, plus a manual_total-
+  // based velocity estimate for projects like Bory / Slnecnice where
+  // the developer doesn't publish P explicitly).
+  //
+  // First data snapshot lives in project_snapshots; we only have one
+  // month yet, so sold_last_month is NULL for everyone until the May
+  // sync run. Until then we fall back to sorting by available_units
+  // (same as before) so the section isn't empty, but we label it
+  // honestly with a small note. Once the next sync populates real
+  // velocity, the sort key flips and the note disappears.
+  const anyVelocity = projects.some(p => (p.sold_last_month || 0) > 0);
+  const top = anyVelocity
+    ? [...projects]
+        .filter(p => (p.sold_last_month || 0) > 0)
+        .sort((a, b) => (b.sold_last_month || 0) - (a.sold_last_month || 0))
+        .slice(0, 6)
+    : [...projects]
+        .sort((a, b) => (b.available_units || 0) - (a.available_units || 0))
+        .slice(0, 6);
 
   return (
     <section style={{ padding: "2rem 2rem 5rem", maxWidth: 1200, margin: "0 auto" }}>
@@ -549,10 +568,17 @@ export function MarketPulse({ lang = "en", setCurrent }) {
         <Stat value={avgEurM2 ? Math.round(avgEurM2) : null} label={tEur} prefix="" suffix=" €" />
       </div>
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "1rem" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: anyVelocity ? "1rem" : "0.3rem" }}>
         <h3 style={{ fontSize: "1.1rem", fontWeight: 600, color: "#e8e8ed", fontFamily: mono, letterSpacing: "0.02em" }}>{topTitle}</h3>
         <button onClick={() => setCurrent && setCurrent("Live")} style={{ background: "none", border: "none", color: green, fontSize: "0.85rem", cursor: "pointer", fontFamily: "inherit" }}>{openAll}</button>
       </div>
+      {!anyVelocity && (
+        <div style={{ fontSize: "0.78rem", color: "#8a8a96", marginBottom: "1rem", fontStyle: "italic" }}>
+          {lang === "sk"
+            ? "Predaje za posledný mesiac začneme zobrazovať od ďalšieho behu syncu (1. mája). Zatiaľ zobrazujeme projekty s najväčšou otvorenou ponukou."
+            : "Last-month sales appear after the next sync run (May 1). Showing projects with the largest open inventory meanwhile."}
+        </div>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "0.85rem" }}>
         {top.map(p => <ProjectMini key={p.id} project={p} setCurrent={setCurrent} lang={lang} />)}
@@ -599,6 +625,9 @@ function ProjectMini({ project, setCurrent, lang }) {
         <div style={{ fontSize: "0.7rem", color: dim, fontFamily: mono }}>{project.district || "—"}</div>
       </div>
       <div style={{ fontSize: "0.75rem", color: dim, marginBottom: "0.6rem" }}>
+        {(project.sold_last_month || 0) > 0 && (
+          <span style={{ color: "#f5a623", fontWeight: 600 }}>+{project.sold_last_month} {lang === "sk" ? "za mesiac" : "this month"} · </span>
+        )}
         {project.available_units} {lang === "sk" ? "voľných" : "avail"}
         {!soldDataUnavailable && <> · {project.sold_units} {lang === "sk" ? "predaných" : "sold"}</>}
         {project.avg_price_eur_m2 ? ` · ${Math.round(project.avg_price_eur_m2).toLocaleString("en-US").replace(/,/g, " ")} €/m²` : ""}
