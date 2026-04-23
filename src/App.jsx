@@ -940,12 +940,14 @@ function DataPage({ setCurrent, l, lang }) {
             borderRadius: 14, overflow: "hidden",
             border: "1px solid #222228",
             aspectRatio: "4 / 3", minHeight: 280,
-            // Reverted to the 'biely projekt' at user's request. Previous
-            // attempts: cc1a3fa10c00 = 'zebra-ish apartment block' (rejected),
-            // 2429e8be8625 = modern geometric office feel. This one is a
-            // clean white contemporary residential, which user approved
-            // earlier when paired with the 'krajšie pekné residential' ask.
-            background: `linear-gradient(135deg, rgba(0,229,160,0.06), rgba(0,0,0,0.1)), url("https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1400&q=85&auto=format&fit=crop") center/cover`,
+            // Image trace (log for future iterations):
+            //  · 2429e8be8625  modern geometric tall white ← this is the
+            //                  'biela veľká budova' user wants
+            //  · be6161a56a0c  read as 'dom / house' (rejected 2×)
+            //  · cc1a3fa10c00  'zebracka bytovka' (rejected)
+            // Restoring 2429e8be8625 — the only one that matches the
+            // 'white big building' description.
+            background: `linear-gradient(135deg, rgba(0,229,160,0.06), rgba(0,0,0,0.1)), url("https://images.unsplash.com/photo-1487958449943-2429e8be8625?w=1400&q=85&auto=format&fit=crop") center/cover`,
           }} aria-label="Modern residential building" />
         </div>
       </div>
