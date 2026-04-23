@@ -896,53 +896,49 @@ function TakeupChart({ snaps, lang }) {
 /* ── Room mix: horizontal stacked bars per room type ──────── */
 /* ── Room-type mix — horizontal stacked bars per room type ──
  *
- * Each row represents one room-count bucket (1-room, 2-room, …).
- * Bar stack order (left → right): sold (P, orange) / reserved (R,
- * gray) / available (V, green). Any segment that's 0 for a row is
- * skipped so the remaining colours fill the bar correctly.
+ * Layout (per row):
  *
- * Right-side label adapts to what data the row actually contains —
- * the previous version hardcoded 'sold/total · sold%' which was
- * completely misleading for projects that don't publish sold data
- * (it showed '0/22 · 0%' even when 8 were reserved and 14 available).
- * Now we pick the most informative label per row:
- *   · If sold > 0 dominates story → 'X P / Y V (total) · Z% sold'
- *   · Only available → 'Y V'
- *   · Reserved + available, no sold → 'X R / Y V (total)'
- *   · Mixed → list all non-zero segments in P/R/V stav codes
+ *   1-room  [■■■■■■□□□□□□□■■■■■■■■■■■■■■■■■■■■]      22 · 50% R
+ *            11 P         11 R         11 V
+ *
+ * Each segment's count+stav code appears directly UNDER its colour
+ * block (same colour as the block, monospace, small). Right side
+ * carries just the total + one headline percent — the most useful
+ * for this mix. If a segment is too narrow (<22 px bar width) the
+ * under-label is skipped entirely so we never overlap; the number
+ * is still visible in the hover tooltip via <title>.
+ *
+ * Previous version crammed '11 R · 11 V (22) · 50% R' onto a single
+ * right-side line which read as dense walls of text across 5 rows.
+ * This split layout lines each count up with its visual segment,
+ * so the eye can scan 'gray bar → 11 R' in one move.
+ *
+ * Right-side headline % picks the signal that matters:
+ *   · Sold segment present    → sold/total %  (absorption)
+ *   · Reserved only (no sold) → reserved/total %  (reservation rate)
+ *   · Only available          → just 'N V'  (nothing to summarise)
  */
 function RoomMixChart({ rows, lang }) {
-  const W = 460, rowH = 26, gap = 6, labelW = 60;
-  // Right-hand label width — grew from 80 to 130 since the new label
-  // can show up to "12 P / 3 R / 7 V (22) · 55%" which is wide.
-  const valueW = 130;
+  const W = 560;
+  const barH = 22;
+  const underH = 14;
+  const rowH = barH + underH + 2;
+  const gap = 12;
+  const labelW = 60;
+  const valueW = 86;
   const barW = W - labelW - valueW - 20;
-  const H = rows.length * (rowH + gap) + 8;
+  const H = rows.length * (rowH + gap) + 6;
 
-  // Pick the right label for a row given which stav values it has
-  const rowLabel = (r) => {
-    const parts = [];
-    if (r.sold > 0)     parts.push(`${r.sold} P`);
-    if (r.reserved > 0) parts.push(`${r.reserved} R`);
-    if (r.avail > 0)    parts.push(`${r.avail} V`);
+  // Minimum segment width (px) before its under-label is dropped.
+  // '11 V' is ~20 px at fontSize 9; below that we'd overlap neighbours.
+  const MIN_LABEL_W = 22;
 
-    if (parts.length === 0) return `${r.total}`;
-
-    // Single-stav row (e.g. "22 V" or "14 P") — no need for totals/%
-    if (parts.length === 1) return parts[0];
-
-    // Mixed — show breakdown with total, plus a sold-% accent if
-    // sold is tracked (the 'absorption' signal buyers look for)
-    const head = parts.join(" · ");
-    const hasSold = r.sold > 0;
-    if (hasSold && r.total > 0) {
-      return `${head} (${r.total}) · ${Math.round((r.sold / r.total) * 100)}%`;
-    }
-    // No sold tracked — show reservation rate instead when applicable
-    if (r.reserved > 0 && r.total > 0) {
-      return `${head} (${r.total}) · ${Math.round((r.reserved / r.total) * 100)}% R`;
-    }
-    return `${head} (${r.total})`;
+  // One clean headline number + % for the right side
+  const sideLabel = (r) => {
+    if (r.total === 0) return "";
+    if (r.sold > 0) return `${r.total} · ${Math.round((r.sold / r.total) * 100)}% P`;
+    if (r.reserved > 0) return `${r.total} · ${Math.round((r.reserved / r.total) * 100)}% R`;
+    return `${r.total} V`;  // all available
   };
 
   return (
@@ -950,24 +946,55 @@ function RoomMixChart({ rows, lang }) {
       {rows.map((r, i) => {
         const y = i * (rowH + gap);
         const pct = r.total > 0 ? {
-          sold: r.sold / r.total * 100,
-          reserved: r.reserved / r.total * 100,
-          avail: r.avail / r.total * 100,
+          sold: r.sold / r.total,
+          reserved: r.reserved / r.total,
+          avail: r.avail / r.total,
         } : { sold: 0, reserved: 0, avail: 0 };
-        const soldW = (pct.sold / 100) * barW;
-        const resvW = (pct.reserved / 100) * barW;
-        const availW = (pct.avail / 100) * barW;
+        const soldW = pct.sold * barW;
+        const resvW = pct.reserved * barW;
+        const availW = pct.avail * barW;
+        const underY = y + barH + underH - 2;
+
         return (
           <g key={r.room}>
-            <text x={0} y={y + rowH / 2 + 4} fill="#e8e8ed" fontFamily={mono} fontSize={11} fontWeight={700}>
+            {/* Row label (room count) — centered vertically with the bar */}
+            <text x={0} y={y + barH / 2 + 4} fill="#e8e8ed" fontFamily={mono} fontSize={11} fontWeight={700}>
               {r.room}-{lang === "sk" ? "izb" : "room"}
             </text>
-            <rect x={labelW} y={y} width={barW} height={rowH} fill="#0a0a0b" stroke={border} />
-            {soldW > 0 && <rect x={labelW} y={y} width={soldW} height={rowH} fill="#f5a623" />}
-            {resvW > 0 && <rect x={labelW + soldW} y={y} width={resvW} height={rowH} fill="#888" />}
-            {availW > 0 && <rect x={labelW + soldW + resvW} y={y} width={availW} height={rowH} fill={green} />}
-            <text x={W - 4} y={y + rowH / 2 + 4} textAnchor="end" fill={dim} fontFamily={mono} fontSize={10}>
-              {rowLabel(r)}
+
+            {/* Bar: background + stacked segments */}
+            <rect x={labelW} y={y} width={barW} height={barH} fill="#0a0a0b" stroke={border}>
+              <title>{`${r.sold} P · ${r.reserved} R · ${r.avail} V · ${r.total} total`}</title>
+            </rect>
+            {soldW > 0 && <rect x={labelW} y={y} width={soldW} height={barH} fill="#f5a623" />}
+            {resvW > 0 && <rect x={labelW + soldW} y={y} width={resvW} height={barH} fill="#888" />}
+            {availW > 0 && <rect x={labelW + soldW + resvW} y={y} width={availW} height={barH} fill={green} />}
+
+            {/* Under-segment counts — same colour as the segment, tiny mono.
+                Skip when the segment is too narrow to hold the label cleanly. */}
+            {soldW >= MIN_LABEL_W && (
+              <text x={labelW + soldW / 2} y={underY} textAnchor="middle"
+                    fill="#f5a623" fontFamily={mono} fontSize={9}>
+                {r.sold} P
+              </text>
+            )}
+            {resvW >= MIN_LABEL_W && (
+              <text x={labelW + soldW + resvW / 2} y={underY} textAnchor="middle"
+                    fill="#aaa" fontFamily={mono} fontSize={9}>
+                {r.reserved} R
+              </text>
+            )}
+            {availW >= MIN_LABEL_W && (
+              <text x={labelW + soldW + resvW + availW / 2} y={underY} textAnchor="middle"
+                    fill={green} fontFamily={mono} fontSize={9}>
+                {r.avail} V
+              </text>
+            )}
+
+            {/* Right-hand total + headline % */}
+            <text x={W - 4} y={y + barH / 2 + 4} textAnchor="end"
+                  fill="#c0c0c8" fontFamily={mono} fontSize={10}>
+              {sideLabel(r)}
             </text>
           </g>
         );
