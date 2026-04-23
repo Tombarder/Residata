@@ -1,0 +1,24 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Residata//Setup Reminder//EN
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+BEGIN:VEVENT
+UID:residata-anthropic-cap-2026-05-05@residata.sk
+DTSTAMP:20260423T140000Z
+DTSTART:20260505T080000Z
+DTEND:20260505T083000Z
+SUMMARY:Residata: Anthropic spending cap → €50
+DESCRIPTION:Open https://console.anthropic.com/settings/limits and reset the Monthly spend cap back to €50.\n\nThis is the reminder Claude set on 2026-04-23.\n\nIf Residata has grown paying customers by now\, consider raising to €200.
+URL:https://console.anthropic.com/settings/limits
+LOCATION:console.anthropic.com
+CATEGORIES:Residata,Security
+PRIORITY:5
+STATUS:CONFIRMED
+BEGIN:VALARM
+ACTION:DISPLAY
+DESCRIPTION:Anthropic spending cap → €50
+TRIGGER:-PT0M
+END:VALARM
+END:VEVENT
+END:VCALENDAR

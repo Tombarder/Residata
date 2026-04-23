@@ -2035,7 +2035,7 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
   const [activity, setActivity] = useState([]);
   const [premiumDomains, setPremiumDomains] = useState([]);
   const [err, setErr] = useState(null);
-  const [tab, setTab] = useState("users");
+  const [tab, setTab] = useState("overview");
   const [search, setSearch] = useState("");
 
   const reloadUsers = () => supabase.from("user_profiles").select("*").order("created_at", { ascending: false })
@@ -2045,7 +2045,11 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
     reloadUsers();
     supabase.from("events").select("*").like("event_type", "new_signup%").order("detected_at", { ascending: false }).limit(20)
       .then(({ data }) => setEvents(data || []));
-    supabase.from("user_activity").select("*").order("created_at", { ascending: false }).limit(100)
+    // Pull more activity than the old 100-event Recent panel needs, because
+    // the Overview tab aggregates across a longer window. 1000 is enough to
+    // cover months of use for the current small user base; if the table
+    // grows past that we'd move aggregation to a DB view.
+    supabase.from("user_activity").select("*").order("created_at", { ascending: false }).limit(1000)
       .then(({ data }) => setActivity(data || []));
     supabase.from("premium_domains").select("*").order("domain")
       .then(({ data }) => setPremiumDomains(data || []));
@@ -2141,6 +2145,9 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
 
       {/* Tabs */}
       <div style={{ display: "flex", gap: "0.5rem", marginTop: "1.5rem", borderBottom: `1px solid ${border}`, marginBottom: "1.5rem" }}>
+        <TabBtn active={tab === "overview"} onClick={() => setTab("overview")}>
+          {lang === "sk" ? "Prehľad" : "Overview"}
+        </TabBtn>
         <TabBtn active={tab === "users"} onClick={() => setTab("users")}>
           {lang === "sk" ? "Užívatelia" : "Users"}
         </TabBtn>
@@ -2224,6 +2231,7 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
         </>
       )}
 
+      {tab === "overview" && <OverviewPanel activity={activity} users={users} lang={lang} />}
       {tab === "activity" && <ActivityPanel activity={activity} users={users} />}
       {tab === "domains" && (
         <PremiumDomainsPanel
@@ -2246,6 +2254,200 @@ function TabBtn({ active, onClick, children }) {
       display: "inline-flex", alignItems: "center", gap: "0.4rem",
       transition: "color 0.15s",
     }}>{children}</button>
+  );
+}
+
+/* ── Overview tab — basic product analytics ────────────────────────
+ * Aggregates the last 1000 user_activity rows against user_profiles.
+ * Gives the admin an at-a-glance read of:
+ *   · Are people using it at all? (events total, this week, this month)
+ *   · Who's active vs. signed-up-and-gone? (per-user summary table)
+ *   · What's the retention pattern? (active days, first/last seen)
+ *
+ * All aggregation is client-side JS — fine for the small N we have
+ * now. If the activity table grows past ~10k rows, migrate to a
+ * Supabase view and query the pre-aggregated summary.
+ */
+function OverviewPanel({ activity, users, lang }) {
+  const now = Date.now();
+  const DAY = 24 * 60 * 60 * 1000;
+  const weekAgo = now - 7 * DAY;
+  const monthAgo = now - 30 * DAY;
+
+  // Bucket events by time window
+  const weekEvents  = activity.filter(e => new Date(e.created_at).getTime() > weekAgo);
+  const monthEvents = activity.filter(e => new Date(e.created_at).getTime() > monthAgo);
+
+  // Active users = had at least one event in the window
+  const activeWeek  = new Set(weekEvents.map(e => e.user_id).filter(Boolean)).size;
+  const activeMonth = new Set(monthEvents.map(e => e.user_id).filter(Boolean)).size;
+
+  // Per-user rollup
+  const byUser = {};
+  for (const e of activity) {
+    const uid = e.user_id;
+    if (!uid) continue;
+    if (!byUser[uid]) {
+      byUser[uid] = {
+        user_id: uid,
+        totalEvents: 0,
+        weekEvents: 0,
+        monthEvents: 0,
+        firstSeen: e.created_at,
+        lastSeen: e.created_at,
+        activeDays: new Set(),
+        eventTypes: {},
+      };
+    }
+    const b = byUser[uid];
+    b.totalEvents += 1;
+    const t = new Date(e.created_at).getTime();
+    if (t > weekAgo)  b.weekEvents += 1;
+    if (t > monthAgo) b.monthEvents += 1;
+    if (new Date(e.created_at) < new Date(b.firstSeen)) b.firstSeen = e.created_at;
+    if (new Date(e.created_at) > new Date(b.lastSeen))  b.lastSeen  = e.created_at;
+    b.activeDays.add(e.created_at.slice(0, 10));
+    b.eventTypes[e.event_type] = (b.eventTypes[e.event_type] || 0) + 1;
+  }
+
+  // Merge profile info into each row
+  const userById = Object.fromEntries(users.map(u => [u.id, u]));
+  const rows = Object.values(byUser).map(b => ({
+    ...b,
+    activeDays: b.activeDays.size,
+    email: userById[b.user_id]?.email || "(unknown)",
+    tier: userById[b.user_id]?.tier || "—",
+    company: userById[b.user_id]?.company || "",
+  })).sort((a, b) => new Date(b.lastSeen) - new Date(a.lastSeen));
+
+  // Event-type breakdown across the full window (top 6)
+  const eventTypeCount = {};
+  for (const e of activity) {
+    eventTypeCount[e.event_type] = (eventTypeCount[e.event_type] || 0) + 1;
+  }
+  const topEventTypes = Object.entries(eventTypeCount)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6);
+
+  // Helper: short relative time ("2 h ago", "3 d ago")
+  const rel = (iso) => {
+    const diff = (now - new Date(iso).getTime()) / 1000;
+    if (diff < 60) return `${Math.round(diff)} s ago`;
+    if (diff < 3600) return `${Math.round(diff / 60)} m ago`;
+    if (diff < 86400) return `${Math.round(diff / 3600)} h ago`;
+    return `${Math.round(diff / 86400)} d ago`;
+  };
+
+  const L = (sk, en) => lang === "sk" ? sk : en;
+  const card = (label, value, sub, colour = "#e8e8ed") => (
+    <div style={{
+      background: bg, border: `1px solid ${border}`, borderRadius: 10,
+      padding: "1.1rem 1.2rem", minHeight: 92,
+    }}>
+      <div style={{ fontFamily: mono, fontSize: "0.64rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.45rem" }}>{label}</div>
+      <div style={{ fontFamily: mono, fontSize: "1.7rem", fontWeight: 700, color: colour, lineHeight: 1 }}>{value}</div>
+      {sub && <div style={{ fontSize: "0.72rem", color: dim, marginTop: "0.35rem" }}>{sub}</div>}
+    </div>
+  );
+
+  return (
+    <>
+      {/* ── Top-level metrics ── */}
+      <SectionHeader>{L("Celkový prehľad", "Top-level metrics")}</SectionHeader>
+      <div style={{
+        display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+        gap: "0.75rem", marginBottom: "2rem",
+      }}>
+        {card(L("Užívateľov celkom", "Total users"), users.length, L("vo všetkých tier-och", "across all tiers"))}
+        {card(L("Aktívni / 7 dní", "Active · 7 d"), activeWeek, L("mali aspoň jeden event", "had any activity"), green)}
+        {card(L("Aktívni / 30 dní", "Active · 30 d"), activeMonth, L("mali aspoň jeden event", "had any activity"), green)}
+        {card(L("Eventy / 7 dní", "Events · 7 d"), weekEvents.length, L("page views + klicky", "page views + clicks"))}
+        {card(L("Eventy / 30 dní", "Events · 30 d"), monthEvents.length, L("page views + klicky", "page views + clicks"))}
+        {card(L("Eventy celkom", "Events total"), activity.length, L("v poslednom 1000 okne", "in last 1000 window"), dim)}
+      </div>
+
+      {/* ── Event-type breakdown ── */}
+      {topEventTypes.length > 0 && (
+        <>
+          <SectionHeader>{L("Najčastejšie eventy", "Most frequent event types")}</SectionHeader>
+          <div style={{
+            display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+            gap: "0.5rem", marginBottom: "2rem",
+          }}>
+            {topEventTypes.map(([type, n]) => (
+              <div key={type} style={{
+                background: bg, border: `1px solid ${border}`, borderRadius: 8,
+                padding: "0.6rem 0.85rem", display: "flex", justifyContent: "space-between", alignItems: "center",
+              }}>
+                <span style={{ fontFamily: mono, fontSize: "0.76rem", color: "#e8e8ed" }}>{type}</span>
+                <span style={{ fontFamily: mono, fontSize: "0.9rem", fontWeight: 700, color: green }}>{n}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* ── Per-user summary ── */}
+      <SectionHeader>{L("Per-user aktivita", "Per-user activity")}</SectionHeader>
+      {rows.length === 0 ? (
+        <div style={{ color: dim, padding: "1.5rem", textAlign: "center", border: `1px solid ${border}`, borderRadius: 12 }}>
+          {L("Zatiaľ žiadna užívateľská aktivita.", "No user activity yet.")}
+        </div>
+      ) : (
+        <div style={{ border: `1px solid ${border}`, borderRadius: 12, overflow: "hidden", marginBottom: "2rem" }}>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem", minWidth: 900 }}>
+              <thead style={{ background: "#0e0e10" }}>
+                <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                  <th style={th}>{L("Email", "Email")}</th>
+                  <th style={th}>{L("Firma", "Company")}</th>
+                  <th style={th}>{L("Tier", "Tier")}</th>
+                  <th style={{ ...th, textAlign: "right" }}>{L("Celkom", "Total")}</th>
+                  <th style={{ ...th, textAlign: "right" }}>{L("7 d", "7 d")}</th>
+                  <th style={{ ...th, textAlign: "right" }}>{L("30 d", "30 d")}</th>
+                  <th style={{ ...th, textAlign: "right" }}>{L("Aktívnych dní", "Active days")}</th>
+                  <th style={th}>{L("Prvýkrát", "First seen")}</th>
+                  <th style={th}>{L("Naposledy", "Last seen")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map(r => {
+                  const lastMs = new Date(r.lastSeen).getTime();
+                  const recent = (now - lastMs) < 7 * DAY;
+                  return (
+                    <tr key={r.user_id} style={{ borderTop: `1px solid ${border}` }}>
+                      <td style={{ ...td, color: "#e8e8ed" }}>{r.email}</td>
+                      <td style={{ ...td, color: dim }}>{r.company || "—"}</td>
+                      <td style={td}>
+                        <span style={{
+                          fontFamily: mono, fontSize: "0.7rem",
+                          padding: "0.15rem 0.5rem", borderRadius: 4,
+                          color: r.tier === "paid" ? green : r.tier === "admin" ? "#f5a623" : r.tier === "pending" ? "#888" : "#c0c0c8",
+                          background: r.tier === "paid" ? "rgba(0,229,160,0.08)" : r.tier === "admin" ? "rgba(245,166,35,0.08)" : "rgba(255,255,255,0.04)",
+                        }}>{r.tier}</span>
+                      </td>
+                      <td style={{ ...td, textAlign: "right", fontFamily: mono, color: "#e8e8ed" }}>{r.totalEvents}</td>
+                      <td style={{ ...td, textAlign: "right", fontFamily: mono, color: r.weekEvents > 0 ? green : dim }}>{r.weekEvents}</td>
+                      <td style={{ ...td, textAlign: "right", fontFamily: mono, color: r.monthEvents > 0 ? "#c0c0c8" : dim }}>{r.monthEvents}</td>
+                      <td style={{ ...td, textAlign: "right", fontFamily: mono, color: dim }}>{r.activeDays}</td>
+                      <td style={{ ...td, color: dim, fontFamily: mono, fontSize: "0.72rem" }}>{r.firstSeen?.slice(0, 10)}</td>
+                      <td style={{ ...td, color: recent ? green : dim, fontFamily: mono, fontSize: "0.72rem" }}>{rel(r.lastSeen)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      <p style={{ color: dim, fontSize: "0.78rem", lineHeight: 1.5, fontStyle: "italic" }}>
+        {L(
+          "Data pochádza z tabuľky user_activity (posledných 1000 eventov). Events zahrňujú page views, otvorenia projektov, AI volania, login, a všetky track() volania z frontendu. Ak chýba daco čo chceš sledovať, pridáme track(\"nieco\") call v relevantnom miestach v UI.",
+          "Data is from user_activity (last 1000 events). Events include page views, project opens, AI calls, logins, and every track() call in the frontend. If something you'd want to see isn't here, we can add track(\"something\") calls in the right UI spots."
+        )}
+      </p>
+    </>
   );
 }
 
