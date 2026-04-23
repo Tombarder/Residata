@@ -1995,70 +1995,66 @@ function FilterPopover({ fieldKey, filter, anchorEl, records, onChange, onClear,
     <div
       id="pivotv2-filter-pop"
       style={{
-        ...style, width: popW, maxHeight: "70vh", overflow: "auto",
-        background: "#0b0b0e", border: `1px solid ${green}`, borderRadius: 8,
-        boxShadow: "0 20px 48px rgba(0,0,0,0.9), 0 0 0 1px rgba(0,229,160,0.12)",
-        padding: "0.8rem 0.9rem",
-        fontFamily: mono, color: text, fontSize: "0.8rem",
+        ...style, width: popW, maxHeight: "72vh", overflow: "auto",
+        background: "#111116",
+        border: `1px solid ${border}`,
+        borderRadius: 10,
+        boxShadow: "0 24px 60px rgba(0,0,0,0.55)",
+        padding: "1rem 1.1rem",
+        color: text, fontSize: "0.88rem",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.6rem" }}>
-        <span style={{ fontSize: "0.62rem", color: green, letterSpacing: "0.1em", textTransform: "uppercase" }}>⚑ FILTER</span>
-        <span style={{ fontWeight: 700, fontSize: "0.88rem", color: text }}>{field?.label || fieldKey}</span>
-        <span style={{ marginLeft: "auto", fontSize: "0.62rem", color: dim }}>
-          {isNumber ? "číslo" : "text"}
-        </span>
+      {/* Header — just the field name, nothing else */}
+      <div style={{ fontWeight: 600, fontSize: "1rem", color: text, marginBottom: "0.8rem" }}>
+        {field?.label || fieldKey}
       </div>
 
-      {/* Mode picker */}
-      <div style={{ display: "flex", gap: "0.25rem", marginBottom: "0.6rem", flexWrap: "wrap" }}>
+      {/* Mode picker — clean pills, plain labels */}
+      <div style={{ display: "flex", gap: "0.3rem", marginBottom: "0.9rem", flexWrap: "wrap" }}>
         {isNumber && (
           <ModeBtn active={mode === "between"} onClick={() => setMode("between")}>rozsah</ModeBtn>
         )}
-        <ModeBtn active={mode === "in"} onClick={() => setMode("in")}>
-          {isNumber ? "konkrétne ≡" : "zahrnúť ≡"}
-        </ModeBtn>
-        <ModeBtn active={mode === "not_in"} onClick={() => setMode("not_in")}>vylúčiť ≠</ModeBtn>
-        <ModeBtn active={mode === "empty"} onClick={() => setMode("empty")}>prázdne</ModeBtn>
+        <ModeBtn active={mode === "in"}        onClick={() => setMode("in")}>zahrnúť</ModeBtn>
+        <ModeBtn active={mode === "not_in"}    onClick={() => setMode("not_in")}>vylúčiť</ModeBtn>
+        <ModeBtn active={mode === "empty"}     onClick={() => setMode("empty")}>len prázdne</ModeBtn>
         <ModeBtn active={mode === "not_empty"} onClick={() => setMode("not_empty")}>má hodnotu</ModeBtn>
       </div>
 
-      {/* Stats strip (numbers only) */}
-      {isNumber && stats && (
-        <div style={{ fontSize: "0.66rem", color: dim, marginBottom: "0.55rem", padding: "0.35rem 0.5rem", background: "#0a0a0c", border: `1px solid ${border}`, borderRadius: 4 }}>
-          min <strong style={{ color: text }}>{fmt(stats.min)}</strong>
-          {" · "}med <strong style={{ color: text }}>{fmt(stats.median)}</strong>
-          {" · "}max <strong style={{ color: text }}>{fmt(stats.max)}</strong>
-          {" · "}{stats.distinct} unikátnych, {stats.count} s hodnotou
-          {hasEmpty && <>, <span style={{ color: "#ff9b6b" }}>{records.length - stats.count} prázdnych</span></>}
-        </div>
-      )}
-
       {/* Range inputs */}
       {mode === "between" && isNumber && (
-        <div style={{ marginBottom: "0.55rem" }}>
-          <div style={{ display: "flex", gap: "0.35rem", alignItems: "center" }}>
-            <label style={{ fontSize: "0.68rem", color: dim }}>od</label>
-            <input type="number" value={minV} onChange={(e) => setMinV(e.target.value)}
-              placeholder={stats ? fmt(stats.min) : ""}
-              style={inpS} />
-            <label style={{ fontSize: "0.68rem", color: dim }}>do</label>
-            <input type="number" value={maxV} onChange={(e) => setMaxV(e.target.value)}
-              placeholder={stats ? fmt(stats.max) : ""}
-              style={inpS} />
+        <div style={{ marginBottom: "0.6rem" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
+            <label style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+              <span style={{ fontSize: "0.75rem", color: dim }}>od</span>
+              <input type="number" value={minV} onChange={(e) => setMinV(e.target.value)}
+                placeholder={stats ? fmt(stats.min) : ""} style={inpS} />
+            </label>
+            <label style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+              <span style={{ fontSize: "0.75rem", color: dim }}>do</span>
+              <input type="number" value={maxV} onChange={(e) => setMaxV(e.target.value)}
+                placeholder={stats ? fmt(stats.max) : ""} style={inpS} />
+            </label>
           </div>
           {stats && (
-            <div style={{ marginTop: "0.4rem", display: "flex", gap: "0.25rem", flexWrap: "wrap" }}>
-              <QuickBtn onClick={() => quickRange(stats.min, stats.median)}>spodná ½</QuickBtn>
-              <QuickBtn onClick={() => quickRange(stats.median, stats.max)}>horná ½</QuickBtn>
-              <QuickBtn onClick={() => quickRange("", "")}>vyčisti rozsah</QuickBtn>
+            <div style={{ marginTop: "0.5rem", display: "flex", gap: "0.3rem", flexWrap: "wrap" }}>
+              <QuickBtn onClick={() => quickRange(stats.min, stats.median)}>dolná polovica</QuickBtn>
+              <QuickBtn onClick={() => quickRange(stats.median, stats.max)}>horná polovica</QuickBtn>
+              <QuickBtn onClick={() => quickRange("", "")}>vyčistiť</QuickBtn>
+            </div>
+          )}
+          {/* Stats as a muted one-liner below the inputs, no box */}
+          {stats && (
+            <div style={{ marginTop: "0.65rem", fontSize: "0.74rem", color: dim, lineHeight: 1.5 }}>
+              V dátach od <strong style={{ color: text, fontWeight: 500 }}>{fmt(stats.min)}</strong> do <strong style={{ color: text, fontWeight: 500 }}>{fmt(stats.max)}</strong>,
+              medián <strong style={{ color: text, fontWeight: 500 }}>{fmt(stats.median)}</strong>.
+              {hasEmpty && <> {records.length - stats.count} záznamov bez hodnoty.</>}
             </div>
           )}
           {hasEmpty && (
-            <label style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginTop: "0.5rem", cursor: "pointer", fontSize: "0.76rem", color: text }}>
+            <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.65rem", cursor: "pointer", fontSize: "0.82rem", color: "#c4c4cc" }}>
               <input type="checkbox" checked={inclEmpty} onChange={(e) => setInclEmpty(e.target.checked)}
-                style={{ accentColor: "#ff9b6b" }} />
-              zahrnúť aj záznamy bez hodnoty (<span style={{ color: "#ff9b6b" }}>prázdne</span>)
+                style={{ accentColor: green, width: 14, height: 14 }} />
+              zahrnúť aj byty bez ceny
             </label>
           )}
         </div>
@@ -2071,16 +2067,16 @@ function FilterPopover({ fieldKey, filter, anchorEl, records, onChange, onClear,
             autoFocus
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="hľadať…"
-            style={{ ...inpS, width: "100%", marginBottom: "0.5rem" }}
+            placeholder="Hľadať…"
+            style={{ ...inpS, width: "100%", marginBottom: "0.55rem" }}
           />
-          <div style={{ display: "flex", gap: "0.3rem", marginBottom: "0.45rem", fontSize: "0.66rem" }}>
+          <div style={{ display: "flex", gap: "0.35rem", marginBottom: "0.5rem", alignItems: "center" }}>
             <QuickBtn onClick={() => {
               const all = [...distinct];
               if (hasEmpty) all.push(EMPTY_SENTINEL);
               setSelected(new Set(all));
-            }}>vybrať všetko</QuickBtn>
-            <QuickBtn onClick={() => setSelected(new Set())}>zrušiť</QuickBtn>
+            }}>všetko</QuickBtn>
+            <QuickBtn onClick={() => setSelected(new Set())}>nič</QuickBtn>
             <QuickBtn onClick={() => {
               setSelected(prev => {
                 const all = [...distinct];
@@ -2089,26 +2085,26 @@ function FilterPopover({ fieldKey, filter, anchorEl, records, onChange, onClear,
                 for (const v of all) if (!prev.has(v)) inv.add(v);
                 return inv;
               });
-            }}>invertovať</QuickBtn>
-            <span style={{ marginLeft: "auto", color: dim }}>
+            }}>prevrátiť</QuickBtn>
+            <span style={{ marginLeft: "auto", color: dim, fontSize: "0.76rem" }}>
               {selected.size} vybraných
             </span>
           </div>
           <div style={{
             maxHeight: 280, overflowY: "auto",
-            border: `1px solid ${border}`, borderRadius: 4, background: "#0a0a0c",
-            padding: "0.2rem",
+            border: `1px solid ${border}`, borderRadius: 6, background: "#0a0a0c",
+            padding: "0.25rem",
           }}>
             {hasEmpty && (
               <CheckboxRow
                 checked={selected.has(EMPTY_SENTINEL)}
                 onChange={() => toggle(EMPTY_SENTINEL)}
-                label={<span style={{ fontStyle: "italic", color: "#ff9b6b" }}>(prázdne)</span>}
+                label={<span style={{ fontStyle: "italic", color: dim }}>(bez hodnoty)</span>}
               />
             )}
             {shown.length === 0 ? (
-              <div style={{ padding: "0.5rem 0.6rem", fontSize: "0.74rem", color: dim, textAlign: "center" }}>
-                žiadne zhody
+              <div style={{ padding: "0.75rem", fontSize: "0.8rem", color: dim, textAlign: "center" }}>
+                Žiadne zhody.
               </div>
             ) : shown.map(v => (
               <CheckboxRow
@@ -2122,19 +2118,19 @@ function FilterPopover({ fieldKey, filter, anchorEl, records, onChange, onClear,
         </div>
       )}
 
-      {/* Footer: Clear / Apply */}
-      <div style={{ display: "flex", justifyContent: "space-between", marginTop: "0.7rem", gap: "0.4rem" }}>
+      {/* Footer: Clear / Cancel / Apply */}
+      <div style={{ display: "flex", justifyContent: "space-between", marginTop: "1rem", gap: "0.5rem" }}>
         <button onClick={() => { onClear(); onClose(); }}
-          style={{ background: "transparent", border: `1px solid ${border}`, color: "#ff6b6b", borderRadius: 4, padding: "0.4rem 0.7rem", cursor: "pointer", fontSize: "0.74rem", fontFamily: "inherit" }}>
-          vymazať filter
+          style={{ background: "transparent", border: "none", color: dim, cursor: "pointer", fontSize: "0.8rem", fontFamily: "inherit", textDecoration: "underline", padding: "0.45rem 0" }}>
+          vymazať
         </button>
-        <div style={{ display: "flex", gap: "0.35rem" }}>
+        <div style={{ display: "flex", gap: "0.4rem" }}>
           <button onClick={onClose}
-            style={{ background: "transparent", border: `1px solid ${border}`, color: dim, borderRadius: 4, padding: "0.4rem 0.8rem", cursor: "pointer", fontSize: "0.74rem", fontFamily: "inherit" }}>
+            style={{ background: "transparent", border: `1px solid ${border}`, color: text, borderRadius: 6, padding: "0.45rem 0.9rem", cursor: "pointer", fontSize: "0.82rem", fontFamily: "inherit" }}>
             zrušiť
           </button>
           <button onClick={apply}
-            style={{ background: green, border: "none", color: "#0a0a0c", borderRadius: 4, padding: "0.4rem 1rem", cursor: "pointer", fontSize: "0.74rem", fontFamily: "inherit", fontWeight: 700 }}>
+            style={{ background: green, border: "none", color: "#0a0a0c", borderRadius: 6, padding: "0.45rem 1.1rem", cursor: "pointer", fontSize: "0.82rem", fontFamily: "inherit", fontWeight: 600 }}>
             použiť
           </button>
         </div>
@@ -2145,21 +2141,22 @@ function FilterPopover({ fieldKey, filter, anchorEl, records, onChange, onClear,
 }
 
 const inpS = {
-  padding: "0.35rem 0.5rem",
-  background: "#0a0a0c", border: `1px solid ${border}`, borderRadius: 4,
-  color: text, fontSize: "0.78rem", fontFamily: "inherit",
-  outline: "none", flex: 1, minWidth: 0,
+  padding: "0.5rem 0.65rem",
+  background: "#0a0a0c", border: `1px solid ${border}`, borderRadius: 6,
+  color: text, fontSize: "0.88rem", fontFamily: "inherit",
+  outline: "none", width: "100%", minWidth: 0, boxSizing: "border-box",
 };
 
 function ModeBtn({ active, onClick, children }) {
   return (
     <button onClick={onClick}
       style={{
-        background: active ? "rgba(0,229,160,0.18)" : "transparent",
+        background: active ? "rgba(0,229,160,0.14)" : "transparent",
         border: `1px solid ${active ? green : border}`,
-        color: active ? green : dim,
-        padding: "0.25rem 0.55rem", borderRadius: 3,
-        cursor: "pointer", fontFamily: mono, fontSize: "0.7rem",
+        color: active ? green : "#c4c4cc",
+        padding: "0.38rem 0.7rem", borderRadius: 6,
+        cursor: "pointer", fontFamily: "inherit", fontSize: "0.78rem",
+        fontWeight: active ? 600 : 400,
       }}>
       {children}
     </button>
@@ -2170,11 +2167,12 @@ function QuickBtn({ onClick, children }) {
     <button onClick={onClick}
       style={{
         background: "transparent", border: `1px solid ${border}`,
-        color: dim, padding: "0.2rem 0.45rem", borderRadius: 3,
-        cursor: "pointer", fontFamily: mono, fontSize: "0.66rem",
+        color: dim, padding: "0.3rem 0.6rem", borderRadius: 6,
+        cursor: "pointer", fontFamily: "inherit", fontSize: "0.74rem",
+        transition: "border-color 0.1s, color 0.1s",
       }}
-      onMouseEnter={(e) => e.currentTarget.style.borderColor = green}
-      onMouseLeave={(e) => e.currentTarget.style.borderColor = border}>
+      onMouseEnter={(e) => { e.currentTarget.style.borderColor = green + "aa"; e.currentTarget.style.color = text; }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = border; e.currentTarget.style.color = dim; }}>
       {children}
     </button>
   );
@@ -2182,13 +2180,13 @@ function QuickBtn({ onClick, children }) {
 function CheckboxRow({ checked, onChange, label }) {
   return (
     <label style={{
-      display: "flex", alignItems: "center", gap: "0.4rem",
-      padding: "0.25rem 0.45rem", cursor: "pointer", borderRadius: 3,
-      fontSize: "0.78rem", color: checked ? text : dim,
+      display: "flex", alignItems: "center", gap: "0.55rem",
+      padding: "0.35rem 0.55rem", cursor: "pointer", borderRadius: 4,
+      fontSize: "0.86rem", color: checked ? text : "#c4c4cc",
     }}
       onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.04)"}
       onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
-      <input type="checkbox" checked={checked} onChange={onChange} style={{ accentColor: green }} />
+      <input type="checkbox" checked={checked} onChange={onChange} style={{ accentColor: green, width: 15, height: 15 }} />
       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
     </label>
   );
