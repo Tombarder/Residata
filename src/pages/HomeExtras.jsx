@@ -499,10 +499,22 @@ export function MarketPulse({ lang = "en", setCurrent }) {
   const { projects } = useProjects();
   const { metrics } = useMetrics();
 
-  const totalUnits = projects.reduce((a, p) => a + (p.total_units || 0), 0);
-  const totalAvail = projects.reduce((a, p) => a + (p.available_units || 0), 0);
-  const totalSold = projects.reduce((a, p) => a + (p.sold_units || 0), 0);
-  const avgEurM2 = metrics.find(m => m.metric_key === "avg_eur_m2")?.value_numeric;
+  // Pull the hero numbers from `metrics` (precomputed during the monthly
+  // sync from REAL flats data — the Clean Master set). We deliberately
+  // don't sum projects.total_units any more: a few registry rows
+  // (Bory 984, Slnecnice 4 000) carry manually-set totals to support
+  // other KPIs, but those flats aren't actually scraped so putting
+  // them in the hero is misleading. The metrics table gives us:
+  //   · total_units_tracked → real flats in DB (~5 100)
+  //   · total_available     → count of stav='V'
+  //   · total_sold_to_date  → total − (available + reserved)
+  //   · avg_eur_m2          → mean €/m² from priced, area-known flats
+  // Everything refreshes after each monthly sync (1st of month, 04:00 UTC).
+  const m = (key) => metrics.find(x => x.metric_key === key)?.value_numeric;
+  const totalUnits = m("total_units_tracked");
+  const totalAvail = m("total_available");
+  const totalSold  = m("total_sold_to_date");
+  const avgEurM2   = m("avg_eur_m2");
 
   const label = lang === "sk" ? "Živé dáta z trhu" : "Live from the market";
   const tTotal = lang === "sk" ? "bytov sledovaných" : "units tracked";
