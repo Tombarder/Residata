@@ -554,7 +554,14 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
 
   // Flats numeric helpers
   const availFlats = flats.filter(f => f.stav === "V");
-  const availPrices = availFlats.map(f => Number(f.cena_s_dph)).filter(Number.isFinite);
+  // `Number(null) === 0` in JS — so the old filter `Number.isFinite`
+  // alone let null-priced flats through as 0, which then polluted
+  // the price histogram with a phantom '€0 units' bar on the far
+  // left. Guard against that explicitly. Same guard needed anywhere
+  // else that does `Number(f.cena_s_dph)` without checking for null.
+  const availPrices = availFlats
+    .map(f => Number(f.cena_s_dph))
+    .filter(v => Number.isFinite(v) && v > 0);
   const topPrice = availPrices.length ? Math.max(...availPrices) : null;
 
   // Has the developer published ANY prices? Some projects publish only
@@ -995,12 +1002,20 @@ function RoomMixChart({ rows, lang }) {
   const codeResv  = "R";  // same letter in both languages
   const codeSold  = lang === "sk" ? "P" : "S";
 
-  // Right-side headline: pick the most informative summary
+  // Right-side headline — unified metric across all rows of the same
+  // chart, not 'pick per row based on what's present'. Previous version
+  // switched metrics (% sold vs % reserved vs bare count) based on what
+  // each row happened to have → inconsistent, unreadable.
+  //
+  // Unified choice: "% available" (% F). Buyer-centric question
+  // "how much is still free?" — works for every data mode the same way.
+  // · V+P+R / V+P / V+R / P+R: {total} · {avail%} F
+  // · V-only: just {total} F (100% by definition, so the % is noise).
   const sideLabel = (r) => {
     if (r.total === 0) return "";
-    if (r.sold > 0)     return `${r.total} · ${Math.round((r.sold / r.total) * 100)}% ${codeSold}`;
-    if (r.reserved > 0) return `${r.total} · ${Math.round((r.reserved / r.total) * 100)}% ${codeResv}`;
-    return `${r.total} ${codeAvail}`;
+    if (vOnly) return `${r.total} ${codeAvail}`;
+    const availPct = Math.round((r.avail / r.total) * 100);
+    return `${r.total} · ${availPct}% ${codeAvail}`;
   };
 
   return (
@@ -1295,20 +1310,10 @@ function FlatsTable({ flats, t, lang, highlightedFlatId }) {
   // Compact th/td — local overrides so this table fits 12 columns on
   // one screen without horizontal scrolling. The global th/td (0.75rem
   // 1rem padding) is designed for wider tables with fewer columns.
-  const compactTh = {
-    padding: "0.5rem 0.35rem", fontWeight: 600,
-    // Sticky header — stays visible when user scrolls the flat list.
-    // top:108 keeps it below the fixed Nav (72px) + Ticker (36px). If
-    // nav chrome ever changes height, adjust this one number.
-    // Background is set on each TH (not <thead>) because sticky elements
-    // need their own opaque backdrop to cover the scrolled-behind rows.
-    position: "sticky",
-    top: 108,
-    background: "#0e0e10",
-    zIndex: 5,
-    // Small shadow to visually separate sticky header from scrolled rows
-    boxShadow: "inset 0 -1px 0 #222228, 0 2px 6px rgba(0,0,0,0.3)",
-  };
+  // Sticky header was reverted: it rendered misaligned in some layouts
+  // (stuck mid-page instead of top). Deferred until we find a version
+  // that plays well with the page-transition wrapper + nav+ticker chrome.
+  const compactTh = { padding: "0.5rem 0.35rem", fontWeight: 600 };
   const compactTd = { padding: "0.45rem 0.35rem", color: "#e8e8ed", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
 
   const [sort, setSort] = useState({ key: "unit", dir: "asc" });
