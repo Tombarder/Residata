@@ -894,10 +894,57 @@ function TakeupChart({ snaps, lang }) {
 }
 
 /* ── Room mix: horizontal stacked bars per room type ──────── */
+/* ── Room-type mix — horizontal stacked bars per room type ──
+ *
+ * Each row represents one room-count bucket (1-room, 2-room, …).
+ * Bar stack order (left → right): sold (P, orange) / reserved (R,
+ * gray) / available (V, green). Any segment that's 0 for a row is
+ * skipped so the remaining colours fill the bar correctly.
+ *
+ * Right-side label adapts to what data the row actually contains —
+ * the previous version hardcoded 'sold/total · sold%' which was
+ * completely misleading for projects that don't publish sold data
+ * (it showed '0/22 · 0%' even when 8 were reserved and 14 available).
+ * Now we pick the most informative label per row:
+ *   · If sold > 0 dominates story → 'X P / Y V (total) · Z% sold'
+ *   · Only available → 'Y V'
+ *   · Reserved + available, no sold → 'X R / Y V (total)'
+ *   · Mixed → list all non-zero segments in P/R/V stav codes
+ */
 function RoomMixChart({ rows, lang }) {
-  const W = 460, rowH = 26, gap = 6, labelW = 60, valueW = 80;
+  const W = 460, rowH = 26, gap = 6, labelW = 60;
+  // Right-hand label width — grew from 80 to 130 since the new label
+  // can show up to "12 P / 3 R / 7 V (22) · 55%" which is wide.
+  const valueW = 130;
   const barW = W - labelW - valueW - 20;
   const H = rows.length * (rowH + gap) + 8;
+
+  // Pick the right label for a row given which stav values it has
+  const rowLabel = (r) => {
+    const parts = [];
+    if (r.sold > 0)     parts.push(`${r.sold} P`);
+    if (r.reserved > 0) parts.push(`${r.reserved} R`);
+    if (r.avail > 0)    parts.push(`${r.avail} V`);
+
+    if (parts.length === 0) return `${r.total}`;
+
+    // Single-stav row (e.g. "22 V" or "14 P") — no need for totals/%
+    if (parts.length === 1) return parts[0];
+
+    // Mixed — show breakdown with total, plus a sold-% accent if
+    // sold is tracked (the 'absorption' signal buyers look for)
+    const head = parts.join(" · ");
+    const hasSold = r.sold > 0;
+    if (hasSold && r.total > 0) {
+      return `${head} (${r.total}) · ${Math.round((r.sold / r.total) * 100)}%`;
+    }
+    // No sold tracked — show reservation rate instead when applicable
+    if (r.reserved > 0 && r.total > 0) {
+      return `${head} (${r.total}) · ${Math.round((r.reserved / r.total) * 100)}% R`;
+    }
+    return `${head} (${r.total})`;
+  };
+
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}>
       {rows.map((r, i) => {
@@ -920,7 +967,7 @@ function RoomMixChart({ rows, lang }) {
             {resvW > 0 && <rect x={labelW + soldW} y={y} width={resvW} height={rowH} fill="#888" />}
             {availW > 0 && <rect x={labelW + soldW + resvW} y={y} width={availW} height={rowH} fill={green} />}
             <text x={W - 4} y={y + rowH / 2 + 4} textAnchor="end" fill={dim} fontFamily={mono} fontSize={10}>
-              {r.sold}/{r.total} · {Math.round(pct.sold)}%
+              {rowLabel(r)}
             </text>
           </g>
         );
