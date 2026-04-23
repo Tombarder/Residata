@@ -17,17 +17,21 @@ import { pushRoute, pathToPage, isAppPage } from "./lib/routing";
 import PlatformShell from "./pages/Platform";
 import { track } from "./lib/track";
 
-const pagesEN = ["Home", "Live", "Sample", "Use Cases", "Pricing", "Contact"];
-const pagesSK = ["Domov", "Live", "Ukážka", "Využitie", "Cenník", "Kontakt"];
-// SK-label → EN-key (routing + render je EN-keyed; SK je len UI nadpis v Nave)
+const pagesEN = ["Home", "Live", "What we deliver", "Use Cases", "Pricing", "Contact"];
+const pagesSK = ["Domov", "Live", "Čo dostanete", "Využitie", "Cenník", "Kontakt"];
+// Nav labels → internal page key. "Data" is the historical internal
+// name for the what-we-deliver / sample page; we keep it for route
+// stability (/sample URL still resolves) but the user-facing label
+// is now "Čo dostanete" / "What we deliver".
 const pageMap = {
   "Domov": "Home",
-  "Ukážka": "Data",     // pôvodne "Dáta" — teraz jednotne "Ukážka" / "Sample"
+  "Ukážka": "Data",             // legacy SK label still resolves
+  "Čo dostanete": "Data",
   "Využitie": "Use Cases",
   "Cenník": "Pricing",
   "Kontakt": "Contact",
-  // EN-ové aliasy pre prípad že nav dostane rovno EN label (defensive)
-  "Sample": "Data",
+  "Sample": "Data",             // legacy EN label still resolves
+  "What we deliver": "Data",
 };
 
 const t = {
@@ -591,66 +595,30 @@ function HomePage({ setCurrent, l, lang, onLogin }) {
         <DistrictPulse lang={lang} setCurrent={setCurrent} />
       </FadeIn>
 
-      {/* (Odstránený pôvodný HowItWorksFlow — nový PipelineFlow vyššie
-          pokrýva rovnaký príbeh bohatšie. Komponent ostal v HomeExtras
-          pre prípad budúceho návratu.) */}
+      {/* Value Prop (Questions + Deliverables + Flex Scope) used to live
+          here — moved to the dedicated "What we deliver" page so the
+          homepage stays focused on live market data and the offer
+          detail lives in one structured place. */}
 
-      {/* Value Prop — Questions left, What you get right */}
-      <FadeIn style={{ padding: "5rem 2rem 0", maxWidth: 1100, margin: "0 auto" }}>
-        <Label>{l.valueLabel}</Label>
-        <h2 className="sec-title">{l.valueTitle}</h2>
-        <p className="sec-desc" style={{ marginBottom: "3rem" }}>
-          {l.valueDesc}
-        </p>
-      </FadeIn>
-
-      <FadeIn delay={0.1} style={{ padding: "0 2rem 0", maxWidth: 1100, margin: "0 auto" }}>
-        <div className="value-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
-          {/* Left — Questions */}
-          <div style={{ border: "1px solid #222228", borderRadius: 12, background: "#16161a", padding: "2rem" }}>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem", color: "#00e5a0", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "1.25rem" }}>{l.questionsLabel}</div>
-            {l.questions.map((q, i) => (
-              <div key={i} style={{ display: "flex", gap: "0.75rem", marginBottom: "0.85rem", alignItems: "flex-start" }}>
-                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.72rem", color: "#00e5a0", marginTop: "0.15rem", flexShrink: 0 }}>→</span>
-                <span style={{ fontSize: "0.84rem", color: "#8a8a96", lineHeight: 1.55 }}>{q}</span>
-              </div>
-            ))}
-          </div>
-
-          {/* Right — What you get */}
-          <div style={{ border: "1px solid #222228", borderRadius: 12, background: "#16161a", padding: "2rem" }}>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem", color: "#00e5a0", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "1.25rem" }}>{l.deliveryLabel}</div>
-            {l.deliveryItems.map(([title, desc]) => (
-              <div key={title} style={{ display: "flex", gap: "0.75rem", marginBottom: "1.25rem", alignItems: "flex-start" }}>
-                <span style={{ color: "#00e5a0", fontSize: "0.85rem", marginTop: "0.15rem", flexShrink: 0 }}>✓</span>
-                <div>
-                  <div style={{ fontSize: "0.9rem", fontWeight: 500, color: "#e8e8ed", marginBottom: "0.2rem" }}>{title}</div>
-                  <div style={{ fontSize: "0.8rem", color: "#8a8a96", lineHeight: 1.55 }}>{desc}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </FadeIn>
-
-      {/* Flexible Scope — standalone */}
-      <FadeIn style={{ padding: "1.5rem 2rem 5rem", maxWidth: 1100, margin: "0 auto" }}>
+      {/* Short teaser pointing to the What-We-Deliver page */}
+      <FadeIn style={{ padding: "4rem 2rem 5rem", maxWidth: 1100, margin: "0 auto" }}>
         <div className="flex-scope" style={{
           border: "1px solid #222228", borderRadius: 12, background: "#16161a",
-          padding: "2.5rem", display: "grid", gridTemplateColumns: "auto 1fr", gap: "2rem", alignItems: "center",
+          padding: "2rem 2.25rem", display: "flex", gap: "1.25rem",
+          alignItems: "center", flexWrap: "wrap",
         }}>
-          <div style={{
-            width: 48, height: 48, borderRadius: 10,
-            background: "rgba(0,229,160,0.08)", border: "1px solid rgba(0,229,160,0.15)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontFamily: "'JetBrains Mono', monospace", fontSize: "1.1rem", color: "#00e5a0", fontWeight: 700,
-          }}>↗</div>
-          <div>
-            <div style={{ fontSize: "1.05rem", fontWeight: 600, color: "#e8e8ed", marginBottom: "0.4rem" }}>{l.flexTitle}</div>
-            <p style={{ fontSize: "0.85rem", color: "#8a8a96", lineHeight: 1.65, maxWidth: 700 }}>
-              {l.flexDesc}
+          <div style={{ flex: 1, minWidth: 260 }}>
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem", color: "#00e5a0", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.4rem" }}>
+              {l.valueLabel}
+            </div>
+            <div style={{ fontSize: "1.05rem", fontWeight: 600, color: "#e8e8ed", marginBottom: "0.4rem" }}>{l.valueTitle}</div>
+            <p style={{ fontSize: "0.85rem", color: "#8a8a96", lineHeight: 1.65, margin: 0 }}>
+              {l.valueDesc}
             </p>
           </div>
+          <button onClick={() => setCurrent("Data")} className="btn-p" style={{ whiteSpace: "nowrap" }}>
+            {lang === "sk" ? "Čo dostanete →" : "What we deliver →"}
+          </button>
         </div>
       </FadeIn>
     </>
@@ -927,15 +895,82 @@ function DataPage({ setCurrent, l, lang }) {
         .dark-scroll { scrollbar-width: thin; scrollbar-color: #333 #111113; }
       `}</style>
 
-      <div style={{ padding: "8rem 2rem 2rem", maxWidth: 1100, margin: "0 auto" }}>
-        <Label>{l.dataLabel}</Label>
-        <h1 className="sec-title">{l.dataTitle}</h1>
-        <p className="sec-desc">{l.dataDesc}</p>
-        {/* Kontext čoho sa to týka + odkaz na Home pre live čísla.
-            Predtým tu bol Stats blok (4 counter karty) + Trend chart +
-            By District tabuľka — tie sú teraz len raz, na Home, ako
-            MarketPulse / DistrictPulse s REÁLNYMI dátami. Sample page
-            sa nemá s nimi duplikovať. */}
+      {/* ═══ HERO — What we deliver (moved from Home) ═══
+          A two-column split: text on the left, market-analytics photo on
+          the right. Same visual language as the Use Cases page cards so
+          the "offer" feels like one brand, not two separate pitches. */}
+      <div style={{ padding: "7rem 2rem 1rem", maxWidth: 1200, margin: "0 auto" }}>
+        <div className="wwd-hero" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "3rem", alignItems: "center" }}>
+          <div>
+            <Label>{l.valueLabel}</Label>
+            <h1 className="sec-title" style={{ marginBottom: "0.75rem" }}>{l.valueTitle}</h1>
+            <p className="sec-desc" style={{ maxWidth: 520 }}>{l.valueDesc}</p>
+          </div>
+          <div style={{
+            borderRadius: 14, overflow: "hidden",
+            border: "1px solid #222228",
+            aspectRatio: "4 / 3", minHeight: 280,
+            background: `linear-gradient(135deg, rgba(0,229,160,0.08), rgba(0,0,0,0)), url("https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=1200&q=80&auto=format&fit=crop") center/cover`,
+          }} aria-label="Market analytics" />
+        </div>
+      </div>
+
+      {/* ═══ Questions ↔ Deliverables — core "what you get" grid ═══ */}
+      <div style={{ padding: "3rem 2rem 0", maxWidth: 1100, margin: "0 auto" }}>
+        <div className="value-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
+          <div style={{ border: "1px solid #222228", borderRadius: 12, background: "#16161a", padding: "2rem" }}>
+            <div style={{ fontFamily: mono, fontSize: "0.65rem", color: "#00e5a0", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "1.25rem" }}>{l.questionsLabel}</div>
+            {l.questions.map((q, i) => (
+              <div key={i} style={{ display: "flex", gap: "0.75rem", marginBottom: "0.85rem", alignItems: "flex-start" }}>
+                <span style={{ fontFamily: mono, fontSize: "0.72rem", color: "#00e5a0", marginTop: "0.15rem", flexShrink: 0 }}>→</span>
+                <span style={{ fontSize: "0.84rem", color: "#8a8a96", lineHeight: 1.55 }}>{q}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ border: "1px solid #222228", borderRadius: 12, background: "#16161a", padding: "2rem" }}>
+            <div style={{ fontFamily: mono, fontSize: "0.65rem", color: "#00e5a0", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "1.25rem" }}>{l.deliveryLabel}</div>
+            {l.deliveryItems.map(([title, desc]) => (
+              <div key={title} style={{ display: "flex", gap: "0.75rem", marginBottom: "1.25rem", alignItems: "flex-start" }}>
+                <span style={{ color: "#00e5a0", fontSize: "0.85rem", marginTop: "0.15rem", flexShrink: 0 }}>✓</span>
+                <div>
+                  <div style={{ fontSize: "0.9rem", fontWeight: 500, color: "#e8e8ed", marginBottom: "0.2rem" }}>{title}</div>
+                  <div style={{ fontSize: "0.8rem", color: "#8a8a96", lineHeight: 1.55 }}>{desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Flexible Scope — full-width card below the two columns */}
+      <div style={{ padding: "1.5rem 2rem 4rem", maxWidth: 1100, margin: "0 auto" }}>
+        <div className="flex-scope" style={{
+          border: "1px solid #222228", borderRadius: 12, background: "#16161a",
+          padding: "2rem 2.25rem", display: "grid", gridTemplateColumns: "auto 1fr", gap: "1.75rem", alignItems: "center",
+        }}>
+          <div style={{
+            width: 48, height: 48, borderRadius: 10,
+            background: "rgba(0,229,160,0.08)", border: "1px solid rgba(0,229,160,0.15)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontFamily: mono, fontSize: "1.1rem", color: "#00e5a0", fontWeight: 700,
+          }}>↗</div>
+          <div>
+            <div style={{ fontSize: "1.05rem", fontWeight: 600, color: "#e8e8ed", marginBottom: "0.4rem" }}>{l.flexTitle}</div>
+            <p style={{ fontSize: "0.85rem", color: "#8a8a96", lineHeight: 1.65, maxWidth: 700, margin: 0 }}>
+              {l.flexDesc}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* ═══ SAMPLE — concrete output the client actually receives ═══ */}
+      <div style={{ padding: "2rem 2rem 2rem", maxWidth: 1100, margin: "0 auto" }}>
+        <div style={{ borderTop: "1px solid #222228", paddingTop: "2.5rem" }}>
+          <Label>{l.dataLabel}</Label>
+          <h2 className="sec-title">{l.dataTitle}</h2>
+          <p className="sec-desc">{l.dataDesc}</p>
+        </div>
+
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: "1.5rem", paddingTop: "1.25rem", borderTop: "1px solid #222228", gap: "1rem", flexWrap: "wrap" }}>
           <div>
             <div style={{ fontSize: "0.85rem", fontWeight: 500, color: "#e8e8ed" }}>{l.dataContext}</div>
@@ -1587,6 +1622,7 @@ export default function App() {
         @media (max-width: 900px) {
           .contact-grid { grid-template-columns: 1fr !important; }
           .value-grid { grid-template-columns: 1fr !important; }
+          .wwd-hero { grid-template-columns: 1fr !important; gap: 1.5rem !important; }
           .case-card-grid { grid-template-columns: 1fr !important; }
           .stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
           .insight-grid { grid-template-columns: 1fr 1fr !important; }
