@@ -205,14 +205,15 @@ function DashboardPanel({ captionRow1, captionRow2, chipLabels }) {
       <g transform="translate(16, 160)">
         <rect x="0" y="0" width="278" height="50" rx="6" fill="#0a0a0b" stroke="#1a1a1f" strokeWidth="0.6" />
         {/* Row 1 */}
-        <text x="10" y="18" fill="#e8e8ed" fontFamily="'Outfit', sans-serif" fontSize="10" fontWeight="600">Slnečnice Viladomy</text>
+        {/* Real active projects with real avg_price_eur_m2 from DB. */}
+        <text x="10" y="18" fill="#e8e8ed" fontFamily="'Outfit', sans-serif" fontSize="10" fontWeight="600">Slnecnice</text>
         <text x="150" y="18" fill="#8a8a96" fontFamily={mono} fontSize="9">Petržalka</text>
-        <text x="225" y="18" fill="#00e5a0" fontFamily={mono} fontSize="9" fontWeight="700">3,650 €/m²</text>
+        <text x="225" y="18" fill="#00e5a0" fontFamily={mono} fontSize="9" fontWeight="700">4,963 €/m²</text>
         {/* Row 2 */}
         <line x1="8" y1="26" x2="270" y2="26" stroke="#1a1a1f" strokeWidth="0.5" />
-        <text x="10" y="42" fill="#e8e8ed" fontFamily="'Outfit', sans-serif" fontSize="10" fontWeight="600">Eurovea City</text>
-        <text x="150" y="42" fill="#8a8a96" fontFamily={mono} fontSize="9">Ružinov</text>
-        <text x="225" y="42" fill="#00e5a0" fontFamily={mono} fontSize="9" fontWeight="700">5,510 €/m²</text>
+        <text x="10" y="42" fill="#e8e8ed" fontFamily="'Outfit', sans-serif" fontSize="10" fontWeight="600">Downtown Yards</text>
+        <text x="150" y="42" fill="#8a8a96" fontFamily={mono} fontSize="9">Staré Mesto</text>
+        <text x="225" y="42" fill="#00e5a0" fontFamily={mono} fontSize="9" fontWeight="700">7,088 €/m²</text>
       </g>
 
       {/* Export chips */}
