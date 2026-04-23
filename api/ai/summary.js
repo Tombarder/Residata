@@ -189,42 +189,12 @@ export default async function handler(req, res) {
     });
   }
 
-  // Resolve ANTHROPIC_API_KEY — env var wins; otherwise fall back to
-  // the app_secrets table in Supabase (populated by the agent so the
-  // user didn't have to copy-paste into Vercel envs manually).
-  let apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    apiKey = await readSecret("ANTHROPIC_API_KEY");
-  }
-  if (!apiKey) {
-    return res.status(501).json({
-      error: "AI disabled on the server (ANTHROPIC_API_KEY missing).",
-    });
-  }
-
-  // ── Body read + validate ──
-  let body = req.body;
-  if (typeof body === "string") {
-    try { body = JSON.parse(body); } catch { return res.status(400).json({ error: "invalid JSON body" }); }
-  }
-  if (!body || typeof body !== "object") {
-    return res.status(400).json({ error: "empty body" });
-  }
-  const { context, lang = "sk" } = body;
-  if (!context || typeof context !== "object") {
-    return res.status(400).json({ error: "missing context" });
-  }
-  const serialized = JSON.stringify(context);
-  if (serialized.length > MAX_INPUT_BYTES) {
-    return res.status(413).json({ error: `context too large (${serialized.length} bytes > ${MAX_INPUT_BYTES})` });
-  }
-
-  // ── Auth — REQUIRED. Anon tier removed. ──
-  // Anyone who wants AI summary has to be logged in. This closes the
-  // biggest cost-abuse vector (random internet traffic burning credit).
-  // Creating an account still costs the attacker time — email domain
-  // validation blocks disposable addresses (see emailValidation.js),
-  // and manual admin approval gates tier upgrades.
+  // ── Auth check FIRST (before any other logic) ──
+  // Order matters for cost protection: validate the caller before we
+  // do anything else. A 400 leak on body shape is harmless on its own,
+  // but rejecting unauthed callers immediately keeps the endpoint
+  // opaque and stops attackers from probing internals.
+  // Anon tier removed — the biggest cost-abuse vector.
   const SUPABASE_URL        = process.env.SUPABASE_URL;
   const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY;
   if (!SUPABASE_URL || !SUPABASE_SECRET_KEY) {
@@ -252,13 +222,39 @@ export default async function handler(req, res) {
       .eq("id", userId)
       .maybeSingle();
     tier = prof?.tier || "free";
-    // Hard-block pending users — account created but not yet approved.
-    // They shouldn't be able to spend Anthropic credit.
     if (tier === "pending") {
       return res.status(403).json({ error: "account pending approval" });
     }
   } catch (_) {
     return res.status(401).json({ error: "auth verification failed" });
+  }
+
+  // Resolve ANTHROPIC_API_KEY — env wins; app_secrets fallback.
+  let apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    apiKey = await readSecret("ANTHROPIC_API_KEY");
+  }
+  if (!apiKey) {
+    return res.status(501).json({
+      error: "AI disabled on the server (ANTHROPIC_API_KEY missing).",
+    });
+  }
+
+  // ── Body read + validate (only after caller is authenticated) ──
+  let body = req.body;
+  if (typeof body === "string") {
+    try { body = JSON.parse(body); } catch { return res.status(400).json({ error: "invalid JSON body" }); }
+  }
+  if (!body || typeof body !== "object") {
+    return res.status(400).json({ error: "empty body" });
+  }
+  const { context, lang = "sk" } = body;
+  if (!context || typeof context !== "object") {
+    return res.status(400).json({ error: "missing context" });
+  }
+  const serialized = JSON.stringify(context);
+  if (serialized.length > MAX_INPUT_BYTES) {
+    return res.status(413).json({ error: `context too large (${serialized.length} bytes > ${MAX_INPUT_BYTES})` });
   }
 
   // ── Rate limiting (per-user, rolling hour + day) ──
