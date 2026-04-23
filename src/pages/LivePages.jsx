@@ -419,6 +419,20 @@ export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en
   const { snapshots } = useProjectSnapshots();
   const project = projects.find(p => p.id === projectId);
 
+  // Scatter-plot → table handoff: clicking a dot in AreaPriceScatter
+  // scrolls the matching row into view and flashes it briefly. The ID
+  // is cleared after 3.5s so the glow animation doesn't linger.
+  const [highlightedFlatId, setHighlightedFlatId] = useState(null);
+  const onSelectFlat = (flatId) => {
+    if (!flatId) return;
+    setHighlightedFlatId(flatId);
+    // Scroll the actual row into view (not the whole table) — handled
+    // inside FlatsTable via its own useEffect on the ID.
+    window.setTimeout(() => {
+      setHighlightedFlatId(prev => prev === flatId ? null : prev);
+    }, 3500);
+  };
+
   // Track project open
   useEffect(() => {
     if (projectId) track("project_view", { project_id: projectId, project_name: project?.name });
@@ -529,8 +543,8 @@ export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en
           </div>
         ) :
         <>
-          {project && <ProjectInsights project={project} flats={flats} snapshots={snapshots} lang={lang} />}
-          <FlatsTable flats={flats} t={t} lang={lang} />
+          {project && <ProjectInsights project={project} flats={flats} snapshots={snapshots} lang={lang} onSelectFlat={onSelectFlat} />}
+          <FlatsTable flats={flats} t={t} lang={lang} highlightedFlatId={highlightedFlatId} />
         </>}
     </main>
   );
@@ -541,7 +555,7 @@ export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en
    client-side from whatever flats / snapshots we already load — no
    extra backend work. Every chart is self-contained (no deps, just
    React + SVG) so bundle stays small. */
-function ProjectInsights({ project, flats, snapshots, lang }) {
+function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
   const locale = lang === "sk" ? "sk-SK" : "en-US";
   const fmtEur = (v) => v == null || !Number.isFinite(v) ? "—" : `${Math.round(v).toLocaleString("en-US").replace(/,/g, " ")} €`;
   const fmtPct = (v) => v == null || !Number.isFinite(v) ? "—" : `${(Math.round(v * 10) / 10).toFixed(1)}%`;
@@ -670,7 +684,7 @@ function ProjectInsights({ project, flats, snapshots, lang }) {
       {flats.length >= 5 && (
         <ChartCard title={L("Plocha × cena (všetky byty)", "Area × price (all units)")}
           subtitle={L("Každý bod = 1 byt · sklon ~ priemerná €/m²", "Each dot = 1 unit · slope ≈ avg €/m²")}>
-          <AreaPriceScatter flats={flats} lang={lang} />
+          <AreaPriceScatter flats={flats} lang={lang} onSelectFlat={onSelectFlat} />
         </ChartCard>
       )}
 
@@ -867,15 +881,21 @@ function PriceHistogram({ prices }) {
   );
 }
 
-/* ── Scatter: area_m² (X) × price_€ (Y), dot per unit ──── */
-function AreaPriceScatter({ flats, lang }) {
+/* ── Scatter: area_m² (X) × price_€ (Y), dot per unit ──────────
+   Each dot carries its full flat object so hover shows a rich HTML
+   tooltip (unit · interior · price · €/m²) and click propagates the
+   flat ID up so LiveProjectDetail can scroll + highlight its row. */
+function AreaPriceScatter({ flats, lang, onSelectFlat }) {
   const W = 940, H = 260, pad = { l: 50, r: 16, t: 12, b: 36 };
   const innerW = W - pad.l - pad.r, innerH = H - pad.t - pad.b;
+  const locale = lang === "sk" ? "sk-SK" : "en-US";
+
   const points = flats
     .map(f => ({
       x: Number(f.obytna_plocha || f.celkova_plocha),
       y: Number(f.cena_s_dph),
       stav: f.stav,
+      flat: f,
     }))
     .filter(p => Number.isFinite(p.x) && Number.isFinite(p.y) && p.x > 0 && p.y > 0);
   if (points.length === 0) return <div style={{ color: dim, fontSize: "0.8rem", textAlign: "center", padding: "1rem" }}>—</div>;
@@ -892,42 +912,111 @@ function AreaPriceScatter({ flats, lang }) {
 
   const colorFor = (stav) => stav === "V" ? green : stav === "P" ? "#f5a623" : stav === "R" || stav === "PR" ? "#888" : dim;
 
+  // Hover state for the rich tooltip — {flat, clientX, clientY} relative
+  // to the <svg>'s bounding rect so we can position an HTML overlay.
+  const [hover, setHover] = useState(null);
+  const wrapperRef = useRef(null);
+
+  const handleMove = (e, flat) => {
+    const rect = wrapperRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setHover({
+      flat,
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    });
+  };
+
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block", overflow: "visible" }}>
-      {/* Grid: 3 vertical + 3 horizontal */}
-      {[0.25, 0.5, 0.75].map((t, i) => (
-        <g key={i}>
-          <line x1={pad.l + innerW * t} x2={pad.l + innerW * t} y1={pad.t} y2={pad.t + innerH} stroke={border} strokeWidth={1} />
-          <line x1={pad.l} x2={pad.l + innerW} y1={pad.t + innerH * t} y2={pad.t + innerH * t} stroke={border} strokeWidth={1} />
+    <div ref={wrapperRef} style={{ position: "relative" }}>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block", overflow: "visible" }}>
+        {/* Grid: 3 vertical + 3 horizontal */}
+        {[0.25, 0.5, 0.75].map((t, i) => (
+          <g key={i}>
+            <line x1={pad.l + innerW * t} x2={pad.l + innerW * t} y1={pad.t} y2={pad.t + innerH} stroke={border} strokeWidth={1} />
+            <line x1={pad.l} x2={pad.l + innerW} y1={pad.t + innerH * t} y2={pad.t + innerH * t} stroke={border} strokeWidth={1} />
+          </g>
+        ))}
+        {/* Fit line */}
+        {avgPerM2 > 0 && (
+          <line x1={xAt(xMin)} x2={xAt(xMax)} y1={yAt(xMin * avgPerM2)} y2={yAt(xMax * avgPerM2)}
+            stroke="#e8e8ed" strokeWidth={1.5} strokeDasharray="5,4" opacity={0.5} />
+        )}
+        {/* Points — clickable, hoverable, with visual feedback */}
+        {points.map((p, i) => {
+          const isHovered = hover?.flat?.id === p.flat.id;
+          return (
+            <circle
+              key={p.flat.id || i}
+              cx={xAt(p.x)} cy={yAt(p.y)}
+              r={isHovered ? 7 : 4}
+              fill={colorFor(p.stav)}
+              opacity={hover && !isHovered ? 0.35 : 0.85}
+              style={{ cursor: onSelectFlat ? "pointer" : "default", transition: "r 0.12s, opacity 0.12s" }}
+              onMouseEnter={(e) => handleMove(e, p.flat)}
+              onMouseMove={(e) => handleMove(e, p.flat)}
+              onMouseLeave={() => setHover(null)}
+              onClick={() => onSelectFlat && onSelectFlat(p.flat.id)}
+            />
+          );
+        })}
+        {/* Axis labels */}
+        <text x={pad.l} y={H - 12} fill={dim} fontFamily={mono} fontSize={10}>{`${Math.round(xMin)} m²`}</text>
+        <text x={W - pad.r} y={H - 12} textAnchor="end" fill={dim} fontFamily={mono} fontSize={10}>{`${Math.round(xMax)} m²`}</text>
+        <text x={pad.l - 6} y={pad.t + 10} textAnchor="end" fill={dim} fontFamily={mono} fontSize={10} transform={`rotate(-90 ${pad.l - 6} ${pad.t + 10})`}>
+          {`${Math.round(yMax / 1000)}k €`}
+        </text>
+        <text x={pad.l - 6} y={pad.t + innerH} textAnchor="end" fill={dim} fontFamily={mono} fontSize={10} transform={`rotate(-90 ${pad.l - 6} ${pad.t + innerH})`}>
+          {`${Math.round(yMin / 1000)}k €`}
+        </text>
+        {/* Legend */}
+        <g transform={`translate(${pad.l + 8}, ${pad.t + 12})`}>
+          <circle cx={4} cy={4} r={3} fill={green} /><text x={12} y={7} fill={dim} fontFamily={mono} fontSize={10}>{lang === "sk" ? "voľné" : "available"}</text>
+          <circle cx={72} cy={4} r={3} fill="#f5a623" /><text x={80} y={7} fill={dim} fontFamily={mono} fontSize={10}>{lang === "sk" ? "predané" : "sold"}</text>
+          <circle cx={132} cy={4} r={3} fill="#888" /><text x={140} y={7} fill={dim} fontFamily={mono} fontSize={10}>{lang === "sk" ? "rezervované" : "reserved"}</text>
         </g>
-      ))}
-      {/* Fit line */}
-      {avgPerM2 > 0 && (
-        <line x1={xAt(xMin)} x2={xAt(xMax)} y1={yAt(xMin * avgPerM2)} y2={yAt(xMax * avgPerM2)}
-          stroke="#e8e8ed" strokeWidth={1.5} strokeDasharray="5,4" opacity={0.5} />
-      )}
-      {/* Points */}
-      {points.map((p, i) => (
-        <circle key={i} cx={xAt(p.x)} cy={yAt(p.y)} r={4} fill={colorFor(p.stav)} opacity={0.75}>
-          <title>{`${p.x} m² · ${Math.round(p.y).toLocaleString("en-US").replace(/,/g, " ")} € · ${p.stav || "?"}`}</title>
-        </circle>
-      ))}
-      {/* Axis labels */}
-      <text x={pad.l} y={H - 12} fill={dim} fontFamily={mono} fontSize={10}>{`${Math.round(xMin)} m²`}</text>
-      <text x={W - pad.r} y={H - 12} textAnchor="end" fill={dim} fontFamily={mono} fontSize={10}>{`${Math.round(xMax)} m²`}</text>
-      <text x={pad.l - 6} y={pad.t + 10} textAnchor="end" fill={dim} fontFamily={mono} fontSize={10} transform={`rotate(-90 ${pad.l - 6} ${pad.t + 10})`}>
-        {`${Math.round(yMax / 1000)}k €`}
-      </text>
-      <text x={pad.l - 6} y={pad.t + innerH} textAnchor="end" fill={dim} fontFamily={mono} fontSize={10} transform={`rotate(-90 ${pad.l - 6} ${pad.t + innerH})`}>
-        {`${Math.round(yMin / 1000)}k €`}
-      </text>
-      {/* Legend */}
-      <g transform={`translate(${pad.l + 8}, ${pad.t + 12})`}>
-        <circle cx={4} cy={4} r={3} fill={green} /><text x={12} y={7} fill={dim} fontFamily={mono} fontSize={10}>{lang === "sk" ? "voľné" : "available"}</text>
-        <circle cx={72} cy={4} r={3} fill="#f5a623" /><text x={80} y={7} fill={dim} fontFamily={mono} fontSize={10}>{lang === "sk" ? "predané" : "sold"}</text>
-        <circle cx={132} cy={4} r={3} fill="#888" /><text x={140} y={7} fill={dim} fontFamily={mono} fontSize={10}>{lang === "sk" ? "rezervované" : "reserved"}</text>
-      </g>
-    </svg>
+      </svg>
+
+      {/* HTML tooltip — richer than SVG <title>, styleable, follows cursor.
+          Positioned via wrapper rect so it tracks the pointer inside the
+          chart. pointer-events:none so it doesn't steal hover from dots. */}
+      {hover && (() => {
+        const f = hover.flat;
+        const m2 = (f.cena_s_dph != null && f.obytna_plocha != null && Number(f.obytna_plocha) > 0)
+          ? Math.round(Number(f.cena_s_dph) / Number(f.obytna_plocha)) : null;
+        return (
+          <div style={{
+            position: "absolute",
+            left: hover.x + 14, top: hover.y + 14,
+            background: "#0b0b0e",
+            border: `1px solid ${border}`,
+            borderLeft: `3px solid ${colorFor(f.stav)}`,
+            borderRadius: 8, padding: "0.55rem 0.75rem",
+            fontSize: "0.8rem", color: "#e8e8ed",
+            pointerEvents: "none", zIndex: 20, whiteSpace: "nowrap",
+            boxShadow: "0 10px 24px rgba(0,0,0,0.6)",
+            maxWidth: 280,
+          }}>
+            <div style={{ fontWeight: 600, marginBottom: "0.35rem" }}>
+              {f.unit_detail || f.unit_id || "—"}
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "0.2rem 0.6rem", fontSize: "0.76rem" }}>
+              <span style={{ color: dim }}>Interiér</span>
+              <span style={{ fontFamily: mono }}>{f.obytna_plocha ? `${f.obytna_plocha} m²` : "—"}</span>
+              <span style={{ color: dim }}>Cena</span>
+              <span style={{ fontFamily: mono }}>{f.cena_s_dph != null ? `${Math.round(f.cena_s_dph).toLocaleString(locale)} €` : "—"}</span>
+              <span style={{ color: dim }}>Cena/m²</span>
+              <span style={{ fontFamily: mono, color: green }}>{m2 != null ? `${m2.toLocaleString(locale)} €` : "—"}</span>
+            </div>
+            {onSelectFlat && (
+              <div style={{ marginTop: "0.4rem", fontSize: "0.68rem", color: dim, fontStyle: "italic" }}>
+                klikni pre zobrazenie v tabuľke →
+              </div>
+            )}
+          </div>
+        );
+      })()}
+    </div>
   );
 }
 
@@ -938,7 +1027,7 @@ function median(arr) {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 }
 
-function FlatsTable({ flats, t, lang }) {
+function FlatsTable({ flats, t, lang, highlightedFlatId }) {
   const stavStyle = {
     V: { color: "#00e5a0", bg: "rgba(0,229,160,0.08)" },
     P: { color: "#f5a623", bg: "rgba(245,166,35,0.08)" },
@@ -947,11 +1036,9 @@ function FlatsTable({ flats, t, lang }) {
   };
   const locale = lang === "sk" ? "sk-SK" : "en-US";
 
-  // ── Sortable columns ─────────────────────────────────────────
-  // Each column declares: its label, value accessor, kind (num vs text),
-  // and default direction on first click. Clicking the same header again
-  // toggles direction. Nulls always sort to the end regardless of dir so
-  // an "asc by cena" view doesn't front-load the un-priced flats.
+  // ── Sortable + filterable columns ─────────────────────────────
+  // kind: "num" → range filter (min/max)
+  // kind: "text" → include-list filter (checkbox of distinct values)
   const COLS = [
     { key: "unit",      label: t.tbl_flat,        align: "left",  kind: "text", def: "asc",  get: f => f.unit_detail || f.unit_id || "" },
     { key: "budova",    label: t.tbl_building,    align: "left",  kind: "text", def: "asc",  get: f => f.budova || "" },
@@ -961,8 +1048,6 @@ function FlatsTable({ flats, t, lang }) {
     { key: "exterior",  label: t.tbl_exterior,    align: "right", kind: "num",  def: "asc",  get: f => f.exterier_plocha },
     { key: "total",     label: t.tbl_total,       align: "right", kind: "num",  def: "asc",  get: f => f.celkova_plocha },
     { key: "price",     label: t.tbl_price,       align: "right", kind: "num",  def: "asc",  get: f => f.cena_s_dph },
-    // Cena na m² obytnej — rovnaký vzorec ako v Sheets: cena_s_dph / obytna_plocha
-    // (NIE celková plocha — inak by sa do menovateľa rátali aj balkóny).
     { key: "price_m2",  label: t.tbl_eur_m2,      align: "right", kind: "num",  def: "asc",
       get: f => (f.cena_s_dph != null && f.obytna_plocha != null && Number(f.obytna_plocha) > 0)
                 ? Number(f.cena_s_dph) / Number(f.obytna_plocha) : null },
@@ -971,22 +1056,50 @@ function FlatsTable({ flats, t, lang }) {
     { key: "stav",      label: t.tbl_status,      align: "left",  kind: "text", def: "asc",  get: f => f.stav || "" },
   ];
 
-  // Default: by flat id, ascending — same order users got before.
   const [sort, setSort] = useState({ key: "unit", dir: "asc" });
+  // columnFilters: { [colKey]: { values: Set<string> }  (text mode)
+  //                           | { min: number|null, max: number|null }  (num mode) }
+  const [columnFilters, setColumnFilters] = useState({});
+  // Which column's filter popup is currently open (null = none).
+  const [openFilterCol, setOpenFilterCol] = useState(null);
+
   const onHeaderClick = (col) => {
     setSort(prev => prev.key === col.key
       ? { key: col.key, dir: prev.dir === "asc" ? "desc" : "asc" }
       : { key: col.key, dir: col.def });
   };
 
+  // ── Apply filters ────────────────────────────────────────────
+  const filteredFlats = flats.filter(f => {
+    for (const col of COLS) {
+      const cf = columnFilters[col.key];
+      if (!cf) continue;
+      const v = col.get(f);
+      if (col.kind === "num") {
+        if (v == null || !Number.isFinite(Number(v))) {
+          // numeric filter with value missing → drop unless user opted in
+          if (!cf.includeEmpty) return false;
+          continue;
+        }
+        const n = Number(v);
+        if (cf.min != null && n < cf.min) return false;
+        if (cf.max != null && n > cf.max) return false;
+      } else {
+        if (!cf.values || cf.values.size === 0) continue;
+        const key = v == null || v === "" ? "__empty__" : String(v);
+        if (!cf.values.has(key)) return false;
+      }
+    }
+    return true;
+  });
+
+  // ── Sort ─────────────────────────────────────────────────────
   const sortedFlats = (() => {
     const col = COLS.find(c => c.key === sort.key) || COLS[0];
     const dir = sort.dir === "desc" ? -1 : 1;
-    const copy = [...flats];
+    const copy = [...filteredFlats];
     copy.sort((a, b) => {
-      const av = col.get(a);
-      const bv = col.get(b);
-      // null/undefined → sort to end regardless of dir
+      const av = col.get(a), bv = col.get(b);
       const ae = av == null || av === "";
       const be = bv == null || bv === "";
       if (ae && be) return 0;
@@ -999,38 +1112,123 @@ function FlatsTable({ flats, t, lang }) {
   })();
 
   const sortArrow = (col) => {
-    if (sort.key !== col.key) {
-      // subtle hint that the column is sortable — two faded chevrons
-      return <span style={{ opacity: 0.25, marginLeft: 4, fontSize: "0.62rem" }}>↕</span>;
-    }
-    return <span style={{ color: green, marginLeft: 4, fontSize: "0.7rem" }}>{sort.dir === "asc" ? "▴" : "▾"}</span>;
+    if (sort.key !== col.key) return <span style={{ opacity: 0.25, marginLeft: 3, fontSize: "0.62rem" }}>↕</span>;
+    return <span style={{ color: green, marginLeft: 3, fontSize: "0.7rem" }}>{sort.dir === "asc" ? "▴" : "▾"}</span>;
   };
 
+  // Is this column currently filtered (effectively narrowing results)?
+  const isFilterActive = (col) => {
+    const cf = columnFilters[col.key];
+    if (!cf) return false;
+    if (col.kind === "num") return cf.min != null || cf.max != null;
+    return cf.values && cf.values.size > 0;
+  };
+
+  const updateColumnFilter = (colKey, patch) => {
+    setColumnFilters(prev => {
+      const next = { ...prev };
+      if (patch == null) delete next[colKey];
+      else next[colKey] = patch;
+      return next;
+    });
+  };
+
+  // ── Highlight row from scatter click ────────────────────────
+  // Scroll matching row into view when highlightedFlatId changes; the
+  // pulse animation picks up via a className match in render.
+  useEffect(() => {
+    if (!highlightedFlatId) return;
+    // defer by a frame so the row is rendered before we scroll
+    const id = requestAnimationFrame(() => {
+      const row = document.getElementById(`flat-row-${highlightedFlatId}`);
+      row?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [highlightedFlatId]);
+
+  const totalCount = flats.length;
+  const visibleCount = sortedFlats.length;
+
   return (
-    <ProtectedData lang={lang} style={{ border: `1px solid ${border}`, borderRadius: 12, overflow: "hidden" }}>
+    <ProtectedData lang={lang} style={{ border: `1px solid ${border}`, borderRadius: 12, overflow: "visible" }}>
+      {/* Filter summary bar — only shown when any filter is active */}
+      {visibleCount !== totalCount && (
+        <div style={{
+          padding: "0.55rem 0.9rem", background: "rgba(0,229,160,0.04)",
+          borderBottom: `1px solid ${border}`, fontSize: "0.78rem",
+          display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap",
+        }}>
+          <span style={{ color: dim }}>
+            {lang === "sk" ? "Zobrazuje sa" : "Showing"} <strong style={{ color: text }}>{visibleCount}</strong> {lang === "sk" ? "z" : "of"} {totalCount} {lang === "sk" ? "bytov" : "flats"}
+          </span>
+          <button onClick={() => setColumnFilters({})}
+            style={{ marginLeft: "auto", background: "transparent", border: "none", color: dim, cursor: "pointer", fontSize: "0.74rem", textDecoration: "underline" }}>
+            {lang === "sk" ? "vymazať filtre" : "clear filters"}
+          </button>
+        </div>
+      )}
+
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
           <thead style={{ background: "#0e0e10" }}>
             <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-              {COLS.map(col => (
-                <th key={col.key}
-                    onClick={() => onHeaderClick(col)}
-                    style={{
-                      ...th, textAlign: col.align, cursor: "pointer", userSelect: "none",
-                      color: sort.key === col.key ? "#e8e8ed" : dim,
-                      transition: "color 0.12s",
-                    }}
-                    onMouseEnter={e => { if (sort.key !== col.key) e.currentTarget.style.color = "#c4c4cc"; }}
-                    onMouseLeave={e => { if (sort.key !== col.key) e.currentTarget.style.color = dim; }}
-                    title={lang === "sk" ? "Klikni pre zoradenie" : "Click to sort"}>
-                  {col.label}{sortArrow(col)}
-                </th>
-              ))}
+              {COLS.map(col => {
+                const filterActive = isFilterActive(col);
+                return (
+                  <th key={col.key}
+                      style={{
+                        ...th, textAlign: col.align, userSelect: "none",
+                        color: sort.key === col.key ? "#e8e8ed" : dim,
+                        position: "relative",
+                      }}>
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
+                      <span onClick={() => onHeaderClick(col)}
+                            style={{ cursor: "pointer" }}
+                            title={lang === "sk" ? "Klikni pre zoradenie" : "Click to sort"}>
+                        {col.label}{sortArrow(col)}
+                      </span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setOpenFilterCol(openFilterCol === col.key ? null : col.key); }}
+                        title={lang === "sk" ? "Filtrovať" : "Filter"}
+                        style={{
+                          background: filterActive ? "rgba(0,229,160,0.18)" : "transparent",
+                          border: `1px solid ${filterActive ? green : "transparent"}`,
+                          color: filterActive ? green : dim,
+                          borderRadius: 3, cursor: "pointer", padding: "0 3px",
+                          fontSize: "0.72rem", lineHeight: 1,
+                        }}>
+                        ⛆
+                      </button>
+                    </div>
+                    {openFilterCol === col.key && (
+                      <ColumnFilterMenu
+                        col={col}
+                        flats={flats}
+                        filter={columnFilters[col.key]}
+                        onApply={(patch) => { updateColumnFilter(col.key, patch); setOpenFilterCol(null); }}
+                        onClose={() => setOpenFilterCol(null)}
+                        lang={lang}
+                        locale={locale}
+                      />
+                    )}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
-            {sortedFlats.map(f => (
-              <tr key={f.id} style={{ borderTop: `1px solid ${border}` }}>
+            {sortedFlats.length === 0 && (
+              <tr><td colSpan={COLS.length} style={{ ...td, textAlign: "center", color: dim, padding: "1.25rem", fontStyle: "italic" }}>
+                {lang === "sk" ? "Žiadne byty neprešli filtrami." : "No flats match the filters."}
+              </td></tr>
+            )}
+            {sortedFlats.map(f => {
+              const isHl = f.id === highlightedFlatId;
+              return (
+              <tr key={f.id}
+                  id={`flat-row-${f.id}`}
+                  className={isHl ? "flat-row-flash" : ""}
+                  style={{ borderTop: `1px solid ${border}` }}>
                 <td style={td}><strong>{f.unit_detail || f.unit_id}</strong></td>
                 <td style={{ ...td, color: dim }}>{f.budova || "—"}</td>
                 <td style={{ ...td, fontFamily: mono }}>{f.poschodie ?? "—"}</td>
@@ -1058,13 +1256,228 @@ function FlatsTable({ flats, t, lang }) {
                   ) : <span style={{ color: dim, fontSize: "0.75rem" }}>{f.stav || "—"}</span>}
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
+      {/* Highlight pulse — 3s flash on the row matched by scatter click.
+          Keyframes defined inline so FlatsTable is self-contained. */}
+      <style>{`
+        @keyframes flatRowFlash {
+          0%   { background-color: rgba(0,229,160,0.35); box-shadow: inset 0 0 0 2px rgba(0,229,160,0.6); }
+          60%  { background-color: rgba(0,229,160,0.12); box-shadow: inset 0 0 0 1px rgba(0,229,160,0.3); }
+          100% { background-color: transparent; box-shadow: none; }
+        }
+        .flat-row-flash > td { animation: flatRowFlash 3s ease-out; }
+      `}</style>
     </ProtectedData>
   );
 }
+
+/* ── Per-column filter menu — inline popover anchored under the TH.
+      Text columns: checkbox list of distinct values + search.
+      Number columns: min / max range with placeholder hints. */
+function ColumnFilterMenu({ col, flats, filter, onApply, onClose, lang, locale }) {
+  // Local draft so "použiť" commits, "zrušiť" discards.
+  const isNum = col.kind === "num";
+
+  // Distinct values + numeric stats derived once per open
+  const { distinct, hasEmpty, numStats } = (() => {
+    const seen = new Set();
+    const strs = [];
+    const nums = [];
+    let empty = false;
+    for (const f of flats) {
+      const v = col.get(f);
+      if (v == null || v === "") { empty = true; continue; }
+      if (isNum) {
+        const n = Number(v);
+        if (Number.isFinite(n)) nums.push(n);
+      } else {
+        const s = String(v);
+        const k = s.trim().toLowerCase();
+        if (!seen.has(k)) { seen.add(k); strs.push(s); }
+      }
+    }
+    strs.sort((a, b) => String(a).localeCompare(String(b), locale, { numeric: true }));
+    let stats = null;
+    if (nums.length) {
+      const s = [...nums].sort((a, b) => a - b);
+      stats = { min: s[0], max: s[s.length - 1] };
+    }
+    return { distinct: strs, hasEmpty: empty, numStats: stats };
+  })();
+
+  // Drafts
+  const initSelected = filter?.values ? new Set(filter.values) : new Set();
+  const [selected, setSelected] = useState(initSelected);
+  const [minV, setMinV] = useState(filter?.min ?? "");
+  const [maxV, setMaxV] = useState(filter?.max ?? "");
+  const [search, setSearch] = useState("");
+
+  // Close on outside click / Esc
+  useEffect(() => {
+    const onDown = (e) => {
+      const pop = document.getElementById(`flats-col-filter-${col.key}`);
+      if (pop && !pop.contains(e.target)) onClose();
+    };
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [col.key, onClose]);
+
+  const toggleVal = (v) => setSelected(prev => {
+    const n = new Set(prev);
+    if (n.has(v)) n.delete(v); else n.add(v);
+    return n;
+  });
+
+  const commit = () => {
+    if (isNum) {
+      const min = minV === "" ? null : Number(minV);
+      const max = maxV === "" ? null : Number(maxV);
+      if (min == null && max == null) onApply(null);
+      else onApply({ min, max });
+    } else {
+      if (selected.size === 0) onApply(null);
+      else onApply({ values: selected });
+    }
+  };
+  const clearAll = () => { onApply(null); };
+
+  const q = search.trim().toLowerCase();
+  const shown = q ? distinct.filter(v => String(v).toLowerCase().includes(q)) : distinct;
+
+  return (
+    <div id={`flats-col-filter-${col.key}`}
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        position: "absolute", top: "100%", left: 0,
+        marginTop: 4, width: 260, zIndex: 50,
+        background: "#111116", border: `1px solid ${border}`,
+        borderRadius: 8, padding: "0.7rem 0.8rem",
+        boxShadow: "0 16px 40px rgba(0,0,0,0.55)",
+        color: "#e8e8ed", fontFamily: "inherit", letterSpacing: "normal",
+        textTransform: "none", fontSize: "0.82rem",
+      }}>
+      <div style={{ fontWeight: 600, marginBottom: "0.55rem" }}>{col.label}</div>
+
+      {isNum ? (
+        <div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.4rem" }}>
+            <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
+              <span style={{ fontSize: "0.72rem", color: dim }}>od</span>
+              <input type="number" value={minV} onChange={(e) => setMinV(e.target.value)}
+                placeholder={numStats ? String(Math.round(numStats.min)) : ""}
+                style={flatsFilterInp} />
+            </label>
+            <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
+              <span style={{ fontSize: "0.72rem", color: dim }}>do</span>
+              <input type="number" value={maxV} onChange={(e) => setMaxV(e.target.value)}
+                placeholder={numStats ? String(Math.round(numStats.max)) : ""}
+                style={flatsFilterInp} />
+            </label>
+          </div>
+          {numStats && (
+            <div style={{ marginTop: "0.5rem", fontSize: "0.72rem", color: dim }}>
+              V dátach: <strong style={{ color: "#e8e8ed", fontWeight: 500 }}>{Math.round(numStats.min)}</strong> – <strong style={{ color: "#e8e8ed", fontWeight: 500 }}>{Math.round(numStats.max)}</strong>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div>
+          <input autoFocus value={search} onChange={(e) => setSearch(e.target.value)}
+            placeholder={lang === "sk" ? "Hľadať…" : "Search…"}
+            style={{ ...flatsFilterInp, width: "100%", marginBottom: "0.4rem" }} />
+          <div style={{ display: "flex", gap: "0.3rem", marginBottom: "0.35rem", fontSize: "0.72rem" }}>
+            <button style={flatsFilterMini} onClick={() => {
+              const all = [...distinct]; if (hasEmpty) all.push("__empty__"); setSelected(new Set(all));
+            }}>všetko</button>
+            <button style={flatsFilterMini} onClick={() => setSelected(new Set())}>nič</button>
+            <button style={flatsFilterMini} onClick={() => {
+              setSelected(prev => {
+                const all = [...distinct]; if (hasEmpty) all.push("__empty__");
+                const inv = new Set();
+                for (const v of all) if (!prev.has(v)) inv.add(v);
+                return inv;
+              });
+            }}>prevrátiť</button>
+          </div>
+          <div style={{
+            maxHeight: 220, overflowY: "auto",
+            border: `1px solid ${border}`, borderRadius: 5, background: "#0a0a0c",
+            padding: "0.2rem",
+          }}>
+            {hasEmpty && (
+              <label style={flatsFilterRow(selected.has("__empty__"))}>
+                <input type="checkbox" checked={selected.has("__empty__")} onChange={() => toggleVal("__empty__")} style={{ accentColor: green }} />
+                <span style={{ fontStyle: "italic", color: dim }}>(prázdne)</span>
+              </label>
+            )}
+            {shown.length === 0 ? (
+              <div style={{ padding: "0.5rem", color: dim, fontSize: "0.76rem", textAlign: "center" }}>Žiadne zhody.</div>
+            ) : shown.map(v => (
+              <label key={String(v)} style={flatsFilterRow(selected.has(String(v)))}>
+                <input type="checkbox" checked={selected.has(String(v))} onChange={() => toggleVal(String(v))} style={{ accentColor: green }} />
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{String(v)}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: "flex", justifyContent: "space-between", marginTop: "0.7rem" }}>
+        <button onClick={clearAll}
+          style={{ background: "transparent", border: "none", color: dim, cursor: "pointer", fontSize: "0.76rem", textDecoration: "underline", padding: "0.3rem 0" }}>
+          vymazať
+        </button>
+        <div style={{ display: "flex", gap: "0.35rem" }}>
+          <button onClick={onClose}
+            style={{ background: "transparent", border: `1px solid ${border}`, color: "#e8e8ed", borderRadius: 5, padding: "0.35rem 0.7rem", cursor: "pointer", fontSize: "0.76rem" }}>
+            zrušiť
+          </button>
+          <button onClick={commit}
+            style={{ background: green, border: "none", color: "#0a0a0c", borderRadius: 5, padding: "0.35rem 0.9rem", cursor: "pointer", fontSize: "0.76rem", fontWeight: 600 }}>
+            použiť
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const flatsFilterInp = {
+  padding: "0.35rem 0.5rem",
+  background: "#0a0a0c",
+  border: `1px solid ${border}`,
+  borderRadius: 5,
+  color: "#e8e8ed",
+  fontSize: "0.8rem",
+  fontFamily: "inherit",
+  outline: "none",
+  width: "100%",
+  boxSizing: "border-box",
+};
+const flatsFilterMini = {
+  background: "transparent",
+  border: `1px solid ${border}`,
+  color: "#8a8a96",
+  padding: "0.22rem 0.5rem",
+  borderRadius: 4,
+  cursor: "pointer",
+  fontFamily: "inherit",
+  fontSize: "0.72rem",
+};
+const flatsFilterRow = (checked) => ({
+  display: "flex", alignItems: "center", gap: "0.45rem",
+  padding: "0.28rem 0.45rem", cursor: "pointer", borderRadius: 3,
+  fontSize: "0.8rem", color: checked ? "#e8e8ed" : "#c4c4cc",
+});
 
 function ChooseProjectGate({ projectId, projectName, profile, reloadProfile, setCurrent, t, lang }) {
   const [busy, setBusy] = useState(false);
