@@ -39,7 +39,10 @@ const t = {
     // Nav
     getAccess: "Get Access",
     // Hero
-    heroBadge: "Live — tracking 140+ developments",
+    // heroBadge text is computed in HomePage from live projects.length;
+    // these static keys are kept only as a fallback for components that
+    // reference them before projects have loaded.
+    heroBadge: "Live — tracking every active development",
     heroTitle1: "Bratislava residential market,",
     heroTitle2: "fully transparent.",
     heroSub: "We monitor every new residential development in Bratislava and turn scattered listings into actionable market intelligence — so you can make pricing, investment, and portfolio decisions based on data.",
@@ -48,7 +51,7 @@ const t = {
     // Value prop
     valueLabel: "What We Deliver",
     valueTitle: "Not just data. Answers.",
-    valueDesc: "Every month you get a full snapshot of the Bratislava new-build market — unit-level data across 140+ projects, plus the insights you need to act on it.",
+    valueDesc: "Every month you get a full snapshot of the Bratislava new-build market — unit-level data across every active project, plus the insights you need to act on it.",
     questionsLabel: "Questions we help you answer",
     questions: [
       "What should I price my 2-bedroom units at in Ružinov to stay competitive?",
@@ -85,7 +88,7 @@ const t = {
         benefits: [["Structured comparable listings", "pricing by location, unit type, floor area, and availability — filterable and exportable"], ["Market depth overview", "how many active projects and units exist in a given district — essential context for any valuation"], ["Monthly refresh", "your comparables are never more than 30 days old — no more working with stale data from last quarter"]] },
       { tag: "Consultants & Analysts", title: "Hours of research, done for you.",
         desc: "Your client needs a market overview for Bratislava residential. You can spend 2–4 weeks clicking through developer websites, copy-pasting into spreadsheets, fighting inconsistent formats, chasing down broken links, and cleaning messy data — or open a single sheet with everything already structured, normalized, and ready to analyze.",
-        benefits: [["Presentation-ready data", "25 normalized columns across 140+ projects — drop straight into models, charts, or client decks"], ["Trend analysis built in", "monthly snapshots mean you can show pricing direction and market shifts without extra work"], ["Full market coverage", "apartments, houses, retail, semidetached — across every active district. No gaps to fill manually"]] },
+        benefits: [["Presentation-ready data", "25 normalized columns across every active project — drop straight into models, charts, or client decks"], ["Trend analysis built in", "monthly snapshots mean you can show pricing direction and market shifts without extra work"], ["Full market coverage", "apartments, houses, retail, semidetached — across every active district. No gaps to fill manually"]] },
     ],
     useCasesCta: "Different need?",
     useCasesCtaDesc: "The pipeline is flexible. If your use case isn't listed, reach out — we likely already have what you need, or can configure it.",
@@ -111,7 +114,7 @@ const t = {
     schemaDesc: "Additional fields include orientation, balcony area, parking, storage, and project-level metadata.",
     schemaNote: "Note: Field availability varies by project. Not all developers publish all data points.",
     wantFull: "Want the full dataset?",
-    wantFullDesc: "This is a sample. The full output covers 4,200+ units across 140+ projects, updated monthly.",
+    wantFullDesc: "This is a sample. The full output covers every unit across every active Bratislava new-build project, refreshed every month.",
     // Pricing
     pricingLabel: "Pricing",
     pricingTitle: "Simple, transparent pricing.",
@@ -148,7 +151,7 @@ const t = {
     // Tiers
     tiers: [
       { tier: "Snapshot", name: "One-time report", price: "€249", note: "Single month, one-time delivery",
-        features: [[true, "Full market report with insights"], [true, "Unit-level data — all 140+ projects"], [true, "Pricing benchmarks & visualizations"], [false, "No historical data"], [false, "No ongoing updates"]], cta: "Get Started" },
+        features: [[true, "Full market report with insights"], [true, "Unit-level data — every active project"], [true, "Pricing benchmarks & visualizations"], [false, "No historical data"], [false, "No ongoing updates"]], cta: "Get Started" },
       { tier: "Standard", name: "Monthly delivery", price: "€349", priceSuffix: "/mo", note: "Billed monthly, cancel anytime",
         features: [[true, "Monthly report with full insights"], [true, "Raw + cleaned datasets included"], [true, "Historical snapshots & trend analysis"], [true, "Absorption rates & sell-out tracking"], [true, "Google Sheets, CSV, or API access"]], featured: true, cta: "Get Started" },
       { tier: "Custom", name: "On-Demand & Enterprise", price: "Let's talk.", isCustom: true, note: "Tailored scope, frequency, and delivery",
@@ -159,7 +162,8 @@ const t = {
   },
   sk: {
     getAccess: "Kontakt",
-    heroBadge: "Live — sledujeme 140+ projektov",
+    // Viď EN variant — live projekt count sa interpoluje v HomePage.
+    heroBadge: "Live — sledujeme všetky aktívne projekty",
     heroTitle1: "Novostavby v Bratislave.",
     heroTitle2: "Celý trh v jednom prehľade.",
     heroSub: "Ceny, dostupnosť, rýchlosť predaja. Všetko v prehľadných reportoch, na základe ktorých môžete robiť dátami podložené rozhodnutia.",
@@ -203,7 +207,7 @@ const t = {
         benefits: [["Štruktúrované ponuky", "ceny podľa lokality, typu, plochy a dostupnosti — filtrovateľné a exportovateľné"], ["Hĺbka trhu", "koľko projektov a bytov je v okrese aktívnych — kontext pre každé ocenenie"], ["Vždy aktuálne", "komparatívy nikdy nie sú staršie ako 30 dní"]] },
       { tag: "Konzultanti a analytici", title: "Hodiny práce, hotové za vás.",
         desc: "Klient chce prehľad bratislavského trhu. Buď strávite týždne zbieraním dát po weboch — alebo otvoríte jeden sheet, kde je všetko pripravené.",
-        benefits: [["Dáta na prezentáciu", "25 stĺpcov naprieč 140+ projektmi — rovno do modelov, grafov alebo klientskych prezentácií"], ["Trendy zahrnuté", "cenový smer a trhové posuny ukážete bez ďalšej práce"], ["Kompletné pokrytie", "byty, domy, apartmány — žiadne medzery"]] },
+        benefits: [["Dáta na prezentáciu", "25 stĺpcov naprieč každým aktívnym projektom — rovno do modelov, grafov alebo klientskych prezentácií"], ["Trendy zahrnuté", "cenový smer a trhové posuny ukážete bez ďalšej práce"], ["Kompletné pokrytie", "byty, domy, apartmány — žiadne medzery"]] },
     ],
     useCasesCta: "Hľadáte riešenie na mieru?",
     useCasesCtaDesc: "Systém je flexibilný. Ak tu nevidíte riešenie na svoj špecifický problém, ozvite sa — veľmi pravdepodobne vám vieme pomôcť riešením na mieru.",
@@ -226,7 +230,7 @@ const t = {
     schemaDesc: "Ďalšie polia: orientácia, balkón, parkovanie, sklad a metadáta projektu.",
     schemaNote: "Poznámka: Nie všetci developeri zverejňujú všetky údaje — dostupnosť polí sa líši.",
     wantFull: "Máte záujem o kompletný dataset?",
-    wantFullDesc: "Toto je ukážka. Celý výstup pokrýva 4 200+ bytov v 140+ projektoch, aktualizovaný každý mesiac.",
+    wantFullDesc: "Toto je ukážka. Celý výstup pokrýva každý byt v každom aktívnom bratislavskom novostavebnom projekte, obnovovaný každý mesiac.",
     pricingLabel: "Cenník",
     pricingTitle: "Transparentný a jednoduchý.",
     pricingDesc: "Vyberte si plán, ktorý sedí vám.",
@@ -260,7 +264,7 @@ const t = {
     ],
     tiers: [
       { tier: "Snapshot trhu", name: "Jednorazový prehľad", price: "€249", note: "Jeden mesiac, jednorazové doručenie",
-        features: [[true, "Kompletný trhový prehľad s insightmi"], [true, "Dáta za každý byt — 140+ projektov"], [true, "Cenové porovnania a vizualizácie"], [false, "Bez historických dát"], [false, "Bez priebežných aktualizácií"]], cta: "Mám záujem" },
+        features: [[true, "Kompletný trhový prehľad s insightmi"], [true, "Dáta za každý byt — všetky aktívne projekty"], [true, "Cenové porovnania a vizualizácie"], [false, "Bez historických dát"], [false, "Bez priebežných aktualizácií"]], cta: "Mám záujem" },
       { tier: "Standard", name: "Mesačné doručenie", price: "€349", priceSuffix: "/mes", note: "Fakturované mesačne, zrušenie kedykoľvek",
         features: [[true, "Mesačná správa s kompletnými insightmi"], [true, "Surové + vyčistené datasety"], [true, "Historické dáta a vývoj trendov"], [true, "Absorpcia a sledovanie vypredania"], [true, "Google Sheets, CSV alebo API"]], featured: true, cta: "Mám záujem" },
       { tier: "Custom", name: "On-Demand & Enterprise", price: "Ozvite sa.", isCustom: true, note: "Rozsah a frekvencia podľa vás",
@@ -1189,8 +1193,8 @@ function DataPage({ setCurrent, l, lang }) {
             </h2>
             <p style={{ color: "#8a8a96", maxWidth: 480, margin: "0 auto 2rem", fontWeight: 300 }}>
               {lang === "sk"
-                ? "Otvor live dashboard pre reálne aktuálne dáta zo všetkých 140+ projektov."
-                : "Open the live dashboard for real, current data across all 140+ projects."}
+                ? "Otvor live dashboard pre reálne aktuálne dáta zo všetkých aktívnych projektov."
+                : "Open the live dashboard for real, current data across every active project."}
             </p>
             <a onClick={() => setCurrent("Live")} className="btn-p">
               {lang === "sk" ? "Otvoriť dashboard" : "Open dashboard"}

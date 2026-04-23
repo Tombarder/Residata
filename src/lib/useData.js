@@ -53,7 +53,16 @@ export function useProjects(limit) {
   return { projects, loading };
 }
 
-/** Units (flats) for one project — gated by RLS on the flats table. */
+/** Units (flats) for one project — gated by RLS on the flats table.
+ *
+ *  Race-condition resilience: clicking a project immediately after a
+ *  client-side nav can fire the flats query before Supabase has attached
+ *  the session token. RLS then evaluates the caller as anonymous and
+ *  returns an empty result (no error). Symptom Tomáš hit: first click
+ *  shows "No data", F5 works. Fix: poll with exponential backoff, up to
+ *  5 attempts, refreshing the session between tries. Every attempt
+ *  checks `cancelled` so navigation-away doesn't leak setState.
+ */
 export function useProjectFlats(projectId) {
   const [flats, setFlats] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -69,15 +78,10 @@ export function useProjectFlats(projectId) {
         .order("poschodie", { ascending: true });
     };
 
+    const sleep = (ms) => new Promise(res => setTimeout(res, ms));
+
     (async () => {
-      // Make sure the supabase client has a current session before firing
-      // any RLS-gated read. getSession is a pure local read; if the access
-      // token is close to expiry we actively refresh. Without this, a
-      // freshly-mounted ProjectDetail (the user clicks a project right
-      // after page load) can fire the flats query before the token has
-      // been attached to the supabase client, and RLS treats the user as
-      // anonymous. Real-world symptom: "No data available" on the first
-      // click; the second click works.
+      // 1. Prime the session BEFORE the first fetch.
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
@@ -86,21 +90,29 @@ export function useProjectFlats(projectId) {
         }
       } catch { /* ignore — we'll still attempt the fetch */ }
 
-      if (cancelled) return;
-      let { data, error: err } = await fetchFlats();
-      if (cancelled) return;
-
-      // Empty result with no error could be a) no flats in DB (edge case
-      // since project shows unit count) or b) RLS evaluated the caller as
-      // unauthenticated. Retry once with an explicit session refresh to
-      // rule out (b).
-      if ((!data || data.length === 0) && !err) {
-        try { await supabase.auth.refreshSession(); } catch { /* ignore */ }
+      // 2. Try up to 5 times with backoff when the result comes back empty
+      //    AND no explicit error. (A real error = stop immediately; empty
+      //    = could be RLS-as-anon race, try again after session refresh.)
+      //    Delays: 0, 250, 600, 1200, 2500 ms — total max ~4.5s.
+      const delays = [0, 250, 600, 1200, 2500];
+      let data = null, err = null;
+      for (let i = 0; i < delays.length; i++) {
         if (cancelled) return;
-        const retry = await fetchFlats();
+        if (delays[i] > 0) await sleep(delays[i]);
         if (cancelled) return;
-        data = retry.data;
-        err = retry.error;
+        // On retries, re-refresh the session in case the first getSession()
+        // returned null for a race reason.
+        if (i > 0) {
+          try { await supabase.auth.refreshSession(); } catch {/* ignore */}
+        }
+        const res = await fetchFlats();
+        if (cancelled) return;
+        data = res.data;
+        err = res.error;
+        if (err) break;                              // explicit error — stop
+        if (data && data.length > 0) break;          // got rows — stop
+        // else empty + no error → try again (maybe RLS race, maybe truly
+        // empty; one more refresh-and-try handles both cheaply).
       }
 
       setFlats(data || []);

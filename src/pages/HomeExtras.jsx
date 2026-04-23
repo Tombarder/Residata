@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useMetrics, useProjects } from "../lib/useData";
+// (imports already include useMetrics — we rely on metrics.total_units_tracked
+// instead of summing projects.total_units, which inflates the count for
+// projects like Bory/Slnečnice whose total_units is a manual registry
+// anchor rather than actual scraped inventory.)
 
 const mono = "'JetBrains Mono', monospace";
 const green = "#00e5a0";
@@ -267,12 +271,18 @@ function FlowStream({ x1, y, x2, count = 5, delayOffset = 0, duration = 3.2 }) {
 }
 
 export function PipelineFlow({ lang = "en" }) {
-  // LIVE čísla z DB — fallbacks iba pre initial loading / DB hiccup.
+  // LIVE čísla z DB. units-in-dataset siahame na metrics.total_units_tracked
+  // (count of real flats in DB) — NIE na sum(projects.total_units) lebo
+  // projekty ako Bory/Slnečnice tam majú manuálne inflated totals z
+  // registry a nadúvalo to číslo na ~11k (lie voči reálnym ~5 100).
   const { projects } = useProjects();
+  const { metrics } = useMetrics();
   const uniqueDevs = new Set(projects.map(p => p.developer).filter(Boolean)).size;
-  const devCount  = uniqueDevs > 0 ? uniqueDevs : 60;
-  const projCount = projects.length > 0 ? projects.length : 142;
-  const unitsInDataset = projects.reduce((a, p) => a + (p.total_units || 0), 0) || 4218;
+  const devCount  = uniqueDevs > 0 ? uniqueDevs : null;
+  const projCount = projects.length > 0 ? projects.length : null;
+  const unitsTracked = metrics.find(m => m.metric_key === "total_units_tracked")?.value_numeric || null;
+  // Pretty "—" when still loading; template strings below degrade gracefully.
+  const fmt = (n, locale) => n == null ? "…" : Number(n).toLocaleString(locale);
 
   // Short + rich texts. Každé slovo nesie význam — žiadne buzzwordy.
   const T = lang === "sk" ? {
@@ -281,30 +291,32 @@ export function PipelineFlow({ lang = "en" }) {
     sub: "3-krokový automatizovaný flow. Každý mesiac, bez výnimky.",
 
     z1Line1: "Dáta zbierame",
-    z1Live: `z ${devCount} developerov · ${projCount.toLocaleString("sk-SK")} projektov`,
+    z1Live: `z ${fmt(devCount, "sk-SK")} developerov · ${fmt(projCount, "sk-SK")} projektov`,
     z1Foot: "každý mesiac, bez výnimiek",
 
     z2Line1: "Normalizácia a validácia",
-    z2Chip: "25 POLÍ · DEDUPLIKOVANÉ",
+    z2Chip: "PRIPRAVENÉ · DEDUPLIKOVANÉ",
 
     z3Line1: "Živý trhový prehľad",
     z3Foot: "pre vaše rozhodnutia podložené dátami",
     z3Chips: ["Sheets", "CSV", "API"],
-    z3Cap1: "MONTHLY AUTO-REFRESH",
-    z3Cap2: "alebo weekly on demand",
+    z3Cap1: "MESAČNÁ AKTUALIZÁCIA",
+    z3Cap2: "alebo týždenne na vyžiadanie",
 
-    statsLabel: ["developerov", "aktívnych projektov", "bytov v datasete", "polí na byt"],
+    // 4 KPI karty pod SVG-scénou. 4. karta je "ako často" namiesto
+    // internej schema-metriky "25 polí" čo kupujúcemu nič nehovorí.
+    statsLabel: ["developerov", "aktívnych projektov", "bytov v datasete", "aktualizácia"],
   } : {
     label: "How it works",
     title: "From scattered developer sites to live market intelligence.",
     sub: "3-step automated flow. Every month, no exceptions.",
 
     z1Line1: "Data collected",
-    z1Live: `from ${devCount} developers · ${projCount.toLocaleString("en-US")} projects`,
+    z1Live: `from ${fmt(devCount, "en-US")} developers · ${fmt(projCount, "en-US")} projects`,
     z1Foot: "every month, no exceptions",
 
     z2Line1: "Standardize & validate",
-    z2Chip: "25 FIELDS · DEDUPED",
+    z2Chip: "READY · DEDUPED",
 
     z3Line1: "Real-time market intelligence",
     z3Foot: "for your data-driven decisions",
@@ -312,7 +324,7 @@ export function PipelineFlow({ lang = "en" }) {
     z3Cap1: "MONTHLY AUTO-REFRESH",
     z3Cap2: "or weekly on demand",
 
-    statsLabel: ["developers", "active projects", "units in dataset", "fields per unit"],
+    statsLabel: ["developers", "active projects", "units in dataset", "refresh cadence"],
   };
 
   return (
@@ -463,10 +475,13 @@ export function PipelineFlow({ lang = "en" }) {
         overflow: "hidden",
       }} className="pipeline-stats">
         {[
-          { n: String(devCount),                                                   label: T.statsLabel[0] },
-          { n: projCount.toLocaleString(lang === "sk" ? "sk-SK" : "en-US"),        label: T.statsLabel[1] },
-          { n: unitsInDataset.toLocaleString(lang === "sk" ? "sk-SK" : "en-US"),   label: T.statsLabel[2] },
-          { n: "25",                                                               label: T.statsLabel[3] },
+          { n: fmt(devCount,    lang === "sk" ? "sk-SK" : "en-US"), label: T.statsLabel[0] },
+          { n: fmt(projCount,   lang === "sk" ? "sk-SK" : "en-US"), label: T.statsLabel[1] },
+          { n: fmt(unitsTracked,lang === "sk" ? "sk-SK" : "en-US"), label: T.statsLabel[2] },
+          // 4. karta je slovný stat — cadence, nie číslo. Buyer sa
+          // nestará o počet stĺpcov v DB, stará sa ako často dostane
+          // fresh dáta. "Monthly" je jasné, actionable, kupujúce.
+          { n: lang === "sk" ? "Mesačne" : "Monthly",                label: T.statsLabel[3] },
         ].map((s, i) => (
           <div key={i} style={{
             textAlign: "center",
