@@ -914,8 +914,12 @@ function DataPage({ setCurrent, l, lang }) {
             borderRadius: 14, overflow: "hidden",
             border: "1px solid #222228",
             aspectRatio: "4 / 3", minHeight: 280,
-            background: `linear-gradient(135deg, rgba(0,229,160,0.08), rgba(0,0,0,0)), url("https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=1200&q=80&auto=format&fit=crop") center/cover`,
-          }} aria-label="Market analytics" />
+            // Modern residential architecture — matches the actual subject
+            // (Bratislava new-build market) better than the dashboard
+            // laptop that was here (it duplicated the Use Cases Investors
+            // card photo, giving the site a recycled feel).
+            background: `linear-gradient(135deg, rgba(0,229,160,0.08), rgba(0,0,0,0.15)), url("https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=1400&q=85&auto=format&fit=crop") center/cover`,
+          }} aria-label="Residential market" />
         </div>
       </div>
 
