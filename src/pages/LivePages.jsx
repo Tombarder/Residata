@@ -1228,7 +1228,20 @@ function FlatsTable({ flats, t, lang, highlightedFlatId }) {
   // Compact th/td — local overrides so this table fits 12 columns on
   // one screen without horizontal scrolling. The global th/td (0.75rem
   // 1rem padding) is designed for wider tables with fewer columns.
-  const compactTh = { padding: "0.5rem 0.35rem", fontWeight: 600 };
+  const compactTh = {
+    padding: "0.5rem 0.35rem", fontWeight: 600,
+    // Sticky header — stays visible when user scrolls the flat list.
+    // top:108 keeps it below the fixed Nav (72px) + Ticker (36px). If
+    // nav chrome ever changes height, adjust this one number.
+    // Background is set on each TH (not <thead>) because sticky elements
+    // need their own opaque backdrop to cover the scrolled-behind rows.
+    position: "sticky",
+    top: 108,
+    background: "#0e0e10",
+    zIndex: 5,
+    // Small shadow to visually separate sticky header from scrolled rows
+    boxShadow: "inset 0 -1px 0 #222228, 0 2px 6px rgba(0,0,0,0.3)",
+  };
   const compactTd = { padding: "0.45rem 0.35rem", color: "#e8e8ed", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
 
   const [sort, setSort] = useState({ key: "unit", dir: "asc" });
