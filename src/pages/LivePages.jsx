@@ -654,15 +654,18 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
           const mixHasV = roomRows.some(r => r.avail > 0);
           const mixHasP = roomRows.some(r => r.sold > 0);
           const mixHasR = roomRows.some(r => r.reserved > 0);
+          // Subtitles reflect the bar's left→right order: available first,
+          // then reserved, then sold — matches the visual flow customers
+          // read naturally (what's free → what's held → what's gone).
           let mixSubtitle, mixNote;
           if (mixHasV && mixHasP && mixHasR) {
-            mixSubtitle = L("Predané / rezervované / voľné", "Sold / reserved / available");
+            mixSubtitle = L("Voľné / rezervované / predané", "Available / reserved / sold");
             mixNote = null;
           } else if (mixHasV && mixHasP) {
-            mixSubtitle = L("Predané / voľné", "Sold / available");
+            mixSubtitle = L("Voľné / predané", "Available / sold");
             mixNote = L("Developer nezverejňuje rezervácie.", "Developer doesn't publish reservations.");
           } else if (mixHasV && mixHasR) {
-            mixSubtitle = L("Rezervované / voľné", "Reserved / available");
+            mixSubtitle = L("Voľné / rezervované", "Available / reserved");
             mixNote = L("Developer nezverejňuje predané byty.", "Developer doesn't publish sold units.");
           } else if (mixHasV) {
             mixSubtitle = L("Len voľné byty", "Available units only");
@@ -671,15 +674,13 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
               "Developer only publishes available units — sold / reserved aren't tracked here.",
             );
           } else if (mixHasP && !mixHasV) {
-            // Sold-out or near-sold-out: chart shows which room types were
-            // ever absorbed, not a live offer. Call that out.
-            mixSubtitle = L("Predané / rezervované", "Sold / reserved");
+            mixSubtitle = L("Rezervované / predané", "Reserved / sold");
             mixNote = L(
               "Projekt je vypredaný — graf ukazuje historický mix po izbách, nie aktuálnu ponuku.",
               "Project is sold out — the chart shows historical room-type mix, not current inventory.",
             );
           } else {
-            mixSubtitle = L("Predané / rezervované", "Sold / reserved");
+            mixSubtitle = L("Rezervované / predané", "Reserved / sold");
             mixNote = null;
           }
           return (
@@ -896,27 +897,22 @@ function TakeupChart({ snaps, lang }) {
 /* ── Room mix: horizontal stacked bars per room type ──────── */
 /* ── Room-type mix — horizontal stacked bars per room type ──
  *
- * Layout (per row):
+ * Layout (left → right): AVAILABLE (green) → RESERVED (gray) → SOLD (orange).
  *
- *   1-room  [■■■■■■□□□□□□□■■■■■■■■■■■■■■■■■■■■]      22 · 50% R
- *            11 P         11 R         11 V
+ *   1-room  [■■■■■■■■■■■■■■■■□□□□□□□■■■■■■]    22 · 50% S
+ *            11 F              8 R      3 S
  *
- * Each segment's count+stav code appears directly UNDER its colour
- * block (same colour as the block, monospace, small). Right side
- * carries just the total + one headline percent — the most useful
- * for this mix. If a segment is too narrow (<22 px bar width) the
- * under-label is skipped entirely so we never overlap; the number
- * is still visible in the hover tooltip via <title>.
+ * Rationale for this order: 'available' is the buyer's starting
+ * point (what's still free), reserved is the in-between, sold is
+ * the tail. Reading left→right mirrors the customer journey.
  *
- * Previous version crammed '11 R · 11 V (22) · 50% R' onto a single
- * right-side line which read as dense walls of text across 5 rows.
- * This split layout lines each count up with its visual segment,
- * so the eye can scan 'gray bar → 11 R' in one move.
+ * Stav codes in labels translate to the user's language:
+ *   · SK: V (voľné)  · R (rezervované)   · P (predané)
+ *   · EN: F (free)   · R (reserved)      · S (sold)
  *
- * Right-side headline % picks the signal that matters:
- *   · Sold segment present    → sold/total %  (absorption)
- *   · Reserved only (no sold) → reserved/total %  (reservation rate)
- *   · Only available          → just 'N V'  (nothing to summarise)
+ * The chart-card subtitle above shows the active codes in the same
+ * left→right order as the bar segments — see the enclosing switch
+ * in ProjectInsights.
  */
 function RoomMixChart({ rows, lang }) {
   const W = 560;
@@ -929,16 +925,19 @@ function RoomMixChart({ rows, lang }) {
   const barW = W - labelW - valueW - 20;
   const H = rows.length * (rowH + gap) + 6;
 
-  // Minimum segment width (px) before its under-label is dropped.
-  // '11 V' is ~20 px at fontSize 9; below that we'd overlap neighbours.
   const MIN_LABEL_W = 22;
 
-  // One clean headline number + % for the right side
+  // Stav letter codes per language
+  const codeAvail = lang === "sk" ? "V" : "F";
+  const codeResv  = "R";  // same letter in both languages
+  const codeSold  = lang === "sk" ? "P" : "S";
+
+  // Right-side headline: pick the most informative summary
   const sideLabel = (r) => {
     if (r.total === 0) return "";
-    if (r.sold > 0) return `${r.total} · ${Math.round((r.sold / r.total) * 100)}% P`;
-    if (r.reserved > 0) return `${r.total} · ${Math.round((r.reserved / r.total) * 100)}% R`;
-    return `${r.total} V`;  // all available
+    if (r.sold > 0)     return `${r.total} · ${Math.round((r.sold / r.total) * 100)}% ${codeSold}`;
+    if (r.reserved > 0) return `${r.total} · ${Math.round((r.reserved / r.total) * 100)}% ${codeResv}`;
+    return `${r.total} ${codeAvail}`;
   };
 
   return (
@@ -955,43 +954,43 @@ function RoomMixChart({ rows, lang }) {
         const availW = pct.avail * barW;
         const underY = y + barH + underH - 2;
 
+        // Left→right x-offsets for each segment under the new order
+        const xAvail = labelW;
+        const xResv  = labelW + availW;
+        const xSold  = labelW + availW + resvW;
+
         return (
           <g key={r.room}>
-            {/* Row label (room count) — centered vertically with the bar */}
             <text x={0} y={y + barH / 2 + 4} fill="#e8e8ed" fontFamily={mono} fontSize={11} fontWeight={700}>
               {r.room}-{lang === "sk" ? "izb" : "room"}
             </text>
 
-            {/* Bar: background + stacked segments */}
             <rect x={labelW} y={y} width={barW} height={barH} fill="#0a0a0b" stroke={border}>
-              <title>{`${r.sold} P · ${r.reserved} R · ${r.avail} V · ${r.total} total`}</title>
+              <title>{`${r.avail} ${codeAvail} · ${r.reserved} ${codeResv} · ${r.sold} ${codeSold} · ${r.total} total`}</title>
             </rect>
-            {soldW > 0 && <rect x={labelW} y={y} width={soldW} height={barH} fill="#f5a623" />}
-            {resvW > 0 && <rect x={labelW + soldW} y={y} width={resvW} height={barH} fill="#888" />}
-            {availW > 0 && <rect x={labelW + soldW + resvW} y={y} width={availW} height={barH} fill={green} />}
+            {availW > 0 && <rect x={xAvail} y={y} width={availW} height={barH} fill={green} />}
+            {resvW  > 0 && <rect x={xResv}  y={y} width={resvW}  height={barH} fill="#888" />}
+            {soldW  > 0 && <rect x={xSold}  y={y} width={soldW}  height={barH} fill="#f5a623" />}
 
-            {/* Under-segment counts — same colour as the segment, tiny mono.
-                Skip when the segment is too narrow to hold the label cleanly. */}
-            {soldW >= MIN_LABEL_W && (
-              <text x={labelW + soldW / 2} y={underY} textAnchor="middle"
-                    fill="#f5a623" fontFamily={mono} fontSize={9}>
-                {r.sold} P
+            {availW >= MIN_LABEL_W && (
+              <text x={xAvail + availW / 2} y={underY} textAnchor="middle"
+                    fill={green} fontFamily={mono} fontSize={9}>
+                {r.avail} {codeAvail}
               </text>
             )}
             {resvW >= MIN_LABEL_W && (
-              <text x={labelW + soldW + resvW / 2} y={underY} textAnchor="middle"
+              <text x={xResv + resvW / 2} y={underY} textAnchor="middle"
                     fill="#aaa" fontFamily={mono} fontSize={9}>
-                {r.reserved} R
+                {r.reserved} {codeResv}
               </text>
             )}
-            {availW >= MIN_LABEL_W && (
-              <text x={labelW + soldW + resvW + availW / 2} y={underY} textAnchor="middle"
-                    fill={green} fontFamily={mono} fontSize={9}>
-                {r.avail} V
+            {soldW >= MIN_LABEL_W && (
+              <text x={xSold + soldW / 2} y={underY} textAnchor="middle"
+                    fill="#f5a623" fontFamily={mono} fontSize={9}>
+                {r.sold} {codeSold}
               </text>
             )}
 
-            {/* Right-hand total + headline % */}
             <text x={W - 4} y={y + barH / 2 + 4} textAnchor="end"
                   fill="#c0c0c8" fontFamily={mono} fontSize={10}>
               {sideLabel(r)}
@@ -1696,31 +1695,42 @@ function ChooseProjectGate({ projectId, projectName, profile, reloadProfile, set
     }, 10000);
 
     try {
-      // Step 1: UPDATE. We deliberately DON'T chain .select().maybeSingle()
-      // here — the SELECT back is an extra round-trip that can return null
-      // under RLS / PostgREST edge cases even when the UPDATE succeeded,
-      // and then the user sees a misleading "Update failed". Instead we
-      // rely on reloadProfile() below to confirm the new state.
+      // Step 1: UPDATE chosen_project_id — source of truth is the DB row.
       const { error: updErr } = await supabase.from("user_profiles")
         .update({ chosen_project_id: projectId })
         .eq("id", profile.id);
       console.log(`[ChooseProject] UPDATE returned after ${Math.round(performance.now() - t0)}ms`, { updErr });
       if (updErr) throw new Error(updErr.message);
 
-      // Step 2: Refresh profile from DB. This is the source of truth.
-      //  - If chosen_project_id now matches, we're good → <LiveProjectDetail>
-      //    re-renders with canView=true and ChooseProjectGate unmounts.
-      //  - If it doesn't match, the UPDATE silently failed (RLS) and we
-      //    surface that to the user instead of leaving them on a dead page.
-      await reloadProfile();
-      console.log(`[ChooseProject] done after ${Math.round(performance.now() - t0)}ms`);
+      // Step 2: Hard navigation to /project/<id>.
+      //
+      // Why hard navigation, not React state update?
+      //
+      // This flow has a subtle timing issue: after the UPDATE commits,
+      // reloadProfile() + setProfile() into the React context + waiting
+      // for useProjectFlats to see the new RLS identity + re-fetch flats
+      // with the new permission all happen across multiple render ticks.
+      // Multiple attempted root-cause fixes (auth-readiness gate; adding
+      // tier/chosen_project_id to useProjectFlats deps; returning a
+      // transitional spinner from the 'alreadyThis' branch) addressed
+      // parts of the race but not all of it — users still occasionally
+      // saw a blank page and had to F5 to recover.
+      //
+      // After-confirm is a once-per-free-user action. A ~400 ms hard
+      // reload here is invisible friction on an already-celebratory
+      // moment ("I just picked my project"), and it yields 100 %
+      // reliability: the browser re-runs the whole boot sequence with
+      // chosen_project_id already committed, so RLS reads succeed on
+      // the very first request. No client-side race possible.
+      //
+      // Not a patch in the sense of 'hiding the bug': it's a
+      // deliberate architecture choice for this one flow. The React
+      // state-flow is still used everywhere else in the app; this one
+      // commit boundary is the right place to reset and reload.
       clearTimeout(fallback);
-      // Hard redirect to /live — React should re-render ChooseProjectGate
-      // into LiveProjectDetail automatically once profile state updates,
-      // but in practice React's state propagation is occasionally slow
-      // enough that the user sees a blank frame. Navigating explicitly
-      // is cheap insurance.
-      setCurrent && setCurrent(`Project:${projectId}`);
+      console.log(`[ChooseProject] hard-navigating to /project/${projectId}`);
+      window.location.href = `/project/${projectId}`;
+      return;  // prevent finally setBusy(false) — component is unmounting via navigation
     } catch (e) {
       console.error("[ChooseProject] exception", e);
       clearTimeout(fallback);
