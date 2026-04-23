@@ -557,6 +557,14 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
   const availPrices = availFlats.map(f => Number(f.cena_s_dph)).filter(Number.isFinite);
   const topPrice = availPrices.length ? Math.max(...availPrices) : null;
 
+  // Has the developer published ANY prices? Some projects publish only
+  // availability + layouts without prices. In that case every price-
+  // dependent chart/KPI is meaningless and we want to call it out
+  // upfront so the user doesn't hunt for a broken-looking €/m² card.
+  const pricedFlats = flats.filter(f => Number.isFinite(Number(f.cena_s_dph)) && Number(f.cena_s_dph) > 0);
+  const noPrices = flats.length > 0 && pricedFlats.length === 0;
+  const partialPrices = pricedFlats.length > 0 && pricedFlats.length < flats.length * 0.5;
+
   // Room-type breakdown — group by izby, compute sold % per group.
   // "Fastest-moving" = highest sold/total ratio (signals market validation).
   const byRoom = {};
@@ -576,6 +584,9 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
     .sort((a, b) => (b.sold / b.total) - (a.sold / a.total))[0];
 
   // ── KPI strip ─────────────────────────────────────────────────
+  // Cards tagged isPriceKpi=true are filtered out when the developer
+  // publishes no prices — showing '— €/m²' cards for a no-price
+  // project just looks broken. See noPrices gate below.
   const kpis = [
     {
       label: L("Voľné byty", "Available units"),
@@ -594,6 +605,7 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
               : <span style={{ color: dim }}>{L("bez zmeny", "no change")} MoM</span>)
         : L("žiadna história", "no history yet"),
       tint: "#e8e8ed",
+      isPriceKpi: true,
     },
     {
       label: L("Najrýchlejšie sa predáva", "Fastest moving"),
@@ -606,6 +618,7 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
       value: topPrice ? fmtEur(topPrice) : "—",
       sub: availPrices.length ? `${availPrices.length} ${L("voľných s cenou", "with price")}` : null,
       tint: "#e8e8ed",
+      isPriceKpi: true,
     },
   ];
 
@@ -615,9 +628,49 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
         {L("Prehľad projektu", "Project insights")}
       </div>
 
+      {/* No-prices warning — sits above the KPI strip so it's the first
+          thing the user sees. Price-dependent KPIs (avg €/m², top price)
+          are filtered out below in the kpis.map. */}
+      {noPrices && (
+        <div style={{
+          background: "rgba(245,166,35,0.08)",
+          border: "1px solid rgba(245,166,35,0.3)",
+          borderRadius: 8,
+          padding: "0.75rem 1rem",
+          marginBottom: "1.25rem",
+          fontSize: "0.8rem",
+          color: "#e8e8ed",
+          lineHeight: 1.5,
+        }}>
+          <strong style={{ color: "#f5a623" }}>⚠ {L("Bez cien", "No prices")}:</strong>{" "}
+          {L(
+            "Developer nezverejňuje ceny bytov. Cenové grafy (rozdelenie cien, €/m² scatter) a KPIs s cenou sú skryté — nemôžu byť zmysluplné bez dát. Dostupnosť, izbovosť a plochy sú uvedené normálne.",
+            "Developer doesn't publish prices. Price-based charts (price distribution, area × price scatter) and price KPIs are hidden — they can't be meaningful without the data. Availability, room-type and area data below are still shown normally.",
+          )}
+        </div>
+      )}
+      {partialPrices && (
+        <div style={{
+          background: "rgba(245,166,35,0.06)",
+          border: "1px solid rgba(245,166,35,0.2)",
+          borderRadius: 8,
+          padding: "0.6rem 1rem",
+          marginBottom: "1.25rem",
+          fontSize: "0.78rem",
+          color: dim,
+          lineHeight: 1.5,
+        }}>
+          <strong style={{ color: "#f5a623" }}>ⓘ</strong>{" "}
+          {L(
+            `Developer publikuje ceny iba pre ${pricedFlats.length} z ${flats.length} bytov — cenové grafy a priemery sú počítané iba z tejto podmnožiny.`,
+            `Developer publishes prices for only ${pricedFlats.length} of ${flats.length} units — price charts and averages are computed on this subset only.`,
+          )}
+        </div>
+      )}
+
       {/* KPI strip */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "0.8rem", marginBottom: "1.5rem" }}>
-        {kpis.map((k, i) => (
+        {kpis.filter(k => !(noPrices && k.isPriceKpi)).map((k, i) => (
           <div key={i} style={{
             background: bg, border: `1px solid ${border}`, borderRadius: 10,
             padding: "1rem 1.1rem",
@@ -703,7 +756,10 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
         )}
       </div>
 
-      {flats.length >= 5 && (() => {
+      {/* Price-scatter: requires actual price data. If the developer
+          doesn't publish prices the chart is meaningless — skip it
+          entirely (user already saw the no-prices banner above). */}
+      {flats.length >= 5 && !noPrices && (() => {
         // Figure out what this project's data actually covers, so the
         // chart title + a one-liner honestly describe what the user is
         // looking at. Some developers only publish their available (V)
