@@ -977,9 +977,11 @@ function TakeupChart({ snaps, lang }) {
  *     Still all-green (the only colour we have) but the widths now
  *     carry signal.
  *
- * Stav codes in labels translate to the user's language:
- *   · SK: V (voľné)  · R (rezervované)   · P (predané)
- *   · EN: F (free)   · R (reserved)      · S (sold)
+ * Stav codes in labels match the displayed names 1:1, per-language:
+ *   · SK: V (voľné)      · R (rezervované)  · P (predané)
+ *   · EN: A (available)  · R (reserved)     · S (sold)
+ * (Not 'F' for free — the EN header says 'Available', codes must
+ * match. User: 'nemoze byt F ako available, bud A alebo potom F free'.)
  */
 function RoomMixChart({ rows, lang }) {
   // Detect V-only mode: no row has any sold or reserved
@@ -997,8 +999,9 @@ function RoomMixChart({ rows, lang }) {
 
   const MIN_LABEL_W = 22;
 
-  // Stav letter codes per language
-  const codeAvail = lang === "sk" ? "V" : "F";
+  // Stav letter codes per language — must match the subtitle header
+  // words so '7 A' reads clearly as '7 available', not '7 F(ree)'.
+  const codeAvail = lang === "sk" ? "V" : "A";
   const codeResv  = "R";  // same letter in both languages
   const codeSold  = lang === "sk" ? "P" : "S";
 
@@ -1007,10 +1010,11 @@ function RoomMixChart({ rows, lang }) {
   // switched metrics (% sold vs % reserved vs bare count) based on what
   // each row happened to have → inconsistent, unreadable.
   //
-  // Unified choice: "% available" (% F). Buyer-centric question
-  // "how much is still free?" — works for every data mode the same way.
-  // · V+P+R / V+P / V+R / P+R: {total} · {avail%} F
-  // · V-only: just {total} F (100% by definition, so the % is noise).
+  // Unified choice: "% available". Buyer-centric question 'how much
+  // is still buyable?' answered the same way across every row, every
+  // data mode. Letter code matches the language (A in EN, V in SK).
+  // · V+P+R / V+P / V+R / P+R: {total} · {avail%} {code}
+  // · V-only: just {total} {code} — 100% is trivially true, skip the %.
   const sideLabel = (r) => {
     if (r.total === 0) return "";
     if (vOnly) return `${r.total} ${codeAvail}`;
