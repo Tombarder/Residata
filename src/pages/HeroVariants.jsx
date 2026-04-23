@@ -23,13 +23,15 @@ const dim = "#8a8a96";
    Real skyline photo s overlayom pinov ktoré pulzujú.
    Hover → tooltip s project name + €/m².
    ════════════════════════════════════════════════════════════ */
+// Real projects from the production registry, with real project-level
+// avg €/m². x/y are just panorama-placement coords, not geo-accurate.
 const PANORAMA_PINS = [
-  { x: 18, y: 42, name: "Slnečnice Viladomy", district: "Petržalka", price: "3,650" },
-  { x: 34, y: 55, name: "Nový Ružinov II",     district: "Ružinov",   price: "4,120" },
-  { x: 48, y: 38, name: "Eurovea City",        district: "Ružinov",   price: "5,510" },
-  { x: 62, y: 48, name: "Zwirn Mlyny",         district: "Staré Mesto", price: "5,200" },
-  { x: 72, y: 60, name: "RNDZ Residence",      district: "Nové Mesto", price: "4,580" },
-  { x: 85, y: 52, name: "Bory Nový Dvor",      district: "Lamač",     price: "3,380" },
+  { x: 18, y: 42, name: "Slnecnice",       district: "Petržalka",    price: "4,963" },
+  { x: 34, y: 55, name: "Novy Ruzinov",    district: "Ružinov",      price: "4,585" },
+  { x: 48, y: 38, name: "Downtown Yards",  district: "Staré Mesto",  price: "7,088" },
+  { x: 62, y: 48, name: "Vydrica",         district: "Staré Mesto",  price: "10,015" },
+  { x: 72, y: 60, name: "Parq Zatisie",    district: "Nové Mesto",   price: "6,308" },
+  { x: 85, y: 52, name: "Rakyta",          district: "Dev. N. Ves",  price: "4,588" },
 ];
 
 export function V1_PanoramaPins({ lang = "en" }) {
@@ -756,30 +758,31 @@ const CLI_COMMANDS = {
   ls: () => [
     { t: "Fetching project registry... 90 projects found.", c: "#55555f" },
     { t: "", c: "#fff" },
-    { t: "Slnečnice Viladomy    Petržalka   248 units    3,650 €/m²   ✓ V", c: "#e8e8ed" },
-    { t: "Nový Ružinov II       Ružinov     186 units    4,120 €/m²   ✓ V", c: "#e8e8ed" },
-    { t: "Eurovea City          Ružinov     412 units    5,510 €/m²   ✓ V", c: "#e8e8ed" },
-    { t: "Zwirn Mlyny           Staré Mesto  96 units    5,200 €/m²   ⚠ 92% sold", c: "#f5a623" },
-    { t: "Bory Nový Dvor        Lamač       210 units    3,380 €/m²   ✓ V", c: "#e8e8ed" },
-    { t: "RNDZ Residence        Nové Mesto   64 units    4,580 €/m²   ✓ V", c: "#e8e8ed" },
-    { t: "... (136 more — use `show <district>` to filter)", c: "#55555f" },
+    { t: "Slnecnice            Petržalka    4000 units   4,963 €/m²   ⚠ 91% sold", c: "#f5a623" },
+    { t: "Novy Ruzinov         Ružinov       652 units   4,585 €/m²   ⚠ 94% sold", c: "#f5a623" },
+    { t: "Downtown Yards       Staré Mesto   656 units   7,088 €/m²   ✓ V", c: "#e8e8ed" },
+    { t: "Vydrica              Staré Mesto   229 units  10,015 €/m²   ⚠ 88% sold", c: "#f5a623" },
+    { t: "Sky Park Tower       Staré Mesto   174 units   7,979 €/m²   ✓ V", c: "#e8e8ed" },
+    { t: "Rakyta               Dev. N. Ves   244 units   4,588 €/m²   ✓ V", c: "#e8e8ed" },
+    { t: "... (84 more — use `show <district>` to filter)", c: "#55555f" },
     { t: "", c: "#fff" },
   ],
   top: (n = 5) => {
+    // Real projects ordered by historical absorption magnitude (sold_units)
     const rows = [
-      ["Bory Bývanie",        "Lamač",       34, "3,380"],
-      ["Slnečnice Viladomy",  "Petržalka",   28, "3,650"],
-      ["Eurovea City",        "Ružinov",     22, "5,510"],
-      ["Nový Ružinov II",     "Ružinov",     19, "4,120"],
-      ["Zwirn Mlyny",         "Staré Mesto", 14, "5,200"],
-      ["Panorama Towers",     "Ružinov",     12, "4,800"],
-      ["Urban Residence",     "Nové Mesto",  11, "4,300"],
+      ["Slnecnice",       "Petržalka",    3618, "4,963"],
+      ["Novy Ruzinov",    "Ružinov",      615,  "4,585"],
+      ["Downtown Yards",  "Staré Mesto",  454,  "7,088"],
+      ["Vydrica",         "Staré Mesto",  202,  "10,015"],
+      ["Pristavna 1",     "Ružinov",      200,  "5,044"],
+      ["Millhaus",        "Staré Mesto",  128,  "6,376"],
+      ["Rakyta",          "Dev. N. Ves",  130,  "4,588"],
     ].slice(0, Math.max(1, Math.min(7, n)));
     return [
-      { t: `Top ${rows.length} projects by units sold last month:`, c: "#e8e8ed" },
+      { t: `Top ${rows.length} projects by cumulative units sold:`, c: "#e8e8ed" },
       { t: "", c: "#fff" },
       ...rows.map(([p, d, u, price], i) => ({
-        t: `  ${String(i + 1).padStart(2, " ")}. ${p.padEnd(22)} ${d.padEnd(12)} +${u} sold     ${price} €/m²`,
+        t: `  ${String(i + 1).padStart(2, " ")}. ${p.padEnd(20)} ${d.padEnd(12)} ${String(u).padStart(5)} sold   ${price} €/m²`,
         c: i === 0 ? green : "#e8e8ed",
       })),
       { t: "", c: "#fff" },
@@ -794,39 +797,53 @@ const CLI_COMMANDS = {
     { t: "  sold (cumulative)     2,528", c: "#f5a623" },
     { t: "  reserved              335", c: "#f5a623" },
     { t: "  avg €/m²              5,715", c: green },
-    { t: "  fastest absorption    Staré Mesto (8.2%)", c: green },
+    { t: "  most premium district Staré Mesto (7 534 €/m²)", c: green },
     { t: "", c: "#fff" },
   ],
   show: (args) => {
     const d = (args[0] || "").toLowerCase();
+    // Real active projects per district from production DB.
     const sets = {
       ruzinov: [
-        "Nový Ružinov II   186 units   4,120 €/m²",
-        "Eurovea City      412 units   5,510 €/m²",
-        "Panorama Towers   168 units   4,800 €/m²",
-        "Einpark Residence  84 units   4,950 €/m²",
+        "Novy Ruzinov       652 units   4,585 €/m²",
+        "Pristavna 1        207 units   5,044 €/m²",
+        "Parq Zatisie       154 units   6,308 €/m²",
       ],
       petrzalka: [
-        "Slnečnice Viladomy 248 units   3,650 €/m²",
-        "Slnečnice Zóna M    96 units   3,720 €/m²",
-        "Nové Lido Phase 1   52 units   3,900 €/m²",
-        "Kopčany Park       120 units   3,400 €/m²",
+        "Slnecnice         4000 units   4,963 €/m²",
       ],
       "staré mesto": [
-        "Zwirn Mlyny        96 units   5,200 €/m²",
-        "River Park II      56 units   5,800 €/m²",
+        "Downtown Yards     656 units   7,088 €/m²",
+        "Vydrica            229 units  10,015 €/m²",
+        "Sky Park Tower     174 units   7,979 €/m²",
+        "Millhaus           149 units   6,376 €/m²",
+        "Uno Postova         52 units   7,850 €/m²",
+        "Drotarska 15        30 units   6,600 €/m²",
       ],
       "stare mesto": [
-        "Zwirn Mlyny        96 units   5,200 €/m²",
-        "River Park II      56 units   5,800 €/m²",
+        "Downtown Yards     656 units   7,088 €/m²",
+        "Vydrica            229 units  10,015 €/m²",
+        "Sky Park Tower     174 units   7,979 €/m²",
+        "Millhaus           149 units   6,376 €/m²",
       ],
-      lamac: [
-        "Bory Nový Dvor    210 units   3,380 €/m²",
+      "nove mesto": [
+        "Parq Zatisie       154 units   6,308 €/m²",
+        "Olivia Residence   140 units   —",
+      ],
+      "nové mesto": [
+        "Parq Zatisie       154 units   6,308 €/m²",
+        "Olivia Residence   140 units   —",
+      ],
+      "devinska": [
+        "Rakyta             244 units   4,588 €/m²",
+      ],
+      "dev. n. ves": [
+        "Rakyta             244 units   4,588 €/m²",
       ],
     };
     const key = Object.keys(sets).find(k => k.startsWith(d));
     if (!key) {
-      return [{ t: `No district matches '${d}'. Try: ruzinov, petrzalka, stare mesto, lamac`, c: "#ff6b6b" }, { t: "", c: "#fff" }];
+      return [{ t: `No district matches '${d}'. Try: ruzinov, petrzalka, stare mesto, nove mesto, devinska`, c: "#ff6b6b" }, { t: "", c: "#fff" }];
     }
     return [
       { t: `Projects in ${key}:`, c: "#e8e8ed" },
