@@ -667,12 +667,45 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
             <TakeupChart snaps={projectSnaps} lang={lang} />
           </ChartCard>
         )}
-        {roomRows.length > 0 && (
-          <ChartCard title={L("Mix po izbách", "Room-type mix")}
-            subtitle={L("Predané / rezervované / voľné", "Sold / reserved / available")}>
-            <RoomMixChart rows={roomRows} lang={lang} />
-          </ChartCard>
-        )}
+        {roomRows.length > 0 && (() => {
+          // Same data-scope pattern as the scatter below — don't claim
+          // "sold / reserved / available" if the project only publishes
+          // V inventory (roomRows would then have all sold=0 reserved=0
+          // and the 3-color bar becomes 100% green with no context).
+          const mixHasV = roomRows.some(r => r.avail > 0);
+          const mixHasP = roomRows.some(r => r.sold > 0);
+          const mixHasR = roomRows.some(r => r.reserved > 0);
+          let mixSubtitle, mixNote;
+          if (mixHasV && mixHasP && mixHasR) {
+            mixSubtitle = L("Predané / rezervované / voľné", "Sold / reserved / available");
+            mixNote = null;
+          } else if (mixHasV && mixHasP) {
+            mixSubtitle = L("Predané / voľné", "Sold / available");
+            mixNote = L("Developer nezverejňuje rezervácie.", "Developer doesn't publish reservations.");
+          } else if (mixHasV && mixHasR) {
+            mixSubtitle = L("Rezervované / voľné", "Reserved / available");
+            mixNote = L("Developer nezverejňuje predané byty.", "Developer doesn't publish sold units.");
+          } else if (mixHasV) {
+            mixSubtitle = L("Len voľné byty", "Available units only");
+            mixNote = L(
+              "Developer zverejňuje iba voľné byty — predané a rezervované tu nie sú započítané.",
+              "Developer only publishes available units — sold / reserved aren't tracked here.",
+            );
+          } else {
+            mixSubtitle = L("Predané / rezervované", "Sold / reserved");
+            mixNote = null;
+          }
+          return (
+            <ChartCard title={L("Mix po izbách", "Room-type mix")} subtitle={mixSubtitle}>
+              <RoomMixChart rows={roomRows} lang={lang} />
+              {mixNote && (
+                <div style={{ fontSize: "0.72rem", color: dim, marginTop: "0.6rem", lineHeight: 1.5, fontStyle: "italic" }}>
+                  {mixNote}
+                </div>
+              )}
+            </ChartCard>
+          );
+        })()}
         {availPrices.length >= 5 && (
           <ChartCard title={L("Rozdelenie cien voľných bytov", "Price distribution — available units")}
             subtitle={L(`Medián ${fmtEur(median(availPrices))}`, `Median ${fmtEur(median(availPrices))}`)}>
@@ -681,12 +714,60 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
         )}
       </div>
 
-      {flats.length >= 5 && (
-        <ChartCard title={L("Plocha × cena (všetky byty)", "Area × price (all units)")}
-          subtitle={L("Každý bod = 1 byt · sklon ~ priemerná €/m²", "Each dot = 1 unit · slope ≈ avg €/m²")}>
-          <AreaPriceScatter flats={flats} lang={lang} onSelectFlat={onSelectFlat} />
-        </ChartCard>
-      )}
+      {flats.length >= 5 && (() => {
+        // Figure out what this project's data actually covers, so the
+        // chart title + a one-liner honestly describe what the user is
+        // looking at. Some developers only publish their available (V)
+        // inventory; the scatter must then not claim to be "all units".
+        const hasV = flats.some(f => f.stav === "V");
+        const hasP = flats.some(f => f.stav === "P");
+        const hasR = flats.some(f => f.stav === "R" || f.stav === "PR");
+        const pricedCount = flats.filter(f => f.cena_s_dph != null && f.obytna_plocha != null && Number(f.obytna_plocha) > 0).length;
+
+        // Title adapts to actual scope.
+        let title, scopeNote;
+        if (hasV && hasP && hasR) {
+          title = L("Plocha × cena (všetky byty)", "Area × price (all units)");
+          scopeNote = L(
+            `Developer zverejňuje voľné, predané aj rezervované byty. V grafe je ${pricedCount} bytov s cenou.`,
+            `Developer publishes available, sold and reserved units. Chart plots ${pricedCount} units with a listed price.`,
+          );
+        } else if (hasV && hasP) {
+          title = L("Plocha × cena (voľné + predané)", "Area × price (available + sold)");
+          scopeNote = L(
+            `Developer zverejňuje voľné a predané byty, nie rezervácie. V grafe je ${pricedCount} bytov s cenou.`,
+            `Developer publishes available and sold units; reservations aren't listed. Chart plots ${pricedCount} priced units.`,
+          );
+        } else if (hasV && hasR) {
+          title = L("Plocha × cena (voľné + rezervované)", "Area × price (available + reserved)");
+          scopeNote = L(
+            `Developer zverejňuje voľné a rezervované byty, nie predané.`,
+            `Developer publishes available and reserved units; sold units aren't listed.`,
+          );
+        } else if (hasV) {
+          title = L("Plocha × cena (len voľné byty)", "Area × price (available units only)");
+          scopeNote = L(
+            `Developer zverejňuje iba voľné byty. Predané a rezervované v grafe nie sú, lebo ich nemáme.`,
+            `Developer publishes only available units. Sold / reserved aren't plotted because we don't have them.`,
+          );
+        } else {
+          title = L("Plocha × cena", "Area × price");
+          scopeNote = L(
+            `V grafe je ${pricedCount} bytov s cenou.`,
+            `Chart plots ${pricedCount} units with a listed price.`,
+          );
+        }
+
+        return (
+          <ChartCard title={title}
+            subtitle={L("Každý bod = 1 byt · sklon ~ priemerná €/m²", "Each dot = 1 unit · slope ≈ avg €/m²")}>
+            <AreaPriceScatter flats={flats} lang={lang} onSelectFlat={onSelectFlat} />
+            <div style={{ fontSize: "0.72rem", color: dim, marginTop: "0.75rem", lineHeight: 1.5, fontStyle: "italic" }}>
+              {scopeNote}
+            </div>
+          </ChartCard>
+        );
+      })()}
 
       <style>{`
         @media (max-width: 760px) { .insights-grid { grid-template-columns: 1fr !important; } }
