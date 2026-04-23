@@ -1133,22 +1133,30 @@ function FlatsTable({ flats, t, lang, highlightedFlatId }) {
   // ── Sortable + filterable columns ─────────────────────────────
   // kind: "num" → range filter (min/max)
   // kind: "text" → include-list filter (checkbox of distinct values)
+  // width: colgroup percentage so the 12 columns fit the viewport
+  //        without horizontal scrolling. Sum ≈ 100 %.
   const COLS = [
-    { key: "unit",      label: t.tbl_flat,        align: "left",  kind: "text", def: "asc",  get: f => f.unit_detail || f.unit_id || "" },
-    { key: "budova",    label: t.tbl_building,    align: "left",  kind: "text", def: "asc",  get: f => f.budova || "" },
-    { key: "poschodie", label: t.tbl_floor,       align: "left",  kind: "num",  def: "asc",  get: f => f.poschodie },
-    { key: "izby",      label: t.tbl_rooms,       align: "left",  kind: "num",  def: "asc",  get: f => f.izby },
-    { key: "interior",  label: t.tbl_interior,    align: "right", kind: "num",  def: "asc",  get: f => f.obytna_plocha },
-    { key: "exterior",  label: t.tbl_exterior,    align: "right", kind: "num",  def: "asc",  get: f => f.exterier_plocha },
-    { key: "total",     label: t.tbl_total,       align: "right", kind: "num",  def: "asc",  get: f => f.celkova_plocha },
-    { key: "price",     label: t.tbl_price,       align: "right", kind: "num",  def: "asc",  get: f => f.cena_s_dph },
-    { key: "price_m2",  label: t.tbl_eur_m2,      align: "right", kind: "num",  def: "asc",
+    { key: "unit",      label: t.tbl_flat,        align: "left",  kind: "text", def: "asc", width: "10%",  get: f => f.unit_detail || f.unit_id || "" },
+    { key: "budova",    label: t.tbl_building,    align: "left",  kind: "text", def: "asc", width: "7%",   get: f => f.budova || "" },
+    { key: "poschodie", label: t.tbl_floor,       align: "left",  kind: "num",  def: "asc", width: "6%",   get: f => f.poschodie },
+    { key: "izby",      label: t.tbl_rooms,       align: "left",  kind: "num",  def: "asc", width: "5%",   get: f => f.izby },
+    { key: "interior",  label: t.tbl_interior,    align: "right", kind: "num",  def: "asc", width: "8%",   get: f => f.obytna_plocha },
+    { key: "exterior",  label: t.tbl_exterior,    align: "right", kind: "num",  def: "asc", width: "7%",   get: f => f.exterier_plocha },
+    { key: "total",     label: t.tbl_total,       align: "right", kind: "num",  def: "asc", width: "7%",   get: f => f.celkova_plocha },
+    { key: "price",     label: t.tbl_price,       align: "right", kind: "num",  def: "asc", width: "12%",  get: f => f.cena_s_dph },
+    { key: "price_m2",  label: t.tbl_eur_m2,      align: "right", kind: "num",  def: "asc", width: "8%",
       get: f => (f.cena_s_dph != null && f.obytna_plocha != null && Number(f.obytna_plocha) > 0)
                 ? Number(f.cena_s_dph) / Number(f.obytna_plocha) : null },
-    { key: "orient",    label: t.tbl_orientation, align: "left",  kind: "text", def: "asc",  get: f => f.orientacia || "" },
-    { key: "handover",  label: t.tbl_handover,    align: "left",  kind: "text", def: "asc",  get: f => f.kolaudacia || "" },
-    { key: "stav",      label: t.tbl_status,      align: "left",  kind: "text", def: "asc",  get: f => f.stav || "" },
+    { key: "orient",    label: t.tbl_orientation, align: "left",  kind: "text", def: "asc", width: "8%",   get: f => f.orientacia || "" },
+    { key: "handover",  label: t.tbl_handover,    align: "left",  kind: "text", def: "asc", width: "14%",  get: f => f.kolaudacia || "" },
+    { key: "stav",      label: t.tbl_status,      align: "left",  kind: "text", def: "asc", width: "8%",   get: f => f.stav || "" },
   ];
+
+  // Compact th/td — local overrides so this table fits 12 columns on
+  // one screen without horizontal scrolling. The global th/td (0.75rem
+  // 1rem padding) is designed for wider tables with fewer columns.
+  const compactTh = { padding: "0.5rem 0.35rem", fontWeight: 600 };
+  const compactTd = { padding: "0.45rem 0.35rem", color: "#e8e8ed", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
 
   const [sort, setSort] = useState({ key: "unit", dir: "asc" });
   // columnFilters: { [colKey]: { values: Set<string> }  (text mode)
@@ -1274,18 +1282,27 @@ function FlatsTable({ flats, t, lang, highlightedFlatId }) {
         </div>
       )}
 
-      <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
+      {/* No overflowX wrapper — table is forced to fit via fixed layout
+          + colgroup widths + compact padding, so the last column is
+          always visible without horizontal scroll. */}
+      <div>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.76rem", tableLayout: "fixed" }}>
+          <colgroup>
+            {COLS.map(col => (
+              <col key={col.key} style={{ width: col.width }} />
+            ))}
+          </colgroup>
           <thead style={{ background: "#0e0e10" }}>
-            <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+            <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>
               {COLS.map(col => {
                 const filterActive = isFilterActive(col);
                 return (
                   <th key={col.key}
                       style={{
-                        ...th, textAlign: col.align, userSelect: "none",
+                        ...compactTh, textAlign: col.align, userSelect: "none",
                         color: sort.key === col.key ? "#e8e8ed" : dim,
                         position: "relative",
+                        overflow: "hidden",
                       }}>
                     <div style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
                       <span onClick={() => onHeaderClick(col)}
@@ -1324,7 +1341,7 @@ function FlatsTable({ flats, t, lang, highlightedFlatId }) {
           </thead>
           <tbody>
             {sortedFlats.length === 0 && (
-              <tr><td colSpan={COLS.length} style={{ ...td, textAlign: "center", color: dim, padding: "1.25rem", fontStyle: "italic" }}>
+              <tr><td colSpan={COLS.length} style={{ ...compactTd, textAlign: "center", color: dim, padding: "1.25rem", fontStyle: "italic", whiteSpace: "normal" }}>
                 {lang === "sk" ? "Žiadne byty neprešli filtrami." : "No flats match the filters."}
               </td></tr>
             )}
@@ -1335,31 +1352,31 @@ function FlatsTable({ flats, t, lang, highlightedFlatId }) {
                   id={`flat-row-${f.id}`}
                   className={isHl ? "flat-row-flash" : ""}
                   style={{ borderTop: `1px solid ${border}` }}>
-                <td style={td}><strong>{f.unit_detail || f.unit_id}</strong></td>
-                <td style={{ ...td, color: dim }}>{f.budova || "—"}</td>
-                <td style={{ ...td, fontFamily: mono }}>{f.poschodie ?? "—"}</td>
-                <td style={{ ...td, fontFamily: mono }}>{f.izby ?? "—"}</td>
-                <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{f.obytna_plocha ? `${f.obytna_plocha} m²` : "—"}</td>
-                <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{f.exterier_plocha ?? "—"}</td>
-                <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{f.celkova_plocha ?? "—"}</td>
-                <td style={{ ...td, textAlign: "right", fontFamily: mono }}>
+                <td style={compactTd}><strong>{f.unit_detail || f.unit_id}</strong></td>
+                <td style={{ ...compactTd, color: dim }}>{f.budova || "—"}</td>
+                <td style={{ ...compactTd, fontFamily: mono }}>{f.poschodie ?? "—"}</td>
+                <td style={{ ...compactTd, fontFamily: mono }}>{f.izby ?? "—"}</td>
+                <td style={{ ...compactTd, textAlign: "right", fontFamily: mono }}>{f.obytna_plocha ? `${f.obytna_plocha}` : "—"}</td>
+                <td style={{ ...compactTd, textAlign: "right", fontFamily: mono }}>{f.exterier_plocha ?? "—"}</td>
+                <td style={{ ...compactTd, textAlign: "right", fontFamily: mono }}>{f.celkova_plocha ?? "—"}</td>
+                <td style={{ ...compactTd, textAlign: "right", fontFamily: mono }}>
                   {f.cena_s_dph != null ? `${Math.round(f.cena_s_dph).toLocaleString(locale)} €` :
                     f.cena_s_dph_text ? <span style={{ color: dim }}>{f.cena_s_dph_text}</span> : "—"}
                 </td>
-                <td style={{ ...td, textAlign: "right", fontFamily: mono, color: dim }}>
+                <td style={{ ...compactTd, textAlign: "right", fontFamily: mono, color: dim }}>
                   {(f.cena_s_dph != null && f.obytna_plocha != null && Number(f.obytna_plocha) > 0)
                     ? Math.round(Number(f.cena_s_dph) / Number(f.obytna_plocha)).toLocaleString(locale)
                     : "—"}
                 </td>
-                <td style={{ ...td, fontFamily: mono, color: dim }}>{f.orientacia || "—"}</td>
-                <td style={{ ...td, fontFamily: mono, color: dim }}>{f.kolaudacia || "—"}</td>
-                <td style={td}>
+                <td style={{ ...compactTd, fontFamily: mono, color: dim }}>{f.orientacia || "—"}</td>
+                <td style={{ ...compactTd, fontFamily: mono, color: dim }}>{f.kolaudacia || "—"}</td>
+                <td style={compactTd}>
                   {f.stav && stavStyle[f.stav] ? (
                     <span style={{
-                      padding: "2px 8px", borderRadius: 4, fontFamily: mono, fontSize: "0.7rem", fontWeight: 600,
+                      padding: "2px 6px", borderRadius: 4, fontFamily: mono, fontSize: "0.64rem", fontWeight: 600,
                       color: stavStyle[f.stav].color, background: stavStyle[f.stav].bg,
                     }}>{f.stav}</span>
-                  ) : <span style={{ color: dim, fontSize: "0.75rem" }}>{f.stav || "—"}</span>}
+                  ) : <span style={{ color: dim, fontSize: "0.7rem" }}>{f.stav || "—"}</span>}
                 </td>
               </tr>
               );
