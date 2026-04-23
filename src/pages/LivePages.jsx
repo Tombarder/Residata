@@ -365,7 +365,16 @@ function ProjectRow({ p, t, lang, setCurrent, canVelocity }) {
       </td>
       <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{velocityCell}</td>
       <td style={{ ...td, textAlign: "right" }}>
-        <button onClick={() => setCurrent && setCurrent(`Project:${p.id}`)} style={miniBtn}>{t.tbl_detail}</button>
+        {/* Disable "Detail" when we know the project has no unit-level
+            data to show (total_units === 0). Saves the user a round-trip
+            to an empty detail page. */}
+        {(p.total_units || 0) > 0 ? (
+          <button onClick={() => setCurrent && setCurrent(`Project:${p.id}`)} style={miniBtn}>{t.tbl_detail}</button>
+        ) : (
+          <span style={{ color: dim, fontSize: "0.72rem", fontStyle: "italic" }} title={lang === "sk" ? "Pre tento projekt ešte nemáme detail" : "No unit-level data yet"}>
+            —
+          </span>
+        )}
       </td>
     </tr>
   );
@@ -490,7 +499,35 @@ export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en
 
       {loading ? <div style={{ color: dim }}>{t.loading_generic}</div> :
         error ? <div style={{ color: "#ff6b6b" }}>Error: {error.message}</div> :
-        flats.length === 0 ? <div style={{ color: dim }}>{t.no_data}</div> :
+        flats.length === 0 ? (
+          /* Three distinct empty-state reasons — don't just say "no data",
+             tell the user why so they know whether to wait or move on. */
+          <div style={{
+            padding: "2rem 1.5rem", border: `1px dashed ${border}`, borderRadius: 10,
+            background: "rgba(255,255,255,0.02)", textAlign: "center",
+          }}>
+            <div style={{ fontSize: "1rem", color: text, fontWeight: 600, marginBottom: "0.6rem" }}>
+              {lang === "sk" ? "Pre tento projekt zatiaľ nemáme detail bytov" : "No unit-level data for this project yet"}
+            </div>
+            <div style={{ color: dim, fontSize: "0.88rem", lineHeight: 1.6, maxWidth: 560, margin: "0 auto" }}>
+              {(() => {
+                // Case 1: project claims N units but we have 0 in DB → sync gap
+                if (project && (project.total_units || 0) > 0) {
+                  return lang === "sk"
+                    ? <>Projekt inzeruje <strong style={{ color: text }}>{project.total_units}</strong> bytov, ale zoznam sa ešte nezosynchronizoval do našej DB. Dáta pribudnú pri najbližšom mesačnom behu.</>
+                    : <>The project lists <strong style={{ color: text }}>{project.total_units}</strong> units but the flat-level sync hasn't run yet. Data will appear on the next monthly sync.</>;
+                }
+                // Case 2: total_units is 0 — developer's public listing is empty
+                return lang === "sk"
+                  ? "Developer zatiaľ nezverejnil verejný zoznam bytov. Projekt je v registri, ale detail bude dostupný až po zverejnení developerom."
+                  : "The developer hasn't published a public unit list yet. The project is in the registry but detail will appear once they publish.";
+              })()}
+            </div>
+            <button onClick={() => setCurrent && setCurrent("Live")} className="btn-s" style={{ marginTop: "1.25rem", fontSize: "0.82rem" }}>
+              ← {lang === "sk" ? "Späť na prehľad" : "Back to dashboard"}
+            </button>
+          </div>
+        ) :
         <>
           {project && <ProjectInsights project={project} flats={flats} snapshots={snapshots} lang={lang} />}
           <FlatsTable flats={flats} t={t} lang={lang} />
