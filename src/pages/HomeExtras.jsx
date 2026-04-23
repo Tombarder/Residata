@@ -275,12 +275,15 @@ export function PipelineFlow({ lang = "en" }) {
   // (count of real flats in DB) — NIE na sum(projects.total_units) lebo
   // projekty ako Bory/Slnečnice tam majú manuálne inflated totals z
   // registry a nadúvalo to číslo na ~11k (lie voči reálnym ~5 100).
+  // `useMetrics` už nečerpáme — "units in dataset" sme odstránili (duplicita
+  // s MarketPulse o pár sekcií nižšie, ktorý to isté číslo ukazuje veľkými
+  // číslami ako "bytov sledovaných"). PipelineFlow ostáva "o tom čo robíme"
+  // (developeri → projekty → ako často), MarketPulse je "čo to naozaj je"
+  // (počty bytov, dostupné, predané, €/m²). Bez prekrytia.
   const { projects } = useProjects();
-  const { metrics } = useMetrics();
   const uniqueDevs = new Set(projects.map(p => p.developer).filter(Boolean)).size;
   const devCount  = uniqueDevs > 0 ? uniqueDevs : null;
   const projCount = projects.length > 0 ? projects.length : null;
-  const unitsTracked = metrics.find(m => m.metric_key === "total_units_tracked")?.value_numeric || null;
   // Pretty "—" when still loading; template strings below degrade gracefully.
   const fmt = (n, locale) => n == null ? "…" : Number(n).toLocaleString(locale);
 
@@ -303,13 +306,13 @@ export function PipelineFlow({ lang = "en" }) {
     z3Cap1: "MESAČNÁ AKTUALIZÁCIA",
     z3Cap2: "alebo týždenne na vyžiadanie",
 
-    // 4 KPI karty pod SVG-scénou. 4. karta je "ako často" namiesto
-    // internej schema-metriky "25 polí" čo kupujúcemu nič nehovorí.
-    // "sledovaných projektov" (not "aktívnych") — projects.length returns
-    // 90 = everything we track, incl. sold-out and paused. Only ~57 of
-    // those are currently "active" (status='active'). Using the word
-    // "aktívnych" alongside 90 would be factually wrong.
-    statsLabel: ["developerov", "sledovaných projektov", "bytov v datasete", "aktualizácia"],
+    // 3 KPI karty pod SVG-scénou. 4. karta "bytov v datasete" sme pustili
+    // — duplikovala totožné číslo z MarketPulse nižšie. Toto je "o nás /
+    // čo robíme" (vstupy + kadencia), MarketPulse je "aké sú dáta"
+    // (počty bytov, dostupné, predané). "sledovaných projektov" (nie
+    // "aktívnych") lebo projects.length = 90 = všetko v registri, aktívnych
+    // je ~57.
+    statsLabel: ["developerov", "sledovaných projektov", "aktualizácia"],
   } : {
     label: "How it works",
     title: "From scattered developer sites to live market intelligence.",
@@ -328,8 +331,8 @@ export function PipelineFlow({ lang = "en" }) {
     z3Cap1: "MONTHLY AUTO-REFRESH",
     z3Cap2: "or weekly on demand",
 
-    // "projects tracked" (not "active projects") — see Slovak comment above.
-    statsLabel: ["developers", "projects tracked", "units in dataset", "refresh cadence"],
+    // See Slovak comment above for why this is 3 cards, not 4.
+    statsLabel: ["developers", "projects tracked", "refresh cadence"],
   };
 
   return (
@@ -468,10 +471,11 @@ export function PipelineFlow({ lang = "en" }) {
         </svg>
       </div>
 
-      {/* Stats strip — LIVE numbers, full-width band */}
+      {/* Stats strip — 3 karty: čo sledujeme (vstup) + ako často. Reálne
+          počty bytov sú v MarketPulse nižšie, netreba ich tu duplikovať. */}
       <div style={{
         display: "grid",
-        gridTemplateColumns: "repeat(4, 1fr)",
+        gridTemplateColumns: "repeat(3, 1fr)",
         gap: 1,
         padding: 0,
         background: border,
@@ -480,13 +484,11 @@ export function PipelineFlow({ lang = "en" }) {
         overflow: "hidden",
       }} className="pipeline-stats">
         {[
-          { n: fmt(devCount,    lang === "sk" ? "sk-SK" : "en-US"), label: T.statsLabel[0] },
-          { n: fmt(projCount,   lang === "sk" ? "sk-SK" : "en-US"), label: T.statsLabel[1] },
-          { n: fmt(unitsTracked,lang === "sk" ? "sk-SK" : "en-US"), label: T.statsLabel[2] },
-          // 4. karta je slovný stat — cadence, nie číslo. Buyer sa
-          // nestará o počet stĺpcov v DB, stará sa ako často dostane
-          // fresh dáta. "Monthly" je jasné, actionable, kupujúce.
-          { n: lang === "sk" ? "Mesačne" : "Monthly",                label: T.statsLabel[3] },
+          { n: fmt(devCount,  lang === "sk" ? "sk-SK" : "en-US"), label: T.statsLabel[0] },
+          { n: fmt(projCount, lang === "sk" ? "sk-SK" : "en-US"), label: T.statsLabel[1] },
+          // 3. karta = cadence, slovný stat. "Mesačne" / "Monthly" hovorí
+          // čo kupujúcemu zaujíma: ako často dostane fresh dáta.
+          { n: lang === "sk" ? "Mesačne" : "Monthly",             label: T.statsLabel[2] },
         ].map((s, i) => (
           <div key={i} style={{
             textAlign: "center",
@@ -505,7 +507,7 @@ export function PipelineFlow({ lang = "en" }) {
 
       <style>{`
         @media (max-width: 560px) {
-          .pipeline-stats { grid-template-columns: 1fr 1fr !important; }
+          .pipeline-stats { grid-template-columns: 1fr !important; }
         }
       `}</style>
     </section>
