@@ -107,15 +107,20 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
     <main style={{ padding: "5rem 2rem 4rem", maxWidth: 1200, margin: "0 auto" }}>
       <Label>{t.live_label}</Label>
       <h1 className="sec-title">{t.live_title}</h1>
-      <p className="sec-desc" style={{ marginBottom: "2.5rem" }}>
-        {t.live_desc_base}{" "}
-        {showSignupPrompt && <>{t.live_desc_anon}</>}
-        {showUpgradeToPaid && <> <button onClick={() => setCurrent && setCurrent("Pricing")} style={linkBtn}>{t.upgrade_to_paid}</button> — {t.live_desc_free}</>}
-      </p>
+      {/* Landing page už má marketing copy a summary metriky (MarketPulse).
+          Live stránka je čistý dátový pohľad. Necháme len prípadný tier-
+          špecifický upsell (anonymous → register, free → upgrade); bez
+          generickej "Data refreshed daily…" vety a bez SummaryCards
+          (total_units strip bol nafúknutý o Bory/Slnečnice manual_totals,
+          cca 10k vs reálnych ~5,1k). */}
+      {(showSignupPrompt || showUpgradeToPaid) && (
+        <p className="sec-desc" style={{ marginBottom: "2.5rem" }}>
+          {showSignupPrompt && <>{t.live_desc_anon}</>}
+          {showUpgradeToPaid && <><button onClick={() => setCurrent && setCurrent("Pricing")} style={linkBtn}>{t.upgrade_to_paid}</button> — {t.live_desc_free}</>}
+        </p>
+      )}
 
-      <SummaryCards projects={projects} t={t} />
-
-      <div style={{ marginTop: "3rem" }}>
+      <div style={{ marginTop: "2rem" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "1rem", flexWrap: "wrap", gap: "1rem" }}>
           <div>
             <div style={labelStyle}>{t.projects_section_label}</div>
@@ -380,32 +385,6 @@ function ProjectRow({ p, t, lang, setCurrent, canVelocity }) {
   );
 }
 
-function SummaryCards({ projects, t }) {
-  const totals = projects.reduce((acc, p) => {
-    acc.total += p.total_units || 0;
-    acc.available += p.available_units || 0;
-    acc.sold += p.sold_units || 0;
-    return acc;
-  }, { total: 0, available: 0, sold: 0 });
-  const soldOut = projects.filter(p => p.sold_percentage === 100).length;
-  const fmt = n => n.toLocaleString(t === liveT.sk ? "sk-SK" : "en-US");
-
-  const Card = ({ label, value, sub }) => (
-    <div style={{ border: `1px solid ${border}`, borderRadius: 12, background: bg, padding: "1.5rem" }}>
-      <div style={{ fontFamily: mono, fontSize: "0.6rem", color: green, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.6rem" }}>{label}</div>
-      <div style={{ fontSize: "2rem", fontWeight: 700, letterSpacing: "-0.02em", fontFamily: mono }}>{value}</div>
-      {sub && <div style={{ fontSize: "0.75rem", color: dim, marginTop: "0.35rem" }}>{sub}</div>}
-    </div>
-  );
-  return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem" }}>
-      <Card label={t.card_projects} value={projects.length} sub={t.card_projects_sub} />
-      <Card label={t.card_total_units} value={fmt(totals.total)} sub={t.card_total_units_sub} />
-      <Card label={t.card_available} value={fmt(totals.available)} sub={t.card_available_sub} />
-      <Card label={t.card_sold} value={fmt(totals.sold)} sub={`${t.card_sold_sub_prefix} ${soldOut}`} />
-    </div>
-  );
-}
 
 /* ───────────────────── PROJECT DETAIL (gated) ───────────────────── */
 export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en" }) {
