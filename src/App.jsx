@@ -940,12 +940,13 @@ function DataPage({ setCurrent, l, lang }) {
             borderRadius: 14, overflow: "hidden",
             border: "1px solid #222228",
             aspectRatio: "4 / 3", minHeight: 280,
-            // Modern residential highrise — matches what Residata actually
-            // covers (new-build apartment projects, not single-family houses).
-            // Prev image was a house which misrepresented the product.
-            // European-feel modern facade, not NY-style skyscraper cliché.
-            background: `linear-gradient(135deg, rgba(0,229,160,0.06), rgba(0,0,0,0.1)), url("https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=1400&q=85&auto=format&fit=crop") center/cover`,
-          }} aria-label="Modern residential highrise" />
+            // Reverted to the 'biely projekt' at user's request. Previous
+            // attempts: cc1a3fa10c00 = 'zebra-ish apartment block' (rejected),
+            // 2429e8be8625 = modern geometric office feel. This one is a
+            // clean white contemporary residential, which user approved
+            // earlier when paired with the 'krajšie pekné residential' ask.
+            background: `linear-gradient(135deg, rgba(0,229,160,0.06), rgba(0,0,0,0.1)), url("https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1400&q=85&auto=format&fit=crop") center/cover`,
+          }} aria-label="Modern residential building" />
         </div>
       </div>
 
