@@ -89,19 +89,30 @@ export function useProjects(limit) {
  *  Auth-readiness gate: we wait for useAuth().loading to flip to false
  *  before firing the fetch. This guarantees the Supabase client has
  *  applied the session token (or confirmed none) to outgoing HTTP
- *  headers. Without this gate, the race described at the top of the
- *  file manifests as "No data" on first click-through after navigation.
+ *  headers. Without this gate, the race manifests as "No data" on
+ *  first click-through after navigation.
  *
- *  Empty state interpretation (after auth is resolved):
- *    - Caller has no permission for this project → RLS returns 0 rows
- *      → UI renders the appropriate gate (ChooseProjectGate / login).
- *      Not this hook's problem.
+ *  RLS-identity gate: we also refetch when anything that could change
+ *  the caller's RLS permission for this table changes — specifically
+ *  `tier` and `chosen_project_id`. Without this, the ChooseProjectGate
+ *  flow breaks: first fetch (before user picks) returns 0 rows because
+ *  RLS rejects free user with no chosen_project_id; after the user
+ *  picks, profile.chosen_project_id changes but the hook wouldn't
+ *  refetch because projectId and authLoading stayed the same. Result
+ *  was a blank-looking page after confirming project choice.
+ *
+ *  Empty state interpretation (after auth + RLS identity resolved):
+ *    - Caller has no permission → RLS returns 0 rows → UI renders the
+ *      appropriate gate (ChooseProjectGate / login). Not this hook's
+ *      problem.
  *    - Project has 0 flats in DB → 0 rows → UI renders "no data yet"
  *      message explaining sync gap vs. developer-no-listing.
- *  Either way: 0 rows here means 0 rows for real. No retries.
+ *  Either way: 0 rows here means 0 rows for real (given current RLS).
  */
 export function useProjectFlats(projectId) {
-  const { loading: authLoading } = useAuth();
+  const { loading: authLoading, profile } = useAuth();
+  const tier = profile?.tier || null;
+  const chosenProjectId = profile?.chosen_project_id || null;
   const [flats, setFlats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -128,7 +139,10 @@ export function useProjectFlats(projectId) {
     })();
 
     return () => { cancelled = true; };
-  }, [projectId, authLoading]);
+    // tier + chosenProjectId are in deps because RLS policy outcome
+    // depends on them — when they change, the server-side permission
+    // may change too and we need a fresh fetch.
+  }, [projectId, authLoading, tier, chosenProjectId]);
 
   return { flats, loading, error };
 }
@@ -165,23 +179,40 @@ export function useProjectSnapshots() {
  *  first client-side nav — RLS was evaluating the caller as anonymous
  *  before the session token caught up.
  *
- *  Caching: result cached at module scope (invalidates on full page
- *  reload). Paged fetch because Supabase caps single queries at 1000
- *  rows and we have ~5,100 flats.
+ *  RLS-identity invalidation: we key the module cache by an identity
+ *  signature (tier + chosen_project_id). Without this, a user who
+ *  logged in as free and later upgraded to paid (or vice-versa) would
+ *  keep seeing the old cached set — wrong scope. When identity changes
+ *  the cache is invalidated and we refetch.
+ *
+ *  Paging: Supabase caps single queries at 1000 rows; we page the
+ *  ~5,100 flats in 1000-chunk ranges.
  */
 let _flatsCache = null;
+let _flatsCacheKey = null;  // identity signature the cache was built for
 export function useAllFlats() {
-  const { loading: authLoading } = useAuth();
-  const [flats, setFlats] = useState(_flatsCache || []);
-  const [loading, setLoading] = useState(_flatsCache === null);
+  const { loading: authLoading, user, profile } = useAuth();
+  const identityKey = user
+    ? `${user.id}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}`
+    : "anon";
+  const [flats, setFlats] = useState(_flatsCacheKey === identityKey ? (_flatsCache || []) : []);
+  const [loading, setLoading] = useState(_flatsCacheKey !== identityKey);
 
   useEffect(() => {
     if (!isSupabaseReady()) { setLoading(false); return; }
-    if (_flatsCache) { setLoading(false); return; }
-    // Wait for auth to resolve before fetching — see module doc.
     if (authLoading) { return; }
 
+    // Cache hit for the same identity → reuse it
+    if (_flatsCacheKey === identityKey && _flatsCache) {
+      setFlats(_flatsCache);
+      setLoading(false);
+      return;
+    }
+
+    // Identity changed (login / logout / tier upgrade / project switch)
+    // → invalidate and refetch
     let cancelled = false;
+    setLoading(true);
     (async () => {
       const all = [];
       const PAGE = 1000;
@@ -201,11 +232,12 @@ export function useAllFlats() {
       }
       if (cancelled) return;
       _flatsCache = all;
+      _flatsCacheKey = identityKey;
       setFlats(all);
       setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [authLoading]);
+  }, [authLoading, identityKey]);
 
   return { flats, loading };
 }

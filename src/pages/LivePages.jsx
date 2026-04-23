@@ -1668,8 +1668,19 @@ function ChooseProjectGate({ projectId, projectName, profile, reloadProfile, set
   }
 
   if (alreadyThis) {
-    // Shouldn't normally reach here (canViewDetail would be true), but safety net
-    return null;
+    // Edge case: user just confirmed this project, profile updated, but
+    // parent's canView hasn't re-evaluated to true yet (single render
+    // frame between context update and parent re-render). Instead of
+    // returning null (blank screen), show a tiny transitional spinner.
+    // Parent will re-render with canView=true immediately after and
+    // replace us with LiveProjectDetail's actual content.
+    return (
+      <main style={{ padding: "6rem 2rem 4rem", textAlign: "center", color: dim }}>
+        <div style={{ fontSize: "0.85rem", fontFamily: mono }}>
+          {lang === "sk" ? "Načítavam projekt…" : "Loading project…"}
+        </div>
+      </main>
+    );
   }
 
   // First assignment — allow
