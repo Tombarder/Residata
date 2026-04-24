@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import Ticker from "./components/Ticker";
 import LoginModal from "./components/LoginModal";
 import CompleteProfile from "./components/CompleteProfile";
+import FloatingChat from "./components/FloatingChat";
 import PendingGate from "./components/PendingGate";
 import Feature from "./components/Feature";
 import UpgradePrompt from "./components/UpgradePrompt";
@@ -1800,6 +1801,13 @@ export default function App() {
         </div>
       )}
       {!isAppPage(current) && <Footer />}
+      {/* Floating AI chat bubble — marketing pages only. The platform
+          has its own /app/ask entry in the sidebar, and rendering it
+          twice would cause two chat instances to share the same
+          localStorage key and fight. */}
+      {!isAppPage(current) && (
+        <FloatingChat lang={lang} onNavigate={handleNav} />
+      )}
       <LoginModal open={loginOpen} onClose={() => setLoginOpen(false)} lang={lang} />
       {/* Force profile completion after login */}
       {auth.user && auth.profile && !auth.profile.profile_completed && (

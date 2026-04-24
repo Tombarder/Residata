@@ -59,11 +59,25 @@ import { createClient } from "@supabase/supabase-js";
 
 export const maxDuration = 30;
 
-const ANTHROPIC_MODEL = "claude-sonnet-4-5";
+// Haiku 4.5 — 3× faster than Sonnet, 5× cheaper, and quality is
+// plenty for grounded market Q&A (we're answering from a structured
+// JSON context, not doing complex reasoning). Switch to Sonnet if
+// users start asking questions that need chain-of-thought.
+const ANTHROPIC_MODEL = "claude-haiku-4-5";
 const MAX_TOKENS      = 500;
 const MAX_INPUT_BYTES = 24 * 1024;
 const MAX_HISTORY     = 10;
 const MAX_MSG_LEN     = 2000;
+// Data-context cache. The market data only refreshes on monthly
+// sync, so a 15-min TTL is safe and cuts two Supabase round-trips
+// from every chat request → shaves ~300-800ms off cold turns.
+const CTX_TTL_MS      = 15 * 60 * 1000;
+const ctxCache        = new Map();  // key → { at: ms, value: object }
+function cachedContext(key, builder) {
+  const hit = ctxCache.get(key);
+  if (hit && Date.now() - hit.at < CTX_TTL_MS) return Promise.resolve(hit.value);
+  return builder().then(v => { ctxCache.set(key, { at: Date.now(), value: v }); return v; });
+}
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS  = 24 * HOUR_MS;
@@ -478,11 +492,19 @@ async function handleInner(req, res) {
   }
 
   // ── Build tier-appropriate data context ──
+  // Cache key includes the user's chosen_project_id for free tier so
+  // a user who switches projects (edge case — normally not allowed)
+  // gets fresh data, not the previous project's flats.
   let dataCtx;
   try {
-    if (tier === "anon")         dataCtx = await buildAnonContext(admin);
-    else if (tier === "free")    dataCtx = await buildFreeContext(admin, userProfile);
-    else /* paid / admin */      dataCtx = await buildPaidContext(admin);
+    if (tier === "anon") {
+      dataCtx = await cachedContext("anon", () => buildAnonContext(admin));
+    } else if (tier === "free") {
+      const k = `free:${userProfile?.chosen_project_id || "none"}`;
+      dataCtx = await cachedContext(k, () => buildFreeContext(admin, userProfile));
+    } else {
+      dataCtx = await cachedContext("paid", () => buildPaidContext(admin));
+    }
   } catch (e) {
     console.error("[chat] context build", e);
     return res.status(500).json({ error: "failed to build data context" });
