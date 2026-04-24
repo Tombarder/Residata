@@ -2200,10 +2200,14 @@ function RankBarList({ rows, setCurrent, suffix = "", color = green }) {
         return (
           <div key={r.key}
             onClick={clickable ? () => setCurrent(`App:ProjectDetail:${r.key}`) : undefined}
+            onMouseEnter={clickable ? (e) => e.currentTarget.style.background = "rgba(255,255,255,0.03)" : undefined}
+            onMouseLeave={clickable ? (e) => e.currentTarget.style.background = "transparent" : undefined}
             style={{
               display: "grid", gridTemplateColumns: "24px 1fr 72px", gap: "0.75rem", alignItems: "center",
-              padding: "0.5rem 0", borderBottom: i < rows.length - 1 ? `1px solid ${border}` : "none",
+              padding: "0.5rem 0.5rem", borderBottom: i < rows.length - 1 ? `1px solid ${border}` : "none",
               cursor: clickable ? "pointer" : "default",
+              borderRadius: 4,
+              transition: "background 0.15s",
             }}
           >
             <span style={{ fontFamily: mono, fontSize: "0.7rem", color: dim, textAlign: "right" }}>{i + 1}.</span>

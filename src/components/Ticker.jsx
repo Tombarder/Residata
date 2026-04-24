@@ -10,9 +10,16 @@ export default function Ticker({ lang = "en" }) {
   const t = liveT[lang] || liveT.en;
   const { metrics, loading } = useMetrics();
 
-  // Fallback ak Supabase ešte nepripravený / prázdny
+  // Language-aware ticker text. Each metric row stores the SK copy
+  // in value_text (legacy source of truth) and an EN copy in
+  // value_json.text_en (added 2026-04-24). EN reader falls back to
+  // SK if the EN translation is missing (e.g. a newly-added metric
+  // that the sync script hasn't emitted an EN variant for yet).
+  const pickText = (m) =>
+    (lang === "en" && m.value_json && m.value_json.text_en) || m.value_text || null;
+
   const items = (metrics.length > 0
-    ? metrics.filter(m => m.value_text).map(m => m.value_text)
+    ? metrics.map(pickText).filter(Boolean)
     : [t.ticker_connecting]);
 
   const loopItems = [...items, ...items];
