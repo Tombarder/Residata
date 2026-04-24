@@ -915,16 +915,22 @@ function AiSummaryBlock({ context, lang }) {
  * break when printing the report to PDF.
  */
 function Histogram({ bins, lang, unit, flats, projects, onProjectClick }) {
+  // ALL hooks must run on every render — putting an early return
+  // between useState and useMemo changed the hook count when `bins`
+  // toggled between empty and non-empty across renders (caused React
+  // #310 "rendered more hooks than during the previous render" crash
+  // on /app once metrics/projects had loaded). Fix: hoist every hook
+  // to the top, guard with nullish arrays inside, and only do the
+  // null render at the end.
   const [openBin, setOpenBin] = useState(null);   // index of currently-expanded bin, or null
-  if (!bins || bins.length === 0) return null;
-  const max = Math.max(...bins.map(b => b.count), 1);
+  const safeBins = Array.isArray(bins) ? bins : [];
   const drillable = Array.isArray(flats) && flats.length > 0;
 
   // Compute the list of flats for the open bin on demand — cheap
   // filter on already-loaded data, no round-trip.
   const flatsInOpenBin = useMemo(() => {
     if (openBin == null || !drillable) return [];
-    const b = bins[openBin];
+    const b = safeBins[openBin];
     if (!b) return [];
     const projById = new Map((projects || []).map(p => [p.id, p]));
     const rows = [];
@@ -935,7 +941,7 @@ function Histogram({ bins, lang, unit, flats, projects, onProjectClick }) {
       if (m2 < 500 || m2 > 20000) continue;
       // Include the last bin's upper edge (to) so the max value lands
       // visibly; lower bins are [from, to).
-      const inRange = openBin === bins.length - 1
+      const inRange = openBin === safeBins.length - 1
         ? (m2 >= b.from && m2 <= b.to)
         : (m2 >= b.from && m2 < b.to);
       if (!inRange) continue;
@@ -953,14 +959,18 @@ function Histogram({ bins, lang, unit, flats, projects, onProjectClick }) {
     }
     rows.sort((a, b) => a.m2 - b.m2);
     return rows;
-  }, [openBin, bins, flats, projects, drillable]);
+  }, [openBin, safeBins, flats, projects, drillable]);
+
+  // Safe to early-return here — all hooks above have already been called.
+  if (safeBins.length === 0) return null;
+  const max = Math.max(...safeBins.map(b => b.count), 1);
 
   return (
     <div style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8, padding: "0.75rem 0.9rem" }}>
       {/* rep-hist-row class is targeted by the page-level @media query
           to stack the 3 columns on narrow viewports (< 640px). */}
       <div className="rep-hist-row" style={{ display: "grid", gridTemplateColumns: "140px 1fr 40px", gap: "0.3rem 0.3rem", alignItems: "center" }}>
-        {bins.map((b, i) => (
+        {safeBins.map((b, i) => (
           <RowBin
             key={i}
             bin={b}
@@ -980,7 +990,7 @@ function Histogram({ bins, lang, unit, flats, projects, onProjectClick }) {
 
       {openBin != null && drillable && (
         <HistogramDrilldown
-          bin={bins[openBin]}
+          bin={safeBins[openBin]}
           rows={flatsInOpenBin}
           unit={unit}
           lang={lang}
