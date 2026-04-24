@@ -235,6 +235,48 @@ export default function PlatformShell({ page, projectId, lang = "en", setCurrent
           .platform-main { margin-left: 0 !important; }
           .platform-hamburger { display: inline-block !important; }
         }
+
+        /* Preview mode for Gated pages (free users on Analytics /
+           Reports / Exports). Approach: the wrapper stays sharp so
+           section titles, column headers, sidebar and the upgrade
+           banner are perfectly readable. Only concrete DATA VALUES
+           are blurred so the user understands "what the feature
+           shows" without getting the actual numbers. Selectors
+           aren't perfect (no JSX-level class annotations exist yet)
+           but cover the 95 % case:
+
+             · svg (every chart body — histograms, scatters, pivot
+               bar chart, heat maps)
+             · table td with monospace font (numeric cells)
+             · KPI-card value elements (identified by the large
+               monospace font inline style)
+             · elements with explicit .preview-blur class for any
+               future fine-grained marking
+
+           Headings (h1/h2/h3), th cells, select boxes, pivot chip
+           labels, picker rows, section labels, and plain prose stay
+           sharp — the user still reads structure + context.
+         */
+        .platform-preview-content { position: relative; }
+        .platform-preview-content svg,
+        .platform-preview-content td[style*="font-family"],
+        .platform-preview-content td[style*="fontFamily"],
+        .platform-preview-content [data-preview-blur],
+        .platform-preview-content .preview-blur {
+          filter: blur(5px) saturate(0.7);
+          user-select: none;
+          pointer-events: none;
+        }
+        /* Interactive chrome INSIDE the blurred wrapper must stay
+           usable (pivot builder drags, filter toggles). Re-assert
+           pointer-events on the outer control surfaces we want to
+           keep clickable even in preview. */
+        .platform-preview-content button,
+        .platform-preview-content select,
+        .platform-preview-content input,
+        .platform-preview-content [role="button"] {
+          pointer-events: auto;
+        }
       `}</style>
     </div>
   );
@@ -533,123 +575,103 @@ function Gated({ require, children, lang, setCurrent }) {
   const { can, tier } = useCapabilities();
   if (can(require)) return children;
   return (
-    <div style={{ position: "relative" }}>
+    <div className="platform-preview-root">
+      <UpgradeOverlay lang={lang} requiredFor={require} currentTier={tier} setCurrent={setCurrent} />
       <div
-        inert=""
-        aria-hidden="true"
-        style={{
-          filter: "blur(6px) saturate(0.6)",
-          pointerEvents: "none",
-          userSelect: "none",
-          opacity: 0.85,
-          transition: "filter 0.25s",
-        }}
+        className="platform-preview-content"
+        aria-label={lang === "sk" ? "Ukážka — dáta sú rozmazané, upgrade-ni pre prístup" : "Preview — data is blurred, upgrade to access"}
       >
         {children}
       </div>
-      <UpgradeOverlay lang={lang} requiredFor={require} currentTier={tier} setCurrent={setCurrent} />
     </div>
   );
 }
 
 /**
- * Floating upgrade card anchored top-centre above the blurred
- * preview. Uses sticky positioning so it stays in view while the
- * user scrolls through the Analytics/Reports skeleton underneath —
- * constant reminder of what the upgrade unlocks.
+ * Slim horizontal banner at the top of the preview content — always
+ * visible when the page loads, scrolls naturally with the rest (not
+ * sticky / floating so it doesn't cover chart titles the user is
+ * trying to read as a "preview"). The previous floating sticky card
+ * overlapped and obscured the content users were supposed to be
+ * seeing as preview.
  */
 function UpgradeOverlay({ lang, requiredFor, currentTier, setCurrent }) {
   const featureMeta = {
     view_analytics: {
-      title:   lang === "sk" ? "Analytika a trendy" : "Analytics & trends",
-      sub:     lang === "sk"
-        ? "Pivot cez tisíce bytov, trendy po mesiacoch, okresy, top developeri, rýchlosť predaja."
-        : "Pivot across thousands of units, month-over-month trends, districts, top developers, sales velocity.",
-      bullets: lang === "sk"
-        ? ["Celý dataset 5 100+ bytov", "Drag-and-drop pivot", "Historické snapshoty", "Top developer / okres rebríčky"]
-        : ["Full dataset of 5,100+ units", "Drag-and-drop pivot", "Historical snapshots", "Top developer / district leaderboards"],
+      title:  lang === "sk" ? "Analytika a trendy" : "Analytics & trends",
+      sub:    lang === "sk"
+        ? "Toto je ukážka paid sekcie. Pivot cez všetky byty, rebríčky okresov a developerov, rýchlosť predaja za posledný mesiac — odomkni reálne čísla upgradom."
+        : "This is a preview of the paid section. Pivot across every unit, district & developer leaderboards, 30-day sales velocity — upgrade to see the real numbers.",
     },
     view_monthly_reports: {
-      title:   lang === "sk" ? "Mesačné reporty" : "Monthly reports",
-      sub:     lang === "sk"
-        ? "PDF / CSV reporty na každý scope — trh, mesto, časť mesta, projekt, developer."
-        : "PDF / CSV reports for every scope — market, city, district, project, developer.",
-      bullets: lang === "sk"
-        ? ["Executive summary + benchmark", "5 scope úrovní", "Historický trend", "Export jedným klikom"]
-        : ["Executive summary + benchmark", "5 scope levels", "Historical trend", "One-click export"],
+      title:  lang === "sk" ? "Mesačné reporty" : "Monthly reports",
+      sub:    lang === "sk"
+        ? "Toto je ukážka paid reportov. PDF / CSV na každý scope — trh, mesto, časť mesta, projekt, developer — s historickým trendom. Upgrade-ni pre plný prístup."
+        : "Preview of the paid reports. PDF / CSV for every scope — market, city, district, project, developer — with historical trend. Upgrade for full access.",
     },
     export_data: {
-      title:   lang === "sk" ? "Exporty CSV / API" : "CSV / API exports",
-      sub:     lang === "sk"
-        ? "Stiahni celý dataset alebo ťahaj priamo cez REST API."
-        : "Download the full dataset or pull via REST API.",
-      bullets: lang === "sk"
-        ? ["CSV zoznam projektov", "CSV unit-level flats", "REST API prístup", "Dedicated API key na požiadanie"]
-        : ["Projects CSV", "Unit-level flats CSV", "REST API access", "Dedicated API key on request"],
+      title:  lang === "sk" ? "Exporty CSV / API" : "CSV / API exports",
+      sub:    lang === "sk"
+        ? "Stiahni celý dataset alebo ťahaj priamo cez REST API. Upgrade-ni pre prístup."
+        : "Download the full dataset or pull via REST API. Upgrade for access.",
     },
     manage_users: {
       title: "Admin",
       sub: lang === "sk" ? "Administrátorská sekcia." : "Admin section.",
-      bullets: [],
     },
-  }[requiredFor] || { title: requiredFor, sub: "", bullets: [] };
+  }[requiredFor] || { title: requiredFor, sub: "" };
 
   return (
     <div style={{
-      position: "sticky",
-      top: "84px",
-      left: 0, right: 0,
-      zIndex: 20,
-      pointerEvents: "none",
-      padding: "1.5rem 1.25rem 0",
-      display: "flex", justifyContent: "center",
+      margin: "1rem 1.5rem 1.25rem",
+      background: "linear-gradient(90deg, rgba(0,229,160,0.07) 0%, rgba(0,229,160,0.02) 60%, transparent 100%)",
+      border: `1px solid rgba(0,229,160,0.28)`,
+      borderRadius: 10,
+      padding: "0.85rem 1.1rem",
+      display: "flex", alignItems: "center", gap: "0.85rem",
+      flexWrap: "wrap",
     }}>
       <div style={{
-        pointerEvents: "auto",
-        background: "linear-gradient(180deg, #14141a 0%, #0e0e10 100%)",
-        border: `1px solid rgba(0,229,160,0.35)`,
-        borderRadius: 14,
-        padding: "1.4rem 1.6rem",
-        maxWidth: 520, width: "100%",
-        boxShadow: "0 20px 60px rgba(0,0,0,0.7), 0 0 40px rgba(0,229,160,0.08)",
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.35rem" }}>
-          <div style={{
-            width: 26, height: 26, borderRadius: 6,
-            background: "rgba(0,229,160,0.12)", color: green,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: "0.82rem",
-          }}>🔒</div>
-          <div style={{ fontFamily: mono, fontSize: "0.62rem", color: green, letterSpacing: "0.12em", textTransform: "uppercase" }}>
-            {lang === "sk" ? "Paid funkcia · ukážka" : "Paid feature · preview"}
-          </div>
-        </div>
-        <h2 style={{ fontSize: "1.25rem", fontWeight: 700, letterSpacing: "-0.02em", color: textLight, margin: "0 0 0.35rem" }}>
-          {featureMeta.title}
-        </h2>
-        <p style={{ color: dim, fontSize: "0.85rem", lineHeight: 1.55, margin: "0 0 0.75rem" }}>
-          {featureMeta.sub}
-        </p>
-        {featureMeta.bullets.length > 0 && (
-          <ul style={{ color: "#c4c4cc", fontSize: "0.82rem", lineHeight: 1.55, margin: "0 0 1rem", paddingLeft: "1.1rem" }}>
-            {featureMeta.bullets.map((b, i) => <li key={i}>{b}</li>)}
-          </ul>
-        )}
-        <div style={{ display: "flex", gap: "0.55rem", flexWrap: "wrap", alignItems: "center" }}>
-          <button
-            className="btn-p"
-            onClick={() => setCurrent && setCurrent("App:Billing")}
-            style={{ fontSize: "0.84rem" }}
-          >
-            {lang === "sk" ? "Upgrade na paid" : "Upgrade to paid"}
-          </button>
-          <span style={{ fontFamily: mono, fontSize: "0.68rem", color: dim }}>
+        flexShrink: 0,
+        width: 30, height: 30, borderRadius: 7,
+        background: "rgba(0,229,160,0.15)", color: green,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: "0.9rem",
+      }}>🔒</div>
+      <div style={{ flex: 1, minWidth: 180 }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: "0.55rem", flexWrap: "wrap" }}>
+          <span style={{ fontFamily: mono, fontSize: "0.58rem", color: green, letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 700 }}>
+            {lang === "sk" ? "Ukážka" : "Preview"}
+          </span>
+          <span style={{ color: textLight, fontWeight: 700, fontSize: "0.94rem", letterSpacing: "-0.01em" }}>
+            {featureMeta.title}
+          </span>
+          <span style={{ fontFamily: mono, fontSize: "0.62rem", color: dim }}>
             {lang === "sk"
-              ? <>aktuálne: <span style={{ color: textLight }}>{currentTier}</span></>
-              : <>current: <span style={{ color: textLight }}>{currentTier}</span></>}
+              ? <>tier <span style={{ color: textLight }}>{currentTier}</span></>
+              : <>tier <span style={{ color: textLight }}>{currentTier}</span></>}
           </span>
         </div>
+        <div style={{ color: "#c0c0c8", fontSize: "0.8rem", lineHeight: 1.45, marginTop: "0.2rem" }}>
+          {featureMeta.sub}
+        </div>
       </div>
+      <button
+        onClick={() => setCurrent && setCurrent("App:Billing")}
+        style={{
+          flexShrink: 0,
+          background: green, color: "#0a0a0c",
+          border: "none", borderRadius: 7,
+          padding: "0.55rem 1.1rem",
+          fontWeight: 700, fontFamily: mono, fontSize: "0.78rem",
+          cursor: "pointer",
+          transition: "transform 0.15s, box-shadow 0.15s",
+        }}
+        onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 6px 18px rgba(0,229,160,0.3)"; }}
+        onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = "none"; }}
+      >
+        {lang === "sk" ? "Upgrade → paid" : "Upgrade → paid"}
+      </button>
     </div>
   );
 }
