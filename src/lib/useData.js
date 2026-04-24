@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase, isSupabaseReady } from "./supabase";
 import { useAuth } from "./useAuth";
 
@@ -82,24 +82,34 @@ export function useMetrics() {
  */
 export function useMarketTotals() {
   const { metrics, loading } = useMetrics();
-  // metrics rows key by `metric_key` column
-  const byKey = {};
-  for (const m of metrics) byKey[m.metric_key] = m;
-  const num = (key) => {
-    const m = byKey[key];
-    if (!m) return null;
-    const v = m.value_numeric;
-    return typeof v === "number" ? v : null;
-  };
-  return {
-    loading,
-    unitsTracked:   num("total_units_tracked"),
-    unitsAvailable: num("total_available"),
-    unitsReserved:  num("total_reserved"),
-    unitsSold:      num("total_sold_to_date"),
-    projectsActive: num("total_projects_active"),
-    avgPriceM2:     num("avg_price_m2"),
-  };
+  // Memoise the parsed totals so consumers (and their useMemo deps
+  // downstream) don't see a brand-new object on every render of the
+  // parent. Without this, Dashboard/Analytics/Reports rebuild their
+  // KPI objects on every render even when the underlying metrics
+  // haven't changed.
+  return useMemo(() => {
+    const byKey = {};
+    if (Array.isArray(metrics)) {
+      for (const m of metrics) {
+        if (m && typeof m === "object" && m.metric_key) byKey[m.metric_key] = m;
+      }
+    }
+    const num = (key) => {
+      const m = byKey[key];
+      if (!m) return null;
+      const v = m.value_numeric;
+      return typeof v === "number" && Number.isFinite(v) ? v : null;
+    };
+    return {
+      loading,
+      unitsTracked:   num("total_units_tracked"),
+      unitsAvailable: num("total_available"),
+      unitsReserved:  num("total_reserved"),
+      unitsSold:      num("total_sold_to_date"),
+      projectsActive: num("total_projects_active"),
+      avgPriceM2:     num("avg_price_m2"),
+    };
+  }, [metrics, loading]);
 }
 
 /** Project list. Public data; anon and authenticated see the same rows

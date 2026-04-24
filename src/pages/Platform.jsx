@@ -11,7 +11,7 @@
  * render with a small 🔒 icon and clicking them lands on an upgrade card
  * instead of the actual feature. Admin-only items are hidden for non-admins.
  */
-import { useState, useEffect } from "react";
+import { Component, useState, useEffect } from "react";
 import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
 import { useProjects, useMarketTotals } from "../lib/useData";
@@ -204,15 +204,19 @@ export default function PlatformShell({ page, projectId, lang = "en", setCurrent
 
         {/* Content area. key={page} makes the fade animation replay on nav,
             but hook state (useProjects etc) survives remount via module-
-            level cache — so we don't see the "zeros flash". */}
+            level cache — so we don't see the "zeros flash". Wrapped in
+            ErrorBoundary so a render crash in any sub-page shows a
+            readable error panel instead of a black screen. */}
         <div style={{ flex: 1 }} key={page} className="page-transition">
-          <PageContent
-            page={page}
-            projectId={projectId}
-            lang={lang}
-            setCurrent={navigate}
-            openLogin={openLogin}
-          />
+          <PlatformErrorBoundary lang={lang}>
+            <PageContent
+              page={page}
+              projectId={projectId}
+              lang={lang}
+              setCurrent={navigate}
+              openLogin={openLogin}
+            />
+          </PlatformErrorBoundary>
         </div>
       </div>
 
@@ -431,6 +435,54 @@ function TopBar({ page, lang, tier }) {
       `}</style>
     </header>
   );
+}
+
+/**
+ * ErrorBoundary — catches a render-time exception in the platform
+ * content area and shows a human-readable panel instead of a black
+ * screen. Without this, an uncaught exception in any subtree (e.g.
+ * a bad row from the DB, a stale cached value after a sync) unmounts
+ * the tree silently and leaves the sidebar + an empty dark page.
+ *
+ * Reload button fully reloads the SPA — clears module-level caches,
+ * re-reads auth, usually recovers. The explicit "go back to /" link
+ * is a safety net in case something in /app/* is consistently broken.
+ */
+class PlatformErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { err: null }; }
+  static getDerivedStateFromError(err) { return { err }; }
+  componentDidCatch(err, info) {
+    console.error("[PlatformErrorBoundary]", err, info);
+    try { track && track("platform_crash", { message: String(err?.message || err).slice(0, 200) }); } catch (_) {}
+  }
+  render() {
+    if (!this.state.err) return this.props.children;
+    const msg = String(this.state.err?.message || this.state.err || "Unknown error");
+    return (
+      <div style={{ padding: "3rem 2rem", maxWidth: 680, margin: "0 auto", color: "#e8e8ed" }}>
+        <div style={{ fontSize: "2rem", marginBottom: "1rem" }}>⚠️</div>
+        <h2 style={{ fontSize: "1.3rem", fontWeight: 700, marginTop: 0, marginBottom: "0.6rem" }}>
+          {this.props.lang === "sk" ? "Niečo sa pokazilo pri vykreslení tejto stránky" : "Something broke while rendering this page"}
+        </h2>
+        <p style={{ color: "#8a8a96", fontSize: "0.9rem", lineHeight: 1.6, marginBottom: "1rem" }}>
+          {this.props.lang === "sk"
+            ? "Pošli nám prosím screenshot a nápis nižšie — opravíme to. Medzitým skús obnoviť stránku, zväčša to stačí."
+            : "Please send us a screenshot of the text below — we'll fix it. A reload usually helps in the meantime."}
+        </p>
+        <pre style={{ background: "#0e0e10", border: "1px solid #222228", borderRadius: 6, padding: "0.75rem 1rem", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.75rem", color: "#ff9aa2", overflowX: "auto" }}>
+{msg}
+        </pre>
+        <div style={{ display: "flex", gap: "0.6rem", marginTop: "1rem", flexWrap: "wrap" }}>
+          <button onClick={() => window.location.reload()} className="btn-p" style={{ fontSize: "0.82rem" }}>
+            {this.props.lang === "sk" ? "Obnoviť stránku" : "Reload page"}
+          </button>
+          <button onClick={() => window.location.assign("/")} className="btn-s" style={{ fontSize: "0.82rem" }}>
+            {this.props.lang === "sk" ? "Domov" : "Home"}
+          </button>
+        </div>
+      </div>
+    );
+  }
 }
 
 // ─── Page router ────────────────────────────────────────────────
