@@ -2052,6 +2052,11 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
   // Published KPI totals (same source the ticker uses) — see useMarketTotals
   // for why this is the authoritative source over sum-of-projects.
   const marketTotals = useMarketTotals();
+  // Capability flag used further down to pick between flats-based
+  // aggregation (paid, precise) and projects-table fallback (free,
+  // preview — all districts/developers visible even though their
+  // numbers are blurred by the Gated wrapper).
+  const { can } = useCapabilities();
 
   if (loading && projects.length === 0) {
     return (
@@ -2101,6 +2106,15 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
   // flats-based: units = count of flats rows, avail/sold/reserved =
   // count by `stav`. sold30 + price still come from projects (those
   // don't live on flats).
+  // Preview mode: free users land here via the Gated wrapper. Their
+  // useAllFlats() is RLS-gated to one project (their chosen_project_id)
+  // so any flats-based aggregation would collapse to one district +
+  // one developer. Since the preview blurs the numbers anyway, we
+  // fall back to project-table sums for non-capable users so the
+  // STRUCTURE shows all 57 projects / all districts / all developers.
+  // Paid users keep the flats-based precise aggregation (no registry
+  // inflation).
+  const canViewAnalytics = can("view_analytics");
   const flatsByProject = new Map();
   for (const f of allFlats || []) {
     let arr = flatsByProject.get(f.project_id);
@@ -2119,18 +2133,30 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
   const byDistrict = {};
   for (const p of projects) {
     if (!p.district) continue;
-    const d = byDistrict[p.district] ||= { district: p.district, count: 0, units: 0, avail: 0, sold: 0, sold30: 0, priceSum: 0, priceN: 0, ids: [] };
+    const d = byDistrict[p.district] ||= { district: p.district, count: 0, units: 0, avail: 0, sold: 0, sold30: 0, priceSum: 0, priceN: 0, ids: [], projects: [] };
     d.count += 1;
     d.ids.push(p.id);
+    d.projects.push(p);
     d.sold30 += p.sold_last_month || 0;
     if (p.avg_price_eur_m2) { d.priceSum += p.avg_price_eur_m2; d.priceN += 1; }
   }
   for (const d of Object.values(byDistrict)) {
-    const fs = flatsFor(d.ids);
-    d.units = fs.length;
-    d.avail = fs.filter(f => f.stav === "V").length;
-    d.sold  = fs.filter(f => f.stav === "P").length;
-    d.hasUnitData = fs.length > 0;
+    if (canViewAnalytics) {
+      const fs = flatsFor(d.ids);
+      d.units = fs.length;
+      d.avail = fs.filter(f => f.stav === "V").length;
+      d.sold  = fs.filter(f => f.stav === "P").length;
+      d.hasUnitData = fs.length > 0;
+    } else {
+      // Preview fallback — project-table sums so every district
+      // renders. Numbers inflated for registry-only projects but
+      // the preview blurs them anyway, so the structural "all
+      // districts visible" goal wins.
+      d.units = d.projects.reduce((a, p) => a + (p.total_units || 0), 0);
+      d.avail = d.projects.reduce((a, p) => a + (p.available_units || 0), 0);
+      d.sold  = d.projects.reduce((a, p) => a + (p.sold_units || 0), 0);
+      d.hasUnitData = d.units > 0;
+    }
   }
   const districts = Object.values(byDistrict)
     .map(d => ({ ...d, avgPrice: d.priceN ? Math.round(d.priceSum / d.priceN) : null,
@@ -2140,24 +2166,31 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
   const byDeveloper = {};
   for (const p of projects) {
     if (!p.developer) continue;
-    const d = byDeveloper[p.developer] ||= { developer: p.developer, count: 0, units: 0, sold: 0, sold30: 0, avail: 0, ids: [] };
+    const d = byDeveloper[p.developer] ||= { developer: p.developer, count: 0, units: 0, sold: 0, sold30: 0, avail: 0, ids: [], projects: [] };
     d.count += 1;
     d.ids.push(p.id);
+    d.projects.push(p);
     d.sold30 += p.sold_last_month || 0;
   }
   for (const d of Object.values(byDeveloper)) {
-    const fs = flatsFor(d.ids);
-    d.units = fs.length;
-    d.avail = fs.filter(f => f.stav === "V").length;
-    d.sold  = fs.filter(f => f.stav === "P").length;
-    d.hasUnitData = fs.length > 0;
+    if (canViewAnalytics) {
+      const fs = flatsFor(d.ids);
+      d.units = fs.length;
+      d.avail = fs.filter(f => f.stav === "V").length;
+      d.sold  = fs.filter(f => f.stav === "P").length;
+      d.hasUnitData = fs.length > 0;
+    } else {
+      // Preview fallback — same rationale as the district loop.
+      d.units = d.projects.reduce((a, p) => a + (p.total_units || 0), 0);
+      d.avail = d.projects.reduce((a, p) => a + (p.available_units || 0), 0);
+      d.sold  = d.projects.reduce((a, p) => a + (p.sold_units || 0), 0);
+      d.hasUnitData = d.units > 0;
+    }
   }
-  // Filter out developers with zero tracked flats (registry-only
-  // entries in the projects table). Showing a developer at "rank 8
-  // with 0 units" isn't useful; drop them so the Top 10 list reflects
-  // who we actually track. If a developer truly has all-reserved +
-  // all-sold projects but we have flat rows for them, they'd still
-  // appear — units > 0 means the scraper pulled SOME rows for them.
+  // Top-developers list: drop only registry-only rows when we're on
+  // paid tier (hasUnitData is meaningful there). For preview, keep
+  // everyone with non-zero total_units so the list shows ~10 real
+  // names the free user would recognise from the market.
   const topDevelopers = Object.values(byDeveloper)
     .filter(d => d.hasUnitData)
     .sort((a, b) => b.units - a.units)
