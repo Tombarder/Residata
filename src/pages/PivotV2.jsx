@@ -1966,21 +1966,34 @@ function FilterPopover({ fieldKey, filter, anchorEl, records, onChange, onClear,
     };
   }, [anchorEl, onClose]);
 
-  // Viewport-clamped anchor positioning. If the chip is near the bottom of
-  // the viewport, flip the popover above it. The popover shrinks to fit
-  // tight viewports (smaller than 376px) — on iPhone SE the clamped 360px
-  // would have leaked off-screen. We use min() so it's never wider than
-  // the viewport minus a 16px gutter.
+  // Anchor positioning — absolute (document-relative), not fixed
+  // (viewport-relative). With fixed, the popover stayed glued to the
+  // viewport while the page scrolled, making it impossible to reach
+  // the bottom of a tall popover on a short viewport (user reported:
+  // "okno je stuck s obrazovkou, nikdy sa neviem dostať na spodok").
+  // Absolute positioning pins the popover under the cell that opened
+  // it, so scrolling the page scrolls the popover together with the
+  // cell — natural, predictable, and the user can scroll past the
+  // popover's bottom if it overflows the viewport.
+  //
+  // Flip-above logic: when there isn't room below the cell (within
+  // the CURRENT viewport) but there is room above, flip. Coordinates
+  // still need window.scrollX/Y added because rect is viewport-local
+  // while absolute positioning is document-local.
   const rect = anchorEl?.getBoundingClientRect();
   const popW = Math.min(360, (typeof window !== "undefined" ? window.innerWidth : 400) - 16);
   const popMaxH = Math.min(560, Math.floor((typeof window !== "undefined" ? window.innerHeight : 600) * 0.75));
   const style = (() => {
     if (!rect) return { display: "none" };
+    const scrollX = typeof window !== "undefined" ? (window.scrollX || window.pageXOffset || 0) : 0;
+    const scrollY = typeof window !== "undefined" ? (window.scrollY || window.pageYOffset || 0) : 0;
     const spaceBelow = window.innerHeight - rect.bottom;
     const flipAbove  = spaceBelow < popMaxH && rect.top > popMaxH;
-    const top  = flipAbove ? Math.max(8, rect.top - popMaxH - 8) : rect.bottom + 8;
-    const left = Math.max(8, Math.min(rect.left, window.innerWidth - popW - 8));
-    return { position: "fixed", top, left, zIndex: 1000 };
+    const top  = flipAbove
+      ? Math.max(scrollY + 8, scrollY + rect.top - popMaxH - 8)
+      : scrollY + rect.bottom + 8;
+    const left = Math.max(scrollX + 8, Math.min(scrollX + rect.left, scrollX + window.innerWidth - popW - 8));
+    return { position: "absolute", top, left, zIndex: 1000 };
   })();
 
   const q = search.trim().toLowerCase();

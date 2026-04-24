@@ -2272,8 +2272,6 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
         <AKpi label={lang === "sk" ? "Predané (30d)" : "Sold (30d)"}        value={totalSold30 ? `+${totalSold30}` : "—"} accent="#f5a623"
               sub={lang === "sk" ? `${absorptionPct}% absorpcia` : `${absorptionPct}% absorption`} />
         <AKpi label={lang === "sk" ? "Priem. €/m²" : "Avg €/m²"}            value={weightedAvg ? weightedAvg.toLocaleString(lang === "sk" ? "sk-SK" : "en-US") : "—"} />
-        <AKpi label={lang === "sk" ? "Vypredané" : "Sold out"}              value={soldOutCount} accent="#ff6b6b"
-              sub={lang === "sk" ? `z ${projects.length} projektov` : `of ${projects.length} projects`} />
       </div>
 
       {/* ═══ PIVOT — drag & drop builder ═══ */}
