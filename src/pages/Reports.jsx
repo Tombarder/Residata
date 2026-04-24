@@ -169,7 +169,7 @@ export default function PlatformReports({ lang = "sk" }) {
 
       {/* Scope bodies */}
       {scope === "market" && (
-        <MarketReport projects={projects} flats={flats} lang={lang} />
+        <MarketReport projects={projects} flats={flats} onOpenProject={openProject} lang={lang} />
       )}
       {scope === "mesto" && cityPick && (
         <FilteredReport
@@ -435,7 +435,7 @@ function PickerRow({ label, value, options, onChange }) {
 /* ══════════════════════════════════════════════════════════════════
    Market report — global, "where the Slovak new-build market stands"
    ══════════════════════════════════════════════════════════════════ */
-function MarketReport({ projects, flats, lang }) {
+function MarketReport({ projects, flats, onOpenProject, lang }) {
   const { snapshots } = useProjectSnapshots();
   const summary = useMemo(() => summariseProjects(projects, flats), [projects, flats]);
   const priceSeries = useMemo(() => priceDistribution(flats, 12), [flats]);
@@ -454,8 +454,8 @@ function MarketReport({ projects, flats, lang }) {
         <AiSummaryBlock context={aiCtx} lang={lang} />
       </ReportSection>
 
-      <ReportSection label={lang === "sk" ? "Rozloženie cien" : "Price distribution"} title={lang === "sk" ? "€/m² cez všetky byty" : "€/m² across all units"}>
-        <Histogram bins={priceSeries} lang={lang} unit="€/m²" />
+      <ReportSection label={lang === "sk" ? "Rozloženie cien" : "Price distribution"} title={lang === "sk" ? "€/m² cez všetky byty \u2014 klik na pásmo otvorí zoznam bytov" : "€/m² across all units \u2014 click a band for the underlying units"}>
+        <Histogram bins={priceSeries} lang={lang} unit="€/m²" flats={flats} projects={projects} onProjectClick={onOpenProject} />
       </ReportSection>
 
       <ReportSection label={lang === "sk" ? "Časti mesta" : "Districts"} title={lang === "sk" ? "Kde je dopyt a ceny najvyššie" : "Where demand and prices concentrate"}>
@@ -516,8 +516,8 @@ function FilteredReport({ scopeLabel, scopeType, projects, flats, allProjects, a
       </ReportSection>
 
       {priceSeries.some(b => b.count > 0) && (
-        <ReportSection label={lang === "sk" ? "Rozloženie cien" : "Price distribution"} title={lang === "sk" ? "Kde sedí väčšina ponuky" : "Where the bulk of supply sits"}>
-          <Histogram bins={priceSeries} lang={lang} unit="€/m²" />
+        <ReportSection label={lang === "sk" ? "Rozloženie cien" : "Price distribution"} title={lang === "sk" ? "Kde sedí väčšina ponuky \u2014 klik na pásmo otvorí zoznam bytov" : "Where the bulk of supply sits \u2014 click a band for the underlying units"}>
+          <Histogram bins={priceSeries} lang={lang} unit="€/m²" flats={flats} projects={projects} onProjectClick={onOpenProject} />
         </ReportSection>
       )}
 
@@ -622,8 +622,8 @@ function ProjectReport({ project, flats, siblings, allFlats, lang }) {
       )}
 
       {priceSeries.some(b => b.count > 0) && (
-        <ReportSection label={lang === "sk" ? "Distribúcia cien" : "Price distribution"} title={lang === "sk" ? "€/m² naprieč bytmi" : "€/m² across units"}>
-          <Histogram bins={priceSeries} lang={lang} unit="€/m²" />
+        <ReportSection label={lang === "sk" ? "Distribúcia cien" : "Price distribution"} title={lang === "sk" ? "€/m² naprieč bytmi \u2014 klik na pásmo otvorí zoznam bytov" : "€/m² across units \u2014 click a band for the underlying units"}>
+          <Histogram bins={priceSeries} lang={lang} unit="€/m²" flats={flats} projects={[project]} />
         </ReportSection>
       )}
 
@@ -900,36 +900,220 @@ function AiSummaryBlock({ context, lang }) {
   );
 }
 
-/* ─── Histogram — SVG/HTML horizontal bars per bin ─── */
-function Histogram({ bins, lang, unit }) {
+/* ─── Histogram — SVG/HTML horizontal bars per bin ───
+ *
+ * Bins are now clickable. Clicking a bin opens a drill-down panel
+ * under the chart listing every flat whose €/m² sits in that band,
+ * sorted ascending by €/m². Each row shows project / district /
+ * rooms / area / price / €/m². If `flats` + `projects` are passed,
+ * the drill-down is rendered; otherwise the component degrades to
+ * the previous read-only display so existing call sites still work.
+ *
+ * Why inline instead of a separate modal: the question "what's in
+ * this bin?" is a follow-up to the chart — keeping the answer in
+ * the same reading flow avoids a context switch. Modal would also
+ * break when printing the report to PDF.
+ */
+function Histogram({ bins, lang, unit, flats, projects, onProjectClick }) {
+  const [openBin, setOpenBin] = useState(null);   // index of currently-expanded bin, or null
   if (!bins || bins.length === 0) return null;
   const max = Math.max(...bins.map(b => b.count), 1);
+  const drillable = Array.isArray(flats) && flats.length > 0;
+
+  // Compute the list of flats for the open bin on demand — cheap
+  // filter on already-loaded data, no round-trip.
+  const flatsInOpenBin = useMemo(() => {
+    if (openBin == null || !drillable) return [];
+    const b = bins[openBin];
+    if (!b) return [];
+    const projById = new Map((projects || []).map(p => [p.id, p]));
+    const rows = [];
+    for (const f of flats) {
+      const price = Number(f.cena_s_dph), area = Number(f.obytna_plocha);
+      if (!Number.isFinite(price) || !Number.isFinite(area) || area <= 0) continue;
+      const m2 = price / area;
+      if (m2 < 500 || m2 > 20000) continue;
+      // Include the last bin's upper edge (to) so the max value lands
+      // visibly; lower bins are [from, to).
+      const inRange = openBin === bins.length - 1
+        ? (m2 >= b.from && m2 <= b.to)
+        : (m2 >= b.from && m2 < b.to);
+      if (!inRange) continue;
+      const p = projById.get(f.project_id);
+      rows.push({
+        flatId: f.id,
+        projectId: f.project_id,
+        project: p?.name || "—",
+        district: p?.district || "—",
+        izby: f.izby,
+        area,
+        price,
+        m2: Math.round(m2),
+      });
+    }
+    rows.sort((a, b) => a.m2 - b.m2);
+    return rows;
+  }, [openBin, bins, flats, projects, drillable]);
+
   return (
     <div style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8, padding: "0.75rem 0.9rem" }}>
       {/* rep-hist-row class is targeted by the page-level @media query
           to stack the 3 columns on narrow viewports (< 640px). */}
       <div className="rep-hist-row" style={{ display: "grid", gridTemplateColumns: "140px 1fr 40px", gap: "0.3rem 0.3rem", alignItems: "center" }}>
         {bins.map((b, i) => (
-          <RowBin key={i} bin={b} max={max} unit={unit} />
+          <RowBin
+            key={i}
+            bin={b}
+            max={max}
+            unit={unit}
+            clickable={drillable}
+            active={openBin === i}
+            onClick={drillable ? () => setOpenBin(openBin === i ? null : i) : undefined}
+          />
         ))}
       </div>
       <div style={{ fontFamily: mono, fontSize: "0.62rem", color: dim, marginTop: "0.55rem", textAlign: "center" }}>
-        {lang === "sk" ? "Osa: počet bytov v cenovom pásme." : "Axis: unit count per price band."}
+        {lang === "sk"
+          ? (drillable ? "Klikni na pásmo pre zoznam bytov v ňom. Osa: počet bytov v cenovom pásme." : "Osa: počet bytov v cenovom pásme.")
+          : (drillable ? "Click a band for the units in it. Axis: unit count per price band." : "Axis: unit count per price band.")}
       </div>
+
+      {openBin != null && drillable && (
+        <HistogramDrilldown
+          bin={bins[openBin]}
+          rows={flatsInOpenBin}
+          unit={unit}
+          lang={lang}
+          onClose={() => setOpenBin(null)}
+          onProjectClick={onProjectClick}
+        />
+      )}
+
+      <style>{`
+        .rep-hist-clickable { cursor: pointer; transition: background 0.12s, border-color 0.12s; }
+        .rep-hist-clickable:hover .rep-hist-label { color: #e8e8ed; }
+        .rep-hist-clickable:hover .rep-hist-bar { border-color: #00e5a0; }
+        .rep-hist-clickable:hover .rep-hist-count { color: #00e5a0; }
+        .rep-hist-clickable.is-active .rep-hist-label { color: #00e5a0; font-weight: 700; }
+        .rep-hist-clickable.is-active .rep-hist-bar { border-color: #00e5a0; box-shadow: 0 0 0 1px rgba(0,229,160,0.4); }
+        .rep-hist-clickable.is-active .rep-hist-count { color: #00e5a0; }
+      `}</style>
     </div>
   );
 }
-function RowBin({ bin, max, unit }) {
+
+/**
+ * HistogramDrilldown — the list that opens under a clicked bin.
+ * Table of every flat in the band, sorted by €/m², with a header
+ * summarising the band (range + count + cheapest/most-expensive).
+ * Project cell click calls onProjectClick (same pattern the
+ * ProjectTable uses), so the user can jump to the Project scope.
+ */
+function HistogramDrilldown({ bin, rows, unit, lang, onClose, onProjectClick }) {
+  if (!bin) return null;
+  const clickable = typeof onProjectClick === "function";
+  const fmtEur = (v) => v == null ? "—" : Math.round(v).toLocaleString(lang === "sk" ? "sk-SK" : "en-US");
+  return (
+    <div style={{ marginTop: "0.75rem", border: `1px solid ${border}`, borderRadius: 8, background: bg }}>
+      <div style={{ padding: "0.6rem 0.85rem", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.5rem", borderBottom: `1px solid ${border}`, background: "rgba(0,229,160,0.04)" }}>
+        <div>
+          <div style={{ fontFamily: mono, fontSize: "0.65rem", color: green, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+            {lang === "sk" ? "Pásmo" : "Band"} {unit ? unit : ""}
+          </div>
+          <div style={{ fontSize: "0.92rem", color: text, fontWeight: 600, marginTop: 2 }}>
+            {bin.label}{unit ? " " + unit : ""} · <span style={{ color: green, fontFamily: mono }}>{rows.length}</span>{" "}
+            <span style={{ color: dim, fontWeight: 400, fontSize: "0.8rem" }}>
+              {lang === "sk" ? (rows.length === 1 ? "byt" : (rows.length < 5 ? "byty" : "bytov")) : (rows.length === 1 ? "unit" : "units")}
+            </span>
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          style={{ background: "transparent", border: `1px solid ${border}`, color: dim, borderRadius: 4, padding: "0.3rem 0.6rem", fontSize: "0.72rem", fontFamily: mono, cursor: "pointer" }}
+          title={lang === "sk" ? "Zavrieť" : "Close"}
+        >
+          ✕ {lang === "sk" ? "zavrieť" : "close"}
+        </button>
+      </div>
+      {rows.length === 0 ? (
+        <div style={{ padding: "1rem", color: dim, fontSize: "0.85rem", textAlign: "center", fontStyle: "italic" }}>
+          {lang === "sk" ? "Žiadne byty v tomto pásme." : "No units in this band."}
+        </div>
+      ) : (
+        <div className="rep-table-wrap" style={{ maxHeight: 340, overflowY: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.8rem" }}>
+            <thead style={{ position: "sticky", top: 0, background: bg2, zIndex: 1 }}>
+              <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                <th style={tdh}>{lang === "sk" ? "Projekt" : "Project"}</th>
+                <th style={tdh}>{lang === "sk" ? "Časť" : "District"}</th>
+                <th style={tdhR}>{lang === "sk" ? "Izby" : "Rooms"}</th>
+                <th style={tdhR}>{lang === "sk" ? "Plocha" : "Area"}</th>
+                <th style={tdhR}>{lang === "sk" ? "Cena €" : "Price €"}</th>
+                <th style={tdhR}>€/m²</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => (
+                <tr
+                  key={r.flatId || i}
+                  className={clickable ? "rep-row-clickable" : "rep-row-hoverable"}
+                  style={{ borderTop: `1px solid ${border}`, cursor: clickable ? "pointer" : "default" }}
+                  onClick={clickable ? () => onProjectClick(r.projectId) : undefined}
+                  title={clickable ? (lang === "sk" ? "Otvoriť projekt-report" : "Open project report") : r.project}
+                >
+                  <td style={tdc}><strong style={{ color: text }}>{r.project}</strong></td>
+                  <td style={tdc}>{r.district}</td>
+                  <td style={tdcR}>{r.izby ?? "—"}</td>
+                  <td style={tdcR}>{r.area ? r.area.toFixed(1) : "—"}</td>
+                  <td style={tdcR}>{fmtEur(r.price)}</td>
+                  <td style={{ ...tdcR, color: green, fontWeight: 700 }}>{fmtEur(r.m2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RowBin({ bin, max, unit, clickable, active, onClick }) {
   const w = (bin.count / max) * 100;
+  const cls = clickable ? `rep-hist-clickable${active ? " is-active" : ""}` : "";
+  const handleKey = (e) => {
+    if (!onClick) return;
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); }
+  };
   return (
     <>
-      <span className="rep-hist-label" style={{ fontFamily: mono, fontSize: "0.68rem", color: dim, textAlign: "right", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+      <span
+        className={`rep-hist-label ${cls}`}
+        role={clickable ? "button" : undefined}
+        tabIndex={clickable ? 0 : -1}
+        onClick={onClick}
+        onKeyDown={clickable ? handleKey : undefined}
+        style={{ fontFamily: mono, fontSize: "0.68rem", color: dim, textAlign: "right", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+      >
         {bin.label}{unit ? " " + unit : ""}
       </span>
-      <div className="rep-hist-bar" style={{ position: "relative", height: 14, background: bg, border: `1px solid ${border}`, borderRadius: 3 }}>
+      <div
+        className={`rep-hist-bar ${cls}`}
+        onClick={onClick}
+        onKeyDown={clickable ? handleKey : undefined}
+        tabIndex={clickable ? 0 : -1}
+        role={clickable ? "button" : undefined}
+        style={{ position: "relative", height: 14, background: bg, border: `1px solid ${border}`, borderRadius: 3 }}
+      >
         <div style={{ position: "absolute", inset: 0, width: `${w}%`, background: `linear-gradient(90deg, ${green}22, ${green})`, borderRadius: 3 }} />
       </div>
-      <span className="rep-hist-count" style={{ fontFamily: mono, fontSize: "0.68rem", color: green, fontWeight: 700, textAlign: "right" }}>
+      <span
+        className={`rep-hist-count ${cls}`}
+        onClick={onClick}
+        onKeyDown={clickable ? handleKey : undefined}
+        tabIndex={clickable ? 0 : -1}
+        role={clickable ? "button" : undefined}
+        style={{ fontFamily: mono, fontSize: "0.68rem", color: green, fontWeight: 700, textAlign: "right" }}
+      >
         {bin.count}
       </span>
     </>
