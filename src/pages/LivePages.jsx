@@ -1089,9 +1089,36 @@ function RoomMixChart({ rows, lang }) {
 }
 
 /* ── Price histogram — 10 bins of available flat prices ──── */
-function PriceHistogram({ prices }) {
-  const W = 460, H = 180, pad = { l: 36, r: 10, t: 10, b: 28 };
+/* ── Price histogram — 10 bins of available-flat prices ──
+ *
+ * User asked for the chart to 'say more' — previously it was just
+ * 10 green bars, median line, and two edge labels. Now:
+ *
+ *   · Hover any bar → HTML tooltip with exact price range of the
+ *     bin + count + % of total. Answers 'what does this bar mean?'
+ *   · Count labels ON top of each bar (when the bar is tall enough
+ *     to hold them) — instant read of 'how many units in this bin?'
+ *   · 5 x-axis tick labels (not just edge min/max) so the user can
+ *     map any bar to a rough price point without mental math
+ *   · Median label sits at its actual X position with the euro
+ *     amount — not floating somewhere generic
+ *   · Bottom caption: N units · price range · median € — the key
+ *     stats plainly stated, so the chart can be 'read' in 2 seconds
+ */
+function PriceHistogram({ prices, lang = "en" }) {
+  const [hover, setHover] = useState(null);  // hovered bin index
+  const [hoverPos, setHoverPos] = useState({ x: 0, y: 0 });  // cursor coords
+  const W = 520, H = 210, pad = { l: 16, r: 16, t: 22, b: 46 };
   const innerW = W - pad.l - pad.r, innerH = H - pad.t - pad.b;
+  const locale = lang === "sk" ? "sk-SK" : "en-US";
+  const L = (sk, en) => lang === "sk" ? sk : en;
+  const fmtK = (n) => `${Math.round(n / 1000)}k €`;
+  const fmtFull = (n) => `€${Math.round(n).toLocaleString(locale).replace(/,/g, " ")}`;
+
+  if (!prices || prices.length === 0) {
+    return <div style={{ color: dim, fontSize: "0.8rem", textAlign: "center", padding: "1rem" }}>—</div>;
+  }
+
   const min = Math.min(...prices), max = Math.max(...prices);
   const bins = 10;
   const binW = (max - min) / bins || 1;
@@ -1103,22 +1130,144 @@ function PriceHistogram({ prices }) {
   const yMax = Math.max(...counts);
   const med = median(prices);
   const medX = pad.l + (innerW * (med - min)) / (max - min || 1);
+  const total = prices.length;
+
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block", overflow: "visible" }}>
-      {counts.map((c, i) => {
-        const x = pad.l + (innerW * i) / bins;
-        const w = (innerW / bins) - 2;
-        const h = (c / yMax) * innerH;
-        const y = pad.t + innerH - h;
-        return <rect key={i} x={x + 1} y={y} width={w} height={h} fill={green} opacity={0.6} rx={2} />;
-      })}
-      {/* Median vertical line */}
-      <line x1={medX} x2={medX} y1={pad.t} y2={pad.t + innerH} stroke="#f5a623" strokeWidth={2} strokeDasharray="4,3" />
-      <text x={medX + 5} y={pad.t + 10} fill="#f5a623" fontFamily={mono} fontSize={10}>medián</text>
-      {/* Axis labels */}
-      <text x={pad.l} y={H - 8} fill={dim} fontFamily={mono} fontSize={10}>{`${Math.round(min / 1000)}k €`}</text>
-      <text x={W - pad.r} y={H - 8} textAnchor="end" fill={dim} fontFamily={mono} fontSize={10}>{`${Math.round(max / 1000)}k €`}</text>
-    </svg>
+    <div style={{ position: "relative" }}>
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        style={{ width: "100%", height: "auto", display: "block", overflow: "visible" }}
+        onMouseMove={(e) => {
+          const svg = e.currentTarget.getBoundingClientRect();
+          setHoverPos({
+            x: ((e.clientX - svg.left) / svg.width) * W,
+            y: ((e.clientY - svg.top) / svg.height) * H,
+          });
+        }}
+        onMouseLeave={() => setHover(null)}
+      >
+        {counts.map((c, i) => {
+          const x = pad.l + (innerW * i) / bins;
+          const w = (innerW / bins) - 2;
+          const h = yMax > 0 ? (c / yMax) * innerH : 0;
+          const y = pad.t + innerH - h;
+          const isHover = hover === i;
+          return (
+            <g key={i}>
+              <rect
+                x={x + 1}
+                y={y}
+                width={w}
+                height={h}
+                fill={green}
+                opacity={isHover ? 0.95 : 0.6}
+                rx={2}
+                style={{ cursor: "pointer", transition: "opacity 0.12s" }}
+                onMouseEnter={() => setHover(i)}
+              />
+              {/* Invisible full-height hover target so thin bars are
+                  still easy to hit with the cursor. */}
+              <rect
+                x={x + 1}
+                y={pad.t}
+                width={w}
+                height={innerH}
+                fill="transparent"
+                style={{ cursor: "pointer" }}
+                onMouseEnter={() => setHover(i)}
+              />
+              {/* Count on top of the bar — only if the bar has room */}
+              {c > 0 && h >= 14 && (
+                <text
+                  x={x + 1 + w / 2}
+                  y={y - 4}
+                  textAnchor="middle"
+                  fill="#e8e8ed"
+                  fontFamily={mono}
+                  fontSize={9}
+                >{c}</text>
+              )}
+            </g>
+          );
+        })}
+
+        {/* Median vertical line + value */}
+        <line x1={medX} x2={medX} y1={pad.t} y2={pad.t + innerH}
+              stroke="#f5a623" strokeWidth={2} strokeDasharray="4,3" />
+        <text x={medX} y={pad.t - 6} textAnchor="middle"
+              fill="#f5a623" fontFamily={mono} fontSize={10} fontWeight={600}>
+          {L("medián", "median")} {fmtK(med)}
+        </text>
+
+        {/* X-axis: 5 tick labels evenly spaced */}
+        {[0, 0.25, 0.5, 0.75, 1].map((frac, idx) => {
+          const v = min + (max - min) * frac;
+          const x = pad.l + innerW * frac;
+          return (
+            <g key={idx}>
+              <line x1={x} y1={pad.t + innerH} x2={x} y2={pad.t + innerH + 4}
+                    stroke={dim} strokeWidth={0.8} />
+              <text x={x} y={H - 26} textAnchor="middle"
+                    fill={dim} fontFamily={mono} fontSize={9}>
+                {fmtK(v)}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Bottom caption — key stats in one line */}
+        <text x={W / 2} y={H - 8} textAnchor="middle"
+              fill={dim} fontFamily={mono} fontSize={9.5}>
+          {L(
+            `${total} bytov · rozsah ${fmtK(min)} – ${fmtK(max)} · medián ${fmtK(med)}`,
+            `${total} units · range ${fmtK(min)} – ${fmtK(max)} · median ${fmtK(med)}`,
+          )}
+        </text>
+      </svg>
+
+      {/* HTML tooltip — richer info per hovered bin */}
+      {hover !== null && (() => {
+        const i = hover;
+        const binStart = min + i * binW;
+        const binEnd = min + (i + 1) * binW;
+        const c = counts[i];
+        const pct = total > 0 ? (c / total) * 100 : 0;
+        // Flip tooltip to left when hovering in the right half so it
+        // never overflows off-chart.
+        const flipX = hoverPos.x > W * 0.65;
+        const flipY = hoverPos.y > H * 0.55;
+        return (
+          <div style={{
+            position: "absolute",
+            left: flipX ? undefined : `calc(${(hoverPos.x / W) * 100}% + 10px)`,
+            right: flipX ? `calc(${(1 - hoverPos.x / W) * 100}% + 10px)` : undefined,
+            top: flipY ? undefined : `calc(${(hoverPos.y / H) * 100}% + 10px)`,
+            bottom: flipY ? `calc(${(1 - hoverPos.y / H) * 100}% + 10px)` : undefined,
+            background: "#0b0b0e",
+            border: `1px solid ${border}`,
+            borderLeft: `3px solid ${green}`,
+            borderRadius: 8,
+            padding: "0.55rem 0.75rem",
+            fontSize: "0.78rem",
+            color: "#e8e8ed",
+            pointerEvents: "none",
+            zIndex: 20,
+            whiteSpace: "nowrap",
+            boxShadow: "0 10px 24px rgba(0,0,0,0.6)",
+          }}>
+            <div style={{ fontWeight: 600, marginBottom: "0.3rem" }}>
+              {fmtFull(binStart)} – {fmtFull(binEnd)}
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "0.15rem 0.65rem", fontSize: "0.74rem" }}>
+              <span style={{ color: dim }}>{L("Bytov", "Units")}</span>
+              <span style={{ fontFamily: mono, color: green, fontWeight: 600 }}>{c}</span>
+              <span style={{ color: dim }}>{L("Z celku", "Of total")}</span>
+              <span style={{ fontFamily: mono }}>{pct.toFixed(0)}%</span>
+            </div>
+          </div>
+        );
+      })()}
+    </div>
   );
 }
 
