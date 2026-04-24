@@ -515,41 +515,140 @@ function PageContent({ page, projectId, lang, setCurrent, openLogin }) {
 }
 
 // ─── Gated wrapper ──────────────────────────────────────────────
+// Previous behaviour: if the caller didn't have the capability we
+// replaced the page with a plain UpgradeCard — structure invisible,
+// paid-tier experience a mystery. User feedback: "nech uvidia
+// strukturu celu a vsetky typy dat, len realne data budu rozmazane
+// ako to mame na live". So: render the real page blurred, overlay
+// a compelling upgrade CTA on top. Same marketing pattern we use for
+// anonymous users on /live — "this is what you're paying for".
+//
+// The real page IS mounted and fetching data (RLS still scopes what
+// the user can see — a free user only gets their chosen_project_id
+// flats, paid gets everything). Blur is presentational; there's no
+// leak of paid-tier rows because the client simply doesn't receive
+// them. Pointer-events:none on the blurred layer stops accidental
+// clicks; `inert` hides it from keyboard tab-order and screen readers.
 function Gated({ require, children, lang, setCurrent }) {
   const { can, tier } = useCapabilities();
   if (can(require)) return children;
-  return <UpgradeCard lang={lang} requiredFor={require} currentTier={tier} setCurrent={setCurrent} />;
+  return (
+    <div style={{ position: "relative" }}>
+      <div
+        inert=""
+        aria-hidden="true"
+        style={{
+          filter: "blur(6px) saturate(0.6)",
+          pointerEvents: "none",
+          userSelect: "none",
+          opacity: 0.85,
+          transition: "filter 0.25s",
+        }}
+      >
+        {children}
+      </div>
+      <UpgradeOverlay lang={lang} requiredFor={require} currentTier={tier} setCurrent={setCurrent} />
+    </div>
+  );
 }
 
-function UpgradeCard({ lang, requiredFor, currentTier, setCurrent }) {
-  const featureName = {
-    view_analytics: lang === "sk" ? "Analytika a trendy" : "Analytics & trends",
-    view_monthly_reports: lang === "sk" ? "Mesačné reporty" : "Monthly reports",
-    export_data: lang === "sk" ? "Exporty (CSV / API)" : "Exports (CSV / API)",
-    manage_users: "Admin",
-  }[requiredFor] || requiredFor;
+/**
+ * Floating upgrade card anchored top-centre above the blurred
+ * preview. Uses sticky positioning so it stays in view while the
+ * user scrolls through the Analytics/Reports skeleton underneath —
+ * constant reminder of what the upgrade unlocks.
+ */
+function UpgradeOverlay({ lang, requiredFor, currentTier, setCurrent }) {
+  const featureMeta = {
+    view_analytics: {
+      title:   lang === "sk" ? "Analytika a trendy" : "Analytics & trends",
+      sub:     lang === "sk"
+        ? "Pivot cez tisíce bytov, trendy po mesiacoch, okresy, top developeri, rýchlosť predaja."
+        : "Pivot across thousands of units, month-over-month trends, districts, top developers, sales velocity.",
+      bullets: lang === "sk"
+        ? ["Celý dataset 5 100+ bytov", "Drag-and-drop pivot", "Historické snapshoty", "Top developer / okres rebríčky"]
+        : ["Full dataset of 5,100+ units", "Drag-and-drop pivot", "Historical snapshots", "Top developer / district leaderboards"],
+    },
+    view_monthly_reports: {
+      title:   lang === "sk" ? "Mesačné reporty" : "Monthly reports",
+      sub:     lang === "sk"
+        ? "PDF / CSV reporty na každý scope — trh, mesto, časť mesta, projekt, developer."
+        : "PDF / CSV reports for every scope — market, city, district, project, developer.",
+      bullets: lang === "sk"
+        ? ["Executive summary + benchmark", "5 scope úrovní", "Historický trend", "Export jedným klikom"]
+        : ["Executive summary + benchmark", "5 scope levels", "Historical trend", "One-click export"],
+    },
+    export_data: {
+      title:   lang === "sk" ? "Exporty CSV / API" : "CSV / API exports",
+      sub:     lang === "sk"
+        ? "Stiahni celý dataset alebo ťahaj priamo cez REST API."
+        : "Download the full dataset or pull via REST API.",
+      bullets: lang === "sk"
+        ? ["CSV zoznam projektov", "CSV unit-level flats", "REST API prístup", "Dedicated API key na požiadanie"]
+        : ["Projects CSV", "Unit-level flats CSV", "REST API access", "Dedicated API key on request"],
+    },
+    manage_users: {
+      title: "Admin",
+      sub: lang === "sk" ? "Administrátorská sekcia." : "Admin section.",
+      bullets: [],
+    },
+  }[requiredFor] || { title: requiredFor, sub: "", bullets: [] };
 
   return (
-    <div style={{ padding: "3rem 2rem", display: "flex", justifyContent: "center" }}>
+    <div style={{
+      position: "sticky",
+      top: "84px",
+      left: 0, right: 0,
+      zIndex: 20,
+      pointerEvents: "none",
+      padding: "1.5rem 1.25rem 0",
+      display: "flex", justifyContent: "center",
+    }}>
       <div style={{
-        background: bg, border: `1px solid ${border}`, borderRadius: 16,
-        padding: "2.5rem 2.25rem", maxWidth: 480, width: "100%", textAlign: "center",
+        pointerEvents: "auto",
+        background: "linear-gradient(180deg, #14141a 0%, #0e0e10 100%)",
+        border: `1px solid rgba(0,229,160,0.35)`,
+        borderRadius: 14,
+        padding: "1.4rem 1.6rem",
+        maxWidth: 520, width: "100%",
+        boxShadow: "0 20px 60px rgba(0,0,0,0.7), 0 0 40px rgba(0,229,160,0.08)",
       }}>
-        <div style={{ fontSize: "2.5rem", marginBottom: "1rem" }}>🔒</div>
-        <div style={{ fontFamily: mono, fontSize: "0.7rem", color: green, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.5rem" }}>
-          {lang === "sk" ? "Platená funkcia" : "Paid feature"}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.35rem" }}>
+          <div style={{
+            width: 26, height: 26, borderRadius: 6,
+            background: "rgba(0,229,160,0.12)", color: green,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: "0.82rem",
+          }}>🔒</div>
+          <div style={{ fontFamily: mono, fontSize: "0.62rem", color: green, letterSpacing: "0.12em", textTransform: "uppercase" }}>
+            {lang === "sk" ? "Paid funkcia · ukážka" : "Paid feature · preview"}
+          </div>
         </div>
-        <h2 style={{ fontSize: "1.4rem", fontWeight: 700, letterSpacing: "-0.02em", color: textLight, margin: 0 }}>
-          {featureName}
+        <h2 style={{ fontSize: "1.25rem", fontWeight: 700, letterSpacing: "-0.02em", color: textLight, margin: "0 0 0.35rem" }}>
+          {featureMeta.title}
         </h2>
-        <p style={{ color: dim, fontSize: "0.9rem", lineHeight: 1.6, marginTop: "0.75rem", marginBottom: "1.5rem" }}>
-          {lang === "sk"
-            ? <>Aktuálny tier: <strong style={{ color: textLight }}>{currentTier}</strong>. Upgrade na <strong style={{ color: green }}>paid</strong> a odomkni túto sekciu + všetky dáta, analytiku, históriu a exporty.</>
-            : <>Current tier: <strong style={{ color: textLight }}>{currentTier}</strong>. Upgrade to <strong style={{ color: green }}>paid</strong> to unlock this section plus full data, analytics, history and exports.</>}
+        <p style={{ color: dim, fontSize: "0.85rem", lineHeight: 1.55, margin: "0 0 0.75rem" }}>
+          {featureMeta.sub}
         </p>
-        <button className="btn-p" onClick={() => setCurrent && setCurrent("App:Billing")}>
-          {lang === "sk" ? "Upgrade na paid" : "Upgrade to paid"}
-        </button>
+        {featureMeta.bullets.length > 0 && (
+          <ul style={{ color: "#c4c4cc", fontSize: "0.82rem", lineHeight: 1.55, margin: "0 0 1rem", paddingLeft: "1.1rem" }}>
+            {featureMeta.bullets.map((b, i) => <li key={i}>{b}</li>)}
+          </ul>
+        )}
+        <div style={{ display: "flex", gap: "0.55rem", flexWrap: "wrap", alignItems: "center" }}>
+          <button
+            className="btn-p"
+            onClick={() => setCurrent && setCurrent("App:Billing")}
+            style={{ fontSize: "0.84rem" }}
+          >
+            {lang === "sk" ? "Upgrade na paid" : "Upgrade to paid"}
+          </button>
+          <span style={{ fontFamily: mono, fontSize: "0.68rem", color: dim }}>
+            {lang === "sk"
+              ? <>aktuálne: <span style={{ color: textLight }}>{currentTier}</span></>
+              : <>current: <span style={{ color: textLight }}>{currentTier}</span></>}
+          </span>
+        </div>
       </div>
     </div>
   );
