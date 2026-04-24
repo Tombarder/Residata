@@ -533,7 +533,7 @@ export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en
             padding: "2rem 1.5rem", border: `1px dashed ${border}`, borderRadius: 10,
             background: "rgba(255,255,255,0.02)", textAlign: "center",
           }}>
-            <div style={{ fontSize: "1rem", color: text, fontWeight: 600, marginBottom: "0.6rem" }}>
+            <div style={{ fontSize: "1rem", color: "#e8e8ed", fontWeight: 600, marginBottom: "0.6rem" }}>
               {lang === "sk" ? "Pre tento projekt zatiaľ nemáme detail bytov" : "No unit-level data for this project yet"}
             </div>
             <div style={{ color: dim, fontSize: "0.88rem", lineHeight: 1.6, maxWidth: 560, margin: "0 auto" }}>
@@ -541,8 +541,8 @@ export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en
                 // Case 1: project claims N units but we have 0 in DB → sync gap
                 if (project && (project.total_units || 0) > 0) {
                   return lang === "sk"
-                    ? <>Projekt inzeruje <strong style={{ color: text }}>{project.total_units}</strong> bytov, ale zoznam sa ešte nezosynchronizoval do našej DB. Dáta pribudnú pri najbližšom mesačnom behu.</>
-                    : <>The project lists <strong style={{ color: text }}>{project.total_units}</strong> units but the flat-level sync hasn't run yet. Data will appear on the next monthly sync.</>;
+                    ? <>Projekt inzeruje <strong style={{ color: "#e8e8ed" }}>{project.total_units}</strong> bytov, ale zoznam sa ešte nezosynchronizoval do našej DB. Dáta pribudnú pri najbližšom mesačnom behu.</>
+                    : <>The project lists <strong style={{ color: "#e8e8ed" }}>{project.total_units}</strong> units but the flat-level sync hasn't run yet. Data will appear on the next monthly sync.</>;
                 }
                 // Case 2: total_units is 0 — developer's public listing is empty
                 return lang === "sk"
@@ -1726,20 +1726,20 @@ function FlatsTable({ flats, t, lang, highlightedFlatId }) {
           <input
             type="number" inputMode="numeric" placeholder={lang === "sk" ? "od" : "min"}
             value={priceMin} onChange={e => setPriceMin(e.target.value)}
-            style={{ width: 80, padding: "0.3rem 0.45rem", background: "#0a0a0b", border: `1px solid ${priceMinN != null ? green : border}`, color: text, borderRadius: 4, fontFamily: mono, fontSize: "0.78rem", outline: "none" }}
+            style={{ width: 80, padding: "0.3rem 0.45rem", background: "#0a0a0b", border: `1px solid ${priceMinN != null ? green : border}`, color: "#e8e8ed", borderRadius: 4, fontFamily: mono, fontSize: "0.78rem", outline: "none" }}
           />
           <span style={{ color: dim, fontFamily: mono, fontSize: "0.75rem" }}>–</span>
           <input
             type="number" inputMode="numeric" placeholder={lang === "sk" ? "do" : "max"}
             value={priceMax} onChange={e => setPriceMax(e.target.value)}
-            style={{ width: 80, padding: "0.3rem 0.45rem", background: "#0a0a0b", border: `1px solid ${priceMaxN != null ? green : border}`, color: text, borderRadius: 4, fontFamily: mono, fontSize: "0.78rem", outline: "none" }}
+            style={{ width: 80, padding: "0.3rem 0.45rem", background: "#0a0a0b", border: `1px solid ${priceMaxN != null ? green : border}`, color: "#e8e8ed", borderRadius: 4, fontFamily: mono, fontSize: "0.78rem", outline: "none" }}
           />
         </div>
 
         {/* Counter + clear */}
         <div style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: "0.75rem" }}>
           <span style={{ fontFamily: mono, fontSize: "0.74rem", color: anyFilterActive ? green : dim }}>
-            <strong style={{ color: text }}>{visibleCount}</strong> {lang === "sk" ? "z" : "of"} {totalCount}
+            <strong style={{ color: "#e8e8ed" }}>{visibleCount}</strong> {lang === "sk" ? "z" : "of"} {totalCount}
           </span>
           {anyFilterActive && (
             <button onClick={clearAllFilters}
@@ -1748,7 +1748,7 @@ function FlatsTable({ flats, t, lang, highlightedFlatId }) {
                 color: dim, borderRadius: 4, padding: "0.3rem 0.7rem",
                 fontFamily: mono, fontSize: "0.7rem", cursor: "pointer",
               }}
-              onMouseEnter={e => { e.currentTarget.style.color = text; e.currentTarget.style.borderColor = "#ff6b6b60"; }}
+              onMouseEnter={e => { e.currentTarget.style.color = "#e8e8ed"; e.currentTarget.style.borderColor = "#ff6b6b60"; }}
               onMouseLeave={e => { e.currentTarget.style.color = dim; e.currentTarget.style.borderColor = border; }}>
               ✕ {lang === "sk" ? "Vymazať filtre" : "Clear filters"}
             </button>
