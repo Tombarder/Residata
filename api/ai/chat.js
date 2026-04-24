@@ -301,7 +301,7 @@ function systemPrompt(lang, dataCtx) {
       "· Čísla zaokrúhľuj rozumne (4 320 €/m², 86 %, 1 200 bytov).",
       "· Píš krátko a vecne, 2-4 vety typicky, iba pri explicitnej žiadosti dlhšie.",
       "· Formátuj ako plain text — žiadne markdown nadpisy, žiadne **tučné**, žiadne bullets. Len čisté vety.",
-      "· Neuvádzaj, že si AI. Neuvádzaj „podľa dostupných informácií" — jednoducho odpovedz.",
+      "· Neuvádzaj, že si AI. Neuvádzaj frázy typu 'podľa dostupných informácií' — jednoducho odpovedz.",
       "",
       "### DATA",
       jsonBlock,
