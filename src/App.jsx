@@ -1714,6 +1714,15 @@ export default function App() {
         @media (max-width: 768px) {
           .hero-actions-wrap { flex-direction: column; align-items: center; }
         }
+
+        /* Project-row click affordance — whole row is clickable on /app/projects.
+           Green tint on hover + green accent name + focus ring for keyboard nav.
+           Tint kept subtle (7%) so data stays readable; focus ring uses the
+           accent colour so it reads as "this is the active target". */
+        .project-row-clickable:hover { background: rgba(0,229,160,0.06); }
+        .project-row-clickable:hover .project-row-name { color: #00e5a0; text-decoration: underline; text-underline-offset: 3px; }
+        .project-row-clickable:focus { outline: none; background: rgba(0,229,160,0.08); box-shadow: inset 0 0 0 1px #00e5a0; }
+        .project-row-clickable:focus .project-row-name { color: #00e5a0; }
       `}</style>
       <RisingParticles />
       <div style={{ position: "relative", zIndex: 1 }}>

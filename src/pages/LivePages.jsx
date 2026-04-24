@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
-import { useProjects, useProjectFlats, useAllFlats, useEarlyAccessStats, useProjectSnapshots } from "../lib/useData";
+import { useProjects, useProjectFlats, useAllFlats, useEarlyAccessStats, useProjectSnapshots, useMarketTotals } from "../lib/useData";
 import { supabase } from "../lib/supabase";
 import { liveT, ll } from "../lib/liveLang";
 import { track } from "../lib/track";
@@ -330,6 +330,7 @@ function StatusBadge({ status, lang }) {
 
 function ProjectRow({ p, t, lang, setCurrent, canVelocity }) {
   const soldDataUnavailable = (p.sold_units || 0) === 0 && (p.reserved_units || 0) === 0 && (p.prereserved_units || 0) === 0;
+  const hasDetail = (p.total_units || 0) > 0;
 
   // Sold velocity cell — paid vidí reálnu hodnotu, ostatní blurred placeholder
   // (detail pod blurom nemá význam čítať, preto len deterministicky-vyzerajúce číslo).
@@ -349,9 +350,33 @@ function ProjectRow({ p, t, lang, setCurrent, canVelocity }) {
         display: "inline-block",
       }} aria-hidden="true">+{fakeVelocity}</span>;
 
+  const openDetail = () => hasDetail && setCurrent && setCurrent(`Project:${p.id}`);
+
+  // Make the whole row behave like a link: click anywhere to open
+  // detail, cursor-pointer, subtle green tint on hover. Name cell
+  // gets an underline-on-hover so the user sees an explicit "click
+  // the name" affordance rather than having to discover the Detail
+  // button. Non-interactive cells (Detail column with the button)
+  // stop propagation so the button's click is the only handler.
+  const clickable = hasDetail;
   return (
-    <tr style={{ borderTop: `1px solid ${border}` }}>
-      <td style={td}><strong>{p.name}</strong></td>
+    <tr
+      onClick={clickable ? openDetail : undefined}
+      onKeyDown={clickable ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDetail(); } } : undefined}
+      tabIndex={clickable ? 0 : -1}
+      role={clickable ? "link" : undefined}
+      className={clickable ? "project-row-clickable" : undefined}
+      style={{ borderTop: `1px solid ${border}`, cursor: clickable ? "pointer" : "default", transition: "background 0.12s" }}
+    >
+      <td style={td}>
+        {clickable ? (
+          <span className="project-row-name" style={{ color: "#e8e8ed", fontWeight: 600 }}>
+            {p.name}
+          </span>
+        ) : (
+          <strong>{p.name}</strong>
+        )}
+      </td>
       <td style={{ ...td, color: dim }}>{p.district || "—"}</td>
       <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{p.total_units}</td>
       <td style={{ ...td, textAlign: "right", fontFamily: mono, color: green }}>{p.available_units}</td>
@@ -369,12 +394,11 @@ function ProjectRow({ p, t, lang, setCurrent, canVelocity }) {
             </span>}
       </td>
       <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{velocityCell}</td>
-      <td style={{ ...td, textAlign: "right" }}>
-        {/* Disable "Detail" when we know the project has no unit-level
-            data to show (total_units === 0). Saves the user a round-trip
-            to an empty detail page. */}
-        {(p.total_units || 0) > 0 ? (
-          <button onClick={() => setCurrent && setCurrent(`Project:${p.id}`)} style={miniBtn}>{t.tbl_detail}</button>
+      <td style={{ ...td, textAlign: "right" }} onClick={(e) => e.stopPropagation()}>
+        {/* Kept as explicit button for users who read the table as
+            a grid of buttons; whole-row click works too. */}
+        {hasDetail ? (
+          <button onClick={openDetail} style={miniBtn}>{t.tbl_detail}</button>
         ) : (
           <span style={{ color: dim, fontSize: "0.72rem", fontStyle: "italic" }} title={lang === "sk" ? "Pre tento projekt ešte nemáme detail" : "No unit-level data yet"}>
             —
@@ -477,9 +501,18 @@ export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en
     );
   }
 
+  // Where "Back to projects" should land depends on context. Inside the
+  // platform shell (URL starts with /app/) we return to /app/projects so
+  // the sidebar + platform chrome stay consistent. On the public site we
+  // return to /live (the marketing dashboard). Previously this always
+  // went to "Live", which yanked platform users back onto the marketing
+  // page — wrong and confusing.
+  const inPlatform = typeof window !== "undefined" && window.location.pathname.startsWith("/app");
+  const backTarget = inPlatform ? "App:Projects" : "Live";
+
   return (
     <main style={{ padding: "5rem 2rem 4rem", maxWidth: 1200, margin: "0 auto" }}>
-      <button onClick={() => setCurrent && setCurrent("Live")} style={{ ...linkBtn, marginBottom: "1rem" }}>{t.back_to_projects}</button>
+      <button onClick={() => setCurrent && setCurrent(backTarget)} style={{ ...linkBtn, marginBottom: "1rem" }}>{t.back_to_projects}</button>
 
       <Label>{project?.district || "Bratislava"}</Label>
       <h1 className="sec-title">{project?.name || projectId}</h1>
@@ -517,7 +550,7 @@ export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en
                   : "The developer hasn't published a public unit list yet. The project is in the registry but detail will appear once they publish.";
               })()}
             </div>
-            <button onClick={() => setCurrent && setCurrent("Live")} className="btn-s" style={{ marginTop: "1.25rem", fontSize: "0.82rem" }}>
+            <button onClick={() => setCurrent && setCurrent(backTarget)} className="btn-s" style={{ marginTop: "1.25rem", fontSize: "0.82rem" }}>
               ← {lang === "sk" ? "Späť na prehľad" : "Back to dashboard"}
             </button>
           </div>
@@ -988,16 +1021,17 @@ function RoomMixChart({ rows, lang }) {
   const vOnly = rows.every(r => (r.sold || 0) === 0 && (r.reserved || 0) === 0);
   const maxTotal = rows.reduce((m, r) => Math.max(m, r.total || 0), 0) || 1;
   const W = 560;
-  const barH = 22;
-  const underH = 14;
-  const rowH = barH + underH + 2;
-  const gap = 12;
-  const labelW = 60;
-  const valueW = 86;
+  const barH = 26;      // taller bar so inline numbers fit comfortably
+  const gap = 10;
+  const labelW = 64;
+  const valueW = 96;
   const barW = W - labelW - valueW - 20;
-  const H = rows.length * (rowH + gap) + 6;
+  const H = rows.length * (barH + gap) + 6;
 
-  const MIN_LABEL_W = 22;
+  // Minimum segment width in pixels to fit an inline count label.
+  // Smaller segments just stay as a colored wedge — the hover tooltip
+  // + right-side summary cover the exact numbers.
+  const MIN_LABEL_W = 28;
 
   // Stav letter codes per language — must match the subtitle header
   // words so '7 A' reads clearly as '7 available', not '7 F(ree)'.
@@ -1005,16 +1039,9 @@ function RoomMixChart({ rows, lang }) {
   const codeResv  = "R";  // same letter in both languages
   const codeSold  = lang === "sk" ? "P" : "S";
 
-  // Right-side headline — unified metric across all rows of the same
-  // chart, not 'pick per row based on what's present'. Previous version
-  // switched metrics (% sold vs % reserved vs bare count) based on what
-  // each row happened to have → inconsistent, unreadable.
-  //
-  // Unified choice: "% available". Buyer-centric question 'how much
-  // is still buyable?' answered the same way across every row, every
-  // data mode. Letter code matches the language (A in EN, V in SK).
-  // · V+P+R / V+P / V+R / P+R: {total} · {avail%} {code}
-  // · V-only: just {total} {code} — 100% is trivially true, skip the %.
+  // Right-side headline — unified metric across all rows so the column
+  // reads as one thing. "% available" answers the buyer-centric
+  // question identically whether a row has reservations or not.
   const sideLabel = (r) => {
     if (r.total === 0) return "";
     if (vOnly) return `${r.total} ${codeAvail}`;
@@ -1025,10 +1052,11 @@ function RoomMixChart({ rows, lang }) {
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}>
       {rows.map((r, i) => {
-        const y = i * (rowH + gap);
+        const y = i * (barH + gap);
 
-        // vOnly mode: bar width = r.total / maxTotal of all rows.
-        // Mixed mode: bar is always full width, segments split it.
+        // vOnly mode: bar width scales by r.total / max so a tiny type
+        // doesn't visually dominate a big type. Mixed mode: bar fills
+        // the track and segments split the full width.
         const rowBarW = vOnly ? (r.total / maxTotal) * barW : barW;
 
         const pct = r.total > 0 ? {
@@ -1039,11 +1067,15 @@ function RoomMixChart({ rows, lang }) {
         const soldW = pct.sold * rowBarW;
         const resvW = pct.reserved * rowBarW;
         const availW = pct.avail * rowBarW;
-        const underY = y + barH + underH - 2;
 
         const xAvail = labelW;
         const xResv  = labelW + availW;
         const xSold  = labelW + availW + resvW;
+
+        // Vertically centered inside the bar — single text line per
+        // segment, bold, contrasting fill. Looks "built-in" rather
+        // than hanging off a separate row under the bar.
+        const textY = y + barH / 2 + 3.5;
 
         return (
           <g key={r.room}>
@@ -1051,34 +1083,37 @@ function RoomMixChart({ rows, lang }) {
               {r.room}-{lang === "sk" ? "izb" : "room"}
             </text>
 
-            <rect x={labelW} y={y} width={barW} height={barH} fill="#0a0a0b" stroke={border}>
+            <rect x={labelW} y={y} width={barW} height={barH} fill="#0a0a0b" stroke={border} rx={2}>
               <title>{`${r.avail} ${codeAvail} · ${r.reserved} ${codeResv} · ${r.sold} ${codeSold} · ${r.total} total`}</title>
             </rect>
-            {availW > 0 && <rect x={xAvail} y={y} width={availW} height={barH} fill={green} />}
-            {resvW  > 0 && <rect x={xResv}  y={y} width={resvW}  height={barH} fill="#888" />}
-            {soldW  > 0 && <rect x={xSold}  y={y} width={soldW}  height={barH} fill="#f5a623" />}
+            {availW > 0 && <rect x={xAvail} y={y} width={availW} height={barH} fill={green} rx={2} />}
+            {resvW  > 0 && <rect x={xResv}  y={y} width={resvW}  height={barH} fill="#888"  rx={2} />}
+            {soldW  > 0 && <rect x={xSold}  y={y} width={soldW}  height={barH} fill="#f5a623" rx={2} />}
 
+            {/* Inline segment labels — black on green/orange (readable
+                on bright fills), white on dim grey. Only rendered when
+                the segment is wide enough to hold the text cleanly. */}
             {availW >= MIN_LABEL_W && (
-              <text x={xAvail + availW / 2} y={underY} textAnchor="middle"
-                    fill={green} fontFamily={mono} fontSize={9}>
+              <text x={xAvail + availW / 2} y={textY} textAnchor="middle"
+                    fill="#0a0a0b" fontFamily={mono} fontSize={10.5} fontWeight={700}>
                 {r.avail} {codeAvail}
               </text>
             )}
             {resvW >= MIN_LABEL_W && (
-              <text x={xResv + resvW / 2} y={underY} textAnchor="middle"
-                    fill="#aaa" fontFamily={mono} fontSize={9}>
+              <text x={xResv + resvW / 2} y={textY} textAnchor="middle"
+                    fill="#fff" fontFamily={mono} fontSize={10.5} fontWeight={700}>
                 {r.reserved} {codeResv}
               </text>
             )}
             {soldW >= MIN_LABEL_W && (
-              <text x={xSold + soldW / 2} y={underY} textAnchor="middle"
-                    fill="#f5a623" fontFamily={mono} fontSize={9}>
+              <text x={xSold + soldW / 2} y={textY} textAnchor="middle"
+                    fill="#0a0a0b" fontFamily={mono} fontSize={10.5} fontWeight={700}>
                 {r.sold} {codeSold}
               </text>
             )}
 
             <text x={W - 4} y={y + barH / 2 + 4} textAnchor="end"
-                  fill="#c0c0c8" fontFamily={mono} fontSize={10}>
+                  fill="#c0c0c8" fontFamily={mono} fontSize={10.5}>
               {sideLabel(r)}
             </text>
           </g>
@@ -1091,24 +1126,28 @@ function RoomMixChart({ rows, lang }) {
 /* ── Price histogram — 10 bins of available flat prices ──── */
 /* ── Price histogram — 10 bins of available-flat prices ──
  *
- * User asked for the chart to 'say more' — previously it was just
- * 10 green bars, median line, and two edge labels. Now:
+ * Visual redesign after user feedback ("je to na dobrej ceste ale
+ * rozhadzane skarede chaoticke zlepsi to"):
  *
- *   · Hover any bar → HTML tooltip with exact price range of the
- *     bin + count + % of total. Answers 'what does this bar mean?'
- *   · Count labels ON top of each bar (when the bar is tall enough
- *     to hold them) — instant read of 'how many units in this bin?'
- *   · 5 x-axis tick labels (not just edge min/max) so the user can
- *     map any bar to a rough price point without mental math
- *   · Median label sits at its actual X position with the euro
- *     amount — not floating somewhere generic
- *   · Bottom caption: N units · price range · median € — the key
- *     stats plainly stated, so the chart can be 'read' in 2 seconds
+ *   · Numbers above each bar REMOVED. They sat at different heights
+ *     (following each bar's top) which read as scattered / noisy.
+ *     Counts still visible in the hover tooltip.
+ *   · X-axis tick labels land on 'nice' round numbers (multiples
+ *     chosen by niceStep) instead of 25% fractions of the raw range,
+ *     so labels read '150k / 250k / 350k / 450k / 550k' not
+ *     '176k / 271k / 366k / 461k / 556k'.
+ *   · Extra vertical padding between chart body and axis so nothing
+ *     crowds together.
+ *   · Median label sits ABOVE pad.t with its own whitespace — no
+ *     collision with bar tops.
+ *   · Bottom caption moved lower, clear separation from axis.
  */
 function PriceHistogram({ prices, lang = "en" }) {
-  const [hover, setHover] = useState(null);  // hovered bin index
-  const [hoverPos, setHoverPos] = useState({ x: 0, y: 0 });  // cursor coords
-  const W = 520, H = 210, pad = { l: 16, r: 16, t: 22, b: 46 };
+  const [hover, setHover] = useState(null);
+  const [hoverPos, setHoverPos] = useState({ x: 0, y: 0 });
+  // Padding: bigger top for median label, bigger bottom for two
+  // rows of text (axis + caption) so they don't stack into each other.
+  const W = 520, H = 220, pad = { l: 16, r: 16, t: 28, b: 52 };
   const innerW = W - pad.l - pad.r, innerH = H - pad.t - pad.b;
   const locale = lang === "sk" ? "sk-SK" : "en-US";
   const L = (sk, en) => lang === "sk" ? sk : en;
@@ -1131,6 +1170,24 @@ function PriceHistogram({ prices, lang = "en" }) {
   const med = median(prices);
   const medX = pad.l + (innerW * (med - min)) / (max - min || 1);
   const total = prices.length;
+
+  // Nice round x-axis ticks. Pick a step so we get ~5 labels spanning
+  // the [min, max] range with human-friendly numbers.
+  const niceStep = (range) => {
+    const target = range / 4;
+    const mag = Math.pow(10, Math.floor(Math.log10(target)));
+    const norm = target / mag;
+    const nice = norm < 1.5 ? 1 : norm < 3 ? 2 : norm < 7 ? 5 : 10;
+    return nice * mag;
+  };
+  const step = niceStep(max - min);
+  const firstTick = Math.ceil(min / step) * step;
+  const lastTick = Math.floor(max / step) * step;
+  const ticks = [];
+  for (let v = firstTick; v <= lastTick + 0.5; v += step) ticks.push(v);
+  // Guarantee at least min and max are represented when the step is coarse
+  if (ticks.length < 2) ticks.unshift(min), ticks.push(max);
+  const xOf = (v) => pad.l + (innerW * (v - min)) / (max - min || 1);
 
   return (
     <div style={{ position: "relative" }}>
@@ -1160,12 +1217,12 @@ function PriceHistogram({ prices, lang = "en" }) {
                 width={w}
                 height={h}
                 fill={green}
-                opacity={isHover ? 0.95 : 0.6}
+                opacity={isHover ? 0.95 : 0.55}
                 rx={2}
                 style={{ cursor: "pointer", transition: "opacity 0.12s" }}
                 onMouseEnter={() => setHover(i)}
               />
-              {/* Invisible full-height hover target so thin bars are
+              {/* Full-height invisible hover target so thin bars are
                   still easy to hit with the cursor. */}
               <rect
                 x={x + 1}
@@ -1176,47 +1233,40 @@ function PriceHistogram({ prices, lang = "en" }) {
                 style={{ cursor: "pointer" }}
                 onMouseEnter={() => setHover(i)}
               />
-              {/* Count on top of the bar — only if the bar has room */}
-              {c > 0 && h >= 14 && (
-                <text
-                  x={x + 1 + w / 2}
-                  y={y - 4}
-                  textAnchor="middle"
-                  fill="#e8e8ed"
-                  fontFamily={mono}
-                  fontSize={9}
-                >{c}</text>
-              )}
             </g>
           );
         })}
 
-        {/* Median vertical line + value */}
+        {/* Median — dashed orange vertical, value label sits above the
+            bars with enough whitespace that it never crowds bar tops. */}
         <line x1={medX} x2={medX} y1={pad.t} y2={pad.t + innerH}
               stroke="#f5a623" strokeWidth={2} strokeDasharray="4,3" />
-        <text x={medX} y={pad.t - 6} textAnchor="middle"
+        <text x={medX} y={16} textAnchor="middle"
               fill="#f5a623" fontFamily={mono} fontSize={10} fontWeight={600}>
           {L("medián", "median")} {fmtK(med)}
         </text>
 
-        {/* X-axis: 5 tick labels evenly spaced */}
-        {[0, 0.25, 0.5, 0.75, 1].map((frac, idx) => {
-          const v = min + (max - min) * frac;
-          const x = pad.l + innerW * frac;
+        {/* Baseline tick */}
+        <line x1={pad.l} y1={pad.t + innerH} x2={W - pad.r} y2={pad.t + innerH}
+              stroke={dim} strokeWidth={0.5} opacity={0.4} />
+
+        {/* X-axis: round tick labels */}
+        {ticks.map((v, idx) => {
+          const x = xOf(v);
           return (
             <g key={idx}>
               <line x1={x} y1={pad.t + innerH} x2={x} y2={pad.t + innerH + 4}
                     stroke={dim} strokeWidth={0.8} />
-              <text x={x} y={H - 26} textAnchor="middle"
-                    fill={dim} fontFamily={mono} fontSize={9}>
+              <text x={x} y={H - 30} textAnchor="middle"
+                    fill={dim} fontFamily={mono} fontSize={9.5}>
                 {fmtK(v)}
               </text>
             </g>
           );
         })}
 
-        {/* Bottom caption — key stats in one line */}
-        <text x={W / 2} y={H - 8} textAnchor="middle"
+        {/* Bottom caption — stats in one clean line, well below axis */}
+        <text x={W / 2} y={H - 10} textAnchor="middle"
               fill={dim} fontFamily={mono} fontSize={9.5}>
           {L(
             `${total} bytov · rozsah ${fmtK(min)} – ${fmtK(max)} · medián ${fmtK(med)}`,
@@ -1225,15 +1275,13 @@ function PriceHistogram({ prices, lang = "en" }) {
         </text>
       </svg>
 
-      {/* HTML tooltip — richer info per hovered bin */}
+      {/* HTML tooltip — on hover shows exact bin stats */}
       {hover !== null && (() => {
         const i = hover;
         const binStart = min + i * binW;
         const binEnd = min + (i + 1) * binW;
         const c = counts[i];
         const pct = total > 0 ? (c / total) * 100 : 0;
-        // Flip tooltip to left when hovering in the right half so it
-        // never overflows off-chart.
         const flipX = hoverPos.x > W * 0.65;
         const flipY = hoverPos.y > H * 0.55;
         return (
@@ -2086,6 +2134,9 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
   // pivot open, no extra round-trip on page load. RLS gates visibility by
   // tier (anon=0, free=chosen_project only, paid/admin=all).
   const { flats: allFlats } = useAllFlats();
+  // Published KPI totals (same source the ticker uses) — see useMarketTotals
+  // for why this is the authoritative source over sum-of-projects.
+  const marketTotals = useMarketTotals();
 
   if (loading && projects.length === 0) {
     return (
@@ -2096,9 +2147,24 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
   }
 
   // ─── KPIs ────────────────────────────────────────────────
-  const totalUnits  = projects.reduce((a, p) => a + (p.total_units || 0), 0);
-  const totalAvail  = projects.reduce((a, p) => a + (p.available_units || 0), 0);
-  const totalSold   = projects.reduce((a, p) => a + (p.sold_units || 0), 0);
+  // Three-tier fallback: (1) published `metrics` row (same source the
+  // ticker uses — always matches the homepage); (2) live allFlats
+  // count (when metrics haven't synced yet but RLS let us see flats);
+  // (3) sum of projects.total_units (last-resort; known to over-count
+  // because a few large projects store registry totals there).
+  const flatsReady = allFlats && allFlats.length > 0;
+  const totalUnits = marketTotals.unitsTracked != null
+    ? marketTotals.unitsTracked
+    : flatsReady ? allFlats.length
+    : projects.reduce((a, p) => a + (p.total_units || 0), 0);
+  const totalAvail = marketTotals.unitsAvailable != null
+    ? marketTotals.unitsAvailable
+    : flatsReady ? allFlats.filter(f => f.stav === "V").length
+    : projects.reduce((a, p) => a + (p.available_units || 0), 0);
+  const totalSold  = marketTotals.unitsSold != null
+    ? marketTotals.unitsSold
+    : flatsReady ? allFlats.filter(f => f.stav === "P").length
+    : projects.reduce((a, p) => a + (p.sold_units || 0), 0);
   const totalSold30 = projects.reduce((a, p) => a + (p.sold_last_month || 0), 0);
   const priceEntries = projects.filter(p => p.avg_price_eur_m2 && p.total_units > 0);
   const weightedAvg = priceEntries.length > 0

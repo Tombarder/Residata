@@ -81,6 +81,17 @@ export default function PlatformReports({ lang = "sk" }) {
 
   const loading = loadingProjects || loadingFlats;
 
+  // Scope-drill callback: clicking a row in the "Projects in scope"
+  // table switches the whole report to the Project scope for that ID.
+  // Auto-scrolls so the user sees the new header instead of wondering
+  // whether the click did anything.
+  const openProject = (id) => {
+    if (!id) return;
+    setProjPick(id);
+    setScope("projekt");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   if (loading && projects.length === 0) {
     return (
       <div style={{ padding: "3rem 2rem", color: dim, fontFamily: mono, fontSize: "0.85rem" }}>
@@ -170,6 +181,8 @@ export default function PlatformReports({ lang = "sk" }) {
             return p && cityOf(p) === cityPick;
           })}
           allProjects={projects}
+          allFlats={flats}
+          onOpenProject={openProject}
           lang={lang}
           breakdownBy="district"
           breakdownLabel={lang === "sk" ? "podľa časti mesta" : "by district"}
@@ -182,6 +195,8 @@ export default function PlatformReports({ lang = "sk" }) {
           projects={projects.filter(p => p.district === distPick)}
           flats={flats.filter(f => projectDistrict(f, projects) === distPick)}
           allProjects={projects}
+          allFlats={flats}
+          onOpenProject={openProject}
           lang={lang}
           breakdownBy="developer"
           breakdownLabel={lang === "sk" ? "podľa developera" : "by developer"}
@@ -192,6 +207,7 @@ export default function PlatformReports({ lang = "sk" }) {
           project={projects.find(p => p.id === projPick)}
           flats={flats.filter(f => f.project_id === projPick)}
           siblings={projects}
+          allFlats={flats}
           lang={lang}
         />
       )}
@@ -205,6 +221,8 @@ export default function PlatformReports({ lang = "sk" }) {
             return p && p.developer === devPick;
           })}
           allProjects={projects}
+          allFlats={flats}
+          onOpenProject={openProject}
           lang={lang}
           breakdownBy="name"
           breakdownLabel={lang === "sk" ? "podľa projektu" : "by project"}
@@ -419,7 +437,7 @@ function PickerRow({ label, value, options, onChange }) {
    ══════════════════════════════════════════════════════════════════ */
 function MarketReport({ projects, flats, lang }) {
   const { snapshots } = useProjectSnapshots();
-  const summary = useMemo(() => summariseProjects(projects), [projects]);
+  const summary = useMemo(() => summariseProjects(projects, flats), [projects, flats]);
   const priceSeries = useMemo(() => priceDistribution(flats, 12), [flats]);
   const districts = useMemo(() => groupAggregates(projects, "district", lang), [projects, lang]);
   const developers = useMemo(() => groupAggregates(projects, "developer", lang).slice(0, 8), [projects, lang]);
@@ -468,10 +486,10 @@ function MarketReport({ projects, flats, lang }) {
    Signs: `scopeLabel` + `scopeType` identify what's narrowed;
           `projects` + `flats` are already filtered to that slice.
    ══════════════════════════════════════════════════════════════════ */
-function FilteredReport({ scopeLabel, scopeType, projects, flats, allProjects, lang, breakdownBy, breakdownLabel }) {
+function FilteredReport({ scopeLabel, scopeType, projects, flats, allProjects, allFlats, onOpenProject, lang, breakdownBy, breakdownLabel }) {
   const { snapshots } = useProjectSnapshots();
-  const summary = useMemo(() => summariseProjects(projects), [projects]);
-  const globalSummary = useMemo(() => summariseProjects(allProjects), [allProjects]);
+  const summary = useMemo(() => summariseProjects(projects, flats), [projects, flats]);
+  const globalSummary = useMemo(() => summariseProjects(allProjects, allFlats), [allProjects, allFlats]);
   const priceSeries = useMemo(() => priceDistribution(flats, 12), [flats]);
   const breakdown = useMemo(() => groupAggregates(projects, breakdownBy, lang), [projects, breakdownBy, lang]);
   const siblings = useMemo(() => groupAggregates(allProjects, breakdownBy === "developer" ? "district" : "developer", lang).slice(0, 6), [allProjects, breakdownBy, lang]);
@@ -513,8 +531,8 @@ function FilteredReport({ scopeLabel, scopeType, projects, flats, allProjects, l
         <BenchmarkCard local={summary} global={globalSummary} scopeLabel={scopeLabel} lang={lang} />
       </ReportSection>
 
-      <ReportSection label={lang === "sk" ? "Projekty v scope" : "Projects in scope"} title={lang === "sk" ? `Kompletný zoznam (${projects.length})` : `Full list (${projects.length})`}>
-        <ProjectTable projects={projects} lang={lang} />
+      <ReportSection label={lang === "sk" ? "Projekty v scope" : "Projects in scope"} title={lang === "sk" ? `Kompletný zoznam (${projects.length}) \u2014 klik otvorí projekt-report` : `Full list (${projects.length}) \u2014 click to open project report`}>
+        <ProjectTable projects={projects} lang={lang} onProjectClick={onOpenProject} />
       </ReportSection>
 
       {snapshots && snapshots.length > 0 && (
@@ -531,16 +549,22 @@ function FilteredReport({ scopeLabel, scopeType, projects, flats, allProjects, l
 /* ══════════════════════════════════════════════════════════════════
    Project report — single-project deep dive.
    ══════════════════════════════════════════════════════════════════ */
-function ProjectReport({ project, flats, siblings, lang }) {
+function ProjectReport({ project, flats, siblings, allFlats, lang }) {
   // Hoist all hooks before any early return to keep hook ordering stable
   // across renders (rules-of-hooks).
   const { snapshots } = useProjectSnapshots();
-  const summary = useMemo(() => project ? summariseProjects([project]) : null, [project]);
+  const summary = useMemo(() => project ? summariseProjects([project], flats) : null, [project, flats]);
   const districtSiblings = useMemo(
     () => project ? siblings.filter(p => p.district === project.district && p.id !== project.id) : [],
     [siblings, project]
   );
-  const districtSummary = useMemo(() => summariseProjects(districtSiblings), [districtSiblings]);
+  // District sibling summary: filter flats to only this district's siblings
+  const districtSiblingIds = useMemo(() => new Set(districtSiblings.map(p => p.id)), [districtSiblings]);
+  const districtFlats = useMemo(
+    () => Array.isArray(allFlats) ? allFlats.filter(f => districtSiblingIds.has(f.project_id)) : [],
+    [allFlats, districtSiblingIds]
+  );
+  const districtSummary = useMemo(() => summariseProjects(districtSiblings, districtFlats), [districtSiblings, districtFlats]);
   const byTyp = useMemo(() => groupAggregatesFromFlats(flats, "typ"), [flats]);
   const byIzby = useMemo(() => groupAggregatesFromFlats(flats, "izby"), [flats]);
   const byPoschodie = useMemo(() => groupAggregatesFromFlats(flats, "poschodie"), [flats]);
@@ -932,8 +956,8 @@ function AggregateTable({ rows, lang, nameLabel }) {
         </thead>
         <tbody>
           {rows.map((r, i) => (
-            <tr key={r.name + i} style={{ borderTop: `1px solid ${border}` }}>
-              <td style={tdc} title={r.name}>{r.name}</td>
+            <tr key={r.name + i} className="rep-row-hoverable" style={{ borderTop: `1px solid ${border}` }}>
+              <td style={tdc} title={r.name}><strong style={{ color: text }}>{r.name}</strong></td>
               <td style={tdcR}>{r.projectCount}</td>
               <td style={tdcR}>{r.totalUnits.toLocaleString("en-US").replace(/,/g, " ")}</td>
               <td style={{ ...tdcR, color: green }}>{r.available.toLocaleString("en-US").replace(/,/g, " ")}</td>
@@ -948,6 +972,10 @@ function AggregateTable({ rows, lang, nameLabel }) {
           ))}
         </tbody>
       </table>
+      <style>{`
+        .rep-row-hoverable { transition: background 0.12s; }
+        .rep-row-hoverable:hover { background: rgba(0,229,160,0.05); }
+      `}</style>
     </div>
   );
 }
@@ -1005,8 +1033,9 @@ function BenchmarkCard({ local, global, scopeLabel, lang }) {
 }
 
 /* ─── Project table (used inside City / District / Developer scopes) ─── */
-function ProjectTable({ projects, lang }) {
+function ProjectTable({ projects, lang, onProjectClick }) {
   const sorted = [...projects].sort((a, b) => (b.total_units || 0) - (a.total_units || 0));
+  const clickable = typeof onProjectClick === "function";
   return (
     <div className="rep-table-wrap" style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8 }}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem", minWidth: 680 }}>
@@ -1023,8 +1052,17 @@ function ProjectTable({ projects, lang }) {
         </thead>
         <tbody>
           {sorted.slice(0, 100).map((p, i) => (
-            <tr key={p.id} style={{ borderTop: i > 0 ? `1px solid ${border}` : "none" }}>
-              <td style={tdc} title={p.name}>{p.name}</td>
+            <tr
+              key={p.id}
+              className={clickable ? "rep-row-clickable" : "rep-row-hoverable"}
+              style={{ borderTop: i > 0 ? `1px solid ${border}` : "none", cursor: clickable ? "pointer" : "default" }}
+              onClick={clickable ? () => onProjectClick(p.id) : undefined}
+              onKeyDown={clickable ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onProjectClick(p.id); } } : undefined}
+              tabIndex={clickable ? 0 : -1}
+              role={clickable ? "link" : undefined}
+              title={clickable ? (lang === "sk" ? "Otvoriť projekt-report" : "Open project report") : p.name}
+            >
+              <td style={tdc}><strong style={{ color: text }}>{p.name}</strong></td>
               <td style={tdc}>{p.developer || "—"}</td>
               <td style={tdc}>{p.district || "—"}</td>
               <td style={tdcR}>{(p.total_units || 0).toLocaleString("en-US").replace(/,/g, " ")}</td>
@@ -1040,6 +1078,12 @@ function ProjectTable({ projects, lang }) {
           {lang === "sk" ? `Zobrazených prvých 100 z ${sorted.length}.` : `Showing top 100 of ${sorted.length}.`}
         </div>
       )}
+      <style>{`
+        .rep-row-clickable { transition: background 0.12s; }
+        .rep-row-clickable:hover { background: rgba(0,229,160,0.08); }
+        .rep-row-clickable:hover td:first-child strong { color: #00e5a0 !important; text-decoration: underline; text-underline-offset: 3px; }
+        .rep-row-clickable:focus { outline: none; background: rgba(0,229,160,0.1); box-shadow: inset 0 0 0 1px #00e5a0; }
+      `}</style>
     </div>
   );
 }
@@ -1176,20 +1220,37 @@ function projectDistrict(flat, projects) {
   const p = projects.find(pp => pp.id === flat.project_id);
   return p?.district || null;
 }
-function summariseProjects(projects) {
-  const totalUnits = projects.reduce((a, p) => a + (p.total_units || 0), 0);
-  const available  = projects.reduce((a, p) => a + (p.available_units || 0), 0);
-  const sold       = projects.reduce((a, p) => a + (p.sold_units || 0), 0);
-  const sold30     = projects.reduce((a, p) => a + (p.sold_last_month || 0), 0);
-  const soldPct    = totalUnits > 0 ? (sold / totalUnits) * 100 : 0;
+function summariseProjects(projects, flats) {
+  // Unit counts: prefer the REAL flats table when available (same source
+  // of truth as the ticker metric `total_units_tracked`). Fall back to
+  // summing projects.total_units only when flats weren't loaded for this
+  // scope — the fallback is known to over-count for a few large projects
+  // whose `total_units` stores registry totals instead of tracked rows
+  // (Slnecnice = 4000, Bory = large). The fallback keeps old call sites
+  // that don't have flats in scope working.
+  let totalUnits, available, sold, reserved;
+  if (Array.isArray(flats) && flats.length > 0) {
+    totalUnits = flats.length;
+    available  = flats.filter(f => f.stav === "V").length;
+    sold       = flats.filter(f => f.stav === "P").length;
+    reserved   = flats.filter(f => f.stav === "R" || f.stav === "PR").length;
+  } else {
+    totalUnits = projects.reduce((a, p) => a + (p.total_units || 0), 0);
+    available  = projects.reduce((a, p) => a + (p.available_units || 0), 0);
+    sold       = projects.reduce((a, p) => a + (p.sold_units || 0), 0);
+    reserved   = 0;
+  }
+  const sold30 = projects.reduce((a, p) => a + (p.sold_last_month || 0), 0);
+  const soldPct = totalUnits > 0 ? (sold / totalUnits) * 100 : 0;
   // Weighted average €/m² — weight by project's total_units so large
-  // projects pull the mean more than boutique ones.
+  // projects pull the mean more than boutique ones. Always derived from
+  // the projects table (flats don't carry per-unit €/m² for every row).
   const priced = projects.filter(p => p.avg_price_eur_m2 && (p.total_units || 0) > 0);
   const wavgM2 = priced.length
     ? priced.reduce((a, p) => a + p.avg_price_eur_m2 * p.total_units, 0) /
       priced.reduce((a, p) => a + p.total_units, 0)
     : null;
-  return { projectCount: projects.length, totalUnits, available, sold, sold30, soldPct, wavgM2 };
+  return { projectCount: projects.length, totalUnits, available, sold, reserved, sold30, soldPct, wavgM2 };
 }
 function groupAggregates(projects, key, lang) {
   const buckets = {};

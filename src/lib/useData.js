@@ -65,6 +65,43 @@ export function useMetrics() {
   return { metrics, loading };
 }
 
+/**
+ * Structured market totals — single source of truth for KPI strips
+ * across Dashboard / Analytics / Reports so every screen shows the
+ * same "units tracked / available / sold" numbers the ticker shows.
+ *
+ * Reads from the `metrics` table which is published by the monthly
+ * sync (sync_to_supabase.py::compute_metrics). The metrics there are
+ * derived from `len(all_flats)` — the REAL row count — not from
+ * projects.total_units (which contains registry totals for a few
+ * large projects like Slnecnice = 4000, Bory = large, making sums
+ * over-count by ~5k).
+ *
+ * Returns numeric values + raw loading flag. Each value may be null
+ * when the metric row doesn't exist yet (e.g. a fresh DB).
+ */
+export function useMarketTotals() {
+  const { metrics, loading } = useMetrics();
+  // metrics rows key by `metric_key` column
+  const byKey = {};
+  for (const m of metrics) byKey[m.metric_key] = m;
+  const num = (key) => {
+    const m = byKey[key];
+    if (!m) return null;
+    const v = m.value_numeric;
+    return typeof v === "number" ? v : null;
+  };
+  return {
+    loading,
+    unitsTracked:   num("total_units_tracked"),
+    unitsAvailable: num("total_available"),
+    unitsReserved:  num("total_reserved"),
+    unitsSold:      num("total_sold_to_date"),
+    projectsActive: num("total_projects_active"),
+    avgPriceM2:     num("avg_price_m2"),
+  };
+}
+
 /** Project list. Public data; anon and authenticated see the same rows
  *  (differences come from what the UI chooses to render, not from RLS). */
 export function useProjects(limit) {

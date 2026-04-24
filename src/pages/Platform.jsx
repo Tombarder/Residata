@@ -14,7 +14,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
-import { useProjects } from "../lib/useData";
+import { useProjects, useMarketTotals } from "../lib/useData";
 import { supabase } from "../lib/supabase";
 import { pushRoute } from "../lib/routing";
 import { track } from "../lib/track";
@@ -135,6 +135,30 @@ export default function PlatformShell({ page, projectId, lang = "en", setCurrent
   if (!auth.user) return null;  // redirecting
 
   const navigate = (p) => {
+    // Rewrite shared-component navigation targets so clicks inside the
+    // platform shell stay inside /app/* instead of bouncing out to the
+    // marketing site. LiveDashboard / LiveProjectDetail / etc are used
+    // both here and on /live, and by default they pass:
+    //   · "Project:<id>"  → should become App:ProjectDetail:<id>
+    //   · "Live"          → should become App:Projects (the platform
+    //                        projects list; keeps the sidebar visible)
+    //   · "Pricing"       → should become App:Billing (the in-platform
+    //                        billing page handles upgrades natively)
+    // Without these rewrites, back-buttons in shared components ("Späť
+    // na prehľad", "Upgrade to paid") teleport the user out of the
+    // platform shell — visually jarring and breaks the back-stack
+    // (browser Back lands on /app/projects but the UI had already
+    // switched to /live).
+    // Extra bonus: keeping PlatformShell mounted across these nav events
+    // means the page-fade happens inside the shell via its internal
+    // key={page} remount. No cross-tree remount = no useProjectFlats
+    // cancelled-flag race = no "stuck on loading" symptom on click.
+    if (typeof p === "string") {
+      if (p.startsWith("Project:"))        p = "App:ProjectDetail:" + p.slice("Project:".length);
+      else if (p === "Live")                p = "App:Projects";
+      else if (p === "Pricing")             p = "App:Billing";
+      else if (p === "Analytics")           p = "App:Analytics";
+    }
     setCurrent && setCurrent(p);
     pushRoute(p);
     setMobileOpen(false);
@@ -474,13 +498,24 @@ function PlatformDashboard({ lang, setCurrent }) {
   const { profile, tier } = useAuth();
   const { can } = useCapabilities();
   const { projects } = useProjects();
+  const marketTotals = useMarketTotals();
 
-  const totals = projects.reduce((a, p) => ({
+  // KPI counts come from the published `metrics` table (same values
+  // the ticker + marketing site show). Fall back to summing projects
+  // when metrics haven't synced yet. `sold30` stays project-derived
+  // because the metric doesn't exist at the per-month granularity.
+  const rawTotals = projects.reduce((a, p) => ({
     units: a.units + (p.total_units || 0),
     avail: a.avail + (p.available_units || 0),
     sold:  a.sold  + (p.sold_units || 0),
     sold30: a.sold30 + (p.sold_last_month || 0),
   }), { units: 0, avail: 0, sold: 0, sold30: 0 });
+  const totals = {
+    units:  marketTotals.unitsTracked   != null ? marketTotals.unitsTracked   : rawTotals.units,
+    avail:  marketTotals.unitsAvailable != null ? marketTotals.unitsAvailable : rawTotals.avail,
+    sold:   marketTotals.unitsSold      != null ? marketTotals.unitsSold      : rawTotals.sold,
+    sold30: rawTotals.sold30,
+  };
   const eurM2Values = projects.map(p => p.avg_price_eur_m2).filter(Boolean);
   const avgEurM2 = eurM2Values.length ? Math.round(eurM2Values.reduce((a, b) => a + b, 0) / eurM2Values.length) : null;
 
