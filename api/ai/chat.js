@@ -223,12 +223,23 @@ async function buildChosenProjectContext(admin, chosenId) {
 }
 
 async function buildPaidContext(admin) {
-  // Everything the aggregations page shows. Capped by row count so
-  // the prompt stays under the token budget; full data is available
-  // in-app, the chatbot is for Q&A not for bulk retrieval.
-  const [metrics, projects] = await Promise.all([
+  // Everything the aggregations page shows PLUS flat-level data for
+  // currently-available (V) and reserved (R/PR) units. Sold (P) units
+  // are intentionally excluded — they're historical and would bloat
+  // the prompt with no Q&A value. Rationale for including flats:
+  // without them the assistant can only answer project-level
+  // questions, and users immediately hit "which flat on 16+ floor
+  // under 1M?" type questions where the chatbot had to say "I don't
+  // know" even though the data sits in the DB.
+  //
+  // Size: ~2,500 available/reserved flats × compact keys → ~30k
+  // input tokens → ~$0.025 per call on Haiku 4.5. Paid tier's 30
+  // daily questions cap that at $0.75/day/user worst case.
+  const [metrics, projects, flats] = await Promise.all([
     admin.from("metrics").select("metric_key, value_numeric"),
     admin.from("projects").select("id, name, developer, district, status, total_units, available_units, sold_units, sold_last_month, sold_percentage, avg_price_eur_m2").limit(200),
+    admin.from("flats").select("project_id, stav, izby, poschodie, budova, obytna_plocha, exterier_plocha, cena_s_dph, orientacia, kolaudacia")
+      .in("stav", ["V", "R", "PR"]).limit(3000),
   ]);
   const mm = {};
   for (const m of metrics.data || []) mm[m.metric_key] = m.value_numeric;
@@ -273,8 +284,28 @@ async function buildPaidContext(admin) {
     d.sold30 += p.sold_last_month || 0;
   }
   const topDevelopers = Object.values(byDev).sort((a, b) => b.units - a.units).slice(0, 10);
+  // Compact flat-level rows — keys are short to save tokens. The
+  // system prompt tells the model how to read them.
+  const idToName = {};
+  for (const p of active) idToName[p.id] = p.name;
+  const availFlats = (flats.data || [])
+    .filter(f => idToName[f.project_id])  // only active projects
+    .map(f => ({
+      proj:  idToName[f.project_id],
+      stav:  f.stav,                              // V=available, R/PR=reserved
+      izby:  f.izby ?? null,                      // rooms
+      posch: f.poschodie ?? null,                 // floor
+      bud:   f.budova || null,                    // building
+      m2:    f.obytna_plocha ?? null,             // interior area
+      ext:   f.exterier_plocha ?? null,           // balcony/terrace
+      eur:   f.cena_s_dph ?? null,                // price incl. VAT
+      eur_m2: (f.cena_s_dph && f.obytna_plocha && f.obytna_plocha > 0)
+                ? Math.round(f.cena_s_dph / f.obytna_plocha) : null,
+      orient: f.orientacia || null,
+      kolaud: f.kolaudacia || null,
+    }));
   return {
-    scope: "paid (full market)",
+    scope: "full market (aggregate + unit-level)",
     city: "Bratislava",
     totals: {
       projects_tracked: mm.total_projects_active ?? null,
@@ -292,6 +323,10 @@ async function buildPaidContext(admin) {
     districts,
     top_developers_by_inventory: topDevelopers,
     top_velocity_30d: topVelocity,
+    // Per-flat rows for V/R/PR (available + reserved). Sold flats
+    // omitted. Keys: proj, stav, izby, posch=floor, bud=building,
+    // m2=interior, ext=balcony, eur=price, eur_m2, orient, kolaud.
+    available_units: availFlats,
   };
 }
 
@@ -306,6 +341,7 @@ function systemPrompt(lang, dataCtx) {
       "",
       "OBSAH:",
       "· Odpovedaj PRIMÁRNE z dát pod ### DATA. Vyhýbaj sa všeobecným odhadom keď dáta máš.",
+      "· Pole `available_units` obsahuje konkrétne byty na predaj (V = voľné, R / PR = rezervované). Kľúče v rámci jedného bytu: `proj` = názov projektu, `stav`, `izby` = počet izieb, `posch` = poschodie, `bud` = budova / blok, `m2` = obytná plocha, `ext` = balkón / terasa, `eur` = cena s DPH v eurách, `eur_m2` = cena za m² (m2). Používaj tieto údaje pre konkrétne otázky typu 'ktoré byty na 16+ poschodí sú pod 1M €' alebo 'najlacnejší 3-izbový v Ružinove'.",
       "· Ak otázka vyžaduje informáciu mimo dát (ekonomické trendy, politický kontext, predpovede), môžeš čerpať z bežnej vedomosti, ALE prefixuj takú časť odpovede na samostatnom riadku: `[všeobecná znalosť, nie dáta Residata]` a potom napíš čo vieš. Residata neručí za tieto údaje.",
       "· Čísla zaokrúhľuj rozumne (4 320 €/m², 86 %, 1 200 bytov).",
       "",
@@ -337,6 +373,7 @@ function systemPrompt(lang, dataCtx) {
     "",
     "CONTENT:",
     "· Answer PRIMARILY from the JSON under ### DATA. Don't guess when the data is there.",
+    "· The `available_units` field is an array of INDIVIDUAL units currently on sale (V = available, R / PR = reserved). Per-unit keys: `proj` = project name, `stav` = status, `izby` = room count, `posch` = floor, `bud` = building, `m2` = interior area, `ext` = balcony/terrace, `eur` = total price incl. VAT, `eur_m2` = price per m², `orient` = orientation, `kolaud` = handover. Use these rows to answer concrete questions like 'which flats on 16+ floor are under 1M €' or 'cheapest 3-room in Ružinov'.",
     "· If the question needs information outside the data (economic trends, political context, forecasts), you may draw on general knowledge BUT prefix that part of the answer on its own line: `[general knowledge, not Residata data]` and continue. Residata doesn't vouch for those details.",
     "· Round numbers sensibly (4,320 €/m², 86 %, 1,200 units).",
     "",
