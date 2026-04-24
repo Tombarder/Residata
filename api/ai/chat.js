@@ -327,6 +327,15 @@ function systemPrompt(lang, dataCtx) {
 // ────────────────────────────────────────────────────────────────
 
 export default async function handler(req, res) {
+  try {
+    return await handleInner(req, res);
+  } catch (e) {
+    console.error("[chat] top-level crash", e);
+    return res.status(500).json({ error: "internal error", detail: String(e?.message || e).slice(0, 200) });
+  }
+}
+
+async function handleInner(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "method not allowed" });
   }
