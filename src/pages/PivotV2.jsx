@@ -694,11 +694,17 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   }, [flats, projectById]);
 
   // ── State ─────────────────────────────────────────────────────
-  // Pre-filled demo: Cast → Developer → Project name in Rows, Count only.
-  // First-time visitors see the pivot computing real numbers immediately.
-  const [rows,    setRows]    = useState(["cast", "developer", "project_name"]);
+  // Default layout: Cast (district) + Project name in Rows, average
+  // €/m² as the value. This is the most information-dense starting
+  // point — user immediately sees "which districts and which projects
+  // sit at which price level" which is the canonical first question
+  // in residential-market analysis. They can reshape it in seconds,
+  // but the pre-filled config teaches the pivot's grammar by example.
+  const [rows,    setRows]    = useState(["cast", "project_name"]);
   const [cols,    setCols]    = useState([]);   // cross-tab axis (≤ 1 field)
-  const [values,  setValues]  = useState([]);
+  const [values,  setValues]  = useState([
+    { key: "cena_na_m2_obytnej", field: "cena_na_m2_obytnej", agg: "avg" },
+  ]);
   const [filters, setFilters] = useState([]);
   const [search,  setSearch]  = useState("");
   const [drag,    setDrag]    = useState(null);
