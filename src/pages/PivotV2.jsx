@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useAllFlats, useProjects } from "../lib/useData";
+import { useCapabilities } from "../lib/useCapabilities";
 
 /* ═══════════════════════════════════════════════════════════════════
    Pivot v2 — Excel-style drag-and-drop pivot
@@ -594,8 +595,10 @@ function defaultAggFor(field) {
 
 /* ══════════════════════════ Main component ════════════════════════ */
 export default function PivotV2({ lang = "sk", setCurrent }) {
-  const { flats } = useAllFlats();
+  const { flats: realFlats } = useAllFlats();
   const { projects } = useProjects();
+  const { can } = useCapabilities();
+  const canViewAnalytics = can("view_analytics");
 
   // Enrich flats with their project's metadata once so every accessor
   // can read off a single flat row.
@@ -604,6 +607,71 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
     for (const p of projects || []) m[p.id] = p;
     return m;
   }, [projects]);
+
+  // Preview flats for free/anon tier — useAllFlats is RLS-gated to the
+  // user's one chosen project (or nothing for anon), which makes the
+  // pivot collapse to a single row. Since the Gated wrapper blurs all
+  // numbers anyway, we synthesize a small set of plausible rows per
+  // project from projects-table metadata so the pivot shows every
+  // project name + district + developer with varied room types and
+  // prices. This is presentational preview only — paid users get the
+  // real flats query.
+  const previewFlats = useMemo(() => {
+    if (canViewAnalytics) return null;
+    if (!projects?.length) return [];
+    const out = [];
+    // Deterministic pseudo-random from project id + index so re-renders
+    // don't reshuffle and the preview stays stable. Math.random is
+    // intentionally NOT used.
+    const hash = (s, n) => {
+      let h = 0;
+      for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+      return Math.abs(h + n * 2654435761) >>> 0;
+    };
+    const ROOM_DIST = [[1, 0.25], [2, 0.35], [3, 0.25], [4, 0.15]];
+    for (const p of projects) {
+      const total = Math.min(20, Math.max(3, p.total_units || 10));
+      const availShare = p.total_units > 0 ? (p.available_units || 0) / p.total_units : 0.4;
+      const soldShare  = p.total_units > 0 ? (p.sold_units     || 0) / p.total_units : 0.5;
+      for (let i = 0; i < total; i++) {
+        const seed = hash(p.id || p.name || "x", i);
+        const r = (seed & 0xffff) / 0xffff;
+        let izby = 2;
+        let acc = 0;
+        for (const [rooms, share] of ROOM_DIST) { acc += share; if (r < acc) { izby = rooms; break; } }
+        const floor  = 1 + ((seed >> 16) & 0xf);
+        const m2     = [34, 52, 74, 96, 120][Math.min(4, izby - 1)] + ((seed >> 4) % 11);
+        const priceM2 = p.avg_price_eur_m2 || 4500;
+        const price  = Math.round(priceM2 * m2);
+        const shareAvailCum = availShare;
+        const shareAvailPlusResv = availShare + Math.max(0, 1 - availShare - soldShare);
+        const stav = r < shareAvailCum ? "V" : r < shareAvailPlusResv ? "R" : "P";
+        out.push({
+          id: `preview-${p.id}-${i}`,
+          project_id: p.id,
+          unit_id: `preview-${i}`,
+          unit_detail: null,
+          typ: "byt",
+          etapa: null,
+          budova: String.fromCharCode(65 + ((seed >> 20) & 0x3)),
+          poschodie: floor,
+          izby,
+          obytna_plocha: m2,
+          balkon_plocha: null, loggia_plocha: null, terasa_plocha: null,
+          zahrada_plocha: null, exterier_plocha: null, kobka_plocha: null,
+          celkova_plocha: m2 + 5,
+          cena_s_dph: price,
+          cena_s_dph_text: null,
+          orientacia: null, kolaudacia: null,
+          stav,
+        });
+      }
+    }
+    return out;
+  }, [canViewAnalytics, projects]);
+
+  // Source-of-truth: real flats for paid/admin, synthetic for free/anon.
+  const flats = canViewAnalytics ? realFlats : previewFlats;
 
   const records = useMemo(() => {
     if (!flats?.length) return [];
