@@ -114,20 +114,35 @@ export function useMarketTotals() {
 
 /** Project list. Public data; anon and authenticated see the same rows
  *  (differences come from what the UI chooses to render, not from RLS). */
+let _projectsCacheKey = null;   // identity signature the cache was built for
 export function useProjects(limit) {
-  const [projects, setProjects] = useState(_projectsCache || []);
-  const [loading, setLoading] = useState(_projectsCache === null);
+  // Invalidate cache on user.id OR tier change. Without this, a user
+  // who first hit the page as free (and Supabase RLS returned the
+  // chosen-project-only scope) would keep seeing the stale 1-row
+  // array even after logging out + back in as paid, or after RLS
+  // was relaxed server-side. Keying by id + tier makes every auth
+  // transition a fresh fetch.
+  const { user, profile } = useAuth();
+  const tier = profile?.tier || "anon";
+  const key = `${user?.id || "anon"}::${tier}::${limit || "all"}`;
+  const cacheHit = _projectsCacheKey === key;
+  const [projects, setProjects] = useState(cacheHit ? (_projectsCache || []) : []);
+  const [loading, setLoading] = useState(!cacheHit);
   useEffect(() => {
     if (!isSupabaseReady()) { setLoading(false); return; }
+    let cancelled = false;
     let q = supabase.from("projects").select("*");
     if (limit) q = q.eq("is_top20", true).limit(limit);
     q.order("available_units", { ascending: false }).then(({ data }) => {
+      if (cancelled) return;
       const arr = data || [];
       _projectsCache = arr;
+      _projectsCacheKey = key;
       setProjects(arr);
       setLoading(false);
     });
-  }, [limit]);
+    return () => { cancelled = true; };
+  }, [limit, key]);
   return { projects, loading };
 }
 
