@@ -166,7 +166,7 @@ export default function ChatAssistant({ lang = "sk" }) {
         </button>
       </div>
 
-      <div style={{ marginTop: "0.6rem", display: "flex", alignItems: "center", gap: "0.75rem", color: dim, fontSize: "0.72rem", fontFamily: mono }}>
+      <div style={{ marginTop: "0.6rem", display: "flex", alignItems: "center", gap: "0.75rem", color: dim, fontSize: "0.72rem", fontFamily: mono, flexWrap: "wrap" }}>
         {chat.messages.length > 0 && (
           <button onClick={chat.clear}
             style={{ background: "transparent", border: "none", color: dim, cursor: "pointer", textDecoration: "underline", fontFamily: "inherit", fontSize: "inherit", padding: 0 }}>
@@ -177,6 +177,27 @@ export default function ChatAssistant({ lang = "sk" }) {
           {L("AI môže robiť chyby. Čísla v Analytics a Reports sú zdrojom pravdy.",
              "AI can err. Numbers in Analytics and Reports are the source of truth.")}
         </span>
+      </div>
+      {/* Persistent legal disclaimer. Always visible under the chat
+          surface so every conversation is framed by the same guard-
+          rail: we're an information service, not investment advice.
+          Kept compact + in Residata's brand style so it reads as a
+          product footer, not a scary modal. */}
+      <div style={{
+        marginTop: "0.85rem",
+        padding: "0.65rem 0.85rem",
+        background: "rgba(245,166,35,0.05)",
+        border: "1px solid rgba(245,166,35,0.18)",
+        borderRadius: 8,
+        color: dim, fontSize: "0.72rem", lineHeight: 1.5,
+      }}>
+        <strong style={{ color: orange, fontFamily: mono, fontSize: "0.6rem", letterSpacing: "0.08em", textTransform: "uppercase", marginRight: "0.4rem" }}>
+          {L("Právna poznámka", "Legal notice")}:
+        </strong>
+        {L(
+          "Residata je informačná služba o trhu novostavieb. Odpovede AI asistenta nepredstavujú investičné, finančné ani právne poradenstvo. Pre konkrétne rozhodnutia o kúpe, predaji alebo investícii konzultuj s realitným alebo finančným poradcom.",
+          "Residata is a market-information service for new-build residential real estate. AI answers do NOT constitute investment, financial or legal advice. For specific buying, selling or investment decisions consult a qualified real-estate or financial professional."
+        )}
       </div>
     </div>
   );

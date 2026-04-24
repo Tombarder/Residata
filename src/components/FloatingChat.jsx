@@ -287,9 +287,9 @@ export default function FloatingChat({ lang = "sk", onNavigate }) {
             </button>
           </div>
 
-          {/* Footer */}
+          {/* Footer: quota + clear, then legal disclaimer row */}
           <div style={{
-            padding: "0.35rem 0.6rem 0.5rem",
+            padding: "0.35rem 0.6rem 0.2rem",
             fontFamily: mono, fontSize: "0.6rem", color: dim,
             display: "flex", justifyContent: "space-between", gap: "0.5rem",
           }}>
@@ -303,6 +303,25 @@ export default function FloatingChat({ lang = "sk", onNavigate }) {
                 style={{ background: "transparent", border: "none", color: dim, cursor: "pointer", textDecoration: "underline", fontFamily: "inherit", fontSize: "inherit", padding: 0 }}>
                 {L("vymazať", "clear")}
               </button>
+            )}
+          </div>
+          {/* Persistent compact legal disclaimer — tiny but always
+              visible so every conversation is framed by the same
+              guardrail. Full wording is available in the /app/ask
+              page; widget stays terse for screen-real-estate reasons. */}
+          <div style={{
+            padding: "0.3rem 0.6rem 0.55rem",
+            borderTop: `1px solid ${border}`,
+            fontFamily: mono, fontSize: "0.55rem", color: dim,
+            lineHeight: 1.45, letterSpacing: "0.01em",
+          }} title={L(
+            "Residata je informačná služba. AI odpovede nepredstavujú investičné, finančné ani právne poradenstvo. Pre konkrétne rozhodnutia konzultuj s odborníkom.",
+            "Residata is an information service. AI answers are not investment, financial or legal advice. Consult a professional for specific decisions."
+          )}>
+            <span style={{ color: orange }}>⚠ </span>
+            {L(
+              "Informačná služba, nie investičné poradenstvo.",
+              "Information service — not investment advice."
             )}
           </div>
         </div>
