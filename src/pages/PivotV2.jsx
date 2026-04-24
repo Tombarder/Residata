@@ -593,7 +593,7 @@ function defaultAggFor(field) {
 }
 
 /* ══════════════════════════ Main component ════════════════════════ */
-export default function PivotV2({ lang = "sk" }) {
+export default function PivotV2({ lang = "sk", setCurrent }) {
   const { flats } = useAllFlats();
   const { projects } = useProjects();
 
@@ -862,6 +862,7 @@ export default function PivotV2({ lang = "sk" }) {
           title: node.path.length ? node.path.join(" › ") : (lang === "sk" ? "Všetky záznamy" : "All records"),
           records: node.records,
         })}
+        onProjectOpen={setCurrent ? (projectId) => setCurrent(`App:ProjectDetail:${projectId}`) : undefined}
         lang={lang}
       />
 
@@ -1481,7 +1482,14 @@ function exportPivotCSV(flatRows, grandTotal, rowFields, colFields, effectiveVal
 }
 
 /* ─── RESULT TABLE ────────────────────────────────────────────── */
-function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, collapsed, onToggle, sort, setSort, grandTotal, lang, valueMode = "raw", dataBars = false, onDrillDown }) {
+function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, collapsed, onToggle, sort, setSort, grandTotal, lang, valueMode = "raw", dataBars = false, onDrillDown, onProjectOpen }) {
+  // Project-name column support:
+  // When the deepest row field is project_name, rows ARE individual
+  // projects — we offer a click-to-navigate on the name cell.
+  // For non-project groupings (cast, developer, district), clicking
+  // the name does nothing (no destination for 'district=Ružinov').
+  const deepestRowField = rowFields[rowFields.length - 1];
+  const projectRowsActive = deepestRowField === "project_name" && typeof onProjectOpen === "function";
   // Cross-tab columns come from the tree's top-level colKeys so every
   // row shares the same horizontal axis (otherwise leaves could have
   // different col sets and the table would be ragged).
@@ -1698,20 +1706,30 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
             const isSubtotal = !n.isLeaf;
             const shade = ["#12121a", "#0f0f14", "#0c0c0f", "#0b0b0c", "#0a0a0b"][Math.min(n.level, 4)];
             const indent = 0.4 + n.level * 0.8;
+            // Is THIS row a navigable project? Only when the deepest
+            // grouping is project_name, this is a leaf node, and we
+            // can resolve a project_id from its records (any record
+            // in the group has it since all records share the project).
+            const isProjectRow = projectRowsActive && n.isLeaf && n.records && n.records.length > 0;
+            const projectId = isProjectRow ? n.records[0]?.project_id : null;
+            const rowClickable = Boolean(isProjectRow && projectId && onProjectOpen);
             return (
-              <tr key={n.pathKey + "|" + idx} style={{
-                background: isSubtotal ? shade : (idx % 2 ? "transparent" : "rgba(255,255,255,0.015)"),
-                borderTop: n.level === 0 ? `1px solid ${border}` : `1px solid #16161a`,
-              }}>
+              <tr key={n.pathKey + "|" + idx}
+                onMouseEnter={rowClickable ? (e) => e.currentTarget.style.background = "rgba(0,229,160,0.06)" : undefined}
+                onMouseLeave={rowClickable ? (e) => {
+                  e.currentTarget.style.background = isSubtotal ? shade : (idx % 2 ? "transparent" : "rgba(255,255,255,0.015)");
+                } : undefined}
+                style={{
+                  background: isSubtotal ? shade : (idx % 2 ? "transparent" : "rgba(255,255,255,0.015)"),
+                  borderTop: n.level === 0 ? `1px solid ${border}` : `1px solid #16161a`,
+                  transition: "background 0.12s",
+                }}>
                 <td style={{
                   ...td, paddingLeft: `${indent}rem`,
                   fontWeight: isSubtotal ? 700 : 400,
                   color: isSubtotal ? text : "#c4c4cc",
                   whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                 }}>
-                  {/* Subtotal level indicator — was a bordered mono badge,
-                      now a barely-visible superscript so the row still
-                      reads "Developer X" not "L2 Developer X". */}
                   {isSubtotal && (
                     <span style={{ color: dim, fontSize: "0.62rem", marginRight: "0.35rem", verticalAlign: "middle" }}>
                       L{n.level + 1}
@@ -1726,15 +1744,33 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                   ) : (
                     <span style={{ display: "inline-block", width: 12, marginRight: "0.35rem" }} />
                   )}
-                  <span title={n.label}>{n.label}</span>
+                  {/* Project-name label is clickable when we can navigate
+                      to that project. On hover it underlines (anchor-like
+                      affordance). Non-project rows stay plain text. */}
+                  {rowClickable ? (
+                    <span
+                      role="button" tabIndex={0}
+                      title={lang === "sk" ? `Otvoriť projekt ${n.label}` : `Open project ${n.label}`}
+                      onClick={() => onProjectOpen(projectId)}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onProjectOpen(projectId); } }}
+                      onMouseEnter={(e) => { e.currentTarget.style.textDecoration = "underline"; e.currentTarget.style.textDecorationColor = green; e.currentTarget.style.textUnderlineOffset = "3px"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.textDecoration = "none"; }}
+                      style={{ cursor: "pointer", color: "#e8e8ed" }}
+                    >{n.label}</span>
+                  ) : (
+                    <span title={n.label}>{n.label}</span>
+                  )}
                   {isSubtotal && n.isCollapsed && (
                     <span style={{ marginLeft: "0.5rem", fontSize: "0.64rem", color: dim, fontFamily: mono, opacity: 0.7 }}>
                       ({n.children.length} {lang === "sk" ? "pod" : "sub"})
                     </span>
                   )}
                 </td>
-                <td style={{ ...td, textAlign: "right", fontFamily: mono, color: isSubtotal ? "#c4c4cc" : dim, fontWeight: isSubtotal ? 600 : 400, cursor: onDrillDown ? "zoom-in" : "default" }}
-                    title={onDrillDown ? "Zobraziť záznamy v tejto skupine" : undefined}
+                {/* # count — always clickable to drill down into records.
+                    Cursor changed from outdated 'zoom-in' (browser-default
+                    magnifier) to 'pointer' (universal, modern). */}
+                <td style={{ ...td, textAlign: "right", fontFamily: mono, color: isSubtotal ? "#c4c4cc" : dim, fontWeight: isSubtotal ? 600 : 400, cursor: onDrillDown ? "pointer" : "default" }}
+                    title={onDrillDown ? (lang === "sk" ? "Zobraziť záznamy v tejto skupine" : "Show records in this group") : undefined}
                     onClick={onDrillDown ? () => onDrillDown(n) : undefined}>
                   {n.count.toLocaleString("en-US").replace(/,/g, " ")}
                 </td>

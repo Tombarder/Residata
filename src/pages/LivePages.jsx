@@ -2167,7 +2167,7 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
 
       {/* ═══ PIVOT — drag & drop builder ═══ */}
       <div style={{ marginBottom: "2.5rem" }}>
-        <PivotV2 lang={lang} />
+        <PivotV2 lang={lang} setCurrent={setCurrent} />
       </div>
 
       {/* ═══ DISTRICT BREAKDOWN — richer than home DistrictPulse ═══ */}
