@@ -22,6 +22,7 @@ import {
   LiveDashboard, LiveProjectDetail, LiveAnalytics, LiveAdmin,
 } from "./LivePages";
 import ReportsPage from "./Reports";
+import ChatAssistant from "../components/ChatAssistant";
 
 const mono = "'JetBrains Mono', monospace";
 const green = "#00e5a0";
@@ -93,12 +94,19 @@ const IconExternal = () => (
 // Each item: { page, label, icon, requires? (capability), adminOnly? }
 // Pages: "App:Dashboard", "App:Projects", "App:Analytics", "App:Reports",
 //        "App:Exports", "App:Billing", "App:Settings", "App:Admin"
+const IconSparkle = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/>
+  </svg>
+);
+
 const NAV = [
   { group: "main", items: [
     { page: "App:Dashboard", label: { en: "Dashboard",  sk: "Dashboard" }, Icon: IconHome },
     { page: "App:Projects",  label: { en: "Projects",   sk: "Projekty"  }, Icon: IconGrid },
     { page: "App:Analytics", label: { en: "Analytics",  sk: "Analytika" }, Icon: IconChart,    requires: "view_analytics" },
     { page: "App:Reports",   label: { en: "Reports",    sk: "Reporty"   }, Icon: IconDoc,      requires: "view_monthly_reports" },
+    { page: "App:Assistant", label: { en: "Ask AI",     sk: "AI asistent" }, Icon: IconSparkle },
     { page: "App:Exports",   label: { en: "Exports",    sk: "Exporty"   }, Icon: IconDownload, requires: "export_data" },
   ]},
   { group: "account", items: [
@@ -381,6 +389,7 @@ function TopBar({ page, lang, tier }) {
     "App:Projects":  { en: "Projects",        sk: "Projekty"     },
     "App:Analytics": { en: "Analytics",       sk: "Analytika"    },
     "App:Reports":   { en: "Reports",         sk: "Reporty"      },
+    "App:Assistant": { en: "AI Assistant",    sk: "AI asistent"  },
     "App:Exports":   { en: "Exports",         sk: "Exporty"      },
     "App:Billing":   { en: "Billing & tier",  sk: "Platba a tier"},
     "App:Settings":  { en: "Settings",        sk: "Nastavenia"   },
@@ -492,6 +501,7 @@ function PageContent({ page, projectId, lang, setCurrent, openLogin }) {
   if (page === "App:Projects")   return <PlatformProjects lang={lang} setCurrent={setCurrent} openLogin={openLogin} />;
   if (page === "App:Analytics")  return <Gated require="view_analytics"       lang={lang} setCurrent={setCurrent}><LiveAnalytics lang={lang} setCurrent={setCurrent} openLogin={openLogin} /></Gated>;
   if (page === "App:Reports")    return <Gated require="view_monthly_reports" lang={lang} setCurrent={setCurrent}><ReportsPage lang={lang} /></Gated>;
+  if (page === "App:Assistant")  return <ChatAssistant lang={lang} />;
   if (page === "App:Exports")    return <Gated require="export_data"          lang={lang} setCurrent={setCurrent}><PlatformExports lang={lang} setCurrent={setCurrent} /></Gated>;
   if (page === "App:Billing")    return <PlatformBilling lang={lang} setCurrent={setCurrent} />;
   if (page === "App:Settings")   return <PlatformSettings lang={lang} />;

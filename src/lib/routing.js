@@ -22,6 +22,7 @@ const APP_PAGE_TO_PATH = {
   "App:Analytics": "/app/analytics",
   "App:Reports":   "/app/reports",
   "App:Exports":   "/app/exports",
+  "App:Assistant": "/app/ask",
   "App:Billing":   "/app/billing",
   "App:Settings":  "/app/settings",
   "App:Admin":     "/app/admin",
