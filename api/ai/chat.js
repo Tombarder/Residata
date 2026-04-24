@@ -99,6 +99,21 @@ function clientIp(req) {
   return req.socket?.remoteAddress || "0.0.0.0";
 }
 
+/* Read one secret from app_secrets via service-role. Returns null on
+   any failure so the caller can fall back to a 501 response. */
+async function readSecret(admin, key) {
+  if (!admin) return null;
+  try {
+    const { data, error } = await admin
+      .from("app_secrets")
+      .select("value")
+      .eq("key", key)
+      .maybeSingle();
+    if (error) return null;
+    return data?.value || null;
+  } catch (_) { return null; }
+}
+
 // In-memory per-IP rate limit (10 requests/min). Resets on cold start
 // but that's fine — it's a bursty-abuse absorber, the tier-based DB
 // counter is the persistent authority.
@@ -387,8 +402,11 @@ async function handleInner(req, res) {
     }
   }
 
-  // ANTHROPIC key check before body read so we fail fast.
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  // ANTHROPIC key — env first, then app_secrets fallback (same pattern
+  // the old summary endpoint used, preserved so the user doesn't have
+  // to re-configure Vercel envs for this new endpoint).
+  let apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) apiKey = await readSecret(admin, "ANTHROPIC_API_KEY");
   if (!apiKey) {
     return res.status(501).json({ error: "AI disabled on the server (ANTHROPIC_API_KEY missing)." });
   }
@@ -428,21 +446,25 @@ async function handleInner(req, res) {
   }
 
   // ── Tier-based daily rate limit ──
+  // For logged-in users we count today's rows in ai_usage_log by
+  // user_id (persists across cold starts, cross-endpoint). For anon
+  // we rely solely on the per-IP in-memory burst limit above —
+  // ai_usage_log doesn't carry a caller_ip column and adding one
+  // would require a schema migration. Anon abuse is capped by the
+  // origin+IP layers; per-anon daily counting is a v2 enhancement.
   const dayLimit = DAILY_LIMITS[tier] ?? DAILY_LIMITS.anon;
   const dayAgo = new Date(Date.now() - DAY_MS).toISOString();
   let dayCount = 0;
-  try {
-    // Count today's calls: by user_id if logged in, by IP if anon.
-    const idCol = userId ? "user_id" : "caller_ip";
-    const idVal = userId || ip;
-    const { count } = await admin.from("ai_usage_log")
-      .select("id", { count: "exact", head: true })
-      .gte("requested_at", dayAgo)
-      .eq(idCol, idVal);
-    dayCount = count || 0;
-  } catch (_) {
-    // Fail closed — don't spend credit if we can't count.
-    return res.status(503).json({ error: "rate limit lookup failed, try again" });
+  if (userId) {
+    try {
+      const { count } = await admin.from("ai_usage_log")
+        .select("id", { count: "exact", head: true })
+        .gte("requested_at", dayAgo)
+        .eq("user_id", userId);
+      dayCount = count || 0;
+    } catch (_) {
+      return res.status(503).json({ error: "rate limit lookup failed, try again" });
+    }
   }
   if (dayCount >= dayLimit) {
     const msg = tier === "anon"
@@ -501,18 +523,18 @@ async function handleInner(req, res) {
     .trim();
 
   // ── Log the call (best-effort — never blocks the response) ──
-  admin.from("ai_usage_log").insert({
-    user_id: userId,
-    caller_ip: userId ? null : ip,
-    tier,
-    requested_at: new Date().toISOString(),
-    model: ANTHROPIC_MODEL,
-    input_tokens: payload.usage?.input_tokens ?? null,
-    output_tokens: payload.usage?.output_tokens ?? null,
-    endpoint: "chat",
-  }).then(({ error }) => {
-    if (error) console.warn("[chat] usage log failed (non-fatal)", error.message);
-  });
+  // Only logs for authed users (ai_usage_log requires user_id).
+  if (userId) {
+    admin.from("ai_usage_log").insert({
+      user_id: userId,
+      endpoint: "chat",
+      input_tokens: payload.usage?.input_tokens ?? null,
+      output_tokens: payload.usage?.output_tokens ?? null,
+      ok: true,
+    }).then(({ error }) => {
+      if (error) console.warn("[chat] usage log failed (non-fatal)", error.message);
+    });
+  }
 
   return res.status(200).json({
     text: textOut,
