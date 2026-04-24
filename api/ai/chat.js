@@ -82,11 +82,14 @@ function cachedContext(key, builder) {
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS  = 24 * HOUR_MS;
 
-// Per-day caps by tier. `pending` refused earlier in the flow; `anon`
-// applies when no Authorization header was sent.
+// Per-day caps by tier. pending is refused earlier in the flow.
+// Design note (2026-04-24): topic-restriction by tier was REMOVED —
+// every tier (anon included) now receives the full market context.
+// Only the daily question quantity changes between tiers. This is
+// the "free taste for everyone, pay for volume" model.
 const DAILY_LIMITS = {
-  anon:  3,
-  free:  10,
+  anon:  1,
+  free:  3,
   paid:  30,
   admin: 100,
 };
@@ -130,7 +133,7 @@ async function readSecret(admin, key) {
 
 // In-memory per-IP rate limit (10 requests/min). Resets on cold start
 // but that's fine — it's a bursty-abuse absorber, the tier-based DB
-// counter is the persistent authority.
+// counter is the persistent authority for logged-in users.
 const ipBucket = new Map();  // ip → { start: ms, count: number }
 const IP_WINDOW_MS = 60 * 1000;
 const IP_MAX = 10;
@@ -148,6 +151,32 @@ function ipRateCheck(ip) {
   return { ok: true };
 }
 
+// Per-IP ANON daily counter (in-memory, 24h TTL). For logged-in
+// users we use the ai_usage_log DB row count, but anon doesn't
+// write to that table (no user_id). This counter stops the most
+// obvious bypass (hit limit → hard-refresh → get another free
+// question) as long as the Vercel function stays warm. Cold
+// starts reset the counter; a fully bullet-proof persistent
+// counter requires a DB table, tracked as a v2 follow-up.
+const anonBucket = new Map();  // ip → { day: "2026-04-24", count: number }
+function todayKey() {
+  const d = new Date();
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}-${String(d.getUTCDate()).padStart(2,"0")}`;
+}
+function anonDailyCount(ip) {
+  const day = todayKey();
+  const b = anonBucket.get(ip);
+  if (!b || b.day !== day) return 0;
+  return b.count;
+}
+function anonDailyIncrement(ip) {
+  const day = todayKey();
+  const b = anonBucket.get(ip);
+  if (!b || b.day !== day) { anonBucket.set(ip, { day, count: 1 }); return 1; }
+  b.count += 1;
+  return b.count;
+}
+
 // ────────────────────────────────────────────────────────────────
 // Tier-aware data context builders.
 // Each function returns a structured JSON of Residata data scoped
@@ -157,63 +186,17 @@ function ipRateCheck(ip) {
 // prompt-jailbreaking can reveal paid-tier data to an anon caller.
 // ────────────────────────────────────────────────────────────────
 
-async function buildAnonContext(admin) {
-  // Hero metrics + a few high-level district benchmarks. No per-
-  // project detail, no flat-level data, no velocity breakdowns.
-  const [metrics, topDistricts] = await Promise.all([
-    admin.from("metrics").select("metric_key, value_numeric").in(
-      "metric_key",
-      ["total_units_tracked", "total_available", "total_reserved",
-       "total_sold_to_date", "total_projects_active"]
-    ),
-    admin.from("projects").select("district, avg_price_eur_m2, total_units")
-      .not("avg_price_eur_m2", "is", null).limit(200),
-  ]);
-  const mm = {};
-  for (const m of metrics.data || []) mm[m.metric_key] = m.value_numeric;
-  // Aggregate to top-5 districts by weighted €/m². Kept intentionally
-  // coarse: anon users get market-wide orientation, no project names.
-  const byD = {};
-  for (const p of topDistricts.data || []) {
-    if (!p.district) continue;
-    const d = byD[p.district] ||= { district: p.district, sumP: 0, sumW: 0, n: 0 };
-    const w = p.total_units || 1;
-    d.sumP += p.avg_price_eur_m2 * w;
-    d.sumW += w;
-    d.n += 1;
-  }
-  const districts = Object.values(byD)
-    .map(d => ({ district: d.district, avg_eur_m2: Math.round(d.sumP / d.sumW), projects: d.n }))
-    .sort((a, b) => b.avg_eur_m2 - a.avg_eur_m2)
-    .slice(0, 5);
-  return {
-    scope: "anon (market overview only)",
-    city: "Bratislava",
-    totals: {
-      projects_tracked: mm.total_projects_active ?? null,
-      units_tracked:    mm.total_units_tracked ?? null,
-      units_available:  mm.total_available ?? null,
-      units_reserved:   mm.total_reserved ?? null,
-      units_sold_to_date: mm.total_sold_to_date ?? null,
-    },
-    top_districts_by_price: districts,
-    data_restrictions: "Per-project detail, unit-level data, developer comparisons and sell-through velocity are reserved for Residata paid subscribers. Answer general questions from the totals above and decline specific per-project questions politely.",
-  };
-}
-
-async function buildFreeContext(admin, userProfile) {
-  // Anon context + user's chosen project detail (if any).
-  const anon = await buildAnonContext(admin);
-  const chosenId = userProfile?.chosen_project_id || null;
-  if (!chosenId) {
-    return { ...anon, your_project: null,
-      data_restrictions: anon.data_restrictions + " This user is on the free tier and hasn't picked their one free-tier project yet — suggest they pick one on /app/projects if they ask about per-project detail." };
-  }
+/* Append user's chosen-project flat-level detail on top of the
+   shared market context. Used only for free-tier users who have
+   selected their one project — gives the assistant the room to
+   answer "how's my project doing" type questions personally. */
+async function buildChosenProjectContext(admin, chosenId) {
   const [proj, flats] = await Promise.all([
     admin.from("projects").select("*").eq("id", chosenId).maybeSingle(),
     admin.from("flats").select("stav, izby, obytna_plocha, cena_s_dph").eq("project_id", chosenId).limit(2000),
   ]);
   const p = proj.data;
+  if (!p) return null;
   const fs = flats.data || [];
   const roomMix = {};
   for (const f of fs) {
@@ -225,21 +208,17 @@ async function buildFreeContext(admin, userProfile) {
     else if (f.stav === "R" || f.stav === "PR") r.R += 1;
   }
   return {
-    ...anon,
-    your_project: p ? {
-      name: p.name,
-      developer: p.developer,
-      district: p.district,
-      status: p.status,
-      total_units: p.total_units,
-      available: p.available_units,
-      sold: p.sold_units,
-      sold_percentage: p.sold_percentage,
-      avg_price_eur_m2: p.avg_price_eur_m2,
-      sold_last_month: p.sold_last_month,
-      room_mix: Object.entries(roomMix).map(([rooms, r]) => ({ rooms, ...r })),
-    } : null,
-    data_restrictions: "Answer questions about totals + the user's own project only. Do NOT reveal details of other projects, developer-to-developer comparisons, or velocity of projects the user hasn't selected. If asked, say it's available on the paid tier.",
+    name: p.name,
+    developer: p.developer,
+    district: p.district,
+    status: p.status,
+    total_units: p.total_units,
+    available: p.available_units,
+    sold: p.sold_units,
+    sold_percentage: p.sold_percentage,
+    avg_price_eur_m2: p.avg_price_eur_m2,
+    sold_last_month: p.sold_last_month,
+    room_mix: Object.entries(roomMix).map(([rooms, r]) => ({ rooms, ...r })),
   };
 }
 
@@ -479,31 +458,67 @@ async function handleInner(req, res) {
     } catch (_) {
       return res.status(503).json({ error: "rate limit lookup failed, try again" });
     }
+  } else {
+    // Anon path — per-IP in-memory counter, resets at midnight UTC.
+    dayCount = anonDailyCount(ip);
   }
   if (dayCount >= dayLimit) {
-    const msg = tier === "anon"
-      ? (lang === "sk"
-          ? `Dosiahli ste denný limit ${dayLimit} otázok ako neprihlásený užívateľ. Prihláste sa pre viac.`
-          : `You've reached the daily limit of ${dayLimit} questions for anonymous users. Sign in for more.`)
-      : (lang === "sk"
-          ? `Dosiahli ste denný limit ${dayLimit} otázok pre tier ${tier}.`
-          : `You've reached the daily limit of ${dayLimit} questions for tier ${tier}.`);
-    return res.status(429).json({ error: msg, tier, limit: dayLimit, retry_after_sec: 3600 });
+    // Tier-specific upgrade CTA. Each tier sees a different message
+    // nudging them toward the next tier with a concrete benefit:
+    //
+    //   anon  → sign up (free) for 3 questions/day
+    //   free  → upgrade to paid for 30 questions/day
+    //   paid  → contact support (30 is the current max for non-admin)
+    //
+    // The client reads `tier` + `limit` + `upgrade_to` from the JSON
+    // body and renders a styled banner with a Login / Billing button.
+    const upgrades = {
+      anon:  { to: "free",  daily: DAILY_LIMITS.free,  action: "sign_in" },
+      free:  { to: "paid",  daily: DAILY_LIMITS.paid,  action: "billing" },
+      paid:  { to: null,    daily: null,               action: "contact" },
+      admin: { to: null,    daily: null,               action: "contact" },
+    };
+    const up = upgrades[tier] || upgrades.anon;
+    const msg = lang === "sk"
+      ? (tier === "anon"
+          ? `Vyčerpal si denný limit ${dayLimit} otázky pre neprihlásených. Prihlás sa (free) pre ${up.daily} otázok denne, alebo zaplať tier pre ${DAILY_LIMITS.paid}/deň.`
+          : tier === "free"
+          ? `Vyčerpal si denný limit ${dayLimit} otázok pre free tier. Upgrade na paid (${DAILY_LIMITS.paid}/deň).`
+          : `Vyčerpal si denný limit ${dayLimit} otázok. Kontaktuj Residata pre vyšší limit.`)
+      : (tier === "anon"
+          ? `You've used your daily ${dayLimit} question as an anonymous user. Sign in (free) for ${up.daily}/day, or go paid for ${DAILY_LIMITS.paid}/day.`
+          : tier === "free"
+          ? `You've used your daily ${dayLimit} questions on the free tier. Upgrade to paid for ${DAILY_LIMITS.paid}/day.`
+          : `You've used your daily ${dayLimit} questions. Contact Residata for a higher limit.`);
+    return res.status(429).json({
+      error: msg,
+      tier,
+      limit: dayLimit,
+      upgrade_to: up.to,
+      upgrade_action: up.action,
+      upgrade_daily: up.daily,
+      retry_after_sec: 3600,
+    });
   }
 
-  // ── Build tier-appropriate data context ──
-  // Cache key includes the user's chosen_project_id for free tier so
-  // a user who switches projects (edge case — normally not allowed)
-  // gets fresh data, not the previous project's flats.
+  // ── Build data context ──
+  // Every tier now receives the FULL market context. The earlier
+  // tier-based topic-restriction design (anon = hero totals only)
+  // was dropped: users found it more confusing than protective, and
+  // the actual protection comes from the DAILY QUANTITY limits above.
+  // Free users with a chosen_project_id get their project's flat-
+  // level detail appended on top so the assistant can answer
+  // personal "my project" questions too.
   let dataCtx;
   try {
-    if (tier === "anon") {
-      dataCtx = await cachedContext("anon", () => buildAnonContext(admin));
-    } else if (tier === "free") {
-      const k = `free:${userProfile?.chosen_project_id || "none"}`;
-      dataCtx = await cachedContext(k, () => buildFreeContext(admin, userProfile));
+    const fullCtx = await cachedContext("full", () => buildPaidContext(admin));
+    if (tier === "free" && userProfile?.chosen_project_id) {
+      const projKey = `free-proj:${userProfile.chosen_project_id}`;
+      const yourProject = await cachedContext(projKey,
+        () => buildChosenProjectContext(admin, userProfile.chosen_project_id));
+      dataCtx = { ...fullCtx, your_project: yourProject };
     } else {
-      dataCtx = await cachedContext("paid", () => buildPaidContext(admin));
+      dataCtx = fullCtx;
     }
   } catch (e) {
     console.error("[chat] context build", e);
@@ -544,8 +559,11 @@ async function handleInner(req, res) {
     .join("\n")
     .trim();
 
-  // ── Log the call (best-effort — never blocks the response) ──
-  // Only logs for authed users (ai_usage_log requires user_id).
+  // ── Log the call ──
+  // For authed users: append to ai_usage_log (persistent, cross-
+  // cold-start). For anon: bump the in-memory per-IP counter so
+  // the next request from this IP in the same UTC day sees a higher
+  // dayCount.
   if (userId) {
     admin.from("ai_usage_log").insert({
       user_id: userId,
@@ -556,6 +574,8 @@ async function handleInner(req, res) {
     }).then(({ error }) => {
       if (error) console.warn("[chat] usage log failed (non-fatal)", error.message);
     });
+  } else {
+    anonDailyIncrement(ip);
   }
 
   return res.status(200).json({

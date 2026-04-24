@@ -22,7 +22,10 @@ import { useAuth } from "./useAuth";
 import { useCapabilities } from "./useCapabilities";
 import { track } from "./track";
 
-const DAILY_LIMIT_BY_TIER = { anon: 3, free: 10, paid: 30, admin: 100 };
+// Mirror of server-side DAILY_LIMITS. If these get out of sync the
+// UI will briefly show a stale quota label until the server's 429
+// corrects it — still safe because the server is authoritative.
+const DAILY_LIMIT_BY_TIER = { anon: 1, free: 3, paid: 30, admin: 100 };
 
 function storageKey(userId) { return `residata_chat_${userId || "anon"}`; }
 
@@ -90,7 +93,14 @@ export function useChat({ lang = "sk" } = {}) {
       });
       if (r.status === 429) {
         const j = await r.json().catch(() => ({}));
-        setError({ kind: "limit", text: j.error || L("Dosiahnutý denný limit.", "Daily limit reached.") });
+        setError({
+          kind: "limit",
+          text: j.error || L("Dosiahnutý denný limit.", "Daily limit reached."),
+          upgradeTo:     j.upgrade_to     || null,   // "free" | "paid" | null
+          upgradeAction: j.upgrade_action || null,   // "sign_in" | "billing" | "contact"
+          upgradeDaily:  j.upgrade_daily  || null,
+          tier:          j.tier           || null,
+        });
         setMessages(prev => prev.slice(0, -1));
         return;
       }

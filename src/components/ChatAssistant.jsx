@@ -7,6 +7,8 @@
  */
 import { useEffect, useRef } from "react";
 import { useChat, GENERAL_KNOWLEDGE_RE } from "../lib/useChat";
+import { LimitBanner } from "./FloatingChat";
+import { pushRoute } from "../lib/routing";
 
 const mono   = "'JetBrains Mono', monospace";
 const green  = "#00e5a0";
@@ -111,9 +113,18 @@ export default function ChatAssistant({ lang = "sk" }) {
         )}
 
         {chat.error && (
-          <div style={{ color: chat.error.kind === "limit" ? orange : red, fontSize: "0.82rem", fontFamily: mono }}>
-            ⚠ {chat.error.text}
-          </div>
+          chat.error.kind === "limit" ? (
+            <LimitBanner
+              error={chat.error}
+              lang={lang}
+              onSignIn={() => { window.location.assign("/"); /* Home opens login modal */ }}
+              onBilling={() => { pushRoute("App:Billing"); window.location.assign("/app/billing"); }}
+            />
+          ) : (
+            <div style={{ color: red, fontSize: "0.82rem", fontFamily: mono }}>
+              ⚠ {chat.error.text}
+            </div>
+          )
         )}
       </div>
 

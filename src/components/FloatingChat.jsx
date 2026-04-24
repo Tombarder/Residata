@@ -81,54 +81,45 @@ export default function FloatingChat({ lang = "sk", onNavigate }) {
         <button
           onClick={() => setOpen(true)}
           aria-label={L("Otvoriť AI asistenta", "Open AI assistant")}
-          title={L("Opýtaj sa AI asistenta", "Ask the AI assistant")}
-          className="residata-chat-bubble"
+          className="residata-chat-pill"
           style={{
             position: "fixed",
             right: 20, bottom: 20,
-            width: 60, height: 60,
-            borderRadius: "50%",
-            border: "none",
-            background: `radial-gradient(circle at 30% 30%, #00ffb7 0%, ${green} 55%, #009b6b 100%)`,
-            boxShadow: "0 8px 28px rgba(0,229,160,0.35), 0 2px 8px rgba(0,0,0,0.4)",
+            height: 44,
+            padding: "0 16px 0 14px",
+            borderRadius: 22,
+            border: `1px solid rgba(0,229,160,0.5)`,
+            background: "#0e0e10",
+            color: text,
             cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            color: "#0a0a0b",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.55rem",
+            fontFamily: "inherit",
+            fontSize: "0.82rem",
+            fontWeight: 600,
+            letterSpacing: "-0.005em",
+            boxShadow: "0 6px 20px rgba(0,0,0,0.45), 0 0 0 1px rgba(0,229,160,0.06) inset",
             zIndex: 2000,
           }}
         >
-          {/* Sparkle + chat-bubble glyph — drawn in the same green
-              accent colour with a soft pulse so the eye finds it
-              without the bubble screaming "notification!!1". */}
-          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-               strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
-            {/* sparkle */}
-            <path d="M12 8v3M12 15v0M9.5 9.5l1.8 1.8M14.5 14.5l-1.8-1.8M10 12h-1M15 12h-1" strokeWidth="1.6"/>
+          {/* Sparkle glyph in the accent green. No notification dot,
+              no speech-bubble icon — we're deliberately NOT looking
+              like WhatsApp/Intercom. The explicit text label tells
+              the user what this is (an AI prompt) without relying on
+              icon recognition. */}
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M12 2l2.2 5.8L20 10l-5.8 2.2L12 18l-2.2-5.8L4 10l5.8-2.2L12 2z" fill={green}/>
+            <path d="M19 3l.9 2.4L22 6l-2.1.6L19 9l-.9-2.4L16 6l2.1-.6L19 3z" fill={green} opacity="0.65"/>
           </svg>
-          <span style={{
-            position: "absolute", top: 8, right: 10,
-            width: 10, height: 10, borderRadius: "50%",
-            background: "#fff",
-            boxShadow: "0 0 0 2px #00b488",
-            animation: "rbs-dot 2.2s ease-in-out infinite",
-          }} />
+          <span>{L("Opýtaj sa AI", "Ask AI")}</span>
           <style>{`
-            @keyframes rbs-dot { 0%,100% { opacity: 0.45; transform: scale(0.85); } 50% { opacity: 1; transform: scale(1.1); } }
-            .residata-chat-bubble { transition: transform 0.2s, box-shadow 0.2s; }
-            .residata-chat-bubble:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(0,229,160,0.5), 0 2px 10px rgba(0,0,0,0.5); }
-            .residata-chat-bubble::after {
-              content: "${L("Opýtaj sa AI", "Ask AI")}";
-              position: absolute; right: 72px; top: 50%; transform: translateY(-50%);
-              background: #0e0e10; color: #e8e8ed;
-              border: 1px solid #222228; border-radius: 6px;
-              padding: 0.4rem 0.7rem; font-size: 0.75rem; font-family: ${mono};
-              white-space: nowrap; opacity: 0; pointer-events: none;
-              transition: opacity 0.2s;
-            }
-            .residata-chat-bubble:hover::after { opacity: 1; }
-            @media (max-width: 520px) {
-              .residata-chat-bubble::after { display: none; }
+            .residata-chat-pill { transition: transform 0.18s, border-color 0.18s, box-shadow 0.18s, background 0.18s; }
+            .residata-chat-pill:hover {
+              transform: translateY(-1px);
+              border-color: ${green};
+              background: #121216;
+              box-shadow: 0 10px 28px rgba(0,0,0,0.55), 0 0 0 1px rgba(0,229,160,0.25) inset, 0 0 24px rgba(0,229,160,0.18);
             }
           `}</style>
         </button>
@@ -250,9 +241,13 @@ export default function FloatingChat({ lang = "sk", onNavigate }) {
             )}
 
             {chat.error && (
-              <div style={{ color: chat.error.kind === "limit" ? orange : red, fontSize: "0.75rem", fontFamily: mono }}>
-                ⚠ {chat.error.text}
-              </div>
+              <LimitBanner
+                error={chat.error}
+                lang={lang}
+                compact
+                onSignIn={() => { setOpen(false); if (onNavigate) onNavigate("Home"); /* marketing Home opens login modal via nav */ }}
+                onBilling={() => { setOpen(false); if (onNavigate) onNavigate("Pricing"); }}
+              />
             )}
           </div>
 
@@ -314,6 +309,61 @@ export default function FloatingChat({ lang = "sk", onNavigate }) {
       )}
     </>
   );
+}
+
+/**
+ * LimitBanner — shown when the server returns 429 with an upgrade
+ * CTA. Exported so ChatAssistant (full page) can reuse it instead
+ * of rolling its own.
+ */
+export function LimitBanner({ error, lang, compact, onSignIn, onBilling }) {
+  const L = (sk, en) => lang === "sk" ? sk : en;
+  const action = error?.upgradeAction;   // "sign_in" | "billing" | "contact"
+  const base = {
+    marginTop: compact ? "0.25rem" : "0.75rem",
+    padding: compact ? "0.55rem 0.7rem" : "0.85rem 1rem",
+    borderRadius: 10,
+    background: "rgba(245,166,35,0.08)",
+    border: "1px solid rgba(245,166,35,0.35)",
+    color: text, fontSize: compact ? "0.78rem" : "0.85rem", lineHeight: 1.5,
+  };
+  return (
+    <div style={base}>
+      <div style={{ color: orange, fontFamily: mono, fontSize: compact ? "0.6rem" : "0.65rem", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.3rem" }}>
+        ⚠ {L("Denný limit vyčerpaný", "Daily limit reached")}
+      </div>
+      <div style={{ marginBottom: "0.55rem" }}>{error.text}</div>
+      <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+        {action === "sign_in" && onSignIn && (
+          <button onClick={onSignIn} style={ctaBtn(green)}>
+            {L("Prihlásiť sa (free)", "Sign in (free)")}
+          </button>
+        )}
+        {(action === "sign_in" || action === "billing") && onBilling && (
+          <button onClick={onBilling} style={ctaBtn("#0a0a0b", green, "#0a0a0b")}>
+            {L("Upgrade na paid", "Upgrade to paid")}
+          </button>
+        )}
+        {action === "contact" && (
+          <a href="mailto:residata@proton.me" style={{ ...ctaBtn("#0a0a0b", green, "#0a0a0b"), textDecoration: "none", display: "inline-block" }}>
+            {L("Napíš Residata", "Contact Residata")}
+          </a>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ctaBtn(bg, fg, textColor) {
+  return {
+    background: bg || green,
+    color: textColor || "#0a0a0b",
+    border: fg ? `1px solid ${fg}` : "none",
+    borderRadius: 7,
+    padding: "0.42rem 0.85rem",
+    fontFamily: mono, fontSize: "0.74rem", fontWeight: 700,
+    cursor: "pointer",
+  };
 }
 
 function MiniBubble({ msg, lang }) {
