@@ -20,10 +20,11 @@
  * cleanly paginates the report so `Cmd-P → Save as PDF` gives a
  * brand-clean document without a PDF library.
  *
- * AI: optional per-report summary. Calls `/api/ai/summary` (Vercel
- * serverless). The function is a thin proxy that fans the page's
- * KPI summary → Claude and returns Slovak prose. Missing API key →
- * the button is disabled with a helpful hint.
+ * AI summary: REMOVED on user request (2026-04-24). The per-report
+ * AI-generated exec summary button was deprecated in favour of a
+ * future grounded chatbot surface that answers arbitrary market
+ * questions from Residata's data. This file now only hosts static
+ * analysis — no LLM calls, no ai_usage_log writes.
  */
 import { useState, useMemo, useEffect } from "react";
 import { useProjects, useAllFlats, useProjectSnapshots } from "../lib/useData";
@@ -443,7 +444,6 @@ function MarketReport({ projects, flats, onOpenProject, lang }) {
   const developers = useMemo(() => groupAggregates(projects, "developer", lang, flats).slice(0, 8), [projects, flats, lang]);
 
   const title = lang === "sk" ? "Slovenský trh novostavieb" : "Slovak new-build market";
-  const aiCtx = buildAiContext({ scope: "market", summary, districts, developers, priceSeries });
 
   return (
     <>
@@ -451,7 +451,6 @@ function MarketReport({ projects, flats, onOpenProject, lang }) {
 
       <ReportSection label={lang === "sk" ? "Executive summary" : "Executive summary"} title={title}>
         <ExecSummary summary={summary} lang={lang} extraDistrict={districts[0]} />
-        <AiSummaryBlock context={aiCtx} lang={lang} />
       </ReportSection>
 
       <ReportSection label={lang === "sk" ? "Rozloženie cien" : "Price distribution"} title={lang === "sk" ? "€/m² cez všetky byty \u2014 klik na pásmo otvorí zoznam bytov" : "€/m² across all units \u2014 click a band for the underlying units"}>
@@ -504,7 +503,6 @@ function FilteredReport({ scopeLabel, scopeType, projects, flats, allProjects, a
   }
 
   const title = lang === "sk" ? `${scopeType}: ${scopeLabel}` : `${scopeType}: ${scopeLabel}`;
-  const aiCtx = buildAiContext({ scope: scopeType, scopeLabel, summary, globalSummary, breakdown, priceSeries });
 
   return (
     <>
@@ -512,7 +510,6 @@ function FilteredReport({ scopeLabel, scopeType, projects, flats, allProjects, a
 
       <ReportSection label={scopeType} title={title}>
         <ExecSummary summary={summary} lang={lang} compared={{ label: lang === "sk" ? "trh" : "market", summary: globalSummary }} />
-        <AiSummaryBlock context={aiCtx} lang={lang} />
       </ReportSection>
 
       {priceSeries.some(b => b.count > 0) && (
@@ -575,11 +572,6 @@ function ProjectReport({ project, flats, siblings, allFlats, lang }) {
   }
 
   const title = project.name;
-  const aiCtx = buildAiContext({
-    scope: "project", scopeLabel: project.name, summary,
-    globalSummary: districtSummary, breakdown: byIzby, priceSeries,
-    meta: { developer: project.developer, district: project.district },
-  });
 
   return (
     <>
@@ -592,15 +584,18 @@ function ProjectReport({ project, flats, siblings, allFlats, lang }) {
         <p style={{ color: "#c4c4cc", lineHeight: 1.7, margin: 0 }}>
           {lang === "sk" ? (
             <><strong style={{ color: text }}>{project.name}</strong> od developera <strong style={{ color: text }}>{project.developer || "—"}</strong> v časti <strong style={{ color: text }}>{project.district || "—"}</strong>.
-            Celkovo {summary.totalUnits} bytov, {summary.soldPct.toFixed(0)}% predaných.
+            {summary.hasUnitData
+              ? <> Celkovo {summary.totalUnits} bytov, {summary.soldPct != null ? summary.soldPct.toFixed(0) : "—"}% predaných.</>
+              : <> Jednotkové dáta pre tento projekt ešte neposielame (registrový záznam).</>}
             {summary.wavgM2 && <> Vážený priemer <strong style={{ color: text }}>{Math.round(summary.wavgM2).toLocaleString("sk-SK")} €/m²</strong>.</>}</>
           ) : (
             <><strong style={{ color: text }}>{project.name}</strong> by <strong style={{ color: text }}>{project.developer || "—"}</strong> in <strong style={{ color: text }}>{project.district || "—"}</strong>.
-            {summary.totalUnits} units, {summary.soldPct.toFixed(0)}% sold.
+            {summary.hasUnitData
+              ? <> {summary.totalUnits} units, {summary.soldPct != null ? summary.soldPct.toFixed(0) : "—"}% sold.</>
+              : <> Unit-level data not tracked yet (registry-only entry).</>}
             {summary.wavgM2 && <> Weighted avg <strong style={{ color: text }}>{Math.round(summary.wavgM2).toLocaleString("en-US")} €/m²</strong>.</>}</>
           )}
         </p>
-        <AiSummaryBlock context={aiCtx} lang={lang} />
       </ReportSection>
 
       {byIzby.length > 0 && (
@@ -715,193 +710,6 @@ function ExecSummary({ summary, lang, extraDistrict, compared }) {
         </>
       )}
     </p>
-  );
-}
-
-/* Strip the lightweight markdown Claude occasionally produces (despite
-   the system prompt telling it not to) and render as proper paragraphs.
-   Kept deliberately narrow — don't try to be a full markdown parser:
-     · `# H1`, `## H2`, `### H3` at line start → bolded paragraph
-     · `**bold**`, `__bold__` → <strong>
-     · `*italic*`, `_italic_` → <em>
-     · `- ` / `* ` list items → bulleted <li>
-     · blank line → paragraph break
-
-   Any other markdown (code blocks, tables, links) renders as plain text.
-   This is XSS-safe because we build React elements — never set
-   innerHTML. */
-function AiParagraphs({ text }) {
-  // Split into blocks by blank lines
-  const blocks = String(text || "").split(/\n\s*\n/).map(b => b.trim()).filter(Boolean);
-  return (
-    <div style={{ color: "#c4c4cc", fontSize: "0.88rem", lineHeight: 1.65 }}>
-      {blocks.map((b, i) => renderAiBlock(b, i))}
-    </div>
-  );
-}
-function renderAiBlock(b, key) {
-  // Heading at start of block
-  const h = b.match(/^(#{1,4})\s+(.*)$/m);
-  if (h && b.split("\n")[0].startsWith("#")) {
-    const rest = b.replace(/^(#{1,4})\s+.*(\n|$)/, "").trim();
-    return (
-      <div key={key} style={{ marginBottom: "0.85rem" }}>
-        <div style={{ fontWeight: 700, color: text, fontSize: "0.92rem", marginBottom: rest ? "0.3rem" : 0 }}>
-          {renderInline(h[2])}
-        </div>
-        {rest && <div>{renderInline(rest)}</div>}
-      </div>
-    );
-  }
-  // Bulleted list — `- item` or `* item`
-  const lines = b.split("\n");
-  if (lines.every(l => /^\s*[-*]\s+/.test(l))) {
-    return (
-      <ul key={key} style={{ margin: "0 0 0.85rem", paddingLeft: "1.25rem" }}>
-        {lines.map((l, j) => <li key={j} style={{ marginBottom: "0.25rem" }}>{renderInline(l.replace(/^\s*[-*]\s+/, ""))}</li>)}
-      </ul>
-    );
-  }
-  // Numbered list — `1. item`, `2. item`. Accept any digits so Claude
-  // can emit `10.` without us falling back to paragraph.
-  if (lines.every(l => /^\s*\d+[.)]\s+/.test(l))) {
-    return (
-      <ol key={key} style={{ margin: "0 0 0.85rem", paddingLeft: "1.35rem" }}>
-        {lines.map((l, j) => <li key={j} style={{ marginBottom: "0.25rem" }}>{renderInline(l.replace(/^\s*\d+[.)]\s+/, ""))}</li>)}
-      </ol>
-    );
-  }
-  return <p key={key} style={{ margin: "0 0 0.85rem" }}>{renderInline(b)}</p>;
-}
-// Inline markdown → array of React nodes. Handles nested ** and * via
-// token sweep. Order matters: **x** before *x*.
-function renderInline(s) {
-  const out = [];
-  let remaining = String(s).replace(/\n/g, " ");
-  let k = 0;
-  const patterns = [
-    { re: /\*\*(.+?)\*\*/,   tag: "strong" },
-    { re: /__([^_]+)__/,     tag: "strong" },
-    { re: /\*([^*\n]+)\*/,   tag: "em" },
-    { re: /(?<![a-z0-9])_([^_\n]+)_(?![a-z0-9])/i, tag: "em" },
-  ];
-  while (remaining) {
-    let earliest = null, earliestMatch = null;
-    for (const p of patterns) {
-      const m = remaining.match(p.re);
-      if (m && (earliest == null || m.index < earliest)) {
-        earliest = m.index; earliestMatch = { m, tag: p.tag };
-      }
-    }
-    if (!earliestMatch) {
-      out.push(remaining);
-      break;
-    }
-    if (earliest > 0) out.push(remaining.slice(0, earliest));
-    const { m, tag } = earliestMatch;
-    const Tag = tag;
-    out.push(<Tag key={k++} style={tag === "strong" ? { color: text, fontWeight: 700 } : {}}>{m[1]}</Tag>);
-    remaining = remaining.slice(earliest + m[0].length);
-  }
-  return out;
-}
-
-/* ─── AI summary — calls /api/ai/summary. Handles no-key gracefully ─── */
-function AiSummaryBlock({ context, lang }) {
-  const [status, setStatus] = useState("idle"); // idle | loading | ok | err | missing_key
-  const [text,   setText]   = useState(null);
-  const [error,  setError]  = useState(null);
-
-  const run = async () => {
-    setStatus("loading");
-    setText(null); setError(null);
-    try {
-      // Attach the user's Supabase session token so the endpoint can
-      // identify them (for rate-limit bucketing by tier + user).
-      const headers = { "Content-Type": "application/json" };
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
-      } catch (_) { /* anon fallback — endpoint applies stricter limit */ }
-
-      const r = await fetch("/api/ai/summary", {
-        method: "POST", headers,
-        body: JSON.stringify({ context, lang }),
-      });
-      if (r.status === 501) { setStatus("missing_key"); return; }
-      if (r.status === 429) {
-        const j = await r.json().catch(() => ({}));
-        setStatus("rate_limited");
-        setError(j.error || "rate limit reached");
-        return;
-      }
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const j = await r.json();
-      setText(j.text || "");
-      setStatus("ok");
-    } catch (e) {
-      setError(String(e?.message || e));
-      setStatus("err");
-    }
-  };
-
-  return (
-    <div className="no-print" style={{ marginTop: "0.9rem", padding: "0.75rem 0.9rem", background: bg2, border: `1px dashed ${green}55`, borderRadius: 6 }}>
-      {status === "idle" && (
-        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", fontSize: "0.78rem" }}>
-          <span style={{ fontFamily: mono, color: green, fontSize: "0.62rem", letterSpacing: "0.1em", textTransform: "uppercase" }}>AI</span>
-          <span style={{ color: dim }}>{lang === "sk" ? "Dáš si aj AI zhrnutie z týchto dát?" : "Want an AI summary of this scope?"}</span>
-          <button onClick={run} style={{ marginLeft: "auto", background: green, color: "#0a0a0c", border: "none", borderRadius: 4, padding: "0.35rem 0.8rem", cursor: "pointer", fontFamily: mono, fontSize: "0.7rem", fontWeight: 700 }}>
-            ✨ {lang === "sk" ? "Vygenerovať" : "Generate"}
-          </button>
-        </div>
-      )}
-      {status === "loading" && (
-        <div style={{ color: dim, fontSize: "0.82rem", fontFamily: mono, display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <span aria-hidden style={{
-            display: "inline-block", width: 10, height: 10, borderRadius: "50%",
-            background: green, animation: "pv2-pulse 1s ease-in-out infinite",
-          }} />
-          {lang === "sk" ? "AI píše zhrnutie…" : "AI drafting…"}
-          <style>{`
-            @keyframes pv2-pulse {
-              0%, 100% { opacity: 0.35; transform: scale(0.9); }
-              50%      { opacity: 1;    transform: scale(1.1); }
-            }
-          `}</style>
-        </div>
-      )}
-      {status === "ok" && text && (
-        <div>
-          <div style={{ fontFamily: mono, fontSize: "0.6rem", color: green, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.4rem" }}>
-            ✨ AI {lang === "sk" ? "zhrnutie" : "summary"}
-          </div>
-          <AiParagraphs text={text} />
-          <div className="no-print" style={{ marginTop: "0.4rem", fontFamily: mono, fontSize: "0.6rem", color: dim }}>
-            {lang === "sk" ? "AI môže robiť chyby — čísla vyššie sú zdrojom pravdy." : "AI can err — the numbers above are the source of truth."}
-          </div>
-        </div>
-      )}
-      {status === "missing_key" && (
-        <div style={{ color: orange, fontSize: "0.8rem" }}>
-          {lang === "sk"
-            ? "AI ešte nie je zapnuté. Pridaj ANTHROPIC_API_KEY do Vercel env a zbuduj deploy."
-            : "AI not enabled. Add ANTHROPIC_API_KEY to Vercel env and redeploy."}
-        </div>
-      )}
-      {status === "err" && (
-        <div style={{ color: red, fontSize: "0.8rem" }}>
-          {lang === "sk" ? "AI zlyhalo: " : "AI failed: "} {error}
-          <button onClick={run} style={{ marginLeft: "0.6rem", background: "transparent", color: green, border: `1px solid ${green}55`, borderRadius: 3, padding: "0.15rem 0.5rem", fontFamily: mono, fontSize: "0.68rem", cursor: "pointer" }}>↻</button>
-        </div>
-      )}
-      {status === "rate_limited" && (
-        <div style={{ color: orange, fontSize: "0.82rem" }}>
-          {lang === "sk" ? "Dosiahnutý limit AI volaní. " : "AI rate limit reached. "}
-          <span style={{ color: dim, fontSize: "0.76rem" }}>{error}</span>
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -1611,36 +1419,3 @@ function downloadScopeCSV(projects, flats, lang) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-/* Build the compact JSON context that gets sent to AI */
-function buildAiContext({ scope, scopeLabel, summary, globalSummary, breakdown, priceSeries, districts, developers, meta }) {
-  const slim = (rows) => (rows || []).slice(0, 8).map(r => ({
-    name: r.name, projects: r.projectCount, units: r.totalUnits,
-    available: r.available, soldPct: Math.round(r.soldPct),
-    wavgM2: r.wavgM2 ? Math.round(r.wavgM2) : null,
-  }));
-  const slimBins = (priceSeries || []).filter(b => b.count > 0).map(b => ({ band: b.label, count: b.count }));
-  return {
-    scope: scope || "market",
-    scopeLabel: scopeLabel || null,
-    meta: meta || null,
-    summary: {
-      projects: summary?.projectCount ?? 0,
-      units: summary?.totalUnits ?? 0,
-      available: summary?.available ?? 0,
-      sold: summary?.sold ?? 0,
-      sold30d: summary?.sold30 ?? 0,
-      soldPct: Math.round(summary?.soldPct ?? 0),
-      wavgM2: summary?.wavgM2 ? Math.round(summary.wavgM2) : null,
-    },
-    benchmark: globalSummary ? {
-      projects: globalSummary.projectCount,
-      units: globalSummary.totalUnits,
-      wavgM2: globalSummary.wavgM2 ? Math.round(globalSummary.wavgM2) : null,
-      soldPct: Math.round(globalSummary.soldPct),
-    } : null,
-    breakdown: slim(breakdown),
-    districts: slim(districts),
-    developers: slim(developers),
-    priceBins: slimBins,
-  };
-}
