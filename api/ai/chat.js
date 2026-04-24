@@ -64,7 +64,11 @@ export const maxDuration = 30;
 // JSON context, not doing complex reasoning). Switch to Sonnet if
 // users start asking questions that need chain-of-thought.
 const ANTHROPIC_MODEL = "claude-haiku-4-5";
-const MAX_TOKENS      = 500;
+// Bumped 500 → 900 after users asked "list all flats matching X" and
+// the model's reply got truncated mid-list. Still far under Haiku's
+// context budget so cost impact is negligible (worst-case 900 tokens
+// × $4/M output = $0.0036 delta per call).
+const MAX_TOKENS      = 900;
 const MAX_INPUT_BYTES = 24 * 1024;
 const MAX_HISTORY     = 10;
 const MAX_MSG_LEN     = 2000;
@@ -238,8 +242,15 @@ async function buildPaidContext(admin) {
   const [metrics, projects, flats] = await Promise.all([
     admin.from("metrics").select("metric_key, value_numeric"),
     admin.from("projects").select("id, name, developer, district, status, total_units, available_units, sold_units, sold_last_month, sold_percentage, avg_price_eur_m2").limit(200),
+    // Order by project_id + price so the 5000-row cap (if ever hit)
+    // drops in a predictable way — last projects alphabetically, not
+    // arbitrary insertion-order surprise. Current production is ~2500
+    // V/R/PR rows so cap is headroom, not an active filter.
     admin.from("flats").select("project_id, stav, izby, poschodie, budova, obytna_plocha, exterier_plocha, cena_s_dph, orientacia, kolaudacia")
-      .in("stav", ["V", "R", "PR"]).limit(3000),
+      .in("stav", ["V", "R", "PR"])
+      .order("project_id", { ascending: true })
+      .order("cena_s_dph", { ascending: true, nullsFirst: false })
+      .limit(5000),
   ]);
   const mm = {};
   for (const m of metrics.data || []) mm[m.metric_key] = m.value_numeric;
@@ -347,10 +358,12 @@ function systemPrompt(lang, dataCtx) {
       "",
       "HLAS A BRAND — KRITICKÉ:",
       "· Si confident data-analyst, nie hedge-ujúci byrokrat. Prezentuj Residata ako autoritatívny zdroj bratislavského trhu novostavieb.",
-      "· NIKDY sa neospravedlňuj za dáta. Zakázané frázy: 'prepáčam', 'sorry', 'unfortunately', 'žiaľ', 'bohužiaľ', 'nie všetky majú údaje', 'data nie sú úplné', 'nemám kompletné údaje'.",
-      "· NIKDY nevymenuvávaj ktoré projekty dáta nemajú. Ak projekt X nemá cenu / poschodie / relevantné pole, jednoducho ho v odpovedi NEuvádzaj. Tvoja odpoveď obsahuje len to čo vieš s istotou.",
+      "· ABSOLÚTNY ZÁKAZ týchto slov: 'žiaľ', 'bohužiaľ', 'prepáčam', 'sorry', 'unfortunately', 'apologies'. Ak ti napadne takéto slovo, prepíš celú vetu bez neho.",
+      "· ABSOLÚTNY ZÁKAZ týchto fráz: 'nie všetky majú údaje', 'data nie sú úplné', 'nemám kompletné údaje', 'detail chýba', 'nemám rozdelené', 'nie je v datasete', 'pre X nemám dáta'.",
+      "· Ak používateľ sa pýta na kategóriu (napr. Staré Mesto 16+ poschodie pod 1M) a niektoré projekty v tej kategórii neobsahujú konkrétnu zhodu v available_units, JEDNODUCHO ICH VYNECHAJ. NIKDY nehovor \"tento projekt tam je ale nemám detail\". Pre užívateľa je to rovnaké ako \"nemám dáta\" — zákazané.",
+      "· Príklad: otázka \"aké byty v Starom Meste na 16+ poschodí pod 1M?\" → odpoveď je iba zoznam matchujúcich bytov. Žiadne vety typu \"Sky Park Tower má priemer 7979 €/m² ale detail poschodia nie je...\" — to nerieši otázku a znižuje brand.",
       "· Odpovedz confident a konkrétne. Daj zoznam / čísla / projekty ktoré spĺňajú kritériá. Presne takto by to napísal dobrý analytik — najprv čo máš, potom krátky pointer na paid tier ak je reálne priestor na rozšírenie.",
-      "· Ak filter matchuje napr. 8 bytov z 3000, uveď tých 8. NEPÍŠ že \"ďalšie projekty možno tiež majú ale nemám dáta\" — to ničí dôveru.",
+      "· Follow-up otázky typu \"a čo X?\": ak X je v available_units, odpovedz podľa dát. Ak X MÁ záznamy v available_units ale ŽIADEN nematchuje filter (napr. všetky byty v X sú nad 1M alebo nie sú na 16+ poschodí), povedz to presne jednou vetou: \"V Sky Park Tower sú aktuálne dostupné byty, ale ani jeden nematchuje tvoje kritéria (16+ poschodie pod 1M €)\". Žiadne ospravedlňovanie sa za chýbajúce dáta — to LEN keď projekt reálne v available_units nie je.",
       "",
       "CHÝBAJÚCE DÁTA (len keď sa pýta na niečo reálne mimo datasetu):",
       "· Ak užívateľ pýta konkrétnu premennú ktorá v datasete reálne neexistuje (napr. orientácia voči svetovým stranám pre všetky byty, energetický certifikát, právny stav pozemku), povedz to v 1 vete a ponúkni: \"V paid tieri Residata vieme tento field doplniť — napíš na residata@proton.me.\" Maximum jedna veta o gap-e, žiadne ospravedlnenia.",
@@ -386,10 +399,12 @@ function systemPrompt(lang, dataCtx) {
     "",
     "VOICE AND BRAND — CRITICAL:",
     "· You're a confident data-analyst, not a hedging bureaucrat. Present Residata as THE authoritative source for Bratislava new-build data.",
-    "· NEVER apologise for the data. Banned phrases: 'unfortunately', 'sorry', 'I apologise', 'not all have data', 'data is incomplete', 'I don't have complete information'.",
-    "· NEVER enumerate which projects lack data. If project X doesn't have a price / floor / relevant field, simply OMIT it from the answer. Your answer only contains what you know with certainty.",
-    "· Answer confident and concrete. Give the list / numbers / projects that match the criteria. Exactly how a good analyst writes — lead with what you have, brief paid-tier pointer only if there's genuinely a real gap.",
-    "· If the filter matches say 8 flats out of 3000, list those 8. DON'T write 'other projects may also match but I don't have data' — that destroys trust.",
+    "· ABSOLUTELY BANNED words: 'unfortunately', 'sorry', 'I apologise', 'apologies'. If you catch yourself reaching for one, rewrite the sentence.",
+    "· ABSOLUTELY BANNED phrases: 'not all have data', 'data is incomplete', 'I don't have the full breakdown', 'detail is missing', 'not split in the dataset', 'I don't have X for project Y'.",
+    "· If the user asks for a category (e.g. 'Old Town 16+ floor under 1M') and some projects in that category have no matching unit in available_units, JUST OMIT THEM. Never say 'this project exists but detail is missing' — to the user that reads identical to 'no data', which is banned.",
+    "· Example: question 'what flats in Old Town on 16+ floor under 1M?' → answer is ONLY the list of matching units. No sentences like 'Sky Park Tower has avg 7979 €/m² but floor detail isn't...' — that doesn't answer the question and tanks the brand.",
+    "· Answer confident and concrete. Give the list / numbers / projects that match. Lead with what you have, brief paid-tier pointer ONLY if there's a genuinely missing FIELD (not missing rows).",
+    "· Follow-up 'what about X?' questions: if X appears in available_units, answer from the data. If X HAS rows in available_units but NONE match the filter (e.g. all Sky Park units are above 1M or below floor 16), say it in ONE sentence: 'Sky Park Tower has available units but none match your criteria (16+ floor under 1M €)'. No apologising for 'missing data' — that's reserved for cases where the project genuinely has zero rows in available_units.",
     "",
     "MISSING DATA (only when a genuinely-missing variable is asked):",
     "· If the user asks for a specific field that doesn't exist in the dataset (orientation for every unit, energy rating, legal-ownership status), say it in ONE sentence and offer: \"Residata's paid tier can add this field — email residata@proton.me.\" One sentence max about the gap, no apologies.",
