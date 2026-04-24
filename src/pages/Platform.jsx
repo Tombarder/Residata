@@ -119,7 +119,7 @@ const NAV = [
 ];
 
 // ─── Platform Shell ─────────────────────────────────────────────
-export default function PlatformShell({ page, projectId, lang = "en", setCurrent, openLogin }) {
+export default function PlatformShell({ page, projectId, lang = "en", setLang, setCurrent, openLogin }) {
   const auth = useAuth();
   const { can, tier } = useCapabilities();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -208,7 +208,7 @@ export default function PlatformShell({ page, projectId, lang = "en", setCurrent
         minWidth: 0,
         display: "flex", flexDirection: "column",
       }} className="platform-main">
-        <TopBar page={page} lang={lang} tier={tier} />
+        <TopBar page={page} lang={lang} setLang={setLang} tier={tier} />
 
         {/* Content area. key={page} makes the fade animation replay on nav,
             but hook state (useProjects etc) survives remount via module-
@@ -425,7 +425,7 @@ function TierBadgeSmall({ tier }) {
 }
 
 // ─── TopBar ─────────────────────────────────────────────────────
-function TopBar({ page, lang, tier }) {
+function TopBar({ page, lang, setLang, tier }) {
   const titles = {
     "App:Dashboard": { en: "Dashboard",       sk: "Dashboard"    },
     "App:Projects":  { en: "Projects",        sk: "Projekty"     },
@@ -457,27 +457,69 @@ function TopBar({ page, lang, tier }) {
         </h1>
       </div>
 
-      {/* Back-to-marketing button — always visible top-right of the platform.
-          Uses a full navigation (window.location) so the marketing bundle
-          loads cleanly without React trying to reconcile platform state. */}
-      <a
-        href="/"
-        onClick={e => { e.preventDefault(); window.location.assign("/"); }}
-        style={{
-          display: "inline-flex", alignItems: "center", gap: "0.45rem",
-          padding: "0.5rem 0.95rem", borderRadius: 8,
-          background: "transparent", border: `1px solid ${border}`,
-          color: "#c0c0c8", fontSize: "0.8rem", fontFamily: "inherit",
-          textDecoration: "none", cursor: "pointer",
-          transition: "border-color 0.15s, color 0.15s",
-        }}
-        onMouseEnter={e => { e.currentTarget.style.borderColor = green; e.currentTarget.style.color = green; }}
-        onMouseLeave={e => { e.currentTarget.style.borderColor = border; e.currentTarget.style.color = "#c0c0c8"; }}
-        title={lang === "sk" ? "Otvoriť webstránku" : "Open website"}
-      >
-        <span style={{ fontSize: "0.9rem", lineHeight: 1 }}>←</span>
-        <span>{lang === "sk" ? "Webstránka" : "Website"}</span>
-      </a>
+      <div style={{ display: "inline-flex", alignItems: "center", gap: "0.6rem" }}>
+        {/* Language switcher — EN / SK pills. Same state that powers the
+            marketing Nav switcher, so toggling here or on /live flips
+            every SK/EN check-expression across the app consistently. */}
+        {setLang && (
+          <div style={{
+            display: "inline-flex", alignItems: "center",
+            border: `1px solid ${border}`, borderRadius: 8, padding: 2,
+            background: "#0e0e10",
+          }}>
+            {["en", "sk"].map(code => {
+              const active = lang === code;
+              return (
+                <button
+                  key={code}
+                  onClick={() => { if (lang !== code) { try { track("language_switched", { from: lang, to: code, surface: "platform" }); } catch (_) {} setLang(code); } }}
+                  style={{
+                    background: active ? "rgba(0,229,160,0.12)" : "transparent",
+                    color: active ? green : dim,
+                    border: "none",
+                    padding: "0.35rem 0.65rem",
+                    borderRadius: 6,
+                    cursor: "pointer",
+                    fontFamily: mono,
+                    fontSize: "0.7rem",
+                    fontWeight: 700,
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
+                    transition: "background 0.12s, color 0.12s",
+                  }}
+                  onMouseEnter={e => { if (!active) e.currentTarget.style.color = textLight; }}
+                  onMouseLeave={e => { if (!active) e.currentTarget.style.color = dim; }}
+                  title={code === "en" ? "English" : "Slovenčina"}
+                >
+                  {code.toUpperCase()}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Back-to-marketing button — always visible top-right of the platform.
+            Uses a full navigation (window.location) so the marketing bundle
+            loads cleanly without React trying to reconcile platform state. */}
+        <a
+          href="/"
+          onClick={e => { e.preventDefault(); window.location.assign("/"); }}
+          style={{
+            display: "inline-flex", alignItems: "center", gap: "0.45rem",
+            padding: "0.5rem 0.95rem", borderRadius: 8,
+            background: "transparent", border: `1px solid ${border}`,
+            color: "#c0c0c8", fontSize: "0.8rem", fontFamily: "inherit",
+            textDecoration: "none", cursor: "pointer",
+            transition: "border-color 0.15s, color 0.15s",
+          }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = green; e.currentTarget.style.color = green; }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = border; e.currentTarget.style.color = "#c0c0c8"; }}
+          title={lang === "sk" ? "Otvoriť webstránku" : "Open website"}
+        >
+          <span style={{ fontSize: "0.9rem", lineHeight: 1 }}>←</span>
+          <span>{lang === "sk" ? "Webstránka" : "Website"}</span>
+        </a>
+      </div>
 
       <style>{`
         @media (min-width: 841px) {
@@ -676,12 +718,96 @@ function UpgradeOverlay({ lang, requiredFor, currentTier, setCurrent }) {
   );
 }
 
+/**
+ * TrialOfferBanner — shown on Dashboard for free users who have
+ * never started their 7-day trial. Non-blocking, dismissible-feel
+ * gift framing (not desperate upsell). Opens Billing where the
+ * actual "Start trial" button lives.
+ */
+function TrialOfferBanner({ lang, onOpenBilling }) {
+  return (
+    <div style={{
+      background: "linear-gradient(90deg, rgba(0,229,160,0.14) 0%, rgba(0,229,160,0.04) 70%, transparent 100%)",
+      border: `1px solid ${green}`,
+      borderRadius: 12,
+      padding: "0.95rem 1.2rem",
+      marginBottom: "1.5rem",
+      display: "flex", alignItems: "center", gap: "0.95rem", flexWrap: "wrap",
+    }}>
+      <div style={{
+        flexShrink: 0,
+        width: 34, height: 34, borderRadius: 8,
+        background: "rgba(0,229,160,0.18)", color: green,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: "1.05rem",
+      }}>🎁</div>
+      <div style={{ flex: 1, minWidth: 200 }}>
+        <div style={{ color: textLight, fontWeight: 700, fontSize: "0.95rem", letterSpacing: "-0.01em" }}>
+          {lang === "sk" ? "7 dní plného Residata — zadarmo" : "7 days of the full Residata — on us"}
+        </div>
+        <div style={{ color: dim, fontSize: "0.8rem", marginTop: "0.15rem", lineHeight: 1.45 }}>
+          {lang === "sk"
+            ? "Všetky projekty, analytika, reporty, exporty. Bez karty. Aktivuješ si ho jedným klikom."
+            : "Every project, analytics, reports, exports. No card required. One-click activation."}
+        </div>
+      </div>
+      <button onClick={onOpenBilling} className="btn-p" style={{ fontSize: "0.82rem" }}>
+        {lang === "sk" ? "Aktivovať trial" : "Activate trial"}
+      </button>
+    </div>
+  );
+}
+
+/**
+ * TrialRunningBanner — shown on Dashboard while the trial is active.
+ * Displays the remaining days in green when >2 days left, amber when
+ * the trial is ending. Click routes to Billing for upgrade/details.
+ */
+function TrialRunningBanner({ lang, daysLeft, onOpenBilling }) {
+  const ending = daysLeft <= 2;
+  const accent = ending ? "#f5a623" : green;
+  const bgTint = ending ? "rgba(245,166,35,0.12)" : "rgba(0,229,160,0.12)";
+  return (
+    <div style={{
+      background: bgTint,
+      border: `1px solid ${accent}60`,
+      borderRadius: 12,
+      padding: "0.8rem 1.1rem",
+      marginBottom: "1.5rem",
+      display: "flex", alignItems: "center", gap: "0.8rem", flexWrap: "wrap",
+      fontSize: "0.85rem",
+    }}>
+      <span style={{ fontSize: "1.05rem" }}>🎁</span>
+      <span style={{ color: textLight, fontWeight: 600 }}>
+        {lang === "sk"
+          ? <>Paid trial aktívny — <span style={{ color: accent }}>{daysLeft === 1 ? "posledný deň" : `${daysLeft} dní zostáva`}</span></>
+          : <>Paid trial active — <span style={{ color: accent }}>{daysLeft === 1 ? "last day" : `${daysLeft} days left`}</span></>}
+      </span>
+      <span style={{ marginLeft: "auto", display: "inline-flex", gap: "0.55rem", alignItems: "center" }}>
+        <span style={{ color: dim, fontSize: "0.78rem", fontFamily: mono }}>
+          {lang === "sk" ? "žiadne strhávanie" : "no auto-charge"}
+        </span>
+        <button onClick={onOpenBilling}
+          style={{
+            background: "transparent", color: accent, border: `1px solid ${accent}`,
+            borderRadius: 6, padding: "0.35rem 0.8rem",
+            fontSize: "0.75rem", fontFamily: mono, fontWeight: 700, cursor: "pointer",
+          }}>
+          {lang === "sk" ? "Detail / upgrade" : "Details / upgrade"}
+        </button>
+      </span>
+    </div>
+  );
+}
+
 // ─── Dashboard page ─────────────────────────────────────────────
 function PlatformDashboard({ lang, setCurrent }) {
   const { profile, tier } = useAuth();
-  const { can } = useCapabilities();
+  const caps = useCapabilities();
+  const { can, baseTier, trialActive, trialDaysLeft } = caps;
   const { projects } = useProjects();
   const marketTotals = useMarketTotals();
+  const showTrialOffer = baseTier === "free" && !trialActive && !profile?.trial_started_at;
 
   // KPI counts come from the published `metrics` table (same values
   // the ticker + marketing site show). Fall back to summing projects
@@ -721,11 +847,22 @@ function PlatformDashboard({ lang, setCurrent }) {
       <h2 style={{ fontSize: "1.5rem", fontWeight: 600, color: textLight, marginTop: 0, marginBottom: "0.25rem" }}>
         {greeting}
       </h2>
-      <p style={{ color: dim, fontSize: "0.95rem", lineHeight: 1.6, marginBottom: "2rem" }}>
+      <p style={{ color: dim, fontSize: "0.95rem", lineHeight: 1.6, marginBottom: "1.5rem" }}>
         {lang === "sk"
           ? <>Toto je tvoj Residata dashboard. Nižšie je aktuálny stav trhu — data refresh každý mesiac, posledný beh pipeline je <strong style={{ color: textLight }}>{new Date().toISOString().slice(0, 10)}</strong>.</>
           : <>This is your Residata dashboard. Current market state below — data refreshes monthly, last pipeline run was <strong style={{ color: textLight }}>{new Date().toISOString().slice(0, 10)}</strong>.</>}
       </p>
+
+      {/* Trial CTA banner — appears for free users who haven't yet
+          used their 7-day trial. Once started, banner flips to a
+          running countdown ("trial day 3 of 7"). Once expired or
+          used, banner disappears entirely. */}
+      {showTrialOffer && (
+        <TrialOfferBanner lang={lang} onOpenBilling={() => setCurrent("App:Billing")} />
+      )}
+      {trialActive && (
+        <TrialRunningBanner lang={lang} daysLeft={trialDaysLeft} onOpenBilling={() => setCurrent("App:Billing")} />
+      )}
 
       {/* KPI strip */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.85rem", marginBottom: "2rem" }}>
@@ -929,14 +1066,42 @@ function PlatformProjects({ lang, setCurrent, openLogin }) {
 
 // ─── Billing page ───────────────────────────────────────────────
 function PlatformBilling({ lang, setCurrent }) {
-  const { tier } = useCapabilities();
+  const caps = useCapabilities();
+  const { tier, baseTier, trialActive, trialDaysLeft, trialUntil } = caps;
   const { profile } = useAuth();
 
-  const isFree = tier === "free";
-  const isPaid = tier === "paid";
-  const isAdmin = tier === "admin";
+  // Display tier logic: effective tier (shown badge) vs base tier
+  // (underlying — used to know if user is "really paid" vs "on trial"
+  // so we can still offer the upgrade CTA during trial).
+  const isFree  = baseTier === "free";
+  const isPaid  = baseTier === "paid";
+  const isAdmin = baseTier === "admin";
+  const trialUsed = Boolean(profile?.trial_started_at);  // one-shot guard
 
   const approvedAt = profile?.approved_at ? new Date(profile.approved_at).toISOString().slice(0, 10) : null;
+
+  const [trialBusy, setTrialBusy] = useState(false);
+  const [trialMsg, setTrialMsg]   = useState(null);
+
+  const startTrial = async () => {
+    setTrialBusy(true); setTrialMsg(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const r = await fetch("/api/trial/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token || ""}` },
+        body: "{}",
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+      setTrialMsg({ kind: "ok", text: lang === "sk" ? "Trial aktivovaný 🎉 Refresh stránku." : "Trial started 🎉 Refresh the page." });
+      setTimeout(() => window.location.reload(), 1200);
+    } catch (e) {
+      setTrialMsg({ kind: "err", text: String(e?.message || e) });
+    } finally {
+      setTrialBusy(false);
+    }
+  };
 
   return (
     <div style={{ padding: "2rem", maxWidth: 760 }}>
@@ -945,19 +1110,27 @@ function PlatformBilling({ lang, setCurrent }) {
         <div style={{ fontFamily: mono, fontSize: "0.65rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.4rem" }}>
           {lang === "sk" ? "Tvoj aktuálny tier" : "Your current tier"}
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.75rem" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.75rem", flexWrap: "wrap" }}>
           <TierBadgeSmall tier={tier} />
           <span style={{ fontSize: "1.35rem", fontWeight: 700, color: textLight, letterSpacing: "-0.02em" }}>
-            {isFree && (lang === "sk" ? "Free" : "Free")}
+            {isFree && (trialActive ? (lang === "sk" ? "Free (trial: paid prístup)" : "Free (trial: paid access)") : (lang === "sk" ? "Free" : "Free"))}
             {isPaid && (lang === "sk" ? "Paid" : "Paid")}
             {isAdmin && "Admin"}
           </span>
+          {trialActive && (
+            <span style={{ fontSize: "0.75rem", color: green, fontFamily: mono, background: "rgba(0,229,160,0.12)", border: `1px solid ${green}`, borderRadius: 100, padding: "2px 10px" }}>
+              🎁 {lang === "sk" ? `Trial · ${trialDaysLeft} dní zostáva` : `Trial · ${trialDaysLeft} days left`}
+            </span>
+          )}
           {approvedAt && <span style={{ fontSize: "0.75rem", color: dim, fontFamily: mono }}>
             {lang === "sk" ? "od" : "since"} {approvedAt}
           </span>}
         </div>
         <p style={{ color: "#c0c0c8", fontSize: "0.9rem", lineHeight: 1.65, margin: 0 }}>
-          {isFree && (lang === "sk"
+          {trialActive && isFree && (lang === "sk"
+            ? <>Máš počas trial-u plný paid prístup (analytika, reporty, exporty). Trial končí <strong style={{ color: textLight }}>{trialUntil ? new Date(trialUntil).toISOString().slice(0, 10) : "—"}</strong>. Bez karty — po skončení trial-u jednoducho padneš späť na free tier, nič ti nestrhneme.</>
+            : <>You have full paid access during the trial (analytics, reports, exports). Trial ends <strong style={{ color: textLight }}>{trialUntil ? new Date(trialUntil).toISOString().slice(0, 10) : "—"}</strong>. No card required — when the trial ends you simply drop back to free, nothing is charged.</>)}
+          {!trialActive && isFree && (lang === "sk"
             ? "Ako free user vidíš zoznam všetkých projektov a plný detail 1 projektu podľa tvojho výberu. Analytika, reporty a exporty sú v paid tieri."
             : "As a free user you see the full project list and full detail of 1 project of your choice. Analytics, reports and exports are in the paid tier.")}
           {isPaid && (lang === "sk"
@@ -969,33 +1142,79 @@ function PlatformBilling({ lang, setCurrent }) {
         </p>
       </div>
 
-      {/* Upgrade CTA (free only) */}
+      {/* 7-day free trial card — free users who haven't used the trial yet. */}
+      {isFree && !trialUsed && (
+        <div style={{
+          background: "linear-gradient(135deg, rgba(0,229,160,0.14), rgba(0,229,160,0.03))",
+          border: `1px solid ${green}`, borderRadius: 12, padding: "1.75rem 2rem", marginBottom: "1.25rem",
+        }}>
+          <div style={{ fontFamily: mono, fontSize: "0.65rem", color: green, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.5rem" }}>
+            🎁 {lang === "sk" ? "Darček pre teba" : "A gift for you"}
+          </div>
+          <h3 style={{ fontSize: "1.25rem", fontWeight: 700, color: textLight, margin: 0, marginBottom: "0.6rem", letterSpacing: "-0.01em" }}>
+            {lang === "sk" ? "7 dní plného Residata — zadarmo" : "7 days of the full Residata — on us"}
+          </h3>
+          <p style={{ color: "#c0c0c8", fontSize: "0.9rem", lineHeight: 1.6, margin: "0 0 1rem" }}>
+            {lang === "sk"
+              ? <>Vyskúšaj Residata naplno týždeň. Všetky projekty, analytika, pivot, reporty, CSV + API exporty. <strong style={{ color: textLight }}>Bez karty, bez platby</strong> — kartu pýtame až keby si sa rozhodol pokračovať po trial-e.</>
+              : <>Try the full Residata for a week. Every project, analytics, pivot, reports, CSV + API exports. <strong style={{ color: textLight }}>No card, no payment</strong> — we only ask for a card if you decide to continue after the trial.</>}
+          </p>
+          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center" }}>
+            <button onClick={startTrial} disabled={trialBusy} className="btn-p" style={{ fontSize: "0.88rem" }}>
+              {trialBusy ? "…" : (lang === "sk" ? "Spustiť 7-dňový trial" : "Start 7-day trial")}
+            </button>
+            <span style={{ fontSize: "0.72rem", color: dim, fontFamily: mono }}>
+              {lang === "sk" ? "žiadna karta · žiadne strhávanie · jednorazovo" : "no card · no auto-charge · one-time"}
+            </span>
+          </div>
+          {trialMsg && (
+            <div style={{ marginTop: "0.6rem", fontSize: "0.82rem", color: trialMsg.kind === "ok" ? green : "#ff6b6b", fontFamily: mono }}>
+              {trialMsg.text}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Upgrade CTA (free users — trial-ended OR still on trial).
+          Pricing messaging highlights the welcome 50%-off-3-months
+          gift to stay on-brand (founder offering value, not desperate
+          for a sale). */}
       {isFree && (
         <div style={{
-          background: "linear-gradient(135deg, rgba(0,229,160,0.1), rgba(0,229,160,0.02))",
+          background: "linear-gradient(135deg, rgba(0,229,160,0.08), rgba(0,229,160,0.02))",
           border: "1px solid rgba(0,229,160,0.3)", borderRadius: 12, padding: "1.75rem 2rem", marginBottom: "1.25rem",
         }}>
           <div style={{ fontFamily: mono, fontSize: "0.65rem", color: green, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.5rem" }}>
             {lang === "sk" ? "Upgrade na paid" : "Upgrade to paid"}
           </div>
-          <h3 style={{ fontSize: "1.2rem", fontWeight: 700, color: textLight, margin: 0, marginBottom: "0.65rem" }}>
-            {lang === "sk" ? "Odomkni celý produkt za €349 / mesiac" : "Unlock the whole product for €349 / month"}
+          <h3 style={{ fontSize: "1.2rem", fontWeight: 700, color: textLight, margin: 0, marginBottom: "0.4rem" }}>
+            {lang === "sk" ? "Paid tier za €349 / mesiac" : "Paid tier · €349 / month"}
           </h3>
-          <ul style={{ color: "#c0c0c8", fontSize: "0.88rem", lineHeight: 1.7, paddingLeft: "1.1rem", margin: "0.5rem 0 1.25rem" }}>
+          <div style={{
+            display: "inline-flex", alignItems: "center", gap: "0.4rem",
+            background: "rgba(245,166,35,0.14)", color: "#f5a623",
+            border: "1px solid rgba(245,166,35,0.4)",
+            fontFamily: mono, fontSize: "0.72rem", fontWeight: 700,
+            padding: "4px 10px", borderRadius: 100,
+            marginBottom: "0.85rem",
+          }}>
+            🎁 {lang === "sk" ? "Welcome gift · prvé 3 mesiace -50 %" : "Welcome gift · first 3 months 50% off"}
+          </div>
+          <ul style={{ color: "#c0c0c8", fontSize: "0.88rem", lineHeight: 1.7, paddingLeft: "1.1rem", margin: "0.2rem 0 1.25rem" }}>
             <li>{lang === "sk" ? "Plný detail každého aktívneho projektu" : "Full detail of every active project"}</li>
             <li>{lang === "sk" ? "Analytika, trendy, heat mapy" : "Analytics, trends, district heat maps"}</li>
             <li>{lang === "sk" ? "Mesačné PDF reporty" : "Monthly PDF reports"}</li>
             <li>{lang === "sk" ? "CSV exporty + REST API" : "CSV exports + REST API"}</li>
-            <li>{lang === "sk" ? "Historické snapshoty (mesiac-na-mesiac)" : "Historical snapshots (month-over-month)"}</li>
+            <li>{lang === "sk" ? "AI asistent · 30 otázok / deň" : "AI assistant · 30 questions / day"}</li>
           </ul>
           <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-            <a href="tel:+421911963909" className="btn-p">📞 Call +421 911 963 909</a>
-            <a href="mailto:residata@proton.me?subject=Upgrade%20to%20paid" className="btn-s">✉️ Email us</a>
+            <a href="tel:+421911963909" className="btn-p">📞 +421 911 963 909</a>
+            <a href="mailto:residata@proton.me?subject=Upgrade%20to%20paid" className="btn-s">✉️ residata@proton.me</a>
           </div>
           <p style={{ fontSize: "0.72rem", color: dim, marginTop: "1rem", fontFamily: mono }}>
             {lang === "sk"
-              ? "Žiadne kreditky / formuláre. 5 min hovor, dohodneme sa, prístup máš hneď."
-              : "No credit cards / forms. 5 min call, we agree, you're paid."}
+              ? "Žiadne kreditky na webe. 5-min hovor, dohodneme sa, prístup máš hneď."
+              : "No credit-card checkout. 5-min call, we agree, you're paid immediately."}
           </p>
         </div>
       )}

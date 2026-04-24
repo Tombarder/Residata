@@ -455,11 +455,30 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
               }}>{lang === "sk" ? "Odhlásiť" : "Sign out"}</button>
             </div>
           ) : (
-            <a onClick={onLogin} className="nav-cta-btn" style={{
-              padding: "0.5rem 1.25rem", background: "#00e5a0", color: "#0a0a0b",
-              fontWeight: 600, borderRadius: 6, fontSize: "0.8rem", cursor: "pointer",
-              letterSpacing: "0.02em", textDecoration: "none",
-            }}>{l.getAccess}</a>
+            // Two separate CTAs — returning users need a clear "sign in"
+            // path, new visitors want "get started free". Both open the
+            // same LoginModal (which supports both flows), but explicit
+            // labels end the "wait, am I signing up or logging in?"
+            // confusion the user reported.
+            <div style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
+              <a onClick={onLogin} className="nav-signin-btn" style={{
+                padding: "0.45rem 0.95rem", background: "transparent", color: "#e8e8ed",
+                border: "1px solid #222228", fontWeight: 500, borderRadius: 6,
+                fontSize: "0.78rem", cursor: "pointer", textDecoration: "none",
+                transition: "border-color 0.15s, color 0.15s",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = "#00e5a0"; e.currentTarget.style.color = "#00e5a0"; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = "#222228"; e.currentTarget.style.color = "#e8e8ed"; }}
+              title={lang === "sk" ? "Už máš účet? Prihlás sa." : "Already have an account? Sign in."}
+              >{lang === "sk" ? "Prihlásiť sa" : "Sign in"}</a>
+              <a onClick={onLogin} className="nav-cta-btn" style={{
+                padding: "0.5rem 1.15rem", background: "#00e5a0", color: "#0a0a0b",
+                fontWeight: 700, borderRadius: 6, fontSize: "0.8rem", cursor: "pointer",
+                letterSpacing: "0.01em", textDecoration: "none",
+              }}
+              title={lang === "sk" ? "Nový tu? Zaregistruj sa za 30s a dostaneš 7-dňový paid trial zadarmo." : "New here? 30s sign-up → 7-day paid trial free."}
+              >{lang === "sk" ? "Začať zadarmo →" : "Get started free →"}</a>
+            </div>
           )}
         </div>
       </div>
@@ -1764,6 +1783,7 @@ export default function App() {
           projectId={typeof current === "string" && current.startsWith("App:ProjectDetail:")
             ? current.slice("App:ProjectDetail:".length) : null}
           lang={lang}
+          setLang={setLang}
           setCurrent={handleNav}
           openLogin={() => setLoginOpen(true)}
         />

@@ -2520,6 +2520,32 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
     else setUsers(u => u.map(x => x.id === id ? { ...x, ...patch } : x));
   };
 
+  // Grant or revoke a 7-day trial for a user. Routes through the
+  // admin-gated /api/trial/grant endpoint (service-role write,
+  // audit-logged, overrides the one-shot self-service guard).
+  const trialAction = async (u, action) => {
+    if (u.id === self?.id) {
+      alert(lang === "sk" ? "Nemôžeš riešiť trial na sebe." : "Can't manage trial on yourself.");
+      return;
+    }
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { alert("No session — sign in first."); return; }
+    try {
+      const r = await fetch("/api/trial/grant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ user_id: u.id, action, days: 7 }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) { alert(`Trial ${action} failed: ${j.error || r.status}`); return; }
+      setUsers(us => us.map(x => x.id === u.id
+        ? { ...x, trial_until: j.trial_until || null, trial_started_at: j.trial_started_at || null }
+        : x));
+    } catch (e) {
+      alert(`Trial ${action} failed: ${String(e.message || e)}`);
+    }
+  };
+
   const deleteUser = async (u) => {
     if (u.id === self?.id) {
       alert(lang === "sk" ? "Nemôžeš vymazať sám seba." : "Can't delete yourself.");
@@ -3245,6 +3271,34 @@ function UserTable({ users, setTier, deleteUser, selfId, t, lang, premiumSet = n
                       <option value="paid">paid</option>
                       <option value="admin">admin</option>
                     </select>
+                    {(() => {
+                      const trialActive = u.trial_until && new Date(u.trial_until).getTime() > Date.now();
+                      const trialLabel = trialActive
+                        ? (lang === "sk" ? "Trial ON" : "Trial ON")
+                        : (lang === "sk" ? "Trial +7d" : "Trial +7d");
+                      const nextAction = trialActive ? "revoke" : "grant";
+                      const trialDays = trialActive
+                        ? Math.max(0, Math.ceil((new Date(u.trial_until).getTime() - Date.now()) / 86400000))
+                        : null;
+                      return (
+                        <button
+                          onClick={() => trialAction(u, nextAction)}
+                          disabled={isSelf}
+                          title={isSelf ? "Can't manage trial on yourself" : (trialActive ? `Ends in ${trialDays} day(s). Click to revoke.` : "Grant 7-day paid trial")}
+                          style={{
+                            background: trialActive ? "rgba(0,229,160,0.12)" : "transparent",
+                            color: isSelf ? "#55555f" : (trialActive ? green : "#c0c0c8"),
+                            border: `1px solid ${trialActive ? green : border}`,
+                            padding: "0.3rem 0.65rem", borderRadius: 4,
+                            fontSize: "0.72rem", fontFamily: "inherit",
+                            cursor: isSelf ? "not-allowed" : "pointer",
+                            opacity: isSelf ? 0.4 : 1,
+                            marginRight: "0.4rem",
+                          }}>
+                          {trialActive ? `🎁 ${trialDays}d` : trialLabel}
+                        </button>
+                      );
+                    })()}
                     <button
                       onClick={() => deleteUser && deleteUser(u)}
                       disabled={isSelf}
