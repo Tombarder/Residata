@@ -2192,28 +2192,44 @@ function ASection({ label, title, children, inline = false }) {
 function RankBarList({ rows, setCurrent, suffix = "", color = green }) {
   if (!rows || rows.length === 0) return null;
   const max = Math.max(...rows.map(r => r.value));
+  // Unique class per render to scope the :hover CSS without leaking
+  // into other RankBarLists on the same page. Plain string is fine —
+  // the class name doesn't change between renders of the same list.
+  const cls = "rbl-" + Math.random().toString(36).slice(2, 8);
   return (
     <div>
+      {/* CSS-in-style-tag because we need :hover selectors for true
+          cross-element feedback (inline style onMouseEnter only fires
+          on the target element, which meant the subtle 3% bg change
+          earlier read as 'only the right number is clickable'). Now
+          the whole row lights up AND the project name gets underlined
+          on hover, so clickability is obvious across the full width. */}
+      <style>{`
+        .${cls}-row { cursor: pointer; transition: background 0.15s; border-radius: 4px; }
+        .${cls}-row:hover { background: rgba(0,229,160,0.07); }
+        .${cls}-row:hover .${cls}-name { text-decoration: underline; text-decoration-color: rgba(0,229,160,0.5); text-underline-offset: 3px; }
+        .${cls}-row * { cursor: inherit; }
+      `}</style>
       {rows.map((r, i) => {
         const pct = max > 0 ? (r.value / max) * 100 : 0;
         const clickable = setCurrent && r.key && typeof r.key === "string" && r.key !== r.label;
         return (
           <div key={r.key}
+            className={clickable ? `${cls}-row` : undefined}
             onClick={clickable ? () => setCurrent(`App:ProjectDetail:${r.key}`) : undefined}
-            onMouseEnter={clickable ? (e) => e.currentTarget.style.background = "rgba(255,255,255,0.03)" : undefined}
-            onMouseLeave={clickable ? (e) => e.currentTarget.style.background = "transparent" : undefined}
             style={{
               display: "grid", gridTemplateColumns: "24px 1fr 72px", gap: "0.75rem", alignItems: "center",
               padding: "0.5rem 0.5rem", borderBottom: i < rows.length - 1 ? `1px solid ${border}` : "none",
               cursor: clickable ? "pointer" : "default",
-              borderRadius: 4,
-              transition: "background 0.15s",
             }}
           >
             <span style={{ fontFamily: mono, fontSize: "0.7rem", color: dim, textAlign: "right" }}>{i + 1}.</span>
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.2rem" }}>
-                <span style={{ fontSize: "0.83rem", color: "#e8e8ed", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.label}</span>
+                <span className={clickable ? `${cls}-name` : undefined}
+                      style={{ fontSize: "0.83rem", color: "#e8e8ed", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {r.label}
+                </span>
                 {r.sub && <span style={{ fontSize: "0.68rem", color: dim, fontFamily: mono, flexShrink: 0, marginLeft: "0.5rem" }}>{r.sub}</span>}
               </div>
               <div style={{ height: 4, background: "#0a0a0b", borderRadius: 2, overflow: "hidden" }}>
