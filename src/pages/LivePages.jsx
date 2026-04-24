@@ -2175,16 +2175,47 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
   const absorptionPct = totalAvail > 0 ? Math.round((totalSold30 / (totalAvail + totalSold30)) * 1000) / 10 : 0;
 
   // ─── Aggregations ────────────────────────────────────────
+  // Group aggregations (district/developer) are derived from flats
+  // rows rather than summing projects.total_units. Same rationale as
+  // the KPI strip: projects.total_units holds registry totals for a
+  // handful of large projects (Slnecnice=4000, Bory, Penta portfolio)
+  // where we don't scrape unit-level data, and summing those makes a
+  // district/developer row show "4 025 units, 90% sold" when in fact
+  // we only have flat-level data for a fraction of that.
+  //
+  // flats-based: units = count of flats rows, avail/sold/reserved =
+  // count by `stav`. sold30 + price still come from projects (those
+  // don't live on flats).
+  const flatsByProject = new Map();
+  for (const f of allFlats || []) {
+    let arr = flatsByProject.get(f.project_id);
+    if (!arr) { arr = []; flatsByProject.set(f.project_id, arr); }
+    arr.push(f);
+  }
+  const flatsFor = (projectIds) => {
+    const out = [];
+    for (const id of projectIds) {
+      const arr = flatsByProject.get(id);
+      if (arr) out.push(...arr);
+    }
+    return out;
+  };
+
   const byDistrict = {};
   for (const p of projects) {
     if (!p.district) continue;
-    const d = byDistrict[p.district] ||= { district: p.district, count: 0, units: 0, avail: 0, sold: 0, sold30: 0, priceSum: 0, priceN: 0 };
+    const d = byDistrict[p.district] ||= { district: p.district, count: 0, units: 0, avail: 0, sold: 0, sold30: 0, priceSum: 0, priceN: 0, ids: [] };
     d.count += 1;
-    d.units  += p.total_units || 0;
-    d.avail  += p.available_units || 0;
-    d.sold   += p.sold_units || 0;
+    d.ids.push(p.id);
     d.sold30 += p.sold_last_month || 0;
     if (p.avg_price_eur_m2) { d.priceSum += p.avg_price_eur_m2; d.priceN += 1; }
+  }
+  for (const d of Object.values(byDistrict)) {
+    const fs = flatsFor(d.ids);
+    d.units = fs.length;
+    d.avail = fs.filter(f => f.stav === "V").length;
+    d.sold  = fs.filter(f => f.stav === "P").length;
+    d.hasUnitData = fs.length > 0;
   }
   const districts = Object.values(byDistrict)
     .map(d => ({ ...d, avgPrice: d.priceN ? Math.round(d.priceSum / d.priceN) : null,
@@ -2194,14 +2225,28 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
   const byDeveloper = {};
   for (const p of projects) {
     if (!p.developer) continue;
-    const d = byDeveloper[p.developer] ||= { developer: p.developer, count: 0, units: 0, sold: 0, sold30: 0, avail: 0 };
+    const d = byDeveloper[p.developer] ||= { developer: p.developer, count: 0, units: 0, sold: 0, sold30: 0, avail: 0, ids: [] };
     d.count += 1;
-    d.units  += p.total_units || 0;
-    d.sold   += p.sold_units || 0;
+    d.ids.push(p.id);
     d.sold30 += p.sold_last_month || 0;
-    d.avail  += p.available_units || 0;
   }
-  const topDevelopers = Object.values(byDeveloper).sort((a, b) => b.units - a.units).slice(0, 10);
+  for (const d of Object.values(byDeveloper)) {
+    const fs = flatsFor(d.ids);
+    d.units = fs.length;
+    d.avail = fs.filter(f => f.stav === "V").length;
+    d.sold  = fs.filter(f => f.stav === "P").length;
+    d.hasUnitData = fs.length > 0;
+  }
+  // Filter out developers with zero tracked flats (registry-only
+  // entries in the projects table). Showing a developer at "rank 8
+  // with 0 units" isn't useful; drop them so the Top 10 list reflects
+  // who we actually track. If a developer truly has all-reserved +
+  // all-sold projects but we have flat rows for them, they'd still
+  // appear — units > 0 means the scraper pulled SOME rows for them.
+  const topDevelopers = Object.values(byDeveloper)
+    .filter(d => d.hasUnitData)
+    .sort((a, b) => b.units - a.units)
+    .slice(0, 10);
 
   const topVelocity = [...projects]
     .filter(p => (p.sold_last_month || 0) > 0)
@@ -2254,23 +2299,39 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
               </tr>
             </thead>
             <tbody>
-              {districts.map(d => (
-                <tr key={d.district} style={{ borderTop: `1px solid ${border}` }}>
-                  <td style={{ ...td, fontWeight: 600 }}>{d.district}</td>
-                  <td style={{ ...td, textAlign: "right", fontFamily: mono, color: d.avgPrice && d.avgPrice >= 5500 ? "#f5a623" : d.avgPrice && d.avgPrice >= 4200 ? green : "#4a90e2", fontWeight: 600 }}>
-                    {d.avgPrice ? d.avgPrice.toLocaleString("en-US").replace(/,/g, " ") : "—"}
-                  </td>
-                  <td style={{ ...td, textAlign: "right", fontFamily: mono, color: dim }}>{d.count}</td>
-                  <td style={{ ...td, textAlign: "right", fontFamily: mono, color: dim }}>{d.units.toLocaleString("en-US").replace(/,/g, " ")}</td>
-                  <td style={{ ...td, textAlign: "right", fontFamily: mono, color: green }}>{d.avail.toLocaleString("en-US").replace(/,/g, " ")}</td>
-                  <td style={{ ...td, textAlign: "right", fontFamily: mono, color: d.sold30 > 0 ? "#f5a623" : dim }}>
-                    {d.sold30 > 0 ? `+${d.sold30}` : "—"}
-                  </td>
-                  <td style={{ ...td, textAlign: "right", fontFamily: mono, color: d.absorption > 5 ? green : dim }}>
-                    {d.absorption.toFixed(1)}%
-                  </td>
-                </tr>
-              ))}
+              {districts.map(d => {
+                // Registry-only district (no flats rows for any of its
+                // projects): render em-dashes in unit/avail/absorption
+                // columns and dim the row. Keeps the district in the
+                // list (so we still show price + project count) without
+                // claiming "0 available / 0 sold" which would be false.
+                const gap = !d.hasUnitData;
+                const dashStyle = { ...td, textAlign: "right", fontFamily: mono, color: dim, fontStyle: "italic" };
+                const gapTitle = lang === "sk"
+                  ? "V tomto okrese trackujeme len registrové projekty (nemáme jednotkové dáta)."
+                  : "We only track registry-level projects in this district (no unit-level data).";
+                return (
+                  <tr key={d.district} style={{ borderTop: `1px solid ${border}`, opacity: gap ? 0.7 : 1 }} title={gap ? gapTitle : undefined}>
+                    <td style={{ ...td, fontWeight: 600 }}>{d.district}</td>
+                    <td style={{ ...td, textAlign: "right", fontFamily: mono, color: d.avgPrice && d.avgPrice >= 5500 ? "#f5a623" : d.avgPrice && d.avgPrice >= 4200 ? green : "#4a90e2", fontWeight: 600 }}>
+                      {d.avgPrice ? d.avgPrice.toLocaleString("en-US").replace(/,/g, " ") : "—"}
+                    </td>
+                    <td style={{ ...td, textAlign: "right", fontFamily: mono, color: dim }}>{d.count}</td>
+                    <td style={gap ? dashStyle : { ...td, textAlign: "right", fontFamily: mono, color: dim }}>
+                      {gap ? "—" : d.units.toLocaleString("en-US").replace(/,/g, " ")}
+                    </td>
+                    <td style={gap ? dashStyle : { ...td, textAlign: "right", fontFamily: mono, color: green }}>
+                      {gap ? "—" : d.avail.toLocaleString("en-US").replace(/,/g, " ")}
+                    </td>
+                    <td style={{ ...td, textAlign: "right", fontFamily: mono, color: d.sold30 > 0 ? "#f5a623" : dim }}>
+                      {d.sold30 > 0 ? `+${d.sold30}` : "—"}
+                    </td>
+                    <td style={gap ? dashStyle : { ...td, textAlign: "right", fontFamily: mono, color: d.absorption > 5 ? green : dim }}>
+                      {gap ? "—" : `${d.absorption.toFixed(1)}%`}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
