@@ -789,8 +789,14 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
           );
         })()}
         {availPrices.length >= 5 && (
+          // Subtitle was showing "Median X" — but the median is also
+          // labelled ON the dashed line inside the chart. Two labels
+          // for the same number (plus a third in the bottom caption)
+          // read as clutter. Subtitle now describes the scope of the
+          // chart instead; the median stays anchored to its line.
           <ChartCard title={L("Rozdelenie cien voľných bytov", "Price distribution — available units")}
-            subtitle={L(`Medián ${fmtEur(median(availPrices))}`, `Median ${fmtEur(median(availPrices))}`)}>
+            subtitle={L(`${availPrices.length} bytov · rozsah ${fmtEur(Math.min(...availPrices))} – ${fmtEur(Math.max(...availPrices))}`,
+                         `${availPrices.length} units · range ${fmtEur(Math.min(...availPrices))} – ${fmtEur(Math.max(...availPrices))}`)}>
             <PriceHistogram prices={availPrices} lang={lang} />
           </ChartCard>
         )}
@@ -1021,10 +1027,10 @@ function RoomMixChart({ rows, lang }) {
   const vOnly = rows.every(r => (r.sold || 0) === 0 && (r.reserved || 0) === 0);
   const maxTotal = rows.reduce((m, r) => Math.max(m, r.total || 0), 0) || 1;
   const W = 560;
-  const barH = 26;      // taller bar so inline numbers fit comfortably
-  const gap = 10;
+  const barH = 30;      // taller bar so we have room for a two-line right-side summary
+  const gap = 12;
   const labelW = 64;
-  const valueW = 96;
+  const valueW = 110;   // wider right column — two aligned lines (count / pct) instead of one cramped mixed line
   const barW = W - labelW - valueW - 20;
   const H = rows.length * (barH + gap) + 6;
 
@@ -1039,15 +1045,23 @@ function RoomMixChart({ rows, lang }) {
   const codeResv  = "R";  // same letter in both languages
   const codeSold  = lang === "sk" ? "P" : "S";
 
-  // Right-side headline — unified metric across all rows so the column
-  // reads as one thing. "% available" answers the buyer-centric
-  // question identically whether a row has reservations or not.
-  const sideLabel = (r) => {
-    if (r.total === 0) return "";
-    if (vOnly) return `${r.total} ${codeAvail}`;
-    const availPct = Math.round((r.avail / r.total) * 100);
-    return `${r.total} · ${availPct}% ${codeAvail}`;
+  // Right-side summary — two stacked lines instead of one cramped
+  // "31 · 45% A" string. User feedback: "nepaci sa mi stale to namano
+  // tie dve metriky, daj to nech to je pod sebou separatne nadpis
+  // a cisla, nie takto nanic ze sa miesa". Structure per row:
+  //
+  //     31 total      ← top line, white, units count
+  //     45% available ← bottom line, green, % of total that's buyable
+  //
+  // V-only rows skip the percentage (it would trivially be 100%).
+  const L = (sk, en) => lang === "sk" ? sk : en;
+  const sideTotal = (r) => r.total === 0 ? null : `${r.total}`;
+  const sideTotalSub = L("spolu", "total");
+  const sidePct   = (r) => {
+    if (r.total === 0 || vOnly) return null;
+    return `${Math.round((r.avail / r.total) * 100)}%`;
   };
+  const sidePctSub = L("voľných", "available");
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}>
@@ -1112,10 +1126,27 @@ function RoomMixChart({ rows, lang }) {
               </text>
             )}
 
-            <text x={W - 4} y={y + barH / 2 + 4} textAnchor="end"
-                  fill="#c0c0c8" fontFamily={mono} fontSize={10.5}>
-              {sideLabel(r)}
-            </text>
+            {/* Right-side structured summary: two aligned lines.
+                Row 1 (white, larger): count + "total" caption
+                Row 2 (green, smaller): % + "available" caption
+                Both right-aligned and sharing the same column so the
+                eye reads a clean vertical pair per row. */}
+            {sideTotal(r) && (
+              <>
+                <text x={W - 4} y={y + barH / 2 - 2} textAnchor="end"
+                      fill="#e8e8ed" fontFamily={mono} fontSize={12} fontWeight={700}>
+                  {sideTotal(r)}
+                  <tspan fill={dim} fontSize={9.5} fontWeight={400} dx={4}>{sideTotalSub}</tspan>
+                </text>
+                {sidePct(r) && (
+                  <text x={W - 4} y={y + barH / 2 + 11} textAnchor="end"
+                        fill={green} fontFamily={mono} fontSize={10.5} fontWeight={700}>
+                    {sidePct(r)}
+                    <tspan fill={dim} fontSize={9.5} fontWeight={400} dx={4}>{sidePctSub}</tspan>
+                  </text>
+                )}
+              </>
+            )}
           </g>
         );
       })}
@@ -1147,7 +1178,9 @@ function PriceHistogram({ prices, lang = "en" }) {
   const [hoverPos, setHoverPos] = useState({ x: 0, y: 0 });
   // Padding: bigger top for median label, bigger bottom for two
   // rows of text (axis + caption) so they don't stack into each other.
-  const W = 520, H = 220, pad = { l: 16, r: 16, t: 28, b: 52 };
+  // Bottom caption removed → tighter bottom padding. Top pad keeps
+  // whitespace for the median label above the bars.
+  const W = 520, H = 190, pad = { l: 16, r: 16, t: 28, b: 26 };
   const innerW = W - pad.l - pad.r, innerH = H - pad.t - pad.b;
   const locale = lang === "sk" ? "sk-SK" : "en-US";
   const L = (sk, en) => lang === "sk" ? sk : en;
@@ -1257,7 +1290,7 @@ function PriceHistogram({ prices, lang = "en" }) {
             <g key={idx}>
               <line x1={x} y1={pad.t + innerH} x2={x} y2={pad.t + innerH + 4}
                     stroke={dim} strokeWidth={0.8} />
-              <text x={x} y={H - 30} textAnchor="middle"
+              <text x={x} y={H - 8} textAnchor="middle"
                     fill={dim} fontFamily={mono} fontSize={9.5}>
                 {fmtK(v)}
               </text>
@@ -1265,14 +1298,11 @@ function PriceHistogram({ prices, lang = "en" }) {
           );
         })}
 
-        {/* Bottom caption — stats in one clean line, well below axis */}
-        <text x={W / 2} y={H - 10} textAnchor="middle"
-              fill={dim} fontFamily={mono} fontSize={9.5}>
-          {L(
-            `${total} bytov · rozsah ${fmtK(min)} – ${fmtK(max)} · medián ${fmtK(med)}`,
-            `${total} units · range ${fmtK(min)} – ${fmtK(max)} · median ${fmtK(med)}`,
-          )}
-        </text>
+        {/* Bottom caption intentionally removed. Count + range live
+            in the card subtitle (above the chart), and the median is
+            annotated directly on its dashed line — repeating all three
+            again at the bottom read as "median median median" to users
+            and cluttered the chart. */}
       </svg>
 
       {/* HTML tooltip — on hover shows exact bin stats */}
@@ -1518,11 +1548,49 @@ function FlatsTable({ flats, t, lang, highlightedFlatId }) {
   const compactTd = { padding: "0.45rem 0.35rem", color: "#e8e8ed", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
 
   const [sort, setSort] = useState({ key: "unit", dir: "asc" });
-  // columnFilters: { [colKey]: { values: Set<string> }  (text mode)
-  //                           | { min: number|null, max: number|null }  (num mode) }
-  const [columnFilters, setColumnFilters] = useState({});
-  // Which column's filter popup is currently open (null = none).
-  const [openFilterCol, setOpenFilterCol] = useState(null);
+
+  // Top-toolbar filter state. The previous per-column '⛆' icon
+  // popover was too hidden — user feedback: "tam nie je filter,
+  // alebo ak je, nejde / nevidno ho". Replaced with an always-visible
+  // pill toolbar above the table. Pills are include-mode by default:
+  // clicking a pill TOGGLES it. An empty selection for a group means
+  // "all" (no filter), so the user's first interaction is an exclude.
+  //
+  // Price range is two number inputs (min/max €) — a slider would need
+  // a library; pair of inputs is simpler and matches the data-ops
+  // mental model people already have from Excel filters.
+  const ROOM_VALUES = Array.from(new Set(flats.map(f => f.izby).filter(v => v != null && v !== "")))
+    .sort((a, b) => Number(a) - Number(b));
+  const STAV_VALUES = ["V", "R", "PR", "P"].filter(s => flats.some(f => f.stav === s));
+  const stavLabel = (s) => ({
+    V:  lang === "sk" ? "Voľné"       : "Available",
+    R:  lang === "sk" ? "Rezervované" : "Reserved",
+    PR: lang === "sk" ? "Predrezervované" : "Pre-reserved",
+    P:  lang === "sk" ? "Predané"     : "Sold",
+  }[s] || s);
+
+  const [stavSel, setStavSel] = useState(() => new Set(STAV_VALUES));
+  const [roomSel, setRoomSel] = useState(() => new Set(ROOM_VALUES.map(String)));
+  const [priceMin, setPriceMin] = useState("");
+  const [priceMax, setPriceMax] = useState("");
+
+  const togglePill = (setFn) => (val) => {
+    setFn(prev => {
+      const next = new Set(prev);
+      if (next.has(val)) next.delete(val); else next.add(val);
+      return next;
+    });
+  };
+  const toggleStav = togglePill(setStavSel);
+  const toggleRoom = togglePill(setRoomSel);
+
+  const clearAllFilters = () => {
+    setStavSel(new Set(STAV_VALUES));
+    setRoomSel(new Set(ROOM_VALUES.map(String)));
+    setPriceMin("");
+    setPriceMax("");
+    track("flat_filter_cleared");
+  };
 
   const onHeaderClick = (col) => {
     setSort(prev => {
@@ -1535,28 +1603,32 @@ function FlatsTable({ flats, t, lang, highlightedFlatId }) {
   };
 
   // ── Apply filters ────────────────────────────────────────────
+  const priceMinN = priceMin === "" ? null : Number(priceMin);
+  const priceMaxN = priceMax === "" ? null : Number(priceMax);
+  const priceActive = priceMinN != null || priceMaxN != null;
   const filteredFlats = flats.filter(f => {
-    for (const col of COLS) {
-      const cf = columnFilters[col.key];
-      if (!cf) continue;
-      const v = col.get(f);
-      if (col.kind === "num") {
-        if (v == null || !Number.isFinite(Number(v))) {
-          // numeric filter with value missing → drop unless user opted in
-          if (!cf.includeEmpty) return false;
-          continue;
-        }
-        const n = Number(v);
-        if (cf.min != null && n < cf.min) return false;
-        if (cf.max != null && n > cf.max) return false;
-      } else {
-        if (!cf.values || cf.values.size === 0) continue;
-        const key = v == null || v === "" ? "__empty__" : String(v);
-        if (!cf.values.has(key)) return false;
-      }
+    // Status pill
+    if (stavSel.size > 0 && stavSel.size < STAV_VALUES.length) {
+      if (!stavSel.has(f.stav)) return false;
+    }
+    // Rooms pill
+    if (roomSel.size > 0 && roomSel.size < ROOM_VALUES.length) {
+      const r = f.izby == null ? "" : String(f.izby);
+      if (!roomSel.has(r)) return false;
+    }
+    // Price range
+    if (priceActive) {
+      const p = Number(f.cena_s_dph);
+      if (!Number.isFinite(p)) return false;
+      if (priceMinN != null && p < priceMinN) return false;
+      if (priceMaxN != null && p > priceMaxN) return false;
     }
     return true;
   });
+  const anyFilterActive =
+    (stavSel.size > 0 && stavSel.size < STAV_VALUES.length) ||
+    (roomSel.size > 0 && roomSel.size < ROOM_VALUES.length) ||
+    priceActive;
 
   // ── Sort ─────────────────────────────────────────────────────
   const sortedFlats = (() => {
@@ -1581,37 +1653,16 @@ function FlatsTable({ flats, t, lang, highlightedFlatId }) {
     return <span style={{ color: green, marginLeft: 3, fontSize: "0.7rem" }}>{sort.dir === "asc" ? "▴" : "▾"}</span>;
   };
 
-  // Is this column currently filtered (effectively narrowing results)?
-  const isFilterActive = (col) => {
-    const cf = columnFilters[col.key];
-    if (!cf) return false;
-    if (col.kind === "num") return cf.min != null || cf.max != null;
-    return cf.values && cf.values.size > 0;
-  };
-
-  const updateColumnFilter = (colKey, patch) => {
-    setColumnFilters(prev => {
-      const next = { ...prev };
-      if (patch == null) delete next[colKey];
-      else next[colKey] = patch;
-      return next;
-    });
-  };
-
   // ── Highlight row from scatter click ────────────────────────
-  // Scroll matching row into view when highlightedFlatId changes. If the
-  // row is filtered out by the user's active column filters we auto-clear
-  // those filters first — otherwise clicking a dot in the scatter would
-  // silently do nothing (the row wouldn't exist in the DOM to scroll to),
-  // which reads as "click is broken".
+  // Scroll matching row into view when highlightedFlatId changes. If
+  // the row is filtered out by the user's active filters we auto-clear
+  // them first so the click never silently does nothing.
   useEffect(() => {
     if (!highlightedFlatId) return;
     const targetInData = flats.some(f => f.id === highlightedFlatId);
     const targetInView = sortedFlats.some(f => f.id === highlightedFlatId);
-    if (targetInData && !targetInView && Object.keys(columnFilters).length > 0) {
-      setColumnFilters({});
-      // Let the next render pass do the scroll — rAF below re-runs once the
-      // row is in the DOM.
+    if (targetInData && !targetInView && anyFilterActive) {
+      clearAllFilters();
       return;
     }
     const id = requestAnimationFrame(() => {
@@ -1619,31 +1670,91 @@ function FlatsTable({ flats, t, lang, highlightedFlatId }) {
       row?.scrollIntoView({ behavior: "smooth", block: "center" });
     });
     return () => cancelAnimationFrame(id);
-    // sortedFlats + columnFilters are intentionally in deps: when we clear
-    // filters, this effect re-fires with the row now visible and scrolls.
-  }, [highlightedFlatId, sortedFlats, columnFilters, flats]);
+  }, [highlightedFlatId, sortedFlats, anyFilterActive, flats]);
 
   const totalCount = flats.length;
   const visibleCount = sortedFlats.length;
 
   return (
     <ProtectedData lang={lang} style={{ border: `1px solid ${border}`, borderRadius: 12, overflow: "visible" }}>
-      {/* Filter summary bar — only shown when any filter is active */}
-      {visibleCount !== totalCount && (
-        <div style={{
-          padding: "0.55rem 0.9rem", background: "rgba(0,229,160,0.04)",
-          borderBottom: `1px solid ${border}`, fontSize: "0.78rem",
-          display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap",
-        }}>
-          <span style={{ color: dim }}>
-            {lang === "sk" ? "Zobrazuje sa" : "Showing"} <strong style={{ color: text }}>{visibleCount}</strong> {lang === "sk" ? "z" : "of"} {totalCount} {lang === "sk" ? "bytov" : "flats"}
+      {/* ── Filter toolbar ─────────────────────────────────────
+          Always visible above the table. Three groups:
+            · Status pills (V / R / PR / P)
+            · Room pills   (1 / 1.5 / 2 / 3 / 4 / …)
+            · Price range  (€ min / € max)
+          Pills are toggleable — click an active pill to exclude it;
+          click again to bring it back. "All" states mean no filter
+          for that group, so the typical interaction is one click to
+          narrow. A showing-N-of-M counter + "Clear filters" button
+          anchor the right side whenever anything is active. */}
+      <div style={{
+        padding: "0.75rem 0.9rem",
+        background: "#0e0e10",
+        borderBottom: `1px solid ${border}`,
+        display: "flex", flexWrap: "wrap", alignItems: "center",
+        gap: "0.75rem 1.1rem",
+      }}>
+        {/* Status group */}
+        {STAV_VALUES.length > 1 && (
+          <FilterGroup
+            label={lang === "sk" ? "Stav" : "Status"}
+            items={STAV_VALUES.map(s => ({
+              key: s, label: stavLabel(s),
+              active: stavSel.has(s),
+              color: s === "V" ? "#00e5a0" : s === "P" ? "#f5a623" : "#888",
+              onClick: () => toggleStav(s),
+            }))}
+          />
+        )}
+        {/* Rooms group */}
+        {ROOM_VALUES.length > 1 && (
+          <FilterGroup
+            label={lang === "sk" ? "Izby" : "Rooms"}
+            items={ROOM_VALUES.map(v => ({
+              key: String(v), label: `${v}`,
+              active: roomSel.has(String(v)),
+              color: "#00e5a0",
+              onClick: () => toggleRoom(String(v)),
+            }))}
+          />
+        )}
+        {/* Price range */}
+        <div style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
+          <span style={{ fontFamily: mono, fontSize: "0.65rem", color: dim, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+            {lang === "sk" ? "Cena €" : "Price €"}
           </span>
-          <button onClick={() => setColumnFilters({})}
-            style={{ marginLeft: "auto", background: "transparent", border: "none", color: dim, cursor: "pointer", fontSize: "0.74rem", textDecoration: "underline" }}>
-            {lang === "sk" ? "vymazať filtre" : "clear filters"}
-          </button>
+          <input
+            type="number" inputMode="numeric" placeholder={lang === "sk" ? "od" : "min"}
+            value={priceMin} onChange={e => setPriceMin(e.target.value)}
+            style={{ width: 80, padding: "0.3rem 0.45rem", background: "#0a0a0b", border: `1px solid ${priceMinN != null ? green : border}`, color: text, borderRadius: 4, fontFamily: mono, fontSize: "0.78rem", outline: "none" }}
+          />
+          <span style={{ color: dim, fontFamily: mono, fontSize: "0.75rem" }}>–</span>
+          <input
+            type="number" inputMode="numeric" placeholder={lang === "sk" ? "do" : "max"}
+            value={priceMax} onChange={e => setPriceMax(e.target.value)}
+            style={{ width: 80, padding: "0.3rem 0.45rem", background: "#0a0a0b", border: `1px solid ${priceMaxN != null ? green : border}`, color: text, borderRadius: 4, fontFamily: mono, fontSize: "0.78rem", outline: "none" }}
+          />
         </div>
-      )}
+
+        {/* Counter + clear */}
+        <div style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: "0.75rem" }}>
+          <span style={{ fontFamily: mono, fontSize: "0.74rem", color: anyFilterActive ? green : dim }}>
+            <strong style={{ color: text }}>{visibleCount}</strong> {lang === "sk" ? "z" : "of"} {totalCount}
+          </span>
+          {anyFilterActive && (
+            <button onClick={clearAllFilters}
+              style={{
+                background: "transparent", border: `1px solid ${border}`,
+                color: dim, borderRadius: 4, padding: "0.3rem 0.7rem",
+                fontFamily: mono, fontSize: "0.7rem", cursor: "pointer",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.color = text; e.currentTarget.style.borderColor = "#ff6b6b60"; }}
+              onMouseLeave={e => { e.currentTarget.style.color = dim; e.currentTarget.style.borderColor = border; }}>
+              ✕ {lang === "sk" ? "Vymazať filtre" : "Clear filters"}
+            </button>
+          )}
+        </div>
+      </div>
 
       {/* No overflowX wrapper — table is forced to fit via fixed layout
           + colgroup widths + compact padding, so the last column is
@@ -1657,53 +1768,19 @@ function FlatsTable({ flats, t, lang, highlightedFlatId }) {
           </colgroup>
           <thead style={{ background: "#0e0e10" }}>
             <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-              {COLS.map(col => {
-                const filterActive = isFilterActive(col);
-                return (
-                  <th key={col.key}
-                      style={{
-                        ...compactTh, textAlign: col.align, userSelect: "none",
-                        color: sort.key === col.key ? "#e8e8ed" : dim,
-                        position: "relative",
-                        overflow: "hidden",
-                      }}>
-                    <div style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
-                      <span onClick={() => onHeaderClick(col)}
-                            style={{ cursor: "pointer" }}
-                            title={lang === "sk" ? "Klikni pre zoradenie" : "Click to sort"}>
-                        {col.label}{sortArrow(col)}
-                      </span>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setOpenFilterCol(openFilterCol === col.key ? null : col.key); }}
-                        title={lang === "sk" ? "Filtrovať" : "Filter"}
-                        style={{
-                          background: filterActive ? "rgba(0,229,160,0.18)" : "transparent",
-                          border: `1px solid ${filterActive ? green : "transparent"}`,
-                          color: filterActive ? green : dim,
-                          borderRadius: 3, cursor: "pointer", padding: "0 3px",
-                          fontSize: "0.72rem", lineHeight: 1,
-                        }}>
-                        ⛆
-                      </button>
-                    </div>
-                    {openFilterCol === col.key && (
-                      <ColumnFilterMenu
-                        col={col}
-                        flats={flats}
-                        filter={columnFilters[col.key]}
-                        onApply={(patch) => {
-                          track("flat_filter_applied", { column: col.key, kind: col.kind, cleared: patch == null });
-                          updateColumnFilter(col.key, patch);
-                          setOpenFilterCol(null);
-                        }}
-                        onClose={() => setOpenFilterCol(null)}
-                        lang={lang}
-                        locale={locale}
-                      />
-                    )}
-                  </th>
-                );
-              })}
+              {COLS.map(col => (
+                <th key={col.key}
+                    onClick={() => onHeaderClick(col)}
+                    title={lang === "sk" ? "Klikni pre zoradenie" : "Click to sort"}
+                    style={{
+                      ...compactTh, textAlign: col.align, userSelect: "none",
+                      color: sort.key === col.key ? "#e8e8ed" : dim,
+                      cursor: "pointer",
+                      overflow: "hidden",
+                    }}>
+                  {col.label}{sortArrow(col)}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
@@ -1765,209 +1842,47 @@ function FlatsTable({ flats, t, lang, highlightedFlatId }) {
   );
 }
 
-/* ── Per-column filter menu — inline popover anchored under the TH.
-      Text columns: checkbox list of distinct values + search.
-      Number columns: min / max range with placeholder hints. */
-function ColumnFilterMenu({ col, flats, filter, onApply, onClose, lang, locale }) {
-  // Local draft so "použiť" commits, "zrušiť" discards.
-  const isNum = col.kind === "num";
-
-  // Distinct values + numeric stats derived once per open
-  const { distinct, hasEmpty, numStats } = (() => {
-    const seen = new Set();
-    const strs = [];
-    const nums = [];
-    let empty = false;
-    for (const f of flats) {
-      const v = col.get(f);
-      if (v == null || v === "") { empty = true; continue; }
-      if (isNum) {
-        const n = Number(v);
-        if (Number.isFinite(n)) nums.push(n);
-      } else {
-        const s = String(v);
-        const k = s.trim().toLowerCase();
-        if (!seen.has(k)) { seen.add(k); strs.push(s); }
-      }
-    }
-    strs.sort((a, b) => String(a).localeCompare(String(b), locale, { numeric: true }));
-    let stats = null;
-    if (nums.length) {
-      const s = [...nums].sort((a, b) => a - b);
-      stats = { min: s[0], max: s[s.length - 1] };
-    }
-    return { distinct: strs, hasEmpty: empty, numStats: stats };
-  })();
-
-  // Drafts
-  const initSelected = filter?.values ? new Set(filter.values) : new Set();
-  const [selected, setSelected] = useState(initSelected);
-  const [minV, setMinV] = useState(filter?.min ?? "");
-  const [maxV, setMaxV] = useState(filter?.max ?? "");
-  const [search, setSearch] = useState("");
-
-  // Close on outside click / Esc
-  useEffect(() => {
-    const onDown = (e) => {
-      const pop = document.getElementById(`flats-col-filter-${col.key}`);
-      if (pop && !pop.contains(e.target)) onClose();
-    };
-    const onKey = (e) => { if (e.key === "Escape") onClose(); };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [col.key, onClose]);
-
-  const toggleVal = (v) => setSelected(prev => {
-    const n = new Set(prev);
-    if (n.has(v)) n.delete(v); else n.add(v);
-    return n;
-  });
-
-  const commit = () => {
-    if (isNum) {
-      const min = minV === "" ? null : Number(minV);
-      const max = maxV === "" ? null : Number(maxV);
-      if (min == null && max == null) onApply(null);
-      else onApply({ min, max });
-    } else {
-      if (selected.size === 0) onApply(null);
-      else onApply({ values: selected });
-    }
-  };
-  const clearAll = () => { onApply(null); };
-
-  const q = search.trim().toLowerCase();
-  const shown = q ? distinct.filter(v => String(v).toLowerCase().includes(q)) : distinct;
-
+/* ── FilterGroup — a labelled row of toggleable pills for the
+ *    always-visible filter toolbar above FlatsTable. Each pill is
+ *    a click-to-toggle chip: active pills show colored + filled,
+ *    inactive pills show dimmed with strikethrough so the excluded
+ *    state is obvious at a glance. */
+function FilterGroup({ label, items }) {
   return (
-    <div id={`flats-col-filter-${col.key}`}
-      onClick={(e) => e.stopPropagation()}
-      style={{
-        position: "absolute", top: "100%", left: 0,
-        marginTop: 4, width: 260, zIndex: 50,
-        background: "#111116", border: `1px solid ${border}`,
-        borderRadius: 8, padding: "0.7rem 0.8rem",
-        boxShadow: "0 16px 40px rgba(0,0,0,0.55)",
-        color: "#e8e8ed", fontFamily: "inherit", letterSpacing: "normal",
-        textTransform: "none", fontSize: "0.82rem",
-      }}>
-      <div style={{ fontWeight: 600, marginBottom: "0.55rem" }}>{col.label}</div>
-
-      {isNum ? (
-        <div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.4rem" }}>
-            <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
-              <span style={{ fontSize: "0.72rem", color: dim }}>od</span>
-              <input type="number" value={minV} onChange={(e) => setMinV(e.target.value)}
-                placeholder={numStats ? String(Math.round(numStats.min)) : ""}
-                style={flatsFilterInp} />
-            </label>
-            <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
-              <span style={{ fontSize: "0.72rem", color: dim }}>do</span>
-              <input type="number" value={maxV} onChange={(e) => setMaxV(e.target.value)}
-                placeholder={numStats ? String(Math.round(numStats.max)) : ""}
-                style={flatsFilterInp} />
-            </label>
-          </div>
-          {numStats && (
-            <div style={{ marginTop: "0.5rem", fontSize: "0.72rem", color: dim }}>
-              V dátach: <strong style={{ color: "#e8e8ed", fontWeight: 500 }}>{Math.round(numStats.min)}</strong> – <strong style={{ color: "#e8e8ed", fontWeight: 500 }}>{Math.round(numStats.max)}</strong>
-            </div>
-          )}
-        </div>
-      ) : (
-        <div>
-          <input autoFocus value={search} onChange={(e) => setSearch(e.target.value)}
-            placeholder={lang === "sk" ? "Hľadať…" : "Search…"}
-            style={{ ...flatsFilterInp, width: "100%", marginBottom: "0.4rem" }} />
-          <div style={{ display: "flex", gap: "0.3rem", marginBottom: "0.35rem", fontSize: "0.72rem" }}>
-            <button style={flatsFilterMini} onClick={() => {
-              const all = [...distinct]; if (hasEmpty) all.push("__empty__"); setSelected(new Set(all));
-            }}>všetko</button>
-            <button style={flatsFilterMini} onClick={() => setSelected(new Set())}>nič</button>
-            <button style={flatsFilterMini} onClick={() => {
-              setSelected(prev => {
-                const all = [...distinct]; if (hasEmpty) all.push("__empty__");
-                const inv = new Set();
-                for (const v of all) if (!prev.has(v)) inv.add(v);
-                return inv;
-              });
-            }}>prevrátiť</button>
-          </div>
-          <div style={{
-            maxHeight: 220, overflowY: "auto",
-            border: `1px solid ${border}`, borderRadius: 5, background: "#0a0a0c",
-            padding: "0.2rem",
-          }}>
-            {hasEmpty && (
-              <label style={flatsFilterRow(selected.has("__empty__"))}>
-                <input type="checkbox" checked={selected.has("__empty__")} onChange={() => toggleVal("__empty__")} style={{ accentColor: green }} />
-                <span style={{ fontStyle: "italic", color: dim }}>(prázdne)</span>
-              </label>
-            )}
-            {shown.length === 0 ? (
-              <div style={{ padding: "0.5rem", color: dim, fontSize: "0.76rem", textAlign: "center" }}>Žiadne zhody.</div>
-            ) : shown.map(v => (
-              <label key={String(v)} style={flatsFilterRow(selected.has(String(v)))}>
-                <input type="checkbox" checked={selected.has(String(v))} onChange={() => toggleVal(String(v))} style={{ accentColor: green }} />
-                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{String(v)}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div style={{ display: "flex", justifyContent: "space-between", marginTop: "0.7rem" }}>
-        <button onClick={clearAll}
-          style={{ background: "transparent", border: "none", color: dim, cursor: "pointer", fontSize: "0.76rem", textDecoration: "underline", padding: "0.3rem 0" }}>
-          vymazať
-        </button>
-        <div style={{ display: "flex", gap: "0.35rem" }}>
-          <button onClick={onClose}
-            style={{ background: "transparent", border: `1px solid ${border}`, color: "#e8e8ed", borderRadius: 5, padding: "0.35rem 0.7rem", cursor: "pointer", fontSize: "0.76rem" }}>
-            zrušiť
+    <div style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem", flexWrap: "wrap" }}>
+      <span style={{ fontFamily: mono, fontSize: "0.65rem", color: dim, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+        {label}
+      </span>
+      {items.map(it => {
+        const active = it.active;
+        const c = it.color || green;
+        return (
+          <button
+            key={it.key}
+            onClick={it.onClick}
+            style={{
+              background: active ? `${c}22` : "transparent",
+              border: `1px solid ${active ? c : border}`,
+              color: active ? c : dim,
+              borderRadius: 999,
+              padding: "0.22rem 0.7rem",
+              fontFamily: mono, fontSize: "0.72rem", fontWeight: 700,
+              cursor: "pointer",
+              textDecoration: active ? "none" : "line-through",
+              opacity: active ? 1 : 0.55,
+              transition: "background 0.12s, border-color 0.12s, color 0.12s",
+            }}
+            onMouseEnter={e => { if (!active) { e.currentTarget.style.opacity = "0.8"; } }}
+            onMouseLeave={e => { if (!active) { e.currentTarget.style.opacity = "0.55"; } }}
+          >
+            {it.label}
           </button>
-          <button onClick={commit}
-            style={{ background: green, border: "none", color: "#0a0a0c", borderRadius: 5, padding: "0.35rem 0.9rem", cursor: "pointer", fontSize: "0.76rem", fontWeight: 600 }}>
-            použiť
-          </button>
-        </div>
-      </div>
+        );
+      })}
     </div>
   );
 }
 
-const flatsFilterInp = {
-  padding: "0.35rem 0.5rem",
-  background: "#0a0a0c",
-  border: `1px solid ${border}`,
-  borderRadius: 5,
-  color: "#e8e8ed",
-  fontSize: "0.8rem",
-  fontFamily: "inherit",
-  outline: "none",
-  width: "100%",
-  boxSizing: "border-box",
-};
-const flatsFilterMini = {
-  background: "transparent",
-  border: `1px solid ${border}`,
-  color: "#8a8a96",
-  padding: "0.22rem 0.5rem",
-  borderRadius: 4,
-  cursor: "pointer",
-  fontFamily: "inherit",
-  fontSize: "0.72rem",
-};
-const flatsFilterRow = (checked) => ({
-  display: "flex", alignItems: "center", gap: "0.45rem",
-  padding: "0.28rem 0.45rem", cursor: "pointer", borderRadius: 3,
-  fontSize: "0.8rem", color: checked ? "#e8e8ed" : "#c4c4cc",
-});
 
 function ChooseProjectGate({ projectId, projectName, profile, reloadProfile, setCurrent, t, lang }) {
   const [busy, setBusy] = useState(false);
