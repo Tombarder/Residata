@@ -175,13 +175,18 @@ export function useProjectFlats(projectId) {
   const { loading: authLoading, profile } = useAuth();
   const tier = profile?.tier || null;
   const chosenProjectId = profile?.chosen_project_id || null;
+  // RLS for flats now also reads trial_until / paid_until / pause
+  // (see current_user_is_paid() — supabase_migration_2026_04_rls_trial_paid).
+  // Including these in deps means switching from one project to another
+  // mid-trial doesn't keep a stale "denied" result around.
+  const trialUntil = profile?.trial_until || null;
+  const paidUntil = profile?.paid_until || null;
+  const paidPaused = profile?.paid_pause_started || null;
   const [flats, setFlats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    // Guard: no Supabase, no projectId, or auth still initializing →
-    // stay in "loading" state; effect will re-run when authLoading flips.
     if (!isSupabaseReady() || !projectId || authLoading) {
       return;
     }
@@ -189,11 +194,35 @@ export function useProjectFlats(projectId) {
     setError(null);
     let cancelled = false;
 
-    (async () => {
-      const { data, error: err } = await supabase.from("flats")
+    // Defensive retry: in some browsers the first fetch right after
+    // a navigation transition can race with the supabase client's
+    // session-token attachment, returning 0 rows even though RLS
+    // would allow them. If we get an empty result AND the user is
+    // privileged enough to expect data, wait one tick and refetch
+    // once. Eliminates the "click project → empty page → refresh
+    // and now it works" symptom users reported.
+    const fetchOnce = async () => {
+      return await supabase.from("flats")
         .select("*")
         .eq("project_id", projectId)
         .order("poschodie", { ascending: true });
+    };
+
+    (async () => {
+      let { data, error: err } = await fetchOnce();
+      // Retry once if first call returned empty AND we have a likely
+      // access promotion path (paid tier, admin, active trial,
+      // active paid window). For genuinely empty projects the retry
+      // is harmless.
+      const looksPrivileged =
+        tier === "paid" || tier === "admin" ||
+        (trialUntil && new Date(trialUntil) > new Date()) ||
+        (paidUntil && new Date(paidUntil) > new Date() && !paidPaused);
+      if (!err && (!data || data.length === 0) && looksPrivileged) {
+        await new Promise(r => setTimeout(r, 250));
+        if (cancelled) return;
+        ({ data, error: err } = await fetchOnce());
+      }
       if (cancelled) return;
       setFlats(data || []);
       setError(err || null);
@@ -201,10 +230,7 @@ export function useProjectFlats(projectId) {
     })();
 
     return () => { cancelled = true; };
-    // tier + chosenProjectId are in deps because RLS policy outcome
-    // depends on them — when they change, the server-side permission
-    // may change too and we need a fresh fetch.
-  }, [projectId, authLoading, tier, chosenProjectId]);
+  }, [projectId, authLoading, tier, chosenProjectId, trialUntil, paidUntil, paidPaused]);
 
   return { flats, loading, error };
 }
