@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { useMetrics, useProjects } from "../lib/useData";
-// (imports already include useMetrics — we rely on metrics.total_units_tracked
+import { useMarketTotals, useProjects, useDistrictTotals } from "../lib/useData";
+// (imports already include useMarketTotals — we rely on its live view
 // instead of summing projects.total_units, which inflates the count for
 // projects like Bory/Slnečnice whose total_units is a manual registry
 // anchor rather than actual scraped inventory.)
@@ -520,24 +520,28 @@ export function PipelineFlow({ lang = "en" }) {
    ────────────────────────────────────────────────────────── */
 export function MarketPulse({ lang = "en", setCurrent }) {
   const { projects } = useProjects();
-  const { metrics } = useMetrics();
+  const totals = useMarketTotals();
 
-  // Pull the hero numbers from `metrics` (precomputed during the monthly
-  // sync from REAL flats data — the Clean Master set). We deliberately
-  // don't sum projects.total_units any more: a few registry rows
-  // (Bory 984, Slnecnice 4 000) carry manually-set totals to support
-  // other KPIs, but those flats aren't actually scraped so putting
-  // them in the hero is misleading. The metrics table gives us:
-  //   · total_units_tracked → real flats in DB (~5 100)
-  //   · total_available     → count of stav='V'
-  //   · total_sold_to_date  → total − (available + reserved)
-  //   · avg_eur_m2          → mean €/m² from priced, area-known flats
-  // Everything refreshes after each monthly sync (1st of month, 04:00 UTC).
-  const m = (key) => metrics.find(x => x.metric_key === key)?.value_numeric;
-  const totalUnits = m("total_units_tracked");
-  const totalAvail = m("total_available");
-  const totalSold  = m("total_sold_to_date");
-  const avgEurM2   = m("avg_eur_m2");
+  // Pull the hero numbers from the LIVE `market_totals` view — derived
+  // on every read from flats_archive (latest month). Always fresh: the
+  // moment manual data lands in the archive or a sync writes new rows,
+  // these numbers update without a separate refresh step.
+  //
+  // The four numbers are:
+  //   · totalUnits  → count of all flats in the latest snapshot month
+  //   · totalAvail  → count where stav = 'V'
+  //   · totalSold   → count where stav = 'P' (real explicit sold,
+  //                   not "everything that's not available")
+  //   · avgEurM2    → simple arithmetic mean of cena/area across flats
+  //                   with both valid price and area
+  //
+  // No more registry-inflated totals leaking in (those were the
+  // Bory 984 / Slnečnice 4000 manual_total values that pushed the
+  // homepage ticker up by ~5k vs. real data).
+  const totalUnits = totals.unitsTracked;
+  const totalAvail = totals.unitsAvailable;
+  const totalSold  = totals.unitsSold;
+  const avgEurM2   = totals.avgPriceM2;
 
   const label = lang === "sk" ? "Živé dáta z trhu" : "Live from the market";
   const tTotal = lang === "sk" ? "bytov sledovaných" : "units tracked";
@@ -728,23 +732,31 @@ function useInView(rootMargin = "0px") {
 }
 
 export function DistrictPulse({ lang = "en", setCurrent }) {
-  const { projects, loading } = useProjects();
+  const { districts, loading } = useDistrictTotals();
   const [sectionRef, inView] = useInView();
 
-  // Aggregate by district (real DB data — refreshes whenever the monthly
-  // sync_to_supabase run updates the `projects` table).
-  const byDistrict = {};
-  for (const p of projects) {
-    if (!p.district || !p.avg_price_eur_m2) continue;
-    if (!byDistrict[p.district]) byDistrict[p.district] = { sum: 0, count: 0, units: 0, avail: 0, sold: 0 };
-    byDistrict[p.district].sum += p.avg_price_eur_m2;
-    byDistrict[p.district].count += 1;
-    byDistrict[p.district].units += p.total_units || 0;
-    byDistrict[p.district].avail += p.available_units || 0;
-    byDistrict[p.district].sold += p.sold_units || 0;
-  }
-  const rows = Object.entries(byDistrict)
-    .map(([d, s]) => ({ district: d, avg: s.sum / s.count, ...s }))
+  // Read per-district aggregates from the `district_totals` Postgres
+  // view (live aggregate from flats_archive's latest month). One row
+  // per district with REAL counts:
+  //   · total_units    — all flats we actually track in the district
+  //   · available_units — stav = 'V'
+  //   · sold_units      — stav = 'P'  (the explicit sold count, no
+  //                       inflation from manual_total registry overrides)
+  //   · project_count   — distinct projects with at least 1 flat
+  //   · avg_eur_m2      — arithmetic mean of cena/area over priced flats
+  //
+  // Drop districts without a price signal (avg_eur_m2 = null) so the
+  // bar chart's max-scale stays meaningful — same UX as before.
+  const rows = (districts || [])
+    .filter(d => d.avg_eur_m2 != null)
+    .map(d => ({
+      district: d.district,
+      avg: Number(d.avg_eur_m2),
+      count: d.project_count,
+      units: d.total_units,
+      avail: d.available_units,
+      sold: d.sold_units,
+    }))
     .sort((a, b) => b.avg - a.avg);
 
   const max = rows.length > 0 ? Math.max(...rows.map(r => r.avg)) : 1;

@@ -97,36 +97,95 @@ export function useMetrics() {
  * Returns numeric values + raw loading flag. Each value may be null
  * when the metric row doesn't exist yet (e.g. a fresh DB).
  */
+/** Live market totals — single source of truth for the homepage ticker,
+ *  Dashboard KPI strip, LiveAnalytics KPI, and Reports KPI when no
+ *  filter is active.
+ *
+ *  Reads from the `market_totals` Postgres view, which computes
+ *  aggregates from flats_archive (filtered to MAX snapshot_month) on
+ *  every read. No staleness — the moment a sync writes new rows or
+ *  a backfill / manual append lands in flats_archive, this hook
+ *  returns the fresh numbers.
+ *
+ *  The view is SECURITY DEFINER so anonymous visitors on the marketing
+ *  homepage can read aggregate counts (no per-flat data exposed; same
+ *  level of detail the old metrics table already exposed publicly).
+ *
+ *  History: this hook used to read from a `metrics` table, which was
+ *  refreshed only during the monthly sync. That made it possible for
+ *  the homepage to show "5 101 bytov" while the platform Pivot showed
+ *  "5 540" (because someone added rows between syncs). One source of
+ *  truth eliminates the entire class of those bugs.
+ */
+let _marketTotalsCache = null;
 export function useMarketTotals() {
-  const { metrics, loading } = useMetrics();
-  // Memoise the parsed totals so consumers (and their useMemo deps
-  // downstream) don't see a brand-new object on every render of the
-  // parent. Without this, Dashboard/Analytics/Reports rebuild their
-  // KPI objects on every render even when the underlying metrics
-  // haven't changed.
-  return useMemo(() => {
-    const byKey = {};
-    if (Array.isArray(metrics)) {
-      for (const m of metrics) {
-        if (m && typeof m === "object" && m.metric_key) byKey[m.metric_key] = m;
-      }
+  const [totals, setTotals] = useState(_marketTotalsCache || {
+    loading: true,
+    unitsTracked: null, unitsAvailable: null, unitsReserved: null,
+    unitsSold: null, avgPriceM2: null, snapshotMonth: null,
+  });
+  useEffect(() => {
+    if (!isSupabaseReady()) {
+      setTotals(t => ({ ...t, loading: false }));
+      return;
     }
-    const num = (key) => {
-      const m = byKey[key];
-      if (!m) return null;
-      const v = m.value_numeric;
-      return typeof v === "number" && Number.isFinite(v) ? v : null;
-    };
-    return {
-      loading,
-      unitsTracked:   num("total_units_tracked"),
-      unitsAvailable: num("total_available"),
-      unitsReserved:  num("total_reserved"),
-      unitsSold:      num("total_sold_to_date"),
-      projectsActive: num("total_projects_active"),
-      avgPriceM2:     num("avg_price_m2"),
-    };
-  }, [metrics, loading]);
+    let cancelled = false;
+    supabase.from("market_totals").select("*").maybeSingle().then(({ data, error }) => {
+      if (cancelled) return;
+      if (error) {
+        console.error("[useMarketTotals]", error);
+        setTotals(t => ({ ...t, loading: false }));
+        return;
+      }
+      const num = (v) => (typeof v === "number" && Number.isFinite(v))
+        ? v
+        : (v != null && !Number.isNaN(Number(v)) ? Number(v) : null);
+      const next = {
+        loading: false,
+        unitsTracked:   num(data?.total_units_tracked),
+        unitsAvailable: num(data?.total_available),
+        unitsReserved:  num(data?.total_reserved),
+        unitsSold:      num(data?.total_sold),
+        avgPriceM2:     num(data?.avg_eur_m2),
+        snapshotMonth:  data?.snapshot_month || null,
+      };
+      _marketTotalsCache = next;
+      setTotals(next);
+    });
+    return () => { cancelled = true; };
+  }, []);
+  return totals;
+}
+
+/** Per-district aggregates derived live from flats_archive — one row per
+ *  district with total_units / available_units / sold_units / reserved /
+ *  project_count / avg_eur_m2. Used by DistrictPulse on the homepage and
+ *  any other "districts breakdown" surface that needs honest counts.
+ *
+ *  Same security model as useMarketTotals — reads a SECURITY DEFINER
+ *  view that exposes only aggregate rows. */
+let _districtTotalsCache = null;
+export function useDistrictTotals() {
+  const [districts, setDistricts] = useState(_districtTotalsCache || []);
+  const [loading, setLoading] = useState(_districtTotalsCache === null);
+  useEffect(() => {
+    if (!isSupabaseReady()) { setLoading(false); return; }
+    let cancelled = false;
+    supabase.from("district_totals").select("*").then(({ data, error }) => {
+      if (cancelled) return;
+      if (error) {
+        console.error("[useDistrictTotals]", error);
+        setLoading(false);
+        return;
+      }
+      const arr = data || [];
+      _districtTotalsCache = arr;
+      setDistricts(arr);
+      setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, []);
+  return { districts, loading };
 }
 
 /** Project list. Public data; anon and authenticated see the same rows
