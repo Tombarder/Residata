@@ -5,6 +5,23 @@ import { useAuth } from "./useAuth";
 /**
  * Data hooks — the one source of truth for reading from Supabase.
  *
+ * ## Single canonical source of unit-level data: flats_archive
+ *
+ * Every byte/flat that ever existed lives in `flats_archive`, append-only,
+ * tagged with snapshot_month. Two convenience reads sit on top:
+ *
+ *   · `flats_current` — Postgres VIEW filtered to MAX(snapshot_month).
+ *     Used when callers want "the latest known state" without specifying
+ *     a month. Refreshed live (no manual maintenance).
+ *
+ *   · `useFlatsArchive(months?)` — explicit time-series read used by
+ *     the Pivot. Pass an array of YYYY-MM strings to limit, omit for all.
+ *
+ * The old `flats` table was dropped — `useFlatsCurrent` reads the view.
+ * This guarantees the homepage ticker, Reports KPI, Pivot "latest" mode
+ * and any other "current state" surface all show the same numbers, since
+ * they all derive from the same underlying archive rows.
+ *
  * ## Module-level caches (why they exist)
  *
  * Problem: the app's top-level layout remounts on every route change (for
@@ -30,7 +47,7 @@ import { useAuth } from "./useAuth";
  * Root cause: data hooks were firing WITHOUT checking whether auth
  * context had finished initializing. Retry was treating a symptom.
  *
- * Real fix: the hooks that depend on RLS (useProjectFlats, useAllFlats)
+ * Real fix: the hooks that depend on RLS (useProjectFlats, useFlatsCurrent)
  * now read `loading` from useAuth and don't fire their fetch until
  * auth is confirmed resolved. This means:
  *   - Session from localStorage has been loaded AND applied to the
@@ -202,7 +219,11 @@ export function useProjectFlats(projectId) {
     // once. Eliminates the "click project → empty page → refresh
     // and now it works" symptom users reported.
     const fetchOnce = async () => {
-      return await supabase.from("flats")
+      // flats_current = view of latest month from flats_archive.
+      // Reading from here guarantees the per-project flat list shows
+      // the same data as the Pivot's "Latest month" mode and the
+      // homepage ticker — single source of truth.
+      return await supabase.from("flats_current")
         .select("*")
         .eq("project_id", projectId)
         .order("poschodie", { ascending: true });
@@ -255,9 +276,14 @@ export function useProjectSnapshots() {
   return { snapshots, loading };
 }
 
-/** All flats across every project — for the unit-level pivot on Analytics.
+/** All flats from the LATEST month across every project — i.e. "current
+ *  state" of the unit-level dataset. Reads from the `flats_current` view
+ *  which is a live filter on flats_archive (no separate table). Use this
+ *  whenever a page wants "what does the market look like right now."
  *
- *  RLS tier behaviour:
+ *  For time-series / cross-month rezy, use `useFlatsArchive` instead.
+ *
+ *  RLS tier behaviour (inherited from flats_archive via security_invoker):
  *    - anonymous          → 0 rows
  *    - free               → flats of user's chosen_project_id only
  *    - paid/admin         → every flat in every active/sold_out project
@@ -276,29 +302,26 @@ export function useProjectSnapshots() {
  *  Paging: Supabase caps single queries at 1000 rows; we page the
  *  ~5,100 flats in 1000-chunk ranges.
  */
-let _flatsCache = null;
-let _flatsCacheKey = null;  // identity signature the cache was built for
-export function useAllFlats() {
+let _flatsCurrentCache = null;
+let _flatsCurrentCacheKey = null;
+export function useFlatsCurrent() {
   const { loading: authLoading, user, profile } = useAuth();
   const identityKey = user
     ? `${user.id}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}`
     : "anon";
-  const [flats, setFlats] = useState(_flatsCacheKey === identityKey ? (_flatsCache || []) : []);
-  const [loading, setLoading] = useState(_flatsCacheKey !== identityKey);
+  const [flats, setFlats] = useState(_flatsCurrentCacheKey === identityKey ? (_flatsCurrentCache || []) : []);
+  const [loading, setLoading] = useState(_flatsCurrentCacheKey !== identityKey);
 
   useEffect(() => {
     if (!isSupabaseReady()) { setLoading(false); return; }
     if (authLoading) { return; }
 
-    // Cache hit for the same identity → reuse it
-    if (_flatsCacheKey === identityKey && _flatsCache) {
-      setFlats(_flatsCache);
+    if (_flatsCurrentCacheKey === identityKey && _flatsCurrentCache) {
+      setFlats(_flatsCurrentCache);
       setLoading(false);
       return;
     }
 
-    // Identity changed (login / logout / tier upgrade / project switch)
-    // → invalidate and refetch
     let cancelled = false;
     setLoading(true);
     (async () => {
@@ -306,21 +329,21 @@ export function useAllFlats() {
       const PAGE = 1000;
       for (let offset = 0; ; offset += PAGE) {
         const { data, error } = await supabase
-          .from("flats")
+          .from("flats_current")
           .select("*")
           .range(offset, offset + PAGE - 1)
           .order("id", { ascending: true });
         if (cancelled) return;
         if (error) {
-          console.error("[useAllFlats]", error);
+          console.error("[useFlatsCurrent]", error);
           break;
         }
         all.push(...(data || []));
         if (!data || data.length < PAGE) break;
       }
       if (cancelled) return;
-      _flatsCache = all;
-      _flatsCacheKey = identityKey;
+      _flatsCurrentCache = all;
+      _flatsCurrentCacheKey = identityKey;
       setFlats(all);
       setLoading(false);
     })();
@@ -332,7 +355,7 @@ export function useAllFlats() {
 
 /** Unit-level historical archive — every flat from every monthly run.
  *
- *  Why this exists separate from useAllFlats:
+ *  Why this exists separate from useFlatsCurrent:
  *    `flats` is the current snapshot — overwritten each sync. The
  *    archive (`flats_archive`) is append-only with a `snapshot_month`
  *    tag, so the platform Pivot can slice across time the same way
@@ -353,7 +376,7 @@ export function useAllFlats() {
  *
  *  Paging:
  *    Supabase caps single queries at 1000 rows. ~5,500 flats × N
- *    months → page in 1000-row chunks just like useAllFlats.
+ *    months → page in 1000-row chunks just like useFlatsCurrent.
  */
 let _archiveCache = null;
 let _archiveCacheKey = null;

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
-import { useProjects, useProjectFlats, useAllFlats, useEarlyAccessStats, useProjectSnapshots, useMarketTotals } from "../lib/useData";
+import { useProjects, useProjectFlats, useFlatsCurrent, useEarlyAccessStats, useProjectSnapshots, useMarketTotals } from "../lib/useData";
 import { supabase } from "../lib/supabase";
 import { liveT, ll } from "../lib/liveLang";
 import { goBack } from "../lib/routing";
@@ -2190,7 +2190,7 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
   // Flats for the unit-level pivot surface. Lazy — cache kicks in on first
   // pivot open, no extra round-trip on page load. RLS gates visibility by
   // tier (anon=0, free=chosen_project only, paid/admin=all).
-  const { flats: allFlats } = useAllFlats();
+  const { flats: allFlats } = useFlatsCurrent();
   // Published KPI totals (same source the ticker uses) — see useMarketTotals
   // for why this is the authoritative source over sum-of-projects.
   const marketTotals = useMarketTotals();

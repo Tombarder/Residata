@@ -27,7 +27,7 @@
  * analysis — no LLM calls, no ai_usage_log writes.
  */
 import { useState, useMemo, useEffect } from "react";
-import { useProjects, useAllFlats, useProjectSnapshots } from "../lib/useData";
+import { useProjects, useFlatsCurrent, useProjectSnapshots } from "../lib/useData";
 import { supabase } from "../lib/supabase";
 
 // ── Visual language (mirrors Platform.jsx) ───────────────────────
@@ -56,7 +56,7 @@ const SCOPES = [
    ══════════════════════════════════════════════════════════════════ */
 export default function PlatformReports({ lang = "sk" }) {
   const { projects, loading: loadingProjects } = useProjects();
-  const { flats,    loading: loadingFlats }    = useAllFlats();
+  const { flats,    loading: loadingFlats }    = useFlatsCurrent();
 
   const [scope, setScope]         = useState("market");
   const [cityPick, setCityPick]   = useState(null);

@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { useAllFlats, useProjects, useFlatsArchive, useArchiveMonths } from "../lib/useData";
+import { useProjects, useFlatsArchive, useArchiveMonths } from "../lib/useData";
 import { useCapabilities } from "../lib/useCapabilities";
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -625,7 +625,7 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
     return m;
   }, [projects]);
 
-  // Preview flats for free/anon tier — useAllFlats is RLS-gated to the
+  // Preview flats for free/anon tier — useFlatsArchive is RLS-gated to the
   // user's one chosen project (or nothing for anon), which makes the
   // pivot collapse to a single row. Since the Gated wrapper blurs all
   // numbers anyway, we synthesize a small set of plausible rows per

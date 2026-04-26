@@ -1525,7 +1525,9 @@ function PlatformExports({ lang }) {
 
   const csvFromFlats = async () => {
     const { supabase } = await import("../lib/supabase");
-    const { data, error } = await supabase.from("flats").select("*").limit(10000);
+    // Export reads flats_current view (latest month from flats_archive) —
+    // matches what the rest of the platform shows as "current state".
+    const { data, error } = await supabase.from("flats_current").select("*").limit(10000);
     if (error) { alert(`Export failed: ${error.message}`); return; }
     if (!data || data.length === 0) { alert("No flats available."); return; }
     const headers = Object.keys(data[0]);
