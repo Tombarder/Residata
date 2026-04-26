@@ -23,30 +23,69 @@ export function useCapabilities() {
     baseTier = profile?.tier || "anon";
   }
 
-  // 7-day free trial — if the user's trial is still active, promote
-  // them to paid capabilities for the remainder. Stored on
-  // user_profiles.trial_until. When the timestamp passes, they
-  // silently fall back to their base tier. We never auto-flip
-  // profile.tier — payment should drive tier, trial is a separate
-  // state. See supabase_migration_2026_04_trial.sql.
-  const trialUntil = profile?.trial_until ? new Date(profile.trial_until).getTime() : null;
-  const trialActive = Boolean(trialUntil && trialUntil > Date.now());
-  const effectiveTier = trialActive && (baseTier === "free" || baseTier === "pending")
-    ? "paid"
-    : baseTier;
+  // ── Subscription windows ──────────────────────────────────
+  // Two independent timestamp pairs gate paid-equivalent access:
+  //   trial_until       — 7-day self-service / admin-granted trial
+  //   paid_until        — actual paid subscription window
+  //   paid_pause_started — admin-paused; suspends paid access
+  //                        regardless of paid_until
+  //
+  // Effective tier is computed live from the timestamps, NEVER
+  // mutated on the user_profiles.tier column. This means:
+  //   · payment timing drives access without rewriting tier rows
+  //   · admin can extend / pause / revoke just by editing dates
+  //   · expired paid users SILENTLY drop back to free (UI
+  //     promptly shows "expired — resubscribe" CTA)
+  //   · trial users are time-boxed identically
+  // See supabase_migration_2026_04_trial.sql + …_subscription.sql.
+  const now = Date.now();
+  const trialUntil   = profile?.trial_until        ? new Date(profile.trial_until).getTime()        : null;
+  const paidUntil    = profile?.paid_until         ? new Date(profile.paid_until).getTime()         : null;
+  const pausedAt     = profile?.paid_pause_started ? new Date(profile.paid_pause_started).getTime() : null;
+
+  const trialActive = Boolean(trialUntil && trialUntil > now);
+  // Paid is active when paid_until is in the future AND not paused
+  // by admin. tier='paid' alone (legacy users without paid_until)
+  // is still treated as active — back-compat for early manual paid
+  // accounts that were flipped before the column existed.
+  const paidPaused = Boolean(pausedAt);
+  const paidWindowActive = Boolean(paidUntil && paidUntil > now);
+  const paidLegacyActive = baseTier === "paid" && !paidUntil && !paidPaused;
+  const paidActive = !paidPaused && (paidWindowActive || paidLegacyActive);
+
+  // Effective tier resolution. admin > paid (by tier) > trial > base.
+  let effectiveTier = baseTier;
+  if (baseTier === "admin") {
+    effectiveTier = "admin";
+  } else if (baseTier === "paid" && paidActive) {
+    effectiveTier = "paid";
+  } else if (baseTier === "paid" && !paidActive) {
+    // Paid window expired or paused — drop them to free until they
+    // resubscribe. Their tier column stays 'paid' so admin can re-
+    // extend without re-flipping; the UI just denies paid features.
+    effectiveTier = "free";
+  } else if (trialActive && (baseTier === "free" || baseTier === "pending")) {
+    effectiveTier = "paid";
+  }
 
   const caps = capsForTier(effectiveTier);
-  const trialDaysLeft = trialActive
-    ? Math.max(0, Math.ceil((trialUntil - Date.now()) / 86400000))
-    : 0;
+  const daysFrom = (ts) => ts ? Math.max(0, Math.ceil((ts - now) / 86400000)) : 0;
+  const trialDaysLeft = trialActive ? daysFrom(trialUntil) : 0;
+  const paidDaysLeft  = paidActive && paidWindowActive ? daysFrom(paidUntil) : null;
 
   return {
     can: (cap) => caps.has(cap),
     tier: effectiveTier,
-    baseTier,          // raw profile.tier — used by Billing UI to show "you're on free, trial gives you paid caps"
+    baseTier,           // raw profile.tier — used by Billing UI
     trialActive,
     trialDaysLeft,
     trialUntil,
+    paidActive,
+    paidPaused,
+    paidDaysLeft,
+    paidUntil,
+    paidStartedAt: profile?.paid_started_at ? new Date(profile.paid_started_at).getTime() : null,
+    paidWindowActive,
     loading,
     user,
     profile,

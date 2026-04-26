@@ -2546,6 +2546,30 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
     }
   };
 
+  // Generic subscription patch via /api/admin/set-subscription. Used
+  // for paid_until extends, pause / unpause, manual date sets and
+  // notes. Server validates admin tier + audit-logs every patch.
+  const subAction = async (u, payload) => {
+    if (u.id === self?.id) {
+      alert(lang === "sk" ? "Nemôžeš riešiť predplatné na sebe." : "Can't manage your own subscription here.");
+      return;
+    }
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { alert("No session — sign in first."); return; }
+    try {
+      const r = await fetch("/api/admin/set-subscription", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ user_id: u.id, ...payload }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) { alert(`Subscription update failed: ${j.error || r.status}`); return; }
+      setUsers(us => us.map(x => x.id === u.id ? { ...x, ...(j.patch || {}) } : x));
+    } catch (e) {
+      alert(`Subscription update failed: ${String(e.message || e)}`);
+    }
+  };
+
   const deleteUser = async (u) => {
     if (u.id === self?.id) {
       alert(lang === "sk" ? "Nemôžeš vymazať sám seba." : "Can't delete yourself.");
@@ -2667,7 +2691,7 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
                 : (lang === "sk" ? "Žiadni užívatelia zatiaľ." : "No users yet.")}
             </div>
           ) : (
-            <UserTable users={visibleUsers} setTier={setTier} deleteUser={deleteUser} selfId={self?.id} t={t} lang={lang} premiumSet={premiumSet} />
+            <UserTable users={visibleUsers} setTier={setTier} deleteUser={deleteUser} trialAction={trialAction} subAction={subAction} selfId={self?.id} t={t} lang={lang} premiumSet={premiumSet} />
           )}
 
           <p style={{ color: dim, fontSize: "0.78rem", marginTop: "1.25rem", lineHeight: 1.5, fontStyle: "italic" }}>
@@ -3215,7 +3239,7 @@ function PremiumDomainsPanel({ domains, reload }) {
   );
 }
 
-function UserTable({ users, setTier, deleteUser, selfId, t, lang, premiumSet = new Set() }) {
+function UserTable({ users, setTier, deleteUser, trialAction, subAction, selfId, t, lang, premiumSet = new Set() }) {
   return (
     <div style={{ border: `1px solid ${border}`, borderRadius: 12, overflow: "hidden", marginBottom: "2rem" }}>
       <div style={{ overflowX: "auto" }}>
@@ -3280,23 +3304,59 @@ function UserTable({ users, setTier, deleteUser, selfId, t, lang, premiumSet = n
                       const trialDays = trialActive
                         ? Math.max(0, Math.ceil((new Date(u.trial_until).getTime() - Date.now()) / 86400000))
                         : null;
+                      const paidActive = u.paid_until && new Date(u.paid_until).getTime() > Date.now() && !u.paid_pause_started;
+                      const paidPaused = Boolean(u.paid_pause_started);
+                      const paidDays = paidActive
+                        ? Math.max(0, Math.ceil((new Date(u.paid_until).getTime() - Date.now()) / 86400000))
+                        : null;
+                      const subBtnStyle = (active, accent = green) => ({
+                        background: active ? `${accent}1f` : "transparent",
+                        color: isSelf ? "#55555f" : (active ? accent : "#c0c0c8"),
+                        border: `1px solid ${active ? accent : border}`,
+                        padding: "0.3rem 0.6rem", borderRadius: 4,
+                        fontSize: "0.7rem", fontFamily: "inherit",
+                        cursor: isSelf ? "not-allowed" : "pointer",
+                        opacity: isSelf ? 0.4 : 1,
+                        marginRight: "0.35rem",
+                      });
                       return (
-                        <button
-                          onClick={() => trialAction(u, nextAction)}
-                          disabled={isSelf}
-                          title={isSelf ? "Can't manage trial on yourself" : (trialActive ? `Ends in ${trialDays} day(s). Click to revoke.` : "Grant 7-day paid trial")}
-                          style={{
-                            background: trialActive ? "rgba(0,229,160,0.12)" : "transparent",
-                            color: isSelf ? "#55555f" : (trialActive ? green : "#c0c0c8"),
-                            border: `1px solid ${trialActive ? green : border}`,
-                            padding: "0.3rem 0.65rem", borderRadius: 4,
-                            fontSize: "0.72rem", fontFamily: "inherit",
-                            cursor: isSelf ? "not-allowed" : "pointer",
-                            opacity: isSelf ? 0.4 : 1,
-                            marginRight: "0.4rem",
-                          }}>
-                          {trialActive ? `🎁 ${trialDays}d` : trialLabel}
-                        </button>
+                        <>
+                          <button
+                            onClick={() => trialAction && trialAction(u, nextAction)}
+                            disabled={isSelf}
+                            title={isSelf ? "Can't manage trial on yourself" : (trialActive ? `Ends in ${trialDays} day(s). Click to revoke.` : "Grant 7-day paid trial")}
+                            style={subBtnStyle(trialActive, green)}>
+                            {trialActive ? `🎁 ${trialDays}d` : trialLabel}
+                          </button>
+                          <button
+                            onClick={() => subAction && subAction(u, { extend_paid_days: 30 })}
+                            disabled={isSelf}
+                            title={isSelf ? "Can't manage your own subscription" : (paidActive ? `Bumps paid_until by 30 days (currently ${paidDays}d remaining)` : "Set paid_until = now + 30 days")}
+                            style={subBtnStyle(paidActive, "#4a90e2")}>
+                            {paidActive ? `💳 ${paidDays}d` : "💳 +30d"}
+                          </button>
+                          {paidActive && (
+                            <button
+                              onClick={() => subAction && subAction(u, paidPaused ? { unpause: true } : { pause: true })}
+                              disabled={isSelf}
+                              title={paidPaused ? "Unpause + extend paid_until by paused duration" : "Pause subscription (suspends paid access)"}
+                              style={subBtnStyle(paidPaused, "#f5a623")}>
+                              {paidPaused ? "▶ Unpause" : "⏸ Pause"}
+                            </button>
+                          )}
+                          {(u.paid_until || u.paid_pause_started) && (
+                            <button
+                              onClick={() => {
+                                if (!confirm(lang === "sk" ? `Vymazať paid window pre ${u.email}?` : `Clear paid window for ${u.email}?`)) return;
+                                subAction && subAction(u, { paid_until: null, paid_started_at: null, paid_pause_started: null });
+                              }}
+                              disabled={isSelf}
+                              title="Clear paid_until + paid_started_at + paused"
+                              style={subBtnStyle(false, "#ff6b6b")}>
+                              🗑
+                            </button>
+                          )}
+                        </>
                       );
                     })()}
                     <button

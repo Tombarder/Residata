@@ -1067,18 +1067,24 @@ function PlatformProjects({ lang, setCurrent, openLogin }) {
 // ─── Billing page ───────────────────────────────────────────────
 function PlatformBilling({ lang, setCurrent }) {
   const caps = useCapabilities();
-  const { tier, baseTier, trialActive, trialDaysLeft, trialUntil } = caps;
+  const { tier, baseTier, trialActive, trialDaysLeft, trialUntil,
+          paidActive, paidPaused, paidWindowActive, paidDaysLeft, paidUntil, paidStartedAt } = caps;
   const { profile } = useAuth();
 
-  // Display tier logic: effective tier (shown badge) vs base tier
-  // (underlying — used to know if user is "really paid" vs "on trial"
-  // so we can still offer the upgrade CTA during trial).
+  // Display logic — the "effective" tier (badge shown) and the
+  // "base" tier (raw column) can disagree:
+  //   · base=free + trial active   → effective=paid, baseTier=free
+  //   · base=paid + paid expired   → effective=free, baseTier=paid
+  //   · base=paid + paused         → effective=free, baseTier=paid
+  // We branch on the actual scenario, not just one of the labels.
   const isFree  = baseTier === "free";
   const isPaid  = baseTier === "paid";
   const isAdmin = baseTier === "admin";
-  const trialUsed = Boolean(profile?.trial_started_at);  // one-shot guard
+  const paidExpired = isPaid && !paidActive && !paidPaused && paidUntil;
+  const trialUsed = Boolean(profile?.trial_started_at);
 
   const approvedAt = profile?.approved_at ? new Date(profile.approved_at).toISOString().slice(0, 10) : null;
+  const fmtDate = (ts) => ts ? new Date(ts).toLocaleDateString(lang === "sk" ? "sk-SK" : "en-US", { day: "numeric", month: "long", year: "numeric" }) : "—";
 
   const [trialBusy, setTrialBusy] = useState(false);
   const [trialMsg, setTrialMsg]   = useState(null);
@@ -1219,21 +1225,145 @@ function PlatformBilling({ lang, setCurrent }) {
         </div>
       )}
 
-      {/* Already paid — subscription info placeholder */}
-      {isPaid && (
-        <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 12, padding: "1.5rem 1.75rem" }}>
-          <div style={{ fontFamily: mono, fontSize: "0.65rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.5rem" }}>
-            {lang === "sk" ? "Predplatné" : "Subscription"}
+      {/* Paid subscription card — countdown + manage */}
+      {isPaid && (paidActive || paidPaused) && (
+        <SubscriptionCard
+          lang={lang}
+          paused={paidPaused}
+          paidWindowActive={paidWindowActive}
+          paidUntil={paidUntil}
+          paidStartedAt={paidStartedAt}
+          paidDaysLeft={paidDaysLeft}
+          fmtDate={fmtDate}
+        />
+      )}
+
+      {/* Paid expired — show resubscribe CTA prominently. */}
+      {isPaid && paidExpired && (
+        <div style={{
+          background: "linear-gradient(135deg, rgba(245,166,35,0.1), rgba(245,166,35,0.02))",
+          border: "1px solid rgba(245,166,35,0.4)", borderRadius: 12, padding: "1.75rem 2rem", marginBottom: "1.25rem",
+        }}>
+          <div style={{ fontFamily: mono, fontSize: "0.65rem", color: "#f5a623", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.5rem", fontWeight: 700 }}>
+            ⚠ {lang === "sk" ? "Predplatné vypršalo" : "Subscription expired"}
           </div>
-          <p style={{ color: "#c0c0c8", fontSize: "0.9rem", lineHeight: 1.6, margin: 0 }}>
+          <h3 style={{ fontSize: "1.2rem", fontWeight: 700, color: textLight, margin: "0 0 0.5rem" }}>
+            {lang === "sk" ? `Skončilo ${fmtDate(paidUntil)}` : `Ended on ${fmtDate(paidUntil)}`}
+          </h3>
+          <p style={{ color: "#c0c0c8", fontSize: "0.9rem", lineHeight: 1.6, margin: "0 0 1rem" }}>
             {lang === "sk"
-              ? "Self-service billing panel (faktúry, zmena platby, storno) pribudne čoskoro. Dovtedy napíš na "
-              : "Self-service billing panel (invoices, payment changes, cancellations) is coming soon. For now email "}
-            <a href="mailto:residata@proton.me" style={{ color: green }}>residata@proton.me</a>
-            {lang === "sk" ? " a vybavíme manuálne." : " and we'll handle it manually."}
+              ? "Tvoj prístup teraz funguje na free úrovni. Môžeš pokračovať v paid prístupe — kontaktuj nás a obnovíme ti predplatné."
+              : "Your access is now at the free tier. You can resume paid access — contact us and we'll renew immediately."}
           </p>
+          <div style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap" }}>
+            <a href="tel:+421911963909" className="btn-p">📞 +421 911 963 909</a>
+            <a href="mailto:residata@proton.me?subject=Resubscribe" className="btn-s">✉️ {lang === "sk" ? "Obnoviť predplatné" : "Resubscribe"}</a>
+          </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Vercel/Linear-style subscription card. Top stripe shows the
+ * status pill + countdown number; below it a row of meta dates
+ * (started / renews) with a Manage button. Pause-state branch
+ * inverts the colour scheme to amber so the user can't miss it.
+ */
+function SubscriptionCard({ lang, paused, paidWindowActive, paidUntil, paidStartedAt, paidDaysLeft, fmtDate }) {
+  const accent = paused ? "#f5a623" : green;
+  const pillBg = paused ? "rgba(245,166,35,0.12)" : "rgba(0,229,160,0.12)";
+  const status = paused
+    ? (lang === "sk" ? "Pozastavené" : "Paused")
+    : paidWindowActive
+      ? (lang === "sk" ? "Aktívne" : "Active")
+      : (lang === "sk" ? "Aktívne (legacy)" : "Active (legacy)");
+  const showCountdown = !paused && paidDaysLeft != null;
+
+  return (
+    <div style={{
+      background: bg, border: `1px solid ${border}`, borderRadius: 12,
+      padding: "1.5rem 1.75rem", marginBottom: "1.25rem",
+    }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem", marginBottom: "1.1rem", flexWrap: "wrap" }}>
+        <div>
+          <div style={{ fontFamily: mono, fontSize: "0.65rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.4rem" }}>
+            {lang === "sk" ? "Predplatné" : "Subscription"}
+          </div>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: "0.55rem" }}>
+            <span style={{
+              fontFamily: mono, fontSize: "0.68rem", fontWeight: 700,
+              letterSpacing: "0.08em", textTransform: "uppercase",
+              color: accent, background: pillBg,
+              border: `1px solid ${accent}55`,
+              borderRadius: 100, padding: "3px 10px",
+            }}>
+              {paused ? "⏸" : "●"} {status}
+            </span>
+            {showCountdown && (
+              <span style={{ color: textLight, fontWeight: 700, fontSize: "1rem", letterSpacing: "-0.01em" }}>
+                {paidDaysLeft === 1
+                  ? (lang === "sk" ? "Posledný deň" : "Last day")
+                  : (lang === "sk" ? `${paidDaysLeft} dní zostáva` : `${paidDaysLeft} days remaining`)}
+              </span>
+            )}
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+          <a href="mailto:residata@proton.me?subject=Subscription" className="btn-s" style={{ fontSize: "0.78rem" }}>
+            {lang === "sk" ? "Spravovať" : "Manage"}
+          </a>
+        </div>
+      </div>
+
+      {/* Meta row — started + renewal dates, like a Stripe receipt. */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.75rem", borderTop: `1px solid ${border}`, paddingTop: "1rem" }}>
+        <div>
+          <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.25rem" }}>
+            {lang === "sk" ? "Začalo" : "Started"}
+          </div>
+          <div style={{ color: textLight, fontSize: "0.92rem", fontWeight: 600 }}>
+            {fmtDate(paidStartedAt)}
+          </div>
+        </div>
+        {paidUntil && (
+          <div>
+            <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.25rem" }}>
+              {paused ? (lang === "sk" ? "Bolo do" : "Was until") : (lang === "sk" ? "Obnovenie" : "Renews")}
+            </div>
+            <div style={{ color: textLight, fontSize: "0.92rem", fontWeight: 600 }}>
+              {fmtDate(paidUntil)}
+            </div>
+          </div>
+        )}
+        <div>
+          <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.25rem" }}>
+            {lang === "sk" ? "Spôsob platby" : "Billing"}
+          </div>
+          <div style={{ color: "#c0c0c8", fontSize: "0.86rem" }}>
+            {lang === "sk" ? "Manuálna fakturácia" : "Manual invoicing"}
+          </div>
+        </div>
+      </div>
+
+      {paused && (
+        <div style={{
+          marginTop: "1rem", padding: "0.65rem 0.9rem",
+          background: "rgba(245,166,35,0.08)", border: "1px solid rgba(245,166,35,0.3)",
+          borderRadius: 8, fontSize: "0.82rem", color: textLight,
+        }}>
+          ⏸ {lang === "sk"
+            ? "Tvoje predplatné je pozastavené adminom. Kontaktuj nás pre obnovu."
+            : "Your subscription is paused by admin. Contact us to resume."}
+        </div>
+      )}
+
+      <p style={{ color: dim, fontSize: "0.78rem", lineHeight: 1.55, margin: "1rem 0 0", fontFamily: mono }}>
+        {lang === "sk"
+          ? <>Faktúry, zmena obdobia, zrušenie — napíš na <a href="mailto:residata@proton.me" style={{ color: green }}>residata@proton.me</a>.</>
+          : <>Invoices, period changes, cancellation — email <a href="mailto:residata@proton.me" style={{ color: green }}>residata@proton.me</a>.</>}
+      </p>
     </div>
   );
 }
