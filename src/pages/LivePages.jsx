@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
-import { useProjects, useProjectFlats, useFlatsCurrent, useEarlyAccessStats, useProjectSnapshots, useMarketTotals } from "../lib/useData";
+import { useProjects, useProjectFlats, useEarlyAccessStats, useProjectSnapshots, useMarketTotals, useDistrictTotals } from "../lib/useData";
 import { supabase } from "../lib/supabase";
 import { liveT, ll } from "../lib/liveLang";
 import { goBack } from "../lib/routing";
@@ -2185,40 +2185,11 @@ function GateMessage({ title, body, cta, backLabel, onCta, setCurrent }) {
    (current snapshot). The Pivot builder uses project_snapshots so users
    can filter / group by month across the whole time-series. */
 export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
-  const { projects, loading } = useProjects();
+  const { projects, loading } = useProjects();        // projects_live → real per-project aggregates
   const { snapshots } = useProjectSnapshots();
-  // Flats for the unit-level pivot surface. Lazy — cache kicks in on first
-  // pivot open, no extra round-trip on page load. RLS gates visibility by
-  // tier (anon=0, free=chosen_project only, paid/admin=all).
-  const { flats: allFlats } = useFlatsCurrent();
-  // Published KPI totals (same source the ticker uses) — see useMarketTotals
-  // for why this is the authoritative source over sum-of-projects.
-  const marketTotals = useMarketTotals();
-  // Capability flag used further down to pick between flats-based
-  // aggregation (paid, precise) and projects-table fallback (free,
-  // preview — all districts/developers visible even though their
-  // numbers are blurred by the Gated wrapper).
+  const marketTotals = useMarketTotals();             // market_totals view (always live)
+  const { districts: districtRows } = useDistrictTotals();  // district_totals view (always live)
   const { can } = useCapabilities();
-
-  // ─── Per-project flat bucket (memoised) ─────────────────────
-  // Has to live BEFORE any conditional return — React's rules of hooks
-  // require every render to call the same number of hooks in the same
-  // order. The realTotal/realSold helpers below use this for breakdowns.
-  const flatsAvailable = Array.isArray(allFlats) && allFlats.length > 0;
-  const flatsByProject = useMemo(() => {
-    if (!flatsAvailable) return null;
-    const m = new Map();
-    for (const f of allFlats) {
-      let r = m.get(f.project_id);
-      if (!r) { r = { total: 0, V: 0, P: 0, R: 0, PR: 0 }; m.set(f.project_id, r); }
-      r.total++;
-      if (f.stav === "V") r.V++;
-      else if (f.stav === "P") r.P++;
-      else if (f.stav === "R") r.R++;
-      else if (f.stav === "PR") r.PR++;
-    }
-    return m;
-  }, [allFlats, flatsAvailable]);
 
   if (loading && projects.length === 0) {
     return (
@@ -2228,105 +2199,65 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
     );
   }
 
-  // ─── KPIs ────────────────────────────────────────────────
-  // Three-tier fallback: (1) published `metrics` row (same source the
-  // ticker uses — always matches the homepage); (2) live allFlats
-  // count (when metrics haven't synced yet but RLS let us see flats);
-  // (3) sum of projects.total_units (last-resort; known to over-count
-  // because a few large projects store registry totals there).
-  const flatsReady = allFlats && allFlats.length > 0;
-  const totalUnits = marketTotals.unitsTracked != null
-    ? marketTotals.unitsTracked
-    : flatsReady ? allFlats.length
-    : projects.reduce((a, p) => a + (p.total_units || 0), 0);
-  const totalAvail = marketTotals.unitsAvailable != null
-    ? marketTotals.unitsAvailable
-    : flatsReady ? allFlats.filter(f => f.stav === "V").length
-    : projects.reduce((a, p) => a + (p.available_units || 0), 0);
-  const totalSold  = marketTotals.unitsSold != null
-    ? marketTotals.unitsSold
-    : flatsReady ? allFlats.filter(f => f.stav === "P").length
-    : projects.reduce((a, p) => a + (p.sold_units || 0), 0);
+  // ─── KPI strip ──────────────────────────────────────────────
+  // All four numbers come from the live `market_totals` view (same
+  // source the homepage Ticker + MarketPulse use). Single source of
+  // truth across the entire app — homepage / live / dashboard /
+  // reports all show identical values.
+  const totalUnits  = marketTotals.unitsTracked   ?? 0;
+  const totalAvail  = marketTotals.unitsAvailable ?? 0;
+  const avgEurM2    = marketTotals.avgPriceM2     ?? null;
+  // Sold-30d is project-level (per-flat stav transitions, computed by
+  // sync — not derivable from the current snapshot alone).
   const totalSold30 = projects.reduce((a, p) => a + (p.sold_last_month || 0), 0);
-  // Avg €/m² as simple arithmetic mean of per-project averages — no
-  // weighting by `total_units` because that field carries inflated
-  // registry numbers for manual_total projects (Slnečnice = 4000)
-  // and would skew the mean toward a few big projects.
-  const priceEntries = projects.filter(p => p.avg_price_eur_m2);
-  const weightedAvg = priceEntries.length > 0
-    ? Math.round(priceEntries.reduce((a, p) => a + p.avg_price_eur_m2, 0) / priceEntries.length)
-    : null;
-  const soldOutCount = projects.filter(p => (p.sold_percentage || 0) >= 100).length;
-  const absorptionPct = totalAvail > 0 ? Math.round((totalSold30 / (totalAvail + totalSold30)) * 1000) / 10 : 0;
+  const absorptionPct = totalAvail > 0
+    ? Math.round((totalSold30 / (totalAvail + totalSold30)) * 1000) / 10
+    : 0;
 
-  // ─── Aggregations ────────────────────────────────────────
-  // Real-data path: when `allFlats` is loaded (paid/admin tier — RLS
-  // returns the full set), bucket flats by project_id once and use
-  // those counts for every breakdown row. Sums the actual rows we
-  // synced to Supabase, so registry-only projects (Slnečnice = 4000
-  // claim, ~50 tracked) contribute only their real ~50, not 4000.
-  //
-  // Fallback path: anon/free tiers don't see all flats (RLS scope =
-  // chosen_project only). For those we fall back to the project row's
-  // stav-bucket columns — `available_units`, `reserved_units`, etc.
-  // are always real counts (never overridden by manual_total). Only
-  // `sold_units` may be inflated when the project has a manual_total
-  // override; we still sum it but the totals become "real avail +
-  // possibly-inflated sold" which is far less wrong than the previous
-  // "registry plan total" sum.
-  //
-  // Either way: every project still appears in the breakdowns —
-  // registry-only projects just contribute 0 (or near-0) to unit
-  // counts, instead of inflating them to 4000.
-  // (flatsByProject memo is built up top — see above the early return.)
-
-  // Per-project real-count helpers
-  const realTotal = (p) => {
-    if (flatsAvailable) return flatsByProject?.get(p.id)?.total || 0;
-    // No flats → sum stav buckets from the project row (real for
-    // available/reserved/etc.; sold may be inflated).
-    return (p.available_units || 0) + (p.sold_units || 0) +
-           (p.reserved_units || 0) + (p.prereserved_units || 0) +
-           (p.future_units || 0) + (p.error_units || 0);
-  };
-  const realSold = (p) => {
-    if (flatsAvailable) return flatsByProject?.get(p.id)?.P || 0;
-    return p.sold_units || 0;  // may be inflated; can't recover without flats
-  };
-
-  const byDistrict = {};
-  for (const p of projects) {
-    if (!p.district) continue;
-    const d = byDistrict[p.district] ||= { district: p.district, count: 0, units: 0, avail: 0, sold: 0, sold30: 0, priceSum: 0, priceN: 0 };
-    d.count += 1;
-    d.units  += realTotal(p);
-    d.avail  += p.available_units || 0;
-    d.sold   += realSold(p);
-    d.sold30 += p.sold_last_month || 0;
-    if (p.avg_price_eur_m2) { d.priceSum += p.avg_price_eur_m2; d.priceN += 1; }
-  }
-  const districts = Object.values(byDistrict)
-    .map(d => ({ ...d, avgPrice: d.priceN ? Math.round(d.priceSum / d.priceN) : null,
-                 absorption: d.avail + d.sold30 > 0 ? (d.sold30 / (d.avail + d.sold30)) * 100 : 0 }))
+  // ─── Per-district aggregates ───────────────────────────────
+  // Read directly from the `district_totals` view — always-live
+  // counts derived from flats_archive grouped by project district.
+  // No more frontend-side bucketing of project rows. Sort by avg
+  // €/m² desc; districts without a price signal (avg=null) sink
+  // to the bottom but stay visible.
+  const districts = (districtRows || [])
+    .map(d => ({
+      district: d.district,
+      count: d.project_count,
+      units: d.total_units,
+      avail: d.available_units,
+      sold: d.sold_units,
+      avgPrice: d.avg_eur_m2,
+      // sold30 still comes from projects (project-level monthly delta).
+      // Fold it in by joining on district name.
+      sold30: projects
+        .filter(p => p.district === d.district)
+        .reduce((a, p) => a + (p.sold_last_month || 0), 0),
+    }))
+    .map(d => ({
+      ...d,
+      absorption: d.avail + d.sold30 > 0 ? (d.sold30 / (d.avail + d.sold30)) * 100 : 0,
+    }))
     .sort((a, b) => (b.avgPrice || 0) - (a.avgPrice || 0));
 
+  // ─── Per-developer aggregates ──────────────────────────────
+  // Computed from projects (which are now `projects_live` — real
+  // per-project counts, no manual_total inflation). Each project's
+  // total_units / sold_units / available_units already reflect
+  // flats_archive truth, so straight summation is correct.
   const byDeveloper = {};
   for (const p of projects) {
     if (!p.developer) continue;
     const d = byDeveloper[p.developer] ||= { developer: p.developer, count: 0, units: 0, sold: 0, sold30: 0, avail: 0, projects: [] };
-    d.count += 1;
-    d.units  += realTotal(p);
-    d.sold   += realSold(p);
-    d.sold30 += p.sold_last_month || 0;
+    d.count  += 1;
+    d.units  += p.total_units || 0;
+    d.sold   += p.sold_units || 0;
     d.avail  += p.available_units || 0;
-    // Stash each project under its developer so the Top-Developers
-    // RankBarList can drill down into the per-project list when a
-    // developer row is expanded. Sorted desc by REAL total below
-    // (so Bory/Slnečnice don't dominate purely from registry inflation).
+    d.sold30 += p.sold_last_month || 0;
     d.projects.push(p);
   }
   for (const d of Object.values(byDeveloper)) {
-    d.projects.sort((a, b) => realTotal(b) - realTotal(a));
+    d.projects.sort((a, b) => (b.total_units || 0) - (a.total_units || 0));
   }
   const topDevelopers = Object.values(byDeveloper).sort((a, b) => b.units - a.units).slice(0, 10);
 
@@ -2353,7 +2284,7 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
         <AKpi label={lang === "sk" ? "Voľné byty" : "Available"}            value={totalAvail.toLocaleString(lang === "sk" ? "sk-SK" : "en-US")} accent={green} />
         <AKpi label={lang === "sk" ? "Predané (30d)" : "Sold (30d)"}        value={totalSold30 ? `+${totalSold30}` : "—"} accent="#f5a623"
               sub={lang === "sk" ? `${absorptionPct}% absorpcia` : `${absorptionPct}% absorption`} />
-        <AKpi label={lang === "sk" ? "Priem. €/m²" : "Avg €/m²"}            value={weightedAvg ? weightedAvg.toLocaleString(lang === "sk" ? "sk-SK" : "en-US") : "—"} />
+        <AKpi label={lang === "sk" ? "Priem. €/m²" : "Avg €/m²"}            value={avgEurM2 ? Math.round(avgEurM2).toLocaleString(lang === "sk" ? "sk-SK" : "en-US") : "—"} />
       </div>
 
       {/* ═══ PIVOT — drag & drop builder ═══ */}
