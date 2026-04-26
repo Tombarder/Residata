@@ -660,7 +660,9 @@ function KpiStrip({ summary, lang, extra = [] }) {
   // registry-only projects, or no tracked flats) — render em-dash
   // instead of "0%" which misleads the reader into thinking nothing
   // has sold when the truth is "we don't know".
-  const soldPctLabel = summary.soldPct == null ? "—" : `${summary.soldPct.toFixed(0)}%`;
+  // n/a when developer doesn't publish sold info — distinct from
+  // a real "0%" so users don't read the absence as "nothing has sold".
+  const soldPctLabel = summary.soldPct == null ? "n/a" : `${summary.soldPct.toFixed(0)}%`;
   const items = [
     { label: lang === "sk" ? "Projektov"   : "Projects",   value: summary.projectCount.toLocaleString("en-US").replace(/,/g, " ") },
     { label: lang === "sk" ? "Bytov"       : "Units",      value: summary.totalUnits.toLocaleString("en-US").replace(/,/g, " ") },
@@ -963,32 +965,25 @@ function AggregateTable({ rows, lang, nameLabel }) {
         </thead>
         <tbody>
           {rows.map((r, i) => {
-            // `hasUnitData === false` means this row's group contains
-            // only registry-only projects — we don't have flat-level
-            // data for them, so rendering 0 / 0 / 0% in the numeric
-            // columns is misleading (reads as "they sold nothing").
-            // Render em-dash + a subtle "no data" title instead.
-            const gap = r.hasUnitData === false;
-            const tipGap = lang === "sk"
-              ? "Projekty v tejto skupine nie sú v našom flats tracking-u (sú v registri, ale nemáme ich jednotkové dáta)."
-              : "Projects in this group are registry-only — we don't have unit-level data for them yet.";
-            const dashTd = { ...tdcR, color: dim, fontStyle: "italic" };
+            // Sold % is null when developer doesn't publish sold info
+            // for this group at all — render "n/a" rather than a
+            // misleading 0%. Everything else always renders numbers.
+            const soldCell = r.soldPct == null
+              ? <span style={{ color: dim, fontStyle: "italic" }}>n/a</span>
+              : `${r.soldPct.toFixed(0)}%`;
             return (
-              <tr key={r.name + i} className="rep-row-hoverable" style={{ borderTop: `1px solid ${border}`, opacity: gap ? 0.7 : 1 }} title={gap ? tipGap : undefined}>
+              <tr key={r.name + i} className="rep-row-hoverable" style={{ borderTop: `1px solid ${border}` }}>
                 <td style={tdc} title={r.name}>
                   <strong style={{ color: text }}>{r.name}</strong>
-                  {gap && <span style={{ marginLeft: 6, fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-                    · {lang === "sk" ? "registry" : "registry"}
-                  </span>}
                 </td>
                 <td style={tdcR}>{r.projectCount}</td>
-                <td style={gap ? dashTd : tdcR}>{gap ? "—" : r.totalUnits.toLocaleString("en-US").replace(/,/g, " ")}</td>
-                <td style={gap ? dashTd : { ...tdcR, color: green }}>{gap ? "—" : r.available.toLocaleString("en-US").replace(/,/g, " ")}</td>
-                <td style={gap ? dashTd : { ...tdcR, color: orange }}>{gap ? "—" : `${r.soldPct.toFixed(0)}%`}</td>
+                <td style={tdcR}>{r.totalUnits.toLocaleString("en-US").replace(/,/g, " ")}</td>
+                <td style={{ ...tdcR, color: green }}>{r.available.toLocaleString("en-US").replace(/,/g, " ")}</td>
+                <td style={{ ...tdcR, color: orange }}>{soldCell}</td>
                 <td style={tdcR}>{r.wavgM2 ? Math.round(r.wavgM2).toLocaleString("en-US").replace(/,/g, " ") : "—"}</td>
                 <td style={{ ...tdc, padding: "0.35rem 0.75rem" }}>
                   <div style={{ position: "relative", height: 10, background: bg, border: `1px solid ${border}`, borderRadius: 2 }}>
-                    <div style={{ position: "absolute", inset: 0, width: `${gap ? 0 : (r.totalUnits / maxUnits) * 100}%`, background: `linear-gradient(90deg, ${green}33, ${green})`, borderRadius: 2 }} />
+                    <div style={{ position: "absolute", inset: 0, width: `${(r.totalUnits / maxUnits) * 100}%`, background: `linear-gradient(90deg, ${green}33, ${green})`, borderRadius: 2 }} />
                   </div>
                 </td>
               </tr>
@@ -1244,54 +1239,38 @@ function projectDistrict(flat, projects) {
   const p = projects.find(pp => pp.id === flat.project_id);
   return p?.district || null;
 }
-function summariseProjects(projects, flats) {
-  // Unit counts: ALWAYS prefer the REAL flats table when it's passed
-  // in (same source-of-truth as the ticker metric total_units_tracked).
-  // Fall back to summing projects.total_units only when the caller
-  // literally didn't pass a flats array. This intentional fallback
-  // over-counts for a handful of large projects whose `total_units`
-  // stores a registry figure instead of tracked rows (Slnecnice=4000,
-  // Bory=large) — that's the only reason to use it, and every current
-  // in-app caller now passes flats, so the fallback is just defensive.
-  //
-  // A critical case: flats = [] (empty array, not undefined). That
-  // means "we DO track these projects but currently see zero flats in
-  // scope" — either the scope is empty, or the projects are registry-
-  // only entries with no scraped flats. We treat empty-array as the
-  // REAL answer (0/0/0), NOT as "use the inflated fallback". Returning
-  // zeros prevents "Penta: 984 units / 0 avail / 0% sold" kind of
-  // misleading rows where the unit count comes from a different source
-  // than the availability + sold counts.
-  const hasFlats = Array.isArray(flats);
-  let totalUnits, available, sold, reserved;
-  if (hasFlats) {
-    totalUnits = flats.length;
-    available  = flats.filter(f => f.stav === "V").length;
-    sold       = flats.filter(f => f.stav === "P").length;
-    reserved   = flats.filter(f => f.stav === "R" || f.stav === "PR").length;
-  } else {
-    totalUnits = projects.reduce((a, p) => a + (p.total_units || 0), 0);
-    available  = projects.reduce((a, p) => a + (p.available_units || 0), 0);
-    sold       = projects.reduce((a, p) => a + (p.sold_units || 0), 0);
-    reserved   = 0;
-  }
-  const sold30 = projects.reduce((a, p) => a + (p.sold_last_month || 0), 0);
-  // Data-gap flag: we trust a sold% only when we actually have unit-
-  // level data (flats rows) for at least one project in the scope.
-  // Without it, sold% is either 0/0 (NaN) or a division by an inflated
-  // registry number — both produce misleading figures. AggregateTable
-  // and KpiStrip read this flag and render "—" instead of "0%".
-  const hasUnitData = totalUnits > 0;
-  const soldPct = hasUnitData ? (sold / totalUnits) * 100 : null;
-  // Weighted average €/m² — weight by project's total_units so large
-  // projects pull the mean more than boutique ones. Always derived from
-  // the projects table (flats don't carry per-unit €/m² for every row).
+function summariseProjects(projects, _flats) {
+  // Aggregate from the projects table — total / available / sold per
+  // project. This is the single source of truth here; flats argument
+  // is ignored to keep the contract simple and predictable.
+  // (Flats-based aggregation was tried and rolled back: it hid
+  // registry-only projects entirely from breakdown tables, which
+  // read as "page is empty" to users — exactly the opposite of what
+  // we want. We prefer to show every project with its registry
+  // numbers and let the per-cell rendering be honest about gaps.)
+  const totalUnits = projects.reduce((a, p) => a + (p.total_units || 0), 0);
+  const available  = projects.reduce((a, p) => a + (p.available_units || 0), 0);
+  const sold       = projects.reduce((a, p) => a + (p.sold_units || 0), 0);
+  const reserved   = projects.reduce((a, p) => a + (p.reserved_units || 0), 0);
+  const sold30     = projects.reduce((a, p) => a + (p.sold_last_month || 0), 0);
+  // sold% — null when nothing has been recorded as sold/reserved
+  // (developer doesn't publish), so the UI can render "n/a" rather
+  // than misleading "0%". Otherwise the honest ratio.
+  const hasSoldData = sold > 0 || reserved > 0;
+  const soldPct = totalUnits > 0 && hasSoldData ? (sold / totalUnits) * 100 : null;
   const priced = projects.filter(p => p.avg_price_eur_m2 && (p.total_units || 0) > 0);
   const wavgM2 = priced.length
     ? priced.reduce((a, p) => a + p.avg_price_eur_m2 * p.total_units, 0) /
       priced.reduce((a, p) => a + p.total_units, 0)
     : null;
-  return { projectCount: projects.length, totalUnits, available, sold, reserved, sold30, soldPct, wavgM2, hasUnitData };
+  return {
+    projectCount: projects.length,
+    totalUnits, available, sold, reserved, sold30, soldPct, wavgM2,
+    // Always true when we have at least 1 project — the "data gap"
+    // signal callers used to render em-dashes is gone. Keep the
+    // field for back-compat with downstream JSX checks.
+    hasUnitData: projects.length > 0 && totalUnits > 0,
+  };
 }
 function groupAggregates(projects, key, lang, allFlats) {
   // Bucket projects by the group key (district / developer / etc),
