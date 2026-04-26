@@ -2200,6 +2200,26 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
   // numbers are blurred by the Gated wrapper).
   const { can } = useCapabilities();
 
+  // ─── Per-project flat bucket (memoised) ─────────────────────
+  // Has to live BEFORE any conditional return — React's rules of hooks
+  // require every render to call the same number of hooks in the same
+  // order. The realTotal/realSold helpers below use this for breakdowns.
+  const flatsAvailable = Array.isArray(allFlats) && allFlats.length > 0;
+  const flatsByProject = useMemo(() => {
+    if (!flatsAvailable) return null;
+    const m = new Map();
+    for (const f of allFlats) {
+      let r = m.get(f.project_id);
+      if (!r) { r = { total: 0, V: 0, P: 0, R: 0, PR: 0 }; m.set(f.project_id, r); }
+      r.total++;
+      if (f.stav === "V") r.V++;
+      else if (f.stav === "P") r.P++;
+      else if (f.stav === "R") r.R++;
+      else if (f.stav === "PR") r.PR++;
+    }
+    return m;
+  }, [allFlats, flatsAvailable]);
+
   if (loading && projects.length === 0) {
     return (
       <main style={{ padding: "5rem 2rem 4rem", maxWidth: 1200, margin: "0 auto", color: dim, fontFamily: mono, fontSize: "0.85rem" }}>
@@ -2258,21 +2278,7 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
   // Either way: every project still appears in the breakdowns —
   // registry-only projects just contribute 0 (or near-0) to unit
   // counts, instead of inflating them to 4000.
-  const flatsAvailable = Array.isArray(allFlats) && allFlats.length > 0;
-  const flatsByProject = useMemo(() => {
-    if (!flatsAvailable) return null;
-    const m = new Map();
-    for (const f of allFlats) {
-      let r = m.get(f.project_id);
-      if (!r) { r = { total: 0, V: 0, P: 0, R: 0, PR: 0 }; m.set(f.project_id, r); }
-      r.total++;
-      if (f.stav === "V") r.V++;
-      else if (f.stav === "P") r.P++;
-      else if (f.stav === "R") r.R++;
-      else if (f.stav === "PR") r.PR++;
-    }
-    return m;
-  }, [allFlats, flatsAvailable]);
+  // (flatsByProject memo is built up top — see above the early return.)
 
   // Per-project real-count helpers
   const realTotal = (p) => {
