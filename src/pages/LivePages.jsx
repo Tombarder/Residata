@@ -2269,12 +2269,19 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
   const byDeveloper = {};
   for (const p of projects) {
     if (!p.developer) continue;
-    const d = byDeveloper[p.developer] ||= { developer: p.developer, count: 0, units: 0, sold: 0, sold30: 0, avail: 0 };
+    const d = byDeveloper[p.developer] ||= { developer: p.developer, count: 0, units: 0, sold: 0, sold30: 0, avail: 0, projects: [] };
     d.count += 1;
     d.units  += p.total_units || 0;
     d.sold   += p.sold_units || 0;
     d.sold30 += p.sold_last_month || 0;
     d.avail  += p.available_units || 0;
+    // Stash each project under its developer so the Top-Developers
+    // RankBarList can drill down into the per-project list when a
+    // developer row is expanded. Sorted desc by total_units below.
+    d.projects.push(p);
+  }
+  for (const d of Object.values(byDeveloper)) {
+    d.projects.sort((a, b) => (b.total_units || 0) - (a.total_units || 0));
   }
   const topDevelopers = Object.values(byDeveloper).sort((a, b) => b.units - a.units).slice(0, 10);
 
@@ -2400,7 +2407,15 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
             </div>
           ) : (
             <RankBarList
-              rows={topDevelopers.map(d => ({ key: d.developer, label: d.developer, sub: `${d.count} projektov`, value: d.units }))}
+              rows={topDevelopers.map(d => ({
+                key: d.developer,
+                label: d.developer,
+                sub: `${d.count} ${lang === "sk" ? "projektov" : "projects"}`,
+                value: d.units,
+                _projects: d.projects,
+              }))}
+              setCurrent={setCurrent}
+              getChildren={(r) => r._projects || []}
               suffix={lang === "sk" ? " bytov" : " units"}
               color="#4a90e2"
             />
@@ -2480,56 +2495,105 @@ function ASection({ label, title, children, inline = false }) {
   );
 }
 
-function RankBarList({ rows, setCurrent, suffix = "", color = green }) {
+function RankBarList({ rows, setCurrent, suffix = "", color = green, getChildren }) {
   if (!rows || rows.length === 0) return null;
   const max = Math.max(...rows.map(r => r.value));
-  // Unique class per render to scope the :hover CSS without leaking
-  // into other RankBarLists on the same page. Plain string is fine —
-  // the class name doesn't change between renders of the same list.
   const cls = "rbl-" + Math.random().toString(36).slice(2, 8);
+  // Track which row is expanded. Only relevant when getChildren is
+  // provided (developer rows that drill down to their projects).
+  const [openKey, setOpenKey] = useState(null);
   return (
     <div>
-      {/* CSS-in-style-tag because we need :hover selectors for true
-          cross-element feedback (inline style onMouseEnter only fires
-          on the target element, which meant the subtle 3% bg change
-          earlier read as 'only the right number is clickable'). Now
-          the whole row lights up AND the project name gets underlined
-          on hover, so clickability is obvious across the full width. */}
       <style>{`
         .${cls}-row { cursor: pointer; transition: background 0.15s; border-radius: 4px; }
         .${cls}-row:hover { background: rgba(0,229,160,0.07); }
         .${cls}-row:hover .${cls}-name { text-decoration: underline; text-decoration-color: rgba(0,229,160,0.5); text-underline-offset: 3px; }
         .${cls}-row * { cursor: inherit; }
+        .${cls}-child { cursor: pointer; transition: background 0.12s; border-radius: 4px; }
+        .${cls}-child:hover { background: rgba(0,229,160,0.06); }
+        .${cls}-child:hover .${cls}-childname { color: ${green}; text-decoration: underline; text-underline-offset: 3px; }
       `}</style>
       {rows.map((r, i) => {
         const pct = max > 0 ? (r.value / max) * 100 : 0;
-        const clickable = setCurrent && r.key && typeof r.key === "string" && r.key !== r.label;
+        const expandable = typeof getChildren === "function";
+        // If row has a usable project-id key (e.g. velocity / sold-%
+        // lists), keep direct-navigation behaviour. Otherwise — and
+        // when expandable is true — clicking opens the children panel.
+        const directNav = setCurrent && r.key && typeof r.key === "string" && r.key !== r.label;
+        const clickable = expandable || directNav;
+        const isOpen = expandable && openKey === r.key;
+        const onClick = expandable
+          ? () => setOpenKey(prev => prev === r.key ? null : r.key)
+          : (directNav ? () => setCurrent(`App:ProjectDetail:${r.key}`) : undefined);
         return (
-          <div key={r.key}
-            className={clickable ? `${cls}-row` : undefined}
-            onClick={clickable ? () => setCurrent(`App:ProjectDetail:${r.key}`) : undefined}
-            style={{
-              display: "grid", gridTemplateColumns: "24px 1fr 72px", gap: "0.75rem", alignItems: "center",
-              padding: "0.5rem 0.5rem", borderBottom: i < rows.length - 1 ? `1px solid ${border}` : "none",
-              cursor: clickable ? "pointer" : "default",
-            }}
-          >
-            <span style={{ fontFamily: mono, fontSize: "0.7rem", color: dim, textAlign: "right" }}>{i + 1}.</span>
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.2rem" }}>
-                <span className={clickable ? `${cls}-name` : undefined}
-                      style={{ fontSize: "0.83rem", color: "#e8e8ed", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {r.label}
-                </span>
-                {r.sub && <span style={{ fontSize: "0.68rem", color: dim, fontFamily: mono, flexShrink: 0, marginLeft: "0.5rem" }}>{r.sub}</span>}
+          <div key={r.key}>
+            <div
+              className={clickable ? `${cls}-row` : undefined}
+              onClick={onClick}
+              style={{
+                display: "grid", gridTemplateColumns: "24px 1fr 72px 16px", gap: "0.75rem", alignItems: "center",
+                padding: "0.5rem 0.5rem",
+                borderBottom: (!isOpen && i < rows.length - 1) ? `1px solid ${border}` : "none",
+                cursor: clickable ? "pointer" : "default",
+              }}
+            >
+              <span style={{ fontFamily: mono, fontSize: "0.7rem", color: dim, textAlign: "right" }}>{i + 1}.</span>
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.2rem" }}>
+                  <span className={clickable ? `${cls}-name` : undefined}
+                        style={{ fontSize: "0.83rem", color: "#e8e8ed", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {r.label}
+                  </span>
+                  {r.sub && <span style={{ fontSize: "0.68rem", color: dim, fontFamily: mono, flexShrink: 0, marginLeft: "0.5rem" }}>{r.sub}</span>}
+                </div>
+                <div style={{ height: 4, background: "#0a0a0b", borderRadius: 2, overflow: "hidden" }}>
+                  <div style={{ width: `${pct}%`, height: "100%", background: color, transition: "width 0.8s ease" }} />
+                </div>
               </div>
-              <div style={{ height: 4, background: "#0a0a0b", borderRadius: 2, overflow: "hidden" }}>
-                <div style={{ width: `${pct}%`, height: "100%", background: color, transition: "width 0.8s ease" }} />
+              <div style={{ fontFamily: mono, fontSize: "0.85rem", color: color, fontWeight: 700, textAlign: "right" }}>
+                {typeof r.value === "number" ? (r.value % 1 !== 0 ? r.value.toFixed(1) : r.value) : r.value}{suffix}
               </div>
+              {expandable
+                ? <span style={{ fontSize: "0.7rem", color: dim, transform: isOpen ? "rotate(90deg)" : "none", transition: "transform 0.15s", textAlign: "center" }}>›</span>
+                : <span />}
             </div>
-            <div style={{ fontFamily: mono, fontSize: "0.85rem", color: color, fontWeight: 700, textAlign: "right" }}>
-              {typeof r.value === "number" ? (r.value % 1 !== 0 ? r.value.toFixed(1) : r.value) : r.value}{suffix}
-            </div>
+
+            {/* Expanded child list — projects belonging to this row.
+                Each child is a click-through to its own ProjectDetail. */}
+            {isOpen && (() => {
+              const children = getChildren(r) || [];
+              return (
+                <div style={{
+                  background: "rgba(0,0,0,0.25)",
+                  borderTop: `1px solid ${border}`,
+                  borderBottom: i < rows.length - 1 ? `1px solid ${border}` : "none",
+                  padding: "0.35rem 0.55rem 0.55rem 2.4rem",
+                }}>
+                  {children.length === 0 ? (
+                    <div style={{ color: dim, fontSize: "0.78rem", padding: "0.4rem 0", fontStyle: "italic" }}>—</div>
+                  ) : children.map(p => (
+                    <div key={p.id}
+                      className={`${cls}-child`}
+                      onClick={(e) => { e.stopPropagation(); setCurrent && setCurrent(`App:ProjectDetail:${p.id}`); }}
+                      style={{
+                        display: "grid", gridTemplateColumns: "1fr auto auto", gap: "0.75rem", alignItems: "baseline",
+                        padding: "0.35rem 0.5rem",
+                      }}
+                    >
+                      <span className={`${cls}-childname`} style={{ fontSize: "0.82rem", color: "#c4c4cc", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", transition: "color 0.12s" }}>
+                        {p.name}
+                      </span>
+                      <span style={{ fontSize: "0.68rem", color: dim, fontFamily: mono }}>
+                        {p.district || "—"}
+                      </span>
+                      <span style={{ fontFamily: mono, fontSize: "0.78rem", color: color, fontWeight: 600 }}>
+                        {p.total_units != null ? p.total_units.toLocaleString("en-US").replace(/,/g, " ") : "—"}{suffix}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
         );
       })}
