@@ -88,9 +88,54 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
   // status field (legacy) default to 'active' for backward compat with
   // pre-migration data.
   const isActive = (p) => (p.status || "active") === "active";
-  const projects = allProjects.filter(isActive);
+  const activeProjects = allProjects.filter(isActive);
   const historicalProjects = allProjects.filter(p => !isActive(p));
   const [showHistorical, setShowHistorical] = useState(false);
+
+  // ── Sortable columns ───────────────────────────────────────
+  // Default: alphabetical by name. The previous default came from
+  // useProjects() which ordered by available_units desc — that
+  // pushed Slnečnice (registry-only inflated count) to the very
+  // top, which read as "Slnečnice dominates the market" even though
+  // we don't actually track most of those units. Alphabetical is
+  // neutral; user can click any header to re-sort.
+  const SORT_COLS = {
+    name:           { kind: "text", get: p => p.name || "" },
+    district:       { kind: "text", get: p => p.district || "" },
+    total_units:    { kind: "num",  get: p => p.total_units },
+    available_units:{ kind: "num",  get: p => p.available_units },
+    sold_units:     { kind: "num",  get: p => p.sold_units },
+    sold_percentage:{ kind: "num",  get: p => p.sold_percentage },
+    avg_price_eur_m2:{ kind: "num", get: p => p.avg_price_eur_m2 },
+    sold_last_month:{ kind: "num",  get: p => p.sold_last_month },
+  };
+  const [sort, setSort] = useState({ key: "name", dir: "asc" });
+  const onHeaderClick = (key) => {
+    setSort(prev => prev.key === key
+      ? { key, dir: prev.dir === "asc" ? "desc" : "asc" }
+      : { key, dir: SORT_COLS[key].kind === "num" ? "desc" : "asc" });
+  };
+  const sortArrow = (key) => {
+    if (sort.key !== key) return <span style={{ opacity: 0.25, marginLeft: 4, fontSize: "0.65rem" }}>↕</span>;
+    return <span style={{ color: green, marginLeft: 4, fontSize: "0.7rem" }}>{sort.dir === "asc" ? "▴" : "▾"}</span>;
+  };
+  const sortProjects = (arr) => {
+    const col = SORT_COLS[sort.key];
+    if (!col) return arr;
+    const dir = sort.dir === "desc" ? -1 : 1;
+    const locale = lang === "sk" ? "sk-SK" : "en-US";
+    return [...arr].sort((a, b) => {
+      const av = col.get(a), bv = col.get(b);
+      const ae = av == null || av === "";
+      const be = bv == null || bv === "";
+      if (ae && be) return 0;
+      if (ae) return 1;   // nulls last
+      if (be) return -1;
+      if (col.kind === "num") return (Number(av) - Number(bv)) * dir;
+      return String(av).localeCompare(String(bv), locale, { numeric: true, sensitivity: "base" }) * dir;
+    });
+  };
+  const projects = sortProjects(activeProjects);
 
   const hasFullAccess = can("view_all_projects_list");
   // Anon: 12 plne, ďalších 8 blurred. Logged-in: všetko.
@@ -141,18 +186,18 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
                 <thead style={{ background: "#0e0e10" }}>
                   <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                    <th style={th}>{t.tbl_project}</th>
-                    <th style={th}>{t.tbl_district}</th>
-                    <th style={{ ...th, textAlign: "right" }}>{t.tbl_units}</th>
-                    <th style={{ ...th, textAlign: "right" }}>{t.tbl_available}</th>
-                    <th style={{ ...th, textAlign: "right" }}>{t.tbl_sold}</th>
-                    <th style={{ ...th, textAlign: "right" }}>{t.tbl_sold_pct}</th>
-                    <th style={{ ...th, textAlign: "right" }}>{t.tbl_eur_m2}</th>
+                    <SortableTh sortKey="name"             align="left"  current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t.tbl_project}</SortableTh>
+                    <SortableTh sortKey="district"         align="left"  current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t.tbl_district}</SortableTh>
+                    <SortableTh sortKey="total_units"      align="right" current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t.tbl_units}</SortableTh>
+                    <SortableTh sortKey="available_units"  align="right" current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t.tbl_available}</SortableTh>
+                    <SortableTh sortKey="sold_units"       align="right" current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t.tbl_sold}</SortableTh>
+                    <SortableTh sortKey="sold_percentage"  align="right" current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t.tbl_sold_pct}</SortableTh>
+                    <SortableTh sortKey="avg_price_eur_m2" align="right" current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t.tbl_eur_m2}</SortableTh>
                     {/* Sold velocity — header viditeľný vždy, obsah blurred pre non-paid */}
-                    <th style={{ ...th, textAlign: "right" }} title={can("view_sold_velocity") ? t.tbl_sold_30d_tooltip_paid : t.tbl_sold_30d_tooltip_locked}>
+                    <SortableTh sortKey="sold_last_month"  align="right" current={sort} onClick={onHeaderClick} arrow={sortArrow} title={can("view_sold_velocity") ? t.tbl_sold_30d_tooltip_paid : t.tbl_sold_30d_tooltip_locked}>
                       {t.tbl_sold_30d}
                       {!can("view_sold_velocity") && <span style={{ marginLeft: 4, color: green, fontSize: "0.6rem" }}>🔒</span>}
-                    </th>
+                    </SortableTh>
                     <th style={th}></th>
                   </tr>
                 </thead>
@@ -311,6 +356,34 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
      sold_out = orange (signals "was live, now done")
      paused   = dim    (signals "data broken, we know about it")
      archived = red-ish (signals "removed from registry") */
+/**
+ * Sortable column header — same UX pattern as the platform's
+ * FlatsTable. Click to sort by this column, click again to reverse.
+ * Active column shows the green ▴/▾; inactive show a dim ↕ to hint
+ * "I'm clickable too". Keyboard accessible via tabIndex + Enter.
+ */
+function SortableTh({ sortKey, align = "left", current, onClick, arrow, title, children }) {
+  const active = current?.key === sortKey;
+  return (
+    <th
+      onClick={() => onClick(sortKey)}
+      onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(sortKey); } }}
+      tabIndex={0}
+      title={title || "Click to sort"}
+      style={{
+        ...th,
+        textAlign: align,
+        cursor: "pointer",
+        color: active ? "#e8e8ed" : dim,
+        userSelect: "none",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {children}{arrow(sortKey)}
+    </th>
+  );
+}
+
 function StatusBadge({ status, lang }) {
   const cfg = {
     sold_out: { bg: "rgba(245,166,35,0.12)", fg: "#f5a623", label: lang === "sk" ? "Vypredané" : "Sold out" },
