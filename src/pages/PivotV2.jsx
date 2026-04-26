@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { useAllFlats, useProjects } from "../lib/useData";
+import { useAllFlats, useProjects, useFlatsArchive, useArchiveMonths } from "../lib/useData";
 import { useCapabilities } from "../lib/useCapabilities";
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -38,6 +38,7 @@ const text    = "#e8e8ed";
 const FIELDS = {
   // Meta
   datum:             { label: "Datum",                      group: "meta",     type: "date",   accessor: (r) => r.last_seen },
+  snapshot_month:    { label: "Mesiac",                     group: "meta",     type: "text",   accessor: (r) => r.snapshot_month },
   batch_id:          { label: "Batch ID",                   group: "meta",     type: "text",   accessor: (r) => r.batch_id },
   import_status:     { label: "Import status",              group: "meta",     type: "text",   accessor: (r) => r.project_status || "active" },
 
@@ -595,10 +596,29 @@ function defaultAggFor(field) {
 
 /* ══════════════════════════ Main component ════════════════════════ */
 export default function PivotV2({ lang = "sk", setCurrent }) {
-  const { flats: realFlats } = useAllFlats();
   const { projects } = useProjects();
   const { can } = useCapabilities();
   const canViewAnalytics = can("view_analytics");
+
+  // Month-scope state — defaults to "last month only" so the pivot
+  // opens fast and reads the same way as the original snapshot Pivot.
+  // User can switch to "all months" to enable cross-month rezy. The
+  // archive's snapshot_month dimension (in FIELDS) makes monthly comparisons
+  // possible once user pulls in 2+ months.
+  const { months: archiveMonths } = useArchiveMonths();
+  const latestMonth = archiveMonths?.[0] || null;
+  // null = "all months", array = filter to those months. Initial load
+  // is 'latest' so we only fetch this month's flats by default — keeps
+  // the page snappy until the user explicitly opts into history.
+  const [scope, setScope] = useState("latest"); // "latest" | "all" | "custom"
+  const [customMonths, setCustomMonths] = useState([]);
+  const monthsFilter = useMemo(() => {
+    if (scope === "all") return undefined;
+    if (scope === "custom" && customMonths.length > 0) return customMonths;
+    return latestMonth ? [latestMonth] : undefined;
+  }, [scope, customMonths, latestMonth]);
+
+  const { flats: realFlats } = useFlatsArchive(monthsFilter);
 
   // Enrich flats with their project's metadata once so every accessor
   // can read off a single flat row.
@@ -871,11 +891,58 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
       border: `1px solid ${green}40`, borderRadius: 12, padding: "1.25rem",
       boxShadow: "0 0 28px rgba(0,229,160,0.05)",
     }}>
-      {/* Header — plain, no loud product badge */}
+      {/* Header — month scope + record count + expand/collapse */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
-        <span style={{ fontSize: "0.78rem", color: dim }}>
-          {records.length.toLocaleString("en-US").replace(/,/g, " ")} {lang === "sk" ? "bytov" : "units"}
-        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.85rem", flexWrap: "wrap" }}>
+          {/* Month scope selector — defaults to "latest" so the pivot
+              opens fast with current data only. Switch to "all" to
+              compare months / unlock the snapshot_month dimension as
+              a draggable field. */}
+          {canViewAnalytics && archiveMonths && archiveMonths.length > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+              <span style={{ fontSize: "0.7rem", color: dim, fontFamily: mono, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                {lang === "sk" ? "Mesiac" : "Month"}
+              </span>
+              <button
+                onClick={() => setScope("latest")}
+                style={{ ...miniBtn, ...(scope === "latest" ? { borderColor: green, color: green } : {}) }}
+                title={lang === "sk" ? `Len posledný mesiac (${latestMonth || "—"})` : `Latest month only (${latestMonth || "—"})`}
+              >
+                {lang === "sk" ? `Posledný (${latestMonth || "—"})` : `Latest (${latestMonth || "—"})`}
+              </button>
+              <button
+                onClick={() => setScope("all")}
+                style={{ ...miniBtn, ...(scope === "all" ? { borderColor: green, color: green } : {}) }}
+                title={lang === "sk" ? `Všetky mesiace v archíve (${archiveMonths.length})` : `All archived months (${archiveMonths.length})`}
+              >
+                {lang === "sk" ? `Všetky (${archiveMonths.length})` : `All (${archiveMonths.length})`}
+              </button>
+              {archiveMonths.length >= 2 && (
+                <select
+                  value={scope === "custom" ? (customMonths[0] || "") : ""}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v) { setCustomMonths([v]); setScope("custom"); }
+                  }}
+                  style={{
+                    ...miniBtn,
+                    background: scope === "custom" ? "#1a1a1f" : "#16161a",
+                    borderColor: scope === "custom" ? green : "#2a2a2e",
+                    color: scope === "custom" ? green : "#c0c0c8",
+                    cursor: "pointer",
+                  }}
+                  title={lang === "sk" ? "Vyber konkrétny mesiac" : "Pick a specific month"}
+                >
+                  <option value="">{lang === "sk" ? "Konkrétny…" : "Specific…"}</option>
+                  {archiveMonths.map(m => <option key={m} value={m}>{m}</option>)}
+                </select>
+              )}
+            </div>
+          )}
+          <span style={{ fontSize: "0.78rem", color: dim }}>
+            {records.length.toLocaleString("en-US").replace(/,/g, " ")} {lang === "sk" ? "bytov" : "units"}
+          </span>
+        </div>
         {rows.length >= 2 && (
           <div style={{ display: "flex", gap: "0.4rem" }}>
             <button onClick={expandAll}   style={miniBtn}>▾ {lang === "sk" ? "Rozbaliť" : "Expand"}</button>

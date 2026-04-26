@@ -330,6 +330,129 @@ export function useAllFlats() {
   return { flats, loading };
 }
 
+/** Unit-level historical archive — every flat from every monthly run.
+ *
+ *  Why this exists separate from useAllFlats:
+ *    `flats` is the current snapshot — overwritten each sync. The
+ *    archive (`flats_archive`) is append-only with a `snapshot_month`
+ *    tag, so the platform Pivot can slice across time the same way
+ *    the Sheets pivot over Clean Master can. After 2-3 months of
+ *    syncs accumulate, trend / month-over-month rezy become possible.
+ *
+ *  Default scope:
+ *    `months` defaults to undefined → all months returned (sorted desc).
+ *    Pass an array of YYYY-MM strings to limit (e.g. `["2026-04"]` for
+ *    just-this-month, `["2026-03","2026-04"]` for two-month compare).
+ *    Most callers will pass the most recent month at first paint and
+ *    let the user expand from there.
+ *
+ *  RLS:
+ *    Same gating as flats — paid/admin/active-trial sees everything,
+ *    free users see only their chosen_project_id rows. Cache key
+ *    includes tier + chosen_project_id so identity changes refetch.
+ *
+ *  Paging:
+ *    Supabase caps single queries at 1000 rows. ~5,500 flats × N
+ *    months → page in 1000-row chunks just like useAllFlats.
+ */
+let _archiveCache = null;
+let _archiveCacheKey = null;
+export function useFlatsArchive(months) {
+  const { loading: authLoading, user, profile } = useAuth();
+  const monthsKey = Array.isArray(months) ? months.slice().sort().join(",") : "all";
+  const identityKey = user
+    ? `${user.id}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}::${monthsKey}`
+    : `anon::${monthsKey}`;
+  const [flats, setFlats] = useState(_archiveCacheKey === identityKey ? (_archiveCache || []) : []);
+  const [loading, setLoading] = useState(_archiveCacheKey !== identityKey);
+
+  useEffect(() => {
+    if (!isSupabaseReady()) { setLoading(false); return; }
+    if (authLoading) return;
+
+    if (_archiveCacheKey === identityKey && _archiveCache) {
+      setFlats(_archiveCache);
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+    (async () => {
+      const all = [];
+      const PAGE = 1000;
+      for (let offset = 0; ; offset += PAGE) {
+        let q = supabase
+          .from("flats_archive")
+          .select("*")
+          .range(offset, offset + PAGE - 1)
+          .order("snapshot_month", { ascending: false })
+          .order("id", { ascending: true });
+        if (Array.isArray(months) && months.length > 0) {
+          q = q.in("snapshot_month", months);
+        }
+        const { data, error } = await q;
+        if (cancelled) return;
+        if (error) {
+          console.error("[useFlatsArchive]", error);
+          break;
+        }
+        all.push(...(data || []));
+        if (!data || data.length < PAGE) break;
+      }
+      if (cancelled) return;
+      _archiveCache = all;
+      _archiveCacheKey = identityKey;
+      setFlats(all);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [authLoading, identityKey, monthsKey]);
+
+  return { flats, loading };
+}
+
+/** Distinct snapshot months available in the archive — small fast call
+ *  used by the Pivot's month-filter dropdown. Public-ish (RLS still
+ *  applies, but month names alone leak no per-flat data). */
+let _archiveMonthsCache = null;
+export function useArchiveMonths() {
+  const [months, setMonths] = useState(_archiveMonthsCache || []);
+  const [loading, setLoading] = useState(_archiveMonthsCache === null);
+  useEffect(() => {
+    if (!isSupabaseReady()) { setLoading(false); return; }
+    let cancelled = false;
+    (async () => {
+      // Distinct months — Supabase doesn't give us DISTINCT directly via
+      // PostgREST, so we project just snapshot_month and dedup client-side.
+      // The set is tiny (≤ 60 even after 5 years), so this is cheap.
+      const { data, error } = await supabase
+        .from("flats_archive")
+        .select("snapshot_month")
+        .order("snapshot_month", { ascending: false });
+      if (cancelled) return;
+      if (error) {
+        console.error("[useArchiveMonths]", error);
+        setLoading(false);
+        return;
+      }
+      const seen = new Set();
+      const arr = [];
+      for (const row of data || []) {
+        if (row.snapshot_month && !seen.has(row.snapshot_month)) {
+          seen.add(row.snapshot_month);
+          arr.push(row.snapshot_month);
+        }
+      }
+      _archiveMonthsCache = arr;
+      setMonths(arr);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+  return { months, loading };
+}
+
 /** Early access slot count for the marketing badge. Public table. */
 export function useEarlyAccessStats() {
   const [stats, setStats] = useState({ paid_count: 0, remaining_slots: 9 });
