@@ -53,19 +53,44 @@ export function useCapabilities() {
   const paidLegacyActive = baseTier === "paid" && !paidUntil && !paidPaused;
   const paidActive = !paidPaused && (paidWindowActive || paidLegacyActive);
 
-  // Effective tier resolution. admin > paid (by tier) > trial > base.
-  let effectiveTier = baseTier;
+  // Effective tier resolution. Order of precedence:
+  //   1. admin (immutable)
+  //   2. paid_pause_started → drop to free regardless of paid_until
+  //      (so a paused paid user really loses access)
+  //   3. paid_until in future → paid (regardless of base tier — admin
+  //      can grant paid time to a free user via paid_until without
+  //      flipping tier; the access works)
+  //   4. base tier 'paid' WITHOUT paid_until → legacy paid (back-
+  //      compat; we never auto-flip these to free)
+  //   5. trial_until in future → paid (only for free / pending base)
+  //   6. else → base tier
+  // tier column is NEVER mutated here — it stays as the audit /
+  // billing label, dates drive the actual access.
+  let effectiveTier;
   if (baseTier === "admin") {
     effectiveTier = "admin";
-  } else if (baseTier === "paid" && paidActive) {
+  } else if (paidPaused) {
+    // Paused — even if base is paid and window is in future, no access.
+    effectiveTier = baseTier === "paid" ? "free" : baseTier;
+  } else if (paidWindowActive) {
+    // Explicit paid window in future wins regardless of base tier.
+    // Lets admin grant paid time to a free user via /api/admin/set-
+    // subscription without first flipping tier='paid' (cleaner audit).
     effectiveTier = "paid";
-  } else if (baseTier === "paid" && !paidActive) {
-    // Paid window expired or paused — drop them to free until they
-    // resubscribe. Their tier column stays 'paid' so admin can re-
-    // extend without re-flipping; the UI just denies paid features.
+  } else if (trialActive) {
+    // Trial active wins over expired paid (let the user keep paid
+    // access during the gift window) AND over base free/pending.
+    effectiveTier = "paid";
+  } else if (baseTier === "paid" && paidUntil && paidUntil <= now) {
+    // Paid window expired AND no trial — drop to free silently.
+    // tier='paid' stays so admin can re-extend without re-flipping;
+    // UI shows the amber "Subscription expired — Resubscribe" card.
     effectiveTier = "free";
-  } else if (trialActive && (baseTier === "free" || baseTier === "pending")) {
+  } else if (baseTier === "paid") {
+    // Legacy paid (tier='paid', no paid_until set yet) — keep paid.
     effectiveTier = "paid";
+  } else {
+    effectiveTier = baseTier;
   }
 
   const caps = capsForTier(effectiveTier);
