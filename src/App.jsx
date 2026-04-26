@@ -14,7 +14,7 @@ import { MarketPulse, DistrictPulse, PipelineFlow } from "./pages/HomeExtras";
 import HeroLabPage from "./pages/HeroVariants";
 import { useAuth } from "./lib/useAuth";
 import { useCapabilities } from "./lib/useCapabilities";
-import { useProjects, useMetrics } from "./lib/useData";
+import { useProjects, useMarketTotals } from "./lib/useData";
 import { pushRoute, pathToPage, isAppPage } from "./lib/routing";
 import { applySeo } from "./lib/seo";
 import { startPageEngagement, stopPageEngagement } from "./lib/engagement";
@@ -233,7 +233,7 @@ const t = {
     insightsBadge: "Apríl 2026 · reálne dáta",
     rawLabel: "Surové dáta",
     unitSample: "Ukážka na úrovni bytov",
-    // Prepisujeme live v DataPage cez useMetrics; fallback kým sa načíta.
+    // Prepisujeme live v DataPage cez useMarketTotals; fallback kým sa načíta.
     showing: "Zobrazených 8 z … záznamov",
     schemaLabel: "Schéma",
     schemaTitle: "Každý dátový bod na byt — kľúčové polia nižšie.",
@@ -867,13 +867,10 @@ function DataPage({ setCurrent, l, lang }) {
   const mono = "'JetBrains Mono', monospace";
   const { can } = useCapabilities();
   const isPaid = can("has_paid_access");
-  // Live count nad "Unit-level sample" tabulkou — nesmie byt hardcoded (kedysi
-  // bolo "4 218" z davna exportu, co uz davno neplati a kupujucemu to lame
-  // ukazuje ako mrtve cislo). Cita total_units_tracked z metrics tabulky,
-  // rovnaky zdroj ako PipelineFlow a MarketPulse → vsetko na stranke je
-  // unified.
-  const { metrics } = useMetrics();
-  const unitsTracked = metrics.find(m => m.metric_key === "total_units_tracked")?.value_numeric || null;
+  // Live count nad "Unit-level sample" tabulkou. Reads from the
+  // `market_totals` view (single source of truth — same number the
+  // homepage MarketPulse and the Ticker show). Always fresh.
+  const { unitsTracked } = useMarketTotals();
   const locale = lang === "sk" ? "sk-SK" : "en-US";
   const showingLive = unitsTracked == null
     ? (lang === "sk" ? "Zobrazených 8 z … záznamov" : "Showing 8 of … records")
@@ -1836,7 +1833,7 @@ export default function App() {
         Important: when inside the platform shell we DON'T wrap in a
         key={current} remount-on-nav div — PlatformShell itself stays
         mounted across /app/* navigation, which keeps the sidebar stable
-        and stops hooks (useProjects, useMetrics…) from re-firing from a
+        and stops hooks (useProjects, useMarketTotals…) from re-firing from a
         cold "zeros" state on every page change. The platform's own content
         area handles the page-fade animation internally.
       */}
