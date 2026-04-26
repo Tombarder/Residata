@@ -529,7 +529,7 @@ function FilteredReport({ scopeLabel, scopeType, projects, flats, allProjects, a
       </ReportSection>
 
       <ReportSection label={lang === "sk" ? "Projekty v scope" : "Projects in scope"} title={lang === "sk" ? `Kompletný zoznam (${projects.length}) \u2014 klik otvorí projekt-report` : `Full list (${projects.length}) \u2014 click to open project report`}>
-        <ProjectTable projects={projects} lang={lang} onProjectClick={onOpenProject} />
+        <ProjectTable projects={projects} flats={flats} lang={lang} onProjectClick={onOpenProject} />
       </ReportSection>
 
       {snapshots && snapshots.length > 0 && (
@@ -1051,9 +1051,55 @@ function BenchmarkCard({ local, global, scopeLabel, lang }) {
   );
 }
 
-/* ─── Project table (used inside City / District / Developer scopes) ─── */
-function ProjectTable({ projects, lang, onProjectClick }) {
-  const sorted = [...projects].sort((a, b) => (b.total_units || 0) - (a.total_units || 0));
+/* ─── Project table (used inside City / District / Developer scopes) ───
+ * Per-row counts come from the flats array (real data) when available —
+ * matches summariseProjects so headline KPI and per-row numbers reconcile.
+ * No-flats fallback uses each project's stav-bucket columns (also real
+ * for available/reserved/etc.; sold may be inflated for manual_total
+ * projects but at least the table doesn't lead with a 4000-row Slnečnice).
+ */
+function ProjectTable({ projects, flats, lang, onProjectClick }) {
+  const haveFlats = Array.isArray(flats);
+  // Pre-bucket flats by project once so per-row enrich is O(1).
+  const byProject = useMemo(() => {
+    if (!haveFlats) return null;
+    const m = new Map();
+    for (const f of flats) {
+      let r = m.get(f.project_id);
+      if (!r) { r = { total: 0, V: 0, P: 0, R: 0, PR: 0, future: 0, err: 0 }; m.set(f.project_id, r); }
+      r.total++;
+      if (f.stav === "V") r.V++;
+      else if (f.stav === "P") r.P++;
+      else if (f.stav === "R") r.R++;
+      else if (f.stav === "PR") r.PR++;
+      else if (f.stav === "Ešte nie v ponuke") r.future++;
+      else if (f.stav === "ERROR") r.err++;
+    }
+    return m;
+  }, [flats, haveFlats]);
+
+  const enriched = projects.map(p => {
+    if (haveFlats) {
+      const r = byProject.get(p.id);
+      const total       = r ? r.total : 0;
+      const available   = r ? r.V : 0;
+      const sold        = r ? r.P : 0;
+      const reserved    = r ? r.R + r.PR : 0;
+      const future      = r ? r.future : 0;
+      const errored     = r ? r.err : 0;
+      const activeTotal = total - future - errored;
+      const hasSoldData = sold > 0 || reserved > 0;
+      const soldPct = activeTotal > 0 && hasSoldData
+        ? ((sold + reserved) / activeTotal) * 100
+        : null;
+      return { ...p, _realTotal: total, _realAvail: available, _realSoldPct: soldPct };
+    }
+    // Fallback: sum stav buckets from the project row itself.
+    const total = (p.available_units || 0) + (p.sold_units || 0) + (p.reserved_units || 0) +
+                  (p.prereserved_units || 0) + (p.future_units || 0) + (p.error_units || 0);
+    return { ...p, _realTotal: total, _realAvail: p.available_units || 0, _realSoldPct: p.sold_percentage };
+  });
+  const sorted = [...enriched].sort((a, b) => b._realTotal - a._realTotal);
   const clickable = typeof onProjectClick === "function";
   return (
     <div className="rep-table-wrap" style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8 }}>
@@ -1084,9 +1130,9 @@ function ProjectTable({ projects, lang, onProjectClick }) {
               <td style={tdc}><strong style={{ color: text }}>{p.name}</strong></td>
               <td style={tdc}>{p.developer || "—"}</td>
               <td style={tdc}>{p.district || "—"}</td>
-              <td style={tdcR}>{(p.total_units || 0).toLocaleString("en-US").replace(/,/g, " ")}</td>
-              <td style={{ ...tdcR, color: green }}>{(p.available_units || 0).toLocaleString("en-US").replace(/,/g, " ")}</td>
-              <td style={{ ...tdcR, color: orange }}>{p.sold_percentage ? p.sold_percentage.toFixed(0) + "%" : "—"}</td>
+              <td style={tdcR}>{p._realTotal.toLocaleString("en-US").replace(/,/g, " ")}</td>
+              <td style={{ ...tdcR, color: green }}>{p._realAvail.toLocaleString("en-US").replace(/,/g, " ")}</td>
+              <td style={{ ...tdcR, color: orange }}>{p._realSoldPct != null ? p._realSoldPct.toFixed(0) + "%" : "—"}</td>
               <td style={tdcR}>{p.avg_price_eur_m2 ? Math.round(p.avg_price_eur_m2).toLocaleString("en-US").replace(/,/g, " ") : "—"}</td>
             </tr>
           ))}
@@ -1125,15 +1171,22 @@ function TrendChart({ snapshots, scopePredicate, lang }) {
       </div>
     );
   }
+  // Sum stav-bucket columns (always-real per-flat counts) instead of
+  // `total_units` so a registry-inflated month from the past doesn't
+  // skew the historical trend. Avg €/m² is unweighted across snapshots
+  // (simple mean of project averages) — same trade-off applies as in
+  // summariseProjects's no-flats fallback.
   const series = months.map(m => {
     const rows = byMonth[m];
-    const totalUnits = rows.reduce((a, r) => a + (r.total_units || 0), 0);
-    const sold       = rows.reduce((a, r) => a + (r.sold_units || 0), 0);
-    const avail      = rows.reduce((a, r) => a + (r.available_units || 0), 0);
-    const priced = rows.filter(r => r.avg_price_eur_m2 && (r.total_units || 0) > 0);
+    const sumOf = (key) => rows.reduce((a, r) => a + (r[key] || 0), 0);
+    const avail = sumOf("available_units");
+    const sold  = sumOf("sold_units");
+    const totalUnits = avail + sold +
+      sumOf("reserved_units") + sumOf("prereserved_units") +
+      sumOf("future_units")   + sumOf("error_units");
+    const priced = rows.filter(r => r.avg_price_eur_m2);
     const wavg = priced.length
-      ? priced.reduce((a, r) => a + r.avg_price_eur_m2 * r.total_units, 0) /
-        priced.reduce((a, r) => a + r.total_units, 0)
+      ? priced.reduce((a, r) => a + r.avg_price_eur_m2, 0) / priced.length
       : null;
     return { m, totalUnits, sold, avail, wavg };
   });
@@ -1239,36 +1292,109 @@ function projectDistrict(flat, projects) {
   const p = projects.find(pp => pp.id === flat.project_id);
   return p?.district || null;
 }
-function summariseProjects(projects, _flats) {
-  // Aggregate from the projects table — total / available / sold per
-  // project. This is the single source of truth here; flats argument
-  // is ignored to keep the contract simple and predictable.
-  // (Flats-based aggregation was tried and rolled back: it hid
-  // registry-only projects entirely from breakdown tables, which
-  // read as "page is empty" to users — exactly the opposite of what
-  // we want. We prefer to show every project with its registry
-  // numbers and let the per-cell rendering be honest about gaps.)
-  const totalUnits = projects.reduce((a, p) => a + (p.total_units || 0), 0);
-  const available  = projects.reduce((a, p) => a + (p.available_units || 0), 0);
-  const sold       = projects.reduce((a, p) => a + (p.sold_units || 0), 0);
-  const reserved   = projects.reduce((a, p) => a + (p.reserved_units || 0), 0);
-  const sold30     = projects.reduce((a, p) => a + (p.sold_last_month || 0), 0);
-  // sold% — null when nothing has been recorded as sold/reserved
-  // (developer doesn't publish), so the UI can render "n/a" rather
-  // than misleading "0%". Otherwise the honest ratio.
-  const hasSoldData = sold > 0 || reserved > 0;
-  const soldPct = totalUnits > 0 && hasSoldData ? (sold / totalUnits) * 100 : null;
-  const priced = projects.filter(p => p.avg_price_eur_m2 && (p.total_units || 0) > 0);
+function summariseProjects(projects, flats) {
+  // === Single source of truth: the flats array ===
+  //
+  // When `flats` is provided, every unit metric is counted directly
+  // from individual flat rows — REAL data, no registry inflation.
+  //
+  // Why this matters: a few projects in the registry (Slnečnice = 4000,
+  // Bory etc.) carry a `manual_total` override that gets stored as
+  // `projects.total_units` and a derived `projects.sold_units` even
+  // though we only actually track ~50 flats per such project in the DB.
+  // Summing `p.total_units` for KPIs would inflate the headline count
+  // by ~5-10k. Counting from `flats.length` instead gives the honest
+  // "what we actually have data on" number.
+  //
+  // Fields per project (sync_to_supabase.py::aggregate_project):
+  //   - total_units, sold_units, sold_percentage  → may be inflated
+  //     when manual_total override applied
+  //   - available_units, reserved_units, prereserved_units,
+  //     future_units, error_units                 → ALWAYS real
+  //     (counted from stav per project, never overridden)
+  //   - sold_last_month                           → real (per-flat
+  //     stav transition counting, no registry math)
+  //
+  // So sold30 keeps coming from project rows (it's a real per-project
+  // delta), and projectCount is just `projects.length`. Everything
+  // else is rebuilt from flats.
+  const haveFlats = Array.isArray(flats);
+
+  if (haveFlats) {
+    const total       = flats.length;
+    const available   = flats.filter(f => f.stav === "V").length;
+    const sold        = flats.filter(f => f.stav === "P").length;
+    const reserved    = flats.filter(f => f.stav === "R").length;
+    const prereserved = flats.filter(f => f.stav === "PR").length;
+    const future      = flats.filter(f => f.stav === "Ešte nie v ponuke").length;
+    const errored     = flats.filter(f => f.stav === "ERROR").length;
+    // 30-day velocity stays per-project (real, computed from stav
+    // transitions in the sync). Sum across the projects in scope.
+    const sold30      = projects.reduce((a, p) => a + (p.sold_last_month || 0), 0);
+    // Active denominator excludes "future" + "error" — same convention
+    // as sync's aggregate_project so % matches across surfaces.
+    const activeTotal = total - future - errored;
+    const hasSoldData = sold > 0 || reserved > 0 || prereserved > 0;
+    const soldPct = activeTotal > 0 && hasSoldData
+      ? ((sold + reserved + prereserved) / activeTotal) * 100
+      : null;
+    // Avg €/m² as simple arithmetic mean of per-flat €/m². No
+    // weighting by registry-claimed inventory, so manual_total
+    // projects can't skew the headline price either.
+    const m2List = flats
+      .filter(f => f.cena_s_dph > 0 && f.obytna_plocha > 0)
+      .map(f => f.cena_s_dph / f.obytna_plocha);
+    const wavgM2 = m2List.length
+      ? m2List.reduce((a, b) => a + b, 0) / m2List.length
+      : null;
+    return {
+      projectCount: projects.length,
+      totalUnits: total,
+      available,
+      sold,
+      reserved: reserved + prereserved,
+      sold30,
+      soldPct,
+      wavgM2,
+      hasUnitData: total > 0,
+    };
+  }
+
+  // === Fallback path: no flats array (e.g. snapshot-only contexts) ===
+  //
+  // Sum stav-bucket columns instead of `total_units` so registry
+  // overrides don't inflate the result here either. `sold_units` is
+  // still inflated for manual_total projects in this branch — there's
+  // no clean way to recover the real sold count without flats — but
+  // the headline `totalUnits` at least matches the sum of buckets we
+  // can count, not the registry plan.
+  const sumOf = (key) => projects.reduce((a, p) => a + (p[key] || 0), 0);
+  const available   = sumOf("available_units");
+  const sold        = sumOf("sold_units");
+  const reserved    = sumOf("reserved_units");
+  const prereserved = sumOf("prereserved_units");
+  const future      = sumOf("future_units");
+  const errored     = sumOf("error_units");
+  const sold30      = sumOf("sold_last_month");
+  const totalUnits  = available + sold + reserved + prereserved + future + errored;
+  const activeTotal = totalUnits - future - errored;
+  const hasSoldData = sold > 0 || reserved > 0 || prereserved > 0;
+  const soldPct = activeTotal > 0 && hasSoldData
+    ? ((sold + reserved + prereserved) / activeTotal) * 100
+    : null;
+  const priced = projects.filter(p => p.avg_price_eur_m2);
   const wavgM2 = priced.length
-    ? priced.reduce((a, p) => a + p.avg_price_eur_m2 * p.total_units, 0) /
-      priced.reduce((a, p) => a + p.total_units, 0)
+    ? priced.reduce((a, p) => a + p.avg_price_eur_m2, 0) / priced.length
     : null;
   return {
     projectCount: projects.length,
-    totalUnits, available, sold, reserved, sold30, soldPct, wavgM2,
-    // Always true when we have at least 1 project — the "data gap"
-    // signal callers used to render em-dashes is gone. Keep the
-    // field for back-compat with downstream JSX checks.
+    totalUnits,
+    available,
+    sold,
+    reserved: reserved + prereserved,
+    sold30,
+    soldPct,
+    wavgM2,
     hasUnitData: projects.length > 0 && totalUnits > 0,
   };
 }

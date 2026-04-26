@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
 import { useProjects, useProjectFlats, useAllFlats, useEarlyAccessStats, useProjectSnapshots, useMarketTotals } from "../lib/useData";
@@ -2228,36 +2228,74 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
     : flatsReady ? allFlats.filter(f => f.stav === "P").length
     : projects.reduce((a, p) => a + (p.sold_units || 0), 0);
   const totalSold30 = projects.reduce((a, p) => a + (p.sold_last_month || 0), 0);
-  const priceEntries = projects.filter(p => p.avg_price_eur_m2 && p.total_units > 0);
+  // Avg €/m² as simple arithmetic mean of per-project averages — no
+  // weighting by `total_units` because that field carries inflated
+  // registry numbers for manual_total projects (Slnečnice = 4000)
+  // and would skew the mean toward a few big projects.
+  const priceEntries = projects.filter(p => p.avg_price_eur_m2);
   const weightedAvg = priceEntries.length > 0
-    ? Math.round(priceEntries.reduce((a, p) => a + p.avg_price_eur_m2 * p.total_units, 0)
-                 / priceEntries.reduce((a, p) => a + p.total_units, 0))
+    ? Math.round(priceEntries.reduce((a, p) => a + p.avg_price_eur_m2, 0) / priceEntries.length)
     : null;
   const soldOutCount = projects.filter(p => (p.sold_percentage || 0) >= 100).length;
   const absorptionPct = totalAvail > 0 ? Math.round((totalSold30 / (totalAvail + totalSold30)) * 1000) / 10 : 0;
 
   // ─── Aggregations ────────────────────────────────────────
-  // Districts + developer breakdowns sum the projects-table fields
-  // directly (total_units / available_units / sold_units / sold30).
-  // This is intentional: every project — including registry-only
-  // entries (Slnečnice, Bory, Penta portfolio) — has SOMETHING to
-  // show, and the user expects to see all 57 projects represented
-  // in the breakdowns. Earlier flats-based aggregation hid those
-  // projects entirely, which read as "page is empty / waiting for
-  // data" — exactly the opposite of what the user wants.
+  // Real-data path: when `allFlats` is loaded (paid/admin tier — RLS
+  // returns the full set), bucket flats by project_id once and use
+  // those counts for every breakdown row. Sums the actual rows we
+  // synced to Supabase, so registry-only projects (Slnečnice = 4000
+  // claim, ~50 tracked) contribute only their real ~50, not 4000.
   //
-  // Honesty layer: the per-cell rendering (in the JSX below) shows
-  // "n/a" for sold % when a project doesn't publish sold data and
-  // "—" for €/m² when prices aren't published — so we never lie
-  // with "0 %" or fake zeros, but we also never hide a project.
+  // Fallback path: anon/free tiers don't see all flats (RLS scope =
+  // chosen_project only). For those we fall back to the project row's
+  // stav-bucket columns — `available_units`, `reserved_units`, etc.
+  // are always real counts (never overridden by manual_total). Only
+  // `sold_units` may be inflated when the project has a manual_total
+  // override; we still sum it but the totals become "real avail +
+  // possibly-inflated sold" which is far less wrong than the previous
+  // "registry plan total" sum.
+  //
+  // Either way: every project still appears in the breakdowns —
+  // registry-only projects just contribute 0 (or near-0) to unit
+  // counts, instead of inflating them to 4000.
+  const flatsAvailable = Array.isArray(allFlats) && allFlats.length > 0;
+  const flatsByProject = useMemo(() => {
+    if (!flatsAvailable) return null;
+    const m = new Map();
+    for (const f of allFlats) {
+      let r = m.get(f.project_id);
+      if (!r) { r = { total: 0, V: 0, P: 0, R: 0, PR: 0 }; m.set(f.project_id, r); }
+      r.total++;
+      if (f.stav === "V") r.V++;
+      else if (f.stav === "P") r.P++;
+      else if (f.stav === "R") r.R++;
+      else if (f.stav === "PR") r.PR++;
+    }
+    return m;
+  }, [allFlats, flatsAvailable]);
+
+  // Per-project real-count helpers
+  const realTotal = (p) => {
+    if (flatsAvailable) return flatsByProject?.get(p.id)?.total || 0;
+    // No flats → sum stav buckets from the project row (real for
+    // available/reserved/etc.; sold may be inflated).
+    return (p.available_units || 0) + (p.sold_units || 0) +
+           (p.reserved_units || 0) + (p.prereserved_units || 0) +
+           (p.future_units || 0) + (p.error_units || 0);
+  };
+  const realSold = (p) => {
+    if (flatsAvailable) return flatsByProject?.get(p.id)?.P || 0;
+    return p.sold_units || 0;  // may be inflated; can't recover without flats
+  };
+
   const byDistrict = {};
   for (const p of projects) {
     if (!p.district) continue;
     const d = byDistrict[p.district] ||= { district: p.district, count: 0, units: 0, avail: 0, sold: 0, sold30: 0, priceSum: 0, priceN: 0 };
     d.count += 1;
-    d.units  += p.total_units || 0;
+    d.units  += realTotal(p);
     d.avail  += p.available_units || 0;
-    d.sold   += p.sold_units || 0;
+    d.sold   += realSold(p);
     d.sold30 += p.sold_last_month || 0;
     if (p.avg_price_eur_m2) { d.priceSum += p.avg_price_eur_m2; d.priceN += 1; }
   }
@@ -2271,17 +2309,18 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
     if (!p.developer) continue;
     const d = byDeveloper[p.developer] ||= { developer: p.developer, count: 0, units: 0, sold: 0, sold30: 0, avail: 0, projects: [] };
     d.count += 1;
-    d.units  += p.total_units || 0;
-    d.sold   += p.sold_units || 0;
+    d.units  += realTotal(p);
+    d.sold   += realSold(p);
     d.sold30 += p.sold_last_month || 0;
     d.avail  += p.available_units || 0;
     // Stash each project under its developer so the Top-Developers
     // RankBarList can drill down into the per-project list when a
-    // developer row is expanded. Sorted desc by total_units below.
+    // developer row is expanded. Sorted desc by REAL total below
+    // (so Bory/Slnečnice don't dominate purely from registry inflation).
     d.projects.push(p);
   }
   for (const d of Object.values(byDeveloper)) {
-    d.projects.sort((a, b) => (b.total_units || 0) - (a.total_units || 0));
+    d.projects.sort((a, b) => realTotal(b) - realTotal(a));
   }
   const topDevelopers = Object.values(byDeveloper).sort((a, b) => b.units - a.units).slice(0, 10);
 

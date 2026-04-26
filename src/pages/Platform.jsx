@@ -815,11 +815,22 @@ function PlatformDashboard({ lang, setCurrent }) {
   const showTrialOffer = baseTier === "free" && !trialActive && !profile?.trial_started_at;
 
   // KPI counts come from the published `metrics` table (same values
-  // the ticker + marketing site show). Fall back to summing projects
-  // when metrics haven't synced yet. `sold30` stays project-derived
-  // because the metric doesn't exist at the per-month granularity.
+  // the ticker + marketing site show — derived from len(all_flats),
+  // i.e. real row counts). Fall back to summing projects when metrics
+  // haven't synced yet. `sold30` stays project-derived because that
+  // metric isn't published at the per-month granularity.
+  //
+  // Fallback note: we sum stav-bucket columns rather than `total_units`
+  // because a few projects (Slnečnice, Bory, etc.) carry a registry
+  // override in `total_units` that inflates by ~5-10k. Available /
+  // reserved / future / error are always real per-project; only
+  // sold_units may carry the inflation, but the headline `units`
+  // count above is no longer a registry plan total.
   const rawTotals = projects.reduce((a, p) => ({
-    units: a.units + (p.total_units || 0),
+    units: a.units +
+      (p.available_units || 0) + (p.sold_units || 0) +
+      (p.reserved_units || 0) + (p.prereserved_units || 0) +
+      (p.future_units || 0) + (p.error_units || 0),
     avail: a.avail + (p.available_units || 0),
     sold:  a.sold  + (p.sold_units || 0),
     sold30: a.sold30 + (p.sold_last_month || 0),
