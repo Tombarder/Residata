@@ -600,39 +600,119 @@ export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en
       {loading ? <div style={{ color: dim }}>{t.loading_generic}</div> :
         error ? <div style={{ color: "#ff6b6b" }}>Error: {error.message}</div> :
         flats.length === 0 ? (
-          /* Three distinct empty-state reasons — don't just say "no data",
-             tell the user why so they know whether to wait or move on. */
-          <div style={{
-            padding: "2rem 1.5rem", border: `1px dashed ${border}`, borderRadius: 10,
-            background: "rgba(255,255,255,0.02)", textAlign: "center",
-          }}>
-            <div style={{ fontSize: "1rem", color: "#e8e8ed", fontWeight: 600, marginBottom: "0.6rem" }}>
-              {lang === "sk" ? "Pre tento projekt zatiaľ nemáme detail bytov" : "No unit-level data for this project yet"}
-            </div>
-            <div style={{ color: dim, fontSize: "0.88rem", lineHeight: 1.6, maxWidth: 560, margin: "0 auto" }}>
-              {(() => {
-                // Case 1: project claims N units but we have 0 in DB → sync gap
-                if (project && (project.total_units || 0) > 0) {
-                  return lang === "sk"
-                    ? <>Projekt inzeruje <strong style={{ color: "#e8e8ed" }}>{project.total_units}</strong> bytov, ale zoznam sa ešte nezosynchronizoval do našej DB. Dáta pribudnú pri najbližšom mesačnom behu.</>
-                    : <>The project lists <strong style={{ color: "#e8e8ed" }}>{project.total_units}</strong> units but the flat-level sync hasn't run yet. Data will appear on the next monthly sync.</>;
-                }
-                // Case 2: total_units is 0 — developer's public listing is empty
-                return lang === "sk"
-                  ? "Developer zatiaľ nezverejnil verejný zoznam bytov. Projekt je v registri, ale detail bude dostupný až po zverejnení developerom."
-                  : "The developer hasn't published a public unit list yet. The project is in the registry but detail will appear once they publish.";
-              })()}
-            </div>
-            <button onClick={() => setCurrent && setCurrent(backTarget)} className="btn-s" style={{ marginTop: "1.25rem", fontSize: "0.82rem" }}>
-              ← {lang === "sk" ? "Späť na prehľad" : "Back to dashboard"}
-            </button>
-          </div>
+          // No flat-level rows yet (scraper hasn't pulled per-unit
+          // detail for this project). But the projects table almost
+          // always carries useful aggregates (total / avail / sold /
+          // €/m² / sold-30d / district / developer) — show those as
+          // a value-first "project summary" instead of just a "no
+          // data" wall. Sync gap caveat goes below the data, framed
+          // as "live changes need 1-2 syncs", not "we have nothing".
+          (project && (project.total_units || 0) > 0)
+            ? <ProjectAggregateOnly project={project} lang={lang} t={t} canVelocity={can("view_sold_velocity")} />
+            : (
+              <div style={{
+                padding: "2rem 1.5rem", border: `1px dashed ${border}`, borderRadius: 10,
+                background: "rgba(255,255,255,0.02)", textAlign: "center",
+              }}>
+                <div style={{ fontSize: "1rem", color: "#e8e8ed", fontWeight: 600, marginBottom: "0.6rem" }}>
+                  {lang === "sk" ? "Developer zatiaľ nezverejnil verejný zoznam bytov" : "Developer hasn't published a public unit list yet"}
+                </div>
+                <div style={{ color: dim, fontSize: "0.88rem", lineHeight: 1.6, maxWidth: 560, margin: "0 auto" }}>
+                  {lang === "sk"
+                    ? "Projekt je v registri, ale detail bude dostupný až po zverejnení developerom."
+                    : "The project is in the registry but detail will appear once they publish."}
+                </div>
+                <button onClick={() => setCurrent && setCurrent(backTarget)} className="btn-s" style={{ marginTop: "1.25rem", fontSize: "0.82rem" }}>
+                  ← {lang === "sk" ? "Späť na prehľad" : "Back to dashboard"}
+                </button>
+              </div>
+            )
         ) :
         <>
           {project && <ProjectInsights project={project} flats={flats} snapshots={snapshots} lang={lang} onSelectFlat={onSelectFlat} />}
           <FlatsTable flats={flats} t={t} lang={lang} highlightedFlatId={highlightedFlatId} />
         </>}
     </main>
+  );
+}
+
+/**
+ * ProjectAggregateOnly — fallback view when we have project-level
+ * aggregates (total_units / available / sold / €/m² / sold-30d /
+ * district / developer) but no per-flat rows yet. Mirrors the
+ * KPI strip from ProjectInsights so the user immediately sees
+ * value, not a "no data" wall. A small note at the bottom is the
+ * only mention of the sync gap — framed as "unit-level breakdown
+ * arriving next sync", not "we have nothing".
+ */
+function ProjectAggregateOnly({ project, lang, t, canVelocity }) {
+  const locale = lang === "sk" ? "sk-SK" : "en-US";
+  const fmt = (n) => n == null ? "—" : Number(n).toLocaleString(locale);
+  const eurM2 = project.avg_price_eur_m2 ? Math.round(project.avg_price_eur_m2) : null;
+  const soldPct = project.sold_percentage != null ? `${project.sold_percentage}%` : null;
+  const soldDataMissing = (project.sold_units || 0) === 0 && (project.reserved_units || 0) === 0;
+
+  const kpis = [
+    { label: lang === "sk" ? "Bytov spolu" : "Total units",  value: fmt(project.total_units), accent: "#e8e8ed" },
+    { label: lang === "sk" ? "Voľné" : "Available",          value: fmt(project.available_units), accent: green },
+    { label: lang === "sk" ? "Predané" : "Sold",             value: soldDataMissing ? "—" : fmt(project.sold_units), accent: "#f5a623", sub: soldDataMissing ? (lang === "sk" ? "developer nezverejňuje" : "developer doesn't publish") : null },
+    { label: lang === "sk" ? "Predaných %" : "Sold %",       value: soldPct || "—", accent: "#f5a623" },
+    { label: "€/m²",                                         value: eurM2 ? fmt(eurM2) : (lang === "sk" ? "nezverejnené" : "not published"), accent: eurM2 ? "#e8e8ed" : dim },
+    ...(canVelocity && project.sold_last_month != null ? [{
+      label: lang === "sk" ? "Predané (30d)" : "Sold (30d)",
+      value: project.sold_last_month > 0 ? `+${project.sold_last_month}` : "0",
+      accent: green,
+    }] : []),
+  ];
+
+  return (
+    <div>
+      {/* KPI strip — same shape as the full ProjectInsights so the
+          page reads as "the data we have" not as "we have nothing". */}
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+        gap: "0.85rem", marginBottom: "1.5rem",
+      }}>
+        {kpis.map((k, i) => (
+          <div key={i} style={{
+            background: "#16161a", border: `1px solid ${border}`,
+            borderRadius: 10, padding: "1rem 1.1rem",
+          }}>
+            <div style={{ fontFamily: mono, fontSize: "0.62rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.45rem" }}>
+              {k.label}
+            </div>
+            <div style={{ fontFamily: mono, fontSize: "1.55rem", fontWeight: 700, color: k.accent || "#e8e8ed", letterSpacing: "-0.02em", lineHeight: 1 }}>
+              {k.value}
+            </div>
+            {k.sub && (
+              <div style={{ fontSize: "0.66rem", color: dim, marginTop: "0.4rem", fontStyle: "italic" }}>
+                {k.sub}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Light "more coming" note. NOT a warning, NOT framed as
+          missing data — just a heads-up that unit-level pages will
+          appear after another sync run. */}
+      <div style={{
+        padding: "0.85rem 1.1rem",
+        background: "rgba(0,229,160,0.04)",
+        border: `1px solid rgba(0,229,160,0.18)`,
+        borderRadius: 8,
+        display: "flex", alignItems: "flex-start", gap: "0.7rem",
+        fontSize: "0.82rem", color: "#c0c0c8", lineHeight: 1.5,
+      }}>
+        <span style={{ color: green, fontSize: "1rem", lineHeight: 1.2 }}>ℹ</span>
+        <div>
+          {lang === "sk"
+            ? <>Detailný rozpis jednotlivých bytov (poschodie, izby, cena za byt, balkón, orientácia) pribudne v ďalšom mesačnom syncu — väčšinou potrebujeme 1–2 behy aby sme zachytili všetky zmeny pre tento projekt. Vyššie čísla sú už aktuálne pre tento mesiac.</>
+            : <>The per-unit breakdown (floor, rooms, price-per-flat, balcony, orientation) will land in the next monthly sync — we typically need 1–2 runs to capture every change for a new project. The aggregate numbers above are already current for this month.</>}
+        </div>
+      </div>
+    </div>
   );
 }
 
