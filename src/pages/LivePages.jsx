@@ -4,6 +4,7 @@ import { useCapabilities } from "../lib/useCapabilities";
 import { useProjects, useProjectFlats, useAllFlats, useEarlyAccessStats, useProjectSnapshots, useMarketTotals } from "../lib/useData";
 import { supabase } from "../lib/supabase";
 import { liveT, ll } from "../lib/liveLang";
+import { goBack } from "../lib/routing";
 import { track } from "../lib/track";
 import { isPersonalEmail } from "../lib/emailValidation";
 import UpgradePrompt from "../components/UpgradePrompt";
@@ -574,18 +575,17 @@ export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en
     );
   }
 
-  // Where "Back to projects" should land depends on context. Inside the
-  // platform shell (URL starts with /app/) we return to /app/projects so
-  // the sidebar + platform chrome stay consistent. On the public site we
-  // return to /live (the marketing dashboard). Previously this always
-  // went to "Live", which yanked platform users back onto the marketing
-  // page — wrong and confusing.
+  // Smart back: prefer the actual previous page in browser history
+  // (Analytics → project detail → back returns to Analytics, not the
+  // generic /app/projects). Fall back to a sensible static target
+  // only when there's no in-app history (direct URL open).
   const inPlatform = typeof window !== "undefined" && window.location.pathname.startsWith("/app");
-  const backTarget = inPlatform ? "App:Projects" : "Live";
+  const backFallback = inPlatform ? "App:Projects" : "Live";
+  const onBack = () => goBack(setCurrent, backFallback);
 
   return (
     <main style={{ padding: "5rem 2rem 4rem", maxWidth: 1200, margin: "0 auto" }}>
-      <button onClick={() => setCurrent && setCurrent(backTarget)} style={{ ...linkBtn, marginBottom: "1rem" }}>{t.back_to_projects}</button>
+      <button onClick={() => onBack()} style={{ ...linkBtn, marginBottom: "1rem" }}>{t.back_to_projects}</button>
 
       <Label>{project?.district || "Bratislava"}</Label>
       <h1 className="sec-title">{project?.name || projectId}</h1>
@@ -622,7 +622,7 @@ export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en
                     ? "Projekt je v registri, ale detail bude dostupný až po zverejnení developerom."
                     : "The project is in the registry but detail will appear once they publish."}
                 </div>
-                <button onClick={() => setCurrent && setCurrent(backTarget)} className="btn-s" style={{ marginTop: "1.25rem", fontSize: "0.82rem" }}>
+                <button onClick={() => onBack()} className="btn-s" style={{ marginTop: "1.25rem", fontSize: "0.82rem" }}>
                   ← {lang === "sk" ? "Späť na prehľad" : "Back to dashboard"}
                 </button>
               </div>
@@ -2112,7 +2112,7 @@ function ChooseProjectGate({ projectId, projectName, profile, reloadProfile, set
           <button className="btn-p" onClick={() => setCurrent(`Project:${profile.chosen_project_id}`)}>
             {lang === "sk" ? "Ísť na môj projekt" : "Go to my project"}
           </button>
-          <button className="btn-s" onClick={() => setCurrent("Live")}>{t.back_to_dashboard}</button>
+          <button className="btn-s" onClick={() => goBack(setCurrent, typeof window !== "undefined" && window.location.pathname.startsWith("/app") ? "App:Projects" : "Live")}>{t.back_to_dashboard}</button>
         </div>
       </main>
     );
@@ -2154,7 +2154,7 @@ function ChooseProjectGate({ projectId, projectName, profile, reloadProfile, set
         <button className="btn-p" onClick={assign} disabled={busy}>
           {busy ? t.saving : ll(t.choose_watch, { name: projectName })}
         </button>
-        <button className="btn-s" onClick={() => setCurrent("Live")}>{t.choose_back}</button>
+        <button className="btn-s" onClick={() => goBack(setCurrent, typeof window !== "undefined" && window.location.pathname.startsWith("/app") ? "App:Projects" : "Live")}>{t.choose_back}</button>
       </div>
       {err && <div style={{ color: "#ff6b6b", marginTop: "0.75rem" }}>{err}</div>}
       <p style={{ fontSize: "0.8rem", color: dim, marginTop: "2rem" }}>
@@ -2165,6 +2165,7 @@ function ChooseProjectGate({ projectId, projectName, profile, reloadProfile, set
 }
 
 function GateMessage({ title, body, cta, backLabel, onCta, setCurrent }) {
+  const inPlatform = typeof window !== "undefined" && window.location.pathname.startsWith("/app");
   return (
     <main style={{ padding: "6rem 2rem 4rem", maxWidth: 600, margin: "0 auto", textAlign: "center" }}>
       <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>🔒</div>
@@ -2172,7 +2173,7 @@ function GateMessage({ title, body, cta, backLabel, onCta, setCurrent }) {
       <p style={{ color: dim, fontSize: "1rem", lineHeight: 1.6, marginBottom: "1.5rem" }}>{body}</p>
       <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center" }}>
         <button className="btn-p" onClick={onCta}>{cta}</button>
-        <button className="btn-s" onClick={() => setCurrent && setCurrent("Live")}>{backLabel}</button>
+        <button className="btn-s" onClick={() => goBack(setCurrent, inPlatform ? "App:Projects" : "Live")}>{backLabel}</button>
       </div>
     </main>
   );

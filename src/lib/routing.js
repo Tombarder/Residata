@@ -91,3 +91,37 @@ export function pushRoute(page, replace = false) {
   if (replace) window.history.replaceState(state, "", path);
   else window.history.pushState(state, "", path);
 }
+
+/**
+ * Smart back-navigation. Tries the browser's native history.back()
+ * first — the user lands wherever they actually came from (Analytics
+ * → project detail → back returns to Analytics, not the hard-coded
+ * App:Projects). Falls back to `fallbackPage` only when there's no
+ * meaningful history entry to return to (e.g. user opened the URL
+ * directly in a new tab).
+ *
+ *   navigate(page) — caller's navigate function (handleNav from App
+ *                    or PlatformShell.navigate). Only used as
+ *                    fallback when history is empty.
+ *   fallbackPage   — the page key to route to as a safety net.
+ *
+ * Why not always history.back(): if the user landed via direct URL
+ * (no in-app history), history.back() either does nothing or
+ * navigates out of the app. Routing them to a sensible fallback
+ * keeps them in-product.
+ */
+export function goBack(navigate, fallbackPage = "Home") {
+  if (typeof window === "undefined") return;
+  const sameOriginReferrer = document.referrer && document.referrer.startsWith(window.location.origin);
+  // history.length includes the current entry — > 1 means there's
+  // something to go back to. Combined with referrer check this is a
+  // 95% reliable "do we have a previous in-app page?" signal.
+  const hasInAppHistory = window.history.length > 1 && (sameOriginReferrer || window.history.state?.page);
+  if (hasInAppHistory) {
+    window.history.back();
+  } else if (navigate) {
+    navigate(fallbackPage);
+  } else {
+    window.location.assign(pageToPath(fallbackPage));
+  }
+}
