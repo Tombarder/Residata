@@ -3,6 +3,7 @@ import Ticker from "./components/Ticker";
 import LoginModal from "./components/LoginModal";
 import CompleteProfile from "./components/CompleteProfile";
 import FloatingChat from "./components/FloatingChat";
+import { TrialBanner, TrialPopup } from "./components/TrialBanner";
 import PendingGate from "./components/PendingGate";
 import Feature from "./components/Feature";
 import UpgradePrompt from "./components/UpgradePrompt";
@@ -1282,13 +1283,22 @@ function DataPage({ setCurrent, l, lang }) {
 }
 
 /* ─────── PRICING ─────── */
-function PricingPage({ setCurrent, l, lang }) {
+function PricingPage({ setCurrent, l, lang, onLogin }) {
   const mono = "'JetBrains Mono', monospace";
   const tiers = l.tiers;
   const faqs = l.faqs;
   const { can } = useCapabilities();
+  const auth = useAuth();
   const showEarlyAccessBlock = can("see_early_access_badge");
   const isAlreadyPaid = can("has_paid_access");
+  // Trial CTA routing: anon → open the LoginModal so they can sign
+  // up first; signed-in free → straight to in-platform Billing where
+  // the Start-trial button lives.
+  const startTrial = () => {
+    if (auth.user) setCurrent("App:Billing");
+    else if (onLogin) onLogin();
+    else setCurrent("Home");
+  };
   const ea = lang === "sk" ? {
     badge: "🔥 Early access — 5 min a máš prístup",
     body: <>Prvých <strong style={{ color: "#00e5a0" }}>9 zákazníkov</strong> dostane <strong style={{ color: "#00e5a0" }}>50 % zľavu prvé 3 mesiace</strong>. Žiadne formuláre — krátky 5-minútový call, dohodneme sa, prístup máš hneď.</>,
@@ -1320,14 +1330,50 @@ function PricingPage({ setCurrent, l, lang }) {
         <h1 className="sec-title">{l.pricingTitle}</h1>
         <p className="sec-desc" style={{ textAlign: "center" }}>{l.pricingDesc}</p>
 
-        {/* Early access CTA — len pre tých ktorí ešte nie sú paid */}
+        {/* 7-day free trial card — front and centre on Pricing for
+            anon + free users. Mirrors the Billing-page version so the
+            messaging is consistent across the funnel. CTA opens the
+            login modal (anon → signup) or routes free users to the
+            in-platform Billing page where the actual Start button
+            lives. */}
         {showEarlyAccessBlock && (
           <div style={{
-            marginTop: "2rem", padding: "1.5rem 2rem", maxWidth: 680,
-            background: "linear-gradient(135deg, rgba(0,229,160,0.08), rgba(0,229,160,0.02))",
-            border: "1px solid rgba(0,229,160,0.25)", borderRadius: 12, width: "100%",
+            marginTop: "2rem", padding: "1.75rem 2rem", maxWidth: 680, width: "100%",
+            background: "linear-gradient(135deg, rgba(0,229,160,0.16), rgba(0,229,160,0.04))",
+            border: "1px solid #00e5a0", borderRadius: 12,
           }}>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem", color: "#00e5a0", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "0.5rem" }}>
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem", color: "#00e5a0", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "0.5rem", fontWeight: 700 }}>
+              🎁 {lang === "sk" ? "Darček pre teba" : "A gift for you"}
+            </div>
+            <h3 style={{ fontSize: "1.35rem", fontWeight: 700, color: "#e8e8ed", margin: "0 0 0.5rem", letterSpacing: "-0.01em" }}>
+              {lang === "sk" ? "7 dní plného Residata — zadarmo" : "7 days of the full Residata — on us"}
+            </h3>
+            <p style={{ fontSize: "0.92rem", color: "#c0c0c8", lineHeight: 1.55, margin: "0 0 1rem" }}>
+              {lang === "sk"
+                ? <>Vyskúšaj všetky projekty, analytiku, reporty, exporty + AI asistenta na týždeň naplno. <strong style={{ color: "#e8e8ed" }}>Bez karty</strong> — kartu pýtame až keby si chcel pokračovať po trial-e.</>
+                : <>Try every project, analytics, reports, exports + the AI assistant for a full week. <strong style={{ color: "#e8e8ed" }}>No card required</strong> — we only ask for one if you decide to continue after the trial.</>}
+            </p>
+            <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center", flexWrap: "wrap", alignItems: "center" }}>
+              <a onClick={startTrial} className="btn-p" style={{ cursor: "pointer" }}>
+                {lang === "sk" ? "Aktivovať 7-dňový trial" : "Activate 7-day trial"}
+              </a>
+              <span style={{ fontSize: "0.72rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace" }}>
+                {lang === "sk" ? "30s signup · žiadna karta · bez strhávania" : "30s signup · no card · no auto-charge"}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Existing early-access / 50% promo card — left in place
+            below the trial card for users who want long-term commit
+            after evaluating during the trial. */}
+        {showEarlyAccessBlock && (
+          <div style={{
+            marginTop: "1.25rem", padding: "1.5rem 2rem", maxWidth: 680,
+            background: "linear-gradient(135deg, rgba(245,166,35,0.08), rgba(245,166,35,0.02))",
+            border: "1px solid rgba(245,166,35,0.3)", borderRadius: 12, width: "100%",
+          }}>
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem", color: "#f5a623", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "0.5rem" }}>
               {ea.badge}
             </div>
             <p style={{ fontSize: "0.95rem", color: "#e8e8ed", lineHeight: 1.6, marginBottom: "1rem" }}>
@@ -1702,7 +1748,16 @@ export default function App() {
         .hero-anim-3 { animation: heroFadeIn 0.8s ease 0.3s both; }
         .hero-anim-4 { animation: heroFadeIn 0.8s ease 0.45s both; }
         .pulse-dot { animation: pulse 2s ease-in-out infinite; }
-        
+
+        /* When TrialBanner is mounted (it adds .residata-has-trial-banner
+           on body), push the fixed Nav down by the banner height so the
+           two stack instead of overlapping. Same offset applied to the
+           fixed Ticker (Ticker positions itself relative to Nav-bottom).
+           Banner height ≈ 40 px on desktop, slightly more if it wraps on
+           mobile — using 44 px gives a little safety margin. */
+        body.residata-has-trial-banner nav { top: 44px !important; }
+        body.residata-has-trial-banner [aria-label="Live market ticker"] { top: 116px !important; }
+
         .card-hover { transition: border-color 0.3s, transform 0.3s, box-shadow 0.3s; }
         .card-hover:hover { border-color: #333 !important; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.2); }
         @media (max-width: 768px) {
@@ -1750,6 +1805,18 @@ export default function App() {
           sidebar — skip the marketing Nav/Ticker/Footer chrome. */}
       {!isAppPage(current) && (
         <>
+          {/* TrialBanner — slim sticky-top bar, ALWAYS visible across
+              marketing pages until dismissed (7-day localStorage flag).
+              Sits ABOVE the Nav so the layout pushes Nav down by the
+              banner's height when present. The banner self-hides for
+              users who don't qualify (paid, mid-trial, used trial). */}
+          <TrialBanner
+            lang={lang}
+            onCta={() => {
+              if (auth.user) handleNav("App:Billing");
+              else setLoginOpen(true);
+            }}
+          />
           <Nav current={current} setCurrent={handleNav} lang={lang} setLang={setLang} auth={auth} onLogin={() => setLoginOpen(true)} caps={caps} />
           <Ticker lang={lang} />
           {/* Spacer for fixed Nav (72px) + Ticker (36px) */}
@@ -1801,7 +1868,7 @@ export default function App() {
 
             {current === "Use Cases" && <UseCasesPage setCurrent={handleNav} l={l} lang={lang} />}
             {current === "Data" && <DataPage setCurrent={handleNav} l={l} lang={lang} />}
-            {current === "Pricing" && <PricingPage setCurrent={handleNav} l={l} lang={lang} />}
+            {current === "Pricing" && <PricingPage setCurrent={handleNav} l={l} lang={lang} onLogin={() => setLoginOpen(true)} />}
             {current === "Contact" && <ContactPage l={l} />}
             {/* Hidden hero-variant preview page — not in Nav, only reachable via /hero-lab URL */}
             {current === "HeroLab" && <HeroLabPage setCurrent={handleNav} lang={lang} />}
@@ -1827,6 +1894,19 @@ export default function App() {
           localStorage key and fight. */}
       {!isAppPage(current) && (
         <FloatingChat lang={lang} onNavigate={handleNav} />
+      )}
+      {/* TrialPopup — marketing pages only. Once-per-day modal that
+          fires 1.5s after page load. Self-suppresses for non-eligible
+          users (paid / mid-trial / trial-used). CTA opens the login
+          modal for anon, jumps to Billing for free signed-in. */}
+      {!isAppPage(current) && (
+        <TrialPopup
+          lang={lang}
+          onCta={() => {
+            if (auth.user) handleNav("App:Billing");
+            else setLoginOpen(true);
+          }}
+        />
       )}
       <LoginModal open={loginOpen} onClose={() => setLoginOpen(false)} lang={lang} />
       {/* Force profile completion after login */}
