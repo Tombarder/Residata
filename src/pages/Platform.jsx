@@ -125,9 +125,10 @@ export default function PlatformShell({ page, projectId, lang = "en", setLang, s
   const [mobileOpen, setMobileOpen] = useState(false);
 
   // If somehow anon ended up on /app/*, kick them to home + open login modal.
+  // setCurrent is handleNav (App.jsx) which already pushes the route —
+  // no need to double-push here.
   useEffect(() => {
     if (!auth.loading && !auth.user) {
-      pushRoute("Home");
       setCurrent && setCurrent("Home");
       openLogin && openLogin();
     }
@@ -167,8 +168,12 @@ export default function PlatformShell({ page, projectId, lang = "en", setLang, s
       else if (p === "Pricing")             p = "App:Billing";
       else if (p === "Analytics")           p = "App:Analytics";
     }
+    // setCurrent is handleNav from App.jsx, which itself calls
+    // pushRoute. Calling pushRoute here too created TWO history
+    // entries for one click — user had to press Back twice to
+    // return. Removed the duplicate push; single source of truth
+    // is handleNav.
     setCurrent && setCurrent(p);
-    pushRoute(p);
     setMobileOpen(false);
     window.scrollTo({ top: 0, behavior: "instant" });
   };
