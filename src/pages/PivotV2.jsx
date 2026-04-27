@@ -985,6 +985,20 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
         lang={lang}
       />
 
+      {/* Chart panel — derived from the same tree as the table.
+          Always rendered (even with no rows) so the user can discover
+          the feature; an empty-state inside the panel guides them to
+          drag a field. Lives BELOW the table because the table is the
+          primary surface; the chart is a supplementary "eyeball check"
+          of the same numbers. */}
+      <PivotChart
+        tree={sortedTree}
+        rowFields={rows}
+        colFields={cols}
+        effectiveValues={effectiveValues}
+        lang={lang}
+      />
+
       {/* Drill-down modal */}
       {drillDown && (
         <DrillDownModal
@@ -2032,6 +2046,722 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
 
 const th = { padding: "0.65rem 0.75rem", fontWeight: 700, borderBottom: `1px solid ${border}` };
 const td = { padding: "0.45rem 0.75rem", borderBottom: "none" };
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   PIVOT CHART
+   ═══════════════════════════════════════════════════════════════════
+
+   A small SVG-only chart panel that renders the same data the pivot
+   table is showing. Reads the top-level rows of the tree (level 0,
+   first row dimension) and turns them into a bar / stacked-bar / line
+   / pie / heatmap. No third-party charting lib — everything is plain
+   <svg>, styled with the same green/orange palette as the rest of
+   the app, so bundle size doesn't grow.
+
+   Why these five chart types:
+     · bar        — universal default for "compare a value across
+                    categories" (e.g. avg €/m² per district).
+     · stacked    — when there's a cross-tab column dimension, each
+                    bar is segmented by colKey (e.g. unit count per
+                    district, segmented by stav V/P/R).
+     · line       — for ordinal row dimensions (snapshot_month, izby,
+                    poschodie). Reads like a trend.
+     · pie        — when the measure is additive (count / sum) AND
+                    there are ≤ 8 categories. Communicates share-of-
+                    total better than bars at small cardinality. We
+                    block it for avg / median / min / max — adding
+                    averages in a pie is meaningless.
+     · heatmap    — for cross-tab where both row and col have many
+                    values (e.g. district × izby with avg €/m²).
+                    Encodes value as cell brightness.
+
+   Auto-detect logic (chartType === 'auto'):
+     · cross-tab present → 'stacked' (or 'heatmap' if many cols)
+     · row dim is snapshot_month → 'line'
+     · row dim is ordinal numeric (izby/poschodie) → 'line'
+     · ≤ 8 categories + additive measure → keep 'bar' default
+                    (pie is opt-in via the picker)
+     · otherwise → 'bar'
+
+   Truncation:
+     · top 20 rows by absolute value, "+N more" indicator. The
+       table shows everything; the chart's job is the eyeball-level
+       comparison, which falls apart past ~20 bars.
+
+   Edge cases handled:
+     · 0 records / 0 rows → shows "Drag a field to see chart"
+     · all values null/zero → "No values to chart yet"
+     · 2+ values defined → user picks which one via dropdown (no
+       grouped-bar — gets visually noisy fast)
+     · negative values (rare in our domain) → handled by signed
+       Y-axis; bars below zero work as expected
+*/
+
+const CHART_PALETTE = [
+  "#00e5a0", "#f5a623", "#4a90e2", "#ff6b6b",
+  "#9b59b6", "#1abc9c", "#e84393", "#fab1a0",
+  "#74b9ff", "#a29bfe", "#fdcb6e", "#55efc4",
+];
+
+function PivotChart({ tree, rowFields, colFields, effectiveValues, lang }) {
+  const [collapsed, setCollapsed] = useState(false);
+  const [chartType, setChartType] = useState("auto");
+  const [valueIdx, setValueIdx] = useState(0);
+
+  // Reset valueIdx if the user removes the value it points to.
+  useEffect(() => {
+    if (valueIdx >= effectiveValues.length) setValueIdx(0);
+  }, [effectiveValues.length, valueIdx]);
+
+  // Top-level rows = the first row dimension's groups. The chart is
+  // intentionally one level deep — nested rollups would need a tree-
+  // map / sunburst to be readable, and the table already shows the
+  // hierarchy. Filter out nodes with no usable value.
+  const topRows = (tree.children || []);
+  const colKeys = tree.colKeys || null;
+  const measure = effectiveValues[Math.min(valueIdx, effectiveValues.length - 1)];
+  const measureField = measure?.field || null;
+  const measureAgg = measure?.agg || "count";
+
+  // Decide auto-default chart type based on shape.
+  const rowFieldKey = rowFields[0] || null;
+  const isOrdinalRow = rowFieldKey === "snapshot_month"
+    || rowFieldKey === "izby"
+    || rowFieldKey === "poschodie";
+  const isAdditiveAgg = measureAgg === "count"
+    || measureAgg === "count_distinct"
+    || measureAgg === "sum";
+
+  const autoType = (() => {
+    if (colKeys && colKeys.length > 0) {
+      // Cross-tab: stacked is the natural default. Heatmap takes over
+      // if both row and col have lots of values (table-of-numbers).
+      if (colKeys.length >= 6 && topRows.length >= 6) return "heatmap";
+      return "stacked";
+    }
+    if (isOrdinalRow) return "line";
+    return "bar";
+  })();
+
+  const effectiveType = chartType === "auto" ? autoType : chartType;
+
+  // Pie is only valid for additive aggregates with reasonable cardinality.
+  const pieAvailable = isAdditiveAgg && topRows.length > 0 && topRows.length <= 12;
+  // Heatmap needs a col dimension.
+  const heatmapAvailable = !!(colKeys && colKeys.length > 0);
+  // Stacked needs a col dimension.
+  const stackedAvailable = !!(colKeys && colKeys.length > 0);
+
+  // ── Empty / unchartable states ────────────────────────────────
+  if (rowFields.length === 0) {
+    return (
+      <ChartHeader collapsed={collapsed} setCollapsed={setCollapsed} lang={lang}>
+        <div style={{ padding: "1.25rem", color: dim, fontSize: "0.82rem", textAlign: "center", fontStyle: "italic" }}>
+          {lang === "sk"
+            ? "Pretiahni pole do Riadkov aby sa zobrazil graf."
+            : "Drag a field into Rows to see the chart."}
+        </div>
+      </ChartHeader>
+    );
+  }
+
+  // Collect numeric value for each top-level row (for non-stacked).
+  const dataPoints = topRows
+    .map((node, i) => ({
+      label: node.label || "—",
+      value: node.rollups?.[valueIdx] ?? null,
+      colRollups: node.colRollups || null,
+      origIdx: i,
+    }))
+    .filter(d => d.value != null && Number.isFinite(d.value));
+
+  if (dataPoints.length === 0) {
+    return (
+      <ChartHeader collapsed={collapsed} setCollapsed={setCollapsed} lang={lang}>
+        <div style={{ padding: "1.25rem", color: dim, fontSize: "0.82rem", textAlign: "center", fontStyle: "italic" }}>
+          {lang === "sk"
+            ? "Žiadne hodnoty na zobrazenie. Skús inú mieru alebo upravi filtre."
+            : "No values to plot. Try a different measure or adjust filters."}
+        </div>
+      </ChartHeader>
+    );
+  }
+
+  // Sort + truncate to top 20 by |value|. Preserve original order if
+  // the row dim is ordinal (line / months should stay in chronological
+  // order).
+  const TRUNCATE = 20;
+  const sortedData = isOrdinalRow
+    ? dataPoints  // keep tree order (already sorted by value or label)
+    : [...dataPoints].sort((a, b) => Math.abs(b.value) - Math.abs(a.value));
+  const truncated = sortedData.slice(0, TRUNCATE);
+  const hiddenCount = sortedData.length - truncated.length;
+
+  // Render
+  return (
+    <ChartHeader collapsed={collapsed} setCollapsed={setCollapsed} lang={lang}>
+      <div style={{ padding: "0.85rem 1rem 1rem" }}>
+        {/* Toolbar: chart type + which measure */}
+        <div style={{
+          display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "center",
+          marginBottom: "0.85rem", fontSize: "0.75rem", color: dim,
+        }}>
+          <span style={{ fontFamily: mono, letterSpacing: "0.04em", textTransform: "uppercase", fontSize: "0.65rem" }}>
+            {lang === "sk" ? "Typ" : "Type"}
+          </span>
+          <ChartTypeBtn active={chartType === "auto"}    onClick={() => setChartType("auto")}    label={`Auto (${labelForType(autoType, lang)})`} />
+          <ChartTypeBtn active={chartType === "bar"}     onClick={() => setChartType("bar")}     label={lang === "sk" ? "Stĺpce" : "Bar"} />
+          {stackedAvailable && (
+            <ChartTypeBtn active={chartType === "stacked"} onClick={() => setChartType("stacked")} label={lang === "sk" ? "Skladané" : "Stacked"} />
+          )}
+          <ChartTypeBtn active={chartType === "line"}    onClick={() => setChartType("line")}    label={lang === "sk" ? "Čiarový" : "Line"} />
+          {pieAvailable && (
+            <ChartTypeBtn active={chartType === "pie"} onClick={() => setChartType("pie")} label={lang === "sk" ? "Koláč" : "Pie"} />
+          )}
+          {heatmapAvailable && (
+            <ChartTypeBtn active={chartType === "heatmap"} onClick={() => setChartType("heatmap")} label={lang === "sk" ? "Heatmapa" : "Heatmap"} />
+          )}
+          {effectiveValues.length > 1 && (
+            <>
+              <span style={{ marginLeft: "0.5rem", fontFamily: mono, letterSpacing: "0.04em", textTransform: "uppercase", fontSize: "0.65rem" }}>
+                {lang === "sk" ? "Miera" : "Measure"}
+              </span>
+              <select
+                value={valueIdx}
+                onChange={(e) => setValueIdx(Number(e.target.value))}
+                style={{
+                  background: panel, border: `1px solid ${border}`, color: text,
+                  padding: "0.25rem 0.5rem", borderRadius: 6, fontSize: "0.72rem",
+                  fontFamily: mono,
+                }}
+              >
+                {effectiveValues.map((v, i) => (
+                  <option key={i} value={i}>{labelForMeasure(v, lang)}</option>
+                ))}
+              </select>
+            </>
+          )}
+          {hiddenCount > 0 && (
+            <span style={{ marginLeft: "auto", fontSize: "0.7rem", color: orange }}>
+              {lang === "sk"
+                ? `Top 20 z ${sortedData.length} (+${hiddenCount} ďalších v tabuľke)`
+                : `Top 20 of ${sortedData.length} (+${hiddenCount} more in table)`}
+            </span>
+          )}
+        </div>
+
+        {/* Chart body */}
+        {effectiveType === "bar" && (
+          <BarChartSVG data={truncated} measureField={measureField} measureAgg={measureAgg} />
+        )}
+        {effectiveType === "stacked" && stackedAvailable && (
+          <StackedBarSVG data={truncated} colKeys={colKeys} valueIdx={valueIdx} measureField={measureField} measureAgg={measureAgg} />
+        )}
+        {effectiveType === "stacked" && !stackedAvailable && (
+          <BarChartSVG data={truncated} measureField={measureField} measureAgg={measureAgg} />
+        )}
+        {effectiveType === "line" && (
+          <LineChartSVG data={truncated} measureField={measureField} measureAgg={measureAgg} />
+        )}
+        {effectiveType === "pie" && pieAvailable && (
+          <PieChartSVG data={truncated} measureField={measureField} measureAgg={measureAgg} lang={lang} />
+        )}
+        {effectiveType === "pie" && !pieAvailable && (
+          <BarChartSVG data={truncated} measureField={measureField} measureAgg={measureAgg} />
+        )}
+        {effectiveType === "heatmap" && heatmapAvailable && (
+          <HeatmapSVG topRows={topRows.slice(0, TRUNCATE)} colKeys={colKeys} valueIdx={valueIdx} measureField={measureField} measureAgg={measureAgg} />
+        )}
+        {effectiveType === "heatmap" && !heatmapAvailable && (
+          <BarChartSVG data={truncated} measureField={measureField} measureAgg={measureAgg} />
+        )}
+      </div>
+    </ChartHeader>
+  );
+}
+
+function labelForType(t, lang) {
+  const sk = { bar: "Stĺpce", stacked: "Skladané", line: "Čiarový", pie: "Koláč", heatmap: "Heatmapa" };
+  const en = { bar: "Bar", stacked: "Stacked", line: "Line", pie: "Pie", heatmap: "Heatmap" };
+  return (lang === "sk" ? sk : en)[t] || t;
+}
+function labelForMeasure(v, lang) {
+  const f = FIELDS[v.field];
+  const fname = f?.label || v.field || (lang === "sk" ? "počet" : "count");
+  return `${aggLabel(v)}(${fname})`;
+}
+
+function ChartHeader({ collapsed, setCollapsed, lang, children }) {
+  return (
+    <div style={{
+      marginTop: "1rem", border: `1px solid ${border}`, borderRadius: 10,
+      background: panel, overflow: "hidden",
+    }}>
+      <button
+        onClick={() => setCollapsed(c => !c)}
+        style={{
+          width: "100%", textAlign: "left", padding: "0.65rem 0.95rem",
+          background: collapsed ? panel : panelHi,
+          border: "none", borderBottom: collapsed ? "none" : `1px solid ${border}`,
+          color: text, cursor: "pointer", fontFamily: "inherit", fontSize: "0.85rem",
+          fontWeight: 600, display: "flex", alignItems: "center", gap: "0.5rem",
+        }}
+      >
+        <span style={{ fontSize: "0.7rem", color: green, transition: "transform 0.15s", transform: collapsed ? "rotate(-90deg)" : "none" }}>▾</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={green} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="12" y1="20" x2="12" y2="10"/>
+          <line x1="18" y1="20" x2="18" y2="4"/>
+          <line x1="6"  y1="20" x2="6"  y2="14"/>
+        </svg>
+        <span>{lang === "sk" ? "Graf" : "Chart"}</span>
+      </button>
+      {!collapsed && children}
+    </div>
+  );
+}
+
+function ChartTypeBtn({ active, onClick, label }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        background: active ? "rgba(0,229,160,0.12)" : "transparent",
+        border: `1px solid ${active ? green : border}`,
+        color: active ? green : text,
+        padding: "0.3rem 0.6rem", borderRadius: 6,
+        fontSize: "0.72rem", cursor: "pointer", fontFamily: "inherit",
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
+/* ── BarChartSVG ──────────────────────────────────────────────────
+   Single-series vertical bars. Y axis auto-scales, gridlines at 4
+   ticks. X labels rotate when too cramped (>8 bars). */
+function BarChartSVG({ data, measureField, measureAgg }) {
+  const W = 880, H = 320;
+  const padL = 56, padR = 16, padT = 16, padB = data.length > 8 ? 96 : 56;
+  const innerW = W - padL - padR;
+  const innerH = H - padT - padB;
+  const n = data.length;
+
+  const minVal = Math.min(0, ...data.map(d => d.value));  // include 0 baseline
+  const maxVal = Math.max(0, ...data.map(d => d.value));
+  const range = maxVal - minVal || 1;
+  const yScale = (v) => padT + innerH - ((v - minVal) / range) * innerH;
+  const barW = Math.max(2, (innerW / n) * 0.7);
+  const xCenter = (i) => padL + (innerW / n) * (i + 0.5);
+
+  const ticks = makeTicks(minVal, maxVal, 4);
+  const rotate = n > 8;
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block", overflow: "visible" }}>
+      {/* gridlines + Y labels */}
+      {ticks.map((t, i) => (
+        <g key={i}>
+          <line x1={padL} x2={W - padR} y1={yScale(t)} y2={yScale(t)} stroke={border} strokeDasharray="2,3"/>
+          <text x={padL - 6} y={yScale(t)} fill={dim} fontSize="10" textAnchor="end" dominantBaseline="middle" fontFamily={mono}>
+            {formatValue(t, measureField, measureAgg)}
+          </text>
+        </g>
+      ))}
+      {/* zero baseline emphasis */}
+      {minVal < 0 && (
+        <line x1={padL} x2={W - padR} y1={yScale(0)} y2={yScale(0)} stroke={dim} strokeWidth="1"/>
+      )}
+      {/* bars */}
+      {data.map((d, i) => {
+        const y0 = yScale(0);
+        const y1 = yScale(d.value);
+        const top = Math.min(y0, y1);
+        const h = Math.abs(y1 - y0);
+        return (
+          <g key={i}>
+            <rect x={xCenter(i) - barW / 2} y={top} width={barW} height={h} fill={green} opacity="0.85" rx="2">
+              <title>{`${d.label}: ${formatValue(d.value, measureField, measureAgg)}`}</title>
+            </rect>
+            {/* value above bar (only if it fits) */}
+            {h > 10 && barW > 18 && (
+              <text x={xCenter(i)} y={top - 4} fill={text} fontSize="9" textAnchor="middle" fontFamily={mono}>
+                {formatValue(d.value, measureField, measureAgg)}
+              </text>
+            )}
+          </g>
+        );
+      })}
+      {/* X labels */}
+      {data.map((d, i) => {
+        const x = xCenter(i);
+        const y = padT + innerH + 14;
+        const truncated = d.label.length > 18 ? d.label.slice(0, 17) + "…" : d.label;
+        return (
+          <text
+            key={i} x={x} y={y} fill={dim} fontSize="10"
+            textAnchor={rotate ? "end" : "middle"} fontFamily={mono}
+            transform={rotate ? `rotate(-35 ${x} ${y})` : undefined}
+          >
+            <title>{d.label}</title>
+            {truncated}
+          </text>
+        );
+      })}
+    </svg>
+  );
+}
+
+/* ── StackedBarSVG ────────────────────────────────────────────────
+   For cross-tab: each row → one bar, segmented by colKey. Each colKey
+   gets a distinct palette colour. Includes a small legend strip. */
+function StackedBarSVG({ data, colKeys, valueIdx, measureField, measureAgg }) {
+  const W = 880, H = 360;
+  const padL = 56, padR = 16, padT = 16, padB = data.length > 8 ? 132 : 92;
+  const innerW = W - padL - padR;
+  const innerH = H - padT - padB;
+  const n = data.length;
+
+  // Per-bar stack values: [colKey, value], filter nulls.
+  const stacks = data.map(d => {
+    const segs = colKeys.map(ck => {
+      const rollup = d.colRollups?.[ck];
+      const v = rollup?.[valueIdx];
+      return { colKey: ck, value: Number.isFinite(v) ? v : 0 };
+    });
+    const total = segs.reduce((a, s) => a + Math.max(0, s.value), 0);
+    return { ...d, segs, total };
+  });
+
+  const maxTotal = Math.max(0, ...stacks.map(s => s.total)) || 1;
+  const yScale = (v) => padT + innerH - (v / maxTotal) * innerH;
+  const barW = Math.max(2, (innerW / n) * 0.7);
+  const xCenter = (i) => padL + (innerW / n) * (i + 0.5);
+
+  const ticks = makeTicks(0, maxTotal, 4);
+  const rotate = n > 8;
+  const legendY = padT + innerH + (rotate ? 76 : 36);
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block", overflow: "visible" }}>
+      {ticks.map((t, i) => (
+        <g key={i}>
+          <line x1={padL} x2={W - padR} y1={yScale(t)} y2={yScale(t)} stroke={border} strokeDasharray="2,3"/>
+          <text x={padL - 6} y={yScale(t)} fill={dim} fontSize="10" textAnchor="end" dominantBaseline="middle" fontFamily={mono}>
+            {formatValue(t, measureField, measureAgg)}
+          </text>
+        </g>
+      ))}
+      {/* segments */}
+      {stacks.map((s, i) => {
+        let cumY = yScale(0);
+        return (
+          <g key={i}>
+            {s.segs.map((seg, j) => {
+              if (seg.value <= 0) return null;
+              const yTop = yScale(s.segs.slice(0, j + 1).reduce((a, x) => a + Math.max(0, x.value), 0));
+              const h = cumY - yTop;
+              cumY = yTop;
+              const fill = CHART_PALETTE[j % CHART_PALETTE.length];
+              return (
+                <rect key={j} x={xCenter(i) - barW / 2} y={yTop} width={barW} height={h} fill={fill} opacity="0.88">
+                  <title>{`${s.label} · ${seg.colKey}: ${formatValue(seg.value, measureField, measureAgg)}`}</title>
+                </rect>
+              );
+            })}
+          </g>
+        );
+      })}
+      {/* X labels */}
+      {data.map((d, i) => {
+        const x = xCenter(i);
+        const y = padT + innerH + 14;
+        const truncated = d.label.length > 18 ? d.label.slice(0, 17) + "…" : d.label;
+        return (
+          <text
+            key={i} x={x} y={y} fill={dim} fontSize="10"
+            textAnchor={rotate ? "end" : "middle"} fontFamily={mono}
+            transform={rotate ? `rotate(-35 ${x} ${y})` : undefined}
+          >
+            <title>{d.label}</title>
+            {truncated}
+          </text>
+        );
+      })}
+      {/* Legend */}
+      {colKeys.map((ck, j) => {
+        const cols = Math.max(1, Math.floor((W - padL - padR) / 130));
+        const row = Math.floor(j / cols);
+        const col = j % cols;
+        const x = padL + col * 130;
+        const y = legendY + row * 16;
+        if (y + 12 > H) return null;
+        const fill = CHART_PALETTE[j % CHART_PALETTE.length];
+        const ckText = String(ck);
+        const truncated = ckText.length > 16 ? ckText.slice(0, 15) + "…" : ckText;
+        return (
+          <g key={j}>
+            <rect x={x} y={y - 8} width={10} height={10} fill={fill}/>
+            <text x={x + 14} y={y} fill={text} fontSize="10" dominantBaseline="middle" fontFamily={mono}>
+              <title>{ckText}</title>
+              {truncated}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+/* ── LineChartSVG ─────────────────────────────────────────────────
+   Single line with circle markers. Useful for time / ordinal rows. */
+function LineChartSVG({ data, measureField, measureAgg }) {
+  const W = 880, H = 320;
+  const padL = 56, padR = 16, padT = 16, padB = data.length > 8 ? 96 : 56;
+  const innerW = W - padL - padR;
+  const innerH = H - padT - padB;
+  const n = data.length;
+
+  const minVal = Math.min(0, ...data.map(d => d.value));
+  const maxVal = Math.max(0, ...data.map(d => d.value));
+  const range = maxVal - minVal || 1;
+  const yScale = (v) => padT + innerH - ((v - minVal) / range) * innerH;
+  const xPos = (i) => padL + (n === 1 ? innerW / 2 : (innerW / (n - 1)) * i);
+
+  const ticks = makeTicks(minVal, maxVal, 4);
+  const path = data.map((d, i) => `${i === 0 ? "M" : "L"} ${xPos(i)} ${yScale(d.value)}`).join(" ");
+  const rotate = n > 8;
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block", overflow: "visible" }}>
+      {ticks.map((t, i) => (
+        <g key={i}>
+          <line x1={padL} x2={W - padR} y1={yScale(t)} y2={yScale(t)} stroke={border} strokeDasharray="2,3"/>
+          <text x={padL - 6} y={yScale(t)} fill={dim} fontSize="10" textAnchor="end" dominantBaseline="middle" fontFamily={mono}>
+            {formatValue(t, measureField, measureAgg)}
+          </text>
+        </g>
+      ))}
+      <path d={path} stroke={green} strokeWidth="2" fill="none"/>
+      {data.map((d, i) => (
+        <g key={i}>
+          <circle cx={xPos(i)} cy={yScale(d.value)} r="4" fill={green} stroke={bg} strokeWidth="1.5">
+            <title>{`${d.label}: ${formatValue(d.value, measureField, measureAgg)}`}</title>
+          </circle>
+        </g>
+      ))}
+      {data.map((d, i) => {
+        const x = xPos(i);
+        const y = padT + innerH + 14;
+        const truncated = d.label.length > 18 ? d.label.slice(0, 17) + "…" : d.label;
+        return (
+          <text
+            key={i} x={x} y={y} fill={dim} fontSize="10"
+            textAnchor={rotate ? "end" : "middle"} fontFamily={mono}
+            transform={rotate ? `rotate(-35 ${x} ${y})` : undefined}
+          >
+            <title>{d.label}</title>
+            {truncated}
+          </text>
+        );
+      })}
+    </svg>
+  );
+}
+
+/* ── PieChartSVG ──────────────────────────────────────────────────
+   Donut with slice labels. Only enabled for additive measures + ≤ 12
+   slices. */
+function PieChartSVG({ data, measureField, measureAgg, lang }) {
+  const W = 880, H = 360;
+  const cx = 240, cy = H / 2;
+  const rOuter = 130, rInner = 60;
+
+  const total = data.reduce((a, d) => a + Math.max(0, d.value), 0);
+  if (total <= 0) {
+    return <div style={{ padding: "1rem", color: dim, fontSize: "0.82rem", fontStyle: "italic" }}>
+      {lang === "sk" ? "Súčet hodnôt = 0; koláč nemá zmysel." : "Total = 0; pie chart not meaningful."}
+    </div>;
+  }
+  let acc = 0;
+  const slices = data.map((d, i) => {
+    const v = Math.max(0, d.value);
+    const startAng = (acc / total) * Math.PI * 2 - Math.PI / 2;
+    acc += v;
+    const endAng = (acc / total) * Math.PI * 2 - Math.PI / 2;
+    return { ...d, startAng, endAng, share: v / total, fill: CHART_PALETTE[i % CHART_PALETTE.length] };
+  });
+  const arc = (s) => {
+    const x0 = cx + rOuter * Math.cos(s.startAng);
+    const y0 = cy + rOuter * Math.sin(s.startAng);
+    const x1 = cx + rOuter * Math.cos(s.endAng);
+    const y1 = cy + rOuter * Math.sin(s.endAng);
+    const xi0 = cx + rInner * Math.cos(s.startAng);
+    const yi0 = cy + rInner * Math.sin(s.startAng);
+    const xi1 = cx + rInner * Math.cos(s.endAng);
+    const yi1 = cy + rInner * Math.sin(s.endAng);
+    const large = s.endAng - s.startAng > Math.PI ? 1 : 0;
+    return [
+      `M ${x0} ${y0}`,
+      `A ${rOuter} ${rOuter} 0 ${large} 1 ${x1} ${y1}`,
+      `L ${xi1} ${yi1}`,
+      `A ${rInner} ${rInner} 0 ${large} 0 ${xi0} ${yi0}`,
+      "Z",
+    ].join(" ");
+  };
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}>
+      {slices.map((s, i) => (
+        <path key={i} d={arc(s)} fill={s.fill} opacity="0.9">
+          <title>{`${s.label}: ${formatValue(s.value, measureField, measureAgg)} (${(s.share * 100).toFixed(1)}%)`}</title>
+        </path>
+      ))}
+      {/* Total label in donut hole */}
+      <text x={cx} y={cy - 6} textAnchor="middle" fill={text} fontSize="14" fontWeight="600" fontFamily={mono}>
+        {formatValue(total, measureField, measureAgg)}
+      </text>
+      <text x={cx} y={cy + 12} textAnchor="middle" fill={dim} fontSize="10" fontFamily={mono}>
+        {lang === "sk" ? "spolu" : "total"}
+      </text>
+      {/* Legend right side */}
+      {slices.map((s, i) => {
+        const y = 36 + i * 22;
+        if (y > H - 16) return null;
+        return (
+          <g key={i}>
+            <rect x={W / 2 + 60} y={y - 8} width={12} height={12} fill={s.fill}/>
+            <text x={W / 2 + 80} y={y} fill={text} fontSize="11" dominantBaseline="middle" fontFamily={mono}>
+              <title>{s.label}</title>
+              {(s.label.length > 22 ? s.label.slice(0, 21) + "…" : s.label)} — {(s.share * 100).toFixed(1)}%
+            </text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+/* ── HeatmapSVG ───────────────────────────────────────────────────
+   row × col grid with cell brightness encoding the value. Dim cells
+   (null / 0) get a hatched look. Hovering shows tooltip with the
+   formatted value. */
+function HeatmapSVG({ topRows, colKeys, valueIdx, measureField, measureAgg }) {
+  const W = 880, H = Math.max(220, 36 + topRows.length * 28 + 40);
+  const padL = 200, padR = 16, padT = 36, padB = 16;
+  const innerW = W - padL - padR;
+  const innerH = H - padT - padB;
+  const cellW = innerW / Math.max(1, colKeys.length);
+  const cellH = innerH / Math.max(1, topRows.length);
+
+  // Find min/max across all valid cells.
+  let minV = Infinity, maxV = -Infinity, anyValid = false;
+  for (const row of topRows) {
+    for (const ck of colKeys) {
+      const v = row.colRollups?.[ck]?.[valueIdx];
+      if (Number.isFinite(v)) {
+        anyValid = true;
+        if (v < minV) minV = v;
+        if (v > maxV) maxV = v;
+      }
+    }
+  }
+  if (!anyValid) { minV = 0; maxV = 1; }
+  const range = (maxV - minV) || 1;
+
+  // Color scale: low = panel bg, high = green. Linear interpolation.
+  const colorFor = (v) => {
+    if (!Number.isFinite(v)) return "transparent";
+    const t = (v - minV) / range;
+    // Mix from #14141a (panelHi) → #00e5a0 (green)
+    const r = Math.round(0x14 + t * (0x00 - 0x14));
+    const g = Math.round(0x14 + t * (0xe5 - 0x14));
+    const b = Math.round(0x1a + t * (0xa0 - 0x1a));
+    return `rgb(${r},${g},${b})`;
+  };
+  const textColorFor = (v) => {
+    if (!Number.isFinite(v)) return dim;
+    const t = (v - minV) / range;
+    return t > 0.55 ? "#0a0a0b" : text;
+  };
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block", overflow: "visible" }}>
+      {/* col headers */}
+      {colKeys.map((ck, j) => {
+        const x = padL + j * cellW + cellW / 2;
+        const ckText = String(ck);
+        const truncated = ckText.length > 14 ? ckText.slice(0, 13) + "…" : ckText;
+        return (
+          <text key={j} x={x} y={padT - 6} fill={dim} fontSize="10" textAnchor="middle" fontFamily={mono}>
+            <title>{ckText}</title>
+            {truncated}
+          </text>
+        );
+      })}
+      {/* rows */}
+      {topRows.map((row, i) => {
+        const y = padT + i * cellH;
+        const rowText = String(row.label || "—");
+        const truncated = rowText.length > 26 ? rowText.slice(0, 25) + "…" : rowText;
+        return (
+          <g key={i}>
+            <text x={padL - 8} y={y + cellH / 2} fill={text} fontSize="11" textAnchor="end" dominantBaseline="middle" fontFamily={mono}>
+              <title>{rowText}</title>
+              {truncated}
+            </text>
+            {colKeys.map((ck, j) => {
+              const v = row.colRollups?.[ck]?.[valueIdx];
+              const x = padL + j * cellW;
+              return (
+                <g key={j}>
+                  <rect
+                    x={x + 1} y={y + 1} width={cellW - 2} height={cellH - 2}
+                    fill={colorFor(v)} stroke={border} strokeWidth="0.5"
+                  >
+                    <title>{`${row.label} · ${ck}: ${formatValue(v, measureField, measureAgg)}`}</title>
+                  </rect>
+                  {Number.isFinite(v) && cellW > 38 && (
+                    <text x={x + cellW / 2} y={y + cellH / 2} fill={textColorFor(v)} fontSize="9" textAnchor="middle" dominantBaseline="middle" fontFamily={mono}>
+                      {formatValue(v, measureField, measureAgg)}
+                    </text>
+                  )}
+                </g>
+              );
+            })}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+/* Make 4-5 evenly-spaced "nice" tick values for a numeric axis.
+   Picks a step from {1,2,2.5,5}×10^k that lands ~targetCount ticks
+   between min and max. Returns sorted ascending including 0 if the
+   range crosses zero. */
+function makeTicks(min, max, targetCount = 4) {
+  if (!Number.isFinite(min) || !Number.isFinite(max) || min === max) {
+    return [min];
+  }
+  const span = max - min;
+  const rough = span / targetCount;
+  const mag = Math.pow(10, Math.floor(Math.log10(rough)));
+  const norm = rough / mag;
+  const niceMul = norm < 1.5 ? 1 : norm < 3 ? 2 : norm < 7 ? 5 : 10;
+  const step = niceMul * mag;
+  const startTick = Math.ceil(min / step) * step;
+  const endTick = Math.floor(max / step) * step;
+  const ticks = [];
+  for (let v = startTick; v <= endTick + 1e-9; v += step) {
+    ticks.push(Math.round(v / step) * step);
+  }
+  // Always include the actual min/max as boundary if they're not on the grid
+  if (ticks[0] > min) ticks.unshift(min);
+  if (ticks[ticks.length - 1] < max) ticks.push(max);
+  return ticks;
+}
 
 
 /* ─── FILTER POPOVER ─────────────────────────────────────────────
