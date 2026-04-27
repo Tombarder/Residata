@@ -43,12 +43,22 @@ const red = "#ff6b6b";
 const orange = "#f5a623";
 
 // ── Scope definitions ────────────────────────────────────────────
+// First five = scope-filtered views (pick a subset, see its report).
+// Last three = analytical reports that span ALL active projects and
+// answer specific business questions.  We keep them in the same tab
+// row because users have one mental "Reports" page; adding a divider
+// chip between groups separates them visually without splitting the
+// surface.
 const SCOPES = [
-  { key: "market",     label: { sk: "Trh",          en: "Market" } },
-  { key: "mesto",      label: { sk: "Mesto",        en: "City" } },
-  { key: "cast",       label: { sk: "Časť mesta",   en: "District" } },
-  { key: "projekt",    label: { sk: "Projekt",      en: "Project" } },
-  { key: "developer",  label: { sk: "Developer",    en: "Developer" } },
+  { key: "market",      label: { sk: "Trh",          en: "Market" } },
+  { key: "mesto",       label: { sk: "Mesto",        en: "City" } },
+  { key: "cast",        label: { sk: "Časť mesta",   en: "District" } },
+  { key: "projekt",     label: { sk: "Projekt",      en: "Project" } },
+  { key: "developer",   label: { sk: "Developer",    en: "Developer" } },
+  // Analytical reports — visually separated by a CSS divider in the tab row
+  { key: "forecast",    label: { sk: "Predpoveď",    en: "Forecast" },    group: "analytics" },
+  { key: "comparables", label: { sk: "Komparable",   en: "Comparables" }, group: "analytics" },
+  { key: "tension",     label: { sk: "Cenový pomer", en: "Pricing tension" }, group: "analytics" },
 ];
 
 /* ══════════════════════════════════════════════════════════════════
@@ -159,17 +169,29 @@ export default function PlatformReports({ lang = "sk" }) {
         }
       />
 
-      {/* Scope tabs */}
+      {/* Scope tabs — divider between scope-filtered and analytical reports */}
       <div className="no-print" style={{
-        display: "flex", gap: "0.3rem", flexWrap: "wrap",
+        display: "flex", gap: "0.3rem", flexWrap: "wrap", alignItems: "center",
         padding: "0.55rem 0.6rem", background: bg2, border: `1px solid ${border}`,
         borderRadius: 8, marginBottom: "1rem",
       }}>
-        {SCOPES.map(s => (
-          <ScopeTab key={s.key} active={scope === s.key} onClick={() => setScope(s.key)}>
-            {s.label[lang] || s.label.sk}
-          </ScopeTab>
-        ))}
+        {SCOPES.map((s, i) => {
+          const prev = i > 0 ? SCOPES[i - 1] : null;
+          const showDivider = prev && prev.group !== s.group && (s.group === "analytics");
+          return (
+            <span key={s.key} style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
+              {showDivider && (
+                <span style={{
+                  width: 1, height: 20, background: border, marginLeft: "0.2rem", marginRight: "0.2rem",
+                }} aria-hidden="true" />
+              )}
+              <ScopeTab active={scope === s.key} onClick={() => setScope(s.key)}>
+                {s.group === "analytics" && <span style={{ color: green, marginRight: "0.25rem", fontSize: "0.7rem" }}>▾</span>}
+                {s.label[lang] || s.label.sk}
+              </ScopeTab>
+            </span>
+          );
+        })}
       </div>
 
       {/* Picker for the current scope */}
@@ -257,6 +279,18 @@ export default function PlatformReports({ lang = "sk" }) {
           breakdownBy="name"
           breakdownLabel={lang === "sk" ? "podľa projektu" : "by project"}
         />
+      )}
+
+      {/* Analytical reports — share the same active-only data set as
+          the Market scope. Each is a self-contained component below. */}
+      {scope === "forecast" && (
+        <SellOutForecastReport projects={projects} lang={lang} onOpenProject={openProject} />
+      )}
+      {scope === "comparables" && (
+        <ComparableTransactionsReport projects={projects} flats={flats} lang={lang} />
+      )}
+      {scope === "tension" && (
+        <PricingTensionReport projects={projects} lang={lang} onOpenProject={openProject} />
       )}
 
       {/* Print stylesheet — strips the platform shell (sidebar + top nav)
@@ -1297,6 +1331,689 @@ function FooterCard({ lang }) {
     </div>
   );
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   ANALYTICAL REPORTS — three cross-cutting views over the active
+   market (vs. the 5 scope-filtered reports above which slice the
+   same data by Market / City / District / Project / Developer).
+
+   Why separate from the scope tabs:
+   The scope reports answer "what does THIS subset look like".
+   These three answer specific business questions that span ALL
+   active projects:
+     · Forecast        — when will current inventory sell out
+     · Comparables     — what has actually sold + at what price
+     · Pricing tension — where is price/velocity out of equilibrium
+
+   They share the same primitives (KpiStrip, ReportSection,
+   AggregateTable, RowBin) so the visual language stays consistent
+   with the scope reports — only the underlying analysis is
+   different.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ─── 1. Sell-out forecast ──────────────────────────────────────────
+   For every active project: months_to_sellout = available / velocity.
+   Velocity = sold_last_month (delta from month-over-month sync).
+   First month of tracking → no velocity → projects sort to the bottom
+   of the table with "—" forecast and a small note explaining why.
+
+   The forecast distribution histogram is the headline: "X projects
+   will be gone in <3 months → if you're a competitor with similar
+   inventory, your price has room". */
+function SellOutForecastReport({ projects, lang, onOpenProject }) {
+  // Compute forecast for every project. Return rows with the math
+  // exposed so we can show velocity / inventory / forecast all in
+  // the same row.
+  const rows = projects.map(p => {
+    const avail = p.available_units || 0;
+    const velocity = Math.max(0, p.sold_last_month || 0);
+    // Months at current velocity. Cap at 999 so the sort + format
+    // logic below doesn't blow up on velocity=tiny + avail=huge.
+    let months = null;
+    if (velocity > 0 && avail > 0) months = Math.min(999, avail / velocity);
+    else if (avail === 0)          months = 0;     // already sold out
+    // velocity 0 + avail > 0 → months stays null ("no signal")
+
+    return {
+      ...p,
+      forecast_months: months,
+      forecast_velocity: velocity,
+      forecast_remaining: avail,
+      // Absorption % per month (velocity / available × 100). Useful
+      // secondary metric — shows momentum independent of inventory.
+      absorption_pct: avail > 0 && velocity > 0 ? (velocity / avail) * 100 : null,
+    };
+  });
+
+  // Distribution buckets — months-to-sellout in business-meaningful bins.
+  const buckets = [
+    { key: "lt3",   labelSk: "< 3 mes.",     labelEn: "< 3 months",    color: red },
+    { key: "3to6",  labelSk: "3–6 mes.",     labelEn: "3–6 months",    color: orange },
+    { key: "6to12", labelSk: "6–12 mes.",    labelEn: "6–12 months",   color: "#f5d142" },
+    { key: "1to2y", labelSk: "1–2 roky",     labelEn: "1–2 years",     color: green },
+    { key: "gt2y",  labelSk: "> 2 roky",     labelEn: "> 2 years",     color: "#5e9bff" },
+    { key: "none",  labelSk: "Bez signálu",  labelEn: "No signal",     color: dim },
+  ];
+  const tally = Object.fromEntries(buckets.map(b => [b.key, 0]));
+  for (const r of rows) {
+    if (r.forecast_months == null)      tally.none++;
+    else if (r.forecast_months < 3)     tally.lt3++;
+    else if (r.forecast_months < 6)     tally["3to6"]++;
+    else if (r.forecast_months < 12)    tally["6to12"]++;
+    else if (r.forecast_months < 24)    tally["1to2y"]++;
+    else                                tally.gt2y++;
+  }
+  const histRows = buckets.map(b => ({
+    label: lang === "sk" ? b.labelSk : b.labelEn,
+    count: tally[b.key],
+    pct: rows.length > 0 ? (tally[b.key] / rows.length) * 100 : 0,
+    color: b.color,
+  }));
+
+  // Aggregate KPIs
+  const totalAvail = rows.reduce((a, r) => a + (r.forecast_remaining || 0), 0);
+  const totalVelocity = rows.reduce((a, r) => a + r.forecast_velocity, 0);
+  const marketMonths = totalVelocity > 0 ? totalAvail / totalVelocity : null;
+  const fastSellers = rows.filter(r => r.forecast_months != null && r.forecast_months < 6).length;
+
+  // Sorted: shortest forecast first (most urgent), nulls go last.
+  const sorted = [...rows].sort((a, b) => {
+    if (a.forecast_months == null && b.forecast_months == null) return 0;
+    if (a.forecast_months == null) return 1;
+    if (b.forecast_months == null) return -1;
+    return a.forecast_months - b.forecast_months;
+  });
+
+  // Edge-case banner for first month of tracking
+  const allNoSignal = rows.length > 0 && rows.every(r => r.forecast_velocity === 0);
+
+  return (
+    <>
+      <ReportSection
+        label={lang === "sk" ? "Analytický report" : "Analytical report"}
+        title={lang === "sk" ? "Predpoveď vypredania" : "Sell-out forecast"}
+      >
+        <p style={{ color: "#c0c0c8", fontSize: "0.9rem", lineHeight: 1.65, margin: "0 0 1rem" }}>
+          {lang === "sk"
+            ? "Pri aktuálnej rýchlosti predaja: za koľko mesiacov sa vypredá inventár každého projektu? Vlhostí radenie podľa najrýchlejších — pre konkurentov je to signál ceny, pre developerov absorpčný benchmark, pre investorov mapa kde sa kapitál točí."
+            : "At the current sales pace: how many months until each project's inventory sells out? Sorted fastest-first — competitors read it as a price signal, developers as an absorption benchmark, investors as a map of where capital is rotating."}
+        </p>
+
+        {allNoSignal && (
+          <div style={{
+            background: `rgba(245,166,35,0.10)`, border: `1px solid ${orange}33`,
+            borderRadius: 6, padding: "0.6rem 0.85rem", marginBottom: "1rem",
+            color: text, fontSize: "0.82rem",
+          }}>
+            ⓘ {lang === "sk"
+              ? "Toto je prvý mesiac sledovania — ešte nemáme month-over-month delta na výpočet velocity. Forecast sa aktivuje od ďalšieho mesačného syncu."
+              : "This is our first month of tracking — no month-over-month delta yet to compute velocity. Forecasts activate after the next monthly sync."}
+          </div>
+        )}
+
+        {/* Headline KPIs */}
+        <div className="rep-kpi-strip" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "0.5rem", marginBottom: "1.25rem" }}>
+          {[
+            { label: lang === "sk" ? "Voľných bytov" : "Available units", value: totalAvail.toLocaleString("en-US").replace(/,/g, " "), color: green },
+            { label: lang === "sk" ? "Predaných (1 mes.)" : "Sold (last mo.)", value: totalVelocity.toLocaleString("en-US").replace(/,/g, " "), color: orange },
+            { label: lang === "sk" ? "Trh sa vypredá za" : "Market sell-out", value: marketMonths != null ? `${marketMonths.toFixed(1)} ${lang === "sk" ? "mes." : "mo."}` : "—" },
+            { label: lang === "sk" ? "Rýchlych projektov (<6 mes.)" : "Fast sellers (<6 mo.)", value: `${fastSellers}`, color: red },
+          ].map((k, i) => (
+            <div key={i} style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8, padding: "0.65rem 0.9rem" }}>
+              <div style={{ fontSize: "0.7rem", color: dim, marginBottom: "0.2rem" }}>{k.label}</div>
+              <div className="report-accent" style={{ fontSize: "1.15rem", fontWeight: 700, color: k.color || text }}>{k.value}</div>
+            </div>
+          ))}
+        </div>
+      </ReportSection>
+
+      {/* Distribution histogram */}
+      <ReportSection title={lang === "sk" ? "Rozloženie projektov podľa predpovede" : "Project distribution by forecast"}>
+        <ForecastHistogram rows={histRows} lang={lang} />
+      </ReportSection>
+
+      {/* Per-project table */}
+      <ReportSection title={lang === "sk" ? "Projekty zoradené podľa predpovede" : "Projects sorted by forecast"}>
+        <div className="rep-table-wrap" style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem", minWidth: 720 }}>
+            <thead>
+              <tr style={{ background: bg, textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                <th style={tdh}>{lang === "sk" ? "Projekt" : "Project"}</th>
+                <th style={tdh}>{lang === "sk" ? "Časť" : "District"}</th>
+                <th style={tdhR}>{lang === "sk" ? "Voľných" : "Available"}</th>
+                <th style={tdhR}>{lang === "sk" ? "Predané (1 mes.)" : "Sold (last mo.)"}</th>
+                <th style={tdhR}>{lang === "sk" ? "Mesiace" : "Months"}</th>
+                <th style={tdhR}>{lang === "sk" ? "Absorpcia/mes." : "Absorption/mo."}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.slice(0, 100).map((p, i) => {
+                const monthLabel = p.forecast_months == null
+                  ? "—"
+                  : p.forecast_months < 0.1
+                    ? "<0.1"
+                    : p.forecast_months >= 24
+                      ? p.forecast_months >= 999 ? "999+" : `${(p.forecast_months / 12).toFixed(1)}r`
+                      : p.forecast_months.toFixed(1);
+                const monthColor = p.forecast_months == null ? dim
+                  : p.forecast_months < 3 ? red
+                  : p.forecast_months < 12 ? orange
+                  : green;
+                const clickable = !!onOpenProject;
+                return (
+                  <tr
+                    key={p.id}
+                    className={clickable ? "rep-row-clickable" : "rep-row-hoverable"}
+                    style={{ borderTop: i > 0 ? `1px solid ${border}` : "none", cursor: clickable ? "pointer" : "default" }}
+                    onClick={clickable ? () => onOpenProject(p.id) : undefined}
+                  >
+                    <td style={tdc}><strong style={{ color: text }}>{p.name}</strong></td>
+                    <td style={tdc}>{p.district || "—"}</td>
+                    <td style={{ ...tdcR, color: green }}>{p.forecast_remaining.toLocaleString("en-US").replace(/,/g, " ")}</td>
+                    <td style={{ ...tdcR, color: orange }}>{p.forecast_velocity > 0 ? p.forecast_velocity : "—"}</td>
+                    <td style={{ ...tdcR, color: monthColor, fontWeight: 700 }}>{monthLabel}</td>
+                    <td style={tdcR}>{p.absorption_pct != null ? `${p.absorption_pct.toFixed(1)}%` : "—"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {sorted.length > 100 && (
+            <div style={{ padding: "0.6rem", color: dim, fontSize: "0.75rem", textAlign: "center", fontFamily: mono }}>
+              {lang === "sk" ? `Zobrazených prvých 100 z ${sorted.length}.` : `Showing top 100 of ${sorted.length}.`}
+            </div>
+          )}
+        </div>
+      </ReportSection>
+    </>
+  );
+}
+
+function ForecastHistogram({ rows, lang }) {
+  const max = Math.max(...rows.map(r => r.count), 1);
+  return (
+    <div style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8, padding: "0.85rem 1rem" }}>
+      {rows.map((r, i) => (
+        <div
+          key={i}
+          className="rep-hist-row"
+          style={{
+            display: "grid", gridTemplateColumns: "120px 1fr 60px",
+            alignItems: "center", gap: "0.6rem",
+            padding: "0.35rem 0", borderTop: i > 0 ? `1px solid ${border}` : "none",
+          }}
+        >
+          <div className="rep-hist-label" style={{ fontSize: "0.78rem", color: text, textAlign: "right", paddingRight: "0.5rem" }}>{r.label}</div>
+          <div className="rep-hist-bar" style={{ background: bg, borderRadius: 3, height: 18, overflow: "hidden", position: "relative" }}>
+            <div className="print-keep-bg" style={{
+              width: `${(r.count / max) * 100}%`, height: "100%",
+              background: `linear-gradient(90deg, ${r.color}66, ${r.color})`,
+              transition: "width 0.3s",
+            }} />
+          </div>
+          <div className="rep-hist-count" style={{ fontFamily: mono, fontSize: "0.85rem", color: text, fontWeight: 700, textAlign: "right" }}>
+            {r.count} <span style={{ color: dim, fontWeight: 400, fontSize: "0.7rem" }}>({r.pct.toFixed(0)}%)</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ─── 2. Comparable transactions ───────────────────────────────────
+   Every flat where stav='P' (sold) becomes a comparable row. Filter
+   chips for quick narrowing (district, room count). Designed for
+   valuers / banks who need to point at "here's what sold for €X/m²".
+
+   Why scoped to ACTIVE projects only: comparables from paused/sold-
+   out projects would be from outdated tracking — the price/availability
+   isn't trustworthy without a recent sync. Active-only keeps the
+   data fresh. (Once we accumulate multiple snapshot months we can
+   relax this — flats from sold-out-under-tracking projects are
+   genuine historical comps.) */
+function ComparableTransactionsReport({ projects, flats, lang }) {
+  // Only sold flats with usable pricing.
+  const soldFlats = useMemo(() => flats.filter(f =>
+    f.stav === "P" && f.cena_s_dph > 0 && f.obytna_plocha > 0
+  ), [flats]);
+
+  // Quick lookup: project metadata
+  const projectById = useMemo(() => {
+    const m = {};
+    for (const p of projects) m[p.id] = p;
+    return m;
+  }, [projects]);
+
+  // Filter state
+  const districts = useMemo(
+    () => uniqueSorted(soldFlats.map(f => projectById[f.project_id]?.district).filter(Boolean)),
+    [soldFlats, projectById]
+  );
+  const [districtPick, setDistrictPick] = useState("__all__");
+  const [roomPick, setRoomPick] = useState("__all__");
+
+  const filtered = useMemo(() => {
+    return soldFlats.filter(f => {
+      if (districtPick !== "__all__") {
+        const d = projectById[f.project_id]?.district;
+        if (d !== districtPick) return false;
+      }
+      if (roomPick !== "__all__") {
+        if (String(f.izby) !== roomPick) return false;
+      }
+      return true;
+    });
+  }, [soldFlats, projectById, districtPick, roomPick]);
+
+  // Aggregates over filtered set
+  const count = filtered.length;
+  const eurM2Vals = filtered.map(f => f.cena_s_dph / f.obytna_plocha).sort((a, b) => a - b);
+  const median = (arr) => arr.length === 0 ? null : (arr.length % 2 ? arr[(arr.length - 1) / 2] : (arr[arr.length / 2 - 1] + arr[arr.length / 2]) / 2);
+  const avgEm2 = eurM2Vals.length > 0 ? eurM2Vals.reduce((a, b) => a + b, 0) / eurM2Vals.length : null;
+  const medEm2 = median(eurM2Vals);
+  const minEm2 = eurM2Vals[0] || null;
+  const maxEm2 = eurM2Vals[eurM2Vals.length - 1] || null;
+  const totalRevenue = filtered.reduce((a, f) => a + f.cena_s_dph, 0);
+
+  // Sort: most expensive first by default (most relevant for top-tier comps)
+  const sorted = [...filtered].sort((a, b) => b.cena_s_dph - a.cena_s_dph);
+
+  // CSV export (just for this report, scoped to filtered set)
+  const downloadCsv = () => {
+    const cols = ["project", "district", "developer", "izby", "obytna_plocha_m2", "cena_eur", "eur_per_m2", "poschodie", "orientacia"];
+    const head = cols.join(",");
+    const rows = filtered.map(f => {
+      const p = projectById[f.project_id] || {};
+      const em2 = (f.cena_s_dph / f.obytna_plocha).toFixed(0);
+      return [
+        JSON.stringify(p.name || ""),
+        JSON.stringify(p.district || ""),
+        JSON.stringify(p.developer || ""),
+        f.izby || "",
+        f.obytna_plocha || "",
+        f.cena_s_dph || "",
+        em2,
+        f.poschodie ?? "",
+        JSON.stringify(f.orientacia || ""),
+      ].join(",");
+    });
+    const csv = [head, ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `residata-comparables-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  return (
+    <>
+      <ReportSection
+        label={lang === "sk" ? "Analytický report" : "Analytical report"}
+        title={lang === "sk" ? "Porovnateľné transakcie" : "Comparable transactions"}
+      >
+        <p style={{ color: "#c0c0c8", fontSize: "0.9rem", lineHeight: 1.65, margin: "0 0 1rem" }}>
+          {lang === "sk"
+            ? "Všetky reálne predané byty (stav „P\") z aktívnej databázy. Pre valuérov, banky a stanovenie kolaterálu — tu sú porovnateľné transakcie, nie marketingové cenníky. Filtrami sa zúži výber, CSV-export pre Excel."
+            : "Every actually-sold unit (stav 'P') from our active database. For valuers, banks, and collateral assessment — these are comparable transactions, not marketing list-prices. Filters narrow the set; CSV export drops into Excel."}
+        </p>
+
+        {/* Filter row */}
+        <div className="no-print" style={{ display: "flex", gap: "0.6rem", marginBottom: "1rem", flexWrap: "wrap", alignItems: "center" }}>
+          <span style={{ fontSize: "0.72rem", color: dim, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+            {lang === "sk" ? "Filtre" : "Filters"}
+          </span>
+          <select value={districtPick} onChange={e => setDistrictPick(e.target.value)} style={selectStyle}>
+            <option value="__all__">{lang === "sk" ? "Všetky časti" : "All districts"}</option>
+            {districts.map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
+          <select value={roomPick} onChange={e => setRoomPick(e.target.value)} style={selectStyle}>
+            <option value="__all__">{lang === "sk" ? "Všetky izbovosti" : "All room counts"}</option>
+            {[1, 2, 3, 4, 5].map(n => <option key={n} value={String(n)}>{n}{lang === "sk" ? "-izb." : "-room"}</option>)}
+          </select>
+          <button onClick={downloadCsv} style={{
+            marginLeft: "auto", background: "transparent", color: green,
+            border: `1px solid ${green}55`, borderRadius: 4, padding: "0.4rem 0.8rem",
+            fontSize: "0.78rem", cursor: "pointer", fontFamily: "inherit",
+          }}>⬇ CSV ({count})</button>
+        </div>
+
+        {/* KPIs */}
+        <div className="rep-kpi-strip" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "0.5rem", marginBottom: "1.25rem" }}>
+          {[
+            { label: lang === "sk" ? "Predaných"  : "Sold",         value: count.toLocaleString("en-US").replace(/,/g, " "), color: green },
+            { label: lang === "sk" ? "Ø €/m²"     : "Avg €/m²",     value: avgEm2 ? Math.round(avgEm2).toLocaleString("en-US").replace(/,/g, " ") : "—" },
+            { label: lang === "sk" ? "Medián €/m²": "Median €/m²",  value: medEm2 ? Math.round(medEm2).toLocaleString("en-US").replace(/,/g, " ") : "—" },
+            { label: lang === "sk" ? "Min €/m²"   : "Min €/m²",     value: minEm2 ? Math.round(minEm2).toLocaleString("en-US").replace(/,/g, " ") : "—", color: green },
+            { label: lang === "sk" ? "Max €/m²"   : "Max €/m²",     value: maxEm2 ? Math.round(maxEm2).toLocaleString("en-US").replace(/,/g, " ") : "—", color: orange },
+            { label: lang === "sk" ? "Objem (€)"  : "Volume (€)",   value: totalRevenue ? Math.round(totalRevenue).toLocaleString("en-US").replace(/,/g, " ") : "—" },
+          ].map((k, i) => (
+            <div key={i} style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8, padding: "0.65rem 0.9rem" }}>
+              <div style={{ fontSize: "0.7rem", color: dim, marginBottom: "0.2rem" }}>{k.label}</div>
+              <div className="report-accent" style={{ fontSize: "1.05rem", fontWeight: 700, color: k.color || text }}>{k.value}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Transaction table */}
+        {sorted.length === 0 ? (
+          <div style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8, padding: "1.5rem", textAlign: "center", color: dim, fontStyle: "italic" }}>
+            {lang === "sk" ? "Žiadne predané byty pre tento filter." : "No sold units for this filter."}
+          </div>
+        ) : (
+          <div className="rep-table-wrap" style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8 }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.8rem", minWidth: 760 }}>
+              <thead>
+                <tr style={{ background: bg, textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                  <th style={tdh}>{lang === "sk" ? "Projekt" : "Project"}</th>
+                  <th style={tdh}>{lang === "sk" ? "Časť" : "District"}</th>
+                  <th style={tdhR}>{lang === "sk" ? "Izby" : "Rooms"}</th>
+                  <th style={tdhR}>m²</th>
+                  <th style={tdhR}>{lang === "sk" ? "Cena (€)" : "Price (€)"}</th>
+                  <th style={tdhR}>€/m²</th>
+                  <th style={tdhR}>{lang === "sk" ? "Posch." : "Floor"}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sorted.slice(0, 200).map((f, i) => {
+                  const p = projectById[f.project_id] || {};
+                  const em2 = Math.round(f.cena_s_dph / f.obytna_plocha);
+                  return (
+                    <tr key={f.id || `${f.project_id}-${f.unit_id}-${i}`} style={{ borderTop: i > 0 ? `1px solid ${border}` : "none" }}>
+                      <td style={tdc}><strong style={{ color: text }}>{p.name || f.project_id}</strong></td>
+                      <td style={tdc}>{p.district || "—"}</td>
+                      <td style={tdcR}>{f.izby || "—"}</td>
+                      <td style={tdcR}>{Number(f.obytna_plocha).toFixed(1)}</td>
+                      <td style={tdcR}>{Math.round(f.cena_s_dph).toLocaleString("en-US").replace(/,/g, " ")}</td>
+                      <td style={{ ...tdcR, color: orange, fontWeight: 700 }}>{em2.toLocaleString("en-US").replace(/,/g, " ")}</td>
+                      <td style={tdcR}>{f.poschodie ?? "—"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {sorted.length > 200 && (
+              <div style={{ padding: "0.6rem", color: dim, fontSize: "0.75rem", textAlign: "center", fontFamily: mono }}>
+                {lang === "sk" ? `Zobrazených prvých 200 z ${sorted.length}. CSV obsahuje všetky.` : `Showing top 200 of ${sorted.length}. CSV has the full set.`}
+              </div>
+            )}
+          </div>
+        )}
+      </ReportSection>
+    </>
+  );
+}
+
+const selectStyle = {
+  background: bg2, color: text, border: `1px solid ${border}`,
+  borderRadius: 4, padding: "0.35rem 0.55rem", fontSize: "0.78rem",
+  fontFamily: "inherit", cursor: "pointer",
+};
+
+/* ─── 3. Pricing tension ───────────────────────────────────────────
+   2-axis matrix: how does each project's avg €/m² compare to the
+   district median, vs. how fast it's selling?
+
+   Quadrants:
+     · TR (high price, high velocity)  = "perceived undervaluation"
+       — investors love this; selling fast despite premium
+     · BR (low price,  high velocity)  = "fair-priced demand"
+     · TL (high price, low velocity)   = "stuck premium" (overpriced)
+     · BL (low price,  low velocity)   = "weak demand"
+
+   v1 reads ONE month at a time (no cross-month price-rise component
+   yet — that activates after the second snapshot lands and we can
+   compute the "rising vs. velocity" delta the user originally asked
+   about). Until then it's a static positioning matrix, which is
+   already a useful surface for spotting outliers. */
+function PricingTensionReport({ projects, lang, onOpenProject }) {
+  // District-level medians, used as the x-axis baseline.
+  const districtMedians = useMemo(() => {
+    const byDistrict = {};
+    for (const p of projects) {
+      if (!p.district || !p.avg_price_eur_m2) continue;
+      (byDistrict[p.district] = byDistrict[p.district] || []).push(p.avg_price_eur_m2);
+    }
+    const out = {};
+    for (const [d, vals] of Object.entries(byDistrict)) {
+      const sorted = [...vals].sort((a, b) => a - b);
+      out[d] = sorted.length % 2
+        ? sorted[(sorted.length - 1) / 2]
+        : (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2;
+    }
+    return out;
+  }, [projects]);
+
+  // Build dot data — only projects with both a price AND inventory.
+  const dots = useMemo(() => {
+    return projects
+      .filter(p => p.avg_price_eur_m2 && p.available_units > 0)
+      .map(p => {
+        const districtMedian = districtMedians[p.district];
+        const premiumPct = districtMedian
+          ? ((p.avg_price_eur_m2 / districtMedian) - 1) * 100
+          : 0;
+        const velocityPct = p.available_units > 0
+          ? ((p.sold_last_month || 0) / p.available_units) * 100
+          : 0;
+        // Tension score: positive = high premium AND fast velocity (undervalued perceived).
+        // Negative = either high premium without velocity, or low premium with velocity.
+        const tensionScore = premiumPct * (velocityPct - 5);  // -5 baseline so "no sales" ≈ 0
+        return { ...p, premiumPct, velocityPct, tensionScore, districtMedian };
+      });
+  }, [projects, districtMedians]);
+
+  // Top 10 by tension score (most "interesting" projects)
+  const topTension = [...dots].sort((a, b) => Math.abs(b.tensionScore) - Math.abs(a.tensionScore)).slice(0, 10);
+
+  // Quadrant tallies
+  const q = { TR: 0, BR: 0, TL: 0, BL: 0 };
+  for (const d of dots) {
+    if (d.premiumPct >= 0 && d.velocityPct >= 5)      q.TR++;
+    else if (d.premiumPct < 0 && d.velocityPct >= 5)  q.BR++;
+    else if (d.premiumPct >= 0 && d.velocityPct < 5)  q.TL++;
+    else                                              q.BL++;
+  }
+
+  return (
+    <>
+      <ReportSection
+        label={lang === "sk" ? "Analytický report" : "Analytical report"}
+        title={lang === "sk" ? "Cenový pomer (premium vs. velocity)" : "Pricing tension (premium vs. velocity)"}
+      >
+        <p style={{ color: "#c0c0c8", fontSize: "0.9rem", lineHeight: 1.65, margin: "0 0 1rem" }}>
+          {lang === "sk"
+            ? "Matrix: ako stojí €/m² každého projektu voči mediánu jeho časti mesta (X), proti rýchlosti predaja % za mesiac (Y). Pravý-horný kvadrant = projekty čo sa predávajú napriek prémii — investorský signál „perceived undervaluation\". Krížový mesačný delta (rast ceny vs. velocity) sa aktivuje po druhom syncu — zatiaľ statický pozičný pohľad."
+            : "Matrix: how each project's €/m² compares to its district median (X) vs. monthly sell-through rate (Y). Top-right = projects selling despite a premium — investor signal of \"perceived undervaluation\". Cross-month rising-price-vs-velocity delta activates after the second monthly sync — for now, a static positioning view."}
+        </p>
+
+        {/* Quadrant tallies */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "0.5rem", marginBottom: "1.25rem" }}>
+          {[
+            { label: lang === "sk" ? "↗ Prémia + predaj" : "↗ Premium + selling",     value: q.TR, color: green,  hint: lang === "sk" ? "Perceived undervaluation" : "Perceived undervaluation" },
+            { label: lang === "sk" ? "↘ Lacné + predaj"  : "↘ Low + selling",         value: q.BR, color: green,  hint: lang === "sk" ? "Cenovo dostupné, ide" : "Affordable, in demand" },
+            { label: lang === "sk" ? "↖ Prémia, stojí"   : "↖ Premium, stuck",        value: q.TL, color: red,    hint: lang === "sk" ? "Pravdepodobne predražené" : "Likely overpriced" },
+            { label: lang === "sk" ? "↙ Lacné, stojí"    : "↙ Low, stuck",            value: q.BL, color: dim,    hint: lang === "sk" ? "Slabá poptávka" : "Weak demand" },
+          ].map((k, i) => (
+            <div key={i} style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8, padding: "0.65rem 0.9rem" }}>
+              <div style={{ fontSize: "0.7rem", color: dim, marginBottom: "0.2rem" }}>{k.label}</div>
+              <div className="report-accent" style={{ fontSize: "1.15rem", fontWeight: 700, color: k.color }}>{k.value}</div>
+              <div style={{ fontSize: "0.66rem", color: dim, marginTop: "0.15rem" }}>{k.hint}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Scatter SVG */}
+        <PricingTensionScatter dots={dots} lang={lang} onOpenProject={onOpenProject} />
+      </ReportSection>
+
+      {/* Top tension list */}
+      <ReportSection title={lang === "sk" ? "Najvýraznejšie napätia (top 10)" : "Highest-tension outliers (top 10)"}>
+        <div className="rep-table-wrap" style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem", minWidth: 720 }}>
+            <thead>
+              <tr style={{ background: bg, textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                <th style={tdh}>{lang === "sk" ? "Projekt" : "Project"}</th>
+                <th style={tdh}>{lang === "sk" ? "Časť" : "District"}</th>
+                <th style={tdhR}>€/m²</th>
+                <th style={tdhR}>{lang === "sk" ? "vs. medián" : "vs. median"}</th>
+                <th style={tdhR}>{lang === "sk" ? "Velocity %/mes." : "Velocity %/mo."}</th>
+                <th style={tdhR}>{lang === "sk" ? "Signál" : "Signal"}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {topTension.map((p, i) => {
+                const signal = p.premiumPct >= 0 && p.velocityPct >= 5
+                  ? (lang === "sk" ? "↗ Undervalued" : "↗ Undervalued")
+                  : p.premiumPct >= 0 && p.velocityPct < 5
+                    ? (lang === "sk" ? "↖ Predražené" : "↖ Overpriced")
+                    : p.premiumPct < 0 && p.velocityPct >= 5
+                      ? (lang === "sk" ? "↘ Lacné, ide" : "↘ Affordable demand")
+                      : (lang === "sk" ? "↙ Slabé" : "↙ Weak");
+                const signalColor = p.premiumPct >= 0 && p.velocityPct >= 5 ? green
+                  : p.premiumPct >= 0 ? red
+                  : p.velocityPct >= 5 ? green
+                  : dim;
+                const clickable = !!onOpenProject;
+                return (
+                  <tr
+                    key={p.id}
+                    className={clickable ? "rep-row-clickable" : "rep-row-hoverable"}
+                    style={{ borderTop: i > 0 ? `1px solid ${border}` : "none", cursor: clickable ? "pointer" : "default" }}
+                    onClick={clickable ? () => onOpenProject(p.id) : undefined}
+                  >
+                    <td style={tdc}><strong style={{ color: text }}>{p.name}</strong></td>
+                    <td style={tdc}>{p.district || "—"}</td>
+                    <td style={tdcR}>{Math.round(p.avg_price_eur_m2).toLocaleString("en-US").replace(/,/g, " ")}</td>
+                    <td style={{ ...tdcR, color: p.premiumPct >= 0 ? orange : green, fontWeight: 700 }}>
+                      {p.premiumPct >= 0 ? "+" : ""}{p.premiumPct.toFixed(1)}%
+                    </td>
+                    <td style={{ ...tdcR, color: p.velocityPct >= 5 ? green : dim }}>{p.velocityPct.toFixed(1)}%</td>
+                    <td style={{ ...tdcR, color: signalColor, fontWeight: 700 }}>{signal}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {topTension.length === 0 && (
+            <div style={{ padding: "1.5rem", textAlign: "center", color: dim, fontStyle: "italic" }}>
+              {lang === "sk"
+                ? "Nedostatok dát na výpočet napätí (žiadne projekty so zverejnenou cenou aj inventárom)."
+                : "Not enough data to compute tensions (no projects with both published price and inventory)."}
+            </div>
+          )}
+        </div>
+      </ReportSection>
+    </>
+  );
+}
+
+function PricingTensionScatter({ dots, lang, onOpenProject }) {
+  const W = 880, H = 420;
+  const padL = 64, padR = 24, padT = 24, padB = 56;
+  const innerW = W - padL - padR;
+  const innerH = H - padT - padB;
+
+  if (dots.length === 0) {
+    return (
+      <div style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8, padding: "1.5rem", textAlign: "center", color: dim, fontStyle: "italic" }}>
+        {lang === "sk" ? "Žiadne body pre scatter graf." : "No data points for scatter."}
+      </div>
+    );
+  }
+
+  // Symmetric x range (-X, +X) so 0 is centered.
+  const maxAbsPremium = Math.max(20, ...dots.map(d => Math.abs(d.premiumPct)));
+  const maxVelocity = Math.max(15, ...dots.map(d => d.velocityPct));
+  const xScale = (px) => padL + innerW * 0.5 + (px / maxAbsPremium) * (innerW * 0.5);
+  const yScale = (vy) => padT + innerH - (vy / maxVelocity) * innerH;
+
+  const xAxis = padT + innerH;
+  const yAxis = padL + innerW * 0.5;
+
+  return (
+    <div style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8, padding: "0.75rem" }}>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}>
+        {/* Quadrant fills */}
+        <rect x={padL} y={padT}             width={innerW * 0.5} height={innerH * 0.5} fill="rgba(255,107,107,0.04)"/>
+        <rect x={padL + innerW * 0.5} y={padT}             width={innerW * 0.5} height={innerH * 0.5} fill="rgba(0,229,160,0.06)"/>
+        <rect x={padL} y={padT + innerH * 0.5} width={innerW * 0.5} height={innerH * 0.5} fill="rgba(138,138,150,0.04)"/>
+        <rect x={padL + innerW * 0.5} y={padT + innerH * 0.5} width={innerW * 0.5} height={innerH * 0.5} fill="rgba(0,229,160,0.04)"/>
+
+        {/* Axes */}
+        <line x1={padL} y1={xAxis} x2={W - padR} y2={xAxis} stroke={dim} strokeWidth="1"/>
+        <line x1={yAxis} y1={padT} x2={yAxis} y2={padT + innerH} stroke={dim} strokeWidth="1"/>
+
+        {/* Grid + tick labels (X: -X%, 0, +X%) */}
+        {[-1, -0.5, 0, 0.5, 1].map((t, i) => {
+          const x = xScale(t * maxAbsPremium);
+          return (
+            <g key={i}>
+              <line x1={x} y1={padT} x2={x} y2={padT + innerH} stroke={border} strokeDasharray="2,3"/>
+              <text x={x} y={padT + innerH + 16} fill={dim} fontSize="10" textAnchor="middle" fontFamily={mono}>
+                {t === 0 ? (lang === "sk" ? "medián" : "median") : `${t > 0 ? "+" : ""}${(t * maxAbsPremium).toFixed(0)}%`}
+              </text>
+            </g>
+          );
+        })}
+        {[0, 0.25, 0.5, 0.75, 1].map((t, i) => {
+          const y = yScale(t * maxVelocity);
+          return (
+            <g key={i}>
+              <line x1={padL} y1={y} x2={W - padR} y2={y} stroke={border} strokeDasharray="2,3"/>
+              <text x={padL - 8} y={y} fill={dim} fontSize="10" textAnchor="end" dominantBaseline="middle" fontFamily={mono}>
+                {(t * maxVelocity).toFixed(0)}%
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Dots — color by quadrant */}
+        {dots.map((d, i) => {
+          const cx = xScale(Math.max(-maxAbsPremium, Math.min(maxAbsPremium, d.premiumPct)));
+          const cy = yScale(Math.max(0, Math.min(maxVelocity, d.velocityPct)));
+          const fill = d.premiumPct >= 0 && d.velocityPct >= 5 ? green
+            : d.premiumPct >= 0 ? red
+            : d.velocityPct >= 5 ? green
+            : dim;
+          const onClick = onOpenProject ? () => onOpenProject(d.id) : undefined;
+          return (
+            <g key={d.id || i} style={{ cursor: onClick ? "pointer" : "default" }} onClick={onClick}>
+              <circle cx={cx} cy={cy} r={Math.min(12, 4 + Math.sqrt(d.available_units || 0) * 0.5)}
+                      fill={fill} opacity="0.65" stroke={fill} strokeWidth="1.2">
+                <title>{`${d.name} (${d.district || "?"})\n€/m²: ${Math.round(d.avg_price_eur_m2).toLocaleString("sk-SK")} (${d.premiumPct >= 0 ? "+" : ""}${d.premiumPct.toFixed(1)}% vs ${lang === "sk" ? "medián" : "median"})\nVelocity: ${d.velocityPct.toFixed(1)} %/mes.\nVoľných: ${d.available_units}`}</title>
+              </circle>
+            </g>
+          );
+        })}
+
+        {/* Quadrant labels (faint, top-corners) */}
+        <text x={padL + innerW * 0.25} y={padT + 16} fill={red} fontSize="11" textAnchor="middle" fontFamily={mono} opacity="0.7">
+          {lang === "sk" ? "↖ Prémia, stojí" : "↖ Premium, stuck"}
+        </text>
+        <text x={padL + innerW * 0.75} y={padT + 16} fill={green} fontSize="11" textAnchor="middle" fontFamily={mono} opacity="0.85">
+          {lang === "sk" ? "↗ Prémia + predaj" : "↗ Premium + selling"}
+        </text>
+        <text x={padL + innerW * 0.25} y={padT + innerH - 4} fill={dim} fontSize="11" textAnchor="middle" fontFamily={mono} opacity="0.7">
+          {lang === "sk" ? "↙ Lacné, stojí" : "↙ Low, stuck"}
+        </text>
+        <text x={padL + innerW * 0.75} y={padT + innerH - 4} fill={green} fontSize="11" textAnchor="middle" fontFamily={mono} opacity="0.7">
+          {lang === "sk" ? "↘ Lacné + predaj" : "↘ Low + selling"}
+        </text>
+
+        {/* Axis titles */}
+        <text x={padL + innerW * 0.5} y={H - 8} fill={text} fontSize="11" textAnchor="middle" fontFamily={mono}>
+          €/m² {lang === "sk" ? "vs. medián časti mesta" : "vs. district median"}
+        </text>
+        <text x={16} y={padT + innerH * 0.5} fill={text} fontSize="11" textAnchor="middle" fontFamily={mono}
+              transform={`rotate(-90 16 ${padT + innerH * 0.5})`}>
+          {lang === "sk" ? "Velocity (% predaných z voľných za mesiac)" : "Velocity (% of available sold per month)"}
+        </text>
+      </svg>
+    </div>
+  );
+}
+
 
 /* ══════════════════════════════════════════════════════════════════
    Analytics helpers — pure functions
