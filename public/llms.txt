@@ -6,14 +6,17 @@
 > banks, valuers, and investors.
 
 Residata tracks every new residential construction project in Bratislava
-(the capital of Slovakia). It normalizes data from 72+ developer websites
+(the capital of Slovakia). It normalizes data from developer websites
 into a single consistent schema, refreshes the snapshot monthly, and
 delivers it as Google Sheets, CSV, XLSX, or via API.
 
-## Scope
+## Scope (April 2026 snapshot)
 
 - City: Bratislava (Slovakia's capital)
-- Coverage: every active new-build residential project — currently ~90 projects, ~5,100 units
+- Coverage: 65 active new-build residential projects, 5,394 units
+- Currently for sale: 2,523 units · reserved: 348 · sold: 2,294
+- Average price across available inventory: €5,707/m²
+- Distinct active developers: 54
 - Data refresh: monthly (first of each month); weekly on request
 - Languages: Slovak and English
 
@@ -29,15 +32,10 @@ delivers it as Google Sheets, CSV, XLSX, or via API.
 - €249 one-time snapshot report
 - €349 monthly for ongoing access
 
-## Pages
+## Public surfaces
 
-- [Homepage](https://residata-gamma.vercel.app/): overview, live market numbers, 3-step pipeline explanation
-- [Live Dashboard](https://residata-gamma.vercel.app/live): every active project with current status
-- [What We Deliver](https://residata-gamma.vercel.app/sample): sample output, schema, insights
-- [Use Cases](https://residata-gamma.vercel.app/use-cases): tailored to each buyer persona
-- [Pricing](https://residata-gamma.vercel.app/pricing): €249 / €349 plans
-- [Contact](https://residata-gamma.vercel.app/contact): residata@proton.me
+- Marketing site: https://residata-gamma.vercel.app/
+- Live dashboard (every active project): https://residata-gamma.vercel.app/live
+- Live analytics with district + developer breakdowns: https://residata-gamma.vercel.app/live/analytics
 
-## Brand
-
-Residata. Based in Slovakia. Founder: Tomáš Kamhal.
+Numbers above are regenerated from the live database on every deploy.
