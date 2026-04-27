@@ -506,19 +506,23 @@ function Footer() {
 /* ─────── HOME ─────── */
 function HomePage({ setCurrent, l, lang, onLogin }) {
   const { can, tier } = useCapabilities();
-  // Hero badge count — exact live count from DB, no rounding. User wants
-  // the real number (e.g. "157 projektov"), not a marketing approximation.
-  // Hero badge — count of CURRENTLY ACTIVE projects (not all 90 in
-  // registry). "Live" implies what's currently being tracked, not
-  // historical / paused. Reads from market_totals.total_projects_active
-  // which is the same number used by /live, Dashboard, and the Ticker
-  // — single source of truth.
+  // Hero badge — surfaces the depth of our dataset. "tracked" = projects
+  // with archive data (active + sold-out under tracking). The active subset
+  // is shown alongside when it differs (today they're equal because nothing
+  // has sold out under tracking yet — the number diverges naturally over
+  // time). Reads from market_totals — single source of truth shared with
+  // /live, Dashboard, Ticker, and the build-time SEO files.
   const marketTotals = useMarketTotals();
   const liveProjCount = marketTotals.projectsActive ?? 0;
+  const trackedProjCount = marketTotals.projectsTracked ?? liveProjCount;
   const heroBadgeText = liveProjCount > 0
-    ? (lang === "sk"
-        ? `Live — sledujeme ${liveProjCount} projektov`
-        : `Live — tracking ${liveProjCount} developments`)
+    ? (trackedProjCount > liveProjCount
+        ? (lang === "sk"
+            ? `Live — ${trackedProjCount} projektov v databáze · ${liveProjCount} aktívne`
+            : `Live — ${trackedProjCount} projects in dataset · ${liveProjCount} active`)
+        : (lang === "sk"
+            ? `Live — sledujeme ${liveProjCount} projektov`
+            : `Live — tracking ${liveProjCount} developments`))
     : (lang === "sk" ? "Live — načítavam projekty…" : "Live — loading projects…");
   // Hero CTA logika podľa tier-u
   let heroButtons;

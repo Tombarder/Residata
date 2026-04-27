@@ -149,6 +149,12 @@ export function useMarketTotals() {
         soldLastMonth:   num(data?.total_sold_last_month),
         avgPriceM2:      num(data?.avg_eur_m2),
         projectsActive:  num(data?.total_projects_active),
+        // projectsTracked = projects with ≥1 snapshot in flats_archive,
+        // including ones that have since sold out / paused. Grows
+        // monotonically over time; legacy registry-only sold-outs without
+        // archive data are NOT included. Fallback to projectsActive while
+        // older view shapes are still being deployed.
+        projectsTracked: num(data?.total_projects_tracked) ?? num(data?.total_projects_active),
         developersActive:num(data?.total_developers_active),
         snapshotMonth:   data?.snapshot_month || null,
       };

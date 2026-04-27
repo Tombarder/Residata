@@ -7,13 +7,16 @@ refresh the dataset monthly.
 
 ## Market coverage (April 2026 snapshot)
 
-- 65 active residential development projects in Bratislava
+- 65 total projects in dataset (currently active + projects that sold out under our tracking — both groups have full historical price/availability snapshots)
+- 65 of them are currently active in the market
 - 54 distinct active developers
-- 5,394 individual units tracked across all projects
+- 5,394 individual units tracked across active projects (current snapshot)
 - 2,523 units currently available (for sale)
 - 348 reserved
 - 2,294 explicitly sold
 - Average price: €5,707 per square meter (across available inventory)
+
+The "total projects" number grows over time as developments sell out and new ones enter the market — the dataset accumulates historical comparable transactions, which is why valuers and banks use Residata for collateral assessment.
 
 ## Districts (top by inventory)
 

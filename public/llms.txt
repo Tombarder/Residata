@@ -13,7 +13,8 @@ delivers it as Google Sheets, CSV, XLSX, or via API.
 ## Scope (April 2026 snapshot)
 
 - City: Bratislava (Slovakia's capital)
-- Coverage: 65 active new-build residential projects, 5,394 units
+- Total projects in dataset: 65 new-build residential projects (current + sold-out under tracking)
+- Currently active (in market): 65 projects, 5,394 units
 - Currently for sale: 2,523 units · reserved: 348 · sold: 2,294
 - Average price across available inventory: €5,707/m²
 - Distinct active developers: 54

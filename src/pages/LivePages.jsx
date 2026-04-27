@@ -2442,10 +2442,22 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
       </div>
 
       <p style={{ color: "#55555f", fontSize: "0.72rem", marginTop: "2rem", fontFamily: mono, textAlign: "center" }}>
-        {/* Source line — count of ACTIVE projects (matches Hero / Dashboard). */}
-        {lang === "sk"
-          ? `Zdroj: ${marketTotals.projectsActive ?? 0} projektov · posledný sync ${projects[0]?.last_updated?.slice(0, 10) || "—"}`
-          : `Source: ${marketTotals.projectsActive ?? 0} projects · last sync ${projects[0]?.last_updated?.slice(0, 10) || "—"}`}
+        {/* Source line — primary number is "in dataset" (depth of coverage).
+            When sold-outs accumulate past the active count, both numbers
+            surface so it's clear how much is currently in market. */}
+        {(() => {
+          const active = marketTotals.projectsActive ?? 0;
+          const tracked = marketTotals.projectsTracked ?? active;
+          const sync = projects[0]?.last_updated?.slice(0, 10) || "—";
+          if (tracked > active) {
+            return lang === "sk"
+              ? `Zdroj: ${tracked} projektov v databáze (${active} aktívnych) · posledný sync ${sync}`
+              : `Source: ${tracked} projects in dataset (${active} active) · last sync ${sync}`;
+          }
+          return lang === "sk"
+            ? `Zdroj: ${active} projektov · posledný sync ${sync}`
+            : `Source: ${active} projects · last sync ${sync}`;
+        })()}
       </p>
     </main>
   );

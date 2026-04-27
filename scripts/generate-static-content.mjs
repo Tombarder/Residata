@@ -98,7 +98,8 @@ delivers it as Google Sheets, CSV, XLSX, or via API.
 ## Scope (${monthLabel} snapshot)
 
 - City: Bratislava (Slovakia's capital)
-- Coverage: ${fmtN(market?.total_projects_active)} active new-build residential projects, ${fmtN(market?.total_units_tracked)} units
+- Total projects in dataset: ${fmtN(market?.total_projects_tracked ?? market?.total_projects_active)} new-build residential projects (current + sold-out under tracking)
+- Currently active (in market): ${fmtN(market?.total_projects_active)} projects, ${fmtN(market?.total_units_tracked)} units
 - Currently for sale: ${fmtN(market?.total_available)} units · reserved: ${fmtN(market?.total_reserved)} · sold: ${fmtN(market?.total_sold)}
 - Average price across available inventory: €${fmtN(market?.avg_eur_m2)}/m²
 - Distinct active developers: ${fmtN(market?.total_developers_active)}
@@ -163,13 +164,16 @@ refresh the dataset monthly.
 
 ## Market coverage (${monthLabel} snapshot)
 
-- ${fmtN(market?.total_projects_active)} active residential development projects in Bratislava
+- ${fmtN(market?.total_projects_tracked ?? market?.total_projects_active)} total projects in dataset (currently active + projects that sold out under our tracking — both groups have full historical price/availability snapshots)
+- ${fmtN(market?.total_projects_active)} of them are currently active in the market
 - ${fmtN(market?.total_developers_active)} distinct active developers
-- ${fmtN(market?.total_units_tracked)} individual units tracked across all projects
+- ${fmtN(market?.total_units_tracked)} individual units tracked across active projects (current snapshot)
 - ${fmtN(market?.total_available)} units currently available (for sale)
 - ${fmtN(market?.total_reserved)} reserved
 - ${fmtN(market?.total_sold)} explicitly sold
 - Average price: €${fmtN(market?.avg_eur_m2)} per square meter (across available inventory)
+
+The "total projects" number grows over time as developments sell out and new ones enter the market — the dataset accumulates historical comparable transactions, which is why valuers and banks use Residata for collateral assessment.
 
 ## Districts (top by inventory)
 
@@ -256,6 +260,9 @@ console.log(`[gen-static] public/sitemap.xml — ${sitemap.length} chars, ${SITE
 const buildData = {
   total_units: market?.total_units_tracked,
   total_projects: market?.total_projects_active,
+  // total_projects_tracked = projects with archive data (current active +
+  // sold-out under tracking). Falls back to active if older view shape.
+  total_projects_tracked: market?.total_projects_tracked ?? market?.total_projects_active,
   total_developers: market?.total_developers_active,
   total_available: market?.total_available,
   avg_eur_m2: market?.avg_eur_m2,

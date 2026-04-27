@@ -288,7 +288,14 @@ export function PipelineFlow({ lang = "en" }) {
   // "live pipeline" panel.
   const marketTotals = useMarketTotals();
   const devCount  = marketTotals.developersActive ?? null;
-  const projCount = marketTotals.projectsActive ?? null;
+  // projCount is used in two places:
+  //   z1Live ("z X developerov · Y projektov") — flow description of where
+  //     we currently scrape from → ACTIVE makes sense (currently collecting)
+  //   stats KPI ("sledovaných projektov" / "projects tracked") — depth of
+  //     dataset → TRACKED makes sense (active + sold-out under tracking)
+  // We keep two separate counts so the labels don't lie.
+  const projCount        = marketTotals.projectsActive  ?? null;
+  const projTrackedCount = marketTotals.projectsTracked ?? marketTotals.projectsActive ?? null;
   // Pretty "—" when still loading; template strings below degrade gracefully.
   const fmt = (n, locale) => n == null ? "…" : Number(n).toLocaleString(locale);
 
@@ -489,11 +496,15 @@ export function PipelineFlow({ lang = "en" }) {
         overflow: "hidden",
       }} className="pipeline-stats">
         {[
-          { n: fmt(devCount,  lang === "sk" ? "sk-SK" : "en-US"), label: T.statsLabel[0] },
-          { n: fmt(projCount, lang === "sk" ? "sk-SK" : "en-US"), label: T.statsLabel[1] },
+          { n: fmt(devCount,         lang === "sk" ? "sk-SK" : "en-US"), label: T.statsLabel[0] },
+          // KPI label is "sledovaných projektov" / "projects tracked" — value
+          // matches the label: projects with archive data (active + sold-out
+          // under tracking). Today this equals projectsActive; over time as
+          // projects sell out the number grows beyond projectsActive.
+          { n: fmt(projTrackedCount, lang === "sk" ? "sk-SK" : "en-US"), label: T.statsLabel[1] },
           // 3. karta = cadence, slovný stat. "Mesačne" / "Monthly" hovorí
           // čo kupujúcemu zaujíma: ako často dostane fresh dáta.
-          { n: lang === "sk" ? "Mesačne" : "Monthly",             label: T.statsLabel[2] },
+          { n: lang === "sk" ? "Mesačne" : "Monthly",                   label: T.statsLabel[2] },
         ].map((s, i) => (
           <div key={i} style={{
             textAlign: "center",

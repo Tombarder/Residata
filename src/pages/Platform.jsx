@@ -874,10 +874,20 @@ function PlatformDashboard({ lang, setCurrent }) {
       )}
 
       {/* KPI strip — every number reads from market_totals (live view).
-          "Sledované projekty" shows ACTIVE projects only (matches the
-          /live count and the homepage Hero), not the full registry of 90. */}
+          "V databáze" = projects with archive data (active + sold-out under
+          tracking, monotonically growing). Subtitle shows the active subset
+          — the count of projects currently in the market. When equal we
+          omit the subtitle to keep the card clean. */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.85rem", marginBottom: "2rem" }}>
-        <KpiCard label={lang === "sk" ? "Sledované projekty" : "Projects tracked"} value={(marketTotals.projectsActive ?? 0).toLocaleString(lang === "sk" ? "sk-SK" : "en-US")} />
+        <KpiCard
+          label={lang === "sk" ? "V databáze" : "In dataset"}
+          value={(marketTotals.projectsTracked ?? marketTotals.projectsActive ?? 0).toLocaleString(lang === "sk" ? "sk-SK" : "en-US")}
+          subtitle={(marketTotals.projectsTracked ?? 0) > (marketTotals.projectsActive ?? 0)
+            ? (lang === "sk"
+                ? `${(marketTotals.projectsActive ?? 0).toLocaleString("sk-SK")} aktívne v predaji`
+                : `${(marketTotals.projectsActive ?? 0).toLocaleString("en-US")} active in market`)
+            : (lang === "sk" ? "všetky aktívne v predaji" : "all active in market")}
+        />
         <KpiCard label={lang === "sk" ? "Voľné byty" : "Available units"} value={totals.avail.toLocaleString(lang === "sk" ? "sk-SK" : "en-US")} accent={green} />
         <KpiCard label={lang === "sk" ? "Predané (30 dní)" : "Sold (30 days)"} value={totals.sold30 ? `+${totals.sold30}` : "—"} accent="#f5a623"
           locked={!can("view_sold_velocity")} />
@@ -921,7 +931,7 @@ function PlatformDashboard({ lang, setCurrent }) {
   );
 }
 
-function KpiCard({ label, value, accent = textLight, locked = false }) {
+function KpiCard({ label, value, subtitle = null, accent = textLight, locked = false }) {
   return (
     <div style={{
       background: bg, border: `1px solid ${border}`, borderRadius: 10,
@@ -934,6 +944,12 @@ function KpiCard({ label, value, accent = textLight, locked = false }) {
         filter: locked ? "blur(5px)" : "none",
         opacity: locked ? 0.5 : 1,
       }}>{value}</div>
+      {subtitle && (
+        <div style={{
+          fontFamily: mono, fontSize: "0.7rem", color: dim,
+          marginTop: "0.4rem", letterSpacing: "0.02em",
+        }}>{subtitle}</div>
+      )}
       {locked && <div style={{ fontSize: "0.65rem", color: "#f5a623", marginTop: "0.35rem", fontFamily: mono }}>paid only</div>}
     </div>
   );
