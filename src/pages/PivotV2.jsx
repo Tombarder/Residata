@@ -1029,6 +1029,7 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
           valueMode={valueMode} setValueMode={setValueMode}
           dataBars={dataBars}   setDataBars={setDataBars}
           onExportCSV={() => exportPivotCSV(flatRows, sortedTree, rows, cols, effectiveValues, valueMode)}
+          effectiveValues={effectiveValues}
           lang={lang}
         />
       )}
@@ -1555,7 +1556,7 @@ function groupLabel(g, lang) {
 }
 
 /* ─── ANALYSIS TOOLBAR ────────────────────────────────────────── */
-function AnalysisToolbar({ valueMode, setValueMode, dataBars, setDataBars, onExportCSV, lang }) {
+function AnalysisToolbar({ valueMode, setValueMode, dataBars, setDataBars, onExportCSV, effectiveValues = [], lang }) {
   const btnBase = {
     background: "transparent",
     border: `1px solid ${border}`,
@@ -1563,7 +1564,32 @@ function AnalysisToolbar({ valueMode, setValueMode, dataBars, setDataBars, onExp
     fontSize: "0.75rem", cursor: "pointer",
   };
   const btnActive = { ...btnBase, background: "rgba(0,229,160,0.14)", color: green, borderColor: green };
-  const btnPill = (active) => (active ? btnActive : btnBase);
+  const btnDisabled = { ...btnBase, opacity: 0.4, cursor: "not-allowed" };
+  const btnPill = (active, disabled) => (disabled ? btnDisabled : (active ? btnActive : btnBase));
+
+  // Pct modes (% z celku, % z rodiča) only make semantic sense for
+  // ADDITIVE aggregates (count, count_distinct, sum). For avg/median/
+  // min/max/measure they compute mathematically valid ratios that
+  // EXCEED 100 % when the child's average is higher than the parent's
+  // (e.g. Staré Mesto avg €/m² = 7,500 vs Bratislava avg = 5,500 →
+  // 136 %), but the label "% z celku/rodiča" implies share-of-total
+  // which averages can't have. Disable the buttons in that case +
+  // auto-revert valueMode to "raw" so the table never shows nonsense.
+  const NON_ADDITIVE = new Set(["avg", "median", "min", "max", "measure"]);
+  const anyNonAdditive = effectiveValues.some(v => NON_ADDITIVE.has(v.agg));
+  const pctDisabled = anyNonAdditive;
+  useEffect(() => {
+    if (pctDisabled && valueMode !== "raw") setValueMode("raw");
+  }, [pctDisabled, valueMode, setValueMode]);
+
+  // Note: the SK string uses Unicode quotes „..." (U+201E / U+201C). Plain
+  // ASCII " inside a JS string literal terminates it — JSX/Vite parser
+  // would die with "Expected `:` but found `Identifier`".
+  const pctTooltip = pctDisabled
+    ? (lang === "sk"
+        ? "% z celku / rodiča má zmysel len pre count / sum. Pri priemere/mediáne/min/max sa hodnoty nesčítavajú do 100 %, takže by zobrazenie klamalo (napr. 135 % pre okres s vyšším priemerom než celé mesto). Prepni mieru na count alebo sum aby sa táto možnosť zapla."
+        : "% of total / parent only makes sense for count / sum. For avg/median/min/max the values don't add up to 100 % (e.g. a district with a higher average shows >100 %), so the labels would mislead. Switch the measure to count or sum to enable this.")
+    : undefined;
 
   return (
     <div style={{
@@ -1575,8 +1601,22 @@ function AnalysisToolbar({ valueMode, setValueMode, dataBars, setDataBars, onExp
         {lang === "sk" ? "Zobraziť" : "Show"}
       </span>
       <button style={btnPill(valueMode === "raw")}        onClick={() => setValueMode("raw")}>{lang === "sk" ? "absolútne" : "absolute"}</button>
-      <button style={btnPill(valueMode === "pct_total")}  onClick={() => setValueMode("pct_total")}>% z celku</button>
-      <button style={btnPill(valueMode === "pct_parent")} onClick={() => setValueMode("pct_parent")}>% z rodiča</button>
+      <button
+        style={btnPill(valueMode === "pct_total", pctDisabled)}
+        onClick={pctDisabled ? undefined : () => setValueMode("pct_total")}
+        disabled={pctDisabled}
+        title={pctTooltip}
+      >
+        % {lang === "sk" ? "z celku" : "of total"}
+      </button>
+      <button
+        style={btnPill(valueMode === "pct_parent", pctDisabled)}
+        onClick={pctDisabled ? undefined : () => setValueMode("pct_parent")}
+        disabled={pctDisabled}
+        title={pctTooltip}
+      >
+        % {lang === "sk" ? "z rodiča" : "of parent"}
+      </button>
 
       <span style={{ width: 1, height: 16, background: border, margin: "0 0.35rem" }} />
 
