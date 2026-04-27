@@ -195,9 +195,13 @@ function anonDailyIncrement(ip) {
    selected their one project — gives the assistant the room to
    answer "how's my project doing" type questions personally. */
 async function buildChosenProjectContext(admin, chosenId) {
+  // projects_live: real per-project counts (not registry-inflated).
+  // flats_current: the latest snapshot_month from flats_archive — same
+  // dataset the platform's "current state" surfaces use. The legacy
+  // `flats` table was dropped in 2026-04 (residata commit 0d396e9).
   const [proj, flats] = await Promise.all([
-    admin.from("projects").select("*").eq("id", chosenId).maybeSingle(),
-    admin.from("flats").select("stav, izby, obytna_plocha, cena_s_dph").eq("project_id", chosenId).limit(2000),
+    admin.from("projects_live").select("*").eq("id", chosenId).maybeSingle(),
+    admin.from("flats_current").select("stav, izby, obytna_plocha, cena_s_dph").eq("project_id", chosenId).limit(2000),
   ]);
   const p = proj.data;
   if (!p) return null;
@@ -239,14 +243,18 @@ async function buildPaidContext(admin) {
   // Size: ~2,500 available/reserved flats × compact keys → ~30k
   // input tokens → ~$0.025 per call on Haiku 4.5. Paid tier's 30
   // daily questions cap that at $0.75/day/user worst case.
+  // Read from VIEWS, not tables: projects_live (real counts), flats_current
+  // (latest snapshot from archive). The legacy `flats` and the inflated
+  // `projects` columns were superseded in 2026-04 — see architecture
+  // memory: "Residata data architecture (2026-04-27)".
   const [metrics, projects, flats] = await Promise.all([
     admin.from("metrics").select("metric_key, value_numeric"),
-    admin.from("projects").select("id, name, developer, district, status, total_units, available_units, sold_units, sold_last_month, sold_percentage, avg_price_eur_m2").limit(200),
+    admin.from("projects_live").select("id, name, developer, district, status, total_units, available_units, sold_units, sold_last_month, sold_percentage, avg_price_eur_m2").limit(200),
     // Order by project_id + price so the 5000-row cap (if ever hit)
     // drops in a predictable way — last projects alphabetically, not
     // arbitrary insertion-order surprise. Current production is ~2500
     // V/R/PR rows so cap is headroom, not an active filter.
-    admin.from("flats").select("project_id, stav, izby, poschodie, budova, obytna_plocha, exterier_plocha, cena_s_dph, orientacia, kolaudacia")
+    admin.from("flats_current").select("project_id, stav, izby, poschodie, budova, obytna_plocha, exterier_plocha, cena_s_dph, orientacia, kolaudacia")
       .in("stav", ["V", "R", "PR"])
       .order("project_id", { ascending: true })
       .order("cena_s_dph", { ascending: true, nullsFirst: false })

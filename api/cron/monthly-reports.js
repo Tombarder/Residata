@@ -77,7 +77,10 @@ export default async function handler(req, res) {
   if (subErr) return res.status(500).json({ error: `subs query: ${subErr.message}` });
 
   // ── Load project data once (shared across all subscriptions) ──
-  const { data: projects, error: pErr } = await admin.from("projects").select("*");
+  // Read from projects_live VIEW so per-project totals reflect real
+  // flat counts (not the inflated total_units / sold_units stored on
+  // the projects table for manual_total override projects).
+  const { data: projects, error: pErr } = await admin.from("projects_live").select("*");
   if (pErr) return res.status(500).json({ error: `projects query: ${pErr.message}` });
 
   const month = new Date().toLocaleDateString("sk-SK", { month: "long", year: "numeric" });
