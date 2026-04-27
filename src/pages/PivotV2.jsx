@@ -2478,13 +2478,104 @@ function ChartTypeBtn({ active, onClick, label }) {
   );
 }
 
+/* ── Chart helpers ────────────────────────────────────────────────
+
+   shortNum(n)
+     Compact integer-ish formatter for axis ticks: 5,500 → "5.5k",
+     12,000 → "12k", 1,200,000 → "1.2M". Keeps the Y axis legible at
+     the chart sizes we use (~880 viewBox px, ~9-11 px font) where
+     "10 000 €/m²" overflows / overlaps neighbouring tick labels.
+     The unit moves out of the per-tick label and into a single
+     axis title so the tick column stays narrow.
+
+   fieldUnit(key, agg)
+     Returns the display unit for an axis title: "€", "€/m²", "m²",
+     "" (counts). Reads from the FIELDS registry so a new field with
+     a unit declaration "just works".
+
+   ChartTooltip
+     Floating box anchored to the mouse position via position:fixed.
+     Replaces the always-on per-bar value labels which collided with
+     each other + with the Y-axis ticks at any reasonable bar count.
+     pointerEvents: "none" so the tooltip can never intercept the
+     mouse leaving the bar — cursor moves through the box, hover
+     handlers fire normally on neighbouring bars. */
+
+function shortNum(n) {
+  if (n == null || !Number.isFinite(n)) return "—";
+  const a = Math.abs(n);
+  if (a >= 1_000_000) {
+    const v = n / 1_000_000;
+    return (Math.abs(v) >= 10 ? v.toFixed(0) : v.toFixed(1).replace(/\.0$/, "")) + "M";
+  }
+  if (a >= 1_000) {
+    const v = n / 1_000;
+    return (Math.abs(v) >= 10 ? v.toFixed(0) : v.toFixed(1).replace(/\.0$/, "")) + "k";
+  }
+  if (a >= 100) return Math.round(n).toString();
+  if (a >= 1)   return (Math.round(n * 10) / 10).toString();
+  return (Math.round(n * 100) / 100).toString();
+}
+
+function fieldUnit(fieldKey, agg) {
+  if (!fieldKey) {
+    // count / count_distinct → unitless
+    return agg === "count" || agg === "count_distinct" ? "" : "";
+  }
+  const f = FIELDS[fieldKey];
+  return f?.unit || "";
+}
+
+function ChartTooltip({ mouseX, mouseY, lines, accentColor }) {
+  if (mouseX == null || mouseY == null) return null;
+  // Offset 14px down-right from cursor; flip left if cursor near right edge.
+  const flipLeft = typeof window !== "undefined" && mouseX > window.innerWidth - 240;
+  return (
+    <div style={{
+      position: "fixed",
+      left: flipLeft ? mouseX - 14 : mouseX + 14,
+      top: mouseY + 14,
+      transform: flipLeft ? "translateX(-100%)" : "none",
+      background: "rgba(14, 14, 18, 0.96)",
+      border: `1px solid ${accentColor || green}`,
+      borderRadius: 6,
+      padding: "0.5rem 0.75rem",
+      fontFamily: mono,
+      fontSize: "0.76rem",
+      color: text,
+      pointerEvents: "none",
+      zIndex: 1000,
+      boxShadow: "0 6px 18px rgba(0,0,0,0.55)",
+      whiteSpace: "nowrap",
+      maxWidth: 280,
+    }}>
+      {lines.map((line, i) => (
+        <div key={i} style={{
+          color: line.muted ? dim : (line.accent ? (accentColor || green) : text),
+          fontWeight: line.bold ? 600 : 400,
+          marginTop: i > 0 ? "0.18rem" : 0,
+          fontSize: line.small ? "0.68rem" : undefined,
+        }}>
+          {line.text}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /* ── BarChartSVG ──────────────────────────────────────────────────
    Single-series vertical bars. Y axis auto-scales, gridlines at 4
    ticks. X labels rotate when too cramped (>8 bars). Each bar carries
-   the row's pathKey via onSelect — clicking jumps to the table row. */
+   the row's pathKey via onSelect — clicking jumps to the table row.
+   Hover shows a floating tooltip with the full value (replaces the
+   per-bar always-on labels which collided at any reasonable bar
+   count). */
 function BarChartSVG({ data, measureField, measureAgg, onSelect }) {
   const W = 880, H = 340;
-  const padL = 64, padR = 16, padT = 24, padB = data.length > 8 ? 110 : 64;
+  // Wider left padding gives the (now-narrower) Y-axis tick column
+  // breathing room; the unit label moves into a small axis title at
+  // the top so the per-tick row stays just "5k", "10k", etc.
+  const padL = 56, padR = 16, padT = 32, padB = data.length > 8 ? 110 : 64;
   const innerW = W - padL - padR;
   const innerH = H - padT - padB;
   const n = data.length;
@@ -2498,67 +2589,94 @@ function BarChartSVG({ data, measureField, measureAgg, onSelect }) {
 
   const ticks = makeTicks(minVal, maxVal, 4);
   const rotate = n > 8;
+  const unit = fieldUnit(measureField, measureAgg);
+
+  // Hover state — replaces the always-on per-bar text labels which
+  // overlapped each other + the Y axis. mouseX/mouseY in viewport
+  // (page) coords so the floating tooltip can position with
+  // position:fixed.
+  const [hover, setHover] = useState(null);
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block", overflow: "visible" }}>
-      {/* gridlines + Y labels */}
-      {ticks.map((t, i) => (
-        <g key={i}>
-          <line x1={padL} x2={W - padR} y1={yScale(t)} y2={yScale(t)} stroke={border} strokeDasharray="2,3"/>
-          <text x={padL - 8} y={yScale(t)} fill={dim} fontSize="11" textAnchor="end" dominantBaseline="middle" fontFamily={mono}>
-            {formatValue(t, measureField, measureAgg)}
+    <div style={{ position: "relative" }}>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block", overflow: "visible" }}>
+        {/* Y-axis title — shows the unit ONCE so each tick can be a
+            short number ("5k", "10k") instead of "5 000 €/m²". */}
+        {unit && (
+          <text x={padL} y={padT - 14} fill={dim} fontSize="10" textAnchor="start" fontFamily={mono}>
+            {unit}
           </text>
-        </g>
-      ))}
-      {/* zero baseline emphasis */}
-      {minVal < 0 && (
-        <line x1={padL} x2={W - padR} y1={yScale(0)} y2={yScale(0)} stroke={dim} strokeWidth="1"/>
-      )}
-      {/* bars — wrapped in <g> with cursor=pointer + click handler */}
-      {data.map((d, i) => {
-        const y0 = yScale(0);
-        const y1 = yScale(d.value);
-        const top = Math.min(y0, y1);
-        const h = Math.abs(y1 - y0);
-        const onClick = () => onSelect && onSelect(d.pathKey);
-        return (
-          <g key={i} className="pivot-chart-target" onClick={onClick}>
-            {/* Invisible wider hit area so thin bars are still easy to click */}
-            <rect x={xCenter(i) - Math.max(barW, 18) / 2} y={padT}
-                  width={Math.max(barW, 18)} height={innerH}
-                  fill="transparent"/>
-            <rect x={xCenter(i) - barW / 2} y={top} width={barW} height={h} fill={green} opacity="0.85" rx="2">
-              <title>{`${d.label}: ${formatValue(d.value, measureField, measureAgg)}\n(click → riadok v tabuľke)`}</title>
-            </rect>
-            {/* value above bar (only if it fits) */}
-            {h > 12 && barW > 20 && (
-              <text x={xCenter(i)} y={top - 5} fill={text} fontSize="10" fontWeight="600" textAnchor="middle" fontFamily={mono}>
-                {formatValue(d.value, measureField, measureAgg)}
-              </text>
-            )}
+        )}
+        {/* gridlines + Y labels (compact) */}
+        {ticks.map((t, i) => (
+          <g key={i}>
+            <line x1={padL} x2={W - padR} y1={yScale(t)} y2={yScale(t)} stroke={border} strokeDasharray="2,3"/>
+            <text x={padL - 6} y={yScale(t)} fill={text} fontSize="10" textAnchor="end" dominantBaseline="middle" fontFamily={mono}>
+              {shortNum(t)}
+            </text>
           </g>
-        );
-      })}
-      {/* X labels — clickable too, in case the bar itself is very short */}
-      {data.map((d, i) => {
-        const x = xCenter(i);
-        const y = padT + innerH + 16;
-        const truncated = d.label.length > 18 ? d.label.slice(0, 17) + "…" : d.label;
-        const onClick = () => onSelect && onSelect(d.pathKey);
-        return (
-          <text
-            key={i} x={x} y={y} fill={text} fontSize="11"
-            textAnchor={rotate ? "end" : "middle"} fontFamily={mono}
-            transform={rotate ? `rotate(-35 ${x} ${y})` : undefined}
-            className="pivot-chart-target"
-            onClick={onClick}
-          >
-            <title>{d.label}</title>
-            {truncated}
-          </text>
-        );
-      })}
-    </svg>
+        ))}
+        {/* zero baseline emphasis */}
+        {minVal < 0 && (
+          <line x1={padL} x2={W - padR} y1={yScale(0)} y2={yScale(0)} stroke={dim} strokeWidth="1"/>
+        )}
+        {/* bars */}
+        {data.map((d, i) => {
+          const y0 = yScale(0);
+          const y1 = yScale(d.value);
+          const top = Math.min(y0, y1);
+          const h = Math.abs(y1 - y0);
+          const onClick = () => onSelect && onSelect(d.pathKey);
+          const onEnter = (e) => setHover({ d, mouseX: e.clientX, mouseY: e.clientY });
+          const onMove  = (e) => setHover(h0 => h0 ? { ...h0, mouseX: e.clientX, mouseY: e.clientY } : h0);
+          const onLeave = () => setHover(null);
+          const isHovered = hover && hover.d === d;
+          return (
+            <g key={i}
+               className="pivot-chart-target"
+               onClick={onClick}
+               onMouseEnter={onEnter} onMouseMove={onMove} onMouseLeave={onLeave}>
+              {/* Invisible wider hit area so thin bars are still easy to click + hover */}
+              <rect x={xCenter(i) - Math.max(barW, 18) / 2} y={padT}
+                    width={Math.max(barW, 18)} height={innerH}
+                    fill="transparent"/>
+              <rect x={xCenter(i) - barW / 2} y={top} width={barW} height={h}
+                    fill={green} opacity={isHovered ? 1 : 0.85} rx="2"
+                    stroke={isHovered ? green : "transparent"} strokeWidth="1.5" />
+            </g>
+          );
+        })}
+        {/* X labels — clickable so even very short bars are still navigable */}
+        {data.map((d, i) => {
+          const x = xCenter(i);
+          const y = padT + innerH + 16;
+          const truncated = d.label.length > 18 ? d.label.slice(0, 17) + "…" : d.label;
+          const onClick = () => onSelect && onSelect(d.pathKey);
+          return (
+            <text
+              key={i} x={x} y={y} fill={text} fontSize="11"
+              textAnchor={rotate ? "end" : "middle"} fontFamily={mono}
+              transform={rotate ? `rotate(-35 ${x} ${y})` : undefined}
+              className="pivot-chart-target"
+              onClick={onClick}
+            >
+              <title>{d.label}</title>
+              {truncated}
+            </text>
+          );
+        })}
+      </svg>
+      {hover && (
+        <ChartTooltip
+          mouseX={hover.mouseX} mouseY={hover.mouseY}
+          lines={[
+            { text: hover.d.label, bold: true },
+            { text: formatValue(hover.d.value, measureField, measureAgg), accent: true },
+            { text: "click → riadok v tabuľke", muted: true, small: true },
+          ]}
+        />
+      )}
+    </div>
   );
 }
 
@@ -2569,7 +2687,7 @@ function BarChartSVG({ data, measureField, measureAgg, onSelect }) {
    → flash just the row. */
 function StackedBarSVG({ data, colKeys, valueIdx, measureField, measureAgg, onSelect }) {
   const W = 880, H = 380;
-  const padL = 64, padR = 16, padT = 24, padB = data.length > 8 ? 144 : 104;
+  const padL = 56, padR = 16, padT = 32, padB = data.length > 8 ? 144 : 104;
   const innerW = W - padL - padR;
   const innerH = H - padT - padB;
   const n = data.length;
@@ -2593,83 +2711,110 @@ function StackedBarSVG({ data, colKeys, valueIdx, measureField, measureAgg, onSe
   const ticks = makeTicks(0, maxTotal, 4);
   const rotate = n > 8;
   const legendY = padT + innerH + (rotate ? 84 : 44);
+  const unit = fieldUnit(measureField, measureAgg);
+
+  // Hover state for floating tooltip — segments AND row labels.
+  const [hover, setHover] = useState(null);
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block", overflow: "visible" }}>
-      {ticks.map((t, i) => (
-        <g key={i}>
-          <line x1={padL} x2={W - padR} y1={yScale(t)} y2={yScale(t)} stroke={border} strokeDasharray="2,3"/>
-          <text x={padL - 8} y={yScale(t)} fill={dim} fontSize="11" textAnchor="end" dominantBaseline="middle" fontFamily={mono}>
-            {formatValue(t, measureField, measureAgg)}
+    <div style={{ position: "relative" }}>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block", overflow: "visible" }}>
+        {unit && (
+          <text x={padL} y={padT - 14} fill={dim} fontSize="10" textAnchor="start" fontFamily={mono}>
+            {unit}
           </text>
-        </g>
-      ))}
-      {/* segments — each is clickable; hover shows the (row, colKey) detail */}
-      {stacks.map((s, i) => {
-        let cumY = yScale(0);
-        return (
+        )}
+        {ticks.map((t, i) => (
           <g key={i}>
-            {s.segs.map((seg, j) => {
-              if (seg.value <= 0) return null;
-              const yTop = yScale(s.segs.slice(0, j + 1).reduce((a, x) => a + Math.max(0, x.value), 0));
-              const h = cumY - yTop;
-              cumY = yTop;
-              const fill = CHART_PALETTE[j % CHART_PALETTE.length];
-              const onClick = () => onSelect && onSelect(s.pathKey, seg.colKey);
-              return (
-                <rect
-                  key={j} x={xCenter(i) - barW / 2} y={yTop} width={barW} height={h}
-                  fill={fill} opacity="0.88"
-                  className="pivot-chart-target" onClick={onClick}
-                >
-                  <title>{`${s.label} · ${seg.colKey}: ${formatValue(seg.value, measureField, measureAgg)}\n(click → bunka v tabuľke)`}</title>
-                </rect>
-              );
-            })}
-          </g>
-        );
-      })}
-      {/* X labels — click flashes whole row */}
-      {data.map((d, i) => {
-        const x = xCenter(i);
-        const y = padT + innerH + 16;
-        const truncated = d.label.length > 18 ? d.label.slice(0, 17) + "…" : d.label;
-        const onClick = () => onSelect && onSelect(d.pathKey);
-        return (
-          <text
-            key={i} x={x} y={y} fill={text} fontSize="11"
-            textAnchor={rotate ? "end" : "middle"} fontFamily={mono}
-            transform={rotate ? `rotate(-35 ${x} ${y})` : undefined}
-            className="pivot-chart-target"
-            onClick={onClick}
-          >
-            <title>{d.label}</title>
-            {truncated}
-          </text>
-        );
-      })}
-      {/* Legend */}
-      {colKeys.map((ck, j) => {
-        const cols = Math.max(1, Math.floor((W - padL - padR) / 140));
-        const row = Math.floor(j / cols);
-        const col = j % cols;
-        const x = padL + col * 140;
-        const y = legendY + row * 18;
-        if (y + 12 > H) return null;
-        const fill = CHART_PALETTE[j % CHART_PALETTE.length];
-        const ckText = String(ck);
-        const truncated = ckText.length > 18 ? ckText.slice(0, 17) + "…" : ckText;
-        return (
-          <g key={j}>
-            <rect x={x} y={y - 9} width={12} height={12} fill={fill} rx="2"/>
-            <text x={x + 18} y={y} fill={text} fontSize="11" dominantBaseline="middle" fontFamily={mono}>
-              <title>{ckText}</title>
-              {truncated}
+            <line x1={padL} x2={W - padR} y1={yScale(t)} y2={yScale(t)} stroke={border} strokeDasharray="2,3"/>
+            <text x={padL - 6} y={yScale(t)} fill={text} fontSize="10" textAnchor="end" dominantBaseline="middle" fontFamily={mono}>
+              {shortNum(t)}
             </text>
           </g>
-        );
-      })}
-    </svg>
+        ))}
+        {/* segments — each is clickable + hoverable */}
+        {stacks.map((s, i) => {
+          let cumY = yScale(0);
+          return (
+            <g key={i}>
+              {s.segs.map((seg, j) => {
+                if (seg.value <= 0) return null;
+                const yTop = yScale(s.segs.slice(0, j + 1).reduce((a, x) => a + Math.max(0, x.value), 0));
+                const h = cumY - yTop;
+                cumY = yTop;
+                const fill = CHART_PALETTE[j % CHART_PALETTE.length];
+                const onClick = () => onSelect && onSelect(s.pathKey, seg.colKey);
+                const onEnter = (e) => setHover({ s, seg, fill, mouseX: e.clientX, mouseY: e.clientY });
+                const onMove  = (e) => setHover(h0 => h0 ? { ...h0, mouseX: e.clientX, mouseY: e.clientY } : h0);
+                const onLeave = () => setHover(null);
+                const isHovered = hover && hover.s === s && hover.seg === seg;
+                return (
+                  <rect
+                    key={j} x={xCenter(i) - barW / 2} y={yTop} width={barW} height={h}
+                    fill={fill} opacity={isHovered ? 1 : 0.88}
+                    stroke={isHovered ? fill : "transparent"} strokeWidth="1.5"
+                    className="pivot-chart-target" onClick={onClick}
+                    onMouseEnter={onEnter} onMouseMove={onMove} onMouseLeave={onLeave}
+                  />
+                );
+              })}
+            </g>
+          );
+        })}
+        {/* X labels */}
+        {data.map((d, i) => {
+          const x = xCenter(i);
+          const y = padT + innerH + 16;
+          const truncated = d.label.length > 18 ? d.label.slice(0, 17) + "…" : d.label;
+          const onClick = () => onSelect && onSelect(d.pathKey);
+          return (
+            <text
+              key={i} x={x} y={y} fill={text} fontSize="11"
+              textAnchor={rotate ? "end" : "middle"} fontFamily={mono}
+              transform={rotate ? `rotate(-35 ${x} ${y})` : undefined}
+              className="pivot-chart-target"
+              onClick={onClick}
+            >
+              <title>{d.label}</title>
+              {truncated}
+            </text>
+          );
+        })}
+        {/* Legend */}
+        {colKeys.map((ck, j) => {
+          const cols = Math.max(1, Math.floor((W - padL - padR) / 140));
+          const row = Math.floor(j / cols);
+          const col = j % cols;
+          const x = padL + col * 140;
+          const y = legendY + row * 18;
+          if (y + 12 > H) return null;
+          const fill = CHART_PALETTE[j % CHART_PALETTE.length];
+          const ckText = String(ck);
+          const truncated = ckText.length > 18 ? ckText.slice(0, 17) + "…" : ckText;
+          return (
+            <g key={j}>
+              <rect x={x} y={y - 9} width={12} height={12} fill={fill} rx="2"/>
+              <text x={x + 18} y={y} fill={text} fontSize="11" dominantBaseline="middle" fontFamily={mono}>
+                <title>{ckText}</title>
+                {truncated}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+      {hover && (
+        <ChartTooltip
+          mouseX={hover.mouseX} mouseY={hover.mouseY}
+          accentColor={hover.fill}
+          lines={[
+            { text: hover.s.label, bold: true },
+            { text: `${hover.seg.colKey}: ${formatValue(hover.seg.value, measureField, measureAgg)}`, accent: true },
+            { text: `Spolu: ${formatValue(hover.s.total, measureField, measureAgg)}`, muted: true, small: true },
+            { text: "click → bunka v tabuľke", muted: true, small: true },
+          ]}
+        />
+      )}
+    </div>
   );
 }
 
@@ -2679,7 +2824,7 @@ function StackedBarSVG({ data, colKeys, valueIdx, measureField, measureAgg, onSe
    don't have to aim for a 4-px dot. */
 function LineChartSVG({ data, measureField, measureAgg, onSelect }) {
   const W = 880, H = 340;
-  const padL = 64, padR = 16, padT = 24, padB = data.length > 8 ? 110 : 64;
+  const padL = 56, padR = 16, padT = 32, padB = data.length > 8 ? 110 : 64;
   const innerW = W - padL - padR;
   const innerH = H - padT - padB;
   const n = data.length;
@@ -2693,49 +2838,75 @@ function LineChartSVG({ data, measureField, measureAgg, onSelect }) {
   const ticks = makeTicks(minVal, maxVal, 4);
   const path = data.map((d, i) => `${i === 0 ? "M" : "L"} ${xPos(i)} ${yScale(d.value)}`).join(" ");
   const rotate = n > 8;
+  const unit = fieldUnit(measureField, measureAgg);
+
+  const [hover, setHover] = useState(null);
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block", overflow: "visible" }}>
-      {ticks.map((t, i) => (
-        <g key={i}>
-          <line x1={padL} x2={W - padR} y1={yScale(t)} y2={yScale(t)} stroke={border} strokeDasharray="2,3"/>
-          <text x={padL - 8} y={yScale(t)} fill={dim} fontSize="11" textAnchor="end" dominantBaseline="middle" fontFamily={mono}>
-            {formatValue(t, measureField, measureAgg)}
+    <div style={{ position: "relative" }}>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block", overflow: "visible" }}>
+        {unit && (
+          <text x={padL} y={padT - 14} fill={dim} fontSize="10" textAnchor="start" fontFamily={mono}>
+            {unit}
           </text>
-        </g>
-      ))}
-      <path d={path} stroke={green} strokeWidth="2.5" fill="none"/>
-      {data.map((d, i) => {
-        const onClick = () => onSelect && onSelect(d.pathKey);
-        return (
-          <g key={i} className="pivot-chart-target" onClick={onClick}>
-            {/* Wider invisible hit area so 4-px dots are still easy targets */}
-            <circle cx={xPos(i)} cy={yScale(d.value)} r="14" fill="transparent"/>
-            <circle cx={xPos(i)} cy={yScale(d.value)} r="5" fill={green} stroke={bg} strokeWidth="1.5">
-              <title>{`${d.label}: ${formatValue(d.value, measureField, measureAgg)}\n(click → riadok v tabuľke)`}</title>
-            </circle>
+        )}
+        {ticks.map((t, i) => (
+          <g key={i}>
+            <line x1={padL} x2={W - padR} y1={yScale(t)} y2={yScale(t)} stroke={border} strokeDasharray="2,3"/>
+            <text x={padL - 6} y={yScale(t)} fill={text} fontSize="10" textAnchor="end" dominantBaseline="middle" fontFamily={mono}>
+              {shortNum(t)}
+            </text>
           </g>
-        );
-      })}
-      {data.map((d, i) => {
-        const x = xPos(i);
-        const y = padT + innerH + 16;
-        const truncated = d.label.length > 18 ? d.label.slice(0, 17) + "…" : d.label;
-        const onClick = () => onSelect && onSelect(d.pathKey);
-        return (
-          <text
-            key={i} x={x} y={y} fill={text} fontSize="11"
-            textAnchor={rotate ? "end" : "middle"} fontFamily={mono}
-            transform={rotate ? `rotate(-35 ${x} ${y})` : undefined}
-            className="pivot-chart-target"
-            onClick={onClick}
-          >
-            <title>{d.label}</title>
-            {truncated}
-          </text>
-        );
-      })}
-    </svg>
+        ))}
+        <path d={path} stroke={green} strokeWidth="2.5" fill="none"/>
+        {data.map((d, i) => {
+          const onClick = () => onSelect && onSelect(d.pathKey);
+          const onEnter = (e) => setHover({ d, mouseX: e.clientX, mouseY: e.clientY });
+          const onMove  = (e) => setHover(h0 => h0 ? { ...h0, mouseX: e.clientX, mouseY: e.clientY } : h0);
+          const onLeave = () => setHover(null);
+          const isHovered = hover && hover.d === d;
+          return (
+            <g key={i}
+               className="pivot-chart-target"
+               onClick={onClick}
+               onMouseEnter={onEnter} onMouseMove={onMove} onMouseLeave={onLeave}>
+              {/* Wider invisible hit area so 5-px dots are still easy targets */}
+              <circle cx={xPos(i)} cy={yScale(d.value)} r="14" fill="transparent"/>
+              <circle cx={xPos(i)} cy={yScale(d.value)} r={isHovered ? 7 : 5}
+                      fill={green} stroke={bg} strokeWidth="1.5"/>
+            </g>
+          );
+        })}
+        {data.map((d, i) => {
+          const x = xPos(i);
+          const y = padT + innerH + 16;
+          const truncated = d.label.length > 18 ? d.label.slice(0, 17) + "…" : d.label;
+          const onClick = () => onSelect && onSelect(d.pathKey);
+          return (
+            <text
+              key={i} x={x} y={y} fill={text} fontSize="11"
+              textAnchor={rotate ? "end" : "middle"} fontFamily={mono}
+              transform={rotate ? `rotate(-35 ${x} ${y})` : undefined}
+              className="pivot-chart-target"
+              onClick={onClick}
+            >
+              <title>{d.label}</title>
+              {truncated}
+            </text>
+          );
+        })}
+      </svg>
+      {hover && (
+        <ChartTooltip
+          mouseX={hover.mouseX} mouseY={hover.mouseY}
+          lines={[
+            { text: hover.d.label, bold: true },
+            { text: formatValue(hover.d.value, measureField, measureAgg), accent: true },
+            { text: "click → riadok v tabuľke", muted: true, small: true },
+          ]}
+        />
+      )}
+    </div>
   );
 }
 
@@ -2748,6 +2919,8 @@ function PieChartSVG({ data, measureField, measureAgg, onSelect, lang }) {
   const rOuter = 140, rInner = 64;
 
   const total = data.reduce((a, d) => a + Math.max(0, d.value), 0);
+  const [hover, setHover] = useState(null);
+
   if (total <= 0) {
     return <div style={{ padding: "1rem", color: dim, fontSize: "0.82rem", fontStyle: "italic" }}>
       {lang === "sk" ? "Súčet hodnôt = 0; koláč nemá zmysel." : "Total = 0; pie chart not meaningful."}
@@ -2781,41 +2954,62 @@ function PieChartSVG({ data, measureField, measureAgg, onSelect, lang }) {
   };
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}>
-      {slices.map((s, i) => {
-        const onClick = () => onSelect && onSelect(s.pathKey);
-        return (
-          <path
-            key={i} d={arc(s)} fill={s.fill} opacity="0.9"
-            className="pivot-chart-target" onClick={onClick}
-          >
-            <title>{`${s.label}: ${formatValue(s.value, measureField, measureAgg)} (${(s.share * 100).toFixed(1)}%)\n(click → riadok v tabuľke)`}</title>
-          </path>
-        );
-      })}
-      {/* Total label in donut hole */}
-      <text x={cx} y={cy - 6} textAnchor="middle" fill={text} fontSize="15" fontWeight="700" fontFamily={mono}>
-        {formatValue(total, measureField, measureAgg)}
-      </text>
-      <text x={cx} y={cy + 14} textAnchor="middle" fill={dim} fontSize="11" fontFamily={mono}>
-        {lang === "sk" ? "spolu" : "total"}
-      </text>
-      {/* Legend right side — each row clickable too */}
-      {slices.map((s, i) => {
-        const y = 36 + i * 24;
-        if (y > H - 16) return null;
-        const onClick = () => onSelect && onSelect(s.pathKey);
-        return (
-          <g key={i} className="pivot-chart-target" onClick={onClick}>
-            <rect x={W / 2 + 60} y={y - 9} width={14} height={14} fill={s.fill} rx="2"/>
-            <text x={W / 2 + 80} y={y} fill={text} fontSize="12" dominantBaseline="middle" fontFamily={mono}>
-              <title>{s.label}</title>
-              {(s.label.length > 22 ? s.label.slice(0, 21) + "…" : s.label)} — {(s.share * 100).toFixed(1)}%
-            </text>
-          </g>
-        );
-      })}
-    </svg>
+    <div style={{ position: "relative" }}>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}>
+        {slices.map((s, i) => {
+          const onClick = () => onSelect && onSelect(s.pathKey);
+          const onEnter = (e) => setHover({ s, mouseX: e.clientX, mouseY: e.clientY });
+          const onMove  = (e) => setHover(h0 => h0 ? { ...h0, mouseX: e.clientX, mouseY: e.clientY } : h0);
+          const onLeave = () => setHover(null);
+          const isHovered = hover && hover.s === s;
+          return (
+            <path
+              key={i} d={arc(s)} fill={s.fill}
+              opacity={isHovered ? 1 : 0.9}
+              stroke={isHovered ? s.fill : "transparent"} strokeWidth="2"
+              className="pivot-chart-target" onClick={onClick}
+              onMouseEnter={onEnter} onMouseMove={onMove} onMouseLeave={onLeave}
+            />
+          );
+        })}
+        {/* Total label in donut hole */}
+        <text x={cx} y={cy - 6} textAnchor="middle" fill={text} fontSize="15" fontWeight="700" fontFamily={mono}>
+          {formatValue(total, measureField, measureAgg)}
+        </text>
+        <text x={cx} y={cy + 14} textAnchor="middle" fill={dim} fontSize="11" fontFamily={mono}>
+          {lang === "sk" ? "spolu" : "total"}
+        </text>
+        {/* Legend right side */}
+        {slices.map((s, i) => {
+          const y = 36 + i * 24;
+          if (y > H - 16) return null;
+          const onClick = () => onSelect && onSelect(s.pathKey);
+          const onEnter = (e) => setHover({ s, mouseX: e.clientX, mouseY: e.clientY });
+          const onMove  = (e) => setHover(h0 => h0 ? { ...h0, mouseX: e.clientX, mouseY: e.clientY } : h0);
+          const onLeave = () => setHover(null);
+          return (
+            <g key={i} className="pivot-chart-target" onClick={onClick}
+               onMouseEnter={onEnter} onMouseMove={onMove} onMouseLeave={onLeave}>
+              <rect x={W / 2 + 60} y={y - 9} width={14} height={14} fill={s.fill} rx="2"/>
+              <text x={W / 2 + 80} y={y} fill={text} fontSize="12" dominantBaseline="middle" fontFamily={mono}>
+                {(s.label.length > 22 ? s.label.slice(0, 21) + "…" : s.label)} — {(s.share * 100).toFixed(1)}%
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+      {hover && (
+        <ChartTooltip
+          mouseX={hover.mouseX} mouseY={hover.mouseY}
+          accentColor={hover.s.fill}
+          lines={[
+            { text: hover.s.label, bold: true },
+            { text: `${formatValue(hover.s.value, measureField, measureAgg)}  ·  ${(hover.s.share * 100).toFixed(1)}%`, accent: true },
+            { text: "click → riadok v tabuľke", muted: true, small: true },
+          ]}
+        />
+      )}
+    </div>
   );
 }
 
@@ -2851,7 +3045,6 @@ function HeatmapSVG({ topRows, colKeys, valueIdx, measureField, measureAgg, onSe
   const colorFor = (v) => {
     if (!Number.isFinite(v)) return "transparent";
     const t = (v - minV) / range;
-    // Mix from #14141a (panelHi) → #00e5a0 (green)
     const r = Math.round(0x14 + t * (0x00 - 0x14));
     const g = Math.round(0x14 + t * (0xe5 - 0x14));
     const b = Math.round(0x1a + t * (0xa0 - 0x1a));
@@ -2863,61 +3056,83 @@ function HeatmapSVG({ topRows, colKeys, valueIdx, measureField, measureAgg, onSe
     return t > 0.55 ? "#0a0a0b" : text;
   };
 
+  // Hover state — covers both row labels and cells.
+  const [hover, setHover] = useState(null);
+
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block", overflow: "visible" }}>
-      {/* col headers */}
-      {colKeys.map((ck, j) => {
-        const x = padL + j * cellW + cellW / 2;
-        const ckText = String(ck);
-        const truncated = ckText.length > 14 ? ckText.slice(0, 13) + "…" : ckText;
-        return (
-          <text key={j} x={x} y={padT - 8} fill={text} fontSize="11" fontWeight="600" textAnchor="middle" fontFamily={mono}>
-            <title>{ckText}</title>
-            {truncated}
-          </text>
-        );
-      })}
-      {/* rows */}
-      {topRows.map((row, i) => {
-        const y = padT + i * cellH;
-        const rowText = String(row.label || "—");
-        const truncated = rowText.length > 28 ? rowText.slice(0, 27) + "…" : rowText;
-        const onRowClick = () => onSelect && onSelect(row.pathKey);
-        return (
-          <g key={i}>
-            <text
-              x={padL - 8} y={y + cellH / 2} fill={text} fontSize="11" fontWeight="500"
-              textAnchor="end" dominantBaseline="middle" fontFamily={mono}
-              className="pivot-chart-target"
-              onClick={onRowClick}
-            >
-              <title>{rowText + "\n(click → riadok v tabuľke)"}</title>
+    <div style={{ position: "relative" }}>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block", overflow: "visible" }}>
+        {/* col headers */}
+        {colKeys.map((ck, j) => {
+          const x = padL + j * cellW + cellW / 2;
+          const ckText = String(ck);
+          const truncated = ckText.length > 14 ? ckText.slice(0, 13) + "…" : ckText;
+          return (
+            <text key={j} x={x} y={padT - 8} fill={text} fontSize="11" fontWeight="600" textAnchor="middle" fontFamily={mono}>
+              <title>{ckText}</title>
               {truncated}
             </text>
-            {colKeys.map((ck, j) => {
-              const v = row.colRollups?.[ck]?.[valueIdx];
-              const x = padL + j * cellW;
-              const onCellClick = () => onSelect && onSelect(row.pathKey, ck);
-              return (
-                <g key={j} className="pivot-chart-target" onClick={onCellClick}>
-                  <rect
-                    x={x + 1} y={y + 1} width={cellW - 2} height={cellH - 2}
-                    fill={colorFor(v)} stroke={border} strokeWidth="0.5"
-                  >
-                    <title>{`${row.label} · ${ck}: ${formatValue(v, measureField, measureAgg)}\n(click → bunka v tabuľke)`}</title>
-                  </rect>
-                  {Number.isFinite(v) && cellW > 42 && (
-                    <text x={x + cellW / 2} y={y + cellH / 2} fill={textColorFor(v)} fontSize="10" fontWeight="600" textAnchor="middle" dominantBaseline="middle" fontFamily={mono} pointerEvents="none">
-                      {formatValue(v, measureField, measureAgg)}
-                    </text>
-                  )}
-                </g>
-              );
-            })}
-          </g>
-        );
-      })}
-    </svg>
+          );
+        })}
+        {/* rows */}
+        {topRows.map((row, i) => {
+          const y = padT + i * cellH;
+          const rowText = String(row.label || "—");
+          const truncated = rowText.length > 28 ? rowText.slice(0, 27) + "…" : rowText;
+          const onRowClick = () => onSelect && onSelect(row.pathKey);
+          return (
+            <g key={i}>
+              <text
+                x={padL - 8} y={y + cellH / 2} fill={text} fontSize="11" fontWeight="500"
+                textAnchor="end" dominantBaseline="middle" fontFamily={mono}
+                className="pivot-chart-target"
+                onClick={onRowClick}
+              >
+                <title>{rowText + "\n(click → riadok v tabuľke)"}</title>
+                {truncated}
+              </text>
+              {colKeys.map((ck, j) => {
+                const v = row.colRollups?.[ck]?.[valueIdx];
+                const x = padL + j * cellW;
+                const onCellClick = () => onSelect && onSelect(row.pathKey, ck);
+                const onEnter = (e) => setHover({ row, ck, v, mouseX: e.clientX, mouseY: e.clientY });
+                const onMove  = (e) => setHover(h0 => h0 ? { ...h0, mouseX: e.clientX, mouseY: e.clientY } : h0);
+                const onLeave = () => setHover(null);
+                const isHovered = hover && hover.row === row && hover.ck === ck;
+                return (
+                  <g key={j}
+                     className="pivot-chart-target"
+                     onClick={onCellClick}
+                     onMouseEnter={onEnter} onMouseMove={onMove} onMouseLeave={onLeave}>
+                    <rect
+                      x={x + 1} y={y + 1} width={cellW - 2} height={cellH - 2}
+                      fill={colorFor(v)}
+                      stroke={isHovered ? green : border}
+                      strokeWidth={isHovered ? "1.5" : "0.5"}
+                    />
+                    {Number.isFinite(v) && cellW > 42 && (
+                      <text x={x + cellW / 2} y={y + cellH / 2} fill={textColorFor(v)} fontSize="10" fontWeight="600" textAnchor="middle" dominantBaseline="middle" fontFamily={mono} pointerEvents="none">
+                        {shortNum(v)}
+                      </text>
+                    )}
+                  </g>
+                );
+              })}
+            </g>
+          );
+        })}
+      </svg>
+      {hover && (
+        <ChartTooltip
+          mouseX={hover.mouseX} mouseY={hover.mouseY}
+          lines={[
+            { text: hover.row.label || "—", bold: true },
+            { text: `${hover.ck}: ${formatValue(hover.v, measureField, measureAgg)}`, accent: true },
+            { text: "click → bunka v tabuľke", muted: true, small: true },
+          ]}
+        />
+      )}
+    </div>
   );
 }
 

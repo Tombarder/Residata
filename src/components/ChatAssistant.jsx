@@ -8,6 +8,7 @@
 import { useEffect, useRef } from "react";
 import { useChat, GENERAL_KNOWLEDGE_RE } from "../lib/useChat";
 import { LimitBanner } from "./FloatingChat";
+import AiBetaBanner from "./AiBetaBanner";
 import { pushRoute } from "../lib/routing";
 
 const mono   = "'JetBrains Mono', monospace";
@@ -47,6 +48,10 @@ export default function ChatAssistant({ lang = "sk" }) {
 
   return (
     <div style={{ padding: "1.25rem 1.5rem 2rem", maxWidth: 920, margin: "0 auto" }}>
+      {/* Beta disclosure — scoped to this AI page (and the FloatingChat
+          panel on marketing). Hidden when dismissed (7-day localStorage). */}
+      <AiBetaBanner lang={lang} />
+
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem", flexWrap: "wrap", marginBottom: "0.75rem" }}>
         <div>
           <h2 style={{ fontSize: "1.4rem", fontWeight: 700, color: text, margin: 0, letterSpacing: "-0.02em" }}>

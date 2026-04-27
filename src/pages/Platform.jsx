@@ -23,7 +23,9 @@ import {
 } from "./LivePages";
 import ReportsPage from "./Reports";
 import ChatAssistant from "../components/ChatAssistant";
-import AiBetaBanner from "../components/AiBetaBanner";
+// AiBetaBanner moved into AI surfaces only (ChatAssistant + FloatingChat)
+// after QA — was on every /app/* page which felt like noise on Dashboard /
+// Reports / Pivot where AI doesn't show up at all.
 
 const mono = "'JetBrains Mono', monospace";
 const green = "#00e5a0";
@@ -215,11 +217,10 @@ export default function PlatformShell({ page, projectId, lang = "en", setLang, s
         display: "flex", flexDirection: "column",
       }} className="platform-main">
         <TopBar page={page} lang={lang} setLang={setLang} tier={tier} />
-        {/* Beta notice — disclosed inside /app/* only (not on marketing).
-            Self-hides for 7 days on dismiss. Sits between TopBar and the
-            page content so it's the first thing the user sees on every
-            new platform navigation, without competing with the page H1. */}
-        <AiBetaBanner lang={lang} />
+        {/* AI beta banner is no longer mounted globally — it lives only
+            on AI surfaces (ChatAssistant page + FloatingChat panel) so
+            it doesn't yell at users on Dashboard / Reports / Pivot
+            where there's no AI activity to disclose. */}
 
         {/* Content area. key={page} makes the fade animation replay on nav,
             but hook state (useProjects etc) survives remount via module-

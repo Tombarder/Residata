@@ -22,6 +22,7 @@ import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../lib/useAuth";
 import { useChat } from "../lib/useChat";
 import { renderAssistantText } from "./ChatAssistant";
+import AiBetaBanner from "./AiBetaBanner";
 import { pushRoute } from "../lib/routing";
 
 const mono   = "'JetBrains Mono', monospace";
@@ -197,6 +198,12 @@ export default function FloatingChat({ lang = "sk", onNavigate }) {
               onMouseLeave={e => { e.currentTarget.style.color = dim; }}
             >✕</button>
           </div>
+
+          {/* Beta disclosure — compact variant suited to the narrow
+              floating panel. Renders only when the user opens the
+              chat bubble (this whole block is gated by `open` above)
+              + auto-hides for 7 days on dismiss. */}
+          <AiBetaBanner lang={lang} compact />
 
           {/* Transcript */}
           <div ref={scrollRef} style={{
