@@ -130,17 +130,29 @@ fs.writeFileSync(path.resolve('public/llms.txt'), llms);
 console.log(`[gen-static] public/llms.txt — ${llms.length} chars`);
 
 // ─────────────────── llms-full.txt — detailed profile ───────────────────
-const districtsTop = districts.slice(0, 8).map(d =>
-  `${d.district} (${d.project_count} projects, ${fmtN(d.total_units)} units${d.avg_eur_m2 ? `, €${fmtN(d.avg_eur_m2)}/m² avg` : ''})`
-).join(', ');
+// Sanitise free-form text from registry (project / developer / district
+// names) so rare characters can't break the markdown. Backticks and
+// asterisks would otherwise format weirdly in the bold/code spans below.
+const safe = (s) => String(s || '')
+  .replace(/[`*_]/g, '')
+  .replace(/[\r\n]+/g, ' ')
+  .trim();
 
-const topProjList = topProjects.slice(0, 10).map(p => {
-  const soldText = p.sold_percentage != null
-    ? `${Number(p.sold_percentage).toFixed(0)}% sold`
-    : 'sales data not published';
-  const priceText = p.avg_price_eur_m2 ? `, €${fmtN(p.avg_price_eur_m2)}/m²` : '';
-  return `- **${p.name}** (${p.district || 'district unknown'}, ${p.developer || 'developer not set'}) — ${fmtN(p.total_units)} units, ${soldText}${priceText}`;
-}).join('\n');
+const districtsTop = districts.length > 0
+  ? districts.slice(0, 8).map(d =>
+      `${safe(d.district)} (${d.project_count} projects, ${fmtN(d.total_units)} units${d.avg_eur_m2 ? `, €${fmtN(d.avg_eur_m2)}/m² avg` : ''})`
+    ).join(', ')
+  : 'No district data available yet.';
+
+const topProjList = topProjects.length > 0
+  ? topProjects.slice(0, 10).map(p => {
+      const soldText = p.sold_percentage != null
+        ? `${Number(p.sold_percentage).toFixed(0)}% sold`
+        : 'sales data not published';
+      const priceText = p.avg_price_eur_m2 ? `, €${fmtN(p.avg_price_eur_m2)}/m²` : '';
+      return `- **${safe(p.name)}** (${safe(p.district) || 'district unknown'}, ${safe(p.developer) || 'developer not set'}) — ${fmtN(p.total_units)} units, ${soldText}${priceText}`;
+    }).join('\n')
+  : '_No project-level data available yet._';
 
 const llmsFull = `# Residata — full coverage profile (for AI agents)
 
