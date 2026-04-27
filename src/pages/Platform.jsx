@@ -854,9 +854,12 @@ function PlatformDashboard({ lang, setCurrent }) {
         {greeting}
       </h2>
       <p style={{ color: dim, fontSize: "0.95rem", lineHeight: 1.6, marginBottom: "1.5rem" }}>
+        {/* Posledný sync mesiac z market_totals view (MAX snapshot_month
+            v archíve). Predtým tam bolo new Date() = dnes — mätúce, lebo
+            user vidí "posledný beh: dnes" aj keď sync bežal pred týždňom. */}
         {lang === "sk"
-          ? <>Toto je tvoj Residata dashboard. Nižšie je aktuálny stav trhu — data refresh každý mesiac, posledný beh pipeline je <strong style={{ color: textLight }}>{new Date().toISOString().slice(0, 10)}</strong>.</>
-          : <>This is your Residata dashboard. Current market state below — data refreshes monthly, last pipeline run was <strong style={{ color: textLight }}>{new Date().toISOString().slice(0, 10)}</strong>.</>}
+          ? <>Toto je tvoj Residata dashboard. Nižšie je aktuálny stav trhu — data refresh každý mesiac, posledný beh pipeline za mesiac <strong style={{ color: textLight }}>{marketTotals.snapshotMonth || "—"}</strong>.</>
+          : <>This is your Residata dashboard. Current market state below — data refreshes monthly, last pipeline run for month <strong style={{ color: textLight }}>{marketTotals.snapshotMonth || "—"}</strong>.</>}
       </p>
 
       {/* Trial CTA banner — appears for free users who haven't yet
