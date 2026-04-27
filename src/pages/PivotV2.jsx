@@ -2526,41 +2526,76 @@ function fieldUnit(fieldKey, agg) {
   return f?.unit || "";
 }
 
+/* formatValueWhole — tooltip-grade formatter that rounds to WHOLE
+   units (no decimals) for everything except percentages, which keep
+   one decimal because "33%" loses too much information vs. "33.4%".
+   Rationale: hover tooltips are an "exact value" affordance — the
+   user already sees the bar height as the relative shape; the
+   number on hover should be the integer that's easy to read aloud.
+   Different from formatValue() (used in tables + axis ticks) which
+   keeps 1 decimal for averages/medians of small-range fields like
+   izby/poschodie. Tooltips trade that precision for legibility. */
+function formatValueWhole(value, fieldKey, agg) {
+  if (value == null || !Number.isFinite(value)) return "—";
+  const f = FIELDS[fieldKey];
+  const unit = f?.unit ? ` ${f.unit}` : "";
+  if (f?.unit === "%") {
+    return `${(Math.round(value * 10) / 10).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).replace(/,/g, " ")}${unit}`;
+  }
+  // counts, sums, averages, prices, areas, €/m² — all displayed as
+  // whole-unit integers in tooltips (no "5965.6 €/m²", just "5 966").
+  const rounded = Math.round(value);
+  return `${rounded.toLocaleString("en-US").replace(/,/g, " ")}${unit}`;
+}
+
+/* ChartTooltip — floating box anchored to the mouse position via
+   position:fixed. Rendered into document.body via a portal because
+   parent transforms (the .page-transition wrapper has a transform-
+   based fade animation that creates a containing block) would
+   otherwise re-anchor "fixed" positioning to the local frame, and
+   our viewport-pixel mouse coords would land in the wrong place
+   (often offscreen). The portal sidesteps the entire stacking-
+   context / containing-block problem by rendering at the body
+   level. pointerEvents:"none" keeps the tooltip from intercepting
+   mouse events when the cursor moves through it. */
 function ChartTooltip({ mouseX, mouseY, lines, accentColor }) {
   if (mouseX == null || mouseY == null) return null;
+  if (typeof document === "undefined") return null;
   // Offset 14px down-right from cursor; flip left if cursor near right edge.
   const flipLeft = typeof window !== "undefined" && mouseX > window.innerWidth - 240;
-  return (
+  const flipUp   = typeof window !== "undefined" && mouseY > window.innerHeight - 140;
+  const node = (
     <div style={{
       position: "fixed",
       left: flipLeft ? mouseX - 14 : mouseX + 14,
-      top: mouseY + 14,
-      transform: flipLeft ? "translateX(-100%)" : "none",
-      background: "rgba(14, 14, 18, 0.96)",
+      top:  flipUp   ? mouseY - 14 : mouseY + 14,
+      transform: `${flipLeft ? "translateX(-100%) " : ""}${flipUp ? "translateY(-100%)" : ""}`.trim(),
+      background: "rgba(14, 14, 18, 0.97)",
       border: `1px solid ${accentColor || green}`,
       borderRadius: 6,
-      padding: "0.5rem 0.75rem",
+      padding: "0.55rem 0.8rem",
       fontFamily: mono,
-      fontSize: "0.76rem",
+      fontSize: "0.78rem",
       color: text,
       pointerEvents: "none",
-      zIndex: 1000,
+      zIndex: 10000,
       boxShadow: "0 6px 18px rgba(0,0,0,0.55)",
       whiteSpace: "nowrap",
-      maxWidth: 280,
+      maxWidth: 320,
     }}>
       {lines.map((line, i) => (
         <div key={i} style={{
           color: line.muted ? dim : (line.accent ? (accentColor || green) : text),
-          fontWeight: line.bold ? 600 : 400,
-          marginTop: i > 0 ? "0.18rem" : 0,
-          fontSize: line.small ? "0.68rem" : undefined,
+          fontWeight: line.bold ? 600 : (line.accent ? 700 : 400),
+          marginTop: i > 0 ? "0.22rem" : 0,
+          fontSize: line.small ? "0.7rem" : (line.accent ? "0.92rem" : undefined),
         }}>
           {line.text}
         </div>
       ))}
     </div>
   );
+  return createPortal(node, document.body);
 }
 
 /* ── BarChartSVG ──────────────────────────────────────────────────
@@ -2671,7 +2706,7 @@ function BarChartSVG({ data, measureField, measureAgg, onSelect }) {
           mouseX={hover.mouseX} mouseY={hover.mouseY}
           lines={[
             { text: hover.d.label, bold: true },
-            { text: formatValue(hover.d.value, measureField, measureAgg), accent: true },
+            { text: formatValueWhole(hover.d.value, measureField, measureAgg), accent: true },
             { text: "click → riadok v tabuľke", muted: true, small: true },
           ]}
         />
@@ -2808,8 +2843,8 @@ function StackedBarSVG({ data, colKeys, valueIdx, measureField, measureAgg, onSe
           accentColor={hover.fill}
           lines={[
             { text: hover.s.label, bold: true },
-            { text: `${hover.seg.colKey}: ${formatValue(hover.seg.value, measureField, measureAgg)}`, accent: true },
-            { text: `Spolu: ${formatValue(hover.s.total, measureField, measureAgg)}`, muted: true, small: true },
+            { text: `${hover.seg.colKey}: ${formatValueWhole(hover.seg.value, measureField, measureAgg)}`, accent: true },
+            { text: `Spolu: ${formatValueWhole(hover.s.total, measureField, measureAgg)}`, muted: true, small: true },
             { text: "click → bunka v tabuľke", muted: true, small: true },
           ]}
         />
@@ -2901,7 +2936,7 @@ function LineChartSVG({ data, measureField, measureAgg, onSelect }) {
           mouseX={hover.mouseX} mouseY={hover.mouseY}
           lines={[
             { text: hover.d.label, bold: true },
-            { text: formatValue(hover.d.value, measureField, measureAgg), accent: true },
+            { text: formatValueWhole(hover.d.value, measureField, measureAgg), accent: true },
             { text: "click → riadok v tabuľke", muted: true, small: true },
           ]}
         />
@@ -3004,7 +3039,7 @@ function PieChartSVG({ data, measureField, measureAgg, onSelect, lang }) {
           accentColor={hover.s.fill}
           lines={[
             { text: hover.s.label, bold: true },
-            { text: `${formatValue(hover.s.value, measureField, measureAgg)}  ·  ${(hover.s.share * 100).toFixed(1)}%`, accent: true },
+            { text: `${formatValueWhole(hover.s.value, measureField, measureAgg)}  ·  ${(hover.s.share * 100).toFixed(1)}%`, accent: true },
             { text: "click → riadok v tabuľke", muted: true, small: true },
           ]}
         />
@@ -3127,7 +3162,7 @@ function HeatmapSVG({ topRows, colKeys, valueIdx, measureField, measureAgg, onSe
           mouseX={hover.mouseX} mouseY={hover.mouseY}
           lines={[
             { text: hover.row.label || "—", bold: true },
-            { text: `${hover.ck}: ${formatValue(hover.v, measureField, measureAgg)}`, accent: true },
+            { text: `${hover.ck}: ${formatValueWhole(hover.v, measureField, measureAgg)}`, accent: true },
             { text: "click → bunka v tabuľke", muted: true, small: true },
           ]}
         />
