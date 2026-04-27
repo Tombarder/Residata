@@ -2442,9 +2442,10 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
       </div>
 
       <p style={{ color: "#55555f", fontSize: "0.72rem", marginTop: "2rem", fontFamily: mono, textAlign: "center" }}>
+        {/* Source line — count of ACTIVE projects (matches Hero / Dashboard). */}
         {lang === "sk"
-          ? `Zdroj: ${projects.length} projektov · posledný sync ${projects[0]?.last_updated?.slice(0, 10) || "—"}`
-          : `Source: ${projects.length} projects · last sync ${projects[0]?.last_updated?.slice(0, 10) || "—"}`}
+          ? `Zdroj: ${marketTotals.projectsActive ?? 0} projektov · posledný sync ${projects[0]?.last_updated?.slice(0, 10) || "—"}`
+          : `Source: ${marketTotals.projectsActive ?? 0} projects · last sync ${projects[0]?.last_updated?.slice(0, 10) || "—"}`}
       </p>
     </main>
   );

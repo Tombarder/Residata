@@ -870,9 +870,11 @@ function PlatformDashboard({ lang, setCurrent }) {
         <TrialRunningBanner lang={lang} daysLeft={trialDaysLeft} onOpenBilling={() => setCurrent("App:Billing")} />
       )}
 
-      {/* KPI strip */}
+      {/* KPI strip — every number reads from market_totals (live view).
+          "Sledované projekty" shows ACTIVE projects only (matches the
+          /live count and the homepage Hero), not the full registry of 90. */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.85rem", marginBottom: "2rem" }}>
-        <KpiCard label={lang === "sk" ? "Sledované projekty" : "Projects tracked"} value={projects.length.toLocaleString(lang === "sk" ? "sk-SK" : "en-US")} />
+        <KpiCard label={lang === "sk" ? "Sledované projekty" : "Projects tracked"} value={(marketTotals.projectsActive ?? 0).toLocaleString(lang === "sk" ? "sk-SK" : "en-US")} />
         <KpiCard label={lang === "sk" ? "Voľné byty" : "Available units"} value={totals.avail.toLocaleString(lang === "sk" ? "sk-SK" : "en-US")} accent={green} />
         <KpiCard label={lang === "sk" ? "Predané (30 dní)" : "Sold (30 days)"} value={totals.sold30 ? `+${totals.sold30}` : "—"} accent="#f5a623"
           locked={!can("view_sold_velocity")} />
