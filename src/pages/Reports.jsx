@@ -55,8 +55,30 @@ const SCOPES = [
    Top-level Reports page. Hosts scope tabs + the picked-scope view.
    ══════════════════════════════════════════════════════════════════ */
 export default function PlatformReports({ lang = "sk" }) {
-  const { projects, loading: loadingProjects } = useProjects();
-  const { flats,    loading: loadingFlats }    = useFlatsCurrent();
+  const { projects: allProjects, loading: loadingProjects } = useProjects();
+  const { flats: allFlats,       loading: loadingFlats }    = useFlatsCurrent();
+
+  // Active subset — used for every "current market" aggregate (Market /
+  // City / District / Developer scopes). Headline numbers must match
+  // what /live, the homepage Ticker, and the Dashboard show — all
+  // active-only — so paused/sold_out projects' stale flats don't leak
+  // into Reports KPI / breakdowns / histograms either.
+  //
+  // Project scope (single project) bypasses this filter — user picked
+  // that specific project explicitly, so it should render even if the
+  // project is paused or sold-out.
+  const activeProjects = useMemo(
+    () => allProjects.filter(p => (p.status || "active") === "active"),
+    [allProjects]
+  );
+  const activeFlats = useMemo(() => {
+    const ids = new Set(activeProjects.map(p => p.id));
+    return allFlats.filter(f => ids.has(f.project_id));
+  }, [allFlats, activeProjects]);
+
+  // Default-scope (everything except Project) reads these:
+  const projects = activeProjects;
+  const flats    = activeFlats;
 
   const [scope, setScope]         = useState("market");
   const [cityPick, setCityPick]   = useState(null);
@@ -64,9 +86,10 @@ export default function PlatformReports({ lang = "sk" }) {
   const [projPick, setProjPick]   = useState(null);
   const [devPick,  setDevPick]    = useState(null);
 
-  // Derive pickers from data. The DB schema doesn't currently carry a
-  // city column — infer it from the district prefix: "Bratislava I..V"
-  // all collapse to "Bratislava", others pass through (district = city).
+  // Derive pickers from active set so the dropdowns don't list cities /
+  // districts that only have paused / sold-out projects with no current
+  // listings to report on. Project picker exception below — uses ALL
+  // projects so user can still navigate to a paused project's history.
   const cityOf = (p) => p.city || inferCity(p.district) || null;
   const cities = useMemo(() => uniqueSorted(projects.map(cityOf).filter(Boolean)), [projects]);
   const districts = useMemo(() => uniqueSorted(projects.map(p => p.district).filter(Boolean)), [projects]);
@@ -157,10 +180,12 @@ export default function PlatformReports({ lang = "sk" }) {
         <PickerRow label={lang === "sk" ? "Časť mesta" : "District"} value={distPick} options={districts} onChange={setDistPick} />
       )}
       {scope === "projekt" && (
+        // Project picker uses allProjects (incl. paused/sold_out) so user
+        // can still pull up a historical project's data on demand.
         <PickerRow
           label={lang === "sk" ? "Projekt" : "Project"}
           value={projPick}
-          options={projects.map(p => ({ value: p.id, label: p.name + (p.district ? ` (${p.district})` : "") }))}
+          options={allProjects.map(p => ({ value: p.id, label: p.name + (p.district ? ` (${p.district})` : "") + (p.status && p.status !== "active" ? ` [${p.status}]` : "") }))}
           onChange={setProjPick}
         />
       )}
@@ -204,9 +229,13 @@ export default function PlatformReports({ lang = "sk" }) {
         />
       )}
       {scope === "projekt" && projPick && (
+        // Project scope: lookup from allProjects (might be paused/sold_out)
+        // and use allFlats so we can show a historical project's data.
+        // Siblings + allFlats stay active-only so context comparisons
+        // (vs. the rest of the active market) make sense.
         <ProjectReport
-          project={projects.find(p => p.id === projPick)}
-          flats={flats.filter(f => f.project_id === projPick)}
+          project={allProjects.find(p => p.id === projPick)}
+          flats={allFlats.filter(f => f.project_id === projPick)}
           siblings={projects}
           allFlats={flats}
           lang={lang}
