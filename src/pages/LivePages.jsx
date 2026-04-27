@@ -2207,9 +2207,9 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
   const totalUnits  = marketTotals.unitsTracked   ?? 0;
   const totalAvail  = marketTotals.unitsAvailable ?? 0;
   const avgEurM2    = marketTotals.avgPriceM2     ?? null;
-  // Sold-30d is project-level (per-flat stav transitions, computed by
-  // sync — not derivable from the current snapshot alone).
-  const totalSold30 = projects.reduce((a, p) => a + (p.sold_last_month || 0), 0);
+  // Sold-30d sum comes from the same view (active-only filter applied
+  // there) — same number as Platform Dashboard and homepage.
+  const totalSold30 = marketTotals.soldLastMonth  ?? 0;
   const absorptionPct = totalAvail > 0
     ? Math.round((totalSold30 / (totalAvail + totalSold30)) * 1000) / 10
     : 0;
@@ -2245,8 +2245,13 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
   // per-project counts, no manual_total inflation). Each project's
   // total_units / sold_units / available_units already reflect
   // flats_archive truth, so straight summation is correct.
+  // Restrict to active projects across all rankings — paused/sold_out
+  // projects shouldn't pollute developer / velocity / sold-out-watch
+  // listings with stale data. Manual projects (status='active') stay in.
+  const activeProjects = projects.filter(p => (p.status || "active") === "active");
+
   const byDeveloper = {};
-  for (const p of projects) {
+  for (const p of activeProjects) {
     if (!p.developer) continue;
     const d = byDeveloper[p.developer] ||= { developer: p.developer, count: 0, units: 0, sold: 0, sold30: 0, avail: 0, projects: [] };
     d.count  += 1;
@@ -2261,12 +2266,12 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
   }
   const topDevelopers = Object.values(byDeveloper).sort((a, b) => b.units - a.units).slice(0, 10);
 
-  const topVelocity = [...projects]
+  const topVelocity = activeProjects
     .filter(p => (p.sold_last_month || 0) > 0)
     .sort((a, b) => (b.sold_last_month || 0) - (a.sold_last_month || 0))
     .slice(0, 10);
 
-  const soldOutWatch = projects
+  const soldOutWatch = activeProjects
     .filter(p => (p.sold_percentage || 0) >= 85 && (p.sold_percentage || 0) < 100 && (p.available_units || 0) > 0)
     .sort((a, b) => (b.sold_percentage || 0) - (a.sold_percentage || 0))
     .slice(0, 8);
@@ -2361,7 +2366,7 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
           title={lang === "sk" ? "Top 10 podľa % predaných" : "Top 10 by % sold"}
           inline>
           <RankBarList
-            rows={[...projects]
+            rows={activeProjects
               .filter(p => (p.sold_percentage || 0) > 0)
               .sort((a, b) => (b.sold_percentage || 0) - (a.sold_percentage || 0))
               .slice(0, 10)

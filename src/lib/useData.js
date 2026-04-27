@@ -146,6 +146,7 @@ export function useMarketTotals() {
         unitsAvailable: num(data?.total_available),
         unitsReserved:  num(data?.total_reserved),
         unitsSold:      num(data?.total_sold),
+        soldLastMonth:  num(data?.total_sold_last_month),
         avgPriceM2:     num(data?.avg_eur_m2),
         snapshotMonth:  data?.snapshot_month || null,
       };

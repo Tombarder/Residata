@@ -826,14 +826,16 @@ function PlatformDashboard({ lang, setCurrent }) {
     units:  marketTotals.unitsTracked   ?? 0,
     avail:  marketTotals.unitsAvailable ?? 0,
     sold:   marketTotals.unitsSold      ?? 0,
-    sold30: projects.reduce((a, p) => a + (p.sold_last_month || 0), 0),
+    sold30: marketTotals.soldLastMonth  ?? 0,
   };
   const avgEurM2 = marketTotals.avgPriceM2 != null
     ? Math.round(marketTotals.avgPriceM2)
     : null;
 
-  // Top 5 most active projects
-  const top = [...projects]
+  // Top 5 most active projects — filter to status='active' so paused/
+  // sold_out projects with stale "available" don't pollute the ranking.
+  const top = projects
+    .filter(p => (p.status || "active") === "active")
     .sort((a, b) => (b.available_units || 0) - (a.available_units || 0))
     .slice(0, 5);
 
@@ -961,18 +963,25 @@ function ActionCard({ title, desc, onClick, accent = false }) {
 function MarketHighlights({ projects, lang, setCurrent, showUpgrade }) {
   if (!projects || projects.length === 0) return null;
 
-  const withVelocity = projects.filter(p => (p.sold_last_month || 0) > 0);
+  // Restrict to active projects so paused/sold_out ones don't surface
+  // as "top seller" / "selling out" / "priciest" — their data is
+  // last-known-stale and clicking the card would open a project the
+  // user has stopped tracking. Manual projects (status='active',
+  // is_manual=true) ARE included — they're alive market data.
+  const activeProjects = projects.filter(p => (p.status || "active") === "active");
+
+  const withVelocity = activeProjects.filter(p => (p.sold_last_month || 0) > 0);
   const topSeller = withVelocity.sort((a, b) => (b.sold_last_month || 0) - (a.sold_last_month || 0))[0];
 
-  const soldOutSoon = projects
+  const soldOutSoon = activeProjects
     .filter(p => (p.sold_percentage || 0) >= 85 && (p.sold_percentage || 0) < 100 && (p.available_units || 0) > 0)
     .sort((a, b) => (b.sold_percentage || 0) - (a.sold_percentage || 0))[0];
 
-  const priciest = projects
+  const priciest = activeProjects
     .filter(p => p.avg_price_eur_m2)
     .sort((a, b) => b.avg_price_eur_m2 - a.avg_price_eur_m2)[0];
 
-  const cheapest = projects
+  const cheapest = activeProjects
     .filter(p => p.avg_price_eur_m2 && p.available_units > 0)
     .sort((a, b) => a.avg_price_eur_m2 - b.avg_price_eur_m2)[0];
 

@@ -563,13 +563,17 @@ export function MarketPulse({ lang = "en", setCurrent }) {
   // (same as before) so the section isn't empty, but we label it
   // honestly with a small note. Once the next sync populates real
   // velocity, the sort key flips and the note disappears.
-  const anyVelocity = projects.some(p => (p.sold_last_month || 0) > 0);
+  // Limit to active projects so paused/sold_out don't show as "most
+  // active" with stale availability/velocity. Manual projects
+  // (status='active') stay in.
+  const activeProjects = projects.filter(p => (p.status || "active") === "active");
+  const anyVelocity = activeProjects.some(p => (p.sold_last_month || 0) > 0);
   const top = anyVelocity
-    ? [...projects]
+    ? activeProjects
         .filter(p => (p.sold_last_month || 0) > 0)
         .sort((a, b) => (b.sold_last_month || 0) - (a.sold_last_month || 0))
         .slice(0, 6)
-    : [...projects]
+    : [...activeProjects]
         .sort((a, b) => (b.available_units || 0) - (a.available_units || 0))
         .slice(0, 6);
 
