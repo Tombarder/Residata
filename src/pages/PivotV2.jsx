@@ -63,14 +63,17 @@ const FIELDS = {
   kobka:             { label: "Kobka",                      group: "spec",     type: "number", unit: "m²",   accessor: (r) => num(r.kobka_plocha) },
   celkova_plocha:    { label: "Celkova plocha",             group: "spec",     type: "number", unit: "m²",   accessor: (r) => num(r.celkova_plocha) },
 
-  // Price — DPH (price-without-VAT delta) and Zlava (discount vs.
-  // list price) are derived columns most users don't need; removed
-  // from the palette per QA. The underlying data still lives in
-  // flats_archive (cena_bez_dph, cennikova_cena) for anyone who
-  // needs them via direct SQL.
+  // Price — DPH (price-without-VAT delta), Zlava (discount vs. list
+  // price) and Cennikova cena (original list price BEFORE discount)
+  // were dropped from the palette per QA. The current price (whether
+  // s_dph or bez_dph) is always THE price the buyer pays, and we now
+  // enforce the invariant in sync (derive_dph_pair) that every priced
+  // flat has BOTH cena_s_dph AND cena_bez_dph populated at 23 % VAT.
+  // cennikova_cena still lives in flats_archive — only meaningful when
+  // it differs from cena_s_dph (i.e. there's an active discount), and
+  // surfacing it in the palette mostly just confused users.
   cena_bez_dph:      { label: "Cena bez DPH",               group: "price",    type: "number", unit: "€",    accessor: (r) => num(r.cena_bez_dph) },
   cena_s_dph:        { label: "Cena s DPH",                 group: "price",    type: "number", unit: "€",    accessor: (r) => num(r.cena_s_dph) },
-  cennikova_cena:    { label: "Cennikova cena",             group: "price",    type: "number", unit: "€",    accessor: (r) => num(r.cennikova_cena) },
 
   // Status / attrs
   stav:              { label: "Stav",                       group: "status",   type: "text",   accessor: (r) => r.stav },
@@ -170,7 +173,7 @@ const FIELD_ORDER = [
   "project_name", "unit_id", "typ", "etapa", "budova", "unit_detail",
   "poschodie", "izby", "obytna_plocha", "balkon", "loggia", "terasa",
   "zahrada", "exterier", "kobka", "celkova_plocha",
-  "cena_bez_dph", "cena_s_dph", "cennikova_cena",
+  "cena_bez_dph", "cena_s_dph",
   "stav", "kolaudacia", "orientacia",
   "cast", "ulica_detail", "budova_stav", "standard",
   "cena_na_m2_obytnej",
