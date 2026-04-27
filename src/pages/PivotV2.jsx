@@ -903,12 +903,79 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   );
 
   // ── UI ─────────────────────────────────────────────────────────
+  // Chart-click → scroll-and-flash glue. The chart panel below the
+  // table calls onChartSelect(pathKey, colKey?) when a bar / segment /
+  // dot / slice / cell is clicked. We find the matching <tr data-pathkey>
+  // (and the cross-tab <td data-colkey> when applicable), scroll it into
+  // the middle of the viewport, and apply a 1.6s pulse so the user sees
+  // exactly which row in the table corresponds to the chart element they
+  // just clicked. setTimeout(0) lets React commit any pending state
+  // updates (collapse expansion, sort change) before we measure the DOM.
+  const handleChartSelect = (pathKey, colKey) => {
+    if (!pathKey) return;
+    setTimeout(() => {
+      const safePath = (window.CSS && window.CSS.escape)
+        ? window.CSS.escape(String(pathKey))
+        : String(pathKey).replace(/(["\\])/g, "\\$1");
+      const rowEl = document.querySelector(`[data-pathkey="${safePath}"]`);
+      if (!rowEl) return;
+      rowEl.scrollIntoView({ behavior: "smooth", block: "center" });
+      rowEl.classList.remove("pivot-flash");
+      // Force reflow so re-adding the class restarts the animation even if
+      // user clicks the same chart element twice in a row.
+      void rowEl.offsetWidth;
+      rowEl.classList.add("pivot-flash");
+      setTimeout(() => rowEl.classList.remove("pivot-flash"), 1700);
+
+      if (colKey != null) {
+        const safeCol = (window.CSS && window.CSS.escape)
+          ? window.CSS.escape(String(colKey))
+          : String(colKey).replace(/(["\\])/g, "\\$1");
+        const cellEl = rowEl.querySelector(`[data-colkey="${safeCol}"]`);
+        if (cellEl) {
+          cellEl.classList.remove("pivot-cell-flash");
+          void cellEl.offsetWidth;
+          cellEl.classList.add("pivot-cell-flash");
+          setTimeout(() => cellEl.classList.remove("pivot-cell-flash"), 1700);
+        }
+      }
+    }, 0);
+  };
+
   return (
     <div style={{
       background: `linear-gradient(135deg, #0e0e12 0%, #0a0a0c 100%)`,
       border: `1px solid ${green}40`, borderRadius: 12, padding: "1.25rem",
       boxShadow: "0 0 28px rgba(0,229,160,0.05)",
     }}>
+      {/* Local stylesheet — keyframes for the chart-click flash. Scoped
+          here (not in the global App.jsx <style>) because nothing else in
+          the app needs it; inline keeps it co-located with the component
+          that triggers the animation. */}
+      <style>{`
+        @keyframes pivotFlash {
+          0%   { background-color: rgba(0,229,160,0.00); box-shadow: inset 0 0 0 rgba(0,229,160,0.00); }
+          15%  { background-color: rgba(0,229,160,0.32); box-shadow: inset 0 0 0 2px rgba(0,229,160,0.65); }
+          100% { background-color: rgba(0,229,160,0.00); box-shadow: inset 0 0 0 rgba(0,229,160,0.00); }
+        }
+        .pivot-flash > td { animation: pivotFlash 1.6s ease-out; }
+        @keyframes pivotCellFlash {
+          0%   { box-shadow: inset 0 0 0 0 ${green}, 0 0 0 ${green}; outline-color: rgba(0,229,160,0); }
+          15%  { box-shadow: inset 0 0 0 2px ${green}, 0 0 12px rgba(0,229,160,0.55); outline-color: ${green}; }
+          100% { box-shadow: inset 0 0 0 0 ${green}, 0 0 0 ${green}; outline-color: rgba(0,229,160,0); }
+        }
+        .pivot-cell-flash {
+          animation: pivotCellFlash 1.6s ease-out;
+          outline: 2px solid transparent;
+          outline-offset: -2px;
+        }
+        /* Chart-element hover affordance — works for bars, segments, dots,
+           slices, and heatmap cells. Cursor + opacity bump tell the user
+           the surface is interactive. */
+        .pivot-chart-target { cursor: pointer; transition: opacity 0.12s, filter 0.12s; }
+        .pivot-chart-target:hover { opacity: 1 !important; filter: brightness(1.18); }
+      `}</style>
+
       {/* Header — record count + expand/collapse. Mesiac scope is part
           of the standard Filters zone (drag the field there, pick months
           from the popup) — no special top-bar selector. */}
@@ -990,12 +1057,14 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
           the feature; an empty-state inside the panel guides them to
           drag a field. Lives BELOW the table because the table is the
           primary surface; the chart is a supplementary "eyeball check"
-          of the same numbers. */}
+          of the same numbers. Click any chart element → scroll the
+          matching row into view + flash highlight via handleChartSelect. */}
       <PivotChart
         tree={sortedTree}
         rowFields={rows}
         colFields={cols}
         effectiveValues={effectiveValues}
+        onSelect={handleChartSelect}
         lang={lang}
       />
 
@@ -1848,6 +1917,11 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
             const rowClickable = Boolean(isProjectRow && projectId && onProjectOpen);
             return (
               <tr key={n.pathKey + "|" + idx}
+                /* data-pathkey lets the chart-click flash handler find this
+                   row by tree path. The chart only emits paths for level-0
+                   rows (always visible regardless of collapse state), so we
+                   don't need to expand parents on click. */
+                data-pathkey={n.pathKey}
                 onMouseEnter={rowClickable ? (e) => e.currentTarget.style.background = "rgba(0,229,160,0.06)" : undefined}
                 onMouseLeave={rowClickable ? (e) => {
                   e.currentTarget.style.background = isSubtotal ? shade : (idx % 2 ? "transparent" : "rgba(255,255,255,0.015)");
@@ -1917,12 +1991,24 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                         const scale = scaleByCellKey[`${ck}::${i}`];
                         const bw = dataBars && n.isLeaf ? barWidth(raw, i, scale) : 0;
                         return (
-                          <td key={`c:${ck}:${v.key}`} style={{
-                            ...td, textAlign: "right", fontFamily: mono,
-                            color: green, fontWeight: isSubtotal ? 800 : 600,
-                            borderLeft: i === 0 ? `1px solid ${border}` : undefined,
-                            position: "relative",
-                          }}>
+                          <td
+                            key={`c:${ck}:${v.key}`}
+                            /* data-colkey: chart-click flash handler uses
+                               this to highlight the specific cross-tab cell
+                               within a row (e.g. clicking a stacked-bar
+                               segment for "stav=V" in row "Ružinov" pulses
+                               the V column cell of the Ružinov row, not the
+                               whole row). Only the FIRST cell per (row, ck)
+                               gets the data-attr — when there are multiple
+                               value columns per ck, we flash just the first
+                               so the highlight stays visually compact. */
+                            data-colkey={i === 0 ? String(ck) : undefined}
+                            style={{
+                              ...td, textAlign: "right", fontFamily: mono,
+                              color: green, fontWeight: isSubtotal ? 800 : 600,
+                              borderLeft: i === 0 ? `1px solid ${border}` : undefined,
+                              position: "relative",
+                            }}>
                             {bw > 0 && (
                               <span aria-hidden style={{
                                 position: "absolute", right: 0, bottom: 0, height: 3,
@@ -2104,7 +2190,7 @@ const CHART_PALETTE = [
   "#74b9ff", "#a29bfe", "#fdcb6e", "#55efc4",
 ];
 
-function PivotChart({ tree, rowFields, colFields, effectiveValues, lang }) {
+function PivotChart({ tree, rowFields, colFields, effectiveValues, onSelect, lang }) {
   const [collapsed, setCollapsed] = useState(false);
   const [chartType, setChartType] = useState("auto");
   const [valueIdx, setValueIdx] = useState(0);
@@ -2167,9 +2253,12 @@ function PivotChart({ tree, rowFields, colFields, effectiveValues, lang }) {
   }
 
   // Collect numeric value for each top-level row (for non-stacked).
+  // pathKey carries through so chart clicks can find the matching <tr>
+  // in the table via the data-pathkey attribute.
   const dataPoints = topRows
     .map((node, i) => ({
       label: node.label || "—",
+      pathKey: node.pathKey,
       value: node.rollups?.[valueIdx] ?? null,
       colRollups: node.colRollups || null,
       origIdx: i,
@@ -2243,7 +2332,7 @@ function PivotChart({ tree, rowFields, colFields, effectiveValues, lang }) {
             </>
           )}
           {hiddenCount > 0 && (
-            <span style={{ marginLeft: "auto", fontSize: "0.7rem", color: orange }}>
+            <span style={{ marginLeft: "auto", fontSize: "0.72rem", color: orange }}>
               {lang === "sk"
                 ? `Top 20 z ${sortedData.length} (+${hiddenCount} ďalších v tabuľke)`
                 : `Top 20 of ${sortedData.length} (+${hiddenCount} more in table)`}
@@ -2251,30 +2340,41 @@ function PivotChart({ tree, rowFields, colFields, effectiveValues, lang }) {
           )}
         </div>
 
+        {/* Click affordance hint — small italic line above the chart so
+            users know why elements have a pointer cursor. */}
+        <div style={{
+          fontSize: "0.7rem", color: dim, fontStyle: "italic",
+          marginBottom: "0.4rem", letterSpacing: "0.01em",
+        }}>
+          {lang === "sk"
+            ? "Klikni na časť grafu — zoskočí na zodpovedajúci riadok v tabuľke vyššie."
+            : "Click any chart element — jumps to the matching row in the table above."}
+        </div>
+
         {/* Chart body */}
         {effectiveType === "bar" && (
-          <BarChartSVG data={truncated} measureField={measureField} measureAgg={measureAgg} />
+          <BarChartSVG data={truncated} measureField={measureField} measureAgg={measureAgg} onSelect={onSelect} />
         )}
         {effectiveType === "stacked" && stackedAvailable && (
-          <StackedBarSVG data={truncated} colKeys={colKeys} valueIdx={valueIdx} measureField={measureField} measureAgg={measureAgg} />
+          <StackedBarSVG data={truncated} colKeys={colKeys} valueIdx={valueIdx} measureField={measureField} measureAgg={measureAgg} onSelect={onSelect} />
         )}
         {effectiveType === "stacked" && !stackedAvailable && (
-          <BarChartSVG data={truncated} measureField={measureField} measureAgg={measureAgg} />
+          <BarChartSVG data={truncated} measureField={measureField} measureAgg={measureAgg} onSelect={onSelect} />
         )}
         {effectiveType === "line" && (
-          <LineChartSVG data={truncated} measureField={measureField} measureAgg={measureAgg} />
+          <LineChartSVG data={truncated} measureField={measureField} measureAgg={measureAgg} onSelect={onSelect} />
         )}
         {effectiveType === "pie" && pieAvailable && (
-          <PieChartSVG data={truncated} measureField={measureField} measureAgg={measureAgg} lang={lang} />
+          <PieChartSVG data={truncated} measureField={measureField} measureAgg={measureAgg} onSelect={onSelect} lang={lang} />
         )}
         {effectiveType === "pie" && !pieAvailable && (
-          <BarChartSVG data={truncated} measureField={measureField} measureAgg={measureAgg} />
+          <BarChartSVG data={truncated} measureField={measureField} measureAgg={measureAgg} onSelect={onSelect} />
         )}
         {effectiveType === "heatmap" && heatmapAvailable && (
-          <HeatmapSVG topRows={topRows.slice(0, TRUNCATE)} colKeys={colKeys} valueIdx={valueIdx} measureField={measureField} measureAgg={measureAgg} />
+          <HeatmapSVG topRows={topRows.slice(0, TRUNCATE)} colKeys={colKeys} valueIdx={valueIdx} measureField={measureField} measureAgg={measureAgg} onSelect={onSelect} />
         )}
         {effectiveType === "heatmap" && !heatmapAvailable && (
-          <BarChartSVG data={truncated} measureField={measureField} measureAgg={measureAgg} />
+          <BarChartSVG data={truncated} measureField={measureField} measureAgg={measureAgg} onSelect={onSelect} />
         )}
       </div>
     </ChartHeader>
@@ -2340,10 +2440,11 @@ function ChartTypeBtn({ active, onClick, label }) {
 
 /* ── BarChartSVG ──────────────────────────────────────────────────
    Single-series vertical bars. Y axis auto-scales, gridlines at 4
-   ticks. X labels rotate when too cramped (>8 bars). */
-function BarChartSVG({ data, measureField, measureAgg }) {
-  const W = 880, H = 320;
-  const padL = 56, padR = 16, padT = 16, padB = data.length > 8 ? 96 : 56;
+   ticks. X labels rotate when too cramped (>8 bars). Each bar carries
+   the row's pathKey via onSelect — clicking jumps to the table row. */
+function BarChartSVG({ data, measureField, measureAgg, onSelect }) {
+  const W = 880, H = 340;
+  const padL = 64, padR = 16, padT = 24, padB = data.length > 8 ? 110 : 64;
   const innerW = W - padL - padR;
   const innerH = H - padT - padB;
   const n = data.length;
@@ -2352,7 +2453,7 @@ function BarChartSVG({ data, measureField, measureAgg }) {
   const maxVal = Math.max(0, ...data.map(d => d.value));
   const range = maxVal - minVal || 1;
   const yScale = (v) => padT + innerH - ((v - minVal) / range) * innerH;
-  const barW = Math.max(2, (innerW / n) * 0.7);
+  const barW = Math.max(2, (innerW / n) * 0.72);
   const xCenter = (i) => padL + (innerW / n) * (i + 0.5);
 
   const ticks = makeTicks(minVal, maxVal, 4);
@@ -2364,7 +2465,7 @@ function BarChartSVG({ data, measureField, measureAgg }) {
       {ticks.map((t, i) => (
         <g key={i}>
           <line x1={padL} x2={W - padR} y1={yScale(t)} y2={yScale(t)} stroke={border} strokeDasharray="2,3"/>
-          <text x={padL - 6} y={yScale(t)} fill={dim} fontSize="10" textAnchor="end" dominantBaseline="middle" fontFamily={mono}>
+          <text x={padL - 8} y={yScale(t)} fill={dim} fontSize="11" textAnchor="end" dominantBaseline="middle" fontFamily={mono}>
             {formatValue(t, measureField, measureAgg)}
           </text>
         </g>
@@ -2373,36 +2474,44 @@ function BarChartSVG({ data, measureField, measureAgg }) {
       {minVal < 0 && (
         <line x1={padL} x2={W - padR} y1={yScale(0)} y2={yScale(0)} stroke={dim} strokeWidth="1"/>
       )}
-      {/* bars */}
+      {/* bars — wrapped in <g> with cursor=pointer + click handler */}
       {data.map((d, i) => {
         const y0 = yScale(0);
         const y1 = yScale(d.value);
         const top = Math.min(y0, y1);
         const h = Math.abs(y1 - y0);
+        const onClick = () => onSelect && onSelect(d.pathKey);
         return (
-          <g key={i}>
+          <g key={i} className="pivot-chart-target" onClick={onClick}>
+            {/* Invisible wider hit area so thin bars are still easy to click */}
+            <rect x={xCenter(i) - Math.max(barW, 18) / 2} y={padT}
+                  width={Math.max(barW, 18)} height={innerH}
+                  fill="transparent"/>
             <rect x={xCenter(i) - barW / 2} y={top} width={barW} height={h} fill={green} opacity="0.85" rx="2">
-              <title>{`${d.label}: ${formatValue(d.value, measureField, measureAgg)}`}</title>
+              <title>{`${d.label}: ${formatValue(d.value, measureField, measureAgg)}\n(click → riadok v tabuľke)`}</title>
             </rect>
             {/* value above bar (only if it fits) */}
-            {h > 10 && barW > 18 && (
-              <text x={xCenter(i)} y={top - 4} fill={text} fontSize="9" textAnchor="middle" fontFamily={mono}>
+            {h > 12 && barW > 20 && (
+              <text x={xCenter(i)} y={top - 5} fill={text} fontSize="10" fontWeight="600" textAnchor="middle" fontFamily={mono}>
                 {formatValue(d.value, measureField, measureAgg)}
               </text>
             )}
           </g>
         );
       })}
-      {/* X labels */}
+      {/* X labels — clickable too, in case the bar itself is very short */}
       {data.map((d, i) => {
         const x = xCenter(i);
-        const y = padT + innerH + 14;
+        const y = padT + innerH + 16;
         const truncated = d.label.length > 18 ? d.label.slice(0, 17) + "…" : d.label;
+        const onClick = () => onSelect && onSelect(d.pathKey);
         return (
           <text
-            key={i} x={x} y={y} fill={dim} fontSize="10"
+            key={i} x={x} y={y} fill={text} fontSize="11"
             textAnchor={rotate ? "end" : "middle"} fontFamily={mono}
             transform={rotate ? `rotate(-35 ${x} ${y})` : undefined}
+            className="pivot-chart-target"
+            onClick={onClick}
           >
             <title>{d.label}</title>
             {truncated}
@@ -2415,10 +2524,12 @@ function BarChartSVG({ data, measureField, measureAgg }) {
 
 /* ── StackedBarSVG ────────────────────────────────────────────────
    For cross-tab: each row → one bar, segmented by colKey. Each colKey
-   gets a distinct palette colour. Includes a small legend strip. */
-function StackedBarSVG({ data, colKeys, valueIdx, measureField, measureAgg }) {
-  const W = 880, H = 360;
-  const padL = 56, padR = 16, padT = 16, padB = data.length > 8 ? 132 : 92;
+   gets a distinct palette colour. Click a segment → flash the matching
+   (row, colKey) cell in the table. Click outside any segment (X label)
+   → flash just the row. */
+function StackedBarSVG({ data, colKeys, valueIdx, measureField, measureAgg, onSelect }) {
+  const W = 880, H = 380;
+  const padL = 64, padR = 16, padT = 24, padB = data.length > 8 ? 144 : 104;
   const innerW = W - padL - padR;
   const innerH = H - padT - padB;
   const n = data.length;
@@ -2436,24 +2547,24 @@ function StackedBarSVG({ data, colKeys, valueIdx, measureField, measureAgg }) {
 
   const maxTotal = Math.max(0, ...stacks.map(s => s.total)) || 1;
   const yScale = (v) => padT + innerH - (v / maxTotal) * innerH;
-  const barW = Math.max(2, (innerW / n) * 0.7);
+  const barW = Math.max(2, (innerW / n) * 0.72);
   const xCenter = (i) => padL + (innerW / n) * (i + 0.5);
 
   const ticks = makeTicks(0, maxTotal, 4);
   const rotate = n > 8;
-  const legendY = padT + innerH + (rotate ? 76 : 36);
+  const legendY = padT + innerH + (rotate ? 84 : 44);
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block", overflow: "visible" }}>
       {ticks.map((t, i) => (
         <g key={i}>
           <line x1={padL} x2={W - padR} y1={yScale(t)} y2={yScale(t)} stroke={border} strokeDasharray="2,3"/>
-          <text x={padL - 6} y={yScale(t)} fill={dim} fontSize="10" textAnchor="end" dominantBaseline="middle" fontFamily={mono}>
+          <text x={padL - 8} y={yScale(t)} fill={dim} fontSize="11" textAnchor="end" dominantBaseline="middle" fontFamily={mono}>
             {formatValue(t, measureField, measureAgg)}
           </text>
         </g>
       ))}
-      {/* segments */}
+      {/* segments — each is clickable; hover shows the (row, colKey) detail */}
       {stacks.map((s, i) => {
         let cumY = yScale(0);
         return (
@@ -2464,25 +2575,33 @@ function StackedBarSVG({ data, colKeys, valueIdx, measureField, measureAgg }) {
               const h = cumY - yTop;
               cumY = yTop;
               const fill = CHART_PALETTE[j % CHART_PALETTE.length];
+              const onClick = () => onSelect && onSelect(s.pathKey, seg.colKey);
               return (
-                <rect key={j} x={xCenter(i) - barW / 2} y={yTop} width={barW} height={h} fill={fill} opacity="0.88">
-                  <title>{`${s.label} · ${seg.colKey}: ${formatValue(seg.value, measureField, measureAgg)}`}</title>
+                <rect
+                  key={j} x={xCenter(i) - barW / 2} y={yTop} width={barW} height={h}
+                  fill={fill} opacity="0.88"
+                  className="pivot-chart-target" onClick={onClick}
+                >
+                  <title>{`${s.label} · ${seg.colKey}: ${formatValue(seg.value, measureField, measureAgg)}\n(click → bunka v tabuľke)`}</title>
                 </rect>
               );
             })}
           </g>
         );
       })}
-      {/* X labels */}
+      {/* X labels — click flashes whole row */}
       {data.map((d, i) => {
         const x = xCenter(i);
-        const y = padT + innerH + 14;
+        const y = padT + innerH + 16;
         const truncated = d.label.length > 18 ? d.label.slice(0, 17) + "…" : d.label;
+        const onClick = () => onSelect && onSelect(d.pathKey);
         return (
           <text
-            key={i} x={x} y={y} fill={dim} fontSize="10"
+            key={i} x={x} y={y} fill={text} fontSize="11"
             textAnchor={rotate ? "end" : "middle"} fontFamily={mono}
             transform={rotate ? `rotate(-35 ${x} ${y})` : undefined}
+            className="pivot-chart-target"
+            onClick={onClick}
           >
             <title>{d.label}</title>
             {truncated}
@@ -2491,19 +2610,19 @@ function StackedBarSVG({ data, colKeys, valueIdx, measureField, measureAgg }) {
       })}
       {/* Legend */}
       {colKeys.map((ck, j) => {
-        const cols = Math.max(1, Math.floor((W - padL - padR) / 130));
+        const cols = Math.max(1, Math.floor((W - padL - padR) / 140));
         const row = Math.floor(j / cols);
         const col = j % cols;
-        const x = padL + col * 130;
-        const y = legendY + row * 16;
+        const x = padL + col * 140;
+        const y = legendY + row * 18;
         if (y + 12 > H) return null;
         const fill = CHART_PALETTE[j % CHART_PALETTE.length];
         const ckText = String(ck);
-        const truncated = ckText.length > 16 ? ckText.slice(0, 15) + "…" : ckText;
+        const truncated = ckText.length > 18 ? ckText.slice(0, 17) + "…" : ckText;
         return (
           <g key={j}>
-            <rect x={x} y={y - 8} width={10} height={10} fill={fill}/>
-            <text x={x + 14} y={y} fill={text} fontSize="10" dominantBaseline="middle" fontFamily={mono}>
+            <rect x={x} y={y - 9} width={12} height={12} fill={fill} rx="2"/>
+            <text x={x + 18} y={y} fill={text} fontSize="11" dominantBaseline="middle" fontFamily={mono}>
               <title>{ckText}</title>
               {truncated}
             </text>
@@ -2515,10 +2634,12 @@ function StackedBarSVG({ data, colKeys, valueIdx, measureField, measureAgg }) {
 }
 
 /* ── LineChartSVG ─────────────────────────────────────────────────
-   Single line with circle markers. Useful for time / ordinal rows. */
-function LineChartSVG({ data, measureField, measureAgg }) {
-  const W = 880, H = 320;
-  const padL = 56, padR = 16, padT = 16, padB = data.length > 8 ? 96 : 56;
+   Single line with circle markers. Useful for time / ordinal rows.
+   Each marker is clickable + has a wider invisible hit-area so users
+   don't have to aim for a 4-px dot. */
+function LineChartSVG({ data, measureField, measureAgg, onSelect }) {
+  const W = 880, H = 340;
+  const padL = 64, padR = 16, padT = 24, padB = data.length > 8 ? 110 : 64;
   const innerW = W - padL - padR;
   const innerH = H - padT - padB;
   const n = data.length;
@@ -2538,28 +2659,36 @@ function LineChartSVG({ data, measureField, measureAgg }) {
       {ticks.map((t, i) => (
         <g key={i}>
           <line x1={padL} x2={W - padR} y1={yScale(t)} y2={yScale(t)} stroke={border} strokeDasharray="2,3"/>
-          <text x={padL - 6} y={yScale(t)} fill={dim} fontSize="10" textAnchor="end" dominantBaseline="middle" fontFamily={mono}>
+          <text x={padL - 8} y={yScale(t)} fill={dim} fontSize="11" textAnchor="end" dominantBaseline="middle" fontFamily={mono}>
             {formatValue(t, measureField, measureAgg)}
           </text>
         </g>
       ))}
-      <path d={path} stroke={green} strokeWidth="2" fill="none"/>
-      {data.map((d, i) => (
-        <g key={i}>
-          <circle cx={xPos(i)} cy={yScale(d.value)} r="4" fill={green} stroke={bg} strokeWidth="1.5">
-            <title>{`${d.label}: ${formatValue(d.value, measureField, measureAgg)}`}</title>
-          </circle>
-        </g>
-      ))}
+      <path d={path} stroke={green} strokeWidth="2.5" fill="none"/>
+      {data.map((d, i) => {
+        const onClick = () => onSelect && onSelect(d.pathKey);
+        return (
+          <g key={i} className="pivot-chart-target" onClick={onClick}>
+            {/* Wider invisible hit area so 4-px dots are still easy targets */}
+            <circle cx={xPos(i)} cy={yScale(d.value)} r="14" fill="transparent"/>
+            <circle cx={xPos(i)} cy={yScale(d.value)} r="5" fill={green} stroke={bg} strokeWidth="1.5">
+              <title>{`${d.label}: ${formatValue(d.value, measureField, measureAgg)}\n(click → riadok v tabuľke)`}</title>
+            </circle>
+          </g>
+        );
+      })}
       {data.map((d, i) => {
         const x = xPos(i);
-        const y = padT + innerH + 14;
+        const y = padT + innerH + 16;
         const truncated = d.label.length > 18 ? d.label.slice(0, 17) + "…" : d.label;
+        const onClick = () => onSelect && onSelect(d.pathKey);
         return (
           <text
-            key={i} x={x} y={y} fill={dim} fontSize="10"
+            key={i} x={x} y={y} fill={text} fontSize="11"
             textAnchor={rotate ? "end" : "middle"} fontFamily={mono}
             transform={rotate ? `rotate(-35 ${x} ${y})` : undefined}
+            className="pivot-chart-target"
+            onClick={onClick}
           >
             <title>{d.label}</title>
             {truncated}
@@ -2572,11 +2701,11 @@ function LineChartSVG({ data, measureField, measureAgg }) {
 
 /* ── PieChartSVG ──────────────────────────────────────────────────
    Donut with slice labels. Only enabled for additive measures + ≤ 12
-   slices. */
-function PieChartSVG({ data, measureField, measureAgg, lang }) {
-  const W = 880, H = 360;
+   slices. Each slice is clickable; legend rows are too. */
+function PieChartSVG({ data, measureField, measureAgg, onSelect, lang }) {
+  const W = 880, H = 380;
   const cx = 240, cy = H / 2;
-  const rOuter = 130, rInner = 60;
+  const rOuter = 140, rInner = 64;
 
   const total = data.reduce((a, d) => a + Math.max(0, d.value), 0);
   if (total <= 0) {
@@ -2613,26 +2742,33 @@ function PieChartSVG({ data, measureField, measureAgg, lang }) {
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}>
-      {slices.map((s, i) => (
-        <path key={i} d={arc(s)} fill={s.fill} opacity="0.9">
-          <title>{`${s.label}: ${formatValue(s.value, measureField, measureAgg)} (${(s.share * 100).toFixed(1)}%)`}</title>
-        </path>
-      ))}
+      {slices.map((s, i) => {
+        const onClick = () => onSelect && onSelect(s.pathKey);
+        return (
+          <path
+            key={i} d={arc(s)} fill={s.fill} opacity="0.9"
+            className="pivot-chart-target" onClick={onClick}
+          >
+            <title>{`${s.label}: ${formatValue(s.value, measureField, measureAgg)} (${(s.share * 100).toFixed(1)}%)\n(click → riadok v tabuľke)`}</title>
+          </path>
+        );
+      })}
       {/* Total label in donut hole */}
-      <text x={cx} y={cy - 6} textAnchor="middle" fill={text} fontSize="14" fontWeight="600" fontFamily={mono}>
+      <text x={cx} y={cy - 6} textAnchor="middle" fill={text} fontSize="15" fontWeight="700" fontFamily={mono}>
         {formatValue(total, measureField, measureAgg)}
       </text>
-      <text x={cx} y={cy + 12} textAnchor="middle" fill={dim} fontSize="10" fontFamily={mono}>
+      <text x={cx} y={cy + 14} textAnchor="middle" fill={dim} fontSize="11" fontFamily={mono}>
         {lang === "sk" ? "spolu" : "total"}
       </text>
-      {/* Legend right side */}
+      {/* Legend right side — each row clickable too */}
       {slices.map((s, i) => {
-        const y = 36 + i * 22;
+        const y = 36 + i * 24;
         if (y > H - 16) return null;
+        const onClick = () => onSelect && onSelect(s.pathKey);
         return (
-          <g key={i}>
-            <rect x={W / 2 + 60} y={y - 8} width={12} height={12} fill={s.fill}/>
-            <text x={W / 2 + 80} y={y} fill={text} fontSize="11" dominantBaseline="middle" fontFamily={mono}>
+          <g key={i} className="pivot-chart-target" onClick={onClick}>
+            <rect x={W / 2 + 60} y={y - 9} width={14} height={14} fill={s.fill} rx="2"/>
+            <text x={W / 2 + 80} y={y} fill={text} fontSize="12" dominantBaseline="middle" fontFamily={mono}>
               <title>{s.label}</title>
               {(s.label.length > 22 ? s.label.slice(0, 21) + "…" : s.label)} — {(s.share * 100).toFixed(1)}%
             </text>
@@ -2645,11 +2781,12 @@ function PieChartSVG({ data, measureField, measureAgg, lang }) {
 
 /* ── HeatmapSVG ───────────────────────────────────────────────────
    row × col grid with cell brightness encoding the value. Dim cells
-   (null / 0) get a hatched look. Hovering shows tooltip with the
-   formatted value. */
-function HeatmapSVG({ topRows, colKeys, valueIdx, measureField, measureAgg }) {
-  const W = 880, H = Math.max(220, 36 + topRows.length * 28 + 40);
-  const padL = 200, padR = 16, padT = 36, padB = 16;
+   (null / 0) get a hatched look. Each cell is clickable → flashes the
+   matching (row, colKey) cell in the table. Row labels are clickable
+   too — flash the whole row. */
+function HeatmapSVG({ topRows, colKeys, valueIdx, measureField, measureAgg, onSelect }) {
+  const W = 880, H = Math.max(240, 44 + topRows.length * 30 + 16);
+  const padL = 220, padR = 16, padT = 44, padB = 16;
   const innerW = W - padL - padR;
   const innerH = H - padT - padB;
   const cellW = innerW / Math.max(1, colKeys.length);
@@ -2694,7 +2831,7 @@ function HeatmapSVG({ topRows, colKeys, valueIdx, measureField, measureAgg }) {
         const ckText = String(ck);
         const truncated = ckText.length > 14 ? ckText.slice(0, 13) + "…" : ckText;
         return (
-          <text key={j} x={x} y={padT - 6} fill={dim} fontSize="10" textAnchor="middle" fontFamily={mono}>
+          <text key={j} x={x} y={padT - 8} fill={text} fontSize="11" fontWeight="600" textAnchor="middle" fontFamily={mono}>
             <title>{ckText}</title>
             {truncated}
           </text>
@@ -2704,26 +2841,33 @@ function HeatmapSVG({ topRows, colKeys, valueIdx, measureField, measureAgg }) {
       {topRows.map((row, i) => {
         const y = padT + i * cellH;
         const rowText = String(row.label || "—");
-        const truncated = rowText.length > 26 ? rowText.slice(0, 25) + "…" : rowText;
+        const truncated = rowText.length > 28 ? rowText.slice(0, 27) + "…" : rowText;
+        const onRowClick = () => onSelect && onSelect(row.pathKey);
         return (
           <g key={i}>
-            <text x={padL - 8} y={y + cellH / 2} fill={text} fontSize="11" textAnchor="end" dominantBaseline="middle" fontFamily={mono}>
-              <title>{rowText}</title>
+            <text
+              x={padL - 8} y={y + cellH / 2} fill={text} fontSize="11" fontWeight="500"
+              textAnchor="end" dominantBaseline="middle" fontFamily={mono}
+              className="pivot-chart-target"
+              onClick={onRowClick}
+            >
+              <title>{rowText + "\n(click → riadok v tabuľke)"}</title>
               {truncated}
             </text>
             {colKeys.map((ck, j) => {
               const v = row.colRollups?.[ck]?.[valueIdx];
               const x = padL + j * cellW;
+              const onCellClick = () => onSelect && onSelect(row.pathKey, ck);
               return (
-                <g key={j}>
+                <g key={j} className="pivot-chart-target" onClick={onCellClick}>
                   <rect
                     x={x + 1} y={y + 1} width={cellW - 2} height={cellH - 2}
                     fill={colorFor(v)} stroke={border} strokeWidth="0.5"
                   >
-                    <title>{`${row.label} · ${ck}: ${formatValue(v, measureField, measureAgg)}`}</title>
+                    <title>{`${row.label} · ${ck}: ${formatValue(v, measureField, measureAgg)}\n(click → bunka v tabuľke)`}</title>
                   </rect>
-                  {Number.isFinite(v) && cellW > 38 && (
-                    <text x={x + cellW / 2} y={y + cellH / 2} fill={textColorFor(v)} fontSize="9" textAnchor="middle" dominantBaseline="middle" fontFamily={mono}>
+                  {Number.isFinite(v) && cellW > 42 && (
+                    <text x={x + cellW / 2} y={y + cellH / 2} fill={textColorFor(v)} fontSize="10" fontWeight="600" textAnchor="middle" dominantBaseline="middle" fontFamily={mono} pointerEvents="none">
                       {formatValue(v, measureField, measureAgg)}
                     </text>
                   )}
