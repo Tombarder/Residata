@@ -63,28 +63,28 @@ const FIELDS = {
   kobka:             { label: "Kobka",                      group: "spec",     type: "number", unit: "m²",   accessor: (r) => num(r.kobka_plocha) },
   celkova_plocha:    { label: "Celkova plocha",             group: "spec",     type: "number", unit: "m²",   accessor: (r) => num(r.celkova_plocha) },
 
-  // Price
+  // Price — DPH (price-without-VAT delta) and Zlava (discount vs.
+  // list price) are derived columns most users don't need; removed
+  // from the palette per QA. The underlying data still lives in
+  // flats_archive (cena_bez_dph, cennikova_cena) for anyone who
+  // needs them via direct SQL.
   cena_bez_dph:      { label: "Cena bez DPH",               group: "price",    type: "number", unit: "€",    accessor: (r) => num(r.cena_bez_dph) },
   cena_s_dph:        { label: "Cena s DPH",                 group: "price",    type: "number", unit: "€",    accessor: (r) => num(r.cena_s_dph) },
-  dph:               { label: "DPH",                        group: "price",    type: "number", unit: "€", derived: true, accessor: (r) => {
-                        const s = num(r.cena_s_dph), b = num(r.cena_bez_dph);
-                        return (s != null && b != null) ? s - b : null;
-                      }},
   cennikova_cena:    { label: "Cennikova cena",             group: "price",    type: "number", unit: "€",    accessor: (r) => num(r.cennikova_cena) },
-  zlava:             { label: "Zlava",                      group: "price",    type: "number", unit: "€", derived: true, accessor: (r) => {
-                        const c = num(r.cennikova_cena), s = num(r.cena_s_dph);
-                        return (c != null && s != null) ? c - s : null;
-                      }},
 
   // Status / attrs
   stav:              { label: "Stav",                       group: "status",   type: "text",   accessor: (r) => r.stav },
   kolaudacia:        { label: "Kolaudacia",                 group: "status",   type: "text",   accessor: (r) => r.kolaudacia },
   orientacia:        { label: "Orientacia",                 group: "status",   type: "text",   accessor: (r) => r.orientacia },
 
-  // Location — uses enriched projects-table metadata
+  // Location — uses enriched projects-table metadata.
+  // CastMesta(kod) and InternaKlasifikacia(zona) — internal
+  // enrichment columns admin only fills sometimes — were dropped
+  // from the palette per QA: most rows are null, so they'd usually
+  // show empty filter lists and inflate the palette without
+  // actionable signal. The values still live in projects.* and can
+  // be exposed again later if a use case emerges.
   cast:              { label: "Cast",                       group: "location", type: "text",   accessor: (r) => r.district },
-  cast_mesta_kod:    { label: "CastMesta(kod)",             group: "location", type: "text",   accessor: (r) => r.cast_mesta_kod },
-  interna_klas_zona: { label: "InternaKlasifikacia(zona)",  group: "location", type: "text",   accessor: (r) => r.interna_klas_zona },
   ulica_detail:      { label: "Ulica/Detail",               group: "location", type: "text",   accessor: (r) => r.ulica_detail },
   budova_stav:       { label: "Budova/stav",                group: "location", type: "text",   accessor: (r) => r.budova_stav },
   standard:          { label: "Standard",                   group: "location", type: "text",   accessor: (r) => r.standard },
@@ -170,9 +170,9 @@ const FIELD_ORDER = [
   "project_name", "unit_id", "typ", "etapa", "budova", "unit_detail",
   "poschodie", "izby", "obytna_plocha", "balkon", "loggia", "terasa",
   "zahrada", "exterier", "kobka", "celkova_plocha",
-  "cena_bez_dph", "cena_s_dph", "dph", "cennikova_cena", "zlava",
+  "cena_bez_dph", "cena_s_dph", "cennikova_cena",
   "stav", "kolaudacia", "orientacia",
-  "cast_mesta_kod", "cast", "interna_klas_zona", "ulica_detail", "budova_stav", "standard",
+  "cast", "ulica_detail", "budova_stav", "standard",
   "cena_na_m2_obytnej",
   // Measures — group-level calculations, Values zone only
   "abs_rate", "wavg_m2_price", "sold_count", "available_count",
@@ -1086,17 +1086,35 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
           filtered by OTHER filters), pass filteredRecords instead. */}
       {filterPopup && (() => {
         const current = filters.find(f => f.key === filterPopup.key);
-        // Use records filtered by OTHER filters so the user sees options
-        // in the context of what's already narrowed. This avoids the
-        // "I just filtered X, now X is gone from list" Excel footgun.
+        // Contextual records first: filter by OTHER active filters so the
+        // user sees options in the narrowed context (the "I just filtered
+        // X, now X is gone" Excel footgun goes away).
+        //
+        // BUT — when other filters narrow to 0 rows (or to a set with no
+        // distinct values for the chosen field), the popover would show
+        // "Žiadne zhody" and the user can't do anything. Per QA report:
+        // this is the bug behind "dam stav do filtra a vidím prázdny
+        // zoznam". Fall back to the FULL records set in that case so the
+        // user always has values to pick from. The popover surfaces a
+        // small info row when the fallback kicks in so the user knows
+        // why their other filters reduce to 0.
         const otherFilters = filters.filter(f => f.key !== filterPopup.key);
         const contextual = records.filter(r => otherFilters.every(f => passesFilter(r, f)));
+        // Cheap probe: do we get distinct values for THIS field from the
+        // contextual set? distinctValuesForField is O(n); good for our
+        // ~5–6k rows. Memoising would gain ~nothing here.
+        const probe = distinctValuesForField(contextual, filterPopup.key);
+        const hasContextualValues = probe.values.length > 0 || probe.hasEmpty;
+        const passedRecords = hasContextualValues ? contextual : records;
+        const fellBack = !hasContextualValues && contextual.length !== records.length;
         return (
           <FilterPopover
             fieldKey={filterPopup.key}
             filter={current}
             anchorEl={filterPopup.anchorEl}
-            records={contextual}
+            records={passedRecords}
+            fellBack={fellBack}
+            otherFilterCount={otherFilters.filter(isFilterActive).length}
             onChange={(patch) => updateFilter(filterPopup.key, patch)}
             onClear={() => updateFilter(filterPopup.key, null)}
             onClose={() => setFilterPopup(null)}
@@ -3205,7 +3223,7 @@ function makeTicks(min, max, targetCount = 4) {
      · number      → range inputs + "include (prázdne)" toggle + optional
                      checkbox list when cardinality is small (<=40).
    Closes on Esc / outside click.                                   */
-function FilterPopover({ fieldKey, filter, anchorEl, records, onChange, onClear, onClose, lang }) {
+function FilterPopover({ fieldKey, filter, anchorEl, records, fellBack = false, otherFilterCount = 0, onChange, onClear, onClose, lang }) {
   const field = FIELDS[fieldKey];
   const { values: distinct, hasEmpty, isNumber, stats } = useMemo(
     () => distinctValuesForField(records, fieldKey),
@@ -3340,6 +3358,27 @@ function FilterPopover({ fieldKey, filter, anchorEl, records, onChange, onClear,
       <div style={{ fontWeight: 600, fontSize: "1rem", color: text, marginBottom: "0.8rem" }}>
         {field?.label || fieldKey}
       </div>
+
+      {/* Fallback notice — shown only when we reverted to the full
+          record set because other filters were too narrow. Tells the
+          user the values they see come from ALL data, so picking one
+          may further conflict with their existing filters. Without
+          this message a user would just see "no values" and be stuck. */}
+      {fellBack && (
+        <div style={{
+          marginBottom: "0.85rem",
+          padding: "0.5rem 0.7rem",
+          background: "rgba(245,166,35,0.08)",
+          border: `1px solid ${orange}33`,
+          borderRadius: 6,
+          fontSize: "0.74rem", color: text, lineHeight: 1.4,
+        }}>
+          <span style={{ color: orange, fontWeight: 700 }}>ⓘ </span>
+          {lang === "sk"
+            ? `Tvoje ostatné filtre (${otherFilterCount}) zužujú výber na 0 riadkov. Zobrazujem hodnoty z celej databázy — keď tu niečo zaškrtneš, výber sa znova prepočíta.`
+            : `Your other filters (${otherFilterCount}) narrow the dataset to 0 rows. Showing values from the full data — picking here will re-evaluate the result set.`}
+        </div>
+      )}
 
       {/* Mode picker — clean pills, plain labels */}
       <div style={{ display: "flex", gap: "0.3rem", marginBottom: "0.9rem", flexWrap: "wrap" }}>
