@@ -31,13 +31,13 @@ export const CAPABILITY_KEYS = [
   // Verejný obsah (marketing + ticker + základný dashboard)
   'view_public_content',         // Home, Pricing, Use Cases, Contact — pre každého
   'view_ticker',                 // Bloomberg ticker pod nav-om
-  'view_dashboard_public',       // /live — summary cards + top 20 projektov
+  'view_dashboard_public',       // /live — summary cards + top N projektov pre anon
   'view_market_pulse',           // MarketPulse sekcia na home
   'view_district_pulse',         // DistrictPulse sekcia na home
   'view_how_it_works',           // pipeline animácia
 
-  // Plný list projektov (>20)
-  'view_all_projects_list',      // všetkých 55+ projektov namiesto top 20
+  // Plný list projektov (anon vidí top ANON_VISIBLE = 12 + 8 blurred)
+  'view_all_projects_list',      // všetky aktívne projekty namiesto top N
 
   // Detail projektu
   'view_chosen_project_detail',  // detail svojho 1 vybraného projektu (free)
