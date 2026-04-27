@@ -14,7 +14,7 @@ import { MarketPulse, DistrictPulse, PipelineFlow } from "./pages/HomeExtras";
 import HeroLabPage from "./pages/HeroVariants";
 import { useAuth } from "./lib/useAuth";
 import { useCapabilities } from "./lib/useCapabilities";
-import { useProjects, useMarketTotals } from "./lib/useData";
+import { useMarketTotals } from "./lib/useData";
 import { pushRoute, pathToPage, isAppPage } from "./lib/routing";
 import { applySeo } from "./lib/seo";
 import { startPageEngagement, stopPageEngagement } from "./lib/engagement";
@@ -508,8 +508,13 @@ function HomePage({ setCurrent, l, lang, onLogin }) {
   const { can, tier } = useCapabilities();
   // Hero badge count — exact live count from DB, no rounding. User wants
   // the real number (e.g. "157 projektov"), not a marketing approximation.
-  const { projects } = useProjects();
-  const liveProjCount = projects.length;
+  // Hero badge — count of CURRENTLY ACTIVE projects (not all 90 in
+  // registry). "Live" implies what's currently being tracked, not
+  // historical / paused. Reads from market_totals.total_projects_active
+  // which is the same number used by /live, Dashboard, and the Ticker
+  // — single source of truth.
+  const marketTotals = useMarketTotals();
+  const liveProjCount = marketTotals.projectsActive ?? 0;
   const heroBadgeText = liveProjCount > 0
     ? (lang === "sk"
         ? `Live — sledujeme ${liveProjCount} projektov`

@@ -646,7 +646,11 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
       return Math.abs(h + n * 2654435761) >>> 0;
     };
     const ROOM_DIST = [[1, 0.25], [2, 0.35], [3, 0.25], [4, 0.15]];
-    for (const p of projects) {
+    // Synthesize previews only for active projects — preview should
+    // reflect what paid users would see in the real Pivot, which is
+    // active-only. Manual projects (status='active') stay in.
+    const activeProjects = projects.filter(p => (p.status || "active") === "active");
+    for (const p of activeProjects) {
       const total = Math.min(20, Math.max(3, p.total_units || 10));
       const availShare = p.total_units > 0 ? (p.available_units || 0) / p.total_units : 0.4;
       const soldShare  = p.total_units > 0 ? (p.sold_units     || 0) / p.total_units : 0.5;

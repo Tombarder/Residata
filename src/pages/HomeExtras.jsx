@@ -281,10 +281,14 @@ export function PipelineFlow({ lang = "en" }) {
   // číslami ako "bytov sledovaných"). PipelineFlow ostáva "o tom čo robíme"
   // (developeri → projekty → ako často), MarketPulse je "čo to naozaj je"
   // (počty bytov, dostupné, predané, €/m²). Bez prekrytia.
-  const { projects } = useProjects();
-  const uniqueDevs = new Set(projects.map(p => p.developer).filter(Boolean)).size;
-  const devCount  = uniqueDevs > 0 ? uniqueDevs : null;
-  const projCount = projects.length > 0 ? projects.length : null;
+  // Live-tracked counts come from market_totals (active filter applied
+  // at the DB level — same number /live shows, same number Hero badge
+  // shows, same number Ticker shows). projects.length here would be 90
+  // (full registry incl. paused/sold-out) which is misleading on a
+  // "live pipeline" panel.
+  const marketTotals = useMarketTotals();
+  const devCount  = marketTotals.developersActive ?? null;
+  const projCount = marketTotals.projectsActive ?? null;
   // Pretty "—" when still loading; template strings below degrade gracefully.
   const fmt = (n, locale) => n == null ? "…" : Number(n).toLocaleString(locale);
 

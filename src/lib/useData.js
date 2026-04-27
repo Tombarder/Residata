@@ -142,13 +142,15 @@ export function useMarketTotals() {
         : (v != null && !Number.isNaN(Number(v)) ? Number(v) : null);
       const next = {
         loading: false,
-        unitsTracked:   num(data?.total_units_tracked),
-        unitsAvailable: num(data?.total_available),
-        unitsReserved:  num(data?.total_reserved),
-        unitsSold:      num(data?.total_sold),
-        soldLastMonth:  num(data?.total_sold_last_month),
-        avgPriceM2:     num(data?.avg_eur_m2),
-        snapshotMonth:  data?.snapshot_month || null,
+        unitsTracked:    num(data?.total_units_tracked),
+        unitsAvailable:  num(data?.total_available),
+        unitsReserved:   num(data?.total_reserved),
+        unitsSold:       num(data?.total_sold),
+        soldLastMonth:   num(data?.total_sold_last_month),
+        avgPriceM2:      num(data?.avg_eur_m2),
+        projectsActive:  num(data?.total_projects_active),
+        developersActive:num(data?.total_developers_active),
+        snapshotMonth:   data?.snapshot_month || null,
       };
       _marketTotalsCache = next;
       setTotals(next);
