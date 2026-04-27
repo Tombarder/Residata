@@ -147,15 +147,26 @@ export default async function handler(req, res) {
    for backwards-compat + future API callers. */
 function filterByScope(projects, scope, label) {
   const s = String(scope || "").toLowerCase();
-  if (!s || s === "market" || s === "trh") return projects;
-  if (s === "developer") return projects.filter(p => p.developer === label);
+  // For multi-project scopes (market / district / developer / city),
+  // include only ACTIVE projects so paused / sold_out / archived
+  // ones don't pollute the sum with stale last-known data. Manual
+  // projects (status='active', is_manual=true) are included like any
+  // other active project.
+  //
+  // For a SINGLE PROJECT subscription ("project" scope), the user
+  // explicitly subscribed to that one — show it regardless of status
+  // (they want updates even if it goes paused or sold-out).
+  const onlyActive = (arr) => arr.filter(p => (p.status || "active") === "active");
+
+  if (!s || s === "market" || s === "trh") return onlyActive(projects);
+  if (s === "developer") return onlyActive(projects).filter(p => p.developer === label);
   if (s === "district" || s === "cast" || s === "cast mesta")
-    return projects.filter(p => p.district === label);
+    return onlyActive(projects).filter(p => p.district === label);
   if (s === "city" || s === "mesto")
-    return projects.filter(p => inferCity(p.district) === label || p.city === label);
+    return onlyActive(projects).filter(p => inferCity(p.district) === label || p.city === label);
   if (s === "project" || s === "projekt")
-    return projects.filter(p => p.id === label);
-  return projects;
+    return projects.filter(p => p.id === label);  // status-agnostic
+  return onlyActive(projects);
 }
 function inferCity(district) {
   if (!district) return null;
