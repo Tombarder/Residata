@@ -87,6 +87,10 @@ select
   p.last_updated,
   p.last_seen_at,
   p.sold_last_month,
+  -- Manual data-source flag (true = user-maintained Raw, not scraper).
+  -- Surfaces that want a "Manual" badge can read this without filtering
+  -- by it; status='active' covers both auto and manual.
+  coalesce(p.is_manual, false)                              as is_manual,
   -- Live aggregates (from flats_archive, not from projects table)
   coalesce(pp.total_units, 0)                                as total_units,
   coalesce(pp.available_units, 0)                            as available_units,
