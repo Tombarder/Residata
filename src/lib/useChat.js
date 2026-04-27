@@ -193,7 +193,16 @@ export function useChat({ lang = "sk" } = {}) {
         throw new Error(`HTTP ${r.status}${body ? `: ${body.slice(0, 120)}` : ""}`);
       }
       const j = await r.json();
-      setMessages(prev => [...prev, { role: "assistant", content: j.text || "" }]);
+      // log_id ties this assistant message to its row in ai_chat_log
+      // so the 👍/👎 buttons can PATCH /api/ai/chat-feedback with the
+      // right id. Older clients without sessionId never get a log_id
+      // (server skips the log row), feedback affordance hides itself.
+      setMessages(prev => [...prev, {
+        role: "assistant",
+        content: j.text || "",
+        log_id: j.log_id || null,
+        feedback: null,
+      }]);
       setRemaining(j.remaining || null);
       track("chat_answer", { tier: j.tier, remaining: j.remaining?.today ?? null });
     } catch (e) {
@@ -220,6 +229,48 @@ export function useChat({ lang = "sk" } = {}) {
     L("Ktorý okres je cenovo najvyšší?", "Which district has the highest prices?"),
   ];
 
+  /* rateMessage — handles 👍/👎 clicks next to an assistant message.
+     Optimistic UI: flips the local feedback state immediately, then
+     fires the PATCH. On server failure we revert the local state and
+     bubble a non-blocking warning so the user knows. Same rating
+     re-clicked = clear (toggle off). */
+  const rateMessage = async (logId, rating) => {
+    if (!logId) return;
+    if (rating !== "good" && rating !== "bad") return;
+    // Snapshot previous state for rollback on server failure
+    let prev = null;
+    setMessages(curr => curr.map(m => {
+      if (m.log_id !== logId) return m;
+      prev = m.feedback;
+      // Toggle: clicking the same rating clears it, otherwise replaces.
+      const next = m.feedback === rating ? null : rating;
+      return { ...m, feedback: next };
+    }));
+    const nextValue = prev === rating ? null : rating;
+    try {
+      const headers = { "Content-Type": "application/json" };
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+      } catch (_) {}
+      const r = await fetch("/api/ai/chat-feedback", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          log_id: logId,
+          session_id: sessionIdRef.current || getOrCreateSessionId(user?.id),
+          feedback: nextValue,   // null clears the rating
+        }),
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      track("chat_feedback", { rating: nextValue, log_id: logId });
+    } catch (e) {
+      // Rollback the optimistic state
+      setMessages(curr => curr.map(m => m.log_id === logId ? { ...m, feedback: prev } : m));
+      console.warn("[useChat] rate failed, reverted:", e?.message || e);
+    }
+  };
+
   return {
     messages, input, setInput, pending, error, remaining,
     tier, dailyLimit, suggestedQuestions,
@@ -227,6 +278,9 @@ export function useChat({ lang = "sk" } = {}) {
     // Chat UI calls this on textarea focus / first keystroke after
     // the previous send so we can measure user-side typing duration.
     markTypingStart,
+    // Chat UI calls this on 👍/👎 click. Server PATCHes the row via
+    // /api/ai/chat-feedback. Optimistic update + rollback on failure.
+    rateMessage,
   };
 }
 

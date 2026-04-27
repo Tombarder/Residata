@@ -735,15 +735,35 @@ async function handleInner(req, res) {
     .trim();
 
   // ── Log the assistant turn ──
-  logTurn({
-    turn_index: userTurnIdx + 1,
-    role: "assistant",
-    content: textOut,
-    response_time_ms: responseTimeMs,
-    model: ANTHROPIC_MODEL,
-    input_tokens: payload.usage?.input_tokens ?? null,
-    output_tokens: payload.usage?.output_tokens ?? null,
-  });
+  // Unlike the fire-and-forget user/error rows, this insert is awaited
+  // so we can return the row id to the client. The client surfaces 👍/👎
+  // buttons next to each assistant message and PATCHes the rating to
+  // /api/ai/chat-feedback using this id. If the insert fails we still
+  // return the answer (logId stays null → no feedback affordance for
+  // that one turn, no crash).
+  let assistantLogId = null;
+  if (sessionId) {
+    try {
+      const { data, error } = await admin
+        .from("ai_chat_log")
+        .insert({
+          ...baseRow,
+          turn_index: userTurnIdx + 1,
+          role: "assistant",
+          content: textOut,
+          response_time_ms: responseTimeMs,
+          model: ANTHROPIC_MODEL,
+          input_tokens: payload.usage?.input_tokens ?? null,
+          output_tokens: payload.usage?.output_tokens ?? null,
+        })
+        .select("id")
+        .single();
+      if (error) console.warn("[chat] ai_chat_log assistant insert failed (non-fatal)", error.message);
+      else assistantLogId = data?.id || null;
+    } catch (e) {
+      console.warn("[chat] ai_chat_log assistant insert threw (non-fatal)", e?.message || e);
+    }
+  }
 
   // ── Log the rate-limit / billing call (separate table, separate purpose) ──
   // For authed users: append to ai_usage_log (persistent, cross-
@@ -767,6 +787,7 @@ async function handleInner(req, res) {
   return res.status(200).json({
     text: textOut,
     tier,
+    log_id: assistantLogId,           // for the thumbs-up/down rating endpoint
     remaining: { today: Math.max(0, dayLimit - dayCount - 1) },
     usage: payload.usage || null,
     response_time_ms: responseTimeMs,

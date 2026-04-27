@@ -169,29 +169,43 @@ export default function PlatformReports({ lang = "sk" }) {
         }
       />
 
-      {/* Scope tabs — divider between scope-filtered and analytical reports */}
+      {/* Scope tabs — split into TWO labelled rows.
+          Row 1 = scope-filtered reports (Market / City / District / Project / Developer)
+          Row 2 = analytical reports (Forecast / Comparables / Pricing tension)
+          The previous single-row layout wrapped onto 3 rows on
+          ≤ 840 px viewports, mixing the two groups visually. Two
+          named rows fit on a single line at standard widths and
+          wrap cleanly within their group on narrow screens, with
+          the group label staying as a stable anchor. */}
       <div className="no-print" style={{
-        display: "flex", gap: "0.3rem", flexWrap: "wrap", alignItems: "center",
-        padding: "0.55rem 0.6rem", background: bg2, border: `1px solid ${border}`,
-        borderRadius: 8, marginBottom: "1rem",
+        background: bg2, border: `1px solid ${border}`, borderRadius: 8,
+        marginBottom: "1rem", overflow: "hidden",
       }}>
-        {SCOPES.map((s, i) => {
-          const prev = i > 0 ? SCOPES[i - 1] : null;
-          const showDivider = prev && prev.group !== s.group && (s.group === "analytics");
+        {(() => {
+          const filtered = SCOPES.filter(s => s.group !== "analytics");
+          const analytical = SCOPES.filter(s => s.group === "analytics");
           return (
-            <span key={s.key} style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
-              {showDivider && (
-                <span style={{
-                  width: 1, height: 20, background: border, marginLeft: "0.2rem", marginRight: "0.2rem",
-                }} aria-hidden="true" />
+            <>
+              <ScopeTabRow
+                label={lang === "sk" ? "Pohľad" : "View"}
+                tabs={filtered}
+                active={scope}
+                onClick={setScope}
+                lang={lang}
+              />
+              {analytical.length > 0 && (
+                <ScopeTabRow
+                  label={lang === "sk" ? "Analytické" : "Analytics"}
+                  tabs={analytical}
+                  active={scope}
+                  onClick={setScope}
+                  lang={lang}
+                  border
+                />
               )}
-              <ScopeTab active={scope === s.key} onClick={() => setScope(s.key)}>
-                {s.group === "analytics" && <span style={{ color: green, marginRight: "0.25rem", fontSize: "0.7rem" }}>▾</span>}
-                {s.label[lang] || s.label.sk}
-              </ScopeTab>
-            </span>
+            </>
           );
-        })}
+        })()}
       </div>
 
       {/* Picker for the current scope */}
@@ -459,6 +473,37 @@ function SubscribeButton({ scope, scopeLabel, lang }) {
       }}>
       {label}
     </button>
+  );
+}
+
+/* Row of scope-tab buttons with a left-side group label. The label
+   stays anchored on a separate baseline so it's always visible even
+   when the tabs themselves wrap to multiple lines on narrow screens. */
+function ScopeTabRow({ label, tabs, active, onClick, lang, border: hasTopBorder = false }) {
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", flexWrap: "wrap",
+      gap: "0.4rem 0.5rem",
+      padding: "0.55rem 0.7rem",
+      borderTop: hasTopBorder ? `1px solid ${border}` : "none",
+      background: hasTopBorder ? "rgba(0,229,160,0.025)" : "transparent",
+    }}>
+      <div style={{
+        fontFamily: mono, fontSize: "0.6rem", color: dim,
+        letterSpacing: "0.12em", textTransform: "uppercase",
+        marginRight: "0.4rem", flex: "0 0 auto",
+        minWidth: 64,
+      }}>
+        {label}
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem", flex: 1 }}>
+        {tabs.map(s => (
+          <ScopeTab key={s.key} active={active === s.key} onClick={() => onClick(s.key)}>
+            {s.label[lang] || s.label.sk}
+          </ScopeTab>
+        ))}
+      </div>
+    </div>
   );
 }
 

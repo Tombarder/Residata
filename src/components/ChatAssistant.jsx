@@ -106,7 +106,7 @@ export default function ChatAssistant({ lang = "sk" }) {
         )}
 
         {chat.messages.map((m, i) => (
-          <MessageBubble key={i} msg={m} lang={lang} />
+          <MessageBubble key={i} msg={m} lang={lang} onRate={chat.rateMessage} />
         ))}
 
         {chat.pending && (
@@ -214,7 +214,7 @@ export default function ChatAssistant({ lang = "sk" }) {
   );
 }
 
-function MessageBubble({ msg, lang }) {
+function MessageBubble({ msg, lang, onRate }) {
   const isUser = msg.role === "user";
   const isAssistant = msg.role === "assistant";
   return (
@@ -238,7 +238,56 @@ function MessageBubble({ msg, lang }) {
             ⚠ {msg.error}
           </div>
         )}
+        {/* 👍/👎 — assistant rows only, only when we have a log_id from the
+            server (older clients without sessionId never get one, the row
+            is anonymous in ai_chat_log so feedback would have nowhere to
+            land). Optimistic toggle handled in useChat.rateMessage. */}
+        {isAssistant && msg.log_id && onRate && (
+          <FeedbackButtons msg={msg} onRate={onRate} lang={lang} />
+        )}
       </div>
+    </div>
+  );
+}
+
+export function FeedbackButtons({ msg, onRate, lang }) {
+  const tag = (active, color) => ({
+    background: active ? `${color}1f` : "transparent",
+    border: `1px solid ${active ? color : border}`,
+    color: active ? color : dim,
+    cursor: "pointer", padding: "0.18rem 0.42rem", borderRadius: 4,
+    fontSize: "0.78rem", fontFamily: "inherit", lineHeight: 1,
+    transition: "background 0.12s, border-color 0.12s, color 0.12s",
+  });
+  const isGood = msg.feedback === "good";
+  const isBad  = msg.feedback === "bad";
+  return (
+    <div style={{
+      display: "flex", gap: "0.35rem",
+      marginTop: "0.5rem", paddingTop: "0.4rem",
+      borderTop: `1px dashed ${border}`,
+    }}>
+      <button
+        onClick={() => onRate(msg.log_id, "good")}
+        title={lang === "sk" ? "Užitočné" : "Helpful"}
+        aria-pressed={isGood}
+        style={tag(isGood, green)}
+      >
+        👍
+      </button>
+      <button
+        onClick={() => onRate(msg.log_id, "bad")}
+        title={lang === "sk" ? "Nepresné / nepomohlo" : "Inaccurate / not helpful"}
+        aria-pressed={isBad}
+        style={tag(isBad, red)}
+      >
+        👎
+      </button>
+      {(isGood || isBad) && (
+        <span style={{ fontSize: "0.66rem", color: dim, fontFamily: mono, alignSelf: "center", marginLeft: "0.2rem" }}>
+          {lang === "sk" ? "ďakujeme za feedback" : "thanks for the feedback"}
+        </span>
+      )}
     </div>
   );
 }

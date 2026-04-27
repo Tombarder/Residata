@@ -237,7 +237,7 @@ export default function FloatingChat({ lang = "sk", onNavigate }) {
             )}
 
             {chat.messages.map((m, i) => (
-              <MiniBubble key={i} msg={m} lang={lang} />
+              <MiniBubble key={i} msg={m} lang={lang} onRate={chat.rateMessage} />
             ))}
 
             {chat.pending && (
@@ -393,7 +393,7 @@ function ctaBtn(bg, fg, textColor) {
   };
 }
 
-function MiniBubble({ msg, lang }) {
+function MiniBubble({ msg, lang, onRate }) {
   const isUser = msg.role === "user";
   const isAssistant = msg.role === "assistant";
   return (
@@ -413,7 +413,38 @@ function MiniBubble({ msg, lang }) {
             ⚠ {msg.error}
           </div>
         )}
+        {/* 👍/👎 — same model as the full ChatAssistant: only assistant
+            rows with a server-issued log_id get the affordance. */}
+        {isAssistant && msg.log_id && onRate && (
+          <FloatFeedback msg={msg} onRate={onRate} lang={lang} />
+        )}
       </div>
+    </div>
+  );
+}
+
+function FloatFeedback({ msg, onRate, lang }) {
+  const tag = (active, color) => ({
+    background: active ? `${color}1f` : "transparent",
+    border: `1px solid ${active ? color : border}`,
+    color: active ? color : dim,
+    cursor: "pointer", padding: "0.12rem 0.32rem", borderRadius: 4,
+    fontSize: "0.72rem", fontFamily: "inherit", lineHeight: 1,
+  });
+  const isGood = msg.feedback === "good";
+  const isBad  = msg.feedback === "bad";
+  return (
+    <div style={{
+      display: "flex", gap: "0.3rem",
+      marginTop: "0.4rem", paddingTop: "0.3rem",
+      borderTop: `1px dashed ${border}`,
+    }}>
+      <button onClick={() => onRate(msg.log_id, "good")}
+              title={lang === "sk" ? "Užitočné" : "Helpful"}
+              aria-pressed={isGood} style={tag(isGood, green)}>👍</button>
+      <button onClick={() => onRate(msg.log_id, "bad")}
+              title={lang === "sk" ? "Nepresné" : "Inaccurate"}
+              aria-pressed={isBad} style={tag(isBad, red)}>👎</button>
     </div>
   );
 }

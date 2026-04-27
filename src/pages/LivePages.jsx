@@ -2772,7 +2772,7 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: "flex", gap: "0.5rem", marginTop: "1.5rem", borderBottom: `1px solid ${border}`, marginBottom: "1.5rem" }}>
+      <div style={{ display: "flex", gap: "0.5rem", marginTop: "1.5rem", borderBottom: `1px solid ${border}`, marginBottom: "1.5rem", flexWrap: "wrap" }}>
         <TabBtn active={tab === "overview"} onClick={() => setTab("overview")}>
           {lang === "sk" ? "Prehľad" : "Overview"}
         </TabBtn>
@@ -2781,6 +2781,7 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
         </TabBtn>
         <TabBtn active={tab === "activity"} onClick={() => setTab("activity")}>{lang === "sk" ? "Aktivita" : "Activity"}</TabBtn>
         <TabBtn active={tab === "domains"} onClick={() => setTab("domains")}>{lang === "sk" ? "Prémiové domény" : "Premium domains"}</TabBtn>
+        <TabBtn active={tab === "ai_chat"} onClick={() => setTab("ai_chat")}>{lang === "sk" ? "AI chat logy" : "AI chat logs"}</TabBtn>
       </div>
 
       {tab === "users" && (
@@ -2867,6 +2868,7 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
           reload={() => supabase.from("premium_domains").select("*").order("domain").then(({ data }) => setPremiumDomains(data || []))}
         />
       )}
+      {tab === "ai_chat" && <AiChatLogsPanel users={users} lang={lang} />}
     </main>
   );
 }
@@ -3284,6 +3286,256 @@ function ActivityPanel({ activity, users }) {
       </div>
       {activity.length === 0 && <div style={{ color: dim, padding: "1.5rem", textAlign: "center" }}>No activity yet.</div>}
     </>
+  );
+}
+
+/* AiChatLogsPanel — admin transcript reader for ai_chat_log.
+   Three views in one panel:
+     1. Summary stats — last-7-days totals: sessions, turns, response
+        time p50/p95, error rate, thumbs-up vs thumbs-down counts.
+     2. Sessions list — most-recent-first, click to expand into the
+        full transcript (user/assistant pairs, timing, model,
+        feedback). Filterable by role (errors only) + by feedback.
+     3. Bad-feedback queue — sorted by feedback_at desc so admin can
+        triage thumbs-down responses first (worst signal = highest
+        value for prompt tuning).
+
+   Reads via the regular supabase client + RLS; admin policy on
+   ai_chat_log allows SELECT for admins. No new endpoint needed. */
+function AiChatLogsPanel({ users, lang }) {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState(null);
+  const [filter, setFilter] = useState("all");  // all | bad | errors | recent
+  const [expanded, setExpanded] = useState(null);
+
+  // Pull last 30 days' worth of log rows. Cap at 2000 to keep the
+  // initial render snappy; filter chips narrow further client-side.
+  // Order by sent_at desc so most-recent activity is at the top.
+  useEffect(() => {
+    let cancelled = false;
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    supabase.from("ai_chat_log")
+      .select("id, session_id, user_id, tier, turn_index, role, content, content_length, sent_at, response_time_ms, user_typing_ms, model, input_tokens, output_tokens, lang, page_url, error_kind, error_message, http_status, feedback, feedback_note, feedback_at")
+      .gte("sent_at", since)
+      .order("sent_at", { ascending: false })
+      .limit(2000)
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) { setErr(error.message); setLoading(false); return; }
+        setRows(data || []);
+        setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  const usersById = useMemo(() => {
+    const m = {};
+    for (const u of users) m[u.id] = u;
+    return m;
+  }, [users]);
+
+  // Aggregate stats for the last 7 days (subset of the 30-day pull).
+  const stats = useMemo(() => {
+    const sevenDayAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const recent = rows.filter(r => new Date(r.sent_at).getTime() >= sevenDayAgo);
+    const sessions = new Set(recent.map(r => r.session_id)).size;
+    const userTurns = recent.filter(r => r.role === "user").length;
+    const assistantTurns = recent.filter(r => r.role === "assistant").length;
+    const errors = recent.filter(r => r.role === "error").length;
+    const goods = recent.filter(r => r.feedback === "good").length;
+    const bads  = recent.filter(r => r.feedback === "bad").length;
+    const responseTimes = recent
+      .filter(r => r.role === "assistant" && Number.isFinite(r.response_time_ms))
+      .map(r => r.response_time_ms)
+      .sort((a, b) => a - b);
+    const p50 = responseTimes.length > 0 ? responseTimes[Math.floor(responseTimes.length * 0.5)] : null;
+    const p95 = responseTimes.length > 0 ? responseTimes[Math.floor(responseTimes.length * 0.95)] : null;
+    return { sessions, userTurns, assistantTurns, errors, goods, bads, p50, p95 };
+  }, [rows]);
+
+  // Group rows into sessions (for the sessions view).
+  const sessions = useMemo(() => {
+    const bySession = new Map();
+    for (const r of rows) {
+      let s = bySession.get(r.session_id);
+      if (!s) {
+        s = {
+          session_id: r.session_id,
+          user_id: r.user_id,
+          tier: r.tier,
+          turns: [],
+          first_at: r.sent_at,
+          last_at: r.sent_at,
+          has_error: false,
+          has_bad_feedback: false,
+          good_count: 0, bad_count: 0,
+        };
+        bySession.set(r.session_id, s);
+      }
+      s.turns.push(r);
+      if (r.sent_at < s.first_at) s.first_at = r.sent_at;
+      if (r.sent_at > s.last_at)  s.last_at  = r.sent_at;
+      if (r.role === "error") s.has_error = true;
+      if (r.feedback === "good") s.good_count++;
+      if (r.feedback === "bad")  { s.bad_count++; s.has_bad_feedback = true; }
+    }
+    // Sort each session's turns ascending by turn_index for replay
+    for (const s of bySession.values()) {
+      s.turns.sort((a, b) => (a.turn_index ?? 0) - (b.turn_index ?? 0));
+    }
+    return Array.from(bySession.values()).sort((a, b) => b.last_at.localeCompare(a.last_at));
+  }, [rows]);
+
+  const filteredSessions = useMemo(() => {
+    if (filter === "bad")     return sessions.filter(s => s.has_bad_feedback);
+    if (filter === "errors")  return sessions.filter(s => s.has_error);
+    if (filter === "recent")  return sessions.slice(0, 25);
+    return sessions;
+  }, [sessions, filter]);
+
+  if (loading) {
+    return <div style={{ color: dim, padding: "1rem", fontFamily: mono, fontSize: "0.82rem" }}>{lang === "sk" ? "Načítavam logy…" : "Loading logs…"}</div>;
+  }
+  if (err) {
+    return <div style={{ color: red, padding: "1rem", fontFamily: mono, fontSize: "0.82rem" }}>⚠ {err}</div>;
+  }
+  if (rows.length === 0) {
+    return <div style={{ color: dim, padding: "1rem", fontFamily: mono, fontSize: "0.82rem", fontStyle: "italic" }}>
+      {lang === "sk"
+        ? "Žiadne AI chat logy za posledných 30 dní (alebo nemáš admin RLS prístup k tabuľke ai_chat_log)."
+        : "No AI chat logs in the last 30 days (or your admin RLS isn't granting access to ai_chat_log)."}
+    </div>;
+  }
+
+  return (
+    <div>
+      {/* 7-day stats strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "0.5rem", marginBottom: "1.25rem" }}>
+        {[
+          { label: lang === "sk" ? "Sessions (7d)" : "Sessions (7d)", value: stats.sessions },
+          { label: lang === "sk" ? "User otázok"   : "User turns",    value: stats.userTurns },
+          { label: lang === "sk" ? "AI odpovedí"   : "Assistant",     value: stats.assistantTurns },
+          { label: lang === "sk" ? "Chýb"          : "Errors",        value: stats.errors, color: stats.errors > 0 ? red : text },
+          { label: lang === "sk" ? "👍"             : "👍",            value: stats.goods, color: green },
+          { label: lang === "sk" ? "👎"             : "👎",            value: stats.bads,  color: stats.bads > 0 ? red : text },
+          { label: "p50 ms", value: stats.p50 != null ? Math.round(stats.p50) : "—" },
+          { label: "p95 ms", value: stats.p95 != null ? Math.round(stats.p95) : "—" },
+        ].map((k, i) => (
+          <div key={i} style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 6, padding: "0.55rem 0.75rem" }}>
+            <div style={{ fontSize: "0.65rem", color: dim, marginBottom: "0.18rem", letterSpacing: "0.04em" }}>{k.label}</div>
+            <div style={{ fontFamily: mono, fontSize: "1.05rem", fontWeight: 700, color: k.color || text }}>{k.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Filter row */}
+      <div style={{ display: "flex", gap: "0.4rem", marginBottom: "0.75rem", flexWrap: "wrap" }}>
+        {[
+          { key: "all",    label: lang === "sk" ? "Všetky"     : "All" },
+          { key: "recent", label: lang === "sk" ? "Posledných 25" : "Last 25" },
+          { key: "bad",    label: "👎 only" },
+          { key: "errors", label: lang === "sk" ? "⚠ chyby" : "⚠ errors" },
+        ].map(f => (
+          <button key={f.key}
+            onClick={() => setFilter(f.key)}
+            style={{
+              background: filter === f.key ? "rgba(0,229,160,0.14)" : "transparent",
+              color: filter === f.key ? green : dim,
+              border: `1px solid ${filter === f.key ? green : border}`,
+              borderRadius: 4, padding: "0.3rem 0.65rem",
+              fontSize: "0.72rem", cursor: "pointer", fontFamily: "inherit",
+            }}>{f.label}</button>
+        ))}
+        <span style={{ marginLeft: "auto", color: dim, fontSize: "0.7rem", alignSelf: "center", fontFamily: mono }}>
+          {filteredSessions.length} {lang === "sk" ? "sessions" : "sessions"} · {rows.length} {lang === "sk" ? "riadkov" : "rows"} (30d)
+        </span>
+      </div>
+
+      {/* Sessions list */}
+      <div style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8, overflow: "hidden" }}>
+        {filteredSessions.length === 0 ? (
+          <div style={{ padding: "1.25rem", color: dim, fontStyle: "italic", textAlign: "center" }}>
+            {lang === "sk" ? "Žiadne sessions zodpovedajúce filtru." : "No sessions match the filter."}
+          </div>
+        ) : filteredSessions.slice(0, 100).map((s, i) => {
+          const u = usersById[s.user_id];
+          const isOpen = expanded === s.session_id;
+          return (
+            <div key={s.session_id} style={{ borderTop: i > 0 ? `1px solid ${border}` : "none" }}>
+              <button
+                onClick={() => setExpanded(isOpen ? null : s.session_id)}
+                style={{
+                  width: "100%", textAlign: "left", background: "transparent",
+                  border: "none", color: text, cursor: "pointer", fontFamily: "inherit",
+                  padding: "0.65rem 0.9rem",
+                  display: "grid", gridTemplateColumns: "auto 1fr auto auto auto auto", gap: "0.6rem", alignItems: "center",
+                }}>
+                <span style={{ color: green, fontSize: "0.7rem", width: 12 }}>{isOpen ? "▾" : "▸"}</span>
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "0.78rem" }}>
+                  <strong style={{ color: text }}>{u?.email || (s.user_id ? s.user_id.slice(0, 8) + "…" : "anon")}</strong>
+                  <span style={{ color: dim, marginLeft: "0.5rem", fontFamily: mono, fontSize: "0.68rem" }}>{s.tier}</span>
+                </span>
+                <span style={{ color: dim, fontSize: "0.7rem", fontFamily: mono }}>{s.turns.length} {lang === "sk" ? "turn" : "turns"}</span>
+                <span style={{ color: s.has_error ? red : (s.has_bad_feedback ? orange : dim), fontSize: "0.7rem", fontFamily: mono, minWidth: 50, textAlign: "right" }}>
+                  {s.has_error ? "⚠" : ""}
+                  {s.bad_count > 0 ? ` 👎${s.bad_count}` : ""}
+                  {s.good_count > 0 ? ` 👍${s.good_count}` : ""}
+                </span>
+                <span style={{ color: dim, fontSize: "0.66rem", fontFamily: mono }}>
+                  {new Date(s.last_at).toLocaleString()}
+                </span>
+                <span style={{ width: 12 }} />
+              </button>
+              {isOpen && (
+                <div style={{ padding: "0 0.9rem 0.9rem 1.5rem", background: bg }}>
+                  {s.turns.map((t, j) => (
+                    <AiTurnRow key={t.id || j} turn={t} />
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {filteredSessions.length > 100 && (
+          <div style={{ padding: "0.6rem", color: dim, fontSize: "0.72rem", textAlign: "center", fontFamily: mono }}>
+            {lang === "sk" ? `Zobrazených prvých 100 z ${filteredSessions.length}.` : `Showing top 100 of ${filteredSessions.length}.`}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AiTurnRow({ turn }) {
+  const isUser      = turn.role === "user";
+  const isAssistant = turn.role === "assistant";
+  const isError     = turn.role === "error";
+  const accent = isUser ? green : isAssistant ? text : isError ? red : dim;
+  const labelText = isUser ? "USER" : isAssistant ? "AI" : isError ? "ERROR" : turn.role.toUpperCase();
+  const timing = [];
+  if (isAssistant && Number.isFinite(turn.response_time_ms)) timing.push(`${turn.response_time_ms}ms response`);
+  if (isUser && Number.isFinite(turn.user_typing_ms))        timing.push(`${(turn.user_typing_ms / 1000).toFixed(1)}s typed`);
+  if (isAssistant && turn.input_tokens)                       timing.push(`${turn.input_tokens}→${turn.output_tokens || 0} tok`);
+  if (isAssistant && turn.model)                              timing.push(turn.model);
+  if (turn.feedback === "good")                               timing.push("👍");
+  if (turn.feedback === "bad")                                timing.push("👎");
+
+  return (
+    <div style={{
+      borderLeft: `2px solid ${accent}`, paddingLeft: "0.65rem",
+      marginTop: "0.55rem", paddingBottom: "0.15rem",
+    }}>
+      <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.1em", display: "flex", gap: "0.6rem", flexWrap: "wrap", marginBottom: "0.18rem" }}>
+        <span style={{ color: accent, fontWeight: 700 }}>{labelText}</span>
+        <span>turn {turn.turn_index}</span>
+        {timing.length > 0 && <span style={{ color: dim }}>{timing.join(" · ")}</span>}
+        {isError && turn.http_status && <span style={{ color: red }}>HTTP {turn.http_status}</span>}
+      </div>
+      <div style={{ whiteSpace: "pre-wrap", color: text, fontSize: "0.82rem", lineHeight: 1.45 }}>
+        {turn.content || (isError ? <span style={{ color: red, fontStyle: "italic" }}>{turn.error_message || "(no content)"}</span> : <span style={{ color: dim, fontStyle: "italic" }}>(empty)</span>)}
+      </div>
+    </div>
   );
 }
 
