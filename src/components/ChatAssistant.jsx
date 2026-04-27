@@ -137,7 +137,13 @@ export default function ChatAssistant({ lang = "sk" }) {
         <textarea
           ref={inputRef}
           value={chat.input}
-          onChange={e => chat.setInput(e.target.value)}
+          /* markTypingStart timestamps the moment the user starts
+             interacting with this question — focus or first keystroke.
+             useChat snapshots that on send() and ships user_typing_ms
+             to ai_chat_log so we can analyze "deliberate vs throwaway"
+             questions in the AI testing review. */
+          onFocus={chat.markTypingStart}
+          onChange={e => { chat.markTypingStart(); chat.setInput(e.target.value); }}
           onKeyDown={onKeyDown}
           disabled={chat.pending}
           placeholder={L("Tvoja otázka… (Enter pošle, Shift+Enter = nový riadok)", "Your question… (Enter sends, Shift+Enter = new line)")}

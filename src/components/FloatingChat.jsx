@@ -260,7 +260,8 @@ export default function FloatingChat({ lang = "sk", onNavigate }) {
             <textarea
               ref={inputRef}
               value={chat.input}
-              onChange={e => chat.setInput(e.target.value)}
+              onFocus={chat.markTypingStart}
+              onChange={e => { chat.markTypingStart(); chat.setInput(e.target.value); }}
               onKeyDown={onKey}
               disabled={chat.pending}
               placeholder={L("Tvoja otázka…", "Your question…")}

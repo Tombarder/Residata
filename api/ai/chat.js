@@ -522,6 +522,25 @@ async function handleInner(req, res) {
   }
   const lang = body.lang === "en" ? "en" : "sk";
   const messages = Array.isArray(body.messages) ? body.messages : null;
+  // Optional fields (newer client; older clients without these still
+  // work — the chat-log row just gets nulls in those columns).
+  // sessionId: UUID generated client-side, persists across the same
+  //   conversation. Used to group transcript rows in ai_chat_log.
+  // typingMs:  how long the user was actively typing this question
+  //   (textarea focus → send click). Useful for "did the user think
+  //   about it" vs "boilerplate question" analytics.
+  // pageUrl:   which page the chat was opened from (eg. /app/dashboard
+  //   vs the floating chat on /). Helps correlate questions with the
+  //   surface they're being asked from.
+  const sessionId = (typeof body.sessionId === "string" && /^[0-9a-f-]{8,}$/i.test(body.sessionId))
+    ? body.sessionId : null;
+  const typingMs = (typeof body.typingMs === "number" && body.typingMs >= 0 && body.typingMs < 24 * 60 * 60 * 1000)
+    ? Math.round(body.typingMs) : null;
+  const pageUrl = (typeof body.pageUrl === "string" && body.pageUrl.length < 500)
+    ? body.pageUrl : null;
+  const userAgent = (typeof req.headers["user-agent"] === "string")
+    ? String(req.headers["user-agent"]).slice(0, 500) : null;
+
   if (!messages || messages.length === 0) {
     return res.status(400).json({ error: "messages array required (non-empty)" });
   }
@@ -629,9 +648,40 @@ async function handleInner(req, res) {
     return res.status(500).json({ error: "failed to build data context" });
   }
 
+  // ── Log the user turn into ai_chat_log ──
+  // Written BEFORE the Anthropic call so the user message is in the
+  // log even if the upstream fails; the assistant row (or the error
+  // row) gets written below. Async + non-fatal — chat keeps working
+  // if the log table is unavailable.
+  const lastUserMsg = clean[clean.length - 1];
+  const userTurnIdx = clean.length - 1;            // 0-based position
+  const baseRow = {
+    session_id: sessionId,
+    user_id: userId || null,
+    caller_ip: ip || null,
+    tier: tier || null,
+    lang,
+    page_url: pageUrl,
+    user_agent: userAgent,
+  };
+  const logTurn = (row) => {
+    if (!sessionId) return;  // older clients without sessionId — skip log
+    admin.from("ai_chat_log").insert({ ...baseRow, ...row })
+      .then(({ error }) => {
+        if (error) console.warn("[chat] ai_chat_log insert failed (non-fatal)", error.message);
+      });
+  };
+  logTurn({
+    turn_index: userTurnIdx,
+    role: "user",
+    content: lastUserMsg.content,
+    user_typing_ms: typingMs,
+  });
+
   // ── Call Anthropic ──
   const system = systemPrompt(lang, dataCtx);
   let anthropicResp;
+  const anthropicStartedAt = Date.now();
   try {
     anthropicResp = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -649,21 +699,53 @@ async function handleInner(req, res) {
     });
   } catch (e) {
     console.error("[chat] anthropic fetch", e);
+    logTurn({
+      turn_index: userTurnIdx + 1,
+      role: "error",
+      content: String(e?.message || e).slice(0, 1000),
+      response_time_ms: Date.now() - anthropicStartedAt,
+      error_kind: "err",
+      error_message: String(e?.message || e).slice(0, 500),
+      http_status: 502,
+      model: ANTHROPIC_MODEL,
+    });
     return res.status(502).json({ error: "AI upstream error" });
   }
   if (!anthropicResp.ok) {
     const errBody = await anthropicResp.text().catch(() => "");
     console.error("[chat] anthropic non-200", anthropicResp.status, errBody.slice(0, 500));
+    logTurn({
+      turn_index: userTurnIdx + 1,
+      role: "error",
+      content: errBody.slice(0, 1000),
+      response_time_ms: Date.now() - anthropicStartedAt,
+      error_kind: "err",
+      error_message: `anthropic_${anthropicResp.status}`,
+      http_status: anthropicResp.status,
+      model: ANTHROPIC_MODEL,
+    });
     return res.status(502).json({ error: `AI upstream ${anthropicResp.status}` });
   }
   const payload = await anthropicResp.json();
+  const responseTimeMs = Date.now() - anthropicStartedAt;
   const textOut = (payload.content || [])
     .filter(c => c.type === "text")
     .map(c => c.text)
     .join("\n")
     .trim();
 
-  // ── Log the call ──
+  // ── Log the assistant turn ──
+  logTurn({
+    turn_index: userTurnIdx + 1,
+    role: "assistant",
+    content: textOut,
+    response_time_ms: responseTimeMs,
+    model: ANTHROPIC_MODEL,
+    input_tokens: payload.usage?.input_tokens ?? null,
+    output_tokens: payload.usage?.output_tokens ?? null,
+  });
+
+  // ── Log the rate-limit / billing call (separate table, separate purpose) ──
   // For authed users: append to ai_usage_log (persistent, cross-
   // cold-start). For anon: bump the in-memory per-IP counter so
   // the next request from this IP in the same UTC day sees a higher
@@ -687,5 +769,6 @@ async function handleInner(req, res) {
     tier,
     remaining: { today: Math.max(0, dayLimit - dayCount - 1) },
     usage: payload.usage || null,
+    response_time_ms: responseTimeMs,
   });
 }

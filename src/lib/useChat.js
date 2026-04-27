@@ -27,7 +27,40 @@ import { track } from "./track";
 // corrects it — still safe because the server is authoritative.
 const DAILY_LIMIT_BY_TIER = { anon: 1, free: 3, paid: 30, admin: 100 };
 
-function storageKey(userId) { return `residata_chat_${userId || "anon"}`; }
+function storageKey(userId)  { return `residata_chat_${userId || "anon"}`; }
+function sessionKey(userId)  { return `residata_chat_session_${userId || "anon"}`; }
+
+// RFC4122-ish UUID v4 — crypto.randomUUID is supported in modern browsers
+// + Node 18+; fallback for older environments uses Math.random which is
+// good enough for log grouping (we don't need cryptographic uniqueness).
+function newSessionId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
+    const r = (Math.random() * 16) | 0;
+    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
+
+function getOrCreateSessionId(userId) {
+  try {
+    const k = sessionKey(userId);
+    let s = localStorage.getItem(k);
+    if (!s) {
+      s = newSessionId();
+      localStorage.setItem(k, s);
+    }
+    return s;
+  } catch {
+    return newSessionId();  // fallback for SSR / disabled storage
+  }
+}
+
+function rotateSessionId(userId) {
+  try { localStorage.removeItem(sessionKey(userId)); } catch (_) {}
+  return getOrCreateSessionId(userId);
+}
 
 export function useChat({ lang = "sk" } = {}) {
   const { user } = useAuth();
@@ -49,6 +82,22 @@ export function useChat({ lang = "sk" } = {}) {
 
   const cancelRef = useRef(false);
 
+  // Session ID — UUID per "conversation". Created lazily on first
+  // message + persisted in localStorage so a tab close → reload
+  // continues the same session. clear() rotates it (= new session).
+  const sessionIdRef = useRef(null);
+
+  // User-typing timing — tracks how many ms elapsed between the user
+  // FIRST starting to type this question (focus, or first keystroke
+  // after the previous send) and pressing Send. Useful signal for
+  // "deliberate question" vs "boilerplate test message". Reset on
+  // every send. The Chat component is responsible for calling
+  // markTypingStart() on focus / first keystroke.
+  const typingStartRef = useRef(null);
+  const markTypingStart = () => {
+    if (typingStartRef.current == null) typingStartRef.current = Date.now();
+  };
+
   useEffect(() => {
     try {
       localStorage.setItem(storageKey(user?.id), JSON.stringify(messages.slice(-40)));
@@ -65,6 +114,11 @@ export function useChat({ lang = "sk" } = {}) {
   }, [user?.id]);
 
   const clear = () => {
+    // Rotate session ID first so the optional "session_ended" log line
+    // (if/when we add it) carries the OLD id; rotation kicks the next
+    // send() into a fresh session.
+    rotateSessionId(user?.id);
+    sessionIdRef.current = null;
     setMessages([]); setError(null);
     try { localStorage.removeItem(storageKey(user?.id)); } catch (_) {}
     track("chat_cleared");
@@ -80,6 +134,18 @@ export function useChat({ lang = "sk" } = {}) {
     setError(null);
     track("chat_question", { tier, len: q.length });
 
+    // Lazy-create session id on first message of a fresh chat.
+    if (!sessionIdRef.current) {
+      sessionIdRef.current = getOrCreateSessionId(user?.id);
+    }
+    // Snapshot typing duration BEFORE the network call so the value
+    // sent to the server reflects user-side time only, not server
+    // round-trip. Reset for the NEXT message.
+    const typingMs = typingStartRef.current != null
+      ? Math.max(0, Date.now() - typingStartRef.current)
+      : null;
+    typingStartRef.current = null;
+
     try {
       const headers = { "Content-Type": "application/json" };
       try {
@@ -89,7 +155,15 @@ export function useChat({ lang = "sk" } = {}) {
 
       const r = await fetch("/api/ai/chat", {
         method: "POST", headers,
-        body: JSON.stringify({ messages: nextMsgs.slice(-20), lang }),
+        body: JSON.stringify({
+          messages: nextMsgs.slice(-20),
+          lang,
+          sessionId: sessionIdRef.current,
+          typingMs,
+          pageUrl: typeof window !== "undefined" && window.location
+            ? window.location.pathname + window.location.search
+            : null,
+        }),
       });
       if (r.status === 429) {
         const j = await r.json().catch(() => ({}));
@@ -150,6 +224,9 @@ export function useChat({ lang = "sk" } = {}) {
     messages, input, setInput, pending, error, remaining,
     tier, dailyLimit, suggestedQuestions,
     send, clear, setError,
+    // Chat UI calls this on textarea focus / first keystroke after
+    // the previous send so we can measure user-side typing duration.
+    markTypingStart,
   };
 }
 
