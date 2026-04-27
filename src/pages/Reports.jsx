@@ -471,6 +471,13 @@ function MarketReport({ projects, flats, onOpenProject, lang }) {
   const priceSeries = useMemo(() => priceDistribution(flats, 12), [flats]);
   const districts = useMemo(() => groupAggregates(projects, "district", lang, flats), [projects, flats, lang]);
   const developers = useMemo(() => groupAggregates(projects, "developer", lang, flats).slice(0, 8), [projects, flats, lang]);
+  // Trend chart: filter snapshots to currently-active projects so the
+  // historical line matches what the rest of Reports shows ("active
+  // market over time"), not "all projects ever, including those that
+  // have since been paused or sold-out". Without this filter, the
+  // trend graph would include Danubius's 146 stale snapshots, etc.
+  const activeProjectIds = useMemo(() => new Set(projects.map(p => p.id)), [projects]);
+  const trendPredicate = useMemo(() => (s) => activeProjectIds.has(s.project_id), [activeProjectIds]);
 
   const title = lang === "sk" ? "Slovenský trh novostavieb" : "Slovak new-build market";
 
@@ -499,8 +506,8 @@ function MarketReport({ projects, flats, onOpenProject, lang }) {
       </ReportSection>
 
       {snapshots && snapshots.length > 0 && (
-        <ReportSection label={lang === "sk" ? "Historický trend" : "Historical trend"} title={lang === "sk" ? "Vývoj po mesiacoch" : "Month-by-month"}>
-          <TrendChart snapshots={snapshots} scopePredicate={null} lang={lang} />
+        <ReportSection label={lang === "sk" ? "Historický trend" : "Historical trend"} title={lang === "sk" ? "Vývoj po mesiacoch (aktívny trh)" : "Month-by-month (active market)"}>
+          <TrendChart snapshots={snapshots} scopePredicate={trendPredicate} lang={lang} />
         </ReportSection>
       )}
 
