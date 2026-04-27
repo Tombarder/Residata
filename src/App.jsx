@@ -8,8 +8,8 @@ import PendingGate from "./components/PendingGate";
 import Feature from "./components/Feature";
 import UpgradePrompt from "./components/UpgradePrompt";
 import { LiveDashboard, LiveProjectDetail, LiveAnalytics, LiveAdmin, EarlyAccessBadge } from "./pages/LivePages";
-// HowItWorksFlow export z HomeExtras už na Home nepoužívame (PipelineFlow ho
-// pokrýva), ale komponent ostáva v HomeExtras pre prípad budúceho návratu.
+// HowItWorksFlow z HomeExtras bol odstránený — PipelineFlow ho plne
+// pokrýva a robí to na živých číslach z useMarketTotals.
 import { MarketPulse, DistrictPulse, PipelineFlow } from "./pages/HomeExtras";
 import HeroLabPage from "./pages/HeroVariants";
 import { useAuth } from "./lib/useAuth";
