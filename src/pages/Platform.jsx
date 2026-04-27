@@ -814,35 +814,23 @@ function PlatformDashboard({ lang, setCurrent }) {
   const marketTotals = useMarketTotals();
   const showTrialOffer = baseTier === "free" && !trialActive && !profile?.trial_started_at;
 
-  // KPI counts come from the published `metrics` table (same values
-  // the ticker + marketing site show — derived from len(all_flats),
-  // i.e. real row counts). Fall back to summing projects when metrics
-  // haven't synced yet. `sold30` stays project-derived because that
-  // metric isn't published at the per-month granularity.
+  // All headline KPIs read from the live `market_totals` view (same
+  // source the homepage Ticker, MarketPulse, and /live/analytics use).
+  // Single source of truth — every page on the platform shows the same
+  // numbers as the public marketing surfaces, no chance of drift.
   //
-  // Fallback note: we sum stav-bucket columns rather than `total_units`
-  // because a few projects (Slnečnice, Bory, etc.) carry a registry
-  // override in `total_units` that inflates by ~5-10k. Available /
-  // reserved / future / error are always real per-project; only
-  // sold_units may carry the inflation, but the headline `units`
-  // count above is no longer a registry plan total.
-  const rawTotals = projects.reduce((a, p) => ({
-    units: a.units +
-      (p.available_units || 0) + (p.sold_units || 0) +
-      (p.reserved_units || 0) + (p.prereserved_units || 0) +
-      (p.future_units || 0) + (p.error_units || 0),
-    avail: a.avail + (p.available_units || 0),
-    sold:  a.sold  + (p.sold_units || 0),
-    sold30: a.sold30 + (p.sold_last_month || 0),
-  }), { units: 0, avail: 0, sold: 0, sold30: 0 });
+  // sold30 stays project-derived because the per-month sold delta is a
+  // per-project field computed by sync from stav transitions — not
+  // derivable from the current snapshot alone.
   const totals = {
-    units:  marketTotals.unitsTracked   != null ? marketTotals.unitsTracked   : rawTotals.units,
-    avail:  marketTotals.unitsAvailable != null ? marketTotals.unitsAvailable : rawTotals.avail,
-    sold:   marketTotals.unitsSold      != null ? marketTotals.unitsSold      : rawTotals.sold,
-    sold30: rawTotals.sold30,
+    units:  marketTotals.unitsTracked   ?? 0,
+    avail:  marketTotals.unitsAvailable ?? 0,
+    sold:   marketTotals.unitsSold      ?? 0,
+    sold30: projects.reduce((a, p) => a + (p.sold_last_month || 0), 0),
   };
-  const eurM2Values = projects.map(p => p.avg_price_eur_m2).filter(Boolean);
-  const avgEurM2 = eurM2Values.length ? Math.round(eurM2Values.reduce((a, b) => a + b, 0) / eurM2Values.length) : null;
+  const avgEurM2 = marketTotals.avgPriceM2 != null
+    ? Math.round(marketTotals.avgPriceM2)
+    : null;
 
   // Top 5 most active projects
   const top = [...projects]
