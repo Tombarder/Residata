@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
 import { useProjects, useProjectFlats, useEarlyAccessStats, useProjectSnapshots, useMarketTotals, useDistrictTotals } from "../lib/useData";
@@ -15,6 +15,12 @@ const green = "#00e5a0";
 const dim = "#8a8a96";
 const border = "#222228";
 const bg = "#16161a";
+// Added for AiChatLogsPanel — matched to the rest of the platform.
+const text = "#e8e8ed";
+const bg2 = "#0e0e10";
+const panel = "#14141a";
+const red = "#ff6b6b";
+const orange = "#f5a623";
 
 /* ── ProtectedData ─────────────────────────────────────────
    Wraps a data region (tables, pivot output, etc.) to discourage
