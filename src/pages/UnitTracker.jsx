@@ -228,14 +228,19 @@ export default function UnitTracker({ lang = "sk", setCurrent }) {
               setYMode={setYMode}
               lang={lang}
               onProjectClick={(pid) => setCurrent && setCurrent(`App:ProjectDetail:${pid}`)}
+              onBackToList={projFilter ? () => setPickedKeys([]) : null}
             />
           )}
 
-          {/* When user has picked a project but NO unit → mini-grid */}
+          {/* When user has picked a project but NO unit → mini-grid.
+              Also passes `search` so the SAME search box from the picker
+              filters this grid in-place (instead of triggering a separate
+              dropdown — that was the duplicate-list confusion). */}
           {pickedHistories.length === 0 && projFilter && (
             <MiniGrid
               project={projectById[projFilter]}
               byUnit={byUnit}
+              search={search}
               onPick={(key) => setPickedKeys([key])}
               lang={lang}
             />
@@ -254,7 +259,10 @@ export default function UnitTracker({ lang = "sk", setCurrent }) {
 // ── Picker row ──────────────────────────────────────────────────
 
 function PickerRow({ projects, byUnit, pickedKeys, togglePick, clearAll, projFilter, setProjFilter, search, setSearch, lang }) {
-  // Search across all units (project_id::unit_id keys + display label).
+  // Universal search across all units. Used ONLY when no project is
+  // picked (state: "empty" / global search). When a project IS picked
+  // the same search box filters the mini-grid in-place — see MiniGrid
+  // — so we never show two parallel lists.
   const allUnits = useMemo(() => {
     const out = [];
     for (const [key, rows] of byUnit) {
@@ -268,37 +276,48 @@ function PickerRow({ projects, byUnit, pickedKeys, togglePick, clearAll, projFil
         izby: r0.izby,
         obytna_plocha: r0.obytna_plocha,
         latest_stav: rows[rows.length - 1].stav,
+        latest_price: rows[rows.length - 1].cena_s_dph,
       });
     }
     return out;
   }, [byUnit]);
 
-  // When a project filter is active, scope search results to that project.
-  const visibleUnits = useMemo(() => {
-    let arr = allUnits;
-    if (projFilter) arr = arr.filter(u => u.project_id === projFilter);
-    if (search.trim()) {
-      const q = search.trim().toLowerCase();
-      arr = arr.filter(u =>
-        u.unit_id.toLowerCase().includes(q) ||
-        u.project_name.toLowerCase().includes(q)
-      );
-    }
-    return arr.slice(0, 25);  // cap dropdown
-  }, [allUnits, projFilter, search]);
+  const globalResults = useMemo(() => {
+    if (!search.trim() || projFilter) return [];
+    const q = search.trim().toLowerCase();
+    return allUnits
+      .filter(u => u.unit_id.toLowerCase().includes(q) || u.project_name.toLowerCase().includes(q))
+      .slice(0, 25);
+  }, [allUnits, search, projFilter]);
 
   const activeProjects = (projects || []).filter(p => (p.status || "active") === "active");
 
+  // Sub-state shown for "compare more" mode: when 1+ unit picked AND
+  // we're in a project context, show a small "+ Pridať ďalší byt"
+  // toggle that opens an inline mini-search SCOPED to that project.
+  const [compareSearchOpen, setCompareSearchOpen] = useState(false);
+  const compareScope = projFilter
+    ? allUnits.filter(u => u.project_id === projFilter && !pickedKeys.includes(u.key))
+    : [];
+  const compareSearchQ = search.trim().toLowerCase();
+  const compareResults = compareSearchOpen
+    ? compareScope.filter(u => !compareSearchQ || u.unit_id.toLowerCase().includes(compareSearchQ) || u.project_name.toLowerCase().includes(compareSearchQ)).slice(0, 12)
+    : [];
+
   return (
-    <div style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 10, padding: "1rem 1.1rem", marginBottom: "1.25rem" }}>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: "0.75rem", alignItems: "end" }} className="ut-picker-grid">
+    <div style={{
+      background: `linear-gradient(180deg, ${bg2} 0%, ${bg} 100%)`,
+      border: `1px solid ${border}`, borderRadius: 12,
+      padding: "1.1rem 1.25rem", marginBottom: "1.25rem",
+    }}>
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(240px, 1fr) minmax(240px, 1fr) auto", gap: "0.85rem", alignItems: "end" }} className="ut-picker-grid">
         <div>
-          <label style={{ display: "block", fontSize: "0.7rem", color: dim, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "0.3rem" }}>
+          <label style={{ display: "block", fontSize: "0.68rem", color: dim, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.35rem", fontWeight: 600 }}>
             {lang === "sk" ? "Projekt" : "Project"}
           </label>
           <select
             value={projFilter || ""}
-            onChange={(e) => setProjFilter(e.target.value || null)}
+            onChange={(e) => { setProjFilter(e.target.value || null); setSearch(""); }}
             style={selectStyle}
           >
             <option value="">{lang === "sk" ? "— vyber projekt —" : "— pick a project —"}</option>
@@ -311,13 +330,17 @@ function PickerRow({ projects, byUnit, pickedKeys, togglePick, clearAll, projFil
         </div>
 
         <div>
-          <label style={{ display: "block", fontSize: "0.7rem", color: dim, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "0.3rem" }}>
-            {lang === "sk" ? "Hľadať byt" : "Search unit"}
+          <label style={{ display: "block", fontSize: "0.68rem", color: dim, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.35rem", fontWeight: 600 }}>
+            {projFilter
+              ? (lang === "sk" ? "Filtrovať byty v projekte" : "Filter units in project")
+              : (lang === "sk" ? "Alebo hľadaj byt naprieč všetkými" : "Or search across all units")}
           </label>
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder={lang === "sk" ? "napr. A2-304 alebo Slnečnice" : "e.g. A2-304 or project name"}
+            placeholder={projFilter
+              ? (lang === "sk" ? "napr. A2-304" : "e.g. A2-304")
+              : (lang === "sk" ? "napr. A2-304 alebo názov projektu" : "e.g. A2-304 or project name")}
             style={selectStyle}
           />
         </div>
@@ -328,8 +351,8 @@ function PickerRow({ projects, byUnit, pickedKeys, togglePick, clearAll, projFil
               onClick={clearAll}
               style={{
                 background: "transparent", color: dim, border: `1px solid ${border}`,
-                borderRadius: 6, padding: "0.55rem 0.85rem", cursor: "pointer", fontSize: "0.78rem",
-                fontFamily: "inherit",
+                borderRadius: 6, padding: "0.6rem 0.9rem", cursor: "pointer", fontSize: "0.78rem",
+                fontFamily: "inherit", whiteSpace: "nowrap",
               }}
               onMouseEnter={e => { e.currentTarget.style.color = red; e.currentTarget.style.borderColor = red; }}
               onMouseLeave={e => { e.currentTarget.style.color = dim; e.currentTarget.style.borderColor = border; }}
@@ -340,60 +363,32 @@ function PickerRow({ projects, byUnit, pickedKeys, togglePick, clearAll, projFil
         </div>
       </div>
 
-      {/* Unit results dropdown — only when search query OR project picked AND no unit picked yet, OR multi-compare */}
-      {(search.trim() || (projFilter && pickedKeys.length < MAX_COMPARE)) && visibleUnits.length > 0 && (
-        <div style={{ marginTop: "0.85rem" }}>
-          <div style={{ fontSize: "0.7rem", color: dim, marginBottom: "0.4rem" }}>
-            {lang === "sk"
-              ? `${visibleUnits.length} bytov · klikni na pridanie (max ${MAX_COMPARE})`
-              : `${visibleUnits.length} units · click to add (max ${MAX_COMPARE})`}
+      {/* Global search results — ONLY when no project picked + has search query.
+          Never shown alongside the mini-grid (which appears when project picked). */}
+      {globalResults.length > 0 && (
+        <div style={{ marginTop: "0.95rem" }}>
+          <div style={{ fontSize: "0.7rem", color: dim, marginBottom: "0.45rem", fontFamily: mono }}>
+            {globalResults.length} {lang === "sk" ? "výsledkov · klikni na výber" : "results · click to select"}
           </div>
           <div style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
-            gap: "0.4rem",
-            maxHeight: 280, overflowY: "auto",
-            background: bg, border: `1px solid ${border}`, borderRadius: 6, padding: "0.5rem",
+            gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+            gap: "0.5rem",
+            maxHeight: 320, overflowY: "auto",
           }}>
-            {visibleUnits.map(u => {
-              const isPicked = pickedKeys.includes(u.key);
-              const stavCol = STAV_COLOR[u.latest_stav] || dim;
-              return (
-                <button
-                  key={u.key}
-                  onClick={() => togglePick(u.key)}
-                  disabled={!isPicked && pickedKeys.length >= MAX_COMPARE}
-                  style={{
-                    background: isPicked ? "rgba(0,229,160,0.10)" : "transparent",
-                    border: `1px solid ${isPicked ? green : border}`,
-                    color: text, cursor: pickedKeys.length >= MAX_COMPARE && !isPicked ? "not-allowed" : "pointer",
-                    padding: "0.5rem 0.7rem", borderRadius: 5,
-                    fontSize: "0.78rem", fontFamily: "inherit", textAlign: "left",
-                    opacity: !isPicked && pickedKeys.length >= MAX_COMPARE ? 0.4 : 1,
-                  }}
-                >
-                  <div style={{ fontWeight: 600, color: isPicked ? green : text }}>
-                    {u.unit_id}
-                  </div>
-                  <div style={{ fontSize: "0.7rem", color: dim, marginTop: "0.15rem", display: "flex", justifyContent: "space-between", gap: "0.5rem" }}>
-                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{u.project_name}</span>
-                    <span style={{ color: stavCol, whiteSpace: "nowrap" }}>{u.latest_stav}</span>
-                  </div>
-                  {(u.izby || u.obytna_plocha) && (
-                    <div style={{ fontSize: "0.66rem", color: dim, marginTop: "0.1rem" }}>
-                      {u.izby ? `${u.izby}izb · ` : ""}{u.obytna_plocha ? `${u.obytna_plocha}m²` : ""}
-                    </div>
-                  )}
-                </button>
-              );
-            })}
+            {globalResults.map(u => (
+              <UnitTile key={u.key} unit={u} isPicked={pickedKeys.includes(u.key)}
+                disabled={!pickedKeys.includes(u.key) && pickedKeys.length >= MAX_COMPARE}
+                onClick={() => togglePick(u.key)} lang={lang} />
+            ))}
           </div>
         </div>
       )}
 
-      {/* Picked chips strip — shows currently selected units */}
+      {/* Picked chips strip — currently selected units, with a "+ add another"
+          button for compare mode (only when project context is active). */}
       {pickedKeys.length > 0 && (
-        <div style={{ marginTop: "0.85rem", display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
+        <div style={{ marginTop: "0.95rem", display: "flex", flexWrap: "wrap", gap: "0.4rem", alignItems: "center" }}>
           {pickedKeys.map((k, i) => {
             const rows = byUnit.get(k) || [];
             const r = rows[0];
@@ -405,22 +400,100 @@ function PickerRow({ projects, byUnit, pickedKeys, togglePick, clearAll, projFil
                 style={{
                   background: `${color}1a`,
                   border: `1px solid ${color}`,
-                  color: text, padding: "0.32rem 0.6rem",
-                  borderRadius: 5, fontSize: "0.76rem", cursor: "pointer", fontFamily: "inherit",
-                  display: "inline-flex", alignItems: "center", gap: "0.4rem",
+                  color: text, padding: "0.35rem 0.65rem",
+                  borderRadius: 6, fontSize: "0.78rem", cursor: "pointer", fontFamily: "inherit",
+                  display: "inline-flex", alignItems: "center", gap: "0.45rem",
                 }}
                 title={lang === "sk" ? "Klikni na odstránenie" : "Click to remove"}
               >
-                <span style={{ width: 8, height: 8, borderRadius: "50%", background: color, display: "inline-block" }}></span>
+                <span style={{ width: 9, height: 9, borderRadius: "50%", background: color, display: "inline-block" }}></span>
                 <strong style={{ color: text }}>{r?.unit_id}</strong>
-                <span style={{ color: dim, fontSize: "0.7rem" }}>· {r?.project_name?.slice(0, 20)}</span>
-                <span style={{ color: dim, marginLeft: "0.2rem" }}>✕</span>
+                <span style={{ color: dim, fontSize: "0.7rem" }}>· {r?.project_name?.slice(0, 22)}</span>
+                <span style={{ color: dim, marginLeft: "0.15rem" }}>✕</span>
               </button>
             );
           })}
+          {/* + Pridať ďalší byt — opens scoped sub-search */}
+          {projFilter && pickedKeys.length < MAX_COMPARE && (
+            <button
+              onClick={() => setCompareSearchOpen(o => !o)}
+              style={{
+                background: "transparent",
+                border: `1px dashed ${green}66`,
+                color: green, padding: "0.32rem 0.65rem",
+                borderRadius: 6, fontSize: "0.78rem", cursor: "pointer", fontFamily: "inherit",
+              }}
+            >
+              {compareSearchOpen
+                ? (lang === "sk" ? "✕ zavrieť" : "✕ close")
+                : (lang === "sk" ? `+ Pridať ďalší byt na porovnanie` : `+ Add unit to compare`)}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Compare-mode sub-search — only when explicitly toggled */}
+      {compareSearchOpen && projFilter && (
+        <div style={{ marginTop: "0.85rem", padding: "0.7rem", background: bg, border: `1px solid ${green}33`, borderRadius: 6 }}>
+          <div style={{ fontSize: "0.7rem", color: dim, marginBottom: "0.4rem" }}>
+            {lang === "sk" ? `Vyber ďalší byt z projektu (${MAX_COMPARE - pickedKeys.length} zostáva)` : `Pick another unit from project (${MAX_COMPARE - pickedKeys.length} left)`}
+          </div>
+          <div style={{
+            display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+            gap: "0.4rem", maxHeight: 240, overflowY: "auto",
+          }}>
+            {compareResults.length === 0 ? (
+              <div style={{ color: dim, fontSize: "0.78rem", fontStyle: "italic", padding: "0.4rem" }}>
+                {lang === "sk" ? "Žiadne ďalšie byty pre tento filter." : "No more units in scope."}
+              </div>
+            ) : compareResults.map(u => (
+              <UnitTile key={u.key} unit={u} isPicked={false}
+                disabled={pickedKeys.length >= MAX_COMPARE}
+                onClick={() => { togglePick(u.key); }} lang={lang} compact />
+            ))}
+          </div>
         </div>
       )}
     </div>
+  );
+}
+
+// Reusable unit tile used in global-search results, mini-grid, and
+// compare-mode sub-search. Same visual language across surfaces.
+function UnitTile({ unit, isPicked, disabled, onClick, lang, compact = false }) {
+  const stavCol = STAV_COLOR[unit.latest_stav] || dim;
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        background: isPicked ? "rgba(0,229,160,0.08)" : "transparent",
+        border: `1px solid ${isPicked ? green : border}`,
+        color: text, cursor: disabled ? "not-allowed" : "pointer",
+        padding: compact ? "0.45rem 0.65rem" : "0.65rem 0.85rem",
+        borderRadius: 7, fontSize: "0.78rem", fontFamily: "inherit", textAlign: "left",
+        opacity: disabled ? 0.4 : 1,
+        transition: "border-color 0.12s, background 0.12s",
+      }}
+      onMouseEnter={e => { if (!disabled && !isPicked) { e.currentTarget.style.borderColor = green; e.currentTarget.style.background = "rgba(0,229,160,0.04)"; } }}
+      onMouseLeave={e => { if (!disabled && !isPicked) { e.currentTarget.style.borderColor = border; e.currentTarget.style.background = "transparent"; } }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "0.5rem", marginBottom: "0.2rem" }}>
+        <strong style={{ color: isPicked ? green : text, fontSize: "0.86rem" }}>{unit.unit_id}</strong>
+        <span style={{ color: stavCol, fontSize: "0.7rem", fontWeight: 700 }}>{unit.latest_stav}</span>
+      </div>
+      <div style={{ fontSize: "0.7rem", color: dim, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        {unit.project_name}
+      </div>
+      {(unit.izby || unit.obytna_plocha || unit.latest_price) && (
+        <div style={{ fontSize: "0.7rem", color: dim, marginTop: "0.25rem" }}>
+          {unit.izby ? `${unit.izby}izb` : ""}
+          {unit.izby && unit.obytna_plocha ? " · " : ""}
+          {unit.obytna_plocha ? `${unit.obytna_plocha} m²` : ""}
+          {unit.latest_price ? <span style={{ color: text, marginLeft: "0.5rem", fontWeight: 600, fontFamily: mono }}>{formatPrice(unit.latest_price)}</span> : ""}
+        </div>
+      )}
+    </button>
   );
 }
 
@@ -433,7 +506,7 @@ const selectStyle = {
 
 // ── Detail view (KPIs + chart + status timeline) ────────────────
 
-function DetailView({ pickedHistories, byUnit, archiveMonths, yMode, setYMode, lang, onProjectClick }) {
+function DetailView({ pickedHistories, byUnit, archiveMonths, yMode, setYMode, lang, onProjectClick, onBackToList }) {
   // Single-unit mode for KPIs: take first picked. Multi-unit overlays
   // chart but keeps single KPI strip for the FIRST picked unit (the
   // "primary" focus). User-feedback iterating possible.
@@ -459,6 +532,23 @@ function DetailView({ pickedHistories, byUnit, archiveMonths, yMode, setYMode, l
 
   return (
     <>
+      {/* Back-to-list nav — only when 1 picked + we have a project context */}
+      {pickedHistories.length === 1 && onBackToList && (
+        <button
+          onClick={onBackToList}
+          style={{
+            background: "transparent", border: "none", color: dim,
+            cursor: "pointer", padding: "0.3rem 0", marginBottom: "0.85rem",
+            fontFamily: "inherit", fontSize: "0.82rem",
+            display: "inline-flex", alignItems: "center", gap: "0.4rem",
+          }}
+          onMouseEnter={e => { e.currentTarget.style.color = green; }}
+          onMouseLeave={e => { e.currentTarget.style.color = dim; }}
+        >
+          ← {lang === "sk" ? "Späť na zoznam bytov" : "Back to unit list"}
+        </button>
+      )}
+
       {/* KPI strip — only meaningful in single-unit mode */}
       {pickedHistories.length === 1 && lifecycle && (
         <KpiStrip lifecycle={lifecycle} primary={r0} onProjectClick={onProjectClick} lang={lang} />
@@ -636,7 +726,7 @@ function ChartCard({ pickedHistories, comparables, archiveMonths, yMode, setYMod
 
   if (allMonths.length === 0 || yValues.length === 0) {
     return (
-      <div style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 10, padding: "1.2rem", marginBottom: "1rem", color: dim, fontSize: "0.85rem", textAlign: "center" }}>
+      <div style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 12, padding: "1.5rem", marginBottom: "1rem", color: dim, fontSize: "0.88rem", textAlign: "center" }}>
         {lang === "sk"
           ? "Tento byt nemá zatiaľ žiadne cenové body. Po ďalšom mesačnom syncu bude mať svoj prvý záznam."
           : "No price points yet for this unit. After the next monthly sync it will have its first record."}
@@ -644,15 +734,26 @@ function ChartCard({ pickedHistories, comparables, archiveMonths, yMode, setYMod
     );
   }
 
+  const isSinglePoint = allMonths.length === 1;
+
   return (
-    <div style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 10, padding: "1rem 1.1rem", marginBottom: "1rem" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.85rem", flexWrap: "wrap", gap: "0.4rem" }}>
-        <div style={{ fontSize: "0.78rem", color: dim, fontFamily: mono, letterSpacing: "0.04em", textTransform: "uppercase" }}>
-          {lang === "sk" ? "Vývoj ceny" : "Price evolution"} · {yLabel}
+    <div style={{
+      background: `linear-gradient(180deg, ${bg2} 0%, ${bg} 100%)`,
+      border: `1px solid ${border}`, borderRadius: 12,
+      padding: "1.1rem 1.25rem", marginBottom: "1rem",
+    }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
+        <div>
+          <div style={{ fontSize: "0.7rem", color: dim, fontFamily: mono, letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 600 }}>
+            {lang === "sk" ? "Vývoj ceny v čase" : "Price evolution over time"}
+          </div>
+          <div style={{ fontSize: "0.74rem", color: dim, marginTop: "0.2rem" }}>
+            {lang === "sk" ? "X = mesiac · Y = " : "X = month · Y = "}{yMode === "perm2" ? "€/m²" : (lang === "sk" ? "celková cena (€)" : "total price (€)")}
+          </div>
         </div>
         <div style={{ display: "flex", gap: "0.3rem" }}>
           <YModeBtn active={yMode === "total"} onClick={() => setYMode("total")}>
-            {lang === "sk" ? "celková cena" : "total price"}
+            {lang === "sk" ? "celková cena" : "total"}
           </YModeBtn>
           <YModeBtn active={yMode === "perm2"} onClick={() => setYMode("perm2")}>
             €/m²
@@ -669,13 +770,24 @@ function ChartCard({ pickedHistories, comparables, archiveMonths, yMode, setYMod
         lang={lang}
       />
 
-      {comparables.length > 0 && pickedHistories.length === 1 && (
-        <div style={{ marginTop: "0.5rem", fontSize: "0.7rem", color: dim, fontStyle: "italic" }}>
-          {lang === "sk"
-            ? `+${comparables.length} podobných bytov v rovnakom projekte (rovnaký počet izieb, ±15 % plocha) v pozadí.`
-            : `+${comparables.length} comparable units in same project (same room count, ±15 % area) shown in background.`}
-        </div>
-      )}
+      {/* Below-chart hints — single-point and comparables */}
+      <div style={{ marginTop: "0.85rem", display: "flex", flexDirection: "column", gap: "0.35rem", fontSize: "0.74rem" }}>
+        {isSinglePoint && (
+          <div style={{ color: orange, display: "flex", alignItems: "center", gap: "0.4rem" }}>
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: orange, display: "inline-block" }}/>
+            {lang === "sk"
+              ? "Zatiaľ máme len 1 mesiac dát. Po ďalšom mesačnom syncu (~1. máj) pribudne ďalší bod a krivka začne mať tvar."
+              : "Only 1 month of data so far. After the next monthly sync (~May 1) another point will appear and the line will take shape."}
+          </div>
+        )}
+        {comparables.length > 0 && pickedHistories.length === 1 && (
+          <div style={{ color: dim, fontStyle: "italic" }}>
+            {lang === "sk"
+              ? `+${comparables.length} podobných bytov (rovnaký počet izieb, ±15 % plocha) v pozadí ako referencia.`
+              : `+${comparables.length} comparable units (same room count, ±15 % area) shown as faint background lines.`}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -700,10 +812,11 @@ function YModeBtn({ active, onClick, children }) {
 // ── Line chart SVG ──────────────────────────────────────────────
 
 function LineChartSVG({ pickedHistories, comparables, allMonths, yOf, fmtY, lang }) {
-  const W = 880, H = 360;
-  const padL = 70, padR = 24, padT = 24, padB = allMonths.length > 8 ? 80 : 50;
+  const W = 880, H = 380;
+  const padL = 80, padR = 32, padT = 36, padB = allMonths.length > 8 ? 90 : 60;
   const innerW = W - padL - padR;
   const innerH = H - padT - padB;
+  const isSinglePoint = allMonths.length === 1;
 
   const monthIdx = useMemo(() => {
     const m = {};
@@ -744,11 +857,20 @@ function LineChartSVG({ pickedHistories, comparables, allMonths, yOf, fmtY, lang
   return (
     <div style={{ position: "relative" }}>
       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}>
+        {/* Soft baseline gradient backdrop for the plot area */}
+        <defs>
+          <linearGradient id="ut-plot-bg" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="rgba(0,229,160,0.04)"/>
+            <stop offset="100%" stopColor="rgba(0,229,160,0)"/>
+          </linearGradient>
+        </defs>
+        <rect x={padL} y={padT} width={innerW} height={innerH} fill="url(#ut-plot-bg)" rx="4"/>
+
         {/* Y gridlines + ticks */}
         {ticks.map((t, i) => (
           <g key={i}>
-            <line x1={padL} x2={W - padR} y1={yScale(t)} y2={yScale(t)} stroke={border} strokeDasharray="2,3"/>
-            <text x={padL - 8} y={yScale(t)} fill={dim} fontSize="11" textAnchor="end" dominantBaseline="middle" fontFamily={mono}>
+            <line x1={padL} x2={W - padR} y1={yScale(t)} y2={yScale(t)} stroke={border} strokeDasharray="2,4" opacity="0.6"/>
+            <text x={padL - 10} y={yScale(t)} fill={dim} fontSize="11" textAnchor="end" dominantBaseline="middle" fontFamily={mono}>
               {fmtY(t).replace(/\s?€\/m²/, "").replace(/\s?€/, "")}
             </text>
           </g>
@@ -765,14 +887,36 @@ function LineChartSVG({ pickedHistories, comparables, allMonths, yOf, fmtY, lang
           if (pts.length === 0) return null;
           const path = pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
           return (
-            <g key={`cmp-${ci}`} opacity="0.18">
+            <g key={`cmp-${ci}`} opacity="0.22">
               <path d={path} stroke={dim} strokeWidth="1.5" fill="none"/>
-              {pts.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={2.5} fill={dim}/>)}
+              {pts.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={3} fill={dim}/>)}
             </g>
           );
         })}
 
-        {/* Picked unit lines */}
+        {/* Future-data hint when only a single data point — a faint
+            dashed line trailing off to the right with "ďalšie body
+            pribudnú v máji 2026" annotation. Helps the user see this
+            IS a line chart, just one with one data point so far. */}
+        {isSinglePoint && pickedHistories.length === 1 && pickedHistories[0].rows.length > 0 && (() => {
+          const r = pickedHistories[0].rows[0];
+          const v = yOf(r);
+          if (!Number.isFinite(v)) return null;
+          const cx = xPos(r.snapshot_month);
+          const cy = yScale(v);
+          if (cx == null) return null;
+          return (
+            <g opacity="0.45">
+              <path d={`M ${cx} ${cy} L ${W - padR - 8} ${cy}`} stroke={green} strokeWidth="1.5" fill="none" strokeDasharray="3,4"/>
+              <text x={W - padR - 8} y={cy - 8} fill={green} fontSize="10" textAnchor="end" fontFamily={mono} opacity="0.85">
+                {lang === "sk" ? "→ ďalší bod po najbližšom synci" : "→ next data point after next sync"}
+              </text>
+            </g>
+          );
+        })()}
+
+        {/* Picked unit lines — render after backdrop + comparables so
+            primary lines sit on top of everything else. */}
         {pickedHistories.map((h, hi) => {
           const color = COMPARE_PALETTE[hi % COMPARE_PALETTE.length];
           const pts = h.rows.map(r => {
@@ -789,20 +933,41 @@ function LineChartSVG({ pickedHistories, comparables, allMonths, yOf, fmtY, lang
               {pts.map((p, i) => {
                 const stavCol = STAV_COLOR[p.r.stav] || color;
                 const isStavChange = i > 0 && pts[i - 1].r.stav !== p.r.stav;
-                const isPriceChange = i > 0 &&
-                  Number.isFinite(yOf(pts[i - 1].r)) && Number.isFinite(yOf(p.r)) &&
-                  Math.abs(yOf(pts[i - 1].r) - yOf(p.r)) / yOf(pts[i - 1].r) > 0.01;
+                const isLatest = i === pts.length - 1;
+                const showValueLabel = isLatest || isStavChange || isSinglePoint;
+                const labelText = fmtY(yOf(p.r));
                 return (
                   <g key={i}
                      onMouseEnter={(e) => setHover({ row: p.r, color, mouseX: e.clientX, mouseY: e.clientY })}
                      onMouseMove={(e) => setHover(h0 => h0 ? { ...h0, mouseX: e.clientX, mouseY: e.clientY } : h0)}
                      onMouseLeave={() => setHover(null)}
                      style={{ cursor: "pointer" }}>
-                    <circle cx={p.x} cy={p.y} r="14" fill="transparent"/>
-                    <circle cx={p.x} cy={p.y} r={isStavChange ? 7 : 5} fill={stavCol} stroke={bg} strokeWidth="2"/>
-                    {/* Status-change marker: small ring around */}
+                    {/* Wider invisible hit area */}
+                    <circle cx={p.x} cy={p.y} r="16" fill="transparent"/>
+                    {/* Outer glow for the latest point or any state-change point */}
+                    {(isLatest || isStavChange) && (
+                      <circle cx={p.x} cy={p.y} r="13" fill="none" stroke={stavCol} strokeWidth="1.5" opacity="0.25"/>
+                    )}
+                    {/* Main dot */}
+                    <circle cx={p.x} cy={p.y} r={isLatest ? 8 : isStavChange ? 7 : 5}
+                            fill={stavCol} stroke={bg} strokeWidth="2.5"/>
+                    {/* Status-change ring */}
                     {isStavChange && (
                       <circle cx={p.x} cy={p.y} r="11" fill="none" stroke={stavCol} strokeWidth="1.5" strokeDasharray="2,2"/>
+                    )}
+                    {/* Value label next to the dot — placed where it
+                        won't collide with the chart edge. Latest point
+                        gets it, plus state-change points, plus single-
+                        point case (so the user always sees the price). */}
+                    {showValueLabel && (
+                      <g>
+                        <rect x={p.x + 12} y={p.y - 11} width={Math.max(70, labelText.length * 7.2)} height={22}
+                              fill="rgba(14,14,18,0.92)" stroke={color} strokeWidth="1" rx="4" opacity="0.95"/>
+                        <text x={p.x + 12 + Math.max(70, labelText.length * 7.2) / 2} y={p.y + 4}
+                              fill={text} fontSize="11" fontWeight="700" textAnchor="middle" fontFamily={mono}>
+                          {labelText}
+                        </text>
+                      </g>
                     )}
                   </g>
                 );
@@ -814,7 +979,7 @@ function LineChartSVG({ pickedHistories, comparables, allMonths, yOf, fmtY, lang
         {/* X axis labels */}
         {allMonths.map((m, i) => {
           const x = padL + (allMonths.length === 1 ? innerW / 2 : (innerW / (allMonths.length - 1)) * i);
-          const y = padT + innerH + 16;
+          const y = padT + innerH + 18;
           return (
             <text key={i} x={x} y={y} fill={text} fontSize="11" fontFamily={mono}
                   textAnchor={rotate ? "end" : "middle"}
@@ -823,6 +988,16 @@ function LineChartSVG({ pickedHistories, comparables, allMonths, yOf, fmtY, lang
             </text>
           );
         })}
+
+        {/* X axis title */}
+        <text x={padL + innerW / 2} y={H - 8} fill={dim} fontSize="10" textAnchor="middle" fontFamily={mono} letterSpacing="0.05em">
+          {lang === "sk" ? "MESIAC" : "MONTH"}
+        </text>
+        {/* Y axis title */}
+        <text x={20} y={padT + innerH / 2} fill={dim} fontSize="10" textAnchor="middle" fontFamily={mono}
+              letterSpacing="0.05em" transform={`rotate(-90 20 ${padT + innerH / 2})`}>
+          {fmtY === formatPerM2 ? "€/m²" : (lang === "sk" ? "CENA (€)" : "PRICE (€)")}
+        </text>
       </svg>
 
       {/* Hover tooltip */}
@@ -906,7 +1081,7 @@ function StatusTimelineCard({ pickedHistories, archiveMonths, lang }) {
 
 // ── Mini-grid (project picked, no unit yet) ─────────────────────
 
-function MiniGrid({ project, byUnit, onPick, lang }) {
+function MiniGrid({ project, byUnit, search, onPick, lang }) {
   // Collect all units in this project. useMemo MUST come before any
   // conditional early return — React enforces hook-call order.
   const units = useMemo(() => {
@@ -921,27 +1096,46 @@ function MiniGrid({ project, byUnit, onPick, lang }) {
     return out;
   }, [byUnit, project]);
 
+  // Apply in-place search filter — same search box that lives in the
+  // picker row above filters the grid here, so the user sees ONE list
+  // (this grid, narrowed) instead of a dropdown PLUS a grid.
+  const filtered = useMemo(() => {
+    if (!search?.trim()) return units;
+    const q = search.trim().toLowerCase();
+    return units.filter(u => String(u.rows[0].unit_id).toLowerCase().includes(q));
+  }, [units, search]);
+
   if (!project) return null;
 
   return (
-    <div style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 10, padding: "1rem 1.1rem" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.85rem" }}>
+    <div style={{
+      background: `linear-gradient(180deg, ${bg2} 0%, ${bg} 100%)`,
+      border: `1px solid ${border}`, borderRadius: 12,
+      padding: "1.1rem 1.25rem",
+    }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
         <div>
-          <h3 style={{ fontSize: "1rem", fontWeight: 600, color: text, margin: 0 }}>
-            {project.name} <span style={{ color: dim, fontSize: "0.85rem", fontWeight: 400 }}>· {units.length} {lang === "sk" ? "bytov" : "units"}</span>
+          <h3 style={{ fontSize: "1.05rem", fontWeight: 600, color: text, margin: 0, letterSpacing: "-0.01em" }}>
+            {project.name}
           </h3>
-          <div style={{ fontSize: "0.74rem", color: dim, marginTop: "0.2rem" }}>
-            {lang === "sk" ? "Klikni na byt pre detail jeho vývoja" : "Click a unit to open its lifecycle"}
+          <div style={{ fontSize: "0.78rem", color: dim, marginTop: "0.25rem" }}>
+            {filtered.length === units.length
+              ? (lang === "sk" ? `${units.length} bytov · klikni na byt pre jeho vývoj` : `${units.length} units · click one to open its timeline`)
+              : (lang === "sk" ? `${filtered.length} z ${units.length} bytov · upravený filter` : `${filtered.length} of ${units.length} units · filtered`)}
           </div>
         </div>
       </div>
       <div style={{
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-        gap: "0.5rem",
-        maxHeight: 600, overflowY: "auto",
+        gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+        gap: "0.55rem",
+        maxHeight: 640, overflowY: "auto",
       }}>
-        {units.map(u => {
+        {filtered.length === 0 ? (
+          <div style={{ gridColumn: "1 / -1", padding: "1.2rem", color: dim, fontSize: "0.85rem", fontStyle: "italic", textAlign: "center" }}>
+            {lang === "sk" ? "Žiadne byty zodpovedajúce filtru." : "No units match the filter."}
+          </div>
+        ) : filtered.map(u => {
           const r0 = u.rows[0];
           const last = u.rows[u.rows.length - 1];
           const stavCol = STAV_COLOR[last.stav] || dim;
@@ -950,22 +1144,38 @@ function MiniGrid({ project, byUnit, onPick, lang }) {
               key={u.key}
               onClick={() => onPick(u.key)}
               style={{
-                background: "transparent", border: `1px solid ${border}`, color: text,
-                cursor: "pointer", padding: "0.6rem 0.8rem", borderRadius: 6,
-                fontSize: "0.8rem", fontFamily: "inherit", textAlign: "left",
-                transition: "border-color 0.12s, background 0.12s",
+                background: bg2, border: `1px solid ${border}`, color: text,
+                cursor: "pointer", padding: "0.75rem 0.9rem", borderRadius: 8,
+                fontSize: "0.82rem", fontFamily: "inherit", textAlign: "left",
+                transition: "border-color 0.15s, background 0.15s, transform 0.12s",
               }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = green; e.currentTarget.style.background = "rgba(0,229,160,0.04)"; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = border; e.currentTarget.style.background = "transparent"; }}
+              onMouseEnter={e => {
+                e.currentTarget.style.borderColor = green;
+                e.currentTarget.style.background = "rgba(0,229,160,0.05)";
+                e.currentTarget.style.transform = "translateY(-1px)";
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.borderColor = border;
+                e.currentTarget.style.background = bg2;
+                e.currentTarget.style.transform = "translateY(0)";
+              }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "0.5rem" }}>
-                <strong style={{ color: text }}>{r0.unit_id}</strong>
-                <span style={{ color: stavCol, fontSize: "0.72rem", fontWeight: 700 }}>{last.stav}</span>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "0.5rem", marginBottom: "0.25rem" }}>
+                <strong style={{ color: text, fontSize: "0.92rem", letterSpacing: "-0.01em" }}>{r0.unit_id}</strong>
+                <span style={{ color: stavCol, fontSize: "0.7rem", fontWeight: 700, padding: "0.1rem 0.4rem", background: `${stavCol}1a`, borderRadius: 3 }}>
+                  {last.stav}
+                </span>
               </div>
-              <div style={{ fontSize: "0.7rem", color: dim, marginTop: "0.2rem" }}>
-                {r0.izby ? `${r0.izby}izb · ` : ""}{r0.obytna_plocha ? `${r0.obytna_plocha} m²` : ""}
+              <div style={{ fontSize: "0.74rem", color: dim, lineHeight: 1.45 }}>
+                {r0.izby ? `${r0.izby}-izb` : ""}
+                {r0.izby && r0.obytna_plocha ? " · " : ""}
+                {r0.obytna_plocha ? `${r0.obytna_plocha} m²` : ""}
+                {(r0.izby || r0.obytna_plocha) && last.cena_s_dph ? <br/> : ""}
                 {last.cena_s_dph && (
-                  <span style={{ color: text, marginLeft: "0.4rem" }}>{formatPrice(last.cena_s_dph)}</span>
+                  <span style={{ color: text, fontWeight: 600, fontFamily: mono, fontSize: "0.8rem" }}>{formatPrice(last.cena_s_dph)}</span>
+                )}
+                {last.cena_s_dph && r0.obytna_plocha && (
+                  <span style={{ color: dim, marginLeft: "0.35rem", fontSize: "0.7rem" }}>· {formatPerM2(last.cena_s_dph / r0.obytna_plocha)}</span>
                 )}
               </div>
               {/* Mini-sparkline — when there are 2+ data points, show line shape */}
