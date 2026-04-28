@@ -22,6 +22,7 @@ import {
   LiveDashboard, LiveProjectDetail, LiveAnalytics, LiveAdmin,
 } from "./LivePages";
 import ReportsPage from "./Reports";
+import UnitTracker from "./UnitTracker";
 import ChatAssistant from "../components/ChatAssistant";
 // AiBetaBanner moved into AI surfaces only (ChatAssistant + FloatingChat)
 // after QA — was on every /app/* page which felt like noise on Dashboard /
@@ -44,6 +45,12 @@ const Icon = ({ d, size = 18, stroke = 1.6 }) => (
   </svg>
 );
 const IconHome = () => <Icon d="M3 12l9-9 9 9M5 10v10h14V10" />;
+const IconClock = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="9"/>
+    <polyline points="12 6 12 12 16 14"/>
+  </svg>
+);
 const IconGrid = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
     <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
@@ -108,6 +115,7 @@ const NAV = [
     { page: "App:Dashboard", label: { en: "Dashboard",  sk: "Dashboard" }, Icon: IconHome },
     { page: "App:Projects",  label: { en: "Projects",   sk: "Projekty"  }, Icon: IconGrid },
     { page: "App:Analytics", label: { en: "Analytics",  sk: "Analytika" }, Icon: IconChart,    requires: "view_analytics" },
+    { page: "App:UnitTimeline", label: { en: "Unit timeline", sk: "Byt v čase" }, Icon: IconClock, requires: "view_analytics" },
     { page: "App:Reports",   label: { en: "Reports",    sk: "Reporty"   }, Icon: IconDoc,      requires: "view_monthly_reports" },
     { page: "App:Assistant", label: { en: "Ask AI",     sk: "AI asistent" }, Icon: IconSparkle },
     { page: "App:Exports",   label: { en: "Exports",    sk: "Exporty"   }, Icon: IconDownload, requires: "export_data" },
@@ -441,8 +449,9 @@ function TopBar({ page, lang, setLang, tier }) {
   const titles = {
     "App:Dashboard": { en: "Dashboard",       sk: "Dashboard"    },
     "App:Projects":  { en: "Projects",        sk: "Projekty"     },
-    "App:Analytics": { en: "Analytics",       sk: "Analytika"    },
-    "App:Reports":   { en: "Reports",         sk: "Reporty"      },
+    "App:Analytics":    { en: "Analytics",     sk: "Analytika"    },
+    "App:UnitTimeline": { en: "Unit timeline", sk: "Byt v čase"   },
+    "App:Reports":      { en: "Reports",       sk: "Reporty"      },
     "App:Assistant": { en: "AI Assistant",    sk: "AI asistent"  },
     "App:Exports":   { en: "Exports",         sk: "Exporty"      },
     "App:Billing":   { en: "Billing & tier",  sk: "Platba a tier"},
@@ -596,6 +605,7 @@ function PageContent({ page, projectId, lang, setCurrent, openLogin }) {
   if (page === "App:Dashboard")  return <PlatformDashboard lang={lang} setCurrent={setCurrent} />;
   if (page === "App:Projects")   return <PlatformProjects lang={lang} setCurrent={setCurrent} openLogin={openLogin} />;
   if (page === "App:Analytics")  return <Gated require="view_analytics"       lang={lang} setCurrent={setCurrent}><LiveAnalytics lang={lang} setCurrent={setCurrent} openLogin={openLogin} /></Gated>;
+  if (page === "App:UnitTimeline") return <Gated require="view_analytics"     lang={lang} setCurrent={setCurrent}><UnitTracker lang={lang} setCurrent={setCurrent} /></Gated>;
   if (page === "App:Reports")    return <Gated require="view_monthly_reports" lang={lang} setCurrent={setCurrent}><ReportsPage lang={lang} /></Gated>;
   if (page === "App:Assistant")  return <ChatAssistant lang={lang} />;
   if (page === "App:Exports")    return <Gated require="export_data"          lang={lang} setCurrent={setCurrent}><PlatformExports lang={lang} setCurrent={setCurrent} /></Gated>;
