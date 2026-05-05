@@ -479,18 +479,20 @@ export function useFlatsArchive(months) {
     setProgress(0);
     (async () => {
       const all = [];
-      // PAGE = 5000 — Supabase PostgREST default max-rows is 1000, but
-      // the server allows up to 10000 per request when the client sets
-      // Range. Using 5000 cuts a 14k-row archive from 14 round-trips
-      // to 3 (≈ 70% wall-clock reduction). Each page is still ordered
-      // by batch_timestamp DESC so newest data lands first; partial
-      // progress updates the UI before the full set arrives.
-      const PAGE = 5000;
-      for (let offset = 0; ; offset += PAGE) {
+      // PostgREST default max-rows is 1000 per request. We REQUEST 5000
+      // hoping the server config allows it (cuts wall-clock by 5x); if
+      // the server caps lower we still continue paginating until an
+      // empty page or error. The break condition is `data.length === 0`
+      // (empty), NOT `length < PAGE` — that older check broke when
+      // server cap was below requested PAGE size, leaving the archive
+      // truncated to a single page.
+      const REQUESTED_PAGE = 5000;
+      let offset = 0;
+      while (true) {
         let q = supabase
           .from("flats_archive")
           .select("*")
-          .range(offset, offset + PAGE - 1)
+          .range(offset, offset + REQUESTED_PAGE - 1)
           .order("batch_timestamp", { ascending: false, nullsFirst: false })
           .order("id", { ascending: true });
         if (Array.isArray(months) && months.length > 0) {
@@ -502,10 +504,25 @@ export function useFlatsArchive(months) {
           console.error("[useFlatsArchive]", error);
           break;
         }
-        all.push(...(data || []));
-        // Push partial results so UI can show progress / render early
+        const got = data?.length || 0;
+        if (got === 0) break;                       // truly out of rows
+        all.push(...data);
         setProgress(all.length);
-        if (!data || data.length < PAGE) break;
+        offset += got;                              // advance by ACTUAL rows
+        if (got < REQUESTED_PAGE && got >= 100) {
+          // Heuristic: server capped page size. Keep going but with the
+          // server's real page size as the new pace. (got < REQUESTED &&
+          // got >= 100 means "server gave us less than we asked but a
+          // realistic chunk — likely cap.")
+          // No-op here, just advance offset; the next iteration's range
+          // request will get the next chunk.
+        }
+        if (got < 50) break;                        // tail end, definitely done
+        // Safety: cap total rows to avoid runaway loops
+        if (offset > 200000) {
+          console.warn("[useFlatsArchive] reached 200k row safety cap");
+          break;
+        }
       }
       if (cancelled) return;
       _archiveCache = all;
