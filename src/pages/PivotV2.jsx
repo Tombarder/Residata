@@ -37,7 +37,21 @@ const text    = "#e8e8ed";
    belong to in the palette. Adding a field = one entry here.                 */
 const FIELDS = {
   // Meta
-  datum:             { label: "Datum",                      group: "meta",     type: "date",   accessor: (r) => r.last_seen },
+  // `datum` = scrape day (YYYY-MM-DD) — derived from `batch_timestamp`, the
+  // canonical Variant-X time axis. We deliberately truncate the full ISO
+  // timestamp to a calendar day so grouping / filtering buckets cleanly
+  // by day instead of by millisecond. (A previous version pointed at
+  // `r.last_seen` which never existed on flats_archive — every record
+  // returned undefined → "no values" / unfilterable Datum chip.)
+  datum:             { label: "Datum",                      group: "meta",     type: "date",   accessor: (r) => {
+                        const ts = r.batch_timestamp || r.created_at;
+                        if (!ts) return null;
+                        // ISO timestamp → 'YYYY-MM-DD'. Tolerates both
+                        // 'YYYY-MM-DDTHH:MM:SS+00:00' and just 'YYYY-MM-DD'.
+                        const s = String(ts);
+                        return s.length >= 10 ? s.slice(0, 10) : s;
+                      }},
+  batch_timestamp:   { label: "Batch (presný čas)",         group: "meta",     type: "text",   accessor: (r) => r.batch_timestamp || null },
   snapshot_month:    { label: "Mesiac",                     group: "meta",     type: "text",   accessor: (r) => r.snapshot_month },
   batch_id:          { label: "Batch ID",                   group: "meta",     type: "text",   accessor: (r) => r.batch_id },
   import_status:     { label: "Import status",              group: "meta",     type: "text",   accessor: (r) => r.project_status || "active" },
@@ -169,7 +183,7 @@ const FIELDS = {
    user's mental model stays intact when they switch between Residata and
    their Excel pivot. */
 const FIELD_ORDER = [
-  "datum", "batch_id", "import_status",
+  "datum", "snapshot_month", "batch_id", "batch_timestamp", "import_status",
   "project_name", "unit_id", "typ", "etapa", "budova", "unit_detail",
   "poschodie", "izby", "obytna_plocha", "balkon", "loggia", "terasa",
   "zahrada", "exterier", "kobka", "celkova_plocha",
