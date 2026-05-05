@@ -634,21 +634,12 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   const latestMonth = archiveMonths?.[0] || null;
   const { flats: realFlats } = useFlatsArchive();  // all months
 
-  // Latest batch DATE (YYYY-MM-DD) — auto-seeds the Datum filter so the
-  // pivot opens on "the most recent scrape" by default. Read from the
-  // loaded archive rather than a separate hook so it auto-rolls forward
-  // the moment a new batch lands in flats_archive (no redeploy needed).
-  const latestDatum = useMemo(() => {
-    if (!realFlats?.length) return null;
-    let max = null;
-    for (const r of realFlats) {
-      const ts = r.batch_timestamp || r.created_at;
-      if (!ts) continue;
-      const d = String(ts).slice(0, 10);  // YYYY-MM-DD
-      if (!max || d > max) max = d;
-    }
-    return max;
-  }, [realFlats]);
+  // Latest batch DATE (YYYY-MM-DD) — used to auto-seed the Datum filter
+  // so the pivot opens on "the most recent scrape" by default. Computed
+  // lazily AFTER `records` is built so it works for both paid users
+  // (real flats) AND free/anon (synthetic preview rows). Auto-rolls
+  // forward the moment a new batch lands in flats_archive.
+  // (Computed below — see latestDatum useMemo after `records`.)
 
   // Enrich flats with their project's metadata once so every accessor
   // can read off a single flat row.
@@ -746,6 +737,27 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
       };
     });
   }, [flats, projectById]);
+
+  // Latest scrape day (YYYY-MM-DD) across all records. Reads from
+  // `records` (works for both real flats and synthetic preview), falls
+  // back to archiveMonths' latestMonth + '-01' if records have no
+  // timestamps yet (loading flicker). Auto-rolls forward as new
+  // batches arrive — no redeploy ever needed.
+  const latestDatum = useMemo(() => {
+    let max = null;
+    for (const r of records) {
+      const ts = r.batch_timestamp || r.created_at;
+      if (!ts) continue;
+      const d = String(ts).slice(0, 10);
+      if (!max || d > max) max = d;
+    }
+    if (max) return max;
+    // Fallback: snapshot_month derived (e.g. preview flats only have
+    // snapshot_month). Synthesizes 'YYYY-MM-15' so the chip shows mid-
+    // month sentinel until real timestamped data lands.
+    if (latestMonth) return `${latestMonth}-15`;
+    return null;
+  }, [records, latestMonth]);
 
   // ── State ─────────────────────────────────────────────────────
   // Default layout: Cast (district) + Project name in Rows, average
