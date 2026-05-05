@@ -613,7 +613,7 @@ function defaultAggFor(field) {
 
 /* ══════════════════════════ Main component ════════════════════════ */
 export default function PivotV2({ lang = "sk", setCurrent }) {
-  const { projects } = useProjects();
+  const { projects, loading: loadingProjects } = useProjects();
   const { can } = useCapabilities();
   const canViewAnalytics = can("view_analytics");
 
@@ -632,7 +632,12 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   // off the same Filters state. Cleaner UX > preemptive optimisation.
   const { months: archiveMonths } = useArchiveMonths();
   const latestMonth = archiveMonths?.[0] || null;
-  const { flats: realFlats } = useFlatsArchive();  // all months
+  const { flats: realFlats, loading: loadingFlats, progress: flatsProgress } = useFlatsArchive();  // all months
+  // Initial-load gate — true while we're still fetching real flats AND
+  // haven't seeded the default Datum filter yet. Used to show a clean
+  // loading state instead of an empty pivot table (which looked like
+  // "no data" for ~5s while the archive paginated in).
+  const isInitialLoading = canViewAnalytics && (loadingFlats || loadingProjects) && (realFlats?.length || 0) === 0;
 
   // Latest batch DATE (YYYY-MM-DD) — used to auto-seed the Datum filter
   // so the pivot opens on "the most recent scrape" by default. Computed
@@ -1022,11 +1027,54 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
            the surface is interactive. */
         .pivot-chart-target { cursor: pointer; transition: opacity 0.12s, filter 0.12s; }
         .pivot-chart-target:hover { opacity: 1 !important; filter: brightness(1.18); }
+        @keyframes pivotPulse {
+          0%, 100% { opacity: 0.45; }
+          50%      { opacity: 0.85; }
+        }
+        .pivot-loading-pulse { animation: pivotPulse 1.6s ease-in-out infinite; }
       `}</style>
+
+      {/* Initial-load skeleton — shown ONLY while real flats are still
+          paginating in. Without this, the pivot would render an empty
+          table + "0 bytov" header for ~5 seconds before suddenly
+          populating, which looked broken. We swap it out the moment
+          records become non-empty. */}
+      {isInitialLoading && (
+        <div style={{
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+          padding: "5rem 1.25rem", gap: "1.1rem", minHeight: 320,
+        }}>
+          <div className="pivot-loading-pulse" style={{
+            fontFamily: mono, fontSize: "0.95rem", color: text,
+            letterSpacing: "0.04em",
+          }}>
+            {lang === "sk" ? "Načítavam analytiku…" : "Loading analytics…"}
+          </div>
+          <div style={{ fontFamily: mono, fontSize: "0.78rem", color: dim }}>
+            {flatsProgress > 0
+              ? `${flatsProgress.toLocaleString("sk-SK")} ${lang === "sk" ? "záznamov" : "records"}`
+              : (lang === "sk" ? "pripravujem" : "preparing")}
+          </div>
+          {/* Skeleton rows */}
+          <div style={{ width: "100%", maxWidth: 720, marginTop: "0.6rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            {[1, 2, 3, 4, 5].map(i => (
+              <div key={i} className="pivot-loading-pulse" style={{
+                height: 18,
+                background: `linear-gradient(90deg, ${border} 0%, ${border}80 50%, ${border} 100%)`,
+                borderRadius: 4,
+                width: `${100 - i * 8}%`,
+                animationDelay: `${i * 0.12}s`,
+              }}/>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Header — record count + expand/collapse. Mesiac scope is part
           of the standard Filters zone (drag the field there, pick months
           from the popup) — no special top-bar selector. */}
+      {!isInitialLoading && (<>
+
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
         <span style={{ fontSize: "0.78rem", color: dim }}>
           {records.length.toLocaleString("en-US").replace(/,/g, " ")} {lang === "sk" ? "bytov" : "units"}
@@ -1203,6 +1251,7 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
           .pivotv2-chip { font-size: 0.68rem !important; padding: 0.25rem 0.4rem !important; }
         }
       `}</style>
+      </>)}
     </div>
   );
 }
