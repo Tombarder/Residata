@@ -739,10 +739,12 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   }, [flats, projectById]);
 
   // Latest scrape day (YYYY-MM-DD) across all records. Reads from
-  // `records` (works for both real flats and synthetic preview), falls
-  // back to archiveMonths' latestMonth + '-01' if records have no
-  // timestamps yet (loading flicker). Auto-rolls forward as new
-  // batches arrive — no redeploy ever needed.
+  // `records` so it works for both real flats (paid users) AND lazy-
+  // loaded data. NO synthetic fallback — if records lack batch_timestamp
+  // (preview flats / not yet loaded), we return null so the auto-seed
+  // effect WAITS instead of firing with a wrong placeholder date that
+  // would filter out everything. Auto-rolls forward as new batches
+  // arrive — no redeploy ever needed.
   const latestDatum = useMemo(() => {
     let max = null;
     for (const r of records) {
@@ -751,13 +753,8 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
       const d = String(ts).slice(0, 10);
       if (!max || d > max) max = d;
     }
-    if (max) return max;
-    // Fallback: snapshot_month derived (e.g. preview flats only have
-    // snapshot_month). Synthesizes 'YYYY-MM-15' so the chip shows mid-
-    // month sentinel until real timestamped data lands.
-    if (latestMonth) return `${latestMonth}-15`;
-    return null;
-  }, [records, latestMonth]);
+    return max;
+  }, [records]);
 
   // ── State ─────────────────────────────────────────────────────
   // Default layout: Cast (district) + Project name in Rows, average
