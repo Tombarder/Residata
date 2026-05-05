@@ -3,18 +3,22 @@
  *
  * Per-unit lifecycle view. User picks a project + unit (or up to 4
  * for compare mode), sees the unit's price evolution, status changes,
- * and key events (first listing, sold date) over the months we have
+ * and key events (first listing, sold date) over the batches we have
  * snapshots for.
  *
- * Reads from flats_archive directly: each row is (snapshot_month,
- * project_id, unit_id, cena_s_dph, stav, ...). Grouping by
- * (project_id, unit_id) and ordering by snapshot_month yields the
- * time-series for that single unit.
+ * Reads from flats_archive directly: each row is (batch_id,
+ * batch_timestamp, snapshot_month, project_id, unit_id, cena_s_dph,
+ * stav, ...). Grouping by (project_id, unit_id) and ordering by
+ * batch_timestamp yields the time-series for that single unit.
  *
- * Today (2026-04-28) flats_archive only has the April snapshot, so
- * every unit shows just one data point — but the page is built so it
- * grows automatically as monthly syncs accumulate. After 6 months
- * users see real curves; after 12+, full lifecycle stories.
+ * Variant X (2026-04): every scraper run becomes its own permanent
+ * row in flats_archive under (country, batch_id, project_id, unit_id).
+ * That means TWO scrapes in the same calendar month produce TWO points
+ * on this chart -- exactly what Boss expected when he asked "why does
+ * unit timeline show only one snapshot." The bug was grouping rows by
+ * snapshot_month (YYYY-MM), which collapsed Apr 17 / Apr 27 / Apr 29
+ * into one bucket. Now we group by batch_timestamp (canonical Variant
+ * X time axis) so every batch is its own data point.
  *
  * Surfaces:
  *   1. KPI strip — first seen, last price, current status, sold date
@@ -73,8 +77,29 @@ const MAX_COMPARE = 4;
 
 // ── Helpers ─────────────────────────────────────────────────────
 
+/** The canonical time axis for a flat row.
+ *
+ *  Variant X (2026-04) made flats_archive append-only with one row per
+ *  (country, batch_id, project_id, unit_id). Each batch carries a
+ *  `batch_timestamp` (ISO 8601) — the actual scrape time. Multiple
+ *  batches can land in the same calendar month (Apr 17 / 27 / 29), so
+ *  grouping by `snapshot_month` collapsed them into a single point on
+ *  the chart — that's the "only one snapshot" bug Boss reported.
+ *
+ *  We now key off `batch_timestamp` everywhere. Falls back to
+ *  `snapshot_month` for legacy rows missing the timestamp (shouldn't
+ *  happen post-Variant-X but safer to keep the fallback than crash on
+ *  an old row). */
+function tsOf(row) {
+  return row?.batch_timestamp || row?.snapshot_month || "";
+}
+
 /** Group flats_archive rows by (project_id, unit_id) and order by
- *  snapshot_month asc within each group. Returns Map<key, rows[]>. */
+ *  batch_timestamp asc within each group. Returns Map<key, rows[]>.
+ *
+ *  Each batch is its own data point. Two batches in the same calendar
+ *  month produce two points on the chart, the way the user expects to
+ *  see "Apr 17 -> Apr 27 -> Apr 29 -> May ..." evolution. */
 function groupByUnit(flats) {
   const map = new Map();
   for (const f of flats) {
@@ -84,7 +109,7 @@ function groupByUnit(flats) {
     map.get(key).push(f);
   }
   for (const arr of map.values()) {
-    arr.sort((a, b) => String(a.snapshot_month).localeCompare(String(b.snapshot_month)));
+    arr.sort((a, b) => String(tsOf(a)).localeCompare(String(tsOf(b))));
   }
   return map;
 }
@@ -121,12 +146,45 @@ function formatPerM2(n) {
   if (n == null || !Number.isFinite(n)) return "—";
   return Math.round(n).toLocaleString("en-US").replace(/,/g, " ") + " €/m²";
 }
-function formatMonth(m, lang) {
-  if (!m) return "—";
-  const [y, mm] = String(m).split("-");
-  const dt = new Date(Number(y), Number(mm) - 1, 1);
-  return dt.toLocaleDateString(lang === "sk" ? "sk-SK" : "en-US", { month: "short", year: "numeric" });
+/** Format the canonical time axis for display.
+ *
+ *  Accepts either:
+ *    - ISO timestamp 'YYYY-MM-DDTHH:MM:SS+ZZ' -> "DD. MMM YYYY" (Slovak: "29. apr 2026")
+ *    - Calendar month 'YYYY-MM'                -> "MMM YYYY"     (legacy fallback)
+ *
+ *  Used on chart axis, KPI strip, hover tooltip, status timeline. After
+ *  Variant X every row should have a full timestamp; the YYYY-MM branch
+ *  is just defensive. */
+function formatTs(ts, lang) {
+  if (!ts) return "—";
+  const s = String(ts);
+  // Full ISO timestamp -> day-precision format
+  if (s.length >= 10 && s.includes("T")) {
+    const d = new Date(s);
+    if (Number.isFinite(d.getTime())) {
+      return d.toLocaleDateString(lang === "sk" ? "sk-SK" : "en-US",
+        { day: "2-digit", month: "short", year: "numeric" });
+    }
+  }
+  // Date-only YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const d = new Date(s + "T00:00:00Z");
+    if (Number.isFinite(d.getTime())) {
+      return d.toLocaleDateString(lang === "sk" ? "sk-SK" : "en-US",
+        { day: "2-digit", month: "short", year: "numeric" });
+    }
+  }
+  // Legacy YYYY-MM month bucket
+  if (/^\d{4}-\d{2}$/.test(s)) {
+    const [y, mm] = s.split("-");
+    const dt = new Date(Number(y), Number(mm) - 1, 1);
+    return dt.toLocaleDateString(lang === "sk" ? "sk-SK" : "en-US",
+      { month: "short", year: "numeric" });
+  }
+  return s;
 }
+// Back-compat alias — older callers may still reference formatMonth.
+const formatMonth = formatTs;
 
 // ── Main component ──────────────────────────────────────────────
 
@@ -586,7 +644,7 @@ function KpiStrip({ lifecycle, primary, onProjectClick, lang }) {
   const items = [
     {
       label: lang === "sk" ? "Prvýkrát videný" : "First seen",
-      value: formatMonth(lifecycle.first.snapshot_month, lang),
+      value: formatTs(tsOf(lifecycle.first), lang),
       sub: lifecycle.first.cena_s_dph ? formatPrice(lifecycle.first.cena_s_dph) : "—",
       color: text,
     },
@@ -601,12 +659,12 @@ function KpiStrip({ lifecycle, primary, onProjectClick, lang }) {
     {
       label: lang === "sk" ? "Aktuálny stav" : "Current status",
       value: STAV_LABEL[lifecycle.last.stav] || lifecycle.last.stav,
-      sub: formatMonth(lifecycle.last.snapshot_month, lang),
+      sub: formatTs(tsOf(lifecycle.last), lang),
       color: STAV_COLOR[lifecycle.last.stav] || text,
     },
     lifecycle.sold ? {
       label: lang === "sk" ? "Predaný" : "Sold",
-      value: formatMonth(lifecycle.sold.snapshot_month, lang),
+      value: formatTs(tsOf(lifecycle.sold), lang),
       sub: formatPrice(lifecycle.sold.cena_s_dph),
       color: red,
     } : {
@@ -701,13 +759,14 @@ function ChartCard({ pickedHistories, comparables, archiveMonths, yMode, setYMod
   const yLabel = yMode === "perm2" ? (lang === "sk" ? "€/m²" : "€/m²") : "€";
   const fmtY  = yMode === "perm2" ? formatPerM2 : formatPrice;
 
-  // X axis: union of ALL months — picked + comparable — but at least
-  // archiveMonths is the source of truth for "available data".
+  // X axis: union of ALL batch timestamps — picked + comparable.
+  // Each batch is its own data point on the chart (Variant X — every
+  // scrape = its own permanent point, NOT collapsed by month).
   const allMonths = useMemo(() => {
     const set = new Set();
-    for (const h of pickedHistories) for (const r of h.rows) set.add(r.snapshot_month);
-    for (const c of comparables) for (const r of c.rows) set.add(r.snapshot_month);
-    return Array.from(set).sort();
+    for (const h of pickedHistories) for (const r of h.rows) set.add(tsOf(r));
+    for (const c of comparables) for (const r of c.rows) set.add(tsOf(r));
+    return Array.from(set).filter(Boolean).sort();
   }, [pickedHistories, comparables]);
 
   // Y range: include all picked + comparables values
@@ -748,7 +807,7 @@ function ChartCard({ pickedHistories, comparables, archiveMonths, yMode, setYMod
             {lang === "sk" ? "Vývoj ceny v čase" : "Price evolution over time"}
           </div>
           <div style={{ fontSize: "0.74rem", color: dim, marginTop: "0.2rem" }}>
-            {lang === "sk" ? "X = mesiac · Y = " : "X = month · Y = "}{yMode === "perm2" ? "€/m²" : (lang === "sk" ? "celková cena (€)" : "total price (€)")}
+            {lang === "sk" ? "X = dátum scrapu · Y = " : "X = scrape date · Y = "}{yMode === "perm2" ? "€/m²" : (lang === "sk" ? "celková cena (€)" : "total price (€)")}
           </div>
         </div>
         <div style={{ display: "flex", gap: "0.3rem" }}>
@@ -776,8 +835,8 @@ function ChartCard({ pickedHistories, comparables, archiveMonths, yMode, setYMod
           <div style={{ color: orange, display: "flex", alignItems: "center", gap: "0.4rem" }}>
             <span style={{ width: 6, height: 6, borderRadius: "50%", background: orange, display: "inline-block" }}/>
             {lang === "sk"
-              ? "Zatiaľ máme len 1 mesiac dát. Po ďalšom mesačnom syncu (~1. máj) pribudne ďalší bod a krivka začne mať tvar."
-              : "Only 1 month of data so far. After the next monthly sync (~May 1) another point will appear and the line will take shape."}
+              ? "Zatiaľ máme len 1 záznam pre tento byt. Pri ďalšom scrape pribudne ďalší bod a krivka začne mať tvar."
+              : "Only 1 record for this unit so far. After the next scrape another point will appear and the line will take shape."}
           </div>
         )}
         {comparables.length > 0 && pickedHistories.length === 1 && (
@@ -879,7 +938,7 @@ function LineChartSVG({ pickedHistories, comparables, allMonths, yOf, fmtY, lang
         {/* Comparable units — faint background lines */}
         {comparables.map((c, ci) => {
           const pts = c.rows.map(r => {
-            const x = xPos(r.snapshot_month);
+            const x = xPos(tsOf(r));
             const y = yOf(r);
             if (x == null || !Number.isFinite(y)) return null;
             return { x, y: yScale(y), r };
@@ -902,14 +961,14 @@ function LineChartSVG({ pickedHistories, comparables, allMonths, yOf, fmtY, lang
           const r = pickedHistories[0].rows[0];
           const v = yOf(r);
           if (!Number.isFinite(v)) return null;
-          const cx = xPos(r.snapshot_month);
+          const cx = xPos(tsOf(r));
           const cy = yScale(v);
           if (cx == null) return null;
           return (
             <g opacity="0.45">
               <path d={`M ${cx} ${cy} L ${W - padR - 8} ${cy}`} stroke={green} strokeWidth="1.5" fill="none" strokeDasharray="3,4"/>
               <text x={W - padR - 8} y={cy - 8} fill={green} fontSize="10" textAnchor="end" fontFamily={mono} opacity="0.85">
-                {lang === "sk" ? "→ ďalší bod po najbližšom synci" : "→ next data point after next sync"}
+                {lang === "sk" ? "→ ďalší bod po najbližšom scrape" : "→ next data point after next scrape"}
               </text>
             </g>
           );
@@ -920,7 +979,7 @@ function LineChartSVG({ pickedHistories, comparables, allMonths, yOf, fmtY, lang
         {pickedHistories.map((h, hi) => {
           const color = COMPARE_PALETTE[hi % COMPARE_PALETTE.length];
           const pts = h.rows.map(r => {
-            const x = xPos(r.snapshot_month);
+            const x = xPos(tsOf(r));
             const y = yOf(r);
             if (x == null || !Number.isFinite(y)) return null;
             return { x, y: yScale(y), r };
@@ -991,7 +1050,7 @@ function LineChartSVG({ pickedHistories, comparables, allMonths, yOf, fmtY, lang
 
         {/* X axis title */}
         <text x={padL + innerW / 2} y={H - 8} fill={dim} fontSize="10" textAnchor="middle" fontFamily={mono} letterSpacing="0.05em">
-          {lang === "sk" ? "MESIAC" : "MONTH"}
+          {lang === "sk" ? "DÁTUM SCRAPU" : "SCRAPE DATE"}
         </text>
         {/* Y axis title */}
         <text x={20} y={padT + innerH / 2} fill={dim} fontSize="10" textAnchor="middle" fontFamily={mono}
@@ -1013,7 +1072,7 @@ function LineChartSVG({ pickedHistories, comparables, allMonths, yOf, fmtY, lang
           boxShadow: "0 6px 18px rgba(0,0,0,0.6)",
           whiteSpace: "nowrap",
         }}>
-          <div style={{ fontWeight: 700, color: hover.color }}>{formatMonth(hover.row.snapshot_month, lang)}</div>
+          <div style={{ fontWeight: 700, color: hover.color }}>{formatTs(tsOf(hover.row), lang)}</div>
           <div style={{ marginTop: "0.18rem" }}>{fmtY(yOf(hover.row))}</div>
           <div style={{ color: STAV_COLOR[hover.row.stav] || dim, fontSize: "0.7rem", marginTop: "0.18rem" }}>
             {STAV_LABEL[hover.row.stav] || hover.row.stav}
@@ -1052,7 +1111,7 @@ function StatusTimelineCard({ pickedHistories, archiveMonths, lang }) {
                 return (
                   <div key={i}
                        style={{ flex: 1, background: fill, position: "relative" }}
-                       title={`${formatMonth(r.snapshot_month, lang)} · ${STAV_LABEL[r.stav] || r.stav}`}>
+                       title={`${formatTs(tsOf(r), lang)} · ${STAV_LABEL[r.stav] || r.stav}`}>
                   </div>
                 );
               })}
@@ -1229,8 +1288,8 @@ function EmptyState({ lang, canFull, archiveMonths }) {
       {months <= 1 && (
         <div style={{ marginTop: "1rem", fontSize: "0.78rem", color: orange, fontStyle: "italic", maxWidth: 540, margin: "1rem auto 0" }}>
           {lang === "sk"
-            ? "Zatiaľ máme iba 1 mesačný snapshot (apríl 2026). Po každom mesačnom syncu pribudne nový dátový bod a krivka sa rozšíri."
-            : "Only 1 monthly snapshot available so far (April 2026). After each monthly sync a new data point will appear and the curve will grow."}
+            ? "Po každom scrape pribudne nový dátový bod a krivka sa rozšíri."
+            : "After each scrape a new data point will appear and the curve will grow."}
         </div>
       )}
     </div>
@@ -1241,13 +1300,14 @@ function EmptyState({ lang, canFull, archiveMonths }) {
 
 function ExportRow({ pickedHistories, lang }) {
   const downloadCsv = () => {
-    const head = ["project_id", "project_name", "unit_id", "snapshot_month", "stav", "cena_s_dph", "cena_bez_dph", "obytna_plocha", "izby", "developer", "district"];
+    const head = ["project_id", "project_name", "unit_id", "batch_timestamp", "snapshot_month", "batch_id", "stav", "cena_s_dph", "cena_bez_dph", "obytna_plocha", "izby", "developer", "district"];
     const out = [head.join(",")];
     for (const h of pickedHistories) {
       for (const r of h.rows) {
         out.push([
           r.project_id, JSON.stringify(r.project_name || ""), r.unit_id,
-          r.snapshot_month, r.stav || "",
+          r.batch_timestamp || "", r.snapshot_month || "", r.batch_id || "",
+          r.stav || "",
           r.cena_s_dph || "", r.cena_bez_dph || "",
           r.obytna_plocha || "", r.izby || "",
           JSON.stringify(r.developer || ""), JSON.stringify(r.district || ""),

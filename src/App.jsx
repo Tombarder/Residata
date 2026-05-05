@@ -879,13 +879,28 @@ function DataPage({ setCurrent, l, lang }) {
   // Live count nad "Unit-level sample" tabulkou. Reads from the
   // `market_totals` view (single source of truth — same number the
   // homepage MarketPulse and the Ticker show). Always fresh.
-  const { unitsTracked } = useMarketTotals();
+  const { unitsTracked, snapshotMonth } = useMarketTotals();
   const locale = lang === "sk" ? "sk-SK" : "en-US";
   const showingLive = unitsTracked == null
     ? (lang === "sk" ? "Zobrazených 8 z … záznamov" : "Showing 8 of … records")
     : (lang === "sk"
         ? `Zobrazených 8 z ${Number(unitsTracked).toLocaleString(locale)} záznamov`
         : `Showing 8 of ${Number(unitsTracked).toLocaleString(locale)} records`);
+  // Dynamic insights badge: derive month label from market_totals.snapshot_month
+  // so the badge always reads "<latest month> <year> · ..." without needing
+  // a release. When May data lands the badge auto-rolls to "Máj 2026".
+  // Falls back to the static l.insightsBadge while market_totals is loading
+  // (prevents an "undefined snapshot" flash on first paint).
+  const dynamicInsightsBadge = (() => {
+    if (!snapshotMonth || !/^\d{4}-\d{2}$/.test(String(snapshotMonth))) {
+      return l.insightsBadge;
+    }
+    const [y, mm] = String(snapshotMonth).split("-");
+    const dt = new Date(Number(y), Number(mm) - 1, 1);
+    const monthLabel = dt.toLocaleDateString(locale, { month: "long", year: "numeric" });
+    const cap = monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1);
+    return lang === "sk" ? `${cap} · reálne dáta` : `${cap} snapshot · real data`;
+  })();
   // Unit-level sample rows — 8 real active projects, prices computed from
   // the project-level avg_price_eur_m2 we actually have in DB × plausible
   // floor area. Unit labels (A2-304 etc.) are illustrative — we don't
@@ -1035,7 +1050,7 @@ function DataPage({ setCurrent, l, lang }) {
         <h2 className="sec-title" style={{ marginBottom: "0.5rem" }}>{l.insightsTitle}</h2>
         <div style={{ display: "flex", alignItems: "center", gap: "1.5rem", marginBottom: "2rem" }}>
           <p className="sec-desc" style={{ marginBottom: 0 }}>{l.insightsDesc}</p>
-          <span style={{ fontFamily: mono, fontSize: "0.6rem", color: "#55555f", background: "#111113", border: "1px solid #222228", padding: "0.3rem 0.75rem", borderRadius: 6, whiteSpace: "nowrap", flexShrink: 0 }}>{l.insightsBadge}</span>
+          <span style={{ fontFamily: mono, fontSize: "0.6rem", color: "#55555f", background: "#111113", border: "1px solid #222228", padding: "0.3rem 0.75rem", borderRadius: 6, whiteSpace: "nowrap", flexShrink: 0 }}>{dynamicInsightsBadge}</span>
         </div>
       </div>
 
