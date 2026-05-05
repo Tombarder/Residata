@@ -346,7 +346,7 @@ function distinctValuesForField(records, fieldKey) {
 }
 
 /* Short human summary of a filter's state, for rendering on the chip. */
-function summariseFilter(filter, fieldType) {
+function summariseFilter(filter, _fieldType) {
   if (!isFilterActive(filter)) return "";
   if (filter.mode === "empty")     return "je prázdne";
   if (filter.mode === "not_empty") return "má hodnotu";
@@ -753,9 +753,13 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   // first paint. They can clear the filter to see all months.
   const monthFilterSeededRef = useRef(false);
   useEffect(() => {
+    // Idempotent one-shot auto-seed: when latestMonth first becomes available
+    // (async from useArchiveMonths), inject a default Mesiac filter chip.
+    // Guarded by ref so this fires exactly once per mount.
     if (monthFilterSeededRef.current) return;
     if (!latestMonth) return;
     monthFilterSeededRef.current = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setFilters(curr => {
       if (curr.some(f => f.key === "snapshot_month")) return curr;
       return [...curr, { key: "snapshot_month", values: [latestMonth] }];
@@ -1759,7 +1763,7 @@ function exportPivotCSV(flatRows, grandTotal, rowFields, colFields, effectiveVal
 }
 
 /* ─── RESULT TABLE ────────────────────────────────────────────── */
-function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, collapsed, onToggle, sort, setSort, grandTotal, lang, valueMode = "raw", dataBars = false, onDrillDown, onProjectOpen }) {
+function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, collapsed: _collapsed, onToggle, sort, setSort, grandTotal, lang, valueMode = "raw", dataBars = false, onDrillDown, onProjectOpen }) {
   // Project-name column support:
   // When the deepest row field is project_name, rows ARE individual
   // projects — we offer a click-to-navigate on the name cell.
@@ -1945,7 +1949,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
             </th>
             {crossTab ? (
               <>
-                {colKeys.map((ck, cidx) => (
+                {colKeys.map((ck) => (
                   effectiveValues.map((v, i) => (
                     <th key={`h:${ck}:${v.key}`}
                         style={{
@@ -2058,7 +2062,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                 </td>
                 {crossTab ? (
                   <>
-                    {colKeys.map((ck, cidx) => (
+                    {colKeys.map((ck) => (
                       effectiveValues.map((v, i) => {
                         const raw = n.colRollups ? n.colRollups[ck]?.[i] : null;
                         const parent = parentByPath[n.pathKey];
@@ -2169,7 +2173,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
             </td>
             {crossTab ? (
               <>
-                {colKeys.map((ck, cidx) => (
+                {colKeys.map((ck) => (
                   effectiveValues.map((v, i) => (
                     <td key={`gt:${ck}:${v.key}`} style={{
                       ...td, textAlign: "right", fontFamily: mono, color: green,
@@ -2265,13 +2269,14 @@ const CHART_PALETTE = [
   "#74b9ff", "#a29bfe", "#fdcb6e", "#55efc4",
 ];
 
-function PivotChart({ tree, rowFields, colFields, effectiveValues, onSelect, lang }) {
+function PivotChart({ tree, rowFields, colFields: _colFields, effectiveValues, onSelect, lang }) {
   const [collapsed, setCollapsed] = useState(false);
   const [chartType, setChartType] = useState("auto");
   const [valueIdx, setValueIdx] = useState(0);
 
   // Reset valueIdx if the user removes the value it points to.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (valueIdx >= effectiveValues.length) setValueIdx(0);
   }, [effectiveValues.length, valueIdx]);
 
@@ -2288,6 +2293,8 @@ function PivotChart({ tree, rowFields, colFields, effectiveValues, onSelect, lan
   // Decide auto-default chart type based on shape.
   const rowFieldKey = rowFields[0] || null;
   const isOrdinalRow = rowFieldKey === "snapshot_month"
+    || rowFieldKey === "datum"
+    || rowFieldKey === "batch_timestamp"
     || rowFieldKey === "izby"
     || rowFieldKey === "poschodie";
   const isAdditiveAgg = measureAgg === "count"
@@ -2570,7 +2577,7 @@ function fieldUnit(fieldKey, agg) {
    Different from formatValue() (used in tables + axis ticks) which
    keeps 1 decimal for averages/medians of small-range fields like
    izby/poschodie. Tooltips trade that precision for legibility. */
-function formatValueWhole(value, fieldKey, agg) {
+function formatValueWhole(value, fieldKey, _agg) {
   if (value == null || !Number.isFinite(value)) return "—";
   const f = FIELDS[fieldKey];
   const unit = f?.unit ? ` ${f.unit}` : "";
@@ -3257,6 +3264,7 @@ function FilterPopover({ fieldKey, filter, anchorEl, records, fellBack = false, 
   const [search, setSearch]       = useState("");
 
   // Re-sync if user re-opens on a different field
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setMode(filter?.mode || (isNumber ? "between" : "in"));
     setSelected(new Set(filter?.values || []));
@@ -3265,6 +3273,7 @@ function FilterPopover({ fieldKey, filter, anchorEl, records, fellBack = false, 
     setInclEmpty(!!filter?.includeEmpty);
     setSearch("");
   }, [fieldKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Close on outside click / Esc
   useEffect(() => {
