@@ -194,7 +194,7 @@ export default function UnitTracker({ lang = "sk", setCurrent }) {
   const canFull = can("view_analytics");
 
   const { projects, loading: loadingProjects } = useProjects();
-  const { flats, loading: loadingFlats } = useFlatsArchive();
+  const { flats, loading: loadingFlats, progress: flatsProgress } = useFlatsArchive();
   const { months: archiveMonths } = useArchiveMonths();
 
   const projectById = useMemo(() => {
@@ -259,7 +259,16 @@ export default function UnitTracker({ lang = "sk", setCurrent }) {
         </p>
       </div>
 
-      {loading && <div style={{ color: dim, fontFamily: mono, fontSize: "0.85rem", padding: "2rem 0" }}>{L("Načítavam…", "Loading…")}</div>}
+      {loading && (
+        <div style={{ color: dim, fontFamily: mono, fontSize: "0.85rem", padding: "2rem 0" }}>
+          {L("Načítavam…", "Loading…")}
+          {flatsProgress > 0 && (
+            <span style={{ marginLeft: "0.5rem", opacity: 0.7 }}>
+              ({flatsProgress.toLocaleString("sk-SK")} {L("záznamov", "records")})
+            </span>
+          )}
+        </div>
+      )}
 
       {!loading && (
         <>
