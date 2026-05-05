@@ -332,7 +332,7 @@ export function PipelineFlow({ lang = "en" }) {
 
     z1Line1: "Data collected",
     z1Live: `from ${fmt(devCount, "en-US")} developers · ${fmt(projCount, "en-US")} projects`,
-    z1Foot: "every month, no exceptions",
+    z1Foot: "every month",
 
     z2Line1: "Standardize & validate",
     z2Chip: "READY · DEDUPED",
