@@ -784,7 +784,7 @@ export function DistrictPulse({ lang = "en", setCurrent }) {
   const title = lang === "sk" ? "Priemerná cena €/m² podľa okresu" : "Average €/m² by district";
   const desc = lang === "sk"
     ? "Skutočné dáta z aktívnych projektov. Updatuje sa každý mesiac po novom run-e."
-    : "Real data from active projects. Refreshes every month after a new pipeline run.";
+    : "Real data from active projects. Refreshes every month.";
 
   return (
     <section ref={sectionRef} style={{ padding: "5rem 2rem", maxWidth: 1100, margin: "0 auto", borderTop: `1px solid ${border}` }}>

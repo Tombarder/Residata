@@ -801,11 +801,15 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
       tint: "#f5a623",
     },
     {
-      label: L("Najdrahší voľný", "Priciest available"),
+      label: L("Najdrahší voľný byt", "currently the most expensive unit"),
       value: topPrice ? fmtEur(topPrice) : "—",
-      sub: availPrices.length ? `${availPrices.length} ${L("voľných s cenou", "with price")}` : null,
+      sub: availPrices.length ? `${availPrices.length} ${L("voľných s cenou", "units with price available")}` : null,
       tint: "#e8e8ed",
       isPriceKpi: true,
+      onClick: (() => {
+        const topFlat = availFlats.find(f => Number(f.cena_s_dph) === topPrice);
+        return (onSelectFlat && topFlat) ? () => onSelectFlat(topFlat) : null;
+      })(),
     },
   ];
 
@@ -858,9 +862,10 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
       {/* KPI strip */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "0.8rem", marginBottom: "1.5rem" }}>
         {kpis.filter(k => !(noPrices && k.isPriceKpi)).map((k, i) => (
-          <div key={i} style={{
+          <div key={i} onClick={k.onClick || undefined} style={{
             background: bg, border: `1px solid ${border}`, borderRadius: 10,
             padding: "1rem 1.1rem",
+            cursor: k.onClick ? "pointer" : "default",
           }}>
             <div style={{ fontFamily: mono, fontSize: "0.58rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.45rem" }}>
               {k.label}

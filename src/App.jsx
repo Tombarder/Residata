@@ -653,10 +653,7 @@ function HomePage({ setCurrent, l, lang, onLogin }) {
             <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem", color: "#00e5a0", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.4rem" }}>
               {l.valueLabel}
             </div>
-            <div style={{ fontSize: "1.05rem", fontWeight: 600, color: "#e8e8ed", marginBottom: "0.4rem" }}>{l.valueTitle}</div>
-            <p style={{ fontSize: "0.85rem", color: "#8a8a96", lineHeight: 1.65, margin: 0 }}>
-              {l.valueDesc}
-            </p>
+            <div style={{ fontSize: "1.05rem", fontWeight: 600, color: "#e8e8ed" }}>{l.valueTitle}</div>
           </div>
           <button onClick={() => setCurrent("Data")} className="btn-p" style={{ whiteSpace: "nowrap" }}>
             {lang === "sk" ? "Čo dostanete →" : "What we deliver →"}
