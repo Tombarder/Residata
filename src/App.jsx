@@ -78,17 +78,17 @@ const t = {
     flexDesc: "Need weekly updates instead of monthly? Want to cover Košice, Brno, or Prague? Need a custom output format for your internal tools or a different property segment? The pipeline is built to be reconfigured — we adapt scope, frequency, and delivery to match your workflow.",
     // Use Cases
     useCasesLabel: "Use Cases",
-    useCasesTitle: "Built for anyone who needs\nto understand the market.",
-    useCasesDesc: "Different roles, same problem — you need reliable, current data on the Bratislava residential market. Here's how each team uses Residata.",
+    useCasesTitle: "Built for professionals who need\nto understand the market.",
+    useCasesDesc: "Different roles, similar problem — you need reliable, current data on the residential market. Here's how different teams benefit from Residata's intelligence.",
     useCases: [
       { tag: "Developers & Sales Teams", title: "Know exactly where to price.",
         desc: "You're launching a new phase and need to set prices. But what are comparable projects actually charging? How fast are they selling? Are you leaving money on the table — or pricing yourself out?",
         benefits: [["Side-by-side competitor pricing", "see €/m² across every comparable project in your district — broken down by unit type, floor, and phase"], ["Sell-through velocity ranking", "know which projects moved the most units last month — and which ones are sitting still"], ["Inventory countdown", "track how many units your competitors have left — time your launches to hit gaps in supply"]] },
       { tag: "Investors & Private Equity", title: "Underwrite with market reality.",
-        desc: "You're evaluating a resi development deal. The developer says demand is strong and prices are rising. But is that true — and is it true for this specific district, unit mix, and price point?",
+        desc: "You're evaluating a resi development deal. The developer says demand is strong and prices are rising. But is that true — and is it true for your specific district, unit mix, and price point?",
         benefits: [["Absorption rates by segment", "how many units actually sell per month in each district — the number that makes or breaks your IRR"], ["Historical price trajectories", "6–12 months of €/m² movement so you can model scenarios based on real trends, not assumptions"], ["Feasibility stress test", "compare your target sell price against what the market is actually paying — by m², type, and location"]] },
       { tag: "Banks & Valuers", title: "Comparable data, ready to use.",
-        desc: "You need market comparables for a valuation or collateral assessment — but gathering them manually from 50+ developer websites takes days. We've already done it.",
+        desc: "You need market comparables for a valuation or collateral assessment — but gathering them manually from 90+ developer websites and transforming them into a usable format takes weeks. And getting historical data retrospectively is impossible. We've already done it for you.",
         benefits: [["Structured comparable listings", "pricing by location, unit type, floor area, and availability — filterable and exportable"], ["Market depth overview", "how many active projects and units exist in a given district — essential context for any valuation"], ["Monthly refresh", "your comparables are never more than 30 days old — no more working with stale data from last quarter"]] },
       { tag: "Consultants & Analysts", title: "Hours of research, done for you.",
         desc: "Your client needs a market overview for Bratislava residential. You can spend 2–4 weeks clicking through developer websites, copy-pasting into spreadsheets, fighting inconsistent formats, chasing down broken links, and cleaning messy data — or open a single sheet with everything already structured, normalized, and ready to analyze.",
@@ -1065,10 +1065,10 @@ function DataPage({ setCurrent, l, lang }) {
         {/* 1 — Top Performer with pace signal + forecast */}
         <InsightCard label="Pace Watch — Novy Ruzinov" title="Sell-out forecast: ~7 months left.">
           <div style={{ fontSize: "0.82rem", color: "#8a8a96", lineHeight: 1.6, marginBottom: "1rem" }}>
-            Quarter-over-quarter sales pace slowed from ~12 to ~4 units/month — a <span style={{ color: "#f5a623", fontWeight: 600 }}>−37% deceleration</span>. Only 27 of 652 units remain. At the current clearing rate the project is fully sold by Q4 2026. Last window for clients wanting in at €4,585/m².
+            Quarter-over-quarter sales pace slowed from ~12 to ~4 units/month — a <span style={{ color: "#f5a623", fontWeight: 600 }}>−67% deceleration</span>. Only 27 of 652 units remain. At the current clearing rate the project is fully sold by Q4 2026. Last window for clients wanting in at €4,585/m².
           </div>
           <div style={{ display: "flex", gap: "1.5rem" }}>
-            <div><div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: "#f5a623" }}>−37%</div><div style={{ fontSize: "0.68rem", color: "#55555f" }}>QoQ pace</div></div>
+            <div><div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: "#f5a623" }}>−67%</div><div style={{ fontSize: "0.68rem", color: "#55555f" }}>QoQ pace</div></div>
             <div><div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: "#e8e8ed" }}>27</div><div style={{ fontSize: "0.68rem", color: "#55555f" }}>units left</div></div>
             <div><div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: "#00e5a0" }}>~7 mo</div><div style={{ fontSize: "0.68rem", color: "#55555f" }}>to sell-out</div></div>
           </div>
@@ -1077,7 +1077,7 @@ function DataPage({ setCurrent, l, lang }) {
         {/* 2 — Segment pricing tension — where the market pressure sits */}
         <InsightCard label="Pricing Tension" title="4-room sits 2× longer than 2-room.">
           <div style={{ fontSize: "0.82rem", color: "#8a8a96", lineHeight: 1.6, marginBottom: "1rem" }}>
-            2-izbové (avg <span style={{ color: "#e8e8ed" }}>€288k</span>) clear in ~9 months median. 4-izbové (<span style={{ color: "#e8e8ed" }}>€632k+</span>) median 18+ months. Premium segment is over-supplied — any new 4+ launch faces stiff comparison. 2-room remains the market's bread & butter.
+            2-bedroom units (avg <span style={{ color: "#e8e8ed" }}>€288k</span>) move out in ~9 months — the market's core product. 4-bedroom units (<span style={{ color: "#e8e8ed" }}>€632k+</span>) sit for 18+ months on average. The premium segment is over-supplied: any new 4+ launch competes against a large pool of existing unsold stock.
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "auto 1fr auto", gap: "0.5rem 0.75rem", fontSize: "0.74rem", alignItems: "center" }}>
             <span style={{ fontFamily: mono, color: "#e8e8ed" }}>2-izb</span>
@@ -1104,9 +1104,9 @@ function DataPage({ setCurrent, l, lang }) {
         </InsightCard>
 
         {/* 3 — Market direction by district (YoY movement) */}
-        <InsightCard label="Market Direction" title="€/m² up ~6% YoY — uneven by district.">
+        <InsightCard label="Market Direction" title="Growth split unevenly — 3 districts outpace, 3 trail.">
           <div style={{ fontSize: "0.82rem", color: "#8a8a96", lineHeight: 1.6, marginBottom: "1rem" }}>
-            Bratislava avg now <span style={{ color: "#e8e8ed" }}>€5,715/m²</span>. Premium districts pulling away, Petržalka flat (mega-supply absorbs demand), Dúbravka / Rača trailing inflation. Gap between top and bottom district: <span style={{ color: "#e8e8ed", fontWeight: 600 }}>3.5×</span>.
+            Market avg now <span style={{ color: "#e8e8ed" }}>€5,715/m²</span> (+6% YoY). Staré Mesto and Ružinov pulling away — up 9.1% and 7.4% respectively. Petržalka holds flat as mega-supply absorbs demand. Dúbravka and Rača trail inflation. Top-to-bottom district gap: <span style={{ color: "#e8e8ed", fontWeight: 600 }}>3.5×</span>.
           </div>
           {[
             ["Staré Mesto", 9.1, "#00e5a0", "€7,534/m²"],
@@ -1129,9 +1129,9 @@ function DataPage({ setCurrent, l, lang }) {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
             <div>
               <div style={{ fontSize: "0.82rem", color: "#8a8a96", lineHeight: 1.65, marginBottom: "1rem" }}>
-                12 active projects, <span style={{ color: "#e8e8ed" }}>602 available units</span> at avg <span style={{ color: "#e8e8ed" }}>€7,534/m²</span>. At the trailing ~55 units/month clearing rate, premium Staré Mesto stock exhausts by Q3 2027.
+                Staré Mesto has 12 active projects and <span style={{ color: "#e8e8ed" }}>602 units</span> left at <span style={{ color: "#e8e8ed" }}>€7,534/m²</span> avg. At the current ~55 units/month clearing rate, that's Q3 2027 — roughly 14 months.
                 <br /><br />
-                <span style={{ color: "#e8e8ed", fontWeight: 600 }}>Signal for banks & valuers:</span> meaningful comparable transactions dry up inside 18 months. Capture the data window now.
+                <span style={{ color: "#e8e8ed", fontWeight: 600 }}>For banks & valuers:</span> comparable transaction data dries up before then. Once these projects are sold, the comp window closes permanently — there's no way to get it back retrospectively.
               </div>
               <div style={{ display: "flex", gap: "1.5rem", flexWrap: "wrap" }}>
                 <div><div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: "#f5a623" }}>~12 mo</div><div style={{ fontSize: "0.68rem", color: "#55555f" }}>inventory runway</div></div>
@@ -1164,9 +1164,9 @@ function DataPage({ setCurrent, l, lang }) {
         </InsightCard>
 
         {/* 5 — Comparable-data closing window (reframed sell-out watch) */}
-        <InsightCard label="Comparable Data — Closing Window" title="5 projects in the last 10% of inventory.">
+        <InsightCard label="Comps Expiry Watch" title="These 5 projects won't exist as comps much longer.">
           <div style={{ fontSize: "0.82rem", color: "#8a8a96", lineHeight: 1.6, marginBottom: "1rem" }}>
-            Above 88% sold-through. For banks & valuers, these are the last meaningful comparable transactions before each project goes effectively dark. Estimated months until each is unreportable as an active comp:
+            Each is above 88% sold-through. When they close, so does your access to their transaction history as live market evidence. How long you have:
           </div>
           {[
             ["Svrcina",       "Karlova Ves",  30,  1, "97%", "<2 mo"],
@@ -1188,88 +1188,94 @@ function DataPage({ setCurrent, l, lang }) {
         </InsightCard>
       </div>
 
-      {/* Unit Table */}
-      <div style={{ padding: "2rem 2rem 2rem", maxWidth: 1100, margin: "0 auto" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "1rem" }}>
+      {/* Unit Table + Schema — two-column layout */}
+      <div style={{ padding: "2rem 2rem 5rem", maxWidth: 1200, margin: "0 auto" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2.5rem", alignItems: "start" }}>
+
+          {/* Left — Real data examples (lighter) */}
           <div>
-            <Label>{l.rawLabel}</Label>
-            <h3 style={{ fontSize: "1.1rem", fontWeight: 600 }}>{l.unitSample}</h3>
-          </div>
-          <span style={{ fontFamily: mono, fontSize: "0.7rem", color: "#55555f" }}>{showingLive}</span>
-        </div>
-        <div className="dark-scroll" style={{ border: "1px solid #222228", borderRadius: 12, overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.8rem", minWidth: 900 }}>
-            <thead>
-              <tr style={{ background: "#111113" }}>
-                {["Project", "District", "Typ", "Label", "m²", "Price €", "€/m²", "Floor", "Stav"].map(h => (
-                  <th key={h} style={{ padding: "0.875rem 1rem", textAlign: "left", fontFamily: mono, fontSize: "0.65rem", color: "#55555f", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 500, borderBottom: "1px solid #222228", whiteSpace: "nowrap" }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r, i) => (
-                <tr key={i} style={{ borderBottom: i < rows.length - 1 ? "1px solid #1a1a1f" : "none" }}>
-                  {r.map((cell, j) => (
-                    <td key={j} style={{
-                      padding: "0.75rem 1rem", whiteSpace: "nowrap",
-                      color: j === 0 ? "#e8e8ed" : "#8a8a96",
-                      fontWeight: j === 0 ? 500 : 400,
-                      fontFamily: j >= 2 ? mono : "inherit",
-                      fontSize: j >= 2 ? "0.73rem" : "0.8rem",
-                    }}>
-                      {j === 8 ? (
-                        <span style={{
-                          fontFamily: mono, fontSize: "0.65rem",
-                          padding: "0.15rem 0.5rem", borderRadius: 4, fontWeight: 500,
-                          color: statusStyle[cell]?.color, background: statusStyle[cell]?.bg,
-                        }}>{cell}</span>
-                      ) : cell}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Schema — Terminal (tech flex at bottom) */}
-      <div style={{ padding: "2rem 2rem 5rem", maxWidth: 1100, margin: "0 auto" }}>
-        <Label>{l.schemaLabel}</Label>
-        <h3 style={{ fontSize: "1.1rem", fontWeight: 600, marginBottom: "0.5rem" }}>{l.schemaTitle}</h3>
-        <p className="sec-desc" style={{ marginBottom: "1.5rem" }}>{l.schemaDesc}</p>
-
-        <div style={{ border: "1px solid #222228", borderRadius: 12, overflow: "hidden", boxShadow: "0 8px 32px rgba(0,0,0,0.3)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.75rem 1.25rem", background: "#111113", borderBottom: "1px solid #222228" }}>
-            <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#ff5f57" }} />
-            <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#ffbd2e" }} />
-            <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#28c840" }} />
-            <span style={{ flex: 1, textAlign: "center", fontFamily: mono, fontSize: "0.68rem", color: "#55555f", marginRight: "2rem" }}>residata.schema.yml</span>
-          </div>
-          <div style={{ background: "#0d0d0f", padding: "1.25rem 1.5rem", fontFamily: mono, fontSize: "0.74rem", lineHeight: 1.85 }}>
-            <div style={{ color: "#55555f", marginBottom: "0.25rem" }}># residata output schema v2.4</div>
-            <div style={{ color: "#55555f", marginBottom: "0.75rem" }}>
-              {lang === "sk" ? "# každý dátový bod ktorý pre vás extrahujeme" : "# every data point we extract per unit"}
-            </div>
-            <div style={{ color: "#55555f", marginBottom: "0.5rem" }}>---</div>
-            <div style={{ marginBottom: "0.25rem" }}><span style={{ color: "#f5a623" }}>fields</span><span style={{ color: "#55555f" }}>:</span></div>
-            {schemaLines.map((s, i) => (
-              <div key={i} style={{ paddingLeft: "1.25rem", display: "flex", gap: "0.5rem" }}>
-                <span style={{ color: "#55555f" }}>-</span>
-                <span style={{ color: "#00e5a0" }}>{s.field}</span>
-                <span style={{ color: "#55555f" }}>:</span>
-                <span style={{ color: "#e8e8ed" }}>{s.type}</span>
-                <span style={{ color: "#55555f", marginLeft: "auto", fontSize: "0.68rem" }}>  # {s.desc}</span>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "1rem" }}>
+              <div>
+                <Label>{l.rawLabel}</Label>
+                <h3 style={{ fontSize: "1.1rem", fontWeight: 600 }}>{l.unitSample}</h3>
               </div>
-            ))}
-            <div style={{ marginTop: "0.75rem", color: "#55555f" }}>---</div>
-            <div style={{ marginTop: "0.25rem" }}><span style={{ color: "#f5a623" }}>refresh</span><span style={{ color: "#55555f" }}>: </span><span style={{ color: "#e8e8ed" }}>monthly</span></div>
-            <div><span style={{ color: "#f5a623" }}>output</span><span style={{ color: "#55555f" }}>: </span><span style={{ color: "#e8e8ed" }}>google_sheets | csv | xlsx</span></div>
-            <div><span style={{ color: "#f5a623" }}>encoding</span><span style={{ color: "#55555f" }}>: </span><span style={{ color: "#e8e8ed" }}>utf-8</span></div>
+              <span style={{ fontFamily: mono, fontSize: "0.7rem", color: "#55555f" }}>{showingLive}</span>
+            </div>
+            <div className="dark-scroll" style={{ border: "1px solid #222228", borderRadius: 12, overflowX: "auto", background: "#111113" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.78rem" }}>
+                <thead>
+                  <tr style={{ background: "#111113" }}>
+                    {["Project", "District", "Typ", "m²", "Price €", "€/m²", "Floor", "Stav"].map(h => (
+                      <th key={h} style={{ padding: "0.75rem 0.85rem", textAlign: "left", fontFamily: mono, fontSize: "0.6rem", color: "#55555f", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 500, borderBottom: "1px solid #222228", whiteSpace: "nowrap" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r, i) => (
+                    <tr key={i} style={{ borderBottom: i < rows.length - 1 ? "1px solid #1a1a1f" : "none" }}>
+                      {r.filter((_, j) => j !== 3).map((cell, j) => (
+                        <td key={j} style={{
+                          padding: "0.65rem 0.85rem", whiteSpace: "nowrap",
+                          color: j === 0 ? "#e8e8ed" : "#8a8a96",
+                          fontWeight: j === 0 ? 500 : 400,
+                          fontFamily: j >= 2 ? mono : "inherit",
+                          fontSize: j >= 2 ? "0.7rem" : "0.78rem",
+                        }}>
+                          {j === 7 ? (
+                            <span style={{
+                              fontFamily: mono, fontSize: "0.62rem",
+                              padding: "0.15rem 0.5rem", borderRadius: 4, fontWeight: 500,
+                              color: statusStyle[cell]?.color, background: statusStyle[cell]?.bg,
+                            }}>{cell}</span>
+                          ) : cell}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-        <div style={{ marginTop: "0.75rem", fontFamily: mono, fontSize: "0.62rem", color: "#55555f", lineHeight: 1.6 }}>
-          {l.schemaNote}
+
+          {/* Right — Schema / YAML (darker) */}
+          <div>
+            <Label>{l.schemaLabel}</Label>
+            <h3 style={{ fontSize: "1.1rem", fontWeight: 600, marginBottom: "0.5rem" }}>{l.schemaTitle}</h3>
+            <p className="sec-desc" style={{ marginBottom: "1.5rem" }}>{l.schemaDesc}</p>
+            <div style={{ border: "1px solid #1a1a1f", borderRadius: 12, overflow: "hidden", boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.75rem 1.25rem", background: "#0a0a0c", borderBottom: "1px solid #1a1a1f" }}>
+                <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#ff5f57" }} />
+                <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#ffbd2e" }} />
+                <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#28c840" }} />
+                <span style={{ flex: 1, textAlign: "center", fontFamily: mono, fontSize: "0.68rem", color: "#55555f", marginRight: "2rem" }}>residata.schema.yml</span>
+              </div>
+              <div style={{ background: "#07070a", padding: "1.25rem 1.5rem", fontFamily: mono, fontSize: "0.73rem", lineHeight: 1.85 }}>
+                <div style={{ color: "#44444e", marginBottom: "0.25rem" }}># residata output schema v2.4</div>
+                <div style={{ color: "#44444e", marginBottom: "0.75rem" }}>
+                  {lang === "sk" ? "# každý dátový bod ktorý pre vás extrahujeme" : "# every data point we extract per unit"}
+                </div>
+                <div style={{ color: "#44444e", marginBottom: "0.5rem" }}>---</div>
+                <div style={{ marginBottom: "0.25rem" }}><span style={{ color: "#f5a623" }}>fields</span><span style={{ color: "#44444e" }}>:</span></div>
+                {schemaLines.map((s, i) => (
+                  <div key={i} style={{ paddingLeft: "1.25rem", display: "flex", gap: "0.5rem" }}>
+                    <span style={{ color: "#44444e" }}>-</span>
+                    <span style={{ color: "#00e5a0" }}>{s.field}</span>
+                    <span style={{ color: "#44444e" }}>:</span>
+                    <span style={{ color: "#c8c8d4" }}>{s.type}</span>
+                    <span style={{ color: "#44444e", marginLeft: "auto", fontSize: "0.67rem" }}>  # {s.desc}</span>
+                  </div>
+                ))}
+                <div style={{ marginTop: "0.75rem", color: "#44444e" }}>---</div>
+                <div style={{ marginTop: "0.25rem" }}><span style={{ color: "#f5a623" }}>refresh</span><span style={{ color: "#44444e" }}>: </span><span style={{ color: "#c8c8d4" }}>monthly</span></div>
+                <div><span style={{ color: "#f5a623" }}>output</span><span style={{ color: "#44444e" }}>: </span><span style={{ color: "#c8c8d4" }}>google_sheets | csv | xlsx</span></div>
+                <div><span style={{ color: "#f5a623" }}>encoding</span><span style={{ color: "#44444e" }}>: </span><span style={{ color: "#c8c8d4" }}>utf-8</span></div>
+              </div>
+            </div>
+            <div style={{ marginTop: "0.75rem", fontFamily: mono, fontSize: "0.62rem", color: "#44444e", lineHeight: 1.6 }}>
+              {l.schemaNote}
+            </div>
+          </div>
+
         </div>
       </div>
 
@@ -1277,7 +1283,7 @@ function DataPage({ setCurrent, l, lang }) {
         {isPaid ? (
           <>
             <h2 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "1rem" }}>
-              {lang === "sk" ? "Toto je ukážka. Ty máš prístup ku všetkému." : "This is a sample. You have access to everything."}
+              {lang === "sk" ? "Toto je len ukážka. Vďaka prémiovému členstvu máš prístup ku všetkému." : "This is just a sample. You already have access to everything thanks to your premium membership."}
             </h2>
             <p style={{ color: "#8a8a96", maxWidth: 480, margin: "0 auto 2rem", fontWeight: 300 }}>
               {lang === "sk"
@@ -1439,7 +1445,7 @@ function PricingPage({ setCurrent, l, lang, onLogin }) {
                   </div>
                 ))}
               </div>
-              {isAlreadyPaid ? (
+              {(isAlreadyPaid && !t.isCustom) ? (
                 <div style={{
                   display: "block", textAlign: "center",
                   fontSize: "0.85rem", padding: "0.85rem 1rem",
@@ -1577,21 +1583,15 @@ function ContactPage({ l }) {
                 <span style={{ fontSize: "0.92rem" }}>+421 911 963 909</span>
               </a>
 
-              <a href="https://calendar.app.google/x6vKBohYsVjNKL1A9" target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: "1rem", color: "#e8e8ed", transition: "color 0.2s" }}
-                onMouseEnter={e => e.currentTarget.style.color = "#00e5a0"}
-                onMouseLeave={e => e.currentTarget.style.color = "#e8e8ed"}>
-                <span style={{ fontFamily: mono, fontSize: "0.8rem", color: "#00e5a0", width: 20, textAlign: "center", flexShrink: 0 }}>▶</span>
-                <span style={{ fontSize: "0.92rem" }}>{l.bookCall}</span>
-              </a>
             </div>
 
             {/* CTA */}
             <div style={{ marginTop: "1.5rem" }}>
-              <a href="mailto:residata@proton.me?subject=Residata%20Inquiry" style={{
+              <a href="https://calendar.app.google/x6vKBohYsVjNKL1A9" target="_blank" rel="noopener noreferrer" style={{
                 display: "block", padding: "0.85rem 2rem", textAlign: "center",
                 background: "#00e5a0", color: "#0a0a0b", fontWeight: 600,
                 fontSize: "0.9rem", borderRadius: 8, textDecoration: "none",
-              }}>{l.sendEmail}</a>
+              }}>{l.bookCall}</a>
             </div>
           </div>
 
