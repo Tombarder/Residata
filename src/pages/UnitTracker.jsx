@@ -892,21 +892,66 @@ function LineChartSVG({ pickedHistories, comparables, allMonths, yOf, fmtY, lang
     return m;
   }, [allMonths]);
 
-  // Y range
-  const allValues = [];
+  // Y range — separate picked from comparables so picked drives the
+  // visible window. Comparables only widen the range if their values
+  // would otherwise leave the visible plot area; otherwise they're
+  // shown clamped at the edge (Yahoo-Finance style).
+  const pickedValues = [];
   for (const h of pickedHistories) for (const r of h.rows) {
-    const v = yOf(r); if (Number.isFinite(v)) allValues.push(v);
+    const v = yOf(r); if (Number.isFinite(v)) pickedValues.push(v);
   }
+  const compValues = [];
   for (const c of comparables) for (const r of c.rows) {
-    const v = yOf(r); if (Number.isFinite(v)) allValues.push(v);
+    const v = yOf(r); if (Number.isFinite(v)) compValues.push(v);
   }
-  const minV = Math.min(...allValues);
-  const maxV = Math.max(...allValues);
-  const range = maxV - minV || 1;
-  // Pad Y by 8% top + bottom for breathing room
-  const yMin = minV - range * 0.08;
-  const yMax = maxV + range * 0.08;
-  const yRange = yMax - yMin;
+  // Primary range: picked unit values (or fall back to all if no picked).
+  const primary = pickedValues.length ? pickedValues : compValues;
+  const pMin = Math.min(...primary);
+  const pMax = Math.max(...primary);
+  const pRange = pMax - pMin;
+
+  // If picked values are nearly flat (<2% variation), expand the visible
+  // window to ±5% of the value so the dots aren't squashed into a single
+  // horizontal line. Otherwise pad 15% top+bottom for breathing room.
+  const flatThreshold = pMax * 0.02;
+  let rawMin, rawMax;
+  if (pRange < flatThreshold) {
+    const center = (pMin + pMax) / 2;
+    const halfWindow = Math.max(center * 0.05, pRange * 2, 1);
+    rawMin = center - halfWindow;
+    rawMax = center + halfWindow;
+  } else {
+    rawMin = pMin - pRange * 0.15;
+    rawMax = pMax + pRange * 0.15;
+  }
+
+  // Now widen if comparables fall outside, but only by enough to include
+  // them — never let comparables shrink the picked unit's prominence.
+  if (compValues.length) {
+    const cMin = Math.min(...compValues);
+    const cMax = Math.max(...compValues);
+    rawMin = Math.min(rawMin, cMin - (rawMax - rawMin) * 0.05);
+    rawMax = Math.max(rawMax, cMax + (rawMax - rawMin) * 0.05);
+  }
+
+  // Round to "nice" numbers for axis ticks (like Yahoo charts: 580k, 600k…).
+  // Pick a step that gives 4-6 ticks.
+  function niceStep(span) {
+    const targetSteps = 5;
+    const rough = span / targetSteps;
+    const mag = Math.pow(10, Math.floor(Math.log10(rough)));
+    const norm = rough / mag;
+    let nice;
+    if (norm < 1.5) nice = 1;
+    else if (norm < 3) nice = 2;
+    else if (norm < 7) nice = 5;
+    else nice = 10;
+    return nice * mag;
+  }
+  const step = niceStep(rawMax - rawMin);
+  const yMin = Math.floor(rawMin / step) * step;
+  const yMax = Math.ceil(rawMax / step) * step;
+  const yRange = (yMax - yMin) || 1;
 
   const yScale = (v) => padT + innerH - ((v - yMin) / yRange) * innerH;
   const xPos = (mo) => {
@@ -916,8 +961,9 @@ function LineChartSVG({ pickedHistories, comparables, allMonths, yOf, fmtY, lang
     return padL + (innerW / (allMonths.length - 1)) * i;
   };
 
-  // Y ticks — 4 evenly spaced
-  const ticks = [yMin, yMin + yRange * 0.25, yMin + yRange * 0.5, yMin + yRange * 0.75, yMax];
+  // Y ticks — round multiples of `step` between yMin and yMax (inclusive).
+  const ticks = [];
+  for (let v = yMin; v <= yMax + step / 2; v += step) ticks.push(v);
 
   const [hover, setHover] = useState(null);
   const rotate = allMonths.length > 8;
