@@ -879,23 +879,108 @@ function YModeBtn({ active, onClick, children }) {
 
 // ── Line chart SVG ──────────────────────────────────────────────
 
+/** Convert a batch_timestamp / snapshot_month string to milliseconds since
+ *  epoch — used for time-proportional X positioning. Robust to all the
+ *  formats we may encounter:
+ *    · ISO timestamp:  '2026-04-29T10:32:00+00:00'
+ *    · Date only:      '2026-04-29'  (Variant-X derived)
+ *    · YYYY-MM legacy: '2026-04'      (pre-Variant-X rows; mid-month proxy) */
+function tsToMs(ts) {
+  if (!ts) return 0;
+  const s = String(ts);
+  if (s.includes("T")) {
+    const t = new Date(s).getTime();
+    if (Number.isFinite(t)) return t;
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    return new Date(s + "T00:00:00Z").getTime();
+  }
+  if (/^\d{4}-\d{2}$/.test(s)) {
+    const [y, m] = s.split("-");
+    // Mid-month so a YYYY-MM legacy row sits roughly between adjacent
+    // ISO timestamps in the same series rather than at the start edge.
+    return Date.UTC(Number(y), Number(m) - 1, 15);
+  }
+  return 0;
+}
+
+/** Pick a "nice" step size so axis ticks land on round numbers (10/20/50/100…).
+ *  Returns the step magnitude given a target of ~5 ticks across the span. */
+function niceStep(span, targetSteps = 5) {
+  if (!Number.isFinite(span) || span <= 0) return 1;
+  const rough = span / targetSteps;
+  const mag = Math.pow(10, Math.floor(Math.log10(rough)));
+  const norm = rough / mag;
+  let nice;
+  if (norm < 1.5) nice = 1;
+  else if (norm < 3) nice = 2;
+  else if (norm < 7) nice = 5;
+  else nice = 10;
+  return nice * mag;
+}
+
+/** Compact thousand-separator formatter for axis tick labels:
+ *  580_000 → '580k', 1_250_000 → '1.25M'. */
+function fmtCompact(n) {
+  if (!Number.isFinite(n)) return "—";
+  const abs = Math.abs(n);
+  if (abs >= 1_000_000) {
+    const v = n / 1_000_000;
+    return v.toFixed(2).replace(/\.?0+$/, "") + "M";
+  }
+  if (abs >= 1_000) {
+    const v = n / 1_000;
+    return (v % 1 === 0 ? v.toFixed(0) : v.toFixed(1)) + "k";
+  }
+  return Math.round(n).toString();
+}
+
+/** Adaptive X-axis tick selector. Returns indices into allMonths to label.
+ *  Always includes first + last; remaining ticks are evenly spaced. */
+function pickXTicks(allMonths, maxTicks = 6) {
+  const n = allMonths.length;
+  if (n === 0) return [];
+  if (n <= maxTicks) return allMonths.map((_, i) => i);
+  const step = (n - 1) / (maxTicks - 1);
+  const out = new Set();
+  for (let i = 0; i < maxTicks; i++) out.add(Math.round(i * step));
+  out.add(0);
+  out.add(n - 1);
+  return [...out].sort((a, b) => a - b);
+}
+
 function LineChartSVG({ pickedHistories, comparables, allMonths, yOf, fmtY, lang }) {
-  const W = 880, H = 380;
-  const padL = 80, padR = 32, padT = 36, padB = allMonths.length > 8 ? 90 : 60;
+  const W = 880, H = 420;
+  const padL = 76, padR = 60, padT = 28, padB = 56;
   const innerW = W - padL - padR;
   const innerH = H - padT - padB;
   const isSinglePoint = allMonths.length === 1;
+  const svgRef = useRef(null);
 
-  const monthIdx = useMemo(() => {
-    const m = {};
-    allMonths.forEach((mo, i) => { m[mo] = i; });
-    return m;
-  }, [allMonths]);
+  // ── Time-proportional X positioning ─────────────────────────────
+  // Spreads points by ACTUAL time delta (Apr 17 → Apr 27 is wider than
+  // Apr 27 → Apr 29). Falls back to evenly-spaced indices if all
+  // timestamps collapse to the same value (corrupt data).
+  const xMin = allMonths.length ? tsToMs(allMonths[0]) : 0;
+  const xMax = allMonths.length ? tsToMs(allMonths[allMonths.length - 1]) : 0;
+  const xSpan = xMax - xMin;
+  const xPos = (ts) => {
+    if (allMonths.length === 1) return padL + innerW / 2;
+    if (xSpan <= 0) {
+      // Fallback: equal spacing by index
+      const i = allMonths.indexOf(ts);
+      if (i < 0) return null;
+      return padL + (innerW / (allMonths.length - 1)) * i;
+    }
+    const ms = tsToMs(ts);
+    return padL + ((ms - xMin) / xSpan) * innerW;
+  };
 
-  // Y range — separate picked from comparables so picked drives the
-  // visible window. Comparables only widen the range if their values
-  // would otherwise leave the visible plot area; otherwise they're
-  // shown clamped at the edge (Yahoo-Finance style).
+  // ── Y range — picked drives the window, NOT comparables ─────────
+  // Comparables are decorative context; we never let them squash
+  // picked unit's prominence. If a comparable falls outside the picked
+  // window, we clip it (rendered at viewport edge). A small "+N more
+  // off-chart" hint shows when that happens.
   const pickedValues = [];
   for (const h of pickedHistories) for (const r of h.rows) {
     const v = yOf(r); if (Number.isFinite(v)) pickedValues.push(v);
@@ -904,20 +989,20 @@ function LineChartSVG({ pickedHistories, comparables, allMonths, yOf, fmtY, lang
   for (const c of comparables) for (const r of c.rows) {
     const v = yOf(r); if (Number.isFinite(v)) compValues.push(v);
   }
-  // Primary range: picked unit values (or fall back to all if no picked).
   const primary = pickedValues.length ? pickedValues : compValues;
-  const pMin = Math.min(...primary);
-  const pMax = Math.max(...primary);
+  const pMin = primary.length ? Math.min(...primary) : 0;
+  const pMax = primary.length ? Math.max(...primary) : 1;
   const pRange = pMax - pMin;
 
-  // If picked values are nearly flat (<2% variation), expand the visible
-  // window to ±5% of the value so the dots aren't squashed into a single
-  // horizontal line. Otherwise pad 15% top+bottom for breathing room.
-  const flatThreshold = pMax * 0.02;
+  // Visibility windowing:
+  //   · Single value or near-flat (<2% variation): expand to ±5% of
+  //     mid value so dots don't collapse into one horizontal line.
+  //   · Otherwise: pad 15% top + 15% bottom for breathing room.
+  const flatThreshold = Math.max(pMax * 0.02, 1);
   let rawMin, rawMax;
   if (pRange < flatThreshold) {
     const center = (pMin + pMax) / 2;
-    const halfWindow = Math.max(center * 0.05, pRange * 2, 1);
+    const halfWindow = Math.max(center * 0.05, 1);
     rawMin = center - halfWindow;
     rawMax = center + halfWindow;
   } else {
@@ -925,52 +1010,105 @@ function LineChartSVG({ pickedHistories, comparables, allMonths, yOf, fmtY, lang
     rawMax = pMax + pRange * 0.15;
   }
 
-  // Now widen if comparables fall outside, but only by enough to include
-  // them — never let comparables shrink the picked unit's prominence.
-  if (compValues.length) {
+  // Comparables: extend window only if the comparable RANGE OVERLAPS
+  // the picked range (i.e., they're realistic peers). If a comparable
+  // is way off (e.g., picked is 568k and comp is 200k), we DO NOT
+  // expand — keeping picked centered. The comparable line just clips
+  // at the chart bottom edge.
+  if (pickedValues.length && compValues.length) {
     const cMin = Math.min(...compValues);
     const cMax = Math.max(...compValues);
-    rawMin = Math.min(rawMin, cMin - (rawMax - rawMin) * 0.05);
-    rawMax = Math.max(rawMax, cMax + (rawMax - rawMin) * 0.05);
+    const pickedSpan = rawMax - rawMin;
+    // Allow comparables to widen by at most ±25% of the picked window —
+    // anything beyond that is clipped (preserves picked unit's visual
+    // dominance).
+    const maxExpand = pickedSpan * 0.25;
+    if (cMin < rawMin) rawMin = Math.max(cMin, rawMin - maxExpand);
+    if (cMax > rawMax) rawMax = Math.min(cMax, rawMax + maxExpand);
   }
 
-  // Round to "nice" numbers for axis ticks (like Yahoo charts: 580k, 600k…).
-  // Pick a step that gives 4-6 ticks.
-  function niceStep(span) {
-    const targetSteps = 5;
-    const rough = span / targetSteps;
-    const mag = Math.pow(10, Math.floor(Math.log10(rough)));
-    const norm = rough / mag;
-    let nice;
-    if (norm < 1.5) nice = 1;
-    else if (norm < 3) nice = 2;
-    else if (norm < 7) nice = 5;
-    else nice = 10;
-    return nice * mag;
-  }
+  // Round to nice tick boundaries.
   const step = niceStep(rawMax - rawMin);
   const yMin = Math.floor(rawMin / step) * step;
   const yMax = Math.ceil(rawMax / step) * step;
   const yRange = (yMax - yMin) || 1;
-
-  const yScale = (v) => padT + innerH - ((v - yMin) / yRange) * innerH;
-  const xPos = (mo) => {
-    const i = monthIdx[mo];
-    if (i == null) return null;
-    if (allMonths.length === 1) return padL + innerW / 2;
-    return padL + (innerW / (allMonths.length - 1)) * i;
+  const yScale = (v) => {
+    // Clamp to chart area so out-of-range comparables don't bleed.
+    const t = padT + innerH - ((v - yMin) / yRange) * innerH;
+    return Math.max(padT, Math.min(padT + innerH, t));
   };
 
-  // Y ticks — round multiples of `step` between yMin and yMax (inclusive).
   const ticks = [];
   for (let v = yMin; v <= yMax + step / 2; v += step) ticks.push(v);
 
-  const [hover, setHover] = useState(null);
-  const rotate = allMonths.length > 8;
+  // Count off-chart comparables (for the "+N more off-chart" hint)
+  const compsOffChart = compValues.filter(v => v < yMin || v > yMax).length;
+
+  // ── Crosshair hover state — Yahoo-Finance style ─────────────────
+  // Single hover state covering entire chart area (not per-dot). We
+  // find the nearest data point in time-space and snap the crosshair
+  // to it. Tooltip shows date + value(s) + status. Mouse-leave clears.
+  const [hoverIdx, setHoverIdx] = useState(null);
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+
+  function handleMouseMove(e) {
+    if (!svgRef.current || allMonths.length === 0) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const scaleX = W / rect.width;
+    const localX = (e.clientX - rect.left) * scaleX;
+    if (localX < padL - 4 || localX > W - padR + 4) {
+      setHoverIdx(null);
+      return;
+    }
+    // Find nearest data point in X
+    let bestIdx = 0;
+    let bestDist = Infinity;
+    for (let i = 0; i < allMonths.length; i++) {
+      const px = xPos(allMonths[i]);
+      if (px == null) continue;
+      const d = Math.abs(px - localX);
+      if (d < bestDist) { bestDist = d; bestIdx = i; }
+    }
+    setHoverIdx(bestIdx);
+    setTooltipPos({ x: e.clientX, y: e.clientY });
+  }
+  function handleMouseLeave() { setHoverIdx(null); }
+
+  // X-axis ticks (adaptive density)
+  const xTickIndices = pickXTicks(allMonths, 6);
+  const rotate = allMonths.length > 12 || (allMonths.length > 5 && innerW < 600);
+
+  // Pre-compute picked points (used by both render + hover lookup)
+  const pickedPointSets = pickedHistories.map((h, hi) => {
+    const color = COMPARE_PALETTE[hi % COMPARE_PALETTE.length];
+    const pts = h.rows.map(r => {
+      const x = xPos(tsOf(r));
+      const y = yOf(r);
+      if (x == null || !Number.isFinite(y)) return null;
+      return { x, y: yScale(y), r, rawY: y };
+    }).filter(Boolean);
+    return { color, pts, key: h.key };
+  });
+
+  // Hovered timestamp (for crosshair)
+  const hoveredTs = hoverIdx != null ? allMonths[hoverIdx] : null;
+  const hoverX = hoveredTs ? xPos(hoveredTs) : null;
+
+  // Find rows aligned with hovered timestamp across all picked units
+  const hoverPicked = hoveredTs ? pickedHistories.map((h, hi) => {
+    const r = h.rows.find(row => tsOf(row) === hoveredTs);
+    return r ? { row: r, color: COMPARE_PALETTE[hi % COMPARE_PALETTE.length] } : null;
+  }).filter(Boolean) : [];
 
   return (
     <div style={{ position: "relative" }}>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}>
+      <svg
+        ref={svgRef}
+        viewBox={`0 0 ${W} ${H}`}
+        style={{ width: "100%", height: "auto", display: "block" }}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+      >
         {/* Soft baseline gradient backdrop for the plot area */}
         <defs>
           <linearGradient id="ut-plot-bg" x1="0" y1="0" x2="0" y2="1">
@@ -980,12 +1118,12 @@ function LineChartSVG({ pickedHistories, comparables, allMonths, yOf, fmtY, lang
         </defs>
         <rect x={padL} y={padT} width={innerW} height={innerH} fill="url(#ut-plot-bg)" rx="4"/>
 
-        {/* Y gridlines + ticks */}
+        {/* Y gridlines + tick labels (compact: 580k, 1.2M) */}
         {ticks.map((t, i) => (
-          <g key={i}>
+          <g key={`ytick-${i}`}>
             <line x1={padL} x2={W - padR} y1={yScale(t)} y2={yScale(t)} stroke={border} strokeDasharray="2,4" opacity="0.6"/>
             <text x={padL - 10} y={yScale(t)} fill={dim} fontSize="11" textAnchor="end" dominantBaseline="middle" fontFamily={mono}>
-              {fmtY(t).replace(/\s?€\/m²/, "").replace(/\s?€/, "")}
+              {fmtCompact(t)}
             </text>
           </g>
         ))}
@@ -1001,17 +1139,24 @@ function LineChartSVG({ pickedHistories, comparables, allMonths, yOf, fmtY, lang
           if (pts.length === 0) return null;
           const path = pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
           return (
-            <g key={`cmp-${ci}`} opacity="0.22">
-              <path d={path} stroke={dim} strokeWidth="1.5" fill="none"/>
-              {pts.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={3} fill={dim}/>)}
+            <g key={`cmp-${ci}`} opacity="0.18">
+              <path d={path} stroke={dim} strokeWidth="1.2" fill="none"/>
+              {pts.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={2} fill={dim}/>)}
             </g>
           );
         })}
 
-        {/* Future-data hint when only a single data point — a faint
-            dashed line trailing off to the right with "ďalšie body
-            pribudnú v máji 2026" annotation. Helps the user see this
-            IS a line chart, just one with one data point so far. */}
+        {/* Off-chart comparable hint (when comparables clipped) */}
+        {compsOffChart > 0 && (
+          <text x={W - padR - 6} y={padT + 14} fill={dim} fontSize="10"
+                textAnchor="end" fontFamily={mono} opacity="0.65">
+            {lang === "sk"
+              ? `${compsOffChart} bodov porovnateľných mimo grafu`
+              : `${compsOffChart} comparable points off-chart`}
+          </text>
+        )}
+
+        {/* Future-data hint when only a single data point */}
         {isSinglePoint && pickedHistories.length === 1 && pickedHistories[0].rows.length > 0 && (() => {
           const r = pickedHistories[0].rows[0];
           const v = yOf(r);
@@ -1029,60 +1174,67 @@ function LineChartSVG({ pickedHistories, comparables, allMonths, yOf, fmtY, lang
           );
         })()}
 
-        {/* Picked unit lines — render after backdrop + comparables so
-            primary lines sit on top of everything else. */}
-        {pickedHistories.map((h, hi) => {
-          const color = COMPARE_PALETTE[hi % COMPARE_PALETTE.length];
-          const pts = h.rows.map(r => {
-            const x = xPos(tsOf(r));
-            const y = yOf(r);
-            if (x == null || !Number.isFinite(y)) return null;
-            return { x, y: yScale(y), r };
-          }).filter(Boolean);
+        {/* Crosshair vertical guide (Yahoo-style) — only when hovering */}
+        {hoverX != null && (
+          <line x1={hoverX} x2={hoverX} y1={padT} y2={padT + innerH}
+                stroke={text} strokeOpacity="0.25" strokeWidth="1" strokeDasharray="3,3" pointerEvents="none"/>
+        )}
+
+        {/* Picked unit lines — minimal dots, no inline labels.
+            Endpoint values shown only at first + last point. Status
+            changes get a colored ring. Hover is handled by the
+            chart-wide overlay below, not per-dot, so labels never
+            collide regardless of how many batches accumulate. */}
+        {pickedPointSets.map(({ color, pts, key }, hi) => {
           if (pts.length === 0) return null;
           const path = pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
           return (
-            <g key={`pick-${hi}`}>
+            <g key={`pick-${key || hi}`}>
               <path d={path} stroke={color} strokeWidth="2.5" fill="none"/>
               {pts.map((p, i) => {
                 const stavCol = STAV_COLOR[p.r.stav] || color;
                 const isStavChange = i > 0 && pts[i - 1].r.stav !== p.r.stav;
+                const isFirst = i === 0;
                 const isLatest = i === pts.length - 1;
-                const showValueLabel = isLatest || isStavChange || isSinglePoint;
-                const labelText = fmtY(yOf(p.r));
+                const isHovered = hoveredTs && tsOf(p.r) === hoveredTs;
+                const showEndpointLabel = (isFirst || isLatest) && !isSinglePoint && hi === 0;
+                // Endpoint labels only on the FIRST picked unit to avoid
+                // label clutter when comparing 4 units. Other picked
+                // units rely on tooltip.
+                const baseRadius = isLatest ? 5 : (isStavChange ? 5 : 3);
+                const radius = isHovered ? baseRadius + 3 : baseRadius;
                 return (
-                  <g key={i}
-                     onMouseEnter={(e) => setHover({ row: p.r, color, mouseX: e.clientX, mouseY: e.clientY })}
-                     onMouseMove={(e) => setHover(h0 => h0 ? { ...h0, mouseX: e.clientX, mouseY: e.clientY } : h0)}
-                     onMouseLeave={() => setHover(null)}
-                     style={{ cursor: "pointer" }}>
-                    {/* Wider invisible hit area */}
-                    <circle cx={p.x} cy={p.y} r="16" fill="transparent"/>
-                    {/* Outer glow for the latest point or any state-change point */}
-                    {(isLatest || isStavChange) && (
-                      <circle cx={p.x} cy={p.y} r="13" fill="none" stroke={stavCol} strokeWidth="1.5" opacity="0.25"/>
+                  <g key={i}>
+                    {/* Status-change dashed ring */}
+                    {isStavChange && (
+                      <circle cx={p.x} cy={p.y} r={radius + 4} fill="none" stroke={stavCol} strokeWidth="1.2" strokeDasharray="2,2" opacity="0.6"/>
+                    )}
+                    {/* Hover highlight ring */}
+                    {isHovered && (
+                      <circle cx={p.x} cy={p.y} r={radius + 5} fill="none" stroke={color} strokeWidth="1.5" opacity="0.6"/>
                     )}
                     {/* Main dot */}
-                    <circle cx={p.x} cy={p.y} r={isLatest ? 8 : isStavChange ? 7 : 5}
-                            fill={stavCol} stroke={bg} strokeWidth="2.5"/>
-                    {/* Status-change ring */}
-                    {isStavChange && (
-                      <circle cx={p.x} cy={p.y} r="11" fill="none" stroke={stavCol} strokeWidth="1.5" strokeDasharray="2,2"/>
-                    )}
-                    {/* Value label next to the dot — placed where it
-                        won't collide with the chart edge. Latest point
-                        gets it, plus state-change points, plus single-
-                        point case (so the user always sees the price). */}
-                    {showValueLabel && (
-                      <g>
-                        <rect x={p.x + 12} y={p.y - 11} width={Math.max(70, labelText.length * 7.2)} height={22}
-                              fill="rgba(14,14,18,0.92)" stroke={color} strokeWidth="1" rx="4" opacity="0.95"/>
-                        <text x={p.x + 12 + Math.max(70, labelText.length * 7.2) / 2} y={p.y + 4}
-                              fill={text} fontSize="11" fontWeight="700" textAnchor="middle" fontFamily={mono}>
-                          {labelText}
-                        </text>
-                      </g>
-                    )}
+                    <circle cx={p.x} cy={p.y} r={radius}
+                            fill={stavCol} stroke={bg} strokeWidth="1.5"/>
+                    {/* Endpoint value label (first + last, primary unit only) */}
+                    {showEndpointLabel && (() => {
+                      const labelText = fmtCompact(p.rawY);
+                      const lblW = Math.max(46, labelText.length * 7);
+                      // Place label inside chart area: first → right of dot,
+                      // last → left of dot, to avoid clipping at edges.
+                      const placeRight = isFirst;
+                      const lblX = placeRight ? p.x + 8 : p.x - 8 - lblW;
+                      return (
+                        <g>
+                          <rect x={lblX} y={p.y - 10} width={lblW} height={20}
+                                fill="rgba(14,14,18,0.95)" stroke={color} strokeWidth="1" rx="3" opacity="0.95"/>
+                          <text x={lblX + lblW / 2} y={p.y + 4}
+                                fill={text} fontSize="10.5" fontWeight="700" textAnchor="middle" fontFamily={mono}>
+                            {labelText}
+                          </text>
+                        </g>
+                      );
+                    })()}
                   </g>
                 );
               })}
@@ -1090,12 +1242,14 @@ function LineChartSVG({ pickedHistories, comparables, allMonths, yOf, fmtY, lang
           );
         })}
 
-        {/* X axis labels */}
-        {allMonths.map((m, i) => {
-          const x = padL + (allMonths.length === 1 ? innerW / 2 : (innerW / (allMonths.length - 1)) * i);
+        {/* X axis labels — adaptive density (max 6 ticks; first+last always shown) */}
+        {xTickIndices.map((i) => {
+          const m = allMonths[i];
+          const x = xPos(m);
+          if (x == null) return null;
           const y = padT + innerH + 18;
           return (
-            <text key={i} x={x} y={y} fill={text} fontSize="11" fontFamily={mono}
+            <text key={`xtick-${i}`} x={x} y={y} fill={text} fontSize="11" fontFamily={mono}
                   textAnchor={rotate ? "end" : "middle"}
                   transform={rotate ? `rotate(-35 ${x} ${y})` : undefined}>
               {formatMonth(m, lang)}
@@ -1114,24 +1268,36 @@ function LineChartSVG({ pickedHistories, comparables, allMonths, yOf, fmtY, lang
         </text>
       </svg>
 
-      {/* Hover tooltip */}
-      {hover && typeof document !== "undefined" && (
+      {/* Yahoo-style hover tooltip — shows date + value(s) for ALL picked
+          units at the snapped timestamp. Pins to the cursor; never blocks
+          dot interaction because crosshair is rendered inside the SVG. */}
+      {hoveredTs && hoverPicked.length > 0 && typeof document !== "undefined" && (
         <div style={{
           position: "fixed",
-          left: hover.mouseX + 14, top: hover.mouseY + 14,
+          left: tooltipPos.x + 14, top: tooltipPos.y + 14,
           background: "rgba(14, 14, 18, 0.97)",
-          border: `1px solid ${hover.color}`,
+          border: `1px solid ${border}`,
           borderRadius: 6, padding: "0.55rem 0.8rem",
           fontFamily: mono, fontSize: "0.78rem", color: text,
           pointerEvents: "none", zIndex: 10000,
           boxShadow: "0 6px 18px rgba(0,0,0,0.6)",
           whiteSpace: "nowrap",
+          minWidth: 160,
         }}>
-          <div style={{ fontWeight: 700, color: hover.color }}>{formatTs(tsOf(hover.row), lang)}</div>
-          <div style={{ marginTop: "0.18rem" }}>{fmtY(yOf(hover.row))}</div>
-          <div style={{ color: STAV_COLOR[hover.row.stav] || dim, fontSize: "0.7rem", marginTop: "0.18rem" }}>
-            {STAV_LABEL[hover.row.stav] || hover.row.stav}
+          <div style={{ fontWeight: 700, color: text, marginBottom: "0.4rem", borderBottom: `1px solid ${border}`, paddingBottom: "0.3rem" }}>
+            {formatTs(hoveredTs, lang)}
           </div>
+          {hoverPicked.map(({ row, color: c }, idx) => (
+            <div key={idx} style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginTop: idx > 0 ? "0.25rem" : 0 }}>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: c, flexShrink: 0 }}/>
+              <span style={{ color: dim, fontSize: "0.72rem" }}>{row.unit_id}</span>
+              <span style={{ marginLeft: "auto", fontWeight: 700 }}>{fmtY(yOf(row))}</span>
+              <span style={{ color: STAV_COLOR[row.stav] || dim, fontSize: "0.68rem",
+                             padding: "0.05rem 0.3rem", border: `1px solid ${STAV_COLOR[row.stav] || dim}`, borderRadius: 3 }}>
+                {row.stav}
+              </span>
+            </div>
+          ))}
         </div>
       )}
     </div>
