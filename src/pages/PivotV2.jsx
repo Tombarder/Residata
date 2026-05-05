@@ -536,10 +536,16 @@ function sortTree(nodes, sortIdx, dir) {
     } else {
       av = a.rollups[sortIdx]; bv = b.rollups[sortIdx];
     }
-    // Nulls sort to the end regardless of direction
-    if (av == null && bv == null) return 0;
-    if (av == null) return 1;
-    if (bv == null) return -1;
+    // Nulls AND NaN sort to the end regardless of direction. NaN comes
+    // from compute() returning NaN when an aggregate hits invalid input
+    // (e.g., avg over rows where every cena is null after filtering).
+    // Treating NaN like null avoids unstable sort orders where Array.sort
+    // gets a NaN comparator return and shuffles rows non-deterministically.
+    const aBad = av == null || (typeof av === "number" && !Number.isFinite(av));
+    const bBad = bv == null || (typeof bv === "number" && !Number.isFinite(bv));
+    if (aBad && bBad) return 0;
+    if (aBad) return 1;
+    if (bBad) return -1;
     return dir === "desc" ? bv - av : av - bv;
   };
   const sorted = [...nodes].sort(cmp);
@@ -929,9 +935,18 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   // Values default to a single implicit "count" when the user hasn't
   // dropped anything into Values yet — the user asked for count-first
   // behaviour so the pivot always shows something meaningful.
-  const effectiveValues = values.length > 0
-    ? values
-    : [{ key: "__count__", field: null, agg: "count" }];
+  //
+  // Memoised so the literal `[{ ... }]` fallback doesn't get a new array
+  // identity on every render, which would invalidate every downstream
+  // useMemo (rawTree, sortedTree, flatRows) and trigger a full pivot
+  // rebuild on every keystroke / hover / drag — the user reported the
+  // pivot "felt sticky" while interacting with unrelated UI.
+  const effectiveValues = useMemo(
+    () => values.length > 0
+      ? values
+      : [{ key: "__count__", field: null, agg: "count" }],
+    [values]
+  );
 
   // Apply filters BEFORE tree build. Inactive filters (chip dropped but not
   // yet configured) pass everything through — see isFilterActive.
@@ -1052,7 +1067,7 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
           </div>
           <div style={{ fontFamily: mono, fontSize: "0.78rem", color: dim }}>
             {flatsProgress > 0
-              ? `${flatsProgress.toLocaleString("sk-SK")} ${lang === "sk" ? "záznamov" : "records"}`
+              ? `${flatsProgress.toLocaleString(lang === "sk" ? "sk-SK" : "en-US")} ${lang === "sk" ? "záznamov" : "records"}`
               : (lang === "sk" ? "pripravujem" : "preparing")}
           </div>
           {/* Skeleton rows */}
@@ -1514,11 +1529,20 @@ function ChipInZone({ label, type, agg, filter, level, onDragStart, onDragStartP
 function RightPanel({ usedKeys, search, setSearch, drag, setDrag, hoverZone, setHoverZone, onDropBack, lang }) {
   // Wire drag events from chips via a DOM-level custom event (chips live
   // in siblings, easier than prop-drilling a setDrag everywhere).
+  // Also listen for the native HTML5 `dragend` so we clear drag state
+  // when the user releases the pointer OUTSIDE any drop zone — without
+  // this, the dim styling on inactive zones + the "drop to remove"
+  // banner over the palette stayed sticky until the next drag.
   useEffect(() => {
-    const h = (e) => setDrag({ ...e.detail });
-    window.addEventListener("pivotv2-drag-start", h);
-    return () => window.removeEventListener("pivotv2-drag-start", h);
-  }, [setDrag]);
+    const onStart = (e) => setDrag({ ...e.detail });
+    const onEnd   = () => { setDrag(null); setHoverZone(null); };
+    window.addEventListener("pivotv2-drag-start", onStart);
+    window.addEventListener("dragend", onEnd);
+    return () => {
+      window.removeEventListener("pivotv2-drag-start", onStart);
+      window.removeEventListener("dragend", onEnd);
+    };
+  }, [setDrag, setHoverZone]);
 
   const q = search.trim().toLowerCase();
   const filtered = FIELD_ORDER
@@ -3079,12 +3103,18 @@ function PieChartSVG({ data, measureField, measureAgg, onSelect, lang }) {
       {lang === "sk" ? "Súčet hodnôt = 0; koláč nemá zmysel." : "Total = 0; pie chart not meaningful."}
     </div>;
   }
-  let acc = 0;
+  // Build slices via prefix sums so the linter's react-hooks/immutability
+  // rule doesn't flag the running accumulator. Functionally identical to
+  // the previous `let acc; data.map(...)` shape — each slice carries the
+  // angular start/end of its arc.
+  const cumulative = [0];
+  for (let i = 0; i < data.length; i++) {
+    cumulative.push(cumulative[i] + Math.max(0, data[i].value));
+  }
   const slices = data.map((d, i) => {
     const v = Math.max(0, d.value);
-    const startAng = (acc / total) * Math.PI * 2 - Math.PI / 2;
-    acc += v;
-    const endAng = (acc / total) * Math.PI * 2 - Math.PI / 2;
+    const startAng = (cumulative[i]     / total) * Math.PI * 2 - Math.PI / 2;
+    const endAng   = (cumulative[i + 1] / total) * Math.PI * 2 - Math.PI / 2;
     return { ...d, startAng, endAng, share: v / total, fill: CHART_PALETTE[i % CHART_PALETTE.length] };
   });
   const arc = (s) => {

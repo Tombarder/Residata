@@ -264,7 +264,7 @@ export default function UnitTracker({ lang = "sk", setCurrent }) {
           {L("Načítavam…", "Loading…")}
           {flatsProgress > 0 && (
             <span style={{ marginLeft: "0.5rem", opacity: 0.7 }}>
-              ({flatsProgress.toLocaleString("sk-SK")} {L("záznamov", "records")})
+              ({flatsProgress.toLocaleString(lang === "sk" ? "sk-SK" : "en-US")} {L("záznamov", "records")})
             </span>
           )}
         </div>
@@ -1051,11 +1051,12 @@ function LineChartSVG({ pickedHistories, comparables, allMonths, yOf, fmtY, lang
   const [hoverIdx, setHoverIdx] = useState(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
 
-  function handleMouseMove(e) {
+  function handlePointerAt(clientX, clientY) {
     if (!svgRef.current || allMonths.length === 0) return;
     const rect = svgRef.current.getBoundingClientRect();
+    if (rect.width <= 0) return;
     const scaleX = W / rect.width;
-    const localX = (e.clientX - rect.left) * scaleX;
+    const localX = (clientX - rect.left) * scaleX;
     if (localX < padL - 4 || localX > W - padR + 4) {
       setHoverIdx(null);
       return;
@@ -1070,9 +1071,21 @@ function LineChartSVG({ pickedHistories, comparables, allMonths, yOf, fmtY, lang
       if (d < bestDist) { bestDist = d; bestIdx = i; }
     }
     setHoverIdx(bestIdx);
-    setTooltipPos({ x: e.clientX, y: e.clientY });
+    setTooltipPos({ x: clientX, y: clientY });
+  }
+  function handleMouseMove(e) {
+    handlePointerAt(e.clientX, e.clientY);
   }
   function handleMouseLeave() { setHoverIdx(null); }
+  // Touch support — same crosshair behaviour for mobile users. We
+  // intentionally don't preventDefault on touchmove so vertical page
+  // scrolling still works; the crosshair is informational, not an
+  // interaction target.
+  function handleTouchMove(e) {
+    const t = e.touches && e.touches[0];
+    if (t) handlePointerAt(t.clientX, t.clientY);
+  }
+  function handleTouchEnd() { setHoverIdx(null); }
 
   // X-axis ticks (adaptive density)
   const xTickIndices = pickXTicks(allMonths, 6);
@@ -1105,9 +1118,13 @@ function LineChartSVG({ pickedHistories, comparables, allMonths, yOf, fmtY, lang
       <svg
         ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
-        style={{ width: "100%", height: "auto", display: "block" }}
+        style={{ width: "100%", height: "auto", display: "block", touchAction: "pan-y" }}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
+        onTouchStart={handleTouchMove}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
       >
         {/* Soft baseline gradient backdrop for the plot area */}
         <defs>
@@ -1270,11 +1287,20 @@ function LineChartSVG({ pickedHistories, comparables, allMonths, yOf, fmtY, lang
 
       {/* Yahoo-style hover tooltip — shows date + value(s) for ALL picked
           units at the snapped timestamp. Pins to the cursor; never blocks
-          dot interaction because crosshair is rendered inside the SVG. */}
-      {hoveredTs && hoverPicked.length > 0 && typeof document !== "undefined" && (
+          dot interaction because crosshair is rendered inside the SVG.
+          Flips left/up when within ~280×140 px of the right/bottom edge
+          so the tooltip never gets clipped at viewport boundaries. */}
+      {hoveredTs && hoverPicked.length > 0 && typeof document !== "undefined" && (() => {
+        const winW = typeof window !== "undefined" ? window.innerWidth : 1024;
+        const winH = typeof window !== "undefined" ? window.innerHeight : 768;
+        const flipLeft = tooltipPos.x > winW - 280;
+        const flipUp   = tooltipPos.y > winH - 140;
+        return (
         <div style={{
           position: "fixed",
-          left: tooltipPos.x + 14, top: tooltipPos.y + 14,
+          left: flipLeft ? tooltipPos.x - 14 : tooltipPos.x + 14,
+          top:  flipUp   ? tooltipPos.y - 14 : tooltipPos.y + 14,
+          transform: `${flipLeft ? "translateX(-100%) " : ""}${flipUp ? "translateY(-100%)" : ""}`.trim() || undefined,
           background: "rgba(14, 14, 18, 0.97)",
           border: `1px solid ${border}`,
           borderRadius: 6, padding: "0.55rem 0.8rem",
@@ -1299,7 +1325,8 @@ function LineChartSVG({ pickedHistories, comparables, allMonths, yOf, fmtY, lang
             </div>
           ))}
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
@@ -1477,13 +1504,25 @@ function MiniSparkline({ rows }) {
   const max = Math.max(...values);
   const range = max - min || 1;
   const W = 240, H = 22;
-  const xs = (i) => (i / (rows.length - 1)) * W;
+  // Guard against div-by-zero when rows has exactly 1 valid row pre-filter
+  // (shouldn't happen because of values.length<2 guard, but if rows are
+  // sparse with only 1 valid out of many, denominator is rows.length-1 not
+  // values.length-1, so we need to be defensive).
+  const denom = Math.max(1, rows.length - 1);
+  const xs = (i) => (i / denom) * W;
   const ys = (v) => H - ((v - min) / range) * H;
-  const path = rows.map((r, i) => {
-    const v = r.cena_s_dph;
-    if (!Number.isFinite(v)) return null;
-    return `${i === 0 ? "M" : "L"} ${xs(i)} ${ys(v)}`;
-  }).filter(Boolean).join(" ");
+  // Build path by collecting valid points first, then mapping to SVG
+  // commands. The first valid point uses "M", subsequent ones "L". An
+  // earlier version used `${i === 0 ? "M" : "L"}` based on the rows[]
+  // index, which produced invalid paths starting with "L" whenever the
+  // first row had a null cena_s_dph (path silently failed to render).
+  const validPoints = [];
+  for (let i = 0; i < rows.length; i++) {
+    const v = rows[i].cena_s_dph;
+    if (!Number.isFinite(v)) continue;
+    validPoints.push({ i, v });
+  }
+  const path = validPoints.map((p, idx) => `${idx === 0 ? "M" : "L"} ${xs(p.i)} ${ys(p.v)}`).join(" ");
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: 22, marginTop: "0.4rem", display: "block" }}>
       <path d={path} stroke={green} strokeWidth="1.5" fill="none" opacity="0.8"/>

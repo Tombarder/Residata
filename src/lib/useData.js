@@ -71,13 +71,16 @@ export function useMetrics() {
   const [loading, setLoading] = useState(_metricsCache === null);
   useEffect(() => {
     if (!isSupabaseReady()) { setLoading(false); return; }
+    let cancelled = false;
     supabase.from("metrics").select("*").order("display_order", { ascending: true })
       .then(({ data }) => {
+        if (cancelled) return;
         const arr = data || [];
         _metricsCache = arr;
         setMetrics(arr);
         setLoading(false);
       });
+    return () => { cancelled = true; };
   }, []);
   return { metrics, loading };
 }
@@ -224,8 +227,13 @@ export function useProjects(limit) {
     let cancelled = false;
     let q = supabase.from("projects_live").select("*");
     if (limit) q = q.eq("is_top20", true).limit(limit);
-    q.order("available_units", { ascending: false }).then(({ data }) => {
+    q.order("available_units", { ascending: false }).then(({ data, error }) => {
       if (cancelled) return;
+      if (error) {
+        console.error("[useProjects]", error);
+        setLoading(false);
+        return;
+      }
       const arr = data || [];
       _projectsCache = arr;
       _projectsCacheKey = key;
@@ -338,14 +346,22 @@ export function useProjectSnapshots() {
   const [loading, setLoading] = useState(_snapshotsCache === null);
   useEffect(() => {
     if (!isSupabaseReady()) { setLoading(false); return; }
+    let cancelled = false;
     supabase.from("project_snapshots").select("*")
       .order("snapshot_month", { ascending: false })
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) {
+          console.error("[useProjectSnapshots]", error);
+          setLoading(false);
+          return;
+        }
         const arr = data || [];
         _snapshotsCache = arr;
         setSnapshots(arr);
         setLoading(false);
       });
+    return () => { cancelled = true; };
   }, []);
   return { snapshots, loading };
 }
@@ -401,7 +417,12 @@ export function useFlatsCurrent() {
     (async () => {
       const all = [];
       const PAGE = 1000;
-      for (let offset = 0; ; offset += PAGE) {
+      let offset = 0;
+      // Safety cap — if server is paginating us into oblivion (e.g. cap < 50
+      // rows but tens of thousands of total rows), give up at 200k. We've
+      // never had more than ~5.5k rows in flats_current; this is a guardrail.
+      const MAX_TOTAL = 200_000;
+      while (offset < MAX_TOTAL) {
         const { data, error } = await supabase
           .from("flats_current")
           .select("*")
@@ -412,8 +433,15 @@ export function useFlatsCurrent() {
           console.error("[useFlatsCurrent]", error);
           break;
         }
-        all.push(...(data || []));
-        if (!data || data.length < PAGE) break;
+        const got = data?.length || 0;
+        if (got === 0) break;                       // truly out of rows
+        all.push(...data);
+        offset += got;                              // advance by ACTUAL rows
+        // If server returned fewer than requested, that's the final page.
+        // But ONLY treat it as "final" when got is reasonably close to PAGE
+        // — if got is tiny (< 50) it might just be the last partial page,
+        // OR the server's hard cap. Either way got < PAGE means done.
+        if (got < PAGE) break;
       }
       if (cancelled) return;
       _flatsCurrentCache = all;
@@ -482,13 +510,20 @@ export function useFlatsArchive(months) {
       // PostgREST default max-rows is 1000 per request. We REQUEST 5000
       // hoping the server config allows it (cuts wall-clock by 5x); if
       // the server caps lower we still continue paginating until an
-      // empty page or error. The break condition is `data.length === 0`
-      // (empty), NOT `length < PAGE` — that older check broke when
-      // server cap was below requested PAGE size, leaving the archive
-      // truncated to a single page.
+      // empty page or error. Termination conditions:
+      //   · got === 0 → no more rows (true end of dataset)
+      //   · got < REQUESTED_PAGE AND we made progress in this iteration →
+      //     server is at the tail of the dataset, also done
+      // Earlier versions had a `got < 50 → break` heuristic which TRUNCATED
+      // the archive when the server happened to cap pages at < 50 rows.
+      // We now rely strictly on actual row counts.
       const REQUESTED_PAGE = 5000;
       let offset = 0;
-      while (true) {
+      let lastPageSize = REQUESTED_PAGE;
+      // Safety cap to prevent runaway loops if a misconfigured server
+      // returns a tiny page size for a huge table.
+      const MAX_TOTAL = 500_000;
+      while (offset < MAX_TOTAL) {
         let q = supabase
           .from("flats_archive")
           .select("*")
@@ -509,20 +544,21 @@ export function useFlatsArchive(months) {
         all.push(...data);
         setProgress(all.length);
         offset += got;                              // advance by ACTUAL rows
-        if (got < REQUESTED_PAGE && got >= 100) {
-          // Heuristic: server capped page size. Keep going but with the
-          // server's real page size as the new pace. (got < REQUESTED &&
-          // got >= 100 means "server gave us less than we asked but a
-          // realistic chunk — likely cap.")
-          // No-op here, just advance offset; the next iteration's range
-          // request will get the next chunk.
+        // If we got fewer rows than the previous page's size, we've likely
+        // hit the dataset end. We track lastPageSize so we don't break
+        // prematurely on a server-imposed page cap (which would otherwise
+        // happen on EVERY page).
+        if (lastPageSize !== REQUESTED_PAGE && got < lastPageSize) break;
+        if (got < REQUESTED_PAGE && lastPageSize === REQUESTED_PAGE) {
+          // First time getting less than REQUESTED — could be server cap
+          // OR end of data. Adjust expected page size to what we got and
+          // keep paginating. The next iteration's same/larger page size
+          // means more data; smaller means done.
+          lastPageSize = got;
         }
-        if (got < 50) break;                        // tail end, definitely done
-        // Safety: cap total rows to avoid runaway loops
-        if (offset > 200000) {
-          console.warn("[useFlatsArchive] reached 200k row safety cap");
-          break;
-        }
+      }
+      if (offset >= MAX_TOTAL) {
+        console.warn("[useFlatsArchive] reached safety cap of", MAX_TOTAL, "rows");
       }
       if (cancelled) return;
       _archiveCache = all;
@@ -582,8 +618,13 @@ export function useEarlyAccessStats() {
   const [stats, setStats] = useState({ paid_count: 0, remaining_slots: 9 });
   useEffect(() => {
     if (!isSupabaseReady()) return;
+    let cancelled = false;
     supabase.from("early_access_stats").select("*").maybeSingle()
-      .then(({ data }) => data && setStats(data));
+      .then(({ data }) => {
+        if (cancelled) return;
+        if (data) setStats(data);
+      });
+    return () => { cancelled = true; };
   }, []);
   return stats;
 }
