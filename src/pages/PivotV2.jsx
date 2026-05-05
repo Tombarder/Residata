@@ -634,6 +634,22 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   const latestMonth = archiveMonths?.[0] || null;
   const { flats: realFlats } = useFlatsArchive();  // all months
 
+  // Latest batch DATE (YYYY-MM-DD) — auto-seeds the Datum filter so the
+  // pivot opens on "the most recent scrape" by default. Read from the
+  // loaded archive rather than a separate hook so it auto-rolls forward
+  // the moment a new batch lands in flats_archive (no redeploy needed).
+  const latestDatum = useMemo(() => {
+    if (!realFlats?.length) return null;
+    let max = null;
+    for (const r of realFlats) {
+      const ts = r.batch_timestamp || r.created_at;
+      if (!ts) continue;
+      const d = String(ts).slice(0, 10);  // YYYY-MM-DD
+      if (!max || d > max) max = d;
+    }
+    return max;
+  }, [realFlats]);
+
   // Enrich flats with their project's metadata once so every accessor
   // can read off a single flat row.
   const projectById = useMemo(() => {
@@ -753,18 +769,20 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   // first paint. They can clear the filter to see all months.
   const monthFilterSeededRef = useRef(false);
   useEffect(() => {
-    // Idempotent one-shot auto-seed: when latestMonth first becomes available
-    // (async from useArchiveMonths), inject a default Mesiac filter chip.
+    // Idempotent one-shot auto-seed: pin the pivot to the LATEST scrape
+    // date by default (Datum field, YYYY-MM-DD precision). Auto-rolls
+    // forward as new batches land — Datum is derived from batch_timestamp
+    // so no manual update is ever needed.
     // Guarded by ref so this fires exactly once per mount.
     if (monthFilterSeededRef.current) return;
-    if (!latestMonth) return;
+    if (!latestDatum) return;
     monthFilterSeededRef.current = true;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setFilters(curr => {
-      if (curr.some(f => f.key === "snapshot_month")) return curr;
-      return [...curr, { key: "snapshot_month", values: [latestMonth] }];
+      if (curr.some(f => f.key === "datum" || f.key === "snapshot_month")) return curr;
+      return [...curr, { key: "datum", values: [latestDatum] }];
     });
-  }, [latestMonth]);
+  }, [latestDatum]);
   const [search,  setSearch]  = useState("");
   const [drag,    setDrag]    = useState(null);
   const [hoverZone, setHoverZone] = useState(null);
