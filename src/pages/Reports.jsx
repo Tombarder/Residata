@@ -865,6 +865,10 @@ function Histogram({ bins, lang, unit, flats, projects, onProjectClick }) {
     const projById = new Map((projects || []).map(p => [p.id, p]));
     const rows = [];
     for (const f of flats) {
+      // Drill-down must mirror the histogram's scope: V/R/PR only.
+      // priceDistribution() filters the same way, so showing sold
+      // flats here would be inconsistent with the bin counts above.
+      if (f.stav !== "V" && f.stav !== "R" && f.stav !== "PR") continue;
       const price = Number(f.cena_s_dph), area = Number(f.obytna_plocha);
       if (!Number.isFinite(price) || !Number.isFinite(area) || area <= 0) continue;
       const m2 = price / area;
@@ -2136,11 +2140,14 @@ function summariseProjects(projects, flats) {
     const soldPct = activeTotal > 0 && hasSoldData
       ? ((sold + reserved + prereserved) / activeTotal) * 100
       : null;
-    // Avg €/m² as simple arithmetic mean of per-flat €/m². No
-    // weighting by registry-claimed inventory, so manual_total
-    // projects can't skew the headline price either.
+    // Avg €/m² as simple arithmetic mean of per-flat €/m² across
+    // FOR-SALE flats (V/R/PR). Sold (P) flats are excluded — ~11% of
+    // them retain a price field but those are old transactions that
+    // bias the headline downward. Matches projects_live.avg_price_eur_m2
+    // which filters the same way at the DB layer.
     const m2List = flats
-      .filter(f => f.cena_s_dph > 0 && f.obytna_plocha > 0)
+      .filter(f => (f.stav === "V" || f.stav === "R" || f.stav === "PR")
+                && f.cena_s_dph > 0 && f.obytna_plocha > 0)
       .map(f => f.cena_s_dph / f.obytna_plocha);
     const wavgM2 = m2List.length
       ? m2List.reduce((a, b) => a + b, 0) / m2List.length
@@ -2239,8 +2246,13 @@ function groupAggregatesFromFlats(flats, key) {
     (buckets[k] = buckets[k] || []).push(f);
   }
   const sumPriceM2 = (rows) => {
+    // Weighted avg €/m² of for-sale flats only (V/R/PR). Sold flats
+    // sometimes retain a price but those are historical and bias
+    // the average downward — same fix as summariseProjects above.
     let sp = 0, sm = 0;
     for (const r of rows) {
+      const stav = (r.stav || "").trim().toUpperCase();
+      if (stav !== "V" && stav !== "R" && stav !== "PR") continue;
       const p = Number(r.cena_s_dph), m = Number(r.obytna_plocha);
       if (!Number.isFinite(p) || !Number.isFinite(m) || m <= 0) continue;
       sp += p; sm += m;
@@ -2273,9 +2285,12 @@ function groupAggregatesFromFlats(flats, key) {
       return b.totalUnits - a.totalUnits;
     });
 }
-/* Price distribution — bin units by €/m² */
+/* Price distribution — bin units by €/m². For-sale flats only (V/R/PR);
+   sold flats are excluded so the histogram reflects current asking
+   prices, not historical transaction mix. */
 function priceDistribution(flats, nBins) {
   const values = flats
+    .filter(f => f.stav === "V" || f.stav === "R" || f.stav === "PR")
     .map(f => {
       const p = Number(f.cena_s_dph), m = Number(f.obytna_plocha);
       return (Number.isFinite(p) && Number.isFinite(m) && m > 0) ? p / m : null;
