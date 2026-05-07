@@ -752,16 +752,19 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
     .filter(v => Number.isFinite(v) && v > 0);
   const topPrice = availPrices.length ? Math.max(...availPrices) : null;
 
-  // Has the developer published ANY prices? Some projects publish only
-  // availability + layouts without prices. In that case every price-
-  // dependent chart/KPI is meaningless and we want to call it out
-  // upfront so the user doesn't hunt for a broken-looking €/m² card.
-  const pricedFlats = flats.filter(f => Number.isFinite(Number(f.cena_s_dph)) && Number(f.cena_s_dph) > 0);
-  const noPrices = flats.length > 0 && pricedFlats.length === 0;
-  // Show "computed on subset" banner whenever <80% of flats are priced —
-  // matches the audit classification (HAS_PRICES = ≥80%, PARTIAL = 10-80%).
-  // Earlier <50% threshold hid the disclaimer on projects with 50-79% coverage.
-  const partialPrices = pricedFlats.length > 0 && pricedFlats.length < flats.length * 0.8;
+  // Has the developer published prices for the FOR-SALE flats? Sold (P)
+  // flats almost never have a published price (the field is removed once
+  // the unit is sold), so including them inflates the "missing prices"
+  // count and incorrectly classifies projects as no-price/partial when
+  // in fact every available unit IS priced. Denominator = V/R/PR; sold
+  // flats are excluded from the price-coverage calculation entirely.
+  const forSaleFlats = flats.filter(f => f.stav === "V" || f.stav === "R" || f.stav === "PR");
+  const pricedForSaleFlats = forSaleFlats.filter(f => Number.isFinite(Number(f.cena_s_dph)) && Number(f.cena_s_dph) > 0);
+  const noPrices = forSaleFlats.length > 0 && pricedForSaleFlats.length === 0;
+  // Show "computed on subset" banner whenever <80% of for-sale units are
+  // priced — matches the audit classification (HAS_PRICES = ≥80%,
+  // PARTIAL = 10-80%, NO_PRICES = <10%) computed against V/R/PR only.
+  const partialPrices = pricedForSaleFlats.length > 0 && pricedForSaleFlats.length < forSaleFlats.length * 0.8;
 
   // Room-type breakdown — group by izby, compute sold % per group.
   // "Fastest-moving" = highest sold/total ratio (signals market validation).
@@ -879,8 +882,8 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
         }}>
           <strong style={{ color: "#f5a623" }}>⚠ {L("Bez cien", "No prices")}:</strong>{" "}
           {L(
-            "Developer nezverejňuje ceny bytov. Cenové grafy (rozdelenie cien, €/m² scatter) a KPIs s cenou sú skryté — nemôžu byť zmysluplné bez dát. Dostupnosť, izbovosť a plochy sú uvedené normálne.",
-            "Developer doesn't publish prices. Price-based charts (price distribution, area × price scatter) and price KPIs are hidden — they can't be meaningful without the data. Availability, room-type and area data below are still shown normally.",
+            "Developer nezverejňuje ceny bytov v aktuálnej ponuke. Cenové grafy (rozdelenie cien, €/m² scatter) a KPIs s cenou sú skryté — nemôžu byť zmysluplné bez dát. Dostupnosť, izbovosť a plochy sú uvedené normálne.",
+            "Developer doesn't publish prices for any for-sale units. Price-based charts (price distribution, area × price scatter) and price KPIs are hidden — they can't be meaningful without the data. Availability, room-type and area data below are still shown normally.",
           )}
         </div>
       )}
@@ -897,8 +900,8 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
         }}>
           <strong style={{ color: "#f5a623" }}>ⓘ</strong>{" "}
           {L(
-            `Developer publikuje ceny iba pre ${pricedFlats.length} z ${flats.length} bytov — cenové grafy a priemery sú počítané iba z tejto podmnožiny.`,
-            `Developer publishes prices for only ${pricedFlats.length} of ${flats.length} units — price charts and averages are computed on this subset only.`,
+            `Developer publikuje ceny iba pre ${pricedForSaleFlats.length} z ${forSaleFlats.length} bytov v ponuke — cenové grafy a priemery sú počítané iba z tejto podmnožiny.`,
+            `Developer publishes prices for only ${pricedForSaleFlats.length} of ${forSaleFlats.length} for-sale units — price charts and averages are computed on this subset only.`,
           )}
         </div>
       )}
