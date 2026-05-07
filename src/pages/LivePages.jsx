@@ -1110,7 +1110,10 @@ function TimelineChart({ snaps, lang }) {
     velRes   = (points[N - 1].res   - points[N - 1 - lookback].res)   / lookback;
     velSold  = (points[N - 1].sold  - points[N - 1 - lookback].sold)  / lookback;
   }
-  const projectAheadMonths = N >= 2 ? 3 : 0;
+  // Project only when we have ENOUGH clean data + non-negative velocity.
+  // With 2 data points where one is from a parser revision, velocity is
+  // misleading. Need 3+ snapshots AND positive sold velocity.
+  const projectAheadMonths = (N >= 3 && velSold > 0.1) ? 3 : 0;
   const lastTotal = points[N - 1].total;
   const projection = [];
   for (let k = 1; k <= projectAheadMonths; k++) {
@@ -1193,10 +1196,16 @@ function TimelineChart({ snaps, lang }) {
   const pctAvail = cur.total > 0 ? (cur.avail / cur.total * 100) : 0;
   // Velocity: avg sold per month from last 3 months
   const velocityPerMonth = velSold;
-  // Months until sellout at current pace (if velocity > 0)
-  const monthsToSellout = velocityPerMonth > 0 ? cur.avail / velocityPerMonth : null;
-  const trendIcon = velocityPerMonth > 0.5 ? "▲" : velocityPerMonth < -0.5 ? "▼" : "▬";
-  const trendColor = velocityPerMonth > 0.5 ? green : velocityPerMonth < -0.5 ? "#ff9b6b" : dim;
+  // Months until sellout at current pace — only meaningful with 3+ snapshots
+  // AND positive velocity (negative means parser revision, not real return).
+  const hasReliableVelocity = N >= 3 && velocityPerMonth > 0.1;
+  const monthsToSellout = hasReliableVelocity ? cur.avail / velocityPerMonth : null;
+  const trendIcon = hasReliableVelocity
+    ? (velocityPerMonth > 0.5 ? "▲" : "▬")
+    : "·";
+  const trendColor = hasReliableVelocity
+    ? (velocityPerMonth > 0.5 ? green : dim)
+    : dim;
 
   const hp = hover && hover.i < realN ? points[hover.i] : null;
   const hpProj = hover && hover.i >= realN ? allFrames[hover.i] : null;
@@ -1243,16 +1252,16 @@ function TimelineChart({ snaps, lang }) {
             <tspan>  </tspan>
             <tspan fill={dim}>{lang === "sk" ? "z" : "of"} {cur.total}</tspan>
           </text>
-          {/* Velocity badge top-right */}
-          {N >= 2 && (
+          {/* Velocity badge top-right — only when reliable data available */}
+          {hasReliableVelocity ? (
             <g transform={`translate(${W - pad.r - 130}, 8)`}>
-              <rect x={0} y={0} width={130} height={36} rx={6}
+              <rect x={0} y={0} width={130} height={40} rx={6}
                     fill={trendColor} opacity={0.12} stroke={trendColor} strokeOpacity={0.3} />
               <text x={10} y={16} fill={dim} fontFamily={mono} fontSize={9}>
                 {lang === "sk" ? "TEMPO" : "VELOCITY"}
               </text>
               <text x={10} y={30} fill={trendColor} fontFamily={mono} fontSize={13} fontWeight={700}>
-                {trendIcon} {velocityPerMonth >= 0 ? "+" : ""}{velocityPerMonth.toFixed(1)} / mes
+                {trendIcon} +{velocityPerMonth % 1 === 0 ? velocityPerMonth.toFixed(0) : velocityPerMonth.toFixed(1)} / mes
               </text>
               {monthsToSellout != null && monthsToSellout > 0 && monthsToSellout < 60 && (
                 <text x={10} y={46} fill={dim} fontFamily={mono} fontSize={8}>
@@ -1261,6 +1270,17 @@ function TimelineChart({ snaps, lang }) {
                     : `≈ ${monthsToSellout.toFixed(1)} mo to sell-out`}
                 </text>
               )}
+            </g>
+          ) : N >= 2 && (
+            <g transform={`translate(${W - pad.r - 130}, 8)`}>
+              <rect x={0} y={0} width={130} height={36} rx={6}
+                    fill={dim} opacity={0.08} stroke={dim} strokeOpacity={0.2} />
+              <text x={10} y={16} fill={dim} fontFamily={mono} fontSize={9}>
+                {lang === "sk" ? "TEMPO" : "VELOCITY"}
+              </text>
+              <text x={10} y={30} fill={dim} fontFamily={mono} fontSize={10}>
+                {lang === "sk" ? "potrebné 3+ mesiace" : "needs 3+ months"}
+              </text>
             </g>
           )}
         </g>
@@ -1459,38 +1479,66 @@ function TakeupChart({ snaps, lang }) {
 
         {/* ── Headline strip ─────────────────────────── */}
         <g>
-          {/* Big velocity number */}
-          <text x={pad.l} y={26} fill={text} fontFamily={mono} fontSize={26} fontWeight={700}>
-            {avg >= 0 ? "+" : ""}{avg.toFixed(1)}
-          </text>
-          <text x={pad.l + 78} y={20} fill={dim} fontFamily={mono} fontSize={11}>
-            {lang === "sk" ? "bytov / mes" : "units / mo"}
-          </text>
-          <text x={pad.l + 78} y={32} fill={dim} fontFamily={mono} fontSize={9}>
-            {lang === "sk" ? `priemer z ${deltas.length} ${deltas.length === 1 ? "mesiaca" : deltas.length < 5 ? "mesiacov" : "mesiacov"}` : `avg of ${deltas.length} mo`}
-          </text>
-          {/* Trend badge */}
-          <g transform={`translate(${W - pad.r - 130}, 8)`}>
-            <rect x={0} y={0} width={130} height={36} rx={6}
-                  fill={trendColor} opacity={0.12} stroke={trendColor} strokeOpacity={0.3} />
-            <text x={10} y={16} fill={dim} fontFamily={mono} fontSize={9}>
-              {lang === "sk" ? "TREND" : "TREND"}
-            </text>
-            <text x={10} y={30} fill={trendColor} fontFamily={mono} fontSize={13} fontWeight={700}>
-              {trendIcon} {trendLabel}
-            </text>
-          </g>
-          {/* Best month annotation under headline */}
-          {deltas.length > 1 && maxDelta > 0 && (() => {
-            const best = deltas.find(d => d.delta === maxDelta);
-            return (
-              <text x={pad.l} y={48} fill={dim} fontFamily={mono} fontSize={9}>
-                {lang === "sk" ? "najlepší mesiac" : "best month"}{" "}
-                <tspan fill={text} fontWeight={700}>{best.month}</tspan>{" "}
-                <tspan fill={green} fontWeight={700}>+{maxDelta}</tspan>
+          {deltas.length === 1 ? (
+            // Single-data-point view — no "avg of 1" weirdness, no trend badge
+            <>
+              <text x={pad.l} y={20} fill={dim} fontFamily={mono} fontSize={10} letterSpacing="0.05em">
+                {lang === "sk" ? "POSLEDNÝ MESIAC" : "LATEST MONTH"}
               </text>
-            );
-          })()}
+              <text x={pad.l} y={42} fill={text} fontFamily={mono} fontSize={22} fontWeight={700}>
+                {deltas[0].delta >= 0 ? "+" : ""}{deltas[0].delta}
+              </text>
+              <text x={pad.l + 60} y={38} fill={dim} fontFamily={mono} fontSize={11}>
+                {Math.abs(deltas[0].delta) === 1
+                  ? (lang === "sk" ? "byt predaný" : "unit sold")
+                  : (lang === "sk" ? "bytov predaných" : "units sold")}
+              </text>
+              <text x={pad.l + 60} y={50} fill={dim} fontFamily={mono} fontSize={9}>
+                {deltas[0].month} ·{" "}
+                <tspan fill={dim}>
+                  {lang === "sk" ? `celkom ${deltas[0].cumSold}` : `${deltas[0].cumSold} total`}
+                </tspan>
+              </text>
+            </>
+          ) : (
+            <>
+              {/* Big velocity number */}
+              <text x={pad.l} y={20} fill={dim} fontFamily={mono} fontSize={10} letterSpacing="0.05em">
+                {lang === "sk" ? "PRIEMERNÉ TEMPO" : "AVG VELOCITY"}
+              </text>
+              <text x={pad.l} y={44} fill={text} fontFamily={mono} fontSize={22} fontWeight={700}>
+                {avg >= 0 ? "+" : ""}{avg % 1 === 0 ? avg.toFixed(0) : avg.toFixed(1)}
+              </text>
+              <text x={pad.l + 70} y={40} fill={dim} fontFamily={mono} fontSize={11}>
+                {lang === "sk" ? "bytov / mes" : "units / mo"}
+              </text>
+              <text x={pad.l + 70} y={51} fill={dim} fontFamily={mono} fontSize={9}>
+                {lang === "sk" ? `za ${deltas.length} ${deltas.length < 5 ? "mesiace" : "mesiacov"}` : `over ${deltas.length} months`}
+              </text>
+              {/* Trend badge */}
+              <g transform={`translate(${W - pad.r - 130}, 8)`}>
+                <rect x={0} y={0} width={130} height={36} rx={6}
+                      fill={trendColor} opacity={0.12} stroke={trendColor} strokeOpacity={0.3} />
+                <text x={10} y={16} fill={dim} fontFamily={mono} fontSize={9}>
+                  {lang === "sk" ? "TREND" : "TREND"}
+                </text>
+                <text x={10} y={30} fill={trendColor} fontFamily={mono} fontSize={13} fontWeight={700}>
+                  {trendIcon} {trendLabel}
+                </text>
+              </g>
+              {/* Best month annotation under headline */}
+              {maxDelta > 0 && (() => {
+                const best = deltas.find(d => d.delta === maxDelta);
+                return (
+                  <text x={pad.l} y={64} fill={dim} fontFamily={mono} fontSize={9}>
+                    {lang === "sk" ? "najlepší mesiac" : "best month"}{" "}
+                    <tspan fill={text} fontWeight={700}>{best.month}</tspan>{" "}
+                    <tspan fill={green} fontWeight={700}>+{maxDelta}</tspan>
+                  </text>
+                );
+              })()}
+            </>
+          )}
         </g>
 
         {/* ── Chart body ─────────────────────────────── */}
