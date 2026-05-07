@@ -758,7 +758,10 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
   // upfront so the user doesn't hunt for a broken-looking €/m² card.
   const pricedFlats = flats.filter(f => Number.isFinite(Number(f.cena_s_dph)) && Number(f.cena_s_dph) > 0);
   const noPrices = flats.length > 0 && pricedFlats.length === 0;
-  const partialPrices = pricedFlats.length > 0 && pricedFlats.length < flats.length * 0.5;
+  // Show "computed on subset" banner whenever <80% of flats are priced —
+  // matches the audit classification (HAS_PRICES = ≥80%, PARTIAL = 10-80%).
+  // Earlier <50% threshold hid the disclaimer on projects with 50-79% coverage.
+  const partialPrices = pricedFlats.length > 0 && pricedFlats.length < flats.length * 0.8;
 
   // Room-type breakdown — group by izby, compute sold % per group.
   // "Fastest-moving" = highest sold/total ratio (signals market validation).
