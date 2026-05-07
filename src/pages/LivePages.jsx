@@ -881,14 +881,17 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
       {/* Charts grid */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1.25rem" }} className="insights-grid">
         {projectSnaps.length >= 2 && (
-          <ChartCard title={L("Timeline — voľné vs. predané", "Timeline — available vs sold")}
-            subtitle={L(`${projectSnaps.length} mesiacov histórie`, `${projectSnaps.length} months of history`)}>
+          <ChartCard title={L("Predajová trajektória", "Sales trajectory")}
+            subtitle={L(
+              `${projectSnaps.length} ${projectSnaps.length === 1 ? "mesiac" : projectSnaps.length < 5 ? "mesiace" : "mesiacov"} histórie · zloženie projektu`,
+              `${projectSnaps.length} months · project composition`
+            )}>
             <TimelineChart snaps={projectSnaps} lang={lang} />
           </ChartCard>
         )}
         {projectSnaps.length >= 2 && (
-          <ChartCard title={L("Mesačná absorpcia (take-up)", "Monthly take-up")}
-            subtitle={L("Δ predaných v každom mesiaci", "Δ sold units per month")}>
+          <ChartCard title={L("Tempo predaja", "Sales pace")}
+            subtitle={L("predaných bytov za mesiac", "units sold per month")}>
             <TakeupChart snaps={projectSnaps} lang={lang} />
           </ChartCard>
         )}
@@ -1048,29 +1051,46 @@ function ChartCard({ title, subtitle, children }) {
   );
 }
 
-/* ── Timeline: stacked composition over months ──────────────
+/* ── Smooth path generator — Catmull-Rom-ish bezier curves
+ *  for stacked area charts. Returns an SVG path string for the
+ *  given (x[i], y[i]) point sequence with smoothed transitions
+ *  between adjacent points. */
+function smoothPath(xs, ys) {
+  if (xs.length === 0) return "";
+  if (xs.length === 1) return `M ${xs[0]} ${ys[0]}`;
+  let d = `M ${xs[0]} ${ys[0]}`;
+  for (let i = 1; i < xs.length; i++) {
+    const dx = (xs[i] - xs[i - 1]) / 3;
+    const c1x = xs[i - 1] + dx;
+    const c1y = ys[i - 1];
+    const c2x = xs[i] - dx;
+    const c2y = ys[i];
+    d += ` C ${c1x} ${c1y} ${c2x} ${c2y} ${xs[i]} ${ys[i]}`;
+  }
+  return d;
+}
+
+/* ── Sales Trajectory — premium stacked composition chart ─────
  *
- *  Predtým: dve mirrored čiary (voľné dolu, predané hore). Boss to
- *  označil ako redundantné — pre fixed-size projekty sú lines presne
- *  inverzné (V + P + R = total = constant), takže obe čiary nesú
- *  rovnakú informáciu.
+ *  Headline KPI strip: % sold + velocity badge.
+ *  Smooth curves (cubic bezier) instead of jagged lines.
+ *  Forward projection (dashed) showing where the project is
+ *  headed at current velocity.
+ *  Y-axis: % scale (0-100% of total) — gives instantly readable
+ *  context regardless of project size.
+ *  Hover crosshair with rich tooltip.
  *
- *  Teraz: stacked area zobrazujúce zloženie projektu v čase. Spodok
- *  = predané (orange), stred = rezervované (yellow), vrch = voľné
- *  (green). Celková výška = total units.
- *
- *  Vizuálny príbeh: projekt sa "predáva" zhora dolu — green vrstva
- *  klesá ako sa byty predávajú. Pri novej fáze celá výška stúpne
- *  (total units narastie viditeľne). Crosshair hover ukáže presné
- *  čísla pre daný mesiac.
+ *  Layers (bottom→top): sold (orange) → reserved (yellow) → available (green).
+ *  As units sell, green layer "melts" downward.
  */
 function TimelineChart({ snaps, lang }) {
-  const W = 460, H = 180, pad = { l: 36, r: 10, t: 14, b: 28 };
+  const W = 460, H = 240;  // taller for headline strip
+  const headlineH = 56;
+  const pad = { l: 38, r: 14, t: headlineH + 14, b: 30 };
   const innerW = W - pad.l - pad.r, innerH = H - pad.t - pad.b;
   const svgRef = useRef(null);
   const [hover, setHover] = useState(null);
 
-  // Per-snapshot V/R/P breakdown
   const points = snaps.map((s) => ({
     month: s.snapshot_month,
     avail: s.available_units || 0,
@@ -1078,37 +1098,83 @@ function TimelineChart({ snaps, lang }) {
     sold:  s.sold_units      || 0,
     total: (s.available_units || 0) + (s.reserved_units || 0) + (s.sold_units || 0),
   }));
-  const yMax = Math.max(1, ...points.map(p => p.total));
-  const xAt = (i) => pad.l + (innerW * i) / Math.max(1, points.length - 1);
-  const yAt = (v) => pad.t + innerH - (innerH * v) / yMax;
 
-  // Build stacked polygons: bottom = sold, middle = reserved, top = avail
-  const xs = points.map((_, i) => xAt(i));
-  const yBottom = pad.t + innerH;
-  const ySold = points.map(p => yAt(p.sold));
-  const yResTop = points.map(p => yAt(p.sold + p.res));
-  const yAvailTop = points.map(p => yAt(p.sold + p.res + p.avail));
+  // Forward projection: extrapolate 3 months ahead based on velocity
+  // (avg delta over last 2-3 months). Capped: avail can't go below 0;
+  // sold can't exceed total; reserved settles at last value.
+  const N = points.length;
+  const lookback = Math.min(3, N - 1);
+  let velAvail = 0, velRes = 0, velSold = 0;
+  if (lookback >= 1) {
+    velAvail = (points[N - 1].avail - points[N - 1 - lookback].avail) / lookback;
+    velRes   = (points[N - 1].res   - points[N - 1 - lookback].res)   / lookback;
+    velSold  = (points[N - 1].sold  - points[N - 1 - lookback].sold)  / lookback;
+  }
+  const projectAheadMonths = N >= 2 ? 3 : 0;
+  const lastTotal = points[N - 1].total;
+  const projection = [];
+  for (let k = 1; k <= projectAheadMonths; k++) {
+    const a = Math.max(0, points[N - 1].avail + velAvail * k);
+    const r = Math.max(0, points[N - 1].res   + velRes   * k);
+    let so  = Math.min(lastTotal, points[N - 1].sold + velSold * k);
+    // Conservation: a + r + so should ≈ total constant for fixed-size project
+    const projTotal = a + r + so;
+    if (projTotal > 0 && lastTotal > 0) {
+      const scale = lastTotal / projTotal;
+      projection.push({ avail: a * scale, res: r * scale, sold: so * scale });
+    } else {
+      projection.push({ avail: a, res: r, sold: so });
+    }
+  }
+  const allFrames = [...points, ...projection.map((p, i) => ({
+    avail: p.avail, res: p.res, sold: p.sold,
+    total: p.avail + p.res + p.sold,
+    isProjection: true,
+    month: "+",
+  }))];
+  const yMax = Math.max(1, ...allFrames.map(p => p.total));
 
-  const polySold = `M ${xs[0]} ${yBottom} ` +
-    xs.map((x, i) => `L ${x} ${ySold[i]}`).join(" ") +
-    ` L ${xs[xs.length - 1]} ${yBottom} Z`;
-  const polyRes = `M ${xs[0]} ${ySold[0]} ` +
-    xs.map((x, i) => `L ${x} ${yResTop[i]}`).join(" ") +
-    " " + xs.slice().reverse().map((x, ri) => {
-      const i = xs.length - 1 - ri;
-      return `L ${x} ${ySold[i]}`;
-    }).join(" ") + " Z";
-  const polyAvail = `M ${xs[0]} ${yResTop[0]} ` +
-    xs.map((x, i) => `L ${x} ${yAvailTop[i]}`).join(" ") +
-    " " + xs.slice().reverse().map((x, ri) => {
-      const i = xs.length - 1 - ri;
-      return `L ${x} ${yResTop[i]}`;
-    }).join(" ") + " Z";
+  // Use % scale (0-100%) instead of absolute count — universal regardless of project size
+  const yAtPct = (frac) => pad.t + innerH - innerH * frac;
 
-  const ticks = [0, 0.25, 0.5, 0.75, 1].map(t => ({
-    y: pad.t + innerH - innerH * t,
-    label: Math.round(yMax * t),
-  }));
+  // X positions: evenly spaced including projection
+  const totalCells = allFrames.length;
+  const xAt = (i) => pad.l + (innerW * i) / Math.max(1, totalCells - 1);
+  const xs = allFrames.map((_, i) => xAt(i));
+
+  // Layer Y positions (top edge of each band, in % of yMax)
+  const ySold      = allFrames.map(p => yAtPct(p.sold / yMax));
+  const yResTop    = allFrames.map(p => yAtPct((p.sold + p.res) / yMax));
+  const yAvailTop  = allFrames.map(p => yAtPct((p.sold + p.res + p.avail) / yMax));
+  const yBottom    = pad.t + innerH;
+
+  // Smooth paths for actual data only (no projection blend in main areas)
+  const realN = points.length;
+  const xsReal     = xs.slice(0, realN);
+  const ySoldReal  = ySold.slice(0, realN);
+  const yResReal   = yResTop.slice(0, realN);
+  const yAvailReal = yAvailTop.slice(0, realN);
+
+  const dSold  = smoothPath(xsReal, ySoldReal)    + ` L ${xsReal[realN - 1]} ${yBottom} L ${xsReal[0]} ${yBottom} Z`;
+  const dRes   = smoothPath(xsReal, yResReal)
+                 + " " + smoothPath(xsReal.slice().reverse(), ySoldReal.slice().reverse()).replace(/^M/, "L")
+                 + " Z";
+  const dAvail = smoothPath(xsReal, yAvailReal)
+                 + " " + smoothPath(xsReal.slice().reverse(), yResReal.slice().reverse()).replace(/^M/, "L")
+                 + " Z";
+
+  // Projection paths (dashed top edges, lighter fills)
+  const xsProj     = xs.slice(realN - 1);  // include last real point as anchor
+  const ySoldProj  = ySold.slice(realN - 1);
+  const yResProj   = yResTop.slice(realN - 1);
+  const yAvailProj = yAvailTop.slice(realN - 1);
+  const hasProjection = projectAheadMonths > 0;
+  const dSoldProj  = hasProjection ? smoothPath(xsProj, ySoldProj) : "";
+  const dResProj   = hasProjection ? smoothPath(xsProj, yResProj) : "";
+  const dAvailProj = hasProjection ? smoothPath(xsProj, yAvailProj) : "";
+
+  // % gridlines (0/25/50/75/100%)
+  const gridFracs = [0, 0.25, 0.5, 0.75, 1];
 
   function handleMove(e) {
     if (!svgRef.current) return;
@@ -1121,69 +1187,185 @@ function TimelineChart({ snaps, lang }) {
     setHover({ i: bestI, mx: e.clientX, my: e.clientY });
   }
 
-  const hp = hover ? points[hover.i] : null;
+  // Headline metrics (current state at most recent real snapshot)
+  const cur = points[N - 1];
+  const pctSold = cur.total > 0 ? (cur.sold / cur.total * 100) : 0;
+  const pctAvail = cur.total > 0 ? (cur.avail / cur.total * 100) : 0;
+  // Velocity: avg sold per month from last 3 months
+  const velocityPerMonth = velSold;
+  // Months until sellout at current pace (if velocity > 0)
+  const monthsToSellout = velocityPerMonth > 0 ? cur.avail / velocityPerMonth : null;
+  const trendIcon = velocityPerMonth > 0.5 ? "▲" : velocityPerMonth < -0.5 ? "▼" : "▬";
+  const trendColor = velocityPerMonth > 0.5 ? green : velocityPerMonth < -0.5 ? "#ff9b6b" : dim;
+
+  const hp = hover && hover.i < realN ? points[hover.i] : null;
+  const hpProj = hover && hover.i >= realN ? allFrames[hover.i] : null;
 
   return (
     <div style={{ position: "relative" }}>
       <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`}
            style={{ width: "100%", height: "auto", display: "block", overflow: "visible" }}
            onMouseMove={handleMove} onMouseLeave={() => setHover(null)}>
-        {ticks.map((t, i) => (
+        <defs>
+          <linearGradient id="tg-avail" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={green} stopOpacity="0.95"/>
+            <stop offset="100%" stopColor={green} stopOpacity="0.55"/>
+          </linearGradient>
+          <linearGradient id="tg-res" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#f5d142" stopOpacity="0.95"/>
+            <stop offset="100%" stopColor="#f5d142" stopOpacity="0.6"/>
+          </linearGradient>
+          <linearGradient id="tg-sold" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#f5a623" stopOpacity="0.95"/>
+            <stop offset="100%" stopColor="#f5a623" stopOpacity="0.7"/>
+          </linearGradient>
+        </defs>
+
+        {/* ── Headline strip ─────────────────────────── */}
+        <g>
+          {/* Big sold % */}
+          <text x={pad.l} y={26} fill={text} fontFamily={mono} fontSize={26} fontWeight={700}>
+            {pctSold.toFixed(1)}%
+          </text>
+          <text x={pad.l + 80} y={26} fill={dim} fontFamily={mono} fontSize={11}>
+            {lang === "sk" ? "predaných" : "sold"}
+          </text>
+          {/* Composition counts */}
+          <text x={pad.l} y={46} fill={dim} fontFamily={mono} fontSize={10}>
+            <tspan fill={green}>● </tspan><tspan fill={text} fontWeight={700}>{cur.avail}</tspan>{" "}
+            <tspan fill={dim}>{lang === "sk" ? "voľn." : "avail"}</tspan>
+            <tspan>  </tspan>
+            <tspan fill="#f5d142">● </tspan><tspan fill={text} fontWeight={700}>{cur.res}</tspan>{" "}
+            <tspan fill={dim}>{lang === "sk" ? "rezerv." : "res"}</tspan>
+            <tspan>  </tspan>
+            <tspan fill="#f5a623">● </tspan><tspan fill={text} fontWeight={700}>{cur.sold}</tspan>{" "}
+            <tspan fill={dim}>{lang === "sk" ? "predan." : "sold"}</tspan>
+            <tspan>  </tspan>
+            <tspan fill={dim}>{lang === "sk" ? "z" : "of"} {cur.total}</tspan>
+          </text>
+          {/* Velocity badge top-right */}
+          {N >= 2 && (
+            <g transform={`translate(${W - pad.r - 130}, 8)`}>
+              <rect x={0} y={0} width={130} height={36} rx={6}
+                    fill={trendColor} opacity={0.12} stroke={trendColor} strokeOpacity={0.3} />
+              <text x={10} y={16} fill={dim} fontFamily={mono} fontSize={9}>
+                {lang === "sk" ? "TEMPO" : "VELOCITY"}
+              </text>
+              <text x={10} y={30} fill={trendColor} fontFamily={mono} fontSize={13} fontWeight={700}>
+                {trendIcon} {velocityPerMonth >= 0 ? "+" : ""}{velocityPerMonth.toFixed(1)} / mes
+              </text>
+              {monthsToSellout != null && monthsToSellout > 0 && monthsToSellout < 60 && (
+                <text x={10} y={46} fill={dim} fontFamily={mono} fontSize={8}>
+                  {lang === "sk"
+                    ? `≈ ${monthsToSellout.toFixed(1)} mes do vypredania`
+                    : `≈ ${monthsToSellout.toFixed(1)} mo to sell-out`}
+                </text>
+              )}
+            </g>
+          )}
+        </g>
+
+        {/* ── Chart body ─────────────────────────────── */}
+        {/* % gridlines */}
+        {gridFracs.map((f, i) => (
           <g key={i}>
-            <line x1={pad.l} x2={W - pad.r} y1={t.y} y2={t.y} stroke={border} strokeWidth={1} opacity={0.6} />
-            <text x={pad.l - 6} y={t.y + 3} textAnchor="end" fill={dim} fontFamily={mono} fontSize={9}>{t.label}</text>
+            <line x1={pad.l} x2={W - pad.r} y1={yAtPct(f)} y2={yAtPct(f)}
+                  stroke={border} strokeWidth={0.5} opacity={f === 0 || f === 1 ? 0.6 : 0.3} />
+            <text x={pad.l - 6} y={yAtPct(f) + 3} textAnchor="end"
+                  fill={dim} fontFamily={mono} fontSize={9}>
+              {Math.round(f * 100)}%
+            </text>
           </g>
         ))}
-        {[0, Math.floor((points.length - 1) / 2), points.length - 1]
+
+        {/* X-axis labels — first, middle, last (real data) */}
+        {[0, Math.floor((realN - 1) / 2), realN - 1]
           .filter((v, i, a) => a.indexOf(v) === i).map(i => (
-          <text key={i} x={xAt(i)} y={H - 8} textAnchor={i === 0 ? "start" : i === points.length - 1 ? "end" : "middle"}
+          <text key={i} x={xs[i]} y={H - 10} textAnchor={i === 0 ? "start" : i === realN - 1 ? "end" : "middle"}
                 fill={dim} fontFamily={mono} fontSize={10}>{points[i].month}</text>
         ))}
+        {hasProjection && (
+          <text x={xs[xs.length - 1]} y={H - 10} textAnchor="end"
+                fill={dim} opacity={0.7} fontFamily={mono} fontSize={9}>
+            {lang === "sk" ? "+3 mes (predpoklad)" : "+3 mo (projected)"}
+          </text>
+        )}
 
-        {/* Stacked layers */}
-        <path d={polySold} fill="#f5a623" opacity={0.85} />
-        <path d={polyRes}  fill="#f5d142" opacity={0.85} />
-        <path d={polyAvail} fill={green}   opacity={0.85} />
+        {/* Layer fills (smooth) */}
+        <path d={dSold}  fill="url(#tg-sold)" />
+        <path d={dRes}   fill="url(#tg-res)" />
+        <path d={dAvail} fill="url(#tg-avail)" />
 
-        {/* Dots on each layer's top edge */}
+        {/* Top stroke lines for definition */}
+        <path d={smoothPath(xsReal, ySoldReal)}    fill="none" stroke="#f5a623" strokeWidth={1.5} opacity={0.9} />
+        <path d={smoothPath(xsReal, yResReal)}     fill="none" stroke="#f5d142" strokeWidth={1.5} opacity={0.9} />
+        <path d={smoothPath(xsReal, yAvailReal)}   fill="none" stroke={green}   strokeWidth={2}   opacity={0.95} />
+
+        {/* Projection (dashed lines, no fills, lighter) */}
+        {hasProjection && (
+          <>
+            <line x1={xs[realN - 1]} x2={xs[realN - 1]} y1={pad.t} y2={pad.t + innerH}
+                  stroke={text} strokeOpacity={0.25} strokeWidth={0.5} strokeDasharray="2,3" />
+            <path d={dSoldProj}  fill="none" stroke="#f5a623" strokeWidth={1.5} strokeDasharray="4,3" opacity={0.5} />
+            <path d={dResProj}   fill="none" stroke="#f5d142" strokeWidth={1.5} strokeDasharray="4,3" opacity={0.5} />
+            <path d={dAvailProj} fill="none" stroke={green}   strokeWidth={1.5} strokeDasharray="4,3" opacity={0.5} />
+          </>
+        )}
+
+        {/* Dots on actual data points only */}
         {points.map((_, i) => (
           <g key={i}>
-            <circle cx={xs[i]} cy={ySold[i]}     r={2.5} fill="#f5a623" />
-            <circle cx={xs[i]} cy={yResTop[i]}   r={2.5} fill="#f5d142" />
-            <circle cx={xs[i]} cy={yAvailTop[i]} r={2.5} fill={green} />
+            <circle cx={xs[i]} cy={yAvailTop[i]} r={2.5} fill={green} stroke="#0a0a0b" strokeWidth={1} />
           </g>
         ))}
 
         {/* Hover crosshair */}
         {hover && (
           <line x1={xs[hover.i]} x2={xs[hover.i]} y1={pad.t} y2={pad.t + innerH}
-                stroke={text} strokeOpacity={0.35} strokeWidth={1} strokeDasharray="3,3" pointerEvents="none" />
+                stroke={text} strokeOpacity={0.4} strokeWidth={1} strokeDasharray="3,3" pointerEvents="none" />
         )}
-
-        {/* Legend top-left */}
-        <g transform={`translate(${pad.l}, ${pad.t - 8})`}>
-          <rect x={0} y={0} width={9} height={6} fill={green} />
-          <text x={13} y={6} fill={dim} fontFamily={mono} fontSize={9}>{lang === "sk" ? "voľné" : "available"}</text>
-          <rect x={70} y={0} width={9} height={6} fill="#f5d142" />
-          <text x={83} y={6} fill={dim} fontFamily={mono} fontSize={9}>{lang === "sk" ? "rezervované" : "reserved"}</text>
-          <rect x={158} y={0} width={9} height={6} fill="#f5a623" />
-          <text x={171} y={6} fill={dim} fontFamily={mono} fontSize={9}>{lang === "sk" ? "predané" : "sold"}</text>
-        </g>
       </svg>
-      {hp && typeof document !== "undefined" && (
-        <div style={{
-          position: "fixed", left: hover.mx + 14, top: hover.my + 14,
-          background: "rgba(14,14,18,0.97)", border: `1px solid ${border}`, borderRadius: 6,
-          padding: "0.5rem 0.7rem", fontFamily: mono, fontSize: "0.72rem",
-          color: text, pointerEvents: "none", zIndex: 10000, whiteSpace: "nowrap",
-        }}>
-          <div style={{ fontWeight: 700, marginBottom: "0.25rem" }}>{hp.month}</div>
-          <div><span style={{ display: "inline-block", width: 8, height: 8, background: green, marginRight: 5 }}/>{lang === "sk" ? "voľné" : "available"}: {hp.avail}</div>
-          <div><span style={{ display: "inline-block", width: 8, height: 8, background: "#f5d142", marginRight: 5 }}/>{lang === "sk" ? "rezerv." : "reserved"}: {hp.res}</div>
-          <div><span style={{ display: "inline-block", width: 8, height: 8, background: "#f5a623", marginRight: 5 }}/>{lang === "sk" ? "predané" : "sold"}: {hp.sold}</div>
-          <div style={{ marginTop: "0.2rem", color: dim }}>{lang === "sk" ? "spolu" : "total"}: {hp.total}</div>
-        </div>
-      )}
+
+      {(hp || hpProj) && typeof document !== "undefined" && (() => {
+        const p = hp || hpProj;
+        const isProj = !!hpProj;
+        return (
+          <div style={{
+            position: "fixed", left: hover.mx + 14, top: hover.my + 14,
+            background: "rgba(14,14,18,0.97)", border: `1px solid ${border}`, borderRadius: 8,
+            padding: "0.6rem 0.85rem", fontFamily: mono, fontSize: "0.74rem",
+            color: text, pointerEvents: "none", zIndex: 10000, whiteSpace: "nowrap",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
+          }}>
+            <div style={{ fontWeight: 700, marginBottom: "0.4rem", borderBottom: `1px solid ${border}`, paddingBottom: "0.3rem" }}>
+              {isProj
+                ? (lang === "sk" ? `Predpoklad +${hover.i - realN + 1} mes` : `Projection +${hover.i - realN + 1} mo`)
+                : p.month}
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: "1rem" }}>
+              <span><span style={{ display: "inline-block", width: 8, height: 8, background: green, marginRight: 5, borderRadius: 2 }}/>{lang === "sk" ? "voľné" : "available"}</span>
+              <span style={{ fontWeight: 700 }}>{Math.round(p.avail)}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: "1rem", marginTop: "0.2rem" }}>
+              <span><span style={{ display: "inline-block", width: 8, height: 8, background: "#f5d142", marginRight: 5, borderRadius: 2 }}/>{lang === "sk" ? "rezerv." : "reserved"}</span>
+              <span style={{ fontWeight: 700 }}>{Math.round(p.res)}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: "1rem", marginTop: "0.2rem" }}>
+              <span><span style={{ display: "inline-block", width: 8, height: 8, background: "#f5a623", marginRight: 5, borderRadius: 2 }}/>{lang === "sk" ? "predané" : "sold"}</span>
+              <span style={{ fontWeight: 700 }}>{Math.round(p.sold)}</span>
+            </div>
+            <div style={{ marginTop: "0.4rem", paddingTop: "0.3rem", borderTop: `1px solid ${border}`, color: dim, fontSize: "0.68rem", display: "flex", justifyContent: "space-between" }}>
+              <span>{lang === "sk" ? "spolu" : "total"}</span>
+              <span>{Math.round(p.total)}</span>
+            </div>
+            {isProj && (
+              <div style={{ marginTop: "0.3rem", color: dim, fontSize: "0.65rem", fontStyle: "italic" }}>
+                {lang === "sk" ? "extrapolácia z aktuálneho tempa" : "extrapolated from current pace"}
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -1199,7 +1381,9 @@ function TimelineChart({ snaps, lang }) {
  *  zobrazí kontext + hint "ďalšie dáta po najbližšom scrape".
  */
 function TakeupChart({ snaps, lang }) {
-  const W = 460, H = 180, pad = { l: 36, r: 10, t: 14, b: 28 };
+  const W = 460, H = 240;
+  const headlineH = 56;
+  const pad = { l: 38, r: 14, t: headlineH + 14, b: 30 };
   const innerW = W - pad.l - pad.r, innerH = H - pad.t - pad.b;
   const svgRef = useRef(null);
   const [hover, setHover] = useState(null);
@@ -1218,14 +1402,29 @@ function TakeupChart({ snaps, lang }) {
   }
 
   const yMax = Math.max(1, ...deltas.map(d => Math.abs(d.delta)));
-  // Slot width per month (full slot incl gap)
-  const slotW = innerW / deltas.length;
-  const barW  = slotW * 0.6;
-  const gapW  = slotW * 0.4;
+  const slotW = innerW / Math.max(deltas.length, 1);
+  const barW  = Math.min(slotW * 0.6, 60);  // cap so single-bar doesn't fill whole chart
+  const gapW  = slotW - barW;
   const zeroY = pad.t + innerH / 2;
   const yAt = (v) => zeroY - (innerH / 2) * (v / yMax);
   const avg = deltas.reduce((a, d) => a + d.delta, 0) / deltas.length;
   const maxDelta = Math.max(...deltas.map(d => d.delta));
+
+  // Trend: compare last delta to running avg (excluding last)
+  const lastDelta = deltas[deltas.length - 1].delta;
+  const prevAvg = deltas.length > 1
+    ? deltas.slice(0, -1).reduce((a, d) => a + d.delta, 0) / (deltas.length - 1)
+    : lastDelta;
+  const trendDir = lastDelta > prevAvg + 0.5 ? "accelerating"
+                  : lastDelta < prevAvg - 0.5 ? "slowing"
+                  : "stable";
+  const trendIcon = trendDir === "accelerating" ? "▲" : trendDir === "slowing" ? "▼" : "▬";
+  const trendColor = trendDir === "accelerating" ? green : trendDir === "slowing" ? "#ff9b6b" : dim;
+  const trendLabel = trendDir === "accelerating"
+    ? (lang === "sk" ? "zrýchľuje" : "accelerating")
+    : trendDir === "slowing"
+      ? (lang === "sk" ? "spomaľuje" : "slowing")
+      : (lang === "sk" ? "stabilné" : "stable");
 
   function handleMove(e) {
     if (!svgRef.current) return;
@@ -1233,7 +1432,6 @@ function TakeupChart({ snaps, lang }) {
     const scaleX = W / rect.width;
     const localX = (e.clientX - rect.left) * scaleX;
     if (localX < pad.l - 4 || localX > W - pad.r + 4) { setHover(null); return; }
-    // Find which bar slot is closest
     let bestI = 0, bestD = Infinity;
     deltas.forEach((_, i) => {
       const cx = pad.l + slotW * i + slotW / 2;
@@ -1248,49 +1446,107 @@ function TakeupChart({ snaps, lang }) {
       <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`}
            style={{ width: "100%", height: "auto", display: "block", overflow: "visible" }}
            onMouseMove={handleMove} onMouseLeave={() => setHover(null)}>
-        {/* Soft grid (top quarter, bottom quarter) — gives chart structure even with 1 bar */}
+        <defs>
+          <linearGradient id="bar-pos" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={green} stopOpacity="1"/>
+            <stop offset="100%" stopColor={green} stopOpacity="0.65"/>
+          </linearGradient>
+          <linearGradient id="bar-neg" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#ff9b6b" stopOpacity="0.65"/>
+            <stop offset="100%" stopColor="#ff9b6b" stopOpacity="1"/>
+          </linearGradient>
+        </defs>
+
+        {/* ── Headline strip ─────────────────────────── */}
+        <g>
+          {/* Big velocity number */}
+          <text x={pad.l} y={26} fill={text} fontFamily={mono} fontSize={26} fontWeight={700}>
+            {avg >= 0 ? "+" : ""}{avg.toFixed(1)}
+          </text>
+          <text x={pad.l + 78} y={20} fill={dim} fontFamily={mono} fontSize={11}>
+            {lang === "sk" ? "bytov / mes" : "units / mo"}
+          </text>
+          <text x={pad.l + 78} y={32} fill={dim} fontFamily={mono} fontSize={9}>
+            {lang === "sk" ? `priemer z ${deltas.length} ${deltas.length === 1 ? "mesiaca" : deltas.length < 5 ? "mesiacov" : "mesiacov"}` : `avg of ${deltas.length} mo`}
+          </text>
+          {/* Trend badge */}
+          <g transform={`translate(${W - pad.r - 130}, 8)`}>
+            <rect x={0} y={0} width={130} height={36} rx={6}
+                  fill={trendColor} opacity={0.12} stroke={trendColor} strokeOpacity={0.3} />
+            <text x={10} y={16} fill={dim} fontFamily={mono} fontSize={9}>
+              {lang === "sk" ? "TREND" : "TREND"}
+            </text>
+            <text x={10} y={30} fill={trendColor} fontFamily={mono} fontSize={13} fontWeight={700}>
+              {trendIcon} {trendLabel}
+            </text>
+          </g>
+          {/* Best month annotation under headline */}
+          {deltas.length > 1 && maxDelta > 0 && (() => {
+            const best = deltas.find(d => d.delta === maxDelta);
+            return (
+              <text x={pad.l} y={48} fill={dim} fontFamily={mono} fontSize={9}>
+                {lang === "sk" ? "najlepší mesiac" : "best month"}{" "}
+                <tspan fill={text} fontWeight={700}>{best.month}</tspan>{" "}
+                <tspan fill={green} fontWeight={700}>+{maxDelta}</tspan>
+              </text>
+            );
+          })()}
+        </g>
+
+        {/* ── Chart body ─────────────────────────────── */}
+        {/* Soft grid */}
         {[0.25, 0.75].map((t, i) => (
           <line key={i} x1={pad.l} x2={W - pad.r}
                 y1={pad.t + innerH * t} y2={pad.t + innerH * t}
-                stroke={border} strokeWidth={0.5} opacity={0.4} strokeDasharray="2,4" />
+                stroke={border} strokeWidth={0.5} opacity={0.3} strokeDasharray="2,4" />
         ))}
         {/* Zero line */}
         <line x1={pad.l} x2={W - pad.r} y1={zeroY} y2={zeroY} stroke={border} strokeWidth={1} />
-        {/* Average line (dashed) */}
-        <line x1={pad.l} x2={W - pad.r} y1={yAt(avg)} y2={yAt(avg)}
-              stroke={dim} strokeWidth={1} strokeDasharray="3,3" opacity={0.6} />
-        <text x={W - pad.r - 3} y={yAt(avg) - 3} textAnchor="end"
-              fill={dim} fontFamily={mono} fontSize={9}>∅ {avg.toFixed(1)}</text>
+        {/* Average line (dashed) — only if >1 bar */}
+        {deltas.length > 1 && (
+          <>
+            <line x1={pad.l} x2={W - pad.r} y1={yAt(avg)} y2={yAt(avg)}
+                  stroke={dim} strokeWidth={1} strokeDasharray="3,3" opacity={0.5} />
+            <text x={W - pad.r - 3} y={yAt(avg) - 3} textAnchor="end"
+                  fill={dim} fontFamily={mono} fontSize={9}>∅ {avg.toFixed(1)}</text>
+          </>
+        )}
 
         {/* Bars */}
         {deltas.map((d, i) => {
-          const x = pad.l + slotW * i + gapW / 2;
+          const x = pad.l + slotW * i + (slotW - barW) / 2;
           const isBest = d.delta === maxDelta && d.delta > 0 && deltas.length > 1;
           const isHovered = hover && hover.i === i;
-          const color = d.delta > 0 ? (isBest ? green : `${green}cc`) : d.delta < 0 ? "#ff9b6b" : dim;
+          const fillUrl = d.delta > 0 ? "url(#bar-pos)" : d.delta < 0 ? "url(#bar-neg)" : dim;
           const y = Math.min(zeroY, yAt(d.delta));
           const height = Math.abs(yAt(d.delta) - zeroY);
           return (
             <g key={i}>
-              {/* Hover halo behind bar */}
+              {/* Hover halo */}
               {isHovered && (
-                <rect x={x - 2} y={pad.t} width={barW + 4} height={innerH}
-                      fill={text} opacity={0.05} rx={3} />
+                <rect x={x - 4} y={pad.t} width={barW + 8} height={innerH}
+                      fill={text} opacity={0.06} rx={4} />
               )}
-              <rect x={x} y={y} width={barW} height={Math.max(1, height)}
-                    fill={color} rx={2}
+              {/* Best month star */}
+              {isBest && (
+                <text x={x + barW / 2} y={y - 8} textAnchor="middle"
+                      fill={green} fontFamily={mono} fontSize={11}>★</text>
+              )}
+              {/* The bar */}
+              <rect x={x} y={y} width={barW} height={Math.max(2, height)}
+                    fill={fillUrl} rx={3}
                     style={{ cursor: "pointer", transition: "opacity 0.12s" }}
-                    opacity={isHovered ? 1 : 0.92} />
-              {/* X label (month-only, e.g. "05") */}
-              <text x={x + barW / 2} y={zeroY + 14} textAnchor="middle"
-                    fill={dim} fontFamily={mono} fontSize={9}>
+                    opacity={isHovered ? 1 : 0.9} />
+              {/* X label */}
+              <text x={x + barW / 2} y={zeroY + 16} textAnchor="middle"
+                    fill={dim} fontFamily={mono} fontSize={9.5}>
                 {d.month.slice(5)}
               </text>
-              {/* Numeric label above bar (only when bar is meaningful sized) */}
-              {Math.abs(d.delta) >= 2 && (
-                <text x={x + barW / 2} y={d.delta > 0 ? y - 3 : y + height + 9}
-                      textAnchor="middle" fill={color}
-                      fontFamily={mono} fontSize={9} fontWeight={700}>
+              {/* Numeric label above/below bar */}
+              {Math.abs(d.delta) >= 1 && (
+                <text x={x + barW / 2} y={d.delta > 0 ? y - 4 : y + height + 11}
+                      textAnchor="middle" fill={d.delta > 0 ? green : "#ff9b6b"}
+                      fontFamily={mono} fontSize={10} fontWeight={700}>
                   {d.delta > 0 ? `+${d.delta}` : d.delta}
                 </text>
               )}
@@ -1298,14 +1554,14 @@ function TakeupChart({ snaps, lang }) {
           );
         })}
 
-        {/* Single-data-point hint — nudge user that chart will fill out */}
+        {/* Single-bar hint */}
         {deltas.length === 1 && (
           <text x={pad.l + innerW / 2} y={pad.t + innerH + 22}
                 textAnchor="middle" fill={dim} opacity={0.7}
                 fontFamily={mono} fontSize={9}>
             {lang === "sk"
-              ? "→ ďalšie body po najbližších behoch"
-              : "→ more bars after upcoming runs"}
+              ? "→ ďalšie mesiace pribudnú s každým novým behom"
+              : "→ more months added with each new run"}
           </text>
         )}
       </svg>
@@ -1315,24 +1571,35 @@ function TakeupChart({ snaps, lang }) {
         const d = deltas[hover.i];
         const sign = d.delta > 0 ? "+" : "";
         const tag = d.delta > 0
-          ? (lang === "sk" ? "predaných" : "sold")
+          ? (lang === "sk" ? "predaných za mesiac" : "sold this month")
           : d.delta < 0
             ? (lang === "sk" ? "vrátených na trh" : "returned to market")
             : (lang === "sk" ? "bez zmeny" : "no change");
         const color = d.delta > 0 ? green : d.delta < 0 ? "#ff9b6b" : dim;
+        const vsAvg = d.delta - avg;
+        const vsAvgLabel = vsAvg > 0.5 ? `+${vsAvg.toFixed(1)} ${lang === "sk" ? "nad priemerom" : "above avg"}`
+                          : vsAvg < -0.5 ? `${vsAvg.toFixed(1)} ${lang === "sk" ? "pod priemerom" : "below avg"}`
+                          : (lang === "sk" ? "v priemere" : "at avg");
         return (
           <div style={{
             position: "fixed", left: hover.mx + 14, top: hover.my + 14,
-            background: "rgba(14,14,18,0.97)", border: `1px solid ${border}`, borderRadius: 6,
-            padding: "0.5rem 0.7rem", fontFamily: mono, fontSize: "0.72rem",
+            background: "rgba(14,14,18,0.97)", border: `1px solid ${border}`, borderRadius: 8,
+            padding: "0.6rem 0.85rem", fontFamily: mono, fontSize: "0.74rem",
             color: text, pointerEvents: "none", zIndex: 10000, whiteSpace: "nowrap",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
           }}>
-            <div style={{ fontWeight: 700, marginBottom: "0.3rem" }}>{d.month}</div>
-            <div style={{ color }}>
-              {sign}{d.delta} {lang === "sk" ? "bytov" : "units"} <span style={{ color: dim, fontWeight: 400 }}>· {tag}</span>
+            <div style={{ fontWeight: 700, marginBottom: "0.4rem", borderBottom: `1px solid ${border}`, paddingBottom: "0.3rem" }}>
+              {d.month}
             </div>
-            <div style={{ color: dim, marginTop: "0.18rem", fontSize: "0.68rem" }}>
-              {lang === "sk" ? "celkom predaných" : "total sold"}: {d.cumSold}
+            <div style={{ fontSize: "1.1rem", color, fontWeight: 700, marginBottom: "0.15rem" }}>
+              {sign}{d.delta} {lang === "sk" ? "bytov" : "units"}
+            </div>
+            <div style={{ color: dim, fontSize: "0.68rem", marginBottom: "0.3rem" }}>{tag}</div>
+            {deltas.length > 1 && (
+              <div style={{ color: dim, fontSize: "0.68rem" }}>{vsAvgLabel}</div>
+            )}
+            <div style={{ color: dim, fontSize: "0.68rem", marginTop: "0.3rem", paddingTop: "0.3rem", borderTop: `1px solid ${border}` }}>
+              {lang === "sk" ? "celkom predaných" : "total sold"}: <span style={{ color: text, fontWeight: 700 }}>{d.cumSold}</span>
             </div>
           </div>
         );
