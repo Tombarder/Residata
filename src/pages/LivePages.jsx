@@ -1048,104 +1048,296 @@ function ChartCard({ title, subtitle, children }) {
   );
 }
 
-/* ── Timeline: two lines over months (available ↓, sold ↑) ─── */
+/* ── Timeline: stacked composition over months ──────────────
+ *
+ *  Predtým: dve mirrored čiary (voľné dolu, predané hore). Boss to
+ *  označil ako redundantné — pre fixed-size projekty sú lines presne
+ *  inverzné (V + P + R = total = constant), takže obe čiary nesú
+ *  rovnakú informáciu.
+ *
+ *  Teraz: stacked area zobrazujúce zloženie projektu v čase. Spodok
+ *  = predané (orange), stred = rezervované (yellow), vrch = voľné
+ *  (green). Celková výška = total units.
+ *
+ *  Vizuálny príbeh: projekt sa "predáva" zhora dolu — green vrstva
+ *  klesá ako sa byty predávajú. Pri novej fáze celá výška stúpne
+ *  (total units narastie viditeľne). Crosshair hover ukáže presné
+ *  čísla pre daný mesiac.
+ */
 function TimelineChart({ snaps, lang }) {
-  const W = 460, H = 180, pad = { l: 36, r: 10, t: 10, b: 28 };
+  const W = 460, H = 180, pad = { l: 36, r: 10, t: 14, b: 28 };
   const innerW = W - pad.l - pad.r, innerH = H - pad.t - pad.b;
-  const xs = snaps.map(s => s.snapshot_month);
-  const avail = snaps.map(s => s.available_units || 0);
-  const sold = snaps.map(s => s.sold_units || 0);
-  const yMax = Math.max(1, ...avail, ...sold);
-  const xAt = (i) => pad.l + (innerW * i) / Math.max(1, snaps.length - 1);
+  const svgRef = useRef(null);
+  const [hover, setHover] = useState(null);
+
+  // Per-snapshot V/R/P breakdown
+  const points = snaps.map((s) => ({
+    month: s.snapshot_month,
+    avail: s.available_units || 0,
+    res:   s.reserved_units  || 0,
+    sold:  s.sold_units      || 0,
+    total: (s.available_units || 0) + (s.reserved_units || 0) + (s.sold_units || 0),
+  }));
+  const yMax = Math.max(1, ...points.map(p => p.total));
+  const xAt = (i) => pad.l + (innerW * i) / Math.max(1, points.length - 1);
   const yAt = (v) => pad.t + innerH - (innerH * v) / yMax;
 
-  const lineAvail = avail.map((v, i) => `${i === 0 ? "M" : "L"} ${xAt(i)} ${yAt(v)}`).join(" ");
-  const lineSold  = sold.map((v, i) => `${i === 0 ? "M" : "L"} ${xAt(i)} ${yAt(v)}`).join(" ");
-  const areaAvail = `${lineAvail} L ${xAt(snaps.length - 1)} ${pad.t + innerH} L ${xAt(0)} ${pad.t + innerH} Z`;
+  // Build stacked polygons: bottom = sold, middle = reserved, top = avail
+  const xs = points.map((_, i) => xAt(i));
+  const yBottom = pad.t + innerH;
+  const ySold = points.map(p => yAt(p.sold));
+  const yResTop = points.map(p => yAt(p.sold + p.res));
+  const yAvailTop = points.map(p => yAt(p.sold + p.res + p.avail));
 
-  // Y-axis ticks — 4 gridlines
+  const polySold = `M ${xs[0]} ${yBottom} ` +
+    xs.map((x, i) => `L ${x} ${ySold[i]}`).join(" ") +
+    ` L ${xs[xs.length - 1]} ${yBottom} Z`;
+  const polyRes = `M ${xs[0]} ${ySold[0]} ` +
+    xs.map((x, i) => `L ${x} ${yResTop[i]}`).join(" ") +
+    " " + xs.slice().reverse().map((x, ri) => {
+      const i = xs.length - 1 - ri;
+      return `L ${x} ${ySold[i]}`;
+    }).join(" ") + " Z";
+  const polyAvail = `M ${xs[0]} ${yResTop[0]} ` +
+    xs.map((x, i) => `L ${x} ${yAvailTop[i]}`).join(" ") +
+    " " + xs.slice().reverse().map((x, ri) => {
+      const i = xs.length - 1 - ri;
+      return `L ${x} ${yResTop[i]}`;
+    }).join(" ") + " Z";
+
   const ticks = [0, 0.25, 0.5, 0.75, 1].map(t => ({
     y: pad.t + innerH - innerH * t,
     label: Math.round(yMax * t),
   }));
 
+  function handleMove(e) {
+    if (!svgRef.current) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const scaleX = W / rect.width;
+    const localX = (e.clientX - rect.left) * scaleX;
+    if (localX < pad.l - 4 || localX > W - pad.r + 4) { setHover(null); return; }
+    let bestI = 0, bestD = Infinity;
+    xs.forEach((x, i) => { const d = Math.abs(x - localX); if (d < bestD) { bestD = d; bestI = i; } });
+    setHover({ i: bestI, mx: e.clientX, my: e.clientY });
+  }
+
+  const hp = hover ? points[hover.i] : null;
+
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block", overflow: "visible" }}>
-      {ticks.map((t, i) => (
-        <g key={i}>
-          <line x1={pad.l} x2={W - pad.r} y1={t.y} y2={t.y} stroke={border} strokeWidth={1} />
-          <text x={pad.l - 6} y={t.y + 3} textAnchor="end" fill={dim} fontFamily={mono} fontSize={9}>{t.label}</text>
+    <div style={{ position: "relative" }}>
+      <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`}
+           style={{ width: "100%", height: "auto", display: "block", overflow: "visible" }}
+           onMouseMove={handleMove} onMouseLeave={() => setHover(null)}>
+        {ticks.map((t, i) => (
+          <g key={i}>
+            <line x1={pad.l} x2={W - pad.r} y1={t.y} y2={t.y} stroke={border} strokeWidth={1} opacity={0.6} />
+            <text x={pad.l - 6} y={t.y + 3} textAnchor="end" fill={dim} fontFamily={mono} fontSize={9}>{t.label}</text>
+          </g>
+        ))}
+        {[0, Math.floor((points.length - 1) / 2), points.length - 1]
+          .filter((v, i, a) => a.indexOf(v) === i).map(i => (
+          <text key={i} x={xAt(i)} y={H - 8} textAnchor={i === 0 ? "start" : i === points.length - 1 ? "end" : "middle"}
+                fill={dim} fontFamily={mono} fontSize={10}>{points[i].month}</text>
+        ))}
+
+        {/* Stacked layers */}
+        <path d={polySold} fill="#f5a623" opacity={0.85} />
+        <path d={polyRes}  fill="#f5d142" opacity={0.85} />
+        <path d={polyAvail} fill={green}   opacity={0.85} />
+
+        {/* Dots on each layer's top edge */}
+        {points.map((_, i) => (
+          <g key={i}>
+            <circle cx={xs[i]} cy={ySold[i]}     r={2.5} fill="#f5a623" />
+            <circle cx={xs[i]} cy={yResTop[i]}   r={2.5} fill="#f5d142" />
+            <circle cx={xs[i]} cy={yAvailTop[i]} r={2.5} fill={green} />
+          </g>
+        ))}
+
+        {/* Hover crosshair */}
+        {hover && (
+          <line x1={xs[hover.i]} x2={xs[hover.i]} y1={pad.t} y2={pad.t + innerH}
+                stroke={text} strokeOpacity={0.35} strokeWidth={1} strokeDasharray="3,3" pointerEvents="none" />
+        )}
+
+        {/* Legend top-left */}
+        <g transform={`translate(${pad.l}, ${pad.t - 8})`}>
+          <rect x={0} y={0} width={9} height={6} fill={green} />
+          <text x={13} y={6} fill={dim} fontFamily={mono} fontSize={9}>{lang === "sk" ? "voľné" : "available"}</text>
+          <rect x={70} y={0} width={9} height={6} fill="#f5d142" />
+          <text x={83} y={6} fill={dim} fontFamily={mono} fontSize={9}>{lang === "sk" ? "rezervované" : "reserved"}</text>
+          <rect x={158} y={0} width={9} height={6} fill="#f5a623" />
+          <text x={171} y={6} fill={dim} fontFamily={mono} fontSize={9}>{lang === "sk" ? "predané" : "sold"}</text>
         </g>
-      ))}
-      {/* X-axis labels — first, middle, last */}
-      {[0, Math.floor((snaps.length - 1) / 2), snaps.length - 1].filter((v, i, a) => a.indexOf(v) === i).map(i => (
-        <text key={i} x={xAt(i)} y={H - 8} textAnchor={i === 0 ? "start" : i === snaps.length - 1 ? "end" : "middle"}
-          fill={dim} fontFamily={mono} fontSize={10}>{xs[i]}</text>
-      ))}
-      {/* Area under available */}
-      <path d={areaAvail} fill={green} opacity={0.08} />
-      {/* Lines */}
-      <path d={lineAvail} fill="none" stroke={green} strokeWidth={2} />
-      <path d={lineSold}  fill="none" stroke="#f5a623" strokeWidth={2} />
-      {/* Dots */}
-      {avail.map((v, i) => (<circle key={`a${i}`} cx={xAt(i)} cy={yAt(v)} r={3} fill={green} />))}
-      {sold.map((v, i) => (<circle key={`s${i}`} cx={xAt(i)} cy={yAt(v)} r={3} fill="#f5a623" />))}
-      {/* Legend */}
-      <g transform={`translate(${pad.l}, ${pad.t - 2})`}>
-        <circle cx={4} cy={4} r={3} fill={green} /><text x={12} y={7} fill={dim} fontFamily={mono} fontSize={10}>{lang === "sk" ? "voľné" : "available"}</text>
-        <circle cx={72} cy={4} r={3} fill="#f5a623" /><text x={80} y={7} fill={dim} fontFamily={mono} fontSize={10}>{lang === "sk" ? "predané" : "sold"}</text>
-      </g>
-    </svg>
+      </svg>
+      {hp && typeof document !== "undefined" && (
+        <div style={{
+          position: "fixed", left: hover.mx + 14, top: hover.my + 14,
+          background: "rgba(14,14,18,0.97)", border: `1px solid ${border}`, borderRadius: 6,
+          padding: "0.5rem 0.7rem", fontFamily: mono, fontSize: "0.72rem",
+          color: text, pointerEvents: "none", zIndex: 10000, whiteSpace: "nowrap",
+        }}>
+          <div style={{ fontWeight: 700, marginBottom: "0.25rem" }}>{hp.month}</div>
+          <div><span style={{ display: "inline-block", width: 8, height: 8, background: green, marginRight: 5 }}/>{lang === "sk" ? "voľné" : "available"}: {hp.avail}</div>
+          <div><span style={{ display: "inline-block", width: 8, height: 8, background: "#f5d142", marginRight: 5 }}/>{lang === "sk" ? "rezerv." : "reserved"}: {hp.res}</div>
+          <div><span style={{ display: "inline-block", width: 8, height: 8, background: "#f5a623", marginRight: 5 }}/>{lang === "sk" ? "predané" : "sold"}: {hp.sold}</div>
+          <div style={{ marginTop: "0.2rem", color: dim }}>{lang === "sk" ? "spolu" : "total"}: {hp.total}</div>
+        </div>
+      )}
+    </div>
   );
 }
 
-/* ── Takeup: bar chart of Δsold per month ──────────────────── */
+/* ── Takeup: bar chart of Δsold per month ──────────────────────
+ *
+ *  Pre-existing problem: pri 1-2 mesiacoch dát chart vyzerá prázdny
+ *  (1 osamotený stĺpec). Plus žiadny hover.
+ *
+ *  Now: každý stĺpec má hover tooltip (mesiac + delta + cumulatívne
+ *  sold). Zelené = predaj zrýchlil oproti priemeru, oranžové = pomalší
+ *  predaj. Avg čiara je sticky (vždy viditeľná). Pri len 1 dátapointe
+ *  zobrazí kontext + hint "ďalšie dáta po najbližšom scrape".
+ */
 function TakeupChart({ snaps, lang }) {
-  const W = 460, H = 180, pad = { l: 36, r: 10, t: 10, b: 28 };
+  const W = 460, H = 180, pad = { l: 36, r: 10, t: 14, b: 28 };
   const innerW = W - pad.l - pad.r, innerH = H - pad.t - pad.b;
-  // Δ = sold[i] - sold[i-1] for i >= 1
+  const svgRef = useRef(null);
+  const [hover, setHover] = useState(null);
+
   const deltas = [];
   for (let i = 1; i < snaps.length; i++) {
     const d = (snaps[i].sold_units || 0) - (snaps[i - 1].sold_units || 0);
-    deltas.push({ month: snaps[i].snapshot_month, delta: d });
+    deltas.push({
+      month: snaps[i].snapshot_month,
+      delta: d,
+      cumSold: snaps[i].sold_units || 0,
+    });
   }
-  if (deltas.length === 0) return <div style={{ color: dim, fontSize: "0.8rem", textAlign: "center", padding: "1rem" }}>—</div>;
+  if (deltas.length === 0) {
+    return <div style={{ color: dim, fontSize: "0.8rem", textAlign: "center", padding: "1rem" }}>—</div>;
+  }
+
   const yMax = Math.max(1, ...deltas.map(d => Math.abs(d.delta)));
-  const barW = innerW / deltas.length * 0.7;
-  const gapW = innerW / deltas.length * 0.3;
+  // Slot width per month (full slot incl gap)
+  const slotW = innerW / deltas.length;
+  const barW  = slotW * 0.6;
+  const gapW  = slotW * 0.4;
   const zeroY = pad.t + innerH / 2;
   const yAt = (v) => zeroY - (innerH / 2) * (v / yMax);
   const avg = deltas.reduce((a, d) => a + d.delta, 0) / deltas.length;
+  const maxDelta = Math.max(...deltas.map(d => d.delta));
+
+  function handleMove(e) {
+    if (!svgRef.current) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const scaleX = W / rect.width;
+    const localX = (e.clientX - rect.left) * scaleX;
+    if (localX < pad.l - 4 || localX > W - pad.r + 4) { setHover(null); return; }
+    // Find which bar slot is closest
+    let bestI = 0, bestD = Infinity;
+    deltas.forEach((_, i) => {
+      const cx = pad.l + slotW * i + slotW / 2;
+      const d = Math.abs(cx - localX);
+      if (d < bestD) { bestD = d; bestI = i; }
+    });
+    setHover({ i: bestI, mx: e.clientX, my: e.clientY });
+  }
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block", overflow: "visible" }}>
-      {/* Zero line */}
-      <line x1={pad.l} x2={W - pad.r} y1={zeroY} y2={zeroY} stroke={border} strokeWidth={1} />
-      {/* Average line (dashed) */}
-      <line x1={pad.l} x2={W - pad.r} y1={yAt(avg)} y2={yAt(avg)} stroke={dim} strokeWidth={1} strokeDasharray="3,3" opacity={0.5} />
-      <text x={W - pad.r - 3} y={yAt(avg) - 3} textAnchor="end" fill={dim} fontFamily={mono} fontSize={9}>∅ {avg.toFixed(1)}</text>
-      {/* Bars */}
-      {deltas.map((d, i) => {
-        const x = pad.l + (innerW * i) / deltas.length + gapW / 2;
-        const isBest = d.delta === Math.max(...deltas.map(x => x.delta)) && d.delta > 0;
-        const color = d.delta > 0 ? (isBest ? green : `${green}aa`) : d.delta < 0 ? "#ff9b6b" : dim;
-        const y = Math.min(zeroY, yAt(d.delta));
-        const height = Math.abs(yAt(d.delta) - zeroY);
-        return (
-          <g key={i}>
-            <rect x={x} y={y} width={barW} height={Math.max(1, height)} fill={color} rx={2} />
-            <text x={x + barW / 2} y={zeroY + 12} textAnchor="middle" fill={dim} fontFamily={mono} fontSize={8}>
-              {d.month.slice(5)}
-            </text>
-            {Math.abs(d.delta) >= 2 && (
-              <text x={x + barW / 2} y={d.delta > 0 ? y - 3 : y + height + 9} textAnchor="middle" fill={color} fontFamily={mono} fontSize={9} fontWeight={700}>
-                {d.delta > 0 ? `+${d.delta}` : d.delta}
+    <div style={{ position: "relative" }}>
+      <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`}
+           style={{ width: "100%", height: "auto", display: "block", overflow: "visible" }}
+           onMouseMove={handleMove} onMouseLeave={() => setHover(null)}>
+        {/* Soft grid (top quarter, bottom quarter) — gives chart structure even with 1 bar */}
+        {[0.25, 0.75].map((t, i) => (
+          <line key={i} x1={pad.l} x2={W - pad.r}
+                y1={pad.t + innerH * t} y2={pad.t + innerH * t}
+                stroke={border} strokeWidth={0.5} opacity={0.4} strokeDasharray="2,4" />
+        ))}
+        {/* Zero line */}
+        <line x1={pad.l} x2={W - pad.r} y1={zeroY} y2={zeroY} stroke={border} strokeWidth={1} />
+        {/* Average line (dashed) */}
+        <line x1={pad.l} x2={W - pad.r} y1={yAt(avg)} y2={yAt(avg)}
+              stroke={dim} strokeWidth={1} strokeDasharray="3,3" opacity={0.6} />
+        <text x={W - pad.r - 3} y={yAt(avg) - 3} textAnchor="end"
+              fill={dim} fontFamily={mono} fontSize={9}>∅ {avg.toFixed(1)}</text>
+
+        {/* Bars */}
+        {deltas.map((d, i) => {
+          const x = pad.l + slotW * i + gapW / 2;
+          const isBest = d.delta === maxDelta && d.delta > 0 && deltas.length > 1;
+          const isHovered = hover && hover.i === i;
+          const color = d.delta > 0 ? (isBest ? green : `${green}cc`) : d.delta < 0 ? "#ff9b6b" : dim;
+          const y = Math.min(zeroY, yAt(d.delta));
+          const height = Math.abs(yAt(d.delta) - zeroY);
+          return (
+            <g key={i}>
+              {/* Hover halo behind bar */}
+              {isHovered && (
+                <rect x={x - 2} y={pad.t} width={barW + 4} height={innerH}
+                      fill={text} opacity={0.05} rx={3} />
+              )}
+              <rect x={x} y={y} width={barW} height={Math.max(1, height)}
+                    fill={color} rx={2}
+                    style={{ cursor: "pointer", transition: "opacity 0.12s" }}
+                    opacity={isHovered ? 1 : 0.92} />
+              {/* X label (month-only, e.g. "05") */}
+              <text x={x + barW / 2} y={zeroY + 14} textAnchor="middle"
+                    fill={dim} fontFamily={mono} fontSize={9}>
+                {d.month.slice(5)}
               </text>
-            )}
-          </g>
+              {/* Numeric label above bar (only when bar is meaningful sized) */}
+              {Math.abs(d.delta) >= 2 && (
+                <text x={x + barW / 2} y={d.delta > 0 ? y - 3 : y + height + 9}
+                      textAnchor="middle" fill={color}
+                      fontFamily={mono} fontSize={9} fontWeight={700}>
+                  {d.delta > 0 ? `+${d.delta}` : d.delta}
+                </text>
+              )}
+            </g>
+          );
+        })}
+
+        {/* Single-data-point hint — nudge user that chart will fill out */}
+        {deltas.length === 1 && (
+          <text x={pad.l + innerW / 2} y={pad.t + innerH + 22}
+                textAnchor="middle" fill={dim} opacity={0.7}
+                fontFamily={mono} fontSize={9}>
+            {lang === "sk"
+              ? "→ ďalšie body po najbližších behoch"
+              : "→ more bars after upcoming runs"}
+          </text>
+        )}
+      </svg>
+
+      {/* Hover tooltip */}
+      {hover && typeof document !== "undefined" && (() => {
+        const d = deltas[hover.i];
+        const sign = d.delta > 0 ? "+" : "";
+        const tag = d.delta > 0
+          ? (lang === "sk" ? "predaných" : "sold")
+          : d.delta < 0
+            ? (lang === "sk" ? "vrátených na trh" : "returned to market")
+            : (lang === "sk" ? "bez zmeny" : "no change");
+        const color = d.delta > 0 ? green : d.delta < 0 ? "#ff9b6b" : dim;
+        return (
+          <div style={{
+            position: "fixed", left: hover.mx + 14, top: hover.my + 14,
+            background: "rgba(14,14,18,0.97)", border: `1px solid ${border}`, borderRadius: 6,
+            padding: "0.5rem 0.7rem", fontFamily: mono, fontSize: "0.72rem",
+            color: text, pointerEvents: "none", zIndex: 10000, whiteSpace: "nowrap",
+          }}>
+            <div style={{ fontWeight: 700, marginBottom: "0.3rem" }}>{d.month}</div>
+            <div style={{ color }}>
+              {sign}{d.delta} {lang === "sk" ? "bytov" : "units"} <span style={{ color: dim, fontWeight: 400 }}>· {tag}</span>
+            </div>
+            <div style={{ color: dim, marginTop: "0.18rem", fontSize: "0.68rem" }}>
+              {lang === "sk" ? "celkom predaných" : "total sold"}: {d.cumSold}
+            </div>
+          </div>
         );
-      })}
-    </svg>
+      })()}
+    </div>
   );
 }
 
