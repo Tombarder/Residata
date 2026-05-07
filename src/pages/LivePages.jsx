@@ -410,7 +410,13 @@ function StatusBadge({ status, lang }) {
 
 function ProjectRow({ p, t, lang, setCurrent, canVelocity }) {
   const soldDataUnavailable = (p.sold_units || 0) === 0 && (p.reserved_units || 0) === 0 && (p.prereserved_units || 0) === 0;
-  const hasDetail = (p.total_units || 0) > 0;
+  // Detail is openable for any project that exists in the registry.
+  // Even if total_units = 0 in the latest month (manual projects whose
+  // snapshot has fallen behind, or projects that don't publish prices),
+  // the detail page falls back to the project's most recent batch — so
+  // it always has SOMETHING to show.
+  const hasDetail = !!p.id;
+  const stale = (p.total_units || 0) === 0;
 
   // Sold velocity cell — paid vidí reálnu hodnotu, ostatní blurred placeholder
   // (detail pod blurom nemá význam čítať, preto len deterministicky-vyzerajúce číslo).
@@ -475,15 +481,17 @@ function ProjectRow({ p, t, lang, setCurrent, canVelocity }) {
       </td>
       <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{velocityCell}</td>
       <td style={{ ...td, textAlign: "right" }} onClick={(e) => e.stopPropagation()}>
-        {/* Kept as explicit button for users who read the table as
-            a grid of buttons; whole-row click works too. */}
-        {hasDetail ? (
-          <button onClick={openDetail} style={miniBtn}>{t.tbl_detail}</button>
-        ) : (
-          <span style={{ color: dim, fontSize: "0.72rem", fontStyle: "italic" }} title={lang === "sk" ? "Pre tento projekt ešte nemáme detail" : "No unit-level data yet"}>
-            —
-          </span>
-        )}
+        {/* Detail je vždy klikateľný — ak máme akékoľvek dáta v archíve,
+            detail page si z neho zobrazí najnovší dostupný batch. Pre
+            "stale" projekty (manuálne, neaktualizované) ukáže badge
+            "staršie dáta". */}
+        <button
+          onClick={openDetail}
+          style={miniBtn}
+          title={stale ? (lang === "sk" ? "Detail s poslednými dostupnými dátami" : "Detail with last available data") : undefined}
+        >
+          {t.tbl_detail}{stale ? " ⓘ" : ""}
+        </button>
       </td>
     </tr>
   );
@@ -772,8 +780,20 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
 
   // ── KPI strip ─────────────────────────────────────────────────
   // Cards tagged isPriceKpi=true are filtered out when the developer
-  // publishes no prices — showing '— €/m²' cards for a no-price
-  // project just looks broken. See noPrices gate below.
+  // publishes no prices. We swap them with non-price alternatives so
+  // the strip stays full and informative.
+  // Non-price alternatives (computed from available units):
+  //   - Avg area (m²) instead of Avg €/m²
+  //   - Largest available unit (area) instead of most expensive
+  const availForArea = availFlats.filter(f => Number.isFinite(Number(f.obytna_plocha)) && Number(f.obytna_plocha) > 0);
+  const avgArea = availForArea.length
+    ? availForArea.reduce((s, f) => s + Number(f.obytna_plocha), 0) / availForArea.length
+    : null;
+  const largestAreaFlat = availForArea.length
+    ? availForArea.reduce((best, f) => Number(f.obytna_plocha) > Number(best.obytna_plocha) ? f : best, availForArea[0])
+    : null;
+  const largestArea = largestAreaFlat ? Number(largestAreaFlat.obytna_plocha) : null;
+
   const kpis = [
     {
       label: L("Voľné byty", "Available units"),
@@ -781,6 +801,7 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
       sub: project.total_units ? `${fmtPct(((project.available_units || 0) / project.total_units) * 100)} ${L("z celku", "of total")}` : null,
       tint: green,
     },
+    // PRICE KPI (filtered out when noPrices)
     {
       label: L("Priem. €/m²", "Avg €/m²"),
       value: project.avg_price_eur_m2 ? Math.round(project.avg_price_eur_m2).toLocaleString("en-US").replace(/,/g, " ") : "—",
@@ -794,12 +815,21 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
       tint: "#e8e8ed",
       isPriceKpi: true,
     },
+    // FALLBACK KPI shown only when noPrices=true (replaces Avg €/m²)
+    {
+      label: L("Priem. plocha (voľné)", "Avg area (avail.)"),
+      value: avgArea ? `${avgArea.toFixed(1)} m²` : "—",
+      sub: availForArea.length ? `${availForArea.length} ${L("voľných", "avail")}` : null,
+      tint: "#e8e8ed",
+      isFallbackKpi: true,
+    },
     {
       label: L("Najrýchlejšie sa predáva", "Fastest moving"),
       value: fastestRoom ? `${fastestRoom.room}-${L("izb", "room")}` : "—",
       sub: fastestRoom ? `${fmtPct((fastestRoom.sold / fastestRoom.total) * 100)} ${L("predané", "sold")}` : null,
       tint: "#f5a623",
     },
+    // PRICE KPI (filtered out when noPrices)
     {
       label: L("Najdrahší voľný byt", "currently the most expensive unit"),
       value: topPrice ? fmtEur(topPrice) : "—",
@@ -810,6 +840,17 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
         const topFlat = availFlats.find(f => Number(f.cena_s_dph) === topPrice);
         return (onSelectFlat && topFlat) ? () => onSelectFlat(topFlat) : null;
       })(),
+    },
+    // FALLBACK KPI shown only when noPrices=true (replaces Most expensive)
+    {
+      label: L("Najväčší voľný byt", "Largest available unit"),
+      value: largestArea ? `${largestArea.toFixed(1)} m²` : "—",
+      sub: largestAreaFlat
+        ? `${largestAreaFlat.izby ? largestAreaFlat.izby + "-izb · " : ""}${largestAreaFlat.unit_id || ""}`
+        : null,
+      tint: "#e8e8ed",
+      isFallbackKpi: true,
+      onClick: (largestAreaFlat && onSelectFlat) ? () => onSelectFlat(largestAreaFlat) : null,
     },
   ];
 
@@ -861,7 +902,13 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
 
       {/* KPI strip */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "0.8rem", marginBottom: "1.5rem" }}>
-        {kpis.filter(k => !(noPrices && k.isPriceKpi)).map((k, i) => (
+        {kpis.filter(k => {
+          // Price-KPIs hidden when noPrices=true (would just show "—")
+          if (noPrices && k.isPriceKpi) return false;
+          // Fallback KPIs only shown when noPrices=true (otherwise duplicate)
+          if (!noPrices && k.isFallbackKpi) return false;
+          return true;
+        }).map((k, i) => (
           <div key={i} onClick={k.onClick || undefined} style={{
             background: bg, border: `1px solid ${border}`, borderRadius: 10,
             padding: "1rem 1.1rem",

@@ -300,7 +300,7 @@ export function useProjectFlats(projectId) {
     // privileged enough to expect data, wait one tick and refetch
     // once. Eliminates the "click project → empty page → refresh
     // and now it works" symptom users reported.
-    const fetchOnce = async () => {
+    const fetchCurrent = async () => {
       // flats_current = view of latest month from flats_archive.
       // Reading from here guarantees the per-project flat list shows
       // the same data as the Pivot's "Latest month" mode and the
@@ -311,8 +311,32 @@ export function useProjectFlats(projectId) {
         .order("poschodie", { ascending: true });
     };
 
+    // Fallback for manual projects (Altum, Bory) — they're updated
+    // sporadically by Boss not by cron, so when the global "latest
+    // snapshot_month" rolls forward they fall out of flats_current.
+    // Their data is STILL VALID, just slightly older. Fetch the most
+    // recent batch that exists for THIS project specifically.
+    const fetchMostRecentForProject = async () => {
+      // First: find most recent batch_timestamp for this project
+      const probe = await supabase.from("flats_archive")
+        .select("batch_id, batch_timestamp")
+        .eq("project_id", projectId)
+        .order("batch_timestamp", { ascending: false, nullsFirst: false })
+        .limit(1);
+      if (probe.error || !probe.data || probe.data.length === 0) {
+        return { data: [], error: probe.error };
+      }
+      const latestBatch = probe.data[0].batch_id;
+      // Then fetch all flats for that specific batch
+      return await supabase.from("flats_archive")
+        .select("*")
+        .eq("project_id", projectId)
+        .eq("batch_id", latestBatch)
+        .order("poschodie", { ascending: true });
+    };
+
     (async () => {
-      let { data, error: err } = await fetchOnce();
+      let { data, error: err } = await fetchCurrent();
       // Retry once if first call returned empty AND we have a likely
       // access promotion path (paid tier, admin, active trial,
       // active paid window). For genuinely empty projects the retry
@@ -324,7 +348,15 @@ export function useProjectFlats(projectId) {
       if (!err && (!data || data.length === 0) && looksPrivileged) {
         await new Promise(r => setTimeout(r, 250));
         if (cancelled) return;
-        ({ data, error: err } = await fetchOnce());
+        ({ data, error: err } = await fetchCurrent());
+      }
+      // Final fallback: archive lookup. Manual projects (status='paused'
+      // promoted to 'active' by sync) often have stale snapshot_month
+      // because they're updated manually. Their archive data is still
+      // valid for display.
+      if (!err && (!data || data.length === 0)) {
+        if (cancelled) return;
+        ({ data, error: err } = await fetchMostRecentForProject());
       }
       if (cancelled) return;
       setFlats(data || []);
