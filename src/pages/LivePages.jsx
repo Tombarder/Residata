@@ -475,9 +475,36 @@ function ProjectRow({ p, t, lang, setCurrent, canVelocity }) {
       <td style={{ ...td, textAlign: "right", fontFamily: mono }}>
         {p.avg_price_eur_m2
           ? Math.round(p.avg_price_eur_m2).toLocaleString(lang === "sk" ? "sk-SK" : "en-US")
-          : <span title={lang === "sk" ? "Developer nezverejňuje ceny" : "Developer doesn't publish prices"} style={{ color: dim, fontStyle: "italic", fontSize: "0.75rem" }}>
-              {lang === "sk" ? "nezverejnené" : "not published"}
-            </span>}
+          : (() => {
+              // Three reasons why €/m² could be null in projects_live:
+              //   a) developer doesn't publish prices at all → min/max also null
+              //   b) developer publishes prices but areas are missing
+              //      (manual project where Boss didn't fill obytna_plocha)
+              //   c) project has 0 V/R/PR (sold-out or pre-launch)
+              // Disambiguate so the tooltip is honest.
+              const hasPriceRange = p.min_price != null && p.max_price != null;
+              const hasInventory = (p.available_units || 0) + (p.reserved_units || 0) + (p.prereserved_units || 0) > 0;
+              let title, label;
+              if (hasPriceRange) {
+                title = lang === "sk"
+                  ? "Ceny zverejnené, ale chýbajú obytné plochy — €/m² nemožno spočítať"
+                  : "Prices published but living areas missing — can't compute €/m²";
+                label = lang === "sk" ? "chýbajú plochy" : "areas missing";
+              } else if (!hasInventory) {
+                title = lang === "sk"
+                  ? "Žiadne byty na predaj — projekt je vypredaný alebo pred štartom"
+                  : "No for-sale units — project is sold-out or pre-launch";
+                label = "—";
+              } else {
+                title = lang === "sk" ? "Developer nezverejňuje ceny" : "Developer doesn't publish prices";
+                label = lang === "sk" ? "nezverejnené" : "not published";
+              }
+              return (
+                <span title={title} style={{ color: dim, fontStyle: "italic", fontSize: "0.75rem" }}>
+                  {label}
+                </span>
+              );
+            })()}
       </td>
       <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{velocityCell}</td>
       <td style={{ ...td, textAlign: "right" }} onClick={(e) => e.stopPropagation()}>
