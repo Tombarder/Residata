@@ -1099,21 +1099,49 @@ function TimelineChart({ snaps, lang }) {
     total: (s.available_units || 0) + (s.reserved_units || 0) + (s.sold_units || 0),
   }));
 
-  // Forward projection: extrapolate 3 months ahead based on velocity
-  // (avg delta over last 2-3 months). Capped: avail can't go below 0;
-  // sold can't exceed total; reserved settles at last value.
+  // Forward projection: extrapolate 3 months ahead based on velocity.
+  //
+  // Velocity calc — robust to data revisions:
+  //  - Walk all consecutive deltas (sold[i] - sold[i-1])
+  //  - KEEP only positive deltas (real sales). Negative deltas are
+  //    almost always parser revisions / dedup cleanups, not market
+  //    returns — physically a sold unit can't un-sell at scale.
+  //  - Average the kept deltas → velocity
+  //  - This means even with 2 snapshots we can extract a useful pace
+  //    if the delta is positive.
+  //
+  //  If ALL deltas are non-positive → can't project (will show neutral
+  //  "calibrating" badge).
   const N = points.length;
-  const lookback = Math.min(3, N - 1);
-  let velAvail = 0, velRes = 0, velSold = 0;
-  if (lookback >= 1) {
-    velAvail = (points[N - 1].avail - points[N - 1 - lookback].avail) / lookback;
-    velRes   = (points[N - 1].res   - points[N - 1 - lookback].res)   / lookback;
-    velSold  = (points[N - 1].sold  - points[N - 1 - lookback].sold)  / lookback;
+  const allDeltas = {
+    avail: [],
+    res:   [],
+    sold:  [],
+  };
+  for (let i = 1; i < N; i++) {
+    allDeltas.avail.push(points[i].avail - points[i - 1].avail);
+    allDeltas.res.push(  points[i].res   - points[i - 1].res);
+    allDeltas.sold.push( points[i].sold  - points[i - 1].sold);
   }
-  // Project only when we have ENOUGH clean data + non-negative velocity.
-  // With 2 data points where one is from a parser revision, velocity is
-  // misleading. Need 3+ snapshots AND positive sold velocity.
-  const projectAheadMonths = (N >= 3 && velSold > 0.1) ? 3 : 0;
+  // For SOLD: only positive deltas count (real sales, not data revisions)
+  const positiveSoldDeltas = allDeltas.sold.filter(d => d > 0);
+  const velSold = positiveSoldDeltas.length > 0
+    ? positiveSoldDeltas.reduce((a, d) => a + d, 0) / positiveSoldDeltas.length
+    : 0;
+  // For AVAIL: only negative deltas count (real units leaving inventory)
+  const negativeAvailDeltas = allDeltas.avail.filter(d => d < 0);
+  const velAvail = negativeAvailDeltas.length > 0
+    ? negativeAvailDeltas.reduce((a, d) => a + d, 0) / negativeAvailDeltas.length
+    : 0;
+  // For RES: settles at last value (reservations are noisy + reverse often)
+  const velRes = 0;
+  // Project when we have ANY positive sold velocity from at least 1 valid
+  // delta. The projection is a rough early-data estimate but better than
+  // nothing — clearly labeled as such.
+  const projectAheadMonths = velSold > 0.1 ? 3 : 0;
+  // Confidence indicator: how many valid (positive) sold deltas we used
+  const velocitySamples = positiveSoldDeltas.length;
+  const isEarlyData = velocitySamples < 3;
   const lastTotal = points[N - 1].total;
   const projection = [];
   for (let k = 1; k <= projectAheadMonths; k++) {
@@ -1194,18 +1222,12 @@ function TimelineChart({ snaps, lang }) {
   const cur = points[N - 1];
   const pctSold = cur.total > 0 ? (cur.sold / cur.total * 100) : 0;
   const pctAvail = cur.total > 0 ? (cur.avail / cur.total * 100) : 0;
-  // Velocity: avg sold per month from last 3 months
+  // Velocity: avg of positive sold deltas (filters out data revisions)
   const velocityPerMonth = velSold;
-  // Months until sellout at current pace — only meaningful with 3+ snapshots
-  // AND positive velocity (negative means parser revision, not real return).
-  const hasReliableVelocity = N >= 3 && velocityPerMonth > 0.1;
-  const monthsToSellout = hasReliableVelocity ? cur.avail / velocityPerMonth : null;
-  const trendIcon = hasReliableVelocity
-    ? (velocityPerMonth > 0.5 ? "▲" : "▬")
-    : "·";
-  const trendColor = hasReliableVelocity
-    ? (velocityPerMonth > 0.5 ? green : dim)
-    : dim;
+  const hasVelocity = velocityPerMonth > 0.1;
+  const monthsToSellout = hasVelocity ? cur.avail / velocityPerMonth : null;
+  const trendIcon = hasVelocity ? "▲" : "·";
+  const trendColor = hasVelocity ? green : dim;
 
   const hp = hover && hover.i < realN ? points[hover.i] : null;
   const hpProj = hover && hover.i >= realN ? allFrames[hover.i] : null;
@@ -1252,34 +1274,43 @@ function TimelineChart({ snaps, lang }) {
             <tspan>  </tspan>
             <tspan fill={dim}>{lang === "sk" ? "z" : "of"} {cur.total}</tspan>
           </text>
-          {/* Velocity badge top-right — only when reliable data available */}
-          {hasReliableVelocity ? (
-            <g transform={`translate(${W - pad.r - 130}, 8)`}>
-              <rect x={0} y={0} width={130} height={40} rx={6}
+          {/* Velocity badge top-right */}
+          {hasVelocity ? (
+            <g transform={`translate(${W - pad.r - 140}, 6)`}>
+              <rect x={0} y={0} width={140} height={50} rx={6}
                     fill={trendColor} opacity={0.12} stroke={trendColor} strokeOpacity={0.3} />
-              <text x={10} y={16} fill={dim} fontFamily={mono} fontSize={9}>
+              <text x={10} y={15} fill={dim} fontFamily={mono} fontSize={9}>
                 {lang === "sk" ? "TEMPO" : "VELOCITY"}
+                {isEarlyData && (
+                  <tspan fill={trendColor} opacity={0.7}> · {lang === "sk" ? "predbežné" : "early"}</tspan>
+                )}
               </text>
-              <text x={10} y={30} fill={trendColor} fontFamily={mono} fontSize={13} fontWeight={700}>
+              <text x={10} y={31} fill={trendColor} fontFamily={mono} fontSize={14} fontWeight={700}>
                 {trendIcon} +{velocityPerMonth % 1 === 0 ? velocityPerMonth.toFixed(0) : velocityPerMonth.toFixed(1)} / mes
               </text>
-              {monthsToSellout != null && monthsToSellout > 0 && monthsToSellout < 60 && (
-                <text x={10} y={46} fill={dim} fontFamily={mono} fontSize={8}>
-                  {lang === "sk"
-                    ? `≈ ${monthsToSellout.toFixed(1)} mes do vypredania`
-                    : `≈ ${monthsToSellout.toFixed(1)} mo to sell-out`}
+              {monthsToSellout != null && monthsToSellout > 0 && monthsToSellout < 120 && (
+                <text x={10} y={45} fill={dim} fontFamily={mono} fontSize={8.5}>
+                  {monthsToSellout < 1
+                    ? (lang === "sk" ? "< mesiac do vypredania" : "< 1 mo to sell-out")
+                    : monthsToSellout < 12
+                      ? (lang === "sk" ? `≈ ${monthsToSellout.toFixed(1)} mes do vypredania` : `≈ ${monthsToSellout.toFixed(1)} mo to sell-out`)
+                      : (lang === "sk" ? `≈ ${(monthsToSellout / 12).toFixed(1)} rokov do vypredania` : `≈ ${(monthsToSellout / 12).toFixed(1)} yr to sell-out`)
+                  }
                 </text>
               )}
             </g>
           ) : N >= 2 && (
-            <g transform={`translate(${W - pad.r - 130}, 8)`}>
-              <rect x={0} y={0} width={130} height={36} rx={6}
+            <g transform={`translate(${W - pad.r - 140}, 6)`}>
+              <rect x={0} y={0} width={140} height={42} rx={6}
                     fill={dim} opacity={0.08} stroke={dim} strokeOpacity={0.2} />
-              <text x={10} y={16} fill={dim} fontFamily={mono} fontSize={9}>
+              <text x={10} y={15} fill={dim} fontFamily={mono} fontSize={9}>
                 {lang === "sk" ? "TEMPO" : "VELOCITY"}
               </text>
-              <text x={10} y={30} fill={dim} fontFamily={mono} fontSize={10}>
-                {lang === "sk" ? "potrebné 3+ mesiace" : "needs 3+ months"}
+              <text x={10} y={29} fill={dim} fontFamily={mono} fontSize={10} fontWeight={600}>
+                {lang === "sk" ? "kalibruje sa" : "calibrating"}
+              </text>
+              <text x={10} y={39} fill={dim} fontFamily={mono} fontSize={7.5} opacity={0.85}>
+                {lang === "sk" ? "potrebný ďalší beh" : "needs more data"}
               </text>
             </g>
           )}
@@ -1306,8 +1337,10 @@ function TimelineChart({ snaps, lang }) {
         ))}
         {hasProjection && (
           <text x={xs[xs.length - 1]} y={H - 10} textAnchor="end"
-                fill={dim} opacity={0.7} fontFamily={mono} fontSize={9}>
-            {lang === "sk" ? "+3 mes (predpoklad)" : "+3 mo (projected)"}
+                fill={trendColor} opacity={0.85} fontFamily={mono} fontSize={9} fontWeight={600}>
+            {isEarlyData
+              ? (lang === "sk" ? "+3 mes (predbežný odhad)" : "+3 mo (early estimate)")
+              : (lang === "sk" ? "+3 mes (predpoklad)" : "+3 mo (projected)")}
           </text>
         )}
 
