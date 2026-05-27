@@ -3250,7 +3250,12 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
   const reloadUsers = () => supabase.from("user_profiles").select("*").order("created_at", { ascending: false })
     .then(({ data, error }) => { setUsers(data || []); if (error) setErr(error.message); });
 
+  // Race condition fix (2026-05-27): wait for session to load before firing
+  // RLS-gated queries. Without this, LiveAdmin mounted before auth session was
+  // ready → supabase requests went out WITHOUT JWT → RLS denied → "No users yet"
+  // even for admin. Now gated on `self?.id` and re-runs when session arrives.
   useEffect(() => {
+    if (!self?.id) return;
     reloadUsers();
     supabase.from("events").select("*").like("event_type", "new_signup%").order("detected_at", { ascending: false }).limit(20)
       .then(({ data }) => setEvents(data || []));
@@ -3262,7 +3267,7 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
       .then(({ data }) => setActivity(data || []));
     supabase.from("premium_domains").select("*").order("domain")
       .then(({ data }) => setPremiumDomains(data || []));
-  }, []);
+  }, [self?.id]);
 
   const premiumSet = new Set(premiumDomains.map(d => d.domain.toLowerCase()));
 
