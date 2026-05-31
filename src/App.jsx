@@ -106,10 +106,11 @@ const t = {
     dataContextSub: "Monthly snapshot · all active residential projects",
     insightsLabel: "Market Insights",
     insightsTitle: "What the data tells you.",
-    insightsDesc: "Examples of the insights you can extract from each monthly delivery. The kind of edge that's hard to build in-house — and expensive to live without.",
-    // Clearer: these are real numbers from the latest monthly snapshot, not
-    // invented marketing. Refreshed every month after the 1st-of-month sync.
-    insightsBadge: "April 2026 snapshot · real data",
+    insightsDesc: "Examples of the insights you can extract from each monthly delivery. The kind of edge that's hard to build in-house — and expensive to live without. The five cards below are illustrative examples — paid subscribers see the live versions in their dashboard, derived from the current snapshot.",
+    // F-062 (Boss 2026-05-31): these cards contain illustrative numbers, not
+    // live derived values. Badge wording made explicit so customers don't
+    // read them as live insights. Real numbers ship in the paid dashboard.
+    insightsBadge: "Illustrative examples · live in dashboard",
     rawLabel: "Raw Data",
     unitSample: "Unit-level sample",
     // `showing` is overridden per render in DataPage with live units-tracked
@@ -226,8 +227,8 @@ const t = {
     dataContextSub: "Mesačný prehľad · všetky aktívne projekty",
     insightsLabel: "Trhové insighty",
     insightsTitle: "Čo z toho vidíte.",
-    insightsDesc: "Príklady insightov z mesačnej dodávky. Informačná výhoda proti konkurencii.",
-    insightsBadge: "Apríl 2026 · reálne dáta",
+    insightsDesc: "Príklady insightov z mesačnej dodávky. Informačná výhoda proti konkurencii. Päť kariet nižšie sú ilustračné príklady — platiaci klienti vidia živé verzie vo svojom dashboarde, vypočítané z aktuálneho snapshotu.",
+    insightsBadge: "Ilustračné príklady · live v dashboarde",
     rawLabel: "Surové dáta",
     unitSample: "Ukážka na úrovni bytov",
     // Prepisujeme live v DataPage cez useMarketTotals; fallback kým sa načíta.
@@ -899,21 +900,13 @@ function DataPage({ setCurrent, l, lang }) {
     : (lang === "sk"
         ? `Zobrazených 8 z ${Number(unitsTracked).toLocaleString(locale)} záznamov`
         : `Showing 8 of ${Number(unitsTracked).toLocaleString(locale)} records`);
-  // Dynamic insights badge: derive month label from market_totals.snapshot_month
-  // so the badge always reads "<latest month> <year> · ..." without needing
-  // a release. When May data lands the badge auto-rolls to "Máj 2026".
-  // Falls back to the static l.insightsBadge while market_totals is loading
-  // (prevents an "undefined snapshot" flash on first paint).
-  const dynamicInsightsBadge = (() => {
-    if (!snapshotMonth || !/^\d{4}-\d{2}$/.test(String(snapshotMonth))) {
-      return l.insightsBadge;
-    }
-    const [y, mm] = String(snapshotMonth).split("-");
-    const dt = new Date(Number(y), Number(mm) - 1, 1);
-    const monthLabel = dt.toLocaleDateString(locale, { month: "long", year: "numeric" });
-    const cap = monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1);
-    return lang === "sk" ? `${cap} · reálne dáta` : `${cap} snapshot · real data`;
-  })();
+  // F-062 (Boss 2026-05-31): the InsightCards section contains hardcoded
+  // illustrative numbers, NOT live derived data. The previous dynamic badge
+  // claimed "<Month Year> snapshot · real data" which was misleading. Badge
+  // text now comes from l.insightsBadge ("Illustrative examples · live in
+  // dashboard") so customers don't mistake hand-authored examples for live
+  // insights. Live versions ship in the paid dashboard.
+  const dynamicInsightsBadge = l.insightsBadge;
   // Unit-level sample rows — 8 real active projects, prices computed from
   // the project-level avg_price_eur_m2 we actually have in DB × plausible
   // floor area. Unit labels (A2-304 etc.) are illustrative — we don't
