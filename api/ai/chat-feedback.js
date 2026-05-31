@@ -54,6 +54,22 @@ export const maxDuration = 10;
 const MAX_BODY_BYTES = 4 * 1024;
 const MAX_NOTE_LEN   = 280;
 
+// F-112: mirror of src/lib/sanitize.js#cleanText kept inline here so the
+// Vercel function doesn't reach into the React bundle (no other api/* file
+// does that today; safer to duplicate the 8 lines than to be the first
+// to cross the boundary and risk a Vercel deploy that resolves it weirdly).
+// Keep in sync with src/lib/sanitize.js if cleanText ever changes.
+function cleanText(raw, { max = 280 } = {}) {
+  if (typeof raw !== "string") return "";
+  let s = raw;
+  s = s.replace(/[<>]/g, "");                  // strip HTML tag chars
+  s = s.replace(/[\x00-\x1F\x7F]/g, " ");      // strip control chars
+  s = s.replace(/^[=+@]+/, "");                // strip CSV-formula triggers
+  s = s.replace(/\s+/g, " ").trim();           // collapse whitespace
+  if (s.length > max) s = s.slice(0, max);
+  return s;
+}
+
 // Trusted origins — copy of the list in /api/ai/chat for parity.
 const ALLOWED_ORIGINS = [
   "https://residata.sk",
@@ -149,7 +165,12 @@ async function handleInner(req, res) {
   if (feedback !== "good" && feedback !== "bad" && feedback !== null) {
     return res.status(400).json({ error: "feedback must be 'good', 'bad', or null (to clear)" });
   }
-  const noteTrim = typeof note === "string" ? note.trim().slice(0, MAX_NOTE_LEN) : null;
+  // F-112: route the user-supplied note through cleanText for the same
+  // defense-in-depth reason CompleteProfile + PlatformSettings sanitize
+  // their string fields. The note is unlikely to be rendered as HTML
+  // today (Boss reads via SQL), but a future analytics dashboard would
+  // inherit the unsanitized payload otherwise.
+  const noteTrim = typeof note === "string" ? cleanText(note, { max: MAX_NOTE_LEN }) || null : null;
 
   const admin = createClient(SUPABASE_URL, SUPABASE_SECRET_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
