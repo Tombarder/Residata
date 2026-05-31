@@ -27,9 +27,17 @@ function sessionId() {
 export async function track(eventType, data = {}) {
   if (!isSupabaseReady()) return;
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    // F-116: getSession() reads from local storage (no network call);
+    // getUser() would round-trip to /auth/v1/user on every track()
+    // invocation, adding ~50-200ms latency and extra load on Supabase
+    // Auth for what is supposed to be a fire-and-forget analytics
+    // event. The JWT in localStorage is signed by Supabase so we can
+    // trust the user.id off it without re-validating — and if the
+    // token has been tampered with, the subsequent insert fails via
+    // RLS anyway.
+    const { data: { session } } = await supabase.auth.getSession();
     await supabase.from("user_activity").insert({
-      user_id: user?.id || null,
+      user_id: session?.user?.id || null,
       session_id: sessionId(),
       event_type: eventType,
       event_data: data && Object.keys(data).length ? data : null,
@@ -37,7 +45,14 @@ export async function track(eventType, data = {}) {
       referrer: typeof document !== "undefined" ? (document.referrer || null) : null,
       user_agent: typeof navigator !== "undefined" ? navigator.userAgent?.slice(0, 300) : null,
     });
-  } catch {
-    // Swallow — tracking nikdy nebreakuje UI
+  } catch (e) {
+    // Swallow — tracking nikdy nebreakuje UI.
+    // F-117: dev-mode visibility so silently-failing tracking (RLS
+    // regression, dropped column, intermittent network) shows up in
+    // the console at dev time. Production stays silent as before.
+    if (import.meta.env.DEV) {
+      // eslint-disable-next-line no-console
+      console.warn("[track] insert failed:", e?.message || e);
+    }
   }
 }
