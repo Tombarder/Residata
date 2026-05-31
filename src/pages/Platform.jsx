@@ -1551,7 +1551,9 @@ function PlatformExports({ lang }) {
       const s = String(v); return s.includes(",") || s.includes("\"") ? `"${s.replace(/"/g, '""')}"` : s;
     }).join(","));
     const csv = [headers.join(","), ...rows].join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    // UTF-8 BOM so Windows Excel auto-detects encoding and renders
+    // "Petržalka" / "Staré Mesto" correctly instead of "Petr�alka".
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href = url;
     a.download = `residata-projects-${new Date().toISOString().slice(0, 10)}.csv`;
@@ -1572,7 +1574,8 @@ function PlatformExports({ lang }) {
       const s = String(v); return s.includes(",") || s.includes("\"") ? `"${s.replace(/"/g, '""')}"` : s;
     }).join(","));
     const csv = [headers.join(","), ...rows].join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    // UTF-8 BOM so Windows Excel renders SK diacritics correctly.
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href = url;
     a.download = `residata-flats-${new Date().toISOString().slice(0, 10)}.csv`;
