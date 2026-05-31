@@ -69,6 +69,15 @@ export function useCapabilities() {
   let effectiveTier;
   if (baseTier === "admin") {
     effectiveTier = "admin";
+  } else if (baseTier === "pending") {
+    // F-113: defense-in-depth. Pending users are awaiting admin approval
+    // and must not have data access regardless of trial_until / paid_until
+    // state. Data-state slop (admin granting trial to a still-pending
+    // user, or a previously-trial user being re-flipped to pending)
+    // would otherwise be silently promoted to paid caps via the
+    // trial_until branch below. Pending stays pending until admin moves
+    // them.
+    effectiveTier = "pending";
   } else if (paidPaused) {
     // Paused — even if base is paid and window is in future, no access.
     effectiveTier = baseTier === "paid" ? "free" : baseTier;
