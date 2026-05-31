@@ -507,11 +507,15 @@ function Footer() {
 function HomePage({ setCurrent, l, lang, onLogin }) {
   const { can, tier } = useCapabilities();
   // Hero badge — surfaces the depth of our dataset. "tracked" = projects
-  // with archive data (active + sold-out under tracking). The active subset
-  // is shown alongside when it differs (today they're equal because nothing
-  // has sold out under tracking yet — the number diverges naturally over
-  // time). Reads from market_totals — single source of truth shared with
-  // /live, Dashboard, Ticker, and the build-time SEO files.
+  // with archive data (active + paused/sold-out projects we still keep
+  // historical data on). The active subset is shown alongside whenever
+  // it differs from tracked. Today the gap is ~30% (e.g. 73 active vs
+  // 116 tracked) because projects move between active and paused as
+  // they sell out or pause sales; the gap grows naturally over time as
+  // more projects accumulate archive history. Reads from market_totals
+  // — same view /live, Dashboard, and the build-time SEO files read.
+  // (The homepage Ticker uses a separate unit-weighted aggregation; see
+  // audit_findings.md F-019 for the divergence.)
   const marketTotals = useMarketTotals();
   const liveProjCount = marketTotals.projectsActive ?? 0;
   const trackedProjCount = marketTotals.projectsTracked ?? liveProjCount;
