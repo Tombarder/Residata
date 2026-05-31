@@ -1514,7 +1514,7 @@ function PlatformSettings({ lang }) {
       {/* Read-only meta */}
       <div style={{ marginTop: "1.25rem", padding: "1rem 1.25rem", background: bg2, border: `1px solid ${border}`, borderRadius: 10, fontSize: "0.78rem", color: dim, fontFamily: mono, lineHeight: 1.7 }}>
         <div>user_id: {user?.id}</div>
-        {profile?.created_at && <div>created: {profile.created_at.slice(0, 16).replace("T", " ")}</div>}
+        {profile?.created_at && <div>created: {new Date(profile.created_at).toLocaleString(lang === "sk" ? "sk-SK" : "en-US", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Bratislava" })}</div>}
         <div>tier: {profile?.tier || "—"}</div>
       </div>
     </div>
