@@ -2661,6 +2661,10 @@ function ChooseProjectGate({ projectId, projectName, profile, reloadProfile, set
   const [err, setErr] = useState(null);
   const locked = profile?.chosen_project_id && profile.chosen_project_id !== projectId;
   const alreadyThis = profile?.chosen_project_id === projectId;
+  // F-093: resolve chosen_project_id (UUID) → display name. Falls back to the
+  // raw id if we haven't yet loaded projects so the locked-state never crashes.
+  const { projects: allProjectsForGate } = useProjects();
+  const chosenName = allProjectsForGate?.find(p => p.id === profile?.chosen_project_id)?.name || profile?.chosen_project_id;
 
   const assign = async () => {
     setBusy(true); setErr(null);
@@ -2731,8 +2735,8 @@ function ChooseProjectGate({ projectId, projectName, profile, reloadProfile, set
         </h1>
         <p style={{ color: dim, lineHeight: 1.6, marginBottom: "0.75rem" }}>
           {lang === "sk"
-            ? <>Tvoj free účet je napojený na projekt <strong style={{ color: green }}>{profile.chosen_project_id}</strong>. Tento výber je uzamknutý — jeden projekt, jeden snapshot.</>
-            : <>Your free account is linked to project <strong style={{ color: green }}>{profile.chosen_project_id}</strong>. This choice is locked — one project, one snapshot.</>}
+            ? <>Tvoj free účet je napojený na projekt <strong style={{ color: green }}>{chosenName}</strong>. Tento výber je uzamknutý — jeden projekt, jeden snapshot.</>
+            : <>Your free account is linked to project <strong style={{ color: green }}>{chosenName}</strong>. This choice is locked — one project, one snapshot.</>}
         </p>
         <p style={{ color: dim, fontSize: "0.85rem", marginBottom: "1.5rem" }}>
           {lang === "sk"
