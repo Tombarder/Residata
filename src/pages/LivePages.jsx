@@ -2665,6 +2665,12 @@ function ChooseProjectGate({ projectId, projectName, profile, reloadProfile, set
   // raw id if we haven't yet loaded projects so the locked-state never crashes.
   const { projects: allProjectsForGate } = useProjects();
   const chosenName = allProjectsForGate?.find(p => p.id === profile?.chosen_project_id)?.name || profile?.chosen_project_id;
+  // F-094: live "all N projects" copy — was hardcoded "60". Use the
+  // tracked dataset count (matches the dataset hero badge) so the upgrade
+  // pitch always matches reality. Fallback to 60 while loading so we
+  // never show "all  projects" with a gap.
+  const gateMarketTotals = useMarketTotals();
+  const trackedProjCount = gateMarketTotals?.projectsTracked ?? gateMarketTotals?.projectsActive ?? 60;
 
   const assign = async () => {
     setBusy(true); setErr(null);
@@ -2740,8 +2746,8 @@ function ChooseProjectGate({ projectId, projectName, profile, reloadProfile, set
         </p>
         <p style={{ color: dim, fontSize: "0.85rem", marginBottom: "1.5rem" }}>
           {lang === "sk"
-            ? <>Pre prístup ku všetkým 60 projektom potrebuješ <button onClick={() => setCurrent("Pricing")} style={linkBtn}>paid tier</button>.</>
-            : <>For access to all 60 projects, <button onClick={() => setCurrent("Pricing")} style={linkBtn}>upgrade to paid</button>.</>}
+            ? <>Pre prístup ku všetkým {trackedProjCount} projektom potrebuješ <button onClick={() => setCurrent("Pricing")} style={linkBtn}>paid tier</button>.</>
+            : <>For access to all {trackedProjCount} projects, <button onClick={() => setCurrent("Pricing")} style={linkBtn}>upgrade to paid</button>.</>}
         </p>
         <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center" }}>
           <button className="btn-p" onClick={() => setCurrent(`Project:${profile.chosen_project_id}`)}>
