@@ -43,10 +43,8 @@ const t = {
     // Nav
     getAccess: "Get Access",
     // Hero
-    // heroBadge text is computed in HomePage from live projects.length;
-    // these static keys are kept only as a fallback for components that
-    // reference them before projects have loaded.
-    heroBadge: "Live — tracking every active development",
+    // heroBadge text is computed in HomePage from live projects.length —
+    // see `heroBadgeText` near the top of HomePage(). No static fallback.
     heroTitle1: "Bratislava residential market,",
     heroTitle2: "fully transparent.",
     heroSub: "We monitor every new residential development in Bratislava and turn scattered listings into actionable market intelligence — so you can make pricing, investment, and portfolio decisions based on data.",
@@ -171,8 +169,7 @@ const t = {
   },
   sk: {
     getAccess: "Kontakt",
-    // Viď EN variant — live projekt count sa interpoluje v HomePage.
-    heroBadge: "Live — sledujeme všetky aktívne projekty",
+    // heroBadge text počíta HomePage z live projekt count — viď `heroBadgeText`.
     heroTitle1: "Novostavby v Bratislave.",
     heroTitle2: "Celý trh v jednom prehľade.",
     heroSub: "Ceny, dostupnosť, rýchlosť predaja. Všetko v prehľadných reportoch, na základe ktorých môžete robiť dátami podložené rozhodnutia.",
