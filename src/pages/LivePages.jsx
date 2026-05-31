@@ -2664,14 +2664,14 @@ function ChooseProjectGate({ projectId, projectName, profile, reloadProfile, set
 
   const assign = async () => {
     setBusy(true); setErr(null);
-    console.log("[ChooseProject] assign start", { userId: profile?.id, projectId });
     const t0 = performance.now();
+    if (import.meta.env.DEV) console.log("[ChooseProject] assign start", { userId: profile?.id, projectId });
 
     // Hard-reload safety net — if for any reason the async chain stalls
     // (stale session, network blip), force a reload to /live so the user
     // never sees a permanent "Saving…" button.
     const fallback = setTimeout(() => {
-      console.warn("[ChooseProject] slow — forcing hard reload");
+      if (import.meta.env.DEV) console.warn("[ChooseProject] slow — forcing hard reload");
       window.location.reload();
     }, 10000);
 
@@ -2680,7 +2680,7 @@ function ChooseProjectGate({ projectId, projectName, profile, reloadProfile, set
       const { error: updErr } = await supabase.from("user_profiles")
         .update({ chosen_project_id: projectId })
         .eq("id", profile.id);
-      console.log(`[ChooseProject] UPDATE returned after ${Math.round(performance.now() - t0)}ms`, { updErr });
+      if (import.meta.env.DEV) console.log(`[ChooseProject] UPDATE returned after ${Math.round(performance.now() - t0)}ms`, { updErr });
       if (updErr) throw new Error(updErr.message);
 
       // Step 2: Hard navigation to /project/<id>.
@@ -2709,11 +2709,11 @@ function ChooseProjectGate({ projectId, projectName, profile, reloadProfile, set
       // state-flow is still used everywhere else in the app; this one
       // commit boundary is the right place to reset and reload.
       clearTimeout(fallback);
-      console.log(`[ChooseProject] hard-navigating to /project/${projectId}`);
+      if (import.meta.env.DEV) console.log(`[ChooseProject] hard-navigating to /project/${projectId}`);
       window.location.href = `/project/${projectId}`;
       return;  // prevent finally setBusy(false) — component is unmounting via navigation
     } catch (e) {
-      console.error("[ChooseProject] exception", e);
+      if (import.meta.env.DEV) console.error("[ChooseProject] exception", e);
       clearTimeout(fallback);
       setErr(e.message || String(e));
     } finally {
