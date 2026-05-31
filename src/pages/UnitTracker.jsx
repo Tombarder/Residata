@@ -39,6 +39,7 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useProjects, useFlatsArchive, useArchiveMonths } from "../lib/useData";
 import { useCapabilities } from "../lib/useCapabilities";
+import { track } from "../lib/track";
 
 const mono   = "'JetBrains Mono', monospace";
 const green  = "#00e5a0";
@@ -1582,6 +1583,7 @@ function ExportRow({ pickedHistories, lang }) {
     const a = document.createElement("a");
     a.href = url; a.download = `residata-unit-history-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
+    try { track("csv_exported", { type: "unit_timeline", row_count: pickedHistories.reduce((a, h) => a + h.rows.length, 0) }); } catch (_) {}
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 

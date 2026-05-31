@@ -1558,6 +1558,7 @@ function PlatformExports({ lang }) {
     const a = document.createElement("a"); a.href = url;
     a.download = `residata-projects-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
+    try { track("csv_exported", { type: "projects", row_count: projects.length }); } catch (_) {}
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
@@ -1580,6 +1581,7 @@ function PlatformExports({ lang }) {
     const a = document.createElement("a"); a.href = url;
     a.download = `residata-flats-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
+    try { track("csv_exported", { type: "flats", row_count: data.length }); } catch (_) {}
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
