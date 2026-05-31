@@ -521,15 +521,25 @@ function HomePage({ setCurrent, l, lang, onLogin }) {
   const marketTotals = useMarketTotals();
   const liveProjCount = marketTotals.projectsActive ?? 0;
   const trackedProjCount = marketTotals.projectsTracked ?? liveProjCount;
-  const heroBadgeText = liveProjCount > 0
-    ? (trackedProjCount > liveProjCount
-        ? (lang === "sk"
-            ? `Live — ${trackedProjCount} projektov v databáze · ${liveProjCount} aktívne`
-            : `Live — ${trackedProjCount} projects in dataset · ${liveProjCount} active`)
-        : (lang === "sk"
-            ? `Live — sledujeme ${liveProjCount} projektov`
-            : `Live — tracking ${liveProjCount} developments`))
-    : (lang === "sk" ? "Live — načítavam projekty…" : "Live — loading projects…");
+  // F-010: split into 3 distinct states so we don't conflate "the hook is
+  // still resolving" with "the DB legitimately has zero active projects."
+  // The old ternary used liveProjCount > 0 ? (…) : "loading…", which
+  // showed "Live — loading projects…" forever in the (vanishingly rare
+  // but real) all-paused state.
+  let heroBadgeText;
+  if (marketTotals.loading) {
+    heroBadgeText = lang === "sk" ? "Live — načítavam projekty…" : "Live — loading projects…";
+  } else if (liveProjCount === 0) {
+    heroBadgeText = lang === "sk" ? "Live — žiadne aktívne projekty" : "Live — no active projects";
+  } else if (trackedProjCount > liveProjCount) {
+    heroBadgeText = lang === "sk"
+      ? `Live — ${trackedProjCount} projektov v databáze · ${liveProjCount} aktívne`
+      : `Live — ${trackedProjCount} projects in dataset · ${liveProjCount} active`;
+  } else {
+    heroBadgeText = lang === "sk"
+      ? `Live — sledujeme ${liveProjCount} projektov`
+      : `Live — tracking ${liveProjCount} developments`;
+  }
   // Hero CTA logika podľa tier-u
   let heroButtons;
   if (can("prompt_signup")) {
