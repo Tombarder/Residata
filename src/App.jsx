@@ -438,14 +438,19 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
                 fontWeight: 600, borderRadius: 6, fontSize: "0.78rem", cursor: "pointer",
                 textDecoration: "none",
               }}>{lang === "sk" ? "Otvoriť platformu →" : "Open platform →"}</a>
-              {/* Debug badge — ukáže aktuálny tier + profile load stav, viditeľné aj v prod kým ladíme */}
-              <span title={`tier=${caps.tier} profile=${auth.profile ? "loaded" : "MISSING"} err=${auth.profileError || "none"}`} style={{
-                fontFamily: "'JetBrains Mono', monospace", fontSize: "0.6rem",
-                padding: "2px 6px", borderRadius: 3,
-                background: auth.profile ? "rgba(0,229,160,0.15)" : "rgba(245,166,35,0.2)",
-                color: auth.profile ? "#00e5a0" : "#f5a623",
-                fontWeight: 700, letterSpacing: "0.05em",
-              }}>{caps.tier}</span>
+              {/* Debug badge — dev-only. Shows current tier + profile load
+                  state next to the user email in the nav. Gated behind
+                  import.meta.env.DEV so customers don't see internal tier
+                  vocabulary in prod. */}
+              {import.meta.env.DEV && (
+                <span title={`tier=${caps.tier} profile=${auth.profile ? "loaded" : "MISSING"} err=${auth.profileError || "none"}`} style={{
+                  fontFamily: "'JetBrains Mono', monospace", fontSize: "0.6rem",
+                  padding: "2px 6px", borderRadius: 3,
+                  background: auth.profile ? "rgba(0,229,160,0.15)" : "rgba(245,166,35,0.2)",
+                  color: auth.profile ? "#00e5a0" : "#f5a623",
+                  fontWeight: 700, letterSpacing: "0.05em",
+                }}>{caps.tier}</span>
+              )}
               <span style={{ fontSize: "0.75rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace", maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {user.email}
               </span>
