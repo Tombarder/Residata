@@ -1,8 +1,11 @@
 import { useEffect, useState, useCallback, createContext, useContext } from "react";
 import { supabase, isSupabaseReady } from "./supabase";
 
-const DEBUG = true;
-const log = (...a) => DEBUG && console.log("[useAuth]", ...a);
+// F-104: gate debug log behind import.meta.env.DEV so production builds
+// don't stream auth state (email, user_id, tier, profile_completed) into
+// the customer's browser DevTools console. Same family as F-095 fix
+// applied to ChooseProjectGate + CompleteProfile in the 2026-05-31 batch.
+const log = (...a) => { if (import.meta.env.DEV) console.log("[useAuth]", ...a); };
 
 /**
  * SHARED auth state via React Context.
