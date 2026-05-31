@@ -829,7 +829,10 @@ function PlatformDashboard({ lang, setCurrent }) {
   const { can, baseTier, trialActive, trialDaysLeft } = caps;
   const { projects } = useProjects();
   const marketTotals = useMarketTotals();
-  const showTrialOffer = baseTier === "free" && !trialActive && !profile?.trial_started_at;
+  // F-026: gate on effective tier (caps.tier), not raw baseTier. Admin-granted
+  // paid users have baseTier='free' but caps.tier='paid' — the old check
+  // pitched a 7-day trial to people who already have permanent paid access.
+  const showTrialOffer = caps.tier === "free" && !trialActive && !profile?.trial_started_at;
 
   // All headline KPIs read from the live `market_totals` view (same
   // source the homepage Ticker, MarketPulse, and /live/analytics use).

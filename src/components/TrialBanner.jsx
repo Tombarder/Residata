@@ -36,13 +36,17 @@ function todayISO() {
  */
 function useShouldShowTrialPromo() {
   const { user, profile } = useAuth();
-  const { baseTier, trialActive } = useCapabilities();
+  // F-026: gate on the EFFECTIVE tier (`tier`), not the raw profile column
+  // (`baseTier`). Admin-granted paid users still have profile.tier='free'
+  // but caps.tier='paid' — the previous baseTier check let them through
+  // and the banner pitched a "7-day trial" they already have permanently.
+  const { tier, trialActive } = useCapabilities();
   // Anon: always eligible (cold visitor we want to convert)
   if (!user) return true;
   // Pending: don't promote — they need approval first
-  if (baseTier === "pending") return false;
+  if (tier === "pending") return false;
   // Already paid / admin: no point
-  if (baseTier === "paid" || baseTier === "admin") return false;
+  if (tier === "paid" || tier === "admin") return false;
   // Free user mid-trial: countdown is on Dashboard, no marketing nudge
   if (trialActive) return false;
   // Free user who already consumed the trial: don't prompt again
