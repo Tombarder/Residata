@@ -1134,8 +1134,9 @@ function PlatformBilling({ lang, setCurrent }) {
   const paidExpired = isPaid && !paidActive && !paidPaused && paidUntil;
   const trialUsed = Boolean(profile?.trial_started_at);
 
-  const approvedAt = profile?.approved_at ? new Date(profile.approved_at).toISOString().slice(0, 10) : null;
+  // fmtDate first (TDZ — const, not hoisted) so approvedAt can use it.
   const fmtDate = (ts) => ts ? new Date(ts).toLocaleDateString(lang === "sk" ? "sk-SK" : "en-US", { day: "numeric", month: "long", year: "numeric" }) : "—";
+  const approvedAt = profile?.approved_at ? fmtDate(profile.approved_at) : null;
 
   const [trialBusy, setTrialBusy] = useState(false);
   const [trialMsg, setTrialMsg]   = useState(null);
@@ -1185,8 +1186,8 @@ function PlatformBilling({ lang, setCurrent }) {
         </div>
         <p style={{ color: "#c0c0c8", fontSize: "0.9rem", lineHeight: 1.65, margin: 0 }}>
           {trialActive && isFree && (lang === "sk"
-            ? <>Máš počas trial-u plný paid prístup (analytika, reporty, exporty). Trial končí <strong style={{ color: textLight }}>{trialUntil ? new Date(trialUntil).toISOString().slice(0, 10) : "—"}</strong>. Bez karty — po skončení trial-u jednoducho padneš späť na free tier, nič ti nestrhneme.</>
-            : <>You have full paid access during the trial (analytics, reports, exports). Trial ends <strong style={{ color: textLight }}>{trialUntil ? new Date(trialUntil).toISOString().slice(0, 10) : "—"}</strong>. No card required — when the trial ends you simply drop back to free, nothing is charged.</>)}
+            ? <>Máš počas trial-u plný paid prístup (analytika, reporty, exporty). Trial končí <strong style={{ color: textLight }}>{fmtDate(trialUntil)}</strong>. Bez karty — po skončení trial-u jednoducho padneš späť na free tier, nič ti nestrhneme.</>
+            : <>You have full paid access during the trial (analytics, reports, exports). Trial ends <strong style={{ color: textLight }}>{fmtDate(trialUntil)}</strong>. No card required — when the trial ends you simply drop back to free, nothing is charged.</>)}
           {!trialActive && isFree && (lang === "sk"
             ? "Ako free user vidíš zoznam všetkých projektov a plný detail 1 projektu podľa tvojho výberu. Analytika, reporty a exporty sú v paid tieri."
             : "As a free user you see the full project list and full detail of 1 project of your choice. Analytics, reports and exports are in the paid tier.")}
