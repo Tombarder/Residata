@@ -23,16 +23,24 @@
 //    about their tier; anon is the only un-authed state and it hits
 //    the strictest limits.
 //
-// 4. **Tier-based daily counter** (ai_usage_log) — caps per user
-//    (or per IP for anon) by tier. Persists across serverless cold
-//    starts via the DB. Paid 30/day, free 10/day, anon 3/day, admin
-//    100/day. pending tier is refused outright.
+// 4. **Tier-based daily counter** — for logged-in users this counts
+//    rows in ai_usage_log by user_id today (persists across cold
+//    starts). For anon callers it's an in-memory per-IP counter that
+//    resets on cold start (see DAILY_LIMITS below for live caps and
+//    the F-109 audit note for the cold-start caveat). pending tier
+//    is refused outright. Current caps: see DAILY_LIMITS const —
+//    paid 30/day, free 3/day, anon 1/day, admin 100/day. Keep this
+//    line in sync with DAILY_LIMITS if you ever bump it.
 //
 // 5. **Bounded input** — request JSON max 24 KB. Each user message
 //    max 2000 chars. Conversation history max 10 turns.
 //
-// 6. **Bounded output** — max_tokens=500 on Anthropic side. Worst-
-//    case single call cost ≈ $0.015 for paid, $0.01 for free.
+// 6. **Bounded output** — MAX_TOKENS = 900 (see const below; bumped
+//    from 500 after users hit truncation on "list every flat matching
+//    X"). Worst-case input is ~30k tokens of paid context × $0.80/M
+//    input ≈ $0.024 plus ~$0.004 output ≈ ~$0.028 / call. Free tier
+//    runs the same context build, so per-call cost is identical;
+//    free's protection is the 3/day quantity cap.
 //
 // 7. **Monthly hard cap on Anthropic side** — configured in the
 //    Anthropic dashboard (Usage Limits → Monthly Spend Cap). Set
