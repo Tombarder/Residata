@@ -3484,7 +3484,7 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
                   <tbody>
                     {events.map(e => (
                       <tr key={e.id} style={{ borderTop: `1px solid ${border}` }}>
-                        <td style={{ ...td, color: dim, fontFamily: mono, fontSize: "0.75rem" }}>{e.detected_at?.slice(0, 16).replace("T", " ")}</td>
+                        <td style={{ ...td, color: dim, fontFamily: mono, fontSize: "0.75rem" }}>{e.detected_at ? new Date(e.detected_at).toLocaleString(lang === "sk" ? "sk-SK" : "en-US", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Bratislava" }) : "—"}</td>
                         <td style={td}><EventBadge type={e.event_type} /></td>
                         <td style={td}>{e.new_value?.email || "—"}</td>
                         <td style={{ ...td, color: dim, fontFamily: mono }}>{e.new_value?.domain || "—"}</td>
