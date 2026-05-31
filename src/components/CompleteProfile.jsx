@@ -44,13 +44,13 @@ export default function CompleteProfile({ lang = "en" }) {
     setErr(null);
     setState("saving");
     const t0 = performance.now();
-    console.log(`[CompleteProfile] submit start`, { user: user?.id });
+    if (import.meta.env.DEV) console.log(`[CompleteProfile] submit start`, { user: user?.id });
 
     // Hard-reload fallback — if for any reason the in-app re-render path fails
     // (stale closure, race, network hiccup), force a full page reload to /app
     // after a timeout. Guarantees the user doesn't sit stuck forever.
     const hardReloadFallback = setTimeout(() => {
-      console.warn("[CompleteProfile] slow submit — forcing hard reload to /app");
+      if (import.meta.env.DEV) console.warn("[CompleteProfile] slow submit — forcing hard reload to /app");
       window.location.replace("/app");
     }, 10000);
 
@@ -84,11 +84,11 @@ export default function CompleteProfile({ lang = "en" }) {
         profile_completed: true,
       }).eq("id", user.id).select();
 
-      console.log(`[CompleteProfile] update returned after ${Math.round(performance.now() - t0)}ms`, { hasData: !!data?.length, error });
+      if (import.meta.env.DEV) console.log(`[CompleteProfile] update returned after ${Math.round(performance.now() - t0)}ms`, { hasData: !!data?.length, error });
 
       if (error) {
         clearTimeout(hardReloadFallback);
-        console.error("[CompleteProfile] ERROR", error);
+        if (import.meta.env.DEV) console.error("[CompleteProfile] ERROR", error);
         setState("error");
         setErr(`${error.message}${error.details ? " — " + error.details : ""}`);
         return;
@@ -108,7 +108,7 @@ export default function CompleteProfile({ lang = "en" }) {
         has_linkedin: !!cleanedLinkedIn,
         has_phone: !!cleanedPhone,
       });
-      console.log(`[CompleteProfile] success · ${Math.round(performance.now() - t0)}ms · hard-redirect to /app`, data[0]);
+      if (import.meta.env.DEV) console.log(`[CompleteProfile] success · ${Math.round(performance.now() - t0)}ms · hard-redirect to /app`, data[0]);
 
       // Update shared context first so in-memory state matches DB.
       setProfile(data[0]);
@@ -122,7 +122,7 @@ export default function CompleteProfile({ lang = "en" }) {
       window.location.replace("/app");
     } catch (e) {
       clearTimeout(hardReloadFallback);
-      console.error("[CompleteProfile] exception", e);
+      if (import.meta.env.DEV) console.error("[CompleteProfile] exception", e);
       setState("error");
       setErr(e.message || String(e));
     }
