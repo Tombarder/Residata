@@ -2831,10 +2831,13 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
   }
 
   // ─── KPI strip ──────────────────────────────────────────────
-  // All four numbers come from the live `market_totals` view (same
-  // source the homepage Ticker + MarketPulse use). Single source of
-  // truth across the entire app — homepage / live / dashboard /
-  // reports all show identical values.
+  // All four numbers come from the live `market_totals` view (project-
+  // weighted aggregates over reference.project_current_state). The
+  // homepage Ticker uses a separate `public.metrics` view that
+  // aggregates unit-weighted from final.units — so the two ARE NOT
+  // currently identical for €/m² (see audit_findings.md F-019 for the
+  // formula divergence + plan to canonicalise). Project counts / units
+  // counts DO reconcile, since both views count from the same matview.
   const totalUnits  = marketTotals.unitsTracked   ?? 0;
   const totalAvail  = marketTotals.unitsAvailable ?? 0;
   const avgEurM2    = marketTotals.avgPriceM2     ?? null;
