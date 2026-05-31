@@ -626,8 +626,8 @@ export function MarketPulse({ lang = "en", setCurrent }) {
       {!anyVelocity && (
         <div style={{ fontSize: "0.78rem", color: "#8a8a96", marginBottom: "1rem", fontStyle: "italic" }}>
           {lang === "sk"
-            ? "Predaje za posledný mesiac začneme zobrazovať od ďalšieho behu syncu (1. mája). Zatiaľ zobrazujeme projekty s najväčšou otvorenou ponukou."
-            : "Last-month sales appear after the next sync run (May 1). Showing projects with the largest open inventory meanwhile."}
+            ? "Predaje za posledný mesiac sa ešte len populujú. Zatiaľ zobrazujeme projekty s najväčšou otvorenou ponukou."
+            : "Last-month sales are still populating. Showing projects with the largest open inventory meanwhile."}
         </div>
       )}
 
