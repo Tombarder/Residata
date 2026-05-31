@@ -1241,6 +1241,11 @@ function DataPage({ setCurrent, l, lang }) {
                 </tbody>
               </table>
             </div>
+            <div style={{ marginTop: "0.5rem", fontFamily: mono, fontSize: "0.6rem", color: "#55555f", fontStyle: "italic", lineHeight: 1.5 }}>
+              {lang === "sk"
+                ? "Ilustračná vzorka · Označenia bytov anonymizované. Reálne projekty + ceny."
+                : "Illustrative sample · Unit IDs anonymized. Real projects + prices."}
+            </div>
           </div>
 
           {/* Right — Schema / YAML (darker) */}
