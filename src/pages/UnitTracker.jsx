@@ -1575,7 +1575,9 @@ function ExportRow({ pickedHistories, lang }) {
       }
     }
     const csv = out.join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    // UTF-8 BOM so Windows Excel renders SK diacritics ("Petržalka",
+    // "Staré Mesto") instead of "Petr�alka" / "Star� Mesto".
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url; a.download = `residata-unit-history-${new Date().toISOString().slice(0, 10)}.csv`;
