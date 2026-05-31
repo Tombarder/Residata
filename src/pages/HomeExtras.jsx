@@ -574,12 +574,15 @@ export function MarketPulse({ lang = "en", setCurrent }) {
   // based velocity estimate for projects like Bory / Slnecnice where
   // the developer doesn't publish P explicitly).
   //
-  // First data snapshot lives in project_snapshots; we only have one
-  // month yet, so sold_last_month is NULL for everyone until the May
-  // sync run. Until then we fall back to sorting by available_units
-  // (same as before) so the section isn't empty, but we label it
-  // honestly with a small note. Once the next sync populates real
-  // velocity, the sort key flips and the note disappears.
+  // Caveat: the v1→v2 cutover (2026-05-28) backfilled per-project
+  // snapshots with sold_count = 0, so the project_sold_last_month view
+  // currently computes inflated deltas (`sold_now - 0` ≈ cumulative
+  // sold) for projects whose only "30-day-old" snapshot is one of the
+  // backfilled rows. Self-corrects ~30 days post-cutover as real daily
+  // history accumulates. See audit_findings.md F-042 for the full
+  // root cause + fix options. When `anyVelocity === false` (no real
+  // deltas yet) we fall back to sorting by available_units so the
+  // section isn't empty, with the honest note below.
   // Limit to active projects so paused/sold_out don't show as "most
   // active" with stale availability/velocity. Manual projects
   // (status='active') stay in.
