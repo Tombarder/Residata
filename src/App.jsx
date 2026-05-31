@@ -496,10 +496,10 @@ function Footer() {
       display: "flex", justifyContent: "space-between", alignItems: "center",
       maxWidth: 1100, margin: "0 auto",
     }}>
-      <span style={{ fontSize: "0.78rem", color: "#55555f" }}>© {new Date().getFullYear()} Residata · Krasovského 13, Bratislava</span>
+      <span style={{ fontSize: "0.78rem", color: "#8a8a96" }}>© {new Date().getFullYear()} Residata · Krasovského 13, Bratislava</span>
       <div style={{ display: "flex", gap: "1.5rem" }}>
-        <a href="mailto:residata@proton.me" style={{ fontSize: "0.78rem", color: "#55555f", textDecoration: "none" }}>residata@proton.me</a>
-        <a href="tel:+421911963909" style={{ fontSize: "0.78rem", color: "#55555f", textDecoration: "none" }}>+421 911 963 909</a>
+        <a href="mailto:residata@proton.me" style={{ fontSize: "0.78rem", color: "#8a8a96", textDecoration: "none" }}>residata@proton.me</a>
+        <a href="tel:+421911963909" style={{ fontSize: "0.78rem", color: "#8a8a96", textDecoration: "none" }}>+421 911 963 909</a>
       </div>
     </footer>
   );
