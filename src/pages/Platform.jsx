@@ -18,6 +18,7 @@ import { useProjects, useMarketTotals } from "../lib/useData";
 import { supabase } from "../lib/supabase";
 import { pushRoute } from "../lib/routing";
 import { track } from "../lib/track";
+import { cleanText, cleanUrl, cleanPhone } from "../lib/sanitize";
 import {
   LiveDashboard, LiveProjectDetail, LiveAnalytics, LiveAdmin,
 } from "./LivePages";
@@ -1440,12 +1441,17 @@ function PlatformSettings({ lang }) {
     e.preventDefault();
     setSaving(true);
     setMsg(null);
+    // F-106: route through sanitize layer the same way CompleteProfile does.
+    // Plain .trim() let users plant `<img onerror=…>` etc. via Settings,
+    // bypassing the intake-clean discipline. cleanText strips HTML tag chars
+    // + CSV-formula triggers, cleanUrl rejects non-http(s) schemes,
+    // cleanPhone keeps only digit-shaped characters.
     const { data, error } = await supabase.from("user_profiles").update({
-      full_name: form.full_name.trim() || null,
-      company: form.company.trim() || null,
-      position: form.position || null,
-      linkedin_url: form.linkedin_url.trim() || null,
-      phone: form.phone.trim() || null,
+      full_name: cleanText(form.full_name, { max: 120 }) || null,
+      company: cleanText(form.company, { max: 120 }) || null,
+      position: cleanText(form.position, { max: 60 }) || null,
+      linkedin_url: cleanUrl(form.linkedin_url, { max: 500 }) || null,
+      phone: cleanPhone(form.phone, { max: 32 }) || null,
     }).eq("id", user.id).select();
     setSaving(false);
     if (error) {
