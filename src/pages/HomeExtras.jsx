@@ -498,9 +498,11 @@ export function PipelineFlow({ lang = "en" }) {
         {[
           { n: fmt(devCount,         lang === "sk" ? "sk-SK" : "en-US"), label: T.statsLabel[0] },
           // KPI label is "sledovaných projektov" / "projects tracked" — value
-          // matches the label: projects with archive data (active + sold-out
-          // under tracking). Today this equals projectsActive; over time as
-          // projects sell out the number grows beyond projectsActive.
+          // matches the label: projects with archive data (active + paused /
+          // sold-out under tracking). Diverges from projectsActive whenever a
+          // project moves between active and paused; today's gap is ~30%
+          // (e.g. 73 active vs 116 tracked). Grows over time as more
+          // historical data accumulates.
           { n: fmt(projTrackedCount, lang === "sk" ? "sk-SK" : "en-US"), label: T.statsLabel[1] },
           // 3. karta = cadence, slovný stat. "Mesačne" / "Monthly" hovorí
           // čo kupujúcemu zaujíma: ako často dostane fresh dáta.
