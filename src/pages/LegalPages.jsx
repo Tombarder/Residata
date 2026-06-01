@@ -18,11 +18,17 @@
  *   - Google (Gmail SMTP for sending login + system emails)
  */
 
+import { useEffect } from "react";
+
 // Shared layout shell for both legal pages.
+//
+// Top padding = 9rem to clear the fixed Nav (~72px) + Ticker (~36px) +
+// optional Trial banner (~36px). Without this the H1 sits behind the
+// Ticker (verified live on first deploy — Boss flagged the clip).
 function LegalPageShell({ title, children }) {
   return (
     <div style={{ background: "#0a0a0c", minHeight: "100vh", color: "#e8e8ed" }}>
-      <div style={{ maxWidth: 760, margin: "0 auto", padding: "4rem 2rem 6rem" }}>
+      <div style={{ maxWidth: 760, margin: "0 auto", padding: "9rem 2rem 6rem" }}>
         <div style={{
           fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
           fontSize: "0.7rem",
@@ -48,6 +54,23 @@ function LegalPageShell({ title, children }) {
   );
 }
 
+// Set <title> + <meta description> on mount.
+// Lightweight — no need for the heavier applySeo() helper since these
+// pages don't need open-graph cards or twitter cards.
+function useDocumentTitle(title, description) {
+  useEffect(() => {
+    const prevTitle = document.title;
+    const metaDesc = document.querySelector('meta[name="description"]');
+    const prevDesc = metaDesc?.getAttribute("content");
+    document.title = title;
+    if (metaDesc && description) metaDesc.setAttribute("content", description);
+    return () => {
+      document.title = prevTitle;
+      if (metaDesc && prevDesc != null) metaDesc.setAttribute("content", prevDesc);
+    };
+  }, [title, description]);
+}
+
 function Section({ title, children }) {
   return (
     <section style={{ marginBottom: "2.25rem" }}>
@@ -70,6 +93,13 @@ function Section({ title, children }) {
 export function PrivacyPage({ lang }) {
   const isSK = lang === "sk";
   const lastUpdated = isSK ? "Posledná aktualizácia: 31. máj 2026" : "Last updated: 31 May 2026";
+
+  useDocumentTitle(
+    isSK ? "Ochrana osobných údajov · Residata" : "Privacy Policy · Residata",
+    isSK
+      ? "Aké osobné údaje Residata spracúva, prečo, komu ich sprístupňujeme a vaše práva podľa GDPR."
+      : "What personal data Residata processes, why, with whom we share it, and your rights under GDPR.",
+  );
 
   return (
     <LegalPageShell title={isSK ? "Zásady ochrany osobných údajov" : "Privacy Policy"}>
@@ -304,6 +334,13 @@ export function PrivacyPage({ lang }) {
 
 export function ImprintPage({ lang }) {
   const isSK = lang === "sk";
+
+  useDocumentTitle(
+    isSK ? "Impressum · Residata" : "Imprint · Residata",
+    isSK
+      ? "Informácie o prevádzkovateľovi webu Residata."
+      : "Information about the operator of the Residata website.",
+  );
 
   return (
     <LegalPageShell title={isSK ? "Impressum" : "Imprint"}>

@@ -122,6 +122,34 @@ const SEO_BY_PAGE = {
       keywords: "Residata kontakt, dáta nehnuteľnosti kontakt, custom report Bratislava",
     },
   },
+  // F-051 legal pages — noindex because they don't earn search traffic
+  // and indexing them would just dilute Google's view of what Residata is.
+  // Each title in-page is set via useDocumentTitle inside LegalPages.jsx;
+  // these entries make the SEO sweep (open graph, robots, hreflang) consistent.
+  Privacy: {
+    path: "/privacy",
+    en: {
+      title: "Privacy Policy · Residata",
+      description: "How Residata handles personal data, third parties involved, retention, and user rights under GDPR.",
+    },
+    sk: {
+      title: "Ochrana osobných údajov · Residata",
+      description: "Ako Residata spracúva osobné údaje, ktoré tretie strany sú zapojené, doba uchovávania a vaše práva podľa GDPR.",
+    },
+    noindex: true,
+  },
+  Imprint: {
+    path: "/imprint",
+    en: {
+      title: "Imprint · Residata",
+      description: "Information about the operator of the Residata website.",
+    },
+    sk: {
+      title: "Impressum · Residata",
+      description: "Informácie o prevádzkovateľovi webu Residata.",
+    },
+    noindex: true,
+  },
 };
 
 /**
