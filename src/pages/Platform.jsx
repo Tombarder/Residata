@@ -1553,8 +1553,15 @@ const inputStyle = {
 // Previously the flats export hard-capped at .limit(10000) — silently dropped
 // rows above the cap. Now we page through Supabase REST using .range(start,
 // end) in PAGE_SIZE batches, building CSV chunks as we go. No upper cap on
-// total rows; sk-ba is ~12.4k current and grows monthly. Memory profile:
-// each chunk is held briefly, joined to a final string, then released.
+// total rows; sk-ba is ~16.7k current and grows monthly.
+//
+// PAGE SIZE = 1000. PostgREST on flats_current caps each request at 1000
+// rows (visible in existing useData.js:461 which uses the same value).
+// Asking for more (we tried 5000 first) just gets capped silently, which
+// fooled the "got fewer rows than requested → done" exit and truncated
+// the export at ~1000 rows. Live Boss test 2026-05-31 night caught this.
+// 17 pages × 1000 rows is still fast enough; round-trip cost dominated by
+// per-request overhead, not per-row.
 //
 // Why client-side and not a Vercel API streaming route: the existing pattern
 // is browser-side (RLS already filters paid-tier rows for the user; nothing
@@ -1564,7 +1571,7 @@ const inputStyle = {
 //
 // Header set: derived from the first non-empty page so it always matches
 // the live view schema (resilient to view-column changes).
-const CSV_PAGE_SIZE = 5000;
+const CSV_PAGE_SIZE = 1000;
 
 function csvEscapeCell(v) {
   if (v == null) return "";
