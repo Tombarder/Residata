@@ -9,7 +9,6 @@ import { useEffect, useRef } from "react";
 import { useChat, GENERAL_KNOWLEDGE_RE } from "../lib/useChat";
 import { LimitBanner } from "./FloatingChat";
 import AiBetaBanner from "./AiBetaBanner";
-import { pushRoute } from "../lib/routing";
 
 const mono   = "'JetBrains Mono', monospace";
 const green  = "#00e5a0";
@@ -21,9 +20,17 @@ const bg2    = "#0e0e10";
 const orange = "#f5a623";
 const red    = "#ff6b6b";
 
-export default function ChatAssistant({ lang = "sk" }) {
+export default function ChatAssistant({ lang = "sk", setCurrent }) {
   const chat = useChat({ lang });
   const L = (sk, en) => lang === "sk" ? sk : en;
+
+  // SPA-nav helper. If parent passed setCurrent (Platform.jsx does), use it
+  // — no page reload, no extra history entry. Falls back to window.location
+  // for safety if rendered without setCurrent (e.g. future floating context).
+  const navTo = (pageKey, fallbackPath) => {
+    if (setCurrent) { setCurrent(pageKey); return; }
+    if (typeof window !== "undefined") window.location.assign(fallbackPath);
+  };
 
   const scrollRef = useRef(null);
   const inputRef  = useRef(null);
@@ -122,8 +129,11 @@ export default function ChatAssistant({ lang = "sk" }) {
             <LimitBanner
               error={chat.error}
               lang={lang}
-              onSignIn={() => { window.location.assign("/"); /* Home opens login modal */ }}
-              onBilling={() => { pushRoute("App:Billing"); window.location.assign("/app/billing"); }}
+              /* SPA-nav when possible (Platform.jsx passes setCurrent —
+                 keeps shell state + scroll). Falls back to full reload if
+                 ChatAssistant is rendered without a navigator. */
+              onSignIn={() => navTo("Home", "/")}
+              onBilling={() => navTo("App:Billing", "/app/billing")}
             />
           ) : (
             <div style={{ color: red, fontSize: "0.82rem", fontFamily: mono }}>
@@ -151,6 +161,7 @@ export default function ChatAssistant({ lang = "sk" }) {
           onChange={e => { chat.markTypingStart(); chat.setInput(e.target.value); }}
           onKeyDown={onKeyDown}
           disabled={chat.pending}
+          aria-label={L("Otázka pre AI asistenta", "Question for the AI assistant")}
           placeholder={L("Tvoja otázka… (Enter pošle, Shift+Enter = nový riadok)", "Your question… (Enter sends, Shift+Enter = new line)")}
           rows={2}
           style={{

@@ -608,7 +608,7 @@ function PageContent({ page, projectId, lang, setCurrent, openLogin }) {
   if (page === "App:Analytics")  return <Gated require="view_analytics"       lang={lang} setCurrent={setCurrent}><LiveAnalytics lang={lang} setCurrent={setCurrent} openLogin={openLogin} /></Gated>;
   if (page === "App:UnitTimeline") return <Gated require="view_analytics"     lang={lang} setCurrent={setCurrent}><UnitTracker lang={lang} setCurrent={setCurrent} /></Gated>;
   if (page === "App:Reports")    return <Gated require="view_monthly_reports" lang={lang} setCurrent={setCurrent}><ReportsPage lang={lang} /></Gated>;
-  if (page === "App:Assistant")  return <ChatAssistant lang={lang} />;
+  if (page === "App:Assistant")  return <ChatAssistant lang={lang} setCurrent={setCurrent} />;
   if (page === "App:Exports")    return <Gated require="export_data"          lang={lang} setCurrent={setCurrent}><PlatformExports lang={lang} setCurrent={setCurrent} /></Gated>;
   if (page === "App:Billing")    return <PlatformBilling lang={lang} setCurrent={setCurrent} />;
   if (page === "App:Settings")   return <PlatformSettings lang={lang} />;
