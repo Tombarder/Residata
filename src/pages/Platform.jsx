@@ -1549,16 +1549,42 @@ const inputStyle = {
 };
 
 // ─── Exports page — CSV downloads + API hint ──────────────
+// F-089 (Boss 2026-05-31, option b): paginated streaming CSV builder.
+// Previously the flats export hard-capped at .limit(10000) — silently dropped
+// rows above the cap. Now we page through Supabase REST using .range(start,
+// end) in PAGE_SIZE batches, building CSV chunks as we go. No upper cap on
+// total rows; sk-ba is ~12.4k current and grows monthly. Memory profile:
+// each chunk is held briefly, joined to a final string, then released.
+//
+// Why client-side and not a Vercel API streaming route: the existing pattern
+// is browser-side (RLS already filters paid-tier rows for the user; nothing
+// leaves the user's machine). Switching to server-side would require a new
+// API endpoint + Vercel function memory tuning. Client-side paging is the
+// minimal change that solves the truncation without changing the data path.
+//
+// Header set: derived from the first non-empty page so it always matches
+// the live view schema (resilient to view-column changes).
+const CSV_PAGE_SIZE = 5000;
+
+function csvEscapeCell(v) {
+  if (v == null) return "";
+  const s = String(v);
+  return s.includes(",") || s.includes("\"") || s.includes("\n")
+    ? `"${s.replace(/"/g, '""')}"`
+    : s;
+}
+
 function PlatformExports({ lang }) {
   const { projects } = useProjects();
   const { user } = useAuth();
+  // Export progress state: null = idle; { current, total, label } while
+  // streaming. Disables the export button + shows a row counter so users
+  // know the click did something even for large exports.
+  const [exportProgress, setExportProgress] = useState(null);
 
   const csvFromProjects = () => {
     const headers = ["id", "name", "district", "total_units", "available_units", "sold_units", "sold_last_month", "sold_percentage", "avg_price_eur_m2", "min_price", "max_price", "developer", "last_updated"];
-    const rows = projects.map(p => headers.map(h => {
-      const v = p[h]; if (v == null) return "";
-      const s = String(v); return s.includes(",") || s.includes("\"") ? `"${s.replace(/"/g, '""')}"` : s;
-    }).join(","));
+    const rows = projects.map(p => headers.map(h => csvEscapeCell(p[h])).join(","));
     const csv = [headers.join(","), ...rows].join("\n");
     // UTF-8 BOM so Windows Excel auto-detects encoding and renders
     // "Petržalka" / "Staré Mesto" correctly instead of "Petr�alka".
@@ -1572,26 +1598,70 @@ function PlatformExports({ lang }) {
   };
 
   const csvFromFlats = async () => {
+    if (exportProgress) return;  // already in progress; ignore double-click
     const { supabase } = await import("../lib/supabase");
-    // Export reads flats_current view (latest month from flats_archive) —
-    // matches what the rest of the platform shows as "current state".
-    const { data, error } = await supabase.from("flats_current").select("*").limit(10000);
-    if (error) { alert(`Export failed: ${error.message}`); return; }
-    if (!data || data.length === 0) { alert("No flats available."); return; }
-    const headers = Object.keys(data[0]);
-    const rows = data.map(r => headers.map(h => {
-      const v = r[h]; if (v == null) return "";
-      const s = String(v); return s.includes(",") || s.includes("\"") ? `"${s.replace(/"/g, '""')}"` : s;
-    }).join(","));
-    const csv = [headers.join(","), ...rows].join("\n");
-    // UTF-8 BOM so Windows Excel renders SK diacritics correctly.
-    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url;
-    a.download = `residata-flats-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    try { track("csv_exported", { type: "flats", row_count: data.length }); } catch (_) {}
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setExportProgress({ current: 0, total: null, label: lang === "sk" ? "Pripravujem…" : "Preparing…" });
+    try {
+      // 1. Get exact total count first so we can show progress + know when
+      //    to stop. `count: 'exact'` + head: true avoids fetching any rows.
+      const countResp = await supabase
+        .from("flats_current")
+        .select("*", { count: "exact", head: true });
+      if (countResp.error) throw countResp.error;
+      const total = countResp.count || 0;
+      if (total === 0) {
+        alert(lang === "sk" ? "Žiadne byty na export." : "No flats available.");
+        return;
+      }
+      setExportProgress({ current: 0, total, label: lang === "sk" ? "Sťahujem…" : "Downloading…" });
+
+      // 2. Stream pages. The first page fixes the header set (column order
+      //    derived from the actual row shape — resilient to view changes).
+      let headers = null;
+      const csvParts = [];
+
+      for (let from = 0; from < total; from += CSV_PAGE_SIZE) {
+        const to = Math.min(from + CSV_PAGE_SIZE - 1, total - 1);
+        const { data, error } = await supabase
+          .from("flats_current")
+          .select("*")
+          .range(from, to);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+
+        if (!headers) {
+          headers = Object.keys(data[0]);
+          csvParts.push(headers.join(","));
+        }
+        for (const row of data) {
+          csvParts.push(headers.map(h => csvEscapeCell(row[h])).join(","));
+        }
+
+        setExportProgress({
+          current: Math.min(from + data.length, total),
+          total,
+          label: lang === "sk" ? "Sťahujem…" : "Downloading…",
+        });
+      }
+
+      // 3. Build Blob + download. UTF-8 BOM stays so Windows Excel renders
+      //    SK diacritics correctly.
+      const csv = csvParts.join("\n");
+      const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `residata-flats-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      try { track("csv_exported", { type: "flats", row_count: total }); } catch (_) {}
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) {
+      // Surface error without ripping the whole page. alert() matches the
+      // pre-fix UX; consider a toast in a future polish pass.
+      alert((lang === "sk" ? "Export zlyhal: " : "Export failed: ") + (e?.message || String(e)));
+    } finally {
+      setExportProgress(null);
+    }
   };
 
   return (
@@ -1608,17 +1678,21 @@ function PlatformExports({ lang }) {
           {lang === "sk" ? "Okamžitý export" : "Instant export"}
         </h3>
         <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-          <button onClick={csvFromProjects} className="btn-p" style={{ fontSize: "0.85rem" }}>
+          <button onClick={csvFromProjects} className="btn-p" style={{ fontSize: "0.85rem" }} disabled={!!exportProgress}>
             ⬇ {lang === "sk" ? "Projekty" : "Projects"} ({projects.length})
           </button>
-          <button onClick={csvFromFlats} className="btn-s" style={{ fontSize: "0.85rem" }}>
-            ⬇ {lang === "sk" ? "Všetky byty" : "All flats"}
+          <button onClick={csvFromFlats} className="btn-s" style={{ fontSize: "0.85rem" }} disabled={!!exportProgress}>
+            {exportProgress
+              ? (exportProgress.total
+                  ? `${exportProgress.label} ${exportProgress.current.toLocaleString(lang === "sk" ? "sk-SK" : "en-US")} / ${exportProgress.total.toLocaleString(lang === "sk" ? "sk-SK" : "en-US")}`
+                  : exportProgress.label)
+              : <>⬇ {lang === "sk" ? "Všetky byty" : "All flats"}</>}
           </button>
         </div>
         <p style={{ color: dim, fontSize: "0.75rem", marginTop: "0.85rem", lineHeight: 1.5 }}>
           {lang === "sk"
-            ? "CSV sa vytvorí v tvojom prehliadači — nič neodchádza mimo tvoj počítač. Pre Excel stačí dvojklik."
-            : "CSV is generated in your browser — nothing leaves your machine. Double-click opens in Excel."}
+            ? "CSV sa vytvorí v tvojom prehliadači — nič neodchádza mimo tvoj počítač. Pre Excel stačí dvojklik. Veľké exporty môžu trvať pár sekúnd."
+            : "CSV is generated in your browser — nothing leaves your machine. Double-click opens in Excel. Large exports may take a few seconds."}
         </p>
       </div>
 
