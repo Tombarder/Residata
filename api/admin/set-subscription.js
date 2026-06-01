@@ -149,13 +149,35 @@ export default async function handler(req, res) {
       .from("user_profiles").update(patch).eq("id", userId);
     if (updErr) return res.status(500).json({ error: "update failed", detail: updErr.message });
 
-    // Audit
-    admin.from("admin_audit_log").insert({
-      admin_id: user.id,
-      target_user_id: userId,
-      action: "subscription_update",
-      details: patch,
-    }).then(({ error }) => { if (error) console.warn("[set-subscription] audit", error.message); });
+    // Audit — F-239 fix: previously wrote to columns admin_id / target_user_id /
+    // details which DON'T EXIST in admin_audit_log (the actual schema uses
+    // actor_id / target_id / payload — same as delete-user.js). Every
+    // subscription_update insert was silently failing (only the .then()
+    // .warn caught it, and Vercel logs aren't watched live). Result: ZERO
+    // subscription_update rows in the live audit trail despite Boss using
+    // this endpoint repeatedly via LiveAdmin. Mirror delete-user.js exactly.
+    const clientIp =
+      (req.headers["x-forwarded-for"] || "").split(",")[0].trim() ||
+      req.headers["x-real-ip"] ||
+      null;
+    const userAgent = req.headers["user-agent"] || null;
+    try {
+      await admin.from("admin_audit_log").insert({
+        actor_id:    user.id,
+        actor_email: user.email || null,
+        action:      "subscription_update",
+        target_id:   userId,
+        payload:     patch,
+        ip:          clientIp,
+        user_agent:  userAgent,
+        success:     true,
+        error:       null,
+      });
+    } catch (auditErr) {
+      // Never let logging mask the real result — but DO surface the failure
+      // in Vercel logs so the next ops sweep catches it.
+      console.warn("[set-subscription] audit insert failed", auditErr?.message || auditErr);
+    }
 
     return res.status(200).json({ ok: true, patch });
   } catch (e) {
