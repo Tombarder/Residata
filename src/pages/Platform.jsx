@@ -1600,34 +1600,46 @@ function PlatformExports({ lang }) {
   const csvFromFlats = async () => {
     if (exportProgress) return;  // already in progress; ignore double-click
     const { supabase } = await import("../lib/supabase");
-    setExportProgress({ current: 0, total: null, label: lang === "sk" ? "Pripravujem…" : "Preparing…" });
+    setExportProgress({ current: 0, total: null, label: lang === "sk" ? "Sťahujem…" : "Downloading…" });
     try {
-      // 1. Get exact total count first so we can show progress + know when
-      //    to stop. `count: 'exact'` + head: true avoids fetching any rows.
-      const countResp = await supabase
+      // F-089 (revised 2026-05-31 night): the previous version blocked on a
+      // `count: 'exact'` head query before fetching any pages. On views as
+      // complex as flats_current (paid-tier join over final.units +
+      // reference.projects + latest-snapshot filter), that count round-trip
+      // can hang 60s+ via PostgREST. Worse, it's pure overhead — we know
+      // we're done when a page comes back smaller than CSV_PAGE_SIZE.
+      //
+      // New approach: start paginating immediately. Show running row count
+      // ("Downloading 10,000 rows…"). If we want the total later we can
+      // fetch it lazily in the background, but the UX value is small and
+      // the latency cost was huge.
+      //
+      // Also: kick off an `estimated` count in parallel — it's cheap (uses
+      // planner stats, not an exact scan) and lets us upgrade the label
+      // to "X / Y" if it returns reasonably. If it errors or hangs we just
+      // continue with the running-count display.
+      const estimatePromise = supabase
         .from("flats_current")
-        .select("*", { count: "exact", head: true });
-      if (countResp.error) throw countResp.error;
-      const total = countResp.count || 0;
-      if (total === 0) {
-        alert(lang === "sk" ? "Žiadne byty na export." : "No flats available.");
-        return;
-      }
-      setExportProgress({ current: 0, total, label: lang === "sk" ? "Sťahujem…" : "Downloading…" });
+        .select("*", { count: "estimated", head: true })
+        .then(r => (!r.error && r.count) ? r.count : null)
+        .catch(() => null);
 
-      // 2. Stream pages. The first page fixes the header set (column order
-      //    derived from the actual row shape — resilient to view changes).
+      let total = null;  // populated lazily when estimate resolves
       let headers = null;
       const csvParts = [];
+      let from = 0;
+      let pageRows = 0;
+      let totalRows = 0;
 
-      for (let from = 0; from < total; from += CSV_PAGE_SIZE) {
-        const to = Math.min(from + CSV_PAGE_SIZE - 1, total - 1);
+      do {
+        const to = from + CSV_PAGE_SIZE - 1;
         const { data, error } = await supabase
           .from("flats_current")
           .select("*")
           .range(from, to);
         if (error) throw error;
-        if (!data || data.length === 0) break;
+        pageRows = data?.length || 0;
+        if (pageRows === 0) break;
 
         if (!headers) {
           headers = Object.keys(data[0]);
@@ -1636,16 +1648,31 @@ function PlatformExports({ lang }) {
         for (const row of data) {
           csvParts.push(headers.map(h => csvEscapeCell(row[h])).join(","));
         }
+        totalRows += pageRows;
+        from += CSV_PAGE_SIZE;
+
+        // After the first page returns, opportunistically read the parallel
+        // estimate so the UI can show "X / Y" once it's available.
+        if (total === null) {
+          try {
+            total = await Promise.race([estimatePromise, Promise.resolve(null)]);
+          } catch (_) {}
+        }
 
         setExportProgress({
-          current: Math.min(from + data.length, total),
-          total,
+          current: totalRows,
+          total: total && total >= totalRows ? total : null,
           label: lang === "sk" ? "Sťahujem…" : "Downloading…",
         });
+      } while (pageRows === CSV_PAGE_SIZE);  // short page = last page
+
+      if (totalRows === 0) {
+        alert(lang === "sk" ? "Žiadne byty na export." : "No flats available.");
+        return;
       }
 
-      // 3. Build Blob + download. UTF-8 BOM stays so Windows Excel renders
-      //    SK diacritics correctly.
+      // Build Blob + download. UTF-8 BOM stays so Windows Excel renders
+      // SK diacritics correctly.
       const csv = csvParts.join("\n");
       const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
@@ -1653,7 +1680,7 @@ function PlatformExports({ lang }) {
       a.href = url;
       a.download = `residata-flats-${new Date().toISOString().slice(0, 10)}.csv`;
       a.click();
-      try { track("csv_exported", { type: "flats", row_count: total }); } catch (_) {}
+      try { track("csv_exported", { type: "flats", row_count: totalRows }); } catch (_) {}
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (e) {
       // Surface error without ripping the whole page. alert() matches the
@@ -1685,7 +1712,9 @@ function PlatformExports({ lang }) {
             {exportProgress
               ? (exportProgress.total
                   ? `${exportProgress.label} ${exportProgress.current.toLocaleString(lang === "sk" ? "sk-SK" : "en-US")} / ${exportProgress.total.toLocaleString(lang === "sk" ? "sk-SK" : "en-US")}`
-                  : exportProgress.label)
+                  : exportProgress.current > 0
+                    ? `${exportProgress.label} ${exportProgress.current.toLocaleString(lang === "sk" ? "sk-SK" : "en-US")}${lang === "sk" ? " riadkov" : " rows"}`
+                    : exportProgress.label)
               : <>⬇ {lang === "sk" ? "Všetky byty" : "All flats"}</>}
           </button>
         </div>
