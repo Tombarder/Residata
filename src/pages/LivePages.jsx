@@ -2130,6 +2130,14 @@ function AreaPriceScatter({ flats, lang, onSelectFlat }) {
   const innerW = W - pad.l - pad.r, innerH = H - pad.t - pad.b;
   const locale = lang === "sk" ? "sk-SK" : "en-US";
 
+  // F-255 fix: hooks MUST be called before any conditional return.
+  // Previously `useState`/`useRef` were defined below an `if (points.length === 0) return` —
+  // when `flats` toggled between empty and non-empty, the hook-call order
+  // changed between renders → React rules-of-hooks violation, potential
+  // "Rendered more hooks than during the previous render" crash.
+  const [hover, setHover] = useState(null);
+  const wrapperRef = useRef(null);
+
   const points = flats
     .map(f => ({
       x: Number(f.obytna_plocha || f.celkova_plocha),
@@ -2151,11 +2159,6 @@ function AreaPriceScatter({ flats, lang, onSelectFlat }) {
   const avgPerM2 = sumArea > 0 ? sumPrice / sumArea : 0;
 
   const colorFor = (stav) => stav === "V" ? green : stav === "P" ? "#f5a623" : stav === "R" || stav === "PR" ? "#888" : dim;
-
-  // Hover state for the rich tooltip — {flat, clientX, clientY} relative
-  // to the <svg>'s bounding rect so we can position an HTML overlay.
-  const [hover, setHover] = useState(null);
-  const wrapperRef = useRef(null);
 
   const handleMove = (e, flat) => {
     const rect = wrapperRef.current?.getBoundingClientRect();
@@ -3134,12 +3137,16 @@ function ASection({ label, title, children, inline = false }) {
 }
 
 function RankBarList({ rows, setCurrent, suffix = "", color = green, getChildren }) {
+  // F-256 fix: hook before any conditional return (rules-of-hooks). Previously
+  // useState lived below `if (!rows || rows.length === 0) return null;` — when
+  // `rows` toggled between empty and non-empty across renders the hook order
+  // diverged and React would throw on the second render.
+  // Track which row is expanded. Only relevant when getChildren is provided
+  // (developer rows that drill down to their projects).
+  const [openKey, setOpenKey] = useState(null);
   if (!rows || rows.length === 0) return null;
   const max = Math.max(...rows.map(r => r.value));
   const cls = "rbl-" + Math.random().toString(36).slice(2, 8);
-  // Track which row is expanded. Only relevant when getChildren is
-  // provided (developer rows that drill down to their projects).
-  const [openKey, setOpenKey] = useState(null);
   return (
     <div>
       <style>{`

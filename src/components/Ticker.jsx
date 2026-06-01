@@ -128,8 +128,8 @@ const styles = {
     pointerEvents: "none",
     zIndex: 1,
   },
-  content: {
-    padding: "0 1rem",
-    fontStyle: "italic",
-  },
+  // (F-254 fix: removed duplicate `content:` key — the earlier definition
+  //  at the top of the styles object wins per object-literal semantics, so
+  //  this italic-styled variant was never reachable. If italic for the
+  //  loading state is intended, override inline at the call site instead.)
 };

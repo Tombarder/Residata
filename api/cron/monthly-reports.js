@@ -100,6 +100,17 @@ export default async function handler(req, res) {
   if (pErr) return res.status(500).json({ error: `projects query: ${pErr.message}` });
 
   const results = [];
+  // F-257 fix: response-body month label needs an outer-scope value. The
+  // F-197/F-198 fix moved per-subscriber `const month` inside the loop
+  // (correct, for locale-aware emails) but the response JSON at the
+  // bottom of this function still references `month`. const is
+  // block-scoped, so post-loop it was a ReferenceError — every cron
+  // fire after subscribers existed would have thrown on response build
+  // (emails sent OK, but Vercel returns 500 → cron logs noisy). Cron's
+  // next fire is 2026-07-01 so the impact would have hit Boss tomorrow.
+  // Compute a default month here in the server's locale for the
+  // response payload only — subscriber-facing labels still use sub.lang.
+  const responseMonth = new Date().toLocaleDateString("sk-SK", { month: "long", year: "numeric" });
 
   for (const sub of subs || []) {
     try {
@@ -157,7 +168,7 @@ export default async function handler(req, res) {
   } catch (_) { /* ignore */ }
 
   return res.status(200).json({
-    month,
+    month: responseMonth,
     subscribers: subs?.length || 0,
     sent_ok:   results.filter(r => r.ok).length,
     sent_fail: results.filter(r => !r.ok).length,
