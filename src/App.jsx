@@ -1689,12 +1689,37 @@ function AuthLoadingSpinner() {
   );
 }
 
+// F-024 fix: persist user's language choice across navigations + sessions.
+// Was previously reset to "en" on every fresh mount, which made SK users
+// lose their choice every time they navigated. localStorage keeps the
+// pick durable; falls back to browser language on first visit so a SK
+// browser lands in SK by default.
+const LANG_STORAGE_KEY = "residata-lang";
+function readInitialLang() {
+  if (typeof window === "undefined") return "en";
+  try {
+    const stored = window.localStorage.getItem(LANG_STORAGE_KEY);
+    if (stored === "en" || stored === "sk") return stored;
+  } catch (_) { /* private mode etc. */ }
+  // First visit: detect from browser
+  const browserLang = (typeof navigator !== "undefined" && navigator.language) || "";
+  if (browserLang.toLowerCase().startsWith("sk")) return "sk";
+  return "en";
+}
+
 export default function App() {
   // Init page from current URL (so direct link / refresh works)
   const [current, setCurrent] = useState(() =>
     typeof window !== "undefined" ? pathToPage(window.location.pathname) : "Home"
   );
-  const [lang, setLang] = useState("en");
+  // F-024 fix — initialize from localStorage + browser-lang detection.
+  const [langRaw, setLangRaw] = useState(readInitialLang);
+  const lang = langRaw === "sk" ? "sk" : "en";
+  // setLang persists the choice. Wrap setLangRaw so call-sites are unchanged.
+  const setLang = (newLang) => {
+    setLangRaw(newLang);
+    try { window.localStorage.setItem(LANG_STORAGE_KEY, newLang); } catch (_) {}
+  };
   const [loginOpen, setLoginOpen] = useState(false);
   const l = t[lang];
   const auth = useAuth();
