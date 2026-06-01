@@ -49,6 +49,7 @@
 // click 👎 then change to 👍, the new rating wins.
 
 import { createClient } from "@supabase/supabase-js";
+import { isTrustedOrigin as checkTrustedOrigin } from "../_lib/origin.js";
 
 export const maxDuration = 10;
 const MAX_BODY_BYTES = 4 * 1024;
@@ -71,6 +72,13 @@ function cleanText(raw, { max = 280 } = {}) {
 }
 
 // Trusted origins — copy of the list in /api/ai/chat for parity.
+// F-310 (DP-095): unified with shared api/_lib/origin.js helper to fix
+// the subdomain-spoofing vulnerability where origin/referer.startsWith(o)
+// matched https://residata.sk.evil.com against https://residata.sk.
+// Vercel preview-deploy auto-allow (the `residata-…vercel.app` pattern)
+// was REMOVED — attacker could deploy a project named `residata-attack`
+// at vercel.app and the Origin header alone would satisfy the predicate.
+// If Boss needs a preview URL during testing, add it explicitly here.
 const ALLOWED_ORIGINS = [
   "https://residata.sk",
   "https://www.residata.sk",
@@ -78,16 +86,7 @@ const ALLOWED_ORIGINS = [
   "http://localhost:5173",
   "http://localhost:4173",
 ];
-function isTrustedOrigin(req) {
-  const origin  = req.headers.origin  || "";
-  const referer = req.headers.referer || "";
-  if (origin && ALLOWED_ORIGINS.some(o => origin.startsWith(o))) return true;
-  if (referer && ALLOWED_ORIGINS.some(o => referer.startsWith(o))) return true;
-  // Same-origin Vercel preview deployments
-  if (referer && referer.includes("residata-") && referer.endsWith(".vercel.app")) return true;
-  if (origin  && origin.includes("residata-")  && origin.endsWith(".vercel.app"))  return true;
-  return false;
-}
+const isTrustedOrigin = (req) => checkTrustedOrigin(req, ALLOWED_ORIGINS);
 
 function clientIp(req) {
   const fwd = req.headers["x-forwarded-for"];

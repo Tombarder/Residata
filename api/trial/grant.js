@@ -13,6 +13,7 @@
 // can self-service-start the trial again later if admin wants.
 
 import { createClient } from "@supabase/supabase-js";
+import { isTrustedOrigin as checkTrustedOrigin } from "../_lib/origin.js";
 
 export const maxDuration = 10;
 
@@ -24,13 +25,7 @@ const TRUSTED_ORIGINS = [
   "http://localhost:3000",
 ];
 
-function isTrustedOrigin(req) {
-  const origin = req.headers.origin || "";
-  const referer = req.headers.referer || "";
-  if (origin && TRUSTED_ORIGINS.some(o => origin === o)) return true;
-  if (referer && TRUSTED_ORIGINS.some(o => referer.startsWith(o))) return true;
-  return false;
-}
+const isTrustedOrigin = (req) => checkTrustedOrigin(req, TRUSTED_ORIGINS);
 
 export default async function handler(req, res) {
   try {
