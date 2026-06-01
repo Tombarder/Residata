@@ -12,6 +12,9 @@ import { LiveDashboard, LiveProjectDetail, LiveAnalytics, LiveAdmin, EarlyAccess
 // pokrýva a robí to na živých číslach z useMarketTotals.
 import { MarketPulse, DistrictPulse, PipelineFlow } from "./pages/HomeExtras";
 import HeroLabPage from "./pages/HeroVariants";
+// Legal pages + cookie banner (F-051 — Boss-mandated 2026-05-31 night).
+import { PrivacyPage, ImprintPage } from "./pages/LegalPages";
+import CookieBanner from "./components/CookieBanner";
 import { useAuth } from "./lib/useAuth";
 import { useCapabilities } from "./lib/useCapabilities";
 import { useMarketTotals } from "./lib/useData";
@@ -490,17 +493,51 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
   );
 }
 
-function Footer() {
+function Footer({ lang = "en", setCurrent }) {
+  const isSK = lang === "sk";
+  // F-051: legal links + cookie settings re-opener. The "Cookie settings"
+  // link calls the global the CookieBanner registers on mount — this lets
+  // users revisit their consent any time without a separate page.
+  const handleNav = (page) => (e) => {
+    e.preventDefault();
+    if (setCurrent) setCurrent(page);
+  };
+  const reopenCookies = (e) => {
+    e.preventDefault();
+    if (typeof window !== "undefined" && window.residataReopenCookieBanner) {
+      window.residataReopenCookieBanner();
+    }
+  };
+  const linkStyle = { fontSize: "0.78rem", color: "#8a8a96", textDecoration: "none" };
   return (
     <footer style={{
       padding: "2.5rem 2rem", borderTop: "1px solid #222228",
-      display: "flex", justifyContent: "space-between", alignItems: "center",
       maxWidth: 1100, margin: "0 auto",
     }}>
-      <span style={{ fontSize: "0.78rem", color: "#8a8a96" }}>© {new Date().getFullYear()} Residata · Krasovského 13, Bratislava</span>
-      <div style={{ display: "flex", gap: "1.5rem" }}>
-        <a href="mailto:residata@proton.me" style={{ fontSize: "0.78rem", color: "#8a8a96", textDecoration: "none" }}>residata@proton.me</a>
-        <a href="tel:+421911963909" style={{ fontSize: "0.78rem", color: "#8a8a96", textDecoration: "none" }}>+421 911 963 909</a>
+      <div style={{
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+        flexWrap: "wrap", gap: "1rem",
+      }}>
+        <span style={{ fontSize: "0.78rem", color: "#8a8a96" }}>© {new Date().getFullYear()} Residata · Krasovského 13, Bratislava</span>
+        <div style={{ display: "flex", gap: "1.5rem", flexWrap: "wrap" }}>
+          <a href="mailto:residata@proton.me" style={linkStyle}>residata@proton.me</a>
+          <a href="tel:+421911963909" style={linkStyle}>+421 911 963 909</a>
+        </div>
+      </div>
+      <div style={{
+        display: "flex", gap: "1.5rem", flexWrap: "wrap",
+        marginTop: "0.85rem", paddingTop: "0.85rem",
+        borderTop: "1px solid #1a1a20",
+      }}>
+        <a href="/privacy" onClick={handleNav("Privacy")} style={linkStyle}>
+          {isSK ? "Ochrana údajov" : "Privacy"}
+        </a>
+        <a href="/imprint" onClick={handleNav("Imprint")} style={linkStyle}>
+          {isSK ? "Impressum" : "Imprint"}
+        </a>
+        <a href="#" onClick={reopenCookies} style={linkStyle}>
+          {isSK ? "Nastavenia cookies" : "Cookie settings"}
+        </a>
       </div>
     </footer>
   );
@@ -1902,6 +1939,9 @@ export default function App() {
             {current === "Data" && <DataPage setCurrent={handleNav} l={l} lang={lang} />}
             {current === "Pricing" && <PricingPage setCurrent={handleNav} l={l} lang={lang} onLogin={() => setLoginOpen(true)} />}
             {current === "Contact" && <ContactPage l={l} />}
+            {/* F-051 (Boss 2026-05-31) — legal pages */}
+            {current === "Privacy" && <PrivacyPage lang={lang} />}
+            {current === "Imprint" && <ImprintPage lang={lang} />}
             {/* Hidden hero-variant preview page — not in Nav, only reachable via /hero-lab URL */}
             {current === "HeroLab" && <HeroLabPage setCurrent={handleNav} lang={lang} />}
 
@@ -1919,7 +1959,11 @@ export default function App() {
           </>
         </div>
       )}
-      {!isAppPage(current) && <Footer />}
+      {!isAppPage(current) && <Footer lang={lang} setCurrent={handleNav} />}
+      {/* F-051 (Boss 2026-05-31) — cookie consent banner. Shows on first
+          visit, persists choice in localStorage. Footer "Cookie settings"
+          link reopens it any time. */}
+      <CookieBanner lang={lang} />
       {/* Floating AI chat bubble — marketing pages only. The platform
           has its own /app/ask entry in the sidebar, and rendering it
           twice would cause two chat instances to share the same

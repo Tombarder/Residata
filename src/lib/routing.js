@@ -71,6 +71,9 @@ export function pathToPage(pathname) {
     "/contact": "Contact",
     "/sample": "Data",    // nový primárny URL
     "/data": "Data",      // spätná kompatibilita (pôvodný URL)
+    // Legal pages — F-051 (Boss 2026-05-31 mandate)
+    "/privacy": "Privacy",
+    "/imprint": "Imprint",
     // Legacy URLs → new platform pages (for backward compat of email links etc)
     "/analytics": "App:Analytics",
     "/admin": "App:Admin",
