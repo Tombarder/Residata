@@ -81,13 +81,32 @@ export default async function handler(req, res) {
       .from("user_profiles").update(patch).eq("id", userId);
     if (updErr) return res.status(500).json({ error: "update failed", detail: updErr.message });
 
-    // Best-effort audit log (admin_audit_log table).
-    admin.from("admin_audit_log").insert({
-      admin_id: user.id,
-      target_user_id: userId,
-      action: `trial_${action}`,
-      details: { days: action === "grant" ? days : null },
-    }).then(({ error }) => { if (error) console.warn("[trial/grant] audit log", error.message); });
+    // Audit log — F-250 fix (same bug family as F-239 in set-subscription).
+    // Previously wrote `admin_id / target_user_id / details` which DON'T
+    // EXIST in admin_audit_log (schema uses actor_id / target_id / payload).
+    // The .then() only logged to console.warn; Vercel logs aren't watched
+    // live; so every trial_grant + trial_revoke action was silently dropped.
+    // Mirror delete-user.js exactly + await + try/catch so failures surface.
+    const clientIp =
+      (req.headers["x-forwarded-for"] || "").split(",")[0].trim() ||
+      req.headers["x-real-ip"] ||
+      null;
+    const userAgent = req.headers["user-agent"] || null;
+    try {
+      await admin.from("admin_audit_log").insert({
+        actor_id:    user.id,
+        actor_email: user.email || null,
+        action:      `trial_${action}`,
+        target_id:   userId,
+        payload:     { days: action === "grant" ? days : null, patch },
+        ip:          clientIp,
+        user_agent:  userAgent,
+        success:     true,
+        error:       null,
+      });
+    } catch (auditErr) {
+      console.warn("[trial/grant] audit insert failed (non-fatal)", auditErr?.message || auditErr);
+    }
 
     return res.status(200).json({ ok: true, action, ...patch });
   } catch (e) {
