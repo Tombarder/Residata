@@ -109,8 +109,12 @@ function groupByUnit(flats) {
     if (!map.has(key)) map.set(key, []);
     map.get(key).push(f);
   }
+  // Sort by parsed ms (tsToMs handles ISO + YYYY-MM-DD + YYYY-MM legacy).
+  // localeCompare on raw strings worked for today's data because Variant-X
+  // ISO timestamps and YYYY-MM legacy still happened to sort correctly as
+  // strings, but the order broke for mixed-format rows in the same month.
   for (const arr of map.values()) {
-    arr.sort((a, b) => String(tsOf(a)).localeCompare(String(tsOf(b))));
+    arr.sort((a, b) => tsToMs(tsOf(a)) - tsToMs(tsOf(b)));
   }
   return map;
 }
@@ -159,28 +163,29 @@ function formatPerM2(n) {
 function formatTs(ts, lang) {
   if (!ts) return "—";
   const s = String(ts);
-  // Full ISO timestamp -> day-precision format
+  const dateOpts = { day: "2-digit", month: "short", year: "numeric", timeZone: "Europe/Bratislava" };
+  const monthOpts = { month: "short", year: "numeric", timeZone: "Europe/Bratislava" };
+  // Full ISO timestamp -> day-precision format (BA-local)
   if (s.length >= 10 && s.includes("T")) {
     const d = new Date(s);
     if (Number.isFinite(d.getTime())) {
-      return d.toLocaleDateString(lang === "sk" ? "sk-SK" : "en-US",
-        { day: "2-digit", month: "short", year: "numeric" });
+      return d.toLocaleDateString(lang === "sk" ? "sk-SK" : "en-US", dateOpts);
     }
   }
-  // Date-only YYYY-MM-DD
+  // Date-only YYYY-MM-DD (treat as UTC midnight, then format in BA TZ)
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
     const d = new Date(s + "T00:00:00Z");
     if (Number.isFinite(d.getTime())) {
-      return d.toLocaleDateString(lang === "sk" ? "sk-SK" : "en-US",
-        { day: "2-digit", month: "short", year: "numeric" });
+      return d.toLocaleDateString(lang === "sk" ? "sk-SK" : "en-US", dateOpts);
     }
   }
-  // Legacy YYYY-MM month bucket
+  // Legacy YYYY-MM month bucket — pin to UTC 1st so BA viewers see the
+  // expected month (a local-time Date constructor would drift on the
+  // first day of the month for the rare DST hour).
   if (/^\d{4}-\d{2}$/.test(s)) {
     const [y, mm] = s.split("-");
-    const dt = new Date(Number(y), Number(mm) - 1, 1);
-    return dt.toLocaleDateString(lang === "sk" ? "sk-SK" : "en-US",
-      { month: "short", year: "numeric" });
+    const dt = new Date(Date.UTC(Number(y), Number(mm) - 1, 1));
+    return dt.toLocaleDateString(lang === "sk" ? "sk-SK" : "en-US", monthOpts);
   }
   return s;
 }
@@ -291,7 +296,6 @@ export default function UnitTracker({ lang = "sk", setCurrent }) {
             <DetailView
               pickedHistories={pickedHistories}
               byUnit={byUnit}
-              archiveMonths={archiveMonths}
               yMode={yMode}
               setYMode={setYMode}
               lang={lang}
@@ -574,7 +578,7 @@ const selectStyle = {
 
 // ── Detail view (KPIs + chart + status timeline) ────────────────
 
-function DetailView({ pickedHistories, byUnit, archiveMonths, yMode, setYMode, lang, onProjectClick, onBackToList }) {
+function DetailView({ pickedHistories, byUnit, yMode, setYMode, lang, onProjectClick, onBackToList }) {
   // Single-unit mode for KPIs: take first picked. Multi-unit overlays
   // chart but keeps single KPI strip for the FIRST picked unit (the
   // "primary" focus). User-feedback iterating possible.
@@ -584,17 +588,24 @@ function DetailView({ pickedHistories, byUnit, archiveMonths, yMode, setYMode, l
   const r0 = primaryRows[0];
 
   // Comparables: only when 1 unit picked. Find similar units in same
-  // project. Drawn as faint background lines on the chart.
+  // project. Drawn as faint background lines on the chart. Sorted by
+  // area-distance ascending so the 8 closest peers always render first,
+  // regardless of Map iteration order (which is Supabase-pagination
+  // insertion order — non-deterministic from the user's perspective).
   const comparables = useMemo(() => {
     if (pickedHistories.length !== 1 || !r0) return [];
     const matches = [];
+    const tArea = Number(r0.obytna_plocha) || 0;
     for (const [key, rows] of byUnit) {
       if (key === primary.key) continue;
       const candidate = rows[0];
       if (isComparable(r0, candidate)) {
-        matches.push({ key, rows });
+        const cArea = Number(candidate.obytna_plocha) || 0;
+        const dist = tArea > 0 && cArea > 0 ? Math.abs(cArea - tArea) : Infinity;
+        matches.push({ key, rows, _dist: dist });
       }
     }
+    matches.sort((a, b) => a._dist - b._dist);
     return matches.slice(0, 8);  // cap to keep chart readable
   }, [pickedHistories, byUnit, primary, r0]);
 
@@ -633,14 +644,13 @@ function DetailView({ pickedHistories, byUnit, archiveMonths, yMode, setYMode, l
       <ChartCard
         pickedHistories={pickedHistories}
         comparables={comparables}
-        archiveMonths={archiveMonths}
         yMode={yMode}
         setYMode={setYMode}
         lang={lang}
       />
 
       {/* Status timeline strip — one row per picked unit */}
-      <StatusTimelineCard pickedHistories={pickedHistories} archiveMonths={archiveMonths} lang={lang} />
+      <StatusTimelineCard pickedHistories={pickedHistories} lang={lang} />
 
       {/* CSV export */}
       <ExportRow pickedHistories={pickedHistories} lang={lang} />
@@ -757,7 +767,7 @@ function KpiStrip({ lifecycle, primary, onProjectClick, lang }) {
 
 // ── Chart card ──────────────────────────────────────────────────
 
-function ChartCard({ pickedHistories, comparables, archiveMonths, yMode, setYMode, lang }) {
+function ChartCard({ pickedHistories, comparables, yMode, setYMode, lang }) {
   // Y-axis value extractor based on yMode
   const yOf = (row) => {
     if (yMode === "perm2") {
@@ -1334,7 +1344,7 @@ function LineChartSVG({ pickedHistories, comparables, allMonths, yOf, fmtY, lang
 
 // ── Status timeline strip ───────────────────────────────────────
 
-function StatusTimelineCard({ pickedHistories, archiveMonths, lang }) {
+function StatusTimelineCard({ pickedHistories, lang }) {
   if (pickedHistories.length === 0) return null;
 
   return (
@@ -1566,7 +1576,7 @@ function ExportRow({ pickedHistories, lang }) {
     for (const h of pickedHistories) {
       for (const r of h.rows) {
         out.push([
-          r.project_id, JSON.stringify(r.project_name || ""), r.unit_id,
+          r.project_id, JSON.stringify(r.project_name || ""), JSON.stringify(r.unit_id || ""),
           r.batch_timestamp || "", r.snapshot_month || "", r.batch_id || "",
           r.stav || "",
           r.cena_s_dph || "", r.cena_bez_dph || "",

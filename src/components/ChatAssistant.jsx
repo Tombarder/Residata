@@ -10,6 +10,18 @@ import { useChat, GENERAL_KNOWLEDGE_RE } from "../lib/useChat";
 import { LimitBanner } from "./FloatingChat";
 import AiBetaBanner from "./AiBetaBanner";
 
+// Pulse animation for the pending indicator. Mounted ONCE at module load
+// (idempotent — id="cb-pulse-anim" prevents duplicate insertion on HMR or
+// repeat imports) instead of inside the pending-toggle JSX, where it was
+// being re-attached every time AI started/finished a response. Same DOM
+// outcome, fewer stylesheet writes.
+if (typeof document !== "undefined" && !document.getElementById("cb-pulse-anim")) {
+  const styleEl = document.createElement("style");
+  styleEl.id = "cb-pulse-anim";
+  styleEl.textContent = "@keyframes cb-pulse { 0%,100% { opacity: 0.3; } 50% { opacity: 1; } }";
+  document.head.appendChild(styleEl);
+}
+
 const mono   = "'JetBrains Mono', monospace";
 const green  = "#00e5a0";
 const dim    = "#8a8a96";
@@ -41,10 +53,27 @@ export default function ChatAssistant({ lang = "sk", setCurrent }) {
   }, [chat.messages, chat.pending]);
   useEffect(() => { inputRef.current?.focus(); }, []);
 
-  const quotaColor = chat.remaining == null ? dim
-    : chat.remaining.today <= 1 ? red
-    : chat.remaining.today <= 3 ? orange
-    : green;
+  // Percentage-based thresholds so paid (250/day) + free (25/day) +
+  // anon (3/day) all get visually proportional warnings. Was absolute
+  // counts (≤1 red, ≤3 orange) which fired too late for the paid tier
+  // (red only at 1/250 = 0.4%) and too early for anon (orange at
+  // 3/3 = 100%). Also keeps ≤1 fallback so the last call always reads red
+  // regardless of dailyLimit (e.g. an admin-throttled user with 0 left).
+  const quotaColor = (() => {
+    if (chat.remaining == null) return dim;
+    const left = chat.remaining.today;
+    if (left <= 1) return red;
+    const limit = chat.dailyLimit || 0;
+    if (limit > 0) {
+      const pct = left / limit;
+      if (pct <= 0.1) return red;
+      if (pct <= 0.25) return orange;
+      return green;
+    }
+    // Fallback to absolute thresholds if dailyLimit unknown.
+    if (left <= 3) return orange;
+    return green;
+  })();
 
   const onKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -120,7 +149,6 @@ export default function ChatAssistant({ lang = "sk", setCurrent }) {
           <div style={{ color: dim, fontFamily: mono, fontSize: "0.8rem", display: "flex", gap: "0.4rem", alignItems: "center" }}>
             <span aria-hidden style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: green, animation: "cb-pulse 1s ease-in-out infinite" }} />
             {L("AI píše odpoveď…", "Assistant is thinking…")}
-            <style>{`@keyframes cb-pulse { 0%,100% { opacity: 0.3; } 50% { opacity: 1; } }`}</style>
           </div>
         )}
 

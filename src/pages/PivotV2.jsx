@@ -636,8 +636,10 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   // gzipped this is well under what a normal SPA pulls; if it ever
   // matters we'll switch back to server-side month filtering driven
   // off the same Filters state. Cleaner UX > preemptive optimisation.
-  const { months: archiveMonths } = useArchiveMonths();
-  const latestMonth = archiveMonths?.[0] || null;
+  // archiveMonths is wired but PivotV2 no longer reads it directly — the
+  // Datum filter is seeded from latestDatum (derived from records below).
+  // Hook call preserved for future Datum-dropdown UX.
+  useArchiveMonths();
   const { flats: realFlats, loading: loadingFlats, progress: flatsProgress } = useFlatsArchive();  // all months
   // Initial-load gate — true while we're still fetching real flats AND
   // haven't seeded the default Datum filter yet. Used to show a clean

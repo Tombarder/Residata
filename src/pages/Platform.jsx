@@ -1135,7 +1135,7 @@ function PlatformBilling({ lang, setCurrent }) {
   const isFree  = baseTier === "free";
   const isPaid  = baseTier === "paid";
   const isAdmin = baseTier === "admin";
-  const paidExpired = isPaid && !paidActive && !paidPaused && paidUntil;
+  const paidExpired = isPaid && !paidActive && !paidPaused && paidUntil != null;
   const trialUsed = Boolean(profile?.trial_started_at);
 
   // fmtDate first (TDZ — const, not hoisted) so approvedAt can use it.
@@ -1334,7 +1334,7 @@ function SubscriptionCard({ lang, paused, paidWindowActive, paidUntil, paidStart
     ? (lang === "sk" ? "Pozastavené" : "Paused")
     : paidWindowActive
       ? (lang === "sk" ? "Aktívne" : "Active")
-      : (lang === "sk" ? "Aktívne (legacy)" : "Active (legacy)");
+      : (lang === "sk" ? "Aktívne (bez expirácie)" : "Active (no expiry)");
   const showCountdown = !paused && paidDaysLeft != null;
 
   return (
@@ -1535,11 +1535,14 @@ function PlatformSettings({ lang }) {
         </form>
       </div>
 
-      {/* Read-only meta */}
+      {/* Read-only meta. F-227: also show position so users can verify
+          what the form is operating on (especially helpful for legacy
+          values surfaced via F-222 fix). */}
       <div style={{ marginTop: "1.25rem", padding: "1rem 1.25rem", background: bg2, border: `1px solid ${border}`, borderRadius: 10, fontSize: "0.78rem", color: dim, fontFamily: mono, lineHeight: 1.7 }}>
         <div>user_id: {user?.id}</div>
         {profile?.created_at && <div>created: {new Date(profile.created_at).toLocaleString(lang === "sk" ? "sk-SK" : "en-US", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Bratislava" })}</div>}
         <div>tier: {profile?.tier || "—"}</div>
+        <div>position: {profile?.position || "—"}</div>
       </div>
     </div>
   );
