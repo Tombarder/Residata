@@ -1473,6 +1473,21 @@ function PlatformSettings({ lang }) {
     { v: "other",      label: lang === "sk" ? "Iné" : "Other" },
   ];
 
+  // F-222: if the user's stored position isn't in the predefined dropdown
+  // (e.g. legacy free-text like "Founder" or "CEO" from an earlier signup
+  // flow), inject it as an extra option so the value is preserved across
+  // saves. Without this, clicking the dropdown and picking any predefined
+  // value silently overwrote their custom string. Boss's account has
+  // `position='Founder'` — caught live during DP-071.
+  const knownPositionValues = new Set(positions.map(p => p.v));
+  const positionsRendered = form.position && !knownPositionValues.has(form.position)
+    ? [
+        positions[0],
+        { v: form.position, label: form.position },
+        ...positions.slice(1),
+      ]
+    : positions;
+
   return (
     <div style={{ padding: "2rem", maxWidth: 620 }}>
       <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 12, padding: "1.75rem 2rem" }}>
@@ -1495,7 +1510,7 @@ function PlatformSettings({ lang }) {
           <SettingsField label={lang === "sk" ? "Pozícia" : "Position"}>
             <select value={form.position} onChange={e => setForm({ ...form, position: e.target.value })}
               style={inputStyle}>
-              {positions.map(p => <option key={p.v} value={p.v}>{p.label}</option>)}
+              {positionsRendered.map(p => <option key={p.v} value={p.v}>{p.label}</option>)}
             </select>
           </SettingsField>
           <SettingsField label="LinkedIn URL">
