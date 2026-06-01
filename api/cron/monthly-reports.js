@@ -70,10 +70,26 @@ export default async function handler(req, res) {
   }
 
   // ── Load subscribers ──
+  // F-201 (DP-063 sweep-back 2026-06-01): per-month idempotency. If Vercel
+  // retries the cron in the same UTC month (rare but possible — Vercel
+  // historically retries 5xx responses), subscribers would otherwise get
+  // duplicate emails. Filter to only those who haven't received THIS
+  // month's report yet.
+  //
+  // Boundary logic: the cron fires at 08:00 UTC on the 1st. date_trunc('month', now())
+  // returns the 00:00 UTC of the 1st — so `last_sent_at < that` always holds for
+  // pre-this-month sends. A retry within the same month would have last_sent_at
+  // >= this-month-start → filtered out → no duplicate. New mid-month subs have
+  // last_sent_at IS NULL → received on next month's fire (correct).
+  const monthStartUtc = new Date(Date.UTC(
+    new Date().getUTCFullYear(), new Date().getUTCMonth(), 1
+  )).toISOString();
+
   const { data: subs, error: subErr } = await admin
     .from("report_subscriptions")
     .select("*")
-    .eq("enabled", true);
+    .eq("enabled", true)
+    .or(`last_sent_at.is.null,last_sent_at.lt.${monthStartUtc}`);
   if (subErr) return res.status(500).json({ error: `subs query: ${subErr.message}` });
 
   // ── Load project data once (shared across all subscriptions) ──
