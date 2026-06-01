@@ -1569,9 +1569,85 @@ const inputStyle = {
 // API endpoint + Vercel function memory tuning. Client-side paging is the
 // minimal change that solves the truncation without changing the data path.
 //
-// Header set: derived from the first non-empty page so it always matches
-// the live view schema (resilient to view-column changes).
+// ─── T-001 + T-002 (Boss live test 2026-05-31 night, post-F-089 ship) ───
+// Boss opened the CSV and called the formatting "shit" — two problems:
+//   T-001  cell formatting was raw DB strings — NUMERIC(12,2) came as
+//          "339500.00" (Excel parses but with the trailing zeros), dates
+//          came as ISO strings with timezone offsets, decimals locale-
+//          inconsistent.
+//   T-002  the export had `project_id` (slug like "stockerka") but no
+//          human-readable project name, developer, district, or city —
+//          a non-technical reader couldn't tell which row was which.
+//
+// Fix: explicit per-column formatting + client-side join with the projects
+// data already loaded by useProjects(). Identity columns get front-loaded
+// so a glance at the leftmost cells tells you what the row is. The
+// internal `id` ROW_NUMBER column gets dropped (no business meaning, just
+// adds noise).
+//
+// Tradeoff (explicit column list vs. Object.keys): if a new column lands
+// in flats_current, it won't appear in the CSV until added here. That's
+// deliberate — schema changes should be reviewed, not silently exported.
 const CSV_PAGE_SIZE = 1000;
+
+// Explicit column order for the flats CSV. Identity + enrichment up
+// front (so you can read the row's meaning without scrolling right),
+// then snapshot metadata, then per-unit fields in roughly DB-view order,
+// then financing + audit at the end.
+const FLATS_CSV_COLUMNS = [
+  // Enrichment from projects (joined client-side from useProjects)
+  "project_name", "developer", "district", "city",
+  // Identity
+  "project_id", "unit_id",
+  // Snapshot context
+  "snapshot_month", "batch_id", "batch_timestamp",
+  // Unit metadata
+  "typ", "etapa", "budova", "unit_detail", "poschodie",
+  // Area (sq m)
+  "izby", "obytna_plocha", "balkon_plocha", "loggia_plocha",
+  "terasa_plocha", "zahrada_plocha", "exterier_plocha",
+  "kobka_plocha", "celkova_plocha",
+  // Pricing
+  "cena_bez_dph", "cena_s_dph", "cena_s_dph_text", "cennikova_cena",
+  // Status
+  "stav", "kolaudacia", "orientacia",
+  // Country
+  "country", "currency",
+  // Financing (NUMERIC(12,2) per migrations/2026-05-26_init_snapshot_model.sql)
+  "fin_10_90", "fin_20_80", "fin_30_40_30",
+  // Audit
+  "created_at",
+];
+
+// Columns that should be re-emitted as plain numbers (no thousands sep,
+// `.` as decimal, no trailing zeros). PostgREST returns NUMERIC as
+// strings — leaving them as "339500.00" works in Excel but looks noisy;
+// stripping the trailing zeros produces a clean "339500" / "48.61".
+const FLATS_NUMBER_COLUMNS = new Set([
+  "izby", "poschodie",
+  "obytna_plocha", "balkon_plocha", "loggia_plocha", "terasa_plocha",
+  "zahrada_plocha", "exterier_plocha", "kobka_plocha", "celkova_plocha",
+  "cena_bez_dph", "cena_s_dph", "cennikova_cena",
+  "fin_10_90", "fin_20_80", "fin_30_40_30",
+]);
+
+// Columns that come as ISO timestamps. Re-render in UTC as
+// "YYYY-MM-DD HH:MM:SS" — Excel autodetects this as a date column,
+// and the space separator (vs. T) reads naturally.
+const FLATS_DATE_COLUMNS = new Set(["batch_timestamp", "created_at"]);
+
+// Column sets for the smaller projects CSV (same idea, smaller surface).
+const PROJECTS_CSV_COLUMNS = [
+  "id", "name", "developer", "district", "city",
+  "total_units", "available_units", "sold_units", "sold_last_month",
+  "sold_percentage", "avg_price_eur_m2", "min_price", "max_price",
+  "kolaudacia", "country", "status", "last_updated",
+];
+const PROJECTS_NUMBER_COLUMNS = new Set([
+  "total_units", "available_units", "sold_units", "sold_last_month",
+  "sold_percentage", "avg_price_eur_m2", "min_price", "max_price",
+]);
+const PROJECTS_DATE_COLUMNS = new Set(["last_updated"]);
 
 function csvEscapeCell(v) {
   if (v == null) return "";
@@ -1579,6 +1655,40 @@ function csvEscapeCell(v) {
   return s.includes(",") || s.includes("\"") || s.includes("\n")
     ? `"${s.replace(/"/g, '""')}"`
     : s;
+}
+
+// Number formatter — Excel-friendly: no thousands separator, `.` as
+// decimal point, no trailing zeros. NaN/Infinity → blank (NOT the
+// literal string "NaN" which would just confuse readers).
+function formatCsvNumber(v) {
+  if (v == null || v === "") return "";
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "";
+  // NUMERIC(12,2) precision — cap at 2 decimals, then trim trailing zeros.
+  const rounded = Math.round(n * 100) / 100;
+  return String(rounded);
+}
+
+// Date formatter — render any ISO/parseable timestamp as UTC
+// "YYYY-MM-DD HH:MM:SS". Already-short strings pass through unchanged
+// (e.g. snapshot_month is "2026-05" and shouldn't be re-parsed).
+function formatCsvDate(v) {
+  if (!v) return "";
+  if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}:\d{2})?$/.test(v)) {
+    return v;
+  }
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return String(v);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
+}
+
+// Per-column dispatch: number columns → formatCsvNumber, date columns →
+// formatCsvDate, everything else → raw string. Then escape for CSV.
+function formatCsvCell(numberCols, dateCols, column, value) {
+  if (numberCols.has(column)) return csvEscapeCell(formatCsvNumber(value));
+  if (dateCols.has(column))   return csvEscapeCell(formatCsvDate(value));
+  return csvEscapeCell(value);
 }
 
 function PlatformExports({ lang }) {
@@ -1590,9 +1700,16 @@ function PlatformExports({ lang }) {
   const [exportProgress, setExportProgress] = useState(null);
 
   const csvFromProjects = () => {
-    const headers = ["id", "name", "district", "total_units", "available_units", "sold_units", "sold_last_month", "sold_percentage", "avg_price_eur_m2", "min_price", "max_price", "developer", "last_updated"];
-    const rows = projects.map(p => headers.map(h => csvEscapeCell(p[h])).join(","));
-    const csv = [headers.join(","), ...rows].join("\n");
+    // T-001: numbers + dates get formatted (was raw DB strings before).
+    // T-002 isn't needed here — projects CSV already has the friendly
+    // `name` column; we just add `city` + `developer` ordering tweak so
+    // identity columns sit next to each other on the left.
+    const rows = projects.map(p =>
+      PROJECTS_CSV_COLUMNS.map(h =>
+        formatCsvCell(PROJECTS_NUMBER_COLUMNS, PROJECTS_DATE_COLUMNS, h, p[h])
+      ).join(",")
+    );
+    const csv = [PROJECTS_CSV_COLUMNS.join(","), ...rows].join("\n");
     // UTF-8 BOM so Windows Excel auto-detects encoding and renders
     // "Petržalka" / "Staré Mesto" correctly instead of "Petr�alka".
     const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
@@ -1631,9 +1748,22 @@ function PlatformExports({ lang }) {
         .then(r => (!r.error && r.count) ? r.count : null)
         .catch(() => null);
 
+      // T-002: build project_id → { name, developer, district, city }
+      // lookup once before paging. `projects` already lives in memory
+      // (useProjects() hook on this component), so no extra round trip.
+      // ~161 projects → Map build is sub-millisecond.
+      const projectLookup = new Map();
+      for (const p of projects) {
+        projectLookup.set(p.id, {
+          project_name: p.name || "",
+          developer: p.developer || "",
+          district: p.district || "",
+          city: p.city || "",
+        });
+      }
+
       let total = null;  // populated lazily when estimate resolves
-      let headers = null;
-      const csvParts = [];
+      const csvParts = [FLATS_CSV_COLUMNS.join(",")];  // header is fixed/explicit
       let from = 0;
       let pageRows = 0;
       let totalRows = 0;
@@ -1648,12 +1778,22 @@ function PlatformExports({ lang }) {
         pageRows = data?.length || 0;
         if (pageRows === 0) break;
 
-        if (!headers) {
-          headers = Object.keys(data[0]);
-          csvParts.push(headers.join(","));
-        }
         for (const row of data) {
-          csvParts.push(headers.map(h => csvEscapeCell(row[h])).join(","));
+          const enrichment = projectLookup.get(row.project_id) || {
+            project_name: "",
+            developer: "",
+            district: "",
+            city: "",
+          };
+          const cells = FLATS_CSV_COLUMNS.map(col => {
+            // Enrichment columns come from the projects lookup, not from
+            // the flats row itself.
+            if (col === "project_name" || col === "developer" || col === "district" || col === "city") {
+              return csvEscapeCell(enrichment[col]);
+            }
+            return formatCsvCell(FLATS_NUMBER_COLUMNS, FLATS_DATE_COLUMNS, col, row[col]);
+          });
+          csvParts.push(cells.join(","));
         }
         totalRows += pageRows;
         from += CSV_PAGE_SIZE;
