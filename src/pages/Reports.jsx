@@ -1484,7 +1484,7 @@ function SellOutForecastReport({ projects, lang, onOpenProject }) {
       >
         <p style={{ color: "#c0c0c8", fontSize: "0.9rem", lineHeight: 1.65, margin: "0 0 1rem" }}>
           {lang === "sk"
-            ? "Pri aktuálnej rýchlosti predaja: za koľko mesiacov sa vypredá inventár každého projektu? Vlhostí radenie podľa najrýchlejších — pre konkurentov je to signál ceny, pre developerov absorpčný benchmark, pre investorov mapa kde sa kapitál točí."
+            ? "Pri aktuálnej rýchlosti predaja: za koľko mesiacov sa vypredá inventár každého projektu? Implicitne radené od najrýchlejších — pre konkurentov je to signál ceny, pre developerov absorpčný benchmark, pre investorov mapa kde sa kapitál točí."
             : "At the current sales pace: how many months until each project's inventory sells out? Sorted fastest-first — competitors read it as a price signal, developers as an absorption benchmark, investors as a map of where capital is rotating."}
         </p>
 
