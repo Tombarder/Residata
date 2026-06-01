@@ -211,7 +211,15 @@ function resolvePageSeo(page, lang) {
   }
   const entry = SEO_BY_PAGE[page];
   if (!entry) return null;
-  return { path: entry.path, ...entry[lang === "sk" ? "sk" : "en"] };
+  // Preserve top-level entry-wide flags (e.g. noindex) alongside the
+  // language-specific copy. Without this spread the noindex flag set on
+  // Privacy/Imprint entries was being dropped, so applySeo wrote
+  // `index, follow` instead of `noindex, nofollow` to <meta robots>.
+  return {
+    path: entry.path,
+    noindex: entry.noindex,
+    ...entry[lang === "sk" ? "sk" : "en"],
+  };
 }
 
 /**
