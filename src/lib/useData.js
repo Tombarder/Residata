@@ -606,7 +606,17 @@ export function useFlatsArchive(months) {
 
 /** Distinct snapshot months available in the archive — small fast call
  *  used by the Pivot's month-filter dropdown. Public-ish (RLS still
- *  applies, but month names alone leak no per-flat data). */
+ *  applies, but month names alone leak no per-flat data).
+ *
+ *  Reads from `public.archive_months` — a view that returns one row per
+ *  distinct YYYY-MM. The earlier implementation queried `flats_archive`
+ *  with `select('snapshot_month').order(desc)` and deduped client-side,
+ *  which silently truncated to the latest month once flats_archive
+ *  exceeded the PostgREST page cap (97 k rows today, all sorted DESC by
+ *  snapshot_month → first 1 000 rows were all from 2026-05, dedup → just
+ *  `['2026-05']`). Surfaced as F-207 during the DP-069 audit. The view
+ *  applies the same WHERE filter as flats_archive (approved + not
+ *  withdrawn) so the two stay consistent.  */
 let _archiveMonthsCache = null;
 export function useArchiveMonths() {
   const [months, setMonths] = useState(_archiveMonthsCache || []);
@@ -615,11 +625,8 @@ export function useArchiveMonths() {
     if (!isSupabaseReady()) { setLoading(false); return; }
     let cancelled = false;
     (async () => {
-      // Distinct months — Supabase doesn't give us DISTINCT directly via
-      // PostgREST, so we project just snapshot_month and dedup client-side.
-      // The set is tiny (≤ 60 even after 5 years), so this is cheap.
       const { data, error } = await supabase
-        .from("flats_archive")
+        .from("archive_months")
         .select("snapshot_month")
         .order("snapshot_month", { ascending: false });
       if (cancelled) return;
@@ -628,6 +635,8 @@ export function useArchiveMonths() {
         setLoading(false);
         return;
       }
+      // Defensive dedup in case a future schema change adds duplicates; the
+      // view already does DISTINCT but the client guard is free insurance.
       const seen = new Set();
       const arr = [];
       for (const row of data || []) {
