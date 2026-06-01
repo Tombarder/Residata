@@ -83,11 +83,19 @@ export default async function handler(req, res) {
   const { data: projects, error: pErr } = await admin.from("projects_live").select("*");
   if (pErr) return res.status(500).json({ error: `projects query: ${pErr.message}` });
 
-  const month = new Date().toLocaleDateString("sk-SK", { month: "long", year: "numeric" });
   const results = [];
 
   for (const sub of subs || []) {
     try {
+      // F-197 + F-198 (DP-063 2026-06-01): honor sub.lang for both the
+      // month label AND the email body. Pre-fix, both were hardcoded to
+      // Slovak. SubscribeButton in Reports.jsx DOES upsert sub.lang based
+      // on the user's UI language, so a customer in EN mode would land
+      // with sub.lang='en' but still receive a fully Slovak email.
+      const lang = sub.lang === "en" ? "en" : "sk";
+      const localeTag = lang === "en" ? "en-US" : "sk-SK";
+      const month = new Date().toLocaleDateString(localeTag, { month: "long", year: "numeric" });
+
       // Filter projects by scope
       const scoped = filterByScope(projects, sub.scope, sub.scope_label);
       const summary = summariseProjects(scoped);
@@ -98,11 +106,12 @@ export default async function handler(req, res) {
         scopeLabel: sub.scope_label,
         summary,
         webUrl: WEB_URL,
-        lang: sub.lang || "sk",
+        lang,
       });
+      const subjectScopeTitle = sub.scope_label || scopeTitle(sub.scope, lang);
       await sendEmail({
         to: sub.email,
-        subject: `Residata · ${capitalize(month)} · ${sub.scope_label || scopeTitle(sub.scope, sub.lang)}`,
+        subject: `Residata · ${capitalize(month)} · ${subjectScopeTitle}`,
         html,
         from: GMAIL_FROM,
         gmailUser: GMAIL_FROM,
@@ -182,6 +191,8 @@ function inferCity(district) {
   return s;
 }
 function scopeTitle(scope, lang) {
+  // F-197 (DP-063): scopeTitle now honors lang. Pre-fix it always
+  // returned Slovak labels even for EN subscribers.
   const sk = {
     market: "Trh", trh: "Trh",
     city: "Mesto", mesto: "Mesto",
@@ -189,7 +200,15 @@ function scopeTitle(scope, lang) {
     developer: "Developer",
     project: "Projekt", projekt: "Projekt",
   };
-  return sk[String(scope || "").toLowerCase()] || scope || "";
+  const en = {
+    market: "Market", trh: "Market",
+    city: "City", mesto: "City",
+    district: "District", cast: "District", "cast mesta": "District",
+    developer: "Developer",
+    project: "Project", projekt: "Project",
+  };
+  const dict = lang === "en" ? en : sk;
+  return dict[String(scope || "").toLowerCase()] || scope || "";
 }
 function capitalize(s) { return s ? s[0].toUpperCase() + s.slice(1) : s; }
 
@@ -233,22 +252,57 @@ function escHtml(s) {
     .replace(/'/g, "&#39;");
 }
 
-/* ─── Email HTML template ─── */
+/* ─── Email HTML template ───
+ *
+ * F-197 (DP-063 2026-06-01): renders in Slovak or English based on
+ * sub.lang. Pre-fix every subscriber got Slovak; SubscribeButton was
+ * upserting lang correctly but the renderer ignored it.
+ *
+ * The translation dict (`T`) lives inside the function so we don't
+ * load it at module init when nothing's been resolved yet. Strings
+ * marked `(n)` accept a numeric/string parameter inline. */
 function renderReportEmailHtml({ subscriberEmail, month, scope, scopeLabel, summary, webUrl, lang }) {
-  const fmt = (n) => n == null ? "—" : Math.round(n).toLocaleString("sk-SK");
-  const title = scopeLabel ? `${escHtml(scopeTitle(scope))} · ${escHtml(scopeLabel)}` : escHtml(scopeTitle(scope));
+  const isEn = lang === "en";
+  const fmt = (n) => n == null ? "—" : Math.round(n).toLocaleString(isEn ? "en-US" : "sk-SK");
+  const T = {
+    monthlyReport: isEn ? "Monthly report" : "Mesačný report",
+    kpiProjects:   isEn ? "Projects"        : "Projektov",
+    kpiUnits:      isEn ? "Units"           : "Bytov",
+    kpiSoldPct:    isEn ? "Sold %"          : "Predaných %",
+    kpiAvgPerM2:   isEn ? "Avg €/m²"        : "Ø €/m²",
+    sold30Sentence: (n30, avail, total) => isEn
+      ? `Over the last 30 days, <strong style="color:${orange}">${n30}</strong> new sales were recorded. There are currently <strong style="color:${green}">${avail}</strong> units available out of ${total}.`
+      : `Za posledných 30 dní pribudlo <strong style="color:${orange}">${n30}</strong> nových predajov. Aktuálne je voľných <strong style="color:${green}">${avail}</strong> bytov z ${total}.`,
+    topSellersTitle: isEn ? "Top sellers (30 days)"                : "Top predajcovia (30 dní)",
+    topSellersEmpty: isEn ? "No sales data for the past month."    : "Žiadne predajné dáta za posledný mesiac.",
+    topSellerSuffix: isEn ? "sold"                                  : "predaných",
+    soldOutTitle:    isEn ? "Selling out (over 85%)"               : "Dopredáva sa (nad 85%)",
+    soldOutEmpty:    isEn ? "Nobody over 85%."                     : "Nikto nad 85%.",
+    soldOutSuffix:   (pct, remaining) => isEn
+      ? `<span style="color:#ff6b6b;font-weight:700">${pct}%</span> sold, ${remaining} remaining`
+      : `<span style="color:#ff6b6b;font-weight:700">${pct}%</span> predané, ${remaining} zostáva`,
+    ctaOpenReport:   isEn ? "Open full report →"                   : "Otvoriť plný report →",
+    footerSubLine:   (email) => isEn
+      ? `You're receiving this monthly email because you subscribed at ${escHtml(email)}.`
+      : `Dostávaš tento mesačný e-mail pretože si sa prihlásil na ${escHtml(email)}.`,
+    dashEmpty:       "—",
+  };
+
+  const titleScope = scopeLabel
+    ? `${escHtml(scopeTitle(scope, lang))} · ${escHtml(scopeLabel)}`
+    : escHtml(scopeTitle(scope, lang));
   const cap = escHtml(capitalize(month));
 
   const topList = summary.topSellers.length
-    ? summary.topSellers.map(p => `<li style="margin:4px 0"><strong style="color:${textLight}">${escHtml(p.name)}</strong> <span style="color:${textDim}">(${escHtml(p.district || "—")})</span> — <span style="color:${green};font-weight:700">+${p.sold_last_month}</span> predaných</li>`).join("")
-    : `<li style="color:${textDim};list-style:none">Žiadne predajné dáta za posledný mesiac.</li>`;
+    ? summary.topSellers.map(p => `<li style="margin:4px 0"><strong style="color:${textLight}">${escHtml(p.name)}</strong> <span style="color:${textDim}">(${escHtml(p.district || T.dashEmpty)})</span> — <span style="color:${green};font-weight:700">+${p.sold_last_month}</span> ${T.topSellerSuffix}</li>`).join("")
+    : `<li style="color:${textDim};list-style:none">${T.topSellersEmpty}</li>`;
 
   const soldOutList = summary.soldOutWatch.length
-    ? summary.soldOutWatch.map(p => `<li style="margin:4px 0"><strong style="color:${textLight}">${escHtml(p.name)}</strong> — <span style="color:#ff6b6b;font-weight:700">${Math.round(p.sold_percentage)}%</span> predané, ${p.available_units} zostáva</li>`).join("")
-    : `<li style="color:${textDim};list-style:none">Nikto nad 85%.</li>`;
+    ? summary.soldOutWatch.map(p => `<li style="margin:4px 0"><strong style="color:${textLight}">${escHtml(p.name)}</strong> — ${T.soldOutSuffix(Math.round(p.sold_percentage), p.available_units)}</li>`).join("")
+    : `<li style="color:${textDim};list-style:none">${T.soldOutEmpty}</li>`;
 
   return `<!DOCTYPE html>
-<html><head><meta charset="UTF-8"></head>
+<html lang="${isEn ? "en" : "sk"}"><head><meta charset="UTF-8"></head>
 <body style="margin:0;padding:0;background:#0a0a0b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:${textLight}">
 <div style="max-width:640px;margin:0 auto;padding:32px 20px">
   <div style="margin-bottom:24px">
@@ -256,42 +310,41 @@ function renderReportEmailHtml({ subscriberEmail, month, scope, scopeLabel, summ
     <span style="font-size:18px;font-weight:600;margin-left:8px">Residata</span>
   </div>
   <div style="background:#16161a;border:1px solid #2a2a32;border-radius:12px;padding:28px">
-    <div style="font-size:11px;color:${green};font-family:'JetBrains Mono',monospace;letter-spacing:0.12em;text-transform:uppercase;margin-bottom:8px">Mesačný report · ${title}</div>
+    <div style="font-size:11px;color:${green};font-family:'JetBrains Mono',monospace;letter-spacing:0.12em;text-transform:uppercase;margin-bottom:8px">${T.monthlyReport} · ${titleScope}</div>
     <h1 style="margin:0 0 16px;font-size:26px;font-weight:700;letter-spacing:-0.02em">${cap}</h1>
     <div style="display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 20px">
       <div style="flex:1;min-width:110px;padding:12px;background:#0e0e10;border:1px solid #2a2a32;border-radius:8px">
-        <div style="font-size:10px;color:${textDim};text-transform:uppercase;letter-spacing:0.08em;font-family:'JetBrains Mono',monospace">Projektov</div>
+        <div style="font-size:10px;color:${textDim};text-transform:uppercase;letter-spacing:0.08em;font-family:'JetBrains Mono',monospace">${T.kpiProjects}</div>
         <div style="font-size:20px;font-weight:700;margin-top:4px">${summary.projectCount}</div>
       </div>
       <div style="flex:1;min-width:110px;padding:12px;background:#0e0e10;border:1px solid #2a2a32;border-radius:8px">
-        <div style="font-size:10px;color:${textDim};text-transform:uppercase;letter-spacing:0.08em;font-family:'JetBrains Mono',monospace">Bytov</div>
+        <div style="font-size:10px;color:${textDim};text-transform:uppercase;letter-spacing:0.08em;font-family:'JetBrains Mono',monospace">${T.kpiUnits}</div>
         <div style="font-size:20px;font-weight:700;margin-top:4px">${fmt(summary.totalUnits)}</div>
       </div>
       <div style="flex:1;min-width:110px;padding:12px;background:#0e0e10;border:1px solid #2a2a32;border-radius:8px">
-        <div style="font-size:10px;color:${textDim};text-transform:uppercase;letter-spacing:0.08em;font-family:'JetBrains Mono',monospace">Predaných %</div>
+        <div style="font-size:10px;color:${textDim};text-transform:uppercase;letter-spacing:0.08em;font-family:'JetBrains Mono',monospace">${T.kpiSoldPct}</div>
         <div style="font-size:20px;font-weight:700;color:${orange};margin-top:4px">${Math.round(summary.soldPct)}%</div>
       </div>
       <div style="flex:1;min-width:110px;padding:12px;background:#0e0e10;border:1px solid #2a2a32;border-radius:8px">
-        <div style="font-size:10px;color:${textDim};text-transform:uppercase;letter-spacing:0.08em;font-family:'JetBrains Mono',monospace">Ø €/m²</div>
+        <div style="font-size:10px;color:${textDim};text-transform:uppercase;letter-spacing:0.08em;font-family:'JetBrains Mono',monospace">${T.kpiAvgPerM2}</div>
         <div style="font-size:20px;font-weight:700;margin-top:4px">${fmt(summary.wavgM2)}</div>
       </div>
     </div>
     <p style="font-size:15px;line-height:1.6;color:#c0c0c8;margin:0 0 20px">
-      Za posledných 30 dní pribudlo <strong style="color:${orange}">${summary.sold30}</strong> nových predajov.
-      Aktuálne je voľných <strong style="color:${green}">${fmt(summary.available)}</strong> bytov z ${fmt(summary.totalUnits)}.
+      ${T.sold30Sentence(summary.sold30, fmt(summary.available), fmt(summary.totalUnits))}
     </p>
-    <h3 style="font-size:14px;margin:24px 0 8px;color:${textLight};letter-spacing:0.02em">Top predajcovia (30 dní)</h3>
+    <h3 style="font-size:14px;margin:24px 0 8px;color:${textLight};letter-spacing:0.02em">${T.topSellersTitle}</h3>
     <ul style="margin:0;padding-left:18px;font-size:14px;color:#c0c0c8">${topList}</ul>
-    <h3 style="font-size:14px;margin:24px 0 8px;color:${textLight};letter-spacing:0.02em">Dopredáva sa (nad 85%)</h3>
+    <h3 style="font-size:14px;margin:24px 0 8px;color:${textLight};letter-spacing:0.02em">${T.soldOutTitle}</h3>
     <ul style="margin:0;padding-left:18px;font-size:14px;color:#c0c0c8">${soldOutList}</ul>
     <div style="margin-top:24px;padding-top:16px;border-top:1px solid #2a2a32">
       <a href="${webUrl}/app/reports" style="display:inline-block;background:${green};color:#0a0a0b;padding:12px 20px;border-radius:8px;font-weight:600;font-size:14px;text-decoration:none">
-        Otvoriť plný report →
+        ${T.ctaOpenReport}
       </a>
     </div>
   </div>
   <div style="margin-top:24px;font-size:11px;color:#55555f;text-align:center;line-height:1.6">
-    Dostávaš tento mesačný e-mail pretože si sa prihlásil na ${escHtml(subscriberEmail)}.
+    ${T.footerSubLine(subscriberEmail)}
     <br/>Residata · <a href="${webUrl}" style="color:#55555f">${webUrl}</a>
   </div>
 </div>
