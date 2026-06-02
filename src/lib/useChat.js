@@ -80,7 +80,13 @@ export function useChat({ lang = "sk" } = {}) {
   const [remaining, setRemaining] = useState(null);
   const [error, setError] = useState(null);
 
-  const cancelRef = useRef(false);
+  // F-318 (DP-097): removed dead `cancelRef = useRef(false)` — it was
+  // declared but never set or read anywhere. Was likely intended to gate
+  // in-flight cancellation on unmount, but the post-unmount state-update
+  // is harmless (React 18 suppresses the warning) and the fetch always
+  // completes server-side regardless. If a future feature needs real
+  // cancellation, use an AbortController in send() with signal passed
+  // to fetch.
 
   // Session ID — UUID per "conversation". Created lazily on first
   // message + persisted in localStorage so a tab close → reload
