@@ -128,6 +128,147 @@ export function useMetrics() {
  *  "5 540" (because someone added rows between syncs). One source of
  *  truth eliminates the entire class of those bugs.
  */
+// =============================================================================
+// useTotals(level, id) — MMR Phase 8 (2026-06-02): generic granularity hook
+// =============================================================================
+// One hook to read aggregate totals at any granularity, backed by the
+// 6 view-per-granularity surfaces Phase 4 added in the v2 DB:
+//
+//   level='global'              → public.totals_global              (1 row)
+//   level='country'             → public.totals_by_country          (N rows, filter by `id`)
+//   level='country_group'       → public.totals_by_country_group    (N rows, filter by `id`)
+//   level='market'              → public.totals_by_market           (N rows, filter by `id`)
+//   level='region'              → public.totals_by_region           (N rows, filter by `id`)
+//   level='city'                → public.totals_by_city             (N rows, filter by `id`)
+//
+// The `id` arg is the filter value for the level (e.g. 'SK' for country,
+// 'sk-ba' for market, 'eu' for country_group, 'bratislavsky' for region,
+// etc.). Omit `id` only for level='global'.
+//
+// Return shape matches useMarketTotals() exactly so consumers can swap
+// hook calls without rewiring their UI.
+//
+// Cache strategy: keyed by `${level}:${id}` so flipping country / market
+// inside the same page doesn't re-flash the spinner. F-313 pattern:
+// don't cache on transient errors; only cache successful reads.
+//
+// Future scope (deferred until cz-praha has real data):
+//   - CountrySwitcher / MarketSwitcher UI component
+//   - URL param ?c=SK / ?m=sk-ba binding
+//   - All-EUR price display (D17) — flats_archive.price_s_dph_eur is
+//     already populated, frontend wires through it then.
+const _totalsCache = new Map();  // key='level:id' → totals obj
+
+const _emptyTotals = {
+  loading: true,
+  unitsTracked: null, unitsAvailable: null, unitsReserved: null,
+  unitsSold: null, soldLastMonth: null, avgPriceM2: null,
+  projectsActive: null, projectsTracked: null, developersActive: null,
+  snapshotMonth: null,
+  // Granularity-specific fields the new views surface:
+  level: null, id: null, name: null, currencyCode: null,
+};
+
+const _normTotalsRow = (data, level, id) => {
+  const num = (v) => (typeof v === "number" && Number.isFinite(v))
+    ? v
+    : (v != null && !Number.isNaN(Number(v)) ? Number(v) : null);
+  return {
+    loading: false,
+    unitsTracked:    num(data?.total_units_tracked),
+    unitsAvailable:  num(data?.total_available),
+    unitsReserved:   num(data?.total_reserved),
+    unitsSold:       num(data?.total_sold),
+    soldLastMonth:   num(data?.total_sold_last_month),
+    avgPriceM2:      num(data?.avg_eur_m2),
+    projectsActive:  num(data?.total_projects_active),
+    projectsTracked: num(data?.total_projects_tracked) ?? num(data?.total_projects_active),
+    developersActive:num(data?.total_developers_active),
+    snapshotMonth:   data?.snapshot_month || null,
+    level,
+    id,
+    // Per-view convenience fields (not on every view, present where applicable):
+    name:           data?.market_name || data?.country_name_en || data?.group_name
+                     || data?.region_name || data?.city_name || null,
+    currencyCode:   data?.currency_code || null,
+  };
+};
+
+const _viewForLevel = {
+  global:         'totals_global',
+  country:        'totals_by_country',
+  country_group:  'totals_by_country_group',
+  market:         'totals_by_market',
+  region:         'totals_by_region',
+  city:           'totals_by_city',
+};
+
+const _filterColForLevel = {
+  global:         null,           // single row, no filter
+  country:        'country_code',
+  country_group:  'group_id',
+  market:         'market_key',
+  region:         'region_id',
+  city:           'city_id',
+};
+
+/**
+ * Generic aggregate-totals hook. Reads from the appropriate
+ * public.totals_by_X view based on `level` + `id`.
+ *
+ * Examples:
+ *   const sk     = useTotals('country', 'SK');         // SK national
+ *   const v4     = useTotals('country_group', 'v4');   // V4 bloc
+ *   const skba   = useTotals('market', 'sk-ba');       // BA market only
+ *   const all    = useTotals('global');                // everything active
+ *
+ * Returns the same flat object shape as useMarketTotals(), so callers
+ * can choose either. The `loading` flag, the snapshotMonth, and all
+ * unit/project counts are preserved field-for-field.
+ */
+export function useTotals(level, id = null) {
+  const cacheKey = `${level}:${id || ''}`;
+  const cached = _totalsCache.get(cacheKey);
+  const [totals, setTotals] = useState(cached || _emptyTotals);
+
+  useEffect(() => {
+    if (!isSupabaseReady()) {
+      setTotals(t => ({ ...t, loading: false }));
+      return;
+    }
+    const view = _viewForLevel[level];
+    const filterCol = _filterColForLevel[level];
+    if (!view) {
+      console.warn(`[useTotals] unknown level=${JSON.stringify(level)}`);
+      setTotals(t => ({ ...t, loading: false }));
+      return;
+    }
+    let cancelled = false;
+    let q = supabase.from(view).select("*");
+    if (filterCol && id != null) {
+      q = q.eq(filterCol, id);
+    }
+    q.maybeSingle().then(({ data, error }) => {
+      if (cancelled) return;
+      if (error) {
+        console.error(`[useTotals] ${level}/${id}`, error);
+        setTotals(t => ({ ...t, loading: false }));
+        return;
+      }
+      const next = _normTotalsRow(data, level, id);
+      _totalsCache.set(cacheKey, next);
+      setTotals(next);
+    });
+    return () => { cancelled = true; };
+  }, [level, id]);
+
+  return totals;
+}
+
+// =============================================================================
+// useMarketTotals — backward-compat wrapper around the legacy
+// public.market_totals alias view. Existing code keeps working unchanged.
+// =============================================================================
 let _marketTotalsCache = null;
 export function useMarketTotals() {
   const [totals, setTotals] = useState(_marketTotalsCache || {
