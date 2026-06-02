@@ -8,6 +8,7 @@ import PendingGate from "./components/PendingGate";
 import Feature from "./components/Feature";
 import UpgradePrompt from "./components/UpgradePrompt";
 import { LiveDashboard, LiveProjectDetail, LiveAnalytics, LiveAdmin, EarlyAccessBadge } from "./pages/LivePages";
+import CountrySwitcher from "./components/CountrySwitcher";
 // HowItWorksFlow z HomeExtras bol odstránený — PipelineFlow ho plne
 // pokrýva a robí to na živých číslach z useMarketTotals.
 import { MarketPulse, DistrictPulse, PipelineFlow } from "./pages/HomeExtras";
@@ -411,6 +412,8 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
               }}>{p}</a>
             );
           })}
+          {/* Country switcher — dormant (renders null) until a 2nd market has data */}
+          <CountrySwitcher lang={lang} />
           {/* Language toggle */}
           <div style={{
             display: "flex", borderRadius: 6, overflow: "hidden",

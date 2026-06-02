@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase, isSupabaseReady } from "./supabase";
 import { useAuth } from "./useAuth";
+import { useCountry } from "./useCountry";
 
 /**
  * Data hooks — the one source of truth for reading from Supabase.
@@ -266,12 +267,17 @@ export function useTotals(level, id = null) {
 }
 
 // =============================================================================
-// useMarketTotals — backward-compat wrapper around the legacy
-// public.market_totals alias view. Existing code keeps working unchanged.
+// useMarketTotals — per-country aggregate totals. Reads public.totals_by_country
+// filtered by the selected country (useCountry). Defaults to 'SK', which is
+// byte-identical to the old SK-pinned market_totals view — that alias was
+// literally `SELECT … FROM totals_by_country WHERE country_code='SK'`, so the
+// SK numbers and column shape are unchanged. Switching country now actually
+// re-aggregates instead of always returning Slovakia.
 // =============================================================================
-let _marketTotalsCache = null;
+const _marketTotalsByCountry = new Map();  // country code → mapped totals object
 export function useMarketTotals() {
-  const [totals, setTotals] = useState(_marketTotalsCache || {
+  const { country } = useCountry();
+  const [totals, setTotals] = useState(() => _marketTotalsByCountry.get(country) || {
     loading: true,
     unitsTracked: null, unitsAvailable: null, unitsReserved: null,
     unitsSold: null, avgPriceM2: null, snapshotMonth: null,
@@ -281,8 +287,10 @@ export function useMarketTotals() {
       setTotals(t => ({ ...t, loading: false }));
       return;
     }
+    const cached = _marketTotalsByCountry.get(country);
+    if (cached) setTotals(cached);
     let cancelled = false;
-    supabase.from("market_totals").select("*").maybeSingle().then(({ data, error }) => {
+    supabase.from("totals_by_country").select("*").eq("country_code", country).maybeSingle().then(({ data, error }) => {
       if (cancelled) return;
       if (error) {
         console.error("[useMarketTotals]", error);
@@ -310,11 +318,11 @@ export function useMarketTotals() {
         developersActive:num(data?.total_developers_active),
         snapshotMonth:   data?.snapshot_month || null,
       };
-      _marketTotalsCache = next;
+      _marketTotalsByCountry.set(country, next);
       setTotals(next);
     });
     return () => { cancelled = true; };
-  }, []);
+  }, [country]);
   return totals;
 }
 
@@ -366,15 +374,16 @@ export function useProjects(limit) {
   // keep seeing the stale array. Keying by id + tier makes every auth
   // transition a fresh fetch.
   const { user, profile } = useAuth();
+  const { country } = useCountry();
   const tier = profile?.tier || "anon";
-  const key = `${user?.id || "anon"}::${tier}::${limit || "all"}`;
+  const key = `${user?.id || "anon"}::${tier}::${limit || "all"}::${country}`;
   const cacheHit = _projectsCacheKey === key;
   const [projects, setProjects] = useState(cacheHit ? (_projectsCache || []) : []);
   const [loading, setLoading] = useState(!cacheHit);
   useEffect(() => {
     if (!isSupabaseReady()) { setLoading(false); return; }
     let cancelled = false;
-    let q = supabase.from("projects_live").select("*");
+    let q = supabase.from("projects_live").select("*").eq("country", country);
     if (limit) q = q.eq("is_top20", true).limit(limit);
     q.order("available_units", { ascending: false }).then(({ data, error }) => {
       if (cancelled) return;
