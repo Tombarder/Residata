@@ -4,6 +4,29 @@ import { useAuth } from "./useAuth";
 import { useCountry } from "./useCountry";
 
 /**
+ * D17 — EUR everywhere. flats_current / flats_archive expose price_s_dph_eur
+ * (native price × reference.currencies.exchange_rate_to_eur; for SK the rate
+ * is 1.0 so it equals cena_s_dph exactly). We overlay the EUR value onto
+ * cena_s_dph / cena_bez_dph here, so every existing "€"-formatted price across
+ * the app renders EUR without editing each per-site formatter. The native
+ * amount is preserved as cena_s_dph_native; native currency code is
+ * currency_native. For SK this is a no-op (EUR == native).
+ */
+function _toEurDisplay(rows) {
+  if (!Array.isArray(rows)) return rows;
+  return rows.map((f) => {
+    if (!f || f.price_s_dph_eur == null) return f; // no EUR value → leave native untouched
+    return {
+      ...f,
+      cena_s_dph_native: f.cena_s_dph,
+      cena_bez_dph_native: f.cena_bez_dph,
+      cena_s_dph: f.price_s_dph_eur,
+      cena_bez_dph: f.price_bez_dph_eur != null ? f.price_bez_dph_eur : f.cena_bez_dph,
+    };
+  });
+}
+
+/**
  * Data hooks — the one source of truth for reading from Supabase.
  *
  * ## Single canonical source of unit-level data: flats_archive
@@ -517,7 +540,7 @@ export function useProjectFlats(projectId) {
         ({ data, error: err } = await fetchMostRecentForProject());
       }
       if (cancelled) return;
-      setFlats(data || []);
+      setFlats(_toEurDisplay(data || []));
       setError(err || null);
       setLoading(false);
     })();
@@ -642,11 +665,12 @@ export function useFlatsCurrent() {
       // rest of the session until they hard-reload. We still surface what
       // we got to local state (best-effort render), but don't write the
       // cache so the next mount retries fresh.
+      const all_eur = _toEurDisplay(all);
       if (!hadError) {
-        _flatsCurrentCache = all;
+        _flatsCurrentCache = all_eur;
         _flatsCurrentCacheKey = identityKey;
       }
-      setFlats(all);
+      setFlats(all_eur);
       setLoading(false);
     })();
     return () => { cancelled = true; };
@@ -768,11 +792,12 @@ export function useFlatsArchive(months) {
       // the analytics Pivot's heavy archive read would otherwise leave the
       // user with truncated time-series for the rest of the session until
       // hard reload. Best-effort render what we got, but don't cache.
+      const all_eur = _toEurDisplay(all);
       if (!hadError) {
-        _archiveCache = all;
+        _archiveCache = all_eur;
         _archiveCacheKey = identityKey;
       }
-      setFlats(all);
+      setFlats(all_eur);
       setLoading(false);
     })();
     return () => { cancelled = true; };
