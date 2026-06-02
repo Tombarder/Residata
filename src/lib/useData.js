@@ -73,8 +73,16 @@ export function useMetrics() {
     if (!isSupabaseReady()) { setLoading(false); return; }
     let cancelled = false;
     supabase.from("metrics").select("*").order("display_order", { ascending: true })
-      .then(({ data }) => {
+      .then(({ data, error }) => {
         if (cancelled) return;
+        // F-313 (DP-096): don't poison the module cache with [] on transient
+        // errors — that would leave the ticker empty for the rest of the
+        // session until hard reload. Cache ONLY on success.
+        if (error) {
+          console.error("[useMetrics]", error);
+          setLoading(false);
+          return;
+        }
         const arr = data || [];
         _metricsCache = arr;
         setMetrics(arr);
@@ -450,6 +458,7 @@ export function useFlatsCurrent() {
       const all = [];
       const PAGE = 1000;
       let offset = 0;
+      let hadError = false;
       // Safety cap — if server is paginating us into oblivion (e.g. cap < 50
       // rows but tens of thousands of total rows), give up at 200k. We've
       // never had more than ~5.5k rows in flats_current; this is a guardrail.
@@ -463,6 +472,7 @@ export function useFlatsCurrent() {
         if (cancelled) return;
         if (error) {
           console.error("[useFlatsCurrent]", error);
+          hadError = true;
           break;
         }
         const got = data?.length || 0;
@@ -476,8 +486,16 @@ export function useFlatsCurrent() {
         if (got < PAGE) break;
       }
       if (cancelled) return;
-      _flatsCurrentCache = all;
-      _flatsCurrentCacheKey = identityKey;
+      // F-313 (DP-096): don't poison the module cache with an empty/partial
+      // result when the fetch errored. A transient Supabase hiccup would
+      // otherwise leave paid users staring at an empty dashboard for the
+      // rest of the session until they hard-reload. We still surface what
+      // we got to local state (best-effort render), but don't write the
+      // cache so the next mount retries fresh.
+      if (!hadError) {
+        _flatsCurrentCache = all;
+        _flatsCurrentCacheKey = identityKey;
+      }
       setFlats(all);
       setLoading(false);
     })();
@@ -539,6 +557,7 @@ export function useFlatsArchive(months) {
     setProgress(0);
     (async () => {
       const all = [];
+      let hadError = false;
       // PostgREST default max-rows is 1000 per request. We REQUEST 5000
       // hoping the server config allows it (cuts wall-clock by 5x); if
       // the server caps lower we still continue paginating until an
@@ -569,6 +588,7 @@ export function useFlatsArchive(months) {
         if (cancelled) return;
         if (error) {
           console.error("[useFlatsArchive]", error);
+          hadError = true;
           break;
         }
         const got = data?.length || 0;
@@ -593,8 +613,15 @@ export function useFlatsArchive(months) {
         console.warn("[useFlatsArchive] reached safety cap of", MAX_TOTAL, "rows");
       }
       if (cancelled) return;
-      _archiveCache = all;
-      _archiveCacheKey = identityKey;
+      // F-313 (DP-096): don't poison the module cache with a partial/empty
+      // result when the fetch errored. A transient Supabase hiccup during
+      // the analytics Pivot's heavy archive read would otherwise leave the
+      // user with truncated time-series for the rest of the session until
+      // hard reload. Best-effort render what we got, but don't cache.
+      if (!hadError) {
+        _archiveCache = all;
+        _archiveCacheKey = identityKey;
+      }
       setFlats(all);
       setLoading(false);
     })();
