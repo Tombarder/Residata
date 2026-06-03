@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
-import { useProjects, useProjectFlats, useEarlyAccessStats, useProjectSnapshots, useMarketTotals, useDistrictTotals } from "../lib/useData";
+import { useProjects, useProjectFlats, useEarlyAccessStats, useProjectSnapshots, useMarketTotals, useTotalsList } from "../lib/useData";
 import { supabase } from "../lib/supabase";
 import { liveT, ll } from "../lib/liveLang";
 import { goBack } from "../lib/routing";
@@ -2832,7 +2832,7 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
   const { projects, loading } = useProjects();        // projects_live → real per-project aggregates
   const { snapshots } = useProjectSnapshots();
   const marketTotals = useMarketTotals();             // market_totals view (always live)
-  const { districts: districtRows } = useDistrictTotals();  // district_totals view (always live)
+  const { rows: districtRows } = useTotalsList("district");  // totals_by_district — city-aware (unified-SK safe)
   const { can } = useCapabilities();
 
   if (loading && projects.length === 0) {
@@ -2870,15 +2870,17 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
   const districts = (districtRows || [])
     .map(d => ({
       district: d.district,
+      city: d.city_name,
       count: d.project_count,
       units: d.total_units,
       avail: d.available_units,
       sold: d.sold_units,
       avgPrice: d.avg_eur_m2,
-      // sold30 still comes from projects (project-level monthly delta).
-      // Fold it in by joining on district name.
+      // sold30 still comes from projects (project-level monthly delta). Join on
+      // BOTH city + district — district name alone collides across cities under
+      // unified SK (e.g. "Staré Mesto" in Bratislava AND Košice).
       sold30: projects
-        .filter(p => p.district === d.district)
+        .filter(p => p.district === d.district && (p.city || null) === (d.city_name || null))
         .reduce((a, p) => a + (p.sold_last_month || 0), 0),
     }))
     .map(d => ({
@@ -2952,6 +2954,7 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
             <thead style={{ background: "#0e0e10" }}>
               <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.68rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                <th style={th}>{lang === "sk" ? "Mesto" : "City"}</th>
                 <th style={th}>{lang === "sk" ? "Okres" : "District"}</th>
                 <th style={{ ...th, textAlign: "right" }}>€/m²</th>
                 <th style={{ ...th, textAlign: "right" }}>{lang === "sk" ? "Projektov" : "Projects"}</th>
@@ -2963,7 +2966,8 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
             </thead>
             <tbody>
               {districts.map(d => (
-                <tr key={d.district} style={{ borderTop: `1px solid ${border}` }}>
+                <tr key={`${d.city || ""}·${d.district}`} style={{ borderTop: `1px solid ${border}` }}>
+                  <td style={{ ...td, color: dim }}>{d.city || "—"}</td>
                   <td style={{ ...td, fontWeight: 600 }}>{d.district}</td>
                   <td style={{ ...td, textAlign: "right", fontFamily: mono, color: d.avgPrice && d.avgPrice >= 5500 ? "#f5a623" : d.avgPrice && d.avgPrice >= 4200 ? green : "#4a90e2", fontWeight: 600 }}>
                     {d.avgPrice ? d.avgPrice.toLocaleString("en-US").replace(/,/g, " ") : "—"}
