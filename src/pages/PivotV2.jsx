@@ -101,6 +101,11 @@ const FIELDS = {
   // show empty filter lists and inflate the palette without
   // actionable signal. The values still live in projects.* and can
   // be exposed again later if a use case emerges.
+  // Mesto (city) — sourced directly from flats_archive.city (populated for
+  // every market). Essential once Slovakia is unified: district alone is
+  // ambiguous (e.g. "Staré Mesto" exists in Bratislava AND Košice), so the
+  // city dimension is what makes a national pivot/export legible.
+  city:              { label: "Mesto",                       group: "location", type: "text",   accessor: (r) => r.city || null },
   cast:              { label: "Cast",                       group: "location", type: "text",   accessor: (r) => r.district },
   ulica_detail:      { label: "Ulica/Detail",               group: "location", type: "text",   accessor: (r) => r.ulica_detail },
   budova_stav:       { label: "Budova/stav",                group: "location", type: "text",   accessor: (r) => r.budova_stav },
@@ -189,7 +194,7 @@ const FIELD_ORDER = [
   "zahrada", "exterier", "kobka", "celkova_plocha",
   "cena_bez_dph", "cena_s_dph",
   "stav", "kolaudacia", "orientacia",
-  "cast", "ulica_detail", "budova_stav", "standard",
+  "city", "cast", "ulica_detail", "budova_stav", "standard",
   "cena_na_m2_obytnej",
   // Measures — group-level calculations, Values zone only
   "abs_rate", "wavg_m2_price", "sold_count", "available_count",
@@ -1145,6 +1150,23 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
           effectiveValues={effectiveValues}
           lang={lang}
         />
+      )}
+
+      {/* €/m² scope caption — the Pivot is a full explorer over flats_archive
+          (every unit, every status, all months). Its weighted €/m² therefore
+          legitimately differs from the homepage headline (simple mean over
+          on-offer units in active projects). Clarify so the two aren't read as
+          contradicting each other. */}
+      {rows.length > 0 && effectiveValues.some(v => v.key === "wavg_m2_price" || v.key === "cena_na_m2_obytnej") && (
+        <div style={{
+          fontSize: "0.66rem", color: dim, opacity: 0.9, lineHeight: 1.5,
+          padding: "0.45rem 0.6rem", margin: "0 0 0.5rem",
+          borderLeft: `2px solid ${dim}`, background: "rgba(255,255,255,0.03)",
+        }}>
+          {lang === "sk"
+            ? "€/m² je vážený priemer (Σ cena ÷ Σ plocha) cez všetky vybrané záznamy — vrátane predaných bytov, starších mesiacov a projektov v ktoromkoľvek stave. Hlavné číslo na webe počíta len ponukové byty (Stav V/R/PR) v aktívnych projektoch, preto sa môže líšiť. Pre zhodu pridaj filter Stav = V/R/PR."
+            : "€/m² is a weighted average (Σ price ÷ Σ area) over all selected records — including sold units, past months, and projects in any status. The homepage headline counts only on-offer units (Stav V/R/PR) in active projects, so it can differ. Add a Stav = V/R/PR filter to match it."}
+        </div>
       )}
 
       <ResultTable
@@ -3722,6 +3744,7 @@ function DrillDownModal({ title, records, onClose, lang }) {
     { key: "obytna_plocha",label: "Plocha" },
     { key: "cena_s_dph",   label: "Cena" },
     { key: "stav",         label: "Stav" },
+    { key: "city",         label: "Mesto" },
     { key: "district",     label: "Časť" },
     { key: "developer",    label: "Developer" },
   ];

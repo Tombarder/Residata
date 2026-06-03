@@ -1669,25 +1669,40 @@ function ComparableTransactionsReport({ projects, flats, lang }) {
 
   // CSV export (just for this report, scoped to filtered set)
   const downloadCsv = () => {
-    const cols = ["project", "district", "developer", "izby", "obytna_plocha_m2", "cena_eur", "eur_per_m2", "poschodie", "orientacia"];
+    // Proper RFC-4180 CSV escaping (doubles internal quotes, wraps when the
+    // value carries a comma/quote/newline). Replaces the old JSON.stringify
+    // hack, which emitted \" instead of "" and breaks Excel on quoted values.
+    const esc = (v) => {
+      if (v == null) return "";
+      const s = String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const cols = ["project", "city", "district", "developer", "izby", "obytna_plocha_m2", "cena_eur", "eur_per_m2", "poschodie", "orientacia"];
     const head = cols.join(",");
     const rows = filtered.map(f => {
       const p = projectById[f.project_id] || {};
-      const em2 = (f.cena_s_dph / f.obytna_plocha).toFixed(0);
+      // Guard against missing/zeroed area (e.g. interior nulled by the area
+      // sanity guard) so eur_per_m2 never exports "Infinity"/"NaN".
+      const em2 = (f.cena_s_dph > 0 && f.obytna_plocha > 0)
+        ? Math.round(f.cena_s_dph / f.obytna_plocha)
+        : "";
       return [
-        JSON.stringify(p.name || ""),
-        JSON.stringify(p.district || ""),
-        JSON.stringify(p.developer || ""),
-        f.izby || "",
-        f.obytna_plocha || "",
-        f.cena_s_dph || "",
+        esc(p.name),
+        esc(p.city || f.city),
+        esc(p.district),
+        esc(p.developer),
+        f.izby ?? "",
+        f.obytna_plocha ?? "",
+        f.cena_s_dph ?? "",
         em2,
         f.poschodie ?? "",
-        JSON.stringify(f.orientacia || ""),
+        esc(f.orientacia),
       ].join(",");
     });
     const csv = [head, ...rows].join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    // Prepend UTF-8 BOM so Excel renders Slovak diacritics (Žilina, Prešov,
+    // Staré Mesto) correctly — was missing here while other exports have it.
+    const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url; a.download = `residata-comparables-${new Date().toISOString().slice(0, 10)}.csv`;
