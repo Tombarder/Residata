@@ -225,6 +225,7 @@ const _viewForLevel = {
   market:         'totals_by_market',
   region:         'totals_by_region',
   city:           'totals_by_city',
+  district:       'totals_by_district',
 };
 
 const _filterColForLevel = {
@@ -234,7 +235,12 @@ const _filterColForLevel = {
   market:         'market_key',
   region:         'region_id',
   city:           'city_id',
+  district:       'district',
 };
+
+// The geo aggregate views spell the country column differently:
+// totals_by_district uses `country`, the rest use `country_code`.
+const _countryColForLevel = (level) => (level === 'district' ? 'country' : 'country_code');
 
 /**
  * Generic aggregate-totals hook. Reads from the appropriate
@@ -287,6 +293,63 @@ export function useTotals(level, id = null) {
   }, [level, id]);
 
   return totals;
+}
+
+// =============================================================================
+// useTotalsList(level, opts) — LIST of all rows at a granularity level, for
+// drill-down (kraje in a country, cities in a kraj, districts in a city).
+// Unlike useTotals (one entity), this returns the children array.
+//
+//   useTotalsList('region',   { country: 'SK' })                          → all SK kraje
+//   useTotalsList('city',     { country: 'SK', filterCol:'region_id', filterId:'sk-bratislavsky' })
+//   useTotalsList('district', { country: 'SK', filterCol:'city_id',   filterId:'bratislava' })
+//
+// When filterCol is given but filterId is null (parent not selected yet) the
+// hook returns [] without querying — so a drill-down can mount all three levels
+// unconditionally (Rules of Hooks) and only the active one fetches.
+// =============================================================================
+const _totalsListCache = new Map();
+export function useTotalsList(level, { country = null, filterCol = null, filterId = null } = {}) {
+  const view = _viewForLevel[level];
+  const cacheKey = `${level}:${country || ''}:${filterCol || ''}:${filterId ?? ''}`;
+  const [rows, setRows] = useState(() => _totalsListCache.get(cacheKey) || []);
+  const [loading, setLoading] = useState(() => !_totalsListCache.has(cacheKey));
+
+  useEffect(() => {
+    // Parent filter requested but no parent selected → nothing to fetch.
+    if (filterCol && filterId == null) {
+      setRows([]);
+      setLoading(false);
+      return;
+    }
+    if (!isSupabaseReady() || !view) {
+      setLoading(false);
+      return;
+    }
+    const cached = _totalsListCache.get(cacheKey);
+    if (cached) { setRows(cached); setLoading(false); }
+    else setLoading(true);
+
+    let cancelled = false;
+    let q = supabase.from(view).select("*");
+    if (country) q = q.eq(_countryColForLevel(level), country);
+    if (filterCol && filterId != null) q = q.eq(filterCol, filterId);
+    q.then(({ data, error }) => {
+      if (cancelled) return;
+      if (error) {
+        console.error(`[useTotalsList] ${level}/${filterCol}=${filterId}`, error);
+        setLoading(false);
+        return;
+      }
+      const arr = data || [];
+      _totalsListCache.set(cacheKey, arr);
+      setRows(arr);
+      setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [level, country, filterCol, filterId, view, cacheKey]);
+
+  return { rows, loading };
 }
 
 // =============================================================================

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { useMarketTotals, useProjects, useDistrictTotals } from "../lib/useData";
+import { useMarketTotals, useProjects, useTotalsList } from "../lib/useData";
+import { useCountry, countryName } from "../lib/useCountry";
 // (imports already include useMarketTotals — we rely on its live view
 // instead of summing projects.total_units, which inflates the count for
 // projects like Bory/Slnečnice whose total_units is a manual registry
@@ -755,41 +756,78 @@ function useInView(rootMargin = "0px") {
   return [ref, inView];
 }
 
-export function DistrictPulse({ lang = "en", setCurrent }) {
-  const { districts, loading } = useDistrictTotals();
+// Empty drill state helper (top level = whole country, by kraj).
+const _emptyDrill = { level: "region", regionId: null, regionName: null, cityId: null, cityName: null };
+
+export function DistrictPulse({ lang = "en", setCurrent }) {  // eslint-disable-line no-unused-vars
+  const { country } = useCountry();
   const [sectionRef, inView] = useInView();
 
-  // Read per-district aggregates from the `district_totals` Postgres
-  // view (live aggregate from flats_archive's latest month). One row
-  // per district with REAL counts:
-  //   · total_units    — all flats we actually track in the district
-  //   · available_units — stav = 'V'
-  //   · sold_units      — stav = 'P'  (the explicit sold count, no
-  //                       inflation from manual_total registry overrides)
-  //   · project_count   — distinct projects with at least 1 flat
-  //   · avg_eur_m2      — arithmetic mean of cena/area over priced flats
-  //
-  // Drop districts without a price signal (avg_eur_m2 = null) so the
-  // bar chart's max-scale stays meaningful — same UX as before.
-  const rows = (districts || [])
-    .filter(d => d.avg_eur_m2 != null)
-    .map(d => ({
-      district: d.district,
-      avg: Number(d.avg_eur_m2),
-      count: d.project_count,
-      units: d.total_units,
-      avail: d.available_units,
-      sold: d.sold_units,
-    }))
-    .sort((a, b) => b.avg - a.avg);
+  // Drill state: Country → kraj (region) → mesto (city) → mestská časť (district).
+  // Reads the live geo-hierarchy aggregate views (totals_by_region / _by_city /
+  // _by_district — all SECURITY DEFINER aggregates, anon-safe). When the rest of
+  // Slovakia is live this becomes the national pricing map; today it shows the
+  // single populated kraj and drills into Bratislava's districts.
+  const [drill, setDrill] = useState(_emptyDrill);
 
+  // Country switch (e.g. CZ) → reset to the top of the hierarchy.
+  useEffect(() => { setDrill(_emptyDrill); }, [country]);
+
+  const regionQ   = useTotalsList("region",   { country });
+  const cityQ     = useTotalsList("city",     { country, filterCol: "region_id", filterId: drill.regionId });
+  const districtQ = useTotalsList("district", { country, filterCol: "city_id",   filterId: drill.cityId });
+
+  // Normalise the active level to a common row shape {key,name,avg,count,units}.
+  let activeRows, loading, drillable;
+  if (drill.level === "region") {
+    loading = regionQ.loading; drillable = true;
+    activeRows = regionQ.rows.map(d => ({ key: d.region_id, name: d.region_name, avg: d.avg_eur_m2, count: d.total_projects_active, units: d.total_units_tracked }));
+  } else if (drill.level === "city") {
+    loading = cityQ.loading; drillable = true;
+    activeRows = cityQ.rows.map(d => ({ key: d.city_id, name: d.city_name, avg: d.avg_eur_m2, count: d.total_projects_active, units: d.total_units_tracked }));
+  } else {
+    loading = districtQ.loading; drillable = false;
+    activeRows = districtQ.rows.map(d => ({ key: d.district, name: d.district, avg: d.avg_eur_m2, count: d.project_count, units: d.total_units }));
+  }
+
+  // Drop entries without a price signal so the bar max-scale stays meaningful.
+  const rows = activeRows
+    .filter(d => d.avg != null)
+    .map(d => ({ ...d, avg: Number(d.avg), units: Number(d.units) || 0, count: Number(d.count) || 0 }))
+    .sort((a, b) => b.avg - a.avg);
   const max = rows.length > 0 ? Math.max(...rows.map(r => r.avg)) : 1;
 
-  const label = lang === "sk" ? "Cenová mapa Bratislavy" : "Bratislava pricing map";
-  const title = lang === "sk" ? "Priemerná cena €/m² podľa okresu" : "Average €/m² by district";
+  const cName = countryName(country, lang);
+  const label = lang === "sk" ? `Cenová mapa — ${cName}` : `${cName} pricing map`;
+  const levelWord = drill.level === "region"
+    ? (lang === "sk" ? "podľa kraja" : "by region")
+    : drill.level === "city"
+      ? (lang === "sk" ? "podľa mesta" : "by city")
+      : (lang === "sk" ? "podľa mestskej časti" : "by district");
+  const title = lang === "sk" ? `Priemerná cena €/m² ${levelWord}` : `Average €/m² ${levelWord}`;
   const desc = lang === "sk"
-    ? "Skutočné dáta z aktívnych projektov. Updatuje sa každý mesiac po novom run-e."
-    : "Real data from active projects. Refreshes every month.";
+    ? "Skutočné dáta z aktívnych projektov. Klikni na riadok pre rozpad nižšie. Updatuje sa každý mesiac."
+    : "Real data from active projects. Click a row to drill down. Refreshes monthly.";
+
+  // Breadcrumb trail (clickable parents).
+  const crumbs = [{ label: cName, go: () => setDrill(_emptyDrill) }];
+  if (drill.regionId) {
+    crumbs.push({
+      label: drill.regionName,
+      go: drill.level === "district"
+        ? () => setDrill({ ..._emptyDrill, level: "city", regionId: drill.regionId, regionName: drill.regionName })
+        : null,
+    });
+  }
+  if (drill.cityId) crumbs.push({ label: drill.cityName, go: null });
+
+  const handleRowClick = (r) => {
+    if (drill.level === "region") {
+      setDrill({ ..._emptyDrill, level: "city", regionId: r.key, regionName: r.name });
+    } else if (drill.level === "city") {
+      setDrill({ level: "district", regionId: drill.regionId, regionName: drill.regionName, cityId: r.key, cityName: r.name });
+    }
+  };
 
   return (
     <section ref={sectionRef} style={{ padding: "5rem 2rem", maxWidth: 1100, margin: "0 auto", borderTop: `1px solid ${border}` }}>
@@ -797,7 +835,26 @@ export function DistrictPulse({ lang = "en", setCurrent }) {
         {label}
       </div>
       <h2 className="sec-title" style={{ marginBottom: "0.5rem" }}>{title}</h2>
-      <p className="sec-desc" style={{ marginBottom: "2.5rem" }}>{desc}</p>
+      <p className="sec-desc" style={{ marginBottom: "1.25rem" }}>{desc}</p>
+
+      {/* Breadcrumb — only once drilled below the top level. */}
+      {crumbs.length > 1 && (
+        <div style={{ fontFamily: mono, fontSize: "0.8rem", marginBottom: "1.75rem", display: "flex", flexWrap: "wrap", gap: "0.4rem", alignItems: "center" }}>
+          {crumbs.map((c, i) => (
+            <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem" }}>
+              {i > 0 && <span style={{ color: dim }}>›</span>}
+              {c.go ? (
+                <button
+                  onClick={c.go}
+                  style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: green, fontFamily: mono, fontSize: "0.8rem" }}
+                >{c.label}</button>
+              ) : (
+                <span style={{ color: "#e8e8ed" }}>{c.label}</span>
+              )}
+            </span>
+          ))}
+        </div>
+      )}
 
       {loading && rows.length === 0 ? (
         <div style={{ color: dim, fontFamily: mono, fontSize: "0.85rem", padding: "2rem 0" }}>
@@ -805,18 +862,19 @@ export function DistrictPulse({ lang = "en", setCurrent }) {
         </div>
       ) : rows.length === 0 ? (
         <div style={{ color: dim, fontSize: "0.9rem" }}>
-          {lang === "sk" ? "Žiadne dáta zatiaľ." : "No data yet."}
+          {lang === "sk" ? "Žiadne cenové dáta na tejto úrovni." : "No pricing data at this level."}
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem" }}>
           {rows.map((r, i) => (
-            <DistrictRow
-              key={r.district}
+            <GeoBarRow
+              key={r.key}
               row={r}
               index={i}
               max={max}
               animate={inView}
               lang={lang}
+              onClick={drillable ? handleRowClick : null}
             />
           ))}
         </div>
@@ -825,27 +883,36 @@ export function DistrictPulse({ lang = "en", setCurrent }) {
   );
 }
 
-function DistrictRow({ row, index, max, animate, lang }) {
+function GeoBarRow({ row, index, max, animate, lang, onClick }) {
   const pct = (row.avg / max) * 100;
   const color = colorForPrice(row.avg);
   const delay = 0.08 * index;
   const animatedAvg = useAnimatedNumber(animate ? Math.round(row.avg) : 0, 1100, delay * 1000);
+  const clickable = typeof onClick === "function";
 
   return (
     <div
+      onClick={clickable ? () => onClick(row) : undefined}
+      role={clickable ? "button" : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onKeyDown={clickable ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(row); } } : undefined}
       style={{
         display: "grid", gridTemplateColumns: "180px 1fr 160px", gap: "1rem", alignItems: "center",
         opacity: animate ? 1 : 0,
         transform: animate ? "translateY(0)" : "translateY(8px)",
         transition: `opacity 0.5s ease ${delay}s, transform 0.5s ease ${delay}s`,
+        cursor: clickable ? "pointer" : "default",
       }}
       className="district-row"
     >
-      {/* Left: district name + count subtitle (was INSIDE the bar with
-          mixBlendMode — which cost paint and was hard to read). Moving
-          it out of the bar kills the perf cost and fixes contrast. */}
+      {/* Left: name + count subtitle. A › chevron marks a drillable row
+          (kraj → mesto → mestská časť). Name kept out of the bar for
+          contrast + paint perf (see git history). */}
       <div>
-        <div style={{ fontSize: "0.92rem", color: "#e8e8ed", fontWeight: 500, lineHeight: 1.25 }}>{row.district}</div>
+        <div style={{ fontSize: "0.92rem", color: "#e8e8ed", fontWeight: 500, lineHeight: 1.25 }}>
+          {row.name}
+          {clickable && <span style={{ color: green, marginLeft: 6, fontFamily: mono }}>›</span>}
+        </div>
         <div style={{ fontSize: "0.68rem", color: "#8a8a96", fontFamily: mono, marginTop: 2, letterSpacing: "0.02em" }}>
           {row.count} {lang === "sk" ? "proj" : "proj"} · {row.units.toLocaleString("en-US").replace(/,/g, " ")} {lang === "sk" ? "bytov" : "units"}
         </div>
