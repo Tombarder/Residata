@@ -628,7 +628,7 @@ export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en
     <main style={{ padding: "5rem 2rem 4rem", maxWidth: 1200, margin: "0 auto" }}>
       <button onClick={() => onBack()} style={{ ...linkBtn, marginBottom: "1rem" }}>{t.back_to_projects}</button>
 
-      <Label>{project?.district || "Bratislava"}</Label>
+      <Label>{[project?.city, project?.district].filter(Boolean).join(" · ") || "—"}</Label>
       <h1 className="sec-title">{project?.name || projectId}</h1>
       <p className="sec-desc" style={{ marginBottom: "2rem" }}>
         {project ? `${project.total_units} ${t.tbl_units.toLowerCase()} · ${project.available_units} ${t.tbl_available.toLowerCase()} · ${project.sold_percentage ?? "?"}% ${t.tbl_sold.toLowerCase()}` : ""}
