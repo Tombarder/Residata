@@ -101,6 +101,11 @@ const FIELDS = {
   // show empty filter lists and inflate the palette without
   // actionable signal. The values still live in projects.* and can
   // be exposed again later if a use case emerges.
+  // Mesto (city) — sourced directly from flats_archive.city (populated for
+  // every market). Essential once Slovakia is unified: district alone is
+  // ambiguous (e.g. "Staré Mesto" exists in Bratislava AND Košice), so the
+  // city dimension is what makes a national pivot/export legible.
+  city:              { label: "Mesto",                       group: "location", type: "text",   accessor: (r) => r.city || null },
   cast:              { label: "Cast",                       group: "location", type: "text",   accessor: (r) => r.district },
   ulica_detail:      { label: "Ulica/Detail",               group: "location", type: "text",   accessor: (r) => r.ulica_detail },
   budova_stav:       { label: "Budova/stav",                group: "location", type: "text",   accessor: (r) => r.budova_stav },
@@ -189,7 +194,7 @@ const FIELD_ORDER = [
   "zahrada", "exterier", "kobka", "celkova_plocha",
   "cena_bez_dph", "cena_s_dph",
   "stav", "kolaudacia", "orientacia",
-  "cast", "ulica_detail", "budova_stav", "standard",
+  "city", "cast", "ulica_detail", "budova_stav", "standard",
   "cena_na_m2_obytnej",
   // Measures — group-level calculations, Values zone only
   "abs_rate", "wavg_m2_price", "sold_count", "available_count",
@@ -3739,6 +3744,7 @@ function DrillDownModal({ title, records, onClose, lang }) {
     { key: "obytna_plocha",label: "Plocha" },
     { key: "cena_s_dph",   label: "Cena" },
     { key: "stav",         label: "Stav" },
+    { key: "city",         label: "Mesto" },
     { key: "district",     label: "Časť" },
     { key: "developer",    label: "Developer" },
   ];
