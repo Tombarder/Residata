@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
-import { useProjects, useProjectFlats, useEarlyAccessStats, useProjectSnapshots, useMarketTotals, useTotalsList } from "../lib/useData";
+import { useProjects, useProjectFlats, useProjectSnapshots, useMarketTotals, useTotalsList } from "../lib/useData";
 import { supabase } from "../lib/supabase";
 import { liveT, ll } from "../lib/liveLang";
 import { goBack } from "../lib/routing";
@@ -4453,27 +4453,9 @@ function EventBadge({ type }) {
   return <span style={{ fontFamily: mono, fontSize: "0.65rem", color: x.color, border: `1px solid ${x.color}`, padding: "1px 6px", borderRadius: 3, fontWeight: 700, letterSpacing: "0.05em" }}>{x.label}</span>;
 }
 
-/* ───────────────────── EARLY ACCESS BADGE ───────────────────── */
-export function EarlyAccessBadge({ lang = "en" }) {
-  const t = liveT[lang] || liveT.en;
-  const { can } = useCapabilities();
-  const { remaining_slots } = useEarlyAccessStats();
-  // Skry pre paid/admin — nepotrebujú vidieť "early access" marketing.
-  if (!can("see_early_access_badge")) return null;
-  if (remaining_slots <= 0) return null;
-  const tmpl = remaining_slots === 1 ? t.ea_badge_one : t.ea_badge;
-  return (
-    <div style={{
-      display: "inline-flex", alignItems: "center", gap: "0.5rem",
-      padding: "0.4rem 0.9rem", background: "rgba(0,229,160,0.1)",
-      border: "1px solid rgba(0,229,160,0.3)", borderRadius: 999,
-      fontFamily: mono, fontSize: "0.7rem", color: green, fontWeight: 600,
-    }}>
-      <span style={{ width: 6, height: 6, borderRadius: "50%", background: green }}></span>
-      {ll(tmpl, { n: remaining_slots })}
-    </div>
-  );
-}
+/* EarlyAccessBadge moved to src/components/EarlyAccessBadge.jsx (perf code-split,
+   2026-06-04) so the marketing landing doesn't pull in this ~254 KB module just
+   to render a small badge. This dead copy removed. */
 
 /* ───────────────────── SHARED STYLES ───────────────────── */
 function Label({ children }) {
