@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import Ticker from "./components/Ticker";
 import LoginModal from "./components/LoginModal";
 import CompleteProfile from "./components/CompleteProfile";
@@ -7,12 +7,22 @@ import { TrialBanner, TrialPopup } from "./components/TrialBanner";
 import PendingGate from "./components/PendingGate";
 import Feature from "./components/Feature";
 import UpgradePrompt from "./components/UpgradePrompt";
-import { LiveDashboard, LiveProjectDetail, LiveAnalytics, LiveAdmin, EarlyAccessBadge } from "./pages/LivePages";
+// PERF Step 5 (LivePages split): the /live dashboard + project detail are the
+// last big modules (~254 KB) that were eager on the landing. Lazy-load them so
+// LivePages becomes an on-demand chunk. (LiveAnalytics/LiveAdmin were imported
+// here but only used inside the already-lazy PlatformShell — dropped as dead.)
+// EarlyAccessBadge was the one tiny thing keeping LivePages eager on the
+// landing; it now lives in its own zero-LivePages-dep component.
+const LiveDashboard = lazy(() => import("./pages/LivePages").then(m => ({ default: m.LiveDashboard })));
+const LiveProjectDetail = lazy(() => import("./pages/LivePages").then(m => ({ default: m.LiveProjectDetail })));
+import EarlyAccessBadge from "./components/EarlyAccessBadge";
 import CountrySwitcher from "./components/CountrySwitcher";
 // HowItWorksFlow z HomeExtras bol odstránený — PipelineFlow ho plne
 // pokrýva a robí to na živých číslach z useMarketTotals.
 import { MarketPulse, DistrictPulse, PipelineFlow } from "./pages/HomeExtras";
-import HeroLabPage from "./pages/HeroVariants";
+// PERF Step 5: code-split — HeroLab is a hidden experimental route, never part
+// of the marketing first paint, so load its chunk on demand.
+const HeroLabPage = lazy(() => import("./pages/HeroVariants"));
 // Legal pages + cookie banner (F-051 — Boss-mandated 2026-05-31 night).
 import { PrivacyPage, ImprintPage } from "./pages/LegalPages";
 import CookieBanner from "./components/CookieBanner";
@@ -22,7 +32,11 @@ import { useMarketTotals } from "./lib/useData";
 import { pushRoute, pathToPage, isAppPage } from "./lib/routing";
 import { applySeo } from "./lib/seo";
 import { startPageEngagement, stopPageEngagement } from "./lib/engagement";
-import PlatformShell from "./pages/Platform";
+// PERF Step 5: code-split — the platform shell pulls in the heaviest modules
+// (Reports, PivotV2, UnitTracker, admin) which a marketing/first-time visitor
+// never needs. Lazy-load it so it's a separate chunk, off the homepage's
+// critical bundle. Rendered inside a <Suspense> below.
+const PlatformShell = lazy(() => import("./pages/Platform"));
 import { track } from "./lib/track";
 
 const pagesEN = ["Home", "Live", "What we deliver", "Use Cases", "Pricing", "Contact"];
@@ -1942,15 +1956,17 @@ export default function App() {
           <AuthLoadingSpinner />
         </div>
       ) : isAppPage(current) ? (
-        <PlatformShell
-          page={current}
-          projectId={typeof current === "string" && current.startsWith("App:ProjectDetail:")
-            ? current.slice("App:ProjectDetail:".length) : null}
-          lang={lang}
-          setLang={setLang}
-          setCurrent={handleNav}
-          openLogin={() => setLoginOpen(true)}
-        />
+        <Suspense fallback={<AuthLoadingSpinner />}>
+          <PlatformShell
+            page={current}
+            projectId={typeof current === "string" && current.startsWith("App:ProjectDetail:")
+              ? current.slice("App:ProjectDetail:".length) : null}
+            lang={lang}
+            setLang={setLang}
+            setCurrent={handleNav}
+            openLogin={() => setLoginOpen(true)}
+          />
+        </Suspense>
       ) : (
         <div key={current} className="page-transition">
           <>
@@ -1958,9 +1974,11 @@ export default function App() {
 
             {/* Live dashboard — pending gets stopped, ostatní vidia (verejnú alebo plnú verziu podľa tier-u) */}
             {current === "Live" && (
-              caps.tier === "pending"
-                ? <PendingGate setCurrent={handleNav} lang={lang} />
-                : <LiveDashboard setCurrent={handleNav} openLogin={() => setLoginOpen(true)} lang={lang} />
+              <Suspense fallback={<AuthLoadingSpinner />}>
+                {caps.tier === "pending"
+                  ? <PendingGate setCurrent={handleNav} lang={lang} />
+                  : <LiveDashboard setCurrent={handleNav} openLogin={() => setLoginOpen(true)} lang={lang} />}
+              </Suspense>
             )}
 
             {current === "Use Cases" && <UseCasesPage setCurrent={handleNav} l={l} lang={lang} />}
@@ -1971,7 +1989,11 @@ export default function App() {
             {current === "Privacy" && <PrivacyPage lang={lang} />}
             {current === "Imprint" && <ImprintPage lang={lang} />}
             {/* Hidden hero-variant preview page — not in Nav, only reachable via /hero-lab URL */}
-            {current === "HeroLab" && <HeroLabPage setCurrent={handleNav} lang={lang} />}
+            {current === "HeroLab" && (
+              <Suspense fallback={<AuthLoadingSpinner />}>
+                <HeroLabPage setCurrent={handleNav} lang={lang} />
+              </Suspense>
+            )}
 
             {/* /admin and /analytics are handled by the PlatformShell branch above.
                 pathToPage() maps those legacy URLs to App:Admin / App:Analytics
@@ -1980,9 +2002,11 @@ export default function App() {
 
             {/* Project detail */}
             {typeof current === "string" && current.startsWith("Project:") && (
-              caps.tier === "pending"
-                ? <PendingGate setCurrent={handleNav} lang={lang} />
-                : <LiveProjectDetail projectId={current.slice(8)} setCurrent={handleNav} openLogin={() => setLoginOpen(true)} lang={lang} />
+              <Suspense fallback={<AuthLoadingSpinner />}>
+                {caps.tier === "pending"
+                  ? <PendingGate setCurrent={handleNav} lang={lang} />
+                  : <LiveProjectDetail projectId={current.slice(8)} setCurrent={handleNav} openLogin={() => setLoginOpen(true)} lang={lang} />}
+              </Suspense>
             )}
           </>
         </div>
