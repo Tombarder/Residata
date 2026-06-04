@@ -489,6 +489,46 @@ export function useProjects(limit) {
   return { projects, loading };
 }
 
+// PERF Step 6: a narrow projects read for the public HOMEPAGE only (MarketPulse).
+// The shared useProjects() above selects "*" (32 columns, ~119 KB for 161 rows)
+// and feeds many surfaces, so it stays untouched. The landing only needs a
+// handful of display/number fields — this hook selects just those, dropping the
+// heaviest unused columns (project_url, last_updated/last_seen_at, and the
+// internal-classification text fields) → roughly half the payload off the
+// homepage, with its own cache so it never interferes with useProjects.
+// Column set is a SUPERSET of every field MarketPulse reads (audited 2026-06-04)
+// plus a safety margin; if a homepage component ever needs more, add it here.
+const _HOME_PROJECT_COLS =
+  "country,id,name,district,sub_district,city,developer,status,is_top20," +
+  "total_units,available_units,sold_units,reserved_units,prereserved_units," +
+  "future_units,sold_last_month,sold_percentage,avg_price_eur_m2,min_price,max_price";
+let _homeProjectsCache = null;
+let _homeProjectsCacheKey = null;
+export function useHomeProjects() {
+  const { country } = useCountry();
+  const key = country;
+  const cacheHit = _homeProjectsCacheKey === key;
+  const [projects, setProjects] = useState(cacheHit ? (_homeProjectsCache || []) : []);
+  const [loading, setLoading] = useState(!cacheHit);
+  useEffect(() => {
+    if (!isSupabaseReady()) { setLoading(false); return; }
+    let cancelled = false;
+    supabase.from("projects_live").select(_HOME_PROJECT_COLS).eq("country", country)
+      .order("available_units", { ascending: false })
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) { console.error("[useHomeProjects]", error); setLoading(false); return; }
+        const arr = data || [];
+        _homeProjectsCache = arr;
+        _homeProjectsCacheKey = key;
+        setProjects(arr);
+        setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [key]);
+  return { projects, loading };
+}
+
 /** Units (flats) for one project — gated by RLS on the flats table.
  *
  *  Auth-readiness gate: we wait for useAuth().loading to flip to false
