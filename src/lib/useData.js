@@ -361,6 +361,37 @@ export function useTotalsList(level, { country = null, filterCol = null, filterI
 // re-aggregates instead of always returning Slovakia.
 // =============================================================================
 const _marketTotalsByCountry = new Map();  // country code → mapped totals object
+
+// PERF Step 2: seed the hero/headline totals from the build-time snapshot
+// (window.__RESIDATA_SNAPSHOT__, injected into index.html before the app JS
+// runs). This makes the FIRST render of useMarketTotals show REAL numbers
+// immediately — no "Live — loading projects…" flash, no DB round-trip on the
+// critical path — while the live fetch in the hook still refreshes in the
+// background. No-op (graceful fallback to loading→fetch) if the snapshot is
+// absent or malformed; never throws.
+(function seedMarketTotalsFromSnapshot() {
+  try {
+    const s = (typeof window !== "undefined") ? window.__RESIDATA_SNAPSHOT__ : null;
+    if (!s || typeof s !== "object") return;
+    const n = (v) => (v != null && !Number.isNaN(Number(v)) ? Number(v) : null);
+    const cc = s.country || "SK";
+    _marketTotalsByCountry.set(cc, {
+      loading: false,
+      unitsTracked:    n(s.total_units),
+      unitsAvailable:  n(s.total_available),
+      unitsReserved:   n(s.total_reserved),
+      unitsSold:       n(s.total_sold),
+      soldLastMonth:   null,                       // not in snapshot — live fetch fills it
+      avgPriceM2:      n(s.avg_eur_m2),
+      projectsActive:  n(s.total_projects),
+      projectsTracked: n(s.total_projects_tracked) ?? n(s.total_projects),
+      developersActive:n(s.total_developers),
+      snapshotMonth:   s.snapshot_month || null,
+      _fromSnapshot:   true,
+    });
+  } catch (_e) { /* a seed must never break the app */ }
+})();
+
 export function useMarketTotals() {
   const { country } = useCountry();
   const [totals, setTotals] = useState(() => _marketTotalsByCountry.get(country) || {
