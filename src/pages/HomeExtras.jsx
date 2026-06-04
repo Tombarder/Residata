@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useMarketTotals, useProjects, useTotalsList } from "../lib/useData";
+import { useMarketTotals, useHomeProjects, useTotalsList } from "../lib/useData";
 import { useCountry, countryName } from "../lib/useCountry";
 // (imports already include useMarketTotals — we rely on its live view
 // instead of summing projects.total_units, which inflates the count for
@@ -537,7 +537,7 @@ export function PipelineFlow({ lang = "en" }) {
    1. MARKET PULSE — live hero-section stats + top projects
    ────────────────────────────────────────────────────────── */
 export function MarketPulse({ lang = "en", setCurrent }) {
-  const { projects } = useProjects();
+  const { projects } = useHomeProjects();  // PERF Step 6: narrow column read (homepage only)
   const totals = useMarketTotals();
 
   // Pull the hero numbers from the LIVE `market_totals` view — derived
