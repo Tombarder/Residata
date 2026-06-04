@@ -667,7 +667,9 @@ function ProjectReport({ project, flats, siblings, allFlats, lang }) {
   const { snapshots } = useProjectSnapshots();
   const summary = useMemo(() => project ? summariseProjects([project], flats) : null, [project, flats]);
   const districtSiblings = useMemo(
-    () => project ? siblings.filter(p => p.district === project.district && p.id !== project.id) : [],
+    // PA-11: same-district siblings must also be the same CITY (district names
+    // repeat across cities under unified SK). City-equal today for BA = no change.
+    () => project ? siblings.filter(p => p.district === project.district && (p.city || "") === (project.city || "") && p.id !== project.id) : [],
     [siblings, project]
   );
   // District sibling summary: filter flats to only this district's siblings
@@ -1831,12 +1833,17 @@ const selectStyle = {
    about). Until then it's a static positioning matrix, which is
    already a useful surface for spotting outliers. */
 function PricingTensionReport({ projects, lang, onOpenProject }) {
+  // PA-11: key districts by CITY+district — district names repeat across cities
+  // under unified SK, so a bare district key would merge e.g. two "Centrum"s.
+  // For BA today (unique district names) this is byte-identical.
+  const dkey = (p) => `${p.city || ""}␟${p.district}`;
   // District-level medians, used as the x-axis baseline.
   const districtMedians = useMemo(() => {
     const byDistrict = {};
     for (const p of projects) {
       if (!p.district || !p.avg_price_eur_m2) continue;
-      (byDistrict[p.district] = byDistrict[p.district] || []).push(p.avg_price_eur_m2);
+      const k = dkey(p);
+      (byDistrict[k] = byDistrict[k] || []).push(p.avg_price_eur_m2);
     }
     const out = {};
     for (const [d, vals] of Object.entries(byDistrict)) {
@@ -1853,7 +1860,7 @@ function PricingTensionReport({ projects, lang, onOpenProject }) {
     return projects
       .filter(p => p.avg_price_eur_m2 && p.available_units > 0)
       .map(p => {
-        const districtMedian = districtMedians[p.district];
+        const districtMedian = districtMedians[dkey(p)];
         const premiumPct = districtMedian
           ? ((p.avg_price_eur_m2 / districtMedian) - 1) * 100
           : 0;
@@ -2232,19 +2239,29 @@ function groupAggregates(projects, key, lang, allFlats) {
   // flats get all zeros + hasUnitData=false → renders as "—" in the
   // table (handled by AggregateTable) instead of misleading 0% cells.
   const haveFlats = Array.isArray(allFlats);
+  const unknown = (lang === "sk" ? "(neznáme)" : "(unknown)");
+  // PA-11: district names repeat across cities (a future SK city could also
+  // have "Staré Mesto"/"Centrum"). When grouping by district, bucket by
+  // CITY+district so they never merge under unified SK. Today every district is
+  // in Bratislava (unique names) so this is byte-identical for the current
+  // dataset — it only diverges once a 2nd SK city goes live. Display name stays
+  // the district; `city` is carried so downstream comparisons can qualify.
   const buckets = {};
   for (const p of projects) {
-    const k = p[key] || (lang === "sk" ? "(neznáme)" : "(unknown)");
-    (buckets[k] = buckets[k] || []).push(p);
+    const dname = p[key] || unknown;
+    const bkey = key === "district" ? `${p.city || ""}␟${dname}` : dname;
+    (buckets[bkey] = buckets[bkey] || []).push(p);
   }
   return Object.entries(buckets)
-    .map(([name, ps]) => {
+    .map(([bkey, ps]) => {
+      const name = key === "district" ? (ps[0][key] || unknown) : bkey;
+      const cityField = key === "district" ? { city: ps[0].city || null } : {};
       let bucketFlats;
       if (haveFlats) {
         const ids = new Set(ps.map(p => p.id));
         bucketFlats = allFlats.filter(f => ids.has(f.project_id));
       }
-      return { name, ...summariseProjects(ps, bucketFlats) };
+      return { name, ...cityField, ...summariseProjects(ps, bucketFlats) };
     })
     // Rank by REAL tracked units (bucketFlats.length) descending. If
     // all buckets have no flats at all (caller didn't pass allFlats),
