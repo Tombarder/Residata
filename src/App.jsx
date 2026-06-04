@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import Ticker from "./components/Ticker";
 import LoginModal from "./components/LoginModal";
 import CompleteProfile from "./components/CompleteProfile";
@@ -12,7 +12,9 @@ import CountrySwitcher from "./components/CountrySwitcher";
 // HowItWorksFlow z HomeExtras bol odstránený — PipelineFlow ho plne
 // pokrýva a robí to na živých číslach z useMarketTotals.
 import { MarketPulse, DistrictPulse, PipelineFlow } from "./pages/HomeExtras";
-import HeroLabPage from "./pages/HeroVariants";
+// PERF Step 5: code-split — HeroLab is a hidden experimental route, never part
+// of the marketing first paint, so load its chunk on demand.
+const HeroLabPage = lazy(() => import("./pages/HeroVariants"));
 // Legal pages + cookie banner (F-051 — Boss-mandated 2026-05-31 night).
 import { PrivacyPage, ImprintPage } from "./pages/LegalPages";
 import CookieBanner from "./components/CookieBanner";
@@ -22,7 +24,11 @@ import { useMarketTotals } from "./lib/useData";
 import { pushRoute, pathToPage, isAppPage } from "./lib/routing";
 import { applySeo } from "./lib/seo";
 import { startPageEngagement, stopPageEngagement } from "./lib/engagement";
-import PlatformShell from "./pages/Platform";
+// PERF Step 5: code-split — the platform shell pulls in the heaviest modules
+// (Reports, PivotV2, UnitTracker, admin) which a marketing/first-time visitor
+// never needs. Lazy-load it so it's a separate chunk, off the homepage's
+// critical bundle. Rendered inside a <Suspense> below.
+const PlatformShell = lazy(() => import("./pages/Platform"));
 import { track } from "./lib/track";
 
 const pagesEN = ["Home", "Live", "What we deliver", "Use Cases", "Pricing", "Contact"];
@@ -1942,15 +1948,17 @@ export default function App() {
           <AuthLoadingSpinner />
         </div>
       ) : isAppPage(current) ? (
-        <PlatformShell
-          page={current}
-          projectId={typeof current === "string" && current.startsWith("App:ProjectDetail:")
-            ? current.slice("App:ProjectDetail:".length) : null}
-          lang={lang}
-          setLang={setLang}
-          setCurrent={handleNav}
-          openLogin={() => setLoginOpen(true)}
-        />
+        <Suspense fallback={<AuthLoadingSpinner />}>
+          <PlatformShell
+            page={current}
+            projectId={typeof current === "string" && current.startsWith("App:ProjectDetail:")
+              ? current.slice("App:ProjectDetail:".length) : null}
+            lang={lang}
+            setLang={setLang}
+            setCurrent={handleNav}
+            openLogin={() => setLoginOpen(true)}
+          />
+        </Suspense>
       ) : (
         <div key={current} className="page-transition">
           <>
@@ -1971,7 +1979,11 @@ export default function App() {
             {current === "Privacy" && <PrivacyPage lang={lang} />}
             {current === "Imprint" && <ImprintPage lang={lang} />}
             {/* Hidden hero-variant preview page — not in Nav, only reachable via /hero-lab URL */}
-            {current === "HeroLab" && <HeroLabPage setCurrent={handleNav} lang={lang} />}
+            {current === "HeroLab" && (
+              <Suspense fallback={<AuthLoadingSpinner />}>
+                <HeroLabPage setCurrent={handleNav} lang={lang} />
+              </Suspense>
+            )}
 
             {/* /admin and /analytics are handled by the PlatformShell branch above.
                 pathToPage() maps those legacy URLs to App:Admin / App:Analytics
