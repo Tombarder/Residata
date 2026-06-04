@@ -265,9 +265,17 @@ const buildData = {
   total_projects_tracked: market?.total_projects_tracked ?? market?.total_projects_active,
   total_developers: market?.total_developers_active,
   total_available: market?.total_available,
+  // PERF Step 2: reserved + sold included so the build-time snapshot is a
+  // complete seed for the hero/headline (useMarketTotals) — see vite.config.js
+  // __BUILD_SNAPSHOT_JSON__ and src/lib/useData.js seedMarketTotalsFromSnapshot.
+  total_reserved: market?.total_reserved,
+  total_sold: market?.total_sold,
   avg_eur_m2: market?.avg_eur_m2,
   snapshot_month: market?.snapshot_month,
   month_label: monthLabel,
+  // The build-time snapshot is the SK market (the generator queries market_totals
+  // which is country-agnostic but our default/primary market is SK).
+  country: 'SK',
   build_date: today,
 };
 fs.writeFileSync(path.resolve('scripts/.build-data.json'), JSON.stringify(buildData, null, 2));

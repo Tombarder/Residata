@@ -40,6 +40,13 @@ function residataIndexHtmlContent() {
         __SCHEMA_TOTAL_PROJECTS__:         data.total_projects         != null ? Number(data.total_projects).toLocaleString('en-US')         : '60+',
         __SCHEMA_TOTAL_PROJECTS_TRACKED__: data.total_projects_tracked != null ? Number(data.total_projects_tracked).toLocaleString('en-US') : (data.total_projects != null ? Number(data.total_projects).toLocaleString('en-US') : '60+'),
         __SCHEMA_MONTH_LABEL__:            data.month_label            || 'the latest snapshot',
+        // PERF Step 2: the FULL build-time snapshot, injected as JSON into an
+        // inline <script> so window.__RESIDATA_SNAPSHOT__ exists before any app
+        // JS runs. src/lib/useData.js seeds useMarketTotals from it → the hero
+        // headline paints real numbers on first render (no "loading…" flash, no
+        // DB round-trip on the critical path). 'null' when build data absent
+        // (graceful fallback → current live-fetch behaviour). Must be valid JS.
+        __BUILD_SNAPSHOT_JSON__:           (data && Object.keys(data).length) ? JSON.stringify(data) : 'null',
       };
       let out = html;
       for (const [k, v] of Object.entries(tokens)) {

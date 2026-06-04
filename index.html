@@ -8,6 +8,15 @@
     <meta name="theme-color" content="#0a0a0b" />
     <meta name="color-scheme" content="dark" />
 
+    <!-- PERF Step 2: build-time market snapshot, injected so the hero/headline
+         can paint REAL numbers on first render without waiting for the DB.
+         __BUILD_SNAPSHOT_JSON__ is replaced at build by vite.config.js with the
+         latest market_totals snapshot (or `null` if build data is absent →
+         graceful fallback to the live fetch). Classic inline script: runs during
+         HTML parse, before the deferred module bundle, so window.__RESIDATA_SNAPSHOT__
+         is already set when src/lib/useData.js seeds useMarketTotals. -->
+    <script>window.__RESIDATA_SNAPSHOT__ = __BUILD_SNAPSHOT_JSON__;</script>
+
     <!-- Primary meta (overridden per-route at runtime via useSeoMeta) -->
     <title>Residata — New-Build Market Intelligence for Bratislava</title>
     <meta name="description" content="Automated market intelligence on every new residential development in Bratislava. Pricing, availability, absorption rate, and trends — structured and refreshed monthly. Built for developers, banks, valuers, and investors." />
