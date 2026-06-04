@@ -7,7 +7,15 @@ import { TrialBanner, TrialPopup } from "./components/TrialBanner";
 import PendingGate from "./components/PendingGate";
 import Feature from "./components/Feature";
 import UpgradePrompt from "./components/UpgradePrompt";
-import { LiveDashboard, LiveProjectDetail, LiveAnalytics, LiveAdmin, EarlyAccessBadge } from "./pages/LivePages";
+// PERF Step 5 (LivePages split): the /live dashboard + project detail are the
+// last big modules (~254 KB) that were eager on the landing. Lazy-load them so
+// LivePages becomes an on-demand chunk. (LiveAnalytics/LiveAdmin were imported
+// here but only used inside the already-lazy PlatformShell — dropped as dead.)
+// EarlyAccessBadge was the one tiny thing keeping LivePages eager on the
+// landing; it now lives in its own zero-LivePages-dep component.
+const LiveDashboard = lazy(() => import("./pages/LivePages").then(m => ({ default: m.LiveDashboard })));
+const LiveProjectDetail = lazy(() => import("./pages/LivePages").then(m => ({ default: m.LiveProjectDetail })));
+import EarlyAccessBadge from "./components/EarlyAccessBadge";
 import CountrySwitcher from "./components/CountrySwitcher";
 // HowItWorksFlow z HomeExtras bol odstránený — PipelineFlow ho plne
 // pokrýva a robí to na živých číslach z useMarketTotals.
@@ -1966,9 +1974,11 @@ export default function App() {
 
             {/* Live dashboard — pending gets stopped, ostatní vidia (verejnú alebo plnú verziu podľa tier-u) */}
             {current === "Live" && (
-              caps.tier === "pending"
-                ? <PendingGate setCurrent={handleNav} lang={lang} />
-                : <LiveDashboard setCurrent={handleNav} openLogin={() => setLoginOpen(true)} lang={lang} />
+              <Suspense fallback={<AuthLoadingSpinner />}>
+                {caps.tier === "pending"
+                  ? <PendingGate setCurrent={handleNav} lang={lang} />
+                  : <LiveDashboard setCurrent={handleNav} openLogin={() => setLoginOpen(true)} lang={lang} />}
+              </Suspense>
             )}
 
             {current === "Use Cases" && <UseCasesPage setCurrent={handleNav} l={l} lang={lang} />}
@@ -1992,9 +2002,11 @@ export default function App() {
 
             {/* Project detail */}
             {typeof current === "string" && current.startsWith("Project:") && (
-              caps.tier === "pending"
-                ? <PendingGate setCurrent={handleNav} lang={lang} />
-                : <LiveProjectDetail projectId={current.slice(8)} setCurrent={handleNav} openLogin={() => setLoginOpen(true)} lang={lang} />
+              <Suspense fallback={<AuthLoadingSpinner />}>
+                {caps.tier === "pending"
+                  ? <PendingGate setCurrent={handleNav} lang={lang} />
+                  : <LiveProjectDetail projectId={current.slice(8)} setCurrent={handleNav} openLogin={() => setLoginOpen(true)} lang={lang} />}
+              </Suspense>
             )}
           </>
         </div>
