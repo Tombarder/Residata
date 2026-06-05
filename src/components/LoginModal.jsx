@@ -10,7 +10,16 @@ export default function LoginModal({ open, onClose, lang = "en" }) {
   const [sent, setSent] = useState(false);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
-  const { signIn } = useAuth();
+  // Code-entry (prefetch-proof login): the email contains a one-time CODE, not
+  // a clickable link. A magic link is a single-use token consumed by the first
+  // GET, so email scanners / antivirus / browser prefetch burn it before the
+  // user clicks (proven 2026-06-04). A typed code has no URL to prefetch.
+  const [code, setCode] = useState("");
+  const [busyVerify, setBusyVerify] = useState(false);
+  const [verifyError, setVerifyError] = useState(null);
+  const [busyResend, setBusyResend] = useState(false);
+  const [resent, setResent] = useState(false);
+  const { signIn, verifyCode } = useAuth();
 
   if (!open) return null;
 
@@ -25,15 +34,42 @@ export default function LoginModal({ open, onClose, lang = "en" }) {
       return;
     }
     setError(null); setBusy(true);
-    track("login_magic_link_requested", { domain: email.split("@")[1] });
+    track("login_code_requested", { domain: email.split("@")[1] });
     const { error } = await signIn(email);
     setBusy(false);
     if (error) {
       setError(error.message || String(error));
-      track("login_magic_link_error", { message: String(error.message || error).slice(0, 200) });
+      track("login_code_request_error", { message: String(error.message || error).slice(0, 200) });
     } else {
       setSent(true);
     }
+  };
+
+  const verifySubmit = async (e) => {
+    e.preventDefault();
+    const clean = code.replace(/\D/g, "");
+    if (!clean) return;
+    setVerifyError(null); setBusyVerify(true);
+    track("login_code_submitted", {});
+    const { error } = await verifyCode(email, clean);
+    setBusyVerify(false);
+    if (error) {
+      setVerifyError(t.login_code_invalid);
+      track("login_code_error", { message: String(error.message || error).slice(0, 120) });
+    } else {
+      track("login_code_success", {});
+      // Auth context picks up SIGNED_IN and re-renders the app logged-in;
+      // closing the modal hands off to the app's tier/profile gating.
+      onClose();
+    }
+  };
+
+  const resend = async () => {
+    setVerifyError(null); setResent(false); setBusyResend(true);
+    setCode("");
+    await signIn(email);
+    setBusyResend(false);
+    setResent(true);
   };
 
   return (
@@ -86,16 +122,46 @@ export default function LoginModal({ open, onClose, lang = "en" }) {
           </>
         ) : (
           <>
-            <div style={{ fontSize: "2rem", textAlign: "center", marginBottom: "0.5rem" }}>✉️</div>
-            <h2 style={{ fontSize: "1.3rem", fontWeight: 700, textAlign: "center", marginBottom: "0.75rem" }}>{t.login_check_title}</h2>
-            <p style={{ fontSize: "0.85rem", color: "#8a8a96", textAlign: "center", lineHeight: 1.6 }}>
+            <div style={{ fontSize: "2rem", textAlign: "center", marginBottom: "0.5rem" }}>🔑</div>
+            <h2 style={{ fontSize: "1.3rem", fontWeight: 700, textAlign: "center", marginBottom: "0.5rem" }}>{t.login_check_title}</h2>
+            <p style={{ fontSize: "0.85rem", color: "#8a8a96", textAlign: "center", lineHeight: 1.6, marginBottom: "0.25rem" }}>
               {t.login_check_body_prefix} <strong style={{ color: "#e8e8ed" }}>{email}</strong>{t.login_check_body_suffix}
             </p>
-            <button onClick={onClose} style={{
-              width: "100%", padding: "0.75rem", background: "transparent", color: "#e8e8ed",
-              fontWeight: 500, borderRadius: 8, border: "1px solid #222228", cursor: "pointer",
-              fontSize: "0.9rem", marginTop: "1.25rem",
-            }}>{t.login_close}</button>
+            <p style={{ fontSize: "0.7rem", color: "#55555f", textAlign: "center", marginBottom: "1rem" }}>
+              {t.login_code_hint}
+            </p>
+            <form onSubmit={verifySubmit}>
+              <input
+                type="text" inputMode="numeric" autoComplete="one-time-code" autoFocus
+                value={code}
+                onChange={e => { setCode(e.target.value.replace(/[^0-9]/g, "").slice(0, 10)); setVerifyError(null); }}
+                placeholder={t.login_code_placeholder}
+                style={{
+                  width: "100%", padding: "0.85rem 1rem", background: "#0e0e10",
+                  border: `1px solid ${verifyError ? "#ff6b6b" : "#222228"}`, borderRadius: 8, color: "#e8e8ed",
+                  fontSize: "1.5rem", fontFamily: "'JetBrains Mono', monospace", textAlign: "center",
+                  letterSpacing: "0.4em", marginBottom: "0.5rem", boxSizing: "border-box", outline: "none",
+                }}
+              />
+              {verifyError && <div style={{ color: "#ff6b6b", fontSize: "0.8rem", marginBottom: "0.6rem", textAlign: "center" }}>{verifyError}</div>}
+              <button type="submit" disabled={busyVerify || !code} style={{
+                width: "100%", padding: "0.75rem", background: "#00e5a0", color: "#0a0a0b",
+                fontWeight: 600, borderRadius: 8, border: "none",
+                cursor: (busyVerify || !code) ? "not-allowed" : "pointer",
+                fontSize: "0.9rem", opacity: (busyVerify || !code) ? 0.4 : 1,
+              }}>{busyVerify ? t.login_verifying : t.login_verify}</button>
+            </form>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "1rem" }}>
+              <button onClick={resend} disabled={busyResend} style={{
+                background: "none", border: "none", color: resent ? "#00e5a0" : "#8a8a96",
+                fontSize: "0.78rem", cursor: busyResend ? "default" : "pointer", padding: 0,
+                fontFamily: "inherit",
+              }}>{resent ? t.login_resent : t.login_resend}</button>
+              <button onClick={onClose} style={{
+                background: "none", border: "none", color: "#55555f",
+                fontSize: "0.78rem", cursor: "pointer", padding: 0, fontFamily: "inherit",
+              }}>{t.login_close}</button>
+            </div>
           </>
         )}
       </div>

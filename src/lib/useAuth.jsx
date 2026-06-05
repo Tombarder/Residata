@@ -99,6 +99,26 @@ function useAuthInternal() {
     });
   };
 
+  // Verify the one-time CODE the user typed (prefetch-proof login path).
+  //
+  // WHY a typed code instead of clicking the email link: the magic link is a
+  // one-time token consumed by the FIRST GET. Email link-scanners / antivirus /
+  // browser prefetch open the link before the user does, burning the token, so
+  // the real click lands on "Email link is invalid or has expired" and the user
+  // stays logged out (proven root cause, 2026-06-04). Critically, the link and
+  // the 6–8 digit code share the SAME token — so a fallback code in the same
+  // email would die with the link too. The email is therefore CODE-ONLY (no
+  // link to prefetch); a typed code has no URL to consume, so it survives.
+  //
+  // type:'email' is the verifyOtp type for signInWithOtp-issued OTP tokens
+  // (verified against the live API: works pre-consumption, fails once the
+  // shared token is burned — exactly the behaviour we want).
+  const verifyCode = async (email, code) => {
+    if (!isSupabaseReady()) return { error: { message: "Supabase offline" } };
+    const token = (code || "").replace(/\D/g, "");
+    return supabase.auth.verifyOtp({ email, token, type: "email" });
+  };
+
   const signOut = async () => {
     if (!isSupabaseReady()) {
       // Even without Supabase reachable, clear the UI
@@ -128,7 +148,7 @@ function useAuthInternal() {
 
   return {
     user, profile, tier, loading, profileError,
-    signIn, signOut,
+    signIn, verifyCode, signOut,
     reloadProfile: () => user && loadProfile(user.id),
     // Lets callers push a locally-updated profile straight into context
     // without a DB round-trip. Useful right after an UPDATE that already
