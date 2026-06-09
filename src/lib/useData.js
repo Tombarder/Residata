@@ -87,16 +87,24 @@ function _toEurDisplay(rows) {
  * doesn't affect the result.
  */
 let _projectsCache = null;
-let _metricsCache = null;
+const _metricsCacheByCountry = new Map();  // country code -> metrics array
 
-/** Live metrics for the ticker (KPI strip). Public table — no auth gate. */
+/** Live metrics for the ticker (KPI strip). Public view — no auth gate.
+ *  Country-scoped: public.metrics now emits each metric per active country
+ *  (LATERAL over countries, EUR-converted), so the ticker shows the SELECTED
+ *  country's numbers. Was hardcoded SK — a CZ visitor saw Slovak figures
+ *  (19 261 bytov / Petržalka / "naprieč BA"). Keyed by country so flipping
+ *  SK<->CZ doesn't re-flash the strip. */
 export function useMetrics() {
-  const [metrics, setMetrics] = useState(_metricsCache || []);
-  const [loading, setLoading] = useState(_metricsCache === null);
+  const { country } = useCountry();
+  const [metrics, setMetrics] = useState(_metricsCacheByCountry.get(country) || []);
+  const [loading, setLoading] = useState(!_metricsCacheByCountry.has(country));
   useEffect(() => {
     if (!isSupabaseReady()) { setLoading(false); return; }
+    const cached = _metricsCacheByCountry.get(country);
+    if (cached) { setMetrics(cached); setLoading(false); }
     let cancelled = false;
-    supabasePublic.from("metrics").select("*").order("display_order", { ascending: true })
+    supabasePublic.from("metrics").select("*").eq("country_code", country).order("display_order", { ascending: true })
       .then(({ data, error }) => {
         if (cancelled) return;
         // F-313 (DP-096): don't poison the module cache with [] on transient
@@ -108,12 +116,12 @@ export function useMetrics() {
           return;
         }
         const arr = data || [];
-        _metricsCache = arr;
+        _metricsCacheByCountry.set(country, arr);
         setMetrics(arr);
         setLoading(false);
       });
     return () => { cancelled = true; };
-  }, []);
+  }, [country]);
   return { metrics, loading };
 }
 
