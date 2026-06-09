@@ -2,6 +2,8 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useProjects, useFlatsArchive, useArchiveMonths } from "../lib/useData";
 import { useCapabilities } from "../lib/useCapabilities";
+import { moneyFromEur, moneySymbol } from "../lib/money";
+import { useCurrency } from "../lib/useCurrency";
 
 /* ═══════════════════════════════════════════════════════════════════
    Pivot v2 — Excel-style drag-and-drop pivot
@@ -576,10 +578,17 @@ function flattenTree(nodes, collapsed) {
 
 /* Format a value for display based on the field's unit + aggregation.
    Numbers get locale spacing, integers where appropriate, unit suffix. */
+/** True for the two money units in the FIELDS registry ("€", "€/m²"). */
+function isMoneyUnit(u) { return u === "€" || u === "€/m²"; }
+/** Map a stored (EUR) money unit to the current display-currency unit. */
+function displayMoneyUnit(u) { return u === "€" ? moneySymbol() : u === "€/m²" ? `${moneySymbol()}/m²` : u; }
+
 function formatValue(value, fieldKey, agg) {
   if (value == null || !Number.isFinite(value)) return "—";
   const f = FIELDS[fieldKey];
-  const unit = f?.unit ? ` ${f.unit}` : "";
+  // Money fields store EUR — convert to the display currency + swap the unit.
+  if (isMoneyUnit(f?.unit)) value = moneyFromEur(value);
+  const unit = f?.unit ? ` ${isMoneyUnit(f.unit) ? displayMoneyUnit(f.unit) : f.unit}` : "";
 
   // Counts — always integer, no unit (unless the measure defines one,
   // e.g. sold_count has unit="")
@@ -624,6 +633,7 @@ function defaultAggFor(field) {
 
 /* ══════════════════════════ Main component ════════════════════════ */
 export default function PivotV2({ lang = "sk", setCurrent }) {
+  useCurrency(); // subscribe: re-render pivot tables/charts/drill-down on currency toggle
   const { projects, loading: loadingProjects } = useProjects();
   const { can } = useCapabilities();
   const canViewAnalytics = can("view_analytics");
@@ -2689,7 +2699,17 @@ function fieldUnit(fieldKey, agg) {
     return agg === "count" || agg === "count_distinct" ? "" : "";
   }
   const f = FIELDS[fieldKey];
-  return f?.unit || "";
+  const u = f?.unit || "";
+  // Money axis titles follow the display currency ("€" → "Kč", "€/m²" → "Kč/m²").
+  return isMoneyUnit(u) ? displayMoneyUnit(u) : u;
+}
+
+/** Axis/heatmap tick formatter: convert EUR→display currency for money
+ *  measures before compacting, so labels match the (converted) axis title.
+ *  Non-money measures (counts, m², %) pass through unchanged. */
+function axisTick(value, measureField) {
+  const f = measureField ? FIELDS[measureField] : null;
+  return shortNum(isMoneyUnit(f?.unit) ? moneyFromEur(value) : value);
 }
 
 /* formatValueWhole — tooltip-grade formatter that rounds to WHOLE
@@ -2704,7 +2724,9 @@ function fieldUnit(fieldKey, agg) {
 function formatValueWhole(value, fieldKey, _agg) {
   if (value == null || !Number.isFinite(value)) return "—";
   const f = FIELDS[fieldKey];
-  const unit = f?.unit ? ` ${f.unit}` : "";
+  // Money fields store EUR — convert to the display currency + swap the unit.
+  if (isMoneyUnit(f?.unit)) value = moneyFromEur(value);
+  const unit = f?.unit ? ` ${isMoneyUnit(f.unit) ? displayMoneyUnit(f.unit) : f.unit}` : "";
   if (f?.unit === "%") {
     return `${(Math.round(value * 10) / 10).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).replace(/,/g, " ")}${unit}`;
   }
@@ -2813,7 +2835,7 @@ function BarChartSVG({ data, measureField, measureAgg, onSelect }) {
           <g key={i}>
             <line x1={padL} x2={W - padR} y1={yScale(t)} y2={yScale(t)} stroke={border} strokeDasharray="2,3"/>
             <text x={padL - 6} y={yScale(t)} fill={text} fontSize="10" textAnchor="end" dominantBaseline="middle" fontFamily={mono}>
-              {shortNum(t)}
+              {axisTick(t, measureField)}
             </text>
           </g>
         ))}
@@ -2929,7 +2951,7 @@ function StackedBarSVG({ data, colKeys, valueIdx, measureField, measureAgg, onSe
           <g key={i}>
             <line x1={padL} x2={W - padR} y1={yScale(t)} y2={yScale(t)} stroke={border} strokeDasharray="2,3"/>
             <text x={padL - 6} y={yScale(t)} fill={text} fontSize="10" textAnchor="end" dominantBaseline="middle" fontFamily={mono}>
-              {shortNum(t)}
+              {axisTick(t, measureField)}
             </text>
           </g>
         ))}
@@ -3055,7 +3077,7 @@ function LineChartSVG({ data, measureField, measureAgg, onSelect }) {
           <g key={i}>
             <line x1={padL} x2={W - padR} y1={yScale(t)} y2={yScale(t)} stroke={border} strokeDasharray="2,3"/>
             <text x={padL - 6} y={yScale(t)} fill={text} fontSize="10" textAnchor="end" dominantBaseline="middle" fontFamily={mono}>
-              {shortNum(t)}
+              {axisTick(t, measureField)}
             </text>
           </g>
         ))}
@@ -3319,7 +3341,7 @@ function HeatmapSVG({ topRows, colKeys, valueIdx, measureField, measureAgg, onSe
                     />
                     {Number.isFinite(v) && cellW > 42 && (
                       <text x={x + cellW / 2} y={y + cellH / 2} fill={textColorFor(v)} fontSize="10" fontWeight="600" textAnchor="middle" dominantBaseline="middle" fontFamily={mono} pointerEvents="none">
-                        {shortNum(v)}
+                        {axisTick(v, measureField)}
                       </text>
                     )}
                   </g>
@@ -3823,20 +3845,29 @@ function DrillDownModal({ title, records, onClose, lang }) {
                 {DRILL_COLS.map(c => (
                   <th key={c.key} style={{ padding: "0.55rem 0.7rem", fontWeight: 700, borderBottom: `1px solid ${border}`, whiteSpace: "nowrap" }}>{c.label}</th>
                 ))}
-                <th style={{ padding: "0.55rem 0.7rem", fontWeight: 700, borderBottom: `1px solid ${border}`, color: green, textAlign: "right" }}>€/m²</th>
+                <th style={{ padding: "0.55rem 0.7rem", fontWeight: 700, borderBottom: `1px solid ${border}`, color: green, textAlign: "right" }}>{moneySymbol()}/m²</th>
               </tr>
             </thead>
             <tbody>
               {records.slice(0, 1000).map((r, i) => (
                 <tr key={(r.id ?? i) + "|" + i} style={{ background: i % 2 ? "transparent" : "rgba(255,255,255,0.015)" }}>
-                  {DRILL_COLS.map(c => (
-                    <td key={c.key} style={{ padding: "0.35rem 0.7rem", color: "#c4c4cc", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 180 }}
-                        title={r[c.key] == null ? "" : String(r[c.key])}>
-                      {r[c.key] == null || r[c.key] === "" ? <span style={{ color: dim, opacity: 0.6 }}>—</span> : String(r[c.key])}
-                    </td>
-                  ))}
+                  {DRILL_COLS.map(c => {
+                    // cena_s_dph is EUR-denominated money — convert to display
+                    // currency. Other columns (text / counts / areas) pass through.
+                    const raw = r[c.key];
+                    const isEmpty = raw == null || raw === "";
+                    const cellText = c.key === "cena_s_dph" && !isEmpty && Number.isFinite(Number(raw))
+                      ? `${Math.round(moneyFromEur(Number(raw))).toLocaleString("en-US").replace(/,/g, " ")} ${moneySymbol()}`
+                      : (isEmpty ? null : String(raw));
+                    return (
+                      <td key={c.key} style={{ padding: "0.35rem 0.7rem", color: "#c4c4cc", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 180 }}
+                          title={cellText == null ? "" : cellText}>
+                        {cellText == null ? <span style={{ color: dim, opacity: 0.6 }}>—</span> : cellText}
+                      </td>
+                    );
+                  })}
                   <td style={{ padding: "0.35rem 0.7rem", textAlign: "right", fontFamily: mono, color: green }}>
-                    {cena_m2(r) != null ? cena_m2(r).toLocaleString("en-US").replace(/,/g, " ") : "—"}
+                    {cena_m2(r) != null ? Math.round(moneyFromEur(cena_m2(r))).toLocaleString("en-US").replace(/,/g, " ") : "—"}
                   </td>
                 </tr>
               ))}

@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
 import { useProjects, useProjectFlats, useProjectSnapshots, useMarketTotals, useTotalsList } from "../lib/useData";
+import { moneyFromEur, moneySymbol } from "../lib/money";
+import { useCurrency } from "../lib/useCurrency";
 import { useCountry } from "../lib/useCountry";
 import { supabase } from "../lib/supabase";
 import { liveT, ll } from "../lib/liveLang";
@@ -88,6 +90,7 @@ const ANON_TEASER = 8;  // navyše zobrazíme blurred — dokopy 20 riadkov s bl
 
 export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
   const t = liveT[lang] || liveT.en;
+  useCurrency(); // subscribe: re-render €/m² columns on currency toggle
   const { can } = useCapabilities();
   const { projects: allProjects, loading } = useProjects();
   // Partition projects by status — active goes in the main table, the rest
@@ -200,7 +203,7 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
                     <SortableTh sortKey="available_units"  align="right" current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t.tbl_available}</SortableTh>
                     <SortableTh sortKey="sold_units"       align="right" current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t.tbl_sold}</SortableTh>
                     <SortableTh sortKey="sold_percentage"  align="right" current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t.tbl_sold_pct}</SortableTh>
-                    <SortableTh sortKey="avg_price_eur_m2" align="right" current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t.tbl_eur_m2}</SortableTh>
+                    <SortableTh sortKey="avg_price_eur_m2" align="right" current={sort} onClick={onHeaderClick} arrow={sortArrow}>{moneySymbol() + "/m²"}</SortableTh>
                     {/* Sold velocity — header viditeľný vždy, obsah blurred pre non-paid */}
                     <SortableTh sortKey="sold_last_month"  align="right" current={sort} onClick={onHeaderClick} arrow={sortArrow} title={can("view_sold_velocity") ? t.tbl_sold_30d_tooltip_paid : t.tbl_sold_30d_tooltip_locked}>
                       {t.tbl_sold_30d}
@@ -230,7 +233,7 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
                       <td style={{ ...td, textAlign: "right", fontFamily: mono, color: "#f5a623" }}>{p.sold_units}</td>
                       <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{p.sold_percentage != null ? `${p.sold_percentage}%` : "—"}</td>
                       <td style={{ ...td, textAlign: "right", fontFamily: mono }}>
-                        {p.avg_price_eur_m2 ? Math.round(p.avg_price_eur_m2).toLocaleString("en-US") : "—"}
+                        {p.avg_price_eur_m2 ? Math.round(moneyFromEur(p.avg_price_eur_m2)).toLocaleString("en-US") : "—"}
                       </td>
                       <td style={{ ...td, textAlign: "right", fontFamily: mono, color: green }}>+{Math.max(1, Math.min(18, Math.round((p.sold_units || 0) * 0.08) || 5))}</td>
                       <td style={{ ...td, textAlign: "right" }}>—</td>
@@ -324,7 +327,7 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
                         <th style={th}>Status</th>
                         <th style={{ ...th, textAlign: "right" }}>{t.tbl_units}</th>
                         <th style={{ ...th, textAlign: "right" }}>{t.tbl_sold_pct}</th>
-                        <th style={{ ...th, textAlign: "right" }}>{t.tbl_eur_m2}</th>
+                        <th style={{ ...th, textAlign: "right" }}>{moneySymbol() + "/m²"}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -344,7 +347,7 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
                           </td>
                           <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{p.total_units || "—"}</td>
                           <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{p.sold_percentage != null ? `${p.sold_percentage}%` : "—"}</td>
-                          <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{p.avg_price_eur_m2 ? Math.round(p.avg_price_eur_m2).toLocaleString("en-US") : "—"}</td>
+                          <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{p.avg_price_eur_m2 ? Math.round(moneyFromEur(p.avg_price_eur_m2)).toLocaleString("en-US") : "—"}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -475,7 +478,7 @@ function ProjectRow({ p, t, lang, setCurrent, canVelocity }) {
       </td>
       <td style={{ ...td, textAlign: "right", fontFamily: mono }}>
         {p.avg_price_eur_m2
-          ? Math.round(p.avg_price_eur_m2).toLocaleString(lang === "sk" ? "sk-SK" : "en-US")
+          ? Math.round(moneyFromEur(p.avg_price_eur_m2)).toLocaleString(lang === "sk" ? "sk-SK" : "en-US")
           : (() => {
               // Three reasons why €/m² could be null in projects_live:
               //   a) developer doesn't publish prices at all → min/max also null
@@ -529,6 +532,7 @@ function ProjectRow({ p, t, lang, setCurrent, canVelocity }) {
 /* ───────────────────── PROJECT DETAIL (gated) ───────────────────── */
 export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en" }) {
   const t = liveT[lang] || liveT.en;
+  useCurrency(); // subscribe: re-render prices/€/m² across insights + flats table
   const { user, profile, loading: authLoading, reloadProfile } = useAuth();
   const { can } = useCapabilities();
   const { flats, loading, error } = useProjectFlats(projectId);
@@ -690,7 +694,7 @@ export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en
 function ProjectAggregateOnly({ project, lang, t, canVelocity }) {
   const locale = lang === "sk" ? "sk-SK" : "en-US";
   const fmt = (n) => n == null ? "—" : Number(n).toLocaleString(locale);
-  const eurM2 = project.avg_price_eur_m2 ? Math.round(project.avg_price_eur_m2) : null;
+  const eurM2 = project.avg_price_eur_m2 ? Math.round(moneyFromEur(project.avg_price_eur_m2)) : null;
   const soldPct = project.sold_percentage != null ? `${project.sold_percentage}%` : null;
   const soldDataMissing = (project.sold_units || 0) === 0 && (project.reserved_units || 0) === 0;
 
@@ -699,7 +703,7 @@ function ProjectAggregateOnly({ project, lang, t, canVelocity }) {
     { label: lang === "sk" ? "Voľné" : "Available",          value: fmt(project.available_units), accent: green },
     { label: lang === "sk" ? "Predané" : "Sold",             value: soldDataMissing ? "—" : fmt(project.sold_units), accent: "#f5a623", sub: soldDataMissing ? (lang === "sk" ? "developer nezverejňuje" : "developer doesn't publish") : null },
     { label: lang === "sk" ? "Predaných %" : "Sold %",       value: soldPct || "—", accent: "#f5a623" },
-    { label: "€/m²",                                         value: eurM2 ? fmt(eurM2) : (lang === "sk" ? "nezverejnené" : "not published"), accent: eurM2 ? "#e8e8ed" : dim },
+    { label: `${moneySymbol()}/m²`,                          value: eurM2 ? fmt(eurM2) : (lang === "sk" ? "nezverejnené" : "not published"), accent: eurM2 ? "#e8e8ed" : dim },
     ...(canVelocity && project.sold_last_month != null ? [{
       label: lang === "sk" ? "Predané (30d)" : "Sold (30d)",
       value: project.sold_last_month > 0 ? `+${project.sold_last_month}` : "0",
@@ -753,7 +757,7 @@ function ProjectAggregateOnly({ project, lang, t, canVelocity }) {
    React + SVG) so bundle stays small. */
 function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
   const locale = lang === "sk" ? "sk-SK" : "en-US";
-  const fmtEur = (v) => v == null || !Number.isFinite(v) ? "—" : `${Math.round(v).toLocaleString("en-US").replace(/,/g, " ")} €`;
+  const fmtEur = (v) => v == null || !Number.isFinite(v) ? "—" : `${Math.round(moneyFromEur(v)).toLocaleString("en-US").replace(/,/g, " ")} ${moneySymbol()}`;
   const fmtPct = (v) => v == null || !Number.isFinite(v) ? "—" : `${(Math.round(v * 10) / 10).toFixed(1)}%`;
   const L = (sk, en) => lang === "sk" ? sk : en;
 
@@ -837,13 +841,13 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
     },
     // PRICE KPI (filtered out when noPrices)
     {
-      label: L("Priem. €/m²", "Avg €/m²"),
-      value: project.avg_price_eur_m2 ? Math.round(project.avg_price_eur_m2).toLocaleString("en-US").replace(/,/g, " ") : "—",
+      label: L(`Priem. ${moneySymbol()}/m²`, `Avg ${moneySymbol()}/m²`),
+      value: project.avg_price_eur_m2 ? Math.round(moneyFromEur(project.avg_price_eur_m2)).toLocaleString("en-US").replace(/,/g, " ") : "—",
       sub: pricemomDelta != null
         ? (pricemomDelta > 0
-            ? <span style={{ color: "#f5a623" }}>+{Math.round(pricemomDelta)} €/m² {L("MoM", "MoM")}</span>
+            ? <span style={{ color: "#f5a623" }}>+{Math.round(moneyFromEur(pricemomDelta))} {moneySymbol()}/m² {L("MoM", "MoM")}</span>
             : pricemomDelta < 0
-              ? <span style={{ color: green }}>{Math.round(pricemomDelta)} €/m² {L("MoM", "MoM")}</span>
+              ? <span style={{ color: green }}>{Math.round(moneyFromEur(pricemomDelta))} {moneySymbol()}/m² {L("MoM", "MoM")}</span>
               : <span style={{ color: dim }}>{L("bez zmeny", "no change")} MoM</span>)
         : L("žiadna história", "no history yet"),
       tint: "#e8e8ed",
@@ -1957,8 +1961,8 @@ function PriceHistogram({ prices, lang = "en" }) {
   const innerW = W - pad.l - pad.r, innerH = H - pad.t - pad.b;
   const locale = lang === "sk" ? "sk-SK" : "en-US";
   const L = (sk, en) => lang === "sk" ? sk : en;
-  const fmtK = (n) => `${Math.round(n / 1000)}k €`;
-  const fmtFull = (n) => `€${Math.round(n).toLocaleString(locale).replace(/,/g, " ")}`;
+  const fmtK = (n) => `${Math.round(moneyFromEur(n) / 1000)}k ${moneySymbol()}`;
+  const fmtFull = (n) => `${Math.round(moneyFromEur(n)).toLocaleString(locale).replace(/,/g, " ")} ${moneySymbol()}`;
 
   if (!prices || prices.length === 0) {
     return <div style={{ color: dim, fontSize: "0.8rem", textAlign: "center", padding: "1rem" }}>—</div>;
@@ -2208,10 +2212,10 @@ function AreaPriceScatter({ flats, lang, onSelectFlat }) {
         <text x={pad.l} y={H - 12} fill={dim} fontFamily={mono} fontSize={10}>{`${Math.round(xMin)} m²`}</text>
         <text x={W - pad.r} y={H - 12} textAnchor="end" fill={dim} fontFamily={mono} fontSize={10}>{`${Math.round(xMax)} m²`}</text>
         <text x={pad.l - 6} y={pad.t + 10} textAnchor="end" fill={dim} fontFamily={mono} fontSize={10} transform={`rotate(-90 ${pad.l - 6} ${pad.t + 10})`}>
-          {`${Math.round(yMax / 1000)}k €`}
+          {`${Math.round(moneyFromEur(yMax) / 1000)}k ${moneySymbol()}`}
         </text>
         <text x={pad.l - 6} y={pad.t + innerH} textAnchor="end" fill={dim} fontFamily={mono} fontSize={10} transform={`rotate(-90 ${pad.l - 6} ${pad.t + innerH})`}>
-          {`${Math.round(yMin / 1000)}k €`}
+          {`${Math.round(moneyFromEur(yMin) / 1000)}k ${moneySymbol()}`}
         </text>
         {/* Legend */}
         <g transform={`translate(${pad.l + 8}, ${pad.t + 12})`}>
@@ -2260,9 +2264,9 @@ function AreaPriceScatter({ flats, lang, onSelectFlat }) {
               <span style={{ color: dim }}>{lang === "sk" ? "Interiér" : "Interior"}</span>
               <span style={{ fontFamily: mono }}>{f.obytna_plocha ? `${f.obytna_plocha} m²` : "—"}</span>
               <span style={{ color: dim }}>{lang === "sk" ? "Cena" : "Price"}</span>
-              <span style={{ fontFamily: mono }}>{f.cena_s_dph != null ? `${Math.round(f.cena_s_dph).toLocaleString(locale)} €` : "—"}</span>
-              <span style={{ color: dim }}>{lang === "sk" ? "Cena/m²" : "€/m²"}</span>
-              <span style={{ fontFamily: mono, color: green }}>{m2 != null ? `${m2.toLocaleString(locale)} €` : "—"}</span>
+              <span style={{ fontFamily: mono }}>{f.cena_s_dph != null ? `${Math.round(moneyFromEur(f.cena_s_dph)).toLocaleString(locale)} ${moneySymbol()}` : "—"}</span>
+              <span style={{ color: dim }}>{lang === "sk" ? "Cena/m²" : `${moneySymbol()}/m²`}</span>
+              <span style={{ fontFamily: mono, color: green }}>{m2 != null ? `${Math.round(moneyFromEur(m2)).toLocaleString(locale)} ${moneySymbol()}` : "—"}</span>
             </div>
             {onSelectFlat && (
               <div style={{ marginTop: "0.4rem", fontSize: "0.68rem", color: dim, fontStyle: "italic" }}>
@@ -2306,7 +2310,7 @@ function FlatsTable({ flats, t, lang, highlightedFlatId }) {
     { key: "exterior",  label: t.tbl_exterior,    align: "right", kind: "num",  def: "asc", width: "7%",   get: f => f.exterier_plocha },
     { key: "total",     label: t.tbl_total,       align: "right", kind: "num",  def: "asc", width: "7%",   get: f => f.celkova_plocha },
     { key: "price",     label: t.tbl_price,       align: "right", kind: "num",  def: "asc", width: "12%",  get: f => f.cena_s_dph },
-    { key: "price_m2",  label: t.tbl_eur_m2,      align: "right", kind: "num",  def: "asc", width: "8%",
+    { key: "price_m2",  label: moneySymbol() + "/m²", align: "right", kind: "num",  def: "asc", width: "8%",
       get: f => (f.cena_s_dph != null && f.obytna_plocha != null && Number(f.obytna_plocha) > 0)
                 ? Number(f.cena_s_dph) / Number(f.obytna_plocha) : null },
     { key: "orient",    label: t.tbl_orientation, align: "left",  kind: "text", def: "asc", width: "8%",   get: f => f.orientacia || "" },
@@ -2580,12 +2584,12 @@ function FlatsTable({ flats, t, lang, highlightedFlatId }) {
                 <td style={{ ...compactTd, textAlign: "right", fontFamily: mono }}>{f.exterier_plocha ?? "—"}</td>
                 <td style={{ ...compactTd, textAlign: "right", fontFamily: mono }}>{f.celkova_plocha ?? "—"}</td>
                 <td style={{ ...compactTd, textAlign: "right", fontFamily: mono }}>
-                  {f.cena_s_dph != null ? `${Math.round(f.cena_s_dph).toLocaleString(locale)} €` :
+                  {f.cena_s_dph != null ? `${Math.round(moneyFromEur(f.cena_s_dph)).toLocaleString(locale)} ${moneySymbol()}` :
                     f.cena_s_dph_text ? <span style={{ color: dim }}>{f.cena_s_dph_text}</span> : "—"}
                 </td>
                 <td style={{ ...compactTd, textAlign: "right", fontFamily: mono, color: dim }}>
                   {(f.cena_s_dph != null && f.obytna_plocha != null && Number(f.obytna_plocha) > 0)
-                    ? Math.round(Number(f.cena_s_dph) / Number(f.obytna_plocha)).toLocaleString(locale)
+                    ? Math.round(moneyFromEur(Number(f.cena_s_dph) / Number(f.obytna_plocha))).toLocaleString(locale)
                     : "—"}
                 </td>
                 <td style={{ ...compactTd, fontFamily: mono, color: dim }}>{f.orientacia || "—"}</td>
@@ -2830,6 +2834,7 @@ function GateMessage({ title, body, cta, backLabel, onCta, setCurrent }) {
    (current snapshot). The Pivot builder uses project_snapshots so users
    can filter / group by month across the whole time-series. */
 export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
+  useCurrency(); // subscribe: re-render KPI + district €/m² on currency toggle
   const { country } = useCountry();
   const { projects, loading } = useProjects();        // projects_live → real per-project aggregates (already country-scoped)
   const { snapshots } = useProjectSnapshots();
@@ -2943,7 +2948,7 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
         <AKpi label={lang === "sk" ? "Voľné byty" : "Available"}            value={totalAvail.toLocaleString(lang === "sk" ? "sk-SK" : "en-US")} accent={green} />
         <AKpi label={lang === "sk" ? "Predané (30d)" : "Sold (30d)"}        value={totalSold30 ? `+${totalSold30}` : "—"} accent="#f5a623"
               sub={lang === "sk" ? `${absorptionPct}% absorpcia` : `${absorptionPct}% absorption`} />
-        <AKpi label={lang === "sk" ? "Priem. €/m²" : "Avg €/m²"}            value={avgEurM2 ? Math.round(avgEurM2).toLocaleString(lang === "sk" ? "sk-SK" : "en-US") : "—"} />
+        <AKpi label={lang === "sk" ? `Priem. ${moneySymbol()}/m²` : `Avg ${moneySymbol()}/m²`}            value={avgEurM2 ? Math.round(moneyFromEur(avgEurM2)).toLocaleString(lang === "sk" ? "sk-SK" : "en-US") : "—"} />
       </div>
 
       {/* ═══ PIVOT — drag & drop builder ═══ */}
@@ -2961,7 +2966,7 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
               <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.68rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
                 <th style={th}>{lang === "sk" ? "Mesto" : "City"}</th>
                 <th style={th}>{lang === "sk" ? "Okres" : "District"}</th>
-                <th style={{ ...th, textAlign: "right" }}>€/m²</th>
+                <th style={{ ...th, textAlign: "right" }}>{moneySymbol()}/m²</th>
                 <th style={{ ...th, textAlign: "right" }}>{lang === "sk" ? "Projektov" : "Projects"}</th>
                 <th style={{ ...th, textAlign: "right" }}>{lang === "sk" ? "Bytov" : "Units"}</th>
                 <th style={{ ...th, textAlign: "right" }}>{lang === "sk" ? "Voľné" : "Avail"}</th>
@@ -2975,7 +2980,7 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
                   <td style={{ ...td, color: dim }}>{d.city || "—"}</td>
                   <td style={{ ...td, fontWeight: 600 }}>{d.district}</td>
                   <td style={{ ...td, textAlign: "right", fontFamily: mono, color: d.avgPrice && d.avgPrice >= 5500 ? "#f5a623" : d.avgPrice && d.avgPrice >= 4200 ? green : "#4a90e2", fontWeight: 600 }}>
-                    {d.avgPrice ? d.avgPrice.toLocaleString("en-US").replace(/,/g, " ") : "—"}
+                    {d.avgPrice ? Math.round(moneyFromEur(d.avgPrice)).toLocaleString("en-US").replace(/,/g, " ") : "—"}
                   </td>
                   <td style={{ ...td, textAlign: "right", fontFamily: mono, color: dim }}>{d.count}</td>
                   <td style={{ ...td, textAlign: "right", fontFamily: mono, color: dim }}>{d.units.toLocaleString("en-US").replace(/,/g, " ")}</td>

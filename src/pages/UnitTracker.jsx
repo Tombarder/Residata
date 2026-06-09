@@ -40,6 +40,8 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { useProjects, useFlatsArchive, useArchiveMonths } from "../lib/useData";
 import { useCapabilities } from "../lib/useCapabilities";
 import { track } from "../lib/track";
+import { moneyFromEur, moneySymbol } from "../lib/money";
+import { useCurrency } from "../lib/useCurrency";
 
 const mono   = "'JetBrains Mono', monospace";
 const green  = "#00e5a0";
@@ -145,11 +147,11 @@ function isComparable(target, candidate) {
 
 function formatPrice(n) {
   if (n == null || !Number.isFinite(n)) return "—";
-  return Math.round(n).toLocaleString("en-US").replace(/,/g, " ") + " €";
+  return Math.round(moneyFromEur(n)).toLocaleString("en-US").replace(/,/g, " ") + " " + moneySymbol();
 }
 function formatPerM2(n) {
   if (n == null || !Number.isFinite(n)) return "—";
-  return Math.round(n).toLocaleString("en-US").replace(/,/g, " ") + " €/m²";
+  return Math.round(moneyFromEur(n)).toLocaleString("en-US").replace(/,/g, " ") + " " + moneySymbol() + "/m²";
 }
 /** Format the canonical time axis for display.
  *
@@ -196,6 +198,7 @@ const formatMonth = formatTs;
 
 export default function UnitTracker({ lang = "sk", setCurrent }) {
   const L = (sk, en) => lang === "sk" ? sk : en;
+  useCurrency(); // subscribe: re-render prices when the currency toggle flips
   const { can } = useCapabilities();
   const canFull = can("view_analytics");
 
@@ -827,7 +830,7 @@ function ChartCard({ pickedHistories, comparables, yMode, setYMode, lang }) {
             {lang === "sk" ? "Vývoj ceny v čase" : "Price evolution over time"}
           </div>
           <div style={{ fontSize: "0.74rem", color: dim, marginTop: "0.2rem" }}>
-            {lang === "sk" ? "X = dátum scrapu · Y = " : "X = scrape date · Y = "}{yMode === "perm2" ? "€/m²" : (lang === "sk" ? "celková cena (€)" : "total price (€)")}
+            {lang === "sk" ? "X = dátum scrapu · Y = " : "X = scrape date · Y = "}{yMode === "perm2" ? `${moneySymbol()}/m²` : (lang === "sk" ? `celková cena (${moneySymbol()})` : `total price (${moneySymbol()})`)}
           </div>
         </div>
         <div style={{ display: "flex", gap: "0.3rem" }}>
@@ -1151,7 +1154,7 @@ function LineChartSVG({ pickedHistories, comparables, allMonths, yOf, fmtY, lang
           <g key={`ytick-${i}`}>
             <line x1={padL} x2={W - padR} y1={yScale(t)} y2={yScale(t)} stroke={border} strokeDasharray="2,4" opacity="0.6"/>
             <text x={padL - 10} y={yScale(t)} fill={dim} fontSize="11" textAnchor="end" dominantBaseline="middle" fontFamily={mono}>
-              {fmtCompact(t)}
+              {fmtCompact(moneyFromEur(t))}
             </text>
           </g>
         ))}
@@ -1246,7 +1249,7 @@ function LineChartSVG({ pickedHistories, comparables, allMonths, yOf, fmtY, lang
                             fill={stavCol} stroke={bg} strokeWidth="1.5"/>
                     {/* Endpoint value label (first + last, primary unit only) */}
                     {showEndpointLabel && (() => {
-                      const labelText = fmtCompact(p.rawY);
+                      const labelText = fmtCompact(moneyFromEur(p.rawY));
                       const lblW = Math.max(46, labelText.length * 7);
                       // Place label inside chart area: first → right of dot,
                       // last → left of dot, to avoid clipping at edges.
@@ -1292,7 +1295,7 @@ function LineChartSVG({ pickedHistories, comparables, allMonths, yOf, fmtY, lang
         {/* Y axis title */}
         <text x={20} y={padT + innerH / 2} fill={dim} fontSize="10" textAnchor="middle" fontFamily={mono}
               letterSpacing="0.05em" transform={`rotate(-90 20 ${padT + innerH / 2})`}>
-          {fmtY === formatPerM2 ? "€/m²" : (lang === "sk" ? "CENA (€)" : "PRICE (€)")}
+          {fmtY === formatPerM2 ? `${moneySymbol()}/m²` : (lang === "sk" ? `CENA (${moneySymbol()})` : `PRICE (${moneySymbol()})`)}
         </text>
       </svg>
 

@@ -15,6 +15,8 @@ import { Component, useState, useEffect } from "react";
 import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
 import { useProjects, useMarketTotals } from "../lib/useData";
+import { moneyFromEur, moneySymbol } from "../lib/money";
+import { useCurrency } from "../lib/useCurrency";
 import { supabase } from "../lib/supabase";
 import { pushRoute } from "../lib/routing";
 import { track } from "../lib/track";
@@ -825,6 +827,7 @@ function TrialRunningBanner({ lang, daysLeft, onOpenBilling }) {
 
 // ─── Dashboard page ─────────────────────────────────────────────
 function PlatformDashboard({ lang, setCurrent }) {
+  useCurrency(); // subscribe: re-render KPIs + highlights when currency toggles
   const { profile, tier } = useAuth();
   const caps = useCapabilities();
   const { can, baseTier, trialActive, trialDaysLeft } = caps;
@@ -912,7 +915,7 @@ function PlatformDashboard({ lang, setCurrent }) {
         <KpiCard label={lang === "sk" ? "Voľné byty" : "Available units"} value={totals.avail.toLocaleString(lang === "sk" ? "sk-SK" : "en-US")} accent={green} />
         <KpiCard label={lang === "sk" ? "Predané (30 dní)" : "Sold (30 days)"} value={totals.sold30 ? `+${totals.sold30}` : "—"} accent="#f5a623"
           locked={!can("view_sold_velocity")} />
-        <KpiCard label={lang === "sk" ? "Priem. €/m²" : "Avg €/m²"} value={avgEurM2 ? avgEurM2.toLocaleString(lang === "sk" ? "sk-SK" : "en-US") : "—"} />
+        <KpiCard label={lang === "sk" ? `Priem. ${moneySymbol()}/m²` : `Avg ${moneySymbol()}/m²`} value={avgEurM2 ? Math.round(moneyFromEur(avgEurM2)).toLocaleString(lang === "sk" ? "sk-SK" : "en-US") : "—"} />
       </div>
 
       {/* Market highlights — replaces the old duplicate-of-sidebar action
@@ -942,7 +945,7 @@ function PlatformDashboard({ lang, setCurrent }) {
               <div style={{ fontSize: "0.72rem", color: dim, fontFamily: mono, marginBottom: 8 }}>{p.district || "—"}</div>
               <div style={{ display: "flex", gap: "1rem", fontSize: "0.75rem" }}>
                 <span><span style={{ color: green, fontFamily: mono, fontWeight: 700 }}>{p.available_units}</span> <span style={{ color: dim }}>{lang === "sk" ? "voľné" : "avail"}</span></span>
-                {p.avg_price_eur_m2 && <span><span style={{ color: textLight, fontFamily: mono, fontWeight: 600 }}>{Math.round(p.avg_price_eur_m2).toLocaleString("en-US").replace(/,/g, " ")}</span> <span style={{ color: dim }}>€/m²</span></span>}
+                {p.avg_price_eur_m2 && <span><span style={{ color: textLight, fontFamily: mono, fontWeight: 600 }}>{Math.round(moneyFromEur(p.avg_price_eur_m2)).toLocaleString("en-US").replace(/,/g, " ")}</span> <span style={{ color: dim }}>{moneySymbol()}/m²</span></span>}
               </div>
             </div>
           ))}
@@ -1031,7 +1034,7 @@ function MarketHighlights({ projects, lang, setCurrent, showUpgrade }) {
   if (topSeller) cards.push({
     tag: lang === "sk" ? "Top predajca (30d)" : "Top seller (30d)",
     title: topSeller.name,
-    sub: `${topSeller.district || "—"} · ${topSeller.avg_price_eur_m2 ? Math.round(topSeller.avg_price_eur_m2).toLocaleString("en-US").replace(/,/g, " ") + " €/m²" : "—"}`,
+    sub: `${topSeller.district || "—"} · ${topSeller.avg_price_eur_m2 ? Math.round(moneyFromEur(topSeller.avg_price_eur_m2)).toLocaleString("en-US").replace(/,/g, " ") + " " + moneySymbol() + "/m²" : "—"}`,
     stat: `+${topSeller.sold_last_month}`,
     statSub: lang === "sk" ? "predaných" : "sold",
     statColor: green,
@@ -1059,11 +1062,11 @@ function MarketHighlights({ projects, lang, setCurrent, showUpgrade }) {
     });
   } else if (priciest) {
     cards.push({
-      tag: lang === "sk" ? "Najdrahší €/m²" : "Priciest €/m²",
+      tag: lang === "sk" ? `Najdrahší ${moneySymbol()}/m²` : `Priciest ${moneySymbol()}/m²`,
       title: priciest.name,
       sub: `${priciest.district || "—"}`,
-      stat: Math.round(priciest.avg_price_eur_m2).toLocaleString("en-US").replace(/,/g, " "),
-      statSub: "€/m²",
+      stat: Math.round(moneyFromEur(priciest.avg_price_eur_m2)).toLocaleString("en-US").replace(/,/g, " "),
+      statSub: `${moneySymbol()}/m²`,
       statColor: "#f5a623",
       onClick: () => setCurrent(`App:ProjectDetail:${priciest.id}`),
     });

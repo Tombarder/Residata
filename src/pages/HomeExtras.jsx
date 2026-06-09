@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useMarketTotals, useHomeProjects, useTotalsList } from "../lib/useData";
 import { useCountry, countryName } from "../lib/useCountry";
+import { moneyFromEur, moneySymbol } from "../lib/money";
+import { useCurrency } from "../lib/useCurrency";
 // (imports already include useMarketTotals — we rely on its live view
 // instead of summing projects.total_units, which inflates the count for
 // projects like Bory/Slnečnice whose total_units is a manual registry
@@ -537,6 +539,7 @@ export function PipelineFlow({ lang = "en" }) {
    1. MARKET PULSE — live hero-section stats + top projects
    ────────────────────────────────────────────────────────── */
 export function MarketPulse({ lang = "en", setCurrent }) {
+  useCurrency(); // subscribe: re-render avg €/m² stat + project cards on currency toggle
   const { projects } = useHomeProjects();  // PERF Step 6: narrow column read (homepage only)
   const totals = useMarketTotals();
 
@@ -565,7 +568,7 @@ export function MarketPulse({ lang = "en", setCurrent }) {
   const tTotal = lang === "sk" ? "bytov sledovaných" : "units tracked";
   const tActive = lang === "sk" ? "voľných bytov" : "available now";
   const tSold = lang === "sk" ? "predaných celkom" : "sold to date";
-  const tEur = lang === "sk" ? "priemer €/m²" : "avg €/m²";
+  const tEur = lang === "sk" ? `priemer ${moneySymbol()}/m²` : `avg ${moneySymbol()}/m²`;
   const topTitle = lang === "sk" ? "Najaktívnejšie projekty" : "Most active projects";
   const openAll = lang === "sk" ? "Všetky projekty →" : "View all projects →";
 
@@ -617,7 +620,7 @@ export function MarketPulse({ lang = "en", setCurrent }) {
         <Stat value={totalUnits} label={tTotal} />
         <Stat value={totalAvail} label={tActive} accent={green} />
         <Stat value={totalSold} label={tSold} accent="#f5a623" />
-        <Stat value={avgEurM2 ? Math.round(avgEurM2) : null} label={tEur} prefix="" suffix=" €" />
+        <Stat value={avgEurM2 ? Math.round(moneyFromEur(avgEurM2)) : null} label={tEur} prefix="" suffix={` ${moneySymbol()}`} />
       </div>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: anyVelocity ? "1rem" : "0.3rem" }}>
@@ -682,7 +685,7 @@ function ProjectMini({ project, setCurrent, lang }) {
         )}
         {project.available_units} {lang === "sk" ? "voľných" : "avail"}
         {!soldDataUnavailable && <> · {project.sold_units} {lang === "sk" ? "predaných" : "sold"}</>}
-        {project.avg_price_eur_m2 ? ` · ${Math.round(project.avg_price_eur_m2).toLocaleString("en-US").replace(/,/g, " ")} €/m²` : ""}
+        {project.avg_price_eur_m2 ? ` · ${Math.round(moneyFromEur(project.avg_price_eur_m2)).toLocaleString("en-US").replace(/,/g, " ")} ${moneySymbol()}/m²` : ""}
       </div>
       {soldDataUnavailable ? (
         <div style={{ fontSize: "0.65rem", color: dim, fontFamily: mono, letterSpacing: "0.05em", fontStyle: "italic" }}>
@@ -760,6 +763,7 @@ function useInView(rootMargin = "0px") {
 const _emptyDrill = { level: "region", regionId: null, regionName: null, cityId: null, cityName: null };
 
 export function DistrictPulse({ lang = "en", setCurrent }) {  // eslint-disable-line no-unused-vars
+  useCurrency(); // subscribe: re-render the per-district €/m² bars on currency toggle
   const { country } = useCountry();
   const [sectionRef, inView] = useInView();
 
@@ -804,7 +808,7 @@ export function DistrictPulse({ lang = "en", setCurrent }) {  // eslint-disable-
     : drill.level === "city"
       ? (lang === "sk" ? "podľa mesta" : "by city")
       : (lang === "sk" ? "podľa mestskej časti" : "by district");
-  const title = lang === "sk" ? `Priemerná cena €/m² ${levelWord}` : `Average €/m² ${levelWord}`;
+  const title = lang === "sk" ? `Priemerná cena ${moneySymbol()}/m² ${levelWord}` : `Average ${moneySymbol()}/m² ${levelWord}`;
   const desc = lang === "sk"
     ? "Skutočné dáta z aktívnych projektov. Klikni na riadok pre rozpad nižšie. Updatuje sa každý mesiac."
     : "Real data from active projects. Click a row to drill down. Refreshes monthly.";
@@ -887,7 +891,7 @@ function GeoBarRow({ row, index, max, animate, lang, onClick }) {
   const pct = (row.avg / max) * 100;
   const color = colorForPrice(row.avg);
   const delay = 0.08 * index;
-  const animatedAvg = useAnimatedNumber(animate ? Math.round(row.avg) : 0, 1100, delay * 1000);
+  const animatedAvg = useAnimatedNumber(animate ? Math.round(moneyFromEur(row.avg)) : 0, 1100, delay * 1000);
   const clickable = typeof onClick === "function";
 
   return (
@@ -950,7 +954,7 @@ function GeoBarRow({ row, index, max, animate, lang, onClick }) {
         textAlign: "right", fontVariantNumeric: "tabular-nums",
         textShadow: `0 0 8px ${color}22`,
       }}>
-        {animatedAvg.toLocaleString("en-US").replace(/,/g, " ")} €
+        {animatedAvg.toLocaleString("en-US").replace(/,/g, " ")} {moneySymbol()}
       </div>
     </div>
   );

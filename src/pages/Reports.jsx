@@ -28,6 +28,8 @@
  */
 import { useState, useMemo, useEffect } from "react";
 import { useProjects, useFlatsCurrent, useProjectSnapshots } from "../lib/useData";
+import { moneyFromEur, moneySymbol } from "../lib/money";
+import { useCurrency } from "../lib/useCurrency";
 import { supabase } from "../lib/supabase";
 
 // ── Visual language (mirrors Platform.jsx) ───────────────────────
@@ -65,6 +67,7 @@ const SCOPES = [
    Top-level Reports page. Hosts scope tabs + the picked-scope view.
    ══════════════════════════════════════════════════════════════════ */
 export default function PlatformReports({ lang = "sk" }) {
+  useCurrency(); // subscribe: re-render every report price/€/m² on currency toggle
   const { projects: allProjects, loading: loadingProjects } = useProjects();
   const { flats: allFlats,       loading: loadingFlats }    = useFlatsCurrent();
 
@@ -704,13 +707,13 @@ function ProjectReport({ project, flats, siblings, allFlats, lang }) {
             {summary.hasUnitData
               ? <> Celkovo {summary.totalUnits} bytov, {summary.soldPct != null ? summary.soldPct.toFixed(0) : "—"}% predaných.</>
               : <> Jednotkové dáta pre tento projekt ešte neposielame (registrový záznam).</>}
-            {summary.wavgM2 && <> Vážený priemer <strong style={{ color: text }}>{Math.round(summary.wavgM2).toLocaleString("sk-SK")} €/m²</strong>.</>}</>
+            {summary.wavgM2 && <> Vážený priemer <strong style={{ color: text }}>{Math.round(moneyFromEur(summary.wavgM2)).toLocaleString("sk-SK")} {moneySymbol()}/m²</strong>.</>}</>
           ) : (
             <><strong style={{ color: text }}>{project.name}</strong> by <strong style={{ color: text }}>{project.developer || "—"}</strong> in <strong style={{ color: text }}>{project.district || "—"}</strong>.
             {summary.hasUnitData
               ? <> {summary.totalUnits} units, {summary.soldPct != null ? summary.soldPct.toFixed(0) : "—"}% sold.</>
               : <> Unit-level data not tracked yet (registry-only entry).</>}
-            {summary.wavgM2 && <> Weighted avg <strong style={{ color: text }}>{Math.round(summary.wavgM2).toLocaleString("en-US")} €/m²</strong>.</>}</>
+            {summary.wavgM2 && <> Weighted avg <strong style={{ color: text }}>{Math.round(moneyFromEur(summary.wavgM2)).toLocaleString("en-US")} {moneySymbol()}/m²</strong>.</>}</>
           )}
         </p>
       </ReportSection>
@@ -787,8 +790,8 @@ function KpiStrip({ summary, lang, extra = [] }) {
     { label: lang === "sk" ? "Predaných"   : "Sold",       value: summary.sold.toLocaleString("en-US").replace(/,/g, " "), color: orange },
     { label: lang === "sk" ? "Predaných %" : "Sold %",     value: soldPctLabel, color: orange },
     ...(summary.wavgM2 ? [{
-      label: lang === "sk" ? "Ø €/m² (vážené)" : "Ø €/m² (wtd)",
-      value: Math.round(summary.wavgM2).toLocaleString("en-US").replace(/,/g, " "),
+      label: lang === "sk" ? `Ø ${moneySymbol()}/m² (vážené)` : `Ø ${moneySymbol()}/m² (wtd)`,
+      value: Math.round(moneyFromEur(summary.wavgM2)).toLocaleString("en-US").replace(/,/g, " "),
     }] : []),
     ...extra,
   ];
@@ -812,8 +815,8 @@ function ExecSummary({ summary, lang, extraDistrict, compared }) {
         <>V tomto výbere sledujeme <strong style={{ color: text }}>{summary.projectCount}</strong> projektov s kapacitou <strong style={{ color: text }}>{summary.totalUnits.toLocaleString("sk-SK")}</strong> bytov.
         Aktuálne je voľných <strong style={{ color: green }}>{summary.available.toLocaleString("sk-SK")}</strong>, predaných <strong style={{ color: orange }}>{summary.sold.toLocaleString("sk-SK")}</strong>.
         {summary.sold30 > 0 && <> Za posledných 30 dní pribudlo <strong style={{ color: orange }}>{summary.sold30}</strong> nových predajov.</>}
-        {summary.wavgM2 && <> Priemerná cena v scope-e je <strong style={{ color: text }}>{Math.round(summary.wavgM2).toLocaleString("sk-SK")} €/m²</strong> (vážené veľkosťou projektu).</>}
-        {extraDistrict && <> Najdrahšia časť: <strong style={{ color: text }}>{extraDistrict.name}</strong>{extraDistrict.wavgM2 && <> ({Math.round(extraDistrict.wavgM2).toLocaleString("sk-SK")} €/m²)</>}.</>}
+        {summary.wavgM2 && <> Priemerná cena v scope-e je <strong style={{ color: text }}>{Math.round(moneyFromEur(summary.wavgM2)).toLocaleString("sk-SK")} {moneySymbol()}/m²</strong> (vážené veľkosťou projektu).</>}
+        {extraDistrict && <> Najdrahšia časť: <strong style={{ color: text }}>{extraDistrict.name}</strong>{extraDistrict.wavgM2 && <> ({Math.round(moneyFromEur(extraDistrict.wavgM2)).toLocaleString("sk-SK")} {moneySymbol()}/m²)</>}.</>}
         {compared && compared.summary.wavgM2 && summary.wavgM2 && (() => {
           const delta = ((summary.wavgM2 / compared.summary.wavgM2) - 1) * 100;
           const sign = delta >= 0 ? "+" : "";
@@ -825,7 +828,7 @@ function ExecSummary({ summary, lang, extraDistrict, compared }) {
         <>This scope contains <strong style={{ color: text }}>{summary.projectCount}</strong> projects holding <strong style={{ color: text }}>{summary.totalUnits.toLocaleString("en-US")}</strong> units.
         Currently <strong style={{ color: green }}>{summary.available.toLocaleString("en-US")}</strong> available, <strong style={{ color: orange }}>{summary.sold.toLocaleString("en-US")}</strong> sold.
         {summary.sold30 > 0 && <> Last 30 days saw <strong style={{ color: orange }}>{summary.sold30}</strong> new sales.</>}
-        {summary.wavgM2 && <> Weighted avg <strong style={{ color: text }}>{Math.round(summary.wavgM2).toLocaleString("en-US")} €/m²</strong>.</>}
+        {summary.wavgM2 && <> Weighted avg <strong style={{ color: text }}>{Math.round(moneyFromEur(summary.wavgM2)).toLocaleString("en-US")} {moneySymbol()}/m²</strong>.</>}
         </>
       )}
     </p>
@@ -958,16 +961,16 @@ function Histogram({ bins, lang, unit, flats, projects, onProjectClick }) {
 function HistogramDrilldown({ bin, rows, unit, lang, onClose, onProjectClick }) {
   if (!bin) return null;
   const clickable = typeof onProjectClick === "function";
-  const fmtEur = (v) => v == null ? "—" : Math.round(v).toLocaleString(lang === "sk" ? "sk-SK" : "en-US");
+  const fmtEur = (v) => v == null ? "—" : Math.round(moneyFromEur(v)).toLocaleString(lang === "sk" ? "sk-SK" : "en-US");
   return (
     <div style={{ marginTop: "0.75rem", border: `1px solid ${border}`, borderRadius: 8, background: bg }}>
       <div style={{ padding: "0.6rem 0.85rem", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.5rem", borderBottom: `1px solid ${border}`, background: "rgba(0,229,160,0.04)" }}>
         <div>
           <div style={{ fontFamily: mono, fontSize: "0.65rem", color: green, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-            {lang === "sk" ? "Pásmo" : "Band"} {unit ? unit : ""}
+            {lang === "sk" ? "Pásmo" : "Band"} {unit ? (unit === "€/m²" ? `${moneySymbol()}/m²` : unit) : ""}
           </div>
           <div style={{ fontSize: "0.92rem", color: text, fontWeight: 600, marginTop: 2 }}>
-            {bin.label}{unit ? " " + unit : ""} · <span style={{ color: green, fontFamily: mono }}>{rows.length}</span>{" "}
+            {bandLabel(bin)}{unit ? " " + (unit === "€/m²" ? `${moneySymbol()}/m²` : unit) : ""} · <span style={{ color: green, fontFamily: mono }}>{rows.length}</span>{" "}
             <span style={{ color: dim, fontWeight: 400, fontSize: "0.8rem" }}>
               {lang === "sk" ? (rows.length === 1 ? "byt" : (rows.length < 5 ? "byty" : "bytov")) : (rows.length === 1 ? "unit" : "units")}
             </span>
@@ -994,8 +997,8 @@ function HistogramDrilldown({ bin, rows, unit, lang, onClose, onProjectClick }) 
                 <th style={tdh}>{lang === "sk" ? "Časť" : "District"}</th>
                 <th style={tdhR}>{lang === "sk" ? "Izby" : "Rooms"}</th>
                 <th style={tdhR}>{lang === "sk" ? "Plocha" : "Area"}</th>
-                <th style={tdhR}>{lang === "sk" ? "Cena €" : "Price €"}</th>
-                <th style={tdhR}>€/m²</th>
+                <th style={tdhR}>{lang === "sk" ? `Cena ${moneySymbol()}` : `Price ${moneySymbol()}`}</th>
+                <th style={tdhR}>{moneySymbol()}/m²</th>
               </tr>
             </thead>
             <tbody>
@@ -1040,7 +1043,7 @@ function RowBin({ bin, max, unit, clickable, active, onClick }) {
         onKeyDown={clickable ? handleKey : undefined}
         style={{ fontFamily: mono, fontSize: "0.68rem", color: dim, textAlign: "right", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
       >
-        {bin.label}{unit ? " " + unit : ""}
+        {bandLabel(bin)}{unit ? " " + (unit === "€/m²" ? `${moneySymbol()}/m²` : unit) : ""}
       </span>
       <div
         className={`rep-hist-bar ${cls}`}
@@ -1080,7 +1083,7 @@ function AggregateTable({ rows, lang, nameLabel }) {
             <th style={tdhR}>{lang === "sk" ? "Bytov"    : "Units"}</th>
             <th style={tdhR}>{lang === "sk" ? "Voľných"  : "Available"}</th>
             <th style={tdhR}>{lang === "sk" ? "Pred. %"  : "Sold %"}</th>
-            <th style={tdhR}>Ø €/m²</th>
+            <th style={tdhR}>Ø {moneySymbol()}/m²</th>
             <th style={{ ...tdh, minWidth: 90 }}>{lang === "sk" ? "Relatívne" : "Relative"}</th>
           </tr>
         </thead>
@@ -1101,7 +1104,7 @@ function AggregateTable({ rows, lang, nameLabel }) {
                 <td style={tdcR}>{r.totalUnits.toLocaleString("en-US").replace(/,/g, " ")}</td>
                 <td style={{ ...tdcR, color: green }}>{r.available.toLocaleString("en-US").replace(/,/g, " ")}</td>
                 <td style={{ ...tdcR, color: orange }}>{soldCell}</td>
-                <td style={tdcR}>{r.wavgM2 ? Math.round(r.wavgM2).toLocaleString("en-US").replace(/,/g, " ") : "—"}</td>
+                <td style={tdcR}>{r.wavgM2 ? Math.round(moneyFromEur(r.wavgM2)).toLocaleString("en-US").replace(/,/g, " ") : "—"}</td>
                 <td style={{ ...tdc, padding: "0.35rem 0.75rem" }}>
                   <div style={{ position: "relative", height: 10, background: bg, border: `1px solid ${border}`, borderRadius: 2 }}>
                     <div style={{ position: "absolute", inset: 0, width: `${(r.totalUnits / maxUnits) * 100}%`, background: `linear-gradient(90deg, ${green}33, ${green})`, borderRadius: 2 }} />
@@ -1132,7 +1135,7 @@ function BenchmarkCard({ local, global, scopeLabel, lang }) {
     return ((local[metric] / global[metric]) - 1) * 100;
   };
   const rows = [
-    { label: lang === "sk" ? "Ø €/m² (vážené)" : "Ø €/m² (weighted)", local: local.wavgM2, global: global.wavgM2, delta: delta("wavgM2"), unit: "€/m²", lowerIsGood: true },
+    { label: lang === "sk" ? `Ø ${moneySymbol()}/m² (vážené)` : `Ø ${moneySymbol()}/m² (weighted)`, local: local.wavgM2, global: global.wavgM2, delta: delta("wavgM2"), unit: `${moneySymbol()}/m²`, money: true, lowerIsGood: true },
     { label: lang === "sk" ? "Predaných %"    : "Sold %",             local: local.soldPct, global: global.soldPct, delta: (local.soldPct || 0) - (global.soldPct || 0), unit: "%",    lowerIsGood: false, absolute: true },
     { label: lang === "sk" ? "Voľných na projekt" : "Avail / project", local: local.projectCount > 0 ? local.available / local.projectCount : 0, global: global.projectCount > 0 ? global.available / global.projectCount : 0, delta: null, unit: "", lowerIsGood: false },
   ];
@@ -1158,8 +1161,8 @@ function BenchmarkCard({ local, global, scopeLabel, lang }) {
             return (
               <tr key={r.label} style={{ borderTop: i > 0 ? `1px solid ${border}` : "none" }}>
                 <td style={tdc}>{r.label}</td>
-                <td style={tdcR}>{r.local == null ? "—" : Math.round(r.local).toLocaleString("en-US").replace(/,/g, " ") + (r.unit ? " " + r.unit : "")}</td>
-                <td style={tdcR}>{r.global == null ? "—" : Math.round(r.global).toLocaleString("en-US").replace(/,/g, " ") + (r.unit ? " " + r.unit : "")}</td>
+                <td style={tdcR}>{r.local == null ? "—" : Math.round(r.money ? moneyFromEur(r.local) : r.local).toLocaleString("en-US").replace(/,/g, " ") + (r.unit ? " " + r.unit : "")}</td>
+                <td style={tdcR}>{r.global == null ? "—" : Math.round(r.money ? moneyFromEur(r.global) : r.global).toLocaleString("en-US").replace(/,/g, " ") + (r.unit ? " " + r.unit : "")}</td>
                 <td style={{ ...tdcR, color: deltaColor, fontWeight: 700 }}>
                   {r.delta == null ? "—" : `${sign}${r.delta.toFixed(1)}${r.absolute ? " pp" : "%"}`}
                 </td>
@@ -1233,7 +1236,7 @@ function ProjectTable({ projects, flats, lang, onProjectClick }) {
             <th style={tdhR}>{lang === "sk" ? "Bytov" : "Units"}</th>
             <th style={tdhR}>{lang === "sk" ? "Voľných" : "Available"}</th>
             <th style={tdhR}>{lang === "sk" ? "Pred %" : "Sold %"}</th>
-            <th style={tdhR}>€/m²</th>
+            <th style={tdhR}>{moneySymbol()}/m²</th>
           </tr>
         </thead>
         <tbody>
@@ -1254,7 +1257,7 @@ function ProjectTable({ projects, flats, lang, onProjectClick }) {
               <td style={tdcR}>{p._realTotal.toLocaleString("en-US").replace(/,/g, " ")}</td>
               <td style={{ ...tdcR, color: green }}>{p._realAvail.toLocaleString("en-US").replace(/,/g, " ")}</td>
               <td style={{ ...tdcR, color: orange }}>{p._realSoldPct != null ? p._realSoldPct.toFixed(0) + "%" : "—"}</td>
-              <td style={tdcR}>{p.avg_price_eur_m2 ? Math.round(p.avg_price_eur_m2).toLocaleString("en-US").replace(/,/g, " ") : "—"}</td>
+              <td style={tdcR}>{p.avg_price_eur_m2 ? Math.round(moneyFromEur(p.avg_price_eur_m2)).toLocaleString("en-US").replace(/,/g, " ") : "—"}</td>
             </tr>
           ))}
         </tbody>
@@ -1321,7 +1324,7 @@ function TrendChart({ snapshots, scopePredicate, lang }) {
             <th style={tdhR}>{lang === "sk" ? "Bytov"    : "Units"}</th>
             <th style={tdhR}>{lang === "sk" ? "Voľných"  : "Available"}</th>
             <th style={tdhR}>{lang === "sk" ? "Predaných" : "Sold"}</th>
-            <th style={tdhR}>€/m²</th>
+            <th style={tdhR}>{moneySymbol()}/m²</th>
             <th style={{ ...tdh, minWidth: 80 }}>{lang === "sk" ? "Trend" : "Trend"}</th>
           </tr>
         </thead>
@@ -1332,7 +1335,7 @@ function TrendChart({ snapshots, scopePredicate, lang }) {
               <td style={tdcR}>{s.totalUnits.toLocaleString("en-US").replace(/,/g, " ")}</td>
               <td style={{ ...tdcR, color: green }}>{s.avail.toLocaleString("en-US").replace(/,/g, " ")}</td>
               <td style={{ ...tdcR, color: orange }}>{s.sold.toLocaleString("en-US").replace(/,/g, " ")}</td>
-              <td style={tdcR}>{s.wavg ? Math.round(s.wavg).toLocaleString("en-US").replace(/,/g, " ") : "—"}</td>
+              <td style={tdcR}>{s.wavg ? Math.round(moneyFromEur(s.wavg)).toLocaleString("en-US").replace(/,/g, " ") : "—"}</td>
               <td style={{ ...tdc, padding: "0.35rem 0.75rem" }}>
                 <div style={{ position: "relative", height: 8, background: bg, border: `1px solid ${border}`, borderRadius: 2 }}>
                   <div style={{ position: "absolute", inset: 0, width: `${(s.totalUnits / maxUnits) * 100}%`, background: `linear-gradient(90deg, ${green}33, ${green})`, borderRadius: 2 }} />
@@ -1360,7 +1363,7 @@ function TopSellerList({ projects, lang }) {
       {tops.map(p => (
         <li key={p.id}>
           <strong style={{ color: text }}>{p.name}</strong> ({p.district || "—"}) — <span style={{ color: green, fontFamily: mono, fontWeight: 700 }}>+{p.sold_last_month}</span> {lang === "sk" ? "predaných" : "sold"}
-          {p.avg_price_eur_m2 && <span style={{ color: dim, fontFamily: mono }}> · {Math.round(p.avg_price_eur_m2).toLocaleString("en-US").replace(/,/g, " ")} €/m²</span>}
+          {p.avg_price_eur_m2 && <span style={{ color: dim, fontFamily: mono }}> · {Math.round(moneyFromEur(p.avg_price_eur_m2)).toLocaleString("en-US").replace(/,/g, " ")} {moneySymbol()}/m²</span>}
         </li>
       ))}
     </ol>
@@ -1748,11 +1751,11 @@ function ComparableTransactionsReport({ projects, flats, lang }) {
         <div className="rep-kpi-strip" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "0.5rem", marginBottom: "1.25rem" }}>
           {[
             { label: lang === "sk" ? "Predaných"  : "Sold",         value: count.toLocaleString("en-US").replace(/,/g, " "), color: green },
-            { label: lang === "sk" ? "Ø €/m²"     : "Avg €/m²",     value: avgEm2 ? Math.round(avgEm2).toLocaleString("en-US").replace(/,/g, " ") : "—" },
-            { label: lang === "sk" ? "Medián €/m²": "Median €/m²",  value: medEm2 ? Math.round(medEm2).toLocaleString("en-US").replace(/,/g, " ") : "—" },
-            { label: lang === "sk" ? "Min €/m²"   : "Min €/m²",     value: minEm2 ? Math.round(minEm2).toLocaleString("en-US").replace(/,/g, " ") : "—", color: green },
-            { label: lang === "sk" ? "Max €/m²"   : "Max €/m²",     value: maxEm2 ? Math.round(maxEm2).toLocaleString("en-US").replace(/,/g, " ") : "—", color: orange },
-            { label: lang === "sk" ? "Objem (€)"  : "Volume (€)",   value: totalRevenue ? Math.round(totalRevenue).toLocaleString("en-US").replace(/,/g, " ") : "—" },
+            { label: lang === "sk" ? `Ø ${moneySymbol()}/m²`     : `Avg ${moneySymbol()}/m²`,     value: avgEm2 ? Math.round(moneyFromEur(avgEm2)).toLocaleString("en-US").replace(/,/g, " ") : "—" },
+            { label: lang === "sk" ? `Medián ${moneySymbol()}/m²`: `Median ${moneySymbol()}/m²`,  value: medEm2 ? Math.round(moneyFromEur(medEm2)).toLocaleString("en-US").replace(/,/g, " ") : "—" },
+            { label: lang === "sk" ? `Min ${moneySymbol()}/m²`   : `Min ${moneySymbol()}/m²`,     value: minEm2 ? Math.round(moneyFromEur(minEm2)).toLocaleString("en-US").replace(/,/g, " ") : "—", color: green },
+            { label: lang === "sk" ? `Max ${moneySymbol()}/m²`   : `Max ${moneySymbol()}/m²`,     value: maxEm2 ? Math.round(moneyFromEur(maxEm2)).toLocaleString("en-US").replace(/,/g, " ") : "—", color: orange },
+            { label: lang === "sk" ? `Objem (${moneySymbol()})`  : `Volume (${moneySymbol()})`,   value: totalRevenue ? Math.round(moneyFromEur(totalRevenue)).toLocaleString("en-US").replace(/,/g, " ") : "—" },
           ].map((k, i) => (
             <div key={i} style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8, padding: "0.65rem 0.9rem" }}>
               <div style={{ fontSize: "0.7rem", color: dim, marginBottom: "0.2rem" }}>{k.label}</div>
@@ -1775,8 +1778,8 @@ function ComparableTransactionsReport({ projects, flats, lang }) {
                   <th style={tdh}>{lang === "sk" ? "Časť" : "District"}</th>
                   <th style={tdhR}>{lang === "sk" ? "Izby" : "Rooms"}</th>
                   <th style={tdhR}>m²</th>
-                  <th style={tdhR}>{lang === "sk" ? "Cena (€)" : "Price (€)"}</th>
-                  <th style={tdhR}>€/m²</th>
+                  <th style={tdhR}>{lang === "sk" ? `Cena (${moneySymbol()})` : `Price (${moneySymbol()})`}</th>
+                  <th style={tdhR}>{moneySymbol()}/m²</th>
                   <th style={tdhR}>{lang === "sk" ? "Posch." : "Floor"}</th>
                 </tr>
               </thead>
@@ -1790,8 +1793,8 @@ function ComparableTransactionsReport({ projects, flats, lang }) {
                       <td style={tdc}>{p.district || "—"}</td>
                       <td style={tdcR}>{f.izby || "—"}</td>
                       <td style={tdcR}>{Number(f.obytna_plocha).toFixed(1)}</td>
-                      <td style={tdcR}>{Math.round(f.cena_s_dph).toLocaleString("en-US").replace(/,/g, " ")}</td>
-                      <td style={{ ...tdcR, color: orange, fontWeight: 700 }}>{em2.toLocaleString("en-US").replace(/,/g, " ")}</td>
+                      <td style={tdcR}>{Math.round(moneyFromEur(f.cena_s_dph)).toLocaleString("en-US").replace(/,/g, " ")}</td>
+                      <td style={{ ...tdcR, color: orange, fontWeight: 700 }}>{Math.round(moneyFromEur(em2)).toLocaleString("en-US").replace(/,/g, " ")}</td>
                       <td style={tdcR}>{f.poschodie ?? "—"}</td>
                     </tr>
                   );
@@ -1926,7 +1929,7 @@ function PricingTensionReport({ projects, lang, onOpenProject }) {
               <tr style={{ background: bg, textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
                 <th style={tdh}>{lang === "sk" ? "Projekt" : "Project"}</th>
                 <th style={tdh}>{lang === "sk" ? "Časť" : "District"}</th>
-                <th style={tdhR}>€/m²</th>
+                <th style={tdhR}>{moneySymbol()}/m²</th>
                 <th style={tdhR}>{lang === "sk" ? "vs. medián" : "vs. median"}</th>
                 <th style={tdhR}>{lang === "sk" ? "Velocity %/mes." : "Velocity %/mo."}</th>
                 <th style={tdhR}>{lang === "sk" ? "Signál" : "Signal"}</th>
@@ -1955,7 +1958,7 @@ function PricingTensionReport({ projects, lang, onOpenProject }) {
                   >
                     <td style={tdc}><strong style={{ color: text }}>{p.name}</strong></td>
                     <td style={tdc}>{p.district || "—"}</td>
-                    <td style={tdcR}>{Math.round(p.avg_price_eur_m2).toLocaleString("en-US").replace(/,/g, " ")}</td>
+                    <td style={tdcR}>{Math.round(moneyFromEur(p.avg_price_eur_m2)).toLocaleString("en-US").replace(/,/g, " ")}</td>
                     <td style={{ ...tdcR, color: p.premiumPct >= 0 ? orange : green, fontWeight: 700 }}>
                       {p.premiumPct >= 0 ? "+" : ""}{p.premiumPct.toFixed(1)}%
                     </td>
@@ -2052,7 +2055,7 @@ function PricingTensionScatter({ dots, lang, onOpenProject }) {
             <g key={d.id || i} style={{ cursor: onClick ? "pointer" : "default" }} onClick={onClick}>
               <circle cx={cx} cy={cy} r={Math.min(12, 4 + Math.sqrt(d.available_units || 0) * 0.5)}
                       fill={fill} opacity="0.65" stroke={fill} strokeWidth="1.2">
-                <title>{`${d.name} (${d.district || "?"})\n€/m²: ${Math.round(d.avg_price_eur_m2).toLocaleString("sk-SK")} (${d.premiumPct >= 0 ? "+" : ""}${d.premiumPct.toFixed(1)}% vs ${lang === "sk" ? "medián" : "median"})\nVelocity: ${d.velocityPct.toFixed(1)} %/mes.\nVoľných: ${d.available_units}`}</title>
+                <title>{`${d.name} (${d.district || "?"})\n${moneySymbol()}/m²: ${Math.round(moneyFromEur(d.avg_price_eur_m2)).toLocaleString("sk-SK")} (${d.premiumPct >= 0 ? "+" : ""}${d.premiumPct.toFixed(1)}% vs ${lang === "sk" ? "medián" : "median"})\nVelocity: ${d.velocityPct.toFixed(1)} %/mes.\nVoľných: ${d.available_units}`}</title>
               </circle>
             </g>
           );
@@ -2074,7 +2077,7 @@ function PricingTensionScatter({ dots, lang, onOpenProject }) {
 
         {/* Axis titles */}
         <text x={padL + innerW * 0.5} y={H - 8} fill={text} fontSize="11" textAnchor="middle" fontFamily={mono}>
-          €/m² {lang === "sk" ? "vs. medián časti mesta" : "vs. district median"}
+          {moneySymbol()}/m² {lang === "sk" ? "vs. medián časti mesta" : "vs. district median"}
         </text>
         <text x={16} y={padT + innerH * 0.5} fill={text} fontSize="11" textAnchor="middle" fontFamily={mono}
               transform={`rotate(-90 16 ${padT + innerH * 0.5})`}>
@@ -2320,6 +2323,16 @@ function groupAggregatesFromFlats(flats, key) {
 /* Price distribution — bin units by €/m². For-sale flats only (V/R/PR);
    sold flats are excluded so the histogram reflects current asking
    prices, not historical transaction mix. */
+/** Render a histogram bin's €/m² band in the CURRENT display currency.
+ *  priceDistribution keeps from/to in EUR (so geometry + drill-down math
+ *  stay consistent); this converts only the displayed boundary numbers. */
+function bandLabel(bin) {
+  if (!bin) return "";
+  const f = Math.round(moneyFromEur(bin.from)).toLocaleString("sk-SK");
+  const t = Math.round(moneyFromEur(bin.to)).toLocaleString("sk-SK");
+  return `${f}–${t}`;
+}
+
 function priceDistribution(flats, nBins) {
   const values = flats
     .filter(f => f.stav === "V" || f.stav === "R" || f.stav === "PR")
