@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase, isSupabaseReady } from "./supabase";
+import { supabase, supabasePublic, isSupabaseReady } from "./supabase";
 import { useAuth } from "./useAuth";
 import { useCountry } from "./useCountry";
 
@@ -96,7 +96,7 @@ export function useMetrics() {
   useEffect(() => {
     if (!isSupabaseReady()) { setLoading(false); return; }
     let cancelled = false;
-    supabase.from("metrics").select("*").order("display_order", { ascending: true })
+    supabasePublic.from("metrics").select("*").order("display_order", { ascending: true })
       .then(({ data, error }) => {
         if (cancelled) return;
         // F-313 (DP-096): don't poison the module cache with [] on transient
@@ -274,7 +274,7 @@ export function useTotals(level, id = null) {
       return;
     }
     let cancelled = false;
-    let q = supabase.from(view).select("*");
+    let q = supabasePublic.from(view).select("*");
     if (filterCol && id != null) {
       q = q.eq(filterCol, id);
     }
@@ -331,7 +331,7 @@ export function useTotalsList(level, { country = null, filterCol = null, filterI
     else setLoading(true);
 
     let cancelled = false;
-    let q = supabase.from(view).select("*");
+    let q = supabasePublic.from(view).select("*");
     if (country) q = q.eq(_countryColForLevel(level), country);
     if (filterCol && filterId != null) q = q.eq(filterCol, filterId);
     q.then(({ data, error }) => {
@@ -407,7 +407,7 @@ export function useMarketTotals() {
     const cached = _marketTotalsByCountry.get(country);
     if (cached) setTotals(cached);
     let cancelled = false;
-    supabase.from("totals_by_country").select("*").eq("country_code", country).maybeSingle().then(({ data, error }) => {
+    supabasePublic.from("totals_by_country").select("*").eq("country_code", country).maybeSingle().then(({ data, error }) => {
       if (cancelled) return;
       if (error) {
         console.error("[useMarketTotals]", error);
@@ -477,7 +477,7 @@ export function useDistrictTotals() {
     if (hit) { setDistricts(hit); setLoading(false); }
     else setLoading(true);
     let cancelled = false;
-    supabase.from("totals_by_district").select("*").eq("country", country).then(({ data, error }) => {
+    supabasePublic.from("totals_by_district").select("*").eq("country", country).then(({ data, error }) => {
       if (cancelled) return;
       if (error) {
         console.error("[useDistrictTotals]", error);
@@ -520,7 +520,7 @@ export function useProjects(limit) {
   useEffect(() => {
     if (!isSupabaseReady()) { setLoading(false); return; }
     let cancelled = false;
-    let q = supabase.from("projects_live").select("*").eq("country", country);
+    let q = supabasePublic.from("projects_live").select("*").eq("country", country);
     if (limit) q = q.eq("is_top20", true).limit(limit);
     q.order("available_units", { ascending: false }).then(({ data, error }) => {
       if (cancelled) return;
@@ -564,7 +564,7 @@ export function useHomeProjects() {
   useEffect(() => {
     if (!isSupabaseReady()) { setLoading(false); return; }
     let cancelled = false;
-    supabase.from("projects_live").select(_HOME_PROJECT_COLS).eq("country", country)
+    supabasePublic.from("projects_live").select(_HOME_PROJECT_COLS).eq("country", country)
       .order("available_units", { ascending: false })
       .then(({ data, error }) => {
         if (cancelled) return;
@@ -714,7 +714,7 @@ export function useProjectSnapshots() {
   useEffect(() => {
     if (!isSupabaseReady()) { setLoading(false); return; }
     let cancelled = false;
-    supabase.from("project_snapshots").select("*")
+    supabasePublic.from("project_snapshots").select("*")
       .order("snapshot_month", { ascending: false })
       .then(({ data, error }) => {
         if (cancelled) return;
@@ -1042,7 +1042,7 @@ export function useEarlyAccessStats() {
   useEffect(() => {
     if (!isSupabaseReady()) return;
     let cancelled = false;
-    supabase.from("early_access_stats").select("*").maybeSingle()
+    supabasePublic.from("early_access_stats").select("*").maybeSingle()
       .then(({ data }) => {
         if (cancelled) return;
         if (data) setStats(data);

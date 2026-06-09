@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { supabase, isSupabaseReady } from "./supabase";
+import { supabasePublic, isSupabaseReady } from "./supabase";
 
 /**
  * useCountry — global selected-country state for the multi-market display layer.
@@ -61,7 +61,7 @@ export function CountryProvider({ children }) {
   useEffect(() => {
     if (!isSupabaseReady()) { setLoading(false); return; }
     let cancelled = false;
-    supabase.from("projects_live").select("country").then(({ data, error }) => {
+    supabasePublic.from("projects_live").select("country").then(({ data, error }) => {
       if (cancelled) return;
       if (error) {
         // Non-fatal: keep the SK default so the site never blanks on this.
