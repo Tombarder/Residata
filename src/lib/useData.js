@@ -763,9 +763,14 @@ let _flatsCurrentCache = null;
 let _flatsCurrentCacheKey = null;
 export function useFlatsCurrent() {
   const { loading: authLoading, user, profile } = useAuth();
+  const { country } = useCountry();
+  // country is part of the identity signature: switching country must refetch
+  // (and not serve a stale other-country cache). flats_current carries a
+  // `country` column ('SK'/'CZ'); without this filter SK paid users saw SK+CZ
+  // rows mixed in Reports.
   const identityKey = user
-    ? `${user.id}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}`
-    : "anon";
+    ? `${user.id}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}::${country}`
+    : `anon::${country}`;
   const [flats, setFlats] = useState(_flatsCurrentCacheKey === identityKey ? (_flatsCurrentCache || []) : []);
   const [loading, setLoading] = useState(_flatsCurrentCacheKey !== identityKey);
 
@@ -794,6 +799,7 @@ export function useFlatsCurrent() {
         const { data, error } = await supabase
           .from("flats_current")
           .select("*")
+          .eq("country", country)
           .range(offset, offset + PAGE - 1)
           .order("id", { ascending: true });
         if (cancelled) return;
@@ -828,7 +834,7 @@ export function useFlatsCurrent() {
       setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [authLoading, identityKey]);
+  }, [authLoading, identityKey, country]);
 
   return { flats, loading };
 }
@@ -862,10 +868,15 @@ let _archiveCache = null;
 let _archiveCacheKey = null;
 export function useFlatsArchive(months) {
   const { loading: authLoading, user, profile } = useAuth();
+  const { country } = useCountry();
   const monthsKey = Array.isArray(months) ? months.slice().sort().join(",") : "all";
+  // country is part of the identity signature so switching country refetches
+  // instead of serving a stale other-country cache. flats_archive carries a
+  // `country` column ('SK'/'CZ'); without this filter SK paid users saw SK+CZ
+  // rows mixed in the Pivot.
   const identityKey = user
-    ? `${user.id}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}::${monthsKey}`
-    : `anon::${monthsKey}`;
+    ? `${user.id}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}::${monthsKey}::${country}`
+    : `anon::${monthsKey}::${country}`;
   const [flats, setFlats] = useState(_archiveCacheKey === identityKey ? (_archiveCache || []) : []);
   const [loading, setLoading] = useState(_archiveCacheKey !== identityKey);
   const [progress, setProgress] = useState(0);
@@ -906,6 +917,7 @@ export function useFlatsArchive(months) {
         let q = supabase
           .from("flats_archive")
           .select("*")
+          .eq("country", country)
           .range(offset, offset + REQUESTED_PAGE - 1)
           .order("batch_timestamp", { ascending: false, nullsFirst: false })
           .order("id", { ascending: true });
@@ -955,7 +967,7 @@ export function useFlatsArchive(months) {
       setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [authLoading, identityKey, monthsKey]);
+  }, [authLoading, identityKey, monthsKey, country]);
 
   return { flats, loading, progress };
 }
@@ -972,7 +984,21 @@ export function useFlatsArchive(months) {
  *  snapshot_month → first 1 000 rows were all from 2026-05, dedup → just
  *  `['2026-05']`). Surfaced as F-207 during the DP-069 audit. The view
  *  applies the same WHERE filter as flats_archive (approved + not
- *  withdrawn) so the two stay consistent.  */
+ *  withdrawn) so the two stay consistent.
+ *
+ *  NOT country-scoped (intentional): the `archive_months` view is built
+ *  from final.snapshots and carries NO country/market column (see
+ *  v2/migrations/2026-06-01_f207_archive_months_view_and_f208_flats_archive_id.sql),
+ *  so it cannot be filtered with `.eq("country", …)` here. Deriving the
+ *  month list from flats_archive filtered by country would reintroduce the
+ *  exact F-207 truncation this view was created to fix (paginating 97 k
+ *  rows, plus RLS would shrink anon/free callers to ≤1 month). Impact of
+ *  leaving it all-country is cosmetic and ~nil today: PivotV2 calls this
+ *  hook but no longer reads the result, and UnitTracker uses only
+ *  `.length` to decide a "≤1 month" empty-state hint — SK and CZ share the
+ *  same monthly cadence, so the count is identical either way. The proper
+ *  fix is a backend change: add a country/market_key column to the
+ *  archive_months view, then add `.eq("country", country)` here.  */
 let _archiveMonthsCache = null;
 export function useArchiveMonths() {
   const [months, setMonths] = useState(_archiveMonthsCache || []);
