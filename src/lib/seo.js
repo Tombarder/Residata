@@ -153,6 +153,76 @@ const SEO_BY_PAGE = {
 };
 
 /**
+ * Per-country SEO copy overrides.
+ *
+ * The site is ONE SPA with a client-side country switcher (no per-country
+ * URLs), so canonical / hreflang / og:url stay per-route and are NOT touched
+ * here — only the human-facing title / description / keywords (and the
+ * og:* / twitter:* tags that derive from them) get localized to the selected
+ * market.
+ *
+ * Mirrors the COUNTRY_COPY pattern in src/App.jsx: SK has NO entry, so
+ * applySeo(..., 'SK') (and any unknown country) returns the base copy
+ * byte-identical. A country block is a lang-keyed list of literal
+ * find→replace rules applied to the resolved title/description/keywords.
+ *
+ * Why find→replace rather than a full per-route copy duplicate: the SK copy
+ * is the single source of truth, so adding/editing a route doesn't require
+ * re-typing every string for every market (which inevitably drifts). The
+ * rules are ordered most-specific-first so multi-word phrases win before the
+ * bare city/country token (e.g. "Bratislava real estate" before "Bratislava").
+ *
+ * To add a market: add a block keyed by ISO code with `en`/`sk` rule lists.
+ */
+const SEO_COUNTRY_OVERRIDES = {
+  CZ: {
+    en: [
+      ["novostavby Bratislava", "novostavby Praha"],
+      ["Bratislava real estate", "Prague real estate"],
+      ["property market Slovakia", "property market Czech"],
+      ["market data Slovakia", "market data Czech"],
+      ["Bratislava", "Prague"],
+      ["Slovakia", "Czech"],
+    ],
+    sk: [
+      ["novostavby Bratislava", "novostavby Praha"],
+      ["v Bratislave", "v Prahe"],
+      ["Bratislava", "Praha"],
+      ["Slovensko", "Česko"],
+    ],
+  },
+};
+
+/**
+ * Apply a country's find→replace rules to a single copy string. Returns the
+ * input unchanged when there's no override (SK / unknown country / no string).
+ */
+function applyCountryRules(value, rules) {
+  if (!value || !rules) return value;
+  let out = value;
+  for (const [from, to] of rules) out = out.split(from).join(to);
+  return out;
+}
+
+/**
+ * Localize a resolved SEO entry (title/description/keywords) for the selected
+ * country. Only these three fields are market-named; og:* / twitter:* derive
+ * from title/description downstream, so they inherit the override for free.
+ * Canonical / hreflang / og:url / og:locale / robots / html[lang] are left to
+ * the per-route logic and are never altered here.
+ */
+function localizeSeoForCountry(meta, lang, country) {
+  const rules = SEO_COUNTRY_OVERRIDES[country]?.[lang === "sk" ? "sk" : "en"];
+  if (!rules) return meta;
+  return {
+    ...meta,
+    title: applyCountryRules(meta.title, rules),
+    description: applyCountryRules(meta.description, rules),
+    keywords: applyCountryRules(meta.keywords, rules),
+  };
+}
+
+/**
  * Upsert a <meta> by name OR property. Creates the tag if missing. This
  * avoids fragile Element.setAttribute chains scattered through the hook.
  */
@@ -223,13 +293,20 @@ function resolvePageSeo(page, lang) {
 }
 
 /**
- * Apply SEO metadata to the document for a given (page, lang) pair.
- * Called from App.jsx inside a useEffect so it fires on every navigation.
+ * Apply SEO metadata to the document for a given (page, lang, country) tuple.
+ * Called from App.jsx inside a useEffect so it fires on every navigation or
+ * country switch.
+ *
+ * `country` only localizes the visible copy (title / description / keywords →
+ * og:* / twitter:*). The canonical / hreflang / og:url / og:locale / robots /
+ * html[lang] logic is per-route and country-agnostic by design (one SPA, no
+ * per-country URLs). SK / unknown country → base copy, byte-identical.
  */
-export function applySeo(page, lang) {
+export function applySeo(page, lang, country) {
   if (typeof document === "undefined") return;
-  const meta = resolvePageSeo(page, lang);
-  if (!meta) return;
+  const resolved = resolvePageSeo(page, lang);
+  if (!resolved) return;
+  const meta = localizeSeoForCountry(resolved, lang, country);
 
   const url = SITE_BASE + meta.path;
   const locale = lang === "sk" ? "sk_SK" : "en_US";

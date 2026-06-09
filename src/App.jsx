@@ -1825,13 +1825,15 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current]);
 
-  // SEO — update <title>, <meta>, canonical, hreflang on every route/lang
-  // change. SPAs without this end up with every URL sharing the homepage
-  // metadata, which makes Google unable to rank /pricing vs /use-cases
-  // separately. See src/lib/seo.js for what gets set.
+  // SEO — update <title>, <meta>, canonical, hreflang on every route/lang/
+  // country change. SPAs without this end up with every URL sharing the
+  // homepage metadata, which makes Google unable to rank /pricing vs
+  // /use-cases separately. `country` localizes the visible copy (a CZ visitor
+  // sees "Praha"/"Prague" in the tab title + og tags) without changing the
+  // per-route canonical/hreflang. See src/lib/seo.js for what gets set.
   useEffect(() => {
-    applySeo(current, lang);
-  }, [current, lang]);
+    applySeo(current, lang, country);
+  }, [current, lang, country]);
 
   const handleNav = (page) => {
     const resolved = typeof page === "string" && page.startsWith("Project:")
