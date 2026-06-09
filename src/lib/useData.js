@@ -444,20 +444,40 @@ export function useMarketTotals() {
 }
 
 /** Per-district aggregates derived live from flats_archive — one row per
- *  district with total_units / available_units / sold_units / reserved /
- *  project_count / avg_eur_m2. Used by DistrictPulse on the homepage and
- *  any other "districts breakdown" surface that needs honest counts.
+ *  city+district with total_units / available_units / sold_units / reserved /
+ *  project_count / avg_eur_m2. Used by any "districts breakdown" surface
+ *  that needs honest counts.
+ *
+ *  Multi-country: reads `totals_by_district` (SK + CZ + …) filtered to the
+ *  selected country (useCountry), so a CZ visitor never sees SK districts.
+ *  The previous implementation read the SK-only `district_totals` alias with
+ *  no country filter, which would have shown Slovakia's districts on the CZ
+ *  view. We keep city+district granularity (totals_by_district is grouped by
+ *  city) so collisions like "Staré Mesto" (Bratislava AND Praha) stay
+ *  distinct rows instead of being summed together.
+ *
+ *  Columns are mapped to the shape the old `district_totals` view exposed
+ *  (district / total_units / available_units / sold_units / reserved_units /
+ *  project_count / avg_eur_m2 / country) PLUS the city fields totals_by_district
+ *  adds (city_id / city_name / region_id / region_name), so existing consumers
+ *  that read either shape keep working.
  *
  *  Same security model as useMarketTotals — reads a SECURITY DEFINER
- *  view that exposes only aggregate rows. */
-let _districtTotalsCache = null;
+ *  view that exposes only aggregate rows. For country='SK' the returned set
+ *  is byte-identical to the SK rows the previous SK-pinned view returned. */
+const _districtTotalsByCountry = new Map();  // country code → rows
 export function useDistrictTotals() {
-  const [districts, setDistricts] = useState(_districtTotalsCache || []);
-  const [loading, setLoading] = useState(_districtTotalsCache === null);
+  const { country } = useCountry();
+  const cached = _districtTotalsByCountry.get(country);
+  const [districts, setDistricts] = useState(cached || []);
+  const [loading, setLoading] = useState(cached === undefined);
   useEffect(() => {
     if (!isSupabaseReady()) { setLoading(false); return; }
+    const hit = _districtTotalsByCountry.get(country);
+    if (hit) { setDistricts(hit); setLoading(false); }
+    else setLoading(true);
     let cancelled = false;
-    supabase.from("district_totals").select("*").then(({ data, error }) => {
+    supabase.from("totals_by_district").select("*").eq("country", country).then(({ data, error }) => {
       if (cancelled) return;
       if (error) {
         console.error("[useDistrictTotals]", error);
@@ -465,12 +485,12 @@ export function useDistrictTotals() {
         return;
       }
       const arr = data || [];
-      _districtTotalsCache = arr;
+      _districtTotalsByCountry.set(country, arr);
       setDistricts(arr);
       setLoading(false);
     });
     return () => { cancelled = true; };
-  }, []);
+  }, [country]);
   return { districts, loading };
 }
 

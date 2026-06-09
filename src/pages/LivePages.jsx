@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
 import { useProjects, useProjectFlats, useProjectSnapshots, useMarketTotals, useTotalsList } from "../lib/useData";
+import { useCountry } from "../lib/useCountry";
 import { supabase } from "../lib/supabase";
 import { liveT, ll } from "../lib/liveLang";
 import { goBack } from "../lib/routing";
@@ -2829,10 +2830,14 @@ function GateMessage({ title, body, cta, backLabel, onCta, setCurrent }) {
    (current snapshot). The Pivot builder uses project_snapshots so users
    can filter / group by month across the whole time-series. */
 export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
-  const { projects, loading } = useProjects();        // projects_live → real per-project aggregates
+  const { country } = useCountry();
+  const { projects, loading } = useProjects();        // projects_live → real per-project aggregates (already country-scoped)
   const { snapshots } = useProjectSnapshots();
-  const marketTotals = useMarketTotals();             // market_totals view (always live)
-  const { rows: districtRows } = useTotalsList("district");  // totals_by_district — city-aware (unified-SK safe)
+  const marketTotals = useMarketTotals();             // totals_by_country (selected country, EUR)
+  // totals_by_district is multi-country — filter to the selected country so a
+  // CZ visitor doesn't see SK districts (and vice-versa). City-aware so
+  // collisions like "Staré Mesto" (Bratislava + Praha) stay distinct rows.
+  const { rows: districtRows } = useTotalsList("district", { country });
   const { can } = useCapabilities();
 
   if (loading && projects.length === 0) {
@@ -2862,11 +2867,11 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
     : 0;
 
   // ─── Per-district aggregates ───────────────────────────────
-  // Read directly from the `district_totals` view — always-live
-  // counts derived from flats_archive grouped by project district.
-  // No more frontend-side bucketing of project rows. Sort by avg
-  // €/m² desc; districts without a price signal (avg=null) sink
-  // to the bottom but stay visible.
+  // Read from the `totals_by_district` view (filtered to the selected
+  // country above) — always-live counts derived from flats_archive
+  // grouped by city + project district. No more frontend-side bucketing
+  // of project rows. Sort by avg €/m² desc; districts without a price
+  // signal (avg=null) sink to the bottom but stay visible.
   const districts = (districtRows || [])
     .map(d => ({
       district: d.district,

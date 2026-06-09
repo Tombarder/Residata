@@ -28,6 +28,7 @@ import { PrivacyPage, ImprintPage } from "./pages/LegalPages";
 import CookieBanner from "./components/CookieBanner";
 import { useAuth } from "./lib/useAuth";
 import { useCapabilities } from "./lib/useCapabilities";
+import { useCountry } from "./lib/useCountry";
 import { useMarketTotals } from "./lib/useData";
 import { pushRoute, pathToPage, isAppPage } from "./lib/routing";
 import { applySeo } from "./lib/seo";
@@ -300,6 +301,51 @@ const t = {
     seePricing: "Pozrieť cenník",
   },
 };
+
+/* ─── Country-aware copy overrides ───────────────────────────────────────
+ * A handful of marketing strings name the primary market explicitly
+ * ("Bratislava"). When the visitor switches the CountrySwitcher to another
+ * country, those strings would otherwise still say "Bratislava" / imply
+ * Slovakia. We override ONLY those market-named strings per country, written
+ * out in full (not string-interpolated) so each language's grammar is correct
+ * — Slovak locative ("v Prahe"), Czech place name in English ("Prague"), etc.
+ *
+ * SK is intentionally ABSENT from this map: the selected-country='SK' path
+ * falls through to the base `t[lang]` strings unchanged, so Slovakia output is
+ * byte-identical to before this map existed. Only keys present here are
+ * overridden; every other copy key keeps its base value via the spread in
+ * localizedCopy(). Add a country block here when a new market goes live.
+ *
+ * NOTE: `dataContext` / `dataContextSub` are included for completeness but are
+ * not currently rendered anywhere (kept in sync with the base `t` object).
+ */
+const COUNTRY_COPY = {
+  CZ: {
+    en: {
+      heroTitle1: "Prague residential market,",
+      heroSub: "We monitor every new residential development in Prague and turn scattered listings into actionable market intelligence — so you can make pricing, investment, and portfolio decisions based on data.",
+      valueDesc: "Every month you get a full snapshot of the Prague new-build market — unit-level data across every active project, plus the insights you need to act on it.",
+      dataContext: "Prague New-Build Market",
+    },
+    sk: {
+      heroTitle1: "Novostavby v Prahe.",
+      // SK heroSub does not name the city in the base copy, so no override needed.
+      valueDesc: "Každý mesiac dostanete kompletný prehľad trhu novostavieb v Prahe — každý byt, každý projekt. A to aj s insightmi, na základe ktorých viete hneď konať.",
+      dataContext: "Trh novostavieb Praha",
+    },
+  },
+};
+
+/**
+ * Resolve the marketing copy for the active language + selected country.
+ * Base = t[lang]; per-country overrides (if any) are spread on top. For SK
+ * (no override block) this returns exactly t[lang].
+ */
+function localizedCopy(lang, country) {
+  const base = t[lang];
+  const override = COUNTRY_COPY[country]?.[lang];
+  return override ? { ...base, ...override } : base;
+}
 
 /* ─── Animation hooks ─── */
 function useScrollReveal() {
@@ -1738,7 +1784,10 @@ export default function App() {
     try { window.localStorage.setItem(LANG_STORAGE_KEY, newLang); } catch (_) {}
   };
   const [loginOpen, setLoginOpen] = useState(false);
-  const l = t[lang];
+  // Country-aware marketing copy: base t[lang], with per-country overrides for
+  // market-named strings (hero / value prop). SK returns t[lang] unchanged.
+  const { country } = useCountry();
+  const l = localizedCopy(lang, country);
   const auth = useAuth();
   const caps = useCapabilities();
 
