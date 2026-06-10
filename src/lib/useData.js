@@ -1145,6 +1145,41 @@ export function useUnitHistories(keys) {
   return { historyByKey, loading };
 }
 
+/** Server-side global unit search (debounced). Calls unit_search(country, q,
+ *  project_ids) which reads RLS-gated flats_current and returns ≤40 matches —
+ *  instead of loading every unit's summary to filter client-side. `query`
+ *  matches unit_id (≥2 chars); `projectIds` (resolved from a project-name query
+ *  client-side) matches whole projects. Disabled unless `enabled`. */
+export function useUnitSearch({ query, projectIds, enabled }) {
+  const { loading: authLoading, user, profile } = useAuth();
+  const { country } = useCountry();
+  const q = (query || "").trim();
+  const pids = Array.isArray(projectIds) ? projectIds : [];
+  const sig = `${user?.id || "anon"}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}::${country}::${q}::${pids.slice().sort().join(",")}::${enabled ? 1 : 0}`;
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!enabled || !isSupabaseReady() || authLoading) { setResults([]); setLoading(false); return; }
+    if (q.length < 2 && pids.length === 0) { setResults([]); setLoading(false); return; }
+    let cancelled = false;
+    setLoading(true);
+    // Debounce so we don't fire a query on every keystroke.
+    const timer = setTimeout(async () => {
+      const { data, error } = await supabase.rpc("unit_search", {
+        p_country: country, p_q: q, p_project_ids: pids, p_limit: 40,
+      });
+      if (cancelled) return;
+      if (error) { console.error("[useUnitSearch]", error); setResults([]); setLoading(false); return; }
+      setResults(_toEurDisplay(Array.isArray(data) ? data : []));
+      setLoading(false);
+    }, 250);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [authLoading, sig]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return { results, loading };
+}
+
 /** Early access slot count for the marketing badge. Public table. */
 export function useEarlyAccessStats() {
   const [stats, setStats] = useState({ paid_count: 0, remaining_slots: 9 });

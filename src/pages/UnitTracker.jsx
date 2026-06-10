@@ -37,7 +37,7 @@
  *      who paste comparables into their own reports
  */
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
-import { useProjects, useUnitSummaries, useUnitHistories, useArchiveMonths } from "../lib/useData";
+import { useProjects, useUnitSummaries, useUnitHistories, useUnitSearch, useArchiveMonths } from "../lib/useData";
 import { useCapabilities } from "../lib/useCapabilities";
 import { track } from "../lib/track";
 import { moneyFromEur, moneySymbol } from "../lib/money";
@@ -95,6 +95,11 @@ const MAX_COMPARE = 4;
  *  an old row). */
 function tsOf(row) {
   return row?.batch_timestamp || row?.snapshot_month || "";
+}
+
+/** Strip diacritics for accent-insensitive matching ("Slnečnice" ~ "Slnecnice"). */
+function stripDia(s) {
+  return (s || "").normalize("NFD").replace(/[̀-ͯ]/g, "");
 }
 
 /** Compact event summary for a unit's history — first/sold/last. */
@@ -218,21 +223,30 @@ export default function UnitTracker({ lang = "sk", setCurrent }) {
     };
   }, [projectById]);
 
-  // ── Server-side data (Phase 1: no more whole-archive client pull) ──
-  // Two narrow summary reads instead of pulling the whole archive:
-  //   · SEARCH scope — the picked project's units (mini-grid + in-place filter),
-  //     or every unit when the user is doing a global cross-project search (the
-  //     one ~7 MB lazy call). Deliberately independent of picks, so cross-project
-  //     compare via global search keeps working.
-  //   · COMPARABLE scope — the single picked unit's project, so we can find its
-  //     peers (same rooms, ±15 % area) without loading anything else.
-  const wantAllSearch = !projFilter && !!search.trim();
+  // ── Server-side data (Phase 1: no whole-archive client pull) ──
+  //   · PROJECT summaries — the picked project's units (mini-grid + in-place
+  //     filter + compare scope). Small + fast (16 kB–1.4 MB).
+  //   · COMPARABLE scope — the single picked unit's project, to find its peers.
+  //   · GLOBAL search — server-side (unit_search), never loads every unit.
   const { units: searchSummaries, loading: loadingSearch } =
-    useUnitSummaries({ projectId: projFilter, all: wantAllSearch });
+    useUnitSummaries({ projectId: projFilter });
 
   const cmpProject = pickedKeys.length === 1 ? keyProject(pickedKeys[0]) : null;
   const { units: cmpSummaries, loading: loadingCmp } =
     useUnitSummaries({ projectId: cmpProject });
+
+  // Global cross-project search: server-side + bounded. A project-NAME query is
+  // resolved to ids client-side (diacritic-insensitive) so "Slnečnice" still
+  // finds that project's units; unit_id is matched server-side by unit_search.
+  const matchingProjectIds = useMemo(() => {
+    const q = stripDia(search.trim().toLowerCase());
+    if (projFilter || q.length < 2) return [];
+    return (projects || []).filter(p => stripDia((p.name || "").toLowerCase()).includes(q)).map(p => p.id);
+  }, [projects, projFilter, search]);
+  const globalEnabled = !projFilter && pickedKeys.length === 0;
+  const { results: searchHits, loading: loadingHits } =
+    useUnitSearch({ query: search, projectIds: matchingProjectIds, enabled: globalEnabled });
+  const globalResults = useMemo(() => searchHits.map(toTile).slice(0, 25), [searchHits, toTile]);
 
   // Latest-state tiles for search results / mini-grid.
   const allUnits = useMemo(
@@ -312,8 +326,10 @@ export default function UnitTracker({ lang = "sk", setCurrent }) {
           <PickerRow
             projects={projects}
             allUnits={allUnits}
+            globalResults={globalResults}
             projectById={projectById}
             loadingScope={loadingScope}
+            loadingGlobal={loadingHits}
             pickedKeys={pickedKeys}
             togglePick={togglePick}
             clearAll={() => setPickedKeys([])}
@@ -365,19 +381,12 @@ export default function UnitTracker({ lang = "sk", setCurrent }) {
 
 // ── Picker row ──────────────────────────────────────────────────
 
-function PickerRow({ projects, allUnits, projectById, loadingScope, pickedKeys, togglePick, clearAll, projFilter, setProjFilter, search, setSearch, lang }) {
-  // `allUnits` are latest-state summaries for the active scope (one project, or
-  // the whole country when global-searching). Used ONLY when no project is
-  // picked (global search). When a project IS picked the same search box filters
-  // the mini-grid in-place — see MiniGrid — so we never show two parallel lists.
-  const globalResults = useMemo(() => {
-    if (!search.trim() || projFilter) return [];
-    const q = search.trim().toLowerCase();
-    return allUnits
-      .filter(u => u.unit_id.toLowerCase().includes(q) || u.project_name.toLowerCase().includes(q))
-      .slice(0, 25);
-  }, [allUnits, search, projFilter]);
-
+function PickerRow({ projects, allUnits, globalResults, projectById, loadingScope, loadingGlobal, pickedKeys, togglePick, clearAll, projFilter, setProjFilter, search, setSearch, lang }) {
+  // `globalResults` (from server-side unit_search) shows ONLY when no project is
+  // picked (global cross-project search). When a project IS picked, the same
+  // search box filters the mini-grid in-place — see MiniGrid — so we never show
+  // two parallel lists. `allUnits` here are the picked project's summaries, used
+  // as the compare sub-search scope.
   const activeProjects = (projects || []).filter(p => (p.status || "active") === "active");
 
   // Sub-state shown for "compare more" mode: when 1+ unit picked AND
@@ -452,7 +461,7 @@ function PickerRow({ projects, allUnits, projectById, loadingScope, pickedKeys, 
       </div>
 
       {/* Global search loading hint (the one ~7 MB all-units call, lazy). */}
-      {loadingScope && !projFilter && search.trim() && globalResults.length === 0 && (
+      {loadingGlobal && !projFilter && search.trim() && globalResults.length === 0 && (
         <div style={{ marginTop: "0.95rem", color: dim, fontFamily: mono, fontSize: "0.78rem" }}>
           {lang === "sk" ? "Hľadám naprieč všetkými bytmi…" : "Searching across all units…"}
         </div>
