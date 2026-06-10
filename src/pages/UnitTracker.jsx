@@ -243,7 +243,9 @@ export default function UnitTracker({ lang = "sk", setCurrent }) {
     if (projFilter || q.length < 2) return [];
     return (projects || []).filter(p => stripDia((p.name || "").toLowerCase()).includes(q)).map(p => p.id);
   }, [projects, projFilter, search]);
-  const globalEnabled = !projFilter && pickedKeys.length === 0;
+  // Enabled whenever no project filter is active — NOT gated on picks, so a user
+  // can pick unit A then search for unit B in another project to compare them.
+  const globalEnabled = !projFilter;
   const { results: searchHits, loading: loadingHits } =
     useUnitSearch({ query: search, projectIds: matchingProjectIds, enabled: globalEnabled });
   const globalResults = useMemo(() => searchHits.map(toTile).slice(0, 25), [searchHits, toTile]);
