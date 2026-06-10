@@ -34,11 +34,31 @@ if (!url || !key) {
   console.warn("Supabase env missing — running in offline/fallback mode");
 }
 
+/**
+ * In-memory auth lock (2026-06-10). supabase-js defaults to the Web Locks API
+ * (navigator.locks) to serialise token refresh across tabs. In some contexts —
+ * incognito, certain browser extensions, embedded/automation webviews — that
+ * lock is never granted, so `auth.getSession()` hangs forever; and because every
+ * authed query awaits getSession() internally, the whole app sticks on
+ * "Loading…" (confirmed live: the raw REST query returned in ~1s while
+ * getSession stalled). This lock serialises auth ops WITHIN the tab — the same
+ * guarantee as supabase's processLock — without ever touching navigator.locks,
+ * so getSession can't deadlock. One chained promise = at most one auth op at a
+ * time; a prior failure never blocks the next.
+ */
+let _authChain = Promise.resolve();
+const inMemoryAuthLock = (_name, _acquireTimeout, fn) => {
+  const run = _authChain.then(() => fn(), () => fn());
+  _authChain = run.then(() => {}, () => {});
+  return run;
+};
+
 export const supabase = url && key ? createClient(url, key, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
     storage: typeof window !== "undefined" ? window.localStorage : undefined,
+    lock: inMemoryAuthLock,
   },
 }) : null;
 

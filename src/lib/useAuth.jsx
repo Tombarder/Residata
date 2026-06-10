@@ -49,25 +49,48 @@ function useAuthInternal() {
       return;
     }
     let unsub = () => {};
+    // Safety net (2026-06-10): never leave the app stuck on the loading screen.
+    // setLoading(false) used to sit AFTER the getSession + profile awaits with
+    // no try/catch and no timeout — so any hung or throwing await (slow network,
+    // a stalled getSession, a transient query failure) left the user on an
+    // infinite spinner. This timeout guarantees the app becomes interactive
+    // (degraded to anon if need be) within a few seconds no matter what.
+    const loadingSafety = setTimeout(() => setLoading(false), 8000);
     (async () => {
-      log("mount: getSession");
-      const { data: { session } } = await supabase.auth.getSession();
-      log("getSession →", session?.user?.email || "no session");
-      setUser(session?.user || null);
-      if (session?.user) {
-        await loadProfile(session.user.id);
-        // STALE-SESSION DETECTION — see notes in previous fix commit.
-        const { data: check } = await supabase.from("user_profiles")
-          .select("id").eq("id", session.user.id).maybeSingle();
-        if (!check) {
-          log("stale session — user in localStorage but not in DB. signing out.");
-          try { await supabase.auth.signOut({ scope: "local" }); } catch {}
-          setUser(null);
-          setProfile(null);
-          setProfileError(null);
+      try {
+        log("mount: getSession");
+        const { data: { session } } = await supabase.auth.getSession();
+        log("getSession →", session?.user?.email || "no session");
+        setUser(session?.user || null);
+        if (session?.user) {
+          // One query does double duty: load the profile AND detect a stale
+          // session. CRITICAL (2026-06-10 fix): only sign out when the query
+          // SUCCEEDED and the row is genuinely gone. The previous code read
+          // `const {data: check}` without the error, so a transient query
+          // failure (data=null) was misread as "user deleted" and logged a
+          // valid user out on a momentary network blip.
+          const { data: prof, error: profErr } = await supabase
+            .from("user_profiles").select("*").eq("id", session.user.id).maybeSingle();
+          if (profErr) {
+            log("loadProfile ERROR (keeping session, NOT signing out)", profErr.message);
+            setProfileError(profErr.message);
+          } else if (!prof) {
+            log("stale session — user in localStorage but not in DB. signing out.");
+            try { await supabase.auth.signOut({ scope: "local" }); } catch {}
+            setUser(null);
+            setProfile(null);
+            setProfileError(null);
+          } else {
+            setProfile(prof);
+            setProfileError(null);
+          }
         }
+      } catch (e) {
+        log("auth init error (degrading to anon)", e);
+      } finally {
+        clearTimeout(loadingSafety);
+        setLoading(false);
       }
-      setLoading(false);
 
       const { data } = supabase.auth.onAuthStateChange(async (event, sess) => {
         log("onAuthStateChange", event, sess?.user?.email || "null");
@@ -77,7 +100,7 @@ function useAuthInternal() {
       });
       unsub = () => data.subscription.unsubscribe();
     })();
-    return () => unsub();
+    return () => { clearTimeout(loadingSafety); unsub(); };
   }, [loadProfile]);
 
   // Reload profile keď user vráti do tab-u
