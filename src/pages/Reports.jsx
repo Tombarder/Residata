@@ -129,7 +129,18 @@ export default function PlatformReports({ lang = "sk" }) {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  if (loading && projects.length === 0) {
+  // Hold the loading screen until BOTH datasets are in. `projects` (a small
+  // ~300-row query) resolves seconds before `flats` (the ~19k current-units
+  // fetch, paginated 5000/page). Guarding on projects.length ALONE let the
+  // full report render with flats=[] for the seconds in between — so every
+  // unit aggregate computed to 0 and the page showed a fully-formed report
+  // reading "kapacitou 0 bytov · 0 voľných · 0 predaných" as if final. A
+  // paying customer hitting Reports mid-load saw "Slovak market: 0 units"
+  // (2026-06-10 platform audit). Waiting for flats too means they see the
+  // loader until real numbers exist, never a zeroed-out report. Once both
+  // datasets are present a background refetch (loading=true again) keeps the
+  // report on screen — no loader flash — because the data conditions hold.
+  if (loading && (projects.length === 0 || flats.length === 0)) {
     return (
       <div style={{ padding: "3rem 2rem", color: dim, fontFamily: mono, fontSize: "0.85rem" }}>
         {lang === "sk" ? "Načítavam report…" : "Loading report…"}
