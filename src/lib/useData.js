@@ -1044,6 +1044,107 @@ export function useArchiveMonths() {
   return { months, loading };
 }
 
+// ── Byt v čase (UnitTracker) server-side data — Phase 1 perf/scaling fix ──────
+//
+// Replaces the old whole-archive pull (useFlatsArchive, ~217k rows / 30-60s) for
+// the UnitTracker screen with two narrow reads backed by RPCs:
+//
+//   · unit_list_json(country, project?) → latest-state summary per unit as ONE
+//     jsonb blob (RLS-gated). Per-project = small + fast (the common flow);
+//     whole-country (project=null) = the single ~7 MB call used only by global
+//     cross-project search.
+//   · unit_history(project, unit)       → one unit's full timeline, lazy, per
+//     picked/comparable unit (tens of ms each).
+//
+// Both inherit flats_archive's RLS gate (free user sees only their chosen
+// project; anon sees nothing), so there is no bypass path. Caches are module-
+// level and keyed by identity so a tier/country change refetches.
+
+let _unitSummCache = new Map();
+/** Latest-state unit summaries for a scope.
+ *  Pass { projectId } for one project's units (grid / comparables), or
+ *  { all: true } for every unit (global search). Neither → returns []. */
+export function useUnitSummaries({ projectId = null, all = false } = {}) {
+  const { loading: authLoading, user, profile } = useAuth();
+  const { country } = useCountry();
+  const scope = projectId ? `p:${projectId}` : (all ? "all" : "none");
+  const idKey = user
+    ? `${user.id}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}::${country}::${scope}`
+    : `anon::${country}::${scope}`;
+  const [units, setUnits] = useState(_unitSummCache.get(idKey) || []);
+  const [loading, setLoading] = useState(scope !== "none" && !_unitSummCache.has(idKey));
+
+  useEffect(() => {
+    if (scope === "none") { setUnits([]); setLoading(false); return; }
+    if (!isSupabaseReady()) { setLoading(false); return; }
+    if (authLoading) return;
+    if (_unitSummCache.has(idKey)) { setUnits(_unitSummCache.get(idKey)); setLoading(false); return; }
+    let cancelled = false;
+    setLoading(true);
+    (async () => {
+      const { data, error } = await supabase.rpc("unit_list_json", {
+        p_country: country,
+        p_project_id: projectId,   // null when scope === 'all'
+      });
+      if (cancelled) return;
+      if (error) { console.error("[useUnitSummaries]", error); setLoading(false); return; }
+      const arr = _toEurDisplay(Array.isArray(data) ? data : []);
+      _unitSummCache.set(idKey, arr);
+      setUnits(arr);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [authLoading, idKey]);
+
+  return { units, loading };
+}
+
+let _unitHistCache = new Map();
+/** Lazily fetch full per-unit histories for a set of `${project_id}::${unit_id}`
+ *  keys. Returns a Map<key, rows[]> covering whichever keys have loaded, plus a
+ *  loading flag while any are still in flight. Each key is fetched once and
+ *  cached (per identity). */
+export function useUnitHistories(keys) {
+  const { loading: authLoading, user, profile } = useAuth();
+  const idPrefix = user ? `${user.id}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}` : "anon";
+  const wantKeys = Array.isArray(keys) ? keys : [];
+  const wantSig = wantKeys.slice().sort().join(",");
+  const [historyByKey, setHistoryByKey] = useState(() => new Map());
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isSupabaseReady() || authLoading) return;
+    let cancelled = false;
+    const assemble = () => {
+      const m = new Map();
+      for (const k of wantKeys) {
+        const cached = _unitHistCache.get(`${idPrefix}::${k}`);
+        if (cached) m.set(k, cached);
+      }
+      return m;
+    };
+    const need = wantKeys.filter(k => !_unitHistCache.has(`${idPrefix}::${k}`));
+    if (need.length === 0) { setHistoryByKey(assemble()); setLoading(false); return; }
+    setLoading(true);
+    (async () => {
+      await Promise.all(need.map(async (k) => {
+        const sep = k.indexOf("::");
+        const pid = k.slice(0, sep);
+        const uid = k.slice(sep + 2);
+        const { data, error } = await supabase.rpc("unit_history", { p_project_id: pid, p_unit_id: uid });
+        if (error) { console.error("[useUnitHistories]", k, error); _unitHistCache.set(`${idPrefix}::${k}`, []); return; }
+        _unitHistCache.set(`${idPrefix}::${k}`, _toEurDisplay(data || []));
+      }));
+      if (cancelled) return;
+      setHistoryByKey(assemble());
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [authLoading, idPrefix, wantSig]);
+
+  return { historyByKey, loading };
+}
+
 /** Early access slot count for the marketing badge. Public table. */
 export function useEarlyAccessStats() {
   const [stats, setStats] = useState({ paid_count: 0, remaining_slots: 9 });

@@ -36,8 +36,8 @@
  *   8. CSV export — one row per (unit, month) for valuers/banks
  *      who paste comparables into their own reports
  */
-import { useState, useMemo, useEffect, useRef } from "react";
-import { useProjects, useFlatsArchive, useArchiveMonths } from "../lib/useData";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useProjects, useUnitSummaries, useUnitHistories, useArchiveMonths } from "../lib/useData";
 import { useCapabilities } from "../lib/useCapabilities";
 import { track } from "../lib/track";
 import { moneyFromEur, moneySymbol } from "../lib/money";
@@ -95,30 +95,6 @@ const MAX_COMPARE = 4;
  *  an old row). */
 function tsOf(row) {
   return row?.batch_timestamp || row?.snapshot_month || "";
-}
-
-/** Group flats_archive rows by (project_id, unit_id) and order by
- *  batch_timestamp asc within each group. Returns Map<key, rows[]>.
- *
- *  Each batch is its own data point. Two batches in the same calendar
- *  month produce two points on the chart, the way the user expects to
- *  see "Apr 17 -> Apr 27 -> Apr 29 -> May ..." evolution. */
-function groupByUnit(flats) {
-  const map = new Map();
-  for (const f of flats) {
-    if (!f.project_id || !f.unit_id) continue;
-    const key = `${f.project_id}::${f.unit_id}`;
-    if (!map.has(key)) map.set(key, []);
-    map.get(key).push(f);
-  }
-  // Sort by parsed ms (tsToMs handles ISO + YYYY-MM-DD + YYYY-MM legacy).
-  // localeCompare on raw strings worked for today's data because Variant-X
-  // ISO timestamps and YYYY-MM legacy still happened to sort correctly as
-  // strings, but the order broke for mixed-format rows in the same month.
-  for (const arr of map.values()) {
-    arr.sort((a, b) => tsToMs(tsOf(a)) - tsToMs(tsOf(b)));
-  }
-  return map;
 }
 
 /** Compact event summary for a unit's history — first/sold/last. */
@@ -203,7 +179,6 @@ export default function UnitTracker({ lang = "sk", setCurrent }) {
   const canFull = can("view_analytics");
 
   const { projects, loading: loadingProjects } = useProjects();
-  const { flats, loading: loadingFlats, progress: flatsProgress } = useFlatsArchive();
   const { months: archiveMonths } = useArchiveMonths();
 
   const projectById = useMemo(() => {
@@ -212,32 +187,12 @@ export default function UnitTracker({ lang = "sk", setCurrent }) {
     return m;
   }, [projects]);
 
-  // Enrich flats with project metadata so cards/charts can show name
-  const enriched = useMemo(() => {
-    if (!flats?.length) return [];
-    return flats.map(f => {
-      const p = projectById[f.project_id];
-      return {
-        ...f,
-        project_name: p?.name || f.project_id,
-        district:     p?.district || null,
-        developer:    p?.developer || null,
-      };
-    });
-  }, [flats, projectById]);
+  // ── UI state ──────────────────────────────────────────────────
+  const [pickedKeys, setPickedKeys] = useState([]);   // `${project_id}::${unit_id}` keys
+  const [projFilter, setProjFilter] = useState(null); // selected project (picker + mini-grid)
+  const [search, setSearch] = useState("");           // unit / project search text
+  const [yMode, setYMode] = useState("total");        // chart Y-axis: total price vs €/m²
 
-  const byUnit = useMemo(() => groupByUnit(enriched), [enriched]);
-
-  // Picked units — array of `${project_id}::${unit_id}` keys
-  const [pickedKeys, setPickedKeys] = useState([]);
-  // Project filter (for picker scope and mini-grid)
-  const [projFilter, setProjFilter] = useState(null);
-  // Search across all units
-  const [search, setSearch] = useState("");
-  // Y-axis mode: total price vs €/m²
-  const [yMode, setYMode] = useState("total");
-
-  // Reset picks if user changes project filter
   const togglePick = (key) => {
     setPickedKeys(prev => {
       if (prev.includes(key)) return prev.filter(k => k !== key);
@@ -246,13 +201,91 @@ export default function UnitTracker({ lang = "sk", setCurrent }) {
     });
   };
 
-  // Histories of all picked units, in order picked.
-  const pickedHistories = useMemo(
-    () => pickedKeys.map(k => ({ key: k, rows: byUnit.get(k) || [] })),
-    [pickedKeys, byUnit]
+  const keyProject = (k) => k.slice(0, k.indexOf("::"));
+
+  const toTile = useCallback((u) => {
+    const p = projectById[u.project_id];
+    return {
+      key: `${u.project_id}::${u.unit_id}`,
+      project_id: u.project_id,
+      project_name: p?.name || u.project_id,
+      district: p?.district || null,
+      unit_id: u.unit_id,
+      izby: u.izby,
+      obytna_plocha: u.obytna_plocha,
+      latest_stav: u.latest_stav,
+      latest_price: u.cena_s_dph,        // already EUR-overlaid by the hook
+    };
+  }, [projectById]);
+
+  // ── Server-side data (Phase 1: no more whole-archive client pull) ──
+  // Two narrow summary reads instead of pulling the whole archive:
+  //   · SEARCH scope — the picked project's units (mini-grid + in-place filter),
+  //     or every unit when the user is doing a global cross-project search (the
+  //     one ~7 MB lazy call). Deliberately independent of picks, so cross-project
+  //     compare via global search keeps working.
+  //   · COMPARABLE scope — the single picked unit's project, so we can find its
+  //     peers (same rooms, ±15 % area) without loading anything else.
+  const wantAllSearch = !projFilter && !!search.trim();
+  const { units: searchSummaries, loading: loadingSearch } =
+    useUnitSummaries({ projectId: projFilter, all: wantAllSearch });
+
+  const cmpProject = pickedKeys.length === 1 ? keyProject(pickedKeys[0]) : null;
+  const { units: cmpSummaries, loading: loadingCmp } =
+    useUnitSummaries({ projectId: cmpProject });
+
+  // Latest-state tiles for search results / mini-grid.
+  const allUnits = useMemo(
+    () => (searchSummaries || []).map(toTile),
+    [searchSummaries, toTile]
   );
 
-  const loading = loadingProjects || loadingFlats;
+  // Enrich raw history rows (from unit_history) with project metadata the UI reads.
+  const enrichRows = useCallback((rows) => (rows || []).map(r => {
+    const p = projectById[r.project_id];
+    return { ...r, project_name: p?.name || r.project_id, district: p?.district || null, developer: p?.developer || null };
+  }), [projectById]);
+
+  // Comparables for a single picked unit: same project, same rooms, ±15% area —
+  // matched against the picked unit's own project summaries.
+  const comparableKeys = useMemo(() => {
+    if (pickedKeys.length !== 1) return [];
+    const pk = pickedKeys[0];
+    const peers = (cmpSummaries || []).map(toTile);
+    const primary = peers.find(u => u.key === pk);
+    if (!primary) return [];
+    const tArea = Number(primary.obytna_plocha) || 0;
+    return peers
+      .filter(u => u.key !== pk && isComparable(primary, u))
+      .map(u => ({ key: u.key, dist: (tArea > 0 && Number(u.obytna_plocha) > 0) ? Math.abs(Number(u.obytna_plocha) - tArea) : Infinity }))
+      .sort((a, b) => a.dist - b.dist)
+      .slice(0, 8)
+      .map(x => x.key);
+  }, [pickedKeys, cmpSummaries, toTile]);
+
+  // Lazy per-unit histories — only for picked + comparable units.
+  const historyKeys = useMemo(
+    () => Array.from(new Set([...pickedKeys, ...comparableKeys])),
+    [pickedKeys, comparableKeys]
+  );
+  const { historyByKey, loading: loadingHist } = useUnitHistories(historyKeys);
+
+  const pickedHistories = useMemo(
+    () => pickedKeys.map(k => ({ key: k, rows: enrichRows(historyByKey.get(k) || []) })),
+    [pickedKeys, historyByKey, enrichRows]
+  );
+  const comparables = useMemo(
+    () => comparableKeys
+      .map(k => ({ key: k, rows: enrichRows(historyByKey.get(k) || []) }))
+      .filter(c => c.rows.length > 0),
+    [comparableKeys, historyByKey, enrichRows]
+  );
+
+  // Whole screen only blocks on the (cached, fast) projects list now.
+  const loading = loadingProjects;
+  // Secondary, in-place spinners while a scope / history loads.
+  const loadingScope = loadingSearch;
+  const loadingDetail = loadingHist || (!!cmpProject && loadingCmp);
 
   return (
     <div style={{ padding: "1.5rem 2rem 4rem", maxWidth: 1280, margin: "0 auto" }}>
@@ -271,11 +304,6 @@ export default function UnitTracker({ lang = "sk", setCurrent }) {
       {loading && (
         <div style={{ color: dim, fontFamily: mono, fontSize: "0.85rem", padding: "2rem 0" }}>
           {L("Načítavam…", "Loading…")}
-          {flatsProgress > 0 && (
-            <span style={{ marginLeft: "0.5rem", opacity: 0.7 }}>
-              ({flatsProgress.toLocaleString(lang === "sk" ? "sk-SK" : "en-US")} {L("záznamov", "records")})
-            </span>
-          )}
         </div>
       )}
 
@@ -283,7 +311,9 @@ export default function UnitTracker({ lang = "sk", setCurrent }) {
         <>
           <PickerRow
             projects={projects}
-            byUnit={byUnit}
+            allUnits={allUnits}
+            projectById={projectById}
+            loadingScope={loadingScope}
             pickedKeys={pickedKeys}
             togglePick={togglePick}
             clearAll={() => setPickedKeys([])}
@@ -295,10 +325,11 @@ export default function UnitTracker({ lang = "sk", setCurrent }) {
           />
 
           {/* Once user has picked at least 1 unit → detail/compare view */}
-          {pickedHistories.length > 0 && (
+          {pickedKeys.length > 0 && (
             <DetailView
               pickedHistories={pickedHistories}
-              byUnit={byUnit}
+              comparables={comparables}
+              loadingDetail={loadingDetail}
               yMode={yMode}
               setYMode={setYMode}
               lang={lang}
@@ -311,10 +342,11 @@ export default function UnitTracker({ lang = "sk", setCurrent }) {
               Also passes `search` so the SAME search box from the picker
               filters this grid in-place (instead of triggering a separate
               dropdown — that was the duplicate-list confusion). */}
-          {pickedHistories.length === 0 && projFilter && (
+          {pickedKeys.length === 0 && projFilter && (
             <MiniGrid
               project={projectById[projFilter]}
-              byUnit={byUnit}
+              units={allUnits}
+              loadingScope={loadingScope}
               search={search}
               onPick={(key) => setPickedKeys([key])}
               lang={lang}
@@ -322,7 +354,7 @@ export default function UnitTracker({ lang = "sk", setCurrent }) {
           )}
 
           {/* Empty state — no project, no unit picked */}
-          {pickedHistories.length === 0 && !projFilter && (
+          {pickedKeys.length === 0 && !projFilter && (
             <EmptyState lang={lang} canFull={canFull} archiveMonths={archiveMonths} />
           )}
         </>
@@ -333,30 +365,11 @@ export default function UnitTracker({ lang = "sk", setCurrent }) {
 
 // ── Picker row ──────────────────────────────────────────────────
 
-function PickerRow({ projects, byUnit, pickedKeys, togglePick, clearAll, projFilter, setProjFilter, search, setSearch, lang }) {
-  // Universal search across all units. Used ONLY when no project is
-  // picked (state: "empty" / global search). When a project IS picked
-  // the same search box filters the mini-grid in-place — see MiniGrid
-  // — so we never show two parallel lists.
-  const allUnits = useMemo(() => {
-    const out = [];
-    for (const [key, rows] of byUnit) {
-      const r0 = rows[0];
-      out.push({
-        key,
-        project_id: r0.project_id,
-        project_name: r0.project_name,
-        unit_id: r0.unit_id,
-        district: r0.district,
-        izby: r0.izby,
-        obytna_plocha: r0.obytna_plocha,
-        latest_stav: rows[rows.length - 1].stav,
-        latest_price: rows[rows.length - 1].cena_s_dph,
-      });
-    }
-    return out;
-  }, [byUnit]);
-
+function PickerRow({ projects, allUnits, projectById, loadingScope, pickedKeys, togglePick, clearAll, projFilter, setProjFilter, search, setSearch, lang }) {
+  // `allUnits` are latest-state summaries for the active scope (one project, or
+  // the whole country when global-searching). Used ONLY when no project is
+  // picked (global search). When a project IS picked the same search box filters
+  // the mini-grid in-place — see MiniGrid — so we never show two parallel lists.
   const globalResults = useMemo(() => {
     if (!search.trim() || projFilter) return [];
     const q = search.trim().toLowerCase();
@@ -438,6 +451,13 @@ function PickerRow({ projects, byUnit, pickedKeys, togglePick, clearAll, projFil
         </div>
       </div>
 
+      {/* Global search loading hint (the one ~7 MB all-units call, lazy). */}
+      {loadingScope && !projFilter && search.trim() && globalResults.length === 0 && (
+        <div style={{ marginTop: "0.95rem", color: dim, fontFamily: mono, fontSize: "0.78rem" }}>
+          {lang === "sk" ? "Hľadám naprieč všetkými bytmi…" : "Searching across all units…"}
+        </div>
+      )}
+
       {/* Global search results — ONLY when no project picked + has search query.
           Never shown alongside the mini-grid (which appears when project picked). */}
       {globalResults.length > 0 && (
@@ -465,8 +485,8 @@ function PickerRow({ projects, byUnit, pickedKeys, togglePick, clearAll, projFil
       {pickedKeys.length > 0 && (
         <div style={{ marginTop: "0.95rem", display: "flex", flexWrap: "wrap", gap: "0.4rem", alignItems: "center" }}>
           {pickedKeys.map((k, i) => {
-            const rows = byUnit.get(k) || [];
-            const r = rows[0];
+            const sep = k.indexOf("::");
+            const r = { unit_id: k.slice(sep + 2), project_name: projectById[k.slice(0, sep)]?.name };
             const color = COMPARE_PALETTE[i % COMPARE_PALETTE.length];
             return (
               <button
@@ -581,36 +601,26 @@ const selectStyle = {
 
 // ── Detail view (KPIs + chart + status timeline) ────────────────
 
-function DetailView({ pickedHistories, byUnit, yMode, setYMode, lang, onProjectClick, onBackToList }) {
+function DetailView({ pickedHistories, comparables, loadingDetail, yMode, setYMode, lang, onProjectClick, onBackToList }) {
   // Single-unit mode for KPIs: take first picked. Multi-unit overlays
   // chart but keeps single KPI strip for the FIRST picked unit (the
-  // "primary" focus). User-feedback iterating possible.
+  // "primary" focus). Comparables (same project, similar size) are computed
+  // upstream from the project's summaries and passed in as { key, rows }.
   const primary = pickedHistories[0];
   const primaryRows = primary?.rows || [];
   const lifecycle = summariseLifecycle(primaryRows);
   const r0 = primaryRows[0];
 
-  // Comparables: only when 1 unit picked. Find similar units in same
-  // project. Drawn as faint background lines on the chart. Sorted by
-  // area-distance ascending so the 8 closest peers always render first,
-  // regardless of Map iteration order (which is Supabase-pagination
-  // insertion order — non-deterministic from the user's perspective).
-  const comparables = useMemo(() => {
-    if (pickedHistories.length !== 1 || !r0) return [];
-    const matches = [];
-    const tArea = Number(r0.obytna_plocha) || 0;
-    for (const [key, rows] of byUnit) {
-      if (key === primary.key) continue;
-      const candidate = rows[0];
-      if (isComparable(r0, candidate)) {
-        const cArea = Number(candidate.obytna_plocha) || 0;
-        const dist = tArea > 0 && cArea > 0 ? Math.abs(cArea - tArea) : Infinity;
-        matches.push({ key, rows, _dist: dist });
-      }
-    }
-    matches.sort((a, b) => a._dist - b._dist);
-    return matches.slice(0, 8);  // cap to keep chart readable
-  }, [pickedHistories, byUnit, primary, r0]);
+  // Histories load lazily per picked unit — show a loader until the primary
+  // unit's series arrives, so the chart's "no price points" empty state doesn't
+  // flash during the fetch.
+  if (loadingDetail && primaryRows.length === 0) {
+    return (
+      <div style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 12, padding: "1.5rem", color: dim, fontFamily: mono, fontSize: "0.85rem", textAlign: "center" }}>
+        {lang === "sk" ? "Načítavam históriu bytu…" : "Loading unit history…"}
+      </div>
+    );
+  }
 
   return (
     <>
@@ -1402,20 +1412,20 @@ function StatusTimelineCard({ pickedHistories, lang }) {
 
 // ── Mini-grid (project picked, no unit yet) ─────────────────────
 
-function MiniGrid({ project, byUnit, search, onPick, lang }) {
-  // Collect all units in this project. useMemo MUST come before any
-  // conditional early return — React enforces hook-call order.
+function MiniGrid({ project, units: scopeUnits, loadingScope, search, onPick, lang }) {
+  // Units in this project, from latest-state summaries (one row per unit). The
+  // per-unit mini-sparkline was dropped here on purpose: it was the only thing
+  // that forced downloading every unit's full history for the whole project
+  // (e.g. 56k rows for Slnečnice). Latest price/status is shown instead; the
+  // full price curve is one click away. useMemo MUST come before any early
+  // return — React enforces hook-call order.
   const units = useMemo(() => {
     if (!project) return [];
-    const out = [];
-    for (const [key, rows] of byUnit) {
-      if (rows[0]?.project_id === project.id) {
-        out.push({ key, rows });
-      }
-    }
-    out.sort((a, b) => String(a.rows[0].unit_id).localeCompare(String(b.rows[0].unit_id), undefined, { numeric: true }));
-    return out;
-  }, [byUnit, project]);
+    return (scopeUnits || [])
+      .filter(u => u.project_id === project.id)
+      .slice()
+      .sort((a, b) => String(a.unit_id).localeCompare(String(b.unit_id), undefined, { numeric: true }));
+  }, [scopeUnits, project]);
 
   // Apply in-place search filter — same search box that lives in the
   // picker row above filters the grid here, so the user sees ONE list
@@ -1423,10 +1433,11 @@ function MiniGrid({ project, byUnit, search, onPick, lang }) {
   const filtered = useMemo(() => {
     if (!search?.trim()) return units;
     const q = search.trim().toLowerCase();
-    return units.filter(u => String(u.rows[0].unit_id).toLowerCase().includes(q));
+    return units.filter(u => String(u.unit_id).toLowerCase().includes(q));
   }, [units, search]);
 
   if (!project) return null;
+  const isLoading = loadingScope && units.length === 0;
 
   return (
     <div style={{
@@ -1440,7 +1451,9 @@ function MiniGrid({ project, byUnit, search, onPick, lang }) {
             {project.name}
           </h3>
           <div style={{ fontSize: "0.78rem", color: dim, marginTop: "0.25rem" }}>
-            {filtered.length === units.length
+            {isLoading
+              ? (lang === "sk" ? "Načítavam byty…" : "Loading units…")
+              : filtered.length === units.length
               ? (lang === "sk" ? `${units.length} bytov · klikni na byt pre jeho vývoj` : `${units.length} units · click one to open its timeline`)
               : (lang === "sk" ? `${filtered.length} z ${units.length} bytov · upravený filter` : `${filtered.length} of ${units.length} units · filtered`)}
           </div>
@@ -1452,14 +1465,16 @@ function MiniGrid({ project, byUnit, search, onPick, lang }) {
         gap: "0.55rem",
         maxHeight: 640, overflowY: "auto",
       }}>
-        {filtered.length === 0 ? (
+        {isLoading ? (
+          <div style={{ gridColumn: "1 / -1", padding: "1.2rem", color: dim, fontFamily: mono, fontSize: "0.85rem", textAlign: "center" }}>
+            {lang === "sk" ? "Načítavam byty…" : "Loading units…"}
+          </div>
+        ) : filtered.length === 0 ? (
           <div style={{ gridColumn: "1 / -1", padding: "1.2rem", color: dim, fontSize: "0.85rem", fontStyle: "italic", textAlign: "center" }}>
             {lang === "sk" ? "Žiadne byty zodpovedajúce filtru." : "No units match the filter."}
           </div>
         ) : filtered.map(u => {
-          const r0 = u.rows[0];
-          const last = u.rows[u.rows.length - 1];
-          const stavCol = STAV_COLOR[last.stav] || dim;
+          const stavCol = STAV_COLOR[u.latest_stav] || dim;
           return (
             <button
               key={u.key}
@@ -1482,65 +1497,28 @@ function MiniGrid({ project, byUnit, search, onPick, lang }) {
               }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "0.5rem", marginBottom: "0.25rem" }}>
-                <strong style={{ color: text, fontSize: "0.92rem", letterSpacing: "-0.01em" }}>{r0.unit_id}</strong>
+                <strong style={{ color: text, fontSize: "0.92rem", letterSpacing: "-0.01em" }}>{u.unit_id}</strong>
                 <span style={{ color: stavCol, fontSize: "0.7rem", fontWeight: 700, padding: "0.1rem 0.4rem", background: `${stavCol}1a`, borderRadius: 3 }}>
-                  {last.stav}
+                  {u.latest_stav}
                 </span>
               </div>
               <div style={{ fontSize: "0.74rem", color: dim, lineHeight: 1.45 }}>
-                {r0.izby ? `${r0.izby}-izb` : ""}
-                {r0.izby && r0.obytna_plocha ? " · " : ""}
-                {r0.obytna_plocha ? `${r0.obytna_plocha} m²` : ""}
-                {(r0.izby || r0.obytna_plocha) && last.cena_s_dph ? <br/> : ""}
-                {last.cena_s_dph && (
-                  <span style={{ color: text, fontWeight: 600, fontFamily: mono, fontSize: "0.8rem" }}>{formatPrice(last.cena_s_dph)}</span>
+                {u.izby ? `${u.izby}-izb` : ""}
+                {u.izby && u.obytna_plocha ? " · " : ""}
+                {u.obytna_plocha ? `${u.obytna_plocha} m²` : ""}
+                {(u.izby || u.obytna_plocha) && u.latest_price ? <br/> : ""}
+                {u.latest_price && (
+                  <span style={{ color: text, fontWeight: 600, fontFamily: mono, fontSize: "0.8rem" }}>{formatPrice(u.latest_price)}</span>
                 )}
-                {last.cena_s_dph && r0.obytna_plocha && (
-                  <span style={{ color: dim, marginLeft: "0.35rem", fontSize: "0.7rem" }}>· {formatPerM2(last.cena_s_dph / r0.obytna_plocha)}</span>
+                {u.latest_price && u.obytna_plocha && (
+                  <span style={{ color: dim, marginLeft: "0.35rem", fontSize: "0.7rem" }}>· {formatPerM2(u.latest_price / u.obytna_plocha)}</span>
                 )}
               </div>
-              {/* Mini-sparkline — when there are 2+ data points, show line shape */}
-              {u.rows.length >= 2 && (
-                <MiniSparkline rows={u.rows} />
-              )}
             </button>
           );
         })}
       </div>
     </div>
-  );
-}
-
-function MiniSparkline({ rows }) {
-  const values = rows.map(r => r.cena_s_dph).filter(v => Number.isFinite(v));
-  if (values.length < 2) return null;
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min || 1;
-  const W = 240, H = 22;
-  // Guard against div-by-zero when rows has exactly 1 valid row pre-filter
-  // (shouldn't happen because of values.length<2 guard, but if rows are
-  // sparse with only 1 valid out of many, denominator is rows.length-1 not
-  // values.length-1, so we need to be defensive).
-  const denom = Math.max(1, rows.length - 1);
-  const xs = (i) => (i / denom) * W;
-  const ys = (v) => H - ((v - min) / range) * H;
-  // Build path by collecting valid points first, then mapping to SVG
-  // commands. The first valid point uses "M", subsequent ones "L". An
-  // earlier version used `${i === 0 ? "M" : "L"}` based on the rows[]
-  // index, which produced invalid paths starting with "L" whenever the
-  // first row had a null cena_s_dph (path silently failed to render).
-  const validPoints = [];
-  for (let i = 0; i < rows.length; i++) {
-    const v = rows[i].cena_s_dph;
-    if (!Number.isFinite(v)) continue;
-    validPoints.push({ i, v });
-  }
-  const path = validPoints.map((p, idx) => `${idx === 0 ? "M" : "L"} ${xs(p.i)} ${ys(p.v)}`).join(" ");
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: 22, marginTop: "0.4rem", display: "block" }}>
-      <path d={path} stroke={green} strokeWidth="1.5" fill="none" opacity="0.8"/>
-    </svg>
   );
 }
 
