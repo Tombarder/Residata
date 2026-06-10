@@ -1,5 +1,6 @@
 import { useMetrics } from "../lib/useData";
 import { liveT } from "../lib/liveLang";
+import { useCurrency } from "../lib/useCurrency";
 
 /**
  * Bloomberg-terminal style ticker.
@@ -9,14 +10,25 @@ import { liveT } from "../lib/liveLang";
 export default function Ticker({ lang = "en" }) {
   const t = liveT[lang] || liveT.en;
   const { metrics, loading } = useMetrics();
+  // Currency toggle: in native (CZK) mode show the native-currency copy
+  // (value_text_native / value_json.text_en_native). For Slovakia these equal
+  // the € copy, so SK is unchanged. Consuming useCurrency() also re-renders the
+  // ticker the instant the user flips the toggle.
+  const { mode } = useCurrency();
+  const native = mode === "native";
 
-  // Language-aware ticker text. Each metric row stores the SK copy
-  // in value_text (legacy source of truth) and an EN copy in
-  // value_json.text_en (added 2026-04-24). EN reader falls back to
-  // SK if the EN translation is missing (e.g. a newly-added metric
-  // that the sync script hasn't emitted an EN variant for yet).
-  const pickText = (m) =>
-    (lang === "en" && m.value_json && m.value_json.text_en) || m.value_text || null;
+  // Language-aware ticker text. Each metric stores the SK copy in value_text and
+  // an EN copy in value_json.text_en; the CZK-native variants are
+  // value_text_native / value_json.text_en_native (the EN-native one is optional —
+  // EN gracefully falls back to the € EN copy until it exists). EN falls back to SK.
+  const pickText = (m) => {
+    if (lang === "en") {
+      return (native && m.value_json && m.value_json.text_en_native)
+        || (m.value_json && m.value_json.text_en)
+        || m.value_text || null;
+    }
+    return (native && m.value_text_native) || m.value_text || null;
+  };
 
   const items = (metrics.length > 0
     ? metrics.map(pickText).filter(Boolean)
