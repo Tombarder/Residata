@@ -27,9 +27,10 @@
  * analysis — no LLM calls, no ai_usage_log writes.
  */
 import { useState, useMemo, useEffect } from "react";
-import { useProjects, useFlatsCurrent, useProjectSnapshots } from "../lib/useData";
+import { useProjects, useProjectSnapshots, useReportHistogram, fetchReportBinUnits, useReportProjectUnits, useReportComparables } from "../lib/useData";
 import { moneyFromEur, moneySymbol } from "../lib/money";
 import { useCurrency } from "../lib/useCurrency";
+import { useCountry } from "../lib/useCountry";
 import { supabase } from "../lib/supabase";
 
 // ── Visual language (mirrors Platform.jsx) ───────────────────────
@@ -69,7 +70,6 @@ const SCOPES = [
 export default function PlatformReports({ lang = "sk" }) {
   useCurrency(); // subscribe: re-render every report price/€/m² on currency toggle
   const { projects: allProjects, loading: loadingProjects } = useProjects();
-  const { flats: allFlats,       loading: loadingFlats }    = useFlatsCurrent();
 
   // Active subset — used for every "current market" aggregate (Market /
   // City / District / Developer scopes). Headline numbers must match
@@ -84,14 +84,15 @@ export default function PlatformReports({ lang = "sk" }) {
     () => allProjects.filter(p => (p.status || "active") === "active"),
     [allProjects]
   );
-  const activeFlats = useMemo(() => {
-    const ids = new Set(activeProjects.map(p => p.id));
-    return allFlats.filter(f => ids.has(f.project_id));
-  }, [allFlats, activeProjects]);
 
-  // Default-scope (everything except Project) reads these:
+  // Default-scope (everything except Project) reads this. Forever perf fix
+  // (2026-06-11): Reports no longer pulls flats_current (32k rows, ~30s). KPIs +
+  // district/developer breakdowns + tables derive from projects (projects_live is
+  // honest in v2 — its rollups match real unit counts exactly). The only
+  // unit-level pieces — price histogram, its drilldown, the project deep-dive and
+  // the comparables tab — are server-side RPCs (see useReportHistogram /
+  // fetchReportBinUnits / useReportProjectUnits / useReportComparables).
   const projects = activeProjects;
-  const flats    = activeFlats;
 
   const [scope, setScope]         = useState("market");
   const [cityPick, setCityPick]   = useState(null);
@@ -116,7 +117,7 @@ export default function PlatformReports({ lang = "sk" }) {
     if (!devPick  && developers[0])   setDevPick(developers[0]);
   }, [cities, districts, projects, developers]); // eslint-disable-line
 
-  const loading = loadingProjects || loadingFlats;
+  const loading = loadingProjects;
 
   // Scope-drill callback: clicking a row in the "Projects in scope"
   // table switches the whole report to the Project scope for that ID.
@@ -140,7 +141,7 @@ export default function PlatformReports({ lang = "sk" }) {
   // loader until real numbers exist, never a zeroed-out report. Once both
   // datasets are present a background refetch (loading=true again) keeps the
   // report on screen — no loader flash — because the data conditions hold.
-  if (loading && (projects.length === 0 || flats.length === 0)) {
+  if (loading && projects.length === 0) {
     return (
       <div style={{ padding: "3rem 2rem", color: dim, fontFamily: mono, fontSize: "0.85rem" }}>
         {lang === "sk" ? "Načítavam report…" : "Loading report…"}
@@ -172,7 +173,7 @@ export default function PlatformReports({ lang = "sk" }) {
         .rep-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
       `}</style>
       <ReportHeader
-        projects={projects} flats={flats} lang={lang}
+        projects={projects} lang={lang}
         scope={scope}
         scopeLabel={
           scope === "mesto"     ? cityPick  :
@@ -243,21 +244,19 @@ export default function PlatformReports({ lang = "sk" }) {
         <PickerRow label={lang === "sk" ? "Developer" : "Developer"} value={devPick} options={developers} onChange={setDevPick} />
       )}
 
-      {/* Scope bodies */}
+      {/* Scope bodies — flats are no longer threaded down; each scope's
+          unit-level data (histogram / drilldown / project units) is fetched
+          server-side by the child via the report RPCs. */}
       {scope === "market" && (
-        <MarketReport projects={projects} flats={flats} onOpenProject={openProject} lang={lang} />
+        <MarketReport projects={projects} onOpenProject={openProject} lang={lang} />
       )}
       {scope === "mesto" && cityPick && (
         <FilteredReport
           scopeLabel={cityPick}
           scopeType={lang === "sk" ? "Mesto" : "City"}
+          rpcScopeType="city" rpcScopeValue={cityPick}
           projects={projects.filter(p => cityOf(p) === cityPick)}
-          flats={flats.filter(f => {
-            const p = projects.find(x => x.id === f.project_id);
-            return p && cityOf(p) === cityPick;
-          })}
           allProjects={projects}
-          allFlats={flats}
           onOpenProject={openProject}
           lang={lang}
           breakdownBy="district"
@@ -268,10 +267,9 @@ export default function PlatformReports({ lang = "sk" }) {
         <FilteredReport
           scopeLabel={distPick}
           scopeType={lang === "sk" ? "Časť mesta" : "District"}
+          rpcScopeType="cast" rpcScopeValue={distPick}
           projects={projects.filter(p => p.district === distPick)}
-          flats={flats.filter(f => projectDistrict(f, projects) === distPick)}
           allProjects={projects}
-          allFlats={flats}
           onOpenProject={openProject}
           lang={lang}
           breakdownBy="developer"
@@ -279,15 +277,12 @@ export default function PlatformReports({ lang = "sk" }) {
         />
       )}
       {scope === "projekt" && projPick && (
-        // Project scope: lookup from allProjects (might be paused/sold_out)
-        // and use allFlats so we can show a historical project's data.
-        // Siblings + allFlats stay active-only so context comparisons
-        // (vs. the rest of the active market) make sense.
+        // Project scope: lookup from allProjects (might be paused/sold_out).
+        // ProjectReport fetches that project's units server-side (report_project_units);
+        // siblings stay active-only so context comparisons make sense.
         <ProjectReport
           project={allProjects.find(p => p.id === projPick)}
-          flats={allFlats.filter(f => f.project_id === projPick)}
           siblings={projects}
-          allFlats={flats}
           lang={lang}
         />
       )}
@@ -295,13 +290,9 @@ export default function PlatformReports({ lang = "sk" }) {
         <FilteredReport
           scopeLabel={devPick}
           scopeType={lang === "sk" ? "Developer" : "Developer"}
+          rpcScopeType="developer" rpcScopeValue={devPick}
           projects={projects.filter(p => p.developer === devPick)}
-          flats={flats.filter(f => {
-            const p = projects.find(x => x.id === f.project_id);
-            return p && p.developer === devPick;
-          })}
           allProjects={projects}
-          allFlats={flats}
           onOpenProject={openProject}
           lang={lang}
           breakdownBy="name"
@@ -315,7 +306,7 @@ export default function PlatformReports({ lang = "sk" }) {
         <SellOutForecastReport projects={projects} lang={lang} onOpenProject={openProject} />
       )}
       {scope === "comparables" && (
-        <ComparableTransactionsReport projects={projects} flats={flats} lang={lang} />
+        <ComparableTransactionsReport projects={projects} lang={lang} />
       )}
       {scope === "tension" && (
         <PricingTensionReport projects={projects} lang={lang} onOpenProject={openProject} />
@@ -364,9 +355,11 @@ export default function PlatformReports({ lang = "sk" }) {
 }
 
 /* ─── Header card: title + month + print + scope-aware subtitle ─── */
-function ReportHeader({ projects, flats, lang, scope, scopeLabel }) {
+function ReportHeader({ projects, lang, scope, scopeLabel }) {
   const month = new Date().toLocaleDateString(lang === "sk" ? "sk-SK" : "en-US", { month: "long", year: "numeric" });
   const lastSync = projects[0]?.last_updated?.slice(0, 10) || new Date().toISOString().slice(0, 10);
+  // Unit count from projects_live rollups (honest in v2) — no flats fetch.
+  const totalUnits = useMemo(() => summariseProjects(projects).totalUnits, [projects]);
   // Display name of the scope tab ("Trh", "Mesto", "Projekt", …).
   const scopeName = SCOPES.find(s => s.key === scope)?.label[lang] || "";
   // For Project scope, scopeLabel is a UUID — resolve to human name for
@@ -387,12 +380,12 @@ function ReportHeader({ projects, flats, lang, scope, scopeLabel }) {
             {month}
           </h2>
           <p style={{ color: dim, fontSize: "0.82rem", margin: "0.4rem 0 0" }}>
-            {lang === "sk" ? "Dáta k" : "Data as of"} {lastSync} · {projects.length} {lang === "sk" ? "projektov" : "projects"} · {flats.length} {lang === "sk" ? "bytov" : "units"}
+            {lang === "sk" ? "Dáta k" : "Data as of"} {lastSync} · {projects.length} {lang === "sk" ? "projektov" : "projects"} · {totalUnits.toLocaleString("en-US").replace(/,/g, " ")} {lang === "sk" ? "bytov" : "units"}
           </p>
         </div>
         <div className="no-print" style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
           <SubscribeButton scope={scope} scopeLabel={scopeLabel} lang={lang} />
-          <button onClick={() => downloadScopeCSV(projects, flats, lang)}
+          <button onClick={() => downloadScopeCSV(projects, lang)}
             style={{
               background: "transparent", color: green, border: `1px solid ${green}55`,
               borderRadius: 4, padding: "0.5rem 0.9rem", fontFamily: mono,
@@ -558,12 +551,14 @@ function PickerRow({ label, value, options, onChange }) {
 /* ══════════════════════════════════════════════════════════════════
    Market report — global, "where the Slovak new-build market stands"
    ══════════════════════════════════════════════════════════════════ */
-function MarketReport({ projects, flats, onOpenProject, lang }) {
+function MarketReport({ projects, onOpenProject, lang }) {
   const { snapshots } = useProjectSnapshots();
-  const summary = useMemo(() => summariseProjects(projects, flats), [projects, flats]);
-  const priceSeries = useMemo(() => priceDistribution(flats, 12), [flats]);
-  const districts = useMemo(() => groupAggregates(projects, "district", lang, flats), [projects, flats, lang]);
-  const developers = useMemo(() => groupAggregates(projects, "developer", lang, flats).slice(0, 8), [projects, flats, lang]);
+  const { country } = useCountry();
+  const { bins: priceSeries } = useReportHistogram({ scopeType: "market", nbins: 12 });
+  const fetchBin = useMemo(() => (from, to) => fetchReportBinUnits({ country, scopeType: "market", from, to }), [country]);
+  const summary = useMemo(() => summariseProjects(projects), [projects]);
+  const districts = useMemo(() => groupAggregates(projects, "district", lang), [projects, lang]);
+  const developers = useMemo(() => groupAggregates(projects, "developer", lang).slice(0, 8), [projects, lang]);
   // Trend chart: filter snapshots to currently-active projects so the
   // historical line matches what the rest of Reports shows ("active
   // market over time"), not "all projects ever, including those that
@@ -583,7 +578,7 @@ function MarketReport({ projects, flats, onOpenProject, lang }) {
       </ReportSection>
 
       <ReportSection label={lang === "sk" ? "Rozloženie cien" : "Price distribution"} title={lang === "sk" ? "€/m² cez všetky byty \u2014 klik na pásmo otvorí zoznam bytov" : "€/m² across all units \u2014 click a band for the underlying units"}>
-        <Histogram bins={priceSeries} lang={lang} unit="€/m²" flats={flats} projects={projects} onProjectClick={onOpenProject} />
+        <Histogram bins={priceSeries} lang={lang} unit="€/m²" onFetchBin={fetchBin} onProjectClick={onOpenProject} />
       </ReportSection>
 
       <ReportSection label={lang === "sk" ? "Časti mesta" : "Districts"} title={lang === "sk" ? "Kde je dopyt a ceny najvyššie" : "Where demand and prices concentrate"}>
@@ -614,13 +609,14 @@ function MarketReport({ projects, flats, onOpenProject, lang }) {
    Signs: `scopeLabel` + `scopeType` identify what's narrowed;
           `projects` + `flats` are already filtered to that slice.
    ══════════════════════════════════════════════════════════════════ */
-function FilteredReport({ scopeLabel, scopeType, projects, flats, allProjects, allFlats, onOpenProject, lang, breakdownBy, breakdownLabel }) {
+function FilteredReport({ scopeLabel, scopeType, rpcScopeType, rpcScopeValue, projects, allProjects, onOpenProject, lang, breakdownBy, breakdownLabel }) {
   const { snapshots } = useProjectSnapshots();
-  const summary = useMemo(() => summariseProjects(projects, flats), [projects, flats]);
-  const globalSummary = useMemo(() => summariseProjects(allProjects, allFlats), [allProjects, allFlats]);
-  const priceSeries = useMemo(() => priceDistribution(flats, 12), [flats]);
-  const breakdown = useMemo(() => groupAggregates(projects, breakdownBy, lang, flats), [projects, flats, breakdownBy, lang]);
-  const siblings = useMemo(() => groupAggregates(allProjects, breakdownBy === "developer" ? "district" : "developer", lang, allFlats).slice(0, 6), [allProjects, allFlats, breakdownBy, lang]);
+  const { country } = useCountry();
+  const { bins: priceSeries } = useReportHistogram({ scopeType: rpcScopeType, scopeValue: rpcScopeValue, nbins: 12 });
+  const fetchBin = useMemo(() => (from, to) => fetchReportBinUnits({ country, scopeType: rpcScopeType, scopeValue: rpcScopeValue, from, to }), [country, rpcScopeType, rpcScopeValue]);
+  const summary = useMemo(() => summariseProjects(projects), [projects]);
+  const globalSummary = useMemo(() => summariseProjects(allProjects), [allProjects]);
+  const breakdown = useMemo(() => groupAggregates(projects, breakdownBy, lang), [projects, breakdownBy, lang]);
   const scopeProjectIds = useMemo(() => new Set(projects.map(p => p.id)), [projects]);
 
   if (projects.length === 0) {
@@ -643,7 +639,7 @@ function FilteredReport({ scopeLabel, scopeType, projects, flats, allProjects, a
 
       {priceSeries.some(b => b.count > 0) && (
         <ReportSection label={lang === "sk" ? "Rozloženie cien" : "Price distribution"} title={lang === "sk" ? "Kde sedí väčšina ponuky \u2014 klik na pásmo otvorí zoznam bytov" : "Where the bulk of supply sits \u2014 click a band for the underlying units"}>
-          <Histogram bins={priceSeries} lang={lang} unit="€/m²" flats={flats} projects={projects} onProjectClick={onOpenProject} />
+          <Histogram bins={priceSeries} lang={lang} unit="€/m²" onFetchBin={fetchBin} onProjectClick={onOpenProject} />
         </ReportSection>
       )}
 
@@ -658,7 +654,7 @@ function FilteredReport({ scopeLabel, scopeType, projects, flats, allProjects, a
       </ReportSection>
 
       <ReportSection label={lang === "sk" ? "Projekty v scope" : "Projects in scope"} title={lang === "sk" ? `Kompletný zoznam (${projects.length}) \u2014 klik otvorí projekt-report` : `Full list (${projects.length}) \u2014 click to open project report`}>
-        <ProjectTable projects={projects} flats={flats} lang={lang} onProjectClick={onOpenProject} />
+        <ProjectTable projects={projects} lang={lang} onProjectClick={onOpenProject} />
       </ReportSection>
 
       {snapshots && snapshots.length > 0 && (
@@ -675,10 +671,13 @@ function FilteredReport({ scopeLabel, scopeType, projects, flats, allProjects, a
 /* ══════════════════════════════════════════════════════════════════
    Project report — single-project deep dive.
    ══════════════════════════════════════════════════════════════════ */
-function ProjectReport({ project, flats, siblings, allFlats, lang }) {
+function ProjectReport({ project, siblings, lang }) {
   // Hoist all hooks before any early return to keep hook ordering stable
   // across renders (rules-of-hooks).
   const { snapshots } = useProjectSnapshots();
+  // This project's current units — fetched server-side (report_project_units),
+  // not sliced from a 32k global pull. `flats` alias keeps the rest unchanged.
+  const { units: flats } = useReportProjectUnits(project?.id);
   const summary = useMemo(() => project ? summariseProjects([project], flats) : null, [project, flats]);
   const districtSiblings = useMemo(
     // PA-11: same-district siblings must also be the same CITY (district names
@@ -686,17 +685,27 @@ function ProjectReport({ project, flats, siblings, allFlats, lang }) {
     () => project ? siblings.filter(p => p.district === project.district && (p.city || "") === (project.city || "") && p.id !== project.id) : [],
     [siblings, project]
   );
-  // District sibling summary: filter flats to only this district's siblings
-  const districtSiblingIds = useMemo(() => new Set(districtSiblings.map(p => p.id)), [districtSiblings]);
-  const districtFlats = useMemo(
-    () => Array.isArray(allFlats) ? allFlats.filter(f => districtSiblingIds.has(f.project_id)) : [],
-    [allFlats, districtSiblingIds]
-  );
-  const districtSummary = useMemo(() => summariseProjects(districtSiblings, districtFlats), [districtSiblings, districtFlats]);
+  // District benchmark from sibling projects' rollups (projects_live honest) — no flats.
+  const districtSummary = useMemo(() => summariseProjects(districtSiblings), [districtSiblings]);
   const byTyp = useMemo(() => groupAggregatesFromFlats(flats, "typ"), [flats]);
   const byIzby = useMemo(() => groupAggregatesFromFlats(flats, "izby"), [flats]);
   const byPoschodie = useMemo(() => groupAggregatesFromFlats(flats, "poschodie"), [flats]);
   const priceSeries = useMemo(() => priceDistribution(flats, 10), [flats]);
+  // Drilldown filters this project's in-memory units to the clicked €/m² band
+  // (EUR basis — useReportProjectUnits overlays price_s_dph_eur onto cena_s_dph).
+  const fetchBin = useMemo(() => (from, to) => Promise.resolve(
+    (flats || [])
+      .filter(f => (f.stav === "V" || f.stav === "R" || f.stav === "PR") && f.cena_s_dph > 0 && f.obytna_plocha > 0)
+      .map(f => ({ f, m2: f.cena_s_dph / f.obytna_plocha }))
+      .filter(x => x.m2 >= from && x.m2 < to)
+      .map(({ f, m2 }) => ({
+        flatId: `${f.project_id}-${f.unit_id}`, projectId: f.project_id,
+        project: project?.name, district: project?.district, izby: f.izby,
+        area: f.obytna_plocha == null ? null : Number(f.obytna_plocha),
+        price: f.cena_s_dph == null ? null : Number(f.cena_s_dph), m2: Math.round(m2),
+      }))
+      .sort((a, b) => a.m2 - b.m2)
+  ), [flats, project]);
 
   if (!project) {
     return <div style={{ color: dim, padding: "2rem" }}>{lang === "sk" ? "Nevybraný projekt." : "No project selected."}</div>;
@@ -749,7 +758,7 @@ function ProjectReport({ project, flats, siblings, allFlats, lang }) {
 
       {priceSeries.some(b => b.count > 0) && (
         <ReportSection label={lang === "sk" ? "Distribúcia cien" : "Price distribution"} title={lang === "sk" ? "€/m² naprieč bytmi \u2014 klik na pásmo otvorí zoznam bytov" : "€/m² across units \u2014 click a band for the underlying units"}>
-          <Histogram bins={priceSeries} lang={lang} unit="€/m²" flats={flats} projects={[project]} />
+          <Histogram bins={priceSeries} lang={lang} unit="€/m²" onFetchBin={fetchBin} />
         </ReportSection>
       )}
 
@@ -860,56 +869,30 @@ function ExecSummary({ summary, lang, extraDistrict, compared }) {
  * the same reading flow avoids a context switch. Modal would also
  * break when printing the report to PDF.
  */
-function Histogram({ bins, lang, unit, flats, projects, onProjectClick }) {
-  // ALL hooks must run on every render — putting an early return
-  // between useState and useMemo changed the hook count when `bins`
-  // toggled between empty and non-empty across renders (caused React
-  // #310 "rendered more hooks than during the previous render" crash
-  // on /app once metrics/projects had loaded). Fix: hoist every hook
-  // to the top, guard with nullish arrays inside, and only do the
-  // null render at the end.
-  const [openBin, setOpenBin] = useState(null);   // index of currently-expanded bin, or null
+function Histogram({ bins, lang, unit, onFetchBin, onProjectClick }) {
+  // ALL hooks must run on every render — guard with nullish arrays inside,
+  // early-return only at the end (avoids the React #310 hook-count crash).
+  const [openBin, setOpenBin] = useState(null);   // index of expanded bin, or null
+  const [drillRows, setDrillRows] = useState([]);
+  const [drillLoading, setDrillLoading] = useState(false);
   const safeBins = Array.isArray(bins) ? bins : [];
-  const drillable = Array.isArray(flats) && flats.length > 0;
+  const drillable = typeof onFetchBin === "function";
 
-  // Compute the list of flats for the open bin on demand — cheap
-  // filter on already-loaded data, no round-trip.
-  const flatsInOpenBin = useMemo(() => {
-    if (openBin == null || !drillable) return [];
-    const b = safeBins[openBin];
-    if (!b) return [];
-    const projById = new Map((projects || []).map(p => [p.id, p]));
-    const rows = [];
-    for (const f of flats) {
-      // Drill-down must mirror the histogram's scope: V/R/PR only.
-      // priceDistribution() filters the same way, so showing sold
-      // flats here would be inconsistent with the bin counts above.
-      if (f.stav !== "V" && f.stav !== "R" && f.stav !== "PR") continue;
-      const price = Number(f.cena_s_dph), area = Number(f.obytna_plocha);
-      if (!Number.isFinite(price) || !Number.isFinite(area) || area <= 0) continue;
-      const m2 = price / area;
-      if (m2 < 500 || m2 > 20000) continue;
-      // Include the last bin's upper edge (to) so the max value lands
-      // visibly; lower bins are [from, to).
-      const inRange = openBin === safeBins.length - 1
-        ? (m2 >= b.from && m2 <= b.to)
-        : (m2 >= b.from && m2 < b.to);
-      if (!inRange) continue;
-      const p = projById.get(f.project_id);
-      rows.push({
-        flatId: f.id,
-        projectId: f.project_id,
-        project: p?.name || "—",
-        district: p?.district || "—",
-        izby: f.izby,
-        area,
-        price,
-        m2: Math.round(m2),
-      });
-    }
-    rows.sort((a, b) => a.m2 - b.m2);
-    return rows;
-  }, [openBin, safeBins, flats, projects, drillable]);
+  // Drilldown is now lazy: clicking a band fetches its units server-side
+  // (report_bin_units) instead of filtering a 32k in-memory pull. Project
+  // scope resolves onFetchBin synchronously from its already-loaded units.
+  const handleBinClick = (i) => {
+    if (!drillable) return;
+    if (openBin === i) { setOpenBin(null); setDrillRows([]); return; }
+    const b = safeBins[i];
+    if (!b) return;
+    setOpenBin(i);
+    setDrillRows([]);
+    setDrillLoading(true);
+    Promise.resolve(onFetchBin(b.from, b.to))
+      .then((rows) => { setDrillRows(Array.isArray(rows) ? rows : []); setDrillLoading(false); })
+      .catch(() => { setDrillRows([]); setDrillLoading(false); });
+  };
 
   // Safe to early-return here — all hooks above have already been called.
   if (safeBins.length === 0) return null;
@@ -928,7 +911,7 @@ function Histogram({ bins, lang, unit, flats, projects, onProjectClick }) {
             unit={unit}
             clickable={drillable}
             active={openBin === i}
-            onClick={drillable ? () => setOpenBin(openBin === i ? null : i) : undefined}
+            onClick={drillable ? () => handleBinClick(i) : undefined}
           />
         ))}
       </div>
@@ -941,10 +924,11 @@ function Histogram({ bins, lang, unit, flats, projects, onProjectClick }) {
       {openBin != null && drillable && (
         <HistogramDrilldown
           bin={safeBins[openBin]}
-          rows={flatsInOpenBin}
+          rows={drillRows}
+          loading={drillLoading}
           unit={unit}
           lang={lang}
-          onClose={() => setOpenBin(null)}
+          onClose={() => { setOpenBin(null); setDrillRows([]); }}
           onProjectClick={onProjectClick}
         />
       )}
@@ -969,7 +953,7 @@ function Histogram({ bins, lang, unit, flats, projects, onProjectClick }) {
  * Project cell click calls onProjectClick (same pattern the
  * ProjectTable uses), so the user can jump to the Project scope.
  */
-function HistogramDrilldown({ bin, rows, unit, lang, onClose, onProjectClick }) {
+function HistogramDrilldown({ bin, rows, loading, unit, lang, onClose, onProjectClick }) {
   if (!bin) return null;
   const clickable = typeof onProjectClick === "function";
   const fmtEur = (v) => v == null ? "—" : Math.round(moneyFromEur(v)).toLocaleString(lang === "sk" ? "sk-SK" : "en-US");
@@ -981,7 +965,7 @@ function HistogramDrilldown({ bin, rows, unit, lang, onClose, onProjectClick }) 
             {lang === "sk" ? "Pásmo" : "Band"} {unit ? (unit === "€/m²" ? `${moneySymbol()}/m²` : unit) : ""}
           </div>
           <div style={{ fontSize: "0.92rem", color: text, fontWeight: 600, marginTop: 2 }}>
-            {bandLabel(bin)}{unit ? " " + (unit === "€/m²" ? `${moneySymbol()}/m²` : unit) : ""} · <span style={{ color: green, fontFamily: mono }}>{rows.length}</span>{" "}
+            {bandLabel(bin)}{unit ? " " + (unit === "€/m²" ? `${moneySymbol()}/m²` : unit) : ""} · <span style={{ color: green, fontFamily: mono }}>{loading ? "…" : rows.length}</span>{" "}
             <span style={{ color: dim, fontWeight: 400, fontSize: "0.8rem" }}>
               {lang === "sk" ? (rows.length === 1 ? "byt" : (rows.length < 5 ? "byty" : "bytov")) : (rows.length === 1 ? "unit" : "units")}
             </span>
@@ -995,7 +979,11 @@ function HistogramDrilldown({ bin, rows, unit, lang, onClose, onProjectClick }) 
           ✕ {lang === "sk" ? "zavrieť" : "close"}
         </button>
       </div>
-      {rows.length === 0 ? (
+      {loading ? (
+        <div style={{ padding: "1rem", color: dim, fontSize: "0.85rem", textAlign: "center", fontStyle: "italic" }}>
+          {lang === "sk" ? "Načítavam byty…" : "Loading units…"}
+        </div>
+      ) : rows.length === 0 ? (
         <div style={{ padding: "1rem", color: dim, fontSize: "0.85rem", textAlign: "center", fontStyle: "italic" }}>
           {lang === "sk" ? "Žiadne byty v tomto pásme." : "No units in this band."}
         </div>
@@ -1636,8 +1624,12 @@ function ForecastHistogram({ rows, lang }) {
    data fresh. (Once we accumulate multiple snapshot months we can
    relax this — flats from sold-out-under-tracking projects are
    genuine historical comps.) */
-function ComparableTransactionsReport({ projects, flats, lang }) {
-  // Only sold flats with usable pricing.
+function ComparableTransactionsReport({ projects, lang }) {
+  // Sold-with-price comparables fetched server-side (report_comparables, ~3k
+  // rows) only when this tab opens — not from the old 32k global pull.
+  const { units: flats, loading: compLoading } = useReportComparables();
+  // Only sold flats with usable pricing (the RPC already filters this; the
+  // guard stays as a belt-and-braces against any stray rows).
   const soldFlats = useMemo(() => flats.filter(f =>
     f.stav === "P" && f.cena_s_dph > 0 && f.obytna_plocha > 0
   ), [flats]);
@@ -1725,6 +1717,14 @@ function ComparableTransactionsReport({ projects, flats, lang }) {
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
+
+  if (compLoading && soldFlats.length === 0) {
+    return (
+      <div style={{ padding: "2rem", color: dim, fontFamily: mono, fontSize: "0.85rem", textAlign: "center" }}>
+        {lang === "sk" ? "Načítavam porovnateľné transakcie…" : "Loading comparable transactions…"}
+      </div>
+    );
+  }
 
   return (
     <>
@@ -2122,14 +2122,6 @@ function inferCity(district) {
   if (/^Trenčín\b/i.test(s))    return "Trenčín";
   return s;
 }
-function projectCity(flat, projects) {
-  const p = projects.find(pp => pp.id === flat.project_id);
-  return p ? (p.city || inferCity(p.district)) : null;
-}
-function projectDistrict(flat, projects) {
-  const p = projects.find(pp => pp.id === flat.project_id);
-  return p?.district || null;
-}
 function summariseProjects(projects, flats) {
   // === Single source of truth: the flats array ===
   //
@@ -2223,10 +2215,20 @@ function summariseProjects(projects, flats) {
   const soldPct = activeTotal > 0 && hasSoldData
     ? ((sold + reserved + prereserved) / activeTotal) * 100
     : null;
-  const priced = projects.filter(p => p.avg_price_eur_m2);
-  const wavgM2 = priced.length
-    ? priced.reduce((a, p) => a + p.avg_price_eur_m2, 0) / priced.length
-    : null;
+  // Unit-weighted mean of per-project avg €/m² (weight = for-sale unit count).
+  // projects_live.avg_price_eur_m2 is each project's mean over its V/R/PR units,
+  // so weighting by that count recovers the EXACT global mean of per-flat €/m²
+  // the old flats-based path computed (mean of all = size-weighted mean of group
+  // means). projects_live verified honest in v2, so this matches to the unit.
+  let _wsum = 0, _wn = 0;
+  for (const p of projects) {
+    if (!p.avg_price_eur_m2) continue;
+    const fs = (p.available_units || 0) + (p.reserved_units || 0) + (p.prereserved_units || 0);
+    if (fs <= 0) continue;
+    _wsum += p.avg_price_eur_m2 * fs;
+    _wn += fs;
+  }
+  const wavgM2 = _wn > 0 ? _wsum / _wn : null;
   return {
     projectCount: projects.length,
     totalUnits,
@@ -2369,7 +2371,7 @@ function priceDistribution(flats, nBins) {
   return bins;
 }
 /* CSV download for the current scope — project-level. */
-function downloadScopeCSV(projects, flats, lang) {
+function downloadScopeCSV(projects, lang) {
   const headers = [
     "id", "name", "developer", "city", "district",
     "total_units", "available_units", "sold_units", "sold_last_month", "sold_percentage",

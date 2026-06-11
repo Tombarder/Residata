@@ -1211,6 +1211,123 @@ export function useProjectUnitsSeries(projectId) {
   return { units, loading };
 }
 
+/* ─── Reports server-side aggregation (forever perf fix, 2026-06-11) ───
+ * Reports used to pull flats_current (32k rows, ~30s) just to draw the €/m²
+ * histogram + drilldown. KPIs/breakdowns now come from projects_live (honest in
+ * v2); these hooks move the only unit-level pieces server-side. RPCs are
+ * SECURITY INVOKER (RLS inherited) and country-scoped to match useFlatsCurrent. */
+let _reportHistCache = new Map();
+/** Adaptive €/m² histogram bins for a Reports scope. Returns {bins:[{from,to,count}],loading}.
+ *  Bins are EUR (price_s_dph_eur basis) — Histogram converts to display currency. */
+export function useReportHistogram({ scopeType = "market", scopeValue = null, nbins = 12 } = {}) {
+  const { loading: authLoading, user, profile } = useAuth();
+  const { country } = useCountry();
+  const key = `${user?.id || "anon"}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}::${country}::${scopeType}::${scopeValue || ""}::${nbins}`;
+  const [bins, setBins] = useState(_reportHistCache.get(key) || null);
+  const [loading, setLoading] = useState(!_reportHistCache.has(key));
+  useEffect(() => {
+    if (!isSupabaseReady()) { setLoading(false); return; }
+    if (authLoading) return;
+    if (_reportHistCache.has(key)) { setBins(_reportHistCache.get(key)); setLoading(false); return; }
+    let cancelled = false;
+    setLoading(true);
+    (async () => {
+      const { data, error } = await supabase.rpc("report_price_histogram", {
+        p_country: country, p_scope_type: scopeType, p_scope_value: scopeValue, p_nbins: nbins,
+      });
+      if (cancelled) return;
+      if (error) { console.error("[useReportHistogram]", error); setBins([]); setLoading(false); return; }
+      const arr = Array.isArray(data) ? data : [];
+      _reportHistCache.set(key, arr);
+      setBins(arr);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [authLoading, key]); // eslint-disable-line react-hooks/exhaustive-deps
+  return { bins: bins || [], loading };
+}
+
+/** Lazy histogram drilldown — the units inside one clicked €/m² band, scoped.
+ *  Plain async (not a hook): called on bin click. Returns rows shaped for
+ *  HistogramDrilldown {flatId,projectId,project,district,izby,area,price,m2}
+ *  with price in EUR so moneyFromEur() renders the display currency. */
+export async function fetchReportBinUnits({ country = null, scopeType = "market", scopeValue = null, from = 0, to = 1e9 } = {}) {
+  if (!isSupabaseReady()) return [];
+  const { data, error } = await supabase.rpc("report_bin_units", {
+    p_country: country, p_scope_type: scopeType, p_scope_value: scopeValue, p_m2_from: from, p_m2_to: to,
+  });
+  if (error) { console.error("[fetchReportBinUnits]", error); return []; }
+  return (Array.isArray(data) ? data : []).map((r) => ({
+    flatId: `${r.project_id}-${r.unit_id}`,
+    projectId: r.project_id,
+    project: r.project,
+    district: r.district,
+    izby: r.izby,
+    area: r.area == null ? null : Number(r.area),
+    price: r.price_s_dph_eur == null ? null : Number(r.price_s_dph_eur),
+    m2: r.m2 == null ? null : Number(r.m2),
+  }));
+}
+
+let _reportProjUnitsCache = new Map();
+/** All current units of ONE project (every stav, incl typ + poschodie) for the
+ *  Reports Project deep-dive — one small jsonb call, RLS-gated. projectId null → []. */
+export function useReportProjectUnits(projectId) {
+  const { loading: authLoading, user, profile } = useAuth();
+  const idKey = projectId
+    ? `${user?.id || "anon"}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}::${projectId}`
+    : "none";
+  const [units, setUnits] = useState(_reportProjUnitsCache.get(idKey) || []);
+  const [loading, setLoading] = useState(!!projectId && !_reportProjUnitsCache.has(idKey));
+  useEffect(() => {
+    if (!projectId) { setUnits([]); setLoading(false); return; }
+    if (!isSupabaseReady() || authLoading) return;
+    if (_reportProjUnitsCache.has(idKey)) { setUnits(_reportProjUnitsCache.get(idKey)); setLoading(false); return; }
+    let cancelled = false;
+    setLoading(true);
+    (async () => {
+      const { data, error } = await supabase.rpc("report_project_units", { p_project_id: projectId });
+      if (cancelled) return;
+      if (error) { console.error("[useReportProjectUnits]", error); setLoading(false); return; }
+      const arr = _toEurDisplay(Array.isArray(data) ? data : []);
+      _reportProjUnitsCache.set(idKey, arr);
+      setUnits(arr);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [authLoading, idKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  return { units, loading };
+}
+
+let _reportCompCache = new Map();
+/** Sold-with-price units for the Reports "Komparable" tab — small (~3k of 19k
+ *  sold keep a price), one jsonb call, country-scoped, RLS-gated. EUR-overlaid. */
+export function useReportComparables() {
+  const { loading: authLoading, user, profile } = useAuth();
+  const { country } = useCountry();
+  const key = `${user?.id || "anon"}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}::${country}`;
+  const [units, setUnits] = useState(_reportCompCache.get(key) || []);
+  const [loading, setLoading] = useState(!_reportCompCache.has(key));
+  useEffect(() => {
+    if (!isSupabaseReady()) { setLoading(false); return; }
+    if (authLoading) return;
+    if (_reportCompCache.has(key)) { setUnits(_reportCompCache.get(key)); setLoading(false); return; }
+    let cancelled = false;
+    setLoading(true);
+    (async () => {
+      const { data, error } = await supabase.rpc("report_comparables", { p_country: country });
+      if (cancelled) return;
+      if (error) { console.error("[useReportComparables]", error); setLoading(false); return; }
+      const arr = _toEurDisplay(Array.isArray(data) ? data : []);
+      _reportCompCache.set(key, arr);
+      setUnits(arr);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [authLoading, key]); // eslint-disable-line react-hooks/exhaustive-deps
+  return { units, loading };
+}
+
 /** Early access slot count for the marketing badge. Public table. */
 export function useEarlyAccessStats() {
   const [stats, setStats] = useState({ paid_count: 0, remaining_slots: 9 });
