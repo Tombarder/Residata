@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useProjects, useFlatsArchive, useArchiveMonths } from "../lib/useData";
 import { useCapabilities } from "../lib/useCapabilities";
@@ -638,24 +638,31 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   const { can } = useCapabilities();
   const canViewAnalytics = can("view_analytics");
 
-  // Mesiac is treated as a regular filterable dimension — same UX as
-  // every other field. We fetch the entire archive once and let the
-  // Filters zone narrow it client-side, so the user has ONE consistent
-  // way to slice (drag → Filters → pick months). A useEffect below
-  // pre-populates the Filter with the most recent month on first load
-  // so the pivot opens "showing the current month" rather than every
-  // month at once. The user can edit / clear / add months freely.
-  //
-  // Trade-off: fetching all months means more bytes over the wire —
-  // 5,5k flats today, ~66k after a year, ~330k after 5 years. JSON
-  // gzipped this is well under what a normal SPA pulls; if it ever
-  // matters we'll switch back to server-side month filtering driven
-  // off the same Filters state. Cleaner UX > preemptive optimisation.
-  // archiveMonths is wired but PivotV2 no longer reads it directly — the
-  // Datum filter is seeded from latestDatum (derived from records below).
-  // Hook call preserved for future Datum-dropdown UX.
-  useArchiveMonths();
-  const { flats: realFlats, loading: loadingFlats, progress: flatsProgress } = useFlatsArchive();  // all months
+  // Mesiac/Datum is a regular filterable dimension. The pivot opens pinned to the
+  // latest scrape (the seeding effect below), so we drive the archive FETCH off
+  // that same Filters state: by default fetch ONLY the latest month (~19k rows,
+  // ~2-3s) instead of every month (216k rows / 30-60s). Adding months/dates to
+  // the filter refetches them; clearing the filter (after first paint) loads all
+  // history. This is the "server-side month filtering driven off the same Filters
+  // state" the previous note deferred — now that the archive is big enough to
+  // matter. The month/date filter governs BOTH the fetch scope and the display,
+  // so the pivot can never show a month it didn't fetch (no data-gap).
+  const [filters, setFilters] = useState([]);
+  const [seeded, setSeeded] = useState(false);   // has the latest-scrape default been seeded?
+  const { months: archiveMonths } = useArchiveMonths();
+  const latestMonth = archiveMonths?.[0];   // archive_months view is sorted DESC
+  const fetchMonths = useMemo(() => {
+    const monthF = filters.find(f => f.key === "snapshot_month");
+    const dateF  = filters.find(f => f.key === "datum");
+    if (monthF?.values?.length) return monthF.values;
+    if (dateF?.values?.length)  return [...new Set(dateF.values.map(d => String(d).slice(0, 7)))];
+    // No month/date filter: default to the latest month UNTIL the user has
+    // interacted with filters (after which an empty filter means "all months",
+    // preserving the prior "clear to see all" behaviour). undefined => all months.
+    if (!seeded && latestMonth) return [latestMonth];
+    return undefined;
+  }, [filters, latestMonth, seeded]);
+  const { flats: realFlats, loading: loadingFlats, progress: flatsProgress } = useFlatsArchive(fetchMonths);
   // Initial-load gate — true while we're still fetching real flats AND
   // haven't seeded the default Datum filter yet. Used to show a clean
   // loading state instead of an empty pivot table (which looked like
@@ -796,30 +803,25 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   const [values,  setValues]  = useState([
     { key: "cena_na_m2_obytnej", field: "cena_na_m2_obytnej", agg: "avg" },
   ]);
-  const [filters, setFilters] = useState([]);
-  // Auto-seed the Mesiac filter to the latest archived month on first
-  // mount once we know what "latest" is. Idempotent — only runs once
-  // per session, and skips entirely if the user already has a Mesiac
-  // filter active (e.g. they cleared it then re-added a different one).
-  // Without this, a brand-new pivot would dump every historical month
-  // into a single sheet which usually isn't what the user wants on
-  // first paint. They can clear the filter to see all months.
-  const monthFilterSeededRef = useRef(false);
+  // filters + monthFilterSeededRef are declared above (before the archive fetch,
+  // so fetchMonths can derive from the same Filters state). Auto-seed the Datum
+  // filter to the latest scrape on first mount — idempotent, once per session,
+  // skipped if the user already has a Datum/Mesiac filter. Clearing it later
+  // loads all months.
   useEffect(() => {
-    // Idempotent one-shot auto-seed: pin the pivot to the LATEST scrape
-    // date by default (Datum field, YYYY-MM-DD precision). Auto-rolls
-    // forward as new batches land — Datum is derived from batch_timestamp
-    // so no manual update is ever needed.
-    // Guarded by ref so this fires exactly once per mount.
-    if (monthFilterSeededRef.current) return;
-    if (!latestDatum) return;
-    monthFilterSeededRef.current = true;
+    // Idempotent one-shot auto-seed: pin the pivot to the LATEST scrape date by
+    // default (Datum field, YYYY-MM-DD). Auto-rolls forward as new batches land.
+    // `seeded` also flips fetchMonths from "latest month only" to honouring an
+    // explicit (or explicitly-cleared) filter.
+    if (seeded || !latestDatum) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSeeded(true);
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setFilters(curr => {
       if (curr.some(f => f.key === "datum" || f.key === "snapshot_month")) return curr;
       return [...curr, { key: "datum", values: [latestDatum] }];
     });
-  }, [latestDatum]);
+  }, [latestDatum, seeded]);
   const [search,  setSearch]  = useState("");
   const [drag,    setDrag]    = useState(null);
   const [hoverZone, setHoverZone] = useState(null);
