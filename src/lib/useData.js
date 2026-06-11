@@ -22,12 +22,19 @@ function _toEurDisplay(rows) {
   if (!Array.isArray(rows)) return rows;
   return rows.map((f) => {
     if (!f || f.price_s_dph_eur == null) return f; // no EUR value → leave native untouched
+    // Effective EUR-per-native rate (1.0 for SK, ~0.0413 for CZK). price_s_dph_eur
+    // / price_bez_dph_eur are precomputed; cennikova_cena (list price) has no EUR
+    // column, so convert it with this rate too — otherwise it stays CZK next to a
+    // EUR sale price in CZ/All exports (looked ~24× off). Native preserved.
+    const rate = f.cena_s_dph ? (f.price_s_dph_eur / f.cena_s_dph) : 1;
     return {
       ...f,
       cena_s_dph_native: f.cena_s_dph,
       cena_bez_dph_native: f.cena_bez_dph,
+      cennikova_cena_native: f.cennikova_cena,
       cena_s_dph: f.price_s_dph_eur,
       cena_bez_dph: f.price_bez_dph_eur != null ? f.price_bez_dph_eur : f.cena_bez_dph,
+      cennikova_cena: f.cennikova_cena != null && Number.isFinite(rate) ? f.cennikova_cena * rate : f.cennikova_cena,
     };
   });
 }
