@@ -14,8 +14,8 @@ const mono = "'JetBrains Mono', monospace";
 // PipelineFlow scene (Bratislava for SK / All, Praha for CZ). Real projects +
 // avg €/m² from the live DB so even the illustration isn't wrong.
 const PANEL_SAMPLE = {
-  SK: { avg: "5,525", rows: [["Downtown Yards", "Staré Mesto", "8,638"], ["Byty Ružinov", "Ružinov", "5,409"]] },
-  CZ: { avg: "7,443", rows: [["Ethos Karlín", "Karlín", "9,960"], ["TOIVO Roztyly", "Chodov", "6,928"]] },
+  SK: { avg: "5,525", mom: "+2.1%", rows: [["Downtown Yards", "Staré Mesto", "8,638"], ["Byty Ružinov", "Ružinov", "5,409"]] },
+  CZ: { avg: "7,443", mom: "+1.5%", rows: [["Ethos Karlín", "Karlín", "9,960"], ["TOIVO Roztyly", "Chodov", "6,928"]] },
 };
 const green = "#00e5a0";
 const dim = "#8a8a96";
@@ -182,7 +182,7 @@ function DashboardPanel({ captionRow1, captionRow2, chipLabels, sample }) {
       <g transform="translate(16, 46)">
         <rect x="0" y="0" width="278" height="100" rx="8" fill="#0a0a0b" stroke="#1a1a1f" strokeWidth="0.6" />
         <text x="10" y="16" fill="#8a8a96" fontFamily={mono} fontSize="8" letterSpacing="0.06em">AVG €/M² · 6 MONTHS</text>
-        <text x="268" y="16" textAnchor="end" fill="#00e5a0" fontFamily={mono} fontSize="8" fontWeight="700">Ø {sample.avg} €/m²</text>
+        <text x="268" y="16" textAnchor="end" fill="#00e5a0" fontFamily={mono} fontSize="8" fontWeight="700">{sample.mom} MoM</text>
 
         {/* Area under curve */}
         <path
