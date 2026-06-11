@@ -654,8 +654,13 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   const fetchMonths = useMemo(() => {
     const monthF = filters.find(f => f.key === "snapshot_month");
     const dateF  = filters.find(f => f.key === "datum");
-    if (monthF?.values?.length) return monthF.values;
-    if (dateF?.values?.length)  return [...new Set(dateF.values.map(d => String(d).slice(0, 7)))];
+    // Fetch the UNION of every month implied by BOTH time filters — never just
+    // one of them — so the pivot can never display a month it didn't fetch
+    // (a user can have a Datum filter AND a Mesiac filter active at once).
+    const months = new Set();
+    if (monthF?.values?.length) monthF.values.forEach(m => months.add(String(m)));
+    if (dateF?.values?.length)  dateF.values.forEach(d => months.add(String(d).slice(0, 7)));
+    if (months.size) return [...months];
     // No month/date filter: default to the latest month UNTIL the user has
     // interacted with filters (after which an empty filter means "all months",
     // preserving the prior "clear to see all" behaviour). undefined => all months.
