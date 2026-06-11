@@ -110,6 +110,28 @@ export function useMetrics() {
     const cached = _metricsCacheByCountry.get(country);
     if (cached) { setMetrics(cached); setLoading(false); }
     let cancelled = false;
+    // "All" has no combined row in `metrics` (it's emitted per country). Build the
+    // key total_* ticker entries from totals_global (cross-market, EUR). Per-market
+    // peak/district entries are omitted in All (they name one project/district).
+    if (isAllCountries(country)) {
+      supabasePublic.from("totals_global").select("*").maybeSingle().then(({ data, error }) => {
+        if (cancelled) return;
+        if (error || !data) { setLoading(false); return; }
+        const f = (n) => (n == null ? "—" : Number(n).toLocaleString("en-US").replace(/,/g, " "));
+        const arr = [
+          { metric_key: "total_units_tracked",   display_order: 9,  category: "total",   value_text: `${f(data.total_units_tracked)} bytov sledovaných` },
+          { metric_key: "total_available",       display_order: 10, category: "total",   value_text: `${f(data.total_available)} bytov v aktívnej ponuke` },
+          { metric_key: "total_reserved",        display_order: 11, category: "total",   value_text: `${f(data.total_reserved)} rezervovaných` },
+          { metric_key: "total_sold_to_date",    display_order: 12, category: "total",   value_text: `${f(data.total_sold)} predaných celkom` },
+          { metric_key: "total_projects_active", display_order: 13, category: "total",   value_text: `${f(data.total_projects_active)} aktívnych projektov` },
+          { metric_key: "avg_eur_m2",            display_order: 53, category: "pricing", value_text: `Priemerná cena: ${f(data.avg_eur_m2)} €/m²` },
+        ];
+        _metricsCacheByCountry.set(country, arr);
+        setMetrics(arr);
+        setLoading(false);
+      });
+      return () => { cancelled = true; };
+    }
     supabasePublic.from("metrics").select("*").eq("country_code", country).order("display_order", { ascending: true })
       .then(({ data, error }) => {
         if (cancelled) return;
