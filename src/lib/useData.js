@@ -874,22 +874,25 @@ export function useFlatsCurrent() {
  */
 let _archiveCache = null;
 let _archiveCacheKey = null;
-export function useFlatsArchive(months) {
+export function useFlatsArchive(months, dates, enabled = true) {
   const { loading: authLoading, user, profile } = useAuth();
   const { country } = useCountry();
+  const datesArr = Array.isArray(dates) && dates.length ? dates.slice().sort() : null;
   const monthsKey = Array.isArray(months) ? months.slice().sort().join(",") : "all";
+  const datesKey = datesArr ? datesArr.join(",") : "all";
   // country is part of the identity signature so switching country refetches
   // instead of serving a stale other-country cache. flats_archive carries a
   // `country` column ('SK'/'CZ'); without this filter SK paid users saw SK+CZ
   // rows mixed in the Pivot.
-  const identityKey = user
-    ? `${user.id}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}::${monthsKey}::${country}`
-    : `anon::${monthsKey}::${country}`;
+  const identityKey = (user
+    ? `${user.id}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}`
+    : "anon") + `::${monthsKey}::${datesKey}::${country}::${enabled ? "1" : "0"}`;
   const [flats, setFlats] = useState(_archiveCacheKey === identityKey ? (_archiveCache || []) : []);
   const [loading, setLoading] = useState(_archiveCacheKey !== identityKey);
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
+    if (!enabled) { setFlats([]); setProgress(0); setLoading(false); return; }
     if (!isSupabaseReady()) { setLoading(false); return; }
     if (authLoading) return;
 
@@ -931,6 +934,14 @@ export function useFlatsArchive(months) {
           .order("id", { ascending: true });
         if (Array.isArray(months) && months.length > 0) {
           q = q.in("snapshot_month", months);
+        }
+        if (datesArr) {
+          // Day-scope: batch_timestamp range [min, max+1) — index-friendly; the
+          // exact datum filter refines in filteredRecords. Cuts the default
+          // fetch from the whole month (~152k) to the shown day (~19k).
+          const hi = new Date(datesArr[datesArr.length - 1] + "T00:00:00Z");
+          hi.setUTCDate(hi.getUTCDate() + 1);
+          q = q.gte("batch_timestamp", datesArr[0]).lt("batch_timestamp", hi.toISOString().slice(0, 10));
         }
         const { data, error } = await q;
         if (cancelled) return;
@@ -975,7 +986,7 @@ export function useFlatsArchive(months) {
       setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [authLoading, identityKey, monthsKey, country]);
+  }, [authLoading, identityKey, monthsKey, datesKey, country, enabled]);
 
   return { flats, loading, progress };
 }
@@ -1042,6 +1053,71 @@ export function useArchiveMonths() {
     return () => { cancelled = true; };
   }, []);
   return { months, loading };
+}
+
+/* ─── Analytika (PivotV2) server-side aggregation (forever perf fix, 2026-06-11) ─
+ * The pivot pulled the whole latest month (152k rows, ~60s) to show one day.
+ * useArchiveDays gives the scrape-day list (seed + datum popover) without records;
+ * usePivotGrain returns server-aggregated grain rows for "server-able" configs
+ * (decomposable aggs + whitelisted dims + time-only filters). The client rebuilds
+ * the tree from the grain; non-server-able configs fall back to the raw path. */
+let _archiveDaysCache = new Map();
+/** Distinct scrape days (YYYY-MM-DD, DESC) for the current country. Light + cached. */
+export function useArchiveDays() {
+  const { country } = useCountry();
+  const [days, setDays] = useState(_archiveDaysCache.get(country) || []);
+  const [loading, setLoading] = useState(!_archiveDaysCache.has(country));
+  useEffect(() => {
+    if (!isSupabaseReady()) { setLoading(false); return; }
+    if (_archiveDaysCache.has(country)) { setDays(_archiveDaysCache.get(country)); setLoading(false); return; }
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase.from("archive_days").select("day").eq("country", country).order("day", { ascending: false });
+      if (cancelled) return;
+      if (error) { console.error("[useArchiveDays]", error); setLoading(false); return; }
+      const seen = new Set(); const arr = [];
+      for (const row of data || []) { const d = row.day; if (d && !seen.has(d)) { seen.add(d); arr.push(d); } }
+      _archiveDaysCache.set(country, arr); setDays(arr); setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [country]);
+  return { days, loading };
+}
+
+let _pivotGrainCache = new Map();
+/** Server-aggregated pivot grain rows [{d:[dimVals], m:{components}}] for the given
+ *  dims + time scope. enabled=false → no fetch (returns null). RLS-gated, cached. */
+export function usePivotGrain({ enabled = false, months = null, dates = null, dims = [] } = {}) {
+  const { loading: authLoading, user, profile } = useAuth();
+  const { country } = useCountry();
+  const key = enabled
+    ? `${user?.id || "anon"}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}::${country}::${(months || []).join(",")}::${(dates || []).join(",")}::${(dims || []).join(",")}`
+    : null;
+  const [grain, setGrain] = useState(key && _pivotGrainCache.has(key) ? _pivotGrainCache.get(key) : null);
+  const [loading, setLoading] = useState(!!enabled && !(key && _pivotGrainCache.has(key)));
+  useEffect(() => {
+    if (!enabled) { setGrain(null); setLoading(false); return; }
+    if (!isSupabaseReady() || authLoading) return;
+    if (_pivotGrainCache.has(key)) { setGrain(_pivotGrainCache.get(key)); setLoading(false); return; }
+    let cancelled = false;
+    setLoading(true);
+    (async () => {
+      const { data, error } = await supabase.rpc("pivot_grain", {
+        p_country: country,
+        p_months: months && months.length ? months : null,
+        p_dates: dates && dates.length ? dates : null,
+        p_dims: dims || [],
+      });
+      if (cancelled) return;
+      if (error) { console.error("[usePivotGrain]", error); setGrain([]); setLoading(false); return; }
+      const arr = Array.isArray(data) ? data : [];
+      _pivotGrainCache.set(key, arr);
+      setGrain(arr);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [enabled, key, authLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+  return { grain, loading };
 }
 
 // ── Byt v čase (UnitTracker) server-side data — Phase 1 perf/scaling fix ──────

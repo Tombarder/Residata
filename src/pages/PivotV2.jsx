@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { useProjects, useFlatsArchive, useArchiveMonths } from "../lib/useData";
+import { useProjects, useFlatsArchive, useArchiveMonths, useArchiveDays, usePivotGrain } from "../lib/useData";
 import { useCapabilities } from "../lib/useCapabilities";
 import { moneyFromEur, moneySymbol } from "../lib/money";
 import { useCurrency } from "../lib/useCurrency";
@@ -526,6 +526,126 @@ function buildTree(records, rowFields, colFields, valueDefs) {
   };
 }
 
+/* ═══ Server-side aggregation (forever perf fix) ════════════════════════════
+   pivot_grain returns one row per group with DECOMPOSABLE measure components,
+   so we rebuild the SAME tree shape buildTree produces — but by summing
+   components up the hierarchy instead of holding 152k records. Identical math
+   for count/sum/avg/min/max + the 4 measures. A config is "server-able" only
+   when every value uses those aggs on a supported field, every dim is
+   whitelisted, and the only active filters are time (datum / snapshot_month).
+   Anything else (median, count_distinct, rare fields, ad-hoc filters) → the
+   caller keeps the existing record path. */
+const SERVERABLE_DIMS = new Set([
+  "project_name", "typ", "etapa", "budova", "unit_detail", "developer", "unit_id",
+  "izby", "poschodie", "stav", "kolaudacia", "orientacia", "city", "cast",
+  "import_status", "snapshot_month", "datum", "batch_id",
+]);
+// numeric field key → component prefix in the grain's `m` object
+const COMP_FIELD = {
+  cena_s_dph: "cs", cena_bez_dph: "cb", obytna_plocha: "ob", celkova_plocha: "ce",
+  izby: "iz", poschodie: "po", cena_na_m2_obytnej: "m2",
+};
+const SERVERABLE_MEASURES = new Set(["abs_rate", "wavg_m2_price", "sold_count", "available_count"]);
+
+function isServerable(rowFields, colFields, valueDefs, filters) {
+  for (const d of [...rowFields, ...colFields]) if (!SERVERABLE_DIMS.has(d)) return false;
+  for (const v of valueDefs) {
+    if (v.field == null || v.field === "__count__") { if (v.agg !== "count") return false; continue; }
+    const f = FIELDS[v.field];
+    if (!f) return false;
+    if (f.type === "measure") { if (!SERVERABLE_MEASURES.has(v.field)) return false; continue; }
+    if (!COMP_FIELD[v.field]) return false;                       // unsupported numeric field
+    if (!["count", "sum", "avg", "min", "max"].includes(v.agg)) return false;  // median/count_distinct
+  }
+  for (const f of (filters || [])) {
+    if (!isFilterActive(f)) continue;
+    if (f.key !== "datum" && f.key !== "snapshot_month") return false;
+    if (f.mode && f.mode !== "in") return false;                  // between/empty on time → fall back
+  }
+  return true;
+}
+
+const _COMP_PREFIXES = ["cs", "cb", "ob", "ce", "iz", "po", "m2"];
+function emptyComp() {
+  const c = { n: 0, avail: 0, sold: 0, res: 0, prer: 0, s_pw: 0, s_lw: 0 };
+  for (const p of _COMP_PREFIXES) { c["s_" + p] = 0; c["n_" + p] = 0; c["mn_" + p] = null; c["mx_" + p] = null; }
+  return c;
+}
+function addComp(acc, m) {
+  if (!m) return;
+  acc.n += +m.n || 0; acc.avail += +m.avail || 0; acc.sold += +m.sold || 0;
+  acc.res += +m.res || 0; acc.prer += +m.prer || 0;
+  acc.s_pw += +m.s_pw || 0; acc.s_lw += +m.s_lw || 0;
+  for (const p of _COMP_PREFIXES) {
+    acc["s_" + p] += +m["s_" + p] || 0;
+    acc["n_" + p] += +m["n_" + p] || 0;
+    const mn = m["mn_" + p], mx = m["mx_" + p];
+    if (mn != null) acc["mn_" + p] = acc["mn_" + p] == null ? +mn : Math.min(acc["mn_" + p], +mn);
+    if (mx != null) acc["mx_" + p] = acc["mx_" + p] == null ? +mx : Math.max(acc["mx_" + p], +mx);
+  }
+}
+function computeFromComp(v, c) {
+  if (!c) return null;
+  if (v.field == null || v.field === "__count__" || v.agg === "count") return c.n;
+  const f = FIELDS[v.field];
+  if (f && f.type === "measure") {
+    switch (v.field) {
+      case "abs_rate":      { const d = c.sold + c.avail; return d > 0 ? (c.sold / d) * 100 : null; }
+      case "wavg_m2_price": return c.s_lw > 0 ? c.s_pw / c.s_lw : null;
+      case "sold_count":    return c.sold;
+      case "available_count": return c.avail;
+      default: return null;
+    }
+  }
+  const p = COMP_FIELD[v.field];
+  if (!p) return null;
+  const cnt = c["n_" + p];
+  switch (v.agg) {
+    case "sum": return cnt > 0 ? c["s_" + p] : null;
+    case "avg": return cnt > 0 ? c["s_" + p] / cnt : null;
+    case "min": return c["mn_" + p];
+    case "max": return c["mx_" + p];
+    default: return null;
+  }
+}
+
+/* Build the same tree buildTree produces, from grain rows [{d:[dimVals], m:{components}}].
+   d holds the row dims then the (optional) col dim, in the order they were sent. */
+function buildTreeFromGrain(grain, rowFields, colFields, valueDefs) {
+  const safe = Array.isArray(grain) ? grain : [];
+  const hasCol = colFields.length > 0;
+  const colIdx = rowFields.length;
+  let colKeys = null;
+  if (hasCol) {
+    const counts = new Map();
+    for (const g of safe) { const ck = normKey(g.d[colIdx]); counts.set(ck, (counts.get(ck) || 0) + (+g.m.n || 0)); }
+    colKeys = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, MAX_COL_VALUES).map(([k]) => k);
+  }
+  const rollupsFor = (rows) => { const c = emptyComp(); for (const g of rows) addComp(c, g.m); return valueDefs.map(v => computeFromComp(v, c)); };
+  const countFor = (rows) => rows.reduce((a, g) => a + (+g.m.n || 0), 0);
+  const colRollupsFor = (rows) => {
+    if (!colKeys) return null;
+    const byKey = {}; for (const ck of colKeys) byKey[ck] = [];
+    for (const g of rows) { const ck = normKey(g.d[colIdx]); if (byKey[ck]) byKey[ck].push(g); }
+    const out = {}; for (const ck of colKeys) out[ck] = rollupsFor(byKey[ck]); return out;
+  };
+  if (rowFields.length === 0) {
+    return { label: "Total", path: [], pathKey: "", level: -1, colKeys, records: [], count: countFor(safe), rollups: rollupsFor(safe), colRollups: colRollupsFor(safe), children: [], isLeaf: true };
+  }
+  const rec = (rows, depth, prefix) => {
+    const byKey = new Map();
+    for (const g of rows) { const key = normKey(g.d[depth]); if (!byKey.has(key)) byKey.set(key, []); byKey.get(key).push(g); }
+    const isDeepest = depth === rowFields.length - 1;
+    const out = [];
+    for (const [key, items] of byKey) {
+      const path = [...prefix, key];
+      out.push({ label: key, path, pathKey: path.join(SEP), level: depth, records: [], count: countFor(items), rollups: rollupsFor(items), colRollups: colRollupsFor(items), children: isDeepest ? [] : rec(items, depth + 1, path), isLeaf: isDeepest });
+    }
+    return out;
+  };
+  return { label: "Total", path: [], pathKey: "", level: -1, colKeys, records: [], count: countFor(safe), rollups: rollupsFor(safe), colRollups: colRollupsFor(safe), children: rec(safe, 0, []), isLeaf: false };
+}
+
 /* Sort the tree in-place by the value at column `sortIdx` (or by label
    when sortIdx === "label") in direction dir. Every subtree sorts
    among its siblings — parent order is preserved. */
@@ -649,30 +769,31 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   // so the pivot can never show a month it didn't fetch (no data-gap).
   const [filters, setFilters] = useState([]);
   const [seeded, setSeeded] = useState(false);   // has the latest-scrape default been seeded?
+  // Forever perf fix (2026-06-11): server-able configs render from the pivot_grain
+  // RPC (instant), and we fetch the 152k-row archive ONLY when a config can't be
+  // aggregated server-side (median / count_distinct / rare field / ad-hoc filter)
+  // or the user drills into a cell. forceRaw flips us onto that record path.
+  const [forceRaw, setForceRaw] = useState(false);
   const { months: archiveMonths } = useArchiveMonths();
+  const { days: archiveDays } = useArchiveDays();
   const latestMonth = archiveMonths?.[0];   // archive_months view is sorted DESC
+  const latestDay = archiveDays?.[0];       // archive_days view is sorted DESC
+  // Time scope — shared by the grain RPC and the (lazy) record fetch. Day-scope
+  // by the Datum filter (default = latest scrape day); month-scope by the Mesiac
+  // filter. Datum alone → date-range only (fast, no month filter mixed in).
   const fetchMonths = useMemo(() => {
     const monthF = filters.find(f => f.key === "snapshot_month");
-    const dateF  = filters.find(f => f.key === "datum");
-    // Fetch the UNION of every month implied by BOTH time filters — never just
-    // one of them — so the pivot can never display a month it didn't fetch
-    // (a user can have a Datum filter AND a Mesiac filter active at once).
-    const months = new Set();
-    if (monthF?.values?.length) monthF.values.forEach(m => months.add(String(m)));
-    if (dateF?.values?.length)  dateF.values.forEach(d => months.add(String(d).slice(0, 7)));
-    if (months.size) return [...months];
-    // No month/date filter: default to the latest month UNTIL the user has
-    // interacted with filters (after which an empty filter means "all months",
-    // preserving the prior "clear to see all" behaviour). undefined => all months.
-    if (!seeded && latestMonth) return [latestMonth];
+    return monthF?.values?.length ? monthF.values.map(String) : undefined;
+  }, [filters]);
+  const fetchDates = useMemo(() => {
+    const dateF = filters.find(f => f.key === "datum");
+    if (dateF?.values?.length) return dateF.values.map(String);
+    if (!seeded && latestDay) return [latestDay];   // default: the latest scrape day
     return undefined;
-  }, [filters, latestMonth, seeded]);
-  const { flats: realFlats, loading: loadingFlats, progress: flatsProgress } = useFlatsArchive(fetchMonths);
-  // Initial-load gate — true while we're still fetching real flats AND
-  // haven't seeded the default Datum filter yet. Used to show a clean
-  // loading state instead of an empty pivot table (which looked like
-  // "no data" for ~5s while the archive paginated in).
-  const isInitialLoading = canViewAnalytics && (loadingFlats || loadingProjects) && (realFlats?.length || 0) === 0;
+  }, [filters, latestDay, seeded]);
+  // Records are fetched ONLY when forceRaw (non-server-able config or drill-down);
+  // server-able configs render from the grain with no archive pull.
+  const { flats: realFlats, loading: loadingFlats, progress: flatsProgress } = useFlatsArchive(fetchMonths, fetchDates, forceRaw);
 
   // Latest batch DATE (YYYY-MM-DD) — used to auto-seed the Datum filter
   // so the pivot opens on "the most recent scrape" by default. Computed
@@ -793,8 +914,10 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
       const d = String(ts).slice(0, 10);
       if (!max || d > max) max = d;
     }
-    return max;
-  }, [records]);
+    // Fall back to the light archive_days source so the auto-seed works in the
+    // grain path (no records loaded). Records-derived wins when present (== same).
+    return max || latestDay || null;
+  }, [records, latestDay]);
 
   // ── State ─────────────────────────────────────────────────────
   // Default layout: Cast (district) + Project name in Rows, average
@@ -979,10 +1102,59 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
     [records, filters]
   );
 
-  const rawTree = useMemo(
-    () => buildTree(filteredRecords, rows, cols, effectiveValues),
-    [filteredRecords, rows, cols, effectiveValues]
+  // ── Server-side aggregation gate (forever perf fix) ───────────────
+  // configServerable = the current config can be answered by pivot_grain
+  // (whitelisted dims, decomposable aggs, time-only filters). When true the
+  // table renders from the grain — no 152k-row archive pull. forceRaw is
+  // independent: it pulls records for a drill-down (table stays on the grain)
+  // or to back a non-server-able config (median / ad-hoc filter / rare field).
+  const configServerable = useMemo(
+    () => canViewAnalytics && isServerable(rows, cols, effectiveValues, filters),
+    [canViewAnalytics, rows, cols, effectiveValues, filters]
   );
+  const gDims = useMemo(() => [...rows, ...cols], [rows, cols]);
+  const { grain, loading: grainLoading } = usePivotGrain({
+    enabled: configServerable, months: fetchMonths, dates: fetchDates, dims: gDims,
+  });
+  // A non-server-able config needs records — pull them (sticky once needed).
+  useEffect(() => {
+    if (canViewAnalytics && !configServerable && !forceRaw) setForceRaw(true);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+  }, [canViewAnalytics, configServerable, forceRaw]);
+
+  // Render from the grain whenever the config is server-able — the table stays
+  // instant. forceRaw loads records in the background to back a drill-down modal
+  // (table unchanged) or a non-server-able config (where useGrain is false anyway).
+  const useGrain = configServerable;
+  const rawTree = useMemo(
+    () => useGrain
+      ? buildTreeFromGrain(grain, rows, cols, effectiveValues)
+      : buildTree(filteredRecords, rows, cols, effectiveValues),
+    [useGrain, grain, filteredRecords, rows, cols, effectiveValues]
+  );
+
+  // Header unit count + loading skeleton, source-aware.
+  const displayCount = useGrain ? (rawTree?.count || 0) : records.length;
+  const isInitialLoading = canViewAnalytics && (
+    useGrain
+      ? (grainLoading && (grain == null || grain.length === 0))
+      : ((forceRaw || !configServerable) && loadingFlats && (realFlats?.length || 0) === 0)
+  );
+
+  // Records for the open drill-down. In grain mode the clicked node carries no
+  // records, so resolve them from filteredRecords by matching the row-dim path
+  // (records arrive via the forceRaw pull the drill-down click triggers).
+  const drillRecords = useMemo(() => {
+    if (!drillDown) return [];
+    if (drillDown.records && drillDown.records.length) return drillDown.records;
+    const path = drillDown.pathKey ? drillDown.pathKey.split(SEP) : [];
+    if (!path.length) return filteredRecords;
+    return filteredRecords.filter(r => path.every((pv, i) => {
+      const f = FIELDS[rows[i]];
+      return f && normKey(f.accessor(r)) === pv;
+    }));
+  }, [drillDown, filteredRecords, rows]);
+  const drillLoading = !!drillDown && configServerable && forceRaw && loadingFlats && drillRecords.length === 0;
 
   const sortedTree = useMemo(() => ({
     ...rawTree,
@@ -1116,8 +1288,8 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
         <span style={{ fontSize: "0.78rem", color: dim }}>
-          {records.length.toLocaleString("en-US").replace(/,/g, " ")} {lang === "sk" ? "bytov" : "units"}
-          {filteredRecords.length !== records.length && (
+          {displayCount.toLocaleString("en-US").replace(/,/g, " ")} {lang === "sk" ? "bytov" : "units"}
+          {!configServerable && filteredRecords.length !== records.length && (
             <span style={{ marginLeft: "0.5rem", color: dim }}>
               ({filteredRecords.length.toLocaleString("en-US").replace(/,/g, " ")} {lang === "sk" ? "po filtroch" : "after filters"})
             </span>
@@ -1197,10 +1369,16 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
         grandTotal={sortedTree}
         valueMode={valueMode}
         dataBars={dataBars}
-        onDrillDown={(node) => setDrillDown({
-          title: node.path.length ? node.path.join(" › ") : (lang === "sk" ? "Všetky záznamy" : "All records"),
-          records: node.records,
-        })}
+        onDrillDown={(node) => {
+          // Grain nodes carry no records — store the path and pull records so
+          // drillRecords can resolve them; record-mode nodes pass records directly.
+          if (configServerable) setForceRaw(true);
+          setDrillDown({
+            title: node.path.length ? node.path.join(" › ") : (lang === "sk" ? "Všetky záznamy" : "All records"),
+            pathKey: node.pathKey,
+            records: node.records,
+          });
+        }}
         onProjectOpen={setCurrent ? (projectId) => setCurrent(`App:ProjectDetail:${projectId}`) : undefined}
         lang={lang}
       />
@@ -1225,8 +1403,9 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
       {drillDown && (
         <DrillDownModal
           title={drillDown.title}
-          records={drillDown.records}
-          onClose={() => setDrillDown(null)}
+          records={drillRecords}
+          loading={drillLoading}
+          onClose={() => { setDrillDown(null); }}
           lang={lang}
         />
       )}
@@ -1251,14 +1430,23 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
         // small info row when the fallback kicks in so the user knows
         // why their other filters reduce to 0.
         const otherFilters = filters.filter(f => f.key !== filterPopup.key);
-        const contextual = records.filter(r => otherFilters.every(f => passesFilter(r, f)));
+        // Grain mode has no records loaded. For the two TIME fields, synthesize
+        // option rows from the light archive_days / archive_months sources so the
+        // user can still pick a day / month. Other fields aren't server-able, so
+        // dropping them into Filters flips forceRaw and real records arrive.
+        let baseRecords = records;
+        if (records.length === 0) {
+          if (filterPopup.key === "datum") baseRecords = (archiveDays || []).map(d => ({ batch_timestamp: d }));
+          else if (filterPopup.key === "snapshot_month") baseRecords = (archiveMonths || []).map(m => ({ snapshot_month: m }));
+        }
+        const contextual = baseRecords.filter(r => otherFilters.every(f => passesFilter(r, f)));
         // Cheap probe: do we get distinct values for THIS field from the
         // contextual set? distinctValuesForField is O(n); good for our
         // ~5–6k rows. Memoising would gain ~nothing here.
         const probe = distinctValuesForField(contextual, filterPopup.key);
         const hasContextualValues = probe.values.length > 0 || probe.hasEmpty;
-        const passedRecords = hasContextualValues ? contextual : records;
-        const fellBack = !hasContextualValues && contextual.length !== records.length;
+        const passedRecords = hasContextualValues ? contextual : baseRecords;
+        const fellBack = !hasContextualValues && contextual.length !== baseRecords.length;
         return (
           <FilterPopover
             fieldKey={filterPopup.key}
@@ -1284,8 +1472,8 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
           fontSize: "0.75rem",
         }}>
           <span style={{ color: dim }}>
-            Filtrovaných <strong style={{ color: text }}>{filteredRecords.length.toLocaleString("en-US").replace(/,/g, " ")}</strong>
-            {" "}z {records.length.toLocaleString("en-US").replace(/,/g, " ")}
+            Filtrovaných <strong style={{ color: text }}>{(configServerable ? displayCount : filteredRecords.length).toLocaleString("en-US").replace(/,/g, " ")}</strong>
+            {" "}z {(configServerable ? displayCount : records.length).toLocaleString("en-US").replace(/,/g, " ")}
           </span>
           {filters.filter(isFilterActive).map(f => (
             <span key={f.key} style={{ color: text }}>
@@ -3752,7 +3940,7 @@ function CheckboxRow({ checked, onChange, label }) {
 /* ─── DRILL-DOWN MODAL ────────────────────────────────────────────
    Click a count or subtotal to see the underlying flat records that
    contributed to that cell. Showing 12 cols by default, scrollable. */
-function DrillDownModal({ title, records, onClose, lang }) {
+function DrillDownModal({ title, records, loading, onClose, lang }) {
   useEffect(() => {
     const onKey = (e) => { if (e.key === "Escape") onClose(); };
     document.addEventListener("keydown", onKey);
@@ -3846,6 +4034,11 @@ function DrillDownModal({ title, records, onClose, lang }) {
           }}>✕</button>
         </div>
         <div style={{ overflow: "auto", flex: 1 }}>
+          {loading && records.length === 0 && (
+            <div style={{ padding: "2rem", textAlign: "center", color: dim, fontFamily: mono, fontSize: "0.8rem" }}>
+              {lang === "sk" ? "Načítavam záznamy…" : "Loading records…"}
+            </div>
+          )}
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.78rem" }}>
             <thead style={{ position: "sticky", top: 0, background: "#0e0e10", zIndex: 1 }}>
               <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.06em" }}>
