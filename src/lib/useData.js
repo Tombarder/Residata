@@ -1152,11 +1152,11 @@ export function useArchiveDays() {
 let _pivotGrainCache = new Map();
 /** Server-aggregated pivot grain rows [{d:[dimVals], m:{components}}] for the given
  *  dims + time scope. enabled=false → no fetch (returns null). RLS-gated, cached. */
-export function usePivotGrain({ enabled = false, months = null, dates = null, dims = [] } = {}) {
+export function usePivotGrain({ enabled = false, months = null, dates = null, dims = [], stav = null } = {}) {
   const { loading: authLoading, user, profile } = useAuth();
   const { country } = useCountry();
   const key = enabled
-    ? `${user?.id || "anon"}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}::${country}::${(months || []).join(",")}::${(dates || []).join(",")}::${(dims || []).join(",")}`
+    ? `${user?.id || "anon"}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}::${country}::${(months || []).join(",")}::${(dates || []).join(",")}::${(dims || []).join(",")}::${(stav || []).join(",")}`
     : null;
   const [grain, setGrain] = useState(key && _pivotGrainCache.has(key) ? _pivotGrainCache.get(key) : null);
   const [loading, setLoading] = useState(!!enabled && !(key && _pivotGrainCache.has(key)));
@@ -1172,6 +1172,7 @@ export function usePivotGrain({ enabled = false, months = null, dates = null, di
         p_months: months && months.length ? months : null,
         p_dates: dates && dates.length ? dates : null,
         p_dims: dims || [],
+        p_stav: stav && stav.length ? stav : null,
       });
       if (cancelled) return;
       if (error) { console.error("[usePivotGrain]", error); setGrain([]); setLoading(false); return; }

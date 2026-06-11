@@ -108,6 +108,10 @@ const FIELDS = {
   // every market). Essential once Slovakia is unified: district alone is
   // ambiguous (e.g. "Staré Mesto" exists in Bratislava AND Košice), so the
   // city dimension is what makes a national pivot/export legible.
+  // Krajina (country) — top of the location hierarchy, above Mesto. Sourced
+  // from flats_archive.country (SK/CZ); shown as readable "Slovensko"/"Česko"
+  // so the client accessor and the server grain (pivot_grain CASE) agree.
+  country:           { label: "Krajina",                     group: "location", type: "text",   accessor: (r) => r.country === "SK" ? "Slovensko" : r.country === "CZ" ? "Česko" : (r.country || null) },
   city:              { label: "Mesto",                       group: "location", type: "text",   accessor: (r) => r.city || null },
   cast:              { label: "Cast",                       group: "location", type: "text",   accessor: (r) => r.district },
   ulica_detail:      { label: "Ulica/Detail",               group: "location", type: "text",   accessor: (r) => r.ulica_detail },
@@ -197,7 +201,7 @@ const FIELD_ORDER = [
   "zahrada", "exterier", "kobka", "celkova_plocha",
   "cena_bez_dph", "cena_s_dph",
   "stav", "kolaudacia", "orientacia",
-  "city", "cast", "ulica_detail", "budova_stav", "standard",
+  "country", "city", "cast", "ulica_detail", "budova_stav", "standard",
   "cena_na_m2_obytnej",
   // Measures — group-level calculations, Values zone only
   "abs_rate", "wavg_m2_price", "sold_count", "available_count",
@@ -554,7 +558,7 @@ function buildTree(records, rowFields, colFields, valueDefs) {
    caller keeps the existing record path. */
 const SERVERABLE_DIMS = new Set([
   "project_name", "typ", "etapa", "budova", "unit_detail", "developer", "unit_id",
-  "izby", "poschodie", "stav", "kolaudacia", "orientacia", "city", "cast",
+  "izby", "poschodie", "stav", "kolaudacia", "orientacia", "country", "city", "cast",
   "import_status", "snapshot_month", "datum", "batch_id",
 ]);
 // numeric field key → component prefix in the grain's `m` object
@@ -576,8 +580,11 @@ function isServerable(rowFields, colFields, valueDefs, filters) {
   }
   for (const f of (filters || [])) {
     if (!isFilterActive(f)) continue;
-    if (f.key !== "datum" && f.key !== "snapshot_month") return false;
-    if (f.mode && f.mode !== "in") return false;                  // between/empty on time → fall back
+    // Time filters (datum/snapshot_month) AND a stav filter are pushed to the
+    // RPC (p_dates / p_months / p_stav), so they stay server-able. Any other
+    // filter, or a non-"in" mode, falls back to the record path.
+    if (f.key !== "datum" && f.key !== "snapshot_month" && f.key !== "stav") return false;
+    if (f.mode && f.mode !== "in") return false;
   }
   return true;
 }
@@ -782,7 +789,10 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   // state" the previous note deferred — now that the archive is big enough to
   // matter. The month/date filter governs BOTH the fetch scope and the display,
   // so the pivot can never show a month it didn't fetch (no data-gap).
-  const [filters, setFilters] = useState([]);
+  // Default filter: show only the on-market units a buyer is actually shopping —
+  // Voľné (V) + Predrezervované (PR). Pushed to the grain RPC (p_stav) so the
+  // default stays instant. The user can edit/clear the chip to see all statuses.
+  const [filters, setFilters] = useState([{ key: "stav", mode: "in", values: ["V", "PR"] }]);
   // Forever perf fix (2026-06-11): server-able configs render from the pivot_grain
   // RPC (instant), and we fetch raw rows ONLY when a config can't be aggregated
   // server-side (median / count_distinct / rare field / ad-hoc filter) or the user
@@ -800,6 +810,14 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   const fetchDates = useMemo(() => {
     const dateF = filters.find(f => f.key === "datum");
     return dateF?.values?.length ? dateF.values.map(String) : undefined;
+  }, [filters]);
+  // A stav (status) filter is pushed to the grain RPC (p_stav) so the default
+  // "only Voľné + Predrezervované" view stays server-able/instant. Strip the
+  // (prázdne) sentinel — the RPC matches concrete stav codes (V/PR/R/P/…).
+  const fetchStav = useMemo(() => {
+    const stavF = filters.find(f => f.key === "stav" && (!f.mode || f.mode === "in"));
+    const vals = stavF?.values?.filter(v => v !== EMPTY_SENTINEL).map(String);
+    return vals && vals.length ? vals : undefined;
   }, [filters]);
   // "Current" view = no time scope → each project's LATEST snapshot. This is the
   // default and the only cross-market-correct mode (SK + CZ scrape on different
@@ -904,6 +922,10 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
       const p = projectById[f.project_id];
       return {
         ...f,
+        // Real flats carry country (flats_current/archive.country); synthetic
+        // preview rows don't, so fall back to the project's country so the
+        // Krajina dimension is populated on the free-tier demo too.
+        country:           f.country ?? p?.country ?? null,
         project_name:      p?.name || f.project_id,
         project_status:    p?.status || "active",
         developer:         p?.developer || null,
@@ -919,13 +941,13 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   }, [flats, projectById]);
 
   // ── State ─────────────────────────────────────────────────────
-  // Default layout: Cast (district) + Project name in Rows, average
-  // €/m² as the value. This is the most information-dense starting
-  // point — user immediately sees "which districts and which projects
-  // sit at which price level" which is the canonical first question
-  // in residential-market analysis. They can reshape it in seconds,
-  // but the pre-filled config teaches the pivot's grammar by example.
-  const [rows,    setRows]    = useState(["cast", "project_name"]);
+  // Default layout: Krajina (country) + Project name in Rows, average
+  // €/m² as the value, filtered to on-market units (V + PR). The user
+  // immediately sees, per country, which projects sit at which price
+  // level among the units actually for sale — the canonical first
+  // question in residential-market analysis. They can reshape it in
+  // seconds; the pre-filled config teaches the pivot's grammar by example.
+  const [rows,    setRows]    = useState(["country", "project_name"]);
   const [cols,    setCols]    = useState([]);   // cross-tab axis (≤ 1 field)
   const [values,  setValues]  = useState([
     { key: "cena_na_m2_obytnej", field: "cena_na_m2_obytnej", agg: "avg" },
@@ -1097,7 +1119,7 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   );
   const gDims = useMemo(() => [...rows, ...cols], [rows, cols]);
   const { grain, loading: grainLoading } = usePivotGrain({
-    enabled: configServerable, months: fetchMonths, dates: fetchDates, dims: gDims,
+    enabled: configServerable, months: fetchMonths, dates: fetchDates, dims: gDims, stav: fetchStav,
   });
   // A non-server-able config needs records — pull them (sticky once needed).
   useEffect(() => {
