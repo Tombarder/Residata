@@ -2270,22 +2270,41 @@ function groupAggregates(projects, key, lang, allFlats) {
   // table (handled by AggregateTable) instead of misleading 0% cells.
   const haveFlats = Array.isArray(allFlats);
   const unknown = (lang === "sk" ? "(neznáme)" : "(unknown)");
-  // PA-11: district names repeat across cities (a future SK city could also
-  // have "Staré Mesto"/"Centrum"). When grouping by district, bucket by
-  // CITY+district so they never merge under unified SK. Today every district is
-  // in Bratislava (unique names) so this is byte-identical for the current
-  // dataset — it only diverges once a 2nd SK city goes live. Display name stays
-  // the district; `city` is carried so downstream comparisons can qualify.
+  // PA-11: district names repeat across cities — "Centrum" exists in BOTH Košice
+  // and Žilina, "Dunajská Streda" in two towns, and SK already spans 28 cities.
+  // (1) Bucket KNOWN districts by CITY+district so same-named ones never merge;
+  //     unknown-district projects share ONE bucket (not one per city).
+  // (2) Qualify the DISPLAY name with the city only when a district name COLLIDES
+  //     across cities, so two "Centrum" rows aren't indistinguishable while
+  //     single-city districts keep their clean bare name.
   const buckets = {};
   for (const p of projects) {
     const dname = p[key] || unknown;
-    const bkey = key === "district" ? `${p.city || ""}␟${dname}` : dname;
+    const bkey = (key === "district" && p[key]) ? `${p.city || ""}␟${p[key]}` : dname;
     (buckets[bkey] = buckets[bkey] || []).push(p);
+  }
+  // district name → set of cities it appears in (collision detection)
+  const distCities = {};
+  if (key === "district") {
+    for (const bkey of Object.keys(buckets)) {
+      const sep = bkey.indexOf("␟");
+      if (sep < 0) continue; // the shared unknown bucket
+      const city = bkey.slice(0, sep), dn = bkey.slice(sep + 1);
+      (distCities[dn] = distCities[dn] || new Set()).add(city);
+    }
   }
   return Object.entries(buckets)
     .map(([bkey, ps]) => {
-      const name = key === "district" ? (ps[0][key] || unknown) : bkey;
-      const cityField = key === "district" ? { city: ps[0].city || null } : {};
+      const city = key === "district" ? (ps[0].city || null) : null;
+      let name;
+      if (key === "district") {
+        const dn = ps[0][key];                       // falsy → the unknown bucket
+        name = !dn ? unknown
+             : (city && (distCities[dn]?.size || 0) > 1) ? `${dn} (${city})` : dn;
+      } else {
+        name = bkey;
+      }
+      const cityField = key === "district" ? { city: ps[0][key] ? city : null } : {};
       let bucketFlats;
       if (haveFlats) {
         const ids = new Set(ps.map(p => p.id));
