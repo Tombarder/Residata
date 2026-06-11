@@ -227,10 +227,10 @@ export function useChat({ lang = "sk" } = {}) {
     L("Porovnaj top 3 developerov podľa inventáru.", "Compare the top 3 developers by inventory."),
   ] : tier === "free" ? [
     L("Aký je stav môjho projektu?", "What's the state of my project?"),
-    L("Koľko bytov je aktuálne na trhu v Bratislave?", "How many units are on the Bratislava market right now?"),
+    L("Koľko bytov je aktuálne na trhu?", "How many units are on the market right now?"),
     L("Ktorý okres je cenovo najdrahší?", "Which district is the most expensive?"),
   ] : [
-    L("Koľko novostavbových bytov sa teraz sleduje v Bratislave?", "How many new-build units are currently tracked in Bratislava?"),
+    L("Koľko novostavbových bytov sa teraz sleduje?", "How many new-build units are currently tracked?"),
     L("Koľko projektov je v aktívnej ponuke?", "How many projects are actively selling?"),
     L("Ktorý okres je cenovo najvyšší?", "Which district has the highest prices?"),
   ];

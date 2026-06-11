@@ -444,10 +444,18 @@ export function useMarketTotals() {
     if (cached) setTotals(cached);
     let cancelled = false;
     // "All" → the cross-market combined row (totals_global); else the per-country
-    // row. totals_global lacks sold_last_month / snapshot_month → they map to null
-    // (sold-velocity already shows "—" today), every other KPI is the SK+CZ sum.
+    // row. totals_global lacks sold_last_month / snapshot_month. sold_last_month
+    // stays null (sold-velocity shows "—"); snapshot_month we fill from the latest
+    // month any market scraped, so the dashboard's "last run for month X" is real.
     const _req = isAllCountries(country)
-      ? supabasePublic.from("totals_global").select("*").maybeSingle()
+      ? Promise.all([
+          supabasePublic.from("totals_global").select("*").maybeSingle(),
+          supabasePublic.from("totals_by_country").select("snapshot_month")
+            .order("snapshot_month", { ascending: false }).limit(1).maybeSingle(),
+        ]).then(([g, m]) => ({
+          data: g.data ? { ...g.data, snapshot_month: m.data?.snapshot_month ?? null } : g.data,
+          error: g.error,
+        }))
       : supabasePublic.from("totals_by_country").select("*").eq("country_code", country).maybeSingle();
     _req.then(({ data, error }) => {
       if (cancelled) return;

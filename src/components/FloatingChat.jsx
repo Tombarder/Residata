@@ -214,8 +214,8 @@ export default function FloatingChat({ lang = "sk", onNavigate }) {
               <div style={{ color: dim, fontSize: "0.8rem" }}>
                 <div style={{ marginBottom: "0.45rem" }}>
                   {user
-                    ? L("Ahoj. Opýtaj sa na čokoľvek o bratislavskom trhu novostavieb.", "Hi. Ask me anything about the Bratislava new-build market.")
-                    : L("Opýtaj sa na bratislavský trh novostavieb. Pre plný prístup k projektom sa prihlás.", "Ask about the Bratislava new-build market. Sign in for per-project detail.")}
+                    ? L("Ahoj. Opýtaj sa na čokoľvek o trhu novostavieb.", "Hi. Ask me anything about the new-build market.")
+                    : L("Opýtaj sa na trh novostavieb. Pre plný prístup k projektom sa prihlás.", "Ask about the new-build market. Sign in for per-project detail.")}
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
                   {chat.suggestedQuestions.slice(0, 3).map((q, i) => (

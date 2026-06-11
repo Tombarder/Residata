@@ -335,6 +335,22 @@ const COUNTRY_COPY = {
       dataContext: "Trh novostavieb Praha",
     },
   },
+  // "all" = combined SK+CZ view (the default country). Broadens the market-named
+  // hero strings to both countries so the landing copy isn't Bratislava-only when
+  // showing the unified market. Same key scope as the CZ block above.
+  all: {
+    en: {
+      heroTitle1: "Slovak & Czech residential market,",
+      heroSub: "We monitor every new residential development across Slovakia and Czechia and turn scattered listings into actionable market intelligence — so you can make pricing, investment, and portfolio decisions based on data.",
+      valueDesc: "Every month you get a full snapshot of the Slovak & Czech new-build market — unit-level data across every active project, plus the insights you need to act on it.",
+      dataContext: "Slovak & Czech New-Build Market",
+    },
+    sk: {
+      heroTitle1: "Novostavby na Slovensku a v Česku.",
+      valueDesc: "Každý mesiac dostanete kompletný prehľad trhu novostavieb na Slovensku a v Česku — každý byt, každý projekt. A to aj s insightmi, na základe ktorých viete hneď konať.",
+      dataContext: "Trh novostavieb Slovensko a Česko",
+    },
+  },
 };
 
 /**

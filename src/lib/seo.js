@@ -191,6 +191,20 @@ const SEO_COUNTRY_OVERRIDES = {
       ["Slovensko", "Česko"],
     ],
   },
+  // "all" = combined SK+CZ view (the default country). Only the visible page
+  // TITLES are broadened off Bratislava-only; descriptions/keywords keep the
+  // base copy (Bratislava keywords still carry SEO value). Precise full-phrase
+  // rules → no bare-token double-replacement risk.
+  all: {
+    en: [
+      ["New-Build Market Intelligence for Bratislava", "New-Build Market Intelligence for Slovakia & Czechia"],
+      ["Bratislava New-Build Market", "Slovak & Czech New-Build Market"],
+    ],
+    sk: [
+      ["Dátový prehľad trhu novostavieb Bratislava", "Dátový prehľad trhu novostavieb — Slovensko a Česko"],
+      ["Trh novostavieb Bratislava", "Trh novostavieb — Slovensko a Česko"],
+    ],
+  },
 };
 
 /**
