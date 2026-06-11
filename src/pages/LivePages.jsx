@@ -1339,9 +1339,9 @@ function TimelineChart({ snaps, lang }) {
 
         {/* ── Headline strip ─────────────────────────── */}
         <g>
-          {/* Big sold % */}
+          {/* Big sold % — whole, like every other sold-through % in the app */}
           <text x={pad.l} y={26} fill={text} fontFamily={mono} fontSize={26} fontWeight={700}>
-            {pctSold.toFixed(1)}%
+            {pctSold.toFixed(0)}%
           </text>
           <text x={pad.l + 80} y={26} fill={dim} fontFamily={mono} fontSize={11}>
             {lang === "sk" ? "predaných" : "sold"}
