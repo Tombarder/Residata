@@ -1113,7 +1113,8 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   const stavSplit = useMemo(() => {
     let offer = 0, sold = 0;
     if (useGrain) {
-      for (const g of (grain || [])) { offer += (+g.avail || 0) + (+g.res || 0) + (+g.prer || 0); sold += (+g.sold || 0); }
+      // grain rows are { d: [dimVals], m: {components} } — components are under .m
+      for (const g of (grain || [])) { const m = g.m || {}; offer += (+m.avail || 0) + (+m.res || 0) + (+m.prer || 0); sold += (+m.sold || 0); }
     } else {
       for (const r of filteredRecords) {
         const s = (r.stav || "").trim().toUpperCase();
