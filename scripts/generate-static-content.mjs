@@ -45,7 +45,10 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
   process.exit(0);
 }
 
-const HOME = 'https://residata-gamma.vercel.app';
+// Single switch for the canonical domain: set VITE_SITE_BASE (or SITE_BASE) in
+// the Vercel build env when the custom domain goes live (e.g. https://residata.sk)
+// and the generated index.html + sitemap.xml pick it up. Matches src/lib/seo.js.
+const HOME = process.env.VITE_SITE_BASE || process.env.SITE_BASE || 'https://residata-gamma.vercel.app';
 
 async function fetchView(table, params = {}) {
   const qs = new URLSearchParams(params).toString();
