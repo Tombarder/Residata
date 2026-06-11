@@ -706,39 +706,33 @@ function isMoneyUnit(u) { return u === "€" || u === "€/m²"; }
 /** Map a stored (EUR) money unit to the current display-currency unit. */
 function displayMoneyUnit(u) { return u === "€" ? moneySymbol() : u === "€/m²" ? `${moneySymbol()}/m²` : u; }
 
+/* Unified number formatting — one consistent rule PER CATEGORY, so a column
+   never mixes "1 234.5" and "1 234" or shows cents on a price. Categories:
+     · Money (prices, €/m²)        → whole numbers, always       "450 000 €"
+     · Percent (%)                 → 1 decimal                   "73.2 %"
+     · Counts (count_*, count meas)→ whole                       "4 558"
+     · Sum of anything else        → whole (aggregate total)     "123 456 m²"
+     · Area / rooms / floor, via
+       avg / median / min / max    → 1 decimal                   "65.4 m²", "2.3"
+*/
+const _fmtWhole = (x) => Math.round(x).toLocaleString("en-US").replace(/,/g, " ");
+const _fmtDec1  = (x) => (Math.round(x * 10) / 10).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).replace(/,/g, " ");
+
 function formatValue(value, fieldKey, agg) {
   if (value == null || !Number.isFinite(value)) return "—";
   const f = FIELDS[fieldKey];
+  const u = f?.unit;
   // Money fields store EUR — convert to the display currency + swap the unit.
-  if (isMoneyUnit(f?.unit)) value = moneyFromEur(value);
-  const unit = f?.unit ? ` ${isMoneyUnit(f.unit) ? displayMoneyUnit(f.unit) : f.unit}` : "";
+  let v = value;
+  if (isMoneyUnit(u)) v = moneyFromEur(v);
+  const unit = u ? ` ${isMoneyUnit(u) ? displayMoneyUnit(u) : u}` : "";
 
-  // Counts — always integer, no unit (unless the measure defines one,
-  // e.g. sold_count has unit="")
-  if (agg === "count" || agg === "count_distinct") {
-    return Math.round(value).toLocaleString("en-US").replace(/,/g, " ");
-  }
-  // Measures — 1 decimal for % units, integer otherwise, always with unit
-  if (agg === "measure") {
-    if (f?.unit === "%") {
-      return `${(Math.round(value * 10) / 10).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).replace(/,/g, " ")}${unit}`;
-    }
-    const rounded = Math.round(value);
-    return `${rounded.toLocaleString("en-US").replace(/,/g, " ")}${unit}`;
-  }
-  // AVG / MEDIAN of small-range numbers (izby, poschodie) → 1 decimal
-  const oneDecAggs = new Set(["avg", "median"]);
-  if (oneDecAggs.has(agg)) {
-    const rounded = Math.round(value * 10) / 10;
-    const isInt = Math.abs(rounded - Math.round(rounded)) < 1e-9;
-    const txt = isInt
-      ? Math.round(rounded).toLocaleString("en-US").replace(/,/g, " ")
-      : rounded.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).replace(/,/g, " ");
-    return `${txt}${unit}`;
-  }
-  // SUM / MIN / MAX → integer with unit
-  const rounded = Math.round(value);
-  return `${rounded.toLocaleString("en-US").replace(/,/g, " ")}${unit}`;
+  if (isMoneyUnit(u)) return `${_fmtWhole(v)}${unit}`;                 // prices + €/m² → whole
+  if (u === "%")      return `${_fmtDec1(v)}${unit}`;                  // percent → 1 decimal
+  if (agg === "count" || agg === "count_distinct") return _fmtWhole(v); // record counts → whole
+  if (agg === "measure") return `${_fmtWhole(v)}${unit}`;             // sold/available counts → whole
+  if (agg === "sum")     return `${_fmtWhole(v)}${unit}`;             // aggregate totals → whole
+  return `${_fmtDec1(v)}${unit}`;                                     // area / rooms / floor (avg/min/max/median) → 1 decimal
 }
 
 function aggLabel(v) {
@@ -4086,7 +4080,9 @@ function DrillDownModal({ title, records, loading, onClose, lang }) {
                     const raw = r[c.key];
                     const isEmpty = raw == null || raw === "";
                     const cellText = c.key === "cena_s_dph" && !isEmpty && Number.isFinite(Number(raw))
-                      ? `${Math.round(moneyFromEur(Number(raw))).toLocaleString("en-US").replace(/,/g, " ")} ${moneySymbol()}`
+                      ? `${Math.round(moneyFromEur(Number(raw))).toLocaleString("en-US").replace(/,/g, " ")} ${moneySymbol()}`   // price → whole
+                      : c.key === "obytna_plocha" && !isEmpty && Number.isFinite(Number(raw))
+                      ? `${_fmtDec1(Number(raw))} m²`                                                                          // area → 1 decimal
                       : (isEmpty ? null : String(raw));
                     return (
                       <td key={c.key} style={{ padding: "0.35rem 0.7rem", color: "#c4c4cc", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 180 }}
