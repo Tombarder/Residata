@@ -1065,9 +1065,55 @@ function UseCasesPage({ setCurrent, l, lang }) {
 }
 
 /* ─────── DATA ─────── */
+// Real per-market sample data for the public "Sample Output" page. Pulled from
+// the live DB (current snapshot) so the demo numbers are ACCURATE, not invented:
+// Bratislava for SK / All, Praha for CZ. Prices are real listed units (unit IDs
+// anonymized); districts/€-m²/sold-through are real current aggregates. Static
+// snapshot example — refresh on a major data shift.
+const DATA_SAMPLE = {
+  SK: {
+    rows: [
+      ["Downtown Yards", "Staré Mesto", "byt", "—", "111.4", "961,860",   "8,638", "4", "V"],
+      ["Drotárska 15",   "Staré Mesto", "byt", "—", "110.5", "765,000",   "6,924", "4", "P"],
+      ["Byty Ružinov",   "Ružinov",     "byt", "—", "61.5",  "332,625",   "5,409", "2", "V"],
+      ["Danubius",       "Ružinov",     "byt", "—", "215.4", "1,135,595", "5,272", "3", "V"],
+      ["Galvania",       "Nové Mesto",  "byt", "—", "80.2",  "495,000",   "6,175", "3", "V"],
+      ["Agáty",          "Dúbravka",    "byt", "—", "87.0",  "587,552",   "6,753", "4", "V"],
+      ["Bory",           "Lamač",       "byt", "—", "137.4", "581,000",   "4,229", "5", "P"],
+      ["Floret",         "Rovinka",     "byt", "—", "59.7",  "229,990",   "3,853", "2", "V"],
+    ],
+    marketAvg: "5,525", gap: "1.9×",
+    districts: [["Staré Mesto","7,521",1469],["Ružinov","6,188",1885],["Karlova Ves","5,786",40],["Nové Mesto","5,684",859],["Dúbravka","5,277",649],["Rača","5,131",223]],
+    seg: ["€281k", "€418k", "€642k"],
+    nearSellout: [["Livana","Záhorská Bystrica",117,1,"99%"],["Svrčina","Karlova Ves",30,1,"97%"],["Drotárska 15","Staré Mesto",30,1,"97%"],["Pristavná 1","Ružinov",207,7,"97%"],["Rowink","Petržalka",80,5,"94%"]],
+    top: { district: "Staré Mesto", projects: 20, units: 1469, avail: 468, m2: "7,521", peak: "15,916" },
+    fast: { project: "Pristavná 1", district: "Ružinov", total: 207, left: 7, pct: "97%" },
+  },
+  CZ: {
+    rows: [
+      ["Ethos Karlín",       "Karlín",   "byt", "—", "112.3", "1,118,457", "9,960", "4", "V"],
+      ["Rezidence Parková",  "Žižkov",   "byt", "—", "60.6",  "517,888",   "8,546", "2", "V"],
+      ["Bohdalecké zahrady", "Michle",   "byt", "—", "91.0",  "720,436",   "7,917", "3", "V"],
+      ["D.O.K. Dřevák",      "Radlice",  "byt", "—", "119.9", "850,654",   "7,095", "4", "R"],
+      ["TOIVO Roztyly II",   "Chodov",   "byt", "—", "49.6",  "343,638",   "6,928", "2", "P"],
+      ["Albatros Kbely",     "Kbely",    "byt", "—", "80.9",  "565,862",   "6,995", "3", "V"],
+      ["Viladomy Střížkov",  "Střížkov", "byt", "—", "34.5",  "268,312",   "7,777", "1", "V"],
+      ["Lihovar Smíchov",    "Smíchov",  "byt", "—", "149.7", "1,418,170", "9,473", "4", "V"],
+    ],
+    marketAvg: "7,443", gap: "1.6×",
+    districts: [["Karlín","9,616",147],["Smíchov","9,109",162],["Žižkov","8,570",104],["Chodov","7,762",115],["Jinonice","7,506",488],["Uhříněves","6,932",263]],
+    seg: ["€407k", "€554k", "€794k"],
+    nearSellout: [["D.O.K. Dřevák","Radlice",26,1,"96%"],["Viladomy Uhříněves","Uhříněves",151,22,"85%"],["JITRO Vršovice","Vršovice",155,25,"84%"],["TOIVO Roztyly II","Chodov",112,26,"77%"],["NEAR living","Palmovka",212,32,"74%"]],
+    top: { district: "Karlín", projects: 2, units: 147, avail: 147, m2: "9,616", peak: "12,071" },
+    fast: { project: "D.O.K. Dřevák", district: "Radlice", total: 26, left: 1, pct: "96%" },
+  },
+};
+
 function DataPage({ setCurrent, l, lang }) {
   const mono = "'JetBrains Mono', monospace";
   const { can } = useCapabilities();
+  const { country } = useCountry();
+  const d = DATA_SAMPLE[country] || DATA_SAMPLE.SK;   // CZ → Praha; SK / All → Bratislava
   const isPaid = can("has_paid_access");
   // Live count nad "Unit-level sample" tabulkou. Reads from the
   // `market_totals` view (single source of truth — same number the
@@ -1086,23 +1132,11 @@ function DataPage({ setCurrent, l, lang }) {
   // dashboard") so customers don't mistake hand-authored examples for live
   // insights. Live versions ship in the paid dashboard.
   const dynamicInsightsBadge = l.insightsBadge;
-  // Unit-level sample rows — 8 real active projects, prices computed from
-  // the project-level avg_price_eur_m2 we actually have in DB × plausible
-  // floor area. Unit labels (A2-304 etc.) are illustrative — we don't
-  // expose real unit IDs on the public sample table. Mix of V/P/R stav
-  // so the schema example is clear. If any developer renames a project,
-  // these rows should be refreshed on the next sync. (Not worth wiring up
-  // live since this is explicitly a snapshot example.)
-  const rows = [
-    ["Slnecnice",       "Petržalka",    "byt", "A2-304",  "68.4", "339,500", "4,963",  "3", "V"],
-    ["Slnecnice",       "Petržalka",    "byt", "B1-412",  "45.2", "224,330", "4,963",  "4", "P"],
-    ["Novy Ruzinov",    "Ružinov",      "byt", "C2-205",  "82.1", "376,450", "4,585",  "2", "V"],
-    ["Vydrica",         "Staré Mesto",  "byt", "V3-101",  "52.3", "523,800", "10,015", "1", "R"],
-    ["Downtown Yards",  "Staré Mesto",  "byt", "DY-503",  "95.6", "677,600", "7,088",  "5", "P"],
-    ["Sky Park Tower",  "Staré Mesto",  "byt", "T2-1804", "56.3", "449,200", "7,979", "18", "V"],
-    ["Millhaus",        "Staré Mesto",  "byt", "M-207",   "73.9", "471,200", "6,376",  "2", "V"],
-    ["Pristavna 1",     "Ružinov",      "byt", "P-066",   "66.0", "332,900", "5,044",  "—", "V"],
-  ];
+  // Unit-level sample rows — real active projects + real listed prices/€-m²
+  // for the viewed market (Bratislava for SK/All, Praha for CZ), from DATA_SAMPLE.
+  // Unit IDs are anonymized ("—"); everything else is real. Floor column shows
+  // rooms (izby). Refresh DATA_SAMPLE on a major data shift.
+  const rows = d.rows;
   const statusStyle = { V: { color: "#00e5a0", bg: "rgba(0,229,160,0.08)" }, P: { color: "#f5a623", bg: "rgba(245,166,35,0.08)" }, R: { color: "#55555f", bg: "rgba(85,85,95,0.15)" } };
 
   // Insight card component
@@ -1250,127 +1284,109 @@ function DataPage({ setCurrent, l, lang }) {
             a reader say "I need this" — static percentages don't do that,
             directional forecasts do. */}
 
-        {/* 1 — Top Performer with pace signal + forecast */}
-        <InsightCard label="Pace Watch — Novy Ruzinov" title="Sell-out forecast: ~7 months left.">
+        {/* 1 — Sell-through leader (real near-sell-out project) */}
+        <InsightCard label={`Sell-through — ${d.fast.project}`} title="In its final units.">
           <div style={{ fontSize: "0.82rem", color: "#8a8a96", lineHeight: 1.6, marginBottom: "1rem" }}>
-            Quarter-over-quarter sales pace slowed from ~12 to ~4 units/month — a <span style={{ color: "#f5a623", fontWeight: 600 }}>−67% deceleration</span>. Only 27 of 652 units remain. At the current clearing rate the project is fully sold by Q4 2026. Last window for clients wanting in at €4,585/m².
+            <span style={{ color: "#e8e8ed" }}>{d.fast.project}</span> in {d.fast.district} is <span style={{ color: "#00e5a0", fontWeight: 600 }}>{d.fast.pct} sold</span> — only {d.fast.left} of {d.fast.total} units remain. The kind of signal a developer uses to time a launch into the gap, and a buyer uses before the last units clear.
           </div>
           <div style={{ display: "flex", gap: "1.5rem" }}>
-            <div><div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: "#f5a623" }}>−67%</div><div style={{ fontSize: "0.68rem", color: "#55555f" }}>QoQ pace</div></div>
-            <div><div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: "#e8e8ed" }}>27</div><div style={{ fontSize: "0.68rem", color: "#55555f" }}>units left</div></div>
-            <div><div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: "#00e5a0" }}>~7 mo</div><div style={{ fontSize: "0.68rem", color: "#55555f" }}>to sell-out</div></div>
+            <div><div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: "#00e5a0" }}>{d.fast.pct}</div><div style={{ fontSize: "0.68rem", color: "#55555f" }}>sold-through</div></div>
+            <div><div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: "#e8e8ed" }}>{d.fast.left}</div><div style={{ fontSize: "0.68rem", color: "#55555f" }}>units left</div></div>
+            <div><div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: "#8a8a96" }}>{d.fast.total}</div><div style={{ fontSize: "0.68rem", color: "#55555f" }}>total units</div></div>
           </div>
         </InsightCard>
 
-        {/* 2 — Segment pricing tension — where the market pressure sits */}
-        <InsightCard label="Pricing Tension" title="4-room sits 2× longer than 2-room.">
+        {/* 2 — Segment pricing — real average price by layout */}
+        <InsightCard label="Segment Pricing" title="The 4-room premium runs ~2× the 2-room core.">
           <div style={{ fontSize: "0.82rem", color: "#8a8a96", lineHeight: 1.6, marginBottom: "1rem" }}>
-            2-bedroom units (avg <span style={{ color: "#e8e8ed" }}>€288k</span>) move out in ~9 months — the market's core product. 4-bedroom units (<span style={{ color: "#e8e8ed" }}>€632k+</span>) sit for 18+ months on average. The premium segment is over-supplied: any new 4+ launch competes against a large pool of existing unsold stock.
+            Average price climbs steeply with size. 2-room units at <span style={{ color: "#e8e8ed" }}>{d.seg[0]}</span> are the market's liquid core; 4-room units average <span style={{ color: "#e8e8ed" }}>{d.seg[2]}</span> — roughly double, and a thinner, slower-moving pool. Pricing a large unit means competing in a much smaller buyer segment.
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "auto 1fr auto", gap: "0.5rem 0.75rem", fontSize: "0.74rem", alignItems: "center" }}>
             <span style={{ fontFamily: mono, color: "#e8e8ed" }}>2-izb</span>
             <div style={{ height: 8, background: "rgba(0,229,160,0.15)", borderRadius: 4, overflow: "hidden" }}>
-              <div style={{ height: "100%", width: "92%", background: "#00e5a0" }} />
+              <div style={{ height: "100%", width: "44%", background: "#00e5a0" }} />
             </div>
-            <span style={{ fontFamily: mono, color: "#00e5a0", fontSize: "0.68rem" }}>~9 mo</span>
+            <span style={{ fontFamily: mono, color: "#00e5a0", fontSize: "0.68rem" }}>{d.seg[0]}</span>
 
             <span style={{ fontFamily: mono, color: "#e8e8ed" }}>3-izb</span>
             <div style={{ height: 8, background: "rgba(0,229,160,0.15)", borderRadius: 4, overflow: "hidden" }}>
-              <div style={{ height: "100%", width: "60%", background: "#00e5a0" }} />
+              <div style={{ height: "100%", width: "68%", background: "#00e5a0" }} />
             </div>
-            <span style={{ fontFamily: mono, color: "#8a8a96", fontSize: "0.68rem" }}>~14 mo</span>
+            <span style={{ fontFamily: mono, color: "#8a8a96", fontSize: "0.68rem" }}>{d.seg[1]}</span>
 
             <span style={{ fontFamily: mono, color: "#e8e8ed" }}>4-izb+</span>
             <div style={{ height: 8, background: "rgba(245,166,35,0.15)", borderRadius: 4, overflow: "hidden" }}>
-              <div style={{ height: "100%", width: "32%", background: "#f5a623" }} />
+              <div style={{ height: "100%", width: "100%", background: "#f5a623" }} />
             </div>
-            <span style={{ fontFamily: mono, color: "#f5a623", fontSize: "0.68rem" }}>~18+ mo</span>
+            <span style={{ fontFamily: mono, color: "#f5a623", fontSize: "0.68rem" }}>{d.seg[2]}</span>
           </div>
           <div style={{ fontSize: "0.68rem", color: "#55555f", marginTop: "0.8rem" }}>
-            Velocity based on current inventory vs. trailing clearance.
+            Average listed price by layout · current snapshot.
           </div>
         </InsightCard>
 
-        {/* 3 — Market direction by district (YoY movement) */}
-        <InsightCard label="Market Direction" title="Growth split unevenly — 3 districts outpace, 3 trail.">
+        {/* 3 — Price by district — real €/m² ranking + live inventory depth */}
+        <InsightCard label="Price by District" title={`Top-to-bottom price spread: ${d.gap}.`}>
           <div style={{ fontSize: "0.82rem", color: "#8a8a96", lineHeight: 1.6, marginBottom: "1rem" }}>
-            Market avg now <span style={{ color: "#e8e8ed" }}>€5,715/m²</span> (+6% YoY). Staré Mesto and Ružinov pulling away — up 9.1% and 7.4% respectively. Petržalka holds flat as mega-supply absorbs demand. Dúbravka and Rača trail inflation. Top-to-bottom district gap: <span style={{ color: "#e8e8ed", fontWeight: 600 }}>3.5×</span>.
+            Market average is <span style={{ color: "#e8e8ed" }}>€{d.marketAvg}/m²</span>. The premium districts price at a <span style={{ color: "#e8e8ed", fontWeight: 600 }}>{d.gap}</span> multiple of the most affordable — the single biggest input into where a new project should price. Live €/m² and tracked inventory by district:
           </div>
-          {[
-            ["Staré Mesto", 9.1, "#00e5a0", "€7,534/m²"],
-            ["Ružinov",     7.4, "#00e5a0", "€5,308/m²"],
-            ["Nové Mesto",  5.8, "#00e5a0", "€5,492/m²"],
-            ["Rača",        4.2, "#8a8a96", "€4,491/m²"],
-            ["Dúbravka",    2.6, "#8a8a96", "€5,027/m²"],
-            ["Petržalka",   1.3, "#8a8a96", "€4,965/m²"],
-          ].map(([name, delta, color, price]) => (
+          {d.districts.map(([name, price, units]) => (
             <div key={name} style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: "0.6rem", alignItems: "center", padding: "0.35rem 0", borderBottom: "1px solid #1a1a1f", fontSize: "0.76rem" }}>
               <span style={{ color: "#e8e8ed" }}>{name}</span>
-              <span style={{ fontFamily: mono, fontSize: "0.68rem", color: "#55555f" }}>{price}</span>
-              <span style={{ fontFamily: mono, fontSize: "0.72rem", fontWeight: 600, color: color, minWidth: 48, textAlign: "right" }}>+{delta}%</span>
+              <span style={{ fontFamily: mono, fontSize: "0.68rem", color: "#55555f" }}>{units} units</span>
+              <span style={{ fontFamily: mono, fontSize: "0.72rem", fontWeight: 600, color: "#00e5a0", minWidth: 64, textAlign: "right" }}>€{price}/m²</span>
             </div>
           ))}
         </InsightCard>
 
-        {/* 4 — Scarcity clock — how much runway for Staré Mesto premium */}
-        <InsightCard label="Scarcity Clock — Staré Mesto" title="Premium cluster: <12 months of inventory." span2>
+        {/* 4 — Premium cluster — real top-district depth + €/m² ranking */}
+        <InsightCard label={`Premium Cluster — ${d.top.district}`} title={`${d.top.avail} units available at €${d.top.m2}/m².`} span2>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
             <div>
               <div style={{ fontSize: "0.82rem", color: "#8a8a96", lineHeight: 1.65, marginBottom: "1rem" }}>
-                Staré Mesto has 12 active projects and <span style={{ color: "#e8e8ed" }}>602 units</span> left at <span style={{ color: "#e8e8ed" }}>€7,534/m²</span> avg. At the current ~55 units/month clearing rate, that's Q3 2027 — roughly 14 months.
+                {d.top.district} is the city's priciest cluster — <span style={{ color: "#e8e8ed" }}>{d.top.projects} active projects</span> and <span style={{ color: "#e8e8ed" }}>{d.top.units} units</span> tracked ({d.top.avail} still available) at <span style={{ color: "#e8e8ed" }}>€{d.top.m2}/m²</span> average, peaking at <span style={{ color: "#e8e8ed" }}>€{d.top.peak}/m²</span>.
                 <br /><br />
-                <span style={{ color: "#e8e8ed", fontWeight: 600 }}>For banks & valuers:</span> comparable transaction data dries up before then. Once these projects are sold, the comp window closes permanently — there's no way to get it back retrospectively.
+                <span style={{ color: "#e8e8ed", fontWeight: 600 }}>For banks & valuers:</span> this is where comparable evidence is scarcest and most valuable. Once a premium project sells out its transaction history stops updating — and can't be reconstructed retrospectively.
               </div>
               <div style={{ display: "flex", gap: "1.5rem", flexWrap: "wrap" }}>
-                <div><div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: "#f5a623" }}>~12 mo</div><div style={{ fontSize: "0.68rem", color: "#55555f" }}>inventory runway</div></div>
-                <div><div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: "#00e5a0" }}>+9.1%</div><div style={{ fontSize: "0.68rem", color: "#55555f" }}>€/m² YoY</div></div>
-                <div><div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: "#e8e8ed" }}>€13,384</div><div style={{ fontSize: "0.68rem", color: "#55555f" }}>peak €/m² (Vydrica)</div></div>
+                <div><div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: "#00e5a0" }}>{d.top.projects}</div><div style={{ fontSize: "0.68rem", color: "#55555f" }}>active projects</div></div>
+                <div><div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: "#e8e8ed" }}>{d.top.avail}</div><div style={{ fontSize: "0.68rem", color: "#55555f" }}>units available</div></div>
+                <div><div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: "#f5a623" }}>€{d.top.peak}</div><div style={{ fontSize: "0.68rem", color: "#55555f" }}>peak €/m²</div></div>
               </div>
             </div>
             <div>
-              <div style={{ fontSize: "0.78rem", color: "#55555f", marginBottom: "0.5rem" }}>Inventory depletion curve · projected</div>
-              {/* Depletion curve — conceptual visual: current 602 units →
-                  0 over ~12 months. Bars represent projected remaining
-                  inventory per month (decreasing). */}
-              <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 80, paddingBottom: 4 }}>
-                {[100, 92, 83, 75, 66, 58, 50, 42, 33, 25, 16, 8].map((h, i) => (
-                  <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-                    <div style={{ width: "100%", height: `${h*0.8}%`, background: i < 6 ? "#00e5a0" : i < 10 ? "#f5a623" : "#ff6b6b", borderRadius: "2px 2px 0 0", opacity: 0.75 }} />
+              <div style={{ fontSize: "0.78rem", color: "#55555f", marginBottom: "0.6rem" }}>Top districts · avg €/m²</div>
+              {(() => { const mx = parseInt(d.districts[0][1].replace(/,/g, ""), 10) || 1; return d.districts.slice(0, 5).map(([name, price]) => {
+                const v = parseInt(price.replace(/,/g, ""), 10) || 0;
+                return (
+                  <div key={name} style={{ marginBottom: "0.6rem" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.2rem", fontSize: "0.72rem" }}>
+                      <span style={{ color: "#8a8a96" }}>{name}</span>
+                      <span style={{ fontFamily: mono, color: "#e8e8ed", fontSize: "0.68rem" }}>€{price}</span>
+                    </div>
+                    <div style={{ width: "100%", height: 6, background: "#222228", borderRadius: 3 }}>
+                      <div style={{ width: `${Math.round((v / mx) * 100)}%`, height: "100%", background: "#00e5a0", borderRadius: 3 }} />
+                    </div>
                   </div>
-                ))}
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", marginTop: "0.25rem" }}>
-                <span style={{ fontFamily: mono, fontSize: "0.58rem", color: "#55555f" }}>now</span>
-                <span style={{ fontFamily: mono, fontSize: "0.58rem", color: "#55555f" }}>+6 mo</span>
-                <span style={{ fontFamily: mono, fontSize: "0.58rem", color: "#55555f" }}>+12 mo</span>
-              </div>
-              <div style={{ fontSize: "0.7rem", color: "#8a8a96", marginTop: "0.5rem" }}>
-                <span style={{ color: "#ff6b6b" }}>■</span> Premium comps window closes
-              </div>
+                );
+              }); })()}
             </div>
           </div>
         </InsightCard>
 
-        {/* 5 — Comparable-data closing window (reframed sell-out watch) */}
-        <InsightCard label="Comps Expiry Watch" title="These 5 projects won't exist as comps much longer.">
+        {/* 5 — Comparable-data closing window (real near-sell-out projects) */}
+        <InsightCard label="Comps Expiry Watch" title="These projects are in their final units.">
           <div style={{ fontSize: "0.82rem", color: "#8a8a96", lineHeight: 1.6, marginBottom: "1rem" }}>
-            Each is above 88% sold-through. When they close, so does your access to their transaction history as live market evidence. How long you have:
+            Each is deep into sell-through. Once a project closes out, its pricing and transaction history stop updating — your live comparable evidence for that location closes with it. Remaining inventory + sold-through:
           </div>
-          {[
-            ["Svrcina",       "Karlova Ves",  30,  1, "97%", "<2 mo"],
-            ["Drotarska 15",  "Staré Mesto",  30,  1, "97%", "<2 mo"],
-            ["Pristavna 1",   "Ružinov",      207, 7, "97%", "~3 mo"],
-            ["Rowink",        "Rovinka",      80,  5, "94%", "~4 mo"],
-            ["Vydrica",       "Staré Mesto",  229, 27, "88%", "~8 mo"],
-          ].map(([name, district, total, remaining, pct, window]) => (
-            <div key={name} style={{ display: "grid", gridTemplateColumns: "1fr auto auto auto", gap: "0.6rem", alignItems: "center", padding: "0.5rem 0", borderBottom: "1px solid #1a1a1f" }}>
+          {d.nearSellout.map(([name, district, total, remaining, pct]) => (
+            <div key={name} style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: "0.6rem", alignItems: "center", padding: "0.5rem 0", borderBottom: "1px solid #1a1a1f" }}>
               <div>
                 <span style={{ fontSize: "0.8rem", color: "#e8e8ed", fontWeight: 500 }}>{name}</span>
                 <span style={{ fontSize: "0.72rem", color: "#55555f", marginLeft: "0.5rem" }}>· {district}</span>
               </div>
-              <span style={{ fontFamily: mono, fontSize: "0.66rem", color: "#8a8a96" }}>{remaining}/{total}</span>
-              <span style={{ fontFamily: mono, fontSize: "0.62rem", color: "#f5a623", background: "rgba(245,166,35,0.08)", padding: "0.1rem 0.4rem", borderRadius: 4 }}>{pct}</span>
-              <span style={{ fontFamily: mono, fontSize: "0.68rem", color: "#ff6b6b", fontWeight: 600, minWidth: 52, textAlign: "right" }}>{window}</span>
+              <span style={{ fontFamily: mono, fontSize: "0.66rem", color: "#8a8a96" }}>{remaining}/{total} left</span>
+              <span style={{ fontFamily: mono, fontSize: "0.62rem", color: "#f5a623", background: "rgba(245,166,35,0.08)", padding: "0.1rem 0.4rem", borderRadius: 4, minWidth: 40, textAlign: "center" }}>{pct}</span>
             </div>
           ))}
         </InsightCard>

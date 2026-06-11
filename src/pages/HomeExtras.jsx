@@ -9,6 +9,14 @@ import { useCurrency } from "../lib/useCurrency";
 // anchor rather than actual scraped inventory.)
 
 const mono = "'JetBrains Mono', monospace";
+
+// Real per-market sample rows for the decorative "live dashboard" mockup in the
+// PipelineFlow scene (Bratislava for SK / All, Praha for CZ). Real projects +
+// avg €/m² from the live DB so even the illustration isn't wrong.
+const PANEL_SAMPLE = {
+  SK: { avg: "5,525", rows: [["Downtown Yards", "Staré Mesto", "8,638"], ["Byty Ružinov", "Ružinov", "5,409"]] },
+  CZ: { avg: "7,443", rows: [["Ethos Karlín", "Karlín", "9,960"], ["TOIVO Roztyly", "Chodov", "6,928"]] },
+};
 const green = "#00e5a0";
 const dim = "#8a8a96";
 const border = "#222228";
@@ -153,7 +161,7 @@ function CenterHub({ subtitle }) {
 }
 
 // ── Dashboard panel — right-side terminal/dashboard target ──
-function DashboardPanel({ captionRow1, captionRow2, chipLabels }) {
+function DashboardPanel({ captionRow1, captionRow2, chipLabels, sample }) {
   return (
     <g>
       {/* Panel frame with glow */}
@@ -174,7 +182,7 @@ function DashboardPanel({ captionRow1, captionRow2, chipLabels }) {
       <g transform="translate(16, 46)">
         <rect x="0" y="0" width="278" height="100" rx="8" fill="#0a0a0b" stroke="#1a1a1f" strokeWidth="0.6" />
         <text x="10" y="16" fill="#8a8a96" fontFamily={mono} fontSize="8" letterSpacing="0.06em">AVG €/M² · 6 MONTHS</text>
-        <text x="268" y="16" textAnchor="end" fill="#00e5a0" fontFamily={mono} fontSize="8" fontWeight="700">+12% YoY</text>
+        <text x="268" y="16" textAnchor="end" fill="#00e5a0" fontFamily={mono} fontSize="8" fontWeight="700">Ø {sample.avg} €/m²</text>
 
         {/* Area under curve */}
         <path
@@ -208,15 +216,15 @@ function DashboardPanel({ captionRow1, captionRow2, chipLabels }) {
       <g transform="translate(16, 160)">
         <rect x="0" y="0" width="278" height="50" rx="6" fill="#0a0a0b" stroke="#1a1a1f" strokeWidth="0.6" />
         {/* Row 1 */}
-        {/* Real active projects with real avg_price_eur_m2 from DB. */}
-        <text x="10" y="18" fill="#e8e8ed" fontFamily="'Outfit', sans-serif" fontSize="10" fontWeight="600">Slnecnice</text>
-        <text x="150" y="18" fill="#8a8a96" fontFamily={mono} fontSize="9">Petržalka</text>
-        <text x="225" y="18" fill="#00e5a0" fontFamily={mono} fontSize="9" fontWeight="700">4,963 €/m²</text>
+        {/* Real active projects + avg €/m² from DB, per viewed market. */}
+        <text x="10" y="18" fill="#e8e8ed" fontFamily="'Outfit', sans-serif" fontSize="10" fontWeight="600">{sample.rows[0][0]}</text>
+        <text x="150" y="18" fill="#8a8a96" fontFamily={mono} fontSize="9">{sample.rows[0][1]}</text>
+        <text x="225" y="18" fill="#00e5a0" fontFamily={mono} fontSize="9" fontWeight="700">{sample.rows[0][2]} €/m²</text>
         {/* Row 2 */}
         <line x1="8" y1="26" x2="270" y2="26" stroke="#1a1a1f" strokeWidth="0.5" />
-        <text x="10" y="42" fill="#e8e8ed" fontFamily="'Outfit', sans-serif" fontSize="10" fontWeight="600">Downtown Yards</text>
-        <text x="150" y="42" fill="#8a8a96" fontFamily={mono} fontSize="9">Staré Mesto</text>
-        <text x="225" y="42" fill="#00e5a0" fontFamily={mono} fontSize="9" fontWeight="700">7,088 €/m²</text>
+        <text x="10" y="42" fill="#e8e8ed" fontFamily="'Outfit', sans-serif" fontSize="10" fontWeight="600">{sample.rows[1][0]}</text>
+        <text x="150" y="42" fill="#8a8a96" fontFamily={mono} fontSize="9">{sample.rows[1][1]}</text>
+        <text x="225" y="42" fill="#00e5a0" fontFamily={mono} fontSize="9" fontWeight="700">{sample.rows[1][2]} €/m²</text>
       </g>
 
       {/* Export chips */}
@@ -290,6 +298,8 @@ export function PipelineFlow({ lang = "en" }) {
   // (full registry incl. paused/sold-out) which is misleading on a
   // "live pipeline" panel.
   const marketTotals = useMarketTotals();
+  const { country } = useCountry();
+  const panelSample = PANEL_SAMPLE[country] || PANEL_SAMPLE.SK;   // CZ → Praha; SK / All → Bratislava
   const devCount  = marketTotals.developersActive ?? null;
   // projCount is used in two places:
   //   z1Live ("z X developerov · Y projektov") — flow description of where
@@ -470,6 +480,7 @@ export function PipelineFlow({ lang = "en" }) {
               captionRow1={T.z3Cap1}
               captionRow2={T.z3Cap2}
               chipLabels={T.z3Chips}
+              sample={panelSample}
             />
 
             {/* Zone 3 label — above panel */}
