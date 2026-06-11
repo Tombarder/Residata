@@ -579,7 +579,10 @@ function MarketReport({ projects, onOpenProject, lang }) {
       <KpiStrip summary={summary} lang={lang} />
 
       <ReportSection label={lang === "sk" ? "Executive summary" : "Executive summary"} title={title}>
-        <ExecSummary summary={summary} lang={lang} extraDistrict={districts[0]} />
+        {/* Priciest district for the summary line — skip the "(neznáme)"/"(unknown)"
+            bucket (projects with no district yet) so it never reads "most expensive
+            part: unknown"; the full district table below still lists it honestly. */}
+        <ExecSummary summary={summary} lang={lang} extraDistrict={districts.find(d => d.name !== "(neznáme)" && d.name !== "(unknown)") || districts[0]} />
       </ReportSection>
 
       <ReportSection label={lang === "sk" ? "Rozloženie cien" : "Price distribution"} title={lang === "sk" ? "€/m² cez všetky byty \u2014 klik na pásmo otvorí zoznam bytov" : "€/m² across all units \u2014 click a band for the underlying units"}>
