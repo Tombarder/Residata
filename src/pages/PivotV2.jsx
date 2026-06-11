@@ -585,6 +585,11 @@ function isServerable(rowFields, colFields, valueDefs, filters) {
     // filter, or a non-"in" mode, falls back to the record path.
     if (f.key !== "datum" && f.key !== "snapshot_month" && f.key !== "stav") return false;
     if (f.mode && f.mode !== "in") return false;
+    // A stav filter that selects the (prázdne) bucket can't be expressed via
+    // p_stav (the RPC matches concrete codes V/PR/…), so force the record path
+    // to honor it exactly. (Practically unreachable — stav is never null in the
+    // data — but keeps the grain and record paths identical for any input.)
+    if (f.key === "stav" && (f.values || []).includes(EMPTY_SENTINEL)) return false;
   }
   return true;
 }
