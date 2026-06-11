@@ -1103,6 +1103,26 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
 
   // Header unit count + loading skeleton, source-aware.
   const displayCount = useGrain ? (rawTree?.count || 0) : records.length;
+
+  // Stav split for the header — so the unit count is never misread as "all on
+  // the market". On-market = V (voľné) + PR (predrezervované) + R (rezervované);
+  // sold = P (predané). Big projects (e.g. Slnečnice) carry thousands of sold
+  // units from the developer feed — intentional (that's the sell-through data),
+  // but it dominates the raw count. Source-aware: grain components when
+  // server-aggregated, else the filtered record set.
+  const stavSplit = useMemo(() => {
+    let offer = 0, sold = 0;
+    if (useGrain) {
+      for (const g of (grain || [])) { offer += (+g.avail || 0) + (+g.res || 0) + (+g.prer || 0); sold += (+g.sold || 0); }
+    } else {
+      for (const r of filteredRecords) {
+        const s = (r.stav || "").trim().toUpperCase();
+        if (s === "P") sold++;
+        else if (s === "V" || s === "R" || s === "PR") offer++;
+      }
+    }
+    return { offer, sold };
+  }, [useGrain, grain, filteredRecords]);
   const isInitialLoading = canViewAnalytics && (
     useGrain
       ? (grainLoading && (grain == null || grain.length === 0))
@@ -1257,6 +1277,12 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
         <span style={{ fontSize: "0.78rem", color: dim }}>
           {displayCount.toLocaleString("en-US").replace(/,/g, " ")} {lang === "sk" ? "bytov" : "units"}
+          {(stavSplit.offer > 0 || stavSplit.sold > 0) && (
+            <span style={{ marginLeft: "0.5rem" }}>
+              · <strong style={{ color: "#00e5a0" }}>{stavSplit.offer.toLocaleString("en-US").replace(/,/g, " ")}</strong> {lang === "sk" ? "v ponuke" : "on offer"}
+              {" · "}<strong style={{ color: "#9a9aa6" }}>{stavSplit.sold.toLocaleString("en-US").replace(/,/g, " ")}</strong> {lang === "sk" ? "predaných" : "sold"}
+            </span>
+          )}
           {!configServerable && filteredRecords.length !== records.length && (
             <span style={{ marginLeft: "0.5rem", color: dim }}>
               ({filteredRecords.length.toLocaleString("en-US").replace(/,/g, " ")} {lang === "sk" ? "po filtroch" : "after filters"})
