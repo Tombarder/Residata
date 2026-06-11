@@ -622,6 +622,9 @@ function buildTreeFromGrain(grain, rowFields, colFields, valueDefs) {
     colKeys = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, MAX_COL_VALUES).map(([k]) => k);
   }
   const rollupsFor = (rows) => { const c = emptyComp(); for (const g of rows) addComp(c, g.m); return valueDefs.map(v => computeFromComp(v, c)); };
+  // Per-node stav components (grain rows carry no records) so the table can show
+  // the on-offer / sold split on every row, not just the header total.
+  const compFor = (rows) => { const c = emptyComp(); for (const g of rows) addComp(c, g.m); return c; };
   const countFor = (rows) => rows.reduce((a, g) => a + (+g.m.n || 0), 0);
   const colRollupsFor = (rows) => {
     if (!colKeys) return null;
@@ -639,7 +642,7 @@ function buildTreeFromGrain(grain, rowFields, colFields, valueDefs) {
     const out = [];
     for (const [key, items] of byKey) {
       const path = [...prefix, key];
-      out.push({ label: key, path, pathKey: path.join(SEP), level: depth, records: [], count: countFor(items), rollups: rollupsFor(items), colRollups: colRollupsFor(items), children: isDeepest ? [] : rec(items, depth + 1, path), isLeaf: isDeepest });
+      out.push({ label: key, path, pathKey: path.join(SEP), level: depth, records: [], comp: compFor(items), count: countFor(items), rollups: rollupsFor(items), colRollups: colRollupsFor(items), children: isDeepest ? [] : rec(items, depth + 1, path), isLeaf: isDeepest });
     }
     return out;
   };
@@ -2086,6 +2089,24 @@ function exportPivotCSV(flatRows, grandTotal, rowFields, colFields, effectiveVal
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+/* On-offer (V+PR+R) vs sold (P) split for a tree node — from its stav comp
+   (grain rows) or its records (raw mode). Lets every row show the split so the
+   count is never misread as "all on the market". */
+function stavSplitOf(n) {
+  const c = n.comp;
+  if (c) return { offer: (+c.avail || 0) + (+c.res || 0) + (+c.prer || 0), sold: +c.sold || 0 };
+  if (n.records && n.records.length) {
+    let offer = 0, sold = 0;
+    for (const r of n.records) {
+      const s = (r.stav || "").trim().toUpperCase();
+      if (s === "P") sold++;
+      else if (s === "V" || s === "R" || s === "PR") offer++;
+    }
+    return { offer, sold };
+  }
+  return null;
+}
+
 /* ─── RESULT TABLE ────────────────────────────────────────────── */
 function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, collapsed: _collapsed, onToggle, sort, setSort, grandTotal, lang, valueMode = "raw", dataBars = false, onDrillDown, onProjectOpen }) {
   // Project-name column support:
@@ -2383,6 +2404,19 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                     title={onDrillDown ? (lang === "sk" ? "Zobraziť záznamy v tejto skupine" : "Show records in this group") : undefined}
                     onClick={onDrillDown ? () => onDrillDown(n) : undefined}>
                   {n.count.toLocaleString("en-US").replace(/,/g, " ")}
+                  {(() => {
+                    const sp = stavSplitOf(n);
+                    if (!sp || sp.sold <= 0) return null;
+                    const f = (x) => x.toLocaleString("en-US").replace(/,/g, " ");
+                    return (
+                      <div title={lang === "sk" ? `${f(sp.offer)} v ponuke · ${f(sp.sold)} predaných` : `${f(sp.offer)} on offer · ${f(sp.sold)} sold`}
+                           style={{ fontSize: "0.58rem", fontWeight: 400, marginTop: 1, whiteSpace: "nowrap" }}>
+                        <span style={{ color: green }}>{f(sp.offer)}</span>
+                        <span style={{ opacity: 0.4 }}> · </span>
+                        <span style={{ opacity: 0.65 }}>{f(sp.sold)}</span>
+                      </div>
+                    );
+                  })()}
                 </td>
                 {crossTab ? (
                   <>
