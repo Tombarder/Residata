@@ -781,7 +781,7 @@ export function useProjectSnapshots() {
  */
 let _flatsCurrentCache = null;
 let _flatsCurrentCacheKey = null;
-export function useFlatsCurrent() {
+export function useFlatsCurrent(enabled = true) {
   const { loading: authLoading, user, profile } = useAuth();
   const { country } = useCountry();
   // country is part of the identity signature: switching country must refetch
@@ -795,6 +795,7 @@ export function useFlatsCurrent() {
   const [loading, setLoading] = useState(_flatsCurrentCacheKey !== identityKey);
 
   useEffect(() => {
+    if (!enabled) { setFlats([]); setLoading(false); return; }
     if (!isSupabaseReady()) { setLoading(false); return; }
     if (authLoading) { return; }
 
@@ -851,7 +852,7 @@ export function useFlatsCurrent() {
       setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [authLoading, identityKey, country]);
+  }, [authLoading, identityKey, country, enabled]);
 
   return { flats, loading };
 }

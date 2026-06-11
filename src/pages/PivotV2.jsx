@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { useProjects, useFlatsArchive, useArchiveMonths, useArchiveDays, usePivotGrain } from "../lib/useData";
+import { useProjects, useFlatsArchive, useFlatsCurrent, useArchiveMonths, useArchiveDays, usePivotGrain } from "../lib/useData";
 import { useCapabilities } from "../lib/useCapabilities";
 import { moneyFromEur, moneySymbol } from "../lib/money";
 import { useCurrency } from "../lib/useCurrency";
@@ -768,16 +768,13 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   // matter. The month/date filter governs BOTH the fetch scope and the display,
   // so the pivot can never show a month it didn't fetch (no data-gap).
   const [filters, setFilters] = useState([]);
-  const [seeded, setSeeded] = useState(false);   // has the latest-scrape default been seeded?
   // Forever perf fix (2026-06-11): server-able configs render from the pivot_grain
-  // RPC (instant), and we fetch the 152k-row archive ONLY when a config can't be
-  // aggregated server-side (median / count_distinct / rare field / ad-hoc filter)
-  // or the user drills into a cell. forceRaw flips us onto that record path.
+  // RPC (instant), and we fetch raw rows ONLY when a config can't be aggregated
+  // server-side (median / count_distinct / rare field / ad-hoc filter) or the user
+  // drills into a cell. forceRaw flips us onto that record path.
   const [forceRaw, setForceRaw] = useState(false);
   const { months: archiveMonths } = useArchiveMonths();
   const { days: archiveDays } = useArchiveDays();
-  const latestMonth = archiveMonths?.[0];   // archive_months view is sorted DESC
-  const latestDay = archiveDays?.[0];       // archive_days view is sorted DESC
   // Time scope — shared by the grain RPC and the (lazy) record fetch. Day-scope
   // by the Datum filter (default = latest scrape day); month-scope by the Mesiac
   // filter. Datum alone → date-range only (fast, no month filter mixed in).
@@ -787,13 +784,20 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   }, [filters]);
   const fetchDates = useMemo(() => {
     const dateF = filters.find(f => f.key === "datum");
-    if (dateF?.values?.length) return dateF.values.map(String);
-    if (!seeded && latestDay) return [latestDay];   // default: the latest scrape day
-    return undefined;
-  }, [filters, latestDay, seeded]);
-  // Records are fetched ONLY when forceRaw (non-server-able config or drill-down);
-  // server-able configs render from the grain with no archive pull.
-  const { flats: realFlats, loading: loadingFlats, progress: flatsProgress } = useFlatsArchive(fetchMonths, fetchDates, forceRaw);
+    return dateF?.values?.length ? dateF.values.map(String) : undefined;
+  }, [filters]);
+  // "Current" view = no time scope → each project's LATEST snapshot. This is the
+  // default and the only cross-market-correct mode (SK + CZ scrape on different
+  // days, so a single global "latest day" would miss one market). The grain RPC
+  // reads flats_current here; any Datum/Mesiac filter switches to flats_archive.
+  const isCurrent = !fetchDates && !fetchMonths;
+  // Records are fetched ONLY when forceRaw (non-server-able config or drill-down).
+  // Current view pulls flats_current (cross-market current); time-travel pulls the
+  // day/month-scoped archive.
+  const { flats: archiveFlats, loading: loadingArchive, progress: flatsProgress } = useFlatsArchive(fetchMonths, fetchDates, forceRaw && !isCurrent);
+  const { flats: currentFlatsRaw, loading: loadingCurrent } = useFlatsCurrent(forceRaw && isCurrent);
+  const realFlats = isCurrent ? currentFlatsRaw : archiveFlats;
+  const loadingFlats = isCurrent ? loadingCurrent : loadingArchive;
 
   // Latest batch DATE (YYYY-MM-DD) — used to auto-seed the Datum filter
   // so the pivot opens on "the most recent scrape" by default. Computed
@@ -899,26 +903,6 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
     });
   }, [flats, projectById]);
 
-  // Latest scrape day (YYYY-MM-DD) across all records. Reads from
-  // `records` so it works for both real flats (paid users) AND lazy-
-  // loaded data. NO synthetic fallback — if records lack batch_timestamp
-  // (preview flats / not yet loaded), we return null so the auto-seed
-  // effect WAITS instead of firing with a wrong placeholder date that
-  // would filter out everything. Auto-rolls forward as new batches
-  // arrive — no redeploy ever needed.
-  const latestDatum = useMemo(() => {
-    let max = null;
-    for (const r of records) {
-      const ts = r.batch_timestamp || r.created_at;
-      if (!ts) continue;
-      const d = String(ts).slice(0, 10);
-      if (!max || d > max) max = d;
-    }
-    // Fall back to the light archive_days source so the auto-seed works in the
-    // grain path (no records loaded). Records-derived wins when present (== same).
-    return max || latestDay || null;
-  }, [records, latestDay]);
-
   // ── State ─────────────────────────────────────────────────────
   // Default layout: Cast (district) + Project name in Rows, average
   // €/m² as the value. This is the most information-dense starting
@@ -931,25 +915,9 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   const [values,  setValues]  = useState([
     { key: "cena_na_m2_obytnej", field: "cena_na_m2_obytnej", agg: "avg" },
   ]);
-  // filters + monthFilterSeededRef are declared above (before the archive fetch,
-  // so fetchMonths can derive from the same Filters state). Auto-seed the Datum
-  // filter to the latest scrape on first mount — idempotent, once per session,
-  // skipped if the user already has a Datum/Mesiac filter. Clearing it later
-  // loads all months.
-  useEffect(() => {
-    // Idempotent one-shot auto-seed: pin the pivot to the LATEST scrape date by
-    // default (Datum field, YYYY-MM-DD). Auto-rolls forward as new batches land.
-    // `seeded` also flips fetchMonths from "latest month only" to honouring an
-    // explicit (or explicitly-cleared) filter.
-    if (seeded || !latestDatum) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setSeeded(true);
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setFilters(curr => {
-      if (curr.some(f => f.key === "datum" || f.key === "snapshot_month")) return curr;
-      return [...curr, { key: "datum", values: [latestDatum] }];
-    });
-  }, [latestDatum, seeded]);
+  // NOTE: the pivot no longer auto-seeds a Datum filter. It opens in the
+  // "current" view (no time scope → each project's latest snapshot, cross-market
+  // correct). The user adds a Datum/Mesiac filter to time-travel into the archive.
   const [search,  setSearch]  = useState("");
   const [drag,    setDrag]    = useState(null);
   const [hoverZone, setHoverZone] = useState(null);
