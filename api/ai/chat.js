@@ -220,6 +220,8 @@ async function buildChosenProjectContext(admin, chosenId) {
   }
   return {
     name: p.name,
+    country: p.country,
+    city: p.city,
     developer: p.developer,
     district: p.district,
     status: p.status,
@@ -250,28 +252,31 @@ async function buildPaidContext(admin) {
   // (latest snapshot from archive). The legacy `flats` and the inflated
   // `projects` columns were superseded in 2026-04 — see architecture
   // memory: "Residata data architecture (2026-04-27)".
-  const [metrics, projects, flats] = await Promise.all([
-    admin.from("metrics").select("metric_key, value_numeric"),
-    admin.from("projects_live").select("id, name, developer, district, status, total_units, available_units, sold_units, sold_last_month, sold_percentage, avg_price_eur_m2").limit(200),
-    // Order by project_id + price so the 5000-row cap (if ever hit)
-    // drops in a predictable way — last projects alphabetically, not
-    // arbitrary insertion-order surprise. Current production is ~2500
-    // V/R/PR rows so cap is headroom, not an active filter.
+  const [markets, projects, flats] = await Promise.all([
+    // Per-market totals (SK + CZ). The old `metrics` table had duplicate keys
+    // (one SK, one CZ row per key) with no country discriminator, so reading it
+    // into a flat map silently kept whichever row came last — wrong numbers.
+    admin.from("totals_by_country").select("country_code, country_name, total_units_tracked, total_available, total_sold, total_reserved, avg_eur_m2, total_sold_last_month, total_projects_active, total_developers_active"),
+    // limit 400: SK (~151) + CZ (~144) all-statuses ≈ 295 — 200 would truncate.
+    admin.from("projects_live").select("id, name, developer, country, city, district, status, total_units, available_units, sold_units, sold_last_month, sold_percentage, avg_price_eur_m2").limit(400),
+    // Order by project_id + price so the row cap drops predictably (alphabetical
+    // tail) rather than arbitrary insertion order.
     admin.from("flats_current").select("project_id, stav, izby, poschodie, budova, obytna_plocha, exterier_plocha, cena_s_dph, orientacia, kolaudacia")
       .in("stav", ["V", "R", "PR"])
       .order("project_id", { ascending: true })
       .order("cena_s_dph", { ascending: true, nullsFirst: false })
       .limit(5000),
   ]);
-  const mm = {};
-  for (const m of metrics.data || []) mm[m.metric_key] = m.value_numeric;
   const all = projects.data || [];
   const active = all.filter(p => (p.status || "active") === "active");
   // District summary (weighted avg €/m²).
   const byD = {};
   for (const p of active) {
     if (!p.district) continue;
-    const d = byD[p.district] ||= { district: p.district, projects: 0, units: 0, avail: 0, sold: 0, sold30: 0, priceW: 0, priceSumW: 0 };
+    // Key by country|city|district so same-named districts in different cities
+    // (e.g. "Centrum") never merge across markets.
+    const key = `${p.country || ""}|${p.city || ""}|${p.district}`;
+    const d = byD[key] ||= { country: p.country, city: p.city, district: p.district, projects: 0, units: 0, avail: 0, sold: 0, sold30: 0, priceW: 0, priceSumW: 0 };
     d.projects += 1;
     d.units += p.total_units || 0;
     d.avail += p.available_units || 0;
@@ -285,7 +290,8 @@ async function buildPaidContext(admin) {
   }
   const districts = Object.values(byD)
     .map(d => ({
-      district: d.district, projects: d.projects, units: d.units,
+      country: d.country, city: d.city, district: d.district,
+      projects: d.projects, units: d.units,
       avail: d.avail, sold: d.sold, sold_30d: d.sold30,
       avg_eur_m2: d.priceW ? Math.round(d.priceSumW / d.priceW) : null,
     }))
@@ -295,7 +301,7 @@ async function buildPaidContext(admin) {
     .filter(p => (p.sold_last_month || 0) > 0)
     .sort((a, b) => (b.sold_last_month || 0) - (a.sold_last_month || 0))
     .slice(0, 10)
-    .map(p => ({ name: p.name, developer: p.developer, district: p.district, sold_30d: p.sold_last_month, avg_eur_m2: p.avg_price_eur_m2 }));
+    .map(p => ({ name: p.name, country: p.country, city: p.city, developer: p.developer, district: p.district, sold_30d: p.sold_last_month, avg_eur_m2: p.avg_price_eur_m2 }));
   // Developer aggregation
   const byDev = {};
   for (const p of active) {
@@ -308,12 +314,13 @@ async function buildPaidContext(admin) {
   const topDevelopers = Object.values(byDev).sort((a, b) => b.units - a.units).slice(0, 10);
   // Compact flat-level rows — keys are short to save tokens. The
   // system prompt tells the model how to read them.
-  const idToName = {};
-  for (const p of active) idToName[p.id] = p.name;
+  const idToName = {}, idToCity = {};
+  for (const p of active) { idToName[p.id] = p.name; idToCity[p.id] = p.city; }
   const availFlats = (flats.data || [])
     .filter(f => idToName[f.project_id])  // only active projects
     .map(f => ({
       proj:  idToName[f.project_id],
+      mesto: idToCity[f.project_id] || null,      // city — market label (SK/CZ)
       stav:  f.stav,                              // V=available, R/PR=reserved
       izby:  f.izby ?? null,                      // rooms
       posch: f.poschodie ?? null,                 // floor
@@ -327,17 +334,19 @@ async function buildPaidContext(admin) {
       kolaud: f.kolaudacia || null,
     }));
   return {
-    scope: "full market (aggregate + unit-level)",
-    city: "Bratislava",
-    totals: {
-      projects_tracked: mm.total_projects_active ?? null,
-      units_tracked:    mm.total_units_tracked ?? null,
-      units_available:  mm.total_available ?? null,
-      units_reserved:   mm.total_reserved ?? null,
-      units_sold_to_date: mm.total_sold_to_date ?? null,
-    },
+    scope: "Slovak + Czech (SK + CZ) new-build market — aggregate + unit-level, ALL markets",
+    // Per-market totals (exact, from totals_by_country). Use these for any
+    // market-wide number; never re-derive them by adding up the project list.
+    markets: (markets.data || []).map(m => ({
+      country: m.country_code, country_name: m.country_name,
+      units_tracked: m.total_units_tracked, available: m.total_available,
+      sold: m.total_sold, reserved: m.total_reserved, avg_eur_m2: m.avg_eur_m2,
+      sold_30d: m.total_sold_last_month, projects_active: m.total_projects_active,
+      developers_active: m.total_developers_active,
+    })),
     projects: active.map(p => ({
-      name: p.name, developer: p.developer, district: p.district,
+      name: p.name, country: p.country, city: p.city,
+      developer: p.developer, district: p.district,
       total: p.total_units, avail: p.available_units, sold: p.sold_units,
       sold_30d: p.sold_last_month, sold_pct: p.sold_percentage,
       avg_eur_m2: p.avg_price_eur_m2,
@@ -345,9 +354,9 @@ async function buildPaidContext(admin) {
     districts,
     top_developers_by_inventory: topDevelopers,
     top_velocity_30d: topVelocity,
-    // Per-flat rows for V/R/PR (available + reserved). Sold flats
-    // omitted. Keys: proj, stav, izby, posch=floor, bud=building,
-    // m2=interior, ext=balcony, eur=price, eur_m2, orient, kolaud.
+    // Per-flat rows for V/R/PR (available + reserved). Sold flats omitted.
+    // Keys: proj=project, mesto=city, stav, izby=rooms, posch=floor,
+    // bud=building, m2=interior, ext=balcony, eur=price, eur_m2, orient, kolaud.
     available_units: availFlats,
   };
 }
@@ -357,15 +366,25 @@ function systemPrompt(lang, dataCtx) {
   const jsonBlock = JSON.stringify(dataCtx);
   if (SK) {
     return [
-      "Si AI analytik Residata, realitnej dátovej služby pre trh novostavieb v Bratislave.",
+      "Si AI analytik Residata, realitnej dátovej služby pre trh novostavieb na Slovensku a v Česku (SK + CZ).",
       "",
       "PRAVIDLÁ ODPOVEDANIA (kritické):",
       "",
       "OBSAH:",
       "· Odpovedaj PRIMÁRNE z dát pod ### DATA. Vyhýbaj sa všeobecným odhadom keď dáta máš.",
-      "· Pole `available_units` obsahuje konkrétne byty na predaj (V = voľné, R / PR = rezervované). Kľúče v rámci jedného bytu: `proj` = názov projektu, `stav`, `izby` = počet izieb, `posch` = poschodie, `bud` = budova / blok, `m2` = obytná plocha, `ext` = balkón / terasa, `eur` = cena s DPH v eurách, `eur_m2` = cena za m² (m2). Používaj tieto údaje pre konkrétne otázky typu 'ktoré byty na 16+ poschodí sú pod 1M €' alebo 'najlacnejší 3-izbový v Ružinove'.",
+      "· Pole `available_units` obsahuje konkrétne byty na predaj (V = voľné, R / PR = rezervované). Kľúče v rámci jedného bytu: `proj` = názov projektu, `mesto` = mesto (ukazuje SK/CZ trh), `stav`, `izby` = počet izieb, `posch` = poschodie, `bud` = budova / blok, `m2` = obytná plocha, `ext` = balkón / terasa, `eur` = cena s DPH v eurách, `eur_m2` = cena za m² (m2). Používaj tieto údaje pre konkrétne otázky typu 'ktoré byty na 16+ poschodí sú pod 1M €' alebo 'najlacnejší 3-izbový v Ružinove'.",
       "· Ak otázka vyžaduje informáciu mimo dát (ekonomické trendy, politický kontext, predpovede), môžeš čerpať z bežnej vedomosti, ALE prefixuj takú časť odpovede na samostatnom riadku: `[všeobecná znalosť, nie dáta Residata]` a potom napíš čo vieš. Residata neručí za tieto údaje.",
       "· Čísla zaokrúhľuj rozumne (4 320 €/m², 86 %, 1 200 bytov).",
+      "",
+      "TRHY (SK + CZ) — KRITICKÉ:",
+      "· Dataset pokrýva DVA trhy: Slovensko (SK) a Česko (CZ). Každý projekt aj byt má `country` (SK/CZ) a `city`/`mesto`. Pole `markets` má PRESNÉ súhrny za každú krajinu zvlášť.",
+      "· DEFAULT: odpovedaj naprieč OBOMA trhmi (SK aj CZ). Filtruj na jeden trh LEN keď to užívateľ explicitne pýta ('len slovenské', 'byty v Prahe', 'český trh', 'iba Bratislava').",
+      "· Keď uvádzaš projekty z rôznych miest/krajín, VŽDY urob jasné kde sú — napr. 'Nový Rohan (Praha, CZ)', 'Slnečnice (Bratislava, SK)'. Užívateľ nesmie byť zmätený že dostal český projekt keď možno čakal len slovenský.",
+      "",
+      "ČÍSLA — KRITICKÉ (nikdy nepočítaj z hlavy):",
+      "· NIKDY nepočítaj percentá ani počty sám. Používaj PRESNÉ hodnoty z dát: `markets` (súhrn za trh), per-projekt `total`/`avail`/`sold`/`sold_pct`/`avg_eur_m2`, `districts` súhrny.",
+      "· Na 'koľko % je predaných v X' použi `sold_pct` toho projektu priamo — neprepočítavaj sold/total.",
+      "· Ak číslo nie je v dátach, NEUVÁDZAJ ho. Nikdy si nevymýšľaj počet typu '3 z 40' — buď je presná hodnota v dátach, alebo o nej nehovor.",
       "",
       "HLAS A BRAND — KRITICKÉ:",
       "· Si confident data-analyst, nie hedge-ujúci byrokrat. Prezentuj Residata ako autoritatívny zdroj bratislavského trhu novostavieb.",
@@ -398,15 +417,25 @@ function systemPrompt(lang, dataCtx) {
     ].join("\n");
   }
   return [
-    "You are Residata's AI analyst — a market-data service for Bratislava new-build residential real estate.",
+    "You are Residata's AI analyst — a market-data service for Slovak and Czech (SK + CZ) new-build residential real estate.",
     "",
     "ANSWER RULES (critical):",
     "",
     "CONTENT:",
     "· Answer PRIMARILY from the JSON under ### DATA. Don't guess when the data is there.",
-    "· The `available_units` field is an array of INDIVIDUAL units currently on sale (V = available, R / PR = reserved). Per-unit keys: `proj` = project name, `stav` = status, `izby` = room count, `posch` = floor, `bud` = building, `m2` = interior area, `ext` = balcony/terrace, `eur` = total price incl. VAT, `eur_m2` = price per m², `orient` = orientation, `kolaud` = handover. Use these rows to answer concrete questions like 'which flats on 16+ floor are under 1M €' or 'cheapest 3-room in Ružinov'.",
+    "· The `available_units` field is an array of INDIVIDUAL units currently on sale (V = available, R / PR = reserved). Per-unit keys: `proj` = project name, `mesto` = city (shows the SK/CZ market), `stav` = status, `izby` = room count, `posch` = floor, `bud` = building, `m2` = interior area, `ext` = balcony/terrace, `eur` = total price incl. VAT, `eur_m2` = price per m², `orient` = orientation, `kolaud` = handover. Use these rows to answer concrete questions like 'which flats on 16+ floor are under 1M €' or 'cheapest 3-room in Ružinov'.",
     "· If the question needs information outside the data (economic trends, political context, forecasts), you may draw on general knowledge BUT prefix that part of the answer on its own line: `[general knowledge, not Residata data]` and continue. Residata doesn't vouch for those details.",
     "· Round numbers sensibly (4,320 €/m², 86 %, 1,200 units).",
+    "",
+    "MARKETS (SK + CZ) — CRITICAL:",
+    "· The dataset covers TWO markets: Slovakia (SK) and Czechia (CZ). Every project and unit has `country` (SK/CZ) and `city`/`mesto`. The `markets` array holds EXACT per-country totals.",
+    "· DEFAULT: answer across BOTH markets (SK and CZ). Filter to one market ONLY when the user explicitly asks ('only Slovak', 'flats in Prague', 'the Czech market', 'just Bratislava').",
+    "· When listing projects from different cities/countries, ALWAYS make clear where each is — e.g. 'Nový Rohan (Prague, CZ)', 'Slnečnice (Bratislava, SK)'. The user must never be confused about getting a Czech project when they may have expected only Slovak ones.",
+    "",
+    "NUMBERS — CRITICAL (never compute them yourself):",
+    "· NEVER compute percentages or counts yourself. Use the EXACT values in the data: `markets` (per-market totals), per-project `total`/`avail`/`sold`/`sold_pct`/`avg_eur_m2`, `districts` totals.",
+    "· For 'what % is sold in X' use that project's `sold_pct` directly — don't recompute sold/total.",
+    "· If a number isn't in the data, DON'T state it. Never invent counts like '3 of 40' — either the exact value is in the data or you don't mention it.",
     "",
     "VOICE AND BRAND — CRITICAL:",
     "· You're a confident data-analyst, not a hedging bureaucrat. Present Residata as THE authoritative source for Bratislava new-build data.",

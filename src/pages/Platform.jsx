@@ -1874,7 +1874,7 @@ function PlatformExports({ lang }) {
         </h3>
         <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
           <button onClick={csvFromProjects} className="btn-p" style={{ fontSize: "0.85rem" }} disabled={!!exportProgress}>
-            ⬇ {lang === "sk" ? "Projekty" : "Projects"} ({projects.length})
+            ⬇ {lang === "sk" ? "Projekty — všetky stavy" : "Projects — all statuses"} ({projects.length})
           </button>
           <button onClick={csvFromFlats} className="btn-s" style={{ fontSize: "0.85rem" }} disabled={!!exportProgress}>
             {exportProgress
