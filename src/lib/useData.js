@@ -1180,6 +1180,37 @@ export function useUnitSearch({ query, projectIds, enabled }) {
   return { results, loading };
 }
 
+let _projSeriesCache = new Map();
+/** Per-unit latest state + compact EUR price series for ONE project — powers the
+ *  Byt v čase mini-grid sparklines in a single small jsonb call (RLS-gated).
+ *  projectId null → []. */
+export function useProjectUnitsSeries(projectId) {
+  const { loading: authLoading, user, profile } = useAuth();
+  const idKey = projectId
+    ? `${user?.id || "anon"}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}::${projectId}`
+    : "none";
+  const [units, setUnits] = useState(_projSeriesCache.get(idKey) || []);
+  const [loading, setLoading] = useState(!!projectId && !_projSeriesCache.has(idKey));
+  useEffect(() => {
+    if (!projectId) { setUnits([]); setLoading(false); return; }
+    if (!isSupabaseReady() || authLoading) return;
+    if (_projSeriesCache.has(idKey)) { setUnits(_projSeriesCache.get(idKey)); setLoading(false); return; }
+    let cancelled = false;
+    setLoading(true);
+    (async () => {
+      const { data, error } = await supabase.rpc("project_units_series", { p_project_id: projectId });
+      if (cancelled) return;
+      if (error) { console.error("[useProjectUnitsSeries]", error); setLoading(false); return; }
+      const arr = _toEurDisplay(Array.isArray(data) ? data : []);   // overlays cena_s_dph; series stays EUR
+      _projSeriesCache.set(idKey, arr);
+      setUnits(arr);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [authLoading, idKey]);
+  return { units, loading };
+}
+
 /** Early access slot count for the marketing badge. Public table. */
 export function useEarlyAccessStats() {
   const [stats, setStats] = useState({ paid_count: 0, remaining_slots: 9 });

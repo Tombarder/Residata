@@ -37,7 +37,7 @@
  *      who paste comparables into their own reports
  */
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
-import { useProjects, useUnitSummaries, useUnitHistories, useUnitSearch, useArchiveMonths } from "../lib/useData";
+import { useProjects, useUnitSummaries, useUnitHistories, useUnitSearch, useProjectUnitsSeries, useArchiveMonths } from "../lib/useData";
 import { useCapabilities } from "../lib/useCapabilities";
 import { track } from "../lib/track";
 import { moneyFromEur, moneySymbol } from "../lib/money";
@@ -220,6 +220,7 @@ export default function UnitTracker({ lang = "sk", setCurrent }) {
       obytna_plocha: u.obytna_plocha,
       latest_stav: u.latest_stav,
       latest_price: u.cena_s_dph,        // already EUR-overlaid by the hook
+      series: u.series || null,          // compact EUR price series (grid sparkline); null for search/compare tiles
     };
   }, [projectById]);
 
@@ -228,8 +229,10 @@ export default function UnitTracker({ lang = "sk", setCurrent }) {
   //     filter + compare scope). Small + fast (16 kB–1.4 MB).
   //   · COMPARABLE scope — the single picked unit's project, to find its peers.
   //   · GLOBAL search — server-side (unit_search), never loads every unit.
+  // Grid data for the selected project: latest state + a compact price series per
+  // unit (for the sparkline), in one small jsonb call — not a full-history pull.
   const { units: searchSummaries, loading: loadingSearch } =
-    useUnitSummaries({ projectId: projFilter });
+    useProjectUnitsSeries(projFilter);
 
   const cmpProject = pickedKeys.length === 1 ? keyProject(pickedKeys[0]) : null;
   const { units: cmpSummaries, loading: loadingCmp } =
@@ -1423,13 +1426,29 @@ function StatusTimelineCard({ pickedHistories, lang }) {
 
 // ── Mini-grid (project picked, no unit yet) ─────────────────────
 
+// Compact price-trend sparkline for a grid tile. Takes the unit's EUR price
+// `series` (from project_units_series) directly — no full-history download.
+function MiniSparkline({ series }) {
+  const values = (series || []).filter(v => Number.isFinite(v));
+  if (values.length < 2) return null;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const W = 240, H = 22;
+  const denom = Math.max(1, values.length - 1);
+  const path = values.map((v, i) => `${i === 0 ? "M" : "L"} ${(i / denom) * W} ${H - ((v - min) / range) * H}`).join(" ");
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: 22, marginTop: "0.4rem", display: "block" }}>
+      <path d={path} stroke={green} strokeWidth="1.5" fill="none" opacity="0.8"/>
+    </svg>
+  );
+}
+
 function MiniGrid({ project, units: scopeUnits, loadingScope, search, onPick, lang }) {
-  // Units in this project, from latest-state summaries (one row per unit). The
-  // per-unit mini-sparkline was dropped here on purpose: it was the only thing
-  // that forced downloading every unit's full history for the whole project
-  // (e.g. 56k rows for Slnečnice). Latest price/status is shown instead; the
-  // full price curve is one click away. useMemo MUST come before any early
-  // return — React enforces hook-call order.
+  // Units in this project, from project_units_series: one row per unit = latest
+  // state + a compact EUR price series (for the sparkline) in a single small
+  // jsonb call — NOT a full per-project history download. useMemo MUST come
+  // before any early return — React enforces hook-call order.
   const units = useMemo(() => {
     if (!project) return [];
     return (scopeUnits || [])
@@ -1525,6 +1544,7 @@ function MiniGrid({ project, units: scopeUnits, loadingScope, search, onPick, la
                   <span style={{ color: dim, marginLeft: "0.35rem", fontSize: "0.7rem" }}>· {formatPerM2(u.latest_price / u.obytna_plocha)}</span>
                 )}
               </div>
+              {u.series && u.series.length >= 2 && <MiniSparkline series={u.series} />}
             </button>
           );
         })}
