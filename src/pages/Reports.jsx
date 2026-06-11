@@ -30,7 +30,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useProjects, useProjectSnapshots, useReportHistogram, fetchReportBinUnits, useReportProjectUnits, useReportComparables } from "../lib/useData";
 import { moneyFromEur, moneySymbol } from "../lib/money";
 import { useCurrency } from "../lib/useCurrency";
-import { useCountry } from "../lib/useCountry";
+import { useCountry, isAllCountries } from "../lib/useCountry";
 import { supabase } from "../lib/supabase";
 
 // ── Visual language (mirrors Platform.jsx) ───────────────────────
@@ -567,7 +567,12 @@ function MarketReport({ projects, onOpenProject, lang }) {
   const activeProjectIds = useMemo(() => new Set(projects.map(p => p.id)), [projects]);
   const trendPredicate = useMemo(() => (s) => activeProjectIds.has(s.project_id), [activeProjectIds]);
 
-  const title = lang === "sk" ? "Slovenský trh novostavieb" : "Slovak new-build market";
+  // Market-aware title: "All" spans markets, so don't label it Slovak/Czech.
+  const title = isAllCountries(country)
+    ? (lang === "sk" ? "Trh novostavieb" : "New-build market")
+    : country === "CZ"
+      ? (lang === "sk" ? "Český trh novostavieb" : "Czech new-build market")
+      : (lang === "sk" ? "Slovenský trh novostavieb" : "Slovak new-build market");
 
   return (
     <>
