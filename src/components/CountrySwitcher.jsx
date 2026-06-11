@@ -2,14 +2,20 @@ import { useCountry, countryName } from "../lib/useCountry";
 import { track } from "../lib/track";
 
 /**
- * CountrySwitcher — segmented toggle in the nav for picking the displayed
- * country. Styled to match the EN/SK language toggle next to it.
+ * CountrySwitcher — market picker in the nav (All / SK / CZ). Shared by the
+ * public site nav and the Platform top bar.
  *
- * Dormant by design: renders NOTHING while only one country has active data
- * (today: Slovakia only). It appears automatically once a second market goes
- * live, because `countries` is derived from public.projects_live. No deploy
- * needed to "turn it on".
+ * Deliberately prominent: a "Market / Trh" label, a flag per option, and a
+ * bright green active state — so it reads clearly as the MARKET selector and
+ * is not confused with the EN/SK language toggle sitting next to it. The
+ * selected market is unmistakable (green fill) and the other options are
+ * legible (not near-invisible grey) so it's obvious they're switchable.
+ *
+ * Dormant by design: renders NOTHING while fewer than two markets are active
+ * (`countries` derives from public.projects_live) — no deploy to turn it on.
  */
+const FLAG = { all: "🌍", SK: "🇸🇰", CZ: "🇨🇿", PL: "🇵🇱", HU: "🇭🇺", AT: "🇦🇹", DE: "🇩🇪" };
+
 export default function CountrySwitcher({ lang = "en" }) {
   const { country, setCountry, countries } = useCountry();
 
@@ -17,35 +23,55 @@ export default function CountrySwitcher({ lang = "en" }) {
   if (!countries || countries.length < 2) return null;
 
   return (
-    <div
-      title={lang === "sk" ? "Krajina" : "Country"}
-      style={{
-        display: "flex", borderRadius: 6, overflow: "hidden",
-        border: "1px solid #222228", fontSize: "0.72rem",
-        fontFamily: "'JetBrains Mono', monospace",
-      }}
-    >
-      {countries.map((c, i) => (
-        <button
-          key={c}
-          onClick={() => {
-            if (c !== country) {
-              track("country_switched", { from: country, to: c });
-              setCountry(c);
-            }
-          }}
-          title={countryName(c, lang)}
-          style={{
-            padding: "0.3rem 0.6rem", border: "none", cursor: "pointer",
-            borderLeft: i ? "1px solid #222228" : "none",
-            background: c === country ? "#222228" : "transparent",
-            color: c === country ? "#e8e8ed" : "#55555f",
-            fontFamily: "inherit", fontSize: "inherit", transition: "all 0.2s",
-          }}
-        >
-          {c === "all" ? countryName("all", lang) : c}
-        </button>
-      ))}
+    <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+      <span
+        aria-hidden
+        style={{
+          fontSize: "0.6rem", letterSpacing: "0.1em", textTransform: "uppercase",
+          color: "#7a7a86", fontWeight: 600,
+          fontFamily: "'JetBrains Mono', monospace", whiteSpace: "nowrap",
+        }}
+      >
+        {lang === "sk" ? "Trh" : "Market"}
+      </span>
+      <div
+        role="group"
+        aria-label={lang === "sk" ? "Trh" : "Market"}
+        style={{
+          display: "flex", borderRadius: 7, overflow: "hidden",
+          border: "1px solid #2e2e38", fontSize: "0.72rem",
+          fontFamily: "'JetBrains Mono', monospace",
+        }}
+      >
+        {countries.map((c, i) => {
+          const active = c === country;
+          return (
+            <button
+              key={c}
+              onClick={() => {
+                if (c !== country) {
+                  track("country_switched", { from: country, to: c });
+                  setCountry(c);
+                }
+              }}
+              title={countryName(c, lang)}
+              aria-pressed={active}
+              style={{
+                display: "flex", alignItems: "center", gap: "0.32rem",
+                padding: "0.34rem 0.62rem", border: "none", cursor: "pointer",
+                borderLeft: i ? "1px solid #2e2e38" : "none",
+                background: active ? "#00e5a0" : "transparent",
+                color: active ? "#06140f" : "#9a9aa6",
+                fontWeight: active ? 700 : 500,
+                fontFamily: "inherit", fontSize: "inherit", transition: "all 0.15s",
+              }}
+            >
+              <span style={{ fontSize: "0.82rem", lineHeight: 1 }}>{FLAG[c] || "🌍"}</span>
+              {c === "all" ? countryName("all", lang) : c}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

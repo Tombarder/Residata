@@ -303,65 +303,124 @@ const t = {
   },
 };
 
-/* ─── Country-aware copy overrides ───────────────────────────────────────
- * A handful of marketing strings name the primary market explicitly
- * ("Bratislava"). When the visitor switches the CountrySwitcher to another
- * country, those strings would otherwise still say "Bratislava" / imply
- * Slovakia. We override ONLY those market-named strings per country, written
- * out in full (not string-interpolated) so each language's grammar is correct
- * — Slovak locative ("v Prahe"), Czech place name in English ("Prague"), etc.
+/* ─── Country-aware copy localization ────────────────────────────────────
+ * The base copy (t[lang]) names the primary market (Bratislava). For other
+ * markets we localize via two layers, applied in order by localizedCopy():
  *
- * SK is intentionally ABSENT from this map: the selected-country='SK' path
- * falls through to the base `t[lang]` strings unchanged, so Slovakia output is
- * byte-identical to before this map existed. Only keys present here are
- * overridden; every other copy key keeps its base value via the spread in
- * localizedCopy(). Add a country block here when a new market goes live.
+ *   1. RULES — ordered literal find→replace pairs applied to EVERY string in
+ *      the copy tree (deepLocalize). Base-copy edits propagate to all markets
+ *      automatically, so there are no parallel hand-maintained copies to drift.
+ *      Most-specific-first (e.g. "Bratislavy" before bare "Bratislava") so
+ *      inflected forms win before the bare token.
+ *   2. OVERRIDES — explicit whole-value replacements that WIN over the rules.
+ *      Used only where a blind swap can't be correct: the example QUESTIONS
+ *      (verb agreement is coupled to the named district) and the flex-plan
+ *      "other cities" list (a different city set per market).
  *
- * NOTE: `dataContext` / `dataContextSub` are included for completeness but are
- * not currently rendered anywhere (kept in sync with the base `t` object).
+ * SK = no entry → base copy, byte-identical. CZ = Bratislava→Praha (+ BA→Prague
+ * districts in the questions). "all" (combined SK+CZ, the default) broadens only
+ * the market-named hero/value strings to both countries; incidental mentions
+ * (the client testimonial's city, example districts) stay base — they're not
+ * market claims, and the combined view leads with the primary market.
  */
-const COUNTRY_COPY = {
+const COUNTRY_LOCALIZE = {
   CZ: {
-    en: {
-      heroTitle1: "Prague residential market,",
-      heroSub: "We monitor every new residential development in Prague and turn scattered listings into actionable market intelligence — so you can make pricing, investment, and portfolio decisions based on data.",
-      valueDesc: "Every month you get a full snapshot of the Prague new-build market — unit-level data across every active project, plus the insights you need to act on it.",
-      dataContext: "Prague New-Build Market",
+    rules: {
+      // English has no inflection here — one swap covers every "Bratislava".
+      en: [["Bratislava", "Prague"]],
+      // Slovak: inflected forms first, genitive next, nominative last (so an
+      // earlier rule never leaves a half-replaced stem for a later one).
+      sk: [
+        ["v Bratislave", "v Prahe"],
+        ["bratislavského", "pražského"],
+        ["bratislavskom", "pražskom"],
+        ["mimo Slovenska", "mimo Česka"],
+        ["Bratislavy", "Prahy"],
+        ["Bratislava", "Praha"],
+      ],
     },
-    sk: {
-      heroTitle1: "Novostavby v Prahe.",
-      // SK heroSub does not name the city in the base copy, so no override needed.
-      valueDesc: "Každý mesiac dostanete kompletný prehľad trhu novostavieb v Prahe — každý byt, každý projekt. A to aj s insightmi, na základe ktorých viete hneď konať.",
-      dataContext: "Trh novostavieb Praha",
+    overrides: {
+      en: {
+        questions: [
+          "What should I price my 2-bedroom units at in Vinohrady to stay competitive?",
+          "If I build in Letňany, how long until I sell out based on current absorption?",
+          "My project costs €50M to build — are market prices high enough to cover costs and deliver 20% margin?",
+          "How fast is Smíchov City selling compared to last quarter — is momentum building or slowing?",
+          "Where is supply running low? Which districts will have no new inventory within 6 months?",
+          "What's the realistic price range for 60m² in Modřany — and where does 90% of demand sit?",
+          "Which competitor projects are about to sell out — what can I learn from their pricing?",
+        ],
+        flexDesc: "Need weekly updates instead of monthly? Want to cover Brno, Ostrava, or Bratislava? Need a custom output format for your internal tools or a different property segment? The pipeline is built to be reconfigured — we adapt scope, frequency, and delivery to match your workflow.",
+      },
+      sk: {
+        questions: [
+          "Ako naceniť 2-izbáky vo Vinohradoch, aby boli konkurencieschopné?",
+          "Ak staviam bytovku v Letňanoch, ako rýchlo sa vypredá na základe aktuálnych predajných trendov?",
+          "Náklady na potenciálny projekt sú €50M — unesie trh ceny, ktoré potrebujem na dosiahnutie 20% marže?",
+          "Predáva sa Smíchov City rýchlejšie alebo pomalšie ako v minulom kvartáli?",
+          "Kde dochádza ponuka? Kde nebudú nové byty do pol roka?",
+          "Za koľko sa reálne predáva 60m² byt v Modřanoch?",
+          "Ktoré projekty sú takmer vypredané a čo sa vieme naučiť z ich cenotvorby?",
+        ],
+        flexDesc: "Týždenné aktualizácie? Pokrytie Brna, Ostravy alebo Bratislavy? Iný formát? Žiadny problém — rozsah, frekvenciu aj doručenie nastavíme podľa vašich preferencií.",
+      },
     },
   },
-  // "all" = combined SK+CZ view (the default country). Broadens the market-named
-  // hero strings to both countries so the landing copy isn't Bratislava-only when
-  // showing the unified market. Same key scope as the CZ block above.
+  // "all" = combined SK+CZ view (the default). Overrides only (no blanket rules)
+  // so the market-claim hero/value strings broaden to both countries while
+  // incidental "Bratislava" mentions (testimonial city, example districts) stay.
   all: {
-    en: {
-      heroTitle1: "Slovak & Czech residential market,",
-      heroSub: "We monitor every new residential development across Slovakia and Czechia and turn scattered listings into actionable market intelligence — so you can make pricing, investment, and portfolio decisions based on data.",
-      valueDesc: "Every month you get a full snapshot of the Slovak & Czech new-build market — unit-level data across every active project, plus the insights you need to act on it.",
-      dataContext: "Slovak & Czech New-Build Market",
-    },
-    sk: {
-      heroTitle1: "Novostavby na Slovensku a v Česku.",
-      valueDesc: "Každý mesiac dostanete kompletný prehľad trhu novostavieb na Slovensku a v Česku — každý byt, každý projekt. A to aj s insightmi, na základe ktorých viete hneď konať.",
-      dataContext: "Trh novostavieb Slovensko a Česko",
+    overrides: {
+      en: {
+        heroTitle1: "Slovak & Czech residential market,",
+        heroSub: "We monitor every new residential development across Slovakia and Czechia and turn scattered listings into actionable market intelligence — so you can make pricing, investment, and portfolio decisions based on data.",
+        valueDesc: "Every month you get a full snapshot of the Slovak & Czech new-build market — unit-level data across every active project, plus the insights you need to act on it.",
+        dataContext: "Slovak & Czech New-Build Market",
+      },
+      sk: {
+        heroTitle1: "Novostavby na Slovensku a v Česku.",
+        valueDesc: "Každý mesiac dostanete kompletný prehľad trhu novostavieb na Slovensku a v Česku — každý byt, každý projekt. A to aj s insightmi, na základe ktorých viete hneď konať.",
+        dataContext: "Trh novostavieb Slovensko a Česko",
+      },
     },
   },
 };
 
 /**
+ * Recursively apply ordered find→replace RULES to every string in a copy
+ * subtree (strings, arrays, plain objects). Non-strings pass through — notably
+ * the booleans inside the tier `features` [bool, "text"] pairs.
+ */
+function deepLocalize(node, rules) {
+  if (typeof node === "string") {
+    let out = node;
+    for (const [from, to] of rules) out = out.split(from).join(to);
+    return out;
+  }
+  if (Array.isArray(node)) return node.map((n) => deepLocalize(n, rules));
+  if (node && typeof node === "object") {
+    const o = {};
+    for (const k in node) o[k] = deepLocalize(node[k], rules);
+    return o;
+  }
+  return node;
+}
+
+/**
  * Resolve the marketing copy for the active language + selected country.
- * Base = t[lang]; per-country overrides (if any) are spread on top. For SK
- * (no override block) this returns exactly t[lang].
+ * SK / unknown → base t[lang], byte-identical. Otherwise apply the market's
+ * find→replace rules across the whole tree, then spread its explicit overrides
+ * on top (overrides win).
  */
 function localizedCopy(lang, country) {
   const base = t[lang];
-  const override = COUNTRY_COPY[country]?.[lang];
-  return override ? { ...base, ...override } : base;
+  const spec = COUNTRY_LOCALIZE[country];
+  if (!spec) return base;
+  const lk = lang === "sk" ? "sk" : "en";
+  const rules = spec.rules?.[lk];
+  const copy = rules && rules.length ? deepLocalize(base, rules) : { ...base };
+  const ov = spec.overrides?.[lk];
+  return ov ? { ...copy, ...ov } : copy;
 }
 
 /* ─── Animation hooks ─── */
