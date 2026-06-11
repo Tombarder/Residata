@@ -1,7 +1,13 @@
 import { useEffect, useState } from "react";
 import { supabase, supabasePublic, isSupabaseReady } from "./supabase";
 import { useAuth } from "./useAuth";
-import { useCountry } from "./useCountry";
+import { useCountry, isAllCountries } from "./useCountry";
+
+// Cross-market "All" view helpers: drop the country filter on table reads and
+// pass NULL to RPCs (every RPC treats p_country NULL as "all markets"). All
+// stored money is EUR, so the combined view is inherently EUR.
+const _eqCountry = (q, c) => (isAllCountries(c) ? q : q.eq("country", c));
+const _pCountry = (c) => (isAllCountries(c) ? null : c);
 
 /**
  * D17 — EUR everywhere. flats_current / flats_archive expose price_s_dph_eur
@@ -415,7 +421,13 @@ export function useMarketTotals() {
     const cached = _marketTotalsByCountry.get(country);
     if (cached) setTotals(cached);
     let cancelled = false;
-    supabasePublic.from("totals_by_country").select("*").eq("country_code", country).maybeSingle().then(({ data, error }) => {
+    // "All" → the cross-market combined row (totals_global); else the per-country
+    // row. totals_global lacks sold_last_month / snapshot_month → they map to null
+    // (sold-velocity already shows "—" today), every other KPI is the SK+CZ sum.
+    const _req = isAllCountries(country)
+      ? supabasePublic.from("totals_global").select("*").maybeSingle()
+      : supabasePublic.from("totals_by_country").select("*").eq("country_code", country).maybeSingle();
+    _req.then(({ data, error }) => {
       if (cancelled) return;
       if (error) {
         console.error("[useMarketTotals]", error);
@@ -485,7 +497,7 @@ export function useDistrictTotals() {
     if (hit) { setDistricts(hit); setLoading(false); }
     else setLoading(true);
     let cancelled = false;
-    supabasePublic.from("totals_by_district").select("*").eq("country", country).then(({ data, error }) => {
+    _eqCountry(supabasePublic.from("totals_by_district").select("*"), country).then(({ data, error }) => {
       if (cancelled) return;
       if (error) {
         console.error("[useDistrictTotals]", error);
@@ -528,7 +540,7 @@ export function useProjects(limit) {
   useEffect(() => {
     if (!isSupabaseReady()) { setLoading(false); return; }
     let cancelled = false;
-    let q = supabasePublic.from("projects_live").select("*").eq("country", country);
+    let q = _eqCountry(supabasePublic.from("projects_live").select("*"), country);
     if (limit) q = q.eq("is_top20", true).limit(limit);
     q.order("available_units", { ascending: false }).then(({ data, error }) => {
       if (cancelled) return;
@@ -572,7 +584,7 @@ export function useHomeProjects() {
   useEffect(() => {
     if (!isSupabaseReady()) { setLoading(false); return; }
     let cancelled = false;
-    supabasePublic.from("projects_live").select(_HOME_PROJECT_COLS).eq("country", country)
+    _eqCountry(supabasePublic.from("projects_live").select(_HOME_PROJECT_COLS), country)
       .order("available_units", { ascending: false })
       .then(({ data, error }) => {
         if (cancelled) return;
@@ -804,10 +816,7 @@ export function useFlatsCurrent() {
       // never had more than ~5.5k rows in flats_current; this is a guardrail.
       const MAX_TOTAL = 200_000;
       while (offset < MAX_TOTAL) {
-        const { data, error } = await supabase
-          .from("flats_current")
-          .select("*")
-          .eq("country", country)
+        const { data, error } = await _eqCountry(supabase.from("flats_current").select("*"), country)
           .range(offset, offset + PAGE - 1)
           .order("id", { ascending: true });
         if (cancelled) return;
@@ -925,10 +934,7 @@ export function useFlatsArchive(months, dates, enabled = true) {
       // returns a tiny page size for a huge table.
       const MAX_TOTAL = 500_000;
       while (offset < MAX_TOTAL) {
-        let q = supabase
-          .from("flats_archive")
-          .select("*")
-          .eq("country", country)
+        let q = _eqCountry(supabase.from("flats_archive").select("*"), country)
           .range(offset, offset + REQUESTED_PAGE - 1)
           .order("batch_timestamp", { ascending: false, nullsFirst: false })
           .order("id", { ascending: true });
@@ -1072,7 +1078,7 @@ export function useArchiveDays() {
     if (_archiveDaysCache.has(country)) { setDays(_archiveDaysCache.get(country)); setLoading(false); return; }
     let cancelled = false;
     (async () => {
-      const { data, error } = await supabase.from("archive_days").select("day").eq("country", country).order("day", { ascending: false });
+      const { data, error } = await _eqCountry(supabase.from("archive_days").select("day"), country).order("day", { ascending: false });
       if (cancelled) return;
       if (error) { console.error("[useArchiveDays]", error); setLoading(false); return; }
       const seen = new Set(); const arr = [];
@@ -1103,7 +1109,7 @@ export function usePivotGrain({ enabled = false, months = null, dates = null, di
     setLoading(true);
     (async () => {
       const { data, error } = await supabase.rpc("pivot_grain", {
-        p_country: country,
+        p_country: _pCountry(country),
         p_months: months && months.length ? months : null,
         p_dates: dates && dates.length ? dates : null,
         p_dims: dims || [],
@@ -1159,7 +1165,7 @@ export function useUnitSummaries({ projectId = null, all = false } = {}) {
     setLoading(true);
     (async () => {
       const { data, error } = await supabase.rpc("unit_list_json", {
-        p_country: country,
+        p_country: _pCountry(country),
         p_project_id: projectId,   // null when scope === 'all'
       });
       if (cancelled) return;
@@ -1243,7 +1249,7 @@ export function useUnitSearch({ query, projectIds, enabled }) {
     // Debounce so we don't fire a query on every keystroke.
     const timer = setTimeout(async () => {
       const { data, error } = await supabase.rpc("unit_search", {
-        p_country: country, p_q: q, p_project_ids: pids, p_limit: 40,
+        p_country: _pCountry(country), p_q: q, p_project_ids: pids, p_limit: 40,
       });
       if (cancelled) return;
       if (error) { console.error("[useUnitSearch]", error); setResults([]); setLoading(false); return; }
@@ -1309,7 +1315,7 @@ export function useReportHistogram({ scopeType = "market", scopeValue = null, nb
     setLoading(true);
     (async () => {
       const { data, error } = await supabase.rpc("report_price_histogram", {
-        p_country: country, p_scope_type: scopeType, p_scope_value: scopeValue, p_nbins: nbins,
+        p_country: _pCountry(country), p_scope_type: scopeType, p_scope_value: scopeValue, p_nbins: nbins,
       });
       if (cancelled) return;
       if (error) { console.error("[useReportHistogram]", error); setBins([]); setLoading(false); return; }
@@ -1330,7 +1336,7 @@ export function useReportHistogram({ scopeType = "market", scopeValue = null, nb
 export async function fetchReportBinUnits({ country = null, scopeType = "market", scopeValue = null, from = 0, to = 1e9 } = {}) {
   if (!isSupabaseReady()) return [];
   const { data, error } = await supabase.rpc("report_bin_units", {
-    p_country: country, p_scope_type: scopeType, p_scope_value: scopeValue, p_m2_from: from, p_m2_to: to,
+    p_country: _pCountry(country), p_scope_type: scopeType, p_scope_value: scopeValue, p_m2_from: from, p_m2_to: to,
   });
   if (error) { console.error("[fetchReportBinUnits]", error); return []; }
   return (Array.isArray(data) ? data : []).map((r) => ({
@@ -1391,7 +1397,7 @@ export function useReportComparables() {
     let cancelled = false;
     setLoading(true);
     (async () => {
-      const { data, error } = await supabase.rpc("report_comparables", { p_country: country });
+      const { data, error } = await supabase.rpc("report_comparables", { p_country: _pCountry(country) });
       if (cancelled) return;
       if (error) { console.error("[useReportComparables]", error); setLoading(false); return; }
       const arr = _toEurDisplay(Array.isArray(data) ? data : []);

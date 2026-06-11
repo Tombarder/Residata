@@ -43,7 +43,7 @@ export default function CountrySwitcher({ lang = "en" }) {
             fontFamily: "inherit", fontSize: "inherit", transition: "all 0.2s",
           }}
         >
-          {c}
+          {c === "all" ? countryName("all", lang) : c}
         </button>
       ))}
     </div>

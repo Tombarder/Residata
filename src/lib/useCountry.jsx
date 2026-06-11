@@ -23,6 +23,7 @@ import { supabasePublic, isSupabaseReady } from "./supabase";
 // markets open. (Matches reference.countries; kept here so the switcher has
 // names without an extra round-trip / a reference.* read anon can't do.)
 const COUNTRY_NAMES = {
+  all: { sk: "Všetky", en: "All" },
   SK: { sk: "Slovensko", en: "Slovakia" },
   CZ: { sk: "Česko", en: "Czechia" },
   PL: { sk: "Poľsko", en: "Poland" },
@@ -35,8 +36,18 @@ export function countryName(code, lang = "en") {
   return COUNTRY_NAMES[code]?.[lang] || code;
 }
 
-const DEFAULT_COUNTRY = "SK";
+/** Sentinel for the cross-market view. `country === ALL_COUNTRIES` means "no
+ *  country filter" — every hook treats it as: drop `.eq('country', …)` on table
+ *  reads, and pass `p_country = null` to RPCs. All stored money is EUR, so the
+ *  combined view is inherently EUR. */
+export const ALL_COUNTRIES = "all";
+export function isAllCountries(c) { return c === ALL_COUNTRIES; }
+
+const DEFAULT_COUNTRY = ALL_COUNTRIES;   // platform + site open on the whole market
 const LS_KEY = "residata_country";
+// One-time reset so existing users (who had a single-country localStorage from
+// the old default) land on the new "All" default once. They can re-pick anytime.
+const LS_MIGRATED = "residata_country_all_default_v1";
 
 const CountryContext = createContext({
   country: DEFAULT_COUNTRY,
@@ -47,9 +58,17 @@ const CountryContext = createContext({
 
 export function CountryProvider({ children }) {
   const [country, setCountryRaw] = useState(() => {
-    try { return localStorage.getItem(LS_KEY) || DEFAULT_COUNTRY; }
-    catch { return DEFAULT_COUNTRY; }
+    try {
+      if (!localStorage.getItem(LS_MIGRATED)) {
+        localStorage.setItem(LS_MIGRATED, "1");
+        localStorage.setItem(LS_KEY, DEFAULT_COUNTRY);
+        return DEFAULT_COUNTRY;
+      }
+      return localStorage.getItem(LS_KEY) || DEFAULT_COUNTRY;
+    } catch { return DEFAULT_COUNTRY; }
   });
+  // Switcher options: ['all', ...real countries] once ≥2 markets exist; a single
+  // market shows just itself (no point in an "All" of one).
   const [countries, setCountries] = useState([DEFAULT_COUNTRY]);
   const [loading, setLoading] = useState(true);
 
@@ -64,17 +83,17 @@ export function CountryProvider({ children }) {
     supabasePublic.from("projects_live").select("country").then(({ data, error }) => {
       if (cancelled) return;
       if (error) {
-        // Non-fatal: keep the SK default so the site never blanks on this.
         console.error("[useCountry] active-countries fetch failed", error);
         setLoading(false);
         return;
       }
-      const set = new Set((data || []).map((r) => r.country).filter(Boolean));
-      set.add(DEFAULT_COUNTRY); // SK always selectable even if the fetch is empty
-      const list = [...set].sort();
+      const reals = [...new Set((data || []).map((r) => r.country).filter(Boolean))].sort();
+      const list = reals.length >= 2 ? [ALL_COUNTRIES, ...reals]
+                 : reals.length === 1 ? reals
+                 : [ALL_COUNTRIES];
       setCountries(list);
-      // A stale localStorage country with no data must not blank the UI.
-      setCountryRaw((prev) => (list.includes(prev) ? prev : DEFAULT_COUNTRY));
+      // A stale selection with no data must not blank the UI.
+      setCountryRaw((prev) => (list.includes(prev) ? prev : (list.includes(ALL_COUNTRIES) ? ALL_COUNTRIES : list[0])));
       setLoading(false);
     });
     return () => { cancelled = true; };

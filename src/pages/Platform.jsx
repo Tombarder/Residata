@@ -27,6 +27,8 @@ import {
 import ReportsPage from "./Reports";
 import UnitTracker from "./UnitTracker";
 import ChatAssistant from "../components/ChatAssistant";
+import CountrySwitcher from "../components/CountrySwitcher";
+import CurrencySwitcher from "../components/CurrencySwitcher";
 // AiBetaBanner moved into AI surfaces only (ChatAssistant + FloatingChat)
 // after QA — was on every /app/* page which felt like noise on Dashboard /
 // Reports / Pivot where AI doesn't show up at all.
@@ -482,6 +484,11 @@ function TopBar({ page, lang, setLang, tier }) {
       </div>
 
       <div style={{ display: "inline-flex", alignItems: "center", gap: "0.6rem" }}>
+        {/* Market (SK / CZ / All) + currency (native / €) switchers. The platform
+            defaults to All; both read the shared context so a change here flows to
+            every screen. CountrySwitcher self-hides when only one market exists. */}
+        <CountrySwitcher lang={lang} />
+        <CurrencySwitcher lang={lang} />
         {/* Language switcher — EN / SK pills. Same state that powers the
             marketing Nav switcher, so toggling here or on /live flips
             every SK/EN check-expression across the app consistently. */}
