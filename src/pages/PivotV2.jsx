@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { useProjects, useFlatsArchive, useFlatsCurrent, useArchiveMonths, useArchiveDays, usePivotGrain } from "../lib/useData";
+import { useProjects, useFlatsArchive, useFlatsCurrent, useArchiveMonths, useArchiveDays, usePivotGrain, fetchFlatsForProjects } from "../lib/useData";
+import { useCountry } from "../lib/useCountry";
 import { useCapabilities } from "../lib/useCapabilities";
 import { moneyFromEur, moneySymbol } from "../lib/money";
 import { useCurrency } from "../lib/useCurrency";
@@ -243,6 +244,22 @@ function normKey(v) {
   const s = String(v).trim();
   return s === "" ? "(prázdne)" : s;
 }
+
+/* Row-field → project attribute, for the targeted drill-down fetch. When a
+   pivot row dimension is one of these (project-level), we resolve the clicked
+   group to a set of project ids and fetch ONLY those projects' flats instead of
+   the whole dataset. Fields not listed here are flat-level (stav, izby, typ,
+   poschodie…) and are matched client-side after the fetch. */
+const PROJECT_LEVEL_ATTR = {
+  project_name: "name",
+  developer: "developer",
+  cast: "district",
+  city: "city",
+  import_status: "status",
+  budova_stav: "budova_stav",
+  standard: "standard",
+  sub_district: "sub_district",
+};
 
 /* Compute one aggregated value from a set of records. Returns a number
    (or null when the aggregation has no defined value, e.g., avg of empty). */
@@ -752,6 +769,7 @@ function defaultAggFor(field) {
 export default function PivotV2({ lang = "sk", setCurrent }) {
   useCurrency(); // subscribe: re-render pivot tables/charts/drill-down on currency toggle
   const { projects, loading: loadingProjects } = useProjects();
+  const { country } = useCountry();   // for targeted drill-down fetch
   const { can } = useCapabilities();
   const canViewAnalytics = can("view_analytics");
 
@@ -1132,7 +1150,10 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   // (records arrive via the forceRaw pull the drill-down click triggers).
   const drillRecords = useMemo(() => {
     if (!drillDown) return [];
-    if (drillDown.records && drillDown.records.length) return drillDown.records;
+    // Targeted-fetch / record-mode result lives on drillDown.records (an array,
+    // possibly empty = "no records"). null = the rare flat-only fallback that
+    // pulls all flats and filters here.
+    if (drillDown.records != null) return drillDown.records;
     const path = drillDown.pathKey ? drillDown.pathKey.split(SEP) : [];
     if (!path.length) return filteredRecords;
     return filteredRecords.filter(r => path.every((pv, i) => {
@@ -1140,7 +1161,10 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
       return f && normKey(f.accessor(r)) === pv;
     }));
   }, [drillDown, filteredRecords, rows]);
-  const drillLoading = !!drillDown && configServerable && forceRaw && loadingFlats && drillRecords.length === 0;
+  const drillLoading = !!drillDown && (
+    drillDown.loading === true ||
+    (drillDown.records == null && configServerable && forceRaw && loadingFlats && drillRecords.length === 0)
+  );
 
   const sortedTree = useMemo(() => ({
     ...rawTree,
@@ -1361,15 +1385,53 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
         grandTotal={sortedTree}
         valueMode={valueMode}
         dataBars={dataBars}
-        onDrillDown={(node) => {
-          // Grain nodes carry no records — store the path and pull records so
-          // drillRecords can resolve them; record-mode nodes pass records directly.
-          if (configServerable) setForceRaw(true);
-          setDrillDown({
-            title: node.path.length ? node.path.join(" › ") : (lang === "sk" ? "Všetky záznamy" : "All records"),
-            pathKey: node.pathKey,
-            records: node.records,
+        onDrillDown={async (node) => {
+          const title = node.path.length ? node.path.join(" › ") : (lang === "sk" ? "Všetky záznamy" : "All records");
+          // Record-mode node already carries its records (non-serverable config).
+          if (node.records && node.records.length) {
+            setDrillDown({ title, pathKey: node.pathKey, records: node.records });
+            return;
+          }
+          // Resolve the clicked group's project ids from its project-level path
+          // conditions, so we fetch ONLY those projects' flats — instant, not the
+          // whole dataset (project / district / developer drill-down).
+          const path = node.path || [];
+          let candIds = null;
+          for (let i = 0; i < path.length; i++) {
+            const attr = PROJECT_LEVEL_ATTR[rows[i]];
+            if (!attr) continue;
+            const m = projects.filter(p => normKey(p[attr]) === path[i]).map(p => p.id);
+            candIds = candIds == null ? m : candIds.filter(id => m.includes(id));
+          }
+          // No project-level narrowing (rare flat-only grouping), or resolution
+          // came up empty (projects still loading) → fall back to the full
+          // client pull so it still works.
+          if (candIds == null || candIds.length === 0) {
+            if (configServerable) setForceRaw(true);
+            setDrillDown({ title, pathKey: node.pathKey, records: null });
+            return;
+          }
+          setDrillDown({ title, pathKey: node.pathKey, records: null, loading: true });
+          const raw = await fetchFlatsForProjects(country, candIds, { isCurrent, months: fetchMonths });
+          const enriched = raw.map((f) => {
+            const p = projectById[f.project_id];
+            return {
+              ...f,
+              project_name: p?.name || f.project_id,
+              project_status: p?.status || "active",
+              developer: p?.developer || null,
+              district: p?.district || null,
+              sub_district: p?.sub_district || null,
+              city: p?.city || null,
+              budova_stav: p?.budova_stav || null,
+              standard: p?.standard || null,
+            };
           });
+          const filtered = enriched.filter((r) => path.every((pv, i) => {
+            const f = FIELDS[rows[i]];
+            return f && normKey(f.accessor(r)) === pv;
+          }));
+          setDrillDown((d) => (d && d.pathKey === node.pathKey ? { ...d, records: filtered, loading: false } : d));
         }}
         onProjectOpen={setCurrent ? (projectId) => setCurrent(`App:ProjectDetail:${projectId}`) : undefined}
         lang={lang}

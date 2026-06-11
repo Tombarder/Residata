@@ -39,6 +39,27 @@ function _toEurDisplay(rows) {
   });
 }
 
+/* Targeted flats fetch for the Analytika drill-down — ONLY the given projects'
+   units, not the whole dataset, so opening the records modal is instant instead
+   of pulling every flat. Capped to a few pages (the modal shows a 1000-row
+   sample). Same EUR overlay as the main reads. */
+export async function fetchFlatsForProjects(country, projectIds, opts = {}) {
+  if (!isSupabaseReady() || !Array.isArray(projectIds) || projectIds.length === 0) return [];
+  const { isCurrent = true, months } = opts;
+  const table = isCurrent ? "flats_current" : "flats_archive";
+  const ids = projectIds.slice(0, 400);   // URL-length / sanity cap
+  const all = [];
+  for (let page = 0; page < 3; page++) {   // up to ~3000 rows; modal caps at 1000
+    let q = _eqCountry(supabase.from(table).select("*"), country).in("project_id", ids);
+    if (!isCurrent && Array.isArray(months) && months.length) q = q.in("snapshot_month", months);
+    const { data, error } = await q.range(page * 1000, page * 1000 + 999).order("id", { ascending: true });
+    if (error || !data || data.length === 0) break;
+    all.push(...data);
+    if (data.length < 1000) break;
+  }
+  return _toEurDisplay(all);
+}
+
 /**
  * Data hooks — the one source of truth for reading from Supabase.
  *
