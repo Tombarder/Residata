@@ -146,13 +146,16 @@ export function useMetrics() {
         if (cancelled) return;
         if (error || !data) { setLoading(false); return; }
         const f = (n) => (n == null ? "—" : Number(n).toLocaleString("en-US").replace(/,/g, " "));
+        // Each metric carries the SK copy (value_text) AND an EN copy
+        // (value_json.text_en) so Ticker.jsx can render the active language —
+        // the "All" cross-market ticker was previously Slovak-only in EN mode.
         const arr = [
-          { metric_key: "total_units_tracked",   display_order: 9,  category: "total",   value_text: `${f(data.total_units_tracked)} bytov sledovaných` },
-          { metric_key: "total_available",       display_order: 10, category: "total",   value_text: `${f(data.total_available)} bytov v aktívnej ponuke` },
-          { metric_key: "total_reserved",        display_order: 11, category: "total",   value_text: `${f(data.total_reserved)} rezervovaných` },
-          { metric_key: "total_sold_to_date",    display_order: 12, category: "total",   value_text: `${f(data.total_sold)} predaných celkom` },
-          { metric_key: "total_projects_active", display_order: 13, category: "total",   value_text: `${f(data.total_projects_active)} aktívnych projektov` },
-          { metric_key: "avg_eur_m2",            display_order: 53, category: "pricing", value_text: `Priemerná cena: ${f(data.avg_eur_m2)} €/m²` },
+          { metric_key: "total_units_tracked",   display_order: 9,  category: "total",   value_text: `${f(data.total_units_tracked)} bytov sledovaných`,    value_json: { text_en: `${f(data.total_units_tracked)} units tracked` } },
+          { metric_key: "total_available",       display_order: 10, category: "total",   value_text: `${f(data.total_available)} bytov v aktívnej ponuke`,    value_json: { text_en: `${f(data.total_available)} units available` } },
+          { metric_key: "total_reserved",        display_order: 11, category: "total",   value_text: `${f(data.total_reserved)} rezervovaných`,    value_json: { text_en: `${f(data.total_reserved)} reserved` } },
+          { metric_key: "total_sold_to_date",    display_order: 12, category: "total",   value_text: `${f(data.total_sold)} predaných celkom`,    value_json: { text_en: `${f(data.total_sold)} sold to date` } },
+          { metric_key: "total_projects_active", display_order: 13, category: "total",   value_text: `${f(data.total_projects_active)} aktívnych projektov`,    value_json: { text_en: `${f(data.total_projects_active)} active projects` } },
+          { metric_key: "avg_eur_m2",            display_order: 53, category: "pricing", value_text: `Priemerná cena: ${f(data.avg_eur_m2)} €/m²`,    value_json: { text_en: `Avg €/m²: €${f(data.avg_eur_m2)}` } },
         ];
         _metricsCacheByCountry.set(country, arr);
         setMetrics(arr);
