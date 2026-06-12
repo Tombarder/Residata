@@ -2958,14 +2958,14 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
 
       {/* ═══ DISTRICT BREAKDOWN — richer than home DistrictPulse ═══ */}
       <ASection
-        label={lang === "sk" ? "Okresy" : "Districts"}
-        title={lang === "sk" ? "Ceny, aktivita a absorpcia podľa okresu" : "Prices, activity and absorption by district"}>
+        label={lang === "sk" ? "Časti" : "Districts"}
+        title={lang === "sk" ? "Ceny, aktivita a absorpcia podľa mestskej časti" : "Prices, activity and absorption by district"}>
         <div style={{ border: `1px solid ${border}`, borderRadius: 12, overflow: "hidden" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
             <thead style={{ background: "#0e0e10" }}>
               <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.68rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
                 <th style={th}>{lang === "sk" ? "Mesto" : "City"}</th>
-                <th style={th}>{lang === "sk" ? "Okres" : "District"}</th>
+                <th style={th}>{lang === "sk" ? "Časť" : "District"}</th>
                 <th style={{ ...th, textAlign: "right" }}>{moneySymbol()}/m²</th>
                 <th style={{ ...th, textAlign: "right" }}>{lang === "sk" ? "Projektov" : "Projects"}</th>
                 <th style={{ ...th, textAlign: "right" }}>{lang === "sk" ? "Bytov" : "Units"}</th>

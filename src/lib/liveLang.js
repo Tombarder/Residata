@@ -107,7 +107,7 @@ export const liveT = {
 
     // Early access badge
     ea_badge: "Early Access — {n} of 9 slots remaining",
-    ea_badge_one: "Early Access — {n} of 9 slots remaining",
+    ea_badge_one: "Early Access — {n} of 9 slot remaining",
 
     // LoginModal
     login_label: "Sign in",

@@ -862,7 +862,7 @@ function ChartCard({ pickedHistories, comparables, yMode, setYMode, lang }) {
             {lang === "sk" ? "celková cena" : "total"}
           </YModeBtn>
           <YModeBtn active={yMode === "perm2"} onClick={() => setYMode("perm2")}>
-            €/m²
+            {`${moneySymbol()}/m²`}
           </YModeBtn>
         </div>
       </div>
