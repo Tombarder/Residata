@@ -172,7 +172,7 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
       {(showSignupPrompt || showUpgradeToPaid) && (
         <p className="sec-desc" style={{ marginBottom: "2.5rem" }}>
           {showSignupPrompt && <>{t.live_desc_anon}</>}
-          {showUpgradeToPaid && <><button onClick={() => setCurrent && setCurrent("Pricing")} style={linkBtn}>{t.upgrade_to_paid}</button> — {t.live_desc_free}</>}
+          {showUpgradeToPaid && <><button onClick={() => setCurrent && setCurrent("Pricing")} style={linkBtn}>{t.upgrade_to_paid}</button> — {ll(t.live_desc_free, { n: projects.length })}</>}
         </p>
       )}
 
@@ -2807,7 +2807,7 @@ function ChooseProjectGate({ projectId, projectName, profile, reloadProfile, set
       </div>
       {err && <div style={{ color: "#ff6b6b", marginTop: "0.75rem" }}>{err}</div>}
       <p style={{ fontSize: "0.8rem", color: dim, marginTop: "2rem" }}>
-        {t.choose_upgrade_hint} <button onClick={() => setCurrent("Pricing")} style={linkBtn}>{t.upgrade_to_paid}</button>.
+        {ll(t.choose_upgrade_hint, { n: trackedProjCount })} <button onClick={() => setCurrent("Pricing")} style={linkBtn}>{t.upgrade_to_paid}</button>.
       </p>
     </main>
   );

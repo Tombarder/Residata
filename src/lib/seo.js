@@ -188,10 +188,10 @@ const SEO_COUNTRY_OVERRIDES = {
     en: [
       ["novostavby Bratislava", "novostavby Praha"],
       ["Bratislava real estate", "Prague real estate"],
-      ["property market Slovakia", "property market Czech"],
-      ["market data Slovakia", "market data Czech"],
+      ["property market Slovakia", "property market Czechia"],
+      ["market data Slovakia", "market data Czechia"],
       ["Bratislava", "Prague"],
-      ["Slovakia", "Czech"],
+      ["Slovakia", "Czechia"],
     ],
     sk: [
       ["novostavby Bratislava", "novostavby Praha"],

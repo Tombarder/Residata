@@ -14,7 +14,7 @@ export const liveT = {
     live_title: "Current market snapshot",
     live_desc_base: "Data refreshed daily. Filter, explore, compare.",
     live_desc_anon: "Sign in for full detail on any single project (free).",
-    live_desc_free: "Upgrade to paid for access to all 60 projects.",
+    live_desc_free: "Upgrade to paid for access to all {n} projects.",
     upgrade_to_paid: "Upgrade to paid",
 
     card_projects: "Projects",
@@ -80,7 +80,7 @@ export const liveT = {
     choose_current_suffix: "This action will replace it.",
     choose_watch: "Track {name}",
     choose_back: "Back",
-    choose_upgrade_hint: "Want access to all 60 projects?",
+    choose_upgrade_hint: "Want access to all {n} projects?",
     saving: "Saving…",
 
     // Analytics
@@ -174,7 +174,7 @@ export const liveT = {
     live_title: "Aktuálny stav trhu",
     live_desc_base: "Dáta aktualizované každý deň. Filtruj, preklikni, porovnaj.",
     live_desc_anon: "Registrácia odomkne plný detail 1 projektu (zadarmo).",
-    live_desc_free: "Upgrade na paid pre prístup ku všetkým 60 projektom.",
+    live_desc_free: "Upgrade na paid pre prístup ku všetkým {n} projektom.",
     upgrade_to_paid: "Upgrade na paid",
 
     card_projects: "Projektov",
@@ -238,7 +238,7 @@ export const liveT = {
     choose_current_suffix: "Touto akciou ho zmeníš.",
     choose_watch: "Sledovať {name}",
     choose_back: "Späť",
-    choose_upgrade_hint: "Chceš sledovať všetkých 60 projektov naraz?",
+    choose_upgrade_hint: "Chceš sledovať všetkých {n} projektov naraz?",
     saving: "Ukladám…",
 
     analytics_gate_title: "Prihlás sa pre analytiku",
