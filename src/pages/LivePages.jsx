@@ -189,6 +189,19 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
           {showSignupPrompt && <button className="btn-p" onClick={openLogin}>{t.register_for_full}</button>}
         </div>
 
+        {/* Sold-velocity is computed month-over-month; right after the June market-key
+            unification the active markets only have one monthly snapshot, so every
+            project's sold_last_month is null. Show a clear "building history" note (paid
+            only — non-paid see a blurred placeholder, not a dash) so a column of "—"
+            doesn't read as broken. Self-heals once a second monthly snapshot lands. */}
+        {!loading && can("view_sold_velocity") && clearRows.length > 0 && clearRows.every(p => p.sold_last_month == null) && (
+          <div style={{ background: "rgba(245,166,35,0.10)", border: "1px solid rgba(245,166,35,0.30)", borderRadius: 8, padding: "0.6rem 0.85rem", marginBottom: "1rem", color: "#c8c8d0", fontSize: "0.82rem", lineHeight: 1.5 }}>
+            ⓘ {lang === "sk"
+              ? "Stĺpec „Predané 30d“ sa ešte napĺňa — počíta sa z dvoch mesiacov dát a zatiaľ máme prvý. Prvé čísla pribudnú po najbližšom mesačnom behu."
+              : "The “Sold 30d” column is still building — it's computed from two months of data and we only have the first. Figures appear after the next monthly run."}
+          </div>
+        )}
+
         {loading ? (
           <div style={{ color: dim, padding: "2rem", textAlign: "center" }}>{t.loading_generic}</div>
         ) : (
