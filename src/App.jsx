@@ -65,15 +65,15 @@ const t = {
     // Hero
     // heroBadge text is computed in HomePage from live projects.length —
     // see `heroBadgeText` near the top of HomePage(). No static fallback.
-    heroTitle1: "Bratislava residential market,",
+    heroTitle1: "Slovak residential market,",
     heroTitle2: "fully transparent.",
-    heroSub: "We monitor every new residential development in Bratislava and turn scattered listings into actionable market intelligence — so you can make pricing, investment, and portfolio decisions based on data.",
+    heroSub: "We monitor every new residential development across Slovakia and turn scattered listings into actionable market intelligence — so you can make pricing, investment, and portfolio decisions based on data.",
     heroBtn1: "Get Access",
     heroBtn2: "See Sample Data",
     // Value prop
     valueLabel: "What We Deliver",
     valueTitle: "Not just data. Answers.",
-    valueDesc: "Every month you get a full snapshot of the Bratislava new-build market — unit-level data across every active project, plus the insights you need to act on it.",
+    valueDesc: "Every month you get a full snapshot of the Slovak new-build market — unit-level data across every active project, plus the insights you need to act on it.",
     questionsLabel: "Questions we help you answer",
     questions: [
       "What should I price my 2-bedroom units at in Ružinov to stay competitive?",
@@ -122,7 +122,7 @@ const t = {
     dataLabel: "Sample Output",
     dataTitle: "This is what you get.",
     dataDesc: "Five concrete insight types, a raw unit-level sample, and the full schema. Same depth, every month.",
-    dataContext: "Bratislava New-Build Market — March 2026",
+    dataContext: "Slovak New-Build Market — March 2026",
     dataContextSub: "Monthly snapshot · all active residential projects",
     insightsLabel: "Market Insights",
     insightsTitle: "What the data tells you.",
@@ -191,14 +191,14 @@ const t = {
   sk: {
     getAccess: "Kontakt",
     // heroBadge text počíta HomePage z live projekt count — viď `heroBadgeText`.
-    heroTitle1: "Novostavby v Bratislave.",
+    heroTitle1: "Novostavby na Slovensku.",
     heroTitle2: "Celý trh v jednom prehľade.",
     heroSub: "Ceny, dostupnosť, rýchlosť predaja. Všetko v prehľadných reportoch, na základe ktorých môžete robiť dátami podložené rozhodnutia.",
     heroBtn1: "Kontaktujte nás",
     heroBtn2: "Ukážka dát",
     valueLabel: "Čo dodávame",
     valueTitle: "Nie len dáta. Odpovede.",
-    valueDesc: "Každý mesiac dostanete kompletný prehľad trhu novostavieb v Bratislave — každý byt, každý projekt. A to aj s insightmi, na základe ktorých viete hneď konať.",
+    valueDesc: "Každý mesiac dostanete kompletný prehľad trhu novostavieb na Slovensku — každý byt, každý projekt. A to aj s insightmi, na základe ktorých viete hneď konať.",
     questionsLabel: "Otázky, na ktoré vám Residata odpovie",
     questions: [
       "Ako naceniť 2-izbáky v Ružinove, aby boli konkurencieschopné?",
@@ -243,7 +243,7 @@ const t = {
     dataLabel: "Ukážka výstupu",
     dataTitle: "Takto vyzerá výstup.",
     dataDesc: "Päť konkrétnych typov insightov, ukážka dát na úrovni bytu, a kompletná schéma výstupu. Rovnaká hĺbka, každý mesiac.",
-    dataContext: "Trh novostavieb Bratislava — Marec 2026",
+    dataContext: "Trh novostavieb Slovensko — Marec 2026",
     dataContextSub: "Mesačný prehľad · všetky aktívne projekty",
     insightsLabel: "Trhové insighty",
     insightsTitle: "Čo z toho vidíte.",
@@ -326,11 +326,17 @@ const t = {
 const COUNTRY_LOCALIZE = {
   CZ: {
     rules: {
-      // English has no inflection here — one swap covers every "Bratislava".
-      en: [["Bratislava", "Prague"]],
-      // Slovak: inflected forms first, genitive next, nominative last (so an
-      // earlier rule never leaves a half-replaced stem for a later one).
+      // Two layers: the country-level MARKET CLAIMS (Slovak→Czech; "Slovak"→
+      // "Czech" also turns "Slovakia"→"Czechia" since Slovakia = Slovak+ia) AND
+      // the incidental CITY examples (Bratislava→Prague). English has no
+      // inflection so one pair each covers every occurrence.
+      en: [["Slovak", "Czech"], ["Bratislava", "Prague"]],
+      // Slovak: country-level claims first (na Slovensku→v Česku, Slovensko→
+      // Česko), then the inflected city forms (most-specific first so an earlier
+      // rule never leaves a half-replaced stem for a later one).
       sk: [
+        ["na Slovensku", "v Česku"],
+        ["Slovensko", "Česko"],
         ["v Bratislave", "v Prahe"],
         ["bratislavského", "pražského"],
         ["bratislavskom", "pražskom"],
