@@ -254,7 +254,15 @@ export default function PlatformShell({ page, projectId, lang = "en", setLang, s
       </div>
 
       <style>{`
+        /* Content-area left edge (= sidebar width on desktop, 0 on mobile).
+           Exposed as a CSS var so body-portaled overlays — e.g. the Analytics
+           and Reports drill-down modals — can center over the CONTENT area
+           instead of the whole viewport. Without it a fixed-width modal centred
+           in the viewport sits ~14px from the sidebar with a big gap on the far
+           side, where the dimmed page bleeds through (looks broken at wide widths). */
+        :root { --platform-content-left: ${SIDEBAR_W}px; }
         @media (max-width: 840px) {
+          :root { --platform-content-left: 0px; }
           .platform-sidebar { transform: translateX(-100%); transition: transform 0.25s ease; }
           .platform-sidebar.is-open { transform: translateX(0); }
           .platform-main { margin-left: 0 !important; }
