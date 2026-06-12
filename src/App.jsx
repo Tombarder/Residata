@@ -528,7 +528,7 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
       backdropFilter: "blur(20px)", borderBottom: "1px solid #222228",
     }}>
       <div style={{
-        maxWidth: 1200, margin: "0 auto", padding: "1.25rem 2rem",
+        maxWidth: 1320, margin: "0 auto", padding: "1.25rem 2rem",
         display: "flex", alignItems: "center", justifyContent: "space-between",
       }}>
         <a onClick={() => setCurrent("Home")} style={{ display: "flex", alignItems: "center", gap: "0.6rem", cursor: "pointer", textDecoration: "none" }}>
@@ -539,7 +539,7 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
           }}>R</div>
           <span style={{ fontWeight: 600, fontSize: "1.1rem", color: "#e8e8ed", letterSpacing: "-0.02em" }}>Residata</span>
         </a>
-        <div className="nav-right" style={{ display: "flex", alignItems: "center", gap: "2rem", listStyle: "none" }}>
+        <div className="nav-right" style={{ display: "flex", alignItems: "center", gap: "1.5rem", listStyle: "none" }}>
           {pages.map((p, i) => {
             const key = pagesEN[i];
             // "Sample" in the nav maps to the "Data" page key internally
@@ -713,18 +713,19 @@ function HomePage({ setCurrent, l, lang, onLogin }) {
   // showed "Live — loading projects…" forever in the (vanishingly rare
   // but real) all-paused state.
   let heroBadgeText;
+  // Unified across EVERY market: active first, then the rest we track that
+  // aren't currently selling. That bucket is a mix (e.g. SK = 3 paused + 2
+  // sold out), so "inactive" is the truthful label — not "sold out". Same
+  // shape for SK / CZ / All. inactive = tracked − active (≥ 0).
+  const inactiveProjCount = Math.max(0, trackedProjCount - liveProjCount);
   if (marketTotals.loading) {
     heroBadgeText = lang === "sk" ? "Live — načítavam projekty…" : "Live — loading projects…";
   } else if (liveProjCount === 0) {
     heroBadgeText = lang === "sk" ? "Live — žiadne aktívne projekty" : "Live — no active projects";
-  } else if (trackedProjCount > liveProjCount) {
-    heroBadgeText = lang === "sk"
-      ? `Live — ${trackedProjCount} projektov v databáze · ${liveProjCount} aktívne`
-      : `Live — ${trackedProjCount} projects in dataset · ${liveProjCount} active`;
   } else {
     heroBadgeText = lang === "sk"
-      ? `Live — sledujeme ${liveProjCount} projektov`
-      : `Live — tracking ${liveProjCount} developments`;
+      ? `Live — ${liveProjCount} aktívnych · ${inactiveProjCount} neaktívnych`
+      : `Live — ${liveProjCount} active · ${inactiveProjCount} inactive`;
   }
   // Hero CTA logika podľa tier-u
   let heroButtons;
