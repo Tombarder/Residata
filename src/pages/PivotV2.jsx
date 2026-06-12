@@ -147,7 +147,7 @@ const FIELDS = {
     },
   },
   wavg_m2_price: {
-    label: "Priem. €/m² (vážené)",
+    label: "Priem. (vážené)", label_en: "Avg (weighted)",
     group: "measure", type: "measure", unit: "€/m²", derived: true,
     accessor: () => null,
     measureCompute: (records) => {
@@ -190,6 +190,34 @@ const FIELDS = {
     },
   },
 };
+
+/* English labels for the (Slovak-primary) FIELDS registry. Resolved via
+   fieldLabel() at every render site (palette, zone chips, result-table column
+   headers, CSV export) so EN users don't see Slovak field names. Keys not listed
+   here are already English (project_name, unit_id, developer, Standard, …) or
+   carry an inline label_en (wavg_m2_price) → both fall back to .label. */
+const FIELD_LABEL_EN = {
+  datum: "Date", batch_timestamp: "Batch (exact time)", snapshot_month: "Month",
+  typ: "Type", etapa: "Phase", budova: "Building",
+  poschodie: "Floor", izby: "Rooms", obytna_plocha: "Living area",
+  balkon: "Balcony", terasa: "Terrace", zahrada: "Garden", exterier: "Exterior",
+  kobka: "Storage", celkova_plocha: "Total area",
+  cena_bez_dph: "Price excl. VAT", cena_s_dph: "Price incl. VAT",
+  stav: "Status", kolaudacia: "Handover", orientacia: "Orientation",
+  country: "Country", city: "City", cast: "District",
+  ulica_detail: "Street/detail", budova_stav: "Building/status",
+  cena_na_m2_obytnej: "Price per m² (living)",
+  sold_count: "Sold", available_count: "Available",
+};
+
+/** Field label in the active UI language. EN prefers an inline `label_en`, then
+    the FIELD_LABEL_EN map, else falls back to the (Slovak-primary) `.label`. */
+function fieldLabel(fieldKey, lang) {
+  const f = FIELDS[fieldKey];
+  if (!f) return fieldKey;
+  if (lang === "sk") return f.label;
+  return f.label_en || FIELD_LABEL_EN[fieldKey] || f.label;
+}
 
 /* Order of fields in the palette. Mirrors Clean Master column order so the
    user's mental model stays intact when they switch between Residata and
@@ -1569,7 +1597,7 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
           </span>
           {filters.filter(isFilterActive).map(f => (
             <span key={f.key} style={{ color: text }}>
-              <span style={{ color: dim }}>{FIELDS[f.key]?.label}:</span> {summariseFilter(f, FIELDS[f.key]?.type)}
+              <span style={{ color: dim }}>{fieldLabel(f.key, lang)}:</span> {summariseFilter(f, FIELDS[f.key]?.type)}
             </span>
           ))}
           <button onClick={() => setFilters(fs => fs.map(f => ({ key: f.key })))}
@@ -1608,7 +1636,7 @@ function LeftPanel({ rows, cols, values, filters, drag, setDrag, hoverZone, setH
         title={lang === "sk" ? "Riadky" : "Rows"}
         hint={lang === "sk" ? "Potiahni pole sem — bude group-by os (hierarchia)." : "Drop a field here — becomes a group-by axis."}
         icon="↓"
-        chips={rows.map(k => ({ key: k, label: FIELDS[k]?.label || k, type: FIELDS[k]?.type }))}
+        chips={rows.map(k => ({ key: k, label: fieldLabel(k, lang) || k, type: FIELDS[k]?.type }))}
         drag={drag} setDrag={setDrag}
         hoverZone={hoverZone} setHoverZone={setHoverZone}
         onDrop={() => onDropToZone("rows")}
@@ -1621,7 +1649,7 @@ function LeftPanel({ rows, cols, values, filters, drag, setDrag, hoverZone, setH
           ? "Potiahni text-pole sem — každá hodnota dostane vlastný stĺpec (cross-tab, napr. Stav: V/P/R)."
           : "Drop a text field here — each value becomes its own column (cross-tab)."}
         icon="→"
-        chips={cols.map(k => ({ key: k, label: FIELDS[k]?.label || k, type: FIELDS[k]?.type }))}
+        chips={cols.map(k => ({ key: k, label: fieldLabel(k, lang) || k, type: FIELDS[k]?.type }))}
         drag={drag} setDrag={setDrag}
         hoverZone={hoverZone} setHoverZone={setHoverZone}
         onDrop={() => onDropToZone("cols")}
@@ -1632,7 +1660,7 @@ function LeftPanel({ rows, cols, values, filters, drag, setDrag, hoverZone, setH
         title={lang === "sk" ? "Hodnoty" : "Values"}
         hint={lang === "sk" ? "Potiahni pole sem — bude sa agregovať (default: count; zmeň kliknutím na chip)." : "Drop a field here — aggregated (default: count; click the chip to change)."}
         icon="Σ"
-        chips={values.map(v => ({ key: v.key, label: FIELDS[v.key]?.label || v.key, type: FIELDS[v.key]?.type, agg: v.agg }))}
+        chips={values.map(v => ({ key: v.key, label: fieldLabel(v.key, lang) || v.key, type: FIELDS[v.key]?.type, agg: v.agg }))}
         drag={drag} setDrag={setDrag}
         hoverZone={hoverZone} setHoverZone={setHoverZone}
         onDrop={() => onDropToZone("values")}
@@ -1648,7 +1676,7 @@ function LeftPanel({ rows, cols, values, filters, drag, setDrag, hoverZone, setH
         icon="⚑"
         chips={filters.map(f => ({
           key: f.key,
-          label: FIELDS[f.key]?.label || f.key,
+          label: fieldLabel(f.key, lang) || f.key,
           type: FIELDS[f.key]?.type,
           // Full filter object passed through so the chip can render its summary
           filter: f,
@@ -1868,7 +1896,7 @@ function RightPanel({ usedKeys, search, setSearch, drag, setDrag, hoverZone, set
   const q = search.trim().toLowerCase();
   const filtered = FIELD_ORDER
     .map(k => ({ key: k, ...FIELDS[k] }))
-    .filter(f => !q || f.label.toLowerCase().includes(q));
+    .filter(f => !q || (f.label + " " + fieldLabel(f.key, "en")).toLowerCase().includes(q));
 
   // Group
   const groups = useMemo(() => {
@@ -1933,6 +1961,7 @@ function RightPanel({ usedKeys, search, setSearch, drag, setDrag, hoverZone, set
               <PaletteField
                 key={f.key}
                 field={f}
+                lang={lang}
                 used={usedKeys.has(f.key)}
                 onDragStart={() => {
                   const payload = { fromZone: "palette", fieldKey: f.key };
@@ -1955,7 +1984,7 @@ function RightPanel({ usedKeys, search, setSearch, drag, setDrag, hoverZone, set
 
 /* (useEffect for the drag-event listener is inlined in RightPanel now.) */
 
-function PaletteField({ field, used, onDragStart }) {
+function PaletteField({ field, used, onDragStart, lang }) {
   const typeBadge = field.type === "number" ? "#" : (field.type === "date" ? "📅" : "T");
   const typeColor = field.type === "number" ? orange : green;
   // Palette fields are ALWAYS draggable now — even when the field is
@@ -1995,7 +2024,7 @@ function PaletteField({ field, used, onDragStart }) {
       <span style={{ fontFamily: mono, fontSize: "0.62rem", width: 16, textAlign: "center", color: typeColor, opacity: used ? 0.45 : 1, fontWeight: 700 }}>
         {typeBadge}
       </span>
-      <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{field.label}</span>
+      <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fieldLabel(field.key, lang)}</span>
       {used && <span style={{ fontFamily: mono, fontSize: "0.58rem", color: green, opacity: 0.65 }} title="Už použité inde">✓</span>}
     </div>
   );
@@ -2234,8 +2263,11 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
   const valueHeaderText = (v) => {
     if (v.key === "__count__") return lang === "sk" ? "Počet" : "Count";
     const fld = FIELDS[v.field];
-    if (fld && fld.type === "measure") return fld.label + (fld.unit ? ` (${fld.unit})` : "");
-    return `${AGG_LABEL[v.agg]} · ${fld?.label || v.field}`;
+    if (fld && fld.type === "measure") {
+      const u = isMoneyUnit(fld.unit) ? displayMoneyUnit(fld.unit) : fld.unit;
+      return fieldLabel(v.field, lang) + (u ? ` (${u})` : "");
+    }
+    return `${AGG_LABEL[v.agg]} · ${fieldLabel(v.field, lang) || v.field}`;
   };
 
   const clickSort = (col) => {
@@ -2361,7 +2393,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
               {colKeys.map(ck => (
                 <th key={"ctop:" + ck} colSpan={effectiveValues.length}
                     style={{ ...th, color: green, borderLeft: `1px solid ${border}`, borderBottom: `1px solid ${border}` }}>
-                  <span style={{ opacity: 0.65 }}>{FIELDS[colFields[0]]?.label}:</span> <strong style={{ color: green }}>{ck}</strong>
+                  <span style={{ opacity: 0.65 }}>{fieldLabel(colFields[0], lang)}:</span> <strong style={{ color: green }}>{ck}</strong>
                 </th>
               ))}
               {/* Grand totals across columns */}
@@ -2378,7 +2410,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
               {rowFields.map((f, i) => (
                 <span key={f} style={{ color: i === 0 ? green : dim }}>
                   {i > 0 && <span style={{ color: dim, opacity: 0.5, margin: "0 0.3rem" }}>›</span>}
-                  <span style={{ opacity: 0.65, marginRight: 3 }}>L{i + 1}</span>{FIELDS[f]?.label}
+                  <span style={{ opacity: 0.65, marginRight: 3 }}>L{i + 1}</span>{fieldLabel(f, lang)}
                 </span>
               ))}
               {sortIndicator("label")}
