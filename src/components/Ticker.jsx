@@ -36,6 +36,19 @@ export default function Ticker({ lang = "en" }) {
 
   const loopItems = [...items, ...items];
 
+  // Constant visual scroll speed regardless of market/currency. The animation
+  // scrolls exactly one copy of `items` (translateX -50%) over `durationS`. With
+  // a FIXED duration the px/sec varied wildly with content width: "All" (6 short
+  // items) crawled, CZ-in-CZK (huge Kč numbers) raced, SK happened to sit right.
+  // Make the duration proportional to content width so px/sec is constant. The
+  // ticker is monospace, so character count is an exact width proxy.
+  // SECONDS_PER_CHAR is calibrated so the SK ticker keeps ~the speed it has today;
+  // clamped so a tiny or huge set still scrolls sanely.
+  const SECONDS_PER_CHAR = 0.15;
+  const PAD_CHARS_PER_ITEM = 12; // dot + gaps + 1.75rem side padding, in mono chars
+  const charUnits = items.reduce((n, s) => n + s.length + PAD_CHARS_PER_ITEM, 0);
+  const durationS = Math.min(240, Math.max(24, Math.round(charUnits * SECONDS_PER_CHAR)));
+
   if (loading && !items.length) {
     return (
       <div style={styles.wrapper}>
@@ -51,7 +64,7 @@ export default function Ticker({ lang = "en" }) {
       <div style={styles.badge}>{t.live}</div>
       <div style={styles.fadeLeft} />
       <div style={styles.track}>
-        <div style={styles.slide}>
+        <div style={{ ...styles.slide, animationDuration: `${durationS}s` }}>
           {loopItems.map((text, i) => (
             <span key={i} style={styles.item}>
               <span style={styles.dot}>●</span>
@@ -105,7 +118,10 @@ const styles = {
   slide: {
     display: "inline-flex",
     whiteSpace: "nowrap",
-    animation: "ticker-slide 120s linear infinite",
+    // duration set inline (animationDuration) per content width for constant speed
+    animationName: "ticker-slide",
+    animationTimingFunction: "linear",
+    animationIterationCount: "infinite",
   },
   item: {
     display: "inline-flex",
