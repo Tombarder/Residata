@@ -248,7 +248,7 @@ const AGG_LABEL = {
   min:            "min",
   max:            "max",
   median:         "median",
-  measure:        "výpočet",
+  measure:        "computed",
 };
 
 /* Max row hierarchy depth — Excel lets you go deep but the UI breaks
@@ -4118,18 +4118,19 @@ function DrillDownModal({ title, records, loading, onClose, lang }) {
 
   // Columns shown in drill-down — the most-useful flat-level fields
   const DRILL_COLS = [
-    { key: "project_name", label: "Projekt" },
-    { key: "unit_id",      label: "Byt" },
-    { key: "typ",          label: "Typ" },
-    { key: "izby",         label: "Izby" },
-    { key: "poschodie",    label: "Posch." },
-    { key: "obytna_plocha",label: "Plocha" },
-    { key: "cena_s_dph",   label: "Cena" },
-    { key: "stav",         label: "Stav" },
-    { key: "city",         label: "Mesto" },
-    { key: "district",     label: "Časť" },
-    { key: "developer",    label: "Developer" },
+    { key: "project_name", label: "Projekt",   en: "Project" },
+    { key: "unit_id",      label: "Byt",       en: "Unit" },
+    { key: "typ",          label: "Typ",       en: "Type" },
+    { key: "izby",         label: "Izby",      en: "Rooms" },
+    { key: "poschodie",    label: "Posch.",    en: "Floor" },
+    { key: "obytna_plocha",label: "Plocha",    en: "Area" },
+    { key: "cena_s_dph",   label: "Cena",      en: "Price" },
+    { key: "stav",         label: "Stav",      en: "Status" },
+    { key: "city",         label: "Mesto",     en: "City" },
+    { key: "district",     label: "Časť",      en: "District" },
+    { key: "developer",    label: "Developer", en: "Developer" },
   ];
+  const drillColLabel = (c) => (lang === "sk" ? c.label : c.en);
 
   const cena_m2 = (r) => {
     const p = Number(r.cena_s_dph), m = Number(r.obytna_plocha);
@@ -4142,7 +4143,7 @@ function DrillDownModal({ title, records, loading, onClose, lang }) {
       const s = String(v);
       return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
     };
-    const headers = [...DRILL_COLS.map(c => c.label), "€/m²"];
+    const headers = [...DRILL_COLS.map(drillColLabel), "€/m²"];
     const lines = [headers.map(esc).join(",")];
     for (const r of records) {
       lines.push([...DRILL_COLS.map(c => r[c.key] ?? ""), cena_m2(r) ?? ""].map(esc).join(","));
@@ -4209,7 +4210,7 @@ function DrillDownModal({ title, records, loading, onClose, lang }) {
             <thead style={{ position: "sticky", top: 0, background: "#0e0e10", zIndex: 1 }}>
               <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.06em" }}>
                 {DRILL_COLS.map(c => (
-                  <th key={c.key} style={{ padding: "0.55rem 0.7rem", fontWeight: 700, borderBottom: `1px solid ${border}`, whiteSpace: "nowrap" }}>{c.label}</th>
+                  <th key={c.key} style={{ padding: "0.55rem 0.7rem", fontWeight: 700, borderBottom: `1px solid ${border}`, whiteSpace: "nowrap" }}>{drillColLabel(c)}</th>
                 ))}
                 <th style={{ padding: "0.55rem 0.7rem", fontWeight: 700, borderBottom: `1px solid ${border}`, color: green, textAlign: "right" }}>{moneySymbol()}/m²</th>
               </tr>
