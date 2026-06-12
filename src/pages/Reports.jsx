@@ -591,7 +591,7 @@ function MarketReport({ projects, onOpenProject, lang }) {
         } />
       </ReportSection>
 
-      <ReportSection label={lang === "sk" ? "Rozloženie cien" : "Price distribution"} title={lang === "sk" ? "€/m² cez všetky byty \u2014 klik na pásmo otvorí zoznam bytov" : "€/m² across all units \u2014 click a band for the underlying units"}>
+      <ReportSection label={lang === "sk" ? "Rozloženie cien" : "Price distribution"} title={lang === "sk" ? `${moneySymbol()}/m² cez všetky byty \u2014 klik na pásmo otvorí zoznam bytov` : `${moneySymbol()}/m² across all units \u2014 click a band for the underlying units`}>
         <Histogram bins={priceSeries} lang={lang} unit="€/m²" onFetchBin={fetchBin} onProjectClick={onOpenProject} />
       </ReportSection>
 
@@ -771,7 +771,7 @@ function ProjectReport({ project, siblings, lang }) {
       )}
 
       {priceSeries.some(b => b.count > 0) && (
-        <ReportSection label={lang === "sk" ? "Distribúcia cien" : "Price distribution"} title={lang === "sk" ? "€/m² naprieč bytmi \u2014 klik na pásmo otvorí zoznam bytov" : "€/m² across units \u2014 click a band for the underlying units"}>
+        <ReportSection label={lang === "sk" ? "Distribúcia cien" : "Price distribution"} title={lang === "sk" ? `${moneySymbol()}/m² naprieč bytmi \u2014 klik na pásmo otvorí zoznam bytov` : `${moneySymbol()}/m² across units \u2014 click a band for the underlying units`}>
           <Histogram bins={priceSeries} lang={lang} unit="€/m²" onFetchBin={fetchBin} />
         </ReportSection>
       )}
