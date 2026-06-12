@@ -1280,6 +1280,17 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
           50%      { opacity: 0.85; }
         }
         .pivot-loading-pulse { animation: pivotPulse 1.6s ease-in-out infinite; }
+        /* Pivot-table row affordance (2026-06-12): the WHOLE row is the click
+           target (open project / toggle group) — best-in-class standard
+           (Linear/Stripe/Notion). The row glows on hover (JS sets the bg) and
+           cursor:pointer + the project name underlines so it's obviously
+           interactive; the count cell keeps its own drill-down (it
+           stopPropagation's). Keyboard focus ring on the name. */
+        .pivot-row-int { cursor: pointer; }
+        .pivot-row-int:hover .pivot-label-text {
+          text-decoration: underline; text-decoration-color: #00e5a0; text-underline-offset: 3px;
+        }
+        .pivot-label-text:focus-visible { outline: 2px solid #00e5a0; outline-offset: -2px; border-radius: 3px; }
       `}</style>
 
       {/* Initial-load skeleton — shown ONLY while real flats are still
@@ -2415,13 +2426,21 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
             const isSubtotal = !n.isLeaf;
             const shade = ["#12121a", "#0f0f14", "#0c0c0f", "#0b0b0c", "#0a0a0b"][Math.min(n.level, 4)];
             const indent = 0.4 + n.level * 0.8;
+            const baseBg = isSubtotal ? shade : (idx % 2 ? "transparent" : "rgba(255,255,255,0.015)");
             // Is THIS row a navigable project? Only when the deepest
             // grouping is project_name, this is a leaf node, and we
             // can resolve a project_id from its records (any record
             // in the group has it since all records share the project).
             const isProjectRow = projectRowsActive && n.isLeaf && n.records && n.records.length > 0;
             const projectId = isProjectRow ? n.records[0]?.project_id : null;
-            const rowClickable = Boolean(isProjectRow && projectId && onProjectOpen);
+            const canOpenProject = Boolean(isProjectRow && projectId && onProjectOpen);
+            const canToggle = Boolean(n.hasChildren);
+            // Whole-row click target where it logically makes sense: a project
+            // leaf opens the project, a group header expands/collapses.
+            const rowInteractive = canOpenProject || canToggle;
+            const rowAction = canOpenProject ? () => onProjectOpen(projectId)
+                            : canToggle ? () => onToggle(n.pathKey)
+                            : undefined;
             return (
               <tr key={n.pathKey + "|" + idx}
                 /* data-pathkey lets the chart-click flash handler find this
@@ -2429,12 +2448,13 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                    rows (always visible regardless of collapse state), so we
                    don't need to expand parents on click. */
                 data-pathkey={n.pathKey}
-                onMouseEnter={rowClickable ? (e) => e.currentTarget.style.background = "rgba(0,229,160,0.06)" : undefined}
-                onMouseLeave={rowClickable ? (e) => {
-                  e.currentTarget.style.background = isSubtotal ? shade : (idx % 2 ? "transparent" : "rgba(255,255,255,0.015)");
-                } : undefined}
+                className={rowInteractive ? "pivot-row-int" : undefined}
+                onClick={rowAction}
+                title={canOpenProject ? (lang === "sk" ? `Otvoriť projekt ${n.label}` : `Open project ${n.label}`) : undefined}
+                onMouseEnter={rowInteractive ? (e) => { e.currentTarget.style.background = "rgba(0,229,160,0.11)"; } : undefined}
+                onMouseLeave={rowInteractive ? (e) => { e.currentTarget.style.background = baseBg; } : undefined}
                 style={{
-                  background: isSubtotal ? shade : (idx % 2 ? "transparent" : "rgba(255,255,255,0.015)"),
+                  background: baseBg,
                   borderTop: n.level === 0 ? `1px solid ${border}` : `1px solid #16161a`,
                   transition: "background 0.12s",
                 }}>
@@ -2450,7 +2470,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                     </span>
                   )}
                   {n.hasChildren ? (
-                    <button onClick={() => onToggle(n.pathKey)}
+                    <button onClick={(e) => { e.stopPropagation(); onToggle(n.pathKey); }}
                       style={{ background: "transparent", border: "none", color: green, cursor: "pointer", padding: 0, marginRight: "0.35rem", fontSize: "0.7rem", width: 12, display: "inline-block", verticalAlign: "middle" }}
                       title={n.isCollapsed ? "Expand" : "Collapse"}>
                       {n.isCollapsed ? "▸" : "▾"}
@@ -2458,18 +2478,19 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                   ) : (
                     <span style={{ display: "inline-block", width: 12, marginRight: "0.35rem" }} />
                   )}
-                  {/* Project-name label is clickable when we can navigate
-                      to that project. On hover it underlines (anchor-like
-                      affordance). Non-project rows stay plain text. */}
-                  {rowClickable ? (
+                  {/* Whole ROW is the click target (see <tr onClick>). The name
+                      is the keyboard-focusable button + carries the underline
+                      affordance (.pivot-row-int:hover .pivot-label-text). Its own
+                      onClick stopPropagation's so a name-click opens once (not
+                      twice via the row). Non-project rows stay plain text. */}
+                  {canOpenProject ? (
                     <span
+                      className="pivot-label-text"
                       role="button" tabIndex={0}
                       title={lang === "sk" ? `Otvoriť projekt ${n.label}` : `Open project ${n.label}`}
-                      onClick={() => onProjectOpen(projectId)}
+                      onClick={(e) => { e.stopPropagation(); onProjectOpen(projectId); }}
                       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onProjectOpen(projectId); } }}
-                      onMouseEnter={(e) => { e.currentTarget.style.textDecoration = "underline"; e.currentTarget.style.textDecorationColor = green; e.currentTarget.style.textUnderlineOffset = "3px"; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.textDecoration = "none"; }}
-                      style={{ cursor: "pointer", color: "#e8e8ed" }}
+                      style={{ color: "#e8e8ed" }}
                     >{n.label}</span>
                   ) : (
                     <span title={n.label}>{n.label}</span>
@@ -2485,7 +2506,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                     magnifier) to 'pointer' (universal, modern). */}
                 <td style={{ ...td, textAlign: "right", fontFamily: mono, color: isSubtotal ? "#c4c4cc" : dim, fontWeight: isSubtotal ? 600 : 400, cursor: onDrillDown ? "pointer" : "default" }}
                     title={onDrillDown ? (lang === "sk" ? "Zobraziť záznamy v tejto skupine" : "Show records in this group") : undefined}
-                    onClick={onDrillDown ? () => onDrillDown(n) : undefined}>
+                    onClick={onDrillDown ? (e) => { e.stopPropagation(); onDrillDown(n); } : undefined}>
                   {n.count.toLocaleString("en-US").replace(/,/g, " ")}
                   {(() => {
                     const sp = stavSplitOf(n);
