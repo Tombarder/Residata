@@ -706,26 +706,22 @@ function HomePage({ setCurrent, l, lang, onLogin }) {
   // audit_findings.md F-019 for the divergence.)
   const marketTotals = useMarketTotals();
   const liveProjCount = marketTotals.projectsActive ?? 0;
-  const trackedProjCount = marketTotals.projectsTracked ?? liveProjCount;
   // F-010: split into 3 distinct states so we don't conflate "the hook is
   // still resolving" with "the DB legitimately has zero active projects."
   // The old ternary used liveProjCount > 0 ? (…) : "loading…", which
   // showed "Live — loading projects…" forever in the (vanishingly rare
   // but real) all-paused state.
   let heroBadgeText;
-  // Unified across EVERY market: active first, then the rest we track that
-  // aren't currently selling. That bucket is a mix (e.g. SK = 3 paused + 2
-  // sold out), so "inactive" is the truthful label — not "sold out". Same
-  // shape for SK / CZ / All. inactive = tracked − active (≥ 0).
-  const inactiveProjCount = Math.max(0, trackedProjCount - liveProjCount);
+  // Boss 2026-06-15: the hero shows ACTIVE projects only — the "inactive"
+  // bucket (paused + sold-out projects we still track) is hidden from this view.
   if (marketTotals.loading) {
     heroBadgeText = lang === "sk" ? "Live — načítavam projekty…" : "Live — loading projects…";
   } else if (liveProjCount === 0) {
     heroBadgeText = lang === "sk" ? "Live — žiadne aktívne projekty" : "Live — no active projects";
   } else {
     heroBadgeText = lang === "sk"
-      ? `Live — ${liveProjCount} aktívnych · ${inactiveProjCount} neaktívnych`
-      : `Live — ${liveProjCount} active · ${inactiveProjCount} inactive`;
+      ? `Live — ${liveProjCount} aktívnych`
+      : `Live — ${liveProjCount} active`;
   }
   // Hero CTA logika podľa tier-u
   let heroButtons;
