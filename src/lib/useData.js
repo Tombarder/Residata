@@ -253,7 +253,7 @@ const _totalsCache = new Map();  // key='level:id' → totals obj
 const _emptyTotals = {
   loading: true,
   unitsTracked: null, unitsAvailable: null, unitsReserved: null,
-  unitsSold: null, soldLastMonth: null, avgPriceM2: null,
+  soldLastMonth: null, avgPriceM2: null,
   projectsActive: null, projectsTracked: null, developersActive: null,
   snapshotMonth: null,
   // Granularity-specific fields the new views surface:
@@ -269,7 +269,6 @@ const _normTotalsRow = (data, level, id) => {
     unitsTracked:    num(data?.total_units_tracked),
     unitsAvailable:  num(data?.total_available),
     unitsReserved:   num(data?.total_reserved),
-    unitsSold:       num(data?.total_sold),
     soldLastMonth:   num(data?.total_sold_last_month),
     avgPriceM2:      num(data?.avg_eur_m2),
     projectsActive:  num(data?.total_projects_active),
@@ -447,7 +446,6 @@ const _marketTotalsByCountry = new Map();  // country code → mapped totals obj
       unitsTracked:    n(s.total_units),
       unitsAvailable:  n(s.total_available),
       unitsReserved:   n(s.total_reserved),
-      unitsSold:       n(s.total_sold),
       soldLastMonth:   null,                       // not in snapshot — live fetch fills it
       avgPriceM2:      n(s.avg_eur_m2),
       projectsActive:  n(s.total_projects),
@@ -464,7 +462,7 @@ export function useMarketTotals() {
   const [totals, setTotals] = useState(() => _marketTotalsByCountry.get(country) || {
     loading: true,
     unitsTracked: null, unitsAvailable: null, unitsReserved: null,
-    unitsSold: null, avgPriceM2: null, snapshotMonth: null,
+    avgPriceM2: null, snapshotMonth: null,
   });
   useEffect(() => {
     if (!isSupabaseReady()) {
@@ -504,7 +502,6 @@ export function useMarketTotals() {
         unitsTracked:    num(data?.total_units_tracked),
         unitsAvailable:  num(data?.total_available),
         unitsReserved:   num(data?.total_reserved),
-        unitsSold:       num(data?.total_sold),
         soldLastMonth:   num(data?.total_sold_last_month),
         avgPriceM2:      num(data?.avg_eur_m2),
         projectsActive:  num(data?.total_projects_active),

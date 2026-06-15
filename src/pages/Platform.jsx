@@ -864,7 +864,6 @@ function PlatformDashboard({ lang, setCurrent }) {
   const totals = {
     units:  marketTotals.unitsTracked   ?? 0,
     avail:  marketTotals.unitsAvailable ?? 0,
-    sold:   marketTotals.unitsSold      ?? 0,
     sold30: marketTotals.soldLastMonth  ?? 0,
   };
   const avgEurM2 = marketTotals.avgPriceM2 != null
