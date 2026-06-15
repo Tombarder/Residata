@@ -123,6 +123,62 @@ export async function fetchFlatsForProjects(country, projectIds, opts = {}) {
 let _projectsCache = null;
 const _metricsCacheByCountry = new Map();  // country code -> metrics array
 
+// ── Velocity data-maturity gate (2026-06-15) ───────────────────────────────
+// "sold last month" is only an honest 30-day figure once a market has >=30 days
+// of real history (public.velocity_maturity). Until then the ticker + dashboard
+// KPI show "building history" instead of a partial-window count, and auto-reveal
+// the real number once the market matures (no code change; every future market
+// gets the same treatment). Fail-OPEN: if maturity can't load we show the number
+// (never hide good data on a transient blip).
+let _velocityMaturity = null;          // { SK: {is_mature, ...}, CZ: {...} }
+let _velocityMaturityPromise = null;
+function _loadVelocityMaturity() {
+  if (_velocityMaturity) return Promise.resolve(_velocityMaturity);
+  if (_velocityMaturityPromise) return _velocityMaturityPromise;
+  _velocityMaturityPromise = supabasePublic.from("velocity_maturity").select("*")
+    .then(({ data }) => {
+      const m = {};
+      (data || []).forEach((r) => { m[r.country_code] = r; });
+      _velocityMaturity = m;
+      return m;
+    })
+    .catch(() => ({}));
+  return _velocityMaturityPromise;
+}
+function _velocityMatureForView(country, mat) {
+  if (!mat || !Object.keys(mat).length) return true;   // unknown -> fail open
+  if (isAllCountries(country)) {
+    const rows = Object.values(mat);
+    return rows.length > 0 && rows.every((r) => r.is_mature);
+  }
+  const r = mat[country];
+  return r ? !!r.is_mature : true;                       // unknown country -> fail open
+}
+function _gateVelocityMetricRows(arr, country, mat) {
+  if (_velocityMatureForView(country, mat)) return arr;
+  return arr.map((m) => m.metric_key === "total_sold_last_month"
+    ? { ...m, value_numeric: null,
+        value_text: "Predané za mesiac: zbierame históriu",
+        value_text_native: "Predané za mesiac: zbierame históriu",
+        value_json: { ...(m.value_json || {}), text_en: "Sold last month: building history" } }
+    : m);
+}
+
+/** Whether the selected country's "sold last month" velocity is mature enough
+ *  (>=30d real history) to display a real number. Fail-open. Dashboard KPI uses it. */
+export function useVelocityMature() {
+  const { country } = useCountry();
+  const [mature, setMature] = useState(true);
+  useEffect(() => {
+    let cancelled = false;
+    _loadVelocityMaturity().then((mat) => {
+      if (!cancelled) setMature(_velocityMatureForView(country, mat));
+    });
+    return () => { cancelled = true; };
+  }, [country]);
+  return mature;
+}
+
 /** Live metrics for the ticker (KPI strip). Public view — no auth gate.
  *  Country-scoped: public.metrics now emits each metric per active country
  *  (LATERAL over countries, EUR-converted), so the ticker shows the SELECTED
@@ -142,7 +198,10 @@ export function useMetrics() {
     // key total_* ticker entries from totals_global (cross-market, EUR). Per-market
     // peak/district entries are omitted in All (they name one project/district).
     if (isAllCountries(country)) {
-      supabasePublic.from("totals_global").select("*").maybeSingle().then(({ data, error }) => {
+      Promise.all([
+        supabasePublic.from("totals_global").select("*").maybeSingle(),
+        _loadVelocityMaturity(),
+      ]).then(([{ data, error }, mat]) => {
         if (cancelled) return;
         if (error || !data) { setLoading(false); return; }
         const f = (n) => (n == null ? "—" : Number(n).toLocaleString("en-US").replace(/,/g, " "));
@@ -157,14 +216,17 @@ export function useMetrics() {
           { metric_key: "total_projects_active", display_order: 13, category: "total",   value_text: `${f(data.total_projects_active)} aktívnych projektov`,    value_json: { text_en: `${f(data.total_projects_active)} active projects` } },
           { metric_key: "avg_eur_m2",            display_order: 53, category: "pricing", value_text: `Priemerná cena: ${f(data.avg_eur_m2)} €/m²`,    value_json: { text_en: `Avg €/m²: €${f(data.avg_eur_m2)}` } },
         ];
-        _metricsCacheByCountry.set(country, arr);
-        setMetrics(arr);
+        const gated = _gateVelocityMetricRows(arr, country, mat);
+        _metricsCacheByCountry.set(country, gated);
+        setMetrics(gated);
         setLoading(false);
       });
       return () => { cancelled = true; };
     }
-    supabasePublic.from("metrics").select("*").eq("country_code", country).order("display_order", { ascending: true })
-      .then(({ data, error }) => {
+    Promise.all([
+      supabasePublic.from("metrics").select("*").eq("country_code", country).order("display_order", { ascending: true }),
+      _loadVelocityMaturity(),
+    ]).then(([{ data, error }, mat]) => {
         if (cancelled) return;
         // F-313 (DP-096): don't poison the module cache with [] on transient
         // errors — that would leave the ticker empty for the rest of the
@@ -174,9 +236,9 @@ export function useMetrics() {
           setLoading(false);
           return;
         }
-        const arr = data || [];
-        _metricsCacheByCountry.set(country, arr);
-        setMetrics(arr);
+        const gated = _gateVelocityMetricRows(data || [], country, mat);
+        _metricsCacheByCountry.set(country, gated);
+        setMetrics(gated);
         setLoading(false);
       });
     return () => { cancelled = true; };

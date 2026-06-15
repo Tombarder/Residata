@@ -14,7 +14,7 @@
 import { Component, useState, useEffect } from "react";
 import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
-import { useProjects, useMarketTotals } from "../lib/useData";
+import { useProjects, useMarketTotals, useVelocityMature } from "../lib/useData";
 import { moneyFromEur, moneySymbol } from "../lib/money";
 import { useCurrency } from "../lib/useCurrency";
 import { supabase } from "../lib/supabase";
@@ -927,7 +927,10 @@ function PlatformDashboard({ lang, setCurrent }) {
             : (lang === "sk" ? "všetky aktívne v predaji" : "all active in market")}
         />
         <KpiCard label={lang === "sk" ? "Voľné byty" : "Available units"} value={totals.avail.toLocaleString(lang === "sk" ? "sk-SK" : "en-US")} accent={green} />
-        <KpiCard label={lang === "sk" ? "Predané (30 dní)" : "Sold (30 days)"} value={totals.sold30 ? `+${totals.sold30}` : "—"} accent="#f5a623"
+        <KpiCard label={lang === "sk" ? "Predané (30 dní)" : "Sold (30 days)"}
+          value={!velocityMature ? "—" : (totals.sold30 ? `+${totals.sold30}` : "—")}
+          subtitle={!velocityMature ? (lang === "sk" ? "zbierame históriu" : "building history") : null}
+          accent="#f5a623"
           locked={!can("view_sold_velocity")} />
         <KpiCard label={lang === "sk" ? `Priem. ${moneySymbol()}/m²` : `Avg ${moneySymbol()}/m²`} value={avgEurM2 ? Math.round(moneyFromEur(avgEurM2)).toLocaleString(lang === "sk" ? "sk-SK" : "en-US") : "—"} />
       </div>
