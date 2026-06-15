@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { useProjects, useFlatsArchive, useFlatsCurrent, useArchiveMonths, useArchiveDays, usePivotGrain, fetchFlatsForProjects } from "../lib/useData";
+import { useProjects, useFlatsArchive, useFlatsCurrent, useArchiveMonths, useArchiveDays, usePivotGrain, usePivotDistinct, fetchFlatsForProjects } from "../lib/useData";
 import { useCountry } from "../lib/useCountry";
 import { useCapabilities } from "../lib/useCapabilities";
 import { moneyFromEur, moneySymbol } from "../lib/money";
@@ -264,6 +264,11 @@ const SEP = "\u2016";
 /* Sentinel used in `filter.values` to mean "the (prázdne) / null bucket".
    Lets the user include or exclude records with missing values explicitly. */
 const EMPTY_SENTINEL = "__EMPTY__";
+
+/* Stable empty array — passed as `records` to FilterPopover on the grain fast-path
+   (values come from distinctOverride, not records) so its useMemo never re-runs on a
+   fresh [] identity each render. */
+const EMPTY_RECORDS = [];
 
 /* ───────────────────────── Helpers ───────────────────────── */
 function num(v) {
@@ -620,6 +625,19 @@ function isServerable(rowFields, colFields, valueDefs, filters) {
     if (f.key === "stav" && (f.values || []).includes(EMPTY_SENTINEL)) return false;
   }
   return true;
+}
+
+/* A filter field whose distinct values can be fetched server-side via ONE fast
+   pivot_grain(p_dims=[field]) call, instead of pulling all ~30k records just to
+   list a handful of values. Eligible = a server-able dimension that is categorical
+   (NOT a numeric range — those need min/max/median stats computed from records) and
+   NOT a time field (datum/snapshot_month synthesize options from the light
+   archive_days/archive_months lists). Covers stav, typ, developer, city, district,
+   orientation, kolaudácia, etapa, … — the common categorical filters. */
+function fieldUsesGrainValues(key) {
+  return SERVERABLE_DIMS.has(key)
+    && !!FIELDS[key] && FIELDS[key].type !== "number"
+    && key !== "datum" && key !== "snapshot_month";
 }
 
 const _COMP_PREFIXES = ["cs", "cb", "ob", "ce", "iz", "po", "m2"];
@@ -1167,21 +1185,36 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
   }, [canViewAnalytics, configServerable, forceRaw]);
 
-  // Opening a filter popover ALSO needs raw records — the value-checkbox list is
-  // derived from `records`. In server-side mode records aren't loaded, so without
-  // this the popover shows an empty list, and a freshly-added (inactive) filter
-  // chip can NEVER be configured: isServerable ignores inactive filters → config
-  // stays server-able → forceRaw never flips → records stay empty → the list stays
-  // empty → the filter can't be activated. A deadlock. Pulling on popover-open
-  // breaks it (the table stays on the grain meanwhile — useGrain is unaffected).
-  // datum/snapshot_month synthesize their options from the light archive lists,
-  // so they don't need the pull.
+  // Opening a filter popover may need raw records — the value-checkbox list is
+  // derived from `records`. In server-side mode records aren't loaded, so a
+  // freshly-added (inactive) filter chip could never be configured: isServerable
+  // ignores inactive filters → config stays server-able → forceRaw never flips →
+  // records stay empty → the list stays empty → deadlock.
+  // EXCEPT server-able CATEGORICAL fields, which now get their values from the grain
+  // (one fast RPC, see usePivotDistinct below) — no records pull. And datum /
+  // snapshot_month synthesize options from the light archive lists. So pull records
+  // only for the rest (numeric ranges / non-server-able fields), which truly need them.
   useEffect(() => {
     if (!canViewAnalytics || forceRaw || !filterPopup) return;
     if (filterPopup.key === "datum" || filterPopup.key === "snapshot_month") return;
+    if (fieldUsesGrainValues(filterPopup.key)) return;
     setForceRaw(true);
     // eslint-disable-next-line react-hooks/set-state-in-effect
   }, [canViewAnalytics, forceRaw, filterPopup]);
+
+  // Server-side distinct values for the OPEN filter popover, when the field is a
+  // server-able categorical dim — one pivot_grain(p_dims=[field]) call instead of a
+  // ~30k-row pull. Scope mirrors the table (month/date); narrowed by the stav filter
+  // for OTHER fields, but a field's own value list is never narrowed by itself.
+  const popupField = filterPopup?.key || null;
+  const popupUsesGrain = !!popupField && fieldUsesGrainValues(popupField);
+  const { values: popupGrainValues, hasEmpty: popupGrainHasEmpty, loading: popupGrainLoading } = usePivotDistinct({
+    enabled: canViewAnalytics && popupUsesGrain,
+    field: popupField,
+    months: fetchMonths,
+    dates: fetchDates,
+    stav: popupField === "stav" ? null : fetchStav,
+  });
 
   // Render from the grain whenever the config is server-able — the table stays
   // instant. forceRaw loads records in the background to back a drill-down modal
@@ -1560,6 +1593,28 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
           filtered by OTHER filters), pass filteredRecords instead. */}
       {filterPopup && (() => {
         const current = filters.find(f => f.key === filterPopup.key);
+        // FAST PATH — server-able categorical field: its distinct values come from
+        // the grain (one pivot_grain(p_dims=[field]) RPC via usePivotDistinct), so we
+        // skip BOTH the ~30k-row records pull and the contextual record-filtering.
+        // This is the forever-fix for "opening a filter dragged the whole dataset".
+        if (popupUsesGrain) {
+          return (
+            <FilterPopover
+              fieldKey={filterPopup.key}
+              filter={current}
+              anchorEl={filterPopup.anchorEl}
+              records={EMPTY_RECORDS}
+              distinctOverride={{ values: popupGrainValues, hasEmpty: popupGrainHasEmpty }}
+              loading={popupGrainLoading}
+              fellBack={false}
+              otherFilterCount={0}
+              onChange={(patch) => updateFilter(filterPopup.key, patch)}
+              onClear={() => updateFilter(filterPopup.key, null)}
+              onClose={() => setFilterPopup(null)}
+              lang={lang}
+            />
+          );
+        }
         // Contextual records first: filter by OTHER active filters so the
         // user sees options in the narrowed context (the "I just filtered
         // X, now X is gone" Excel footgun goes away).
@@ -3794,12 +3849,17 @@ function makeTicks(min, max, targetCount = 4) {
      · number      → range inputs + "include (prázdne)" toggle + optional
                      checkbox list when cardinality is small (<=40).
    Closes on Esc / outside click.                                   */
-function FilterPopover({ fieldKey, filter, anchorEl, records, loading = false, fellBack = false, otherFilterCount = 0, onChange, onClear, onClose, lang }) {
+function FilterPopover({ fieldKey, filter, anchorEl, records, distinctOverride = null, loading = false, fellBack = false, otherFilterCount = 0, onChange, onClear, onClose, lang }) {
   const field = FIELDS[fieldKey];
-  const { values: distinct, hasEmpty, isNumber, stats } = useMemo(
+  const computed = useMemo(
     () => distinctValuesForField(records, fieldKey),
     [records, fieldKey]
   );
+  // Grain fast-path: server-side distinct values override the records-derived list.
+  // A grain-served field is always categorical → isNumber:false, no range stats.
+  const { values: distinct, hasEmpty, isNumber, stats } = distinctOverride
+    ? { values: distinctOverride.values, hasEmpty: distinctOverride.hasEmpty, isNumber: false, stats: null }
+    : computed;
 
   // Local draft state so Apply commits and Cancel discards
   const initialMode = filter?.mode || (isNumber ? "between" : "in");
