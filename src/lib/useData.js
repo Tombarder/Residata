@@ -475,9 +475,10 @@ export function useMarketTotals() {
     if (cached) setTotals(cached);
     let cancelled = false;
     // "All" → the cross-market combined row (totals_global); else the per-country
-    // row. totals_global lacks sold_last_month / snapshot_month. sold_last_month
-    // stays null (sold-velocity shows "—"); snapshot_month we fill from the latest
-    // month any market scraped, so the dashboard's "last run for month X" is real.
+    // row. totals_global now includes total_sold_last_month (cross-market velocity,
+    // 2026-06-15) so "sold last month" renders for the All view too; it still lacks
+    // snapshot_month, which we fill from the latest month any market scraped so the
+    // dashboard's "last run for month X" is real.
     const _req = isAllCountries(country)
       ? Promise.all([
           supabasePublic.from("totals_global").select("*").maybeSingle(),
