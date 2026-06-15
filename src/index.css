@@ -1,1 +1,17 @@
 body { margin: 0; }
+
+/* ── Responsive top nav ─────────────────────────────────────────────────────
+   The desktop nav packs a lot: logo + 6 marketing links + a market/currency/
+   language control cluster + 2 CTAs. On narrower screens (and especially when
+   the CZ [Kč|€] currency toggle appears) the single row used to overflow and cut
+   off the CTA. Compress the spacing first; below ~1180px collapse the secondary
+   marketing links so the header never breaks — the logo (→ Home), the market
+   switcher, and the CTAs always stay clean + non-interruptive. */
+@media (max-width: 1300px) {
+  .nav-right  { gap: 0.85rem !important; }
+  .nav-links  { gap: 1rem !important; }
+  .nav-link   { font-size: 0.82rem !important; }
+}
+@media (max-width: 1180px) {
+  .nav-links  { display: none !important; }
+}

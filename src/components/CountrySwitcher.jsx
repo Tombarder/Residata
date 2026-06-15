@@ -66,7 +66,7 @@ export default function CountrySwitcher({ lang = "en" }) {
                 fontFamily: "inherit", fontSize: "inherit", transition: "all 0.15s",
               }}
             >
-              <span style={{ fontSize: "0.82rem", lineHeight: 1 }}>{FLAG[c] || "🌍"}</span>
+              {c === "all" && <span style={{ fontSize: "0.82rem", lineHeight: 1 }}>{FLAG[c] || "🌍"}</span>}
               {c === "all" ? countryName("all", lang) : c}
             </button>
           );

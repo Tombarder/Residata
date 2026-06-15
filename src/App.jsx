@@ -539,7 +539,8 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
           }}>R</div>
           <span style={{ fontWeight: 600, fontSize: "1.1rem", color: "#e8e8ed", letterSpacing: "-0.02em" }}>Residata</span>
         </a>
-        <div className="nav-right" style={{ display: "flex", alignItems: "center", gap: "1.5rem", listStyle: "none" }}>
+        <div className="nav-right" style={{ display: "flex", alignItems: "center", gap: "1.25rem", listStyle: "none" }}>
+          <div className="nav-links" style={{ display: "flex", alignItems: "center", gap: "1.4rem" }}>
           {pages.map((p, i) => {
             const key = pagesEN[i];
             // "Sample" in the nav maps to the "Data" page key internally
@@ -554,6 +555,10 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
               }}>{p}</a>
             );
           })}
+          </div>
+          {/* Market + currency + language = ONE tight control cluster, so adding the
+              CZ [Kč|€] toggle never reflows or breaks the row (non-interruptive). */}
+          <div className="nav-controls" style={{ display: "flex", alignItems: "center", gap: "0.55rem" }}>
           {/* Country switcher — dormant (renders null) until a 2nd market has data */}
           <CountrySwitcher lang={lang} />
           {/* Currency switcher — dormant (renders null) unless the viewed country's
@@ -578,6 +583,7 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
               color: lang === "sk" ? "#e8e8ed" : "#55555f",
               fontFamily: "inherit", fontSize: "inherit", transition: "all 0.2s",
             }}>SK</button>
+          </div>
           </div>
           {user ? (
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
