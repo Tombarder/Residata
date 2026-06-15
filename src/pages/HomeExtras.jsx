@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useMarketTotals, useHomeProjects, useTotalsList } from "../lib/useData";
+import { useMarketTotals, useHomeProjects, useTotalsList, useVelocityMature } from "../lib/useData";
 import { useCountry, countryName } from "../lib/useCountry";
 import { moneyFromEur, moneySymbol } from "../lib/money";
 import { useCurrency } from "../lib/useCurrency";
@@ -554,6 +554,7 @@ export function MarketPulse({ lang = "en", setCurrent }) {
   useCurrency(); // subscribe: re-render avg €/m² stat + project cards on currency toggle
   const { projects } = useHomeProjects();  // PERF Step 6: narrow column read (homepage only)
   const totals = useMarketTotals();
+  const velocityMature = useVelocityMature();  // gate "sold last month" until 30d history
 
   // Pull the hero numbers from the LIVE `market_totals` view — derived
   // on every read from flats_archive (latest month). Always fresh: the
@@ -635,7 +636,9 @@ export function MarketPulse({ lang = "en", setCurrent }) {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem", marginBottom: "3rem" }}>
         <Stat value={totalUnits} label={tTotal} />
         <Stat value={totalAvail} label={tActive} accent={green} />
-        <Stat value={soldLastMonth} label={tSoldMonth} accent="#f5a623" />
+        <Stat value={velocityMature ? soldLastMonth : null}
+              placeholder={velocityMature ? null : (lang === "sk" ? "zbierame históriu" : "building history")}
+              label={tSoldMonth} accent="#f5a623" />
         <Stat value={inv.ready ? Math.round(inv.value) : null} placeholder={inv.ready ? null : inv.text}
               suffix={inv.ready ? (lang === "sk" ? " mes." : " mo") : ""} label={tInventory} />
         <Stat value={avgEurM2 ? Math.round(moneyFromEur(avgEurM2)) : null} label={tEur} prefix="" suffix={` ${moneySymbol()}`} />
