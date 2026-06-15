@@ -3,6 +3,7 @@ import { useMarketTotals, useHomeProjects, useTotalsList } from "../lib/useData"
 import { useCountry, countryName } from "../lib/useCountry";
 import { moneyFromEur, moneySymbol } from "../lib/money";
 import { useCurrency } from "../lib/useCurrency";
+import { marketInventoryDisplay, fmtMonthsToSellout } from "../lib/absorption";
 // (imports already include useMarketTotals — we rely on its live view
 // instead of summing projects.total_units, which inflates the count for
 // projects like Bory/Slnečnice whose total_units is a manual registry
@@ -572,13 +573,17 @@ export function MarketPulse({ lang = "en", setCurrent }) {
   // homepage ticker up by ~5k vs. real data).
   const totalUnits = totals.unitsTracked;
   const totalAvail = totals.unitsAvailable;
-  const totalSold  = totals.unitsSold;
+  const soldLastMonth = totals.soldLastMonth;          // velocity, not the vanity cumulative
   const avgEurM2   = totals.avgPriceM2;
+  // months-of-inventory (market absorption) — fully plumbed; shows the live number once
+  // velocity coverage is mature, "waiting for more data" until then (see absorption.js).
+  const inv = marketInventoryDisplay(totalAvail, soldLastMonth, projects, lang);
 
   const label = lang === "sk" ? "Živé dáta z trhu" : "Live from the market";
   const tTotal = lang === "sk" ? "bytov sledovaných" : "units tracked";
   const tActive = lang === "sk" ? "voľných bytov" : "available now";
-  const tSold = lang === "sk" ? "predaných celkom" : "sold to date";
+  const tSoldMonth = lang === "sk" ? "predaných za mesiac" : "sold last month";
+  const tInventory = lang === "sk" ? "zásoba na trhu" : "market supply";
   const tEur = lang === "sk" ? `priemer ${moneySymbol()}/m²` : `avg ${moneySymbol()}/m²`;
   const topTitle = lang === "sk" ? "Najaktívnejšie projekty" : "Most active projects";
   const openAll = lang === "sk" ? "Všetky projekty →" : "View all projects →";
@@ -630,7 +635,9 @@ export function MarketPulse({ lang = "en", setCurrent }) {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem", marginBottom: "3rem" }}>
         <Stat value={totalUnits} label={tTotal} />
         <Stat value={totalAvail} label={tActive} accent={green} />
-        <Stat value={totalSold} label={tSold} accent="#f5a623" />
+        <Stat value={soldLastMonth} label={tSoldMonth} accent="#f5a623" />
+        <Stat value={inv.ready ? Math.round(inv.value) : null} placeholder={inv.ready ? null : inv.text}
+              suffix={inv.ready ? (lang === "sk" ? " mes." : " mo") : ""} label={tInventory} />
         <Stat value={avgEurM2 ? Math.round(moneyFromEur(avgEurM2)) : null} label={tEur} prefix="" suffix={` ${moneySymbol()}`} />
       </div>
 
@@ -653,17 +660,20 @@ export function MarketPulse({ lang = "en", setCurrent }) {
   );
 }
 
-function Stat({ value, label, prefix = "", suffix = "", accent = "#e8e8ed" }) {
+function Stat({ value, label, prefix = "", suffix = "", accent = "#e8e8ed", placeholder = null }) {
   const display = useAnimatedNumber(value);
   return (
     <div style={{ border: `1px solid ${border}`, borderRadius: 12, background: bg, padding: "1.5rem 1.5rem 1.25rem" }}>
       <div style={{
         fontSize: "2.4rem", fontWeight: 700, letterSpacing: "-0.03em",
-        fontFamily: mono, color: accent, lineHeight: 1.1,
+        fontFamily: mono, color: accent, lineHeight: 1.1, minHeight: "2.6rem",
+        display: "flex", alignItems: "center",
       }}>
-        {value == null ? "—" : (
-          <>{prefix}{display.toLocaleString("en-US").replace(/,/g, " ")}{suffix}</>
-        )}
+        {value == null
+          ? (placeholder
+              ? <span style={{ fontSize: "0.9rem", fontWeight: 500, color: dim, fontStyle: "italic", letterSpacing: 0 }}>⏳ {placeholder}</span>
+              : "—")
+          : (<>{prefix}{display.toLocaleString("en-US").replace(/,/g, " ")}{suffix}</>)}
       </div>
       <div style={{ fontSize: "0.78rem", color: dim, marginTop: "0.4rem", textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: mono }}>
         {label}
@@ -712,6 +722,9 @@ function ProjectMini({ project, setCurrent, lang }) {
           </div>
           <div style={{ fontSize: "0.65rem", color: dim, fontFamily: mono, marginTop: "0.3rem", letterSpacing: "0.05em" }}>
             {pct.toFixed(0)}% {lang === "sk" ? "predané" : "sold"}
+            {fmtMonthsToSellout(project.available_units, project.sold_last_month, lang) && (
+              <span style={{ color: green, fontWeight: 600 }}> · {fmtMonthsToSellout(project.available_units, project.sold_last_month, lang)}</span>
+            )}
           </div>
         </>
       )}
