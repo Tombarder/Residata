@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { useProjects, useFlatsArchive, useFlatsCurrent, useArchiveMonths, useArchiveDays, usePivotGrain, usePivotDistinct, fetchFlatsForProjects } from "../lib/useData";
+import { useProjects, useFlatsArchive, useFlatsCurrent, useArchiveMonths, useArchiveDays, usePivotGrain, usePivotDistinct, usePivotFieldStats, fetchFlatsForProjects } from "../lib/useData";
 import { useCountry } from "../lib/useCountry";
 import { useCapabilities } from "../lib/useCapabilities";
 import { moneyFromEur, moneySymbol } from "../lib/money";
@@ -640,6 +640,15 @@ function fieldUsesGrainValues(key) {
     && key !== "datum" && key !== "snapshot_month";
 }
 
+/* Continuous numeric fields whose range-filter popover gets its min/max/median from
+   the report_field_stats RPC (one fast call on the NATIVE column) instead of a
+   ~30k-row pull. (izby/poschodie are low-cardinality discrete dims that keep the
+   records path so their value-checkbox "in" mode still works.) */
+const STATS_RPC_FIELDS = new Set([
+  "cena_s_dph", "cena_bez_dph", "obytna_plocha", "celkova_plocha", "cena_na_m2_obytnej",
+]);
+function fieldUsesStatsRpc(key) { return STATS_RPC_FIELDS.has(key); }
+
 const _COMP_PREFIXES = ["cs", "cb", "ob", "ce", "iz", "po", "m2"];
 function emptyComp() {
   const c = { n: 0, avail: 0, sold: 0, res: 0, prer: 0, s_pw: 0, s_lw: 0 };
@@ -1197,7 +1206,8 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   useEffect(() => {
     if (!canViewAnalytics || forceRaw || !filterPopup) return;
     if (filterPopup.key === "datum" || filterPopup.key === "snapshot_month") return;
-    if (fieldUsesGrainValues(filterPopup.key)) return;
+    if (fieldUsesGrainValues(filterPopup.key)) return;   // grain serves its values
+    if (fieldUsesStatsRpc(filterPopup.key)) return;       // stats RPC serves its bounds
     setForceRaw(true);
     // eslint-disable-next-line react-hooks/set-state-in-effect
   }, [canViewAnalytics, forceRaw, filterPopup]);
@@ -1214,6 +1224,17 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
     months: fetchMonths,
     dates: fetchDates,
     stav: popupField === "stav" ? null : fetchStav,
+  });
+
+  // Server-side min/max/median/count for a continuous-numeric range filter popover —
+  // one report_field_stats RPC on the NATIVE column instead of a ~30k-row pull.
+  const popupUsesStats = !!popupField && fieldUsesStatsRpc(popupField);
+  const { stats: popupFieldStats, loading: popupStatsLoading } = usePivotFieldStats({
+    enabled: canViewAnalytics && popupUsesStats,
+    field: popupField,
+    months: fetchMonths,
+    dates: fetchDates,
+    stav: fetchStav,
   });
 
   // Render from the grain whenever the config is server-able — the table stays
@@ -1606,6 +1627,29 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
               records={EMPTY_RECORDS}
               distinctOverride={{ values: popupGrainValues, hasEmpty: popupGrainHasEmpty }}
               loading={popupGrainLoading}
+              fellBack={false}
+              otherFilterCount={0}
+              onChange={(patch) => updateFilter(filterPopup.key, patch)}
+              onClear={() => updateFilter(filterPopup.key, null)}
+              onClose={() => setFilterPopup(null)}
+              lang={lang}
+            />
+          );
+        }
+        // FAST PATH — continuous-numeric field: its range bounds (min/max/median)
+        // come from the report_field_stats RPC (NATIVE column, one call), so opening
+        // the range popover doesn't pull ~30k rows. (Applying the filter still loads
+        // records for the table — numeric ranges aren't server-able — but the popover
+        // itself is instant.)
+        if (popupUsesStats) {
+          return (
+            <FilterPopover
+              fieldKey={filterPopup.key}
+              filter={current}
+              anchorEl={filterPopup.anchorEl}
+              records={EMPTY_RECORDS}
+              statsOverride={popupFieldStats}
+              loading={popupStatsLoading}
               fellBack={false}
               otherFilterCount={0}
               onChange={(patch) => updateFilter(filterPopup.key, patch)}
@@ -3849,17 +3893,28 @@ function makeTicks(min, max, targetCount = 4) {
      · number      → range inputs + "include (prázdne)" toggle + optional
                      checkbox list when cardinality is small (<=40).
    Closes on Esc / outside click.                                   */
-function FilterPopover({ fieldKey, filter, anchorEl, records, distinctOverride = null, loading = false, fellBack = false, otherFilterCount = 0, onChange, onClear, onClose, lang }) {
+function FilterPopover({ fieldKey, filter, anchorEl, records, distinctOverride = null, statsOverride = null, loading = false, fellBack = false, otherFilterCount = 0, onChange, onClear, onClose, lang }) {
   const field = FIELDS[fieldKey];
   const computed = useMemo(
     () => distinctValuesForField(records, fieldKey),
     [records, fieldKey]
   );
-  // Grain fast-path: server-side distinct values override the records-derived list.
-  // A grain-served field is always categorical → isNumber:false, no range stats.
-  const { values: distinct, hasEmpty, isNumber, stats } = distinctOverride
-    ? { values: distinctOverride.values, hasEmpty: distinctOverride.hasEmpty, isNumber: false, stats: null }
-    : computed;
+  // Server-side fast paths override the records-derived list:
+  //  · distinctOverride (grain) → categorical value checkboxes ("in" mode).
+  //  · statsOverride (report_field_stats) → numeric range bounds ("between" mode),
+  //    no value list; nNull drives the "(prázdne)" toggle + the "X bez hodnoty" note.
+  let distinct, hasEmpty, isNumber, stats;
+  if (distinctOverride) {
+    distinct = distinctOverride.values; hasEmpty = distinctOverride.hasEmpty; isNumber = false; stats = null;
+  } else if (statsOverride) {
+    distinct = EMPTY_RECORDS; isNumber = true;
+    hasEmpty = (statsOverride.nNull || 0) > 0;
+    stats = statsOverride.min == null ? null
+      : { min: statsOverride.min, max: statsOverride.max, median: statsOverride.median,
+          count: statsOverride.count, distinct: 0, nNull: statsOverride.nNull };
+  } else {
+    ({ values: distinct, hasEmpty, isNumber, stats } = computed);
+  }
 
   // Local draft state so Apply commits and Cancel discards
   const initialMode = filter?.mode || (isNumber ? "between" : "in");
@@ -4064,7 +4119,7 @@ function FilterPopover({ fieldKey, filter, anchorEl, records, distinctOverride =
             <div style={{ marginTop: "0.65rem", fontSize: "0.74rem", color: dim, lineHeight: 1.5 }}>
               V dátach od <strong style={{ color: text, fontWeight: 500 }}>{fmt(stats.min)}</strong> do <strong style={{ color: text, fontWeight: 500 }}>{fmt(stats.max)}</strong>,
               medián <strong style={{ color: text, fontWeight: 500 }}>{fmt(stats.median)}</strong>.
-              {hasEmpty && <> {records.length - stats.count} záznamov bez hodnoty.</>}
+              {hasEmpty && <> {stats.nNull != null ? stats.nNull : records.length - stats.count} záznamov bez hodnoty.</>}
             </div>
           )}
           {hasEmpty && (
