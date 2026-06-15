@@ -777,6 +777,14 @@ const _fmtDec1  = (x) => (Math.round(x * 10) / 10).toLocaleString("en-US", { min
 
 function formatValue(value, fieldKey, agg) {
   if (value == null || !Number.isFinite(value)) return "—";
+  // Count aggregations are dimensionless ROW counts — they NEVER carry the
+  // field's unit and are NEVER currency-converted, whatever field they sit on
+  // (counting non-null prices is still a count, not a price). This MUST come
+  // before the money/% branches: otherwise count-of-a-€-field rendered the
+  // count as "300 €/m²" and even multiplied it by the FX rate in CZK view.
+  // (QA: "price per m2 → count shows 300 eur/m2".)
+  if (agg === "count" || agg === "count_distinct") return _fmtWhole(value);
+
   const f = FIELDS[fieldKey];
   const u = f?.unit;
   // Money fields store EUR — convert to the display currency + swap the unit.
@@ -786,7 +794,6 @@ function formatValue(value, fieldKey, agg) {
 
   if (isMoneyUnit(u)) return `${_fmtWhole(v)}${unit}`;                 // prices + €/m² → whole
   if (u === "%")      return `${_fmtDec1(v)}${unit}`;                  // percent → 1 decimal
-  if (agg === "count" || agg === "count_distinct") return _fmtWhole(v); // record counts → whole
   if (agg === "measure") return `${_fmtWhole(v)}${unit}`;             // sold/available counts → whole
   if (agg === "sum")     return `${_fmtWhole(v)}${unit}`;             // aggregate totals → whole
   return `${_fmtDec1(v)}${unit}`;                                     // area / rooms / floor (avg/min/max/median) → 1 decimal
@@ -1159,6 +1166,22 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
     if (canViewAnalytics && !configServerable && !forceRaw) setForceRaw(true);
     // eslint-disable-next-line react-hooks/set-state-in-effect
   }, [canViewAnalytics, configServerable, forceRaw]);
+
+  // Opening a filter popover ALSO needs raw records — the value-checkbox list is
+  // derived from `records`. In server-side mode records aren't loaded, so without
+  // this the popover shows an empty list, and a freshly-added (inactive) filter
+  // chip can NEVER be configured: isServerable ignores inactive filters → config
+  // stays server-able → forceRaw never flips → records stay empty → the list stays
+  // empty → the filter can't be activated. A deadlock. Pulling on popover-open
+  // breaks it (the table stays on the grain meanwhile — useGrain is unaffected).
+  // datum/snapshot_month synthesize their options from the light archive lists,
+  // so they don't need the pull.
+  useEffect(() => {
+    if (!canViewAnalytics || forceRaw || !filterPopup) return;
+    if (filterPopup.key === "datum" || filterPopup.key === "snapshot_month") return;
+    setForceRaw(true);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+  }, [canViewAnalytics, forceRaw, filterPopup]);
 
   // Render from the grain whenever the config is server-able — the table stays
   // instant. forceRaw loads records in the background to back a drill-down modal
@@ -1567,12 +1590,18 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
         const hasContextualValues = probe.values.length > 0 || probe.hasEmpty;
         const passedRecords = hasContextualValues ? contextual : baseRecords;
         const fellBack = !hasContextualValues && contextual.length !== baseRecords.length;
+        // Records still streaming in for a field that needs them (the popover-open
+        // effect just flipped forceRaw) → show a "loading values" state instead of
+        // a bare "no matches", so it never looks broken/empty.
+        const needsRecords = filterPopup.key !== "datum" && filterPopup.key !== "snapshot_month";
+        const loadingValues = needsRecords && records.length === 0;
         return (
           <FilterPopover
             fieldKey={filterPopup.key}
             filter={current}
             anchorEl={filterPopup.anchorEl}
             records={passedRecords}
+            loading={loadingValues}
             fellBack={fellBack}
             otherFilterCount={otherFilters.filter(isFilterActive).length}
             onChange={(patch) => updateFilter(filterPopup.key, patch)}
@@ -3081,8 +3110,14 @@ function axisTick(value, measureField) {
    Different from formatValue() (used in tables + axis ticks) which
    keeps 1 decimal for averages/medians of small-range fields like
    izby/poschodie. Tooltips trade that precision for legibility. */
-function formatValueWhole(value, fieldKey, _agg) {
+function formatValueWhole(value, fieldKey, agg) {
   if (value == null || !Number.isFinite(value)) return "—";
+  // Count aggregations are dimensionless row counts — bare integer, no unit,
+  // no currency conversion (mirrors formatValue so a count-of-€ tooltip never
+  // reads "300 €/m²"). Must precede the money/% branches below.
+  if (agg === "count" || agg === "count_distinct") {
+    return Math.round(value).toLocaleString("en-US").replace(/,/g, " ");
+  }
   const f = FIELDS[fieldKey];
   // Money fields store EUR — convert to the display currency + swap the unit.
   if (isMoneyUnit(f?.unit)) value = moneyFromEur(value);
@@ -3759,7 +3794,7 @@ function makeTicks(min, max, targetCount = 4) {
      · number      → range inputs + "include (prázdne)" toggle + optional
                      checkbox list when cardinality is small (<=40).
    Closes on Esc / outside click.                                   */
-function FilterPopover({ fieldKey, filter, anchorEl, records, fellBack = false, otherFilterCount = 0, onChange, onClear, onClose, lang }) {
+function FilterPopover({ fieldKey, filter, anchorEl, records, loading = false, fellBack = false, otherFilterCount = 0, onChange, onClear, onClose, lang }) {
   const field = FIELDS[fieldKey];
   const { values: distinct, hasEmpty, isNumber, stats } = useMemo(
     () => distinctValuesForField(records, fieldKey),
@@ -3897,6 +3932,19 @@ function FilterPopover({ fieldKey, filter, anchorEl, records, fellBack = false, 
         {field?.label || fieldKey}
       </div>
 
+      {/* Loading notice — raw records are still streaming in to back this
+          popover's value list (server-side mode loads them lazily on open).
+          Shown so an in-flight popover never looks like a broken empty list. */}
+      {loading && (
+        <div style={{
+          marginBottom: "0.85rem", padding: "0.5rem 0.7rem",
+          background: "rgba(0,229,160,0.06)", border: `1px solid ${green}33`,
+          borderRadius: 6, fontSize: "0.78rem", color: dim, lineHeight: 1.4,
+        }}>
+          {lang === "sk" ? "Načítavam hodnoty…" : "Loading values…"}
+        </div>
+      )}
+
       {/* Fallback notice — shown only when we reverted to the full
           record set because other filters were too narrow. Tells the
           user the values they see come from ALL data, so picking one
@@ -4013,7 +4061,7 @@ function FilterPopover({ fieldKey, filter, anchorEl, records, fellBack = false, 
             )}
             {shown.length === 0 ? (
               <div style={{ padding: "0.75rem", fontSize: "0.8rem", color: dim, textAlign: "center" }}>
-                Žiadne zhody.
+                {loading ? (lang === "sk" ? "Načítavam…" : "Loading…") : "Žiadne zhody."}
               </div>
             ) : shown.map(v => (
               <CheckboxRow
