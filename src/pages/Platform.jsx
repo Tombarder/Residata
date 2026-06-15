@@ -848,6 +848,7 @@ function PlatformDashboard({ lang, setCurrent }) {
   const { can, baseTier, trialActive, trialDaysLeft } = caps;
   const { projects } = useProjects();
   const marketTotals = useMarketTotals();
+  const velocityMature = useVelocityMature();   // gate "Sold 30d" KPI until 30d of velocity history
   // F-026: gate on effective tier (caps.tier), not raw baseTier. Admin-granted
   // paid users have baseTier='free' but caps.tier='paid' — the old check
   // pitched a 7-day trial to people who already have permanent paid access.
