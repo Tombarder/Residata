@@ -3,6 +3,7 @@ import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
 import { useProjects, useProjectFlats, useProjectSnapshots, useMarketTotals, useTotalsList } from "../lib/useData";
 import { moneyFromEur, moneySymbol } from "../lib/money";
+import { fmtSelloutValue } from "../lib/absorption";
 import { useCurrency } from "../lib/useCurrency";
 import { useCountry } from "../lib/useCountry";
 import { supabase } from "../lib/supabase";
@@ -720,6 +721,11 @@ function ProjectAggregateOnly({ project, lang, t, canVelocity }) {
     ...(canVelocity && project.sold_last_month != null ? [{
       label: lang === "sk" ? "Predané (30d)" : "Sold (30d)",
       value: project.sold_last_month > 0 ? `+${project.sold_last_month}` : "0",
+      accent: green,
+    }] : []),
+    ...(canVelocity && fmtSelloutValue(project.available_units, project.sold_last_month, lang) ? [{
+      label: lang === "sk" ? "Vypredané o" : "Sells out in",
+      value: fmtSelloutValue(project.available_units, project.sold_last_month, lang),
       accent: green,
     }] : []),
   ];
