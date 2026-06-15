@@ -1187,6 +1187,65 @@ export function usePivotGrain({ enabled = false, months = null, dates = null, di
   return { grain, loading };
 }
 
+// Cache for server-side distinct filter values — one fast pivot_grain(p_dims=[field])
+// call instead of pulling the whole archive (~30k rows) just to populate a dropdown.
+const _pivotDistinctCache = new Map();
+
+/* usePivotDistinct — distinct values of ONE categorical field, server-side.
+   Calls pivot_grain grouped by [field]: each grain row is {d:[value], m:{n}}, so the
+   row keys ARE the field's distinct values, computed by the SAME server CASE the
+   client accessor mirrors (so they match what records-side filtering compares).
+   Returns the same {values, hasEmpty} shape distinctValuesForField() yields for a
+   TEXT field, so FilterPopover can consume it interchangeably — WITHOUT a records pull. */
+export function usePivotDistinct({ enabled = false, field = null, months = null, dates = null, stav = null } = {}) {
+  const { loading: authLoading, user, profile } = useAuth();
+  const { country } = useCountry();
+  const key = enabled && field
+    ? `${user?.id || "anon"}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}::${country}::${field}::${(months || []).join(",")}::${(dates || []).join(",")}::${(stav || []).join(",")}`
+    : null;
+  const [result, setResult] = useState(() => (key && _pivotDistinctCache.has(key)) ? _pivotDistinctCache.get(key) : { values: [], hasEmpty: false });
+  const [loading, setLoading] = useState(!!enabled && !(key && _pivotDistinctCache.has(key)));
+  useEffect(() => {
+    if (!enabled || !field) { setLoading(false); return; }
+    if (!isSupabaseReady() || authLoading) return;
+    if (_pivotDistinctCache.has(key)) { setResult(_pivotDistinctCache.get(key)); setLoading(false); return; }
+    let cancelled = false;
+    setLoading(true);
+    (async () => {
+      const { data, error } = await supabase.rpc("pivot_grain", {
+        p_country: _pCountry(country),
+        p_months: months && months.length ? months : null,
+        p_dates: dates && dates.length ? dates : null,
+        p_dims: [field],
+        p_stav: stav && stav.length ? stav : null,
+      });
+      if (cancelled) return;
+      if (error) { console.error("[usePivotDistinct]", error); setResult({ values: [], hasEmpty: false }); setLoading(false); return; }
+      const rows = Array.isArray(data) ? data : [];
+      // Mirror distinctValuesForField()'s TEXT branch: dedupe case-insensitively on
+      // trimmed lowercase, keep first-seen casing, sort locale-numeric, track empties.
+      let hasEmpty = false;
+      const seen = new Set();
+      const strs = [];
+      for (const g of rows) {
+        const v = g && g.d ? g.d[0] : null;
+        if (v == null || v === "") { hasEmpty = true; continue; }
+        const s = String(v);
+        const k = s.trim().toLowerCase();
+        if (seen.has(k)) continue;
+        seen.add(k); strs.push(s);
+      }
+      strs.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+      const out = { values: strs, hasEmpty };
+      _pivotDistinctCache.set(key, out);
+      setResult(out);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [enabled, key, authLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+  return { values: result.values, hasEmpty: result.hasEmpty, loading };
+}
+
 // ── Byt v čase (UnitTracker) server-side data — Phase 1 perf/scaling fix ──────
 //
 // Replaces the old whole-archive pull (useFlatsArchive, ~217k rows / 30-60s) for
