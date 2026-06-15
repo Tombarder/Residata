@@ -1308,6 +1308,57 @@ export function usePivotDistinct({ enabled = false, field = null, months = null,
   return { values: result.values, hasEmpty: result.hasEmpty, loading };
 }
 
+// Cache for server-side numeric-field stats (min/max/median/count) — so a numeric
+// range filter popover opens instantly instead of pulling ~30k rows for its bounds.
+const _pivotStatsCache = new Map();
+
+/* usePivotFieldStats — min/max/median/count for ONE numeric field, server-side, via
+   the report_field_stats RPC. Stats come from the NATIVE columns (cena_s_dph, not
+   the EUR copy) so the popover's range hints stay in the same units the records-path
+   filter compares. Scope mirrors the table (country/month/date/stav). SECURITY
+   INVOKER → RLS gates it (anon gets nulls). */
+export function usePivotFieldStats({ enabled = false, field = null, months = null, dates = null, stav = null } = {}) {
+  const { loading: authLoading, user, profile } = useAuth();
+  const { country } = useCountry();
+  const key = enabled && field
+    ? `${user?.id || "anon"}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}::${country}::${field}::${(months || []).join(",")}::${(dates || []).join(",")}::${(stav || []).join(",")}`
+    : null;
+  const [stats, setStats] = useState(() => (key && _pivotStatsCache.has(key)) ? _pivotStatsCache.get(key) : null);
+  const [loading, setLoading] = useState(!!enabled && !(key && _pivotStatsCache.has(key)));
+  useEffect(() => {
+    if (!enabled || !field) { setLoading(false); return; }
+    if (!isSupabaseReady() || authLoading) return;
+    if (_pivotStatsCache.has(key)) { setStats(_pivotStatsCache.get(key)); setLoading(false); return; }
+    let cancelled = false;
+    setLoading(true);
+    (async () => {
+      const { data, error } = await supabase.rpc("report_field_stats", {
+        p_field: field,
+        p_country: _pCountry(country),
+        p_months: months && months.length ? months : null,
+        p_dates: dates && dates.length ? dates : null,
+        p_stav: stav && stav.length ? stav : null,
+      });
+      if (cancelled) return;
+      if (error || !data || data.min == null) {   // null min ⇒ no rows visible (anon/empty)
+        if (error) console.error("[usePivotFieldStats]", error);
+        const empty = { min: null, max: null, median: null, count: 0, nNull: 0 };
+        if (!error) _pivotStatsCache.set(key, empty);
+        setStats(empty); setLoading(false); return;
+      }
+      const s = {
+        min: Number(data.min), max: Number(data.max),
+        median: data.median == null ? null : Number(data.median),
+        count: Number(data.count || 0), nNull: Number(data.n_null || 0),
+      };
+      _pivotStatsCache.set(key, s);
+      setStats(s); setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [enabled, key, authLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+  return { stats, loading };
+}
+
 // ── Byt v čase (UnitTracker) server-side data — Phase 1 perf/scaling fix ──────
 //
 // Replaces the old whole-archive pull (useFlatsArchive, ~217k rows / 30-60s) for
