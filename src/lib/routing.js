@@ -19,6 +19,7 @@
 const APP_PAGE_TO_PATH = {
   "App:Dashboard": "/app",
   "App:Projects":  "/app/projects",
+  "App:Map":       "/app/map",
   "App:Analytics": "/app/analytics",
   "App:Reports":   "/app/reports",
   "App:Exports":   "/app/exports",

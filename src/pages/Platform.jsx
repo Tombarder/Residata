@@ -11,7 +11,7 @@
  * render with a small 🔒 icon and clicking them lands on an upgrade card
  * instead of the actual feature. Admin-only items are hidden for non-admins.
  */
-import { Component, useState, useEffect } from "react";
+import { Component, useState, useEffect, lazy, Suspense } from "react";
 import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
 import { useProjects, useMarketTotals, useVelocityMature } from "../lib/useData";
@@ -114,11 +114,21 @@ const IconSparkle = () => (
     <path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/>
   </svg>
 );
+const IconMap = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <polygon points="1 6 8 3 16 6 23 3 23 18 16 21 8 18 1 21 1 6"/>
+    <line x1="8" y1="3" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="21"/>
+  </svg>
+);
+
+// Map view is lazy-loaded — MapLibre is a heavy dep we only want on /app/map.
+const MapView = lazy(() => import("./MapView"));
 
 const NAV = [
   { group: "main", items: [
     { page: "App:Dashboard", label: { en: "Dashboard",  sk: "Dashboard" }, Icon: IconHome },
     { page: "App:Projects",  label: { en: "Projects",   sk: "Projekty"  }, Icon: IconGrid },
+    { page: "App:Map",       label: { en: "Map view",   sk: "Mapa"      }, Icon: IconMap },
     { page: "App:Analytics", label: { en: "Analytics",  sk: "Analytika" }, Icon: IconChart,    requires: "view_analytics" },
     { page: "App:UnitTimeline", label: { en: "Unit timeline", sk: "Byt v čase" }, Icon: IconClock, requires: "view_analytics" },
     { page: "App:Reports",   label: { en: "Reports",    sk: "Reporty"   }, Icon: IconDoc,      requires: "view_monthly_reports" },
@@ -462,6 +472,7 @@ function TopBar({ page, lang, setLang, tier }) {
   const titles = {
     "App:Dashboard": { en: "Dashboard",       sk: "Dashboard"    },
     "App:Projects":  { en: "Projects",        sk: "Projekty"     },
+    "App:Map":       { en: "Map view",        sk: "Mapa"         },
     "App:Analytics":    { en: "Analytics",     sk: "Analytika"    },
     "App:UnitTimeline": { en: "Unit timeline", sk: "Byt v čase"   },
     "App:Reports":      { en: "Reports",       sk: "Reporty"      },
@@ -622,6 +633,7 @@ function PageContent({ page, projectId, lang, setCurrent, openLogin }) {
   // Gated pages with an UpgradeCard fallback for users who lack the capability.
   if (page === "App:Dashboard")  return <PlatformDashboard lang={lang} setCurrent={setCurrent} />;
   if (page === "App:Projects")   return <PlatformProjects lang={lang} setCurrent={setCurrent} openLogin={openLogin} />;
+  if (page === "App:Map")        return <Suspense fallback={<div style={{ padding: "2rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.8rem" }}>{lang === "sk" ? "Načítavam mapu…" : "Loading map…"}</div>}><MapView lang={lang} setCurrent={setCurrent} /></Suspense>;
   if (page === "App:Analytics")  return <Gated require="view_analytics"       lang={lang} setCurrent={setCurrent}><LiveAnalytics lang={lang} setCurrent={setCurrent} openLogin={openLogin} /></Gated>;
   if (page === "App:UnitTimeline") return <Gated require="view_analytics"     lang={lang} setCurrent={setCurrent}><UnitTracker lang={lang} setCurrent={setCurrent} /></Gated>;
   if (page === "App:Reports")    return <Gated require="view_monthly_reports" lang={lang} setCurrent={setCurrent}><ReportsPage lang={lang} /></Gated>;
