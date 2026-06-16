@@ -39,6 +39,12 @@ const MAP_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.j
 const FALLBACK_CENTER = [18.5, 48.7];
 const FALLBACK_ZOOM = 6.2;
 
+// Remembered camera (center/zoom/bearing/pitch) so returning from a project
+// detail reopens the map exactly where you left it. Module-level on purpose: it
+// survives the component unmount/remount that navigation causes, but is wiped on
+// a full page reload → back to the default fitted view, as intended.
+let savedView = null;
+
 function buildFeatures(projects, coords) {
   const feats = [];
   for (const p of projects) {
@@ -119,15 +125,28 @@ export default function MapView({ lang = "en", setCurrent }) {
   // ── Initialise the map once ──
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
+    // Restore the camera from the last time the map was open this session.
+    const hadSavedView = savedView != null;
     const map = new maplibregl.Map({
       container: containerRef.current,
       style: MAP_STYLE,
-      center: FALLBACK_CENTER,
-      zoom: FALLBACK_ZOOM,
+      center: hadSavedView ? savedView.center : FALLBACK_CENTER,
+      zoom: hadSavedView ? savedView.zoom : FALLBACK_ZOOM,
+      bearing: hadSavedView ? savedView.bearing : 0,
+      pitch: hadSavedView ? savedView.pitch : 0,
       attributionControl: true,
     });
     mapRef.current = map;
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+    // Remember the camera on every settle, so navigating away + back restores it.
+    map.on("moveend", () => {
+      savedView = {
+        center: map.getCenter().toArray(),
+        zoom: map.getZoom(),
+        bearing: map.getBearing(),
+        pitch: map.getPitch(),
+      };
+    });
 
     map.on("load", () => {
       if (mapRef.current !== map) return;  // component unmounted before the style finished loading
@@ -165,9 +184,12 @@ export default function MapView({ lang = "en", setCurrent }) {
       });
 
       readyRef.current = true;
-      // Data may not have arrived yet — fit now if it has, otherwise the data
-      // effect below fits as soon as it does (handles the load-before-data race).
-      if (featuresRef.current.features.length) {
+      if (hadSavedView) {
+        // Restored a previous camera — don't auto-fit over where the user left off.
+        fitKeyRef.current = countryRef.current;
+      } else if (featuresRef.current.features.length) {
+        // Data may not have arrived yet — fit now if it has, otherwise the data
+        // effect below fits as soon as it does (handles the load-before-data race).
         fitToData(map, featuresRef.current, false);
         fitKeyRef.current = countryRef.current;
       }
