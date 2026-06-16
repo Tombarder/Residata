@@ -194,13 +194,58 @@ export default function MapView({ lang = "en", setCurrent }) {
         fitKeyRef.current = countryRef.current;
       }
 
-      // Zoom into a cluster on click
+      // Click a cluster → open a scrollable list of the projects inside it, so
+      // users can see and open each one WITHOUT zooming all the way in
+      // (the pattern Zillow / Redfin / Idealista use). A "Zoom in" button is
+      // offered for those who still want to drill the map down.
       map.on("click", "clusters", (e) => {
         const f = map.queryRenderedFeatures(e.point, { layers: ["clusters"] })[0];
         if (!f) return;
-        map.getSource("projects").getClusterExpansionZoom(f.properties.cluster_id, (err, z) => {
-          if (!err) map.easeTo({ center: f.geometry.coordinates, zoom: z });
-        });
+        const clusterId = f.properties.cluster_id;
+        const count = f.properties.point_count;
+        const coords = f.geometry.coordinates;
+        const src = map.getSource("projects");
+        src.getClusterLeaves(clusterId, 500, 0).then((leaves) => {
+          if (!leaves) return;
+          const el = document.createElement("div");
+          el.style.width = "284px";
+          const header =
+            `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">` +
+            `<span style="font-weight:600;font-size:0.85rem;color:${textLight}">${count} ${lang === "sk" ? "projektov tu" : "projects here"}</span>` +
+            `<button id="mv-zoom" style="font-size:0.68rem;color:${green};background:transparent;border:1px solid ${green}55;border-radius:6px;padding:3px 8px;cursor:pointer;white-space:nowrap">${lang === "sk" ? "Priblížiť" : "Zoom in"}</button>` +
+            `</div>`;
+          const rows = leaves.map((lf) => {
+            const p = lf.properties;
+            const loc = [p.city, p.district].filter(Boolean).join(" · ");
+            const price = Number(p.ppm2) > 0 ? `€${Number(p.ppm2).toLocaleString("sk-SK")}/m²` : "—";
+            const dotc = Number(p.available) > 0 ? green : greyPt;
+            return (
+              `<button class="mv-row" data-id="${escapeHtml(String(p.id))}">` +
+              `<span style="width:8px;height:8px;border-radius:50%;background:${dotc};flex:none"></span>` +
+              `<span style="flex:1;min-width:0">` +
+              `<span style="display:block;font-size:0.8rem;color:${textLight};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(p.name)}</span>` +
+              `<span style="display:block;font-size:0.68rem;color:${dim};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(loc)}</span>` +
+              `</span>` +
+              `<span style="font-family:${mono};font-size:0.64rem;color:${dim};text-align:right;flex:none;line-height:1.35">${p.available}/${p.total}<br>${price}</span>` +
+              `</button>`
+            );
+          }).join("");
+          el.innerHTML = header + `<div style="max-height:46vh;overflow-y:auto;margin:0 -5px">${rows}</div>`;
+          el.querySelectorAll(".mv-row").forEach((btn) => {
+            btn.onclick = () => {
+              if (popupRef.current) popupRef.current.remove();
+              setCurrentRef.current && setCurrentRef.current("App:ProjectDetail:" + btn.dataset.id);
+            };
+          });
+          const zb = el.querySelector("#mv-zoom");
+          if (zb) zb.onclick = () => {
+            if (popupRef.current) { popupRef.current.remove(); popupRef.current = null; }
+            src.getClusterExpansionZoom(clusterId).then((z) => map.easeTo({ center: coords, zoom: z })).catch(() => {});
+          };
+          if (popupRef.current) popupRef.current.remove();
+          popupRef.current = new maplibregl.Popup({ closeButton: true, maxWidth: "300px", offset: 14 })
+            .setLngLat(coords).setDOMContent(el).addTo(map);
+        }).catch(() => {});
       });
 
       // Popup on a project point
@@ -315,6 +360,11 @@ export default function MapView({ lang = "en", setCurrent }) {
         .maplibregl-popup-tip { border-top-color:${bg2} !important; border-bottom-color:${bg2} !important; }
         .maplibregl-popup-close-button { color:${dim}; font-size:16px; padding:2px 6px; }
         .maplibregl-ctrl-attrib { font-size:9px; }
+        .mv-row { display:flex; align-items:center; gap:9px; width:100%; text-align:left;
+          background:transparent; border:none; border-bottom:1px solid rgba(255,255,255,0.06);
+          padding:8px 5px; cursor:pointer; font-family:inherit; }
+        .mv-row:last-child { border-bottom:none; }
+        .mv-row:hover { background:rgba(0,229,160,0.09); }
       `}</style>
     </div>
   );
