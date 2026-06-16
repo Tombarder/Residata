@@ -148,6 +148,12 @@ export default function MapView({ lang = "en", setCurrent }) {
       };
     });
 
+    // Keep the canvas sized to its container even if the layout changes
+    // (MapLibre only auto-tracks WINDOW resize, not container-only changes such
+    // as a sidebar toggle, split view, or the map mounting before layout settles).
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => map.resize()) : null;
+    if (ro && containerRef.current) ro.observe(containerRef.current);
+
     map.on("load", () => {
       if (mapRef.current !== map) return;  // component unmounted before the style finished loading
       map.addSource("projects", {
@@ -198,7 +204,7 @@ export default function MapView({ lang = "en", setCurrent }) {
       // smaller bubbles / individual pins. MapLibre recomputes clustering at the
       // new zoom, so each click drills down until you reach individual projects
       // (standard cluster-expansion behaviour — Google Maps / Leaflet style).
-      map.on("click", "clusters", (e) => {
+      const expandCluster = (e) => {
         const f = map.queryRenderedFeatures(e.point, { layers: ["clusters"] })[0];
         if (!f) return;
         const src = map.getSource("projects");
@@ -211,7 +217,9 @@ export default function MapView({ lang = "en", setCurrent }) {
             });
           })
           .catch(() => {});
-      });
+      };
+      map.on("click", "clusters", expandCluster);
+      map.on("click", "cluster-count", expandCluster);  // clicking the number zooms too
 
       // Popup on a project point
       map.on("click", "points", (e) => {
@@ -237,13 +245,14 @@ export default function MapView({ lang = "en", setCurrent }) {
           .setLngLat(f.geometry.coordinates).setDOMContent(el).addTo(map);
       });
 
-      ["clusters", "points"].forEach((layer) => {
+      ["clusters", "cluster-count", "points"].forEach((layer) => {
         map.on("mouseenter", layer, () => { map.getCanvas().style.cursor = "pointer"; });
         map.on("mouseleave", layer, () => { map.getCanvas().style.cursor = ""; });
       });
     });
 
     return () => {
+      if (ro) ro.disconnect();
       if (popupRef.current) { popupRef.current.remove(); popupRef.current = null; }
       map.remove(); mapRef.current = null; readyRef.current = false;
     };
