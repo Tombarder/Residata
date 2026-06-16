@@ -72,8 +72,11 @@ export default function MapView({ lang = "en", setCurrent }) {
   const readyRef = useRef(false);
   const featuresRef = useRef({ type: "FeatureCollection", features: [] });
   const setCurrentRef = useRef(setCurrent);
-  const fittedCountryRef = useRef(null);
+  const countryRef = useRef(country);   // latest country, readable inside the once-mounted load handler
+  const fitKeyRef = useRef(null);        // country we've already auto-fitted to (once data was present)
+  const popupRef = useRef(null);         // single active popup — clicking pins must not stack popups
   setCurrentRef.current = setCurrent;
+  countryRef.current = country;
 
   // ── Load coordinates (anon, public read-only view) ──
   useEffect(() => {
@@ -110,7 +113,7 @@ export default function MapView({ lang = "en", setCurrent }) {
     }
     const b = new maplibregl.LngLatBounds();
     data.features.forEach((f) => b.extend(f.geometry.coordinates));
-    if (!b.isEmpty()) map[animate ? "fitBounds" : "fitBounds"](b, { padding: 70, maxZoom: 13, duration: animate ? 600 : 0 });
+    if (!b.isEmpty()) map.fitBounds(b, { padding: 70, maxZoom: 13, duration: animate ? 600 : 0 });
   }
 
   // ── Initialise the map once ──
@@ -127,6 +130,7 @@ export default function MapView({ lang = "en", setCurrent }) {
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
 
     map.on("load", () => {
+      if (mapRef.current !== map) return;  // component unmounted before the style finished loading
       map.addSource("projects", {
         type: "geojson",
         data: featuresRef.current,
@@ -161,8 +165,12 @@ export default function MapView({ lang = "en", setCurrent }) {
       });
 
       readyRef.current = true;
-      fitToData(map, featuresRef.current, false);
-      fittedCountryRef.current = country;
+      // Data may not have arrived yet — fit now if it has, otherwise the data
+      // effect below fits as soon as it does (handles the load-before-data race).
+      if (featuresRef.current.features.length) {
+        fitToData(map, featuresRef.current, false);
+        fitKeyRef.current = countryRef.current;
+      }
 
       // Zoom into a cluster on click
       map.on("click", "clusters", (e) => {
@@ -192,7 +200,8 @@ export default function MapView({ lang = "en", setCurrent }) {
           `${lang === "sk" ? "Otvoriť projekt" : "Open project"} →</button>`;
         const openBtn = el.querySelector("#mv-open");
         if (openBtn) openBtn.onclick = () => { setCurrentRef.current && setCurrentRef.current("App:ProjectDetail:" + p.id); };
-        new maplibregl.Popup({ closeButton: true, maxWidth: "260px", offset: 12 })
+        if (popupRef.current) popupRef.current.remove();
+        popupRef.current = new maplibregl.Popup({ closeButton: true, maxWidth: "260px", offset: 12 })
           .setLngLat(f.geometry.coordinates).setDOMContent(el).addTo(map);
       });
 
@@ -202,25 +211,30 @@ export default function MapView({ lang = "en", setCurrent }) {
       });
     });
 
-    return () => { map.remove(); mapRef.current = null; readyRef.current = false; };
+    return () => {
+      if (popupRef.current) { popupRef.current.remove(); popupRef.current = null; }
+      map.remove(); mapRef.current = null; readyRef.current = false;
+    };
   }, []);  // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Push data updates into the map; refit when the country changes ──
+  // ── Push data updates into the map; auto-fit on first data + on country change ──
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !readyRef.current) return;
     const src = map.getSource("projects");
     if (src) src.setData(fc);
-    if (fittedCountryRef.current !== country) {
-      fitToData(map, fc, true);
-      fittedCountryRef.current = country;
+    // Fit when we actually have points AND haven't yet fitted for this country.
+    // Covers the common race where the map loads before the data arrives.
+    if (fc.features.length && fitKeyRef.current !== country) {
+      fitToData(map, fc, fitKeyRef.current !== null);
+      fitKeyRef.current = country;
     }
   }, [fc, country]);
 
   const isLoading = loading || coords === null;
 
   return (
-    <div style={{ height: "calc(100vh - 64px)", display: "flex", flexDirection: "column", background: bg2 }}>
+    <div style={{ height: "calc(100dvh - 64px)", display: "flex", flexDirection: "column", background: bg2 }}>
       {/* Header strip */}
       <div style={{
         display: "flex", alignItems: "center", gap: "1rem", flexWrap: "wrap",
