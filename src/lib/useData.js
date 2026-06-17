@@ -1213,30 +1213,28 @@ export function useArchiveDays() {
 }
 
 let _pivotGrainCache = new Map();
-/** Server-aggregated pivot grain rows [{d:[dimVals], m:{components}}] for the given
- *  dims + time scope. enabled=false → no fetch (returns null). RLS-gated, cached. */
-export function usePivotGrain({ enabled = false, months = null, dates = null, dims = [], stav = null } = {}) {
+/** Server-aggregated pivot grain rows [{d:[dimVals], m:{components}}] for a full
+ *  analytics_pivot spec ({dims, filters, filters_not, ranges, nulls, mode, …}).
+ *  The spec is built in PivotV2 (buildPivotSpec) — ALL filters are applied server-side
+ *  now, so any-dimension filtering is instant (no browser record pull). enabled=false →
+ *  no fetch (returns null). RLS-gated (mode 'archive' is paid/chosen-project gated in the
+ *  RPC, mirroring flats_archive). Cached by user+tier+chosen+spec. */
+export function usePivotGrain({ enabled = false, spec = null } = {}) {
   const { loading: authLoading, user, profile } = useAuth();
-  const { country } = useCountry();
-  const key = enabled
-    ? `${user?.id || "anon"}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}::${country}::${(months || []).join(",")}::${(dates || []).join(",")}::${(dims || []).join(",")}::${(stav || []).join(",")}`
+  const specKey = spec ? JSON.stringify(spec) : "";
+  const key = enabled && spec
+    ? `${user?.id || "anon"}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}::${specKey}`
     : null;
   const [grain, setGrain] = useState(key && _pivotGrainCache.has(key) ? _pivotGrainCache.get(key) : null);
   const [loading, setLoading] = useState(!!enabled && !(key && _pivotGrainCache.has(key)));
   useEffect(() => {
-    if (!enabled) { setGrain(null); setLoading(false); return; }
+    if (!enabled || !spec) { setGrain(null); setLoading(false); return; }
     if (!isSupabaseReady() || authLoading) return;
     if (_pivotGrainCache.has(key)) { setGrain(_pivotGrainCache.get(key)); setLoading(false); return; }
     let cancelled = false;
     setLoading(true);
     (async () => {
-      const { data, error } = await supabase.rpc("pivot_grain", {
-        p_country: _pCountry(country),
-        p_months: months && months.length ? months : null,
-        p_dates: dates && dates.length ? dates : null,
-        p_dims: dims || [],
-        p_stav: stav && stav.length ? stav : null,
-      });
+      const { data, error } = await supabase.rpc("analytics_pivot", { p_spec: spec });
       if (cancelled) return;
       if (error) { console.error("[usePivotGrain]", error); setGrain([]); setLoading(false); return; }
       const arr = Array.isArray(data) ? data : [];
@@ -1262,8 +1260,19 @@ const _pivotDistinctCache = new Map();
 export function usePivotDistinct({ enabled = false, field = null, months = null, dates = null, stav = null } = {}) {
   const { loading: authLoading, user, profile } = useAuth();
   const { country } = useCountry();
+  // One analytics_pivot(dims=[field]) call: each grain row is {d:[value], m:{…}}, so the
+  // row keys ARE the field's distinct values. Scope mirrors the table (country/month/date,
+  // and stav for OTHER fields — a field's own value list is never narrowed by itself).
+  const spec = enabled && field ? (() => {
+    const filters = {};
+    if (!isAllCountries(country)) filters.country = [country];
+    if (months && months.length) filters.snapshot_month = months.map(String);
+    if (dates && dates.length) filters.datum = dates.map(String);
+    if (stav && stav.length && field !== "stav") filters.stav = stav.map(String);
+    return { dims: [field], mode: (months?.length || dates?.length) ? "archive" : "latest", filters };
+  })() : null;
   const key = enabled && field
-    ? `${user?.id || "anon"}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}::${country}::${field}::${(months || []).join(",")}::${(dates || []).join(",")}::${(stav || []).join(",")}`
+    ? `${user?.id || "anon"}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}::${JSON.stringify(spec)}`
     : null;
   const [result, setResult] = useState(() => (key && _pivotDistinctCache.has(key)) ? _pivotDistinctCache.get(key) : { values: [], hasEmpty: false });
   const [loading, setLoading] = useState(!!enabled && !(key && _pivotDistinctCache.has(key)));
@@ -1274,13 +1283,7 @@ export function usePivotDistinct({ enabled = false, field = null, months = null,
     let cancelled = false;
     setLoading(true);
     (async () => {
-      const { data, error } = await supabase.rpc("pivot_grain", {
-        p_country: _pCountry(country),
-        p_months: months && months.length ? months : null,
-        p_dates: dates && dates.length ? dates : null,
-        p_dims: [field],
-        p_stav: stav && stav.length ? stav : null,
-      });
+      const { data, error } = await supabase.rpc("analytics_pivot", { p_spec: spec });
       if (cancelled) return;
       if (error) { console.error("[usePivotDistinct]", error); setResult({ values: [], hasEmpty: false }); setLoading(false); return; }
       const rows = Array.isArray(data) ? data : [];
