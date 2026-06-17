@@ -1661,3 +1661,57 @@ export function useEarlyAccessStats() {
   }, []);
   return stats;
 }
+
+/* ── Unit Explorer (Phase 3.1) — raw per-unit detail rows from analytics_units ──
+   spec = { columns:[field keys], filters/filters_not/ranges/nulls:{…}, mode:'latest'|'archive',
+            sort:[{key,dir}], limit, offset }. RLS-gated in the RPC (archive = paid/chosen-project).
+   Fetches limit+1 → hasMore; returns the page (sliced to limit). */
+export function useUnitsDetail({ enabled = false, spec = null } = {}) {
+  const { loading: authLoading, user, profile } = useAuth();
+  const specKey = spec ? JSON.stringify(spec) : "";
+  const key = enabled && spec
+    ? `${user?.id || "anon"}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}::${specKey}`
+    : null;
+  const [rows, setRows] = useState([]);
+  const [hasMore, setHasMore] = useState(false);
+  const [loading, setLoading] = useState(!!enabled);
+  useEffect(() => {
+    if (!enabled || !spec) { setRows([]); setHasMore(false); setLoading(false); return; }
+    if (!isSupabaseReady() || authLoading) return;
+    let cancelled = false;
+    setLoading(true);
+    (async () => {
+      const { data, error } = await supabase.rpc("analytics_units", { p_spec: spec });
+      if (cancelled) return;
+      if (error) { console.error("[useUnitsDetail]", error); setRows([]); setHasMore(false); setLoading(false); return; }
+      const all = Array.isArray(data?.rows) ? data.rows : [];
+      const lim = Number(data?.limit ?? spec.limit ?? 100);
+      setHasMore(all.length > lim);
+      setRows(all.slice(0, lim));
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [enabled, key, authLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+  return { rows, hasMore, loading };
+}
+
+/* The analytics dimension/measure registry — the single source for the Explorer's column
+   picker (and any future field-driven UI). Cached process-wide (it's small + static). */
+let _analyticsRegistryCache = null;
+export function useAnalyticsRegistry() {
+  const [reg, setReg] = useState(_analyticsRegistryCache || { dimensions: [], measures: [] });
+  const [loading, setLoading] = useState(!_analyticsRegistryCache);
+  useEffect(() => {
+    if (_analyticsRegistryCache) { setReg(_analyticsRegistryCache); setLoading(false); return; }
+    if (!isSupabaseReady()) { setLoading(false); return; }
+    let cancelled = false;
+    supabase.rpc("analytics_registry").then(({ data, error }) => {
+      if (cancelled) return;
+      if (error || !data) { console.error("[useAnalyticsRegistry]", error); setLoading(false); return; }
+      _analyticsRegistryCache = data;
+      setReg(data); setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, []);
+  return { dimensions: reg.dimensions || [], measures: reg.measures || [], loading };
+}
