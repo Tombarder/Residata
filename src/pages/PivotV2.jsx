@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useProjects, useFlatsArchive, useFlatsCurrent, useArchiveMonths, useArchiveDays, usePivotGrain, usePivotDistinct, usePivotFieldStats, fetchFlatsForProjects } from "../lib/useData";
-import { useCountry } from "../lib/useCountry";
+import { useCountry, isAllCountries } from "../lib/useCountry";
 import { useCapabilities } from "../lib/useCapabilities";
 import { moneyFromEur, moneySymbol } from "../lib/money";
 import { useCurrency } from "../lib/useCurrency";
@@ -611,20 +611,50 @@ function isServerable(rowFields, colFields, valueDefs, filters) {
     if (!COMP_FIELD[v.field]) return false;                       // unsupported numeric field
     if (!["count", "sum", "avg", "min", "max"].includes(v.agg)) return false;  // median/count_distinct
   }
+  // Filters are now ALL applied server-side by analytics_pivot (any dim, any mode:
+  // in / not_in / between / empty / not_empty — see buildPivotSpec). A filter is
+  // server-able when it maps cleanly to the engine: a `between` on a range-able
+  // measure, or any other mode on a registered dim. Anything else → record path.
   for (const f of (filters || [])) {
     if (!isFilterActive(f)) continue;
-    // Time filters (datum/snapshot_month) AND a stav filter are pushed to the
-    // RPC (p_dates / p_months / p_stav), so they stay server-able. Any other
-    // filter, or a non-"in" mode, falls back to the record path.
-    if (f.key !== "datum" && f.key !== "snapshot_month" && f.key !== "stav") return false;
-    if (f.mode && f.mode !== "in") return false;
-    // A stav filter that selects the (prázdne) bucket can't be expressed via
-    // p_stav (the RPC matches concrete codes V/PR/…), so force the record path
-    // to honor it exactly. (Practically unreachable — stav is never null in the
-    // data — but keeps the grain and record paths identical for any input.)
-    if (f.key === "stav" && (f.values || []).includes(EMPTY_SENTINEL)) return false;
+    if (f.mode === "between") { if (!SERVER_RANGE_FIELDS.has(f.key)) return false; }
+    else if (!SERVERABLE_DIMS.has(f.key)) return false;
   }
   return true;
+}
+
+// Numeric fields whose `between` range filter the engine can apply (mapped to a
+// measure_registry field in buildPivotSpec). Everything else routes via dims.
+const SERVER_RANGE_FIELDS = new Set([
+  "cena_s_dph", "cena_bez_dph", "obytna_plocha", "celkova_plocha", "cena_na_m2_obytnej", "izby", "poschodie",
+]);
+// UI field key → engine measure_registry key, where they differ.
+const RANGE_MEASURE_KEY = { cena_na_m2_obytnej: "price_per_m2" };
+
+/* Build the analytics_pivot spec from the pivot UI state. Mirrors passesFilter()
+   semantics EXACTLY so the server result equals the old client-filtered tree:
+     in / not_in → filters / filters_not  ((prázdne) sentinel → JSON null = "or empty")
+     between     → ranges {min,max,includeEmpty}   empty/not_empty → nulls
+   country comes from the global selector (not a chip); months/dates/stav are just
+   ordinary dim filters. mode = latest (current state) | archive (a time filter set). */
+function buildPivotSpec({ dims, filters, country, isCurrent }) {
+  const spec = { dims, mode: isCurrent ? "latest" : "archive", filters: {}, filters_not: {}, ranges: {}, nulls: {} };
+  if (!isAllCountries(country)) spec.filters.country = [country];
+  for (const f of (filters || [])) {
+    if (!isFilterActive(f)) continue;
+    if (f.mode === "empty" || f.mode === "not_empty") { spec.nulls[f.key] = f.mode; continue; }
+    if (f.mode === "between") {
+      spec.ranges[RANGE_MEASURE_KEY[f.key] || f.key] = { min: f.min ?? null, max: f.max ?? null, includeEmpty: !!f.includeEmpty };
+      continue;
+    }
+    const vals = (f.values || []).map(v => (v === EMPTY_SENTINEL ? null : String(v)));
+    if (f.mode === "not_in") spec.filters_not[f.key] = vals;
+    else spec.filters[f.key] = vals;          // 'in' (default)
+  }
+  if (!Object.keys(spec.filters_not).length) delete spec.filters_not;
+  if (!Object.keys(spec.ranges).length) delete spec.ranges;
+  if (!Object.keys(spec.nulls).length) delete spec.nulls;
+  return spec;
 }
 
 /* A filter field whose distinct values can be fetched server-side via ONE fast
@@ -1185,9 +1215,13 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
     [canViewAnalytics, rows, cols, effectiveValues, filters]
   );
   const gDims = useMemo(() => [...rows, ...cols], [rows, cols]);
-  const { grain, loading: grainLoading } = usePivotGrain({
-    enabled: configServerable, months: fetchMonths, dates: fetchDates, dims: gDims, stav: fetchStav,
-  });
+  // Full server-side spec — ALL active filters (any dim, any mode) go to the engine,
+  // so a city/developer/price filter is instant instead of pulling the archive.
+  const pivotSpec = useMemo(
+    () => buildPivotSpec({ dims: gDims, filters, country, isCurrent }),
+    [gDims, filters, country, isCurrent]
+  );
+  const { grain, loading: grainLoading } = usePivotGrain({ enabled: configServerable, spec: pivotSpec });
   // A non-server-able config needs records — pull them (sticky once needed).
   useEffect(() => {
     if (canViewAnalytics && !configServerable && !forceRaw) setForceRaw(true);
