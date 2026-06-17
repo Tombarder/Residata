@@ -629,6 +629,8 @@ function isServerable(rowFields, colFields, valueDefs, filters) {
 // measure_registry field in buildPivotSpec). Everything else routes via dims.
 const SERVER_RANGE_FIELDS = new Set([
   "cena_s_dph", "cena_bez_dph", "obytna_plocha", "celkova_plocha", "cena_na_m2_obytnej", "izby", "poschodie",
+  // area sub-fields the UI also offers a numeric range for (engine measure_registry has them):
+  "balkon", "loggia", "terasa", "zahrada", "exterier", "kobka",
 ]);
 // UI field key → engine measure_registry key, where they differ.
 const RANGE_MEASURE_KEY = { cena_na_m2_obytnej: "price_per_m2" };
@@ -647,7 +649,9 @@ function buildPivotSpec({ dims, filters, country, isCurrent }) {
     if (!isFilterActive(f)) continue;
     if (f.mode === "empty" || f.mode === "not_empty") { spec.nulls[ek(f.key)] = f.mode; continue; }
     if (f.mode === "between") {
-      spec.ranges[ek(f.key)] = { min: f.min ?? null, max: f.max ?? null, includeEmpty: !!f.includeEmpty };
+      // between is only meaningful for a range-able numeric field (the UI gates it to
+      // isNumber). Guard so a stray non-numeric between can never produce an invalid spec.
+      if (SERVER_RANGE_FIELDS.has(f.key)) spec.ranges[ek(f.key)] = { min: f.min ?? null, max: f.max ?? null, includeEmpty: !!f.includeEmpty };
       continue;
     }
     const vals = (f.values || []).map(v => (v === EMPTY_SENTINEL ? null : String(v)));
