@@ -617,8 +617,10 @@ function isServerable(rowFields, colFields, valueDefs, filters) {
   // measure, or any other mode on a registered dim. Anything else → record path.
   for (const f of (filters || [])) {
     if (!isFilterActive(f)) continue;
-    if (f.mode === "between") { if (!SERVER_RANGE_FIELDS.has(f.key)) return false; }
-    else if (!SERVERABLE_DIMS.has(f.key)) return false;
+    // Server-able when the field is a registered dim (any mode) OR a range-able measure
+    // (between / empty / not_empty / in on price·area·€m² — the engine resolves measures
+    // via measure_registry). Anything else → record path.
+    if (!SERVERABLE_DIMS.has(f.key) && !SERVER_RANGE_FIELDS.has(f.key)) return false;
   }
   return true;
 }
@@ -640,16 +642,17 @@ const RANGE_MEASURE_KEY = { cena_na_m2_obytnej: "price_per_m2" };
 function buildPivotSpec({ dims, filters, country, isCurrent }) {
   const spec = { dims, mode: isCurrent ? "latest" : "archive", filters: {}, filters_not: {}, ranges: {}, nulls: {} };
   if (!isAllCountries(country)) spec.filters.country = [country];
+  const ek = (k) => RANGE_MEASURE_KEY[k] || k;   // UI field key → engine key (measures; no-op for dims)
   for (const f of (filters || [])) {
     if (!isFilterActive(f)) continue;
-    if (f.mode === "empty" || f.mode === "not_empty") { spec.nulls[f.key] = f.mode; continue; }
+    if (f.mode === "empty" || f.mode === "not_empty") { spec.nulls[ek(f.key)] = f.mode; continue; }
     if (f.mode === "between") {
-      spec.ranges[RANGE_MEASURE_KEY[f.key] || f.key] = { min: f.min ?? null, max: f.max ?? null, includeEmpty: !!f.includeEmpty };
+      spec.ranges[ek(f.key)] = { min: f.min ?? null, max: f.max ?? null, includeEmpty: !!f.includeEmpty };
       continue;
     }
     const vals = (f.values || []).map(v => (v === EMPTY_SENTINEL ? null : String(v)));
-    if (f.mode === "not_in") spec.filters_not[f.key] = vals;
-    else spec.filters[f.key] = vals;          // 'in' (default)
+    if (f.mode === "not_in") spec.filters_not[ek(f.key)] = vals;
+    else spec.filters[ek(f.key)] = vals;          // 'in' (default)
   }
   if (!Object.keys(spec.filters_not).length) delete spec.filters_not;
   if (!Object.keys(spec.ranges).length) delete spec.ranges;
