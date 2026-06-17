@@ -26,6 +26,7 @@ import {
 } from "./LivePages";
 import ReportsPage from "./Reports";
 import UnitTracker from "./UnitTracker";
+import UnitExplorer from "./UnitExplorer";
 import ChatAssistant from "../components/ChatAssistant";
 import CountrySwitcher from "../components/CountrySwitcher";
 import CurrencySwitcher from "../components/CurrencySwitcher";
@@ -131,6 +132,7 @@ const NAV = [
     { page: "App:Map",       label: { en: "Map view",   sk: "Mapa"      }, Icon: IconMap },
     { page: "App:Analytics", label: { en: "Analytics",  sk: "Analytika" }, Icon: IconChart,    requires: "view_analytics" },
     { page: "App:UnitTimeline", label: { en: "Unit timeline", sk: "Byt v čase" }, Icon: IconClock, requires: "view_analytics" },
+    { page: "App:Explorer", label: { en: "Unit Explorer", sk: "Prieskumník" }, Icon: IconGrid, requires: "view_analytics" },
     { page: "App:Reports",   label: { en: "Reports",    sk: "Reporty"   }, Icon: IconDoc,      requires: "view_monthly_reports" },
     { page: "App:Assistant", label: { en: "Ask AI",     sk: "AI asistent" }, Icon: IconSparkle },
     { page: "App:Exports",   label: { en: "Exports",    sk: "Exporty"   }, Icon: IconDownload, requires: "export_data" },
@@ -475,6 +477,7 @@ function TopBar({ page, lang, setLang, tier }) {
     "App:Map":       { en: "Map view",        sk: "Mapa"         },
     "App:Analytics":    { en: "Analytics",     sk: "Analytika"    },
     "App:UnitTimeline": { en: "Unit timeline", sk: "Byt v čase"   },
+    "App:Explorer":     { en: "Unit Explorer", sk: "Prieskumník"  },
     "App:Reports":      { en: "Reports",       sk: "Reporty"      },
     "App:Assistant": { en: "AI Assistant",    sk: "AI asistent"  },
     "App:Exports":   { en: "Exports",         sk: "Exporty"      },
@@ -636,6 +639,7 @@ function PageContent({ page, projectId, lang, setCurrent, openLogin }) {
   if (page === "App:Map")        return <Suspense fallback={<div style={{ padding: "2rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.8rem" }}>{lang === "sk" ? "Načítavam mapu…" : "Loading map…"}</div>}><MapView lang={lang} setCurrent={setCurrent} /></Suspense>;
   if (page === "App:Analytics")  return <Gated require="view_analytics"       lang={lang} setCurrent={setCurrent}><LiveAnalytics lang={lang} setCurrent={setCurrent} openLogin={openLogin} /></Gated>;
   if (page === "App:UnitTimeline") return <Gated require="view_analytics"     lang={lang} setCurrent={setCurrent}><UnitTracker lang={lang} setCurrent={setCurrent} /></Gated>;
+  if (page === "App:Explorer")   return <Gated require="view_analytics"       lang={lang} setCurrent={setCurrent}><UnitExplorer lang={lang} setCurrent={setCurrent} /></Gated>;
   if (page === "App:Reports")    return <Gated require="view_monthly_reports" lang={lang} setCurrent={setCurrent}><ReportsPage lang={lang} /></Gated>;
   if (page === "App:Assistant")  return <ChatAssistant lang={lang} setCurrent={setCurrent} />;
   if (page === "App:Exports")    return <Gated require="export_data"          lang={lang} setCurrent={setCurrent}><PlatformExports lang={lang} setCurrent={setCurrent} /></Gated>;
