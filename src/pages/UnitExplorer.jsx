@@ -3,11 +3,13 @@
    (not aggregated). Reads the detail engine analytics_units (server-side, paginated, RLS-gated).
    UI matches the Analytics/pivot design language (green accent, card panels, JetBrains-Mono
    labels, the POLIA-style field palette). */
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useCountry, isAllCountries } from "../lib/useCountry";
-import { useUnitsDetail, useAnalyticsRegistry, usePivotDistinct } from "../lib/useData";
+import { useUnitsInfinite, useAnalyticsRegistry, usePivotDistinct } from "../lib/useData";
 
-const PAGE = 50;
+const PAGE = 100;          // rows fetched per network page (accumulated; the table is virtualized)
+const ROW_H = 33;          // fixed row height (px) — required for windowed virtualization math
+const OVERSCAN = 8;        // extra rows rendered above/below the viewport for smooth scrolling
 const DEFAULT_COLS = ["project_name", "city", "cast", "typ", "izby", "obytna_plocha", "cena_s_dph", "price_per_m2", "stav"];
 
 // design tokens — identical to PivotV2 so the two pages feel like one product
@@ -66,10 +68,10 @@ export default function UnitExplorer({ lang = "sk" }) {
   const [fProject, setFProject] = useState(""); const [fCity, setFCity] = useState(""); const [fDev, setFDev] = useState(""); const [fStav, setFStav] = useState("");
   const [pMin, setPMin] = useState(""); const [pMax, setPMax] = useState("");
   const [sort, setSort] = useState({ key: "cena_s_dph", dir: "desc" });
-  const [offset, setOffset] = useState(0);
   const [search, setSearch] = useState("");
-
-  useEffect(() => { setOffset(0); }, [country, mode, fProject, fCity, fDev, fStav, pMin, pMax, sort]);
+  const scrollRef = useRef(null);
+  const [scrollTop, setScrollTop] = useState(0);
+  const [viewH, setViewH] = useState(560);
 
   // dropdown option lists follow the chosen scope (audit M4): in "História" they include
   // values that exist only historically (e.g. a now-sold-out project), not just current ones.
@@ -85,12 +87,34 @@ export default function UnitExplorer({ lang = "sk" }) {
     if (fCity) filters.city = [fCity];
     if (fDev) filters.developer = [fDev];
     if (fStav) filters.stav = [fStav];
-    const s = { columns: cols, filters, mode, sort: [sort], limit: PAGE, offset };
+    const s = { columns: cols, filters, mode, sort: [sort] };   // limit/offset managed by useUnitsInfinite
     if (pMin || pMax) s.ranges = { cena_s_dph: { min: pMin || null, max: pMax || null } };
     return s;
-  }, [country, fProject, fCity, fDev, fStav, pMin, pMax, cols, mode, sort, offset]);
+  }, [country, fProject, fCity, fDev, fStav, pMin, pMax, cols, mode, sort]);
 
-  const { rows, hasMore, loading } = useUnitsDetail({ enabled: cols.length > 0, spec });
+  const { rows, hasMore, loading, loadMore } = useUnitsInfinite({ enabled: cols.length > 0, spec, pageSize: PAGE });
+
+  // a new query (filter/sort/column change) scrolls back to the top
+  const specKey = JSON.stringify(spec);
+  useEffect(() => { setScrollTop(0); if (scrollRef.current) scrollRef.current.scrollTop = 0; }, [specKey]);
+
+  // measure the scroll viewport height (for the windowing math) + track resize
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const measure = () => setViewH(el.clientHeight || 560);
+    measure();
+    const ro = new ResizeObserver(measure); ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // virtualization: render only the visible row slice (+ overscan), padded by spacer rows
+  const total = rows.length;
+  const startIdx = Math.max(0, Math.floor(scrollTop / ROW_H) - OVERSCAN);
+  const endIdx = Math.min(total, Math.ceil((scrollTop + viewH) / ROW_H) + OVERSCAN);
+  const visible = rows.slice(startIdx, endIdx);
+  const padTop = startIdx * ROW_H;
+  const padBottom = Math.max(0, (total - endIdx) * ROW_H);
 
   const toggleSort = (k) => setSort((s) => (s.key === k ? { key: k, dir: s.dir === "asc" ? "desc" : "asc" } : { key: k, dir: "asc" }));
   const toggleCol = (k) => setCols((c) => (c.includes(k) ? c.filter((x) => x !== k) : [...c, k]));
@@ -147,20 +171,23 @@ export default function UnitExplorer({ lang = "sk" }) {
             <input style={{ ...sel, width: 84 }} placeholder={t("cena do", "€ to")} value={pMax} onChange={(e) => setPMax(e.target.value)} inputMode="numeric" />
             {activeFilters > 0 && <button onClick={() => { setFProject(""); setFCity(""); setFDev(""); setFStav(""); setPMin(""); setPMax(""); }} style={{ ...sel, cursor: "pointer", color: dim, fontFamily: mono, fontSize: "0.7rem" }}>✕ {t("vyčistiť", "clear")}</button>}
             <span style={{ marginLeft: "auto", fontFamily: mono, fontSize: "0.72rem", color: dim }}>
-              {loading ? t("načítavam…", "loading…") : `${rows.length ? offset + 1 : 0}–${offset + rows.length}${hasMore ? "+" : ""} ${t("bytov", "units")}`}
+              {loading && rows.length === 0 ? t("načítavam…", "loading…") : `${rows.length}${hasMore ? "+" : ""} ${t("bytov", "units")}`}
             </span>
           </div>
 
-          {/* table */}
-          <div style={{ overflowX: "auto", border: `1px solid ${border}`, borderRadius: 8, background: panel }}>
-            <table style={{ borderCollapse: "collapse", width: "100%", fontSize: "0.8rem" }}>
+          {/* virtualized scrolling table — only the visible row window is in the DOM; scrolling
+              near the bottom auto-loads the next page (handles arbitrarily large result sets) */}
+          <div ref={scrollRef}
+            onScroll={(e) => { const el = e.currentTarget; setScrollTop(el.scrollTop); if (hasMore && !loading && el.scrollHeight - el.scrollTop - el.clientHeight < 500) loadMore(); }}
+            style={{ overflow: "auto", height: "62vh", border: `1px solid ${border}`, borderRadius: 8, background: panel }}>
+            <table style={{ borderCollapse: "separate", borderSpacing: 0, tableLayout: "fixed", width: "100%", minWidth: Math.max(1, cols.length) * 150, fontSize: "0.8rem" }}>
               <thead style={{ background: "#0e0e10", position: "sticky", top: 0, zIndex: 1 }}>
                 <tr>
                   {cols.map((k) => {
                     const numeric = fields.find((f) => f.key === k)?.type === "numeric";
                     return (
                       <th key={k} onClick={() => toggleSort(k)} title={t("Klikni pre zoradenie", "Click to sort")}
-                        style={{ padding: "0.55rem 0.7rem", textAlign: numeric ? "right" : "left", whiteSpace: "nowrap", cursor: "pointer", borderBottom: `1px solid ${border}`, color: sort.key === k ? green : "#c4c4cc", userSelect: "none", fontFamily: mono, fontSize: "0.68rem", letterSpacing: "0.04em", textTransform: "uppercase", fontWeight: 700 }}>
+                        style={{ padding: "0.55rem 0.7rem", textAlign: numeric ? "right" : "left", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", cursor: "pointer", borderBottom: `1px solid ${border}`, color: sort.key === k ? green : "#c4c4cc", userSelect: "none", fontFamily: mono, fontSize: "0.68rem", letterSpacing: "0.04em", textTransform: "uppercase", fontWeight: 700 }}>
                         {lbl(k)}{sort.key === k ? (sort.dir === "asc" ? " ▲" : " ▼") : ""}
                       </th>
                     );
@@ -168,28 +195,28 @@ export default function UnitExplorer({ lang = "sk" }) {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r, i) => (
-                  <tr key={r.composite_unit_id || i} style={{ borderTop: `1px solid #16161a`, background: i % 2 ? "#0c0c0f" : "transparent" }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = panelHi)}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = i % 2 ? "#0c0c0f" : "transparent")}>
-                    {cols.map((k) => {
-                      const numeric = fields.find((f) => f.key === k)?.type === "numeric";
-                      return <td key={k} style={{ padding: "0.42rem 0.7rem", whiteSpace: "nowrap", textAlign: numeric ? "right" : "left", color: k === sort.key ? text : "#c4c4cc", fontFamily: numeric ? mono : "inherit", fontVariantNumeric: "tabular-nums" }}>{fmtVal(k, r[k], fmtByKey)}</td>;
-                    })}
-                  </tr>
-                ))}
+                {padTop > 0 && <tr style={{ height: padTop }}><td colSpan={cols.length} style={{ padding: 0, border: 0 }} /></tr>}
+                {visible.map((r, vi) => {
+                  const i = startIdx + vi;
+                  return (
+                    <tr key={r.composite_unit_id || i} style={{ background: i % 2 ? "#0c0c0f" : "transparent" }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = panelHi)}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = i % 2 ? "#0c0c0f" : "transparent")}>
+                      {cols.map((k) => {
+                        const numeric = fields.find((f) => f.key === k)?.type === "numeric";
+                        return <td key={k} style={{ height: ROW_H, boxSizing: "border-box", padding: "0 0.7rem", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: numeric ? "right" : "left", borderTop: `1px solid #16161a`, color: k === sort.key ? text : "#c4c4cc", fontFamily: numeric ? mono : "inherit", fontVariantNumeric: "tabular-nums" }}>{fmtVal(k, r[k], fmtByKey)}</td>;
+                      })}
+                    </tr>
+                  );
+                })}
+                {padBottom > 0 && <tr style={{ height: padBottom }}><td colSpan={cols.length} style={{ padding: 0, border: 0 }} /></tr>}
                 {!loading && rows.length === 0 && (
                   <tr><td colSpan={cols.length || 1} style={{ padding: "2rem", textAlign: "center", color: dim, fontStyle: "italic" }}>{cols.length === 0 ? t("Vyber aspoň jeden stĺpec vpravo →", "Pick at least one column on the right →") : t("Žiadne byty pre tento filter.", "No units match this filter.")}</td></tr>
                 )}
               </tbody>
             </table>
           </div>
-
-          {/* pagination */}
-          <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginTop: "0.55rem", color: dim, fontSize: "0.78rem", fontFamily: mono }}>
-            <button disabled={offset === 0 || loading} onClick={() => setOffset((o) => Math.max(0, o - PAGE))} style={{ ...sel, cursor: offset === 0 ? "default" : "pointer", opacity: offset === 0 ? 0.4 : 1, fontFamily: mono, fontSize: "0.72rem" }}>‹ {t("späť", "prev")}</button>
-            <button disabled={!hasMore || loading} onClick={() => setOffset((o) => o + PAGE)} style={{ ...sel, cursor: hasMore ? "pointer" : "default", opacity: hasMore ? 1 : 0.4, fontFamily: mono, fontSize: "0.72rem" }}>{t("ďalej", "next")} ›</button>
-          </div>
+          {loading && rows.length > 0 && <div style={{ marginTop: "0.45rem", fontFamily: mono, fontSize: "0.7rem", color: dim }}>{t("načítavam ďalšie…", "loading more…")}</div>}
         </div>
 
         {/* field palette (POLIA-style) */}

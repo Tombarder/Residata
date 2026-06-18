@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { supabase, supabasePublic, isSupabaseReady } from "./supabase";
 import { useAuth } from "./useAuth";
 import { useCountry, isAllCountries } from "./useCountry";
@@ -1693,6 +1693,57 @@ export function useUnitsDetail({ enabled = false, spec = null } = {}) {
     return () => { cancelled = true; };
   }, [enabled, key, authLoading]); // eslint-disable-line react-hooks/exhaustive-deps
   return { rows, hasMore, loading };
+}
+
+/* Infinite/accumulating variant of useUnitsDetail for a virtualized table: keeps appending
+   pages (loadMore) instead of prev/next paging, so the Explorer can scroll through an
+   arbitrarily large result set smoothly. `spec` must NOT carry limit/offset — those are managed
+   here. A generation counter drops stale responses when the spec changes mid-flight. */
+export function useUnitsInfinite({ enabled = false, spec = null, pageSize = 100 } = {}) {
+  const { loading: authLoading, user, profile } = useAuth();
+  const specKey = spec ? JSON.stringify(spec) : "";
+  const authKey = `${user?.id || "anon"}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}`;
+  const genRef = useRef(0);
+  const offsetRef = useRef(0);
+  const [rows, setRows] = useState([]);
+  const [hasMore, setHasMore] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const fetchPage = useCallback(async (gen) => {
+    if (!enabled || !spec || !isSupabaseReady() || authLoading) return;
+    setLoading(true);
+    try {
+      const pageSpec = { ...spec, limit: pageSize, offset: offsetRef.current };
+      const { data, error } = await supabase.rpc("analytics_units", { p_spec: pageSpec });
+      if (gen !== genRef.current) return;               // superseded by a newer query → drop this page
+      if (error) { console.error("[useUnitsInfinite]", error); return; }
+      const all = Array.isArray(data?.rows) ? data.rows : [];
+      const lim = Number(data?.limit ?? pageSize);
+      const page = all.slice(0, lim);
+      offsetRef.current += page.length;
+      setHasMore(all.length > lim);
+      setRows(prev => [...prev, ...page]);
+    } finally {
+      if (gen === genRef.current) setLoading(false);    // only the current generation owns `loading`
+    }
+  }, [enabled, specKey, authKey, authLoading, pageSize]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // spec/auth change → bump generation, reset accumulation, load page 0
+  useEffect(() => {
+    genRef.current += 1;
+    const gen = genRef.current;
+    offsetRef.current = 0;
+    setRows([]); setHasMore(false);
+    if (enabled && spec && isSupabaseReady() && !authLoading) fetchPage(gen);
+    else setLoading(false);                             // not fetching → clear any orphaned loading
+  }, [specKey, authKey, enabled, authLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const loadMore = useCallback(() => {
+    if (!hasMore || loading) return;
+    fetchPage(genRef.current);
+  }, [hasMore, loading, fetchPage]);
+
+  return { rows, hasMore, loading, loadMore };
 }
 
 /* The analytics dimension/measure registry — the single source for the Explorer's column
