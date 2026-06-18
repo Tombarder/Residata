@@ -1257,7 +1257,7 @@ const _pivotDistinctCache = new Map();
    client accessor mirrors (so they match what records-side filtering compares).
    Returns the same {values, hasEmpty} shape distinctValuesForField() yields for a
    TEXT field, so FilterPopover can consume it interchangeably — WITHOUT a records pull. */
-export function usePivotDistinct({ enabled = false, field = null, months = null, dates = null, stav = null } = {}) {
+export function usePivotDistinct({ enabled = false, field = null, months = null, dates = null, stav = null, mode = null } = {}) {
   const { loading: authLoading, user, profile } = useAuth();
   const { country } = useCountry();
   // One analytics_pivot(dims=[field]) call: each grain row is {d:[value], m:{…}}, so the
@@ -1269,7 +1269,7 @@ export function usePivotDistinct({ enabled = false, field = null, months = null,
     if (months && months.length) filters.snapshot_month = months.map(String);
     if (dates && dates.length) filters.datum = dates.map(String);
     if (stav && stav.length && field !== "stav") filters.stav = stav.map(String);
-    return { dims: [field], mode: (months?.length || dates?.length) ? "archive" : "latest", filters };
+    return { dims: [field], mode: mode || ((months?.length || dates?.length) ? "archive" : "latest"), filters };
   })() : null;
   const key = enabled && field
     ? `${user?.id || "anon"}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}::${JSON.stringify(spec)}`

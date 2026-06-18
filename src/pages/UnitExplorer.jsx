@@ -71,10 +71,12 @@ export default function UnitExplorer({ lang = "sk" }) {
 
   useEffect(() => { setOffset(0); }, [country, mode, fProject, fCity, fDev, fStav, pMin, pMax, sort]);
 
-  const cityOpts = usePivotDistinct({ enabled: true, field: "city" });
-  const devOpts = usePivotDistinct({ enabled: true, field: "developer" });
-  const projOpts = usePivotDistinct({ enabled: true, field: "project_name" });
-  const stavOpts = usePivotDistinct({ enabled: true, field: "stav" });
+  // dropdown option lists follow the chosen scope (audit M4): in "História" they include
+  // values that exist only historically (e.g. a now-sold-out project), not just current ones.
+  const cityOpts = usePivotDistinct({ enabled: true, field: "city", mode });
+  const devOpts = usePivotDistinct({ enabled: true, field: "developer", mode });
+  const projOpts = usePivotDistinct({ enabled: true, field: "project_name", mode });
+  const stavOpts = usePivotDistinct({ enabled: true, field: "stav", mode });
 
   const spec = useMemo(() => {
     const filters = {};
