@@ -81,8 +81,11 @@ export default function MapView({ lang = "en", setCurrent }) {
   const countryRef = useRef(country);   // latest country, readable inside the once-mounted load handler
   const fitKeyRef = useRef(null);        // country we've already auto-fitted to (once data was present)
   const popupRef = useRef(null);         // single active popup — clicking pins must not stack popups
-  setCurrentRef.current = setCurrent;
-  countryRef.current = country;
+  // Keep these refs on the latest values for the once-mounted (deps []) Mapbox load/click
+  // handlers — updated post-commit via effects, never written during render
+  // (lint: react-hooks/static-components forbids ref writes during render).
+  useEffect(() => { setCurrentRef.current = setCurrent; }, [setCurrent]);
+  useEffect(() => { countryRef.current = country; }, [country]);
 
   // ── Load coordinates (anon, public read-only view) ──
   useEffect(() => {
@@ -104,7 +107,7 @@ export default function MapView({ lang = "en", setCurrent }) {
     () => buildFeatures(projects || [], coords || {}),
     [projects, coords]
   );
-  featuresRef.current = fc;
+  useEffect(() => { featuresRef.current = fc; }, [fc]);
 
   const placed = fc.features.length;
   const placeholderCount = useMemo(() => {
