@@ -72,8 +72,9 @@ export default function LocationManager({ lang = "en" }) {
   const citiesRef = useRef([]);
   const catalogRef = useRef({ byCity: {}, cityIds: new Set() });
   const cityIdRef = useRef("");
-  const districtRef = useRef("");
   const revGenRef = useRef(0);
+  const userMovedRef = useRef(false);       // true only when the USER moves the pin (not on project load)
+  const districtTouchedRef = useRef(false); // true once the user manually edits the district for this placement
 
   // ── Load projects + cities + districts ──
   useEffect(() => {
@@ -93,7 +94,6 @@ export default function LocationManager({ lang = "en" }) {
 
   useEffect(() => { citiesRef.current = cities; }, [cities]);
   useEffect(() => { cityIdRef.current = cityId; }, [cityId]);
-  useEffect(() => { districtRef.current = district; }, [district]);
 
   const citiesById = useMemo(() => Object.fromEntries(cities.map((c) => [c.id, c])), [cities]);
   const catalog = useMemo(() => {
@@ -159,7 +159,7 @@ export default function LocationManager({ lang = "en" }) {
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
     const marker = new maplibregl.Marker({ draggable: true, color: green });
     markerRef.current = marker;
-    const onMove = (lat, lng) => { setPin({ lat: +lat.toFixed(6), lng: +lng.toFixed(6) }); setSuggestions([]); };
+    const onMove = (lat, lng) => { userMovedRef.current = true; setPin({ lat: +lat.toFixed(6), lng: +lng.toFixed(6) }); setSuggestions([]); };
     marker.on("dragend", () => { const ll = marker.getLngLat(); onMove(ll.lat, ll.lng); });
     map.on("click", (e) => onMove(e.lngLat.lat, e.lngLat.lng));
     const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => map.resize()) : null;
@@ -174,8 +174,13 @@ export default function LocationManager({ lang = "en" }) {
   }, [pin]);
 
   // ── Pin drives City + Region (reverse-geocode → match; suggest district) ──
+  // ONLY when the user moved the pin. Loading a saved project shows its saved
+  // classification verbatim — re-deriving would let the map service silently
+  // overwrite a city/district the Boss confirmed.
   useEffect(() => {
     if (!pin || !citiesRef.current.length) return;
+    if (!userMovedRef.current) return;
+    userMovedRef.current = false;
     const gen = ++revGenRef.current;
     (async () => {
       const info = await reverseGeocode(pin.lat, pin.lng);
@@ -185,11 +190,18 @@ export default function LocationManager({ lang = "en" }) {
       const cityChanged = finalCity?.id !== cityIdRef.current;
       setCityId(finalCity?.id || "");
       setCityWarn(info?.city && !matched ? info.city : null);
-      // Suggest the district from the pin when the city changed or the field is empty;
-      // keep the user's typed/saved district otherwise.
-      if (cityChanged || !districtRef.current.trim()) {
-        const sug = info?.district && info.district.trim() ? info.district.trim() : smallCityDistrict(finalCity?.id);
-        setDistrict(sug);
+      // The pin is the source of truth: re-derive the district from the new point —
+      // UNLESS the user manually typed one (and the city didn't change, which would
+      // invalidate a typed district anyway).
+      if (cityChanged || !districtTouchedRef.current) {
+        // Only trust the pin's district if it's a name in OUR catalog (keeps our
+        // naming, e.g. SK mestská časť "Petržalka"). The map service returns
+        // numbered districts for Praha ("Praha 10") that clash with our cadastral
+        // names ("Vinohrady") — for those, leave it empty so you pick from the list.
+        const fromPin = info?.district && info.district.trim();
+        const cat = catalogRef.current.byCity[finalCity?.id] || [];
+        const inCatalog = fromPin && cat.some((d) => norm(d) === norm(fromPin));
+        setDistrict(inCatalog ? fromPin : smallCityDistrict(finalCity?.id));
       }
     })();
   }, [pin]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -233,6 +245,7 @@ export default function LocationManager({ lang = "en" }) {
   function pick(s) {
     clearTimeout(debounceRef.current);
     if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; }
+    userMovedRef.current = true; districtTouchedRef.current = false; // fresh placement → accept the pin's district suggestion
     setPin({ lat: s.lat, lng: s.lng }); setAddr(s.label); setSuggestions([]); setSearching(false);
     if (mapRef.current) mapRef.current.flyTo({ center: [s.lng, s.lat], zoom: 16, duration: 600 });
   }
@@ -240,14 +253,16 @@ export default function LocationManager({ lang = "en" }) {
   function selectProject(p) {
     clearTimeout(debounceRef.current);
     if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; }
-    revGenRef.current++; // cancel any in-flight reverse-geocode from the previous project
+    revGenRef.current++;             // cancel any in-flight reverse-geocode
+    userMovedRef.current = false;    // loading a project is NOT a user pin-move → keep saved classification
+    districtTouchedRef.current = false;
     setSelectedId(p.id); setSuggestions([]); setCityWarn(null);
     const lat = p.lat != null ? Number(p.lat) : null, lng = p.lng != null ? Number(p.lng) : null;
     const located = p.location_verified && lat != null && lng != null;
     setCityId(p.city_id || "");
     setDistrict(p.district && p.district.trim() ? p.district : (catalog.cityIds.has(p.city_id) ? "" : cityNameOf(p.city_id)));
     if (located) {
-      setAddr(p.address || ""); setPin({ lat, lng }); // pin effect will re-derive city/district from the point
+      setAddr(p.address || ""); setPin({ lat, lng }); // shows the saved pin; no re-derive (userMovedRef=false)
       if (mapRef.current) mapRef.current.flyTo({ center: [lng, lat], zoom: 15, duration: 600 });
     } else {
       setPin(null);
@@ -266,7 +281,7 @@ export default function LocationManager({ lang = "en" }) {
       const { error } = await withTimeout(supabase.rpc("admin_set_project_location", {
         p_id: selected.id, p_lat: pin.lat, p_lng: pin.lng, p_address: addr.trim() || null,
         p_district: district.trim(), p_city_id: cityId,
-      }), 15000);
+      }), 30000);
       if (error) { setToast({ type: "err", msg: error.message }); return; }
       if (district.trim() && !(catalog.byCity[cityId] || []).includes(district.trim())) {
         setDistricts((prev) => [...prev, { city_id: cityId, name: district.trim() }]);
@@ -365,7 +380,7 @@ export default function LocationManager({ lang = "en" }) {
                         </button>))}
                     </div>)}
                 </div>
-                <button onClick={save} disabled={!pin || saving} style={btn(green, !pin || saving, true)}>{saving ? t("Saving…", "Ukladám…") : t("Save", "Uložiť")}</button>
+                <button onClick={save} disabled={!pin || !cityId || saving} style={btn(green, !pin || !cityId || saving, true)}>{saving ? t("Saving…", "Ukladám…") : t("Save", "Uložiť")}</button>
               </div>
 
               <div style={{ display: "flex", gap: 14, alignItems: "center", marginTop: 9, flexWrap: "wrap" }}>
@@ -376,7 +391,7 @@ export default function LocationManager({ lang = "en" }) {
                 </span>
                 <label style={{ display: "inline-flex", alignItems: "center", fontSize: "0.74rem", color: dim }}>
                   {t("District", "Okres")}
-                  <input list="district-opts" value={district} onChange={(e) => setDistrict(e.target.value)}
+                  <input list="district-opts" value={district} onChange={(e) => { districtTouchedRef.current = true; setDistrict(e.target.value); }}
                     placeholder={smallCity ? t("(optional — uses city)", "(voliteľné — použije mesto)") : t("e.g. Petržalka", "napr. Petržalka")}
                     style={{ ...inputStyle, width: "auto", minWidth: 170, marginLeft: 6, borderColor: (!smallCity && !district.trim()) ? amber : border }} />
                   <datalist id="district-opts">{districtOptions.map((d) => <option key={d} value={d} />)}</datalist>
