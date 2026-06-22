@@ -27,3 +27,6 @@ dist-ssr
 # JSON snapshot of live data so the Vite plugin can inject the same
 # numbers into index.html during the same build. Regenerated each build.
 scripts/.build-data.json
+
+# Vercel CLI local link (project/org ids)
+.vercel
