@@ -58,6 +58,7 @@ export const CAPABILITY_KEYS = [
   // Admin
   'manage_users',                // /admin — flip tier
   'manage_premium_domains',      // /admin — CRUD domén
+  'manage_locations',            // /app/locations — set project map pins (admin-only)
   'view_activity_log',           // /admin — event feed
   'view_admin_nav',              // zobraziť "ADMIN" link v nav
 
@@ -136,6 +137,7 @@ const PAID_CAPS = [
 
 const ADMIN_CAPS = [
   ...PAID_CAPS,
+  'manage_locations',
   'manage_premium_domains',
   'manage_users',
   'view_activity_log',
