@@ -124,6 +124,7 @@ const IconMap = () => (
 
 // Map view is lazy-loaded — MapLibre is a heavy dep we only want on /app/map.
 const MapView = lazy(() => import("./MapView"));
+const LocationManager = lazy(() => import("./LocationManager"));
 
 const NAV = [
   { group: "main", items: [
@@ -142,6 +143,7 @@ const NAV = [
     { page: "App:Settings", label: { en: "Settings",       sk: "Nastavenia"   }, Icon: IconSettings },
   ]},
   { group: "admin", items: [
+    { page: "App:Locations", label: { en: "Locations", sk: "Polohy" }, Icon: IconMap, adminOnly: true },
     { page: "App:Admin", label: { en: "Admin", sk: "Admin" }, Icon: IconShield, adminOnly: true },
   ]},
 ];
@@ -484,6 +486,7 @@ function TopBar({ page, lang, setLang, tier }) {
     "App:Billing":   { en: "Billing & tier",  sk: "Platba a tier"},
     "App:Settings":  { en: "Settings",        sk: "Nastavenia"   },
     "App:Admin":     { en: "Admin",           sk: "Admin"        },
+    "App:Locations": { en: "Locations",       sk: "Polohy"       },
   };
   const isProjectDetail = typeof page === "string" && page.startsWith("App:ProjectDetail:");
   const title = isProjectDetail
@@ -646,6 +649,7 @@ function PageContent({ page, projectId, lang, setCurrent, openLogin }) {
   if (page === "App:Billing")    return <PlatformBilling lang={lang} setCurrent={setCurrent} />;
   if (page === "App:Settings")   return <PlatformSettings lang={lang} />;
   if (page === "App:Admin")      return <Gated require="manage_users" lang={lang} setCurrent={setCurrent}><LiveAdmin lang={lang} setCurrent={setCurrent} /></Gated>;
+  if (page === "App:Locations")  return <Gated require="manage_locations" lang={lang} setCurrent={setCurrent}><Suspense fallback={<div style={{ padding: "2rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.8rem" }}>{lang === "sk" ? "Načítavam…" : "Loading…"}</div>}><LocationManager lang={lang} /></Suspense></Gated>;
   if (typeof page === "string" && page.startsWith("App:ProjectDetail:")) {
     const id = page.slice("App:ProjectDetail:".length);
     return <LiveProjectDetail projectId={id} lang={lang} setCurrent={setCurrent} openLogin={openLogin} />;
