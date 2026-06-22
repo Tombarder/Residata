@@ -294,25 +294,28 @@ async function toolSearchApartments(admin, a, allowHistorical) {
   if (gated) return { gated: true, message: "Searching past months is a paid feature. I can search what's on the market now." };
   const sortMap = { price: "cena_s_dph", eur_per_m2: "price_per_m2", floor: "poschodie", area: "obytna_plocha", rooms: "izby" };
   const status = a.status || "available";
+  const reqLimit = Math.min(Math.max(a.limit || 50, 1), 100);
   const spec = {
     columns: ["project_name", "unit_id", "city", "cast", "izby", "poschodie", "obytna_plocha", "cena_s_dph", "price_per_m2", "stav"],
     filters: buildFilters({ ...a, status }),
     ranges: buildRanges(a, { withFloor: true, withArea: true }),
     sort: [{ key: sortMap[a.sort || "price"], dir: a.order === "desc" ? "desc" : "asc" }],
-    limit: Math.min(Math.max(a.limit || 25, 1), 100),
+    limit: reqLimit,
     mode,
   };
   const { data, error } = await admin.rpc("analytics_units", { p_spec: spec });
   if (error) throw new Error(error.message);
   const STATUS_LABEL = { V: "available", P: "sold", R: "reserved", PR: "pre-reserved" };
-  const rows = ((data && data.rows) || []).map((r) => ({
+  const raw = (data && data.rows) || [];
+  const has_more = raw.length > reqLimit; // engine fetched limit+1 to signal a next page
+  const rows = raw.slice(0, reqLimit).map((r) => ({
     project: r.project_name, unit: r.unit_id, city: r.city, district: r.cast,
     rooms: r.izby != null ? Math.round(Number(r.izby)) : null,
     floor: r.poschodie, area_m2: num(r.obytna_plocha),
     price_eur: round(r.cena_s_dph), eur_per_m2: round(r.price_per_m2),
     status: STATUS_LABEL[r.stav] || r.stav,
   }));
-  return { mode, count: rows.length, apartments: rows };
+  return { mode, count: rows.length, has_more, apartments: rows };
 }
 
 async function executeTool(admin, name, args, allowHistorical) {
@@ -343,7 +346,7 @@ function systemPrompt(lang, allowHistorical) {
       "· VŠETKY čísla získavaj cez nástroje (tools) — dotazujú živú databázu všetkých bytov a projektov. NIKDY si čísla nevymýšľaj a nepočítaj percentá z hlavy; ak nie sú v odpovedi nástroja, zavolaj nástroj.",
       "· market_overview = prehľad trhu, najpredávanejšie / najrýchlejšie projekty, porovnanie SK vs CZ.",
       "· market_stats = počty/priemery/€m² zoskupené podľa dimenzie (okres, mesto, developer, izby, mesiac…) s filtrami; vrátane histórie (mode 'historical').",
-      "· search_apartments = konkrétne byty podľa kritérií (mesto, okres, izby, poschodie, cena…). Prehľadáva CELÚ databázu, žiadny strop.",
+      "· search_apartments = konkrétne byty podľa kritérií (mesto, okres, izby, poschodie, cena…). Prehľadáva CELÚ databázu, žiadny strop. Ak má výsledok has_more=true, vidíš len prvé výsledky podľa triedenia — povedz že je ich viac a ponúkni zúženie; netvrď že je to úplný zoznam.",
       "· Pokojne zavolaj viac nástrojov po sebe. Po získaní dát odpovedz vecne.",
       `· ${histLine}`,
       "",
@@ -363,7 +366,7 @@ function systemPrompt(lang, allowHistorical) {
     "· Get ALL numbers via the tools — they query the live database of every apartment and project. NEVER invent numbers or compute percentages in your head; if it's not in a tool result, call a tool.",
     "· market_overview = market totals, best-selling / fastest-moving projects, SK-vs-CZ comparison.",
     "· market_stats = counts/averages/€m² grouped by a dimension (district, city, developer, rooms, month…) with filters; includes history (mode 'historical').",
-    "· search_apartments = specific apartments by criteria (city, district, rooms, floor, price…). Searches the WHOLE database, no cap.",
+    "· search_apartments = specific apartments by criteria (city, district, rooms, floor, price…). Searches the WHOLE database, no cap. If the result has has_more=true you're seeing only the top matches by the chosen sort — say there are more and offer to narrow/re-sort; never imply the list is complete.",
     "· Call multiple tools in sequence if needed. Once you have the data, answer concretely.",
     `· ${histLine}`,
     "",
