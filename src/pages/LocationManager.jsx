@@ -2,17 +2,18 @@
  * LocationManager — admin-only map picker for setting each project's real
  * location. Replaces hand-editing lat/lng in the database grid.
  *
- * Flow: pick a project → type its address and press "Find" (geocoded via
- * /api/admin/geocode, OSM) OR click/drag directly on the map → "Save".
+ * Flow: pick a project → as you type an address (or the project name) you get
+ * Google-style suggestions → click one (or click/drag the map) → Save.
  *
- * Data:
- *   · supabase.rpc("admin_list_project_locations")  → every project + current pin
- *   · supabase.rpc("admin_set_project_location")    → write a confirmed pin
- *     (sets it manual + verified, so the auto-placement trigger can never
- *      overwrite it). Both RPCs are admin-gated server-side and fail closed.
+ * Geocoding is done DIRECTLY from the browser against Photon (OpenStreetMap,
+ * CORS-enabled, no key, type-ahead optimised). On purpose there is NO auth call
+ * and NO serverless round-trip in the suggest path — so it can never hang on a
+ * stalled token refresh, and every request is debounced + abortable + capped by
+ * a hard timeout. Map click/drag is always available as a fallback.
  *
- * The map basemap is the same keyless CARTO dark-matter style the public Map
- * view uses. A single draggable marker represents the pin being edited.
+ * Writes go through supabase.rpc("admin_set_project_location") — admin-gated,
+ * fails closed; it sets the pin manual+verified so the auto-placement trigger
+ * can never overwrite it. The list comes from admin_list_project_locations().
  */
 import { useEffect, useRef, useState, useMemo } from "react";
 import maplibregl from "maplibre-gl";
@@ -20,6 +21,10 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { supabase } from "../lib/supabase";
 
 const MAP_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
+const PHOTON = "https://photon.komoot.io/api/";
+// Country-centre bias so suggestions rank local results first.
+const BIAS = { SK: { lat: 48.7, lon: 19.5 }, CZ: { lat: 49.8, lon: 15.5 } };
+
 const green = "#00e5a0";
 const amber = "#f5a623";
 const textLight = "#e8e8ed";
@@ -28,6 +33,12 @@ const border = "#222228";
 const bg = "#0a0a0b";
 const bg2 = "#0e0e10";
 const mono = "'JetBrains Mono', monospace";
+
+function buildLabel(p) {
+  const line1 = p.name || [p.street, p.housenumber].filter(Boolean).join(" ");
+  const line2 = [p.postcode, p.city || p.county || p.district].filter(Boolean).join(" ");
+  return [line1, line2, p.state].filter(Boolean).join(", ") || p.name || "—";
+}
 
 export default function LocationManager({ lang = "en" }) {
   const t = (en, sk) => (lang === "sk" ? sk : en);
@@ -42,14 +53,16 @@ export default function LocationManager({ lang = "en" }) {
   // editor state
   const [addr, setAddr] = useState("");
   const [pin, setPin] = useState(null); // {lat, lng}
-  const [candidates, setCandidates] = useState([]);
-  const [geocoding, setGeocoding] = useState(false);
+  const [suggestions, setSuggestions] = useState([]);
+  const [searching, setSearching] = useState(false);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
 
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const markerRef = useRef(null);
+  const debounceRef = useRef(null);
+  const abortRef = useRef(null);
 
   // ── Load the project list ──
   useEffect(() => {
@@ -105,9 +118,11 @@ export default function LocationManager({ lang = "en" }) {
     marker.on("dragend", () => {
       const ll = marker.getLngLat();
       setPin({ lat: +ll.lat.toFixed(6), lng: +ll.lng.toFixed(6) });
+      setSuggestions([]);
     });
     map.on("click", (e) => {
       setPin({ lat: +e.lngLat.lat.toFixed(6), lng: +e.lngLat.lng.toFixed(6) });
+      setSuggestions([]);
     });
 
     const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => map.resize()) : null;
@@ -132,69 +147,119 @@ export default function LocationManager({ lang = "en" }) {
   // ── Auto-dismiss toast ──
   useEffect(() => {
     if (!toast) return;
-    const id = setTimeout(() => setToast(null), 2600);
+    const id = setTimeout(() => setToast(null), 2800);
     return () => clearTimeout(id);
   }, [toast]);
 
+  // ── Cleanup pending search work on unmount ──
+  useEffect(() => () => {
+    clearTimeout(debounceRef.current);
+    if (abortRef.current) abortRef.current.abort();
+  }, []);
+
+  // ── Geocode (browser-direct, abortable, hard-timeout) ──
+  async function doSearch(q, cc) {
+    if (abortRef.current) abortRef.current.abort();
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    const killer = setTimeout(() => ctrl.abort(), 8000);
+    setSearching(true);
+    try {
+      const bias = BIAS[cc] || BIAS.SK;
+      const url = `${PHOTON}?q=${encodeURIComponent(q)}&limit=6&lat=${bias.lat}&lon=${bias.lon}`;
+      const r = await fetch(url, { signal: ctrl.signal });
+      if (!r.ok) throw new Error("geocoder " + r.status);
+      const j = await r.json();
+      let feats = (j.features || []).filter((f) => f.geometry?.coordinates?.length === 2);
+      const skcz = feats.filter((f) => ["SK", "CZ"].includes(f.properties?.countrycode));
+      if (skcz.length) feats = skcz;
+      const seen = new Set();
+      const sugg = [];
+      for (const f of feats) {
+        const lat = +f.geometry.coordinates[1].toFixed(6);
+        const lng = +f.geometry.coordinates[0].toFixed(6);
+        const label = buildLabel(f.properties);
+        const key = label + "|" + lat + "|" + lng;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        sugg.push({ label, lat, lng, cc: f.properties?.countrycode });
+      }
+      if (abortRef.current === ctrl) setSuggestions(sugg);
+    } catch (e) {
+      if (e.name !== "AbortError" && abortRef.current === ctrl) setSuggestions([]);
+    } finally {
+      clearTimeout(killer);
+      if (abortRef.current === ctrl) { setSearching(false); abortRef.current = null; }
+    }
+  }
+
+  function onAddrChange(value) {
+    setAddr(value);
+    clearTimeout(debounceRef.current);
+    const q = value.trim();
+    if (q.length < 3) {
+      if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; }
+      setSuggestions([]); setSearching(false);
+      return;
+    }
+    setSearching(true);
+    const cc = selected?.country_code;
+    debounceRef.current = setTimeout(() => doSearch(q, cc), 320);
+  }
+
+  function pick(s) {
+    clearTimeout(debounceRef.current);
+    if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; }
+    setPin({ lat: s.lat, lng: s.lng });
+    setAddr(s.label);
+    setSuggestions([]);
+    setSearching(false);
+    const map = mapRef.current;
+    if (map) map.flyTo({ center: [s.lng, s.lat], zoom: 16, duration: 600 });
+  }
+
   function selectProject(p) {
+    clearTimeout(debounceRef.current);
+    if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; }
     setSelectedId(p.id);
-    setAddr(p.address || "");
-    setCandidates([]);
+    setSuggestions([]);
     const lat = p.lat != null ? Number(p.lat) : null;
     const lng = p.lng != null ? Number(p.lng) : null;
-    if (lat != null && lng != null) {
+    if (p.location_verified && lat != null && lng != null) {
+      // Already confirmed — show its real pin for review / re-edit.
+      setAddr(p.address || "");
       setPin({ lat, lng });
-      const map = mapRef.current;
-      if (map) map.flyTo({ center: [lng, lat], zoom: p.location_verified ? 15 : 12, duration: 600 });
+      if (mapRef.current) mapRef.current.flyTo({ center: [lng, lat], zoom: 15, duration: 600 });
     } else {
+      // Not located yet: fly to the city area for context, NO pin (so you can't
+      // accidentally confirm the placeholder), and auto-suggest from name+city.
       setPin(null);
+      const query = [p.name, p.city_name].filter(Boolean).join(", ");
+      setAddr(query);
+      if (lat != null && lng != null && mapRef.current) mapRef.current.flyTo({ center: [lng, lat], zoom: 12, duration: 600 });
+      if (query.length >= 3) doSearch(query, p.country_code);
     }
   }
 
-  function pick(c) {
-    setPin({ lat: +c.lat.toFixed(6), lng: +c.lng.toFixed(6) });
-    const map = mapRef.current;
-    if (map) map.flyTo({ center: [c.lng, c.lat], zoom: 16, duration: 600 });
-  }
-
-  async function findOnMap() {
-    const q = addr.trim();
-    if (q.length < 3) return;
-    setGeocoding(true);
-    setCandidates([]);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const r = await fetch("/api/admin/geocode", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token || ""}` },
-        body: JSON.stringify({ q }),
-      });
-      const j = await r.json();
-      if (!r.ok) { setToast({ type: "err", msg: j.error || "geocode failed" }); return; }
-      const results = j.results || [];
-      if (!results.length) {
-        setToast({ type: "err", msg: t("No match — click the map to place it", "Žiadna zhoda — klikni do mapy") });
-        return;
-      }
-      setCandidates(results);
-      pick(results[0]); // jump straight to the best match
-    } catch (e) {
-      setToast({ type: "err", msg: String(e?.message || e) });
-    } finally {
-      setGeocoding(false);
-    }
+  function withTimeout(promise, ms) {
+    return Promise.race([
+      promise,
+      new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), ms)),
+    ]);
   }
 
   async function save() {
     if (!selected || !pin) return;
     setSaving(true);
     try {
-      const { error } = await supabase.rpc("admin_set_project_location", {
-        p_id: selected.id, p_lat: pin.lat, p_lng: pin.lng, p_address: addr.trim() || null,
-      });
+      const { error } = await withTimeout(
+        supabase.rpc("admin_set_project_location", {
+          p_id: selected.id, p_lat: pin.lat, p_lng: pin.lng, p_address: addr.trim() || null,
+        }),
+        15000
+      );
       if (error) { setToast({ type: "err", msg: error.message }); return; }
 
-      // Compute the next unconfirmed BEFORE we mutate local state.
       const next = (projects || []).find((p) =>
         !p.location_verified && p.id !== selected.id && (country === "all" || p.country_code === country)
       );
@@ -207,7 +272,12 @@ export default function LocationManager({ lang = "en" }) {
       if (next) selectProject(next);
       else { setSelectedId(null); setPin(null); setAddr(""); }
     } catch (e) {
-      setToast({ type: "err", msg: String(e?.message || e) });
+      setToast({
+        type: "err",
+        msg: e?.message === "timeout"
+          ? t("Save timed out — try again", "Uloženie vypršalo — skús znova")
+          : String(e?.message || e),
+      });
     } finally {
       setSaving(false);
     }
@@ -221,19 +291,13 @@ export default function LocationManager({ lang = "en" }) {
           <div style={{ fontSize: "0.95rem", fontWeight: 600 }}>{t("Project locations", "Polohy projektov")}</div>
           <div style={{ fontFamily: mono, fontSize: "0.72rem", color: dim, marginTop: 4 }}>
             <span style={{ color: green }}>{confirmedCount}</span> / {total} {t("located", "umiestnených")}
-            {total > 0 && (
-              <span style={{ marginLeft: 8, color: dim }}>
-                · {total - confirmedCount} {t("to do", "zostáva")}
-              </span>
-            )}
+            {total > 0 && <span style={{ marginLeft: 8 }}>· {total - confirmedCount} {t("to do", "zostáva")}</span>}
           </div>
-          {/* progress bar */}
           <div style={{ height: 4, background: "#1a1a1f", borderRadius: 3, marginTop: 8, overflow: "hidden" }}>
             <div style={{ width: total ? `${(confirmedCount / total) * 100}%` : "0%", height: "100%", background: green, transition: "width 0.3s" }} />
           </div>
         </div>
 
-        {/* filters */}
         <div style={{ padding: "0.6rem 0.8rem", display: "flex", gap: 6, flexWrap: "wrap", borderBottom: `1px solid ${border}` }}>
           {[["unconfirmed", t("To do", "Zostáva")], ["confirmed", t("Done", "Hotové")], ["all", t("All", "Všetky")]].map(([k, lbl]) => (
             <Chip key={k} active={filter === k} onClick={() => setFilter(k)}>{lbl}</Chip>
@@ -244,38 +308,26 @@ export default function LocationManager({ lang = "en" }) {
           ))}
         </div>
 
-        {/* search */}
         <div style={{ padding: "0.6rem 0.8rem" }}>
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={t("Search projects…", "Hľadať projekty…")}
-            style={inputStyle}
-          />
+          <input value={search} onChange={(e) => setSearch(e.target.value)}
+            placeholder={t("Search projects…", "Hľadať projekty…")} style={inputStyle} />
         </div>
 
-        {/* list */}
         <div style={{ flex: 1, overflowY: "auto" }}>
           {projects === null && <div style={emptyStyle}>{t("Loading…", "Načítavam…")}</div>}
           {err && <div style={{ ...emptyStyle, color: "#ff6b6b" }}>{err}</div>}
-          {projects && !err && filtered.length === 0 && (
-            <div style={emptyStyle}>{t("Nothing here.", "Nič tu nie je.")}</div>
-          )}
+          {projects && !err && filtered.length === 0 && <div style={emptyStyle}>{t("Nothing here.", "Nič tu nie je.")}</div>}
           {filtered.map((p) => {
             const active = p.id === selectedId;
             return (
-              <button
-                key={p.id}
-                onClick={() => selectProject(p)}
-                style={{
-                  display: "flex", alignItems: "center", gap: 10, width: "100%",
-                  padding: "0.6rem 0.85rem", textAlign: "left", border: "none",
-                  borderLeft: `3px solid ${active ? green : "transparent"}`,
-                  borderBottom: `1px solid ${border}`,
-                  background: active ? "rgba(0,229,160,0.10)" : "transparent",
-                  color: textLight, cursor: "pointer", fontFamily: "inherit",
-                }}
-              >
+              <button key={p.id} onClick={() => selectProject(p)} style={{
+                display: "flex", alignItems: "center", gap: 10, width: "100%",
+                padding: "0.6rem 0.85rem", textAlign: "left", border: "none",
+                borderLeft: `3px solid ${active ? green : "transparent"}`,
+                borderBottom: `1px solid ${border}`,
+                background: active ? "rgba(0,229,160,0.10)" : "transparent",
+                color: textLight, cursor: "pointer", fontFamily: "inherit",
+              }}>
                 <span style={{
                   width: 9, height: 9, borderRadius: "50%", flexShrink: 0,
                   background: p.location_verified ? green : amber,
@@ -297,7 +349,6 @@ export default function LocationManager({ lang = "en" }) {
 
       {/* ── Right: editor + map ── */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, position: "relative" }}>
-        {/* editor strip */}
         <div style={{ padding: "0.85rem 1.1rem", borderBottom: `1px solid ${border}`, background: bg2 }}>
           {!selected ? (
             <div style={{ fontSize: "0.85rem", color: dim }}>
@@ -314,50 +365,65 @@ export default function LocationManager({ lang = "en" }) {
                   border: `1px solid ${selected.location_verified ? green : amber}55`,
                   background: `${selected.location_verified ? green : amber}12`,
                 }}>
-                  {selected.location_verified ? t("confirmed", "potvrdené") : t("guessed", "odhad")}
+                  {selected.location_verified ? t("confirmed", "potvrdené") : t("not located yet", "zatiaľ neumiestnené")}
                 </span>
               </div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                <input
-                  value={addr}
-                  onChange={(e) => setAddr(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") findOnMap(); }}
-                  placeholder={t("Type the address, e.g. Agátová 12, Bratislava", "Zadaj adresu, napr. Agátová 12, Bratislava")}
-                  style={{ ...inputStyle, flex: 1, minWidth: 240 }}
-                />
-                <button onClick={findOnMap} disabled={geocoding || addr.trim().length < 3} style={btn(green, geocoding || addr.trim().length < 3)}>
-                  {geocoding ? t("Finding…", "Hľadám…") : t("Find on map", "Nájsť na mape")}
-                </button>
+
+              <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                <div style={{ position: "relative", flex: 1, minWidth: 240 }}>
+                  <input
+                    value={addr}
+                    onChange={(e) => onAddrChange(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Escape") setSuggestions([]); }}
+                    placeholder={t("Type an address or place — e.g. Sky Park, Bratislava", "Zadaj adresu alebo názov — napr. Sky Park, Bratislava")}
+                    style={inputStyle}
+                    autoComplete="off"
+                  />
+                  {(searching || suggestions.length > 0) && (
+                    <div style={{
+                      position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 20,
+                      background: bg2, border: `1px solid ${border}`, borderRadius: 8,
+                      boxShadow: "0 10px 34px rgba(0,0,0,0.55)", overflow: "hidden", maxHeight: 280, overflowY: "auto",
+                    }}>
+                      {searching && (
+                        <div style={{ padding: "8px 11px", fontSize: "0.74rem", color: dim, fontFamily: mono }}>
+                          {t("Searching…", "Hľadám…")}
+                        </div>
+                      )}
+                      {!searching && suggestions.length === 0 && (
+                        <div style={{ padding: "8px 11px", fontSize: "0.74rem", color: dim }}>
+                          {t("No matches — click the map to place it.", "Žiadna zhoda — klikni do mapy.")}
+                        </div>
+                      )}
+                      {suggestions.map((s, i) => (
+                        <button key={i} onClick={() => pick(s)} style={{
+                          display: "block", textAlign: "left", width: "100%", padding: "8px 11px",
+                          background: "transparent", border: "none", borderBottom: i < suggestions.length - 1 ? `1px solid ${border}` : "none",
+                          color: textLight, fontSize: "0.78rem", cursor: "pointer", fontFamily: "inherit",
+                        }}
+                          onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(0,229,160,0.10)")}
+                          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+                          <span style={{ color: green, marginRight: 7 }}>📍</span>{s.label}
+                          {s.cc && s.cc !== "SK" && <span style={{ color: dim, fontFamily: mono, fontSize: "0.64rem", marginLeft: 6 }}>{s.cc}</span>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <button onClick={save} disabled={!pin || saving} style={btn(green, !pin || saving, true)}>
                   {saving ? t("Saving…", "Ukladám…") : t("Save location", "Uložiť polohu")}
                 </button>
               </div>
 
-              {/* candidates */}
-              {candidates.length > 0 && (
-                <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 3, maxHeight: 132, overflowY: "auto" }}>
-                  {candidates.map((c, i) => (
-                    <button key={i} onClick={() => pick(c)} style={{
-                      textAlign: "left", background: pin && Math.abs(pin.lat - c.lat) < 1e-6 && Math.abs(pin.lng - c.lng) < 1e-6 ? "rgba(0,229,160,0.10)" : "transparent",
-                      border: `1px solid ${border}`, borderRadius: 6, color: textLight, padding: "5px 9px",
-                      fontSize: "0.74rem", cursor: "pointer", fontFamily: "inherit",
-                    }}>
-                      <span style={{ color: green, fontFamily: mono, fontSize: "0.66rem", marginRight: 6 }}>📍</span>
-                      {c.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-              <div style={{ marginTop: 7, fontSize: "0.7rem", color: dim }}>
+              <div style={{ marginTop: 7, fontSize: "0.7rem", color: pin ? dim : amber }}>
                 {pin
                   ? <>📌 {pin.lat}, {pin.lng} — {t("drag the pin or click the map to fine-tune", "potiahni špendlík alebo klikni do mapy pre doladenie")}</>
-                  : t("No pin yet — find an address or click the map.", "Zatiaľ bez špendlíka — nájdi adresu alebo klikni do mapy.")}
+                  : t("Pick a suggestion above or click the spot on the map, then Save.", "Vyber návrh hore alebo klikni na miesto v mape, potom Ulož.")}
               </div>
             </>
           )}
         </div>
 
-        {/* map */}
         <div style={{ flex: 1, position: "relative", minHeight: 320 }}>
           <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />
           {toast && (
@@ -399,7 +465,7 @@ const emptyStyle = { padding: "1.5rem 1.1rem", color: dim, fontSize: "0.8rem", f
 
 function btn(color, disabled, filled = false) {
   return {
-    padding: "0.5rem 0.95rem", borderRadius: 7, fontSize: "0.82rem", fontWeight: 600,
+    padding: "0.5rem 0.95rem", borderRadius: 7, fontSize: "0.82rem", fontWeight: 600, whiteSpace: "nowrap",
     cursor: disabled ? "not-allowed" : "pointer", fontFamily: "inherit",
     border: `1px solid ${color}`,
     background: disabled ? "#1a1a1f" : (filled ? color : "transparent"),
