@@ -19,7 +19,6 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { supabase } from "../lib/supabase";
 
 const MAP_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
 const PHOTON = "https://photon.komoot.io/api/";
@@ -34,6 +33,43 @@ const border = "#222228";
 const bg = "#0a0a0b";
 const bg2 = "#0e0e10";
 const mono = "'JetBrains Mono', monospace";
+
+// SK + CZ bounding box (minLon, minLat, maxLon, maxLat) — restricts geocoder
+// suggestions to our region so we never propose places in New Zealand.
+const SKCZ_BBOX = "12.0,47.7,22.6,51.1";
+
+// Direct PostgREST RPC. supabase.rpc() awaits getSession() internally, which can
+// HANG/stall for tens of seconds when the auth layer is contended (the cause of
+// the "Save timed out"). We read the already-stored access token synchronously
+// and call PostgREST ourselves — no getSession, no lock, no hang.
+const SUPA_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPA_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+function storedAccessToken() {
+  try {
+    for (const k of Object.keys(localStorage)) {
+      if (k.startsWith("sb-") && k.includes("-auth-token")) {
+        const v = JSON.parse(localStorage.getItem(k));
+        const tok = v?.access_token || v?.currentSession?.access_token || (Array.isArray(v) ? v[0] : null);
+        if (tok) return tok;
+      }
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+async function rpcDirect(fn, body, { timeoutMs = 20000 } = {}) {
+  const ctrl = new AbortController();
+  const killer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const r = await fetch(`${SUPA_URL}/rest/v1/rpc/${fn}`, {
+      method: "POST", signal: ctrl.signal,
+      headers: { "Content-Type": "application/json", apikey: SUPA_KEY, Authorization: `Bearer ${storedAccessToken() || ""}` },
+      body: JSON.stringify(body || {}),
+    });
+    if (r.status === 401) throw new Error("session-expired");
+    if (!r.ok) throw new Error(`${r.status} ${(await r.text().catch(() => "")).slice(0, 140)}`);
+    return await r.json();
+  } finally { clearTimeout(killer); }
+}
 
 const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
 function buildLabel(p) {
@@ -77,18 +113,23 @@ export default function LocationManager({ lang = "en" }) {
   const userMovedRef = useRef(false);       // true only when the USER moves the pin (not on project load)
   const districtTouchedRef = useRef(false); // true once the user manually edits the district for this placement
 
-  // ── Load projects + cities + districts ──
+  // ── Load projects + cities + districts (direct PostgREST — no getSession) ──
   useEffect(() => {
     let alive = true;
     (async () => {
-      const [{ data: pj, error: pe }, { data: ci }, { data: di }] = await Promise.all([
-        supabase.rpc("admin_list_project_locations"),
-        supabase.rpc("admin_list_cities"),
-        supabase.rpc("admin_list_districts"),
-      ]);
-      if (!alive) return;
-      if (pe) { setErr(pe.message); setProjects([]); return; }
-      setProjects(pj || []); setCities(ci || []); setDistricts(di || []);
+      try {
+        const [pj, ci, di] = await Promise.all([
+          rpcDirect("admin_list_project_locations", {}),
+          rpcDirect("admin_list_cities", {}),
+          rpcDirect("admin_list_districts", {}),
+        ]);
+        if (!alive) return;
+        setProjects(pj || []); setCities(ci || []); setDistricts(di || []);
+      } catch (e) {
+        if (!alive) return;
+        setErr(e?.message === "session-expired" ? "Session expired — reload the page." : (e?.message || "load failed"));
+        setProjects([]);
+      }
     })();
     return () => { alive = false; };
   }, []);
@@ -214,19 +255,30 @@ export default function LocationManager({ lang = "en" }) {
   useEffect(() => { if (!toast) return; const id = setTimeout(() => setToast(null), 2800); return () => clearTimeout(id); }, [toast]);
   useEffect(() => () => { clearTimeout(debounceRef.current); if (abortRef.current) abortRef.current.abort(); }, []);
 
-  // ── Forward geocode (browser-direct) ──
-  async function doSearch(q, cc) {
+  // Bias geocoding to where the project actually is (its pin, else its city centre),
+  // so suggestions are local — like Google Maps near you, not in New Zealand.
+  function searchBias() {
+    if (pin) return { lat: pin.lat, lon: pin.lng };
+    const c = citiesById[selected?.city_id];
+    if (c && c.lat != null) return { lat: Number(c.lat), lon: Number(c.lng) };
+    const b = BIAS[selected?.country_code] || BIAS.SK;
+    return { lat: b.lat, lon: b.lon };
+  }
+
+  // ── Forward geocode (browser-direct, SK/CZ only, biased to the project) ──
+  async function doSearch(q, cc, biasLat, biasLon) {
     if (abortRef.current) abortRef.current.abort();
     const ctrl = new AbortController(); abortRef.current = ctrl;
     const killer = setTimeout(() => ctrl.abort(), 8000);
     setSearching(true);
     try {
-      const bias = BIAS[cc] || BIAS.SK;
-      const r = await fetch(`${PHOTON}?q=${encodeURIComponent(q)}&limit=6&lat=${bias.lat}&lon=${bias.lon}`, { signal: ctrl.signal });
+      const fb = BIAS[cc] || BIAS.SK;
+      const lat = biasLat != null ? biasLat : fb.lat, lon = biasLon != null ? biasLon : fb.lon;
+      const r = await fetch(`${PHOTON}?q=${encodeURIComponent(q)}&limit=8&lang=default&lat=${lat}&lon=${lon}&bbox=${SKCZ_BBOX}`, { signal: ctrl.signal });
       if (!r.ok) throw new Error("geocoder " + r.status);
       const feats0 = ((await r.json()).features || []).filter((f) => f.geometry?.coordinates?.length === 2);
-      const skcz = feats0.filter((f) => ["SK", "CZ"].includes(f.properties?.countrycode));
-      const feats = skcz.length ? skcz : feats0;
+      // STRICT: only SK/CZ — never fall back to worldwide results.
+      const feats = feats0.filter((f) => ["SK", "CZ"].includes(f.properties?.countrycode));
       const seen = new Set(); const out = [];
       for (const f of feats) {
         const lat = +f.geometry.coordinates[1].toFixed(6), lng = +f.geometry.coordinates[0].toFixed(6);
@@ -244,7 +296,7 @@ export default function LocationManager({ lang = "en" }) {
     const q = value.trim();
     if (q.length < 3) { if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; } setSuggestions([]); setSearching(false); return; }
     setSearching(true);
-    debounceRef.current = setTimeout(() => doSearch(q, selected?.country_code), 320);
+    debounceRef.current = setTimeout(() => { const b = searchBias(); doSearch(q, selected?.country_code, b.lat, b.lon); }, 320);
   }
 
   function pick(s) {
@@ -273,32 +325,39 @@ export default function LocationManager({ lang = "en" }) {
       setPin(null);
       setAddr([p.name, p.city_name].filter(Boolean).join(", "));
       if (lat != null && lng != null && mapRef.current) mapRef.current.flyTo({ center: [lng, lat], zoom: 12, duration: 600 });
-      if (p.name) doSearch([p.name, p.city_name].filter(Boolean).join(", "), p.country_code);
+      if (p.name) { const c = citiesById[p.city_id]; doSearch([p.name, p.city_name].filter(Boolean).join(", "), p.country_code, c && c.lat != null ? Number(c.lat) : undefined, c && c.lat != null ? Number(c.lng) : undefined); }
     }
   }
-
-  function withTimeout(promise, ms) { return Promise.race([promise, new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), ms))]); }
 
   async function save() {
     if (!selected || !pin || !cityId || deriving) return;
     setSaving(true);
     try {
-      const { error } = await withTimeout(supabase.rpc("admin_set_project_location", {
+      const rows = await rpcDirect("admin_set_project_location", {
         p_id: selected.id, p_lat: pin.lat, p_lng: pin.lng, p_address: addr.trim() || null,
         p_district: district.trim(), p_city_id: cityId,
-      }), 30000);
-      if (error) { setToast({ type: "err", msg: error.message }); return; }
+      });
+      const row = Array.isArray(rows) ? rows[0] : rows; // authoritative saved values
       if (district.trim() && !(catalog.byCity[cityId] || []).includes(district.trim())) {
         setDistricts((prev) => [...prev, { city_id: cityId, name: district.trim() }]);
       }
-      const next = (projects || []).find((p) => !p.location_verified && p.id !== selected.id && (country === "all" || p.country_code === country));
+      const savedLat = row?.lat != null ? Number(row.lat) : pin.lat;
+      const savedLng = row?.lng != null ? Number(row.lng) : pin.lng;
+      const savedCity = row?.city_id || cityId;
+      const savedDist = row?.district ?? (district.trim() || null);
+      // Update the in-memory list from the SAVED row so re-opening shows the real pin.
       setProjects((prev) => prev.map((p) => p.id === selected.id
-        ? { ...p, lat: pin.lat, lng: pin.lng, address: addr.trim() || null, district: district.trim() || null, city_id: cityId, city_name: cityNameOf(cityId), location_source: "manual", location_verified: true }
+        ? { ...p, lat: savedLat, lng: savedLng, address: row?.address ?? (addr.trim() || null),
+            district: savedDist, city_id: savedCity, city_name: cityNameOf(savedCity),
+            location_source: "manual", location_verified: true }
         : p));
+      // Reflect the saved pin in the editor and stay here (so you can see it's confirmed).
+      setPin({ lat: savedLat, lng: savedLng });
       setToast({ type: "ok", msg: t("Saved ✓", "Uložené ✓") });
-      if (next) selectProject(next); else { setSelectedId(null); setPin(null); setAddr(""); }
     } catch (e) {
-      setToast({ type: "err", msg: e?.message === "timeout" ? t("Save timed out — try again", "Uloženie vypršalo — skús znova") : String(e?.message || e) });
+      setToast({ type: "err", msg: e?.message === "session-expired"
+        ? t("Session expired — reload the page", "Relácia vypršala — obnov stránku")
+        : (e?.message || "save failed") });
     } finally { setSaving(false); }
   }
 
