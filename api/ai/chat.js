@@ -1,111 +1,80 @@
 // Vercel serverless endpoint: /api/ai/chat
 //
-// Residata AI assistant — grounded chatbot. Users ask free-form
-// questions about the Bratislava new-build market, the endpoint
-// assembles a TIER-APPROPRIATE data context from Supabase, calls
-// Claude, and returns prose. Tier-based context slicing is the key
-// data-protection mechanism: anonymous users CANNOT see per-project
-// detail because the server doesn't put that data in the prompt —
-// it's not a "tell Claude not to share it" rule (unreliable), it's
-// "the information never reaches Claude" (ironclad).
+// Residata AI assistant — grounded chatbot for the Slovak + Czech (SK + CZ)
+// new-build apartment market.
 //
-// === Security layers (defence in depth) ===
+// === ARCHITECTURE (rebuilt 2026-06-22) — TOOLS, not a data dump ===
 //
-// 1. **Origin / Referer allowlist** — rejects curl / Postman calls
-//    that didn't come from a trusted Residata domain. CORS is
-//    browser-enforced so this server-side check is the actual gate.
+// The model is given THREE tools and queries the live database itself, instead
+// of us stuffing a truncated copy of the data into the prompt. This is the
+// permanent fix for "the AI is missing data": every question is answered from
+// the FULL fact table (~all units, every project, both markets) — current OR
+// historical — with no row cap and no alphabetical truncation. The old approach
+// fed ~5,000 of ~13,000 current units into the prompt, so late-alphabet projects
+// (Sky Park Tower, Zwirn…) were invisible and it wrongly answered "no data".
 //
-// 2. **Per-IP rate limit** (10 req/min in-memory) — absorbs bursty
-//    abuse before it hits the DB counter or spends Anthropic credit.
+//   Tools (each runs server-side against analytics.unit_facts via the SECURITY
+//   DEFINER query engines public.analytics_pivot / public.analytics_units, plus
+//   public.projects for velocity):
+//     • market_overview   — per-country totals + best-sellers + top developers
+//     • market_stats      — counts / averages / €m² grouped by any dimension,
+//                           any filters, CURRENT or HISTORICAL (month-by-month)
+//     • search_apartments — specific units by city/district/rooms/floor/price/…,
+//                           CURRENT or HISTORICAL
 //
-// 3. **Auth verification** (Supabase session) — for logged-in users
-//    we read tier from user_profiles server-side. Client can't lie
-//    about their tier; anon is the only un-authed state and it hits
-//    the strictest limits.
+//   The tool layer hides the data quirks from the model (district's field is
+//   `cast`; rooms are stored as `3.0`, so room filters use the numeric path) and
+//   translates the engines' compact measure codes into clean labelled JSON.
 //
-// 4. **Tier-based daily counter** — for logged-in users this counts
-//    rows in ai_usage_log by user_id today (persists across cold
-//    starts). For anon callers it's an in-memory per-IP counter that
-//    resets on cold start (see DAILY_LIMITS below for live caps and
-//    the F-109 audit note for the cold-start caveat). pending tier
-//    is refused outright. Current caps: see DAILY_LIMITS const —
-//    paid 30/day, free 3/day, anon 1/day, admin 100/day. Keep this
-//    line in sync with DAILY_LIMITS if you ever bump it.
+// === MODEL per tier (Boss 2026-06-22) ===
+//   paid / admin / active-trial  → claude-sonnet-4-6  (quality)
+//   anon / free                  → claude-haiku-4-5   (cheap free taste)
+//   See MODEL_BY_TIER. Prompt caching is on (cache_control on the stable system
+//   prefix), and the system prompt is small now (data comes from tools, not the
+//   prompt) so per-question cost is already low.
 //
-// 5. **Bounded input** — request JSON max 24 KB. Each user message
-//    max 2000 chars. Conversation history max 10 turns.
+// === ACCESS by tier (mirrors src/lib/capabilities.js) ===
+//   HISTORICAL data (mode:'historical') is a PAID feature (paid/admin/trial).
+//   anon/free get CURRENT data only; a historical request returns a gate notice.
+//   An active trial (user_profiles.trial_until > now) counts as paid here — same
+//   promotion the capability layer does (trial keeps tier='free').
 //
-// 6. **Bounded output** — MAX_TOKENS = 900 (see const below; bumped
-//    from 500 after users hit truncation on "list every flat matching
-//    X"). Worst-case input is ~30k tokens of paid context × $0.80/M
-//    input ≈ $0.024 plus ~$0.004 output ≈ ~$0.028 / call. Free tier
-//    runs the same context build, so per-call cost is identical;
-//    free's protection is the 3/day quantity cap.
-//
-// 7. **Monthly hard cap on Anthropic side** — configured in the
-//    Anthropic dashboard (Usage Limits → Monthly Spend Cap). Set
-//    this to $100-200/month as a last-resort backstop.
+// === DAILY CAPS (questions/day; see DAILY_LIMITS) ===
+//   anon 1 · free 3 · paid 30 · admin 100. Active trial uses the paid cap.
+//   Enforced: logged-in = today's rows in ai_usage_log by user_id (persists
+//   across cold starts); anon = in-memory per-IP counter (+ a 10/min per-IP
+//   burst limit on every caller). At the cap → 429 with an upgrade CTA, resets
+//   at 00:00 UTC. Hard stop (never billed past it). A monthly spend cap in the
+//   Anthropic dashboard is the backstop ALARM, not the enforcement.
 //
 // === Request / response ===
-//
-//   Request:
-//     { messages: [{role: 'user'|'assistant', content: string}],
-//       lang: 'sk'|'en' }
-//
-//   Response (200):
-//     { text, tier, remaining: { today }, usage: { input_tokens, output_tokens } }
-//
-//   Non-200:
-//     401 — not authenticated (when the caller sent an invalid token)
-//     403 — untrusted origin OR tier is 'pending' (awaiting approval)
-//     429 — rate limit (per-IP or per-tier daily cap)
-//     413 — body too large
-//     501 — ANTHROPIC_API_KEY missing
-//     500 — unexpected server error
+//   Request : { messages:[{role,content}], lang:'sk'|'en', sessionId?, typingMs?, pageUrl? }
+//   Response: { text, tier, model, log_id, remaining:{today}, usage:{input_tokens,output_tokens,
+//               cache_read_input_tokens,cache_creation_input_tokens}, response_time_ms }
+//   Non-200 : 401 auth · 403 origin/pending · 429 rate · 413 too large · 501 no key · 500
 
 import { createClient } from "@supabase/supabase-js";
 import { isTrustedOrigin as checkTrustedOrigin } from "../_lib/origin.js";
 
-export const maxDuration = 30;
+export const maxDuration = 60; // tool loop = a few model round-trips
 
-// Haiku 4.5 — 3× faster than Sonnet, 5× cheaper, and quality is
-// plenty for grounded market Q&A (we're answering from a structured
-// JSON context, not doing complex reasoning). Switch to Sonnet if
-// users start asking questions that need chain-of-thought.
-const ANTHROPIC_MODEL = "claude-haiku-4-5";
-// Bumped 500 → 900 after users asked "list all flats matching X" and
-// the model's reply got truncated mid-list. Still far under Haiku's
-// context budget so cost impact is negligible (worst-case 900 tokens
-// × $4/M output = $0.0036 delta per call).
-const MAX_TOKENS      = 900;
+// Model per tier. Sonnet for paying users (quality); Haiku for the free taste (cost).
+const MODEL_BY_TIER = {
+  anon:  "claude-haiku-4-5",
+  free:  "claude-haiku-4-5",
+  paid:  "claude-sonnet-4-6",
+  admin: "claude-sonnet-4-6",
+};
+const FALLBACK_MODEL = "claude-haiku-4-5";
+
+const MAX_TOKENS      = 1500;  // room for a listy answer or a tool call
+const MAX_TOOL_ITERS  = 6;     // model<->tool round-trips before we force a stop
 const MAX_INPUT_BYTES = 24 * 1024;
 const MAX_HISTORY     = 10;
 const MAX_MSG_LEN     = 2000;
-// Data-context cache. The market data only refreshes on monthly
-// sync, so a 15-min TTL is safe and cuts two Supabase round-trips
-// from every chat request → shaves ~300-800ms off cold turns.
-const CTX_TTL_MS      = 15 * 60 * 1000;
-const ctxCache        = new Map();  // key → { at: ms, value: object }
-function cachedContext(key, builder) {
-  const hit = ctxCache.get(key);
-  if (hit && Date.now() - hit.at < CTX_TTL_MS) return Promise.resolve(hit.value);
-  return builder().then(v => { ctxCache.set(key, { at: Date.now(), value: v }); return v; });
-}
 
-const HOUR_MS = 60 * 60 * 1000;
-const DAY_MS  = 24 * HOUR_MS;
-
-// Per-day caps by tier. pending is refused earlier in the flow.
-// Design note (2026-04-24): topic-restriction by tier was REMOVED —
-// every tier (anon included) now receives the full market context.
-// Only the daily question quantity changes between tiers. This is
-// the "free taste for everyone, pay for volume" model.
-const DAILY_LIMITS = {
-  anon:  1,
-  free:  3,
-  paid:  30,
-  admin: 100,
-};
+// Per-day caps by tier. pending is refused earlier. Active trial uses the paid cap.
+const DAILY_LIMITS = { anon: 1, free: 3, paid: 30, admin: 100 };
 
 const TRUSTED_ORIGINS = [
   "https://residata-gamma.vercel.app",
@@ -114,8 +83,10 @@ const TRUSTED_ORIGINS = [
   "http://localhost:5173",
   "http://localhost:3000",
 ];
-
 const isTrustedOrigin = (req) => checkTrustedOrigin(req, TRUSTED_ORIGINS);
+
+const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS  = 24 * HOUR_MS;
 
 function clientIp(req) {
   const fwd = req.headers["x-forwarded-for"];
@@ -123,348 +94,286 @@ function clientIp(req) {
   return req.socket?.remoteAddress || "0.0.0.0";
 }
 
-/* Read one secret from app_secrets via service-role. Returns null on
-   any failure so the caller can fall back to a 501 response. */
+/* Effective tier: an active trial (trial_until > now) is treated as paid — the
+   same promotion src/lib/capabilities.js does (trial keeps the row tier 'free'). */
+function effectiveTier(prof) {
+  const base = prof?.tier || "anon";
+  if (base === "free" && prof?.trial_until && new Date(prof.trial_until).getTime() > Date.now()) {
+    return "paid";
+  }
+  return base;
+}
+const isPaidTier = (t) => t === "paid" || t === "admin";
+
+/* Read one secret from app_secrets via service-role. */
 async function readSecret(admin, key) {
   if (!admin) return null;
   try {
-    const { data, error } = await admin
-      .from("app_secrets")
-      .select("value")
-      .eq("key", key)
-      .maybeSingle();
+    const { data, error } = await admin.from("app_secrets").select("value").eq("key", key).maybeSingle();
     if (error) return null;
     return data?.value || null;
   } catch (_) { return null; }
 }
 
-// In-memory per-IP rate limit (10 requests/min). Resets on cold start
-// but that's fine — it's a bursty-abuse absorber, the tier-based DB
-// counter is the persistent authority for logged-in users.
-const ipBucket = new Map();  // ip → { start: ms, count: number }
+// In-memory per-IP burst limit (10/min) — absorbs bursty abuse before DB/credit.
+const ipBucket = new Map();
 const IP_WINDOW_MS = 60 * 1000;
 const IP_MAX = 10;
 function ipRateCheck(ip) {
   const now = Date.now();
   const b = ipBucket.get(ip);
-  if (!b || now - b.start > IP_WINDOW_MS) {
-    ipBucket.set(ip, { start: now, count: 1 });
-    return { ok: true };
-  }
+  if (!b || now - b.start > IP_WINDOW_MS) { ipBucket.set(ip, { start: now, count: 1 }); return { ok: true }; }
   b.count += 1;
-  if (b.count > IP_MAX) {
-    return { ok: false, retryAfterSec: Math.ceil((b.start + IP_WINDOW_MS - now) / 1000) };
-  }
+  if (b.count > IP_MAX) return { ok: false, retryAfterSec: Math.ceil((b.start + IP_WINDOW_MS - now) / 1000) };
   return { ok: true };
 }
 
-// Per-IP ANON daily counter (in-memory, 24h TTL). For logged-in
-// users we use the ai_usage_log DB row count, but anon doesn't
-// write to that table (no user_id). This counter stops the most
-// obvious bypass (hit limit → hard-refresh → get another free
-// question) as long as the Vercel function stays warm. Cold
-// starts reset the counter; a fully bullet-proof persistent
-// counter requires a DB table, tracked as a v2 follow-up.
-const anonBucket = new Map();  // ip → { day: "2026-04-24", count: number }
+// Per-IP ANON daily counter (in-memory, resets on cold start / midnight UTC).
+const anonBucket = new Map();
 function todayKey() {
   const d = new Date();
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}-${String(d.getUTCDate()).padStart(2,"0")}`;
 }
-function anonDailyCount(ip) {
-  const day = todayKey();
-  const b = anonBucket.get(ip);
-  if (!b || b.day !== day) return 0;
-  return b.count;
-}
+function anonDailyCount(ip) { const b = anonBucket.get(ip); return (!b || b.day !== todayKey()) ? 0 : b.count; }
 function anonDailyIncrement(ip) {
-  const day = todayKey();
-  const b = anonBucket.get(ip);
+  const day = todayKey(); const b = anonBucket.get(ip);
   if (!b || b.day !== day) { anonBucket.set(ip, { day, count: 1 }); return 1; }
-  b.count += 1;
-  return b.count;
+  b.count += 1; return b.count;
 }
 
 // ────────────────────────────────────────────────────────────────
-// Tier-aware data context builders.
-// Each function returns a structured JSON of Residata data scoped
-// to what the caller is allowed to see. The JSON gets serialised
-// into the system prompt so Claude answers from it. Anything not
-// in the returned object is invisible to the LLM — no amount of
-// prompt-jailbreaking can reveal paid-tier data to an anon caller.
+// TOOLS — the model's window onto the full database.
 // ────────────────────────────────────────────────────────────────
 
-/* Append user's chosen-project flat-level detail on top of the
-   shared market context. Used only for free-tier users who have
-   selected their one project — gives the assistant the room to
-   answer "how's my project doing" type questions personally. */
-async function buildChosenProjectContext(admin, chosenId) {
-  // projects_live: real per-project counts (not registry-inflated).
-  // flats_current: the latest snapshot_month from flats_archive — same
-  // dataset the platform's "current state" surfaces use. The legacy
-  // `flats` table was dropped in 2026-04 (residata commit 0d396e9).
-  const [proj, flats] = await Promise.all([
-    admin.from("projects_live").select("*").eq("id", chosenId).maybeSingle(),
-    admin.from("flats_current").select("stav, izby, obytna_plocha, cena_s_dph").eq("project_id", chosenId).limit(2000),
-  ]);
-  const p = proj.data;
-  if (!p) return null;
-  const fs = flats.data || [];
-  const roomMix = {};
-  for (const f of fs) {
-    const k = f.izby == null ? "?" : String(f.izby);
-    const r = roomMix[k] ||= { total: 0, V: 0, R: 0, P: 0 };
-    r.total += 1;
-    if (f.stav === "V") r.V += 1;
-    else if (f.stav === "P") r.P += 1;
-    else if (f.stav === "R" || f.stav === "PR") r.R += 1;
-  }
-  return {
-    name: p.name,
-    country: p.country,
-    city: p.city,
-    developer: p.developer,
-    district: p.district,
-    status: p.status,
-    total_units: p.total_units,
-    available: p.available_units,
-    sold: p.sold_units,
-    sold_percentage: p.sold_percentage,
-    avg_price_eur_m2: p.avg_price_eur_m2,
-    sold_last_month: p.sold_last_month,
-    room_mix: Object.entries(roomMix).map(([rooms, r]) => ({ rooms, ...r })),
-  };
+const TOOLS = [
+  {
+    name: "market_overview",
+    description:
+      "Big-picture market numbers for the CURRENT month. Returns, for each country (Slovakia/SK and Czechia/CZ): units tracked, available, sold, reserved, average €/m², units sold in the last 30 days, active projects; PLUS the top sellers (most units sold in the last 30 days) and the largest developers by inventory, each tagged with its country and city. Use this for market-wide questions, 'best-selling / fastest-selling project', and SK-vs-CZ comparisons.",
+    input_schema: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
+    name: "market_stats",
+    description:
+      "Counts, sums and averages over apartments, grouped by a dimension and filtered however you like. Use for 'average €/m² in Prague', 'how many available 2-rooms in Ružinov', '€/m² by district', or month-by-month HISTORY. Returns one row per group with: units (n), available, sold, reserved, avg_price_eur, avg_eur_per_m2, min_price, max_price. You do any ranking/sorting of the returned groups yourself.",
+    input_schema: {
+      type: "object",
+      properties: {
+        group_by: { type: "string", enum: ["none","country","city","district","developer","project","rooms","type","status","month","kolaudacia","orientation"], description: "Dimension to group by. 'none' = one overall total for the filtered set. 'month' = history over time." },
+        country:  { type: "string", enum: ["SK","CZ"] },
+        city:     { type: "string", description: "e.g. Bratislava, Praha, Brno" },
+        district: { type: "string", description: "e.g. Ružinov, Žižkov" },
+        developer:{ type: "string" },
+        project:  { type: "string", description: "Project name." },
+        rooms:    { type: "integer", description: "Exact room count, e.g. 3." },
+        status:   { type: "string", enum: ["available","sold","reserved","any"], description: "Default any." },
+        price_min:{ type: "number" }, price_max: { type: "number" },
+        mode:     { type: "string", enum: ["current","historical"], description: "current = latest month (default). historical = all months over time (PAID)." },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "search_apartments",
+    description:
+      "Find SPECIFIC apartments matching exact criteria. Use for 'cheapest available 3-room in Bratislava', 'flats on the 16th floor or higher under €1M', etc. Returns up to `limit` matching units, each with: project, unit, city, district, rooms, floor, area_m2, price_eur, eur_per_m2, status. Searches the WHOLE database — every project, no cap.",
+    input_schema: {
+      type: "object",
+      properties: {
+        city:      { type: "string" }, district: { type: "string" },
+        developer: { type: "string" }, project:  { type: "string" },
+        rooms:     { type: "integer", description: "Exact room count." },
+        status:    { type: "string", enum: ["available","sold","reserved","any"], description: "Default available." },
+        price_min: { type: "number" }, price_max: { type: "number" },
+        floor_min: { type: "integer" }, floor_max: { type: "integer" },
+        area_min:  { type: "number" }, area_max: { type: "number" },
+        sort:      { type: "string", enum: ["price","eur_per_m2","floor","area","rooms"], description: "Sort field (default price)." },
+        order:     { type: "string", enum: ["asc","desc"], description: "Default asc." },
+        mode:      { type: "string", enum: ["current","historical"], description: "current = on the market now (default). historical = past months (PAID)." },
+        limit:     { type: "integer", description: "Max rows (default 25, max 100)." },
+      },
+      additionalProperties: false,
+    },
+  },
+];
+
+// friendly group/dim name -> analytics dim_registry key (district's key is `cast`)
+const GROUP_KEY = {
+  none: null, country: "country", city: "city", district: "cast", developer: "developer",
+  project: "project_name", rooms: "izby", type: "typ", status: "stav", month: "snapshot_month",
+  kolaudacia: "kolaudacia", orientation: "orientacia",
+};
+const STATUS_CODE = { available: "V", sold: "P", reserved: "R" };
+
+function pageMode(mode, allowHistorical) {
+  // returns ['latest'|'archive', gatedBool]
+  if (mode === "historical") return allowHistorical ? ["archive", false] : ["latest", true];
+  return ["latest", false];
 }
 
-async function buildPaidContext(admin) {
-  // Everything the aggregations page shows PLUS flat-level data for
-  // currently-available (V) and reserved (R/PR) units. Sold (P) units
-  // are intentionally excluded — they're historical and would bloat
-  // the prompt with no Q&A value. Rationale for including flats:
-  // without them the assistant can only answer project-level
-  // questions, and users immediately hit "which flat on 16+ floor
-  // under 1M?" type questions where the chatbot had to say "I don't
-  // know" even though the data sits in the DB.
-  //
-  // Size: ~2,500 available/reserved flats × compact keys → ~30k
-  // input tokens → ~$0.025 per call on Haiku 4.5. Paid tier's 30
-  // daily questions cap that at $0.75/day/user worst case.
-  // Read from VIEWS, not tables: projects_live (real counts), flats_current
-  // (latest snapshot from archive). The legacy `flats` and the inflated
-  // `projects` columns were superseded in 2026-04 — see architecture
-  // memory: "Residata data architecture (2026-04-27)".
-  const [markets, projects, flats] = await Promise.all([
-    // Per-market totals (SK + CZ). The old `metrics` table had duplicate keys
-    // (one SK, one CZ row per key) with no country discriminator, so reading it
-    // into a flat map silently kept whichever row came last — wrong numbers.
-    admin.from("totals_by_country").select("country_code, country_name, total_units_tracked, total_available, total_sold, total_reserved, avg_eur_m2, total_sold_last_month, total_projects_active, total_developers_active"),
-    // limit 400: SK (~151) + CZ (~144) all-statuses ≈ 295 — 200 would truncate.
-    admin.from("projects_live").select("id, name, developer, country, city, district, status, total_units, available_units, sold_units, sold_last_month, sold_percentage, avg_price_eur_m2").limit(400),
-    // Order by project_id + price so the row cap drops predictably (alphabetical
-    // tail) rather than arbitrary insertion order.
-    admin.from("flats_current").select("project_id, stav, izby, poschodie, budova, obytna_plocha, exterier_plocha, cena_s_dph, orientacia, kolaudacia")
-      .in("stav", ["V", "R", "PR"])
-      .order("project_id", { ascending: true })
-      .order("cena_s_dph", { ascending: true, nullsFirst: false })
-      .limit(5000),
-  ]);
-  const all = projects.data || [];
-  const active = all.filter(p => (p.status || "active") === "active");
-  // District summary (weighted avg €/m²).
-  const byD = {};
-  for (const p of active) {
-    if (!p.district) continue;
-    // Key by country|city|district so same-named districts in different cities
-    // (e.g. "Centrum") never merge across markets.
-    const key = `${p.country || ""}|${p.city || ""}|${p.district}`;
-    const d = byD[key] ||= { country: p.country, city: p.city, district: p.district, projects: 0, units: 0, avail: 0, sold: 0, sold30: 0, priceW: 0, priceSumW: 0 };
-    d.projects += 1;
-    d.units += p.total_units || 0;
-    d.avail += p.available_units || 0;
-    d.sold  += p.sold_units || 0;
-    d.sold30 += p.sold_last_month || 0;
-    if (p.avg_price_eur_m2) {
-      const w = p.total_units || 1;
-      d.priceSumW += p.avg_price_eur_m2 * w;
-      d.priceW += w;
-    }
+function buildFilters(a) {
+  // categorical dim filters for both engines
+  const f = {};
+  if (a.country)   f.country = [a.country];
+  if (a.city)      f.city = [a.city];
+  if (a.district)  f.cast = [a.district];
+  if (a.developer) f.developer = [a.developer];
+  if (a.project)   f.project_name = [a.project];
+  if (a.status && a.status !== "any" && STATUS_CODE[a.status]) f.stav = [STATUS_CODE[a.status]];
+  return f;
+}
+function buildRanges(a, { withFloor = false, withArea = false } = {}) {
+  const r = {};
+  if (a.price_min != null || a.price_max != null) {
+    r.cena_s_dph = {}; if (a.price_min != null) r.cena_s_dph.min = String(a.price_min); if (a.price_max != null) r.cena_s_dph.max = String(a.price_max);
   }
-  const districts = Object.values(byD)
-    .map(d => ({
-      country: d.country, city: d.city, district: d.district,
-      projects: d.projects, units: d.units,
-      avail: d.avail, sold: d.sold, sold_30d: d.sold30,
-      avg_eur_m2: d.priceW ? Math.round(d.priceSumW / d.priceW) : null,
-    }))
-    .sort((a, b) => b.units - a.units);
-  // Top velocity (last-30-day sellers)
-  const topVelocity = [...active]
-    .filter(p => (p.sold_last_month || 0) > 0)
-    .sort((a, b) => (b.sold_last_month || 0) - (a.sold_last_month || 0))
-    .slice(0, 10)
-    .map(p => ({ name: p.name, country: p.country, city: p.city, developer: p.developer, district: p.district, sold_30d: p.sold_last_month, avg_eur_m2: p.avg_price_eur_m2 }));
-  // Developer aggregation
+  if (a.rooms != null) r.izby = { min: String(a.rooms), max: String(a.rooms) }; // numeric path dodges '3.0'
+  if (withFloor && (a.floor_min != null || a.floor_max != null)) {
+    r.poschodie = {}; if (a.floor_min != null) r.poschodie.min = String(a.floor_min); if (a.floor_max != null) r.poschodie.max = String(a.floor_max);
+  }
+  if (withArea && (a.area_min != null || a.area_max != null)) {
+    r.obytna_plocha = {}; if (a.area_min != null) r.obytna_plocha.min = String(a.area_min); if (a.area_max != null) r.obytna_plocha.max = String(a.area_max);
+  }
+  return r;
+}
+const num = (v) => (v == null ? null : Number(v));
+const round = (v) => (v == null ? null : Math.round(Number(v)));
+
+async function toolMarketOverview(admin) {
+  const { data, error } = await admin
+    .from("projects")
+    .select("name, country, city, district, developer, status, total_units, available_units, sold_units, reserved_units, sold_last_month, avg_price_eur_m2")
+    .limit(400);
+  if (error) throw new Error(error.message);
+  const all = (data || []).filter((p) => (p.status || "active") === "active");
+  const byCountry = {};
+  for (const p of all) {
+    const c = p.country || "?";
+    const d = (byCountry[c] ||= { country: c, projects: 0, units: 0, available: 0, sold: 0, reserved: 0, sold_30d: 0, pw: 0, lw: 0 });
+    d.projects++; d.units += p.total_units || 0; d.available += p.available_units || 0;
+    d.sold += p.sold_units || 0; d.reserved += p.reserved_units || 0; d.sold_30d += p.sold_last_month || 0;
+    if (p.avg_price_eur_m2) { const w = p.total_units || 1; d.pw += p.avg_price_eur_m2 * w; d.lw += w; }
+  }
+  const markets = Object.values(byCountry).map((d) => ({
+    country: d.country, projects_active: d.projects, units_tracked: d.units,
+    available: d.available, sold: d.sold, reserved: d.reserved,
+    sold_last_30d: d.sold_30d, avg_eur_per_m2: d.lw ? Math.round(d.pw / d.lw) : null,
+  }));
+  const top_sellers_30d = [...all].filter((p) => (p.sold_last_month || 0) > 0)
+    .sort((a, b) => (b.sold_last_month || 0) - (a.sold_last_month || 0)).slice(0, 10)
+    .map((p) => ({ project: p.name, country: p.country, city: p.city, district: p.district, sold_last_30d: p.sold_last_month, avg_eur_per_m2: round(p.avg_price_eur_m2) }));
   const byDev = {};
-  for (const p of active) {
-    if (!p.developer) continue;
-    const d = byDev[p.developer] ||= { developer: p.developer, projects: 0, units: 0, sold30: 0 };
-    d.projects += 1;
-    d.units += p.total_units || 0;
-    d.sold30 += p.sold_last_month || 0;
-  }
-  const topDevelopers = Object.values(byDev).sort((a, b) => b.units - a.units).slice(0, 10);
-  // Compact flat-level rows — keys are short to save tokens. The
-  // system prompt tells the model how to read them.
-  const idToName = {}, idToCity = {};
-  for (const p of active) { idToName[p.id] = p.name; idToCity[p.id] = p.city; }
-  const availFlats = (flats.data || [])
-    .filter(f => idToName[f.project_id])  // only active projects
-    .map(f => ({
-      proj:  idToName[f.project_id],
-      mesto: idToCity[f.project_id] || null,      // city — market label (SK/CZ)
-      stav:  f.stav,                              // V=available, R/PR=reserved
-      izby:  f.izby ?? null,                      // rooms
-      posch: f.poschodie ?? null,                 // floor
-      bud:   f.budova || null,                    // building
-      m2:    f.obytna_plocha ?? null,             // interior area
-      ext:   f.exterier_plocha ?? null,           // balcony/terrace
-      eur:   f.cena_s_dph ?? null,                // price incl. VAT
-      eur_m2: (f.cena_s_dph && f.obytna_plocha && f.obytna_plocha > 0)
-                ? Math.round(f.cena_s_dph / f.obytna_plocha) : null,
-      orient: f.orientacia || null,
-      kolaud: f.kolaudacia || null,
-    }));
-  return {
-    scope: "Slovak + Czech (SK + CZ) new-build market — aggregate + unit-level, ALL markets",
-    // Per-market totals (exact, from totals_by_country). Use these for any
-    // market-wide number; never re-derive them by adding up the project list.
-    markets: (markets.data || []).map(m => ({
-      country: m.country_code, country_name: m.country_name,
-      units_tracked: m.total_units_tracked, available: m.total_available,
-      sold: m.total_sold, reserved: m.total_reserved, avg_eur_m2: m.avg_eur_m2,
-      sold_30d: m.total_sold_last_month, projects_active: m.total_projects_active,
-      developers_active: m.total_developers_active,
-    })),
-    projects: active.map(p => ({
-      name: p.name, country: p.country, city: p.city,
-      developer: p.developer, district: p.district,
-      total: p.total_units, avail: p.available_units, sold: p.sold_units,
-      sold_30d: p.sold_last_month, sold_pct: p.sold_percentage,
-      avg_eur_m2: p.avg_price_eur_m2,
-    })),
-    districts,
-    top_developers_by_inventory: topDevelopers,
-    top_velocity_30d: topVelocity,
-    // Per-flat rows for V/R/PR (available + reserved). Sold flats omitted.
-    // Keys: proj=project, mesto=city, stav, izby=rooms, posch=floor,
-    // bud=building, m2=interior, ext=balcony, eur=price, eur_m2, orient, kolaud.
-    available_units: availFlats,
-  };
+  for (const p of all) { if (!p.developer) continue; const d = (byDev[p.developer] ||= { developer: p.developer, projects: 0, units: 0, sold_30d: 0 }); d.projects++; d.units += p.total_units || 0; d.sold_30d += p.sold_last_month || 0; }
+  const top_developers = Object.values(byDev).sort((a, b) => b.units - a.units).slice(0, 10);
+  return { markets, top_sellers_30d, top_developers };
 }
 
-function systemPrompt(lang, dataCtx) {
+async function toolMarketStats(admin, a, allowHistorical) {
+  const [mode, gated] = pageMode(a.mode, allowHistorical);
+  if (gated) return { gated: true, message: "Month-by-month history is a paid feature. On the current-month data I can answer fully." };
+  const gkey = GROUP_KEY[a.group_by || "none"];
+  const spec = { dims: gkey ? [gkey] : [], filters: buildFilters(a), ranges: buildRanges(a), mode };
+  const { data, error } = await admin.rpc("analytics_pivot", { p_spec: spec });
+  if (error) throw new Error(error.message);
+  const groups = (data || []).map((g) => {
+    const m = g.m || {};
+    return {
+      group: gkey ? (g.d && g.d[0] != null ? String(g.d[0]) : "(none)") : "ALL",
+      units: m.n || 0, available: m.avail || 0, sold: m.sold || 0, reserved: m.res || 0,
+      avg_price_eur: m.n_cs ? Math.round(m.s_cs / m.n_cs) : null,
+      avg_eur_per_m2: m.s_lw ? Math.round(m.s_pw / m.s_lw) : null,
+      min_price: round(m.mn_cs), max_price: round(m.mx_cs),
+    };
+  });
+  groups.sort((x, y) => y.units - x.units); // keep payload small + useful
+  return { mode, group_by: a.group_by || "none", groups: groups.slice(0, 60) };
+}
+
+async function toolSearchApartments(admin, a, allowHistorical) {
+  const [mode, gated] = pageMode(a.mode, allowHistorical);
+  if (gated) return { gated: true, message: "Searching past months is a paid feature. I can search what's on the market now." };
+  const sortMap = { price: "cena_s_dph", eur_per_m2: "price_per_m2", floor: "poschodie", area: "obytna_plocha", rooms: "izby" };
+  const status = a.status || "available";
+  const spec = {
+    columns: ["project_name", "unit_id", "city", "cast", "izby", "poschodie", "obytna_plocha", "cena_s_dph", "price_per_m2", "stav"],
+    filters: buildFilters({ ...a, status }),
+    ranges: buildRanges(a, { withFloor: true, withArea: true }),
+    sort: [{ key: sortMap[a.sort || "price"], dir: a.order === "desc" ? "desc" : "asc" }],
+    limit: Math.min(Math.max(a.limit || 25, 1), 100),
+    mode,
+  };
+  const { data, error } = await admin.rpc("analytics_units", { p_spec: spec });
+  if (error) throw new Error(error.message);
+  const STATUS_LABEL = { V: "available", P: "sold", R: "reserved", PR: "pre-reserved" };
+  const rows = ((data && data.rows) || []).map((r) => ({
+    project: r.project_name, unit: r.unit_id, city: r.city, district: r.cast,
+    rooms: r.izby != null ? Math.round(Number(r.izby)) : null,
+    floor: r.poschodie, area_m2: num(r.obytna_plocha),
+    price_eur: round(r.cena_s_dph), eur_per_m2: round(r.price_per_m2),
+    status: STATUS_LABEL[r.stav] || r.stav,
+  }));
+  return { mode, count: rows.length, apartments: rows };
+}
+
+async function executeTool(admin, name, args, allowHistorical) {
+  try {
+    if (name === "market_overview")   return await toolMarketOverview(admin);
+    if (name === "market_stats")      return await toolMarketStats(admin, args || {}, allowHistorical);
+    if (name === "search_apartments") return await toolSearchApartments(admin, args || {}, allowHistorical);
+    return { error: `unknown tool ${name}` };
+  } catch (e) {
+    return { error: String(e?.message || e).slice(0, 300) };
+  }
+}
+
+// ────────────────────────────────────────────────────────────────
+
+function systemPrompt(lang, allowHistorical) {
   const SK = lang !== "en";
-  const jsonBlock = JSON.stringify(dataCtx);
+  const histLine = allowHistorical
+    ? (SK ? "Máš prístup k AKTUÁLNYM aj HISTORICKÝM dátam (mesiac po mesiaci) — pre históriu daj mode 'historical'."
+          : "You have CURRENT and HISTORICAL data (month-by-month) — pass mode 'historical' for history.")
+    : (SK ? "Máš prístup k AKTUÁLNYM dátam. História (mesiac po mesiaci) je platená funkcia — ak ju pýta, povedz to jednou vetou."
+          : "You have CURRENT data. Month-by-month history is a paid feature — if asked, say so in one sentence.");
   if (SK) {
     return [
-      "Si AI analytik Residata, realitnej dátovej služby pre trh novostavieb na Slovensku a v Česku (SK + CZ).",
+      "Si AI analytik Residata — dátovej služby pre trh novostavieb na Slovensku a v Česku (SK + CZ).",
       "",
-      "PRAVIDLÁ ODPOVEDANIA (kritické):",
+      "AKO ODPOVEDÁŠ:",
+      "· VŠETKY čísla získavaj cez nástroje (tools) — dotazujú živú databázu všetkých bytov a projektov. NIKDY si čísla nevymýšľaj a nepočítaj percentá z hlavy; ak nie sú v odpovedi nástroja, zavolaj nástroj.",
+      "· market_overview = prehľad trhu, najpredávanejšie / najrýchlejšie projekty, porovnanie SK vs CZ.",
+      "· market_stats = počty/priemery/€m² zoskupené podľa dimenzie (okres, mesto, developer, izby, mesiac…) s filtrami; vrátane histórie (mode 'historical').",
+      "· search_apartments = konkrétne byty podľa kritérií (mesto, okres, izby, poschodie, cena…). Prehľadáva CELÚ databázu, žiadny strop.",
+      "· Pokojne zavolaj viac nástrojov po sebe. Po získaní dát odpovedz vecne.",
+      `· ${histLine}`,
       "",
-      "OBSAH:",
-      "· Odpovedaj PRIMÁRNE z dát pod ### DATA. Vyhýbaj sa všeobecným odhadom keď dáta máš.",
-      "· Pole `available_units` obsahuje konkrétne byty na predaj (V = voľné, R / PR = rezervované). Kľúče v rámci jedného bytu: `proj` = názov projektu, `mesto` = mesto (ukazuje SK/CZ trh), `stav`, `izby` = počet izieb, `posch` = poschodie, `bud` = budova / blok, `m2` = obytná plocha, `ext` = balkón / terasa, `eur` = cena s DPH v eurách, `eur_m2` = cena za m² (m2). Používaj tieto údaje pre konkrétne otázky typu 'ktoré byty na 16+ poschodí sú pod 1M €' alebo 'najlacnejší 3-izbový v Ružinove'.",
-      "· Ak otázka vyžaduje informáciu mimo dát (ekonomické trendy, politický kontext, predpovede), môžeš čerpať z bežnej vedomosti, ALE prefixuj takú časť odpovede na samostatnom riadku: `[všeobecná znalosť, nie dáta Residata]` a potom napíš čo vieš. Residata neručí za tieto údaje.",
-      "· Čísla zaokrúhľuj rozumne (4 320 €/m², 86 %, 1 200 bytov).",
+      "TRHY (SK + CZ): odpovedaj defaultne za OBA trhy; filtruj na jeden LEN keď to užívateľ pýta. Pri projektoch z rôznych miest VŽDY uveď kde sú — napr. 'Slnečnice (Bratislava, SK)', 'Nový Rohan (Praha, CZ)'.",
       "",
-      "TRHY (SK + CZ) — KRITICKÉ:",
-      "· Dataset pokrýva DVA trhy: Slovensko (SK) a Česko (CZ). Každý projekt aj byt má `country` (SK/CZ) a `city`/`mesto`. Pole `markets` má PRESNÉ súhrny za každú krajinu zvlášť.",
-      "· DEFAULT: odpovedaj naprieč OBOMA trhmi (SK aj CZ). Filtruj na jeden trh LEN keď to užívateľ explicitne pýta ('len slovenské', 'byty v Prahe', 'český trh', 'iba Bratislava').",
-      "· Keď uvádzaš projekty z rôznych miest/krajín, VŽDY urob jasné kde sú — napr. 'Nový Rohan (Praha, CZ)', 'Slnečnice (Bratislava, SK)'. Užívateľ nesmie byť zmätený že dostal český projekt keď možno čakal len slovenský.",
+      "HLAS: sebavedomý analytik, nie hedge-ujúci byrokrat. ZÁKAZ slov 'žiaľ/bohužiaľ/prepáčam/sorry/unfortunately'. Ak nástroj vráti 0 výsledkov, povedz to priamo (napr. 'žiadny byt nespĺňa kritériá'), neospravedlňuj sa za 'chýbajúce dáta'. Ak konkrétne pole reálne v dátach nie je, povedz to 1 vetou a ponúkni paid: residata@proton.me.",
       "",
-      "ČÍSLA — KRITICKÉ (nikdy nepočítaj z hlavy):",
-      "· NIKDY nepočítaj percentá ani počty sám. Používaj PRESNÉ hodnoty z dát: `markets` (súhrn za trh), per-projekt `total`/`avail`/`sold`/`sold_pct`/`avg_eur_m2`, `districts` súhrny.",
-      "· Na 'koľko % je predaných v X' použi `sold_pct` toho projektu priamo — neprepočítavaj sold/total.",
-      "· Ak číslo nie je v dátach, NEUVÁDZAJ ho. Nikdy si nevymýšľaj počet typu '3 z 40' — buď je presná hodnota v dátach, alebo o nej nehovor.",
+      "PRÁVNE: toto NIE je investičné poradenstvo. Neraď konkrétne kúpiť/predať. Opisuj fakty (predajnosť, cena, dostupnosť). Pri otázke 'mám kúpiť X?' uveď čo hovoria dáta + 'Toto je tržná informácia, nie investičné odporúčanie.'",
       "",
-      "HLAS A BRAND — KRITICKÉ:",
-      "· Si confident data-analyst, nie hedge-ujúci byrokrat. Prezentuj Residata ako autoritatívny zdroj bratislavského trhu novostavieb.",
-      "· ABSOLÚTNY ZÁKAZ týchto slov: 'žiaľ', 'bohužiaľ', 'prepáčam', 'sorry', 'unfortunately', 'apologies'. Ak ti napadne takéto slovo, prepíš celú vetu bez neho.",
-      "· ABSOLÚTNY ZÁKAZ týchto fráz: 'nie všetky majú údaje', 'data nie sú úplné', 'nemám kompletné údaje', 'detail chýba', 'nemám rozdelené', 'nie je v datasete', 'pre X nemám dáta'.",
-      "· Ak používateľ sa pýta na kategóriu (napr. Staré Mesto 16+ poschodie pod 1M) a niektoré projekty v tej kategórii neobsahujú konkrétnu zhodu v available_units, JEDNODUCHO ICH VYNECHAJ. NIKDY nehovor \"tento projekt tam je ale nemám detail\". Pre užívateľa je to rovnaké ako \"nemám dáta\" — zákazané.",
-      "· Príklad: otázka \"aké byty v Starom Meste na 16+ poschodí pod 1M?\" → odpoveď je iba zoznam matchujúcich bytov. Žiadne vety typu \"Sky Park Tower má priemer 7979 €/m² ale detail poschodia nie je...\" — to nerieši otázku a znižuje brand.",
-      "· Odpovedz confident a konkrétne. Daj zoznam / čísla / projekty ktoré spĺňajú kritériá. Presne takto by to napísal dobrý analytik — najprv čo máš, potom krátky pointer na paid tier ak je reálne priestor na rozšírenie.",
-      "· Follow-up otázky typu \"a čo X?\": ak X je v available_units, odpovedz podľa dát. Ak X MÁ záznamy v available_units ale ŽIADEN nematchuje filter (napr. všetky byty v X sú nad 1M alebo nie sú na 16+ poschodí), povedz to presne jednou vetou: \"V Sky Park Tower sú aktuálne dostupné byty, ale ani jeden nematchuje tvoje kritéria (16+ poschodie pod 1M €)\". Žiadne ospravedlňovanie sa za chýbajúce dáta — to LEN keď projekt reálne v available_units nie je.",
-      "",
-      "CHÝBAJÚCE DÁTA (len keď sa pýta na niečo reálne mimo datasetu):",
-      "· Ak užívateľ pýta konkrétnu premennú ktorá v datasete reálne neexistuje (napr. orientácia voči svetovým stranám pre všetky byty, energetický certifikát, právny stav pozemku), povedz to v 1 vete a ponúkni: \"V paid tieri Residata vieme tento field doplniť — napíš na residata@proton.me.\" Maximum jedna veta o gap-e, žiadne ospravedlnenia.",
-      "· NIKDY nepošli užívateľa k developerovi, na realitnú kanceláriu, ani mu nenavrhuj \"over si to sám\".",
-      "· Ak vieš CELÚ odpoveď z dát, NEPRIDÁVAJ \"paid tier\" CTA — je to spam. CTA dávaj len keď dáta reálne chýbajú.",
-      "",
-      "PRÁVNE OCHRANNÉ PRAVIDLÁ — kritické:",
-      "· Toto NIE JE investičné poradenstvo. Residata je informačná služba.",
-      "· NIKDY neradím konkrétne kúpiť / predať / neinvestovať do konkrétneho projektu / bytu / developera. Nehovorím \"kúp si toto\", \"toto je dobrá investícia\", \"tento projekt má potenciál\".",
-      "· Môžem opisovať tržné dáta (predajnosť, cena, dostupnosť, trend) ale zostávam pri faktoch. Interpretáciu a rozhodnutie nechávam na užívateľa.",
-      "· Ak sa niekto pýta \"mám kúpiť X?\" alebo \"je to dobrá investícia?\", odpoviem čo hovoria DÁTA o tom projekte + dodám: \"Toto je tržná informácia, nie investičné odporúčanie. Pre rozhodnutie konzultuj s realitným alebo finančným poradcom.\"",
-      "· Ak sa niekto pýta na predpovede cien do budúcna, označím to ako neisté a neradím. Môžem uviesť historický trend z dát.",
-      "",
-      "FORMÁT:",
-      "· Píš krátko a vecne, 2–4 vety typicky, iba pri explicitnej žiadosti dlhšie.",
-      "· Plain text — žiadne markdown nadpisy, žiadne **tučné**, žiadne bullets.",
-      "· Neuvádzaj, že si AI. Neuvádzaj frázy typu 'podľa dostupných informácií' — jednoducho odpovedz.",
-      "",
-      "### DATA",
-      jsonBlock,
+      "FORMÁT: krátko, 2–5 viet alebo krátky zoznam. Plain text, žiadny markdown, žiadne **tučné**. Neuvádzaj že si AI.",
     ].join("\n");
   }
   return [
-    "You are Residata's AI analyst — a market-data service for Slovak and Czech (SK + CZ) new-build residential real estate.",
+    "You are Residata's AI analyst — a market-data service for Slovak and Czech (SK + CZ) new-build apartments.",
     "",
-    "ANSWER RULES (critical):",
+    "HOW YOU ANSWER:",
+    "· Get ALL numbers via the tools — they query the live database of every apartment and project. NEVER invent numbers or compute percentages in your head; if it's not in a tool result, call a tool.",
+    "· market_overview = market totals, best-selling / fastest-moving projects, SK-vs-CZ comparison.",
+    "· market_stats = counts/averages/€m² grouped by a dimension (district, city, developer, rooms, month…) with filters; includes history (mode 'historical').",
+    "· search_apartments = specific apartments by criteria (city, district, rooms, floor, price…). Searches the WHOLE database, no cap.",
+    "· Call multiple tools in sequence if needed. Once you have the data, answer concretely.",
+    `· ${histLine}`,
     "",
-    "CONTENT:",
-    "· Answer PRIMARILY from the JSON under ### DATA. Don't guess when the data is there.",
-    "· The `available_units` field is an array of INDIVIDUAL units currently on sale (V = available, R / PR = reserved). Per-unit keys: `proj` = project name, `mesto` = city (shows the SK/CZ market), `stav` = status, `izby` = room count, `posch` = floor, `bud` = building, `m2` = interior area, `ext` = balcony/terrace, `eur` = total price incl. VAT, `eur_m2` = price per m², `orient` = orientation, `kolaud` = handover. Use these rows to answer concrete questions like 'which flats on 16+ floor are under 1M €' or 'cheapest 3-room in Ružinov'.",
-    "· If the question needs information outside the data (economic trends, political context, forecasts), you may draw on general knowledge BUT prefix that part of the answer on its own line: `[general knowledge, not Residata data]` and continue. Residata doesn't vouch for those details.",
-    "· Round numbers sensibly (4,320 €/m², 86 %, 1,200 units).",
+    "MARKETS (SK + CZ): answer across BOTH by default; filter to one only when asked. When listing projects from different places ALWAYS say where each is — e.g. 'Slnečnice (Bratislava, SK)', 'Nový Rohan (Prague, CZ)'.",
     "",
-    "MARKETS (SK + CZ) — CRITICAL:",
-    "· The dataset covers TWO markets: Slovakia (SK) and Czechia (CZ). Every project and unit has `country` (SK/CZ) and `city`/`mesto`. The `markets` array holds EXACT per-country totals.",
-    "· DEFAULT: answer across BOTH markets (SK and CZ). Filter to one market ONLY when the user explicitly asks ('only Slovak', 'flats in Prague', 'the Czech market', 'just Bratislava').",
-    "· When listing projects from different cities/countries, ALWAYS make clear where each is — e.g. 'Nový Rohan (Prague, CZ)', 'Slnečnice (Bratislava, SK)'. The user must never be confused about getting a Czech project when they may have expected only Slovak ones.",
+    "VOICE: confident analyst, not a hedging bureaucrat. BANNED: 'unfortunately/sorry/apologies'. If a tool returns 0 results, say it plainly ('no apartment matches those criteria') — do NOT apologise for 'missing data'. If a specific field genuinely isn't in the data, say so in one sentence and offer the paid tier: residata@proton.me.",
     "",
-    "NUMBERS — CRITICAL (never compute them yourself):",
-    "· NEVER compute percentages or counts yourself. Use the EXACT values in the data: `markets` (per-market totals), per-project `total`/`avail`/`sold`/`sold_pct`/`avg_eur_m2`, `districts` totals.",
-    "· For 'what % is sold in X' use that project's `sold_pct` directly — don't recompute sold/total.",
-    "· If a number isn't in the data, DON'T state it. Never invent counts like '3 of 40' — either the exact value is in the data or you don't mention it.",
+    "LEGAL: this is NOT investment advice. Don't recommend buying/selling a specific project. Describe facts (sales pace, price, availability). For 'should I buy X?' give what the data says + 'This is market information, not investment advice.'",
     "",
-    "VOICE AND BRAND — CRITICAL:",
-    "· You're a confident data-analyst, not a hedging bureaucrat. Present Residata as THE authoritative source for Bratislava new-build data.",
-    "· ABSOLUTELY BANNED words: 'unfortunately', 'sorry', 'I apologise', 'apologies'. If you catch yourself reaching for one, rewrite the sentence.",
-    "· ABSOLUTELY BANNED phrases: 'not all have data', 'data is incomplete', 'I don't have the full breakdown', 'detail is missing', 'not split in the dataset', 'I don't have X for project Y'.",
-    "· If the user asks for a category (e.g. 'Old Town 16+ floor under 1M') and some projects in that category have no matching unit in available_units, JUST OMIT THEM. Never say 'this project exists but detail is missing' — to the user that reads identical to 'no data', which is banned.",
-    "· Example: question 'what flats in Old Town on 16+ floor under 1M?' → answer is ONLY the list of matching units. No sentences like 'Sky Park Tower has avg 7979 €/m² but floor detail isn't...' — that doesn't answer the question and tanks the brand.",
-    "· Answer confident and concrete. Give the list / numbers / projects that match. Lead with what you have, brief paid-tier pointer ONLY if there's a genuinely missing FIELD (not missing rows).",
-    "· Follow-up 'what about X?' questions: if X appears in available_units, answer from the data. If X HAS rows in available_units but NONE match the filter (e.g. all Sky Park units are above 1M or below floor 16), say it in ONE sentence: 'Sky Park Tower has available units but none match your criteria (16+ floor under 1M €)'. No apologising for 'missing data' — that's reserved for cases where the project genuinely has zero rows in available_units.",
-    "",
-    "MISSING DATA (only when a genuinely-missing variable is asked):",
-    "· If the user asks for a specific field that doesn't exist in the dataset (orientation for every unit, energy rating, legal-ownership status), say it in ONE sentence and offer: \"Residata's paid tier can add this field — email residata@proton.me.\" One sentence max about the gap, no apologies.",
-    "· NEVER redirect to the developer / real-estate agency / suggest 'check for yourself'.",
-    "· If you already have the FULL answer from the data, do NOT add a paid-tier CTA — it's spam. CTAs only when data genuinely doesn't cover it.",
-    "",
-    "LEGAL SAFEGUARD RULES — critical:",
-    "· This is NOT investment advice. Residata is an information service.",
-    "· NEVER recommend specific buy / sell / invest actions on a particular project / flat / developer. Don't say \"buy this\", \"this is a good investment\", \"this project has potential\".",
-    "· You may describe market data (sales velocity, price, availability, trend) but stick to facts. Interpretation and decisions stay with the user.",
-    "· If someone asks \"should I buy X?\" or \"is this a good investment?\", answer with what the DATA says about that project + add: \"This is market information, not investment advice. For a decision consult a real-estate or financial professional.\"",
-    "· For price-forecast questions, mark them as uncertain and don't recommend. You may cite historical trend from the data.",
-    "",
-    "FORMAT:",
-    "· Write short, factual answers — typically 2–4 sentences; go longer only when asked.",
-    "· Plain text — no markdown, no headings, no bullet lists.",
-    "· Don't say you're AI. Don't preface with 'based on the available information' — just answer.",
-    "",
-    "### DATA",
-    jsonBlock,
+    "FORMAT: short — 2–5 sentences or a short list. Plain text, no markdown, no **bold**. Don't say you're an AI.",
   ].join("\n");
 }
 
@@ -480,348 +389,172 @@ export default async function handler(req, res) {
 }
 
 async function handleInner(req, res) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "method not allowed" });
-  }
-  if (!isTrustedOrigin(req)) {
-    return res.status(403).json({ error: "untrusted origin" });
-  }
+  if (req.method !== "POST") return res.status(405).json({ error: "method not allowed" });
+  if (!isTrustedOrigin(req)) return res.status(403).json({ error: "untrusted origin" });
 
   const ip = clientIp(req);
   const ipGate = ipRateCheck(ip);
-  if (!ipGate.ok) {
-    res.setHeader("Retry-After", String(ipGate.retryAfterSec));
-    return res.status(429).json({ error: "rate limit: too many requests from this IP", retry_after_sec: ipGate.retryAfterSec });
-  }
+  if (!ipGate.ok) { res.setHeader("Retry-After", String(ipGate.retryAfterSec)); return res.status(429).json({ error: "rate limit: too many requests from this IP", retry_after_sec: ipGate.retryAfterSec }); }
 
-  const SUPABASE_URL        = process.env.SUPABASE_URL;
+  const SUPABASE_URL = process.env.SUPABASE_URL;
   const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY;
-  if (!SUPABASE_URL || !SUPABASE_SECRET_KEY) {
-    return res.status(500).json({ error: "server misconfigured: SUPABASE envs missing" });
-  }
+  if (!SUPABASE_URL || !SUPABASE_SECRET_KEY) return res.status(500).json({ error: "server misconfigured: SUPABASE envs missing" });
 
-  // ── Resolve caller identity (anon vs logged-in) ──
   const authHeader = req.headers.authorization || req.headers.Authorization || "";
   const token = authHeader.replace(/^Bearer\s+/i, "").trim();
-
-  const admin = createClient(SUPABASE_URL, SUPABASE_SECRET_KEY, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
+  const admin = createClient(SUPABASE_URL, SUPABASE_SECRET_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
 
   let userId = null;
   let tier = "anon";
-  let userProfile = null;
-
   if (token) {
     try {
       const { data: { user }, error: authErr } = await admin.auth.getUser(token);
-      if (authErr || !user) {
-        return res.status(401).json({ error: "invalid or expired token" });
-      }
+      if (authErr || !user) return res.status(401).json({ error: "invalid or expired token" });
       userId = user.id;
-      const { data: prof } = await admin.from("user_profiles")
-        .select("tier, chosen_project_id").eq("id", userId).maybeSingle();
-      userProfile = prof || null;
-      tier = prof?.tier || "free";
-      if (tier === "pending") {
-        return res.status(403).json({ error: "account pending approval" });
-      }
-    } catch (_) {
-      return res.status(401).json({ error: "auth verification failed" });
-    }
+      const { data: prof } = await admin.from("user_profiles").select("tier, chosen_project_id, trial_until").eq("id", userId).maybeSingle();
+      if (prof?.tier === "pending") return res.status(403).json({ error: "account pending approval" });
+      tier = effectiveTier(prof);   // trial -> paid
+    } catch (_) { return res.status(401).json({ error: "auth verification failed" }); }
   }
+  const model = MODEL_BY_TIER[tier] || FALLBACK_MODEL;
+  const allowHistorical = isPaidTier(tier);
 
-  // ANTHROPIC key — env first, then app_secrets fallback (same pattern
-  // the old summary endpoint used, preserved so the user doesn't have
-  // to re-configure Vercel envs for this new endpoint).
   let apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) apiKey = await readSecret(admin, "ANTHROPIC_API_KEY");
-  if (!apiKey) {
-    return res.status(501).json({ error: "AI disabled on the server (ANTHROPIC_API_KEY missing)." });
-  }
+  if (!apiKey) return res.status(501).json({ error: "AI disabled on the server (ANTHROPIC_API_KEY missing)." });
 
-  // ── Body parse + validate ──
+  // ── body ──
   let body = req.body;
-  if (typeof body === "string") {
-    try { body = JSON.parse(body); } catch { return res.status(400).json({ error: "invalid JSON body" }); }
-  }
-  if (!body || typeof body !== "object") {
-    return res.status(400).json({ error: "empty body" });
-  }
-  const serialized = JSON.stringify(body);
-  if (serialized.length > MAX_INPUT_BYTES) {
-    return res.status(413).json({ error: `body too large (${serialized.length} > ${MAX_INPUT_BYTES})` });
-  }
+  if (typeof body === "string") { try { body = JSON.parse(body); } catch { return res.status(400).json({ error: "invalid JSON body" }); } }
+  if (!body || typeof body !== "object") return res.status(400).json({ error: "empty body" });
+  if (JSON.stringify(body).length > MAX_INPUT_BYTES) return res.status(413).json({ error: "body too large" });
   const lang = body.lang === "en" ? "en" : "sk";
-  const messages = Array.isArray(body.messages) ? body.messages : null;
-  // Optional fields (newer client; older clients without these still
-  // work — the chat-log row just gets nulls in those columns).
-  // sessionId: UUID generated client-side, persists across the same
-  //   conversation. Used to group transcript rows in ai_chat_log.
-  // typingMs:  how long the user was actively typing this question
-  //   (textarea focus → send click). Useful for "did the user think
-  //   about it" vs "boilerplate question" analytics.
-  // pageUrl:   which page the chat was opened from (eg. /app/dashboard
-  //   vs the floating chat on /). Helps correlate questions with the
-  //   surface they're being asked from.
-  const sessionId = (typeof body.sessionId === "string" && /^[0-9a-f-]{8,}$/i.test(body.sessionId))
-    ? body.sessionId : null;
-  const typingMs = (typeof body.typingMs === "number" && body.typingMs >= 0 && body.typingMs < 24 * 60 * 60 * 1000)
-    ? Math.round(body.typingMs) : null;
-  const pageUrl = (typeof body.pageUrl === "string" && body.pageUrl.length < 500)
-    ? body.pageUrl : null;
-  const userAgent = (typeof req.headers["user-agent"] === "string")
-    ? String(req.headers["user-agent"]).slice(0, 500) : null;
+  const messagesIn = Array.isArray(body.messages) ? body.messages : null;
+  const sessionId = (typeof body.sessionId === "string" && /^[0-9a-f-]{8,}$/i.test(body.sessionId)) ? body.sessionId : null;
+  const typingMs = (typeof body.typingMs === "number" && body.typingMs >= 0 && body.typingMs < DAY_MS) ? Math.round(body.typingMs) : null;
+  const pageUrl = (typeof body.pageUrl === "string" && body.pageUrl.length < 500) ? body.pageUrl : null;
+  const userAgent = (typeof req.headers["user-agent"] === "string") ? String(req.headers["user-agent"]).slice(0, 500) : null;
+  if (!messagesIn || messagesIn.length === 0) return res.status(400).json({ error: "messages array required" });
+  if (messagesIn.length > MAX_HISTORY * 2) return res.status(400).json({ error: `too many messages (max ${MAX_HISTORY * 2})` });
 
-  if (!messages || messages.length === 0) {
-    return res.status(400).json({ error: "messages array required (non-empty)" });
-  }
-  if (messages.length > MAX_HISTORY * 2) {
-    return res.status(400).json({ error: `too many messages (max ${MAX_HISTORY * 2})` });
-  }
-  // Each message: { role: 'user'|'assistant', content: string (<=2000 chars) }
-  const clean = [];
-  for (const m of messages) {
+  const messages = [];
+  for (const m of messagesIn) {
     if (!m || typeof m !== "object") continue;
     if (m.role !== "user" && m.role !== "assistant") continue;
     if (typeof m.content !== "string") continue;
-    const c = m.content.trim();
-    if (!c) continue;
-    clean.push({ role: m.role, content: c.slice(0, MAX_MSG_LEN) });
+    const c = m.content.trim(); if (!c) continue;
+    messages.push({ role: m.role, content: c.slice(0, MAX_MSG_LEN) });
   }
-  if (clean.length === 0 || clean[clean.length - 1].role !== "user") {
-    return res.status(400).json({ error: "last message must be from the user" });
-  }
+  if (messages.length === 0 || messages[messages.length - 1].role !== "user") return res.status(400).json({ error: "last message must be from the user" });
 
-  // ── Tier-based daily rate limit ──
-  // For logged-in users we count today's rows in ai_usage_log by
-  // user_id (persists across cold starts, cross-endpoint). For anon
-  // we rely solely on the per-IP in-memory burst limit above —
-  // ai_usage_log doesn't carry a caller_ip column and adding one
-  // would require a schema migration. Anon abuse is capped by the
-  // origin+IP layers; per-anon daily counting is a v2 enhancement.
+  // ── daily cap (effective tier) ──
   const dayLimit = DAILY_LIMITS[tier] ?? DAILY_LIMITS.anon;
-  const dayAgo = new Date(Date.now() - DAY_MS).toISOString();
   let dayCount = 0;
   if (userId) {
     try {
-      const { count } = await admin.from("ai_usage_log")
-        .select("id", { count: "exact", head: true })
-        .gte("requested_at", dayAgo)
-        .eq("user_id", userId);
+      const { count } = await admin.from("ai_usage_log").select("id", { count: "exact", head: true })
+        .gte("requested_at", new Date(Date.now() - DAY_MS).toISOString()).eq("user_id", userId);
       dayCount = count || 0;
-    } catch (_) {
-      return res.status(503).json({ error: "rate limit lookup failed, try again" });
-    }
-  } else {
-    // Anon path — per-IP in-memory counter, resets at midnight UTC.
-    dayCount = anonDailyCount(ip);
-  }
+    } catch (_) { return res.status(503).json({ error: "rate limit lookup failed, try again" }); }
+  } else { dayCount = anonDailyCount(ip); }
   if (dayCount >= dayLimit) {
-    // Tier-specific upgrade CTA. Each tier sees a different message
-    // nudging them toward the next tier with a concrete benefit:
-    //
-    //   anon  → sign up (free) for 3 questions/day
-    //   free  → upgrade to paid for 30 questions/day
-    //   paid  → contact support (30 is the current max for non-admin)
-    //
-    // The client reads `tier` + `limit` + `upgrade_to` from the JSON
-    // body and renders a styled banner with a Login / Billing button.
     const upgrades = {
-      anon:  { to: "free",  daily: DAILY_LIMITS.free,  action: "sign_in" },
-      free:  { to: "paid",  daily: DAILY_LIMITS.paid,  action: "billing" },
-      paid:  { to: null,    daily: null,               action: "contact" },
-      admin: { to: null,    daily: null,               action: "contact" },
+      anon: { to: "free", daily: DAILY_LIMITS.free, action: "sign_in" },
+      free: { to: "paid", daily: DAILY_LIMITS.paid, action: "billing" },
+      paid: { to: null, daily: null, action: "contact" },
+      admin:{ to: null, daily: null, action: "contact" },
     };
     const up = upgrades[tier] || upgrades.anon;
     const msg = lang === "sk"
-      ? (tier === "anon"
-          ? `Vyčerpal si denný limit ${dayLimit} otázky pre neprihlásených. Prihlás sa (free) pre ${up.daily} otázok denne, alebo zaplať tier pre ${DAILY_LIMITS.paid}/deň.`
-          : tier === "free"
-          ? `Vyčerpal si denný limit ${dayLimit} otázok pre free tier. Upgrade na paid (${DAILY_LIMITS.paid}/deň).`
-          : `Vyčerpal si denný limit ${dayLimit} otázok. Kontaktuj Residata pre vyšší limit.`)
-      : (tier === "anon"
-          ? `You've used your daily ${dayLimit} question as an anonymous user. Sign in (free) for ${up.daily}/day, or go paid for ${DAILY_LIMITS.paid}/day.`
-          : tier === "free"
-          ? `You've used your daily ${dayLimit} questions on the free tier. Upgrade to paid for ${DAILY_LIMITS.paid}/day.`
-          : `You've used your daily ${dayLimit} questions. Contact Residata for a higher limit.`);
-    return res.status(429).json({
-      error: msg,
-      tier,
-      limit: dayLimit,
-      upgrade_to: up.to,
-      upgrade_action: up.action,
-      upgrade_daily: up.daily,
-      retry_after_sec: 3600,
-    });
+      ? (tier === "anon" ? `Vyčerpal si denný limit ${dayLimit} otázky pre neprihlásených. Prihlás sa (free) pre ${up.daily}/deň, alebo zaplať tier pre ${DAILY_LIMITS.paid}/deň.`
+        : tier === "free" ? `Vyčerpal si denný limit ${dayLimit} otázok pre free tier. Upgrade na paid (${DAILY_LIMITS.paid}/deň).`
+        : `Vyčerpal si denný limit ${dayLimit} otázok. Kontaktuj Residata pre vyšší limit.`)
+      : (tier === "anon" ? `You've used your daily ${dayLimit} question as an anonymous user. Sign in (free) for ${up.daily}/day, or go paid for ${DAILY_LIMITS.paid}/day.`
+        : tier === "free" ? `You've used your daily ${dayLimit} questions on the free tier. Upgrade to paid for ${DAILY_LIMITS.paid}/day.`
+        : `You've used your daily ${dayLimit} questions. Contact Residata for a higher limit.`);
+    return res.status(429).json({ error: msg, tier, limit: dayLimit, upgrade_to: up.to, upgrade_action: up.action, upgrade_daily: up.daily, retry_after_sec: 3600 });
   }
 
-  // ── Build data context ──
-  // Every tier now receives the FULL market context. The earlier
-  // tier-based topic-restriction design (anon = hero totals only)
-  // was dropped: users found it more confusing than protective, and
-  // the actual protection comes from the DAILY QUANTITY limits above.
-  // Free users with a chosen_project_id get their project's flat-
-  // level detail appended on top so the assistant can answer
-  // personal "my project" questions too.
-  let dataCtx;
-  try {
-    const fullCtx = await cachedContext("full", () => buildPaidContext(admin));
-    if (tier === "free" && userProfile?.chosen_project_id) {
-      const projKey = `free-proj:${userProfile.chosen_project_id}`;
-      const yourProject = await cachedContext(projKey,
-        () => buildChosenProjectContext(admin, userProfile.chosen_project_id));
-      dataCtx = { ...fullCtx, your_project: yourProject };
-    } else {
-      dataCtx = fullCtx;
-    }
-  } catch (e) {
-    console.error("[chat] context build", e);
-    return res.status(500).json({ error: "failed to build data context" });
-  }
+  // ── log the user turn ──
+  const lastUserMsg = messages[messages.length - 1];
+  const baseRow = { session_id: sessionId, user_id: userId || null, caller_ip: ip || null, tier: tier || null, lang, page_url: pageUrl, user_agent: userAgent };
+  const logTurn = (row) => { if (!sessionId) return; admin.from("ai_chat_log").insert({ ...baseRow, ...row }).then(({ error }) => { if (error) console.warn("[chat] ai_chat_log insert failed", error.message); }); };
+  logTurn({ turn_index: messages.length - 1, role: "user", content: lastUserMsg.content, user_typing_ms: typingMs });
 
-  // ── Log the user turn into ai_chat_log ──
-  // Written BEFORE the Anthropic call so the user message is in the
-  // log even if the upstream fails; the assistant row (or the error
-  // row) gets written below. Async + non-fatal — chat keeps working
-  // if the log table is unavailable.
-  const lastUserMsg = clean[clean.length - 1];
-  const userTurnIdx = clean.length - 1;            // 0-based position
-  const baseRow = {
-    session_id: sessionId,
-    user_id: userId || null,
-    caller_ip: ip || null,
-    tier: tier || null,
-    lang,
-    page_url: pageUrl,
-    user_agent: userAgent,
-  };
-  const logTurn = (row) => {
-    if (!sessionId) return;  // older clients without sessionId — skip log
-    admin.from("ai_chat_log").insert({ ...baseRow, ...row })
-      .then(({ error }) => {
-        if (error) console.warn("[chat] ai_chat_log insert failed (non-fatal)", error.message);
+  // ── tool-calling loop ──
+  const system = [{ type: "text", text: systemPrompt(lang, allowHistorical), cache_control: { type: "ephemeral" } }];
+  const convo = messages.map((m) => ({ role: m.role, content: m.content }));
+  const usage = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
+  const startedAt = Date.now();
+  let textOut = "";
+  let lastError = null;
+
+  for (let iter = 0; iter < MAX_TOOL_ITERS; iter++) {
+    let resp;
+    try {
+      resp = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
+        body: JSON.stringify({ model, max_tokens: MAX_TOKENS, system, tools: TOOLS, messages: convo }),
       });
-  };
-  logTurn({
-    turn_index: userTurnIdx,
-    role: "user",
-    content: lastUserMsg.content,
-    user_typing_ms: typingMs,
-  });
+    } catch (e) { lastError = String(e?.message || e); break; }
+    if (!resp.ok) { lastError = `anthropic_${resp.status}`; const t = await resp.text().catch(() => ""); console.error("[chat] anthropic", resp.status, t.slice(0, 400)); break; }
+    const payload = await resp.json();
+    const u = payload.usage || {};
+    usage.input_tokens += u.input_tokens || 0;
+    usage.output_tokens += u.output_tokens || 0;
+    usage.cache_read_input_tokens += u.cache_read_input_tokens || 0;
+    usage.cache_creation_input_tokens += u.cache_creation_input_tokens || 0;
 
-  // ── Call Anthropic ──
-  const system = systemPrompt(lang, dataCtx);
-  let anthropicResp;
-  const anthropicStartedAt = Date.now();
-  try {
-    anthropicResp = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: ANTHROPIC_MODEL,
-        max_tokens: MAX_TOKENS,
-        system,
-        messages: clean,
-      }),
-    });
-  } catch (e) {
-    console.error("[chat] anthropic fetch", e);
-    logTurn({
-      turn_index: userTurnIdx + 1,
-      role: "error",
-      content: String(e?.message || e).slice(0, 1000),
-      response_time_ms: Date.now() - anthropicStartedAt,
-      error_kind: "err",
-      error_message: String(e?.message || e).slice(0, 500),
-      http_status: 502,
-      model: ANTHROPIC_MODEL,
-    });
-    return res.status(502).json({ error: "AI upstream error" });
-  }
-  if (!anthropicResp.ok) {
-    const errBody = await anthropicResp.text().catch(() => "");
-    console.error("[chat] anthropic non-200", anthropicResp.status, errBody.slice(0, 500));
-    logTurn({
-      turn_index: userTurnIdx + 1,
-      role: "error",
-      content: errBody.slice(0, 1000),
-      response_time_ms: Date.now() - anthropicStartedAt,
-      error_kind: "err",
-      error_message: `anthropic_${anthropicResp.status}`,
-      http_status: anthropicResp.status,
-      model: ANTHROPIC_MODEL,
-    });
-    return res.status(502).json({ error: `AI upstream ${anthropicResp.status}` });
-  }
-  const payload = await anthropicResp.json();
-  const responseTimeMs = Date.now() - anthropicStartedAt;
-  const textOut = (payload.content || [])
-    .filter(c => c.type === "text")
-    .map(c => c.text)
-    .join("\n")
-    .trim();
+    const content = payload.content || [];
+    textOut = content.filter((c) => c.type === "text").map((c) => c.text).join("\n").trim();
 
-  // ── Log the assistant turn ──
-  // Unlike the fire-and-forget user/error rows, this insert is awaited
-  // so we can return the row id to the client. The client surfaces 👍/👎
-  // buttons next to each assistant message and PATCHes the rating to
-  // /api/ai/chat-feedback using this id. If the insert fails we still
-  // return the answer (logId stays null → no feedback affordance for
-  // that one turn, no crash).
+    if (payload.stop_reason === "tool_use") {
+      const toolUses = content.filter((c) => c.type === "tool_use");
+      convo.push({ role: "assistant", content });
+      const results = [];
+      for (const tu of toolUses) {
+        const out = await executeTool(admin, tu.name, tu.input, allowHistorical);
+        results.push({ type: "tool_result", tool_use_id: tu.id, content: JSON.stringify(out).slice(0, 30000) });
+      }
+      convo.push({ role: "user", content: results });
+      continue; // ask the model again with the tool results
+    }
+    break; // end_turn (or other) — we have the answer
+  }
+  const responseTimeMs = Date.now() - startedAt;
+  if (!textOut && lastError) return res.status(502).json({ error: "AI upstream error", detail: lastError.slice(0, 120) });
+  if (!textOut) textOut = lang === "sk" ? "Nepodarilo sa vygenerovať odpoveď, skús to znova." : "I couldn't generate an answer — please try again.";
+
+  // ── log assistant turn (summed usage across the tool loop) ──
   let assistantLogId = null;
   if (sessionId) {
     try {
-      const { data, error } = await admin
-        .from("ai_chat_log")
-        .insert({
-          ...baseRow,
-          turn_index: userTurnIdx + 1,
-          role: "assistant",
-          content: textOut,
-          response_time_ms: responseTimeMs,
-          model: ANTHROPIC_MODEL,
-          input_tokens: payload.usage?.input_tokens ?? null,
-          output_tokens: payload.usage?.output_tokens ?? null,
-        })
-        .select("id")
-        .single();
-      if (error) console.warn("[chat] ai_chat_log assistant insert failed (non-fatal)", error.message);
+      const { data, error } = await admin.from("ai_chat_log").insert({
+        ...baseRow, turn_index: messages.length, role: "assistant", content: textOut,
+        response_time_ms: responseTimeMs, model,
+        input_tokens: usage.input_tokens, output_tokens: usage.output_tokens,
+        cache_read_input_tokens: usage.cache_read_input_tokens,
+        cache_creation_input_tokens: usage.cache_creation_input_tokens,
+      }).select("id").single();
+      if (error) console.warn("[chat] assistant insert failed", error.message);
       else assistantLogId = data?.id || null;
-    } catch (e) {
-      console.warn("[chat] ai_chat_log assistant insert threw (non-fatal)", e?.message || e);
-    }
+    } catch (e) { console.warn("[chat] assistant insert threw", e?.message || e); }
   }
 
-  // ── Log the rate-limit / billing call (separate table, separate purpose) ──
-  // For authed users: append to ai_usage_log (persistent, cross-
-  // cold-start). For anon: bump the in-memory per-IP counter so
-  // the next request from this IP in the same UTC day sees a higher
-  // dayCount.
+  // ── usage/billing counter (one row per question) ──
   if (userId) {
     admin.from("ai_usage_log").insert({
-      user_id: userId,
-      endpoint: "chat",
-      input_tokens: payload.usage?.input_tokens ?? null,
-      output_tokens: payload.usage?.output_tokens ?? null,
-      ok: true,
-    }).then(({ error }) => {
-      if (error) console.warn("[chat] usage log failed (non-fatal)", error.message);
-    });
-  } else {
-    anonDailyIncrement(ip);
-  }
+      user_id: userId, endpoint: "chat", ok: true,
+      input_tokens: usage.input_tokens, output_tokens: usage.output_tokens,
+      cache_read_input_tokens: usage.cache_read_input_tokens,
+      cache_creation_input_tokens: usage.cache_creation_input_tokens,
+    }).then(({ error }) => { if (error) console.warn("[chat] usage log failed", error.message); });
+  } else { anonDailyIncrement(ip); }
 
   return res.status(200).json({
-    text: textOut,
-    tier,
-    log_id: assistantLogId,           // for the thumbs-up/down rating endpoint
+    text: textOut, tier, model, log_id: assistantLogId,
     remaining: { today: Math.max(0, dayLimit - dayCount - 1) },
-    usage: payload.usage || null,
-    response_time_ms: responseTimeMs,
+    usage, response_time_ms: responseTimeMs,
   });
 }
