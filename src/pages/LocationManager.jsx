@@ -58,6 +58,7 @@ export default function LocationManager({ lang = "en" }) {
   const [pin, setPin] = useState(null);
   const [cityId, setCityId] = useState("");   // DERIVED from pin (read-only)
   const [cityWarn, setCityWarn] = useState(null); // pin is in a place not in our cities
+  const [deriving, setDeriving] = useState(false); // reverse-geocode in flight after a user pin-move
   const [district, setDistrict] = useState("");
   const [suggestions, setSuggestions] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -124,12 +125,15 @@ export default function LocationManager({ lang = "en" }) {
     return citiesRef.current.find((c) => norm(c.name) === n && (!cc || c.country_code === cc)) || null;
   }
   async function reverseGeocode(lat, lng) {
+    const ctrl = new AbortController();
+    const killer = setTimeout(() => ctrl.abort(), 8000); // never let a slow lookup hang the UI
     try {
-      const r = await fetch(`${PHOTON_REVERSE}?lat=${lat}&lon=${lng}&limit=1`);
+      const r = await fetch(`${PHOTON_REVERSE}?lat=${lat}&lon=${lng}&limit=1`, { signal: ctrl.signal });
       if (!r.ok) return null;
       const p = ((await r.json()).features || [])[0]?.properties || {};
       return { city: p.city, district: p.district, cc: p.countrycode };
     } catch { return null; }
+    finally { clearTimeout(killer); }
   }
   function smallCityDistrict(cid) { return catalogRef.current.cityIds.has(cid) ? "" : (citiesById[cid]?.name || ""); }
 
@@ -159,7 +163,7 @@ export default function LocationManager({ lang = "en" }) {
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
     const marker = new maplibregl.Marker({ draggable: true, color: green });
     markerRef.current = marker;
-    const onMove = (lat, lng) => { userMovedRef.current = true; setPin({ lat: +lat.toFixed(6), lng: +lng.toFixed(6) }); setSuggestions([]); };
+    const onMove = (lat, lng) => { userMovedRef.current = true; setDeriving(true); setPin({ lat: +lat.toFixed(6), lng: +lng.toFixed(6) }); setSuggestions([]); };
     marker.on("dragend", () => { const ll = marker.getLngLat(); onMove(ll.lat, ll.lng); });
     map.on("click", (e) => onMove(e.lngLat.lat, e.lngLat.lng));
     const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => map.resize()) : null;
@@ -203,6 +207,7 @@ export default function LocationManager({ lang = "en" }) {
         const inCatalog = fromPin && cat.some((d) => norm(d) === norm(fromPin));
         setDistrict(inCatalog ? fromPin : smallCityDistrict(finalCity?.id));
       }
+      setDeriving(false); // city/district now match the pin → Save allowed
     })();
   }, [pin]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -245,7 +250,7 @@ export default function LocationManager({ lang = "en" }) {
   function pick(s) {
     clearTimeout(debounceRef.current);
     if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; }
-    userMovedRef.current = true; districtTouchedRef.current = false; // fresh placement → accept the pin's district suggestion
+    userMovedRef.current = true; districtTouchedRef.current = false; setDeriving(true); // fresh placement → derive city/district before Save is allowed
     setPin({ lat: s.lat, lng: s.lng }); setAddr(s.label); setSuggestions([]); setSearching(false);
     if (mapRef.current) mapRef.current.flyTo({ center: [s.lng, s.lat], zoom: 16, duration: 600 });
   }
@@ -256,7 +261,7 @@ export default function LocationManager({ lang = "en" }) {
     revGenRef.current++;             // cancel any in-flight reverse-geocode
     userMovedRef.current = false;    // loading a project is NOT a user pin-move → keep saved classification
     districtTouchedRef.current = false;
-    setSelectedId(p.id); setSuggestions([]); setCityWarn(null);
+    setSelectedId(p.id); setSuggestions([]); setCityWarn(null); setDeriving(false);
     const lat = p.lat != null ? Number(p.lat) : null, lng = p.lng != null ? Number(p.lng) : null;
     const located = p.location_verified && lat != null && lng != null;
     setCityId(p.city_id || "");
@@ -275,7 +280,7 @@ export default function LocationManager({ lang = "en" }) {
   function withTimeout(promise, ms) { return Promise.race([promise, new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), ms))]); }
 
   async function save() {
-    if (!selected || !pin || !cityId) return;
+    if (!selected || !pin || !cityId || deriving) return;
     setSaving(true);
     try {
       const { error } = await withTimeout(supabase.rpc("admin_set_project_location", {
@@ -380,7 +385,7 @@ export default function LocationManager({ lang = "en" }) {
                         </button>))}
                     </div>)}
                 </div>
-                <button onClick={save} disabled={!pin || !cityId || saving} style={btn(green, !pin || !cityId || saving, true)}>{saving ? t("Saving…", "Ukladám…") : t("Save", "Uložiť")}</button>
+                <button onClick={save} disabled={!pin || !cityId || deriving || saving} style={btn(green, !pin || !cityId || deriving || saving, true)}>{saving ? t("Saving…", "Ukladám…") : deriving ? t("Locating…", "Zisťujem…") : t("Save", "Uložiť")}</button>
               </div>
 
               <div style={{ display: "flex", gap: 14, alignItems: "center", marginTop: 9, flexWrap: "wrap" }}>
