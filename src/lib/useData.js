@@ -760,14 +760,28 @@ export function useProjectFlats(projectId) {
   const [flats, setFlats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  // Monotonic request id (2026-06-22) — replaces a per-effect boolean
+  // `cancelled` flag. Opening a project FROM THE MAP tears down a heavy
+  // maplibre instance while auth/profile re-resolves, which re-ran this effect
+  // several times in quick succession; the old flag let the LATEST successful
+  // 200 be discarded ("if (cancelled) return" before setLoading(false)),
+  // stranding the page on "Loading…" forever even though the rows came back.
+  // With a request id, only STALE runs skip; the newest run always commits and
+  // (in finally) always clears loading — robust to any remount/auth timing.
+  const reqRef = useRef(0);
 
   useEffect(() => {
-    if (!isSupabaseReady() || !projectId || authLoading) {
+    if (!isSupabaseReady() || !projectId) {
+      setLoading(false);   // nothing to load → never strand the spinner
       return;
     }
+    // Auth still resolving — keep the spinner; this effect re-runs when
+    // authLoading flips (it's a dep) and then starts the fetch.
+    if (authLoading) return;
+    const myReq = ++reqRef.current;
+    const isStale = () => myReq !== reqRef.current;
     setLoading(true);
     setError(null);
-    let cancelled = false;
 
     // Defensive retry: in some browsers the first fetch right after
     // a navigation transition can race with the supabase client's
@@ -812,35 +826,45 @@ export function useProjectFlats(projectId) {
     };
 
     (async () => {
-      let { data, error: err } = await fetchCurrent();
-      // Retry once if first call returned empty AND we have a likely
-      // access promotion path (paid tier, admin, active trial,
-      // active paid window). For genuinely empty projects the retry
-      // is harmless.
-      const looksPrivileged =
-        tier === "paid" || tier === "admin" ||
-        (trialUntil && new Date(trialUntil) > new Date()) ||
-        (paidUntil && new Date(paidUntil) > new Date() && !paidPaused);
-      if (!err && (!data || data.length === 0) && looksPrivileged) {
-        await new Promise(r => setTimeout(r, 250));
-        if (cancelled) return;
-        ({ data, error: err } = await fetchCurrent());
+      try {
+        let { data, error: err } = await fetchCurrent();
+        // Retry once if first call returned empty AND we have a likely
+        // access promotion path (paid tier, admin, active trial,
+        // active paid window). For genuinely empty projects the retry
+        // is harmless.
+        const looksPrivileged =
+          tier === "paid" || tier === "admin" ||
+          (trialUntil && new Date(trialUntil) > new Date()) ||
+          (paidUntil && new Date(paidUntil) > new Date() && !paidPaused);
+        if (!err && (!data || data.length === 0) && looksPrivileged) {
+          await new Promise(r => setTimeout(r, 250));
+          if (isStale()) return;
+          ({ data, error: err } = await fetchCurrent());
+        }
+        // Final fallback: archive lookup. Manual projects (status='paused'
+        // promoted to 'active' by sync) often have stale snapshot_month
+        // because they're updated manually. Their archive data is still
+        // valid for display.
+        if (!err && (!data || data.length === 0)) {
+          if (isStale()) return;
+          ({ data, error: err } = await fetchMostRecentForProject());
+        }
+        if (isStale()) return;
+        setFlats(_toEurDisplay(data || []));
+        setError(err || null);
+      } catch (e) {
+        if (!isStale()) setError(e);
+      } finally {
+        // The newest run always reaches here and clears the spinner — this is
+        // the fix for the "stuck on Loading…" race. A stale run (superseded by
+        // a newer effect run, or unmounted) leaves loading to whoever's current.
+        if (!isStale()) setLoading(false);
       }
-      // Final fallback: archive lookup. Manual projects (status='paused'
-      // promoted to 'active' by sync) often have stale snapshot_month
-      // because they're updated manually. Their archive data is still
-      // valid for display.
-      if (!err && (!data || data.length === 0)) {
-        if (cancelled) return;
-        ({ data, error: err } = await fetchMostRecentForProject());
-      }
-      if (cancelled) return;
-      setFlats(_toEurDisplay(data || []));
-      setError(err || null);
-      setLoading(false);
     })();
 
-    return () => { cancelled = true; };
+    // Invalidate this run on re-run / unmount so a late-resolving fetch can't
+    // overwrite a newer run's result or setState after unmount.
+    return () => { reqRef.current++; };
   }, [projectId, authLoading, tier, chosenProjectId, trialUntil, paidUntil, paidPaused]);
 
   return { flats, loading, error };
