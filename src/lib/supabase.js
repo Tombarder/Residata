@@ -96,7 +96,12 @@ export const isSupabaseReady = () => !!supabase;
 if (typeof window !== "undefined" && supabasePublic) {
   // setTimeout 0 so we don't block initial render on the network call
   setTimeout(() => {
-    supabasePublic.from("projects").select("id").limit(1).then(
+    // Warm against projects_live — a light, fast view the homepage actually reads.
+    // NOT public.projects: that aggregate view times out for the anon role
+    // (Postgres 57014 / statement_timeout), so the old warm-up returned HTTP 500
+    // on every page load — it never actually warmed anything AND each call held a
+    // DB connection busy until the timeout fired. projects_live returns instantly.
+    supabasePublic.from("projects_live").select("id").limit(1).then(
       () => { /* warmed */ },
       () => { /* ignore — real calls will retry */ }
     );
