@@ -189,11 +189,17 @@ export function useMetrics() {
   const { country } = useCountry();
   const [metrics, setMetrics] = useState(_metricsCacheByCountry.get(country) || []);
   const [loading, setLoading] = useState(!_metricsCacheByCountry.has(country));
+  // Request-id guard + .finally (2026-06-22) — same hardening as useProjectFlats.
+  // Replaces a `cancelled` boolean that put the guard before setLoading(false) and
+  // had no .catch, so a rejected request (or rapid country re-switch) could strand
+  // the ticker on its loading state.
+  const reqRef = useRef(0);
   useEffect(() => {
     if (!isSupabaseReady()) { setLoading(false); return; }
     const cached = _metricsCacheByCountry.get(country);
     if (cached) { setMetrics(cached); setLoading(false); }
-    let cancelled = false;
+    const myReq = ++reqRef.current;
+    const isStale = () => myReq !== reqRef.current;
     // "All" has no combined row in `metrics` (it's emitted per country). Build the
     // key total_* ticker entries from totals_global (cross-market, EUR). Per-market
     // peak/district entries are omitted in All (they name one project/district).
@@ -202,8 +208,8 @@ export function useMetrics() {
         supabasePublic.from("totals_global").select("*").maybeSingle(),
         _loadVelocityMaturity(),
       ]).then(([{ data, error }, mat]) => {
-        if (cancelled) return;
-        if (error || !data) { setLoading(false); return; }
+        if (isStale()) return;
+        if (error || !data) return;
         const f = (n) => (n == null ? "—" : Number(n).toLocaleString("en-US").replace(/,/g, " "));
         // Each metric carries the SK copy (value_text) AND an EN copy
         // (value_json.text_en) so Ticker.jsx can render the active language —
@@ -219,29 +225,34 @@ export function useMetrics() {
         const gated = _gateVelocityMetricRows(arr, country, mat);
         _metricsCacheByCountry.set(country, gated);
         setMetrics(gated);
-        setLoading(false);
+      }).catch((e) => {
+        if (!isStale()) console.error("[useMetrics]", e);
+      }).finally(() => {
+        if (!isStale()) setLoading(false);
       });
-      return () => { cancelled = true; };
+      return () => { reqRef.current++; };
     }
     Promise.all([
       supabasePublic.from("metrics").select("*").eq("country_code", country).order("display_order", { ascending: true }),
       _loadVelocityMaturity(),
     ]).then(([{ data, error }, mat]) => {
-        if (cancelled) return;
+        if (isStale()) return;
         // F-313 (DP-096): don't poison the module cache with [] on transient
         // errors — that would leave the ticker empty for the rest of the
         // session until hard reload. Cache ONLY on success.
         if (error) {
           console.error("[useMetrics]", error);
-          setLoading(false);
           return;
         }
         const gated = _gateVelocityMetricRows(data || [], country, mat);
         _metricsCacheByCountry.set(country, gated);
         setMetrics(gated);
-        setLoading(false);
+      }).catch((e) => {
+        if (!isStale()) console.error("[useMetrics]", e);
+      }).finally(() => {
+        if (!isStale()) setLoading(false);
       });
-    return () => { cancelled = true; };
+    return () => { reqRef.current++; };
   }, [country]);
   return { metrics, loading };
 }
@@ -442,6 +453,12 @@ export function useTotalsList(level, { country = null, filterCol = null, filterI
   const cacheKey = `${level}:${country || ''}:${filterCol || ''}:${filterId ?? ''}`;
   const [rows, setRows] = useState(() => _totalsListCache.get(cacheKey) || []);
   const [loading, setLoading] = useState(() => !_totalsListCache.has(cacheKey));
+  // Request-id guard + .finally (2026-06-22) — same hardening as useProjectFlats:
+  // only stale runs skip, and the latest run always clears loading on every path
+  // (success / db-error / rejection). Replaces a `cancelled` boolean that put the
+  // guard before setLoading(false) and had no .catch (a rejected request stranded
+  // the spinner).
+  const reqRef = useRef(0);
 
   useEffect(() => {
     // Parent filter requested but no parent selected → nothing to fetch.
@@ -458,23 +475,26 @@ export function useTotalsList(level, { country = null, filterCol = null, filterI
     if (cached) { setRows(cached); setLoading(false); }
     else setLoading(true);
 
-    let cancelled = false;
+    const myReq = ++reqRef.current;
+    const isStale = () => myReq !== reqRef.current;
     let q = supabasePublic.from(view).select("*");
     if (country) q = q.eq(_countryColForLevel(level), country);
     if (filterCol && filterId != null) q = q.eq(filterCol, filterId);
     q.then(({ data, error }) => {
-      if (cancelled) return;
+      if (isStale()) return;
       if (error) {
         console.error(`[useTotalsList] ${level}/${filterCol}=${filterId}`, error);
-        setLoading(false);
         return;
       }
       const arr = data || [];
       _totalsListCache.set(cacheKey, arr);
       setRows(arr);
-      setLoading(false);
+    }).catch((e) => {
+      if (!isStale()) console.error(`[useTotalsList] ${level}/${filterCol}=${filterId}`, e);
+    }).finally(() => {
+      if (!isStale()) setLoading(false);
     });
-    return () => { cancelled = true; };
+    return () => { reqRef.current++; };
   }, [level, country, filterCol, filterId, view, cacheKey]);
 
   return { rows, loading };
@@ -612,25 +632,31 @@ export function useDistrictTotals() {
   const cached = _districtTotalsByCountry.get(country);
   const [districts, setDistricts] = useState(cached || []);
   const [loading, setLoading] = useState(cached === undefined);
+  // Request-id guard + .finally (2026-06-22) — same hardening as useProjectFlats.
+  // The old `cancelled` boolean put `if (cancelled) return` BEFORE setLoading(false),
+  // and there was no .catch, so (a) a rapid re-run could strand the spinner and
+  // (b) a rejected request left it spinning forever. Now only stale runs skip and
+  // the latest run always clears loading in finally, on every path.
+  const reqRef = useRef(0);
   useEffect(() => {
     if (!isSupabaseReady()) { setLoading(false); return; }
     const hit = _districtTotalsByCountry.get(country);
     if (hit) { setDistricts(hit); setLoading(false); }
     else setLoading(true);
-    let cancelled = false;
+    const myReq = ++reqRef.current;
+    const isStale = () => myReq !== reqRef.current;
     _eqCountry(supabasePublic.from("totals_by_district").select("*"), country).then(({ data, error }) => {
-      if (cancelled) return;
-      if (error) {
-        console.error("[useDistrictTotals]", error);
-        setLoading(false);
-        return;
-      }
+      if (isStale()) return;
+      if (error) { console.error("[useDistrictTotals]", error); return; }
       const arr = data || [];
       _districtTotalsByCountry.set(country, arr);
       setDistricts(arr);
-      setLoading(false);
+    }).catch((e) => {
+      if (!isStale()) console.error("[useDistrictTotals]", e);
+    }).finally(() => {
+      if (!isStale()) setLoading(false);
     });
-    return () => { cancelled = true; };
+    return () => { reqRef.current++; };
   }, [country]);
   return { districts, loading };
 }
