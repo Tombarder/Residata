@@ -243,18 +243,22 @@ export default function LocationManager({ lang = "en" }) {
       const cityChanged = finalCity?.id !== cityIdRef.current;
       setCityId(finalCity?.id || "");
       setCityWarn(cityName && !matched ? cityName : null);
-      // The pin is the source of truth: re-derive the district from the new point —
-      // UNLESS the user manually typed one (and the city didn't change, which would
-      // invalidate a typed district anyway).
-      if (cityChanged || !districtTouchedRef.current) {
-        // Only trust the pin's district if it's a name in OUR catalog (keeps our
-        // naming, e.g. SK mestská časť "Petržalka"). The map service returns
-        // numbered districts for Praha ("Praha 10") that clash with our cadastral
-        // names ("Vinohrady") — for those, leave it empty so you pick from the list.
-        const fromPin = info?.district && info.district.trim();
-        const cat = catalogRef.current.byCity[finalCity?.id] || [];
-        const inCatalog = fromPin && cat.some((d) => norm(d) === norm(fromPin));
-        setDistrict(inCatalog ? fromPin : smallCityDistrict(finalCity?.id));
+      // The PIN drives the okres. When the reverse-geocode returns a district that is
+      // one of OUR catalog names (a Bratislava/Brno mestská časť), set it EVERY time the
+      // pin moves — even over a previous value — so the okres always matches where the
+      // pin is (this is what makes it auto-adjust for Bratislava). If the city changed,
+      // reset to the small-city default. Otherwise (same city, no catalog match — e.g.
+      // Praha, where the service returns "obvod Praha 2" not "Vinohrady") leave the okres
+      // as-is rather than wiping a value we can't auto-replace.
+      const fromPin = info?.district && info.district.trim();
+      const cat = catalogRef.current.byCity[finalCity?.id] || [];
+      const inCatalog = fromPin && cat.some((d) => norm(d) === norm(fromPin));
+      if (inCatalog) {
+        setDistrict(fromPin);
+        districtTouchedRef.current = false;
+      } else if (cityChanged) {
+        setDistrict(smallCityDistrict(finalCity?.id));
+        districtTouchedRef.current = false;
       }
       setDeriving(false); // city/district now match the pin → Save allowed
     })();
