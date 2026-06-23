@@ -57,12 +57,20 @@ function storedAccessToken() {
   return null;
 }
 async function rpcDirect(fn, body, { timeoutMs = 20000 } = {}) {
+  // Read the admin's access token up front. If localStorage holds no readable Supabase
+  // session (e.g. the SDK ever changes its storage key/shape), fail with a clear message
+  // instead of firing a guaranteed-401 request with an empty Bearer.
+  const token = storedAccessToken();
+  if (!token) {
+    console.warn(`rpcDirect(${fn}): no readable Supabase auth token in localStorage`);
+    throw new Error("Couldn't read your session — reload the page and sign in again.");
+  }
   const ctrl = new AbortController();
   const killer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     const r = await fetch(`${SUPA_URL}/rest/v1/rpc/${fn}`, {
       method: "POST", signal: ctrl.signal,
-      headers: { "Content-Type": "application/json", apikey: SUPA_KEY, Authorization: `Bearer ${storedAccessToken() || ""}` },
+      headers: { "Content-Type": "application/json", apikey: SUPA_KEY, Authorization: `Bearer ${token}` },
       body: JSON.stringify(body || {}),
     });
     if (r.status === 401) throw new Error("session-expired");
