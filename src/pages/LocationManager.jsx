@@ -94,6 +94,7 @@ export default function LocationManager({ lang = "en" }) {
   const [pin, setPin] = useState(null);
   const [cityId, setCityId] = useState("");   // DERIVED from pin (read-only)
   const [cityWarn, setCityWarn] = useState(null); // pin is in a place not in our cities
+  const [addingCity, setAddingCity] = useState(false); // adding cityWarn as a new city
   const [deriving, setDeriving] = useState(false); // reverse-geocode in flight after a user pin-move
   const [district, setDistrict] = useState("");
   const [suggestions, setSuggestions] = useState([]);
@@ -329,6 +330,27 @@ export default function LocationManager({ lang = "en" }) {
     }
   }
 
+  // The pin is in a real town that isn't in our cities yet → add it. Region/market/
+  // country are inherited server-side from the geographically nearest city, so the
+  // Boss never has to pick a kraj or get blocked. The new city is selected immediately.
+  async function addCity() {
+    if (!cityWarn || !pin || addingCity) return;
+    setAddingCity(true);
+    try {
+      const rows = await rpcDirect("admin_add_city", { p_name: cityWarn, p_lat: pin.lat, p_lng: pin.lng });
+      const nc = Array.isArray(rows) ? rows[0] : rows;
+      if (!nc || !nc.id) throw new Error("no city returned");
+      setCities((prev) => prev.some((c) => c.id === nc.id) ? prev : [...prev, nc]);
+      citiesRef.current = citiesRef.current.some((c) => c.id === nc.id) ? citiesRef.current : [...citiesRef.current, nc];
+      setCityId(nc.id);
+      setCityWarn(null);
+      setDistrict(nc.name);   // a new town is a small city → district defaults to the town (editable)
+      setToast({ type: "ok", msg: t(`Added "${nc.name}"`, `Pridané mesto "${nc.name}"`) });
+    } catch {
+      setToast({ type: "err", msg: t("Could not add the city — try again.", "Mesto sa nepodarilo pridať — skús znova.") });
+    } finally { setAddingCity(false); }
+  }
+
   async function save() {
     if (!selected || !pin || !cityId || deriving) return;
     setSaving(true);
@@ -463,9 +485,14 @@ export default function LocationManager({ lang = "en" }) {
               </div>
 
               {cityWarn && (
-                <div style={{ marginTop: 7, fontSize: "0.7rem", color: amber }}>
-                  ⚠ {t(`The pin is in "${cityWarn}", which isn't one of our cities — move it into the right city, or it won't be classified correctly.`,
-                       `Pin je v "${cityWarn}", čo nie je jedno z našich miest — presuň ho do správneho mesta, inak sa nezatriedi správne.`)}
+                <div style={{ marginTop: 7, fontSize: "0.7rem", color: amber, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <span>⚠ {t(`The pin is in "${cityWarn}", which isn't one of our cities yet.`,
+                             `Pin je v "${cityWarn}", čo zatiaľ nie je jedno z našich miest.`)}</span>
+                  <button onClick={addCity} disabled={addingCity || !pin}
+                    style={{ padding: "4px 9px", borderRadius: 6, border: `1px solid ${green}`, background: "rgba(0,229,160,0.12)", color: green, fontSize: "0.7rem", cursor: (addingCity || !pin) ? "default" : "pointer", fontFamily: "inherit" }}>
+                    {addingCity ? t("Adding…", "Pridávam…") : t(`+ Add "${cityWarn}" as a city`, `+ Pridať "${cityWarn}" ako mesto`)}
+                  </button>
+                  <span style={{ color: dim, fontSize: "0.64rem" }}>{t("(region auto-set from the nearest city)", "(kraj sa doplní podľa najbližšieho mesta)")}</span>
                 </div>
               )}
               <div style={{ marginTop: 7, fontSize: "0.7rem", color: pin ? dim : amber }}>
