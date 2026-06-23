@@ -1,5 +1,5 @@
 /**
- * MapView — all projects plotted on an interactive map.
+ * MapView — all projects plotted on an interactive map, with search + filters.
  *
  * Data flow:
  *   · useProjects()          → the country-scoped project list (names, unit
@@ -7,6 +7,12 @@
  *                              table and Dashboard read, so numbers stay in sync.
  *   · public.project_coords  → id → {lat,lng}. A dedicated, read-only view over
  *                              reference.projects(lat,lng). Merged in by id.
+ *
+ * Search + filters run entirely in-memory over the already-loaded project list
+ * (no extra round-trips): a name search-box with type-ahead suggestions, plus
+ * Mesto / Časť / Developer / Cena (€/m²) / Stav filters — the same dimensions the
+ * Analytics views expose, applied to the map pins. The map re-fits to the result
+ * set when a filter narrows it, and selecting a suggestion flies straight to it.
  *
  * Projects whose coordinates aren't set yet simply don't appear (and are
  * reported in the header count). Right now most coordinates are PLACEHOLDERS
@@ -32,6 +38,7 @@ const dim = "#8a8a96";
 const textLight = "#e8e8ed";
 const border = "#222228";
 const bg2 = "#0e0e10";
+const panel = "#141418";
 
 // CARTO dark-matter vector style — free, no key, ships its own glyphs+sprites.
 const MAP_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
@@ -45,6 +52,29 @@ const FALLBACK_ZOOM = 6.2;
 // a full page reload → back to the default fitted view, as intended.
 let savedView = null;
 
+// Diacritic-insensitive normalise for search/match (Petržalka ↔ petrzalka).
+const norm = (s) => (s || "").toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+const uniqueSorted = (arr) =>
+  Array.from(new Set(arr.filter((v) => v != null && String(v).trim() !== ""))).sort((a, b) =>
+    String(a).localeCompare(String(b), "sk", { sensitivity: "base" })
+  );
+
+// The single source of truth for the properties carried on a map feature AND
+// shown in a popup — used by buildFeatures() and by search-select so both render
+// identically.
+function projectProps(p) {
+  return {
+    id: p.id,
+    name: p.name || p.id,
+    city: p.city || "",
+    district: p.district || "",
+    available: Number(p.available_units) || 0,
+    total: Number(p.total_units) || 0,
+    sold: Number(p.sold_units) || 0,
+    ppm2: Math.round(Number(p.avg_price_eur_m2) || 0),
+  };
+}
+
 function buildFeatures(projects, coords) {
   const feats = [];
   for (const p of projects) {
@@ -53,24 +83,41 @@ function buildFeatures(projects, coords) {
     feats.push({
       type: "Feature",
       geometry: { type: "Point", coordinates: [c.lng, c.lat] },
-      properties: {
-        id: p.id,
-        name: p.name || p.id,
-        city: p.city || "",
-        district: p.district || "",
-        available: Number(p.available_units) || 0,
-        total: Number(p.total_units) || 0,
-        sold: Number(p.sold_units) || 0,
-        ppm2: Math.round(Number(p.avg_price_eur_m2) || 0),
-      },
+      properties: projectProps(p),
     });
   }
   return { type: "FeatureCollection", features: feats };
 }
 
+// Build + show the project popup. Shared by the map's point-click handler and by
+// search-select, so a clicked pin and a chosen suggestion render the same card.
+function showProjectPopup(map, lngLat, props, lang, onOpen, popupRef) {
+  const el = document.createElement("div");
+  el.style.minWidth = "180px";
+  const loc = [props.city, props.district].filter(Boolean).join(" · ");
+  const price = Number(props.ppm2) > 0 ? `€${Number(props.ppm2).toLocaleString("sk-SK")}/m²` : "—";
+  el.innerHTML =
+    `<div style="font-weight:600;font-size:0.92rem;color:${textLight};margin-bottom:2px">${escapeHtml(props.name)}</div>` +
+    `<div style="font-size:0.72rem;color:${dim};margin-bottom:8px">${escapeHtml(loc)}</div>` +
+    `<div style="font-family:${mono};font-size:0.72rem;color:${textLight};line-height:1.5">` +
+    `<div><span style="color:${dim}">${lang === "sk" ? "Voľné" : "Available"}</span> &nbsp;${props.available} / ${props.total}</div>` +
+    `<div><span style="color:${dim}">${lang === "sk" ? "Priem." : "Avg"}</span> &nbsp;${price}</div></div>` +
+    `<button id="mv-open" style="margin-top:10px;width:100%;padding:7px 10px;background:${green};color:#0a0a0b;` +
+    `border:none;border-radius:6px;font-weight:600;font-size:0.78rem;cursor:pointer">` +
+    `${lang === "sk" ? "Otvoriť projekt" : "Open project"} →</button>`;
+  const openBtn = el.querySelector("#mv-open");
+  if (openBtn) openBtn.onclick = () => onOpen(props.id);
+  if (popupRef.current) popupRef.current.remove();
+  popupRef.current = new maplibregl.Popup({ closeButton: true, maxWidth: "260px", offset: 12 })
+    .setLngLat(lngLat)
+    .setDOMContent(el)
+    .addTo(map);
+}
+
 export default function MapView({ lang = "en", setCurrent }) {
   const { projects, loading } = useProjects();
   const { country } = useCountry();
+  const sk = lang === "sk";
 
   const [coords, setCoords] = useState(null);     // id -> {lat,lng,verified} | null while loading
   const containerRef = useRef(null);
@@ -78,13 +125,28 @@ export default function MapView({ lang = "en", setCurrent }) {
   const readyRef = useRef(false);
   const featuresRef = useRef({ type: "FeatureCollection", features: [] });
   const setCurrentRef = useRef(setCurrent);
+  const langRef = useRef(lang);
   const countryRef = useRef(country);   // latest country, readable inside the once-mounted load handler
   const fitKeyRef = useRef(null);        // country we've already auto-fitted to (once data was present)
   const popupRef = useRef(null);         // single active popup — clicking pins must not stack popups
+
+  // ── Filter + search state ──
+  const [query, setQuery] = useState("");
+  const [fCity, setFCity] = useState("");
+  const [fDistrict, setFDistrict] = useState("");
+  const [fDeveloper, setFDeveloper] = useState("");
+  const [fStatus, setFStatus] = useState("all");   // all | available | sold
+  const [priceMin, setPriceMin] = useState("");
+  const [priceMax, setPriceMax] = useState("");
+  const [showSuggest, setShowSuggest] = useState(false);
+  const [activeIdx, setActiveIdx] = useState(-1);
+  const searchWrapRef = useRef(null);
+
   // Keep these refs on the latest values for the once-mounted (deps []) Mapbox load/click
   // handlers — updated post-commit via effects, never written during render
   // (lint: react-hooks/static-components forbids ref writes during render).
   useEffect(() => { setCurrentRef.current = setCurrent; }, [setCurrent]);
+  useEffect(() => { langRef.current = lang; }, [lang]);
   useEffect(() => { countryRef.current = country; }, [country]);
 
   // ── Load coordinates (anon, public read-only view) ──
@@ -103,13 +165,74 @@ export default function MapView({ lang = "en", setCurrent }) {
     return () => { cancelled = true; };
   }, []);
 
-  const fc = useMemo(
-    () => buildFeatures(projects || [], coords || {}),
-    [projects, coords]
+  // ── Filter option lists (data-driven, country-scoped via useProjects) ──
+  const cityOptions = useMemo(() => uniqueSorted((projects || []).map((p) => p.city)), [projects]);
+  const districtOptions = useMemo(
+    () => uniqueSorted((projects || []).filter((p) => !fCity || p.city === fCity).map((p) => p.district)),
+    [projects, fCity]
   );
+  const developerOptions = useMemo(() => uniqueSorted((projects || []).map((p) => p.developer)), [projects]);
+  const priceBounds = useMemo(() => {
+    let lo = Infinity, hi = 0;
+    for (const p of projects || []) {
+      const v = Math.round(Number(p.avg_price_eur_m2) || 0);
+      if (v > 0) { if (v < lo) lo = v; if (v > hi) hi = v; }
+    }
+    return Number.isFinite(lo) ? { lo, hi } : { lo: 0, hi: 0 };
+  }, [projects]);
+
+  // ── Apply the dropdown/range filters (everything except the name query) ──
+  const dropdownFiltered = useMemo(() => {
+    const pMin = priceMin === "" ? null : Number(priceMin);
+    const pMax = priceMax === "" ? null : Number(priceMax);
+    const priceActive = pMin != null || pMax != null;
+    return (projects || []).filter((p) => {
+      if (fCity && p.city !== fCity) return false;
+      if (fDistrict && p.district !== fDistrict) return false;
+      if (fDeveloper && p.developer !== fDeveloper) return false;
+      const avail = Number(p.available_units) || 0;
+      if (fStatus === "available" && !(avail > 0)) return false;
+      if (fStatus === "sold" && avail > 0) return false;
+      if (priceActive) {
+        const ppm2 = Math.round(Number(p.avg_price_eur_m2) || 0);
+        if (ppm2 <= 0) return false;                       // unknown price can't be confirmed in-range
+        if (pMin != null && ppm2 < pMin) return false;
+        if (pMax != null && ppm2 > pMax) return false;
+      }
+      return true;
+    });
+  }, [projects, fCity, fDistrict, fDeveloper, fStatus, priceMin, priceMax]);
+
+  // ── Name query narrows the dropdown-filtered set → what the map shows ──
+  const q = norm(query);
+  const shown = useMemo(() => {
+    if (!q) return dropdownFiltered;
+    return dropdownFiltered.filter((p) => norm(p.name).includes(q));
+  }, [dropdownFiltered, q]);
+
+  // ── Type-ahead suggestions: prefix matches first, then contains; capped ──
+  const suggestions = useMemo(() => {
+    if (!q) return [];
+    const starts = [], contains = [];
+    for (const p of dropdownFiltered) {
+      const n = norm(p.name);
+      if (n.startsWith(q)) starts.push(p);
+      else if (n.includes(q)) contains.push(p);
+      if (starts.length >= 8) break;
+    }
+    return [...starts, ...contains].slice(0, 8);
+  }, [dropdownFiltered, q]);
+
+  const anyFilter = !!(query || fCity || fDistrict || fDeveloper || fStatus !== "all" || priceMin !== "" || priceMax !== "");
+
+  const fc = useMemo(() => buildFeatures(shown, coords || {}), [shown, coords]);
   useEffect(() => { featuresRef.current = fc; }, [fc]);
 
   const placed = fc.features.length;
+  const totalPlaced = useMemo(
+    () => (coords ? (projects || []).filter((p) => coords[p.id]).length : 0),
+    [projects, coords]
+  );
   const placeholderCount = useMemo(() => {
     if (!coords) return 0;
     return fc.features.filter((f) => coords[f.properties.id] && !coords[f.properties.id].verified).length;
@@ -227,25 +350,11 @@ export default function MapView({ lang = "en", setCurrent }) {
       // Popup on a project point
       map.on("click", "points", (e) => {
         const f = e.features[0];
-        const p = f.properties;
-        const el = document.createElement("div");
-        el.style.minWidth = "180px";
-        const loc = [p.city, p.district].filter(Boolean).join(" · ");
-        const price = Number(p.ppm2) > 0 ? `€${Number(p.ppm2).toLocaleString("sk-SK")}/m²` : "—";
-        el.innerHTML =
-          `<div style="font-weight:600;font-size:0.92rem;color:${textLight};margin-bottom:2px">${escapeHtml(p.name)}</div>` +
-          `<div style="font-size:0.72rem;color:${dim};margin-bottom:8px">${escapeHtml(loc)}</div>` +
-          `<div style="font-family:${mono};font-size:0.72rem;color:${textLight};line-height:1.5">` +
-          `<div><span style="color:${dim}">Available</span> &nbsp;${p.available} / ${p.total}</div>` +
-          `<div><span style="color:${dim}">Avg</span> &nbsp;${price}</div></div>` +
-          `<button id="mv-open" style="margin-top:10px;width:100%;padding:7px 10px;background:${green};color:#0a0a0b;` +
-          `border:none;border-radius:6px;font-weight:600;font-size:0.78rem;cursor:pointer">` +
-          `${lang === "sk" ? "Otvoriť projekt" : "Open project"} →</button>`;
-        const openBtn = el.querySelector("#mv-open");
-        if (openBtn) openBtn.onclick = () => { setCurrentRef.current && setCurrentRef.current("App:ProjectDetail:" + p.id); };
-        if (popupRef.current) popupRef.current.remove();
-        popupRef.current = new maplibregl.Popup({ closeButton: true, maxWidth: "260px", offset: 12 })
-          .setLngLat(f.geometry.coordinates).setDOMContent(el).addTo(map);
+        showProjectPopup(
+          map, f.geometry.coordinates, f.properties, langRef.current,
+          (id) => { setCurrentRef.current && setCurrentRef.current("App:ProjectDetail:" + id); },
+          popupRef
+        );
       });
 
       ["clusters", "cluster-count", "points"].forEach((layer) => {
@@ -259,7 +368,7 @@ export default function MapView({ lang = "en", setCurrent }) {
       if (popupRef.current) { popupRef.current.remove(); popupRef.current = null; }
       map.remove(); mapRef.current = null; readyRef.current = false;
     };
-  }, []);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Push data updates into the map; auto-fit on first data + on country change ──
   useEffect(() => {
@@ -275,6 +384,70 @@ export default function MapView({ lang = "en", setCurrent }) {
     }
   }, [fc, country]);
 
+  // ── Re-fit to the result set when a NON-search filter narrows it ──
+  // (Search typing only filters the pins + offers suggestions; selecting a
+  // suggestion flies to it. Dropdown/range/status changes reframe the map.)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !readyRef.current) return;
+    const active = fCity || fDistrict || fDeveloper || fStatus !== "all" || priceMin !== "" || priceMax !== "";
+    if (!active) return;                          // "show all" is handled by the country/data fit
+    if (featuresRef.current.features.length) fitToData(map, featuresRef.current, true);
+  }, [fCity, fDistrict, fDeveloper, fStatus, priceMin, priceMax]);
+
+  // ── Country switch: filters are country-scoped, so reset them ──
+  const firstCountry = useRef(true);
+  useEffect(() => {
+    if (firstCountry.current) { firstCountry.current = false; return; }
+    setQuery(""); setFCity(""); setFDistrict(""); setFDeveloper("");
+    setFStatus("all"); setPriceMin(""); setPriceMax(""); setShowSuggest(false);
+  }, [country]);
+
+  // ── Close the suggestion dropdown on outside click ──
+  useEffect(() => {
+    if (!showSuggest) return;
+    const onDown = (e) => { if (searchWrapRef.current && !searchWrapRef.current.contains(e.target)) setShowSuggest(false); };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [showSuggest]);
+
+  function selectProject(p) {
+    setQuery(p.name);
+    setShowSuggest(false);
+    setActiveIdx(-1);
+    const map = mapRef.current;
+    const c = (coords || {})[p.id];
+    if (!map) return;
+    if (c) {
+      map.flyTo({ center: [c.lng, c.lat], zoom: Math.max(map.getZoom(), 14), duration: 700 });
+      showProjectPopup(
+        map, [c.lng, c.lat], projectProps(p), langRef.current,
+        (id) => { setCurrentRef.current && setCurrentRef.current("App:ProjectDetail:" + id); },
+        popupRef
+      );
+    }
+  }
+
+  function onSearchKeyDown(e) {
+    if (e.key === "ArrowDown") { e.preventDefault(); setShowSuggest(true); setActiveIdx((i) => Math.min(i + 1, suggestions.length - 1)); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setActiveIdx((i) => Math.max(i - 1, 0)); }
+    else if (e.key === "Enter") {
+      const pick = suggestions[activeIdx] || suggestions[0];
+      if (pick) { e.preventDefault(); selectProject(pick); }
+    } else if (e.key === "Escape") { setShowSuggest(false); setActiveIdx(-1); }
+  }
+
+  function clearFilters() {
+    setQuery(""); setFCity(""); setFDistrict(""); setFDeveloper("");
+    setFStatus("all"); setPriceMin(""); setPriceMax(""); setShowSuggest(false); setActiveIdx(-1);
+    if (popupRef.current) { popupRef.current.remove(); popupRef.current = null; }
+    const map = mapRef.current;
+    if (map && readyRef.current) {
+      // Re-frame to all placeable projects of this country.
+      fitToData(map, buildFeatures(projects || [], coords || {}), true);
+    }
+  }
+
   const isLoading = loading || coords === null;
 
   return (
@@ -285,15 +458,18 @@ export default function MapView({ lang = "en", setCurrent }) {
         padding: "0.85rem 1.25rem", borderBottom: `1px solid ${border}`, background: "#0a0a0b",
       }}>
         <div style={{ fontSize: "0.82rem", color: textLight }}>
-          <strong style={{ color: green, fontFamily: mono }}>{placed}</strong>{" "}
-          {lang === "sk" ? "projektov na mape" : "projects on the map"}
+          <strong style={{ color: green, fontFamily: mono }}>{placed}</strong>
+          {anyFilter && totalPlaced > 0 && (
+            <span style={{ color: dim }}> {sk ? "z" : "of"} <span style={{ fontFamily: mono }}>{totalPlaced}</span></span>
+          )}{" "}
+          {sk ? "projektov na mape" : "projects on the map"}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "0.9rem", fontSize: "0.72rem", color: dim }}>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-            <Dot color={green} /> {lang === "sk" ? "voľné byty" : "available"}
+            <Dot color={green} /> {sk ? "voľné byty" : "available"}
           </span>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-            <Dot color={greyPt} /> {lang === "sk" ? "vypredané" : "sold out"}
+            <Dot color={greyPt} /> {sk ? "vypredané" : "sold out"}
           </span>
         </div>
         {placeholderCount > 0 && (
@@ -302,10 +478,127 @@ export default function MapView({ lang = "en", setCurrent }) {
             border: `1px solid ${amber}40`, background: `${amber}12`,
             padding: "3px 9px", borderRadius: 20,
           }}>
-            📍 {lang === "sk"
+            📍 {sk
               ? `${placeholderCount} dočasných polôh (presné pozície sa dopĺňajú)`
               : `${placeholderCount} placeholder locations — exact positions being added`}
           </div>
+        )}
+      </div>
+
+      {/* Filter + search bar */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap",
+        padding: "0.6rem 1.25rem", borderBottom: `1px solid ${border}`, background: panel,
+      }}>
+        {/* Name search with type-ahead */}
+        <div ref={searchWrapRef} style={{ position: "relative", flex: "1 1 240px", minWidth: 200, maxWidth: 360 }}>
+          <input
+            value={query}
+            onChange={(e) => { setQuery(e.target.value); setShowSuggest(true); setActiveIdx(-1); }}
+            onFocus={() => { if (query) setShowSuggest(true); }}
+            onKeyDown={onSearchKeyDown}
+            placeholder={sk ? "Hľadať projekt…" : "Search project…"}
+            aria-label={sk ? "Hľadať projekt" : "Search project"}
+            style={inputStyle}
+          />
+          {query && (
+            <button
+              onClick={() => { setQuery(""); setShowSuggest(false); setActiveIdx(-1); }}
+              aria-label={sk ? "Zmazať" : "Clear"}
+              style={{
+                position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)",
+                background: "none", border: "none", color: dim, cursor: "pointer", fontSize: "1rem", lineHeight: 1, padding: "2px 4px",
+              }}
+            >×</button>
+          )}
+          {showSuggest && suggestions.length > 0 && (
+            <div style={{
+              position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 30,
+              background: bg2, border: `1px solid ${border}`, borderRadius: 8, overflow: "hidden",
+              boxShadow: "0 12px 30px rgba(0,0,0,0.55)", maxHeight: 320, overflowY: "auto",
+            }}>
+              {suggestions.map((p, i) => {
+                const loc = [p.city, p.district].filter(Boolean).join(" · ");
+                const hasCoord = !!(coords || {})[p.id];
+                return (
+                  <div
+                    key={p.id}
+                    onMouseDown={(e) => { e.preventDefault(); selectProject(p); }}
+                    onMouseEnter={() => setActiveIdx(i)}
+                    style={{
+                      padding: "8px 11px", cursor: "pointer",
+                      background: i === activeIdx ? "#1d1d22" : "transparent",
+                      borderBottom: i < suggestions.length - 1 ? `1px solid ${border}` : "none",
+                    }}
+                  >
+                    <div style={{ fontSize: "0.82rem", color: textLight, display: "flex", justifyContent: "space-between", gap: 8 }}>
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
+                      {!hasCoord && <span style={{ color: amber, fontSize: "0.62rem", flexShrink: 0 }}>{sk ? "bez polohy" : "no pin"}</span>}
+                    </div>
+                    {loc && <div style={{ fontSize: "0.68rem", color: dim, marginTop: 1 }}>{loc}</div>}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* City */}
+        <select value={fCity} onChange={(e) => { setFCity(e.target.value); setFDistrict(""); }} style={selectStyle} aria-label={sk ? "Mesto" : "City"}>
+          <option value="">{sk ? "Mesto — všetky" : "City — all"}</option>
+          {cityOptions.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
+
+        {/* District */}
+        <select value={fDistrict} onChange={(e) => setFDistrict(e.target.value)} style={selectStyle} aria-label={sk ? "Časť" : "District"}>
+          <option value="">{sk ? "Časť — všetky" : "District — all"}</option>
+          {districtOptions.map((d) => <option key={d} value={d}>{d}</option>)}
+        </select>
+
+        {/* Developer */}
+        <select value={fDeveloper} onChange={(e) => setFDeveloper(e.target.value)} style={selectStyle} aria-label="Developer">
+          <option value="">{sk ? "Developer — všetci" : "Developer — all"}</option>
+          {developerOptions.map((d) => <option key={d} value={d}>{d}</option>)}
+        </select>
+
+        {/* Price €/m² */}
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+          <input
+            type="number" inputMode="numeric" min="0" value={priceMin}
+            onChange={(e) => setPriceMin(e.target.value.replace(/[^\d]/g, ""))}
+            placeholder={priceBounds.hi ? String(priceBounds.lo) : (sk ? "od" : "min")}
+            aria-label={sk ? "Cena od €/m²" : "Price from €/m²"}
+            style={{ ...inputStyle, width: 74, paddingRight: 8 }}
+          />
+          <span style={{ color: dim, fontSize: "0.72rem" }}>–</span>
+          <input
+            type="number" inputMode="numeric" min="0" value={priceMax}
+            onChange={(e) => setPriceMax(e.target.value.replace(/[^\d]/g, ""))}
+            placeholder={priceBounds.hi ? String(priceBounds.hi) : (sk ? "do" : "max")}
+            aria-label={sk ? "Cena do €/m²" : "Price to €/m²"}
+            style={{ ...inputStyle, width: 74, paddingRight: 8 }}
+          />
+          <span style={{ color: dim, fontSize: "0.72rem", fontFamily: mono }}>€/m²</span>
+        </div>
+
+        {/* Status chips */}
+        <div style={{ display: "inline-flex", gap: 4 }}>
+          {[
+            { k: "all", label: sk ? "Všetky" : "All" },
+            { k: "available", label: sk ? "Voľné" : "Available" },
+            { k: "sold", label: sk ? "Vypredané" : "Sold out" },
+          ].map((s) => (
+            <button key={s.k} onClick={() => setFStatus(s.k)} style={chipStyle(fStatus === s.k)}>{s.label}</button>
+          ))}
+        </div>
+
+        {anyFilter && (
+          <button onClick={clearFilters} style={{
+            marginLeft: "auto", background: "none", border: `1px solid ${border}`, color: dim,
+            borderRadius: 7, padding: "6px 11px", fontSize: "0.74rem", cursor: "pointer",
+          }}>
+            ✕ {sk ? "Vyčistiť" : "Clear"}
+          </button>
         )}
       </div>
 
@@ -317,15 +610,17 @@ export default function MapView({ lang = "en", setCurrent }) {
             position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
             color: dim, fontFamily: mono, fontSize: "0.8rem", background: "rgba(10,10,11,0.4)", pointerEvents: "none",
           }}>
-            {lang === "sk" ? "Načítavam mapu…" : "Loading map…"}
+            {sk ? "Načítavam mapu…" : "Loading map…"}
           </div>
         )}
         {!isLoading && placed === 0 && (
           <div style={{
             position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
-            color: dim, fontFamily: mono, fontSize: "0.8rem", textAlign: "center", padding: "2rem",
+            color: dim, fontFamily: mono, fontSize: "0.8rem", textAlign: "center", padding: "2rem", pointerEvents: "none",
           }}>
-            {lang === "sk" ? "Žiadne projekty s polohou." : "No projects with a location yet."}
+            {anyFilter
+              ? (sk ? "Žiadny projekt nezodpovedá filtrom." : "No projects match the filters.")
+              : (sk ? "Žiadne projekty s polohou." : "No projects with a location yet.")}
           </div>
         )}
       </div>
@@ -337,9 +632,28 @@ export default function MapView({ lang = "en", setCurrent }) {
         .maplibregl-popup-tip { border-top-color:${bg2} !important; border-bottom-color:${bg2} !important; }
         .maplibregl-popup-close-button { color:${dim}; font-size:16px; padding:2px 6px; }
         .maplibregl-ctrl-attrib { font-size:9px; }
+        select option { background:${bg2}; color:${textLight}; }
       `}</style>
     </div>
   );
+}
+
+const inputStyle = {
+  width: "100%", boxSizing: "border-box", padding: "7px 26px 7px 11px",
+  background: bg2, border: `1px solid ${border}`, borderRadius: 7,
+  color: textLight, fontSize: "0.82rem", outline: "none",
+};
+const selectStyle = {
+  padding: "7px 9px", background: bg2, border: `1px solid ${border}`, borderRadius: 7,
+  color: textLight, fontSize: "0.8rem", outline: "none", cursor: "pointer", maxWidth: 180,
+};
+function chipStyle(active) {
+  return {
+    padding: "6px 11px", borderRadius: 7, cursor: "pointer", fontSize: "0.74rem",
+    border: `1px solid ${active ? green : border}`,
+    background: active ? `${green}1a` : "transparent",
+    color: active ? green : dim,
+  };
 }
 
 function Dot({ color }) {
