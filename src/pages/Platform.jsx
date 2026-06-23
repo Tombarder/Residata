@@ -124,6 +124,7 @@ const IconMap = () => (
 
 // Map view is lazy-loaded — MapLibre is a heavy dep we only want on /app/map.
 const MapView = lazy(() => import("./MapView"));
+const MapView2 = lazy(() => import("./MapView2"));
 const LocationManager = lazy(() => import("./LocationManager"));
 
 const NAV = [
@@ -131,6 +132,7 @@ const NAV = [
     { page: "App:Dashboard", label: { en: "Dashboard",  sk: "Dashboard" }, Icon: IconHome },
     { page: "App:Projects",  label: { en: "Projects",   sk: "Projekty"  }, Icon: IconGrid },
     { page: "App:Map",       label: { en: "Map view",   sk: "Mapa"      }, Icon: IconMap },
+    { page: "App:Map2",      label: { en: "Map 2",      sk: "Mapa 2"    }, Icon: IconMap },
     { page: "App:Analytics", label: { en: "Analytics",  sk: "Analytika" }, Icon: IconChart,    requires: "view_analytics" },
     { page: "App:UnitTimeline", label: { en: "Unit timeline", sk: "Byt v čase" }, Icon: IconClock, requires: "view_analytics" },
     { page: "App:Explorer", label: { en: "Unit Explorer", sk: "Prieskumník" }, Icon: IconGrid, requires: "view_analytics" },
@@ -477,6 +479,7 @@ function TopBar({ page, lang, setLang, tier }) {
     "App:Dashboard": { en: "Dashboard",       sk: "Dashboard"    },
     "App:Projects":  { en: "Projects",        sk: "Projekty"     },
     "App:Map":       { en: "Map view",        sk: "Mapa"         },
+    "App:Map2":      { en: "Map 2",           sk: "Mapa 2"       },
     "App:Analytics":    { en: "Analytics",     sk: "Analytika"    },
     "App:UnitTimeline": { en: "Unit timeline", sk: "Byt v čase"   },
     "App:Explorer":     { en: "Unit Explorer", sk: "Prieskumník"  },
@@ -640,6 +643,7 @@ function PageContent({ page, projectId, lang, setCurrent, openLogin }) {
   if (page === "App:Dashboard")  return <PlatformDashboard lang={lang} setCurrent={setCurrent} />;
   if (page === "App:Projects")   return <PlatformProjects lang={lang} setCurrent={setCurrent} openLogin={openLogin} />;
   if (page === "App:Map")        return <Suspense fallback={<div style={{ padding: "2rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.8rem" }}>{lang === "sk" ? "Načítavam mapu…" : "Loading map…"}</div>}><MapView lang={lang} setCurrent={setCurrent} /></Suspense>;
+  if (page === "App:Map2")       return <Suspense fallback={<div style={{ padding: "2rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.8rem" }}>{lang === "sk" ? "Načítavam mapu…" : "Loading map…"}</div>}><MapView2 lang={lang} setCurrent={setCurrent} /></Suspense>;
   if (page === "App:Analytics")  return <Gated require="view_analytics"       lang={lang} setCurrent={setCurrent}><LiveAnalytics lang={lang} setCurrent={setCurrent} openLogin={openLogin} /></Gated>;
   if (page === "App:UnitTimeline") return <Gated require="view_analytics"     lang={lang} setCurrent={setCurrent}><UnitTracker lang={lang} setCurrent={setCurrent} /></Gated>;
   if (page === "App:Explorer")   return <Gated require="view_analytics"       lang={lang} setCurrent={setCurrent}><UnitExplorer lang={lang} setCurrent={setCurrent} /></Gated>;

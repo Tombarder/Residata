@@ -20,6 +20,7 @@ const APP_PAGE_TO_PATH = {
   "App:Dashboard": "/app",
   "App:Projects":  "/app/projects",
   "App:Map":       "/app/map",
+  "App:Map2":      "/app/map-2",
   "App:Analytics": "/app/analytics",
   "App:UnitTimeline": "/app/unit-timeline",
   "App:Explorer":  "/app/explorer",
