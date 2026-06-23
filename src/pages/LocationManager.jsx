@@ -234,10 +234,13 @@ export default function LocationManager({ lang = "en" }) {
       const pickedTown = pickedTownRef.current;   // kept (not reset) so the add-city click can read the picked kraj
       const info = await reverseGeocode(pin.lat, pin.lng);
       if (gen !== revGenRef.current) return; // superseded by a newer pin
-      // The town from the picked address suggestion is reliable; the reverse-geocode
-      // often returns the nearest big city (or nothing) for small towns — so prefer
-      // the picked town for the CITY, and still use the reverse result for the district.
-      const cityName = pickedTown || info?.city;
+      // The picked suggestion's town is reliable for small towns (reverse returns the
+      // nearest big city / nothing). BUT a picked "town" that's actually a mestská časť
+      // in our district catalog (e.g. "Petržalka") is NOT a city — for those use the
+      // reverse-geocode's city, so we never offer to add a district as a city. Reverse
+      // is still used for the district either way.
+      const pickedIsDistrict = pickedTown && Object.values(catalogRef.current.byCity).some((arr) => arr.some((d) => norm(d) === norm(pickedTown)));
+      const cityName = (pickedTown && !pickedIsDistrict) ? pickedTown : info?.city;
       const matched = cityName ? matchCity(cityName, info?.cc) : null;
       const finalCity = matched || nearestCity(pin.lat, pin.lng, citiesRef.current);
       const cityChanged = finalCity?.id !== cityIdRef.current;
