@@ -26,6 +26,7 @@
  * it can never 401 on a stale login, today or in the future.
  */
 import { createClient } from "@supabase/supabase-js";
+import { createBoundedAuthLock, makeAuthTimeoutFetch } from "./authResilience";
 
 const url = import.meta.env.VITE_SUPABASE_URL;
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -35,23 +36,23 @@ if (!url || !key) {
 }
 
 /**
- * In-memory auth lock (2026-06-10). supabase-js defaults to the Web Locks API
- * (navigator.locks) to serialise token refresh across tabs. In some contexts —
- * incognito, certain browser extensions, embedded/automation webviews — that
- * lock is never granted, so `auth.getSession()` hangs forever; and because every
- * authed query awaits getSession() internally, the whole app sticks on
- * "Loading…" (confirmed live: the raw REST query returned in ~1s while
- * getSession stalled). This lock serialises auth ops WITHIN the tab — the same
- * guarantee as supabase's processLock — without ever touching navigator.locks,
- * so getSession can't deadlock. One chained promise = at most one auth op at a
- * time; a prior failure never blocks the next.
+ * In-tab auth lock (2026-06-10, hardened 2026-06-23). supabase-js defaults to
+ * the Web Locks API (navigator.locks) to serialise token refresh across tabs. In
+ * some contexts — incognito, certain browser extensions, embedded/automation
+ * webviews — that lock is never granted, so `auth.getSession()` hangs forever;
+ * and because every authed query awaits getSession() internally, the whole app
+ * sticks on "Loading…". So we serialise auth ops WITHIN the tab without ever
+ * touching navigator.locks.
+ *
+ * 2026-06-23 hardening (see ./authResilience.js): the original chain waited
+ * FOREVER to acquire, so one slow/stuck token refresh wedged the chain and every
+ * later logged-in query hung until a full page reload — the "open a project from
+ * the Map → stuck on Loading…, only refresh fixes it" bug. The lock now
+ * self-heals (the chain always advances within a hard cap), and the auth fetch
+ * is bounded so a refresh can never hang the chain in the first place. Two
+ * independent guards, each removing one unbounded wait.
  */
-let _authChain = Promise.resolve();
-const inMemoryAuthLock = (_name, _acquireTimeout, fn) => {
-  const run = _authChain.then(() => fn(), () => fn());
-  _authChain = run.then(() => {}, () => {});
-  return run;
-};
+const inMemoryAuthLock = createBoundedAuthLock();
 
 export const supabase = url && key ? createClient(url, key, {
   auth: {
@@ -60,6 +61,10 @@ export const supabase = url && key ? createClient(url, key, {
     storage: typeof window !== "undefined" ? window.localStorage : undefined,
     lock: inMemoryAuthLock,
   },
+  // Bound auth network calls (/auth/v1/*) so a hung/slow token refresh can never
+  // hold the auth lock indefinitely. Scoped to auth only — paged data reads pass
+  // through untouched and are never aborted mid-flight.
+  global: { fetch: makeAuthTimeoutFetch() },
 }) : null;
 
 /**
