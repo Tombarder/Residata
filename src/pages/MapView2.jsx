@@ -32,6 +32,7 @@ import {
 const mono = "'JetBrains Mono', monospace";
 const green = "#00e5a0";
 const amber = "#f5a623";
+const greyPt = "#6b6b76";
 const dim = "#8a8a96";
 const textLight = "#e8e8ed";
 const border = "#222228";
@@ -183,14 +184,30 @@ export default function MapView2({ lang = "en", setCurrent }) {
   const fc = useMemo(() => buildFeatures(shown, coords || {}, lens, thresholds, verifiedOnly), [shown, coords, lens, thresholds, verifiedOnly]);
   useEffect(() => { featuresRef.current = fc; }, [fc]);
 
-  // KPI context for the current filtered view.
-  const kpis = useMemo(() => {
+  // Market overview for the current filtered view — drives the adaptive header.
+  const marketStats = useMemo(() => {
     const priced = shown.map(ppm2Of).filter((v) => v > 0).sort((a, b) => a - b);
+    const at = (q) => (priced.length ? priced[Math.min(priced.length - 1, Math.floor(q * priced.length))] : null);
     const med = priced.length ? priced[Math.floor((priced.length - 1) / 2)] : null;
-    const units = shown.reduce((s, p) => s + (Number(p.total_units) || 0), 0);
-    const abs = shown.map((p) => p.sold_percentage).filter((v) => v != null).map(Number);
-    const avgAbs = abs.length ? Math.round(abs.reduce((a, b) => a + b, 0) / abs.length) : null;
-    return { count: shown.length, med, units, avgAbs };
+    const sum = (f) => shown.reduce((s, p) => s + (Number(f(p)) || 0), 0);
+    const available = sum((p) => p.available_units);
+    const reserved = sum((p) => (Number(p.reserved_units) || 0) + (Number(p.prereserved_units) || 0));
+    const sold = sum((p) => p.sold_units);
+    const invTotal = available + reserved + sold;
+    // Price histogram clamped to the 2nd–98th percentile so a few outliers don't flatten it.
+    const N = 18, hist = new Array(N).fill(0);
+    const hLo = at(0.02), hHi = at(0.98);
+    if (priced.length >= 5 && hHi > hLo) {
+      const span = hHi - hLo;
+      priced.forEach((v) => { hist[Math.min(N - 1, Math.max(0, Math.floor(((v - hLo) / span) * N)))]++; });
+    }
+    const comp = { ready: 0, soon: 0, mid: 0, far: 0, unknown: 0 };
+    shown.forEach((p) => { comp[completionBucket(p)]++; });
+    return {
+      count: shown.length, med, pMin: priced[0] ?? null, pMax: priced[priced.length - 1] ?? null,
+      hLo, hHi, hist, units: sum((p) => p.total_units), available, reserved, sold, invTotal,
+      soldPct: invTotal ? Math.round((sold / invTotal) * 100) : null, comp,
+    };
   }, [shown]);
 
   const compSet = useMemo(() => computeCompetitiveSet(shown, coords, analysisCenter, radiusKm, verifiedOnly), [shown, coords, analysisCenter, radiusKm, verifiedOnly]);
@@ -309,31 +326,21 @@ export default function MapView2({ lang = "en", setCurrent }) {
   const openProject = (id) => setCurrentRef.current && setCurrentRef.current("App:ProjectDetail:" + id);
   const isLoading = loading || coords === null;
   const legend = legendForLens(lens, thresholds, fmt);
-  const activeLens = LENSES.find((l) => l.key === lens);
 
   return (
     <div style={{ height: "calc(100dvh - 64px)", display: "flex", flexDirection: "column", background: bg2 }}>
-      {/* Lens bar + KPI context */}
-      <div style={{ display: "flex", alignItems: "center", gap: "0.9rem", flexWrap: "wrap", padding: "0.6rem 1.25rem", borderBottom: `1px solid ${border}`, background: "#0a0a0b" }}>
-        <span style={{ fontSize: "0.72rem", color: dim }}>{sk ? "Mapa ukazuje" : "Map shows"}</span>
-        <div style={{ display: "inline-flex", gap: 5, flexWrap: "wrap" }}>
-          {LENSES.map((l) => <button key={l.key} onClick={() => setLens(l.key)} style={chipStyle(lens === l.key)}>{l.label}</button>)}
+      {/* Market overview — lens tabs + adaptive insight */}
+      <div style={{ borderBottom: `1px solid ${border}`, background: "#0a0a0b", padding: "0.6rem 1.25rem 0.7rem" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.8rem", flexWrap: "wrap", marginBottom: 10 }}>
+          <span style={{ fontSize: "0.6rem", color: dim, letterSpacing: "0.12em", textTransform: "uppercase" }}>{sk ? "Trh" : "Market"}</span>
+          <div style={{ display: "inline-flex", gap: 3, background: bg2, border: `1px solid ${border}`, borderRadius: 999, padding: 3 }}>
+            {LENSES.map((l) => <button key={l.key} onClick={() => setLens(l.key)} style={tabStyle(lens === l.key)} title={l.desc}>{l.label}</button>)}
+          </div>
+          <span style={{ marginLeft: "auto", fontSize: "0.7rem", color: dim, fontFamily: mono }}>
+            <strong style={{ color: textLight }}>{marketStats.count}</strong> {sk ? "projektov" : "projects"} · <span style={{ color: lensCoverage < 0.4 ? amber : dim }}>{pct(lensCoverage)} {sk ? "s dátami" : "with data"}</span>
+          </span>
         </div>
-        <div style={{ marginLeft: "auto", display: "flex", gap: "1.1rem", fontSize: "0.72rem", color: dim, fontFamily: mono }}>
-          <span><strong style={{ color: textLight }}>{kpis.count}</strong> {sk ? "projektov" : "projects"}</span>
-          <span>{kpis.med ? <><strong style={{ color: textLight }}>€{fmt(kpis.med)}</strong>/m²</> : "—"}</span>
-          <span><strong style={{ color: textLight }}>{fmtK(kpis.units)}</strong> {sk ? "bytov" : "units"}</span>
-          <span>{kpis.avgAbs != null ? <><strong style={{ color: textLight }}>{kpis.avgAbs}%</strong> {sk ? "predané" : "sold"}</> : "—"}</span>
-        </div>
-      </div>
-
-      {/* Lens description + coverage */}
-      <div style={{ display: "flex", alignItems: "center", gap: "0.8rem", flexWrap: "wrap", padding: "0.45rem 1.25rem", borderBottom: `1px solid ${border}`, background: "#08080a" }}>
-        <span style={{ fontSize: "0.72rem", color: dim }}>{activeLens?.desc}</span>
-        <span style={{ fontSize: "0.66rem", color: lensCoverage < 0.4 ? amber : dim, marginLeft: "auto" }}>
-          {sk ? "dáta pre" : "data for"} <strong style={{ fontFamily: mono }}>{pct(lensCoverage)}</strong> {sk ? "projektov" : "of projects"}
-          {lensCoverage < 0.4 ? (sk ? " — zvyšok neznámy" : " — rest unknown") : ""}
-        </span>
+        <MarketInsight lens={lens} stats={marketStats} sk={sk} />
       </div>
 
       {/* Filter bar + legend */}
@@ -485,6 +492,84 @@ const inputStyle = { boxSizing: "border-box", padding: "7px 11px", background: b
 const selectStyle = { padding: "7px 9px", background: bg2, border: `1px solid ${border}`, borderRadius: 7, color: textLight, fontSize: "0.8rem", outline: "none", cursor: "pointer", maxWidth: 170 };
 function chipStyle(active) {
   return { padding: "6px 12px", borderRadius: 999, cursor: "pointer", fontSize: "0.76rem", border: `1px solid ${active ? green : border}`, background: active ? `${green}1a` : "transparent", color: active ? green : dim };
+}
+function tabStyle(active) {
+  return { padding: "5px 13px", borderRadius: 999, cursor: "pointer", fontSize: "0.75rem", border: "none", background: active ? green : "transparent", color: active ? "#06140f" : dim, fontWeight: active ? 600 : 400 };
+}
+const dot = (c) => ({ width: 8, height: 8, borderRadius: "50%", background: c, display: "inline-block", marginRight: 5 });
+
+// Adaptive market overview — the headline metric + a visual that fits the lens.
+function MarketInsight({ lens, stats, sk }) {
+  const s = stats;
+  let headline, visual;
+  if (lens === "price") {
+    headline = <Headline big={s.med ? `€${fmt(s.med)}` : "—"} unit="/m²" sub={s.pMin ? `${sk ? "medián · rozsah" : "median · range"} €${fmt(s.pMin)}–€${fmt(s.pMax)}` : (sk ? "bez zverejnených cien" : "no published prices")} />;
+    visual = <Histogram hist={s.hist} hLo={s.hLo} hHi={s.hHi} med={s.med} />;
+  } else if (lens === "completion") {
+    const known = s.count - s.comp.unknown;
+    headline = <Headline big={s.count ? `${Math.round((known / s.count) * 100)}%` : "—"} sub={sk ? "má termín dokončenia" : "have a completion date"} />;
+    visual = <Pipeline comp={s.comp} />;
+  } else if (lens === "supply") {
+    headline = <Headline big={fmtK(s.available)} sub={`${sk ? "voľných · z" : "units available · of"} ${fmtK(s.invTotal)}`} />;
+    visual = <InventoryBar avail={s.available} res={s.reserved} sold={s.sold} sk={sk} />;
+  } else {
+    headline = <Headline big={s.soldPct != null ? `${s.soldPct}%` : "—"} sub={`${sk ? "predané · " : "sold · "}${fmtK(s.sold)} ${sk ? "z" : "of"} ${fmtK(s.invTotal)}`} />;
+    visual = <InventoryBar avail={s.available} res={s.reserved} sold={s.sold} sk={sk} />;
+  }
+  return <div style={{ display: "flex", alignItems: "center", gap: 20 }}>{headline}{visual}</div>;
+}
+function Headline({ big, unit, sub }) {
+  return (
+    <div style={{ minWidth: 124, flexShrink: 0 }}>
+      <div style={{ fontSize: "1.5rem", fontWeight: 700, color: textLight, fontFamily: mono, lineHeight: 1 }}>{big}{unit ? <span style={{ fontSize: "0.78rem", color: dim, fontWeight: 400 }}>{unit}</span> : null}</div>
+      <div style={{ fontSize: "0.64rem", color: dim, marginTop: 4 }}>{sub}</div>
+    </div>
+  );
+}
+function Histogram({ hist, hLo, hHi, med }) {
+  if (!hist || !hist.some((n) => n > 0)) return <div style={{ flex: 1, fontSize: "0.7rem", color: dim }}>—</div>;
+  const max = Math.max(...hist, 1);
+  const medIdx = (med != null && hHi > hLo) ? Math.min(hist.length - 1, Math.max(0, Math.floor(((med - hLo) / (hHi - hLo)) * hist.length))) : -1;
+  return (
+    <div style={{ flex: 1, minWidth: 150 }}>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 36 }}>
+        {hist.map((n, i) => <div key={i} title={String(n)} style={{ flex: 1, height: `${Math.max(7, (n / max) * 100)}%`, background: i === medIdx ? green : "#2c6e59", borderRadius: 2 }} />)}
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.58rem", color: dim, fontFamily: mono, marginTop: 4 }}>
+        <span>€{fmt(hLo)}</span><span>€{fmt(hHi)}/m²</span>
+      </div>
+    </div>
+  );
+}
+function InventoryBar({ avail, res, sold, sk }) {
+  const t = Math.max(1, avail + res + sold);
+  const seg = (v, c, lbl) => (v > 0 ? <div key={lbl} title={`${lbl}: ${fmt(v)}`} style={{ width: `${(v / t) * 100}%`, background: c, height: "100%" }} /> : null);
+  return (
+    <div style={{ flex: 1, minWidth: 200 }}>
+      <div style={{ display: "flex", height: 18, borderRadius: 5, overflow: "hidden", background: "#17171c", border: `1px solid ${border}` }}>
+        {seg(avail, green, sk ? "voľné" : "available")}{seg(res, amber, sk ? "rezervované" : "reserved")}{seg(sold, greyPt, sk ? "predané" : "sold")}
+      </div>
+      <div style={{ display: "flex", gap: 14, fontSize: "0.62rem", color: dim, marginTop: 5, flexWrap: "wrap" }}>
+        <span><span style={dot(green)} />{fmtK(avail)} {sk ? "voľné" : "available"}</span>
+        <span><span style={dot(amber)} />{fmtK(res)} {sk ? "rezerv." : "reserved"}</span>
+        <span><span style={dot(greyPt)} />{fmtK(sold)} {sk ? "predané" : "sold"}</span>
+      </div>
+    </div>
+  );
+}
+function Pipeline({ comp }) {
+  const order = ["ready", "soon", "mid", "far", "unknown"];
+  const t = Math.max(1, order.reduce((s, k) => s + comp[k], 0));
+  return (
+    <div style={{ flex: 1, minWidth: 220 }}>
+      <div style={{ display: "flex", height: 18, borderRadius: 5, overflow: "hidden", background: "#17171c", border: `1px solid ${border}` }}>
+        {order.map((k) => (comp[k] > 0 ? <div key={k} title={`${COMPLETION[k].label}: ${comp[k]}`} style={{ width: `${(comp[k] / t) * 100}%`, background: COMPLETION[k].color, height: "100%" }} /> : null))}
+      </div>
+      <div style={{ display: "flex", gap: 12, fontSize: "0.6rem", color: dim, marginTop: 5, flexWrap: "wrap" }}>
+        {order.map((k) => (comp[k] > 0 ? <span key={k}><span style={dot(COMPLETION[k].color)} />{comp[k]} {COMPLETION[k].short}</span> : null))}
+      </div>
+    </div>
+  );
 }
 function escapeHtml(s) {
   return String(s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
