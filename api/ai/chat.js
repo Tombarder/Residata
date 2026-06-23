@@ -26,9 +26,8 @@
 //   `cast`; rooms are stored as `3.0`, so room filters use the numeric path) and
 //   translates the engines' compact measure codes into clean labelled JSON.
 //
-// === MODEL per tier (Boss 2026-06-22) ===
-//   paid / admin / active-trial  → claude-sonnet-4-6  (quality)
-//   anon / free                  → claude-haiku-4-5   (cheap free taste)
+// === MODEL (Boss 2026-06-22) ===
+//   claude-sonnet-4-6 for EVERY tier — Sonnet is the base model, anon/free included.
 //   See MODEL_BY_TIER. Prompt caching is on (cache_control on the stable system
 //   prefix), and the system prompt is small now (data comes from tools, not the
 //   prompt) so per-question cost is already low.
@@ -40,7 +39,7 @@
 //   promotion the capability layer does (trial keeps tier='free').
 //
 // === DAILY CAPS (questions/day; see DAILY_LIMITS) ===
-//   anon 1 · free 3 · paid 30 · admin 100. Active trial uses the paid cap.
+//   anon 1 · free 3 · paid 15 · admin 100. Active trial uses the paid cap.
 //   Enforced: logged-in = today's rows in ai_usage_log by user_id (persists
 //   across cold starts); anon = in-memory per-IP counter (+ a 10/min per-IP
 //   burst limit on every caller). At the cap → 429 with an upgrade CTA, resets
@@ -58,14 +57,14 @@ import { isTrustedOrigin as checkTrustedOrigin } from "../_lib/origin.js";
 
 export const maxDuration = 60; // tool loop = a few model round-trips
 
-// Model per tier. Sonnet for paying users (quality); Haiku for the free taste (cost).
+// Sonnet 4.6 as the base model for EVERY tier (Boss 2026-06-22 — Sonnet everywhere).
 const MODEL_BY_TIER = {
-  anon:  "claude-haiku-4-5",
-  free:  "claude-haiku-4-5",
+  anon:  "claude-sonnet-4-6",
+  free:  "claude-sonnet-4-6",
   paid:  "claude-sonnet-4-6",
   admin: "claude-sonnet-4-6",
 };
-const FALLBACK_MODEL = "claude-haiku-4-5";
+const FALLBACK_MODEL = "claude-sonnet-4-6";
 
 const MAX_TOKENS      = 1500;  // room for a listy answer or a tool call
 const MAX_TOOL_ITERS  = 6;     // model<->tool round-trips before we force a stop
@@ -74,7 +73,7 @@ const MAX_HISTORY     = 10;
 const MAX_MSG_LEN     = 2000;
 
 // Per-day caps by tier. pending is refused earlier. Active trial uses the paid cap.
-const DAILY_LIMITS = { anon: 1, free: 3, paid: 30, admin: 100 };
+const DAILY_LIMITS = { anon: 1, free: 3, paid: 15, admin: 100 };
 
 const TRUSTED_ORIGINS = [
   "https://residata-gamma.vercel.app",
