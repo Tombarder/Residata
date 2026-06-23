@@ -332,7 +332,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
   const legend = legendForLens(lens, thresholds, fmt);
 
   return (
-    <div style={{ height: "calc(100dvh - 64px)", display: "flex", flexDirection: "column", background: bg2 }}>
+    <div className="mv2-root" style={{ height: "calc(100dvh - 64px)", display: "flex", flexDirection: "column", background: bg2 }}>
       {/* Market overview — lens tabs + adaptive insight */}
       <div style={{ borderBottom: `1px solid ${border}`, background: "#0a0a0b", padding: "0.6rem 1.25rem 0.7rem" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.8rem", flexWrap: "wrap", marginBottom: 10 }}>
@@ -478,6 +478,14 @@ export default function MapView2({ lang = "en", setCurrent }) {
       </div>
 
       <style>{`
+        .mv2-root button { transition: filter .12s ease, background .12s ease, border-color .12s ease, color .12s ease; }
+        .mv2-root button:hover { filter: brightness(1.12); }
+        .mv2-root input { transition: border-color .12s ease; }
+        .mv2-root input:focus { border-color: ${green}66; }
+        .mv2-root ::-webkit-scrollbar { width: 9px; height: 9px; }
+        .mv2-root ::-webkit-scrollbar-thumb { background: #2a2a31; border-radius: 6px; }
+        .mv2-root ::-webkit-scrollbar-thumb:hover { background: #3a3a44; }
+        .mv2-root ::-webkit-scrollbar-track { background: transparent; }
         .maplibregl-popup-content { background:${bg2}; color:${textLight}; border:1px solid ${border}; border-radius:10px; padding:12px 13px; box-shadow:0 8px 30px rgba(0,0,0,0.5); }
         .mv2-hover .maplibregl-popup-content { padding:7px 10px; }
         .maplibregl-popup-tip { border-top-color:${bg2} !important; border-bottom-color:${bg2} !important; }
