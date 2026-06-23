@@ -21,7 +21,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../lib/useAuth";
 import { useChat } from "../lib/useChat";
-import { renderAssistantText } from "./ChatAssistant";
+import { renderAssistantText, ChatProgress } from "./ChatAssistant";
 import AiBetaBanner from "./AiBetaBanner";
 import { pushRoute } from "../lib/routing";
 
@@ -241,10 +241,13 @@ export default function FloatingChat({ lang = "sk", onNavigate }) {
             ))}
 
             {chat.pending && (
-              <div style={{ color: dim, fontFamily: mono, fontSize: "0.72rem", display: "flex", gap: "0.35rem", alignItems: "center" }}>
-                <span aria-hidden style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: green, animation: "rbs-pulse 1s ease-in-out infinite" }} />
-                {L("AI píše…", "Thinking…")}
-              </div>
+              <ChatProgress
+                steps={chat.steps}
+                showProgress={chat.showProgress}
+                setShowProgress={chat.setShowProgress}
+                lang={lang}
+                compact
+              />
             )}
 
             {chat.error && (

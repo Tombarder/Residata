@@ -32,6 +32,47 @@ const bg2    = "#0e0e10";
 const orange = "#f5a623";
 const red    = "#ff6b6b";
 
+/* ChatProgress — the live "what's happening" view shown while an answer is
+   pending. Visible by default; a small toggle hides it (the choice is persisted
+   in useChat). Steps come from the endpoint's SSE `step` events — free, since
+   they just surface the database lookups the assistant already runs. Shared by
+   the full page and the floating widget. */
+export function ChatProgress({ steps = [], showProgress, setShowProgress, lang = "sk", compact = false }) {
+  const L = (sk, en) => (lang === "sk" ? sk : en);
+  const fs = compact ? "0.72rem" : "0.8rem";
+  const dot = { display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: green, animation: "cb-pulse 1s ease-in-out infinite", flexShrink: 0 };
+  const toggle = (
+    <button onClick={() => setShowProgress(!showProgress)}
+      style={{ background: "transparent", border: "none", color: dim, cursor: "pointer", fontFamily: mono, fontSize: compact ? "0.56rem" : "0.6rem", textDecoration: "underline", padding: 0, marginLeft: "0.55rem" }}>
+      {showProgress ? L("skryť", "hide") : L("zobraziť postup", "show steps")}
+    </button>
+  );
+  if (!showProgress) {
+    return (
+      <div style={{ color: dim, fontFamily: mono, fontSize: fs, display: "flex", gap: "0.4rem", alignItems: "center" }}>
+        <span aria-hidden style={dot} />{L("Pracujem…", "Working…")}{toggle}
+      </div>
+    );
+  }
+  const lines = steps.length ? steps : [L("Premýšľam…", "Thinking…")];
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "0.28rem" }}>
+      {lines.map((s, i) => {
+        const isLast = i === lines.length - 1;
+        return (
+          <div key={i} style={{ display: "flex", gap: "0.4rem", alignItems: "center", color: isLast ? text : dim, fontFamily: mono, fontSize: fs, opacity: isLast ? 1 : 0.6 }}>
+            {isLast
+              ? <span aria-hidden style={dot} />
+              : <span aria-hidden style={{ color: green, fontSize: "0.7rem", width: 8, flexShrink: 0, textAlign: "center" }}>✓</span>}
+            <span>{s}</span>
+            {isLast && toggle}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function ChatAssistant({ lang = "sk", setCurrent }) {
   const chat = useChat({ lang });
   const L = (sk, en) => lang === "sk" ? sk : en;
@@ -146,10 +187,12 @@ export default function ChatAssistant({ lang = "sk", setCurrent }) {
         ))}
 
         {chat.pending && (
-          <div style={{ color: dim, fontFamily: mono, fontSize: "0.8rem", display: "flex", gap: "0.4rem", alignItems: "center" }}>
-            <span aria-hidden style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: green, animation: "cb-pulse 1s ease-in-out infinite" }} />
-            {L("AI píše odpoveď…", "Assistant is thinking…")}
-          </div>
+          <ChatProgress
+            steps={chat.steps}
+            showProgress={chat.showProgress}
+            setShowProgress={chat.setShowProgress}
+            lang={lang}
+          />
         )}
 
         {chat.error && (

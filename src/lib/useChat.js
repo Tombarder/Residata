@@ -108,6 +108,17 @@ export function useChat({ lang = "sk" } = {}) {
   const [remaining, setRemaining] = useState(null);
   const [error, setError] = useState(null);
 
+  // Live progress steps for the in-flight question (from the SSE `step` events).
+  const [steps, setSteps] = useState([]);
+  // Show/hide the progress steps. Default ON; persisted so the choice sticks.
+  const [showProgress, setShowProgressState] = useState(() => {
+    try { return localStorage.getItem("residata_chat_show_progress") !== "0"; } catch { return true; }
+  });
+  const setShowProgress = (v) => {
+    setShowProgressState(!!v);
+    try { localStorage.setItem("residata_chat_show_progress", v ? "1" : "0"); } catch (_) {}
+  };
+
   // F-318 (DP-097): removed dead `cancelRef = useRef(false)` — it was
   // declared but never set or read anywhere. Was likely intended to gate
   // in-flight cancellation on unmount, but the post-unmount state-update
@@ -173,6 +184,7 @@ export function useChat({ lang = "sk" } = {}) {
     if (textOverride == null) setInput("");
     setPending(true);
     setError(null);
+    setSteps([]);
     track("chat_question", { tier, len: q.length });
 
     // Lazy-create session id on first message of a fresh chat.
@@ -203,6 +215,7 @@ export function useChat({ lang = "sk" } = {}) {
           body: JSON.stringify({
             messages: nextMsgs.slice(-20),
             lang,
+            stream: true,
             sessionId: sessionIdRef.current,
             typingMs,
             pageUrl: typeof window !== "undefined" && window.location
@@ -240,11 +253,42 @@ export function useChat({ lang = "sk" } = {}) {
         const body = await r.text().catch(() => "");
         throw new Error(`HTTP ${r.status}${body ? `: ${body.slice(0, 120)}` : ""}`);
       }
-      const j = await r.json();
-      // log_id ties this assistant message to its row in ai_chat_log
-      // so the 👍/👎 buttons can PATCH /api/ai/chat-feedback with the
-      // right id. Older clients without sessionId never get a log_id
-      // (server skips the log row), feedback affordance hides itself.
+      // Read the answer. The endpoint streams Server-Sent Events when it can
+      // (live `step` progress events + a final `done`); fall back to plain JSON
+      // if it didn't stream (older deploy / a buffering proxy). Either way the
+      // final `j` carries text/log_id/remaining.
+      const ct = r.headers.get("content-type") || "";
+      let j = {};
+      if (ct.includes("event-stream") && r.body && r.body.getReader) {
+        const reader = r.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = "";
+        let streamErr = null;
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          let nl;
+          while ((nl = buf.indexOf("\n\n")) !== -1) {
+            const block = buf.slice(0, nl); buf = buf.slice(nl + 2);
+            const dataLine = block.split("\n").find((l) => l.startsWith("data:"));
+            if (!dataLine) continue;
+            let ev; try { ev = JSON.parse(dataLine.slice(5).trim()); } catch { continue; }
+            if (ev.type === "start" || ev.type === "step") {
+              if (ev.label) setSteps((prev) => [...prev, ev.label]);
+            } else if (ev.type === "done") {
+              j = ev;
+            } else if (ev.type === "error") {
+              streamErr = ev.text || "AI error";
+            }
+          }
+        }
+        if (streamErr) throw new Error(streamErr);
+      } else {
+        j = await r.json();
+      }
+      // log_id ties this assistant message to its row in ai_chat_log so the
+      // 👍/👎 buttons can PATCH /api/ai/chat-feedback with the right id.
       setMessages(prev => [...prev, {
         role: "assistant",
         content: j.text || "",
@@ -262,6 +306,7 @@ export function useChat({ lang = "sk" } = {}) {
       setMessages(prev => [...prev.slice(0, -1), { role: "user", content: q, error: text }]);
     } finally {
       setPending(false);
+      setSteps([]);
     }
   };
 
@@ -325,6 +370,7 @@ export function useChat({ lang = "sk" } = {}) {
 
   return {
     messages, input, setInput, pending, error, remaining,
+    steps, showProgress, setShowProgress,
     tier, dailyLimit, suggestedQuestions,
     send, clear, setError,
     // Chat UI calls this on textarea focus / first keystroke after
