@@ -25,7 +25,7 @@ import { track } from "./track";
 // Mirror of server-side DAILY_LIMITS. If these get out of sync the
 // UI will briefly show a stale quota label until the server's 429
 // corrects it — still safe because the server is authoritative.
-const DAILY_LIMIT_BY_TIER = { anon: 1, free: 3, paid: 30, admin: 100 };
+const DAILY_LIMIT_BY_TIER = { anon: 1, free: 3, paid: 15, admin: 100 };
 
 function storageKey(userId)  { return `residata_chat_${userId || "anon"}`; }
 function sessionKey(userId)  { return `residata_chat_session_${userId || "anon"}`; }
@@ -60,6 +60,34 @@ function getOrCreateSessionId(userId) {
 function rotateSessionId(userId) {
   try { localStorage.removeItem(sessionKey(userId)); } catch (_) {}
   return getOrCreateSessionId(userId);
+}
+
+/* Get the access token without EVER hanging. supabase.auth.getSession() can
+   deadlock on a stuck gotrue token-refresh (the documented "stuck loading until
+   a full refresh" bug) — and chat awaited it before every send, so a deadlocked
+   refresh meant the question never left the browser. We race getSession() against
+   a short timeout and, on timeout, read the persisted session token straight from
+   localStorage (no refresh, no hang). A slightly-stale token is fine: the server
+   validates it and returns 401 if expired, which the UI already handles. */
+async function getAccessTokenSafe() {
+  try {
+    const viaApi = supabase.auth.getSession()
+      .then(r => r?.data?.session?.access_token || null)
+      .catch(() => null);
+    const timeout = new Promise(res => setTimeout(() => res("__timeout__"), 3000));
+    const r = await Promise.race([viaApi, timeout]);
+    if (r !== "__timeout__") return r;
+  } catch (_) {}
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith("sb-") && k.endsWith("-auth-token")) {
+        const v = JSON.parse(localStorage.getItem(k) || "null");
+        return v?.access_token || v?.currentSession?.access_token || null;
+      }
+    }
+  } catch (_) {}
+  return null;
 }
 
 export function useChat({ lang = "sk" } = {}) {
@@ -104,20 +132,27 @@ export function useChat({ lang = "sk" } = {}) {
     if (typingStartRef.current == null) typingStartRef.current = Date.now();
   };
 
+  // Persist + reload the conversation, keyed by user-id, in ONE effect so the
+  // two can't race. The old two-effect version wiped the transcript on every
+  // navigation: when the user identity resolves a moment after first paint (or
+  // on remount), the save effect ran first and wrote the empty initial messages
+  // over that user's stored history, then the reload read the now-empty key.
+  // Here, when the identity CHANGES we reload that identity's history and do NOT
+  // persist the stale messages; same-user message changes just save.
+  const msgsUserRef = useRef(user?.id);
   useEffect(() => {
+    if (msgsUserRef.current !== user?.id) {
+      msgsUserRef.current = user?.id;
+      try {
+        const raw = localStorage.getItem(storageKey(user?.id));
+        setMessages(raw ? (JSON.parse(raw) || []).slice(-40) : []);
+      } catch { setMessages([]); }
+      return; // don't overwrite the just-loaded history with pre-reload state
+    }
     try {
       localStorage.setItem(storageKey(user?.id), JSON.stringify(messages.slice(-40)));
     } catch (_) {}
   }, [messages, user?.id]);
-
-  // If the user logs in / out while the hook is mounted, reload
-  // the conversation from THAT identity's history.
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(storageKey(user?.id));
-      setMessages(raw ? (JSON.parse(raw) || []).slice(-40) : []);
-    } catch { setMessages([]); }
-  }, [user?.id]);
 
   const clear = () => {
     // Rotate session ID first so the optional "session_ended" log line
@@ -154,23 +189,30 @@ export function useChat({ lang = "sk" } = {}) {
 
     try {
       const headers = { "Content-Type": "application/json" };
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
-      } catch (_) {}
+      const tokenSafe = await getAccessTokenSafe();   // never hangs (auth-deadlock guard)
+      if (tokenSafe) headers.Authorization = `Bearer ${tokenSafe}`;
 
-      const r = await fetch("/api/ai/chat", {
-        method: "POST", headers,
-        body: JSON.stringify({
-          messages: nextMsgs.slice(-20),
-          lang,
-          sessionId: sessionIdRef.current,
-          typingMs,
-          pageUrl: typeof window !== "undefined" && window.location
-            ? window.location.pathname + window.location.search
-            : null,
-        }),
-      });
+      // Abort guard: a hung request can never spin forever. 90s leaves margin
+      // over the server's 60s budget; on timeout the catch shows a retry hint.
+      const ac = new AbortController();
+      const abortTimer = setTimeout(() => ac.abort(), 90000);
+      let r;
+      try {
+        r = await fetch("/api/ai/chat", {
+          method: "POST", headers, signal: ac.signal,
+          body: JSON.stringify({
+            messages: nextMsgs.slice(-20),
+            lang,
+            sessionId: sessionIdRef.current,
+            typingMs,
+            pageUrl: typeof window !== "undefined" && window.location
+              ? window.location.pathname + window.location.search
+              : null,
+          }),
+        });
+      } finally {
+        clearTimeout(abortTimer);
+      }
       if (r.status === 429) {
         const j = await r.json().catch(() => ({}));
         setError({
@@ -212,8 +254,12 @@ export function useChat({ lang = "sk" } = {}) {
       setRemaining(j.remaining || null);
       track("chat_answer", { tier: j.tier, remaining: j.remaining?.today ?? null });
     } catch (e) {
-      setError({ kind: "err", text: String(e?.message || e) });
-      setMessages(prev => [...prev.slice(0, -1), { role: "user", content: q, error: String(e?.message || e) }]);
+      const aborted = e?.name === "AbortError";
+      const text = aborted
+        ? L("Otázka trvala príliš dlho — skús to znova.", "That took too long — please try again.")
+        : String(e?.message || e);
+      setError({ kind: "err", text });
+      setMessages(prev => [...prev.slice(0, -1), { role: "user", content: q, error: text }]);
     } finally {
       setPending(false);
     }
