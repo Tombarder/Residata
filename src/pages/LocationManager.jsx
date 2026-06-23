@@ -113,6 +113,7 @@ export default function LocationManager({ lang = "en" }) {
   const revGenRef = useRef(0);
   const userMovedRef = useRef(false);       // true only when the USER moves the pin (not on project load)
   const districtTouchedRef = useRef(false); // true once the user manually edits the district for this placement
+  const pickedTownRef = useRef(null);       // town from a picked address suggestion — a reliable city, unlike reverse-geocode
 
   // ── Load projects + cities + districts (direct PostgREST — no getSession) ──
   useEffect(() => {
@@ -205,7 +206,7 @@ export default function LocationManager({ lang = "en" }) {
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
     const marker = new maplibregl.Marker({ draggable: true, color: green });
     markerRef.current = marker;
-    const onMove = (lat, lng) => { userMovedRef.current = true; setDeriving(true); setPin({ lat: +lat.toFixed(6), lng: +lng.toFixed(6) }); setSuggestions([]); };
+    const onMove = (lat, lng) => { userMovedRef.current = true; pickedTownRef.current = null; setDeriving(true); setPin({ lat: +lat.toFixed(6), lng: +lng.toFixed(6) }); setSuggestions([]); };
     marker.on("dragend", () => { const ll = marker.getLngLat(); onMove(ll.lat, ll.lng); });
     map.on("click", (e) => onMove(e.lngLat.lat, e.lngLat.lng));
     const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => map.resize()) : null;
@@ -229,13 +230,18 @@ export default function LocationManager({ lang = "en" }) {
     userMovedRef.current = false;
     const gen = ++revGenRef.current;
     (async () => {
+      const pickedTown = pickedTownRef.current; pickedTownRef.current = null;
       const info = await reverseGeocode(pin.lat, pin.lng);
       if (gen !== revGenRef.current) return; // superseded by a newer pin
-      const matched = info?.city ? matchCity(info.city, info.cc) : null;
+      // The town from the picked address suggestion is reliable; the reverse-geocode
+      // often returns the nearest big city (or nothing) for small towns — so prefer
+      // the picked town for the CITY, and still use the reverse result for the district.
+      const cityName = pickedTown || info?.city;
+      const matched = cityName ? matchCity(cityName, info?.cc) : null;
       const finalCity = matched || nearestCity(pin.lat, pin.lng, citiesRef.current);
       const cityChanged = finalCity?.id !== cityIdRef.current;
       setCityId(finalCity?.id || "");
-      setCityWarn(info?.city && !matched ? info.city : null);
+      setCityWarn(cityName && !matched ? cityName : null);
       // The pin is the source of truth: re-derive the district from the new point —
       // UNLESS the user manually typed one (and the city didn't change, which would
       // invalidate a typed district anyway).
@@ -285,7 +291,7 @@ export default function LocationManager({ lang = "en" }) {
         const lat = +f.geometry.coordinates[1].toFixed(6), lng = +f.geometry.coordinates[0].toFixed(6);
         const label = buildLabel(f.properties); const key = label + lat + lng;
         if (seen.has(key)) continue; seen.add(key);
-        out.push({ label, lat, lng, cc: f.properties?.countrycode });
+        out.push({ label, lat, lng, cc: f.properties?.countrycode, town: f.properties?.city || f.properties?.name || null });
       }
       if (abortRef.current === ctrl) setSuggestions(out);
     } catch (e) { if (e.name !== "AbortError" && abortRef.current === ctrl) setSuggestions([]); }
@@ -303,7 +309,7 @@ export default function LocationManager({ lang = "en" }) {
   function pick(s) {
     clearTimeout(debounceRef.current);
     if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; }
-    userMovedRef.current = true; districtTouchedRef.current = false; setDeriving(true); // fresh placement → derive city/district before Save is allowed
+    userMovedRef.current = true; districtTouchedRef.current = false; pickedTownRef.current = s.town || null; setDeriving(true); // fresh placement → derive city/district before Save is allowed
     setPin({ lat: s.lat, lng: s.lng }); setAddr(s.label); setSuggestions([]); setSearching(false);
     if (mapRef.current) mapRef.current.flyTo({ center: [s.lng, s.lat], zoom: 16, duration: 600 });
   }
