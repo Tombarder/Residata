@@ -183,8 +183,11 @@ export default function MapView({ lang = "en", setCurrent }) {
 
   // ── Apply the dropdown/range filters (everything except the name query) ──
   const dropdownFiltered = useMemo(() => {
-    const pMin = priceMin === "" ? null : Number(priceMin);
-    const pMax = priceMax === "" ? null : Number(priceMax);
+    let pMin = priceMin === "" ? null : Number(priceMin);
+    let pMax = priceMax === "" ? null : Number(priceMax);
+    // Tolerate an inverted range (min > max) by swapping, so the user gets the obvious
+    // intent instead of a silently-empty map.
+    if (pMin != null && pMax != null && pMin > pMax) { const t = pMin; pMin = pMax; pMax = t; }
     const priceActive = pMin != null || pMax != null;
     return (projects || []).filter((p) => {
       if (fCity && p.city !== fCity) return false;
@@ -432,7 +435,10 @@ export default function MapView({ lang = "en", setCurrent }) {
     if (e.key === "ArrowDown") { e.preventDefault(); setShowSuggest(true); setActiveIdx((i) => Math.min(i + 1, suggestions.length - 1)); }
     else if (e.key === "ArrowUp") { e.preventDefault(); setActiveIdx((i) => Math.max(i - 1, 0)); }
     else if (e.key === "Enter") {
-      const pick = suggestions[activeIdx] || suggestions[0];
+      // Only act on a highlighted suggestion (or when there's exactly one), so a plain
+      // Enter on free-typed text doesn't surprise-jump to an unrelated first suggestion.
+      const pick = activeIdx >= 0 ? suggestions[activeIdx]
+                 : (suggestions.length === 1 ? suggestions[0] : null);
       if (pick) { e.preventDefault(); selectProject(pick); }
     } else if (e.key === "Escape") { setShowSuggest(false); setActiveIdx(-1); }
   }
