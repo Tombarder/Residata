@@ -28,6 +28,8 @@ import {
   LENSES, COMPLETION, NO_DATA, ppm2Of, metricValue, completionBucket,
   tertiles, colorFor, coverage, circlePolygon, computeCompetitiveSet, legendForLens,
 } from "../lib/mapMetrics";
+import MapFilterBuilder from "../components/MapFilterBuilder";
+import { applyFilters, describe, isComplete } from "../lib/mapFilters";
 
 const mono = "'JetBrains Mono', monospace";
 const green = "#00e5a0";
@@ -46,10 +48,6 @@ const FALLBACK_ZOOM = 6.2;
 let savedView = null;
 
 const norm = (s) => (s || "").toString().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
-const uniqueSorted = (arr) =>
-  Array.from(new Set(arr.filter((v) => v != null && String(v).trim() !== ""))).sort((a, b) =>
-    String(a).localeCompare(String(b), "sk", { sensitivity: "base" })
-  );
 const fmt = (n) => Number(Math.round(n)).toLocaleString("sk-SK");
 const fmtK = (n) => (n >= 10000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1) + "k" : fmt(n));
 const pct = (x) => `${Math.round(x * 100)}%`;
@@ -136,9 +134,8 @@ export default function MapView2({ lang = "en", setCurrent }) {
   const onAnalyzeRef = useRef(() => {});
 
   const [lens, setLens] = useState("price");
-  const [fCity, setFCity] = useState("");
-  const [fDistrict, setFDistrict] = useState("");
-  const [fDeveloper, setFDeveloper] = useState("");
+  const [conditions, setConditions] = useState([]);
+  const [filterOpen, setFilterOpen] = useState(false);
   const [nameQuery, setNameQuery] = useState("");
   const [analysisCenter, setAnalysisCenter] = useState(null);
   const [radiusKm, setRadiusKm] = useState(1.5);
@@ -165,20 +162,12 @@ export default function MapView2({ lang = "en", setCurrent }) {
     return () => { cancelled = true; };
   }, []);
 
-  const cityOptions = useMemo(() => uniqueSorted((projects || []).map((p) => p.city)), [projects]);
-  const districtOptions = useMemo(() => uniqueSorted((projects || []).filter((p) => !fCity || p.city === fCity).map((p) => p.district)), [projects, fCity]);
-  const developerOptions = useMemo(() => uniqueSorted((projects || []).map((p) => p.developer)), [projects]);
-
   const shown = useMemo(() => {
     const q = norm(nameQuery);
-    return (projects || []).filter((p) => {
-      if (fCity && p.city !== fCity) return false;
-      if (fDistrict && p.district !== fDistrict) return false;
-      if (fDeveloper && p.developer !== fDeveloper) return false;
-      if (q && !norm(p.name).includes(q)) return false;
-      return true;
-    });
-  }, [projects, fCity, fDistrict, fDeveloper, nameQuery]);
+    const named = q ? (projects || []).filter((p) => norm(p.name).includes(q)) : (projects || []);
+    return applyFilters(named, conditions);
+  }, [projects, nameQuery, conditions]);
+  const activeConds = useMemo(() => conditions.filter(isComplete), [conditions]);
 
   // Projects currently on screen = filters ∩ the map viewport. The overview reads
   // ONLY these, so panning / zooming / filtering all recompute it live.
@@ -335,7 +324,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
   const firstCountry = useRef(true);
   useEffect(() => {
     if (firstCountry.current) { firstCountry.current = false; return; }
-    setFCity(""); setFDistrict(""); setFDeveloper(""); setNameQuery(""); setAnalysisCenter(null); setAnchorId(null);
+    setConditions([]); setNameQuery(""); setAnalysisCenter(null); setAnchorId(null);
   }, [country]);
 
   const openProject = (id) => setCurrentRef.current && setCurrentRef.current("App:ProjectDetail:" + id);
@@ -364,15 +353,15 @@ export default function MapView2({ lang = "en", setCurrent }) {
       {/* Filter bar + legend */}
       <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap", padding: "0.55rem 1.25rem", borderBottom: `1px solid ${border}`, background: panel }}>
         <input value={nameQuery} onChange={(e) => setNameQuery(e.target.value)} placeholder={sk ? "Hľadať projekt…" : "Find project…"} style={{ ...inputStyle, flex: "1 1 160px", maxWidth: 220 }} />
-        <select value={fCity} onChange={(e) => { setFCity(e.target.value); setFDistrict(""); }} style={selectStyle} aria-label="City">
-          <option value="">{sk ? "Mesto — všetky" : "City — all"}</option>{cityOptions.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
-        <select value={fDistrict} onChange={(e) => setFDistrict(e.target.value)} style={selectStyle} aria-label="District">
-          <option value="">{sk ? "Časť — všetky" : "District — all"}</option>{districtOptions.map((d) => <option key={d} value={d}>{d}</option>)}
-        </select>
-        <select value={fDeveloper} onChange={(e) => setFDeveloper(e.target.value)} style={selectStyle} aria-label="Developer">
-          <option value="">{sk ? "Developer — všetci" : "Developer — all"}</option>{developerOptions.map((d) => <option key={d} value={d}>{d}</option>)}
-        </select>
+        <button onClick={() => setFilterOpen((v) => !v)} style={chipStyle(filterOpen || activeConds.length > 0)}>
+          ⚙ {sk ? "Filtre" : "Filters"}{activeConds.length > 0 ? ` · ${activeConds.length}` : ""}
+        </button>
+        {activeConds.map((c) => (
+          <span key={c.id} style={{ display: "inline-flex", alignItems: "center", gap: 5, background: `${green}14`, color: green, border: `1px solid ${green}40`, borderRadius: 999, padding: "4px 9px", fontSize: "0.7rem", maxWidth: 250 }}>
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{describe(c, sk)}</span>
+            <span onClick={() => setConditions((cs) => cs.filter((x) => x.id !== c.id))} style={{ cursor: "pointer", flexShrink: 0 }}>×</span>
+          </span>
+        ))}
         <button onClick={() => setVerifiedOnly((v) => !v)} style={chipStyle(verifiedOnly)} title={sk ? "Len presné polohy" : "Only precise locations"}>
           ◉ {sk ? "presné polohy" : "precise only"}
         </button>
@@ -384,6 +373,10 @@ export default function MapView2({ lang = "en", setCurrent }) {
       {/* Map + competitive panel */}
       <div style={{ position: "relative", flex: 1, minHeight: 360 }}>
         <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />
+
+        {filterOpen && (
+          <MapFilterBuilder conditions={conditions} setConditions={setConditions} projects={projects || []} matchCount={shown.length} totalCount={(projects || []).length} sk={sk} onClose={() => setFilterOpen(false)} />
+        )}
 
         {!analysisCenter && !isLoading && (
           <div style={{ position: "absolute", top: 12, left: "50%", transform: "translateX(-50%)", background: "rgba(14,14,16,0.92)", border: `1px solid ${green}55`, color: textLight, fontSize: "0.74rem", padding: "7px 14px", borderRadius: 20, pointerEvents: "none" }}>
@@ -507,7 +500,6 @@ function Stat({ label, value, sub }) {
 }
 
 const inputStyle = { boxSizing: "border-box", padding: "7px 11px", background: bg2, border: `1px solid ${border}`, borderRadius: 7, color: textLight, fontSize: "0.82rem", outline: "none" };
-const selectStyle = { padding: "7px 9px", background: bg2, border: `1px solid ${border}`, borderRadius: 7, color: textLight, fontSize: "0.8rem", outline: "none", cursor: "pointer", maxWidth: 170 };
 function chipStyle(active) {
   return { padding: "6px 12px", borderRadius: 999, cursor: "pointer", fontSize: "0.76rem", border: `1px solid ${active ? green : border}`, background: active ? `${green}1a` : "transparent", color: active ? green : dim };
 }
