@@ -386,6 +386,8 @@ export default async function handler(req, res) {
     return await handleInner(req, res);
   } catch (e) {
     console.error("[chat] top-level crash", e);
+    // If we've already started streaming, headers are sent — just close.
+    if (res.headersSent) { try { res.end(); } catch (_) {} return; }
     return res.status(500).json({ error: "internal error", detail: String(e?.message || e).slice(0, 200) });
   }
 }
@@ -483,6 +485,32 @@ async function handleInner(req, res) {
   const logTurn = (row) => { if (!sessionId) return; admin.from("ai_chat_log").insert({ ...baseRow, ...row }).then(({ error }) => { if (error) console.warn("[chat] ai_chat_log insert failed", error.message); }); };
   logTurn({ turn_index: messages.length - 1, role: "user", content: lastUserMsg.content, user_typing_ms: typingMs });
 
+  // ── streaming (opt-in: body.stream === true) ──
+  // All auth/cap/validation errors already returned JSON by status above, so by
+  // here we're committed to a 200. When the client asks to stream, we emit a
+  // `start` event, a `step` event as each tool runs (so the UI shows what's
+  // happening), then a final `done` event. Non-streaming callers (no flag) get
+  // the JSON body at the end, unchanged — so this is backward-compatible.
+  const wantStream = body.stream === true;
+  let sseStarted = false;
+  const sse = (obj) => {
+    if (!wantStream) return;
+    if (!sseStarted) {
+      res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+      res.setHeader("Cache-Control", "no-cache, no-transform");
+      res.setHeader("Connection", "keep-alive");
+      res.setHeader("X-Accel-Buffering", "no"); // ask proxies not to buffer
+      if (typeof res.flushHeaders === "function") res.flushHeaders();
+      sseStarted = true;
+    }
+    res.write(`data: ${JSON.stringify(obj)}\n\n`);
+    if (typeof res.flush === "function") res.flush();
+  };
+  const STEP_LABELS = lang === "sk"
+    ? { market_overview: "Čítam prehľad trhu…", market_stats: "Počítam čísla z databázy…", search_apartments: "Hľadám konkrétne byty…" }
+    : { market_overview: "Reading the market overview…", market_stats: "Crunching the numbers…", search_apartments: "Searching the apartments…" };
+  sse({ type: "start", label: lang === "sk" ? "Premýšľam…" : "Thinking…" });
+
   // ── tool-calling loop ──
   const system = [{ type: "text", text: systemPrompt(lang, allowHistorical), cache_control: { type: "ephemeral" } }];
   const convo = messages.map((m) => ({ role: m.role, content: m.content }));
@@ -516,6 +544,7 @@ async function handleInner(req, res) {
       convo.push({ role: "assistant", content });
       const results = [];
       for (const tu of toolUses) {
+        sse({ type: "step", tool: tu.name, label: STEP_LABELS[tu.name] || (lang === "sk" ? "Pracujem…" : "Working…") });
         const out = await executeTool(admin, tu.name, tu.input, allowHistorical);
         results.push({ type: "tool_result", tool_use_id: tu.id, content: JSON.stringify(out).slice(0, 30000) });
       }
@@ -525,7 +554,10 @@ async function handleInner(req, res) {
     break; // end_turn (or other) — we have the answer
   }
   const responseTimeMs = Date.now() - startedAt;
-  if (!textOut && lastError) return res.status(502).json({ error: "AI upstream error", detail: lastError.slice(0, 120) });
+  if (!textOut && lastError) {
+    if (wantStream) { sse({ type: "error", text: lang === "sk" ? "Chyba AI, skús to znova." : "AI error — please try again." }); return res.end(); }
+    return res.status(502).json({ error: "AI upstream error", detail: lastError.slice(0, 120) });
+  }
   if (!textOut) textOut = lang === "sk" ? "Nepodarilo sa vygenerovať odpoveď, skús to znova." : "I couldn't generate an answer — please try again.";
 
   // ── log assistant turn (summed usage across the tool loop) ──
@@ -554,9 +586,11 @@ async function handleInner(req, res) {
     }).then(({ error }) => { if (error) console.warn("[chat] usage log failed", error.message); });
   } else { anonDailyIncrement(ip); }
 
-  return res.status(200).json({
+  const result = {
     text: textOut, tier, model, log_id: assistantLogId,
     remaining: { today: Math.max(0, dayLimit - dayCount - 1) },
     usage, response_time_ms: responseTimeMs,
-  });
+  };
+  if (wantStream) { sse({ type: "done", ...result }); return res.end(); }
+  return res.status(200).json(result);
 }
