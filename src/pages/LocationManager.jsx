@@ -114,6 +114,7 @@ export default function LocationManager({ lang = "en" }) {
   const userMovedRef = useRef(false);       // true only when the USER moves the pin (not on project load)
   const districtTouchedRef = useRef(false); // true once the user manually edits the district for this placement
   const pickedTownRef = useRef(null);       // town from a picked address suggestion — a reliable city, unlike reverse-geocode
+  const pickedRegionRef = useRef(null);     // kraj from the same picked suggestion → correct region when adding a new city
 
   // ── Load projects + cities + districts (direct PostgREST — no getSession) ──
   useEffect(() => {
@@ -206,7 +207,7 @@ export default function LocationManager({ lang = "en" }) {
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
     const marker = new maplibregl.Marker({ draggable: true, color: green });
     markerRef.current = marker;
-    const onMove = (lat, lng) => { userMovedRef.current = true; pickedTownRef.current = null; setDeriving(true); setPin({ lat: +lat.toFixed(6), lng: +lng.toFixed(6) }); setSuggestions([]); };
+    const onMove = (lat, lng) => { userMovedRef.current = true; pickedTownRef.current = null; pickedRegionRef.current = null; setDeriving(true); setPin({ lat: +lat.toFixed(6), lng: +lng.toFixed(6) }); setSuggestions([]); };
     marker.on("dragend", () => { const ll = marker.getLngLat(); onMove(ll.lat, ll.lng); });
     map.on("click", (e) => onMove(e.lngLat.lat, e.lngLat.lng));
     const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => map.resize()) : null;
@@ -230,7 +231,7 @@ export default function LocationManager({ lang = "en" }) {
     userMovedRef.current = false;
     const gen = ++revGenRef.current;
     (async () => {
-      const pickedTown = pickedTownRef.current; pickedTownRef.current = null;
+      const pickedTown = pickedTownRef.current;   // kept (not reset) so the add-city click can read the picked kraj
       const info = await reverseGeocode(pin.lat, pin.lng);
       if (gen !== revGenRef.current) return; // superseded by a newer pin
       // The town from the picked address suggestion is reliable; the reverse-geocode
@@ -291,7 +292,7 @@ export default function LocationManager({ lang = "en" }) {
         const lat = +f.geometry.coordinates[1].toFixed(6), lng = +f.geometry.coordinates[0].toFixed(6);
         const label = buildLabel(f.properties); const key = label + lat + lng;
         if (seen.has(key)) continue; seen.add(key);
-        out.push({ label, lat, lng, cc: f.properties?.countrycode, town: f.properties?.city || f.properties?.name || null });
+        out.push({ label, lat, lng, cc: f.properties?.countrycode, town: f.properties?.city || f.properties?.name || null, region: f.properties?.state || null });
       }
       if (abortRef.current === ctrl) setSuggestions(out);
     } catch (e) { if (e.name !== "AbortError" && abortRef.current === ctrl) setSuggestions([]); }
@@ -309,7 +310,7 @@ export default function LocationManager({ lang = "en" }) {
   function pick(s) {
     clearTimeout(debounceRef.current);
     if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; }
-    userMovedRef.current = true; districtTouchedRef.current = false; pickedTownRef.current = s.town || null; setDeriving(true); // fresh placement → derive city/district before Save is allowed
+    userMovedRef.current = true; districtTouchedRef.current = false; pickedTownRef.current = s.town || null; pickedRegionRef.current = s.region || null; setDeriving(true); // fresh placement → derive city/district before Save is allowed
     setPin({ lat: s.lat, lng: s.lng }); setAddr(s.label); setSuggestions([]); setSearching(false);
     if (mapRef.current) mapRef.current.flyTo({ center: [s.lng, s.lat], zoom: 16, duration: 600 });
   }
@@ -319,7 +320,7 @@ export default function LocationManager({ lang = "en" }) {
     if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; }
     revGenRef.current++;             // cancel any in-flight reverse-geocode
     userMovedRef.current = false;    // loading a project is NOT a user pin-move → keep saved classification
-    districtTouchedRef.current = false;
+    districtTouchedRef.current = false; pickedTownRef.current = null; pickedRegionRef.current = null;
     setSelectedId(p.id); setSuggestions([]); setCityWarn(null); setDeriving(false);
     const lat = p.lat != null ? Number(p.lat) : null, lng = p.lng != null ? Number(p.lng) : null;
     const located = p.location_verified && lat != null && lng != null;
@@ -343,7 +344,7 @@ export default function LocationManager({ lang = "en" }) {
     if (!cityWarn || !pin || addingCity) return;
     setAddingCity(true);
     try {
-      const rows = await rpcDirect("admin_add_city", { p_name: cityWarn, p_lat: pin.lat, p_lng: pin.lng });
+      const rows = await rpcDirect("admin_add_city", { p_name: cityWarn, p_lat: pin.lat, p_lng: pin.lng, p_region_name: pickedRegionRef.current || null });
       const nc = Array.isArray(rows) ? rows[0] : rows;
       if (!nc || !nc.id) throw new Error("no city returned");
       setCities((prev) => prev.some((c) => c.id === nc.id) ? prev : [...prev, nc]);
