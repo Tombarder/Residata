@@ -144,6 +144,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
   const [radiusKm, setRadiusKm] = useState(1.5);
   const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [anchorId, setAnchorId] = useState(null); // project an "◎ Area" was opened from → benchmark vs its set
+  const [viewBounds, setViewBounds] = useState(null); // current map viewport → the overview reflects only what's on screen
 
   useEffect(() => { setCurrentRef.current = setCurrent; }, [setCurrent]);
   useEffect(() => { countryRef.current = country; }, [country]);
@@ -179,17 +180,27 @@ export default function MapView2({ lang = "en", setCurrent }) {
     });
   }, [projects, fCity, fDistrict, fDeveloper, nameQuery]);
 
+  // Projects currently on screen = filters ∩ the map viewport. The overview reads
+  // ONLY these, so panning / zooming / filtering all recompute it live.
+  const inView = useMemo(() => {
+    if (!coords) return [];
+    const placed = shown.filter((p) => coords[p.id]);
+    if (!viewBounds) return placed;
+    const { w, s, e, n } = viewBounds;
+    return placed.filter((p) => { const c = coords[p.id]; return c.lng >= w && c.lng <= e && c.lat >= s && c.lat <= n; });
+  }, [shown, coords, viewBounds]);
+
   const thresholds = useMemo(() => (lens === "completion" ? null : tertiles(shown.map((p) => metricValue(p, lens)))), [shown, lens]);
-  const lensCoverage = useMemo(() => coverage(shown, lens), [shown, lens]);
+  const lensCoverage = useMemo(() => coverage(inView, lens), [inView, lens]);
   const fc = useMemo(() => buildFeatures(shown, coords || {}, lens, thresholds, verifiedOnly), [shown, coords, lens, thresholds, verifiedOnly]);
   useEffect(() => { featuresRef.current = fc; }, [fc]);
 
-  // Market overview for the current filtered view — drives the adaptive header.
+  // Market overview for the projects in view — drives the adaptive header.
   const marketStats = useMemo(() => {
-    const priced = shown.map(ppm2Of).filter((v) => v > 0).sort((a, b) => a - b);
+    const priced = inView.map(ppm2Of).filter((v) => v > 0).sort((a, b) => a - b);
     const at = (q) => (priced.length ? priced[Math.min(priced.length - 1, Math.floor(q * priced.length))] : null);
     const med = priced.length ? priced[Math.floor((priced.length - 1) / 2)] : null;
-    const sum = (f) => shown.reduce((s, p) => s + (Number(f(p)) || 0), 0);
+    const sum = (f) => inView.reduce((s, p) => s + (Number(f(p)) || 0), 0);
     const available = sum((p) => p.available_units);
     const reserved = sum((p) => (Number(p.reserved_units) || 0) + (Number(p.prereserved_units) || 0));
     const sold = sum((p) => p.sold_units);
@@ -202,13 +213,13 @@ export default function MapView2({ lang = "en", setCurrent }) {
       priced.forEach((v) => { hist[Math.min(N - 1, Math.max(0, Math.floor(((v - hLo) / span) * N)))]++; });
     }
     const comp = { ready: 0, soon: 0, mid: 0, far: 0, unknown: 0 };
-    shown.forEach((p) => { comp[completionBucket(p)]++; });
+    inView.forEach((p) => { comp[completionBucket(p)]++; });
     return {
-      count: shown.length, med, pMin: priced[0] ?? null, pMax: priced[priced.length - 1] ?? null,
+      count: inView.length, med, pMin: priced[0] ?? null, pMax: priced[priced.length - 1] ?? null,
       hLo, hHi, hist, units: sum((p) => p.total_units), available, reserved, sold, invTotal,
       soldPct: invTotal ? Math.round((sold / invTotal) * 100) : null, comp,
     };
-  }, [shown]);
+  }, [inView]);
 
   const compSet = useMemo(() => computeCompetitiveSet(shown, coords, analysisCenter, radiusKm, verifiedOnly), [shown, coords, analysisCenter, radiusKm, verifiedOnly]);
   const anchor = useMemo(() => (anchorId ? shown.find((p) => p.id === anchorId) : null), [anchorId, shown]);
@@ -226,7 +237,11 @@ export default function MapView2({ lang = "en", setCurrent }) {
     const map = new maplibregl.Map({ container: containerRef.current, style: MAP_STYLE, center: hadSaved ? savedView.center : FALLBACK_CENTER, zoom: hadSaved ? savedView.zoom : FALLBACK_ZOOM, attributionControl: true });
     mapRef.current = map;
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
-    map.on("moveend", () => { savedView = { center: map.getCenter().toArray(), zoom: map.getZoom() }; });
+    map.on("moveend", () => {
+      savedView = { center: map.getCenter().toArray(), zoom: map.getZoom() };
+      const b = map.getBounds();
+      setViewBounds({ w: b.getWest(), s: b.getSouth(), e: b.getEast(), n: b.getNorth() });
+    });
     const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => map.resize()) : null;
     if (ro && containerRef.current) ro.observe(containerRef.current);
 
@@ -337,7 +352,10 @@ export default function MapView2({ lang = "en", setCurrent }) {
             {LENSES.map((l) => <button key={l.key} onClick={() => setLens(l.key)} style={tabStyle(lens === l.key)} title={l.desc}>{l.label}</button>)}
           </div>
           <span style={{ marginLeft: "auto", fontSize: "0.7rem", color: dim, fontFamily: mono }}>
-            <strong style={{ color: textLight }}>{marketStats.count}</strong> {sk ? "projektov" : "projects"} · <span style={{ color: lensCoverage < 0.4 ? amber : dim }}>{pct(lensCoverage)} {sk ? "s dátami" : "with data"}</span>
+            <strong style={{ color: textLight }}>{marketStats.count}</strong> {sk ? "v zábere" : "in view"}
+            {marketStats.count === 0 && shown.length > 0
+              ? <span style={{ color: amber }}> · {sk ? "oddiaľ pre všetky" : "zoom out for all"}</span>
+              : <> · <span style={{ color: lensCoverage < 0.4 ? amber : dim }}>{pct(lensCoverage)} {sk ? "s dátami" : "with data"}</span></>}
           </span>
         </div>
         <MarketInsight lens={lens} stats={marketStats} sk={sk} />
