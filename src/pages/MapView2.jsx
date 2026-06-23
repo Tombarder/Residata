@@ -110,7 +110,7 @@ function showProjectPopup(map, lngLat, props, handlers, popupRef) {
   const open = el.querySelector("#mv2-open");
   const analyze = el.querySelector("#mv2-analyze");
   if (open) open.onclick = () => handlers.onOpen(props.id);
-  if (analyze) analyze.onclick = () => handlers.onAnalyze({ lng: props.lng, lat: props.lat });
+  if (analyze) analyze.onclick = () => handlers.onAnalyze(props);
   if (popupRef.current) popupRef.current.remove();
   popupRef.current = new maplibregl.Popup({ closeButton: true, maxWidth: "260px", offset: 12 }).setLngLat(lngLat).setDOMContent(el).addTo(map);
 }
@@ -142,11 +142,12 @@ export default function MapView2({ lang = "en", setCurrent }) {
   const [analysisCenter, setAnalysisCenter] = useState(null);
   const [radiusKm, setRadiusKm] = useState(1.5);
   const [verifiedOnly, setVerifiedOnly] = useState(false);
+  const [anchorId, setAnchorId] = useState(null); // project an "◎ Area" was opened from → benchmark vs its set
 
   useEffect(() => { setCurrentRef.current = setCurrent; }, [setCurrent]);
   useEffect(() => { countryRef.current = country; }, [country]);
   useEffect(() => { lensRef.current = lens; }, [lens]);
-  useEffect(() => { onAnalyzeRef.current = (ll) => setAnalysisCenter(ll); }, []);
+  useEffect(() => { onAnalyzeRef.current = (p) => { setAnalysisCenter({ lng: p.lng, lat: p.lat }); setAnchorId(p.id || null); }; }, []);
 
   // ── Coordinates (public, with verified flag) ──
   useEffect(() => {
@@ -193,6 +194,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
   }, [shown]);
 
   const compSet = useMemo(() => computeCompetitiveSet(shown, coords, analysisCenter, radiusKm, verifiedOnly), [shown, coords, analysisCenter, radiusKm, verifiedOnly]);
+  const anchor = useMemo(() => (anchorId ? shown.find((p) => p.id === anchorId) : null), [anchorId, shown]);
 
   function fitToData(map, data, animate) {
     if (!data.features.length) { map.jumpTo({ center: FALLBACK_CENTER, zoom: FALLBACK_ZOOM }); return; }
@@ -255,7 +257,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
       map.on("click", (e) => {
         const hit = map.queryRenderedFeatures(e.point, { layers: ["points"] });
         if (hit && hit.length) return;
-        setAnalysisCenter({ lng: e.lngLat.lng, lat: e.lngLat.lat });
+        setAnalysisCenter({ lng: e.lngLat.lng, lat: e.lngLat.lat }); setAnchorId(null);
       });
     });
 
@@ -287,7 +289,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
         const el = document.createElement("div");
         el.style.cssText = `width:16px;height:16px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:${green};border:2px solid #0a0a0b;box-shadow:0 0 0 2px ${green}55;cursor:grab`;
         const mk = new maplibregl.Marker({ element: el, draggable: true }).setLngLat([analysisCenter.lng, analysisCenter.lat]).addTo(map);
-        mk.on("dragend", () => { const ll = mk.getLngLat(); setAnalysisCenter({ lng: ll.lng, lat: ll.lat }); });
+        mk.on("dragend", () => { const ll = mk.getLngLat(); setAnalysisCenter({ lng: ll.lng, lat: ll.lat }); setAnchorId(null); });
         markerRef.current = mk;
       } else {
         markerRef.current.setLngLat([analysisCenter.lng, analysisCenter.lat]);
@@ -301,7 +303,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
   const firstCountry = useRef(true);
   useEffect(() => {
     if (firstCountry.current) { firstCountry.current = false; return; }
-    setFCity(""); setFDistrict(""); setFDeveloper(""); setNameQuery(""); setAnalysisCenter(null);
+    setFCity(""); setFDistrict(""); setFDeveloper(""); setNameQuery(""); setAnalysisCenter(null); setAnchorId(null);
   }, [country]);
 
   const openProject = (id) => setCurrentRef.current && setCurrentRef.current("App:ProjectDetail:" + id);
@@ -374,10 +376,26 @@ export default function MapView2({ lang = "en", setCurrent }) {
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 2 }}>
                 <span style={{ color: textLight, fontWeight: 600, fontSize: "0.85rem" }}>{sk ? "Konkurenčné okolie" : "Competitive set"}</span>
-                <button onClick={() => setAnalysisCenter(null)} style={{ background: "none", border: "none", color: dim, cursor: "pointer", fontSize: "0.95rem" }} aria-label="Clear">✕</button>
+                <button onClick={() => { setAnalysisCenter(null); setAnchorId(null); }} style={{ background: "none", border: "none", color: dim, cursor: "pointer", fontSize: "0.95rem" }} aria-label="Clear">✕</button>
               </div>
               <div style={{ fontSize: "0.7rem", color: dim, marginBottom: 9 }}>{sk ? "v okruhu" : "within"} <strong style={{ color: textLight, fontFamily: mono }}>{radiusKm.toFixed(1)} km</strong></div>
               <input type="range" min="0.5" max="5" step="0.5" value={radiusKm} onChange={(e) => setRadiusKm(Number(e.target.value))} style={{ width: "100%", marginBottom: 12, accentColor: green }} aria-label="Radius km" />
+
+              {anchor && compSet && compSet.inside.length > 1 && (() => {
+                const ap = ppm2Of(anchor);
+                const deltaPct = (ap > 0 && compSet.median) ? Math.round(((ap - compSet.median) / compSet.median) * 100) : null;
+                const aAbs = anchor.sold_percentage == null ? null : Math.round(Number(anchor.sold_percentage));
+                return (
+                  <div style={{ background: `${green}10`, border: `1px solid ${green}40`, borderRadius: 8, padding: "8px 10px", marginBottom: 12 }}>
+                    <div style={{ fontSize: "0.68rem", color: green, marginBottom: 3 }}>◎ {sk ? "Tvoj projekt vs okolie" : "This project vs the set"}</div>
+                    <div style={{ fontSize: "0.78rem", color: textLight, fontWeight: 600, marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{anchor.name}</div>
+                    <div style={{ fontSize: "0.72rem", color: dim, fontFamily: mono, lineHeight: 1.7 }}>
+                      <div>€{ap ? fmt(ap) : "—"}/m²{deltaPct != null ? <span style={{ color: deltaPct > 0 ? "#ff8a8a" : "#7ee0b6" }}> · {deltaPct > 0 ? "+" : ""}{deltaPct}% {sk ? "vs medián" : "vs median"}</span> : ""}</div>
+                      <div>{aAbs == null ? "—" : aAbs + "%"} {sk ? "predané" : "sold"}{compSet.avgAbs != null && aAbs != null ? <span style={{ color: aAbs >= compSet.avgAbs ? "#7ee0b6" : "#ff8a8a" }}> · {sk ? "okolie" : "set"} {compSet.avgAbs}%</span> : ""}</div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: compSet && compSet.placeholderCount ? 8 : 12 }}>
                 <Stat label={sk ? "Projekty" : "Projects"} value={compSet ? compSet.inside.length : 0} />
@@ -415,7 +433,10 @@ export default function MapView2({ lang = "en", setCurrent }) {
                     </div>
                   ))}
 
-                  <div style={{ fontSize: "0.7rem", color: dim, margin: "12px 0 6px" }}>{sk ? "Projekty" : "Projects"} ({compSet.inside.length})</div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "12px 0 6px" }}>
+                    <span style={{ fontSize: "0.7rem", color: dim }}>{sk ? "Projekty" : "Projects"} ({compSet.inside.length})</span>
+                    <button onClick={() => exportCsv(compSet.inside, coords)} style={{ background: "none", border: `1px solid ${border}`, color: dim, borderRadius: 6, padding: "3px 8px", fontSize: "0.66rem", cursor: "pointer" }} title={sk ? "Stiahnuť ako CSV" : "Download as CSV"}>⬇ CSV</button>
+                  </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                     {compSet.inside.slice().sort((a, b) => ppm2Of(b) - ppm2Of(a)).slice(0, 40).map((p) => (
                       <button key={p.id} onClick={() => openProject(p.id)} style={{ display: "flex", justifyContent: "space-between", gap: 8, background: "none", border: "none", color: textLight, cursor: "pointer", fontSize: "0.75rem", padding: "3px 4px", textAlign: "left", borderRadius: 5 }}
@@ -467,4 +488,21 @@ function chipStyle(active) {
 }
 function escapeHtml(s) {
   return String(s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+// Download the competitive set as CSV (developers want it in their own model).
+function exportCsv(rows, coords) {
+  const head = ["Project", "Developer", "City", "District", "EUR_per_m2", "Total_units", "Available", "Absorption_pct", "Approx_location"];
+  const esc = (v) => { const s = String(v == null ? "" : v); return /[",\n;]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const lines = [head.join(",")].concat((rows || []).map((p) => [
+    p.name, p.developer || "", p.city || "", p.district || "", ppm2Of(p) || "",
+    Number(p.total_units) || "", Number(p.available_units) || "",
+    p.sold_percentage == null ? "" : Math.round(Number(p.sold_percentage)),
+    (coords && coords[p.id] && !coords[p.id].verified) ? "yes" : "",
+  ].map(esc).join(",")));
+  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "competitive-set.csv"; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
