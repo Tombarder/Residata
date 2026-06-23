@@ -9,6 +9,7 @@
 import {
   FIELDS, FIELD_BY_KEY, opsForField, defaultOpForField, fieldOptions,
 } from "../lib/mapFilters";
+import Picker from "./Picker";
 
 const green = "#00e5a0";
 const dim = "#8a8a96";
@@ -79,15 +80,11 @@ function Row({ c, i, projects, sk, onField, onOp, update, remove }) {
   const op = ops.find((o) => o.key === c.op);
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 7 }}>
-      <span style={{ fontSize: "0.62rem", color: dim, width: 26, flexShrink: 0 }}>{i === 0 ? (sk ? "kde" : "where") : (sk ? "a" : "and")}</span>
-      <select value={c.field} onChange={(e) => onField(c.id, e.target.value)} style={{ ...sel, flex: "0 0 130px" }}>
-        {FIELDS.map((ff) => <option key={ff.key} value={ff.key}>{sk ? ff.label_sk : ff.label}</option>)}
-      </select>
-      <select value={c.op} onChange={(e) => onOp(c.id, e.target.value)} style={{ ...sel, flex: "0 0 116px" }}>
-        {ops.map((o) => <option key={o.key} value={o.key}>{sk ? o.label_sk : o.label}</option>)}
-      </select>
+      <span style={{ fontSize: "0.58rem", color: dim, width: 30, flexShrink: 0, textTransform: "uppercase", letterSpacing: "0.06em" }}>{i === 0 ? (sk ? "kde" : "where") : (sk ? "a" : "and")}</span>
+      <Picker value={c.field} onChange={(v) => onField(c.id, v)} options={FIELDS.map((ff) => ({ value: ff.key, label: sk ? ff.label_sk : ff.label }))} width={138} searchable ariaLabel="Field" />
+      <Picker value={c.op} onChange={(v) => onOp(c.id, v)} options={ops.map((o) => ({ value: o.key, label: sk ? o.label_sk : o.label }))} width={116} ariaLabel="Operator" />
       <ValueEditor field={f} op={op} value={c.value} onChange={(v) => update(c.id, { value: v })} projects={projects} sk={sk} />
-      <button onClick={() => remove(c.id)} style={{ background: "none", border: "none", color: dim, cursor: "pointer", fontSize: "1rem", flexShrink: 0, padding: "0 2px" }} aria-label="Remove">×</button>
+      <button onClick={() => remove(c.id)} style={{ background: "none", border: "none", color: dim, cursor: "pointer", fontSize: "1.05rem", flexShrink: 0, padding: "0 2px", lineHeight: 1 }} aria-label="Remove">×</button>
     </div>
   );
 }
@@ -105,29 +102,9 @@ function ValueEditor({ field, op, value, onChange, projects, sk }) {
   }
   if (op.needsValue === "one") return <input type="number" value={value ?? ""} onChange={(e) => onChange(e.target.value)} placeholder="—" style={{ ...num, flex: 1 }} />;
   if (op.needsValue === "text") return <input value={value ?? ""} onChange={(e) => onChange(e.target.value)} placeholder={sk ? "text…" : "text…"} style={{ ...num, flex: 1 }} />;
-  if (op.needsValue === "multi") return <MultiSelect field={field} value={value || []} onChange={onChange} projects={projects} sk={sk} />;
+  if (op.needsValue === "multi") return <Picker multi searchable value={value || []} onChange={onChange} options={fieldOptions(projects, field).map((o) => ({ value: o, label: field.optionLabel ? field.optionLabel(o) : o }))} placeholder={sk ? "vyber…" : "select…"} ariaLabel="Values" />;
   return <div style={{ flex: 1 }} />;
 }
 
-function MultiSelect({ field, value, onChange, projects, sk }) {
-  const label = (v) => (field.optionLabel ? field.optionLabel(v) : v);
-  const opts = fieldOptions(projects, field).filter((o) => !value.includes(o));
-  return (
-    <div style={{ flex: 1, display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center", minWidth: 0 }}>
-      {value.map((v) => (
-        <span key={v} style={{ display: "inline-flex", alignItems: "center", gap: 4, background: `${green}1a`, color: green, borderRadius: 5, padding: "2px 6px", fontSize: "0.72rem", maxWidth: 140 }}>
-          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label(v)}</span>
-          <span onClick={() => onChange(value.filter((x) => x !== v))} style={{ cursor: "pointer" }}>×</span>
-        </span>
-      ))}
-      <select value="" onChange={(e) => { if (e.target.value) onChange([...value, e.target.value]); }} style={{ ...sel, minWidth: 88, maxWidth: 160 }}>
-        <option value="">{value.length ? (sk ? "+ ďalšie" : "+ more") : (sk ? "vyber…" : "select…")}</option>
-        {opts.map((o) => <option key={o} value={o}>{label(o)}</option>)}
-      </select>
-    </div>
-  );
-}
-
-const sel = { padding: "6px 7px", background: bg2, border: `1px solid ${border}`, borderRadius: 6, color: textLight, fontSize: "0.74rem", outline: "none", cursor: "pointer", minWidth: 0 };
 const num = { boxSizing: "border-box", padding: "6px 8px", background: bg2, border: `1px solid ${border}`, borderRadius: 6, color: textLight, fontSize: "0.74rem", outline: "none", minWidth: 0 };
 const addBtn = { marginTop: 4, background: "none", border: `1px dashed ${border}`, color: green, borderRadius: 7, padding: "7px 12px", fontSize: "0.76rem", cursor: "pointer", width: "100%" };
