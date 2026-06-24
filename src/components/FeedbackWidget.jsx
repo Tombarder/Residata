@@ -5,19 +5,24 @@
  * EVERY page: marketing site AND the /app platform. Fixed bottom-right.
  *
  * Placement: on marketing pages the AI chat pill also sits bottom-right, so we
- * accept a `raised` prop and float ABOVE it (raised → bottom:78). On platform
- * pages there's no chat pill, so it sits at bottom:20 alone.
+ * accept a `raised` prop and float ABOVE it (raised → bottom:78).
  *
- * Flow (two clear steps): 1) pick a category from a tidy grid → 2) write the
- * message → send. Anon may add a contact email; logged-in users are attributed
- * server-side from their token. Same dark Residata look as FloatingChat.
+ * Features:
+ *   · category grid → message → send (anon may add a contact email)
+ *   · auto-captures the project id when filed from a project page
+ *   · optional screenshot (paste or upload, downscaled client-side) + how-to
+ *   · logged-in users get a "My messages" tab showing their past reports + status
+ * Logged-in callers are attributed server-side from their token.
  */
 import { useRef, useState } from "react";
 import { useAuth } from "../lib/useAuth";
+import { supabase } from "../lib/supabase";
 import { cleanText, cleanEmail } from "../lib/sanitize";
 
 const mono   = "'JetBrains Mono', monospace";
 const green  = "#00e5a0";
+const amber  = "#f5a623";
+const blue   = "#4a9eff";
 const dim    = "#8a8a96";
 const text   = "#e8e8ed";
 const border = "#222228";
@@ -26,6 +31,7 @@ const bg2    = "#0e0e10";
 const red    = "#ff6b6b";
 
 const MAX_MESSAGE = 4000;
+const MAX_SHOT_DATAURL = 3.6 * 1024 * 1024; // keep the POST comfortably under Vercel's body limit
 
 // key · emoji · SK label · EN label  (keys must match the DB CHECK + endpoint)
 const CATEGORIES = [
@@ -37,9 +43,14 @@ const CATEGORIES = [
   ["other",    "💬", "Iné",               "Other"],
 ];
 
-// Read the Supabase access token from localStorage (same approach as DataQA /
-// LocationManager). Optional — anon submissions work without it; when present
-// the server attributes the report to the real account.
+// status → colour · SK · EN  (for the "My messages" list)
+const STATUS_META = {
+  new:         [amber, "Nové",      "New"],
+  in_progress: [blue,  "Rieši sa",  "In progress"],
+  resolved:    [green, "Vyriešené", "Resolved"],
+  wont_fix:    [dim,   "Zatvorené", "Closed"],
+};
+
 function storedAccessToken() {
   try {
     for (const k of Object.keys(localStorage)) {
@@ -53,34 +64,100 @@ function storedAccessToken() {
   return null;
 }
 
+// Which project (if any) is the user looking at? Parses the route.
+function detectProjectId() {
+  if (typeof window === "undefined") return null;
+  const p = window.location.pathname;
+  const m = p.match(/^\/app\/projects\/([^/]+)/) || p.match(/^\/project\/([^/]+)/);
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+// Downscale + re-encode to JPEG so the upload stays small (a 4K screenshot
+// becomes ~200-400 KB). Returns a data URL.
+function downscaleImage(file, maxDim = 1600, quality = 0.82) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (Math.max(width, height) > maxDim) {
+          const s = maxDim / Math.max(width, height);
+          width = Math.round(width * s); height = Math.round(height * s);
+        }
+        const c = document.createElement("canvas");
+        c.width = width; c.height = height;
+        c.getContext("2d").drawImage(img, 0, 0, width, height);
+        resolve(c.toDataURL("image/jpeg", quality));
+      };
+      img.onerror = reject;
+      img.src = reader.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function FeedbackWidget({ lang = "sk", raised = false }) {
   const L = (sk, en) => (lang === "sk" ? sk : en);
   const { user, profile } = useAuth();
 
   const [open, setOpen] = useState(false);
+  const [view, setView] = useState("form");        // form | mine
   const [category, setCategory] = useState(null);
   const [message, setMessage] = useState("");
   const [email, setEmail] = useState("");
-  const [phase, setPhase] = useState("idle"); // idle | sending | done | error
+  const [screenshot, setScreenshot] = useState(null);  // data URL
+  const [shotName, setShotName] = useState("");
+  const [phase, setPhase] = useState("idle");       // idle | sending | done | error
   const [errorMsg, setErrorMsg] = useState("");
+  const [mine, setMine] = useState(null);           // array | null
+  const [mineErr, setMineErr] = useState("");
   const taRef = useRef(null);
+  const fileRef = useRef(null);
 
   const accountEmail = user?.email || profile?.email || null;
+  const loggedIn = !!user;
   const bottom = raised ? 78 : 20;
   const msgLen = message.trim().length;
 
   function resetForm() {
     setCategory(null); setMessage(""); setEmail("");
+    setScreenshot(null); setShotName("");
     setPhase("idle"); setErrorMsg("");
   }
   function close() {
     setOpen(false);
-    if (phase === "done") resetForm();  // keep the draft on an accidental close
+    if (phase === "done") { resetForm(); setView("form"); }
   }
   function pickCategory(key) {
     setCategory(key);
-    // Guide the flow: once they pick a type, drop the cursor into the message.
     setTimeout(() => taRef.current?.focus(), 60);
+  }
+
+  async function processImageFile(file) {
+    if (!file || !file.type.startsWith("image/")) {
+      setErrorMsg(L("Vyber prosím obrázok.", "Please pick an image.")); return;
+    }
+    try {
+      const dataUrl = await downscaleImage(file);
+      if (dataUrl.length > MAX_SHOT_DATAURL) {
+        setErrorMsg(L("Obrázok je príliš veľký — skús menší výrez.", "Image too large — try a smaller area.")); return;
+      }
+      setScreenshot(dataUrl); setShotName(file.name || "screenshot.png"); setErrorMsg("");
+    } catch {
+      setErrorMsg(L("Obrázok sa nepodarilo načítať.", "Couldn't read that image."));
+    }
+  }
+  function onPickFile(e) { const f = e.target.files?.[0]; if (f) processImageFile(f); e.target.value = ""; }
+  function onPaste(e) {
+    const items = e.clipboardData?.items; if (!items) return;
+    for (const it of items) {
+      if (it.type && it.type.startsWith("image/")) {
+        const f = it.getAsFile();
+        if (f) { e.preventDefault(); processImageFile(f); return; }
+      }
+    }
   }
 
   const canSend = !!category && cleanText(message, { max: MAX_MESSAGE }).length >= 2 && phase !== "sending";
@@ -96,36 +173,33 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
       page_url: typeof window !== "undefined" ? window.location.href : null,
       app_lang: lang === "sk" ? "sk" : "en",
     };
-    if (!accountEmail) {
-      const e = cleanEmail(email);
-      if (e) payload.email = e;
-    }
+    const pid = detectProjectId();
+    if (pid) payload.project_id = pid;
+    if (screenshot) payload.screenshot = screenshot;
+    if (!accountEmail) { const e = cleanEmail(email); if (e) payload.email = e; }
     try {
       const headers = { "Content-Type": "application/json" };
       if (token) headers.Authorization = `Bearer ${token}`;
-      const r = await fetch("/api/feedback/submit", {
-        method: "POST", headers, body: JSON.stringify(payload),
-      });
-      if (r.status === 429) {
-        setPhase("error");
-        setErrorMsg(L("Priveľa správ za chvíľu — skús o minútu.", "Too many messages — try again in a minute."));
-        return;
-      }
-      if (!r.ok) {
-        setPhase("error");
-        setErrorMsg(L("Nepodarilo sa odoslať. Skús to znova.", "Couldn't send. Please try again."));
-        return;
-      }
+      const r = await fetch("/api/feedback/submit", { method: "POST", headers, body: JSON.stringify(payload) });
+      if (r.status === 429) { setPhase("error"); setErrorMsg(L("Priveľa správ za chvíľu — skús o minútu.", "Too many messages — try again in a minute.")); return; }
+      if (r.status === 413) { setPhase("error"); setErrorMsg(L("Príloha je príliš veľká.", "Attachment too large.")); return; }
+      if (!r.ok) { setPhase("error"); setErrorMsg(L("Nepodarilo sa odoslať. Skús to znova.", "Couldn't send. Please try again.")); return; }
       setPhase("done");
     } catch {
-      setPhase("error");
-      setErrorMsg(L("Nepodarilo sa odoslať. Skús to znova.", "Couldn't send. Please try again."));
+      setPhase("error"); setErrorMsg(L("Nepodarilo sa odoslať. Skús to znova.", "Couldn't send. Please try again."));
     }
   }
 
   function onMsgKey(e) {
-    // ⌘/Ctrl + Enter sends — a power-user shortcut, Enter alone still newlines.
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); submit(); }
+  }
+
+  async function loadMine() {
+    setView("mine"); setMine(null); setMineErr("");
+    if (!supabase) { setMineErr(L("Nedostupné.", "Unavailable.")); return; }
+    const { data, error } = await supabase.rpc("my_feedback");
+    if (error) { setMineErr(error.message); setMine([]); }
+    else setMine(Array.isArray(data) ? data : []);
   }
 
   // ── Launcher pill ──────────────────────────────────────────────
@@ -169,12 +243,17 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
   // ── Panel ──────────────────────────────────────────────────────
   const stepLabel = { color: dim, fontFamily: mono, fontSize: "0.62rem", letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: "0.5rem", display: "flex", alignItems: "center", gap: "0.4rem" };
   const stepNum = { color: green, fontWeight: 700 };
+  const tabStyle = (active) => ({
+    flex: 1, padding: "0.5rem 0.6rem", cursor: "pointer", background: "transparent", border: "none",
+    color: active ? text : dim, fontFamily: "inherit", fontSize: "0.78rem", fontWeight: active ? 700 : 500,
+    borderBottom: `2px solid ${active ? green : "transparent"}`,
+  });
 
   return (
-    <div style={{
+    <div onPaste={onPaste} style={{
       position: "fixed", right: 20, bottom,
       width: "min(400px, calc(100vw - 32px))",
-      maxHeight: "min(660px, calc(100vh - 40px))",
+      maxHeight: "min(680px, calc(100vh - 40px))",
       background: bg2, border: `1px solid ${border}`, borderRadius: 16,
       boxShadow: "0 20px 60px rgba(0,0,0,0.65)",
       display: "flex", flexDirection: "column", zIndex: 2000,
@@ -216,34 +295,64 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
         >✕</button>
       </div>
 
+      {/* Tabs — only for logged-in users (anon has nothing to look back on) */}
+      {loggedIn && phase !== "done" && (
+        <div style={{ display: "flex", borderBottom: `1px solid ${border}` }}>
+          <button style={tabStyle(view === "form")} onClick={() => setView("form")}>{L("Napísať", "Write")}</button>
+          <button style={tabStyle(view === "mine")} onClick={loadMine}>{L("Moje správy", "My messages")}</button>
+        </div>
+      )}
+
       {/* Body */}
       <div style={{ padding: "1rem 1rem 1.1rem", overflowY: "auto" }}>
-        {phase === "done" ? (
+        {view === "mine" ? (
+          /* ── My past submissions ───────────────────────────────── */
+          <>
+            {mineErr && <div style={{ color: amber, fontSize: "0.8rem", marginBottom: "0.6rem" }}>{mineErr}</div>}
+            {mine === null && <div style={{ color: dim, fontFamily: mono, fontSize: "0.78rem" }}>{L("Načítavam…", "Loading…")}</div>}
+            {mine && mine.length === 0 && (
+              <div style={{ color: dim, fontSize: "0.83rem", textAlign: "center", padding: "1.4rem 0.5rem" }}>
+                {L("Zatiaľ si nám nič neposlal. Napíš nám čokoľvek!", "You haven't sent anything yet. Tell us anything!")}
+              </div>
+            )}
+            {mine && mine.map((m) => {
+              const c = CATEGORIES.find(x => x[0] === m.category) || ["other","💬","Iné","Other"];
+              const s = STATUS_META[m.status] || STATUS_META.new;
+              return (
+                <div key={m.id} style={{ border: `1px solid ${border}`, borderRadius: 10, padding: "0.7rem 0.8rem", marginBottom: "0.6rem", background: bg }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.4rem", flexWrap: "wrap" }}>
+                    <span style={{ fontSize: "0.76rem", color: "#cdd0d6" }}>{c[1]} {L(c[2], c[3])}</span>
+                    <span style={{ fontSize: "0.62rem", fontFamily: mono, color: s[0], border: `1px solid ${s[0]}`, borderRadius: 100, padding: "1px 8px", textTransform: "uppercase", letterSpacing: 0.4 }}>{L(s[1], s[2])}</span>
+                    <span style={{ marginLeft: "auto", fontSize: "0.62rem", fontFamily: mono, color: dim }}>{(m.created_at || "").slice(0, 10)}</span>
+                  </div>
+                  <div style={{ fontSize: "0.82rem", color: text, lineHeight: 1.45, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{m.message}</div>
+                  {m.project_name && <div style={{ fontSize: "0.66rem", fontFamily: mono, color: dim, marginTop: "0.35rem" }}>📍 {m.project_name}</div>}
+                </div>
+              );
+            })}
+            <button onClick={() => setView("form")}
+              style={{ marginTop: "0.4rem", width: "100%", background: "transparent", border: `1px solid ${border}`, color: text, borderRadius: 9, padding: "0.55rem", cursor: "pointer", fontSize: "0.82rem", fontFamily: "inherit" }}>
+              {L("← Napísať novú správu", "← Write a new message")}
+            </button>
+          </>
+        ) : phase === "done" ? (
+          /* ── Success ───────────────────────────────────────────── */
           <div style={{ textAlign: "center", padding: "1.6rem 0.5rem 1.2rem" }}>
             <div style={{ width: 52, height: 52, borderRadius: "50%", background: "rgba(0,229,160,0.14)", border: `1px solid ${green}`, margin: "0 auto 0.85rem", display: "flex", alignItems: "center", justifyContent: "center", animation: "rbf-pop 0.35s ease-out" }}>
               <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={green} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
             </div>
-            <div style={{ color: text, fontWeight: 700, fontSize: "1rem", marginBottom: "0.4rem" }}>
-              {L("Ďakujeme! 🙌", "Thank you! 🙌")}
-            </div>
+            <div style={{ color: text, fontWeight: 700, fontSize: "1rem", marginBottom: "0.4rem" }}>{L("Ďakujeme! 🙌", "Thank you! 🙌")}</div>
             <div style={{ color: dim, fontSize: "0.83rem", lineHeight: 1.55, marginBottom: "1.2rem", maxWidth: 280, marginLeft: "auto", marginRight: "auto" }}>
-              {L("Máme to a pozrieme sa na to. Ak to bude treba, ozveme sa ti.",
-                 "We've got it and we'll take a look. We'll reach out if needed.")}
+              {L("Máme to a pozrieme sa na to. Ak to bude treba, ozveme sa ti.", "We've got it and we'll take a look. We'll reach out if needed.")}
             </div>
             <div style={{ display: "flex", gap: "0.5rem", justifyContent: "center" }}>
-              <button onClick={resetForm}
-                style={{ background: green, border: "none", color: "#0a0a0c", borderRadius: 9, padding: "0.55rem 1rem", cursor: "pointer", fontSize: "0.82rem", fontWeight: 700, fontFamily: mono }}>
-                {L("Poslať ďalšiu", "Send another")}
-              </button>
-              <button onClick={() => { setOpen(false); resetForm(); }}
-                style={{ background: "transparent", border: `1px solid ${border}`, color: text, borderRadius: 9, padding: "0.55rem 1rem", cursor: "pointer", fontSize: "0.82rem", fontFamily: "inherit" }}>
-                {L("Zavrieť", "Close")}
-              </button>
+              <button onClick={resetForm} style={{ background: green, border: "none", color: "#0a0a0c", borderRadius: 9, padding: "0.55rem 1rem", cursor: "pointer", fontSize: "0.82rem", fontWeight: 700, fontFamily: mono }}>{L("Poslať ďalšiu", "Send another")}</button>
+              <button onClick={() => { setOpen(false); resetForm(); }} style={{ background: "transparent", border: `1px solid ${border}`, color: text, borderRadius: 9, padding: "0.55rem 1rem", cursor: "pointer", fontSize: "0.82rem", fontFamily: "inherit" }}>{L("Zavrieť", "Close")}</button>
             </div>
           </div>
         ) : (
+          /* ── Form ──────────────────────────────────────────────── */
           <>
-            {/* Friendly intro — what we'd love to hear from them */}
             <div style={{ color: "#cdd0d6", fontSize: "0.84rem", lineHeight: 1.55, marginBottom: "1.1rem" }}>
               {L(
                 "Daj nám vedieť čokoľvek — ak niečo nefunguje, ak vieš o aktívnej novostavbe, ktorá nám chýba, alebo máš otázku či nápad na novú funkciu, ktorú by si uvítal. Tie najlepšie veľmi radi pridáme. 🙌",
@@ -276,8 +385,7 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
             {/* Step 2 — message */}
             <div style={stepLabel}><span style={stepNum}>2</span> {L("Tvoja správa", "Your message")}</div>
             <textarea
-              ref={taRef}
-              value={message}
+              ref={taRef} value={message}
               onChange={e => setMessage(e.target.value.slice(0, MAX_MESSAGE))}
               onKeyDown={onMsgKey}
               placeholder={L("Napíš nám, čo máš na srdci…", "Write us what's on your mind…")}
@@ -285,29 +393,45 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
               style={{
                 width: "100%", boxSizing: "border-box", minHeight: 92, maxHeight: 220,
                 background: bg, border: `1px solid ${border}`, borderRadius: 10, color: text,
-                fontFamily: "inherit", fontSize: "0.85rem", lineHeight: 1.5,
-                padding: "0.6rem 0.7rem", resize: "vertical", outline: "none",
+                fontFamily: "inherit", fontSize: "0.85rem", lineHeight: 1.5, padding: "0.6rem 0.7rem", resize: "vertical", outline: "none",
               }}
               onFocus={e => { e.currentTarget.style.borderColor = "rgba(0,229,160,0.5)"; }}
               onBlur={e => { e.currentTarget.style.borderColor = border; }}
             />
-            <div style={{ marginTop: "0.35rem", color: dim, fontSize: "0.62rem", fontFamily: mono, textAlign: "right" }}>
-              {msgLen} / {MAX_MESSAGE}
-            </div>
+            <div style={{ marginTop: "0.35rem", color: dim, fontSize: "0.62rem", fontFamily: mono, textAlign: "right" }}>{msgLen} / {MAX_MESSAGE}</div>
 
-            {/* Optional email — only for anon (logged-in is known server-side) */}
+            {/* Step 3 (optional) — screenshot */}
+            <div style={{ ...stepLabel, marginTop: "0.85rem", marginBottom: "0.4rem" }}>
+              <span style={stepNum}>3</span> {L("Screenshot", "Screenshot")} · {L("nepovinné", "optional")}
+            </div>
+            {screenshot ? (
+              <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", border: `1px solid ${border}`, borderRadius: 10, padding: "0.5rem 0.6rem", background: bg }}>
+                <img src={screenshot} alt="" style={{ width: 46, height: 46, objectFit: "cover", borderRadius: 6, border: `1px solid ${border}` }} />
+                <span style={{ flex: 1, minWidth: 0, fontSize: "0.74rem", color: dim, fontFamily: mono, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{shotName}</span>
+                <button onClick={() => { setScreenshot(null); setShotName(""); }} title={L("Odstrániť", "Remove")}
+                  style={{ background: "transparent", border: `1px solid ${border}`, color: dim, borderRadius: 6, cursor: "pointer", padding: "0.25rem 0.5rem", fontSize: "0.72rem", fontFamily: mono }}>✕</button>
+              </div>
+            ) : (
+              <>
+                <button onClick={() => fileRef.current?.click()}
+                  style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.45rem", background: bg, border: `1px dashed ${border}`, color: "#cdd0d6", borderRadius: 10, padding: "0.65rem", cursor: "pointer", fontSize: "0.8rem", fontFamily: "inherit" }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(0,229,160,0.5)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = border; }}>
+                  <span aria-hidden="true">📎</span> {L("Vložiť (Ctrl/⌘+V) alebo nahrať obrázok", "Paste (Ctrl/⌘+V) or upload an image")}
+                </button>
+                <input ref={fileRef} type="file" accept="image/*" onChange={onPickFile} style={{ display: "none" }} />
+                <div style={{ marginTop: "0.45rem", color: dim, fontSize: "0.66rem", lineHeight: 1.5 }}>
+                  {L("Screenshot nám veľmi pomôže. Ako naň:", "A screenshot helps us a lot. How to take one:")}<br />
+                  <span style={{ fontFamily: mono }}>Mac: ⌘ + Shift + 4</span> · <span style={{ fontFamily: mono }}>Windows: ⊞ + Shift + S</span>
+                </div>
+              </>
+            )}
+
+            {/* Optional email — only for anon */}
             {!accountEmail && (
-              <input
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                type="email"
+              <input value={email} onChange={e => setEmail(e.target.value)} type="email"
                 placeholder={L("E-mail (nepovinné, ak chceš odpoveď)", "Email (optional, if you want a reply)")}
-                style={{
-                  width: "100%", boxSizing: "border-box", marginTop: "0.5rem",
-                  background: bg, border: `1px solid ${border}`, borderRadius: 10, color: text,
-                  fontFamily: "inherit", fontSize: "0.82rem", padding: "0.55rem 0.7rem", outline: "none",
-                }}
-              />
+                style={{ width: "100%", boxSizing: "border-box", marginTop: "0.7rem", background: bg, border: `1px solid ${border}`, borderRadius: 10, color: text, fontFamily: "inherit", fontSize: "0.82rem", padding: "0.55rem 0.7rem", outline: "none" }} />
             )}
 
             {phase === "error" && (
@@ -316,22 +440,15 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
               </div>
             )}
 
-            <button
-              className="rbf-send"
-              onClick={submit}
-              disabled={!canSend}
+            <button className="rbf-send" onClick={submit} disabled={!canSend}
               style={{
                 marginTop: "1rem", width: "100%",
-                background: canSend ? green : "#1c1c22",
-                color: canSend ? "#0a0a0c" : dim,
+                background: canSend ? green : "#1c1c22", color: canSend ? "#0a0a0c" : dim,
                 border: "none", borderRadius: 10, padding: "0.7rem 0.8rem",
-                fontWeight: 700, fontFamily: mono, fontSize: "0.82rem",
-                cursor: canSend ? "pointer" : "not-allowed",
+                fontWeight: 700, fontFamily: mono, fontSize: "0.82rem", cursor: canSend ? "pointer" : "not-allowed",
                 display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "0.4rem",
               }}>
-              {phase === "sending"
-                ? L("Odosielam…", "Sending…")
-                : <>{L("Odoslať", "Send")} <span aria-hidden="true">→</span></>}
+              {phase === "sending" ? L("Odosielam…", "Sending…") : <>{L("Odoslať", "Send")} <span aria-hidden="true">→</span></>}
             </button>
 
             <div style={{ marginTop: "0.6rem", color: dim, fontSize: "0.64rem", fontFamily: mono, textAlign: "center", lineHeight: 1.5 }}>
