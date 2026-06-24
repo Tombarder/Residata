@@ -7,10 +7,12 @@
  *      users who haven't yet used their trial. Dismissal is sticky
  *      for 7 days via localStorage.
  *
- *   2. Modal popup (one-shot per day)
+ *   2. Modal popup (one-shot per browser session)
  *      Shown to the same audience after a 1.5s delay so it doesn't
- *      pop the moment they land. Dismissed copy lives in
- *      localStorage keyed by ISO date — opens again next day.
+ *      pop the moment they land. A sessionStorage flag suppresses it
+ *      for the rest of the session — it re-opens the next time the
+ *      visitor opens the site after closing it (sessionStorage clears
+ *      on tab/browser close). Does not re-pop on reload/navigation.
  *
  * Both hide automatically once the user starts a trial (capability
  * promotion fires `trialActive`) or on paid/admin tier. Both hide
@@ -22,12 +24,7 @@ import { useCapabilities } from "../lib/useCapabilities";
 import { track } from "../lib/track";
 
 const KEY_BANNER_DISMISSED = "residata_trial_banner_until";   // unix ms — banner hidden until this time
-const KEY_POPUP_LAST_SHOWN = "residata_trial_popup_date";     // YYYY-MM-DD — popup last shown on this date
-
-function todayISO() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
+const KEY_POPUP_SESSION    = "residata_trial_popup_seen";     // sessionStorage flag — shown once this browser session
 
 /**
  * Decide whether the trial promo surfaces should be shown to the
@@ -158,13 +155,17 @@ export function TrialPopup({ lang = "sk", onCta }) {
   useEffect(() => {
     if (!eligible) { setOpen(false); return; }
     try {
-      const lastShown = localStorage.getItem(KEY_POPUP_LAST_SHOWN);
-      if (lastShown === todayISO()) { setOpen(false); return; }
+      // Per-SESSION (sessionStorage), not per-day: greet the visitor once each
+      // time they open the site fresh. sessionStorage clears when the tab/
+      // browser is closed, so the popup re-appears "every time they open the
+      // website after closing it" — but does NOT re-pop on in-session reloads
+      // or page navigation.
+      if (sessionStorage.getItem(KEY_POPUP_SESSION)) { setOpen(false); return; }
       // Delay so it doesn't pop the instant they land — feels less
       // pushy and gives them a chance to look at the page first.
       const t = setTimeout(() => {
         setOpen(true);
-        try { localStorage.setItem(KEY_POPUP_LAST_SHOWN, todayISO()); } catch (_) {}
+        try { sessionStorage.setItem(KEY_POPUP_SESSION, "1"); } catch (_) {}
         track("trial_popup_shown");
       }, 1500);
       return () => clearTimeout(t);
@@ -301,7 +302,7 @@ export function TrialPopup({ lang = "sk", onCta }) {
           margin: "0.85rem 0 0", textAlign: "center",
           fontFamily: "'JetBrains Mono', monospace",
         }}>
-          {L("Otvorí sa znova zajtra ak nezareaguješ.", "Will re-appear tomorrow if you skip it.")}
+          {L("Otvorí sa znova keď nabudúce otvoríš Residata.", "Re-appears next time you open Residata.")}
         </p>
       </div>
     </div>
