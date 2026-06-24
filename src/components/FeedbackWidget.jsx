@@ -327,6 +327,12 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
                   </div>
                   <div style={{ fontSize: "0.82rem", color: text, lineHeight: 1.45, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{m.message}</div>
                   {m.project_name && <div style={{ fontSize: "0.66rem", fontFamily: mono, color: dim, marginTop: "0.35rem" }}>📍 {m.project_name}</div>}
+                  {m.admin_reply && (
+                    <div style={{ marginTop: "0.55rem", paddingTop: "0.55rem", borderTop: `1px solid ${border}` }}>
+                      <span style={{ color: green, fontFamily: mono, fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: 0.5 }}>↩ {L("Naša odpoveď", "Our reply")}</span>
+                      <div style={{ marginTop: 3, fontSize: "0.8rem", color: "#cdd0d6", lineHeight: 1.45, whiteSpace: "pre-wrap" }}>{m.admin_reply}</div>
+                    </div>
+                  )}
                 </div>
               );
             })}

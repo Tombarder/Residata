@@ -257,6 +257,34 @@ export function feedbackHtml(fb, webUrl) {
   });
 }
 
+/**
+ * Reply email sent TO the user when the admin answers their feedback from the
+ * admin log. `reply` is the admin's text; `original` quotes their message.
+ * Chrome is localised to the user's language; the body is the admin's words.
+ */
+export function feedbackReplyHtml(reply, original, webUrl, lang = "sk") {
+  const sk = lang === "sk";
+  const t = (s, e) => (sk ? s : e);
+  const replyHtml = escHtml(reply).replace(/\n/g, "<br>");
+  const origBlock = original
+    ? `<div style="border-left:2px solid ${CARD_BORDER};padding-left:12px;margin:8px 0 0;color:${TEXT_DIM};font-size:13px;line-height:1.6">${escHtml(String(original).slice(0, 600)).replace(/\n/g, "<br>")}</div>`
+    : "";
+  const inner = `
+    <div style="${S.eyebrow}">${t("Odpoveď od Residata", "Reply from Residata")}</div>
+    <h1 style="${S.h1}">${t("Ozvali sme sa ti", "We got back to you")} 🙌</h1>
+    <p style="${S.p}">${t("Ďakujeme za tvoju správu — tu je naša odpoveď:", "Thanks for your message — here's our reply:")}</p>
+    <div style="padding:16px 18px;border:1px solid ${CARD_BORDER};border-radius:8px;margin:14px 0;background:${INNER_BOX};color:${TEXT_HI};font-size:15px;line-height:1.6">${replyHtml}</div>
+    ${original ? `<p style="${S.p};font-size:12px;color:${TEXT_DIM};margin-bottom:2px">${t("Tvoja pôvodná správa:", "Your original message:")}</p>${origBlock}` : ""}
+    <a href="${webUrl}" style="${S.btnGreen};margin-top:14px">${t("Otvoriť Residatu", "Open Residata")} →</a>`;
+  return shell({
+    title: t("Odpoveď od Residata", "Reply from Residata"),
+    preheader: String(reply || "").slice(0, 80),
+    inner,
+    footer: t("Residata · tento e-mail dostávaš, lebo si nám poslal spätnú väzbu",
+              "Residata · you're receiving this because you sent us feedback"),
+  });
+}
+
 // ──────────────────────────────────────────────────────────
 // SMTP send helper (Gmail)
 // ──────────────────────────────────────────────────────────
