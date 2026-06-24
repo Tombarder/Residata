@@ -137,10 +137,10 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
         style={{
           position: "fixed", right: 20, bottom,
           height: 40, padding: "0 14px 0 12px", borderRadius: 20,
-          border: `1px solid ${border}`, background: bg2, color: text,
+          border: `1px solid rgba(0,229,160,0.55)`, background: bg2, color: text,
           cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "0.5rem",
           fontFamily: "inherit", fontSize: "0.78rem", fontWeight: 600, letterSpacing: "-0.005em",
-          boxShadow: "0 6px 18px rgba(0,0,0,0.4)", zIndex: 2000,
+          zIndex: 2000, animation: "rbf-glow 2.4s ease-in-out infinite",
         }}
       >
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={green} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -148,10 +148,17 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
         </svg>
         <span>{L("Spätná väzba", "Feedback")}</span>
         <style>{`
-          .residata-fb-pill { transition: transform .18s, border-color .18s, box-shadow .18s, background .18s; }
+          @keyframes rbf-glow {
+            0%, 100% { box-shadow: 0 6px 18px rgba(0,0,0,0.4), 0 0 0 0 rgba(0,229,160,0); }
+            50%      { box-shadow: 0 8px 22px rgba(0,0,0,0.45), 0 0 22px 3px rgba(0,229,160,0.45); }
+          }
+          .residata-fb-pill { transition: transform .18s, border-color .18s, background .18s; }
           .residata-fb-pill:hover {
-            transform: translateY(-1px); border-color: ${green}; background: #121216;
-            box-shadow: 0 10px 26px rgba(0,0,0,0.5), 0 0 0 1px rgba(0,229,160,0.18) inset;
+            transform: translateY(-1px); border-color: ${green}; background: #121216; animation-play-state: paused;
+            box-shadow: 0 10px 28px rgba(0,0,0,0.55), 0 0 28px 5px rgba(0,229,160,0.55), 0 0 0 1px rgba(0,229,160,0.3) inset;
+          }
+          @media (prefers-reduced-motion: reduce) {
+            .residata-fb-pill { animation: none; box-shadow: 0 6px 18px rgba(0,0,0,0.4), 0 0 16px 2px rgba(0,229,160,0.35); }
           }
         `}</style>
       </button>
@@ -213,6 +220,13 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
           </div>
         ) : (
           <>
+            {/* Friendly intro — what we'd love to hear from them */}
+            <div style={{ color: "#cdd0d6", fontSize: "0.84rem", lineHeight: 1.55, marginBottom: "0.95rem" }}>
+              {L(
+                "Daj nám vedieť čokoľvek — ak niečo nefunguje, ak vieš o aktívnej novostavbe, ktorá nám chýba, alebo máš otázku či nápad na novú funkciu, ktorú by si uvítal. Tie najlepšie veľmi radi pridáme. 🙌",
+                "Tell us anything — if something's not working, if you know an active new-build we're missing, or if you have a question or a feature you'd love to see. We're always glad to add the best ones. 🙌"
+              )}
+            </div>
             {/* Category */}
             <div style={{ color: dim, fontFamily: mono, fontSize: "0.62rem", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "0.45rem" }}>
               {L("Typ", "Type")}
@@ -243,10 +257,7 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
               ref={taRef}
               value={message}
               onChange={e => setMessage(e.target.value.slice(0, MAX_MESSAGE))}
-              placeholder={L(
-                "Popíš čo sa deje, čo by si zlepšil, alebo na čo sa pýtaš…",
-                "Describe what's happening, what you'd improve, or your question…"
-              )}
+              placeholder={L("Tvoja správa…", "Your message…")}
               rows={4}
               style={{
                 width: "100%", boxSizing: "border-box", minHeight: 96, maxHeight: 220,
