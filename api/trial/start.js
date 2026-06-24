@@ -77,14 +77,19 @@ export default async function handler(req, res) {
 
     const now = new Date();
     const end = new Date(now.getTime() + TRIAL_DAYS * 86400 * 1000);
-    const { error: updateErr } = await admin
+    const { data: updRows, error: updateErr } = await admin
       .from("user_profiles")
       .update({
         trial_started_at: now.toISOString(),
         trial_until:      end.toISOString(),
       })
-      .eq("id", user.id);
+      .eq("id", user.id)
+      .select("id");
     if (updateErr) return res.status(500).json({ error: "update failed", detail: updateErr.message });
+    // Service-role write should always hit exactly the one row; 0 = misconfig.
+    if (!updRows || updRows.length === 0) {
+      return res.status(500).json({ error: "trial write did not land — no row updated (key/RLS misconfig?)" });
+    }
 
     return res.status(200).json({
       trial_started_at: now.toISOString(),

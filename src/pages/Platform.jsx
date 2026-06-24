@@ -18,6 +18,7 @@ import { useProjects, useMarketTotals, useVelocityMature } from "../lib/useData"
 import { moneyFromEur, moneySymbol } from "../lib/money";
 import { useCurrency } from "../lib/useCurrency";
 import { supabase } from "../lib/supabase";
+import { getFreshAccessToken, authErrorMessage } from "../lib/sessionGuard";
 import { pushRoute } from "../lib/routing";
 import { track } from "../lib/track";
 import { cleanText, cleanUrl, cleanPhone } from "../lib/sanitize";
@@ -1211,18 +1212,20 @@ function PlatformBilling({ lang, setCurrent }) {
   const startTrial = async () => {
     setTrialBusy(true); setTrialMsg(null);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      // Refresh first so the trial request never goes out with a dead token
+      // (the #1 reason "start trial" silently failed with a 401).
+      const token = await getFreshAccessToken();
       const r = await fetch("/api/trial/start", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token || ""}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: "{}",
       });
       const j = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
-      setTrialMsg({ kind: "ok", text: lang === "sk" ? "Trial aktivovaný 🎉 Refresh stránku." : "Trial started 🎉 Refresh the page." });
+      if (!r.ok) throw new Error(r.status === 401 ? authErrorMessage({ status: 401 }, lang) : (j.error || `HTTP ${r.status}`));
+      setTrialMsg({ kind: "ok", text: lang === "sk" ? "Trial aktivovaný 🎉 Obnovujem stránku…" : "Trial started 🎉 Refreshing…" });
       setTimeout(() => window.location.reload(), 1200);
     } catch (e) {
-      setTrialMsg({ kind: "err", text: String(e?.message || e) });
+      setTrialMsg({ kind: "err", text: e?.code === "SESSION_EXPIRED" ? authErrorMessage(e, lang) : String(e?.message || e) });
     } finally {
       setTrialBusy(false);
     }

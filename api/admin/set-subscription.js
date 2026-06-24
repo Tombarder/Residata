@@ -140,9 +140,15 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "no fields to update" });
     }
 
-    const { error: updErr } = await admin
-      .from("user_profiles").update(patch).eq("id", userId);
+    // .select() + row-count check: the service-role key bypasses RLS, so a
+    // 0-row result here means a real misconfig (wrong key / RLS regression) —
+    // surface it LOUDLY instead of returning a misleading 200 that never landed.
+    const { data: updRows, error: updErr } = await admin
+      .from("user_profiles").update(patch).eq("id", userId).select("id");
     if (updErr) return res.status(500).json({ error: "update failed", detail: updErr.message });
+    if (!updRows || updRows.length === 0) {
+      return res.status(500).json({ error: "write did not land — no row updated (key/RLS misconfig?)" });
+    }
 
     // Audit — F-239 fix: previously wrote to columns admin_id / target_user_id /
     // details which DON'T EXIST in admin_audit_log (the actual schema uses
