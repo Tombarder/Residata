@@ -4011,7 +4011,8 @@ function AiChatLogsPanel({ users, lang }) {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
   const [filter, setFilter] = useState("all");  // all | bad | errors | recent
-  const [openSession, setOpenSession] = useState(null);  // session shown in the full-conversation modal
+  const [expanded, setExpanded] = useState(null);  // session_id of the inline quick-peek
+  const [viewFull, setViewFull] = useState(null);  // session shown in the proper full-area view
   const [userFilter, setUserFilter] = useState("all");   // "all" | a user_id
 
   // Pull last 30 days' worth of log rows (cap 2000). load() is also wired to a
@@ -4124,6 +4125,17 @@ function AiChatLogsPanel({ users, lang }) {
     </div>;
   }
 
+  // A conversation opened "full" takes over the tab area as a proper page-like
+  // view (not a popup) — click Back to return to the list.
+  if (viewFull) {
+    return <FullConversationView
+      session={viewFull}
+      email={usersById[viewFull.user_id]?.email || (viewFull.user_id ? viewFull.user_id.slice(0, 8) + "…" : (lang === "sk" ? "Anonym" : "Anonymous"))}
+      lang={lang}
+      onBack={() => setViewFull(null)}
+    />;
+  }
+
   return (
     <div>
       {/* 7-day stats strip */}
@@ -4192,20 +4204,21 @@ function AiChatLogsPanel({ users, lang }) {
           </div>
         ) : filteredSessions.slice(0, 100).map((s, i) => {
           const u = usersById[s.user_id];
+          const isOpen = expanded === s.session_id;
           return (
             <div key={s.session_id} style={{ borderTop: i > 0 ? `1px solid ${border}` : "none" }}>
               <button
-                onClick={() => setOpenSession(s)}
-                title={lang === "sk" ? "Otvoriť celú konverzáciu" : "Open the full conversation"}
+                onClick={() => setExpanded(isOpen ? null : s.session_id)}
+                title={lang === "sk" ? "Rozbaliť / zbaliť" : "Expand / collapse"}
                 style={{
-                  width: "100%", textAlign: "left", background: "transparent",
+                  width: "100%", textAlign: "left", background: isOpen ? "rgba(255,255,255,0.03)" : "transparent",
                   border: "none", color: text, cursor: "pointer", fontFamily: "inherit",
                   padding: "0.65rem 0.9rem",
                   display: "grid", gridTemplateColumns: "auto 1fr auto auto auto auto auto", gap: "0.6rem", alignItems: "center",
                 }}
-                onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.03)"; }}
-                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
-                <span style={{ color: green, fontSize: "0.7rem", width: 12 }}>▸</span>
+                onMouseEnter={e => { if (!isOpen) e.currentTarget.style.background = "rgba(255,255,255,0.03)"; }}
+                onMouseLeave={e => { if (!isOpen) e.currentTarget.style.background = "transparent"; }}>
+                <span style={{ color: green, fontSize: "0.7rem", width: 12 }}>{isOpen ? "▾" : "▸"}</span>
                 <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "0.78rem" }}>
                   <strong style={{ color: text }}>{u?.email || (s.user_id ? s.user_id.slice(0, 8) + "…" : "anon")}</strong>
                   <span style={{ color: dim, marginLeft: "0.5rem", fontFamily: mono, fontSize: "0.68rem" }}>{s.tier}</span>
@@ -4221,8 +4234,20 @@ function AiChatLogsPanel({ users, lang }) {
                 <span style={{ color: dim, fontSize: "0.66rem", fontFamily: mono }}>
                   {new Date(s.last_at).toLocaleString()}
                 </span>
-                <span title={lang === "sk" ? "otvoriť" : "open"} style={{ color: dim, fontSize: "0.72rem" }}>↗</span>
+                <span style={{ width: 12 }} />
               </button>
+              {isOpen && (
+                <div style={{ padding: "0.2rem 0.9rem 0.9rem 1.5rem", background: bg }}>
+                  <button
+                    onClick={() => setViewFull(s)}
+                    style={{ marginBottom: "0.7rem", background: "rgba(0,229,160,0.12)", color: green, border: `1px solid ${green}`, borderRadius: 7, padding: "0.45rem 0.85rem", fontSize: "0.78rem", cursor: "pointer", fontFamily: "inherit", fontWeight: 600 }}>
+                    {lang === "sk" ? "Zobraziť celú konverzáciu →" : "Open full conversation →"}
+                  </button>
+                  {s.turns.map((t, j) => (
+                    <AiTurnRow key={t.id || j} turn={t} />
+                  ))}
+                </div>
+              )}
             </div>
           );
         })}
@@ -4232,82 +4257,63 @@ function AiChatLogsPanel({ users, lang }) {
           </div>
         )}
       </div>
-
-      <ConversationModal
-        session={openSession}
-        email={openSession ? (usersById[openSession.user_id]?.email || (openSession.user_id ? openSession.user_id.slice(0, 8) + "…" : (lang === "sk" ? "Anonym" : "Anonymous"))) : null}
-        lang={lang}
-        onClose={() => setOpenSession(null)}
-      />
     </div>
   );
 }
 
-/* ConversationModal — opens a single conversation as a clean chat view, the way
-   the user saw it: user bubbles right, AI bubbles left, with each answer's time +
-   cost + model underneath. Click the backdrop or press Esc to close. */
-function ConversationModal({ session, email, lang, onClose }) {
+/* FullConversationView — a single conversation as a proper, full-area chat view
+   (NOT a popup): a header bar with a Back button + who/when/cost, then the whole
+   transcript in a comfortable centered column the way the user saw it in the app. */
+function FullConversationView({ session, email, lang, onBack }) {
   const L = (sk, en) => (lang === "sk" ? sk : en);
-  useEffect(() => {
-    if (!session) return undefined;
-    const onKey = (e) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [session, onClose]);
-  if (!session) return null;
   const turns = session.turns || [];
   const qCount = turns.filter(t => t.role === "user").length;
   return (
-    <div onClick={onClose}
-      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.74)", zIndex: 4000,
-        display: "flex", alignItems: "center", justifyContent: "center", padding: "1.5rem" }}>
-      <div onClick={(e) => e.stopPropagation()}
-        style={{ width: "min(760px, 100%)", maxHeight: "88vh", display: "flex", flexDirection: "column",
-          background: bg2, border: `1px solid ${border}`, borderRadius: 14, boxShadow: "0 30px 80px rgba(0,0,0,0.7)", overflow: "hidden" }}>
-        {/* header */}
-        <div style={{ padding: "0.9rem 1.1rem", borderBottom: `1px solid ${border}`, display: "flex", alignItems: "center", gap: "0.75rem",
-          background: "linear-gradient(180deg, rgba(0,229,160,0.06), transparent)" }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ color: text, fontWeight: 700, fontSize: "0.95rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{email}</div>
-            <div style={{ color: dim, fontFamily: mono, fontSize: "0.66rem", marginTop: "0.15rem" }}>
-              {session.tier} · {new Date(session.first_at).toLocaleString()} · {qCount} {L("otázok", "questions")} · <span style={{ color: green }}>{fmtUsd(session.cost)}</span>
-            </div>
+    <div style={{ display: "flex", flexDirection: "column", minHeight: "60vh" }}>
+      {/* header bar */}
+      <div style={{ display: "flex", alignItems: "center", gap: "0.9rem", padding: "0.2rem 0 1rem", borderBottom: `1px solid ${border}`, marginBottom: "1.4rem", flexWrap: "wrap" }}>
+        <button onClick={onBack} title={L("Späť", "Back")}
+          style={{ background: "transparent", border: `1px solid ${border}`, color: text, borderRadius: 8, cursor: "pointer", padding: "0.45rem 0.9rem", fontSize: "0.82rem", fontFamily: "inherit" }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = green; e.currentTarget.style.color = green; }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = border; e.currentTarget.style.color = text; }}>
+          ← {L("Späť na logy", "Back to logs")}
+        </button>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ color: text, fontWeight: 700, fontSize: "1.05rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{email}</div>
+          <div style={{ color: dim, fontFamily: mono, fontSize: "0.7rem", marginTop: "0.15rem" }}>
+            {session.tier} · {new Date(session.first_at).toLocaleString()} · {qCount} {L("otázok", "questions")} · <span style={{ color: green }}>{fmtUsd(session.cost)}</span>
           </div>
-          <button onClick={onClose} title={L("Zavrieť (Esc)", "Close (Esc)")}
-            style={{ background: "transparent", border: `1px solid ${border}`, color: dim, borderRadius: 7, cursor: "pointer", padding: "0.35rem 0.6rem", fontSize: "0.85rem", fontFamily: mono, lineHeight: 1 }}>✕</button>
         </div>
-        {/* transcript */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "1rem 1.1rem", display: "flex", flexDirection: "column", gap: "0.7rem" }}>
-          {turns.map((t, j) => {
-            const isUser = t.role === "user";
-            const isErr  = t.role === "error";
-            return (
-              <div key={t.id || j} style={{ display: "flex", justifyContent: isUser ? "flex-end" : "flex-start" }}>
-                <div style={{ maxWidth: "86%",
-                  background: isUser ? "rgba(0,229,160,0.12)" : (isErr ? "rgba(255,107,107,0.10)" : "#15151b"),
-                  border: `1px solid ${isUser ? "rgba(0,229,160,0.3)" : (isErr ? "rgba(255,107,107,0.4)" : border)}`,
-                  borderRadius: 12, padding: "0.6rem 0.8rem", color: text, fontSize: "0.86rem", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
+      </div>
+
+      {/* transcript — a comfortable centered column, like the real chat */}
+      <div style={{ width: "100%", maxWidth: 820, margin: "0 auto", display: "flex", flexDirection: "column", gap: "1.1rem", paddingBottom: "2rem" }}>
+        {turns.map((t, j) => {
+          const isUser = t.role === "user";
+          const isErr  = t.role === "error";
+          return (
+            <div key={t.id || j} style={{ display: "flex", justifyContent: isUser ? "flex-end" : "flex-start" }}>
+              <div style={{ maxWidth: isUser ? "80%" : "92%",
+                background: isUser ? "rgba(0,229,160,0.10)" : (isErr ? "rgba(255,107,107,0.10)" : "#15151b"),
+                border: `1px solid ${isUser ? "rgba(0,229,160,0.28)" : (isErr ? "rgba(255,107,107,0.4)" : border)}`,
+                borderRadius: 14, padding: "0.85rem 1.05rem", color: text, fontSize: "0.95rem", lineHeight: 1.6 }}>
+                <div style={{ whiteSpace: "pre-wrap" }}>
                   {t.content || (isErr ? <span style={{ color: red, fontStyle: "italic" }}>{t.error_message || "(error)"}</span> : <span style={{ color: dim, fontStyle: "italic" }}>(empty)</span>)}
-                  {!isUser && (
-                    <div style={{ marginTop: "0.4rem", paddingTop: "0.3rem", borderTop: `1px dashed ${border}`, color: dim, fontFamily: mono, fontSize: "0.58rem", display: "flex", gap: "0.6rem", flexWrap: "wrap" }}>
-                      <span>{new Date(t.sent_at).toLocaleTimeString()}</span>
-                      {t.role === "assistant" && <span style={{ color: green }}>{fmtUsd(turnCostUsd(t))}</span>}
-                      {t.model && <span>{t.model}</span>}
-                      {Number.isFinite(t.response_time_ms) && <span>{(t.response_time_ms / 1000).toFixed(1)}s</span>}
-                      {t.feedback === "good" && <span>👍</span>}
-                      {t.feedback === "bad" && <span>👎</span>}
-                    </div>
-                  )}
                 </div>
+                {!isUser && (
+                  <div style={{ marginTop: "0.6rem", paddingTop: "0.45rem", borderTop: `1px dashed ${border}`, color: dim, fontFamily: mono, fontSize: "0.62rem", display: "flex", gap: "0.7rem", flexWrap: "wrap" }}>
+                    <span>{new Date(t.sent_at).toLocaleTimeString()}</span>
+                    {t.role === "assistant" && <span style={{ color: green }}>{fmtUsd(turnCostUsd(t))}</span>}
+                    {t.model && <span>{t.model}</span>}
+                    {Number.isFinite(t.response_time_ms) && <span>{(t.response_time_ms / 1000).toFixed(1)}s</span>}
+                    {t.feedback === "good" && <span>👍</span>}
+                    {t.feedback === "bad" && <span>👎</span>}
+                  </div>
+                )}
               </div>
-            );
-          })}
-        </div>
-        {/* footer */}
-        <div style={{ padding: "0.55rem 1.1rem", borderTop: `1px solid ${border}`, display: "flex", justifyContent: "space-between", color: dim, fontFamily: mono, fontSize: "0.66rem" }}>
-          <span>{turns.length} {L("správ", "messages")}</span>
-          <span style={{ color: green }}>{L("Spolu", "Total")} {fmtUsd(session.cost)}</span>
-        </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
