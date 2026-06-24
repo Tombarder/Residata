@@ -12,6 +12,7 @@
  * Read + triage only; users' messages are never edited.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { supabase } from "../lib/supabase";
 
 const green = "#00e5a0";
 const amber = "#f5a623";
@@ -115,6 +116,12 @@ export default function FeedbackLog({ lang = "sk" }) {
     } catch (e) { setErr(e.message); }
     finally { setBusy((b) => ({ ...b, [id]: false })); }
   }
+  async function viewShot(path) {
+    if (!supabase) return;
+    const { data, error } = await supabase.storage.from("feedback-attachments").createSignedUrl(path, 600);
+    if (data?.signedUrl) window.open(data.signedUrl, "_blank", "noopener");
+    else if (error) setErr(error.message);
+  }
 
   const cat = (k) => CATEGORIES[k] || CATEGORIES.other;
   const st = (k) => STATUSES[k] || STATUSES.new;
@@ -211,12 +218,19 @@ export default function FeedbackLog({ lang = "sk" }) {
               {/* message */}
               <div style={{ fontSize: 14, lineHeight: 1.6, color: textLight, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{f.message}</div>
 
-              {/* page context */}
-              {f.page_path && (
-                <div style={{ marginTop: 8, fontSize: 12, color: dim, fontFamily: mono }}>
-                  {f.page_url
+              {/* context: project · page · screenshot */}
+              {(f.project_name || f.page_path || f.attachment_path) && (
+                <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", fontSize: 12, color: dim, fontFamily: mono }}>
+                  {f.project_name && <span style={{ color: "#cdd0d6" }}>📍 {f.project_name}</span>}
+                  {f.page_path && (f.page_url
                     ? <a href={f.page_url} target="_blank" rel="noopener noreferrer" style={{ color: dim }}>{f.page_path} ↗</a>
-                    : f.page_path}
+                    : <span>{f.page_path}</span>)}
+                  {f.attachment_path && (
+                    <button onClick={() => viewShot(f.attachment_path)}
+                      style={{ background: "transparent", border: `1px solid ${border}`, color: green, borderRadius: 6, cursor: "pointer", padding: "3px 8px", fontSize: 12, fontFamily: mono }}>
+                      📎 {t("View screenshot", "Zobraziť screenshot")}
+                    </button>
+                  )}
                 </div>
               )}
 
