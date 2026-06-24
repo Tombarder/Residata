@@ -85,6 +85,8 @@ export default function FeedbackLog({ lang = "sk" }) {
   const [fCategory, setFCategory] = useState("");
   const [notes, setNotes] = useState({});   // id -> draft note
   const [busy, setBusy] = useState({});      // id -> bool
+  const [replyDraft, setReplyDraft] = useState({});  // id -> reply text
+  const [replying, setReplying] = useState({});      // id -> bool
 
   const load = useCallback(() => {
     // setState only inside async callbacks (never synchronously in the effect).
@@ -121,6 +123,23 @@ export default function FeedbackLog({ lang = "sk" }) {
     const { data, error } = await supabase.storage.from("feedback-attachments").createSignedUrl(path, 600);
     if (data?.signedUrl) window.open(data.signedUrl, "_blank", "noopener");
     else if (error) setErr(error.message);
+  }
+  async function sendReply(id) {
+    const txt = (replyDraft[id] || "").trim();
+    if (txt.length < 2) return;
+    setReplying((r) => ({ ...r, [id]: true })); setErr(null);
+    try {
+      const token = storedAccessToken();
+      const r = await fetch("/api/feedback/reply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ feedback_id: id, reply: txt }),
+      });
+      if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || `HTTP ${r.status}`); }
+      setItems((list) => (list || []).map((x) => (x.id === id ? { ...x, admin_reply: txt, replied_at: new Date().toISOString() } : x)));
+      setReplyDraft((d) => { const c = { ...d }; delete c[id]; return c; });
+    } catch (e) { setErr("Reply: " + e.message); }
+    finally { setReplying((r) => ({ ...r, [id]: false })); }
   }
 
   const cat = (k) => CATEGORIES[k] || CATEGORIES.other;
@@ -264,6 +283,37 @@ export default function FeedbackLog({ lang = "sk" }) {
                   {t("Save note", "Uložiť")}
                 </button>
               </div>
+
+              {/* reply to the user (only if we have an address) */}
+              {f.email && (
+                <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${border}` }}>
+                  {f.admin_reply && (
+                    <div style={{ fontSize: 12, color: dim, marginBottom: 8 }}>
+                      <span style={{ color: green }}>↩ {t("Replied", "Odpovedané")}</span>
+                      {f.replied_at ? ` · ${fmtDate(f.replied_at)}` : ""}
+                      <div style={{ color: "#cdd0d6", marginTop: 3, whiteSpace: "pre-wrap" }}>{f.admin_reply}</div>
+                    </div>
+                  )}
+                  <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                    <textarea
+                      value={replyDraft[f.id] ?? ""}
+                      onChange={(e) => setReplyDraft((d) => ({ ...d, [f.id]: e.target.value }))}
+                      placeholder={t(`Reply to ${f.email} (emails them)…`, `Odpovedať na ${f.email} (pošle e-mail)…`)}
+                      rows={2}
+                      style={{ flex: 1, minWidth: 0, padding: "8px 11px", background: bg, border: `1px solid ${border}`, borderRadius: 8, color: textLight, fontSize: 13, outline: "none", resize: "vertical", fontFamily: "inherit" }}
+                    />
+                    <button
+                      disabled={replying[f.id] || (replyDraft[f.id] || "").trim().length < 2}
+                      onClick={() => sendReply(f.id)}
+                      style={{ padding: "8px 13px", fontSize: 12, borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap",
+                        border: `1px solid ${green}`, color: "#0a0a0c", background: green,
+                        cursor: replying[f.id] || (replyDraft[f.id] || "").trim().length < 2 ? "not-allowed" : "pointer",
+                        opacity: replying[f.id] || (replyDraft[f.id] || "").trim().length < 2 ? 0.45 : 1 }}>
+                      {replying[f.id] ? t("Sending…", "Posielam…") : `↩ ${f.admin_reply ? t("Reply again", "Znova") : t("Reply", "Odpovedať")}`}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           );
         })}
