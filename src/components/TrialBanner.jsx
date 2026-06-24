@@ -7,16 +7,17 @@
  *      users who haven't yet used their trial. Dismissal is sticky
  *      for 7 days via localStorage.
  *
- *   2. Modal popup (one-shot per browser session)
- *      Shown to the same audience after a 1.5s delay so it doesn't
- *      pop the moment they land. A sessionStorage flag suppresses it
- *      for the rest of the session — it re-opens the next time the
- *      visitor opens the site after closing it (sessionStorage clears
- *      on tab/browser close). Does not re-pop on reload/navigation.
+ *   2. Modal popup — ANON only, fires on EVERY page load (incl. refresh)
+ *      Shown 1.5s after each marketing page load to visitors who have NOT
+ *      signed up yet, so the offer is impossible to miss. No per-day/session
+ *      suppression — a refresh re-shows it. The instant the visitor has an
+ *      account it never shows again (no longer relevant; would just annoy).
+ *      Does not re-pop on internal SPA navigation (the component stays
+ *      mounted), only on a real load/refresh.
  *
- * Both hide automatically once the user starts a trial (capability
- * promotion fires `trialActive`) or on paid/admin tier. Both hide
- * on /app/* (the platform has its own Billing CTAs).
+ * The banner hides once the user starts a trial / is paid / admin / pending /
+ * has already used the trial (useShouldShowTrialPromo). The popup hides the
+ * moment the visitor is signed in (anon-only). Both hide on /app/*.
  */
 import { useEffect, useState } from "react";
 import { useAuth } from "../lib/useAuth";
@@ -24,7 +25,6 @@ import { useCapabilities } from "../lib/useCapabilities";
 import { track } from "../lib/track";
 
 const KEY_BANNER_DISMISSED = "residata_trial_banner_until";   // unix ms — banner hidden until this time
-const KEY_POPUP_SESSION    = "residata_trial_popup_seen";     // sessionStorage flag — shown once this browser session
 
 /**
  * Decide whether the trial promo surfaces should be shown to the
@@ -149,27 +149,27 @@ export function TrialBanner({ lang = "sk", onCta }) {
 // ────────────────────────────────────────────────────────────
 export function TrialPopup({ lang = "sk", onCta }) {
   const [open, setOpen] = useState(false);
-  const eligible = useShouldShowTrialPromo();
+  // The popup is purely an ANON → sign-up conversion nudge. Show it to visitors
+  // who have NOT signed up yet, on EVERY page load (incl. refresh) so the offer
+  // is impossible to miss. The instant they have an account, never show it again
+  // — it's no longer relevant and would only annoy. (Signed-in free users still
+  // get the slim top banner + the Billing "Start 7-day trial" card.)
+  const { user } = useAuth();
+  const eligible = !user;
   const L = (sk, en) => lang === "sk" ? sk : en;
 
   useEffect(() => {
     if (!eligible) { setOpen(false); return; }
-    try {
-      // Per-SESSION (sessionStorage), not per-day: greet the visitor once each
-      // time they open the site fresh. sessionStorage clears when the tab/
-      // browser is closed, so the popup re-appears "every time they open the
-      // website after closing it" — but does NOT re-pop on in-session reloads
-      // or page navigation.
-      if (sessionStorage.getItem(KEY_POPUP_SESSION)) { setOpen(false); return; }
-      // Delay so it doesn't pop the instant they land — feels less
-      // pushy and gives them a chance to look at the page first.
-      const t = setTimeout(() => {
-        setOpen(true);
-        try { sessionStorage.setItem(KEY_POPUP_SESSION, "1"); } catch (_) {}
-        track("trial_popup_shown");
-      }, 1500);
-      return () => clearTimeout(t);
-    } catch (_) {}
+    // No suppression flag — fire on every fresh page load (a refresh re-mounts
+    // this component and re-runs this effect). Internal SPA navigation keeps it
+    // mounted, so it does NOT re-pop on every click; dismissing closes it for
+    // the current page view and the next load/refresh brings it back. Delay so
+    // the page paints first (less pushy).
+    const t = setTimeout(() => {
+      setOpen(true);
+      track("trial_popup_shown");
+    }, 1500);
+    return () => clearTimeout(t);
   }, [eligible]);
 
   if (!open) return null;
