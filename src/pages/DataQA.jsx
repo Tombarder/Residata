@@ -75,6 +75,8 @@ const COLS = [
   ["orientacia", "Orient.", "Orient.", "t"],
   ["stav", "Stav", "Status", "t"],
 ];
+const COUNTRIES = { SK: "Slovensko", CZ: "Česko" };
+const selStyle = { display: "block", width: "100%", boxSizing: "border-box", marginTop: 5, padding: "9px 12px", background: bg2, border: `1px solid ${border}`, borderRadius: 8, color: textLight, fontSize: 14, outline: "none" };
 
 export default function DataQA({ lang = "sk" }) {
   const t = (en, sk) => (lang === "sk" ? sk : en);
@@ -84,6 +86,9 @@ export default function DataQA({ lang = "sk" }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [sel, setSel] = useState(null);
+  const [fCountry, setFCountry] = useState("");
+  const [fRegion, setFRegion] = useState("");
+  const [fCity, setFCity] = useState("");
 
   const [dates, setDates] = useState([]);
   const [date, setDate] = useState("");
@@ -124,12 +129,26 @@ export default function DataQA({ lang = "sk" }) {
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
 
+  const opts = useMemo(() => {
+    const ps = projects || [];
+    const uniq = (arr) => [...new Set(arr.filter(Boolean))].sort((a, b) => a.localeCompare(b, "sk"));
+    return {
+      countries: uniq(ps.map((p) => p.country)),
+      regions: uniq(ps.filter((p) => !fCountry || p.country === fCountry).map((p) => p.region)),
+      cities: uniq(ps.filter((p) => (!fCountry || p.country === fCountry) && (!fRegion || p.region === fRegion)).map((p) => p.city)),
+    };
+  }, [projects, fCountry, fRegion]);
+
   const matches = useMemo(() => {
     if (!projects) return [];
     const q = norm(query);
-    const list = q ? projects.filter((p) => norm(p.name).includes(q) || norm(p.city).includes(q)) : projects;
-    return list.slice(0, 60);
-  }, [projects, query]);
+    return projects.filter((p) =>
+      (!fCountry || p.country === fCountry) &&
+      (!fRegion || p.region === fRegion) &&
+      (!fCity || p.city === fCity) &&
+      (!q || norm(p.name).includes(q) || norm(p.city).includes(q))
+    );
+  }, [projects, query, fCountry, fRegion, fCity]);
 
   const rows = useMemo(() => {
     if (!units) return [];
@@ -203,6 +222,34 @@ export default function DataQA({ lang = "sk" }) {
       {!projects && !err && <div style={{ color: dim, fontFamily: mono, fontSize: 13 }}>{t("Loading projects…", "Načítavam projekty…")}</div>}
 
       {projects && (
+        <>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 12 }}>
+          <div style={{ minWidth: 140 }}>
+            <label style={cardLabel}>{t("Country", "Krajina")}</label>
+            <select value={fCountry} onChange={(e) => { setFCountry(e.target.value); setFRegion(""); setFCity(""); }} style={selStyle}>
+              <option value="">{t("All", "Všetky")}</option>
+              {opts.countries.map((c) => <option key={c} value={c}>{COUNTRIES[c] || c}</option>)}
+            </select>
+          </div>
+          <div style={{ minWidth: 170 }}>
+            <label style={cardLabel}>{t("Region", "Kraj")}</label>
+            <select value={fRegion} onChange={(e) => { setFRegion(e.target.value); setFCity(""); }} style={selStyle}>
+              <option value="">{t("All", "Všetky")}</option>
+              {opts.regions.map((r) => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </div>
+          <div style={{ minWidth: 150 }}>
+            <label style={cardLabel}>{t("City", "Mesto")}</label>
+            <select value={fCity} onChange={(e) => setFCity(e.target.value)} style={selStyle}>
+              <option value="">{t("All", "Všetky")}</option>
+              {opts.cities.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          {(fCountry || fRegion || fCity) && (
+            <button onClick={() => { setFCountry(""); setFRegion(""); setFCity(""); }} style={{ ...btn, padding: "8px 12px", fontSize: 12 }}>{t("Clear", "Zrušiť filtre")}</button>
+          )}
+          <span style={{ fontSize: 12, color: dim, fontFamily: mono, paddingBottom: 9 }}>{matches.length} {t("projects", "projektov")}</span>
+        </div>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 16 }}>
           <div ref={boxRef} style={{ position: "relative", flex: "1 1 280px", minWidth: 240 }}>
             <label style={cardLabel}>{t("Project", "Projekt")} ({projects.length})</label>
@@ -243,6 +290,7 @@ export default function DataQA({ lang = "sk" }) {
             </a>
           )}
         </div>
+        </>
       )}
 
       {sel && (
