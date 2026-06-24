@@ -96,6 +96,13 @@ function applyHeatMode(map, on) {
     : ["interpolate", ["linear"], ["get", "units"], 0, 5, 30, 7, 80, 11, 200, 16, 500, 22]);
 }
 
+// Radius slider uses a quadratic mapping (pos 0..1000) so the lower, common range
+// gets most of the travel while the slider still reaches 50 km. Rounds to 0.5 km.
+const R_MIN = 0.5, R_MAX = 50;
+const posToRadius = (pos) => Math.round((R_MIN + (R_MAX - R_MIN) * (pos / 1000) ** 2) * 2) / 2;
+const radiusToPos = (r) => Math.round(Math.sqrt(Math.max(0, (r - R_MIN) / (R_MAX - R_MIN))) * 1000);
+const RADIUS_PRESETS = [1, 5, 10, 25, 50];
+
 function hoverLabel(props, lens) {
   if (lens === "price")      return props.ppm2 > 0 ? `€${fmt(props.ppm2)}/m²` : "no price";
   if (lens === "supply")     return `${props.available} available`;
@@ -237,6 +244,15 @@ export default function MapView2({ lang = "en", setCurrent }) {
 
   const compSet = useMemo(() => computeCompetitiveSet(shown, coords, analysisCenter, radiusKm, verifiedOnly), [shown, coords, analysisCenter, radiusKm, verifiedOnly]);
   const anchor = useMemo(() => (anchorId ? shown.find((p) => p.id === anchorId) : null), [anchorId, shown]);
+
+  // Zoom/pan the map so the whole analysis circle fits (used by the radius presets
+  // and on slider release) — otherwise a 50 km radius would run off-screen.
+  const fitToRadius = (r) => {
+    const map = mapRef.current, c = analysisCenter;
+    if (!map || !c) return;
+    const dLat = r / 110.574, dLng = r / (111.32 * Math.cos((c.lat * Math.PI) / 180));
+    map.fitBounds([[c.lng - dLng, c.lat - dLat], [c.lng + dLng, c.lat + dLat]], { padding: 56, duration: 500, maxZoom: 15 });
+  };
 
   function fitToData(map, data, animate) {
     if (!data.features.length) { map.jumpTo({ center: FALLBACK_CENTER, zoom: FALLBACK_ZOOM }); return; }
@@ -452,8 +468,14 @@ export default function MapView2({ lang = "en", setCurrent }) {
                 <span style={{ color: textLight, fontWeight: 600, fontSize: "0.85rem" }}>{sk ? "Konkurenčné okolie" : "Competitive set"}</span>
                 <button onClick={() => { setAnalysisCenter(null); setAnchorId(null); }} style={{ background: "none", border: "none", color: dim, cursor: "pointer", fontSize: "0.95rem" }} aria-label="Clear">✕</button>
               </div>
-              <div style={{ fontSize: "0.7rem", color: dim, marginBottom: 9 }}>{sk ? "v okruhu" : "within"} <strong style={{ color: textLight, fontFamily: mono }}>{radiusKm.toFixed(1)} km</strong></div>
-              <input type="range" min="0.5" max="5" step="0.5" value={radiusKm} onChange={(e) => setRadiusKm(Number(e.target.value))} style={{ width: "100%", marginBottom: 12, accentColor: green }} aria-label="Radius km" />
+              <div style={{ fontSize: "0.7rem", color: dim, marginBottom: 9 }}>{sk ? "v okruhu" : "within"} <strong style={{ color: textLight, fontFamily: mono }}>{radiusKm % 1 === 0 ? radiusKm : radiusKm.toFixed(1)} km</strong></div>
+              <input type="range" min={0} max={1000} step={1} value={radiusToPos(radiusKm)} onChange={(e) => setRadiusKm(posToRadius(Number(e.target.value)))} onPointerUp={(e) => fitToRadius(posToRadius(Number(e.target.value)))} style={{ width: "100%", marginBottom: 8, accentColor: green }} aria-label="Radius km" />
+              <div style={{ display: "flex", gap: 5, marginBottom: 12 }}>
+                {RADIUS_PRESETS.map((p) => {
+                  const on = Math.abs(radiusKm - p) < 0.01;
+                  return <button key={p} onClick={() => { setRadiusKm(p); fitToRadius(p); }} style={{ flex: 1, minWidth: 0, padding: "5px 0", borderRadius: 6, fontSize: "0.68rem", cursor: "pointer", border: `1px solid ${on ? `${green}66` : border}`, background: on ? `${green}14` : "transparent", color: on ? green : dim }}>{p} km</button>;
+                })}
+              </div>
 
               {anchor && compSet && compSet.inside.length > 1 && (() => {
                 const ap = ppm2Of(anchor);
