@@ -197,6 +197,65 @@ export function approvedUserHtml(user, webUrl) {
 }
 
 // ──────────────────────────────────────────────────────────
+// User feedback / problem-report notification
+// ──────────────────────────────────────────────────────────
+
+// Shared by the email builder + the /api/feedback/submit subject line so
+// the label is identical in the inbox and in the message body. English —
+// admin-facing, same as every other notification in this file.
+export const FEEDBACK_CATEGORY_LABELS = {
+  data:     { label: "Data quality",      emoji: "📊" },
+  bug:      { label: "Bug / not working", emoji: "🐞" },
+  website:  { label: "Website / display", emoji: "🖥️" },
+  question: { label: "Question",          emoji: "❓" },
+  idea:     { label: "Suggestion / feature", emoji: "💡" },
+  other:    { label: "Other",             emoji: "💬" },
+};
+
+function escHtml(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/**
+ * Admin notification for a new feedback / problem report submitted via the
+ * site-wide widget. Mirrors the branded dark card used by the other emails.
+ *
+ * @param {object} fb  { category, message, email, user_tier, page_path,
+ *                        page_url, created_at }
+ * @param {string} webUrl  base site URL (for the "open feedback log" button)
+ */
+export function feedbackHtml(fb, webUrl) {
+  const meta = FEEDBACK_CATEGORY_LABELS[fb.category] || FEEDBACK_CATEGORY_LABELS.other;
+  const when = (fb.created_at || new Date().toISOString()).slice(0, 16).replace("T", " ");
+  const msgHtml = escHtml(fb.message).replace(/\n/g, "<br>");
+
+  const rows = [
+    `<div style="${S.row}"><span style="${S.rowLabel}">From</span><span style="color:${TEXT_HI}">${fb.email ? escHtml(fb.email) : "anonymous"}</span></div>`,
+    `<div style="${S.row}"><span style="${S.rowLabel}">Tier</span>${escHtml(fb.user_tier || "anon")}</div>`,
+    fb.page_path ? `<div style="${S.row}"><span style="${S.rowLabel}">Page</span>${escHtml(fb.page_path)}</div>` : "",
+    `<div style="${S.row}"><span style="${S.rowLabel}">When</span>${escHtml(when)} UTC</div>`,
+  ].join("");
+
+  const inner = `
+    <div style="${S.eyebrow}">New feedback · ${escHtml(meta.label)}</div>
+    <h1 style="${S.h1}">${meta.emoji} ${escHtml(meta.label)}</h1>
+    <div style="padding:16px 18px;border:1px solid ${CARD_BORDER};border-radius:8px;margin:14px 0;background:${INNER_BOX};color:${TEXT_HI};font-size:15px;line-height:1.6;white-space:normal">${msgHtml}</div>
+    <div style="${S.userBox}">
+      ${rows}
+    </div>
+    <a href="${webUrl}/app/feedback" style="${S.btnGreen}">Open feedback log →</a>`;
+
+  return shell({
+    title: "New Residata feedback",
+    preheader: `${meta.label}: ${String(fb.message || "").slice(0, 80)}`,
+    inner,
+    footer: "Residata · user feedback · reply to the address above if it needs a follow-up",
+  });
+}
+
+// ──────────────────────────────────────────────────────────
 // SMTP send helper (Gmail)
 // ──────────────────────────────────────────────────────────
 export async function sendEmail({ to, subject, html, from, gmailUser, gmailPassword }) {

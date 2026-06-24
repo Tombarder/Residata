@@ -60,6 +60,7 @@ export const CAPABILITY_KEYS = [
   'manage_premium_domains',      // /admin — CRUD domén
   'manage_locations',            // /app/locations — set project map pins (admin-only)
   'manage_data_qa',              // /app/data-qa — admin Data-QA / control tool (admin-only)
+  'view_feedback_log',           // /app/feedback — user feedback / problem-report inbox (admin-only)
   'view_activity_log',           // /admin — event feed
   'view_admin_nav',              // zobraziť "ADMIN" link v nav
 
@@ -144,6 +145,7 @@ const ADMIN_CAPS = [
   'manage_users',
   'view_activity_log',
   'view_admin_nav',
+  'view_feedback_log',
 ];
 
 export const TIER_CAPABILITIES = {

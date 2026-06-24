@@ -3,6 +3,7 @@ import Ticker from "./components/Ticker";
 import LoginModal from "./components/LoginModal";
 import CompleteProfile from "./components/CompleteProfile";
 import FloatingChat from "./components/FloatingChat";
+import FeedbackWidget from "./components/FeedbackWidget";
 import { TrialBanner, TrialPopup } from "./components/TrialBanner";
 import PendingGate from "./components/PendingGate";
 import Feature from "./components/Feature";
@@ -2190,6 +2191,10 @@ export default function App() {
       {!isAppPage(current) && (
         <FloatingChat lang={lang} onNavigate={handleNav} />
       )}
+      {/* Feedback widget — EVERY page (marketing + platform). On marketing it
+          floats above the AI chat pill (`raised`) so the two never overlap;
+          on the platform the chat pill isn't shown so it sits on its own. */}
+      <FeedbackWidget lang={lang} raised={!isAppPage(current)} />
       {/* TrialPopup — marketing pages only. Once-per-day modal that
           fires 1.5s after page load. Self-suppresses for non-eligible
           users (paid / mid-trial / trial-used). CTA opens the login
