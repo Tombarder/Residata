@@ -1,18 +1,21 @@
 /**
  * DataQA — admin-only "Kontrola dát" tool.
  *
- * Lets an admin browse exactly what we scraped, per project and per scrape DATE
- * (snapshot), and eyeball-compare it against the developer's own website (one-click
- * open). Good overview: summary cards, sortable/filterable units table, and Excel-style
- * row-select aggregation (count / sum / average) for quick control.
+ * Pick a project (searchable, optionally pre-filtered by Country / Region / City),
+ * pick a snapshot DATE, and see that project's units for that day — sortable,
+ * status-filterable, with Excel-style row-select aggregation and a one-click open
+ * of the developer's site for side-by-side comparison. Read-only (control, not edit).
  *
- * Data comes from three admin-gated RPCs (public._require_admin):
- *   admin_qa_projects()                 → project list + live counts + source URL
- *   admin_qa_dates(p_project_id)        → available snapshot dates for a project
- *   admin_qa_units(p_project_id, p_date)→ that project's units on that date
- * Read-only by design — this is for control, not editing.
+ * Data: 3 admin-gated RPCs (public._require_admin), all returning jsonb (no row cap):
+ *   admin_qa_projects()                  → projects + counts + country/region/city + url
+ *   admin_qa_dates(p_project_id)         → available snapshot dates (newest first)
+ *   admin_qa_units(p_project_id, p_date) → that snapshot's units
+ *
+ * Hardened (2026-06-24 audit): request-sequencing guard against out-of-order responses,
+ * NaN-safe aggregates, "Na vyžiadanie" sentinel shown, CSV escaped + injection-safe,
+ * memoised rows + deferred search for big projects, localized errors, select-all.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
 const green = "#00e5a0";
 const amber = "#f5a623";
@@ -39,9 +42,9 @@ function storedAccessToken() {
   } catch { /* ignore */ }
   return null;
 }
-async function rpcDirect(fn, body, { timeoutMs = 30000 } = {}) {
+async function rpcDirect(fn, body, { timeoutMs = 45000 } = {}) {
   const token = storedAccessToken();
-  if (!token) throw new Error("Couldn't read your session — reload the page and sign in again.");
+  if (!token) throw new Error("NO_SESSION");
   const ctrl = new AbortController();
   const killer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
@@ -50,19 +53,26 @@ async function rpcDirect(fn, body, { timeoutMs = 30000 } = {}) {
       headers: { "Content-Type": "application/json", apikey: SUPA_KEY, Authorization: `Bearer ${token}` },
       body: JSON.stringify(body || {}),
     });
-    if (r.status === 401) throw new Error("session-expired");
-    if (!r.ok) throw new Error(`${r.status} ${(await r.text().catch(() => "")).slice(0, 160)}`);
+    if (r.status === 401) throw new Error("SESSION_EXPIRED");
+    if (!r.ok) {
+      const detail = await r.text().catch(() => "");
+      console.warn(`rpcDirect ${fn}: ${r.status} ${detail.slice(0, 200)}`);
+      throw new Error("RPC_ERROR");
+    }
     return await r.json();
   } finally { clearTimeout(killer); }
 }
 
-const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
-const fmt = (n) => (n == null || n === "" ? "—" : Math.round(Number(n)).toLocaleString("sk-SK"));
-const fmt1 = (n) => (n == null || n === "" ? "—" : Number(n).toFixed(1));
+const norm = (s) => (s == null ? "" : String(s)).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+const fin = (v) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
+const fmt = (n) => { const x = fin(n); return x == null ? "—" : Math.round(x).toLocaleString("sk-SK"); };
+const fmt1 = (n) => { const x = fin(n); return x == null ? "—" : x.toFixed(1); };
 const izbyTxt = (s) => (s == null ? "—" : String(s).replace(/\.0$/, ""));
+const avgFin = (arr, f) => { const v = arr.map((r) => fin(f(r))).filter((n) => n != null); return v.length ? v.reduce((a, n) => a + n, 0) / v.length : null; };
 
 const STAVY = [["all", "Všetky", "All"], ["V", "Voľné", "Available"], ["P", "Predané", "Sold"], ["R", "Rezervované", "Reserved"], ["PR", "Predrezerv.", "Pre-reserved"]];
 const stavColor = (s) => (s === "V" ? green : s === "P" ? dim : s === "R" ? amber : s === "PR" ? blue : textLight);
+const COUNTRIES = { SK: "Slovensko", CZ: "Česko" };
 
 const COLS = [
   ["unit_id", "Byt", "Unit", "t"],
@@ -75,11 +85,37 @@ const COLS = [
   ["orientacia", "Orient.", "Orient.", "t"],
   ["stav", "Stav", "Status", "t"],
 ];
-const COUNTRIES = { SK: "Slovensko", CZ: "Česko" };
+const TD = COLS.map((c) => ({ padding: "8px 11px", textAlign: c[3] === "n" ? "right" : "left", color: textLight, fontSize: 13, whiteSpace: "nowrap" }));
+const TH = COLS.map((c) => ({ padding: "9px 11px", textAlign: c[3] === "n" ? "right" : "left", color: dim, fontFamily: mono, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.3, cursor: "pointer", whiteSpace: "nowrap", userSelect: "none", borderBottom: `1px solid ${border}` }));
 const selStyle = { display: "block", width: "100%", boxSizing: "border-box", marginTop: 5, padding: "9px 12px", background: bg2, border: `1px solid ${border}`, borderRadius: 8, color: textLight, fontSize: 14, outline: "none" };
+
+function cellNode(u, key) {
+  if (key === "stav") return <span style={{ color: stavColor(u.stav), fontWeight: 600 }}>{u.stav}</span>;
+  if (key === "izby") return izbyTxt(u.izby);
+  if (key === "obytna" || key === "celkova") return fmt1(u[key]);
+  if (key === "cena") return u.cena != null ? fmt(u.cena) : (u.cena_text || "—");
+  if (key === "eur_m2") return fmt(u.eur_m2);
+  return u[key] == null ? "—" : u[key];
+}
+const Row = memo(function Row({ u, isChecked, onToggle, lang }) {
+  return (
+    <tr style={{ borderBottom: `1px solid ${border}`, background: isChecked ? "rgba(0,229,160,0.06)" : "transparent" }}>
+      <td style={{ padding: "8px 11px" }}>
+        <input type="checkbox" checked={isChecked} onChange={() => onToggle(u.unit_id)}
+          aria-label={(lang === "sk" ? "Vybrať byt " : "Select unit ") + u.unit_id} />
+      </td>
+      {COLS.map((c, i) => <td key={c[0]} style={TD[i]}>{cellNode(u, c[0])}</td>)}
+    </tr>
+  );
+});
 
 export default function DataQA({ lang = "sk" }) {
   const t = (en, sk) => (lang === "sk" ? sk : en);
+  const mapErr = (code) => ({
+    NO_SESSION: t("Couldn't read your session — reload and sign in again.", "Nedá sa prečítať relácia — obnov stránku a prihlás sa znova."),
+    SESSION_EXPIRED: t("Session expired — reload and sign in again.", "Relácia vypršala — obnov stránku a prihlás sa znova."),
+    RPC_ERROR: t("Couldn't load data — try again.", "Nepodarilo sa načítať dáta — skús znova."),
+  }[code] || code);
 
   const [projects, setProjects] = useState(null);
   const [err, setErr] = useState(null);
@@ -97,31 +133,51 @@ export default function DataQA({ lang = "sk" }) {
 
   const [stav, setStav] = useState("all");
   const [uSearch, setUSearch] = useState("");
+  const dSearch = useDeferredValue(uSearch);
   const [sortCol, setSortCol] = useState("unit_id");
   const [sortDir, setSortDir] = useState(1);
   const [checked, setChecked] = useState({});
   const boxRef = useRef(null);
+  const reqRef = useRef(0);
 
   useEffect(() => {
-    rpcDirect("admin_qa_projects", {}).then(setProjects).catch((e) => setErr(e.message));
+    let alive = true;
+    rpcDirect("admin_qa_projects", {})
+      .then((p) => { if (alive) setProjects(Array.isArray(p) ? p : []); })
+      .catch((e) => { if (alive) setErr(e.message); });
+    return () => { alive = false; };
   }, []);
 
-  function pick(p) {
+  const loadUnits = useCallback((pid, d) => {
+    setUnits(null); setUErr(null); setChecked({});
+    const my = ++reqRef.current;
+    rpcDirect("admin_qa_units", { p_project_id: pid, p_date: d || null })
+      .then((u) => { if (my === reqRef.current) setUnits(Array.isArray(u) ? u : []); })
+      .catch((e) => { if (my === reqRef.current) setUErr(e.message); });
+  }, []);
+
+  const pick = useCallback((p) => {
     setSel(p); setQuery(p.name); setOpen(false);
     setUnits(null); setUErr(null); setChecked({}); setStav("all"); setUSearch("");
-    rpcDirect("admin_qa_dates", { p_project_id: p.id }).then((d) => {
-      setDates(d || []);
-      const first = d && d.length ? d[0].scrape_date : null;
-      setDate(first || "");
-      loadUnits(p.id, first);
-    }).catch((e) => setUErr(e.message));
-  }
-  function loadUnits(pid, d) {
-    setUnits(null); setUErr(null); setChecked({});
-    rpcDirect("admin_qa_units", { p_project_id: pid, p_date: d || null })
-      .then(setUnits).catch((e) => setUErr(e.message));
-  }
-  function changeDate(d) { setDate(d); loadUnits(sel.id, d); }
+    setSortCol("unit_id"); setSortDir(1);
+    const my = ++reqRef.current;
+    rpcDirect("admin_qa_dates", { p_project_id: p.id })
+      .then((d) => {
+        if (my !== reqRef.current) return;
+        const sorted = [...(Array.isArray(d) ? d : [])].sort((a, b) => (a.scrape_date < b.scrape_date ? 1 : -1));
+        setDates(sorted);
+        const first = sorted.length ? sorted[0].scrape_date : "";
+        setDate(first);
+        loadUnits(p.id, first);
+      })
+      .catch((e) => { if (my === reqRef.current) setUErr(e.message); });
+  }, [loadUnits]);
+
+  function changeDate(d) { if (!sel) return; setDate(d); loadUnits(sel.id, d); }
+
+  const onToggle = useCallback((id) => {
+    setChecked((c) => { const n = { ...c }; if (n[id]) delete n[id]; else n[id] = true; return n; });
+  }, []);
 
   useEffect(() => {
     function onDoc(e) { if (boxRef.current && !boxRef.current.contains(e.target)) setOpen(false); }
@@ -150,63 +206,73 @@ export default function DataQA({ lang = "sk" }) {
     );
   }, [projects, query, fCountry, fRegion, fCity]);
 
+  const snap = useMemo(() => {
+    if (!units) return null;
+    const by = (s) => units.filter((u) => u.stav === s).length;
+    const cenas = units.map((u) => fin(u.cena)).filter((n) => n != null);
+    return {
+      total: units.length, v: by("V"), p: by("P"), r: by("R"), pr: by("PR"),
+      avgPsm: avgFin(units, (u) => u.eur_m2),
+      minP: cenas.length ? cenas.reduce((m, n) => Math.min(m, n), Infinity) : null,
+      maxP: cenas.length ? cenas.reduce((m, n) => Math.max(m, n), -Infinity) : null,
+    };
+  }, [units]);
+
   const rows = useMemo(() => {
     if (!units) return [];
     let r = units;
     if (stav !== "all") r = r.filter((u) => u.stav === stav);
-    if (uSearch) { const q = norm(uSearch); r = r.filter((u) => norm(u.unit_id).includes(q)); }
+    const q = norm(dSearch);
+    if (q) r = r.filter((u) => norm(u.unit_id).includes(q));
     const c = sortCol, dir = sortDir;
     const numeric = COLS.find((x) => x[0] === c)?.[3] === "n";
     return [...r].sort((a, b) => {
-      let x = a[c], y = b[c];
-      if (numeric) { x = x == null ? -Infinity : Number(x); y = y == null ? -Infinity : Number(y); }
-      else { x = x || ""; y = y || ""; }
-      return (x < y ? -1 : x > y ? 1 : 0) * dir;
+      if (numeric) {
+        const x = fin(a[c]), y = fin(b[c]);
+        if (x == null && y == null) return 0;
+        if (x == null) return 1; if (y == null) return -1;
+        return (x - y) * dir;
+      }
+      return String(a[c] ?? "").localeCompare(String(b[c] ?? ""), "sk") * dir;
     });
-  }, [units, stav, uSearch, sortCol, sortDir]);
+  }, [units, stav, dSearch, sortCol, sortDir]);
 
-  // Summary cards reflect the SELECTED snapshot (project + date), computed from the
-  // loaded units — NOT the project's current rollup — so they adjust on every date change.
-  const snap = useMemo(() => {
-    if (!units) return null;
-    const by = (s) => units.filter((u) => u.stav === s).length;
-    const priced = units.filter((u) => u.cena != null);
-    const pm = units.filter((u) => u.eur_m2 != null);
-    return {
-      total: units.length, v: by("V"), p: by("P"), r: by("R"), pr: by("PR"),
-      avgPsm: pm.length ? pm.reduce((a, u) => a + Number(u.eur_m2), 0) / pm.length : null,
-      minP: priced.length ? priced.reduce((m, u) => Math.min(m, Number(u.cena)), Infinity) : null,
-      maxP: priced.length ? priced.reduce((m, u) => Math.max(m, Number(u.cena)), -Infinity) : null,
-    };
-  }, [units]);
+  const selRows = rows.filter((r) => checked[r.unit_id]);
+  const aggRows = selRows.length ? selRows : rows;
+  const cenaSum = aggRows.map((r) => fin(r.cena)).filter((n) => n != null);
+  const allChecked = rows.length > 0 && rows.every((r) => checked[r.unit_id]);
+  function toggleAll() {
+    setChecked((c) => { const n = { ...c }; if (allChecked) rows.forEach((r) => delete n[r.unit_id]); else rows.forEach((r) => { n[r.unit_id] = true; }); return n; });
+  }
 
+  function csvCell(v) {
+    let s = v == null ? "" : String(v);
+    if (/^[=+\-@]/.test(s)) s = "'" + s;
+    if (/[";\n\r]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
+    return s;
+  }
   function exportCsv() {
     if (!units) return;
     const head = ["Projekt", "Dátum", ...COLS.map((c) => c[1])];
-    const lines = [head.join(";")];
+    const lines = [head.map(csvCell).join(";")];
     rows.forEach((u) => {
-      const vals = COLS.map((c) => (c[0] === "izby" ? izbyTxt(u.izby) : (u[c[0]] == null ? "" : u[c[0]])));
-      lines.push([sel.name, date, ...vals].join(";"));
+      const vals = COLS.map((c) => c[0] === "izby" ? izbyTxt(u.izby)
+        : c[0] === "cena" ? (u.cena != null ? u.cena : (u.cena_text || ""))
+        : (u[c[0]] == null ? "" : u[c[0]]));
+      lines.push([sel.name, date, ...vals].map(csvCell).join(";"));
     });
-    const blob = new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `${sel.id}_${date || "current"}.csv`;
+    a.download = `${norm(sel.name).replace(/\s+/g, "-") || sel.id}_${date || "current"}.csv`;
     a.click();
     URL.revokeObjectURL(a.href);
   }
-
-  const selRows = rows.filter((r) => checked[r.unit_id]);
-  const aggBase = selRows.length ? selRows : null;
-  const priced = (aggBase || rows).filter((r) => r.cena != null);
-  const avg = (arr, f) => (arr.length ? arr.reduce((s, r) => s + Number(f(r)), 0) / arr.length : null);
 
   const card = { background: bg2, border: `1px solid ${border}`, borderRadius: 10, padding: "12px 14px" };
   const cardLabel = { fontSize: 11, color: dim, fontFamily: mono, textTransform: "uppercase", letterSpacing: 0.4 };
   const cardVal = { fontSize: 22, fontWeight: 600, color: textLight, marginTop: 4 };
   const btn = { padding: "8px 14px", borderRadius: 8, border: `1px solid ${border}`, background: "transparent", color: textLight, cursor: "pointer", fontSize: 13 };
-  const th = (c) => ({ padding: "9px 11px", textAlign: c[3] === "n" ? "right" : "left", color: dim, fontFamily: mono, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.3, cursor: "pointer", whiteSpace: "nowrap", userSelect: "none", borderBottom: `1px solid ${border}` });
-  const td = (c) => ({ padding: "8px 11px", textAlign: c[3] === "n" ? "right" : "left", color: textLight, fontSize: 13, whiteSpace: "nowrap" });
 
   return (
     <div style={{ minHeight: "100vh", background: bg, color: textLight, padding: "1.5rem 1.75rem" }}>
@@ -218,7 +284,7 @@ export default function DataQA({ lang = "sk" }) {
         </p>
       </div>
 
-      {err && <div style={{ ...card, borderColor: amber, color: amber, marginBottom: 14 }}>{err}</div>}
+      {err && <div style={{ ...card, borderColor: amber, color: amber, marginBottom: 14 }}>{mapErr(err)}</div>}
       {!projects && !err && <div style={{ color: dim, fontFamily: mono, fontSize: 13 }}>{t("Loading projects…", "Načítavam projekty…")}</div>}
 
       {projects && (
@@ -250,22 +316,22 @@ export default function DataQA({ lang = "sk" }) {
           )}
           <span style={{ fontSize: 12, color: dim, fontFamily: mono, paddingBottom: 9 }}>{matches.length} {t("projects", "projektov")}</span>
         </div>
+
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 16 }}>
           <div ref={boxRef} style={{ position: "relative", flex: "1 1 280px", minWidth: 240 }}>
-            <label style={cardLabel}>{t("Project", "Projekt")} ({projects.length})</label>
-            <input
-              value={query} onChange={(e) => { setQuery(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)}
+            <label style={cardLabel}>{t("Project", "Projekt")}</label>
+            <input value={query} onChange={(e) => { setQuery(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)}
+              role="combobox" aria-expanded={open} aria-autocomplete="list"
               placeholder={t("type to search…", "píš pre hľadanie…")}
-              style={{ width: "100%", boxSizing: "border-box", marginTop: 5, padding: "9px 12px", background: bg2, border: `1px solid ${border}`, borderRadius: 8, color: textLight, fontSize: 14, outline: "none" }}
-            />
+              style={{ width: "100%", boxSizing: "border-box", marginTop: 5, padding: "9px 12px", background: bg2, border: `1px solid ${border}`, borderRadius: 8, color: textLight, fontSize: 14, outline: "none" }} />
             {open && matches.length > 0 && (
-              <div style={{ position: "absolute", zIndex: 30, top: "100%", left: 0, right: 0, marginTop: 4, maxHeight: 320, overflowY: "auto", background: bg2, border: `1px solid ${border}`, borderRadius: 8 }}>
+              <div role="listbox" style={{ position: "absolute", zIndex: 30, top: "100%", left: 0, right: 0, marginTop: 4, maxHeight: 320, overflowY: "auto", background: bg2, border: `1px solid ${border}`, borderRadius: 8 }}>
                 {matches.map((p) => (
-                  <div key={p.id} onClick={() => pick(p)}
+                  <div key={p.id} role="option" aria-selected={sel?.id === p.id} onClick={() => pick(p)}
                     style={{ padding: "8px 12px", cursor: "pointer", borderBottom: `1px solid ${border}`, display: "flex", justifyContent: "space-between", gap: 10 }}
                     onMouseEnter={(e) => (e.currentTarget.style.background = bg)} onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
                     <span style={{ fontSize: 13 }}>{p.name}</span>
-                    <span style={{ fontSize: 12, color: dim, fontFamily: mono }}>{p.city} · {p.total_units}{t(" units", " bytov")}</span>
+                    <span style={{ fontSize: 12, color: dim, fontFamily: mono }}>{p.city} · {p.total_units ?? 0}{t(" units", " bytov")}</span>
                   </div>
                 ))}
               </div>
@@ -274,9 +340,8 @@ export default function DataQA({ lang = "sk" }) {
 
           <div style={{ minWidth: 170 }}>
             <label style={cardLabel}>{t("Date (snapshot)", "Dátum (snapshot)")}</label>
-            <select value={date} onChange={(e) => changeDate(e.target.value)} disabled={!sel}
-              style={{ display: "block", width: "100%", boxSizing: "border-box", marginTop: 5, padding: "9px 12px", background: bg2, border: `1px solid ${border}`, borderRadius: 8, color: textLight, fontSize: 14, outline: "none" }}>
-              {dates.length === 0 && <option>—</option>}
+            <select value={date} onChange={(e) => changeDate(e.target.value)} disabled={!sel} style={selStyle}>
+              {dates.length === 0 && <option value="">—</option>}
               {dates.map((d, i) => (
                 <option key={d.scrape_date} value={d.scrape_date}>{d.scrape_date}{i === 0 ? t(" (latest)", " (najnovšie)") : ""} · {d.units}</option>
               ))}
@@ -319,7 +384,7 @@ export default function DataQA({ lang = "sk" }) {
             <button onClick={exportCsv} style={{ ...btn, padding: "7px 12px", fontSize: 12 }} title={t("Export shown rows to CSV", "Stiahnuť zobrazené riadky do CSV")}>CSV ↓</button>
           </div>
 
-          {uErr && <div style={{ ...card, borderColor: amber, color: amber }}>{uErr}</div>}
+          {uErr && <div style={{ ...card, borderColor: amber, color: amber }}>{mapErr(uErr)}</div>}
           {!units && !uErr && <div style={{ color: dim, fontFamily: mono, fontSize: 13, padding: "1rem 0" }}>{t("Loading units…", "Načítavam byty…")}</div>}
 
           {units && (
@@ -328,31 +393,20 @@ export default function DataQA({ lang = "sk" }) {
                 <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 720 }}>
                   <thead>
                     <tr style={{ background: bg2 }}>
-                      <th style={{ ...th(["", "", "", "t"]), width: 34 }}></th>
-                      {COLS.map((c) => (
-                        <th key={c[0]} style={th(c)} onClick={() => { if (sortCol === c[0]) setSortDir(-sortDir); else { setSortCol(c[0]); setSortDir(1); } }}>
+                      <th style={{ padding: "9px 11px", width: 34 }}>
+                        <input type="checkbox" checked={allChecked} onChange={toggleAll}
+                          aria-label={t("Select all shown", "Vybrať všetky zobrazené")} title={t("Select all shown", "Vybrať všetky zobrazené")} />
+                      </th>
+                      {COLS.map((c, i) => (
+                        <th key={c[0]} style={TH[i]} aria-sort={sortCol === c[0] ? (sortDir > 0 ? "ascending" : "descending") : "none"}
+                          onClick={() => { if (sortCol === c[0]) setSortDir(-sortDir); else { setSortCol(c[0]); setSortDir(1); } }}>
                           {t(c[2], c[1])}{sortCol === c[0] ? (sortDir > 0 ? " ↑" : " ↓") : ""}
                         </th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {rows.map((u) => (
-                      <tr key={u.unit_id} style={{ borderBottom: `1px solid ${border}`, background: checked[u.unit_id] ? "rgba(0,229,160,0.06)" : "transparent" }}>
-                        <td style={{ padding: "8px 11px" }}>
-                          <input type="checkbox" checked={!!checked[u.unit_id]} onChange={(e) => setChecked((c) => ({ ...c, [u.unit_id]: e.target.checked }))} />
-                        </td>
-                        {COLS.map((c) => {
-                          let v;
-                          if (c[0] === "stav") v = <span style={{ color: stavColor(u.stav), fontWeight: 600 }}>{u.stav}</span>;
-                          else if (c[0] === "izby") v = izbyTxt(u.izby);
-                          else if (c[0] === "obytna" || c[0] === "celkova") v = fmt1(u[c[0]]);
-                          else if (c[0] === "cena" || c[0] === "eur_m2") v = fmt(u[c[0]]);
-                          else v = u[c[0]] == null ? "—" : u[c[0]];
-                          return <td key={c[0]} style={td(c)}>{v}</td>;
-                        })}
-                      </tr>
-                    ))}
+                    {rows.map((u) => <Row key={u.unit_id} u={u} isChecked={!!checked[u.unit_id]} onToggle={onToggle} lang={lang} />)}
                     {rows.length === 0 && <tr><td colSpan={COLS.length + 1} style={{ padding: "1.2rem", color: dim, fontSize: 13, textAlign: "center" }}>{t("No units for this filter.", "Žiadne byty pre tento filter.")}</td></tr>}
                   </tbody>
                 </table>
@@ -360,12 +414,12 @@ export default function DataQA({ lang = "sk" }) {
 
               <div style={{ display: "flex", gap: 18, flexWrap: "wrap", padding: "11px 14px", background: bg2, borderTop: `1px solid ${border}`, fontSize: 13, color: textLight }}>
                 <span style={{ color: dim, fontFamily: mono, fontSize: 12 }}>
-                  {aggBase ? t(`${selRows.length} selected`, `vybrané: ${selRows.length}`) : t(`${rows.length} shown`, `zobrazené: ${rows.length}`)}
+                  {selRows.length ? t(`${selRows.length} selected`, `vybrané: ${selRows.length}`) : t(`${rows.length} shown`, `zobrazené: ${rows.length}`)}
                 </span>
-                <span>{t("Σ price", "Σ cena")}: <b>{priced.length ? fmt(priced.reduce((s, r) => s + Number(r.cena), 0)) + " €" : "—"}</b></span>
-                <span>{t("avg price", "Ø cena")}: <b>{priced.length ? fmt(avg(priced, (r) => r.cena)) + " €" : "—"}</b></span>
-                <span>{t("avg €/m²", "Ø €/m²")}: <b>{(() => { const a = (aggBase || rows).filter((r) => r.eur_m2 != null); return a.length ? fmt(avg(a, (r) => r.eur_m2)) : "—"; })()}</b></span>
-                <span>{t("avg area", "Ø plocha")}: <b>{(() => { const a = (aggBase || rows).filter((r) => r.obytna != null); return a.length ? fmt1(avg(a, (r) => r.obytna)) + " m²" : "—"; })()}</b></span>
+                <span>{t("Σ price", "Σ cena")}: <b>{cenaSum.length ? fmt(cenaSum.reduce((s, n) => s + n, 0)) + " €" : "—"}</b></span>
+                <span>{t("avg price", "Ø cena")}: <b>{cenaSum.length ? fmt(avgFin(aggRows, (r) => r.cena)) + " €" : "—"}</b></span>
+                <span>{t("avg €/m²", "Ø €/m²")}: <b>{fmt(avgFin(aggRows, (r) => r.eur_m2))}</b></span>
+                <span>{t("avg area", "Ø plocha")}: <b>{fmt1(avgFin(aggRows, (r) => r.obytna))}{avgFin(aggRows, (r) => r.obytna) != null ? " m²" : ""}</b></span>
               </div>
             </div>
           )}
