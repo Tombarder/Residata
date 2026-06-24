@@ -26,7 +26,7 @@ import { useCountry } from "../lib/useCountry";
 import { supabasePublic, isSupabaseReady } from "../lib/supabase";
 import {
   LENSES, COMPLETION, NO_DATA, ppm2Of, metricValue, completionBucket,
-  tertiles, colorFor, coverage, circlePolygon, computeCompetitiveSet, legendForLens,
+  tertiles, colorFor, coverage, circlePolygon, computeCompetitiveSet, legendForLens, valueRange, heatWeight,
 } from "../lib/mapMetrics";
 import MapFilterBuilder from "../components/MapFilterBuilder";
 import { applyFilters, describe, isComplete } from "../lib/mapFilters";
@@ -52,7 +52,7 @@ const fmt = (n) => Number(Math.round(n)).toLocaleString("sk-SK");
 const fmtK = (n) => (n >= 10000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1) + "k" : fmt(n));
 const pct = (x) => `${Math.round(x * 100)}%`;
 
-function projectProps(p, c, lens, thresholds) {
+function projectProps(p, c, lens, thresholds, heatRange) {
   return {
     id: p.id,
     name: p.name || p.id,
@@ -63,29 +63,44 @@ function projectProps(p, c, lens, thresholds) {
     available: Number(p.available_units) || 0,
     total: Number(p.total_units) || 0,
     soldPct: p.sold_percentage == null ? null : Math.round(Number(p.sold_percentage)),
+    soldLM: Number(p.sold_last_month) || 0,
     units: Number(p.total_units) || Number(p.available_units) || 0,
     completion: completionBucket(p),
     verified: !!(c && c.verified),
     color: colorFor(p, lens, thresholds),
+    w: heatWeight(p, lens, heatRange),
     lng: c.lng, lat: c.lat,
   };
 }
 
-function buildFeatures(projects, coords, lens, thresholds, verifiedOnly) {
+function buildFeatures(projects, coords, lens, thresholds, verifiedOnly, heatRange) {
   const feats = [];
   for (const p of projects) {
     const c = coords[p.id];
     if (!c) continue;
     if (verifiedOnly && !c.verified) continue;
-    feats.push({ type: "Feature", geometry: { type: "Point", coordinates: [c.lng, c.lat] }, properties: projectProps(p, c, lens, thresholds) });
+    feats.push({ type: "Feature", geometry: { type: "Point", coordinates: [c.lng, c.lat] }, properties: projectProps(p, c, lens, thresholds, heatRange) });
   }
   return { type: "FeatureCollection", features: feats };
+}
+
+// Apply the heat/dots view mode to an already-loaded map. Shared by the toggle
+// effect and the load handler, so toggling Heat during the load window still takes
+// effect. The "off" paint is identical to the points layer's original definition.
+function applyHeatMode(map, on) {
+  if (!map.getLayer("heat")) return;
+  map.setLayoutProperty("heat", "visibility", on ? "visible" : "none");
+  map.setPaintProperty("points", "circle-opacity", on ? ["case", ["get", "verified"], 0.32, 0.16] : ["case", ["get", "verified"], 0.92, 0.4]);
+  map.setPaintProperty("points", "circle-radius", on
+    ? ["interpolate", ["linear"], ["get", "units"], 0, 3, 200, 6, 500, 9]
+    : ["interpolate", ["linear"], ["get", "units"], 0, 5, 30, 7, 80, 11, 200, 16, 500, 22]);
 }
 
 function hoverLabel(props, lens) {
   if (lens === "price")      return props.ppm2 > 0 ? `€${fmt(props.ppm2)}/m²` : "no price";
   if (lens === "supply")     return `${props.available} available`;
   if (lens === "absorption") return props.soldPct == null ? "absorption —" : `${props.soldPct}% sold`;
+  if (lens === "momentum")   return props.soldLM > 0 ? `${props.soldLM} sold last mo.` : "no recent sales";
   return COMPLETION[props.completion].label;
 }
 
@@ -123,6 +138,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const readyRef = useRef(false);
+  const heatModeRef = useRef(false);
   const featuresRef = useRef({ type: "FeatureCollection", features: [] });
   const setCurrentRef = useRef(setCurrent);
   const countryRef = useRef(country);
@@ -141,6 +157,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
   const [radiusKm, setRadiusKm] = useState(1.5);
   const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [showSoldOut, setShowSoldOut] = useState(true); // sold out = no units available
+  const [heatMode, setHeatMode] = useState(false); // dots vs heatmap of the active lens
   const [anchorId, setAnchorId] = useState(null); // project an "◎ Area" was opened from → benchmark vs its set
   const [viewBounds, setViewBounds] = useState(null); // current map viewport → the overview reflects only what's on screen
 
@@ -185,8 +202,9 @@ export default function MapView2({ lang = "en", setCurrent }) {
   }, [shown, coords, viewBounds]);
 
   const thresholds = useMemo(() => (lens === "completion" ? null : tertiles(shown.map((p) => metricValue(p, lens)))), [shown, lens]);
+  const heatRange = useMemo(() => valueRange(shown, lens), [shown, lens]);
   const lensCoverage = useMemo(() => coverage(inView, lens), [inView, lens]);
-  const fc = useMemo(() => buildFeatures(shown, coords || {}, lens, thresholds, verifiedOnly), [shown, coords, lens, thresholds, verifiedOnly]);
+  const fc = useMemo(() => buildFeatures(shown, coords || {}, lens, thresholds, verifiedOnly, heatRange), [shown, coords, lens, thresholds, verifiedOnly, heatRange]);
   useEffect(() => { featuresRef.current = fc; }, [fc]);
 
   // Market overview for the projects in view — drives the adaptive header.
@@ -208,10 +226,12 @@ export default function MapView2({ lang = "en", setCurrent }) {
     }
     const comp = { ready: 0, soon: 0, mid: 0, far: 0, unknown: 0 };
     inView.forEach((p) => { comp[completionBucket(p)]++; });
+    const soldLM = sum((p) => p.sold_last_month);
+    const moving = inView.filter((p) => (Number(p.sold_last_month) || 0) > 0).length;
     return {
       count: inView.length, med, pMin: priced[0] ?? null, pMax: priced[priced.length - 1] ?? null,
       hLo, hHi, hist, units: sum((p) => p.total_units), available, reserved, sold, invTotal,
-      soldPct: invTotal ? Math.round((sold / invTotal) * 100) : null, comp,
+      soldPct: invTotal ? Math.round((sold / invTotal) * 100) : null, soldLM, moving, comp,
     };
   }, [inView]);
 
@@ -246,6 +266,19 @@ export default function MapView2({ lang = "en", setCurrent }) {
       map.addLayer({ id: "radius-line", type: "line", source: "radius", paint: { "line-color": green, "line-width": 1.5, "line-dasharray": [2, 2] } });
 
       map.addSource("projects", { type: "geojson", data: featuresRef.current });
+      // Heatmap of the active lens (hidden until "Heat" is toggled). Weight = how
+      // "hot" each project is on the active metric (heatWeight, 0..1).
+      map.addLayer({
+        id: "heat", type: "heatmap", source: "projects", layout: { visibility: "none" },
+        paint: {
+          "heatmap-weight": ["get", "w"],
+          "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 6, 1, 13, 3],
+          "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 6, 16, 11, 32, 14, 52],
+          "heatmap-opacity": ["interpolate", ["linear"], ["zoom"], 11, 0.9, 14, 0.5],
+          "heatmap-color": ["interpolate", ["linear"], ["heatmap-density"],
+            0, "rgba(0,0,0,0)", 0.15, "rgba(40,110,89,0.45)", 0.35, "#3aa0ff", 0.6, "#f5a623", 0.82, "#ff7a3d", 1, "#ff3d3d"],
+        },
+      });
       map.addLayer({
         id: "points", type: "circle", source: "projects",
         paint: {
@@ -259,6 +292,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
       });
 
       readyRef.current = true;
+      if (heatModeRef.current) applyHeatMode(map, true);
       if (hadSaved) fitKeyRef.current = countryRef.current;
       else if (featuresRef.current.features.length) { fitToData(map, featuresRef.current, false); fitKeyRef.current = countryRef.current; }
 
@@ -304,6 +338,14 @@ export default function MapView2({ lang = "en", setCurrent }) {
     if (fc.features.length && fitKeyRef.current !== country) { fitToData(map, fc, fitKeyRef.current !== null); fitKeyRef.current = country; }
   }, [fc, country]);
 
+  // ── Heat vs dots ── show the heatmap and fade the dots (still clickable) ──
+  useEffect(() => {
+    heatModeRef.current = heatMode;
+    const map = mapRef.current;
+    if (!map || !readyRef.current || !map.getLayer("heat")) return;
+    applyHeatMode(map, heatMode);
+  }, [heatMode]);
+
   // Radius ring + draggable analysis marker.
   useEffect(() => {
     const map = mapRef.current;
@@ -345,6 +387,9 @@ export default function MapView2({ lang = "en", setCurrent }) {
           <div style={{ display: "inline-flex", gap: 3, background: bg2, border: `1px solid ${border}`, borderRadius: 999, padding: 3 }}>
             {LENSES.map((l) => <button key={l.key} onClick={() => setLens(l.key)} style={tabStyle(lens === l.key)} title={l.desc}>{l.label}</button>)}
           </div>
+          <button onClick={() => setHeatMode((v) => !v)} style={chipStyle(heatMode)} title={sk ? "Tepelná mapa aktívnej metriky" : "Heatmap of the active metric"}>
+            {heatMode ? "◉" : "○"} {sk ? "Teplo" : "Heat"}
+          </button>
           <span style={{ marginLeft: "auto", fontSize: "0.7rem", color: dim, fontFamily: mono }}>
             <strong style={{ color: textLight }}>{marketStats.count}</strong> {sk ? "v zábere" : "in view"}
             {marketStats.count === 0 && shown.length > 0
@@ -432,6 +477,15 @@ export default function MapView2({ lang = "en", setCurrent }) {
                 <Stat label={sk ? "Vypredanosť" : "Absorbed"} value={compSet && compSet.avgAbs != null ? compSet.avgAbs + "%" : "—"} />
                 <Stat label={sk ? "Byty" : "Units"} value={compSet ? fmtK(compSet.totalUnits) : 0} sub={compSet ? `${fmtK(compSet.availUnits)} ${sk ? "voľných" : "free"}` : ""} />
               </div>
+
+              {compSet && compSet.median && compSet.priceHi > compSet.priceLo && (
+                <PricingBand cs={compSet} anchorPpm2={anchor ? ppm2Of(anchor) : 0} sk={sk} />
+              )}
+              {compSet && compSet.soldLastMonth > 0 && (
+                <div style={{ fontSize: "0.66rem", color: dim, marginBottom: 12 }}>
+                  ▴ <span style={{ color: green, fontFamily: mono }}>{compSet.soldLastMonth}</span> {sk ? "bytov predaných v tomto okruhu za posledný mesiac" : "units sold in this area last month"}
+                </div>
+              )}
 
               {compSet && compSet.placeholderCount > 0 && (
                 <div style={{ fontSize: "0.66rem", color: amber, background: `${amber}12`, border: `1px solid ${amber}33`, borderRadius: 6, padding: "5px 8px", marginBottom: 12 }}>
@@ -528,6 +582,41 @@ function tabStyle(active) {
 const dot = (c) => ({ width: 8, height: 8, borderRadius: "50%", background: c, display: "inline-block", marginRight: 5 });
 
 // Adaptive market overview — the headline metric + a visual that fits the lens.
+// Pricing-positioning band for the analysed area: full €/m² range with the
+// middle-50% (P25–P75) highlighted, the median marked, and — when an anchor
+// project is set — a caret showing exactly where it would sit in the market.
+function PricingBand({ cs, anchorPpm2, sk }) {
+  const { priceLo, priceHi, p25, p75, median } = cs;
+  if (!median || !(priceHi > priceLo)) return null;
+  const span = priceHi - priceLo;
+  const pos = (v) => Math.max(0, Math.min(100, ((v - priceLo) / span) * 100));
+  const aPos = anchorPpm2 > 0 ? pos(anchorPpm2) : null;
+  const aQuart = anchorPpm2 > 0 && p25 != null && p75 != null
+    ? (anchorPpm2 < p25 ? (sk ? "spodný kvartil — lacnejší než okolie" : "bottom quartile — cheaper than the area")
+      : anchorPpm2 > p75 ? (sk ? "horný kvartil — drahší než okolie" : "top quartile — pricier than the area")
+      : (sk ? "stredné pásmo trhu" : "right in the market mid-band"))
+    : null;
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
+        <span style={{ fontSize: "0.6rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase" }}>{sk ? "Cenové pásmo €/m²" : "Pricing band €/m²"}</span>
+        <span style={{ fontSize: "0.62rem", color: dim, fontFamily: mono }}>{sk ? "stred 50 %" : "middle 50%"} €{fmt(p25)}–€{fmt(p75)}</span>
+      </div>
+      <div style={{ position: "relative", height: 12, marginBottom: 6 }}>
+        <div style={{ position: "absolute", left: 0, right: 0, top: 5, height: 2, background: "#26262d", borderRadius: 2 }} />
+        <div style={{ position: "absolute", left: `${pos(p25)}%`, width: `${Math.max(1, pos(p75) - pos(p25))}%`, top: 2, height: 8, background: `${green}30`, border: `1px solid ${green}66`, borderRadius: 4 }} />
+        <div style={{ position: "absolute", left: `${pos(median)}%`, top: 0, width: 2, height: 12, background: green, transform: "translateX(-1px)" }} title={`med €${fmt(median)}`} />
+        {aPos != null ? <div style={{ position: "absolute", left: `${aPos}%`, top: -4, transform: "translateX(-5px)", width: 0, height: 0, borderLeft: "5px solid transparent", borderRight: "5px solid transparent", borderTop: `7px solid ${textLight}` }} title={`${sk ? "tento projekt" : "this project"} €${fmt(anchorPpm2)}`} /> : null}
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.6rem", color: dim, fontFamily: mono }}>
+        <span>€{fmt(priceLo)}</span>
+        <span style={{ color: green }}>med €{fmt(median)}</span>
+        <span>€{fmt(priceHi)}</span>
+      </div>
+      {aQuart ? <div style={{ fontSize: "0.64rem", color: dim, marginTop: 7 }}>{sk ? "Tento projekt " : "This project "}<span style={{ color: textLight, fontFamily: mono }}>€{fmt(anchorPpm2)}/m²</span> · {aQuart}</div> : null}
+    </div>
+  );
+}
 function MarketInsight({ lens, stats, sk }) {
   const s = stats;
   let headline, visual;
@@ -541,6 +630,9 @@ function MarketInsight({ lens, stats, sk }) {
   } else if (lens === "supply") {
     headline = <Headline big={fmtK(s.available)} sub={`${sk ? "voľných · z" : "units available · of"} ${fmtK(s.invTotal)}`} />;
     visual = <InventoryBar avail={s.available} res={s.reserved} sold={s.sold} sk={sk} />;
+  } else if (lens === "momentum") {
+    headline = <Headline big={fmtK(s.soldLM)} sub={`${sk ? "predaných za mesiac · " : "sold last month · "}${s.moving}/${s.count} ${sk ? "v pohybe" : "moving"}`} />;
+    visual = <MovingBar moving={s.moving} count={s.count} soldLM={s.soldLM} sk={sk} />;
   } else {
     headline = <Headline big={s.soldPct != null ? `${s.soldPct}%` : "—"} sub={`${sk ? "predané · " : "sold · "}${fmtK(s.sold)} ${sk ? "z" : "of"} ${fmtK(s.invTotal)}`} />;
     visual = <InventoryBar avail={s.available} res={s.reserved} sold={s.sold} sk={sk} />;
@@ -582,6 +674,23 @@ function InventoryBar({ avail, res, sold, sk }) {
         <span><span style={dot(green)} />{fmtK(avail)} {sk ? "voľné" : "available"}</span>
         <span><span style={dot(amber)} />{fmtK(res)} {sk ? "rezerv." : "reserved"}</span>
         <span><span style={dot(greyPt)} />{fmtK(sold)} {sk ? "predané" : "sold"}</span>
+      </div>
+    </div>
+  );
+}
+function MovingBar({ moving, count, soldLM, sk }) {
+  const t = Math.max(1, count);
+  const staticN = Math.max(0, count - moving);
+  return (
+    <div style={{ flex: 1, minWidth: 200 }}>
+      <div style={{ display: "flex", height: 18, borderRadius: 5, overflow: "hidden", background: "#17171c", border: `1px solid ${border}` }}>
+        {moving > 0 ? <div title={String(moving)} style={{ width: `${(moving / t) * 100}%`, background: green, height: "100%" }} /> : null}
+        {staticN > 0 ? <div title={String(staticN)} style={{ width: `${(staticN / t) * 100}%`, background: greyPt, height: "100%" }} /> : null}
+      </div>
+      <div style={{ display: "flex", gap: 14, fontSize: "0.62rem", color: dim, marginTop: 5, flexWrap: "wrap" }}>
+        <span><span style={dot(green)} />{moving} {sk ? "v pohybe" : "selling"}</span>
+        <span><span style={dot(greyPt)} />{staticN} {sk ? "bez predaja" : "no sales"}</span>
+        {soldLM > 0 ? <span style={{ fontFamily: mono, color: green }}>{soldLM} {sk ? "ks/mes." : "units/mo"}</span> : null}
       </div>
     </div>
   );
