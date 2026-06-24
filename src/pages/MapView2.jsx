@@ -140,6 +140,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
   const [analysisCenter, setAnalysisCenter] = useState(null);
   const [radiusKm, setRadiusKm] = useState(1.5);
   const [verifiedOnly, setVerifiedOnly] = useState(false);
+  const [showSoldOut, setShowSoldOut] = useState(true); // sold out = no units available
   const [anchorId, setAnchorId] = useState(null); // project an "◎ Area" was opened from → benchmark vs its set
   const [viewBounds, setViewBounds] = useState(null); // current map viewport → the overview reflects only what's on screen
 
@@ -162,11 +163,15 @@ export default function MapView2({ lang = "en", setCurrent }) {
     return () => { cancelled = true; };
   }, []);
 
-  const shown = useMemo(() => {
+  // Base set = name search + the filter builder. The sold-out toggle then trims
+  // it; we keep the base so we can show how many sold-out it would hide.
+  const baseSet = useMemo(() => {
     const q = norm(nameQuery);
     const named = q ? (projects || []).filter((p) => norm(p.name).includes(q)) : (projects || []);
     return applyFilters(named, conditions);
   }, [projects, nameQuery, conditions]);
+  const soldOutCount = useMemo(() => baseSet.filter((p) => (Number(p.available_units) || 0) === 0).length, [baseSet]);
+  const shown = useMemo(() => (showSoldOut ? baseSet : baseSet.filter((p) => (Number(p.available_units) || 0) > 0)), [baseSet, showSoldOut]);
   const activeConds = useMemo(() => conditions.filter(isComplete), [conditions]);
 
   // Projects currently on screen = filters ∩ the map viewport. The overview reads
@@ -364,6 +369,12 @@ export default function MapView2({ lang = "en", setCurrent }) {
         ))}
         <button onClick={() => setVerifiedOnly((v) => !v)} style={chipStyle(verifiedOnly)} title={sk ? "Len presné polohy" : "Only precise locations"}>
           ◉ {sk ? "presné polohy" : "precise only"}
+        </button>
+        <button onClick={() => setShowSoldOut((v) => !v)} title={sk ? "Zobraziť / skryť vypredané projekty (bez voľných bytov)" : "Show / hide sold-out projects (no units available)"}
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 11px", borderRadius: 999, fontSize: "0.74rem", cursor: "pointer", border: `1px solid ${showSoldOut ? border : `${amber}55`}`, background: showSoldOut ? "transparent" : `${amber}14`, color: showSoldOut ? textLight : amber }}>
+          <EyeIcon off={!showSoldOut} />
+          <span style={{ textDecoration: showSoldOut ? "none" : "line-through" }}>{sk ? "Vypredané" : "Sold out"}</span>
+          {soldOutCount > 0 && <span style={{ opacity: 0.7, fontFamily: mono, fontSize: "0.66rem" }}>· {soldOutCount}</span>}
         </button>
         <div style={{ display: "inline-flex", alignItems: "center", gap: 9, marginLeft: "auto", fontSize: "0.66rem", color: dim, flexWrap: "wrap" }}>
           {legend.map((it) => <span key={it.label} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><span style={{ width: 9, height: 9, borderRadius: "50%", background: it.color, display: "inline-block" }} />{it.label}</span>)}
@@ -591,6 +602,24 @@ function Pipeline({ comp }) {
 }
 function escapeHtml(s) {
   return String(s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function EyeIcon({ off }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }} aria-hidden="true">
+      {off ? (
+        <>
+          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+          <line x1="1" y1="1" x2="23" y2="23" />
+        </>
+      ) : (
+        <>
+          <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" />
+          <circle cx="12" cy="12" r="3" />
+        </>
+      )}
+    </svg>
+  );
 }
 
 // Download the competitive set as CSV (developers want it in their own model).
