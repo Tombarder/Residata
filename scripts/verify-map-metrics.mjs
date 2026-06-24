@@ -6,6 +6,7 @@
 import {
   completionBucket, tertiles, colorFor, coverage, distanceKm,
   computeCompetitiveSet, legendForLens, metricValue, NO_DATA, RAMP, COMPLETION,
+  valueRange, heatWeight,
 } from "../src/lib/mapMetrics.js";
 
 let fail = 0;
@@ -92,6 +93,26 @@ console.log("\nlegendForLens");
 ok("price legend has 4 rows incl. no-data", legendForLens("price", [3500, 5000]).length === 4);
 ok("completion legend has 5 rows", legendForLens("completion", null).length === 5);
 ok("metricValue supply = available_units", metricValue({ available_units: 12 }, "supply") === 12);
+
+// ── momentum lens + heatmap weight + percentiles (the "whoa" additions) ──
+console.log("\nmomentum / heatmap / percentiles");
+eq("momentum: 5 sold → 5", metricValue({ sold_last_month: 5 }, "momentum"), 5);
+eq("momentum: 0 sold → null (grey, not a cool dot)", metricValue({ sold_last_month: 0 }, "momentum"), null);
+const vr = valueRange([{ avg_price_eur_m2: 3000 }, { avg_price_eur_m2: 7000 }, {}], "price");
+eq("valueRange price → {min:3000,max:7000}", vr, { min: 3000, max: 7000 });
+ok("heatWeight: max price → ~1", Math.abs(heatWeight({ avg_price_eur_m2: 7000 }, "price", vr) - 1) < 1e-9);
+ok("heatWeight: min price → small floor (>0)", heatWeight({ avg_price_eur_m2: 3000 }, "price", vr) > 0 && heatWeight({ avg_price_eur_m2: 3000 }, "price", vr) <= 0.05);
+ok("heatWeight: no value → 0", heatWeight({ avg_price_eur_m2: 0 }, "price", vr) === 0);
+ok("heatWeight: completion ready → 1", heatWeight({ kolaudacia: "Skolaudované" }, "completion") === 1);
+{
+  const center2 = { lat: 48.15, lng: 17.11 };
+  const near2 = { lat: 48.151, lng: 17.111 };
+  const ps = [2000, 4000, 6000, 8000].map((pr, i) => ({ id: "p" + i, avg_price_eur_m2: pr, sold_last_month: i, total_units: 10, available_units: 5 }));
+  const cs2 = computeCompetitiveSet(ps, Object.fromEntries(ps.map((p) => [p.id, { ...near2, verified: true }])), center2, 2);
+  eq("p25 of [2000,4000,6000,8000] = 2000", cs2.p25, 2000);
+  eq("p75 of [2000,4000,6000,8000] = 6000", cs2.p75, 6000);
+  eq("soldLastMonth sum 0+1+2+3 = 6", cs2.soldLastMonth, 6);
+}
 
 console.log(`\n${fail === 0 ? "\x1b[32mALL CHECKS PASSED\x1b[0m" : `\x1b[31m${fail} CHECK(S) FAILED\x1b[0m`}\n`);
 process.exit(fail === 0 ? 0 : 1);

@@ -19,6 +19,7 @@ export const LENSES = [
   { key: "price",      label: "Price €/m²",  unit: "€/m²", desc: "Average asking price per m² — where the market runs rich vs soft." },
   { key: "supply",     label: "Supply",      unit: "u",    desc: "Units still available — where competing inventory is concentrated." },
   { key: "absorption", label: "Absorption",  unit: "%",    desc: "Share already sold/reserved — what's clearing fast vs sitting." },
+  { key: "momentum",   label: "Sold / mo",   unit: "u",    desc: "Units sold in the last month — where demand is actually moving." },
   { key: "completion", label: "Completion",  unit: "",     desc: "When competing supply hands over (sparse data — many unknown)." },
 ];
 
@@ -41,7 +42,26 @@ export function metricValue(p, lens) {
   if (lens === "price")      { const v = ppm2Of(p); return v > 0 ? v : null; }
   if (lens === "supply")     { return Number(p.available_units) || 0; }
   if (lens === "absorption") { return p.sold_percentage == null ? null : Number(p.sold_percentage); }
+  if (lens === "momentum")   { const v = Number(p.sold_last_month) || 0; return v > 0 ? v : null; }
   return null; // completion is categorical, not a scalar
+}
+
+/** Min/max of the lens metric across projects (for normalising heatmap weight). */
+export function valueRange(projects, lens) {
+  let min = Infinity, max = -Infinity;
+  for (const p of projects) { const v = metricValue(p, lens); if (v != null && Number.isFinite(v)) { if (v < min) min = v; if (v > max) max = v; } }
+  return Number.isFinite(min) ? { min, max } : null;
+}
+
+const COMPLETION_HEAT = { ready: 1, soon: 0.7, mid: 0.4, far: 0.2, unknown: 0 };
+
+/** 0..1 weight for the heatmap: how "hot" a project is on the active lens. */
+export function heatWeight(p, lens, range) {
+  if (lens === "completion") return COMPLETION_HEAT[completionBucket(p)] ?? 0;
+  const v = metricValue(p, lens);
+  if (v == null) return 0;
+  if (!range || range.max <= range.min) return 0.5;
+  return Math.max(0.04, Math.min(1, (v - range.min) / (range.max - range.min)));
 }
 
 /** Bucket a free-text kolaudácia value into a completion category. */
@@ -125,6 +145,8 @@ export function computeCompetitiveSet(projects, coords, center, radiusKm, verifi
   });
   const placeholderCount = inside.filter((p) => coords[p.id] && !coords[p.id].verified).length;
   const priced = inside.map(ppm2Of).filter((v) => v > 0).sort((a, b) => a - b);
+  const pAt = (q) => (priced.length ? priced[Math.min(priced.length - 1, Math.floor(q * (priced.length - 1)))] : null);
+  const soldLastMonth = inside.reduce((s, p) => s + (Number(p.sold_last_month) || 0), 0);
   const totalUnits = inside.reduce((s, p) => s + (Number(p.total_units) || 0), 0);
   const availUnits = inside.reduce((s, p) => s + (Number(p.available_units) || 0), 0);
   const absVals = inside.map((p) => p.sold_percentage).filter((v) => v != null).map(Number);
@@ -142,9 +164,10 @@ export function computeCompetitiveSet(projects, coords, center, radiusKm, verifi
   return {
     inside, placeholderCount,
     median: median(priced),
+    p25: pAt(0.25), p75: pAt(0.75),
     priceLo: priced.length ? priced[0] : null,
     priceHi: priced.length ? priced[priced.length - 1] : null,
-    totalUnits, availUnits, avgAbs, comp, topDevs,
+    totalUnits, availUnits, avgAbs, soldLastMonth, comp, topDevs,
   };
 }
 
