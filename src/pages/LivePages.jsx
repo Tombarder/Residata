@@ -3991,12 +3991,28 @@ function ActivityPanel({ activity, users }) {
 
    Reads via the regular supabase client + RLS; admin policy on
    ai_chat_log allows SELECT for admins. No new endpoint needed. */
+
+// Per-answer cost in USD, computed client-side from the logged tokens + model
+// (same list price as the DB cost views: Sonnet $3/$15, Haiku $1/$5; cache-read
+// 0.10x input, cache-write 1.25x input). User/error rows cost 0.
+const AI_PRICE = { "claude-sonnet-4-6": [3, 15], "claude-haiku-4-5": [1, 5] };
+function turnCostUsd(t) {
+  if (!t || t.role !== "assistant") return 0;
+  const [inP, outP] = AI_PRICE[t.model] || [1, 5];
+  return (t.input_tokens || 0) / 1e6 * inP
+       + (t.output_tokens || 0) / 1e6 * outP
+       + (t.cache_read_input_tokens || 0) / 1e6 * inP * 0.1
+       + (t.cache_creation_input_tokens || 0) / 1e6 * inP * 1.25;
+}
+function fmtUsd(c) { return c ? "$" + (c >= 0.1 ? c.toFixed(2) : c.toFixed(4)) : "$0"; }
+
 function AiChatLogsPanel({ users, lang }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
   const [filter, setFilter] = useState("all");  // all | bad | errors | recent
   const [expanded, setExpanded] = useState(null);
+  const [userFilter, setUserFilter] = useState("all");  // "all" | a user_id
 
   // Pull last 30 days' worth of log rows. Cap at 2000 to keep the
   // initial render snappy; filter chips narrow further client-side.
@@ -4005,7 +4021,7 @@ function AiChatLogsPanel({ users, lang }) {
     let cancelled = false;
     const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
     supabase.from("ai_chat_log")
-      .select("id, session_id, user_id, tier, turn_index, role, content, content_length, sent_at, response_time_ms, user_typing_ms, model, input_tokens, output_tokens, lang, page_url, error_kind, error_message, http_status, feedback, feedback_note, feedback_at")
+      .select("id, session_id, user_id, tier, turn_index, role, content, content_length, sent_at, response_time_ms, user_typing_ms, model, input_tokens, output_tokens, cache_read_input_tokens, cache_creation_input_tokens, lang, page_url, error_kind, error_message, http_status, feedback, feedback_note, feedback_at")
       .gte("sent_at", since)
       .order("sent_at", { ascending: false })
       .limit(2000)
@@ -4040,7 +4056,8 @@ function AiChatLogsPanel({ users, lang }) {
       .sort((a, b) => a - b);
     const p50 = responseTimes.length > 0 ? responseTimes[Math.floor(responseTimes.length * 0.5)] : null;
     const p95 = responseTimes.length > 0 ? responseTimes[Math.floor(responseTimes.length * 0.95)] : null;
-    return { sessions, userTurns, assistantTurns, errors, goods, bads, p50, p95 };
+    const cost = recent.reduce((a, r) => a + turnCostUsd(r), 0);
+    return { sessions, userTurns, assistantTurns, errors, goods, bads, p50, p95, cost };
   }, [rows]);
 
   // Group rows into sessions (for the sessions view).
@@ -4058,11 +4075,12 @@ function AiChatLogsPanel({ users, lang }) {
           last_at: r.sent_at,
           has_error: false,
           has_bad_feedback: false,
-          good_count: 0, bad_count: 0,
+          good_count: 0, bad_count: 0, cost: 0,
         };
         bySession.set(r.session_id, s);
       }
       s.turns.push(r);
+      s.cost += turnCostUsd(r);
       if (r.sent_at < s.first_at) s.first_at = r.sent_at;
       if (r.sent_at > s.last_at)  s.last_at  = r.sent_at;
       if (r.role === "error") s.has_error = true;
@@ -4076,12 +4094,25 @@ function AiChatLogsPanel({ users, lang }) {
     return Array.from(bySession.values()).sort((a, b) => b.last_at.localeCompare(a.last_at));
   }, [rows]);
 
+  // Distinct users who actually have sessions — powers the "pick a user" dropdown.
+  const sessionUsers = useMemo(() => {
+    const seen = new Map();
+    for (const s of sessions) {
+      if (s.user_id && !seen.has(s.user_id)) {
+        seen.set(s.user_id, usersById[s.user_id]?.email || (s.user_id.slice(0, 8) + "…"));
+      }
+    }
+    return Array.from(seen.entries()).sort((a, b) => String(a[1]).localeCompare(String(b[1])));
+  }, [sessions, usersById]);
+
   const filteredSessions = useMemo(() => {
-    if (filter === "bad")     return sessions.filter(s => s.has_bad_feedback);
-    if (filter === "errors")  return sessions.filter(s => s.has_error);
-    if (filter === "recent")  return sessions.slice(0, 25);
-    return sessions;
-  }, [sessions, filter]);
+    let base = sessions;
+    if (userFilter !== "all")     base = base.filter(s => s.user_id === userFilter);
+    if (filter === "bad")         base = base.filter(s => s.has_bad_feedback);
+    else if (filter === "errors") base = base.filter(s => s.has_error);
+    else if (filter === "recent") base = base.slice(0, 25);
+    return base;
+  }, [sessions, filter, userFilter]);
 
   if (loading) {
     return <div style={{ color: dim, padding: "1rem", fontFamily: mono, fontSize: "0.82rem" }}>{lang === "sk" ? "Načítavam logy…" : "Loading logs…"}</div>;
@@ -4110,6 +4141,7 @@ function AiChatLogsPanel({ users, lang }) {
           { label: lang === "sk" ? "👎"             : "👎",            value: stats.bads,  color: stats.bads > 0 ? red : text },
           { label: "p50 ms", value: stats.p50 != null ? Math.round(stats.p50) : "—" },
           { label: "p95 ms", value: stats.p95 != null ? Math.round(stats.p95) : "—" },
+          { label: lang === "sk" ? "Cena (7d)" : "Cost (7d)", value: fmtUsd(stats.cost), color: green },
         ].map((k, i) => (
           <div key={i} style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 6, padding: "0.55rem 0.75rem" }}>
             <div style={{ fontSize: "0.65rem", color: dim, marginBottom: "0.18rem", letterSpacing: "0.04em" }}>{k.label}</div>
@@ -4136,6 +4168,17 @@ function AiChatLogsPanel({ users, lang }) {
               fontSize: "0.72rem", cursor: "pointer", fontFamily: "inherit",
             }}>{f.label}</button>
         ))}
+        <select value={userFilter} onChange={e => setUserFilter(e.target.value)}
+          title={lang === "sk" ? "Vyber užívateľa" : "Pick a user"}
+          style={{
+            background: "#0e0e10", color: userFilter === "all" ? dim : green,
+            border: `1px solid ${userFilter === "all" ? border : green}`,
+            borderRadius: 4, padding: "0.3rem 0.5rem", fontSize: "0.72rem",
+            fontFamily: "inherit", cursor: "pointer", maxWidth: 220,
+          }}>
+          <option value="all">{lang === "sk" ? "Všetci užívatelia" : "All users"}</option>
+          {sessionUsers.map(([uid, email]) => <option key={uid} value={uid}>{email}</option>)}
+        </select>
         <span style={{ marginLeft: "auto", color: dim, fontSize: "0.7rem", alignSelf: "center", fontFamily: mono }}>
           {filteredSessions.length} {lang === "sk" ? "sessions" : "sessions"} · {rows.length} {lang === "sk" ? "riadkov" : "rows"} (30d)
         </span>
@@ -4158,7 +4201,7 @@ function AiChatLogsPanel({ users, lang }) {
                   width: "100%", textAlign: "left", background: "transparent",
                   border: "none", color: text, cursor: "pointer", fontFamily: "inherit",
                   padding: "0.65rem 0.9rem",
-                  display: "grid", gridTemplateColumns: "auto 1fr auto auto auto auto", gap: "0.6rem", alignItems: "center",
+                  display: "grid", gridTemplateColumns: "auto 1fr auto auto auto auto auto", gap: "0.6rem", alignItems: "center",
                 }}>
                 <span style={{ color: green, fontSize: "0.7rem", width: 12 }}>{isOpen ? "▾" : "▸"}</span>
                 <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "0.78rem" }}>
@@ -4166,6 +4209,8 @@ function AiChatLogsPanel({ users, lang }) {
                   <span style={{ color: dim, marginLeft: "0.5rem", fontFamily: mono, fontSize: "0.68rem" }}>{s.tier}</span>
                 </span>
                 <span style={{ color: dim, fontSize: "0.7rem", fontFamily: mono }}>{s.turns.length} {lang === "sk" ? "turn" : "turns"}</span>
+                <span title={lang === "sk" ? "cena celej konverzácie" : "whole-conversation cost"}
+                  style={{ color: green, fontSize: "0.7rem", fontFamily: mono, minWidth: 56, textAlign: "right" }}>{fmtUsd(s.cost)}</span>
                 <span style={{ color: s.has_error ? red : (s.has_bad_feedback ? orange : dim), fontSize: "0.7rem", fontFamily: mono, minWidth: 50, textAlign: "right" }}>
                   {s.has_error ? "⚠" : ""}
                   {s.bad_count > 0 ? ` 👎${s.bad_count}` : ""}
@@ -4206,6 +4251,7 @@ function AiTurnRow({ turn }) {
   if (isAssistant && Number.isFinite(turn.response_time_ms)) timing.push(`${turn.response_time_ms}ms response`);
   if (isUser && Number.isFinite(turn.user_typing_ms))        timing.push(`${(turn.user_typing_ms / 1000).toFixed(1)}s typed`);
   if (isAssistant && turn.input_tokens)                       timing.push(`${turn.input_tokens}→${turn.output_tokens || 0} tok`);
+  if (isAssistant)                                            timing.push(fmtUsd(turnCostUsd(turn)));
   if (isAssistant && turn.model)                              timing.push(turn.model);
   if (turn.feedback === "good")                               timing.push("👍");
   if (turn.feedback === "bad")                                timing.push("👎");
