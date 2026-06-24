@@ -2195,10 +2195,10 @@ export default function App() {
           floats above the AI chat pill (`raised`) so the two never overlap;
           on the platform the chat pill isn't shown so it sits on its own. */}
       <FeedbackWidget lang={lang} raised={!isAppPage(current)} />
-      {/* TrialPopup — marketing pages only. Once-per-day modal that
-          fires 1.5s after page load. Self-suppresses for non-eligible
-          users (paid / mid-trial / trial-used). CTA opens the login
-          modal for anon, jumps to Billing for free signed-in. */}
+      {/* TrialPopup — marketing pages only. ANON-only modal that fires 1.5s
+          after EVERY page load (incl. refresh) so the offer can't be missed;
+          never shown once the visitor is signed in. CTA opens the login /
+          sign-up modal. */}
       {!isAppPage(current) && (
         <TrialPopup
           lang={lang}
