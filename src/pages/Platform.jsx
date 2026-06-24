@@ -121,11 +121,17 @@ const IconMap = () => (
     <line x1="8" y1="3" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="21"/>
   </svg>
 );
+const IconTable = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/>
+  </svg>
+);
 
 // Map view is lazy-loaded — MapLibre is a heavy dep we only want on /app/map.
 const MapView = lazy(() => import("./MapView"));
 const MapView2 = lazy(() => import("./MapView2"));
 const LocationManager = lazy(() => import("./LocationManager"));
+const DataQA = lazy(() => import("./DataQA"));
 
 const NAV = [
   { group: "main", items: [
@@ -145,6 +151,7 @@ const NAV = [
     { page: "App:Settings", label: { en: "Settings",       sk: "Nastavenia"   }, Icon: IconSettings },
   ]},
   { group: "admin", items: [
+    { page: "App:DataQA", label: { en: "Data control", sk: "Kontrola dát" }, Icon: IconTable, adminOnly: true },
     { page: "App:Locations", label: { en: "Locations", sk: "Polohy" }, Icon: IconMap, adminOnly: true },
     { page: "App:Admin", label: { en: "Admin", sk: "Admin" }, Icon: IconShield, adminOnly: true },
   ]},
@@ -490,6 +497,7 @@ function TopBar({ page, lang, setLang, tier }) {
     "App:Settings":  { en: "Settings",        sk: "Nastavenia"   },
     "App:Admin":     { en: "Admin",           sk: "Admin"        },
     "App:Locations": { en: "Locations",       sk: "Polohy"       },
+    "App:DataQA":    { en: "Data control",    sk: "Kontrola dát" },
   };
   const isProjectDetail = typeof page === "string" && page.startsWith("App:ProjectDetail:");
   const title = isProjectDetail
@@ -654,6 +662,7 @@ function PageContent({ page, projectId, lang, setCurrent, openLogin }) {
   if (page === "App:Settings")   return <PlatformSettings lang={lang} />;
   if (page === "App:Admin")      return <Gated require="manage_users" lang={lang} setCurrent={setCurrent}><LiveAdmin lang={lang} setCurrent={setCurrent} /></Gated>;
   if (page === "App:Locations")  return <Gated require="manage_locations" lang={lang} setCurrent={setCurrent}><Suspense fallback={<div style={{ padding: "2rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.8rem" }}>{lang === "sk" ? "Načítavam…" : "Loading…"}</div>}><LocationManager lang={lang} /></Suspense></Gated>;
+  if (page === "App:DataQA")     return <Gated require="manage_data_qa" lang={lang} setCurrent={setCurrent}><Suspense fallback={<div style={{ padding: "2rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.8rem" }}>{lang === "sk" ? "Načítavam…" : "Loading…"}</div>}><DataQA lang={lang} /></Suspense></Gated>;
   if (typeof page === "string" && page.startsWith("App:ProjectDetail:")) {
     const id = page.slice("App:ProjectDetail:".length);
     return <LiveProjectDetail projectId={id} lang={lang} setCurrent={setCurrent} openLogin={openLogin} />;
