@@ -7,6 +7,7 @@ import { fmtSelloutValue } from "../lib/absorption";
 import { useCurrency } from "../lib/useCurrency";
 import { useCountry } from "../lib/useCountry";
 import { supabase } from "../lib/supabase";
+import { getFreshAccessToken, authErrorMessage } from "../lib/sessionGuard";
 import { liveT, ll } from "../lib/liveLang";
 import { goBack } from "../lib/routing";
 import { track } from "../lib/track";
@@ -3331,9 +3332,23 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
     }
     const patch = { tier };
     if (tier !== "pending") patch.approved_at = new Date().toISOString();
-    const { error } = await supabase.from("user_profiles").update(patch).eq("id", id);
-    if (error) alert(error.message);
-    else setUsers(u => u.map(x => x.id === id ? { ...x, ...patch } : x));
+    // Refresh the session first so the update never goes out with a dead token
+    // (an expired admin session would otherwise hit "permission denied").
+    try { await getFreshAccessToken(); }
+    catch (e) { alert(authErrorMessage(e, lang)); return; }
+    // .select() so we KNOW the row actually changed. Without it a 0-row update
+    // (lost session / missing admin rights) returns no error, and we'd falsely
+    // show success that reverts on the next refresh ("I changed the tier and it
+    // didn't stick"). Confirm-after-write + a clear message instead.
+    const { data, error } = await supabase.from("user_profiles").update(patch).eq("id", id).select();
+    if (error) { alert(authErrorMessage(error, lang)); return; }
+    if (!data || data.length === 0) {
+      alert(lang === "sk"
+        ? "Zmena sa neuložila (0 riadkov) — pravdepodobne vypršala prihlasovacia relácia alebo chýbajú admin práva. Obnov stránku a skús znova."
+        : "Change didn't save (0 rows) — your session likely expired or admin rights are missing. Reload and try again.");
+      return;
+    }
+    setUsers(u => u.map(x => x.id === id ? { ...x, ...data[0] } : x));
   };
 
   // Grant or revoke a 7-day trial for a user. Routes through the
@@ -3344,16 +3359,20 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
       alert(lang === "sk" ? "Nemôžeš riešiť trial na sebe." : "Can't manage trial on yourself.");
       return;
     }
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { alert("No session — sign in first."); return; }
+    let token;
+    try { token = await getFreshAccessToken(); }
+    catch (e) { alert(authErrorMessage(e, lang)); return; }
     try {
       const r = await fetch("/api/trial/grant", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ user_id: u.id, action, days: 7 }),
       });
       const j = await r.json().catch(() => ({}));
-      if (!r.ok) { alert(`Trial ${action} failed: ${j.error || r.status}`); return; }
+      if (!r.ok) {
+        alert(r.status === 401 ? authErrorMessage({ status: 401 }, lang) : `Trial ${action} failed: ${j.error || r.status}`);
+        return;
+      }
       setUsers(us => us.map(x => x.id === u.id
         ? { ...x, trial_until: j.trial_until || null, trial_started_at: j.trial_started_at || null }
         : x));
@@ -3370,16 +3389,20 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
       alert(lang === "sk" ? "Nemôžeš riešiť predplatné na sebe." : "Can't manage your own subscription here.");
       return;
     }
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { alert("No session — sign in first."); return; }
+    let token;
+    try { token = await getFreshAccessToken(); }
+    catch (e) { alert(authErrorMessage(e, lang)); return; }
     try {
       const r = await fetch("/api/admin/set-subscription", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ user_id: u.id, ...payload }),
       });
       const j = await r.json().catch(() => ({}));
-      if (!r.ok) { alert(`Subscription update failed: ${j.error || r.status}`); return; }
+      if (!r.ok) {
+        alert(r.status === 401 ? authErrorMessage({ status: 401 }, lang) : `Subscription update failed: ${j.error || r.status}`);
+        return;
+      }
       setUsers(us => us.map(x => x.id === u.id ? { ...x, ...(j.patch || {}) } : x));
     } catch (e) {
       alert(`Subscription update failed: ${String(e.message || e)}`);
@@ -3397,23 +3420,21 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
     if (!confirm(confirmText)) return;
 
     // Needs service-role on backend — calls /api/admin/delete-user with caller's bearer token
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      alert("No session — sign in first.");
-      return;
-    }
+    let token;
+    try { token = await getFreshAccessToken(); }
+    catch (e) { alert(authErrorMessage(e, lang)); return; }
     try {
       const resp = await fetch("/api/admin/delete-user", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${session.access_token}`,
+          "Authorization": `Bearer ${token}`,
         },
         body: JSON.stringify({ user_id: u.id }),
       });
       const json = await resp.json();
       if (!resp.ok) {
-        alert(`Delete failed: ${json.error || resp.status}`);
+        alert(resp.status === 401 ? authErrorMessage({ status: 401 }, lang) : `Delete failed: ${json.error || resp.status}`);
         return;
       }
       setUsers(us => us.filter(x => x.id !== u.id));

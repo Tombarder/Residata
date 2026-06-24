@@ -72,9 +72,12 @@ export default async function handler(req, res) {
       patch = { trial_until: end.toISOString(), trial_started_at: now.toISOString() };
     }
 
-    const { error: updErr } = await admin
-      .from("user_profiles").update(patch).eq("id", userId);
+    const { data: updRows, error: updErr } = await admin
+      .from("user_profiles").update(patch).eq("id", userId).select("id");
     if (updErr) return res.status(500).json({ error: "update failed", detail: updErr.message });
+    if (!updRows || updRows.length === 0) {
+      return res.status(500).json({ error: "trial write did not land — no row updated (key/RLS misconfig?)" });
+    }
 
     // Audit log — F-250 fix (same bug family as F-239 in set-subscription).
     // Previously wrote `admin_id / target_user_id / details` which DON'T
