@@ -46,6 +46,11 @@ export function metricValue(p, lens) {
   return null; // completion is categorical, not a scalar
 }
 
+/** Did the developer publish any price for this project (€/m², min or max)? */
+export function hasPublishedPrice(p) {
+  return ppm2Of(p) > 0 || Number(p.min_price) > 0 || Number(p.max_price) > 0;
+}
+
 /** Min/max of the lens metric across projects (for normalising heatmap weight). */
 export function valueRange(projects, lens) {
   let min = Infinity, max = -Infinity;

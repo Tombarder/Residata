@@ -6,7 +6,7 @@
 import {
   completionBucket, tertiles, colorFor, coverage, distanceKm,
   computeCompetitiveSet, legendForLens, metricValue, NO_DATA, RAMP, COMPLETION,
-  valueRange, heatWeight,
+  valueRange, heatWeight, hasPublishedPrice,
 } from "../src/lib/mapMetrics.js";
 
 let fail = 0;
@@ -113,6 +113,14 @@ ok("heatWeight: completion ready → 1", heatWeight({ kolaudacia: "Skolaudované
   eq("p75 of [2000,4000,6000,8000] = 6000", cs2.p75, 6000);
   eq("soldLastMonth sum 0+1+2+3 = 6", cs2.soldLastMonth, 6);
 }
+
+// ── hasPublishedPrice (the "No price" toggle predicate) ──
+console.log("\nhasPublishedPrice");
+ok("€/m² present → true", hasPublishedPrice({ avg_price_eur_m2: 5000 }) === true);
+ok("min_price present → true", hasPublishedPrice({ min_price: 219000 }) === true);
+ok("max_price present → true", hasPublishedPrice({ max_price: 400000 }) === true);
+ok("nothing → false", hasPublishedPrice({}) === false);
+ok("explicit zeros → false", hasPublishedPrice({ avg_price_eur_m2: 0, min_price: 0, max_price: 0 }) === false);
 
 console.log(`\n${fail === 0 ? "\x1b[32mALL CHECKS PASSED\x1b[0m" : `\x1b[31m${fail} CHECK(S) FAILED\x1b[0m`}\n`);
 process.exit(fail === 0 ? 0 : 1);

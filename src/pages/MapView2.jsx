@@ -26,7 +26,7 @@ import { useCountry } from "../lib/useCountry";
 import { supabasePublic, isSupabaseReady } from "../lib/supabase";
 import {
   LENSES, COMPLETION, NO_DATA, ppm2Of, metricValue, completionBucket,
-  tertiles, colorFor, coverage, circlePolygon, computeCompetitiveSet, legendForLens, valueRange, heatWeight,
+  tertiles, colorFor, coverage, circlePolygon, computeCompetitiveSet, legendForLens, valueRange, heatWeight, hasPublishedPrice,
 } from "../lib/mapMetrics";
 import MapFilterBuilder from "../components/MapFilterBuilder";
 import { applyFilters, describe, isComplete } from "../lib/mapFilters";
@@ -164,6 +164,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
   const [radiusKm, setRadiusKm] = useState(1.5);
   const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [showSoldOut, setShowSoldOut] = useState(true); // sold out = no units available
+  const [showNoPrice, setShowNoPrice] = useState(true); // projects with no published price
   const [heatMode, setHeatMode] = useState(false); // dots vs heatmap of the active lens
   const [anchorId, setAnchorId] = useState(null); // project an "◎ Area" was opened from → benchmark vs its set
   const [viewBounds, setViewBounds] = useState(null); // current map viewport → the overview reflects only what's on screen
@@ -195,7 +196,13 @@ export default function MapView2({ lang = "en", setCurrent }) {
     return applyFilters(named, conditions);
   }, [projects, nameQuery, conditions]);
   const soldOutCount = useMemo(() => baseSet.filter((p) => (Number(p.available_units) || 0) === 0).length, [baseSet]);
-  const shown = useMemo(() => (showSoldOut ? baseSet : baseSet.filter((p) => (Number(p.available_units) || 0) > 0)), [baseSet, showSoldOut]);
+  const noPriceCount = useMemo(() => baseSet.filter((p) => !hasPublishedPrice(p)).length, [baseSet]);
+  const shown = useMemo(() => {
+    let s = baseSet;
+    if (!showSoldOut) s = s.filter((p) => (Number(p.available_units) || 0) > 0);
+    if (!showNoPrice) s = s.filter(hasPublishedPrice);
+    return s;
+  }, [baseSet, showSoldOut, showNoPrice]);
   const activeConds = useMemo(() => conditions.filter(isComplete), [conditions]);
 
   // Projects currently on screen = filters ∩ the map viewport. The overview reads
@@ -292,7 +299,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
           "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 6, 16, 11, 32, 14, 52],
           "heatmap-opacity": ["interpolate", ["linear"], ["zoom"], 11, 0.9, 14, 0.5],
           "heatmap-color": ["interpolate", ["linear"], ["heatmap-density"],
-            0, "rgba(0,0,0,0)", 0.15, "rgba(40,110,89,0.45)", 0.35, "#3aa0ff", 0.6, "#f5a623", 0.82, "#ff7a3d", 1, "#ff3d3d"],
+            0, "rgba(0,0,0,0)", 0.15, "rgba(43,76,155,0.5)", 0.4, "#3aa0ff", 0.62, "#f5a623", 0.82, "#ff7a3d", 1, "#ff3d3d"],
         },
       });
       map.addLayer({
@@ -437,8 +444,16 @@ export default function MapView2({ lang = "en", setCurrent }) {
           <span style={{ textDecoration: showSoldOut ? "none" : "line-through" }}>{sk ? "Vypredané" : "Sold out"}</span>
           {soldOutCount > 0 && <span style={{ opacity: 0.7, fontFamily: mono, fontSize: "0.66rem" }}>· {soldOutCount}</span>}
         </button>
+        <button onClick={() => setShowNoPrice((v) => !v)} title={sk ? "Zobraziť / skryť projekty bez zverejnenej ceny (počítajú sa do prehľadov len keď sú zapnuté)" : "Show / hide projects with no published price (counted in the stats only while shown)"}
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 11px", borderRadius: 999, fontSize: "0.74rem", cursor: "pointer", border: `1px solid ${showNoPrice ? border : `${amber}55`}`, background: showNoPrice ? "transparent" : `${amber}14`, color: showNoPrice ? textLight : amber }}>
+          <EyeIcon off={!showNoPrice} />
+          <span style={{ textDecoration: showNoPrice ? "none" : "line-through" }}>{sk ? "Bez ceny" : "No price"}</span>
+          {noPriceCount > 0 && <span style={{ opacity: 0.7, fontFamily: mono, fontSize: "0.66rem" }}>· {noPriceCount}</span>}
+        </button>
         <div style={{ display: "inline-flex", alignItems: "center", gap: 9, marginLeft: "auto", fontSize: "0.66rem", color: dim, flexWrap: "wrap" }}>
-          {legend.map((it) => <span key={it.label} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><span style={{ width: 9, height: 9, borderRadius: "50%", background: it.color, display: "inline-block" }} />{it.label}</span>)}
+          {heatMode
+            ? <HeatLegend lens={lens} sk={sk} />
+            : legend.map((it) => <span key={it.label} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><span style={{ width: 9, height: 9, borderRadius: "50%", background: it.color, display: "inline-block" }} />{it.label}</span>)}
         </div>
       </div>
 
@@ -735,6 +750,19 @@ function escapeHtml(s) {
   return String(s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+// Heatmap legend — shown in place of the dot legend while Heat is on: a cool→hot
+// gradient (matching the heatmap-color ramp) labelled with the active metric.
+function HeatLegend({ lens, sk }) {
+  const L = LENSES.find((l) => l.key === lens);
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }} title={sk ? "Tepelná mapa — intenzita podľa zvolenej metriky" : "Heatmap — intensity by the active metric"}>
+      <span>{sk ? "menej" : "low"}</span>
+      <span style={{ width: 84, height: 9, borderRadius: 5, background: "linear-gradient(90deg, #2b4c9b, #3aa0ff, #f5a623, #ff7a3d, #ff3d3d)", display: "inline-block" }} />
+      <span style={{ color: textLight }}>{sk ? "viac" : "high"}</span>
+      {L ? <span style={{ opacity: 0.7 }}>· {L.label}</span> : null}
+    </span>
+  );
+}
 function EyeIcon({ off }) {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }} aria-hidden="true">
