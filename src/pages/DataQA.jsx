@@ -146,6 +146,37 @@ export default function DataQA({ lang = "sk" }) {
     });
   }, [units, stav, uSearch, sortCol, sortDir]);
 
+  // Summary cards reflect the SELECTED snapshot (project + date), computed from the
+  // loaded units — NOT the project's current rollup — so they adjust on every date change.
+  const snap = useMemo(() => {
+    if (!units) return null;
+    const by = (s) => units.filter((u) => u.stav === s).length;
+    const priced = units.filter((u) => u.cena != null);
+    const pm = units.filter((u) => u.eur_m2 != null);
+    return {
+      total: units.length, v: by("V"), p: by("P"), r: by("R"), pr: by("PR"),
+      avgPsm: pm.length ? pm.reduce((a, u) => a + Number(u.eur_m2), 0) / pm.length : null,
+      minP: priced.length ? priced.reduce((m, u) => Math.min(m, Number(u.cena)), Infinity) : null,
+      maxP: priced.length ? priced.reduce((m, u) => Math.max(m, Number(u.cena)), -Infinity) : null,
+    };
+  }, [units]);
+
+  function exportCsv() {
+    if (!units) return;
+    const head = ["Projekt", "Dátum", ...COLS.map((c) => c[1])];
+    const lines = [head.join(";")];
+    rows.forEach((u) => {
+      const vals = COLS.map((c) => (c[0] === "izby" ? izbyTxt(u.izby) : (u[c[0]] == null ? "" : u[c[0]])));
+      lines.push([sel.name, date, ...vals].join(";"));
+    });
+    const blob = new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${sel.id}_${date || "current"}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
   const selRows = rows.filter((r) => checked[r.unit_id]);
   const aggBase = selRows.length ? selRows : null;
   const priced = (aggBase || rows).filter((r) => r.cena != null);
@@ -216,13 +247,17 @@ export default function DataQA({ lang = "sk" }) {
 
       {sel && (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 10, marginBottom: 16 }}>
-            <div style={card}><div style={cardLabel}>{t("Units total", "Bytov spolu")}</div><div style={cardVal}>{fmt(sel.total_units)}</div></div>
-            <div style={card}><div style={cardLabel}>{t("Available", "Voľných")}</div><div style={{ ...cardVal, color: green }}>{fmt(sel.available_units)}</div></div>
-            <div style={card}><div style={cardLabel}>{t("Sold", "Predaných")}</div><div style={cardVal}>{fmt(sel.sold_units)}</div></div>
-            <div style={card}><div style={cardLabel}>{t("Reserved", "Rezervovaných")}</div><div style={cardVal}>{fmt(sel.reserved_units)}</div></div>
-            <div style={card}><div style={cardLabel}>{t("Avg €/m²", "Priemer €/m²")}</div><div style={cardVal}>{fmt(sel.avg_eur_m2)}</div></div>
-            <div style={card}><div style={cardLabel}>{t("Price from–to", "Cena od–do")}</div><div style={{ ...cardVal, fontSize: 15 }}>{fmt(sel.min_price)} – {fmt(sel.max_price)} €</div></div>
+          <div style={{ fontSize: 12, color: dim, fontFamily: mono, marginBottom: 8 }}>
+            {t("Snapshot of", "Snapshot k")} <span style={{ color: textLight }}>{date || "—"}</span> · {fmt(snap?.total)}{t(" units", " bytov")}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(118px,1fr))", gap: 10, marginBottom: 16 }}>
+            <div style={card}><div style={cardLabel}>{t("Units total", "Bytov spolu")}</div><div style={cardVal}>{fmt(snap?.total)}</div></div>
+            <div style={card}><div style={cardLabel}>{t("Available", "Voľných")}</div><div style={{ ...cardVal, color: green }}>{fmt(snap?.v)}</div></div>
+            <div style={card}><div style={cardLabel}>{t("Sold", "Predaných")}</div><div style={cardVal}>{fmt(snap?.p)}</div></div>
+            <div style={card}><div style={cardLabel}>{t("Reserved", "Rezervované")}</div><div style={cardVal}>{fmt(snap?.r)}</div></div>
+            <div style={card}><div style={cardLabel}>{t("Pre-reserved", "Predrezerv.")}</div><div style={cardVal}>{fmt(snap?.pr)}</div></div>
+            <div style={card}><div style={cardLabel}>{t("Avg €/m²", "Priemer €/m²")}</div><div style={cardVal}>{fmt(snap?.avgPsm)}</div></div>
+            <div style={card}><div style={cardLabel}>{t("Price from–to", "Cena od–do")}</div><div style={{ ...cardVal, fontSize: 15 }}>{fmt(snap?.minP)} – {fmt(snap?.maxP)} €</div></div>
           </div>
 
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
@@ -232,7 +267,8 @@ export default function DataQA({ lang = "sk" }) {
                 style={{ ...btn, padding: "6px 12px", fontSize: 12, borderColor: on ? green : border, color: on ? green : textLight, background: on ? "rgba(0,229,160,0.08)" : "transparent" }}>{t(s[2], s[1])}</button>;
             })}
             <input value={uSearch} onChange={(e) => setUSearch(e.target.value)} placeholder={t("search unit…", "hľadať byt…")}
-              style={{ marginLeft: "auto", padding: "7px 11px", background: bg2, border: `1px solid ${border}`, borderRadius: 8, color: textLight, fontSize: 13, outline: "none", width: 160 }} />
+              style={{ marginLeft: "auto", padding: "7px 11px", background: bg2, border: `1px solid ${border}`, borderRadius: 8, color: textLight, fontSize: 13, outline: "none", width: 150 }} />
+            <button onClick={exportCsv} style={{ ...btn, padding: "7px 12px", fontSize: 12 }} title={t("Export shown rows to CSV", "Stiahnuť zobrazené riadky do CSV")}>CSV ↓</button>
           </div>
 
           {uErr && <div style={{ ...card, borderColor: amber, color: amber }}>{uErr}</div>}
