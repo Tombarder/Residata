@@ -16,6 +16,7 @@
  * memoised rows + deferred search for big projects, localized errors, select-all.
  */
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import ProjectsEditor from "../components/ProjectsEditor";
 
 const green = "#00e5a0";
 const amber = "#f5a623";
@@ -118,6 +119,7 @@ export default function DataQA({ lang = "sk" }) {
   }[code] || code);
 
   const [projects, setProjects] = useState(null);
+  const [view, setView] = useState("snapshots");   // "snapshots" | "edit"
   const [err, setErr] = useState(null);
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -284,10 +286,25 @@ export default function DataQA({ lang = "sk" }) {
         </p>
       </div>
 
-      {err && <div style={{ ...card, borderColor: amber, color: amber, marginBottom: 14 }}>{mapErr(err)}</div>}
-      {!projects && !err && <div style={{ color: dim, fontFamily: mono, fontSize: 13 }}>{t("Loading projects…", "Načítavam projekty…")}</div>}
+      {/* Tab: browse data snapshots (default) vs edit project config */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, borderBottom: `1px solid ${border}` }}>
+        {[["snapshots", t("Data snapshots", "Snímky dát")], ["edit", t("Edit projects", "Upraviť projekty")]].map(([k, label]) => (
+          <button key={k} onClick={() => setView(k)}
+            style={{
+              background: "transparent", border: "none",
+              borderBottom: `2px solid ${view === k ? green : "transparent"}`,
+              color: view === k ? textLight : dim, padding: "8px 12px", fontSize: 14,
+              fontWeight: 600, cursor: "pointer", marginBottom: -1,
+            }}>{label}</button>
+        ))}
+      </div>
 
-      {projects && (
+      {view === "edit" && <ProjectsEditor lang={lang} />}
+
+      {err && view === "snapshots" && <div style={{ ...card, borderColor: amber, color: amber, marginBottom: 14 }}>{mapErr(err)}</div>}
+      {view === "snapshots" && !projects && !err && <div style={{ color: dim, fontFamily: mono, fontSize: 13 }}>{t("Loading projects…", "Načítavam projekty…")}</div>}
+
+      {view === "snapshots" && projects && (
         <>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 12 }}>
           <div style={{ minWidth: 140 }}>
