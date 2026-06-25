@@ -41,6 +41,11 @@
   --z-modal: 3000;    /* login / complete-profile */
   --z-popup: 3200;    /* trial popup */
   --z-cookie: 3500;   /* cookie banner */
+  --z-tooltip: 4000;  /* chart tooltips — above modals */
+
+  /* ── platform ─────────────────────────────────────────── */
+  --topbar-h: 64px;   /* platform top bar height (full-bleed pages compute from this) */
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 
   /* ── motion ───────────────────────────────────────────── */
   --ease: cubic-bezier(0.4, 0, 0.2, 1);
@@ -64,9 +69,12 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ── one consistent keyboard-focus ring across the whole app ───────────── */
+/* ── one consistent keyboard-focus ring across the whole app ─────────────
+   !important so it overrides the many inline `outline:none` declarations in the
+   platform (which previously removed the keyboard focus indicator entirely).
+   :focus-visible only triggers on keyboard nav, so this never shows on click. */
 :where(a, button, input, select, textarea, [role="button"], [tabindex]:not([tabindex="-1"])):focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--accent) !important;
   outline-offset: 2px;
   border-radius: var(--r-sm);
 }

@@ -24,12 +24,12 @@ export default function DataFreshness({ lang = "sk", style, className }) {
     : "Date of the last complete data pull for the selected market. The date does not advance until the whole market scrapes — so you can see when the data is a few days old.";
   return (
     <span title={tip} className={className} style={{
-      fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-      fontSize: "0.72rem", color: "#9aa0a6", whiteSpace: "nowrap",
+      fontFamily: "var(--font-mono)",
+      fontSize: "0.72rem", color: "var(--text-dim)", whiteSpace: "nowrap",
       display: "inline-flex", alignItems: "center", gap: "0.4rem", ...style,
     }}>
       <span aria-hidden style={{
-        width: 6, height: 6, borderRadius: "50%", background: "#3fb950",
+        width: 6, height: 6, borderRadius: "50%", background: "var(--accent)",
         display: "inline-block", flexShrink: 0,
       }} />
       {label} {formatted}
