@@ -1,15 +1,16 @@
 /**
- * FeedbackLog — admin-only "Feedback / Spätná väzba" inbox.
+ * FeedbackLog — admin-only "Feedback / Spätná väzba" inbox, now CONVERSATIONS.
  *
- * Shows every report submitted via the site-wide FeedbackWidget so the Boss can
- * read them, triage (new → in progress → resolved / won't-fix), add a private
- * note, and see the bigger picture (counts by status + category).
+ * Two views:
+ *   · list   — the log of conversations (newest activity first), each showing the
+ *     latest message + a "needs reply" flag + message count. This is the "log of
+ *     each new message" — a new message bumps its conversation to the top.
+ *   · thread — open a conversation to see the whole back-and-forth in one + reply
+ *     (the reply is emailed to the user and appended to the thread).
  *
- * Data via three admin-gated RPCs (public._require_admin → fails closed):
- *   admin_feedback_stats()                          → header counts
- *   admin_list_feedback(p_status, p_category)       → the list (jsonb, no row cap)
- *   admin_update_feedback(p_id, p_status, p_note)   → triage a row
- * Read + triage only; users' messages are never edited.
+ * RPCs (admin-gated via public._require_admin):
+ *   admin_feedback_stats() · admin_list_feedback() · admin_conversation(id)
+ *   admin_update_feedback(id,status,note)   reply via /api/feedback/reply
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
@@ -56,7 +57,6 @@ async function rpcDirect(fn, body, { timeoutMs = 30000 } = {}) {
   } finally { clearTimeout(killer); }
 }
 
-// key · emoji · EN · SK  (keys match the DB + widget)
 const CATEGORIES = {
   data:     ["📊", "Data quality",      "Kvalita dát"],
   bug:      ["🐞", "Bug / not working", "Chyba / nefunguje"],
@@ -72,7 +72,6 @@ const STATUSES = {
   wont_fix:    [dim,   "Won't fix",   "Nebude sa riešiť"],
 };
 const STATUS_ORDER = ["new", "in_progress", "resolved", "wont_fix"];
-
 const fmtDate = (s) => (s ? String(s).slice(0, 16).replace("T", " ") : "—");
 
 export default function FeedbackLog({ lang = "sk" }) {
@@ -83,63 +82,72 @@ export default function FeedbackLog({ lang = "sk" }) {
   const [err, setErr] = useState(null);
   const [fStatus, setFStatus] = useState("");
   const [fCategory, setFCategory] = useState("");
-  const [notes, setNotes] = useState({});   // id -> draft note
-  const [busy, setBusy] = useState({});      // id -> bool
-  const [replyDraft, setReplyDraft] = useState({});  // id -> reply text
-  const [replying, setReplying] = useState({});      // id -> bool
+  const [busy, setBusy] = useState({});
+  const [openConv, setOpenConv] = useState(null);
+  const [conv, setConv] = useState(null);
+  const [convLoading, setConvLoading] = useState(false);
+  const [note, setNote] = useState("");
+  const [replyDraft, setReplyDraft] = useState("");
+  const [replying, setReplying] = useState(false);
 
   const load = useCallback(() => {
-    // setState only inside async callbacks (never synchronously in the effect).
     rpcDirect("admin_feedback_stats", {}).then(setStats).catch((e) => setErr(e.message));
-    rpcDirect("admin_list_feedback", {
-      p_status: fStatus || null,
-      p_category: fCategory || null,
-    }).then((rows) => { setItems(rows || []); setErr(null); }).catch((e) => setErr(e.message));
+    rpcDirect("admin_list_feedback", { p_status: fStatus || null, p_category: fCategory || null })
+      .then((rows) => { setItems(rows || []); setErr(null); }).catch((e) => setErr(e.message));
   }, [fStatus, fCategory]);
-
   useEffect(() => { load(); }, [load]);
+
+  async function openConversation(id) {
+    setOpenConv(id); setConv(null); setConvLoading(true); setReplyDraft(""); setErr(null);
+    try {
+      const data = await rpcDirect("admin_conversation", { p_id: id });
+      setConv(data); setNote(data?.admin_note || "");
+    } catch (e) { setErr(e.message); }
+    finally { setConvLoading(false); }
+  }
+  function backToList() { setOpenConv(null); setConv(null); load(); }
 
   async function setStatus(id, status) {
     setBusy((b) => ({ ...b, [id]: true }));
     try {
-      const updated = await rpcDirect("admin_update_feedback", { p_id: id, p_status: status });
-      setItems((list) => (list || []).map((x) => (x.id === id ? { ...x, ...updated } : x)));
+      await rpcDirect("admin_update_feedback", { p_id: id, p_status: status });
+      setItems((list) => (list || []).map((x) => (x.id === id ? { ...x, status } : x)));
+      if (conv && conv.id === id) setConv((c) => ({ ...c, status }));
       rpcDirect("admin_feedback_stats", {}).then(setStats).catch(() => {});
     } catch (e) { setErr(e.message); }
     finally { setBusy((b) => ({ ...b, [id]: false })); }
   }
   async function saveNote(id) {
-    const note = notes[id] ?? "";
     setBusy((b) => ({ ...b, [id]: true }));
     try {
-      const updated = await rpcDirect("admin_update_feedback", { p_id: id, p_note: note });
-      setItems((list) => (list || []).map((x) => (x.id === id ? { ...x, ...updated } : x)));
-      setNotes((n) => { const c = { ...n }; delete c[id]; return c; });
+      await rpcDirect("admin_update_feedback", { p_id: id, p_note: note });
+      if (conv && conv.id === id) setConv((c) => ({ ...c, admin_note: note }));
     } catch (e) { setErr(e.message); }
     finally { setBusy((b) => ({ ...b, [id]: false })); }
+  }
+  async function sendReply() {
+    const txt = (replyDraft || "").trim();
+    if (txt.length < 2 || !openConv) return;
+    setReplying(true); setErr(null);
+    try {
+      const token = storedAccessToken();
+      const r = await fetch("/api/feedback/reply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ feedback_id: openConv, reply: txt }),
+      });
+      if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || `HTTP ${r.status}`); }
+      setReplyDraft("");
+      const data = await rpcDirect("admin_conversation", { p_id: openConv });
+      setConv(data);
+    } catch (e) { setErr("Reply: " + e.message); }
+    finally { setReplying(false); }
   }
   async function viewShot(path) {
     if (!supabase) return;
     const { data, error } = await supabase.storage.from("feedback-attachments").createSignedUrl(path, 600);
     if (data?.signedUrl) window.open(data.signedUrl, "_blank", "noopener");
     else if (error) setErr(error.message);
-  }
-  async function sendReply(id) {
-    const txt = (replyDraft[id] || "").trim();
-    if (txt.length < 2) return;
-    setReplying((r) => ({ ...r, [id]: true })); setErr(null);
-    try {
-      const token = storedAccessToken();
-      const r = await fetch("/api/feedback/reply", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ feedback_id: id, reply: txt }),
-      });
-      if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || `HTTP ${r.status}`); }
-      setItems((list) => (list || []).map((x) => (x.id === id ? { ...x, admin_reply: txt, replied_at: new Date().toISOString() } : x)));
-      setReplyDraft((d) => { const c = { ...d }; delete c[id]; return c; });
-    } catch (e) { setErr("Reply: " + e.message); }
-    finally { setReplying((r) => ({ ...r, [id]: false })); }
   }
 
   const cat = (k) => CATEGORIES[k] || CATEGORIES.other;
@@ -149,28 +157,112 @@ export default function FeedbackLog({ lang = "sk" }) {
   const cardLabel = { fontSize: 11, color: dim, fontFamily: mono, textTransform: "uppercase", letterSpacing: 0.4 };
   const cardVal = { fontSize: 22, fontWeight: 600, color: textLight, marginTop: 4 };
   const selStyle = { marginTop: 5, padding: "9px 12px", background: bg2, border: `1px solid ${border}`, borderRadius: 8, color: textLight, fontSize: 14, outline: "none" };
-
   const byCat = stats?.by_category || {};
   const catChips = useMemo(() => Object.keys(CATEGORIES), []);
 
+  function statusButtons(id, current) {
+    return (
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+        {STATUS_ORDER.map((sk) => {
+          const on = current === sk; const col = STATUSES[sk][0];
+          return (
+            <button key={sk} disabled={busy[id] || on} onClick={() => setStatus(id, sk)}
+              style={{ padding: "5px 10px", fontSize: 12, borderRadius: 7, cursor: on ? "default" : "pointer", border: `1px solid ${on ? col : border}`, color: on ? col : textLight, background: on ? `${col}14` : "transparent", opacity: busy[id] && !on ? 0.5 : 1 }}>
+              {t(STATUSES[sk][1], STATUSES[sk][2])}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // ── Thread view ────────────────────────────────────────────────
+  if (openConv) {
+    const c = conv ? cat(conv.category) : null;
+    const s = conv ? st(conv.status) : null;
+    return (
+      <div style={{ minHeight: "100vh", background: bg, color: textLight, padding: "1.5rem 1.75rem" }}>
+        <button onClick={backToList} style={{ background: "transparent", border: "none", color: dim, cursor: "pointer", fontFamily: mono, fontSize: 13, padding: 0, marginBottom: 14 }}>← {t("Back to all feedback", "Späť na zoznam")}</button>
+        {err && <div style={{ ...card, borderColor: amber, color: amber, marginBottom: 14 }}>{err}</div>}
+        {convLoading && <div style={{ color: dim, fontFamily: mono, fontSize: 13 }}>{t("Loading…", "Načítavam…")}</div>}
+        {conv && (
+          <>
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, marginBottom: 14 }}>
+              <span style={{ fontSize: 14, color: textLight }}>{c[0]} {t(c[1], c[2])}</span>
+              <span style={{ fontSize: 11, fontFamily: mono, color: s[0], border: `1px solid ${s[0]}`, borderRadius: 100, padding: "2px 9px", textTransform: "uppercase", letterSpacing: 0.4 }}>{t(s[1], s[2])}</span>
+              <span style={{ fontSize: 12, color: dim, fontFamily: mono }}>{conv.email || t("anonymous", "anonym")}{conv.user_tier ? ` · ${conv.user_tier}` : ""}</span>
+              {conv.project_name && <span style={{ fontSize: 12, color: "#cdd0d6", fontFamily: mono }}>📍 {conv.project_name}</span>}
+              {conv.page_url && <a href={conv.page_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: dim, fontFamily: mono }}>{conv.page_path} ↗</a>}
+            </div>
+
+            <div style={{ ...card, marginBottom: 14 }}>
+              <div style={{ ...cardLabel, marginBottom: 6 }}>{t("Status", "Stav")}</div>
+              {statusButtons(conv.id, conv.status)}
+              <div style={{ display: "flex", gap: 8, alignItems: "flex-start", marginTop: 12 }}>
+                <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("Private note (only admins)…", "Súkromná poznámka (len admin)…")}
+                  style={{ flex: 1, minWidth: 0, padding: "8px 11px", background: bg, border: `1px solid ${border}`, borderRadius: 8, color: textLight, fontSize: 13, outline: "none" }} />
+                <button disabled={busy[conv.id] || note === (conv.admin_note || "")} onClick={() => saveNote(conv.id)}
+                  style={{ padding: "8px 12px", fontSize: 12, borderRadius: 8, cursor: note !== (conv.admin_note || "") ? "pointer" : "not-allowed", border: `1px solid ${note !== (conv.admin_note || "") ? green : border}`, color: note !== (conv.admin_note || "") ? green : dim, background: "transparent", whiteSpace: "nowrap" }}>
+                  {t("Save note", "Uložiť")}
+                </button>
+              </div>
+            </div>
+
+            {/* messages */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+              {(conv.messages || []).map((m) => {
+                const isUser = m.sender === "user";
+                return (
+                  <div key={m.id} style={{ display: "flex", justifyContent: isUser ? "flex-start" : "flex-end" }}>
+                    <div style={{ maxWidth: "78%", background: isUser ? bg2 : "rgba(0,229,160,0.08)", border: `1px solid ${isUser ? border : "rgba(0,229,160,0.3)"}`, borderRadius: 10, padding: "10px 13px" }}>
+                      <div style={{ fontFamily: mono, fontSize: 10, color: isUser ? dim : green, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>
+                        {isUser ? t("User", "Používateľ") : t("You (Residata)", "Ty (Residata)")} · {fmtDate(m.created_at)}
+                      </div>
+                      <div style={{ fontSize: 14, color: textLight, lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{m.body}</div>
+                      {m.attachment_path && (
+                        <button onClick={() => viewShot(m.attachment_path)} style={{ marginTop: 7, background: "transparent", border: `1px solid ${border}`, color: green, borderRadius: 6, cursor: "pointer", padding: "3px 8px", fontSize: 12, fontFamily: mono }}>📎 {t("View screenshot", "Zobraziť screenshot")}</button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* reply box */}
+            <div style={{ ...card }}>
+              <div style={{ ...cardLabel, marginBottom: 6 }}>{t("Reply", "Odpovedať")}{conv.email ? ` → ${conv.email}` : ""}</div>
+              {conv.email ? (
+                <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                  <textarea value={replyDraft} onChange={(e) => setReplyDraft(e.target.value)} placeholder={t("Write your reply (emails the user)…", "Napíš odpoveď (pošle e-mail používateľovi)…")} rows={3}
+                    style={{ flex: 1, minWidth: 0, padding: "9px 12px", background: bg, border: `1px solid ${border}`, borderRadius: 8, color: textLight, fontSize: 14, outline: "none", resize: "vertical", fontFamily: "inherit" }} />
+                  <button disabled={replying || replyDraft.trim().length < 2} onClick={sendReply}
+                    style={{ padding: "9px 14px", fontSize: 13, borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap", border: `1px solid ${green}`, color: "#0a0a0c", background: green, cursor: replying || replyDraft.trim().length < 2 ? "not-allowed" : "pointer", opacity: replying || replyDraft.trim().length < 2 ? 0.45 : 1 }}>
+                    {replying ? t("Sending…", "Posielam…") : `↩ ${t("Send reply", "Odoslať")}`}
+                  </button>
+                </div>
+              ) : (
+                <div style={{ fontSize: 13, color: dim }}>{t("No email on file — can't reply to this one.", "Bez e-mailu — na túto sa nedá odpovedať.")}</div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  // ── List view ──────────────────────────────────────────────────
   return (
     <div style={{ minHeight: "100vh", background: bg, color: textLight, padding: "1.5rem 1.75rem" }}>
       <div style={{ marginBottom: 18, display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div>
           <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>{t("Feedback", "Spätná väzba")}</h1>
-          <p style={{ margin: "4px 0 0", color: dim, fontSize: 13 }}>
-            {t("Problem reports, questions and suggestions from users.",
-               "Hlásenia problémov, otázky a návrhy od používateľov.")}
-          </p>
+          <p style={{ margin: "4px 0 0", color: dim, fontSize: 13 }}>{t("Conversations — newest activity first. Open one to see the full thread + reply.", "Konverzácie — najnovšie hore. Otvor konverzáciu pre celé vlákno + odpoveď.")}</p>
         </div>
-        <button onClick={load} style={{ padding: "8px 14px", borderRadius: 8, border: `1px solid ${border}`, background: "transparent", color: textLight, cursor: "pointer", fontSize: 13 }}>
-          {t("Refresh", "Obnoviť")} ↻
-        </button>
+        <button onClick={load} style={{ padding: "8px 14px", borderRadius: 8, border: `1px solid ${border}`, background: "transparent", color: textLight, cursor: "pointer", fontSize: 13 }}>{t("Refresh", "Obnoviť")} ↻</button>
       </div>
 
       {err && <div style={{ ...card, borderColor: amber, color: amber, marginBottom: 14 }}>{err}</div>}
 
-      {/* Stats */}
       {stats && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(118px,1fr))", gap: 10, marginBottom: 16 }}>
           <div style={card}><div style={cardLabel}>{t("Total", "Spolu")}</div><div style={cardVal}>{stats.total ?? 0}</div></div>
@@ -181,7 +273,6 @@ export default function FeedbackLog({ lang = "sk" }) {
         </div>
       )}
 
-      {/* Filters */}
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 16 }}>
         <div style={{ display: "flex", flexDirection: "column", minWidth: 150 }}>
           <label style={cardLabel}>{t("Status", "Stav")}</label>
@@ -197,123 +288,44 @@ export default function FeedbackLog({ lang = "sk" }) {
             {catChips.map((c) => <option key={c} value={c}>{cat(c)[0]} {t(cat(c)[1], cat(c)[2])}{byCat[c] ? ` (${byCat[c]})` : ""}</option>)}
           </select>
         </div>
-        {(fStatus || fCategory) && (
-          <button onClick={() => { setFStatus(""); setFCategory(""); }} style={{ padding: "8px 12px", borderRadius: 8, border: `1px solid ${border}`, background: "transparent", color: textLight, cursor: "pointer", fontSize: 12 }}>
-            {t("Clear", "Zrušiť")}
-          </button>
-        )}
-        {items && <span style={{ fontSize: 12, color: dim, fontFamily: mono, paddingBottom: 9 }}>{items.length} {t("items", "položiek")}</span>}
+        {(fStatus || fCategory) && <button onClick={() => { setFStatus(""); setFCategory(""); }} style={{ padding: "8px 12px", borderRadius: 8, border: `1px solid ${border}`, background: "transparent", color: textLight, cursor: "pointer", fontSize: 12 }}>{t("Clear", "Zrušiť")}</button>}
+        {items && <span style={{ fontSize: 12, color: dim, fontFamily: mono, paddingBottom: 9 }}>{items.length} {t("conversations", "konverzácií")}</span>}
       </div>
 
       {!items && !err && <div style={{ color: dim, fontFamily: mono, fontSize: 13 }}>{t("Loading…", "Načítavam…")}</div>}
-      {items && items.length === 0 && (
-        <div style={{ ...card, color: dim, fontSize: 13 }}>
-          {t("No feedback yet for this filter.", "Zatiaľ žiadna spätná väzba pre tento filter.")}
-        </div>
-      )}
+      {items && items.length === 0 && <div style={{ ...card, color: dim, fontSize: 13 }}>{t("No feedback yet for this filter.", "Zatiaľ žiadna spätná väzba pre tento filter.")}</div>}
 
-      {/* List */}
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {(items || []).map((f) => {
           const c = cat(f.category), s = st(f.status);
-          const noteDraft = notes[f.id] ?? (f.admin_note || "");
-          const noteDirty = (notes[f.id] ?? null) !== null && noteDraft !== (f.admin_note || "");
           return (
             <div key={f.id} style={{ ...card, padding: "14px 16px" }}>
-              {/* meta row */}
               <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, color: textLight, border: `1px solid ${border}`, borderRadius: 6, padding: "3px 8px" }}>
-                  {c[0]} {t(c[1], c[2])}
-                </span>
-                <span style={{ fontSize: 11, fontFamily: mono, color: s[0], border: `1px solid ${s[0]}`, borderRadius: 100, padding: "2px 9px", textTransform: "uppercase", letterSpacing: 0.4 }}>
-                  {t(s[1], s[2])}
-                </span>
-                <span style={{ fontSize: 12, color: dim, fontFamily: mono }}>{fmtDate(f.created_at)}</span>
-                <span style={{ marginLeft: "auto", fontSize: 12, color: dim, fontFamily: mono }}>
-                  {(f.email || t("anonymous", "anonym"))}{f.user_tier ? ` · ${f.user_tier}` : ""}
-                </span>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, color: textLight, border: `1px solid ${border}`, borderRadius: 6, padding: "3px 8px" }}>{c[0]} {t(c[1], c[2])}</span>
+                <span style={{ fontSize: 11, fontFamily: mono, color: s[0], border: `1px solid ${s[0]}`, borderRadius: 100, padding: "2px 9px", textTransform: "uppercase", letterSpacing: 0.4 }}>{t(s[1], s[2])}</span>
+                {f.needs_reply && <span style={{ fontSize: 11, fontFamily: mono, color: green }}>● {t("needs reply", "čaká na odpoveď")}</span>}
+                <span style={{ fontSize: 12, color: dim, fontFamily: mono }}>{fmtDate(f.activity_at)}</span>
+                <span style={{ marginLeft: "auto", fontSize: 12, color: dim, fontFamily: mono }}>{f.email || t("anonymous", "anonym")}{f.user_tier ? ` · ${f.user_tier}` : ""}</span>
               </div>
 
-              {/* message */}
-              <div style={{ fontSize: 14, lineHeight: 1.6, color: textLight, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{f.message}</div>
+              <div style={{ fontSize: 14, lineHeight: 1.55, color: textLight, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                {f.last_sender === "admin" ? <span style={{ color: green, fontFamily: mono, fontSize: 12 }}>↩ </span> : null}{f.last_body}
+              </div>
 
-              {/* context: project · page · screenshot */}
-              {(f.project_name || f.page_path || f.attachment_path) && (
+              {(f.project_name || f.page_path) && (
                 <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", fontSize: 12, color: dim, fontFamily: mono }}>
                   {f.project_name && <span style={{ color: "#cdd0d6" }}>📍 {f.project_name}</span>}
-                  {f.page_path && (f.page_url
-                    ? <a href={f.page_url} target="_blank" rel="noopener noreferrer" style={{ color: dim }}>{f.page_path} ↗</a>
-                    : <span>{f.page_path}</span>)}
-                  {f.attachment_path && (
-                    <button onClick={() => viewShot(f.attachment_path)}
-                      style={{ background: "transparent", border: `1px solid ${border}`, color: green, borderRadius: 6, cursor: "pointer", padding: "3px 8px", fontSize: 12, fontFamily: mono }}>
-                      📎 {t("View screenshot", "Zobraziť screenshot")}
-                    </button>
-                  )}
+                  {f.page_path && (f.page_url ? <a href={f.page_url} target="_blank" rel="noopener noreferrer" style={{ color: dim }}>{f.page_path} ↗</a> : <span>{f.page_path}</span>)}
                 </div>
               )}
 
-              {/* triage row */}
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginTop: 12, paddingTop: 12, borderTop: `1px solid ${border}` }}>
-                {STATUS_ORDER.map((sk) => {
-                  const on = f.status === sk;
-                  const col = STATUSES[sk][0];
-                  return (
-                    <button key={sk} disabled={busy[f.id] || on} onClick={() => setStatus(f.id, sk)}
-                      style={{ padding: "5px 10px", fontSize: 12, borderRadius: 7, cursor: on ? "default" : "pointer",
-                        border: `1px solid ${on ? col : border}`, color: on ? col : textLight,
-                        background: on ? `${col}14` : "transparent", opacity: busy[f.id] && !on ? 0.5 : 1 }}>
-                      {t(STATUSES[sk][1], STATUSES[sk][2])}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* admin note */}
-              <div style={{ display: "flex", gap: 8, alignItems: "flex-start", marginTop: 10 }}>
-                <input
-                  value={noteDraft}
-                  onChange={(e) => setNotes((n) => ({ ...n, [f.id]: e.target.value }))}
-                  placeholder={t("Private note (only admins)…", "Súkromná poznámka (len admin)…")}
-                  style={{ flex: 1, minWidth: 0, padding: "8px 11px", background: bg, border: `1px solid ${border}`, borderRadius: 8, color: textLight, fontSize: 13, outline: "none" }}
-                />
-                <button disabled={busy[f.id] || !noteDirty} onClick={() => saveNote(f.id)}
-                  style={{ padding: "8px 12px", fontSize: 12, borderRadius: 8, cursor: noteDirty ? "pointer" : "not-allowed",
-                    border: `1px solid ${noteDirty ? green : border}`, color: noteDirty ? green : dim, background: "transparent", whiteSpace: "nowrap" }}>
-                  {t("Save note", "Uložiť")}
+                {statusButtons(f.id, f.status)}
+                <button onClick={() => openConversation(f.id)}
+                  style={{ marginLeft: "auto", padding: "6px 12px", fontSize: 12, borderRadius: 8, cursor: "pointer", border: `1px solid ${green}`, color: green, background: "transparent", whiteSpace: "nowrap" }}>
+                  💬 {t("Open conversation", "Otvoriť konverzáciu")} ({f.msg_count}) →
                 </button>
               </div>
-
-              {/* reply to the user (only if we have an address) */}
-              {f.email && (
-                <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${border}` }}>
-                  {f.admin_reply && (
-                    <div style={{ fontSize: 12, color: dim, marginBottom: 8 }}>
-                      <span style={{ color: green }}>↩ {t("Replied", "Odpovedané")}</span>
-                      {f.replied_at ? ` · ${fmtDate(f.replied_at)}` : ""}
-                      <div style={{ color: "#cdd0d6", marginTop: 3, whiteSpace: "pre-wrap" }}>{f.admin_reply}</div>
-                    </div>
-                  )}
-                  <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                    <textarea
-                      value={replyDraft[f.id] ?? ""}
-                      onChange={(e) => setReplyDraft((d) => ({ ...d, [f.id]: e.target.value }))}
-                      placeholder={t(`Reply to ${f.email} (emails them)…`, `Odpovedať na ${f.email} (pošle e-mail)…`)}
-                      rows={2}
-                      style={{ flex: 1, minWidth: 0, padding: "8px 11px", background: bg, border: `1px solid ${border}`, borderRadius: 8, color: textLight, fontSize: 13, outline: "none", resize: "vertical", fontFamily: "inherit" }}
-                    />
-                    <button
-                      disabled={replying[f.id] || (replyDraft[f.id] || "").trim().length < 2}
-                      onClick={() => sendReply(f.id)}
-                      style={{ padding: "8px 13px", fontSize: 12, borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap",
-                        border: `1px solid ${green}`, color: "#0a0a0c", background: green,
-                        cursor: replying[f.id] || (replyDraft[f.id] || "").trim().length < 2 ? "not-allowed" : "pointer",
-                        opacity: replying[f.id] || (replyDraft[f.id] || "").trim().length < 2 ? 0.45 : 1 }}>
-                      {replying[f.id] ? t("Sending…", "Posielam…") : `↩ ${f.admin_reply ? t("Reply again", "Znova") : t("Reply", "Odpovedať")}`}
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
           );
         })}
