@@ -1,4 +1,105 @@
-body { margin: 0; }
+/* ============================================================================
+   Residata — design tokens + global resets
+   Single source of truth for color / spacing / radius / layout / z-index.
+   Token values match the literals already used across the app, so introducing
+   them changes nothing visually — it just makes the system consistent.
+   ============================================================================ */
+:root {
+  /* ── color ────────────────────────────────────────────── */
+  --bg:            #0a0a0b;   /* page background (was also mistyped #0a0a0c in places) */
+  --surface:       #16161a;   /* cards / panels */
+  --surface-2:     #1d1d22;   /* raised surface / inputs */
+  --border:        #222228;
+  --border-soft:   #2a2a31;
+  --accent:        #00e5a0;   /* brand green */
+  --accent-strong: #00c98c;
+  --accent-2:      #f5a623;   /* secondary accent (trial / dev badge) */
+  --text:          #e8e8ed;   /* primary text */
+  --text-dim:      #8a8a96;   /* secondary text */
+  --text-faint:    #55555f;   /* tertiary / disabled */
+  --on-accent:     #06140f;   /* text on a green fill */
+
+  /* ── spacing scale (4px base) ─────────────────────────── */
+  --sp-1: 0.25rem; --sp-2: 0.5rem;  --sp-3: 0.75rem; --sp-4: 1rem;
+  --sp-5: 1.5rem;  --sp-6: 2rem;    --sp-8: 3rem;    --sp-10: 4rem;
+
+  /* ── radius scale ─────────────────────────────────────── */
+  --r-sm: 6px; --r-md: 8px; --r-lg: 12px; --r-xl: 16px; --r-pill: 999px;
+
+  /* ── layout ───────────────────────────────────────────── */
+  --container: 1200px;                       /* one content width for nav, footer, pages */
+  --container-pad: clamp(1rem, 4vw, 2rem);   /* consistent side gutters */
+  --page-top: 8rem;                          /* clearance below the fixed nav + ticker */
+
+  /* ── z-index ladder (named layers, no more ad-hoc 9999) ── */
+  --z-bg: 0;
+  --z-dock: 90;
+  --z-ticker: 99;
+  --z-nav: 100;
+  --z-banner: 110;
+  --z-pill: 2000;     /* floating chat / feedback launchers */
+  --z-modal: 3000;    /* login / complete-profile */
+  --z-popup: 3200;    /* trial popup */
+  --z-cookie: 3500;   /* cookie banner */
+
+  /* ── motion ───────────────────────────────────────────── */
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── universal box model: borders + padding stay inside declared widths ─── */
+*, *::before, *::after { box-sizing: border-box; }
+
+/* ── reserve the scrollbar gutter on every page so content never shifts
+   horizontally between a scrolling page (Home) and a short one (Contact) ─── */
+html {
+  scrollbar-gutter: stable;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── one consistent keyboard-focus ring across the whole app ───────────── */
+:where(a, button, input, select, textarea, [role="button"], [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+/* ── respect users who ask for less motion ─────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── Nav links: centered zone, hover + active underline indicator ───────── */
+.nav-link {
+  position: relative;
+  color: var(--text-dim);
+  text-decoration: none;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: color 0.18s var(--ease);
+  white-space: nowrap;
+}
+.nav-link:hover { color: var(--text); }
+.nav-link--active { color: var(--text); }
+.nav-link--active::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: -7px;
+  height: 2px; border-radius: 2px;
+  background: var(--accent);
+}
 
 /* ── Responsive top nav ─────────────────────────────────────────────────────
    The desktop nav packs a lot: logo + 6 marketing links + a market/currency/
@@ -14,4 +115,16 @@ body { margin: 0; }
 }
 @media (max-width: 1180px) {
   .nav-links  { display: none !important; }
+}
+/* Phone: declutter the nav so the primary CTA fits on one line. "Sign in" is
+   hidden (the CTA opens the same login modal, which handles returning users
+   too), leaving logo + language toggle + one clear CTA. */
+@media (max-width: 560px) {
+  .nav-right { gap: 0.45rem !important; }
+  .nav-signin-btn { display: none !important; }
+  .nav-cta-btn {
+    font-size: 0.74rem !important;
+    padding: 0.42rem 0.7rem !important;
+    white-space: nowrap;
+  }
 }
