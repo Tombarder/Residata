@@ -478,7 +478,10 @@ export function useTotalsList(level, { country = null, filterCol = null, filterI
     const myReq = ++reqRef.current;
     const isStale = () => myReq !== reqRef.current;
     let q = supabasePublic.from(view).select("*");
-    if (country) q = q.eq(_countryColForLevel(level), country);
+    // 'all' = the cross-market view → NO country filter (show every region/city/
+    // district across all markets). A literal .eq('country_code','all') matched
+    // nothing, which is why the homepage pricing-map block was empty in All view.
+    if (country && country !== "all") q = q.eq(_countryColForLevel(level), country);
     if (filterCol && filterId != null) q = q.eq(filterCol, filterId);
     q.then(({ data, error }) => {
       if (isStale()) return;
