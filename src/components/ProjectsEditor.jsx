@@ -173,7 +173,8 @@ export default function ProjectsEditor({ lang = "sk" }) {
                   </td>
                   <td style={td}>
                     <select value={valueOf(row, "city_id") || ""} onChange={(e) => setField(row.id, "city_id", e.target.value)} style={inputStyle}>
-                      <option value="">—</option>
+                      {/* city is required (NOT NULL) — no empty option */}
+                      {!valueOf(row, "city_id") && <option value="">—</option>}
                       {cities.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                   </td>
