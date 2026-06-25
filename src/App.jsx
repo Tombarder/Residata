@@ -18,8 +18,7 @@ import UpgradePrompt from "./components/UpgradePrompt";
 const LiveDashboard = lazy(() => import("./pages/LivePages").then(m => ({ default: m.LiveDashboard })));
 const LiveProjectDetail = lazy(() => import("./pages/LivePages").then(m => ({ default: m.LiveProjectDetail })));
 import EarlyAccessBadge from "./components/EarlyAccessBadge";
-import CountrySwitcher from "./components/CountrySwitcher";
-import CurrencySwitcher from "./components/CurrencySwitcher";
+import MarketControls from "./components/MarketControls";
 // HowItWorksFlow z HomeExtras bol odstránený — PipelineFlow ho plne
 // pokrýva a robí to na živých číslach z useMarketTotals.
 import { MarketPulse, DistrictPulse, PipelineFlow } from "./pages/HomeExtras";
@@ -561,11 +560,9 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
           {/* Market + currency + language = ONE tight control cluster, so adding the
               CZ [Kč|€] toggle never reflows or breaks the row (non-interruptive). */}
           <div className="nav-controls" style={{ display: "flex", alignItems: "center", gap: "0.55rem" }}>
-          {/* Country switcher — dormant (renders null) until a 2nd market has data */}
-          <CountrySwitcher lang={lang} />
-          {/* Currency switcher — dormant (renders null) unless the viewed country's
-              native currency != € (today: Czechia → [Kč | €]) */}
-          <CurrencySwitcher lang={lang} />
+          {/* Market + currency, grouped + ALWAYS both rendered so the row never
+              reflows when the CZK toggle appears. */}
+          <MarketControls lang={lang} variant="inline" />
           {/* Language toggle */}
           <div style={{
             display: "flex", borderRadius: 6, overflow: "hidden",
