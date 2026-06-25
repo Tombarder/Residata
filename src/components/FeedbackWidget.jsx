@@ -148,8 +148,10 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
     const pid = detectProjectId(); if (pid) payload.project_id = pid;
     if (screenshot) payload.screenshot = screenshot;
     if (!accountEmail) { const e = cleanEmail(email); if (e) payload.email = e; }
-    payload.diagnostics = getDiagnostics();
-    if (includeShot) { const auto = await capturePageScreenshot(); if (auto) payload.auto_screenshot = auto; }
+    let shot = { url: null, error: null };
+    if (includeShot) shot = await capturePageScreenshot();
+    payload.diagnostics = getDiagnostics(shot.error ? { screenshot_error: shot.error } : {});
+    if (shot.url) payload.auto_screenshot = shot.url;
     try {
       const headers = { "Content-Type": "application/json" }; if (token) headers.Authorization = `Bearer ${token}`;
       const r = await fetch("/api/feedback/submit", { method: "POST", headers, body: JSON.stringify(payload) });
@@ -178,8 +180,10 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
     const txt = cleanText(continueMsg, { max: MAX_MESSAGE });
     if (txt.length < 2 || !activeConv) return;
     setContinuePhase("sending"); setContinueErr("");
-    const payload = { conversation_id: activeConv, message: txt, app_lang: lang === "sk" ? "sk" : "en", page_path: typeof window !== "undefined" ? window.location.pathname : null, page_url: typeof window !== "undefined" ? window.location.href : null, diagnostics: getDiagnostics() };
-    if (includeShot) { const auto = await capturePageScreenshot(); if (auto) payload.auto_screenshot = auto; }
+    let shot = { url: null, error: null };
+    if (includeShot) shot = await capturePageScreenshot();
+    const payload = { conversation_id: activeConv, message: txt, app_lang: lang === "sk" ? "sk" : "en", page_path: typeof window !== "undefined" ? window.location.pathname : null, page_url: typeof window !== "undefined" ? window.location.href : null, diagnostics: getDiagnostics(shot.error ? { screenshot_error: shot.error } : {}) };
+    if (shot.url) payload.auto_screenshot = shot.url;
     try {
       const token = storedAccessToken();
       const r = await fetch("/api/feedback/submit", {
