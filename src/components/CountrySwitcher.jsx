@@ -2,22 +2,22 @@ import { useCountry, countryName } from "../lib/useCountry";
 import { track } from "../lib/track";
 
 /**
- * CountrySwitcher — market picker (All / SK / CZ). Shared by the public site and
- * the platform; usually rendered inside <MarketControls> next to the currency
- * switcher.
+ * CountrySwitcher — market picker (All / SK / CZ). Usually rendered inside
+ * <MarketControls> next to the currency switcher.
  *
- * `hideLabel` drops the inline "Market / Trh" caption when the surrounding
- * container already labels it (e.g. the MarketControls panel).
+ * Props:
+ *   · hideLabel — drop the inline "Market / Trh" caption (the container labels it).
+ *   · fill      — equal-width segments that fill the container (flex:1 each), for
+ *                 the panel layout; otherwise content-sized for tight inline rows.
  *
- * Dormant by design: renders NOTHING while fewer than two markets are active
- * (`countries` derives from public.projects_live) — no deploy to turn it on.
+ * Dormant by design: renders NOTHING while fewer than two markets are active.
  */
 const FLAG = { all: "🌍", SK: "🇸🇰", CZ: "🇨🇿", PL: "🇵🇱", HU: "🇭🇺", AT: "🇦🇹", DE: "🇩🇪" };
+const MONO = "'JetBrains Mono', monospace";
 
-export default function CountrySwitcher({ lang = "en", hideLabel = false }) {
+export default function CountrySwitcher({ lang = "en", hideLabel = false, fill = false }) {
   const { country, setCountry, countries } = useCountry();
 
-  // Nothing to switch between → don't clutter the UI.
   if (!countries || countries.length < 2) return null;
 
   const group = (
@@ -25,9 +25,9 @@ export default function CountrySwitcher({ lang = "en", hideLabel = false }) {
       role="group"
       aria-label={lang === "sk" ? "Trh" : "Market"}
       style={{
-        display: "flex", borderRadius: 7, overflow: "hidden",
-        border: "1px solid #2e2e38", fontSize: "0.72rem",
-        fontFamily: "'JetBrains Mono', monospace",
+        display: "flex", borderRadius: 8, overflow: "hidden",
+        border: "1px solid #2e2e38", fontSize: "0.72rem", fontFamily: MONO,
+        width: fill ? "100%" : undefined,
       }}
     >
       {countries.map((c, i) => {
@@ -44,14 +44,17 @@ export default function CountrySwitcher({ lang = "en", hideLabel = false }) {
             title={countryName(c, lang)}
             aria-pressed={active}
             style={{
-              display: "flex", alignItems: "center", gap: "0.32rem",
-              padding: "0.34rem 0.62rem", border: "none", cursor: "pointer",
+              flex: fill ? "1 1 0" : undefined,
+              display: "flex", alignItems: "center", justifyContent: "center", gap: "0.3rem",
+              padding: "0.4rem 0.55rem", border: "none", cursor: "pointer",
               borderLeft: i ? "1px solid #2e2e38" : "none",
               background: active ? "#00e5a0" : "transparent",
               color: active ? "#06140f" : "#9a9aa6",
-              fontWeight: active ? 700 : 500,
+              fontWeight: active ? 700 : 500, whiteSpace: "nowrap",
               fontFamily: "inherit", fontSize: "inherit", transition: "all 0.15s",
             }}
+            onMouseEnter={(e) => { if (!active) e.currentTarget.style.color = "#e8e8ed"; }}
+            onMouseLeave={(e) => { if (!active) e.currentTarget.style.color = "#9a9aa6"; }}
           >
             {c === "all" && <span style={{ fontSize: "0.82rem", lineHeight: 1 }}>{FLAG[c] || "🌍"}</span>}
             {c === "all" ? countryName("all", lang) : c}
@@ -69,8 +72,7 @@ export default function CountrySwitcher({ lang = "en", hideLabel = false }) {
         aria-hidden
         style={{
           fontSize: "0.6rem", letterSpacing: "0.1em", textTransform: "uppercase",
-          color: "#7a7a86", fontWeight: 600,
-          fontFamily: "'JetBrains Mono', monospace", whiteSpace: "nowrap",
+          color: "#7a7a86", fontWeight: 600, fontFamily: MONO, whiteSpace: "nowrap",
         }}
       >
         {lang === "sk" ? "Trh" : "Market"}
