@@ -78,8 +78,10 @@ export function CurrencyProvider({ children }) {
     const reals = (countries || []).filter((c) => c && c !== "all");
     const offered = ["EUR", ...reals.map((c) => NATIVE_CCY[c] || "EUR")]
       .filter((v, i, a) => a.indexOf(v) === i);
-    // Explicit choice wins (global); otherwise follow the viewed market.
-    let displayCode = chosen && offered.includes(chosen) ? chosen : marketNative;
+    // Explicit choice wins (global); otherwise default to EUR (Boss 2026-06-25:
+    // "default is EUR and ALL"). The whole platform is EUR-first, so a fresh
+    // visitor lands on € everywhere; CZK is one click and then sticks globally.
+    let displayCode = chosen && offered.includes(chosen) ? chosen : "EUR";
     if (!offered.includes(displayCode)) displayCode = "EUR";
     const exch = rates[displayCode]; // EUR per 1 unit
     const unitsPerEur = displayCode === "EUR" ? 1 : (exch ? 1 / exch : 1);
