@@ -529,59 +529,52 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
       backdropFilter: "blur(20px)", borderBottom: "1px solid #222228",
     }}>
       <div style={{
-        maxWidth: 1320, margin: "0 auto", padding: "1.25rem 2rem",
-        display: "flex", alignItems: "center", justifyContent: "space-between",
+        maxWidth: "var(--container)", margin: "0 auto", padding: "1rem var(--container-pad)",
+        display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: "1rem",
       }}>
-        <a onClick={() => setCurrent("Home")} style={{ display: "flex", alignItems: "center", gap: "0.6rem", cursor: "pointer", textDecoration: "none" }}>
+        <a onClick={() => setCurrent("Home")} style={{ justifySelf: "start", display: "flex", alignItems: "center", gap: "0.6rem", cursor: "pointer", textDecoration: "none" }}>
           <div style={{
-            width: 28, height: 28, background: "#00e5a0", borderRadius: 6,
+            width: 28, height: 28, background: "var(--accent)", borderRadius: "var(--r-sm)",
             display: "flex", alignItems: "center", justifyContent: "center",
-            fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, fontSize: 14, color: "#0a0a0b",
+            fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, fontSize: 14, color: "var(--bg)",
           }}>R</div>
-          <span style={{ fontWeight: 600, fontSize: "1.1rem", color: "#e8e8ed", letterSpacing: "-0.02em" }}>Residata</span>
+          <span style={{ fontWeight: 600, fontSize: "1.1rem", color: "var(--text)", letterSpacing: "-0.02em" }}>Residata</span>
         </a>
-        <div className="nav-right" style={{ display: "flex", alignItems: "center", gap: "1.25rem", listStyle: "none" }}>
-          <div className="nav-links" style={{ display: "flex", alignItems: "center", gap: "1.4rem" }}>
+        {/* Center zone: marketing links, balanced between logo and CTAs */}
+        <div className="nav-links" style={{ justifySelf: "center", display: "flex", alignItems: "center", gap: "1.75rem" }}>
           {pages.map((p, i) => {
             const key = pagesEN[i];
             // "Sample" in the nav maps to the "Data" page key internally
             // (see pageMap). Resolve it the same way so the active-state
-            // highlight picks up the glow when we're on /sample.
+            // underline picks up when we're on /sample.
             const internalKey = pageMap[key] || key;
             const isActive = current === internalKey;
             return (
-              <a key={key} className="nav-link" onClick={() => setCurrent(key)} style={{
-                color: isActive ? "#e8e8ed" : "#8a8a96", textDecoration: "none",
-                fontSize: "0.875rem", cursor: "pointer", transition: "color 0.2s",
-              }}>{p}</a>
+              <a key={key} className={"nav-link" + (isActive ? " nav-link--active" : "")} onClick={() => setCurrent(key)}>{p}</a>
             );
           })}
-          </div>
-          {/* Market + currency + language = ONE tight control cluster, so adding the
-              CZ [Kč|€] toggle never reflows or breaks the row (non-interruptive). */}
-          <div className="nav-controls" style={{ display: "flex", alignItems: "center", gap: "0.55rem" }}>
-          {/* Market + Currency now live in the fixed MarketControls panel (marketing
-              chrome below), so the nav stays clean and never reflows. */}
-          {/* Language toggle */}
+        </div>
+        {/* Right zone: language toggle + auth CTAs */}
+        <div className="nav-right" style={{ justifySelf: "end", display: "flex", alignItems: "center", gap: "0.75rem", listStyle: "none" }}>
+          {/* Language toggle (Market + Currency live in the fixed MarketControls dock) */}
           <div style={{
-            display: "flex", borderRadius: 6, overflow: "hidden",
-            border: "1px solid #222228", fontSize: "0.72rem",
+            display: "flex", borderRadius: "var(--r-sm)", overflow: "hidden",
+            border: "1px solid var(--border)", fontSize: "0.72rem",
             fontFamily: "'JetBrains Mono', monospace",
           }}>
             <button onClick={() => { if (lang !== "en") { track("language_switched", { from: lang, to: "en" }); setLang("en"); } }} style={{
               padding: "0.3rem 0.6rem", border: "none", cursor: "pointer",
-              background: lang === "en" ? "#222228" : "transparent",
-              color: lang === "en" ? "#e8e8ed" : "#55555f",
+              background: lang === "en" ? "var(--border)" : "transparent",
+              color: lang === "en" ? "var(--text)" : "var(--text-faint)",
               fontFamily: "inherit", fontSize: "inherit", transition: "all 0.2s",
             }}>EN</button>
             <button onClick={() => { if (lang !== "sk") { track("language_switched", { from: lang, to: "sk" }); setLang("sk"); } }} style={{
               padding: "0.3rem 0.6rem", border: "none", cursor: "pointer",
-              borderLeft: "1px solid #222228",
-              background: lang === "sk" ? "#222228" : "transparent",
-              color: lang === "sk" ? "#e8e8ed" : "#55555f",
+              borderLeft: "1px solid var(--border)",
+              background: lang === "sk" ? "var(--border)" : "transparent",
+              color: lang === "sk" ? "var(--text)" : "var(--text-faint)",
               fontFamily: "inherit", fontSize: "inherit", transition: "all 0.2s",
             }}>SK</button>
-          </div>
           </div>
           {user ? (
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
@@ -664,7 +657,7 @@ function Footer({ lang = "en", setCurrent }) {
   return (
     <footer style={{
       padding: "2.5rem 2rem", borderTop: "1px solid #222228",
-      maxWidth: 1100, margin: "0 auto",
+      maxWidth: "var(--container)", margin: "0 auto",
     }}>
       <div style={{
         display: "flex", justifyContent: "space-between", alignItems: "center",
@@ -846,7 +839,7 @@ function HomePage({ setCurrent, l, lang, onLogin }) {
           detail lives in one structured place. */}
 
       {/* Short teaser pointing to the What-We-Deliver page */}
-      <FadeIn style={{ padding: "4rem 2rem 5rem", maxWidth: 1100, margin: "0 auto" }}>
+      <FadeIn style={{ padding: "4rem 2rem 5rem", maxWidth: "var(--container)", margin: "0 auto" }}>
         <div className="flex-scope" style={{
           border: "1px solid #222228", borderRadius: 12, background: "#16161a",
           padding: "2rem 2.25rem", display: "flex", gap: "1.25rem",
@@ -886,13 +879,13 @@ function UseCasesPage({ setCurrent, l, lang }) {
   const isPaid = can("has_paid_access");
   return (
     <>
-      <div style={{ padding: "8rem 2rem 3rem", maxWidth: 1100, margin: "0 auto", textAlign: "center" }}>
+      <div style={{ padding: "8rem 2rem 3rem", maxWidth: "var(--container)", margin: "0 auto", textAlign: "center" }}>
         <Label>{l.useCasesLabel}</Label>
         <h1 className="sec-title" style={{ whiteSpace: "pre-line" }}>{l.useCasesTitle}</h1>
         <p className="sec-desc" style={{ margin: "0 auto" }}>{l.useCasesDesc}</p>
       </div>
 
-      <div style={{ padding: "0 2rem 5rem", maxWidth: 1150, margin: "0 auto" }}>
+      <div style={{ padding: "0 2rem 5rem", maxWidth: "var(--container)", margin: "0 auto" }}>
         {l.useCases.map((c, i) => {
           const img = USE_CASE_IMAGES[i] || USE_CASE_IMAGES[0];
           const imageLeft = i % 2 === 0;  // even index → image left
@@ -1204,7 +1197,7 @@ function DataPage({ setCurrent, l, lang }) {
           A two-column split: text on the left, market-analytics photo on
           the right. Same visual language as the Use Cases page cards so
           the "offer" feels like one brand, not two separate pitches. */}
-      <div style={{ padding: "7rem 2rem 1rem", maxWidth: 1200, margin: "0 auto" }}>
+      <div style={{ padding: "8rem 2rem 1rem", maxWidth: "var(--container)", margin: "0 auto" }}>
         <div className="wwd-hero" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "3rem", alignItems: "center" }}>
           <div>
             <Label>{l.valueLabel}</Label>
@@ -1228,7 +1221,7 @@ function DataPage({ setCurrent, l, lang }) {
       </div>
 
       {/* ═══ Questions ↔ Deliverables — core "what you get" grid ═══ */}
-      <div style={{ padding: "3rem 2rem 0", maxWidth: 1100, margin: "0 auto" }}>
+      <div style={{ padding: "3rem 2rem 0", maxWidth: "var(--container)", margin: "0 auto" }}>
         <div className="value-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
           <div style={{ border: "1px solid #222228", borderRadius: 12, background: "#16161a", padding: "2rem" }}>
             <div style={{ fontFamily: mono, fontSize: "0.65rem", color: "#00e5a0", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "1.25rem" }}>{l.questionsLabel}</div>
@@ -1255,7 +1248,7 @@ function DataPage({ setCurrent, l, lang }) {
       </div>
 
       {/* Flexible Scope — full-width card below the two columns */}
-      <div style={{ padding: "1.5rem 2rem 4rem", maxWidth: 1100, margin: "0 auto" }}>
+      <div style={{ padding: "1.5rem 2rem 4rem", maxWidth: "var(--container)", margin: "0 auto" }}>
         <div className="flex-scope" style={{
           border: "1px solid #222228", borderRadius: 12, background: "#16161a",
           padding: "2rem 2.25rem", display: "grid", gridTemplateColumns: "auto 1fr", gap: "1.75rem", alignItems: "center",
@@ -1276,7 +1269,7 @@ function DataPage({ setCurrent, l, lang }) {
       </div>
 
       {/* ═══ INSIGHTS ═══ */}
-      <div style={{ padding: "2rem 2rem 1rem", maxWidth: 1100, margin: "0 auto" }}>
+      <div style={{ padding: "2rem 2rem 1rem", maxWidth: "var(--container)", margin: "0 auto" }}>
         <Label>{l.insightsLabel}</Label>
         <h2 className="sec-title" style={{ marginBottom: "0.5rem" }}>{l.insightsTitle}</h2>
         <div style={{ display: "flex", alignItems: "center", gap: "1.5rem", marginBottom: "2rem" }}>
@@ -1285,7 +1278,7 @@ function DataPage({ setCurrent, l, lang }) {
         </div>
       </div>
 
-      <div className="insight-grid" style={{ padding: "0 2rem 2rem", maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1rem" }}>
+      <div className="insight-grid" style={{ padding: "0 2rem 2rem", maxWidth: "var(--container)", margin: "0 auto", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1rem" }}>
 
         {/* ─── Insight cards — April 2026 snapshot with directional signals
             Every card pairs a hard number with a trend (QoQ, YoY, months-
@@ -1412,7 +1405,7 @@ function DataPage({ setCurrent, l, lang }) {
       </div>
 
       {/* Unit Table + Schema — two-column layout */}
-      <div style={{ padding: "2rem 2rem 5rem", maxWidth: 1200, margin: "0 auto" }}>
+      <div style={{ padding: "2rem 2rem 5rem", maxWidth: "var(--container)", margin: "0 auto" }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2.5rem", alignItems: "start" }}>
 
           {/* Left — Real data examples (lighter) */}
@@ -1565,7 +1558,7 @@ function PricingPage({ setCurrent, l, lang, onLogin }) {
 
   return (
     <>
-      <div style={{ padding: "8rem 2rem 3rem", maxWidth: 1100, margin: "0 auto", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
+      <div style={{ padding: "8rem 2rem 3rem", maxWidth: "var(--container)", margin: "0 auto", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
         {showEarlyAccessBlock && <div style={{ marginBottom: "1rem" }}><EarlyAccessBadge lang={lang} /></div>}
         {isAlreadyPaid && (
           <div style={{ marginBottom: "1rem",
@@ -1639,7 +1632,7 @@ function PricingPage({ setCurrent, l, lang, onLogin }) {
         )}
       </div>
 
-      <div style={{ padding: "0 2rem 4rem", maxWidth: 1100, margin: "0 auto" }}>
+      <div style={{ padding: "0 2rem 4rem", maxWidth: "var(--container)", margin: "0 auto" }}>
         <div className="pricing-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1.5rem" }}>
           {tiers.map(t => (
             <div key={t.tier} style={{
@@ -1761,13 +1754,13 @@ function ContactPage({ l }) {
   const mono = "'JetBrains Mono', monospace";
   return (
     <>
-      <div style={{ padding: "8rem 2rem 3rem", maxWidth: 1100, margin: "0 auto" }}>
+      <div style={{ padding: "8rem 2rem 3rem", maxWidth: "var(--container)", margin: "0 auto" }}>
         <Label>{l.contactLabel}</Label>
         <h1 className="sec-title">{l.contactTitle}</h1>
         <p className="sec-desc">{l.contactDesc}</p>
       </div>
 
-      <div style={{ padding: "0 2rem 5rem", maxWidth: 1100, margin: "0 auto" }}>
+      <div style={{ padding: "0 2rem 5rem", maxWidth: "var(--container)", margin: "0 auto" }}>
         <div className="contact-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
 
           {/* Left — Contact card */}
@@ -1968,11 +1961,11 @@ export default function App() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@300;400;500;600;700&display=swap');
         .sec-title { font-size: clamp(1.8rem, 3.5vw, 2.6rem); font-weight: 700; letter-spacing: -0.03em; margin-bottom: 1rem; line-height: 1.15; }
-        .sec-desc { font-size: 1.05rem; color: #8a8a96; max-width: 600px; font-weight: 300; line-height: 1.7; }
-        .btn-p { display: inline-block; padding: 0.75rem 2rem; background: #00e5a0; color: #0a0a0b; font-weight: 600; font-size: 0.9rem; border: none; border-radius: 8px; cursor: pointer; text-decoration: none; transition: all 0.2s; }
+        .sec-desc { font-size: 1.05rem; color: var(--text-dim); max-width: 600px; font-weight: 300; line-height: 1.7; }
+        .btn-p { display: inline-block; padding: 0.75rem 2rem; background: var(--accent); color: var(--bg); font-weight: 600; font-size: 0.9rem; border: none; border-radius: var(--r-md); cursor: pointer; text-decoration: none; transition: all 0.2s; }
         .btn-p:hover { opacity: 0.85; transform: translateY(-1px); }
-        .btn-s { display: inline-block; padding: 0.75rem 2rem; background: transparent; color: #e8e8ed; font-weight: 500; font-size: 0.9rem; border: 1px solid #222228; border-radius: 8px; cursor: pointer; text-decoration: none; transition: all 0.2s; }
-        .btn-s:hover { border-color: #55555f; transform: translateY(-1px); }
+        .btn-s { display: inline-block; padding: 0.75rem 2rem; background: transparent; color: var(--text); font-weight: 500; font-size: 0.9rem; border: 1px solid var(--border); border-radius: var(--r-md); cursor: pointer; text-decoration: none; transition: all 0.2s; }
+        .btn-s:hover { border-color: var(--text-faint); transform: translateY(-1px); }
         
         @keyframes ticker-slide { from { transform: translateX(0); } to { transform: translateX(-50%); } }
         @keyframes pageFade {

@@ -27,12 +27,12 @@ import { useEffect } from "react";
 // Ticker (verified live on first deploy — Boss flagged the clip).
 function LegalPageShell({ title, children }) {
   return (
-    <div style={{ background: "#0a0a0c", minHeight: "100vh", color: "#e8e8ed" }}>
+    <div style={{ background: "var(--bg)", minHeight: "100vh", color: "var(--text)" }}>
       <div style={{ maxWidth: 760, margin: "0 auto", padding: "9rem 2rem 6rem" }}>
         <div style={{
           fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
           fontSize: "0.7rem",
-          color: "#00e5a0",
+          color: "var(--accent)",
           letterSpacing: "0.12em",
           textTransform: "uppercase",
           marginBottom: "0.8rem",
@@ -40,11 +40,12 @@ function LegalPageShell({ title, children }) {
           Residata
         </div>
         <h1 style={{
-          fontSize: "2.2rem",
+          fontSize: "clamp(1.8rem, 3.5vw, 2.6rem)",
           fontWeight: 700,
-          letterSpacing: "-0.02em",
+          letterSpacing: "-0.03em",
           margin: "0 0 2rem 0",
-          color: "#e8e8ed",
+          lineHeight: 1.15,
+          color: "var(--text)",
         }}>{title}</h1>
         <div style={{ fontSize: "0.95rem", lineHeight: 1.75, color: "#c5c5cc" }}>
           {children}
