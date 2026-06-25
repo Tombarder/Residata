@@ -31,6 +31,7 @@ import UnitExplorer from "./UnitExplorer";
 import ChatAssistant from "../components/ChatAssistant";
 import CountrySwitcher from "../components/CountrySwitcher";
 import CurrencySwitcher from "../components/CurrencySwitcher";
+import DataFreshness from "../components/DataFreshness";
 // AiBetaBanner moved into AI surfaces only (ChatAssistant + FloatingChat)
 // after QA — was on every /app/* page which felt like noise on Dashboard /
 // Reports / Pivot where AI doesn't show up at all.
@@ -529,6 +530,10 @@ function TopBar({ page, lang, setLang, tier }) {
       </div>
 
       <div style={{ display: "inline-flex", alignItems: "center", gap: "0.6rem" }}>
+        {/* When the displayed market's data is from (latest COMPLETE snapshot). A
+            stuck batch shows an older date here — the visible "go fix it" signal,
+            and it sits next to the market switcher it tracks. */}
+        <DataFreshness lang={lang} className="platform-topbar-freshness" />
         {/* Market (SK / CZ / All) + currency (native / €) switchers. The platform
             defaults to All; both read the shared context so a change here flows to
             every screen. CountrySwitcher self-hides when only one market exists. */}

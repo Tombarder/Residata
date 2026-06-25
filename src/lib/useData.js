@@ -1816,3 +1816,48 @@ export function useAnalyticsRegistry() {
   }, []);
   return { dimensions: reg.dimensions || [], measures: reg.measures || [], loading };
 }
+
+// ── Data freshness (2026-06-25) ────────────────────────────────────────────
+// "Dáta aktualizované DD.M.YYYY" per country — the latest APPROVED snapshot date
+// (public.market_freshness). Snapshots approve all-or-nothing, so when a market's
+// batch is stuck (a project can't scrape) this date stops advancing for that
+// market — the visible "this batch needs fixing" signal, never silently mixing
+// fresh + stale data. The "All" view shows the OLDEST market date (the combined
+// view is only as fresh as its stalest market).
+let _freshness = null;            // { SK: 'YYYY-MM-DD', CZ: '…' }
+let _freshnessPromise = null;
+function _loadFreshness() {
+  if (_freshness) return Promise.resolve(_freshness);
+  if (_freshnessPromise) return _freshnessPromise;
+  _freshnessPromise = supabasePublic.from("market_freshness").select("country,last_data_date")
+    .then(({ data }) => {
+      const m = {};
+      (data || []).forEach((r) => { if (r.country) m[r.country] = r.last_data_date; });
+      _freshness = m;
+      return m;
+    })
+    .catch(() => ({}));
+  return _freshnessPromise;
+}
+function _freshnessForView(country, m) {
+  if (!m || !Object.keys(m).length) return null;
+  if (isAllCountries(country)) {
+    const dates = Object.values(m).filter(Boolean).sort();   // ISO dates sort chronologically
+    return dates[0] || null;                                 // oldest = honest combined freshness
+  }
+  return m[country] || null;
+}
+
+/** Latest data date ('YYYY-MM-DD') for the selected country (the oldest market
+ *  for the "All" view), or null while loading. Drives the freshness indicator. */
+export function useFreshness() {
+  const { country } = useCountry();
+  const [date, setDate] = useState(() => _freshnessForView(country, _freshness));
+  useEffect(() => {
+    let cancelled = false;
+    if (!isSupabaseReady()) return;
+    _loadFreshness().then((m) => { if (!cancelled) setDate(_freshnessForView(country, m)); });
+    return () => { cancelled = true; };
+  }, [country]);
+  return date;
+}
