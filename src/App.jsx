@@ -4,6 +4,7 @@ import LoginModal from "./components/LoginModal";
 import CompleteProfile from "./components/CompleteProfile";
 import FloatingChat from "./components/FloatingChat";
 import FeedbackWidget from "./components/FeedbackWidget";
+import "./lib/diagnostics";   // installs the error/network collector at startup
 import { TrialBanner, TrialPopup } from "./components/TrialBanner";
 import PendingGate from "./components/PendingGate";
 import Feature from "./components/Feature";

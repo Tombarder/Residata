@@ -78,13 +78,24 @@ function ipRateCheck(ip) {
   return { ok: true };
 }
 
-// Upload an optional screenshot to <message_id>.<ext> and return the path.
-async function uploadShot(admin, img, messageId) {
+// Upload an optional image to <message_id><suffix>.<ext> and return the path.
+async function uploadShot(admin, img, messageId, suffix = "") {
   if (!img) return null;
-  const path = `${messageId}.${img.ext}`;
+  const path = `${messageId}${suffix}.${img.ext}`;
   const { error } = await admin.storage.from("feedback-attachments").upload(path, img.buffer, { contentType: img.mime, upsert: true });
-  if (error) { console.error("[feedback] screenshot upload failed:", error.message); return null; }
+  if (error) { console.error("[feedback] image upload failed:", error.message); return null; }
   return path;
+}
+
+// Attach a manual screenshot + an auto page-screenshot to a message.
+async function attachToMessage(admin, messageId, img, autoImg) {
+  const update = {};
+  const p1 = await uploadShot(admin, img, messageId, "");
+  if (p1) update.attachment_path = p1;
+  const p2 = await uploadShot(admin, autoImg, messageId, "_auto");
+  if (p2) update.auto_screenshot_path = p2;
+  if (Object.keys(update).length) await admin.from("feedback_messages").update(update).eq("id", messageId);
+  return update;
 }
 
 export default async function handler(req, res) {
@@ -112,6 +123,8 @@ async function handleInner(req, res) {
   if (message.length < 2) return res.status(400).json({ error: "message too short" });
   const conversation_id = body.conversation_id;
   const img = parseDataUrlImage(body.screenshot);
+  const autoImg = parseDataUrlImage(body.auto_screenshot);
+  const diagnostics = (body.diagnostics && typeof body.diagnostics === "object" && !Array.isArray(body.diagnostics)) ? body.diagnostics : null;
   const app_lang = body.app_lang === "en" ? "en" : "sk";
 
   const admin = createClient(SUPABASE_URL, SUPABASE_SECRET_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
@@ -163,11 +176,10 @@ async function handleInner(req, res) {
     if (conv.user_id !== user_id) return res.status(403).json({ error: "not your conversation" });
 
     const { data: msg, error: mErr } = await admin
-      .from("feedback_messages").insert({ conversation_id, sender: "user", author_id: user_id, body: message })
+      .from("feedback_messages").insert({ conversation_id, sender: "user", author_id: user_id, body: message, diagnostics })
       .select("id").single();
     if (mErr) { console.error("[feedback] message insert failed", mErr.message); return res.status(500).json({ error: "could not save message" }); }
-    const path = await uploadShot(admin, img, msg.id);
-    if (path) await admin.from("feedback_messages").update({ attachment_path: path }).eq("id", msg.id);
+    await attachToMessage(admin, msg.id, img, autoImg);
 
     await notifyAdmin(conv.category, conv.project_name, conv.email || accountEmail, true);
     return res.status(200).json({ ok: true, id: conversation_id, message_id: msg.id });
@@ -195,16 +207,13 @@ async function handleInner(req, res) {
   // First message of the thread (kept in sync with the conversation opener).
   const { data: msg, error: mErr } = await admin
     .from("feedback_messages")
-    .insert({ conversation_id: conv.id, sender: "user", author_id: user_id, body: message, created_at: conv.created_at })
+    .insert({ conversation_id: conv.id, sender: "user", author_id: user_id, body: message, created_at: conv.created_at, diagnostics })
     .select("id").single();
   if (mErr) console.error("[feedback] opener message insert failed", mErr.message);
 
-  if (img && msg?.id) {
-    const path = await uploadShot(admin, img, msg.id);
-    if (path) {
-      await admin.from("feedback_messages").update({ attachment_path: path }).eq("id", msg.id);
-      await admin.from("feedback").update({ attachment_path: path }).eq("id", conv.id);
-    }
+  if (msg?.id) {
+    const up = await attachToMessage(admin, msg.id, img, autoImg);
+    if (up.attachment_path) await admin.from("feedback").update({ attachment_path: up.attachment_path }).eq("id", conv.id);
   }
 
   await notifyAdmin(category, project_name, email, false);
