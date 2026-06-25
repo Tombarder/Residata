@@ -16,6 +16,7 @@ import { useRef, useState } from "react";
 import { useAuth } from "../lib/useAuth";
 import { supabase } from "../lib/supabase";
 import { cleanText, cleanEmail } from "../lib/sanitize";
+import { getDiagnostics, capturePageScreenshot } from "../lib/diagnostics";
 
 const mono   = "'JetBrains Mono', monospace";
 const green  = "#00e5a0";
@@ -105,6 +106,7 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
   const [continueMsg, setContinueMsg] = useState("");
   const [continuePhase, setContinuePhase] = useState("idle");
   const [continueErr, setContinueErr] = useState("");
+  const [includeShot, setIncludeShot] = useState(true);  // auto page-screenshot + diagnostics
   const taRef = useRef(null);
   const fileRef = useRef(null);
 
@@ -146,6 +148,8 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
     const pid = detectProjectId(); if (pid) payload.project_id = pid;
     if (screenshot) payload.screenshot = screenshot;
     if (!accountEmail) { const e = cleanEmail(email); if (e) payload.email = e; }
+    payload.diagnostics = getDiagnostics();
+    if (includeShot) { const auto = await capturePageScreenshot(); if (auto) payload.auto_screenshot = auto; }
     try {
       const headers = { "Content-Type": "application/json" }; if (token) headers.Authorization = `Bearer ${token}`;
       const r = await fetch("/api/feedback/submit", { method: "POST", headers, body: JSON.stringify(payload) });
@@ -174,12 +178,14 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
     const txt = cleanText(continueMsg, { max: MAX_MESSAGE });
     if (txt.length < 2 || !activeConv) return;
     setContinuePhase("sending"); setContinueErr("");
+    const payload = { conversation_id: activeConv, message: txt, app_lang: lang === "sk" ? "sk" : "en", page_path: typeof window !== "undefined" ? window.location.pathname : null, page_url: typeof window !== "undefined" ? window.location.href : null, diagnostics: getDiagnostics() };
+    if (includeShot) { const auto = await capturePageScreenshot(); if (auto) payload.auto_screenshot = auto; }
     try {
       const token = storedAccessToken();
       const r = await fetch("/api/feedback/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ conversation_id: activeConv, message: txt, app_lang: lang === "sk" ? "sk" : "en", page_path: typeof window !== "undefined" ? window.location.pathname : null }),
+        body: JSON.stringify(payload),
       });
       if (!r.ok) { setContinuePhase("error"); setContinueErr(L("Nepodarilo sa odoslať.", "Couldn't send.")); return; }
       setContinueMsg(""); setContinuePhase("idle");
@@ -191,7 +197,7 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
   // ── Launcher pill ──────────────────────────────────────────────
   if (!open) {
     return (
-      <button onClick={() => setOpen(true)} aria-label={L("Nahlásiť problém alebo návrh", "Report a problem or suggestion")} className="residata-fb-pill"
+      <button onClick={() => setOpen(true)} aria-label={L("Nahlásiť problém alebo návrh", "Report a problem or suggestion")} className="residata-fb-pill" data-rbf-ignore
         style={{ position: "fixed", right: 20, bottom, height: 40, padding: "0 14px 0 12px", borderRadius: 20, border: `1px solid rgba(0,229,160,0.55)`, background: bg2, color: text, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "0.5rem", fontFamily: "inherit", fontSize: "0.78rem", fontWeight: 600, letterSpacing: "-0.005em", zIndex: 2000, animation: "rbf-glow 2.4s ease-in-out infinite" }}>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={green} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
@@ -228,7 +234,7 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
   }
 
   return (
-    <div onPaste={onPaste} style={{ position: "fixed", right: 20, bottom, width: "min(400px, calc(100vw - 32px))", maxHeight: "min(680px, calc(100vh - 40px))", background: bg2, border: `1px solid ${border}`, borderRadius: 16, boxShadow: "0 20px 60px rgba(0,0,0,0.65)", display: "flex", flexDirection: "column", zIndex: 2000, animation: "rbf-panel 0.2s ease-out" }}>
+    <div onPaste={onPaste} data-rbf-ignore style={{ position: "fixed", right: 20, bottom, width: "min(400px, calc(100vw - 32px))", maxHeight: "min(680px, calc(100vh - 40px))", background: bg2, border: `1px solid ${border}`, borderRadius: 16, boxShadow: "0 20px 60px rgba(0,0,0,0.65)", display: "flex", flexDirection: "column", zIndex: 2000, animation: "rbf-panel 0.2s ease-out" }}>
       <style>{`
         @keyframes rbf-panel { from {opacity:0; transform:translateY(12px);} to {opacity:1; transform:translateY(0);} }
         @keyframes rbf-pop { 0% {transform:scale(0.6); opacity:0;} 60% {transform:scale(1.08);} 100% {transform:scale(1); opacity:1;} }
@@ -390,6 +396,11 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
                 </div>
               </>
             )}
+
+            <label style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem", marginTop: "0.8rem", cursor: "pointer", color: dim, fontSize: "0.68rem", lineHeight: 1.5 }}>
+              <input type="checkbox" checked={includeShot} onChange={e => setIncludeShot(e.target.checked)} style={{ marginTop: 2, accentColor: green }} />
+              <span>{L("Automaticky priložiť screenshot tejto stránky + technické info (chyby, prehliadač) — pomôže nám rýchlo nájsť problém.", "Automatically attach a screenshot of this page + technical info (errors, browser) — helps us find the problem fast.")}</span>
+            </label>
 
             {!accountEmail && (
               <input value={email} onChange={e => setEmail(e.target.value)} type="email" placeholder={L("E-mail (nepovinné, ak chceš odpoveď)", "Email (optional, if you want a reply)")}

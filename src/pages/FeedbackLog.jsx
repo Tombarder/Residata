@@ -18,6 +18,7 @@ import { supabase } from "../lib/supabase";
 const green = "#00e5a0";
 const amber = "#f5a623";
 const blue = "#4a9eff";
+const red = "#ff6b6b";
 const textLight = "#e8e8ed";
 const dim = "#8a8a96";
 const border = "#222228";
@@ -89,6 +90,7 @@ export default function FeedbackLog({ lang = "sk" }) {
   const [note, setNote] = useState("");
   const [replyDraft, setReplyDraft] = useState("");
   const [replying, setReplying] = useState(false);
+  const [diagOpen, setDiagOpen] = useState({});
 
   const load = useCallback(() => {
     rpcDirect("admin_feedback_stats", {}).then(setStats).catch((e) => setErr(e.message));
@@ -160,6 +162,28 @@ export default function FeedbackLog({ lang = "sk" }) {
   const byCat = stats?.by_category || {};
   const catChips = useMemo(() => Object.keys(CATEGORIES), []);
 
+  const diagBtn = { background: "transparent", border: `1px solid ${border}`, color: green, borderRadius: 6, cursor: "pointer", padding: "3px 8px", fontSize: 12, fontFamily: mono };
+  function renderDiag(d) {
+    if (!d) return null;
+    const evs = d.events || [];
+    return (
+      <div style={{ marginTop: 8, background: bg, border: `1px solid ${border}`, borderRadius: 8, padding: "9px 11px", fontFamily: mono, fontSize: 11, color: dim, lineHeight: 1.7 }}>
+        {d.page && <div><span style={{ color: "#cdd0d6" }}>page:</span> {d.url || d.page}</div>}
+        {d.viewport && <div>viewport: {d.viewport.w}×{d.viewport.h}{d.dpr ? ` · dpr ${d.dpr}` : ""}{typeof d.online === "boolean" ? ` · online ${d.online}` : ""}{d.lang ? ` · ${d.lang}` : ""}</div>}
+        {d.ua && <div style={{ wordBreak: "break-all" }}>browser: {d.ua}</div>}
+        {evs.length > 0 ? (
+          <div style={{ marginTop: 6 }}>
+            <div style={{ color: "#cdd0d6" }}>{t("errors / network", "chyby / sieť")} ({evs.length}):</div>
+            {evs.map((ev, i) => {
+              const isErr = /error|fail|reject/.test(ev.t || "");
+              return <div key={i} style={{ color: isErr ? red : dim, marginTop: 2, wordBreak: "break-all" }}>· [{ev.t}] {ev.m}</div>;
+            })}
+          </div>
+        ) : <div style={{ marginTop: 6, color: green }}>{t("no errors recorded", "žiadne chyby")} ✓</div>}
+      </div>
+    );
+  }
+
   function statusButtons(id, current) {
     return (
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
@@ -220,8 +244,15 @@ export default function FeedbackLog({ lang = "sk" }) {
                       </div>
                       <div style={{ fontSize: 14, color: textLight, lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{m.body}</div>
                       {m.attachment_path && (
-                        <button onClick={() => viewShot(m.attachment_path)} style={{ marginTop: 7, background: "transparent", border: `1px solid ${border}`, color: green, borderRadius: 6, cursor: "pointer", padding: "3px 8px", fontSize: 12, fontFamily: mono }}>📎 {t("View screenshot", "Zobraziť screenshot")}</button>
+                        <button onClick={() => viewShot(m.attachment_path)} style={{ ...diagBtn, marginTop: 7 }}>📎 {t("View screenshot", "Zobraziť screenshot")}</button>
                       )}
+                      {(m.auto_screenshot_path || m.diagnostics) && (
+                        <div style={{ marginTop: 7, display: "flex", flexWrap: "wrap", gap: 7 }}>
+                          {m.auto_screenshot_path && <button onClick={() => viewShot(m.auto_screenshot_path)} style={diagBtn}>🖼️ {t("Page screenshot", "Screenshot stránky")}</button>}
+                          {m.diagnostics && <button onClick={() => setDiagOpen((o) => ({ ...o, [m.id]: !o[m.id] }))} style={diagBtn}>🔧 {t("Diagnostics", "Diagnostika")} {diagOpen[m.id] ? "▲" : "▼"}</button>}
+                        </div>
+                      )}
+                      {m.diagnostics && diagOpen[m.id] && renderDiag(m.diagnostics)}
                     </div>
                   </div>
                 );
