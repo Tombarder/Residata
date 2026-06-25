@@ -560,9 +560,8 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
           {/* Market + currency + language = ONE tight control cluster, so adding the
               CZ [Kč|€] toggle never reflows or breaks the row (non-interruptive). */}
           <div className="nav-controls" style={{ display: "flex", alignItems: "center", gap: "0.55rem" }}>
-          {/* Market + currency, grouped + ALWAYS both rendered so the row never
-              reflows when the CZK toggle appears. */}
-          <MarketControls lang={lang} variant="inline" />
+          {/* Market + Currency now live in the fixed MarketControls panel (marketing
+              chrome below), so the nav stays clean and never reflows. */}
           {/* Language toggle */}
           <div style={{
             display: "flex", borderRadius: 6, overflow: "hidden",
@@ -2186,6 +2185,22 @@ export default function App() {
           has its own /app/ask entry in the sidebar, and rendering it
           twice would cause two chat instances to share the same
           localStorage key and fight. */}
+      {/* Market + Currency — fixed control panel, always visible on every marketing
+          page. Bottom-left so it's clear of the bottom-right chat/feedback pills
+          and never reflows the nav/header. */}
+      {!isAppPage(current) && (
+        <>
+          <style>{`
+            .mc-dock { position: fixed; left: 1.25rem; bottom: 1.25rem; z-index: 90; width: 208px; max-width: calc(100vw - 2.5rem); }
+            @media (max-width: 640px) {
+              .mc-dock { left: 0.55rem; bottom: 0.55rem; width: 156px; transform: scale(0.94); transform-origin: bottom left; }
+            }
+          `}</style>
+          <div className="mc-dock">
+            <MarketControls lang={lang} />
+          </div>
+        </>
+      )}
       {!isAppPage(current) && (
         <FloatingChat lang={lang} onNavigate={handleNav} />
       )}
