@@ -91,6 +91,7 @@ export default function FeedbackLog({ lang = "sk" }) {
   const [replyDraft, setReplyDraft] = useState("");
   const [replying, setReplying] = useState(false);
   const [diagOpen, setDiagOpen] = useState({});
+  const [shotUrls, setShotUrls] = useState({});   // storage path -> signed URL
 
   const load = useCallback(() => {
     rpcDirect("admin_feedback_stats", {}).then(setStats).catch((e) => setErr(e.message));
@@ -100,10 +101,18 @@ export default function FeedbackLog({ lang = "sk" }) {
   useEffect(() => { load(); }, [load]);
 
   async function openConversation(id) {
-    setOpenConv(id); setConv(null); setConvLoading(true); setReplyDraft(""); setErr(null);
+    setOpenConv(id); setConv(null); setConvLoading(true); setReplyDraft(""); setErr(null); setShotUrls({});
     try {
       const data = await rpcDirect("admin_conversation", { p_id: id });
       setConv(data); setNote(data?.admin_note || "");
+      // sign every screenshot path so they render inline (no popups / window.open)
+      const paths = [];
+      (data?.messages || []).forEach((m) => { if (m.attachment_path) paths.push(m.attachment_path); if (m.auto_screenshot_path) paths.push(m.auto_screenshot_path); });
+      if (paths.length && supabase) {
+        const { data: signed } = await supabase.storage.from("feedback-attachments").createSignedUrls(paths, 3600);
+        const map = {}; (signed || []).forEach((s) => { if (s && s.signedUrl && s.path) map[s.path] = s.signedUrl; });
+        setShotUrls(map);
+      }
     } catch (e) { setErr(e.message); }
     finally { setConvLoading(false); }
   }
@@ -145,13 +154,6 @@ export default function FeedbackLog({ lang = "sk" }) {
     } catch (e) { setErr("Reply: " + e.message); }
     finally { setReplying(false); }
   }
-  async function viewShot(path) {
-    if (!supabase) return;
-    const { data, error } = await supabase.storage.from("feedback-attachments").createSignedUrl(path, 600);
-    if (data?.signedUrl) window.open(data.signedUrl, "_blank", "noopener");
-    else if (error) setErr(error.message);
-  }
-
   const cat = (k) => CATEGORIES[k] || CATEGORIES.other;
   const st = (k) => STATUSES[k] || STATUSES.new;
 
@@ -168,6 +170,7 @@ export default function FeedbackLog({ lang = "sk" }) {
     const evs = d.events || [];
     return (
       <div style={{ marginTop: 8, background: bg, border: `1px solid ${border}`, borderRadius: 8, padding: "9px 11px", fontFamily: mono, fontSize: 11, color: dim, lineHeight: 1.7 }}>
+        {d.screenshot_error && <div style={{ color: amber, marginBottom: 4 }}>⚠ {t("screenshot failed", "screenshot zlyhal")}: {d.screenshot_error}</div>}
         {d.page && <div><span style={{ color: "#cdd0d6" }}>page:</span> {d.url || d.page}</div>}
         {d.viewport && <div>viewport: {d.viewport.w}×{d.viewport.h}{d.dpr ? ` · dpr ${d.dpr}` : ""}{typeof d.online === "boolean" ? ` · online ${d.online}` : ""}{d.lang ? ` · ${d.lang}` : ""}</div>}
         {d.ua && <div style={{ wordBreak: "break-all" }}>browser: {d.ua}</div>}
@@ -243,16 +246,24 @@ export default function FeedbackLog({ lang = "sk" }) {
                         {isUser ? t("User", "Používateľ") : t("You (Residata)", "Ty (Residata)")} · {fmtDate(m.created_at)}
                       </div>
                       <div style={{ fontSize: 14, color: textLight, lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{m.body}</div>
-                      {m.attachment_path && (
-                        <button onClick={() => viewShot(m.attachment_path)} style={{ ...diagBtn, marginTop: 7 }}>📎 {t("View screenshot", "Zobraziť screenshot")}</button>
-                      )}
-                      {(m.auto_screenshot_path || m.diagnostics) && (
-                        <div style={{ marginTop: 7, display: "flex", flexWrap: "wrap", gap: 7 }}>
-                          {m.auto_screenshot_path && <button onClick={() => viewShot(m.auto_screenshot_path)} style={diagBtn}>🖼️ {t("Page screenshot", "Screenshot stránky")}</button>}
-                          {m.diagnostics && <button onClick={() => setDiagOpen((o) => ({ ...o, [m.id]: !o[m.id] }))} style={diagBtn}>🔧 {t("Diagnostics", "Diagnostika")} {diagOpen[m.id] ? "▲" : "▼"}</button>}
+                      {m.attachment_path && shotUrls[m.attachment_path] && (
+                        <div style={{ marginTop: 8 }}>
+                          <div style={{ fontSize: 11, color: dim, fontFamily: mono, marginBottom: 4 }}>📎 {t("Attached screenshot", "Priložený screenshot")}</div>
+                          <a href={shotUrls[m.attachment_path]} target="_blank" rel="noopener noreferrer"><img src={shotUrls[m.attachment_path]} alt="" style={{ maxWidth: "100%", maxHeight: 320, borderRadius: 8, border: `1px solid ${border}`, display: "block" }} /></a>
                         </div>
                       )}
-                      {m.diagnostics && diagOpen[m.id] && renderDiag(m.diagnostics)}
+                      {m.auto_screenshot_path && shotUrls[m.auto_screenshot_path] && (
+                        <div style={{ marginTop: 8 }}>
+                          <div style={{ fontSize: 11, color: dim, fontFamily: mono, marginBottom: 4 }}>🖼️ {t("Page screenshot (auto)", "Screenshot stránky (auto)")}</div>
+                          <a href={shotUrls[m.auto_screenshot_path]} target="_blank" rel="noopener noreferrer"><img src={shotUrls[m.auto_screenshot_path]} alt="" style={{ maxWidth: "100%", maxHeight: 380, borderRadius: 8, border: `1px solid ${border}`, display: "block" }} /></a>
+                        </div>
+                      )}
+                      {m.diagnostics && (
+                        <div style={{ marginTop: 8 }}>
+                          <button onClick={() => setDiagOpen((o) => ({ ...o, [m.id]: !o[m.id] }))} style={diagBtn}>🔧 {t("Diagnostics", "Diagnostika")} {diagOpen[m.id] ? "▲" : "▼"}</button>
+                          {diagOpen[m.id] && renderDiag(m.diagnostics)}
+                        </div>
+                      )}
                     </div>
                   </div>
                 );

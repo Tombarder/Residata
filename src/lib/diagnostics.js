@@ -88,8 +88,20 @@ export function getDiagnostics(extra = {}) {
  * any element marked data-rbf-ignore (the feedback widget). Returns a JPEG data
  * URL or null. Never throws.
  */
-export async function capturePageScreenshot({ timeoutMs = 5000, maxDim = 1100 } = {}) {
-  if (typeof document === "undefined") return null;
+export async function capturePageScreenshot({ timeoutMs = 10000, maxDim = 1100 } = {}) {
+  if (typeof document === "undefined") return { url: null, error: "no document" };
+  // html2canvas throws InvalidStateError via createPattern on 0-size gradient
+  // backgrounds (e.g. zero-value bar-chart bars on the Reports page). Make
+  // createPattern return null for 0-size images instead of throwing — a 0-size
+  // element paints nothing anyway. Restored in finally.
+  const ctxProto = typeof CanvasRenderingContext2D !== "undefined" && CanvasRenderingContext2D.prototype;
+  const origCreatePattern = ctxProto && ctxProto.createPattern;
+  if (origCreatePattern) {
+    ctxProto.createPattern = function (img, rep) {
+      try { if (img && (img.width === 0 || img.height === 0)) return null; return origCreatePattern.call(this, img, rep); }
+      catch { return null; }
+    };
+  }
   try {
     const mod = await import("html2canvas");
     const html2canvas = mod.default || mod;
@@ -144,9 +156,12 @@ export async function capturePageScreenshot({ timeoutMs = 5000, maxDim = 1100 } 
     const out = document.createElement("canvas");
     out.width = w; out.height = h;
     out.getContext("2d").drawImage(canvas, 0, 0, w, h);
-    return out.toDataURL("image/jpeg", 0.7);
-  } catch {
-    return null;  // best-effort — the diagnostics still go through
+    return { url: out.toDataURL("image/jpeg", 0.7), error: null };
+  } catch (e) {
+    // best-effort — the diagnostics still go through; record WHY it failed.
+    return { url: null, error: String((e && (e.name + ": " + e.message)) || e).slice(0, 160) };
+  } finally {
+    if (origCreatePattern) ctxProto.createPattern = origCreatePattern;
   }
 }
 
