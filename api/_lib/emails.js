@@ -241,8 +241,8 @@ export function feedbackHtml(fb, webUrl) {
   ].join("");
 
   const inner = `
-    <div style="${S.eyebrow}">New feedback · ${escHtml(meta.label)}</div>
-    <h1 style="${S.h1}">${meta.emoji} ${escHtml(meta.label)}</h1>
+    <div style="${S.eyebrow}">${fb.is_reply ? "New message in a conversation" : "New feedback"} · ${escHtml(meta.label)}</div>
+    <h1 style="${S.h1}">${fb.is_reply ? "↩ " : ""}${meta.emoji} ${escHtml(meta.label)}</h1>
     <div style="padding:16px 18px;border:1px solid ${CARD_BORDER};border-radius:8px;margin:14px 0;background:${INNER_BOX};color:${TEXT_HI};font-size:15px;line-height:1.6;white-space:normal">${msgHtml}</div>
     <div style="${S.userBox}">
       ${rows}

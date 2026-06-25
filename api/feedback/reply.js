@@ -121,14 +121,13 @@ async function handleInner(req, res) {
     return res.status(500).json({ error: "email send failed" });
   }
 
-  // ── Record the reply on the row (after the email actually sent) ──
-  const { error: updErr } = await admin
-    .from("feedback")
-    .update({ admin_reply: reply, replied_at: new Date().toISOString(), replied_by: u.user.id })
-    .eq("id", feedback_id);
-  if (updErr) {
+  // ── Record the reply as an admin message in the thread (after the send) ──
+  const { error: msgErr } = await admin
+    .from("feedback_messages")
+    .insert({ conversation_id: feedback_id, sender: "admin", author_id: u.user.id, body: reply });
+  if (msgErr) {
     // Email went out but the record failed — surface it; the admin can retry.
-    console.error("[feedback-reply] record failed:", updErr.message);
+    console.error("[feedback-reply] message insert failed:", msgErr.message);
     return res.status(200).json({ ok: true, emailed: true, recordFailed: true });
   }
 
