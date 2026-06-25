@@ -29,8 +29,7 @@ import ReportsPage from "./Reports";
 import UnitTracker from "./UnitTracker";
 import UnitExplorer from "./UnitExplorer";
 import ChatAssistant from "../components/ChatAssistant";
-import CountrySwitcher from "../components/CountrySwitcher";
-import CurrencySwitcher from "../components/CurrencySwitcher";
+import MarketControls from "../components/MarketControls";
 import DataFreshness from "../components/DataFreshness";
 // AiBetaBanner moved into AI surfaces only (ChatAssistant + FloatingChat)
 // after QA — was on every /app/* page which felt like noise on Dashboard /
@@ -428,6 +427,12 @@ function Sidebar({ page, lang, can, tier, email, onNavigate, onSignOut, mobileOp
           })}
         </nav>
 
+        {/* Market + currency — docked on the side, ALWAYS visible, so the data
+            view controls never crowd or shift the top header. */}
+        <div style={{ padding: "0 0.75rem 0.5rem" }}>
+          <MarketControls lang={lang} />
+        </div>
+
         {/* Account card */}
         <div style={{ padding: "0.75rem", borderTop: `1px solid ${border}` }}>
           <div style={{
@@ -534,11 +539,8 @@ function TopBar({ page, lang, setLang, tier }) {
             stuck batch shows an older date here — the visible "go fix it" signal,
             and it sits next to the market switcher it tracks. */}
         <DataFreshness lang={lang} className="platform-topbar-freshness" />
-        {/* Market (SK / CZ / All) + currency (native / €) switchers. The platform
-            defaults to All; both read the shared context so a change here flows to
-            every screen. CountrySwitcher self-hides when only one market exists. */}
-        <CountrySwitcher lang={lang} />
-        <CurrencySwitcher lang={lang} />
+        {/* Market + currency switchers moved to the sidebar (MarketControls) so
+            the top bar never shifts when you switch market/currency. */}
         {/* Language switcher — EN / SK pills. Same state that powers the
             marketing Nav switcher, so toggling here or on /live flips
             every SK/EN check-expression across the app consistently. */}
