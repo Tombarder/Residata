@@ -98,11 +98,42 @@ export async function capturePageScreenshot({ timeoutMs = 5000, maxDim = 1100 } 
       useCORS: true,
       backgroundColor: "#0a0a0b",
       scale: Math.min(1.5, window.devicePixelRatio || 1),
+      // Capture the CURRENT VIEWPORT. windowWidth/Height MUST be the viewport
+      // size (not scrollWidth/Height) — otherwise vh/vw units expand to the full
+      // page in the clone and any min-height:100vh hero pushes its centered
+      // content far below the crop → blank capture (the marketing-hero bug).
       x: window.scrollX, y: window.scrollY,
       width: window.innerWidth, height: window.innerHeight,
-      windowWidth: document.documentElement.scrollWidth,
-      windowHeight: document.documentElement.scrollHeight,
+      scrollX: -window.scrollX, scrollY: -window.scrollY,
+      windowWidth: window.innerWidth, windowHeight: window.innerHeight,
       ignoreElements: (el) => !!(el && el.hasAttribute && el.hasAttribute("data-rbf-ignore")),
+      onclone: (doc) => {
+        // html2canvas restarts CSS entrance animations inside its clone and
+        // snapshots them at their opacity:0 START frame → reveal/hero content
+        // (e.g. .hero-anim-* using @keyframes heroFadeIn { from { opacity:0 } })
+        // renders blank. Force every animation/transition to land instantly on
+        // its END state, and un-hide known entrance wrappers.
+        try {
+          // animation:none (not duration:0) — an ACTIVE animation overrides inline
+          // styles, and here opacity:0 comes only from the keyframe, so killing the
+          // animation lets the element's default opacity:1 show.
+          const s = doc.createElement("style");
+          s.textContent = "*,*::before,*::after{animation:none!important;transition:none!important;}";
+          doc.head.appendChild(s);
+          doc.querySelectorAll('[class*="hero-anim"], .page-transition, .reveal').forEach((el) => {
+            el.style.opacity = "1"; el.style.transform = "none";
+          });
+          // Gradient-clipped text (background-clip:text + transparent fill) is
+          // invisible in html2canvas → fall back to a solid readable colour.
+          doc.querySelectorAll("[style]").forEach((el) => {
+            const st = el.style;
+            if (st.webkitBackgroundClip === "text" || st.backgroundClip === "text") {
+              st.webkitTextFillColor = "#e8e8ed"; st.color = "#e8e8ed";
+              st.webkitBackgroundClip = "border-box"; st.backgroundClip = "border-box"; st.background = "none";
+            }
+          });
+        } catch { /* best-effort */ }
+      },
     });
     const canvas = await Promise.race([
       canvasP,
