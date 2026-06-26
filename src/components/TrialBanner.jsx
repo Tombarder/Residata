@@ -138,10 +138,12 @@ export function TrialBanner({ lang = "sk", onCta }) {
         <strong style={{ color: "#00e5a0", fontWeight: 700 }}>
           {L("7 dní zadarmo", "7 days free")}
         </strong>{" "}
-        — {L(
+        {/* full copy on wider screens, punchy short copy on phones (see responsive.css) */}
+        <span className="trial-banner-long">— {L(
           "celý Residata: analytika, reporty, AI asistent. Žiadna karta.",
           "the full Residata: analytics, reports, AI assistant. No card required.",
-        )}
+        )}</span>
+        <span className="trial-banner-short">— {L("plný prístup, bez karty.", "full access, no card.")}</span>
       </span>
       <button onClick={click}
         style={{

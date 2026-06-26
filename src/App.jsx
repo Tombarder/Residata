@@ -2093,6 +2093,9 @@ export default function App() {
         .btn-p:hover { opacity: 0.85; transform: translateY(-1px); }
         .btn-s { display: inline-block; padding: 0.75rem 2rem; background: transparent; color: var(--text); font-weight: 500; font-size: 0.9rem; border: 1px solid var(--border); border-radius: var(--r-md); cursor: pointer; text-decoration: none; transition: all 0.2s; }
         .btn-s:hover { border-color: var(--text-faint); transform: translateY(-1px); }
+        /* tactile press feedback (esp. nice on touch — there's no hover there) */
+        .btn-p:active { transform: scale(0.985); opacity: 0.9; }
+        .btn-s:active { transform: scale(0.985); border-color: var(--accent); }
         
         @keyframes ticker-slide { from { transform: translateX(0); } to { transform: translateX(-50%); } }
         @keyframes pageFade {
@@ -2115,7 +2118,11 @@ export default function App() {
           .home-hero .hero-anim-1 { margin-bottom: 1rem !important; }
           .home-hero .hero-anim-2 { font-size: 2.3rem !important; }
           .home-hero .hero-anim-3 { margin-top: 0.9rem !important; font-size: 1.02rem !important; line-height: 1.55 !important; }
-          .home-hero .hero-anim-4 { margin-top: 1.2rem !important; gap: 0.6rem !important; }
+          /* Full-width, equal, comfortably-tall CTAs — modern + thumb-friendly,
+             and a cleaner read than two mismatched auto-width buttons in space. */
+          .home-hero .hero-anim-4 { margin-top: 1.5rem !important; gap: 0.7rem !important; width: min(100%, 360px); align-items: stretch !important; }
+          .home-hero .hero-anim-4 .btn-p,
+          .home-hero .hero-anim-4 .btn-s { width: 100%; box-sizing: border-box; padding: 0.95rem 1rem; font-size: 0.98rem; }
         }
 
         /* When the dismissible trial banner is showing, push the whole marketing
