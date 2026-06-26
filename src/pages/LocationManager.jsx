@@ -25,14 +25,7 @@ const PHOTON = "https://photon.komoot.io/api/";
 const PHOTON_REVERSE = "https://photon.komoot.io/reverse";
 const BIAS = { SK: { lat: 48.7, lon: 19.5 }, CZ: { lat: 49.8, lon: 15.5 } };
 
-const green = "#00e5a0";
-const amber = "#f5a623";
-const textLight = "#e8e8ed";
-const dim = "#8a8a96";
-const border = "#222228";
-const bg = "#0a0a0b";
-const bg2 = "#0e0e10";
-const mono = "'JetBrains Mono', monospace";
+import { accent as green, orange as amber, text as textLight, dim, border, bg, surfaceDark as bg2, mono } from "../lib/theme";
 
 // SK + CZ bounding box (minLon, minLat, maxLon, maxLat) — restricts geocoder
 // suggestions to our region so we never propose places in New Zealand.

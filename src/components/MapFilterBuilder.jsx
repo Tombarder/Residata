@@ -11,13 +11,9 @@ import {
 } from "../lib/mapFilters";
 import Picker from "./Picker";
 
-const green = "#00e5a0";
-const dim = "#8a8a96";
-const textLight = "#e8e8ed";
+import { accent as green, dim, text as textLight, surfaceDark as bg2, mono } from "../lib/theme";
 const border = "#26262d";
-const bg2 = "#0e0e10";
 const panel = "#161619";
-const mono = "'JetBrains Mono', monospace";
 
 let _cid = 0;
 const newId = () => "c" + (++_cid);

@@ -174,14 +174,6 @@ if (typeof window !== "undefined" && import.meta.env.DEV) {
   }
 }
 
-/**
- * Pure function (nie hook) — užitočné mimo React kontextu (napr. v utility fn).
- */
-export function canForTier(tier, cap) {
-  const set = TIER_CAPABILITY_SETS[tier] || TIER_CAPABILITY_SETS.anon;
-  return set.has(cap);
-}
-
 export function capsForTier(tier) {
   return TIER_CAPABILITY_SETS[tier] || TIER_CAPABILITY_SETS.anon;
 }

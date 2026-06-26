@@ -31,13 +31,8 @@ import { useCountry } from "../lib/useCountry";
 import { supabasePublic, isSupabaseReady } from "../lib/supabase";
 
 const mono = "'JetBrains Mono', monospace";
-const green = "#00e5a0";
-const amber = "#f5a623";
+import { accent as green, orange as amber, dim, text as textLight, border, surfaceDark as bg2 } from "../lib/theme";
 const greyPt = "#6b6b76";
-const dim = "#8a8a96";
-const textLight = "#e8e8ed";
-const border = "#222228";
-const bg2 = "#0e0e10";
 const panel = "#141418";
 
 // CARTO dark-matter vector style — free, no key, ships its own glyphs+sprites.

@@ -15,16 +15,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 
-const green = "#00e5a0";
-const amber = "#f5a623";
-const blue = "#4a9eff";
+import { accent as green, orange as amber, blue, text as textLight, dim, border, bg, surfaceDark as bg2, mono } from "../lib/theme";
 const red = "#ff6b6b";
-const textLight = "#e8e8ed";
-const dim = "#8a8a96";
-const border = "#222228";
-const bg = "#0a0a0b";
-const bg2 = "#0e0e10";
-const mono = "'JetBrains Mono', monospace";
 
 const SUPA_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPA_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;

@@ -10,11 +10,8 @@
 import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 
-const green = "#00e5a0";
-const dim = "#8a8a96";
-const textLight = "#e8e8ed";
+import { accent as green, dim, text as textLight, surfaceDark as bg2 } from "../lib/theme";
 const border = "#23232a";
-const bg2 = "#0e0e10";
 const popBg = "#17171c";
 const hover = "#23232a";
 

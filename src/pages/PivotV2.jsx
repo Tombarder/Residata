@@ -25,14 +25,8 @@ import { useCurrency } from "../lib/useCurrency";
 */
 
 const mono    = "'JetBrains Mono', ui-monospace, Menlo, monospace";
-const green   = "#00e5a0";
-const orange  = "#f5a623";
-const dim     = "#8a8a96";
-const border  = "#222228";
-const bg      = "#0a0a0b";
+import { accent as green, orange, dim, border, bg, surfacePanel as panelHi, text } from "../lib/theme";
 const panel   = "#0e0e12";
-const panelHi = "#14141a";
-const text    = "#e8e8ed";
 
 /* ─── Field registry ─────────────────────────────────────────────
    Single source of truth for which fields exist, what type they are,
