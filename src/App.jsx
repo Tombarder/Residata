@@ -2107,10 +2107,27 @@ export default function App() {
            iOS Safari's dynamic toolbar. */
         .home-hero { min-height: 100vh; min-height: 100svh; }
         /* On phones the hero sizes to its content instead of being forced to
-           full height: the tall copy then isn't pinned to the very bottom (so it
-           never collides with the floating Ask AI / Feedback pills), and a sliver
-           of the next section peeks up as a natural scroll cue. */
-        @media (max-width: 640px) { .home-hero { min-height: auto; } }
+           full height, and its vertical rhythm + type scale are tightened so the
+           (tall) copy + CTAs stay compact and clear the fixed top chrome AND the
+           floating Ask AI / Feedback pills at the bottom-right. */
+        @media (max-width: 640px) {
+          .home-hero { min-height: auto; padding-top: 6.5rem !important; padding-bottom: 2.5rem; }
+          .home-hero .hero-anim-1 { margin-bottom: 1rem !important; }
+          .home-hero .hero-anim-2 { font-size: 2.3rem !important; }
+          .home-hero .hero-anim-3 { margin-top: 0.9rem !important; font-size: 1.02rem !important; line-height: 1.55 !important; }
+          .home-hero .hero-anim-4 { margin-top: 1.2rem !important; gap: 0.6rem !important; }
+        }
+
+        /* When the dismissible trial banner is showing, push the whole marketing
+           page below it (it's fixed at top:0, so without this the first section
+           tucks under the pushed-down nav/ticker). --trial-banner-h is the
+           banner's measured height, published by TrialBanner. Scoped to ≤900px:
+           on phones/tablets the banner wraps to 2–3 lines and the tuck is real;
+           on desktop it's a single thin line that the existing layout clears, so
+           desktop spacing stays exactly as-is. */
+        @media (max-width: 900px) {
+          body.residata-has-trial-banner .page-transition { padding-top: var(--trial-banner-h, 0px); }
+        }
 
         /* Use Cases cards — hover zoom on image + border glow */
         .use-case-card { transition: border-color 0.3s, box-shadow 0.3s; }
