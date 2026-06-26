@@ -19,7 +19,7 @@
  * has already used the trial (useShouldShowTrialPromo). The popup hides the
  * moment the visitor is signed in (anon-only). Both hide on /app/*.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
 import { track } from "../lib/track";
@@ -58,6 +58,7 @@ export function TrialBanner({ lang = "sk", onCta }) {
   const [hidden, setHidden] = useState(true);
   const eligible = useShouldShowTrialPromo();
   const L = (sk, en) => lang === "sk" ? sk : en;
+  const bannerRef = useRef(null);
 
   useEffect(() => {
     if (!eligible) { setHidden(true); return; }
@@ -81,6 +82,30 @@ export function TrialBanner({ lang = "sk", onCta }) {
     return () => document.body.classList.remove(cls);
   }, [eligible, hidden]);
 
+  // Publish the banner's REAL height as --trial-banner-h so the fixed Nav +
+  // Ticker offset by exactly that, at any width. The text wraps to 2–3 lines on
+  // a narrow phone, so a hardcoded 44px offset would let the banner overlap the
+  // nav — measuring removes that magic number. Re-measures on resize + lang
+  // change (different copy ⇒ different height).
+  useEffect(() => {
+    const show = eligible && !hidden;
+    const root = typeof document !== "undefined" ? document.documentElement : null;
+    if (!root) return;
+    if (!show) { root.style.removeProperty("--trial-banner-h"); return; }
+    const el = bannerRef.current;
+    if (!el) return;
+    const apply = () => root.style.setProperty("--trial-banner-h", el.offsetHeight + "px");
+    apply();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(apply) : null;
+    ro?.observe(el);
+    window.addEventListener("resize", apply);
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener("resize", apply);
+      root.style.removeProperty("--trial-banner-h");
+    };
+  }, [eligible, hidden, lang]);
+
   if (!eligible || hidden) return null;
 
   const dismiss = () => {
@@ -94,7 +119,7 @@ export function TrialBanner({ lang = "sk", onCta }) {
   };
 
   return (
-    <div style={{
+    <div ref={bannerRef} style={{
       position: "fixed",
       top: 0, left: 0, right: 0,
       zIndex: 110,
@@ -102,7 +127,8 @@ export function TrialBanner({ lang = "sk", onCta }) {
       borderBottom: "1px solid rgba(0,229,160,0.35)",
       color: "#e8e8ed",
       fontSize: "0.78rem",
-      padding: "0.5rem 1rem",
+      // top inset clears the notch/status bar; side insets clear landscape cutouts
+      padding: "calc(0.5rem + var(--safe-top)) max(1rem, var(--safe-right)) 0.5rem max(1rem, var(--safe-left))",
       display: "flex", alignItems: "center", justifyContent: "center", gap: "0.75rem",
       backdropFilter: "blur(10px)",
       WebkitBackdropFilter: "blur(10px)",
@@ -194,9 +220,12 @@ export function TrialPopup({ lang = "sk", onCta }) {
         background: "rgba(0,0,0,0.7)",
         backdropFilter: "blur(6px)",
         WebkitBackdropFilter: "blur(6px)",
-        zIndex: 1500,
+        // z-popup (3200) per the index.css ladder — above the floating pills
+        // (2000) so they don't bleed over this modal on phones.
+        zIndex: "var(--z-popup)",
         display: "flex", alignItems: "center", justifyContent: "center",
-        padding: "1rem",
+        // safe-area padding keeps the card + close button clear of the notch
+        padding: "max(1rem, var(--safe-top)) max(1rem, var(--safe-right)) max(1rem, var(--safe-bottom)) max(1rem, var(--safe-left))",
         animation: "trialPopupBg 0.25s ease-out",
       }}
       onClick={e => { if (e.target === e.currentTarget) close("backdrop"); }}

@@ -81,7 +81,7 @@ export default function Ticker({ lang = "en" }) {
 const styles = {
   wrapper: {
     position: "fixed",
-    top: 72,                    // pod Nav (ktorý je ~72px fixed hore)
+    top: "calc(72px + var(--safe-top))",  // pod Nav (~72px) + notch inset (0 on non-notch devices)
     left: 0,
     right: 0,
     zIndex: 99,
