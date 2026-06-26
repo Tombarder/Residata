@@ -23,13 +23,7 @@ if (typeof document !== "undefined" && !document.getElementById("cb-pulse-anim")
 }
 
 const mono   = "'JetBrains Mono', monospace";
-const green  = "#00e5a0";
-const dim    = "#8a8a96";
-const text   = "#e8e8ed";
-const border = "#222228";
-const bg     = "#0a0a0b";
-const bg2    = "#0e0e10";
-const orange = "#f5a623";
+import { accent as green, dim, text, border, bg, surfaceDark as bg2, orange } from "../lib/theme";
 const red    = "#ff6b6b";
 
 /* ChatProgress — the live "what's happening" view shown while an answer is

@@ -36,12 +36,7 @@ import DataFreshness from "../components/DataFreshness";
 // Reports / Pivot where AI doesn't show up at all.
 
 const mono = "'JetBrains Mono', monospace";
-const green = "#00e5a0";
-const dim = "#8a8a96";
-const textLight = "#e8e8ed";
-const border = "#222228";
-const bg = "#16161a";
-const bg2 = "#0e0e10";
+import { accent as green, dim, text as textLight, border, surface as bg, surfaceDark as bg2 } from "../lib/theme";
 const SIDEBAR_W = 240;
 
 // ─── Icons — inline SVG, same weight as HowItWorks ──────────────

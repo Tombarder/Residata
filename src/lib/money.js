@@ -19,9 +19,7 @@ export function setMoney(next) {
   _money = { ..._money, ...next };
 }
 
-export function moneyCode() { return _money.code; }
 export function moneySymbol() { return _money.symbol; }
-export function moneyUnitsPerEur() { return _money.unitsPerEur; }
 
 /** Convert a EUR-denominated number into the current display currency.
  *  Returns the input unchanged for null / non-finite so formatters keep their
@@ -32,7 +30,3 @@ export function moneyFromEur(eur) {
   if (!Number.isFinite(n)) return eur;
   return n * _money.unitsPerEur;
 }
-
-/** True when the current display currency is NOT the euro (i.e. CZK-native).
- *  Lets a formatter decide e.g. whether to drop decimals. */
-export function moneyIsConverted() { return _money.unitsPerEur !== 1; }

@@ -13,8 +13,8 @@ const OVERSCAN = 8;        // extra rows rendered above/below the viewport for s
 const DEFAULT_COLS = ["project_name", "city", "cast", "typ", "izby", "obytna_plocha", "cena_s_dph", "price_per_m2", "stav"];
 
 // design tokens — identical to PivotV2 so the two pages feel like one product
-const green = "#00e5a0", orange = "#f5a623", dim = "#8a8a96", border = "#222228",
-  bg = "#0a0a0b", panel = "#0e0e12", panelHi = "#14141a", text = "#e8e8ed";
+import { accent as green, orange, dim, border, bg, surfacePanel as panelHi, text } from "../lib/theme";
+const panel = "#0e0e12";
 const mono = "'JetBrains Mono', ui-monospace, Menlo, monospace";
 
 // group the registry fields into readable categories for the palette
