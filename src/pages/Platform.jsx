@@ -1001,7 +1001,9 @@ function PlatformDashboard({ lang, setCurrent }) {
             <div style={{ color: dim, fontSize: "0.85rem" }}>{lang === "sk" ? "Načítavam…" : "Loading…"}</div>
           ) : top.map(p => (
             <div key={p.id}
+              role="button" tabIndex={0}
               onClick={() => setCurrent(`App:ProjectDetail:${p.id}`)}
+              onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setCurrent(`App:ProjectDetail:${p.id}`); } }}
               style={{
                 background: bg, border: `1px solid ${border}`, borderRadius: 10,
                 padding: "0.9rem 1rem", cursor: "pointer", transition: "border-color 0.15s, transform 0.15s",
