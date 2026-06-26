@@ -237,8 +237,11 @@ export default function UnitExplorer({ lang = "sk" }) {
                 {palette[g].map((f) => {
                   const on = cols.includes(f.key);
                   return (
-                    <div key={f.key} onClick={() => toggleCol(f.key)} title={on ? t("Klikni pre skrytie", "Click to hide") : t("Klikni pre zobrazenie", "Click to show")}
-                      style={{ display: "flex", alignItems: "center", gap: "0.45rem", padding: "0.32rem 0.55rem", borderRadius: 4, color: on ? text : "#9a9aa6", fontSize: "0.78rem", cursor: "pointer", userSelect: "none", borderLeft: `2px solid ${on ? green : "transparent"}`, background: on ? "rgba(0,229,160,0.06)" : "transparent" }}
+                    <div key={f.key} role="checkbox" aria-checked={on} tabIndex={0}
+                      onClick={() => toggleCol(f.key)}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleCol(f.key); } }}
+                      title={on ? t("Klikni pre skrytie", "Click to hide") : t("Klikni pre zobrazenie", "Click to show")}
+                      style={{ display: "flex", alignItems: "center", gap: "0.45rem", padding: "0.32rem 0.55rem", borderRadius: 4, color: on ? text : dim, fontSize: "0.78rem", cursor: "pointer", userSelect: "none", borderLeft: `2px solid ${on ? green : "transparent"}`, background: on ? "rgba(0,229,160,0.06)" : "transparent" }}
                       onMouseEnter={(e) => { if (!on) e.currentTarget.style.background = panelHi; }}
                       onMouseLeave={(e) => { if (!on) e.currentTarget.style.background = "transparent"; }}>
                       <span style={{ fontFamily: mono, fontSize: "0.62rem", width: 16, textAlign: "center", color: typeColor(f.type), fontWeight: 700 }}>{typeBadge(f.type)}</span>
