@@ -95,6 +95,14 @@ html, body { max-width: 100%; overflow-x: clip; }
 .show-tablet-down { display: none !important; }
 @media (max-width: 900px) { .show-tablet-down { display: revert !important; } }
 
+/* Trial banner copy: full sentence on wider screens, punchy short line on
+   phones so the banner stays 1–2 lines instead of a heavy 3-line block. */
+.trial-banner-short { display: none; }
+@media (max-width: 640px) {
+  .trial-banner-long  { display: none; }
+  .trial-banner-short { display: inline; }
+}
+
 /* ============================================================================
    Mobile top-nav — hamburger + slide-in menu
    ----------------------------------------------------------------------------
