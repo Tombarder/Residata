@@ -93,9 +93,9 @@ export default function CookieBanner({ lang = "en" }) {
       aria-label={isSK ? "Súhlas s cookies" : "Cookie consent"}
       style={{
         position: "fixed",
-        bottom: 20,
-        left: 20,
-        right: 20,
+        bottom: "calc(20px + var(--safe-bottom))",
+        left: "calc(20px + var(--safe-left))",
+        right: "calc(20px + var(--safe-right))",
         maxWidth: 640,
         margin: "0 auto",
         background: "#16161a",

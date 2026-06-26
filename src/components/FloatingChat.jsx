@@ -85,7 +85,7 @@ export default function FloatingChat({ lang = "sk", onNavigate }) {
           className="residata-chat-pill"
           style={{
             position: "fixed",
-            right: 20, bottom: 20,
+            right: "calc(20px + var(--safe-right))", bottom: "calc(20px + var(--safe-bottom))",
             height: 44,
             padding: "0 16px 0 14px",
             borderRadius: 22,
@@ -129,9 +129,9 @@ export default function FloatingChat({ lang = "sk", onNavigate }) {
       {open && (
         <div style={{
           position: "fixed",
-          right: 20, bottom: 20,
+          right: "calc(20px + var(--safe-right))", bottom: "calc(20px + var(--safe-bottom))",
           width: "min(380px, calc(100vw - 32px))",
-          height: "min(560px, calc(100vh - 40px))",
+          height: "min(560px, calc(100dvh - 40px - var(--safe-bottom)))",
           background: bg2, border: `1px solid ${border}`, borderRadius: 14,
           boxShadow: "0 20px 60px rgba(0,0,0,0.65), 0 0 40px rgba(0,229,160,0.08)",
           display: "flex", flexDirection: "column",

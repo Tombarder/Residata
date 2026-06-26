@@ -145,7 +145,8 @@ export default function CompleteProfile({ lang = "en" }) {
   return (
     <div style={{
       position: "fixed", inset: 0, background: "rgba(10,10,11,0.95)", backdropFilter: "blur(8px)",
-      display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2000, padding: "1rem",
+      display: "flex", alignItems: "center", justifyContent: "center", zIndex: "var(--z-modal)",
+      padding: "max(1rem, var(--safe-top)) max(1rem, var(--safe-right)) max(1rem, var(--safe-bottom)) max(1rem, var(--safe-left))",
       overflowY: "auto",
     }}>
       <div style={{

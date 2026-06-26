@@ -75,7 +75,8 @@ export default function LoginModal({ open, onClose, lang = "en" }) {
   return (
     <div onClick={onClose} style={{
       position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)",
-      display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "1rem",
+      display: "flex", alignItems: "center", justifyContent: "center", zIndex: "var(--z-modal)",
+      padding: "max(1rem, var(--safe-top)) max(1rem, var(--safe-right)) max(1rem, var(--safe-bottom)) max(1rem, var(--safe-left))",
     }}>
       <div onClick={e => e.stopPropagation()} style={{
         background: "#16161a", border: "1px solid #222228", borderRadius: 14,

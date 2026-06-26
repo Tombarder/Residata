@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
+import { createPortal } from "react-dom";
 import Ticker from "./components/Ticker";
 import LoginModal from "./components/LoginModal";
 import CompleteProfile from "./components/CompleteProfile";
@@ -522,14 +523,64 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
   const l = t[lang];
   const user = auth?.user;
   const showAdminLink = caps.can("view_admin_nav");
+  // Mobile menu (≤1180px). Desktop (>1180) never mounts the overlay.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const closeBtnRef = useRef(null);
+
+  // While the menu is open: lock background scroll, close on Esc, and move
+  // focus into the sheet (basic a11y for an overlay dialog).
+  useEffect(() => {
+    if (!menuOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e) => { if (e.key === "Escape") setMenuOpen(false); };
+    window.addEventListener("keydown", onKey);
+    const focusT = setTimeout(() => closeBtnRef.current?.focus(), 0);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", onKey);
+      clearTimeout(focusT);
+    };
+  }, [menuOpen]);
+
+  // Route from the menu, then close it.
+  const go = (page) => { setCurrent(page); setMenuOpen(false); };
+
+  // Close the menu on ANY route change — covers browser back/forward while it's
+  // open (link clicks already close it via go()).
+  useEffect(() => { setMenuOpen(false); }, [current]);
+
+  // Language toggle — shared between the desktop cluster and the mobile menu.
+  const langToggle = (
+    <div style={{
+      display: "flex", borderRadius: "var(--r-sm)", overflow: "hidden",
+      border: "1px solid var(--border)", fontSize: "0.72rem",
+      fontFamily: "'JetBrains Mono', monospace",
+    }}>
+      <button onClick={() => { if (lang !== "en") { track("language_switched", { from: lang, to: "en" }); setLang("en"); } }} style={{
+        padding: "0.4rem 0.8rem", border: "none", cursor: "pointer",
+        background: lang === "en" ? "var(--border)" : "transparent",
+        color: lang === "en" ? "var(--text)" : "var(--text-faint)",
+        fontFamily: "inherit", fontSize: "inherit", transition: "all 0.2s",
+      }}>EN</button>
+      <button onClick={() => { if (lang !== "sk") { track("language_switched", { from: lang, to: "sk" }); setLang("sk"); } }} style={{
+        padding: "0.4rem 0.8rem", border: "none", cursor: "pointer",
+        borderLeft: "1px solid var(--border)",
+        background: lang === "sk" ? "var(--border)" : "transparent",
+        color: lang === "sk" ? "var(--text)" : "var(--text-faint)",
+        fontFamily: "inherit", fontSize: "inherit", transition: "all 0.2s",
+      }}>SK</button>
+    </div>
+  );
+
   return (
-    <nav style={{
+    <nav className="marketing-nav" style={{
       position: "fixed", top: 0, width: "100%", zIndex: 100,
       background: "rgba(10,10,11,0.85)",
       backdropFilter: "blur(20px)", borderBottom: "1px solid #222228",
     }}>
       <div style={{
-        maxWidth: "var(--container)", margin: "0 auto", padding: "1rem var(--container-pad)",
+        maxWidth: "var(--container)", margin: "0 auto", padding: "1rem var(--gutter-safe)",
         display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: "1rem",
       }}>
         <a onClick={() => setCurrent("Home")} style={{ justifySelf: "start", display: "flex", alignItems: "center", gap: "0.6rem", cursor: "pointer", textDecoration: "none" }}>
@@ -554,28 +605,11 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
             );
           })}
         </div>
-        {/* Right zone: language toggle + auth CTAs */}
+        {/* Right zone: desktop cluster (hidden ≤1180) + hamburger (shown ≤1180) */}
         <div className="nav-right" style={{ justifySelf: "end", display: "flex", alignItems: "center", gap: "0.75rem", listStyle: "none" }}>
+          <div className="nav-desktop-actions" style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
           {/* Language toggle (Market + Currency live in the fixed MarketControls dock) */}
-          <div style={{
-            display: "flex", borderRadius: "var(--r-sm)", overflow: "hidden",
-            border: "1px solid var(--border)", fontSize: "0.72rem",
-            fontFamily: "'JetBrains Mono', monospace",
-          }}>
-            <button onClick={() => { if (lang !== "en") { track("language_switched", { from: lang, to: "en" }); setLang("en"); } }} style={{
-              padding: "0.3rem 0.6rem", border: "none", cursor: "pointer",
-              background: lang === "en" ? "var(--border)" : "transparent",
-              color: lang === "en" ? "var(--text)" : "var(--text-faint)",
-              fontFamily: "inherit", fontSize: "inherit", transition: "all 0.2s",
-            }}>EN</button>
-            <button onClick={() => { if (lang !== "sk") { track("language_switched", { from: lang, to: "sk" }); setLang("sk"); } }} style={{
-              padding: "0.3rem 0.6rem", border: "none", cursor: "pointer",
-              borderLeft: "1px solid var(--border)",
-              background: lang === "sk" ? "var(--border)" : "transparent",
-              color: lang === "sk" ? "var(--text)" : "var(--text-faint)",
-              fontFamily: "inherit", fontSize: "inherit", transition: "all 0.2s",
-            }}>SK</button>
-          </div>
+          {langToggle}
           {user ? (
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
               {/* Primary CTA for logged-in users on marketing pages: jump to platform. */}
@@ -632,8 +666,101 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
               >{lang === "sk" ? "Začať zadarmo →" : "Get started free →"}</a>
             </div>
           )}
+          </div>
+          {/* Hamburger — only rendered/visible ≤1180px (see responsive.css) */}
+          <button
+            className="nav-hamburger"
+            aria-label={lang === "sk" ? "Otvoriť menu" : "Open menu"}
+            aria-expanded={menuOpen}
+            aria-haspopup="dialog"
+            onClick={() => setMenuOpen(true)}
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <line x1="3" y1="6" x2="21" y2="6" />
+              <line x1="3" y1="12" x2="21" y2="12" />
+              <line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+          </button>
         </div>
       </div>
+
+      {/* ─── Mobile menu overlay (≤1180px) ───
+          Portaled to <body> so it escapes the nav's z-index:100 stacking
+          context — otherwise the root-level floating pills (z 2000) would
+          render on top of the menu (z 3000 only works in the same context). */}
+      {menuOpen && createPortal(
+        <div className="nav-menu-overlay" onClick={() => setMenuOpen(false)}>
+          <div
+            className="nav-menu-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-label={lang === "sk" ? "Navigácia" : "Navigation"}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="nav-menu-head">
+              <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem", letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--text-faint)" }}>
+                {lang === "sk" ? "Menu" : "Menu"}
+              </span>
+              <button
+                ref={closeBtnRef}
+                className="nav-menu-close"
+                aria-label={lang === "sk" ? "Zavrieť menu" : "Close menu"}
+                onClick={() => setMenuOpen(false)}
+              >×</button>
+            </div>
+
+            <div className="nav-menu-links">
+              {pages.map((p, i) => {
+                const key = pagesEN[i];
+                const internalKey = pageMap[key] || key;
+                const isActive = current === internalKey;
+                return (
+                  <a key={key} className={"nav-menu-link" + (isActive ? " nav-menu-link--active" : "")} onClick={() => go(key)}>{p}</a>
+                );
+              })}
+            </div>
+
+            <div style={{ marginTop: "1.1rem", display: "flex", alignItems: "center", gap: "0.75rem" }}>
+              <span style={{ fontSize: "0.72rem", color: "var(--text-faint)", fontFamily: "'JetBrains Mono', monospace" }}>
+                {lang === "sk" ? "Jazyk" : "Language"}
+              </span>
+              {langToggle}
+            </div>
+
+            {/* Market + Currency — on phones/tablets these live here in the menu
+                (the floating dock is hidden ≤1180) so they never overlap content. */}
+            <div style={{ marginTop: "0.85rem" }}>
+              <MarketControls lang={lang} />
+            </div>
+
+            <div className="nav-menu-actions">
+              {user ? (
+                <>
+                  <a onClick={() => go("App:Dashboard")} className="btn-p">
+                    {lang === "sk" ? "Otvoriť platformu →" : "Open platform →"}
+                  </a>
+                  <span style={{ fontSize: "0.75rem", color: "var(--text-dim)", fontFamily: "'JetBrains Mono', monospace", textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {user.email}
+                  </span>
+                  <a onClick={() => { auth.signOut(); setMenuOpen(false); }} className="btn-s" style={{ cursor: "pointer" }}>
+                    {lang === "sk" ? "Odhlásiť" : "Sign out"}
+                  </a>
+                </>
+              ) : (
+                <>
+                  <a onClick={() => { onLogin(); setMenuOpen(false); }} className="btn-p" style={{ cursor: "pointer" }}>
+                    {lang === "sk" ? "Začať zadarmo →" : "Get started free →"}
+                  </a>
+                  <a onClick={() => { onLogin(); setMenuOpen(false); }} className="btn-s" style={{ cursor: "pointer" }}>
+                    {lang === "sk" ? "Prihlásiť sa" : "Sign in"}
+                  </a>
+                </>
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </nav>
   );
 }
@@ -656,7 +783,7 @@ function Footer({ lang = "en", setCurrent }) {
   const linkStyle = { fontSize: "0.78rem", color: "#8a8a96", textDecoration: "none" };
   return (
     <footer style={{
-      padding: "2.5rem 2rem", borderTop: "1px solid #222228",
+      padding: "2.5rem var(--gutter-safe) calc(2.5rem + var(--safe-bottom))", borderTop: "1px solid #222228",
       maxWidth: "var(--container)", margin: "0 auto",
     }}>
       <div style={{
@@ -758,10 +885,10 @@ function HomePage({ setCurrent, l, lang, onLogin }) {
   return (
     <>
       {/* Hero */}
-      <section style={{
-        minHeight: "100vh", display: "flex", flexDirection: "column",
+      <section className="home-hero" style={{
+        display: "flex", flexDirection: "column",
         justifyContent: "center", alignItems: "center", textAlign: "center",
-        padding: "8rem 2rem 4rem", position: "relative", overflow: "hidden",
+        padding: "8rem var(--container-pad) 4rem", position: "relative", overflow: "hidden",
       }}>
         {/* Animated dot grid */}
         <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
@@ -1404,9 +1531,9 @@ function DataPage({ setCurrent, l, lang }) {
         </InsightCard>
       </div>
 
-      {/* Unit Table + Schema — two-column layout */}
+      {/* Unit Table + Schema — two-column layout (stacks to 1col ≤900 via .schema-grid) */}
       <div style={{ padding: "2rem 2rem 5rem", maxWidth: "var(--container)", margin: "0 auto" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2.5rem", alignItems: "start" }}>
+        <div className="schema-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2.5rem", alignItems: "start" }}>
 
           {/* Left — Real data examples (lighter) */}
           <div>
@@ -1974,6 +2101,17 @@ export default function App() {
         }
         .page-transition { animation: pageFade 0.35s ease-out both; }
 
+        /* Home hero fills the viewport. min-height is declared twice on purpose:
+           old browsers use 100vh; modern phones use 100svh (the SMALL viewport,
+           i.e. with the URL bar showing) so the hero never hides content behind
+           iOS Safari's dynamic toolbar. */
+        .home-hero { min-height: 100vh; min-height: 100svh; }
+        /* On phones the hero sizes to its content instead of being forced to
+           full height: the tall copy then isn't pinned to the very bottom (so it
+           never collides with the floating Ask AI / Feedback pills), and a sliver
+           of the next section peeks up as a natural scroll cue. */
+        @media (max-width: 640px) { .home-hero { min-height: auto; } }
+
         /* Use Cases cards — hover zoom on image + border glow */
         .use-case-card { transition: border-color 0.3s, box-shadow 0.3s; }
         .use-case-card:hover { border-color: rgba(0,229,160,0.35) !important; box-shadow: 0 8px 32px rgba(0,229,160,0.08); }
@@ -2024,8 +2162,20 @@ export default function App() {
            fixed Ticker (Ticker positions itself relative to Nav-bottom).
            Banner height ≈ 40 px on desktop, slightly more if it wraps on
            mobile — using 44 px gives a little safety margin. */
-        body.residata-has-trial-banner nav { top: 44px !important; }
-        body.residata-has-trial-banner [aria-label="Live market ticker"] { top: 116px !important; }
+        /* Top-stack notch handling. The fixed banner→nav→ticker offsets all
+           shift down by the safe-area-top so nothing tucks under the iPhone
+           status bar / notch (env() is 0px on devices without one → no change).
+           Default: the nav itself owns the inset (its content clears the notch).
+           With the trial banner present: the banner owns the inset, the nav sits
+           below it, so its own top padding resets to 1rem (no double count). */
+        .marketing-nav > div { padding-top: calc(1rem + var(--safe-top)) !important; }
+        /* --trial-banner-h is the banner's measured height (it already includes
+           the notch inset via the banner's own padding), so the nav sits exactly
+           below it at any width; 44px is a first-paint fallback before JS measures.
+           The ticker then sits a nav-height (72px) below that. */
+        body.residata-has-trial-banner .marketing-nav { top: var(--trial-banner-h, 44px) !important; }
+        body.residata-has-trial-banner .marketing-nav > div { padding-top: 1rem !important; }
+        body.residata-has-trial-banner [aria-label="Live market ticker"] { top: calc(var(--trial-banner-h, 44px) + 72px) !important; }
 
         .card-hover { transition: border-color 0.3s, transform 0.3s, box-shadow 0.3s; }
         .card-hover:hover { border-color: #333 !important; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.2); }
@@ -2184,9 +2334,14 @@ export default function App() {
       {!isAppPage(current) && (
         <>
           <style>{`
-            .mc-dock { position: fixed; left: 1.25rem; bottom: 1.25rem; z-index: 90; width: 208px; max-width: calc(100vw - 2.5rem); }
-            @media (max-width: 640px) {
-              .mc-dock { left: 0.55rem; bottom: 0.55rem; width: 156px; transform: scale(0.94); transform-origin: bottom left; }
+            /* Bottom-left dock — desktop only. Kept clear of the iOS home bar /
+               landscape cutout via the safe-area insets (0px without them). At
+               ≤1180 the nav collapses to the hamburger menu, which carries the
+               Market + Currency controls instead — so the dock hides and never
+               overlaps page content (e.g. the hero CTAs) on phones/tablets. */
+            .mc-dock { position: fixed; left: calc(1.25rem + var(--safe-left)); bottom: calc(1.25rem + var(--safe-bottom)); z-index: 90; width: 208px; max-width: calc(100vw - 2.5rem); }
+            @media (max-width: 1180px) {
+              .mc-dock { display: none; }
             }
           `}</style>
           <div className="mc-dock">

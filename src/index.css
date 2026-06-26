@@ -4,6 +4,11 @@
    Token values match the literals already used across the app, so introducing
    them changes nothing visually — it just makes the system consistent.
    ============================================================================ */
+/* Responsive foundation — breakpoint scale, safe-area tokens, fluid primitives,
+   mobile nav menu, iOS correctness. Imported first so its :root tokens are
+   available everywhere. (@import must precede normal rules.) */
+@import "./styles/responsive.css";
+
 :root {
   /* ── color ────────────────────────────────────────────── */
   --bg:            #0a0a0b;   /* page background (was also mistyped #0a0a0c in places) */
