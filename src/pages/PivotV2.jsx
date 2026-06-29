@@ -115,7 +115,7 @@ const FIELDS = {
   // e.g. "Nový downtown"); backed by analytics.dim_registry.sub_district.
   country:           { label: "Krajina",                     group: "location", type: "text",   accessor: (r) => r.country === "SK" ? "Slovensko" : r.country === "CZ" ? "Česko" : (r.country || null) },
   city:              { label: "Mesto",                       group: "location", type: "text",   accessor: (r) => r.city || null },
-  cast:              { label: "Cast",                       group: "location", type: "text",   accessor: (r) => r.district },
+  cast:              { label: "Mestská časť",                group: "location", type: "text",   accessor: (r) => r.district },
   sub_district:      { label: "Podčasť",                     group: "location", type: "text",   accessor: (r) => r.sub_district },
 
   // Derived metric
