@@ -265,6 +265,51 @@ const SEP = "\u2016";
    Lets the user include or exclude records with missing values explicitly. */
 const EMPTY_SENTINEL = "__EMPTY__";
 
+/* ─── Default layout + persisted state ───────────────────────────
+   The pivot opens on this layout (Krajina + Project name in Rows, avg €/m² as
+   the value, on-market-only filter). Extracted as constants so the "Predvolené /
+   Default" button can restore them and so the persistence layer has a baseline. */
+const DEFAULT_ROWS    = ["country", "project_name"];
+const DEFAULT_COLS    = [];
+const DEFAULT_VALUES  = [{ key: "cena_na_m2_obytnej", field: "cena_na_m2_obytnej", agg: "avg" }];
+const DEFAULT_FILTERS = [{ key: "stav", mode: "in", values: ["V", "PR"] }];
+const DEFAULT_VALUE_MODE = "raw";
+const DEFAULT_DATA_BARS  = true;
+const DEFAULT_SORT       = { col: "count", dir: "desc" };
+
+/* Persist the whole pivot setup (rows/cols/values/filters + display options) to
+   localStorage so it SURVIVES navigating away (to Reports, etc.) and back, and
+   across refreshes/sessions — for the logged-in user and anonymous visitors alike
+   (localStorage lives until the browser data is cleared). Versioned key so a future
+   schema change can invalidate old blobs cleanly. */
+const PIVOT_STATE_KEY = "residata.pivotV2.state.v1";
+
+/* Restored configs are SANITISED against the current FIELDS registry: a saved key
+   for a field that no longer exists (e.g. a retired palette entry) is dropped, so a
+   stale blob can never wedge the pivot. */
+function _knownDim(k) { return !!FIELDS[k]; }
+function sanitizePivotState(s) {
+  if (!s || typeof s !== "object") return null;
+  const out = {};
+  if (Array.isArray(s.rows))    out.rows    = s.rows.filter(_knownDim).slice(0, MAX_ROWS);
+  if (Array.isArray(s.cols))    out.cols    = s.cols.filter(_knownDim).slice(0, MAX_COLS);
+  if (Array.isArray(s.values))  out.values  = s.values.filter(v => v && _knownDim(v.field)).slice(0, MAX_VALUES);
+  if (Array.isArray(s.filters)) out.filters = s.filters.filter(f => f && _knownDim(f.key));
+  if (s.valueMode === "raw" || s.valueMode === "pct_total" || s.valueMode === "pct_parent") out.valueMode = s.valueMode;
+  if (typeof s.dataBars === "boolean") out.dataBars = s.dataBars;
+  if (s.sort && typeof s.sort === "object" && "dir" in s.sort) out.sort = s.sort;
+  return out;
+}
+function loadPivotState() {
+  try {
+    const raw = typeof window !== "undefined" && window.localStorage.getItem(PIVOT_STATE_KEY);
+    return raw ? sanitizePivotState(JSON.parse(raw)) : null;
+  } catch { return null; }
+}
+function savePivotState(s) {
+  try { window.localStorage.setItem(PIVOT_STATE_KEY, JSON.stringify(s)); } catch { /* private mode / quota — ignore */ }
+}
+
 /* Stable empty array — passed as `records` to FilterPopover on the grain fast-path
    (values come from distinctOverride, not records) so its useMemo never re-runs on a
    fresh [] identity each render. */
@@ -906,17 +951,22 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   // Default filter: show only the on-market units a buyer is actually shopping —
   // Voľné (V) + Predrezervované (PR). Pushed to the grain RPC (p_stav) so the
   // default stays instant. The user can edit/clear the chip to see all statuses.
-  const [filters, setFilters] = useState([{ key: "stav", mode: "in", values: ["V", "PR"] }]);
+  // Restore the persisted setup ONCE on mount (survives navigating to Reports etc.
+  // and back, and across refreshes). Falls back to the defaults when nothing is
+  // saved or the blob is unusable. See loadPivotState/savePivotState.
+  const [persisted] = useState(loadPivotState);
+  // Default filter: show only the on-market units a buyer is actually shopping —
+  // Voľné (V) + Predrezervované (PR). Pushed to the grain RPC (p_stav) so the
+  // default stays instant. The user can edit/clear the chip to see all statuses.
+  const [filters, setFilters] = useState(persisted?.filters ?? DEFAULT_FILTERS);
   // Default layout: Krajina (country) + Project name in Rows, average €/m² as the
   // value, filtered to on-market units (V + PR). The user immediately sees, per
   // country, which projects sit at which price level among the units actually for
   // sale — the canonical first question in residential-market analysis. (Declared
   // here, above isCurrent, so the time-axis logic below can read Rows/Cols.)
-  const [rows,    setRows]    = useState(["country", "project_name"]);
-  const [cols,    setCols]    = useState([]);   // cross-tab axis (≤ 1 field)
-  const [values,  setValues]  = useState([
-    { key: "cena_na_m2_obytnej", field: "cena_na_m2_obytnej", agg: "avg" },
-  ]);
+  const [rows,    setRows]    = useState(persisted?.rows   ?? DEFAULT_ROWS);
+  const [cols,    setCols]    = useState(persisted?.cols   ?? DEFAULT_COLS);
+  const [values,  setValues]  = useState(persisted?.values ?? DEFAULT_VALUES);
   // Forever perf fix (2026-06-11): server-able configs render from the pivot_grain
   // RPC (instant), and we fetch raw rows ONLY when a config can't be aggregated
   // server-side (median / count_distinct / rare field / ad-hoc filter) or the user
@@ -1076,7 +1126,7 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   const [hoverZone, setHoverZone] = useState(null);
   const [collapsed, setCollapsed] = useState(() => new Set());
   // Sort state: { col: "label" | "count" | valueIdx (0..n-1), dir: "asc"|"desc" }
-  const [sort, setSort] = useState({ col: "count", dir: "desc" });
+  const [sort, setSort] = useState(persisted?.sort ?? DEFAULT_SORT);
   // Which filter chip's popover is currently open (null = none).
   // { key, anchorEl } — anchor used to position the popover next to the chip.
   const [filterPopup, setFilterPopup] = useState(null);
@@ -1086,8 +1136,28 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   //  dataBars:  inline horizontal bar per leaf cell
   // (heatmap + chart toggles were removed — heatmap added noise, chart
   //  users can build themselves by copying the CSV into Excel.)
-  const [valueMode, setValueMode] = useState("raw");
-  const [dataBars,  setDataBars]  = useState(true);
+  const [valueMode, setValueMode] = useState(persisted?.valueMode ?? DEFAULT_VALUE_MODE);
+  const [dataBars,  setDataBars]  = useState(persisted?.dataBars ?? DEFAULT_DATA_BARS);
+
+  // Persist the whole setup whenever it changes, so leaving the page (to Reports,
+  // etc.) and coming back — or a refresh — restores exactly where the user left off.
+  // Only the layout/filters/display options are saved (not transient UI like the
+  // open popover, drag state, or collapsed rows).
+  useEffect(() => {
+    savePivotState({ rows, cols, values, filters, valueMode, dataBars, sort });
+  }, [rows, cols, values, filters, valueMode, dataBars, sort]);
+
+  // "Predvolené" → restore the opening layout. "Vyčistiť" → wipe rows/cols/values/
+  // filters to a clean slate (no field-by-field removal). Both persist via the effect.
+  const resetToDefault = () => {
+    setRows(DEFAULT_ROWS); setCols(DEFAULT_COLS); setValues(DEFAULT_VALUES); setFilters(DEFAULT_FILTERS);
+    setValueMode(DEFAULT_VALUE_MODE); setDataBars(DEFAULT_DATA_BARS); setSort(DEFAULT_SORT);
+    setCollapsed(new Set()); setSearch("");
+  };
+  const clearAll = () => {
+    setRows([]); setCols([]); setValues([]); setFilters([]);
+    setCollapsed(new Set()); setSearch("");
+  };
 
   // Drill-down modal: clicked cell → shows underlying records
   const [drillDown, setDrillDown] = useState(null);
@@ -1509,12 +1579,31 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
             </span>
           )}
         </span>
-        {rows.length >= 2 && (
-          <div style={{ display: "flex", gap: "0.4rem" }}>
+        <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", flexWrap: "wrap" }}>
+          {/* Always-available layout controls. "Predvolené" restores the opening
+              setup; "Vyčistiť" wipes everything to a clean slate in one click —
+              no removing fields one by one. The whole setup auto-persists, so it's
+              still here after visiting Reports etc. and coming back. */}
+          <button
+            onClick={resetToDefault}
+            style={miniBtn}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = green; e.currentTarget.style.color = green; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = border; e.currentTarget.style.color = dim; }}
+            title={lang === "sk" ? "Obnoviť predvolené rozloženie" : "Restore the default layout"}
+          >↺ {lang === "sk" ? "Predvolené" : "Default"}</button>
+          <button
+            onClick={clearAll}
+            style={miniBtn}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#ff6b6b"; e.currentTarget.style.color = "#ff6b6b"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = border; e.currentTarget.style.color = dim; }}
+            title={lang === "sk" ? "Vymazať všetky filtre aj rozloženie" : "Clear all filters and layout"}
+          >✕ {lang === "sk" ? "Vyčistiť" : "Clear"}</button>
+          {rows.length >= 2 && (<>
+            <span style={{ width: 1, alignSelf: "stretch", background: border, margin: "0.1rem 0.2rem" }} />
             <button onClick={expandAll}   style={miniBtn}>▾ {lang === "sk" ? "Rozbaliť" : "Expand"}</button>
             <button onClick={collapseAll} style={miniBtn}>▸ {lang === "sk" ? "Zbaliť" : "Collapse"}</button>
-          </div>
-        )}
+          </>)}
+        </div>
       </div>
 
       <div style={{
