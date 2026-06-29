@@ -181,16 +181,23 @@ function deepLocalize(node, rules) {
  * on top (overrides win).
  */
 function localizedCopy(lang, country) {
-  // Boss's live copy edits (public.site_content) win over the in-code defaults;
-  // the country find→replace + overrides then apply on top of the edited base.
-  const base = applyOverrides(lang, t[lang] || t.en, "mk");
+  // 1) Start from the in-code default for the language.
+  const codeBase = t[lang] || t.en;
+  // 2) Apply the country localization (find→replace rules + the country's own
+  //    whole-value overrides), exactly as before.
   const spec = COUNTRY_LOCALIZE[country];
-  if (!spec) return base;
-  const lk = lang === "sk" ? "sk" : "en";
-  const rules = spec.rules?.[lk];
-  const copy = rules && rules.length ? deepLocalize(base, rules) : { ...base };
-  const ov = spec.overrides?.[lk];
-  return ov ? { ...copy, ...ov } : copy;
+  let copy = codeBase;
+  if (spec) {
+    const lk = lang === "sk" ? "sk" : "en";
+    const rules = spec.rules?.[lk];
+    copy = rules && rules.length ? deepLocalize(codeBase, rules) : { ...codeBase };
+    const ov = spec.overrides?.[lk];
+    if (ov) copy = { ...copy, ...ov };
+  }
+  // 3) The Boss's explicit live edits (public.site_content) win LAST — over the
+  //    country localization too. Otherwise editing the hero (which the default
+  //    "all" view overrides) would silently do nothing. An edit always shows.
+  return applyOverrides(lang, copy, "mk");
 }
 
 /* ─── Animation hooks ─── */
