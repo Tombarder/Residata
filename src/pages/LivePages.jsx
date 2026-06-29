@@ -3312,14 +3312,16 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
   //   2. surface query errors instead of swallowing them,
   //   3. treat "admin got 0 rows, no error" as an auth problem (an admin ALWAYS
   //      sees at least themselves) → show a Reload instead of a silent empty.
-  const loadAll = useCallback(async () => {
+  // `silent` (used by the focus/visibility self-heal) refetches in the
+  // background WITHOUT blanking the table to a loading/error frame — data is
+  // only swapped in on success, so returning to the tab never flashes "Loading".
+  const loadAll = useCallback(async ({ silent = false } = {}) => {
     if (!self?.id) return;
-    setErr(null); setLoading(true);
+    if (!silent) { setErr(null); setLoading(true); }
     try {
       await getFreshAccessToken();
     } catch (e) {
-      setLoading(false);
-      setErr(authErrorMessage(e, lang));
+      if (!silent) { setLoading(false); setErr(authErrorMessage(e, lang)); }
       return;
     }
     const [u, ev, act, pd] = await Promise.all([
@@ -3330,8 +3332,12 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
       supabase.from("user_activity").select("*").order("created_at", { ascending: false }).limit(1000),
       supabase.from("premium_domains").select("*").order("domain"),
     ]);
-    setLoading(false);
-    if (u.error) { setErr(authErrorMessage(u.error, lang)); return; }
+    if (!silent) setLoading(false);
+    if (u.error) { if (!silent) setErr(authErrorMessage(u.error, lang)); return; }
+    // On a silent refetch that came back empty (stale-token race), keep the
+    // current rows on screen rather than wiping them — the next real load or a
+    // manual Reload surfaces any genuine problem.
+    if (silent && (u.data || []).length === 0) return;
     setUsers(u.data || []);
     setEvents(ev.data || []);
     setActivity(act.data || []);
@@ -3342,12 +3348,12 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
   useEffect(() => { loadAll(); }, [loadAll]);
 
   // Self-heal: a backgrounded admin tab's token can expire while away. Refetch
-  // (with a fresh token) on focus / visibility so the table repopulates instead
-  // of staying mysteriously empty after the user comes back.
+  // (with a fresh token) on focus / visibility so the table stays fresh after
+  // the user returns — silently, so it never flashes a loading frame.
   useEffect(() => {
     if (!self?.id) return;
-    const onFocus = () => loadAll();
-    const onVis = () => { if (!document.hidden) loadAll(); };
+    const onFocus = () => loadAll({ silent: true });
+    const onVis = () => { if (!document.hidden) loadAll({ silent: true }); };
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVis);
     return () => {
