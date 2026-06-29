@@ -93,11 +93,17 @@ const FIELDS = {
 
   // Location — uses enriched projects-table metadata.
   // CastMesta(kod) and InternaKlasifikacia(zona) — internal
-  // enrichment columns admin only fills sometimes — were dropped
-  // from the palette per QA: most rows are null, so they'd usually
-  // show empty filter lists and inflate the palette without
-  // actionable signal. The values still live in projects.* and can
-  // be exposed again later if a use case emerges.
+  // enrichment columns admin only fills sometimes — are kept out of the
+  // palette: most rows are null. The values still live in projects.* and
+  // can be exposed again later if a use case emerges.
+  //
+  // 2026-06-29 cleanup: `ulica_detail` / `budova_stav` / `standard` were
+  // REMOVED — those columns don't exist on reference.projects (nor on the
+  // flats views), so their accessors returned null for EVERY row: dead
+  // palette entries that could never filter/group/render. (Verified against
+  // information_schema: no such columns anywhere.) Every field in the palette
+  // now maps to a real, populated data source backed by analytics.dim_registry.
+  //
   // Mesto (city) — sourced directly from flats_archive.city (populated for
   // every market). Essential once Slovakia is unified: district alone is
   // ambiguous (e.g. "Staré Mesto" exists in Bratislava AND Košice), so the
@@ -105,12 +111,12 @@ const FIELDS = {
   // Krajina (country) — top of the location hierarchy, above Mesto. Sourced
   // from flats_archive.country (SK/CZ); shown as readable "Slovensko"/"Česko"
   // so the client accessor and the server grain (pivot_grain CASE) agree.
+  // Podčasť (sub_district) — finer than district (a project's micro-location,
+  // e.g. "Nový downtown"); backed by analytics.dim_registry.sub_district.
   country:           { label: "Krajina",                     group: "location", type: "text",   accessor: (r) => r.country === "SK" ? "Slovensko" : r.country === "CZ" ? "Česko" : (r.country || null) },
   city:              { label: "Mesto",                       group: "location", type: "text",   accessor: (r) => r.city || null },
   cast:              { label: "Cast",                       group: "location", type: "text",   accessor: (r) => r.district },
-  ulica_detail:      { label: "Ulica/Detail",               group: "location", type: "text",   accessor: (r) => r.ulica_detail },
-  budova_stav:       { label: "Budova/stav",                group: "location", type: "text",   accessor: (r) => r.budova_stav },
-  standard:          { label: "Standard",                   group: "location", type: "text",   accessor: (r) => r.standard },
+  sub_district:      { label: "Podčasť",                     group: "location", type: "text",   accessor: (r) => r.sub_district },
 
   // Derived metric
   cena_na_m2_obytnej:{ label: "Cena na m2 obytnej",         group: "derived",  type: "number", unit: "€/m²", derived: true, accessor: (r) => {
@@ -188,7 +194,7 @@ const FIELDS = {
 /* English labels for the (Slovak-primary) FIELDS registry. Resolved via
    fieldLabel() at every render site (palette, zone chips, result-table column
    headers, CSV export) so EN users don't see Slovak field names. Keys not listed
-   here are already English (project_name, unit_id, developer, Standard, …) or
+   here are already English (project_name, unit_id, developer, …) or
    carry an inline label_en (wavg_m2_price) → both fall back to .label. */
 const FIELD_LABEL_EN = {
   datum: "Date", batch_timestamp: "Batch (exact time)", snapshot_month: "Month",
@@ -198,8 +204,8 @@ const FIELD_LABEL_EN = {
   kobka: "Storage", celkova_plocha: "Total area",
   cena_bez_dph: "Price excl. VAT", cena_s_dph: "Price incl. VAT",
   stav: "Status", kolaudacia: "Handover", orientacia: "Orientation",
-  country: "Country", city: "City", cast: "District",
-  ulica_detail: "Street/detail", budova_stav: "Building/status",
+  country: "Country", city: "City", cast: "District", sub_district: "Sub-district",
+  import_status: "Project status",
   cena_na_m2_obytnej: "Price per m² (living)",
   sold_count: "Sold", available_count: "Available",
 };
@@ -218,12 +224,12 @@ function fieldLabel(fieldKey, lang) {
    their Excel pivot. */
 const FIELD_ORDER = [
   "datum", "snapshot_month", "batch_id", "batch_timestamp", "import_status",
-  "project_name", "unit_id", "typ", "etapa", "budova", "unit_detail",
+  "project_name", "developer", "unit_id", "typ", "etapa", "budova", "unit_detail",
   "poschodie", "izby", "obytna_plocha", "balkon", "loggia", "terasa",
   "zahrada", "exterier", "kobka", "celkova_plocha",
   "cena_bez_dph", "cena_s_dph",
   "stav", "kolaudacia", "orientacia",
-  "country", "city", "cast", "ulica_detail", "budova_stav", "standard",
+  "country", "city", "cast", "sub_district",
   "cena_na_m2_obytnej",
   // Measures — group-level calculations, Values zone only
   "abs_rate", "wavg_m2_price", "sold_count", "available_count",
@@ -287,8 +293,6 @@ const PROJECT_LEVEL_ATTR = {
   cast: "district",
   city: "city",
   import_status: "status",
-  budova_stav: "budova_stav",
-  standard: "standard",
   sub_district: "sub_district",
 };
 
@@ -583,10 +587,19 @@ function buildTree(records, rowFields, colFields, valueDefs) {
    whitelisted, and the only active filters are time (datum / snapshot_month).
    Anything else (median, count_distinct, rare fields, ad-hoc filters) → the
    caller keeps the existing record path. */
+// Server-able dimensions. CONTRACT: every key here MUST be an enabled key in
+// analytics.dim_registry (the DB single-source-of-truth that the engine resolves
+// against). This set is therefore a curated SUBSET of the registry — registry dims
+// that are intentionally not surfaced (e.g. all-NULL `lifecycle`, or `market` which
+// is redundant with `country` for the two active markets) are simply omitted.
+// Self-guarding: if a key here is NOT registered, analytics_pivot RAISEs
+// 'unknown dim …' loudly at query time (no silent wrong data). Verified 2026-06-29
+// against the live registry (developer / sub_district / batch_timestamp all present).
 const SERVERABLE_DIMS = new Set([
-  "project_name", "typ", "etapa", "budova", "unit_detail", "developer", "unit_id",
-  "izby", "poschodie", "stav", "kolaudacia", "orientacia", "country", "city", "cast",
-  "import_status", "snapshot_month", "datum", "batch_id",
+  "project_name", "developer", "typ", "etapa", "budova", "unit_detail", "unit_id",
+  "izby", "poschodie", "stav", "kolaudacia", "orientacia",
+  "country", "city", "cast", "sub_district",
+  "import_status", "snapshot_month", "datum", "batch_id", "batch_timestamp",
 ]);
 // numeric field key → component prefix in the grain's `m` object
 const COMP_FIELD = {
@@ -594,6 +607,9 @@ const COMP_FIELD = {
   izby: "iz", poschodie: "po", cena_na_m2_obytnej: "m2",
 };
 const SERVERABLE_MEASURES = new Set(["abs_rate", "wavg_m2_price", "sold_count", "available_count"]);
+// Time-axis dimensions. Using any of these as a Row/Column means "trend over time"
+// → the pivot must read the archive, not just the current snapshot (see isCurrent).
+const TIME_DIMS = new Set(["datum", "snapshot_month", "batch_timestamp"]);
 
 function isServerable(rowFields, colFields, valueDefs, filters) {
   for (const d of [...rowFields, ...colFields]) if (!SERVERABLE_DIMS.has(d)) return false;
@@ -891,6 +907,16 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   // Voľné (V) + Predrezervované (PR). Pushed to the grain RPC (p_stav) so the
   // default stays instant. The user can edit/clear the chip to see all statuses.
   const [filters, setFilters] = useState([{ key: "stav", mode: "in", values: ["V", "PR"] }]);
+  // Default layout: Krajina (country) + Project name in Rows, average €/m² as the
+  // value, filtered to on-market units (V + PR). The user immediately sees, per
+  // country, which projects sit at which price level among the units actually for
+  // sale — the canonical first question in residential-market analysis. (Declared
+  // here, above isCurrent, so the time-axis logic below can read Rows/Cols.)
+  const [rows,    setRows]    = useState(["country", "project_name"]);
+  const [cols,    setCols]    = useState([]);   // cross-tab axis (≤ 1 field)
+  const [values,  setValues]  = useState([
+    { key: "cena_na_m2_obytnej", field: "cena_na_m2_obytnej", agg: "avg" },
+  ]);
   // Forever perf fix (2026-06-11): server-able configs render from the pivot_grain
   // RPC (instant), and we fetch raw rows ONLY when a config can't be aggregated
   // server-side (median / count_distinct / rare field / ad-hoc filter) or the user
@@ -921,7 +947,15 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   // default and the only cross-market-correct mode (SK + CZ scrape on different
   // days, so a single global "latest day" would miss one market). The grain RPC
   // reads flats_current here; any Datum/Mesiac filter switches to flats_archive.
-  const isCurrent = !fetchDates && !fetchMonths;
+  //
+  // A time dimension in Rows/Cols (Datum / Mesiac / Batch-čas) ALSO switches to the
+  // archive: putting Datum in Rows means "show me the trend over time", which only
+  // exists in history. Without this the series stayed pinned to the single current
+  // snapshot → one bucket, "doesn't move by date" (the exact symptom Boss reported).
+  // This makes BOTH the grain path AND the record path (median/count_distinct over
+  // time) time-travel correctly, not just a time *filter*.
+  const groupByTime = rows.some(d => TIME_DIMS.has(d)) || cols.some(d => TIME_DIMS.has(d));
+  const isCurrent = !fetchDates && !fetchMonths && !groupByTime;
   // Records are fetched ONLY when forceRaw (non-server-able config or drill-down).
   // Current view pulls flats_current (cross-market current); time-travel pulls the
   // day/month-scoped archive.
@@ -1029,27 +1063,11 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
         developer:         p?.developer || null,
         district:          p?.district || null,
         sub_district:      p?.sub_district || null,
-        cast_mesta_kod:    p?.cast_mesta_kod || null,
-        interna_klas_zona: p?.interna_klas_zona || null,
-        ulica_detail:      p?.ulica_detail || null,
-        budova_stav:       p?.budova_stav || null,
-        standard:          p?.standard || null,
       };
     });
   }, [flats, projectById]);
 
   // ── State ─────────────────────────────────────────────────────
-  // Default layout: Krajina (country) + Project name in Rows, average
-  // €/m² as the value, filtered to on-market units (V + PR). The user
-  // immediately sees, per country, which projects sit at which price
-  // level among the units actually for sale — the canonical first
-  // question in residential-market analysis. They can reshape it in
-  // seconds; the pre-filled config teaches the pivot's grammar by example.
-  const [rows,    setRows]    = useState(["country", "project_name"]);
-  const [cols,    setCols]    = useState([]);   // cross-tab axis (≤ 1 field)
-  const [values,  setValues]  = useState([
-    { key: "cena_na_m2_obytnej", field: "cena_na_m2_obytnej", agg: "avg" },
-  ]);
   // NOTE: the pivot no longer auto-seeds a Datum filter. It opens in the
   // "current" view (no time scope → each project's latest snapshot, cross-market
   // correct). The user adds a Datum/Mesiac filter to time-travel into the archive.
@@ -1218,6 +1236,8 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   const gDims = useMemo(() => [...rows, ...cols], [rows, cols]);
   // Full server-side spec — ALL active filters (any dim, any mode) go to the engine,
   // so a city/developer/price filter is instant instead of pulling the archive.
+  // (`isCurrent` already accounts for a time group-by — see its definition — so a
+  // Datum/Mesiac dimension in Rows correctly switches the engine into archive mode.)
   const pivotSpec = useMemo(
     () => buildPivotSpec({ dims: gDims, filters, country, isCurrent }),
     [gDims, filters, country, isCurrent]
@@ -1601,8 +1621,6 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
               district: p?.district || null,
               sub_district: p?.sub_district || null,
               city: p?.city || null,
-              budova_stav: p?.budova_stav || null,
-              standard: p?.standard || null,
             };
           });
           const filtered = enriched.filter((r) => path.every((pv, i) => {
