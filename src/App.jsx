@@ -1400,7 +1400,7 @@ function DataPage({ setCurrent, l, lang }) {
       <div style={{ padding: "2rem 2rem 1rem", maxWidth: "var(--container)", margin: "0 auto" }}>
         <Label>{l.insightsLabel}</Label>
         <h2 className="sec-title" style={{ marginBottom: "0.5rem" }}>{l.insightsTitle}</h2>
-        <div style={{ display: "flex", alignItems: "center", gap: "1.5rem", marginBottom: "2rem" }}>
+        <div className="insights-intro" style={{ display: "flex", alignItems: "center", gap: "1.5rem", marginBottom: "2rem" }}>
           <p className="sec-desc" style={{ marginBottom: 0 }}>{l.insightsDesc}</p>
           <span style={{ fontFamily: mono, fontSize: "0.6rem", color: "#55555f", background: "#111113", border: "1px solid #222228", padding: "0.3rem 0.75rem", borderRadius: 6, whiteSpace: "nowrap", flexShrink: 0 }}>{dynamicInsightsBadge}</span>
         </div>
