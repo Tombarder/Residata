@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { useAuth } from "../lib/useAuth";
-import { liveT } from "../lib/liveLang";
+import { getLiveT } from "../lib/liveLang";
 import { validateBusinessEmail } from "../lib/emailValidation";
 import { track } from "../lib/track";
 import { useBreakpointDown } from "../lib/breakpoints";
 
 export default function LoginModal({ open, onClose, lang = "en" }) {
-  const t = liveT[lang] || liveT.en;
+  const t = getLiveT(lang);
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [error, setError] = useState(null);

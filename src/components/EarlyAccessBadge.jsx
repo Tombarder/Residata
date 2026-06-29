@@ -5,7 +5,7 @@
 //   useEarlyAccessStats → lib/useData. Behaviour is byte-identical to the
 //   original; only its home changed. (The copy still in LivePages.jsx is now
 //   dead — safe to remove in a later cleanup.)
-import { liveT, ll } from "../lib/liveLang";
+import { getLiveT, ll } from "../lib/liveLang";
 import { useCapabilities } from "../lib/useCapabilities";
 import { useEarlyAccessStats } from "../lib/useData";
 
@@ -13,7 +13,7 @@ const mono = "'JetBrains Mono', monospace";
 const green = "#00e5a0";
 
 export default function EarlyAccessBadge({ lang = "en" }) {
-  const t = liveT[lang] || liveT.en;
+  const t = getLiveT(lang);
   const { can } = useCapabilities();
   const { remaining_slots } = useEarlyAccessStats();
   // Hide for paid/admin — they don't need the "early access" marketing.

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../lib/useAuth";
-import { liveT } from "../lib/liveLang";
+import { getLiveT } from "../lib/liveLang";
 import { track } from "../lib/track";
 import { cleanText, cleanUrl, cleanPhone } from "../lib/sanitize";
 import { hasTrialIntent, clearTrialIntent, activateTrial } from "../lib/trial";
@@ -27,7 +27,7 @@ import { hasTrialIntent, clearTrialIntent, activateTrial } from "../lib/trial";
  * the parent unmounts the overlay in the same render tick.
  */
 export default function CompleteProfile({ lang = "en" }) {
-  const t = liveT[lang] || liveT.en;
+  const t = getLiveT(lang);
   const { user, setProfile, signOut } = useAuth();
   const [form, setForm] = useState({
     full_name: "", company: "", position: "", linkedin_url: "", phone: "",

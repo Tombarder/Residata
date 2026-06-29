@@ -322,3 +322,19 @@ export const liveT = {
 export function ll(str, params = {}) {
   return str.replace(/\{(\w+)\}/g, (_, k) => params[k] ?? `{${k}}`);
 }
+
+import { applyOverrides } from "./copyOverrides";
+
+/**
+ * Resolve the live/admin-page dictionary for `lang`, with the Boss's DB
+ * overrides merged on top of the code defaults. Use this instead of reading
+ * `liveT[lang]` directly so edited copy shows up live.
+ *
+ * Fallback chain: unknown lang (e.g. 'cs' before its copy is written) falls
+ * back to English defaults, then any 'cs' overrides win — so a partially
+ * translated Czech site shows English where untranslated, never blank.
+ */
+export function getLiveT(lang) {
+  const base = liveT[lang] || liveT.en;
+  return applyOverrides(lang, base, "lv");
+}

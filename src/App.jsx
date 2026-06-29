@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
+import { t } from "./lib/marketingCopy";
 import { createPortal } from "react-dom";
 import Ticker from "./components/Ticker";
 import LoginModal from "./components/LoginModal";
@@ -8,6 +9,7 @@ import FeedbackWidget from "./components/FeedbackWidget";
 import "./lib/diagnostics";   // installs the error/network collector at startup
 import { TrialBanner, TrialPopup } from "./components/TrialBanner";
 import { setTrialIntent, activateTrial } from "./lib/trial";
+import { applyOverrides, useCopyVersion } from "./lib/copyOverrides";
 import PendingGate from "./components/PendingGate";
 import Feature from "./components/Feature";
 import UpgradePrompt from "./components/UpgradePrompt";
@@ -61,250 +63,7 @@ const pageMap = {
   "What we deliver": "Data",
 };
 
-const t = {
-  en: {
-    // Nav
-    getAccess: "Get Access",
-    // Hero
-    // heroBadge text is computed in HomePage from live projects.length —
-    // see `heroBadgeText` near the top of HomePage(). No static fallback.
-    heroTitle1: "Slovak residential market,",
-    heroTitle2: "fully transparent.",
-    heroSub: "We monitor every new residential development across Slovakia and turn scattered listings into actionable market intelligence — so you can make pricing, investment, and portfolio decisions based on data.",
-    heroBtn1: "Get Access",
-    heroBtn2: "See Sample Data",
-    // Value prop
-    valueLabel: "What We Deliver",
-    valueTitle: "Not just data. Answers.",
-    valueDesc: "Every month you get a full snapshot of the Slovak new-build market — unit-level data across every active project, plus the insights you need to act on it.",
-    questionsLabel: "Questions we help you answer",
-    questions: [
-      "What should I price my 2-bedroom units at in Ružinov to stay competitive?",
-      "If I build in Záhorská Bystrica, how long until I sell out based on current absorption?",
-      "My project costs €50M to build — are market prices high enough to cover costs and deliver 20% margin?",
-      "How fast is Bory selling compared to last quarter — is momentum building or slowing?",
-      "Where is supply running low? Which districts will have no new inventory within 6 months?",
-      "What's the realistic price range for 60m² in Petržalka — and where does 90% of demand sit?",
-      "Which competitor projects are about to sell out — what can I learn from their pricing?",
-    ],
-    deliveryLabel: "Every month you get",
-    deliveryItems: [
-      ["Competitive pricing intelligence", "Know exactly what every project charges per m² — by district, unit type, and phase. Benchmark your own pricing against the entire market."],
-      ["Sell-through velocity", "See which projects are selling fast and which are stalling. Spot momentum shifts before the market does."],
-      ["Supply & pipeline tracking", "Track new launches, upcoming phases, and total inventory — know what's coming so you're never caught off guard."],
-      ["Absorption analysis", "Understand how fast the market absorbs new units by district and segment. Critical for launch timing and feasibility."],
-      ["Historical trends", "Month-over-month snapshots let you track pricing direction and velocity — not just where the market is, but where it's heading."],
-    ],
-    flexTitle: "On-Demand plan — we adapt to your needs.",
-    flexDesc: "Need weekly updates instead of monthly? Want to expand into Poland, Austria, or another market? Need a custom output format for your internal tools or a different property segment? The pipeline is built to be reconfigured — we adapt scope, frequency, and delivery to match your workflow.",
-    // Use Cases
-    useCasesLabel: "Use Cases",
-    useCasesTitle: "Built for professionals who need\nto understand the market.",
-    useCasesDesc: "Different roles, similar problem — you need reliable, current data on the residential market. Here's how different teams benefit from Residata's intelligence.",
-    useCases: [
-      { tag: "Developers & Sales Teams", title: "Know exactly where to price.",
-        desc: "You're launching a new phase and need to set prices. But what are comparable projects actually charging? How fast are they selling? Are you leaving money on the table — or pricing yourself out?",
-        benefits: [["Side-by-side competitor pricing", "see €/m² across every comparable project in your district — broken down by unit type, floor, and phase"], ["Sell-through velocity ranking", "know which projects moved the most units last month — and which ones are sitting still"], ["Inventory countdown", "track how many units your competitors have left — time your launches to hit gaps in supply"]] },
-      { tag: "Investors & Private Equity", title: "Underwrite with market reality.",
-        desc: "You're evaluating a resi development deal. The developer says demand is strong and prices are rising. But is that true — and is it true for your specific district, unit mix, and price point?",
-        benefits: [["Absorption rates by segment", "how many units actually sell per month in each district — the number that makes or breaks your IRR"], ["Historical price trajectories", "6–12 months of €/m² movement so you can model scenarios based on real trends, not assumptions"], ["Feasibility stress test", "compare your target sell price against what the market is actually paying — by m², type, and location"]] },
-      { tag: "Banks & Valuers", title: "Comparable data, ready to use.",
-        desc: "You need market comparables for a valuation or collateral assessment — but gathering them manually from scattered developer websites and transforming them into a usable format takes weeks. And getting historical data retrospectively is impossible. We've already done it for you.",
-        benefits: [["Structured comparable listings", "pricing by location, unit type, floor area, and availability — filterable and exportable"], ["Market depth overview", "how many active projects and units exist in a given district — essential context for any valuation"], ["Monthly refresh", "your comparables are never more than 30 days old — no more working with stale data from last quarter"]] },
-      { tag: "Consultants & Analysts", title: "Hours of research, done for you.",
-        desc: "Your client needs a market overview for Bratislava residential. You can spend 2–4 weeks clicking through developer websites, copy-pasting into spreadsheets, fighting inconsistent formats, chasing down broken links, and cleaning messy data — or open a single sheet with everything already structured, normalized, and ready to analyze.",
-        benefits: [["Presentation-ready data", "normalized columns across every active project — drop straight into models, charts, or client decks"], ["Trend analysis built in", "monthly snapshots mean you can show pricing direction and market shifts without extra work"], ["Full market coverage", "apartments, houses, retail, semidetached — across every active district. No gaps to fill manually"]] },
-    ],
-    useCasesCta: "Different need?",
-    useCasesCtaDesc: "The pipeline is flexible. If your use case isn't listed, reach out — we likely already have what you need, or can configure it.",
-    useCasesCtaBtn: "See Pricing",
-    whatYouGet: "What you get",
-    // Data / Sample page — focuses on INSIGHTS + RAW SAMPLE + SCHEMA.
-    // Live market numbers (totals, trends, district prices) are shown on Home
-    // via MarketPulse / DistrictPulse — we don't duplicate them here.
-    dataLabel: "Sample Output",
-    dataTitle: "This is what you get.",
-    dataDesc: "Five concrete insight types, a raw unit-level sample, and the full schema. Same depth, every month.",
-    dataContext: "Slovak New-Build Market",
-    dataContextSub: "Monthly snapshot · all active residential projects",
-    insightsLabel: "Market Insights",
-    insightsTitle: "What the data tells you.",
-    insightsDesc: "Examples of the insights you can extract from each monthly delivery. The kind of edge that's hard to build in-house — and expensive to live without. The five cards below are illustrative examples — paid subscribers see the live versions in their dashboard, derived from the current snapshot.",
-    // F-062 (Boss 2026-05-31): these cards contain illustrative numbers, not
-    // live derived values. Badge wording made explicit so customers don't
-    // read them as live insights. Real numbers ship in the paid dashboard.
-    insightsBadge: "Illustrative examples · live in dashboard",
-    rawLabel: "Raw Data",
-    unitSample: "Unit-level sample",
-    // `showing` is overridden per render in DataPage with live units-tracked
-    // count from the metrics table. This static fallback only shows in the
-    // ~100ms before the hook resolves (graceful "…" number).
-    showing: "Showing 8 of … records",
-    schemaLabel: "Schema",
-    schemaTitle: "Every data point per unit — key fields below.",
-    schemaDesc: "Additional fields include orientation, balcony area, parking, storage, and project-level metadata.",
-    schemaNote: "Note: Field availability varies by project. Not all developers publish all data points.",
-    wantFull: "Want the full dataset?",
-    wantFullDesc: "This is a sample. The full output covers every unit across every active Bratislava new-build project, refreshed every month.",
-    // Pricing
-    pricingLabel: "Pricing",
-    pricingTitle: "Simple, transparent pricing.",
-    pricingDesc: "Choose the plan that fits your needs. Start with a one-time report or get ongoing market intelligence.",
-    testimonial: "When you're making pricing decisions on a project worth €30M+, you can't afford to guess what the market will bear. Residata gives us the full picture — what comparable projects charge, how fast they sell, where supply is tightening. For the cost of a dinner, we get data that directly impacts millions in revenue.",
-    testimonialFrom: "From a client",
-    testimonialName: "Marek T.",
-    testimonialRole: "Head of Residential Development in Bratislava",
-    commonQ: "Common questions",
-    faqs: [
-      ["What do I actually receive?", "You get a structured market report with insights, visualizations, and recommendations — covering pricing trends, absorption rates, competitive positioning, and supply dynamics. We also include raw and cleaned datasets so you can run your own analysis if needed."],
-      ["How often is the data updated?", "Standard delivery is monthly. We can go as frequent as weekly — and technically even daily, but we recommend weekly at most. Shorter intervals rarely justify the cost, as the new-build market doesn't shift that fast."],
-      ["Can you cover cities beyond Bratislava?", "Yes. The pipeline is market-agnostic — we can configure it for any city or region where developer data is publicly listed. This falls under our Custom plan."],
-      ["Can I add specific projects or developers to track?", "Absolutely. If a project is publicly listed, we can add it to the registry. Custom clients can request additions at any time."],
-    ],
-    notSure: "Not sure which plan fits?",
-    notSureDesc: "Reach out and we'll walk you through the data, the pipeline, and which option makes sense for your use case.",
-    getInTouch: "Get in Touch",
-    // Contact
-    contactLabel: "Contact",
-    contactTitle: "Let's talk.",
-    contactDesc: "Whether you want to see a demo, explore a specific plan, or simply learn how Residata can support your market decisions — we'd love to hear from you.",
-    emailDesc: "Detailed inquiries & data requests",
-    phoneDesc: "Quick questions or scheduling a call",
-    bookCall: "Book a 20-min intro call",
-    sendEmail: "Send an Email",
-    whatToExpect: "What to expect",
-    steps: [
-      ["1", "Intro call or email exchange", "We learn about your use case — what decisions you're making, what data you're currently missing, and what format works for you."],
-      ["2", "Sample delivery", "You get a real sample from the latest pipeline run — not a demo, actual data — so you can evaluate the quality and depth firsthand."],
-      ["3", "Tailored setup", "We configure scope, frequency, and output format to match your workflow. You start receiving monthly (or more frequent) deliveries."],
-      ["4", "Ongoing market edge", "Every delivery gives you a clear view of the market — competitive pricing, absorption trends, supply shifts, and sell-out signals. The kind of insight that turns guesswork into confident decisions."],
-    ],
-    // Tiers
-    tiers: [
-      { tier: "Snapshot", name: "One-time report", price: "€249", note: "Single month, one-time delivery",
-        features: [[true, "Full market report with insights"], [true, "Unit-level data — every active project"], [true, "Pricing benchmarks & visualizations"], [false, "No historical data"], [false, "No ongoing updates"]], cta: "Get Started" },
-      { tier: "Standard", name: "Monthly delivery", price: "€349", priceSuffix: "/mo", note: "Billed monthly, cancel anytime",
-        features: [[true, "Monthly report with full insights"], [true, "Raw + cleaned datasets included"], [true, "Historical snapshots & trend analysis"], [true, "Absorption rates & sell-out tracking"], [true, "Google Sheets, CSV, or API access"]], featured: true, cta: "Get Started" },
-      { tier: "Custom", name: "On-Demand & Enterprise", price: "Let's talk.", isCustom: true, note: "Tailored scope, frequency, and delivery",
-        features: [[true, "Everything in Standard"], [true, "Weekly or bi-weekly updates"], [true, "Coverage beyond Bratislava"], [true, "Additional markets or property types"], [true, "Custom integrations and output formats"]], cta: "Contact Us" },
-    ],
-    mostPopular: "Most Popular",
-    seePricing: "See Pricing",
-  },
-  sk: {
-    getAccess: "Kontakt",
-    // heroBadge text počíta HomePage z live projekt count — viď `heroBadgeText`.
-    heroTitle1: "Novostavby na Slovensku.",
-    heroTitle2: "Celý trh v jednom prehľade.",
-    heroSub: "Ceny, dostupnosť, rýchlosť predaja. Všetko v prehľadných reportoch, na základe ktorých môžete robiť dátami podložené rozhodnutia.",
-    heroBtn1: "Kontaktujte nás",
-    heroBtn2: "Ukážka dát",
-    valueLabel: "Čo dodávame",
-    valueTitle: "Nie len dáta. Odpovede.",
-    valueDesc: "Každý mesiac dostanete kompletný prehľad trhu novostavieb na Slovensku — každý byt, každý projekt. A to aj s insightmi, na základe ktorých viete hneď konať.",
-    questionsLabel: "Otázky, na ktoré vám Residata odpovie",
-    questions: [
-      "Ako naceniť 2-izbáky v Ružinove, aby boli konkurencieschopné?",
-      "Ak staviam bytovku v Záhorskej Bystrici, ako rýchlo sa vypredá na základe aktuálnych predajných trendov?",
-      "Náklady na potenciálny projekt sú €50M — unesie trh ceny, ktoré potrebujem na dosiahnutie 20% marže?",
-      "Predávajú sa Bory rýchlejšie alebo pomalšie ako v minulom kvartáli?",
-      "Kde dochádza ponuka? Kde nebudú nové byty do pol roka?",
-      "Za koľko sa reálne predáva 60m² byt v Petržalke?",
-      "Ktoré projekty sú takmer vypredané a čo sa vieme naučiť z ich cenotvorby?",
-    ],
-    deliveryLabel: "Každý mesiac dostanete",
-    deliveryItems: [
-      ["Ceny konkurencie", "Koľko si účtuje každý projekt za m² — podľa časti mesta, typu bytu alebo kľudne aj poschodia."],
-      ["Rýchlosť predaja", "Ktoré projekty sa hýbu a ktoré stoja. Zachytíte zmenu trendu skôr ako ostatní."],
-      ["Nová ponuka na trhu", "Čo sa chystá, čo sa práve spustilo, koľko bytov je celkovo v ponuke."],
-      ["Absorpcia", "Koľko bytov sa reálne predá mesačne — za daný projekt, mestskú časť, alebo aj celkovo."],
-      ["Cenové trendy", "Kam smerujú ceny a akou rýchlosťou sa menia. Nielen aktuálny stav, ale aj vývoj."],
-    ],
-    flexTitle: "On-Demand plán — prispôsobíme sa vašim potrebám.",
-    flexDesc: "Týždenné aktualizácie? Rozšírenie do Poľska, Rakúska alebo iného trhu? Iný formát? Žiadny problém — rozsah, frekvenciu aj doručenie nastavíme podľa vašich preferencií.",
-    useCasesLabel: "Využitie",
-    useCasesTitle: "Pre profesionálov, ktorí potrebujú\nrozumieť trhu.",
-    useCasesDesc: "Rôzne role, podobná potreba — aktuálne a spoľahlivé dáta o rezidenčnom trhu. Tu je to, ako rôzne tímy využívajú Residatu.",
-    useCases: [
-      { tag: "Developeri a obchodné tímy", title: "Spoľahlivé podklady na nacenenie.",
-        desc: "Spúšťate novú fázu a riešite ceny. Koľko si účtuje konkurencia? Ako rýchlo sa podobný projekt predáva? Naceňujete byty správne?",
-        benefits: [["Prehľady cien konkurencie", "€/m² za každý porovnateľný projekt vo vami zvolenej lokalite — podľa typu, poschodia a fázy"], ["Kto predáva najrýchlejšie", "ktoré projekty predali najviac bytov minulý mesiac — a ktoré stoja"], ["Koľko kapacity zostáva u konkurencie voľnej?", "sledujte voľné jednotky a medzery na trhu"]] },
-      { tag: "Investori a Private Equity", title: "Investícia podložená dátami.",
-        desc: "Posudzujete development deal. Developer tvrdí, že dopyt je silný a ceny rastú. Platí to aj pre váš konkrétny okres, mix bytov a cenovú hladinu?",
-        benefits: [["Absorpcia podľa segmentu", "koľko bytov sa reálne predá mesačne v každom okrese — číslo, na ktorom stojí vaše IRR"], ["Vývoj cien za 6–12 mesiacov", "reálne trendy €/m² pre modelovanie scenárov — nie odhady, ale dáta"], ["Stress test feasibility", "porovnajte cieľovú cenu s tým, čo trh reálne platí"]] },
-      { tag: "Banky a znalci", title: "Komparatívy hotové na použitie.",
-        desc: "Potrebujete trhové komparatívy na ocenenie alebo kolaterál — ale zbierať ich ručne z roztrúsených webov developerov a transformovať ich do použiteľného formátu trvá týždne. A získanie historických dát spätne je nemožné. My sme to urobili za vás.",
-        benefits: [["Štruktúrované ponuky", "ceny podľa lokality, typu, plochy a dostupnosti — filtrovateľné a exportovateľné"], ["Hĺbka trhu", "koľko projektov a bytov je v okrese aktívnych — kontext pre každé ocenenie"], ["Vždy aktuálne", "komparatívy nikdy nie sú staršie ako 30 dní"]] },
-      { tag: "Konzultanti a analytici", title: "Hodiny práce, hotové za vás.",
-        desc: "Klient chce prehľad bratislavského trhu. Buď strávite týždne zbieraním dát po weboch — alebo otvoríte jeden sheet, kde je všetko pripravené.",
-        benefits: [["Dáta na prezentáciu", "normalizované stĺpce naprieč každým aktívnym projektom — rovno do modelov, grafov alebo klientskych prezentácií"], ["Trendy zahrnuté", "cenový smer a trhové posuny ukážete bez ďalšej práce"], ["Kompletné pokrytie", "byty, domy, apartmány — žiadne medzery"]] },
-    ],
-    useCasesCta: "Hľadáte riešenie na mieru?",
-    useCasesCtaDesc: "Systém je flexibilný. Ak tu nevidíte riešenie na svoj špecifický problém, ozvite sa — veľmi pravdepodobne vám vieme pomôcť riešením na mieru.",
-    useCasesCtaBtn: "Pozrieť cenník",
-    whatYouGet: "Čo dostanete",
-    dataLabel: "Ukážka výstupu",
-    dataTitle: "Takto vyzerá výstup.",
-    dataDesc: "Päť konkrétnych typov insightov, ukážka dát na úrovni bytu, a kompletná schéma výstupu. Rovnaká hĺbka, každý mesiac.",
-    dataContext: "Trh novostavieb Slovensko",
-    dataContextSub: "Mesačný prehľad · všetky aktívne projekty",
-    insightsLabel: "Trhové insighty",
-    insightsTitle: "Čo z toho vidíte.",
-    insightsDesc: "Príklady insightov z mesačnej dodávky. Informačná výhoda proti konkurencii. Päť kariet nižšie sú ilustračné príklady — platiaci klienti vidia živé verzie vo svojom dashboarde, vypočítané z aktuálneho snapshotu.",
-    insightsBadge: "Ilustračné príklady · live v dashboarde",
-    rawLabel: "Surové dáta",
-    unitSample: "Ukážka na úrovni bytov",
-    // Prepisujeme live v DataPage cez useMarketTotals; fallback kým sa načíta.
-    showing: "Zobrazených 8 z … záznamov",
-    schemaLabel: "Schéma",
-    schemaTitle: "Každý dátový bod na byt — kľúčové polia nižšie.",
-    schemaDesc: "Ďalšie polia: orientácia, balkón, parkovanie, sklad a metadáta projektu.",
-    schemaNote: "Poznámka: Nie všetci developeri zverejňujú všetky údaje — dostupnosť polí sa líši.",
-    wantFull: "Máte záujem o kompletný dataset?",
-    wantFullDesc: "Toto je ukážka. Celý výstup pokrýva každý byt v každom aktívnom bratislavskom novostavebnom projekte, obnovovaný každý mesiac.",
-    pricingLabel: "Cenník",
-    pricingTitle: "Transparentný a jednoduchý.",
-    pricingDesc: "Vyberte si plán, ktorý sedí vám.",
-    testimonial: "Keď naceňujete projekt za €30M+, nemôžete hádať čo trh unesie. Residata nám dáva kompletný obraz o trhu — čo si účtuje konkurencia, ako rýchlo predáva, kde sa ponuka zužuje, kde rastie dopyt a po akom type nehnuteľnosti. Za cenu jednej večere máme dáta, na základe ktorých robíme rozhodnutia za stovky tisíc eur.",
-    testimonialFrom: "Od klienta",
-    testimonialName: "Marek T.",
-    testimonialRole: "Riaditeľ rezidenčného developmentu v Bratislave",
-    commonQ: "Časté otázky",
-    faqs: [
-      ["Čo presne dostanem?", "Trhovú správu s insightmi, vizualizáciami a odporúčaniami — cenové trendy, absorpcia, konkurenčné porovnanie, dynamika ponuky. Súčasťou sú aj surové a vyčistené datasety pre vlastnú analýzu."],
-      ["Ako často sa dáta aktualizujú?", "Štandardne mesačne. Vieme aktualizovať aj týždenne — technicky aj denne, ale odporúčame max. raz týždenne. Kratšie intervaly sa zriedka oplatia, trh novostavieb sa tak rýchlo nemení."],
-      ["Pokrývate aj iné mestá?", "Áno. Systém funguje pre akékoľvek mesto s verejne dostupnými dátami. Táto služba spadá pod Custom plán a nacenenie záleží na požadovaných špecifikách."],
-      ["Dá sa pridať konkrétny projekt?", "Samozrejme. Ak je verejne dostupný a nie je v našom datasete, prosím ozvite sa nám a radi ho pridáme. Custom klienti môžu požiadať aj o pridanie alebo analýzu projektu mimo Bratislavy."],
-    ],
-    notSure: "Neviete ktoré riešenie je pre vás vhodné?",
-    notSureDesc: "Radi vám pomôžeme počas bezplatnej konzultácie.",
-    getInTouch: "Napíšte nám",
-    contactLabel: "Kontakt",
-    contactTitle: "Ozvite sa.",
-    contactDesc: "Chcete demo, máte otázky, alebo chcete vedieť či vám Residata pomôže — radi sa porozprávame.",
-    emailDesc: "Podrobné otázky a žiadosti o dáta",
-    phoneDesc: "Rýchle otázky alebo dohodnutie hovoru",
-    bookCall: "Dohodnúť si 20-min hovor",
-    sendEmail: "Napísať email",
-    whatToExpect: "Ako to prebieha",
-    steps: [
-      ["1", "Úvodný hovor alebo email", "Zistíme čo riešite, aké dáta vám chýbajú a v akom formáte ich chcete."],
-      ["2", "Ukážka na reálnych dátach", "Pošleme vám ukážku z posledného behu — reálne dáta, nie demo."],
-      ["3", "Nastavenie na mieru", "Nastavíme rozsah, frekvenciu a formát podľa vás. Začnete dostávať pravidelné dodávky."],
-      ["4", "Priebežná výhoda", "Každá dodávka = jasný pohľad na trh. Ceny, absorpcia, ponuka, signály vypredania. Rozhodujete sa na dátach, nie na pocite."],
-    ],
-    tiers: [
-      { tier: "Snapshot trhu", name: "Jednorazový prehľad", price: "€249", note: "Jeden mesiac, jednorazové doručenie",
-        features: [[true, "Kompletný trhový prehľad s insightmi"], [true, "Dáta za každý byt — všetky aktívne projekty"], [true, "Cenové porovnania a vizualizácie"], [false, "Bez historických dát"], [false, "Bez priebežných aktualizácií"]], cta: "Mám záujem" },
-      { tier: "Standard", name: "Mesačné doručenie", price: "€349", priceSuffix: "/mes", note: "Fakturované mesačne, zrušenie kedykoľvek",
-        features: [[true, "Mesačná správa s kompletnými insightmi"], [true, "Surové + vyčistené datasety"], [true, "Historické dáta a vývoj trendov"], [true, "Absorpcia a sledovanie vypredania"], [true, "Google Sheets, CSV alebo API"]], featured: true, cta: "Mám záujem" },
-      { tier: "Custom", name: "On-Demand & Enterprise", price: "Ozvite sa.", isCustom: true, note: "Rozsah a frekvencia podľa vás",
-        features: [[true, "Všetko v Standard"], [true, "Týždenné alebo dvojtýždenné aktualizácie"], [true, "Pokrytie akejkoľvek lokality (aj mimo Slovenska)"], [true, "Ďalšie trhy alebo typy nehnuteľností"], [true, "Vlastné integrácie a formáty"]], cta: "Kontaktovať" },
-    ],
-    mostPopular: "Najobľúbenejší",
-    seePricing: "Pozrieť cenník",
-  },
-};
+// `t` (marketing copy dict) now lives in lib/marketingCopy.js — imported above.
 
 /* ─── Country-aware copy localization ────────────────────────────────────
  * The base copy (t[lang]) names the primary market (Bratislava). For other
@@ -422,7 +181,9 @@ function deepLocalize(node, rules) {
  * on top (overrides win).
  */
 function localizedCopy(lang, country) {
-  const base = t[lang];
+  // Boss's live copy edits (public.site_content) win over the in-code defaults;
+  // the country find→replace + overrides then apply on top of the edited base.
+  const base = applyOverrides(lang, t[lang] || t.en, "mk");
   const spec = COUNTRY_LOCALIZE[country];
   if (!spec) return base;
   const lk = lang === "sk" ? "sk" : "en";
@@ -598,7 +359,7 @@ function AccountMenu({ user, caps, auth, setCurrent, lang }) {
 
 function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
   const pages = lang === "sk" ? pagesSK : pagesEN;
-  const l = t[lang];
+  const l = applyOverrides(lang, t[lang], "mk");
   const user = auth?.user;
   const showAdminLink = caps.can("view_admin_nav");
   // Mobile menu (≤1180px). Desktop (>1180) never mounts the overlay.
@@ -2088,6 +1849,8 @@ export default function App() {
   // F-024 fix — initialize from localStorage + browser-lang detection.
   const [langRaw, setLangRaw] = useState(readInitialLang);
   const lang = langRaw === "sk" ? "sk" : "en";
+  // Re-render when the Boss's live copy edits load/refresh (overlay over the dicts).
+  useCopyVersion();
   // setLang persists the choice. Wrap setLangRaw so call-sites are unchanged.
   const setLang = (newLang) => {
     setLangRaw(newLang);

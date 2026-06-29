@@ -134,6 +134,7 @@ const MapView2 = lazy(() => import("./MapView2"));
 const LocationManager = lazy(() => import("./LocationManager"));
 const DataQA = lazy(() => import("./DataQA"));
 const FeedbackLog = lazy(() => import("./FeedbackLog"));
+const TextsEditor = lazy(() => import("./TextsEditor"));
 
 const NAV = [
   { group: "main", items: [
@@ -156,6 +157,7 @@ const NAV = [
     { page: "App:DataQA", label: { en: "Data control", sk: "Kontrola dát" }, Icon: IconTable, adminOnly: true },
     { page: "App:Feedback", label: { en: "Feedback", sk: "Spätná väzba" }, Icon: IconFeedback, adminOnly: true },
     { page: "App:Locations", label: { en: "Locations", sk: "Polohy" }, Icon: IconMap, adminOnly: true },
+    { page: "App:Texts", label: { en: "Texts", sk: "Texty" }, Icon: IconDoc, adminOnly: true },
     { page: "App:Admin", label: { en: "Admin", sk: "Admin" }, Icon: IconShield, adminOnly: true },
   ]},
 ];
@@ -508,6 +510,7 @@ function TopBar({ page, lang, setLang, tier }) {
     "App:Locations": { en: "Locations",       sk: "Polohy"       },
     "App:DataQA":    { en: "Data control",    sk: "Kontrola dát" },
     "App:Feedback":  { en: "Feedback",        sk: "Spätná väzba" },
+    "App:Texts":     { en: "Website texts",   sk: "Texty na webe" },
   };
   const isProjectDetail = typeof page === "string" && page.startsWith("App:ProjectDetail:");
   const title = isProjectDetail
@@ -675,6 +678,7 @@ function PageContent({ page, projectId, lang, setCurrent, openLogin }) {
   if (page === "App:Locations")  return <Gated require="manage_locations" lang={lang} setCurrent={setCurrent}><Suspense fallback={<div style={{ padding: "2rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.8rem" }}>{lang === "sk" ? "Načítavam…" : "Loading…"}</div>}><LocationManager lang={lang} /></Suspense></Gated>;
   if (page === "App:DataQA")     return <Gated require="manage_data_qa" lang={lang} setCurrent={setCurrent}><Suspense fallback={<div style={{ padding: "2rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.8rem" }}>{lang === "sk" ? "Načítavam…" : "Loading…"}</div>}><DataQA lang={lang} /></Suspense></Gated>;
   if (page === "App:Feedback")   return <Gated require="view_feedback_log" lang={lang} setCurrent={setCurrent}><Suspense fallback={<div style={{ padding: "2rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.8rem" }}>{lang === "sk" ? "Načítavam…" : "Loading…"}</div>}><FeedbackLog lang={lang} /></Suspense></Gated>;
+  if (page === "App:Texts")      return <Gated require="manage_site_content" lang={lang} setCurrent={setCurrent}><Suspense fallback={<div style={{ padding: "2rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.8rem" }}>{lang === "sk" ? "Načítavam…" : "Loading…"}</div>}><TextsEditor lang={lang} /></Suspense></Gated>;
   if (typeof page === "string" && page.startsWith("App:ProjectDetail:")) {
     const id = page.slice("App:ProjectDetail:".length);
     return <LiveProjectDetail projectId={id} lang={lang} setCurrent={setCurrent} openLogin={openLogin} />;
