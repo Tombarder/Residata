@@ -1,8 +1,10 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useProjects, useFlatsArchive, useFlatsCurrent, useArchiveMonths, useArchiveDays, usePivotGrain, usePivotDistinct, usePivotFieldStats, fetchFlatsForProjects } from "../lib/useData";
 import { useCountry, isAllCountries } from "../lib/useCountry";
 import { useCapabilities } from "../lib/useCapabilities";
+import { useAuth } from "../lib/useAuth";
+import { supabase } from "../lib/supabase";
 import { moneyFromEur, moneySymbol } from "../lib/money";
 import { useCurrency } from "../lib/useCurrency";
 
@@ -938,6 +940,7 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   const { country } = useCountry();   // for targeted drill-down fetch
   const { can } = useCapabilities();
   const canViewAnalytics = can("view_analytics");
+  const { user, profile } = useAuth();   // for cross-device (per-account) pivot persistence
 
   // Mesiac/Datum is a regular filterable dimension. The pivot opens pinned to the
   // latest scrape (the seeding effect below), so we drive the archive FETCH off
@@ -1146,6 +1149,51 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   useEffect(() => {
     savePivotState({ rows, cols, values, filters, valueMode, dataBars, sort });
   }, [rows, cols, values, filters, valueMode, dataBars, sort]);
+
+  // ── Cross-device (per-ACCOUNT) persistence ──────────────────────
+  // localStorage above is per-browser. For a logged-in user we ALSO sync the setup
+  // to their account (user_profiles.pivot_prefs) so the SAME login shows the SAME
+  // saved setup on every device/session. DB is the source of truth when logged in.
+  //
+  // `hydrated` (state, not a ref — so the save effect re-runs once it flips) guards
+  // the load→save race: until the profile (with its saved prefs) has loaded and been
+  // applied, we must NOT write the local/default state over the account's saved prefs.
+  // `justAppliedRef` skips the one save the apply itself would echo straight back.
+  const [hydrated, setHydrated] = useState(false);
+  const justAppliedRef = useRef(false);
+  const dbSaveTimer    = useRef(null);
+
+  // Apply the account's saved prefs ONCE, when the profile first loads. (Declared
+  // BEFORE the DB-save effect so it runs first on the login render.)
+  useEffect(() => {
+    if (hydrated || !profile) return;     // wait for the profile to load (anon → never; localStorage only)
+    setHydrated(true);
+    const dbPrefs = profile.pivot_prefs ? sanitizePivotState(profile.pivot_prefs) : null;
+    if (!dbPrefs) return;                 // logged in but nothing saved yet → seed from current state (save effect)
+    justAppliedRef.current = true;        // don't echo this load straight back to the DB
+    if (dbPrefs.rows)     setRows(dbPrefs.rows);
+    if (dbPrefs.cols)     setCols(dbPrefs.cols);
+    if (dbPrefs.values)   setValues(dbPrefs.values);
+    if (dbPrefs.filters)  setFilters(dbPrefs.filters);
+    if (dbPrefs.valueMode) setValueMode(dbPrefs.valueMode);
+    if (typeof dbPrefs.dataBars === "boolean") setDataBars(dbPrefs.dataBars);
+    if (dbPrefs.sort)     setSort(dbPrefs.sort);
+  }, [profile, hydrated]);
+
+  // Persist to the account (debounced) on every change — but only once hydrated, so
+  // we never clobber the saved prefs before they've loaded. The first run after a
+  // fresh login with an EMPTY account seeds it from the current state. Anon users skip
+  // this (no `user`) and keep localStorage only.
+  useEffect(() => {
+    if (!user || !hydrated) return;
+    if (justAppliedRef.current) { justAppliedRef.current = false; return; }
+    clearTimeout(dbSaveTimer.current);
+    const payload = { rows, cols, values, filters, valueMode, dataBars, sort };
+    dbSaveTimer.current = setTimeout(() => {
+      supabase.rpc("set_pivot_prefs", { p_prefs: payload }).catch(() => { /* offline / transient — localStorage still holds it */ });
+    }, 700);
+    return () => clearTimeout(dbSaveTimer.current);
+  }, [user, hydrated, rows, cols, values, filters, valueMode, dataBars, sort]);
 
   // "Predvolené" → restore the opening layout. "Vyčistiť" → wipe rows/cols/values/
   // filters to a clean slate (no field-by-field removal). Both persist via the effect.
