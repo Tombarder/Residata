@@ -519,6 +519,83 @@ function RisingParticles() {
   return <canvas ref={canvasRef} style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0 }} />;
 }
 
+/* Logged-in account control for the desktop nav. A fixed-size avatar button that
+   opens a dropdown holding the FULL email, the plan, account links + sign out —
+   so the nav's width never depends on how long the user's email is (the old
+   inline email truncated to "name@gmai…" and crammed the bar). */
+function AccountMenu({ user, caps, auth, setCurrent, lang }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onDoc); document.removeEventListener("keydown", onKey); };
+  }, [open]);
+
+  const email = user?.email || "";
+  const initial = (email.trim()[0] || "?").toUpperCase();
+  const tier = caps.tier;
+  const isFree = tier === "free";
+  const planLabel = tier === "admin" ? "Admin"
+    : tier === "paid" ? (lang === "sk" ? "Platený plán" : "Paid plan")
+    : tier === "pending" ? (lang === "sk" ? "Čaká na schválenie" : "Pending approval")
+    : (lang === "sk" ? "Free plán" : "Free plan");
+  const planColor = (tier === "paid" || tier === "admin") ? "#00e5a0" : tier === "pending" ? "#f5a623" : "#8a8a96";
+  const go = (page) => { setCurrent(page); setOpen(false); };
+  const item = { display: "block", width: "100%", textAlign: "left", background: "none", border: "none", color: "#e8e8ed", fontSize: "0.82rem", fontFamily: "inherit", padding: "0.5rem 0.6rem", borderRadius: 6, cursor: "pointer" };
+  const hov = (on) => (e) => { e.currentTarget.style.background = on; };
+
+  return (
+    <div ref={ref} style={{ position: "relative", flexShrink: 0 }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        aria-haspopup="menu" aria-expanded={open}
+        aria-label={lang === "sk" ? "Účet" : "Account"} title={email}
+        style={{
+          width: 36, height: 36, borderRadius: "50%",
+          background: "rgba(0,229,160,0.12)", border: "1px solid rgba(0,229,160,0.4)",
+          color: "#00e5a0", fontWeight: 700, fontSize: "0.9rem",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          cursor: "pointer", padding: 0, fontFamily: "inherit",
+        }}
+      >{initial}</button>
+      {open && (
+        <div role="menu" style={{
+          position: "absolute", top: "calc(100% + 0.55rem)", right: 0,
+          minWidth: 240, maxWidth: 290,
+          background: "#16161a", border: "1px solid #2a2a31", borderRadius: 12,
+          boxShadow: "0 18px 44px rgba(0,0,0,0.55)", padding: "0.55rem", zIndex: 200,
+        }}>
+          <div style={{ padding: "0.35rem 0.6rem 0.6rem" }}>
+            <div style={{ fontSize: "0.82rem", color: "#e8e8ed", fontWeight: 600, wordBreak: "break-all", lineHeight: 1.35 }}>{email}</div>
+            <div style={{ fontSize: "0.62rem", color: planColor, marginTop: 4, fontFamily: "'JetBrains Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700 }}>{planLabel}</div>
+          </div>
+          <div style={{ height: 1, background: "#222228", margin: "0.25rem 0.2rem 0.4rem" }} />
+          {isFree ? (
+            <button role="menuitem" onClick={() => go("App:Billing")} style={{ ...item, color: "#00e5a0", fontWeight: 600 }} onMouseEnter={hov("rgba(0,229,160,0.08)")} onMouseLeave={hov("none")}>
+              {lang === "sk" ? "Upgradovať na platený" : "Upgrade to paid"}
+            </button>
+          ) : (
+            <button role="menuitem" onClick={() => go("App:Billing")} style={item} onMouseEnter={hov("#1d1d22")} onMouseLeave={hov("none")}>
+              {lang === "sk" ? "Fakturácia" : "Billing"}
+            </button>
+          )}
+          <button role="menuitem" onClick={() => go("App:Settings")} style={item} onMouseEnter={hov("#1d1d22")} onMouseLeave={hov("none")}>
+            {lang === "sk" ? "Nastavenia účtu" : "Account settings"}
+          </button>
+          <div style={{ height: 1, background: "#222228", margin: "0.4rem 0.2rem" }} />
+          <button role="menuitem" onClick={() => auth.signOut()} style={{ ...item, color: "#ff8484" }} onMouseEnter={hov("rgba(255,107,107,0.08)")} onMouseLeave={hov("none")}>
+            {lang === "sk" ? "Odhlásiť sa" : "Sign out"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
   const pages = lang === "sk" ? pagesSK : pagesEN;
   const l = t[lang];
@@ -613,33 +690,16 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
           {langToggle}
           {user ? (
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-              {/* Primary CTA for logged-in users on marketing pages: jump to platform. */}
+              {/* Primary CTA for logged-in users on marketing pages: jump to platform.
+                  nowrap so it never breaks onto two lines when the bar is tight. */}
               <a onClick={() => setCurrent("App:Dashboard")} className="nav-cta-btn" style={{
                 padding: "0.45rem 1rem", background: "#00e5a0", color: "#0a0a0b",
                 fontWeight: 600, borderRadius: 6, fontSize: "0.78rem", cursor: "pointer",
-                textDecoration: "none",
+                textDecoration: "none", whiteSpace: "nowrap",
               }}>{lang === "sk" ? "Otvoriť platformu →" : "Open platform →"}</a>
-              {/* Debug badge — dev-only. Shows current tier + profile load
-                  state next to the user email in the nav. Gated behind
-                  import.meta.env.DEV so customers don't see internal tier
-                  vocabulary in prod. */}
-              {import.meta.env.DEV && (
-                <span title={`tier=${caps.tier} profile=${auth.profile ? "loaded" : "MISSING"} err=${auth.profileError || "none"}`} style={{
-                  fontFamily: "'JetBrains Mono', monospace", fontSize: "0.6rem",
-                  padding: "2px 6px", borderRadius: 3,
-                  background: auth.profile ? "rgba(0,229,160,0.15)" : "rgba(245,166,35,0.2)",
-                  color: auth.profile ? "#00e5a0" : "#f5a623",
-                  fontWeight: 700, letterSpacing: "0.05em",
-                }}>{caps.tier}</span>
-              )}
-              <span style={{ fontSize: "0.75rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace", maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {user.email}
-              </span>
-              <button onClick={() => auth.signOut()} style={{
-                padding: "0.4rem 0.85rem", background: "transparent", color: "#e8e8ed",
-                fontWeight: 500, borderRadius: 6, fontSize: "0.75rem", cursor: "pointer",
-                border: "1px solid #222228", fontFamily: "inherit",
-              }}>{lang === "sk" ? "Odhlásiť" : "Sign out"}</button>
+              {/* Account = fixed-size avatar menu (email / plan / sign-out live inside),
+                  so the nav width is independent of how long the email is. */}
+              <AccountMenu user={user} caps={caps} auth={auth} setCurrent={setCurrent} lang={lang} />
             </div>
           ) : (
             // Two separate CTAs — returning users need a clear "sign in"
@@ -737,14 +797,21 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
             <div className="nav-menu-actions">
               {user ? (
                 <>
+                  {/* Identity block — full email, wrapped (never truncated), so any
+                      length reads cleanly. Mirrors the desktop avatar dropdown. */}
+                  <div style={{ padding: "0 0.15rem 0.15rem", textAlign: "center" }}>
+                    <div style={{ fontSize: "0.6rem", color: "var(--text-faint)", fontFamily: "'JetBrains Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 5 }}>
+                      {lang === "sk" ? "Prihlásený ako" : "Signed in as"}
+                    </div>
+                    <div style={{ fontSize: "0.85rem", color: "var(--text)", fontWeight: 600, wordBreak: "break-all", lineHeight: 1.4 }}>
+                      {user.email}
+                    </div>
+                  </div>
                   <a onClick={() => go("App:Dashboard")} className="btn-p">
                     {lang === "sk" ? "Otvoriť platformu →" : "Open platform →"}
                   </a>
-                  <span style={{ fontSize: "0.75rem", color: "var(--text-dim)", fontFamily: "'JetBrains Mono', monospace", textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {user.email}
-                  </span>
                   <a onClick={() => { auth.signOut(); setMenuOpen(false); }} className="btn-s" style={{ cursor: "pointer" }}>
-                    {lang === "sk" ? "Odhlásiť" : "Sign out"}
+                    {lang === "sk" ? "Odhlásiť sa" : "Sign out"}
                   </a>
                 </>
               ) : (
