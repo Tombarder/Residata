@@ -4541,6 +4541,22 @@ function UserTable({ users, setTier, deleteUser, trialAction, subAction, selfId,
                             style={subBtnStyle(trialActive, green)}>
                             {trialActive ? `🎁 ${trialDays}d` : trialLabel}
                           </button>
+                          {/* Reset trial — clears trial_started_at + trial_until so the
+                              account becomes a fresh "never-used-the-trial" free user
+                              again. Lets us re-test the self-service Activate/Start-trial
+                              buttons on a test account as many times as we want. Shown
+                              only when there's a trial to clear (active, expired, or used). */}
+                          {(u.trial_started_at || u.trial_until) && (
+                            <button
+                              onClick={() => trialAction && trialAction(u, "revoke")}
+                              disabled={isSelf}
+                              title={isSelf
+                                ? "Can't reset trial on yourself"
+                                : "Reset trial — clears trial start + expiry so this account can start the 7-day trial again (for testing the activation buttons)"}
+                              style={subBtnStyle(false, "#b07cff")}>
+                              ↺ {lang === "sk" ? "Reset trial" : "Reset trial"}
+                            </button>
+                          )}
                           <button
                             onClick={() => subAction && subAction(u, { extend_paid_days: 30 })}
                             disabled={isSelf}
