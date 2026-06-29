@@ -103,6 +103,29 @@ html, body { max-width: 100%; overflow-x: clip; }
   .trial-banner-short { display: inline; }
 }
 
+/* ── Phone content density ──────────────────────────────────────────────────
+   The cards are styled with desktop padding (2–2.5rem ≈ 32–40px). On a 390px
+   screen that boxes their text into a cramped strip — the main reason the site
+   felt "squeezed in" rather than built for phones. Pull card padding in on
+   phones so content gets real width. Targets the inline-styled cards by their
+   exact padding value (React renders e.g. `padding: 2.5rem;`); buttons/badges
+   use sub-1rem padding and are untouched. Desktop is unaffected. */
+@media (max-width: 640px) {
+  [style*="padding: 2.5rem;"],
+  [style*="padding: 2rem;"],
+  [style*="padding: 2rem 2.25rem;"],
+  [style*="padding: 2.5rem 3rem;"],
+  [style*="padding: 1.75rem;"],
+  [style*="padding: 1.75rem 2rem;"],
+  [style*="padding: 1.5rem 2rem;"] { padding: 1.35rem !important; }
+}
+
+/* Side-by-side blocks that must stack on phones (a description + a no-shrink
+   badge sat in a flex row, squashing the text to a one-word-per-line column). */
+@media (max-width: 640px) {
+  .insights-intro { flex-direction: column; align-items: flex-start; gap: 0.85rem; }
+}
+
 /* ============================================================================
    Mobile top-nav — hamburger + slide-in menu
    ----------------------------------------------------------------------------
