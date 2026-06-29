@@ -584,7 +584,7 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
         maxWidth: "var(--container)", margin: "0 auto", padding: "1rem var(--gutter-safe)",
         display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: "1rem",
       }}>
-        <a onClick={() => setCurrent("Home")} style={{ justifySelf: "start", display: "flex", alignItems: "center", gap: "0.6rem", cursor: "pointer", textDecoration: "none" }}>
+        <a onClick={() => setCurrent("Home")} style={{ gridColumn: 1, justifySelf: "start", display: "flex", alignItems: "center", gap: "0.6rem", cursor: "pointer", textDecoration: "none" }}>
           <div style={{
             width: 28, height: 28, background: "var(--accent)", borderRadius: "var(--r-sm)",
             display: "flex", alignItems: "center", justifyContent: "center",
@@ -607,7 +607,7 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
           })}
         </div>
         {/* Right zone: desktop cluster (hidden ≤1180) + hamburger (shown ≤1180) */}
-        <div className="nav-right" style={{ justifySelf: "end", display: "flex", alignItems: "center", gap: "0.75rem", listStyle: "none" }}>
+        <div className="nav-right" style={{ gridColumn: 3, justifySelf: "end", display: "flex", alignItems: "center", gap: "0.75rem", listStyle: "none" }}>
           <div className="nav-desktop-actions" style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
           {/* Language toggle (Market + Currency live in the fixed MarketControls dock) */}
           {langToggle}
