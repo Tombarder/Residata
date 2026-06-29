@@ -142,27 +142,28 @@ function useAuthInternal() {
     return supabase.auth.verifyOtp({ email, token, type: "email" });
   };
 
-  const signOut = async () => {
-    if (!isSupabaseReady()) {
-      // Even without Supabase reachable, clear the UI
-      window.location.replace("/");
-      return;
-    }
+  const signOut = () => {
     log("signOut: clearing session");
-    // scope:'local' — clears localStorage session without calling the Supabase
-    // server. Default scope:'global' no-ops when access token is expired
-    // (magic-link tokens are 1h), leaving the user stuck "logged in".
-    try {
-      await supabase.auth.signOut({ scope: "local" });
-    } catch (e) {
-      log("signOut error (ignored)", e);
-    }
+    // 1. Optimistically clear UI state so the app reflects signed-out instantly.
     setUser(null);
     setProfile(null);
     setProfileError(null);
-    // Hard reload — guarantees no stale in-memory state, no cached React trees,
-    // no dangling onAuthStateChange listener race. Lands the user on the public
-    // home page as a clean anon. Belt-and-suspenders; reliability > elegance.
+    // 2. Purge the Supabase session from localStorage SYNCHRONOUSLY. This is the
+    //    real fix for "sign out does nothing until I refresh + retry": gotrue's
+    //    own signOut() can hang forever on a stuck token-refresh (known deadlock,
+    //    see supabase.js), and the old code awaited it BEFORE clearing/reloading —
+    //    so a hung call stranded the user logged-in. Removing the token by hand
+    //    guarantees the reload below can't rehydrate the session.
+    try {
+      for (const k of Object.keys(localStorage)) {
+        if (k.startsWith("sb-") && k.includes("-auth-token")) localStorage.removeItem(k);
+      }
+    } catch (_) { /* private mode / no storage — reload still lands on anon */ }
+    // 3. Best-effort gotrue signOut, FIRE-AND-FORGET (never awaited — a hung call
+    //    must not block the redirect; the manual purge above already did the work).
+    try { if (isSupabaseReady()) supabase.auth.signOut({ scope: "local" }); } catch (_) {}
+    // 4. Hard reload to a clean anon home — always runs, immediately. No stale
+    //    in-memory state, no dangling onAuthStateChange race.
     window.location.replace("/");
   };
 
