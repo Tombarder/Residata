@@ -1,5 +1,5 @@
 import { useMetrics } from "../lib/useData";
-import { liveT } from "../lib/liveLang";
+import { getLiveT } from "../lib/liveLang";
 import { useCurrency } from "../lib/useCurrency";
 
 /**
@@ -8,7 +8,7 @@ import { useCurrency } from "../lib/useCurrency";
  * Visible on every page, below nav.
  */
 export default function Ticker({ lang = "en" }) {
-  const t = liveT[lang] || liveT.en;
+  const t = getLiveT(lang);
   const { metrics, loading } = useMetrics();
   // Currency toggle: in native (CZK) mode show the native-currency copy
   // (value_text_native / value_json.text_en_native). For Slovakia these equal

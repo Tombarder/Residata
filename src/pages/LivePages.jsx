@@ -8,7 +8,7 @@ import { useCurrency } from "../lib/useCurrency";
 import { useCountry } from "../lib/useCountry";
 import { supabase } from "../lib/supabase";
 import { getFreshAccessToken, authErrorMessage } from "../lib/sessionGuard";
-import { liveT, ll } from "../lib/liveLang";
+import { getLiveT, ll } from "../lib/liveLang";
 import { goBack } from "../lib/routing";
 import { track } from "../lib/track";
 import { isPersonalEmail } from "../lib/emailValidation";
@@ -91,7 +91,7 @@ const ANON_VISIBLE = 12;
 const ANON_TEASER = 8;  // navyše zobrazíme blurred — dokopy 20 riadkov s blurom
 
 export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
-  const t = liveT[lang] || liveT.en;
+  const t = getLiveT(lang);
   useCurrency(); // subscribe: re-render €/m² columns on currency toggle
   const { can } = useCapabilities();
   const { projects: allProjects, loading } = useProjects();
@@ -546,7 +546,7 @@ function ProjectRow({ p, t, lang, setCurrent, canVelocity }) {
 
 /* ───────────────────── PROJECT DETAIL (gated) ───────────────────── */
 export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en" }) {
-  const t = liveT[lang] || liveT.en;
+  const t = getLiveT(lang);
   useCurrency(); // subscribe: re-render prices/€/m² across insights + flats table
   const { user, profile, loading: authLoading, reloadProfile } = useAuth();
   const { can } = useCapabilities();
@@ -3291,7 +3291,7 @@ function RankBarList({ rows, setCurrent, suffix = "", color = green, getChildren
      - Premium domains + activity tabs unchanged from before
 */
 export function LiveAdmin({ setCurrent, lang = "en" }) {
-  const t = liveT[lang] || liveT.en;
+  const t = getLiveT(lang);
   const { user: self } = useAuth();
   const [users, setUsers] = useState([]);
   const [events, setEvents] = useState([]);

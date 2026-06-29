@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { liveT } from "../lib/liveLang";
+import { getLiveT } from "../lib/liveLang";
 import { useAuth } from "../lib/useAuth";
 
 /**
@@ -12,7 +12,7 @@ import { useAuth } from "../lib/useAuth";
  * Bez tohto by user sedel navždy kým sám manuálne refreshne.
  */
 export default function PendingGate({ setCurrent, lang = "en" }) {
-  const t = liveT[lang] || liveT.en;
+  const t = getLiveT(lang);
   const { reloadProfile } = useAuth();
   const [pollCount, setPollCount] = useState(0);
 
