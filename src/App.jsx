@@ -7,6 +7,7 @@ import FloatingChat from "./components/FloatingChat";
 import FeedbackWidget from "./components/FeedbackWidget";
 import "./lib/diagnostics";   // installs the error/network collector at startup
 import { TrialBanner, TrialPopup } from "./components/TrialBanner";
+import { setTrialIntent, activateTrial } from "./lib/trial";
 import PendingGate from "./components/PendingGate";
 import Feature from "./components/Feature";
 import UpgradePrompt from "./components/UpgradePrompt";
@@ -1659,17 +1660,25 @@ function PricingPage({ setCurrent, l, lang, onLogin }) {
   const mono = "'JetBrains Mono', monospace";
   const tiers = l.tiers;
   const faqs = l.faqs;
-  const { can } = useCapabilities();
+  const { can, tier, trialActive } = useCapabilities();
   const auth = useAuth();
   const showEarlyAccessBlock = can("see_early_access_badge");
   const isAlreadyPaid = can("has_paid_access");
-  // Trial CTA routing: anon → open the LoginModal so they can sign
-  // up first; signed-in free → straight to in-platform Billing where
-  // the Start-trial button lives.
-  const startTrial = () => {
-    if (auth.user) setCurrent("App:Billing");
-    else if (onLogin) onLogin();
-    else setCurrent("Home");
+  // Trial CTA routing (mirrors App.handleTrialCta):
+  //   · anon            → remember trial intent + open sign-up; the trial
+  //                       auto-starts after profile completion.
+  //   · signed-in free  → activate the trial in one click, then enter the app.
+  //   · everyone else   → Billing.
+  const startTrial = async () => {
+    if (!auth.user) { setTrialIntent(); if (onLogin) onLogin(); else setCurrent("Home"); return; }
+    const freeEligible = tier === "free" && !trialActive && !auth.profile?.trial_started_at;
+    if (freeEligible) {
+      try {
+        const res = await activateTrial();
+        if (res.ok) { window.location.assign("/app"); return; }
+      } catch (_) { /* fall through to Billing */ }
+    }
+    setCurrent("App:Billing");
   };
   const ea = lang === "sk" ? {
     badge: "🔥 Early access — 5 min a máš prístup",
@@ -2083,6 +2092,27 @@ export default function App() {
   // the Home hero has its own per-tier button set (see HomePage.heroButtons).
   // So no standalone handleGetAccess is needed here.
 
+  // Shared handler for every marketing "Activate trial" CTA (top banner +
+  // popup). One behaviour, three outcomes:
+  //   · anon            → remember trial intent + open sign-up. The trial
+  //                       auto-starts right after profile completion, so the
+  //                       "30s sign-up → 7-day trial" promise actually holds.
+  //   · logged-in free  → activate the trial in ONE click, then land in the
+  //                       platform (full reload picks up the new paid caps).
+  //                       Falls back to Billing if the call can't complete.
+  //   · everyone else   → Billing (already paid / admin / pending / used).
+  const handleTrialCta = async () => {
+    if (!auth.user) { setTrialIntent(); setLoginOpen(true); return; }
+    const freeEligible = caps.tier === "free" && !caps.trialActive && !auth.profile?.trial_started_at;
+    if (freeEligible) {
+      try {
+        const res = await activateTrial();
+        if (res.ok) { window.location.assign("/app"); return; }
+      } catch (_) { /* fall through to Billing */ }
+    }
+    handleNav("App:Billing");
+  };
+
   return (
     <div style={{ background: "#0a0a0b", color: "#e8e8ed", fontFamily: "'Outfit', -apple-system, sans-serif", minHeight: "100vh", WebkitFontSmoothing: "antialiased", position: "relative" }}>
       <style>{`
@@ -2257,10 +2287,7 @@ export default function App() {
               users who don't qualify (paid, mid-trial, used trial). */}
           <TrialBanner
             lang={lang}
-            onCta={() => {
-              if (auth.user) handleNav("App:Billing");
-              else setLoginOpen(true);
-            }}
+            onCta={handleTrialCta}
           />
           <Nav current={current} setCurrent={handleNav} lang={lang} setLang={setLang} auth={auth} onLogin={() => setLoginOpen(true)} caps={caps} />
           <Ticker lang={lang} />
@@ -2389,10 +2416,7 @@ export default function App() {
       {!isAppPage(current) && (
         <TrialPopup
           lang={lang}
-          onCta={() => {
-            if (auth.user) handleNav("App:Billing");
-            else setLoginOpen(true);
-          }}
+          onCta={handleTrialCta}
         />
       )}
       <LoginModal open={loginOpen} onClose={() => setLoginOpen(false)} lang={lang} />

@@ -4,6 +4,7 @@ import { useAuth } from "../lib/useAuth";
 import { liveT } from "../lib/liveLang";
 import { track } from "../lib/track";
 import { cleanText, cleanUrl, cleanPhone } from "../lib/sanitize";
+import { hasTrialIntent, clearTrialIntent, activateTrial } from "../lib/trial";
 
 /**
  * Povinný post-login krok. Full-screen overlay ak user je authenticated +
@@ -112,6 +113,16 @@ export default function CompleteProfile({ lang = "en" }) {
 
       // Update shared context first so in-memory state matches DB.
       setProfile(data[0]);
+
+      // Honour the "30s sign-up → 7-day trial" promise: if the user arrived
+      // via a trial CTA (intent flag set while anon), auto-start their trial
+      // now that the auto-approve trigger has flipped them to 'free'. Best-
+      // effort — never block the redirect on it; the endpoint refuses double-
+      // trials so this is safe even if somehow retried.
+      if (hasTrialIntent()) {
+        try { await activateTrial(); } catch (_) { /* non-fatal — they can start it from Billing */ }
+        clearTrialIntent();
+      }
 
       // Hard redirect to /app (platform dashboard) — reliable unmount + clean
       // state. The previous approach (setProfile + pushRoute, relying on React
