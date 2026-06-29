@@ -3,6 +3,7 @@ import { useAuth } from "../lib/useAuth";
 import { liveT } from "../lib/liveLang";
 import { validateBusinessEmail } from "../lib/emailValidation";
 import { track } from "../lib/track";
+import { useBreakpointDown } from "../lib/breakpoints";
 
 export default function LoginModal({ open, onClose, lang = "en" }) {
   const t = liveT[lang] || liveT.en;
@@ -10,6 +11,9 @@ export default function LoginModal({ open, onClose, lang = "en" }) {
   const [sent, setSent] = useState(false);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  // The platform (analytics/maps/tables) is desktop-first; on a phone/tablet we
+  // surface a heads-up in the login+register modal so expectations are set.
+  const isSmallScreen = useBreakpointDown(900);
   // Code-entry (prefetch-proof login): the email contains a one-time CODE, not
   // a clickable link. A magic link is a single-use token consumed by the first
   // GET, so email scanners / antivirus / browser prefetch burn it before the
@@ -89,6 +93,23 @@ export default function LoginModal({ open, onClose, lang = "en" }) {
 
         {!sent ? (
           <>
+            {isSmallScreen && (
+              <div style={{
+                display: "flex", gap: "0.6rem", alignItems: "flex-start",
+                background: "rgba(245,166,35,0.08)", border: "1px solid rgba(245,166,35,0.3)",
+                borderRadius: 8, padding: "0.75rem 0.85rem", marginBottom: "1.25rem",
+                fontSize: "0.8rem", color: "#d8d8de", lineHeight: 1.55,
+              }}>
+                <span aria-hidden style={{ fontSize: "1rem", lineHeight: 1.4, flexShrink: 0 }}>💻</span>
+                <span>
+                  {lang === "sk" ? (
+                    <><strong style={{ color: "#f5a623", fontWeight: 700 }}>Najlepšie na počítači.</strong> Platforma Residata (analytika, mapy, dátové tabuľky) je navrhnutá pre desktop a na telefóne nebude vyzerať ani fungovať správne. Prihlásiť sa môžeš aj tu, no pre plný zážitok ju otvor na notebooku.</>
+                  ) : (
+                    <><strong style={{ color: "#f5a623", fontWeight: 700 }}>Best on a computer.</strong> The Residata platform — analytics, maps and full data tables — is built for desktop and won't look or work well on a phone. You can still sign in here, but open it on a laptop for the full experience.</>
+                  )}
+                </span>
+              </div>
+            )}
             <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem", color: "#00e5a0", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "0.75rem" }}>{t.login_label}</div>
             <h2 style={{ fontSize: "1.4rem", fontWeight: 700, letterSpacing: "-0.02em", marginBottom: "0.5rem" }}>{t.login_title}</h2>
             <p style={{ fontSize: "0.85rem", color: "#8a8a96", lineHeight: 1.6, marginBottom: "1.25rem" }}>
