@@ -362,7 +362,7 @@ export function PipelineFlow({ lang = "en" }) {
   };
 
   return (
-    <section style={{ padding: "3rem 2rem 5rem", maxWidth: 1280, margin: "0 auto" }}>
+    <section style={{ padding: "clamp(2rem,6vw,3rem) 2rem clamp(2.5rem,8vw,5rem)", maxWidth: 1280, margin: "0 auto" }}>
       {/* Header — krátky a vecný */}
       <div style={{ textAlign: "center", marginBottom: "2.5rem" }}>
         <div style={{ fontFamily: mono, fontSize: "0.7rem", color: green, letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "0.75rem" }}>
@@ -619,7 +619,7 @@ export function MarketPulse({ lang = "en", setCurrent }) {
         .slice(0, 6);
 
   return (
-    <section style={{ padding: "2rem 2rem 5rem", maxWidth: 1200, margin: "0 auto" }}>
+    <section style={{ padding: "2rem 2rem clamp(2.5rem,8vw,5rem)", maxWidth: 1200, margin: "0 auto" }}>
       <div style={{ textAlign: "center", marginBottom: "2.5rem" }}>
         <div style={{
           display: "inline-flex", alignItems: "center", gap: "0.5rem",
@@ -644,9 +644,9 @@ export function MarketPulse({ lang = "en", setCurrent }) {
         <Stat value={avgEurM2 ? Math.round(moneyFromEur(avgEurM2)) : null} label={tEur} prefix="" suffix={` ${moneySymbol()}`} />
       </div>
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: anyVelocity ? "1rem" : "0.3rem" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: "0.25rem 1rem", marginBottom: anyVelocity ? "1rem" : "0.3rem" }}>
         <h3 style={{ fontSize: "1.1rem", fontWeight: 600, color: "#e8e8ed", fontFamily: mono, letterSpacing: "0.02em" }}>{topTitle}</h3>
-        <button onClick={() => setCurrent && setCurrent("Live")} style={{ background: "none", border: "none", color: green, fontSize: "0.85rem", cursor: "pointer", fontFamily: "inherit" }}>{openAll}</button>
+        <button onClick={() => setCurrent && setCurrent("Live")} style={{ background: "none", border: "none", color: green, fontSize: "0.85rem", cursor: "pointer", fontFamily: "inherit", padding: 0, whiteSpace: "nowrap" }}>{openAll}</button>
       </div>
       {!anyVelocity && (
         <div style={{ fontSize: "0.78rem", color: "#8a8a96", marginBottom: "1rem", fontStyle: "italic" }}>
@@ -861,7 +861,7 @@ export function DistrictPulse({ lang = "en", setCurrent }) {  // eslint-disable-
   };
 
   return (
-    <section ref={sectionRef} style={{ padding: "5rem 2rem", maxWidth: 1100, margin: "0 auto", borderTop: `1px solid ${border}` }}>
+    <section ref={sectionRef} style={{ padding: "clamp(2.75rem,8vw,5rem) 2rem", maxWidth: 1100, margin: "0 auto", borderTop: `1px solid ${border}` }}>
       <div style={{ fontFamily: mono, fontSize: "0.7rem", color: green, letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "0.75rem" }}>
         {label}
       </div>
@@ -979,7 +979,7 @@ function GeoBarRow({ row, index, max, animate, lang, onClick }) {
       <div style={{
         fontFamily: mono, fontSize: "1.05rem", fontWeight: 700, color,
         textAlign: "right", fontVariantNumeric: "tabular-nums",
-        textShadow: `0 0 8px ${color}22`,
+        textShadow: `0 0 8px ${color}22`, whiteSpace: "nowrap",
       }}>
         {animatedAvg.toLocaleString("en-US").replace(/,/g, " ")} {moneySymbol()}
       </div>

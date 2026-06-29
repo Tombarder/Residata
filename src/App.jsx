@@ -966,7 +966,7 @@ function HomePage({ setCurrent, l, lang, onLogin }) {
           detail lives in one structured place. */}
 
       {/* Short teaser pointing to the What-We-Deliver page */}
-      <FadeIn style={{ padding: "4rem 2rem 5rem", maxWidth: "var(--container)", margin: "0 auto" }}>
+      <FadeIn style={{ padding: "clamp(2.5rem,7vw,4rem) 2rem clamp(2.5rem,8vw,5rem)", maxWidth: "var(--container)", margin: "0 auto" }}>
         <div className="flex-scope" style={{
           border: "1px solid #222228", borderRadius: 12, background: "#16161a",
           padding: "2rem 2.25rem", display: "flex", gap: "1.25rem",
@@ -1012,7 +1012,7 @@ function UseCasesPage({ setCurrent, l, lang }) {
         <p className="sec-desc" style={{ margin: "0 auto" }}>{l.useCasesDesc}</p>
       </div>
 
-      <div style={{ padding: "0 2rem 5rem", maxWidth: "var(--container)", margin: "0 auto" }}>
+      <div style={{ padding: "0 2rem clamp(2.5rem,8vw,5rem)", maxWidth: "var(--container)", margin: "0 auto" }}>
         {l.useCases.map((c, i) => {
           const img = USE_CASE_IMAGES[i] || USE_CASE_IMAGES[0];
           const imageLeft = i % 2 === 0;  // even index → image left
@@ -1164,7 +1164,7 @@ function UseCasesPage({ setCurrent, l, lang }) {
         })}
       </div>
 
-      <div style={{ padding: "4rem 2rem", textAlign: "center" }}>
+      <div style={{ padding: "clamp(2.5rem,7vw,4rem) 2rem", textAlign: "center" }}>
         {isPaid ? (
           <>
             <h2 style={{ fontSize: "1.5rem", fontWeight: 700, letterSpacing: "-0.03em", marginBottom: "1rem" }}>
@@ -1273,7 +1273,7 @@ function DataPage({ setCurrent, l, lang }) {
 
   // Insight card component
   const InsightCard = ({ label, title, children, span2 }) => (
-    <div style={{
+    <div className={span2 ? "insight-span2" : undefined} style={{
       border: "1px solid #222228", borderRadius: 12, background: "#16161a", padding: "1.75rem",
       gridColumn: span2 ? "span 2" : "span 1",
     }}>
@@ -1375,7 +1375,7 @@ function DataPage({ setCurrent, l, lang }) {
       </div>
 
       {/* Flexible Scope — full-width card below the two columns */}
-      <div style={{ padding: "1.5rem 2rem 4rem", maxWidth: "var(--container)", margin: "0 auto" }}>
+      <div style={{ padding: "1.5rem 2rem clamp(2.5rem,7vw,4rem)", maxWidth: "var(--container)", margin: "0 auto" }}>
         <div className="flex-scope" style={{
           border: "1px solid #222228", borderRadius: 12, background: "#16161a",
           padding: "2rem 2.25rem", display: "grid", gridTemplateColumns: "auto 1fr", gap: "1.75rem", alignItems: "center",
@@ -1476,7 +1476,7 @@ function DataPage({ setCurrent, l, lang }) {
 
         {/* 4 — Premium cluster — real top-district depth + €/m² ranking */}
         <InsightCard label={`Premium Cluster — ${d.top.district}`} title={`${d.top.avail} units available at €${d.top.m2}/m².`} span2>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
+          <div className="ic-split" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
             <div>
               <div style={{ fontSize: "0.82rem", color: "#8a8a96", lineHeight: 1.65, marginBottom: "1rem" }}>
                 {d.top.district} is the city's priciest cluster — <span style={{ color: "#e8e8ed" }}>{d.top.projects} active projects</span> and <span style={{ color: "#e8e8ed" }}>{d.top.units} units</span> tracked ({d.top.avail} still available) at <span style={{ color: "#e8e8ed" }}>€{d.top.m2}/m²</span> average, peaking at <span style={{ color: "#e8e8ed" }}>€{d.top.peak}/m²</span>.
@@ -1532,7 +1532,7 @@ function DataPage({ setCurrent, l, lang }) {
       </div>
 
       {/* Unit Table + Schema — two-column layout (stacks to 1col ≤900 via .schema-grid) */}
-      <div style={{ padding: "2rem 2rem 5rem", maxWidth: "var(--container)", margin: "0 auto" }}>
+      <div style={{ padding: "2rem 2rem clamp(2.5rem,8vw,5rem)", maxWidth: "var(--container)", margin: "0 auto" }}>
         <div className="schema-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2.5rem", alignItems: "start" }}>
 
           {/* Left — Real data examples (lighter) */}
@@ -1627,7 +1627,7 @@ function DataPage({ setCurrent, l, lang }) {
         </div>
       </div>
 
-      <div style={{ padding: "4rem 2rem", textAlign: "center" }}>
+      <div style={{ padding: "clamp(2.5rem,7vw,4rem) 2rem", textAlign: "center" }}>
         {isPaid ? (
           <>
             <h2 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "1rem" }}>
@@ -1851,7 +1851,7 @@ function PricingPage({ setCurrent, l, lang, onLogin }) {
       </div>
 
       {/* FAQ */}
-      <div style={{ padding: "3rem 2rem 5rem", maxWidth: 800, margin: "0 auto" }}>
+      <div style={{ padding: "3rem 2rem clamp(2.5rem,8vw,5rem)", maxWidth: 800, margin: "0 auto" }}>
         <h3 style={{ fontSize: "1.3rem", fontWeight: 600, marginBottom: "2rem" }}>{l.commonQ}</h3>
         {faqs.map(([q, a], i) => (
           <div key={i} style={{ borderTop: "1px solid #222228", padding: "1.5rem 0", borderBottom: i === faqs.length - 1 ? "1px solid #222228" : "none" }}>
@@ -1861,7 +1861,7 @@ function PricingPage({ setCurrent, l, lang, onLogin }) {
         ))}
       </div>
 
-      <div style={{ padding: "4rem 2rem 6rem", textAlign: "center", position: "relative" }}>
+      <div style={{ padding: "clamp(2.5rem,7vw,4rem) 2rem clamp(3rem,9vw,6rem)", textAlign: "center", position: "relative" }}>
         <div style={{
           position: "absolute", bottom: 0, left: "50%", transform: "translateX(-50%)",
           width: 600, height: 400,
@@ -1887,7 +1887,7 @@ function ContactPage({ l }) {
         <p className="sec-desc">{l.contactDesc}</p>
       </div>
 
-      <div style={{ padding: "0 2rem 5rem", maxWidth: "var(--container)", margin: "0 auto" }}>
+      <div style={{ padding: "0 2rem clamp(2.5rem,8vw,5rem)", maxWidth: "var(--container)", margin: "0 auto" }}>
         <div className="contact-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
 
           {/* Left — Contact card */}
@@ -2163,7 +2163,7 @@ export default function App() {
         @media (max-width: 760px) {
           .flow-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 1.5rem !important; row-gap: 2rem !important; }
           .flow-grid > div > div:last-child { display: none !important; }
-          .district-row { grid-template-columns: 1fr 70px !important; font-size: 0.85rem; }
+          .district-row { grid-template-columns: 1fr auto !important; font-size: 0.85rem; }
           .district-row > div:nth-child(2) { display: none; }
         }
         @keyframes heroFadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
@@ -2228,6 +2228,8 @@ export default function App() {
           .stats-grid { grid-template-columns: 1fr 1fr !important; }
           .insight-grid { grid-template-columns: 1fr !important; }
           .insight-span2 { grid-column: span 1 !important; }
+          /* split layouts inside insight cards (text | chart) stack on phones */
+          .ic-split { grid-template-columns: 1fr !important; }
         }
         @media (max-width: 768px) {
           .hero-actions-wrap { flex-direction: column; align-items: center; }
