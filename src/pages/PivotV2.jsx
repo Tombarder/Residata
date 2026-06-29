@@ -279,12 +279,24 @@ const DEFAULT_VALUE_MODE = "raw";
 const DEFAULT_DATA_BARS  = true;
 const DEFAULT_SORT       = { col: "count", dir: "desc" };
 
-/* Persist the whole pivot setup (rows/cols/values/filters + display options) to
-   localStorage so it SURVIVES navigating away (to Reports, etc.) and back, and
-   across refreshes/sessions — for the logged-in user and anonymous visitors alike
-   (localStorage lives until the browser data is cleared). Versioned key so a future
-   schema change can invalidate old blobs cleanly. */
-const PIVOT_STATE_KEY = "residata.pivotV2.state.v1";
+/* The default bundle the "Predvolené" button + a fresh start fall back to. */
+const DEFAULT_BUNDLE = {
+  rows: DEFAULT_ROWS, cols: DEFAULT_COLS, values: DEFAULT_VALUES, filters: DEFAULT_FILTERS,
+  valueMode: DEFAULT_VALUE_MODE, dataBars: DEFAULT_DATA_BARS, sort: DEFAULT_SORT,
+};
+
+/* Persist the pivot setup (rows/cols/values/filters + display options) to localStorage
+   so it SURVIVES navigating away (to Reports, etc.) and back + refreshes.
+   ── ACCOUNT-SCOPED (2026-06-29) ──
+   The key is namespaced by the logged-in user's id (or "anon"), so the setup sticks to
+   the ACCOUNT — not the browser. This fixes the cross-account leak: logging in with a
+   different account on the same browser previously showed the PREVIOUS account's setup
+   (single shared key). Now each account reads only its own key; a new account starts
+   clean. (For a logged-in user the DB copy in user_profiles.pivot_prefs is still the
+   cross-device source of truth — this keyed localStorage is just an instant per-account
+   cache + the anon fallback.) */
+const PIVOT_KEY_PREFIX = "residata.pivotV2.state.v2.";
+function pivotStateKey(scope) { return PIVOT_KEY_PREFIX + (scope || "anon"); }
 
 /* Restored configs are SANITISED against the current FIELDS registry: a saved key
    for a field that no longer exists (e.g. a retired palette entry) is dropped, so a
@@ -302,14 +314,18 @@ function sanitizePivotState(s) {
   if (s.sort && typeof s.sort === "object" && "dir" in s.sort) out.sort = s.sort;
   return out;
 }
-function loadPivotState() {
+function loadPivotState(scope) {
   try {
-    const raw = typeof window !== "undefined" && window.localStorage.getItem(PIVOT_STATE_KEY);
+    const raw = typeof window !== "undefined" && window.localStorage.getItem(pivotStateKey(scope));
     return raw ? sanitizePivotState(JSON.parse(raw)) : null;
   } catch { return null; }
 }
-function savePivotState(s) {
-  try { window.localStorage.setItem(PIVOT_STATE_KEY, JSON.stringify(s)); } catch { /* private mode / quota — ignore */ }
+function savePivotState(scope, s) {
+  try { window.localStorage.setItem(pivotStateKey(scope), JSON.stringify(s)); } catch { /* private mode / quota — ignore */ }
+}
+/* One-time cleanup of the pre-2026-06-29 SHARED key (the leak source). */
+function purgeLegacyPivotState() {
+  try { window.localStorage.removeItem("residata.pivotV2.state.v1"); } catch { /* ignore */ }
 }
 
 /* Stable empty array — passed as `records` to FilterPopover on the grain fast-path
@@ -940,7 +956,7 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   const { country } = useCountry();   // for targeted drill-down fetch
   const { can } = useCapabilities();
   const canViewAnalytics = can("view_analytics");
-  const { user, profile } = useAuth();   // for cross-device (per-account) pivot persistence
+  const { user, profile, loading: authLoading } = useAuth();   // for per-account pivot persistence
 
   // Mesiac/Datum is a regular filterable dimension. The pivot opens pinned to the
   // latest scrape (the seeding effect below), so we drive the archive FETCH off
@@ -955,9 +971,10 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   // Voľné (V) + Predrezervované (PR). Pushed to the grain RPC (p_stav) so the
   // default stays instant. The user can edit/clear the chip to see all statuses.
   // Restore the persisted setup ONCE on mount (survives navigating to Reports etc.
-  // and back, and across refreshes). Falls back to the defaults when nothing is
-  // saved or the blob is unusable. See loadPivotState/savePivotState.
-  const [persisted] = useState(loadPivotState);
+  // and back, and across refreshes). Scoped to the current account id (or "anon" when
+  // not yet known) so it NEVER shows another account's setup. The hydration effect
+  // below re-applies the authoritative source once auth + profile resolve.
+  const [persisted] = useState(() => loadPivotState(user?.id));
   // Default filter: show only the on-market units a buyer is actually shopping —
   // Voľné (V) + Predrezervované (PR). Pushed to the grain RPC (p_stav) so the
   // default stays instant. The user can edit/clear the chip to see all statuses.
@@ -1142,48 +1159,60 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   const [valueMode, setValueMode] = useState(persisted?.valueMode ?? DEFAULT_VALUE_MODE);
   const [dataBars,  setDataBars]  = useState(persisted?.dataBars ?? DEFAULT_DATA_BARS);
 
-  // Persist the whole setup whenever it changes, so leaving the page (to Reports,
-  // etc.) and coming back — or a refresh — restores exactly where the user left off.
-  // Only the layout/filters/display options are saved (not transient UI like the
-  // open popover, drag state, or collapsed rows).
-  useEffect(() => {
-    savePivotState({ rows, cols, values, filters, valueMode, dataBars, sort });
-  }, [rows, cols, values, filters, valueMode, dataBars, sort]);
-
-  // ── Cross-device (per-ACCOUNT) persistence ──────────────────────
-  // localStorage above is per-browser. For a logged-in user we ALSO sync the setup
-  // to their account (user_profiles.pivot_prefs) so the SAME login shows the SAME
-  // saved setup on every device/session. DB is the source of truth when logged in.
-  //
-  // `hydrated` (state, not a ref — so the save effect re-runs once it flips) guards
-  // the load→save race: until the profile (with its saved prefs) has loaded and been
-  // applied, we must NOT write the local/default state over the account's saved prefs.
-  // `justAppliedRef` skips the one save the apply itself would echo straight back.
+  // ── Per-ACCOUNT persistence (the setup sticks to the ACCOUNT, not the browser) ──
+  // For a logged-in user the account is the SOURCE OF TRUTH: their saved setup comes
+  // from user_profiles.pivot_prefs (cross-device) with the per-account localStorage as
+  // an instant cache. We ALWAYS apply the account's source on hydration — so a previous
+  // session's / another account's local state can never bleed through. Anon visitors use
+  // the "anon" localStorage only. `scopeId` re-hydrates when the account changes
+  // (logout→login) without needing a full reload.
   const [hydrated, setHydrated] = useState(false);
   const justAppliedRef = useRef(false);
   const dbSaveTimer    = useRef(null);
+  const scopeId = user?.id || "anon";
+  const hydratedScopeRef = useRef(null);
 
-  // Apply the account's saved prefs ONCE, when the profile first loads. (Declared
-  // BEFORE the DB-save effect so it runs first on the login render.)
+  // Helper: apply a full prefs bundle to the live pivot state.
+  const applyPrefs = (p) => {
+    setRows(p.rows ?? DEFAULT_ROWS);
+    setCols(p.cols ?? DEFAULT_COLS);
+    setValues(p.values ?? DEFAULT_VALUES);
+    setFilters(p.filters ?? DEFAULT_FILTERS);
+    setValueMode(p.valueMode ?? DEFAULT_VALUE_MODE);
+    setDataBars(typeof p.dataBars === "boolean" ? p.dataBars : DEFAULT_DATA_BARS);
+    setSort(p.sort ?? DEFAULT_SORT);
+  };
+
+  useEffect(() => { purgeLegacyPivotState(); }, []);   // drop the pre-fix shared key once
+
+  // Persist on every change to the CURRENT account's localStorage key (or "anon").
+  // Account-scoped so one account never overwrites another's cache on a shared browser.
   useEffect(() => {
-    if (hydrated || !profile) return;     // wait for the profile to load (anon → never; localStorage only)
-    setHydrated(true);
-    const dbPrefs = profile.pivot_prefs ? sanitizePivotState(profile.pivot_prefs) : null;
-    if (!dbPrefs) return;                 // logged in but nothing saved yet → seed from current state (save effect)
-    justAppliedRef.current = true;        // don't echo this load straight back to the DB
-    if (dbPrefs.rows)     setRows(dbPrefs.rows);
-    if (dbPrefs.cols)     setCols(dbPrefs.cols);
-    if (dbPrefs.values)   setValues(dbPrefs.values);
-    if (dbPrefs.filters)  setFilters(dbPrefs.filters);
-    if (dbPrefs.valueMode) setValueMode(dbPrefs.valueMode);
-    if (typeof dbPrefs.dataBars === "boolean") setDataBars(dbPrefs.dataBars);
-    if (dbPrefs.sort)     setSort(dbPrefs.sort);
-  }, [profile, hydrated]);
+    if (!hydrated) return;   // don't write the pre-hydration default over a real saved setup
+    savePivotState(user?.id, { rows, cols, values, filters, valueMode, dataBars, sort });
+  }, [hydrated, user, rows, cols, values, filters, valueMode, dataBars, sort]);
 
-  // Persist to the account (debounced) on every change — but only once hydrated, so
-  // we never clobber the saved prefs before they've loaded. The first run after a
-  // fresh login with an EMPTY account seeds it from the current state. Anon users skip
-  // this (no `user`) and keep localStorage only.
+  useEffect(() => {
+    if (authLoading) return;                       // wait until we KNOW who (if anyone) is logged in
+    if (hydratedScopeRef.current === scopeId) return;  // already hydrated for this account
+    hydratedScopeRef.current = scopeId;
+    justAppliedRef.current = true;                 // the apply below must not echo straight back to the DB
+    let prefs;
+    if (user) {
+      // logged in → account is authoritative: DB prefs, else this account's local cache,
+      // else a clean default. Always applied, so nothing from another account survives.
+      prefs = (profile?.pivot_prefs && sanitizePivotState(profile.pivot_prefs))
+              || loadPivotState(user.id) || DEFAULT_BUNDLE;
+    } else {
+      prefs = loadPivotState("anon") || DEFAULT_BUNDLE;
+    }
+    applyPrefs(prefs);
+    setHydrated(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, scopeId, profile]);
+
+  // Persist to the ACCOUNT (debounced) on every change, once hydrated — so the same
+  // login shows the same setup on every device. Anon users skip this (localStorage only).
   useEffect(() => {
     if (!user || !hydrated) return;
     if (justAppliedRef.current) { justAppliedRef.current = false; return; }
