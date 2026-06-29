@@ -142,28 +142,47 @@ function useAuthInternal() {
     return supabase.auth.verifyOtp({ email, token, type: "email" });
   };
 
-  const signOut = () => {
+  const signOut = async () => {
     log("signOut: clearing session");
-    // 1. Optimistically clear UI state so the app reflects signed-out instantly.
+    // Robust sign-out — correct in three independent failure modes (normal /
+    // gotrue wedged / a future supabase-js renaming its storage key), with no
+    // fragile dependency as the PRIMARY mechanism. Context: "sign out does
+    // nothing until I refresh + retry" came from the old code AWAITING gotrue's
+    // signOut() unbounded — and gotrue can deadlock on a stuck token-refresh.
+
+    // 1. Optimistic UI — reflect signed-out instantly, before any async work.
     setUser(null);
     setProfile(null);
     setProfileError(null);
-    // 2. Purge the Supabase session from localStorage SYNCHRONOUSLY. This is the
-    //    real fix for "sign out does nothing until I refresh + retry": gotrue's
-    //    own signOut() can hang forever on a stuck token-refresh (known deadlock,
-    //    see supabase.js), and the old code awaited it BEFORE clearing/reloading —
-    //    so a hung call stranded the user logged-in. Removing the token by hand
-    //    guarantees the reload below can't rehydrate the session.
+
+    // 2. PRIMARY: let gotrue remove its OWN session token, whatever its internal
+    //    storage key is now or after a future upgrade (format-proof — never
+    //    guesses the key). scope:"local" = no server round-trip. The bounded auth
+    //    lock (see supabase.js) makes this resolve fast instead of deadlocking;
+    //    the timeout is a hard ceiling so the redirect can NEVER be blocked, even
+    //    in a pathological case. Whichever settles first, we proceed.
+    if (isSupabaseReady()) {
+      try {
+        await Promise.race([
+          supabase.auth.signOut({ scope: "local" }),
+          new Promise((resolve) => setTimeout(resolve, 1500)),
+        ]);
+      } catch (_) { /* fall through to the backstop + reload */ }
+    }
+
+    // 3. BACKSTOP for the (pathological) timeout case: if gotrue didn't finish,
+    //    remove its session key by hand so the reload can't rehydrate it. Matches
+    //    gotrue's default `sb-<ref>-auth-token`; harmless no-op if already gone.
+    //    Secondary by design — step 2 is what normally clears the session.
     try {
       for (const k of Object.keys(localStorage)) {
         if (k.startsWith("sb-") && k.includes("-auth-token")) localStorage.removeItem(k);
       }
     } catch (_) { /* private mode / no storage — reload still lands on anon */ }
-    // 3. Best-effort gotrue signOut, FIRE-AND-FORGET (never awaited — a hung call
-    //    must not block the redirect; the manual purge above already did the work).
-    try { if (isSupabaseReady()) supabase.auth.signOut({ scope: "local" }); } catch (_) {}
-    // 4. Hard reload to a clean anon home — always runs, immediately. No stale
-    //    in-memory state, no dangling onAuthStateChange race.
+
+    // 4. Hard reload to a clean anon home — always runs. Discards all in-memory
+    //    state (cached queries, gotrue's session object), so no dangling
+    //    logged-in artifact or onAuthStateChange race can survive.
     window.location.replace("/");
   };
 
