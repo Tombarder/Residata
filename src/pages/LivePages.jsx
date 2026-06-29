@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
 import { useProjects, useProjectFlats, useProjectSnapshots, useMarketTotals, useTotalsList } from "../lib/useData";
@@ -3298,30 +3298,63 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
   const [activity, setActivity] = useState([]);
   const [premiumDomains, setPremiumDomains] = useState([]);
   const [err, setErr] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("overview");
   const [search, setSearch] = useState("");
 
-  const reloadUsers = () => supabase.from("user_profiles").select("*").order("created_at", { ascending: false })
-    .then(({ data, error }) => { setUsers(data || []); if (error) setErr(error.message); });
+  // Session-robust admin data load. THE long-term fix for "admin sees no users":
+  // a stale admin tab (access token expired / mid-refresh) was sending the
+  // RLS-gated reads with no valid JWT → they ran as anon → RLS returned 0 rows
+  // → the panel silently showed "No users yet". The action handlers were already
+  // hardened this way (#91); the data LOAD never was. We now:
+  //   1. force a fresh token first (refreshes, or throws SESSION_EXPIRED on a
+  //      truly dead session → clean re-login prompt, never a blank table),
+  //   2. surface query errors instead of swallowing them,
+  //   3. treat "admin got 0 rows, no error" as an auth problem (an admin ALWAYS
+  //      sees at least themselves) → show a Reload instead of a silent empty.
+  const loadAll = useCallback(async () => {
+    if (!self?.id) return;
+    setErr(null); setLoading(true);
+    try {
+      await getFreshAccessToken();
+    } catch (e) {
+      setLoading(false);
+      setErr(authErrorMessage(e, lang));
+      return;
+    }
+    const [u, ev, act, pd] = await Promise.all([
+      supabase.from("user_profiles").select("*").order("created_at", { ascending: false }),
+      supabase.from("events").select("*").like("event_type", "new_signup%").order("detected_at", { ascending: false }).limit(20),
+      // 1000 covers months of activity for the current user base; move to a DB
+      // view if the table outgrows it.
+      supabase.from("user_activity").select("*").order("created_at", { ascending: false }).limit(1000),
+      supabase.from("premium_domains").select("*").order("domain"),
+    ]);
+    setLoading(false);
+    if (u.error) { setErr(authErrorMessage(u.error, lang)); return; }
+    setUsers(u.data || []);
+    setEvents(ev.data || []);
+    setActivity(act.data || []);
+    setPremiumDomains(pd.data || []);
+  }, [self?.id, lang]);
 
-  // Race condition fix (2026-05-27): wait for session to load before firing
-  // RLS-gated queries. Without this, LiveAdmin mounted before auth session was
-  // ready → supabase requests went out WITHOUT JWT → RLS denied → "No users yet"
-  // even for admin. Now gated on `self?.id` and re-runs when session arrives.
+  // Initial load (and re-load when the session id arrives / changes).
+  useEffect(() => { loadAll(); }, [loadAll]);
+
+  // Self-heal: a backgrounded admin tab's token can expire while away. Refetch
+  // (with a fresh token) on focus / visibility so the table repopulates instead
+  // of staying mysteriously empty after the user comes back.
   useEffect(() => {
     if (!self?.id) return;
-    reloadUsers();
-    supabase.from("events").select("*").like("event_type", "new_signup%").order("detected_at", { ascending: false }).limit(20)
-      .then(({ data }) => setEvents(data || []));
-    // Pull more activity than the old 100-event Recent panel needs, because
-    // the Overview tab aggregates across a longer window. 1000 is enough to
-    // cover months of use for the current small user base; if the table
-    // grows past that we'd move aggregation to a DB view.
-    supabase.from("user_activity").select("*").order("created_at", { ascending: false }).limit(1000)
-      .then(({ data }) => setActivity(data || []));
-    supabase.from("premium_domains").select("*").order("domain")
-      .then(({ data }) => setPremiumDomains(data || []));
-  }, [self?.id]);
+    const onFocus = () => loadAll();
+    const onVis = () => { if (!document.hidden) loadAll(); };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [self?.id, loadAll]);
 
   const premiumSet = new Set(premiumDomains.map(d => d.domain.toLowerCase()));
 
@@ -3522,11 +3555,30 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
             </div>
           </div>
 
-          {visibleUsers.length === 0 ? (
+          {loading ? (
             <div style={{ color: dim, padding: "1.5rem", fontSize: "0.9rem", textAlign: "center", border: `1px solid ${border}`, borderRadius: 12 }}>
-              {search
-                ? (lang === "sk" ? `Nikto nevyhovuje hľadaniu "${search}".` : `No users match "${search}".`)
-                : (lang === "sk" ? "Žiadni užívatelia zatiaľ." : "No users yet.")}
+              {lang === "sk" ? "Načítavam užívateľov…" : "Loading users…"}
+            </div>
+          ) : (err || users.length === 0) ? (
+            // err = the load failed outright. users.length === 0 with no error =
+            // the query ran unauthenticated (stale session) — an admin always sees
+            // at least themselves, so 0 rows is never a genuine empty table.
+            <div style={{ color: "#ffb3b3", padding: "1.5rem", fontSize: "0.9rem", textAlign: "center", border: "1px solid rgba(255,107,107,0.4)", borderRadius: 12, background: "rgba(255,107,107,0.06)" }}>
+              <div style={{ marginBottom: "0.85rem", lineHeight: 1.5 }}>
+                {err || (lang === "sk"
+                  ? "Nepodarilo sa načítať užívateľov — pravdepodobne vypršala tvoja prihlasovacia relácia."
+                  : "Couldn't load users — your session has likely expired.")}
+              </div>
+              <button onClick={loadAll} style={{
+                background: green, color: "#0a0a0b", border: "none", borderRadius: 6,
+                padding: "0.5rem 1.1rem", fontSize: "0.8rem", fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+              }}>
+                {lang === "sk" ? "Načítať znova" : "Reload"}
+              </button>
+            </div>
+          ) : visibleUsers.length === 0 ? (
+            <div style={{ color: dim, padding: "1.5rem", fontSize: "0.9rem", textAlign: "center", border: `1px solid ${border}`, borderRadius: 12 }}>
+              {lang === "sk" ? `Nikto nevyhovuje hľadaniu "${search}".` : `No users match "${search}".`}
             </div>
           ) : (
             <UserTable users={visibleUsers} setTier={setTier} deleteUser={deleteUser} trialAction={trialAction} subAction={subAction} selfId={self?.id} t={t} lang={lang} premiumSet={premiumSet} />
