@@ -18,7 +18,7 @@ import { useProjects, useMarketTotals, useVelocityMature } from "../lib/useData"
 import { moneyFromEur, moneySymbol } from "../lib/money";
 import { useCurrency } from "../lib/useCurrency";
 import { supabase } from "../lib/supabase";
-import { getFreshAccessToken, authErrorMessage } from "../lib/sessionGuard";
+import { useActivateTrial } from "../lib/useActivateTrial";
 import { pushRoute } from "../lib/routing";
 import { track } from "../lib/track";
 import { cleanText, cleanUrl, cleanPhone } from "../lib/sanitize";
@@ -806,10 +806,11 @@ function UpgradeOverlay({ lang, requiredFor, currentTier, setCurrent }) {
 /**
  * TrialOfferBanner — shown on Dashboard for free users who have
  * never started their 7-day trial. Non-blocking, dismissible-feel
- * gift framing (not desperate upsell). Opens Billing where the
- * actual "Start trial" button lives.
+ * gift framing (not desperate upsell). The button ACTIVATES the trial
+ * in one click (the copy promises "one-click activation") — previously
+ * it only navigated to Billing without activating anything.
  */
-function TrialOfferBanner({ lang, onOpenBilling }) {
+function TrialOfferBanner({ lang, onActivate, busy, msg }) {
   return (
     <div style={{
       background: "linear-gradient(90deg, rgba(0,229,160,0.14) 0%, rgba(0,229,160,0.04) 70%, transparent 100%)",
@@ -836,9 +837,16 @@ function TrialOfferBanner({ lang, onOpenBilling }) {
             : "Every project, analytics, reports, exports. No card required. One-click activation."}
         </div>
       </div>
-      <button onClick={onOpenBilling} className="btn-p" style={{ fontSize: "0.82rem" }}>
-        {lang === "sk" ? "Aktivovať trial" : "Activate trial"}
-      </button>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "0.3rem" }}>
+        <button onClick={onActivate} disabled={busy} className="btn-p" style={{ fontSize: "0.82rem", cursor: busy ? "wait" : "pointer", opacity: busy ? 0.7 : 1 }}>
+          {busy ? "…" : (lang === "sk" ? "Aktivovať trial" : "Activate trial")}
+        </button>
+        {msg && (
+          <span style={{ fontSize: "0.72rem", fontFamily: "'JetBrains Mono', monospace", color: msg.kind === "ok" ? green : "#ff6b6b" }}>
+            {msg.text}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
@@ -898,6 +906,10 @@ function PlatformDashboard({ lang, setCurrent }) {
   // paid users have baseTier='free' but caps.tier='paid' — the old check
   // pitched a 7-day trial to people who already have permanent paid access.
   const showTrialOffer = caps.tier === "free" && !trialActive && !profile?.trial_started_at;
+  // One-click trial activation straight from the dashboard banner. If the
+  // trial was already used / the user is already paid (409), fall back to the
+  // Billing page for the full picture instead of showing a hard error.
+  const trialOffer = useActivateTrial({ lang, onConsumed: () => setCurrent("App:Billing") });
 
   // All headline KPIs read from the live `market_totals` view (same
   // source the homepage Ticker, MarketPulse, and /live/analytics use).
@@ -951,7 +963,7 @@ function PlatformDashboard({ lang, setCurrent }) {
           running countdown ("trial day 3 of 7"). Once expired or
           used, banner disappears entirely. */}
       {showTrialOffer && (
-        <TrialOfferBanner lang={lang} onOpenBilling={() => setCurrent("App:Billing")} />
+        <TrialOfferBanner lang={lang} onActivate={trialOffer.start} busy={trialOffer.busy} msg={trialOffer.msg} />
       )}
       {trialActive && (
         <TrialRunningBanner lang={lang} daysLeft={trialDaysLeft} onOpenBilling={() => setCurrent("App:Billing")} />
@@ -1210,30 +1222,10 @@ function PlatformBilling({ lang, setCurrent }) {
   const fmtDate = (ts) => ts ? new Date(ts).toLocaleDateString(lang === "sk" ? "sk-SK" : "en-US", { day: "numeric", month: "long", year: "numeric" }) : "—";
   const approvedAt = profile?.approved_at ? fmtDate(profile.approved_at) : null;
 
-  const [trialBusy, setTrialBusy] = useState(false);
-  const [trialMsg, setTrialMsg]   = useState(null);
-
-  const startTrial = async () => {
-    setTrialBusy(true); setTrialMsg(null);
-    try {
-      // Refresh first so the trial request never goes out with a dead token
-      // (the #1 reason "start trial" silently failed with a 401).
-      const token = await getFreshAccessToken();
-      const r = await fetch("/api/trial/start", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: "{}",
-      });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(r.status === 401 ? authErrorMessage({ status: 401 }, lang) : (j.error || `HTTP ${r.status}`));
-      setTrialMsg({ kind: "ok", text: lang === "sk" ? "Trial aktivovaný 🎉 Obnovujem stránku…" : "Trial started 🎉 Refreshing…" });
-      setTimeout(() => window.location.reload(), 1200);
-    } catch (e) {
-      setTrialMsg({ kind: "err", text: e?.code === "SESSION_EXPIRED" ? authErrorMessage(e, lang) : String(e?.message || e) });
-    } finally {
-      setTrialBusy(false);
-    }
-  };
+  // Trial activation now flows through the shared one-click action so this
+  // page and the dashboard banner behave identically (refresh token → start
+  // → reload on success). See src/lib/trial.js + useActivateTrial.js.
+  const { start: startTrial, busy: trialBusy, msg: trialMsg } = useActivateTrial({ lang });
 
   return (
     <div style={{ padding: "2rem", maxWidth: 760 }}>
