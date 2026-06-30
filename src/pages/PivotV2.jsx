@@ -1106,6 +1106,15 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
       return Math.abs(h + n * 2654435761) >>> 0;
     };
     const ROOM_DIST = [[1, 0.25], [2, 0.35], [3, 0.25], [4, 0.15]];
+    // A few synthetic scrape points (spanning ~2 months) so the TIME dimensions
+    // (Datum / Mesiac / Batch presný čas) demo a believable trend in the free
+    // preview instead of every unit collapsing into one "(prázdne)" bucket. Derived
+    // from "now" so the demo never shows stale dates; computed once per memo (stable).
+    const _now = new Date();
+    const SYNTH_DAYS = [0, 13, 34, 61].map((d) => {
+      const iso = new Date(_now.getTime() - d * 86400000).toISOString();
+      return { ts: iso.slice(0, 19) + "+00:00", month: iso.slice(0, 7) };
+    });
     // Synthesize previews only for active projects — preview should
     // reflect what paid users would see in the real Pivot, which is
     // active-only. Manual projects (status='active') stay in.
@@ -1127,10 +1136,16 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
         const shareAvailCum = availShare;
         const shareAvailPlusResv = availShare + Math.max(0, 1 - availShare - soldShare);
         const stav = r < shareAvailCum ? "V" : r < shareAvailPlusResv ? "R" : "P";
+        // `seed` is an unsigned 32-bit int (… >>> 0); use it directly so the index is
+        // always 0..len-1. (A signed `seed >> 8` can be NEGATIVE for hashes ≥ 2^31 →
+        // SYNTH_DAYS[neg] = undefined → crash. Caught in free-tier live test.)
+        const day = SYNTH_DAYS[seed % SYNTH_DAYS.length];
         out.push({
           id: `preview-${p.id}-${i}`,
           project_id: p.id,
           unit_id: `preview-${i}`,
+          batch_timestamp: day.ts,
+          snapshot_month: day.month,
           unit_detail: null,
           typ: "byt",
           etapa: null,
@@ -1767,7 +1782,7 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
         <AnalysisToolbar
           valueMode={valueMode} setValueMode={setValueMode}
           dataBars={dataBars}   setDataBars={setDataBars}
-          onExportCSV={() => exportPivotCSV(flatRows, sortedTree, rows, cols, effectiveValues, valueMode)}
+          onExportCSV={() => exportPivotCSV(flatRows, sortedTree, rows, cols, effectiveValues, valueMode, lang)}
           effectiveValues={effectiveValues}
           lang={lang}
         />
@@ -2519,15 +2534,17 @@ function AnalysisToolbar({ valueMode, setValueMode, dataBars, setDataBars, onExp
 }
 
 /* ─── CSV EXPORT ──────────────────────────────────────────────── */
-function exportPivotCSV(flatRows, grandTotal, rowFields, colFields, effectiveValues, valueMode) {
+function exportPivotCSV(flatRows, grandTotal, rowFields, colFields, effectiveValues, valueMode, lang = "sk") {
   const esc = (v) => {
     if (v == null) return "";
     const s = String(v);
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
+  // Headers follow the active UI language (fieldLabel), same as every on-screen label —
+  // an EN user must not get Slovak column names in their export.
   const valueHeader = (v) => v.key === "__count__"
     ? "Count"
-    : `${AGG_LABEL[v.agg]}(${FIELDS[v.field]?.label || v.field})`;
+    : `${AGG_LABEL[v.agg]}(${fieldLabel(v.field, lang)})`;
 
   const fmt = (v) => (v == null || !Number.isFinite(v)) ? "" :
     Number.isInteger(v) ? String(v) : String(Math.round(v * 100) / 100);
@@ -2537,7 +2554,7 @@ function exportPivotCSV(flatRows, grandTotal, rowFields, colFields, effectiveVal
 
   // Build header
   const header = [
-    ...rowFields.map((f, i) => `L${i + 1}·${FIELDS[f]?.label || f}`),
+    ...rowFields.map((f, i) => `L${i + 1}·${fieldLabel(f, lang)}`),
     "Count",
   ];
   if (crossTab) {
