@@ -24,6 +24,7 @@ const LiveDashboard = lazy(() => import("./pages/LivePages").then(m => ({ defaul
 const LiveProjectDetail = lazy(() => import("./pages/LivePages").then(m => ({ default: m.LiveProjectDetail })));
 import EarlyAccessBadge from "./components/EarlyAccessBadge";
 import MarketControls from "./components/MarketControls";
+import { NavLink, NavButton } from "./components/NavControls";
 // HowItWorksFlow z HomeExtras bol odstránený — PipelineFlow ho plne
 // pokrýva a robí to na živých číslach z useMarketTotals.
 import { MarketPulse, DistrictPulse, PipelineFlow } from "./pages/HomeExtras";
@@ -464,14 +465,14 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
         maxWidth: "var(--container)", margin: "0 auto", padding: "1rem var(--gutter-safe)",
         display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: "1rem",
       }}>
-        <a onClick={() => setCurrent("Home")} style={{ gridColumn: 1, justifySelf: "start", display: "flex", alignItems: "center", gap: "0.6rem", cursor: "pointer", textDecoration: "none" }}>
+        <NavLink to="Home" onNavigate={setCurrent} aria-label={lang === "sk" ? "Residata — domov" : "Residata — home"} style={{ gridColumn: 1, justifySelf: "start", display: "flex", alignItems: "center", gap: "0.6rem", cursor: "pointer", textDecoration: "none" }}>
           <div style={{
             width: 28, height: 28, background: "var(--accent)", borderRadius: "var(--r-sm)",
             display: "flex", alignItems: "center", justifyContent: "center",
             fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, fontSize: 14, color: "var(--bg)",
           }}>R</div>
           <span style={{ fontWeight: 600, fontSize: "1.1rem", color: "var(--text)", letterSpacing: "-0.02em" }}>Residata</span>
-        </a>
+        </NavLink>
         {/* Center zone: marketing links, balanced between logo and CTAs */}
         <div className="nav-links" style={{ justifySelf: "center", display: "flex", alignItems: "center", gap: "1.75rem" }}>
           {pages.map((p, i) => {
@@ -482,7 +483,7 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
             const internalKey = pageMap[key] || key;
             const isActive = current === internalKey;
             return (
-              <a key={key} className={"nav-link" + (isActive ? " nav-link--active" : "")} onClick={() => setCurrent(key)}>{p}</a>
+              <NavLink key={key} to={internalKey} onNavigate={setCurrent} className={"nav-link" + (isActive ? " nav-link--active" : "")}>{p}</NavLink>
             );
           })}
         </div>
@@ -495,11 +496,11 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
               {/* Primary CTA for logged-in users on marketing pages: jump to platform.
                   nowrap so it never breaks onto two lines when the bar is tight. */}
-              <a onClick={() => setCurrent("App:Dashboard")} className="nav-cta-btn" style={{
+              <NavLink to="App:Dashboard" onNavigate={setCurrent} className="nav-cta-btn" style={{
                 padding: "0.45rem 1rem", background: "#00e5a0", color: "#0a0a0b",
                 fontWeight: 600, borderRadius: 6, fontSize: "0.78rem", cursor: "pointer",
                 textDecoration: "none", whiteSpace: "nowrap",
-              }}>{lang === "sk" ? "Otvoriť platformu →" : "Open platform →"}</a>
+              }}>{lang === "sk" ? "Otvoriť platformu →" : "Open platform →"}</NavLink>
               {/* Account = fixed-size avatar menu (email / plan / sign-out live inside),
                   so the nav width is independent of how long the email is. */}
               <AccountMenu user={user} caps={caps} auth={auth} setCurrent={setCurrent} lang={lang} />
@@ -511,7 +512,7 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
             // labels end the "wait, am I signing up or logging in?"
             // confusion the user reported.
             <div style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
-              <a onClick={onLogin} className="nav-signin-btn" style={{
+              <NavButton onClick={onLogin} className="nav-signin-btn" style={{
                 padding: "0.45rem 0.95rem", background: "transparent", color: "#e8e8ed",
                 border: "1px solid #222228", fontWeight: 500, borderRadius: 6,
                 fontSize: "0.78rem", cursor: "pointer", textDecoration: "none",
@@ -520,14 +521,14 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
               onMouseEnter={e => { e.currentTarget.style.borderColor = "#00e5a0"; e.currentTarget.style.color = "#00e5a0"; }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = "#222228"; e.currentTarget.style.color = "#e8e8ed"; }}
               title={lang === "sk" ? "Už máš účet? Prihlás sa." : "Already have an account? Sign in."}
-              >{lang === "sk" ? "Prihlásiť sa" : "Sign in"}</a>
-              <a onClick={onLogin} className="nav-cta-btn" style={{
+              >{lang === "sk" ? "Prihlásiť sa" : "Sign in"}</NavButton>
+              <NavButton onClick={onLogin} className="nav-cta-btn" style={{
                 padding: "0.5rem 1.15rem", background: "#00e5a0", color: "#0a0a0b",
                 fontWeight: 700, borderRadius: 6, fontSize: "0.8rem", cursor: "pointer",
                 letterSpacing: "0.01em", textDecoration: "none",
               }}
               title={lang === "sk" ? "Nový tu? Zaregistruj sa za 30s a dostaneš 7-dňový paid trial zadarmo." : "New here? 30s sign-up → 7-day paid trial free."}
-              >{lang === "sk" ? "Začať zadarmo →" : "Get started free →"}</a>
+              >{lang === "sk" ? "Začať zadarmo →" : "Get started free →"}</NavButton>
             </div>
           )}
           </div>
@@ -579,7 +580,7 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
                 const internalKey = pageMap[key] || key;
                 const isActive = current === internalKey;
                 return (
-                  <a key={key} className={"nav-menu-link" + (isActive ? " nav-menu-link--active" : "")} onClick={() => go(key)}>{p}</a>
+                  <NavLink key={key} to={internalKey} onNavigate={go} className={"nav-menu-link" + (isActive ? " nav-menu-link--active" : "")}>{p}</NavLink>
                 );
               })}
             </div>
@@ -610,21 +611,21 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
                       {user.email}
                     </div>
                   </div>
-                  <a onClick={() => go("App:Dashboard")} className="btn-p">
+                  <NavLink to="App:Dashboard" onNavigate={go} className="btn-p">
                     {lang === "sk" ? "Otvoriť platformu →" : "Open platform →"}
-                  </a>
-                  <a onClick={() => { auth.signOut(); setMenuOpen(false); }} className="btn-s" style={{ cursor: "pointer" }}>
+                  </NavLink>
+                  <NavButton onClick={() => { auth.signOut(); setMenuOpen(false); }} className="btn-s" style={{ cursor: "pointer" }}>
                     {lang === "sk" ? "Odhlásiť sa" : "Sign out"}
-                  </a>
+                  </NavButton>
                 </>
               ) : (
                 <>
-                  <a onClick={() => { onLogin(); setMenuOpen(false); }} className="btn-p" style={{ cursor: "pointer" }}>
+                  <NavButton onClick={() => { onLogin(); setMenuOpen(false); }} className="btn-p" style={{ cursor: "pointer" }}>
                     {lang === "sk" ? "Začať zadarmo →" : "Get started free →"}
-                  </a>
-                  <a onClick={() => { onLogin(); setMenuOpen(false); }} className="btn-s" style={{ cursor: "pointer" }}>
+                  </NavButton>
+                  <NavButton onClick={() => { onLogin(); setMenuOpen(false); }} className="btn-s" style={{ cursor: "pointer" }}>
                     {lang === "sk" ? "Prihlásiť sa" : "Sign in"}
-                  </a>
+                  </NavButton>
                 </>
               )}
             </div>
