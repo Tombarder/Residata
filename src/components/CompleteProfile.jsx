@@ -156,13 +156,15 @@ export default function CompleteProfile({ lang = "en" }) {
   return (
     <div style={{
       position: "fixed", inset: 0, background: "rgba(10,10,11,0.95)", backdropFilter: "blur(8px)",
-      display: "flex", alignItems: "center", justifyContent: "center", zIndex: "var(--z-modal)",
+      // flex-start + margin:auto on the child centers when it fits, scrolls from
+      // the top when taller than the viewport (center would clip the top).
+      display: "flex", alignItems: "flex-start", justifyContent: "center", zIndex: "var(--z-modal)",
       padding: "max(1rem, var(--safe-top)) max(1rem, var(--safe-right)) max(1rem, var(--safe-bottom)) max(1rem, var(--safe-left))",
       overflowY: "auto",
     }}>
       <div style={{
         background: "#16161a", border: "1px solid #222228", borderRadius: 14,
-        padding: "2.25rem 2rem", maxWidth: 480, width: "100%",
+        padding: "2.25rem 2rem", maxWidth: 480, width: "100%", margin: "auto 0",
       }}>
         {state === "error" ? (
           // ROLLBACK — something went wrong, let user retry

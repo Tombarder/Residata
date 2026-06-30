@@ -92,6 +92,12 @@ function useAuthInternal() {
         setLoading(false);
       }
 
+      // ⚠️ This callback must NEVER `await` a supabase.auth.* call: gotrue invokes
+      // it from INSIDE its own auth lock while emitting an event (e.g. SIGNED_OUT
+      // during signOut), so awaiting another auth op here would self-deadlock the
+      // lock until its 35s safety cap. loadProfile() only hits PostgREST (not the
+      // auth endpoint / lock), so it's safe. Defer any future auth work with
+      // setTimeout(fn, 0) to run it outside the lock.
       const { data } = supabase.auth.onAuthStateChange(async (event, sess) => {
         log("onAuthStateChange", event, sess?.user?.email || "null");
         setUser(sess?.user || null);
@@ -155,28 +161,33 @@ function useAuthInternal() {
     setProfile(null);
     setProfileError(null);
 
-    // 2. PRIMARY: let gotrue remove its OWN session token, whatever its internal
-    //    storage key is now or after a future upgrade (format-proof — never
-    //    guesses the key). scope:"local" = no server round-trip. The bounded auth
-    //    lock (see supabase.js) makes this resolve fast instead of deadlocking;
-    //    the timeout is a hard ceiling so the redirect can NEVER be blocked, even
-    //    in a pathological case. Whichever settles first, we proceed.
+    // 2. Best-effort: let gotrue run its own local sign-out — it broadcasts
+    //    SIGNED_OUT to other tabs and clears its key in whatever format it
+    //    currently uses. The bounded auth lock (see supabase.js) keeps it from
+    //    deadlocking; the 1500ms race is a hard ceiling so a wedged/slow network
+    //    can NEVER block the redirect. We deliberately do NOT depend on this
+    //    completing — step 3 is the deterministic guarantee — so a timeout here is
+    //    fine (the awaited call would otherwise be 8s fetch + 35s lock worst-case).
     if (isSupabaseReady()) {
       try {
         await Promise.race([
           supabase.auth.signOut({ scope: "local" }),
           new Promise((resolve) => setTimeout(resolve, 1500)),
         ]);
-      } catch (_) { /* fall through to the backstop + reload */ }
+      } catch (_) { /* fall through to the deterministic teardown + reload */ }
     }
 
-    // 3. BACKSTOP for the (pathological) timeout case: if gotrue didn't finish,
-    //    remove its session key by hand so the reload can't rehydrate it. Matches
-    //    gotrue's default `sb-<ref>-auth-token`; harmless no-op if already gone.
-    //    Secondary by design — step 2 is what normally clears the session.
+    // 3. DETERMINISTIC teardown — the actual guarantee. Clear the WHOLE Supabase
+    //    auth-client key family from localStorage (the session `sb-<ref>-auth-token`,
+    //    its size-chunks `…auth-token.0/.1`, the PKCE code-verifier, etc.), not just
+    //    the bare session key — under a slow network the race above times out before
+    //    gotrue finishes its own storage write, so depending on it would leave stale
+    //    keys behind. The `sb-` prefix is gotrue's and stable across the v2 line; the
+    //    public read-only client uses a different key ("residata-public-noauth"), so
+    //    this only ever clears the authed session, never public state.
     try {
       for (const k of Object.keys(localStorage)) {
-        if (k.startsWith("sb-") && k.includes("-auth-token")) localStorage.removeItem(k);
+        if (k.startsWith("sb-")) localStorage.removeItem(k);
       }
     } catch (_) { /* private mode / no storage — reload still lands on anon */ }
 

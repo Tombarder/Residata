@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, lazy, Suspense } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, lazy, Suspense } from "react";
+import { useNavCollapsed } from "./lib/breakpoints";
 import { t } from "./lib/marketingCopy";
 import { createPortal } from "react-dom";
 import Ticker from "./components/Ticker";
@@ -289,22 +290,38 @@ function AccountMenu({ user, caps, auth, setCurrent, lang }) {
   const ref = useRef(null);
   useEffect(() => {
     if (!open) return;
+    // Remember what opened the menu (the avatar button) so focus returns to it on
+    // close — keyboard / screen-reader users otherwise lose their place.
+    const trigger = typeof document !== "undefined" ? document.activeElement : null;
     const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
     const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
     document.addEventListener("mousedown", onDoc);
     document.addEventListener("keydown", onKey);
-    return () => { document.removeEventListener("mousedown", onDoc); document.removeEventListener("keydown", onKey); };
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+      if (trigger && typeof trigger.focus === "function") trigger.focus();
+    };
   }, [open]);
 
   const email = user?.email || "";
   const initial = (email.trim()[0] || "?").toUpperCase();
   const tier = caps.tier;
+  // While the profile is still loading — or permanently if its fetch failed —
+  // caps.tier is "anon" even though we have a logged-in user. Don't assert a plan
+  // in that window: a real paid/admin user would otherwise be briefly (or, on a
+  // fetch error, persistently) mislabeled "Free plan", and the label ("Free")
+  // would contradict the action button ("Billing", since isFree is strict).
+  const tierKnown = tier !== "anon";
   const isFree = tier === "free";
-  const planLabel = tier === "admin" ? "Admin"
+  const planLabel = !tierKnown ? "…"
+    : tier === "admin" ? "Admin"
     : tier === "paid" ? (lang === "sk" ? "Platený plán" : "Paid plan")
     : tier === "pending" ? (lang === "sk" ? "Čaká na schválenie" : "Pending approval")
     : (lang === "sk" ? "Free plán" : "Free plan");
-  const planColor = (tier === "paid" || tier === "admin") ? "#00e5a0" : tier === "pending" ? "#f5a623" : "#8a8a96";
+  const planColor = !tierKnown ? "#8a8a96"
+    : (tier === "paid" || tier === "admin") ? "#00e5a0"
+    : tier === "pending" ? "#f5a623" : "#8a8a96";
   const go = (page) => { setCurrent(page); setOpen(false); };
   const item = { display: "block", width: "100%", textAlign: "left", background: "none", border: "none", color: "#e8e8ed", fontSize: "0.82rem", fontFamily: "inherit", padding: "0.5rem 0.6rem", borderRadius: 6, cursor: "pointer" };
   const hov = (on) => (e) => { e.currentTarget.style.background = on; };
@@ -364,6 +381,32 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
   // Mobile menu (≤1180px). Desktop (>1180) never mounts the overlay.
   const [menuOpen, setMenuOpen] = useState(false);
   const closeBtnRef = useRef(null);
+  const navRef = useRef(null);
+  // Single source of truth for the hamburger breakpoint (BP.desktop = 1180),
+  // shared with the CSS swap so JS state and the CSS media query can't disagree.
+  const collapsed = useNavCollapsed();
+
+  // Publish the nav's REAL measured height as --nav-h so the fixed ticker (and
+  // the floating chat/feedback panels) sit exactly at its bottom edge. The nav is
+  // content-sized and grows with the notch inset + the phone layout, so a hard-
+  // coded 72px left a hairline overlap on every phone. useLayoutEffect sets it
+  // before paint, so there's no first-frame jump.
+  useLayoutEffect(() => {
+    const el = navRef.current;
+    const root = typeof document !== "undefined" ? document.documentElement : null;
+    if (!el || !root) return;
+    const apply = () => root.style.setProperty("--nav-h", el.offsetHeight + "px");
+    apply();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(apply) : null;
+    ro?.observe(el);
+    window.addEventListener("resize", apply);
+    return () => { ro?.disconnect(); window.removeEventListener("resize", apply); };
+  }, []);
+
+  // When the viewport grows past the hamburger breakpoint, force the mobile menu
+  // shut — otherwise the overlay + body-scroll-lock stay active behind a now-
+  // hidden hamburger, silently freezing the desktop page with no way to recover.
+  useEffect(() => { if (!collapsed) setMenuOpen(false); }, [collapsed]);
 
   // While the menu is open: lock background scroll, close on Esc, and move
   // focus into the sheet (basic a11y for an overlay dialog).
@@ -412,7 +455,7 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
   );
 
   return (
-    <nav className="marketing-nav" style={{
+    <nav ref={navRef} className="marketing-nav" style={{
       position: "fixed", top: 0, width: "100%", zIndex: 100,
       background: "rgba(10,10,11,0.85)",
       backdropFilter: "blur(20px)", borderBottom: "1px solid #222228",
@@ -2058,7 +2101,7 @@ export default function App() {
            The ticker then sits a nav-height (72px) below that. */
         body.residata-has-trial-banner .marketing-nav { top: var(--trial-banner-h, 44px) !important; }
         body.residata-has-trial-banner .marketing-nav > div { padding-top: 1rem !important; }
-        body.residata-has-trial-banner [aria-label="Live market ticker"] { top: calc(var(--trial-banner-h, 44px) + 72px) !important; }
+        body.residata-has-trial-banner [aria-label="Live market ticker"] { top: calc(var(--trial-banner-h, 44px) + var(--nav-h, 72px)) !important; }
 
         .card-hover { transition: border-color 0.3s, transform 0.3s, box-shadow 0.3s; }
         .card-hover:hover { border-color: #333 !important; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.2); }

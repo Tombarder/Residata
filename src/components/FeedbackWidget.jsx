@@ -204,7 +204,7 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
   if (!open) {
     return (
       <button onClick={() => setOpen(true)} aria-label={L("Nahlásiť problém alebo návrh", "Report a problem or suggestion")} className="residata-fb-pill" data-rbf-ignore
-        style={{ position: "fixed", right: "calc(20px + var(--safe-right))", bottom, height: 40, padding: "0 14px 0 12px", borderRadius: 20, border: `1px solid rgba(0,229,160,0.55)`, background: bg2, color: text, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "0.5rem", fontFamily: "inherit", fontSize: "0.78rem", fontWeight: 600, letterSpacing: "-0.005em", zIndex: 2000, animation: "rbf-glow 2.4s ease-in-out infinite" }}>
+        style={{ position: "fixed", right: "calc(20px + var(--safe-right))", bottom, height: 40, padding: "0 14px 0 12px", borderRadius: 20, border: `1px solid rgba(0,229,160,0.55)`, background: bg2, color: text, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "0.5rem", fontFamily: "inherit", fontSize: "0.78rem", fontWeight: 600, letterSpacing: "-0.005em", zIndex: "var(--z-pill)", animation: "rbf-glow 2.4s ease-in-out infinite" }}>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={green} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
         </svg>
@@ -240,7 +240,7 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
   }
 
   return (
-    <div onPaste={onPaste} data-rbf-ignore style={{ position: "fixed", right: "calc(20px + var(--safe-right))", bottom, width: "min(400px, calc(100vw - 32px))", maxHeight: "min(680px, calc(100dvh - 40px - var(--safe-bottom)))", background: bg2, border: `1px solid ${border}`, borderRadius: 16, boxShadow: "0 20px 60px rgba(0,0,0,0.65)", display: "flex", flexDirection: "column", zIndex: 2000, animation: "rbf-panel 0.2s ease-out" }}>
+    <div onPaste={onPaste} data-rbf-ignore style={{ position: "fixed", right: "calc(20px + var(--safe-right))", bottom, width: "min(400px, calc(100vw - 32px))", maxHeight: "min(680px, calc(100svh - var(--nav-h, 72px) - var(--safe-bottom) - 40px))", background: bg2, border: `1px solid ${border}`, borderRadius: 16, boxShadow: "0 20px 60px rgba(0,0,0,0.65)", display: "flex", flexDirection: "column", zIndex: "var(--z-pill)", animation: "rbf-panel 0.2s ease-out" }}>
       <style>{`
         @keyframes rbf-panel { from {opacity:0; transform:translateY(12px);} to {opacity:1; transform:translateY(0);} }
         @keyframes rbf-pop { 0% {transform:scale(0.6); opacity:0;} 60% {transform:scale(1.08);} 100% {transform:scale(1); opacity:1;} }
