@@ -20,7 +20,7 @@
  * Built for F-051. Boss 2026-05-31: free path, no third-party libraries.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 const STORAGE_KEY = "residata-cookie-consent";
 const CURRENT_VERSION = 1;
@@ -69,6 +69,30 @@ export default function CookieBanner({ lang = "en" }) {
     return () => { delete window.residataReopenCookieBanner; };
   }, []);
 
+  // While the consent banner occupies the bottom edge, publish its measured
+  // height (--cookie-banner-h) + a body class so the bottom-right floating pills
+  // lift above it on phones, where they share the same corner. Mirrors the
+  // --trial-banner-h pattern; both are cleared the instant consent is resolved.
+  const dialogRef = useRef(null);
+  useLayoutEffect(() => {
+    if (typeof document === "undefined") return;
+    const root = document.documentElement;
+    const clear = () => {
+      root.style.removeProperty("--cookie-banner-h");
+      document.body.classList.remove("residata-has-cookie");
+    };
+    if (!visible) { clear(); return; }
+    const el = dialogRef.current;
+    if (!el) return;
+    const apply = () => root.style.setProperty("--cookie-banner-h", el.offsetHeight + "px");
+    apply();
+    document.body.classList.add("residata-has-cookie");
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(apply) : null;
+    ro?.observe(el);
+    window.addEventListener("resize", apply);
+    return () => { ro?.disconnect(); window.removeEventListener("resize", apply); clear(); };
+  }, [visible, expanded]);
+
   if (!visible) return null;
 
   const acceptAll = () => {
@@ -89,6 +113,7 @@ export default function CookieBanner({ lang = "en" }) {
 
   return (
     <div
+      ref={dialogRef}
       role="dialog"
       aria-label={isSK ? "Súhlas s cookies" : "Cookie consent"}
       style={{
@@ -102,7 +127,7 @@ export default function CookieBanner({ lang = "en" }) {
         border: "1px solid #2a2a32",
         borderRadius: 12,
         padding: "1.25rem 1.5rem",
-        zIndex: 9999,
+        zIndex: "var(--z-cookie)",
         boxShadow: "0 12px 40px rgba(0,0,0,0.5)",
         fontSize: "0.86rem",
         lineHeight: 1.55,

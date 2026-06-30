@@ -42,8 +42,11 @@
    One stray over-wide element shouldn't let the whole page slide horizontally.
    `overflow-x: clip` contains it WITHOUT creating a scroll container, so —
    unlike `overflow: hidden` — it never breaks position: sticky / fixed inside.
-   Genuine overflow sources are still fixed individually; this is the net. ─── */
-html, body { max-width: 100%; overflow-x: clip; }
+   Genuine overflow sources are still fixed individually; this is the net.
+   Scoped to <html> only: root overflow propagates from <html>, so adding <body>
+   is redundant and would create a second computed scroll context right next to
+   `scrollbar-gutter: stable`. One source, same containment. ─────────────────── */
+html { max-width: 100%; overflow-x: clip; }
 
 /* ── Stop iOS Safari auto-zooming when a form field is focused ───────────────
    Any text control under 16px makes iOS zoom in on focus (jarring, and it
@@ -87,7 +90,7 @@ html, body { max-width: 100%; overflow-x: clip; }
    on desktop, where the content already fits. */
 .value-grid > *, .insight-grid > *, .schema-grid > *, .wwd-hero > *,
 .contact-grid > *, .pricing-grid > *, .stats-grid > *, .chart-grid > *,
-.case-card-grid > * { min-width: 0; }
+.case-card-grid > *, .district-row > * { min-width: 0; }
 
 /* ── Visibility helpers tied to the scale ───────────────────────────────── */
 .hide-tablet-down { }
@@ -121,9 +124,28 @@ html, body { max-width: 100%; overflow-x: clip; }
 }
 
 /* Side-by-side blocks that must stack on phones (a description + a no-shrink
-   badge sat in a flex row, squashing the text to a one-word-per-line column). */
+   badge sat in a flex row, squashing the text to a one-word-per-line column).
+   align-items + gap carry !important because the element sets them inline
+   (gap:1.5rem, align:center) and inline styles otherwise beat a class rule —
+   without it only flex-direction would flip and the gap/alignment wouldn't. */
 @media (max-width: 640px) {
-  .insights-intro { flex-direction: column; align-items: flex-start; gap: 0.85rem; }
+  .insights-intro {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 0.85rem !important;
+  }
+}
+
+/* While the cookie-consent banner occupies the bottom edge, lift the floating
+   chat/feedback launcher pills above it on phones — they share the bottom-right
+   corner on a narrow screen, so the consent buttons and a pill would collide.
+   --cookie-banner-h is published by CookieBanner only while it's visible; the
+   pills' own bottom offset is inline, so !important is required to override it. */
+@media (max-width: 680px) {
+  body.residata-has-cookie .residata-chat-pill,
+  body.residata-has-cookie .residata-fb-pill {
+    bottom: calc(20px + var(--safe-bottom) + var(--cookie-banner-h, 0px) + 12px) !important;
+  }
 }
 
 /* ============================================================================

@@ -43,8 +43,8 @@
   --z-nav: 100;
   --z-banner: 110;
   --z-pill: 2000;     /* floating chat / feedback launchers */
-  --z-modal: 3000;    /* login / complete-profile */
-  --z-popup: 3200;    /* trial popup */
+  --z-popup: 2900;    /* trial promo popup — a marketing nudge, MUST stay below the auth modal */
+  --z-modal: 3000;    /* login / complete-profile — auth always wins over the promo */
   --z-cookie: 3500;   /* cookie banner */
   --z-tooltip: 4000;  /* chart tooltips — above modals */
 

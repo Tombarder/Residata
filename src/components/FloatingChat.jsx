@@ -101,7 +101,7 @@ export default function FloatingChat({ lang = "sk", onNavigate }) {
             fontWeight: 600,
             letterSpacing: "-0.005em",
             boxShadow: "0 6px 20px rgba(0,0,0,0.45), 0 0 0 1px rgba(0,229,160,0.06) inset",
-            zIndex: 2000,
+            zIndex: "var(--z-pill)",
           }}
         >
           {/* Sparkle glyph in the accent green. No notification dot,
@@ -131,11 +131,15 @@ export default function FloatingChat({ lang = "sk", onNavigate }) {
           position: "fixed",
           right: "calc(20px + var(--safe-right))", bottom: "calc(20px + var(--safe-bottom))",
           width: "min(380px, calc(100vw - 32px))",
-          height: "min(560px, calc(100dvh - 40px - var(--safe-bottom)))",
+          // svh (smallest viewport) keeps the bottom-anchored panel STABLE when
+          // the iOS toolbar expands — dvh would shrink and shove the panel's top
+          // edge down mid-read. Subtract the nav height + home-bar inset so the
+          // panel can never run under the top chrome or the home indicator.
+          height: "min(560px, calc(100svh - var(--nav-h, 72px) - var(--safe-bottom) - 40px))",
           background: bg2, border: `1px solid ${border}`, borderRadius: 14,
           boxShadow: "0 20px 60px rgba(0,0,0,0.65), 0 0 40px rgba(0,229,160,0.08)",
           display: "flex", flexDirection: "column",
-          zIndex: 2000,
+          zIndex: "var(--z-pill)",
           animation: "rbs-panel 0.2s ease-out",
         }}>
           <style>{`

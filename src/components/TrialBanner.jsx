@@ -19,7 +19,7 @@
  * has already used the trial (useShouldShowTrialPromo). The popup hides the
  * moment the visitor is signed in (anon-only). Both hide on /app/*.
  */
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useLayoutEffect, useState, useRef } from "react";
 import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
 import { track } from "../lib/track";
@@ -73,7 +73,7 @@ export function TrialBanner({ lang = "sk", onCta }) {
   // overlap. CSS rule lives in the inline style block at App.jsx.
   // Clean-up on unmount / dismiss removes the class so layout snaps
   // back to default.
-  useEffect(() => {
+  useLayoutEffect(() => {
     const show = eligible && !hidden;
     const cls = "residata-has-trial-banner";
     if (typeof document === "undefined") return;
@@ -87,7 +87,7 @@ export function TrialBanner({ lang = "sk", onCta }) {
   // a narrow phone, so a hardcoded 44px offset would let the banner overlap the
   // nav — measuring removes that magic number. Re-measures on resize + lang
   // change (different copy ⇒ different height).
-  useEffect(() => {
+  useLayoutEffect(() => {
     const show = eligible && !hidden;
     const root = typeof document !== "undefined" ? document.documentElement : null;
     if (!root) return;
@@ -122,14 +122,16 @@ export function TrialBanner({ lang = "sk", onCta }) {
     <div ref={bannerRef} style={{
       position: "fixed",
       top: 0, left: 0, right: 0,
-      zIndex: 110,
+      zIndex: "var(--z-banner)",
       background: "linear-gradient(90deg, rgba(0,229,160,0.18), rgba(0,229,160,0.08) 60%, rgba(0,229,160,0.04))",
       borderBottom: "1px solid rgba(0,229,160,0.35)",
       color: "#e8e8ed",
       fontSize: "0.78rem",
       // top inset clears the notch/status bar; side insets clear landscape cutouts
       padding: "calc(0.5rem + var(--safe-top)) max(1rem, var(--safe-right)) 0.5rem max(1rem, var(--safe-left))",
-      display: "flex", alignItems: "center", justifyContent: "center", gap: "0.75rem",
+      // wrap so the Activate/✕ buttons drop below the text on a ~320px phone
+      // instead of clipping past the edge.
+      display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem 0.75rem", flexWrap: "wrap",
       backdropFilter: "blur(10px)",
       WebkitBackdropFilter: "blur(10px)",
     }}>
@@ -222,8 +224,10 @@ export function TrialPopup({ lang = "sk", onCta }) {
         background: "rgba(0,0,0,0.7)",
         backdropFilter: "blur(6px)",
         WebkitBackdropFilter: "blur(6px)",
-        // z-popup (3200) per the index.css ladder — above the floating pills
-        // (2000) so they don't bleed over this modal on phones.
+        // z-popup per the index.css ladder — above the floating pills (2000) so
+        // they don't bleed over this promo, but BELOW the auth modal (--z-modal):
+        // a sign-up/login modal must always win over a marketing nudge, so if the
+        // login modal is open this promo can never paint over it.
         zIndex: "var(--z-popup)",
         display: "flex", alignItems: "center", justifyContent: "center",
         // safe-area padding keeps the card + close button clear of the notch

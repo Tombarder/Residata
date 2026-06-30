@@ -3,7 +3,7 @@ import { useAuth } from "../lib/useAuth";
 import { getLiveT } from "../lib/liveLang";
 import { validateBusinessEmail } from "../lib/emailValidation";
 import { track } from "../lib/track";
-import { useBreakpointDown } from "../lib/breakpoints";
+import { useBreakpointDown, BP } from "../lib/breakpoints";
 
 export default function LoginModal({ open, onClose, lang = "en" }) {
   const t = getLiveT(lang);
@@ -13,7 +13,7 @@ export default function LoginModal({ open, onClose, lang = "en" }) {
   const [busy, setBusy] = useState(false);
   // The platform (analytics/maps/tables) is desktop-first; on a phone/tablet we
   // surface a heads-up in the login+register modal so expectations are set.
-  const isSmallScreen = useBreakpointDown(900);
+  const isSmallScreen = useBreakpointDown(BP.tablet);
   // Code-entry (prefetch-proof login): the email contains a one-time CODE, not
   // a clickable link. A magic link is a single-use token consumed by the first
   // GET, so email scanners / antivirus / browser prefetch burn it before the
@@ -79,12 +79,17 @@ export default function LoginModal({ open, onClose, lang = "en" }) {
   return (
     <div onClick={onClose} style={{
       position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)",
-      display: "flex", alignItems: "center", justifyContent: "center", zIndex: "var(--z-modal)",
+      // align-items:flex-start + margin:auto on the child (below) centers the modal
+      // when it fits but lets it scroll from the top when it's taller than the
+      // viewport (short landscape phone, on-screen keyboard, or the extra small-
+      // screen heads-up note). align-items:center would clip the top unreachably.
+      display: "flex", alignItems: "flex-start", justifyContent: "center", zIndex: "var(--z-modal)",
+      overflowY: "auto",
       padding: "max(1rem, var(--safe-top)) max(1rem, var(--safe-right)) max(1rem, var(--safe-bottom)) max(1rem, var(--safe-left))",
     }}>
       <div onClick={e => e.stopPropagation()} style={{
         background: "#16161a", border: "1px solid #222228", borderRadius: 14,
-        padding: "2rem", maxWidth: 420, width: "100%", position: "relative",
+        padding: "2rem", maxWidth: 420, width: "100%", position: "relative", margin: "auto 0",
       }}>
         <button onClick={onClose} style={{
           position: "absolute", top: "0.9rem", right: "1rem", background: "none", border: "none",
