@@ -7,41 +7,42 @@
  * moment it's saved (no deploy). Reset deletes the override → the code default
  * renders again. The site can never go blank — an empty table = today's copy.
  *
+ * ORIENTATION (lib/copyGroups.js): keys are organized the way the site is — by
+ * PAGE and SECTION (Home ▸ Hero, Pricing ▸ Plans, Login modal…). A left-hand
+ * navigator picks the page; the main area shows that page's sections. Search
+ * spans everything. Every key shows a readable label + the raw key underneath.
+ *
  * TWO dictionaries share the table, namespaced so identical bare keys can't
  * collide: "mk" = marketing copy (`t` in lib/marketingCopy.js), "lv" = the
  * live/app + login + admin copy (`liveT` in liveLang.js). Stored key =
  * `${ns}:${bareKey}`.
  *
  * EDIT-IN-PLACE: each field is pre-filled with the text that's live right now
- * (override if set, else the code default) so you tweak it in place — never
- * retype from a blank box. Save appears only when the text differs from the code
- * default; if you edit a saved override back to exactly the default, the tool
- * offers Reset (remove the row) instead of saving a redundant copy.
+ * (override if set, else the code default). Save appears only when the text
+ * differs from the default; editing a saved override back to the default offers
+ * Reset instead of a redundant copy.
  *
  * NO LOST EDITS: typed-but-unsaved text lives in the PARENT (`drafts`), keyed by
- * key. Filtering/searching unmounts rows, but the draft survives — switching
- * language or reloading is the only thing that discards (with a confirm).
+ * key, so switching page / filtering / searching never drops an edit. Only a
+ * language switch or reload discards (with a confirm / browser guard).
  *
  * STRUCTURED BLOCKS: composite copy (arrays-of-arrays / arrays-of-objects, e.g.
- * deliveryItems, useCases, tiers) is edited by StructuredRow — a recursive
- * editor with repeatable rows + the right sub-fields. It serializes back to the
- * SAME JSON shape, so the overlay merges it by key like any other value; its
- * working value is held in `drafts` as JSON text, so the same no-lost-edits and
- * unsaved-guard behavior applies.
+ * deliveryItems, useCases, tiers) is edited by StructuredRow — a recursive editor
+ * that serializes back to the SAME JSON shape; its working value lives in `drafts`
+ * as JSON text, so the same no-lost-edits behavior applies.
  *
- * LANGUAGES: SK + EN + CZ are all live on the public switcher (CZ launched
- * 2026-06-30). Untranslated Czech keys fall back to EN, so it's safe to leave
- * any cs cell blank — the public site shows English there, never blank.
+ * LANGUAGES: SK + EN + CZ are all live on the public switcher. Untranslated Czech
+ * falls back to EN, so a blank cs cell is safe (English shows there, never blank).
  *
  * SECURITY mirrors LocationManager: writes go through admin-gated SECURITY
  * DEFINER RPCs (admin_*_site_content), called via a direct PostgREST fetch that
- * reads the stored access token synchronously (supabase.rpc()'s internal
- * getSession() can hang under auth-lock contention).
+ * reads the stored access token synchronously.
  */
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { t as marketingDict } from "../lib/marketingCopy";
 import { liveT } from "../lib/liveLang";
 import { refreshOverrides } from "../lib/copyOverrides";
+import { PAGES, humanizeKey } from "../lib/copyGroups";
 import {
   accent as green, orange as amber, text as textLight, dim, faint,
   border, bg, surfaceDark as bg2, mono,
@@ -125,14 +126,14 @@ function missingTokens(a, b) {
 }
 
 const SOURCES = [
-  { ns: "mk", dict: marketingDict, label: "Marketing site", hint: "Home, hero, value props, use cases, pricing, contact" },
-  { ns: "lv", dict: liveT,         label: "Platform & app", hint: "Dashboard, project detail, login, profile, gates, ticker" },
+  { ns: "mk", dict: marketingDict, label: "Marketing site" },
+  { ns: "lv", dict: liveT,         label: "Platform & app" },
 ];
 
 // Build the editable key universe — UNION of all languages' keys, so a key that
 // exists in only one language is still editable (never silently missing).
-function buildRows() {
-  return SOURCES.map(({ ns, dict, label, hint }) => {
+function buildSources() {
+  return SOURCES.map(({ ns, dict, label }) => {
     const keys = [...new Set([
       ...Object.keys(dict.en || {}),
       ...Object.keys(dict.sk || {}),
@@ -142,7 +143,7 @@ function buildRows() {
       const def = dict.en?.[key] ?? dict.sk?.[key] ?? dict.cs?.[key];
       return { ns, key, type: classify(def), def: { sk: dict.sk?.[key], en: dict.en?.[key], cs: dict.cs?.[key] } };
     });
-    return { ns, label, hint, items };
+    return { ns, label, items };
   });
 }
 
@@ -159,14 +160,40 @@ function previewText(v, max = 90) {
 
 export default function TextsEditor({ lang = "en" }) {
   const uiSK = lang === "sk";
-  const sections = useMemo(() => buildRows(), []);
+  const sources = useMemo(() => buildSources(), []);
   const itemByKey = useMemo(() => {
     const m = {};
-    for (const sec of sections) for (const it of sec.items) m[`${it.ns}:${it.key}`] = it;
+    for (const sec of sources) for (const it of sec.items) m[`${it.ns}:${it.key}`] = it;
     return m;
-  }, [sections]);
+  }, [sources]);
+
+  // Page model: each PAGES entry resolved to real items, + an "Other" page per ns
+  // for any key not mapped in copyGroups (so nothing is ever hidden).
+  const pages = useMemo(() => {
+    const used = new Set();
+    const out = [];
+    for (const p of PAGES) {
+      const secs = [];
+      for (const s of p.sections) {
+        const items = s.keys.map((k) => itemByKey[`${p.ns}:${k}`]).filter(Boolean);
+        s.keys.forEach((k) => used.add(`${p.ns}:${k}`));
+        if (items.length) secs.push({ label: s.label, items });
+      }
+      if (secs.length) out.push({ ns: p.ns, group: p.group, id: p.id, label: p.label, blurb: p.blurb, secs });
+    }
+    for (const src of sources) {
+      const leftover = src.items.filter((it) => !used.has(`${it.ns}:${it.key}`));
+      if (leftover.length) out.push({
+        ns: src.ns, group: src.label, id: `other-${src.ns}`,
+        label: uiSK ? "Ostatné" : "Other", blurb: uiSK ? "Nezaradené kľúče" : "Unmapped keys",
+        secs: [{ label: uiSK ? "Ostatné" : "Other", items: leftover }],
+      });
+    }
+    return out;
+  }, [itemByKey, sources, uiSK]);
 
   const [activeLang, setActiveLang] = useState("sk");
+  const [activePageId, setActivePageId] = useState(pages[0]?.id);
   const [search, setSearch] = useState("");
   const [filterMode, setFilterMode] = useState("all"); // all | edited | untranslated
   const [overrides, setOverrides] = useState({});       // `${lang}|${ns}:${key}` -> value
@@ -186,7 +213,7 @@ export default function TextsEditor({ lang = "en" }) {
     if (!it) return false;
     const live = effectiveOf(it);
     if (it.type === "structured") {
-      const parsed = safeParse(drafts[rk]); // structured drafts are stored as JSON text
+      const parsed = safeParse(drafts[rk]);
       return parsed !== undefined && !sameVal(parsed, live);
     }
     return !sameVal(parseDraft(drafts[rk], it.type), live);
@@ -251,6 +278,39 @@ export default function TextsEditor({ lang = "en" }) {
   const q = search.trim().toLowerCase();
   const hasOv = (langCode, ns, key) => overrides[`${langCode}|${ns}:${key}`] !== undefined;
   const editedInLang = (langCode) => Object.keys(overrides).filter((k) => k.startsWith(langCode + "|")).length;
+  const editedInPage = (page) => {
+    let n = 0;
+    for (const s of page.secs) for (const it of s.items) if (hasOv(activeLang, it.ns, it.key)) n++;
+    return n;
+  };
+
+  const matches = (it) => {
+    const edited = hasOv(activeLang, it.ns, it.key);
+    if (filterMode === "edited" && !edited) return false;
+    if (filterMode === "untranslated" && edited) return false;
+    if (!q) return true;
+    return it.key.toLowerCase().includes(q)
+      || humanizeKey(it.key).toLowerCase().includes(q)
+      || previewText(defaultFor(it, activeLang), 99999).toLowerCase().includes(q);
+  };
+
+  const renderRow = (it) => {
+    const rk = `${it.ns}:${it.key}`;
+    const RowComp = it.type === "structured" ? StructuredRow : Row;
+    return (
+      <RowComp
+        key={`${rk}:${activeLang}`}
+        item={it} label={humanizeKey(it.key)} lang={activeLang} uiSK={uiSK}
+        stored={overrides[`${activeLang}|${rk}`]}
+        draft={drafts[rk]}
+        fill={FILL_LANGS.reduce((a, lc) => (a[lc] = hasOv(lc, it.ns, it.key), a), {})}
+        onDraft={(text) => setDraft(rk, text)}
+        onClearDraft={() => clearDraft(rk)}
+        onSave={(val) => saveOverride(it.ns, it.key, val)}
+        onReset={() => resetOverride(it.ns, it.key)}
+      />
+    );
+  };
 
   const FILTERS = [
     { id: "all", label: uiSK ? "Všetky" : "All" },
@@ -258,15 +318,24 @@ export default function TextsEditor({ lang = "en" }) {
     { id: "untranslated", label: activeLang === "cs" ? (uiSK ? "Nepreložené" : "Untranslated") : (uiSK ? "Neupravené" : "Default") },
   ];
 
+  const activePage = pages.find((p) => p.id === activePageId) || pages[0];
+  const navGroups = [];
+  for (const p of pages) {
+    let g = navGroups.find((x) => x.group === p.group);
+    if (!g) { g = { group: p.group, pages: [] }; navGroups.push(g); }
+    g.pages.push(p);
+  }
+  const emptyMsg = uiSK ? "Žiadne texty pre tento filter." : "No texts for this filter.";
+
   return (
-    <div style={{ padding: "1.5rem 1.25rem", maxWidth: 1000, margin: "0 auto", color: textLight, fontFamily: mono }}>
+    <div style={{ padding: "1.5rem 1.25rem", maxWidth: 1140, margin: "0 auto", color: textLight, fontFamily: mono }}>
       <h1 style={{ fontSize: "1.15rem", fontWeight: 700, margin: "0 0 0.3rem" }}>
         {uiSK ? "Texty na webe" : "Website texts"}
       </h1>
-      <p style={{ color: dim, fontSize: "0.78rem", lineHeight: 1.5, margin: "0 0 1rem", maxWidth: 720 }}>
+      <p style={{ color: dim, fontSize: "0.78rem", lineHeight: 1.5, margin: "0 0 1rem", maxWidth: 760 }}>
         {uiSK
-          ? "Uprav ľubovoľný text priamo v poli. Ulož → ihneď naživo, bez nasadenia. „Reset“ vráti pôvodný text (default v kóde). Každý jazyk je samostatný — nie preklad."
-          : "Edit any text right in the field. Save → live instantly, no deploy. “Reset” restores the original (code default). Each language is independent — not a translation."}
+          ? "Vľavo vyber stránku, vpravo uprav text priamo v poli. Ulož → ihneď naživo, bez nasadenia. „Reset“ vráti pôvodný text. Každý jazyk je samostatný — nie preklad."
+          : "Pick a page on the left, edit the text in place on the right. Save → live instantly, no deploy. “Reset” restores the original. Each language is independent — not a translation."}
       </p>
 
       {/* Language tabs */}
@@ -278,7 +347,7 @@ export default function TextsEditor({ lang = "en" }) {
           const active = L.code === activeLang;
           const n = editedInLang(L.code);
           return (
-            <button key={L.code} onClick={() => switchLang(L.code)} title={L.note || ""}
+            <button key={L.code} onClick={() => switchLang(L.code)}
               style={{
                 padding: "0.35rem 0.7rem", borderRadius: 7, cursor: "pointer",
                 border: `1px solid ${active ? green : border}`,
@@ -288,7 +357,6 @@ export default function TextsEditor({ lang = "en" }) {
               }}>
               {L.label}
               {n > 0 && <span style={{ fontSize: "0.58rem", background: active ? "#06140f" : border, color: active ? green : dim, borderRadius: 6, padding: "0 5px", fontWeight: 700 }}>{n}</span>}
-              {L.note && <span style={{ fontSize: "0.56rem", opacity: 0.8, fontWeight: 500 }}>· {L.note}</span>}
             </button>
           );
         })}
@@ -313,7 +381,7 @@ export default function TextsEditor({ lang = "en" }) {
         </div>
         <input
           value={search} onChange={(e) => setSearch(e.target.value)}
-          placeholder={uiSK ? "Hľadať v textoch alebo kľúčoch…" : "Search text or key…"}
+          placeholder={uiSK ? "Hľadať vo všetkých textoch…" : "Search all texts…"}
           style={{
             flex: 1, minWidth: 200, padding: "0.5rem 0.7rem", boxSizing: "border-box",
             background: bg2, border: `1px solid ${border}`, borderRadius: 7, color: textLight,
@@ -329,57 +397,83 @@ export default function TextsEditor({ lang = "en" }) {
         </div>
       )}
 
-      {!loading && sections.map((sec) => {
-        const visible = sec.items.filter((it) => {
-          const edited = hasOv(activeLang, it.ns, it.key);
-          if (filterMode === "edited" && !edited) return false;
-          if (filterMode === "untranslated" && edited) return false;
-          if (!q) return true;
-          if (it.key.toLowerCase().includes(q)) return true;
-          return previewText(defaultFor(it, activeLang), 99999).toLowerCase().includes(q);
-        });
-        if (!visible.length) return null;
-        return (
-          <section key={sec.ns} style={{ marginBottom: "1.6rem" }}>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: "0.6rem", borderBottom: `1px solid ${border}`, paddingBottom: "0.35rem" }}>
-              <h2 style={{ fontSize: "0.82rem", fontWeight: 700, margin: 0 }}>{sec.label}</h2>
-              <span style={{ fontSize: "0.64rem", color: faint }}>{sec.hint}</span>
-              <span style={{ marginLeft: "auto", fontSize: "0.64rem", color: faint }}>{visible.length}</span>
-            </div>
-            {visible.map((it) => {
-              const rk = `${it.ns}:${it.key}`;
-              const RowComp = it.type === "structured" ? StructuredRow : Row;
-              return (
-                <RowComp
-                  key={`${rk}:${activeLang}`}
-                  item={it} lang={activeLang} uiSK={uiSK}
-                  stored={overrides[`${activeLang}|${rk}`]}
-                  draft={drafts[rk]}
-                  fill={FILL_LANGS.reduce((a, lc) => (a[lc] = hasOv(lc, it.ns, it.key), a), {})}
-                  onDraft={(text) => setDraft(rk, text)}
-                  onClearDraft={() => clearDraft(rk)}
-                  onSave={(val) => saveOverride(it.ns, it.key, val)}
-                  onReset={() => resetOverride(it.ns, it.key)}
-                />
-              );
-            })}
-          </section>
-        );
-      })}
+      {!loading && (
+        <div style={{ display: "flex", gap: 18, alignItems: "flex-start", flexWrap: "wrap" }}>
+          {/* ── Page navigator ── */}
+          <nav style={navCol}>
+            {q && <div style={{ fontSize: "0.62rem", color: amber, marginBottom: 10 }}>{uiSK ? "Hľadanie naprieč stránkami" : "Searching across pages"}</div>}
+            {navGroups.map((g) => (
+              <div key={g.group} style={{ marginBottom: 14 }}>
+                <div style={navGroupLabel}>{g.group}</div>
+                {g.pages.map((p) => {
+                  const active = !q && p.id === activePage?.id;
+                  const ed = editedInPage(p);
+                  return (
+                    <button key={p.id} onClick={() => { setSearch(""); setActivePageId(p.id); }} style={navItem(active)}>
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.label}</span>
+                      {ed > 0 && <span style={navBadge(active)}>{ed}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+          </nav>
+
+          {/* ── Main editing area ── */}
+          <div style={{ flex: "999 1 440px", minWidth: 0 }}>
+            {q ? (
+              (() => {
+                const groups = pages
+                  .map((p) => ({ p, items: p.secs.flatMap((s) => s.items).filter(matches) }))
+                  .filter((x) => x.items.length);
+                if (!groups.length) return <div style={emptyBox}>{emptyMsg}</div>;
+                return groups.map(({ p, items }) => (
+                  <section key={p.id} style={{ marginBottom: 20 }}>
+                    <div style={pageHead}>
+                      <span style={{ fontSize: "0.58rem", color: faint, textTransform: "uppercase", letterSpacing: "0.08em" }}>{p.group}</span>
+                      <h2 style={{ margin: "1px 0 0", fontSize: "0.9rem", fontWeight: 700 }}>{p.label} <span style={{ color: faint, fontWeight: 400, fontSize: "0.7rem" }}>· {items.length}</span></h2>
+                    </div>
+                    {items.map(renderRow)}
+                  </section>
+                ));
+              })()
+            ) : activePage ? (
+              <>
+                <div style={pageHead}>
+                  <span style={{ fontSize: "0.58rem", color: faint, textTransform: "uppercase", letterSpacing: "0.08em" }}>{activePage.group}</span>
+                  <h2 style={{ margin: "1px 0 1px", fontSize: "1rem", fontWeight: 700 }}>{activePage.label}</h2>
+                  <div style={{ fontSize: "0.66rem", color: dim }}>{activePage.blurb}</div>
+                </div>
+                {(() => {
+                  const blocks = activePage.secs.map((s) => {
+                    const items = s.items.filter(matches);
+                    if (!items.length) return null;
+                    return (
+                      <section key={s.label} style={{ marginBottom: 18 }}>
+                        <div style={secHead}>{s.label} <span style={{ color: faint, fontWeight: 400 }}>· {items.length}</span></div>
+                        {items.map(renderRow)}
+                      </section>
+                    );
+                  }).filter(Boolean);
+                  return blocks.length ? blocks : <div style={emptyBox}>{emptyMsg}</div>;
+                })()}
+              </>
+            ) : null}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 // ── One editable copy row ────────────────────────────────────────────────────
-function Row({ item, lang, uiSK, stored, draft, fill, onDraft, onClearDraft, onSave, onReset }) {
+function Row({ item, label, lang, uiSK, stored, draft, fill, onDraft, onClearDraft, onSave, onReset }) {
   const def = defaultFor(item, lang);
   const hasOverride = stored !== undefined && stored !== null;
   const csFallback = lang === "cs" && item.def.cs == null;
 
-  // The live value for this language (override if set, else default), as text.
   const effective = hasOverride ? stored : def;
   const liveText = toText(effective, item.type);
-  // Edit-in-place: show the draft if the user has typed, otherwise the live text.
   const val = draft !== undefined ? draft : liveText;
 
   const [busy, setBusy] = useState(false);
@@ -410,13 +504,13 @@ function Row({ item, lang, uiSK, stored, draft, fill, onDraft, onClearDraft, onS
   return (
     <div style={rowWrap}>
       <div style={keyCol}>
-        <span style={keyLabel}>{item.key}</span>
+        <span style={fieldName}>{label || humanizeKey(item.key)}</span>
+        <span style={keyTag}>{item.key}{item.type === "list" ? " · list" : ""}</span>
         <FillDots fill={fill} />
-        {hasOverride && <span style={{ fontSize: "0.55rem", color: green }}>{uiSK ? "upravené" : "edited"}</span>}
+        {hasOverride && <span style={editedTag}>{uiSK ? "upravené" : "edited"}</span>}
         {csFallback && <span style={{ fontSize: "0.55rem", color: faint }}>EN fallback</span>}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        {/* EN reference when authoring SK/CZ — so each language is written naturally, not blind */}
         {lang !== "en" && item.def.en != null && (
           <div style={{ fontSize: "0.6rem", color: faint, marginBottom: 3, lineHeight: 1.4 }}>
             <span style={{ color: dim }}>EN:</span> {previewText(item.def.en, 140)}
@@ -439,7 +533,6 @@ function Row({ item, lang, uiSK, stored, draft, fill, onDraft, onClearDraft, onS
               {busy ? (uiSK ? "Ukladám…" : "Saving…") : (uiSK ? "Uložiť" : "Save")}
             </button>
           )}
-          {/* Reverted a saved override back to the default → offer Reset, not a redundant Save */}
           {!canSave && changedFromLive && equalsDefault && hasOverride && (
             <span style={{ fontSize: "0.6rem", color: faint }}>{uiSK ? "= default, použi Reset" : "= default, use Reset"}</span>
           )}
@@ -485,23 +578,15 @@ function FillDots({ fill }) {
 }
 
 // ── Structured (composite) block editor ──────────────────────────────────────
-// A structured value is an array-of-arrays or array-of-objects (optionally
-// nested, e.g. useCases[].benefits[]). We infer the shape from the code default
-// and render a recursive editor that serializes back to the SAME JSON shape, so
-// the overlay (copyOverrides.applyOverrides) merges it by key with no change.
-// The working value is driven by the parent draft (JSON text), exactly like a
-// Row's textarea — so unsaved structured edits count toward the page guards.
-
 const isScalar = (x) => x === null || typeof x !== "object";
 
-// A blank value matching the SHAPE of `sample` — used to add a fresh row.
 function blankLike(sample) {
   if (typeof sample === "boolean") return false;
   if (typeof sample === "number") return 0;
   if (typeof sample === "string") return "";
   if (Array.isArray(sample)) {
-    if (sample.every(isScalar)) return sample.map(blankLike); // scalar tuple → keep width
-    return [blankLike(sample[0] ?? "")];                       // list of composites → one blank
+    if (sample.every(isScalar)) return sample.map(blankLike);
+    return [blankLike(sample[0] ?? "")];
   }
   if (sample && typeof sample === "object") {
     const o = {};
@@ -511,9 +596,6 @@ function blankLike(sample) {
   return "";
 }
 
-// Recursive value editor. `value` is the live working copy; `sample` is the code
-// default at the same path (drives placeholders, blank-row templates, and the
-// scalar-tuple vs repeatable-list decision when `value` is empty).
 function ValueEditor({ value, sample, onChange, uiSK, depth = 0 }) {
   if (typeof value === "boolean") {
     return (
@@ -538,7 +620,6 @@ function ValueEditor({ value, sample, onChange, uiSK, depth = 0 }) {
     const isTuple = isScalar(repElem);
 
     if (isTuple) {
-      // Fixed-width row of scalars (e.g. [title, desc], [bool, text]) — edit in place.
       const cells = value.length ? value : (Array.isArray(sample) ? sample.map(blankLike) : []);
       return (
         <div style={tupleRow}>
@@ -556,7 +637,6 @@ function ValueEditor({ value, sample, onChange, uiSK, depth = 0 }) {
       );
     }
 
-    // Repeatable list of composites (objects / nested arrays / strings).
     const template = value[0] ?? (Array.isArray(sample) ? sample[0] : "") ?? "";
     const move = (i, d) => {
       const j = i + d;
@@ -592,7 +672,6 @@ function ValueEditor({ value, sample, onChange, uiSK, depth = 0 }) {
     );
   }
 
-  // Object → labeled fields (preserve the keys the value actually has).
   const keys = Object.keys(value || {});
   return (
     <div style={objWrap(depth)}>
@@ -613,9 +692,7 @@ function ValueEditor({ value, sample, onChange, uiSK, depth = 0 }) {
   );
 }
 
-// Structured-block row — mirrors Row's draft/save/reset semantics, but the
-// "draft" is the JSON-serialized working value held in the parent `drafts` map.
-function StructuredRow({ item, lang, uiSK, stored, draft, fill, onDraft, onClearDraft, onSave, onReset }) {
+function StructuredRow({ item, label, lang, uiSK, stored, draft, fill, onDraft, onClearDraft, onSave, onReset }) {
   const def = defaultFor(item, lang);
   const hasOverride = stored !== undefined && stored !== null;
   const csFallback = lang === "cs" && item.def.cs == null;
@@ -648,10 +725,10 @@ function StructuredRow({ item, lang, uiSK, stored, draft, fill, onDraft, onClear
   return (
     <div style={rowWrap}>
       <div style={keyCol}>
-        <span style={keyLabel}>{item.key}</span>
+        <span style={fieldName}>{label || humanizeKey(item.key)}</span>
+        <span style={keyTag}>{item.key} · {uiSK ? "blok" : "block"}</span>
         <FillDots fill={fill} />
-        <span style={{ fontSize: "0.55rem", color: dim }}>{uiSK ? "štruktúrovaný" : "structured"}</span>
-        {hasOverride && <span style={{ fontSize: "0.55rem", color: green }}>{uiSK ? "upravené" : "edited"}</span>}
+        {hasOverride && <span style={editedTag}>{uiSK ? "upravené" : "edited"}</span>}
         {csFallback && <span style={{ fontSize: "0.55rem", color: faint }}>EN fallback</span>}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -709,9 +786,38 @@ function StructuredRow({ item, lang, uiSK, stored, draft, fill, onDraft, onClear
   );
 }
 
+// ── Layout styles ────────────────────────────────────────────────────────────
+const navCol = {
+  flex: "1 1 180px", maxWidth: 226, minWidth: 168, position: "sticky", top: 8,
+  alignSelf: "flex-start", display: "flex", flexDirection: "column",
+  maxHeight: "calc(100vh - 90px)", overflowY: "auto",
+  background: bg2, border: `1px solid ${border}`, borderRadius: 9, padding: "0.7rem 0.6rem",
+};
+const navGroupLabel = { fontSize: "0.56rem", textTransform: "uppercase", letterSpacing: "0.08em", color: faint, fontWeight: 700, margin: "0 0 5px 4px" };
+function navItem(active) {
+  return {
+    display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, width: "100%",
+    textAlign: "left", padding: "0.34rem 0.5rem", marginBottom: 2, borderRadius: 6, cursor: "pointer",
+    border: "1px solid transparent", background: active ? green : "transparent",
+    color: active ? "#06140f" : dim, fontWeight: active ? 700 : 500, fontFamily: mono, fontSize: "0.72rem",
+  };
+}
+function navBadge(active) {
+  return {
+    fontSize: "0.55rem", fontWeight: 700, borderRadius: 6, padding: "0 5px", flexShrink: 0,
+    background: active ? "#06140f" : border, color: active ? green : dim,
+  };
+}
+const pageHead = { marginBottom: "0.9rem", paddingBottom: "0.4rem", borderBottom: `1px solid ${border}` };
+const secHead = { fontSize: "0.74rem", fontWeight: 700, color: textLight, margin: "0 0 0.3rem", padding: "0.2rem 0", letterSpacing: "0.01em" };
+const emptyBox = { color: faint, fontSize: "0.74rem", padding: "1.2rem 0" };
+
+// ── Row styles ───────────────────────────────────────────────────────────────
 const rowWrap = { display: "flex", gap: "0.9rem", padding: "0.7rem 0", borderBottom: `1px solid ${border}`, alignItems: "flex-start" };
-const keyCol = { width: 190, flexShrink: 0, display: "flex", flexDirection: "column", gap: 3, paddingTop: 4 };
-const keyLabel = { fontSize: "0.66rem", color: dim, wordBreak: "break-word" };
+const keyCol = { width: 196, flexShrink: 0, display: "flex", flexDirection: "column", gap: 3, paddingTop: 2 };
+const fieldName = { fontSize: "0.72rem", color: textLight, fontWeight: 600, lineHeight: 1.3 };
+const keyTag = { fontSize: "0.54rem", color: faint, fontFamily: mono, wordBreak: "break-word" };
+const editedTag = { fontSize: "0.55rem", color: green, fontWeight: 600 };
 function btn(bgc, color, bd) {
   return {
     padding: "0.28rem 0.6rem", borderRadius: 6, cursor: "pointer", fontFamily: mono, fontSize: "0.66rem",
