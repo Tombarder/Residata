@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useMarketTotals, useHomeProjects, useTotalsList, useVelocityMature } from "../lib/useData";
 import { useCountry, countryName } from "../lib/useCountry";
 import { moneyFromEur, moneySymbol } from "../lib/money";
+import { localeTag } from "../lib/locale";
 import { useCurrency } from "../lib/useCurrency";
 import { marketInventoryDisplay, fmtMonthsToSellout } from "../lib/absorption";
 // (imports already include useMarketTotals — we rely on its live view
@@ -511,14 +512,14 @@ export function PipelineFlow({ lang = "en" }) {
         overflow: "hidden",
       }} className="pipeline-stats">
         {[
-          { n: fmt(devCount,         lang === "sk" ? "sk-SK" : "en-US"), label: T.statsLabel[0] },
+          { n: fmt(devCount,         localeTag(lang)), label: T.statsLabel[0] },
           // KPI label is "sledovaných projektov" / "projects tracked" — value
           // matches the label: projects with archive data (active + paused /
           // sold-out under tracking). Diverges from projectsActive whenever a
           // project moves between active and paused; today's gap is ~30%
           // (e.g. 73 active vs 116 tracked). Grows over time as more
           // historical data accumulates.
-          { n: fmt(projTrackedCount, lang === "sk" ? "sk-SK" : "en-US"), label: T.statsLabel[1] },
+          { n: fmt(projTrackedCount, localeTag(lang)), label: T.statsLabel[1] },
           // 3. karta = cadence, slovný stat. "Mesačne" / "Monthly" hovorí
           // čo kupujúcemu zaujíma: ako často dostane fresh dáta.
           { n: lang === "sk" ? "Mesačne" : "Monthly",                   label: T.statsLabel[2] },

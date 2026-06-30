@@ -6,6 +6,7 @@ import { useCapabilities } from "../lib/useCapabilities";
 import { useAuth } from "../lib/useAuth";
 import { supabase } from "../lib/supabase";
 import { moneyFromEur, moneySymbol } from "../lib/money";
+import { localeTag } from "../lib/locale";
 import { useCurrency } from "../lib/useCurrency";
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -1685,7 +1686,7 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
           </div>
           <div style={{ fontFamily: mono, fontSize: "0.78rem", color: dim }}>
             {flatsProgress > 0
-              ? `${flatsProgress.toLocaleString(lang === "sk" ? "sk-SK" : "en-US")} ${lang === "sk" ? "záznamov" : "records"}`
+              ? `${flatsProgress.toLocaleString(localeTag(lang))} ${lang === "sk" ? "záznamov" : "records"}`
               : (lang === "sk" ? "pripravujem" : "preparing")}
           </div>
           {/* Skeleton rows */}

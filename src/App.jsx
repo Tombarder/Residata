@@ -39,6 +39,7 @@ import { useCountry } from "./lib/useCountry";
 import { useMarketTotals } from "./lib/useData";
 import { pushRoute, pathToPage, isAppPage } from "./lib/routing";
 import { applySeo } from "./lib/seo";
+import { localeTag } from "./lib/locale";
 import { startPageEngagement, stopPageEngagement } from "./lib/engagement";
 // PERF Step 5: code-split — the platform shell pulls in the heaviest modules
 // (Reports, PivotV2, UnitTracker, admin) which a marketing/first-time visitor
@@ -49,6 +50,11 @@ import { track } from "./lib/track";
 
 const pagesEN = ["Home", "Live", "What we deliver", "Use Cases", "Pricing", "Contact"];
 const pagesSK = ["Domov", "Live", "Čo dostanete", "Využitie", "Cenník", "Kontakt"];
+// Czech nav labels. Like pagesSK these are structural UI (not part of the
+// Texts-editable `t` dict), so CZ visitors get Czech nav even before body copy
+// is authored in the admin tool. Display-only: routing always keys off
+// pagesEN[i] (see Nav), so these never need pageMap entries.
+const pagesCS = ["Domů", "Live", "Co dostanete", "Využití", "Ceník", "Kontakt"];
 // Nav labels → internal page key. "Data" is the historical internal
 // name for the what-we-deliver / sample page; we keep it for route
 // stability (/sample URL still resolves) but the user-facing label
@@ -408,7 +414,7 @@ function AccountMenu({ user, caps, auth, setCurrent, lang }) {
 }
 
 function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
-  const pages = lang === "sk" ? pagesSK : pagesEN;
+  const pages = lang === "sk" ? pagesSK : lang === "cs" ? pagesCS : pagesEN;
   const user = auth?.user;
   const showAdminLink = caps.can("view_admin_nav");
   // Mobile menu (≤1180px). Desktop (>1180) never mounts the overlay.
@@ -484,6 +490,13 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
         color: lang === "sk" ? "var(--text)" : "var(--text-faint)",
         fontFamily: "inherit", fontSize: "inherit", transition: "all 0.2s",
       }}>SK</button>
+      <button onClick={() => { if (lang !== "cs") { track("language_switched", { from: lang, to: "cs" }); setLang("cs"); } }} style={{
+        padding: "0.4rem 0.8rem", border: "none", cursor: "pointer",
+        borderLeft: "1px solid var(--border)",
+        background: lang === "cs" ? "var(--border)" : "transparent",
+        color: lang === "cs" ? "var(--text)" : "var(--text-faint)",
+        fontFamily: "inherit", fontSize: "inherit", transition: "all 0.2s",
+      }}>CZ</button>
     </div>
   );
 
@@ -1155,7 +1168,7 @@ function DataPage({ setCurrent, l, lang }) {
   // `market_totals` view (single source of truth — same number the
   // homepage MarketPulse and the Ticker show). Always fresh.
   const { unitsTracked, snapshotMonth } = useMarketTotals();
-  const locale = lang === "sk" ? "sk-SK" : "en-US";
+  const locale = localeTag(lang);
   const showingLive = unitsTracked == null
     ? (lang === "sk" ? "Zobrazených 8 z … záznamov" : "Showing 8 of … records")
     : (lang === "sk"
@@ -1909,11 +1922,12 @@ function readInitialLang() {
   if (typeof window === "undefined") return "en";
   try {
     const stored = window.localStorage.getItem(LANG_STORAGE_KEY);
-    if (stored === "en" || stored === "sk") return stored;
+    if (stored === "en" || stored === "sk" || stored === "cs") return stored;
   } catch (_) { /* private mode etc. */ }
   // First visit: detect from browser
   const browserLang = (typeof navigator !== "undefined" && navigator.language) || "";
   if (browserLang.toLowerCase().startsWith("sk")) return "sk";
+  if (browserLang.toLowerCase().startsWith("cs")) return "cs";
   return "en";
 }
 
@@ -1924,7 +1938,7 @@ export default function App() {
   );
   // F-024 fix — initialize from localStorage + browser-lang detection.
   const [langRaw, setLangRaw] = useState(readInitialLang);
-  const lang = langRaw === "sk" ? "sk" : "en";
+  const lang = langRaw === "sk" ? "sk" : langRaw === "cs" ? "cs" : "en";
   // Re-render when the Boss's live copy edits load/refresh (overlay over the dicts).
   useCopyVersion();
   // setLang persists the choice. Wrap setLangRaw so call-sites are unchanged.

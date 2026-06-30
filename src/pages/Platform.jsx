@@ -16,6 +16,7 @@ import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
 import { useProjects, useMarketTotals, useVelocityMature } from "../lib/useData";
 import { moneyFromEur, moneySymbol } from "../lib/money";
+import { localeTag } from "../lib/locale";
 import { useCurrency } from "../lib/useCurrency";
 import { supabase } from "../lib/supabase";
 import { useActivateTrial } from "../lib/useActivateTrial";
@@ -537,7 +538,7 @@ function TopBar({ page, lang, setLang, tier }) {
         <DataFreshness lang={lang} className="platform-topbar-freshness" />
         {/* Market + currency switchers moved to the sidebar (MarketControls) so
             the top bar never shifts when you switch market/currency. */}
-        {/* Language switcher — EN / SK pills. Same state that powers the
+        {/* Language switcher — EN / SK / CZ pills. Same state that powers the
             marketing Nav switcher, so toggling here or on /live flips
             every SK/EN check-expression across the app consistently. */}
         {setLang && (
@@ -546,7 +547,7 @@ function TopBar({ page, lang, setLang, tier }) {
             border: `1px solid ${border}`, borderRadius: 8, padding: 2,
             background: "#0e0e10",
           }}>
-            {["en", "sk"].map(code => {
+            {["en", "sk", "cs"].map(code => {
               const active = lang === code;
               return (
                 <button
@@ -568,7 +569,7 @@ function TopBar({ page, lang, setLang, tier }) {
                   }}
                   onMouseEnter={e => { if (!active) e.currentTarget.style.color = textLight; }}
                   onMouseLeave={e => { if (!active) e.currentTarget.style.color = dim; }}
-                  title={code === "en" ? "English" : "Slovenčina"}
+                  title={{ en: "English", sk: "Slovenčina", cs: "Čeština" }[code] || code}
                 >
                   {code.toUpperCase()}
                 </button>
@@ -979,20 +980,20 @@ function PlatformDashboard({ lang, setCurrent }) {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.85rem", marginBottom: "2rem" }}>
         <KpiCard
           label={lang === "sk" ? "V databáze" : "In dataset"}
-          value={(marketTotals.projectsTracked ?? marketTotals.projectsActive ?? 0).toLocaleString(lang === "sk" ? "sk-SK" : "en-US")}
+          value={(marketTotals.projectsTracked ?? marketTotals.projectsActive ?? 0).toLocaleString(localeTag(lang))}
           subtitle={(marketTotals.projectsTracked ?? 0) > (marketTotals.projectsActive ?? 0)
             ? (lang === "sk"
                 ? `${(marketTotals.projectsActive ?? 0).toLocaleString("sk-SK")} aktívne v predaji`
                 : `${(marketTotals.projectsActive ?? 0).toLocaleString("en-US")} active in market`)
             : (lang === "sk" ? "všetky aktívne v predaji" : "all active in market")}
         />
-        <KpiCard label={lang === "sk" ? "Voľné byty" : "Available units"} value={totals.avail.toLocaleString(lang === "sk" ? "sk-SK" : "en-US")} accent={green} />
+        <KpiCard label={lang === "sk" ? "Voľné byty" : "Available units"} value={totals.avail.toLocaleString(localeTag(lang))} accent={green} />
         <KpiCard label={lang === "sk" ? "Predané (30 dní)" : "Sold (30 days)"}
           value={!velocityMature ? "—" : (totals.sold30 ? `+${totals.sold30}` : "—")}
           subtitle={!velocityMature ? (lang === "sk" ? "zbierame históriu" : "building history") : null}
           accent="#f5a623"
           locked={!can("view_sold_velocity")} />
-        <KpiCard label={lang === "sk" ? `Priem. ${moneySymbol()}/m²` : `Avg ${moneySymbol()}/m²`} value={avgEurM2 ? Math.round(moneyFromEur(avgEurM2)).toLocaleString(lang === "sk" ? "sk-SK" : "en-US") : "—"} />
+        <KpiCard label={lang === "sk" ? `Priem. ${moneySymbol()}/m²` : `Avg ${moneySymbol()}/m²`} value={avgEurM2 ? Math.round(moneyFromEur(avgEurM2)).toLocaleString(localeTag(lang)) : "—"} />
       </div>
 
       {/* Market highlights — replaces the old duplicate-of-sidebar action
@@ -1221,7 +1222,7 @@ function PlatformBilling({ lang, setCurrent }) {
   const trialUsed = Boolean(profile?.trial_started_at);
 
   // fmtDate first (TDZ — const, not hoisted) so approvedAt can use it.
-  const fmtDate = (ts) => ts ? new Date(ts).toLocaleDateString(lang === "sk" ? "sk-SK" : "en-US", { day: "numeric", month: "long", year: "numeric" }) : "—";
+  const fmtDate = (ts) => ts ? new Date(ts).toLocaleDateString(localeTag(lang), { day: "numeric", month: "long", year: "numeric" }) : "—";
   const approvedAt = profile?.approved_at ? fmtDate(profile.approved_at) : null;
 
   // Trial activation now flows through the shared one-click action so this
@@ -1604,7 +1605,7 @@ function PlatformSettings({ lang }) {
           values surfaced via F-222 fix). */}
       <div style={{ marginTop: "1.25rem", padding: "1rem 1.25rem", background: bg2, border: `1px solid ${border}`, borderRadius: 10, fontSize: "0.78rem", color: dim, fontFamily: mono, lineHeight: 1.7 }}>
         <div>user_id: {user?.id}</div>
-        {profile?.created_at && <div>created: {new Date(profile.created_at).toLocaleString(lang === "sk" ? "sk-SK" : "en-US", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Bratislava" })}</div>}
+        {profile?.created_at && <div>created: {new Date(profile.created_at).toLocaleString(localeTag(lang), { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Bratislava" })}</div>}
         <div>tier: {profile?.tier || "—"}</div>
         <div>position: {profile?.position || "—"}</div>
       </div>
@@ -1940,9 +1941,9 @@ function PlatformExports({ lang }) {
           <button onClick={csvFromFlats} className="btn-s" style={{ fontSize: "0.85rem" }} disabled={!!exportProgress}>
             {exportProgress
               ? (exportProgress.total
-                  ? `${exportProgress.label} ${exportProgress.current.toLocaleString(lang === "sk" ? "sk-SK" : "en-US")} / ${exportProgress.total.toLocaleString(lang === "sk" ? "sk-SK" : "en-US")}`
+                  ? `${exportProgress.label} ${exportProgress.current.toLocaleString(localeTag(lang))} / ${exportProgress.total.toLocaleString(localeTag(lang))}`
                   : exportProgress.current > 0
-                    ? `${exportProgress.label} ${exportProgress.current.toLocaleString(lang === "sk" ? "sk-SK" : "en-US")}${lang === "sk" ? " riadkov" : " rows"}`
+                    ? `${exportProgress.label} ${exportProgress.current.toLocaleString(localeTag(lang))}${lang === "sk" ? " riadkov" : " rows"}`
                     : exportProgress.label)
               : <>⬇ {lang === "sk" ? "Všetky byty" : "All flats"}</>}
           </button>

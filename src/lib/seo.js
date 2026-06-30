@@ -332,10 +332,12 @@ export function applySeo(page, lang, country) {
   const meta = localizeSeoForCountry(resolved, lang, country);
 
   const url = SITE_BASE + meta.path;
-  const locale = lang === "sk" ? "sk_SK" : "en_US";
+  const locale = { sk: "sk_SK", cs: "cs_CZ" }[lang] || "en_US";
 
-  // <html lang> — important for accessibility + hreflang signals
-  document.documentElement.setAttribute("lang", lang === "sk" ? "sk" : "en");
+  // <html lang> — important for accessibility + hreflang signals. Reflects the
+  // SELECTED language (en|sk|cs), even though untranslated copy falls back to
+  // English — by the time CZ is public the copy is authored in Czech.
+  document.documentElement.setAttribute("lang", { sk: "sk", cs: "cs" }[lang] || "en");
 
   // Title + primary description
   document.title = meta.title;
@@ -350,11 +352,12 @@ export function applySeo(page, lang, country) {
   // Canonical URL
   setLink("canonical", url);
 
-  // hreflang — tell Google both language versions exist at same URL
+  // hreflang — tell Google the language versions exist at same URL
   // (we don't have /sk prefix — language is state-driven). The x-default
   // points to the primary (English).
   setLink("alternate", url, "en");
   setLink("alternate", url, "sk");
+  setLink("alternate", url, "cs");
   setLink("alternate", url, "x-default");
 
   // Open Graph

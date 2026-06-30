@@ -40,6 +40,7 @@ import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useProjects, useUnitSummaries, useUnitHistories, useUnitSearch, useProjectUnitsSeries, useArchiveMonths } from "../lib/useData";
 import { useCapabilities } from "../lib/useCapabilities";
 import { track } from "../lib/track";
+import { localeTag } from "../lib/locale";
 import { moneyFromEur, moneySymbol } from "../lib/money";
 import { useCurrency } from "../lib/useCurrency";
 
@@ -145,14 +146,14 @@ function formatTs(ts, lang) {
   if (s.length >= 10 && s.includes("T")) {
     const d = new Date(s);
     if (Number.isFinite(d.getTime())) {
-      return d.toLocaleDateString(lang === "sk" ? "sk-SK" : "en-US", dateOpts);
+      return d.toLocaleDateString(localeTag(lang), dateOpts);
     }
   }
   // Date-only YYYY-MM-DD (treat as UTC midnight, then format in BA TZ)
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
     const d = new Date(s + "T00:00:00Z");
     if (Number.isFinite(d.getTime())) {
-      return d.toLocaleDateString(lang === "sk" ? "sk-SK" : "en-US", dateOpts);
+      return d.toLocaleDateString(localeTag(lang), dateOpts);
     }
   }
   // Legacy YYYY-MM month bucket — pin to UTC 1st so BA viewers see the
@@ -161,7 +162,7 @@ function formatTs(ts, lang) {
   if (/^\d{4}-\d{2}$/.test(s)) {
     const [y, mm] = s.split("-");
     const dt = new Date(Date.UTC(Number(y), Number(mm) - 1, 1));
-    return dt.toLocaleDateString(lang === "sk" ? "sk-SK" : "en-US", monthOpts);
+    return dt.toLocaleDateString(localeTag(lang), monthOpts);
   }
   return s;
 }

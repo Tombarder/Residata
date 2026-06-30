@@ -21,8 +21,12 @@ export default function Ticker({ lang = "en" }) {
   // an EN copy in value_json.text_en; the CZK-native variants are
   // value_text_native / value_json.text_en_native (the EN-native one is optional —
   // EN gracefully falls back to the € EN copy until it exists). EN falls back to SK.
+  // SK is the only language with native code-level ticker copy (value_text).
+  // Every other language (en, and cs until per-metric Czech copy exists) uses
+  // the English copy as the universal fallback — same cs->en chain as getLiveT /
+  // localizedCopy. Without this, a Czech visitor saw the SK ticker.
   const pickText = (m) => {
-    if (lang === "en") {
+    if (lang !== "sk") {
       return (native && m.value_json && m.value_json.text_en_native)
         || (m.value_json && m.value_json.text_en)
         || m.value_text || null;

@@ -3,6 +3,7 @@ import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
 import { useProjects, useProjectFlats, useProjectSnapshots, useMarketTotals, useTotalsList } from "../lib/useData";
 import { moneyFromEur, moneySymbol } from "../lib/money";
+import { localeTag } from "../lib/locale";
 import { fmtSelloutValue } from "../lib/absorption";
 import { useCurrency } from "../lib/useCurrency";
 import { useCountry } from "../lib/useCountry";
@@ -136,7 +137,7 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
     const col = SORT_COLS[sort.key];
     if (!col) return arr;
     const dir = sort.dir === "desc" ? -1 : 1;
-    const locale = lang === "sk" ? "sk-SK" : "en-US";
+    const locale = localeTag(lang);
     return [...arr].sort((a, b) => {
       const av = col.get(a), bv = col.get(b);
       const ae = av == null || av === "";
@@ -493,7 +494,7 @@ function ProjectRow({ p, t, lang, setCurrent, canVelocity }) {
       </td>
       <td style={{ ...td, textAlign: "right", fontFamily: mono }}>
         {p.avg_price_eur_m2
-          ? Math.round(moneyFromEur(p.avg_price_eur_m2)).toLocaleString(lang === "sk" ? "sk-SK" : "en-US")
+          ? Math.round(moneyFromEur(p.avg_price_eur_m2)).toLocaleString(localeTag(lang))
           : (() => {
               // Three reasons why €/m² could be null in projects_live:
               //   a) developer doesn't publish prices at all → min/max also null
@@ -707,7 +708,7 @@ export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en
  * arriving next sync", not "we have nothing".
  */
 function ProjectAggregateOnly({ project, lang, t, canVelocity }) {
-  const locale = lang === "sk" ? "sk-SK" : "en-US";
+  const locale = localeTag(lang);
   const fmt = (n) => n == null ? "—" : Number(n).toLocaleString(locale);
   const eurM2 = project.avg_price_eur_m2 ? Math.round(moneyFromEur(project.avg_price_eur_m2)) : null;
   const soldPct = project.sold_percentage != null ? `${project.sold_percentage}%` : null;
@@ -776,7 +777,7 @@ function ProjectAggregateOnly({ project, lang, t, canVelocity }) {
    extra backend work. Every chart is self-contained (no deps, just
    React + SVG) so bundle stays small. */
 function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
-  const locale = lang === "sk" ? "sk-SK" : "en-US";
+  const locale = localeTag(lang);
   const fmtEur = (v) => v == null || !Number.isFinite(v) ? "—" : `${Math.round(moneyFromEur(v)).toLocaleString("en-US").replace(/,/g, " ")} ${moneySymbol()}`;
   const fmtPct = (v) => v == null || !Number.isFinite(v) ? "—" : `${(Math.round(v * 10) / 10).toFixed(1)}%`;
   const L = (sk, en) => lang === "sk" ? sk : en;
@@ -1979,7 +1980,7 @@ function PriceHistogram({ prices, lang = "en" }) {
   // whitespace for the median label above the bars.
   const W = 520, H = 190, pad = { l: 16, r: 16, t: 28, b: 26 };
   const innerW = W - pad.l - pad.r, innerH = H - pad.t - pad.b;
-  const locale = lang === "sk" ? "sk-SK" : "en-US";
+  const locale = localeTag(lang);
   const L = (sk, en) => lang === "sk" ? sk : en;
   const fmtK = (n) => `${Math.round(moneyFromEur(n) / 1000)}k ${moneySymbol()}`;
   const fmtFull = (n) => `${Math.round(moneyFromEur(n)).toLocaleString(locale).replace(/,/g, " ")} ${moneySymbol()}`;
@@ -2153,7 +2154,7 @@ function PriceHistogram({ prices, lang = "en" }) {
 function AreaPriceScatter({ flats, lang, onSelectFlat }) {
   const W = 940, H = 260, pad = { l: 50, r: 16, t: 12, b: 36 };
   const innerW = W - pad.l - pad.r, innerH = H - pad.t - pad.b;
-  const locale = lang === "sk" ? "sk-SK" : "en-US";
+  const locale = localeTag(lang);
 
   // F-255 fix: hooks MUST be called before any conditional return.
   // Previously `useState`/`useRef` were defined below an `if (points.length === 0) return` —
@@ -2314,7 +2315,7 @@ function FlatsTable({ flats, t, lang, highlightedFlatId }) {
     R: { color: "#888", bg: "rgba(136,136,136,0.08)" },
     PR: { color: "#aaa", bg: "rgba(170,170,170,0.08)" },
   };
-  const locale = lang === "sk" ? "sk-SK" : "en-US";
+  const locale = localeTag(lang);
 
   // ── Sortable + filterable columns ─────────────────────────────
   // kind: "num" → range filter (min/max)
@@ -2964,11 +2965,11 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
     <main style={{ padding: "1rem 2rem 4rem", maxWidth: 1240, margin: "0 auto" }}>
       {/* ═══ KPI STRIP ═══ */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.85rem", marginBottom: "2rem" }}>
-        <AKpi label={lang === "sk" ? "Sledované byty" : "Units tracked"}   value={totalUnits.toLocaleString(lang === "sk" ? "sk-SK" : "en-US")} />
-        <AKpi label={lang === "sk" ? "Voľné byty" : "Available"}            value={totalAvail.toLocaleString(lang === "sk" ? "sk-SK" : "en-US")} accent={green} />
+        <AKpi label={lang === "sk" ? "Sledované byty" : "Units tracked"}   value={totalUnits.toLocaleString(localeTag(lang))} />
+        <AKpi label={lang === "sk" ? "Voľné byty" : "Available"}            value={totalAvail.toLocaleString(localeTag(lang))} accent={green} />
         <AKpi label={lang === "sk" ? "Predané (30d)" : "Sold (30d)"}        value={totalSold30 ? `+${totalSold30}` : "—"} accent="#f5a623"
               sub={lang === "sk" ? `${absorptionPct}% absorpcia` : `${absorptionPct}% absorption`} />
-        <AKpi label={lang === "sk" ? `Priem. ${moneySymbol()}/m²` : `Avg ${moneySymbol()}/m²`}            value={avgEurM2 ? Math.round(moneyFromEur(avgEurM2)).toLocaleString(lang === "sk" ? "sk-SK" : "en-US") : "—"} />
+        <AKpi label={lang === "sk" ? `Priem. ${moneySymbol()}/m²` : `Avg ${moneySymbol()}/m²`}            value={avgEurM2 ? Math.round(moneyFromEur(avgEurM2)).toLocaleString(localeTag(lang)) : "—"} />
       </div>
 
       {/* ═══ PIVOT — drag & drop builder ═══ */}
@@ -3613,7 +3614,7 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
                   <tbody>
                     {events.map(e => (
                       <tr key={e.id} style={{ borderTop: `1px solid ${border}` }}>
-                        <td style={{ ...td, color: dim, fontFamily: mono, fontSize: "0.75rem" }}>{e.detected_at ? new Date(e.detected_at).toLocaleString(lang === "sk" ? "sk-SK" : "en-US", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Bratislava" }) : "—"}</td>
+                        <td style={{ ...td, color: dim, fontFamily: mono, fontSize: "0.75rem" }}>{e.detected_at ? new Date(e.detected_at).toLocaleString(localeTag(lang), { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Bratislava" }) : "—"}</td>
                         <td style={td}><EventBadge type={e.event_type} /></td>
                         <td style={td}>{e.new_value?.email || "—"}</td>
                         <td style={{ ...td, color: dim, fontFamily: mono }}>{e.new_value?.domain || "—"}</td>
