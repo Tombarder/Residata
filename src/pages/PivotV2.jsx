@@ -302,16 +302,52 @@ function pivotStateKey(scope) { return PIVOT_KEY_PREFIX + (scope || "anon"); }
    for a field that no longer exists (e.g. a retired palette entry) is dropped, so a
    stale blob can never wedge the pivot. */
 function _knownDim(k) { return !!FIELDS[k]; }
+// Allow-lists + bounds for the validator. A persisted blob is UNTRUSTED input
+// (localStorage is user-writable; pivot_prefs round-trips through the DB), so we
+// validate STRUCTURE, not just field keys — a malformed/oversized filter or sort
+// must never reach buildPivotSpec / the SQL engine / the sort logic.
+const VALID_FILTER_MODES = new Set(["in", "not_in", "between", "empty", "not_empty"]);
+const VALID_AGGS = new Set(["count", "count_distinct", "sum", "avg", "min", "max", "median", "measure"]);
+const MAX_FILTERS = 50;          // generous; a real pivot uses a handful
+const MAX_FILTER_VALUES = 300;   // e.g. selecting many cities; bounded
+const MAX_VALUE_LEN = 120;       // a single filter value (a city/dev name) is short
+
+function _sanFilter(f) {
+  if (!f || typeof f !== "object" || !_knownDim(f.key)) return null;
+  const out = { key: f.key };
+  if (f.mode != null) { if (!VALID_FILTER_MODES.has(f.mode)) return null; out.mode = f.mode; }
+  if (Array.isArray(f.values)) {
+    out.values = f.values
+      .filter(v => v == null || typeof v === "string" || typeof v === "number")
+      .slice(0, MAX_FILTER_VALUES)
+      .map(v => (v == null ? v : String(v).slice(0, MAX_VALUE_LEN)));
+  }
+  if (f.min != null && Number.isFinite(Number(f.min))) out.min = Number(f.min);
+  if (f.max != null && Number.isFinite(Number(f.max))) out.max = Number(f.max);
+  if (typeof f.includeEmpty === "boolean") out.includeEmpty = f.includeEmpty;
+  return out;
+}
+function _sanValue(v) {
+  if (!v || typeof v !== "object" || !_knownDim(v.field)) return null;
+  if (v.agg != null && !VALID_AGGS.has(v.agg)) return null;
+  return { key: typeof v.key === "string" ? v.key : v.field, field: v.field, agg: v.agg };
+}
+function _sanSort(s) {
+  if (!s || typeof s !== "object") return undefined;
+  // col is "label" | "count" | a numeric value-index; dir is asc|desc.
+  const col = (typeof s.col === "string" || typeof s.col === "number") ? s.col : "count";
+  return { col, dir: s.dir === "asc" ? "asc" : "desc" };
+}
 function sanitizePivotState(s) {
   if (!s || typeof s !== "object") return null;
   const out = {};
   if (Array.isArray(s.rows))    out.rows    = s.rows.filter(_knownDim).slice(0, MAX_ROWS);
   if (Array.isArray(s.cols))    out.cols    = s.cols.filter(_knownDim).slice(0, MAX_COLS);
-  if (Array.isArray(s.values))  out.values  = s.values.filter(v => v && _knownDim(v.field)).slice(0, MAX_VALUES);
-  if (Array.isArray(s.filters)) out.filters = s.filters.filter(f => f && _knownDim(f.key));
+  if (Array.isArray(s.values))  out.values  = s.values.map(_sanValue).filter(Boolean).slice(0, MAX_VALUES);
+  if (Array.isArray(s.filters)) out.filters = s.filters.map(_sanFilter).filter(Boolean).slice(0, MAX_FILTERS);
   if (s.valueMode === "raw" || s.valueMode === "pct_total" || s.valueMode === "pct_parent") out.valueMode = s.valueMode;
   if (typeof s.dataBars === "boolean") out.dataBars = s.dataBars;
-  if (s.sort && typeof s.sort === "object" && "dir" in s.sort) out.sort = s.sort;
+  const srt = _sanSort(s.sort); if (srt) out.sort = srt;
   return out;
 }
 function loadPivotState(scope) {
@@ -1166,11 +1202,15 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   // session's / another account's local state can never bleed through. Anon visitors use
   // the "anon" localStorage only. `scopeId` re-hydrates when the account changes
   // (logout→login) without needing a full reload.
-  const [hydrated, setHydrated] = useState(false);
+  // `hydratedScope` = the account whose AUTHORITATIVE setup is currently applied. It's
+  // STATE (not a ref) so the save effects re-evaluate the moment it flips, and it holds
+  // the *scope string* (not just a bool) so saves only ever fire for the CURRENT, fully
+  // hydrated account — never writing one account's state into another's slot during a
+  // logout→login switch.
+  const [hydratedScope, setHydratedScope] = useState(null);
   const justAppliedRef = useRef(false);
   const dbSaveTimer    = useRef(null);
   const scopeId = user?.id || "anon";
-  const hydratedScopeRef = useRef(null);
 
   // Helper: apply a full prefs bundle to the live pivot state.
   const applyPrefs = (p) => {
@@ -1185,36 +1225,48 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
 
   useEffect(() => { purgeLegacyPivotState(); }, []);   // drop the pre-fix shared key once
 
-  // Persist on every change to the CURRENT account's localStorage key (or "anon").
-  // Account-scoped so one account never overwrites another's cache on a shared browser.
+  // Hydrate the CURRENT account's authoritative setup. Re-runs on account / profile
+  // change. The cross-device source of truth is the user's OWN profile row
+  // (profile.id === user.id). During a mid-session account switch the AuthContext may
+  // briefly still hold the PREVIOUS account's profile — we must NOT trust it, or one
+  // account's saved view would bleed into another. So we finalize (mark the scope
+  // hydrated → enable saving) ONLY once the matching profile has loaded; until then we
+  // show this account's local cache (or a clean default) as a non-persisted placeholder.
   useEffect(() => {
-    if (!hydrated) return;   // don't write the pre-hydration default over a real saved setup
-    savePivotState(user?.id, { rows, cols, values, filters, valueMode, dataBars, sort });
-  }, [hydrated, user, rows, cols, values, filters, valueMode, dataBars, sort]);
+    if (authLoading) return;                 // wait until we know who (if anyone) is logged in
+    if (hydratedScope === scopeId) return;   // already finalized for this account
 
-  useEffect(() => {
-    if (authLoading) return;                       // wait until we KNOW who (if anyone) is logged in
-    if (hydratedScopeRef.current === scopeId) return;  // already hydrated for this account
-    hydratedScopeRef.current = scopeId;
-    justAppliedRef.current = true;                 // the apply below must not echo straight back to the DB
-    let prefs;
-    if (user) {
-      // logged in → account is authoritative: DB prefs, else this account's local cache,
-      // else a clean default. Always applied, so nothing from another account survives.
-      prefs = (profile?.pivot_prefs && sanitizePivotState(profile.pivot_prefs))
-              || loadPivotState(user.id) || DEFAULT_BUNDLE;
-    } else {
-      prefs = loadPivotState("anon") || DEFAULT_BUNDLE;
+    if (!user) {                             // anon → per-browser "anon" cache only
+      justAppliedRef.current = true;
+      applyPrefs(loadPivotState("anon") || DEFAULT_BUNDLE);
+      setHydratedScope("anon");
+      return;
     }
-    applyPrefs(prefs);
-    setHydrated(true);
+    const ownProfile = profile && profile.id === user.id ? profile : null;
+    if (!ownProfile) {                       // this account's profile not loaded yet
+      justAppliedRef.current = true;         // placeholder; do NOT finalize (saves stay off)
+      applyPrefs(loadPivotState(user.id) || DEFAULT_BUNDLE);
+      return;
+    }
+    const dbPrefs = ownProfile.pivot_prefs ? sanitizePivotState(ownProfile.pivot_prefs) : null;
+    justAppliedRef.current = true;           // the apply below must not echo straight back to the DB
+    applyPrefs(dbPrefs || loadPivotState(user.id) || DEFAULT_BUNDLE);
+    setHydratedScope(scopeId);               // finalized → saving enabled for this account
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, scopeId, profile]);
+  }, [authLoading, scopeId, user, profile]);
 
-  // Persist to the ACCOUNT (debounced) on every change, once hydrated — so the same
-  // login shows the same setup on every device. Anon users skip this (localStorage only).
+  // Persist on every change to the CURRENT account's localStorage key (or "anon") —
+  // ONLY once that account is fully hydrated, so we never write a placeholder / another
+  // account's state into this account's slot.
   useEffect(() => {
-    if (!user || !hydrated) return;
+    if (hydratedScope !== scopeId) return;
+    savePivotState(user?.id, { rows, cols, values, filters, valueMode, dataBars, sort });
+  }, [hydratedScope, scopeId, user, rows, cols, values, filters, valueMode, dataBars, sort]);
+
+  // Persist to the ACCOUNT (debounced) so the same login shows the same setup on every
+  // device. Gated on the finalized current scope; anon users skip this (localStorage only).
+  useEffect(() => {
+    if (!user || hydratedScope !== scopeId) return;
     if (justAppliedRef.current) { justAppliedRef.current = false; return; }
     clearTimeout(dbSaveTimer.current);
     const payload = { rows, cols, values, filters, valueMode, dataBars, sort };
@@ -1222,7 +1274,7 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
       supabase.rpc("set_pivot_prefs", { p_prefs: payload }).catch(() => { /* offline / transient — localStorage still holds it */ });
     }, 700);
     return () => clearTimeout(dbSaveTimer.current);
-  }, [user, hydrated, rows, cols, values, filters, valueMode, dataBars, sort]);
+  }, [user, hydratedScope, scopeId, rows, cols, values, filters, valueMode, dataBars, sort]);
 
   // "Predvolené" → restore the opening layout. "Vyčistiť" → wipe rows/cols/values/
   // filters to a clean slate (no field-by-field removal). Both persist via the effect.
@@ -4512,7 +4564,14 @@ function DrillDownModal({ title, records, loading, onClose, lang }) {
     { key: "district",     label: "Časť",      en: "District" },
     { key: "developer",    label: "Developer", en: "Developer" },
   ];
-  const drillColLabel = (c) => (lang === "sk" ? c.label : c.en);
+  // Drill-col key → FIELDS registry key (identical except district→cast). Labels come
+  // from the single field registry via fieldLabel(), so a rename (e.g. "Mestská časť")
+  // propagates here automatically; the inline label/en is only a fallback.
+  const DRILL_FIELD_KEY = { district: "cast" };
+  const drillColLabel = (c) => {
+    const fk = DRILL_FIELD_KEY[c.key] || c.key;
+    return FIELDS[fk] ? fieldLabel(fk, lang) : (lang === "sk" ? c.label : c.en);
+  };
 
   const cena_m2 = (r) => {
     const p = Number(r.cena_s_dph), m = Number(r.obytna_plocha);
