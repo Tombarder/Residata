@@ -515,21 +515,21 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
       <button type="button" aria-pressed={lang === "en"} onClick={() => { if (lang !== "en") { track("language_switched", { from: lang, to: "en" }); setLang("en"); } }} style={{
         padding: "0.4rem 0.8rem", border: "none", cursor: "pointer",
         background: lang === "en" ? "var(--border)" : "transparent",
-        color: lang === "en" ? "var(--text)" : "var(--text-faint)",
+        color: lang === "en" ? "var(--text)" : "var(--text-dim)",
         fontFamily: "inherit", fontSize: "inherit", transition: "all 0.2s",
       }}>EN</button>
       <button type="button" aria-pressed={lang === "sk"} onClick={() => { if (lang !== "sk") { track("language_switched", { from: lang, to: "sk" }); setLang("sk"); } }} style={{
         padding: "0.4rem 0.8rem", border: "none", cursor: "pointer",
         borderLeft: "1px solid var(--border)",
         background: lang === "sk" ? "var(--border)" : "transparent",
-        color: lang === "sk" ? "var(--text)" : "var(--text-faint)",
+        color: lang === "sk" ? "var(--text)" : "var(--text-dim)",
         fontFamily: "inherit", fontSize: "inherit", transition: "all 0.2s",
       }}>SK</button>
       <button type="button" aria-pressed={lang === "cs"} onClick={() => { if (lang !== "cs") { track("language_switched", { from: lang, to: "cs" }); setLang("cs"); } }} style={{
         padding: "0.4rem 0.8rem", border: "none", cursor: "pointer",
         borderLeft: "1px solid var(--border)",
         background: lang === "cs" ? "var(--border)" : "transparent",
-        color: lang === "cs" ? "var(--text)" : "var(--text-faint)",
+        color: lang === "cs" ? "var(--text)" : "var(--text-dim)",
         fontFamily: "inherit", fontSize: "inherit", transition: "all 0.2s",
       }}>CZ</button>
     </div>
@@ -1940,11 +1940,11 @@ function Label({ children }) {
 // before the real profile arrives.
 function AuthLoadingSpinner() {
   return (
-    <main style={{ padding: "8rem 2rem 4rem", textAlign: "center", color: "#8a8a96" }}>
+    <div role="status" aria-live="polite" style={{ padding: "8rem 2rem 4rem", textAlign: "center", color: "#8a8a96" }}>
       <div style={{ fontSize: "0.8rem", fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.1em", textTransform: "uppercase" }}>
         Loading…
       </div>
-    </main>
+    </div>
   );
 }
 
@@ -2286,7 +2286,7 @@ export default function App() {
           />
         </Suspense>
       ) : (
-        <div key={current} className="page-transition">
+        <main key={current} className="page-transition">
           <>
             {current === "Home" && <HomePage setCurrent={handleNav} l={l} lang={lang} onLogin={() => setLoginOpen(true)} />}
 
@@ -2327,7 +2327,7 @@ export default function App() {
               </Suspense>
             )}
           </>
-        </div>
+        </main>
       )}
       {!isAppPage(current) && <Footer lang={lang} setCurrent={handleNav} />}
       {/* F-051 (Boss 2026-05-31) — cookie consent banner. Shows on first

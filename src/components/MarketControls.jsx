@@ -20,7 +20,9 @@ import { useCurrency } from "../lib/useCurrency";
  */
 const LABEL = {
   fontSize: "0.55rem", letterSpacing: "0.14em", textTransform: "uppercase",
-  color: "#7a7a86", fontWeight: 700, fontFamily: "'JetBrains Mono', monospace",
+  // #8a8a96 (=--text-dim) clears WCAG AA (5.6:1 on the dock bg); the old
+  // #7a7a86 sat at 4.48:1, a hair under the 4.5:1 threshold.
+  color: "#8a8a96", fontWeight: 700, fontFamily: "'JetBrains Mono', monospace",
   whiteSpace: "nowrap",
 };
 
