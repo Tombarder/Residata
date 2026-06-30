@@ -155,6 +155,12 @@ function useAuthInternal() {
     // fragile dependency as the PRIMARY mechanism. Context: "sign out does
     // nothing until I refresh + retry" came from the old code AWAITING gotrue's
     // signOut() unbounded — and gotrue can deadlock on a stuck token-refresh.
+    //
+    // Contract: this signs out THIS device (scope:"local"). On the fast path
+    // gotrue also broadcasts SIGNED_OUT so other open tabs sign out live; on the
+    // wedged path (timeout) they don't get the broadcast but re-sync to signed-out
+    // on their next auth op / reload (the shared localStorage session is gone). We
+    // deliberately do NOT force-revoke the user's sessions on their other devices.
 
     // 1. Optimistic UI — reflect signed-out instantly, before any async work.
     setUser(null);

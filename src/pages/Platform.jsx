@@ -449,13 +449,11 @@ function Sidebar({ page, lang, can, tier, email, onNavigate, onSignOut, mobileOp
             </div>
           </div>
           <button
-            onClick={async () => {
-              // Defensive: try the real sign-out, but fall back to a hard
-              // navigation either way. That makes the button impossible to
-              // "not work" — worst case the page just reloads anon.
-              try { await onSignOut(); } catch (e) { console.error("signOut", e); }
-              window.location.href = "/";
-            }}
+            // signOut() owns the teardown + hard reload to "/" (it clears state,
+            // purges the session, and always reaches window.location.replace —
+            // it can't hang or throw), so the caller just invokes it. One owner
+            // of the redirect; no dead post-await navigation.
+            onClick={() => onSignOut()}
             style={{
               width: "100%", padding: "0.55rem", background: "transparent",
               border: `1px solid ${border}`, color: "#c0c0c8",
