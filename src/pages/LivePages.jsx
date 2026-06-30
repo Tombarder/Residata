@@ -4312,7 +4312,7 @@ function AiChatLogsPanel({ users, lang }) {
                   {s.good_count > 0 ? ` 👍${s.good_count}` : ""}
                 </span>
                 <span style={{ color: dim, fontSize: "0.66rem", fontFamily: mono }}>
-                  {new Date(s.last_at).toLocaleString()}
+                  {new Date(s.last_at).toLocaleString(localeTag(lang))}
                 </span>
                 <span style={{ width: 12 }} />
               </button>
@@ -4361,7 +4361,7 @@ function FullConversationView({ session, email, lang, onBack }) {
         <div style={{ minWidth: 0 }}>
           <div style={{ color: text, fontWeight: 700, fontSize: "1.05rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{email}</div>
           <div style={{ color: dim, fontFamily: mono, fontSize: "0.7rem", marginTop: "0.15rem" }}>
-            {session.tier} · {new Date(session.first_at).toLocaleString()} · {qCount} {L("otázok", "questions")} · <span style={{ color: green }}>{fmtUsd(session.cost)}</span>
+            {session.tier} · {new Date(session.first_at).toLocaleString(localeTag(lang))} · {qCount} {L("otázok", "questions")} · <span style={{ color: green }}>{fmtUsd(session.cost)}</span>
           </div>
         </div>
       </div>
@@ -4382,7 +4382,7 @@ function FullConversationView({ session, email, lang, onBack }) {
                 </div>
                 {!isUser && (
                   <div style={{ marginTop: "0.6rem", paddingTop: "0.45rem", borderTop: `1px dashed ${border}`, color: dim, fontFamily: mono, fontSize: "0.62rem", display: "flex", gap: "0.7rem", flexWrap: "wrap" }}>
-                    <span>{new Date(t.sent_at).toLocaleTimeString()}</span>
+                    <span>{new Date(t.sent_at).toLocaleTimeString(localeTag(lang))}</span>
                     {t.role === "assistant" && <span style={{ color: green }}>{fmtUsd(turnCostUsd(t))}</span>}
                     {t.model && <span>{t.model}</span>}
                     {Number.isFinite(t.response_time_ms) && <span>{(t.response_time_ms / 1000).toFixed(1)}s</span>}
