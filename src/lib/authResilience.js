@@ -68,7 +68,10 @@ export function makeAuthTimeoutFetch(baseFetch, { authTimeoutMs = AUTH_FETCH_TIM
  * single stuck op can never block every later auth op forever. (The old lock set
  * `_authChain = run.then(...)`, so a stuck `run` wedged the chain permanently.)
  * In normal operation every op settles in well under maxHoldMs, so ops stay
- * strictly serialised and the cap never trips.
+ * strictly serialised and the cap never trips. Trade-off by design: if an op IS
+ * genuinely stuck past the cap, the next op starts while it's still running — the
+ * cap chooses liveness over strict mutual exclusion (the right call for auth ops,
+ * and the bounded auth fetch means fn should settle long before maxHoldMs anyway).
  */
 export function createBoundedAuthLock({ maxHoldMs = AUTH_LOCK_MAX_HOLD_MS } = {}) {
   let chain = Promise.resolve();
