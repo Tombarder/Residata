@@ -29,6 +29,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useProjects, useProjectSnapshots, useReportHistogram, fetchReportBinUnits, useReportProjectUnits, useReportComparables } from "../lib/useData";
 import { moneyFromEur, moneySymbol } from "../lib/money";
+import { localeTag } from "../lib/locale";
 import { useCurrency } from "../lib/useCurrency";
 import { useCountry, isAllCountries } from "../lib/useCountry";
 import { supabase } from "../lib/supabase";
@@ -349,7 +350,7 @@ export default function PlatformReports({ lang = "sk" }) {
 
 /* ─── Header card: title + month + print + scope-aware subtitle ─── */
 function ReportHeader({ projects, lang, scope, scopeLabel }) {
-  const month = new Date().toLocaleDateString(lang === "sk" ? "sk-SK" : "en-US", { month: "long", year: "numeric" });
+  const month = new Date().toLocaleDateString(localeTag(lang), { month: "long", year: "numeric" });
   const lastSync = projects[0]?.last_updated?.slice(0, 10) || new Date().toISOString().slice(0, 10);
   // Unit count from projects_live rollups (honest in v2) — no flats fetch.
   const totalUnits = useMemo(() => summariseProjects(projects).totalUnits, [projects]);
@@ -963,7 +964,7 @@ function Histogram({ bins, lang, unit, onFetchBin, onProjectClick }) {
 function HistogramDrilldown({ bin, rows, loading, unit, lang, onClose, onProjectClick }) {
   if (!bin) return null;
   const clickable = typeof onProjectClick === "function";
-  const fmtEur = (v) => v == null ? "—" : Math.round(moneyFromEur(v)).toLocaleString(lang === "sk" ? "sk-SK" : "en-US");
+  const fmtEur = (v) => v == null ? "—" : Math.round(moneyFromEur(v)).toLocaleString(localeTag(lang));
   return (
     <div style={{ marginTop: "0.75rem", border: `1px solid ${border}`, borderRadius: 8, background: bg }}>
       <div style={{ padding: "0.6rem 0.85rem", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.5rem", borderBottom: `1px solid ${border}`, background: "rgba(0,229,160,0.04)" }}>
