@@ -216,6 +216,11 @@ export default function TextsEditor({ lang = "en" }) {
           ? "Uprav ľubovoľný text na webe. Ulož → ihneď naživo, bez nasadenia. Prázdne pole = pôvodný text (default v kóde). „Reset“ vráti default. Každý jazyk je samostatný — nie preklad."
           : "Edit any text on the site. Save → live instantly, no deploy. An empty field = the original (code default). “Reset” restores the default. Each language is independent — not a translation."}
       </p>
+      <p style={{ color: faint, fontSize: "0.68rem", lineHeight: 1.5, margin: "-0.4rem 0 1rem", maxWidth: 720 }}>
+        {uiSK
+          ? "Spravované v kóde (nie tu): aria-labely a tooltipy pre čítačky, navigačné odkazy viazané na routovanie, formátované zoznamy s tučným textom (napr. odrážky v trial popupe a v trial karte na cenníku) a komentáre v ukážke schémy."
+          : "Code-managed (not here): screen-reader aria-labels & tooltips, routing-coupled nav-link labels, formatted lists with inline bold (e.g. the trial-popup + pricing trial-card feature bullets), and the sample-schema comments."}
+      </p>
 
       {/* Language tabs */}
       <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", marginBottom: "0.6rem", flexWrap: "wrap" }}>

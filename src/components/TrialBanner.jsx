@@ -175,7 +175,7 @@ export function TrialBanner({ lang = "sk", onCta }) {
 // ────────────────────────────────────────────────────────────
 // Popup (one-shot per day)
 // ────────────────────────────────────────────────────────────
-export function TrialPopup({ lang = "sk", onCta }) {
+export function TrialPopup({ lang = "sk", l = {}, onCta }) {
   const [open, setOpen] = useState(false);
   // The popup is purely an ANON → sign-up conversion nudge. Show it to visitors
   // who have NOT signed up yet, on EVERY page load (incl. refresh) so the offer
@@ -268,21 +268,21 @@ export function TrialPopup({ lang = "sk", onCta }) {
           color: "#00e5a0", letterSpacing: "0.14em", textTransform: "uppercase",
           fontWeight: 700, marginBottom: "0.35rem",
         }}>
-          {L("Darček pre teba", "A gift for you")}
+          {l.trialGift ?? L("Darček pre teba", "A gift for you")}
         </div>
 
         <h2 id="trial-popup-title" style={{
           fontSize: "1.4rem", fontWeight: 700, color: "#e8e8ed",
           letterSpacing: "-0.02em", margin: "0 0 0.6rem", lineHeight: 1.25,
         }}>
-          {L("7 dní plného Residata — zadarmo", "7 days of the full Residata — on us")}
+          {l.trialHeadline ?? L("7 dní plného Residata — zadarmo", "7 days of the full Residata — on us")}
         </h2>
 
         <p style={{
           color: "#c0c0c8", fontSize: "0.9rem", lineHeight: 1.55,
           margin: "0 0 1rem",
         }}>
-          {L(
+          {l.trialPopupBody ?? L(
             "Vyskúšaj všetky projekty, analytiku, reporty, exporty + AI asistenta na týždeň naplno.",
             "Try every project, analytics, reports, exports + the AI assistant for a full week.",
           )}
@@ -310,7 +310,7 @@ export function TrialPopup({ lang = "sk", onCta }) {
           onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,229,160,0.4)"; }}
           onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = "none"; }}
         >
-          {L("Aktivovať 7-dňový trial", "Activate 7-day trial")}
+          {l.trialActivate ?? L("Aktivovať 7-dňový trial", "Activate 7-day trial")}
         </button>
 
         <button onClick={() => close("maybe_later")}
@@ -325,7 +325,7 @@ export function TrialPopup({ lang = "sk", onCta }) {
           onMouseEnter={e => e.currentTarget.style.color = "#e8e8ed"}
           onMouseLeave={e => e.currentTarget.style.color = "#8a8a96"}
         >
-          {L("Možno neskôr", "Maybe later")}
+          {l.trialMaybeLater ?? L("Možno neskôr", "Maybe later")}
         </button>
 
         <p style={{
@@ -333,7 +333,7 @@ export function TrialPopup({ lang = "sk", onCta }) {
           margin: "0.85rem 0 0", textAlign: "center",
           fontFamily: "'JetBrains Mono', monospace",
         }}>
-          {L("Otvorí sa znova keď nabudúce otvoríš Residata.", "Re-appears next time you open Residata.")}
+          {l.trialReappear ?? L("Otvorí sa znova keď nabudúce otvoríš Residata.", "Re-appears next time you open Residata.")}
         </p>
       </div>
     </div>

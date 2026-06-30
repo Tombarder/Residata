@@ -291,7 +291,7 @@ function RisingParticles() {
    opens a dropdown holding the FULL email, the plan, account links + sign out —
    so the nav's width never depends on how long the user's email is (the old
    inline email truncated to "name@gmai…" and crammed the bar). */
-function AccountMenu({ user, caps, auth, setCurrent, lang }) {
+function AccountMenu({ user, caps, auth, setCurrent, lang, l }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   useEffect(() => {
@@ -308,9 +308,9 @@ function AccountMenu({ user, caps, auth, setCurrent, lang }) {
   const tier = caps.tier;
   const isFree = tier === "free";
   const planLabel = tier === "admin" ? "Admin"
-    : tier === "paid" ? (lang === "sk" ? "Platený plán" : "Paid plan")
-    : tier === "pending" ? (lang === "sk" ? "Čaká na schválenie" : "Pending approval")
-    : (lang === "sk" ? "Free plán" : "Free plan");
+    : tier === "paid" ? l.accPaidPlan
+    : tier === "pending" ? l.accPending
+    : l.accFreePlan;
   const planColor = (tier === "paid" || tier === "admin") ? "#00e5a0" : tier === "pending" ? "#f5a623" : "#8a8a96";
   const go = (page) => { setCurrent(page); setOpen(false); };
   const item = { display: "block", width: "100%", textAlign: "left", background: "none", border: "none", color: "#e8e8ed", fontSize: "0.82rem", fontFamily: "inherit", padding: "0.5rem 0.6rem", borderRadius: 6, cursor: "pointer" };
@@ -344,19 +344,19 @@ function AccountMenu({ user, caps, auth, setCurrent, lang }) {
           <div style={{ height: 1, background: "#222228", margin: "0.25rem 0.2rem 0.4rem" }} />
           {isFree ? (
             <button role="menuitem" onClick={() => go("App:Billing")} style={{ ...item, color: "#00e5a0", fontWeight: 600 }} onMouseEnter={hov("rgba(0,229,160,0.08)")} onMouseLeave={hov("none")}>
-              {lang === "sk" ? "Upgradovať na platený" : "Upgrade to paid"}
+              {l.accUpgrade}
             </button>
           ) : (
             <button role="menuitem" onClick={() => go("App:Billing")} style={item} onMouseEnter={hov("#1d1d22")} onMouseLeave={hov("none")}>
-              {lang === "sk" ? "Fakturácia" : "Billing"}
+              {l.accBilling}
             </button>
           )}
           <button role="menuitem" onClick={() => go("App:Settings")} style={item} onMouseEnter={hov("#1d1d22")} onMouseLeave={hov("none")}>
-            {lang === "sk" ? "Nastavenia účtu" : "Account settings"}
+            {l.accSettings}
           </button>
           <div style={{ height: 1, background: "#222228", margin: "0.4rem 0.2rem" }} />
           <button role="menuitem" onClick={() => auth.signOut()} style={{ ...item, color: "#ff8484" }} onMouseEnter={hov("rgba(255,107,107,0.08)")} onMouseLeave={hov("none")}>
-            {lang === "sk" ? "Odhlásiť sa" : "Sign out"}
+            {l.accSignOut}
           </button>
         </div>
       )}
@@ -464,10 +464,10 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
                 padding: "0.45rem 1rem", background: "#00e5a0", color: "#0a0a0b",
                 fontWeight: 600, borderRadius: 6, fontSize: "0.78rem", cursor: "pointer",
                 textDecoration: "none", whiteSpace: "nowrap",
-              }}>{lang === "sk" ? "Otvoriť platformu →" : "Open platform →"}</a>
+              }}>{l.openPlatform} →</a>
               {/* Account = fixed-size avatar menu (email / plan / sign-out live inside),
                   so the nav width is independent of how long the email is. */}
-              <AccountMenu user={user} caps={caps} auth={auth} setCurrent={setCurrent} lang={lang} />
+              <AccountMenu user={user} caps={caps} auth={auth} setCurrent={setCurrent} lang={lang} l={l} />
             </div>
           ) : (
             // Two separate CTAs — returning users need a clear "sign in"
@@ -485,14 +485,14 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
               onMouseEnter={e => { e.currentTarget.style.borderColor = "#00e5a0"; e.currentTarget.style.color = "#00e5a0"; }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = "#222228"; e.currentTarget.style.color = "#e8e8ed"; }}
               title={lang === "sk" ? "Už máš účet? Prihlás sa." : "Already have an account? Sign in."}
-              >{lang === "sk" ? "Prihlásiť sa" : "Sign in"}</a>
+              >{l.navSignIn}</a>
               <a onClick={onLogin} className="nav-cta-btn" style={{
                 padding: "0.5rem 1.15rem", background: "#00e5a0", color: "#0a0a0b",
                 fontWeight: 700, borderRadius: 6, fontSize: "0.8rem", cursor: "pointer",
                 letterSpacing: "0.01em", textDecoration: "none",
               }}
               title={lang === "sk" ? "Nový tu? Zaregistruj sa za 30s a dostaneš 7-dňový paid trial zadarmo." : "New here? 30s sign-up → 7-day paid trial free."}
-              >{lang === "sk" ? "Začať zadarmo →" : "Get started free →"}</a>
+              >{l.navGetStarted} →</a>
             </div>
           )}
           </div>
@@ -528,7 +528,7 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
           >
             <div className="nav-menu-head">
               <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem", letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--text-faint)" }}>
-                {lang === "sk" ? "Menu" : "Menu"}
+                {l.menuTitle}
               </span>
               <button
                 ref={closeBtnRef}
@@ -551,7 +551,7 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
 
             <div style={{ marginTop: "1.1rem", display: "flex", alignItems: "center", gap: "0.75rem" }}>
               <span style={{ fontSize: "0.72rem", color: "var(--text-faint)", fontFamily: "'JetBrains Mono', monospace" }}>
-                {lang === "sk" ? "Jazyk" : "Language"}
+                {l.langLabel}
               </span>
               {langToggle}
             </div>
@@ -569,26 +569,26 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
                       length reads cleanly. Mirrors the desktop avatar dropdown. */}
                   <div style={{ padding: "0 0.15rem 0.15rem", textAlign: "center" }}>
                     <div style={{ fontSize: "0.6rem", color: "var(--text-faint)", fontFamily: "'JetBrains Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 5 }}>
-                      {lang === "sk" ? "Prihlásený ako" : "Signed in as"}
+                      {l.signedInAs}
                     </div>
                     <div style={{ fontSize: "0.85rem", color: "var(--text)", fontWeight: 600, wordBreak: "break-all", lineHeight: 1.4 }}>
                       {user.email}
                     </div>
                   </div>
                   <a onClick={() => go("App:Dashboard")} className="btn-p">
-                    {lang === "sk" ? "Otvoriť platformu →" : "Open platform →"}
+                    {l.openPlatform} →
                   </a>
                   <a onClick={() => { auth.signOut(); setMenuOpen(false); }} className="btn-s" style={{ cursor: "pointer" }}>
-                    {lang === "sk" ? "Odhlásiť sa" : "Sign out"}
+                    {l.accSignOut}
                   </a>
                 </>
               ) : (
                 <>
                   <a onClick={() => { onLogin(); setMenuOpen(false); }} className="btn-p" style={{ cursor: "pointer" }}>
-                    {lang === "sk" ? "Začať zadarmo →" : "Get started free →"}
+                    {l.navGetStarted} →
                   </a>
                   <a onClick={() => { onLogin(); setMenuOpen(false); }} className="btn-s" style={{ cursor: "pointer" }}>
-                    {lang === "sk" ? "Prihlásiť sa" : "Sign in"}
+                    {l.navSignIn}
                   </a>
                 </>
               )}
@@ -697,24 +697,24 @@ function HomePage({ setCurrent, l, lang, onLogin }) {
     // Logged-in but not yet approved (freemium edge case).
     heroButtons = (
       <>
-        <a onClick={() => setCurrent("App:Dashboard")} className="btn-p">{lang === "sk" ? "Otvoriť platformu" : "Open platform"}</a>
-        <a onClick={() => setCurrent("Pricing")} className="btn-s">{lang === "sk" ? "Cenník" : "See pricing"}</a>
+        <a onClick={() => setCurrent("App:Dashboard")} className="btn-p">{l.openPlatform}</a>
+        <a onClick={() => setCurrent("Pricing")} className="btn-s">{l.heroSeePricing}</a>
       </>
     );
   } else if (can("prompt_upgrade_to_paid")) {
     // Logged-in free user — route to platform, offer upgrade as secondary.
     heroButtons = (
       <>
-        <a onClick={() => setCurrent("App:Dashboard")} className="btn-p">{lang === "sk" ? "Otvoriť platformu" : "Open platform"}</a>
-        <a onClick={() => setCurrent("App:Billing")} className="btn-s">{lang === "sk" ? "Upgrade na paid" : "Upgrade to paid"}</a>
+        <a onClick={() => setCurrent("App:Dashboard")} className="btn-p">{l.openPlatform}</a>
+        <a onClick={() => setCurrent("App:Billing")} className="btn-s">{l.heroUpgrade}</a>
       </>
     );
   } else {
     // paid / admin — primary = platform, secondary = Analytics (platform).
     heroButtons = (
       <>
-        <a onClick={() => setCurrent("App:Dashboard")} className="btn-p">{lang === "sk" ? "Otvoriť platformu" : "Open platform"}</a>
-        {can("view_analytics") && <a onClick={() => setCurrent("App:Analytics")} className="btn-s">{lang === "sk" ? "Analytika" : "Analytics"}</a>}
+        <a onClick={() => setCurrent("App:Dashboard")} className="btn-p">{l.openPlatform}</a>
+        {can("view_analytics") && <a onClick={() => setCurrent("App:Analytics")} className="btn-s">{l.heroAnalytics}</a>}
       </>
     );
   }
@@ -815,7 +815,7 @@ function HomePage({ setCurrent, l, lang, onLogin }) {
             <div style={{ fontSize: "1.05rem", fontWeight: 600, color: "#e8e8ed" }}>{l.valueTitle}</div>
           </div>
           <button onClick={() => setCurrent("Data")} className="btn-p" style={{ whiteSpace: "nowrap" }}>
-            {lang === "sk" ? "Čo dostanete →" : "What we deliver →"}
+            {l.valueCtaBtn} →
           </button>
         </div>
       </FadeIn>
@@ -1004,15 +1004,13 @@ function UseCasesPage({ setCurrent, l, lang }) {
         {isPaid ? (
           <>
             <h2 style={{ fontSize: "1.5rem", fontWeight: 700, letterSpacing: "-0.03em", marginBottom: "1rem" }}>
-              {lang === "sk" ? "Tvoj use case je pokrytý?" : "Your use case covered?"}
+              {l.ucPaidTitle}
             </h2>
             <p style={{ color: "#8a8a96", maxWidth: 480, margin: "0 auto 2rem", fontWeight: 300 }}>
-              {lang === "sk"
-                ? "Otvor dashboard a začni pracovať s reálnymi dátami. Ak niečo chýba, napíš — doladíme."
-                : "Open the dashboard and work with real data. If something's missing, reach out — we'll tailor it."}
+              {l.ucPaidDesc}
             </p>
             <a onClick={() => setCurrent("Live")} className="btn-p">
-              {lang === "sk" ? "Otvoriť dashboard" : "Open dashboard"}
+              {l.openDashboard}
             </a>
           </>
         ) : (
@@ -1467,15 +1465,13 @@ function DataPage({ setCurrent, l, lang }) {
         {isPaid ? (
           <>
             <h2 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "1rem" }}>
-              {lang === "sk" ? "Toto je len ukážka. Vďaka prémiovému členstvu máš prístup ku všetkému." : "This is just a sample. You already have access to everything thanks to your premium membership."}
+              {l.dataPaidTitle}
             </h2>
             <p style={{ color: "#8a8a96", maxWidth: 480, margin: "0 auto 2rem", fontWeight: 300 }}>
-              {lang === "sk"
-                ? "Otvor live dashboard pre reálne aktuálne dáta zo všetkých aktívnych projektov."
-                : "Open the live dashboard for real, current data across every active project."}
+              {l.dataPaidDesc}
             </p>
             <a onClick={() => setCurrent("Live")} className="btn-p">
-              {lang === "sk" ? "Otvoriť dashboard" : "Open dashboard"}
+              {l.openDashboard}
             </a>
           </>
         ) : (
@@ -1559,10 +1555,10 @@ function PricingPage({ setCurrent, l, lang, onLogin }) {
             border: "1px solid #00e5a0", borderRadius: 12,
           }}>
             <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem", color: "#00e5a0", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "0.5rem", fontWeight: 700 }}>
-              🎁 {lang === "sk" ? "Darček pre teba" : "A gift for you"}
+              🎁 {l.trialGift}
             </div>
             <h3 style={{ fontSize: "1.35rem", fontWeight: 700, color: "#e8e8ed", margin: "0 0 0.5rem", letterSpacing: "-0.01em" }}>
-              {lang === "sk" ? "7 dní plného Residata — zadarmo" : "7 days of the full Residata — on us"}
+              {l.trialHeadline}
             </h3>
             <p style={{ fontSize: "0.92rem", color: "#c0c0c8", lineHeight: 1.55, margin: "0 0 1rem" }}>
               {lang === "sk"
@@ -1571,10 +1567,10 @@ function PricingPage({ setCurrent, l, lang, onLogin }) {
             </p>
             <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center", flexWrap: "wrap", alignItems: "center" }}>
               <a onClick={startTrial} className="btn-p" style={{ cursor: "pointer" }}>
-                {lang === "sk" ? "Aktivovať 7-dňový trial" : "Activate 7-day trial"}
+                {l.trialActivate}
               </a>
               <span style={{ fontSize: "0.72rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace" }}>
-                {lang === "sk" ? "30s signup · žiadna karta · bez strhávania" : "30s signup · no card · no auto-charge"}
+                {l.trialMicro}
               </span>
             </div>
           </div>
@@ -2253,6 +2249,7 @@ export default function App() {
       {!isAppPage(current) && (
         <TrialPopup
           lang={lang}
+          l={l}
           onCta={handleTrialCta}
         />
       )}

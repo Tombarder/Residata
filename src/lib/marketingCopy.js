@@ -136,6 +136,43 @@ export const t = {
     ],
     mostPopular: "Most Popular",
     seePricing: "See Pricing",
+    // ── App chrome & CTAs — lifted from inline ternaries in App.jsx so the
+    //    Texts editor can reach them. Nav, account menu, hero buttons, the
+    //    7-day trial popup + pricing card. (Pure a11y aria-labels and
+    //    routing-coupled nav-link labels stay in code — see TextsEditor note.)
+    openPlatform: "Open platform",
+    openDashboard: "Open dashboard",
+    heroSeePricing: "See pricing",
+    heroUpgrade: "Upgrade to paid",
+    heroAnalytics: "Analytics",
+    valueCtaBtn: "What we deliver",
+    // Nav
+    navSignIn: "Sign in",
+    navGetStarted: "Get started free",
+    menuTitle: "Menu",
+    langLabel: "Language",
+    signedInAs: "Signed in as",
+    // Account menu
+    accPaidPlan: "Paid plan",
+    accPending: "Pending approval",
+    accFreePlan: "Free plan",
+    accUpgrade: "Upgrade to paid",
+    accBilling: "Billing",
+    accSettings: "Account settings",
+    accSignOut: "Sign out",
+    // Paid-user CTA blocks (Use Cases + Sample pages)
+    ucPaidTitle: "Your use case covered?",
+    ucPaidDesc: "Open the dashboard and work with real data. If something's missing, reach out — we'll tailor it.",
+    dataPaidTitle: "This is just a sample. You already have access to everything thanks to your premium membership.",
+    dataPaidDesc: "Open the live dashboard for real, current data across every active project.",
+    // 7-day trial promo (popup + pricing card share these)
+    trialGift: "A gift for you",
+    trialHeadline: "7 days of the full Residata — on us",
+    trialActivate: "Activate 7-day trial",
+    trialPopupBody: "Try every project, analytics, reports, exports + the AI assistant for a full week.",
+    trialMaybeLater: "Maybe later",
+    trialReappear: "Re-appears next time you open Residata.",
+    trialMicro: "30s signup · no card · no auto-charge",
   },
   sk: {
     getAccess: "Kontakt",
@@ -249,5 +286,39 @@ export const t = {
     ],
     mostPopular: "Najobľúbenejší",
     seePricing: "Pozrieť cenník",
+    // ── App chrome & CTAs — viď komentár v `en`.
+    openPlatform: "Otvoriť platformu",
+    openDashboard: "Otvoriť dashboard",
+    heroSeePricing: "Cenník",
+    heroUpgrade: "Upgrade na paid",
+    heroAnalytics: "Analytika",
+    valueCtaBtn: "Čo dostanete",
+    // Nav
+    navSignIn: "Prihlásiť sa",
+    navGetStarted: "Začať zadarmo",
+    menuTitle: "Menu",
+    langLabel: "Jazyk",
+    signedInAs: "Prihlásený ako",
+    // Account menu
+    accPaidPlan: "Platený plán",
+    accPending: "Čaká na schválenie",
+    accFreePlan: "Free plán",
+    accUpgrade: "Upgradovať na platený",
+    accBilling: "Fakturácia",
+    accSettings: "Nastavenia účtu",
+    accSignOut: "Odhlásiť sa",
+    // Paid-user CTA blocks (Use Cases + Sample pages)
+    ucPaidTitle: "Tvoj use case je pokrytý?",
+    ucPaidDesc: "Otvor dashboard a začni pracovať s reálnymi dátami. Ak niečo chýba, napíš — doladíme.",
+    dataPaidTitle: "Toto je len ukážka. Vďaka prémiovému členstvu máš prístup ku všetkému.",
+    dataPaidDesc: "Otvor live dashboard pre reálne aktuálne dáta zo všetkých aktívnych projektov.",
+    // 7-day trial promo (popup + pricing card share these)
+    trialGift: "Darček pre teba",
+    trialHeadline: "7 dní plného Residata — zadarmo",
+    trialActivate: "Aktivovať 7-dňový trial",
+    trialPopupBody: "Vyskúšaj všetky projekty, analytiku, reporty, exporty + AI asistenta na týždeň naplno.",
+    trialMaybeLater: "Možno neskôr",
+    trialReappear: "Otvorí sa znova keď nabudúce otvoríš Residata.",
+    trialMicro: "30s signup · žiadna karta · bez strhávania",
   },
 };
