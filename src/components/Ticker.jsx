@@ -55,7 +55,7 @@ export default function Ticker({ lang = "en" }) {
 
   if (loading && !items.length) {
     return (
-      <div style={styles.wrapper}>
+      <div style={styles.wrapper} aria-hidden="true">
         <div style={styles.fadeLeft} />
         <div style={{...styles.content, color: "#55555f"}}>{t.ticker_loading}</div>
         <div style={styles.fadeRight} />
@@ -64,7 +64,7 @@ export default function Ticker({ lang = "en" }) {
   }
 
   return (
-    <div style={styles.wrapper} aria-label="Live market ticker">
+    <div style={styles.wrapper} aria-hidden="true">
       <div style={styles.badge}>{t.live}</div>
       <div style={styles.fadeLeft} />
       <div style={styles.track}>

@@ -84,6 +84,18 @@ body {
   border-radius: var(--r-sm);
 }
 
+/* ── visually-hidden but screen-reader-readable (e.g. a label for an
+   icon-only / action table column whose header has no visible text) ────── */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* ── respect users who ask for less motion ─────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

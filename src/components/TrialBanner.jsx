@@ -119,7 +119,7 @@ export function TrialBanner({ lang = "sk", onCta }) {
   };
 
   return (
-    <div ref={bannerRef} style={{
+    <div ref={bannerRef} role="region" aria-label={L("Akcia", "Promotion")} style={{
       position: "fixed",
       top: 0, left: 0, right: 0,
       zIndex: "var(--z-banner)",
