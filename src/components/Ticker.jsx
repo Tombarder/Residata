@@ -81,10 +81,13 @@ export default function Ticker({ lang = "en" }) {
 const styles = {
   wrapper: {
     position: "fixed",
-    top: "calc(72px + var(--safe-top))",  // pod Nav (~72px) + notch inset (0 on non-notch devices)
+    // Sit exactly at the nav's bottom edge. --nav-h is the nav's REAL measured
+    // height (published by the marketing Nav, already includes its notch-inset
+    // padding); the fallback reproduces the old hard-coded 72px + inset.
+    top: "var(--nav-h, calc(72px + var(--safe-top)))",
     left: 0,
     right: 0,
-    zIndex: 99,
+    zIndex: "var(--z-ticker, 99)",
     height: 36,
     background: "#0e0e10",
     borderBottom: "1px solid #222228",
