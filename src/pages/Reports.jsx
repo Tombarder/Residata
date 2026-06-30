@@ -4,7 +4,7 @@
  * Five scopes, each its own view but sharing primitives:
  *   · Market     — nationwide snapshot (every active project)
  *   · Mesto      — one city (Bratislava / Košice / …)
- *   · Časť mesta — one district (Staré Mesto, Petržalka, Ružinov, …)
+ *   · Mestská časť — one district (Staré Mesto, Petržalka, Ružinov, …)
  *   · Projekt    — deep-dive on one project
  *   · Developer  — developer portfolio overview
  *
@@ -48,7 +48,7 @@ const red = "#ff6b6b";
 const SCOPES = [
   { key: "market",      label: { sk: "Trh",          en: "Market" } },
   { key: "mesto",       label: { sk: "Mesto",        en: "City" } },
-  { key: "cast",        label: { sk: "Časť mesta",   en: "District" } },
+  { key: "cast",        label: { sk: "Mestská časť",   en: "District" } },
   { key: "projekt",     label: { sk: "Projekt",      en: "Project" } },
   { key: "developer",   label: { sk: "Developer",    en: "Developer" } },
   // Analytical reports — visually separated by a CSS divider in the tab row
@@ -221,7 +221,7 @@ export default function PlatformReports({ lang = "sk" }) {
         <PickerRow label={lang === "sk" ? "Mesto" : "City"} value={cityPick} options={cities} onChange={setCityPick} />
       )}
       {scope === "cast" && (
-        <PickerRow label={lang === "sk" ? "Časť mesta" : "District"} value={distPick} options={districts} onChange={setDistPick} />
+        <PickerRow label={lang === "sk" ? "Mestská časť" : "District"} value={distPick} options={districts} onChange={setDistPick} />
       )}
       {scope === "projekt" && (
         // Project picker uses allProjects (incl. paused/sold_out) so user
@@ -259,7 +259,7 @@ export default function PlatformReports({ lang = "sk" }) {
       {scope === "cast" && distPick && (
         <FilteredReport
           scopeLabel={distPick}
-          scopeType={lang === "sk" ? "Časť mesta" : "District"}
+          scopeType={lang === "sk" ? "Mestská časť" : "District"}
           rpcScopeType="cast" rpcScopeValue={distPick}
           projects={projects.filter(p => p.district === distPick)}
           allProjects={projects}
@@ -589,7 +589,7 @@ function MarketReport({ projects, onOpenProject, lang }) {
       </ReportSection>
 
       <ReportSection label={lang === "sk" ? "Časti mesta" : "Districts"} title={lang === "sk" ? "Kde je dopyt a ceny najvyššie" : "Where demand and prices concentrate"}>
-        <AggregateTable rows={districts} lang={lang} nameLabel={lang === "sk" ? "Časť" : "District"} />
+        <AggregateTable rows={districts} lang={lang} nameLabel={lang === "sk" ? "Mestská časť" : "District"} />
       </ReportSection>
 
       <ReportSection label={lang === "sk" ? "Top developeri" : "Top developers"} title={lang === "sk" ? "Podľa objemu jednotiek" : "By total inventory"}>
@@ -724,7 +724,7 @@ function ProjectReport({ project, siblings, lang }) {
     <>
       <KpiStrip summary={summary} lang={lang} extra={[
         { label: "Developer",   value: project.developer || "—" },
-        { label: lang === "sk" ? "Časť" : "District", value: project.district || "—" },
+        { label: lang === "sk" ? "Mestská časť" : "District", value: project.district || "—" },
       ]} />
 
       <ReportSection label={lang === "sk" ? "Profil projektu" : "Project profile"} title={title}>
@@ -1000,7 +1000,7 @@ function HistogramDrilldown({ bin, rows, loading, unit, lang, onClose, onProject
             <thead style={{ position: "sticky", top: 0, background: bg2, zIndex: 1 }}>
               <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
                 <th style={tdh}>{lang === "sk" ? "Projekt" : "Project"}</th>
-                <th style={tdh}>{lang === "sk" ? "Časť" : "District"}</th>
+                <th style={tdh}>{lang === "sk" ? "Mestská časť" : "District"}</th>
                 <th style={tdhR}>{lang === "sk" ? "Izby" : "Rooms"}</th>
                 <th style={tdhR}>{lang === "sk" ? "Plocha" : "Area"}</th>
                 <th style={tdhR}>{lang === "sk" ? `Cena ${moneySymbol()}` : `Price ${moneySymbol()}`}</th>
@@ -1238,7 +1238,7 @@ function ProjectTable({ projects, flats, lang, onProjectClick }) {
           <tr style={{ background: bg, textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
             <th style={tdh}>{lang === "sk" ? "Projekt" : "Project"}</th>
             <th style={tdh}>Developer</th>
-            <th style={tdh}>{lang === "sk" ? "Časť" : "District"}</th>
+            <th style={tdh}>{lang === "sk" ? "Mestská časť" : "District"}</th>
             <th style={tdhR}>{lang === "sk" ? "Bytov" : "Units"}</th>
             <th style={tdhR}>{lang === "sk" ? "Voľných" : "Available"}</th>
             <th style={tdhR}>{lang === "sk" ? "Pred %" : "Sold %"}</th>
@@ -1539,7 +1539,7 @@ function SellOutForecastReport({ projects, lang, onOpenProject }) {
             <thead>
               <tr style={{ background: bg, textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
                 <th style={tdh}>{lang === "sk" ? "Projekt" : "Project"}</th>
-                <th style={tdh}>{lang === "sk" ? "Časť" : "District"}</th>
+                <th style={tdh}>{lang === "sk" ? "Mestská časť" : "District"}</th>
                 <th style={tdhR}>{lang === "sk" ? "Voľných" : "Available"}</th>
                 <th style={tdhR}>{lang === "sk" ? "Predané (1 mes.)" : "Sold (last mo.)"}</th>
                 <th style={tdhR}>{lang === "sk" ? "Mesiace" : "Months"}</th>
@@ -1793,7 +1793,7 @@ function ComparableTransactionsReport({ projects, lang }) {
               <thead>
                 <tr style={{ background: bg, textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
                   <th style={tdh}>{lang === "sk" ? "Projekt" : "Project"}</th>
-                  <th style={tdh}>{lang === "sk" ? "Časť" : "District"}</th>
+                  <th style={tdh}>{lang === "sk" ? "Mestská časť" : "District"}</th>
                   <th style={tdhR}>{lang === "sk" ? "Izby" : "Rooms"}</th>
                   <th style={tdhR}>m²</th>
                   <th style={tdhR}>{lang === "sk" ? `Cena (${moneySymbol()})` : `Price (${moneySymbol()})`}</th>
@@ -1946,7 +1946,7 @@ function PricingTensionReport({ projects, lang, onOpenProject }) {
             <thead>
               <tr style={{ background: bg, textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
                 <th style={tdh}>{lang === "sk" ? "Projekt" : "Project"}</th>
-                <th style={tdh}>{lang === "sk" ? "Časť" : "District"}</th>
+                <th style={tdh}>{lang === "sk" ? "Mestská časť" : "District"}</th>
                 <th style={tdhR}>{moneySymbol()}/m²</th>
                 <th style={tdhR}>{lang === "sk" ? "vs. medián" : "vs. median"}</th>
                 <th style={tdhR}>{lang === "sk" ? "Velocity %/mes." : "Velocity %/mo."}</th>
