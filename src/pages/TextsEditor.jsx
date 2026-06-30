@@ -22,9 +22,9 @@
  * key. Filtering/searching unmounts rows, but the draft survives — switching
  * language or reloading is the only thing that discards (with a confirm).
  *
- * LANGUAGES: SK + EN are live on the public switcher. CZ ('cs') is editable here
- * already (so the copy can be written ahead of time) but stays hidden from public
- * visitors until it's turned on — until then untranslated Czech falls back to EN.
+ * LANGUAGES: SK + EN + CZ are all live on the public switcher (CZ launched
+ * 2026-06-30). Untranslated Czech keys fall back to EN, so it's safe to leave
+ * any cs cell blank — the public site shows English there, never blank.
  *
  * SECURITY mirrors LocationManager: writes go through admin-gated SECURITY
  * DEFINER RPCs (admin_*_site_content), called via a direct PostgREST fetch that
@@ -87,7 +87,7 @@ async function rpcDirect(fn, body, { timeoutMs = 20000 } = {}) {
 const LANGS = [
   { code: "sk", label: "SK" },
   { code: "en", label: "EN" },
-  { code: "cs", label: "CZ", note: "not yet public" },
+  { code: "cs", label: "CZ" },
 ];
 const FILL_LANGS = ["sk", "en", "cs"];
 
