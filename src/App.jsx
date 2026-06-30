@@ -37,7 +37,7 @@ import { useAuth } from "./lib/useAuth";
 import { useCapabilities } from "./lib/useCapabilities";
 import { useCountry } from "./lib/useCountry";
 import { useMarketTotals } from "./lib/useData";
-import { pushRoute, pathToPage, isAppPage } from "./lib/routing";
+import { pushRoute, pathToPage, isAppPage, pageToPath } from "./lib/routing";
 import { applySeo } from "./lib/seo";
 import { localeTag } from "./lib/locale";
 import { startPageEngagement, stopPageEngagement } from "./lib/engagement";
@@ -304,6 +304,27 @@ function NavBtn({ style, children, ...rest }) {
   return <button type="button" style={{ ...NAV_BTN_RESET, ...style }} {...rest}>{children}</button>;
 }
 
+/* Sibling of NavBtn for items that NAVIGATE (logo, the marketing links, "Open
+   platform") rather than act. A NavBtn is keyboard-operable, but a navigation
+   is semantically a LINK: rendering a real <a href> makes screen readers
+   announce "link", shows the URL on hover, and restores native cmd / ctrl /
+   middle-click "open in new tab" + "copy link". A plain left-click is handed to
+   the SPA router (onNavigate); modified / non-primary clicks fall through so the
+   browser still opens a new tab/window. The href comes from the same
+   pageToPath() the router pushes, so the address bar and the link always agree.
+   No style reset is needed — an <a> inherits font + has no control chrome, and
+   every call-site already sets text-decoration:none + its colour via class or
+   inline style, so the rendering is byte-identical to the old button. */
+function NavLink({ to, onNavigate, onClick, style, children, ...rest }) {
+  const handleClick = (e) => {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    onClick?.(e);
+    onNavigate?.(to);
+  };
+  return <a href={pageToPath(to)} onClick={handleClick} style={style} {...rest}>{children}</a>;
+}
+
 /* Logged-in account control for the desktop nav. A fixed-size avatar button that
    opens a dropdown holding the FULL email, the plan, account links + sign out —
    so the nav's width never depends on how long the user's email is (the old
@@ -420,6 +441,7 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
   // Mobile menu (≤1180px). Desktop (>1180) never mounts the overlay.
   const [menuOpen, setMenuOpen] = useState(false);
   const closeBtnRef = useRef(null);
+  const panelRef = useRef(null);
   const navRef = useRef(null);
   // Single source of truth for the hamburger breakpoint (BP.desktop = 1180),
   // shared with the CSS swap so JS state and the CSS media query can't disagree.
@@ -453,7 +475,20 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
     if (!menuOpen) return;
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const onKey = (e) => { if (e.key === "Escape") setMenuOpen(false); };
+    // Esc closes; Tab is trapped inside the sheet so keyboard focus can't drift
+    // onto the (visually covered) page behind an aria-modal dialog — wrapping
+    // from the last focusable back to the first and vice-versa.
+    const onKey = (e) => {
+      if (e.key === "Escape") { setMenuOpen(false); return; }
+      if (e.key !== "Tab") return;
+      const panel = panelRef.current;
+      if (!panel) return;
+      const f = panel.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])');
+      if (!f.length) return;
+      const first = f[0], last = f[f.length - 1], el = document.activeElement;
+      if (e.shiftKey && (el === first || !panel.contains(el))) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && (el === last || !panel.contains(el))) { e.preventDefault(); first.focus(); }
+    };
     window.addEventListener("keydown", onKey);
     const focusT = setTimeout(() => closeBtnRef.current?.focus(), 0);
     return () => {
@@ -472,25 +507,25 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
 
   // Language toggle — shared between the desktop cluster and the mobile menu.
   const langToggle = (
-    <div style={{
+    <div role="group" aria-label={lang === "en" ? "Language" : "Jazyk"} style={{
       display: "flex", borderRadius: "var(--r-sm)", overflow: "hidden",
       border: "1px solid var(--border)", fontSize: "0.72rem",
       fontFamily: "'JetBrains Mono', monospace",
     }}>
-      <button onClick={() => { if (lang !== "en") { track("language_switched", { from: lang, to: "en" }); setLang("en"); } }} style={{
+      <button type="button" aria-pressed={lang === "en"} onClick={() => { if (lang !== "en") { track("language_switched", { from: lang, to: "en" }); setLang("en"); } }} style={{
         padding: "0.4rem 0.8rem", border: "none", cursor: "pointer",
         background: lang === "en" ? "var(--border)" : "transparent",
         color: lang === "en" ? "var(--text)" : "var(--text-faint)",
         fontFamily: "inherit", fontSize: "inherit", transition: "all 0.2s",
       }}>EN</button>
-      <button onClick={() => { if (lang !== "sk") { track("language_switched", { from: lang, to: "sk" }); setLang("sk"); } }} style={{
+      <button type="button" aria-pressed={lang === "sk"} onClick={() => { if (lang !== "sk") { track("language_switched", { from: lang, to: "sk" }); setLang("sk"); } }} style={{
         padding: "0.4rem 0.8rem", border: "none", cursor: "pointer",
         borderLeft: "1px solid var(--border)",
         background: lang === "sk" ? "var(--border)" : "transparent",
         color: lang === "sk" ? "var(--text)" : "var(--text-faint)",
         fontFamily: "inherit", fontSize: "inherit", transition: "all 0.2s",
       }}>SK</button>
-      <button onClick={() => { if (lang !== "cs") { track("language_switched", { from: lang, to: "cs" }); setLang("cs"); } }} style={{
+      <button type="button" aria-pressed={lang === "cs"} onClick={() => { if (lang !== "cs") { track("language_switched", { from: lang, to: "cs" }); setLang("cs"); } }} style={{
         padding: "0.4rem 0.8rem", border: "none", cursor: "pointer",
         borderLeft: "1px solid var(--border)",
         background: lang === "cs" ? "var(--border)" : "transparent",
@@ -501,7 +536,7 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
   );
 
   return (
-    <nav ref={navRef} className="marketing-nav" style={{
+    <nav ref={navRef} className="marketing-nav" aria-label={lang === "sk" ? "Hlavná navigácia" : lang === "cs" ? "Hlavní navigace" : "Main navigation"} style={{
       position: "fixed", top: 0, width: "100%", zIndex: 100,
       background: "rgba(10,10,11,0.85)",
       backdropFilter: "blur(20px)", borderBottom: "1px solid #222228",
@@ -510,14 +545,14 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
         maxWidth: "var(--container)", margin: "0 auto", padding: "1rem var(--gutter-safe)",
         display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: "1rem",
       }}>
-        <NavBtn onClick={() => setCurrent("Home")} aria-label="Residata — home" style={{ gridColumn: 1, justifySelf: "start", display: "flex", alignItems: "center", gap: "0.6rem", cursor: "pointer", textDecoration: "none" }}>
+        <NavLink to="Home" onNavigate={setCurrent} aria-label="Residata — home" style={{ gridColumn: 1, justifySelf: "start", display: "flex", alignItems: "center", gap: "0.6rem", cursor: "pointer", textDecoration: "none" }}>
           <div style={{
             width: 28, height: 28, background: "var(--accent)", borderRadius: "var(--r-sm)",
             display: "flex", alignItems: "center", justifyContent: "center",
             fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, fontSize: 14, color: "var(--bg)",
           }}>R</div>
           <span style={{ fontWeight: 600, fontSize: "1.1rem", color: "var(--text)", letterSpacing: "-0.02em" }}>Residata</span>
-        </NavBtn>
+        </NavLink>
         {/* Center zone: marketing links, balanced between logo and CTAs */}
         <div className="nav-links" style={{ justifySelf: "center", display: "flex", alignItems: "center", gap: "1.75rem" }}>
           {pages.map((p, i) => {
@@ -528,7 +563,7 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
             const internalKey = pageMap[key] || key;
             const isActive = current === internalKey;
             return (
-              <NavBtn key={key} className={"nav-link" + (isActive ? " nav-link--active" : "")} aria-current={isActive ? "page" : undefined} onClick={() => setCurrent(key)}>{p}</NavBtn>
+              <NavLink key={key} to={internalKey} onNavigate={setCurrent} className={"nav-link" + (isActive ? " nav-link--active" : "")} aria-current={isActive ? "page" : undefined}>{p}</NavLink>
             );
           })}
         </div>
@@ -541,11 +576,11 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
               {/* Primary CTA for logged-in users on marketing pages: jump to platform.
                   nowrap so it never breaks onto two lines when the bar is tight. */}
-              <NavBtn onClick={() => setCurrent("App:Dashboard")} className="nav-cta-btn" style={{
+              <NavLink to="App:Dashboard" onNavigate={setCurrent} className="nav-cta-btn" style={{
                 padding: "0.45rem 1rem", background: "#00e5a0", color: "#0a0a0b",
                 fontWeight: 600, borderRadius: 6, fontSize: "0.78rem", cursor: "pointer",
                 textDecoration: "none", whiteSpace: "nowrap",
-              }}>{lang === "sk" ? "Otvoriť platformu →" : "Open platform →"}</NavBtn>
+              }}>{lang === "sk" ? "Otvoriť platformu →" : "Open platform →"}</NavLink>
               {/* Account = fixed-size avatar menu (email / plan / sign-out live inside),
                   so the nav width is independent of how long the email is. */}
               <AccountMenu user={user} caps={caps} auth={auth} setCurrent={setCurrent} lang={lang} />
@@ -601,6 +636,7 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
       {menuOpen && createPortal(
         <div className="nav-menu-overlay" onClick={() => setMenuOpen(false)}>
           <div
+            ref={panelRef}
             className="nav-menu-panel"
             role="dialog"
             aria-modal="true"
@@ -625,7 +661,7 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
                 const internalKey = pageMap[key] || key;
                 const isActive = current === internalKey;
                 return (
-                  <NavBtn key={key} className={"nav-menu-link" + (isActive ? " nav-menu-link--active" : "")} aria-current={isActive ? "page" : undefined} onClick={() => go(key)}>{p}</NavBtn>
+                  <NavLink key={key} to={internalKey} onNavigate={go} className={"nav-menu-link" + (isActive ? " nav-menu-link--active" : "")} aria-current={isActive ? "page" : undefined}>{p}</NavLink>
                 );
               })}
             </div>
@@ -656,9 +692,9 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
                       {user.email}
                     </div>
                   </div>
-                  <button type="button" onClick={() => go("App:Dashboard")} className="btn-p">
+                  <NavLink to="App:Dashboard" onNavigate={go} className="btn-p">
                     {lang === "sk" ? "Otvoriť platformu →" : "Open platform →"}
-                  </button>
+                  </NavLink>
                   <button type="button" onClick={() => { auth.signOut(); setMenuOpen(false); }} className="btn-s" style={{ cursor: "pointer" }}>
                     {lang === "sk" ? "Odhlásiť sa" : "Sign out"}
                   </button>
