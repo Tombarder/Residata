@@ -225,7 +225,7 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
                       {t.tbl_sold_30d}
                       {!can("view_sold_velocity") && <span style={{ marginLeft: 4, color: green, fontSize: "0.6rem" }}>🔒</span>}
                     </SortableTh>
-                    <th style={th}></th>
+                    <th style={th}><span className="sr-only">{lang === "sk" ? "Detail" : "Details"}</span></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -4489,7 +4489,7 @@ function PremiumDomainsPanel({ domains, reload }) {
               <th style={th}>Domain</th>
               <th style={th}>Default tier</th>
               <th style={th}>Note</th>
-              <th style={th}></th>
+              <th style={th}><span className="sr-only">Actions</span></th>
             </tr>
           </thead>
           <tbody>

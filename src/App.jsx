@@ -284,7 +284,7 @@ function RisingParticles() {
     };
   }, []);
   
-  return <canvas ref={canvasRef} style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0 }} />;
+  return <canvas ref={canvasRef} aria-hidden="true" style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0 }} />;
 }
 
 /* Keyboard-accessible nav control. These nav items route WITHIN the SPA (no URL
@@ -1045,7 +1045,7 @@ function UseCasesPage({ setCurrent, l, lang }) {
                   <div style={{
                     position: "absolute", bottom: "1.5rem", left: "1.5rem", right: "1.5rem",
                   }}>
-                    <h3 style={{
+                    <h2 style={{
                       fontSize: "1.75rem",
                       fontWeight: 700,
                       letterSpacing: "-0.025em",
@@ -1053,7 +1053,7 @@ function UseCasesPage({ setCurrent, l, lang }) {
                       lineHeight: 1.2,
                       textShadow: "0 2px 16px rgba(0,0,0,0.9)",
                       margin: 0,
-                    }}>{c.tag}</h3>
+                    }}>{c.tag}</h2>
                   </div>
                 </div>
 
@@ -1296,7 +1296,7 @@ function DataPage({ setCurrent, l, lang }) {
             // Restoring 2429e8be8625 — the only one that matches the
             // 'white big building' description.
             background: `linear-gradient(135deg, rgba(0,229,160,0.06), rgba(0,0,0,0.1)), url("https://images.unsplash.com/photo-1487958449943-2429e8be8625?w=1400&q=85&auto=format&fit=crop") center/cover`,
-          }} aria-label="Modern residential building" />
+          }} role="img" aria-label="Modern residential building" />
         </div>
       </div>
 
@@ -1497,7 +1497,7 @@ function DataPage({ setCurrent, l, lang }) {
               </div>
               <span style={{ fontFamily: mono, fontSize: "0.7rem", color: "#55555f" }}>{showingLive}</span>
             </div>
-            <div className="dark-scroll" style={{ border: "1px solid #222228", borderRadius: 12, overflowX: "auto", background: "#111113" }}>
+            <div className="dark-scroll" role="region" aria-label={lang === "sk" ? "Ukážka dát — tabuľka" : "Sample data table"} tabIndex={0} style={{ border: "1px solid #222228", borderRadius: 12, overflowX: "auto", background: "#111113" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.78rem" }}>
                 <thead>
                   <tr style={{ background: "#111113" }}>
@@ -1678,9 +1678,9 @@ function PricingPage({ setCurrent, l, lang, onLogin }) {
             <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem", color: "#00e5a0", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "0.5rem", fontWeight: 700 }}>
               🎁 {lang === "sk" ? "Darček pre teba" : "A gift for you"}
             </div>
-            <h3 style={{ fontSize: "1.35rem", fontWeight: 700, color: "#e8e8ed", margin: "0 0 0.5rem", letterSpacing: "-0.01em" }}>
+            <h2 style={{ fontSize: "1.35rem", fontWeight: 700, color: "#e8e8ed", margin: "0 0 0.5rem", letterSpacing: "-0.01em" }}>
               {lang === "sk" ? "7 dní plného Residata — zadarmo" : "7 days of the full Residata — on us"}
-            </h3>
+            </h2>
             <p style={{ fontSize: "0.92rem", color: "#c0c0c8", lineHeight: 1.55, margin: "0 0 1rem" }}>
               {lang === "sk"
                 ? <>Vyskúšaj všetky projekty, analytiku, reporty, exporty + AI asistenta na týždeň naplno. <strong style={{ color: "#e8e8ed" }}>Bez karty</strong> — kartu pýtame až keby si chcel pokračovať po trial-e.</>
@@ -1737,7 +1737,7 @@ function PricingPage({ setCurrent, l, lang, onLogin }) {
                 }}>{l.mostPopular}</div>
               )}
               <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.7rem", color: "#00e5a0", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.75rem" }}>{t.tier}</div>
-              <h3 style={{ fontSize: "1.3rem", fontWeight: 600, marginBottom: "0.5rem" }}>{t.name}</h3>
+              <h2 style={{ fontSize: "1.3rem", fontWeight: 600, marginBottom: "0.5rem" }}>{t.name}</h2>
               {t.isCustom ? (
                 <div style={{ fontSize: "1.2rem", fontWeight: 600, marginBottom: "0.25rem" }}>{t.price}</div>
               ) : (
@@ -1814,7 +1814,7 @@ function PricingPage({ setCurrent, l, lang, onLogin }) {
 
       {/* FAQ */}
       <div style={{ padding: "3rem 2rem clamp(2.5rem,8vw,5rem)", maxWidth: 800, margin: "0 auto" }}>
-        <h3 style={{ fontSize: "1.3rem", fontWeight: 600, marginBottom: "2rem" }}>{l.commonQ}</h3>
+        <h2 style={{ fontSize: "1.3rem", fontWeight: 600, marginBottom: "2rem" }}>{l.commonQ}</h2>
         {faqs.map(([q, a], i) => (
           <div key={i} style={{ borderTop: "1px solid #222228", padding: "1.5rem 0", borderBottom: i === faqs.length - 1 ? "1px solid #222228" : "none" }}>
             <div style={{ fontSize: "0.95rem", fontWeight: 500, marginBottom: "0.5rem" }}>{q}</div>
@@ -2069,6 +2069,14 @@ export default function App() {
     handleNav("App:Billing");
   };
 
+  // Some page components render their OWN <main> (the Live dashboard, project
+  // detail, hero-lab — full app-style views). For those the page-transition
+  // wrapper must stay a <div>, otherwise two <main>s nest and duplicate the
+  // landmark. Marketing pages (no own main) use this wrapper itself as <main>.
+  const pageOwnsMain = current === "Live" || current === "HeroLab" ||
+    (typeof current === "string" && current.startsWith("Project:"));
+  const PageWrap = pageOwnsMain ? "div" : "main";
+
   return (
     <div style={{ background: "#0a0a0b", color: "#e8e8ed", fontFamily: "'Outfit', -apple-system, sans-serif", minHeight: "100vh", WebkitFontSmoothing: "antialiased", position: "relative" }}>
       <style>{`
@@ -2286,7 +2294,7 @@ export default function App() {
           />
         </Suspense>
       ) : (
-        <main key={current} className="page-transition">
+        <PageWrap key={current} className="page-transition">
           <>
             {current === "Home" && <HomePage setCurrent={handleNav} l={l} lang={lang} onLogin={() => setLoginOpen(true)} />}
 
@@ -2327,7 +2335,7 @@ export default function App() {
               </Suspense>
             )}
           </>
-        </main>
+        </PageWrap>
       )}
       {!isAppPage(current) && <Footer lang={lang} setCurrent={handleNav} />}
       {/* F-051 (Boss 2026-05-31) — cookie consent banner. Shows on first
@@ -2354,7 +2362,7 @@ export default function App() {
               .mc-dock { display: none; }
             }
           `}</style>
-          <div className="mc-dock">
+          <div className="mc-dock" role="region" aria-label={lang === "sk" ? "Trh a mena" : lang === "cs" ? "Trh a měna" : "Market and currency"}>
             <MarketControls lang={lang} />
           </div>
         </>
