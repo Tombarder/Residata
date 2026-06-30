@@ -281,6 +281,23 @@ function RisingParticles() {
   return <canvas ref={canvasRef} style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0 }} />;
 }
 
+/* Keyboard-accessible nav control. These nav items route WITHIN the SPA (no URL
+   to put in href), so they must be real <button>s — an <a> without href is
+   skipped by Tab and ignores Enter/Space, which left the whole marketing nav
+   unreachable for keyboard / screen-reader users. The reset strips native button
+   chrome (background/border/padding/font-family/appearance) so the element looks
+   exactly like the content it wraps; the caller's inline style spreads AFTER it,
+   so the styled CTAs (their own background/padding) and the class-styled text
+   links (.nav-link) both render unchanged — only the semantics improve. */
+const NAV_BTN_RESET = {
+  background: "none", border: 0, padding: 0, margin: 0,
+  fontFamily: "inherit", lineHeight: "inherit", textAlign: "inherit",
+  cursor: "pointer", appearance: "none", WebkitAppearance: "none",
+};
+function NavBtn({ style, children, ...rest }) {
+  return <button type="button" style={{ ...NAV_BTN_RESET, ...style }} {...rest}>{children}</button>;
+}
+
 /* Logged-in account control for the desktop nav. A fixed-size avatar button that
    opens a dropdown holding the FULL email, the plan, account links + sign out —
    so the nav's width never depends on how long the user's email is (the old
@@ -293,13 +310,29 @@ function AccountMenu({ user, caps, auth, setCurrent, lang }) {
     // Remember what opened the menu (the avatar button) so focus returns to it on
     // close — keyboard / screen-reader users otherwise lose their place.
     const trigger = typeof document !== "undefined" ? document.activeElement : null;
+    const items = () => [...(ref.current?.querySelectorAll('[role="menuitem"]') || [])];
     const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    // Full ARIA menu keyboard pattern: Esc closes, Up/Down roves between items
+    // (wrapping), Home/End jump to ends — so the role="menu" isn't a lie.
+    const onKey = (e) => {
+      if (e.key === "Escape") { setOpen(false); return; }
+      const list = items();
+      if (!list.length) return;
+      const i = list.indexOf(document.activeElement);
+      if (e.key === "ArrowDown") { e.preventDefault(); (list[i + 1] || list[0]).focus(); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); (list[i - 1] || list[list.length - 1]).focus(); }
+      else if (e.key === "Home") { e.preventDefault(); list[0].focus(); }
+      else if (e.key === "End") { e.preventDefault(); list[list.length - 1].focus(); }
+    };
     document.addEventListener("mousedown", onDoc);
     document.addEventListener("keydown", onKey);
+    // Move focus to the first item on open (WAI menu-button pattern). The ring
+    // only shows for keyboard users (:focus-visible), so mouse users see nothing.
+    const focusT = setTimeout(() => items()[0]?.focus(), 0);
     return () => {
       document.removeEventListener("mousedown", onDoc);
       document.removeEventListener("keydown", onKey);
+      clearTimeout(focusT);
       if (trigger && typeof trigger.focus === "function") trigger.focus();
     };
   }, [open]);
@@ -464,14 +497,14 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
         maxWidth: "var(--container)", margin: "0 auto", padding: "1rem var(--gutter-safe)",
         display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: "1rem",
       }}>
-        <a onClick={() => setCurrent("Home")} style={{ gridColumn: 1, justifySelf: "start", display: "flex", alignItems: "center", gap: "0.6rem", cursor: "pointer", textDecoration: "none" }}>
+        <NavBtn onClick={() => setCurrent("Home")} aria-label="Residata — home" style={{ gridColumn: 1, justifySelf: "start", display: "flex", alignItems: "center", gap: "0.6rem", cursor: "pointer", textDecoration: "none" }}>
           <div style={{
             width: 28, height: 28, background: "var(--accent)", borderRadius: "var(--r-sm)",
             display: "flex", alignItems: "center", justifyContent: "center",
             fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, fontSize: 14, color: "var(--bg)",
           }}>R</div>
           <span style={{ fontWeight: 600, fontSize: "1.1rem", color: "var(--text)", letterSpacing: "-0.02em" }}>Residata</span>
-        </a>
+        </NavBtn>
         {/* Center zone: marketing links, balanced between logo and CTAs */}
         <div className="nav-links" style={{ justifySelf: "center", display: "flex", alignItems: "center", gap: "1.75rem" }}>
           {pages.map((p, i) => {
@@ -482,7 +515,7 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
             const internalKey = pageMap[key] || key;
             const isActive = current === internalKey;
             return (
-              <a key={key} className={"nav-link" + (isActive ? " nav-link--active" : "")} onClick={() => setCurrent(key)}>{p}</a>
+              <NavBtn key={key} className={"nav-link" + (isActive ? " nav-link--active" : "")} aria-current={isActive ? "page" : undefined} onClick={() => setCurrent(key)}>{p}</NavBtn>
             );
           })}
         </div>
@@ -495,11 +528,11 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
               {/* Primary CTA for logged-in users on marketing pages: jump to platform.
                   nowrap so it never breaks onto two lines when the bar is tight. */}
-              <a onClick={() => setCurrent("App:Dashboard")} className="nav-cta-btn" style={{
+              <NavBtn onClick={() => setCurrent("App:Dashboard")} className="nav-cta-btn" style={{
                 padding: "0.45rem 1rem", background: "#00e5a0", color: "#0a0a0b",
                 fontWeight: 600, borderRadius: 6, fontSize: "0.78rem", cursor: "pointer",
                 textDecoration: "none", whiteSpace: "nowrap",
-              }}>{lang === "sk" ? "Otvoriť platformu →" : "Open platform →"}</a>
+              }}>{lang === "sk" ? "Otvoriť platformu →" : "Open platform →"}</NavBtn>
               {/* Account = fixed-size avatar menu (email / plan / sign-out live inside),
                   so the nav width is independent of how long the email is. */}
               <AccountMenu user={user} caps={caps} auth={auth} setCurrent={setCurrent} lang={lang} />
@@ -511,7 +544,7 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
             // labels end the "wait, am I signing up or logging in?"
             // confusion the user reported.
             <div style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
-              <a onClick={onLogin} className="nav-signin-btn" style={{
+              <NavBtn onClick={onLogin} className="nav-signin-btn" style={{
                 padding: "0.45rem 0.95rem", background: "transparent", color: "#e8e8ed",
                 border: "1px solid #222228", fontWeight: 500, borderRadius: 6,
                 fontSize: "0.78rem", cursor: "pointer", textDecoration: "none",
@@ -520,14 +553,14 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
               onMouseEnter={e => { e.currentTarget.style.borderColor = "#00e5a0"; e.currentTarget.style.color = "#00e5a0"; }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = "#222228"; e.currentTarget.style.color = "#e8e8ed"; }}
               title={lang === "sk" ? "Už máš účet? Prihlás sa." : "Already have an account? Sign in."}
-              >{lang === "sk" ? "Prihlásiť sa" : "Sign in"}</a>
-              <a onClick={onLogin} className="nav-cta-btn" style={{
+              >{lang === "sk" ? "Prihlásiť sa" : "Sign in"}</NavBtn>
+              <NavBtn onClick={onLogin} className="nav-cta-btn" style={{
                 padding: "0.5rem 1.15rem", background: "#00e5a0", color: "#0a0a0b",
                 fontWeight: 700, borderRadius: 6, fontSize: "0.8rem", cursor: "pointer",
                 letterSpacing: "0.01em", textDecoration: "none",
               }}
               title={lang === "sk" ? "Nový tu? Zaregistruj sa za 30s a dostaneš 7-dňový paid trial zadarmo." : "New here? 30s sign-up → 7-day paid trial free."}
-              >{lang === "sk" ? "Začať zadarmo →" : "Get started free →"}</a>
+              >{lang === "sk" ? "Začať zadarmo →" : "Get started free →"}</NavBtn>
             </div>
           )}
           </div>
@@ -579,7 +612,7 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
                 const internalKey = pageMap[key] || key;
                 const isActive = current === internalKey;
                 return (
-                  <a key={key} className={"nav-menu-link" + (isActive ? " nav-menu-link--active" : "")} onClick={() => go(key)}>{p}</a>
+                  <NavBtn key={key} className={"nav-menu-link" + (isActive ? " nav-menu-link--active" : "")} aria-current={isActive ? "page" : undefined} onClick={() => go(key)}>{p}</NavBtn>
                 );
               })}
             </div>
@@ -610,21 +643,21 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
                       {user.email}
                     </div>
                   </div>
-                  <a onClick={() => go("App:Dashboard")} className="btn-p">
+                  <button type="button" onClick={() => go("App:Dashboard")} className="btn-p">
                     {lang === "sk" ? "Otvoriť platformu →" : "Open platform →"}
-                  </a>
-                  <a onClick={() => { auth.signOut(); setMenuOpen(false); }} className="btn-s" style={{ cursor: "pointer" }}>
+                  </button>
+                  <button type="button" onClick={() => { auth.signOut(); setMenuOpen(false); }} className="btn-s" style={{ cursor: "pointer" }}>
                     {lang === "sk" ? "Odhlásiť sa" : "Sign out"}
-                  </a>
+                  </button>
                 </>
               ) : (
                 <>
-                  <a onClick={() => { onLogin(); setMenuOpen(false); }} className="btn-p" style={{ cursor: "pointer" }}>
+                  <button type="button" onClick={() => { onLogin(); setMenuOpen(false); }} className="btn-p" style={{ cursor: "pointer" }}>
                     {lang === "sk" ? "Začať zadarmo →" : "Get started free →"}
-                  </a>
-                  <a onClick={() => { onLogin(); setMenuOpen(false); }} className="btn-s" style={{ cursor: "pointer" }}>
+                  </button>
+                  <button type="button" onClick={() => { onLogin(); setMenuOpen(false); }} className="btn-s" style={{ cursor: "pointer" }}>
                     {lang === "sk" ? "Prihlásiť sa" : "Sign in"}
-                  </a>
+                  </button>
                 </>
               )}
             </div>
@@ -724,32 +757,32 @@ function HomePage({ setCurrent, l, lang, onLogin }) {
     // anon — hlavný CTA = signup
     heroButtons = (
       <>
-        <a onClick={onLogin} className="btn-p">{l.heroBtn1}</a>
-        <a onClick={() => setCurrent("Live")} className="btn-s">{l.heroBtn2}</a>
+        <button type="button" onClick={onLogin} className="btn-p">{l.heroBtn1}</button>
+        <button type="button" onClick={() => setCurrent("Live")} className="btn-s">{l.heroBtn2}</button>
       </>
     );
   } else if (tier === "pending") {
     // Logged-in but not yet approved (freemium edge case).
     heroButtons = (
       <>
-        <a onClick={() => setCurrent("App:Dashboard")} className="btn-p">{lang === "sk" ? "Otvoriť platformu" : "Open platform"}</a>
-        <a onClick={() => setCurrent("Pricing")} className="btn-s">{lang === "sk" ? "Cenník" : "See pricing"}</a>
+        <button type="button" onClick={() => setCurrent("App:Dashboard")} className="btn-p">{lang === "sk" ? "Otvoriť platformu" : "Open platform"}</button>
+        <button type="button" onClick={() => setCurrent("Pricing")} className="btn-s">{lang === "sk" ? "Cenník" : "See pricing"}</button>
       </>
     );
   } else if (can("prompt_upgrade_to_paid")) {
     // Logged-in free user — route to platform, offer upgrade as secondary.
     heroButtons = (
       <>
-        <a onClick={() => setCurrent("App:Dashboard")} className="btn-p">{lang === "sk" ? "Otvoriť platformu" : "Open platform"}</a>
-        <a onClick={() => setCurrent("App:Billing")} className="btn-s">{lang === "sk" ? "Upgrade na paid" : "Upgrade to paid"}</a>
+        <button type="button" onClick={() => setCurrent("App:Dashboard")} className="btn-p">{lang === "sk" ? "Otvoriť platformu" : "Open platform"}</button>
+        <button type="button" onClick={() => setCurrent("App:Billing")} className="btn-s">{lang === "sk" ? "Upgrade na paid" : "Upgrade to paid"}</button>
       </>
     );
   } else {
     // paid / admin — primary = platform, secondary = Analytics (platform).
     heroButtons = (
       <>
-        <a onClick={() => setCurrent("App:Dashboard")} className="btn-p">{lang === "sk" ? "Otvoriť platformu" : "Open platform"}</a>
-        {can("view_analytics") && <a onClick={() => setCurrent("App:Analytics")} className="btn-s">{lang === "sk" ? "Analytika" : "Analytics"}</a>}
+        <button type="button" onClick={() => setCurrent("App:Dashboard")} className="btn-p">{lang === "sk" ? "Otvoriť platformu" : "Open platform"}</button>
+        {can("view_analytics") && <button type="button" onClick={() => setCurrent("App:Analytics")} className="btn-s">{lang === "sk" ? "Analytika" : "Analytics"}</button>}
       </>
     );
   }
@@ -1046,15 +1079,15 @@ function UseCasesPage({ setCurrent, l, lang }) {
                 ? "Otvor dashboard a začni pracovať s reálnymi dátami. Ak niečo chýba, napíš — doladíme."
                 : "Open the dashboard and work with real data. If something's missing, reach out — we'll tailor it."}
             </p>
-            <a onClick={() => setCurrent("Live")} className="btn-p">
+            <button type="button" onClick={() => setCurrent("Live")} className="btn-p">
               {lang === "sk" ? "Otvoriť dashboard" : "Open dashboard"}
-            </a>
+            </button>
           </>
         ) : (
           <>
             <h2 style={{ fontSize: "1.5rem", fontWeight: 700, letterSpacing: "-0.03em", marginBottom: "1rem" }}>{l.useCasesCta}</h2>
             <p style={{ color: "#8a8a96", maxWidth: 480, margin: "0 auto 2rem", fontWeight: 300 }}>{l.useCasesCtaDesc}</p>
-            <a onClick={() => setCurrent("Pricing")} className="btn-p">{l.useCasesCtaBtn}</a>
+            <button type="button" onClick={() => setCurrent("Pricing")} className="btn-p">{l.useCasesCtaBtn}</button>
           </>
         )}
       </div>
@@ -1509,15 +1542,15 @@ function DataPage({ setCurrent, l, lang }) {
                 ? "Otvor live dashboard pre reálne aktuálne dáta zo všetkých aktívnych projektov."
                 : "Open the live dashboard for real, current data across every active project."}
             </p>
-            <a onClick={() => setCurrent("Live")} className="btn-p">
+            <button type="button" onClick={() => setCurrent("Live")} className="btn-p">
               {lang === "sk" ? "Otvoriť dashboard" : "Open dashboard"}
-            </a>
+            </button>
           </>
         ) : (
           <>
             <h2 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "1rem" }}>{l.wantFull}</h2>
             <p style={{ color: "#8a8a96", maxWidth: 480, margin: "0 auto 2rem", fontWeight: 300 }}>{l.wantFullDesc}</p>
-            <a onClick={() => setCurrent("Pricing")} className="btn-p">{l.seePricing}</a>
+            <button type="button" onClick={() => setCurrent("Pricing")} className="btn-p">{l.seePricing}</button>
           </>
         )}
       </div>
@@ -1605,9 +1638,9 @@ function PricingPage({ setCurrent, l, lang, onLogin }) {
                 : <>Try every project, analytics, reports, exports + the AI assistant for a full week. <strong style={{ color: "#e8e8ed" }}>No card required</strong> — we only ask for one if you decide to continue after the trial.</>}
             </p>
             <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center", flexWrap: "wrap", alignItems: "center" }}>
-              <a onClick={startTrial} className="btn-p" style={{ cursor: "pointer" }}>
+              <button type="button" onClick={startTrial} className="btn-p" style={{ cursor: "pointer" }}>
                 {lang === "sk" ? "Aktivovať 7-dňový trial" : "Activate 7-day trial"}
-              </a>
+              </button>
               <span style={{ fontSize: "0.72rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace" }}>
                 {lang === "sk" ? "30s signup · žiadna karta · bez strhávania" : "30s signup · no card · no auto-charge"}
               </span>
@@ -1685,14 +1718,15 @@ function PricingPage({ setCurrent, l, lang, onLogin }) {
                   {lang === "sk" ? "Už máš prístup" : "You're subscribed"}
                 </div>
               ) : (
-                <a
+                <button
+                  type="button"
                   onClick={() => setCurrent("Contact")}
                   className={t.featured ? "btn-p" : "btn-s"}
                   style={{
                     display: "block", textAlign: "center",
                     fontSize: "0.9rem", padding: "0.85rem 2rem",
                   }}
-                >{t.cta}</a>
+                >{t.cta}</button>
               )}
             </div>
           ))}
@@ -1749,7 +1783,7 @@ function PricingPage({ setCurrent, l, lang, onLogin }) {
         }} />
         <h2 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "1rem" }}>{l.notSure}</h2>
         <p style={{ color: "#8a8a96", maxWidth: 480, margin: "0 auto 2rem", fontWeight: 300 }}>{l.notSureDesc}</p>
-        <a onClick={() => setCurrent("Contact")} className="btn-p" style={{ cursor: "pointer" }}>{l.getInTouch}</a>
+        <button type="button" onClick={() => setCurrent("Contact")} className="btn-p" style={{ cursor: "pointer" }}>{l.getInTouch}</button>
       </div>
     </>
   );
@@ -1991,9 +2025,9 @@ export default function App() {
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@300;400;500;600;700&display=swap');
         .sec-title { font-size: clamp(1.8rem, 3.5vw, 2.6rem); font-weight: 700; letter-spacing: -0.03em; margin-bottom: 1rem; line-height: 1.15; }
         .sec-desc { font-size: 1.05rem; color: var(--text-dim); max-width: 600px; font-weight: 300; line-height: 1.7; }
-        .btn-p { display: inline-block; padding: 0.75rem 2rem; background: var(--accent); color: var(--bg); font-weight: 600; font-size: 0.9rem; border: none; border-radius: var(--r-md); cursor: pointer; text-decoration: none; transition: all 0.2s; }
+        .btn-p { display: inline-block; padding: 0.75rem 2rem; background: var(--accent); color: var(--bg); font-weight: 600; font-size: 0.9rem; font-family: inherit; border: none; border-radius: var(--r-md); cursor: pointer; text-decoration: none; transition: all 0.2s; -webkit-appearance: none; appearance: none; }
         .btn-p:hover { opacity: 0.85; transform: translateY(-1px); }
-        .btn-s { display: inline-block; padding: 0.75rem 2rem; background: transparent; color: var(--text); font-weight: 500; font-size: 0.9rem; border: 1px solid var(--border); border-radius: var(--r-md); cursor: pointer; text-decoration: none; transition: all 0.2s; }
+        .btn-s { display: inline-block; padding: 0.75rem 2rem; background: transparent; color: var(--text); font-weight: 500; font-size: 0.9rem; font-family: inherit; border: 1px solid var(--border); border-radius: var(--r-md); cursor: pointer; text-decoration: none; transition: all 0.2s; -webkit-appearance: none; appearance: none; }
         .btn-s:hover { border-color: var(--text-faint); transform: translateY(-1px); }
         /* tactile press feedback (esp. nice on touch — there's no hover there) */
         .btn-p:active { transform: scale(0.985); opacity: 0.9; }
@@ -2105,10 +2139,11 @@ export default function App() {
 
         .card-hover { transition: border-color 0.3s, transform 0.3s, box-shadow 0.3s; }
         .card-hover:hover { border-color: #333 !important; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.2); }
-        @media (max-width: 768px) {
-          .nav-right .nav-link { display: none; }
-          .nav-cta-btn { display: inline-block !important; }
-        }
+        /* (Removed a dead @media 768px nav block: its .nav-right .nav-link rule
+           never matched — the links live in the center .nav-links, not .nav-right
+           — and its .nav-cta-btn rule sat inside .nav-desktop-actions, which is
+           display:none at the 1180 breakpoint, so a child rule could not un-hide
+           it. The nav swap is fully owned by responsive.css at 1180.) */
         @media (max-width: 640px) {
           .nav-right { gap: 0.75rem !important; }
           .contact-grid { grid-template-columns: 1fr !important; }

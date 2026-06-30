@@ -183,7 +183,7 @@ export default function CompleteProfile({ lang = "en" }) {
             }}>
               {lang === "sk" ? "Skúsiť znova" : "Try again"}
             </button>
-            <button type="button" onClick={signOut} style={{
+            <button type="button" onClick={() => signOut()} style={{
               width: "100%", padding: "0.5rem", background: "transparent", color: "#55555f",
               border: "none", fontSize: "0.75rem", cursor: "pointer", marginTop: "0.75rem",
             }}>{t.cp_signout} ({user?.email})</button>
@@ -244,7 +244,7 @@ export default function CompleteProfile({ lang = "en" }) {
                 {state === "saving" ? (lang === "sk" ? "Ukladám…" : "Saving…") : t.cp_submit}
               </button>
 
-              <button type="button" onClick={signOut} disabled={state === "saving"} style={{
+              <button type="button" onClick={() => signOut()} disabled={state === "saving"} style={{
                 width: "100%", padding: "0.5rem", background: "transparent", color: "#55555f",
                 border: "none", fontSize: "0.75rem", cursor: state === "saving" ? "wait" : "pointer", marginTop: "0.75rem",
                 opacity: state === "saving" ? 0.5 : 1,
