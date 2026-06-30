@@ -8,8 +8,19 @@
  * renders again. The site can never go blank — an empty table = today's copy.
  *
  * TWO dictionaries share the table, namespaced so identical bare keys can't
- * collide: "mk" = marketing copy (`t` in App.jsx), "lv" = the live/app + login
- * + admin copy (`liveT` in liveLang.js). Stored key = `${ns}:${bareKey}`.
+ * collide: "mk" = marketing copy (`t` in lib/marketingCopy.js), "lv" = the
+ * live/app + login + admin copy (`liveT` in liveLang.js). Stored key =
+ * `${ns}:${bareKey}`.
+ *
+ * EDIT-IN-PLACE: each field is pre-filled with the text that's live right now
+ * (override if set, else the code default) so you tweak it in place — never
+ * retype from a blank box. Save appears only when the text differs from the code
+ * default; if you edit a saved override back to exactly the default, the tool
+ * offers Reset (remove the row) instead of saving a redundant copy.
+ *
+ * NO LOST EDITS: typed-but-unsaved text lives in the PARENT (`drafts`), keyed by
+ * key. Filtering/searching unmounts rows, but the draft survives — switching
+ * language or reloading is the only thing that discards (with a confirm).
  *
  * LANGUAGES: SK + EN are live on the public switcher. CZ ('cs') is editable here
  * already (so the copy can be written ahead of time) but stays hidden from public
@@ -20,7 +31,7 @@
  * reads the stored access token synchronously (supabase.rpc()'s internal
  * getSession() can hang under auth-lock contention).
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { t as marketingDict } from "../lib/marketingCopy";
 import { liveT } from "../lib/liveLang";
 import { refreshOverrides } from "../lib/copyOverrides";
@@ -78,12 +89,31 @@ const LANGS = [
   { code: "en", label: "EN" },
   { code: "cs", label: "CZ", note: "not yet public" },
 ];
+const FILL_LANGS = ["sk", "en", "cs"];
 
-// ── Classify a default value into how we edit it ─────────────────────────────
+// ── Value helpers (string | list shared between parent + Row) ────────────────
 function classify(v) {
   if (typeof v === "string") return "string";
   if (Array.isArray(v) && v.every((x) => typeof x === "string")) return "list";
   return "structured"; // arrays of arrays/objects, nested objects — Phase 2 UI
+}
+// value (string | string[]) -> textarea text
+function toText(v, type) {
+  if (type === "list") return Array.isArray(v) ? v.join("\n") : "";
+  return typeof v === "string" ? v : v == null ? "" : String(v);
+}
+// textarea text -> value (string | string[])
+function parseDraft(text, type) {
+  return type === "list" ? text.split("\n").map((s) => s.trim()).filter(Boolean) : text;
+}
+const sameVal = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+// {token} placeholders present in `a` but dropped from `b`
+function missingTokens(a, b) {
+  const re = /\{[a-zA-Z_]\w*\}/g;
+  const inA = a.match(re);
+  if (!inA || !inA.length) return [];
+  const inB = new Set(b.match(re) || []);
+  return [...new Set(inA)].filter((tok) => !inB.has(tok));
 }
 
 const SOURCES = [
@@ -91,45 +121,72 @@ const SOURCES = [
   { ns: "lv", dict: liveT,         label: "Platform & app", hint: "Dashboard, project detail, login, profile, gates, ticker" },
 ];
 
-// Build the editable key universe from the code dicts (EN is the canonical key set).
+// Build the editable key universe — UNION of all languages' keys, so a key that
+// exists in only one language is still editable (never silently missing).
 function buildRows() {
-  const rows = [];
-  for (const { ns, dict, label, hint } of SOURCES) {
-    const keys = Object.keys(dict.en || {});
+  return SOURCES.map(({ ns, dict, label, hint }) => {
+    const keys = [...new Set([
+      ...Object.keys(dict.en || {}),
+      ...Object.keys(dict.sk || {}),
+      ...Object.keys(dict.cs || {}),
+    ])];
     const items = keys.map((key) => {
-      const def = dict.en?.[key];
-      return {
-        ns, key, type: classify(def),
-        def: { sk: dict.sk?.[key], en: dict.en?.[key], cs: dict.cs?.[key] },
-      };
+      const def = dict.en?.[key] ?? dict.sk?.[key] ?? dict.cs?.[key];
+      return { ns, key, type: classify(def), def: { sk: dict.sk?.[key], en: dict.en?.[key], cs: dict.cs?.[key] } };
     });
-    rows.push({ ns, label, hint, items });
-  }
-  return rows;
+    return { ns, label, hint, items };
+  });
 }
 
 function defaultFor(item, lang) {
   // cs has no code default → fall back to EN so the row shows something useful.
   if (lang === "cs") return item.def.cs ?? item.def.en;
-  return item.def[lang];
+  return item.def[lang] ?? item.def.en;
 }
 function previewText(v, max = 90) {
-  let s = "";
-  if (typeof v === "string") s = v;
-  else if (Array.isArray(v)) s = v.join(" · ");
-  else s = JSON.stringify(v);
-  s = s.replace(/\s+/g, " ").trim();
+  let s = typeof v === "string" ? v : Array.isArray(v) ? v.join(" · ") : JSON.stringify(v);
+  s = (s || "").replace(/\s+/g, " ").trim();
   return s.length > max ? s.slice(0, max) + "…" : s;
 }
 
 export default function TextsEditor({ lang = "en" }) {
   const uiSK = lang === "sk";
   const sections = useMemo(() => buildRows(), []);
+  const itemByKey = useMemo(() => {
+    const m = {};
+    for (const sec of sections) for (const it of sec.items) m[`${it.ns}:${it.key}`] = it;
+    return m;
+  }, [sections]);
+
   const [activeLang, setActiveLang] = useState("sk");
   const [search, setSearch] = useState("");
-  const [overrides, setOverrides] = useState({}); // `${lang}|${ns}:${key}` -> value
+  const [filterMode, setFilterMode] = useState("all"); // all | edited | untranslated
+  const [overrides, setOverrides] = useState({});       // `${lang}|${ns}:${key}` -> value
+  const [drafts, setDrafts] = useState({});             // `${ns}:${key}` -> textarea text (active lang)
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // The effective live value for a row in the active language (override or default).
+  const effectiveOf = useCallback((it) => {
+    const ov = overrides[`${activeLang}|${it.ns}:${it.key}`];
+    return ov !== undefined ? ov : defaultFor(it, activeLang);
+  }, [overrides, activeLang]);
+
+  // A row is pending if it has a draft that differs from the effective live value.
+  const pendingKeys = useMemo(() => Object.keys(drafts).filter((rk) => {
+    const it = itemByKey[rk];
+    if (!it || it.type === "structured") return false;
+    return !sameVal(parseDraft(drafts[rk], it.type), effectiveOf(it));
+  }), [drafts, itemByKey, effectiveOf]);
+  const dirtyCount = pendingKeys.length;
+
+  // Guard against losing typed-but-unsaved edits on a hard navigation / reload.
+  useEffect(() => {
+    if (!dirtyCount) return;
+    const h = (e) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", h);
+    return () => window.removeEventListener("beforeunload", h);
+  }, [dirtyCount]);
 
   async function load() {
     setLoading(true); setError(null);
@@ -146,21 +203,47 @@ export default function TextsEditor({ lang = "en" }) {
   }
   useEffect(() => { load(); }, []);
 
-  async function saveOverride(ns, key, value) {
+  const setDraft = useCallback((rk, text) => {
+    setDrafts((d) => ({ ...d, [rk]: text }));
+  }, []);
+  const clearDraft = useCallback((rk) => {
+    setDrafts((d) => { if (!(rk in d)) return d; const n = { ...d }; delete n[rk]; return n; });
+  }, []);
+
+  const saveOverride = useCallback(async (ns, key, value) => {
     const storedKey = `${ns}:${key}`;
     await rpcDirect("admin_upsert_site_content", { p_key: storedKey, p_lang: activeLang, p_value: value });
     setOverrides((m) => ({ ...m, [`${activeLang}|${storedKey}`]: value }));
+    clearDraft(storedKey);
     refreshOverrides(); // push the change to the live overlay immediately
-  }
-  async function resetOverride(ns, key) {
+  }, [activeLang, clearDraft]);
+
+  const resetOverride = useCallback(async (ns, key) => {
     const storedKey = `${ns}:${key}`;
     await rpcDirect("admin_delete_site_content", { p_key: storedKey, p_lang: activeLang });
     setOverrides((m) => { const n = { ...m }; delete n[`${activeLang}|${storedKey}`]; return n; });
+    clearDraft(storedKey);
     refreshOverrides();
+  }, [activeLang, clearDraft]);
+
+  function switchLang(code) {
+    if (code === activeLang) return;
+    if (dirtyCount > 0 && !window.confirm(uiSK
+      ? `Máš ${dirtyCount} neuložených úprav. Prepnutím jazyka sa zahodia. Pokračovať?`
+      : `You have ${dirtyCount} unsaved edit(s). Switching language discards them. Continue?`)) return;
+    setDrafts({});
+    setActiveLang(code);
   }
 
   const q = search.trim().toLowerCase();
-  const editedCount = Object.keys(overrides).filter((k) => k.startsWith(activeLang + "|")).length;
+  const hasOv = (langCode, ns, key) => overrides[`${langCode}|${ns}:${key}`] !== undefined;
+  const editedInLang = (langCode) => Object.keys(overrides).filter((k) => k.startsWith(langCode + "|")).length;
+
+  const FILTERS = [
+    { id: "all", label: uiSK ? "Všetky" : "All" },
+    { id: "edited", label: uiSK ? "Upravené" : "Edited" },
+    { id: "untranslated", label: activeLang === "cs" ? (uiSK ? "Nepreložené" : "Untranslated") : (uiSK ? "Neupravené" : "Default") },
+  ];
 
   return (
     <div style={{ padding: "1.5rem 1.25rem", maxWidth: 1000, margin: "0 auto", color: textLight, fontFamily: mono }}>
@@ -169,19 +252,20 @@ export default function TextsEditor({ lang = "en" }) {
       </h1>
       <p style={{ color: dim, fontSize: "0.78rem", lineHeight: 1.5, margin: "0 0 1rem", maxWidth: 720 }}>
         {uiSK
-          ? "Uprav ľubovoľný text na webe. Ulož → ihneď naživo, bez nasadenia. Prázdne pole = pôvodný text (default v kóde). „Reset“ vráti default. Každý jazyk je samostatný — nie preklad."
-          : "Edit any text on the site. Save → live instantly, no deploy. An empty field = the original (code default). “Reset” restores the default. Each language is independent — not a translation."}
+          ? "Uprav ľubovoľný text priamo v poli. Ulož → ihneď naživo, bez nasadenia. „Reset“ vráti pôvodný text (default v kóde). Každý jazyk je samostatný — nie preklad."
+          : "Edit any text right in the field. Save → live instantly, no deploy. “Reset” restores the original (code default). Each language is independent — not a translation."}
       </p>
 
       {/* Language tabs */}
-      <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", marginBottom: "0.75rem", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", marginBottom: "0.6rem", flexWrap: "wrap" }}>
         <span style={{ fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.1em", color: faint, marginRight: 4 }}>
           {uiSK ? "Jazyk" : "Language"}
         </span>
         {LANGS.map((L) => {
           const active = L.code === activeLang;
+          const n = editedInLang(L.code);
           return (
-            <button key={L.code} onClick={() => setActiveLang(L.code)} title={L.note || ""}
+            <button key={L.code} onClick={() => switchLang(L.code)} title={L.note || ""}
               style={{
                 padding: "0.35rem 0.7rem", borderRadius: 7, cursor: "pointer",
                 border: `1px solid ${active ? green : border}`,
@@ -190,25 +274,40 @@ export default function TextsEditor({ lang = "en" }) {
                 fontFamily: mono, fontSize: "0.74rem", display: "flex", alignItems: "center", gap: 6,
               }}>
               {L.label}
+              {n > 0 && <span style={{ fontSize: "0.58rem", background: active ? "#06140f" : border, color: active ? green : dim, borderRadius: 6, padding: "0 5px", fontWeight: 700 }}>{n}</span>}
               {L.note && <span style={{ fontSize: "0.56rem", opacity: 0.8, fontWeight: 500 }}>· {L.note}</span>}
             </button>
           );
         })}
-        <span style={{ marginLeft: "auto", fontSize: "0.68rem", color: dim }}>
-          {editedCount > 0 ? (uiSK ? `${editedCount} upravených v ${activeLang.toUpperCase()}` : `${editedCount} edited in ${activeLang.toUpperCase()}`) : (uiSK ? "žiadne úpravy" : "no edits")}
-        </span>
+        {dirtyCount > 0 && (
+          <span style={{ marginLeft: "auto", fontSize: "0.66rem", color: amber, fontWeight: 600 }}>
+            {uiSK ? `${dirtyCount} neuložených` : `${dirtyCount} unsaved`}
+          </span>
+        )}
       </div>
 
-      {/* Search */}
-      <input
-        value={search} onChange={(e) => setSearch(e.target.value)}
-        placeholder={uiSK ? "Hľadať v textoch alebo kľúčoch…" : "Search text or key…"}
-        style={{
-          width: "100%", padding: "0.5rem 0.7rem", marginBottom: "1rem", boxSizing: "border-box",
-          background: bg2, border: `1px solid ${border}`, borderRadius: 7, color: textLight,
-          fontFamily: mono, fontSize: "0.78rem",
-        }}
-      />
+      {/* Filter + search */}
+      <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 2, background: bg2, border: `1px solid ${border}`, borderRadius: 7, padding: 2 }}>
+          {FILTERS.map((f) => (
+            <button key={f.id} onClick={() => setFilterMode(f.id)}
+              style={{
+                padding: "0.3rem 0.6rem", borderRadius: 5, cursor: "pointer", border: "none",
+                background: filterMode === f.id ? border : "transparent",
+                color: filterMode === f.id ? textLight : dim, fontFamily: mono, fontSize: "0.68rem", fontWeight: 600,
+              }}>{f.label}</button>
+          ))}
+        </div>
+        <input
+          value={search} onChange={(e) => setSearch(e.target.value)}
+          placeholder={uiSK ? "Hľadať v textoch alebo kľúčoch…" : "Search text or key…"}
+          style={{
+            flex: 1, minWidth: 200, padding: "0.5rem 0.7rem", boxSizing: "border-box",
+            background: bg2, border: `1px solid ${border}`, borderRadius: 7, color: textLight,
+            fontFamily: mono, fontSize: "0.78rem",
+          }}
+        />
+      </div>
 
       {loading && <div style={{ color: dim, fontSize: "0.8rem", padding: "1rem 0" }}>{uiSK ? "Načítavam…" : "Loading…"}</div>}
       {error && (
@@ -219,10 +318,12 @@ export default function TextsEditor({ lang = "en" }) {
 
       {!loading && sections.map((sec) => {
         const visible = sec.items.filter((it) => {
+          const edited = hasOv(activeLang, it.ns, it.key);
+          if (filterMode === "edited" && !edited) return false;
+          if (filterMode === "untranslated" && edited) return false;
           if (!q) return true;
           if (it.key.toLowerCase().includes(q)) return true;
-          const d = defaultFor(it, activeLang);
-          return previewText(d, 99999).toLowerCase().includes(q);
+          return previewText(defaultFor(it, activeLang), 99999).toLowerCase().includes(q);
         });
         if (!visible.length) return null;
         return (
@@ -232,15 +333,22 @@ export default function TextsEditor({ lang = "en" }) {
               <span style={{ fontSize: "0.64rem", color: faint }}>{sec.hint}</span>
               <span style={{ marginLeft: "auto", fontSize: "0.64rem", color: faint }}>{visible.length}</span>
             </div>
-            {visible.map((it) => (
-              <Row
-                key={`${it.ns}:${it.key}:${activeLang}`}
-                item={it} lang={activeLang} uiSK={uiSK}
-                stored={overrides[`${activeLang}|${it.ns}:${it.key}`]}
-                onSave={(val) => saveOverride(it.ns, it.key, val)}
-                onReset={() => resetOverride(it.ns, it.key)}
-              />
-            ))}
+            {visible.map((it) => {
+              const rk = `${it.ns}:${it.key}`;
+              return (
+                <Row
+                  key={`${rk}:${activeLang}`}
+                  item={it} lang={activeLang} uiSK={uiSK}
+                  stored={overrides[`${activeLang}|${rk}`]}
+                  draft={drafts[rk]}
+                  fill={FILL_LANGS.reduce((a, lc) => (a[lc] = hasOv(lc, it.ns, it.key), a), {})}
+                  onDraft={(text) => setDraft(rk, text)}
+                  onClearDraft={() => clearDraft(rk)}
+                  onSave={(val) => saveOverride(it.ns, it.key, val)}
+                  onReset={() => resetOverride(it.ns, it.key)}
+                />
+              );
+            })}
           </section>
         );
       })}
@@ -249,23 +357,28 @@ export default function TextsEditor({ lang = "en" }) {
 }
 
 // ── One editable copy row ────────────────────────────────────────────────────
-function Row({ item, lang, uiSK, stored, onSave, onReset }) {
+function Row({ item, lang, uiSK, stored, draft, fill, onDraft, onClearDraft, onSave, onReset }) {
   const def = defaultFor(item, lang);
   const hasOverride = stored !== undefined && stored !== null;
   const csFallback = lang === "cs" && item.def.cs == null;
+  const isStructured = item.type === "structured";
 
-  const toText = (v) => (item.type === "list" ? (Array.isArray(v) ? v.join("\n") : "") : (typeof v === "string" ? v : ""));
-  const initial = hasOverride ? toText(stored) : "";
-  const [val, setVal] = useState(initial);
+  // The live value for this language (override if set, else default), as text.
+  const effective = hasOverride ? stored : def;
+  const liveText = toText(effective, item.type);
+  // Edit-in-place: show the draft if the user has typed, otherwise the live text.
+  const val = draft !== undefined ? draft : liveText;
+
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [err, setErr] = useState(null);
 
-  if (item.type === "structured") {
+  if (isStructured) {
     return (
       <div style={rowWrap}>
         <div style={keyCol}>
           <span style={keyLabel}>{item.key}</span>
+          <FillDots fill={fill} />
           <span style={{ fontSize: "0.56rem", color: amber }}>{uiSK ? "štruktúrovaný blok" : "structured block"}</span>
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -278,23 +391,24 @@ function Row({ item, lang, uiSK, stored, onSave, onReset }) {
     );
   }
 
-  const dirty = item.type === "list"
-    ? JSON.stringify(val.split("\n").map((s) => s.trim()).filter(Boolean)) !== JSON.stringify(Array.isArray(stored) ? stored : [])
-    : val !== (hasOverride ? stored : "");
-  const isEmpty = val.trim() === "";
+  const parsed = parseDraft(val, item.type);
+  const isEmpty = item.type === "list" ? parsed.length === 0 : val.trim() === "";
+  const equalsDefault = sameVal(parsed, def);
+  const changedFromLive = draft !== undefined && !sameVal(parsed, effective);
+  const canSave = changedFromLive && !equalsDefault && !isEmpty;
+  const dropped = !isEmpty ? missingTokens(toText(def, item.type), val) : [];
 
   async function doSave() {
     setBusy(true); setErr(null); setSaved(false);
     try {
-      const value = item.type === "list" ? val.split("\n").map((s) => s.trim()).filter(Boolean) : val;
-      await onSave(value);
+      await onSave(item.type === "list" ? parsed : val);
       setSaved(true); setTimeout(() => setSaved(false), 1800);
     } catch (e) { setErr(e.message || String(e)); }
     finally { setBusy(false); }
   }
   async function doReset() {
     setBusy(true); setErr(null);
-    try { await onReset(); setVal(""); } catch (e) { setErr(e.message || String(e)); }
+    try { await onReset(); } catch (e) { setErr(e.message || String(e)); }
     finally { setBusy(false); }
   }
 
@@ -302,50 +416,81 @@ function Row({ item, lang, uiSK, stored, onSave, onReset }) {
     <div style={rowWrap}>
       <div style={keyCol}>
         <span style={keyLabel}>{item.key}</span>
+        <FillDots fill={fill} />
         {hasOverride && <span style={{ fontSize: "0.55rem", color: green }}>{uiSK ? "upravené" : "edited"}</span>}
         {csFallback && <span style={{ fontSize: "0.55rem", color: faint }}>EN fallback</span>}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
+        {/* EN reference when authoring SK/CZ — so each language is written naturally, not blind */}
+        {lang !== "en" && item.def.en != null && (
+          <div style={{ fontSize: "0.6rem", color: faint, marginBottom: 3, lineHeight: 1.4 }}>
+            <span style={{ color: dim }}>EN:</span> {previewText(item.def.en, 140)}
+          </div>
+        )}
         <textarea
           value={val}
-          onChange={(e) => setVal(e.target.value)}
-          placeholder={item.type === "list" ? (Array.isArray(def) ? def.join("\n") : "") : (def || "")}
-          rows={item.type === "list" ? Math.min(8, Math.max(2, (Array.isArray(def) ? def.length : 1))) : (def && def.length > 70 ? 3 : 1)}
+          onChange={(e) => onDraft(e.target.value)}
+          placeholder={toText(def, item.type)}
+          rows={item.type === "list" ? Math.min(8, Math.max(2, (Array.isArray(def) ? def.length : 1))) : (liveText.length > 70 ? 3 : 1)}
           style={{
             width: "100%", boxSizing: "border-box", resize: "vertical",
-            background: bg, border: `1px solid ${dirty ? green : border}`, borderRadius: 6,
+            background: bg, border: `1px solid ${changedFromLive ? green : border}`, borderRadius: 6,
             color: textLight, fontFamily: mono, fontSize: "0.76rem", lineHeight: 1.5, padding: "0.45rem 0.6rem",
           }}
         />
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 5, minHeight: 20 }}>
-          {dirty && !isEmpty && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 5, minHeight: 20, flexWrap: "wrap" }}>
+          {canSave && (
             <button onClick={doSave} disabled={busy} style={btn(green, "#06140f")}>
               {busy ? (uiSK ? "Ukladám…" : "Saving…") : (uiSK ? "Uložiť" : "Save")}
             </button>
+          )}
+          {/* Reverted a saved override back to the default → offer Reset, not a redundant Save */}
+          {!canSave && changedFromLive && equalsDefault && hasOverride && (
+            <span style={{ fontSize: "0.6rem", color: faint }}>{uiSK ? "= default, použi Reset" : "= default, use Reset"}</span>
           )}
           {hasOverride && (
             <button onClick={doReset} disabled={busy} style={btn("transparent", dim, border)}>
               {uiSK ? "Reset na default" : "Reset to default"}
             </button>
           )}
+          {draft !== undefined && !changedFromLive && (
+            <button onClick={onClearDraft} disabled={busy} style={btn("transparent", faint, border)}>
+              {uiSK ? "Zahodiť zmenu" : "Discard"}
+            </button>
+          )}
           {item.type === "list" && (
             <span style={{ fontSize: "0.58rem", color: faint }}>{uiSK ? "jeden riadok = jedna položka" : "one line = one item"}</span>
+          )}
+          {dropped.length > 0 && (
+            <span style={{ fontSize: "0.6rem", color: amber }}>
+              {uiSK ? "chýba zástupný symbol " : "missing placeholder "}{dropped.join(" ")}
+            </span>
           )}
           {saved && <span style={{ fontSize: "0.62rem", color: green }}>✓ {uiSK ? "uložené — naživo" : "saved — live"}</span>}
           {err && <span style={{ fontSize: "0.62rem", color: amber }}>{err}</span>}
         </div>
-        {!hasOverride && (
-          <div style={{ fontSize: "0.6rem", color: faint, marginTop: 3 }}>
-            {uiSK ? "Default: " : "Default: "}{previewText(def, 120) || (uiSK ? "(prázdne)" : "(empty)")}
-          </div>
-        )}
       </div>
     </div>
   );
 }
 
+// Per-key fill indicator: which languages already have an override.
+function FillDots({ fill }) {
+  return (
+    <span style={{ display: "flex", gap: 4, alignItems: "center" }}>
+      {FILL_LANGS.map((lc) => (
+        <span key={lc} title={`${lc.toUpperCase()}: ${fill[lc] ? "edited" : "default"}`}
+          style={{
+            fontSize: "0.5rem", letterSpacing: "0.04em", fontWeight: 700,
+            color: fill[lc] ? green : faint, opacity: fill[lc] ? 1 : 0.5,
+          }}>{lc.toUpperCase()}</span>
+      ))}
+    </span>
+  );
+}
+
 const rowWrap = { display: "flex", gap: "0.9rem", padding: "0.7rem 0", borderBottom: `1px solid ${border}`, alignItems: "flex-start" };
-const keyCol = { width: 190, flexShrink: 0, display: "flex", flexDirection: "column", gap: 2, paddingTop: 4 };
+const keyCol = { width: 190, flexShrink: 0, display: "flex", flexDirection: "column", gap: 3, paddingTop: 4 };
 const keyLabel = { fontSize: "0.66rem", color: dim, wordBreak: "break-word" };
 function btn(bgc, color, bd) {
   return {
