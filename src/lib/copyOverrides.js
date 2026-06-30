@@ -61,9 +61,18 @@ function writeCache(obj) {
  * iterate the BASE dict (not the override map), so only overrides that match a
  * real default key are ever applied.
  *
+ * KIND-GUARD: an override is applied only when its JSON kind (string / array /
+ * object) matches the code default's. A malformed row — e.g. a string stored
+ * where the default is an array, which a component renders with .map() — is
+ * ignored and the default renders instead. The live site can never break on a
+ * bad override row; worst case it shows the original copy.
+ *
  * Returns the base object unchanged (same reference) when there is nothing to
  * apply, so callers pay zero cost in the common case.
  */
+function kindOf(v) {
+  return Array.isArray(v) ? "array" : v === null ? "null" : typeof v;
+}
 export function applyOverrides(lang, baseDict, ns) {
   if (!baseDict) return baseDict;
   const o = OVERRIDES[lang];
@@ -73,6 +82,7 @@ export function applyOverrides(lang, baseDict, ns) {
   for (const k in baseDict) {
     const v = o[prefix + k];
     if (v === undefined || v === null) continue;
+    if (kindOf(v) !== kindOf(baseDict[k])) continue; // malformed override → keep default
     if (out === null) out = { ...baseDict };
     out[k] = v;
   }

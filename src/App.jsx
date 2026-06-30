@@ -359,7 +359,6 @@ function AccountMenu({ user, caps, auth, setCurrent, lang }) {
 
 function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
   const pages = lang === "sk" ? pagesSK : pagesEN;
-  const l = applyOverrides(lang, t[lang], "mk");
   const user = auth?.user;
   const showAdminLink = caps.can("view_admin_nav");
   // Mobile menu (≤1180px). Desktop (>1180) never mounts the overlay.
