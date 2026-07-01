@@ -52,7 +52,9 @@ function fmtVal(key, val, fmtByKey) {
 function fieldKind(meta) {
   if (!meta) return "text";
   if (meta.type === "numeric") return "num";
-  if (meta.type === "date" || meta.type === "month") return "date";
+  if (meta.type === "date") return "date";   // from/to range (engine supports date-dim ranges)
+  // 'month' (snapshot_month, 'YYYY-MM') → a value picker, not a date range: a calendar input
+  // can't express "YYYY-MM" and the engine filters months as an IN list, not a range.
   return "text";
 }
 
