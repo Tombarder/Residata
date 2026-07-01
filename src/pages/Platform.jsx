@@ -1879,17 +1879,22 @@ function PlatformExports({ lang, setCurrent }) {
         });
       }
 
-      // ONE gated call per market (parallel) — never a raw view read; the real-paid gate
-      // is enforced server-side in export_units_json. Each returns the whole day's units as a
-      // single jsonb array (not subject to PostgREST's 1000-row cap), so the per-day dedup
-      // runs once per market instead of being re-computed on every page.
-      const results = await Promise.all(
-        markets.map(m => supabase.rpc("export_units_json", { p_country: m, p_day: effectiveDay }))
-      );
+      // ONE gated call per market — never a raw view read; the real-paid gate is enforced
+      // server-side in export_units_json. Each returns the whole day's units as a single jsonb
+      // array (not subject to PostgREST's 1000-row cap), so the per-day dedup runs once.
+      // SEQUENTIAL, not parallel: two heavy exports at once contend on the same DB backend
+      // (each ends up ~2.5× slower and can brush the statement timeout); solo they stay fast.
       let rows = [];
-      for (const r of results) {
-        if (r.error) throw r.error;
-        if (Array.isArray(r.data)) rows = rows.concat(r.data);
+      for (let mi = 0; mi < markets.length; mi++) {
+        if (markets.length > 1) {
+          setExportProgress({
+            current: rows.length, total: null,
+            label: lang === "sk" ? `Sťahujem trh ${mi + 1}/${markets.length}…` : `Fetching market ${mi + 1}/${markets.length}…`,
+          });
+        }
+        const { data, error } = await supabase.rpc("export_units_json", { p_country: markets[mi], p_day: effectiveDay });
+        if (error) throw error;
+        if (Array.isArray(data)) rows = rows.concat(data);
       }
       const totalRows = rows.length;
 
