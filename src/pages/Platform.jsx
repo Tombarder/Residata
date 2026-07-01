@@ -1708,22 +1708,9 @@ const FLATS_CSV_COLUMNS = [
   "created_at",
 ];
 
-// Columns that should be re-emitted as plain numbers (no thousands sep,
-// `.` as decimal, no trailing zeros). PostgREST returns NUMERIC as
-// strings — leaving them as "339500.00" works in Excel but looks noisy;
-// stripping the trailing zeros produces a clean "339500" / "48.61".
-const FLATS_NUMBER_COLUMNS = new Set([
-  "izby", "poschodie",
-  "obytna_plocha", "balkon_plocha", "loggia_plocha", "terasa_plocha",
-  "zahrada_plocha", "exterier_plocha", "kobka_plocha", "celkova_plocha",
-  "cena_bez_dph", "cena_s_dph", "cennikova_cena",
-  "fin_10_90", "fin_20_80", "fin_30_40_30",
-]);
-
-// Columns that come as ISO timestamps. Re-render in UTC as
-// "YYYY-MM-DD HH:MM:SS" — Excel autodetects this as a date column,
-// and the space separator (vs. T) reads naturally.
-const FLATS_DATE_COLUMNS = new Set(["batch_timestamp", "created_at"]);
+// (The flats CSV is now built + formatted server-side by export_units_csv, so the
+// per-column number/date formatting sets that used to live here were removed — the
+// projects CSV below still formats client-side.)
 
 // Column sets for the smaller projects CSV (same idea, smaller surface).
 const PROJECTS_CSV_COLUMNS = [
@@ -1857,9 +1844,8 @@ function PlatformExports({ lang, setCurrent }) {
       return;
     }
     // Which markets to pull. A single-market view → one call. "All" → one call per real
-    // market, run in PARALLEL (each ~one dedup, well under the DB statement timeout) and
-    // merged — far faster than one giant all-markets call, and avoids the row cap since each
-    // returns a single jsonb array (not rows).
+    // market, run SEQUENTIALLY (two heavy exports at once contend on the same DB backend and
+    // brush the statement timeout) and merged.
     const realMarkets = (countries || []).filter(c => !isAllCountries(c));
     const markets = isAllCountries(country)
       ? (realMarkets.length ? realMarkets : [null])
@@ -1867,75 +1853,49 @@ function PlatformExports({ lang, setCurrent }) {
 
     setExportProgress({ current: 0, total: null, label: lang === "sk" ? "Pripravujem export…" : "Preparing export…" });
     try {
-      // Enrichment lookup: project_id → { name, developer, district, city }.
-      // `projects` already lives in memory (useProjects), so no extra round trip.
-      const projectLookup = new Map();
-      for (const p of projects) {
-        projectLookup.set(p.id, {
-          project_name: p.name || "",
-          developer: p.developer || "",
-          district: p.district || "",
-          city: p.city || "",
-        });
-      }
-
-      // ONE gated call per market — never a raw view read; the real-paid gate is enforced
-      // server-side in export_units_json. Each returns the whole day's units as a single jsonb
-      // array (not subject to PostgREST's 1000-row cap), so the per-day dedup runs once.
-      // SEQUENTIAL, not parallel: two heavy exports at once contend on the same DB backend
-      // (each ends up ~2.5× slower and can brush the statement timeout); solo they stay fast.
-      let rows = [];
+      // ONE gated call per market. export_units_csv builds the CSV rows SERVER-SIDE (string_agg)
+      // and returns them as a single text value — no giant jsonb blob, no client-side row
+      // assembly, no raw view read. Project name/developer/district/city come from unit_facts
+      // itself, so they're always complete (incl. sold-out / historical projects that have left
+      // projects_live). The real-paid gate + per-day dedup are enforced inside the function.
+      const parts = [];
       for (let mi = 0; mi < markets.length; mi++) {
         if (markets.length > 1) {
           setExportProgress({
-            current: rows.length, total: null,
+            current: 0, total: null,
             label: lang === "sk" ? `Sťahujem trh ${mi + 1}/${markets.length}…` : `Fetching market ${mi + 1}/${markets.length}…`,
           });
         }
-        const { data, error } = await supabase.rpc("export_units_json", { p_country: markets[mi], p_day: effectiveDay });
+        const { data, error } = await supabase.rpc("export_units_csv", { p_country: markets[mi], p_day: effectiveDay });
         if (error) throw error;
-        if (Array.isArray(data)) rows = rows.concat(data);
+        if (data && data.length) parts.push(data);
       }
-      const totalRows = rows.length;
 
-      if (totalRows === 0) {
+      if (parts.length === 0) {
         alert(lang === "sk" ? "Žiadne byty na export pre tento dátum." : "No flats for this date.");
         return;
       }
 
       setExportProgress({
-        current: totalRows, total: totalRows,
-        label: lang === "sk" ? "Vytváram CSV…" : "Building CSV…",
+        current: 0, total: null,
+        label: lang === "sk" ? "Vytváram súbor…" : "Building file…",
       });
 
-      const csvParts = [FLATS_CSV_COLUMNS.join(",")];  // header is fixed/explicit
-      for (const row of rows) {
-        const enrichment = projectLookup.get(row.project_id) || {
-          project_name: "", developer: "", district: "", city: "",
-        };
-        const cells = FLATS_CSV_COLUMNS.map(col => {
-          // Enrichment columns come from the projects lookup, not the flats row.
-          if (col === "project_name" || col === "developer" || col === "district" || col === "city") {
-            return csvEscapeCell(enrichment[col]);
-          }
-          return formatCsvCell(FLATS_NUMBER_COLUMNS, FLATS_DATE_COLUMNS, col, row[col]);
-        });
-        csvParts.push(cells.join(","));
-      }
-
+      // Header (fixed order — must match export_units_csv column order) + server-built rows.
+      const csv = [FLATS_CSV_COLUMNS.join(","), ...parts].join("\n");
+      const totalRows = csv.split("\n").length - 1;  // minus header
       const pCountry = isAllCountries(country) ? "all" : country;
-      // Build Blob + download. UTF-8 BOM stays so Windows Excel renders SK diacritics.
-      const csv = csvParts.join("\n");
+      // UTF-8 BOM so Windows Excel renders SK/CZ diacritics correctly.
       const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `residata-flats-${pCountry || "all"}-${effectiveDay}.csv`;
+      a.download = `residata-flats-${pCountry}-${effectiveDay}.csv`;
       a.click();
-      try { track("csv_exported", { type: "flats", row_count: totalRows, day: effectiveDay, country: pCountry || "all" }); } catch (_) {}
+      try { track("csv_exported", { type: "flats", row_count: totalRows, day: effectiveDay, country: pCountry }); } catch (_) {}
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (e) {
-      // export_units raises 42501 for non-real-paid — surface a friendly message.
+      // export_units_csv raises 42501 for non-real-paid — surface a friendly message.
       const msg = String(e?.message || e || "");
       if (/export_not_permitted|42501|permission|insufficient/i.test(msg)) {
         alert(lang === "sk"
@@ -2017,8 +1977,8 @@ function PlatformExports({ lang, setCurrent }) {
         </div>
         <p style={{ color: dim, fontSize: "0.75rem", marginTop: "0.85rem", lineHeight: 1.5 }}>
           {lang === "sk"
-            ? "CSV sa vytvorí v tvojom prehliadači — nič neodchádza mimo tvoj počítač. Pre Excel stačí dvojklik. Veľké exporty môžu trvať pár sekúnd."
-            : "CSV is generated in your browser — nothing leaves your machine. Double-click opens in Excel. Large exports may take a few seconds."}
+            ? "CSV sa stiahne cez tvoju zabezpečenú session pre vybraný dátum. Pre Excel stačí dvojklik. Veľké exporty môžu trvať pár sekúnd."
+            : "The CSV downloads over your secure session for the selected date. Double-click opens it in Excel. Large exports may take a few seconds."}
         </p>
       </div>
 
