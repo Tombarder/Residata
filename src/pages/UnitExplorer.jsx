@@ -7,7 +7,6 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { useCountry, isAllCountries } from "../lib/useCountry";
 import { useUnitsInfinite, useAnalyticsRegistry, usePivotDistinct } from "../lib/useData";
 import { supabase } from "../lib/supabase";
-import { pushRoute } from "../lib/routing";
 
 // sessionStorage key: the project set handed from a filtered analytics view to the map.
 export const MAP_PROJECT_SET_KEY = "residata.mapProjectSet";
@@ -94,7 +93,7 @@ function XFilterRow({ row, fields, mode, lang, sel, onPatch, onRemove }) {
   );
 }
 
-export default function UnitExplorer({ lang = "sk" }) {
+export default function UnitExplorer({ lang = "sk", setCurrent }) {
   const t = (sk, en) => (lang === "sk" ? sk : en);
   const { country } = useCountry();
   const { dimensions, measures } = useAnalyticsRegistry();
@@ -222,7 +221,10 @@ export default function UnitExplorer({ lang = "sk" }) {
       const { data, error } = await supabase.rpc("analytics_pivot", { p_spec });
       const names = error ? [] : (Array.isArray(data) ? data : []).map((r) => r?.d?.[0]).filter(Boolean);
       sessionStorage.setItem(MAP_PROJECT_SET_KEY, JSON.stringify({ names, count: names.length, source: "explorer", ts: Date.now() }));
-      pushRoute("App:Map2");
+      // setCurrent (handleNav) actually switches the SPA page AND updates the URL; a bare
+      // pushRoute would only change the address bar without rendering the map.
+      if (setCurrent) setCurrent("App:Map2");
+      else window.location.assign("/app/map-2");
     } finally {
       setMapBusy(false);
     }
