@@ -1678,7 +1678,6 @@ const inputStyle = {
 // Tradeoff (explicit column list vs. Object.keys): if a new column lands
 // in flats_current, it won't appear in the CSV until added here. That's
 // deliberate — schema changes should be reviewed, not silently exported.
-const CSV_PAGE_SIZE = 1000;
 
 // Explicit column order for the flats CSV. Identity + enrichment up
 // front (so you can read the row's meaning without scrolling right),
@@ -1788,7 +1787,7 @@ function PlatformExports({ lang, setCurrent }) {
   // users reach this page (view_exports_page) and can pick a date, but the actual
   // download is real-paid only — the DB export_units() RPC enforces the same rule.
   const { can, isTrialPaid } = useCapabilities();
-  const { country } = useCountry();
+  const { country, countries } = useCountry();
   const canExport = can("export_data");
 
   // Snapshot-date picker. Available days come from public.archive_days (distinct
@@ -1857,8 +1856,16 @@ function PlatformExports({ lang, setCurrent }) {
       alert(lang === "sk" ? "Nie je dostupný žiadny dátum." : "No snapshot date available.");
       return;
     }
-    const pCountry = isAllCountries(country) ? null : country;
-    setExportProgress({ current: 0, total: null, label: lang === "sk" ? "Sťahujem…" : "Downloading…" });
+    // Which markets to pull. A single-market view → one call. "All" → one call per real
+    // market, run in PARALLEL (each ~one dedup, well under the DB statement timeout) and
+    // merged — far faster than one giant all-markets call, and avoids the row cap since each
+    // returns a single jsonb array (not rows).
+    const realMarkets = (countries || []).filter(c => !isAllCountries(c));
+    const markets = isAllCountries(country)
+      ? (realMarkets.length ? realMarkets : [null])
+      : [country];
+
+    setExportProgress({ current: 0, total: null, label: lang === "sk" ? "Pripravujem export…" : "Preparing export…" });
     try {
       // Enrichment lookup: project_id → { name, developer, district, city }.
       // `projects` already lives in memory (useProjects), so no extra round trip.
@@ -1872,53 +1879,46 @@ function PlatformExports({ lang, setCurrent }) {
         });
       }
 
-      const csvParts = [FLATS_CSV_COLUMNS.join(",")];  // header is fixed/explicit
-      let from = 0;
-      let pageRows = 0;
-      let totalRows = 0;
-
-      // Data comes ONLY through the gated public.export_units() RPC — never a raw
-      // view read — so the real-paid gate is enforced server-side. Paginated via
-      // p_limit/p_offset; p_day selects the snapshot (NULL would mean latest).
-      do {
-        const { data, error } = await supabase.rpc("export_units", {
-          p_country: pCountry,
-          p_day: effectiveDay,
-          p_limit: CSV_PAGE_SIZE,
-          p_offset: from,
-        });
-        if (error) throw error;
-        pageRows = data?.length || 0;
-        if (pageRows === 0) break;
-
-        for (const row of data) {
-          const enrichment = projectLookup.get(row.project_id) || {
-            project_name: "", developer: "", district: "", city: "",
-          };
-          const cells = FLATS_CSV_COLUMNS.map(col => {
-            // Enrichment columns come from the projects lookup, not the flats row.
-            if (col === "project_name" || col === "developer" || col === "district" || col === "city") {
-              return csvEscapeCell(enrichment[col]);
-            }
-            return formatCsvCell(FLATS_NUMBER_COLUMNS, FLATS_DATE_COLUMNS, col, row[col]);
-          });
-          csvParts.push(cells.join(","));
-        }
-        totalRows += pageRows;
-        from += CSV_PAGE_SIZE;
-
-        setExportProgress({
-          current: totalRows,
-          total: null,
-          label: lang === "sk" ? "Sťahujem…" : "Downloading…",
-        });
-      } while (pageRows === CSV_PAGE_SIZE);  // short page = last page
+      // ONE gated call per market (parallel) — never a raw view read; the real-paid gate
+      // is enforced server-side in export_units_json. Each returns the whole day's units as a
+      // single jsonb array (not subject to PostgREST's 1000-row cap), so the per-day dedup
+      // runs once per market instead of being re-computed on every page.
+      const results = await Promise.all(
+        markets.map(m => supabase.rpc("export_units_json", { p_country: m, p_day: effectiveDay }))
+      );
+      let rows = [];
+      for (const r of results) {
+        if (r.error) throw r.error;
+        if (Array.isArray(r.data)) rows = rows.concat(r.data);
+      }
+      const totalRows = rows.length;
 
       if (totalRows === 0) {
         alert(lang === "sk" ? "Žiadne byty na export pre tento dátum." : "No flats for this date.");
         return;
       }
 
+      setExportProgress({
+        current: totalRows, total: totalRows,
+        label: lang === "sk" ? "Vytváram CSV…" : "Building CSV…",
+      });
+
+      const csvParts = [FLATS_CSV_COLUMNS.join(",")];  // header is fixed/explicit
+      for (const row of rows) {
+        const enrichment = projectLookup.get(row.project_id) || {
+          project_name: "", developer: "", district: "", city: "",
+        };
+        const cells = FLATS_CSV_COLUMNS.map(col => {
+          // Enrichment columns come from the projects lookup, not the flats row.
+          if (col === "project_name" || col === "developer" || col === "district" || col === "city") {
+            return csvEscapeCell(enrichment[col]);
+          }
+          return formatCsvCell(FLATS_NUMBER_COLUMNS, FLATS_DATE_COLUMNS, col, row[col]);
+        });
+        csvParts.push(cells.join(","));
+      }
+
+      const pCountry = isAllCountries(country) ? "all" : country;
       // Build Blob + download. UTF-8 BOM stays so Windows Excel renders SK diacritics.
       const csv = csvParts.join("\n");
       const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
