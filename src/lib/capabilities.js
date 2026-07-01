@@ -48,7 +48,9 @@ export const CAPABILITY_KEYS = [
   'view_analytics',              // grafy, trendy
   'view_historical_data',        // mesiac-na-mesiac
   'view_sold_velocity',          // sold_last_month column (kľúčová metrika rýchlosti predaja)
-  'export_data',                 // CSV / JSON download
+  'view_exports_page',           // môže OTVORIŤ /app/exports + vybrať dátum (trial + real-paid)
+  'export_data',                 // reálne STIAHNUŤ dáta — LEN real-paid/admin (nie trial). Pridáva sa
+                                 // dynamicky v useCapabilities, nie je v žiadnom statickom tier-e.
   'view_monthly_reports',        // PDF reporty
 
   // Profile
@@ -120,7 +122,6 @@ const FREE_CAPS = [
 
 const PAID_CAPS = [
   'change_own_profile',
-  'export_data',
   'has_paid_access',
   'view_all_projects_list',
   'view_analytics',
@@ -128,6 +129,7 @@ const PAID_CAPS = [
   'view_chosen_project_detail',   // backward compat — paid samozrejme vidí aj "svoj" projekt
   'view_dashboard_public',
   'view_district_pulse',
+  'view_exports_page',            // trial + real-paid MÔŽU otvoriť Exporty + vybrať dátum...
   'view_historical_data',
   'view_how_it_works',
   'view_market_pulse',
@@ -135,6 +137,8 @@ const PAID_CAPS = [
   'view_public_content',
   'view_sold_velocity',
   'view_ticker',
+  // POZOR: 'export_data' (reálne stiahnutie) NIE je tu — pridáva sa dynamicky v
+  // useCapabilities LEN pre admin || real-paid, takže trial-"paid" ho NEDOSTANE.
   // NIE: prompt_signup, prompt_upgrade_to_paid, see_early_access_badge, access_pending_gate
 ];
 

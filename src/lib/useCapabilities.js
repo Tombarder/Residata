@@ -102,7 +102,21 @@ export function useCapabilities() {
     effectiveTier = baseTier;
   }
 
-  const caps = capsForTier(effectiveTier);
+  // ── Real-paid vs trial-"paid" split ───────────────────────
+  // effectiveTier collapses both real subscribers and 7-day trials to "paid".
+  // Export is for REAL paying customers only (Boss 2026-07-01) — the whole
+  // dataset is too valuable to hand a trial user. So `export_data` is NOT in any
+  // static tier set; it's granted here only when the user is admin or genuinely
+  // real-paid. Mirrors public.current_user_is_real_paid() in the DB (the true gate).
+  const isAdmin      = effectiveTier === "admin";
+  const isRealPaid   = effectiveTier === "paid" && paidActive;        // real subscription / legacy paid
+  const isTrialPaid  = effectiveTier === "paid" && !paidActive && trialActive; // trial-only "paid"
+  const canExport    = isAdmin || isRealPaid;
+
+  const caps = new Set(capsForTier(effectiveTier));
+  if (canExport) caps.add("export_data");
+  else caps.delete("export_data");   // belt-and-suspenders — trial/free never export
+
   const daysFrom = (ts) => ts ? Math.max(0, Math.ceil((ts - now) / 86400000)) : 0;
   const trialDaysLeft = trialActive ? daysFrom(trialUntil) : 0;
   const paidDaysLeft  = paidActive && paidWindowActive ? daysFrom(paidUntil) : null;
@@ -114,6 +128,8 @@ export function useCapabilities() {
     trialActive,
     trialDaysLeft,
     trialUntil,
+    isRealPaid,          // genuinely paying (admin-granted paid_until / legacy paid) — gates export
+    isTrialPaid,         // "paid" only via the 7-day trial — full access EXCEPT export
     paidActive,
     paidPaused,
     paidDaysLeft,

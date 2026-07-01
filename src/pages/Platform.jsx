@@ -15,6 +15,7 @@ import { Component, useState, useEffect, lazy, Suspense } from "react";
 import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
 import { useProjects, useMarketTotals, useVelocityMature } from "../lib/useData";
+import { useCountry, isAllCountries } from "../lib/useCountry";
 import { moneyFromEur, moneySymbol } from "../lib/money";
 import { localeTag, PUBLIC_LANGS } from "../lib/locale";
 import { useCurrency } from "../lib/useCurrency";
@@ -148,7 +149,7 @@ const NAV = [
     { page: "App:Explorer", label: { en: "Unit Explorer", sk: "Prieskumník" }, Icon: IconGrid, requires: "view_analytics" },
     { page: "App:Reports",   label: { en: "Reports",    sk: "Reporty"   }, Icon: IconDoc,      requires: "view_monthly_reports" },
     { page: "App:Assistant", label: { en: "Ask AI",     sk: "AI asistent" }, Icon: IconSparkle },
-    { page: "App:Exports",   label: { en: "Exports",    sk: "Exporty"   }, Icon: IconDownload, requires: "export_data" },
+    { page: "App:Exports",   label: { en: "Exports",    sk: "Exporty"   }, Icon: IconDownload, requires: "view_exports_page" },
   ]},
   { group: "account", items: [
     { page: "App:Billing",  label: { en: "Billing & tier", sk: "Platba a tier" }, Icon: IconCard },
@@ -670,7 +671,7 @@ function PageContent({ page, projectId, lang, setCurrent, openLogin }) {
   if (page === "App:Explorer")   return <Gated require="view_analytics"       lang={lang} setCurrent={setCurrent}><UnitExplorer lang={lang} setCurrent={setCurrent} /></Gated>;
   if (page === "App:Reports")    return <Gated require="view_monthly_reports" lang={lang} setCurrent={setCurrent}><ReportsPage lang={lang} /></Gated>;
   if (page === "App:Assistant")  return <ChatAssistant lang={lang} setCurrent={setCurrent} />;
-  if (page === "App:Exports")    return <Gated require="export_data"          lang={lang} setCurrent={setCurrent}><PlatformExports lang={lang} setCurrent={setCurrent} /></Gated>;
+  if (page === "App:Exports")    return <Gated require="view_exports_page"    lang={lang} setCurrent={setCurrent}><PlatformExports lang={lang} setCurrent={setCurrent} /></Gated>;
   if (page === "App:Billing")    return <PlatformBilling lang={lang} setCurrent={setCurrent} />;
   if (page === "App:Settings")   return <PlatformSettings lang={lang} />;
   if (page === "App:Admin")      return <Gated require="manage_users" lang={lang} setCurrent={setCurrent}><LiveAdmin lang={lang} setCurrent={setCurrent} /></Gated>;
@@ -744,6 +745,12 @@ function UpgradeOverlay({ lang, requiredFor, currentTier, setCurrent }) {
       sub:    lang === "sk"
         ? "Stiahni celý dataset alebo ťahaj priamo cez REST API. Upgrade-ni pre prístup."
         : "Download the full dataset or pull via REST API. Upgrade for access.",
+    },
+    view_exports_page: {
+      title:  lang === "sk" ? "Exporty CSV / API" : "CSV / API exports",
+      sub:    lang === "sk"
+        ? "Vyber si dátum snapshotu a stiahni dataset. Prístup je súčasťou plateného plánu."
+        : "Pick a snapshot date and download the dataset. Access is part of the paid plan.",
     },
     manage_users: {
       title: "Admin",
@@ -1774,13 +1781,53 @@ function formatCsvCell(numberCols, dateCols, column, value) {
   return csvEscapeCell(value);
 }
 
-function PlatformExports({ lang }) {
+function PlatformExports({ lang, setCurrent }) {
   const { projects } = useProjects();
   const { user } = useAuth();
+  // export_data is granted ONLY to real-paid + admin (see useCapabilities). Trial
+  // users reach this page (view_exports_page) and can pick a date, but the actual
+  // download is real-paid only — the DB export_units() RPC enforces the same rule.
+  const { can, isTrialPaid } = useCapabilities();
+  const { country } = useCountry();
+  const canExport = can("export_data");
+
+  // Snapshot-date picker. Available days come from public.archive_days (distinct
+  // approved-snapshot days per country) — auto-grows as new snapshots are approved,
+  // zero maintenance. Country-aware: respects the market switcher.
+  const [days, setDays] = useState([]);          // ["2026-07-01", …] newest first
+  const [selectedDay, setSelectedDay] = useState(""); // "" → latest available
+  const [daysLoading, setDaysLoading] = useState(true);
+
   // Export progress state: null = idle; { current, total, label } while
   // streaming. Disables the export button + shows a row counter so users
   // know the click did something even for large exports.
   const [exportProgress, setExportProgress] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setDaysLoading(true);
+      try {
+        let q = supabase.from("archive_days").select("day, country");
+        if (!isAllCountries(country)) q = q.eq("country", country);
+        const { data, error } = await q;
+        if (error) throw error;
+        const uniq = Array.from(new Set((data || []).map(r => r.day))).sort().reverse();
+        if (!cancelled) {
+          setDays(uniq);
+          // keep the current pick if it's still available, else fall back to latest ("")
+          setSelectedDay(prev => (prev && uniq.includes(prev)) ? prev : "");
+        }
+      } catch (_) {
+        if (!cancelled) setDays([]);
+      } finally {
+        if (!cancelled) setDaysLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [country]);
+
+  const effectiveDay = selectedDay || days[0] || null;   // the day an export will pull
 
   const csvFromProjects = () => {
     // T-001: numbers + dates get formatted (was raw DB strings before).
@@ -1806,35 +1853,15 @@ function PlatformExports({ lang }) {
 
   const csvFromFlats = async () => {
     if (exportProgress) return;  // already in progress; ignore double-click
-    const { supabase } = await import("../lib/supabase");
+    if (!effectiveDay) {
+      alert(lang === "sk" ? "Nie je dostupný žiadny dátum." : "No snapshot date available.");
+      return;
+    }
+    const pCountry = isAllCountries(country) ? null : country;
     setExportProgress({ current: 0, total: null, label: lang === "sk" ? "Sťahujem…" : "Downloading…" });
     try {
-      // F-089 (revised 2026-05-31 night): the previous version blocked on a
-      // `count: 'exact'` head query before fetching any pages. On views as
-      // complex as flats_current (paid-tier join over final.units +
-      // reference.projects + latest-snapshot filter), that count round-trip
-      // can hang 60s+ via PostgREST. Worse, it's pure overhead — we know
-      // we're done when a page comes back smaller than CSV_PAGE_SIZE.
-      //
-      // New approach: start paginating immediately. Show running row count
-      // ("Downloading 10,000 rows…"). If we want the total later we can
-      // fetch it lazily in the background, but the UX value is small and
-      // the latency cost was huge.
-      //
-      // Also: kick off an `estimated` count in parallel — it's cheap (uses
-      // planner stats, not an exact scan) and lets us upgrade the label
-      // to "X / Y" if it returns reasonably. If it errors or hangs we just
-      // continue with the running-count display.
-      const estimatePromise = supabase
-        .from("flats_current")
-        .select("*", { count: "estimated", head: true })
-        .then(r => (!r.error && r.count) ? r.count : null)
-        .catch(() => null);
-
-      // T-002: build project_id → { name, developer, district, city }
-      // lookup once before paging. `projects` already lives in memory
-      // (useProjects() hook on this component), so no extra round trip.
-      // ~161 projects → Map build is sub-millisecond.
+      // Enrichment lookup: project_id → { name, developer, district, city }.
+      // `projects` already lives in memory (useProjects), so no extra round trip.
       const projectLookup = new Map();
       for (const p of projects) {
         projectLookup.set(p.id, {
@@ -1845,32 +1872,31 @@ function PlatformExports({ lang }) {
         });
       }
 
-      let total = null;  // populated lazily when estimate resolves
       const csvParts = [FLATS_CSV_COLUMNS.join(",")];  // header is fixed/explicit
       let from = 0;
       let pageRows = 0;
       let totalRows = 0;
 
+      // Data comes ONLY through the gated public.export_units() RPC — never a raw
+      // view read — so the real-paid gate is enforced server-side. Paginated via
+      // p_limit/p_offset; p_day selects the snapshot (NULL would mean latest).
       do {
-        const to = from + CSV_PAGE_SIZE - 1;
-        const { data, error } = await supabase
-          .from("flats_current")
-          .select("*")
-          .range(from, to);
+        const { data, error } = await supabase.rpc("export_units", {
+          p_country: pCountry,
+          p_day: effectiveDay,
+          p_limit: CSV_PAGE_SIZE,
+          p_offset: from,
+        });
         if (error) throw error;
         pageRows = data?.length || 0;
         if (pageRows === 0) break;
 
         for (const row of data) {
           const enrichment = projectLookup.get(row.project_id) || {
-            project_name: "",
-            developer: "",
-            district: "",
-            city: "",
+            project_name: "", developer: "", district: "", city: "",
           };
           const cells = FLATS_CSV_COLUMNS.map(col => {
-            // Enrichment columns come from the projects lookup, not from
-            // the flats row itself.
+            // Enrichment columns come from the projects lookup, not the flats row.
             if (col === "project_name" || col === "developer" || col === "district" || col === "city") {
               return csvEscapeCell(enrichment[col]);
             }
@@ -1881,41 +1907,38 @@ function PlatformExports({ lang }) {
         totalRows += pageRows;
         from += CSV_PAGE_SIZE;
 
-        // After the first page returns, opportunistically read the parallel
-        // estimate so the UI can show "X / Y" once it's available.
-        if (total === null) {
-          try {
-            total = await Promise.race([estimatePromise, Promise.resolve(null)]);
-          } catch (_) {}
-        }
-
         setExportProgress({
           current: totalRows,
-          total: total && total >= totalRows ? total : null,
+          total: null,
           label: lang === "sk" ? "Sťahujem…" : "Downloading…",
         });
       } while (pageRows === CSV_PAGE_SIZE);  // short page = last page
 
       if (totalRows === 0) {
-        alert(lang === "sk" ? "Žiadne byty na export." : "No flats available.");
+        alert(lang === "sk" ? "Žiadne byty na export pre tento dátum." : "No flats for this date.");
         return;
       }
 
-      // Build Blob + download. UTF-8 BOM stays so Windows Excel renders
-      // SK diacritics correctly.
+      // Build Blob + download. UTF-8 BOM stays so Windows Excel renders SK diacritics.
       const csv = csvParts.join("\n");
       const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `residata-flats-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.download = `residata-flats-${pCountry || "all"}-${effectiveDay}.csv`;
       a.click();
-      try { track("csv_exported", { type: "flats", row_count: totalRows }); } catch (_) {}
+      try { track("csv_exported", { type: "flats", row_count: totalRows, day: effectiveDay, country: pCountry || "all" }); } catch (_) {}
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (e) {
-      // Surface error without ripping the whole page. alert() matches the
-      // pre-fix UX; consider a toast in a future polish pass.
-      alert((lang === "sk" ? "Export zlyhal: " : "Export failed: ") + (e?.message || String(e)));
+      // export_units raises 42501 for non-real-paid — surface a friendly message.
+      const msg = String(e?.message || e || "");
+      if (/export_not_permitted|42501|permission|insufficient/i.test(msg)) {
+        alert(lang === "sk"
+          ? "Export je dostupný len pre reálne platiacich zákazníkov."
+          : "Export is available to paying customers only.");
+      } else {
+        alert((lang === "sk" ? "Export zlyhal: " : "Export failed: ") + msg);
+      }
     } finally {
       setExportProgress(null);
     }
@@ -1925,10 +1948,49 @@ function PlatformExports({ lang }) {
     <div style={{ padding: "1rem 2rem 4rem", maxWidth: 720 }}>
       <p style={{ color: dim, fontSize: "0.9rem", lineHeight: 1.6, marginTop: 0, marginBottom: "1.5rem" }}>
         {lang === "sk"
-          ? "Stiahni si celý dataset ako CSV, alebo ho ťahaj priamo cez REST API do tvojho stacku."
-          : "Download the full dataset as CSV, or pull it via the REST API straight into your stack."}
+          ? "Vyber si dátum snapshotu a stiahni dataset ako CSV, alebo ho ťahaj cez REST API do tvojho stacku."
+          : "Pick a snapshot date and download the dataset as CSV, or pull it via the REST API straight into your stack."}
       </p>
 
+      {/* Snapshot-date picker — always visible; trial users can browse dates too. */}
+      <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 12, padding: "1.25rem 1.75rem", marginBottom: "1rem" }}>
+        <div style={{ fontFamily: mono, fontSize: "0.65rem", color: green, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.6rem" }}>
+          {lang === "sk" ? "Dátum snapshotu" : "Snapshot date"}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+          <select
+            value={selectedDay}
+            onChange={(e) => setSelectedDay(e.target.value)}
+            disabled={daysLoading || days.length === 0 || !!exportProgress}
+            style={{
+              background: "#0e0e10", color: textLight, border: `1px solid ${border}`,
+              borderRadius: 6, padding: "0.5rem 0.7rem", fontFamily: mono, fontSize: "0.8rem",
+              minWidth: 200, cursor: days.length === 0 ? "default" : "pointer",
+            }}>
+            {days.length === 0 && (
+              <option value="">{daysLoading ? (lang === "sk" ? "Načítavam…" : "Loading…") : (lang === "sk" ? "Žiadne dáta" : "No data")}</option>
+            )}
+            {days.map((d, i) => (
+              <option key={d} value={i === 0 ? "" : d}>
+                {d}{i === 0 ? (lang === "sk" ? "  (najnovší)" : "  (latest)") : ""}
+              </option>
+            ))}
+          </select>
+          <span style={{ color: dim, fontSize: "0.75rem" }}>
+            {lang === "sk"
+              ? `${days.length} dostupných dátumov · trh: ${isAllCountries(country) ? "všetky" : country}`
+              : `${days.length} dates available · market: ${isAllCountries(country) ? "all" : country}`}
+          </span>
+        </div>
+        <p style={{ color: dim, fontSize: "0.72rem", marginTop: "0.7rem", lineHeight: 1.5, marginBottom: 0 }}>
+          {lang === "sk"
+            ? "Nové dátumy pribúdajú automaticky po každom schválenom snapshote."
+            : "New dates appear automatically after each approved snapshot."}
+        </p>
+      </div>
+
+      {canExport ? (
+      <>
       <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 12, padding: "1.5rem 1.75rem", marginBottom: "1rem" }}>
         <div style={{ fontFamily: mono, fontSize: "0.65rem", color: green, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.5rem" }}>CSV</div>
         <h3 style={{ fontSize: "1.05rem", fontWeight: 600, color: textLight, margin: 0, marginBottom: "1rem" }}>
@@ -1945,7 +2007,7 @@ function PlatformExports({ lang }) {
                   : exportProgress.current > 0
                     ? `${exportProgress.label} ${exportProgress.current.toLocaleString(localeTag(lang))}${lang === "sk" ? " riadkov" : " rows"}`
                     : exportProgress.label)
-              : <>⬇ {lang === "sk" ? "Všetky byty" : "All flats"}</>}
+              : <>⬇ {lang === "sk" ? "Všetky byty" : "All flats"}{effectiveDay ? ` (${effectiveDay})` : ""}</>}
           </button>
         </div>
         <p style={{ color: dim, fontSize: "0.75rem", marginTop: "0.85rem", lineHeight: 1.5 }}>
@@ -1981,6 +2043,33 @@ function PlatformExports({ lang }) {
           </p>
         )}
       </div>
+      </>
+      ) : (
+      /* Trial / non-paying: can reach the page + pick a date, but export is real-paid only. */
+      <div style={{ background: bg, border: `1px solid #f5a62355`, borderRadius: 12, padding: "1.5rem 1.75rem" }}>
+        <div style={{ fontFamily: mono, fontSize: "0.65rem", color: "#f5a623", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.5rem" }}>
+          {lang === "sk" ? "Len pre platený plán" : "Paid plan only"}
+        </div>
+        <h3 style={{ fontSize: "1.05rem", fontWeight: 600, color: textLight, margin: 0, marginBottom: "0.75rem" }}>
+          {lang === "sk" ? "Export je pre reálne platiacich zákazníkov" : "Export is for paying customers"}
+        </h3>
+        <p style={{ color: "#c0c0c8", fontSize: "0.85rem", lineHeight: 1.6, marginBottom: "1.1rem" }}>
+          {isTrialPaid
+            ? (lang === "sk"
+                ? "Máš trial prístup — počas neho vidíš plný obsah, ale sťahovanie (export) dát je vyhradené pre reálne platený plán. Dátum vyššie si môžeš pokojne prezrieť."
+                : "You're on the trial — full access to browse, but downloading (export) the dataset is reserved for a real paid plan. Feel free to explore the dates above.")
+            : (lang === "sk"
+                ? "Sťahovanie (export) dát je súčasťou plateného plánu."
+                : "Downloading (export) the dataset is part of the paid plan.")}
+        </p>
+        <button
+          className="btn-p"
+          onClick={() => setCurrent && setCurrent("App:Billing")}
+          style={{ fontSize: "0.85rem" }}>
+          {lang === "sk" ? "Zobraziť plán a ceny →" : "See plans & pricing →"}
+        </button>
+      </div>
+      )}
     </div>
   );
 }
