@@ -39,7 +39,7 @@ import { useCountry } from "./lib/useCountry";
 import { useMarketTotals } from "./lib/useData";
 import { pushRoute, pathToPage, isAppPage, pageToPath } from "./lib/routing";
 import { applySeo } from "./lib/seo";
-import { localeTag } from "./lib/locale";
+import { localeTag, PUBLIC_LANGS, DEFAULT_LANG, LANG_LABELS, isPublicLang, coercePublicLang } from "./lib/locale";
 import { startPageEngagement, stopPageEngagement } from "./lib/engagement";
 // PERF Step 5: code-split — the platform shell pulls in the heaviest modules
 // (Reports, PivotV2, UnitTracker, admin) which a marketing/first-time visitor
@@ -506,32 +506,25 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
   useEffect(() => { setMenuOpen(false); }, [current]);
 
   // Language toggle — shared between the desktop cluster and the mobile menu.
+  // Pills are rendered from PUBLIC_LANGS (locale.js) so the exposed set is
+  // config-driven — re-enabling Czech is one edit there, no markup change here.
   const langToggle = (
     <div role="group" aria-label={lang === "en" ? "Language" : "Jazyk"} style={{
       display: "flex", borderRadius: "var(--r-sm)", overflow: "hidden",
       border: "1px solid var(--border)", fontSize: "0.72rem",
       fontFamily: "'JetBrains Mono', monospace",
     }}>
-      <button type="button" aria-pressed={lang === "en"} onClick={() => { if (lang !== "en") { track("language_switched", { from: lang, to: "en" }); setLang("en"); } }} style={{
-        padding: "0.4rem 0.8rem", border: "none", cursor: "pointer",
-        background: lang === "en" ? "var(--border)" : "transparent",
-        color: lang === "en" ? "var(--text)" : "var(--text-dim)",
-        fontFamily: "inherit", fontSize: "inherit", transition: "all 0.2s",
-      }}>EN</button>
-      <button type="button" aria-pressed={lang === "sk"} onClick={() => { if (lang !== "sk") { track("language_switched", { from: lang, to: "sk" }); setLang("sk"); } }} style={{
-        padding: "0.4rem 0.8rem", border: "none", cursor: "pointer",
-        borderLeft: "1px solid var(--border)",
-        background: lang === "sk" ? "var(--border)" : "transparent",
-        color: lang === "sk" ? "var(--text)" : "var(--text-dim)",
-        fontFamily: "inherit", fontSize: "inherit", transition: "all 0.2s",
-      }}>SK</button>
-      <button type="button" aria-pressed={lang === "cs"} onClick={() => { if (lang !== "cs") { track("language_switched", { from: lang, to: "cs" }); setLang("cs"); } }} style={{
-        padding: "0.4rem 0.8rem", border: "none", cursor: "pointer",
-        borderLeft: "1px solid var(--border)",
-        background: lang === "cs" ? "var(--border)" : "transparent",
-        color: lang === "cs" ? "var(--text)" : "var(--text-dim)",
-        fontFamily: "inherit", fontSize: "inherit", transition: "all 0.2s",
-      }}>CZ</button>
+      {PUBLIC_LANGS.map((code, i) => (
+        <button key={code} type="button" aria-pressed={lang === code}
+          onClick={() => { if (lang !== code) { track("language_switched", { from: lang, to: code }); setLang(code); } }}
+          style={{
+            padding: "0.4rem 0.8rem", border: "none", cursor: "pointer",
+            borderLeft: i ? "1px solid var(--border)" : undefined,
+            background: lang === code ? "var(--border)" : "transparent",
+            color: lang === code ? "var(--text)" : "var(--text-dim)",
+            fontFamily: "inherit", fontSize: "inherit", transition: "all 0.2s",
+          }}>{LANG_LABELS[code] || code.toUpperCase()}</button>
+      ))}
     </div>
   );
 
@@ -1958,13 +1951,15 @@ function readInitialLang() {
   if (typeof window === "undefined") return "en";
   try {
     const stored = window.localStorage.getItem(LANG_STORAGE_KEY);
-    if (stored === "en" || stored === "sk" || stored === "cs") return stored;
+    // Only honour a stored pick that is still public (a returning visitor's stale
+    // 'cs' falls through to browser detection / default rather than sticking).
+    if (isPublicLang(stored)) return stored;
   } catch (_) { /* private mode etc. */ }
-  // First visit: detect from browser
+  // First visit: detect from browser, but only into a public language.
   const browserLang = (typeof navigator !== "undefined" && navigator.language) || "";
-  if (browserLang.toLowerCase().startsWith("sk")) return "sk";
-  if (browserLang.toLowerCase().startsWith("cs")) return "cs";
-  return "en";
+  if (isPublicLang("sk") && browserLang.toLowerCase().startsWith("sk")) return "sk";
+  if (isPublicLang("cs") && browserLang.toLowerCase().startsWith("cs")) return "cs";
+  return DEFAULT_LANG;
 }
 
 export default function App() {
@@ -1974,7 +1969,7 @@ export default function App() {
   );
   // F-024 fix — initialize from localStorage + browser-lang detection.
   const [langRaw, setLangRaw] = useState(readInitialLang);
-  const lang = langRaw === "sk" ? "sk" : langRaw === "cs" ? "cs" : "en";
+  const lang = coercePublicLang(langRaw);
   // Re-render when the Boss's live copy edits load/refresh (overlay over the dicts).
   useCopyVersion();
   // setLang persists the choice. Wrap setLangRaw so call-sites are unchanged.
