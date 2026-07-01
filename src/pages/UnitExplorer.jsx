@@ -65,8 +65,9 @@ export default function UnitExplorer({ lang = "sk" }) {
 
   const [mode, setMode] = useState("latest");
   const [cols, setCols] = useState(DEFAULT_COLS);
-  const [fProject, setFProject] = useState(""); const [fCity, setFCity] = useState(""); const [fDev, setFDev] = useState(""); const [fStav, setFStav] = useState("");
+  const [fProject, setFProject] = useState(""); const [fCity, setFCity] = useState(""); const [fCast, setFCast] = useState(""); const [fDev, setFDev] = useState(""); const [fStav, setFStav] = useState("");
   const [pMin, setPMin] = useState(""); const [pMax, setPMax] = useState("");
+  const [m2Min, setM2Min] = useState(""); const [m2Max, setM2Max] = useState("");
   const [sort, setSort] = useState({ key: "cena_s_dph", dir: "desc" });
   const [search, setSearch] = useState("");
   const scrollRef = useRef(null);
@@ -76,21 +77,32 @@ export default function UnitExplorer({ lang = "sk" }) {
   // dropdown option lists follow the chosen scope (audit M4): in "História" they include
   // values that exist only historically (e.g. a now-sold-out project), not just current ones.
   const cityOpts = usePivotDistinct({ enabled: true, field: "city", mode });
+  // Mestská časť options narrow to the chosen city (Bratislava's časti ≠ Praha's) — same
+  // parent-scopes-child behaviour as the Map filter. With no city picked, all časti show.
+  const castOpts = usePivotDistinct({ enabled: true, field: "cast", mode, city: fCity || null });
   const devOpts = usePivotDistinct({ enabled: true, field: "developer", mode });
   const projOpts = usePivotDistinct({ enabled: true, field: "project_name", mode });
   const stavOpts = usePivotDistinct({ enabled: true, field: "stav", mode });
+
+  // Changing the city invalidates a previously-picked mestská časť (it belongs to the old
+  // city), so clear it — otherwise the table would filter to an empty intersection.
+  useEffect(() => { setFCast(""); }, [fCity]);
 
   const spec = useMemo(() => {
     const filters = {};
     if (!isAllCountries(country)) filters.country = [country];
     if (fProject) filters.project_name = [fProject];
     if (fCity) filters.city = [fCity];
+    if (fCast) filters.cast = [fCast];
     if (fDev) filters.developer = [fDev];
     if (fStav) filters.stav = [fStav];
     const s = { columns: cols, filters, mode, sort: [sort] };   // limit/offset managed by useUnitsInfinite
-    if (pMin || pMax) s.ranges = { cena_s_dph: { min: pMin || null, max: pMax || null } };
+    const ranges = {};
+    if (pMin || pMax) ranges.cena_s_dph = { min: pMin || null, max: pMax || null };
+    if (m2Min || m2Max) ranges.price_per_m2 = { min: m2Min || null, max: m2Max || null };
+    if (Object.keys(ranges).length) s.ranges = ranges;
     return s;
-  }, [country, fProject, fCity, fDev, fStav, pMin, pMax, cols, mode, sort]);
+  }, [country, fProject, fCity, fCast, fDev, fStav, pMin, pMax, m2Min, m2Max, cols, mode, sort]);
 
   const { rows, hasMore, loading, loadMore } = useUnitsInfinite({ enabled: cols.length > 0, spec, pageSize: PAGE });
 
@@ -118,7 +130,7 @@ export default function UnitExplorer({ lang = "sk" }) {
 
   const toggleSort = (k) => setSort((s) => (s.key === k ? { key: k, dir: s.dir === "asc" ? "desc" : "asc" } : { key: k, dir: "asc" }));
   const toggleCol = (k) => setCols((c) => (c.includes(k) ? c.filter((x) => x !== k) : [...c, k]));
-  const activeFilters = [fProject, fCity, fDev, fStav, pMin, pMax].filter(Boolean).length;
+  const activeFilters = [fProject, fCity, fCast, fDev, fStav, pMin, pMax, m2Min, m2Max].filter(Boolean).length;
 
   // palette: filter by search, group by category
   const palette = useMemo(() => {
@@ -165,11 +177,14 @@ export default function UnitExplorer({ lang = "sk" }) {
             <span style={{ fontFamily: mono, fontSize: "0.62rem", color: dim, letterSpacing: "0.08em", textTransform: "uppercase", marginRight: "0.1rem" }}>{t("Filtre", "Filters")}{activeFilters ? ` · ${activeFilters}` : ""}</span>
             <Sel value={fProject} onChange={setFProject} opts={projOpts.values} ph={t("Projekt: všetky", "Project: all")} />
             <Sel value={fCity} onChange={setFCity} opts={cityOpts.values} ph={t("Mesto: všetky", "City: all")} />
+            <Sel value={fCast} onChange={setFCast} opts={castOpts.values} ph={t("Mestská časť: všetky", "District: all")} />
             <Sel value={fDev} onChange={setFDev} opts={devOpts.values} ph={t("Developer: všetci", "Developer: all")} />
             <Sel value={fStav} onChange={setFStav} opts={stavOpts.values} ph={t("Stav: všetky", "Status: all")} />
             <input style={{ ...sel, width: 84 }} placeholder={t("cena od", "€ from")} value={pMin} onChange={(e) => setPMin(e.target.value)} inputMode="numeric" />
             <input style={{ ...sel, width: 84 }} placeholder={t("cena do", "€ to")} value={pMax} onChange={(e) => setPMax(e.target.value)} inputMode="numeric" />
-            {activeFilters > 0 && <button onClick={() => { setFProject(""); setFCity(""); setFDev(""); setFStav(""); setPMin(""); setPMax(""); }} style={{ ...sel, cursor: "pointer", color: dim, fontFamily: mono, fontSize: "0.7rem" }}>✕ {t("vyčistiť", "clear")}</button>}
+            <input style={{ ...sel, width: 92 }} placeholder={t("€/m² od", "€/m² from")} value={m2Min} onChange={(e) => setM2Min(e.target.value)} inputMode="numeric" />
+            <input style={{ ...sel, width: 92 }} placeholder={t("€/m² do", "€/m² to")} value={m2Max} onChange={(e) => setM2Max(e.target.value)} inputMode="numeric" />
+            {activeFilters > 0 && <button onClick={() => { setFProject(""); setFCity(""); setFCast(""); setFDev(""); setFStav(""); setPMin(""); setPMax(""); setM2Min(""); setM2Max(""); }} style={{ ...sel, cursor: "pointer", color: dim, fontFamily: mono, fontSize: "0.7rem" }}>✕ {t("vyčistiť", "clear")}</button>}
             <span style={{ marginLeft: "auto", fontFamily: mono, fontSize: "0.72rem", color: dim }}>
               {loading && rows.length === 0 ? t("načítavam…", "loading…") : `${rows.length}${hasMore ? "+" : ""} ${t("bytov", "units")}`}
             </span>

@@ -1310,18 +1310,22 @@ const _pivotDistinctCache = new Map();
    client accessor mirrors (so they match what records-side filtering compares).
    Returns the same {values, hasEmpty} shape distinctValuesForField() yields for a
    TEXT field, so FilterPopover can consume it interchangeably — WITHOUT a records pull. */
-export function usePivotDistinct({ enabled = false, field = null, months = null, dates = null, stav = null, mode = null } = {}) {
+export function usePivotDistinct({ enabled = false, field = null, months = null, dates = null, stav = null, mode = null, city = null } = {}) {
   const { loading: authLoading, user, profile } = useAuth();
   const { country } = useCountry();
   // One analytics_pivot(dims=[field]) call: each grain row is {d:[value], m:{…}}, so the
   // row keys ARE the field's distinct values. Scope mirrors the table (country/month/date,
   // and stav for OTHER fields — a field's own value list is never narrowed by itself).
+  // `city` narrows a location field's options to one city (e.g. only Bratislava's mestské
+  // časti), the same "parent scopes child" behaviour the Map filter uses — never applied to
+  // the `city` field itself (a field's own list is never narrowed by itself).
   const spec = enabled && field ? (() => {
     const filters = {};
     if (!isAllCountries(country)) filters.country = [country];
     if (months && months.length) filters.snapshot_month = months.map(String);
     if (dates && dates.length) filters.datum = dates.map(String);
     if (stav && stav.length && field !== "stav") filters.stav = stav.map(String);
+    if (city && field !== "city") filters.city = [String(city)];
     return { dims: [field], mode: mode || ((months?.length || dates?.length) ? "archive" : "latest"), filters };
   })() : null;
   const key = enabled && field
