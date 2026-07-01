@@ -22,3 +22,36 @@ const LOCALE_TAGS = { en: "en-US", sk: "sk-SK", cs: "cs-CZ" };
 export function localeTag(lang) {
   return LOCALE_TAGS[lang] || LOCALE_TAGS.en;
 }
+
+/**
+ * PUBLIC_LANGS — the single source of truth for which UI languages are exposed
+ * to visitors (switcher pills, browser auto-detect, hreflang alternates).
+ *
+ * Czech ('cs') is FULLY BUILT — nav labels (pagesCS), live dicts (liveLang.js),
+ * cs-CZ number/date formatting, hreflang — but held back from the public launch.
+ * To re-expose Czech everywhere, add "cs" back to this array (ONE edit); every
+ * switcher, the auto-detect, and the hreflang set read from here. Order here is
+ * the order the switcher pills render in. Never hardcode a language list again.
+ */
+export const PUBLIC_LANGS = ["en", "sk"];
+
+/** Fallback language for anything not in PUBLIC_LANGS. */
+export const DEFAULT_LANG = "en";
+
+/** Short label shown on switcher pills per language code. */
+export const LANG_LABELS = { en: "EN", sk: "SK", cs: "CZ" };
+
+/** True if `lang` is currently public (shown in switchers / auto-selectable). */
+export function isPublicLang(lang) {
+  return PUBLIC_LANGS.includes(lang);
+}
+
+/**
+ * Coerce any stored/detected language code to a public one. A stale pick that is
+ * no longer public (e.g. a returning visitor whose localStorage still says 'cs')
+ * falls back to DEFAULT_LANG so nobody gets stranded on a hidden language with no
+ * pill to switch away from.
+ */
+export function coercePublicLang(lang) {
+  return isPublicLang(lang) ? lang : DEFAULT_LANG;
+}

@@ -16,7 +16,7 @@ import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
 import { useProjects, useMarketTotals, useVelocityMature } from "../lib/useData";
 import { moneyFromEur, moneySymbol } from "../lib/money";
-import { localeTag } from "../lib/locale";
+import { localeTag, PUBLIC_LANGS } from "../lib/locale";
 import { useCurrency } from "../lib/useCurrency";
 import { supabase } from "../lib/supabase";
 import { useActivateTrial } from "../lib/useActivateTrial";
@@ -547,7 +547,7 @@ function TopBar({ page, lang, setLang, tier }) {
             border: `1px solid ${border}`, borderRadius: 8, padding: 2,
             background: "#0e0e10",
           }}>
-            {["en", "sk", "cs"].map(code => {
+            {PUBLIC_LANGS.map(code => {
               const active = lang === code;
               return (
                 <button
