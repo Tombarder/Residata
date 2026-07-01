@@ -62,7 +62,6 @@ const FIELDS = {
   typ:               { label: "Typ",                        group: "identity", type: "text",   accessor: (r) => r.typ },
   etapa:             { label: "Etapa",                      group: "identity", type: "text",   accessor: (r) => r.etapa },
   budova:            { label: "Budova",                     group: "identity", type: "text",   accessor: (r) => r.budova },
-  unit_detail:       { label: "Unit/detail",                group: "identity", type: "text",   accessor: (r) => r.unit_detail },
   developer:         { label: "Developer",                  group: "identity", type: "text",   accessor: (r) => r.developer },
 
   // Unit spec
@@ -227,7 +226,7 @@ function fieldLabel(fieldKey, lang) {
    their Excel pivot. */
 const FIELD_ORDER = [
   "datum", "snapshot_month", "batch_id", "batch_timestamp", "import_status",
-  "project_name", "developer", "unit_id", "typ", "etapa", "budova", "unit_detail",
+  "project_name", "developer", "unit_id", "typ", "etapa", "budova",
   "poschodie", "izby", "obytna_plocha", "balkon", "loggia", "terasa",
   "zahrada", "exterier", "kobka", "celkova_plocha",
   "cena_bez_dph", "cena_s_dph",
@@ -696,7 +695,7 @@ function buildTree(records, rowFields, colFields, valueDefs) {
 // 'unknown dim …' loudly at query time (no silent wrong data). Verified 2026-06-29
 // against the live registry (developer / sub_district / batch_timestamp all present).
 const SERVERABLE_DIMS = new Set([
-  "project_name", "developer", "typ", "etapa", "budova", "unit_detail", "unit_id",
+  "project_name", "developer", "typ", "etapa", "budova", "unit_id",
   "izby", "poschodie", "stav", "kolaudacia", "orientacia",
   "country", "city", "cast", "sub_district",
   "import_status", "snapshot_month", "datum", "batch_id", "batch_timestamp",

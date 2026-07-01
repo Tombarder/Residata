@@ -163,6 +163,20 @@ export default function MapView2({ lang = "en", setCurrent }) {
   const [heatMode, setHeatMode] = useState(false); // dots vs heatmap of the active lens
   const [anchorId, setAnchorId] = useState(null); // project an "◎ Area" was opened from → benchmark vs its set
   const [viewBounds, setViewBounds] = useState(null); // current map viewport → the overview reflects only what's on screen
+  const [extSet, setExtSet] = useState(null); // {nameSet:Set<normName>, count} handed from a filtered analytics view ("Show on map")
+
+  // On mount, consume a project set handed over from a filtered analytics view (Unit Explorer's
+  // "Show on map"). Restricts the map to exactly those projects until cleared. Consume-once.
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem("residata.mapProjectSet");
+      if (!raw) return;
+      sessionStorage.removeItem("residata.mapProjectSet");
+      const parsed = JSON.parse(raw);
+      const names = (parsed && parsed.names) || [];
+      if (names.length) setExtSet({ nameSet: new Set(names.map(norm)), count: names.length });
+    } catch { /* ignore malformed handoff */ }
+  }, []);
 
   useEffect(() => { setCurrentRef.current = setCurrent; }, [setCurrent]);
   useEffect(() => { countryRef.current = country; }, [country]);
@@ -187,9 +201,10 @@ export default function MapView2({ lang = "en", setCurrent }) {
   // it; we keep the base so we can show how many sold-out it would hide.
   const baseSet = useMemo(() => {
     const q = norm(nameQuery);
-    const named = q ? (projects || []).filter((p) => norm(p.name).includes(q)) : (projects || []);
+    let named = q ? (projects || []).filter((p) => norm(p.name).includes(q)) : (projects || []);
+    if (extSet) named = named.filter((p) => extSet.nameSet.has(norm(p.name)));
     return applyFilters(named, conditions);
-  }, [projects, nameQuery, conditions]);
+  }, [projects, nameQuery, conditions, extSet]);
   const soldOutCount = useMemo(() => baseSet.filter((p) => (Number(p.available_units) || 0) === 0).length, [baseSet]);
   const noPriceCount = useMemo(() => baseSet.filter((p) => !hasPublishedPrice(p)).length, [baseSet]);
   const shown = useMemo(() => {
@@ -389,7 +404,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
   const firstCountry = useRef(true);
   useEffect(() => {
     if (firstCountry.current) { firstCountry.current = false; return; }
-    setConditions([]); setNameQuery(""); setAnalysisCenter(null); setAnchorId(null);
+    setConditions([]); setNameQuery(""); setAnalysisCenter(null); setAnchorId(null); setExtSet(null);
   }, [country]);
 
   const openProject = (id) => setCurrentRef.current && setCurrentRef.current("App:ProjectDetail:" + id);
@@ -424,6 +439,13 @@ export default function MapView2({ lang = "en", setCurrent }) {
         <button onClick={() => setFilterOpen((v) => !v)} style={chipStyle(filterOpen || activeConds.length > 0)}>
           ⚙ {sk ? "Filtre" : "Filters"}{activeConds.length > 0 ? ` · ${activeConds.length}` : ""}
         </button>
+        {extSet && (
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: `${green}22`, color: green, border: `1px solid ${green}`, borderRadius: 999, padding: "4px 10px", fontSize: "0.72rem", fontWeight: 600 }}
+            title={sk ? "Zobrazené len projekty vyfiltrované v analytike" : "Showing only the projects filtered in analytics"}>
+            🗺 {sk ? `Z analytiky: ${extSet.count} projektov` : `From analytics: ${extSet.count} projects`}
+            <span onClick={() => setExtSet(null)} style={{ cursor: "pointer", opacity: 0.8 }} title={sk ? "zrušiť" : "clear"}>✕</span>
+          </span>
+        )}
         {activeConds.map((c) => (
           <span key={c.id} style={{ display: "inline-flex", alignItems: "center", gap: 5, background: `${green}14`, color: green, border: `1px solid ${green}40`, borderRadius: 999, padding: "4px 9px", fontSize: "0.7rem", maxWidth: 250 }}>
             <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{describe(c, sk)}</span>

@@ -382,6 +382,34 @@ const _filterColForLevel = {
 const _countryColForLevel = (level) => (level === 'district' ? 'country' : 'country_code');
 
 /**
+ * One delayed retry for the PUBLIC aggregate reads (totals_* / district),
+ * which route through the session-less `supabasePublic` client.
+ *
+ * The FIRST render right after a fresh magic-link login fires a burst of
+ * queries while the app is still warming up (auth token exchange, profile
+ * fetch, cold PostgREST connection). In that window a public read can come back
+ * with a TRANSIENT error (aborted fetch / cold statement_timeout). These hooks
+ * had no retry, so a single failed attempt left the /app dashboard KPI cards
+ * (Sledované byty / Voľné / Predané / €/m²) and the "podľa mestskej časti"
+ * district totals empty until the user reloaded — even though the data was fine.
+ *
+ * One delayed re-read closes that window. Paired with re-running the effect when
+ * auth settles (the `authLoading` / `user?.id` deps below, mirroring
+ * usePivotDistinct) it gives two independent recovery paths. `run` MUST create a
+ * fresh query each call — a supabase builder is single-shot — so pass a thunk,
+ * not an already-awaited promise. On success (no error) it returns after the
+ * first attempt; it never masks a persistent error (that still surfaces).
+ */
+async function _readPublicWithRetry(run, { retries = 1, delayMs = 300 } = {}) {
+  let res = await run();
+  for (let attempt = 0; res && res.error && attempt < retries; attempt++) {
+    await new Promise((r) => setTimeout(r, delayMs));
+    res = await run();
+  }
+  return res;
+}
+
+/**
  * Generic aggregate-totals hook. Reads from the appropriate
  * public.totals_by_X view based on `level` + `id`.
  *
@@ -396,6 +424,10 @@ const _countryColForLevel = (level) => (level === 'district' ? 'country' : 'coun
  * unit/project counts are preserved field-for-field.
  */
 export function useTotals(level, id = null) {
+  // Auth-settle signal: re-run the fetch once auth resolves, and retry on a
+  // transient first-load error (see _readPublicWithRetry). Public read, so we
+  // don't GATE on authLoading — we just want a fresh attempt when it settles.
+  const { loading: authLoading, user } = useAuth();
   const cacheKey = `${level}:${id || ''}`;
   const cached = _totalsCache.get(cacheKey);
   const [totals, setTotals] = useState(cached || _emptyTotals);
@@ -413,11 +445,12 @@ export function useTotals(level, id = null) {
       return;
     }
     let cancelled = false;
-    let q = supabasePublic.from(view).select("*");
-    if (filterCol && id != null) {
-      q = q.eq(filterCol, id);
-    }
-    q.maybeSingle().then(({ data, error }) => {
+    const runReq = () => {
+      let q = supabasePublic.from(view).select("*");
+      if (filterCol && id != null) q = q.eq(filterCol, id);
+      return q.maybeSingle();
+    };
+    _readPublicWithRetry(runReq).then(({ data, error }) => {
       if (cancelled) return;
       if (error) {
         console.error(`[useTotals] ${level}/${id}`, error);
@@ -429,7 +462,7 @@ export function useTotals(level, id = null) {
       setTotals(next);
     });
     return () => { cancelled = true; };
-  }, [level, id]);
+  }, [level, id, authLoading, user?.id]);
 
   return totals;
 }
@@ -449,6 +482,11 @@ export function useTotals(level, id = null) {
 // =============================================================================
 const _totalsListCache = new Map();
 export function useTotalsList(level, { country = null, filterCol = null, filterId = null } = {}) {
+  // Auth-settle signal (mirrors usePivotDistinct): re-fetch once auth resolves.
+  // Public read via supabasePublic, so no GATE — just a fresh attempt on settle,
+  // plus a transient-error retry below. Fixes the "/app dashboard district totals
+  // empty on first load right after login" race.
+  const { loading: authLoading, user } = useAuth();
   const view = _viewForLevel[level];
   const cacheKey = `${level}:${country || ''}:${filterCol || ''}:${filterId ?? ''}`;
   const [rows, setRows] = useState(() => _totalsListCache.get(cacheKey) || []);
@@ -477,13 +515,18 @@ export function useTotalsList(level, { country = null, filterCol = null, filterI
 
     const myReq = ++reqRef.current;
     const isStale = () => myReq !== reqRef.current;
-    let q = supabasePublic.from(view).select("*");
-    // 'all' = the cross-market view → NO country filter (show every region/city/
-    // district across all markets). A literal .eq('country_code','all') matched
-    // nothing, which is why the homepage pricing-map block was empty in All view.
-    if (country && country !== "all") q = q.eq(_countryColForLevel(level), country);
-    if (filterCol && filterId != null) q = q.eq(filterCol, filterId);
-    q.then(({ data, error }) => {
+    // Fresh query each attempt (builder is single-shot) so _readPublicWithRetry
+    // can re-fire on a transient first-load error.
+    const runReq = () => {
+      let q = supabasePublic.from(view).select("*");
+      // 'all' = the cross-market view → NO country filter (show every region/city/
+      // district across all markets). A literal .eq('country_code','all') matched
+      // nothing, which is why the homepage pricing-map block was empty in All view.
+      if (country && country !== "all") q = q.eq(_countryColForLevel(level), country);
+      if (filterCol && filterId != null) q = q.eq(filterCol, filterId);
+      return q;
+    };
+    _readPublicWithRetry(runReq).then(({ data, error }) => {
       if (isStale()) return;
       if (error) {
         console.error(`[useTotalsList] ${level}/${filterCol}=${filterId}`, error);
@@ -498,7 +541,7 @@ export function useTotalsList(level, { country = null, filterCol = null, filterI
       if (!isStale()) setLoading(false);
     });
     return () => { reqRef.current++; };
-  }, [level, country, filterCol, filterId, view, cacheKey]);
+  }, [level, country, filterCol, filterId, view, cacheKey, authLoading, user?.id]);
 
   return { rows, loading };
 }
@@ -543,6 +586,11 @@ const _marketTotalsByCountry = new Map();  // country code → mapped totals obj
 })();
 
 export function useMarketTotals() {
+  // Auth-settle signal (mirrors usePivotDistinct): re-fetch once auth resolves.
+  // Public read via supabasePublic, so no GATE — just a fresh attempt on settle,
+  // plus a transient-error retry below. Fixes the "/app dashboard KPI cards empty
+  // on first load right after login" race.
+  const { loading: authLoading, user } = useAuth();
   const { country } = useCountry();
   const [totals, setTotals] = useState(() => _marketTotalsByCountry.get(country) || {
     loading: true,
@@ -562,7 +610,9 @@ export function useMarketTotals() {
     // 2026-06-15) so "sold last month" renders for the All view too; it still lacks
     // snapshot_month, which we fill from the latest month any market scraped so the
     // dashboard's "last run for month X" is real.
-    const _req = isAllCountries(country)
+    // Fresh query each attempt (builder is single-shot) so _readPublicWithRetry
+    // can re-fire on a transient first-load error.
+    const runReq = () => (isAllCountries(country)
       ? Promise.all([
           supabasePublic.from("totals_global").select("*").maybeSingle(),
           supabasePublic.from("totals_by_country").select("snapshot_month")
@@ -571,8 +621,8 @@ export function useMarketTotals() {
           data: g.data ? { ...g.data, snapshot_month: m.data?.snapshot_month ?? null } : g.data,
           error: g.error,
         }))
-      : supabasePublic.from("totals_by_country").select("*").eq("country_code", country).maybeSingle();
-    _req.then(({ data, error }) => {
+      : supabasePublic.from("totals_by_country").select("*").eq("country_code", country).maybeSingle());
+    _readPublicWithRetry(runReq).then(({ data, error }) => {
       if (cancelled) return;
       if (error) {
         console.error("[useMarketTotals]", error);
@@ -603,7 +653,7 @@ export function useMarketTotals() {
       setTotals(next);
     });
     return () => { cancelled = true; };
-  }, [country]);
+  }, [country, authLoading, user?.id]);
   return totals;
 }
 
@@ -631,6 +681,10 @@ export function useMarketTotals() {
  *  is byte-identical to the SK rows the previous SK-pinned view returned. */
 const _districtTotalsByCountry = new Map();  // country code → rows
 export function useDistrictTotals() {
+  // Auth-settle signal (mirrors usePivotDistinct): re-fetch once auth resolves.
+  // Public read via supabasePublic, so no GATE — just a fresh attempt on settle,
+  // plus a transient-error retry below (same first-load race as the KPI cards).
+  const { loading: authLoading, user } = useAuth();
   const { country } = useCountry();
   const cached = _districtTotalsByCountry.get(country);
   const [districts, setDistricts] = useState(cached || []);
@@ -648,7 +702,10 @@ export function useDistrictTotals() {
     else setLoading(true);
     const myReq = ++reqRef.current;
     const isStale = () => myReq !== reqRef.current;
-    _eqCountry(supabasePublic.from("totals_by_district").select("*"), country).then(({ data, error }) => {
+    // Fresh query each attempt (builder is single-shot) so _readPublicWithRetry
+    // can re-fire on a transient first-load error.
+    const runReq = () => _eqCountry(supabasePublic.from("totals_by_district").select("*"), country);
+    _readPublicWithRetry(runReq).then(({ data, error }) => {
       if (isStale()) return;
       if (error) { console.error("[useDistrictTotals]", error); return; }
       const arr = data || [];
@@ -660,7 +717,7 @@ export function useDistrictTotals() {
       if (!isStale()) setLoading(false);
     });
     return () => { reqRef.current++; };
-  }, [country]);
+  }, [country, authLoading, user?.id]);
   return { districts, loading };
 }
 

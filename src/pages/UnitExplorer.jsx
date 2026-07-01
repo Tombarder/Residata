@@ -6,6 +6,11 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useCountry, isAllCountries } from "../lib/useCountry";
 import { useUnitsInfinite, useAnalyticsRegistry, usePivotDistinct } from "../lib/useData";
+import { supabase } from "../lib/supabase";
+import { pushRoute } from "../lib/routing";
+
+// sessionStorage key: the project set handed from a filtered analytics view to the map.
+export const MAP_PROJECT_SET_KEY = "residata.mapProjectSet";
 
 const PAGE = 100;          // rows fetched per network page (accumulated; the table is virtualized)
 const ROW_H = 33;          // fixed row height (px) — required for windowed virtualization math
@@ -44,6 +49,51 @@ function fmtVal(key, val, fmtByKey) {
   return String(val);
 }
 
+// kind of filter control a field needs, from its registry type
+function fieldKind(meta) {
+  if (!meta) return "text";
+  if (meta.type === "numeric") return "num";
+  if (meta.type === "date" || meta.type === "month") return "date";
+  return "text";
+}
+
+/* One generic "filter on any field" row. Rendered per active extra-filter so it can call
+   usePivotDistinct for its own text field (stable per React key). Text → is / is-not a set of
+   values (chips); number/date → from/to range. Feeds the same analytics_units spec the quick
+   filters do (filters / filters_not / ranges), so ANY field in the list is filterable. */
+function XFilterRow({ row, fields, mode, lang, sel, onPatch, onRemove }) {
+  const t = (sk, en) => (lang === "sk" ? sk : en);
+  const label = (f) => (lang === "sk" ? f.label_sk : f.label_en);
+  const meta = fields.find((f) => f.key === row.key);
+  const kind = fieldKind(meta);
+  const distinct = usePivotDistinct({ enabled: kind === "text" && !!row.key, field: row.key, mode });
+  const chip = { cursor: "pointer", background: green, color: "#04130d", borderRadius: 4, padding: "0.1rem 0.4rem", fontSize: "0.72rem", fontWeight: 600, whiteSpace: "nowrap" };
+  return (
+    <div style={{ display: "inline-flex", gap: "0.3rem", alignItems: "center", background: bg, border: `1px solid ${border}`, borderRadius: 6, padding: "0.2rem 0.3rem", flexWrap: "wrap" }}>
+      <select value={row.key} onChange={(e) => onPatch({ key: e.target.value, op: "in", vals: [], min: "", max: "" })} style={{ ...sel, minWidth: 118, color: row.key ? text : dim }}>
+        <option value="">{t("pole…", "field…")}</option>
+        {fields.map((f) => <option key={f.key} value={f.key} style={{ color: text }}>{label(f)}</option>)}
+      </select>
+      {row.key && kind === "text" && (<>
+        <select value={row.op} onChange={(e) => onPatch({ op: e.target.value })} style={{ ...sel }}>
+          <option value="in">{t("je", "is")}</option>
+          <option value="not_in">{t("nie je", "is not")}</option>
+        </select>
+        <select value="" onChange={(e) => { const v = e.target.value; if (v && !(row.vals || []).includes(v)) onPatch({ vals: [...(row.vals || []), v] }); }} style={{ ...sel, minWidth: 120, color: dim }}>
+          <option value="">{distinct.loading ? t("načítavam…", "loading…") : t("+ hodnota", "+ value")}</option>
+          {(distinct.values || []).filter((v) => !(row.vals || []).includes(v)).map((v) => <option key={v} value={v} style={{ color: text }}>{v}</option>)}
+        </select>
+        {(row.vals || []).map((v) => <span key={v} onClick={() => onPatch({ vals: row.vals.filter((x) => x !== v) })} style={chip} title={t("odstrániť", "remove")}>{v} ✕</span>)}
+      </>)}
+      {row.key && (kind === "num" || kind === "date") && (<>
+        <input type={kind === "date" ? "date" : "text"} value={row.min} placeholder={t("od", "from")} onChange={(e) => onPatch({ min: e.target.value })} style={{ ...sel, width: kind === "date" ? 132 : 76 }} inputMode={kind === "num" ? "numeric" : undefined} />
+        <input type={kind === "date" ? "date" : "text"} value={row.max} placeholder={t("do", "to")} onChange={(e) => onPatch({ max: e.target.value })} style={{ ...sel, width: kind === "date" ? 132 : 76 }} inputMode={kind === "num" ? "numeric" : undefined} />
+      </>)}
+      <button onClick={onRemove} style={{ ...sel, cursor: "pointer", color: dim, padding: "0.2rem 0.45rem" }} title={t("odstrániť filter", "remove filter")}>✕</button>
+    </div>
+  );
+}
+
 export default function UnitExplorer({ lang = "sk" }) {
   const t = (sk, en) => (lang === "sk" ? sk : en);
   const { country } = useCountry();
@@ -68,6 +118,10 @@ export default function UnitExplorer({ lang = "sk" }) {
   const [fProject, setFProject] = useState(""); const [fCity, setFCity] = useState(""); const [fCast, setFCast] = useState(""); const [fDev, setFDev] = useState(""); const [fStav, setFStav] = useState("");
   const [pMin, setPMin] = useState(""); const [pMax, setPMax] = useState("");
   const [m2Min, setM2Min] = useState(""); const [m2Max, setM2Max] = useState("");
+  // generic "filter on any field" rows — {id, key, op, vals[], min, max}. Cover EVERY field
+  // not already handled by a dedicated quick control above.
+  const [xf, setXf] = useState([]);
+  const xfId = useRef(0);
   const [sort, setSort] = useState({ key: "cena_s_dph", dir: "desc" });
   const [search, setSearch] = useState("");
   const scrollRef = useRef(null);
@@ -88,21 +142,41 @@ export default function UnitExplorer({ lang = "sk" }) {
   // city), so clear it — otherwise the table would filter to an empty intersection.
   useEffect(() => { setFCast(""); }, [fCity]);
 
+  // fields available to the generic "+ filter" picker: everything EXCEPT the ones already
+  // driven by a dedicated quick control (so no confusing double-filter on the same field).
+  const QUICK_COVERED = useMemo(() => new Set(["country", "city", "cast", "developer", "stav", "project_name", "cena_s_dph", "price_per_m2"]), []);
+  const xfFields = useMemo(() => fields.filter((f) => !QUICK_COVERED.has(f.key)), [fields, QUICK_COVERED]);
+  const xfActive = xf.filter((r) => r.key && ((r.vals && r.vals.length) || r.min || r.max));
+
   const spec = useMemo(() => {
     const filters = {};
+    const filters_not = {};
+    const ranges = {};
     if (!isAllCountries(country)) filters.country = [country];
     if (fProject) filters.project_name = [fProject];
     if (fCity) filters.city = [fCity];
     if (fCast) filters.cast = [fCast];
     if (fDev) filters.developer = [fDev];
     if (fStav) filters.stav = [fStav];
-    const s = { columns: cols, filters, mode, sort: [sort] };   // limit/offset managed by useUnitsInfinite
-    const ranges = {};
     if (pMin || pMax) ranges.cena_s_dph = { min: pMin || null, max: pMax || null };
     if (m2Min || m2Max) ranges.price_per_m2 = { min: m2Min || null, max: m2Max || null };
+    // generic per-field filters → same spec shape the engine already supports
+    for (const r of xf) {
+      if (!r.key) continue;
+      const meta = fields.find((f) => f.key === r.key);
+      const kind = fieldKind(meta);
+      if (kind === "text" && r.vals && r.vals.length) {
+        if (r.op === "not_in") filters_not[r.key] = r.vals;
+        else filters[r.key] = r.vals;
+      } else if ((kind === "num" || kind === "date") && (r.min || r.max)) {
+        ranges[r.key] = { min: r.min || null, max: r.max || null };
+      }
+    }
+    const s = { columns: cols, filters, mode, sort: [sort] };   // limit/offset managed by useUnitsInfinite
+    if (Object.keys(filters_not).length) s.filters_not = filters_not;
     if (Object.keys(ranges).length) s.ranges = ranges;
     return s;
-  }, [country, fProject, fCity, fCast, fDev, fStav, pMin, pMax, m2Min, m2Max, cols, mode, sort]);
+  }, [country, fProject, fCity, fCast, fDev, fStav, pMin, pMax, m2Min, m2Max, cols, mode, sort, xf, fields]);
 
   const { rows, hasMore, loading, loadMore } = useUnitsInfinite({ enabled: cols.length > 0, spec, pageSize: PAGE });
 
@@ -130,7 +204,29 @@ export default function UnitExplorer({ lang = "sk" }) {
 
   const toggleSort = (k) => setSort((s) => (s.key === k ? { key: k, dir: s.dir === "asc" ? "desc" : "asc" } : { key: k, dir: "asc" }));
   const toggleCol = (k) => setCols((c) => (c.includes(k) ? c.filter((x) => x !== k) : [...c, k]));
-  const activeFilters = [fProject, fCity, fCast, fDev, fStav, pMin, pMax, m2Min, m2Max].filter(Boolean).length;
+  const activeFilters = [fProject, fCity, fCast, fDev, fStav, pMin, pMax, m2Min, m2Max].filter(Boolean).length + xfActive.length;
+  const addXf = () => setXf((a) => [...a, { id: ++xfId.current, key: "", op: "in", vals: [], min: "", max: "" }]);
+  const patchXf = (id, patch) => setXf((a) => a.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  const removeXf = (id) => setXf((a) => a.filter((r) => r.id !== id));
+
+  // "Show on map" — hand the CURRENT filtered set's distinct projects to the map. One pivot
+  // call (dims=[project_name], same filters) yields exactly the projects behind these units,
+  // even for unit-level filters (izby, plocha…) the project-level map can't express itself.
+  const [mapBusy, setMapBusy] = useState(false);
+  const showOnMap = async () => {
+    setMapBusy(true);
+    try {
+      const p_spec = { dims: ["project_name"], filters: spec.filters, mode: spec.mode };
+      if (spec.filters_not) p_spec.filters_not = spec.filters_not;
+      if (spec.ranges) p_spec.ranges = spec.ranges;
+      const { data, error } = await supabase.rpc("analytics_pivot", { p_spec });
+      const names = error ? [] : (Array.isArray(data) ? data : []).map((r) => r?.d?.[0]).filter(Boolean);
+      sessionStorage.setItem(MAP_PROJECT_SET_KEY, JSON.stringify({ names, count: names.length, source: "explorer", ts: Date.now() }));
+      pushRoute("App:Map2");
+    } finally {
+      setMapBusy(false);
+    }
+  };
 
   // palette: filter by search, group by category
   const palette = useMemo(() => {
@@ -184,8 +280,18 @@ export default function UnitExplorer({ lang = "sk" }) {
             <input style={{ ...sel, width: 84 }} placeholder={t("cena do", "€ to")} value={pMax} onChange={(e) => setPMax(e.target.value)} inputMode="numeric" />
             <input style={{ ...sel, width: 92 }} placeholder={t("€/m² od", "€/m² from")} value={m2Min} onChange={(e) => setM2Min(e.target.value)} inputMode="numeric" />
             <input style={{ ...sel, width: 92 }} placeholder={t("€/m² do", "€/m² to")} value={m2Max} onChange={(e) => setM2Max(e.target.value)} inputMode="numeric" />
-            {activeFilters > 0 && <button onClick={() => { setFProject(""); setFCity(""); setFCast(""); setFDev(""); setFStav(""); setPMin(""); setPMax(""); setM2Min(""); setM2Max(""); }} style={{ ...sel, cursor: "pointer", color: dim, fontFamily: mono, fontSize: "0.7rem" }}>✕ {t("vyčistiť", "clear")}</button>}
-            <span style={{ marginLeft: "auto", fontFamily: mono, fontSize: "0.72rem", color: dim }}>
+            {/* generic per-field filters — one row per chosen field (any field in the list) */}
+            {xf.map((r) => (
+              <XFilterRow key={r.id} row={r} fields={xfFields} mode={mode} lang={lang} sel={sel}
+                onPatch={(patch) => patchXf(r.id, patch)} onRemove={() => removeXf(r.id)} />
+            ))}
+            <button onClick={addXf} style={{ ...sel, cursor: "pointer", color: green, fontFamily: mono, fontSize: "0.72rem", borderColor: green }}>+ {t("filter", "filter")}</button>
+            {activeFilters > 0 && <button onClick={() => { setFProject(""); setFCity(""); setFCast(""); setFDev(""); setFStav(""); setPMin(""); setPMax(""); setM2Min(""); setM2Max(""); setXf([]); }} style={{ ...sel, cursor: "pointer", color: dim, fontFamily: mono, fontSize: "0.7rem" }}>✕ {t("vyčistiť", "clear")}</button>}
+            <button onClick={showOnMap} disabled={mapBusy} title={t("Zobraziť vyfiltrované projekty na mape", "Show the filtered projects on the map")}
+              style={{ ...sel, marginLeft: "auto", cursor: mapBusy ? "wait" : "pointer", color: "#04130d", background: green, borderColor: green, fontFamily: mono, fontSize: "0.72rem", fontWeight: 700 }}>
+              🗺 {mapBusy ? t("otváram…", "opening…") : t("Zobraziť na mape", "Show on map")}
+            </button>
+            <span style={{ fontFamily: mono, fontSize: "0.72rem", color: dim }}>
               {loading && rows.length === 0 ? t("načítavam…", "loading…") : `${rows.length}${hasMore ? "+" : ""} ${t("bytov", "units")}`}
             </span>
           </div>
