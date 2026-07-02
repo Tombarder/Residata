@@ -27,6 +27,7 @@ import { supabasePublic, isSupabaseReady } from "../lib/supabase";
 import {
   LENSES, COMPLETION, NO_DATA, ppm2Of, metricValue, completionBucket,
   tertiles, colorFor, coverage, circlePolygon, computeCompetitiveSet, legendForLens, valueRange, heatWeight, hasPublishedPrice,
+  median, percentile, setAbsorptionPct,
 } from "../lib/mapMetrics";
 import MapFilterBuilder from "../components/MapFilterBuilder";
 import { applyFilters, describe, isComplete } from "../lib/mapFilters";
@@ -234,8 +235,8 @@ export default function MapView2({ lang = "en", setCurrent }) {
   // Market overview for the projects in view — drives the adaptive header.
   const marketStats = useMemo(() => {
     const priced = inView.map(ppm2Of).filter((v) => v > 0).sort((a, b) => a - b);
-    const at = (q) => (priced.length ? priced[Math.min(priced.length - 1, Math.floor(q * priced.length))] : null);
-    const med = priced.length ? priced[Math.floor((priced.length - 1) / 2)] : null;
+    const at = (q) => percentile(priced, q); // canonical percentile (shared w/ competitive panel)
+    const med = median(priced);              // canonical median (shared w/ competitive panel + analytics)
     const sum = (f) => inView.reduce((s, p) => s + (Number(f(p)) || 0), 0);
     const available = sum((p) => p.available_units);
     const reserved = sum((p) => (Number(p.reserved_units) || 0) + (Number(p.prereserved_units) || 0));
@@ -255,7 +256,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
     return {
       count: inView.length, med, pMin: priced[0] ?? null, pMax: priced[priced.length - 1] ?? null,
       hLo, hHi, hist, units: sum((p) => p.total_units), available, reserved, sold, invTotal,
-      soldPct: invTotal ? Math.round((sold / invTotal) * 100) : null, soldLM, moving, comp,
+      soldPct: setAbsorptionPct(inView), soldLM, moving, comp,
     };
   }, [inView]);
 
