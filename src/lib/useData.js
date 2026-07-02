@@ -204,8 +204,12 @@ export function useMetrics() {
     // key total_* ticker entries from totals_global (cross-market, EUR). Per-market
     // peak/district entries are omitted in All (they name one project/district).
     if (isAllCountries(country)) {
+      // Fresh query each attempt (builder is single-shot) so _readPublicWithRetry
+      // can re-fire when the heavy rollup view exceeds the anon statement timeout
+      // on a COLD cache (57014) — the retry hits the now-warm view (~100ms).
+      const runGlobal = () => supabasePublic.from("totals_global").select("*").maybeSingle();
       Promise.all([
-        supabasePublic.from("totals_global").select("*").maybeSingle(),
+        _readPublicWithRetry(runGlobal),
         _loadVelocityMaturity(),
       ]).then(([{ data, error }, mat]) => {
         if (isStale()) return;
@@ -232,8 +236,12 @@ export function useMetrics() {
       });
       return () => { reqRef.current++; };
     }
+    // Fresh query each attempt (builder is single-shot) so _readPublicWithRetry
+    // can re-fire when the heavy `metrics` rollup view exceeds the anon statement
+    // timeout on a COLD cache (57014) — the retry hits the now-warm view (~100ms).
+    const runMetrics = () => supabasePublic.from("metrics").select("*").eq("country_code", country).order("display_order", { ascending: true });
     Promise.all([
-      supabasePublic.from("metrics").select("*").eq("country_code", country).order("display_order", { ascending: true }),
+      _readPublicWithRetry(runMetrics),
       _loadVelocityMaturity(),
     ]).then(([{ data, error }, mat]) => {
         if (isStale()) return;
