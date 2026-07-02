@@ -156,11 +156,14 @@ const FIELDS = {
       // Weighted by m² — each € of price contributes proportionally to
       // the m² it covers. Σ price / Σ plocha. Far more meaningful than
       // simple mean(price/m²), which would double-count small units.
+      // num() guards null/"" (Number(null)===0 would otherwise add a unit's m²
+      // with a €0 price — an unpriced unit deflates the weighted €/m²). Require
+      // a real positive price, matching the server path (s_pw/s_lw, price>0).
       let sumPrice = 0, sumPlocha = 0;
       for (const r of records) {
-        const p = Number(r.cena_s_dph);
-        const m = Number(r.obytna_plocha);
-        if (!Number.isFinite(p) || !Number.isFinite(m) || m <= 0) continue;
+        const p = num(r.cena_s_dph);
+        const m = num(r.obytna_plocha);
+        if (p == null || p <= 0 || m == null || m <= 0) continue;
         sumPrice  += p;
         sumPlocha += m;
       }
@@ -4591,8 +4594,9 @@ function DrillDownModal({ title, records, loading, onClose, lang }) {
   };
 
   const cena_m2 = (r) => {
-    const p = Number(r.cena_s_dph), m = Number(r.obytna_plocha);
-    return (Number.isFinite(p) && Number.isFinite(m) && m > 0) ? Math.round(p / m) : null;
+    // num() guards null/"" (Number(null)===0); an unpriced unit must be "—", not €0/m².
+    const p = num(r.cena_s_dph), m = num(r.obytna_plocha);
+    return (p != null && p > 0 && m != null && m > 0) ? Math.round(p / m) : null;
   };
 
   const downloadCSV = () => {

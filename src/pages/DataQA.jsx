@@ -6,10 +6,22 @@
  * status-filterable, with Excel-style row-select aggregation and a one-click open
  * of the developer's site for side-by-side comparison. Read-only (control, not edit).
  *
+ * Column manager (2026-07-02): every column we have is available; the reviewer can
+ * show/hide, reorder (drag a header or use the ⚙ panel), and reset to the original
+ * layout with one button. The chosen layout persists in localStorage across projects
+ * and reloads — only Reset clears it.
+ *
+ * Selected counter (2026-07-02): a live "Vybrané X / Y" stat card counts ticked units
+ * against the snapshot total, for checking completeness vs. the developer's website.
+ *
+ * Project pager (2026-07-02): ◀ ▶ arrows step through the currently-filtered project
+ * list (respects the Country/Region/City filters), so the reviewer can go project by
+ * project without re-searching.
+ *
  * Data: 3 admin-gated RPCs (public._require_admin), all returning jsonb (no row cap):
  *   admin_qa_projects()                  → projects + counts + country/region/city + url
  *   admin_qa_dates(p_project_id)         → available snapshot dates (newest first)
- *   admin_qa_units(p_project_id, p_date) → that snapshot's units
+ *   admin_qa_units(p_project_id, p_date) → that snapshot's units (full QA column set)
  *
  * Hardened (2026-06-24 audit): request-sequencing guard against out-of-order responses,
  * NaN-safe aggregates, "Na vyžiadanie" sentinel shown, CSV escaped + injection-safe,
@@ -65,7 +77,10 @@ async function rpcDirect(fn, body, { timeoutMs = 45000 } = {}) {
 }
 
 const norm = (s) => (s == null ? "" : String(s)).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
-const fin = (v) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
+// NOTE: guard null/"" first — Number(null) and Number("") are 0 (finite), which would
+// silently turn missing values into 0 and corrupt every aggregate (avg €/m², min price)
+// and render null numeric cells as "0"/"0.0" instead of "—".
+const fin = (v) => { if (v == null || v === "") return null; const n = Number(v); return Number.isFinite(n) ? n : null; };
 const fmt = (n) => { const x = fin(n); return x == null ? "—" : Math.round(x).toLocaleString("sk-SK"); };
 const fmt1 = (n) => { const x = fin(n); return x == null ? "—" : x.toFixed(1); };
 const izbyTxt = (s) => (s == null ? "—" : String(s).replace(/\.0$/, ""));
@@ -75,37 +90,82 @@ const STAVY = [["all", "Všetky", "All"], ["V", "Voľné", "Available"], ["P", "
 const stavColor = (s) => (s === "V" ? green : s === "P" ? dim : s === "R" ? amber : s === "PR" ? blue : textLight);
 const COUNTRIES = { SK: "Slovensko", CZ: "Česko" };
 
-const COLS = [
-  ["unit_id", "Byt", "Unit", "t"],
-  ["poschodie", "Posch.", "Floor", "n"],
-  ["izby", "Izby", "Rooms", "n"],
-  ["obytna", "Obytná m²", "Living m²", "n"],
-  ["celkova", "Celková m²", "Total m²", "n"],
-  ["cena", "Cena €", "Price €", "n"],
-  ["eur_m2", "€/m²", "€/m²", "n"],
-  ["orientacia", "Orient.", "Orient.", "t"],
-  ["stav", "Stav", "Status", "t"],
+// Full column registry. { key, sk, en, type } — type "n" = numeric (right-aligned), "t" = text.
+// Order here is the DEFAULT (used by Reset). Every column is visible by default.
+const ALL_COLS = [
+  { key: "unit_id",      sk: "Byt",          en: "Unit",            type: "t" },
+  { key: "typ",          sk: "Typ",          en: "Type",            type: "t" },
+  { key: "etapa",        sk: "Etapa",        en: "Phase",           type: "t" },
+  { key: "budova",       sk: "Budova",       en: "Building",        type: "t" },
+  { key: "unit_detail",  sk: "Detail",       en: "Detail",          type: "t" },
+  { key: "poschodie",    sk: "Posch.",       en: "Floor",           type: "n" },
+  { key: "izby",         sk: "Izby",         en: "Rooms",           type: "n" },
+  { key: "obytna",       sk: "Obytná m²",    en: "Living m²",       type: "n" },
+  { key: "balkon",       sk: "Balkón m²",    en: "Balcony m²",      type: "n" },
+  { key: "loggia",       sk: "Loggia m²",    en: "Loggia m²",       type: "n" },
+  { key: "terasa",       sk: "Terasa m²",    en: "Terrace m²",      type: "n" },
+  { key: "zahrada",      sk: "Záhrada m²",   en: "Garden m²",       type: "n" },
+  { key: "exterier",     sk: "Exteriér m²",  en: "Exterior m²",     type: "n" },
+  { key: "kobka",        sk: "Kobka m²",     en: "Storage m²",      type: "n" },
+  { key: "celkova",      sk: "Celková m²",   en: "Total m²",        type: "n" },
+  { key: "cena_bez_dph", sk: "Cena bez DPH", en: "Price excl. VAT", type: "n" },
+  { key: "cena",         sk: "Cena s DPH",   en: "Price incl. VAT", type: "n" },
+  { key: "cennikova",    sk: "Cenníková",    en: "List price",      type: "n" },
+  { key: "eur_m2",       sk: "€/m²",         en: "€/m²",            type: "n" },
+  { key: "stav",         sk: "Stav",         en: "Status",          type: "t" },
+  { key: "orientacia",   sk: "Orient.",      en: "Orient.",         type: "t" },
+  { key: "kolaudacia",   sk: "Kolaudácia",   en: "Completion",      type: "t" },
 ];
-const TD = COLS.map((c) => ({ padding: "8px 11px", textAlign: c[3] === "n" ? "right" : "left", color: textLight, fontSize: 13, whiteSpace: "nowrap" }));
-const TH = COLS.map((c) => ({ padding: "9px 11px", textAlign: c[3] === "n" ? "right" : "left", color: dim, fontFamily: mono, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.3, cursor: "pointer", whiteSpace: "nowrap", userSelect: "none", borderBottom: `1px solid ${border}` }));
+const COL_MAP = Object.fromEntries(ALL_COLS.map((c) => [c.key, c]));
+const DEFAULT_ORDER = ALL_COLS.map((c) => c.key);
+const AREA = new Set(["obytna", "celkova", "balkon", "loggia", "terasa", "zahrada", "exterier", "kobka"]);
+const PRICE = new Set(["cena_bez_dph", "cennikova"]);
+const LS_COLS = "residata_dataqa_columns_v1";
+
+// Load persisted column layout, reconciled with the current registry:
+// unknown keys dropped, newly-added columns appended (visible), so it survives schema growth.
+function loadColCfg() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(LS_COLS));
+    if (raw && Array.isArray(raw.order)) {
+      const known = raw.order.filter((k) => COL_MAP[k]);
+      const missing = DEFAULT_ORDER.filter((k) => !known.includes(k));
+      const hidden = {};
+      for (const k of Object.keys(raw.hidden || {})) if (COL_MAP[k]) hidden[k] = true;
+      return { order: [...known, ...missing], hidden };
+    }
+  } catch { /* ignore */ }
+  return { order: [...DEFAULT_ORDER], hidden: {} };
+}
+
+const tdStyle = (type) => ({ padding: "8px 11px", textAlign: type === "n" ? "right" : "left", color: textLight, fontSize: 13, whiteSpace: "nowrap" });
+const thStyle = (type) => ({ padding: "9px 11px", textAlign: type === "n" ? "right" : "left", color: dim, fontFamily: mono, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.3, cursor: "pointer", whiteSpace: "nowrap", userSelect: "none", borderBottom: `1px solid ${border}` });
 const selStyle = { display: "block", width: "100%", boxSizing: "border-box", marginTop: 5, padding: "9px 12px", background: bg2, border: `1px solid ${border}`, borderRadius: 8, color: textLight, fontSize: 14, outline: "none" };
 
 function cellNode(u, key) {
-  if (key === "stav") return <span style={{ color: stavColor(u.stav), fontWeight: 600 }}>{u.stav}</span>;
+  if (key === "stav") return <span style={{ color: stavColor(u.stav), fontWeight: 600 }}>{u.stav || "—"}</span>;
   if (key === "izby") return izbyTxt(u.izby);
-  if (key === "obytna" || key === "celkova") return fmt1(u[key]);
+  if (AREA.has(key)) return fmt1(u[key]);
   if (key === "cena") return u.cena != null ? fmt(u.cena) : (u.cena_text || "—");
+  if (PRICE.has(key)) return fmt(u[key]);
   if (key === "eur_m2") return fmt(u.eur_m2);
-  return u[key] == null ? "—" : u[key];
+  return u[key] == null || u[key] === "" ? "—" : u[key];
 }
-const Row = memo(function Row({ u, isChecked, onToggle, lang }) {
+// Raw value for CSV (no JSX, no "—" placeholders).
+function csvValue(u, key) {
+  if (key === "izby") return izbyTxt(u.izby) === "—" ? "" : izbyTxt(u.izby);
+  if (key === "cena") return u.cena != null ? u.cena : (u.cena_text || "");
+  return u[key] == null ? "" : u[key];
+}
+
+const Row = memo(function Row({ u, cols, isChecked, onToggle, lang }) {
   return (
     <tr style={{ borderBottom: `1px solid ${border}`, background: isChecked ? "rgba(0,229,160,0.06)" : "transparent" }}>
       <td style={{ padding: "8px 11px" }}>
         <input type="checkbox" checked={isChecked} onChange={() => onToggle(u.unit_id)}
           aria-label={(lang === "sk" ? "Vybrať byt " : "Select unit ") + u.unit_id} />
       </td>
-      {COLS.map((c, i) => <td key={c[0]} style={TD[i]}>{cellNode(u, c[0])}</td>)}
+      {cols.map((c) => <td key={c.key} style={tdStyle(c.type)}>{cellNode(u, c.key)}</td>)}
     </tr>
   );
 });
@@ -141,6 +201,44 @@ export default function DataQA({ lang = "sk" }) {
   const [checked, setChecked] = useState({});
   const boxRef = useRef(null);
   const reqRef = useRef(0);
+
+  // Column manager (persisted across projects + reloads; only Reset clears it).
+  const [colCfg, setColCfg] = useState(loadColCfg);
+  const [colPanel, setColPanel] = useState(false);
+  const dragKey = useRef(null);
+  useEffect(() => {
+    try { localStorage.setItem(LS_COLS, JSON.stringify(colCfg)); } catch { /* ignore */ }
+  }, [colCfg]);
+  const visibleCols = useMemo(
+    () => colCfg.order.filter((k) => !colCfg.hidden[k]).map((k) => COL_MAP[k]).filter(Boolean),
+    [colCfg]
+  );
+  const hiddenCount = ALL_COLS.length - visibleCols.length;
+
+  function toggleColHidden(key) {
+    setColCfg((cfg) => { const hidden = { ...cfg.hidden }; if (hidden[key]) delete hidden[key]; else hidden[key] = true; return { ...cfg, hidden }; });
+  }
+  function moveCol(key, delta) {
+    setColCfg((cfg) => {
+      const order = [...cfg.order];
+      const i = order.indexOf(key), j = i + delta;
+      if (i < 0 || j < 0 || j >= order.length) return cfg;
+      [order[i], order[j]] = [order[j], order[i]];
+      return { ...cfg, order };
+    });
+  }
+  function dropCol(targetKey) {
+    const from = dragKey.current; dragKey.current = null;
+    if (!from || from === targetKey) return;
+    setColCfg((cfg) => {
+      const order = cfg.order.filter((k) => k !== from);
+      const idx = order.indexOf(targetKey);
+      order.splice(idx < 0 ? order.length : idx, 0, from);
+      return { ...cfg, order };
+    });
+  }
+  function resetCols() { setColCfg({ order: [...DEFAULT_ORDER], hidden: {} }); }
+  function showAllCols() { setColCfg((cfg) => ({ ...cfg, hidden: {} })); }
 
   useEffect(() => {
     let alive = true;
@@ -197,16 +295,31 @@ export default function DataQA({ lang = "sk" }) {
     };
   }, [projects, fCountry, fRegion]);
 
-  const matches = useMemo(() => {
+  // Projects passing the Country/Region/City filters (NOT the text query).
+  // This is the list the ◀ ▶ pager steps through and the "N projektov" count reflects.
+  const filtered = useMemo(() => {
     if (!projects) return [];
-    const q = norm(query);
     return projects.filter((p) =>
       (!fCountry || p.country === fCountry) &&
       (!fRegion || p.region === fRegion) &&
-      (!fCity || p.city === fCity) &&
-      (!q || norm(p.name).includes(q) || norm(p.city).includes(q))
+      (!fCity || p.city === fCity)
     );
-  }, [projects, query, fCountry, fRegion, fCity]);
+  }, [projects, fCountry, fRegion, fCity]);
+
+  // Filtered list further narrowed by the search box — powers the dropdown.
+  const matches = useMemo(() => {
+    const q = norm(query);
+    if (!q) return filtered;
+    return filtered.filter((p) => norm(p.name).includes(q) || norm(p.city).includes(q));
+  }, [filtered, query]);
+
+  const navIdx = sel ? filtered.findIndex((p) => p.id === sel.id) : -1;
+  function navBy(delta) {
+    if (navIdx < 0) return;
+    const j = navIdx + delta;
+    if (j < 0 || j >= filtered.length) return;
+    pick(filtered[j]);
+  }
 
   const snap = useMemo(() => {
     if (!units) return null;
@@ -220,6 +333,12 @@ export default function DataQA({ lang = "sk" }) {
     };
   }, [units]);
 
+  // Units ticked in this snapshot, regardless of the current status filter.
+  const selCount = useMemo(
+    () => (units ? units.reduce((n, u) => n + (checked[u.unit_id] ? 1 : 0), 0) : 0),
+    [units, checked]
+  );
+
   const rows = useMemo(() => {
     if (!units) return [];
     let r = units;
@@ -227,7 +346,7 @@ export default function DataQA({ lang = "sk" }) {
     const q = norm(dSearch);
     if (q) r = r.filter((u) => norm(u.unit_id).includes(q));
     const c = sortCol, dir = sortDir;
-    const numeric = COLS.find((x) => x[0] === c)?.[3] === "n";
+    const numeric = COL_MAP[c]?.type === "n";
     return [...r].sort((a, b) => {
       if (numeric) {
         const x = fin(a[c]), y = fin(b[c]);
@@ -255,12 +374,11 @@ export default function DataQA({ lang = "sk" }) {
   }
   function exportCsv() {
     if (!units) return;
-    const head = ["Projekt", "Dátum", ...COLS.map((c) => c[1])];
+    const cols = visibleCols.length ? visibleCols : ALL_COLS;
+    const head = ["Projekt", "Dátum", ...cols.map((c) => t(c.en, c.sk))];
     const lines = [head.map(csvCell).join(";")];
     rows.forEach((u) => {
-      const vals = COLS.map((c) => c[0] === "izby" ? izbyTxt(u.izby)
-        : c[0] === "cena" ? (u.cena != null ? u.cena : (u.cena_text || ""))
-        : (u[c[0]] == null ? "" : u[c[0]]));
+      const vals = cols.map((c) => csvValue(u, c.key));
       lines.push([sel.name, date, ...vals].map(csvCell).join(";"));
     });
     const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
@@ -275,6 +393,8 @@ export default function DataQA({ lang = "sk" }) {
   const cardLabel = { fontSize: 11, color: dim, fontFamily: mono, textTransform: "uppercase", letterSpacing: 0.4 };
   const cardVal = { fontSize: 22, fontWeight: 600, color: textLight, marginTop: 4 };
   const btn = { padding: "8px 14px", borderRadius: 8, border: `1px solid ${border}`, background: "transparent", color: textLight, cursor: "pointer", fontSize: 13 };
+  const navBtn = (enabled) => ({ padding: "7px 11px", borderRadius: 8, border: `1px solid ${border}`, background: bg2, color: enabled ? textLight : dim, cursor: enabled ? "pointer" : "not-allowed", fontSize: 14, lineHeight: 1 });
+  const miniBtn = (enabled) => ({ padding: "1px 6px", borderRadius: 5, border: `1px solid ${border}`, background: "transparent", color: enabled ? textLight : dim, cursor: enabled ? "pointer" : "not-allowed", fontSize: 12, lineHeight: 1.4 });
 
   return (
     <div style={{ minHeight: "100vh", background: bg, color: textLight, padding: "1.5rem 1.75rem" }}>
@@ -331,7 +451,18 @@ export default function DataQA({ lang = "sk" }) {
           {(fCountry || fRegion || fCity) && (
             <button onClick={() => { setFCountry(""); setFRegion(""); setFCity(""); }} style={{ ...btn, padding: "8px 12px", fontSize: 12 }}>{t("Clear", "Zrušiť filtre")}</button>
           )}
-          <span style={{ fontSize: 12, color: dim, fontFamily: mono, paddingBottom: 9 }}>{matches.length} {t("projects", "projektov")}</span>
+          <span style={{ fontSize: 12, color: dim, fontFamily: mono, paddingBottom: 9 }}>{filtered.length} {t("projects", "projektov")}</span>
+
+          {/* Project pager — steps through the filtered list (top-right). */}
+          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 7, paddingBottom: 2 }}>
+            <button onClick={() => navBy(-1)} disabled={navIdx <= 0} style={navBtn(navIdx > 0)}
+              title={t("Previous project", "Predošlý projekt")} aria-label={t("Previous project", "Predošlý projekt")}>◀</button>
+            <span style={{ fontSize: 12, color: dim, fontFamily: mono, minWidth: 56, textAlign: "center" }}>
+              {navIdx >= 0 ? `${navIdx + 1} / ${filtered.length}` : `— / ${filtered.length}`}
+            </span>
+            <button onClick={() => navBy(1)} disabled={navIdx < 0 || navIdx >= filtered.length - 1} style={navBtn(navIdx >= 0 && navIdx < filtered.length - 1)}
+              title={t("Next project", "Ďalší projekt")} aria-label={t("Next project", "Ďalší projekt")}>▶</button>
+          </div>
         </div>
 
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 16 }}>
@@ -382,6 +513,12 @@ export default function DataQA({ lang = "sk" }) {
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(118px,1fr))", gap: 10, marginBottom: 16 }}>
             <div style={card}><div style={cardLabel}>{t("Units total", "Bytov spolu")}</div><div style={cardVal}>{fmt(snap?.total)}</div></div>
+            <div style={{ ...card, borderColor: selCount ? green : border }}>
+              <div style={cardLabel}>{t("Selected", "Vybrané")}</div>
+              <div style={{ ...cardVal, color: selCount ? green : textLight }}>
+                {fmt(selCount)}<span style={{ fontSize: 13, color: dim, fontWeight: 400 }}> / {fmt(snap?.total)}</span>
+              </div>
+            </div>
             <div style={card}><div style={cardLabel}>{t("Available", "Voľných")}</div><div style={{ ...cardVal, color: green }}>{fmt(snap?.v)}</div></div>
             <div style={card}><div style={cardLabel}>{t("Sold", "Predaných")}</div><div style={cardVal}>{fmt(snap?.p)}</div></div>
             <div style={card}><div style={cardLabel}>{t("Reserved", "Rezervované")}</div><div style={cardVal}>{fmt(snap?.r)}</div></div>
@@ -393,13 +530,51 @@ export default function DataQA({ lang = "sk" }) {
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
             {STAVY.map((s) => {
               const on = stav === s[0];
-              return <button key={s[0]} onClick={() => { setStav(s[0]); setChecked({}); }}
+              return <button key={s[0]} onClick={() => setStav(s[0])}
                 style={{ ...btn, padding: "6px 12px", fontSize: 12, borderColor: on ? green : border, color: on ? green : textLight, background: on ? "rgba(0,229,160,0.08)" : "transparent" }}>{t(s[2], s[1])}</button>;
             })}
             <input value={uSearch} onChange={(e) => setUSearch(e.target.value)} placeholder={t("search unit…", "hľadať byt…")}
               style={{ marginLeft: "auto", padding: "7px 11px", background: bg2, border: `1px solid ${border}`, borderRadius: 8, color: textLight, fontSize: 13, outline: "none", width: 150 }} />
+            <button onClick={() => setColPanel((v) => !v)} style={{ ...btn, padding: "7px 12px", fontSize: 12, borderColor: colPanel ? green : border, color: colPanel ? green : textLight }}
+              title={t("Show / hide / reorder columns", "Zobraziť / skryť / presúvať stĺpce")}>
+              ⚙ {t("Columns", "Stĺpce")} {visibleCols.length}/{ALL_COLS.length}
+            </button>
             <button onClick={exportCsv} style={{ ...btn, padding: "7px 12px", fontSize: 12 }} title={t("Export shown rows to CSV", "Stiahnuť zobrazené riadky do CSV")}>CSV ↓</button>
           </div>
+
+          {colPanel && (
+            <div style={{ ...card, marginBottom: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
+                <span style={{ ...cardLabel, fontSize: 12 }}>
+                  {t("Columns", "Stĺpce")} — {visibleCols.length}/{ALL_COLS.length} {t("shown", "zobrazených")}{hiddenCount ? `, ${hiddenCount} ${t("hidden", "skrytých")}` : ""}
+                </span>
+                <button onClick={showAllCols} style={{ ...btn, padding: "5px 10px", fontSize: 12, marginLeft: "auto" }}>{t("Show all", "Zobraziť všetky")}</button>
+                <button onClick={resetCols} style={{ ...btn, padding: "5px 10px", fontSize: 12, borderColor: amber, color: amber }}
+                  title={t("Reset to original order + show all", "Obnoviť pôvodné poradie + zobraziť všetky")}>{t("Reset", "Reset")}</button>
+              </div>
+              <p style={{ margin: "0 0 10px", color: dim, fontSize: 12 }}>
+                {t("Tip: drag a column header to reorder. Layout is remembered across projects until you press Reset.",
+                   "Tip: poradie zmeníš aj ťahaním hlavičky stĺpca. Rozloženie sa pamätá naprieč projektmi, kým nedáš Reset.")}
+              </p>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(210px,1fr))", gap: 6 }}>
+                {colCfg.order.map((k, i) => {
+                  const c = COL_MAP[k];
+                  if (!c) return null;
+                  const shown = !colCfg.hidden[k];
+                  return (
+                    <div key={k} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 8px", background: bg, border: `1px solid ${border}`, borderRadius: 7 }}>
+                      <label style={{ display: "flex", alignItems: "center", gap: 7, flex: 1, cursor: "pointer", fontSize: 13, color: shown ? textLight : dim }}>
+                        <input type="checkbox" checked={shown} onChange={() => toggleColHidden(k)} />
+                        {t(c.en, c.sk)}
+                      </label>
+                      <button onClick={() => moveCol(k, -1)} disabled={i === 0} style={miniBtn(i > 0)} title={t("Move up", "Vyššie")} aria-label={t("Move up", "Vyššie")}>↑</button>
+                      <button onClick={() => moveCol(k, 1)} disabled={i === colCfg.order.length - 1} style={miniBtn(i < colCfg.order.length - 1)} title={t("Move down", "Nižšie")} aria-label={t("Move down", "Nižšie")}>↓</button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {uErr && <div style={{ ...card, borderColor: amber, color: amber }}>{mapErr(uErr)}</div>}
           {!units && !uErr && <div style={{ color: dim, fontFamily: mono, fontSize: 13, padding: "1rem 0" }}>{t("Loading units…", "Načítavam byty…")}</div>}
@@ -414,17 +589,21 @@ export default function DataQA({ lang = "sk" }) {
                         <input type="checkbox" checked={allChecked} onChange={toggleAll}
                           aria-label={t("Select all shown", "Vybrať všetky zobrazené")} title={t("Select all shown", "Vybrať všetky zobrazené")} />
                       </th>
-                      {COLS.map((c, i) => (
-                        <th key={c[0]} style={TH[i]} aria-sort={sortCol === c[0] ? (sortDir > 0 ? "ascending" : "descending") : "none"}
-                          onClick={() => { if (sortCol === c[0]) setSortDir(-sortDir); else { setSortCol(c[0]); setSortDir(1); } }}>
-                          {t(c[2], c[1])}{sortCol === c[0] ? (sortDir > 0 ? " ↑" : " ↓") : ""}
+                      {visibleCols.map((c) => (
+                        <th key={c.key} style={thStyle(c.type)} aria-sort={sortCol === c.key ? (sortDir > 0 ? "ascending" : "descending") : "none"}
+                          draggable
+                          onDragStart={() => { dragKey.current = c.key; }}
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={() => dropCol(c.key)}
+                          onClick={() => { if (sortCol === c.key) setSortDir(-sortDir); else { setSortCol(c.key); setSortDir(1); } }}>
+                          {t(c.en, c.sk)}{sortCol === c.key ? (sortDir > 0 ? " ↑" : " ↓") : ""}
                         </th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {rows.map((u) => <Row key={u.unit_id} u={u} isChecked={!!checked[u.unit_id]} onToggle={onToggle} lang={lang} />)}
-                    {rows.length === 0 && <tr><td colSpan={COLS.length + 1} style={{ padding: "1.2rem", color: dim, fontSize: 13, textAlign: "center" }}>{t("No units for this filter.", "Žiadne byty pre tento filter.")}</td></tr>}
+                    {rows.map((u) => <Row key={u.unit_id} u={u} cols={visibleCols} isChecked={!!checked[u.unit_id]} onToggle={onToggle} lang={lang} />)}
+                    {rows.length === 0 && <tr><td colSpan={visibleCols.length + 1} style={{ padding: "1.2rem", color: dim, fontSize: 13, textAlign: "center" }}>{t("No units for this filter.", "Žiadne byty pre tento filter.")}</td></tr>}
                   </tbody>
                 </table>
               </div>
