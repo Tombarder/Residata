@@ -1851,6 +1851,14 @@ function PlatformExports({ lang, setCurrent }) {
       ? (realMarkets.length ? realMarkets : [null])
       : [country];
 
+    // Date passed to the RPC. When a specific date is picked → that date for every market.
+    // When "latest" (selectedDay === "") → NULL per market, so each market resolves its OWN
+    // latest snapshot. This matters for "all": during the daily scrape window one market can
+    // have today's snapshot before the other, and a single shared date would silently drop the
+    // lagging market. NULL-per-market always returns each market's freshest complete snapshot.
+    const pDay = selectedDay || null;
+    const fileDay = selectedDay || "latest";
+
     setExportProgress({ current: 0, total: null, label: lang === "sk" ? "Pripravujem export…" : "Preparing export…" });
     try {
       // ONE gated call per market. export_units_csv builds the CSV rows SERVER-SIDE (string_agg)
@@ -1866,7 +1874,7 @@ function PlatformExports({ lang, setCurrent }) {
             label: lang === "sk" ? `Sťahujem trh ${mi + 1}/${markets.length}…` : `Fetching market ${mi + 1}/${markets.length}…`,
           });
         }
-        const { data, error } = await supabase.rpc("export_units_csv", { p_country: markets[mi], p_day: effectiveDay });
+        const { data, error } = await supabase.rpc("export_units_csv", { p_country: markets[mi], p_day: pDay });
         if (error) throw error;
         if (data && data.length) parts.push(data);
       }
@@ -1890,9 +1898,9 @@ function PlatformExports({ lang, setCurrent }) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `residata-flats-${pCountry}-${effectiveDay}.csv`;
+      a.download = `residata-flats-${pCountry}-${fileDay}.csv`;
       a.click();
-      try { track("csv_exported", { type: "flats", row_count: totalRows, day: effectiveDay, country: pCountry }); } catch (_) {}
+      try { track("csv_exported", { type: "flats", row_count: totalRows, day: fileDay, country: pCountry }); } catch (_) {}
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (e) {
       // export_units_csv raises 42501 for non-real-paid — surface a friendly message.
@@ -1977,8 +1985,8 @@ function PlatformExports({ lang, setCurrent }) {
         </div>
         <p style={{ color: dim, fontSize: "0.75rem", marginTop: "0.85rem", lineHeight: 1.5 }}>
           {lang === "sk"
-            ? "CSV sa stiahne cez tvoju zabezpečenú session pre vybraný dátum. Pre Excel stačí dvojklik. Veľké exporty môžu trvať pár sekúnd."
-            : "The CSV downloads over your secure session for the selected date. Double-click opens it in Excel. Large exports may take a few seconds."}
+            ? "Tlačidlo Všetky byty sťahuje unit-level dáta k vybranému dátumu; Projekty je aktuálny súhrn projektov (nezávislý od dátumu). Pre Excel stačí dvojklik. Veľké exporty môžu trvať pár sekúnd."
+            : "The All flats button downloads unit-level data for the selected date; Projects is a current project summary (independent of the date). Double-click opens it in Excel. Large exports may take a few seconds."}
         </p>
       </div>
 
