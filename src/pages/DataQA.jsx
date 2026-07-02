@@ -77,7 +77,10 @@ async function rpcDirect(fn, body, { timeoutMs = 45000 } = {}) {
 }
 
 const norm = (s) => (s == null ? "" : String(s)).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
-const fin = (v) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
+// NOTE: guard null/"" first — Number(null) and Number("") are 0 (finite), which would
+// silently turn missing values into 0 and corrupt every aggregate (avg €/m², min price)
+// and render null numeric cells as "0"/"0.0" instead of "—".
+const fin = (v) => { if (v == null || v === "") return null; const n = Number(v); return Number.isFinite(n) ? n : null; };
 const fmt = (n) => { const x = fin(n); return x == null ? "—" : Math.round(x).toLocaleString("sk-SK"); };
 const fmt1 = (n) => { const x = fin(n); return x == null ? "—" : x.toFixed(1); };
 const izbyTxt = (s) => (s == null ? "—" : String(s).replace(/\.0$/, ""));
@@ -527,7 +530,7 @@ export default function DataQA({ lang = "sk" }) {
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
             {STAVY.map((s) => {
               const on = stav === s[0];
-              return <button key={s[0]} onClick={() => { setStav(s[0]); setChecked({}); }}
+              return <button key={s[0]} onClick={() => setStav(s[0])}
                 style={{ ...btn, padding: "6px 12px", fontSize: 12, borderColor: on ? green : border, color: on ? green : textLight, background: on ? "rgba(0,229,160,0.08)" : "transparent" }}>{t(s[2], s[1])}</button>;
             })}
             <input value={uSearch} onChange={(e) => setUSearch(e.target.value)} placeholder={t("search unit…", "hľadať byt…")}
