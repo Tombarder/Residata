@@ -133,7 +133,46 @@ export function circlePolygon(center, radiusKm, steps = 72) {
   return { type: "FeatureCollection", features: [{ type: "Feature", geometry: { type: "Polygon", coordinates: [ring] }, properties: {} }] };
 }
 
-const median = (sortedNums) => (sortedNums.length ? sortedNums[Math.floor((sortedNums.length - 1) / 2)] : null);
+// ── Canonical statistics ──────────────────────────────────────────────────
+// One definition each for median / percentile / set-absorption, shared by the
+// map header (MapView2) and the competitive-set panel so the same area never
+// reports two different medians or two different "absorbed %". These match the
+// analytics engine (PivotV2: median averages the two middles for even N).
+
+/** Standard median — averages the two middle values for even N. Accepts an
+ *  unsorted array; null if empty. */
+export function median(nums) {
+  const s = (nums || []).filter((x) => x != null && Number.isFinite(x)).sort((a, b) => a - b);
+  if (!s.length) return null;
+  const m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+}
+
+/** Linear-interpolation percentile (type-7 / Excel PERCENTILE.INC) over an
+ *  already-ascending finite array. q in [0,1]; null if empty. */
+export function percentile(sortedAsc, q) {
+  const n = sortedAsc ? sortedAsc.length : 0;
+  if (!n) return null;
+  if (n === 1) return sortedAsc[0];
+  const idx = q * (n - 1);
+  const lo = Math.floor(idx), hi = Math.ceil(idx);
+  return lo === hi ? sortedAsc[lo] : sortedAsc[lo] + (sortedAsc[hi] - sortedAsc[lo]) * (idx - lo);
+}
+
+/** Unit-weighted absorption for a SET of projects: Σ sold / Σ(available +
+ *  reserved + prereserved + sold), as a rounded %. The single definition used
+ *  by both the market header and the competitive-set panel. null if the set has
+ *  no in-offer inventory counts. */
+export function setAbsorptionPct(projects) {
+  let sold = 0, denom = 0;
+  for (const p of projects || []) {
+    const s = Number(p.sold_units) || 0;
+    const a = Number(p.available_units) || 0;
+    const r = (Number(p.reserved_units) || 0) + (Number(p.prereserved_units) || 0);
+    sold += s; denom += s + a + r;
+  }
+  return denom > 0 ? Math.round((sold / denom) * 100) : null;
+}
 
 /**
  * Summarise the competitive set within `radiusKm` of `center`.
@@ -150,12 +189,10 @@ export function computeCompetitiveSet(projects, coords, center, radiusKm, verifi
   });
   const placeholderCount = inside.filter((p) => coords[p.id] && !coords[p.id].verified).length;
   const priced = inside.map(ppm2Of).filter((v) => v > 0).sort((a, b) => a - b);
-  const pAt = (q) => (priced.length ? priced[Math.min(priced.length - 1, Math.floor(q * (priced.length - 1)))] : null);
   const soldLastMonth = inside.reduce((s, p) => s + (Number(p.sold_last_month) || 0), 0);
   const totalUnits = inside.reduce((s, p) => s + (Number(p.total_units) || 0), 0);
   const availUnits = inside.reduce((s, p) => s + (Number(p.available_units) || 0), 0);
-  const absVals = inside.map((p) => p.sold_percentage).filter((v) => v != null).map(Number);
-  const avgAbs = absVals.length ? Math.round(absVals.reduce((a, b) => a + b, 0) / absVals.length) : null;
+  const avgAbs = setAbsorptionPct(inside); // unit-weighted, identical to the header
   const comp = { ready: 0, soon: 0, mid: 0, far: 0, unknown: 0 };
   inside.forEach((p) => { comp[completionBucket(p)]++; });
   const byDev = {};
@@ -169,7 +206,7 @@ export function computeCompetitiveSet(projects, coords, center, radiusKm, verifi
   return {
     inside, placeholderCount,
     median: median(priced),
-    p25: pAt(0.25), p75: pAt(0.75),
+    p25: percentile(priced, 0.25), p75: percentile(priced, 0.75),
     priceLo: priced.length ? priced[0] : null,
     priceHi: priced.length ? priced[priced.length - 1] : null,
     totalUnits, availUnits, avgAbs, soldLastMonth, comp, topDevs,
