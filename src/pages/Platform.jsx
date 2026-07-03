@@ -1702,8 +1702,11 @@ const FLATS_CSV_COLUMNS = [
   "stav", "kolaudacia", "orientacia",
   // Country
   "country", "currency",
-  // Financing (NUMERIC(12,2) per migrations/2026-05-26_init_snapshot_model.sql)
+  // Financing schedules — one column per scheme (uniform DB, Boss 2026-07-03).
+  // Order MUST match export_units_csv concat_ws in
+  // v2/migrations/2026-07-03_financing_columns_uniform.sql.
   "fin_10_90", "fin_20_80", "fin_30_40_30",
+  "fin_10_40_40_10", "fin_70_30", "fin_30_50_20",
   // Audit
   "created_at",
 ];
