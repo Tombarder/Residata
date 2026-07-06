@@ -1715,6 +1715,51 @@ const FLATS_CSV_COLUMNS = [
 // per-column number/date formatting sets that used to live here were removed — the
 // projects CSV below still formats client-side.)
 
+// Flats columns that hold a real number — typed as numeric in the .xlsx export so
+// Excel can sort/sum them. Deliberately EXCLUDES id-like / free-text columns
+// (unit_id, poschodie "prízemie", batch_id …) which must stay text. Areas + prices
+// only; conditional coercion still keeps a non-numeric value as text.
+const FLATS_NUMBER_COLUMNS = new Set([
+  "izby", "obytna_plocha", "balkon_plocha", "loggia_plocha", "terasa_plocha",
+  "zahrada_plocha", "exterier_plocha", "kobka_plocha", "celkova_plocha",
+  "cena_bez_dph", "cena_s_dph", "cennikova_cena",
+]);
+
+// Minimal RFC-4180 CSV parser → array of string-cell rows. Handles quoted fields
+// with embedded commas / quotes ("") / newlines, so re-parsing our server CSV for
+// the .xlsx build is lossless. \r is dropped; a trailing newline yields no phantom row.
+function parseCsvRows(text) {
+  const rows = []; let row = []; let field = ""; let inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQ) {
+      if (c === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else inQ = false; }
+      else field += c;
+    } else if (c === '"') { inQ = true; }
+    else if (c === ",") { row.push(field); field = ""; }
+    else if (c === "\n") { row.push(field); rows.push(row); row = []; field = ""; }
+    else if (c !== "\r") { field += c; }
+  }
+  if (field !== "" || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+
+// Build one typed .xlsx cell. Empty → blank; a value in numberCols that parses to a
+// finite number → numeric; everything else → text. `raw` may be a string (parsed CSV)
+// or a real value (project objects).
+function xlsxCell(colName, raw, numberCols) {
+  const s = raw == null ? "" : String(raw).trim();
+  if (s === "") return { value: null };
+  if (numberCols.has(colName)) {
+    const n = Number(s);
+    if (Number.isFinite(n)) return { type: Number, value: n };
+  }
+  return { type: String, value: s };
+}
+
+// Widen each column to its header a bit; cap so a long free-text column can't blow up.
+const xlsxColWidths = (cols) => cols.map((h) => ({ width: Math.min(Math.max(h.length + 2, 10), 32) }));
+
 // Column sets for the smaller projects CSV (same idea, smaller surface).
 const PROJECTS_CSV_COLUMNS = [
   "id", "name", "developer", "district", "city",
@@ -1791,6 +1836,8 @@ function PlatformExports({ lang, setCurrent }) {
   // streaming. Disables the export button + shows a row counter so users
   // know the click did something even for large exports.
   const [exportProgress, setExportProgress] = useState(null);
+  // Download format for the two dataset buttons: "csv" | "xlsx".
+  const [xfmt, setXfmt] = useState("csv");
 
   useEffect(() => {
     let cancelled = false;
@@ -1920,6 +1967,91 @@ function PlatformExports({ lang, setCurrent }) {
     }
   };
 
+  // ── Excel (.xlsx) variants ─────────────────────────────────
+  // Same data + same real-paid gate as CSV. The xlsx library is loaded on demand
+  // (dynamic import) so it never weighs down the main bundle. Numbers are typed as
+  // numeric so Excel can sort/sum; text (ids, diacritics) stays text.
+  const xlsxFromProjects = async () => {
+    if (exportProgress) return;
+    setExportProgress({ current: 0, total: null, label: lang === "sk" ? "Vytváram Excel…" : "Building Excel…" });
+    try {
+      const header = PROJECTS_CSV_COLUMNS.map((h) => ({ value: h, fontWeight: "bold" }));
+      const body = projects.map((p) =>
+        PROJECTS_CSV_COLUMNS.map((col) => xlsxCell(col, p[col], PROJECTS_NUMBER_COLUMNS)));
+      const { default: writeXlsxFile } = await import("write-excel-file/browser");
+      await writeXlsxFile([header, ...body], {
+        fileName: `residata-projects-${new Date().toISOString().slice(0, 10)}.xlsx`,
+        columns: xlsxColWidths(PROJECTS_CSV_COLUMNS),
+        sheet: lang === "sk" ? "Projekty" : "Projects",
+      });
+      try { track("xlsx_exported", { type: "projects", row_count: projects.length }); } catch (_) {}
+    } catch (e) {
+      alert((lang === "sk" ? "Export zlyhal: " : "Export failed: ") + String(e?.message || e || ""));
+    } finally {
+      setExportProgress(null);
+    }
+  };
+
+  const xlsxFromFlats = async () => {
+    if (exportProgress) return;
+    if (!effectiveDay) {
+      alert(lang === "sk" ? "Nie je dostupný žiadny dátum." : "No snapshot date available.");
+      return;
+    }
+    const realMarkets = (countries || []).filter((c) => !isAllCountries(c));
+    const markets = isAllCountries(country) ? (realMarkets.length ? realMarkets : [null]) : [country];
+    const pDay = selectedDay || null;
+    const fileDay = selectedDay || "latest";
+    setExportProgress({ current: 0, total: null, label: lang === "sk" ? "Pripravujem export…" : "Preparing export…" });
+    try {
+      // ONE gated call per market — identical to the CSV path (real-paid gate + per-day
+      // dedup live inside export_units_csv). We re-parse the returned CSV into typed cells.
+      const parts = [];
+      for (let mi = 0; mi < markets.length; mi++) {
+        if (markets.length > 1) {
+          setExportProgress({
+            current: 0, total: null,
+            label: lang === "sk" ? `Sťahujem trh ${mi + 1}/${markets.length}…` : `Fetching market ${mi + 1}/${markets.length}…`,
+          });
+        }
+        const { data, error } = await supabase.rpc("export_units_csv", { p_country: markets[mi], p_day: pDay });
+        if (error) throw error;
+        if (data && data.length) parts.push(data);
+      }
+      if (parts.length === 0) {
+        alert(lang === "sk" ? "Žiadne byty na export pre tento dátum." : "No flats for this date.");
+        return;
+      }
+      setExportProgress({ current: 0, total: null, label: lang === "sk" ? "Vytváram Excel…" : "Building Excel…" });
+      const csvText = [FLATS_CSV_COLUMNS.join(","), ...parts].join("\n");
+      const bodyRows = parseCsvRows(csvText).slice(1).filter((r) => r.length > 1); // drop header row
+      const header = FLATS_CSV_COLUMNS.map((h) => ({ value: h, fontWeight: "bold" }));
+      const body = bodyRows.map((r) => FLATS_CSV_COLUMNS.map((col, ci) => xlsxCell(col, r[ci], FLATS_NUMBER_COLUMNS)));
+      const { default: writeXlsxFile } = await import("write-excel-file/browser");
+      const pCountry = isAllCountries(country) ? "all" : country;
+      await writeXlsxFile([header, ...body], {
+        fileName: `residata-flats-${pCountry}-${fileDay}.xlsx`,
+        columns: xlsxColWidths(FLATS_CSV_COLUMNS),
+        sheet: lang === "sk" ? "Byty" : "Flats",
+      });
+      try { track("xlsx_exported", { type: "flats", row_count: body.length, day: fileDay, country: pCountry }); } catch (_) {}
+    } catch (e) {
+      const msg = String(e?.message || e || "");
+      if (/export_not_permitted|42501|permission|insufficient/i.test(msg)) {
+        alert(lang === "sk"
+          ? "Export je dostupný len pre reálne platiacich zákazníkov."
+          : "Export is available to paying customers only.");
+      } else {
+        alert((lang === "sk" ? "Export zlyhal: " : "Export failed: ") + msg);
+      }
+    } finally {
+      setExportProgress(null);
+    }
+  };
+
+  const doProjects = () => (xfmt === "xlsx" ? xlsxFromProjects() : csvFromProjects());
+  const doFlats = () => (xfmt === "xlsx" ? xlsxFromFlats() : csvFromFlats());
+
   return (
     <div style={{ padding: "1rem 2rem 4rem", maxWidth: 720 }}>
       <p style={{ color: dim, fontSize: "0.9rem", lineHeight: 1.6, marginTop: 0, marginBottom: "1.5rem" }}>
@@ -1968,15 +2100,28 @@ function PlatformExports({ lang, setCurrent }) {
       {canExport ? (
       <>
       <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 12, padding: "1.5rem 1.75rem", marginBottom: "1rem" }}>
-        <div style={{ fontFamily: mono, fontSize: "0.65rem", color: green, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.5rem" }}>CSV</div>
+        <div style={{ fontFamily: mono, fontSize: "0.65rem", color: green, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.5rem" }}>CSV / EXCEL</div>
         <h3 style={{ fontSize: "1.05rem", fontWeight: 600, color: textLight, margin: 0, marginBottom: "1rem" }}>
           {lang === "sk" ? "Okamžitý export" : "Instant export"}
         </h3>
+        {/* Format toggle — the two dataset buttons below download in the chosen format. */}
+        <div style={{ display: "inline-flex", gap: 0, marginBottom: "1rem", border: `1px solid ${border}`, borderRadius: 8, overflow: "hidden" }}>
+          {["csv", "xlsx"].map((f) => (
+            <button key={f} onClick={() => setXfmt(f)} disabled={!!exportProgress}
+              style={{
+                padding: "0.4rem 1rem", fontSize: "0.8rem", fontFamily: mono, cursor: exportProgress ? "default" : "pointer",
+                border: "none", background: xfmt === f ? green : "transparent", color: xfmt === f ? "#06140f" : dim,
+                fontWeight: xfmt === f ? 700 : 400,
+              }}>
+              {f === "csv" ? "CSV" : "Excel (.xlsx)"}
+            </button>
+          ))}
+        </div>
         <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-          <button onClick={csvFromProjects} className="btn-p" style={{ fontSize: "0.85rem" }} disabled={!!exportProgress}>
+          <button onClick={doProjects} className="btn-p" style={{ fontSize: "0.85rem" }} disabled={!!exportProgress}>
             ⬇ {lang === "sk" ? "Projekty — všetky stavy" : "Projects — all statuses"} ({projects.length})
           </button>
-          <button onClick={csvFromFlats} className="btn-s" style={{ fontSize: "0.85rem" }} disabled={!!exportProgress}>
+          <button onClick={doFlats} className="btn-s" style={{ fontSize: "0.85rem" }} disabled={!!exportProgress}>
             {exportProgress
               ? (exportProgress.total
                   ? `${exportProgress.label} ${exportProgress.current.toLocaleString(localeTag(lang))} / ${exportProgress.total.toLocaleString(localeTag(lang))}`
@@ -1988,8 +2133,8 @@ function PlatformExports({ lang, setCurrent }) {
         </div>
         <p style={{ color: dim, fontSize: "0.75rem", marginTop: "0.85rem", lineHeight: 1.5 }}>
           {lang === "sk"
-            ? "Tlačidlo Všetky byty sťahuje unit-level dáta k vybranému dátumu; Projekty je aktuálny súhrn projektov (nezávislý od dátumu). Pre Excel stačí dvojklik. Veľké exporty môžu trvať pár sekúnd."
-            : "The All flats button downloads unit-level data for the selected date; Projects is a current project summary (independent of the date). Double-click opens it in Excel. Large exports may take a few seconds."}
+            ? "Vyber si formát (CSV alebo Excel .xlsx) a stiahni. Tlačidlo Všetky byty sťahuje unit-level dáta k vybranému dátumu; Projekty je aktuálny súhrn projektov (nezávislý od dátumu). Veľké exporty môžu trvať pár sekúnd."
+            : "Pick a format (CSV or Excel .xlsx) and download. The All flats button downloads unit-level data for the selected date; Projects is a current project summary (independent of the date). Large exports may take a few seconds."}
         </p>
       </div>
 
