@@ -15,6 +15,8 @@ import { track } from "../lib/track";
 import { isPersonalEmail } from "../lib/emailValidation";
 import UpgradePrompt from "../components/UpgradePrompt";
 import PivotV2 from "./PivotV2";
+import MapFilterBuilder from "../components/MapFilterBuilder";
+import { applyFilters, describe, isComplete } from "../lib/mapFilters";
 
 const mono = "'JetBrains Mono', monospace";
 const green = "#00e5a0";
@@ -27,6 +29,14 @@ const bg2 = "#0e0e10";
 const panel = "#14141a";
 const red = "#ff6b6b";
 const orange = "#f5a623";
+
+// Filter-bar styling — matched to the map's filter bar (MapView2) so the
+// Projects filters look identical to the rest of the platform.
+const filterInput = { boxSizing: "border-box", padding: "7px 11px", background: bg2, border: `1px solid ${border}`, borderRadius: 7, color: text, fontSize: "0.82rem", outline: "none" };
+function filterChip(active) {
+  return { padding: "6px 12px", borderRadius: 999, cursor: "pointer", fontSize: "0.76rem", border: `1px solid ${active ? green : border}`, background: active ? `${green}1a` : "transparent", color: active ? green : dim };
+}
+const chipTag = { display: "inline-flex", alignItems: "center", gap: 5, background: `${green}14`, color: green, border: `1px solid ${green}40`, borderRadius: 999, padding: "4px 9px", fontSize: "0.7rem", maxWidth: 260 };
 
 /* ── ProtectedData ─────────────────────────────────────────
    Wraps a data region (tables, pivot output, etc.) to discourage
@@ -106,6 +116,26 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
   const historicalProjects = allProjects.filter(p => !isActive(p));
   const [showHistorical, setShowHistorical] = useState(false);
 
+  // ── Filters ────────────────────────────────────────────────
+  // Same composable filter builder as the map (Mapa 2), so the Projects
+  // filters match the rest of the platform: country / city / district /
+  // available units / developer / price / status / completion … plus a
+  // free-text name+developer search. All client-side over the already-
+  // loaded list (no extra queries), ANDed together.
+  const sk = lang === "sk";
+  const [conditions, setConditions] = useState([]);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [nameQuery, setNameQuery] = useState("");
+  const nameMatch = (p) => {
+    const q = nameQuery.trim().toLowerCase();
+    if (!q) return true;
+    return (p.name || "").toLowerCase().includes(q) || (p.developer || "").toLowerCase().includes(q);
+  };
+  const filteredActive = applyFilters(activeProjects.filter(nameMatch), conditions);
+  const filteredHistorical = applyFilters(historicalProjects.filter(nameMatch), conditions);
+  const activeConds = conditions.filter(isComplete);
+  const hasFilters = activeConds.length > 0 || nameQuery.trim() !== "";
+
   // ── Sortable columns ───────────────────────────────────────
   // Default: alphabetical by name. The previous default came from
   // useProjects() which ordered by available_units desc — that
@@ -149,7 +179,7 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
       return String(av).localeCompare(String(bv), locale, { numeric: true, sensitivity: "base" }) * dir;
     });
   };
-  const projects = sortProjects(activeProjects);
+  const projects = sortProjects(filteredActive);
 
   const hasFullAccess = can("view_all_projects_list");
   // Anon: 12 plne, ďalších 8 blurred. Logged-in: všetko.
@@ -192,6 +222,52 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
           {showSignupPrompt && <button className="btn-p" onClick={openLogin}>{t.register_for_full}</button>}
         </div>
 
+        {/* Filter bar — same builder as the map (country / city / district /
+            available units / developer / price / status …) + name search. */}
+        {!loading && activeProjects.length > 0 && (
+          <>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap", marginBottom: "0.85rem" }}>
+              <input
+                value={nameQuery}
+                onChange={(e) => setNameQuery(e.target.value)}
+                placeholder={sk ? "Hľadať projekt alebo developera…" : "Find project or developer…"}
+                style={{ ...filterInput, flex: "1 1 180px", maxWidth: 260 }}
+              />
+              <button onClick={() => setFilterOpen((v) => !v)} style={filterChip(filterOpen || activeConds.length > 0)}>
+                ⚙ {sk ? "Filtre" : "Filters"}{activeConds.length > 0 ? ` · ${activeConds.length}` : ""}
+              </button>
+              {activeConds.map((c) => (
+                <span key={c.id} style={chipTag}>
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{describe(c, sk)}</span>
+                  <span onClick={() => setConditions((cs) => cs.filter((x) => x.id !== c.id))} style={{ cursor: "pointer", flexShrink: 0 }}>×</span>
+                </span>
+              ))}
+              {hasFilters && (
+                <button onClick={() => { setConditions([]); setNameQuery(""); }} style={{ background: "none", border: "none", color: dim, cursor: "pointer", fontSize: "0.76rem" }}>
+                  {sk ? "Vyčistiť" : "Clear"}
+                </button>
+              )}
+              <span style={{ marginLeft: "auto", fontSize: "0.74rem", color: dim, fontFamily: mono }}>
+                {filteredActive.length}{hasFilters ? ` / ${activeProjects.length}` : ""} {sk ? "projektov" : "projects"}
+              </span>
+            </div>
+            {/* zero-height anchor so the floating builder panel drops below the bar */}
+            <div style={{ position: "relative", zIndex: 5 }}>
+              {filterOpen && (
+                <MapFilterBuilder
+                  conditions={conditions}
+                  setConditions={setConditions}
+                  projects={activeProjects}
+                  matchCount={filteredActive.length}
+                  totalCount={activeProjects.length}
+                  sk={sk}
+                  onClose={() => setFilterOpen(false)}
+                />
+              )}
+            </div>
+          </>
+        )}
+
         {/* Sold-velocity is computed month-over-month; right after the June market-key
             unification the active markets only have one monthly snapshot, so every
             project's sold_last_month is null. Show a clear "building history" note (paid
@@ -230,6 +306,19 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
                 </thead>
                 <tbody>
                   {clearRows.map(p => <ProjectRow key={p.id} p={p} t={t} lang={lang} setCurrent={setCurrent} canVelocity={can("view_sold_velocity")} />)}
+
+                  {clearRows.length === 0 && (
+                    <tr>
+                      <td colSpan={9} style={{ ...td, textAlign: "center", color: dim, padding: "2.5rem 1rem" }}>
+                        {sk ? "Žiadne projekty nevyhovujú filtru." : "No projects match the filter."}
+                        {hasFilters && (
+                          <button onClick={() => { setConditions([]); setNameQuery(""); }} style={{ marginLeft: 10, background: "none", border: "none", color: green, cursor: "pointer", fontSize: "0.8rem" }}>
+                            {sk ? "Vyčistiť filtre" : "Clear filters"}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  )}
 
                   {/* Blurred teaser rows — anon only. Vyššia opacity + mäkkší blur,
                       nech je viditeľné že sú tam reálne dáta. */}
@@ -295,7 +384,7 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
         {/* Historical projects (sold_out / paused / archived) — collapsed by
             default so the live list stays the focus. Only show for users
             with full access (anon teaser doesn't need another wall). */}
-        {hasFullAccess && historicalProjects.length > 0 && (
+        {hasFullAccess && filteredHistorical.length > 0 && (
           <div style={{ marginTop: "1.25rem" }}>
             <button
               onClick={() => setShowHistorical(s => !s)}
@@ -315,9 +404,9 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
                   {showHistorical ? "▾" : "▸"} {lang === "sk" ? "Historické" : "Historical"}
                 </span>
                 {(() => {
-                  const so = historicalProjects.filter(p => p.status === "sold_out").length;
-                  const pa = historicalProjects.filter(p => p.status === "paused").length;
-                  const ar = historicalProjects.filter(p => p.status === "archived").length;
+                  const so = filteredHistorical.filter(p => p.status === "sold_out").length;
+                  const pa = filteredHistorical.filter(p => p.status === "paused").length;
+                  const ar = filteredHistorical.filter(p => p.status === "archived").length;
                   const parts = [];
                   if (so) parts.push(`${so} ${lang === "sk" ? "vypredané" : "sold out"}`);
                   if (pa) parts.push(`${pa} ${lang === "sk" ? "pozastavené" : "paused"}`);
@@ -326,7 +415,7 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
                 })()}
               </span>
               <span style={{ fontFamily: mono, fontSize: "0.72rem", color: dim }}>
-                {historicalProjects.length} {lang === "sk" ? "projektov" : "projects"}
+                {filteredHistorical.length} {lang === "sk" ? "projektov" : "projects"}
               </span>
             </button>
             {showHistorical && (
@@ -347,7 +436,7 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
                       </tr>
                     </thead>
                     <tbody>
-                      {historicalProjects.map(p => (
+                      {filteredHistorical.map(p => (
                         <tr key={p.id}
                           onClick={() => setCurrent && p.status !== "paused" && setCurrent(`Project:${p.id}`)}
                           style={{

@@ -16,6 +16,7 @@ const num = (v) => (v == null || v === "" || Number.isNaN(Number(v)) ? null : Nu
 
 // label: English · label_sk: Slovak. `get` reads the value from a projects_live row.
 export const FIELDS = [
+  { key: "country",         label: "Country",         label_sk: "Krajina",      type: "category", get: (p) => p.country || "" },
   { key: "city",            label: "City",            label_sk: "Mesto",        type: "category", get: (p) => p.city || "" },
   { key: "district",        label: "District",        label_sk: "Mestská časť", type: "category", get: (p) => p.district || "" },
   { key: "sub_district",    label: "Sub-district",    label_sk: "Podčasť",      type: "category", get: (p) => p.sub_district || "" },
