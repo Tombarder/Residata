@@ -1760,6 +1760,22 @@ function xlsxCell(colName, raw, numberCols) {
 // Widen each column to its header a bit; cap so a long free-text column can't blow up.
 const xlsxColWidths = (cols) => cols.map((h) => ({ width: Math.min(Math.max(h.length + 2, 10), 32) }));
 
+// Build + download an .xlsx. write-excel-file v4 returns a { toBlob, toFile } wrapper —
+// the `fileName` option does NOT auto-download — so we take the Blob and trigger the
+// download ourselves, the same explicit anchor pattern the CSV export uses. The lib is
+// loaded on demand so it never weighs the main bundle.
+async function saveXlsx(rows, { columns, sheet, fileName }) {
+  const { default: writeXlsxFile } = await import("write-excel-file/browser");
+  const workbook = await writeXlsxFile(rows, { columns, sheet });
+  const blob = await workbook.toBlob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
 // Column sets for the smaller projects CSV (same idea, smaller surface).
 const PROJECTS_CSV_COLUMNS = [
   "id", "name", "developer", "district", "city",
@@ -1978,11 +1994,10 @@ function PlatformExports({ lang, setCurrent }) {
       const header = PROJECTS_CSV_COLUMNS.map((h) => ({ value: h, fontWeight: "bold" }));
       const body = projects.map((p) =>
         PROJECTS_CSV_COLUMNS.map((col) => xlsxCell(col, p[col], PROJECTS_NUMBER_COLUMNS)));
-      const { default: writeXlsxFile } = await import("write-excel-file/browser");
-      await writeXlsxFile([header, ...body], {
-        fileName: `residata-projects-${new Date().toISOString().slice(0, 10)}.xlsx`,
+      await saveXlsx([header, ...body], {
         columns: xlsxColWidths(PROJECTS_CSV_COLUMNS),
         sheet: lang === "sk" ? "Projekty" : "Projects",
+        fileName: `residata-projects-${new Date().toISOString().slice(0, 10)}.xlsx`,
       });
       try { track("xlsx_exported", { type: "projects", row_count: projects.length }); } catch (_) {}
     } catch (e) {
@@ -2027,12 +2042,11 @@ function PlatformExports({ lang, setCurrent }) {
       const bodyRows = parseCsvRows(csvText).slice(1).filter((r) => r.length > 1); // drop header row
       const header = FLATS_CSV_COLUMNS.map((h) => ({ value: h, fontWeight: "bold" }));
       const body = bodyRows.map((r) => FLATS_CSV_COLUMNS.map((col, ci) => xlsxCell(col, r[ci], FLATS_NUMBER_COLUMNS)));
-      const { default: writeXlsxFile } = await import("write-excel-file/browser");
       const pCountry = isAllCountries(country) ? "all" : country;
-      await writeXlsxFile([header, ...body], {
-        fileName: `residata-flats-${pCountry}-${fileDay}.xlsx`,
+      await saveXlsx([header, ...body], {
         columns: xlsxColWidths(FLATS_CSV_COLUMNS),
         sheet: lang === "sk" ? "Byty" : "Flats",
+        fileName: `residata-flats-${pCountry}-${fileDay}.xlsx`,
       });
       try { track("xlsx_exported", { type: "flats", row_count: body.length, day: fileDay, country: pCountry }); } catch (_) {}
     } catch (e) {
