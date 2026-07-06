@@ -26,7 +26,8 @@ import { useCountry } from "../lib/useCountry";
 import { supabasePublic, isSupabaseReady } from "../lib/supabase";
 import {
   LENSES, COMPLETION, NO_DATA, ppm2Of, metricValue, completionBucket,
-  tertiles, colorFor, coverage, circlePolygon, computeCompetitiveSet, legendForLens, valueRange, heatWeight, hasPublishedPrice,
+  tertiles, colorFor, coverage, circlePolygon, computeCompetitiveSet, computePolygonSet, computeCorridorSet,
+  corridorBufferRing, polygonAreaKm2, polylineLengthKm, legendForLens, valueRange, heatWeight, hasPublishedPrice,
   median, percentile, setAbsorptionPct,
 } from "../lib/mapMetrics";
 import MapFilterBuilder from "../components/MapFilterBuilder";
@@ -42,6 +43,12 @@ const FALLBACK_CENTER = [18.5, 48.7];
 const FALLBACK_ZOOM = 6.2;
 
 let savedView = null;
+
+// Saved draw-areas persist per-browser (localStorage). Cross-device sync (DB-backed)
+// is the next step; this makes a developer's site catchments stick immediately.
+const AREAS_KEY = "residata_map_areas_v1";
+function loadSavedAreas() { try { return JSON.parse(localStorage.getItem(AREAS_KEY) || "[]"); } catch (_) { return []; } }
+function persistSavedAreas(list) { try { localStorage.setItem(AREAS_KEY, JSON.stringify(list)); } catch (_) {} }
 
 const norm = (s) => (s || "").toString().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
 const fmt = (n) => Number(Math.round(n)).toLocaleString("sk-SK");
@@ -166,6 +173,72 @@ export default function MapView2({ lang = "en", setCurrent }) {
   const [viewBounds, setViewBounds] = useState(null); // current map viewport → the overview reflects only what's on screen
   const [extSet, setExtSet] = useState(null); // {nameSet:Set<normName>, count} handed from a filtered analytics view ("Show on map")
 
+  // ── Draw an area — polygon OR corridor — feeding the SAME competitive panel ──
+  // drawTool: the tool actively adding points (null when idle/finished).
+  // pts: in-progress vertices. shape: the finished selection —
+  //   {kind:'polygon', ring:[[lng,lat],…]} | {kind:'corridor', line:[[lng,lat],…], widthKm}.
+  const [drawTool, setDrawTool] = useState(null);
+  const [pts, setPts] = useState([]);
+  const [shape, setShape] = useState(null);
+  const [corridorKm, setCorridorKm] = useState(0.4);
+  const [savedAreas, setSavedAreas] = useState(loadSavedAreas);
+  const drawToolRef = useRef(null); drawToolRef.current = drawTool;
+  const ptsRef = useRef([]); ptsRef.current = pts;
+  const corridorKmRef = useRef(0.4); corridorKmRef.current = corridorKm;
+  const shapeRef = useRef(null); shapeRef.current = shape;
+  const mapClickRef = useRef(() => {});
+  const finishRef = useRef(() => {});
+  const setVertexRef = useRef(() => {});
+  const vertexMarkersRef = useRef([]);
+  const draggingRef = useRef(false);
+
+  const startDraw = (kind) => { setAnalysisCenter(null); setAnchorId(null); setShape(null); setPts([]); setDrawTool(kind); };
+  const cancelDraw = () => { setPts([]); setDrawTool(null); };
+  const undoPt = () => setPts((p) => p.slice(0, -1));
+  const clearShape = () => { setShape(null); setPts([]); setDrawTool(null); };
+  const finishDraw = () => {
+    const p = ptsRef.current, kind = drawToolRef.current;
+    if (kind === "polygon" && p.length >= 3) { setShape({ kind: "polygon", ring: [...p, p[0]] }); setPts([]); setDrawTool(null); }
+    else if (kind === "corridor" && p.length >= 2) { setShape({ kind: "corridor", line: [...p], widthKm: corridorKmRef.current }); setPts([]); setDrawTool(null); }
+  };
+  finishRef.current = finishDraw;
+  // Move vertex i live — updates the in-progress pts or the finished shape.
+  const setVertex = (i, lng, lat) => {
+    if (drawToolRef.current) { setPts((p) => p.map((c, k) => (k === i ? [lng, lat] : c))); return; }
+    const s = shapeRef.current; if (!s) return;
+    if (s.kind === "polygon") { const v = s.ring.slice(0, -1).map((c, k) => (k === i ? [lng, lat] : c)); setShape({ ...s, ring: [...v, v[0]] }); }
+    else if (s.kind === "corridor") { setShape({ ...s, line: s.line.map((c, k) => (k === i ? [lng, lat] : c)) }); }
+  };
+  setVertexRef.current = setVertex;
+  // Map click: add a vertex (or close the polygon when clicking near its first point); else radius.
+  mapClickRef.current = (e, map) => {
+    if (draggingRef.current) return;
+    const tool = drawToolRef.current;
+    if (tool) {
+      const p = ptsRef.current;
+      if (tool === "polygon" && p.length >= 3) {
+        const first = map.project(p[0]);
+        if (Math.hypot(first.x - e.point.x, first.y - e.point.y) < 12) { finishDraw(); return; }
+      }
+      setPts((prev) => [...prev, [e.lngLat.lng, e.lngLat.lat]]);
+      return;
+    }
+    const hit = map.queryRenderedFeatures(e.point, { layers: ["points"] });
+    if (hit && hit.length) return;
+    setAnalysisCenter({ lng: e.lngLat.lng, lat: e.lngLat.lat }); setAnchorId(null);
+  };
+  const setCorridorWidth = (v) => { setCorridorKm(v); setShape((s) => (s && s.kind === "corridor" ? { ...s, widthKm: v } : s)); };
+  const saveCurrentArea = () => {
+    if (!shape) return;
+    const name = (typeof prompt === "function" ? prompt(sk ? "Názov oblasti:" : "Area name:") : "");
+    const nm = (name || "").trim(); if (!nm) return;
+    const item = { id: String(Date.now()), name: nm, shape, country };
+    const next = [item, ...savedAreas.filter((a) => a.name !== nm)].slice(0, 40);
+    setSavedAreas(next); persistSavedAreas(next);
+  };
+  const loadArea = (a) => { setDrawTool(null); setPts([]); setAnalysisCenter(null); setAnchorId(null); if (a.shape.kind === "corridor") setCorridorKm(a.shape.widthKm); setShape(a.shape); };
+  const deleteArea = (id) => { const next = savedAreas.filter((a) => a.id !== id); setSavedAreas(next); persistSavedAreas(next); };
+
   // On mount, consume a project set handed over from a filtered analytics view (Unit Explorer's
   // "Show on map"). Restricts the map to exactly those projects until cleared. Consume-once.
   useEffect(() => {
@@ -260,7 +333,19 @@ export default function MapView2({ lang = "en", setCurrent }) {
     };
   }, [inView]);
 
-  const compSet = useMemo(() => computeCompetitiveSet(shown, coords, analysisCenter, radiusKm, verifiedOnly), [shown, coords, analysisCenter, radiusKm, verifiedOnly]);
+  const compSet = useMemo(() => {
+    if (shape && shape.kind === "polygon") return computePolygonSet(shown, coords, shape.ring, verifiedOnly);
+    if (shape && shape.kind === "corridor") return computeCorridorSet(shown, coords, shape.line, shape.widthKm, verifiedOnly);
+    return computeCompetitiveSet(shown, coords, analysisCenter, radiusKm, verifiedOnly);
+  }, [shown, coords, shape, analysisCenter, radiusKm, verifiedOnly]);
+  const selection = shape || analysisCenter; // panel shows for radius OR a drawn shape
+  // Size readout for the drawn selection.
+  const shapeSize = useMemo(() => {
+    if (!shape) return null;
+    if (shape.kind === "polygon") { const km2 = polygonAreaKm2(shape.ring); return { km2, label: `${km2 < 1 ? km2.toFixed(2) : km2.toFixed(1)} km²` }; }
+    const len = polylineLengthKm(shape.line);
+    return { km2: len * shape.widthKm * 2, label: `${len.toFixed(1)} km × ${Math.round(shape.widthKm * 1000)} m` };
+  }, [shape]);
   const anchor = useMemo(() => (anchorId ? shown.find((p) => p.id === anchorId) : null), [anchorId, shown]);
 
   // Zoom/pan the map so the whole analysis circle fits (used by the radius presets
@@ -299,6 +384,12 @@ export default function MapView2({ lang = "en", setCurrent }) {
       map.addLayer({ id: "radius-fill", type: "fill", source: "radius", paint: { "fill-color": green, "fill-opacity": 0.07 } });
       map.addLayer({ id: "radius-line", type: "line", source: "radius", paint: { "line-color": green, "line-width": 1.5, "line-dasharray": [2, 2] } });
 
+      // Hand-drawn polygon (in-progress line + vertices, or the finished area).
+      map.addSource("draw", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+      map.addLayer({ id: "draw-fill", type: "fill", source: "draw", filter: ["==", ["geometry-type"], "Polygon"], paint: { "fill-color": amber, "fill-opacity": 0.10 } });
+      map.addLayer({ id: "draw-line", type: "line", source: "draw", filter: ["!=", ["geometry-type"], "Point"], paint: { "line-color": amber, "line-width": 2 } });
+      map.addLayer({ id: "draw-vertex", type: "circle", source: "draw", filter: ["==", ["geometry-type"], "Point"], paint: { "circle-radius": 4, "circle-color": amber, "circle-stroke-width": 2, "circle-stroke-color": "#0a0a0b" } });
+
       map.addSource("projects", { type: "geojson", data: featuresRef.current });
       // Heatmap of the active lens (hidden until "Heat" is toggled). Weight = how
       // "hot" each project is on the active metric (heatWeight, 0..1).
@@ -332,6 +423,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
 
       hoverPopupRef.current = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 12, className: "mv2-hover" });
       map.on("mousemove", "points", (e) => {
+        if (drawToolRef.current) return; // no hover popups while drawing an area
         const f = e.features[0]; const p = f.properties;
         map.getCanvas().style.cursor = "pointer";
         hoverPopupRef.current.setLngLat(f.geometry.coordinates)
@@ -341,6 +433,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
       map.on("mouseleave", "points", () => { map.getCanvas().style.cursor = ""; if (hoverPopupRef.current) hoverPopupRef.current.remove(); });
 
       map.on("click", "points", (e) => {
+        if (drawToolRef.current) return; // clicking a pin while drawing just drops a vertex (handled below)
         if (hoverPopupRef.current) hoverPopupRef.current.remove();
         const f = e.features[0];
         showProjectPopup(map, f.geometry.coordinates, f.properties, {
@@ -348,10 +441,11 @@ export default function MapView2({ lang = "en", setCurrent }) {
           onAnalyze: (ll) => onAnalyzeRef.current(ll),
         }, popupRef);
       });
-      map.on("click", (e) => {
-        const hit = map.queryRenderedFeatures(e.point, { layers: ["points"] });
-        if (hit && hit.length) return;
-        setAnalysisCenter({ lng: e.lngLat.lng, lat: e.lngLat.lat }); setAnchorId(null);
+      map.on("click", (e) => mapClickRef.current(e, map));
+      map.on("dblclick", (e) => {
+        if (!drawToolRef.current) return;
+        e.preventDefault(); // don't zoom — finish the polygon instead
+        finishRef.current();
       });
     });
 
@@ -360,6 +454,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
       if (popupRef.current) { popupRef.current.remove(); popupRef.current = null; }
       if (hoverPopupRef.current) { hoverPopupRef.current.remove(); hoverPopupRef.current = null; }
       if (markerRef.current) { markerRef.current.remove(); markerRef.current = null; }
+      vertexMarkersRef.current.forEach((m) => m.remove()); vertexMarkersRef.current = [];
       map.remove(); mapRef.current = null; readyRef.current = false;
     };
   }, []);
@@ -402,10 +497,69 @@ export default function MapView2({ lang = "en", setCurrent }) {
     }
   }, [analysisCenter, radiusKm]);
 
+  // Render the finished shape (polygon fill / corridor buffer + centerline) or the
+  // in-progress geometry into the "draw" source. Vertices are draggable Markers (below).
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !readyRef.current) return;
+    const src = map.getSource("draw");
+    if (!src) return;
+    const poly = (ring) => ({ type: "Feature", geometry: { type: "Polygon", coordinates: [ring] }, properties: {} });
+    const line = (cs) => ({ type: "Feature", geometry: { type: "LineString", coordinates: cs }, properties: {} });
+    const features = [];
+    if (shape) {
+      if (shape.kind === "polygon") features.push(poly(shape.ring));
+      else { const buf = corridorBufferRing(shape.line, shape.widthKm); if (buf) features.push(poly(buf)); features.push(line(shape.line)); }
+    } else if (pts.length) {
+      if (drawTool === "corridor" && pts.length >= 2) { const buf = corridorBufferRing(pts, corridorKm); if (buf) features.push(poly(buf)); }
+      if (pts.length >= 2) features.push(line(pts));
+    }
+    src.setData({ type: "FeatureCollection", features });
+  }, [pts, shape, drawTool, corridorKm]);
+
+  // Draggable vertex handles for the active geometry (in-progress pts or finished shape).
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !readyRef.current) return;
+    const verts = drawTool ? pts : (shape ? (shape.kind === "polygon" ? shape.ring.slice(0, -1) : shape.line) : []);
+    const arr = vertexMarkersRef.current;
+    while (arr.length > verts.length) { const m = arr.pop(); m.remove(); }
+    while (arr.length < verts.length) {
+      const el = document.createElement("div");
+      el.style.cssText = `width:13px;height:13px;border-radius:50%;background:${amber};border:2px solid #0a0a0b;cursor:grab;box-shadow:0 0 0 2px ${amber}66`;
+      const mk = new maplibregl.Marker({ element: el, draggable: true }).setLngLat([0, 0]).addTo(map);
+      mk.on("dragstart", () => { draggingRef.current = true; });
+      mk.on("drag", () => { const ll = mk.getLngLat(); setVertexRef.current(mk.__i, ll.lng, ll.lat); });
+      mk.on("dragend", () => { setTimeout(() => { draggingRef.current = false; }, 60); });
+      arr.push(mk);
+    }
+    verts.forEach((c, i) => { arr[i].__i = i; arr[i].setLngLat(c); });
+  }, [pts, shape, drawTool]);
+
+  // Draw mode: crosshair cursor + suppress double-click-zoom (dblclick finishes the shape).
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !readyRef.current) return;
+    if (drawTool) { map.doubleClickZoom.disable(); map.getCanvas().style.cursor = "crosshair"; }
+    else { map.doubleClickZoom.enable(); map.getCanvas().style.cursor = ""; }
+  }, [drawTool]);
+
+  // Keyboard: Esc cancels an in-progress draw, Backspace removes the last point.
+  useEffect(() => {
+    if (!drawTool) return;
+    const onKey = (e) => {
+      if (e.key === "Escape") { e.preventDefault(); cancelDraw(); }
+      else if (e.key === "Backspace") { e.preventDefault(); undoPt(); }
+      else if (e.key === "Enter") { e.preventDefault(); finishRef.current(); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [drawTool]);
+
   const firstCountry = useRef(true);
   useEffect(() => {
     if (firstCountry.current) { firstCountry.current = false; return; }
-    setConditions([]); setNameQuery(""); setAnalysisCenter(null); setAnchorId(null); setExtSet(null);
+    setConditions([]); setNameQuery(""); setAnalysisCenter(null); setAnchorId(null); setExtSet(null); setShape(null); setPts([]); setDrawTool(null);
   }, [country]);
 
   const openProject = (id) => setCurrentRef.current && setCurrentRef.current("App:ProjectDetail:" + id);
@@ -439,6 +593,12 @@ export default function MapView2({ lang = "en", setCurrent }) {
         <input value={nameQuery} onChange={(e) => setNameQuery(e.target.value)} placeholder={sk ? "Hľadať projekt…" : "Find project…"} style={{ ...inputStyle, flex: "1 1 160px", maxWidth: 220 }} />
         <button onClick={() => setFilterOpen((v) => !v)} style={chipStyle(filterOpen || activeConds.length > 0)}>
           ⚙ {sk ? "Filtre" : "Filters"}{activeConds.length > 0 ? ` · ${activeConds.length}` : ""}
+        </button>
+        <button onClick={() => (drawTool === "polygon" ? cancelDraw() : startDraw("polygon"))} style={chipStyle(drawTool === "polygon" || shape?.kind === "polygon")} title={sk ? "Nakresli vlastnú oblasť (polygón)" : "Draw a custom area (polygon)"}>
+          ▱ {sk ? "Oblasť" : "Area"}
+        </button>
+        <button onClick={() => (drawTool === "corridor" ? cancelDraw() : startDraw("corridor"))} style={chipStyle(drawTool === "corridor" || shape?.kind === "corridor")} title={sk ? "Nakresli koridor: trasa + šírka (napr. okolo električky)" : "Draw a corridor: a route + width (e.g. along a tram line)"}>
+          ⇢ {sk ? "Koridor" : "Corridor"}
         </button>
         {extSet && (
           <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: `${green}22`, color: green, border: `1px solid ${green}`, borderRadius: 999, padding: "4px 10px", fontSize: "0.72rem", fontWeight: 600 }}
@@ -483,32 +643,88 @@ export default function MapView2({ lang = "en", setCurrent }) {
           <MapFilterBuilder conditions={conditions} setConditions={setConditions} projects={projects || []} matchCount={shown.length} totalCount={(projects || []).length} sk={sk} onClose={() => setFilterOpen(false)} />
         )}
 
-        {!analysisCenter && !isLoading && (
+        {drawTool ? (() => {
+          const minPts = drawTool === "polygon" ? 3 : 2;
+          const ok = pts.length >= minPts;
+          return (
+            <div style={{ position: "absolute", top: 12, left: "50%", transform: "translateX(-50%)", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", justifyContent: "center", maxWidth: "calc(100% - 24px)", background: "rgba(14,14,16,0.96)", border: `1px solid ${amber}88`, color: textLight, fontSize: "0.74rem", padding: "6px 8px 6px 14px", borderRadius: 20 }}>
+              {drawTool === "polygon" ? "▱" : "⇢"} {sk
+                ? `Klikaj ${drawTool === "polygon" ? "body oblasti" : "body trasy"} (${pts.length}) — ${drawTool === "polygon" ? "dvojklik/prvý bod" : "dvojklik"} ukončí, Esc zruší`
+                : `Click ${drawTool === "polygon" ? "area points" : "route points"} (${pts.length}) — ${drawTool === "polygon" ? "double-click/first point" : "double-click"} to finish, Esc to cancel`}
+              {drawTool === "corridor" && (
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ color: dim }}>{sk ? "šírka" : "width"}</span>
+                  <input type="range" min={100} max={2000} step={50} value={Math.round(corridorKm * 1000)} onChange={(e) => setCorridorWidth(Number(e.target.value) / 1000)} style={{ width: 90, accentColor: amber }} />
+                  <span style={{ fontFamily: mono, color: textLight }}>{Math.round(corridorKm * 1000)} m</span>
+                </span>
+              )}
+              {pts.length > 0 && <button onClick={undoPt} title={sk ? "Späť (Backspace)" : "Undo (Backspace)"} style={{ background: "none", border: `1px solid ${border}`, color: dim, borderRadius: 6, padding: "3px 8px", fontSize: "0.7rem", cursor: "pointer" }}>↶</button>}
+              <button onClick={() => finishRef.current()} disabled={!ok} style={{ background: ok ? amber : "transparent", color: ok ? "#0a0a0b" : dim, border: `1px solid ${amber}`, borderRadius: 6, padding: "3px 11px", fontSize: "0.72rem", fontWeight: 600, cursor: ok ? "pointer" : "default" }}>{sk ? "Hotovo" : "Done"}</button>
+              <button onClick={cancelDraw} title={sk ? "Zrušiť" : "Cancel"} style={{ background: "none", border: "none", color: dim, cursor: "pointer", fontSize: "1rem", lineHeight: 1 }}>✕</button>
+            </div>
+          );
+        })() : (!selection && !isLoading && (
           <div style={{ position: "absolute", top: 12, left: "50%", transform: "translateX(-50%)", background: "rgba(14,14,16,0.92)", border: `1px solid ${green}55`, color: textLight, fontSize: "0.74rem", padding: "7px 14px", borderRadius: 20, pointerEvents: "none" }}>
-            ◎ {sk ? "Klikni pri pozemku — ukážem konkurenciu v okruhu" : "Click near a site — I'll show the competition within a radius"}
+            ◎ {sk ? "Klikni pri pozemku (okruh) — alebo ▱ Oblasť / ⇢ Koridor pre vlastný tvar" : "Click near a site (radius) — or ▱ Area / ⇢ Corridor to draw a shape"}
           </div>
-        )}
+        ))}
 
         <div style={{ position: "absolute", top: 12, right: 12, width: 300, maxWidth: "calc(100% - 24px)", maxHeight: "calc(100% - 24px)", overflowY: "auto", background: "rgba(14,14,16,0.97)", border: `1px solid ${border}`, borderRadius: 12, boxShadow: "0 12px 30px rgba(0,0,0,0.5)", padding: "14px 15px" }}>
-          {!analysisCenter ? (
+          {!selection ? (
             <div style={{ color: dim, fontSize: "0.8rem", lineHeight: 1.6 }}>
               <div style={{ color: textLight, fontWeight: 600, marginBottom: 6, fontSize: "0.85rem" }}>{sk ? "Konkurenčné okolie" : "Competitive set"}</div>
-              {sk ? "Klikni na mapu pri pozemku (alebo „◎ Area" + "“ v karte projektu) — zhrniem konkurenciu v okruhu. Bod sa dá ťahať." : "Click the map near a site (or “◎ Area” in a project card) and I'll summarise the competition within a radius. Drag the point to move it."}
+              {sk ? "Klikni na mapu pri pozemku (okruh), alebo ▱ Oblasť / ⇢ Koridor pre vlastný tvar — zhrniem konkurenciu vnútri." : "Click the map near a site (radius), or ▱ Area / ⇢ Corridor for a custom shape — I'll summarise the competition inside."}
+              {savedAreas.length > 0 && (
+                <div style={{ marginTop: 14, borderTop: `1px solid ${border}`, paddingTop: 12 }}>
+                  <div style={{ fontSize: "0.7rem", color: dim, marginBottom: 7 }}>☆ {sk ? "Uložené oblasti" : "Saved areas"}</div>
+                  {savedAreas.map((a) => (
+                    <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 6, padding: "3px 0" }}>
+                      <button onClick={() => loadArea(a)} style={{ flex: 1, textAlign: "left", background: "none", border: "none", color: textLight, cursor: "pointer", fontSize: "0.76rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                        onMouseEnter={(e) => (e.currentTarget.style.color = green)} onMouseLeave={(e) => (e.currentTarget.style.color = textLight)}>
+                        {a.shape.kind === "polygon" ? "▱" : "⇢"} {a.name}{a.country && a.country !== "all" ? <span style={{ color: dim }}> · {String(a.country).toUpperCase()}</span> : ""}
+                      </button>
+                      <button onClick={() => deleteArea(a.id)} title={sk ? "Zmazať" : "Delete"} style={{ background: "none", border: "none", color: dim, cursor: "pointer", fontSize: "0.85rem" }}>✕</button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ) : (
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 2 }}>
                 <span style={{ color: textLight, fontWeight: 600, fontSize: "0.85rem" }}>{sk ? "Konkurenčné okolie" : "Competitive set"}</span>
-                <button onClick={() => { setAnalysisCenter(null); setAnchorId(null); }} style={{ background: "none", border: "none", color: dim, cursor: "pointer", fontSize: "0.95rem" }} aria-label="Clear">✕</button>
+                <button onClick={() => { if (shape) { clearShape(); } else { setAnalysisCenter(null); setAnchorId(null); } }} style={{ background: "none", border: "none", color: dim, cursor: "pointer", fontSize: "0.95rem" }} aria-label="Clear">✕</button>
               </div>
-              <div style={{ fontSize: "0.7rem", color: dim, marginBottom: 9 }}>{sk ? "v okruhu" : "within"} <strong style={{ color: textLight, fontFamily: mono }}>{radiusKm % 1 === 0 ? radiusKm : radiusKm.toFixed(1)} km</strong></div>
-              <input type="range" min={0} max={1000} step={1} value={radiusToPos(radiusKm)} onChange={(e) => setRadiusKm(posToRadius(Number(e.target.value)))} onPointerUp={(e) => fitToRadius(posToRadius(Number(e.target.value)))} style={{ width: "100%", marginBottom: 8, accentColor: green }} aria-label="Radius km" />
-              <div style={{ display: "flex", gap: 5, marginBottom: 12 }}>
-                {RADIUS_PRESETS.map((p) => {
-                  const on = Math.abs(radiusKm - p) < 0.01;
-                  return <button key={p} onClick={() => { setRadiusKm(p); fitToRadius(p); }} style={{ flex: 1, minWidth: 0, padding: "5px 0", borderRadius: 6, fontSize: "0.68rem", cursor: "pointer", border: `1px solid ${on ? `${green}66` : border}`, background: on ? `${green}14` : "transparent", color: on ? green : dim }}>{p} km</button>;
-                })}
-              </div>
+              {shape ? (
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+                    <span style={{ fontSize: "0.7rem", color: amber, background: `${amber}14`, border: `1px solid ${amber}44`, borderRadius: 6, padding: "3px 8px" }}>
+                      {shape.kind === "polygon" ? "▱" : "⇢"} {shape.kind === "polygon" ? (sk ? "oblasť" : "area") : (sk ? "koridor" : "corridor")}{shapeSize ? ` · ${shapeSize.label}` : ""}
+                    </span>
+                    <button onClick={() => startDraw(shape.kind)} title={sk ? "Nakresliť znova" : "Redraw"} style={{ background: "none", border: `1px solid ${border}`, color: dim, borderRadius: 6, padding: "3px 9px", fontSize: "0.68rem", cursor: "pointer" }}>{sk ? "Znova" : "Redraw"}</button>
+                    <button onClick={saveCurrentArea} title={sk ? "Uložiť oblasť" : "Save area"} style={{ background: "none", border: `1px solid ${border}`, color: green, borderRadius: 6, padding: "3px 9px", fontSize: "0.68rem", cursor: "pointer" }}>☆ {sk ? "Uložiť" : "Save"}</button>
+                  </div>
+                  {shape.kind === "corridor" && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: "0.66rem", color: dim, minWidth: 40 }}>{sk ? "šírka" : "width"}</span>
+                      <input type="range" min={100} max={2000} step={50} value={Math.round(shape.widthKm * 1000)} onChange={(e) => setCorridorWidth(Number(e.target.value) / 1000)} style={{ flex: 1, accentColor: amber }} />
+                      <span style={{ fontSize: "0.66rem", color: textLight, fontFamily: mono, minWidth: 46, textAlign: "right" }}>{Math.round(shape.widthKm * 1000)} m</span>
+                    </div>
+                  )}
+                  <div style={{ fontSize: "0.62rem", color: dim, marginTop: 6 }}>{sk ? "Ťahaj body pre úpravu tvaru." : "Drag the points to reshape."}</div>
+                </div>
+              ) : (
+                <>
+                  <div style={{ fontSize: "0.7rem", color: dim, marginBottom: 9 }}>{sk ? "v okruhu" : "within"} <strong style={{ color: textLight, fontFamily: mono }}>{radiusKm % 1 === 0 ? radiusKm : radiusKm.toFixed(1)} km</strong></div>
+                  <input type="range" min={0} max={1000} step={1} value={radiusToPos(radiusKm)} onChange={(e) => setRadiusKm(posToRadius(Number(e.target.value)))} onPointerUp={(e) => fitToRadius(posToRadius(Number(e.target.value)))} style={{ width: "100%", marginBottom: 8, accentColor: green }} aria-label="Radius km" />
+                  <div style={{ display: "flex", gap: 5, marginBottom: 12 }}>
+                    {RADIUS_PRESETS.map((p) => {
+                      const on = Math.abs(radiusKm - p) < 0.01;
+                      return <button key={p} onClick={() => { setRadiusKm(p); fitToRadius(p); }} style={{ flex: 1, minWidth: 0, padding: "5px 0", borderRadius: 6, fontSize: "0.68rem", cursor: "pointer", border: `1px solid ${on ? `${green}66` : border}`, background: on ? `${green}14` : "transparent", color: on ? green : dim }}>{p} km</button>;
+                    })}
+                  </div>
+                </>
+              )}
 
               {anchor && compSet && compSet.inside.length > 1 && (() => {
                 const ap = ppm2Of(anchor);

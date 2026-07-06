@@ -179,14 +179,20 @@ export function setAbsorptionPct(projects) {
  * `coords` is { id -> {lat,lng,verified} }. `verifiedOnly` excludes projects
  * whose coordinates are placeholders (city centroid) so the radius is honest.
  */
-export function computeCompetitiveSet(projects, coords, center, radiusKm, verifiedOnly = false) {
-  if (!center || !coords) return null;
-  const inside = projects.filter((p) => {
-    const c = coords[p.id];
-    if (!c) return false;
-    if (verifiedOnly && !c.verified) return false;
-    return distanceKm(center, c) <= radiusKm;
-  });
+/** Ray-casting point-in-polygon. `ring` = [[lng,lat], …] (closed or open). */
+export function pointInRing(lng, lat, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+    if (((yi > lat) !== (yj > lat)) && (lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+
+/** Aggregate a set of projects into the competitive-panel shape. Shared by the
+ *  radius (computeCompetitiveSet) and polygon (computePolygonSet) selections so an
+ *  area never reports two different medians / absorption figures. */
+function summarizeSet(inside, coords) {
   const placeholderCount = inside.filter((p) => coords[p.id] && !coords[p.id].verified).length;
   const priced = inside.map(ppm2Of).filter((v) => v > 0).sort((a, b) => a - b);
   const soldLastMonth = inside.reduce((s, p) => s + (Number(p.sold_last_month) || 0), 0);
@@ -211,6 +217,104 @@ export function computeCompetitiveSet(projects, coords, center, radiusKm, verifi
     priceHi: priced.length ? priced[priced.length - 1] : null,
     totalUnits, availUnits, avgAbs, soldLastMonth, comp, topDevs,
   };
+}
+
+/** Summarise the competitive set within `radiusKm` of `center`. verifiedOnly
+ *  excludes placeholder (city-centroid) coords so the radius stays honest. */
+export function computeCompetitiveSet(projects, coords, center, radiusKm, verifiedOnly = false) {
+  if (!center || !coords) return null;
+  const inside = projects.filter((p) => {
+    const c = coords[p.id];
+    if (!c) return false;
+    if (verifiedOnly && !c.verified) return false;
+    return distanceKm(center, c) <= radiusKm;
+  });
+  return summarizeSet(inside, coords);
+}
+
+/** Summarise the competitive set inside a hand-drawn polygon `ring` ([[lng,lat],…]).
+ *  Same shape + stats as computeCompetitiveSet — just a polygon membership test. */
+export function computePolygonSet(projects, coords, ring, verifiedOnly = false) {
+  if (!ring || ring.length < 3 || !coords) return null;
+  const inside = projects.filter((p) => {
+    const c = coords[p.id];
+    if (!c) return false;
+    if (verifiedOnly && !c.verified) return false;
+    return pointInRing(c.lng, c.lat, ring);
+  });
+  return summarizeSet(inside, coords);
+}
+
+// ── Corridor (draw a route + a width) ─────────────────────────────────────────
+// Local equirectangular scale factors at a reference latitude (km per degree).
+const _kx = (lat) => 111.32 * Math.cos((lat * Math.PI) / 180);
+const _ky = 110.574;
+const _meanLat = (line) => line.reduce((s, p) => s + p[1], 0) / line.length;
+
+/** Min distance (km) from a point to a polyline. */
+export function distanceToPolylineKm(lng, lat, line) {
+  if (!line || !line.length) return Infinity;
+  if (line.length === 1) return distanceKm({ lng, lat }, { lng: line[0][0], lat: line[0][1] });
+  const kx = _kx(lat), px = lng * kx, py = lat * _ky;
+  let min = Infinity;
+  for (let i = 1; i < line.length; i++) {
+    const ax = line[i - 1][0] * kx, ay = line[i - 1][1] * _ky, bx = line[i][0] * kx, by = line[i][1] * _ky;
+    const dx = bx - ax, dy = by - ay, L2 = dx * dx + dy * dy;
+    let t = L2 ? ((px - ax) * dx + (py - ay) * dy) / L2 : 0;
+    t = Math.max(0, Math.min(1, t));
+    min = Math.min(min, Math.hypot(px - (ax + t * dx), py - (ay + t * dy)));
+  }
+  return min;
+}
+
+/** Total length (km) of a polyline. */
+export function polylineLengthKm(line) {
+  let d = 0;
+  for (let i = 1; i < (line || []).length; i++) d += distanceKm({ lng: line[i - 1][0], lat: line[i - 1][1] }, { lng: line[i][0], lat: line[i][1] });
+  return d;
+}
+
+/** Summarise the set inside a corridor: within `widthKm` of the drawn route. */
+export function computeCorridorSet(projects, coords, line, widthKm, verifiedOnly = false) {
+  if (!line || line.length < 2 || !coords) return null;
+  const inside = projects.filter((p) => {
+    const c = coords[p.id];
+    if (!c) return false;
+    if (verifiedOnly && !c.verified) return false;
+    return distanceToPolylineKm(c.lng, c.lat, line) <= widthKm;
+  });
+  return summarizeSet(inside, coords);
+}
+
+/** Shoelace area (km²) of a lng/lat ring (cos-lat corrected). */
+export function polygonAreaKm2(ring) {
+  if (!ring || ring.length < 3) return 0;
+  const kx = _kx(_meanLat(ring));
+  let a = 0;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    a += (ring[j][0] * kx) * (ring[i][1] * _ky) - (ring[i][0] * kx) * (ring[j][1] * _ky);
+  }
+  return Math.abs(a) / 2;
+}
+
+/** Approximate buffer polygon around a polyline — VISUAL only (membership uses the
+ *  exact distance test). Offsets each side by widthKm in a local metric frame. */
+export function corridorBufferRing(line, widthKm) {
+  if (!line || line.length < 2) return null;
+  const kx = _kx(_meanLat(line));
+  const M = line.map((p) => [p[0] * kx, p[1] * _ky]);
+  const left = [], right = [];
+  for (let i = 0; i < M.length; i++) {
+    const prev = M[Math.max(0, i - 1)], next = M[Math.min(M.length - 1, i + 1)];
+    let vx = next[0] - prev[0], vy = next[1] - prev[1];
+    const len = Math.hypot(vx, vy) || 1; vx /= len; vy /= len;
+    const nx = -vy * widthKm, ny = vx * widthKm; // perpendicular × width (km)
+    left.push([M[i][0] + nx, M[i][1] + ny]);
+    right.push([M[i][0] - nx, M[i][1] - ny]);
+  }
+  const ring = [...left, ...right.reverse()];
+  ring.push(ring[0]);
+  return ring.map((m) => [m[0] / kx, m[1] / _ky]);
 }
 
 /** Legend rows for the active lens (colour + label). */
