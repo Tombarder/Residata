@@ -22,12 +22,13 @@
  * render in the user's selected display currency; velocity/analytics widgets
  * are capability-gated (blurred + upgrade nudge for free users).
  */
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
 import {
-  useProjects, useMarketTotals, useVelocityMature, useDistrictTotals, useProjectSnapshots,
+  useProjects, useMarketTotals, useVelocityMature, useDistrictTotals,
 } from "../lib/useData";
+import { supabase } from "../lib/supabase";
 import { useCountry, isAllCountries, countryName } from "../lib/useCountry";
 import { useCurrency } from "../lib/useCurrency";
 import { moneyFromEur, moneySymbol } from "../lib/money";
@@ -195,6 +196,34 @@ function KpiCard({ label, value, sub, accent = textLight, locked = false, size =
   );
 }
 
+// Per-project monthly history for trend sparklines. MUST use the AUTHED client:
+// project_snapshots is RLS-gated (historical data is a paid capability), so the
+// shared anon-client useProjectSnapshots() hook returns [] for everyone. The
+// dashboard is always behind auth, so we read it as the logged-in user — paid /
+// admin get the full series, free users get nothing (their trend widgets are
+// capability-blurred anyway). One light query (<1k rows), cached module-level.
+let _historyCache = null;
+function useProjectHistory() {
+  const { user } = useAuth();
+  const [rows, setRows] = useState(_historyCache || []);
+  useEffect(() => {
+    if (!user) { setRows([]); return; }
+    if (_historyCache) { setRows(_historyCache); return; }
+    let cancelled = false;
+    supabase.from("project_snapshots")
+      .select("project_id,snapshot_month,available_units,sold_units,avg_price_eur_m2")
+      .order("snapshot_month", { ascending: true })
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) { console.error("[useProjectHistory]", error); return; }
+        _historyCache = data || [];
+        setRows(_historyCache);
+      });
+    return () => { cancelled = true; };
+  }, [user?.id]);
+  return rows;
+}
+
 // ═══════════════════════════════════════════════════════════════
 // Main
 // ═══════════════════════════════════════════════════════════════
@@ -209,7 +238,7 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
   const marketTotals = useMarketTotals();
   const velocityMature = useVelocityMature();
   const { districts } = useDistrictTotals();
-  const { snapshots } = useProjectSnapshots();
+  const snapshots = useProjectHistory();
 
   const { config, loading: cfgLoading, saveState, setConfig, resetToDefault } = useDashboardConfig();
 
