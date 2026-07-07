@@ -26,7 +26,8 @@
  * it can never 401 on a stale login, today or in the future.
  */
 import { createClient } from "@supabase/supabase-js";
-import { createBoundedAuthLock, makeAuthTimeoutFetch } from "./authResilience";
+import { createBoundedAuthLock, makeAuthTimeoutFetch, makeDataTimeoutFetch } from "./authResilience";
+import { initAuthTokenSync, getDataAccessToken } from "./authToken";
 
 const url = import.meta.env.VITE_SUPABASE_URL;
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -61,10 +62,52 @@ export const supabase = url && key ? createClient(url, key, {
     storage: typeof window !== "undefined" ? window.localStorage : undefined,
     lock: inMemoryAuthLock,
   },
-  // Bound auth network calls (/auth/v1/*) so a hung/slow token refresh can never
-  // hold the auth lock indefinitely. Scoped to auth only — paged data reads pass
-  // through untouched and are never aborted mid-flight.
-  global: { fetch: makeAuthTimeoutFetch() },
+  // Bound EVERY request on the auth client: /auth/v1/* at 8s (so a hung/slow token
+  // refresh can never hold the auth lock indefinitely) AND all other traffic
+  // (loadProfile + privileged WRITES) at 35s (so a dead socket can't strand a save
+  // or the admin panel forever either). Composed: the data-timeout wraps the
+  // auth-timeout, so auth calls keep their tighter 8s bound while everything else
+  // gets the 35s ceiling. The heavy paged reads no longer run on THIS client (they
+  // moved to supabaseData), so a 35s ceiling here is safe — nothing legitimate on
+  // the auth client takes that long.
+  global: { fetch: makeDataTimeoutFetch(makeAuthTimeoutFetch()) },
+}) : null;
+
+// Keep the token store in sync with the AUTH client's session lifecycle. Must
+// run BEFORE supabaseData issues any request so getDataAccessToken() has a live
+// token (it also seeds synchronously from localStorage on import, so even a
+// pre-event first read is covered).
+if (supabase) initAuthTokenSync(supabase);
+
+/**
+ * ── The RLS-gated DATA client (2026-07-07) — the permanent cure for
+ *    "logged-in page hangs on Loading…, only a hard refresh fixes it". ──
+ *
+ * A THIRD client, used by EVERY RLS-gated read (project detail, Analytics,
+ * Reports, Unit Explorer, dashboard history, CSV export). It is created with the
+ * `accessToken` option, so supabase-js resolves the Bearer token via
+ * getDataAccessToken() — which reads an in-memory/localStorage token WITHOUT ever
+ * calling getSession() or touching the auth lock — INSTEAD of the internal
+ * getSession()/lock/refresh dance that could hang the read before the fetch even
+ * fired. `makeDataTimeoutFetch` additionally aborts any read whose socket goes
+ * dead. Two independent guarantees → a data read can no longer hang, by
+ * construction.
+ *
+ * IMPORTANT: never call `supabaseData.auth.*` — a client configured with
+ * `accessToken` throws on any auth access. Session management stays entirely on
+ * the `supabase` (auth) client, used only by useAuth / sessionGuard. This client
+ * is READ-ONLY plumbing for RLS-gated data.
+ *
+ * A distinct storageKey keeps it fully isolated from both other clients.
+ */
+export const supabaseData = url && key ? createClient(url, key, {
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false,
+    storageKey: "residata-data-rls",
+  },
+  accessToken: getDataAccessToken,
+  global: { fetch: makeDataTimeoutFetch() },
 }) : null;
 
 /**

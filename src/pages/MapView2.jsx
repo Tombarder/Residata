@@ -23,7 +23,7 @@ import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useProjects } from "../lib/useData";
 import { useCountry } from "../lib/useCountry";
-import { supabase, supabasePublic, isSupabaseReady } from "../lib/supabase";
+import { supabase, supabaseData, supabasePublic, isSupabaseReady } from "../lib/supabase";
 import {
   LENSES, COMPLETION, NO_DATA, ppm2Of, metricValue, completionBucket,
   tertiles, colorFor, coverage, circlePolygon, computeCompetitiveSet, computePolygonSet, computeCorridorSet,
@@ -271,7 +271,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
     let cancelled = false;
     (async () => {
       try {
-        const { data, error } = await supabase.from("user_map_areas")
+        const { data, error } = await supabaseData.from("user_map_areas")
           .select("id, name, shape, country").order("created_at", { ascending: false });
         if (error) throw error;
         const dbAreas = (data || []).map((r) => ({ id: r.id, name: r.name, shape: r.shape, country: r.country }));

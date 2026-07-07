@@ -1,7 +1,37 @@
 import { useEffect, useState, useRef, useCallback } from "react";
-import { supabase, supabasePublic, isSupabaseReady } from "./supabase";
+import { supabaseData, supabasePublic, isSupabaseReady } from "./supabase";
 import { useAuth } from "./useAuth";
 import { useCountry, isAllCountries } from "./useCountry";
+
+/**
+ * sbRead — the single settle-guarantee wrapper every RLS-gated read goes through.
+ *
+ * All authed reads now run on `supabaseData` (see supabase.js), which already
+ * (a) never blocks on getSession() and (b) aborts a dead socket after 35s — so
+ * the underlying promise always settles. sbRead is the belt-and-suspenders app
+ * layer on top: it converts ANY thrown rejection into `{data:null, error}` and
+ * hard-caps the total wait, so a hook's `loading` flag can NEVER be stranded on
+ * "Loading…" regardless of what the library or network does. This is the piece
+ * that stops the bug from ever reappearing in a NEW hook: as long as a read is
+ * wrapped in sbRead, it is structurally incapable of hanging the UI.
+ */
+const READ_HARD_CAP_MS = 40000;
+function sbRead(builder) {
+  let capTimer = null;
+  const settled = Promise.resolve(builder).then(
+    (r) => r,
+    (error) => ({ data: null, error: error || new Error("read failed") })
+  );
+  const cap = new Promise((resolve) => {
+    capTimer = setTimeout(
+      () => resolve({ data: null, error: { message: "read timed out (client cap)", code: "CLIENT_TIMEOUT" } }),
+      READ_HARD_CAP_MS
+    );
+  });
+  // Clear the backstop timer as soon as the real read settles, so rapid
+  // navigation doesn't leave a fleet of 40s timers pending.
+  return Promise.race([settled, cap]).finally(() => { if (capTimer) clearTimeout(capTimer); });
+}
 
 // Cross-market "All" view helpers: drop the country filter on table reads and
 // pass NULL to RPCs (every RPC treats p_country NULL as "all markets"). All
@@ -50,9 +80,9 @@ export async function fetchFlatsForProjects(country, projectIds, opts = {}) {
   const ids = projectIds.slice(0, 400);   // URL-length / sanity cap
   const all = [];
   for (let page = 0; page < 3; page++) {   // up to ~3000 rows; modal caps at 1000
-    let q = _eqCountry(supabase.from(table).select("*"), country).in("project_id", ids);
+    let q = _eqCountry(supabaseData.from(table).select("*"), country).in("project_id", ids);
     if (!isCurrent && Array.isArray(months) && months.length) q = q.in("snapshot_month", months);
-    const { data, error } = await q.range(page * 1000, page * 1000 + 999).order("id", { ascending: true });
+    const { data, error } = await sbRead(q.range(page * 1000, page * 1000 + 999).order("id", { ascending: true }));
     if (error || !data || data.length === 0) break;
     all.push(...data);
     if (data.length < 1000) break;
@@ -889,10 +919,10 @@ export function useProjectFlats(projectId) {
       // Reading from here guarantees the per-project flat list shows
       // the same data as the Pivot's "Latest month" mode and the
       // homepage ticker — single source of truth.
-      return await supabase.from("flats_current")
+      return await sbRead(supabaseData.from("flats_current")
         .select("*")
         .eq("project_id", projectId)
-        .order("poschodie", { ascending: true });
+        .order("poschodie", { ascending: true }));
     };
 
     // Fallback for manual projects (Altum, Bory) — they're updated
@@ -902,21 +932,21 @@ export function useProjectFlats(projectId) {
     // recent batch that exists for THIS project specifically.
     const fetchMostRecentForProject = async () => {
       // First: find most recent batch_timestamp for this project
-      const probe = await supabase.from("flats_archive")
+      const probe = await sbRead(supabaseData.from("flats_archive")
         .select("batch_id, batch_timestamp")
         .eq("project_id", projectId)
         .order("batch_timestamp", { ascending: false, nullsFirst: false })
-        .limit(1);
+        .limit(1));
       if (probe.error || !probe.data || probe.data.length === 0) {
         return { data: [], error: probe.error };
       }
       const latestBatch = probe.data[0].batch_id;
       // Then fetch all flats for that specific batch
-      return await supabase.from("flats_archive")
+      return await sbRead(supabaseData.from("flats_archive")
         .select("*")
         .eq("project_id", projectId)
         .eq("batch_id", latestBatch)
-        .order("poschodie", { ascending: true });
+        .order("poschodie", { ascending: true }));
     };
 
     (async () => {
@@ -1056,9 +1086,9 @@ export function useFlatsCurrent(enabled = true) {
       // never had more than ~5.5k rows in flats_current; this is a guardrail.
       const MAX_TOTAL = 200_000;
       while (offset < MAX_TOTAL) {
-        const { data, error } = await _eqCountry(supabase.from("flats_current").select("*"), country)
+        const { data, error } = await sbRead(_eqCountry(supabaseData.from("flats_current").select("*"), country)
           .range(offset, offset + PAGE - 1)
-          .order("id", { ascending: true });
+          .order("id", { ascending: true }));
         if (cancelled) return;
         if (error) {
           console.error("[useFlatsCurrent]", error);
@@ -1174,7 +1204,7 @@ export function useFlatsArchive(months, dates, enabled = true) {
       // returns a tiny page size for a huge table.
       const MAX_TOTAL = 500_000;
       while (offset < MAX_TOTAL) {
-        let q = _eqCountry(supabase.from("flats_archive").select("*"), country)
+        let q = _eqCountry(supabaseData.from("flats_archive").select("*"), country)
           .range(offset, offset + REQUESTED_PAGE - 1)
           .order("batch_timestamp", { ascending: false, nullsFirst: false })
           .order("id", { ascending: true });
@@ -1189,7 +1219,7 @@ export function useFlatsArchive(months, dates, enabled = true) {
           hi.setUTCDate(hi.getUTCDate() + 1);
           q = q.gte("batch_timestamp", datesArr[0]).lt("batch_timestamp", hi.toISOString().slice(0, 10));
         }
-        const { data, error } = await q;
+        const { data, error } = await sbRead(q);
         if (cancelled) return;
         if (error) {
           console.error("[useFlatsArchive]", error);
@@ -1272,10 +1302,10 @@ export function useArchiveMonths() {
     if (!isSupabaseReady()) { setLoading(false); return; }
     let cancelled = false;
     (async () => {
-      const { data, error } = await supabase
+      const { data, error } = await sbRead(supabaseData
         .from("archive_months")
         .select("snapshot_month")
-        .order("snapshot_month", { ascending: false });
+        .order("snapshot_month", { ascending: false }));
       if (cancelled) return;
       if (error) {
         console.error("[useArchiveMonths]", error);
@@ -1318,7 +1348,7 @@ export function useArchiveDays() {
     if (_archiveDaysCache.has(country)) { setDays(_archiveDaysCache.get(country)); setLoading(false); return; }
     let cancelled = false;
     (async () => {
-      const { data, error } = await _eqCountry(supabase.from("archive_days").select("day"), country).order("day", { ascending: false });
+      const { data, error } = await sbRead(_eqCountry(supabaseData.from("archive_days").select("day"), country).order("day", { ascending: false }));
       if (cancelled) return;
       if (error) { console.error("[useArchiveDays]", error); setLoading(false); return; }
       const seen = new Set(); const arr = [];
@@ -1352,7 +1382,7 @@ export function usePivotGrain({ enabled = false, spec = null } = {}) {
     let cancelled = false;
     setLoading(true);
     (async () => {
-      const { data, error } = await supabase.rpc("analytics_pivot", { p_spec: spec });
+      const { data, error } = await sbRead(supabaseData.rpc("analytics_pivot", { p_spec: spec }));
       if (cancelled) return;
       if (error) { console.error("[usePivotGrain]", error); setGrain([]); setLoading(false); return; }
       const arr = Array.isArray(data) ? data : [];
@@ -1405,7 +1435,7 @@ export function usePivotDistinct({ enabled = false, field = null, months = null,
     let cancelled = false;
     setLoading(true);
     (async () => {
-      const { data, error } = await supabase.rpc("analytics_pivot", { p_spec: spec });
+      const { data, error } = await sbRead(supabaseData.rpc("analytics_pivot", { p_spec: spec }));
       if (cancelled) return;
       if (error) { console.error("[usePivotDistinct]", error); setResult({ values: [], hasEmpty: false }); setLoading(false); return; }
       const rows = Array.isArray(data) ? data : [];
@@ -1457,13 +1487,13 @@ export function usePivotFieldStats({ enabled = false, field = null, months = nul
     let cancelled = false;
     setLoading(true);
     (async () => {
-      const { data, error } = await supabase.rpc("report_field_stats", {
+      const { data, error } = await sbRead(supabaseData.rpc("report_field_stats", {
         p_field: field,
         p_country: _pCountry(country),
         p_months: months && months.length ? months : null,
         p_dates: dates && dates.length ? dates : null,
         p_stav: stav && stav.length ? stav : null,
-      });
+      }));
       if (cancelled) return;
       if (error || !data || data.min == null) {   // null min ⇒ no rows visible (anon/empty)
         if (error) console.error("[usePivotFieldStats]", error);
@@ -1522,10 +1552,10 @@ export function useUnitSummaries({ projectId = null, all = false } = {}) {
     let cancelled = false;
     setLoading(true);
     (async () => {
-      const { data, error } = await supabase.rpc("unit_list_json", {
+      const { data, error } = await sbRead(supabaseData.rpc("unit_list_json", {
         p_country: _pCountry(country),
         p_project_id: projectId,   // null when scope === 'all'
-      });
+      }));
       if (cancelled) return;
       if (error) { console.error("[useUnitSummaries]", error); setLoading(false); return; }
       const arr = _toEurDisplay(Array.isArray(data) ? data : []);
@@ -1571,7 +1601,7 @@ export function useUnitHistories(keys) {
         const sep = k.indexOf("::");
         const pid = k.slice(0, sep);
         const uid = k.slice(sep + 2);
-        const { data, error } = await supabase.rpc("unit_history", { p_project_id: pid, p_unit_id: uid });
+        const { data, error } = await sbRead(supabaseData.rpc("unit_history", { p_project_id: pid, p_unit_id: uid }));
         if (error) { console.error("[useUnitHistories]", k, error); _unitHistCache.set(`${idPrefix}::${k}`, []); return; }
         _unitHistCache.set(`${idPrefix}::${k}`, _toEurDisplay(data || []));
       }));
@@ -1606,9 +1636,9 @@ export function useUnitSearch({ query, projectIds, enabled }) {
     setLoading(true);
     // Debounce so we don't fire a query on every keystroke.
     const timer = setTimeout(async () => {
-      const { data, error } = await supabase.rpc("unit_search", {
+      const { data, error } = await sbRead(supabaseData.rpc("unit_search", {
         p_country: _pCountry(country), p_q: q, p_project_ids: pids, p_limit: 40,
-      });
+      }));
       if (cancelled) return;
       if (error) { console.error("[useUnitSearch]", error); setResults([]); setLoading(false); return; }
       setResults(_toEurDisplay(Array.isArray(data) ? data : []));
@@ -1638,7 +1668,7 @@ export function useProjectUnitsSeries(projectId) {
     let cancelled = false;
     setLoading(true);
     (async () => {
-      const { data, error } = await supabase.rpc("project_units_series", { p_project_id: projectId });
+      const { data, error } = await sbRead(supabaseData.rpc("project_units_series", { p_project_id: projectId }));
       if (cancelled) return;
       if (error) { console.error("[useProjectUnitsSeries]", error); setLoading(false); return; }
       const arr = _toEurDisplay(Array.isArray(data) ? data : []);   // overlays cena_s_dph; series stays EUR
@@ -1672,9 +1702,9 @@ export function useReportHistogram({ scopeType = "market", scopeValue = null, nb
     let cancelled = false;
     setLoading(true);
     (async () => {
-      const { data, error } = await supabase.rpc("report_price_histogram", {
+      const { data, error } = await sbRead(supabaseData.rpc("report_price_histogram", {
         p_country: _pCountry(country), p_scope_type: scopeType, p_scope_value: scopeValue, p_nbins: nbins,
-      });
+      }));
       if (cancelled) return;
       if (error) { console.error("[useReportHistogram]", error); setBins([]); setLoading(false); return; }
       const arr = Array.isArray(data) ? data : [];
@@ -1693,9 +1723,9 @@ export function useReportHistogram({ scopeType = "market", scopeValue = null, nb
  *  with price in EUR so moneyFromEur() renders the display currency. */
 export async function fetchReportBinUnits({ country = null, scopeType = "market", scopeValue = null, from = 0, to = 1e9 } = {}) {
   if (!isSupabaseReady()) return [];
-  const { data, error } = await supabase.rpc("report_bin_units", {
+  const { data, error } = await sbRead(supabaseData.rpc("report_bin_units", {
     p_country: _pCountry(country), p_scope_type: scopeType, p_scope_value: scopeValue, p_m2_from: from, p_m2_to: to,
-  });
+  }));
   if (error) { console.error("[fetchReportBinUnits]", error); return []; }
   return (Array.isArray(data) ? data : []).map((r) => ({
     flatId: `${r.project_id}-${r.unit_id}`,
@@ -1726,7 +1756,7 @@ export function useReportProjectUnits(projectId) {
     let cancelled = false;
     setLoading(true);
     (async () => {
-      const { data, error } = await supabase.rpc("report_project_units", { p_project_id: projectId });
+      const { data, error } = await sbRead(supabaseData.rpc("report_project_units", { p_project_id: projectId }));
       if (cancelled) return;
       if (error) { console.error("[useReportProjectUnits]", error); setLoading(false); return; }
       const arr = _toEurDisplay(Array.isArray(data) ? data : []);
@@ -1755,7 +1785,7 @@ export function useReportComparables() {
     let cancelled = false;
     setLoading(true);
     (async () => {
-      const { data, error } = await supabase.rpc("report_comparables", { p_country: _pCountry(country) });
+      const { data, error } = await sbRead(supabaseData.rpc("report_comparables", { p_country: _pCountry(country) }));
       if (cancelled) return;
       if (error) { console.error("[useReportComparables]", error); setLoading(false); return; }
       const arr = _toEurDisplay(Array.isArray(data) ? data : []);
@@ -1803,7 +1833,7 @@ export function useUnitsDetail({ enabled = false, spec = null } = {}) {
     let cancelled = false;
     setLoading(true);
     (async () => {
-      const { data, error } = await supabase.rpc("analytics_units", { p_spec: spec });
+      const { data, error } = await sbRead(supabaseData.rpc("analytics_units", { p_spec: spec }));
       if (cancelled) return;
       if (error) { console.error("[useUnitsDetail]", error); setRows([]); setHasMore(false); setLoading(false); return; }
       const all = Array.isArray(data?.rows) ? data.rows : [];
@@ -1836,7 +1866,7 @@ export function useUnitsInfinite({ enabled = false, spec = null, pageSize = 100 
     setLoading(true);
     try {
       const pageSpec = { ...spec, limit: pageSize, offset: offsetRef.current };
-      const { data, error } = await supabase.rpc("analytics_units", { p_spec: pageSpec });
+      const { data, error } = await sbRead(supabaseData.rpc("analytics_units", { p_spec: pageSpec }));
       if (gen !== genRef.current) return;               // superseded by a newer query → drop this page
       if (error) { console.error("[useUnitsInfinite]", error); return; }
       const all = Array.isArray(data?.rows) ? data.rows : [];
@@ -1878,7 +1908,7 @@ export function useAnalyticsRegistry() {
     if (_analyticsRegistryCache) { setReg(_analyticsRegistryCache); setLoading(false); return; }
     if (!isSupabaseReady()) { setLoading(false); return; }
     let cancelled = false;
-    supabase.rpc("analytics_registry").then(({ data, error }) => {
+    sbRead(supabaseData.rpc("analytics_registry")).then(({ data, error }) => {
       if (cancelled) return;
       if (error || !data) { console.error("[useAnalyticsRegistry]", error); setLoading(false); return; }
       _analyticsRegistryCache = data;

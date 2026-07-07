@@ -6,7 +6,7 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useCountry, isAllCountries } from "../lib/useCountry";
 import { useUnitsInfinite, useAnalyticsRegistry, usePivotDistinct } from "../lib/useData";
-import { supabase } from "../lib/supabase";
+import { supabaseData } from "../lib/supabase";
 
 // sessionStorage key: the project set handed from a filtered analytics view to the map.
 export const MAP_PROJECT_SET_KEY = "residata.mapProjectSet";
@@ -220,7 +220,7 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
       const p_spec = { dims: ["project_name"], filters: spec.filters, mode: spec.mode };
       if (spec.filters_not) p_spec.filters_not = spec.filters_not;
       if (spec.ranges) p_spec.ranges = spec.ranges;
-      const { data, error } = await supabase.rpc("analytics_pivot", { p_spec });
+      const { data, error } = await supabaseData.rpc("analytics_pivot", { p_spec });
       const names = error ? [] : (Array.isArray(data) ? data : []).map((r) => r?.d?.[0]).filter(Boolean);
       sessionStorage.setItem(MAP_PROJECT_SET_KEY, JSON.stringify({ names, count: names.length, source: "explorer", ts: Date.now() }));
       // setCurrent (handleNav) actually switches the SPA page AND updates the URL; a bare
