@@ -191,8 +191,13 @@ export function pointInRing(lng, lat, ring) {
 
 /** Aggregate a set of projects into the competitive-panel shape. Shared by the
  *  radius (computeCompetitiveSet) and polygon (computePolygonSet) selections so an
- *  area never reports two different medians / absorption figures. */
-function summarizeSet(inside, coords) {
+ *  area never reports two different medians / absorption figures.
+ *
+ *  Exported so the panel can RE-aggregate a subset — e.g. the same area's stats
+ *  with the developer's own (or other) projects removed — through the identical
+ *  code path, guaranteeing the "excluded from average" figures are computed the
+ *  same way as the full-set figures (no parallel math to drift). */
+export function summarizeSet(inside, coords) {
   const placeholderCount = inside.filter((p) => coords[p.id] && !coords[p.id].verified).length;
   const priced = inside.map(ppm2Of).filter((v) => v > 0).sort((a, b) => a - b);
   const soldLastMonth = inside.reduce((s, p) => s + (Number(p.sold_last_month) || 0), 0);
