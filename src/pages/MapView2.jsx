@@ -669,11 +669,22 @@ export default function MapView2({ lang = "en", setCurrent }) {
           </div>
         ))}
 
-        <div style={{ position: "absolute", top: 12, right: 12, width: 300, maxWidth: "calc(100% - 24px)", maxHeight: "calc(100% - 24px)", overflowY: "auto", background: "rgba(14,14,16,0.97)", border: `1px solid ${border}`, borderRadius: 12, boxShadow: "0 12px 30px rgba(0,0,0,0.5)", padding: "14px 15px" }}>
+        <div style={{ position: "absolute", top: 12, left: 12, width: 310, maxWidth: "calc(100% - 24px)", maxHeight: "calc(100% - 24px)", overflowY: "auto", background: "rgba(14,14,16,0.97)", border: `1px solid ${border}`, borderRadius: 12, boxShadow: "0 12px 30px rgba(0,0,0,0.5)", padding: "14px 15px", zIndex: 30 }}>
           {!selection ? (
-            <div style={{ color: dim, fontSize: "0.8rem", lineHeight: 1.6 }}>
-              <div style={{ color: textLight, fontWeight: 600, marginBottom: 6, fontSize: "0.85rem" }}>{sk ? "Konkurenčné okolie" : "Competitive set"}</div>
-              {sk ? "Klikni na mapu pri pozemku (okruh), alebo ▱ Oblasť / ⇢ Koridor pre vlastný tvar — zhrniem konkurenciu vnútri." : "Click the map near a site (radius), or ▱ Area / ⇢ Corridor for a custom shape — I'll summarise the competition inside."}
+            <div style={{ color: dim, fontSize: "0.8rem", lineHeight: 1.5 }}>
+              <div style={{ color: textLight, fontWeight: 700, marginBottom: 4, fontSize: "0.92rem" }}>{sk ? "Prieskum konkurencie v okolí" : "Competition in an area"}</div>
+              <div style={{ marginBottom: 12 }}>
+                {sk
+                  ? "Vyber si oblasť na mape a ukážem ti všetky projekty vnútri — medián €/m², vypredanosť, developerov, dokončenie aj celý zoznam."
+                  : "Pick an area on the map and I'll summarise every project inside — median €/m², absorption, developers, completion and the full list."}
+              </div>
+              <div style={{ color: dim, fontSize: "0.66rem", textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 7 }}>{sk ? "Ako začať — 3 spôsoby" : "How to start — 3 ways"}</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+                <div><span style={{ color: green, fontWeight: 600 }}>◎ {sk ? "Klikni na mapu" : "Click the map"}</span><br />{sk ? "okruh okolo bodu — jeho veľkosť si nastavíš posuvníkom." : "a radius around that point — set its size with the slider."}</div>
+                <div><span style={{ color: amber, fontWeight: 600 }}>▱ {sk ? "Oblasť" : "Area"}</span> <span style={{ color: dim }}>({sk ? "tlačidlo hore" : "button above"})</span><br />{sk ? "nakresli vlastný tvar: klikaj rohy, dvojklik ukončí." : "draw a custom shape: click the corners, double-click to finish."}</div>
+                <div><span style={{ color: amber, fontWeight: 600 }}>⇢ {sk ? "Koridor" : "Corridor"}</span> <span style={{ color: dim }}>({sk ? "tlačidlo hore" : "button above"})</span><br />{sk ? "nakresli trasu + šírku — napr. pás okolo električky." : "draw a route + a width — e.g. a band along a tram line."}</div>
+              </div>
+              <div style={{ fontSize: "0.68rem", color: dim, marginTop: 10, fontStyle: "italic" }}>{sk ? "Tip: body sa dajú ťahať, oblasť sa dá uložiť." : "Tip: drag the points to reshape, and save an area to reuse it."}</div>
               {savedAreas.length > 0 && (
                 <div style={{ marginTop: 14, borderTop: `1px solid ${border}`, paddingTop: 12 }}>
                   <div style={{ fontSize: "0.7rem", color: dim, marginBottom: 7 }}>☆ {sk ? "Uložené oblasti" : "Saved areas"}</div>
