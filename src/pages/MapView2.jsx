@@ -189,10 +189,10 @@ export default function MapView2({ lang = "en", setCurrent }) {
   const [compFilter, setCompFilter] = useState(null); // completion bucket the project list is drilled into (null = all)
   const dismissExplainer = () => { setShowExplainer(false); try { localStorage.setItem("residata_map_explainer_hidden", "1"); } catch (_) {} };
   const reopenExplainer = () => { setShowExplainer(true); try { localStorage.removeItem("residata_map_explainer_hidden"); } catch (_) {} };
-  const drawToolRef = useRef(null); drawToolRef.current = drawTool;
-  const ptsRef = useRef([]); ptsRef.current = pts;
-  const corridorKmRef = useRef(0.4); corridorKmRef.current = corridorKm;
-  const shapeRef = useRef(null); shapeRef.current = shape;
+  const drawToolRef = useRef(null);
+  const ptsRef = useRef([]);
+  const corridorKmRef = useRef(0.4);
+  const shapeRef = useRef(null);
   const mapClickRef = useRef(() => {});
   const finishRef = useRef(() => {});
   const setVertexRef = useRef(() => {});
@@ -208,7 +208,6 @@ export default function MapView2({ lang = "en", setCurrent }) {
     if (kind === "polygon" && p.length >= 3) { setShape({ kind: "polygon", ring: [...p, p[0]] }); setPts([]); setDrawTool(null); }
     else if (kind === "corridor" && p.length >= 2) { setShape({ kind: "corridor", line: [...p], widthKm: corridorKmRef.current }); setPts([]); setDrawTool(null); }
   };
-  finishRef.current = finishDraw;
   // Move vertex i live — updates the in-progress pts or the finished shape.
   const setVertex = (i, lng, lat) => {
     if (drawToolRef.current) { setPts((p) => p.map((c, k) => (k === i ? [lng, lat] : c))); return; }
@@ -216,9 +215,8 @@ export default function MapView2({ lang = "en", setCurrent }) {
     if (s.kind === "polygon") { const v = s.ring.slice(0, -1).map((c, k) => (k === i ? [lng, lat] : c)); setShape({ ...s, ring: [...v, v[0]] }); }
     else if (s.kind === "corridor") { setShape({ ...s, line: s.line.map((c, k) => (k === i ? [lng, lat] : c)) }); }
   };
-  setVertexRef.current = setVertex;
   // Map click: add a vertex (or close the polygon when clicking near its first point); else radius.
-  mapClickRef.current = (e, map) => {
+  const handleMapClick = (e, map) => {
     if (draggingRef.current) return;
     const tool = drawToolRef.current;
     if (tool) {
@@ -234,6 +232,21 @@ export default function MapView2({ lang = "en", setCurrent }) {
     if (hit && hit.length) return;
     setAnalysisCenter({ lng: e.lngLat.lng, lat: e.lngLat.lat }); setAnchorId(null);
   };
+  // Mirror the latest state + callbacks into refs AFTER commit — never during
+  // render (that's the react-hooks/refs anti-pattern and double-runs under
+  // StrictMode). The maplibre handlers registered once in the map-init effect
+  // read these refs, so they always see the freshest values without
+  // re-subscribing. Every read happens inside an async handler, so a one-tick-
+  // late ref is never observed.
+  useEffect(() => {
+    drawToolRef.current = drawTool;
+    ptsRef.current = pts;
+    corridorKmRef.current = corridorKm;
+    shapeRef.current = shape;
+    finishRef.current = finishDraw;
+    setVertexRef.current = setVertex;
+    mapClickRef.current = handleMapClick;
+  });
   const setCorridorWidth = (v) => { setCorridorKm(v); setShape((s) => (s && s.kind === "corridor" ? { ...s, widthKm: v } : s)); };
   // Saved areas are DB-backed (public.user_map_areas, RLS per-user → follow the user
   // across devices) with a localStorage cache/fallback so the UI is instant and still
