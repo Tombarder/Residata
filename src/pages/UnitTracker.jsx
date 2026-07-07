@@ -308,8 +308,8 @@ export default function UnitTracker({ lang = "sk", setCurrent }) {
         </h2>
         <p style={{ color: dim, fontSize: "0.88rem", lineHeight: 1.55, margin: "0.4rem 0 0", maxWidth: 720 }}>
           {L(
-            "Vyber projekt a byt, uvidíš vývoj jeho ceny, zmeny stavu, kedy sa prvýkrát objavil a kedy sa predal. Porovnaj až 4 byty naraz. Dáta sa rozširujú každý mesiac — graf rastie sám.",
-            "Pick a project + unit to see its price history, status changes, first listing and sold date. Compare up to 4 units side-by-side. Data accumulates monthly — the chart grows on its own."
+            "Vyber projekt a byt, uvidíš vývoj jeho ceny, zmeny stavu, kedy sa prvýkrát objavil a kedy sa predal. Porovnaj až 4 byty naraz. Dáta sa rozširujú priebežne — graf rastie sám.",
+            "Pick a project + unit to see its price history, status changes, first listing and sold date. Compare up to 4 units side-by-side. Data accumulates over time — the chart grows on its own."
           )}
         </p>
       </div>

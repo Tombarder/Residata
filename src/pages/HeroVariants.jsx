@@ -255,7 +255,7 @@ export function V2_IsometricFlow({ lang = "en" }) {
           {lang === "sk" ? "72 webov → 1 dashboard" : "72 sites → 1 dashboard"}
         </text>
         <text x="600" y="85" textAnchor="middle" fill={dim} fontFamily="'Outfit', sans-serif" fontSize="14">
-          {lang === "sk" ? "Plne automatizovaná pipeline, každý mesiac" : "Fully automated pipeline, every month"}
+          {lang === "sk" ? "Plne automatizovaná pipeline, každý deň" : "Fully automated pipeline, every day"}
         </text>
       </svg>
     </div>
@@ -532,13 +532,13 @@ export function V4_MatrixRain({ lang = "en" }) {
             {lang === "sk" ? "Raw output" : "Raw output"}
           </div>
           <h2 style={{ fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 700, letterSpacing: "-0.03em", lineHeight: 1.1, color: "#fff", margin: 0, textShadow: "0 2px 32px rgba(0,0,0,0.9)" }}>
-            {lang === "sk" ? "Každý byt, každý mesiac," : "Every unit, every month,"}<br />
+            {lang === "sk" ? "Každý byt, každý deň," : "Every unit, every day,"}<br />
             <span style={{ color: green }}>{lang === "sk" ? "štruktúrovane." : "structured."}</span>
           </h2>
           <p style={{ color: "#c0c0c8", fontSize: "1rem", marginTop: "1rem", lineHeight: 1.6, maxWidth: 480, margin: "1rem auto 0", textShadow: "0 2px 16px rgba(0,0,0,0.9)" }}>
             {lang === "sk"
-              ? "Každý byt každého aktívneho projektu. Mesačne. Export do Google Sheets, CSV, alebo priamo do vášho systému cez API."
-              : "Every unit of every active project. Monthly. Export to Google Sheets, CSV, or straight into your stack via API."}
+              ? "Každý byt každého aktívneho projektu. Denne. Export do Google Sheets, CSV, alebo priamo do vášho systému cez API."
+              : "Every unit of every active project. Refreshed daily. Export to Google Sheets, CSV, or straight into your stack via API."}
           </p>
         </div>
       </div>

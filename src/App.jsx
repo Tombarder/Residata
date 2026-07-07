@@ -125,7 +125,7 @@ const COUNTRY_LOCALIZE = {
           "What's the realistic price range for 60m² in Modřany — and where does 90% of demand sit?",
           "Which competitor projects are about to sell out — what can I learn from their pricing?",
         ],
-        flexDesc: "Need weekly updates instead of monthly? Want to expand into Poland, Austria, or another market? Need a custom output format for your internal tools or a different property segment? The pipeline is built to be reconfigured — we adapt scope, frequency, and delivery to match your workflow.",
+        flexDesc: "Want to expand into Poland, Austria, or another market? Need a custom output format for your internal tools or a different property segment? The pipeline is built to be reconfigured — we adapt scope, frequency, and delivery to match your workflow.",
       },
       sk: {
         questions: [
@@ -149,12 +149,12 @@ const COUNTRY_LOCALIZE = {
       en: {
         heroTitle1: "Slovak & Czech residential market,",
         heroSub: "We monitor every new residential development across Slovakia and Czechia and turn scattered listings into actionable market intelligence — so you can make pricing, investment, and portfolio decisions based on data.",
-        valueDesc: "Every month you get a full snapshot of the Slovak & Czech new-build market — unit-level data across every active project, plus the insights you need to act on it.",
+        valueDesc: "A complete picture of the Slovak & Czech new-build market, refreshed daily — unit-level data across every active project, plus the insights you need to act on it.",
         dataContext: "Slovak & Czech New-Build Market",
       },
       sk: {
         heroTitle1: "Novostavby na Slovensku a v Česku.",
-        valueDesc: "Každý mesiac dostanete kompletný prehľad trhu novostavieb na Slovensku a v Česku — každý byt, každý projekt. A to aj s insightmi, na základe ktorých viete hneď konať.",
+        valueDesc: "Kompletný prehľad trhu novostavieb na Slovensku a v Česku, aktualizovaný každý deň — každý byt, každý projekt. A to aj s insightmi, na základe ktorých viete hneď konať.",
         dataContext: "Trh novostavieb Slovensko a Česko",
       },
     },
@@ -1560,7 +1560,7 @@ function DataPage({ setCurrent, l, lang }) {
                   </div>
                 ))}
                 <div style={{ marginTop: "0.75rem", color: "#44444e" }}>---</div>
-                <div style={{ marginTop: "0.25rem" }}><span style={{ color: "#f5a623" }}>refresh</span><span style={{ color: "#44444e" }}>: </span><span style={{ color: "#c8c8d4" }}>monthly</span></div>
+                <div style={{ marginTop: "0.25rem" }}><span style={{ color: "#f5a623" }}>refresh</span><span style={{ color: "#44444e" }}>: </span><span style={{ color: "#c8c8d4" }}>daily</span></div>
                 <div><span style={{ color: "#f5a623" }}>output</span><span style={{ color: "#44444e" }}>: </span><span style={{ color: "#c8c8d4" }}>google_sheets | csv | xlsx</span></div>
                 <div><span style={{ color: "#f5a623" }}>encoding</span><span style={{ color: "#44444e" }}>: </span><span style={{ color: "#c8c8d4" }}>utf-8</span></div>
               </div>

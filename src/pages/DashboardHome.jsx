@@ -27,7 +27,7 @@ import { createPortal } from "react-dom";
 import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
 import {
-  useProjects, useMarketTotals, useVelocityMature, useDistrictTotals,
+  useProjects, useMarketTotals, useVelocityMature, useDistrictTotals, useFreshness,
 } from "../lib/useData";
 import { supabaseData } from "../lib/supabase";
 import { useCountry, isAllCountries, countryName } from "../lib/useCountry";
@@ -387,6 +387,8 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
   const velocityMature = useVelocityMature();
   const { districts } = useDistrictTotals();
   const snapshots = useProjectHistory();
+  const freshness = useFreshness(); // last data date (YYYY-MM-DD) — data refreshes daily
+  const fmtDate = (d) => { try { return new Date(d).toLocaleDateString(localeTag(lang), { day: "numeric", month: "short", year: "numeric" }); } catch { return d; } };
 
   const { config, loading: cfgLoading, saveState, setConfig, resetToDefault } = useDashboardConfig();
 
@@ -476,8 +478,8 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
       <h2 style={{ fontSize: "1.5rem", fontWeight: 600, color: textLight, margin: "0 0 0.2rem" }}>{greeting}</h2>
       <p style={{ color: dim, fontSize: "0.9rem", lineHeight: 1.55, margin: "0 0 1.4rem" }}>
         {lang === "sk"
-          ? <>Tvoj osobný prehľad trhu novostavieb. Dáta sa obnovujú mesačne — posledný beh za mesiac <strong style={{ color: textLight }}>{marketTotals.snapshotMonth || "—"}</strong>.</>
-          : <>Your personal new-build market overview. Data refreshes monthly — last run for month <strong style={{ color: textLight }}>{marketTotals.snapshotMonth || "—"}</strong>.</>}
+          ? <>Tvoj osobný prehľad trhu novostavieb. Dáta sa obnovujú <strong style={{ color: textLight }}>každý deň</strong>{freshness ? <> — naposledy aktualizované <strong style={{ color: textLight }}>{fmtDate(freshness)}</strong></> : null}.</>
+          : <>Your personal new-build market overview. Data refreshes <strong style={{ color: textLight }}>daily</strong>{freshness ? <> — last updated <strong style={{ color: textLight }}>{fmtDate(freshness)}</strong></> : null}.</>}
       </p>
 
       {showTrialOffer && <TrialOfferBanner lang={lang} onActivate={trialOffer.start} busy={trialOffer.busy} msg={trialOffer.msg} />}

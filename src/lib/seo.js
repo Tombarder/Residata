@@ -59,12 +59,12 @@ const SEO_BY_PAGE = {
     path: "/",
     en: {
       title: "Residata — New-Build Market Intelligence for Bratislava",
-      description: "Every new residential development in Bratislava, structured and refreshed monthly. Pricing, availability, absorption, and trends — built for developers, banks, valuers, and investors.",
+      description: "Every new residential development in Bratislava, structured and refreshed daily. Pricing, availability, absorption, and trends — built for developers, banks, valuers, and investors.",
       keywords: "Bratislava real estate, new-build market data, residential market intelligence, absorption rate, property market Slovakia, €/m² trends",
     },
     sk: {
       title: "Residata — Dátový prehľad trhu novostavieb Bratislava",
-      description: "Každý aktívny projekt novostavby v Bratislave na jednom mieste. Ceny, dostupnosť, rýchlosť predaja a trendy — aktualizované každý mesiac. Pre developerov, banky, odhadcov a investorov.",
+      description: "Každý aktívny projekt novostavby v Bratislave na jednom mieste. Ceny, dostupnosť, rýchlosť predaja a trendy — aktualizované každý deň. Pre developerov, banky, odhadcov a investorov.",
       keywords: "novostavby Bratislava, trh novostavieb, ceny bytov, market intelligence, dáta nehnuteľnosti, €/m² trendy, rýchlosť predaja",
     },
   },

@@ -322,7 +322,7 @@ export function PipelineFlow({ lang = "en" }) {
 
     z1Line1: "Dáta zbierame",
     z1Live: `z ${fmt(devCount, "sk-SK")} developerov · ${fmt(projCount, "sk-SK")} projektov`,
-    z1Foot: "každý mesiac, bez výnimiek",
+    z1Foot: "každý deň, bez výnimiek",
 
     z2Line1: "Normalizácia a validácia",
     z2Chip: "PRIPRAVENÉ · DEDUPLIKOVANÉ",
@@ -330,8 +330,8 @@ export function PipelineFlow({ lang = "en" }) {
     z3Line1: "Živý trhový prehľad",
     z3Foot: "pre vaše rozhodnutia podložené dátami",
     z3Chips: ["Sheets", "CSV", "API"],
-    z3Cap1: "MESAČNÁ AKTUALIZÁCIA",
-    z3Cap2: "alebo týždenne na vyžiadanie",
+    z3Cap1: "DENNÁ AKTUALIZÁCIA",
+    z3Cap2: "vždy aktuálny stav trhu",
 
     // 3 KPI karty pod SVG-scénou. 4. karta "bytov v datasete" sme pustili
     // — duplikovala totožné číslo z MarketPulse nižšie. Toto je "o nás /
@@ -347,7 +347,7 @@ export function PipelineFlow({ lang = "en" }) {
 
     z1Line1: "Data collected",
     z1Live: `from ${fmt(devCount, "en-US")} developers · ${fmt(projCount, "en-US")} projects`,
-    z1Foot: "every month",
+    z1Foot: "every day",
 
     z2Line1: "Standardize & validate",
     z2Chip: "READY · DEDUPED",
@@ -355,8 +355,8 @@ export function PipelineFlow({ lang = "en" }) {
     z3Line1: "Real-time market intelligence",
     z3Foot: "for your data-driven decisions",
     z3Chips: ["Sheets", "CSV", "API"],
-    z3Cap1: "MONTHLY AUTO-REFRESH",
-    z3Cap2: "or weekly on demand",
+    z3Cap1: "DAILY AUTO-REFRESH",
+    z3Cap2: "always the current market",
 
     // See Slovak comment above for why this is 3 cards, not 4.
     statsLabel: ["developers", "projects tracked", "refresh cadence"],
@@ -522,7 +522,7 @@ export function PipelineFlow({ lang = "en" }) {
           { n: fmt(projTrackedCount, localeTag(lang)), label: T.statsLabel[1] },
           // 3. karta = cadence, slovný stat. "Mesačne" / "Monthly" hovorí
           // čo kupujúcemu zaujíma: ako často dostane fresh dáta.
-          { n: lang === "sk" ? "Mesačne" : "Monthly",                   label: T.statsLabel[2] },
+          { n: lang === "sk" ? "Denne" : "Daily",                       label: T.statsLabel[2] },
         ].map((s, i) => (
           <div key={i} style={{
             textAlign: "center",
@@ -838,8 +838,8 @@ export function DistrictPulse({ lang = "en", setCurrent }) {  // eslint-disable-
       : (lang === "sk" ? "podľa mestskej časti" : "by district");
   const title = lang === "sk" ? `Priemerná cena ${moneySymbol()}/m² ${levelWord}` : `Average ${moneySymbol()}/m² ${levelWord}`;
   const desc = lang === "sk"
-    ? "Skutočné dáta z aktívnych projektov. Klikni na riadok pre rozpad nižšie. Updatuje sa každý mesiac."
-    : "Real data from active projects. Click a row to drill down. Refreshes monthly.";
+    ? "Skutočné dáta z aktívnych projektov. Klikni na riadok pre rozpad nižšie. Updatuje sa každý deň."
+    : "Real data from active projects. Click a row to drill down. Refreshes daily.";
 
   // Breadcrumb trail (clickable parents).
   const crumbs = [{ label: cName, go: () => setDrill(_emptyDrill) }];
