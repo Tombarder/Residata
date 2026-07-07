@@ -1,24 +1,24 @@
 # Residata
 
-> New-build residential market intelligence for Bratislava, Slovakia.
-> Every active development, structured and refreshed monthly. Pricing,
+> New-build residential market intelligence for Slovakia and Czechia.
+> Every active development, structured and refreshed daily. Pricing,
 > availability, absorption rate, and trends — delivered to developers,
 > banks, valuers, and investors.
 
-Residata tracks every new residential construction project in Bratislava
-(the capital of Slovakia). It normalizes data from developer websites
-into a single consistent schema, refreshes the snapshot monthly, and
-delivers it as Google Sheets, CSV, XLSX, or via API.
+Residata tracks every new residential development across Slovakia and
+Czechia (Bratislava and Prague and their wider markets). It normalizes
+data from developer websites into a single consistent schema, refreshes
+it daily, and delivers it as CSV, XLSX, or via API.
 
-## Scope (April 2026 snapshot)
+## Scope (updated daily; snapshot July 2026)
 
-- City: Bratislava (Slovakia's capital)
-- Total projects in dataset: 65 new-build residential projects (current + sold-out under tracking)
-- Currently active (in market): 65 projects, 5,394 units
-- Currently for sale: 2,523 units · reserved: 348 · sold: 2,294
-- Average price across available inventory: €5,707/m²
-- Distinct active developers: 54
-- Data refresh: monthly (first of each month); weekly on request
+- Markets: Slovakia (Bratislava) and Czechia (Prague)
+- Total projects in dataset: 327 new-build residential projects (current + sold-out under tracking)
+- Currently active (in market): 274 projects, 33,247 units
+- Currently for sale: 10,170 units · reserved: 2,721 · sold: 19,659
+- Average price across available inventory: €6,182/m²
+- Distinct active developers: 188
+- Data refresh: daily
 - Languages: Slovak and English
 
 ## What Residata is for
@@ -26,7 +26,7 @@ delivers it as Google Sheets, CSV, XLSX, or via API.
 - **Developers** — price new projects against real comparables; track absorption of your and competitors' inventory; spot supply gaps by district and segment.
 - **Banks & valuers** — pull recent comparable transactions for valuation and collateral assessment; never work with stale data.
 - **Investors** — discover projects with favorable pricing, spot slowing sales velocity, identify sell-out timing.
-- **Consultants & analysts** — skip weeks of manual data collection; open one sheet with the whole Bratislava market normalized.
+- **Consultants & analysts** — skip weeks of manual data collection; open the whole Slovak and Czech new-build market, normalized.
 
 ## Pricing
 

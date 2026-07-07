@@ -60,16 +60,20 @@ async function fetchView(table, params = {}) {
   return r.json();
 }
 
-let market, districts, topProjects;
+// `market` uses public.totals_global (SK + CZ combined) so the static/LLM surfaces
+// match the daily multi-market product — NOT market_totals, which is SK-only and
+// would undercount coverage. market_totals is still fetched for snapshot_month.
+let market, districts, topProjects, skMeta;
 try {
-  [[market], districts, topProjects] = await Promise.all([
-    fetchView('market_totals'),
+  [[market], districts, topProjects, [skMeta]] = await Promise.all([
+    fetchView('totals_global'),
     fetchView('district_totals', { order: 'total_units.desc' }),
     fetchView('projects_live', {
       status: 'eq.active',
       order: 'total_units.desc',
       limit: '15',
     }),
+    fetchView('market_totals'),
   ]);
 } catch (e) {
   console.warn('[gen-static] Supabase fetch failed — keeping existing files. Error:', e.message);
@@ -78,7 +82,7 @@ try {
 
 const fmtN = (n) => n == null ? '—' : Number(n).toLocaleString('en-US');
 const today = new Date().toISOString().slice(0, 10);
-const month = market?.snapshot_month || today.slice(0, 7);
+const month = skMeta?.snapshot_month || today.slice(0, 7);
 const monthLabel = (() => {
   const [y, m] = month.split('-');
   const dt = new Date(Number(y), Number(m) - 1, 1);
@@ -88,25 +92,25 @@ const monthLabel = (() => {
 // ───────────────────── llms.txt — short summary ─────────────────────
 const llms = `# Residata
 
-> New-build residential market intelligence for Bratislava, Slovakia.
-> Every active development, structured and refreshed monthly. Pricing,
+> New-build residential market intelligence for Slovakia and Czechia.
+> Every active development, structured and refreshed daily. Pricing,
 > availability, absorption rate, and trends — delivered to developers,
 > banks, valuers, and investors.
 
-Residata tracks every new residential construction project in Bratislava
-(the capital of Slovakia). It normalizes data from developer websites
-into a single consistent schema, refreshes the snapshot monthly, and
-delivers it as Google Sheets, CSV, XLSX, or via API.
+Residata tracks every new residential development across Slovakia and
+Czechia (Bratislava and Prague and their wider markets). It normalizes
+data from developer websites into a single consistent schema, refreshes
+it daily, and delivers it as CSV, XLSX, or via API.
 
-## Scope (${monthLabel} snapshot)
+## Scope (updated daily; snapshot ${monthLabel})
 
-- City: Bratislava (Slovakia's capital)
+- Markets: Slovakia (Bratislava) and Czechia (Prague)
 - Total projects in dataset: ${fmtN(market?.total_projects_tracked ?? market?.total_projects_active)} new-build residential projects (current + sold-out under tracking)
 - Currently active (in market): ${fmtN(market?.total_projects_active)} projects, ${fmtN(market?.total_units_tracked)} units
 - Currently for sale: ${fmtN(market?.total_available)} units · reserved: ${fmtN(market?.total_reserved)} · sold: ${fmtN(market?.total_sold)}
 - Average price across available inventory: €${fmtN(market?.avg_eur_m2)}/m²
 - Distinct active developers: ${fmtN(market?.total_developers_active)}
-- Data refresh: monthly (first of each month); weekly on request
+- Data refresh: daily
 - Languages: Slovak and English
 
 ## What Residata is for
@@ -114,7 +118,7 @@ delivers it as Google Sheets, CSV, XLSX, or via API.
 - **Developers** — price new projects against real comparables; track absorption of your and competitors' inventory; spot supply gaps by district and segment.
 - **Banks & valuers** — pull recent comparable transactions for valuation and collateral assessment; never work with stale data.
 - **Investors** — discover projects with favorable pricing, spot slowing sales velocity, identify sell-out timing.
-- **Consultants & analysts** — skip weeks of manual data collection; open one sheet with the whole Bratislava market normalized.
+- **Consultants & analysts** — skip weeks of manual data collection; open the whole Slovak and Czech new-build market, normalized.
 
 ## Pricing
 
@@ -161,11 +165,11 @@ const topProjList = topProjects.length > 0
 const llmsFull = `# Residata — full coverage profile (for AI agents)
 
 Residata is a market intelligence service for new-build residential
-real estate in Bratislava, Slovakia. We track every active development
-project, normalize data from developer websites into one schema, and
-refresh the dataset monthly.
+real estate across Slovakia and Czechia (Bratislava, Prague, and their
+wider markets). We track every active development project, normalize data
+from developer websites into one schema, and refresh the dataset daily.
 
-## Market coverage (${monthLabel} snapshot)
+## Market coverage (updated daily; snapshot ${monthLabel})
 
 - ${fmtN(market?.total_projects_tracked ?? market?.total_projects_active)} total projects in dataset (currently active + projects that sold out under our tracking — both groups have full historical price/availability snapshots)
 - ${fmtN(market?.total_projects_active)} of them are currently active in the market
@@ -188,21 +192,21 @@ ${topProjList}
 
 ## Data delivery
 
-- Google Sheet (live linked, updates monthly)
-- CSV / XLSX exports
-- API access (paid tier)
-- Monthly PDF reports (paid tier)
+- CSV / XLSX exports (any daily snapshot)
+- REST API access (paid tier)
+- Live dashboard, analytics/pivot, and unit-level explorer
+- AI assistant that answers questions over the dataset
 
 ## How the data is collected
 
-1. Scrape every active developer's public project listing site
+1. Scrape every active developer's public project listing site, daily
 2. Normalize columns into a consistent schema (unit type, area, price, status, orientation, handover date)
-3. Cross-validate against previous snapshot for sales velocity / absorption
-4. Publish to Google Sheets, Supabase API, and the live dashboard
+3. Cross-validate against the previous snapshot for sales velocity / absorption
+4. Publish to the Supabase API and the live dashboard
 
 Some projects with non-public sales data, hand-curated layouts, or
-broken automation are filled manually each month — they show up the
-same way as auto-scraped projects in all the public dashboards.
+broken automation are filled manually — they show up the same way as
+auto-scraped projects in all the public dashboards.
 
 ## Pricing
 

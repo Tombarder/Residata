@@ -1,57 +1,57 @@
 # Residata — full coverage profile (for AI agents)
 
 Residata is a market intelligence service for new-build residential
-real estate in Bratislava, Slovakia. We track every active development
-project, normalize data from developer websites into one schema, and
-refresh the dataset monthly.
+real estate across Slovakia and Czechia (Bratislava, Prague, and their
+wider markets). We track every active development project, normalize data
+from developer websites into one schema, and refresh the dataset daily.
 
-## Market coverage (April 2026 snapshot)
+## Market coverage (updated daily; snapshot July 2026)
 
-- 65 total projects in dataset (currently active + projects that sold out under our tracking — both groups have full historical price/availability snapshots)
-- 65 of them are currently active in the market
-- 54 distinct active developers
-- 5,394 individual units tracked across active projects (current snapshot)
-- 2,523 units currently available (for sale)
-- 348 reserved
-- 2,294 explicitly sold
-- Average price: €5,707 per square meter (across available inventory)
+- 327 total projects in dataset (currently active + projects that sold out under our tracking — both groups have full historical price/availability snapshots)
+- 274 of them are currently active in the market
+- 188 distinct active developers
+- 33,247 individual units tracked across active projects (current snapshot)
+- 10,170 units currently available (for sale)
+- 2,721 reserved
+- 19,659 explicitly sold
+- Average price: €6,182 per square meter (across available inventory)
 
 The "total projects" number grows over time as developments sell out and new ones enter the market — the dataset accumulates historical comparable transactions, which is why valuers and banks use Residata for collateral assessment.
 
 ## Districts (top by inventory)
 
-Staré Mesto (15 projects, 1,417 units, €7,408/m² avg), Ružinov (14 projects, 1,029 units, €6,107/m² avg), Nové Mesto (10 projects, 841 units, €5,595/m² avg), Petržalka (4 projects, 610 units, €5,023/m² avg), Devínska Nová Ves (4 projects, 469 units, €4,611/m² avg), Dúbravka (5 projects, 306 units, €5,277/m² avg), Rača (2 projects, 223 units, €4,491/m² avg), Rovinka (2 projects, 120 units, €3,990/m² avg).
+Petržalka (4 projects, 4,956 units, €5,104/m² avg), Ružinov (21 projects, 2,222 units, €6,158/m² avg), Staré Mesto (16 projects, 1,369 units, €8,179/m² avg), Nové Mesto (11 projects, 1,253 units, €6,300/m² avg), Košice (8 projects, 1,019 units, €4,836/m² avg), Lamač (2 projects, 963 units, €4,599/m² avg), Trnava (4 projects, 946 units, €4,067/m² avg), Dúbravka (5 projects, 812 units, €5,298/m² avg).
 
 ## Notable projects (top by inventory)
 
-- **Slnecnice** (Petržalka, Cresco) — 382 units, 2% sold, €4,962.57/m²
-- **Portum Towers** (Staré Mesto, Top Estates) — 308 units, 37% sold
-- **Galvania** (Nové Mesto, Tatra Real) — 302 units, 86% sold, €4,844.49/m²
-- **Rakyta** (Devínska Nová Ves, Lucron) — 244 units, 58% sold, €4,588/m²
-- **Vydrica** (Staré Mesto, Lucron) — 229 units, 88% sold, €10,014.9/m²
-- **Pristavna 1** (Ružinov, Grafobal) — 207 units, 97% sold, €5,044.16/m²
-- **Downtown Yards** (Staré Mesto, J&T Real Estate) — 202 units, sales data not published, €7,088.48/m²
-- **Stockerka** (Devínska Nová Ves, Proxenta) — 189 units, 56% sold, €4,768.77/m²
-- **Milrose** (Ružinov, Intrade Group) — 185 units, 34% sold, €6,358.39/m²
-- **Sky Park Tower** (Staré Mesto, Alto Real Estate) — 174 units, 63% sold, €7,979.41/m²
+- **Slnecnice** (Petržalka, Cresco) — 4,552 units, 92% sold, €5,069.03/m²
+- **Bory** (Lamač, Penta Real Estate) — 925 units, 90% sold, €4,617.71/m²
+- **EkoCity Hostivar** (Hostivař, Ekospol) — 753 units, 80% sold, €6,300.62/m²
+- **Zwirn** (Nové Mesto, YIT) — 697 units, 87% sold, €6,896.37/m²
+- **Cukrovar Trnava** (Trnava, Cukrovar Trnava) — 687 units, 74% sold, €4,234.94/m²
+- **Ceresne Living Dubravka** (Dúbravka, ITB Development a.s.) — 567 units, 84% sold, €5,488.59/m²
+- **Zelene Vlcince** (Vlčince, Reinoo) — 512 units, 98% sold, €4,398.89/m²
+- **Kolbenova park** (Praha, CPI Property Group) — 496 units, 85% sold, €7,813.13/m²
+- **WatsoNova Kosice** (Košice, CTR WatsoNova s. r. o.) — 492 units, 81% sold, €4,952.44/m²
+- **Hagibor** (Praha, Crestyl) — 485 units, 96% sold, €9,158.09/m²
 
 ## Data delivery
 
-- Google Sheet (live linked, updates monthly)
-- CSV / XLSX exports
-- API access (paid tier)
-- Monthly PDF reports (paid tier)
+- CSV / XLSX exports (any daily snapshot)
+- REST API access (paid tier)
+- Live dashboard, analytics/pivot, and unit-level explorer
+- AI assistant that answers questions over the dataset
 
 ## How the data is collected
 
-1. Scrape every active developer's public project listing site
+1. Scrape every active developer's public project listing site, daily
 2. Normalize columns into a consistent schema (unit type, area, price, status, orientation, handover date)
-3. Cross-validate against previous snapshot for sales velocity / absorption
-4. Publish to Google Sheets, Supabase API, and the live dashboard
+3. Cross-validate against the previous snapshot for sales velocity / absorption
+4. Publish to the Supabase API and the live dashboard
 
 Some projects with non-public sales data, hand-curated layouts, or
-broken automation are filled manually each month — they show up the
-same way as auto-scraped projects in all the public dashboards.
+broken automation are filled manually — they show up the same way as
+auto-scraped projects in all the public dashboards.
 
 ## Pricing
 
