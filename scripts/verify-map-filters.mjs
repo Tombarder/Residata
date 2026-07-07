@@ -35,9 +35,8 @@ ok("total_units at least 100 → a,b", ids(run([{ field: "total_units", op: "gte
 ok("absorption at most 50 → a,d", ids(run([{ field: "sold_percentage", op: "lte", value: 50 }])) === "a,d");
 ok("available at least 1 (has stock) → a,d", ids(run([{ field: "available_units", op: "gte", value: 1 }])) === "a,d");
 
-// boolean
-ok("top20 is yes → a,d", ids(run([{ field: "is_top20", op: "true" }])) === "a,d");
-ok("top20 is no → b,c", ids(run([{ field: "is_top20", op: "false" }])) === "b,c");
+// status (readable labels, raw value filtering)
+ok("status is any of [active] → a,b,d", ids(run([{ field: "status", op: "in", value: ["active"] }])) === "a,b,d");
 
 // completion (derived bucket, nowYear via mapMetrics default — test relative ops that don't depend on year)
 ok("completion is empty/unknown → c", ids(run([{ field: "completion", op: "in", value: ["unknown"] }])) === "c");
@@ -58,7 +57,7 @@ ok("isComplete: between [4000,''] → true", isComplete({ field: "ppm2", op: "be
 ok("isComplete: set → true (no value needed)", isComplete({ field: "developer", op: "set" }) === true);
 
 // describe + options
-ok("describe between", describe({ field: "ppm2", op: "between", value: [4000, 6000] }) === "Price €/m² €4000–€6000", describe({ field: "ppm2", op: "between", value: [4000, 6000] }));
+ok("describe between", (() => { const d = describe({ field: "ppm2", op: "between", value: [4000, 6000] }); return d.startsWith("Price per m²") && /4.?000/.test(d) && /6.?000/.test(d) && d.includes("–"); })(), describe({ field: "ppm2", op: "between", value: [4000, 6000] }));
 ok("fieldOptions city → [Bratislava, Brno]", fieldOptions(P, FIELD_BY_KEY.city).join(",") === "Bratislava,Brno");
 ok("fieldOptions developer drops empty → [Corwin, YIT]", fieldOptions(P, FIELD_BY_KEY.developer).join(",") === "Corwin,YIT");
 

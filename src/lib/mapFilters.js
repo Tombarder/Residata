@@ -14,27 +14,35 @@ import { ppm2Of, completionBucket, COMPLETION } from "./mapMetrics.js";
 const norm = (s) => (s == null ? "" : String(s)).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
 const num = (v) => (v == null || v === "" || Number.isNaN(Number(v)) ? null : Number(v));
 
-// label: English · label_sk: Slovak. `get` reads the value from a projects_live row.
+// Readable labels for the raw project status values (Slovak-first — the switcher is
+// language-aware elsewhere; these keep the filter dropdown human, not "sold_out").
+const STATUS_LABEL = { active: "v ponuke", sold_out: "vypredané", paused: "pozastavené", archived: "archív", "": "—" };
+const eur = (v) => "€" + Math.round(v).toLocaleString("sk-SK");
+
+// The user-facing filter columns. label: English · label_sk: Slovak. `get` reads the
+// value from a projects_live row. Kept intentionally small + intuitive — internal /
+// confusing columns (reserved counts, sold counts, "manually maintained", top-20,
+// sub-district) were removed so every option makes obvious sense to a developer.
 export const FIELDS = [
-  { key: "country",         label: "Country",         label_sk: "Krajina",      type: "category", get: (p) => p.country || "" },
-  { key: "city",            label: "City",            label_sk: "Mesto",        type: "category", get: (p) => p.city || "" },
-  { key: "district",        label: "District",        label_sk: "Mestská časť", type: "category", get: (p) => p.district || "" },
-  { key: "sub_district",    label: "Sub-district",    label_sk: "Podčasť",      type: "category", get: (p) => p.sub_district || "" },
-  { key: "developer",       label: "Developer",       label_sk: "Developer",    type: "category", get: (p) => (p.developer || "").trim() },
-  { key: "status",          label: "Project status",  label_sk: "Stav projektu",type: "category", get: (p) => p.status || "" },
-  { key: "completion",      label: "Completion",      label_sk: "Dokončenie",   type: "category", get: (p) => completionBucket(p),
+  // ── Where ──
+  { key: "country",         label: "Country",   label_sk: "Krajina",      type: "category", get: (p) => p.country || "" },
+  { key: "city",            label: "City",      label_sk: "Mesto",        type: "category", get: (p) => p.city || "" },
+  { key: "district",        label: "District",  label_sk: "Mestská časť", type: "category", get: (p) => p.district || "" },
+  { key: "developer",       label: "Developer", label_sk: "Developer",    type: "category", get: (p) => (p.developer || "").trim() },
+  // ── Status / timing ──
+  { key: "status",          label: "Availability", label_sk: "Stav projektu", type: "category", get: (p) => p.status || "",
+    optionLabel: (v) => STATUS_LABEL[v] || v },
+  { key: "completion",      label: "Completion (when)", label_sk: "Dokončenie (kedy)", type: "category", get: (p) => completionBucket(p),
     options: ["ready", "soon", "mid", "far", "unknown"], optionLabel: (v) => COMPLETION[v]?.label || v },
-  { key: "is_top20",        label: "Top 20 (by availability)", label_sk: "Top 20 (podľa ponuky)", type: "boolean", get: (p) => !!p.is_top20 },
-  { key: "is_manual",       label: "Manually maintained",      label_sk: "Ručne udržiavaný",      type: "boolean", get: (p) => !!p.is_manual },
-  { key: "ppm2",            label: "Price €/m²",      label_sk: "Cena €/m²",    type: "number", get: (p) => ppm2Of(p) || null, fmt: (v) => "€" + Math.round(v) },
-  { key: "min_price",       label: "Cheapest unit €", label_sk: "Najlacnejší byt €", type: "number", get: (p) => num(p.min_price), fmt: (v) => "€" + Math.round(v) },
-  { key: "max_price",       label: "Priciest unit €", label_sk: "Najdrahší byt €",   type: "number", get: (p) => num(p.max_price), fmt: (v) => "€" + Math.round(v) },
-  { key: "total_units",     label: "Total units",     label_sk: "Počet bytov",  type: "number", get: (p) => num(p.total_units) },
-  { key: "available_units", label: "Available units", label_sk: "Voľné byty",   type: "number", get: (p) => Number(p.available_units) || 0 },
-  { key: "sold_units",      label: "Sold units",      label_sk: "Predané byty", type: "number", get: (p) => Number(p.sold_units) || 0 },
-  { key: "reserved_units",  label: "Reserved units",  label_sk: "Rezervované",  type: "number", get: (p) => (Number(p.reserved_units) || 0) + (Number(p.prereserved_units) || 0) },
-  { key: "sold_percentage", label: "Absorption %",    label_sk: "Vypredanosť %",type: "number", get: (p) => num(p.sold_percentage), fmt: (v) => Math.round(v) + "%" },
-  { key: "sold_last_month", label: "Sold last month", label_sk: "Predané za mesiac", type: "number", get: (p) => Number(p.sold_last_month) || 0 },
+  // ── Price ──
+  { key: "ppm2",            label: "Price per m²",         label_sk: "Cena za m²",            type: "number", get: (p) => ppm2Of(p) || null, fmt: (v) => "€" + Math.round(v).toLocaleString("sk-SK") },
+  { key: "min_price",       label: "Cheapest unit price",  label_sk: "Cena najlacnejšieho bytu", type: "number", get: (p) => num(p.min_price), fmt: eur },
+  { key: "max_price",       label: "Priciest unit price",  label_sk: "Cena najdrahšieho bytu",   type: "number", get: (p) => num(p.max_price), fmt: eur },
+  // ── Size & sales ──
+  { key: "total_units",     label: "Project size (total flats)", label_sk: "Veľkosť projektu (počet bytov)", type: "number", get: (p) => num(p.total_units) },
+  { key: "available_units", label: "Flats available now",        label_sk: "Voľných bytov (počet)",          type: "number", get: (p) => Number(p.available_units) || 0 },
+  { key: "sold_percentage", label: "Sold so far (%)",            label_sk: "Vypredanosť (%)",                type: "number", get: (p) => num(p.sold_percentage), fmt: (v) => Math.round(v) + "%" },
+  { key: "sold_last_month", label: "Sold in the last month",     label_sk: "Predané za posledný mesiac",     type: "number", get: (p) => Number(p.sold_last_month) || 0 },
 ];
 
 export const FIELD_BY_KEY = Object.fromEntries(FIELDS.map((f) => [f.key, f]));

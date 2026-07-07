@@ -165,7 +165,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
   const [nameQuery, setNameQuery] = useState("");
   const [analysisCenter, setAnalysisCenter] = useState(null);
   const [radiusKm, setRadiusKm] = useState(1.5);
-  const [verifiedOnly, setVerifiedOnly] = useState(false);
+  const verifiedOnly = false; // "precise only" toggle removed — include every located project
   const [showSoldOut, setShowSoldOut] = useState(true); // sold out = no units available
   const [showNoPrice, setShowNoPrice] = useState(true); // projects with no published price
   const [heatMode, setHeatMode] = useState(false); // dots vs heatmap of the active lens
@@ -182,6 +182,12 @@ export default function MapView2({ lang = "en", setCurrent }) {
   const [shape, setShape] = useState(null);
   const [corridorKm, setCorridorKm] = useState(0.4);
   const [savedAreas, setSavedAreas] = useState(loadSavedAreas);
+  const [showExplainer, setShowExplainer] = useState(() => { try { return localStorage.getItem("residata_map_explainer_hidden") !== "1"; } catch (_) { return true; } });
+  const [saving, setSaving] = useState(false);   // inline "name this area" input open
+  const [saveName, setSaveName] = useState("");
+  const [justSaved, setJustSaved] = useState("");  // the name we just saved (brief ✓ confirmation)
+  const dismissExplainer = () => { setShowExplainer(false); try { localStorage.setItem("residata_map_explainer_hidden", "1"); } catch (_) {} };
+  const reopenExplainer = () => { setShowExplainer(true); try { localStorage.removeItem("residata_map_explainer_hidden"); } catch (_) {} };
   const drawToolRef = useRef(null); drawToolRef.current = drawTool;
   const ptsRef = useRef([]); ptsRef.current = pts;
   const corridorKmRef = useRef(0.4); corridorKmRef.current = corridorKm;
@@ -228,15 +234,16 @@ export default function MapView2({ lang = "en", setCurrent }) {
     setAnalysisCenter({ lng: e.lngLat.lng, lat: e.lngLat.lat }); setAnchorId(null);
   };
   const setCorridorWidth = (v) => { setCorridorKm(v); setShape((s) => (s && s.kind === "corridor" ? { ...s, widthKm: v } : s)); };
-  const saveCurrentArea = () => {
-    if (!shape) return;
-    const name = (typeof prompt === "function" ? prompt(sk ? "Názov oblasti:" : "Area name:") : "");
-    const nm = (name || "").trim(); if (!nm) return;
+  const beginSave = () => { if (!shape) return; setSaveName(""); setSaving(true); };
+  const confirmSave = () => {
+    const nm = saveName.trim();
+    if (!nm || !shape) { setSaving(false); return; }
     const item = { id: String(Date.now()), name: nm, shape, country };
     const next = [item, ...savedAreas.filter((a) => a.name !== nm)].slice(0, 40);
     setSavedAreas(next); persistSavedAreas(next);
+    setSaving(false); setSaveName(""); setJustSaved(nm); setTimeout(() => setJustSaved(""), 2600);
   };
-  const loadArea = (a) => { setDrawTool(null); setPts([]); setAnalysisCenter(null); setAnchorId(null); if (a.shape.kind === "corridor") setCorridorKm(a.shape.widthKm); setShape(a.shape); };
+  const loadArea = (a) => { setSaving(false); setDrawTool(null); setPts([]); setAnalysisCenter(null); setAnchorId(null); if (a.shape.kind === "corridor") setCorridorKm(a.shape.widthKm); setShape(a.shape); };
   const deleteArea = (id) => { const next = savedAreas.filter((a) => a.id !== id); setSavedAreas(next); persistSavedAreas(next); };
 
   // On mount, consume a project set handed over from a filtered analytics view (Unit Explorer's
@@ -566,6 +573,23 @@ export default function MapView2({ lang = "en", setCurrent }) {
   const isLoading = loading || coords === null;
   const legend = legendForLens(lens, thresholds, fmt);
 
+  // Saved-areas list — shown in the panel in BOTH the empty and the active state, so
+  // after you save an area you immediately see it and can reload it.
+  const savedAreasBlock = savedAreas.length > 0 ? (
+    <div style={{ marginTop: 14, borderTop: `1px solid ${border}`, paddingTop: 12 }}>
+      <div style={{ fontSize: "0.7rem", color: dim, marginBottom: 7 }}>☆ {sk ? "Uložené oblasti" : "Saved areas"} ({savedAreas.length})</div>
+      {savedAreas.map((a) => (
+        <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 6, padding: "3px 0" }}>
+          <button onClick={() => loadArea(a)} title={sk ? "Zobraziť túto oblasť" : "Load this area"} style={{ flex: 1, textAlign: "left", background: "none", border: "none", color: justSaved === a.name ? green : textLight, cursor: "pointer", fontSize: "0.76rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = green)} onMouseLeave={(e) => (e.currentTarget.style.color = justSaved === a.name ? green : textLight)}>
+            {a.shape.kind === "polygon" ? "▱" : "⇢"} {a.name}{justSaved === a.name ? " ✓" : ""}{a.country && a.country !== "all" ? <span style={{ color: dim }}> · {String(a.country).toUpperCase()}</span> : ""}
+          </button>
+          <button onClick={() => deleteArea(a.id)} title={sk ? "Zmazať" : "Delete"} style={{ background: "none", border: "none", color: dim, cursor: "pointer", fontSize: "0.85rem" }}>✕</button>
+        </div>
+      ))}
+    </div>
+  ) : null;
+
   return (
     <div className="mv2-root" style={{ height: "calc(100dvh - 64px)", display: "flex", flexDirection: "column", background: bg2 }}>
       {/* Market overview — lens tabs + adaptive insight */}
@@ -600,6 +624,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
         <button onClick={() => (drawTool === "corridor" ? cancelDraw() : startDraw("corridor"))} style={chipStyle(drawTool === "corridor" || shape?.kind === "corridor")} title={sk ? "Nakresli koridor: trasa + šírka (napr. okolo električky)" : "Draw a corridor: a route + width (e.g. along a tram line)"}>
           ⇢ {sk ? "Koridor" : "Corridor"}
         </button>
+        {!showExplainer && <button onClick={reopenExplainer} title={sk ? "Ako to funguje?" : "How it works?"} style={{ ...chipStyle(false), padding: "6px 10px" }}>?</button>}
         {extSet && (
           <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: `${green}22`, color: green, border: `1px solid ${green}`, borderRadius: 999, padding: "4px 10px", fontSize: "0.72rem", fontWeight: 600 }}
             title={sk ? "Zobrazené len projekty vyfiltrované v analytike" : "Showing only the projects filtered in analytics"}>
@@ -613,9 +638,6 @@ export default function MapView2({ lang = "en", setCurrent }) {
             <span onClick={() => setConditions((cs) => cs.filter((x) => x.id !== c.id))} style={{ cursor: "pointer", flexShrink: 0 }}>×</span>
           </span>
         ))}
-        <button onClick={() => setVerifiedOnly((v) => !v)} style={chipStyle(verifiedOnly)} title={sk ? "Len presné polohy" : "Only precise locations"}>
-          ◉ {sk ? "presné polohy" : "precise only"}
-        </button>
         <button onClick={() => setShowSoldOut((v) => !v)} title={sk ? "Zobraziť / skryť vypredané projekty (bez voľných bytov)" : "Show / hide sold-out projects (no units available)"}
           style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 11px", borderRadius: 999, fontSize: "0.74rem", cursor: "pointer", border: `1px solid ${showSoldOut ? border : `${amber}55`}`, background: showSoldOut ? "transparent" : `${amber}14`, color: showSoldOut ? textLight : amber }}>
           <EyeIcon off={!showSoldOut} />
@@ -643,7 +665,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
           <MapFilterBuilder conditions={conditions} setConditions={setConditions} projects={projects || []} matchCount={shown.length} totalCount={(projects || []).length} sk={sk} onClose={() => setFilterOpen(false)} />
         )}
 
-        {drawTool ? (() => {
+        {drawTool && (() => {
           const minPts = drawTool === "polygon" ? 3 : 2;
           const ok = pts.length >= minPts;
           return (
@@ -663,42 +685,34 @@ export default function MapView2({ lang = "en", setCurrent }) {
               <button onClick={cancelDraw} title={sk ? "Zrušiť" : "Cancel"} style={{ background: "none", border: "none", color: dim, cursor: "pointer", fontSize: "1rem", lineHeight: 1 }}>✕</button>
             </div>
           );
-        })() : (!selection && !isLoading && (
-          <div style={{ position: "absolute", top: 12, left: "50%", transform: "translateX(-50%)", background: "rgba(14,14,16,0.92)", border: `1px solid ${green}55`, color: textLight, fontSize: "0.74rem", padding: "7px 14px", borderRadius: 20, pointerEvents: "none" }}>
-            ◎ {sk ? "Klikni pri pozemku (okruh) — alebo ▱ Oblasť / ⇢ Koridor pre vlastný tvar" : "Click near a site (radius) — or ▱ Area / ⇢ Corridor to draw a shape"}
-          </div>
-        ))}
+        })()}
 
+        {(selection || showExplainer || savedAreas.length > 0) && (
         <div style={{ position: "absolute", top: 12, left: 12, width: 310, maxWidth: "calc(100% - 24px)", maxHeight: "calc(100% - 24px)", overflowY: "auto", background: "rgba(14,14,16,0.97)", border: `1px solid ${border}`, borderRadius: 12, boxShadow: "0 12px 30px rgba(0,0,0,0.5)", padding: "14px 15px", zIndex: 30 }}>
           {!selection ? (
             <div style={{ color: dim, fontSize: "0.8rem", lineHeight: 1.5 }}>
-              <div style={{ color: textLight, fontWeight: 700, marginBottom: 4, fontSize: "0.92rem" }}>{sk ? "Prieskum konkurencie v okolí" : "Competition in an area"}</div>
-              <div style={{ marginBottom: 12 }}>
-                {sk
-                  ? "Vyber si oblasť na mape a ukážem ti všetky projekty vnútri — medián €/m², vypredanosť, developerov, dokončenie aj celý zoznam."
-                  : "Pick an area on the map and I'll summarise every project inside — median €/m², absorption, developers, completion and the full list."}
-              </div>
-              <div style={{ color: dim, fontSize: "0.66rem", textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 7 }}>{sk ? "Ako začať — 3 spôsoby" : "How to start — 3 ways"}</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-                <div><span style={{ color: green, fontWeight: 600 }}>◎ {sk ? "Klikni na mapu" : "Click the map"}</span><br />{sk ? "okruh okolo bodu — jeho veľkosť si nastavíš posuvníkom." : "a radius around that point — set its size with the slider."}</div>
-                <div><span style={{ color: amber, fontWeight: 600 }}>▱ {sk ? "Oblasť" : "Area"}</span> <span style={{ color: dim }}>({sk ? "tlačidlo hore" : "button above"})</span><br />{sk ? "nakresli vlastný tvar: klikaj rohy, dvojklik ukončí." : "draw a custom shape: click the corners, double-click to finish."}</div>
-                <div><span style={{ color: amber, fontWeight: 600 }}>⇢ {sk ? "Koridor" : "Corridor"}</span> <span style={{ color: dim }}>({sk ? "tlačidlo hore" : "button above"})</span><br />{sk ? "nakresli trasu + šírku — napr. pás okolo električky." : "draw a route + a width — e.g. a band along a tram line."}</div>
-              </div>
-              <div style={{ fontSize: "0.68rem", color: dim, marginTop: 10, fontStyle: "italic" }}>{sk ? "Tip: body sa dajú ťahať, oblasť sa dá uložiť." : "Tip: drag the points to reshape, and save an area to reuse it."}</div>
-              {savedAreas.length > 0 && (
-                <div style={{ marginTop: 14, borderTop: `1px solid ${border}`, paddingTop: 12 }}>
-                  <div style={{ fontSize: "0.7rem", color: dim, marginBottom: 7 }}>☆ {sk ? "Uložené oblasti" : "Saved areas"}</div>
-                  {savedAreas.map((a) => (
-                    <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 6, padding: "3px 0" }}>
-                      <button onClick={() => loadArea(a)} style={{ flex: 1, textAlign: "left", background: "none", border: "none", color: textLight, cursor: "pointer", fontSize: "0.76rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-                        onMouseEnter={(e) => (e.currentTarget.style.color = green)} onMouseLeave={(e) => (e.currentTarget.style.color = textLight)}>
-                        {a.shape.kind === "polygon" ? "▱" : "⇢"} {a.name}{a.country && a.country !== "all" ? <span style={{ color: dim }}> · {String(a.country).toUpperCase()}</span> : ""}
-                      </button>
-                      <button onClick={() => deleteArea(a.id)} title={sk ? "Zmazať" : "Delete"} style={{ background: "none", border: "none", color: dim, cursor: "pointer", fontSize: "0.85rem" }}>✕</button>
-                    </div>
-                  ))}
+              {showExplainer && (
+                <div style={{ position: "relative", marginBottom: savedAreasBlock ? 0 : 2 }}>
+                  <button onClick={dismissExplainer} title={sk ? "Skryť" : "Hide"} style={{ position: "absolute", top: -4, right: -4, background: "none", border: "none", color: dim, cursor: "pointer", fontSize: "0.95rem", lineHeight: 1 }} aria-label="Hide">✕</button>
+                  <div style={{ color: textLight, fontWeight: 700, marginBottom: 4, fontSize: "0.92rem", paddingRight: 16 }}>{sk ? "Prieskum konkurencie v okolí" : "Competition in an area"}</div>
+                  <div style={{ marginBottom: 12 }}>
+                    {sk
+                      ? "Vyber si oblasť na mape a ukážem ti všetky projekty vnútri — medián €/m², vypredanosť, developerov, dokončenie aj celý zoznam."
+                      : "Pick an area on the map and I'll summarise every project inside — median €/m², absorption, developers, completion and the full list."}
+                  </div>
+                  <div style={{ color: dim, fontSize: "0.66rem", textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 7 }}>{sk ? "Ako začať — 3 spôsoby" : "How to start — 3 ways"}</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+                    <div><span style={{ color: green, fontWeight: 600 }}>◎ {sk ? "Klikni na mapu" : "Click the map"}</span><br />{sk ? "okruh okolo bodu — jeho veľkosť si nastavíš posuvníkom." : "a radius around that point — set its size with the slider."}</div>
+                    <div><span style={{ color: amber, fontWeight: 600 }}>▱ {sk ? "Oblasť" : "Area"}</span> <span style={{ color: dim }}>({sk ? "tlačidlo hore" : "button above"})</span><br />{sk ? "nakresli vlastný tvar: klikaj rohy, dvojklik ukončí." : "draw a custom shape: click the corners, double-click to finish."}</div>
+                    <div><span style={{ color: amber, fontWeight: 600 }}>⇢ {sk ? "Koridor" : "Corridor"}</span> <span style={{ color: dim }}>({sk ? "tlačidlo hore" : "button above"})</span><br />{sk ? "nakresli trasu + šírku — napr. pás okolo električky." : "draw a route + a width — e.g. a band along a tram line."}</div>
+                  </div>
+                  <div style={{ fontSize: "0.68rem", color: dim, marginTop: 10, fontStyle: "italic" }}>{sk ? "Tip: body sa dajú ťahať, oblasť sa dá uložiť." : "Tip: drag the points to reshape, and save an area to reuse it."}</div>
                 </div>
               )}
+              {!showExplainer && !savedAreasBlock && (
+                <div style={{ fontSize: "0.78rem" }}>{sk ? "Klikni na mapu, alebo použi ▱ Oblasť / ⇢ Koridor." : "Click the map, or use ▱ Area / ⇢ Corridor."} <button onClick={reopenExplainer} style={{ background: "none", border: "none", color: green, cursor: "pointer", fontSize: "0.78rem", padding: 0 }}>{sk ? "Ako?" : "How?"}</button></div>
+              )}
+              {savedAreasBlock}
             </div>
           ) : (
             <div>
@@ -713,8 +727,21 @@ export default function MapView2({ lang = "en", setCurrent }) {
                       {shape.kind === "polygon" ? "▱" : "⇢"} {shape.kind === "polygon" ? (sk ? "oblasť" : "area") : (sk ? "koridor" : "corridor")}{shapeSize ? ` · ${shapeSize.label}` : ""}
                     </span>
                     <button onClick={() => startDraw(shape.kind)} title={sk ? "Nakresliť znova" : "Redraw"} style={{ background: "none", border: `1px solid ${border}`, color: dim, borderRadius: 6, padding: "3px 9px", fontSize: "0.68rem", cursor: "pointer" }}>{sk ? "Znova" : "Redraw"}</button>
-                    <button onClick={saveCurrentArea} title={sk ? "Uložiť oblasť" : "Save area"} style={{ background: "none", border: `1px solid ${border}`, color: green, borderRadius: 6, padding: "3px 9px", fontSize: "0.68rem", cursor: "pointer" }}>☆ {sk ? "Uložiť" : "Save"}</button>
+                    {!saving && <button onClick={beginSave} title={sk ? "Uložiť túto oblasť pre neskôr" : "Save this area for later"} style={{ background: "none", border: `1px solid ${green}55`, color: green, borderRadius: 6, padding: "3px 9px", fontSize: "0.68rem", cursor: "pointer" }}>☆ {sk ? "Uložiť" : "Save"}</button>}
                   </div>
+                  {saving && (
+                    <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+                      <input autoFocus value={saveName} onChange={(e) => setSaveName(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") confirmSave(); if (e.key === "Escape") setSaving(false); }}
+                        placeholder={sk ? "Názov oblasti…" : "Name this area…"}
+                        style={{ flex: 1, minWidth: 0, boxSizing: "border-box", padding: "6px 9px", background: bg2, border: `1px solid ${border}`, borderRadius: 7, color: textLight, fontSize: "0.8rem", outline: "none" }} />
+                      <button onClick={confirmSave} disabled={!saveName.trim()} style={{ background: saveName.trim() ? green : "transparent", color: saveName.trim() ? "#0a0a0b" : dim, border: `1px solid ${green}55`, borderRadius: 7, padding: "0 12px", fontSize: "0.74rem", fontWeight: 600, cursor: saveName.trim() ? "pointer" : "default" }}>{sk ? "Uložiť" : "Save"}</button>
+                      <button onClick={() => setSaving(false)} title={sk ? "Zrušiť" : "Cancel"} style={{ background: "none", border: `1px solid ${border}`, color: dim, borderRadius: 7, padding: "0 8px", fontSize: "0.85rem", cursor: "pointer" }}>✕</button>
+                    </div>
+                  )}
+                  {justSaved && !saving && (
+                    <div style={{ fontSize: "0.7rem", color: green, marginBottom: 6 }}>✓ {sk ? `Uložené ako „${justSaved}" — nájdeš to nižšie.` : `Saved as "${justSaved}" — see below.`}</div>
+                  )}
                   {shape.kind === "corridor" && (
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <span style={{ fontSize: "0.66rem", color: dim, minWidth: 40 }}>{sk ? "šírka" : "width"}</span>
@@ -815,9 +842,11 @@ export default function MapView2({ lang = "en", setCurrent }) {
               ) : (
                 <div style={{ color: dim, fontSize: "0.78rem" }}>{sk ? "Žiadne projekty v okruhu — zväčši okruh alebo klikni inde." : "No projects in range — widen the radius or click elsewhere."}</div>
               )}
+              {savedAreasBlock}
             </div>
           )}
         </div>
+        )}
 
         {isLoading && (
           <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: dim, fontFamily: mono, fontSize: "0.8rem", background: "rgba(10,10,11,0.4)", pointerEvents: "none" }}>{sk ? "Načítavam mapu…" : "Loading map…"}</div>
