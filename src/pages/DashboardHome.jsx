@@ -1,0 +1,922 @@
+/**
+ * DashboardHome — the personalized landing page of the platform (/app).
+ *
+ * This is what a customer sees the instant they click "Open platform" on the
+ * marketing site. It is deliberately NOT a page of random facts — it is THEIR
+ * dashboard:
+ *
+ *   ZONE A · Market Overview (always present)
+ *     General market datapoints for the selected scope, with its own filter
+ *     (market comes from the sidebar market switcher; an "Area" selector here
+ *     narrows to a single district). KPI strip adapts to the scope.
+ *
+ *   ZONE B · My dashboard (personalized · modular · persistent)
+ *     A grid of widgets the customer assembles themselves — metric tiles,
+ *     watched projects, leaderboards, price benchmarks, trends, district
+ *     summaries. Add / configure / resize / reorder / remove. Every change is
+ *     saved to public.user_dashboards and stays FOREVER until they change it.
+ *
+ * All data comes from the same live views the rest of the platform uses
+ * (projects_live, totals_by_country/district, project_snapshots), so the
+ * numbers here always match Analytics / Reports / the marketing site. Prices
+ * render in the user's selected display currency; velocity/analytics widgets
+ * are capability-gated (blurred + upgrade nudge for free users).
+ */
+import { useState, useMemo, useRef } from "react";
+import { useAuth } from "../lib/useAuth";
+import { useCapabilities } from "../lib/useCapabilities";
+import {
+  useProjects, useMarketTotals, useVelocityMature, useDistrictTotals, useProjectSnapshots,
+} from "../lib/useData";
+import { useCountry, isAllCountries, countryName } from "../lib/useCountry";
+import { useCurrency } from "../lib/useCurrency";
+import { moneyFromEur, moneySymbol } from "../lib/money";
+import { localeTag } from "../lib/locale";
+import { useActivateTrial } from "../lib/useActivateTrial";
+import {
+  accent as green, orange, blue, dim, faint, text as textLight, border,
+  surface as bg, surfaceDark as bg2, surfacePanel, mono,
+} from "../lib/theme";
+import { useDashboardConfig, newWidgetId } from "../lib/useDashboardConfig";
+
+const L = (lang, sk, en) => (lang === "sk" ? sk : en);
+
+// ─── formatting ────────────────────────────────────────────────
+const fmtCount = (v, lang) =>
+  (v == null || Number.isNaN(Number(v))) ? "—" : Number(v).toLocaleString(localeTag(lang));
+const fmtM2 = (eur, lang) =>
+  (eur == null || Number.isNaN(Number(eur))) ? "—"
+    : `${Math.round(moneyFromEur(Number(eur))).toLocaleString(localeTag(lang))} ${moneySymbol()}/m²`;
+const fmtMonths = (m, lang) => {
+  if (m == null || !Number.isFinite(m)) return "—";
+  if (m >= 24) return `~${(m / 12).toFixed(1)} ${L(lang, "r", "yr")}`;
+  return `~${m < 10 ? m.toFixed(1) : Math.round(m)} ${L(lang, "mes", "mo")}`;
+};
+
+// ─── metric registry (shared by KPI strip + metric widget) ─────
+const METRICS = {
+  available:  { label: { sk: "Voľné byty",         en: "Available units" }, fmt: "count", accent: green },
+  avg_m2:     { label: { sk: "Priem. cena /m²",    en: "Avg price /m²"   }, fmt: "m2" },
+  sold30:     { label: { sk: "Predané (30 dní)",   en: "Sold (30 days)"  }, fmt: "count", accent: orange, requires: "view_sold_velocity" },
+  sold_total: { label: { sk: "Predané (spolu)",    en: "Sold (total)"    }, fmt: "count" },
+  reserved:   { label: { sk: "Rezervované",         en: "Reserved"        }, fmt: "count", accent: blue },
+  tracked:    { label: { sk: "Byty v databáze",     en: "Units tracked"   }, fmt: "count" },
+  projects:   { label: { sk: "Projekty",            en: "Projects"        }, fmt: "count" },
+  inventory:  { label: { sk: "Mesiacov zásob",      en: "Months of stock" }, fmt: "months" },
+};
+const fmtMetric = (key, val, lang) => {
+  const f = METRICS[key]?.fmt;
+  if (f === "m2") return fmtM2(val, lang);
+  if (f === "months") return fmtMonths(val, lang);
+  return fmtCount(val, lang);
+};
+
+// Aggregate a developer's active projects into the same numeric shape a market /
+// district row exposes, so metricValue() can treat all three scopes uniformly.
+function developerAgg(projects, developer) {
+  const ps = (projects || []).filter(p => p.developer === developer && (p.status || "active") === "active");
+  let avail = 0, sold = 0, tracked = 0, reserved = 0, sold30 = 0, wSum = 0, wTot = 0;
+  for (const p of ps) {
+    avail    += p.available_units || 0;
+    sold     += p.sold_units || 0;
+    tracked  += p.total_units || 0;
+    reserved += p.reserved_units || 0;
+    sold30   += p.sold_last_month || 0;
+    if (p.avg_price_eur_m2) { const w = p.available_units || p.total_units || 1; wSum += p.avg_price_eur_m2 * w; wTot += w; }
+  }
+  return { avail, sold, tracked, reserved, sold30, projects: ps.length, avg: wTot ? wSum / wTot : null };
+}
+
+// One number for (metric × scope). Returns raw value (EUR for prices), or null.
+function metricValue(metric, scope, ctx) {
+  const { marketTotals, districts, projects } = ctx;
+  if (!scope || scope.kind === "market") {
+    const t = marketTotals;
+    switch (metric) {
+      case "available":  return t.unitsAvailable;
+      case "avg_m2":     return t.avgPriceM2;
+      case "sold30":     return t.soldLastMonth;
+      case "reserved":   return t.unitsReserved;
+      case "tracked":    return t.unitsTracked;
+      case "projects":   return t.projectsActive;
+      case "sold_total": return (projects || []).reduce((a, p) => a + (p.sold_units || 0), 0);
+      case "inventory":  return (t.soldLastMonth > 0 && t.unitsAvailable != null) ? t.unitsAvailable / t.soldLastMonth : null;
+      default: return null;
+    }
+  }
+  if (scope.kind === "district") {
+    const row = (districts || []).find(d => d.district === scope.district && String(d.city_id) === String(scope.city));
+    if (!row) return null;
+    switch (metric) {
+      case "available":  return row.available_units;
+      case "avg_m2":     return row.avg_eur_m2;
+      case "reserved":   return row.reserved_units;
+      case "tracked":    return row.total_units;
+      case "projects":   return row.project_count;
+      case "sold_total": return row.sold_units;
+      case "sold30":     return null;   // no per-district velocity
+      case "inventory":  return null;
+      default: return null;
+    }
+  }
+  if (scope.kind === "developer") {
+    const a = developerAgg(projects, scope.developer);
+    switch (metric) {
+      case "available":  return a.avail;
+      case "avg_m2":     return a.avg;
+      case "sold30":     return a.sold30;
+      case "reserved":   return a.reserved;
+      case "tracked":    return a.tracked;
+      case "projects":   return a.projects;
+      case "sold_total": return a.sold;
+      case "inventory":  return (a.sold30 > 0) ? a.avail / a.sold30 : null;
+      default: return null;
+    }
+  }
+  return null;
+}
+
+const scopeLabel = (scope, lang) => {
+  if (!scope || scope.kind === "market") return L(lang, "celý trh", "whole market");
+  if (scope.kind === "district") return scope.districtLabel || scope.district;
+  if (scope.kind === "developer") return scope.developer;
+  return "";
+};
+
+// ─── tiny inline sparkline ─────────────────────────────────────
+function Sparkline({ series, color = green, width = 120, height = 34 }) {
+  const pts = (series || []).filter(v => v != null && Number.isFinite(Number(v))).map(Number);
+  if (pts.length < 2) return <div style={{ height, color: faint, fontFamily: mono, fontSize: "0.65rem", display: "flex", alignItems: "center" }}>—</div>;
+  const min = Math.min(...pts), max = Math.max(...pts);
+  const span = max - min || 1;
+  const stepX = width / (pts.length - 1);
+  const y = v => height - 3 - ((v - min) / span) * (height - 6);
+  const d = pts.map((v, i) => `${i === 0 ? "M" : "L"}${(i * stepX).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+  const last = pts[pts.length - 1];
+  return (
+    <svg width={width} height={height} style={{ display: "block" }}>
+      <path d={d} fill="none" stroke={color} strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" />
+      <circle cx={((pts.length - 1) * stepX).toFixed(1)} cy={y(last).toFixed(1)} r="2.4" fill={color} />
+    </svg>
+  );
+}
+
+// ─── styled primitives ─────────────────────────────────────────
+const selStyle = {
+  width: "100%", padding: "0.5rem 0.65rem", background: bg2, border: `1px solid ${border}`,
+  borderRadius: 8, color: textLight, fontSize: "0.82rem", fontFamily: "inherit", outline: "none", cursor: "pointer",
+};
+function Field({ label, children }) {
+  return (
+    <label style={{ display: "block", marginBottom: "0.7rem" }}>
+      <span style={{ display: "block", fontSize: "0.62rem", color: dim, fontFamily: mono, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.3rem" }}>{label}</span>
+      {children}
+    </label>
+  );
+}
+function Select({ value, onChange, options }) {
+  return (
+    <select value={value} onChange={e => onChange(e.target.value)} style={selStyle}>
+      {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+    </select>
+  );
+}
+
+// ─── KPI card (Zone A + metric widget) ─────────────────────────
+function KpiCard({ label, value, sub, accent = textLight, locked = false, size = "md" }) {
+  return (
+    <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 10, padding: size === "lg" ? "1.15rem 1.25rem" : "0.9rem 1rem", minWidth: 0 }}>
+      <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.4rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</div>
+      <div style={{ fontFamily: mono, fontSize: size === "lg" ? "1.9rem" : "1.5rem", fontWeight: 700, color: accent, letterSpacing: "-0.02em", lineHeight: 1, filter: locked ? "blur(6px)" : "none", opacity: locked ? 0.55 : 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{value}</div>
+      {locked
+        ? <div style={{ fontSize: "0.62rem", color: orange, marginTop: "0.35rem", fontFamily: mono }}>{"paid only"}</div>
+        : (sub && <div style={{ fontFamily: mono, fontSize: "0.66rem", color: dim, marginTop: "0.4rem" }}>{sub}</div>)}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Main
+// ═══════════════════════════════════════════════════════════════
+export default function DashboardHome({ lang = "en", setCurrent }) {
+  useCurrency(); // re-render prices when the display currency toggles
+  const { profile } = useAuth();
+  const caps = useCapabilities();
+  const { can, tier, trialActive, trialDaysLeft } = caps;
+  const { country } = useCountry();
+
+  const { projects } = useProjects();
+  const marketTotals = useMarketTotals();
+  const velocityMature = useVelocityMature();
+  const { districts } = useDistrictTotals();
+  const { snapshots } = useProjectSnapshots();
+
+  const { config, loading: cfgLoading, saveState, setConfig, resetToDefault } = useDashboardConfig();
+
+  // trial banner (free users who never started their 7-day trial)
+  const showTrialOffer = tier === "free" && !trialActive && !profile?.trial_started_at;
+  const trialOffer = useActivateTrial({ lang, onConsumed: () => setCurrent("App:Billing") });
+
+  // ── modal state: add-widget palette / configure widget ──
+  const [editor, setEditor] = useState(null); // { mode:'add'|'edit', widget }
+
+  const ctx = { marketTotals, districts, projects, snapshots, lang, can, setCurrent };
+
+  // Snapshot series lookup: project_id → months asc → row
+  const seriesByProject = useMemo(() => {
+    const m = new Map();
+    for (const r of (snapshots || [])) {
+      if (!m.has(r.project_id)) m.set(r.project_id, []);
+      m.get(r.project_id).push(r);
+    }
+    for (const arr of m.values()) arr.sort((a, b) => String(a.snapshot_month).localeCompare(String(b.snapshot_month)));
+    return m;
+  }, [snapshots]);
+  ctx.seriesByProject = seriesByProject;
+
+  const greeting = useMemo(() => {
+    const hour = new Date().getHours();
+    const name = (profile?.full_name || "").split(" ")[0] || "";
+    const word = lang === "sk"
+      ? (hour < 11 ? "Dobré ráno" : hour < 17 ? "Ahoj" : "Dobrý večer")
+      : (hour < 11 ? "Good morning" : hour < 17 ? "Hey" : "Good evening");
+    return name ? `${word}, ${name}.` : `${word}.`;
+  }, [profile?.full_name, lang]);
+
+  // ── Zone A scope (persisted in config.overview.area) ──
+  const area = config?.overview?.area || null;
+
+  // Districts for the Area selector — biggest first, current country only
+  const areaOptions = useMemo(() => {
+    const opts = [{ value: "", label: L(lang, "Celý trh", "Whole market") }];
+    const sorted = [...(districts || [])].sort((a, b) => (b.total_units || 0) - (a.total_units || 0));
+    for (const d of sorted) {
+      if (!d.district) continue;
+      opts.push({ value: `${d.city_id}::${d.district}`, label: `${d.district}${d.city_name ? ` · ${d.city_name}` : ""}` });
+    }
+    return opts;
+  }, [districts, lang]);
+
+  const setArea = (v) => {
+    if (!v) { setConfig(c => ({ ...c, overview: { ...c.overview, area: null } })); return; }
+    const [city, ...rest] = v.split("::");
+    const district = rest.join("::");
+    const row = (districts || []).find(d => d.district === district && String(d.city_id) === String(city));
+    setConfig(c => ({ ...c, overview: { ...c.overview, area: { district, city, districtLabel: row ? `${district}${row.city_name ? ` · ${row.city_name}` : ""}` : district } } }));
+  };
+
+  const scope = area ? { kind: "district", district: area.district, city: area.city, districtLabel: area.districtLabel } : { kind: "market" };
+
+  // KPI strip metric set depends on scope
+  const kpiMetrics = area
+    ? ["projects", "available", "sold_total", "avg_m2", "reserved", "tracked"]
+    : ["projects", "available", "sold30", "avg_m2", "reserved", "inventory"];
+
+  // ── widget mutations ──
+  const widgets = config?.widgets || [];
+  const addWidget = (w) => { setConfig(c => ({ ...c, widgets: [...c.widgets, { ...w, id: newWidgetId() }] })); setEditor(null); };
+  const updateWidget = (id, w) => { setConfig(c => ({ ...c, widgets: c.widgets.map(x => x.id === id ? { ...x, ...w } : x) })); setEditor(null); };
+  const removeWidget = (id) => setConfig(c => ({ ...c, widgets: c.widgets.filter(x => x.id !== id) }));
+  const toggleWidth = (id) => setConfig(c => ({ ...c, widgets: c.widgets.map(x => x.id === id ? { ...x, w: x.w === 2 ? 1 : 2 } : x) }));
+  const moveWidget = (id, dir) => setConfig(c => {
+    const arr = [...c.widgets]; const i = arr.findIndex(x => x.id === id);
+    const j = i + dir; if (i < 0 || j < 0 || j >= arr.length) return c;
+    [arr[i], arr[j]] = [arr[j], arr[i]]; return { ...c, widgets: arr };
+  });
+  // drag reorder
+  const dragId = useRef(null);
+  const onDrop = (targetId) => {
+    const from = dragId.current; dragId.current = null;
+    if (!from || from === targetId) return;
+    setConfig(c => {
+      const arr = [...c.widgets];
+      const fi = arr.findIndex(x => x.id === from), ti = arr.findIndex(x => x.id === targetId);
+      if (fi < 0 || ti < 0) return c;
+      const [m] = arr.splice(fi, 1); arr.splice(ti, 0, m); return { ...c, widgets: arr };
+    });
+  };
+
+  return (
+    <div style={{ padding: "1.75rem 2rem 4rem", maxWidth: 1280 }}>
+      {/* Greeting + freshness line */}
+      <h2 style={{ fontSize: "1.5rem", fontWeight: 600, color: textLight, margin: "0 0 0.2rem" }}>{greeting}</h2>
+      <p style={{ color: dim, fontSize: "0.9rem", lineHeight: 1.55, margin: "0 0 1.4rem" }}>
+        {lang === "sk"
+          ? <>Tvoj osobný prehľad trhu novostavieb. Dáta sa obnovujú mesačne — posledný beh za mesiac <strong style={{ color: textLight }}>{marketTotals.snapshotMonth || "—"}</strong>.</>
+          : <>Your personal new-build market overview. Data refreshes monthly — last run for month <strong style={{ color: textLight }}>{marketTotals.snapshotMonth || "—"}</strong>.</>}
+      </p>
+
+      {showTrialOffer && <TrialOfferBanner lang={lang} onActivate={trialOffer.start} busy={trialOffer.busy} msg={trialOffer.msg} />}
+      {trialActive && <TrialRunningBanner lang={lang} daysLeft={trialDaysLeft} onOpenBilling={() => setCurrent("App:Billing")} />}
+
+      {/* ═══ ZONE A · Market overview ═══ */}
+      <section style={{ marginBottom: "2.25rem" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap", marginBottom: "0.85rem" }}>
+          <div style={{ fontFamily: mono, fontSize: "0.68rem", color: green, letterSpacing: "0.12em", textTransform: "uppercase" }}>
+            {L(lang, "Prehľad trhu", "Market overview")}
+            <span style={{ color: dim, marginLeft: "0.6rem", textTransform: "none", letterSpacing: 0 }}>
+              · {isAllCountries(country) ? L(lang, "všetky trhy", "all markets") : countryName(country, lang)} · {scopeLabel(scope, lang)}
+            </span>
+          </div>
+          {/* Area filter/selection menu */}
+          <div style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
+            <span style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.08em", textTransform: "uppercase" }}>{L(lang, "Oblasť", "Area")}</span>
+            <select value={area ? `${area.city}::${area.district}` : ""} onChange={e => setArea(e.target.value)}
+              style={{ ...selStyle, width: "auto", minWidth: 200, maxWidth: 320 }}>
+              {areaOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+        </div>
+        <div className="dash-kpi-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(155px, 1fr))", gap: "0.75rem" }}>
+          {kpiMetrics.map(mk => {
+            const def = METRICS[mk];
+            const locked = def.requires && !can(def.requires);
+            const gateVelocity = mk === "sold30" && !velocityMature;
+            const raw = metricValue(mk, scope, ctx);
+            const value = gateVelocity ? "—" : fmtMetric(mk, raw, lang);
+            return (
+              <KpiCard key={mk}
+                label={def.label[lang] || def.label.en}
+                value={mk === "sold30" && !gateVelocity && raw ? `+${fmtCount(raw, lang)}` : value}
+                sub={gateVelocity ? L(lang, "zbierame históriu", "building history") : null}
+                accent={def.accent || textLight}
+                locked={locked && !gateVelocity} />
+            );
+          })}
+        </div>
+      </section>
+
+      {/* ═══ ZONE B · My dashboard ═══ */}
+      <section>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap", marginBottom: "0.95rem" }}>
+          <div style={{ fontFamily: mono, fontSize: "0.68rem", color: green, letterSpacing: "0.12em", textTransform: "uppercase" }}>
+            {L(lang, "Môj dashboard", "My dashboard")}
+            <SavePill saveState={saveState} lang={lang} />
+          </div>
+          <div style={{ display: "inline-flex", gap: "0.5rem" }}>
+            <button onClick={() => setEditor({ mode: "add" })}
+              style={{ background: green, color: "#06140f", border: "none", borderRadius: 8, padding: "0.5rem 0.95rem", fontWeight: 700, fontFamily: mono, fontSize: "0.76rem", cursor: "pointer" }}>
+              + {L(lang, "Pridať widget", "Add widget")}
+            </button>
+            <button onClick={() => { if (window.confirm(L(lang, "Obnoviť dashboard na predvolené rozloženie?", "Reset dashboard to the default layout?"))) resetToDefault(); }}
+              title={L(lang, "Obnoviť predvolené", "Reset to default")}
+              style={{ background: "transparent", color: dim, border: `1px solid ${border}`, borderRadius: 8, padding: "0.5rem 0.8rem", fontFamily: mono, fontSize: "0.74rem", cursor: "pointer" }}>
+              {L(lang, "Obnoviť", "Reset")}
+            </button>
+          </div>
+        </div>
+
+        {cfgLoading ? (
+          <div style={{ color: dim, fontFamily: mono, fontSize: "0.8rem", padding: "1rem 0" }}>{L(lang, "Načítavam…", "Loading…")}</div>
+        ) : widgets.length === 0 ? (
+          <EmptyState lang={lang} onAdd={() => setEditor({ mode: "add" })} />
+        ) : (
+          <div className="dash-grid" style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "0.9rem" }}>
+            {widgets.map((w, i) => (
+              <div key={w.id}
+                draggable
+                onDragStart={() => { dragId.current = w.id; }}
+                onDragOver={e => e.preventDefault()}
+                onDrop={() => onDrop(w.id)}
+                style={{ gridColumn: w.w === 2 ? "span 2" : "span 1", minWidth: 0 }}
+                className="dash-cell">
+                <WidgetCard
+                  widget={w} ctx={ctx} lang={lang}
+                  first={i === 0} last={i === widgets.length - 1}
+                  onConfigure={() => setEditor({ mode: "edit", widget: w })}
+                  onRemove={() => removeWidget(w.id)}
+                  onToggleWidth={() => toggleWidth(w.id)}
+                  onMove={dir => moveWidget(w.id, dir)}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {editor && (
+        <WidgetEditor
+          mode={editor.mode} widget={editor.widget} ctx={ctx} lang={lang}
+          onClose={() => setEditor(null)}
+          onAdd={addWidget}
+          onSave={w => updateWidget(editor.widget.id, w)}
+        />
+      )}
+
+      <style>{`
+        @media (max-width: 720px) {
+          .dash-grid { grid-template-columns: 1fr !important; }
+          .dash-cell { grid-column: span 1 !important; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// ─── save indicator ────────────────────────────────────────────
+function SavePill({ saveState, lang }) {
+  if (saveState === "idle") return null;
+  const map = {
+    saving: { t: L(lang, "ukladám…", "saving…"), c: dim },
+    saved:  { t: L(lang, "uložené ✓", "saved ✓"), c: green },
+    error:  { t: L(lang, "chyba ukladania", "save failed"), c: "#ff6b6b" },
+  };
+  const s = map[saveState]; if (!s) return null;
+  return <span style={{ marginLeft: "0.7rem", fontFamily: mono, fontSize: "0.62rem", color: s.c, textTransform: "none", letterSpacing: 0 }}>{s.t}</span>;
+}
+
+// ─── empty state ───────────────────────────────────────────────
+function EmptyState({ lang, onAdd }) {
+  return (
+    <div style={{ border: `1px dashed ${border}`, borderRadius: 12, padding: "2.5rem 1.5rem", textAlign: "center", background: bg }}>
+      <div style={{ fontSize: "1.6rem", marginBottom: "0.6rem" }}>🧩</div>
+      <div style={{ color: textLight, fontWeight: 600, fontSize: "1rem", marginBottom: "0.35rem" }}>
+        {L(lang, "Zostav si vlastný dashboard", "Build your own dashboard")}
+      </div>
+      <p style={{ color: dim, fontSize: "0.85rem", lineHeight: 1.55, maxWidth: 440, margin: "0 auto 1.1rem" }}>
+        {L(lang, "Pridaj si widgety ktoré ťa zaujímajú — sledované projekty, ceny /m² po častiach mesta, rebríčky, trendy. Zostanú ti tu natrvalo.",
+              "Add the widgets you care about — watched projects, €/m² by district, leaderboards, trends. They stay here for good.")}
+      </p>
+      <button onClick={onAdd} style={{ background: green, color: "#06140f", border: "none", borderRadius: 8, padding: "0.6rem 1.2rem", fontWeight: 700, fontFamily: mono, fontSize: "0.8rem", cursor: "pointer" }}>
+        + {L(lang, "Pridať prvý widget", "Add your first widget")}
+      </button>
+    </div>
+  );
+}
+
+// ─── trial banners ─────────────────────────────────────────────
+function TrialOfferBanner({ lang, onActivate, busy, msg }) {
+  return (
+    <div style={{ background: "linear-gradient(90deg, rgba(0,229,160,0.14) 0%, rgba(0,229,160,0.04) 70%, transparent 100%)", border: `1px solid ${green}`, borderRadius: 12, padding: "0.95rem 1.2rem", marginBottom: "1.4rem", display: "flex", alignItems: "center", gap: "0.95rem", flexWrap: "wrap" }}>
+      <div style={{ flexShrink: 0, width: 34, height: 34, borderRadius: 8, background: "rgba(0,229,160,0.18)", color: green, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.05rem" }}>🎁</div>
+      <div style={{ flex: 1, minWidth: 200 }}>
+        <div style={{ color: textLight, fontWeight: 700, fontSize: "0.95rem" }}>{L(lang, "7 dní plného Residata — zadarmo", "7 days of the full Residata — on us")}</div>
+        <div style={{ color: dim, fontSize: "0.8rem", marginTop: "0.15rem", lineHeight: 1.45 }}>{L(lang, "Všetky projekty, analytika, reporty, exporty. Bez karty. Jedným klikom.", "Every project, analytics, reports, exports. No card required. One-click.")}</div>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "0.3rem" }}>
+        <button onClick={onActivate} disabled={busy} className="btn-p" style={{ fontSize: "0.82rem", cursor: busy ? "wait" : "pointer", opacity: busy ? 0.7 : 1 }}>{busy ? "…" : L(lang, "Aktivovať trial", "Activate trial")}</button>
+        {msg && <span style={{ fontSize: "0.72rem", fontFamily: mono, color: msg.kind === "ok" ? green : "#ff6b6b" }}>{msg.text}</span>}
+      </div>
+    </div>
+  );
+}
+function TrialRunningBanner({ lang, daysLeft, onOpenBilling }) {
+  const ending = daysLeft <= 2; const accent = ending ? orange : green;
+  return (
+    <div style={{ background: ending ? "rgba(245,166,35,0.12)" : "rgba(0,229,160,0.12)", border: `1px solid ${accent}60`, borderRadius: 12, padding: "0.8rem 1.1rem", marginBottom: "1.4rem", display: "flex", alignItems: "center", gap: "0.8rem", flexWrap: "wrap", fontSize: "0.85rem" }}>
+      <span style={{ fontSize: "1.05rem" }}>🎁</span>
+      <span style={{ color: textLight, fontWeight: 600 }}>
+        {lang === "sk" ? <>Paid trial aktívny — <span style={{ color: accent }}>{daysLeft === 1 ? "posledný deň" : `${daysLeft} dní zostáva`}</span></> : <>Paid trial active — <span style={{ color: accent }}>{daysLeft === 1 ? "last day" : `${daysLeft} days left`}</span></>}
+      </span>
+      <button onClick={onOpenBilling} style={{ marginLeft: "auto", background: "transparent", color: accent, border: `1px solid ${accent}`, borderRadius: 6, padding: "0.35rem 0.8rem", fontSize: "0.75rem", fontFamily: mono, fontWeight: 700, cursor: "pointer" }}>{L(lang, "Detail / upgrade", "Details / upgrade")}</button>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Widget card shell + toolbar
+// ═══════════════════════════════════════════════════════════════
+const WIDGET_META = {
+  metric:    { icon: "▦", title: { sk: "Metrika", en: "Metric" } },
+  project:   { icon: "★", title: { sk: "Sledovaný projekt", en: "Watched project" } },
+  ranking:   { icon: "≡", title: { sk: "Rebríček", en: "Leaderboard" } },
+  benchmark: { icon: "▤", title: { sk: "Ceny /m²", en: "Price benchmark" } },
+  trend:     { icon: "◠", title: { sk: "Trend", en: "Trend" } },
+  segment:   { icon: "◪", title: { sk: "Zhrnutie oblasti", en: "Area summary" } },
+};
+
+function WidgetCard({ widget, ctx, lang, first, last, onConfigure, onRemove, onToggleWidth, onMove }) {
+  const [hover, setHover] = useState(false);
+  const meta = WIDGET_META[widget.type] || { icon: "▦", title: { sk: widget.type, en: widget.type } };
+  return (
+    <div onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{ background: bg, border: `1px solid ${border}`, borderRadius: 12, padding: "0.95rem 1.05rem", height: "100%", boxSizing: "border-box", position: "relative", transition: "border-color 0.15s" }}>
+      {/* toolbar */}
+      <div style={{ position: "absolute", top: 8, right: 8, display: "flex", gap: 3, opacity: hover ? 1 : 0, transition: "opacity 0.12s", background: bg2, border: `1px solid ${border}`, borderRadius: 7, padding: 2 }}>
+        <TBtn title={L(lang, "Vľavo", "Move left")} onClick={() => onMove(-1)} disabled={first}>◀</TBtn>
+        <TBtn title={L(lang, "Vpravo", "Move right")} onClick={() => onMove(1)} disabled={last}>▶</TBtn>
+        <TBtn title={L(lang, "Šírka", "Resize")} onClick={onToggleWidth}>{widget.w === 2 ? "▢" : "▭"}</TBtn>
+        <TBtn title={L(lang, "Nastaviť", "Configure")} onClick={onConfigure}>⚙</TBtn>
+        <TBtn title={L(lang, "Odstrániť", "Remove")} onClick={onRemove} danger>✕</TBtn>
+      </div>
+      {/* header */}
+      <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "0.7rem", paddingRight: hover ? 120 : 0 }}>
+        <span style={{ color: dim, fontSize: "0.75rem" }}>{meta.icon}</span>
+        <span style={{ fontFamily: mono, fontSize: "0.58rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase" }}>{meta.title[lang] || meta.title.en}</span>
+      </div>
+      {/* body */}
+      <WidgetBody widget={widget} ctx={ctx} lang={lang} />
+    </div>
+  );
+}
+function TBtn({ children, onClick, title, disabled, danger }) {
+  return (
+    <button title={title} onClick={onClick} disabled={disabled}
+      style={{ width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", color: disabled ? faint : (danger ? "#ff6b6b" : dim), cursor: disabled ? "default" : "pointer", fontSize: "0.72rem", borderRadius: 5, fontFamily: mono }}
+      onMouseEnter={e => { if (!disabled) e.currentTarget.style.background = "rgba(255,255,255,0.06)"; }}
+      onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
+      {children}
+    </button>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Widget bodies
+// ═══════════════════════════════════════════════════════════════
+function WidgetBody({ widget, ctx, lang }) {
+  switch (widget.type) {
+    case "metric":    return <MetricBody cfg={widget.cfg} ctx={ctx} lang={lang} />;
+    case "project":   return <ProjectBody cfg={widget.cfg} ctx={ctx} lang={lang} />;
+    case "ranking":   return <RankingBody cfg={widget.cfg} ctx={ctx} lang={lang} />;
+    case "benchmark": return <BenchmarkBody cfg={widget.cfg} ctx={ctx} lang={lang} />;
+    case "trend":     return <TrendBody cfg={widget.cfg} ctx={ctx} lang={lang} />;
+    case "segment":   return <SegmentBody cfg={widget.cfg} ctx={ctx} lang={lang} />;
+    default:          return <Muted lang={lang} />;
+  }
+}
+const Muted = ({ lang, text }) => <div style={{ color: faint, fontFamily: mono, fontSize: "0.75rem" }}>{text || L(lang, "Nastav tento widget ⚙", "Configure this widget ⚙")}</div>;
+
+function MetricBody({ cfg, ctx, lang }) {
+  const { can } = ctx;
+  const def = METRICS[cfg.metric]; if (!def) return <Muted lang={lang} />;
+  const locked = def.requires && !can(def.requires);
+  const raw = metricValue(cfg.metric, cfg.scope, ctx);
+  return (
+    <div>
+      <div style={{ fontFamily: mono, fontSize: "1.85rem", fontWeight: 700, color: def.accent || textLight, letterSpacing: "-0.02em", lineHeight: 1, filter: locked ? "blur(6px)" : "none", opacity: locked ? 0.55 : 1 }}>
+        {locked ? "12 345" : fmtMetric(cfg.metric, raw, lang)}
+      </div>
+      <div style={{ fontFamily: mono, fontSize: "0.66rem", color: dim, marginTop: "0.5rem" }}>
+        {locked ? <span style={{ color: orange }}>{L(lang, "len pre paid", "paid only")}</span> : <>{def.label[lang] || def.label.en} · {scopeLabel(cfg.scope, lang)}</>}
+      </div>
+    </div>
+  );
+}
+
+function ProjectBody({ cfg, ctx, lang }) {
+  const { projects, seriesByProject, setCurrent, can } = ctx;
+  const p = (projects || []).find(x => x.id === cfg.projectId);
+  if (!p) return <Muted lang={lang} text={L(lang, "Projekt nenájdený — vyber iný ⚙", "Project not found — pick another ⚙")} />;
+  const series = (seriesByProject.get(p.id) || []).map(r => r.available_units);
+  const soldLocked = !can("view_sold_velocity");
+  return (
+    <div role="button" tabIndex={0} onClick={() => setCurrent(`App:ProjectDetail:${p.id}`)}
+      onKeyDown={e => { if (e.key === "Enter") setCurrent(`App:ProjectDetail:${p.id}`); }}
+      style={{ cursor: "pointer" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: "0.6rem", alignItems: "flex-start" }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontWeight: 600, color: textLight, fontSize: "0.98rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</div>
+          <div style={{ fontFamily: mono, fontSize: "0.68rem", color: dim, marginTop: 2 }}>{p.district || "—"}{p.developer ? ` · ${p.developer}` : ""}</div>
+        </div>
+        <Sparkline series={series} color={green} width={92} height={30} />
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(70px, 1fr))", gap: "0.5rem", marginTop: "0.85rem" }}>
+        <MiniStat label={L(lang, "Voľné", "Avail")} value={fmtCount(p.available_units, lang)} accent={green} />
+        <MiniStat label={L(lang, "Predané", "Sold")} value={p.sold_percentage != null ? `${Math.round(p.sold_percentage)}%` : "—"} />
+        <MiniStat label={`${moneySymbol()}/m²`} value={p.avg_price_eur_m2 ? Math.round(moneyFromEur(p.avg_price_eur_m2)).toLocaleString(localeTag(lang)) : "—"} />
+        <MiniStat label={L(lang, "30d", "30d")} value={soldLocked ? "🔒" : (p.sold_last_month ? `+${p.sold_last_month}` : "—")} accent={orange} />
+      </div>
+    </div>
+  );
+}
+function MiniStat({ label, value, accent = textLight }) {
+  return (
+    <div style={{ minWidth: 0 }}>
+      <div style={{ fontFamily: mono, fontSize: "1.02rem", fontWeight: 700, color: accent, lineHeight: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{value}</div>
+      <div style={{ fontFamily: mono, fontSize: "0.56rem", color: dim, letterSpacing: "0.06em", textTransform: "uppercase", marginTop: "0.3rem" }}>{label}</div>
+    </div>
+  );
+}
+
+// leaderboard
+const RANK_METRICS = {
+  projects: {
+    available:  { label: { sk: "Voľné byty", en: "Available" }, get: p => p.available_units, fmt: "count" },
+    sold30:     { label: { sk: "Predaj 30d", en: "Sold 30d" }, get: p => p.sold_last_month, fmt: "count", requires: "view_sold_velocity" },
+    avg_m2:     { label: { sk: "Cena /m²", en: "Price /m²" }, get: p => p.avg_price_eur_m2, fmt: "m2" },
+    sold_pct:   { label: { sk: "% predané", en: "% sold" }, get: p => p.sold_percentage, fmt: "pct" },
+  },
+  districts: {
+    available:  { label: { sk: "Voľné byty", en: "Available" }, get: d => d.available_units, fmt: "count" },
+    avg_m2:     { label: { sk: "Cena /m²", en: "Price /m²" }, get: d => d.avg_eur_m2, fmt: "m2" },
+    sold_total: { label: { sk: "Predané", en: "Sold" }, get: d => d.sold_units, fmt: "count" },
+    projects:   { label: { sk: "Projekty", en: "Projects" }, get: d => d.project_count, fmt: "count" },
+  },
+  developers: {
+    available:  { label: { sk: "Voľné byty", en: "Available" }, get: a => a.avail, fmt: "count" },
+    sold30:     { label: { sk: "Predaj 30d", en: "Sold 30d" }, get: a => a.sold30, fmt: "count", requires: "view_sold_velocity" },
+    projects:   { label: { sk: "Projekty", en: "Projects" }, get: a => a.projects, fmt: "count" },
+    avg_m2:     { label: { sk: "Cena /m²", en: "Price /m²" }, get: a => a.avg, fmt: "m2" },
+  },
+};
+function fmtRankVal(fmt, v, lang) {
+  if (v == null) return "—";
+  if (fmt === "m2") return fmtM2(v, lang);
+  if (fmt === "pct") return `${Math.round(v)}%`;
+  return fmtCount(v, lang);
+}
+function RankingBody({ cfg, ctx, lang }) {
+  const { projects, districts, can, setCurrent } = ctx;
+  const entity = cfg.entity || "projects";
+  const mdef = (RANK_METRICS[entity] || RANK_METRICS.projects)[cfg.metric] || Object.values(RANK_METRICS[entity])[0];
+  const locked = mdef.requires && !can(mdef.requires);
+  const dir = cfg.dir || "top"; const n = cfg.n || 5;
+
+  let rows = [];
+  if (entity === "projects") {
+    rows = (projects || []).filter(p => (p.status || "active") === "active" && mdef.get(p) != null)
+      .map(p => ({ key: p.id, name: p.name, sub: p.district || "—", val: mdef.get(p), clickId: p.id }));
+  } else if (entity === "districts") {
+    rows = (districts || []).filter(d => d.district && mdef.get(d) != null)
+      .map(d => ({ key: `${d.city_id}:${d.district}`, name: d.district, sub: d.city_name || "—", val: mdef.get(d) }));
+  } else {
+    const byDev = new Map();
+    for (const p of (projects || [])) { if (p.developer && (p.status || "active") === "active") { if (!byDev.has(p.developer)) byDev.set(p.developer, developerAgg(projects, p.developer)); } }
+    rows = [...byDev.entries()].filter(([, a]) => mdef.get(a) != null)
+      .map(([name, a]) => ({ key: name, name, sub: `${a.projects} ${L(lang, "proj.", "proj")}`, val: mdef.get(a) }));
+  }
+  rows.sort((a, b) => dir === "top" ? b.val - a.val : a.val - b.val);
+  rows = rows.slice(0, n);
+
+  if (rows.length === 0) return <Muted lang={lang} text={L(lang, "Žiadne dáta", "No data")} />;
+  const max = Math.max(...rows.map(r => Math.abs(r.val) || 0)) || 1;
+  return (
+    <div style={{ filter: locked ? "blur(6px)" : "none", opacity: locked ? 0.6 : 1 }}>
+      {rows.map((r, i) => (
+        <div key={r.key} role={r.clickId ? "button" : undefined} tabIndex={r.clickId ? 0 : undefined}
+          onClick={r.clickId ? () => setCurrent(`App:ProjectDetail:${r.clickId}`) : undefined}
+          style={{ display: "flex", alignItems: "center", gap: "0.6rem", padding: "0.32rem 0", cursor: r.clickId ? "pointer" : "default", borderBottom: i < rows.length - 1 ? `1px solid ${border}55` : "none" }}>
+          <span style={{ fontFamily: mono, fontSize: "0.66rem", color: faint, width: 14, flexShrink: 0 }}>{i + 1}</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: "0.82rem", color: textLight, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</div>
+            <div style={{ position: "relative", height: 3, background: `${border}`, borderRadius: 2, marginTop: 4 }}>
+              <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${Math.max(4, (Math.abs(r.val) / max) * 100)}%`, background: green, borderRadius: 2, opacity: 0.7 }} />
+            </div>
+          </div>
+          <span style={{ fontFamily: mono, fontSize: "0.78rem", fontWeight: 700, color: textLight, flexShrink: 0 }}>{fmtRankVal(mdef.fmt, r.val, lang)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// price benchmark (bar list)
+function BenchmarkBody({ cfg, ctx, lang }) {
+  const { districts, projects } = ctx;
+  const by = cfg.by || "district"; const n = cfg.n || 8;
+  let rows = [];
+  if (by === "district") {
+    rows = (districts || []).filter(d => d.district && d.avg_eur_m2).map(d => ({ name: d.district, sub: d.city_name, val: d.avg_eur_m2 }));
+  } else {
+    const byDev = new Map();
+    for (const p of (projects || [])) { if (p.developer && (p.status || "active") === "active" && !byDev.has(p.developer)) byDev.set(p.developer, developerAgg(projects, p.developer)); }
+    rows = [...byDev.entries()].filter(([, a]) => a.avg != null).map(([name, a]) => ({ name, val: a.avg }));
+  }
+  rows.sort((a, b) => b.val - a.val); rows = rows.slice(0, n);
+  if (rows.length === 0) return <Muted lang={lang} text={L(lang, "Žiadne dáta", "No data")} />;
+  const max = Math.max(...rows.map(r => r.val)) || 1;
+  return (
+    <div>
+      {rows.map((r, i) => (
+        <div key={r.name + i} style={{ display: "flex", alignItems: "center", gap: "0.6rem", padding: "0.28rem 0" }}>
+          <div style={{ width: "38%", minWidth: 0, fontSize: "0.78rem", color: textLight, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={r.name}>{r.name}</div>
+          <div style={{ flex: 1, height: 8, background: `${border}`, borderRadius: 3, position: "relative", overflow: "hidden" }}>
+            <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${Math.max(5, (r.val / max) * 100)}%`, background: `linear-gradient(90deg, ${green}, ${green}cc)`, borderRadius: 3 }} />
+          </div>
+          <div style={{ fontFamily: mono, fontSize: "0.72rem", fontWeight: 700, color: textLight, flexShrink: 0, minWidth: 62, textAlign: "right" }}>{fmtM2(r.val, lang)}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// trend (sparkline of a project series over the available months)
+const TREND_SERIES = {
+  available: { label: { sk: "Voľné byty", en: "Available units" }, get: r => r.available_units, fmt: "count", color: green },
+  sold:      { label: { sk: "Predané (spolu)", en: "Sold (total)" }, get: r => r.sold_units, fmt: "count", color: orange },
+  avg_m2:    { label: { sk: "Cena /m²", en: "Price /m²" }, get: r => r.avg_price_eur_m2, fmt: "m2", color: blue },
+};
+function TrendBody({ cfg, ctx, lang }) {
+  const { projects, seriesByProject, can } = ctx;
+  const locked = !can("view_historical_data");
+  const p = (projects || []).find(x => x.id === cfg.projectId);
+  if (!p) return <Muted lang={lang} text={L(lang, "Vyber projekt ⚙", "Pick a project ⚙")} />;
+  const sdef = TREND_SERIES[cfg.series] || TREND_SERIES.available;
+  const rows = seriesByProject.get(p.id) || [];
+  const vals = rows.map(sdef.get);
+  const first = vals.find(v => v != null), last = [...vals].reverse().find(v => v != null);
+  const delta = (first != null && last != null) ? last - first : null;
+  return (
+    <div style={{ filter: locked ? "blur(6px)" : "none", opacity: locked ? 0.6 : 1 }}>
+      <div style={{ fontWeight: 600, color: textLight, fontSize: "0.9rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</div>
+      <div style={{ fontFamily: mono, fontSize: "0.62rem", color: dim, marginBottom: "0.5rem" }}>{sdef.label[lang] || sdef.label.en} · {rows.length} {L(lang, "mes.", "mo")}</div>
+      <Sparkline series={vals} color={sdef.color} width={cfg._w === 2 ? 320 : 200} height={46} />
+      <div style={{ display: "flex", alignItems: "baseline", gap: "0.6rem", marginTop: "0.5rem" }}>
+        <span style={{ fontFamily: mono, fontSize: "1.05rem", fontWeight: 700, color: textLight }}>{fmtRankVal(sdef.fmt, last, lang)}</span>
+        {delta != null && delta !== 0 && (
+          <span style={{ fontFamily: mono, fontSize: "0.72rem", color: delta > 0 ? green : "#ff6b6b" }}>{delta > 0 ? "▲" : "▼"} {fmtRankVal(sdef.fmt, Math.abs(delta), lang)}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// district / area summary
+function SegmentBody({ cfg, ctx, lang }) {
+  const { districts } = ctx;
+  const row = (districts || []).find(d => d.district === cfg.district && String(d.city_id) === String(cfg.city));
+  if (!row) return <Muted lang={lang} text={L(lang, "Vyber oblasť ⚙", "Pick an area ⚙")} />;
+  const stats = [
+    { label: L(lang, "Voľné", "Available"), value: fmtCount(row.available_units, lang), accent: green },
+    { label: L(lang, "Predané", "Sold"), value: fmtCount(row.sold_units, lang) },
+    { label: `${moneySymbol()}/m²`, value: row.avg_eur_m2 ? Math.round(moneyFromEur(row.avg_eur_m2)).toLocaleString(localeTag(lang)) : "—" },
+    { label: L(lang, "Rezerv.", "Reserved"), value: fmtCount(row.reserved_units, lang), accent: blue },
+    { label: L(lang, "Projekty", "Projects"), value: fmtCount(row.project_count, lang) },
+    { label: L(lang, "Spolu", "Total"), value: fmtCount(row.total_units, lang) },
+  ];
+  return (
+    <div>
+      <div style={{ fontWeight: 600, color: textLight, fontSize: "0.92rem" }}>{row.district}</div>
+      <div style={{ fontFamily: mono, fontSize: "0.62rem", color: dim, marginBottom: "0.7rem" }}>{row.city_name || "—"}</div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.6rem" }}>
+        {stats.map(s => <MiniStat key={s.label} label={s.label} value={s.value} accent={s.accent || textLight} />)}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Widget editor (add palette + per-type config)
+// ═══════════════════════════════════════════════════════════════
+const PALETTE = [
+  { type: "project",   desc: { sk: "Priebežne sleduj jeden projekt.", en: "Keep one project in view." } },
+  { type: "ranking",   desc: { sk: "Top-N projektov / častí / developerov.", en: "Top-N projects / districts / developers." } },
+  { type: "benchmark", desc: { sk: "Ceny /m² podľa časti mesta alebo developera.", en: "€/m² by district or developer." } },
+  { type: "metric",    desc: { sk: "Jedno číslo pre trh / oblasť / developera.", en: "One number for market / area / developer." } },
+  { type: "trend",     desc: { sk: "Vývoj projektu v čase.", en: "A project's trend over time." } },
+  { type: "segment",   desc: { sk: "Zhrnutie jednej časti mesta.", en: "Summary of one district." } },
+];
+const DEFAULT_CFG = {
+  project:   () => ({ projectId: "" }),
+  ranking:   () => ({ entity: "projects", metric: "available", dir: "top", n: 5 }),
+  benchmark: () => ({ by: "district", metric: "avg_m2", n: 8 }),
+  metric:    () => ({ metric: "available", scope: { kind: "market" } }),
+  trend:     () => ({ projectId: "", series: "available" }),
+  segment:   () => ({ district: "", city: "" }),
+};
+
+function WidgetEditor({ mode, widget, ctx, lang, onClose, onAdd, onSave }) {
+  const [type, setType] = useState(mode === "edit" ? widget.type : null);
+  const [cfg, setCfg] = useState(mode === "edit" ? { ...widget.cfg } : null);
+  const w = mode === "edit" ? (widget.w || 1) : 1;
+
+  const pick = (t) => { setType(t); setCfg(DEFAULT_CFG[t]()); };
+  const commit = () => {
+    if (!type) return;
+    if (mode === "edit") onSave({ type, cfg, w });
+    else onAdd({ type, cfg, w });
+  };
+  const valid = type && isCfgValid(type, cfg);
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 80, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "6vh 1rem", overflowY: "auto" }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 520, background: surfacePanel, border: `1px solid ${border}`, borderRadius: 14, padding: "1.4rem 1.5rem", boxShadow: "0 24px 60px rgba(0,0,0,0.5)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem" }}>
+          <h3 style={{ margin: 0, color: textLight, fontSize: "1.1rem", fontWeight: 700 }}>
+            {mode === "edit" ? L(lang, "Nastaviť widget", "Configure widget") : L(lang, "Pridať widget", "Add widget")}
+          </h3>
+          <button onClick={onClose} style={{ background: "transparent", border: "none", color: dim, fontSize: "1.1rem", cursor: "pointer" }}>✕</button>
+        </div>
+
+        {/* type picker (add mode, before a type is chosen) */}
+        {mode === "add" && !type && (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.6rem" }}>
+            {PALETTE.map(pt => (
+              <button key={pt.type} onClick={() => pick(pt.type)}
+                style={{ textAlign: "left", background: bg, border: `1px solid ${border}`, borderRadius: 10, padding: "0.8rem 0.9rem", cursor: "pointer" }}
+                onMouseEnter={e => e.currentTarget.style.borderColor = green}
+                onMouseLeave={e => e.currentTarget.style.borderColor = border}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", marginBottom: "0.3rem" }}>
+                  <span style={{ color: green }}>{WIDGET_META[pt.type].icon}</span>
+                  <span style={{ color: textLight, fontWeight: 600, fontSize: "0.86rem" }}>{WIDGET_META[pt.type].title[lang] || WIDGET_META[pt.type].title.en}</span>
+                </div>
+                <div style={{ color: dim, fontSize: "0.72rem", lineHeight: 1.4 }}>{pt.desc[lang] || pt.desc.en}</div>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* config form */}
+        {type && (
+          <div>
+            {mode === "add" && (
+              <button onClick={() => { setType(null); setCfg(null); }}
+                style={{ background: "transparent", border: "none", color: dim, fontFamily: mono, fontSize: "0.72rem", cursor: "pointer", marginBottom: "0.8rem", padding: 0 }}>
+                ← {L(lang, "Späť na výber", "Back to picker")}
+              </button>
+            )}
+            <ConfigForm type={type} cfg={cfg} setCfg={setCfg} ctx={ctx} lang={lang} />
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.6rem", marginTop: "1.1rem" }}>
+              <button onClick={onClose} style={{ background: "transparent", border: `1px solid ${border}`, color: dim, borderRadius: 8, padding: "0.5rem 1rem", fontSize: "0.8rem", cursor: "pointer", fontFamily: "inherit" }}>{L(lang, "Zrušiť", "Cancel")}</button>
+              <button onClick={commit} disabled={!valid}
+                style={{ background: valid ? green : border, color: valid ? "#06140f" : faint, border: "none", borderRadius: 8, padding: "0.5rem 1.2rem", fontWeight: 700, fontFamily: mono, fontSize: "0.8rem", cursor: valid ? "pointer" : "default" }}>
+                {mode === "edit" ? L(lang, "Uložiť", "Save") : L(lang, "Pridať", "Add")}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function isCfgValid(type, cfg) {
+  if (!cfg) return false;
+  if (type === "project" || type === "trend") return !!cfg.projectId;
+  if (type === "segment") return !!cfg.district;
+  if (type === "metric") {
+    if (cfg.scope?.kind === "district") return !!cfg.scope.district;
+    if (cfg.scope?.kind === "developer") return !!cfg.scope.developer;
+    return true;
+  }
+  return true;
+}
+
+function ConfigForm({ type, cfg, setCfg, ctx, lang }) {
+  const { projects, districts } = ctx;
+  const set = (patch) => setCfg({ ...cfg, ...patch });
+
+  const projectOpts = useMemo(() => [{ value: "", label: L(lang, "— vyber projekt —", "— pick a project —") },
+    ...[...(projects || [])].sort((a, b) => (a.name || "").localeCompare(b.name || "")).map(p => ({ value: p.id, label: p.name }))], [projects, lang]);
+  const districtOpts = useMemo(() => [{ value: "", label: L(lang, "— vyber oblasť —", "— pick an area —") },
+    ...[...(districts || [])].filter(d => d.district).sort((a, b) => (b.total_units || 0) - (a.total_units || 0))
+      .map(d => ({ value: `${d.city_id}::${d.district}`, label: `${d.district}${d.city_name ? ` · ${d.city_name}` : ""}` }))], [districts, lang]);
+  const developerOpts = useMemo(() => {
+    const set2 = new Map();
+    for (const p of (projects || [])) if (p.developer && (p.status || "active") === "active") set2.set(p.developer, (set2.get(p.developer) || 0) + 1);
+    return [{ value: "", label: L(lang, "— vyber developera —", "— pick a developer —") },
+      ...[...set2.keys()].sort().map(d => ({ value: d, label: d }))];
+  }, [projects, lang]);
+
+  if (type === "project") {
+    return <Field label={L(lang, "Projekt", "Project")}><Select value={cfg.projectId} onChange={v => set({ projectId: v })} options={projectOpts} /></Field>;
+  }
+  if (type === "trend") {
+    return <>
+      <Field label={L(lang, "Projekt", "Project")}><Select value={cfg.projectId} onChange={v => set({ projectId: v })} options={projectOpts} /></Field>
+      <Field label={L(lang, "Ukazovateľ", "Series")}><Select value={cfg.series} onChange={v => set({ series: v })}
+        options={Object.entries(TREND_SERIES).map(([k, d]) => ({ value: k, label: d.label[lang] || d.label.en }))} /></Field>
+    </>;
+  }
+  if (type === "segment") {
+    return <Field label={L(lang, "Oblasť", "Area")}><Select value={cfg.district ? `${cfg.city}::${cfg.district}` : ""}
+      onChange={v => { const [c, ...r] = v.split("::"); set({ city: c, district: r.join("::") }); }} options={districtOpts} /></Field>;
+  }
+  if (type === "benchmark") {
+    return <>
+      <Field label={L(lang, "Podľa", "Group by")}><Select value={cfg.by} onChange={v => set({ by: v })}
+        options={[{ value: "district", label: L(lang, "Časť mesta", "District") }, { value: "developer", label: L(lang, "Developer", "Developer") }]} /></Field>
+      <Field label={L(lang, "Počet", "Rows")}><Select value={String(cfg.n)} onChange={v => set({ n: Number(v) })}
+        options={[5, 8, 10, 15].map(n => ({ value: String(n), label: String(n) }))} /></Field>
+    </>;
+  }
+  if (type === "ranking") {
+    const metricOpts = Object.entries(RANK_METRICS[cfg.entity] || RANK_METRICS.projects).map(([k, d]) => ({ value: k, label: d.label[lang] || d.label.en }));
+    return <>
+      <Field label={L(lang, "Zoznam", "List of")}><Select value={cfg.entity} onChange={v => {
+        const first = Object.keys(RANK_METRICS[v])[0];
+        set({ entity: v, metric: Object.keys(RANK_METRICS[v]).includes(cfg.metric) ? cfg.metric : first });
+      }} options={[
+        { value: "projects", label: L(lang, "Projekty", "Projects") },
+        { value: "districts", label: L(lang, "Časti mesta", "Districts") },
+        { value: "developers", label: L(lang, "Developeri", "Developers") },
+      ]} /></Field>
+      <Field label={L(lang, "Metrika", "Metric")}><Select value={cfg.metric} onChange={v => set({ metric: v })} options={metricOpts} /></Field>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.7rem" }}>
+        <Field label={L(lang, "Poradie", "Order")}><Select value={cfg.dir} onChange={v => set({ dir: v })}
+          options={[{ value: "top", label: L(lang, "Najviac", "Highest") }, { value: "bottom", label: L(lang, "Najmenej", "Lowest") }]} /></Field>
+        <Field label={L(lang, "Počet", "Rows")}><Select value={String(cfg.n)} onChange={v => set({ n: Number(v) })}
+          options={[3, 5, 8, 10].map(n => ({ value: String(n), label: String(n) }))} /></Field>
+      </div>
+    </>;
+  }
+  if (type === "metric") {
+    const kind = cfg.scope?.kind || "market";
+    return <>
+      <Field label={L(lang, "Metrika", "Metric")}><Select value={cfg.metric} onChange={v => set({ metric: v })}
+        options={Object.entries(METRICS).map(([k, d]) => ({ value: k, label: d.label[lang] || d.label.en }))} /></Field>
+      <Field label={L(lang, "Rozsah", "Scope")}><Select value={kind} onChange={v => set({ scope: v === "market" ? { kind: "market" } : { kind: v } })}
+        options={[{ value: "market", label: L(lang, "Celý trh", "Whole market") }, { value: "district", label: L(lang, "Časť mesta", "District") }, { value: "developer", label: L(lang, "Developer", "Developer") }]} /></Field>
+      {kind === "district" && (
+        <Field label={L(lang, "Oblasť", "Area")}><Select value={cfg.scope.district ? `${cfg.scope.city}::${cfg.scope.district}` : ""}
+          onChange={v => { const [c, ...r] = v.split("::"); const district = r.join("::"); const row = (districts || []).find(d => d.district === district && String(d.city_id) === String(c)); set({ scope: { kind: "district", city: c, district, districtLabel: row ? `${district}${row.city_name ? ` · ${row.city_name}` : ""}` : district } }); }}
+          options={districtOpts} /></Field>
+      )}
+      {kind === "developer" && (
+        <Field label={L(lang, "Developer", "Developer")}><Select value={cfg.scope.developer || ""}
+          onChange={v => set({ scope: { kind: "developer", developer: v } })} options={developerOpts} /></Field>
+      )}
+    </>;
+  }
+  return null;
+}
