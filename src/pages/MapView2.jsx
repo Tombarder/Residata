@@ -186,6 +186,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
   const [saving, setSaving] = useState(false);   // inline "name this area" input open
   const [saveName, setSaveName] = useState("");
   const [justSaved, setJustSaved] = useState("");  // the name we just saved (brief ✓ confirmation)
+  const [compFilter, setCompFilter] = useState(null); // completion bucket the project list is drilled into (null = all)
   const dismissExplainer = () => { setShowExplainer(false); try { localStorage.setItem("residata_map_explainer_hidden", "1"); } catch (_) {} };
   const reopenExplainer = () => { setShowExplainer(true); try { localStorage.removeItem("residata_map_explainer_hidden"); } catch (_) {} };
   const drawToolRef = useRef(null); drawToolRef.current = drawTool;
@@ -346,6 +347,10 @@ export default function MapView2({ lang = "en", setCurrent }) {
     return computeCompetitiveSet(shown, coords, analysisCenter, radiusKm, verifiedOnly);
   }, [shown, coords, shape, analysisCenter, radiusKm, verifiedOnly]);
   const selection = shape || analysisCenter; // panel shows for radius OR a drawn shape
+  // Reset the completion drill-down whenever the selection TYPE changes (new area /
+  // switch radius↔polygon↔corridor / cleared) — but not on every vertex drag.
+  const selKey = selection ? (shape ? shape.kind : "radius") : "none";
+  useEffect(() => { setCompFilter(null); }, [selKey]);
   // Size readout for the drawn selection.
   const shapeSize = useMemo(() => {
     if (!shape) return null;
@@ -573,6 +578,22 @@ export default function MapView2({ lang = "en", setCurrent }) {
   const isLoading = loading || coords === null;
   const legend = legendForLens(lens, thresholds, fmt);
 
+  // ── Completion drill-down helpers ──
+  const COMP_LABEL = sk
+    ? { ready: "hotové", soon: "o rok", mid: "o 2 roky", far: "neskôr", unknown: "neznáme" }
+    : { ready: "ready", soon: "+1 yr", mid: "+2 yrs", far: "later", unknown: "unknown" };
+  // "When it completes" for a project row: a year, "hotové/done", or null (unknown).
+  const completionWhen = (p) => {
+    const k = (p.kolaudacia || "").toString().trim();
+    if (!k) return null;
+    if (/skolaud|hotov|dokon|nas[ťt]ah|ready|complet|move/i.test(k)) return sk ? "hotové" : "done";
+    const m = k.match(/20\d{2}/);
+    if (m) return m[0];
+    return k.length <= 12 ? k : null;
+  };
+  // The project list, optionally drilled into one completion bucket.
+  const listProjects = compSet ? (compFilter ? compSet.inside.filter((p) => completionBucket(p) === compFilter) : compSet.inside) : [];
+
   // Saved-areas list — shown in the panel in BOTH the empty and the active state, so
   // after you save an area you immediately see it and can reload it.
   const savedAreasBlock = savedAreas.length > 0 ? (
@@ -792,7 +813,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
               )}
               {compSet && compSet.soldLastMonth > 0 && (
                 <div style={{ fontSize: "0.66rem", color: dim, marginBottom: 12 }}>
-                  ▴ <span style={{ color: green, fontFamily: mono }}>{compSet.soldLastMonth}</span> {sk ? "bytov predaných v tomto okruhu za posledný mesiac" : "units sold in this area last month"}
+                  ▴ <span style={{ color: green, fontFamily: mono }}>{compSet.soldLastMonth}</span> {sk ? `bytov predaných ${shape ? "v tejto oblasti" : "v tomto okruhu"} za posledný mesiac` : "units sold in this area last month"}
                 </div>
               )}
 
@@ -804,18 +825,27 @@ export default function MapView2({ lang = "en", setCurrent }) {
 
               {compSet && compSet.inside.length > 0 ? (
                 <>
-                  <div style={{ fontSize: "0.7rem", color: dim, marginBottom: 6 }}>{sk ? "Dokončenie" : "Completing"}</div>
-                  <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
-                    {["ready", "soon", "mid", "far", "unknown"].map((k) => (
-                      <div key={k} style={{ flex: 1, textAlign: "center" }}>
-                        <div style={{ height: 28, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-                          <div style={{ width: 16, height: Math.max(3, (compSet.comp[k] / Math.max(1, compSet.inside.length)) * 28), background: COMPLETION[k].color, borderRadius: 3 }} />
-                        </div>
-                        <div style={{ fontSize: "0.58rem", color: dim, marginTop: 3 }}>{COMPLETION[k].short}</div>
-                        <div style={{ fontSize: "0.64rem", color: textLight, fontFamily: mono }}>{compSet.comp[k]}</div>
-                      </div>
-                    ))}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                    <span style={{ fontSize: "0.7rem", color: dim }}>{sk ? "Kedy sa dokončia" : "When they complete"}</span>
+                    {compFilter && <button onClick={() => setCompFilter(null)} style={{ background: "none", border: "none", color: green, cursor: "pointer", fontSize: "0.66rem" }}>{sk ? "zrušiť ✕" : "clear ✕"}</button>}
                   </div>
+                  <div style={{ display: "flex", gap: 5, marginBottom: 3 }}>
+                    {["ready", "soon", "mid", "far", "unknown"].map((k) => {
+                      const n = compSet.comp[k]; const active = compFilter === k;
+                      return (
+                        <button key={k} onClick={() => n > 0 && setCompFilter(active ? null : k)} disabled={n === 0}
+                          title={n > 0 ? (sk ? `Zobraziť projekty (${COMP_LABEL[k]})` : `Show projects (${COMP_LABEL[k]})`) : ""}
+                          style={{ flex: 1, minWidth: 0, background: active ? `${COMPLETION[k].color}22` : "none", border: `1px solid ${active ? COMPLETION[k].color : "transparent"}`, borderRadius: 7, padding: "4px 1px", cursor: n > 0 ? "pointer" : "default", textAlign: "center", opacity: n === 0 ? 0.4 : 1 }}>
+                          <div style={{ height: 26, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+                            <div style={{ width: 15, height: Math.max(3, (n / Math.max(1, compSet.inside.length)) * 26), background: COMPLETION[k].color, borderRadius: 3 }} />
+                          </div>
+                          <div style={{ fontSize: "0.55rem", color: active ? COMPLETION[k].color : dim, marginTop: 3, lineHeight: 1.1 }}>{COMP_LABEL[k]}</div>
+                          <div style={{ fontSize: "0.66rem", color: textLight, fontFamily: mono }}>{n}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div style={{ fontSize: "0.6rem", color: dim, marginBottom: 12, fontStyle: "italic" }}>{sk ? "Klikni na stĺpec a ukáže ti projekty s daným dokončením." : "Click a bar to list the projects completing then."}</div>
 
                   <div style={{ fontSize: "0.7rem", color: dim, marginBottom: 6 }}>{sk ? "Najväčší developeri" : "Top developers"}</div>
                   {compSet.topDevs.map((d) => (
@@ -826,18 +856,30 @@ export default function MapView2({ lang = "en", setCurrent }) {
                   ))}
 
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "12px 0 6px" }}>
-                    <span style={{ fontSize: "0.7rem", color: dim }}>{sk ? "Projekty" : "Projects"} ({compSet.inside.length})</span>
-                    <button onClick={() => exportCsv(compSet.inside, coords)} style={{ background: "none", border: `1px solid ${border}`, color: dim, borderRadius: 6, padding: "3px 8px", fontSize: "0.66rem", cursor: "pointer" }} title={sk ? "Stiahnuť ako CSV" : "Download as CSV"}>⬇ CSV</button>
+                    <span style={{ fontSize: "0.7rem", color: dim }}>{sk ? "Projekty" : "Projects"}{compFilter ? <span style={{ color: COMPLETION[compFilter].color }}> · {COMP_LABEL[compFilter]}</span> : ""} ({listProjects.length})</span>
+                    <button onClick={() => exportCsv(listProjects, coords)} style={{ background: "none", border: `1px solid ${border}`, color: dim, borderRadius: 6, padding: "3px 8px", fontSize: "0.66rem", cursor: "pointer" }} title={sk ? "Stiahnuť ako CSV" : "Download as CSV"}>⬇ CSV</button>
                   </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                    {compSet.inside.slice().sort((a, b) => ppm2Of(b) - ppm2Of(a)).slice(0, 40).map((p) => (
-                      <button key={p.id} onClick={() => openProject(p.id)} style={{ display: "flex", justifyContent: "space-between", gap: 8, background: "none", border: "none", color: textLight, cursor: "pointer", fontSize: "0.75rem", padding: "3px 4px", textAlign: "left", borderRadius: 5 }}
-                        onMouseEnter={(e) => (e.currentTarget.style.background = "#1d1d22")} onMouseLeave={(e) => (e.currentTarget.style.background = "none")}>
-                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(coords && coords[p.id] && !coords[p.id].verified) ? "◍ " : ""}{p.name}</span>
-                        <span style={{ color: dim, fontFamily: mono, flexShrink: 0 }}>{ppm2Of(p) ? "€" + fmt(ppm2Of(p)) : "—"}</span>
-                      </button>
-                    ))}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                    {listProjects.slice().sort((a, b) => ppm2Of(b) - ppm2Of(a)).slice(0, 60).map((p) => {
+                      const when = completionWhen(p); const bucket = completionBucket(p); const avail = Number(p.available_units) || 0;
+                      return (
+                        <button key={p.id} onClick={() => openProject(p.id)} style={{ display: "block", width: "100%", background: "none", border: "none", cursor: "pointer", padding: "4px 5px", textAlign: "left", borderRadius: 6 }}
+                          onMouseEnter={(e) => (e.currentTarget.style.background = "#1d1d22")} onMouseLeave={(e) => (e.currentTarget.style.background = "none")}>
+                          <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                            <span style={{ color: textLight, fontSize: "0.76rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(coords && coords[p.id] && !coords[p.id].verified) ? "◍ " : ""}{p.name}</span>
+                            <span style={{ color: dim, fontFamily: mono, fontSize: "0.74rem", flexShrink: 0 }}>{ppm2Of(p) ? "€" + fmt(ppm2Of(p)) + "/m²" : "—"}</span>
+                          </div>
+                          <div style={{ display: "flex", gap: 8, fontSize: "0.62rem", color: dim, marginTop: 1 }}>
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }} title={sk ? "Dokončenie (kolaudácia)" : "Completion"}><span style={{ width: 6, height: 6, borderRadius: "50%", background: COMPLETION[bucket].color, display: "inline-block", flexShrink: 0 }} />{when || (sk ? "termín ?" : "date ?")}</span>
+                            <span>· {avail} {sk ? "voľných" : "free"}</span>
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
+                  {compFilter && listProjects.length === 0 && (
+                    <div style={{ color: dim, fontSize: "0.72rem", padding: "6px 2px" }}>{sk ? "Žiadne projekty s týmto dokončením — " : "No projects with this timing — "}<button onClick={() => setCompFilter(null)} style={{ background: "none", border: "none", color: green, cursor: "pointer", fontSize: "0.72rem", padding: 0 }}>{sk ? "zobraziť všetky" : "show all"}</button></div>
+                  )}
                 </>
               ) : (
                 <div style={{ color: dim, fontSize: "0.78rem" }}>{sk ? "Žiadne projekty v okruhu — zväčši okruh alebo klikni inde." : "No projects in range — widen the radius or click elsewhere."}</div>
