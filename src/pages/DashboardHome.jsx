@@ -48,6 +48,7 @@ const fmtCount = (v, lang) =>
 const fmtM2 = (eur, lang) =>
   (eur == null || Number.isNaN(Number(eur))) ? "—"
     : `${Math.round(moneyFromEur(Number(eur))).toLocaleString(localeTag(lang))} ${moneySymbol()}/m²`;
+const fmtPct = (v) => (v == null || !Number.isFinite(Number(v))) ? "—" : `${Math.round(Number(v))}%`;
 const fmtMonths = (m, lang) => {
   if (m == null || !Number.isFinite(m)) return "—";
   if (m >= 24) return `~${(m / 12).toFixed(1)} ${L(lang, "r", "yr")}`;
@@ -55,20 +56,27 @@ const fmtMonths = (m, lang) => {
 };
 
 // ─── metric registry (shared by KPI strip + metric widget) ─────
+// hint = one-line plain-language clarification shown under the number, so a
+// non-analyst instantly knows what "Reserved" or "All units" actually means.
 const METRICS = {
-  available:  { label: { sk: "Voľné byty",         en: "Available units" }, fmt: "count", accent: green },
-  avg_m2:     { label: { sk: "Priem. cena /m²",    en: "Avg price /m²"   }, fmt: "m2" },
-  sold30:     { label: { sk: "Predané (30 dní)",   en: "Sold (30 days)"  }, fmt: "count", accent: orange, requires: "view_sold_velocity" },
-  sold_total: { label: { sk: "Predané (spolu)",    en: "Sold (total)"    }, fmt: "count" },
-  reserved:   { label: { sk: "Rezervované",         en: "Reserved"        }, fmt: "count", accent: blue },
-  tracked:    { label: { sk: "Byty v databáze",     en: "Units tracked"   }, fmt: "count" },
-  projects:   { label: { sk: "Projekty",            en: "Projects"        }, fmt: "count" },
-  inventory:  { label: { sk: "Mesiacov zásob",      en: "Months of stock" }, fmt: "months" },
+  available:   { label: { sk: "Voľné byty",     en: "Available"    }, hint: { sk: "aktuálne v predaji",         en: "on the market now"      }, fmt: "count", accent: green },
+  avg_m2:      { label: { sk: "Priem. cena/m²", en: "Avg price/m²" }, hint: { sk: "ponuková, s DPH",            en: "asking, incl. VAT"      }, fmt: "m2" },
+  sold30:      { label: { sk: "Predané/30 dní", en: "Sold/30 days" }, hint: { sk: "tempo predaja",              en: "sales pace"             }, fmt: "count", accent: orange, requires: "view_sold_velocity" },
+  sold_total:  { label: { sk: "Predané spolu",  en: "Sold total"   }, hint: { sk: "kumulatívne doteraz",        en: "cumulative to date"     }, fmt: "count" },
+  sold_through:{ label: { sk: "Vypredanosť",    en: "Sold-through" }, hint: { sk: "podiel už predaných",        en: "share already sold"     }, fmt: "pct", accent: orange },
+  reserved:    { label: { sk: "Rezervované",    en: "Reserved"     }, hint: { sk: "vr. predrezervovaných",      en: "incl. pre-reserved"     }, fmt: "count", accent: blue },
+  tracked:     { label: { sk: "Všetky byty",    en: "All units"    }, hint: { sk: "vrátane predaných",          en: "incl. sold"             }, fmt: "count" },
+  projects:    { label: { sk: "Projekty",       en: "Projects"     }, hint: { sk: "aktívne v predaji",          en: "active in market"       }, fmt: "count" },
+  developers:  { label: { sk: "Developeri",     en: "Developers"   }, hint: { sk: "aktívni na trhu",            en: "active in market"       }, fmt: "count" },
+  inventory:   { label: { sk: "Zásoba",         en: "Inventory"    }, hint: { sk: "mesiacov pri dnešnom tempe", en: "months at today's pace" }, fmt: "months" },
 };
+// Metrics that support a month-over-month delta (derivable from project history).
+const MOM_METRICS = new Set(["available", "avg_m2", "reserved", "sold_total", "sold_through"]);
 const fmtMetric = (key, val, lang) => {
   const f = METRICS[key]?.fmt;
   if (f === "m2") return fmtM2(val, lang);
   if (f === "months") return fmtMonths(val, lang);
+  if (f === "pct") return fmtPct(val);
   return fmtCount(val, lang);
 };
 
@@ -101,6 +109,12 @@ function metricValue(metric, scope, ctx) {
       case "tracked":    return t.unitsTracked;
       case "projects":   return t.projectsActive;
       case "sold_total": return (projects || []).reduce((a, p) => a + (p.sold_units || 0), 0);
+      case "developers": return t.developersActive;
+      case "sold_through": {
+        const sold = (projects || []).reduce((a, p) => a + (p.sold_units || 0), 0);
+        const den = sold + (t.unitsAvailable || 0) + (t.unitsReserved || 0);
+        return den ? (sold / den) * 100 : null;
+      }
       case "inventory":  return (t.soldLastMonth > 0 && t.unitsAvailable != null) ? t.unitsAvailable / t.soldLastMonth : null;
       default: return null;
     }
@@ -115,6 +129,11 @@ function metricValue(metric, scope, ctx) {
       case "tracked":    return row.total_units;
       case "projects":   return row.project_count;
       case "sold_total": return row.sold_units;
+      case "developers": return null;   // districts view has no developer count
+      case "sold_through": {
+        const den = (row.sold_units || 0) + (row.available_units || 0) + (row.reserved_units || 0);
+        return den ? ((row.sold_units || 0) / den) * 100 : null;
+      }
       case "sold30":     return null;   // no per-district velocity
       case "inventory":  return null;
       default: return null;
@@ -130,11 +149,74 @@ function metricValue(metric, scope, ctx) {
       case "tracked":    return a.tracked;
       case "projects":   return a.projects;
       case "sold_total": return a.sold;
+      case "developers": return null;
+      case "sold_through": {
+        const den = a.sold + a.avail + a.reserved;
+        return den ? (a.sold / den) * 100 : null;
+      }
       case "inventory":  return (a.sold30 > 0) ? a.avail / a.sold30 : null;
       default: return null;
     }
   }
   return null;
+}
+
+// ─── month-over-month deltas from project history ──────────────
+// Aggregate the per-project monthly snapshots to the chosen scope, month by
+// month, so the KPI strip + metric widgets can show "▲/▼ vs last month".
+// Scope match: market = everything; developer = same developer; district = same
+// district NAME (only used where the country is unambiguous — the KPI strip
+// restricts MoM to market scope to avoid same-named districts across cities).
+function scopeHistory(scope, snapshots) {
+  const rows = (snapshots || []).filter(r => {
+    if (!scope || scope.kind === "market") return true;
+    if (scope.kind === "developer") return r.developer === scope.developer;
+    if (scope.kind === "district") return r.district === scope.district;
+    return true;
+  });
+  const byMonth = new Map();
+  for (const r of rows) {
+    const m = r.snapshot_month; if (!m) continue;
+    let a = byMonth.get(m);
+    if (!a) { a = { available: 0, sold: 0, reserved: 0, wSum: 0, wTot: 0 }; byMonth.set(m, a); }
+    a.available += r.available_units || 0;
+    a.sold += r.sold_units || 0;
+    a.reserved += r.reserved_units || 0;
+    if (r.avg_price_eur_m2) { const w = r.available_units || 1; a.wSum += r.avg_price_eur_m2 * w; a.wTot += w; }
+  }
+  return [...byMonth.keys()].sort().map(m => {
+    const a = byMonth.get(m), den = a.sold + a.available + a.reserved;
+    return { month: m, available: a.available, sold: a.sold, reserved: a.reserved,
+             avg_m2: a.wTot ? a.wSum / a.wTot : null, sold_through: den ? (a.sold / den) * 100 : null };
+  });
+}
+function momDelta(metric, scope, ctx) {
+  const key = { available: "available", avg_m2: "avg_m2", reserved: "reserved", sold_total: "sold", sold_through: "sold_through" }[metric];
+  if (!key) return null;
+  const h = scopeHistory(scope, ctx.snapshots);
+  if (h.length < 2) return null;
+  const cur = h[h.length - 1][key], prev = h[h.length - 2][key];
+  if (cur == null || prev == null) return null;
+  const abs = cur - prev;
+  if (Math.abs(abs) < 1e-9) return null;
+  return { abs, metric };
+}
+// A compact "▲ 320" / "▼ 1 200 €" / "▲ 2 pp" chip. Direction only — deliberately
+// no green/red good-bad colouring (a price rise or more supply isn't "bad").
+function DeltaChip({ delta, lang }) {
+  if (!delta) return null;
+  const up = delta.abs > 0;
+  const mag = Math.abs(delta.abs);
+  let txt;
+  if (delta.metric === "avg_m2") txt = `${Math.round(moneyFromEur(mag)).toLocaleString(localeTag(lang))} ${moneySymbol()}`;
+  else if (delta.metric === "sold_through") txt = `${mag.toFixed(1)} pp`;
+  else txt = fmtCount(Math.round(mag), lang);
+  return (
+    <span title={L(lang, "oproti minulému mesiacu", "vs last month")}
+      style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, whiteSpace: "nowrap" }}>
+      <span style={{ color: up ? green : "#ff8a8a" }}>{up ? "▲" : "▼"}</span> {txt}
+    </span>
+  );
 }
 
 const scopeLabel = (scope, lang) => {
@@ -183,15 +265,20 @@ function Select({ value, onChange, options }) {
   );
 }
 
-// ─── KPI card (Zone A + metric widget) ─────────────────────────
-function KpiCard({ label, value, sub, accent = textLight, locked = false, size = "md" }) {
+// ─── KPI card (Zone A) ─────────────────────────────────────────
+function KpiCard({ label, value, hint, delta, lang, accent = textLight, locked = false }) {
   return (
-    <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 10, padding: size === "lg" ? "1.15rem 1.25rem" : "0.9rem 1rem", minWidth: 0 }}>
-      <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.4rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</div>
-      <div style={{ fontFamily: mono, fontSize: size === "lg" ? "1.9rem" : "1.5rem", fontWeight: 700, color: accent, letterSpacing: "-0.02em", lineHeight: 1, filter: locked ? "blur(6px)" : "none", opacity: locked ? 0.55 : 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{value}</div>
+    <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 12, padding: "0.95rem 1.05rem", minWidth: 0, display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+      <span style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.09em", textTransform: "uppercase", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+      <div style={{ fontFamily: mono, fontSize: "1.4rem", fontWeight: 700, color: accent, letterSpacing: "-0.02em", lineHeight: 1.05, filter: locked ? "blur(6px)" : "none", opacity: locked ? 0.55 : 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{value}</div>
       {locked
-        ? <div style={{ fontSize: "0.62rem", color: orange, marginTop: "0.35rem", fontFamily: mono }}>{"paid only"}</div>
-        : (sub && <div style={{ fontFamily: mono, fontSize: "0.66rem", color: dim, marginTop: "0.4rem" }}>{sub}</div>)}
+        ? <div style={{ fontSize: "0.62rem", color: orange, fontFamily: mono }}>{L(lang, "len pre paid", "paid only")}</div>
+        : (hint || delta) && (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.4rem" }}>
+            <span style={{ fontFamily: mono, fontSize: "0.63rem", color: faint, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{hint}</span>
+            <DeltaChip delta={delta} lang={lang} />
+          </div>
+        )}
     </div>
   );
 }
@@ -211,7 +298,7 @@ function useProjectHistory() {
     if (_historyCache) { setRows(_historyCache); return; }
     let cancelled = false;
     supabase.from("project_snapshots")
-      .select("project_id,snapshot_month,available_units,sold_units,avg_price_eur_m2")
+      .select("project_id,snapshot_month,available_units,sold_units,reserved_units,avg_price_eur_m2,district,developer")
       .order("snapshot_month", { ascending: true })
       .then(({ data, error }) => {
         if (cancelled) return;
@@ -298,8 +385,8 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
 
   // KPI strip metric set depends on scope
   const kpiMetrics = area
-    ? ["projects", "available", "sold_total", "avg_m2", "reserved", "tracked"]
-    : ["projects", "available", "sold30", "avg_m2", "reserved", "inventory"];
+    ? ["available", "avg_m2", "sold_total", "sold_through", "reserved", "projects", "tracked"]
+    : ["available", "avg_m2", "sold30", "sold_through", "reserved", "inventory", "projects", "developers"];
 
   // ── widget mutations ──
   const widgets = config?.widgets || [];
@@ -356,18 +443,27 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
             </select>
           </div>
         </div>
-        <div className="dash-kpi-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(155px, 1fr))", gap: "0.75rem" }}>
+        <div className="dash-kpi-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "0.7rem" }}>
           {kpiMetrics.map(mk => {
             const def = METRICS[mk];
             const locked = def.requires && !can(def.requires);
             const gateVelocity = mk === "sold30" && !velocityMature;
             const raw = metricValue(mk, scope, ctx);
-            const value = gateVelocity ? "—" : fmtMetric(mk, raw, lang);
+            // In the KPI strip the "/m²" lives in the label, so the value drops the
+            // suffix (just "5 104 €") — keeps the number readable in a narrow card.
+            const value = gateVelocity ? "—"
+              : mk === "sold30" ? (raw ? `+${fmtCount(raw, lang)}` : "—")
+              : mk === "avg_m2" ? (raw != null ? `${Math.round(moneyFromEur(raw)).toLocaleString(localeTag(lang))} ${moneySymbol()}` : "—")
+              : fmtMetric(mk, raw, lang);
+            // MoM delta only on market scope (district by-name would merge same-named
+            // districts across cities in the "all markets" view — see momDelta note).
+            const delta = (!locked && !gateVelocity && !area && MOM_METRICS.has(mk)) ? momDelta(mk, scope, ctx) : null;
             return (
               <KpiCard key={mk}
                 label={def.label[lang] || def.label.en}
-                value={mk === "sold30" && !gateVelocity && raw ? `+${fmtCount(raw, lang)}` : value}
-                sub={gateVelocity ? L(lang, "zbierame históriu", "building history") : null}
+                value={value}
+                hint={gateVelocity ? L(lang, "zbierame históriu", "building history") : (def.hint?.[lang] || def.hint?.en)}
+                delta={delta} lang={lang}
                 accent={def.accent || textLight}
                 locked={locked && !gateVelocity} />
             );
@@ -377,10 +473,18 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
 
       {/* ═══ ZONE B · My dashboard ═══ */}
       <section>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap", marginBottom: "0.95rem" }}>
-          <div style={{ fontFamily: mono, fontSize: "0.68rem", color: green, letterSpacing: "0.12em", textTransform: "uppercase" }}>
-            {L(lang, "Môj dashboard", "My dashboard")}
-            <SavePill saveState={saveState} lang={lang} />
+        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap", marginBottom: "0.95rem" }}>
+          <div>
+            <div style={{ fontFamily: mono, fontSize: "0.68rem", color: green, letterSpacing: "0.12em", textTransform: "uppercase" }}>
+              {L(lang, "Môj dashboard", "My dashboard")}
+              <SavePill saveState={saveState} lang={lang} />
+            </div>
+            {widgets.length > 0 && (
+              <div style={{ fontSize: "0.72rem", color: faint, marginTop: "0.4rem" }}>
+                {L(lang, "Ťahaj karty pre presun · ⋯ pre nastavenia · zmeny sa ukladajú samé",
+                      "Drag cards to reorder · ⋯ for options · changes save automatically")}
+              </div>
+            )}
           </div>
           <div style={{ display: "inline-flex", gap: "0.5rem" }}>
             <button onClick={() => setEditor({ mode: "add" })}
@@ -403,8 +507,6 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
           <div className="dash-grid" style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "0.9rem" }}>
             {widgets.map((w, i) => (
               <div key={w.id}
-                draggable
-                onDragStart={() => { dragId.current = w.id; }}
                 onDragOver={e => e.preventDefault()}
                 onDrop={() => onDrop(w.id)}
                 style={{ gridColumn: w.w === 2 ? "span 2" : "span 1", minWidth: 0 }}
@@ -412,6 +514,7 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
                 <WidgetCard
                   widget={w} ctx={ctx} lang={lang}
                   first={i === 0} last={i === widgets.length - 1}
+                  dragProps={{ draggable: true, onDragStart: () => { dragId.current = w.id; }, onDragEnd: () => { dragId.current = null; } }}
                   onConfigure={() => setEditor({ mode: "edit", widget: w })}
                   onRemove={() => removeWidget(w.id)}
                   onToggleWidth={() => toggleWidth(w.id)}
@@ -514,37 +617,71 @@ const WIDGET_META = {
   segment:   { icon: "◪", title: { sk: "Zhrnutie oblasti", en: "Area summary" } },
 };
 
-function WidgetCard({ widget, ctx, lang, first, last, onConfigure, onRemove, onToggleWidth, onMove }) {
+function WidgetCard({ widget, ctx, lang, first, last, dragProps, onConfigure, onRemove, onToggleWidth, onMove }) {
   const [hover, setHover] = useState(false);
   const meta = WIDGET_META[widget.type] || { icon: "▦", title: { sk: widget.type, en: widget.type } };
   return (
     <div onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{ background: bg, border: `1px solid ${border}`, borderRadius: 12, padding: "0.95rem 1.05rem", height: "100%", boxSizing: "border-box", position: "relative", transition: "border-color 0.15s" }}>
-      {/* toolbar */}
-      <div style={{ position: "absolute", top: 8, right: 8, display: "flex", gap: 3, opacity: hover ? 1 : 0, transition: "opacity 0.12s", background: bg2, border: `1px solid ${border}`, borderRadius: 7, padding: 2 }}>
-        <TBtn title={L(lang, "Vľavo", "Move left")} onClick={() => onMove(-1)} disabled={first}>◀</TBtn>
-        <TBtn title={L(lang, "Vpravo", "Move right")} onClick={() => onMove(1)} disabled={last}>▶</TBtn>
-        <TBtn title={L(lang, "Šírka", "Resize")} onClick={onToggleWidth}>{widget.w === 2 ? "▢" : "▭"}</TBtn>
-        <TBtn title={L(lang, "Nastaviť", "Configure")} onClick={onConfigure}>⚙</TBtn>
-        <TBtn title={L(lang, "Odstrániť", "Remove")} onClick={onRemove} danger>✕</TBtn>
-      </div>
-      {/* header */}
-      <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "0.7rem", paddingRight: hover ? 120 : 0 }}>
-        <span style={{ color: dim, fontSize: "0.75rem" }}>{meta.icon}</span>
-        <span style={{ fontFamily: mono, fontSize: "0.58rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase" }}>{meta.title[lang] || meta.title.en}</span>
+      style={{ background: bg, border: `1px solid ${hover ? "#2c2c34" : border}`, borderRadius: 12, height: "100%", boxSizing: "border-box", transition: "border-color 0.15s", display: "flex", flexDirection: "column" }}>
+      {/* header — drag handle + icon + title on the left; ⋯ menu on the right.
+          Only the header is draggable, so clicks inside the body (leaderboard
+          rows, project cards) never start an accidental drag. */}
+      <div {...dragProps}
+        style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.4rem",
+          padding: "0.6rem 0.75rem 0.6rem 0.85rem", borderBottom: `1px solid ${border}`, cursor: "grab" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", minWidth: 0 }}>
+          <span title={L(lang, "Ťahaj pre presun", "Drag to reorder")} style={{ color: hover ? dim : faint, fontSize: "0.8rem", lineHeight: 1, letterSpacing: "-2px", transition: "color 0.15s" }}>⠿</span>
+          <span style={{ color: green, fontSize: "0.78rem" }}>{meta.icon}</span>
+          <span style={{ fontFamily: mono, fontSize: "0.58rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{meta.title[lang] || meta.title.en}</span>
+        </div>
+        <WidgetMenu lang={lang} widget={widget} first={first} last={last}
+          onConfigure={onConfigure} onToggleWidth={onToggleWidth} onMove={onMove} onRemove={onRemove} />
       </div>
       {/* body */}
-      <WidgetBody widget={widget} ctx={ctx} lang={lang} />
+      <div style={{ padding: "0.9rem 1.05rem 1rem", flex: 1 }}>
+        <WidgetBody widget={widget} ctx={ctx} lang={lang} />
+      </div>
     </div>
   );
 }
-function TBtn({ children, onClick, title, disabled, danger }) {
+
+// Always-visible "⋯" overflow menu — the discoverable home for every widget
+// action (configure / resize / reorder / remove). Replaces the old cryptic
+// hover-only glyph toolbar.
+function WidgetMenu({ lang, widget, first, last, onConfigure, onToggleWidth, onMove, onRemove }) {
+  const [open, setOpen] = useState(false);
+  const close = () => setOpen(false);
   return (
-    <button title={title} onClick={onClick} disabled={disabled}
-      style={{ width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", color: disabled ? faint : (danger ? "#ff6b6b" : dim), cursor: disabled ? "default" : "pointer", fontSize: "0.72rem", borderRadius: 5, fontFamily: mono }}
-      onMouseEnter={e => { if (!disabled) e.currentTarget.style.background = "rgba(255,255,255,0.06)"; }}
+    <div style={{ position: "relative", flexShrink: 0 }}>
+      <button aria-label={L(lang, "Možnosti widgetu", "Widget options")} onClick={(e) => { e.stopPropagation(); setOpen(o => !o); }}
+        onMouseDown={e => e.stopPropagation()}
+        style={{ width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", background: open ? "rgba(255,255,255,0.06)" : "transparent", border: `1px solid ${open ? border : "transparent"}`, borderRadius: 7, color: dim, cursor: "pointer", fontSize: "1rem", lineHeight: 1 }}
+        onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; e.currentTarget.style.color = textLight; }}
+        onMouseLeave={e => { if (!open) e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = dim; }}>⋯</button>
+      {open && (
+        <>
+          <div onClick={close} onMouseDown={e => e.stopPropagation()} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+          <div onMouseDown={e => e.stopPropagation()} style={{ position: "absolute", right: 0, top: "calc(100% + 5px)", zIndex: 41, minWidth: 178, background: surfacePanel, border: `1px solid ${border}`, borderRadius: 10, boxShadow: "0 12px 34px rgba(0,0,0,0.55)", padding: "0.3rem", cursor: "default" }}>
+            <MenuItem icon="⚙" onClick={() => { onConfigure(); close(); }}>{L(lang, "Nastaviť", "Configure")}</MenuItem>
+            <MenuItem icon={widget.w === 2 ? "▭" : "▬"} onClick={() => { onToggleWidth(); close(); }}>{widget.w === 2 ? L(lang, "Na polovicu", "Half width") : L(lang, "Na celú šírku", "Full width")}</MenuItem>
+            <MenuItem icon="↑" disabled={first} onClick={() => { onMove(-1); close(); }}>{L(lang, "Posunúť vyššie", "Move up")}</MenuItem>
+            <MenuItem icon="↓" disabled={last} onClick={() => { onMove(1); close(); }}>{L(lang, "Posunúť nižšie", "Move down")}</MenuItem>
+            <div style={{ height: 1, background: border, margin: "0.3rem 0.15rem" }} />
+            <MenuItem icon="🗑" danger onClick={() => { onRemove(); close(); }}>{L(lang, "Odstrániť", "Remove")}</MenuItem>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+function MenuItem({ icon, children, onClick, disabled, danger }) {
+  return (
+    <button onClick={onClick} disabled={disabled}
+      style={{ display: "flex", alignItems: "center", gap: "0.6rem", width: "100%", textAlign: "left", padding: "0.5rem 0.6rem", background: "transparent", border: "none", borderRadius: 7, cursor: disabled ? "default" : "pointer", color: disabled ? faint : (danger ? "#ff8a8a" : "#d0d0d6"), fontFamily: "inherit", fontSize: "0.82rem" }}
+      onMouseEnter={e => { if (!disabled) e.currentTarget.style.background = danger ? "rgba(255,107,107,0.1)" : "rgba(255,255,255,0.05)"; }}
       onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
-      {children}
+      <span style={{ width: 16, textAlign: "center", fontSize: "0.8rem", opacity: 0.9 }}>{icon}</span>
+      <span>{children}</span>
     </button>
   );
 }
@@ -570,13 +707,19 @@ function MetricBody({ cfg, ctx, lang }) {
   const def = METRICS[cfg.metric]; if (!def) return <Muted lang={lang} />;
   const locked = def.requires && !can(def.requires);
   const raw = metricValue(cfg.metric, cfg.scope, ctx);
+  const scopeKind = cfg.scope?.kind || "market";
+  const delta = (!locked && MOM_METRICS.has(cfg.metric) && scopeKind !== "district") ? momDelta(cfg.metric, cfg.scope, ctx) : null;
   return (
     <div>
-      <div style={{ fontFamily: mono, fontSize: "1.85rem", fontWeight: 700, color: def.accent || textLight, letterSpacing: "-0.02em", lineHeight: 1, filter: locked ? "blur(6px)" : "none", opacity: locked ? 0.55 : 1 }}>
-        {locked ? "12 345" : fmtMetric(cfg.metric, raw, lang)}
+      <div style={{ display: "flex", alignItems: "baseline", gap: "0.6rem", flexWrap: "wrap" }}>
+        <div style={{ fontFamily: mono, fontSize: "1.95rem", fontWeight: 700, color: def.accent || textLight, letterSpacing: "-0.02em", lineHeight: 1, filter: locked ? "blur(6px)" : "none", opacity: locked ? 0.55 : 1 }}>
+          {locked ? "12 345" : fmtMetric(cfg.metric, raw, lang)}
+        </div>
+        {!locked && <DeltaChip delta={delta} lang={lang} />}
       </div>
-      <div style={{ fontFamily: mono, fontSize: "0.66rem", color: dim, marginTop: "0.5rem" }}>
-        {locked ? <span style={{ color: orange }}>{L(lang, "len pre paid", "paid only")}</span> : <>{def.label[lang] || def.label.en} · {scopeLabel(cfg.scope, lang)}</>}
+      <div style={{ fontFamily: mono, fontSize: "0.66rem", color: dim, marginTop: "0.55rem" }}>
+        {locked ? <span style={{ color: orange }}>{L(lang, "len pre paid", "paid only")}</span>
+          : <>{def.label[lang] || def.label.en} · {scopeLabel(cfg.scope, lang)} · <span style={{ color: faint }}>{def.hint?.[lang] || def.hint?.en}</span></>}
       </div>
     </div>
   );
@@ -626,16 +769,18 @@ const RANK_METRICS = {
     sold_pct:   { label: { sk: "% predané", en: "% sold" }, get: p => p.sold_percentage, fmt: "pct" },
   },
   districts: {
-    available:  { label: { sk: "Voľné byty", en: "Available" }, get: d => d.available_units, fmt: "count" },
-    avg_m2:     { label: { sk: "Cena /m²", en: "Price /m²" }, get: d => d.avg_eur_m2, fmt: "m2" },
-    sold_total: { label: { sk: "Predané", en: "Sold" }, get: d => d.sold_units, fmt: "count" },
-    projects:   { label: { sk: "Projekty", en: "Projects" }, get: d => d.project_count, fmt: "count" },
+    available:   { label: { sk: "Voľné byty", en: "Available" }, get: d => d.available_units, fmt: "count" },
+    avg_m2:      { label: { sk: "Cena /m²", en: "Price /m²" }, get: d => d.avg_eur_m2, fmt: "m2" },
+    sold_total:  { label: { sk: "Predané", en: "Sold" }, get: d => d.sold_units, fmt: "count" },
+    sold_through:{ label: { sk: "Vypredanosť", en: "Sold-through" }, get: d => { const den = (d.sold_units || 0) + (d.available_units || 0) + (d.reserved_units || 0); return den ? (d.sold_units || 0) / den * 100 : null; }, fmt: "pct" },
+    projects:    { label: { sk: "Projekty", en: "Projects" }, get: d => d.project_count, fmt: "count" },
   },
   developers: {
-    available:  { label: { sk: "Voľné byty", en: "Available" }, get: a => a.avail, fmt: "count" },
-    sold30:     { label: { sk: "Predaj 30d", en: "Sold 30d" }, get: a => a.sold30, fmt: "count", requires: "view_sold_velocity" },
-    projects:   { label: { sk: "Projekty", en: "Projects" }, get: a => a.projects, fmt: "count" },
-    avg_m2:     { label: { sk: "Cena /m²", en: "Price /m²" }, get: a => a.avg, fmt: "m2" },
+    available:   { label: { sk: "Voľné byty", en: "Available" }, get: a => a.avail, fmt: "count" },
+    sold30:      { label: { sk: "Predaj 30d", en: "Sold 30d" }, get: a => a.sold30, fmt: "count", requires: "view_sold_velocity" },
+    sold_through:{ label: { sk: "Vypredanosť", en: "Sold-through" }, get: a => { const den = a.sold + a.avail + a.reserved; return den ? a.sold / den * 100 : null; }, fmt: "pct" },
+    projects:    { label: { sk: "Projekty", en: "Projects" }, get: a => a.projects, fmt: "count" },
+    avg_m2:      { label: { sk: "Cena /m²", en: "Price /m²" }, get: a => a.avg, fmt: "m2" },
   },
 };
 function fmtRankVal(fmt, v, lang) {
