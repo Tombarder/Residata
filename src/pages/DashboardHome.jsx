@@ -39,6 +39,8 @@ import {
   surface as bg, surfaceDark as bg2, surfacePanel, mono,
 } from "../lib/theme";
 import { useDashboardConfig, newWidgetId } from "../lib/useDashboardConfig";
+import MapFilterBuilder from "../components/MapFilterBuilder";
+import { applyFilters, describe, isComplete } from "../lib/mapFilters";
 
 const L = (lang, sk, en) => (lang === "sk" ? sk : en);
 
@@ -219,6 +221,63 @@ function DeltaChip({ delta, lang }) {
   );
 }
 
+// ─── overview aggregation over an arbitrary (filtered) project set ─────
+// The Market Overview zone is now driven by the same filter engine as the Map /
+// Projects list (applyFilters over projects_live), so its KPIs are computed live
+// from whatever subset the user's filters select — not a single pre-baked view.
+function aggregateProjects(list) {
+  let available = 0, sold = 0, reserved = 0, tracked = 0, sold30 = 0, wSum = 0, wTot = 0;
+  const devs = new Set();
+  for (const p of list || []) {
+    available += p.available_units || 0;
+    sold      += p.sold_units || 0;
+    reserved  += p.reserved_units || 0;
+    tracked   += p.total_units || 0;
+    sold30    += p.sold_last_month || 0;
+    if (p.developer && String(p.developer).trim()) devs.add(String(p.developer).trim());
+    if (p.avg_price_eur_m2) { const w = p.available_units || p.total_units || 1; wSum += p.avg_price_eur_m2 * w; wTot += w; }
+  }
+  const den = sold + available + reserved;
+  return {
+    available, sold_total: sold, reserved, tracked, sold30,
+    projects: (list || []).length, developers: devs.size,
+    avg_m2: wTot ? wSum / wTot : null,
+    sold_through: den ? (sold / den) * 100 : null,
+    inventory: sold30 > 0 ? available / sold30 : null,
+  };
+}
+const aggMetric = (agg, metric) => (agg && metric in agg ? agg[metric] : null);
+
+// Monthly history aggregated over a set of project ids → MoM delta for the strip.
+function aggHistory(idSet, snapshots) {
+  const byMonth = new Map();
+  for (const r of snapshots || []) {
+    if (!idSet.has(r.project_id)) continue;
+    const m = r.snapshot_month; if (!m) continue;
+    let a = byMonth.get(m);
+    if (!a) { a = { available: 0, sold: 0, reserved: 0, wSum: 0, wTot: 0 }; byMonth.set(m, a); }
+    a.available += r.available_units || 0;
+    a.sold += r.sold_units || 0;
+    a.reserved += r.reserved_units || 0;
+    if (r.avg_price_eur_m2) { const w = r.available_units || 1; a.wSum += r.avg_price_eur_m2 * w; a.wTot += w; }
+  }
+  return [...byMonth.keys()].sort().map(m => {
+    const a = byMonth.get(m), den = a.sold + a.available + a.reserved;
+    return { available: a.available, sold_total: a.sold, reserved: a.reserved,
+             avg_m2: a.wTot ? a.wSum / a.wTot : null, sold_through: den ? (a.sold / den) * 100 : null };
+  });
+}
+function aggMomDelta(metric, idSet, snapshots) {
+  if (!MOM_METRICS.has(metric)) return null;
+  const h = aggHistory(idSet, snapshots);
+  if (h.length < 2) return null;
+  const cur = h[h.length - 1][metric], prev = h[h.length - 2][metric];
+  if (cur == null || prev == null) return null;
+  const abs = cur - prev;
+  if (Math.abs(abs) < 1e-9) return null;
+  return { abs, metric };
+}
+
 const scopeLabel = (scope, lang) => {
   if (!scope || scope.kind === "market") return L(lang, "celý trh", "whole market");
   if (scope.kind === "district") return scope.districtLabel || scope.district;
@@ -249,6 +308,12 @@ const selStyle = {
   width: "100%", padding: "0.5rem 0.65rem", background: bg2, border: `1px solid ${border}`,
   borderRadius: 8, color: textLight, fontSize: "0.82rem", fontFamily: "inherit", outline: "none", cursor: "pointer",
 };
+// Pill-style chip button matching the Map / Projects filter bar.
+const filterChip = (active) => ({
+  display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 999,
+  fontSize: "0.74rem", cursor: "pointer", fontFamily: "inherit",
+  border: `1px solid ${active ? green : border}`, background: active ? `${green}14` : bg2, color: active ? green : textLight,
+});
 function Field({ label, children }) {
   return (
     <label style={{ display: "block", marginBottom: "0.7rem" }}>
@@ -359,34 +424,30 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
     return name ? `${word}, ${name}.` : `${word}.`;
   }, [profile?.full_name, lang]);
 
-  // ── Zone A scope (persisted in config.overview.area) ──
-  const area = config?.overview?.area || null;
+  // ── Zone A · Market Overview filters (persisted in config.overview.filters) ──
+  // Same composable filter engine as the Map / Projects list (applyFilters over
+  // projects_live). Conditions AND together; the KPI strip is computed live from
+  // the matching subset — any dimension, not a single pre-baked district.
+  const conditions = config?.overview?.filters || [];
+  const setConditions = (next) => setConfig(c => {
+    const value = typeof next === "function" ? next(c.overview?.filters || []) : next;
+    return { ...c, overview: { ...c.overview, filters: value } };
+  });
+  const [filterOpen, setFilterOpen] = useState(false);
+  const activeConds = useMemo(() => (conditions || []).filter(isComplete), [conditions]);
 
-  // Districts for the Area selector — biggest first, current country only
-  const areaOptions = useMemo(() => {
-    const opts = [{ value: "", label: L(lang, "Celý trh", "Whole market") }];
-    const sorted = [...(districts || [])].sort((a, b) => (b.total_units || 0) - (a.total_units || 0));
-    for (const d of sorted) {
-      if (!d.district) continue;
-      opts.push({ value: `${d.city_id}::${d.district}`, label: `${d.district}${d.city_name ? ` · ${d.city_name}` : ""}` });
-    }
-    return opts;
-  }, [districts, lang]);
+  // Base set: active projects by default; if the user added a "Availability"
+  // (status) condition, filter over ALL projects so they can explicitly pull in
+  // sold-out / paused. Then apply the rest of their conditions.
+  const overviewProjects = useMemo(() => {
+    const hasStatus = activeConds.some(c => c.field === "status");
+    const base = hasStatus ? (projects || []) : (projects || []).filter(p => (p.status || "active") === "active");
+    return applyFilters(base, activeConds);
+  }, [projects, activeConds]);
+  const overviewAgg = useMemo(() => aggregateProjects(overviewProjects), [overviewProjects]);
+  const overviewIds = useMemo(() => new Set(overviewProjects.map(p => p.id)), [overviewProjects]);
 
-  const setArea = (v) => {
-    if (!v) { setConfig(c => ({ ...c, overview: { ...c.overview, area: null } })); return; }
-    const [city, ...rest] = v.split("::");
-    const district = rest.join("::");
-    const row = (districts || []).find(d => d.district === district && String(d.city_id) === String(city));
-    setConfig(c => ({ ...c, overview: { ...c.overview, area: { district, city, districtLabel: row ? `${district}${row.city_name ? ` · ${row.city_name}` : ""}` : district } } }));
-  };
-
-  const scope = area ? { kind: "district", district: area.district, city: area.city, districtLabel: area.districtLabel } : { kind: "market" };
-
-  // KPI strip metric set depends on scope
-  const kpiMetrics = area
-    ? ["available", "avg_m2", "sold_total", "sold_through", "reserved", "projects", "tracked"]
-    : ["available", "avg_m2", "sold30", "sold_through", "reserved", "inventory", "projects", "developers"];
+  const kpiMetrics = ["available", "avg_m2", "sold30", "sold_through", "reserved", "inventory", "projects", "developers"];
 
   // ── widget mutations ──
   const widgets = config?.widgets || [];
@@ -426,38 +487,49 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
       {trialActive && <TrialRunningBanner lang={lang} daysLeft={trialDaysLeft} onOpenBilling={() => setCurrent("App:Billing")} />}
 
       {/* ═══ ZONE A · Market overview ═══ */}
-      <section style={{ marginBottom: "2.25rem" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap", marginBottom: "0.85rem" }}>
-          <div style={{ fontFamily: mono, fontSize: "0.68rem", color: green, letterSpacing: "0.12em", textTransform: "uppercase" }}>
+      <section style={{ marginBottom: "2.25rem", position: "relative" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.55rem", flexWrap: "wrap", marginBottom: "0.85rem" }}>
+          <div style={{ fontFamily: mono, fontSize: "0.68rem", color: green, letterSpacing: "0.12em", textTransform: "uppercase", marginRight: "0.15rem" }}>
             {L(lang, "Prehľad trhu", "Market overview")}
-            <span style={{ color: dim, marginLeft: "0.6rem", textTransform: "none", letterSpacing: 0 }}>
-              · {isAllCountries(country) ? L(lang, "všetky trhy", "all markets") : countryName(country, lang)} · {scopeLabel(scope, lang)}
+            <span style={{ color: dim, marginLeft: "0.55rem", textTransform: "none", letterSpacing: 0 }}>
+              · {isAllCountries(country) ? L(lang, "všetky trhy", "all markets") : countryName(country, lang)}
+              {" · "}<strong style={{ color: textLight }}>{fmtCount(overviewProjects.length, lang)}</strong> {L(lang, "projektov", "projects")}
             </span>
           </div>
-          {/* Area filter/selection menu */}
-          <div style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
-            <span style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.08em", textTransform: "uppercase" }}>{L(lang, "Oblasť", "Area")}</span>
-            <select value={area ? `${area.city}::${area.district}` : ""} onChange={e => setArea(e.target.value)}
-              style={{ ...selStyle, width: "auto", minWidth: 200, maxWidth: 320 }}>
-              {areaOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-          </div>
+          {/* Filters — the exact same builder as the Map / Projects list */}
+          <button onClick={() => setFilterOpen(o => !o)} style={filterChip(filterOpen || activeConds.length > 0)}>
+            ⚙ {L(lang, "Filtre", "Filters")}{activeConds.length ? ` · ${activeConds.length}` : ""}
+          </button>
+          {activeConds.map(c => (
+            <span key={c.id} style={{ display: "inline-flex", alignItems: "center", gap: 5, background: `${green}14`, color: green, border: `1px solid ${green}40`, borderRadius: 999, padding: "4px 9px", fontSize: "0.7rem", maxWidth: 260 }}>
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{describe(c, lang === "sk")}</span>
+              <span onClick={() => setConditions(cs => cs.filter(x => x.id !== c.id))} style={{ cursor: "pointer", flexShrink: 0 }}>×</span>
+            </span>
+          ))}
+          {activeConds.length > 0 && (
+            <button onClick={() => setConditions([])} style={{ background: "none", border: "none", color: dim, cursor: "pointer", fontSize: "0.72rem", fontFamily: mono }}>{L(lang, "vyčistiť", "clear")}</button>
+          )}
         </div>
+
+        {filterOpen && (
+          <MapFilterBuilder conditions={conditions} setConditions={setConditions}
+            projects={(projects || [])} matchCount={overviewProjects.length} totalCount={(projects || []).length}
+            sk={lang === "sk"} onClose={() => setFilterOpen(false)} />
+        )}
+
         <div className="dash-kpi-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "0.7rem" }}>
           {kpiMetrics.map(mk => {
             const def = METRICS[mk];
             const locked = def.requires && !can(def.requires);
             const gateVelocity = mk === "sold30" && !velocityMature;
-            const raw = metricValue(mk, scope, ctx);
+            const raw = aggMetric(overviewAgg, mk);
             // In the KPI strip the "/m²" lives in the label, so the value drops the
             // suffix (just "5 104 €") — keeps the number readable in a narrow card.
             const value = gateVelocity ? "—"
               : mk === "sold30" ? (raw ? `+${fmtCount(raw, lang)}` : "—")
               : mk === "avg_m2" ? (raw != null ? `${Math.round(moneyFromEur(raw)).toLocaleString(localeTag(lang))} ${moneySymbol()}` : "—")
               : fmtMetric(mk, raw, lang);
-            // MoM delta only on market scope (district by-name would merge same-named
-            // districts across cities in the "all markets" view — see momDelta note).
-            const delta = (!locked && !gateVelocity && !area && MOM_METRICS.has(mk)) ? momDelta(mk, scope, ctx) : null;
+            const delta = (!locked && !gateVelocity && MOM_METRICS.has(mk)) ? aggMomDelta(mk, overviewIds, snapshots) : null;
             return (
               <KpiCard key={mk}
                 label={def.label[lang] || def.label.en}
@@ -661,7 +733,7 @@ function WidgetMenu({ lang, widget, first, last, onConfigure, onToggleWidth, onM
       {open && (
         <>
           <div onClick={close} onMouseDown={e => e.stopPropagation()} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
-          <div onMouseDown={e => e.stopPropagation()} style={{ position: "absolute", right: 0, top: "calc(100% + 5px)", zIndex: 41, minWidth: 178, background: surfacePanel, border: `1px solid ${border}`, borderRadius: 10, boxShadow: "0 12px 34px rgba(0,0,0,0.55)", padding: "0.3rem", cursor: "default" }}>
+          <div onMouseDown={e => e.stopPropagation()} style={{ position: "absolute", right: 0, top: "calc(100% + 5px)", zIndex: 41, minWidth: 184, background: "#17171c", border: "1px solid #23232a", borderRadius: 11, boxShadow: "0 20px 52px rgba(0,0,0,0.72)", padding: "0.35rem", cursor: "default" }}>
             <MenuItem icon="⚙" onClick={() => { onConfigure(); close(); }}>{L(lang, "Nastaviť", "Configure")}</MenuItem>
             <MenuItem icon={widget.w === 2 ? "▭" : "▬"} onClick={() => { onToggleWidth(); close(); }}>{widget.w === 2 ? L(lang, "Na polovicu", "Half width") : L(lang, "Na celú šírku", "Full width")}</MenuItem>
             <MenuItem icon="↑" disabled={first} onClick={() => { onMove(-1); close(); }}>{L(lang, "Posunúť vyššie", "Move up")}</MenuItem>

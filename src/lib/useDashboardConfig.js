@@ -40,7 +40,7 @@ export function newWidgetId() {
 export function defaultConfig() {
   return {
     version: DASHBOARD_VERSION,
-    overview: { area: null },
+    overview: { filters: [] },
     widgets: [
       { id: newWidgetId(), type: "ranking",   w: 1, cfg: { entity: "projects", metric: "sold30",    dir: "top", n: 5 } },
       { id: newWidgetId(), type: "benchmark",  w: 1, cfg: { by: "district", metric: "avg_m2", n: 8 } },
@@ -57,7 +57,14 @@ function normalize(raw) {
   if (!raw || typeof raw !== "object" || !Array.isArray(raw.widgets)) return defaultConfig();
   return {
     version: raw.version || DASHBOARD_VERSION,
-    overview: raw.overview && typeof raw.overview === "object" ? { area: raw.overview.area ?? null } : { area: null },
+    // Persist the Market-Overview filter conditions. Re-id each on load with an
+    // "f…" prefix so they can never collide with the shared MapFilterBuilder's
+    // per-session "cN" counter ids (which reset to c1 every page load).
+    overview: {
+      filters: Array.isArray(raw.overview?.filters)
+        ? raw.overview.filters.map(c => ({ ...c, id: "f" + Math.random().toString(36).slice(2, 9) }))
+        : [],
+    },
     widgets: raw.widgets
       .filter(w => w && typeof w === "object" && typeof w.type === "string")
       .map(w => ({
