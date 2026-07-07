@@ -18,7 +18,7 @@ import { useProjects } from "../lib/useData";
 import DashboardHome from "./DashboardHome";
 import { useCountry, isAllCountries } from "../lib/useCountry";
 import { localeTag, PUBLIC_LANGS } from "../lib/locale";
-import { supabase } from "../lib/supabase";
+import { supabase, supabaseData } from "../lib/supabase";
 import { useActivateTrial } from "../lib/useActivateTrial";
 import { pushRoute } from "../lib/routing";
 import { track } from "../lib/track";
@@ -1476,7 +1476,7 @@ function PlatformExports({ lang, setCurrent }) {
     (async () => {
       setDaysLoading(true);
       try {
-        let q = supabase.from("archive_days").select("day, country");
+        let q = supabaseData.from("archive_days").select("day, country");
         if (!isAllCountries(country)) q = q.eq("country", country);
         const { data, error } = await q;
         if (error) throw error;
@@ -1556,7 +1556,7 @@ function PlatformExports({ lang, setCurrent }) {
             label: lang === "sk" ? `Sťahujem trh ${mi + 1}/${markets.length}…` : `Fetching market ${mi + 1}/${markets.length}…`,
           });
         }
-        const { data, error } = await supabase.rpc("export_units_csv", { p_country: markets[mi], p_day: pDay });
+        const { data, error } = await supabaseData.rpc("export_units_csv", { p_country: markets[mi], p_day: pDay });
         if (error) throw error;
         if (data && data.length) parts.push(data);
       }
@@ -1645,7 +1645,7 @@ function PlatformExports({ lang, setCurrent }) {
             label: lang === "sk" ? `Sťahujem trh ${mi + 1}/${markets.length}…` : `Fetching market ${mi + 1}/${markets.length}…`,
           });
         }
-        const { data, error } = await supabase.rpc("export_units_csv", { p_country: markets[mi], p_day: pDay });
+        const { data, error } = await supabaseData.rpc("export_units_csv", { p_country: markets[mi], p_day: pDay });
         if (error) throw error;
         if (data && data.length) parts.push(data);
       }

@@ -28,7 +28,7 @@ import { useCapabilities } from "../lib/useCapabilities";
 import {
   useProjects, useMarketTotals, useVelocityMature, useDistrictTotals,
 } from "../lib/useData";
-import { supabase } from "../lib/supabase";
+import { supabaseData } from "../lib/supabase";
 import { useCountry, isAllCountries, countryName } from "../lib/useCountry";
 import { useCurrency } from "../lib/useCurrency";
 import { moneyFromEur, moneySymbol } from "../lib/money";
@@ -362,7 +362,7 @@ function useProjectHistory() {
     if (!user) { setRows([]); return; }
     if (_historyCache) { setRows(_historyCache); return; }
     let cancelled = false;
-    supabase.from("project_snapshots")
+    supabaseData.from("project_snapshots")
       .select("project_id,snapshot_month,available_units,sold_units,reserved_units,avg_price_eur_m2,district,developer")
       .order("snapshot_month", { ascending: true })
       .then(({ data, error }) => {

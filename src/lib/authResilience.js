@@ -59,6 +59,37 @@ export function makeAuthTimeoutFetch(baseFetch, { authTimeoutMs = AUTH_FETCH_TIM
   };
 }
 
+// Hard ceiling for a single RLS-gated DATA read (ms). The data client no longer
+// blocks on getSession() (see authToken.js), so this only ever trips on a truly
+// stuck socket — a dead keep-alive after laptop-sleep / a Wi-Fi handoff that the
+// browser hasn't reaped. Generous: the app pages reads in ≤5000-row chunks that
+// return in a few seconds on a warm connection; 35s means "the connection itself
+// is dead", so we abort it (freeing the socket) and let the read layer retry on a
+// fresh one instead of spinning forever.
+export const DATA_FETCH_TIMEOUT_MS = 35000;
+
+/**
+ * Wrap a base fetch so EVERY request is bounded by a hard timeout via
+ * AbortController — used by the DATA client. On timeout the socket is aborted,
+ * which makes PostgREST resolve with an AbortError `{error}` (it never rejects
+ * for non-throwOnError builders), so the calling hook always reaches its
+ * `setLoading(false)` and can retry — a stuck connection can no longer strand
+ * the UI. Honours a caller-supplied AbortSignal too.
+ */
+export function makeDataTimeoutFetch(baseFetch, { timeoutMs = DATA_FETCH_TIMEOUT_MS } = {}) {
+  const f = baseFetch || ((...a) => fetch(...a));
+  return (input, init = {}) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const callerSignal = init.signal;
+    if (callerSignal) {
+      if (callerSignal.aborted) controller.abort();
+      else callerSignal.addEventListener("abort", () => controller.abort(), { once: true });
+    }
+    return f(input, { ...init, signal: controller.signal }).finally(() => clearTimeout(timer));
+  };
+}
+
 /**
  * A self-healing in-tab serialisation lock with the signature gotrue expects:
  *   (name, acquireTimeout, fn) => Promise<result of fn>
