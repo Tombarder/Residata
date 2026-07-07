@@ -20,7 +20,7 @@
  */
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useAuth } from "./useAuth";
-import { supabase } from "./supabase";
+import { supabase, supabaseData } from "./supabase";
 
 export const DASHBOARD_VERSION = 1;
 
@@ -91,7 +91,9 @@ export function useDashboardConfig() {
     let cancelled = false;
     setLoading(true);
     if (!user) { setConfigState(defaultConfig()); setLoading(false); return; }
-    supabase.from("user_dashboards").select("config").eq("user_id", user.id).maybeSingle()
+    // Read via supabaseData (no getSession on the path → the dashboard can never
+    // hang on "loading"). The debounced upsert below stays on the auth client.
+    supabaseData.from("user_dashboards").select("config").eq("user_id", user.id).maybeSingle()
       .then(({ data, error }) => {
         if (cancelled) return;
         if (error) console.error("[useDashboardConfig] load", error);

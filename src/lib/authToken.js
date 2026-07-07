@@ -36,10 +36,14 @@
 
 // Refresh proactively if the token expires within this window (seconds).
 const REFRESH_SKEW_S = 90;
-// Hard cap on how long a data read may wait for a boundary refresh (ms). The
-// auth client autoRefreshes well before expiry, so this only ever trips on a
-// woken-from-sleep edge; even then it's bounded, never infinite.
-const REFRESH_RACE_MS = 6000;
+// Hard cap on how long a data read may wait for a boundary refresh (ms). Set
+// just ABOVE the auth-fetch timeout (AUTH_FETCH_TIMEOUT_MS = 8000) so the bounded
+// refresh has time to actually COMPLETE and hand back the FRESH token — rather
+// than the race returning the stale token at 6s and the read then 401-ing at the
+// exact expiry boundary. The auth client autoRefreshes proactively well before
+// expiry, so this fallback almost never triggers; when it does it's bounded,
+// never infinite.
+const REFRESH_RACE_MS = 9000;
 
 let _authClient = null;      // the AUTH client (set via initAuthTokenSync)
 let _accessToken = null;     // current user access token, or null when logged out

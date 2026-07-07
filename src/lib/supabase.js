@@ -62,10 +62,15 @@ export const supabase = url && key ? createClient(url, key, {
     storage: typeof window !== "undefined" ? window.localStorage : undefined,
     lock: inMemoryAuthLock,
   },
-  // Bound auth network calls (/auth/v1/*) so a hung/slow token refresh can never
-  // hold the auth lock indefinitely. Scoped to auth only — paged data reads pass
-  // through untouched and are never aborted mid-flight.
-  global: { fetch: makeAuthTimeoutFetch() },
+  // Bound EVERY request on the auth client: /auth/v1/* at 8s (so a hung/slow token
+  // refresh can never hold the auth lock indefinitely) AND all other traffic
+  // (loadProfile + privileged WRITES) at 35s (so a dead socket can't strand a save
+  // or the admin panel forever either). Composed: the data-timeout wraps the
+  // auth-timeout, so auth calls keep their tighter 8s bound while everything else
+  // gets the 35s ceiling. The heavy paged reads no longer run on THIS client (they
+  // moved to supabaseData), so a 35s ceiling here is safe — nothing legitimate on
+  // the auth client takes that long.
+  global: { fetch: makeDataTimeoutFetch(makeAuthTimeoutFetch()) },
 }) : null;
 
 // Keep the token store in sync with the AUTH client's session lifecycle. Must

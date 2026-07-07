@@ -17,17 +17,20 @@ import { useCountry, isAllCountries } from "./useCountry";
  */
 const READ_HARD_CAP_MS = 40000;
 function sbRead(builder) {
+  let capTimer = null;
   const settled = Promise.resolve(builder).then(
     (r) => r,
     (error) => ({ data: null, error: error || new Error("read failed") })
   );
-  const cap = new Promise((resolve) =>
-    setTimeout(
+  const cap = new Promise((resolve) => {
+    capTimer = setTimeout(
       () => resolve({ data: null, error: { message: "read timed out (client cap)", code: "CLIENT_TIMEOUT" } }),
       READ_HARD_CAP_MS
-    )
-  );
-  return Promise.race([settled, cap]);
+    );
+  });
+  // Clear the backstop timer as soon as the real read settles, so rapid
+  // navigation doesn't leave a fleet of 40s timers pending.
+  return Promise.race([settled, cap]).finally(() => { if (capTimer) clearTimeout(capTimer); });
 }
 
 // Cross-market "All" view helpers: drop the country filter on table reads and
