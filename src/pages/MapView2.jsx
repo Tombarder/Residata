@@ -28,9 +28,10 @@ import {
   LENSES, COMPLETION, NO_DATA, ppm2Of, metricValue, completionBucket,
   tertiles, colorFor, coverage, circlePolygon, computeCompetitiveSet, computePolygonSet, computeCorridorSet,
   corridorBufferRing, polygonAreaKm2, polylineLengthKm, legendForLens, valueRange, heatWeight, hasPublishedPrice,
-  median, percentile, setAbsorptionPct, summarizeSet,
+  median, percentile, setAbsorptionPct,
 } from "../lib/mapMetrics";
 import MapFilterBuilder from "../components/MapFilterBuilder";
+import Picker from "../components/Picker";
 import { applyFilters, describe, isComplete } from "../lib/mapFilters";
 
 const mono = "'JetBrains Mono', monospace";
@@ -49,15 +50,6 @@ let savedView = null;
 const AREAS_KEY = "residata_map_areas_v1";
 function loadSavedAreas() { try { return JSON.parse(localStorage.getItem(AREAS_KEY) || "[]"); } catch (_) { return []; } }
 function persistSavedAreas(list) { try { localStorage.setItem(AREAS_KEY, JSON.stringify(list)); } catch (_) {} }
-
-// "My projects" — the ids a developer marked as their own (★). Persisted so the
-// marking sticks across areas and sessions: a developer's own sites don't change,
-// and marking one as "mine" both drops it out of the competition average and pins
-// it as the comparison baseline. Exclusions/compare picks are per-analysis (state
-// only); ownership is durable, so only this one is persisted.
-const OWN_KEY = "residata_map_own_projects_v1";
-function loadOwnIds() { try { return new Set(JSON.parse(localStorage.getItem(OWN_KEY) || "[]").map(String)); } catch (_) { return new Set(); } }
-function persistOwnIds(set) { try { localStorage.setItem(OWN_KEY, JSON.stringify([...set])); } catch (_) {} }
 
 const norm = (s) => (s || "").toString().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
 const fmt = (n) => Number(Math.round(n)).toLocaleString("sk-SK");
@@ -138,12 +130,15 @@ function showProjectPopup(map, lngLat, props, handlers, popupRef) {
     `<div><span style="color:${dim}">Absorbed</span> &nbsp;${props.soldPct == null ? "—" : props.soldPct + "%"}</div></div>` +
     `<div style="display:flex;gap:6px;margin-top:10px">` +
     `<button id="mv2-analyze" style="flex:1;padding:7px 8px;background:transparent;color:${green};border:1px solid ${green};border-radius:6px;font-weight:600;font-size:0.72rem;cursor:pointer">◎ Area</button>` +
+    `<button id="mv2-compare" style="flex:1;padding:7px 8px;background:transparent;color:${textLight};border:1px solid ${border};border-radius:6px;font-weight:600;font-size:0.72rem;cursor:pointer">⇄ Compare</button>` +
     `<button id="mv2-open" style="flex:1.3;padding:7px 8px;background:${green};color:#0a0a0b;border:none;border-radius:6px;font-weight:600;font-size:0.72rem;cursor:pointer">Open →</button>` +
     `</div>`;
   const open = el.querySelector("#mv2-open");
   const analyze = el.querySelector("#mv2-analyze");
+  const compare = el.querySelector("#mv2-compare");
   if (open) open.onclick = () => handlers.onOpen(props.id);
   if (analyze) analyze.onclick = () => handlers.onAnalyze(props);
+  if (compare && handlers.onCompare) compare.onclick = () => handlers.onCompare(props);
   if (popupRef.current) popupRef.current.remove();
   popupRef.current = new maplibregl.Popup({ closeButton: true, maxWidth: "260px", offset: 12 }).setLngLat(lngLat).setDOMContent(el).addTo(map);
 }
@@ -167,6 +162,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
   const markerRef = useRef(null);
   const lensRef = useRef("price");
   const onAnalyzeRef = useRef(() => {});
+  const onCompareRef = useRef(() => {});
 
   const [lens, setLens] = useState("price");
   const [conditions, setConditions] = useState([]);
@@ -181,14 +177,14 @@ export default function MapView2({ lang = "en", setCurrent }) {
   const [anchorId, setAnchorId] = useState(null); // project an "◎ Area" was opened from → benchmark vs its set
   const [viewBounds, setViewBounds] = useState(null); // current map viewport → the overview reflects only what's on screen
   const [extSet, setExtSet] = useState(null); // {nameSet:Set<normName>, count} handed from a filtered analytics view ("Show on map")
-  // ── Compare & exclude (developer workflow) ──
-  // excludedIds: projects the user removed from the area AVERAGES (e.g. an outlier
-  //   or a project that isn't real competition). ownIds: projects marked "mine" (★)
-  //   — auto-excluded from the average AND used as the comparison baseline.
-  //   compareIds: projects pinned into the side-by-side compare tray.
-  const [excludedIds, setExcludedIds] = useState(() => new Set());
+
+  // ── Compare (separate from Area exploration) ──
+  // The user assembles an explicit set of projects — by name search (Picker),
+  // by clicking a pin, or by "add all in this area" — and sees them side by side.
+  // One can be marked the baseline (yours); the rest show €/m² delta vs it.
+  const [compareMode, setCompareMode] = useState(false);
   const [compareIds, setCompareIds] = useState(() => new Set());
-  const [ownIds, setOwnIds] = useState(loadOwnIds);
+  const [baselineId, setBaselineId] = useState(null);
 
   // ── Draw an area — polygon OR corridor — feeding the SAME competitive panel ──
   // drawTool: the tool actively adding points (null when idle/finished).
@@ -433,58 +429,37 @@ export default function MapView2({ lang = "en", setCurrent }) {
   }, [shape]);
   const anchor = useMemo(() => (anchorId ? shown.find((p) => p.id === anchorId) : null), [anchorId, shown]);
 
-  // "Yours" = the durably-starred projects (ownIds) PLUS the project this area was
-  // opened from (anchorId) for THIS session only. The anchor is your baseline
-  // while you analyse from it, but we don't persist it — exploring from many pins
-  // must not silently mark them all as owned. Manual ★ is the durable marker.
-  const ownEff = useMemo(() => {
-    const s = new Set(ownIds);
-    if (anchorId) s.add(anchorId);
-    return s;
-  }, [ownIds, anchorId]);
-
-  // ── Effective competitive set = the area's projects MINUS the ones excluded
-  //    from the average (manual exclusions ∪ "yours"). Re-aggregated through the
-  //    SAME summarizeSet() as the full set, so every headline figure (median,
-  //    absorption, range, units, developers, completion mix) stays internally
-  //    consistent and can never drift from a parallel calculation. When nothing
-  //    is excluded, effSet === compSet (no work, no re-render churn). ──
-  const effExcludedIds = useMemo(() => {
-    const s = new Set(excludedIds);
-    ownEff.forEach((id) => s.add(id));
-    return s;
-  }, [excludedIds, ownEff]);
-  const excludedInArea = useMemo(
-    () => (compSet ? compSet.inside.filter((p) => effExcludedIds.has(p.id)) : []),
-    [compSet, effExcludedIds],
+  // ── Compare data + actions ──
+  // Options for the manual "add project" multi-select (every project, by name).
+  const projectOptions = useMemo(
+    () => (projects || []).map((p) => ({ value: p.id, label: p.name })).sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" })),
+    [projects],
   );
-  const effSet = useMemo(() => {
-    if (!compSet) return null;
-    if (excludedInArea.length === 0) return compSet;               // nothing removed → identical set
-    const kept = compSet.inside.filter((p) => !effExcludedIds.has(p.id));
-    return summarizeSet(kept, coords || {});
-  }, [compSet, excludedInArea, effExcludedIds, coords]);
-
-  // When the whole selection is cleared, drop the per-analysis picks (exclusions
-  // + compare). Ownership (★) is durable and survives. Keyed on a boolean so a
-  // vertex drag (which changes the shape object identity) never wipes the picks.
-  const hasSelection = !!selection;
+  const projectById = useMemo(() => { const m = new Map(); (projects || []).forEach((p) => m.set(p.id, p)); return m; }, [projects]);
+  // The compared projects (resolved from ALL projects, so a lens/filter never
+  // drops one you explicitly picked). Missing ids (e.g. other country) are skipped.
+  const compareProjects = useMemo(
+    () => [...compareIds].map((id) => projectById.get(id)).filter(Boolean),
+    [compareIds, projectById],
+  );
+  // Wire the pin-popup "⇄ Compare" button → add that project + open compare mode.
   useEffect(() => {
-    if (!hasSelection) { setExcludedIds(new Set()); setCompareIds(new Set()); }
-  }, [hasSelection]);
-
-  const toggleExclude = (id) => setExcludedIds((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
-  const toggleCompare = (id) => setCompareIds((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
-  const toggleOwn = (id) => setOwnIds((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); persistOwnIds(n); return n; });
-
-  // Projects shown in the compare tray: everything the user pinned to compare,
-  // PLUS any "mine" project that's in the area (the baseline). Own first, then by
-  // €/m² desc. Empty → the tray is hidden.
-  const compareList = useMemo(() => {
-    if (!compSet) return [];
-    const rows = compSet.inside.filter((p) => compareIds.has(p.id) || ownEff.has(p.id));
-    return rows.sort((a, b) => (ownEff.has(b.id) ? 1 : 0) - (ownEff.has(a.id) ? 1 : 0) || ppm2Of(b) - ppm2Of(a));
-  }, [compSet, compareIds, ownEff]);
+    onCompareRef.current = (p) => {
+      if (!p || !p.id) return;
+      setCompareIds((prev) => { const n = new Set(prev); n.add(p.id); return n; });
+      setCompareMode(true);
+    };
+  }, []);
+  const removeCompare = (id) => {
+    setCompareIds((prev) => { const n = new Set(prev); n.delete(id); return n; });
+    setBaselineId((b) => (b === id ? null : b));
+  };
+  const clearCompare = () => { setCompareIds(new Set()); setBaselineId(null); };
+  const setBaseline = (id) => setBaselineId((b) => (b === id ? null : id));
+  const addAreaToCompare = () => {
+    if (!compSet || !compSet.inside.length) return;
+    setCompareIds((prev) => { const n = new Set(prev); compSet.inside.forEach((p) => n.add(p.id)); return n; });
+  };
 
   // Zoom/pan the map so the whole analysis circle fits (used by the radius presets
   // and on slider release) — otherwise a 50 km radius would run off-screen.
@@ -577,6 +552,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
         showProjectPopup(map, f.geometry.coordinates, f.properties, {
           onOpen: (id) => setCurrentRef.current && setCurrentRef.current("App:ProjectDetail:" + id),
           onAnalyze: (ll) => onAnalyzeRef.current(ll),
+          onCompare: (p) => onCompareRef.current(p),
         }, popupRef);
       });
       map.on("click", (e) => mapClickRef.current(e, map));
@@ -771,6 +747,9 @@ export default function MapView2({ lang = "en", setCurrent }) {
         <button onClick={() => (drawTool === "corridor" ? cancelDraw() : startDraw("corridor"))} style={chipStyle(drawTool === "corridor" || shape?.kind === "corridor")} title={sk ? "Nakresli koridor: trasa + šírka (napr. okolo električky)" : "Draw a corridor: a route + width (e.g. along a tram line)"}>
           ⇢ {sk ? "Koridor" : "Corridor"}
         </button>
+        <button onClick={() => setCompareMode((v) => !v)} style={chipStyle(compareMode)} title={sk ? "Porovnaj vybrané projekty vedľa seba" : "Compare hand-picked projects side by side"}>
+          ⇄ {sk ? "Porovnať" : "Compare"}{compareIds.size ? ` · ${compareIds.size}` : ""}
+        </button>
         {!showExplainer && <button onClick={reopenExplainer} title={sk ? "Ako to funguje?" : "How it works?"} style={{ ...chipStyle(false), padding: "6px 10px" }}>?</button>}
         {extSet && (
           <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: `${green}22`, color: green, border: `1px solid ${green}`, borderRadius: 999, padding: "4px 10px", fontSize: "0.72rem", fontWeight: 600 }}
@@ -834,9 +813,18 @@ export default function MapView2({ lang = "en", setCurrent }) {
           );
         })()}
 
-        {(selection || showExplainer || savedAreas.length > 0) && (
+        {(compareMode || selection || showExplainer || savedAreas.length > 0) && (
         <div style={{ position: "absolute", top: 12, left: 12, width: 310, maxWidth: "calc(100% - 24px)", maxHeight: "calc(100% - 24px)", overflowY: "auto", background: "rgba(14,14,16,0.97)", border: `1px solid ${border}`, borderRadius: 12, boxShadow: "0 12px 30px rgba(0,0,0,0.5)", padding: "14px 15px", zIndex: 30 }}>
-          {!selection ? (
+          {compareMode ? (
+            <ComparePanel
+              options={projectOptions} compareIds={compareIds} setCompareIds={setCompareIds}
+              rows={compareProjects} baselineId={baselineId} setBaseline={setBaseline}
+              onRemove={removeCompare} onClear={clearCompare}
+              areaCount={compSet ? compSet.inside.length : 0} onAddArea={addAreaToCompare}
+              onClose={() => setCompareMode(false)} openProject={openProject}
+              completionWhen={completionWhen} coords={coords} sk={sk}
+            />
+          ) : !selection ? (
             <div style={{ color: dim, fontSize: "0.8rem", lineHeight: 1.5 }}>
               {showExplainer && (
                 <div style={{ position: "relative", marginBottom: savedAreasBlock ? 0 : 2 }}>
@@ -913,60 +901,39 @@ export default function MapView2({ lang = "en", setCurrent }) {
 
               {anchor && compSet && compSet.inside.length > 1 && (() => {
                 const ap = ppm2Of(anchor);
-                const deltaPct = (ap > 0 && effSet && effSet.median) ? Math.round(((ap - effSet.median) / effSet.median) * 100) : null;
+                const deltaPct = (ap > 0 && compSet.median) ? Math.round(((ap - compSet.median) / compSet.median) * 100) : null;
                 const aAbs = anchor.sold_percentage == null ? null : Math.round(Number(anchor.sold_percentage));
-                const setAbs = effSet ? effSet.avgAbs : null;
                 return (
                   <div style={{ background: `${green}10`, border: `1px solid ${green}40`, borderRadius: 8, padding: "8px 10px", marginBottom: 12 }}>
-                    <div style={{ fontSize: "0.68rem", color: green, marginBottom: 3 }}>◎ {sk ? "Tvoj projekt vs konkurencia" : "This project vs the competition"}</div>
+                    <div style={{ fontSize: "0.68rem", color: green, marginBottom: 3 }}>◎ {sk ? "Tvoj projekt vs okolie" : "This project vs the set"}</div>
                     <div style={{ fontSize: "0.78rem", color: textLight, fontWeight: 600, marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{anchor.name}</div>
                     <div style={{ fontSize: "0.72rem", color: dim, fontFamily: mono, lineHeight: 1.7 }}>
                       <div>€{ap ? fmt(ap) : "—"}/m²{deltaPct != null ? <span style={{ color: deltaPct > 0 ? "#ff8a8a" : "#7ee0b6" }}> · {deltaPct > 0 ? "+" : ""}{deltaPct}% {sk ? "vs medián" : "vs median"}</span> : ""}</div>
-                      <div>{aAbs == null ? "—" : aAbs + "%"} {sk ? "predané" : "sold"}{setAbs != null && aAbs != null ? <span style={{ color: aAbs >= setAbs ? "#7ee0b6" : "#ff8a8a" }}> · {sk ? "konkurencia" : "rivals"} {setAbs}%</span> : ""}</div>
+                      <div>{aAbs == null ? "—" : aAbs + "%"} {sk ? "predané" : "sold"}{compSet.avgAbs != null && aAbs != null ? <span style={{ color: aAbs >= compSet.avgAbs ? "#7ee0b6" : "#ff8a8a" }}> · {sk ? "okolie" : "set"} {compSet.avgAbs}%</span> : ""}</div>
                     </div>
                   </div>
                 );
               })()}
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: excludedInArea.length ? 6 : (effSet && effSet.placeholderCount ? 8 : 12) }}>
-                <Stat label={sk ? "Projekty" : "Projects"} value={effSet ? effSet.inside.length : 0} sub={excludedInArea.length ? (sk ? `+${excludedInArea.length} mimo priemeru` : `+${excludedInArea.length} excluded`) : ""} />
-                <Stat label={sk ? "Medián €/m²" : "Median €/m²"} value={effSet && effSet.median ? fmt(effSet.median) : "—"} sub={effSet && effSet.priceLo ? `${fmt(effSet.priceLo)}–${fmt(effSet.priceHi)}` : ""} />
-                <Stat label={sk ? "Vypredanosť" : "Absorbed"} value={effSet && effSet.avgAbs != null ? effSet.avgAbs + "%" : "—"} />
-                <Stat label={sk ? "Byty" : "Units"} value={effSet ? fmtK(effSet.totalUnits) : 0} sub={effSet ? `${fmtK(effSet.availUnits)} ${sk ? "voľných" : "free"}` : ""} />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: compSet && compSet.placeholderCount ? 8 : 12 }}>
+                <Stat label={sk ? "Projekty" : "Projects"} value={compSet ? compSet.inside.length : 0} />
+                <Stat label={sk ? "Medián €/m²" : "Median €/m²"} value={compSet && compSet.median ? fmt(compSet.median) : "—"} sub={compSet && compSet.priceLo ? `${fmt(compSet.priceLo)}–${fmt(compSet.priceHi)}` : ""} />
+                <Stat label={sk ? "Vypredanosť" : "Absorbed"} value={compSet && compSet.avgAbs != null ? compSet.avgAbs + "%" : "—"} />
+                <Stat label={sk ? "Byty" : "Units"} value={compSet ? fmtK(compSet.totalUnits) : 0} sub={compSet ? `${fmtK(compSet.availUnits)} ${sk ? "voľných" : "free"}` : ""} />
               </div>
 
-              {excludedInArea.length > 0 && (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, background: `${amber}10`, border: `1px solid ${amber}33`, borderRadius: 6, padding: "5px 8px", marginBottom: 12 }}>
-                  <span style={{ fontSize: "0.64rem", color: amber }}>
-                    {sk ? "Priemery nezahŕňajú" : "Averages exclude"} <strong style={{ fontFamily: mono }}>{excludedInArea.length}</strong> {sk ? (excludedInArea.length === 1 ? "projekt" : "projektov") : (excludedInArea.length === 1 ? "project" : "projects")}
-                    {excludedInArea.some((p) => ownEff.has(p.id)) ? <span style={{ color: dim }}> {sk ? "(vrátane tvojich ★)" : "(incl. yours ★)"}</span> : ""}
-                  </span>
-                  {compSet.inside.some((p) => excludedIds.has(p.id)) && (
-                    <button onClick={() => { setExcludedIds(new Set()); }} style={{ background: "none", border: "none", color: green, cursor: "pointer", fontSize: "0.64rem", flexShrink: 0 }} title={sk ? "Zahrnúť manuálne vylúčené späť (★ ostávajú)" : "Re-include manually excluded (★ stay out)"}>{sk ? "vrátiť ✕" : "reset ✕"}</button>
-                  )}
-                </div>
+              {compSet && compSet.median && compSet.priceHi > compSet.priceLo && (
+                <PricingBand cs={compSet} anchorPpm2={anchor ? ppm2Of(anchor) : 0} sk={sk} />
               )}
-
-              {effSet && effSet.median && effSet.priceHi > effSet.priceLo && (
-                <PricingBand cs={effSet} anchorPpm2={anchor ? ppm2Of(anchor) : 0} sk={sk} />
-              )}
-              {effSet && effSet.soldLastMonth > 0 && (
+              {compSet && compSet.soldLastMonth > 0 && (
                 <div style={{ fontSize: "0.66rem", color: dim, marginBottom: 12 }}>
-                  ▴ <span style={{ color: green, fontFamily: mono }}>{effSet.soldLastMonth}</span> {sk ? `bytov predaných ${shape ? "v tejto oblasti" : "v tomto okruhu"} za posledný mesiac` : "units sold in this area last month"}
+                  ▴ <span style={{ color: green, fontFamily: mono }}>{compSet.soldLastMonth}</span> {sk ? `bytov predaných ${shape ? "v tejto oblasti" : "v tomto okruhu"} za posledný mesiac` : "units sold in this area last month"}
                 </div>
               )}
 
-              {compareList.length > 0 && (
-                <CompareTray rows={compareList} effSet={effSet} ownIds={ownEff} anchorId={anchorId} coords={coords} sk={sk}
-                  onRemove={(id) => { if (ownIds.has(id)) toggleOwn(id); else toggleCompare(id); }}
-                  onClear={() => setCompareIds(new Set())}
-                  hasPicks={compareIds.size > 0}
-                  openProject={openProject} completionWhen={completionWhen} />
-              )}
-
-              {effSet && effSet.placeholderCount > 0 && (
+              {compSet && compSet.placeholderCount > 0 && (
                 <div style={{ fontSize: "0.66rem", color: amber, background: `${amber}12`, border: `1px solid ${amber}33`, borderRadius: 6, padding: "5px 8px", marginBottom: 12 }}>
-                  ◍ {effSet.placeholderCount} {sk ? "z nich má len približnú (mestskú) polohu" : `of these are approximate (city-level) locations`}
+                  ◍ {compSet.placeholderCount} {sk ? "z nich má len približnú (mestskú) polohu" : `of these are approximate (city-level) locations`}
                 </div>
               )}
 
@@ -978,13 +945,13 @@ export default function MapView2({ lang = "en", setCurrent }) {
                   </div>
                   <div style={{ display: "flex", gap: 5, marginBottom: 3 }}>
                     {["ready", "soon", "mid", "far", "unknown"].map((k) => {
-                      const n = effSet.comp[k]; const active = compFilter === k;
+                      const n = compSet.comp[k]; const active = compFilter === k;
                       return (
                         <button key={k} onClick={() => n > 0 && setCompFilter(active ? null : k)} disabled={n === 0}
                           title={n > 0 ? (sk ? `Zobraziť projekty (${COMP_LABEL[k]})` : `Show projects (${COMP_LABEL[k]})`) : ""}
                           style={{ flex: 1, minWidth: 0, background: active ? `${COMPLETION[k].color}22` : "none", border: `1px solid ${active ? COMPLETION[k].color : "transparent"}`, borderRadius: 7, padding: "4px 1px", cursor: n > 0 ? "pointer" : "default", textAlign: "center", opacity: n === 0 ? 0.4 : 1 }}>
                           <div style={{ height: 26, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-                            <div style={{ width: 15, height: Math.max(3, (n / Math.max(1, effSet.inside.length)) * 26), background: COMPLETION[k].color, borderRadius: 3 }} />
+                            <div style={{ width: 15, height: Math.max(3, (n / Math.max(1, compSet.inside.length)) * 26), background: COMPLETION[k].color, borderRadius: 3 }} />
                           </div>
                           <div style={{ fontSize: "0.55rem", color: active ? COMPLETION[k].color : dim, marginTop: 3, lineHeight: 1.1 }}>{COMP_LABEL[k]}</div>
                           <div style={{ fontSize: "0.66rem", color: textLight, fontFamily: mono }}>{n}</div>
@@ -995,7 +962,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
                   <div style={{ fontSize: "0.6rem", color: dim, marginBottom: 12, fontStyle: "italic" }}>{sk ? "Klikni na stĺpec a ukáže ti projekty s daným dokončením." : "Click a bar to list the projects completing then."}</div>
 
                   <div style={{ fontSize: "0.7rem", color: dim, marginBottom: 6 }}>{sk ? "Najväčší developeri" : "Top developers"}</div>
-                  {effSet.topDevs.map((d) => (
+                  {compSet.topDevs.map((d) => (
                     <div key={d.dev} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem", color: textLight, padding: "2px 0" }}>
                       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 158 }}>{d.dev}</span>
                       <span style={{ color: dim, fontFamily: mono }}>{d.n} · {d.ppm2 ? "€" + fmt(d.ppm2) : "—"}</span>
@@ -1006,34 +973,21 @@ export default function MapView2({ lang = "en", setCurrent }) {
                     <span style={{ fontSize: "0.7rem", color: dim }}>{sk ? "Projekty" : "Projects"}{compFilter ? <span style={{ color: COMPLETION[compFilter].color }}> · {COMP_LABEL[compFilter]}</span> : ""} ({listProjects.length})</span>
                     <button onClick={() => exportCsv(listProjects, coords)} style={{ background: "none", border: `1px solid ${border}`, color: dim, borderRadius: 6, padding: "3px 8px", fontSize: "0.66rem", cursor: "pointer" }} title={sk ? "Stiahnuť ako CSV" : "Download as CSV"}>⬇ CSV</button>
                   </div>
-                  <div style={{ fontSize: "0.58rem", color: dim, marginBottom: 4, display: "flex", gap: 9, flexWrap: "wrap" }}>
-                    <span><span style={{ color: green }}>★</span> {sk ? "tvoj" : "yours"}</span>
-                    <span><span style={{ color: amber }}>⊘</span> {sk ? "mimo priemeru" : "exclude"}</span>
-                    <span><span style={{ color: green }}>⇄</span> {sk ? "porovnať" : "compare"}</span>
-                  </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
                     {listProjects.slice().sort((a, b) => ppm2Of(b) - ppm2Of(a)).slice(0, 60).map((p) => {
                       const when = completionWhen(p); const bucket = completionBucket(p); const avail = Number(p.available_units) || 0;
-                      const isOwn = ownEff.has(p.id); const isAnchor = p.id === anchorId; const manualExcl = excludedIds.has(p.id); const outOfAvg = isOwn || manualExcl; const inCompare = compareIds.has(p.id);
                       return (
-                        <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 4, padding: "3px 5px", borderRadius: 6, background: isOwn ? `${green}0d` : "transparent", opacity: outOfAvg && !isOwn ? 0.55 : 1 }}
-                          onMouseEnter={(e) => (e.currentTarget.style.background = isOwn ? `${green}14` : "#1d1d22")} onMouseLeave={(e) => (e.currentTarget.style.background = isOwn ? `${green}0d` : "transparent")}>
-                          <button onClick={() => openProject(p.id)} style={{ flex: 1, minWidth: 0, background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "left" }} title={sk ? "Otvoriť projekt" : "Open project"}>
-                            <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                              <span style={{ color: isOwn ? green : textLight, fontSize: "0.76rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{isOwn ? "★ " : ""}{(coords && coords[p.id] && !coords[p.id].verified) ? "◍ " : ""}{p.name}</span>
-                              <span style={{ color: dim, fontFamily: mono, fontSize: "0.74rem", flexShrink: 0, textDecoration: outOfAvg ? "line-through" : "none" }}>{ppm2Of(p) ? "€" + fmt(ppm2Of(p)) + "/m²" : "—"}</span>
-                            </div>
-                            <div style={{ display: "flex", gap: 8, fontSize: "0.62rem", color: dim, marginTop: 1 }}>
-                              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }} title={sk ? "Dokončenie (kolaudácia)" : "Completion"}><span style={{ width: 6, height: 6, borderRadius: "50%", background: COMPLETION[bucket].color, display: "inline-block", flexShrink: 0 }} />{when || (sk ? "termín ?" : "date ?")}</span>
-                              <span>· {avail} {sk ? "voľných" : "free"}</span>
-                            </div>
-                          </button>
-                          <div style={{ display: "flex", gap: 1, flexShrink: 0 }}>
-                            <button onClick={() => !isAnchor && toggleOwn(p.id)} disabled={isAnchor} title={isAnchor ? (sk ? "Odtiaľto si otvoril oblasť — je to tvoj základ" : "You opened the area from here — it's your baseline") : (sk ? "Označiť ako tvoj projekt (vypadne z priemeru, je základ porovnania)" : "Mark as your project (drops out of the average, becomes the compare baseline)")} style={rowIconStyle(isOwn, green, isAnchor)}>★</button>
-                            <button onClick={() => !isOwn && toggleExclude(p.id)} disabled={isOwn} title={isOwn ? (sk ? "Tvoje projekty sú z priemeru von automaticky" : "Your projects are excluded automatically") : (sk ? "Vylúčiť z priemeru" : "Exclude from the average")} style={rowIconStyle(manualExcl, amber, isOwn)}>⊘</button>
-                            <button onClick={() => toggleCompare(p.id)} title={sk ? "Pridať do porovnania" : "Add to comparison"} style={rowIconStyle(inCompare, green)}>⇄</button>
+                        <button key={p.id} onClick={() => openProject(p.id)} style={{ display: "block", width: "100%", background: "none", border: "none", cursor: "pointer", padding: "4px 5px", textAlign: "left", borderRadius: 6 }}
+                          onMouseEnter={(e) => (e.currentTarget.style.background = "#1d1d22")} onMouseLeave={(e) => (e.currentTarget.style.background = "none")}>
+                          <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                            <span style={{ color: textLight, fontSize: "0.76rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(coords && coords[p.id] && !coords[p.id].verified) ? "◍ " : ""}{p.name}</span>
+                            <span style={{ color: dim, fontFamily: mono, fontSize: "0.74rem", flexShrink: 0 }}>{ppm2Of(p) ? "€" + fmt(ppm2Of(p)) + "/m²" : "—"}</span>
                           </div>
-                        </div>
+                          <div style={{ display: "flex", gap: 8, fontSize: "0.62rem", color: dim, marginTop: 1 }}>
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }} title={sk ? "Dokončenie (kolaudácia)" : "Completion"}><span style={{ width: 6, height: 6, borderRadius: "50%", background: COMPLETION[bucket].color, display: "inline-block", flexShrink: 0 }} />{when || (sk ? "termín ?" : "date ?")}</span>
+                            <span>· {avail} {sk ? "voľných" : "free"}</span>
+                          </div>
+                        </button>
                       );
                     })}
                   </div>
@@ -1085,65 +1039,74 @@ function Stat({ label, value, sub }) {
   );
 }
 
-// Small square toggle for a project row (★ mine / ⊘ exclude / ⇄ compare).
-function rowIconStyle(active, activeColor, disabled) {
-  return {
-    width: 21, height: 21, lineHeight: "1", textAlign: "center", padding: 0,
-    borderRadius: 5, cursor: disabled ? "default" : "pointer", fontSize: "0.72rem",
-    border: `1px solid ${active ? activeColor : "transparent"}`,
-    background: active ? `${activeColor}22` : "transparent",
-    color: disabled ? "#3a3a44" : (active ? activeColor : dim),
-    flexShrink: 0,
-  };
-}
-
-// Side-by-side comparison of the picked projects (+ any "mine" as the baseline),
-// each measured against the effective competition median/absorption (effSet).
-function CompareTray({ rows, effSet, ownIds, anchorId, coords, sk, onRemove, onClear, hasPicks, openProject, completionWhen }) {
-  const med = effSet && effSet.median ? effSet.median : null;
-  const setAbs = effSet ? effSet.avgAbs : null;
-  const deltaPct = (v) => (med && v > 0 ? Math.round(((v - med) / med) * 100) : null);
+// Compare a hand-picked set of projects side by side. Selection happens elsewhere
+// (name search here, a pin's "⇄ Compare", or "add all in this area") — this panel
+// only presents the set. One project can be the baseline (★ yours); the rest show
+// their €/m² delta against it, or against the set median when none is chosen.
+function ComparePanel({ options, compareIds, setCompareIds, rows, baselineId, setBaseline, onRemove, onClear, areaCount, onAddArea, onClose, openProject, completionWhen, coords, sk }) {
+  const priced = rows.map(ppm2Of).filter((v) => v > 0).sort((a, b) => a - b);
+  const setMed = median(priced);
+  const setAbs = rows.length ? setAbsorptionPct(rows) : null;
+  const baseline = baselineId ? rows.find((p) => p.id === baselineId) : null;
+  const refPpm = baseline && ppm2Of(baseline) > 0 ? ppm2Of(baseline) : setMed;
+  const refLabel = baseline ? (sk ? "vs tvoj" : "vs yours") : (sk ? "vs medián" : "vs median");
+  const delta = (v) => (refPpm && v > 0 ? Math.round(((v - refPpm) / refPpm) * 100) : null);
+  const sorted = rows.slice().sort((a, b) => (b.id === baselineId ? 1 : 0) - (a.id === baselineId ? 1 : 0) || ppm2Of(b) - ppm2Of(a));
   return (
-    <div style={{ border: `1px solid ${green}44`, background: `${green}0a`, borderRadius: 8, padding: "9px 10px", marginBottom: 12 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 7 }}>
-        <span style={{ fontSize: "0.72rem", color: green, fontWeight: 600 }}>⇄ {sk ? "Porovnanie" : "Compare"} ({rows.length})</span>
-        {hasPicks && <button onClick={onClear} style={{ background: "none", border: "none", color: dim, cursor: "pointer", fontSize: "0.64rem" }}>{sk ? "vyčistiť ✕" : "clear ✕"}</button>}
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 9 }}>
+        <span style={{ color: textLight, fontWeight: 600, fontSize: "0.85rem" }}>⇄ {sk ? "Porovnanie" : "Compare"}{rows.length ? ` (${rows.length})` : ""}</span>
+        <button onClick={onClose} title={sk ? "Zavrieť porovnanie" : "Close compare"} style={{ background: "none", border: "none", color: dim, cursor: "pointer", fontSize: "0.95rem" }} aria-label="Close">✕</button>
       </div>
-      {med && (
-        <div style={{ fontSize: "0.6rem", color: dim, marginBottom: 6, fontFamily: mono }}>
-          {sk ? "Konkurencia medián" : "Rivals median"}: €{fmt(med)}/m²{setAbs != null ? ` · ${setAbs}% ${sk ? "predané" : "sold"}` : ""}
-        </div>
+      <Picker multi searchable options={options} value={[...compareIds]} onChange={(arr) => setCompareIds(new Set(arr))} placeholder={sk ? "Pridať projekt (hľadaj podľa mena)…" : "Add a project (search by name)…"} width="100%" sk={sk} ariaLabel="Add projects to compare" />
+      {areaCount > 0 && (
+        <button onClick={onAddArea} style={{ width: "100%", marginTop: 8, background: `${green}12`, border: `1px solid ${green}55`, color: green, borderRadius: 7, padding: "7px 8px", fontSize: "0.72rem", cursor: "pointer" }}>
+          ➕ {sk ? `Pridať ${areaCount} z nakreslenej oblasti` : `Add ${areaCount} from the drawn area`}
+        </button>
       )}
-      <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-        {rows.map((p) => {
-          const isOwn = ownIds.has(p.id);
-          const ppm = ppm2Of(p);
-          const d = deltaPct(ppm);
-          const abs = p.sold_percentage == null ? null : Math.round(Number(p.sold_percentage));
-          const when = completionWhen(p); const bucket = completionBucket(p);
-          const avail = Number(p.available_units) || 0; const tot = Number(p.total_units) || 0;
-          const approx = coords && coords[p.id] && !coords[p.id].verified;
-          return (
-            <div key={p.id} style={{ background: isOwn ? `${green}12` : "#141418", border: `1px solid ${isOwn ? `${green}44` : border}`, borderRadius: 7, padding: "6px 8px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6 }}>
-                <button onClick={() => openProject(p.id)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: isOwn ? green : textLight, fontSize: "0.75rem", fontWeight: isOwn ? 600 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left", flex: 1, minWidth: 0 }} title={sk ? "Otvoriť projekt" : "Open project"}>
-                  {isOwn ? "★ " : ""}{approx ? "◍ " : ""}{p.name}{isOwn ? <span style={{ color: dim, fontWeight: 400 }}> · {sk ? "tvoj" : "yours"}</span> : ""}
-                </button>
-                {p.id === anchorId
-                  ? <span title={sk ? "Základ (otvoril si oblasť odtiaľto)" : "Baseline (area opened from here)"} style={{ color: green, fontSize: "0.7rem", flexShrink: 0, padding: "0 2px" }}>◎</span>
-                  : <button onClick={() => onRemove(p.id)} title={sk ? "Odobrať z porovnania" : "Remove from comparison"} style={{ background: "none", border: "none", color: dim, cursor: "pointer", fontSize: "0.8rem", flexShrink: 0, padding: "0 2px" }}>✕</button>}
-              </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 10px", fontSize: "0.66rem", color: dim, fontFamily: mono, marginTop: 3 }}>
-                <span style={{ color: textLight }}>{ppm ? "€" + fmt(ppm) + "/m²" : "—"}{d != null ? <span style={{ color: d > 0 ? "#ff8a8a" : "#7ee0b6" }}> {d > 0 ? "+" : ""}{d}%</span> : ""}</span>
-                <span>{abs == null ? "—" : abs + "%"} {sk ? "pred." : "sold"}{setAbs != null && abs != null ? <span style={{ color: abs >= setAbs ? "#7ee0b6" : "#ff8a8a" }}> ({abs - setAbs >= 0 ? "+" : ""}{abs - setAbs})</span> : ""}</span>
-                <span>{avail}/{tot} {sk ? "voľ." : "free"}</span>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: COMPLETION[bucket].color, display: "inline-block" }} />{when || (sk ? "termín ?" : "date ?")}</span>
-              </div>
-              {p.developer ? <div style={{ fontSize: "0.6rem", color: dim, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.developer}</div> : null}
-            </div>
-          );
-        })}
-      </div>
+      {rows.length === 0 ? (
+        <div style={{ color: dim, fontSize: "0.76rem", lineHeight: 1.6, marginTop: 12 }}>
+          {sk
+            ? "Vyber projekty na porovnanie: hľadaj vyššie podľa mena, klikni špendlík na mape (⇄ Compare), alebo nakresli oblasť (▱ / ⇢) a pridaj všetky vnútri."
+            : "Pick projects to compare: search by name above, click a pin on the map (⇄ Compare), or draw an area (▱ / ⇢) and add everything inside."}
+        </div>
+      ) : (
+        <>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.64rem", color: dim, fontFamily: mono, margin: "11px 0 6px" }}>
+            <span>{sk ? "Medián setu" : "Set median"}: €{setMed ? fmt(setMed) : "—"}/m²</span>
+            <span>{setAbs != null ? `${setAbs}% ${sk ? "predané" : "sold"}` : ""}</span>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            {sorted.map((p) => {
+              const isBase = p.id === baselineId;
+              const ppm = ppm2Of(p); const d = isBase ? null : delta(ppm);
+              const abs = p.sold_percentage == null ? null : Math.round(Number(p.sold_percentage));
+              const when = completionWhen(p); const bucket = completionBucket(p);
+              const avail = Number(p.available_units) || 0; const tot = Number(p.total_units) || 0;
+              const approx = coords && coords[p.id] && !coords[p.id].verified;
+              return (
+                <div key={p.id} style={{ background: isBase ? `${green}12` : "#141418", border: `1px solid ${isBase ? `${green}55` : border}`, borderRadius: 8, padding: "7px 9px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <button onClick={() => setBaseline(p.id)} title={isBase ? (sk ? "Zrušiť ako tvoj základ" : "Unset as your baseline") : (sk ? "Označiť ako tvoj (základ porovnania)" : "Mark as yours (comparison baseline)")} style={{ background: isBase ? `${green}22` : "transparent", border: `1px solid ${isBase ? green : "transparent"}`, color: isBase ? green : dim, cursor: "pointer", borderRadius: 5, width: 21, height: 21, flexShrink: 0, fontSize: "0.72rem", lineHeight: 1 }}>★</button>
+                    <button onClick={() => openProject(p.id)} style={{ flex: 1, minWidth: 0, background: "none", border: "none", cursor: "pointer", textAlign: "left", padding: 0, color: isBase ? green : textLight, fontSize: "0.77rem", fontWeight: isBase ? 600 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={sk ? "Otvoriť projekt" : "Open project"}>
+                      {approx ? "◍ " : ""}{p.name}{isBase ? <span style={{ color: dim, fontWeight: 400 }}> · {sk ? "tvoj" : "yours"}</span> : ""}
+                    </button>
+                    <button onClick={() => onRemove(p.id)} title={sk ? "Odobrať z porovnania" : "Remove from comparison"} style={{ background: "none", border: "none", color: dim, cursor: "pointer", fontSize: "0.8rem", flexShrink: 0, padding: "0 2px" }}>✕</button>
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 10px", fontSize: "0.66rem", color: dim, fontFamily: mono, marginTop: 4, paddingLeft: 27 }}>
+                    <span style={{ color: textLight }}>{ppm ? "€" + fmt(ppm) + "/m²" : "—"}{d != null ? <span style={{ color: d > 0 ? "#ff8a8a" : "#7ee0b6" }}> {d > 0 ? "+" : ""}{d}% {refLabel}</span> : ""}</span>
+                    <span>{abs == null ? "—" : abs + "%"} {sk ? "pred." : "sold"}</span>
+                    <span>{avail}/{tot} {sk ? "voľ." : "free"}</span>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: COMPLETION[bucket].color, display: "inline-block" }} />{when || (sk ? "termín ?" : "date ?")}</span>
+                  </div>
+                  {p.developer ? <div style={{ fontSize: "0.6rem", color: dim, marginTop: 2, paddingLeft: 27, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.developer}</div> : null}
+                </div>
+              );
+            })}
+          </div>
+          <button onClick={onClear} style={{ width: "100%", marginTop: 8, background: "none", border: `1px solid ${border}`, color: dim, borderRadius: 7, padding: "6px 8px", fontSize: "0.7rem", cursor: "pointer" }}>{sk ? "Vyčistiť všetko" : "Clear all"}</button>
+        </>
+      )}
     </div>
   );
 }
