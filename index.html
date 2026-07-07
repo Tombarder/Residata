@@ -18,9 +18,9 @@
     <script>window.__RESIDATA_SNAPSHOT__ = __BUILD_SNAPSHOT_JSON__;</script>
 
     <!-- Primary meta (overridden per-route at runtime via useSeoMeta) -->
-    <title>Residata — New-Build Market Intelligence for Bratislava</title>
-    <meta name="description" content="Automated market intelligence on every new residential development in Bratislava. Pricing, availability, absorption rate, and trends — structured and refreshed monthly. Built for developers, banks, valuers, and investors." />
-    <meta name="keywords" content="novostavby Bratislava, trh novostavieb, real estate market intelligence, residential development data, new-build pricing, absorption rate, property data Slovakia, market analytics real estate" />
+    <title>Residata — New-Build Market Intelligence for Slovakia & Czechia</title>
+    <meta name="description" content="Automated market intelligence on every new residential development across Slovakia and Czechia. Pricing, availability, absorption rate, and trends — structured and refreshed monthly. Built for developers, banks, valuers, and investors." />
+    <meta name="keywords" content="novostavby Bratislava, novostavby Praha, trh novostavieb, real estate market intelligence, residential development data, new-build pricing, absorption rate, property data Slovakia, property data Czechia, market analytics real estate" />
     <meta name="author" content="Residata" />
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
     <meta name="googlebot" content="index, follow" />
@@ -35,22 +35,23 @@
     <!-- Open Graph / LinkedIn / Facebook -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Residata" />
-    <meta property="og:title" content="Residata — New-Build Market Intelligence for Bratislava" />
-    <meta property="og:description" content="Every new residential development in Bratislava, structured and refreshed monthly. Pricing, availability, absorption, trends — built for developers, banks, and investors." />
+    <meta property="og:title" content="Residata — New-Build Market Intelligence for Slovakia & Czechia" />
+    <meta property="og:description" content="Every new residential development across Slovakia and Czechia, structured and refreshed monthly. Pricing, availability, absorption, trends — built for developers, banks, and investors." />
     <meta property="og:image" content="https://residata-gamma.vercel.app/og-image.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="Residata — Bratislava new-build market intelligence dashboard" />
+    <meta property="og:image:alt" content="Residata — Slovak & Czech new-build market intelligence dashboard" />
     <meta property="og:url" content="https://residata-gamma.vercel.app/" />
     <meta property="og:locale" content="en_US" />
     <meta property="og:locale:alternate" content="sk_SK" />
+    <meta property="og:locale:alternate" content="cs_CZ" />
 
     <!-- Twitter / X -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Residata — Bratislava New-Build Market Intelligence" />
-    <meta name="twitter:description" content="Every new residential development, structured and refreshed monthly. Pricing, availability, absorption — for developers, banks, investors." />
+    <meta name="twitter:title" content="Residata — Slovak & Czech New-Build Market Intelligence" />
+    <meta name="twitter:description" content="Every new residential development across Slovakia & Czechia, structured and refreshed monthly. Pricing, availability, absorption — for developers, banks, investors." />
     <meta name="twitter:image" content="https://residata-gamma.vercel.app/og-image.png" />
-    <meta name="twitter:image:alt" content="Residata — Bratislava new-build market intelligence dashboard" />
+    <meta name="twitter:image:alt" content="Residata — Slovak & Czech new-build market intelligence dashboard" />
 
     <!-- App-specific meta (helps parsers + LLM ingestion) -->
     <meta name="application-name" content="Residata" />
@@ -82,13 +83,12 @@
           "url": "https://residata-gamma.vercel.app/",
           "logo": "https://residata-gamma.vercel.app/favicon.svg",
           "slogan": "New-build market data you can act on.",
-          "description": "Residata delivers structured market intelligence on every new residential development in Bratislava, Slovakia. Pricing, availability, absorption rate, and trends — refreshed monthly.",
+          "description": "Residata delivers structured market intelligence on every new residential development across Slovakia and Czechia. Pricing, availability, absorption rate, and trends — refreshed monthly.",
           "email": "residata@proton.me",
-          "areaServed": {
-            "@type": "City",
-            "name": "Bratislava",
-            "addressCountry": "SK"
-          },
+          "areaServed": [
+            { "@type": "Country", "name": "Slovakia" },
+            { "@type": "Country", "name": "Czechia" }
+          ],
           "foundingDate": "2026",
           "knowsAbout": [
             "Residential real estate market",
@@ -104,9 +104,9 @@
           "@id": "https://residata-gamma.vercel.app/#website",
           "url": "https://residata-gamma.vercel.app/",
           "name": "Residata",
-          "description": "New-build market intelligence for Bratislava",
+          "description": "New-build market intelligence for Slovakia & Czechia",
           "publisher": { "@id": "https://residata-gamma.vercel.app/#org" },
-          "inLanguage": ["en", "sk"]
+          "inLanguage": ["en", "sk", "cs"]
         },
         {
           "@type": "SoftwareApplication",
@@ -115,7 +115,7 @@
           "applicationCategory": "BusinessApplication",
           "applicationSubCategory": "Real Estate Market Intelligence",
           "operatingSystem": "Web (any modern browser)",
-          "description": "Monthly-refreshed dataset and dashboard covering every new residential development in Bratislava: pricing, availability, absorption, €/m², sell-out forecasts.",
+          "description": "Monthly-refreshed dataset and dashboard covering every new residential development across Slovakia and Czechia: pricing, availability, absorption, €/m², sell-out forecasts.",
           "publisher": { "@id": "https://residata-gamma.vercel.app/#org" },
           "offers": {
             "@type": "AggregateOffer",
@@ -125,7 +125,7 @@
             "offerCount": "2"
           },
           "featureList": [
-            "Every new-build residential project in Bratislava",
+            "Every new-build residential project across Slovakia & Czechia",
             "Monthly refresh",
             "Unit-level pricing and availability",
             "Absorption rate by district and project",
@@ -138,12 +138,15 @@
           "@id": "https://residata-gamma.vercel.app/#service",
           "serviceType": "Real estate market intelligence",
           "provider": { "@id": "https://residata-gamma.vercel.app/#org" },
-          "areaServed": { "@type": "City", "name": "Bratislava" },
+          "areaServed": [
+            { "@type": "Country", "name": "Slovakia" },
+            { "@type": "Country", "name": "Czechia" }
+          ],
           "audience": {
             "@type": "BusinessAudience",
             "audienceType": "Developers, banks, valuers, investors, real estate consultants"
           },
-          "description": "Monthly-refreshed intelligence on the Bratislava new-build residential market — covering pricing, availability, absorption, and trends across every active project."
+          "description": "Monthly-refreshed intelligence on the Slovak and Czech new-build residential markets — covering pricing, availability, absorption, and trends across every active project."
         }
       ]
     }
@@ -161,7 +164,7 @@
           "name": "What is Residata?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Residata is a market intelligence platform that tracks every new residential development in Bratislava, Slovakia. It delivers structured data on pricing, availability, absorption rate, and sales velocity — refreshed monthly — to developers, banks, valuers, and investors."
+            "text": "Residata is a market intelligence platform that tracks every new residential development across Slovakia and Czechia. It delivers structured data on pricing, availability, absorption rate, and sales velocity — refreshed monthly — to developers, banks, valuers, and investors."
           }
         },
         {
@@ -169,7 +172,7 @@
           "name": "What data does Residata cover?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Every active new-build residential project in Bratislava: unit counts, prices and price per square meter, availability, sold and reserved status, floor, orientation, handover date, developer, district. __SCHEMA_TOTAL_PROJECTS_TRACKED__ projects in dataset (__SCHEMA_TOTAL_PROJECTS__ currently active in the market), roughly __SCHEMA_TOTAL_UNITS__ units across active projects as of __SCHEMA_MONTH_LABEL__. Sold-out projects stay in the dataset as historical comparable transactions for valuers and banks."
+            "text": "Every active new-build residential project across Slovakia and Czechia: unit counts, prices and price per square meter, availability, sold and reserved status, floor, orientation, handover date, developer, district. __SCHEMA_TOTAL_PROJECTS_TRACKED__ projects in dataset (__SCHEMA_TOTAL_PROJECTS__ currently active in the market), roughly __SCHEMA_TOTAL_UNITS__ units across active projects as of __SCHEMA_MONTH_LABEL__. Sold-out projects stay in the dataset as historical comparable transactions for valuers and banks."
           }
         },
         {
@@ -193,7 +196,7 @@
           "name": "Where is Residata's data sourced from?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Every developer's public listing site across 72 developers in Bratislava. Residata normalizes and validates the data centrally, so buyers get a single consistent schema instead of 72 different formats."
+            "text": "Every developer's public listing site across Slovakia and Czechia. Residata normalizes and validates the data centrally, so buyers get a single consistent schema instead of hundreds of different formats."
           }
         },
         {
@@ -214,7 +217,7 @@
     <noscript>
       <div style="padding:2rem;font-family:sans-serif;color:#e8e8ed;background:#0a0a0b;">
         <h1>Residata</h1>
-        <p>New-build residential market intelligence for Bratislava, Slovakia. Monthly-refreshed data on pricing, availability, absorption, and trends across every active development.</p>
+        <p>New-build residential market intelligence for Slovakia & Czechia. Monthly-refreshed data on pricing, availability, absorption, and trends across every active development.</p>
         <p>This app requires JavaScript. Please enable it or contact <a href="mailto:residata@proton.me" style="color:#00e5a0;">residata@proton.me</a> for the static report.</p>
       </div>
     </noscript>

@@ -91,8 +91,8 @@ export const liveT = {
     analytics_see_pricing: "See pricing",
     analytics_label: "Analytics",
     analytics_title: "Trends & insights",
-    analytics_desc: "Coming soon: price trends over time, district heat maps, data export, monthly reports.",
-    analytics_placeholder: "Detailed charts and trend analytics in preparation — for early access email residata@proton.me",
+    analytics_desc: "Price trends over time, district heat maps, data export, and monthly reports.",
+    analytics_placeholder: "Detailed charts and trend analytics — questions? email residata@proton.me",
 
     // Admin
     admin_label: "Admin",
@@ -248,8 +248,8 @@ export const liveT = {
     analytics_see_pricing: "Zobraziť cenník",
     analytics_label: "Analytics",
     analytics_title: "Trendy a insights",
-    analytics_desc: "Čoskoro: grafy cien v čase, heat mapy okresov, export dát, monthly reporty.",
-    analytics_placeholder: "Detailné grafy a trend analytika v príprave — pre včasný prístup napíš na residata@proton.me",
+    analytics_desc: "Grafy cien v čase, heat mapy okresov, export dát a mesačné reporty.",
+    analytics_placeholder: "Detailné grafy a trend analytika — otázky? napíš na residata@proton.me",
 
     admin_label: "Admin",
     admin_title: "Správa tier-ov užívateľov",
