@@ -23,7 +23,7 @@ import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useProjects } from "../lib/useData";
 import { useCountry } from "../lib/useCountry";
-import { supabasePublic, isSupabaseReady } from "../lib/supabase";
+import { supabase, supabasePublic, isSupabaseReady } from "../lib/supabase";
 import {
   LENSES, COMPLETION, NO_DATA, ppm2Of, metricValue, completionBucket,
   tertiles, colorFor, coverage, circlePolygon, computeCompetitiveSet, computePolygonSet, computeCorridorSet,
@@ -235,17 +235,60 @@ export default function MapView2({ lang = "en", setCurrent }) {
     setAnalysisCenter({ lng: e.lngLat.lng, lat: e.lngLat.lat }); setAnchorId(null);
   };
   const setCorridorWidth = (v) => { setCorridorKm(v); setShape((s) => (s && s.kind === "corridor" ? { ...s, widthKm: v } : s)); };
+  // Saved areas are DB-backed (public.user_map_areas, RLS per-user → follow the user
+  // across devices) with a localStorage cache/fallback so the UI is instant and still
+  // works if the DB call fails. persistSavedAreas keeps the cache in sync.
+  const setAreas = (next) => { setSavedAreas(next); persistSavedAreas(next); };
   const beginSave = () => { if (!shape) return; setSaveName(""); setSaving(true); };
-  const confirmSave = () => {
+  const confirmSave = async () => {
     const nm = saveName.trim();
     if (!nm || !shape) { setSaving(false); return; }
-    const item = { id: String(Date.now()), name: nm, shape, country };
-    const next = [item, ...savedAreas.filter((a) => a.name !== nm)].slice(0, 40);
-    setSavedAreas(next); persistSavedAreas(next);
     setSaving(false); setSaveName(""); setJustSaved(nm); setTimeout(() => setJustSaved(""), 2600);
+    // Optimistic local insert (dedupe by name), then reconcile with the DB row id.
+    const localItem = { id: "ls-" + String(Date.now()), name: nm, shape, country };
+    setAreas([localItem, ...savedAreas.filter((a) => a.name !== nm)].slice(0, 60));
+    if (!isSupabaseReady()) return;
+    try {
+      await supabase.from("user_map_areas").delete().eq("name", nm); // keep names unique per user
+      const { data, error } = await supabase.from("user_map_areas")
+        .insert({ name: nm, shape, country }).select("id, name, shape, country").single();
+      if (error) throw error;
+      setSavedAreas((prev) => { const next = prev.map((a) => (a.id === localItem.id ? { id: data.id, name: data.name, shape: data.shape, country: data.country } : a)); persistSavedAreas(next); return next; });
+    } catch (_) { /* keep the localStorage-only copy */ }
   };
   const loadArea = (a) => { setSaving(false); setDrawTool(null); setPts([]); setAnalysisCenter(null); setAnchorId(null); if (a.shape.kind === "corridor") setCorridorKm(a.shape.widthKm); setShape(a.shape); };
-  const deleteArea = (id) => { const next = savedAreas.filter((a) => a.id !== id); setSavedAreas(next); persistSavedAreas(next); };
+  const deleteArea = async (id) => {
+    setSavedAreas((prev) => { const next = prev.filter((a) => a.id !== id); persistSavedAreas(next); return next; });
+    if (isSupabaseReady() && !String(id).startsWith("ls-")) { try { await supabase.from("user_map_areas").delete().eq("id", id); } catch (_) {} }
+  };
+  // On mount: pull the user's saved areas from the DB (source of truth, follows them
+  // across devices). The localStorage cache seeds the initial state for an instant paint.
+  // One-time migration: any area that lives only in this browser's cache (saved before
+  // the DB feature existed) is pushed into the DB so it follows the user from now on.
+  // If the DB is unreachable, the cache stays untouched.
+  useEffect(() => {
+    if (!isSupabaseReady()) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = await supabase.from("user_map_areas")
+          .select("id, name, shape, country").order("created_at", { ascending: false });
+        if (error) throw error;
+        const dbAreas = (data || []).map((r) => ({ id: r.id, name: r.name, shape: r.shape, country: r.country }));
+        const dbNames = new Set(dbAreas.map((a) => a.name));
+        const toMigrate = loadSavedAreas().filter((a) => a && a.shape && a.name && !dbNames.has(a.name));
+        let merged = dbAreas;
+        if (toMigrate.length) {
+          const { data: ins } = await supabase.from("user_map_areas")
+            .insert(toMigrate.map((a) => ({ name: a.name, shape: a.shape, country: a.country })))
+            .select("id, name, shape, country");
+          if (Array.isArray(ins)) merged = [...ins.map((r) => ({ id: r.id, name: r.name, shape: r.shape, country: r.country })), ...dbAreas];
+        }
+        if (!cancelled) setAreas(merged);
+      } catch (_) { /* keep the localStorage cache */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // On mount, consume a project set handed over from a filtered analytics view (Unit Explorer's
   // "Show on map"). Restricts the map to exactly those projects until cleared. Consume-once.
@@ -752,7 +795,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
                   </div>
                   {saving && (
                     <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
-                      <input autoFocus value={saveName} onChange={(e) => setSaveName(e.target.value)}
+                      <input autoFocus value={saveName} maxLength={120} onChange={(e) => setSaveName(e.target.value)}
                         onKeyDown={(e) => { if (e.key === "Enter") confirmSave(); if (e.key === "Escape") setSaving(false); }}
                         placeholder={sk ? "Názov oblasti…" : "Name this area…"}
                         style={{ flex: 1, minWidth: 0, boxSizing: "border-box", padding: "6px 9px", background: bg2, border: `1px solid ${border}`, borderRadius: 7, color: textLight, fontSize: "0.8rem", outline: "none" }} />
