@@ -6,6 +6,7 @@
  * Conditions AND together. All logic lives in ../lib/mapFilters (unit-tested);
  * this is just the editor.
  */
+import { createPortal } from "react-dom";
 import {
   FIELDS, FIELD_BY_KEY, opsForField, defaultOpForField, fieldOptions,
 } from "../lib/mapFilters";
@@ -32,14 +33,20 @@ function makeCondition(fieldKey = FIELDS[0].key) {
   return { id: newId(), field: fieldKey, op, value: defaultValueFor(f, op) };
 }
 
-export default function MapFilterBuilder({ conditions, setConditions, projects, matchCount, totalCount, sk, onClose }) {
+export default function MapFilterBuilder({ conditions, setConditions, projects, matchCount, totalCount, sk, onClose, asModal = false }) {
   const update = (id, patch) => setConditions(conditions.map((c) => (c.id === id ? { ...c, ...patch } : c)));
   const remove = (id) => setConditions(conditions.filter((c) => c.id !== id));
   const onField = (id, fieldKey) => { const f = FIELD_BY_KEY[fieldKey]; const op = defaultOpForField(f); update(id, { field: fieldKey, op, value: defaultValueFor(f, op) }); };
   const onOp = (id, opKey) => { const c = conditions.find((x) => x.id === id); update(id, { op: opKey, value: defaultValueFor(FIELD_BY_KEY[c.field], opKey) }); };
 
-  return (
-    <div style={{ position: "absolute", top: 8, left: "1.25rem", zIndex: 40, width: 700, maxWidth: "calc(100% - 2.5rem)", background: panel, border: `1px solid ${border}`, borderRadius: 14, boxShadow: "0 22px 60px rgba(0,0,0,0.66)" }}>
+  // asModal: a compact, centered modal portaled to <body> (used on the dashboard,
+  // where the big absolute overlay covered half the screen). Default: the original
+  // absolute panel anchored top-left (used over the map).
+  const rootStyle = asModal
+    ? { width: "100%", background: panel, border: `1px solid ${border}`, borderRadius: 14, boxShadow: "0 24px 64px rgba(0,0,0,0.7)" }
+    : { position: "absolute", top: 8, left: "1.25rem", zIndex: 40, width: 700, maxWidth: "calc(100% - 2.5rem)", background: panel, border: `1px solid ${border}`, borderRadius: 14, boxShadow: "0 22px 60px rgba(0,0,0,0.66)" };
+  const body = (
+    <div style={rootStyle}>
       <div style={{ display: "flex", alignItems: "center", padding: "15px 18px", borderBottom: `1px solid ${border}` }}>
         <span style={{ color: textLight, fontWeight: 600, fontSize: "1rem" }}>{sk ? "Filtre" : "Filters"}</span>
         <span style={{ marginLeft: 12, fontSize: "0.82rem", color: dim, fontFamily: mono }}>
@@ -68,6 +75,16 @@ export default function MapFilterBuilder({ conditions, setConditions, projects, 
       )}
     </div>
   );
+
+  if (asModal) {
+    return createPortal(
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(0,0,0,0.62)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "7vh 1rem 4vh", overflowY: "auto" }}>
+        <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 560 }}>{body}</div>
+      </div>,
+      document.body
+    );
+  }
+  return body;
 }
 
 function Row({ c, i, projects, sk, onField, onOp, update, remove }) {

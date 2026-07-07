@@ -23,6 +23,7 @@
  * are capability-gated (blurred + upgrade nudge for free users).
  */
 import { useState, useMemo, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
 import {
@@ -40,6 +41,7 @@ import {
 } from "../lib/theme";
 import { useDashboardConfig, newWidgetId } from "../lib/useDashboardConfig";
 import MapFilterBuilder from "../components/MapFilterBuilder";
+import Picker from "../components/Picker";
 import { applyFilters, describe, isComplete } from "../lib/mapFilters";
 
 const L = (lang, sk, en) => (lang === "sk" ? sk : en);
@@ -304,10 +306,6 @@ function Sparkline({ series, color = green, width = 120, height = 34 }) {
 }
 
 // ─── styled primitives ─────────────────────────────────────────
-const selStyle = {
-  width: "100%", padding: "0.5rem 0.65rem", background: bg2, border: `1px solid ${border}`,
-  borderRadius: 8, color: textLight, fontSize: "0.82rem", fontFamily: "inherit", outline: "none", cursor: "pointer",
-};
 // Pill-style chip button matching the Map / Projects filter bar.
 const filterChip = (active) => ({
   display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 999,
@@ -316,18 +314,16 @@ const filterChip = (active) => ({
 });
 function Field({ label, children }) {
   return (
-    <label style={{ display: "block", marginBottom: "0.7rem" }}>
-      <span style={{ display: "block", fontSize: "0.62rem", color: dim, fontFamily: mono, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.3rem" }}>{label}</span>
+    <div style={{ marginBottom: "0.75rem" }}>
+      <span style={{ display: "block", fontSize: "0.62rem", color: dim, fontFamily: mono, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.35rem" }}>{label}</span>
       {children}
-    </label>
+    </div>
   );
 }
-function Select({ value, onChange, options }) {
-  return (
-    <select value={value} onChange={e => onChange(e.target.value)} style={selStyle}>
-      {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-    </select>
-  );
+// Config-form dropdown = the platform's Picker (portaled, on-theme, searchable),
+// so the editor's menus match the Map / Projects "rolldown" style exactly.
+function Select({ value, onChange, options, searchable = false, sk = false }) {
+  return <Picker value={value} onChange={onChange} options={options} searchable={searchable} sk={sk} placeholder={sk ? "vyber…" : "select…"} />;
 }
 
 // ─── KPI card (Zone A) ─────────────────────────────────────────
@@ -400,6 +396,7 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
 
   // ── modal state: add-widget palette / configure widget ──
   const [editor, setEditor] = useState(null); // { mode:'add'|'edit', widget }
+  const [confirmReset, setConfirmReset] = useState(false);
 
   const ctx = { marketTotals, districts, projects, snapshots, lang, can, setCurrent };
 
@@ -512,7 +509,7 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
         </div>
 
         {filterOpen && (
-          <MapFilterBuilder conditions={conditions} setConditions={setConditions}
+          <MapFilterBuilder asModal conditions={conditions} setConditions={setConditions}
             projects={(projects || [])} matchCount={overviewProjects.length} totalCount={(projects || []).length}
             sk={lang === "sk"} onClose={() => setFilterOpen(false)} />
         )}
@@ -558,16 +555,30 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
               </div>
             )}
           </div>
-          <div style={{ display: "inline-flex", gap: "0.5rem" }}>
+          <div style={{ display: "inline-flex", gap: "0.5rem", alignItems: "center" }}>
             <button onClick={() => setEditor({ mode: "add" })}
               style={{ background: green, color: "#06140f", border: "none", borderRadius: 8, padding: "0.5rem 0.95rem", fontWeight: 700, fontFamily: mono, fontSize: "0.76rem", cursor: "pointer" }}>
               + {L(lang, "Pridať widget", "Add widget")}
             </button>
-            <button onClick={() => { if (window.confirm(L(lang, "Obnoviť dashboard na predvolené rozloženie?", "Reset dashboard to the default layout?"))) resetToDefault(); }}
-              title={L(lang, "Obnoviť predvolené", "Reset to default")}
-              style={{ background: "transparent", color: dim, border: `1px solid ${border}`, borderRadius: 8, padding: "0.5rem 0.8rem", fontFamily: mono, fontSize: "0.74rem", cursor: "pointer" }}>
-              {L(lang, "Obnoviť", "Reset")}
-            </button>
+            {confirmReset ? (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem" }}>
+                <span style={{ fontSize: "0.72rem", color: dim, fontFamily: mono }}>{L(lang, "Obnoviť predvolené?", "Reset to default?")}</span>
+                <button onClick={() => { resetToDefault(); setConfirmReset(false); }}
+                  style={{ background: "transparent", color: "#ff8a8a", border: "1px solid #ff8a8a55", borderRadius: 8, padding: "0.45rem 0.7rem", fontFamily: mono, fontSize: "0.72rem", cursor: "pointer" }}>
+                  {L(lang, "Áno", "Yes")}
+                </button>
+                <button onClick={() => setConfirmReset(false)}
+                  style={{ background: "transparent", color: dim, border: `1px solid ${border}`, borderRadius: 8, padding: "0.45rem 0.7rem", fontFamily: mono, fontSize: "0.72rem", cursor: "pointer" }}>
+                  {L(lang, "Nie", "No")}
+                </button>
+              </span>
+            ) : (
+              <button onClick={() => setConfirmReset(true)}
+                title={L(lang, "Obnoviť predvolené", "Reset to default")}
+                style={{ background: "transparent", color: dim, border: `1px solid ${border}`, borderRadius: 8, padding: "0.5rem 0.8rem", fontFamily: mono, fontSize: "0.74rem", cursor: "pointer" }}>
+                {L(lang, "Obnoviť", "Reset")}
+              </button>
+            )}
           </div>
         </div>
 
@@ -689,22 +700,61 @@ const WIDGET_META = {
   segment:   { icon: "◪", title: { sk: "Zhrnutie oblasti", en: "Area summary" } },
 };
 
+// A DESCRIPTIVE header title — "metric of what". Instead of a generic "Metric" /
+// "Leaderboard", show exactly what the card displays: "Available · whole market",
+// "Top 5 projects · Sold 30d", "€/m² by district", the project name, etc.
+function widgetTitle(w, ctx, lang) {
+  const { projects, districts } = ctx;
+  const cfg = w.cfg || {};
+  const projName = (id) => (projects || []).find(p => p.id === id)?.name;
+  const distLabel = (city, district) => {
+    const r = (districts || []).find(d => d.district === district && String(d.city_id) === String(city));
+    return r ? `${district}${r.city_name ? ` · ${r.city_name}` : ""}` : district;
+  };
+  switch (w.type) {
+    case "metric": {
+      const m = METRICS[cfg.metric];
+      return m ? `${m.label[lang] || m.label.en} · ${scopeLabel(cfg.scope, lang)}` : L(lang, "Metrika", "Metric");
+    }
+    case "project": return projName(cfg.projectId) || L(lang, "Sledovaný projekt", "Watched project");
+    case "trend": {
+      const s = TREND_SERIES[cfg.series] || TREND_SERIES.available;
+      const pn = projName(cfg.projectId);
+      return pn ? `${pn} · ${s.label[lang] || s.label.en}` : L(lang, "Trend projektu", "Project trend");
+    }
+    case "benchmark": {
+      const byL = cfg.by === "developer" ? L(lang, "developera", "developer") : L(lang, "časti mesta", "district");
+      return `${moneySymbol()}/m² ${L(lang, "podľa", "by")} ${byL}`;
+    }
+    case "ranking": {
+      const entL = { projects: L(lang, "projekty", "projects"), districts: L(lang, "časti mesta", "districts"), developers: L(lang, "developeri", "developers") }[cfg.entity || "projects"];
+      const md = (RANK_METRICS[cfg.entity] || RANK_METRICS.projects)[cfg.metric];
+      const mL = md ? (md.label[lang] || md.label.en) : "";
+      const dir = cfg.dir === "bottom" ? L(lang, "Najnižšie", "Bottom") : "Top";
+      return `${dir} ${cfg.n || 5} ${entL} · ${mL}`;
+    }
+    case "segment": return cfg.district ? distLabel(cfg.city, cfg.district) : L(lang, "Zhrnutie oblasti", "Area summary");
+    default: return w.type;
+  }
+}
+
 function WidgetCard({ widget, ctx, lang, first, last, dragProps, onConfigure, onRemove, onToggleWidth, onMove }) {
   const [hover, setHover] = useState(false);
   const meta = WIDGET_META[widget.type] || { icon: "▦", title: { sk: widget.type, en: widget.type } };
+  const title = widgetTitle(widget, ctx, lang);
   return (
     <div onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{ background: bg, border: `1px solid ${hover ? "#2c2c34" : border}`, borderRadius: 12, height: "100%", boxSizing: "border-box", transition: "border-color 0.15s", display: "flex", flexDirection: "column" }}>
-      {/* header — drag handle + icon + title on the left; ⋯ menu on the right.
-          Only the header is draggable, so clicks inside the body (leaderboard
-          rows, project cards) never start an accidental drag. */}
+      {/* header — drag handle + icon + DESCRIPTIVE title on the left; ⋯ menu on
+          the right. Only the header is draggable, so clicks inside the body
+          (leaderboard rows, project cards) never start an accidental drag. */}
       <div {...dragProps}
         style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.4rem",
-          padding: "0.6rem 0.75rem 0.6rem 0.85rem", borderBottom: `1px solid ${border}`, cursor: "grab" }}>
+          padding: "0.62rem 0.7rem 0.62rem 0.85rem", borderBottom: `1px solid ${border}`, cursor: "grab" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", minWidth: 0 }}>
-          <span title={L(lang, "Ťahaj pre presun", "Drag to reorder")} style={{ color: hover ? dim : faint, fontSize: "0.8rem", lineHeight: 1, letterSpacing: "-2px", transition: "color 0.15s" }}>⠿</span>
-          <span style={{ color: green, fontSize: "0.78rem" }}>{meta.icon}</span>
-          <span style={{ fontFamily: mono, fontSize: "0.58rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{meta.title[lang] || meta.title.en}</span>
+          <span title={L(lang, "Ťahaj pre presun", "Drag to reorder")} style={{ color: hover ? dim : faint, fontSize: "0.8rem", lineHeight: 1, letterSpacing: "-2px", transition: "color 0.15s", flexShrink: 0 }}>⠿</span>
+          <span style={{ color: green, fontSize: "0.8rem", flexShrink: 0 }}>{meta.icon}</span>
+          <span title={title} style={{ fontSize: "0.82rem", fontWeight: 600, color: textLight, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</span>
         </div>
         <WidgetMenu lang={lang} widget={widget} first={first} last={last}
           onConfigure={onConfigure} onToggleWidth={onToggleWidth} onMove={onMove} onRemove={onRemove} />
@@ -1024,9 +1074,13 @@ function WidgetEditor({ mode, widget, ctx, lang, onClose, onAdd, onSave }) {
   };
   const valid = type && isCfgValid(type, cfg);
 
-  return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 80, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "6vh 1rem", overflowY: "auto" }}>
-      <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 520, background: surfacePanel, border: `1px solid ${border}`, borderRadius: 14, padding: "1.4rem 1.5rem", boxShadow: "0 24px 60px rgba(0,0,0,0.5)" }}>
+  // Portaled to <body> so the fixed overlay is positioned against the VIEWPORT,
+  // not the transform'd .page-transition wrapper (which would pin it to the top
+  // of the page — invisible when the user is scrolled down). zIndex stays below
+  // the Picker menu's 1000 so its dropdowns render above this modal.
+  return createPortal(
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.62)", zIndex: 80, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "7vh 1rem 4vh", overflowY: "auto" }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 500, background: surfacePanel, border: `1px solid ${border}`, borderRadius: 14, padding: "1.4rem 1.5rem", boxShadow: "0 24px 60px rgba(0,0,0,0.5)" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem" }}>
           <h3 style={{ margin: 0, color: textLight, fontSize: "1.1rem", fontWeight: 700 }}>
             {mode === "edit" ? L(lang, "Nastaviť widget", "Configure widget") : L(lang, "Pridať widget", "Add widget")}
@@ -1072,7 +1126,8 @@ function WidgetEditor({ mode, widget, ctx, lang, onClose, onAdd, onSave }) {
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -1105,18 +1160,18 @@ function ConfigForm({ type, cfg, setCfg, ctx, lang }) {
   }, [projects, lang]);
 
   if (type === "project") {
-    return <Field label={L(lang, "Projekt", "Project")}><Select value={cfg.projectId} onChange={v => set({ projectId: v })} options={projectOpts} /></Field>;
+    return <Field label={L(lang, "Projekt", "Project")}><Select value={cfg.projectId} onChange={v => set({ projectId: v })} options={projectOpts} searchable sk={lang === "sk"} /></Field>;
   }
   if (type === "trend") {
     return <>
-      <Field label={L(lang, "Projekt", "Project")}><Select value={cfg.projectId} onChange={v => set({ projectId: v })} options={projectOpts} /></Field>
+      <Field label={L(lang, "Projekt", "Project")}><Select value={cfg.projectId} onChange={v => set({ projectId: v })} options={projectOpts} searchable sk={lang === "sk"} /></Field>
       <Field label={L(lang, "Ukazovateľ", "Series")}><Select value={cfg.series} onChange={v => set({ series: v })}
         options={Object.entries(TREND_SERIES).map(([k, d]) => ({ value: k, label: d.label[lang] || d.label.en }))} /></Field>
     </>;
   }
   if (type === "segment") {
     return <Field label={L(lang, "Oblasť", "Area")}><Select value={cfg.district ? `${cfg.city}::${cfg.district}` : ""}
-      onChange={v => { const [c, ...r] = v.split("::"); set({ city: c, district: r.join("::") }); }} options={districtOpts} /></Field>;
+      onChange={v => { const [c, ...r] = v.split("::"); set({ city: c, district: r.join("::") }); }} options={districtOpts} searchable sk={lang === "sk"} /></Field>;
   }
   if (type === "benchmark") {
     return <>
@@ -1156,11 +1211,11 @@ function ConfigForm({ type, cfg, setCfg, ctx, lang }) {
       {kind === "district" && (
         <Field label={L(lang, "Oblasť", "Area")}><Select value={cfg.scope.district ? `${cfg.scope.city}::${cfg.scope.district}` : ""}
           onChange={v => { const [c, ...r] = v.split("::"); const district = r.join("::"); const row = (districts || []).find(d => d.district === district && String(d.city_id) === String(c)); set({ scope: { kind: "district", city: c, district, districtLabel: row ? `${district}${row.city_name ? ` · ${row.city_name}` : ""}` : district } }); }}
-          options={districtOpts} /></Field>
+          options={districtOpts} searchable sk={lang === "sk"} /></Field>
       )}
       {kind === "developer" && (
         <Field label={L(lang, "Developer", "Developer")}><Select value={cfg.scope.developer || ""}
-          onChange={v => set({ scope: { kind: "developer", developer: v } })} options={developerOpts} /></Field>
+          onChange={v => set({ scope: { kind: "developer", developer: v } })} options={developerOpts} searchable sk={lang === "sk"} /></Field>
       )}
     </>;
   }
