@@ -124,6 +124,7 @@ export default function LoginModal({ open, onClose, lang = "en" }) {
               <input
                 type="email" required autoFocus
                 value={email} onChange={e => setEmail(e.target.value)}
+                aria-label={t.login_placeholder}
                 placeholder={t.login_placeholder}
                 style={{
                   width: "100%", padding: "0.75rem 1rem", background: "#0e0e10",
@@ -162,6 +163,7 @@ export default function LoginModal({ open, onClose, lang = "en" }) {
                 type="text" inputMode="numeric" autoComplete="one-time-code" autoFocus
                 value={code}
                 onChange={e => { setCode(e.target.value.replace(/[^0-9]/g, "").slice(0, 10)); setVerifyError(null); }}
+                aria-label={t.login_code_placeholder}
                 placeholder={t.login_code_placeholder}
                 style={{
                   width: "100%", padding: "0.85rem 1rem", background: "#0e0e10",
