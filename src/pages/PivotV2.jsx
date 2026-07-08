@@ -507,10 +507,11 @@ function distinctValuesForField(records, fieldKey) {
 }
 
 /* Short human summary of a filter's state, for rendering on the chip. */
-function summariseFilter(filter, _fieldType) {
+function summariseFilter(filter, _fieldType, lang) {
   if (!isFilterActive(filter)) return "";
-  if (filter.mode === "empty")     return "je prázdne";
-  if (filter.mode === "not_empty") return "má hodnotu";
+  const en = lang != null && lang !== "sk";   // default to SK when lang is absent (SK is the primary locale)
+  if (filter.mode === "empty")     return en ? "is empty" : "je prázdne";
+  if (filter.mode === "not_empty") return en ? "has value" : "má hodnotu";
   if (filter.mode === "between") {
     const parts = [];
     if (filter.min != null) parts.push(`≥ ${filter.min}`);
@@ -2014,7 +2015,7 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
           </span>
           {filters.filter(isFilterActive).map(f => (
             <span key={f.key} style={{ color: text }}>
-              <span style={{ color: dim }}>{fieldLabel(f.key, lang)}:</span> {summariseFilter(f, FIELDS[f.key]?.type)}
+              <span style={{ color: dim }}>{fieldLabel(f.key, lang)}:</span> {summariseFilter(f, FIELDS[f.key]?.type, lang)}
             </span>
           ))}
           <button onClick={() => setFilters(fs => fs.map(f => ({ key: f.key })))}
@@ -2049,7 +2050,8 @@ function LeftPanel({ rows, cols, values, filters, drag, setDrag, hoverZone, setH
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
       <DropZone
-        zoneKey="rows"
+        zoneKey="rows" 
+        lang={lang}
         title={lang === "sk" ? "Riadky" : "Rows"}
         hint={lang === "sk" ? "Potiahni pole sem — bude group-by os (hierarchia)." : "Drop a field here — becomes a group-by axis."}
         icon="↓"
@@ -2060,7 +2062,8 @@ function LeftPanel({ rows, cols, values, filters, drag, setDrag, hoverZone, setH
         onRemove={(k) => removeFromZone("rows", k)}
       />
       <DropZone
-        zoneKey="cols"
+        zoneKey="cols" 
+        lang={lang}
         title={lang === "sk" ? "Stĺpce" : "Columns"}
         hint={lang === "sk"
           ? "Potiahni text-pole sem — každá hodnota dostane vlastný stĺpec (cross-tab, napr. Stav: V/P/R)."
@@ -2073,7 +2076,8 @@ function LeftPanel({ rows, cols, values, filters, drag, setDrag, hoverZone, setH
         onRemove={(k) => removeFromZone("cols", k)}
       />
       <DropZone
-        zoneKey="values"
+        zoneKey="values" 
+        lang={lang}
         title={lang === "sk" ? "Hodnoty" : "Values"}
         hint={lang === "sk" ? "Potiahni pole sem — bude sa agregovať (default: count; zmeň kliknutím na chip)." : "Drop a field here — aggregated (default: count; click the chip to change)."}
         icon="Σ"
@@ -2085,7 +2089,8 @@ function LeftPanel({ rows, cols, values, filters, drag, setDrag, hoverZone, setH
         onChangeAgg={changeValueAgg}
       />
       <DropZone
-        zoneKey="filters"
+        zoneKey="filters" 
+        lang={lang}
         title={lang === "sk" ? "Filtre" : "Filters"}
         hint={lang === "sk"
           ? "Potiahni pole sem — vylúč / zahrň konkrétne hodnoty. Platí na celý pivot (pred agregáciou)."
@@ -2108,7 +2113,7 @@ function LeftPanel({ rows, cols, values, filters, drag, setDrag, hoverZone, setH
   );
 }
 
-function DropZone({ zoneKey, title, hint, icon, chips, drag, hoverZone, setHoverZone, onDrop, onRemove, onChangeAgg, onChipClick }) {
+function DropZone({ zoneKey, title, hint, icon, chips, drag, hoverZone, setHoverZone, onDrop, onRemove, onChangeAgg, onChipClick, lang }) {
   const isHover = hoverZone === zoneKey && drag;
   const isDragging = drag != null;
   return (
@@ -2150,6 +2155,7 @@ function DropZone({ zoneKey, title, hint, icon, chips, drag, hoverZone, setHover
               onRemove={() => onRemove(c.key)}
               onChangeAgg={onChangeAgg ? (a) => onChangeAgg(c.key, a) : null}
               onClick={onChipClick ? (e) => onChipClick(c.key, e.currentTarget) : null}
+              lang={lang}
             />
           ))}
         </div>
@@ -2160,7 +2166,7 @@ function DropZone({ zoneKey, title, hint, icon, chips, drag, hoverZone, setHover
 
 /* A chip inside a drop zone. In Values zone the chip carries an agg
    dropdown directly — click to cycle or pick from a menu. */
-function ChipInZone({ label, type, agg, filter, level, onDragStart, onDragStartPayload, onRemove, onChangeAgg, onClick }) {
+function ChipInZone({ label, type, agg, filter, level, onDragStart, onDragStartPayload, onRemove, onChangeAgg, onClick, lang }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const aggs = type === "measure" ? AGGS_MEASURE
              : type === "number" ? AGGS_NUMBER
@@ -2171,7 +2177,7 @@ function ChipInZone({ label, type, agg, filter, level, onDragStart, onDragStartP
   // filter gets the normal green chip color.
   const isFilterChip = filter !== undefined;
   const active = isFilterChip ? isFilterActive(filter) : true;
-  const filterSummary = isFilterChip ? summariseFilter(filter, type) : null;
+  const filterSummary = isFilterChip ? summariseFilter(filter, type, lang) : null;
 
   // Filter chips are NOT draggable — the browser's dragstart vs click
   // dance on a draggable element was swallowing clicks in some cases
@@ -3348,28 +3354,28 @@ function PivotChart({ tree, rowFields, colFields: _colFields, effectiveValues, o
 
         {/* Chart body */}
         {effectiveType === "bar" && (
-          <BarChartSVG data={truncated} measureField={measureField} measureAgg={measureAgg} onSelect={onSelect} />
+          <BarChartSVG data={truncated} measureField={measureField} measureAgg={measureAgg} onSelect={onSelect} lang={lang} />
         )}
         {effectiveType === "stacked" && stackedAvailable && (
-          <StackedBarSVG data={truncated} colKeys={colKeys} valueIdx={valueIdx} measureField={measureField} measureAgg={measureAgg} onSelect={onSelect} />
+          <StackedBarSVG data={truncated} colKeys={colKeys} valueIdx={valueIdx} measureField={measureField} measureAgg={measureAgg} onSelect={onSelect} lang={lang} />
         )}
         {effectiveType === "stacked" && !stackedAvailable && (
-          <BarChartSVG data={truncated} measureField={measureField} measureAgg={measureAgg} onSelect={onSelect} />
+          <BarChartSVG data={truncated} measureField={measureField} measureAgg={measureAgg} onSelect={onSelect} lang={lang} />
         )}
         {effectiveType === "line" && (
-          <LineChartSVG data={truncated} measureField={measureField} measureAgg={measureAgg} onSelect={onSelect} />
+          <LineChartSVG data={truncated} measureField={measureField} measureAgg={measureAgg} onSelect={onSelect} lang={lang} />
         )}
         {effectiveType === "pie" && pieAvailable && (
           <PieChartSVG data={truncated} measureField={measureField} measureAgg={measureAgg} onSelect={onSelect} lang={lang} />
         )}
         {effectiveType === "pie" && !pieAvailable && (
-          <BarChartSVG data={truncated} measureField={measureField} measureAgg={measureAgg} onSelect={onSelect} />
+          <BarChartSVG data={truncated} measureField={measureField} measureAgg={measureAgg} onSelect={onSelect} lang={lang} />
         )}
         {effectiveType === "heatmap" && heatmapAvailable && (
-          <HeatmapSVG topRows={topRows.slice(0, TRUNCATE)} colKeys={colKeys} valueIdx={valueIdx} measureField={measureField} measureAgg={measureAgg} onSelect={onSelect} />
+          <HeatmapSVG topRows={topRows.slice(0, TRUNCATE)} colKeys={colKeys} valueIdx={valueIdx} measureField={measureField} measureAgg={measureAgg} onSelect={onSelect} lang={lang} />
         )}
         {effectiveType === "heatmap" && !heatmapAvailable && (
-          <BarChartSVG data={truncated} measureField={measureField} measureAgg={measureAgg} onSelect={onSelect} />
+          <BarChartSVG data={truncated} measureField={measureField} measureAgg={measureAgg} onSelect={onSelect} lang={lang} />
         )}
       </div>
     </ChartHeader>
@@ -3578,7 +3584,7 @@ function ChartTooltip({ mouseX, mouseY, lines, accentColor }) {
    Hover shows a floating tooltip with the full value (replaces the
    per-bar always-on labels which collided at any reasonable bar
    count). */
-function BarChartSVG({ data, measureField, measureAgg, onSelect }) {
+function BarChartSVG({ data, measureField, measureAgg, onSelect, lang }) {
   const W = 880, H = 340;
   // Wider left padding gives the (now-narrower) Y-axis tick column
   // breathing room; the unit label moves into a small axis title at
@@ -3680,7 +3686,7 @@ function BarChartSVG({ data, measureField, measureAgg, onSelect }) {
           lines={[
             { text: hover.d.label, bold: true },
             { text: formatValueWhole(hover.d.value, measureField, measureAgg), accent: true },
-            { text: "click → riadok v tabuľke", muted: true, small: true },
+            { text: lang === "sk" ? "klik → riadok v tabuľke" : "click → row in table", muted: true, small: true },
           ]}
         />
       )}
@@ -3693,7 +3699,7 @@ function BarChartSVG({ data, measureField, measureAgg, onSelect }) {
    gets a distinct palette colour. Click a segment → flash the matching
    (row, colKey) cell in the table. Click outside any segment (X label)
    → flash just the row. */
-function StackedBarSVG({ data, colKeys, valueIdx, measureField, measureAgg, onSelect }) {
+function StackedBarSVG({ data, colKeys, valueIdx, measureField, measureAgg, onSelect, lang }) {
   const W = 880, H = 380;
   const padL = 56, padR = 16, padT = 32, padB = data.length > 8 ? 144 : 104;
   const innerW = W - padL - padR;
@@ -3817,8 +3823,8 @@ function StackedBarSVG({ data, colKeys, valueIdx, measureField, measureAgg, onSe
           lines={[
             { text: hover.s.label, bold: true },
             { text: `${hover.seg.colKey}: ${formatValueWhole(hover.seg.value, measureField, measureAgg)}`, accent: true },
-            { text: `Spolu: ${formatValueWhole(hover.s.total, measureField, measureAgg)}`, muted: true, small: true },
-            { text: "click → bunka v tabuľke", muted: true, small: true },
+            { text: `${lang === "sk" ? "Spolu" : "Total"}: ${formatValueWhole(hover.s.total, measureField, measureAgg)}`, muted: true, small: true },
+            { text: lang === "sk" ? "klik → bunka v tabuľke" : "click → cell in table", muted: true, small: true },
           ]}
         />
       )}
@@ -3830,7 +3836,7 @@ function StackedBarSVG({ data, colKeys, valueIdx, measureField, measureAgg, onSe
    Single line with circle markers. Useful for time / ordinal rows.
    Each marker is clickable + has a wider invisible hit-area so users
    don't have to aim for a 4-px dot. */
-function LineChartSVG({ data, measureField, measureAgg, onSelect }) {
+function LineChartSVG({ data, measureField, measureAgg, onSelect, lang }) {
   const W = 880, H = 340;
   const padL = 56, padR = 16, padT = 32, padB = data.length > 8 ? 110 : 64;
   const innerW = W - padL - padR;
@@ -3910,7 +3916,7 @@ function LineChartSVG({ data, measureField, measureAgg, onSelect }) {
           lines={[
             { text: hover.d.label, bold: true },
             { text: formatValueWhole(hover.d.value, measureField, measureAgg), accent: true },
-            { text: "click → riadok v tabuľke", muted: true, small: true },
+            { text: lang === "sk" ? "klik → riadok v tabuľke" : "click → row in table", muted: true, small: true },
           ]}
         />
       )}
@@ -4019,7 +4025,7 @@ function PieChartSVG({ data, measureField, measureAgg, onSelect, lang }) {
           lines={[
             { text: hover.s.label, bold: true },
             { text: `${formatValueWhole(hover.s.value, measureField, measureAgg)}  ·  ${(hover.s.share * 100).toFixed(1)}%`, accent: true },
-            { text: "click → riadok v tabuľke", muted: true, small: true },
+            { text: lang === "sk" ? "klik → riadok v tabuľke" : "click → row in table", muted: true, small: true },
           ]}
         />
       )}
@@ -4032,7 +4038,7 @@ function PieChartSVG({ data, measureField, measureAgg, onSelect, lang }) {
    (null / 0) get a hatched look. Each cell is clickable → flashes the
    matching (row, colKey) cell in the table. Row labels are clickable
    too — flash the whole row. */
-function HeatmapSVG({ topRows, colKeys, valueIdx, measureField, measureAgg, onSelect }) {
+function HeatmapSVG({ topRows, colKeys, valueIdx, measureField, measureAgg, onSelect, lang }) {
   const W = 880, H = Math.max(240, 44 + topRows.length * 30 + 16);
   const padL = 220, padR = 16, padT = 44, padB = 16;
   const innerW = W - padL - padR;
@@ -4102,7 +4108,7 @@ function HeatmapSVG({ topRows, colKeys, valueIdx, measureField, measureAgg, onSe
                 className="pivot-chart-target"
                 onClick={onRowClick}
               >
-                <title>{rowText + "\n(click → riadok v tabuľke)"}</title>
+                <title>{rowText + (lang === "sk" ? "\n(klik → riadok v tabuľke)" : "\n(click → row in table)")}</title>
                 {truncated}
               </text>
               {colKeys.map((ck, j) => {
@@ -4142,7 +4148,7 @@ function HeatmapSVG({ topRows, colKeys, valueIdx, measureField, measureAgg, onSe
           lines={[
             { text: hover.row.label || "—", bold: true },
             { text: `${hover.ck}: ${formatValueWhole(hover.v, measureField, measureAgg)}`, accent: true },
-            { text: "click → bunka v tabuľke", muted: true, small: true },
+            { text: lang === "sk" ? "klik → bunka v tabuľke" : "click → cell in table", muted: true, small: true },
           ]}
         />
       )}
@@ -4375,12 +4381,12 @@ function FilterPopover({ fieldKey, filter, anchorEl, records, distinctOverride =
       {/* Mode picker — clean pills, plain labels */}
       <div style={{ display: "flex", gap: "0.3rem", marginBottom: "0.9rem", flexWrap: "wrap" }}>
         {isNumber && (
-          <ModeBtn active={mode === "between"} onClick={() => setMode("between")}>rozsah</ModeBtn>
+          <ModeBtn active={mode === "between"} onClick={() => setMode("between")}>{lang === "sk" ? "rozsah" : "range"}</ModeBtn>
         )}
-        <ModeBtn active={mode === "in"}        onClick={() => setMode("in")}>zahrnúť</ModeBtn>
-        <ModeBtn active={mode === "not_in"}    onClick={() => setMode("not_in")}>vylúčiť</ModeBtn>
-        <ModeBtn active={mode === "empty"}     onClick={() => setMode("empty")}>len prázdne</ModeBtn>
-        <ModeBtn active={mode === "not_empty"} onClick={() => setMode("not_empty")}>má hodnotu</ModeBtn>
+        <ModeBtn active={mode === "in"}        onClick={() => setMode("in")}>{lang === "sk" ? "zahrnúť" : "include"}</ModeBtn>
+        <ModeBtn active={mode === "not_in"}    onClick={() => setMode("not_in")}>{lang === "sk" ? "vylúčiť" : "exclude"}</ModeBtn>
+        <ModeBtn active={mode === "empty"}     onClick={() => setMode("empty")}>{lang === "sk" ? "len prázdne" : "empty only"}</ModeBtn>
+        <ModeBtn active={mode === "not_empty"} onClick={() => setMode("not_empty")}>{lang === "sk" ? "má hodnotu" : "has value"}</ModeBtn>
       </div>
 
       {/* Range inputs */}
@@ -4388,36 +4394,36 @@ function FilterPopover({ fieldKey, filter, anchorEl, records, distinctOverride =
         <div style={{ marginBottom: "0.6rem" }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
             <label style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-              <span style={{ fontSize: "0.75rem", color: dim }}>od</span>
+              <span style={{ fontSize: "0.75rem", color: dim }}>{lang === "sk" ? "od" : "from"}</span>
               <input type="number" value={minV} onChange={(e) => setMinV(e.target.value)}
                 placeholder={stats ? fmt(stats.min) : ""} style={inpS} />
             </label>
             <label style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-              <span style={{ fontSize: "0.75rem", color: dim }}>do</span>
+              <span style={{ fontSize: "0.75rem", color: dim }}>{lang === "sk" ? "do" : "to"}</span>
               <input type="number" value={maxV} onChange={(e) => setMaxV(e.target.value)}
                 placeholder={stats ? fmt(stats.max) : ""} style={inpS} />
             </label>
           </div>
           {stats && (
             <div style={{ marginTop: "0.5rem", display: "flex", gap: "0.3rem", flexWrap: "wrap" }}>
-              <QuickBtn onClick={() => quickRange(stats.min, stats.median)}>dolná polovica</QuickBtn>
-              <QuickBtn onClick={() => quickRange(stats.median, stats.max)}>horná polovica</QuickBtn>
-              <QuickBtn onClick={() => quickRange("", "")}>vyčistiť</QuickBtn>
+              <QuickBtn onClick={() => quickRange(stats.min, stats.median)}>{lang === "sk" ? "dolná polovica" : "lower half"}</QuickBtn>
+              <QuickBtn onClick={() => quickRange(stats.median, stats.max)}>{lang === "sk" ? "horná polovica" : "upper half"}</QuickBtn>
+              <QuickBtn onClick={() => quickRange("", "")}>{lang === "sk" ? "vyčistiť" : "clear"}</QuickBtn>
             </div>
           )}
           {/* Stats as a muted one-liner below the inputs, no box */}
           {stats && (
             <div style={{ marginTop: "0.65rem", fontSize: "0.74rem", color: dim, lineHeight: 1.5 }}>
-              V dátach od <strong style={{ color: text, fontWeight: 500 }}>{fmt(stats.min)}</strong> do <strong style={{ color: text, fontWeight: 500 }}>{fmt(stats.max)}</strong>,
-              medián <strong style={{ color: text, fontWeight: 500 }}>{fmt(stats.median)}</strong>.
-              {hasEmpty && <> {stats.nNull != null ? stats.nNull : records.length - stats.count} záznamov bez hodnoty.</>}
+              {lang === "sk" ? "V dátach od " : "In data from "}<strong style={{ color: text, fontWeight: 500 }}>{fmt(stats.min)}</strong>{lang === "sk" ? " do " : " to "}<strong style={{ color: text, fontWeight: 500 }}>{fmt(stats.max)}</strong>,
+              {lang === "sk" ? " medián " : " median "}<strong style={{ color: text, fontWeight: 500 }}>{fmt(stats.median)}</strong>.
+              {hasEmpty && <> {Math.max(0, stats.nNull != null ? stats.nNull : records.length - stats.count)} {lang === "sk" ? "záznamov bez hodnoty." : "records without a value."}</>}
             </div>
           )}
           {hasEmpty && (
             <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.65rem", cursor: "pointer", fontSize: "0.82rem", color: "#c4c4cc" }}>
               <input type="checkbox" checked={inclEmpty} onChange={(e) => setInclEmpty(e.target.checked)}
                 style={{ accentColor: green, width: 14, height: 14 }} />
-              zahrnúť aj byty bez ceny
+              {lang === "sk" ? "zahrnúť aj byty bez ceny" : "include units without a value"}
             </label>
           )}
         </div>
@@ -4430,7 +4436,7 @@ function FilterPopover({ fieldKey, filter, anchorEl, records, distinctOverride =
             autoFocus
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Hľadať…"
+            placeholder={lang === "sk" ? "Hľadať…" : "Search…"}
             style={{ ...inpS, width: "100%", marginBottom: "0.55rem" }}
           />
           <div style={{ display: "flex", gap: "0.35rem", marginBottom: "0.5rem", alignItems: "center" }}>
@@ -4438,8 +4444,8 @@ function FilterPopover({ fieldKey, filter, anchorEl, records, distinctOverride =
               const all = [...distinct];
               if (hasEmpty) all.push(EMPTY_SENTINEL);
               setSelected(new Set(all));
-            }}>všetko</QuickBtn>
-            <QuickBtn onClick={() => setSelected(new Set())}>nič</QuickBtn>
+            }}>{lang === "sk" ? "všetko" : "all"}</QuickBtn>
+            <QuickBtn onClick={() => setSelected(new Set())}>{lang === "sk" ? "nič" : "none"}</QuickBtn>
             <QuickBtn onClick={() => {
               setSelected(prev => {
                 const all = [...distinct];
@@ -4448,9 +4454,9 @@ function FilterPopover({ fieldKey, filter, anchorEl, records, distinctOverride =
                 for (const v of all) if (!prev.has(v)) inv.add(v);
                 return inv;
               });
-            }}>prevrátiť</QuickBtn>
+            }}>{lang === "sk" ? "prevrátiť" : "invert"}</QuickBtn>
             <span style={{ marginLeft: "auto", color: dim, fontSize: "0.76rem" }}>
-              {selected.size} vybraných
+              {lang === "sk" ? `${selected.size} vybraných` : `${selected.size} selected`}
             </span>
           </div>
           <div style={{
@@ -4462,12 +4468,12 @@ function FilterPopover({ fieldKey, filter, anchorEl, records, distinctOverride =
               <CheckboxRow
                 checked={selected.has(EMPTY_SENTINEL)}
                 onChange={() => toggle(EMPTY_SENTINEL)}
-                label={<span style={{ fontStyle: "italic", color: dim }}>(bez hodnoty)</span>}
+                label={<span style={{ fontStyle: "italic", color: dim }}>{lang === "sk" ? "(bez hodnoty)" : "(no value)"}</span>}
               />
             )}
             {shown.length === 0 ? (
               <div style={{ padding: "0.75rem", fontSize: "0.8rem", color: dim, textAlign: "center" }}>
-                {loading ? (lang === "sk" ? "Načítavam…" : "Loading…") : "Žiadne zhody."}
+                {loading ? (lang === "sk" ? "Načítavam…" : "Loading…") : (lang === "sk" ? "Žiadne zhody." : "No matches.")}
               </div>
             ) : shown.map(v => (
               <CheckboxRow
