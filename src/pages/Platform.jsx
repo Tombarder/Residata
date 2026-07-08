@@ -605,6 +605,14 @@ function TopBar({ page, lang, setLang, tier }) {
         @media (min-width: 841px) {
           .platform-topbar-inner { padding-left: 0 !important; }
         }
+        /* Phones: the header competed for width (freshness + language + Website
+           button all crowded the title). Drop the secondary "data updated" chip
+           (the page body still shows it), tighten padding, shrink the title. */
+        @media (max-width: 640px) {
+          .platform-topbar { padding: 0.85rem 1rem !important; }
+          .platform-topbar h1 { font-size: 1.15rem !important; }
+          .platform-topbar-freshness { display: none !important; }
+        }
       `}</style>
     </header>
   );
