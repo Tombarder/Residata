@@ -25,7 +25,13 @@ const eur = (v) => "€" + Math.round(v).toLocaleString("sk-SK");
 // sub-district) were removed so every option makes obvious sense to a developer.
 export const FIELDS = [
   // ── Where ──
-  { key: "country",         label: "Country",   label_sk: "Krajina",      type: "category", get: (p) => p.country || "" },
+  // NOTE: no "country" field on purpose. Market (SK / CZ / all) is owned globally by
+  // the sidebar TRH switcher (useCountry), which already country-filters every data
+  // hook. A second country filter here duplicated + conflicted with it (e.g. switcher
+  // = CZ while a saved "Krajina = SK" chip forced 0 results, and it only reached the
+  // KPI strip, not the dashboard widgets) — the "filters don't work" bug. Existing
+  // saved country conditions become inert automatically (isComplete → false for an
+  // unknown field, so they drop out of the active set + chips).
   { key: "city",            label: "City",      label_sk: "Mesto",        type: "category", get: (p) => p.city || "" },
   { key: "district",        label: "District",  label_sk: "Mestská časť", type: "category", get: (p) => p.district || "" },
   { key: "developer",       label: "Developer", label_sk: "Developer",    type: "category", get: (p) => (p.developer || "").trim() },

@@ -22,7 +22,7 @@
  * render in the user's selected display currency; velocity/analytics widgets
  * are capability-gated (blurred + upgrade nudge for free users).
  */
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useId } from "react";
 import { createPortal } from "react-dom";
 import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
@@ -335,9 +335,11 @@ function KpiCard({ label, value, hint, delta, lang, accent = textLight, locked =
       {locked
         ? <div style={{ fontSize: "0.62rem", color: orange, fontFamily: mono }}>{L(lang, "len pre paid", "paid only")}</div>
         : (hint || delta) && (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.4rem" }}>
-            <span style={{ fontFamily: mono, fontSize: "0.63rem", color: faint, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{hint}</span>
-            <DeltaChip delta={delta} lang={lang} />
+          // hint WRAPS (no ellipsis) so the full label is always readable — the cards
+          // are narrow (7 across) and truncating cut "aktuálne v predaji" → "…preda…".
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "0.4rem" }}>
+            <span style={{ fontFamily: mono, fontSize: "0.63rem", color: faint, lineHeight: 1.3, flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{hint}</span>
+            <div style={{ flexShrink: 0 }}><DeltaChip delta={delta} lang={lang} /></div>
           </div>
         )}
     </div>
@@ -994,8 +996,74 @@ const TREND_SERIES = {
   sold:      { label: { sk: "Predané (spolu)", en: "Sold (total)" }, get: r => r.sold_units, fmt: "count", color: orange },
   avg_m2:    { label: { sk: "Cena /m²", en: "Price /m²" }, get: r => r.avg_price_eur_m2, fmt: "m2", color: blue },
 };
+const monthShort = (m, lang) => {
+  try { const [y, mo] = String(m).split("-"); return new Date(+y, +mo - 1, 1).toLocaleDateString(localeTag(lang), { month: "short" }); }
+  catch { return m; }
+};
+const monthLong = (m, lang) => {
+  try { const [y, mo] = String(m).split("-"); return new Date(+y, +mo - 1, 1).toLocaleDateString(localeTag(lang), { month: "short", year: "numeric" }); }
+  catch { return m; }
+};
+
+// Interactive project trend chart — area + line, month axis, and a hover readout
+// (value + month) with a vertical guide. Replaces the bare, label-less, non-
+// interactive sparkline in trend widgets (hover/dates/numbers were all missing).
+function TrendChart({ rows, sdef, lang }) {
+  const [hi, setHi] = useState(null);
+  const svgRef = useRef(null);
+  const gid = useId();
+  const pts = useMemo(() => (rows || [])
+    .map(r => ({ m: r.snapshot_month, v: sdef.get(r) }))
+    .filter(p => p.v != null && Number.isFinite(Number(p.v)))
+    .map(p => ({ m: p.m, v: Number(p.v) })), [rows, sdef]);
+  if (pts.length < 2)
+    return <div style={{ height: 62, display: "flex", alignItems: "center", color: faint, fontFamily: mono, fontSize: "0.68rem" }}>{L(lang, "Zatiaľ málo histórie na graf", "Not enough history to chart yet")}</div>;
+  const W = 300, H = 74, padT = 8, padB = 4;
+  const vals = pts.map(p => p.v);
+  const min = Math.min(...vals), max = Math.max(...vals), span = (max - min) || 1;
+  const X = i => (i / (pts.length - 1)) * W;
+  const Y = v => padT + (1 - (v - min) / span) * (H - padT - padB);
+  const line = pts.map((p, i) => `${i ? "L" : "M"}${X(i).toFixed(1)},${Y(p.v).toFixed(1)}`).join(" ");
+  const area = `${line} L${W.toFixed(1)},${(H - padB).toFixed(1)} L0,${(H - padB).toFixed(1)} Z`;
+  const onMove = (e) => {
+    const r = svgRef.current?.getBoundingClientRect(); if (!r || !r.width) return;
+    const frac = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+    setHi(Math.round(frac * (pts.length - 1)));
+  };
+  const hp = hi != null ? pts[hi] : null;
+  const hpct = hi != null ? (hi / (pts.length - 1)) * 100 : 0;
+  return (
+    <div style={{ position: "relative" }}>
+      <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none"
+        onMouseMove={onMove} onMouseLeave={() => setHi(null)}
+        style={{ display: "block", overflow: "visible", cursor: "crosshair" }}>
+        <defs><linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={sdef.color} stopOpacity="0.26" /><stop offset="100%" stopColor={sdef.color} stopOpacity="0" />
+        </linearGradient></defs>
+        <path d={area} fill={`url(#${gid})`} />
+        <path d={line} fill="none" stroke={sdef.color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+        {hp && <line x1={X(hi)} y1={padT} x2={X(hi)} y2={H - padB} stroke={sdef.color} strokeWidth="1" strokeDasharray="2 2" opacity="0.55" vectorEffect="non-scaling-stroke" />}
+        {pts.map((p, i) => <circle key={i} cx={X(i)} cy={Y(p.v)} r={hi === i ? 3.4 : 1.8} fill={sdef.color} vectorEffect="non-scaling-stroke" />)}
+      </svg>
+      <div style={{ display: "flex", justifyContent: "space-between", fontFamily: mono, fontSize: "0.56rem", color: faint, marginTop: 3 }}>
+        <span>{monthShort(pts[0].m, lang)}</span>
+        {pts.length > 2 && <span>{monthShort(pts[Math.floor((pts.length - 1) / 2)].m, lang)}</span>}
+        <span>{monthShort(pts[pts.length - 1].m, lang)}</span>
+      </div>
+      {hp && (
+        <div style={{ position: "absolute", top: -6, left: `${hpct}%`, transform: `translate(${hpct > 80 ? "-100%" : hpct < 20 ? "0" : "-50%"},-100%)`,
+          background: "#17171c", border: `1px solid ${border}`, borderRadius: 7, padding: "3px 8px", fontFamily: mono, fontSize: "0.66rem",
+          color: textLight, whiteSpace: "nowrap", pointerEvents: "none", boxShadow: "0 6px 18px rgba(0,0,0,0.55)", zIndex: 2 }}>
+          <span style={{ color: sdef.color, fontWeight: 700 }}>{fmtRankVal(sdef.fmt, hp.v, lang)}</span>
+          <span style={{ color: dim }}> · {monthLong(hp.m, lang)}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function TrendBody({ cfg, ctx, lang }) {
-  const { projects, seriesByProject, can } = ctx;
+  const { projects, seriesByProject, can, setCurrent } = ctx;
   const locked = !can("view_historical_data");
   const p = (projects || []).find(x => x.id === cfg.projectId);
   if (!p) return <Muted lang={lang} text={L(lang, "Vyber projekt ⚙", "Pick a project ⚙")} />;
@@ -1004,17 +1072,27 @@ function TrendBody({ cfg, ctx, lang }) {
   const vals = rows.map(sdef.get);
   const first = vals.find(v => v != null), last = [...vals].reverse().find(v => v != null);
   const delta = (first != null && last != null) ? last - first : null;
+  const clickable = !locked;
+  const open = () => setCurrent(`App:ProjectDetail:${p.id}`);
   return (
-    <div style={{ filter: locked ? "blur(6px)" : "none", opacity: locked ? 0.6 : 1 }}>
-      <div style={{ fontWeight: 600, color: textLight, fontSize: "0.9rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</div>
-      <div style={{ fontFamily: mono, fontSize: "0.62rem", color: dim, marginBottom: "0.5rem" }}>{sdef.label[lang] || sdef.label.en} · {rows.length} {L(lang, "mes.", "mo")}</div>
-      <Sparkline series={vals} color={sdef.color} width={cfg._w === 2 ? 320 : 200} height={46} />
-      <div style={{ display: "flex", alignItems: "baseline", gap: "0.6rem", marginTop: "0.5rem" }}>
-        <span style={{ fontFamily: mono, fontSize: "1.05rem", fontWeight: 700, color: textLight }}>{fmtRankVal(sdef.fmt, last, lang)}</span>
-        {delta != null && delta !== 0 && (
-          <span style={{ fontFamily: mono, fontSize: "0.72rem", color: delta > 0 ? green : "#ff6b6b" }}>{delta > 0 ? "▲" : "▼"} {fmtRankVal(sdef.fmt, Math.abs(delta), lang)}</span>
-        )}
+    <div role={clickable ? "button" : undefined} tabIndex={clickable ? 0 : undefined}
+      onClick={clickable ? open : undefined}
+      onKeyDown={clickable ? (e) => { if (e.key === "Enter") open(); } : undefined}
+      title={clickable ? L(lang, "Otvoriť detail projektu", "Open project detail") : undefined}
+      style={{ filter: locked ? "blur(6px)" : "none", opacity: locked ? 0.6 : 1, cursor: clickable ? "pointer" : "default" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "0.5rem" }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontWeight: 600, color: textLight, fontSize: "0.9rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</div>
+          <div style={{ fontFamily: mono, fontSize: "0.62rem", color: dim }}>{sdef.label[lang] || sdef.label.en} · {rows.length} {L(lang, "mes.", "mo")}</div>
+        </div>
+        <div style={{ textAlign: "right", flexShrink: 0 }}>
+          <div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: textLight, lineHeight: 1.1 }}>{fmtRankVal(sdef.fmt, last, lang)}</div>
+          {delta != null && delta !== 0 && (
+            <div style={{ fontFamily: mono, fontSize: "0.68rem", color: delta > 0 ? green : "#ff6b6b" }}>{delta > 0 ? "▲" : "▼"} {fmtRankVal(sdef.fmt, Math.abs(delta), lang)}</div>
+          )}
+        </div>
       </div>
+      <div style={{ marginTop: "0.6rem" }}><TrendChart rows={rows} sdef={sdef} lang={lang} /></div>
     </div>
   );
 }
