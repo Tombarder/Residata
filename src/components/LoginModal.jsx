@@ -144,8 +144,12 @@ export default function LoginModal({ open, onClose, lang = "en" }) {
                 fontSize: "0.9rem", opacity: (busy || emailError) ? 0.4 : 1,
               }}>{busy ? t.login_sending : t.login_send}</button>
             </form>
-            <p style={{ fontSize: "0.7rem", color: "#55555f", marginTop: "1rem", textAlign: "center" }}>
-              {t.login_terms}
+            <p style={{ fontSize: "0.7rem", color: "#55555f", marginTop: "1rem", textAlign: "center", lineHeight: 1.55 }}>
+              {lang === "sk" ? "Prihlásením súhlasíš s " : "By signing in you agree to our "}
+              <a href="/terms" style={{ color: "#8a8a96", textDecoration: "underline" }}>{lang === "sk" ? "obchodnými podmienkami" : "Terms of Service"}</a>
+              {lang === "sk" ? " a " : " and "}
+              <a href="/privacy" style={{ color: "#8a8a96", textDecoration: "underline" }}>{lang === "sk" ? "ochranou osobných údajov" : "Privacy Policy"}</a>
+              {lang === "sk" ? ". Free verzia zahŕňa plný prístup k 1 projektu." : ". Free tier includes access to 1 full project snapshot."}
             </p>
           </>
         ) : (

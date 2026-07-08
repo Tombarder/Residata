@@ -82,6 +82,7 @@ export function pathToPage(pathname) {
     // Legal pages — F-051 (Boss 2026-05-31 mandate)
     "/privacy": "Privacy",
     "/imprint": "Imprint",
+    "/terms": "Terms",
     // Legacy URLs → new platform pages (for backward compat of email links etc)
     "/analytics": "App:Analytics",
     "/admin": "App:Admin",

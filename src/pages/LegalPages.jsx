@@ -330,6 +330,122 @@ export function PrivacyPage({ lang }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────
+// TERMS OF SERVICE
+// NOTE (for the operator): this is a conservative, protective starting draft.
+// The disclaimers (informational-only / no-advice, data-accuracy, liability cap,
+// "as is") are the key protections for a market-data product. Have it reviewed by
+// a Slovak lawyer before relying on it commercially, and align the entity details
+// with your final legal form.
+// ─────────────────────────────────────────────────────────────────────
+
+export function TermsPage({ lang }) {
+  const isSK = lang === "sk";
+  const lastUpdated = isSK ? "Účinné od: 8. júl 2026" : "Effective: 8 July 2026";
+
+  useDocumentTitle(
+    isSK ? "Obchodné podmienky · Residata" : "Terms of Service · Residata",
+    isSK
+      ? "Podmienky používania platformy Residata — predmet služby, dáta, predplatné, zodpovednosť a rozhodné právo."
+      : "Terms governing the use of Residata — service scope, data, subscription, liability, and governing law.",
+  );
+
+  return (
+    <LegalPageShell title={isSK ? "Obchodné podmienky" : "Terms of Service"}>
+      <p style={{ marginTop: 0, fontSize: "0.82rem", color: "#8a8a96", marginBottom: "2rem" }}>{lastUpdated}</p>
+
+      <Section title={isSK ? "1. Úvod a súhlas" : "1. Introduction and acceptance"}>
+        <p>{isSK
+          ? "Tieto obchodné podmienky upravujú prístup k službe Residata a jej používanie („Služba“). Prevádzkovateľom je Tomáš Kamhal, so sídlom Krasovského 13, Bratislava, Slovenská republika („my“, „prevádzkovateľ“). Vytvorením účtu alebo používaním Služby potvrdzujete, že ste si tieto podmienky prečítali a súhlasíte s nimi. Ak s nimi nesúhlasíte, Službu nepoužívajte."
+          : "These Terms govern access to and use of the Residata service (the “Service”). The Service is operated by Tomáš Kamhal, located at Krasovského 13, Bratislava, Slovak Republic (“we”, “the operator”). By creating an account or using the Service you confirm that you have read and agree to these Terms. If you do not agree, do not use the Service."}</p>
+      </Section>
+
+      <Section title={isSK ? "2. Predmet služby" : "2. What the Service provides"}>
+        <p>{isSK
+          ? "Residata je nástroj trhovej inteligencie pre novostavby na bývanie. Zhromažďuje, normalizuje a prezentuje verejne dostupné údaje o rezidenčných projektoch (ceny, dostupnosť, absorpcia, trendy) do jednotného prehľadu, dashboardu, analytiky a exportov. Služba je určená na profesionálne/obchodné použitie."
+          : "Residata is a market-intelligence tool for new-build residential real estate. It collects, normalizes and presents publicly available information about residential projects (pricing, availability, absorption, trends) into a unified overview, dashboard, analytics and exports. The Service is intended for professional/business use."}</p>
+      </Section>
+
+      <Section title={isSK ? "3. Povaha dát — informatívna, nie poradenstvo" : "3. Nature of the data — informational, not advice"}>
+        <p style={{ marginTop: 0 }}>{isSK
+          ? "Dáta v Službe pochádzajú prevažne z verejných zdrojov (najmä webových stránok developerov) a sú spracované automatizovane. Vynakladáme primeranú snahu o ich presnosť a aktuálnosť, avšak NEZARUČUJEME úplnosť, presnosť, aktuálnosť ani vhodnosť dát na konkrétny účel. Zdroje sa môžu meniť, byť dočasne nedostupné alebo obsahovať chyby."
+          : "The data in the Service comes largely from public sources (primarily developer websites) and is processed automatically. We make reasonable efforts toward accuracy and timeliness, but we DO NOT warrant the completeness, accuracy, currency, or fitness of the data for any particular purpose. Sources may change, be temporarily unavailable, or contain errors."}</p>
+        <p>{isSK
+          ? "Služba a jej výstupy majú výlučne informatívny charakter a NEPREDSTAVUJÚ investičné, finančné, právne, daňové ani znalecké poradenstvo. Akékoľvek rozhodnutia (nákupné, investičné, oceňovacie, obchodné) robíte na vlastnú zodpovednosť a odporúčame ich overiť u primárneho zdroja a u odborného poradcu."
+          : "The Service and its outputs are for information only and DO NOT constitute investment, financial, legal, tax, or valuation advice. Any decisions (purchase, investment, valuation, commercial) are made at your own responsibility, and we recommend verifying them against the primary source and a qualified professional advisor."}</p>
+      </Section>
+
+      <Section title={isSK ? "4. Účet a oprávnenie" : "4. Account and eligibility"}>
+        <p>{isSK
+          ? "Na časti Služby je potrebná registrácia. Zaväzujete sa poskytnúť pravdivé údaje, chrániť svoje prihlasovacie údaje a nezdieľať prístup s tretími osobami. Za aktivitu na svojom účte zodpovedáte vy. Službu môžu využívať osoby staršie ako 18 rokov konajúce v rámci svojej podnikateľskej alebo profesijnej činnosti."
+          : "Parts of the Service require registration. You agree to provide truthful information, keep your credentials secure, and not share access with third parties. You are responsible for activity on your account. The Service is available to persons over 18 acting in the course of their business or profession."}</p>
+      </Section>
+
+      <Section title={isSK ? "5. Predplatné, skúšobná verzia a platby" : "5. Subscription, trial and payment"}>
+        <p>{isSK
+          ? "Služba sa poskytuje vo viacerých úrovniach (bezplatná, skúšobná a platená). Bezplatná skúšobná verzia (spravidla 7 dní) poskytuje rozšírený prístup bez nutnosti platobnej karty. Platená úroveň sa poskytuje za priebežný poplatok (aktuálne 349 € / mesiac, prípadne s úvodnou zľavou); presné podmienky a fakturácia sa dohodnú priamo s prevádzkovateľom. Predplatné môžete zrušiť; už zaplatené obdobie sa spravidla nevracia, ak nie je dohodnuté inak."
+          : "The Service is offered in several tiers (free, trial, and paid). The free trial (typically 7 days) provides extended access without requiring a payment card. The paid tier is provided for a recurring fee (currently €349 / month, possibly with an introductory discount); exact terms and billing are arranged directly with the operator. You may cancel your subscription; an already-paid period is generally non-refundable unless agreed otherwise."}</p>
+      </Section>
+
+      <Section title={isSK ? "6. Prijateľné používanie" : "6. Acceptable use"}>
+        <p>{isSK
+          ? "Zaväzujete sa Službu nepoužívať v rozpore so zákonom ani spôsobom, ktorý by ju mohol poškodiť. Bez nášho písomného súhlasu najmä nesmiete: (a) hromadne sťahovať alebo automatizovane extrahovať dáta nad rámec poskytnutých exportov; (b) ďalej predávať, redistribuovať alebo verejne sprístupňovať dáta zo Služby; (c) spätne analyzovať alebo obchádzať technické či prístupové obmedzenia; (d) zdieľať svoj prístup. Porušenie môže viesť k pozastaveniu alebo zrušeniu účtu."
+          : "You agree not to use the Service unlawfully or in a way that could harm it. Without our written consent you in particular may not: (a) bulk-download or automatically extract data beyond the exports we provide; (b) resell, redistribute, or publicly make available data from the Service; (c) reverse-engineer or circumvent technical or access controls; (d) share your access. Violation may result in suspension or termination of the account."}</p>
+      </Section>
+
+      <Section title={isSK ? "7. Duševné vlastníctvo" : "7. Intellectual property"}>
+        <p>{isSK
+          ? "Platforma, jej softvér, dizajn a spôsob usporiadania a prezentácie dát (databázová štruktúra a kompilácia) sú chránené a patria prevádzkovateľovi. Jednotlivé faktické údaje pochádzajú z ich pôvodných zdrojov. Poskytujeme vám nevýhradné, neprevoditeľné právo používať Službu na vlastné obchodné účely počas trvania predplatného."
+          : "The platform, its software, design, and the way data is organized and presented (the database structure and compilation) are protected and belong to the operator. Individual factual data originates from its original sources. We grant you a non-exclusive, non-transferable right to use the Service for your own business purposes for the duration of your subscription."}</p>
+      </Section>
+
+      <Section title={isSK ? "8. Dostupnosť a beta funkcie" : "8. Availability and beta features"}>
+        <p>{isSK
+          ? "Službu sa snažíme poskytovať spoľahlivo, no NEZARUČUJEME nepretržitú dostupnosť; môže dochádzať k výpadkom, údržbe a zmenám. Niektoré funkcie (napr. AI asistent) sú v skúšobnom/beta režime a môžu byť obmedzené alebo zmenené. AI výstupy môžu obsahovať chyby a nie sú zdrojom pravdy — smerodajné sú čísla v Analytike a Reportoch."
+          : "We aim to provide the Service reliably but DO NOT guarantee uninterrupted availability; outages, maintenance, and changes may occur. Some features (e.g. the AI assistant) are in trial/beta and may be limited or changed. AI outputs may contain errors and are not a source of truth — the figures in Analytics and Reports are authoritative."}</p>
+      </Section>
+
+      <Section title={isSK ? "9. Ochrana osobných údajov" : "9. Data protection"}>
+        <p>{isSK
+          ? <>Spracúvanie osobných údajov upravujú samostatné <a href="/privacy" style={{ color: "#00e5a0" }}>Zásady ochrany osobných údajov</a>, ktoré sú súčasťou týchto podmienok.</>
+          : <>The processing of personal data is governed by our separate <a href="/privacy" style={{ color: "#00e5a0" }}>Privacy Policy</a>, which forms part of these Terms.</>}</p>
+      </Section>
+
+      <Section title={isSK ? "10. Vylúčenie záruk a obmedzenie zodpovednosti" : "10. Warranty disclaimer and limitation of liability"}>
+        <p style={{ marginTop: 0 }}>{isSK
+          ? "Služba sa poskytuje „tak ako je“ a „ako je dostupná“, bez akýchkoľvek výslovných či implicitných záruk (vrátane záruky presnosti, vhodnosti na účel alebo neprerušovanej prevádzky) v maximálnom rozsahu povolenom právom."
+          : "The Service is provided “as is” and “as available”, without any express or implied warranties (including accuracy, fitness for purpose, or uninterrupted operation) to the maximum extent permitted by law."}</p>
+        <p>{isSK
+          ? "V maximálnom rozsahu povolenom právom nezodpovedáme za nepriame, následné alebo náhodné škody ani za ušlý zisk či rozhodnutia prijaté na základe dát zo Služby. Naša celková zodpovednosť voči vám je obmedzená sumou, ktorú ste za Službu zaplatili počas 12 mesiacov predchádzajúcich udalosti, ktorá zakladá nárok. Týmto nie sú dotknuté práva spotrebiteľa ani zodpovednosť, ktorú nemožno podľa práva vylúčiť."
+          : "To the maximum extent permitted by law, we are not liable for indirect, consequential, or incidental damages, lost profits, or decisions made based on data from the Service. Our total liability to you is limited to the amount you paid for the Service in the 12 months preceding the event giving rise to the claim. This does not affect consumer rights or liability that cannot be excluded under applicable law."}</p>
+      </Section>
+
+      <Section title={isSK ? "11. Trvanie a ukončenie" : "11. Term and termination"}>
+        <p>{isSK
+          ? "Ktorákoľvek strana môže vzťah ukončiť. Váš prístup môžeme pozastaviť alebo zrušiť pri porušení týchto podmienok alebo z prevádzkových či právnych dôvodov. Po ukončení zaniká vaše právo používať Službu; ustanovenia o duševnom vlastníctve, zodpovednosti a rozhodnom práve zostávajú v platnosti."
+          : "Either party may end the relationship. We may suspend or terminate your access for breach of these Terms or for operational or legal reasons. On termination your right to use the Service ceases; the provisions on intellectual property, liability, and governing law survive."}</p>
+      </Section>
+
+      <Section title={isSK ? "12. Zmeny podmienok" : "12. Changes to these Terms"}>
+        <p>{isSK
+          ? "Tieto podmienky môžeme priebežne aktualizovať. O podstatných zmenách vás budeme informovať primeraným spôsobom (napr. v aplikácii alebo e-mailom). Pokračovaním v používaní Služby po účinnosti zmien vyjadrujete s aktualizovanými podmienkami súhlas."
+          : "We may update these Terms from time to time. We will notify you of material changes by reasonable means (e.g. in the app or by email). Continuing to use the Service after changes take effect constitutes acceptance of the updated Terms."}</p>
+      </Section>
+
+      <Section title={isSK ? "13. Rozhodné právo a spory" : "13. Governing law and disputes"}>
+        <p>{isSK
+          ? "Tieto podmienky sa riadia právom Slovenskej republiky. Na riešenie sporov sú príslušné súdy Slovenskej republiky. Tým nie sú dotknuté kogentné práva spotrebiteľa podľa miesta jeho bydliska."
+          : "These Terms are governed by the law of the Slovak Republic. The courts of the Slovak Republic have jurisdiction over disputes. This does not affect the mandatory consumer rights of a consumer's place of residence."}</p>
+      </Section>
+
+      <Section title={isSK ? "14. Kontakt" : "14. Contact"}>
+        <p>{isSK ? "Otázky k týmto podmienkam:" : "Questions about these Terms:"}{" "}
+          <a href="mailto:tkamhal@gmail.com" style={{ color: "#00e5a0" }}>tkamhal@gmail.com</a></p>
+      </Section>
+    </LegalPageShell>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
 // IMPRINT
 // ─────────────────────────────────────────────────────────────────────
 

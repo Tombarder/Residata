@@ -31,7 +31,7 @@ import { MarketPulse, DistrictPulse, PipelineFlow } from "./pages/HomeExtras";
 // of the marketing first paint, so load its chunk on demand.
 const HeroLabPage = lazy(() => import("./pages/HeroVariants"));
 // Legal pages + cookie banner (F-051 — Boss-mandated 2026-05-31 night).
-import { PrivacyPage, ImprintPage } from "./pages/LegalPages";
+import { PrivacyPage, ImprintPage, TermsPage } from "./pages/LegalPages";
 import CookieBanner from "./components/CookieBanner";
 import { useAuth } from "./lib/useAuth";
 import { useCapabilities } from "./lib/useCapabilities";
@@ -749,6 +749,9 @@ function Footer({ lang = "en", setCurrent }) {
       }}>
         <a href="/privacy" onClick={handleNav("Privacy")} style={linkStyle}>
           {isSK ? "Ochrana údajov" : "Privacy"}
+        </a>
+        <a href="/terms" onClick={handleNav("Terms")} style={linkStyle}>
+          {isSK ? "Obchodné podmienky" : "Terms"}
         </a>
         <a href="/imprint" onClick={handleNav("Imprint")} style={linkStyle}>
           {isSK ? "Impressum" : "Imprint"}
@@ -2309,6 +2312,7 @@ export default function App() {
             {/* F-051 (Boss 2026-05-31) — legal pages */}
             {current === "Privacy" && <PrivacyPage lang={lang} />}
             {current === "Imprint" && <ImprintPage lang={lang} />}
+            {current === "Terms" && <TermsPage lang={lang} />}
             {/* Hidden hero-variant preview page — not in Nav, only reachable via /hero-lab URL */}
             {current === "HeroLab" && (
               <Suspense fallback={<AuthLoadingSpinner />}>
