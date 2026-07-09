@@ -46,9 +46,12 @@ async function applySubscription(admin, stripe, sub) {
   }
 
   const active = ["active", "trialing", "past_due"].includes(sub.status);
-  const periodEnd = sub.current_period_end
-    ? new Date(sub.current_period_end * 1000).toISOString()
-    : null;
+  // Recent Stripe API versions moved current_period_end from the subscription
+  // top-level onto each line item. Read the item first, fall back to top-level
+  // (older versions) so paid_until is set correctly regardless of API version.
+  const periodEndUnix =
+    sub.items?.data?.[0]?.current_period_end ?? sub.current_period_end ?? null;
+  const periodEnd = periodEndUnix ? new Date(periodEndUnix * 1000).toISOString() : null;
 
   // Read current row so we never demote an admin and only stamp paid_started_at once.
   const { data: current } = await admin
