@@ -836,7 +836,7 @@ function PlatformProjects({ lang, setCurrent, openLogin }) {
 // ─── Billing page ───────────────────────────────────────────────
 function PlatformBilling({ lang, setCurrent }) {
   const caps = useCapabilities();
-  const { tier, baseTier, trialActive, trialDaysLeft, trialUntil,
+  const { tier, baseTier, trialActive, trialDaysLeft, trialUntil, canStartTrial,
           paidActive, paidPaused, paidWindowActive, paidDaysLeft, paidUntil, paidStartedAt } = caps;
   const { profile } = useAuth();
 
@@ -850,7 +850,6 @@ function PlatformBilling({ lang, setCurrent }) {
   const isPaid  = baseTier === "paid";
   const isAdmin = baseTier === "admin";
   const paidExpired = isPaid && !paidActive && !paidPaused && paidUntil != null;
-  const trialUsed = Boolean(profile?.trial_started_at);
 
   // fmtDate first (TDZ — const, not hoisted) so approvedAt can use it.
   const fmtDate = (ts) => ts ? new Date(ts).toLocaleDateString(localeTag(lang), { day: "numeric", month: "long", year: "numeric" }) : "—";
@@ -900,8 +899,10 @@ function PlatformBilling({ lang, setCurrent }) {
         </p>
       </div>
 
-      {/* 7-day free trial card — free users who haven't used the trial yet. */}
-      {isFree && !trialUsed && (
+      {/* 7-day free trial card — only users who can still START the trial
+          (canStartTrial: effective-free, never used, not mid-trial). Same
+          predicate as every other trial surface. */}
+      {canStartTrial && (
         <div style={{
           background: "linear-gradient(135deg, rgba(0,229,160,0.14), rgba(0,229,160,0.03))",
           border: `1px solid ${green}`, borderRadius: 12, padding: "1.75rem 2rem", marginBottom: "1.25rem",

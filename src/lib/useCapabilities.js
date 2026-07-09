@@ -121,11 +121,40 @@ export function useCapabilities() {
   const trialDaysLeft = trialActive ? daysFrom(trialUntil) : 0;
   const paidDaysLeft  = paidActive && paidWindowActive ? daysFrom(paidUntil) : null;
 
+  // ── Trial-lifecycle flags — ONE source of truth for the whole app ─────────
+  // Before this, six surfaces (marketing banner, marketing popup, dashboard
+  // banner, both App.jsx CTA handlers, the Billing card) each recomputed
+  // "is this user eligible for the trial?" slightly differently — some on
+  // baseTier, some on effectiveTier, some forgetting trial_started_at. That
+  // drift is exactly why the trial UI felt "scattered": the same user could
+  // see the offer on one surface and not another. These derived flags below
+  // are THE definition; every surface must read them, never re-derive.
+  //
+  //   trialConsumed — the trial was ever started (active OR long expired).
+  //   trialExpired  — started but the window has closed.
+  //   canStartTrial — a LOGGED-IN user who can activate right now: effective
+  //                   tier is plain 'free', no trial running, none ever used.
+  //                   Excludes anon (no account yet), pending (awaiting
+  //                   approval), admin-granted-paid (effTier='paid'), paid,
+  //                   admin — all by construction.
+  //   showTrialOffer — whether ANY trial-promo surface should appear:
+  //                   anon visitors (convert them) OR a logged-in free user
+  //                   who can still start it. This is the single predicate the
+  //                   banner + popup + dashboard offer all gate on.
+  const trialConsumed = Boolean(profile?.trial_started_at);
+  const trialExpired  = trialConsumed && !trialActive;
+  const canStartTrial = effectiveTier === "free" && !trialActive && !trialConsumed;
+  const showTrialOffer = user ? canStartTrial : true;
+
   return {
     can: (cap) => caps.has(cap),
     tier: effectiveTier,
     baseTier,           // raw profile.tier — used by Billing UI
     trialActive,
+    trialConsumed,
+    trialExpired,
+    canStartTrial,
+    showTrialOffer,
     trialDaysLeft,
     trialUntil,
     isRealPaid,          // genuinely paying (admin-granted paid_until / legacy paid) — gates export

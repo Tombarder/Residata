@@ -381,7 +381,7 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
   useCurrency(); // re-render prices when the display currency toggles
   const { profile } = useAuth();
   const caps = useCapabilities();
-  const { can, tier, trialActive, trialDaysLeft } = caps;
+  const { can, trialActive, trialDaysLeft, canStartTrial } = caps;
   const { country } = useCountry();
 
   const { projects } = useProjects();
@@ -394,8 +394,9 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
 
   const { config, loading: cfgLoading, saveState, setConfig, resetToDefault } = useDashboardConfig();
 
-  // trial banner (free users who never started their 7-day trial)
-  const showTrialOffer = tier === "free" && !trialActive && !profile?.trial_started_at;
+  // trial banner (free users who never started their 7-day trial) — single
+  // source of truth so this matches every other trial surface exactly.
+  const showTrialOffer = canStartTrial;
   const trialOffer = useActivateTrial({ lang, onConsumed: () => setCurrent("App:Billing") });
 
   // ── modal state: add-widget palette / configure widget ──

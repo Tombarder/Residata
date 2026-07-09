@@ -1608,7 +1608,7 @@ function PricingPage({ setCurrent, l, lang, onLogin }) {
   const mono = "'JetBrains Mono', monospace";
   const tiers = l.tiers;
   const faqs = l.faqs;
-  const { can, tier, trialActive } = useCapabilities();
+  const { can, canStartTrial } = useCapabilities();
   const auth = useAuth();
   const showEarlyAccessBlock = can("see_early_access_badge");
   const isAlreadyPaid = can("has_paid_access");
@@ -1619,8 +1619,7 @@ function PricingPage({ setCurrent, l, lang, onLogin }) {
   //   · everyone else   → Billing.
   const startTrial = async () => {
     if (!auth.user) { setTrialIntent(); if (onLogin) onLogin(); else setCurrent("Home"); return; }
-    const freeEligible = tier === "free" && !trialActive && !auth.profile?.trial_started_at;
-    if (freeEligible) {
+    if (canStartTrial) {
       try {
         const res = await activateTrial();
         if (res.ok) { window.location.assign("/app"); return; }
@@ -2057,8 +2056,7 @@ export default function App() {
   //   · everyone else   → Billing (already paid / admin / pending / used).
   const handleTrialCta = async () => {
     if (!auth.user) { setTrialIntent(); setLoginOpen(true); return; }
-    const freeEligible = caps.tier === "free" && !caps.trialActive && !auth.profile?.trial_started_at;
-    if (freeEligible) {
+    if (caps.canStartTrial) {
       try {
         const res = await activateTrial();
         if (res.ok) { window.location.assign("/app"); return; }

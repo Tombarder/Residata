@@ -7,56 +7,37 @@
  *      users who haven't yet used their trial. Dismissal is sticky
  *      for 7 days via localStorage.
  *
- *   2. Modal popup — ANON only, fires on EVERY page load (incl. refresh)
- *      Shown 1.5s after each marketing page load to visitors who have NOT
- *      signed up yet, so the offer is impossible to miss. No per-day/session
- *      suppression — a refresh re-shows it. The instant the visitor has an
- *      account it never shows again (no longer relevant; would just annoy).
- *      Does not re-pop on internal SPA navigation (the component stays
- *      mounted), only on a real load/refresh.
+ *   2. Modal popup — fires on EVERY marketing page load (incl. refresh)
+ *      Shown 1.5s after each load to anyone who can still start the trial:
+ *      anon visitors AND logged-in free users who haven't activated it yet
+ *      (Boss rule — keep offering until they actually start it). No per-day/
+ *      session suppression — a refresh re-shows it. The instant the trial is
+ *      active / used / the user is paid|admin it never shows again. Does not
+ *      re-pop on internal SPA navigation (the component stays mounted), only
+ *      on a real load/refresh.
  *
- * The banner hides once the user starts a trial / is paid / admin / pending /
- * has already used the trial (useShouldShowTrialPromo). The popup hides the
- * moment the visitor is signed in (anon-only). Both hide on /app/*.
+ * Both surfaces gate on the SAME predicate — useCapabilities().showTrialOffer
+ * — so they can never disagree. It is true for anon visitors and for logged-in
+ * free users who can still start the trial; false for trial-active, trial-used,
+ * paid, admin and pending. Both hide on /app/*.
  */
 import { useEffect, useLayoutEffect, useState, useRef } from "react";
-import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
 import { track } from "../lib/track";
 
 const KEY_BANNER_DISMISSED = "residata_trial_banner_until";   // unix ms — banner hidden until this time
 
-/**
- * Decide whether the trial promo surfaces should be shown to the
- * current user. Returns false for paid/admin, trial-active users,
- * and pending users.
- */
-function useShouldShowTrialPromo() {
-  const { user, profile } = useAuth();
-  // F-026: gate on the EFFECTIVE tier (`tier`), not the raw profile column
-  // (`baseTier`). Admin-granted paid users still have profile.tier='free'
-  // but caps.tier='paid' — the previous baseTier check let them through
-  // and the banner pitched a "7-day trial" they already have permanently.
-  const { tier, trialActive } = useCapabilities();
-  // Anon: always eligible (cold visitor we want to convert)
-  if (!user) return true;
-  // Pending: don't promote — they need approval first
-  if (tier === "pending") return false;
-  // Already paid / admin: no point
-  if (tier === "paid" || tier === "admin") return false;
-  // Free user mid-trial: countdown is on Dashboard, no marketing nudge
-  if (trialActive) return false;
-  // Free user who already consumed the trial: don't prompt again
-  if (profile?.trial_started_at) return false;
-  return true;
-}
+// Both promo surfaces gate on the SAME predicate — useCapabilities().showTrialOffer
+// (anon visitor OR logged-in free user who can still start the trial). That single
+// source of truth is defined in useCapabilities; nothing here re-derives it, so the
+// banner and popup can never disagree about who's eligible.
 
 // ────────────────────────────────────────────────────────────
 // Top banner
 // ────────────────────────────────────────────────────────────
 export function TrialBanner({ lang = "sk", onCta }) {
   const [hidden, setHidden] = useState(true);
-  const eligible = useShouldShowTrialPromo();
+  const { showTrialOffer: eligible } = useCapabilities();
   const L = (sk, en) => lang === "sk" ? sk : en;
   const bannerRef = useRef(null);
 
@@ -179,13 +160,13 @@ export function TrialBanner({ lang = "sk", onCta }) {
 // ────────────────────────────────────────────────────────────
 export function TrialPopup({ lang = "sk", onCta }) {
   const [open, setOpen] = useState(false);
-  // The popup is purely an ANON → sign-up conversion nudge. Show it to visitors
-  // who have NOT signed up yet, on EVERY page load (incl. refresh) so the offer
-  // is impossible to miss. The instant they have an account, never show it again
-  // — it's no longer relevant and would only annoy. (Signed-in free users still
-  // get the slim top banner + the Billing "Start 7-day trial" card.)
-  const { user } = useAuth();
-  const eligible = !user;
+  // Conversion nudge for anyone who can still start the trial: anon visitors we
+  // want to sign up, AND logged-in free users who haven't activated it yet
+  // (Boss rule: the offer keeps popping until they actually start the trial).
+  // Fires on EVERY marketing page load (incl. refresh) so it's impossible to
+  // miss. The moment the trial is active / used / the user is paid|admin,
+  // showTrialOffer flips false and it never shows again.
+  const { showTrialOffer: eligible } = useCapabilities();
   const L = (sk, en) => lang === "sk" ? sk : en;
 
   useEffect(() => {
