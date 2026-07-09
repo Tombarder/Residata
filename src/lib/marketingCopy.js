@@ -129,7 +129,7 @@ export const t = {
     tiers: [
       { tier: "Snapshot", name: "One-time report", price: "€249", note: "One-time snapshot, single delivery",
         features: [[true, "Full market report with insights"], [true, "Unit-level data — every active project"], [true, "Pricing benchmarks & visualizations"], [false, "No historical data"], [false, "No ongoing updates"]], cta: "Get Started" },
-      { tier: "Standard", name: "Full access", price: "€349", priceSuffix: "/mo", note: "Billed monthly, cancel anytime",
+      { tier: "Standard", name: "Full access", price: "€25", priceSuffix: "/mo", note: "Billed monthly, cancel anytime",
         features: [[true, "Live dashboard + full market report"], [true, "Raw + cleaned datasets included"], [true, "Historical snapshots & trend analysis"], [true, "Absorption rates & sell-out tracking"], [true, "CSV, Excel (.xlsx), or API access"]], featured: true, cta: "Get Started" },
       { tier: "Custom", name: "On-Demand & Enterprise", price: "Let's talk.", isCustom: true, note: "Tailored scope, frequency, and delivery",
         features: [[true, "Everything in Standard"], [true, "Custom refresh cadence & priority support"], [true, "Coverage beyond Bratislava"], [true, "Additional markets or property types"], [true, "Custom integrations and output formats"]], cta: "Contact Us" },
@@ -242,7 +242,7 @@ export const t = {
     tiers: [
       { tier: "Snapshot trhu", name: "Jednorazový prehľad", price: "€249", note: "Jednorazový snapshot, jedno doručenie",
         features: [[true, "Kompletný trhový prehľad s insightmi"], [true, "Dáta za každý byt — všetky aktívne projekty"], [true, "Cenové porovnania a vizualizácie"], [false, "Bez historických dát"], [false, "Bez priebežných aktualizácií"]], cta: "Mám záujem" },
-      { tier: "Standard", name: "Plný prístup", price: "€349", priceSuffix: "/mes", note: "Fakturované mesačne, zrušenie kedykoľvek",
+      { tier: "Standard", name: "Plný prístup", price: "€25", priceSuffix: "/mes", note: "Fakturované mesačne, zrušenie kedykoľvek",
         features: [[true, "Live dashboard + kompletný report"], [true, "Surové + vyčistené datasety"], [true, "Historické dáta a vývoj trendov"], [true, "Absorpcia a sledovanie vypredania"], [true, "CSV, Excel (.xlsx) alebo API"]], featured: true, cta: "Mám záujem" },
       { tier: "Custom", name: "On-Demand & Enterprise", price: "Ozvite sa.", isCustom: true, note: "Rozsah a frekvencia podľa vás",
         features: [[true, "Všetko v Standard"], [true, "Vlastná frekvencia aktualizácií a prioritná podpora"], [true, "Pokrytie akejkoľvek lokality (aj mimo Slovenska)"], [true, "Ďalšie trhy alebo typy nehnuteľností"], [true, "Vlastné integrácie a formáty"]], cta: "Kontaktovať" },
