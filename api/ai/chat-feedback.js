@@ -49,7 +49,7 @@
 // click 👎 then change to 👍, the new rating wins.
 
 import { createClient } from "@supabase/supabase-js";
-import { isTrustedOrigin as checkTrustedOrigin } from "../_lib/origin.js";
+import { isTrustedRequest as isTrustedOrigin } from "../_lib/origin.js";
 
 export const maxDuration = 10;
 const MAX_BODY_BYTES = 4 * 1024;
@@ -71,22 +71,6 @@ function cleanText(raw, { max = 280 } = {}) {
   return s;
 }
 
-// Trusted origins — copy of the list in /api/ai/chat for parity.
-// F-310 (DP-095): unified with shared api/_lib/origin.js helper to fix
-// the subdomain-spoofing vulnerability where origin/referer.startsWith(o)
-// matched https://residata.sk.evil.com against https://residata.sk.
-// Vercel preview-deploy auto-allow (the `residata-…vercel.app` pattern)
-// was REMOVED — attacker could deploy a project named `residata-attack`
-// at vercel.app and the Origin header alone would satisfy the predicate.
-// If Boss needs a preview URL during testing, add it explicitly here.
-const ALLOWED_ORIGINS = [
-  "https://residata.sk",
-  "https://www.residata.sk",
-  "https://residata-gamma.vercel.app",
-  "http://localhost:5173",
-  "http://localhost:4173",
-];
-const isTrustedOrigin = (req) => checkTrustedOrigin(req, ALLOWED_ORIGINS);
 
 function clientIp(req) {
   const fwd = req.headers["x-forwarded-for"];

@@ -15,20 +15,11 @@
 // Response: 200 { ok:true, emailed } · 400 · 401 · 403 · 404 · 429 · 500
 
 import { createClient } from "@supabase/supabase-js";
-import { isTrustedOrigin as checkTrustedOrigin } from "../_lib/origin.js";
+import { isTrustedRequest as isTrustedOrigin } from "../_lib/origin.js";
 import { feedbackReplyHtml, sendEmail } from "../_lib/emails.js";
 
 export const maxDuration = 15;
 const MAX_REPLY_LEN = 4000;
-
-const ALLOWED_ORIGINS = [
-  "https://residata.sk",
-  "https://www.residata.sk",
-  "https://residata-gamma.vercel.app",
-  "http://localhost:5173",
-  "http://localhost:4173",
-];
-const isTrustedOrigin = (req) => checkTrustedOrigin(req, ALLOWED_ORIGINS);
 
 function cleanText(raw, { max = 200 } = {}) {
   if (typeof raw !== "string") return "";

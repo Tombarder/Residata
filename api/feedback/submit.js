@@ -11,7 +11,7 @@
 // Identity (and conversation ownership) resolved server-side from the Bearer token.
 
 import { createClient } from "@supabase/supabase-js";
-import { isTrustedOrigin as checkTrustedOrigin } from "../_lib/origin.js";
+import { isTrustedRequest as isTrustedOrigin } from "../_lib/origin.js";
 import { feedbackHtml, sendEmail, FEEDBACK_CATEGORY_LABELS } from "../_lib/emails.js";
 
 export const maxDuration = 15;
@@ -23,11 +23,6 @@ const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 const IMAGE_MIME_EXT  = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
 const VALID_CATEGORIES = new Set(["data", "bug", "website", "question", "idea", "other"]);
 
-const ALLOWED_ORIGINS = [
-  "https://residata.sk", "https://www.residata.sk", "https://residata-gamma.vercel.app",
-  "http://localhost:5173", "http://localhost:4173",
-];
-const isTrustedOrigin = (req) => checkTrustedOrigin(req, ALLOWED_ORIGINS);
 
 function cleanText(raw, { max = 200 } = {}) {
   if (typeof raw !== "string") return "";

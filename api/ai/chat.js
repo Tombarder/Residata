@@ -53,7 +53,7 @@
 //   Non-200 : 401 auth · 403 origin/pending · 429 rate · 413 too large · 501 no key · 500
 
 import { createClient } from "@supabase/supabase-js";
-import { isTrustedOrigin as checkTrustedOrigin } from "../_lib/origin.js";
+import { isTrustedRequest as isTrustedOrigin } from "../_lib/origin.js";
 
 export const maxDuration = 60; // tool loop = a few model round-trips
 
@@ -75,14 +75,6 @@ const MAX_MSG_LEN     = 2000;
 // Per-day caps by tier. pending is refused earlier. Active trial uses the paid cap.
 const DAILY_LIMITS = { anon: 1, free: 3, paid: 15, admin: 100 };
 
-const TRUSTED_ORIGINS = [
-  "https://residata-gamma.vercel.app",
-  "https://residata.sk",
-  "https://www.residata.sk",
-  "http://localhost:5173",
-  "http://localhost:3000",
-];
-const isTrustedOrigin = (req) => checkTrustedOrigin(req, TRUSTED_ORIGINS);
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS  = 24 * HOUR_MS;

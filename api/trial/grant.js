@@ -13,19 +13,9 @@
 // can self-service-start the trial again later if admin wants.
 
 import { createClient } from "@supabase/supabase-js";
-import { isTrustedOrigin as checkTrustedOrigin } from "../_lib/origin.js";
+import { isTrustedRequest as isTrustedOrigin } from "../_lib/origin.js";
 
 export const maxDuration = 10;
-
-const TRUSTED_ORIGINS = [
-  "https://residata-gamma.vercel.app",
-  "https://residata.sk",
-  "https://www.residata.sk",
-  "http://localhost:5173",
-  "http://localhost:3000",
-];
-
-const isTrustedOrigin = (req) => checkTrustedOrigin(req, TRUSTED_ORIGINS);
 
 export default async function handler(req, res) {
   try {

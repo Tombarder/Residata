@@ -40,3 +40,29 @@ export function isTrustedOrigin(req, trustedOrigins) {
   }
   return false;
 }
+
+// ── ONE canonical trusted-origins list for the whole API ──────────────────
+//
+// Every browser-facing endpoint gates on this SAME list. It lives here, once,
+// so adding or moving a domain is a single edit — never per-endpoint copies
+// that drift out of sync. That drift is exactly what broke the residata.eu
+// launch: the frontend moved to residata.eu but seven endpoints kept their own
+// stale arrays (residata-gamma / residata.sk only), so every authenticated
+// action from the new domain answered 403 "untrusted origin" — which the client
+// surfaced as "your session expired", i.e. "login is broken". A shared constant
+// makes that class of bug impossible: the next domain change touches one line.
+export const TRUSTED_ORIGINS = [
+  "https://residata.eu",               // live production domain
+  "https://www.residata.eu",
+  "https://residata-gamma.vercel.app", // Vercel production alias / fallback
+  "https://residata.sk",               // reserved brand domains (kept trusted)
+  "https://www.residata.sk",
+  "http://localhost:5173",             // Vite dev
+  "http://localhost:4173",             // Vite preview
+  "http://localhost:3000",             // alt local dev
+];
+
+/** Check a request against the canonical shared allowlist (the common case). */
+export function isTrustedRequest(req) {
+  return isTrustedOrigin(req, TRUSTED_ORIGINS);
+}
