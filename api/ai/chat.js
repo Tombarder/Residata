@@ -127,18 +127,8 @@ function ipRateCheck(ip) {
   return { ok: true };
 }
 
-// Per-IP ANON daily counter (in-memory, resets on cold start / midnight UTC).
-const anonBucket = new Map();
-function todayKey() {
-  const d = new Date();
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}-${String(d.getUTCDate()).padStart(2,"0")}`;
-}
-function anonDailyCount(ip) { const b = anonBucket.get(ip); return (!b || b.day !== todayKey()) ? 0 : b.count; }
-function anonDailyIncrement(ip) {
-  const day = todayKey(); const b = anonBucket.get(ip);
-  if (!b || b.day !== day) { anonBucket.set(ip, { day, count: 1 }); return 1; }
-  b.count += 1; return b.count;
-}
+// (The anon daily cap is now durable — counted from ai_usage_log by caller_ip — so
+// the old in-memory per-instance counter that this replaced has been removed.)
 
 // ────────────────────────────────────────────────────────────────
 // TOOLS — the model's window onto the full database.
@@ -464,14 +454,19 @@ async function handleInner(req, res) {
 
   // ── daily cap (effective tier) ──
   const dayLimit = DAILY_LIMITS[tier] ?? DAILY_LIMITS.anon;
+  // DURABLE daily cap for BOTH tiers: count today's rows in ai_usage_log — by user_id
+  // for logged-in, by caller_ip for anon. The anon count used to live in an in-memory
+  // Map (per-serverless-instance, reset on cold start) → the 1/day anon cap was
+  // bypassable across Vercel instances. Reading it from the DB makes it a real cap.
   let dayCount = 0;
-  if (userId) {
-    try {
-      const { count } = await admin.from("ai_usage_log").select("id", { count: "exact", head: true })
-        .gte("requested_at", new Date(Date.now() - DAY_MS).toISOString()).eq("user_id", userId);
-      dayCount = count || 0;
-    } catch (_) { return res.status(503).json({ error: "rate limit lookup failed, try again" }); }
-  } else { dayCount = anonDailyCount(ip); }
+  try {
+    const sinceIso = new Date(Date.now() - DAY_MS).toISOString();
+    const base = admin.from("ai_usage_log").select("id", { count: "exact", head: true }).gte("requested_at", sinceIso);
+    const { count } = userId
+      ? await base.eq("user_id", userId)
+      : await base.is("user_id", null).eq("caller_ip", ip || "");
+    dayCount = count || 0;
+  } catch (_) { return res.status(503).json({ error: "rate limit lookup failed, try again" }); }
   if (dayCount >= dayLimit) {
     const upgrades = {
       anon: { to: "free", daily: DAILY_LIMITS.free, action: "sign_in" },
@@ -587,15 +582,14 @@ async function handleInner(req, res) {
     } catch (e) { console.warn("[chat] assistant insert threw", e?.message || e); }
   }
 
-  // ── usage/billing counter (one row per question) ──
-  if (userId) {
-    admin.from("ai_usage_log").insert({
-      user_id: userId, endpoint: "chat", ok: true,
-      input_tokens: usage.input_tokens, output_tokens: usage.output_tokens,
-      cache_read_input_tokens: usage.cache_read_input_tokens,
-      cache_creation_input_tokens: usage.cache_creation_input_tokens,
-    }).then(({ error }) => { if (error) console.warn("[chat] usage log failed", error.message); });
-  } else { anonDailyIncrement(ip); }
+  // ── usage/billing counter (one row per question) — durable for BOTH tiers ──
+  // (user_id for logged-in, caller_ip for anon) so the daily-cap count above is real.
+  admin.from("ai_usage_log").insert({
+    user_id: userId || null, caller_ip: ip || null, endpoint: "chat", ok: true,
+    input_tokens: usage.input_tokens, output_tokens: usage.output_tokens,
+    cache_read_input_tokens: usage.cache_read_input_tokens,
+    cache_creation_input_tokens: usage.cache_creation_input_tokens,
+  }).then(({ error }) => { if (error) console.warn("[chat] usage log failed", error.message); });
 
   const result = {
     text: textOut, tier, model, log_id: assistantLogId,

@@ -53,11 +53,17 @@ export default async function handler(req, res) {
   };
 
   // ── Auth ──
+  // When a CRON_SECRET is configured it is the ONLY accepted proof: Vercel sends it
+  // as `Authorization: Bearer $CRON_SECRET` for genuine cron runs, and the
+  // `x-vercel-cron` header alone is spoofable — so a configured secret must NOT be
+  // bypassable by that header (otherwise anyone could trigger a subscriber-email
+  // blast). Only when no secret is configured do we fall back to the weaker header
+  // check, so a cron that predates the secret isn't silently broken.
   const secret = await secretOrFallback("CRON_SECRET");
   const authHeader = req.headers.authorization || req.headers.Authorization || "";
   const isVercelCron = req.headers["x-vercel-cron"] === "1";
   const tokenOk = secret && authHeader === `Bearer ${secret}`;
-  if (!tokenOk && !isVercelCron) {
+  if (secret ? !tokenOk : !isVercelCron) {
     return res.status(401).json({ error: "unauthorized" });
   }
 
