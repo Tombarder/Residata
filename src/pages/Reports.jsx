@@ -28,6 +28,7 @@
  */
 import { useState, useMemo, useEffect } from "react";
 import { useProjects, useProjectSnapshots, useReportHistogram, fetchReportBinUnits, useReportProjectUnits, useReportComparables } from "../lib/useData";
+import LoadError from "../components/LoadError";
 import { moneyFromEur, moneySymbol } from "../lib/money";
 import { localeTag } from "../lib/locale";
 import { useCurrency } from "../lib/useCurrency";
@@ -1635,7 +1636,7 @@ function ForecastHistogram({ rows, lang }) {
 function ComparableTransactionsReport({ projects, lang }) {
   // Sold-with-price comparables fetched server-side (report_comparables, ~3k
   // rows) only when this tab opens — not from the old 32k global pull.
-  const { units: flats, loading: compLoading } = useReportComparables();
+  const { units: flats, loading: compLoading, error: compFailed } = useReportComparables();
   // Only sold flats with usable pricing (the RPC already filters this; the
   // guard stays as a belt-and-braces against any stray rows).
   const soldFlats = useMemo(() => flats.filter(f =>
@@ -1785,9 +1786,13 @@ function ComparableTransactionsReport({ projects, lang }) {
 
         {/* Transaction table */}
         {sorted.length === 0 ? (
-          <div style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8, padding: "1.5rem", textAlign: "center", color: dim, fontStyle: "italic" }}>
-            {lang === "sk" ? "Žiadne predané byty pre tento filter." : "No sold units for this filter."}
-          </div>
+          compFailed ? (
+            <div style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8 }}><LoadError lang={lang} /></div>
+          ) : (
+            <div style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8, padding: "1.5rem", textAlign: "center", color: dim, fontStyle: "italic" }}>
+              {lang === "sk" ? "Žiadne predané byty pre tento filter." : "No sold units for this filter."}
+            </div>
+          )
         ) : (
           <div className="rep-table-wrap" style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8 }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.8rem", minWidth: 760 }}>

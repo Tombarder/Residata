@@ -6,6 +6,7 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useCountry, isAllCountries } from "../lib/useCountry";
 import { useUnitsInfinite, useAnalyticsRegistry, usePivotDistinct } from "../lib/useData";
+import LoadError from "../components/LoadError";
 import { supabaseData } from "../lib/supabase";
 
 // sessionStorage key: the project set handed from a filtered analytics view to the map.
@@ -179,7 +180,7 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
     return s;
   }, [country, fProject, fCity, fCast, fDev, fStav, pMin, pMax, m2Min, m2Max, cols, mode, sort, xf, fields]);
 
-  const { rows, hasMore, loading, loadMore } = useUnitsInfinite({ enabled: cols.length > 0, spec, pageSize: PAGE });
+  const { rows, hasMore, loading, loadMore, error: loadFailed } = useUnitsInfinite({ enabled: cols.length > 0, spec, pageSize: PAGE });
 
   // a new query (filter/sort/column change) scrolls back to the top
   const specKey = JSON.stringify(spec);
@@ -335,7 +336,10 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
                   );
                 })}
                 {padBottom > 0 && <tr style={{ height: padBottom }}><td colSpan={cols.length} style={{ padding: 0, border: 0 }} /></tr>}
-                {!loading && rows.length === 0 && (
+                {!loading && rows.length === 0 && loadFailed && (
+                  <tr><td colSpan={cols.length || 1} style={{ padding: 0 }}><LoadError lang={lang} /></td></tr>
+                )}
+                {!loading && rows.length === 0 && !loadFailed && (
                   <tr><td colSpan={cols.length || 1} style={{ padding: "2rem", textAlign: "center", color: dim, fontStyle: "italic" }}>{cols.length === 0 ? t("Vyber aspoň jeden stĺpec vpravo →", "Pick at least one column on the right →") : t("Žiadne byty pre tento filter.", "No units match this filter.")}</td></tr>
                 )}
               </tbody>

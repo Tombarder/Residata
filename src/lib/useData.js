@@ -631,7 +631,7 @@ export function useMarketTotals() {
   const { loading: authLoading, user } = useAuth();
   const { country } = useCountry();
   const [totals, setTotals] = useState(() => _marketTotalsByCountry.get(country) || {
-    loading: true,
+    loading: true, error: false,
     unitsTracked: null, unitsAvailable: null, unitsReserved: null,
     avgPriceM2: null, snapshotMonth: null,
   });
@@ -664,14 +664,14 @@ export function useMarketTotals() {
       if (cancelled) return;
       if (error) {
         console.error("[useMarketTotals]", error);
-        setTotals(t => ({ ...t, loading: false }));
+        setTotals(t => ({ ...t, loading: false, error: true }));
         return;
       }
       const num = (v) => (typeof v === "number" && Number.isFinite(v))
         ? v
         : (v != null && !Number.isNaN(Number(v)) ? Number(v) : null);
       const next = {
-        loading: false,
+        loading: false, error: false,
         unitsTracked:    num(data?.total_units_tracked),
         unitsAvailable:  num(data?.total_available),
         unitsReserved:   num(data?.total_reserved),
@@ -1375,16 +1375,17 @@ export function usePivotGrain({ enabled = false, spec = null } = {}) {
     : null;
   const [grain, setGrain] = useState(key && _pivotGrainCache.has(key) ? _pivotGrainCache.get(key) : null);
   const [loading, setLoading] = useState(!!enabled && !(key && _pivotGrainCache.has(key)));
+  const [error, setError] = useState(false);
   useEffect(() => {
-    if (!enabled || !spec) { setGrain(null); setLoading(false); return; }
+    if (!enabled || !spec) { setGrain(null); setLoading(false); setError(false); return; }
     if (!isSupabaseReady() || authLoading) return;
-    if (_pivotGrainCache.has(key)) { setGrain(_pivotGrainCache.get(key)); setLoading(false); return; }
+    if (_pivotGrainCache.has(key)) { setGrain(_pivotGrainCache.get(key)); setLoading(false); setError(false); return; }
     let cancelled = false;
-    setLoading(true);
+    setLoading(true); setError(false);
     (async () => {
       const { data, error } = await sbRead(supabaseData.rpc("analytics_pivot", { p_spec: spec }));
       if (cancelled) return;
-      if (error) { console.error("[usePivotGrain]", error); setGrain([]); setLoading(false); return; }
+      if (error) { console.error("[usePivotGrain]", error); setGrain([]); setLoading(false); setError(true); return; }
       const arr = Array.isArray(data) ? data : [];
       _pivotGrainCache.set(key, arr);
       setGrain(arr);
@@ -1392,7 +1393,7 @@ export function usePivotGrain({ enabled = false, spec = null } = {}) {
     })();
     return () => { cancelled = true; };
   }, [enabled, key, authLoading]); // eslint-disable-line react-hooks/exhaustive-deps
-  return { grain, loading };
+  return { grain, loading, error };
 }
 
 // Cache for server-side distinct filter values — one fast pivot_grain(p_dims=[field])
@@ -1778,16 +1779,17 @@ export function useReportComparables() {
   const key = `${user?.id || "anon"}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}::${country}`;
   const [units, setUnits] = useState(_reportCompCache.get(key) || []);
   const [loading, setLoading] = useState(!_reportCompCache.has(key));
+  const [error, setError] = useState(false);
   useEffect(() => {
     if (!isSupabaseReady()) { setLoading(false); return; }
     if (authLoading) return;
-    if (_reportCompCache.has(key)) { setUnits(_reportCompCache.get(key)); setLoading(false); return; }
+    if (_reportCompCache.has(key)) { setUnits(_reportCompCache.get(key)); setLoading(false); setError(false); return; }
     let cancelled = false;
-    setLoading(true);
+    setLoading(true); setError(false);
     (async () => {
       const { data, error } = await sbRead(supabaseData.rpc("report_comparables", { p_country: _pCountry(country) }));
       if (cancelled) return;
-      if (error) { console.error("[useReportComparables]", error); setLoading(false); return; }
+      if (error) { console.error("[useReportComparables]", error); setLoading(false); setError(true); return; }
       const arr = _toEurDisplay(Array.isArray(data) ? data : []);
       _reportCompCache.set(key, arr);
       setUnits(arr);
@@ -1795,7 +1797,7 @@ export function useReportComparables() {
     })();
     return () => { cancelled = true; };
   }, [authLoading, key]); // eslint-disable-line react-hooks/exhaustive-deps
-  return { units, loading };
+  return { units, loading, error };
 }
 
 /** Early access slot count for the marketing badge. Public table. */
@@ -1860,6 +1862,7 @@ export function useUnitsInfinite({ enabled = false, spec = null, pageSize = 100 
   const [rows, setRows] = useState([]);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
 
   const fetchPage = useCallback(async (gen) => {
     if (!enabled || !spec || !isSupabaseReady() || authLoading) return;
@@ -1868,7 +1871,7 @@ export function useUnitsInfinite({ enabled = false, spec = null, pageSize = 100 
       const pageSpec = { ...spec, limit: pageSize, offset: offsetRef.current };
       const { data, error } = await sbRead(supabaseData.rpc("analytics_units", { p_spec: pageSpec }));
       if (gen !== genRef.current) return;               // superseded by a newer query → drop this page
-      if (error) { console.error("[useUnitsInfinite]", error); return; }
+      if (error) { console.error("[useUnitsInfinite]", error); setError(true); return; }
       const all = Array.isArray(data?.rows) ? data.rows : [];
       const lim = Number(data?.limit ?? pageSize);
       const page = all.slice(0, lim);
@@ -1885,7 +1888,7 @@ export function useUnitsInfinite({ enabled = false, spec = null, pageSize = 100 
     genRef.current += 1;
     const gen = genRef.current;
     offsetRef.current = 0;
-    setRows([]); setHasMore(false);
+    setRows([]); setHasMore(false); setError(false);
     if (enabled && spec && isSupabaseReady() && !authLoading) fetchPage(gen);
     else setLoading(false);                             // not fetching → clear any orphaned loading
   }, [specKey, authKey, enabled, authLoading]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1895,7 +1898,7 @@ export function useUnitsInfinite({ enabled = false, spec = null, pageSize = 100 
     fetchPage(genRef.current);
   }, [hasMore, loading, fetchPage]);
 
-  return { rows, hasMore, loading, loadMore };
+  return { rows, hasMore, loading, loadMore, error };
 }
 
 /* The analytics dimension/measure registry — the single source for the Explorer's column
