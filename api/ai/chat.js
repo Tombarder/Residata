@@ -584,12 +584,19 @@ async function handleInner(req, res) {
 
   // ── usage/billing counter (one row per question) — durable for BOTH tiers ──
   // (user_id for logged-in, caller_ip for anon) so the daily-cap count above is real.
-  admin.from("ai_usage_log").insert({
-    user_id: userId || null, caller_ip: ip || null, endpoint: "chat", ok: true,
-    input_tokens: usage.input_tokens, output_tokens: usage.output_tokens,
-    cache_read_input_tokens: usage.cache_read_input_tokens,
-    cache_creation_input_tokens: usage.cache_creation_input_tokens,
-  }).then(({ error }) => { if (error) console.warn("[chat] usage log failed", error.message); });
+  // AWAITED before we end the response: a fire-and-forget insert here was being
+  // dropped when the serverless process froze after res.end/res.json, so the row that
+  // the next request's cap counts never landed. Awaiting it (a single INSERT) is
+  // negligible after a multi-second LLM call and makes the cap actually enforce.
+  try {
+    const { error: usageErr } = await admin.from("ai_usage_log").insert({
+      user_id: userId || null, caller_ip: ip || null, endpoint: "chat", ok: true,
+      input_tokens: usage.input_tokens, output_tokens: usage.output_tokens,
+      cache_read_input_tokens: usage.cache_read_input_tokens,
+      cache_creation_input_tokens: usage.cache_creation_input_tokens,
+    });
+    if (usageErr) console.warn("[chat] usage log failed", usageErr.message);
+  } catch (e) { console.warn("[chat] usage log threw", e?.message || e); }
 
   const result = {
     text: textOut, tier, model, log_id: assistantLogId,
