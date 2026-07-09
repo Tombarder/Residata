@@ -2251,6 +2251,9 @@ function AreaPriceScatter({ flats, lang, onSelectFlat }) {
   // changed between renders → React rules-of-hooks violation, potential
   // "Rendered more hooks than during the previous render" crash.
   const [hover, setHover] = useState(null);
+  // Toggleable legend series — click a category to hide its dots (declutter a
+  // project drowning in sold units), click again to bring them back. All on by default.
+  const [hiddenCats, setHiddenCats] = useState(() => new Set());
   const wrapperRef = useRef(null);
 
   const points = flats
@@ -2268,12 +2271,49 @@ function AreaPriceScatter({ flats, lang, onSelectFlat }) {
   const xAt = (v) => pad.l + ((v - xMin) / (xMax - xMin || 1)) * innerW;
   const yAt = (v) => pad.t + innerH - ((v - yMin) / (yMax - yMin || 1)) * innerH;
 
-  // Fit: avg €/m² line — from (xMin, xMin * avg_per_m2) to (xMax, xMax * avg_per_m2)
-  const sumPrice = points.reduce((a, p) => a + p.y, 0);
-  const sumArea  = points.reduce((a, p) => a + p.x, 0);
-  const avgPerM2 = sumArea > 0 ? sumPrice / sumArea : 0;
+  // "Ešte nie v ponuke" = units the developer already prices but hasn't
+  // released for sale yet. They carry a price so they DO land on the chart —
+  // give them their own colour + toggle instead of an anonymous grey blob
+  // that reads like a second "reserved" (Bory alone has ~300 of them).
+  const COMING = "#6f86c9";
+  const colorFor = (stav) =>
+    stav === "V" ? green :
+    stav === "P" ? "#f5a623" :
+    (stav === "R" || stav === "PR") ? "#888" :
+    stav === "Ešte nie v ponuke" ? COMING : dim;
 
-  const colorFor = (stav) => stav === "V" ? green : stav === "P" ? "#f5a623" : stav === "R" || stav === "PR" ? "#888" : dim;
+  // ── Toggleable series ─────────────────────────────────────────
+  // One status bucket per pressable legend pill. Only buckets that actually
+  // occur in this project appear. Hiding one filters its dots (and the trend
+  // line) but NEVER rescales the axes — the frame stays put while you declutter.
+  const catKeyOf = (stav) =>
+    stav === "V" ? "V" :
+    stav === "P" ? "P" :
+    (stav === "R" || stav === "PR") ? "R" :
+    stav === "Ešte nie v ponuke" ? "N" : null;
+  const CATS = [
+    { key: "V", label: lang === "sk" ? "Voľné"             : "Available",      color: green },
+    { key: "P", label: lang === "sk" ? "Predané"           : "Sold",           color: "#f5a623" },
+    { key: "R", label: lang === "sk" ? "Rezervované"       : "Reserved",       color: "#888" },
+    { key: "N", label: lang === "sk" ? "Ešte nie v ponuke" : "Not yet listed", color: COMING },
+  ];
+  const countOf = (key) => points.reduce((n, p) => n + (catKeyOf(p.stav) === key ? 1 : 0), 0);
+  const presentCats = CATS.map(c => ({ ...c, count: countOf(c.key) })).filter(c => c.count > 0);
+  const toggleCat = (key) => setHiddenCats(prev => {
+    const next = new Set(prev);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    return next;
+  });
+  const visiblePoints = points.filter(p => {
+    const k = catKeyOf(p.stav);
+    return !k || !hiddenCats.has(k);
+  });
+
+  // Fit: avg €/m² trend line over the CURRENTLY VISIBLE units, so the
+  // reference reflects exactly what's on screen after toggling.
+  const sumPrice = visiblePoints.reduce((a, p) => a + p.y, 0);
+  const sumArea  = visiblePoints.reduce((a, p) => a + p.x, 0);
+  const avgPerM2 = sumArea > 0 ? sumPrice / sumArea : 0;
 
   const handleMove = (e, flat) => {
     const rect = wrapperRef.current?.getBoundingClientRect();
@@ -2287,6 +2327,45 @@ function AreaPriceScatter({ flats, lang, onSelectFlat }) {
 
   return (
     <div ref={wrapperRef} style={{ position: "relative" }}>
+      {/* Toggleable legend — pressable pills: coloured dot · label · count.
+          On = filled dot + tinted pill; off = hollow dot, struck-through, dimmed. */}
+      {presentCats.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "flex-end", marginBottom: 10 }}>
+          {presentCats.map(c => {
+            const off = hiddenCats.has(c.key);
+            return (
+              <button
+                key={c.key}
+                type="button"
+                onClick={() => toggleCat(c.key)}
+                aria-pressed={!off}
+                title={off ? (lang === "sk" ? "Zobraziť" : "Show") : (lang === "sk" ? "Skryť" : "Hide")}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 7,
+                  padding: "5px 11px 5px 9px", borderRadius: 999,
+                  border: `1px solid ${off ? border : c.color + "59"}`,
+                  background: off ? "transparent" : c.color + "14",
+                  color: off ? dim : "#e8e8ed",
+                  fontFamily: mono, fontSize: "0.72rem", fontWeight: 600,
+                  cursor: "pointer", lineHeight: 1,
+                  transition: "background 0.14s, border-color 0.14s, opacity 0.14s",
+                  opacity: off ? 0.6 : 1, WebkitTapHighlightColor: "transparent",
+                }}
+                onMouseEnter={(e) => { if (!off) e.currentTarget.style.background = c.color + "24"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = off ? "transparent" : c.color + "14"; }}
+              >
+                <span style={{
+                  width: 9, height: 9, borderRadius: "50%", flex: "0 0 auto",
+                  background: off ? "transparent" : c.color,
+                  border: `1.5px solid ${c.color}`,
+                }} />
+                <span style={{ textDecoration: off ? "line-through" : "none" }}>{c.label}</span>
+                <span style={{ color: off ? dim : c.color, fontVariantNumeric: "tabular-nums", fontWeight: 700 }}>{c.count}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block", overflow: "visible" }}>
         {/* Grid: 3 vertical + 3 horizontal */}
         {[0.25, 0.5, 0.75].map((t, i) => (
@@ -2301,7 +2380,7 @@ function AreaPriceScatter({ flats, lang, onSelectFlat }) {
             stroke="#e8e8ed" strokeWidth={1.5} strokeDasharray="5,4" opacity={0.5} />
         )}
         {/* Points — clickable, hoverable, with visual feedback */}
-        {points.map((p, i) => {
+        {visiblePoints.map((p, i) => {
           const isHovered = hover?.flat?.id === p.flat.id;
           return (
             <circle
@@ -2327,12 +2406,6 @@ function AreaPriceScatter({ flats, lang, onSelectFlat }) {
         <text x={pad.l - 6} y={pad.t + innerH} textAnchor="end" fill={dim} fontFamily={mono} fontSize={10} transform={`rotate(-90 ${pad.l - 6} ${pad.t + innerH})`}>
           {`${Math.round(moneyFromEur(yMin) / 1000)}k ${moneySymbol()}`}
         </text>
-        {/* Legend */}
-        <g transform={`translate(${pad.l + 8}, ${pad.t + 12})`}>
-          <circle cx={4} cy={4} r={3} fill={green} /><text x={12} y={7} fill={dim} fontFamily={mono} fontSize={10}>{lang === "sk" ? "voľné" : "available"}</text>
-          <circle cx={72} cy={4} r={3} fill="#f5a623" /><text x={80} y={7} fill={dim} fontFamily={mono} fontSize={10}>{lang === "sk" ? "predané" : "sold"}</text>
-          <circle cx={132} cy={4} r={3} fill="#888" /><text x={140} y={7} fill={dim} fontFamily={mono} fontSize={10}>{lang === "sk" ? "rezervované" : "reserved"}</text>
-        </g>
       </svg>
 
       {/* HTML tooltip — richer than SVG <title>, styleable, follows cursor.
