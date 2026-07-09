@@ -17,6 +17,7 @@
     "nodemailer": "^9.0.1",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
+    "stripe": "^22.3.0",
     "write-excel-file": "^4.1.1"
   },
   "devDependencies": {
