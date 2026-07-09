@@ -20,6 +20,7 @@ import { useCountry, isAllCountries } from "../lib/useCountry";
 import { localeTag, PUBLIC_LANGS } from "../lib/locale";
 import { supabase, supabaseData } from "../lib/supabase";
 import { useActivateTrial } from "../lib/useActivateTrial";
+import { startCheckout, openBillingPortal } from "../lib/billing";
 import { pushRoute } from "../lib/routing";
 import { track } from "../lib/track";
 import { cleanText, cleanUrl, cleanPhone } from "../lib/sanitize";
@@ -860,8 +861,70 @@ function PlatformBilling({ lang, setCurrent }) {
   // → reload on success). See src/lib/trial.js + useActivateTrial.js.
   const { start: startTrial, busy: trialBusy, msg: trialMsg } = useActivateTrial({ lang });
 
+  // ── Real Stripe billing actions ──────────────────────────────────
+  const [payBusy, setPayBusy] = useState(false);
+  const [payErr, setPayErr] = useState("");
+  const [checkoutMsg, setCheckoutMsg] = useState(null); // "success" | "cancelled"
+
+  // Detect return from Stripe Checkout (?checkout=success|cancelled) and strip
+  // the query params so a reload doesn't re-trigger the banner.
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    const c = p.get("checkout");
+    if (c === "success" || c === "cancelled") setCheckoutMsg(c);
+    if (c) {
+      p.delete("checkout"); p.delete("session_id");
+      const q = p.toString();
+      window.history.replaceState({}, "", window.location.pathname + (q ? `?${q}` : ""));
+    }
+  }, []);
+
+  async function handleSubscribe() {
+    setPayBusy(true); setPayErr("");
+    try {
+      await startCheckout(); // redirects to Stripe on success
+    } catch (e) {
+      setPayBusy(false);
+      setPayErr(e?.message === "SESSION_EXPIRED"
+        ? (lang === "sk" ? "Relácia vypršala — prihlás sa znova." : "Session expired — please sign in again.")
+        : (lang === "sk" ? "Nepodarilo sa spustiť platbu. Skús znova." : "Couldn't start checkout. Please try again."));
+    }
+  }
+
+  async function handleManage() {
+    setPayBusy(true); setPayErr("");
+    try {
+      await openBillingPortal(); // redirects to Stripe portal on success
+    } catch (e) {
+      setPayBusy(false);
+      setPayErr(e?.status === 400
+        ? (lang === "sk" ? "Online správa nie je dostupná pre tento účet — napíš nám na residata@proton.me." : "Online management isn't available for this account — email residata@proton.me.")
+        : (lang === "sk" ? "Nepodarilo sa otvoriť správu predplatného." : "Couldn't open billing management."));
+    }
+  }
+
   return (
     <div style={{ padding: "2rem", maxWidth: 760 }}>
+      {/* Return from Stripe Checkout */}
+      {checkoutMsg === "success" && (
+        <div style={{
+          background: "rgba(0,229,160,0.1)", border: `1px solid ${green}`, borderRadius: 12,
+          padding: "1rem 1.25rem", marginBottom: "1.25rem", color: textLight, fontSize: "0.9rem", lineHeight: 1.55,
+        }}>
+          ✓ {lang === "sk"
+            ? "Platba prijatá — tvoj paid prístup sa práve aktivuje. Môže to trvať pár sekúnd; ak sa tier nezmení, obnov stránku."
+            : "Payment received — your paid access is activating now. This can take a few seconds; refresh the page if your tier doesn't update."}
+        </div>
+      )}
+      {checkoutMsg === "cancelled" && (
+        <div style={{
+          background: "rgba(245,166,35,0.08)", border: "1px solid rgba(245,166,35,0.35)", borderRadius: 12,
+          padding: "0.85rem 1.15rem", marginBottom: "1.25rem", color: "#c0c0c8", fontSize: "0.85rem",
+        }}>
+          {lang === "sk" ? "Platba zrušená — nič sme ti nestrhli." : "Checkout cancelled — you weren't charged."}
+        </div>
+      )}
+
       {/* Current tier card */}
       <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 12, padding: "1.75rem 2rem", marginBottom: "1.25rem" }}>
         <div style={{ fontFamily: mono, fontSize: "0.65rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.4rem" }}>
@@ -946,19 +1009,9 @@ function PlatformBilling({ lang, setCurrent }) {
           <div style={{ fontFamily: mono, fontSize: "0.65rem", color: green, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.5rem" }}>
             {lang === "sk" ? "Upgrade na paid" : "Upgrade to paid"}
           </div>
-          <h3 style={{ fontSize: "1.2rem", fontWeight: 700, color: textLight, margin: 0, marginBottom: "0.4rem" }}>
-            {lang === "sk" ? "Paid tier za €349 / mesiac" : "Paid tier · €349 / month"}
+          <h3 style={{ fontSize: "1.4rem", fontWeight: 700, color: textLight, margin: 0, marginBottom: "0.85rem", letterSpacing: "-0.01em" }}>
+            {lang === "sk" ? "Paid tier · €25 / mesiac" : "Paid tier · €25 / month"}
           </h3>
-          <div style={{
-            display: "inline-flex", alignItems: "center", gap: "0.4rem",
-            background: "rgba(245,166,35,0.14)", color: "#f5a623",
-            border: "1px solid rgba(245,166,35,0.4)",
-            fontFamily: mono, fontSize: "0.72rem", fontWeight: 700,
-            padding: "4px 10px", borderRadius: 100,
-            marginBottom: "0.85rem",
-          }}>
-            🎁 {lang === "sk" ? "Welcome gift · prvé 3 mesiace -50 %" : "Welcome gift · first 3 months 50% off"}
-          </div>
           <ul style={{ color: "#c0c0c8", fontSize: "0.88rem", lineHeight: 1.7, paddingLeft: "1.1rem", margin: "0.2rem 0 1.25rem" }}>
             <li>{lang === "sk" ? "Plný detail každého aktívneho projektu" : "Full detail of every active project"}</li>
             <li>{lang === "sk" ? "Analytika, trendy, heat mapy" : "Analytics, trends, district heat maps"}</li>
@@ -966,14 +1019,21 @@ function PlatformBilling({ lang, setCurrent }) {
             <li>{lang === "sk" ? "CSV exporty + REST API" : "CSV exports + REST API"}</li>
             <li>{lang === "sk" ? "AI asistent · 30 otázok / deň" : "AI assistant · 30 questions / day"}</li>
           </ul>
-          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-            <a href="tel:+421911963909" className="btn-p">📞 +421 911 963 909</a>
-            <a href="mailto:residata@proton.me?subject=Upgrade%20to%20paid" className="btn-s">✉️ residata@proton.me</a>
+          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center" }}>
+            <button type="button" onClick={handleSubscribe} disabled={payBusy} className="btn-p" style={{ fontSize: "0.9rem" }}>
+              {payBusy ? "…" : (lang === "sk" ? "Predplatiť · €25 / mesiac" : "Subscribe · €25 / month")}
+            </button>
+            <a href="mailto:residata@proton.me?subject=Question%20about%20Residata" className="btn-s" style={{ fontSize: "0.82rem" }}>
+              {lang === "sk" ? "Mám otázku" : "I have a question"}
+            </a>
           </div>
+          {payErr && (
+            <div style={{ marginTop: "0.6rem", fontSize: "0.82rem", color: "#ff6b6b", fontFamily: mono }}>{payErr}</div>
+          )}
           <p style={{ fontSize: "0.72rem", color: dim, marginTop: "1rem", fontFamily: mono }}>
             {lang === "sk"
-              ? "Žiadne kreditky na webe. 5-min hovor, dohodneme sa, prístup máš hneď."
-              : "No credit-card checkout. 5-min call, we agree, you're paid immediately."}
+              ? "Bezpečná platba cez Stripe · kartou · zrušíš kedykoľvek."
+              : "Secure checkout by Stripe · card · cancel anytime."}
           </p>
         </div>
       )}
@@ -988,6 +1048,9 @@ function PlatformBilling({ lang, setCurrent }) {
           paidStartedAt={paidStartedAt}
           paidDaysLeft={paidDaysLeft}
           fmtDate={fmtDate}
+          onManage={handleManage}
+          manageBusy={payBusy}
+          manageErr={payErr}
         />
       )}
 
@@ -1008,10 +1071,15 @@ function PlatformBilling({ lang, setCurrent }) {
               ? "Tvoj prístup teraz funguje na free úrovni. Môžeš pokračovať v paid prístupe — kontaktuj nás a obnovíme ti predplatné."
               : "Your access is now at the free tier. You can resume paid access — contact us and we'll renew immediately."}
           </p>
-          <div style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap" }}>
-            <a href="tel:+421911963909" className="btn-p">📞 +421 911 963 909</a>
-            <a href="mailto:residata@proton.me?subject=Resubscribe" className="btn-s">✉️ {lang === "sk" ? "Obnoviť predplatné" : "Resubscribe"}</a>
+          <div style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap", alignItems: "center" }}>
+            <button type="button" onClick={handleSubscribe} disabled={payBusy} className="btn-p" style={{ fontSize: "0.88rem" }}>
+              {payBusy ? "…" : (lang === "sk" ? "Obnoviť predplatné · €25 / mes." : "Resubscribe · €25 / mo")}
+            </button>
+            <a href="mailto:residata@proton.me?subject=Resubscribe" className="btn-s" style={{ fontSize: "0.8rem" }}>✉️ {lang === "sk" ? "Napíš nám" : "Contact us"}</a>
           </div>
+          {payErr && (
+            <div style={{ marginTop: "0.6rem", fontSize: "0.82rem", color: "#ff6b6b", fontFamily: mono }}>{payErr}</div>
+          )}
         </div>
       )}
     </div>
@@ -1024,7 +1092,7 @@ function PlatformBilling({ lang, setCurrent }) {
  * (started / renews) with a Manage button. Pause-state branch
  * inverts the colour scheme to amber so the user can't miss it.
  */
-function SubscriptionCard({ lang, paused, paidWindowActive, paidUntil, paidStartedAt, paidDaysLeft, fmtDate }) {
+function SubscriptionCard({ lang, paused, paidWindowActive, paidUntil, paidStartedAt, paidDaysLeft, fmtDate, onManage, manageBusy, manageErr }) {
   const accent = paused ? "#f5a623" : green;
   const pillBg = paused ? "rgba(245,166,35,0.12)" : "rgba(0,229,160,0.12)";
   const status = paused
@@ -1064,9 +1132,9 @@ function SubscriptionCard({ lang, paused, paidWindowActive, paidUntil, paidStart
           </div>
         </div>
         <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-          <a href="mailto:residata@proton.me?subject=Subscription" className="btn-s" style={{ fontSize: "0.78rem" }}>
-            {lang === "sk" ? "Spravovať" : "Manage"}
-          </a>
+          <button type="button" onClick={onManage} disabled={manageBusy} className="btn-s" style={{ fontSize: "0.78rem" }}>
+            {manageBusy ? "…" : (lang === "sk" ? "Spravovať platbu" : "Manage billing")}
+          </button>
         </div>
       </div>
 
@@ -1112,10 +1180,14 @@ function SubscriptionCard({ lang, paused, paidWindowActive, paidUntil, paidStart
         </div>
       )}
 
+      {manageErr && (
+        <div style={{ marginTop: "0.8rem", fontSize: "0.8rem", color: "#ff6b6b", fontFamily: mono }}>{manageErr}</div>
+      )}
+
       <p style={{ color: dim, fontSize: "0.78rem", lineHeight: 1.55, margin: "1rem 0 0", fontFamily: mono }}>
         {lang === "sk"
-          ? <>Faktúry, zmena obdobia, zrušenie — napíš na <a href="mailto:residata@proton.me" style={{ color: green }}>residata@proton.me</a>.</>
-          : <>Invoices, period changes, cancellation — email <a href="mailto:residata@proton.me" style={{ color: green }}>residata@proton.me</a>.</>}
+          ? <>Faktúry, zmena obdobia, zrušenie — spravuj cez <strong style={{ color: "#c0c0c8" }}>Spravovať platbu</strong> alebo napíš na <a href="mailto:residata@proton.me" style={{ color: green }}>residata@proton.me</a>.</>
+          : <>Invoices, period changes, cancellation — use <strong style={{ color: "#c0c0c8" }}>Manage billing</strong> above, or email <a href="mailto:residata@proton.me" style={{ color: green }}>residata@proton.me</a>.</>}
       </p>
     </div>
   );
