@@ -30,3 +30,4 @@ scripts/.build-data.json
 
 # Vercel CLI local link (project/org ids)
 .vercel
+.env*
