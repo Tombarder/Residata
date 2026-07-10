@@ -94,12 +94,17 @@ export default async function handler(req, res) {
     }
 
     // Shortcut: extend_trial_days
+    // · Active trial  → true extension: add days onto the existing end and
+    //   KEEP the original trial_started_at (the "day X of N" origin).
+    // · No/expired trial → fresh restart from now, so trial_started_at MUST
+    //   reset too. The old `!trial_until` guard left an EXPIRED trial's stale
+    //   start date in place, which broke "day X of 7".
     if (Number.isFinite(Number(body.extend_trial_days))) {
       const days = Math.max(1, Math.min(365, Number(body.extend_trial_days)));
-      const base = target.trial_until && new Date(target.trial_until) > new Date()
-        ? new Date(target.trial_until) : new Date();
+      const trialActive = target.trial_until && new Date(target.trial_until) > new Date();
+      const base = trialActive ? new Date(target.trial_until) : new Date();
       patch.trial_until = new Date(base.getTime() + days * 86400 * 1000).toISOString();
-      if (!target.trial_until) patch.trial_started_at = new Date().toISOString();
+      if (!trialActive) patch.trial_started_at = new Date().toISOString();
     }
 
     // Shortcut: extend_paid_days

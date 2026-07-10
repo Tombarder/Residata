@@ -4732,10 +4732,7 @@ function UserTable({ users, setTier, deleteUser, trialAction, subAction, selfId,
                     </select>
                     {(() => {
                       const trialActive = u.trial_until && new Date(u.trial_until).getTime() > Date.now();
-                      const trialLabel = trialActive
-                        ? (lang === "sk" ? "Trial ON" : "Trial ON")
-                        : (lang === "sk" ? "Trial +7d" : "Trial +7d");
-                      const nextAction = trialActive ? "revoke" : "grant";
+                      const hasTrial = Boolean(u.trial_started_at || u.trial_until);
                       const trialDays = trialActive ? daysUntil(u.trial_until) : null;
                       const paidActive = u.paid_until && new Date(u.paid_until).getTime() > Date.now() && !u.paid_pause_started;
                       const paidPaused = Boolean(u.paid_pause_started);
@@ -4752,27 +4749,45 @@ function UserTable({ users, setTier, deleteUser, trialAction, subAction, selfId,
                       });
                       return (
                         <>
+                          {/* Main trial button ALWAYS grants a fresh 7-day trial. The
+                              /api/trial/grant endpoint overwrites, so this is a true
+                              (re)start: on a user with no trial it grants; on one who
+                              already has an active/expired trial it RESTARTS the clock to
+                              a fresh 7 days from now. It NEVER revokes — removing a trial
+                              is a separate, explicit, confirm-gated action below (that
+                              silent grant↔revoke toggle was the "+7 removed my trial" bug). */}
                           <button
-                            onClick={() => trialAction && trialAction(u, nextAction)}
+                            onClick={() => trialAction && trialAction(u, "grant")}
                             disabled={isSelf}
-                            title={isSelf ? "Can't manage trial on yourself" : (trialActive ? `Ends in ${trialDays} day(s). Click to revoke.` : "Grant 7-day paid trial")}
+                            title={isSelf
+                              ? "Can't manage trial on yourself"
+                              : (trialActive
+                                  ? `Trial active — ${trialDays} day(s) left. Click to RESTART a fresh 7 days.`
+                                  : (hasTrial ? "Restart a fresh 7-day paid trial" : "Grant a 7-day paid trial"))}
                             style={subBtnStyle(trialActive, green)}>
-                            {trialActive ? `🎁 ${trialDays}d` : trialLabel}
+                            {trialActive ? `🎁 ${trialDays}d · ↻ 7d` : (hasTrial ? "🎁 Restart 7d" : "🎁 Trial +7d")}
                           </button>
-                          {/* Reset trial — clears trial_started_at + trial_until so the
-                              account becomes a fresh "never-used-the-trial" free user
-                              again. Lets us re-test the self-service Activate/Start-trial
-                              buttons on a test account as many times as we want. Shown
-                              only when there's a trial to clear (active, expired, or used). */}
-                          {(u.trial_started_at || u.trial_until) && (
+                          {/* Revoke trial — clears trial_started_at + trial_until. Removes
+                              trial access AND resets the account to "never used the trial"
+                              so it can self-service-start again (also how we re-test the
+                              Activate buttons). Confirm-gated so it can't be hit by accident.
+                              Shown only when there's a trial to clear. */}
+                          {hasTrial && (
                             <button
-                              onClick={() => trialAction && trialAction(u, "revoke")}
+                              onClick={() => {
+                                if (isSelf) return;
+                                const ok = confirm(lang === "sk"
+                                  ? `Zrušiť trial pre ${u.email}? Vymaže začiatok aj koniec trial-u (užívateľ stratí prístup a bude môcť trial spustiť znova).`
+                                  : `Revoke trial for ${u.email}? Clears trial start + expiry (they lose access and can start a fresh trial again).`);
+                                if (!ok) return;
+                                trialAction && trialAction(u, "revoke");
+                              }}
                               disabled={isSelf}
                               title={isSelf
-                                ? "Can't reset trial on yourself"
-                                : "Reset trial — clears trial start + expiry so this account can start the 7-day trial again (for testing the activation buttons)"}
-                              style={subBtnStyle(false, "#b07cff")}>
-                              ↺ {lang === "sk" ? "Reset trial" : "Reset trial"}
+                                ? "Can't revoke trial on yourself"
+                                : "Revoke trial — clears trial start + expiry (removes access, lets them start a fresh trial again)"}
+                              style={subBtnStyle(false, "#ff6b6b")}>
+                              ✕ {lang === "sk" ? "Zrušiť trial" : "Revoke"}
                             </button>
                           )}
                           <button
