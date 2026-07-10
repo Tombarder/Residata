@@ -18,11 +18,8 @@ import UpgradePrompt from "./components/UpgradePrompt";
 // last big modules (~254 KB) that were eager on the landing. Lazy-load them so
 // LivePages becomes an on-demand chunk. (LiveAnalytics/LiveAdmin were imported
 // here but only used inside the already-lazy PlatformShell — dropped as dead.)
-// EarlyAccessBadge was the one tiny thing keeping LivePages eager on the
-// landing; it now lives in its own zero-LivePages-dep component.
 const LiveDashboard = lazy(() => import("./pages/LivePages").then(m => ({ default: m.LiveDashboard })));
 const LiveProjectDetail = lazy(() => import("./pages/LivePages").then(m => ({ default: m.LiveProjectDetail })));
-import EarlyAccessBadge from "./components/EarlyAccessBadge";
 import MarketControls from "./components/MarketControls";
 // HowItWorksFlow z HomeExtras bol odstránený — PipelineFlow ho plne
 // pokrýva a robí to na živých číslach z useMarketTotals.
@@ -1608,9 +1605,8 @@ function PricingPage({ setCurrent, l, lang, onLogin }) {
   const mono = "'JetBrains Mono', monospace";
   const tiers = l.tiers;
   const faqs = l.faqs;
-  const { can, canStartTrial } = useCapabilities();
+  const { can, canStartTrial, showTrialOffer } = useCapabilities();
   const auth = useAuth();
-  const showEarlyAccessBlock = can("see_early_access_badge");
   const isAlreadyPaid = can("has_paid_access");
   // Trial CTA routing (mirrors App.handleTrialCta):
   //   · anon            → remember trial intent + open sign-up; the trial
@@ -1627,22 +1623,9 @@ function PricingPage({ setCurrent, l, lang, onLogin }) {
     }
     setCurrent("App:Billing");
   };
-  const ea = lang === "sk" ? {
-    badge: "🔥 Early access — 5 min a máš prístup",
-    body: <>Prvých <strong style={{ color: "#00e5a0" }}>9 zákazníkov</strong> dostane <strong style={{ color: "#00e5a0" }}>50 % zľavu prvé 3 mesiace</strong>. Žiadne formuláre — krátky 5-minútový call, dohodneme sa, prístup máš hneď.</>,
-    cta1: "📞 Zavolať +421 911 963 909",
-    cta2: "✉️ Booknuť 5-min call",
-  } : {
-    badge: "🔥 Early access — 5 minutes to full access",
-    body: <>First <strong style={{ color: "#00e5a0" }}>9 customers</strong> get <strong style={{ color: "#00e5a0" }}>50% off for the first 3 months</strong>. No forms — a quick 5-minute call, we agree, you're in.</>,
-    cta1: "📞 Call +421 911 963 909",
-    cta2: "✉️ Book a 5-min call",
-  };
-
   return (
     <>
       <div style={{ padding: "8rem 2rem 3rem", maxWidth: "var(--container)", margin: "0 auto", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
-        {showEarlyAccessBlock && <div style={{ marginBottom: "1rem" }}><EarlyAccessBadge lang={lang} /></div>}
         {isAlreadyPaid && (
           <div style={{ marginBottom: "1rem",
             display: "inline-flex", alignItems: "center", gap: "0.5rem",
@@ -1664,7 +1647,7 @@ function PricingPage({ setCurrent, l, lang, onLogin }) {
             login modal (anon → signup) or routes free users to the
             in-platform Billing page where the actual Start button
             lives. */}
-        {showEarlyAccessBlock && (
+        {showTrialOffer && (
           <div style={{
             marginTop: "2rem", padding: "1.75rem 2rem", maxWidth: 680, width: "100%",
             background: "linear-gradient(135deg, rgba(0,229,160,0.16), rgba(0,229,160,0.04))",
@@ -1688,28 +1671,6 @@ function PricingPage({ setCurrent, l, lang, onLogin }) {
               <span style={{ fontSize: "0.72rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace" }}>
                 {lang === "sk" ? "30s signup · žiadna karta · bez strhávania" : "30s signup · no card · no auto-charge"}
               </span>
-            </div>
-          </div>
-        )}
-
-        {/* Existing early-access / 50% promo card — left in place
-            below the trial card for users who want long-term commit
-            after evaluating during the trial. */}
-        {showEarlyAccessBlock && (
-          <div style={{
-            marginTop: "1.25rem", padding: "1.5rem 2rem", maxWidth: 680,
-            background: "linear-gradient(135deg, rgba(245,166,35,0.08), rgba(245,166,35,0.02))",
-            border: "1px solid rgba(245,166,35,0.3)", borderRadius: 12, width: "100%",
-          }}>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem", color: "#f5a623", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "0.5rem" }}>
-              {ea.badge}
-            </div>
-            <p style={{ fontSize: "0.95rem", color: "#e8e8ed", lineHeight: 1.6, marginBottom: "1rem" }}>
-              {ea.body}
-            </p>
-            <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center", flexWrap: "wrap" }}>
-              <a href="tel:+421911963909" className="btn-p">{ea.cta1}</a>
-              <a href="https://calendar.app.google/x6vKBohYsVjNKL1A9" target="_blank" rel="noopener noreferrer" className="btn-s">{ea.cta2}</a>
             </div>
           </div>
         )}

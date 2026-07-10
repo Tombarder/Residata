@@ -70,7 +70,6 @@ export const CAPABILITY_KEYS = [
   // UI prompts (len pre príslušné tiery)
   'prompt_signup',               // "Sign up / Get Access" CTA — len pre anonymných
   'prompt_upgrade_to_paid',      // "Upgrade to paid" CTA — len pre free (nie pending/paid)
-  'see_early_access_badge',      // "X slots remaining" — všetci okrem paid/admin
 
   // Meta / convenience
   'has_paid_access',             // paid+admin — pre generické "user platí" checky
@@ -82,7 +81,6 @@ export const CAPABILITY_KEYS = [
 
 const ANON_CAPS = [
   'prompt_signup',
-  'see_early_access_badge',
   'view_dashboard_public',
   'view_district_pulse',
   'view_how_it_works',
@@ -96,7 +94,6 @@ const PENDING_CAPS = [
   // NEmá prístup k dátam okrem verejných. NEukazujeme "Sign up" (už je prihlásený).
   'access_pending_gate',
   'change_own_profile',
-  'see_early_access_badge',
   'view_dashboard_public',
   'view_district_pulse',
   'view_how_it_works',
@@ -109,7 +106,6 @@ const FREE_CAPS = [
   'change_own_profile',
   'choose_project',
   'prompt_upgrade_to_paid',      // pre free je relevantný upgrade prompt
-  'see_early_access_badge',
   'view_all_projects_list',      // vidí kompletný zoznam
   'view_chosen_project_detail',  // iba svoj 1 projekt
   'view_dashboard_public',
@@ -139,7 +135,7 @@ const PAID_CAPS = [
   'view_ticker',
   // POZOR: 'export_data' (reálne stiahnutie) NIE je tu — pridáva sa dynamicky v
   // useCapabilities LEN pre admin || real-paid, takže trial-"paid" ho NEDOSTANE.
-  // NIE: prompt_signup, prompt_upgrade_to_paid, see_early_access_badge, access_pending_gate
+  // NIE: prompt_signup, prompt_upgrade_to_paid, access_pending_gate
 ];
 
 const ADMIN_CAPS = [

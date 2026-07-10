@@ -4876,10 +4876,6 @@ function EventBadge({ type }) {
   return <span style={{ fontFamily: mono, fontSize: "0.65rem", color: x.color, border: `1px solid ${x.color}`, padding: "1px 6px", borderRadius: 3, fontWeight: 700, letterSpacing: "0.05em" }}>{x.label}</span>;
 }
 
-/* EarlyAccessBadge moved to src/components/EarlyAccessBadge.jsx (perf code-split,
-   2026-06-04) so the marketing landing doesn't pull in this ~254 KB module just
-   to render a small badge. This dead copy removed. */
-
 /* ───────────────────── SHARED STYLES ───────────────────── */
 function Label({ children }) {
   return <div style={{ ...labelStyle, marginBottom: "1rem" }}>{children}</div>;

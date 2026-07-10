@@ -1800,22 +1800,6 @@ export function useReportComparables() {
   return { units, loading, error };
 }
 
-/** Early access slot count for the marketing badge. Public table. */
-export function useEarlyAccessStats() {
-  const [stats, setStats] = useState({ paid_count: 0, remaining_slots: 9 });
-  useEffect(() => {
-    if (!isSupabaseReady()) return;
-    let cancelled = false;
-    supabasePublic.from("early_access_stats").select("*").maybeSingle()
-      .then(({ data }) => {
-        if (cancelled) return;
-        if (data) setStats(data);
-      });
-    return () => { cancelled = true; };
-  }, []);
-  return stats;
-}
-
 /* ── Unit Explorer (Phase 3.1) — raw per-unit detail rows from analytics_units ──
    spec = { columns:[field keys], filters/filters_not/ranges/nulls:{…}, mode:'latest'|'archive',
             sort:[{key,dir}], limit, offset }. RLS-gated in the RPC (archive = paid/chosen-project).

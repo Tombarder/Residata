@@ -105,10 +105,6 @@ export const liveT = {
     admin_403_title: "403",
     admin_403_body: "Admin only.",
 
-    // Early access badge
-    ea_badge: "Early Access — {n} of 9 slots remaining",
-    ea_badge_one: "Early Access — {n} of 9 slot remaining",
-
     // LoginModal
     login_label: "Sign in",
     login_title: "Get instant access",
@@ -260,9 +256,6 @@ export const liveT = {
     admin_actions: "Akcie",
     admin_403_title: "403",
     admin_403_body: "Len pre admin.",
-
-    ea_badge: "Early Access — zostáva {n} miest z 9",
-    ea_badge_one: "Early Access — zostáva {n} miesto z 9",
 
     login_label: "Prihlásenie",
     login_title: "Okamžitý prístup",

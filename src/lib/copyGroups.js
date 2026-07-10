@@ -120,13 +120,6 @@ export const PAGES = [
     ],
   },
   {
-    ns: "lv", group: "Platform & app", id: "lv-earlyaccess",
-    label: "Early-access badge", blurb: "“X slots remaining” badge",
-    sections: [
-      { label: "Badge", keys: ["ea_badge", "ea_badge_one"] },
-    ],
-  },
-  {
     ns: "lv", group: "Platform & app", id: "lv-admin",
     label: "Admin screens", blurb: "Internal admin tool labels",
     sections: [
