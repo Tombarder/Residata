@@ -4,6 +4,7 @@ import { useCapabilities } from "../lib/useCapabilities";
 import { useProjects, useProjectFlats, useProjectSnapshots, useMarketTotals, useTotalsList } from "../lib/useData";
 import { moneyFromEur, moneySymbol } from "../lib/money";
 import { localeTag } from "../lib/locale";
+import { daysUntil } from "../lib/dates";
 import { fmtSelloutValue } from "../lib/absorption";
 import { useCurrency } from "../lib/useCurrency";
 import { useCountry } from "../lib/useCountry";
@@ -4735,14 +4736,10 @@ function UserTable({ users, setTier, deleteUser, trialAction, subAction, selfId,
                         ? (lang === "sk" ? "Trial ON" : "Trial ON")
                         : (lang === "sk" ? "Trial +7d" : "Trial +7d");
                       const nextAction = trialActive ? "revoke" : "grant";
-                      const trialDays = trialActive
-                        ? Math.max(0, Math.ceil((new Date(u.trial_until).getTime() - Date.now()) / 86400000))
-                        : null;
+                      const trialDays = trialActive ? daysUntil(u.trial_until) : null;
                       const paidActive = u.paid_until && new Date(u.paid_until).getTime() > Date.now() && !u.paid_pause_started;
                       const paidPaused = Boolean(u.paid_pause_started);
-                      const paidDays = paidActive
-                        ? Math.max(0, Math.ceil((new Date(u.paid_until).getTime() - Date.now()) / 86400000))
-                        : null;
+                      const paidDays = paidActive ? daysUntil(u.paid_until) : null;
                       const subBtnStyle = (active, accent = green) => ({
                         background: active ? `${accent}1f` : "transparent",
                         color: isSelf ? "#55555f" : (active ? accent : "#c0c0c8"),

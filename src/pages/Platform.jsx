@@ -477,6 +477,7 @@ function TierBadgeSmall({ tier }) {
   const palette = {
     free:    { c: "#c0c0c8", bg: "rgba(192,192,200,0.1)"  },
     paid:    { c: green,     bg: "rgba(0,229,160,0.12)"    },
+    trial:   { c: green,     bg: "rgba(0,229,160,0.12)"    },
     admin:   { c: "#f5a623", bg: "rgba(245,166,35,0.12)"   },
     pending: { c: "#888",    bg: "rgba(136,136,136,0.12)"  },
     anon:    { c: dim,       bg: "rgba(138,138,150,0.08)"  },
@@ -933,7 +934,9 @@ function PlatformBilling({ lang, setCurrent }) {
           {lang === "sk" ? "Tvoj aktuálny tier" : "Your current tier"}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.75rem", flexWrap: "wrap" }}>
-          <TierBadgeSmall tier={tier} />
+          {/* During a trial the effective tier is "paid", but the user isn't paying —
+              show a TRIAL badge, not PAID, so it isn't misleading. */}
+          <TierBadgeSmall tier={trialActive && !paidActive ? "trial" : tier} />
           <span style={{ fontSize: "1.35rem", fontWeight: 700, color: textLight, letterSpacing: "-0.02em" }}>
             {isFree && (trialActive ? (lang === "sk" ? "Free (trial: paid prístup)" : "Free (trial: paid access)") : (lang === "sk" ? "Free" : "Free"))}
             {isPaid && (lang === "sk" ? "Paid" : "Paid")}

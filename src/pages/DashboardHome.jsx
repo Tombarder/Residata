@@ -686,7 +686,7 @@ function TrialRunningBanner({ lang, daysLeft, onOpenBilling }) {
     <div style={{ background: ending ? "rgba(245,166,35,0.12)" : "rgba(0,229,160,0.12)", border: `1px solid ${accent}60`, borderRadius: 12, padding: "0.8rem 1.1rem", marginBottom: "1.4rem", display: "flex", alignItems: "center", gap: "0.8rem", flexWrap: "wrap", fontSize: "0.85rem" }}>
       <span style={{ fontSize: "1.05rem" }}>🎁</span>
       <span style={{ color: textLight, fontWeight: 600 }}>
-        {lang === "sk" ? <>Paid trial aktívny — <span style={{ color: accent }}>{daysLeft === 1 ? "posledný deň" : `${daysLeft} dní zostáva`}</span></> : <>Paid trial active — <span style={{ color: accent }}>{daysLeft === 1 ? "last day" : `${daysLeft} days left`}</span></>}
+        {lang === "sk" ? <>Paid trial aktívny — <span style={{ color: accent }}>{daysLeft <= 0 ? "posledný deň" : `${daysLeft} dní zostáva`}</span></> : <>Paid trial active — <span style={{ color: accent }}>{daysLeft <= 0 ? "last day" : `${daysLeft} day${daysLeft === 1 ? "" : "s"} left`}</span></>}
       </span>
       <button onClick={onOpenBilling} style={{ marginLeft: "auto", background: "transparent", color: accent, border: `1px solid ${accent}`, borderRadius: 6, padding: "0.35rem 0.8rem", fontSize: "0.75rem", fontFamily: mono, fontWeight: 700, cursor: "pointer" }}>{L(lang, "Detail / upgrade", "Details / upgrade")}</button>
     </div>
