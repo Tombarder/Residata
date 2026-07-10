@@ -36,16 +36,21 @@ async function postAuthed(path) {
 // browser's popup blocker allows it; we point it at Stripe once the session URL
 // is ready. If the popup was blocked, we fall back to same-tab navigation.
 async function openStripe(path) {
-  const win = window.open("", "_blank");
-  if (win) { try { win.document.write("<p style='font-family:sans-serif;padding:2rem;color:#555'>Opening secure Stripe checkout…</p>"); } catch (_) {} }
+  // Open a blank tab synchronously in the click handler so the popup blocker
+  // allows it, then point it at Stripe once we have the URL. IMPORTANT: do NOT
+  // document.write into the popup — that leaves its document in a loading state
+  // that swallows the later navigation (the bug that left the tab stuck on a
+  // blank "Opening…" page). Just set location.href.
+  const win = window.open("about:blank", "_blank");
+  let url;
   try {
-    const url = await postAuthed(path);
-    if (win && !win.closed) win.location.assign(url);
-    else window.location.assign(url);
+    url = await postAuthed(path);
   } catch (e) {
     if (win && !win.closed) win.close();
     throw e;
   }
+  if (win && !win.closed) win.location.href = url;
+  else window.location.href = url; // popup blocked → same tab, so it never hangs
 }
 
 export async function startCheckout() {
