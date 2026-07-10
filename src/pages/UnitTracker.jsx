@@ -308,8 +308,8 @@ export default function UnitTracker({ lang = "sk", setCurrent }) {
         </h2>
         <p style={{ color: dim, fontSize: "0.88rem", lineHeight: 1.55, margin: "0.4rem 0 0", maxWidth: 720 }}>
           {L(
-            "Vyber projekt a byt, uvidíš vývoj jeho ceny, zmeny stavu, kedy sa prvýkrát objavil a kedy sa predal. Porovnaj až 4 byty naraz. Dáta sa rozširujú priebežne — graf rastie sám.",
-            "Pick a project + unit to see its price history, status changes, first listing and sold date. Compare up to 4 units side-by-side. Data accumulates over time — the chart grows on its own."
+            "Vyber projekt → klikni na byt a uvidíš jeho cenu, stav a kľúčové udalosti v čase. Chceš porovnať? Klikni na ďalšie byty (max 4 naraz, nech graf zostane čitateľný). Dáta pribúdajú po každom scrape — graf rastie sám.",
+            "Pick a project → click a unit to see its price, status and key events over time. Want to compare? Click more units (up to 4 at once, so the chart stays readable). Data grows with every scrape."
           )}
         </p>
       </div>
@@ -324,10 +324,8 @@ export default function UnitTracker({ lang = "sk", setCurrent }) {
         <>
           <PickerRow
             projects={projects}
-            allUnits={allUnits}
             globalResults={globalResults}
             projectById={projectById}
-            loadingScope={loadingScope}
             loadingGlobal={loadingHits}
             pickedKeys={pickedKeys}
             togglePick={togglePick}
@@ -339,7 +337,9 @@ export default function UnitTracker({ lang = "sk", setCurrent }) {
             lang={lang}
           />
 
-          {/* Once user has picked at least 1 unit → detail/compare view */}
+          {/* Chart/detail for the selected unit(s) — appears above the grid the
+              moment ≥1 unit is selected, so the grid you clicked from stays put
+              below (no "list disappeared, where did it go?" jump). */}
           {pickedKeys.length > 0 && (
             <DetailView
               pickedHistories={pickedHistories}
@@ -349,27 +349,29 @@ export default function UnitTracker({ lang = "sk", setCurrent }) {
               setYMode={setYMode}
               lang={lang}
               onProjectClick={(pid) => setCurrent && setCurrent(`App:ProjectDetail:${pid}`)}
-              onBackToList={projFilter ? () => setPickedKeys([]) : null}
+              onBackToList={null}
             />
           )}
 
-          {/* When user has picked a project but NO unit → mini-grid.
-              Also passes `search` so the SAME search box from the picker
-              filters this grid in-place (instead of triggering a separate
-              dropdown — that was the duplicate-list confusion). */}
-          {pickedKeys.length === 0 && projFilter && (
-            <MiniGrid
+          {/* ONE unit grid — always shown once a project is chosen. Click a tile
+              to select it (chart appears above); click more tiles to compare up
+              to 4. Selected tiles are highlighted; this is the same list whether
+              you're picking your first unit or adding a comparison — no second
+              grid, no separate "compare" mode (that was the confusing duplicate). */}
+          {projFilter && (
+            <UnitGrid
               project={projectById[projFilter]}
               units={allUnits}
               loadingScope={loadingScope}
               search={search}
-              onPick={(key) => setPickedKeys([key])}
+              pickedKeys={pickedKeys}
+              togglePick={togglePick}
               lang={lang}
             />
           )}
 
-          {/* Empty state — no project, no unit picked */}
-          {pickedKeys.length === 0 && !projFilter && (
+          {/* Empty state — no project chosen yet */}
+          {!projFilter && pickedKeys.length === 0 && (
             <EmptyState lang={lang} canFull={canFull} archiveMonths={archiveMonths} />
           )}
         </>
@@ -380,25 +382,13 @@ export default function UnitTracker({ lang = "sk", setCurrent }) {
 
 // ── Picker row ──────────────────────────────────────────────────
 
-function PickerRow({ projects, allUnits, globalResults, projectById, loadingScope, loadingGlobal, pickedKeys, togglePick, clearAll, projFilter, setProjFilter, search, setSearch, lang }) {
+function PickerRow({ projects, globalResults, projectById, loadingGlobal, pickedKeys, togglePick, clearAll, projFilter, setProjFilter, search, setSearch, lang }) {
   // `globalResults` (from server-side unit_search) shows ONLY when no project is
   // picked (global cross-project search). When a project IS picked, the same
-  // search box filters the mini-grid in-place — see MiniGrid — so we never show
+  // search box filters the unit grid in-place — see UnitGrid — so we never show
   // two parallel lists. `allUnits` here are the picked project's summaries, used
   // as the compare sub-search scope.
   const activeProjects = (projects || []).filter(p => (p.status || "active") === "active");
-
-  // Sub-state shown for "compare more" mode: when 1+ unit picked AND
-  // we're in a project context, show a small "+ Pridať ďalší byt"
-  // toggle that opens an inline mini-search SCOPED to that project.
-  const [compareSearchOpen, setCompareSearchOpen] = useState(false);
-  const compareScope = projFilter
-    ? allUnits.filter(u => u.project_id === projFilter && !pickedKeys.includes(u.key))
-    : [];
-  const compareSearchQ = search.trim().toLowerCase();
-  const compareResults = compareSearchOpen
-    ? compareScope.filter(u => !compareSearchQ || u.unit_id.toLowerCase().includes(compareSearchQ) || u.project_name.toLowerCase().includes(compareSearchQ)).slice(0, 12)
-    : [];
 
   return (
     <div style={{
@@ -516,45 +506,15 @@ function PickerRow({ projects, allUnits, globalResults, projectById, loadingScop
               </button>
             );
           })}
-          {/* + Pridať ďalší byt — opens scoped sub-search */}
-          {projFilter && pickedKeys.length < MAX_COMPARE && (
-            <button
-              onClick={() => setCompareSearchOpen(o => !o)}
-              style={{
-                background: "transparent",
-                border: `1px dashed ${green}66`,
-                color: green, padding: "0.32rem 0.65rem",
-                borderRadius: 6, fontSize: "0.78rem", cursor: "pointer", fontFamily: "inherit",
-              }}
-            >
-              {compareSearchOpen
-                ? (lang === "sk" ? "✕ zavrieť" : "✕ close")
-                : (lang === "sk" ? `+ Pridať ďalší byt na porovnanie` : `+ Add unit to compare`)}
-            </button>
+          {/* How to compare: just click more tiles in the grid below. No separate
+              "compare mode" — the limit exists only so the chart stays readable. */}
+          {pickedKeys.length < MAX_COMPARE && (
+            <span style={{ color: dim, fontSize: "0.74rem", fontStyle: "italic", marginLeft: "0.15rem" }}>
+              {lang === "sk"
+                ? `+ klikni na ďalší byt nižšie na porovnanie (max ${MAX_COMPARE})`
+                : `+ click another unit below to compare (max ${MAX_COMPARE})`}
+            </span>
           )}
-        </div>
-      )}
-
-      {/* Compare-mode sub-search — only when explicitly toggled */}
-      {compareSearchOpen && projFilter && (
-        <div style={{ marginTop: "0.85rem", padding: "0.7rem", background: bg, border: `1px solid ${green}33`, borderRadius: 6 }}>
-          <div style={{ fontSize: "0.7rem", color: dim, marginBottom: "0.4rem" }}>
-            {lang === "sk" ? `Vyber ďalší byt z projektu (${MAX_COMPARE - pickedKeys.length} zostáva)` : `Pick another unit from project (${MAX_COMPARE - pickedKeys.length} left)`}
-          </div>
-          <div style={{
-            display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
-            gap: "0.4rem", maxHeight: 240, overflowY: "auto",
-          }}>
-            {compareResults.length === 0 ? (
-              <div style={{ color: dim, fontSize: "0.78rem", fontStyle: "italic", padding: "0.4rem" }}>
-                {lang === "sk" ? "Žiadne ďalšie byty pre tento filter." : "No more units in scope."}
-              </div>
-            ) : compareResults.map(u => (
-              <UnitTile key={u.key} unit={u} isPicked={false}
-                disabled={pickedKeys.length >= MAX_COMPARE}
-                onClick={() => { togglePick(u.key); }} lang={lang} compact />
-            ))}
-          </div>
         </div>
       )}
     </div>
@@ -1438,7 +1398,7 @@ function MiniSparkline({ series }) {
   );
 }
 
-function MiniGrid({ project, units: scopeUnits, loadingScope, search, onPick, lang }) {
+function UnitGrid({ project, units: scopeUnits, loadingScope, search, pickedKeys, togglePick, lang }) {
   // Units in this project, from project_units_series: one row per unit = latest
   // state + a compact EUR price series (for the sparkline) in a single small
   // jsonb call — NOT a full per-project history download. useMemo MUST come
@@ -1462,6 +1422,7 @@ function MiniGrid({ project, units: scopeUnits, loadingScope, search, onPick, la
 
   if (!project) return null;
   const isLoading = loadingScope && units.length === 0;
+  const pickedCount = pickedKeys.length;
 
   return (
     <div style={{
@@ -1477,9 +1438,13 @@ function MiniGrid({ project, units: scopeUnits, loadingScope, search, onPick, la
           <div style={{ fontSize: "0.78rem", color: dim, marginTop: "0.25rem" }}>
             {isLoading
               ? (lang === "sk" ? "Načítavam byty…" : "Loading units…")
+              : pickedCount > 0
+              ? (lang === "sk"
+                  ? `Vybrané ${pickedCount}/${MAX_COMPARE} · klikni na ďalší byt na porovnanie, alebo na vybraný na odobratie`
+                  : `Selected ${pickedCount}/${MAX_COMPARE} · click another unit to compare, or a selected one to remove`)
               : filtered.length === units.length
-              ? (lang === "sk" ? `${units.length} bytov · klikni na byt pre jeho vývoj` : `${units.length} units · click one to open its timeline`)
-              : (lang === "sk" ? `${filtered.length} z ${units.length} bytov · upravený filter` : `${filtered.length} of ${units.length} units · filtered`)}
+              ? (lang === "sk" ? `${units.length} bytov · klikni na byt a uvidíš jeho cenu v čase` : `${units.length} units · click one to see its price over time`)
+              : (lang === "sk" ? `${filtered.length} z ${units.length} bytov · filtrované` : `${filtered.length} of ${units.length} units · filtered`)}
           </div>
         </div>
       </div>
@@ -1499,29 +1464,44 @@ function MiniGrid({ project, units: scopeUnits, loadingScope, search, onPick, la
           </div>
         ) : filtered.map(u => {
           const stavCol = STAV_COLOR[u.latest_stav] || dim;
+          const pickIdx = pickedKeys.indexOf(u.key);
+          const selected = pickIdx >= 0;
+          const selColor = selected ? COMPARE_PALETTE[pickIdx % COMPARE_PALETTE.length] : green;
+          const atMax = !selected && pickedKeys.length >= MAX_COMPARE;
           return (
             <button
               key={u.key}
-              onClick={() => onPick(u.key)}
+              onClick={() => togglePick(u.key)}
+              disabled={atMax}
+              title={atMax
+                ? (lang === "sk" ? `Naraz sa dá porovnať max ${MAX_COMPARE} bytov — odober jeden na pridanie ďalšieho` : `You can compare at most ${MAX_COMPARE} units — remove one to add another`)
+                : (selected ? (lang === "sk" ? "Klikni na odobratie z výberu" : "Click to remove from selection") : (lang === "sk" ? "Klikni na výber" : "Click to select"))}
               style={{
-                background: bg2, border: `1px solid ${border}`, color: text,
-                cursor: "pointer", padding: "0.75rem 0.9rem", borderRadius: 8,
+                background: selected ? `${selColor}1f` : bg2,
+                border: `1px solid ${selected ? selColor : border}`,
+                color: text, cursor: atMax ? "not-allowed" : "pointer",
+                opacity: atMax ? 0.4 : 1,
+                padding: "0.75rem 0.9rem", borderRadius: 8,
                 fontSize: "0.82rem", fontFamily: "inherit", textAlign: "left",
                 transition: "border-color 0.15s, background 0.15s, transform 0.12s",
               }}
               onMouseEnter={e => {
+                if (atMax || selected) return;
                 e.currentTarget.style.borderColor = green;
                 e.currentTarget.style.background = "rgba(0,229,160,0.05)";
                 e.currentTarget.style.transform = "translateY(-1px)";
               }}
               onMouseLeave={e => {
+                if (selected) return;
                 e.currentTarget.style.borderColor = border;
                 e.currentTarget.style.background = bg2;
                 e.currentTarget.style.transform = "translateY(0)";
               }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "0.5rem", marginBottom: "0.25rem" }}>
-                <strong style={{ color: text, fontSize: "0.92rem", letterSpacing: "-0.01em" }}>{u.unit_id}</strong>
+                <strong style={{ color: selected ? selColor : text, fontSize: "0.92rem", letterSpacing: "-0.01em" }}>
+                  {selected ? "✓ " : ""}{u.unit_id}
+                </strong>
                 <span style={{ color: stavCol, fontSize: "0.7rem", fontWeight: 700, padding: "0.1rem 0.4rem", background: `${stavCol}1a`, borderRadius: 3 }}>
                   {u.latest_stav}
                 </span>
@@ -1555,12 +1535,12 @@ function EmptyState({ lang, canFull, archiveMonths }) {
     <div style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 10, padding: "2.5rem 1.5rem", textAlign: "center" }}>
       <div style={{ fontSize: "2.5rem", marginBottom: "0.5rem", opacity: 0.5 }}>⏱</div>
       <div style={{ fontSize: "1rem", color: text, marginBottom: "0.4rem", fontWeight: 600 }}>
-        {lang === "sk" ? "Vyber projekt a byt" : "Pick a project and unit"}
+        {lang === "sk" ? "Začni výberom projektu hore" : "Start by picking a project above"}
       </div>
       <div style={{ fontSize: "0.85rem", color: dim, maxWidth: 540, margin: "0 auto", lineHeight: 1.55 }}>
         {lang === "sk"
-          ? "Môžeš porovnať až 4 byty naraz. Vidíš vývoj ceny, zmeny stavu, kedy sa byt prvýkrát objavil v ponuke a kedy bol predaný."
-          : "Compare up to 4 units side-by-side. See price evolution, status changes, when the unit first appeared and when it sold."}
+          ? "Potom klikni na byt a uvidíš vývoj jeho ceny, zmeny stavu, kedy sa prvýkrát objavil a kedy sa predal. Klikni na ďalšie byty (max 4) na porovnanie."
+          : "Then click a unit to see its price evolution, status changes, when it first appeared and when it sold. Click more units (up to 4) to compare."}
       </div>
       {months <= 1 && (
         <div style={{ marginTop: "1rem", fontSize: "0.78rem", color: orange, fontStyle: "italic", maxWidth: 540, margin: "1rem auto 0" }}>
