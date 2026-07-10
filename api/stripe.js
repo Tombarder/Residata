@@ -58,6 +58,12 @@ async function handleCheckout(req, res) {
     allow_promotion_codes: true,
     billing_address_collection: "auto",
     automatic_tax: { enabled: false },
+    // Force EUR as the presentment currency. Stripe "Adaptive Pricing" (on by
+    // default) auto-converts the €49.99 price into the visitor's local currency
+    // — so Czech users landed on CZK by default. Disabling it per-session pins
+    // checkout to the price's own currency (eur) everywhere. In code, so it's
+    // not a dashboard setting that can silently drift back.
+    adaptive_pricing: { enabled: false },
     success_url: `${origin}/app?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/app?checkout=cancelled`,
   };
