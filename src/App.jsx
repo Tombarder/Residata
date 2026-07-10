@@ -1716,7 +1716,7 @@ function PricingPage({ setCurrent, l, lang, onLogin }) {
       </div>
 
       <div style={{ padding: "0 2rem 4rem", maxWidth: "var(--container)", margin: "0 auto" }}>
-        <div className="pricing-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1.5rem" }}>
+        <div className="pricing-grid" style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "1.5rem", maxWidth: 780, margin: "0 auto" }}>
           {tiers.map(t => (
             <div key={t.tier} style={{
               border: `1px solid ${t.featured ? "#00e5a0" : "#222228"}`,
@@ -1737,6 +1737,7 @@ function PricingPage({ setCurrent, l, lang, onLogin }) {
                 <div style={{ fontSize: "1.2rem", fontWeight: 600, marginBottom: "0.25rem" }}>{t.price}</div>
               ) : (
                 <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "2.2rem", fontWeight: 700, marginBottom: "0.25rem" }}>
+                  {t.anchor && <span style={{ fontSize: "1.15rem", fontWeight: 400, color: "#55555f", textDecoration: "line-through", marginRight: "0.5rem" }}>{t.anchor}</span>}
                   {t.price}{t.priceSuffix && <span style={{ fontSize: "1rem", fontWeight: 400, color: "#55555f" }}>{t.priceSuffix}</span>}
                 </div>
               )}

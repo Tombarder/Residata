@@ -2,7 +2,7 @@
 //
 // Your LIVE secret key stays in YOUR terminal — it is never shared with Claude
 // or committed anywhere. This script just uses it to create the live product,
-// the €25/mo price, and the live webhook, then prints the 3 values to paste
+// the €49.99/mo price, and the live webhook, then prints the 3 values to paste
 // into Vercel.
 //
 // Usage (from the residata-frontend folder):
@@ -30,7 +30,7 @@ try {
     url: "https://residata.eu",
   });
   const price = await stripe.prices.create({
-    product: product.id, unit_amount: 2500, currency: "eur",
+    product: product.id, unit_amount: 4999, currency: "eur",
     recurring: { interval: "month" }, lookup_key: "residata_monthly_live",
   });
   const wh = await stripe.webhookEndpoints.create({

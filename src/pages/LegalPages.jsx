@@ -382,8 +382,8 @@ export function TermsPage({ lang }) {
 
       <Section title={isSK ? "5. Predplatné, skúšobná verzia a platby" : "5. Subscription, trial and payment"}>
         <p>{isSK
-          ? "Služba sa poskytuje vo viacerých úrovniach (bezplatná, skúšobná a platená). Bezplatná skúšobná verzia (spravidla 7 dní) poskytuje rozšírený prístup bez nutnosti platobnej karty. Platená úroveň sa poskytuje za priebežný poplatok (aktuálne 25 € / mesiac, prípadne s úvodnou zľavou); presné podmienky a fakturácia sa dohodnú priamo s prevádzkovateľom. Predplatné môžete zrušiť; už zaplatené obdobie sa spravidla nevracia, ak nie je dohodnuté inak."
-          : "The Service is offered in several tiers (free, trial, and paid). The free trial (typically 7 days) provides extended access without requiring a payment card. The paid tier is provided for a recurring fee (currently €25 / month, possibly with an introductory discount); exact terms and billing are arranged directly with the operator. You may cancel your subscription; an already-paid period is generally non-refundable unless agreed otherwise."}</p>
+          ? "Služba sa poskytuje vo viacerých úrovniach (bezplatná, skúšobná a platená). Bezplatná skúšobná verzia (spravidla 7 dní) poskytuje rozšírený prístup bez nutnosti platobnej karty. Platená úroveň sa poskytuje za priebežný poplatok (aktuálne 49,99 € / mesiac — úvodná cena, bežne 149,99 €); presné podmienky a fakturácia sa dohodnú priamo s prevádzkovateľom. Predplatné môžete zrušiť; už zaplatené obdobie sa spravidla nevracia, ak nie je dohodnuté inak."
+          : "The Service is offered in several tiers (free, trial, and paid). The free trial (typically 7 days) provides extended access without requiring a payment card. The paid tier is provided for a recurring fee (currently €49.99 / month — launch price, regularly €149.99); exact terms and billing are arranged directly with the operator. You may cancel your subscription; an already-paid period is generally non-refundable unless agreed otherwise."}</p>
       </Section>
 
       <Section title={isSK ? "6. Prijateľné používanie" : "6. Acceptable use"}>

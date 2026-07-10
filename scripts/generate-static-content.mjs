@@ -122,8 +122,7 @@ it daily, and delivers it as CSV, XLSX, or via API.
 
 ## Pricing
 
-- €249 one-time snapshot report
-- €25 monthly for ongoing access
+- €49.99 / month for full ongoing access (launch price; regular €149.99)
 
 ## Public surfaces
 
@@ -210,8 +209,7 @@ auto-scraped projects in all the public dashboards.
 
 ## Pricing
 
-- One-time snapshot report: €249
-- Monthly ongoing access: €25 / month
+- Monthly ongoing access: €49.99 / month (launch price; regular €149.99)
 
 ## Where to find this
 

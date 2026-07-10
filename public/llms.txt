@@ -30,8 +30,7 @@ it daily, and delivers it as CSV, XLSX, or via API.
 
 ## Pricing
 
-- €249 one-time snapshot report
-- €25 monthly for ongoing access
+- €49.99 / month for full ongoing access (launch price; regular €149.99)
 
 ## Public surfaces
 
