@@ -1605,7 +1605,7 @@ function PricingPage({ setCurrent, l, lang, onLogin }) {
   const mono = "'JetBrains Mono', monospace";
   const tiers = l.tiers;
   const faqs = l.faqs;
-  const { can, canStartTrial, showTrialOffer } = useCapabilities();
+  const { can, showTrialOffer } = useCapabilities();
   const auth = useAuth();
   const isAlreadyPaid = can("has_paid_access");
   // Trial CTA routing (mirrors App.handleTrialCta):
@@ -1614,12 +1614,19 @@ function PricingPage({ setCurrent, l, lang, onLogin }) {
   //   · signed-in free  → activate the trial in one click, then enter the app.
   //   · everyone else   → Billing.
   const startTrial = async () => {
-    if (!auth.user) { setTrialIntent(); if (onLogin) onLogin(); else setCurrent("Home"); return; }
-    if (canStartTrial) {
-      try {
-        const res = await activateTrial();
-        if (res.ok) { window.location.assign("/app"); return; }
-      } catch (_) { /* fall through to Billing */ }
+    // Don't treat a still-hydrating session as anon (that opened the login flow
+    // for a logged-in user on the first click; a reload "fixed" it). Only route
+    // to login/signup when we KNOW there's no user; otherwise attempt the trial,
+    // which resolves the real session itself and only throws for a true anon.
+    if (!auth.user && !auth.loading) { setTrialIntent(); if (onLogin) onLogin(); else setCurrent("Home"); return; }
+    try {
+      const res = await activateTrial();
+      if (res.ok) { window.location.assign("/app"); return; }
+    } catch (e) {
+      if (e?.code === "SESSION_EXPIRED" || e?.status === 401) {
+        setTrialIntent(); if (onLogin) onLogin(); else setCurrent("Home"); return;
+      }
+      /* fall through to Billing */
     }
     setCurrent("App:Billing");
   };
@@ -2017,12 +2024,22 @@ export default function App() {
   //                       Falls back to Billing if the call can't complete.
   //   · everyone else   → Billing (already paid / admin / pending / used).
   const handleTrialCta = async () => {
-    if (!auth.user) { setTrialIntent(); setLoginOpen(true); return; }
-    if (caps.canStartTrial) {
-      try {
-        const res = await activateTrial();
-        if (res.ok) { window.location.assign("/app"); return; }
-      } catch (_) { /* fall through to Billing */ }
+    // Only route to login when we KNOW there's no user. Branching on auth.user
+    // alone opened the login modal for an already-logged-in user whose session
+    // was still hydrating on the first click (a reload "fixed" it only because
+    // the session had hydrated by then). While auth is still loading, attempt
+    // the trial — activateTrial() resolves the real session itself and throws
+    // SESSION_EXPIRED only for a genuine anon, which we then route to login.
+    if (!auth.user && !auth.loading) { setTrialIntent(); setLoginOpen(true); return; }
+    try {
+      const res = await activateTrial();
+      if (res.ok) { window.location.assign("/app"); return; }
+      // 409 consumed / already paid → the full picture lives on Billing.
+    } catch (e) {
+      if (e?.code === "SESSION_EXPIRED" || e?.status === 401) {
+        setTrialIntent(); setLoginOpen(true); return;   // genuinely not signed in
+      }
+      /* any other error → fall through to Billing */
     }
     handleNav("App:Billing");
   };

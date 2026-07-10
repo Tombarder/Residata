@@ -29,36 +29,45 @@ const REFRESH_SKEW_S = 60; // refresh if the token expires within this window
  * token. Throws an Error with code 'SESSION_EXPIRED' if the session is dead.
  */
 export async function getFreshAccessToken() {
-  let session = null;
-  try {
-    ({ data: { session } } = await supabase.auth.getSession());
-  } catch {
-    session = null;
-  }
-  const now = Math.floor(Date.now() / 1000);
-  const stale =
-    !session?.access_token ||
-    (typeof session.expires_at === "number" && session.expires_at - now <= REFRESH_SKEW_S);
+  const now = () => Math.floor(Date.now() / 1000);
+  const readSession = async () => {
+    try { const { data } = await supabase.auth.getSession(); return data?.session || null; }
+    catch { return null; }
+  };
+  const fresh = (s) =>
+    s?.access_token &&
+    !(typeof s.expires_at === "number" && s.expires_at - now() <= REFRESH_SKEW_S);
+  const notExpired = (s) =>
+    s?.access_token &&
+    !(typeof s.expires_at === "number" && s.expires_at <= now());
 
-  if (stale) {
-    let refreshed = null;
-    let refreshErr = null;
-    try {
-      const { data, error } = await supabase.auth.refreshSession();
-      refreshed = data?.session || null;
-      refreshErr = error || null;
-    } catch (e) {
-      refreshErr = e;
-    }
-    if (!refreshed?.access_token) {
-      const e = new Error("SESSION_EXPIRED");
-      e.code = "SESSION_EXPIRED";
-      e.cause = refreshErr;
-      throw e;
-    }
-    session = refreshed;
+  let session = await readSession();
+  if (fresh(session)) return session.access_token;
+
+  // Token missing or about to expire → force a refresh.
+  let refreshErr = null;
+  try {
+    const { data, error } = await supabase.auth.refreshSession();
+    refreshErr = error || null;
+    if (data?.session?.access_token) return data.session.access_token;
+  } catch (e) {
+    refreshErr = e;
   }
-  return session.access_token;
+
+  // Refresh FAILED — but this is usually a benign refresh-token-ROTATION race,
+  // not a dead session: supabase-js's background autoRefresh (or another tab)
+  // already spent the refresh token and stored a fresh session, so OUR explicit
+  // refresh answers "refresh token already used". That's exactly the "first
+  // click fails, reload fixes it" bug — the reload just re-read the freshly
+  // stored session. So re-read once before declaring the login dead; accept any
+  // token that isn't already expired.
+  session = await readSession();
+  if (notExpired(session)) return session.access_token;
+
+  const e = new Error("SESSION_EXPIRED");
+  e.code = "SESSION_EXPIRED";
+  e.cause = refreshErr;
+  throw e;
 }
 
 /** True for any error that means "your login is no longer valid". */
