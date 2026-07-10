@@ -32,12 +32,12 @@ async function postAuthed(path) {
 // Start a subscription. On success the browser leaves for Stripe's Checkout;
 // this function does not return in the happy path.
 export async function startCheckout() {
-  const url = await postAuthed("/api/stripe/create-checkout");
+  const url = await postAuthed("/api/stripe?action=checkout");
   window.location.assign(url);
 }
 
 // Open the self-serve billing portal (manage card / cancel / invoices).
 export async function openBillingPortal() {
-  const url = await postAuthed("/api/stripe/portal");
+  const url = await postAuthed("/api/stripe?action=portal");
   window.location.assign(url);
 }
