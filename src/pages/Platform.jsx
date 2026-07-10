@@ -941,11 +941,13 @@ function PlatformBilling({ lang, setCurrent }) {
           </span>
           {trialActive && (
             <span style={{ fontSize: "0.75rem", color: green, fontFamily: mono, background: "rgba(0,229,160,0.12)", border: `1px solid ${green}`, borderRadius: 100, padding: "2px 10px" }}>
-              🎁 {lang === "sk" ? `Trial · ${trialDaysLeft} dní zostáva` : `Trial · ${trialDaysLeft} days left`}
+              🎁 {trialDaysLeft <= 0
+                ? (lang === "sk" ? "Trial · posledný deň" : "Trial · last day")
+                : (lang === "sk" ? `Trial · ${trialDaysLeft} dní zostáva` : `Trial · ${trialDaysLeft} day${trialDaysLeft === 1 ? "" : "s"} left`)}
             </span>
           )}
           {approvedAt && <span style={{ fontSize: "0.75rem", color: dim, fontFamily: mono }}>
-            {lang === "sk" ? "od" : "since"} {approvedAt}
+            {lang === "sk" ? "člen od" : "member since"} {approvedAt}
           </span>}
         </div>
         <p style={{ color: "#c0c0c8", fontSize: "0.9rem", lineHeight: 1.65, margin: 0 }}>
@@ -1126,9 +1128,9 @@ function SubscriptionCard({ lang, paused, paidWindowActive, paidUntil, paidStart
             </span>
             {showCountdown && (
               <span style={{ color: textLight, fontWeight: 700, fontSize: "1rem", letterSpacing: "-0.01em" }}>
-                {paidDaysLeft === 1
+                {paidDaysLeft <= 0
                   ? (lang === "sk" ? "Posledný deň" : "Last day")
-                  : (lang === "sk" ? `${paidDaysLeft} dní zostáva` : `${paidDaysLeft} days remaining`)}
+                  : (lang === "sk" ? `${paidDaysLeft} dní zostáva` : `${paidDaysLeft} day${paidDaysLeft === 1 ? "" : "s"} remaining`)}
               </span>
             )}
           </div>

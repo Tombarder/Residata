@@ -117,7 +117,12 @@ export function useCapabilities() {
   if (canExport) caps.add("export_data");
   else caps.delete("export_data");   // belt-and-suspenders — trial/free never export
 
-  const daysFrom = (ts) => ts ? Math.max(0, Math.ceil((ts - now) / 86400000)) : 0;
+  // Whole CALENDAR days between today and the target date (both at local
+  // midnight), so "days left" always matches the end date shown — e.g. ends
+  // 16 Jul, today 10 Jul → 6. The old hour-based Math.ceil over-counted a
+  // partial day (6.16 → "7"), which read as inconsistent with the end date.
+  const dayStart = (ms) => { const d = new Date(ms); d.setHours(0, 0, 0, 0); return d.getTime(); };
+  const daysFrom = (ts) => ts ? Math.max(0, Math.round((dayStart(ts) - dayStart(now)) / 86400000)) : 0;
   const trialDaysLeft = trialActive ? daysFrom(trialUntil) : 0;
   const paidDaysLeft  = paidActive && paidWindowActive ? daysFrom(paidUntil) : null;
 
