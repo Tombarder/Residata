@@ -12,7 +12,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { isTrustedRequest as isTrustedOrigin } from "../_lib/origin.js";
-import { feedbackHtml, sendEmail, FEEDBACK_CATEGORY_LABELS } from "../_lib/emails.js";
+import { feedbackHtml, feedbackReceiptHtml, sendEmail, FEEDBACK_CATEGORY_LABELS } from "../_lib/emails.js";
 
 export const maxDuration = 15;
 
@@ -160,6 +160,21 @@ async function handleInner(req, res) {
     } catch (e) { console.error("[feedback] notify email failed:", String(e?.message || e).slice(0, 160)); }
   }
 
+  // Confirmation receipt TO the user: "we got your message". Only for a brand-new
+  // conversation, and only when we have an address. Non-fatal — a failed receipt
+  // must never fail the submit (the message is already saved + admin notified).
+  async function notifyUser(category, toEmail, convId) {
+    if (!GMAIL_APP_PASSWORD || !toEmail) return;
+    try {
+      await sendEmail({
+        to: toEmail,
+        subject: app_lang === "en" ? "We received your message — Residata" : "Máme tvoju správu — Residata",
+        html: feedbackReceiptHtml({ category, message }, WEB_URL, app_lang === "en" ? "en" : "sk", convId),
+        from: GMAIL_FROM, gmailUser: GMAIL_FROM, gmailPassword: GMAIL_APP_PASSWORD,
+      });
+    } catch (e) { console.error("[feedback] user receipt failed:", String(e?.message || e).slice(0, 160)); }
+  }
+
   // ── CONTINUE an existing conversation ──
   if (conversation_id !== undefined && conversation_id !== null && conversation_id !== "") {
     if (!isUuid(conversation_id)) return res.status(400).json({ error: "invalid conversation_id" });
@@ -212,5 +227,6 @@ async function handleInner(req, res) {
   }
 
   await notifyAdmin(category, project_name, email, false);
+  await notifyUser(category, email, conv.id);   // "we received your message" receipt
   return res.status(200).json({ ok: true, id: conv.id });
 }

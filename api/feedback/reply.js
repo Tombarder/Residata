@@ -104,7 +104,7 @@ async function handleInner(req, res) {
     await sendEmail({
       to: fb.email,
       subject: fb.app_lang === "en" ? "Reply from Residata" : "Odpoveď od Residata",
-      html: feedbackReplyHtml(reply, fb.message, WEB_URL, fb.app_lang === "en" ? "en" : "sk"),
+      html: feedbackReplyHtml(reply, fb.message, WEB_URL, fb.app_lang === "en" ? "en" : "sk", feedback_id),
       from: GMAIL_FROM, gmailUser: GMAIL_FROM, gmailPassword: GMAIL_APP_PASSWORD,
     });
   } catch (e) {

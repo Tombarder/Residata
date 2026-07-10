@@ -12,7 +12,7 @@
  * New message → new conversation. Or open an existing one and continue it.
  * Logged-in callers attributed + ownership checked server-side.
  */
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useAuth } from "../lib/useAuth";
 import { supabase } from "../lib/supabase";
 import { cleanText, cleanEmail } from "../lib/sanitize";
@@ -85,6 +85,23 @@ function downscaleImage(file, maxDim = 1600, quality = 0.82) {
 const catMeta = (k) => CATEGORIES.find((x) => x[0] === k) || ["other", "💬", "Iné", "Other"];
 const fmtDay = (s) => (s ? String(s).slice(0, 10) : "");
 
+// ── Unread tracking (in-app "new reply" alert) ─────────────────────────────
+// A conversation is "unread" when its last message is from admin and its
+// activity timestamp is newer than the last time the user opened it. We persist
+// the per-conversation "seen at" locally so the pill can show a badge WITHOUT a
+// read-state column in the DB. Opening the thread marks it seen.
+const FB_SEEN_KEY = "residata_fb_seen";
+function loadSeen() { try { return JSON.parse(localStorage.getItem(FB_SEEN_KEY) || "{}"); } catch { return {}; } }
+function markConvSeen(id, when) {
+  if (!id) return;
+  try { const s = loadSeen(); s[id] = when || new Date().toISOString(); localStorage.setItem(FB_SEEN_KEY, JSON.stringify(s)); } catch { /* ignore */ }
+}
+function countUnread(convs) {
+  if (!Array.isArray(convs)) return 0;
+  const seen = loadSeen();
+  return convs.filter(c => c.last_sender === "admin" && (!seen[c.id] || String(seen[c.id]) < String(c.activity_at))).length;
+}
+
 export default function FeedbackWidget({ lang = "sk", raised = false }) {
   const L = (sk, en) => (lang === "sk" ? sk : en);
   const { user, profile } = useAuth();
@@ -107,6 +124,7 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
   const [continuePhase, setContinuePhase] = useState("idle");
   const [continueErr, setContinueErr] = useState("");
   const [includeShot, setIncludeShot] = useState(true);  // auto page-screenshot + diagnostics
+  const [unread, setUnread] = useState(0);               // # conversations with an unseen admin reply
   const taRef = useRef(null);
   const fileRef = useRef(null);
 
@@ -120,6 +138,56 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
   function resetForm() { setCategory(null); setMessage(""); setEmail(""); setScreenshot(null); setShotName(""); setPhase("idle"); setErrorMsg(""); }
   function close() { setOpen(false); if (phase === "done") { resetForm(); setView("form"); } }
   function pickCategory(key) { setCategory(key); setTimeout(() => taRef.current?.focus(), 60); }
+
+  // Recompute the pill's unread-reply badge from the user's conversations.
+  async function refreshUnread() {
+    if (!user || !supabase) { setUnread(0); return; }
+    try {
+      const { data } = await supabase.rpc("my_feedback");
+      setUnread(countUnread(data));
+    } catch { /* non-fatal — badge just stays as-is */ }
+  }
+
+  // Open the widget from ANYWHERE via window.dispatchEvent(new CustomEvent(
+  // "residata:open-feedback", { detail: { category } })) — used by the Billing
+  // "I have a question" button and any other in-app "ask us" affordance, so we
+  // never fall back to an external mailto.
+  useEffect(() => {
+    function onOpenEvent(e) {
+      setView("form"); setPhase("idle"); setOpen(true);
+      const cat = e?.detail?.category;
+      if (cat) { setCategory(cat); setTimeout(() => taRef.current?.focus(), 90); }
+    }
+    window.addEventListener("residata:open-feedback", onOpenEvent);
+    return () => window.removeEventListener("residata:open-feedback", onOpenEvent);
+  }, []);
+
+  // Deep-link from the reply email: /app?feedback=<conversationId> opens that
+  // conversation straight away (…=new opens a fresh message form). The param is
+  // stripped so a reload doesn't re-trigger it.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const p = new URLSearchParams(window.location.search);
+    const fid = p.get("feedback");
+    if (!fid) return;
+    setOpen(true);
+    if (fid === "new") setView("form");
+    else { setView("mine"); openThread(fid); }
+    p.delete("feedback");
+    const q = p.toString();
+    window.history.replaceState({}, "", window.location.pathname + (q ? `?${q}` : "") + window.location.hash);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Keep the unread badge fresh: on mount, when auth resolves, and whenever the
+  // tab regains focus (that's when an admin reply most likely arrived).
+  useEffect(() => {
+    refreshUnread();
+    const onFocus = () => refreshUnread();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   async function processImageFile(file) {
     if (!file || !file.type.startsWith("image/")) { setErrorMsg(L("Vyber prosím obrázok.", "Please pick an image.")); return; }
@@ -173,10 +241,11 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
   }
   async function openThread(id) {
     setActiveConv(id); setView("thread"); setThread(null); setThreadLoading(true); setContinueMsg(""); setContinueErr(""); setContinuePhase("idle");
+    markConvSeen(id); setUnread((n) => Math.max(0, n - 1));   // opening it clears its unread state
     if (!supabase) { setThreadLoading(false); return; }
     const { data, error } = await supabase.rpc("my_conversation", { p_id: id });
     setThreadLoading(false);
-    if (error) setContinueErr(error.message); else setThread(data);
+    if (error) setContinueErr(error.message); else { setThread(data); refreshUnread(); }
   }
   async function sendContinue() {
     const txt = cleanText(continueMsg, { max: MAX_MESSAGE });
@@ -208,7 +277,15 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={green} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
         </svg>
-        <span>{L("Spätná väzba", "Feedback")}</span>
+        <span>{unread > 0 ? L("Nová odpoveď", "New reply") : L("Spätná väzba", "Feedback")}</span>
+        {unread > 0 && (
+          <span aria-label={L("nové odpovede", "new replies")} style={{
+            position: "absolute", top: -7, right: -7, minWidth: 19, height: 19, padding: "0 5px",
+            borderRadius: 10, background: "#ff4d4d", color: "#fff", fontSize: "0.64rem", fontWeight: 700,
+            display: "flex", alignItems: "center", justifyContent: "center", fontFamily: mono,
+            border: "2px solid #0a0a0b", lineHeight: 1,
+          }}>{unread > 9 ? "9+" : unread}</span>
+        )}
         <style>{`
           @keyframes rbf-glow { 0%,100% { box-shadow: 0 6px 18px rgba(0,0,0,0.4), 0 0 0 0 rgba(0,229,160,0); } 50% { box-shadow: 0 8px 22px rgba(0,0,0,0.45), 0 0 22px 3px rgba(0,229,160,0.45); } }
           .residata-fb-pill { transition: transform .18s, border-color .18s, background .18s; }

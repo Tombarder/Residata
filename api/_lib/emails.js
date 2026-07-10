@@ -262,26 +262,56 @@ export function feedbackHtml(fb, webUrl) {
  * admin log. `reply` is the admin's text; `original` quotes their message.
  * Chrome is localised to the user's language; the body is the admin's words.
  */
-export function feedbackReplyHtml(reply, original, webUrl, lang = "sk") {
+export function feedbackReplyHtml(reply, original, webUrl, lang = "sk", convId = null) {
   const sk = lang === "sk";
   const t = (s, e) => (sk ? s : e);
   const replyHtml = escHtml(reply).replace(/\n/g, "<br>");
   const origBlock = original
     ? `<div style="border-left:2px solid ${CARD_BORDER};padding-left:12px;margin:8px 0 0;color:${TEXT_DIM};font-size:13px;line-height:1.6">${escHtml(String(original).slice(0, 600)).replace(/\n/g, "<br>")}</div>`
     : "";
+  // Deep-link straight to THIS conversation on the platform — the widget reads
+  // ?feedback=<id> and opens the thread, so the user lands on our reply and can
+  // answer in-app immediately (no external email thread).
+  const convLink = convId ? `${webUrl}/app?feedback=${encodeURIComponent(convId)}` : `${webUrl}/app`;
   const inner = `
     <div style="${S.eyebrow}">${t("Odpoveď od Residata", "Reply from Residata")}</div>
     <h1 style="${S.h1}">${t("Ozvali sme sa ti", "We got back to you")} 🙌</h1>
     <p style="${S.p}">${t("Ďakujeme za tvoju správu — tu je naša odpoveď:", "Thanks for your message — here's our reply:")}</p>
     <div style="padding:16px 18px;border:1px solid ${CARD_BORDER};border-radius:8px;margin:14px 0;background:${INNER_BOX};color:${TEXT_HI};font-size:15px;line-height:1.6">${replyHtml}</div>
     ${original ? `<p style="${S.p};font-size:12px;color:${TEXT_DIM};margin-bottom:2px">${t("Tvoja pôvodná správa:", "Your original message:")}</p>${origBlock}` : ""}
-    <a href="${webUrl}" style="${S.btnGreen};margin-top:14px">${t("Otvoriť Residatu", "Open Residata")} →</a>`;
+    <a href="${convLink}" style="${S.btnGreen};margin-top:14px">${t("Otvoriť konverzáciu na platforme", "Open the conversation on the platform")} →</a>
+    <p style="${S.p};font-size:12px;color:${TEXT_DIM};margin-top:12px">${t("Odpovedať môžeš priamo tu v e-maile aj v aplikácii.", "You can reply right here by email or in the app.")}</p>`;
   return shell({
     title: t("Odpoveď od Residata", "Reply from Residata"),
     preheader: String(reply || "").slice(0, 80),
     inner,
     footer: t("Residata · tento e-mail dostávaš, lebo si nám poslal spätnú väzbu",
               "Residata · you're receiving this because you sent us feedback"),
+  });
+}
+
+/**
+ * Receipt email sent TO the user right after they submit a NEW message via the
+ * feedback widget — confirms we received it and points back to the conversation
+ * on the platform. Only sent when we have an email to send to.
+ */
+export function feedbackReceiptHtml(fb, webUrl, lang = "sk", convId = null) {
+  const sk = lang === "sk";
+  const t = (s, e) => (sk ? s : e);
+  const meta = FEEDBACK_CATEGORY_LABELS[fb.category] || FEEDBACK_CATEGORY_LABELS.other;
+  const msgHtml = escHtml(String(fb.message || "")).replace(/\n/g, "<br>");
+  const convLink = convId ? `${webUrl}/app?feedback=${encodeURIComponent(convId)}` : `${webUrl}/app`;
+  const inner = `
+    <div style="${S.eyebrow}">${t("Máme to", "Got it")} · ${escHtml(meta.label)}</div>
+    <h1 style="${S.h1}">${t("Tvoja správa dorazila", "Your message reached us")} 🙌</h1>
+    <p style="${S.p}">${t("Ďakujeme! Ozveme sa ti čo najskôr — odpoveď uvidíš tu v e-maile aj v aplikácii v sekcii „Moje konverzácie“.", "Thanks! We'll get back to you shortly — you'll see the reply here by email and in the app under \"My conversations\".")}</p>
+    <div style="padding:16px 18px;border:1px solid ${CARD_BORDER};border-radius:8px;margin:14px 0;background:${INNER_BOX};color:${TEXT_HI};font-size:15px;line-height:1.6">${msgHtml}</div>
+    <a href="${convLink}" style="${S.btnGreen};margin-top:6px">${t("Otvoriť konverzáciu", "Open the conversation")} →</a>`;
+  return shell({
+    title: t("Máme tvoju správu", "We received your message"),
+    preheader: t("Ďakujeme — ozveme sa ti čoskoro.", "Thanks — we'll get back to you soon."),
+    inner,
+    footer: t("Residata · potvrdenie prijatia tvojej správy", "Residata · confirmation we received your message"),
   });
 }
 

@@ -1040,9 +1040,12 @@ function PlatformBilling({ lang, setCurrent }) {
             <button type="button" onClick={handleSubscribe} disabled={payBusy} className="btn-p" style={{ fontSize: "0.9rem" }}>
               {payBusy ? "…" : (lang === "sk" ? "Predplatiť · €49.99 / mesiac" : "Subscribe · €49.99 / month")}
             </button>
-            <a href="mailto:residata@proton.me?subject=Question%20about%20Residata" className="btn-s" style={{ fontSize: "0.82rem" }}>
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent("residata:open-feedback", { detail: { category: "question" } }))}
+              className="btn-s" style={{ fontSize: "0.82rem", cursor: "pointer" }}>
               {lang === "sk" ? "Mám otázku" : "I have a question"}
-            </a>
+            </button>
           </div>
           {payErr && (
             <div style={{ marginTop: "0.6rem", fontSize: "0.82rem", color: "#ff6b6b", fontFamily: mono }}>{payErr}</div>
@@ -1092,7 +1095,7 @@ function PlatformBilling({ lang, setCurrent }) {
             <button type="button" onClick={handleSubscribe} disabled={payBusy} className="btn-p" style={{ fontSize: "0.88rem" }}>
               {payBusy ? "…" : (lang === "sk" ? "Obnoviť predplatné · €49.99 / mes." : "Resubscribe · €49.99 / mo")}
             </button>
-            <a href="mailto:residata@proton.me?subject=Resubscribe" className="btn-s" style={{ fontSize: "0.8rem" }}>✉️ {lang === "sk" ? "Napíš nám" : "Contact us"}</a>
+            <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("residata:open-feedback", { detail: { category: "question" } }))} className="btn-s" style={{ fontSize: "0.8rem", cursor: "pointer" }}>{lang === "sk" ? "Napíš nám" : "Contact us"}</button>
           </div>
           {payErr && (
             <div style={{ marginTop: "0.6rem", fontSize: "0.82rem", color: "#ff6b6b", fontFamily: mono }}>{payErr}</div>
