@@ -12,14 +12,21 @@
 // caller can prompt re-login instead of showing a dead button.
 
 import { getFreshAccessToken } from "./sessionGuard";
+import { forceTokenRefresh } from "./authToken";
+
+const authHeaders = (token) => ({ "Content-Type": "application/json", Authorization: `Bearer ${token}` });
 
 async function postAuthed(path) {
-  const token = await getFreshAccessToken(); // throws SESSION_EXPIRED if dead
-  const r = await fetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    body: "{}",
-  });
+  let token = await getFreshAccessToken(); // non-blocking; throws SESSION_EXPIRED only if no session
+  let r = await fetch(path, { method: "POST", headers: authHeaders(token), body: "{}" });
+  // Stale-token recovery: the non-blocking token store can hand back a token
+  // that just crossed expiry (its bounded refresh raced out). One forced refresh
+  // + single retry — the same "stale → 401 → refresh → retry" contract the
+  // RLS-gated read layer uses — instead of surfacing a false "session expired".
+  if (r.status === 401) {
+    token = await forceTokenRefresh();
+    if (token) r = await fetch(path, { method: "POST", headers: authHeaders(token), body: "{}" });
+  }
   const data = await r.json().catch(() => ({}));
   if (!r.ok || !data?.url) {
     const e = new Error(data?.error || `HTTP ${r.status}`);

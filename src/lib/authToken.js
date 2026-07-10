@@ -153,6 +153,19 @@ export async function getDataAccessToken() {
   return _accessToken || null;
 }
 
+/**
+ * Force a bounded token refresh regardless of the current expiry, then return
+ * the (hopefully fresh) token. For privileged API callers (trial / pay / admin)
+ * to recover from a 401 with ONE retry — the same "stale token → 401 → refresh →
+ * retry" contract the RLS-gated read layer already uses. Bounded + deduped +
+ * always-resolves, exactly like every other path here: never the auth lock,
+ * never a hang. Returns null only if the session is genuinely gone.
+ */
+export async function forceTokenRefresh() {
+  await _boundedRefresh();
+  return _accessToken || null;
+}
+
 /** Test/diagnostic peek at the current token state (not used in the render path). */
 export function _debugTokenState() {
   return { hasToken: !!_accessToken, expiresAt: _expiresAt };

@@ -15,6 +15,7 @@
 // completed (the "30s sign-up → 7-day trial" promise).
 
 import { getFreshAccessToken } from "./sessionGuard";
+import { forceTokenRefresh } from "./authToken";
 
 // localStorage flag — set when an anon visitor clicks a trial CTA, read +
 // cleared right after profile completion to auto-start the trial.
@@ -50,12 +51,16 @@ export function clearTrialIntent() {
  * so callers can show a clean "sign in again" / "try again" message.
  */
 export async function activateTrial() {
-  const token = await getFreshAccessToken(); // throws SESSION_EXPIRED if dead
-  const r = await fetch("/api/trial/start", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    body: "{}",
-  });
+  const headers = (t) => ({ "Content-Type": "application/json", Authorization: `Bearer ${t}` });
+  let token = await getFreshAccessToken(); // non-blocking; throws SESSION_EXPIRED only if no session
+  let r = await fetch("/api/trial/start", { method: "POST", headers: headers(token), body: "{}" });
+  // Stale-token recovery: one forced refresh + single retry on a 401 (the token
+  // store may hand back a just-expired token) — same contract as the read layer,
+  // so a slightly-stale token doesn't surface as a false "session expired".
+  if (r.status === 401) {
+    token = await forceTokenRefresh();
+    if (token) r = await fetch("/api/trial/start", { method: "POST", headers: headers(token), body: "{}" });
+  }
   const data = await r.json().catch(() => ({}));
   if (r.ok) return { ok: true, data };
   // 409 = already used / already paid — a normal "can't start" state, not an

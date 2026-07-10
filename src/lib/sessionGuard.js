@@ -1,73 +1,51 @@
 // src/lib/sessionGuard.js
 //
 // One place to make privileged actions (admin tier/subscription writes, the
-// trial endpoints) robust against a STALE browser session.
+// trial + pay endpoints) robust against a STALE browser session.
 //
 // WHY THIS EXISTS — the real-world failure behind "the subscription system
 // doesn't work":
-//   Magic-link access tokens live ~1 hour. When an admin tab has been open
-//   longer, the access token is expired. supabase-js normally auto-refreshes,
-//   but if the refresh token is also stale/used the request goes out with a
-//   dead token and the backend answers with a raw
-//   "permission denied for table user_profiles" (client PATCH) or a 401
-//   "authentication required" (the /api endpoints). To a non-technical admin
-//   that just reads as "I clicked and nothing happened / it's broken".
+//   Magic-link access tokens live ~1 hour. When a tab has been open longer, the
+//   access token drifts into the refresh window. The backend then answers a dead
+//   token with a raw "permission denied" (client PATCH) or a 401 (the /api
+//   endpoints) — to a user that just reads as "I clicked and nothing happened".
 //
-//   getFreshAccessToken() forces a refresh when the token is missing or about
-//   to expire and throws a tagged SESSION_EXPIRED error if the session can't be
-//   revived — so callers (a) never send a dead token to the server, and
-//   (b) can show a clean "sign in again" message instead of a raw JWT/RLS error.
+// ── WHY IT NO LONGER USES supabase.auth.getSession()/refreshSession() ──────────
+//   The ORIGINAL implementation called getSession()/refreshSession() directly.
+//   Both serialise behind the single in-tab auth lock and kick a NETWORK token
+//   refresh; when the token had drifted into the refresh window (classically:
+//   the user was on the Map, which runs on the anon client, so the authed token
+//   aged unnoticed), that refresh could stall — and the caller's `await` never
+//   returned. For the Stripe "pay" flow that meant the popup opened about:blank
+//   and hung there; only a reload (fresh token) sometimes cleared it. This is
+//   the SAME hang authToken.js already cured for every RLS-gated data read by
+//   moving them off getSession() onto a non-blocking in-memory token store.
+//
+//   getFreshAccessToken() now delegates to that SAME store (getDataAccessToken):
+//   in-memory token + localStorage seed + a BOUNDED proactive refresh that
+//   always settles (never the auth lock, never an unbounded wait). So privileged
+//   actions can no longer hang on auth, by construction — not a timeout band-aid.
+//   For the rare case where the bounded refresh returned a still-stale token,
+//   the API callers do one forceTokenRefresh()+retry on a 401 (see billing.js /
+//   trial.js) — the same "stale → 401 → refresh → retry" contract the read layer
+//   uses. Throws SESSION_EXPIRED only when there is genuinely no session.
 
-import { supabase } from "./supabase";
-
-const REFRESH_SKEW_S = 60; // refresh if the token expires within this window
+import { getDataAccessToken } from "./authToken";
 
 /**
- * Return a guaranteed-fresh access token, refreshing the session first if the
- * current token is missing or about to expire. Also primes the in-memory
- * supabase client so any FOLLOW-UP `supabase.from(...)` call uses the fresh
- * token. Throws an Error with code 'SESSION_EXPIRED' if the session is dead.
+ * Return an access token WITHOUT ever hanging. Sourced from the non-blocking
+ * token store (getDataAccessToken) — in-memory + localStorage seed + bounded
+ * refresh — never supabase.auth.getSession()/the auth lock. Throws an Error with
+ * code 'SESSION_EXPIRED' when there is no session at all.
  */
 export async function getFreshAccessToken() {
-  const now = () => Math.floor(Date.now() / 1000);
-  const readSession = async () => {
-    try { const { data } = await supabase.auth.getSession(); return data?.session || null; }
-    catch { return null; }
-  };
-  const fresh = (s) =>
-    s?.access_token &&
-    !(typeof s.expires_at === "number" && s.expires_at - now() <= REFRESH_SKEW_S);
-  const notExpired = (s) =>
-    s?.access_token &&
-    !(typeof s.expires_at === "number" && s.expires_at <= now());
-
-  let session = await readSession();
-  if (fresh(session)) return session.access_token;
-
-  // Token missing or about to expire → force a refresh.
-  let refreshErr = null;
-  try {
-    const { data, error } = await supabase.auth.refreshSession();
-    refreshErr = error || null;
-    if (data?.session?.access_token) return data.session.access_token;
-  } catch (e) {
-    refreshErr = e;
+  const token = await getDataAccessToken();
+  if (!token) {
+    const e = new Error("SESSION_EXPIRED");
+    e.code = "SESSION_EXPIRED";
+    throw e;
   }
-
-  // Refresh FAILED — but this is usually a benign refresh-token-ROTATION race,
-  // not a dead session: supabase-js's background autoRefresh (or another tab)
-  // already spent the refresh token and stored a fresh session, so OUR explicit
-  // refresh answers "refresh token already used". That's exactly the "first
-  // click fails, reload fixes it" bug — the reload just re-read the freshly
-  // stored session. So re-read once before declaring the login dead; accept any
-  // token that isn't already expired.
-  session = await readSession();
-  if (notExpired(session)) return session.access_token;
-
-  const e = new Error("SESSION_EXPIRED");
-  e.code = "SESSION_EXPIRED";
-  e.cause = refreshErr;
-  throw e;
+  return token;
 }
 
 /** True for any error that means "your login is no longer valid". */
