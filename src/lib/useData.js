@@ -791,9 +791,11 @@ export function useProjects(limit) {
   useEffect(() => {
     if (!isSupabaseReady()) { setLoading(false); return; }
     let cancelled = false;
-    // Signal the transition: a country/tier switch holds the stale array until
-    // the refetch lands, so mark loading so consumers don't treat it as final.
-    setLoading(true);
+    // Signal the transition for a REAL refetch (new country/tier/limit — no cache
+    // for this key): the hook holds the stale array until the fetch lands, so mark
+    // loading. On a cache HIT we already seeded fresh data + loading=false, so
+    // don't flip loading and cause a needless spinner flicker on cached mounts.
+    if (!cacheHit) setLoading(true);
     let q = _eqCountry(supabasePublic.from("projects_live").select("*"), country);
     if (limit) q = q.eq("is_top20", true).limit(limit);
     q.order("available_units", { ascending: false }).then(({ data, error }) => {

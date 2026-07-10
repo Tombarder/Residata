@@ -107,7 +107,7 @@ function countUnread(convs) {
 
 export default function FeedbackWidget({ lang = "sk", raised = false }) {
   const L = (sk, en) => (lang === "sk" ? sk : en);
-  const { user, profile } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
 
   const [open, setOpen] = useState(false);
   const [view, setView] = useState("form");         // form | mine | thread
@@ -130,6 +130,7 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
   const [unread, setUnread] = useState(0);               // # conversations with an unseen admin reply
   const taRef = useRef(null);
   const fileRef = useRef(null);
+  const pendingDeepLinkRef = useRef(null);   // ?feedback=<id> captured before auth resolves
 
   const accountEmail = user?.email || profile?.email || null;
   const loggedIn = !!user;
@@ -165,9 +166,11 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
     return () => window.removeEventListener("residata:open-feedback", onOpenEvent);
   }, []);
 
-  // Deep-link from the reply email: /app?feedback=<conversationId> opens that
-  // conversation straight away (…=new opens a fresh message form). The param is
-  // stripped so a reload doesn't re-trigger it.
+  // Deep-link from the reply email: /app?feedback=<conversationId>. Capture it on
+  // mount and strip the param, but DON'T open the thread yet — this is typically a
+  // cold page load (the user just clicked an email link) where auth is still
+  // hydrating, so my_conversation would run as anon and RLS would deny it. We open
+  // it in the next effect, once auth has resolved.
   useEffect(() => {
     if (typeof window === "undefined") return;
     const p = new URLSearchParams(window.location.search);
@@ -175,12 +178,25 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
     if (!fid) return;
     setOpen(true);
     if (fid === "new") setView("form");
-    else { setView("mine"); openThread(fid); }
+    else { setView("mine"); pendingDeepLinkRef.current = fid; }
     p.delete("feedback");
     const q = p.toString();
     window.history.replaceState({}, "", window.location.pathname + (q ? `?${q}` : "") + window.location.hash);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Open the captured deep-linked thread ONCE auth has settled — my_conversation
+  // is RLS-gated to the owner, so it needs the resolved session. If auth finishes
+  // with no user (link opened logged-out), drop to the form; the thread is still
+  // reachable via "My conversations" after they log in.
+  useEffect(() => {
+    const fid = pendingDeepLinkRef.current;
+    if (!fid || authLoading) return;
+    pendingDeepLinkRef.current = null;
+    if (user) openThread(fid);
+    else setView("form");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, user]);
 
   // Keep the unread badge fresh: on mount, when auth resolves, and whenever the
   // tab regains focus (that's when an admin reply most likely arrived).

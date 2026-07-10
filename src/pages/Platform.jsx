@@ -322,6 +322,8 @@ export default function PlatformShell({ page, projectId, lang = "en", setLang, s
          */
         .platform-preview-content { position: relative; }
         .platform-preview-content svg,
+        .platform-preview-content canvas,
+        .platform-preview-content .maplibregl-canvas,
         .platform-preview-content td[style*="font-family"],
         .platform-preview-content td[style*="fontFamily"],
         .platform-preview-content [data-preview-blur],
@@ -330,6 +332,10 @@ export default function PlatformShell({ page, projectId, lang = "en", setLang, s
           user-select: none;
           pointer-events: none;
         }
+        /* The map (Market Radar) is a WebGL <canvas> — blurred above. Also kill
+           pointer events on the whole map so a non-paid user can't hover for the
+           real €/m² tooltips or drag/draw to read data behind the blur. */
+        .platform-preview-content .maplibregl-map { pointer-events: none; }
         /* Interactive chrome INSIDE the blurred wrapper must stay
            usable (pivot builder drags, filter toggles). Re-assert
            pointer-events on the outer control surfaces we want to
