@@ -38,17 +38,18 @@ async function postAuthed(path) {
 
 // Start a subscription. On success the browser leaves for Stripe's Checkout;
 // this function does not return in the happy path.
-// Opens Stripe in a NEW tab so residata.eu stays open behind it. The blank tab
-// is opened synchronously inside the click handler (before any await) so the
+// Opens Stripe in a NEW tab so residata.eu stays open behind it. The tab is
+// opened synchronously inside the click handler (before any await) so the
 // browser's popup blocker allows it; we point it at Stripe once the session URL
 // is ready. If the popup was blocked, we fall back to same-tab navigation.
 async function openStripe(path) {
-  // Open a blank tab synchronously in the click handler so the popup blocker
-  // allows it, then point it at Stripe once we have the URL. IMPORTANT: do NOT
-  // document.write into the popup — that leaves its document in a loading state
-  // that swallows the later navigation (the bug that left the tab stuck on a
-  // blank "Opening…" page). Just set location.href.
-  const win = window.open("about:blank", "_blank");
+  // Open the new tab onto our OWN branded "Opening secure checkout…" page (not
+  // about:blank) so the user never sees a raw blank tab during the ~1s it takes
+  // the server to create the checkout session. It's a fully-loaded static page,
+  // so setting win.location.href navigates cleanly to Stripe — unlike
+  // document.write, which left the doc mid-load and swallowed the navigation
+  // (the old stuck-blank bug). Popup blocked → fall back to same-tab.
+  const win = window.open("/checkout-redirect.html", "_blank");
   let url;
   try {
     url = await postAuthed(path);
