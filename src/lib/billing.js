@@ -31,13 +31,28 @@ async function postAuthed(path) {
 
 // Start a subscription. On success the browser leaves for Stripe's Checkout;
 // this function does not return in the happy path.
+// Opens Stripe in a NEW tab so residata.eu stays open behind it. The blank tab
+// is opened synchronously inside the click handler (before any await) so the
+// browser's popup blocker allows it; we point it at Stripe once the session URL
+// is ready. If the popup was blocked, we fall back to same-tab navigation.
+async function openStripe(path) {
+  const win = window.open("", "_blank");
+  if (win) { try { win.document.write("<p style='font-family:sans-serif;padding:2rem;color:#555'>Opening secure Stripe checkout…</p>"); } catch (_) {} }
+  try {
+    const url = await postAuthed(path);
+    if (win && !win.closed) win.location.assign(url);
+    else window.location.assign(url);
+  } catch (e) {
+    if (win && !win.closed) win.close();
+    throw e;
+  }
+}
+
 export async function startCheckout() {
-  const url = await postAuthed("/api/stripe?action=checkout");
-  window.location.assign(url);
+  await openStripe("/api/stripe?action=checkout");
 }
 
 // Open the self-serve billing portal (manage card / cancel / invoices).
 export async function openBillingPortal() {
-  const url = await postAuthed("/api/stripe?action=portal");
-  window.location.assign(url);
+  await openStripe("/api/stripe?action=portal");
 }

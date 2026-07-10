@@ -13,7 +13,7 @@
 // webhook needs the raw bytes for signature verification; checkout/portal don't
 // read the body at all.
 
-import { getStripe, getSupabaseAdmin, getUserFromRequest, ensureCustomer, requestOrigin } from "./_lib/stripe.js";
+import { getStripe, getSupabaseAdmin, getUserFromRequest, requestOrigin } from "./_lib/stripe.js";
 import { isTrustedRequest } from "./_lib/origin.js";
 
 export const config = { api: { bodyParser: false } };
@@ -38,12 +38,10 @@ async function handleCheckout(req, res) {
   if (error) return res.status(status).json({ error });
 
   const stripe = getStripe();
-  const customerId = await ensureCustomer(stripe, admin, user, profile);
   const origin = requestOrigin(req);
 
-  const session = await stripe.checkout.sessions.create({
+  const params = {
     mode: "subscription",
-    customer: customerId,
     line_items: [{ price: priceId, quantity: 1 }],
     client_reference_id: user.id,
     subscription_data: { metadata: { supabase_user_id: user.id } },
@@ -52,7 +50,14 @@ async function handleCheckout(req, res) {
     automatic_tax: { enabled: false },
     success_url: `${origin}/app?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/app?checkout=cancelled`,
-  });
+  };
+  // Returning subscriber → reuse their Stripe customer. New user → let Checkout
+  // create the customer from their email (skips a separate customers.create call
+  // = one less round-trip = faster). The webhook stores the customer id afterward.
+  if (profile?.stripe_customer_id) params.customer = profile.stripe_customer_id;
+  else if (user.email) params.customer_email = user.email;
+
+  const session = await stripe.checkout.sessions.create(params);
   return res.status(200).json({ url: session.url });
 }
 

@@ -882,24 +882,26 @@ function PlatformBilling({ lang, setCurrent }) {
   async function handleSubscribe() {
     setPayBusy(true); setPayErr("");
     try {
-      await startCheckout(); // redirects to Stripe on success
+      await startCheckout(); // opens Stripe in a new tab
     } catch (e) {
-      setPayBusy(false);
       setPayErr(e?.message === "SESSION_EXPIRED"
         ? (lang === "sk" ? "Relácia vypršala — prihlás sa znova." : "Session expired — please sign in again.")
         : (lang === "sk" ? "Nepodarilo sa spustiť platbu. Skús znova." : "Couldn't start checkout. Please try again."));
+    } finally {
+      setPayBusy(false);
     }
   }
 
   async function handleManage() {
     setPayBusy(true); setPayErr("");
     try {
-      await openBillingPortal(); // redirects to Stripe portal on success
+      await openBillingPortal(); // opens Stripe portal in a new tab
     } catch (e) {
-      setPayBusy(false);
       setPayErr(e?.status === 400
         ? (lang === "sk" ? "Online správa nie je dostupná pre tento účet — napíš nám na residata@proton.me." : "Online management isn't available for this account — email residata@proton.me.")
         : (lang === "sk" ? "Nepodarilo sa otvoriť správu predplatného." : "Couldn't open billing management."));
+    } finally {
+      setPayBusy(false);
     }
   }
 
