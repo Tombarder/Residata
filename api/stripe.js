@@ -19,6 +19,11 @@ import { isTrustedRequest } from "./_lib/origin.js";
 export const config = { api: { bodyParser: false } };
 export const maxDuration = 15;
 
+// €49.99 / month. THE single place the price lives — change this number and
+// deploy. Checkout defines the price inline (price_data below), so there is NO
+// Stripe Price object, NO STRIPE_PRICE_ID env var, and nothing to set up by hand.
+const MONTHLY_PRICE_CENTS = 4999;
+
 async function readRawBody(req) {
   const chunks = [];
   for await (const chunk of req) {
@@ -30,9 +35,6 @@ async function readRawBody(req) {
 // ─── checkout ────────────────────────────────────────────────────────────
 async function handleCheckout(req, res) {
   if (!isTrustedRequest(req)) return res.status(403).json({ error: "untrusted origin" });
-  const priceId = process.env.STRIPE_PRICE_ID;
-  if (!priceId) return res.status(500).json({ error: "server misconfigured (no STRIPE_PRICE_ID)" });
-
   const admin = getSupabaseAdmin();
   const { user, profile, error, status } = await getUserFromRequest(req, admin);
   if (error) return res.status(status).json({ error });
@@ -42,7 +44,15 @@ async function handleCheckout(req, res) {
 
   const params = {
     mode: "subscription",
-    line_items: [{ price: priceId, quantity: 1 }],
+    line_items: [{
+      quantity: 1,
+      price_data: {
+        currency: "eur",
+        product_data: { name: "Residata — Full access" },
+        unit_amount: MONTHLY_PRICE_CENTS,
+        recurring: { interval: "month" },
+      },
+    }],
     client_reference_id: user.id,
     subscription_data: { metadata: { supabase_user_id: user.id } },
     allow_promotion_codes: true,
