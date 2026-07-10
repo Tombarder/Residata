@@ -73,7 +73,22 @@ async function handleCheckout(req, res) {
   if (profile?.stripe_customer_id) params.customer = profile.stripe_customer_id;
   else if (user.email) params.customer_email = user.email;
 
-  const session = await stripe.checkout.sessions.create(params);
+  let session;
+  try {
+    session = await stripe.checkout.sessions.create(params);
+  } catch (e) {
+    // adaptive_pricing is only recognised on recent Stripe API versions. If this
+    // account's version rejects it, DON'T fail checkout — retry once without the
+    // EUR pin (currency then follows Stripe's default). Logged so the fallback is
+    // visible if it ever triggers. Any other error is real → rethrow.
+    if (e?.param === "adaptive_pricing" || /adaptive_pricing/i.test(String(e?.message || ""))) {
+      console.warn("[stripe] adaptive_pricing rejected by API version — retrying without EUR pin");
+      const retry = { ...params }; delete retry.adaptive_pricing;
+      session = await stripe.checkout.sessions.create(retry);
+    } else {
+      throw e;
+    }
+  }
   return res.status(200).json({ url: session.url });
 }
 

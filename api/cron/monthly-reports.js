@@ -34,7 +34,7 @@ export default async function handler(req, res) {
   //    if they aren't in the Vercel env) ──
   const SUPABASE_URL        = process.env.SUPABASE_URL;
   const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY;
-  const WEB_URL             = process.env.WEB_URL || "https://residata-gamma.vercel.app";
+  const WEB_URL             = process.env.WEB_URL || "https://residata.eu";
   if (!SUPABASE_URL || !SUPABASE_SECRET_KEY) {
     return res.status(500).json({ error: "SUPABASE envs missing" });
   }

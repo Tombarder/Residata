@@ -143,7 +143,7 @@ async function handleInner(req, res) {
   const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "tkamhal@gmail.com";
   const GMAIL_FROM  = process.env.GMAIL_FROM  || "tkamhal@gmail.com";
   const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
-  const WEB_URL = process.env.WEB_URL || "https://residata-gamma.vercel.app";
+  const WEB_URL = process.env.WEB_URL || "https://residata.eu";
   const page_path = cleanText(body.page_path, { max: 200 }) || null;
   const page_url  = cleanText(body.page_url,  { max: MAX_SHORT_LEN }) || null;
 

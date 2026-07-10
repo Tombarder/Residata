@@ -37,7 +37,7 @@ export default async function handler(req, res) {
   const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY;
   const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
   const GMAIL_FROM = process.env.GMAIL_FROM || "tkamhal@gmail.com";
-  const WEB_URL = process.env.WEB_URL || "https://residata-gamma.vercel.app";
+  const WEB_URL = process.env.WEB_URL || "https://residata.eu";
 
   if (!SUPABASE_URL || !SUPABASE_SECRET_KEY || !GMAIL_APP_PASSWORD) {
     return res.status(500).json({ error: "server misconfigured: missing required env" });

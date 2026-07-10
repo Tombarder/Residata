@@ -99,7 +99,10 @@ function markConvSeen(id, when) {
 function countUnread(convs) {
   if (!Array.isArray(convs)) return 0;
   const seen = loadSeen();
-  return convs.filter(c => c.last_sender === "admin" && (!seen[c.id] || String(seen[c.id]) < String(c.activity_at))).length;
+  const ms = (v) => { const t = new Date(v).getTime(); return Number.isFinite(t) ? t : 0; };
+  // Numeric compare — ISO "…Z" (our seen stamp) and Postgres timestamptz
+  // "…+00:00" aren't safely string-comparable, so parse both to epoch ms.
+  return convs.filter(c => c.last_sender === "admin" && (!seen[c.id] || ms(seen[c.id]) < ms(c.activity_at))).length;
 }
 
 export default function FeedbackWidget({ lang = "sk", raised = false }) {
@@ -272,7 +275,7 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
   // ── Launcher pill ──────────────────────────────────────────────
   if (!open) {
     return (
-      <button onClick={() => setOpen(true)} aria-label={L("Nahlásiť problém alebo návrh", "Report a problem or suggestion")} className="residata-fb-pill" data-rbf-ignore
+      <button onClick={() => { setOpen(true); if (unread > 0) loadMine(); }} aria-label={L("Nahlásiť problém alebo návrh", "Report a problem or suggestion")} className="residata-fb-pill" data-rbf-ignore
         style={{ position: "fixed", right: "calc(20px + var(--safe-right))", bottom, height: 40, padding: "0 14px 0 12px", borderRadius: 20, border: `1px solid rgba(0,229,160,0.55)`, background: bg2, color: text, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "0.5rem", fontFamily: "inherit", fontSize: "0.78rem", fontWeight: 600, letterSpacing: "-0.005em", zIndex: "var(--z-pill)", animation: "rbf-glow 2.4s ease-in-out infinite" }}>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={green} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
