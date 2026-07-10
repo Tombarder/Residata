@@ -143,7 +143,7 @@ const NAV = [
     { page: "App:Dashboard", label: { en: "Dashboard",  sk: "Dashboard" }, Icon: IconHome },
     { page: "App:Projects",  label: { en: "Projects",   sk: "Projekty"  }, Icon: IconGrid },
     { page: "App:Map",       label: { en: "Map view",   sk: "Mapa"      }, Icon: IconMap },
-    { page: "App:Map2",      label: { en: "Map 2",      sk: "Mapa 2"    }, Icon: IconMap },
+    { page: "App:Map2",      label: { en: "Market Radar", sk: "Trhový radar" }, Icon: IconMap, requires: "view_analytics" },
     { page: "App:Analytics", label: { en: "Analytics",  sk: "Analytika" }, Icon: IconChart,    requires: "view_analytics" },
     { page: "App:UnitTimeline", label: { en: "Unit timeline", sk: "Byt v čase" }, Icon: IconClock, requires: "view_analytics" },
     { page: "App:Explorer", label: { en: "Unit Explorer", sk: "Prieskumník" }, Icon: IconGrid, requires: "view_analytics" },
@@ -498,7 +498,7 @@ function TopBar({ page, lang, setLang, tier }) {
     "App:Dashboard": { en: "Dashboard",       sk: "Dashboard"    },
     "App:Projects":  { en: "Projects",        sk: "Projekty"     },
     "App:Map":       { en: "Map view",        sk: "Mapa"         },
-    "App:Map2":      { en: "Map 2",           sk: "Mapa 2"       },
+    "App:Map2":      { en: "Market Radar",     sk: "Trhový radar" },
     "App:Analytics":    { en: "Analytics",     sk: "Analytika"    },
     "App:UnitTimeline": { en: "Unit timeline", sk: "Byt v čase"   },
     "App:Explorer":     { en: "Unit Explorer", sk: "Prieskumník"  },
@@ -674,7 +674,7 @@ function PageContent({ page, projectId, lang, setCurrent, openLogin }) {
   if (page === "App:Dashboard")  return <DashboardHome lang={lang} setCurrent={setCurrent} />;
   if (page === "App:Projects")   return <PlatformProjects lang={lang} setCurrent={setCurrent} openLogin={openLogin} />;
   if (page === "App:Map")        return <Suspense fallback={<div style={{ padding: "2rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.8rem" }}>{lang === "sk" ? "Načítavam mapu…" : "Loading map…"}</div>}><MapView lang={lang} setCurrent={setCurrent} /></Suspense>;
-  if (page === "App:Map2")       return <Suspense fallback={<div style={{ padding: "2rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.8rem" }}>{lang === "sk" ? "Načítavam mapu…" : "Loading map…"}</div>}><MapView2 lang={lang} setCurrent={setCurrent} /></Suspense>;
+  if (page === "App:Map2")       return <Gated require="view_analytics" copyKey="market_radar" lang={lang} setCurrent={setCurrent}><Suspense fallback={<div style={{ padding: "2rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.8rem" }}>{lang === "sk" ? "Načítavam mapu…" : "Loading map…"}</div>}><MapView2 lang={lang} setCurrent={setCurrent} /></Suspense></Gated>;
   if (page === "App:Analytics")  return <Gated require="view_analytics"       lang={lang} setCurrent={setCurrent}><LiveAnalytics lang={lang} setCurrent={setCurrent} openLogin={openLogin} /></Gated>;
   if (page === "App:UnitTimeline") return <Gated require="view_analytics"     lang={lang} setCurrent={setCurrent}><UnitTracker lang={lang} setCurrent={setCurrent} /></Gated>;
   if (page === "App:Explorer")   return <Gated require="view_analytics"       lang={lang} setCurrent={setCurrent}><UnitExplorer lang={lang} setCurrent={setCurrent} /></Gated>;
@@ -711,12 +711,16 @@ function PageContent({ page, projectId, lang, setCurrent, openLogin }) {
 // leak of paid-tier rows because the client simply doesn't receive
 // them. Pointer-events:none on the blurred layer stops accidental
 // clicks; `inert` hides it from keyboard tab-order and screen readers.
-function Gated({ require, children, lang, setCurrent }) {
+// `require` is the real capability that unlocks the section. `copyKey` (optional)
+// overrides ONLY which UpgradeOverlay copy shows — so a section can gate on an
+// existing capability (e.g. view_analytics) yet still show its own feature-
+// specific hook (e.g. the Market Radar map) instead of the generic analytics copy.
+function Gated({ require, copyKey, children, lang, setCurrent }) {
   const { can, tier } = useCapabilities();
   if (can(require)) return children;
   return (
     <div className="platform-preview-root">
-      <UpgradeOverlay lang={lang} requiredFor={require} currentTier={tier} setCurrent={setCurrent} />
+      <UpgradeOverlay lang={lang} requiredFor={copyKey || require} currentTier={tier} setCurrent={setCurrent} />
       <div
         className="platform-preview-content"
         aria-label={lang === "sk" ? "Ukážka — dáta sú rozmazané, upgrade-ni pre prístup" : "Preview — data is blurred, upgrade to access"}
@@ -742,6 +746,12 @@ function UpgradeOverlay({ lang, requiredFor, currentTier, setCurrent }) {
       sub:    lang === "sk"
         ? "Toto je ukážka paid sekcie. Pivot cez všetky byty, rebríčky okresov a developerov, rýchlosť predaja za posledný mesiac — odomkni reálne čísla upgradom."
         : "This is a preview of the paid section. Pivot across every unit, district & developer leaderboards, 30-day sales velocity — upgrade to see the real numbers.",
+    },
+    market_radar: {
+      title:  lang === "sk" ? "Market Radar — analytická mapa" : "Market Radar — analytics map",
+      sub:    lang === "sk"
+        ? "Toto je ukážka. Nakresli si vlastnú oblasť či koridor, tepelná mapa cien a rýchlosti predaja, konkurenčný set projektov v zábere, €/m² a dostupnosť naživo — reálne dáta odomkneš upgradom (alebo 7-dňovým trialom)."
+        : "This is a preview. Draw your own area or corridor, heatmap of price & sell-through, the competitive set of projects in view, live €/m² and availability — unlock the real data with an upgrade (or the 7-day trial).",
     },
     view_monthly_reports: {
       title:  lang === "sk" ? "Mesačné reporty" : "Monthly reports",
