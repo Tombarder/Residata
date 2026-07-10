@@ -144,7 +144,7 @@ function showProjectPopup(map, lngLat, props, handlers, popupRef) {
 }
 
 export default function MapView2({ lang = "en", setCurrent }) {
-  const { projects, loading } = useProjects();
+  const { projects, loading, dataCountry } = useProjects();
   const { country } = useCountry();
   const sk = lang === "sk";
 
@@ -578,8 +578,11 @@ export default function MapView2({ lang = "en", setCurrent }) {
     if (!map || !readyRef.current) return;
     const src = map.getSource("projects");
     if (src) src.setData(fc);
-    if (fc.features.length && fitKeyRef.current !== country) { fitToData(map, fc, fitKeyRef.current !== null); fitKeyRef.current = country; }
-  }, [fc, country]);
+    // Only auto-fit once the data belongs to the selected country — during a
+    // switch useProjects briefly returns the previous country's array, and
+    // fitting to that then latching fitKeyRef made SK zoom to CZ and vice-versa.
+    if (fc.features.length && dataCountry === country && fitKeyRef.current !== country) { fitToData(map, fc, fitKeyRef.current !== null); fitKeyRef.current = country; }
+  }, [fc, country, dataCountry]);
 
   // ── Heat vs dots ── show the heatmap and fade the dots (still clickable) ──
   useEffect(() => {

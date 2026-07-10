@@ -782,9 +782,18 @@ export function useProjects(limit) {
   const cacheHit = _projectsCacheKey === key;
   const [projects, setProjects] = useState(cacheHit ? (_projectsCache || []) : []);
   const [loading, setLoading] = useState(!cacheHit);
+  // The country the CURRENT `projects` array actually belongs to. On an async
+  // country switch this hook keeps returning the previous country's array until
+  // the new fetch resolves; `dataCountry` lets consumers (e.g. the maps'
+  // auto-fit) tell "settled data for the selected country" from "stale data
+  // from the country we just left". Null until the first fetch lands.
+  const [dataCountry, setDataCountry] = useState(cacheHit ? country : null);
   useEffect(() => {
     if (!isSupabaseReady()) { setLoading(false); return; }
     let cancelled = false;
+    // Signal the transition: a country/tier switch holds the stale array until
+    // the refetch lands, so mark loading so consumers don't treat it as final.
+    setLoading(true);
     let q = _eqCountry(supabasePublic.from("projects_live").select("*"), country);
     if (limit) q = q.eq("is_top20", true).limit(limit);
     q.order("available_units", { ascending: false }).then(({ data, error }) => {
@@ -798,11 +807,12 @@ export function useProjects(limit) {
       _projectsCache = arr;
       _projectsCacheKey = key;
       setProjects(arr);
+      setDataCountry(country);   // this array is now for `country`
       setLoading(false);
     });
     return () => { cancelled = true; };
   }, [limit, key]);
-  return { projects, loading };
+  return { projects, loading, dataCountry };
 }
 
 // PERF Step 6: a narrow projects read for the public HOMEPAGE only (MarketPulse).

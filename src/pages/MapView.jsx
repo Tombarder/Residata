@@ -110,7 +110,7 @@ function showProjectPopup(map, lngLat, props, lang, onOpen, popupRef) {
 }
 
 export default function MapView({ lang = "en", setCurrent }) {
-  const { projects, loading } = useProjects();
+  const { projects, loading, dataCountry } = useProjects();
   const { country } = useCountry();
   const sk = lang === "sk";
 
@@ -374,13 +374,16 @@ export default function MapView({ lang = "en", setCurrent }) {
     if (!map || !readyRef.current) return;
     const src = map.getSource("projects");
     if (src) src.setData(fc);
-    // Fit when we actually have points AND haven't yet fitted for this country.
-    // Covers the common race where the map loads before the data arrives.
-    if (fc.features.length && fitKeyRef.current !== country) {
+    // Fit when we have points AND haven't yet fitted for this country — but ONLY
+    // once the data actually belongs to the selected country. During a country
+    // switch useProjects briefly still returns the PREVIOUS country's array;
+    // fitting to that (then latching fitKeyRef) is exactly what made SK zoom to
+    // CZ and vice-versa. Gate on dataCountry === country so we fit to settled data.
+    if (fc.features.length && dataCountry === country && fitKeyRef.current !== country) {
       fitToData(map, fc, fitKeyRef.current !== null);
       fitKeyRef.current = country;
     }
-  }, [fc, country]);
+  }, [fc, country, dataCountry]);
 
   // ── Re-fit to the result set when a NON-search filter narrows it ──
   // (Search typing only filters the pins + offers suggestions; selecting a
