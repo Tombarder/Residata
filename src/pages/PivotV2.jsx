@@ -4226,6 +4226,14 @@ function makeTicks(min, max, targetCount = 4) {
    Closes on Esc / outside click.                                   */
 function FilterPopover({ fieldKey, filter, anchorEl, records, distinctOverride = null, statsOverride = null, loading = false, fellBack = false, otherFilterCount = 0, onChange, onClear, onClose, lang }) {
   const field = FIELDS[fieldKey];
+  // Money range filters are stored + compared in EUR (analytics engine + records
+  // both use price_s_dph_eur), and report_field_stats now returns EUR bounds. But
+  // the input the user SEES/types follows the currency toggle. So convert at the
+  // edges only: EUR→display for hints/inputs, display→EUR on apply. Non-money
+  // fields (area/rooms/floor) pass through unchanged.
+  const isMoney = isMoneyUnit(field?.unit);
+  const eurToDisp = (v) => (isMoney && Number.isFinite(Number(v))) ? moneyFromEur(Number(v)) : v;
+  const dispToEur = (v) => { if (!isMoney || !Number.isFinite(Number(v))) return v; const rate = moneyFromEur(1) || 1; return Number(v) / rate; };
   const computed = useMemo(
     () => distinctValuesForField(records, fieldKey),
     [records, fieldKey]
@@ -4251,8 +4259,9 @@ function FilterPopover({ fieldKey, filter, anchorEl, records, distinctOverride =
   const initialMode = filter?.mode || (isNumber ? "between" : "in");
   const [mode, setMode]           = useState(initialMode);
   const [selected, setSelected]   = useState(() => new Set(filter?.values || []));
-  const [minV, setMinV]           = useState(filter?.min ?? "");
-  const [maxV, setMaxV]           = useState(filter?.max ?? "");
+  const dispInit = (v) => v == null ? "" : String(isMoney ? Math.round(eurToDisp(v)) : v);
+  const [minV, setMinV]           = useState(dispInit(filter?.min));
+  const [maxV, setMaxV]           = useState(dispInit(filter?.max));
   const [inclEmpty, setInclEmpty] = useState(!!filter?.includeEmpty);
   const [search, setSearch]       = useState("");
 
@@ -4261,8 +4270,8 @@ function FilterPopover({ fieldKey, filter, anchorEl, records, distinctOverride =
   useEffect(() => {
     setMode(filter?.mode || (isNumber ? "between" : "in"));
     setSelected(new Set(filter?.values || []));
-    setMinV(filter?.min ?? "");
-    setMaxV(filter?.max ?? "");
+    setMinV(dispInit(filter?.min));
+    setMaxV(dispInit(filter?.max));
     setInclEmpty(!!filter?.includeEmpty);
     setSearch("");
   }, [fieldKey]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -4333,8 +4342,8 @@ function FilterPopover({ fieldKey, filter, anchorEl, records, distinctOverride =
     if (mode === "empty" || mode === "not_empty") {
       onChange({ mode, values: [], min: null, max: null });
     } else if (modeIsRange) {
-      const min = minV === "" ? null : Number(minV);
-      const max = maxV === "" ? null : Number(maxV);
+      const min = minV === "" ? null : dispToEur(Number(minV));
+      const max = maxV === "" ? null : dispToEur(Number(maxV));
       onChange({ mode: "between", min, max, includeEmpty: inclEmpty, values: [] });
     } else if (modeIsValueList) {
       onChange({ mode, values: Array.from(selected), min: null, max: null });
@@ -4351,6 +4360,12 @@ function FilterPopover({ fieldKey, filter, anchorEl, records, distinctOverride =
       ? n.toLocaleString("en-US").replace(/,/g, " ")
       : (Math.round(n * 100) / 100).toLocaleString("en-US").replace(/,/g, " ");
   };
+  // Money-field display helpers: convert the EUR stat/bound into the current
+  // currency for what the user sees (dispNum) and label it (fmtStat).
+  const dispNum = (v) => isMoney && Number.isFinite(Number(v)) ? Math.round(eurToDisp(v)) : v;
+  const fmtStat = (n) => isMoney && Number.isFinite(n)
+    ? `${fmt(Math.round(eurToDisp(n)))} ${displayMoneyUnit(field.unit)}`
+    : fmt(n);
 
   // Render through a portal attached to document.body so the popover
   // escapes any transform'd ancestor (.page-transition uses animation:
@@ -4430,26 +4445,26 @@ function FilterPopover({ fieldKey, filter, anchorEl, records, distinctOverride =
             <label style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
               <span style={{ fontSize: "0.75rem", color: dim }}>{lang === "sk" ? "od" : "from"}</span>
               <input type="number" value={minV} onChange={(e) => setMinV(e.target.value)}
-                placeholder={stats ? fmt(stats.min) : ""} style={inpS} />
+                placeholder={stats ? fmtStat(stats.min) : ""} style={inpS} />
             </label>
             <label style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
               <span style={{ fontSize: "0.75rem", color: dim }}>{lang === "sk" ? "do" : "to"}</span>
               <input type="number" value={maxV} onChange={(e) => setMaxV(e.target.value)}
-                placeholder={stats ? fmt(stats.max) : ""} style={inpS} />
+                placeholder={stats ? fmtStat(stats.max) : ""} style={inpS} />
             </label>
           </div>
           {stats && (
             <div style={{ marginTop: "0.5rem", display: "flex", gap: "0.3rem", flexWrap: "wrap" }}>
-              <QuickBtn onClick={() => quickRange(stats.min, stats.median)}>{lang === "sk" ? "dolná polovica" : "lower half"}</QuickBtn>
-              <QuickBtn onClick={() => quickRange(stats.median, stats.max)}>{lang === "sk" ? "horná polovica" : "upper half"}</QuickBtn>
+              <QuickBtn onClick={() => quickRange(dispNum(stats.min), dispNum(stats.median))}>{lang === "sk" ? "dolná polovica" : "lower half"}</QuickBtn>
+              <QuickBtn onClick={() => quickRange(dispNum(stats.median), dispNum(stats.max))}>{lang === "sk" ? "horná polovica" : "upper half"}</QuickBtn>
               <QuickBtn onClick={() => quickRange("", "")}>{lang === "sk" ? "vyčistiť" : "clear"}</QuickBtn>
             </div>
           )}
           {/* Stats as a muted one-liner below the inputs, no box */}
           {stats && (
             <div style={{ marginTop: "0.65rem", fontSize: "0.74rem", color: dim, lineHeight: 1.5 }}>
-              {lang === "sk" ? "V dátach od " : "In data from "}<strong style={{ color: text, fontWeight: 500 }}>{fmt(stats.min)}</strong>{lang === "sk" ? " do " : " to "}<strong style={{ color: text, fontWeight: 500 }}>{fmt(stats.max)}</strong>,
-              {lang === "sk" ? " medián " : " median "}<strong style={{ color: text, fontWeight: 500 }}>{fmt(stats.median)}</strong>.
+              {lang === "sk" ? "V dátach od " : "In data from "}<strong style={{ color: text, fontWeight: 500 }}>{fmtStat(stats.min)}</strong>{lang === "sk" ? " do " : " to "}<strong style={{ color: text, fontWeight: 500 }}>{fmtStat(stats.max)}</strong>,
+              {lang === "sk" ? " medián " : " median "}<strong style={{ color: text, fontWeight: 500 }}>{fmtStat(stats.median)}</strong>.
               {hasEmpty && <> {Math.max(0, stats.nNull != null ? stats.nNull : records.length - stats.count)} {lang === "sk" ? "záznamov bez hodnoty." : "records without a value."}</>}
             </div>
           )}
