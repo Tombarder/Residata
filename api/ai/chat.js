@@ -450,9 +450,16 @@ async function handleInner(req, res) {
   // for logged-in, by caller_ip for anon. The anon count used to live in an in-memory
   // Map (per-serverless-instance, reset on cold start) → the 1/day anon cap was
   // bypassable across Vercel instances. Reading it from the DB makes it a real cap.
+  // Calendar-day UTC window so enforcement matches the documented "resets at
+  // 00:00 UTC". The previous rolling 24h window kept a user blocked long past
+  // the promised reset (a 15:00 question still counted at 00:01) and made
+  // retry_after uncomputable. Boundary burst is separately capped by the 10/min
+  // per-IP limit above.
+  const capNow = new Date();
+  const startOfDayUtc = new Date(Date.UTC(capNow.getUTCFullYear(), capNow.getUTCMonth(), capNow.getUTCDate()));
   let dayCount = 0;
   try {
-    const sinceIso = new Date(Date.now() - DAY_MS).toISOString();
+    const sinceIso = startOfDayUtc.toISOString();
     const base = admin.from("ai_usage_log").select("id", { count: "exact", head: true }).gte("requested_at", sinceIso);
     const { count } = userId
       ? await base.eq("user_id", userId)
@@ -474,7 +481,12 @@ async function handleInner(req, res) {
       : (tier === "anon" ? `You've used your daily ${dayLimit} question as an anonymous user. Sign in (free) for ${up.daily}/day, or go paid for ${DAILY_LIMITS.paid}/day.`
         : tier === "free" ? `You've used your daily ${dayLimit} questions on the free tier. Upgrade to paid for ${DAILY_LIMITS.paid}/day.`
         : `You've used your daily ${dayLimit} questions. Contact Residata for a higher limit.`);
-    return res.status(429).json({ error: msg, tier, limit: dayLimit, upgrade_to: up.to, upgrade_action: up.action, upgrade_daily: up.daily, retry_after_sec: 3600 });
+    // Real seconds until the cap actually resets (next 00:00 UTC), not a fixed
+    // hour — so the client's "try again in N" is honest.
+    const nextMidnightUtc = new Date(Date.UTC(capNow.getUTCFullYear(), capNow.getUTCMonth(), capNow.getUTCDate() + 1));
+    const retryAfterSec = Math.max(60, Math.ceil((nextMidnightUtc.getTime() - Date.now()) / 1000));
+    res.setHeader("Retry-After", String(retryAfterSec));
+    return res.status(429).json({ error: msg, tier, limit: dayLimit, upgrade_to: up.to, upgrade_action: up.action, upgrade_daily: up.daily, retry_after_sec: retryAfterSec });
   }
 
   // ── log the user turn ──
