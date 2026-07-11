@@ -5,6 +5,8 @@
    labels, the POLIA-style field palette). */
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useCountry, isAllCountries } from "../lib/useCountry";
+import { useCurrency } from "../lib/useCurrency";
+import { moneyFromEur, moneySymbol } from "../lib/money";
 import { useUnitsInfinite, useAnalyticsRegistry, usePivotDistinct } from "../lib/useData";
 import LoadError from "../components/LoadError";
 import { supabaseData } from "../lib/supabase";
@@ -43,8 +45,8 @@ function fmtVal(key, val, fmtByKey) {
   if (val == null || val === "") return "—";
   const f = fmtByKey[key];
   const n = Number(val);
-  if (f === "eur" && Number.isFinite(n)) return "€" + Math.round(n).toLocaleString("sk-SK").replace(/,/g, " ");
-  if (f === "per_m2" && Number.isFinite(n)) return Math.round(n).toLocaleString("sk-SK").replace(/,/g, " ") + " €/m²";
+  if (f === "eur" && Number.isFinite(n)) return moneySymbol() + Math.round(moneyFromEur(n)).toLocaleString("sk-SK").replace(/,/g, " ");
+  if (f === "per_m2" && Number.isFinite(n)) return Math.round(moneyFromEur(n)).toLocaleString("sk-SK").replace(/,/g, " ") + " " + moneySymbol() + "/m²";
   if (f === "area" && Number.isFinite(n)) return n.toLocaleString("sk-SK", { maximumFractionDigits: 1 }) + " m²";
   return String(val);
 }
@@ -99,6 +101,7 @@ function XFilterRow({ row, fields, mode, lang, sel, onPatch, onRemove }) {
 export default function UnitExplorer({ lang = "sk", setCurrent }) {
   const t = (sk, en) => (lang === "sk" ? sk : en);
   const { country } = useCountry();
+  useCurrency(); // subscribe so €/€-m² cells re-render in the selected currency
   const { dimensions, measures } = useAnalyticsRegistry();
 
   // unified field list (dedup dim/measure on key); keep label + type + format

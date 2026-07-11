@@ -28,6 +28,8 @@ import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useProjects } from "../lib/useData";
 import { useCountry } from "../lib/useCountry";
+import { useCurrency } from "../lib/useCurrency";
+import { moneyFromEur, moneySymbol } from "../lib/money";
 import { supabasePublic, isSupabaseReady } from "../lib/supabase";
 
 const mono = "'JetBrains Mono', monospace";
@@ -90,7 +92,7 @@ function showProjectPopup(map, lngLat, props, lang, onOpen, popupRef) {
   const el = document.createElement("div");
   el.style.minWidth = "180px";
   const loc = [props.city, props.district].filter(Boolean).join(" · ");
-  const price = Number(props.ppm2) > 0 ? `€${Number(props.ppm2).toLocaleString("sk-SK")}/m²` : "—";
+  const price = Number(props.ppm2) > 0 ? `${moneySymbol()}${Math.round(moneyFromEur(Number(props.ppm2))).toLocaleString("sk-SK")}/m²` : "—";
   el.innerHTML =
     `<div style="font-weight:600;font-size:0.92rem;color:${textLight};margin-bottom:2px">${escapeHtml(props.name)}</div>` +
     `<div style="font-size:0.72rem;color:${dim};margin-bottom:8px">${escapeHtml(loc)}</div>` +
@@ -112,6 +114,7 @@ function showProjectPopup(map, lngLat, props, lang, onOpen, popupRef) {
 export default function MapView({ lang = "en", setCurrent }) {
   const { projects, loading, dataCountry } = useProjects();
   const { country } = useCountry();
+  useCurrency(); // subscribe so pin popups re-render in the selected currency
   const sk = lang === "sk";
 
   const [coords, setCoords] = useState(null);     // id -> {lat,lng,verified} | null while loading

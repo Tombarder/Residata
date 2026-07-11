@@ -23,6 +23,8 @@ import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useProjects } from "../lib/useData";
 import { useCountry } from "../lib/useCountry";
+import { useCurrency } from "../lib/useCurrency";
+import { moneyFromEur, moneySymbol } from "../lib/money";
 import { supabase, supabaseData, supabasePublic, isSupabaseReady } from "../lib/supabase";
 import {
   LENSES, COMPLETION, NO_DATA, ppm2Of, metricValue, completionBucket,
@@ -53,6 +55,10 @@ function persistSavedAreas(list) { try { localStorage.setItem(AREAS_KEY, JSON.st
 
 const norm = (s) => (s || "").toString().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
 const fmt = (n) => Number(Math.round(n)).toLocaleString("sk-SK");
+// Currency-aware money display — EUR value → the toggled currency + symbol. (fmt
+// stays currency-agnostic; it's also used for counts/areas which must NOT convert.)
+const mVal = (eur) => `${moneySymbol()}${fmt(moneyFromEur(eur))}`;
+const mM2  = (eur) => `${mVal(eur)}/m²`;
 const fmtK = (n) => (n >= 10000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1) + "k" : fmt(n));
 const pct = (x) => `${Math.round(x * 100)}%`;
 
@@ -108,7 +114,7 @@ const radiusToPos = (r) => Math.round(Math.sqrt(Math.max(0, (r - R_MIN) / (R_MAX
 const RADIUS_PRESETS = [1, 5, 10, 25, 50];
 
 function hoverLabel(props, lens) {
-  if (lens === "price")      return props.ppm2 > 0 ? `€${fmt(props.ppm2)}/m²` : "no price";
+  if (lens === "price")      return props.ppm2 > 0 ? mM2(props.ppm2) : "no price";
   if (lens === "supply")     return `${props.available} available`;
   if (lens === "absorption") return props.soldPct == null ? "absorption —" : `${props.soldPct}% sold`;
   if (lens === "momentum")   return props.soldLM > 0 ? `${props.soldLM} sold last mo.` : "no recent sales";
@@ -119,7 +125,7 @@ function showProjectPopup(map, lngLat, props, handlers, popupRef) {
   const el = document.createElement("div");
   el.style.minWidth = "186px";
   const loc = [props.city, props.district].filter(Boolean).join(" · ");
-  const price = props.ppm2 > 0 ? `€${fmt(props.ppm2)}/m²` : "—";
+  const price = props.ppm2 > 0 ? mM2(props.ppm2) : "—";
   const approx = props.verified ? "" : `<div style="font-size:0.64rem;color:${amber};margin-bottom:6px">◍ approximate location</div>`;
   el.innerHTML =
     `<div style="font-weight:600;font-size:0.92rem;color:${textLight};margin-bottom:2px">${escapeHtml(props.name)}</div>` +
@@ -146,6 +152,7 @@ function showProjectPopup(map, lngLat, props, handlers, popupRef) {
 export default function MapView2({ lang = "en", setCurrent }) {
   const { projects, loading, dataCountry } = useProjects();
   const { country } = useCountry();
+  useCurrency(); // subscribe so €/m² readouts re-render in the selected currency
   const sk = lang === "sk";
 
   const [coords, setCoords] = useState(null);
@@ -933,7 +940,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: compSet && compSet.placeholderCount ? 8 : 12 }}>
                 <Stat label={sk ? "Projekty" : "Projects"} value={compSet ? compSet.inside.length : 0} />
-                <Stat label={sk ? "Medián €/m²" : "Median €/m²"} value={compSet && compSet.median ? fmt(compSet.median) : "—"} sub={compSet && compSet.priceLo ? `${fmt(compSet.priceLo)}–${fmt(compSet.priceHi)}` : ""} />
+                <Stat label={sk ? `Medián ${moneySymbol()}/m²` : `Median ${moneySymbol()}/m²`} value={compSet && compSet.median ? fmt(moneyFromEur(compSet.median)) : "—"} sub={compSet && compSet.priceLo ? `${fmt(moneyFromEur(compSet.priceLo))}–${fmt(moneyFromEur(compSet.priceHi))}` : ""} />
                 <Stat label={sk ? "Vypredanosť" : "Absorbed"} value={compSet && compSet.avgAbs != null ? compSet.avgAbs + "%" : "—"} />
                 <Stat label={sk ? "Byty" : "Units"} value={compSet ? fmtK(compSet.totalUnits) : 0} sub={compSet ? `${fmtK(compSet.availUnits)} ${sk ? "voľných" : "free"}` : ""} />
               </div>
@@ -981,7 +988,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
                   {compSet.topDevs.map((d) => (
                     <div key={d.dev} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem", color: textLight, padding: "2px 0" }}>
                       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 158 }}>{d.dev}</span>
-                      <span style={{ color: dim, fontFamily: mono }}>{d.n} · {d.ppm2 ? "€" + fmt(d.ppm2) : "—"}</span>
+                      <span style={{ color: dim, fontFamily: mono }}>{d.n} · {d.ppm2 ? mVal(d.ppm2) : "—"}</span>
                     </div>
                   ))}
 
@@ -997,7 +1004,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
                           onMouseEnter={(e) => (e.currentTarget.style.background = "#1d1d22")} onMouseLeave={(e) => (e.currentTarget.style.background = "none")}>
                           <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
                             <span style={{ color: textLight, fontSize: "0.76rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(coords && coords[p.id] && !coords[p.id].verified) ? "◍ " : ""}{p.name}</span>
-                            <span style={{ color: dim, fontFamily: mono, fontSize: "0.74rem", flexShrink: 0 }}>{ppm2Of(p) ? "€" + fmt(ppm2Of(p)) + "/m²" : "—"}</span>
+                            <span style={{ color: dim, fontFamily: mono, fontSize: "0.74rem", flexShrink: 0 }}>{ppm2Of(p) ? mM2(ppm2Of(p)) : "—"}</span>
                           </div>
                           <div style={{ display: "flex", gap: 8, fontSize: "0.62rem", color: dim, marginTop: 1 }}>
                             <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }} title={sk ? "Dokončenie (kolaudácia)" : "Completion"}><span style={{ width: 6, height: 6, borderRadius: "50%", background: COMPLETION[bucket].color, display: "inline-block", flexShrink: 0 }} />{when || (sk ? "termín ?" : "date ?")}</span>
@@ -1110,7 +1117,7 @@ function ComparePanel({ options, compareIds, setCompareIds, rows, baselineId, se
                     <button onClick={() => onRemove(p.id)} title={sk ? "Odobrať z porovnania" : "Remove from comparison"} style={{ background: "none", border: "none", color: dim, cursor: "pointer", fontSize: "0.8rem", flexShrink: 0, padding: "0 2px" }}>✕</button>
                   </div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 10px", fontSize: "0.66rem", color: dim, fontFamily: mono, marginTop: 4, paddingLeft: 27 }}>
-                    <span style={{ color: textLight }}>{ppm ? "€" + fmt(ppm) + "/m²" : "—"}{d != null ? <span style={{ color: d > 0 ? "#ff8a8a" : "#7ee0b6" }}> {d > 0 ? "+" : ""}{d}% {refLabel}</span> : ""}</span>
+                    <span style={{ color: textLight }}>{ppm ? mM2(ppm) : "—"}{d != null ? <span style={{ color: d > 0 ? "#ff8a8a" : "#7ee0b6" }}> {d > 0 ? "+" : ""}{d}% {refLabel}</span> : ""}</span>
                     <span>{abs == null ? "—" : abs + "%"} {sk ? "pred." : "sold"}</span>
                     <span>{avail}/{tot} {sk ? "voľ." : "free"}</span>
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: COMPLETION[bucket].color, display: "inline-block" }} />{when || (sk ? "termín ?" : "date ?")}</span>
