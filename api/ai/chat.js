@@ -375,17 +375,25 @@ function systemPrompt(lang, allowHistorical) {
 // ────────────────────────────────────────────────────────────────
 
 export default async function handler(req, res) {
+  // Shared reservation context: handleInner reserves a daily-cap slot up front
+  // (an ai_usage_log row) and either finalizes it (success) or releases it. If
+  // an unexpected error throws out of handleInner before finalize, release the
+  // reservation here so a crash never permanently consumes the user's quota.
+  const ctx = { admin: null, reservationId: null, finalized: false };
   try {
-    return await handleInner(req, res);
+    return await handleInner(req, res, ctx);
   } catch (e) {
     console.error("[chat] top-level crash", e);
+    if (ctx.admin && ctx.reservationId != null && !ctx.finalized) {
+      try { await ctx.admin.from("ai_usage_log").delete().eq("id", ctx.reservationId); } catch (_) {}
+    }
     // If we've already started streaming, headers are sent — just close.
     if (res.headersSent) { try { res.end(); } catch (_) {} return; }
     return res.status(500).json({ error: "internal error", detail: String(e?.message || e).slice(0, 200) });
   }
 }
 
-async function handleInner(req, res) {
+async function handleInner(req, res, ctx) {
   if (req.method !== "POST") return res.status(405).json({ error: "method not allowed" });
   if (!isTrustedOrigin(req)) return res.status(403).json({ error: "untrusted origin" });
 
@@ -400,6 +408,7 @@ async function handleInner(req, res) {
   const authHeader = req.headers.authorization || req.headers.Authorization || "";
   const token = authHeader.replace(/^Bearer\s+/i, "").trim();
   const admin = createClient(SUPABASE_URL, SUPABASE_SECRET_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
+  ctx.admin = admin;   // so the top-level catch can release a stranded reservation
 
   let userId = null;
   let tier = "anon";
@@ -457,16 +466,29 @@ async function handleInner(req, res) {
   // per-IP limit above.
   const capNow = new Date();
   const startOfDayUtc = new Date(Date.UTC(capNow.getUTCFullYear(), capNow.getUTCMonth(), capNow.getUTCDate()));
+  // ATOMIC reserve: count-under-a-per-principal-lock + conditional insert in ONE
+  // DB call (public.ai_usage_reserve). Replaces the old count-then-insert-later
+  // pattern whose multi-second gap let two concurrent requests both pass a cap.
+  // We reserve the slot NOW (an ai_usage_log row) and later either UPDATE it with
+  // token counts on success or DELETE it on failure — so a failed answer still
+  // doesn't count, but the cap can no longer be doubled under concurrency.
   let dayCount = 0;
+  let allowed = false;
   try {
-    const sinceIso = startOfDayUtc.toISOString();
-    const base = admin.from("ai_usage_log").select("id", { count: "exact", head: true }).gte("requested_at", sinceIso);
-    const { count } = userId
-      ? await base.eq("user_id", userId)
-      : await base.is("user_id", null).eq("caller_ip", ip || "");
-    dayCount = count || 0;
+    const { data: rez, error: rezErr } = await admin.rpc("ai_usage_reserve", {
+      p_user_id: userId || null,
+      p_ip: ip || null,   // stored on the row for both tiers; counting keys on user_id when logged in
+      p_limit: dayLimit,
+      p_since: startOfDayUtc.toISOString(),
+      p_endpoint: "chat",
+    });
+    if (rezErr) throw rezErr;
+    const row = Array.isArray(rez) ? rez[0] : rez;
+    allowed = !!row?.allowed;
+    dayCount = row?.day_count ?? 0;
+    if (allowed) ctx.reservationId = row?.reservation_id ?? null;
   } catch (_) { return res.status(503).json({ error: "rate limit lookup failed, try again" }); }
-  if (dayCount >= dayLimit) {
+  if (!allowed) {
     const upgrades = {
       anon: { to: "free", daily: DAILY_LIMITS.free, action: "sign_in" },
       free: { to: "paid", daily: DAILY_LIMITS.paid, action: "billing" },
@@ -565,6 +587,12 @@ async function handleInner(req, res) {
   }
   const responseTimeMs = Date.now() - startedAt;
   if (!textOut && lastError) {
+    // Answer failed → release the reserved slot so it doesn't count (unchanged
+    // leniency: a failed answer is free).
+    if (ctx.reservationId != null && !ctx.finalized) {
+      try { await admin.from("ai_usage_log").delete().eq("id", ctx.reservationId); } catch (_) {}
+      ctx.reservationId = null;
+    }
     if (wantStream) { sse({ type: "error", text: lang === "sk" ? "Chyba AI, skús to znova." : "AI error — please try again." }); return res.end(); }
     return res.status(502).json({ error: "AI upstream error", detail: lastError.slice(0, 120) });
   }
@@ -586,21 +614,31 @@ async function handleInner(req, res) {
     } catch (e) { console.warn("[chat] assistant insert threw", e?.message || e); }
   }
 
-  // ── usage/billing counter (one row per question) — durable for BOTH tiers ──
-  // (user_id for logged-in, caller_ip for anon) so the daily-cap count above is real.
-  // AWAITED before we end the response: a fire-and-forget insert here was being
-  // dropped when the serverless process froze after res.end/res.json, so the row that
-  // the next request's cap counts never landed. Awaiting it (a single INSERT) is
-  // negligible after a multi-second LLM call and makes the cap actually enforce.
+  // ── finalize the usage/billing counter (one row per question) ──
+  // The slot was already RESERVED atomically before the LLM call (ai_usage_reserve),
+  // which is what makes the daily cap race-safe. Here we just UPDATE that reserved
+  // row with the token counts. Fallback to a plain INSERT if we somehow have no
+  // reservation id, so the cap row still lands either way. Marking ctx.finalized
+  // stops the top-level catch from releasing a legitimately-counted question.
   try {
-    const { error: usageErr } = await admin.from("ai_usage_log").insert({
-      user_id: userId || null, caller_ip: ip || null, endpoint: "chat", ok: true,
-      input_tokens: usage.input_tokens, output_tokens: usage.output_tokens,
-      cache_read_input_tokens: usage.cache_read_input_tokens,
-      cache_creation_input_tokens: usage.cache_creation_input_tokens,
-    });
-    if (usageErr) console.warn("[chat] usage log failed", usageErr.message);
-  } catch (e) { console.warn("[chat] usage log threw", e?.message || e); }
+    if (ctx.reservationId != null) {
+      const { error: usageErr } = await admin.from("ai_usage_log").update({
+        input_tokens: usage.input_tokens, output_tokens: usage.output_tokens,
+        cache_read_input_tokens: usage.cache_read_input_tokens,
+        cache_creation_input_tokens: usage.cache_creation_input_tokens,
+      }).eq("id", ctx.reservationId);
+      if (usageErr) console.warn("[chat] usage finalize failed", usageErr.message);
+    } else {
+      const { error: usageErr } = await admin.from("ai_usage_log").insert({
+        user_id: userId || null, caller_ip: ip || null, endpoint: "chat", ok: true,
+        input_tokens: usage.input_tokens, output_tokens: usage.output_tokens,
+        cache_read_input_tokens: usage.cache_read_input_tokens,
+        cache_creation_input_tokens: usage.cache_creation_input_tokens,
+      });
+      if (usageErr) console.warn("[chat] usage log failed", usageErr.message);
+    }
+    ctx.finalized = true;   // the slot is legitimately consumed; don't release it
+  } catch (e) { console.warn("[chat] usage log threw", e?.message || e); ctx.finalized = true; }
 
   const result = {
     text: textOut, tier, model, log_id: assistantLogId,
