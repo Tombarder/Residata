@@ -1460,7 +1460,7 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
     () => buildPivotSpec({ dims: gDims, filters, country, isCurrent }),
     [gDims, filters, country, isCurrent]
   );
-  const { grain, loading: grainLoading } = usePivotGrain({ enabled: configServerable, spec: pivotSpec });
+  const { grain, loading: grainLoading, error: grainError } = usePivotGrain({ enabled: configServerable, spec: pivotSpec });
   // A non-server-able config needs records — pull them (sticky once needed).
   useEffect(() => {
     if (canViewAnalytics && !configServerable && !forceRaw) setForceRaw(true);
@@ -1549,6 +1549,10 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
       ? (grainLoading && (grain == null || grain.length === 0))
       : ((forceRaw || !configServerable) && loadingFlats && (realFlats?.length || 0) === 0)
   );
+  // The server pivot (analytics_pivot RPC) can fail (cold statement_timeout, RLS,
+  // bad spec). Without this the empty grain rendered as a benign "0 units" — a
+  // silent failure indistinguishable from "filters matched nothing". Surface it.
+  const grainErrored = useGrain && !!grainError && !grainLoading && (grain == null || grain.length === 0);
 
   // Records for the open drill-down. In grain mode the clicked node carries no
   // records, so resolve them from filteredRecords by matching the row-dim path
@@ -1707,10 +1711,36 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
         </div>
       )}
 
+      {/* Load error (server pivot RPC failed) — a DISTINCT state, never the
+          "0 units" empty, so a failure can't masquerade as no-data. */}
+      {!isInitialLoading && grainErrored && (
+        <div style={{
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+          padding: "4rem 1.25rem", gap: "0.9rem", minHeight: 280, textAlign: "center",
+        }}>
+          <div style={{ fontSize: "1.6rem" }}>⚠️</div>
+          <div style={{ color: text, fontWeight: 600, fontSize: "0.95rem" }}>
+            {lang === "sk" ? "Analytiku sa nepodarilo načítať" : "Couldn't load analytics"}
+          </div>
+          <div style={{ color: dim, fontSize: "0.82rem", maxWidth: 420, lineHeight: 1.5 }}>
+            {lang === "sk"
+              ? "Toto nie je prázdny výsledok — požiadavka zlyhala. Skús to znova."
+              : "This isn't an empty result — the request failed. Please try again."}
+          </div>
+          <button onClick={() => window.location.reload()} style={{
+            marginTop: "0.3rem", background: green, color: "#0a0a0c", border: "none",
+            borderRadius: 8, padding: "0.55rem 1.1rem", fontFamily: mono, fontSize: "0.8rem",
+            fontWeight: 700, cursor: "pointer",
+          }}>
+            {lang === "sk" ? "Skúsiť znova" : "Try again"}
+          </button>
+        </div>
+      )}
+
       {/* Header — record count + expand/collapse. Mesiac scope is part
           of the standard Filters zone (drag the field there, pick months
           from the popup) — no special top-bar selector. */}
-      {!isInitialLoading && (<>
+      {!isInitialLoading && !grainErrored && (<>
 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
         <span style={{ fontSize: "0.78rem", color: dim }}>

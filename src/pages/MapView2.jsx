@@ -149,6 +149,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
   const sk = lang === "sk";
 
   const [coords, setCoords] = useState(null);
+  const [coordsError, setCoordsError] = useState(false);   // project_coords load failed
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const readyRef = useRef(false);
@@ -335,15 +336,23 @@ export default function MapView2({ lang = "en", setCurrent }) {
   useEffect(() => { onAnalyzeRef.current = (p) => { setAnalysisCenter({ lng: p.lng, lat: p.lat }); setAnchorId(p.id || null); }; }, []);
 
   // ── Coordinates (public, with verified flag) ──
+  // Guard BOTH failure modes: an error result AND a rejected promise (dead
+  // socket / abort). Without the .catch a rejection left coords=null forever →
+  // permanent "Loading map…" spinner; and a failure that emptied coords was
+  // mislabeled as "zoom out for all". Track coordsError so the UI can say so.
   useEffect(() => {
     if (!isSupabaseReady() || !supabasePublic) { setCoords({}); return; }
     let cancelled = false;
     supabasePublic.from("project_coords").select("id,lat,lng,location_verified").then(({ data, error }) => {
       if (cancelled) return;
-      if (error) { console.error("[project_coords]", error); setCoords({}); return; }
+      if (error) { console.error("[project_coords]", error); setCoords({}); setCoordsError(true); return; }
       const m = {};
       (data || []).forEach((r) => { if (r.lat != null && r.lng != null) m[r.id] = { lat: Number(r.lat), lng: Number(r.lng), verified: r.location_verified }; });
-      setCoords(m);
+      setCoords(m); setCoordsError(false);
+    }, (err) => {
+      if (cancelled) return;
+      console.error("[project_coords] rejected", err?.message || err);
+      setCoords({}); setCoordsError(true);   // clear the spinner, flag the failure
     });
     return () => { cancelled = true; };
   }, []);
@@ -729,10 +738,14 @@ export default function MapView2({ lang = "en", setCurrent }) {
             {heatMode ? "◉" : "○"} {sk ? "Teplo" : "Heat"}
           </button>
           <span style={{ marginLeft: "auto", fontSize: "0.7rem", color: dim, fontFamily: mono }}>
-            <strong style={{ color: textLight }}>{marketStats.count}</strong> {sk ? "v zábere" : "in view"}
-            {marketStats.count === 0 && shown.length > 0
-              ? <span style={{ color: amber }}> · {sk ? "oddiaľ pre všetky" : "zoom out for all"}</span>
-              : <> · <span style={{ color: lensCoverage < 0.4 ? amber : dim }}>{pct(lensCoverage)} {sk ? "s dátami" : "with data"}</span></>}
+            {coordsError
+              ? <span style={{ color: amber }}>⚠ {sk ? "polohy sa nenačítali — obnov stránku" : "locations failed to load — refresh"}</span>
+              : <>
+                  <strong style={{ color: textLight }}>{marketStats.count}</strong> {sk ? "v zábere" : "in view"}
+                  {marketStats.count === 0 && shown.length > 0
+                    ? <span style={{ color: amber }}> · {sk ? "oddiaľ pre všetky" : "zoom out for all"}</span>
+                    : <> · <span style={{ color: lensCoverage < 0.4 ? amber : dim }}>{pct(lensCoverage)} {sk ? "s dátami" : "with data"}</span></>}
+                </>}
           </span>
         </div>
         <MarketInsight lens={lens} stats={marketStats} sk={sk} />
