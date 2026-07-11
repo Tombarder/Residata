@@ -689,11 +689,11 @@ function PageContent({ page, projectId, lang, setCurrent, openLogin }) {
   if (page === "App:Exports")    return <Gated require="view_exports_page"    lang={lang} setCurrent={setCurrent}><PlatformExports lang={lang} setCurrent={setCurrent} /></Gated>;
   if (page === "App:Billing")    return <PlatformBilling lang={lang} setCurrent={setCurrent} />;
   if (page === "App:Settings")   return <PlatformSettings lang={lang} />;
-  if (page === "App:Admin")      return <Gated require="manage_users" lang={lang} setCurrent={setCurrent}><LiveAdmin lang={lang} setCurrent={setCurrent} /></Gated>;
-  if (page === "App:Locations")  return <Gated require="manage_locations" lang={lang} setCurrent={setCurrent}><Suspense fallback={<div style={{ padding: "2rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.8rem" }}>{lang === "sk" ? "Načítavam…" : "Loading…"}</div>}><LocationManager lang={lang} /></Suspense></Gated>;
-  if (page === "App:DataQA")     return <Gated require="manage_data_qa" lang={lang} setCurrent={setCurrent}><Suspense fallback={<div style={{ padding: "2rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.8rem" }}>{lang === "sk" ? "Načítavam…" : "Loading…"}</div>}><DataQA lang={lang} /></Suspense></Gated>;
-  if (page === "App:Feedback")   return <Gated require="view_feedback_log" lang={lang} setCurrent={setCurrent}><Suspense fallback={<div style={{ padding: "2rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.8rem" }}>{lang === "sk" ? "Načítavam…" : "Loading…"}</div>}><FeedbackLog lang={lang} /></Suspense></Gated>;
-  if (page === "App:Texts")      return <Gated require="manage_site_content" lang={lang} setCurrent={setCurrent}><Suspense fallback={<div style={{ padding: "2rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.8rem" }}>{lang === "sk" ? "Načítavam…" : "Loading…"}</div>}><TextsEditor lang={lang} /></Suspense></Gated>;
+  if (page === "App:Admin")      return <AdminGate require="manage_users" lang={lang}><LiveAdmin lang={lang} setCurrent={setCurrent} /></AdminGate>;
+  if (page === "App:Locations")  return <AdminGate require="manage_locations" lang={lang}><Suspense fallback={<div style={{ padding: "2rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.8rem" }}>{lang === "sk" ? "Načítavam…" : "Loading…"}</div>}><LocationManager lang={lang} /></Suspense></AdminGate>;
+  if (page === "App:DataQA")     return <AdminGate require="manage_data_qa" lang={lang}><Suspense fallback={<div style={{ padding: "2rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.8rem" }}>{lang === "sk" ? "Načítavam…" : "Loading…"}</div>}><DataQA lang={lang} /></Suspense></AdminGate>;
+  if (page === "App:Feedback")   return <AdminGate require="view_feedback_log" lang={lang}><Suspense fallback={<div style={{ padding: "2rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.8rem" }}>{lang === "sk" ? "Načítavam…" : "Loading…"}</div>}><FeedbackLog lang={lang} /></Suspense></AdminGate>;
+  if (page === "App:Texts")      return <AdminGate require="manage_site_content" lang={lang}><Suspense fallback={<div style={{ padding: "2rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.8rem" }}>{lang === "sk" ? "Načítavam…" : "Loading…"}</div>}><TextsEditor lang={lang} /></Suspense></AdminGate>;
   if (typeof page === "string" && page.startsWith("App:ProjectDetail:")) {
     const id = page.slice("App:ProjectDetail:".length);
     return <LiveProjectDetail projectId={id} lang={lang} setCurrent={setCurrent} openLogin={openLogin} />;
@@ -735,6 +735,34 @@ function Gated({ require, copyKey, children, lang, setCurrent }) {
       </div>
     </div>
   );
+}
+
+// HARD authorization gate for ADMIN / staff sections — the opposite of Gated's
+// paid-upsell "blurred preview". An unauthorized user gets a plain 403 and the
+// child (LiveAdmin, DataQA, FeedbackLog, TextsEditor, LocationManager) is NEVER
+// mounted — so its data fetches never fire and its action buttons never render.
+// (Admin actions were only saved by backend RLS, but presenting a clickable,
+// screen-reader-readable admin console behind a blur + "upgrade to paid" CTA was
+// the wrong boundary.) While auth resolves we show nothing rather than flash.
+function AdminGate({ require, lang, children }) {
+  const { can, loading } = useCapabilities();
+  if (loading) {
+    return <div style={{ padding: "2rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.8rem" }}>{lang === "sk" ? "Načítavam…" : "Loading…"}</div>;
+  }
+  if (!can(require)) {
+    return (
+      <div style={{ padding: "4.5rem 2rem", textAlign: "center", color: "#8a8a96" }}>
+        <div style={{ fontSize: "2rem", marginBottom: "0.7rem" }}>🔒</div>
+        <div style={{ color: "#e8e8ed", fontWeight: 600, fontSize: "1rem", marginBottom: "0.35rem" }}>
+          {lang === "sk" ? "403 — Prístup zamietnutý" : "403 — Not authorized"}
+        </div>
+        <div style={{ fontSize: "0.85rem" }}>
+          {lang === "sk" ? "Táto sekcia je len pre administrátorov." : "This section is admin-only."}
+        </div>
+      </div>
+    );
+  }
+  return children;
 }
 
 /**
