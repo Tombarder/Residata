@@ -780,7 +780,15 @@ export default function MapView2({ lang = "en", setCurrent }) {
         {extSet && (
           <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: `${green}22`, color: green, border: `1px solid ${green}`, borderRadius: 999, padding: "4px 10px", fontSize: "0.72rem", fontWeight: 600 }}
             title={sk ? "Zobrazené len projekty vyfiltrované v analytike" : "Showing only the projects filtered in analytics"}>
-            🗺 {sk ? `Z analytiky: ${extSet.count} projektov` : `From analytics: ${extSet.count} projects`}
+            🗺 {(() => {
+              // Honest count: how many of the handed analytics projects are actually
+              // on THIS (country-scoped) map — not the full handed list (a name not in
+              // the loaded set has no pin, so counting it overstated the map).
+              const shownN = projects.filter((p) => extSet.nameSet.has(norm(p.name))).length;
+              return shownN < extSet.count
+                ? (sk ? `Z analytiky: ${shownN} z ${extSet.count} projektov` : `From analytics: ${shownN} of ${extSet.count} projects`)
+                : (sk ? `Z analytiky: ${extSet.count} projektov` : `From analytics: ${extSet.count} projects`);
+            })()}
             <span onClick={() => setExtSet(null)} style={{ cursor: "pointer", opacity: 0.8 }} title={sk ? "zrušiť" : "clear"}>✕</span>
           </span>
         )}

@@ -1149,7 +1149,7 @@ function BenchmarkCard({ local, global, scopeLabel, lang }) {
   };
   const rows = [
     { label: lang === "sk" ? `Ø ${moneySymbol()}/m² (vážené)` : `Ø ${moneySymbol()}/m² (weighted)`, local: local.wavgM2, global: global.wavgM2, delta: delta("wavgM2"), unit: `${moneySymbol()}/m²`, money: true, lowerIsGood: true },
-    { label: lang === "sk" ? "Predaných %"    : "Sold %",             local: local.soldPct, global: global.soldPct, delta: (local.soldPct || 0) - (global.soldPct || 0), unit: "%",    lowerIsGood: false, absolute: true },
+    { label: lang === "sk" ? "Predaných %"    : "Sold %",             local: local.soldPct, global: global.soldPct, delta: (local.soldPct == null || global.soldPct == null) ? null : local.soldPct - global.soldPct, unit: "%",    lowerIsGood: false, absolute: true },
     { label: lang === "sk" ? "Voľných na projekt" : "Avail / project", local: local.projectCount > 0 ? local.available / local.projectCount : 0, global: global.projectCount > 0 ? global.available / global.projectCount : 0, delta: null, unit: "", lowerIsGood: false },
   ];
   return (
@@ -2397,6 +2397,9 @@ function priceDistribution(flats, nBins) {
   lo = Math.floor(lo / 500) * 500;
   hi = Math.ceil(hi  / 500) * 500;
   const step = Math.max(500, Math.ceil((hi - lo) / nBins / 500) * 500);
+  // Single distinct value on a 500 boundary → lo === hi → the loop never runs and
+  // the whole "price distribution" section silently vanished. Guarantee ≥1 bin.
+  if (hi <= lo) hi = lo + step;
   const bins = [];
   for (let b = lo; b < hi; b += step) {
     bins.push({ from: b, to: b + step, label: `${b.toLocaleString("sk-SK")}–${(b + step).toLocaleString("sk-SK")}`, count: 0 });
