@@ -2585,15 +2585,34 @@ function exportPivotCSV(flatRows, grandTotal, rowFields, colFields, effectiveVal
   };
   // Headers follow the active UI language (fieldLabel), same as every on-screen label —
   // an EN user must not get Slovak column names in their export.
-  const valueHeader = (v) => v.key === "__count__"
-    ? "Count"
-    : `${AGG_LABEL[v.agg]}(${fieldLabel(v.field, lang)})`;
-
-  const fmt = (v) => (v == null || !Number.isFinite(v)) ? "" :
-    Number.isInteger(v) ? String(v) : String(Math.round(v * 100) / 100);
+  // Measure unit → header + currency conversion, mirroring the on-screen
+  // formatValue so the CSV matches what the user sees (currency + unit).
+  const measureUnit = (v) => v.key === "__count__" ? null : FIELDS[v.field]?.unit;
+  const valueHeader = (v) => {
+    if (v.key === "__count__") return "Count";
+    const u = measureUnit(v);
+    const unit = isMoneyUnit(u) ? ` (${displayMoneyUnit(u)})` : (u ? ` (${u})` : "");
+    return `${AGG_LABEL[v.agg]}(${fieldLabel(v.field, lang)})${unit}`;
+  };
+  const fmtMeasure = (raw, v) => {
+    if (raw == null || !Number.isFinite(raw)) return "";
+    const val = isMoneyUnit(measureUnit(v)) ? moneyFromEur(raw) : raw;
+    return Number.isInteger(val) ? String(val) : String(Math.round(val * 100) / 100);
+  };
 
   const crossTab = colFields.length > 0;
   const colKeys = crossTab ? (grandTotal.colKeys || []) : [];
+
+  // Parent-node lookup for the "% of parent" value mode (level-0 → grand total).
+  const nodeByPath = new Map();
+  for (const n of flatRows) nodeByPath.set(JSON.stringify(n.path.slice(0, n.level + 1)), n);
+  const parentOf = (n) => (n.level === 0 ? grandTotal : (nodeByPath.get(JSON.stringify(n.path.slice(0, n.level))) || grandTotal));
+  // A single value cell honoring the active valueMode (absolute / % total / % parent).
+  const cellVal = (raw, i, parentRaw) => {
+    if (valueMode === "pct_total") { const g = grandForCol(i); return raw == null || !g ? "" : `${((raw / g) * 100).toFixed(1)}%`; }
+    if (valueMode === "pct_parent") { return raw == null || !parentRaw ? "" : `${((raw / parentRaw) * 100).toFixed(1)}%`; }
+    return fmtMeasure(raw, effectiveValues[i]);
+  };
 
   // Build header
   const header = [
@@ -2615,47 +2634,37 @@ function exportPivotCSV(flatRows, grandTotal, rowFields, colFields, effectiveVal
   for (const n of flatRows) {
     const labelCols = rowFields.map((_, i) => i <= n.level ? (n.path[i] || "") : "");
     const row = [...labelCols, String(n.count)];
+    const par = parentOf(n);
     if (crossTab) {
       for (const ck of colKeys) {
         for (let i = 0; i < effectiveValues.length; i++) {
-          const raw = n.colRollups?.[ck]?.[i];
-          if (valueMode === "pct_total") {
-            const g = grandForCol(i);
-            row.push(raw == null || !g ? "" : `${((raw / g) * 100).toFixed(1)}%`);
-          } else row.push(fmt(raw));
+          row.push(cellVal(n.colRollups?.[ck]?.[i], i, par.colRollups?.[ck]?.[i]));
         }
       }
-      // Σ total columns
       for (let i = 0; i < effectiveValues.length; i++) {
-        const raw = n.rollups[i];
-        if (valueMode === "pct_total") {
-          const g = grandForCol(i);
-          row.push(raw == null || !g ? "" : `${((raw / g) * 100).toFixed(1)}%`);
-        } else row.push(fmt(raw));
+        row.push(cellVal(n.rollups[i], i, par.rollups?.[i]));
       }
     } else {
       for (let i = 0; i < effectiveValues.length; i++) {
-        const raw = n.rollups[i];
-        if (valueMode === "pct_total") {
-          const g = grandForCol(i);
-          row.push(raw == null || !g ? "" : `${((raw / g) * 100).toFixed(1)}%`);
-        } else row.push(fmt(raw));
+        row.push(cellVal(n.rollups[i], i, par.rollups?.[i]));
       }
     }
     lines.push(row.map(esc).join(","));
   }
 
   // Grand total row
+  // Grand total row is always ABSOLUTE (currency-converted) — clearest anchor
+  // regardless of the % value mode.
   const gt = ["TOTAL", ...rowFields.slice(1).map(() => ""), String(grandTotal.count)];
   if (crossTab) {
     for (const ck of colKeys) {
       for (let i = 0; i < effectiveValues.length; i++) {
-        gt.push(fmt(grandTotal.colRollups?.[ck]?.[i]));
+        gt.push(fmtMeasure(grandTotal.colRollups?.[ck]?.[i], effectiveValues[i]));
       }
     }
-    for (let i = 0; i < effectiveValues.length; i++) gt.push(fmt(grandTotal.rollups[i]));
+    for (let i = 0; i < effectiveValues.length; i++) gt.push(fmtMeasure(grandTotal.rollups[i], effectiveValues[i]));
   } else {
-    for (let i = 0; i < effectiveValues.length; i++) gt.push(fmt(grandTotal.rollups[i]));
+    for (let i = 0; i < effectiveValues.length; i++) gt.push(fmtMeasure(grandTotal.rollups[i], effectiveValues[i]));
   }
   lines.push(gt.map(esc).join(","));
 
