@@ -167,7 +167,7 @@ const NAV = [
 // ─── Platform Shell ─────────────────────────────────────────────
 export default function PlatformShell({ page, projectId, lang = "en", setLang, setCurrent, openLogin }) {
   const auth = useAuth();
-  const { can, tier } = useCapabilities();
+  const { can, displayTier } = useCapabilities();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   // If somehow anon ended up on /app/*, kick them to home + open login modal.
@@ -230,7 +230,7 @@ export default function PlatformShell({ page, projectId, lang = "en", setLang, s
         page={page}
         lang={lang}
         can={can}
-        tier={tier}
+        tier={displayTier}
         email={auth.user.email}
         onNavigate={navigate}
         onSignOut={auth.signOut}
@@ -259,7 +259,7 @@ export default function PlatformShell({ page, projectId, lang = "en", setLang, s
         minWidth: 0,
         display: "flex", flexDirection: "column",
       }} className="platform-main">
-        <TopBar page={page} lang={lang} setLang={setLang} tier={tier} />
+        <TopBar page={page} lang={lang} setLang={setLang} tier={displayTier} />
         {/* AI beta banner is no longer mounted globally — it lives only
             on AI surfaces (ChatAssistant page + FloatingChat panel) so
             it doesn't yell at users on Dashboard / Reports / Pivot

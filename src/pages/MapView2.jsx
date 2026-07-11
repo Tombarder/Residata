@@ -495,12 +495,15 @@ export default function MapView2({ lang = "en", setCurrent }) {
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
-    const hadSaved = savedView != null;
+    // Only reuse the remembered viewport if it belongs to the CURRENTLY selected
+    // country — otherwise, after switching markets while unmounted, the map opened
+    // over the previous country and the fit was skipped (all pins off-screen).
+    const hadSaved = savedView != null && savedView.country === countryRef.current;
     const map = new maplibregl.Map({ container: containerRef.current, style: MAP_STYLE, center: hadSaved ? savedView.center : FALLBACK_CENTER, zoom: hadSaved ? savedView.zoom : FALLBACK_ZOOM, attributionControl: true });
     mapRef.current = map;
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
     map.on("moveend", () => {
-      savedView = { center: map.getCenter().toArray(), zoom: map.getZoom() };
+      savedView = { center: map.getCenter().toArray(), zoom: map.getZoom(), country: countryRef.current };
       const b = map.getBounds();
       setViewBounds({ w: b.getWest(), s: b.getSouth(), e: b.getEast(), n: b.getNorth() });
     });

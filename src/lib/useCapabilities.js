@@ -160,6 +160,11 @@ export function useCapabilities() {
   return {
     can: (cap) => caps.has(cap),
     tier: effectiveTier,
+    // Badge/label tier: a 7-day-trial user is effectiveTier "paid" but ISN'T
+    // paying → show "trial", not "PAID". ONE source so the sidebar, top bar and
+    // Billing card can't disagree (they used to: two showed PAID, Billing showed
+    // TRIAL). Read this for any user-facing tier BADGE.
+    displayTier: (trialActive && !paidActive) ? "trial" : effectiveTier,
     baseTier,           // raw profile.tier — used by Billing UI
     trialActive,
     trialConsumed,
