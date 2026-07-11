@@ -983,7 +983,8 @@ function PlatformBilling({ lang, setCurrent }) {
           <TierBadgeSmall tier={trialActive && !paidActive ? "trial" : tier} />
           <span style={{ fontSize: "1.35rem", fontWeight: 700, color: textLight, letterSpacing: "-0.02em" }}>
             {isFree && (trialActive ? (lang === "sk" ? "Free (trial: paid prístup)" : "Free (trial: paid access)") : (lang === "sk" ? "Free" : "Free"))}
-            {isPaid && (lang === "sk" ? "Paid" : "Paid")}
+            {isPaid && !paidExpired && (lang === "sk" ? "Paid" : "Paid")}
+            {paidExpired && (lang === "sk" ? "Free" : "Free")}
             {isAdmin && "Admin"}
           </span>
           {trialActive && (
@@ -1001,10 +1002,10 @@ function PlatformBilling({ lang, setCurrent }) {
           {trialActive && isFree && (lang === "sk"
             ? <>Máš počas trial-u plný paid prístup (analytika, reporty, exporty). Trial končí <strong style={{ color: textLight }}>{fmtDate(trialUntil)}</strong>. Bez karty — po skončení trial-u jednoducho padneš späť na free tier, nič ti nestrhneme.</>
             : <>You have full paid access during the trial (analytics, reports, exports). Trial ends <strong style={{ color: textLight }}>{fmtDate(trialUntil)}</strong>. No card required — when the trial ends you simply drop back to free, nothing is charged.</>)}
-          {!trialActive && isFree && (lang === "sk"
+          {((!trialActive && isFree) || paidExpired) && (lang === "sk"
             ? "Ako free user vidíš zoznam všetkých projektov a plný detail 1 projektu podľa tvojho výberu. Analytika, reporty a exporty sú v paid tieri."
             : "As a free user you see the full project list and full detail of 1 project of your choice. Analytics, reports and exports are in the paid tier.")}
-          {isPaid && (lang === "sk"
+          {isPaid && !paidExpired && (lang === "sk"
             ? "Máš plný prístup — všetky projekty, historická data, analytika, exporty, mesačné reporty."
             : "You have full access — every project, historical data, analytics, exports, monthly reports.")}
           {isAdmin && (lang === "sk"

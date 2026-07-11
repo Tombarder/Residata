@@ -13,11 +13,17 @@
 // auth.users delete cascades into user_profiles via FK.
 
 import { createClient } from "@supabase/supabase-js";
+import { isTrustedRequest as isTrustedOrigin } from "../_lib/origin.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "method not allowed" });
   }
+
+  // Same origin allowlist every other privileged endpoint enforces
+  // (set-subscription / trial-grant / trial-start). This is the single
+  // irreversible admin op, so it must not be the least-gated one.
+  if (!isTrustedOrigin(req)) return res.status(403).json({ error: "untrusted origin" });
 
   const SUPABASE_URL = process.env.SUPABASE_URL;
   const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY;

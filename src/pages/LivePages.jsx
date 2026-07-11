@@ -4797,7 +4797,7 @@ function UserTable({ users, setTier, deleteUser, trialAction, subAction, selfId,
                             style={subBtnStyle(paidActive, "#4a90e2")}>
                             {paidActive ? `💳 ${paidDays}d` : "💳 +30d"}
                           </button>
-                          {paidActive && (
+                          {(paidActive || paidPaused) && (
                             <button
                               onClick={() => subAction && subAction(u, paidPaused ? { unpause: true } : { pause: true })}
                               disabled={isSelf}
