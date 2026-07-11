@@ -126,8 +126,31 @@ export function useChat({ lang = "sk" } = {}) {
   const msgsUserRef = useRef(user?.id);
   useEffect(() => {
     if (msgsUserRef.current !== user?.id) {
+      const prevId = msgsUserRef.current;
       msgsUserRef.current = user?.id;
       try {
+        // Anon → signed-in: adopt the anonymous transcript (typed in the
+        // marketing bubble BEFORE login) into the user's own history and drop
+        // the anon copy, so the conversation continues after sign-in — the
+        // promise this hook's + FloatingChat's docstrings make. Idempotent:
+        // once the anon key is removed, re-runs for the same user are no-ops.
+        if (!prevId && user?.id) {
+          const anonRaw = localStorage.getItem(storageKey(null));
+          const anonMsgs = anonRaw ? (JSON.parse(anonRaw) || []) : [];
+          if (Array.isArray(anonMsgs) && anonMsgs.length) {
+            const ownRaw = localStorage.getItem(storageKey(user.id));
+            const ownMsgs = ownRaw ? (JSON.parse(ownRaw) || []) : [];
+            const merged = [...(Array.isArray(ownMsgs) ? ownMsgs : []), ...anonMsgs].slice(-40);
+            localStorage.setItem(storageKey(user.id), JSON.stringify(merged));
+            localStorage.removeItem(storageKey(null));
+            // carry the anon session id too so the adopted turns stay grouped
+            const anonSess = localStorage.getItem(sessionKey(null));
+            if (anonSess && !localStorage.getItem(sessionKey(user.id))) {
+              localStorage.setItem(sessionKey(user.id), anonSess);
+            }
+            localStorage.removeItem(sessionKey(null));
+          }
+        }
         const raw = localStorage.getItem(storageKey(user?.id));
         setMessages(raw ? (JSON.parse(raw) || []).slice(-40) : []);
       } catch { setMessages([]); }
@@ -224,6 +247,10 @@ export function useChat({ lang = "sk" } = {}) {
           tier:          j.tier           || null,
         });
         setMessages(prev => prev.slice(0, -1));
+        // Restore the just-typed question (input was cleared at send start) so a
+        // rate-limited user doesn't lose what they wrote — they can retry once
+        // the limit resets. 403/501 are terminal states where a retry is pointless.
+        if (textOverride == null) setInput(q);
         return;
       }
       if (r.status === 403) {
@@ -251,6 +278,7 @@ export function useChat({ lang = "sk" } = {}) {
         const decoder = new TextDecoder();
         let buf = "";
         let streamErr = null;
+        let sawDone = false;
         for (;;) {
           const { done, value } = await reader.read();
           if (done) break;
@@ -264,13 +292,17 @@ export function useChat({ lang = "sk" } = {}) {
             if (ev.type === "start" || ev.type === "step") {
               if (ev.label) setSteps((prev) => [...prev, ev.label]);
             } else if (ev.type === "done") {
-              j = ev;
+              j = ev; sawDone = true;
             } else if (ev.type === "error") {
               streamErr = ev.text || "AI error";
             }
           }
         }
         if (streamErr) throw new Error(streamErr);
+        // A stream that ended with neither a `done` nor an `error` frame means
+        // the server threw AFTER headers were sent (its top-level catch just
+        // res.end()s) — surface it as an error instead of pushing a blank bubble.
+        if (!sawDone) throw new Error(L("Spojenie sa prerušilo — skús to znova.", "The connection was interrupted — please try again."));
       } else {
         j = await r.json();
       }

@@ -11,7 +11,7 @@
  * render with a small 🔒 icon and clicking them lands on an upgrade card
  * instead of the actual feature. Admin-only items are hidden for non-admins.
  */
-import { Component, useState, useEffect, lazy, Suspense } from "react";
+import { Component, useState, useEffect, useRef, lazy, Suspense } from "react";
 import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
 import { useProjects } from "../lib/useData";
@@ -1261,8 +1261,34 @@ function PlatformSettings({ lang }) {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState(null);
 
+  // Re-sync the form once the profile resolves. useAuth flips loading=false
+  // after an 8s safety timeout even if the profile fetch hasn't returned (and
+  // onAuthStateChange can transiently null it), so this component can mount with
+  // profile=null → an all-empty form. Hydrate once the real profile arrives so
+  // Save can never write empty strings over real values. The ref guards against
+  // clobbering the user's in-progress edits on later profile refreshes.
+  const hydratedRef = useRef(Boolean(profile));
+  useEffect(() => {
+    if (profile && !hydratedRef.current) {
+      hydratedRef.current = true;
+      setForm({
+        full_name: profile.full_name || "",
+        company:   profile.company || "",
+        position:  profile.position || "",
+        linkedin_url: profile.linkedin_url || "",
+        phone:     profile.phone || "",
+      });
+    }
+  }, [profile]);
+
   const save = async (e) => {
     e.preventDefault();
+    // Refuse to save until the profile has loaded — otherwise an empty form
+    // (mounted before the profile resolved) would null-wipe real values.
+    if (!profile) {
+      setMsg({ type: "err", text: lang === "sk" ? "Profil sa ešte načítava — skús o chvíľu." : "Profile still loading — try again in a moment." });
+      return;
+    }
     setSaving(true);
     setMsg(null);
     // F-106: route through sanitize layer the same way CompleteProfile does.
