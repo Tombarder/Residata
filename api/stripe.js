@@ -110,7 +110,20 @@ async function handlePortal(req, res) {
 }
 
 // ─── webhook ─────────────────────────────────────────────────────────────
-async function applySubscription(admin, stripe, sub) {
+// Sync a Stripe subscription's lifecycle onto user_profiles.paid_until.
+//
+// Three regimes, keyed off the Stripe status (and the `deleted` event):
+//   · PAID    (active / trialing) → extend paid_until to the period end,
+//     but MONOTONICALLY (never rewind on a duplicated / out-of-order event).
+//   · TERMINAL (canceled / unpaid / incomplete_expired, or subscription.deleted)
+//     → REVOKE: set paid_until = now and drop the subscription id. Stripe deletes
+//     at period end for cancel-at-period-end, so "now" ≈ the intended end.
+//   · GRACE   (past_due / incomplete / paused / anything else) → leave paid_until
+//     UNCHANGED. Crucially we must NOT extend on past_due: a declined renewal
+//     advances current_period_end to the unpaid next period, and extending off
+//     that would hand the user a free month. Existing (not-yet-elapsed) paid_until
+//     is their grace window.
+async function applySubscription(admin, stripe, sub, { deleted = false } = {}) {
   const customerId = typeof sub.customer === "string" ? sub.customer : sub.customer?.id;
 
   let userId = sub.metadata?.supabase_user_id || null;
@@ -125,27 +138,37 @@ async function applySubscription(admin, stripe, sub) {
   }
   if (!userId) { console.warn("[stripe webhook] no user for subscription", sub.id); return; }
 
-  const active = ["active", "trialing", "past_due"].includes(sub.status);
+  const status = sub.status;
+  const terminal = deleted || ["canceled", "unpaid", "incomplete_expired"].includes(status);
+  const paidNow  = ["active", "trialing"].includes(status);
   // current_period_end moved from the subscription top-level onto each line item
   // in recent Stripe API versions — read item first, fall back to top-level.
   const periodEndUnix = sub.items?.data?.[0]?.current_period_end ?? sub.current_period_end ?? null;
   const periodEnd = periodEndUnix ? new Date(periodEndUnix * 1000).toISOString() : null;
 
   const { data: current } = await admin
-    .from("user_profiles").select("tier, paid_started_at").eq("id", userId).maybeSingle();
+    .from("user_profiles").select("tier, paid_started_at, paid_until").eq("id", userId).maybeSingle();
 
-  const patch = { stripe_subscription_id: sub.id };
+  const patch = { stripe_subscription_id: deleted ? null : sub.id };
   if (customerId) patch.stripe_customer_id = customerId;
-  if (active && periodEnd) {
-    patch.paid_until = periodEnd;
+
+  if (terminal) {
+    // Revoke as of now — the ONLY path that lowers paid_until.
+    patch.paid_until = new Date().toISOString();
+    patch.paid_pause_started = null;
+  } else if (paidNow && periodEnd) {
+    // Extend only forward — a stale/duplicate event can never rewind access.
+    const curMs = current?.paid_until ? new Date(current.paid_until).getTime() : 0;
+    patch.paid_until = new Date(periodEnd).getTime() > curMs ? periodEnd : current.paid_until;
     patch.paid_pause_started = null;
     if (current?.tier !== "admin") patch.tier = "paid";
     if (!current?.paid_started_at) patch.paid_started_at = new Date().toISOString();
   }
+  // GRACE (past_due / incomplete / paused): touch neither paid_until nor tier.
 
   const { error } = await admin.from("user_profiles").update(patch).eq("id", userId);
   if (error) console.error("[stripe webhook] profile update failed", error.message);
-  else console.log(`[stripe webhook] ${sub.status} → user ${userId} paid_until=${patch.paid_until || "(unchanged)"}`);
+  else console.log(`[stripe webhook] ${deleted ? "deleted" : status} → user ${userId} paid_until=${patch.paid_until || "(unchanged)"}`);
 }
 
 async function handleWebhook(req, res) {
@@ -184,14 +207,25 @@ async function handleWebhook(req, res) {
       case "customer.subscription.created":
       case "customer.subscription.updated":
       case "customer.subscription.deleted": {
-        await applySubscription(admin, stripe, event.data.object);
+        await applySubscription(admin, stripe, event.data.object, {
+          deleted: event.type === "customer.subscription.deleted",
+        });
         break;
       }
       case "invoice.paid":
       case "invoice.payment_succeeded": {
-        const subId = event.data.object.subscription;
-        if (subId) {
-          const sub = await stripe.subscriptions.retrieve(typeof subId === "string" ? subId : subId.id);
+        // `invoice.subscription` was removed from recent Stripe API versions (moved
+        // under invoice.parent / line-item parent) — the same migration handled for
+        // current_period_end. Resolve it robustly so this renewal safety-net path
+        // doesn't silently no-op.
+        const inv = event.data.object;
+        const subRef =
+          inv.subscription
+          ?? inv.parent?.subscription_details?.subscription
+          ?? inv.lines?.data?.[0]?.parent?.subscription_item_details?.subscription
+          ?? null;
+        if (subRef) {
+          const sub = await stripe.subscriptions.retrieve(typeof subRef === "string" ? subRef : subRef.id);
           await applySubscription(admin, stripe, sub);
         }
         break;

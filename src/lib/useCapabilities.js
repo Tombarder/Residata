@@ -146,7 +146,15 @@ export function useCapabilities() {
   //                   banner + popup + dashboard offer all gate on.
   const trialConsumed = Boolean(profile?.trial_started_at);
   const trialExpired  = trialConsumed && !trialActive;
-  const canStartTrial = effectiveTier === "free" && !trialActive && !trialConsumed;
+  // Anchor eligibility on the RAW billing label (baseTier), not the derived
+  // effectiveTier: an EXPIRED-paid (paid_until in the past) or ADMIN-PAUSED paid
+  // account both collapse to effectiveTier==="free", so keying only on effective
+  // offered lapsed customers the one-time trial — a revenue leak, and for paused
+  // users activating it burned their lifetime trial for ZERO access (the paused
+  // branch resolves before trialActive). baseTier==="free" excludes every
+  // paid-lineage account; keeping effectiveTier==="free" still excludes a free
+  // user who was admin-granted a paid_until window.
+  const canStartTrial = baseTier === "free" && effectiveTier === "free" && !trialActive && !trialConsumed;
   const showTrialOffer = user ? canStartTrial : true;
 
   return {
