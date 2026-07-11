@@ -161,6 +161,18 @@ const SEO_BY_PAGE = {
     },
     noindex: true,
   },
+  Terms: {
+    path: "/terms",
+    en: {
+      title: "Terms of Service · Residata",
+      description: "The terms governing use of Residata — access, subscriptions, acceptable use, and liability.",
+    },
+    sk: {
+      title: "Obchodné podmienky · Residata",
+      description: "Podmienky používania Residata — prístup, predplatné, prijateľné použitie a zodpovednosť.",
+    },
+    noindex: true,
+  },
 };
 
 /**

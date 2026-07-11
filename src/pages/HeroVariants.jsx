@@ -537,8 +537,8 @@ export function V4_MatrixRain({ lang = "en" }) {
           </h2>
           <p style={{ color: "#c0c0c8", fontSize: "1rem", marginTop: "1rem", lineHeight: 1.6, maxWidth: 480, margin: "1rem auto 0", textShadow: "0 2px 16px rgba(0,0,0,0.9)" }}>
             {lang === "sk"
-              ? "Každý byt každého aktívneho projektu. Denne. Export do Google Sheets, CSV, alebo priamo do vášho systému cez API."
-              : "Every unit of every active project. Refreshed daily. Export to Google Sheets, CSV, or straight into your stack via API."}
+              ? "Každý byt každého aktívneho projektu. Denne. Export do CSV, Excelu (.xlsx), alebo priamo do vášho systému cez API."
+              : "Every unit of every active project. Refreshed daily. Export to CSV, Excel (.xlsx), or straight into your stack via API."}
           </p>
         </div>
       </div>

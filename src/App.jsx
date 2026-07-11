@@ -800,7 +800,7 @@ function HomePage({ setCurrent, l, lang, onLogin }) {
     heroButtons = (
       <>
         <button type="button" onClick={onLogin} className="btn-p">{l.heroBtn1}</button>
-        <button type="button" onClick={() => setCurrent("Live")} className="btn-s">{l.heroBtn2}</button>
+        <button type="button" onClick={() => setCurrent("Data")} className="btn-s">{l.heroBtn2}</button>
       </>
     );
   } else if (tier === "pending") {
@@ -1561,7 +1561,7 @@ function DataPage({ setCurrent, l, lang }) {
                 ))}
                 <div style={{ marginTop: "0.75rem", color: "#44444e" }}>---</div>
                 <div style={{ marginTop: "0.25rem" }}><span style={{ color: "#f5a623" }}>refresh</span><span style={{ color: "#44444e" }}>: </span><span style={{ color: "#c8c8d4" }}>daily</span></div>
-                <div><span style={{ color: "#f5a623" }}>output</span><span style={{ color: "#44444e" }}>: </span><span style={{ color: "#c8c8d4" }}>google_sheets | csv | xlsx</span></div>
+                <div><span style={{ color: "#f5a623" }}>output</span><span style={{ color: "#44444e" }}>: </span><span style={{ color: "#c8c8d4" }}>csv | xlsx | api</span></div>
                 <div><span style={{ color: "#f5a623" }}>encoding</span><span style={{ color: "#44444e" }}>: </span><span style={{ color: "#c8c8d4" }}>utf-8</span></div>
               </div>
             </div>

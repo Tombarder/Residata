@@ -8,7 +8,7 @@ import { daysUntil } from "../lib/dates";
 import { fmtSelloutValue } from "../lib/absorption";
 import { useCurrency } from "../lib/useCurrency";
 import { useCountry } from "../lib/useCountry";
-import { supabase } from "../lib/supabase";
+import { supabase, supabaseData } from "../lib/supabase";
 import { getFreshAccessToken, authErrorMessage } from "../lib/sessionGuard";
 import { getLiveT, ll } from "../lib/liveLang";
 import { goBack } from "../lib/routing";
@@ -3489,12 +3489,12 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
       return;
     }
     const [u, ev, act, pd] = await Promise.all([
-      supabase.from("user_profiles").select("*").order("created_at", { ascending: false }),
-      supabase.from("events").select("*").like("event_type", "new_signup%").order("detected_at", { ascending: false }).limit(20),
+      supabaseData.from("user_profiles").select("*").order("created_at", { ascending: false }),
+      supabaseData.from("events").select("*").like("event_type", "new_signup%").order("detected_at", { ascending: false }).limit(20),
       // 1000 covers months of activity for the current user base; move to a DB
       // view if the table outgrows it.
-      supabase.from("user_activity").select("*").order("created_at", { ascending: false }).limit(1000),
-      supabase.from("premium_domains").select("*").order("domain"),
+      supabaseData.from("user_activity").select("*").order("created_at", { ascending: false }).limit(1000),
+      supabaseData.from("premium_domains").select("*").order("domain"),
     ]);
     if (!silent) setLoading(false);
     if (u.error) { if (!silent) setErr(authErrorMessage(u.error, lang)); return; }
@@ -4262,7 +4262,7 @@ function AiChatLogsPanel({ users, lang }) {
   // Refresh button so the admin sees new turns the moment a user asks more.
   const load = () => {
     const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-    supabase.from("ai_chat_log")
+    supabaseData.from("ai_chat_log")  // RLS read on auth-lock-free data client (2026-07-11)
       .select("id, session_id, user_id, tier, turn_index, role, content, content_length, sent_at, response_time_ms, user_typing_ms, model, input_tokens, output_tokens, cache_read_input_tokens, cache_creation_input_tokens, lang, page_url, error_kind, error_message, http_status, feedback, feedback_note, feedback_at")
       .gte("sent_at", since)
       .order("sent_at", { ascending: false })

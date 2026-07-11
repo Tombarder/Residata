@@ -33,7 +33,7 @@ import { moneyFromEur, moneySymbol } from "../lib/money";
 import { localeTag } from "../lib/locale";
 import { useCurrency } from "../lib/useCurrency";
 import { useCountry, isAllCountries } from "../lib/useCountry";
-import { supabase } from "../lib/supabase";
+import { supabase, supabaseData } from "../lib/supabase";
 
 // ── Visual language (mirrors Platform.jsx) ───────────────────────
 const mono = "'JetBrains Mono', monospace";
@@ -424,7 +424,11 @@ function SubscribeButton({ scope, scopeLabel, lang }) {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) { if (!cancelled) setState("off"); return; }
         if (!cancelled) setEmail(user.email);
-        const { data } = await supabase.from("report_subscriptions")
+        // RLS-gated read via supabaseData (auth-lock-free token) — NOT the auth
+        // `supabase` client, whose lock can stall this read on a stuck/refreshing
+        // session (the documented "logged-in page hangs on Loading" class). The
+        // write below stays on the auth client. (2026-07-11 fix.)
+        const { data } = await supabaseData.from("report_subscriptions")
           .select("enabled, scope, scope_label").eq("user_id", user.id).maybeSingle();
         if (cancelled) return;
         // "on" only when subscribed AND the current scope matches — lets

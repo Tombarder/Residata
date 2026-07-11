@@ -200,31 +200,51 @@ export function useChat({ lang = "sk" } = {}) {
     typingStartRef.current = null;
 
     try {
-      const headers = { "Content-Type": "application/json" };
       const tokenSafe = await getAccessTokenSafe();   // never hangs (auth-deadlock guard)
-      if (tokenSafe) headers.Authorization = `Bearer ${tokenSafe}`;
+      const bodyStr = JSON.stringify({
+        messages: nextMsgs.slice(-20),
+        lang,
+        stream: true,
+        sessionId: sessionIdRef.current,
+        typingMs,
+        pageUrl: typeof window !== "undefined" && window.location
+          ? window.location.pathname + window.location.search
+          : null,
+      });
 
-      // Abort guard: a hung request can never spin forever. 90s leaves margin
-      // over the server's 60s budget; on timeout the catch shows a retry hint.
-      const ac = new AbortController();
-      const abortTimer = setTimeout(() => ac.abort(), 90000);
-      let r;
-      try {
-        r = await fetch("/api/ai/chat", {
-          method: "POST", headers, signal: ac.signal,
-          body: JSON.stringify({
-            messages: nextMsgs.slice(-20),
-            lang,
-            stream: true,
-            sessionId: sessionIdRef.current,
-            typingMs,
-            pageUrl: typeof window !== "undefined" && window.location
-              ? window.location.pathname + window.location.search
-              : null,
-          }),
-        });
-      } finally {
-        clearTimeout(abortTimer);
+      // One POST attempt with a given bearer. Abort guard: a hung request can
+      // never spin forever. 90s leaves margin over the server's 60s budget; on
+      // timeout the catch shows a retry hint.
+      const postChat = async (bearer) => {
+        const headers = { "Content-Type": "application/json" };
+        if (bearer) headers.Authorization = `Bearer ${bearer}`;
+        const ac = new AbortController();
+        const abortTimer = setTimeout(() => ac.abort(), 90000);
+        try {
+          return await fetch("/api/ai/chat", { method: "POST", headers, signal: ac.signal, body: bodyStr });
+        } finally {
+          clearTimeout(abortTimer);
+        }
+      };
+
+      let r = await postChat(tokenSafe);
+
+      // Self-heal an expired access token. getAccessTokenSafe()'s localStorage
+      // fallback can hand us a token past its ~1h expiry (tab left open, or the
+      // getSession() refresh raced past our 3s guard). The server then answers
+      // 401 "invalid or expired token" — which a hard page-refresh used to be
+      // the only cure for. Instead, force one token refresh (time-boxed so a
+      // stuck gotrue can't freeze the chat) and retry the POST once.
+      if (r.status === 401 && tokenSafe) {
+        let fresh = null;
+        try {
+          const refreshed = supabase.auth.refreshSession()
+            .then((x) => x?.data?.session?.access_token || null)
+            .catch(() => null);
+          const to = new Promise((res) => setTimeout(() => res(null), 5000));
+          fresh = await Promise.race([refreshed, to]);
+        } catch (_) {}
+        if (fresh && fresh !== tokenSafe) r = await postChat(fresh);
       }
       if (r.status === 429) {
         const j = await r.json().catch(() => ({}));
