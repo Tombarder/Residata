@@ -104,12 +104,17 @@ export default function PlatformReports({ lang = "sk" }) {
   const districts = useMemo(() => uniqueSorted(projects.map(p => p.district).filter(Boolean)), [projects]);
   const developers = useMemo(() => uniqueSorted(projects.map(p => p.developer).filter(Boolean)), [projects]);
 
-  // Initialise pickers once data arrives
+  // Initialise pickers once data arrives — AND self-heal a pick that's no longer
+  // valid for the current options. After a country switch (SK→CZ) the old
+  // city/district/developer/project isn't in the new market's lists, so the pick
+  // stayed truthy, matched nothing, and the report rendered "no data for X" until
+  // the user manually reselected. Keep a still-valid pick; else fall back to the
+  // first option (functional updates → no stale closure, no loop).
   useEffect(() => {
-    if (!cityPick && cities[0])       setCityPick(cities[0]);
-    if (!distPick && districts[0])    setDistPick(districts[0]);
-    if (!projPick && projects[0])     setProjPick(projects[0].id);
-    if (!devPick  && developers[0])   setDevPick(developers[0]);
+    if (cities.length)     setCityPick(v => (v && cities.includes(v)) ? v : cities[0]);
+    if (districts.length)  setDistPick(v => (v && districts.includes(v)) ? v : districts[0]);
+    if (developers.length) setDevPick(v => (v && developers.includes(v)) ? v : developers[0]);
+    if (projects.length)   setProjPick(v => (v && projects.some(p => p.id === v)) ? v : projects[0].id);
   }, [cities, districts, projects, developers]); // eslint-disable-line
 
   const loading = loadingProjects;

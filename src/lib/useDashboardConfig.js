@@ -84,19 +84,35 @@ export function useDashboardConfig() {
   const [saveState, setSaveState] = useState("idle");
   const saveTimer = useRef(null);
   const savedTimer = useRef(null);
+  // True ONLY after a load that actually succeeded (error === null, incl. the
+  // genuine new-user data === null case). The debounced upsert is hard-gated on
+  // this so a transient READ failure — which would otherwise show defaultConfig —
+  // can never be persisted over the user's real saved layout.
+  const loadedOkRef = useRef(false);
+  const [loadError, setLoadError] = useState(false);
 
   // Load the user's row once auth resolves. Anon (shouldn't reach here — the
   // dashboard is behind auth) falls back to the default in-memory only.
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
+    setLoading(true); setLoadError(false); loadedOkRef.current = false;
     if (!user) { setConfigState(defaultConfig()); setLoading(false); return; }
     // Read via supabaseData (no getSession on the path → the dashboard can never
     // hang on "loading"). The debounced upsert below stays on the auth client.
     supabaseData.from("user_dashboards").select("config").eq("user_id", user.id).maybeSingle()
       .then(({ data, error }) => {
         if (cancelled) return;
-        if (error) console.error("[useDashboardConfig] load", error);
+        if (error) {
+          // Real read failure — DON'T persist. Render the default so the page
+          // isn't blank, but keep loadedOkRef false so no edit can overwrite the
+          // (unloaded) saved layout, and surface an error for a retry affordance.
+          console.error("[useDashboardConfig] load", error);
+          setLoadError(true);
+          setConfigState(defaultConfig());
+          setLoading(false);
+          return;
+        }
+        loadedOkRef.current = true;            // success (incl. new user: data === null)
         setConfigState(normalize(data?.config));
         setLoading(false);
       });
@@ -108,8 +124,10 @@ export function useDashboardConfig() {
     const value = typeof next === "function" ? next : () => next;
     setConfigState(prev => {
       const resolved = value(prev || defaultConfig());
-      // Persist (debounced) — skip if anon or nothing to save.
-      if (user) {
+      // Persist (debounced) — skip if anon, or if the initial load hasn't
+      // SUCCEEDED yet (a failed load must never let an edit overwrite the real
+      // saved layout with the default shown as a fallback).
+      if (user && loadedOkRef.current) {
         setSaveState("saving");
         clearTimeout(saveTimer.current);
         saveTimer.current = setTimeout(async () => {
@@ -131,5 +149,5 @@ export function useDashboardConfig() {
 
   const resetToDefault = useCallback(() => setConfig(defaultConfig()), [setConfig]);
 
-  return { config, loading, saveState, setConfig, resetToDefault };
+  return { config, loading, loadError, saveState, setConfig, resetToDefault };
 }
