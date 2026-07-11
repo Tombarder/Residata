@@ -171,8 +171,12 @@ function metricValue(metric, scope, ctx) {
 // Scope match: market = everything; developer = same developer; district = same
 // district NAME (only used where the country is unambiguous — the KPI strip
 // restricts MoM to market scope to avoid same-named districts across cities).
-function scopeHistory(scope, snapshots) {
+function scopeHistory(scope, snapshots, countryIds) {
   const rows = (snapshots || []).filter(r => {
+    // Restrict to the current country's projects FIRST. project_snapshots carries
+    // both markets, so a "market" (or cross-border developer) scope would sum
+    // SK + CZ and show a MoM delta that never happened in the user's market.
+    if (countryIds && !countryIds.has(r.project_id)) return false;
     if (!scope || scope.kind === "market") return true;
     if (scope.kind === "developer") return r.developer === scope.developer;
     if (scope.kind === "district") return r.district === scope.district;
@@ -197,7 +201,10 @@ function scopeHistory(scope, snapshots) {
 function momDelta(metric, scope, ctx) {
   const key = { available: "available", avg_m2: "avg_m2", reserved: "reserved", sold_total: "sold", sold_through: "sold_through" }[metric];
   if (!key) return null;
-  const h = scopeHistory(scope, ctx.snapshots);
+  // ctx.projects is already country-scoped → its id set restricts the history to
+  // the current market (mirrors the KPI strip's aggMomDelta(overviewIds,…)).
+  const countryIds = new Set((ctx.projects || []).map(p => p.id));
+  const h = scopeHistory(scope, ctx.snapshots, countryIds);
   if (h.length < 2) return null;
   const cur = h[h.length - 1][key], prev = h[h.length - 2][key];
   if (cur == null || prev == null) return null;

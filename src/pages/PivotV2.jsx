@@ -1890,10 +1890,14 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
               city: p?.city || null,
             };
           });
-          const filtered = enriched.filter((r) => path.every((pv, i) => {
-            const f = FIELDS[rows[i]];
-            return f && normKey(f.accessor(r)) === pv;
-          }));
+          // Match the row-dim path AND re-apply the ACTIVE filters (stav, price
+          // ranges, …). Without the filter pass the modal listed every unit of the
+          // matched projects across all statuses — so the header count contradicted
+          // the filtered cell number the user actually clicked.
+          const filtered = enriched.filter((r) =>
+            path.every((pv, i) => { const f = FIELDS[rows[i]]; return f && normKey(f.accessor(r)) === pv; })
+            && filters.every((flt) => passesFilter(r, flt))
+          );
           setDrillDown((d) => (d && d.pathKey === node.pathKey ? { ...d, records: filtered, loading: false } : d));
         }}
         onProjectOpen={setCurrent ? (projectId) => setCurrent(`App:ProjectDetail:${projectId}`) : undefined}
