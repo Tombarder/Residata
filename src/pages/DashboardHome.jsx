@@ -534,7 +534,11 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
             const raw = aggMetric(overviewAgg, mk);
             // In the KPI strip the "/m²" lives in the label, so the value drops the
             // suffix (just "5 104 €") — keeps the number readable in a narrow card.
-            const value = gateVelocity ? "—"
+            // locked → render a FAKE placeholder, never the real paid figure
+            // (KpiCard's blur is cosmetic, not security — the true number must
+            // not reach the DOM). Same masking MetricBody uses.
+            const value = locked ? "12 345"
+              : gateVelocity ? "—"
               : mk === "sold30" ? (raw ? `+${fmtCount(raw, lang)}` : "—")
               : mk === "avg_m2" ? (raw != null ? `${Math.round(moneyFromEur(raw)).toLocaleString(localeTag(lang))} ${moneySymbol()}` : "—")
               : fmtMetric(mk, raw, lang);
@@ -943,8 +947,15 @@ function RankingBody({ cfg, ctx, lang }) {
     rows = [...byDev.entries()].filter(([, a]) => mdef.get(a) != null)
       .map(([name, a]) => ({ key: name, name, sub: `${a.projects} ${L(lang, "proj.", "proj")}`, val: mdef.get(a) }));
   }
-  rows.sort((a, b) => dir === "top" ? b.val - a.val : a.val - b.val);
-  rows = rows.slice(0, n);
+  // locked → replace real names+values with fake placeholder rows (the blur
+  // below is cosmetic, not security — real leaderboard data must not reach the
+  // DOM). Mirrors MetricBody's fake-value masking.
+  if (locked) {
+    rows = Array.from({ length: n }, (_, i) => ({ key: `locked-${i}`, name: "••••••••", sub: "••••", val: (n - i) * 10 }));
+  } else {
+    rows.sort((a, b) => dir === "top" ? b.val - a.val : a.val - b.val);
+    rows = rows.slice(0, n);
+  }
 
   if (rows.length === 0) return <Muted lang={lang} text={L(lang, "Žiadne dáta", "No data")} />;
   const max = Math.max(...rows.map(r => Math.abs(r.val) || 0)) || 1;
