@@ -17,7 +17,7 @@
  * conversation continue.
  */
 import { useEffect, useRef, useState } from "react";
-import { supabase } from "./supabase";
+import { getDataAccessToken, forceTokenRefresh } from "./authToken";
 import { useAuth } from "./useAuth";
 import { useCapabilities } from "./useCapabilities";
 import { track } from "./track";
@@ -62,33 +62,6 @@ function rotateSessionId(userId) {
   return getOrCreateSessionId(userId);
 }
 
-/* Get the access token without EVER hanging. supabase.auth.getSession() can
-   deadlock on a stuck gotrue token-refresh (the documented "stuck loading until
-   a full refresh" bug) — and chat awaited it before every send, so a deadlocked
-   refresh meant the question never left the browser. We race getSession() against
-   a short timeout and, on timeout, read the persisted session token straight from
-   localStorage (no refresh, no hang). A slightly-stale token is fine: the server
-   validates it and returns 401 if expired, which the UI already handles. */
-async function getAccessTokenSafe() {
-  try {
-    const viaApi = supabase.auth.getSession()
-      .then(r => r?.data?.session?.access_token || null)
-      .catch(() => null);
-    const timeout = new Promise(res => setTimeout(() => res("__timeout__"), 3000));
-    const r = await Promise.race([viaApi, timeout]);
-    if (r !== "__timeout__") return r;
-  } catch (_) {}
-  try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k && k.startsWith("sb-") && k.endsWith("-auth-token")) {
-        const v = JSON.parse(localStorage.getItem(k) || "null");
-        return v?.access_token || v?.currentSession?.access_token || null;
-      }
-    }
-  } catch (_) {}
-  return null;
-}
 
 export function useChat({ lang = "sk" } = {}) {
   const { user } = useAuth();
@@ -200,7 +173,10 @@ export function useChat({ lang = "sk" } = {}) {
     typingStartRef.current = null;
 
     try {
-      const tokenSafe = await getAccessTokenSafe();   // never hangs (auth-deadlock guard)
+      // Canonical token store: proactively refreshes BEFORE expiry, bounded,
+      // never the auth lock, never hangs — the same source every RLS-gated read
+      // and the trial/pay/admin callers use (src/lib/authToken.js).
+      const tokenSafe = await getDataAccessToken();
       const bodyStr = JSON.stringify({
         messages: nextMsgs.slice(-20),
         lang,
@@ -229,21 +205,12 @@ export function useChat({ lang = "sk" } = {}) {
 
       let r = await postChat(tokenSafe);
 
-      // Self-heal an expired access token. getAccessTokenSafe()'s localStorage
-      // fallback can hand us a token past its ~1h expiry (tab left open, or the
-      // getSession() refresh raced past our 3s guard). The server then answers
-      // 401 "invalid or expired token" — which a hard page-refresh used to be
-      // the only cure for. Instead, force one token refresh (time-boxed so a
-      // stuck gotrue can't freeze the chat) and retry the POST once.
+      // Self-heal an expired access token: on a 401 "invalid or expired token"
+      // (which a hard page-refresh used to be the only cure for), force one
+      // bounded token refresh and retry the POST once — the exact stale-token →
+      // 401 → refresh → retry contract authToken.forceTokenRefresh() exists for.
       if (r.status === 401 && tokenSafe) {
-        let fresh = null;
-        try {
-          const refreshed = supabase.auth.refreshSession()
-            .then((x) => x?.data?.session?.access_token || null)
-            .catch(() => null);
-          const to = new Promise((res) => setTimeout(() => res(null), 5000));
-          fresh = await Promise.race([refreshed, to]);
-        } catch (_) {}
+        const fresh = await forceTokenRefresh();
         if (fresh && fresh !== tokenSafe) r = await postChat(fresh);
       }
       if (r.status === 429) {
@@ -367,8 +334,8 @@ export function useChat({ lang = "sk" } = {}) {
     try {
       const headers = { "Content-Type": "application/json" };
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+        const t = await getDataAccessToken();   // canonical non-hanging token
+        if (t) headers.Authorization = `Bearer ${t}`;
       } catch (_) {}
       const r = await fetch("/api/ai/chat-feedback", {
         method: "PATCH",
