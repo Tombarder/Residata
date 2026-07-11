@@ -850,10 +850,12 @@ function buildTreeFromGrain(grain, rowFields, colFields, valueDefs) {
   const hasCol = colFields.length > 0;
   const colIdx = rowFields.length;
   let colKeys = null;
+  let colOverflow = 0;   // # distinct column values beyond MAX_COL_VALUES (folded into Σ only)
   if (hasCol) {
     const counts = new Map();
     for (const g of safe) { const ck = normKey(g.d[colIdx]); counts.set(ck, (counts.get(ck) || 0) + (+g.m.n || 0)); }
     colKeys = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, MAX_COL_VALUES).map(([k]) => k);
+    colOverflow = Math.max(0, counts.size - colKeys.length);
   }
   const rollupsFor = (rows) => { const c = emptyComp(); for (const g of rows) addComp(c, g.m); return valueDefs.map(v => computeFromComp(v, c)); };
   // Per-node stav components (grain rows carry no records) so the table can show
@@ -867,7 +869,7 @@ function buildTreeFromGrain(grain, rowFields, colFields, valueDefs) {
     const out = {}; for (const ck of colKeys) out[ck] = rollupsFor(byKey[ck]); return out;
   };
   if (rowFields.length === 0) {
-    return { label: "Total", path: [], pathKey: "", level: -1, colKeys, records: [], count: countFor(safe), rollups: rollupsFor(safe), colRollups: colRollupsFor(safe), children: [], isLeaf: true };
+    return { label: "Total", path: [], pathKey: "", level: -1, colKeys, colOverflow, records: [], count: countFor(safe), rollups: rollupsFor(safe), colRollups: colRollupsFor(safe), children: [], isLeaf: true };
   }
   const rec = (rows, depth, prefix) => {
     const byKey = new Map();
@@ -880,7 +882,7 @@ function buildTreeFromGrain(grain, rowFields, colFields, valueDefs) {
     }
     return out;
   };
-  return { label: "Total", path: [], pathKey: "", level: -1, colKeys, records: [], count: countFor(safe), rollups: rollupsFor(safe), colRollups: colRollupsFor(safe), children: rec(safe, 0, []), isLeaf: false };
+  return { label: "Total", path: [], pathKey: "", level: -1, colKeys, colOverflow, records: [], count: countFor(safe), rollups: rollupsFor(safe), colRollups: colRollupsFor(safe), children: rec(safe, 0, []), isLeaf: false };
 }
 
 /* Sort the tree in-place by the value at column `sortIdx` (or by label
@@ -2711,6 +2713,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
   // row shares the same horizontal axis (otherwise leaves could have
   // different col sets and the table would be ragged).
   const colKeys = colFields.length ? (grandTotal.colKeys || []) : null;
+  const colOverflow = grandTotal.colOverflow || 0;   // # column values folded into Σ but not shown
   const crossTab = !!colKeys;
   if (!rowFields.length) {
     return (
@@ -2864,10 +2867,15 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                   <span style={{ opacity: 0.65 }}>{fieldLabel(colFields[0], lang)}:</span> <strong style={{ color: green }}>{ck}</strong>
                 </th>
               ))}
-              {/* Grand totals across columns */}
+              {/* Grand totals across columns. When there are more distinct column
+                  values than fit (MAX_COL_VALUES), Σ still counts ALL of them, so
+                  flag the hidden ones — otherwise Σ silently exceeds the sum of the
+                  visible columns. */}
               <th colSpan={effectiveValues.length}
-                  style={{ ...th, color: dim, borderLeft: `2px solid ${green}55` }}>
+                  style={{ ...th, color: dim, borderLeft: `2px solid ${green}55` }}
+                  title={colOverflow > 0 ? (lang === "sk" ? `Σ zahŕňa aj ${colOverflow} ďalších stĺpcov, ktoré sa nezmestili` : `Σ also includes ${colOverflow} more columns that didn't fit`) : undefined}>
                 Σ {lang === "sk" ? "spolu" : "total"}
+                {colOverflow > 0 && <span style={{ color: orange, fontWeight: 400 }}> · +{colOverflow}</span>}
               </th>
             </tr>
           )}
