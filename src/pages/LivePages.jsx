@@ -217,7 +217,7 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
             <h2 style={{ fontSize: "1.6rem", fontWeight: 700 }}>
               {hasFullAccess
                 ? ll(t.projects_title_all, { n: projects.length })
-                : ll(t.projects_title_top, { n: ANON_VISIBLE, total: projects.length })}
+                : ll(t.projects_title_top, { n: Math.min(ANON_VISIBLE, projects.length), total: projects.length })}
             </h2>
           </div>
           {showSignupPrompt && <button className="btn-p" onClick={openLogin}>{t.register_for_full}</button>}
@@ -987,7 +987,7 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
       isPriceKpi: true,
       onClick: (() => {
         const topFlat = availFlats.find(f => Number(f.cena_s_dph) === topPrice);
-        return (onSelectFlat && topFlat) ? () => onSelectFlat(topFlat) : null;
+        return (onSelectFlat && topFlat) ? () => onSelectFlat(topFlat.id) : null;
       })(),
     },
     // FALLBACK KPI shown only when noPrices=true (replaces Most expensive)
@@ -999,7 +999,7 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
         : null,
       tint: "#e8e8ed",
       isFallbackKpi: true,
-      onClick: (largestAreaFlat && onSelectFlat) ? () => onSelectFlat(largestAreaFlat) : null,
+      onClick: (largestAreaFlat && onSelectFlat) ? () => onSelectFlat(largestAreaFlat.id) : null,
     },
   ];
 
@@ -2580,12 +2580,16 @@ function FlatsTable({ flats, t, lang, highlightedFlatId }) {
       const r = f.izby == null ? "" : String(f.izby);
       if (!roomSel.has(r)) return false;
     }
-    // Price range
+    // Price range — the column displays moneyFromEur() (CZK in CZK mode) and the
+    // user types bounds in that same displayed currency, so convert the row's EUR
+    // price to the display currency before comparing (was comparing typed CZK vs
+    // raw EUR → every row excluded in CZK mode).
     if (priceActive) {
       const p = Number(f.cena_s_dph);
       if (!Number.isFinite(p)) return false;
-      if (priceMinN != null && p < priceMinN) return false;
-      if (priceMaxN != null && p > priceMaxN) return false;
+      const pDisp = moneyFromEur(p);
+      if (priceMinN != null && pDisp < priceMinN) return false;
+      if (priceMaxN != null && pDisp > priceMaxN) return false;
     }
     return true;
   });
@@ -2685,7 +2689,7 @@ function FlatsTable({ flats, t, lang, highlightedFlatId }) {
         {/* Price range */}
         <div style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
           <span style={{ fontFamily: mono, fontSize: "0.65rem", color: dim, textTransform: "uppercase", letterSpacing: "0.08em" }}>
-            {lang === "sk" ? "Cena €" : "Price €"}
+            {(lang === "sk" ? "Cena " : "Price ") + moneySymbol()}
           </span>
           <input
             type="number" inputMode="numeric" placeholder={lang === "sk" ? "od" : "min"}
