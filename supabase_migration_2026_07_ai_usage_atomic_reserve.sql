@@ -64,5 +64,11 @@ END;
 $function$;
 
 -- Only the service-role backend (/api/ai/chat uses the secret key) calls this.
-REVOKE ALL ON FUNCTION public.ai_usage_reserve(uuid, text, integer, timestamptz, text) FROM PUBLIC;
+-- 2026-07-11: REVOKE from the NAMED roles anon/authenticated too, not just PUBLIC.
+-- The public schema's default privileges GRANT EXECUTE on every new function to
+-- anon+authenticated, and that grant is to the named roles — so `REVOKE FROM PUBLIC`
+-- alone leaves this SECURITY DEFINER writer anon-executable (integrity_check
+-- secdef_grants / admin_rpc_gates caught it live). Revoking the named roles keeps it
+-- backend-only across any recreate/redeploy.
+REVOKE ALL ON FUNCTION public.ai_usage_reserve(uuid, text, integer, timestamptz, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.ai_usage_reserve(uuid, text, integer, timestamptz, text) TO service_role;

@@ -102,6 +102,9 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
   const t = (sk, en) => (lang === "sk" ? sk : en);
   const { country } = useCountry();
   useCurrency(); // subscribe so €/€-m² cells re-render in the selected currency
+  // display value of 1 EUR = the current display-currency rate; recomputes on each
+  // currency toggle (used to convert money FILTER inputs display->EUR, see spec below).
+  const _money1 = moneyFromEur(1) || 1;
   const { dimensions, measures } = useAnalyticsRegistry();
 
   // unified field list (dedup dim/measure on key); keep label + type + format
@@ -163,8 +166,13 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
     if (fCast) filters.cast = [fCast];
     if (fDev) filters.developer = [fDev];
     if (fStav) filters.stav = [fStav];
-    if (pMin || pMax) ranges.cena_s_dph = { min: pMin || null, max: pMax || null };
-    if (m2Min || m2Max) ranges.price_per_m2 = { min: m2Min || null, max: m2Max || null };
+    // Currency fix (2026-07-11): the table renders money via moneyFromEur (EUR->display),
+    // but analytics_units stores/filters money in EUR. Convert money range inputs from the
+    // DISPLAY currency back to EUR, else in CZK mode a typed CZK band is compared against EUR
+    // values -> empty/nonsensical results. Mirrors PivotV2's dispToEur.
+    const dispToEur = (v) => (v === null || v === undefined || v === "" ? null : Number(v) / _money1);
+    if (pMin || pMax) ranges.cena_s_dph = { min: dispToEur(pMin), max: dispToEur(pMax) };
+    if (m2Min || m2Max) ranges.price_per_m2 = { min: dispToEur(m2Min), max: dispToEur(m2Max) };
     // generic per-field filters → same spec shape the engine already supports
     for (const r of xf) {
       if (!r.key) continue;
@@ -174,14 +182,18 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
         if (r.op === "not_in") filters_not[r.key] = r.vals;
         else filters[r.key] = r.vals;
       } else if ((kind === "num" || kind === "date") && (r.min || r.max)) {
-        ranges[r.key] = { min: r.min || null, max: r.max || null };
+        // money fields (eur / per_m2) are stored in EUR -> convert the typed display value.
+        const isMoney = fmtByKey[r.key] === "eur" || fmtByKey[r.key] === "per_m2";
+        ranges[r.key] = isMoney
+          ? { min: dispToEur(r.min), max: dispToEur(r.max) }
+          : { min: r.min || null, max: r.max || null };
       }
     }
     const s = { columns: cols, filters, mode, sort: [sort] };   // limit/offset managed by useUnitsInfinite
     if (Object.keys(filters_not).length) s.filters_not = filters_not;
     if (Object.keys(ranges).length) s.ranges = ranges;
     return s;
-  }, [country, fProject, fCity, fCast, fDev, fStav, pMin, pMax, m2Min, m2Max, cols, mode, sort, xf, fields]);
+  }, [country, fProject, fCity, fCast, fDev, fStav, pMin, pMax, m2Min, m2Max, cols, mode, sort, xf, fields, fmtByKey, _money1]);
 
   const { rows, hasMore, loading, loadMore, error: loadFailed } = useUnitsInfinite({ enabled: cols.length > 0, spec, pageSize: PAGE });
 
