@@ -410,7 +410,7 @@ export default function LocationManager({ lang = "en" }) {
             <span style={{ color: green }}>{confirmedCount}</span> / {total} {t("located", "umiestnených")}
             {noDistrictCount > 0 && <span style={{ marginLeft: 8, color: amber }}>· {noDistrictCount} {t("no district", "bez okresu")}</span>}
           </div>
-          <div style={{ height: 4, background: "#1a1a1f", borderRadius: 3, marginTop: 8, overflow: "hidden" }}>
+          <div style={{ height: 4, background: "var(--surface-3)", borderRadius: 3, marginTop: 8, overflow: "hidden" }}>
             <div style={{ width: total ? `${(confirmedCount / total) * 100}%` : "0%", height: "100%", background: green, transition: "width 0.3s" }} />
           </div>
         </div>
@@ -535,5 +535,5 @@ function Chip({ active, onClick, children }) {
 const inputStyle = { width: "100%", boxSizing: "border-box", padding: "0.5rem 0.7rem", background: bg, border: `1px solid ${border}`, borderRadius: 7, color: textLight, fontSize: "0.84rem", fontFamily: "inherit", outline: "none" };
 const emptyStyle = { padding: "1.5rem 1.1rem", color: dim, fontSize: "0.8rem", fontFamily: mono };
 function btn(color, disabled, filled = false) {
-  return { padding: "0.5rem 0.95rem", borderRadius: 7, fontSize: "0.82rem", fontWeight: 600, whiteSpace: "nowrap", cursor: disabled ? "not-allowed" : "pointer", fontFamily: "inherit", border: `1px solid ${color}`, background: disabled ? "#1a1a1f" : (filled ? color : "transparent"), color: disabled ? "#55555f" : (filled ? "#06281d" : color), opacity: disabled ? 0.7 : 1, transition: "opacity 0.15s" };
+  return { padding: "0.5rem 0.95rem", borderRadius: 7, fontSize: "0.82rem", fontWeight: 600, whiteSpace: "nowrap", cursor: disabled ? "not-allowed" : "pointer", fontFamily: "inherit", border: `1px solid ${color}`, background: disabled ? "var(--surface-3)" : (filled ? color : "transparent"), color: disabled ? "var(--text-faint)" : (filled ? "#06281d" : color), opacity: disabled ? 0.7 : 1, transition: "opacity 0.15s" };
 }

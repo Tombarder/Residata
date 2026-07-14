@@ -88,12 +88,12 @@ export default function LoginModal({ open, onClose, lang = "en" }) {
       padding: "max(1rem, var(--safe-top)) max(1rem, var(--safe-right)) max(1rem, var(--safe-bottom)) max(1rem, var(--safe-left))",
     }}>
       <div onClick={e => e.stopPropagation()} style={{
-        background: "#16161a", border: "1px solid #222228", borderRadius: 14,
+        background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14,
         padding: "2rem", maxWidth: 420, width: "100%", position: "relative", margin: "auto 0",
       }}>
         <button onClick={onClose} style={{
           position: "absolute", top: "0.9rem", right: "1rem", background: "none", border: "none",
-          color: "#8a8a96", fontSize: "1.25rem", cursor: "pointer", padding: 0,
+          color: "var(--text-dim)", fontSize: "1.25rem", cursor: "pointer", padding: 0,
         }}>×</button>
 
         {!sent ? (
@@ -117,7 +117,7 @@ export default function LoginModal({ open, onClose, lang = "en" }) {
             )}
             <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem", color: "#00e5a0", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "0.75rem" }}>{t.login_label}</div>
             <h2 style={{ fontSize: "1.4rem", fontWeight: 700, letterSpacing: "-0.02em", marginBottom: "0.5rem" }}>{t.login_title}</h2>
-            <p style={{ fontSize: "0.85rem", color: "#8a8a96", lineHeight: 1.6, marginBottom: "1.25rem" }}>
+            <p style={{ fontSize: "0.85rem", color: "var(--text-dim)", lineHeight: 1.6, marginBottom: "1.25rem" }}>
               {t.login_desc}
             </p>
             <form onSubmit={submit}>
@@ -127,28 +127,28 @@ export default function LoginModal({ open, onClose, lang = "en" }) {
                 aria-label={t.login_placeholder}
                 placeholder={t.login_placeholder}
                 style={{
-                  width: "100%", padding: "0.75rem 1rem", background: "#0e0e10",
-                  border: `1px solid ${emailError ? "#ff6b6b" : "#222228"}`, borderRadius: 8, color: "#e8e8ed",
+                  width: "100%", padding: "0.75rem 1rem", background: "var(--surface-2)",
+                  border: `1px solid ${emailError ? "#ff6b6b" : "var(--border)"}`, borderRadius: 8, color: "var(--text)",
                   fontSize: "0.95rem", fontFamily: "inherit", marginBottom: "0.25rem",
                   boxSizing: "border-box", outline: "none",
                 }}
               />
-              <div style={{ fontSize: "0.7rem", color: emailError ? "#ff6b6b" : "#55555f", marginBottom: "0.75rem", minHeight: "1rem" }}>
+              <div style={{ fontSize: "0.7rem", color: emailError ? "#ff6b6b" : "var(--text-faint)", marginBottom: "0.75rem", minHeight: "1rem" }}>
                 {emailError || t.login_biz_email_hint}
               </div>
               {error && <div style={{ color: "#ff6b6b", fontSize: "0.8rem", marginBottom: "0.75rem" }}>{error}</div>}
               <button type="submit" disabled={busy || !email || !!emailError} style={{
-                width: "100%", padding: "0.75rem", background: "#00e5a0", color: "#0a0a0b",
+                width: "100%", padding: "0.75rem", background: "#00e5a0", color: "var(--bg)",
                 fontWeight: 600, borderRadius: 8, border: "none",
                 cursor: (busy || emailError) ? "not-allowed" : "pointer",
                 fontSize: "0.9rem", opacity: (busy || emailError) ? 0.4 : 1,
               }}>{busy ? t.login_sending : t.login_send}</button>
             </form>
-            <p style={{ fontSize: "0.7rem", color: "#55555f", marginTop: "1rem", textAlign: "center", lineHeight: 1.55 }}>
+            <p style={{ fontSize: "0.7rem", color: "var(--text-faint)", marginTop: "1rem", textAlign: "center", lineHeight: 1.55 }}>
               {lang === "sk" ? "Prihlásením súhlasíš s " : "By signing in you agree to our "}
-              <a href="/terms" style={{ color: "#8a8a96", textDecoration: "underline" }}>{lang === "sk" ? "obchodnými podmienkami" : "Terms of Service"}</a>
+              <a href="/terms" style={{ color: "var(--text-dim)", textDecoration: "underline" }}>{lang === "sk" ? "obchodnými podmienkami" : "Terms of Service"}</a>
               {lang === "sk" ? " a " : " and "}
-              <a href="/privacy" style={{ color: "#8a8a96", textDecoration: "underline" }}>{lang === "sk" ? "ochranou osobných údajov" : "Privacy Policy"}</a>
+              <a href="/privacy" style={{ color: "var(--text-dim)", textDecoration: "underline" }}>{lang === "sk" ? "ochranou osobných údajov" : "Privacy Policy"}</a>
               {lang === "sk" ? ". Free verzia zahŕňa plný prístup k 1 projektu." : ". Free tier includes access to 1 full project snapshot."}
             </p>
           </>
@@ -156,10 +156,10 @@ export default function LoginModal({ open, onClose, lang = "en" }) {
           <>
             <div style={{ fontSize: "2rem", textAlign: "center", marginBottom: "0.5rem" }}>🔑</div>
             <h2 style={{ fontSize: "1.3rem", fontWeight: 700, textAlign: "center", marginBottom: "0.5rem" }}>{t.login_check_title}</h2>
-            <p style={{ fontSize: "0.85rem", color: "#8a8a96", textAlign: "center", lineHeight: 1.6, marginBottom: "0.25rem" }}>
-              {t.login_check_body_prefix} <strong style={{ color: "#e8e8ed" }}>{email}</strong>{t.login_check_body_suffix}
+            <p style={{ fontSize: "0.85rem", color: "var(--text-dim)", textAlign: "center", lineHeight: 1.6, marginBottom: "0.25rem" }}>
+              {t.login_check_body_prefix} <strong style={{ color: "var(--text)" }}>{email}</strong>{t.login_check_body_suffix}
             </p>
-            <p style={{ fontSize: "0.7rem", color: "#55555f", textAlign: "center", marginBottom: "1rem" }}>
+            <p style={{ fontSize: "0.7rem", color: "var(--text-faint)", textAlign: "center", marginBottom: "1rem" }}>
               {t.login_code_hint}
             </p>
             <form onSubmit={verifySubmit}>
@@ -170,15 +170,15 @@ export default function LoginModal({ open, onClose, lang = "en" }) {
                 aria-label={t.login_code_placeholder}
                 placeholder={t.login_code_placeholder}
                 style={{
-                  width: "100%", padding: "0.85rem 1rem", background: "#0e0e10",
-                  border: `1px solid ${verifyError ? "#ff6b6b" : "#222228"}`, borderRadius: 8, color: "#e8e8ed",
+                  width: "100%", padding: "0.85rem 1rem", background: "var(--surface-2)",
+                  border: `1px solid ${verifyError ? "#ff6b6b" : "var(--border)"}`, borderRadius: 8, color: "var(--text)",
                   fontSize: "1.5rem", fontFamily: "'JetBrains Mono', monospace", textAlign: "center",
                   letterSpacing: "0.4em", marginBottom: "0.5rem", boxSizing: "border-box", outline: "none",
                 }}
               />
               {verifyError && <div style={{ color: "#ff6b6b", fontSize: "0.8rem", marginBottom: "0.6rem", textAlign: "center" }}>{verifyError}</div>}
               <button type="submit" disabled={busyVerify || !code} style={{
-                width: "100%", padding: "0.75rem", background: "#00e5a0", color: "#0a0a0b",
+                width: "100%", padding: "0.75rem", background: "#00e5a0", color: "var(--bg)",
                 fontWeight: 600, borderRadius: 8, border: "none",
                 cursor: (busyVerify || !code) ? "not-allowed" : "pointer",
                 fontSize: "0.9rem", opacity: (busyVerify || !code) ? 0.4 : 1,
@@ -186,12 +186,12 @@ export default function LoginModal({ open, onClose, lang = "en" }) {
             </form>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "1rem" }}>
               <button onClick={resend} disabled={busyResend} style={{
-                background: "none", border: "none", color: resent ? "#00e5a0" : "#8a8a96",
+                background: "none", border: "none", color: resent ? "#00e5a0" : "var(--text-dim)",
                 fontSize: "0.78rem", cursor: busyResend ? "default" : "pointer", padding: 0,
                 fontFamily: "inherit",
               }}>{resent ? t.login_resent : t.login_resend}</button>
               <button onClick={onClose} style={{
-                background: "none", border: "none", color: "#55555f",
+                background: "none", border: "none", color: "var(--text-faint)",
                 fontSize: "0.78rem", cursor: "pointer", padding: 0, fontFamily: "inherit",
               }}>{t.login_close}</button>
             </div>

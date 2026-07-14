@@ -34,9 +34,9 @@ const HIDE_DAYS = 7;
 
 const green   = "#00e5a0";
 const orange  = "#f5a623";
-const dim     = "#8a8a96";
-const text    = "#e8e8ed";
-const border  = "#222228";
+const dim     = "var(--text-dim)";
+const text    = "var(--text)";
+const border  = "var(--border)";
 const mono    = "'JetBrains Mono', ui-monospace, Menlo, monospace";
 
 function isDismissedNow() {
@@ -99,7 +99,7 @@ export default function AiBetaBanner({ lang = "sk", compact = false }) {
         }}
       >
         <span style={{
-          background: orange, color: "#0a0a0b",
+          background: orange, color: "var(--bg)",
           padding: "0.05rem 0.35rem", borderRadius: 3,
           fontSize: "0.56rem", fontWeight: 700, letterSpacing: "0.08em",
         }}>{T.label}</span>
@@ -140,7 +140,7 @@ export default function AiBetaBanner({ lang = "sk", compact = false }) {
     >
       <span aria-hidden style={{ fontSize: "1rem", lineHeight: 1 }}>{T.icon}</span>
       <span style={{
-        background: orange, color: "#0a0a0b",
+        background: orange, color: "var(--bg)",
         padding: "0.1rem 0.45rem", borderRadius: 3,
         fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.08em",
       }}>{T.label}</span>

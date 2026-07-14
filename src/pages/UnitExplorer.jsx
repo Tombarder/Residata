@@ -21,7 +21,7 @@ const DEFAULT_COLS = ["project_name", "city", "cast", "typ", "izby", "obytna_plo
 
 // design tokens — identical to PivotV2 so the two pages feel like one product
 import { accent as green, orange, dim, border, bg, surfacePanel as panelHi, text } from "../lib/theme";
-const panel = "#0e0e12";
+const panel = "var(--surface-2)";
 const mono = "'JetBrains Mono', ui-monospace, Menlo, monospace";
 
 // group the registry fields into readable categories for the palette
@@ -322,13 +322,13 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
             onScroll={(e) => { const el = e.currentTarget; setScrollTop(el.scrollTop); if (hasMore && !loading && el.scrollHeight - el.scrollTop - el.clientHeight < 500) loadMore(); }}
             style={{ overflow: "auto", height: "62vh", border: `1px solid ${border}`, borderRadius: 8, background: panel }}>
             <table style={{ borderCollapse: "separate", borderSpacing: 0, tableLayout: "fixed", width: "100%", minWidth: Math.max(1, cols.length) * 150, fontSize: "0.8rem" }}>
-              <thead style={{ background: "#0e0e10", position: "sticky", top: 0, zIndex: 1 }}>
+              <thead style={{ background: "var(--surface-2)", position: "sticky", top: 0, zIndex: 1 }}>
                 <tr>
                   {cols.map((k) => {
                     const numeric = fields.find((f) => f.key === k)?.type === "numeric";
                     return (
                       <th key={k} onClick={() => toggleSort(k)} title={t("Klikni pre zoradenie", "Click to sort")}
-                        style={{ padding: "0.55rem 0.7rem", textAlign: numeric ? "right" : "left", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", cursor: "pointer", borderBottom: `1px solid ${border}`, color: sort.key === k ? green : "#c4c4cc", userSelect: "none", fontFamily: mono, fontSize: "0.68rem", letterSpacing: "0.04em", textTransform: "uppercase", fontWeight: 700 }}>
+                        style={{ padding: "0.55rem 0.7rem", textAlign: numeric ? "right" : "left", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", cursor: "pointer", borderBottom: `1px solid ${border}`, color: sort.key === k ? green : "var(--text-2)", userSelect: "none", fontFamily: mono, fontSize: "0.68rem", letterSpacing: "0.04em", textTransform: "uppercase", fontWeight: 700 }}>
                         {lbl(k)}{sort.key === k ? (sort.dir === "asc" ? " ▲" : " ▼") : ""}
                       </th>
                     );
@@ -340,12 +340,12 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
                 {visible.map((r, vi) => {
                   const i = startIdx + vi;
                   return (
-                    <tr key={r.composite_unit_id || i} style={{ background: i % 2 ? "#0c0c0f" : "transparent" }}
+                    <tr key={r.composite_unit_id || i} style={{ background: i % 2 ? "var(--surface-2)" : "transparent" }}
                       onMouseEnter={(e) => (e.currentTarget.style.background = panelHi)}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = i % 2 ? "#0c0c0f" : "transparent")}>
+                      onMouseLeave={(e) => (e.currentTarget.style.background = i % 2 ? "var(--surface-2)" : "transparent")}>
                       {cols.map((k) => {
                         const numeric = fields.find((f) => f.key === k)?.type === "numeric";
-                        return <td key={k} style={{ height: ROW_H, boxSizing: "border-box", padding: "0 0.7rem", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: numeric ? "right" : "left", borderTop: `1px solid #16161a`, color: k === sort.key ? text : "#c4c4cc", fontFamily: numeric ? mono : "inherit", fontVariantNumeric: "tabular-nums" }}>{fmtVal(k, r[k], fmtByKey)}</td>;
+                        return <td key={k} style={{ height: ROW_H, boxSizing: "border-box", padding: "0 0.7rem", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: numeric ? "right" : "left", borderTop: `1px solid var(--surface)`, color: k === sort.key ? text : "var(--text-2)", fontFamily: numeric ? mono : "inherit", fontVariantNumeric: "tabular-nums" }}>{fmtVal(k, r[k], fmtByKey)}</td>;
                       })}
                     </tr>
                   );

@@ -11,7 +11,7 @@ import { useSales, usePivotDistinct } from "../lib/useData";
 import LoadError from "../components/LoadError";
 import { accent as green, orange, dim, border, bg, surfacePanel as panelHi, text } from "../lib/theme";
 
-const panel = "#0e0e12";
+const panel = "var(--surface-2)";
 const mono = "'JetBrains Mono', ui-monospace, Menlo, monospace";
 
 const PERIODS = [[30, "30 dní", "30 days"], [45, "45 dní", "45 days"], [60, "60 dní", "60 days"], [90, "90 dní", "90 days"]];
@@ -222,7 +222,7 @@ export default function SalesView({ lang = "sk" }) {
               {projects.length > 0 && <div onClick={() => setProjects([])} style={{ cursor: "pointer", color: dim, fontSize: "0.72rem", fontFamily: mono, padding: "0.2rem 0.3rem" }}>✕ {t("zrušiť výber", "clear")}</div>}
               {projOpts.loading && <div style={{ color: dim, fontSize: "0.75rem", padding: "0.3rem" }}>{t("načítavam…", "loading…")}</div>}
               {projFiltered.map((v) => (
-                <label key={v} style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.28rem 0.3rem", fontSize: "0.78rem", cursor: "pointer", color: projects.includes(v) ? text : "#c4c4cc", borderRadius: 4 }}
+                <label key={v} style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.28rem 0.3rem", fontSize: "0.78rem", cursor: "pointer", color: projects.includes(v) ? text : "var(--text-2)", borderRadius: 4 }}
                   onMouseEnter={(e) => (e.currentTarget.style.background = panelHi)} onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
                   <input type="checkbox" checked={projects.includes(v)} onChange={() => toggleProject(v)} />
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v}</span>
@@ -276,12 +276,12 @@ export default function SalesView({ lang = "sk" }) {
               {brk.loading && <tr><td colSpan={5} style={{ padding: "1rem", textAlign: "center", color: dim }}>{t("načítavam…", "loading…")}</td></tr>}
               {!brk.loading && brkRows.length === 0 && <tr><td colSpan={5} style={{ padding: "1.2rem", textAlign: "center", color: dim, fontStyle: "italic" }}>{isPipe ? t("Žiadne jednotky pre tento výber.", "No units for this selection.") : t("Žiadne predaje pre tento výber.", "No sales for this selection.")}</td></tr>}
               {brkRows.map((r, i) => (
-                <tr key={String(r.group) + i} style={{ background: i % 2 ? "#0c0c0f" : "transparent" }}>
+                <tr key={String(r.group) + i} style={{ background: i % 2 ? "var(--surface-2)" : "transparent" }}>
                   <td style={{ padding: "0.4rem 0.6rem", color: text }}>{r.group ?? "—"}</td>
                   <td style={{ padding: "0.4rem 0.6rem", textAlign: "right", fontFamily: mono, color: text }}>{Number(r.sold).toLocaleString("sk-SK")}</td>
-                  <td style={{ padding: "0.4rem 0.6rem", textAlign: "right", fontFamily: mono, color: "#c4c4cc" }}>{fmtMoney(r.sold_value_eur)}</td>
-                  <td style={{ padding: "0.4rem 0.6rem", textAlign: "right", fontFamily: mono, color: "#c4c4cc" }}>{fmtCell("per_m2", r.median_eur_m2)}</td>
-                  <td style={{ padding: "0.4rem 0.6rem", textAlign: "right", fontFamily: mono, color: "#c4c4cc" }}>{r.median_days_on_market != null ? Math.round(r.median_days_on_market) : "—"}</td>
+                  <td style={{ padding: "0.4rem 0.6rem", textAlign: "right", fontFamily: mono, color: "var(--text-2)" }}>{fmtMoney(r.sold_value_eur)}</td>
+                  <td style={{ padding: "0.4rem 0.6rem", textAlign: "right", fontFamily: mono, color: "var(--text-2)" }}>{fmtCell("per_m2", r.median_eur_m2)}</td>
+                  <td style={{ padding: "0.4rem 0.6rem", textAlign: "right", fontFamily: mono, color: "var(--text-2)" }}>{r.median_days_on_market != null ? Math.round(r.median_days_on_market) : "—"}</td>
                 </tr>
               ))}
             </tbody>
@@ -297,13 +297,13 @@ export default function SalesView({ lang = "sk" }) {
         </div>
         <div style={{ overflowX: "auto", maxHeight: "60vh", overflowY: "auto" }}>
           <table style={{ borderCollapse: "separate", borderSpacing: 0, width: "100%", fontSize: "0.78rem", minWidth: 820 }}>
-            <thead style={{ position: "sticky", top: 0, background: "#0e0e10", zIndex: 1 }}><tr>
+            <thead style={{ position: "sticky", top: 0, background: "var(--surface-2)", zIndex: 1 }}><tr>
               {detailCols.filter((c) => c[3] !== "hide").map((c) => {
                 const numeric = ["num", "eur", "per_m2", "area"].includes(c[3]);
                 const sortable = SORTABLE.includes(c[0]);
                 return (
                   <th key={c[0]} onClick={sortable ? () => toggleSort(c[0]) : undefined}
-                    style={{ padding: "0.45rem 0.6rem", textAlign: numeric ? "right" : "left", borderBottom: `1px solid ${border}`, color: sort.key === c[0] ? green : "#c4c4cc", cursor: sortable ? "pointer" : "default", fontFamily: mono, fontSize: "0.64rem", textTransform: "uppercase", letterSpacing: "0.03em", whiteSpace: "nowrap", userSelect: "none" }}>
+                    style={{ padding: "0.45rem 0.6rem", textAlign: numeric ? "right" : "left", borderBottom: `1px solid ${border}`, color: sort.key === c[0] ? green : "var(--text-2)", cursor: sortable ? "pointer" : "default", fontFamily: mono, fontSize: "0.64rem", textTransform: "uppercase", letterSpacing: "0.03em", whiteSpace: "nowrap", userSelect: "none" }}>
                     {t(c[1], c[2])}{sort.key === c[0] ? (sort.dir === "asc" ? " ▲" : " ▼") : ""}
                   </th>
                 );
@@ -314,17 +314,17 @@ export default function SalesView({ lang = "sk" }) {
               {det.error && <tr><td colSpan={10} style={{ padding: 0 }}><LoadError lang={lang} /></td></tr>}
               {!det.loading && !det.error && detRows.length === 0 && <tr><td colSpan={10} style={{ padding: "1.5rem", textAlign: "center", color: dim, fontStyle: "italic" }}>{isPipe ? t("Žiadne jednotky v tomto stave pre tento výber.", "No units in this state for this selection.") : t("Žiadne predané byty pre tento výber a obdobie.", "No sold units for this selection and period.")}</td></tr>}
               {detRows.map((r, i) => (
-                <tr key={(r.project_id || "") + (r.unit_id || "") + i} style={{ background: i % 2 ? "#0c0c0f" : "transparent" }}>
+                <tr key={(r.project_id || "") + (r.unit_id || "") + i} style={{ background: i % 2 ? "var(--surface-2)" : "transparent" }}>
                   {detailCols.filter((c) => c[3] !== "hide").map((c) => {
                     const numeric = ["num", "eur", "per_m2", "area"].includes(c[3]);
                     if (c[3] === "sig") {
                       const marked = r.detection_method === "marked";
-                      return <td key={c[0]} style={{ padding: "0.35rem 0.6rem", borderTop: `1px solid #16161a` }}>
+                      return <td key={c[0]} style={{ padding: "0.35rem 0.6rem", borderTop: `1px solid var(--surface)` }}>
                         <span title={marked ? t("Developer označil ako predané", "Developer marked as sold") : t("Zmizol z ponuky (developer neoznačuje predané)", "Removed from listing (developer doesn't mark sold)")}
                           style={{ fontFamily: mono, fontSize: "0.62rem", color: marked ? green : orange }}>{marked ? t("označené", "marked") : t("zmizol", "delisted")}</span>
                       </td>;
                     }
-                    return <td key={c[0]} style={{ padding: "0.35rem 0.6rem", textAlign: numeric ? "right" : "left", borderTop: `1px solid #16161a`, color: "#c4c4cc", fontFamily: numeric ? mono : "inherit", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+                    return <td key={c[0]} style={{ padding: "0.35rem 0.6rem", textAlign: numeric ? "right" : "left", borderTop: `1px solid var(--surface)`, color: "var(--text-2)", fontFamily: numeric ? mono : "inherit", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
                       {c[0] === "days_on_market" && r.left_censored ? <span title={t("Byt bol v ponuke ešte pred spustením sledovania — presný čas na trhu nepoznáme", "Listed before tracking began — true days-on-market unknown")} style={{ color: dim }}>—</span> : fmtCell(c[3], r[c[0]])}
                     </td>;
                   })}

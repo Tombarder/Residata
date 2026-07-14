@@ -33,11 +33,11 @@ import ProjectsEditor from "../components/ProjectsEditor";
 const green = "#00e5a0";
 const amber = "#f5a623";
 const blue = "#4a9eff";
-const textLight = "#e8e8ed";
-const dim = "#8a8a96";
-const border = "#222228";
-const bg = "#0a0a0b";
-const bg2 = "#0e0e10";
+const textLight = "var(--text)";
+const dim = "var(--text-dim)";
+const border = "var(--border)";
+const bg = "var(--bg)";
+const bg2 = "var(--surface-2)";
 const mono = "'JetBrains Mono', monospace";
 
 const SUPA_URL = import.meta.env.VITE_SUPABASE_URL;

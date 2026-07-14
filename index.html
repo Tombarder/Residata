@@ -17,6 +17,12 @@
          is already set when src/lib/useData.js seeds useMarketTotals. -->
     <script>window.__RESIDATA_SNAPSHOT__ = __BUILD_SNAPSHOT_JSON__;</script>
 
+    <!-- Theme baseline = dark. The light theme is scoped to the PLATFORM (/app):
+         PlatformShell applies the stored preference on mount and reverts to dark on
+         unmount, so the public marketing site always renders in its designed dark look
+         (its hero/sections aren't themed). Mirrors src/lib/theme-mode.js. -->
+    <script>document.documentElement.setAttribute('data-theme','dark');</script>
+
     <!-- Primary meta (overridden per-route at runtime via useSeoMeta) -->
     <title>Residata — New-Build Market Intelligence for Slovakia & Czechia</title>
     <meta name="description" content="Automated market intelligence on every new residential development across Slovakia and Czechia. Pricing, availability, absorption rate, and trends — structured and refreshed daily. Built for developers, banks, valuers, and investors." />

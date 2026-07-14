@@ -78,7 +78,7 @@ function Section({ title, children }) {
       <h2 style={{
         fontSize: "1.1rem",
         fontWeight: 600,
-        color: "#e8e8ed",
+        color: "var(--text)",
         margin: "0 0 0.85rem 0",
         letterSpacing: "-0.01em",
       }}>{title}</h2>
@@ -104,7 +104,7 @@ export function PrivacyPage({ lang }) {
 
   return (
     <LegalPageShell title={isSK ? "Zásady ochrany osobných údajov" : "Privacy Policy"}>
-      <p style={{ marginTop: 0, fontSize: "0.82rem", color: "#8a8a96", marginBottom: "2rem" }}>
+      <p style={{ marginTop: 0, fontSize: "0.82rem", color: "var(--text-dim)", marginBottom: "2rem" }}>
         {lastUpdated}
       </p>
 
@@ -351,7 +351,7 @@ export function TermsPage({ lang }) {
 
   return (
     <LegalPageShell title={isSK ? "Obchodné podmienky" : "Terms of Service"}>
-      <p style={{ marginTop: 0, fontSize: "0.82rem", color: "#8a8a96", marginBottom: "2rem" }}>{lastUpdated}</p>
+      <p style={{ marginTop: 0, fontSize: "0.82rem", color: "var(--text-dim)", marginBottom: "2rem" }}>{lastUpdated}</p>
 
       <Section title={isSK ? "1. Úvod a súhlas" : "1. Introduction and acceptance"}>
         <p>{isSK

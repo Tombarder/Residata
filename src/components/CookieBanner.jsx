@@ -123,8 +123,8 @@ export default function CookieBanner({ lang = "en" }) {
         right: "calc(20px + var(--safe-right))",
         maxWidth: 640,
         margin: "0 auto",
-        background: "#16161a",
-        border: "1px solid #2a2a32",
+        background: "var(--surface)",
+        border: "1px solid var(--border-soft)",
         borderRadius: 12,
         padding: "1.25rem 1.5rem",
         zIndex: "var(--z-cookie)",
@@ -160,8 +160,8 @@ export default function CookieBanner({ lang = "en" }) {
 
       {expanded && (
         <div style={{
-          background: "#0e0e10",
-          border: "1px solid #222228",
+          background: "var(--surface-2)",
+          border: "1px solid var(--border)",
           borderRadius: 8,
           padding: "0.85rem 1rem",
           margin: "0.85rem 0",
@@ -171,27 +171,27 @@ export default function CookieBanner({ lang = "en" }) {
             justifyContent: "space-between",
             alignItems: "center",
             paddingBottom: "0.6rem",
-            borderBottom: "1px solid #222228",
+            borderBottom: "1px solid var(--border)",
             marginBottom: "0.6rem",
           }}>
             <div>
-              <div style={{ fontWeight: 600, color: "#e8e8ed" }}>
+              <div style={{ fontWeight: 600, color: "var(--text)" }}>
                 {isSK ? "Nevyhnutné" : "Essential"}
               </div>
-              <div style={{ fontSize: "0.78rem", color: "#8a8a96" }}>
+              <div style={{ fontSize: "0.78rem", color: "var(--text-dim)" }}>
                 {isSK ? "Prihlásenie a relácia (Supabase). Bez týchto cookies stránka nefunguje." : "Login and session (Supabase). The site does not work without these."}
               </div>
             </div>
-            <span style={{ fontSize: "0.78rem", color: "#55555f" }}>
+            <span style={{ fontSize: "0.78rem", color: "var(--text-faint)" }}>
               {isSK ? "vždy zapnuté" : "always on"}
             </span>
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
-              <div style={{ fontWeight: 600, color: "#e8e8ed" }}>
+              <div style={{ fontWeight: 600, color: "var(--text)" }}>
                 {isSK ? "Analytické" : "Analytics"}
               </div>
-              <div style={{ fontSize: "0.78rem", color: "#8a8a96" }}>
+              <div style={{ fontSize: "0.78rem", color: "var(--text-dim)" }}>
                 {isSK ? "Žiadne nie sú aktívne. Pri pridaní v budúcnosti budeme rešpektovať túto voľbu." : "None currently active. If added in the future, this choice will be respected."}
               </div>
             </div>
@@ -202,7 +202,7 @@ export default function CookieBanner({ lang = "en" }) {
                 onChange={e => setAnalytics(e.target.checked)}
                 style={{ width: 16, height: 16, accentColor: "#00e5a0" }}
               />
-              <span style={{ fontSize: "0.78rem", color: analytics ? "#00e5a0" : "#8a8a96" }}>
+              <span style={{ fontSize: "0.78rem", color: analytics ? "#00e5a0" : "var(--text-dim)" }}>
                 {analytics ? (isSK ? "povolené" : "allowed") : (isSK ? "blokované" : "blocked")}
               </span>
             </label>
@@ -215,7 +215,7 @@ export default function CookieBanner({ lang = "en" }) {
           onClick={acceptAll}
           style={{
             background: "#00e5a0",
-            color: "#0a0a0c",
+            color: "var(--bg)",
             border: "none",
             padding: "0.55rem 1.1rem",
             borderRadius: 8,
@@ -230,8 +230,8 @@ export default function CookieBanner({ lang = "en" }) {
           onClick={rejectAll}
           style={{
             background: "transparent",
-            color: "#e8e8ed",
-            border: "1px solid #2a2a32",
+            color: "var(--text)",
+            border: "1px solid var(--border-soft)",
             padding: "0.55rem 1.1rem",
             borderRadius: 8,
             fontSize: "0.82rem",
@@ -246,7 +246,7 @@ export default function CookieBanner({ lang = "en" }) {
             onClick={() => setExpanded(true)}
             style={{
               background: "transparent",
-              color: "#8a8a96",
+              color: "var(--text-dim)",
               border: "none",
               padding: "0.55rem 0.5rem",
               fontSize: "0.82rem",

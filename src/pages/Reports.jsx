@@ -739,7 +739,7 @@ function ProjectReport({ project, siblings, lang }) {
       ]} />
 
       <ReportSection label={lang === "sk" ? "Profil projektu" : "Project profile"} title={title}>
-        <p style={{ color: "#c4c4cc", lineHeight: 1.7, margin: 0 }}>
+        <p style={{ color: "var(--text-2)", lineHeight: 1.7, margin: 0 }}>
           {lang === "sk" ? (
             <><strong style={{ color: text }}>{project.name}</strong> od developera <strong style={{ color: text }}>{project.developer || "—"}</strong> v časti <strong style={{ color: text }}>{project.district || "—"}</strong>.
             {summary.hasUnitData
@@ -848,7 +848,7 @@ function KpiStrip({ summary, lang, extra = [] }) {
 function ExecSummary({ summary, lang, extraDistrict, compared }) {
   // Compact Slovak summary paragraph
   return (
-    <p style={{ color: "#c0c0c8", fontSize: "0.95rem", lineHeight: 1.7, margin: 0 }}>
+    <p style={{ color: "var(--text-2)", fontSize: "0.95rem", lineHeight: 1.7, margin: 0 }}>
       {lang === "sk" ? (
         <>V tomto výbere sledujeme <strong style={{ color: text }}>{summary.projectCount}</strong> projektov s kapacitou <strong style={{ color: text }}>{summary.totalUnits.toLocaleString("sk-SK")}</strong> bytov.
         Aktuálne je voľných <strong style={{ color: green }}>{summary.available.toLocaleString("sk-SK")}</strong>, predaných <strong style={{ color: orange }}>{summary.sold.toLocaleString("sk-SK")}</strong>.
@@ -953,7 +953,7 @@ function Histogram({ bins, lang, unit, onFetchBin, onProjectClick }) {
 
       <style>{`
         .rep-hist-clickable { cursor: pointer; transition: background 0.12s, border-color 0.12s; }
-        .rep-hist-clickable:hover .rep-hist-label { color: #e8e8ed; }
+        .rep-hist-clickable:hover .rep-hist-label { color: var(--text); }
         .rep-hist-clickable:hover .rep-hist-bar { border-color: #00e5a0; }
         .rep-hist-clickable:hover .rep-hist-count { color: #00e5a0; }
         .rep-hist-clickable.is-active .rep-hist-label { color: #00e5a0; font-weight: 700; }
@@ -1141,7 +1141,7 @@ function AggregateTable({ rows, lang, nameLabel }) {
 }
 const tdh  = { padding: "0.55rem 0.75rem", fontWeight: 700, textAlign: "left" };
 const tdhR = { ...tdh, textAlign: "right" };
-const tdc  = { padding: "0.45rem 0.75rem", color: "#c4c4cc", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 240 };
+const tdc  = { padding: "0.45rem 0.75rem", color: "var(--text-2)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 240 };
 const tdcR = { ...tdc, textAlign: "right", fontFamily: mono, color: text };
 
 /* ─── BenchmarkCard — compares scope vs market ─── */
@@ -1376,7 +1376,7 @@ function TopSellerList({ projects, lang }) {
     return <div style={{ color: dim, fontSize: "0.85rem" }}>{lang === "sk" ? "Predajné dáta sa naplnia po ďalšom mesačnom behu." : "Velocity data populates after the next monthly run."}</div>;
   }
   return (
-    <ol style={{ paddingLeft: "1.25rem", margin: 0, color: "#c0c0c8", fontSize: "0.88rem", lineHeight: 1.8 }}>
+    <ol style={{ paddingLeft: "1.25rem", margin: 0, color: "var(--text-2)", fontSize: "0.88rem", lineHeight: 1.8 }}>
       {tops.map(p => (
         <li key={p.id}>
           <strong style={{ color: text }}>{p.name}</strong> ({p.district || "—"}) — <span style={{ color: green, fontFamily: mono, fontWeight: 700 }}>+{p.sold_last_month}</span> {lang === "sk" ? "predaných" : "sold"}
@@ -1394,7 +1394,7 @@ function FooterCard({ lang }) {
       <div style={{ fontFamily: mono, fontSize: "0.62rem", color: dim, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.3rem" }}>
         {lang === "sk" ? "Čo ďalej" : "What's next"}
       </div>
-      <p style={{ color: "#c0c0c8", fontSize: "0.82rem", lineHeight: 1.6, margin: 0 }}>
+      <p style={{ color: "var(--text-2)", fontSize: "0.82rem", lineHeight: 1.6, margin: 0 }}>
         {lang === "sk"
           ? "Potrebuješ špecifický uhol (časová rada, porovnanie dvoch projektov, e-mail report)? Napíš na residata@proton.me — vieme pridať."
           : "Need a specific angle (time series, side-by-side, email report)? Email residata@proton.me."}
@@ -1504,7 +1504,7 @@ function SellOutForecastReport({ projects, lang, onOpenProject }) {
         label={lang === "sk" ? "Analytický report" : "Analytical report"}
         title={lang === "sk" ? "Predpoveď vypredania" : "Sell-out forecast"}
       >
-        <p style={{ color: "#c0c0c8", fontSize: "0.9rem", lineHeight: 1.65, margin: "0 0 1rem" }}>
+        <p style={{ color: "var(--text-2)", fontSize: "0.9rem", lineHeight: 1.65, margin: "0 0 1rem" }}>
           {lang === "sk"
             ? "Pri aktuálnej rýchlosti predaja: za koľko mesiacov sa vypredá inventár každého projektu? Implicitne radené od najrýchlejších — pre konkurentov je to signál ceny, pre developerov absorpčný benchmark, pre investorov mapa kde sa kapitál točí."
             : "At the current sales pace: how many months until each project's inventory sells out? Sorted fastest-first — competitors read it as a price signal, developers as an absorption benchmark, investors as a map of where capital is rotating."}
@@ -1750,7 +1750,7 @@ function ComparableTransactionsReport({ projects, lang }) {
         label={lang === "sk" ? "Analytický report" : "Analytical report"}
         title={lang === "sk" ? "Porovnateľné transakcie" : "Comparable transactions"}
       >
-        <p style={{ color: "#c0c0c8", fontSize: "0.9rem", lineHeight: 1.65, margin: "0 0 1rem" }}>
+        <p style={{ color: "var(--text-2)", fontSize: "0.9rem", lineHeight: 1.65, margin: "0 0 1rem" }}>
           {lang === "sk"
             ? "Všetky reálne predané byty (stav „P\") z aktívnej databázy. Pre valuérov, banky a stanovenie kolaterálu — tu sú porovnateľné transakcie, nie marketingové cenníky. Filtrami sa zúži výber, CSV-export pre Excel."
             : "Every actually-sold unit (stav 'P') from our active database. For valuers, banks, and collateral assessment — these are comparable transactions, not marketing list-prices. Filters narrow the set; CSV export drops into Excel."}
@@ -1928,7 +1928,7 @@ function PricingTensionReport({ projects, lang, onOpenProject }) {
         label={lang === "sk" ? "Analytický report" : "Analytical report"}
         title={lang === "sk" ? "Cenový pomer (premium vs. velocity)" : "Pricing tension (premium vs. velocity)"}
       >
-        <p style={{ color: "#c0c0c8", fontSize: "0.9rem", lineHeight: 1.65, margin: "0 0 1rem" }}>
+        <p style={{ color: "var(--text-2)", fontSize: "0.9rem", lineHeight: 1.65, margin: "0 0 1rem" }}>
           {lang === "sk"
             ? "Matrix: ako stojí €/m² každého projektu voči mediánu jeho časti mesta (X), proti rýchlosti predaja % za mesiac (Y). Pravý-horný kvadrant = projekty čo sa predávajú napriek prémii — investorský signál „perceived undervaluation\". Krížový mesačný delta (rast ceny vs. velocity) sa aktivuje po druhom syncu — zatiaľ statický pozičný pohľad."
             : "Matrix: how each project's €/m² compares to its district median (X) vs. monthly sell-through rate (Y). Top-right = projects selling despite a premium — investor signal of \"perceived undervaluation\". Cross-month rising-price-vs-velocity delta activates after the second monthly sync — for now, a static positioning view."}

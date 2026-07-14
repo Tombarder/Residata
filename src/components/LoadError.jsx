@@ -9,11 +9,11 @@ export default function LoadError({ lang = "en", onRetry, compact = false }) {
   return (
     <div style={{
       padding: compact ? "1.1rem 1rem" : "2.25rem 1.5rem",
-      textAlign: "center", color: "#8a8a96",
+      textAlign: "center", color: "var(--text-dim)",
       fontFamily: "system-ui, -apple-system, sans-serif",
     }}>
       <div style={{ fontSize: "1.4rem", marginBottom: "0.55rem" }}>⚠️</div>
-      <div style={{ color: "#e8e8ed", fontWeight: 600, marginBottom: "0.3rem", fontSize: "0.95rem" }}>
+      <div style={{ color: "var(--text)", fontWeight: 600, marginBottom: "0.3rem", fontSize: "0.95rem" }}>
         {sk ? "Dáta sa nepodarilo načítať" : "Couldn’t load the data"}
       </div>
       <div style={{ fontSize: "0.83rem", marginBottom: "1rem", lineHeight: 1.5 }}>

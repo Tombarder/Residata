@@ -10,19 +10,28 @@
 @import "./styles/responsive.css";
 
 :root {
-  /* ── color ────────────────────────────────────────────── */
-  --bg:            #0a0a0b;   /* page background (was also mistyped #0a0a0c in places) */
-  --surface:       #16161a;   /* cards / panels */
-  --surface-2:     #1d1d22;   /* raised surface / inputs */
+  /* ── color — DARK (default). A light theme overrides these under
+     :root[data-theme="light"] below; every neutral in the app resolves to one of
+     these tokens so switching the theme is a single data-attribute flip. Brand /
+     status colors (green / orange / red / blue / yellow) are theme-invariant. ── */
+  --bg:            #0a0a0b;   /* page background */
+  --surface:       #14141a;   /* primary card / panel */
+  --surface-2:     #0e0e12;   /* inset / row-stripe (darker than a card in dark) */
+  --surface-3:     #1c1c22;   /* raised / input / hover */
   --border:        #222228;
-  --border-soft:   #2a2a31;
-  --accent:        #00e5a0;   /* brand green */
+  --border-soft:   #2c2c34;
+  --accent:        #00e5a0;   /* brand green (theme-invariant) */
   --accent-strong: #00c98c;
-  --accent-2:      #f5a623;   /* secondary accent (trial / dev badge) */
+  --accent-2:      #f5a623;   /* secondary accent (theme-invariant) */
+  --danger:        #ff6b6b;   /* error / negative (theme-invariant) */
+  --info:          #4a9eff;   /* reserved / info blue (theme-invariant) */
+  --warning:       #f5d142;   /* warning yellow (theme-invariant) */
   --text:          #e8e8ed;   /* primary text */
-  --text-dim:      #8a8a96;   /* secondary text */
+  --text-2:        #c4c4cc;   /* bright secondary text */
+  --text-dim:      #8a8a96;   /* secondary / label text */
   --text-faint:    #55555f;   /* tertiary / disabled */
-  --on-accent:     #06140f;   /* text on a green fill */
+  --on-accent:     #06140f;   /* text on a green fill (dark, fine on both themes) */
+  color-scheme: dark;
 
   /* ── spacing scale (4px base) ─────────────────────────── */
   --sp-1: 0.25rem; --sp-2: 0.5rem;  --sp-3: 0.75rem; --sp-4: 1rem;
@@ -54,6 +63,32 @@
 
   /* ── motion ───────────────────────────────────────────── */
   --ease: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── LIGHT THEME ─────────────────────────────────────────────────────────────
+   A calm, professional light palette — soft off-white page, white cards,
+   near-black text (not stark). Only neutrals flip; brand green + status colours
+   stay, but red/blue/yellow are darkened so they read on white. Activated by
+   setThemePreference() setting <html data-theme="light"> (see src/lib/theme-mode.js). */
+:root[data-theme="light"] {
+  --bg:            #eceff3;
+  --surface:       #ffffff;
+  --surface-2:     #f3f5f8;
+  --surface-3:     #e7ebf1;
+  --border:        #dce0e6;
+  --border-soft:   #e6e9ee;
+  --accent:        #00e5a0;
+  --accent-strong: #00b585;
+  --accent-2:      #e2900a;
+  --danger:        #d92d20;
+  --info:          #2563eb;
+  --warning:       #b8860b;
+  --text:          #1a1d23;
+  --text-2:        #3c414b;
+  --text-dim:      #667085;
+  --text-faint:    #98a0ac;
+  --on-accent:     #06140f;
+  color-scheme: light;
 }
 
 /* ── universal box model: borders + padding stay inside declared widths ─── */

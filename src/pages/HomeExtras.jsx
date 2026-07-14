@@ -20,9 +20,9 @@ const PANEL_SAMPLE = {
   CZ: { avg: "7,443", mom: "+1.5%", rows: [["Ethos Karlín", "Karlín", "9,960"], ["TOIVO Roztyly", "Chodov", "6,928"]] },
 };
 const green = "#00e5a0";
-const dim = "#8a8a96";
-const border = "#222228";
-const bg = "#16161a";
+const dim = "var(--text-dim)";
+const border = "var(--border)";
+const bg = "var(--surface)";
 
 /* ──────────────────────────────────────────────────────────
    0. PIPELINE FLOW — dynamic single-canvas visualisation
@@ -60,7 +60,7 @@ function IsoBuildingsCluster() {
             {/* Top face (parallelogram) */}
             <polygon
               points={`${x},${y} ${x + depth * 0.8},${y - depth * 0.5} ${x + w + depth * 0.8},${y - depth * 0.5} ${x + w},${y}`}
-              fill="#3a3a44"
+              fill="var(--border-soft)"
               stroke="#4a4a54" strokeWidth="0.4"
             />
             {/* Right side face (dark) */}
@@ -70,7 +70,7 @@ function IsoBuildingsCluster() {
               stroke="#1a1a20" strokeWidth="0.4"
             />
             {/* Front face with subtle gradient */}
-            <rect x={x} y={y} width={w} height={h} fill="url(#iso-wall)" stroke="#2a2a32" strokeWidth="0.5" />
+            <rect x={x} y={y} width={w} height={h} fill="url(#iso-wall)" stroke="var(--border-soft)" strokeWidth="0.5" />
             {/* Windows — 3 cols × N rows */}
             {Array.from({ length: rows }).map((_, r) =>
               Array.from({ length: cols }).map((_, c) => {
@@ -124,7 +124,7 @@ function CenterHub({ subtitle }) {
       <g>
         <polygon
           points="0,-56 48,-28 48,28 0,56 -48,28 -48,-28"
-          fill="#0e0e10"
+          fill="var(--surface-2)"
           stroke="#00e5a0"
           strokeWidth="1.8"
         >
@@ -154,7 +154,7 @@ function CenterHub({ subtitle }) {
       ))}
 
       {/* Subtitle tag underneath */}
-      <rect x="-92" y="78" width="184" height="24" rx="12" fill="#0e0e10" stroke="#00e5a0" strokeOpacity="0.4" strokeWidth="0.8" />
+      <rect x="-92" y="78" width="184" height="24" rx="12" fill="var(--surface-2)" stroke="#00e5a0" strokeOpacity="0.4" strokeWidth="0.8" />
       <text x="0" y="94" textAnchor="middle" fill="#00e5a0" fontFamily={mono} fontSize="11" fontWeight="700" letterSpacing="0.06em">
         {subtitle}
       </text>
@@ -167,23 +167,23 @@ function DashboardPanel({ captionRow1, captionRow2, chipLabels, sample }) {
   return (
     <g>
       {/* Panel frame with glow */}
-      <rect x="0" y="0" width="310" height="260" rx="14" fill="#0e0e10" stroke="#00e5a0" strokeOpacity="0.45" strokeWidth="1.3" />
+      <rect x="0" y="0" width="310" height="260" rx="14" fill="var(--surface-2)" stroke="#00e5a0" strokeOpacity="0.45" strokeWidth="1.3" />
       <rect x="0" y="0" width="310" height="260" rx="14" fill="none" stroke="#00e5a0" strokeOpacity="0.12" strokeWidth="4" />
 
       {/* Header bar */}
-      <rect x="0" y="0" width="310" height="32" rx="14" fill="#111113" />
-      <rect x="0" y="18" width="310" height="14" fill="#111113" />
+      <rect x="0" y="0" width="310" height="32" rx="14" fill="var(--surface)" />
+      <rect x="0" y="18" width="310" height="14" fill="var(--surface)" />
       <circle cx="14" cy="16" r="4" fill="#ff5f57" />
       <circle cx="28" cy="16" r="4" fill="#ffbd2e" />
       <circle cx="42" cy="16" r="4" fill="#28c840" />
-      <text x="155" y="20" textAnchor="middle" fill="#55555f" fontFamily={mono} fontSize="9" letterSpacing="0.08em">
+      <text x="155" y="20" textAnchor="middle" fill="var(--text-faint)" fontFamily={mono} fontSize="9" letterSpacing="0.08em">
         residata — live dashboard
       </text>
 
       {/* Chart card — €/m² trend */}
       <g transform="translate(16, 46)">
-        <rect x="0" y="0" width="278" height="100" rx="8" fill="#0a0a0b" stroke="#1a1a1f" strokeWidth="0.6" />
-        <text x="10" y="16" fill="#8a8a96" fontFamily={mono} fontSize="8" letterSpacing="0.06em">AVG €/M² · 6 MONTHS</text>
+        <rect x="0" y="0" width="278" height="100" rx="8" fill="var(--bg)" stroke="var(--surface-3)" strokeWidth="0.6" />
+        <text x="10" y="16" fill="var(--text-dim)" fontFamily={mono} fontSize="8" letterSpacing="0.06em">AVG €/M² · 6 MONTHS</text>
         <text x="268" y="16" textAnchor="end" fill="#00e5a0" fontFamily={mono} fontSize="8" fontWeight="700">{sample.mom} MoM</text>
 
         {/* Area under curve */}
@@ -206,7 +206,7 @@ function DashboardPanel({ captionRow1, captionRow2, chipLabels, sample }) {
         </path>
         {/* Dots */}
         {[[12,80],[52,62],[92,68],[132,44],[172,50],[212,28],[262,40]].map(([x, y], i) => (
-          <circle key={i} cx={x} cy={y} r="2.2" fill="#0a0a0b" stroke="#00e5a0" strokeWidth="1.3" />
+          <circle key={i} cx={x} cy={y} r="2.2" fill="var(--bg)" stroke="#00e5a0" strokeWidth="1.3" />
         ))}
         {/* Current-period marker (rightmost) */}
         <circle cx="262" cy="40" r="4" fill="#00e5a0">
@@ -216,16 +216,16 @@ function DashboardPanel({ captionRow1, captionRow2, chipLabels, sample }) {
 
       {/* Mini table row */}
       <g transform="translate(16, 160)">
-        <rect x="0" y="0" width="278" height="50" rx="6" fill="#0a0a0b" stroke="#1a1a1f" strokeWidth="0.6" />
+        <rect x="0" y="0" width="278" height="50" rx="6" fill="var(--bg)" stroke="var(--surface-3)" strokeWidth="0.6" />
         {/* Row 1 */}
         {/* Real active projects + avg €/m² from DB, per viewed market. */}
-        <text x="10" y="18" fill="#e8e8ed" fontFamily="'Outfit', sans-serif" fontSize="10" fontWeight="600">{sample.rows[0][0]}</text>
-        <text x="150" y="18" fill="#8a8a96" fontFamily={mono} fontSize="9">{sample.rows[0][1]}</text>
+        <text x="10" y="18" fill="var(--text)" fontFamily="'Outfit', sans-serif" fontSize="10" fontWeight="600">{sample.rows[0][0]}</text>
+        <text x="150" y="18" fill="var(--text-dim)" fontFamily={mono} fontSize="9">{sample.rows[0][1]}</text>
         <text x="225" y="18" fill="#00e5a0" fontFamily={mono} fontSize="9" fontWeight="700">{sample.rows[0][2]} €/m²</text>
         {/* Row 2 */}
-        <line x1="8" y1="26" x2="270" y2="26" stroke="#1a1a1f" strokeWidth="0.5" />
-        <text x="10" y="42" fill="#e8e8ed" fontFamily="'Outfit', sans-serif" fontSize="10" fontWeight="600">{sample.rows[1][0]}</text>
-        <text x="150" y="42" fill="#8a8a96" fontFamily={mono} fontSize="9">{sample.rows[1][1]}</text>
+        <line x1="8" y1="26" x2="270" y2="26" stroke="var(--surface-3)" strokeWidth="0.5" />
+        <text x="10" y="42" fill="var(--text)" fontFamily="'Outfit', sans-serif" fontSize="10" fontWeight="600">{sample.rows[1][0]}</text>
+        <text x="150" y="42" fill="var(--text-dim)" fontFamily={mono} fontSize="9">{sample.rows[1][1]}</text>
         <text x="225" y="42" fill="#00e5a0" fontFamily={mono} fontSize="9" fontWeight="700">{sample.rows[1][2]} €/m²</text>
       </g>
 
@@ -237,7 +237,7 @@ function DashboardPanel({ captionRow1, captionRow2, chipLabels, sample }) {
           return (
             <g key={label}>
               <rect x={xs[i]} y="0" width={widths[i]} height="24" rx="5"
-                fill="#0a0a0b" stroke="#00e5a0" strokeOpacity="0.55" strokeWidth="0.9" />
+                fill="var(--bg)" stroke="#00e5a0" strokeOpacity="0.55" strokeWidth="0.9" />
               <text x={xs[i] + widths[i] / 2} y="16" textAnchor="middle"
                 fill="#00e5a0" fontFamily={mono} fontSize="9" fontWeight="700" letterSpacing="0.08em">
                 {label}
@@ -246,8 +246,8 @@ function DashboardPanel({ captionRow1, captionRow2, chipLabels, sample }) {
           );
         })}
         {/* Caption next to chips */}
-        <text x="196" y="10" fill="#8a8a96" fontFamily={mono} fontSize="7" letterSpacing="0.05em">{captionRow1}</text>
-        <text x="196" y="20" fill="#55555f" fontFamily={mono} fontSize="7" letterSpacing="0.05em">{captionRow2}</text>
+        <text x="196" y="10" fill="var(--text-dim)" fontFamily={mono} fontSize="7" letterSpacing="0.05em">{captionRow1}</text>
+        <text x="196" y="20" fill="var(--text-faint)" fontFamily={mono} fontSize="7" letterSpacing="0.05em">{captionRow2}</text>
       </g>
     </g>
   );
@@ -258,7 +258,7 @@ function FlowStream({ x1, y, x2, count = 5, delayOffset = 0, duration = 3.2 }) {
   return (
     <>
       {/* Static track */}
-      <line x1={x1} y1={y} x2={x2} y2={y} stroke="#222228" strokeWidth="1" strokeDasharray="2 4" />
+      <line x1={x1} y1={y} x2={x2} y2={y} stroke="var(--border)" strokeWidth="1" strokeDasharray="2 4" />
       <line x1={x1} y1={y} x2={x2} y2={y} stroke="url(#flow-gradient)" strokeWidth="2" opacity="0.4" />
 
       {/* Animated dots */}
@@ -369,7 +369,7 @@ export function PipelineFlow({ lang = "en" }) {
         <div style={{ fontFamily: mono, fontSize: "0.7rem", color: green, letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "0.75rem" }}>
           {T.label}
         </div>
-        <h2 style={{ fontSize: "clamp(1.8rem, 3.2vw, 2.5rem)", fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1.15, color: "#e8e8ed", margin: 0 }}>
+        <h2 style={{ fontSize: "clamp(1.8rem, 3.2vw, 2.5rem)", fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1.15, color: "var(--text)", margin: 0 }}>
           {T.title}
         </h2>
         <p style={{ color: dim, fontSize: "1rem", marginTop: "0.8rem", maxWidth: 640, margin: "0.8rem auto 0", lineHeight: 1.6 }}>
@@ -380,7 +380,7 @@ export function PipelineFlow({ lang = "en" }) {
       {/* Scene canvas — single cohesive SVG */}
       <div style={{
         position: "relative",
-        background: "linear-gradient(180deg, #0a0a0b 0%, #101014 100%)",
+        background: "linear-gradient(180deg, var(--bg) 0%, #101014 100%)",
         border: `1px solid ${border}`, borderRadius: 16, overflow: "hidden",
         marginBottom: "1.5rem",
       }}>
@@ -405,7 +405,7 @@ export function PipelineFlow({ lang = "en" }) {
             {/* Hub core fill */}
             <linearGradient id="hub-core" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="#1a2a24" />
-              <stop offset="100%" stopColor="#0a0a0b" />
+              <stop offset="100%" stopColor="var(--bg)" />
             </linearGradient>
             {/* Flow line gradient */}
             <linearGradient id="flow-gradient" x1="0" y1="0" x2="1" y2="0">
@@ -428,7 +428,7 @@ export function PipelineFlow({ lang = "en" }) {
             </filter>
             {/* Dot-grid pattern backdrop */}
             <pattern id="dot-grid" width="26" height="26" patternUnits="userSpaceOnUse">
-              <circle cx="1" cy="1" r="0.8" fill="#2a2a32" />
+              <circle cx="1" cy="1" r="0.8" fill="var(--border-soft)" />
             </pattern>
           </defs>
 
@@ -527,7 +527,7 @@ export function PipelineFlow({ lang = "en" }) {
           <div key={i} style={{
             textAlign: "center",
             padding: "1.25rem 0.5rem",
-            background: "linear-gradient(180deg, #0e0e10, #16161a)",
+            background: "linear-gradient(180deg, var(--surface-2), var(--surface))",
           }}>
             <div style={{ fontFamily: mono, fontSize: "clamp(1.6rem, 3vw, 2.2rem)", fontWeight: 700, color: green, letterSpacing: "-0.02em", lineHeight: 1 }}>
               {s.n}
@@ -646,11 +646,11 @@ export function MarketPulse({ lang = "en", setCurrent }) {
       </div>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: "0.25rem 1rem", marginBottom: anyVelocity ? "1rem" : "0.3rem" }}>
-        <h3 style={{ fontSize: "1.1rem", fontWeight: 600, color: "#e8e8ed", fontFamily: mono, letterSpacing: "0.02em" }}>{topTitle}</h3>
+        <h3 style={{ fontSize: "1.1rem", fontWeight: 600, color: "var(--text)", fontFamily: mono, letterSpacing: "0.02em" }}>{topTitle}</h3>
         <button onClick={() => setCurrent && setCurrent("Live")} style={{ background: "none", border: "none", color: green, fontSize: "0.85rem", cursor: "pointer", fontFamily: "inherit", padding: 0, whiteSpace: "nowrap" }}>{openAll}</button>
       </div>
       {!anyVelocity && (
-        <div style={{ fontSize: "0.78rem", color: "#8a8a96", marginBottom: "1rem", fontStyle: "italic" }}>
+        <div style={{ fontSize: "0.78rem", color: "var(--text-dim)", marginBottom: "1rem", fontStyle: "italic" }}>
           {lang === "sk"
             ? "Predaje za posledný mesiac sa ešte len populujú. Zatiaľ zobrazujeme projekty s najväčšou otvorenou ponukou."
             : "Last-month sales are still populating. Showing projects with the largest open inventory meanwhile."}
@@ -664,7 +664,7 @@ export function MarketPulse({ lang = "en", setCurrent }) {
   );
 }
 
-function Stat({ value, label, prefix = "", suffix = "", accent = "#e8e8ed", placeholder = null }) {
+function Stat({ value, label, prefix = "", suffix = "", accent = "var(--text)", placeholder = null }) {
   const display = useAnimatedNumber(value);
   return (
     <div style={{ border: `1px solid ${border}`, borderRadius: 12, background: bg, padding: "1.5rem 1.5rem 1.25rem" }}>
@@ -707,7 +707,7 @@ function ProjectMini({ project, setCurrent, lang }) {
     >
       {/* Header: name + district */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "0.75rem" }}>
-        <div style={{ fontSize: "1rem", fontWeight: 600, color: "#e8e8ed", letterSpacing: "-0.01em", lineHeight: 1.3 }}>{project.name}</div>
+        <div style={{ fontSize: "1rem", fontWeight: 600, color: "var(--text)", letterSpacing: "-0.01em", lineHeight: 1.3 }}>{project.name}</div>
         <div style={{ fontSize: "0.68rem", color: dim, fontFamily: mono, whiteSpace: "nowrap", flexShrink: 0, marginTop: "0.15rem" }}>{project.district || "—"}</div>
       </div>
 
@@ -722,8 +722,8 @@ function ProjectMini({ project, setCurrent, lang }) {
             +{soldLastMonth} {lang === "sk" ? "za mesiac" : "this month"}
           </span>
         )}
-        <span><strong style={{ color: "#e8e8ed", fontWeight: 600 }}>{nf(project.available_units)}</strong> {lang === "sk" ? "voľných" : "available"}</span>
-        {!soldDataUnavailable && <span><strong style={{ color: "#e8e8ed", fontWeight: 600 }}>{nf(project.sold_units)}</strong> {lang === "sk" ? "predaných" : "sold"}</span>}
+        <span><strong style={{ color: "var(--text)", fontWeight: 600 }}>{nf(project.available_units)}</strong> {lang === "sk" ? "voľných" : "available"}</span>
+        {!soldDataUnavailable && <span><strong style={{ color: "var(--text)", fontWeight: 600 }}>{nf(project.sold_units)}</strong> {lang === "sk" ? "predaných" : "sold"}</span>}
         {project.avg_price_eur_m2 ? (
           <span style={{ fontFamily: mono, color: "#c8c8d0", whiteSpace: "nowrap" }}>{nf(Math.round(moneyFromEur(project.avg_price_eur_m2)))} {moneySymbol()}/m²</span>
         ) : null}
@@ -736,7 +736,7 @@ function ProjectMini({ project, setCurrent, lang }) {
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-          <div style={{ height: 5, background: "#0e0e10", borderRadius: 3, overflow: "hidden" }}>
+          <div style={{ height: 5, background: "var(--surface-2)", borderRadius: 3, overflow: "hidden" }}>
             <div style={{
               width: `${Math.min(100, pct)}%`, height: "100%", background: barColor,
               borderRadius: 3, transition: "width 0.6s ease",
@@ -897,7 +897,7 @@ export function DistrictPulse({ lang = "en", setCurrent }) {  // eslint-disable-
                   style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: green, fontFamily: mono, fontSize: "0.8rem" }}
                 >{c.label}</button>
               ) : (
-                <span style={{ color: "#e8e8ed" }}>{c.label}</span>
+                <span style={{ color: "var(--text)" }}>{c.label}</span>
               )}
             </span>
           ))}
@@ -957,11 +957,11 @@ function GeoBarRow({ row, index, max, animate, lang, onClick }) {
           (kraj → mesto → mestská časť). Name kept out of the bar for
           contrast + paint perf (see git history). */}
       <div>
-        <div style={{ fontSize: "0.92rem", color: "#e8e8ed", fontWeight: 500, lineHeight: 1.25 }}>
+        <div style={{ fontSize: "0.92rem", color: "var(--text)", fontWeight: 500, lineHeight: 1.25 }}>
           {row.name}
           {clickable && <span style={{ color: green, marginLeft: 6, fontFamily: mono }}>›</span>}
         </div>
-        <div style={{ fontSize: "0.68rem", color: "#8a8a96", fontFamily: mono, marginTop: 2, letterSpacing: "0.02em" }}>
+        <div style={{ fontSize: "0.68rem", color: "var(--text-dim)", fontFamily: mono, marginTop: 2, letterSpacing: "0.02em" }}>
           {row.count} {lang === "sk" ? "proj" : "proj"} · {row.units.toLocaleString("en-US").replace(/,/g, " ")} {lang === "sk" ? "bytov" : "units"}
         </div>
       </div>
@@ -969,7 +969,7 @@ function GeoBarRow({ row, index, max, animate, lang, onClick }) {
       {/* Bar — cleaner, no overlay text so the fill color stays readable
           and no mix-blend-mode paint cost. */}
       <div style={{
-        height: 28, background: "#0e0e10", borderRadius: 6, overflow: "hidden", position: "relative",
+        height: 28, background: "var(--surface-2)", borderRadius: 6, overflow: "hidden", position: "relative",
         border: `1px solid ${border}`,
       }}>
         <div style={{

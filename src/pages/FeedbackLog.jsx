@@ -163,12 +163,12 @@ export default function FeedbackLog({ lang = "sk" }) {
     return (
       <div style={{ marginTop: 8, background: bg, border: `1px solid ${border}`, borderRadius: 8, padding: "9px 11px", fontFamily: mono, fontSize: 11, color: dim, lineHeight: 1.7 }}>
         {d.screenshot_error && <div style={{ color: amber, marginBottom: 4 }}>⚠ {t("screenshot failed", "screenshot zlyhal")}: {d.screenshot_error}</div>}
-        {d.page && <div><span style={{ color: "#cdd0d6" }}>page:</span> {d.url || d.page}</div>}
+        {d.page && <div><span style={{ color: "var(--text-2)" }}>page:</span> {d.url || d.page}</div>}
         {d.viewport && <div>viewport: {d.viewport.w}×{d.viewport.h}{d.dpr ? ` · dpr ${d.dpr}` : ""}{typeof d.online === "boolean" ? ` · online ${d.online}` : ""}{d.lang ? ` · ${d.lang}` : ""}</div>}
         {d.ua && <div style={{ wordBreak: "break-all" }}>browser: {d.ua}</div>}
         {evs.length > 0 ? (
           <div style={{ marginTop: 6 }}>
-            <div style={{ color: "#cdd0d6" }}>{t("errors / network", "chyby / sieť")} ({evs.length}):</div>
+            <div style={{ color: "var(--text-2)" }}>{t("errors / network", "chyby / sieť")} ({evs.length}):</div>
             {evs.map((ev, i) => {
               const isErr = /error|fail|reject/.test(ev.t || "");
               return <div key={i} style={{ color: isErr ? red : dim, marginTop: 2, wordBreak: "break-all" }}>· [{ev.t}] {ev.m}</div>;
@@ -210,7 +210,7 @@ export default function FeedbackLog({ lang = "sk" }) {
               <span style={{ fontSize: 14, color: textLight }}>{c[0]} {t(c[1], c[2])}</span>
               <span style={{ fontSize: 11, fontFamily: mono, color: s[0], border: `1px solid ${s[0]}`, borderRadius: 100, padding: "2px 9px", textTransform: "uppercase", letterSpacing: 0.4 }}>{t(s[1], s[2])}</span>
               <span style={{ fontSize: 12, color: dim, fontFamily: mono }}>{conv.email || t("anonymous", "anonym")}{conv.user_tier ? ` · ${conv.user_tier}` : ""}</span>
-              {conv.project_name && <span style={{ fontSize: 12, color: "#cdd0d6", fontFamily: mono }}>📍 {conv.project_name}</span>}
+              {conv.project_name && <span style={{ fontSize: 12, color: "var(--text-2)", fontFamily: mono }}>📍 {conv.project_name}</span>}
               {conv.page_url && <a href={conv.page_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: dim, fontFamily: mono }}>{conv.page_path} ↗</a>}
             </div>
 
@@ -270,7 +270,7 @@ export default function FeedbackLog({ lang = "sk" }) {
                   <textarea value={replyDraft} onChange={(e) => setReplyDraft(e.target.value)} placeholder={t("Write your reply (emails the user)…", "Napíš odpoveď (pošle e-mail používateľovi)…")} rows={3}
                     style={{ flex: 1, minWidth: 0, padding: "9px 12px", background: bg, border: `1px solid ${border}`, borderRadius: 8, color: textLight, fontSize: 14, outline: "none", resize: "vertical", fontFamily: "inherit" }} />
                   <button disabled={replying || replyDraft.trim().length < 2} onClick={sendReply}
-                    style={{ padding: "9px 14px", fontSize: 13, borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap", border: `1px solid ${green}`, color: "#0a0a0c", background: green, cursor: replying || replyDraft.trim().length < 2 ? "not-allowed" : "pointer", opacity: replying || replyDraft.trim().length < 2 ? 0.45 : 1 }}>
+                    style={{ padding: "9px 14px", fontSize: 13, borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap", border: `1px solid ${green}`, color: "var(--bg)", background: green, cursor: replying || replyDraft.trim().length < 2 ? "not-allowed" : "pointer", opacity: replying || replyDraft.trim().length < 2 ? 0.45 : 1 }}>
                     {replying ? t("Sending…", "Posielam…") : `↩ ${t("Send reply", "Odoslať")}`}
                   </button>
                 </div>
@@ -348,7 +348,7 @@ export default function FeedbackLog({ lang = "sk" }) {
 
               {(f.project_name || f.page_path) && (
                 <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", fontSize: 12, color: dim, fontFamily: mono }}>
-                  {f.project_name && <span style={{ color: "#cdd0d6" }}>📍 {f.project_name}</span>}
+                  {f.project_name && <span style={{ color: "var(--text-2)" }}>📍 {f.project_name}</span>}
                   {f.page_path && (f.page_url ? <a href={f.page_url} target="_blank" rel="noopener noreferrer" style={{ color: dim }}>{f.page_path} ↗</a> : <span>{f.page_path}</span>)}
                 </div>
               )}

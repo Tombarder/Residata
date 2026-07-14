@@ -760,7 +760,7 @@ function WidgetCard({ widget, ctx, lang, first, last, dragProps, onConfigure, on
   const title = widgetTitle(widget, ctx, lang);
   return (
     <div onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{ background: bg, border: `1px solid ${hover ? "#2c2c34" : border}`, borderRadius: 12, height: "100%", boxSizing: "border-box", transition: "border-color 0.15s", display: "flex", flexDirection: "column" }}>
+      style={{ background: bg, border: `1px solid ${hover ? "var(--border-soft)" : border}`, borderRadius: 12, height: "100%", boxSizing: "border-box", transition: "border-color 0.15s", display: "flex", flexDirection: "column" }}>
       {/* header — drag handle + icon + DESCRIPTIVE title on the left; ⋯ menu on
           the right. Only the header is draggable, so clicks inside the body
           (leaderboard rows, project cards) never start an accidental drag. */}
@@ -799,7 +799,7 @@ function WidgetMenu({ lang, widget, first, last, onConfigure, onToggleWidth, onM
       {open && (
         <>
           <div onClick={close} onMouseDown={e => e.stopPropagation()} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
-          <div onMouseDown={e => e.stopPropagation()} style={{ position: "absolute", right: 0, top: "calc(100% + 5px)", zIndex: 41, minWidth: 184, background: "#17171c", border: "1px solid #23232a", borderRadius: 11, boxShadow: "0 20px 52px rgba(0,0,0,0.72)", padding: "0.35rem", cursor: "default" }}>
+          <div onMouseDown={e => e.stopPropagation()} style={{ position: "absolute", right: 0, top: "calc(100% + 5px)", zIndex: 41, minWidth: 184, background: "var(--surface)", border: "1px solid #23232a", borderRadius: 11, boxShadow: "0 20px 52px rgba(0,0,0,0.72)", padding: "0.35rem", cursor: "default" }}>
             <MenuItem icon="⚙" onClick={() => { onConfigure(); close(); }}>{L(lang, "Nastaviť", "Configure")}</MenuItem>
             <MenuItem icon={widget.w === 2 ? "▭" : "▬"} onClick={() => { onToggleWidth(); close(); }}>{widget.w === 2 ? L(lang, "Na polovicu", "Half width") : L(lang, "Na celú šírku", "Full width")}</MenuItem>
             <MenuItem icon="↑" disabled={first} onClick={() => { onMove(-1); close(); }}>{L(lang, "Posunúť vyššie", "Move up")}</MenuItem>
@@ -1071,7 +1071,7 @@ function TrendChart({ rows, sdef, lang }) {
       </div>
       {hp && (
         <div style={{ position: "absolute", top: -6, left: `${hpct}%`, transform: `translate(${hpct > 80 ? "-100%" : hpct < 20 ? "0" : "-50%"},-100%)`,
-          background: "#17171c", border: `1px solid ${border}`, borderRadius: 7, padding: "3px 8px", fontFamily: mono, fontSize: "0.66rem",
+          background: "var(--surface)", border: `1px solid ${border}`, borderRadius: 7, padding: "3px 8px", fontFamily: mono, fontSize: "0.66rem",
           color: textLight, whiteSpace: "nowrap", pointerEvents: "none", boxShadow: "0 6px 18px rgba(0,0,0,0.55)", zIndex: 2 }}>
           <span style={{ color: sdef.color, fontWeight: 700 }}>{fmtRankVal(sdef.fmt, hp.v, lang)}</span>
           <span style={{ color: dim }}> · {monthLong(hp.m, lang)}</span>

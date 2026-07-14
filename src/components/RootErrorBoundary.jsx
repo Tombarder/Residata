@@ -39,7 +39,7 @@ class RootErrorBoundary extends Component {
     return (
       <div style={{
         minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: '#0a0a0b', color: '#e8e8ed', fontFamily: 'system-ui, -apple-system, sans-serif',
+        background: 'var(--bg)', color: 'var(--text)', fontFamily: 'system-ui, -apple-system, sans-serif',
         padding: '2rem',
       }}>
         <div style={{ maxWidth: 560, textAlign: 'left' }}>
@@ -47,13 +47,13 @@ class RootErrorBoundary extends Component {
           <h1 style={{ fontSize: '1.35rem', fontWeight: 700, margin: '0 0 0.6rem' }}>
             {sk ? 'Niečo sa pokazilo' : 'Something went wrong'}
           </h1>
-          <p style={{ color: '#8a8a96', fontSize: '0.95rem', lineHeight: 1.6, margin: '0 0 1.25rem' }}>
+          <p style={{ color: 'var(--text-dim)', fontSize: '0.95rem', lineHeight: 1.6, margin: '0 0 1.25rem' }}>
             {sk
               ? 'Ospravedlňujeme sa — stránku sa nepodarilo načítať. Skús ju obnoviť; ak problém pretrváva, daj nám vedieť.'
               : "Sorry — this page failed to load. Try reloading; if it keeps happening, let us know."}
           </p>
           <pre style={{
-            background: '#0e0e10', border: '1px solid #222228', borderRadius: 6,
+            background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6,
             padding: '0.7rem 0.9rem', fontFamily: 'monospace', fontSize: '0.72rem',
             color: '#ff9aa2', overflowX: 'auto', margin: '0 0 1.25rem',
           }}>{msg}</pre>
@@ -69,7 +69,7 @@ class RootErrorBoundary extends Component {
             <button
               onClick={() => window.location.assign('/')}
               style={{
-                background: 'transparent', color: '#e8e8ed', border: '1px solid #333',
+                background: 'transparent', color: 'var(--text)', border: '1px solid #333',
                 borderRadius: 6, padding: '0.6rem 1.1rem', fontSize: '0.88rem', cursor: 'pointer',
               }}>
               {sk ? 'Domov' : 'Home'}

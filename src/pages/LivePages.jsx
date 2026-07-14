@@ -21,13 +21,13 @@ import { applyFilters, describe, isComplete } from "../lib/mapFilters";
 
 const mono = "'JetBrains Mono', monospace";
 const green = "#00e5a0";
-const dim = "#8a8a96";
-const border = "#222228";
-const bg = "#16161a";
+const dim = "var(--text-dim)";
+const border = "var(--border)";
+const bg = "var(--surface)";
 // Added for AiChatLogsPanel — matched to the rest of the platform.
-const text = "#e8e8ed";
-const bg2 = "#0e0e10";
-const panel = "#14141a";
+const text = "var(--text)";
+const bg2 = "var(--surface-2)";
+const panel = "var(--surface)";
 const red = "#ff6b6b";
 const orange = "#f5a623";
 
@@ -77,7 +77,7 @@ function ProtectedData({ children, lang = "en", style, ...rest }) {
       {toast && (
         <div style={{
           position: "fixed", bottom: "1.5rem", left: "50%", transform: "translateX(-50%)",
-          background: "#0e0e10", border: `1px solid ${green}`, color: "#e8e8ed",
+          background: "var(--surface-2)", border: `1px solid ${green}`, color: "var(--text)",
           padding: "0.7rem 1.1rem", borderRadius: 8, fontSize: "0.82rem",
           boxShadow: `0 12px 32px rgba(0,0,0,0.75), 0 0 22px rgba(0,229,160,0.2)`,
           zIndex: 99999, fontFamily: "inherit",
@@ -288,7 +288,7 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
           <ProtectedData lang={lang} style={{ border: `1px solid ${border}`, borderRadius: 12, overflow: "hidden", position: "relative" }}>
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
-                <thead style={{ background: "#0e0e10" }}>
+                <thead style={{ background: "var(--surface-2)" }}>
                   <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
                     <SortableTh sortKey="name"             align="left"  current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t.tbl_project}</SortableTh>
                     <SortableTh sortKey="district"         align="left"  current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t.tbl_district}</SortableTh>
@@ -366,7 +366,7 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
                 boxShadow: "0 10px 40px rgba(0,0,0,0.6), 0 0 32px rgba(0,229,160,0.08)",
                 maxWidth: "calc(100% - 2rem)",
               }}>
-                <div style={{ fontSize: "0.95rem", color: "#e8e8ed", marginBottom: "0.4rem", fontWeight: 500 }}>
+                <div style={{ fontSize: "0.95rem", color: "var(--text)", marginBottom: "0.4rem", fontWeight: 500 }}>
                   {lang === "sk"
                     ? <>🔒 Ďalších <strong style={{ color: green }}>{projects.length - ANON_VISIBLE}</strong> projektov po registrácii</>
                     : <>🔒 <strong style={{ color: green }}>{projects.length - ANON_VISIBLE}</strong> more projects with a free account</>}
@@ -391,13 +391,13 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
               onClick={() => setShowHistorical(s => !s)}
               style={{
                 width: "100%", padding: "0.7rem 1rem",
-                background: "#0e0e10", border: `1px solid ${border}`,
+                background: "var(--surface-2)", border: `1px solid ${border}`,
                 borderRadius: 8, color: dim, fontFamily: "inherit",
                 fontSize: "0.82rem", cursor: "pointer",
                 display: "flex", alignItems: "center", justifyContent: "space-between",
                 transition: "border-color 0.15s, color 0.15s",
               }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = dim; e.currentTarget.style.color = "#e8e8ed"; }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = dim; e.currentTarget.style.color = "var(--text)"; }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = border; e.currentTarget.style.color = dim; }}
             >
               <span>
@@ -425,7 +425,7 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
               }}>
                 <div style={{ overflowX: "auto" }}>
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
-                    <thead style={{ background: "#0e0e10" }}>
+                    <thead style={{ background: "var(--surface-2)" }}>
                       <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.68rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
                         <th style={th}>{t.tbl_project}</th>
                         <th style={th}>{lang === "sk" ? "Developer" : "Developer"}</th>
@@ -445,7 +445,7 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
                             cursor: p.status !== "paused" ? "pointer" : "default",
                             color: dim,
                           }}>
-                          <td style={td}><strong style={{ color: "#c4c4cc" }}>{p.name}</strong></td>
+                          <td style={td}><strong style={{ color: "var(--text-2)" }}>{p.name}</strong></td>
                           <td style={td}>{p.developer || "—"}</td>
                           <td style={td}>{p.district || "—"}</td>
                           <td style={td}>
@@ -491,7 +491,7 @@ function SortableTh({ sortKey, align = "left", current, onClick, arrow, title, c
         ...th,
         textAlign: align,
         cursor: "pointer",
-        color: active ? "#e8e8ed" : dim,
+        color: active ? "var(--text)" : dim,
         userSelect: "none",
         whiteSpace: "nowrap",
       }}
@@ -566,7 +566,7 @@ function ProjectRow({ p, t, lang, setCurrent, canVelocity }) {
     >
       <td style={td}>
         {clickable ? (
-          <span className="project-row-name" style={{ color: "#e8e8ed", fontWeight: 600 }}>
+          <span className="project-row-name" style={{ color: "var(--text)", fontWeight: 600 }}>
             {p.name}
           </span>
         ) : (
@@ -766,7 +766,7 @@ export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en
                 padding: "2rem 1.5rem", border: `1px dashed ${border}`, borderRadius: 10,
                 background: "rgba(255,255,255,0.02)", textAlign: "center",
               }}>
-                <div style={{ fontSize: "1rem", color: "#e8e8ed", fontWeight: 600, marginBottom: "0.6rem" }}>
+                <div style={{ fontSize: "1rem", color: "var(--text)", fontWeight: 600, marginBottom: "0.6rem" }}>
                   {lang === "sk" ? "Developer zatiaľ nezverejnil verejný zoznam bytov" : "Developer hasn't published a public unit list yet"}
                 </div>
                 <div style={{ color: dim, fontSize: "0.88rem", lineHeight: 1.6, maxWidth: 560, margin: "0 auto" }}>
@@ -805,11 +805,11 @@ function ProjectAggregateOnly({ project, lang, t, canVelocity }) {
   const soldDataMissing = (project.sold_units || 0) === 0 && (project.reserved_units || 0) === 0;
 
   const kpis = [
-    { label: lang === "sk" ? "Bytov spolu" : "Total units",  value: fmt(project.total_units), accent: "#e8e8ed" },
+    { label: lang === "sk" ? "Bytov spolu" : "Total units",  value: fmt(project.total_units), accent: "var(--text)" },
     { label: lang === "sk" ? "Voľné" : "Available",          value: fmt(project.available_units), accent: green },
     { label: lang === "sk" ? "Predané" : "Sold",             value: soldDataMissing ? "—" : fmt(project.sold_units), accent: "#f5a623", sub: soldDataMissing ? (lang === "sk" ? "developer nezverejňuje" : "developer doesn't publish") : null },
     { label: lang === "sk" ? "Predaných %" : "Sold %",       value: soldPct || "—", accent: "#f5a623" },
-    { label: `${moneySymbol()}/m²`,                          value: eurM2 ? fmt(eurM2) : (lang === "sk" ? "nezverejnené" : "not published"), accent: eurM2 ? "#e8e8ed" : dim },
+    { label: `${moneySymbol()}/m²`,                          value: eurM2 ? fmt(eurM2) : (lang === "sk" ? "nezverejnené" : "not published"), accent: eurM2 ? "var(--text)" : dim },
     ...(canVelocity && project.sold_last_month != null ? [{
       label: lang === "sk" ? "Predané (30d)" : "Sold (30d)",
       value: project.sold_last_month > 0 ? `+${project.sold_last_month}` : "0",
@@ -833,13 +833,13 @@ function ProjectAggregateOnly({ project, lang, t, canVelocity }) {
       }}>
         {kpis.map((k, i) => (
           <div key={i} style={{
-            background: "#16161a", border: `1px solid ${border}`,
+            background: "var(--surface)", border: `1px solid ${border}`,
             borderRadius: 10, padding: "1rem 1.1rem",
           }}>
             <div style={{ fontFamily: mono, fontSize: "0.62rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.45rem" }}>
               {k.label}
             </div>
-            <div style={{ fontFamily: mono, fontSize: "1.55rem", fontWeight: 700, color: k.accent || "#e8e8ed", letterSpacing: "-0.02em", lineHeight: 1 }}>
+            <div style={{ fontFamily: mono, fontSize: "1.55rem", fontWeight: 700, color: k.accent || "var(--text)", letterSpacing: "-0.02em", lineHeight: 1 }}>
               {k.value}
             </div>
             {k.sub && (
@@ -961,7 +961,7 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
               ? <span style={{ color: green }}>{Math.round(moneyFromEur(pricemomDelta))} {moneySymbol()}/m² {L("MoM", "MoM")}</span>
               : <span style={{ color: dim }}>{L("bez zmeny", "no change")} MoM</span>)
         : L("žiadna história", "no history yet"),
-      tint: "#e8e8ed",
+      tint: "var(--text)",
       isPriceKpi: true,
     },
     // FALLBACK KPI shown only when noPrices=true (replaces Avg €/m²)
@@ -969,7 +969,7 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
       label: L("Priem. plocha (voľné)", "Avg area (avail.)"),
       value: avgArea ? `${avgArea.toFixed(1)} m²` : "—",
       sub: availForArea.length ? `${availForArea.length} ${L("voľných", "avail")}` : null,
-      tint: "#e8e8ed",
+      tint: "var(--text)",
       isFallbackKpi: true,
     },
     {
@@ -983,7 +983,7 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
       label: L("Najdrahší voľný byt", "currently the most expensive unit"),
       value: topPrice ? fmtEur(topPrice) : "—",
       sub: availPrices.length ? `${availPrices.length} ${L("voľných s cenou", "units with price available")}` : null,
-      tint: "#e8e8ed",
+      tint: "var(--text)",
       isPriceKpi: true,
       onClick: (() => {
         const topFlat = availFlats.find(f => Number(f.cena_s_dph) === topPrice);
@@ -997,7 +997,7 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
       sub: largestAreaFlat
         ? `${largestAreaFlat.izby ? largestAreaFlat.izby + "-izb · " : ""}${largestAreaFlat.unit_id || ""}`
         : null,
-      tint: "#e8e8ed",
+      tint: "var(--text)",
       isFallbackKpi: true,
       onClick: (largestAreaFlat && onSelectFlat) ? () => onSelectFlat(largestAreaFlat.id) : null,
     },
@@ -1020,7 +1020,7 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
           padding: "0.75rem 1rem",
           marginBottom: "1.25rem",
           fontSize: "0.8rem",
-          color: "#e8e8ed",
+          color: "var(--text)",
           lineHeight: 1.5,
         }}>
           <strong style={{ color: "#f5a623" }}>⚠ {L("Bez cien", "No prices")}:</strong>{" "}
@@ -1239,7 +1239,7 @@ function ChartCard({ title, subtitle, children }) {
       padding: "1rem 1.1rem",
     }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.85rem", gap: "0.5rem" }}>
-        <div style={{ fontSize: "0.88rem", color: "#e8e8ed", fontWeight: 600 }}>{title}</div>
+        <div style={{ fontSize: "0.88rem", color: "var(--text)", fontWeight: 600 }}>{title}</div>
         {subtitle && <div style={{ fontSize: "0.7rem", color: dim, fontFamily: mono }}>{subtitle}</div>}
       </div>
       {children}
@@ -1564,7 +1564,7 @@ function TimelineChart({ snaps, lang }) {
         {/* Dots on actual data points only */}
         {points.map((_, i) => (
           <g key={i}>
-            <circle cx={xs[i]} cy={yAvailTop[i]} r={2.5} fill={green} stroke="#0a0a0b" strokeWidth={1} />
+            <circle cx={xs[i]} cy={yAvailTop[i]} r={2.5} fill={green} stroke="var(--bg)" strokeWidth={1} />
           </g>
         ))}
 
@@ -1981,11 +1981,11 @@ function RoomMixChart({ rows, lang }) {
 
         return (
           <g key={r.room}>
-            <text x={0} y={y + barH / 2 + 4} fill="#e8e8ed" fontFamily={mono} fontSize={11} fontWeight={700}>
+            <text x={0} y={y + barH / 2 + 4} fill="var(--text)" fontFamily={mono} fontSize={11} fontWeight={700}>
               {r.room}-{lang === "sk" ? "izb" : "room"}
             </text>
 
-            <rect x={labelW} y={y} width={barW} height={barH} fill="#0a0a0b" stroke={border} rx={2}>
+            <rect x={labelW} y={y} width={barW} height={barH} fill="var(--bg)" stroke={border} rx={2}>
               <title>{`${r.avail} ${codeAvail} · ${r.reserved} ${codeResv} · ${r.sold} ${codeSold} · ${r.total} total`}</title>
             </rect>
             {availW > 0 && <rect x={xAvail} y={y} width={availW} height={barH} fill={green} rx={2} />}
@@ -1997,7 +1997,7 @@ function RoomMixChart({ rows, lang }) {
                 the segment is wide enough to hold the text cleanly. */}
             {availW >= MIN_LABEL_W && (
               <text x={xAvail + availW / 2} y={textY} textAnchor="middle"
-                    fill="#0a0a0b" fontFamily={mono} fontSize={10.5} fontWeight={700}>
+                    fill="var(--bg)" fontFamily={mono} fontSize={10.5} fontWeight={700}>
                 {r.avail} {codeAvail}
               </text>
             )}
@@ -2009,7 +2009,7 @@ function RoomMixChart({ rows, lang }) {
             )}
             {soldW >= MIN_LABEL_W && (
               <text x={xSold + soldW / 2} y={textY} textAnchor="middle"
-                    fill="#0a0a0b" fontFamily={mono} fontSize={10.5} fontWeight={700}>
+                    fill="var(--bg)" fontFamily={mono} fontSize={10.5} fontWeight={700}>
                 {r.sold} {codeSold}
               </text>
             )}
@@ -2022,7 +2022,7 @@ function RoomMixChart({ rows, lang }) {
             {sideTotal(r) && (
               <>
                 <text x={W - 4} y={y + barH / 2 - 2} textAnchor="end"
-                      fill="#e8e8ed" fontFamily={mono} fontSize={12} fontWeight={700}>
+                      fill="var(--text)" fontFamily={mono} fontSize={12} fontWeight={700}>
                   {sideTotal(r)}
                   <tspan fill={dim} fontSize={9.5} fontWeight={400} dx={4}>{sideTotalSub}</tspan>
                 </text>
@@ -2209,13 +2209,13 @@ function PriceHistogram({ prices, lang = "en" }) {
             right: flipX ? `calc(${(1 - hoverPos.x / W) * 100}% + 10px)` : undefined,
             top: flipY ? undefined : `calc(${(hoverPos.y / H) * 100}% + 10px)`,
             bottom: flipY ? `calc(${(1 - hoverPos.y / H) * 100}% + 10px)` : undefined,
-            background: "#0b0b0e",
+            background: "var(--surface-2)",
             border: `1px solid ${border}`,
             borderLeft: `3px solid ${green}`,
             borderRadius: 8,
             padding: "0.55rem 0.75rem",
             fontSize: "0.78rem",
-            color: "#e8e8ed",
+            color: "var(--text)",
             pointerEvents: "none",
             zIndex: 20,
             whiteSpace: "nowrap",
@@ -2346,7 +2346,7 @@ function AreaPriceScatter({ flats, lang, onSelectFlat }) {
                   padding: "5px 11px 5px 9px", borderRadius: 999,
                   border: `1px solid ${off ? border : c.color + "59"}`,
                   background: off ? "transparent" : c.color + "14",
-                  color: off ? dim : "#e8e8ed",
+                  color: off ? dim : "var(--text)",
                   fontFamily: mono, fontSize: "0.72rem", fontWeight: 600,
                   cursor: "pointer", lineHeight: 1,
                   transition: "background 0.14s, border-color 0.14s, opacity 0.14s",
@@ -2378,7 +2378,7 @@ function AreaPriceScatter({ flats, lang, onSelectFlat }) {
         {/* Fit line */}
         {avgPerM2 > 0 && (
           <line x1={xAt(xMin)} x2={xAt(xMax)} y1={yAt(xMin * avgPerM2)} y2={yAt(xMax * avgPerM2)}
-            stroke="#e8e8ed" strokeWidth={1.5} strokeDasharray="5,4" opacity={0.5} />
+            stroke="var(--text)" strokeWidth={1.5} strokeDasharray="5,4" opacity={0.5} />
         )}
         {/* Points — clickable, hoverable, with visual feedback */}
         {visiblePoints.map((p, i) => {
@@ -2432,11 +2432,11 @@ function AreaPriceScatter({ flats, lang, onSelectFlat }) {
             right: flipX ? `calc(100% - ${hover.x - 14}px)` : undefined,
             top: flipY ? undefined : hover.y + 14,
             bottom: flipY ? `calc(100% - ${hover.y - 14}px)` : undefined,
-            background: "#0b0b0e",
+            background: "var(--surface-2)",
             border: `1px solid ${border}`,
             borderLeft: `3px solid ${colorFor(f.stav)}`,
             borderRadius: 8, padding: "0.55rem 0.75rem",
-            fontSize: "0.8rem", color: "#e8e8ed",
+            fontSize: "0.8rem", color: "var(--text)",
             pointerEvents: "none", zIndex: 20, whiteSpace: "nowrap",
             boxShadow: "0 10px 24px rgba(0,0,0,0.6)",
             maxWidth: 280,
@@ -2509,7 +2509,7 @@ function FlatsTable({ flats, t, lang, highlightedFlatId }) {
   // (stuck mid-page instead of top). Deferred until we find a version
   // that plays well with the page-transition wrapper + nav+ticker chrome.
   const compactTh = { padding: "0.5rem 0.35rem", fontWeight: 600 };
-  const compactTd = { padding: "0.45rem 0.35rem", color: "#e8e8ed", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
+  const compactTd = { padding: "0.45rem 0.35rem", color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
 
   const [sort, setSort] = useState({ key: "unit", dir: "asc" });
 
@@ -2657,7 +2657,7 @@ function FlatsTable({ flats, t, lang, highlightedFlatId }) {
           anchor the right side whenever anything is active. */}
       <div style={{
         padding: "0.75rem 0.9rem",
-        background: "#0e0e10",
+        background: "var(--surface-2)",
         borderBottom: `1px solid ${border}`,
         display: "flex", flexWrap: "wrap", alignItems: "center",
         gap: "0.75rem 1.1rem",
@@ -2694,20 +2694,20 @@ function FlatsTable({ flats, t, lang, highlightedFlatId }) {
           <input
             type="number" inputMode="numeric" placeholder={lang === "sk" ? "od" : "min"}
             value={priceMin} onChange={e => setPriceMin(e.target.value)}
-            style={{ width: 80, padding: "0.3rem 0.45rem", background: "#0a0a0b", border: `1px solid ${priceMinN != null ? green : border}`, color: "#e8e8ed", borderRadius: 4, fontFamily: mono, fontSize: "0.78rem", outline: "none" }}
+            style={{ width: 80, padding: "0.3rem 0.45rem", background: "var(--bg)", border: `1px solid ${priceMinN != null ? green : border}`, color: "var(--text)", borderRadius: 4, fontFamily: mono, fontSize: "0.78rem", outline: "none" }}
           />
           <span style={{ color: dim, fontFamily: mono, fontSize: "0.75rem" }}>–</span>
           <input
             type="number" inputMode="numeric" placeholder={lang === "sk" ? "do" : "max"}
             value={priceMax} onChange={e => setPriceMax(e.target.value)}
-            style={{ width: 80, padding: "0.3rem 0.45rem", background: "#0a0a0b", border: `1px solid ${priceMaxN != null ? green : border}`, color: "#e8e8ed", borderRadius: 4, fontFamily: mono, fontSize: "0.78rem", outline: "none" }}
+            style={{ width: 80, padding: "0.3rem 0.45rem", background: "var(--bg)", border: `1px solid ${priceMaxN != null ? green : border}`, color: "var(--text)", borderRadius: 4, fontFamily: mono, fontSize: "0.78rem", outline: "none" }}
           />
         </div>
 
         {/* Counter + clear */}
         <div style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: "0.75rem" }}>
           <span style={{ fontFamily: mono, fontSize: "0.74rem", color: anyFilterActive ? green : dim }}>
-            <strong style={{ color: "#e8e8ed" }}>{visibleCount}</strong> {lang === "sk" ? "z" : "of"} {totalCount}
+            <strong style={{ color: "var(--text)" }}>{visibleCount}</strong> {lang === "sk" ? "z" : "of"} {totalCount}
           </span>
           {anyFilterActive && (
             <button onClick={clearAllFilters}
@@ -2716,7 +2716,7 @@ function FlatsTable({ flats, t, lang, highlightedFlatId }) {
                 color: dim, borderRadius: 4, padding: "0.3rem 0.7rem",
                 fontFamily: mono, fontSize: "0.7rem", cursor: "pointer",
               }}
-              onMouseEnter={e => { e.currentTarget.style.color = "#e8e8ed"; e.currentTarget.style.borderColor = "#ff6b6b60"; }}
+              onMouseEnter={e => { e.currentTarget.style.color = "var(--text)"; e.currentTarget.style.borderColor = "#ff6b6b60"; }}
               onMouseLeave={e => { e.currentTarget.style.color = dim; e.currentTarget.style.borderColor = border; }}>
               ✕ {lang === "sk" ? "Vymazať filtre" : "Clear filters"}
             </button>
@@ -2734,7 +2734,7 @@ function FlatsTable({ flats, t, lang, highlightedFlatId }) {
               <col key={col.key} style={{ width: col.width }} />
             ))}
           </colgroup>
-          <thead style={{ background: "#0e0e10" }}>
+          <thead style={{ background: "var(--surface-2)" }}>
             <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>
               {COLS.map(col => (
                 <th key={col.key}
@@ -2742,7 +2742,7 @@ function FlatsTable({ flats, t, lang, highlightedFlatId }) {
                     title={lang === "sk" ? "Klikni pre zoradenie" : "Click to sort"}
                     style={{
                       ...compactTh, textAlign: col.align, userSelect: "none",
-                      color: sort.key === col.key ? "#e8e8ed" : dim,
+                      color: sort.key === col.key ? "var(--text)" : dim,
                       cursor: "pointer",
                       overflow: "hidden",
                     }}>
@@ -2981,7 +2981,7 @@ function ChooseProjectGate({ projectId, projectName, profile, reloadProfile, set
           ? <>Free účet ti odomkne plný detail <strong style={{ color: green }}>1 projektu</strong>. Chceš sledovať <strong style={{ color: green }}>{projectName}</strong>?</>
           : <>Your free account unlocks full detail of <strong style={{ color: green }}>1 project</strong>. Do you want to track <strong style={{ color: green }}>{projectName}</strong>?</>}
       </p>
-      <div style={{ padding: "1rem 1.25rem", background: "rgba(245,166,35,0.08)", border: "1px solid rgba(245,166,35,0.3)", borderRadius: 8, marginBottom: "1.25rem", fontSize: "0.85rem", color: "#e8e8ed" }}>
+      <div style={{ padding: "1rem 1.25rem", background: "rgba(245,166,35,0.08)", border: "1px solid rgba(245,166,35,0.3)", borderRadius: 8, marginBottom: "1.25rem", fontSize: "0.85rem", color: "var(--text)" }}>
         <strong style={{ color: "#f5a623" }}>⚠ {lang === "sk" ? "Pozor" : "Heads up"}:</strong>{" "}
         {lang === "sk"
           ? "výber je po potvrdení uzamknutý. Budeš vidieť len tento jeden projekt. Pre viac projektov je potrebný paid tier."
@@ -3150,7 +3150,7 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
         title={lang === "sk" ? "Ceny, aktivita a absorpcia podľa mestskej časti" : "Prices, activity and absorption by district"}>
         <div style={{ border: `1px solid ${border}`, borderRadius: 12, overflow: "hidden" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
-            <thead style={{ background: "#0e0e10" }}>
+            <thead style={{ background: "var(--surface-2)" }}>
               <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.68rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
                 <th style={th}>{lang === "sk" ? "Mesto" : "City"}</th>
                 <th style={th}>{lang === "sk" ? "Časť" : "District"}</th>
@@ -3275,7 +3275,7 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
                   onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                 >
                   <div>
-                    <div style={{ fontSize: "0.88rem", fontWeight: 600, color: "#e8e8ed" }}>{p.name}</div>
+                    <div style={{ fontSize: "0.88rem", fontWeight: 600, color: "var(--text)" }}>{p.name}</div>
                     <div style={{ fontSize: "0.7rem", color: dim, fontFamily: mono, marginTop: 2 }}>
                       {p.district || "—"} · {p.available_units} {lang === "sk" ? "voľných z" : "left of"} {p.total_units}
                     </div>
@@ -3290,7 +3290,7 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
         </ASection>
       </div>
 
-      <p style={{ color: "#55555f", fontSize: "0.72rem", marginTop: "2rem", fontFamily: mono, textAlign: "center" }}>
+      <p style={{ color: "var(--text-faint)", fontSize: "0.72rem", marginTop: "2rem", fontFamily: mono, textAlign: "center" }}>
         {/* Source line — primary number is "in dataset" (depth of coverage).
             When sold-outs accumulate past the active count, both numbers
             surface so it's clear how much is currently in market. */}
@@ -3314,7 +3314,7 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
 
 
 // ─── Analytics primitives ────────────────────────────────
-function AKpi({ label, value, accent = "#e8e8ed", sub }) {
+function AKpi({ label, value, accent = "var(--text)", sub }) {
   return (
     <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 10, padding: "1.1rem 1.2rem" }}>
       <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.4rem" }}>{label}</div>
@@ -3329,7 +3329,7 @@ function ASection({ label, title, children, inline = false }) {
     <section style={{ marginBottom: inline ? 0 : "2rem" }}>
       <div style={{ marginBottom: "0.85rem" }}>
         <div style={{ fontFamily: mono, fontSize: "0.65rem", color: green, letterSpacing: "0.12em", textTransform: "uppercase" }}>{label}</div>
-        <h2 style={{ fontSize: "1.1rem", fontWeight: 600, color: "#e8e8ed", margin: "0.2rem 0 0", letterSpacing: "-0.01em" }}>{title}</h2>
+        <h2 style={{ fontSize: "1.1rem", fontWeight: 600, color: "var(--text)", margin: "0.2rem 0 0", letterSpacing: "-0.01em" }}>{title}</h2>
       </div>
       <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 12, padding: "1rem 1.1rem" }}>
         {children}
@@ -3388,12 +3388,12 @@ function RankBarList({ rows, setCurrent, suffix = "", color = green, getChildren
               <div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.2rem" }}>
                   <span className={clickable ? `${cls}-name` : undefined}
-                        style={{ fontSize: "0.83rem", color: "#e8e8ed", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        style={{ fontSize: "0.83rem", color: "var(--text)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {r.label}
                   </span>
                   {r.sub && <span style={{ fontSize: "0.68rem", color: dim, fontFamily: mono, flexShrink: 0, marginLeft: "0.5rem" }}>{r.sub}</span>}
                 </div>
-                <div style={{ height: 4, background: "#0a0a0b", borderRadius: 2, overflow: "hidden" }}>
+                <div style={{ height: 4, background: "var(--bg)", borderRadius: 2, overflow: "hidden" }}>
                   <div style={{ width: `${pct}%`, height: "100%", background: color, transition: "width 0.8s ease" }} />
                 </div>
               </div>
@@ -3427,7 +3427,7 @@ function RankBarList({ rows, setCurrent, suffix = "", color = green, getChildren
                         padding: "0.35rem 0.5rem",
                       }}
                     >
-                      <span className={`${cls}-childname`} style={{ fontSize: "0.82rem", color: "#c4c4cc", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", transition: "color 0.12s" }}>
+                      <span className={`${cls}-childname`} style={{ fontSize: "0.82rem", color: "var(--text-2)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", transition: "color 0.12s" }}>
                         {p.name}
                       </span>
                       <span style={{ fontSize: "0.68rem", color: dim, fontFamily: mono }}>
@@ -3672,8 +3672,8 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
         gap: "0.75rem", marginTop: "1.5rem", marginBottom: "1rem",
       }}>
         {[
-          { k: "total",   label: lang === "sk" ? "Celkom" : "Total",   n: users.length,             color: "#e8e8ed" },
-          { k: "free",    label: "Free",                               n: tierCount.free    || 0,    color: "#c0c0c8" },
+          { k: "total",   label: lang === "sk" ? "Celkom" : "Total",   n: users.length,             color: "var(--text)" },
+          { k: "free",    label: "Free",                               n: tierCount.free    || 0,    color: "var(--text-2)" },
           { k: "paid",    label: "Paid",                               n: tierCount.paid    || 0,    color: green },
           { k: "admin",   label: "Admin",                              n: tierCount.admin   || 0,    color: "#f5a623" },
           { k: "pending", label: "Pending",                            n: tierCount.pending || 0,    color: "#888" },
@@ -3710,8 +3710,8 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
               onChange={e => setSearch(e.target.value)}
               placeholder={lang === "sk" ? "🔍 Hľadať podľa emailu, mena, firmy, pozície…" : "🔍 Search by email, name, company, position…"}
               style={{
-                flex: 1, padding: "0.6rem 0.9rem", background: "#0e0e10",
-                border: `1px solid ${border}`, borderRadius: 8, color: "#e8e8ed",
+                flex: 1, padding: "0.6rem 0.9rem", background: "var(--surface-2)",
+                border: `1px solid ${border}`, borderRadius: 8, color: "var(--text)",
                 fontSize: "0.85rem", fontFamily: "inherit", outline: "none",
               }}
             />
@@ -3744,7 +3744,7 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
                   : "Couldn't load users — your session has likely expired.")}
               </div>
               <button onClick={loadAll} style={{
-                background: green, color: "#0a0a0b", border: "none", borderRadius: 6,
+                background: green, color: "var(--bg)", border: "none", borderRadius: 6,
                 padding: "0.5rem 1.1rem", fontSize: "0.8rem", fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
               }}>
                 {lang === "sk" ? "Načítať znova" : "Reload"}
@@ -3769,7 +3769,7 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
               <SectionHeader>{t.admin_events_section}</SectionHeader>
               <div style={{ border: `1px solid ${border}`, borderRadius: 12, overflow: "hidden", marginBottom: "2rem" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
-                  <thead style={{ background: "#0e0e10" }}>
+                  <thead style={{ background: "var(--surface-2)" }}>
                     <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
                       <th style={th}>When</th>
                       <th style={th}>Event</th>
@@ -3813,7 +3813,7 @@ function TabBtn({ active, onClick, children }) {
   return (
     <button onClick={onClick} style={{
       background: "none", border: "none", padding: "0.6rem 1rem",
-      cursor: "pointer", color: active ? "#e8e8ed" : dim,
+      cursor: "pointer", color: active ? "var(--text)" : dim,
       fontSize: "0.88rem", fontWeight: active ? 600 : 500,
       borderBottom: `2px solid ${active ? green : "transparent"}`,
       marginBottom: -1, fontFamily: "inherit",
@@ -3934,7 +3934,7 @@ function OverviewPanel({ activity, users, lang }) {
   };
 
   const L = (sk, en) => lang === "sk" ? sk : en;
-  const card = (label, value, sub, colour = "#e8e8ed") => (
+  const card = (label, value, sub, colour = "var(--text)") => (
     <div style={{
       background: bg, border: `1px solid ${border}`, borderRadius: 10,
       padding: "1.1rem 1.2rem", minHeight: 92,
@@ -4010,7 +4010,7 @@ function OverviewPanel({ activity, users, lang }) {
                   padding: "0.4rem 0",
                   borderBottom: `1px solid ${border}`,
                 }}>
-                  <span style={{ fontFamily: mono, fontSize: "0.74rem", color: "#e8e8ed", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{type}</span>
+                  <span style={{ fontFamily: mono, fontSize: "0.74rem", color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{type}</span>
                   <div style={{ height: 8, background: "rgba(255,255,255,0.04)", borderRadius: 4, overflow: "hidden" }}>
                     <div style={{
                       height: "100%",
@@ -4037,7 +4037,7 @@ function OverviewPanel({ activity, users, lang }) {
         <div style={{ border: `1px solid ${border}`, borderRadius: 12, overflow: "hidden", marginBottom: "2rem" }}>
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem", minWidth: 900 }}>
-              <thead style={{ background: "#0e0e10" }}>
+              <thead style={{ background: "var(--surface-2)" }}>
                 <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
                   <th style={th}>{L("Email", "Email")}</th>
                   <th style={th}>{L("Firma", "Company")}</th>
@@ -4056,19 +4056,19 @@ function OverviewPanel({ activity, users, lang }) {
                   const recent = (now - lastMs) < 7 * DAY;
                   return (
                     <tr key={r.user_id} style={{ borderTop: `1px solid ${border}` }}>
-                      <td style={{ ...td, color: "#e8e8ed" }}>{r.email}</td>
+                      <td style={{ ...td, color: "var(--text)" }}>{r.email}</td>
                       <td style={{ ...td, color: dim }}>{r.company || "—"}</td>
                       <td style={td}>
                         <span style={{
                           fontFamily: mono, fontSize: "0.7rem",
                           padding: "0.15rem 0.5rem", borderRadius: 4,
-                          color: r.tier === "paid" ? green : r.tier === "admin" ? "#f5a623" : r.tier === "pending" ? "#888" : "#c0c0c8",
+                          color: r.tier === "paid" ? green : r.tier === "admin" ? "#f5a623" : r.tier === "pending" ? "#888" : "var(--text-2)",
                           background: r.tier === "paid" ? "rgba(0,229,160,0.08)" : r.tier === "admin" ? "rgba(245,166,35,0.08)" : "rgba(255,255,255,0.04)",
                         }}>{r.tier}</span>
                       </td>
-                      <td style={{ ...td, textAlign: "right", fontFamily: mono, color: "#e8e8ed" }}>{r.totalEvents}</td>
+                      <td style={{ ...td, textAlign: "right", fontFamily: mono, color: "var(--text)" }}>{r.totalEvents}</td>
                       <td style={{ ...td, textAlign: "right", fontFamily: mono, color: r.weekEvents > 0 ? green : dim }}>{r.weekEvents}</td>
-                      <td style={{ ...td, textAlign: "right", fontFamily: mono, color: r.monthEvents > 0 ? "#c0c0c8" : dim }}>{r.monthEvents}</td>
+                      <td style={{ ...td, textAlign: "right", fontFamily: mono, color: r.monthEvents > 0 ? "var(--text-2)" : dim }}>{r.monthEvents}</td>
                       <td style={{ ...td, textAlign: "right", fontFamily: mono, color: dim }}>{r.activeDays}</td>
                       <td style={{ ...td, color: dim, fontFamily: mono, fontSize: "0.72rem" }}>{r.firstSeen?.slice(0, 10)}</td>
                       <td style={{ ...td, color: recent ? green : dim, fontFamily: mono, fontSize: "0.72rem" }}>{rel(r.lastSeen)}</td>
@@ -4129,7 +4129,7 @@ function MiniBarChart({ title, subtitle, data, field, colour, highlightLast }) {
     }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.35rem" }}>
         <div>
-          <div style={{ fontSize: "0.78rem", fontWeight: 600, color: "#e8e8ed" }}>{title}</div>
+          <div style={{ fontSize: "0.78rem", fontWeight: 600, color: "var(--text)" }}>{title}</div>
           {subtitle && <div style={{ fontSize: "0.68rem", color: dim, fontFamily: mono, marginTop: "0.15rem" }}>{subtitle}</div>}
         </div>
         <div style={{ textAlign: "right" }}>
@@ -4192,7 +4192,7 @@ function ActivityPanel({ activity, users }) {
       <div style={{ border: `1px solid ${border}`, borderRadius: 12, overflow: "hidden" }}>
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
-            <thead style={{ background: "#0e0e10" }}>
+            <thead style={{ background: "var(--surface-2)" }}>
               <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
                 <th style={th}>When</th>
                 <th style={th}>User</th>
@@ -4208,7 +4208,7 @@ function ActivityPanel({ activity, users }) {
                   <tr key={e.id} style={{ borderTop: `1px solid ${border}` }}>
                     <td style={{ ...td, color: dim, fontFamily: mono, fontSize: "0.72rem" }}>{e.created_at?.slice(5, 16).replace("T", " ")}</td>
                     <td style={td}>{u?.email || <span style={{ color: dim, fontSize: "0.75rem" }}>anon · {e.session_id?.slice(0, 8)}</span>}</td>
-                    <td style={{ ...td, fontFamily: mono, fontSize: "0.72rem", color: "#e8e8ed" }}>{e.event_type}</td>
+                    <td style={{ ...td, fontFamily: mono, fontSize: "0.72rem", color: "var(--text)" }}>{e.event_type}</td>
                     <td style={{ ...td, color: dim, fontFamily: mono, fontSize: "0.72rem" }}>{e.page_path || "—"}</td>
                     <td style={{ ...td, color: dim, fontSize: "0.7rem", fontFamily: mono, maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {e.event_data ? JSON.stringify(e.event_data) : "—"}
@@ -4426,7 +4426,7 @@ function AiChatLogsPanel({ users, lang }) {
         <select value={userFilter} onChange={e => setUserFilter(e.target.value)}
           title={lang === "sk" ? "Vyber užívateľa" : "Pick a user"}
           style={{
-            background: "#0e0e10", color: userFilter === "all" ? dim : green,
+            background: "var(--surface-2)", color: userFilter === "all" ? dim : green,
             border: `1px solid ${userFilter === "all" ? border : green}`,
             borderRadius: 4, padding: "0.3rem 0.5rem", fontSize: "0.72rem",
             fontFamily: "inherit", cursor: "pointer", maxWidth: 220,
@@ -4629,21 +4629,21 @@ function PremiumDomainsPanel({ domains, reload }) {
     <>
       <SectionHeader>Premium domains — auto-tier on approval</SectionHeader>
       <p style={{ color: dim, fontSize: "0.85rem", marginBottom: "1rem", lineHeight: 1.5 }}>
-        When you approve a pending user, the system checks their email domain here. If found → auto-sets the chosen tier. Otherwise defaults to <code style={{ color: "#e8e8ed" }}>free</code>.
+        When you approve a pending user, the system checks their email domain here. If found → auto-sets the chosen tier. Otherwise defaults to <code style={{ color: "var(--text)" }}>free</code>.
       </p>
 
       {/* Add form */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 140px 1fr auto", gap: "0.5rem", alignItems: "center", marginBottom: "1.5rem" }}>
         <input placeholder="example.com" value={newDomain} onChange={e => setNewDomain(e.target.value)}
-          style={{ padding: "0.55rem 0.75rem", background: "#0e0e10", border: `1px solid ${border}`, borderRadius: 6, color: "#e8e8ed", fontSize: "0.85rem", fontFamily: "inherit" }} />
+          style={{ padding: "0.55rem 0.75rem", background: "var(--surface-2)", border: `1px solid ${border}`, borderRadius: 6, color: "var(--text)", fontSize: "0.85rem", fontFamily: "inherit" }} />
         <select value={newTier} onChange={e => setNewTier(e.target.value)}
-          style={{ padding: "0.55rem 0.75rem", background: "#0e0e10", border: `1px solid ${border}`, borderRadius: 6, color: "#e8e8ed", fontSize: "0.85rem" }}>
+          style={{ padding: "0.55rem 0.75rem", background: "var(--surface-2)", border: `1px solid ${border}`, borderRadius: 6, color: "var(--text)", fontSize: "0.85rem" }}>
           <option value="paid">paid</option>
           <option value="free">free</option>
           <option value="admin">admin</option>
         </select>
         <input placeholder="note (e.g. Owner org)" value={newNote} onChange={e => setNewNote(e.target.value)}
-          style={{ padding: "0.55rem 0.75rem", background: "#0e0e10", border: `1px solid ${border}`, borderRadius: 6, color: "#e8e8ed", fontSize: "0.85rem", fontFamily: "inherit" }} />
+          style={{ padding: "0.55rem 0.75rem", background: "var(--surface-2)", border: `1px solid ${border}`, borderRadius: 6, color: "var(--text)", fontSize: "0.85rem", fontFamily: "inherit" }} />
         <button onClick={add} disabled={busy || !newDomain.trim()} className="btn-p" style={{ fontSize: "0.8rem", padding: "0.55rem 1.25rem" }}>Add</button>
       </div>
       {err && <div style={{ color: "#ff6b6b", marginBottom: "1rem" }}>{err}</div>}
@@ -4651,7 +4651,7 @@ function PremiumDomainsPanel({ domains, reload }) {
       {/* Existing */}
       <div style={{ border: `1px solid ${border}`, borderRadius: 12, overflow: "hidden" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
-          <thead style={{ background: "#0e0e10" }}>
+          <thead style={{ background: "var(--surface-2)" }}>
             <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
               <th style={th}>Domain</th>
               <th style={th}>Default tier</th>
@@ -4683,7 +4683,7 @@ function UserTable({ users, setTier, deleteUser, trialAction, subAction, selfId,
     <div style={{ border: `1px solid ${border}`, borderRadius: 12, overflow: "hidden", marginBottom: "2rem" }}>
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
-          <thead style={{ background: "#0e0e10" }}>
+          <thead style={{ background: "var(--surface-2)" }}>
             <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
               <th style={th}>{t.admin_email}</th>
               <th style={th}>Name</th>
@@ -4724,7 +4724,7 @@ function UserTable({ users, setTier, deleteUser, trialAction, subAction, selfId,
                       disabled={isSelf}
                       title={isSelf ? "Can't change your own tier" : ""}
                       style={{
-                        background: "#0e0e10", color: "#e8e8ed",
+                        background: "var(--surface-2)", color: "var(--text)",
                         border: `1px solid ${border}`, padding: "0.3rem 0.5rem",
                         borderRadius: 4, fontSize: "0.75rem", marginRight: "0.4rem",
                         opacity: isSelf ? 0.4 : 1, cursor: isSelf ? "not-allowed" : "pointer",
@@ -4743,7 +4743,7 @@ function UserTable({ users, setTier, deleteUser, trialAction, subAction, selfId,
                       const paidDays = paidActive ? daysUntil(u.paid_until) : null;
                       const subBtnStyle = (active, accent = green) => ({
                         background: active ? `${accent}1f` : "transparent",
-                        color: isSelf ? "#55555f" : (active ? accent : "#c0c0c8"),
+                        color: isSelf ? "var(--text-faint)" : (active ? accent : "var(--text-2)"),
                         border: `1px solid ${active ? accent : border}`,
                         padding: "0.3rem 0.6rem", borderRadius: 4,
                         fontSize: "0.7rem", fontFamily: "inherit",
@@ -4831,7 +4831,7 @@ function UserTable({ users, setTier, deleteUser, trialAction, subAction, selfId,
                       title={isSelf ? "Can't delete yourself" : "Delete user (permanent)"}
                       style={{
                         background: "transparent",
-                        color: isSelf ? "#55555f" : "#ff6b6b",
+                        color: isSelf ? "var(--text-faint)" : "#ff6b6b",
                         border: `1px solid ${isSelf ? border : "rgba(255,107,107,0.4)"}`,
                         padding: "0.3rem 0.65rem", borderRadius: 4,
                         fontSize: "0.75rem",
@@ -4852,11 +4852,11 @@ function UserTable({ users, setTier, deleteUser, trialAction, subAction, selfId,
 }
 
 function SectionHeader({ children }) {
-  return <h2 style={{ fontSize: "1rem", fontWeight: 600, color: "#8a8a96", letterSpacing: "0.04em", textTransform: "uppercase", marginTop: "2.5rem", marginBottom: "1rem", fontFamily: mono, display: "flex", alignItems: "center", gap: "0.6rem" }}>{children}</h2>;
+  return <h2 style={{ fontSize: "1rem", fontWeight: 600, color: "var(--text-dim)", letterSpacing: "0.04em", textTransform: "uppercase", marginTop: "2.5rem", marginBottom: "1rem", fontFamily: mono, display: "flex", alignItems: "center", gap: "0.6rem" }}>{children}</h2>;
 }
 
 function CountBadge({ n }) {
-  return <span style={{ background: "#f5a623", color: "#0a0a0b", fontSize: "0.7rem", padding: "1px 7px", borderRadius: 10, fontWeight: 700 }}>{n}</span>;
+  return <span style={{ background: "#f5a623", color: "var(--bg)", fontSize: "0.7rem", padding: "1px 7px", borderRadius: 10, fontWeight: 700 }}>{n}</span>;
 }
 
 function TierBadge({ tier }) {
@@ -4864,7 +4864,7 @@ function TierBadge({ tier }) {
     paid: "#00e5a0",
     admin: "#f5a623",
     pending: "#888",
-    free: "#c0c0c8",
+    free: "var(--text-2)",
   };
   const c = map[tier] || dim;
   return <span style={{ fontFamily: mono, fontSize: "0.7rem", color: c, border: `1px solid ${c}`, padding: "2px 8px", borderRadius: 4, textTransform: "uppercase", fontWeight: 600 }}>{tier}</span>;
@@ -4886,6 +4886,6 @@ function Label({ children }) {
 }
 const labelStyle = { fontFamily: mono, fontSize: "0.7rem", color: green, letterSpacing: "0.15em", textTransform: "uppercase" };
 const th = { padding: "0.75rem 1rem", fontWeight: 600 };
-const td = { padding: "0.75rem 1rem", color: "#e8e8ed" };
+const td = { padding: "0.75rem 1rem", color: "var(--text)" };
 const linkBtn = { background: "none", border: "none", color: green, cursor: "pointer", padding: 0, fontSize: "inherit", fontFamily: "inherit", textDecoration: "underline" };
-const miniBtn = { background: "transparent", border: `1px solid ${border}`, color: "#e8e8ed", padding: "0.35rem 0.75rem", borderRadius: 6, cursor: "pointer", fontSize: "0.75rem" };
+const miniBtn = { background: "transparent", border: `1px solid ${border}`, color: "var(--text)", padding: "0.35rem 0.75rem", borderRadius: 6, cursor: "pointer", fontSize: "0.75rem" };

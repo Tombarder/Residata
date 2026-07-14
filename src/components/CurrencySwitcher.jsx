@@ -28,7 +28,7 @@ export default function CurrencySwitcher({ lang = "en", fill = false }) {
       title={lang === "sk" ? "Mena" : "Currency"}
       style={{
         display: "flex", borderRadius: 8, overflow: "hidden",
-        border: "1px solid #2e2e38", fontSize: "0.72rem", fontFamily: MONO,
+        border: "1px solid var(--border-soft)", fontSize: "0.72rem", fontFamily: MONO,
         width: fill ? "100%" : undefined,
       }}
     >
@@ -49,14 +49,14 @@ export default function CurrencySwitcher({ lang = "en", fill = false }) {
               flex: fill ? "1 1 0" : undefined,
               display: "flex", alignItems: "center", justifyContent: "center",
               padding: "0.4rem 0.62rem", border: "none", cursor: "pointer",
-              borderLeft: i ? "1px solid #2e2e38" : "none",
+              borderLeft: i ? "1px solid var(--border-soft)" : "none",
               background: active ? "#00e5a0" : "transparent",
-              color: active ? "#06140f" : "#9a9aa6",
+              color: active ? "#06140f" : "var(--text-dim)",
               fontWeight: active ? 700 : 500, whiteSpace: "nowrap",
               fontFamily: "inherit", fontSize: "inherit", transition: "all 0.15s",
             }}
-            onMouseEnter={(e) => { if (!active) e.currentTarget.style.color = "#e8e8ed"; }}
-            onMouseLeave={(e) => { if (!active) e.currentTarget.style.color = "#9a9aa6"; }}
+            onMouseEnter={(e) => { if (!active) e.currentTarget.style.color = "var(--text)"; }}
+            onMouseLeave={(e) => { if (!active) e.currentTarget.style.color = "var(--text-dim)"; }}
           >
             {SYM[code] || code}
           </button>

@@ -41,6 +41,7 @@ import DataFreshness from "../components/DataFreshness";
 
 const mono = "'JetBrains Mono', monospace";
 import { accent as green, dim, text as textLight, border, surface as bg, surfaceDark as bg2 } from "../lib/theme";
+import { useThemeMode, applyTheme, getTheme } from "../lib/theme-mode";
 const SIDEBAR_W = 240;
 
 // ─── Icons — inline SVG, same weight as HowItWorks ──────────────
@@ -173,6 +174,14 @@ export default function PlatformShell({ page, projectId, lang = "en", setLang, s
   const { can, displayTier } = useCapabilities();
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  // Light theme is scoped to the platform: apply the user's preference while the
+  // platform is mounted, and revert to dark when leaving (the marketing site isn't
+  // themed). The toggle (TopBar) updates the preference live.
+  useEffect(() => {
+    applyTheme(getTheme());
+    return () => applyTheme("dark");
+  }, []);
+
   // If somehow anon ended up on /app/*, kick them to home + open login modal.
   // setCurrent is handleNav (App.jsx) which already pushes the route —
   // no need to double-push here.
@@ -228,7 +237,7 @@ export default function PlatformShell({ page, projectId, lang = "en", setLang, s
   };
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", background: "#0a0a0b" }}>
+    <div style={{ minHeight: "100vh", display: "flex", background: "var(--bg)" }}>
       <Sidebar
         page={page}
         lang={lang}
@@ -372,7 +381,7 @@ function Sidebar({ page, lang, can, tier, email, onNavigate, onSignOut, mobileOp
         className={`platform-sidebar${mobileOpen ? " is-open" : ""}`}
         style={{
           position: "fixed", left: 0, top: 0, bottom: 0, width: SIDEBAR_W,
-          background: "linear-gradient(180deg, #0e0e10 0%, #0a0a0b 100%)",
+          background: "linear-gradient(180deg, var(--surface-2) 0%, var(--bg) 100%)",
           borderRight: `1px solid ${border}`,
           display: "flex", flexDirection: "column",
           zIndex: 50,
@@ -383,7 +392,7 @@ function Sidebar({ page, lang, can, tier, email, onNavigate, onSignOut, mobileOp
           <div style={{
             width: 32, height: 32, borderRadius: 7, background: green,
             display: "flex", alignItems: "center", justifyContent: "center",
-            fontWeight: 700, color: "#0a0a0b", fontFamily: mono, fontSize: 16,
+            fontWeight: 700, color: "var(--bg)", fontFamily: mono, fontSize: 16,
           }}>R</div>
           <div>
             <div style={{ fontWeight: 600, color: textLight, fontSize: "1rem", letterSpacing: "-0.01em", lineHeight: 1 }}>Residata</div>
@@ -415,18 +424,18 @@ function Sidebar({ page, lang, can, tier, email, onNavigate, onSignOut, mobileOp
                         background: active ? "rgba(0,229,160,0.12)" : "transparent",
                         border: "none",
                         borderLeft: `3px solid ${active ? green : "transparent"}`,
-                        color: active ? textLight : (locked ? "#55555f" : "#c0c0c8"),
+                        color: active ? textLight : (locked ? "var(--text-faint)" : "var(--text-2)"),
                         cursor: "pointer",
                         fontSize: "0.88rem", fontFamily: "inherit",
                         textAlign: "left", borderRadius: 0,
                         transition: "background 0.15s, color 0.15s",
                       }}
                       onMouseEnter={e => !active && (e.currentTarget.style.background = "rgba(255,255,255,0.03)", e.currentTarget.style.color = textLight)}
-                      onMouseLeave={e => !active && (e.currentTarget.style.background = "transparent", e.currentTarget.style.color = locked ? "#55555f" : "#c0c0c8")}
+                      onMouseLeave={e => !active && (e.currentTarget.style.background = "transparent", e.currentTarget.style.color = locked ? "var(--text-faint)" : "var(--text-2)")}
                     >
                       <span style={{ display: "inline-flex", alignItems: "center", color: active ? green : "inherit" }}><item.Icon /></span>
                       <span style={{ flex: 1 }}>{item.label[lang] || item.label.en}</span>
-                      {locked && <span style={{ color: "#55555f" }}><IconLock /></span>}
+                      {locked && <span style={{ color: "var(--text-faint)" }}><IconLock /></span>}
                     </button>
                   );
                 })}
@@ -467,7 +476,7 @@ function Sidebar({ page, lang, can, tier, email, onNavigate, onSignOut, mobileOp
             onClick={() => onSignOut()}
             style={{
               width: "100%", padding: "0.55rem", background: "transparent",
-              border: `1px solid ${border}`, color: "#c0c0c8",
+              border: `1px solid ${border}`, color: "var(--text-2)",
               fontSize: "0.78rem", borderRadius: 6, cursor: "pointer",
               fontFamily: "inherit",
             }}
@@ -484,7 +493,7 @@ function Sidebar({ page, lang, can, tier, email, onNavigate, onSignOut, mobileOp
 
 function TierBadgeSmall({ tier }) {
   const palette = {
-    free:    { c: "#c0c0c8", bg: "rgba(192,192,200,0.1)"  },
+    free:    { c: "var(--text-2)", bg: "rgba(192,192,200,0.1)"  },
     paid:    { c: green,     bg: "rgba(0,229,160,0.12)"    },
     trial:   { c: green,     bg: "rgba(0,229,160,0.12)"    },
     admin:   { c: "#f5a623", bg: "rgba(245,166,35,0.12)"   },
@@ -503,6 +512,7 @@ function TierBadgeSmall({ tier }) {
 
 // ─── TopBar ─────────────────────────────────────────────────────
 function TopBar({ page, lang, setLang, tier }) {
+  const [themeMode, toggleThemeMode] = useThemeMode();
   const titles = {
     "App:Dashboard": { en: "Dashboard",       sk: "Dashboard"    },
     "App:Projects":  { en: "Projects",        sk: "Projekty"     },
@@ -531,7 +541,7 @@ function TopBar({ page, lang, setLang, tier }) {
   return (
     <header style={{
       padding: "1.25rem 2rem", display: "flex", alignItems: "center", justifyContent: "space-between",
-      borderBottom: `1px solid ${border}`, background: "#0a0a0b",
+      borderBottom: `1px solid ${border}`, background: "var(--bg)",
       position: "sticky", top: 0, zIndex: 30,
     }} className="platform-topbar">
       <div style={{ paddingLeft: "2.5rem" /* leave room for mobile hamburger */ }} className="platform-topbar-inner">
@@ -557,7 +567,7 @@ function TopBar({ page, lang, setLang, tier }) {
           <div style={{
             display: "inline-flex", alignItems: "center",
             border: `1px solid ${border}`, borderRadius: 8, padding: 2,
-            background: "#0e0e10",
+            background: "var(--surface-2)",
           }}>
             {PUBLIC_LANGS.map(code => {
               const active = lang === code;
@@ -590,6 +600,23 @@ function TopBar({ page, lang, setLang, tier }) {
           </div>
         )}
 
+        {/* Light / dark theme toggle */}
+        <button
+          onClick={toggleThemeMode}
+          aria-label={lang === "sk" ? "Prepnúť tému" : "Toggle theme"}
+          title={themeMode === "light" ? (lang === "sk" ? "Tmavý režim" : "Dark mode") : (lang === "sk" ? "Svetlý režim" : "Light mode")}
+          style={{
+            display: "inline-flex", alignItems: "center", justifyContent: "center",
+            width: 38, height: 38, borderRadius: 8, cursor: "pointer",
+            background: "transparent", border: `1px solid ${border}`, color: "var(--text-2)",
+            fontSize: "1rem", lineHeight: 1, transition: "border-color 0.15s",
+          }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = green; }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = border; }}
+        >
+          {themeMode === "light" ? "🌙" : "☀️"}
+        </button>
+
         {/* Back-to-marketing button — always visible top-right of the platform.
             Uses a full navigation (window.location) so the marketing bundle
             loads cleanly without React trying to reconcile platform state. */}
@@ -600,12 +627,12 @@ function TopBar({ page, lang, setLang, tier }) {
             display: "inline-flex", alignItems: "center", gap: "0.45rem",
             padding: "0.5rem 0.95rem", borderRadius: 8,
             background: "transparent", border: `1px solid ${border}`,
-            color: "#c0c0c8", fontSize: "0.8rem", fontFamily: "inherit",
+            color: "var(--text-2)", fontSize: "0.8rem", fontFamily: "inherit",
             textDecoration: "none", cursor: "pointer",
             transition: "border-color 0.15s, color 0.15s",
           }}
           onMouseEnter={e => { e.currentTarget.style.borderColor = green; e.currentTarget.style.color = green; }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor = border; e.currentTarget.style.color = "#c0c0c8"; }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = border; e.currentTarget.style.color = "var(--text-2)"; }}
           title={lang === "sk" ? "Otvoriť webstránku" : "Open website"}
         >
           <span style={{ fontSize: "0.9rem", lineHeight: 1 }}>←</span>
@@ -652,17 +679,17 @@ class PlatformErrorBoundary extends Component {
     if (!this.state.err) return this.props.children;
     const msg = String(this.state.err?.message || this.state.err || "Unknown error");
     return (
-      <div style={{ padding: "3rem 2rem", maxWidth: 680, margin: "0 auto", color: "#e8e8ed" }}>
+      <div style={{ padding: "3rem 2rem", maxWidth: 680, margin: "0 auto", color: "var(--text)" }}>
         <div style={{ fontSize: "2rem", marginBottom: "1rem" }}>⚠️</div>
         <h2 style={{ fontSize: "1.3rem", fontWeight: 700, marginTop: 0, marginBottom: "0.6rem" }}>
           {this.props.lang === "sk" ? "Niečo sa pokazilo pri vykreslení tejto stránky" : "Something broke while rendering this page"}
         </h2>
-        <p style={{ color: "#8a8a96", fontSize: "0.9rem", lineHeight: 1.6, marginBottom: "1rem" }}>
+        <p style={{ color: "var(--text-dim)", fontSize: "0.9rem", lineHeight: 1.6, marginBottom: "1rem" }}>
           {this.props.lang === "sk"
             ? "Pošli nám prosím screenshot a nápis nižšie — opravíme to. Medzitým skús obnoviť stránku, zväčša to stačí."
             : "Please send us a screenshot of the text below — we'll fix it. A reload usually helps in the meantime."}
         </p>
-        <pre style={{ background: "#0e0e10", border: "1px solid #222228", borderRadius: 6, padding: "0.75rem 1rem", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.75rem", color: "#ff9aa2", overflowX: "auto" }}>
+        <pre style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 6, padding: "0.75rem 1rem", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.75rem", color: "#ff9aa2", overflowX: "auto" }}>
 {msg}
         </pre>
         <div style={{ display: "flex", gap: "0.6rem", marginTop: "1rem", flexWrap: "wrap" }}>
@@ -683,8 +710,8 @@ function PageContent({ page, projectId, lang, setCurrent, openLogin }) {
   // Gated pages with an UpgradeCard fallback for users who lack the capability.
   if (page === "App:Dashboard")  return <DashboardHome lang={lang} setCurrent={setCurrent} />;
   if (page === "App:Projects")   return <PlatformProjects lang={lang} setCurrent={setCurrent} openLogin={openLogin} />;
-  if (page === "App:Map")        return <Suspense fallback={<div style={{ padding: "2rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.8rem" }}>{lang === "sk" ? "Načítavam mapu…" : "Loading map…"}</div>}><MapView lang={lang} setCurrent={setCurrent} /></Suspense>;
-  if (page === "App:Map2")       return <Gated require="view_analytics" copyKey="market_radar" lang={lang} setCurrent={setCurrent}><Suspense fallback={<div style={{ padding: "2rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.8rem" }}>{lang === "sk" ? "Načítavam mapu…" : "Loading map…"}</div>}><MapView2 lang={lang} setCurrent={setCurrent} /></Suspense></Gated>;
+  if (page === "App:Map")        return <Suspense fallback={<div style={{ padding: "2rem", color: "var(--text-dim)", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.8rem" }}>{lang === "sk" ? "Načítavam mapu…" : "Loading map…"}</div>}><MapView lang={lang} setCurrent={setCurrent} /></Suspense>;
+  if (page === "App:Map2")       return <Gated require="view_analytics" copyKey="market_radar" lang={lang} setCurrent={setCurrent}><Suspense fallback={<div style={{ padding: "2rem", color: "var(--text-dim)", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.8rem" }}>{lang === "sk" ? "Načítavam mapu…" : "Loading map…"}</div>}><MapView2 lang={lang} setCurrent={setCurrent} /></Suspense></Gated>;
   if (page === "App:Analytics")  return <Gated require="view_analytics"       lang={lang} setCurrent={setCurrent}><LiveAnalytics lang={lang} setCurrent={setCurrent} openLogin={openLogin} /></Gated>;
   if (page === "App:UnitTimeline") return <Gated require="view_analytics"     lang={lang} setCurrent={setCurrent}><UnitTracker lang={lang} setCurrent={setCurrent} /></Gated>;
   if (page === "App:Explorer")   return <Gated require="view_analytics"       lang={lang} setCurrent={setCurrent}><UnitExplorer lang={lang} setCurrent={setCurrent} /></Gated>;
@@ -695,10 +722,10 @@ function PageContent({ page, projectId, lang, setCurrent, openLogin }) {
   if (page === "App:Billing")    return <PlatformBilling lang={lang} setCurrent={setCurrent} />;
   if (page === "App:Settings")   return <PlatformSettings lang={lang} />;
   if (page === "App:Admin")      return <AdminGate require="manage_users" lang={lang}><LiveAdmin lang={lang} setCurrent={setCurrent} /></AdminGate>;
-  if (page === "App:Locations")  return <AdminGate require="manage_locations" lang={lang}><Suspense fallback={<div style={{ padding: "2rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.8rem" }}>{lang === "sk" ? "Načítavam…" : "Loading…"}</div>}><LocationManager lang={lang} /></Suspense></AdminGate>;
-  if (page === "App:DataQA")     return <AdminGate require="manage_data_qa" lang={lang}><Suspense fallback={<div style={{ padding: "2rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.8rem" }}>{lang === "sk" ? "Načítavam…" : "Loading…"}</div>}><DataQA lang={lang} /></Suspense></AdminGate>;
-  if (page === "App:Feedback")   return <AdminGate require="view_feedback_log" lang={lang}><Suspense fallback={<div style={{ padding: "2rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.8rem" }}>{lang === "sk" ? "Načítavam…" : "Loading…"}</div>}><FeedbackLog lang={lang} /></Suspense></AdminGate>;
-  if (page === "App:Texts")      return <AdminGate require="manage_site_content" lang={lang}><Suspense fallback={<div style={{ padding: "2rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.8rem" }}>{lang === "sk" ? "Načítavam…" : "Loading…"}</div>}><TextsEditor lang={lang} /></Suspense></AdminGate>;
+  if (page === "App:Locations")  return <AdminGate require="manage_locations" lang={lang}><Suspense fallback={<div style={{ padding: "2rem", color: "var(--text-dim)", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.8rem" }}>{lang === "sk" ? "Načítavam…" : "Loading…"}</div>}><LocationManager lang={lang} /></Suspense></AdminGate>;
+  if (page === "App:DataQA")     return <AdminGate require="manage_data_qa" lang={lang}><Suspense fallback={<div style={{ padding: "2rem", color: "var(--text-dim)", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.8rem" }}>{lang === "sk" ? "Načítavam…" : "Loading…"}</div>}><DataQA lang={lang} /></Suspense></AdminGate>;
+  if (page === "App:Feedback")   return <AdminGate require="view_feedback_log" lang={lang}><Suspense fallback={<div style={{ padding: "2rem", color: "var(--text-dim)", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.8rem" }}>{lang === "sk" ? "Načítavam…" : "Loading…"}</div>}><FeedbackLog lang={lang} /></Suspense></AdminGate>;
+  if (page === "App:Texts")      return <AdminGate require="manage_site_content" lang={lang}><Suspense fallback={<div style={{ padding: "2rem", color: "var(--text-dim)", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.8rem" }}>{lang === "sk" ? "Načítavam…" : "Loading…"}</div>}><TextsEditor lang={lang} /></Suspense></AdminGate>;
   if (typeof page === "string" && page.startsWith("App:ProjectDetail:")) {
     const id = page.slice("App:ProjectDetail:".length);
     return <LiveProjectDetail projectId={id} lang={lang} setCurrent={setCurrent} openLogin={openLogin} />;
@@ -752,13 +779,13 @@ function Gated({ require, copyKey, children, lang, setCurrent }) {
 function AdminGate({ require, lang, children }) {
   const { can, loading } = useCapabilities();
   if (loading) {
-    return <div style={{ padding: "2rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.8rem" }}>{lang === "sk" ? "Načítavam…" : "Loading…"}</div>;
+    return <div style={{ padding: "2rem", color: "var(--text-dim)", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.8rem" }}>{lang === "sk" ? "Načítavam…" : "Loading…"}</div>;
   }
   if (!can(require)) {
     return (
-      <div style={{ padding: "4.5rem 2rem", textAlign: "center", color: "#8a8a96" }}>
+      <div style={{ padding: "4.5rem 2rem", textAlign: "center", color: "var(--text-dim)" }}>
         <div style={{ fontSize: "2rem", marginBottom: "0.7rem" }}>🔒</div>
-        <div style={{ color: "#e8e8ed", fontWeight: 600, fontSize: "1rem", marginBottom: "0.35rem" }}>
+        <div style={{ color: "var(--text)", fontWeight: 600, fontSize: "1rem", marginBottom: "0.35rem" }}>
           {lang === "sk" ? "403 — Prístup zamietnutý" : "403 — Not authorized"}
         </div>
         <div style={{ fontSize: "0.85rem" }}>
@@ -847,7 +874,7 @@ function UpgradeOverlay({ lang, requiredFor, currentTier, setCurrent }) {
               : <>tier <span style={{ color: textLight }}>{currentTier}</span></>}
           </span>
         </div>
-        <div style={{ color: "#c0c0c8", fontSize: "0.8rem", lineHeight: 1.45, marginTop: "0.2rem" }}>
+        <div style={{ color: "var(--text-2)", fontSize: "0.8rem", lineHeight: 1.45, marginTop: "0.2rem" }}>
           {featureMeta.sub}
         </div>
       </div>
@@ -855,7 +882,7 @@ function UpgradeOverlay({ lang, requiredFor, currentTier, setCurrent }) {
         onClick={() => setCurrent && setCurrent("App:Billing")}
         style={{
           flexShrink: 0,
-          background: green, color: "#0a0a0c",
+          background: green, color: "var(--bg)",
           border: "none", borderRadius: 7,
           padding: "0.55rem 1.1rem",
           fontWeight: 700, fontFamily: mono, fontSize: "0.78rem",
@@ -974,7 +1001,7 @@ function PlatformBilling({ lang, setCurrent }) {
       {checkoutMsg === "cancelled" && (
         <div style={{
           background: "rgba(245,166,35,0.08)", border: "1px solid rgba(245,166,35,0.35)", borderRadius: 12,
-          padding: "0.85rem 1.15rem", marginBottom: "1.25rem", color: "#c0c0c8", fontSize: "0.85rem",
+          padding: "0.85rem 1.15rem", marginBottom: "1.25rem", color: "var(--text-2)", fontSize: "0.85rem",
         }}>
           {lang === "sk" ? "Platba zrušená — nič sme ti nestrhli." : "Checkout cancelled — you weren't charged."}
         </div>
@@ -1006,7 +1033,7 @@ function PlatformBilling({ lang, setCurrent }) {
             {lang === "sk" ? "člen od" : "member since"} {approvedAt}
           </span>}
         </div>
-        <p style={{ color: "#c0c0c8", fontSize: "0.9rem", lineHeight: 1.65, margin: 0 }}>
+        <p style={{ color: "var(--text-2)", fontSize: "0.9rem", lineHeight: 1.65, margin: 0 }}>
           {trialActive && isFree && (lang === "sk"
             ? <>Máš počas trial-u plný paid prístup (analytika, reporty, exporty). Trial končí <strong style={{ color: textLight }}>{fmtDate(trialUntil)}</strong>. Bez karty — po skončení trial-u jednoducho padneš späť na free tier, nič ti nestrhneme.</>
             : <>You have full paid access during the trial (analytics, reports, exports). Trial ends <strong style={{ color: textLight }}>{fmtDate(trialUntil)}</strong>. No card required — when the trial ends you simply drop back to free, nothing is charged.</>)}
@@ -1036,7 +1063,7 @@ function PlatformBilling({ lang, setCurrent }) {
           <h3 style={{ fontSize: "1.25rem", fontWeight: 700, color: textLight, margin: 0, marginBottom: "0.6rem", letterSpacing: "-0.01em" }}>
             {lang === "sk" ? "7 dní plného Residata — zadarmo" : "7 days of the full Residata — on us"}
           </h3>
-          <p style={{ color: "#c0c0c8", fontSize: "0.9rem", lineHeight: 1.6, margin: "0 0 1rem" }}>
+          <p style={{ color: "var(--text-2)", fontSize: "0.9rem", lineHeight: 1.6, margin: "0 0 1rem" }}>
             {lang === "sk"
               ? <>Vyskúšaj Residata naplno týždeň. Všetky projekty, analytika, pivot, reporty, CSV + API exporty. <strong style={{ color: textLight }}>Bez karty, bez platby</strong> — kartu pýtame až keby si sa rozhodol pokračovať po trial-e.</>
               : <>Try the full Residata for a week. Every project, analytics, pivot, reports, CSV + API exports. <strong style={{ color: textLight }}>No card, no payment</strong> — we only ask for a card if you decide to continue after the trial.</>}
@@ -1072,7 +1099,7 @@ function PlatformBilling({ lang, setCurrent }) {
           <h3 style={{ fontSize: "1.4rem", fontWeight: 700, color: textLight, margin: 0, marginBottom: "0.85rem", letterSpacing: "-0.01em" }}>
             Paid tier · {anchorDisplay && <span style={{ color: dim, fontWeight: 400, textDecoration: "line-through", marginRight: "0.35rem" }}>{anchorDisplay}</span>}{priceDisplay} <span style={{ fontSize: "0.9rem", fontWeight: 400, color: dim }}>{lang === "sk" ? "/ mesiac" : "/ month"}</span>
           </h3>
-          <ul style={{ color: "#c0c0c8", fontSize: "0.88rem", lineHeight: 1.7, paddingLeft: "1.1rem", margin: "0.2rem 0 1.25rem" }}>
+          <ul style={{ color: "var(--text-2)", fontSize: "0.88rem", lineHeight: 1.7, paddingLeft: "1.1rem", margin: "0.2rem 0 1.25rem" }}>
             <li>{lang === "sk" ? "Plný detail každého aktívneho projektu" : "Full detail of every active project"}</li>
             <li>{lang === "sk" ? "Analytika, trendy, heat mapy" : "Analytics, trends, district heat maps"}</li>
             <li>{lang === "sk" ? "Mesačné PDF reporty" : "Monthly PDF reports"}</li>
@@ -1129,7 +1156,7 @@ function PlatformBilling({ lang, setCurrent }) {
           <h3 style={{ fontSize: "1.2rem", fontWeight: 700, color: textLight, margin: "0 0 0.5rem" }}>
             {lang === "sk" ? `Skončilo ${fmtDate(paidUntil)}` : `Ended on ${fmtDate(paidUntil)}`}
           </h3>
-          <p style={{ color: "#c0c0c8", fontSize: "0.9rem", lineHeight: 1.6, margin: "0 0 1rem" }}>
+          <p style={{ color: "var(--text-2)", fontSize: "0.9rem", lineHeight: 1.6, margin: "0 0 1rem" }}>
             {lang === "sk"
               ? "Tvoj prístup teraz funguje na free úrovni. Môžeš pokračovať v paid prístupe — kontaktuj nás a obnovíme ti predplatné."
               : "Your access is now at the free tier. You can resume paid access — contact us and we'll renew immediately."}
@@ -1225,7 +1252,7 @@ function SubscriptionCard({ lang, paused, paidWindowActive, paidUntil, paidStart
           <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.25rem" }}>
             {lang === "sk" ? "Spôsob platby" : "Billing"}
           </div>
-          <div style={{ color: "#c0c0c8", fontSize: "0.86rem" }}>
+          <div style={{ color: "var(--text-2)", fontSize: "0.86rem" }}>
             {lang === "sk" ? "Manuálna fakturácia" : "Manual invoicing"}
           </div>
         </div>
@@ -1249,8 +1276,8 @@ function SubscriptionCard({ lang, paused, paidWindowActive, paidUntil, paidStart
 
       <p style={{ color: dim, fontSize: "0.78rem", lineHeight: 1.55, margin: "1rem 0 0", fontFamily: mono }}>
         {lang === "sk"
-          ? <>Faktúry, zmena obdobia, zrušenie — spravuj cez <strong style={{ color: "#c0c0c8" }}>Spravovať platbu</strong> alebo napíš na <a href="mailto:residata@proton.me" style={{ color: green }}>residata@proton.me</a>.</>
-          : <>Invoices, period changes, cancellation — use <strong style={{ color: "#c0c0c8" }}>Manage billing</strong> above, or email <a href="mailto:residata@proton.me" style={{ color: green }}>residata@proton.me</a>.</>}
+          ? <>Faktúry, zmena obdobia, zrušenie — spravuj cez <strong style={{ color: "var(--text-2)" }}>Spravovať platbu</strong> alebo napíš na <a href="mailto:residata@proton.me" style={{ color: green }}>residata@proton.me</a>.</>
+          : <>Invoices, period changes, cancellation — use <strong style={{ color: "var(--text-2)" }}>Manage billing</strong> above, or email <a href="mailto:residata@proton.me" style={{ color: green }}>residata@proton.me</a>.</>}
       </p>
     </div>
   );
@@ -1871,7 +1898,7 @@ function PlatformExports({ lang, setCurrent }) {
             onChange={(e) => setSelectedDay(e.target.value)}
             disabled={daysLoading || days.length === 0 || !!exportProgress}
             style={{
-              background: "#0e0e10", color: textLight, border: `1px solid ${border}`,
+              background: "var(--surface-2)", color: textLight, border: `1px solid ${border}`,
               borderRadius: 6, padding: "0.5rem 0.7rem", fontFamily: mono, fontSize: "0.8rem",
               minWidth: 200, cursor: days.length === 0 ? "default" : "pointer",
             }}>
@@ -1943,7 +1970,7 @@ function PlatformExports({ lang, setCurrent }) {
         <h3 style={{ fontSize: "1.05rem", fontWeight: 600, color: textLight, margin: 0, marginBottom: "0.75rem" }}>
           {lang === "sk" ? "REST API cez Supabase" : "REST API via Supabase"}
         </h3>
-        <p style={{ color: "#c0c0c8", fontSize: "0.85rem", lineHeight: 1.6, marginBottom: "1rem" }}>
+        <p style={{ color: "var(--text-2)", fontSize: "0.85rem", lineHeight: 1.6, marginBottom: "1rem" }}>
           {lang === "sk"
             ? "Dataset je dostupný priamo cez Supabase REST endpoint (gated cez tvoju session). Ak potrebuješ dedikovaný API kľúč pre server-to-server integráciu, napíš na "
             : "The dataset is available directly through Supabase REST (gated by your session). For a dedicated server-to-server API key, email "}
@@ -1951,7 +1978,7 @@ function PlatformExports({ lang, setCurrent }) {
         </p>
         <pre style={{
           margin: 0, padding: "0.75rem 1rem", background: bg2, borderRadius: 6,
-          fontSize: "0.75rem", color: "#c0c0c8", fontFamily: mono, overflowX: "auto",
+          fontSize: "0.75rem", color: "var(--text-2)", fontFamily: mono, overflowX: "auto",
         }}>
 {`GET https://mtclsrswxtjseewyrcbx.supabase.co/rest/v1/projects
   Headers:
@@ -1974,7 +2001,7 @@ function PlatformExports({ lang, setCurrent }) {
         <h3 style={{ fontSize: "1.05rem", fontWeight: 600, color: textLight, margin: 0, marginBottom: "0.75rem" }}>
           {lang === "sk" ? "Export je pre reálne platiacich zákazníkov" : "Export is for paying customers"}
         </h3>
-        <p style={{ color: "#c0c0c8", fontSize: "0.85rem", lineHeight: 1.6, marginBottom: "1.1rem" }}>
+        <p style={{ color: "var(--text-2)", fontSize: "0.85rem", lineHeight: 1.6, marginBottom: "1.1rem" }}>
           {isTrialPaid
             ? (lang === "sk"
                 ? "Máš trial prístup — počas neho vidíš plný obsah, ale sťahovanie (export) dát je vyhradené pre reálne platený plán. Dátum vyššie si môžeš pokojne prezrieť."

@@ -163,28 +163,28 @@ export default function CompleteProfile({ lang = "en" }) {
       overflowY: "auto",
     }}>
       <div style={{
-        background: "#16161a", border: "1px solid #222228", borderRadius: 14,
+        background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14,
         padding: "2.25rem 2rem", maxWidth: 480, width: "100%", margin: "auto 0",
       }}>
         {state === "error" ? (
           // ROLLBACK — something went wrong, let user retry
           <div style={{ padding: "0.5rem 0" }}>
             <div style={{ fontSize: "2.5rem", marginBottom: "0.75rem", textAlign: "center" }}>⚠</div>
-            <h2 style={{ fontSize: "1.3rem", fontWeight: 700, textAlign: "center", marginBottom: "0.75rem", color: "#e8e8ed" }}>
+            <h2 style={{ fontSize: "1.3rem", fontWeight: 700, textAlign: "center", marginBottom: "0.75rem", color: "var(--text)" }}>
               {lang === "sk" ? "Uloženie zlyhalo" : "Save failed"}
             </h2>
             <p style={{ color: "#ff6b6b", fontSize: "0.85rem", textAlign: "center", marginBottom: "1.5rem", lineHeight: 1.5 }}>
               {err}
             </p>
             <button onClick={retry} style={{
-              width: "100%", padding: "0.85rem", background: "#00e5a0", color: "#0a0a0b",
+              width: "100%", padding: "0.85rem", background: "#00e5a0", color: "var(--bg)",
               fontWeight: 600, borderRadius: 8, border: "none", cursor: "pointer",
               fontSize: "0.95rem",
             }}>
               {lang === "sk" ? "Skúsiť znova" : "Try again"}
             </button>
             <button type="button" onClick={() => signOut()} style={{
-              width: "100%", padding: "0.5rem", background: "transparent", color: "#55555f",
+              width: "100%", padding: "0.5rem", background: "transparent", color: "var(--text-faint)",
               border: "none", fontSize: "0.75rem", cursor: "pointer", marginTop: "0.75rem",
             }}>{t.cp_signout} ({user?.email})</button>
           </div>
@@ -194,8 +194,8 @@ export default function CompleteProfile({ lang = "en" }) {
             <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem", color: "#00e5a0", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "0.75rem" }}>
               {lang === "sk" ? "Krok 2 z 2" : "Step 2 of 2"}
             </div>
-            <h2 style={{ fontSize: "1.5rem", fontWeight: 700, letterSpacing: "-0.02em", marginBottom: "0.5rem", color: "#e8e8ed" }}>{t.cp_title}</h2>
-            <p style={{ fontSize: "0.85rem", color: "#8a8a96", lineHeight: 1.6, marginBottom: "1.5rem" }}>
+            <h2 style={{ fontSize: "1.5rem", fontWeight: 700, letterSpacing: "-0.02em", marginBottom: "0.5rem", color: "var(--text)" }}>{t.cp_title}</h2>
+            <p style={{ fontSize: "0.85rem", color: "var(--text-dim)", lineHeight: 1.6, marginBottom: "1.5rem" }}>
               {t.cp_desc}
             </p>
 
@@ -224,7 +224,7 @@ export default function CompleteProfile({ lang = "en" }) {
                 type="submit"
                 disabled={state === "saving"}
                 style={{
-                  width: "100%", padding: "0.85rem", background: "#00e5a0", color: "#0a0a0b",
+                  width: "100%", padding: "0.85rem", background: "#00e5a0", color: "var(--bg)",
                   fontWeight: 600, borderRadius: 8, border: "none",
                   cursor: state === "saving" ? "wait" : "pointer",
                   fontSize: "0.95rem", marginTop: "0.5rem",
@@ -235,7 +235,7 @@ export default function CompleteProfile({ lang = "en" }) {
                 {state === "saving" && (
                   <span style={{
                     width: 14, height: 14,
-                    border: "2px solid #0a0a0b",
+                    border: "2px solid var(--bg)",
                     borderTopColor: "transparent",
                     borderRadius: "50%",
                     animation: "cp-spin 0.7s linear infinite",
@@ -245,7 +245,7 @@ export default function CompleteProfile({ lang = "en" }) {
               </button>
 
               <button type="button" onClick={() => signOut()} disabled={state === "saving"} style={{
-                width: "100%", padding: "0.5rem", background: "transparent", color: "#55555f",
+                width: "100%", padding: "0.5rem", background: "transparent", color: "var(--text-faint)",
                 border: "none", fontSize: "0.75rem", cursor: state === "saving" ? "wait" : "pointer", marginTop: "0.75rem",
                 opacity: state === "saving" ? 0.5 : 1,
               }}>{t.cp_signout} ({user?.email})</button>
@@ -261,7 +261,7 @@ export default function CompleteProfile({ lang = "en" }) {
 function Field({ label, required, children }) {
   return (
     <div style={{ marginBottom: "0.85rem" }}>
-      <label style={{ display: "block", fontSize: "0.75rem", color: "#8a8a96", marginBottom: "0.35rem", fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.05em", textTransform: "uppercase" }}>
+      <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-dim)", marginBottom: "0.35rem", fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.05em", textTransform: "uppercase" }}>
         {label} {required && <span style={{ color: "#00e5a0" }}>*</span>}
       </label>
       {children}
@@ -270,7 +270,7 @@ function Field({ label, required, children }) {
 }
 
 const fieldStyle = {
-  width: "100%", padding: "0.65rem 0.85rem", background: "#0e0e10",
-  border: "1px solid #222228", borderRadius: 8, color: "#e8e8ed",
+  width: "100%", padding: "0.65rem 0.85rem", background: "var(--surface-2)",
+  border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)",
   fontSize: "0.9rem", fontFamily: "inherit", boxSizing: "border-box", outline: "none",
 };

@@ -48,7 +48,7 @@ const STATUSES = [
   { v: "sold_out", sk: "Vypredaný", en: "Sold out" },
 ];
 
-const GREEN = "#00e5a0", BORDER = "#222228", BG = "#0e0e10", FG = "#e8e8ed", MUTED = "#8a8a96";
+const GREEN = "#00e5a0", BORDER = "var(--border)", BG = "var(--surface-2)", FG = "var(--text)", MUTED = "var(--text-dim)";
 const inputStyle = {
   width: "100%", background: "#16181d", color: FG, border: `1px solid ${BORDER}`,
   borderRadius: 6, padding: "5px 7px", fontSize: "0.8rem", boxSizing: "border-box",

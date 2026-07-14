@@ -164,12 +164,12 @@ export default function ChatAssistant({ lang = "sk", setCurrent }) {
                   style={{
                     textAlign: "left", cursor: "pointer",
                     background: "transparent", border: `1px solid ${border}`,
-                    color: "#c4c4cc", padding: "0.55rem 0.8rem",
+                    color: "var(--text-2)", padding: "0.55rem 0.8rem",
                     borderRadius: 8, fontFamily: "inherit", fontSize: "0.82rem",
                     lineHeight: 1.4,
                   }}
                   onMouseEnter={e => { e.currentTarget.style.borderColor = green; e.currentTarget.style.color = text; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = border; e.currentTarget.style.color = "#c4c4cc"; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = border; e.currentTarget.style.color = "var(--text-2)"; }}
                 >{q}</button>
               ))}
             </div>
@@ -242,7 +242,7 @@ export default function ChatAssistant({ lang = "sk", setCurrent }) {
           disabled={chat.pending || !chat.input.trim()}
           style={{
             background: chat.pending || !chat.input.trim() ? "#2a2a30" : green,
-            color: chat.pending || !chat.input.trim() ? dim : "#0a0a0c",
+            color: chat.pending || !chat.input.trim() ? dim : "var(--bg)",
             border: "none", borderRadius: 8,
             padding: "0.7rem 1.1rem", fontWeight: 700, fontFamily: mono, fontSize: "0.82rem",
             cursor: chat.pending || !chat.input.trim() ? "not-allowed" : "pointer",

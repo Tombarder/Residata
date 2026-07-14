@@ -12,7 +12,7 @@ import { createPortal } from "react-dom";
 
 import { accent as green, dim, text as textLight, surfaceDark as bg2 } from "../lib/theme";
 const border = "#23232a";
-const popBg = "#17171c";
+const popBg = "var(--surface)";
 const hover = "#23232a";
 
 const norm = (s) => (s == null ? "" : String(s)).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();

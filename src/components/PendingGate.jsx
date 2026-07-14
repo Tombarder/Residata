@@ -32,10 +32,10 @@ export default function PendingGate({ setCurrent, lang = "en" }) {
       <h1 style={{ fontSize: "1.8rem", fontWeight: 700, marginBottom: "0.75rem", letterSpacing: "-0.02em" }}>
         {t.pending_title}
       </h1>
-      <p style={{ color: "#8a8a96", fontSize: "0.95rem", lineHeight: 1.7, marginBottom: "1rem" }}>
+      <p style={{ color: "var(--text-dim)", fontSize: "0.95rem", lineHeight: 1.7, marginBottom: "1rem" }}>
         {t.pending_body}
       </p>
-      <p style={{ color: "#8a8a96", fontSize: "0.85rem", lineHeight: 1.6, marginBottom: "1.5rem" }}>
+      <p style={{ color: "var(--text-dim)", fontSize: "0.85rem", lineHeight: 1.6, marginBottom: "1.5rem" }}>
         {t.pending_meanwhile}
       </p>
 
@@ -56,7 +56,7 @@ export default function PendingGate({ setCurrent, lang = "en" }) {
           animation: "pg-pulse 1.4s ease-in-out infinite",
         }} />
         {lang === "sk" ? "Sledujeme schválenie · live" : "Watching for approval · live"}
-        {pollCount > 0 && <span style={{ color: "#8a8a96", fontWeight: 400 }}>· checked {pollCount}×</span>}
+        {pollCount > 0 && <span style={{ color: "var(--text-dim)", fontWeight: 400 }}>· checked {pollCount}×</span>}
       </div>
 
       <div>

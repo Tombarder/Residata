@@ -57,7 +57,7 @@ export default function Ticker({ lang = "en" }) {
     return (
       <div style={styles.wrapper} aria-hidden="true">
         <div style={styles.fadeLeft} />
-        <div style={{...styles.content, color: "#55555f"}}>{t.ticker_loading}</div>
+        <div style={{...styles.content, color: "var(--text-faint)"}}>{t.ticker_loading}</div>
         <div style={styles.fadeRight} />
       </div>
     );
@@ -93,15 +93,15 @@ const styles = {
     right: 0,
     zIndex: "var(--z-ticker, 99)",
     height: 36,
-    background: "#0e0e10",
-    borderBottom: "1px solid #222228",
-    borderTop: "1px solid #222228",
+    background: "var(--surface-2)",
+    borderBottom: "1px solid var(--border)",
+    borderTop: "1px solid var(--border)",
     overflow: "hidden",
     display: "flex",
     alignItems: "center",
     fontFamily: "'JetBrains Mono', monospace",
     fontSize: "0.75rem",
-    color: "#c0c0c8",
+    color: "var(--text-2)",
   },
   badge: {
     flex: "0 0 auto",
@@ -110,12 +110,12 @@ const styles = {
     fontWeight: 700,
     letterSpacing: "0.15em",
     color: "#00e5a0",
-    borderRight: "1px solid #222228",
+    borderRight: "1px solid var(--border)",
     height: "100%",
     display: "flex",
     alignItems: "center",
     zIndex: 2,
-    background: "#0e0e10",
+    background: "var(--surface-2)",
   },
   track: {
     flex: 1,
@@ -149,7 +149,7 @@ const styles = {
     top: 0,
     bottom: 0,
     width: 40,
-    background: "linear-gradient(to right, #0e0e10, transparent)",
+    background: "linear-gradient(to right, var(--surface-2), transparent)",
     pointerEvents: "none",
     zIndex: 1,
   },
@@ -159,7 +159,7 @@ const styles = {
     top: 0,
     bottom: 0,
     width: 40,
-    background: "linear-gradient(to left, #0e0e10, transparent)",
+    background: "linear-gradient(to left, var(--surface-2), transparent)",
     pointerEvents: "none",
     zIndex: 1,
   },

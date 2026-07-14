@@ -29,7 +29,7 @@ import { useCurrency } from "../lib/useCurrency";
 
 const mono    = "'JetBrains Mono', ui-monospace, Menlo, monospace";
 import { accent as green, orange, dim, border, bg, surfacePanel as panelHi, text } from "../lib/theme";
-const panel   = "#0e0e12";
+const panel   = "var(--surface-2)";
 
 /* ─── Field registry ─────────────────────────────────────────────
    Single source of truth for which fields exist, what type they are,
@@ -1629,7 +1629,7 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
 
   return (
     <div style={{
-      background: `linear-gradient(135deg, #0e0e12 0%, #0a0a0c 100%)`,
+      background: `linear-gradient(135deg, var(--surface-2) 0%, var(--bg) 100%)`,
       border: `1px solid ${green}40`, borderRadius: 12, padding: "1.25rem",
       boxShadow: "0 0 28px rgba(0,229,160,0.05)",
     }}>
@@ -1730,7 +1730,7 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
               : "This isn't an empty result — the request failed. Please try again."}
           </div>
           <button onClick={() => window.location.reload()} style={{
-            marginTop: "0.3rem", background: green, color: "#0a0a0c", border: "none",
+            marginTop: "0.3rem", background: green, color: "var(--bg)", border: "none",
             borderRadius: 8, padding: "0.55rem 1.1rem", fontFamily: mono, fontSize: "0.8rem",
             fontWeight: 700, cursor: "pointer",
           }}>
@@ -1750,7 +1750,7 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
           {(stavSplit.offer > 0 || stavSplit.sold > 0) && (
             <span style={{ marginLeft: "0.5rem" }}>
               · <strong style={{ color: "#00e5a0" }}>{stavSplit.offer.toLocaleString("en-US").replace(/,/g, " ")}</strong> {lang === "sk" ? "v ponuke" : "on offer"}
-              {" · "}<strong style={{ color: "#9a9aa6" }}>{stavSplit.sold.toLocaleString("en-US").replace(/,/g, " ")}</strong> {lang === "sk" ? "predaných" : "sold"}
+              {" · "}<strong style={{ color: "var(--text-dim)" }}>{stavSplit.sold.toLocaleString("en-US").replace(/,/g, " ")}</strong> {lang === "sk" ? "predaných" : "sold"}
             </span>
           )}
           {!configServerable && filteredRecords.length !== records.length && (
@@ -2241,7 +2241,7 @@ function ChipInZone({ label, type, agg, filter, level, onDragStart, onDragStartP
         display: "inline-flex", alignItems: "center", gap: "0.35rem",
         padding: "0.3rem 0.45rem 0.3rem 0.55rem", borderRadius: 100,
         background: active ? "rgba(0,229,160,0.14)" : "rgba(138,138,150,0.10)",
-        border: `1px solid ${active ? green : "#3a3a44"}`,
+        border: `1px solid ${active ? green : "var(--border-soft)"}`,
         color: active ? green : dim,
         fontSize: "0.75rem",
         cursor: onClick ? "pointer" : "grab",
@@ -2297,7 +2297,7 @@ function ChipInZone({ label, type, agg, filter, level, onDragStart, onDragStartP
           {menuOpen && (
             <div style={{
               position: "absolute", top: "100%", left: 0, marginTop: 4,
-              background: "#0b0b0e", border: `1px solid ${green}`,
+              background: "var(--surface-2)", border: `1px solid ${green}`,
               borderRadius: 6, padding: "0.25rem",
               boxShadow: "0 12px 32px rgba(0,0,0,0.8)",
               zIndex: 900, minWidth: 140,
@@ -2467,7 +2467,7 @@ function PaletteField({ field, used, onDragStart, lang }) {
       style={{
         display: "flex", alignItems: "center", gap: "0.45rem",
         padding: "0.32rem 0.55rem", borderRadius: 4,
-        color: used ? "#8a8a96" : text, fontSize: "0.78rem",
+        color: used ? "var(--text-dim)" : text, fontSize: "0.78rem",
         cursor: "grab", userSelect: "none",
         borderLeft: "2px solid transparent", transition: "background 0.1s, border-color 0.1s",
       }}
@@ -2856,7 +2856,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
       background: panel, maxHeight: 720,
     }}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
-        <thead style={{ background: "#0e0e10", position: "sticky", top: 0, zIndex: 2 }}>
+        <thead style={{ background: "var(--surface-2)", position: "sticky", top: 0, zIndex: 2 }}>
           {crossTab && (
             /* Top header row: col-field name spanning all per-col groups */
             <tr style={{ textAlign: "center", color: dim, fontFamily: mono, fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
@@ -2932,7 +2932,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
         <tbody>
           {flatRows.map((n, idx) => {
             const isSubtotal = !n.isLeaf;
-            const shade = ["#12121a", "#0f0f14", "#0c0c0f", "#0b0b0c", "#0a0a0b"][Math.min(n.level, 4)];
+            const shade = ["#12121a", "#0f0f14", "var(--surface-2)", "#0b0b0c", "var(--bg)"][Math.min(n.level, 4)];
             const indent = 0.4 + n.level * 0.8;
             const baseBg = isSubtotal ? shade : (idx % 2 ? "transparent" : "rgba(255,255,255,0.015)");
             // Is THIS row a navigable project? Only when the deepest
@@ -2963,13 +2963,13 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                 onMouseLeave={rowInteractive ? (e) => { e.currentTarget.style.background = baseBg; } : undefined}
                 style={{
                   background: baseBg,
-                  borderTop: n.level === 0 ? `1px solid ${border}` : `1px solid #16161a`,
+                  borderTop: n.level === 0 ? `1px solid ${border}` : `1px solid var(--surface)`,
                   transition: "background 0.12s",
                 }}>
                 <td style={{
                   ...td, paddingLeft: `${indent}rem`,
                   fontWeight: isSubtotal ? 700 : 400,
-                  color: isSubtotal ? text : "#c4c4cc",
+                  color: isSubtotal ? text : "var(--text-2)",
                   whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                 }}>
                   {isSubtotal && (
@@ -2998,7 +2998,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                       title={lang === "sk" ? `Otvoriť projekt ${n.label}` : `Open project ${n.label}`}
                       onClick={(e) => { e.stopPropagation(); onProjectOpen(projectId); }}
                       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onProjectOpen(projectId); } }}
-                      style={{ color: "#e8e8ed" }}
+                      style={{ color: "var(--text)" }}
                     >{n.label}</span>
                   ) : (
                     <span title={n.label}>{n.label}</span>
@@ -3012,7 +3012,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                 {/* # count — always clickable to drill down into records.
                     Cursor changed from outdated 'zoom-in' (browser-default
                     magnifier) to 'pointer' (universal, modern). */}
-                <td style={{ ...td, textAlign: "right", fontFamily: mono, color: isSubtotal ? "#c4c4cc" : dim, fontWeight: isSubtotal ? 600 : 400, cursor: onDrillDown ? "pointer" : "default" }}
+                <td style={{ ...td, textAlign: "right", fontFamily: mono, color: isSubtotal ? "var(--text-2)" : dim, fontWeight: isSubtotal ? 600 : 400, cursor: onDrillDown ? "pointer" : "default" }}
                     title={onDrillDown ? (lang === "sk" ? "Zobraziť záznamy v tejto skupine" : "Show records in this group") : undefined}
                     onClick={onDrillDown ? (e) => { e.stopPropagation(); onDrillDown(n); } : undefined}>
                   {n.count.toLocaleString("en-US").replace(/,/g, " ")}
@@ -4124,7 +4124,7 @@ function HeatmapSVG({ topRows, colKeys, valueIdx, measureField, measureAgg, onSe
   const textColorFor = (v) => {
     if (!Number.isFinite(v)) return dim;
     const t = (v - minV) / range;
-    return t > 0.55 ? "#0a0a0b" : text;
+    return t > 0.55 ? "var(--bg)" : text;
   };
 
   // Hover state — covers both row labels and cells.
@@ -4486,7 +4486,7 @@ function FilterPopover({ fieldKey, filter, anchorEl, records, distinctOverride =
             </div>
           )}
           {hasEmpty && (
-            <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.65rem", cursor: "pointer", fontSize: "0.82rem", color: "#c4c4cc" }}>
+            <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.65rem", cursor: "pointer", fontSize: "0.82rem", color: "var(--text-2)" }}>
               <input type="checkbox" checked={inclEmpty} onChange={(e) => setInclEmpty(e.target.checked)}
                 style={{ accentColor: green, width: 14, height: 14 }} />
               {lang === "sk" ? "zahrnúť aj byty bez ceny" : "include units without a value"}
@@ -4527,7 +4527,7 @@ function FilterPopover({ fieldKey, filter, anchorEl, records, distinctOverride =
           </div>
           <div style={{
             maxHeight: 280, overflowY: "auto",
-            border: `1px solid ${border}`, borderRadius: 6, background: "#0a0a0c",
+            border: `1px solid ${border}`, borderRadius: 6, background: "var(--bg)",
             padding: "0.25rem",
           }}>
             {hasEmpty && (
@@ -4565,7 +4565,7 @@ function FilterPopover({ fieldKey, filter, anchorEl, records, distinctOverride =
             zrušiť
           </button>
           <button onClick={apply}
-            style={{ background: green, border: "none", color: "#0a0a0c", borderRadius: 6, padding: "0.45rem 1.1rem", cursor: "pointer", fontSize: "0.82rem", fontFamily: "inherit", fontWeight: 600 }}>
+            style={{ background: green, border: "none", color: "var(--bg)", borderRadius: 6, padding: "0.45rem 1.1rem", cursor: "pointer", fontSize: "0.82rem", fontFamily: "inherit", fontWeight: 600 }}>
             použiť
           </button>
         </div>
@@ -4577,7 +4577,7 @@ function FilterPopover({ fieldKey, filter, anchorEl, records, distinctOverride =
 
 const inpS = {
   padding: "0.5rem 0.65rem",
-  background: "#0a0a0c", border: `1px solid ${border}`, borderRadius: 6,
+  background: "var(--bg)", border: `1px solid ${border}`, borderRadius: 6,
   color: text, fontSize: "0.88rem", fontFamily: "inherit",
   outline: "none", width: "100%", minWidth: 0, boxSizing: "border-box",
 };
@@ -4588,7 +4588,7 @@ function ModeBtn({ active, onClick, children }) {
       style={{
         background: active ? "rgba(0,229,160,0.14)" : "transparent",
         border: `1px solid ${active ? green : border}`,
-        color: active ? green : "#c4c4cc",
+        color: active ? green : "var(--text-2)",
         padding: "0.38rem 0.7rem", borderRadius: 6,
         cursor: "pointer", fontFamily: "inherit", fontSize: "0.78rem",
         fontWeight: active ? 600 : 400,
@@ -4617,7 +4617,7 @@ function CheckboxRow({ checked, onChange, label }) {
     <label style={{
       display: "flex", alignItems: "center", gap: "0.55rem",
       padding: "0.35rem 0.55rem", cursor: "pointer", borderRadius: 4,
-      fontSize: "0.86rem", color: checked ? text : "#c4c4cc",
+      fontSize: "0.86rem", color: checked ? text : "var(--text-2)",
     }}
       onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.04)"}
       onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
@@ -4710,7 +4710,7 @@ function DrillDownModal({ title, records, loading, onClose, lang }) {
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: "#0a0a0c", border: `1px solid ${green}55`, borderRadius: 10,
+          background: "var(--bg)", border: `1px solid ${green}55`, borderRadius: 10,
           width: "min(1200px, 100%)", maxHeight: "88vh", display: "flex", flexDirection: "column",
           boxShadow: "0 20px 64px rgba(0,0,0,0.9)",
         }}
@@ -4741,7 +4741,7 @@ function DrillDownModal({ title, records, loading, onClose, lang }) {
             </div>
           )}
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.78rem" }}>
-            <thead style={{ position: "sticky", top: 0, background: "#0e0e10", zIndex: 1 }}>
+            <thead style={{ position: "sticky", top: 0, background: "var(--surface-2)", zIndex: 1 }}>
               <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.06em" }}>
                 {DRILL_COLS.map(c => (
                   <th key={c.key} style={{ padding: "0.55rem 0.7rem", fontWeight: 700, borderBottom: `1px solid ${border}`, whiteSpace: "nowrap" }}>{drillColLabel(c)}</th>
@@ -4763,7 +4763,7 @@ function DrillDownModal({ title, records, loading, onClose, lang }) {
                       ? `${_fmtDec1(Number(raw))} m²`                                                                          // area → 1 decimal
                       : (isEmpty ? null : String(raw));
                     return (
-                      <td key={c.key} style={{ padding: "0.35rem 0.7rem", color: "#c4c4cc", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 180 }}
+                      <td key={c.key} style={{ padding: "0.35rem 0.7rem", color: "var(--text-2)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 180 }}
                           title={cellText == null ? "" : cellText}>
                         {cellText == null ? <span style={{ color: dim, opacity: 0.6 }}>—</span> : cellText}
                       </td>

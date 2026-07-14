@@ -64,22 +64,22 @@ export default function UpgradePrompt({ feature, variant = "block", onLogin, onG
   const cardStyle = variant === "card" ? {
     padding: "2rem",
     textAlign: "center",
-    border: "1px solid #222228",
+    border: "1px solid var(--border)",
     borderRadius: 12,
-    background: "#16161a",
+    background: "var(--surface)",
     maxWidth: 500,
     margin: "0 auto",
   } : {
     padding: "2rem 1rem",
     textAlign: "center",
-    color: "#8a8a96",
+    color: "var(--text-dim)",
   };
 
   return (
     <div style={cardStyle}>
       <div style={{ fontSize: "2rem", marginBottom: "0.75rem" }}>{config.icon}</div>
-      <h3 style={{ fontSize: "1.15rem", fontWeight: 600, color: "#e8e8ed", marginBottom: "0.5rem" }}>{config.title}</h3>
-      <p style={{ fontSize: "0.88rem", color: "#8a8a96", lineHeight: 1.55, marginBottom: "1.25rem" }}>{config.body}</p>
+      <h3 style={{ fontSize: "1.15rem", fontWeight: 600, color: "var(--text)", marginBottom: "0.5rem" }}>{config.title}</h3>
+      <p style={{ fontSize: "0.88rem", color: "var(--text-dim)", lineHeight: 1.55, marginBottom: "1.25rem" }}>{config.body}</p>
       {config.cta && config.onClick && (
         <button onClick={config.onClick} className="btn-p">{config.cta}</button>
       )}
@@ -87,7 +87,7 @@ export default function UpgradePrompt({ feature, variant = "block", onLogin, onG
   );
 }
 
-const inlineStyle = { fontSize: "0.85rem", color: "#8a8a96" };
+const inlineStyle = { fontSize: "0.85rem", color: "var(--text-dim)" };
 const linkBtn = { background: "none", border: "none", color: "#00e5a0", cursor: "pointer", padding: 0, fontSize: "inherit", fontFamily: "inherit", textDecoration: "underline" };
 
 const translations = {

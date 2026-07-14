@@ -1,16 +1,25 @@
-// theme.js — single source of truth for the platform's JS-driven palette.
-// Mirrors the CSS design tokens in index.css, kept as JS hex so it also works
-// where CSS variables can't reach (maplibre paint, canvas fills).
-export const accent       = "#00e5a0"; // brand green   (= --accent)
-export const onAccent     = "#06140f"; // text on green
-export const dim          = "#8a8a96"; // (= --text-dim)
-export const faint        = "#55555f"; // (= --text-faint)
-export const border       = "#222228"; // (= --border)
-export const text         = "#e8e8ed"; // (= --text)
-export const bg           = "#0a0a0b"; // page bg       (= --bg)
-export const surface      = "#16161a"; // card surface  (= --surface)
-export const surfaceDark  = "#0e0e10"; // dark inset/raised surface
-export const surfacePanel = "#14141a"; // slightly-raised panel
-export const orange       = "#f5a623"; // secondary accent (= --accent-2)
-export const blue         = "#4a9eff"; // status "reserved" blue
+// theme.js — JS-side design tokens for inline styles.
+//
+// NEUTRALS resolve to CSS variables (index.css) so they flip with the light/dark
+// theme automatically wherever they're used in an inline style or a style-string.
+// BRAND / STATUS colours stay literal hex: they are theme-invariant AND some feed
+// straight into maplibre paint (MapView2 fill/circle colours), which cannot take a
+// `var(...)`. Never convert accent/orange/blue/onAccent to var().
+export const accent       = "#00e5a0"; // brand green (theme-invariant; used in map paint)
+export const accentStrong = "#00c98c";
+export const onAccent     = "#06140f"; // text on a green fill (dark, fine on both themes)
+export const orange       = "#f5a623"; // secondary accent (theme-invariant; map paint)
+export const blue         = "#4a9eff"; // status "reserved" blue (theme-invariant)
+export const danger       = "#ff6b6b"; // error / negative (theme-invariant)
+
+// neutrals — CSS variables, so they theme-switch
+export const dim          = "var(--text-dim)";
+export const faint        = "var(--text-faint)";
+export const border       = "var(--border)";
+export const text         = "var(--text)";
+export const text2        = "var(--text-2)";
+export const bg           = "var(--bg)";
+export const surface      = "var(--surface)";
+export const surfaceDark  = "var(--surface-2)"; // inset / darker panel
+export const surfacePanel = "var(--surface)";   // card / panel
 export const mono         = "'JetBrains Mono', monospace";

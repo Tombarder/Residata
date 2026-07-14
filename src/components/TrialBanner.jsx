@@ -106,7 +106,7 @@ export function TrialBanner({ lang = "sk", onCta }) {
       zIndex: "var(--z-banner)",
       background: "linear-gradient(90deg, rgba(0,229,160,0.18), rgba(0,229,160,0.08) 60%, rgba(0,229,160,0.04))",
       borderBottom: "1px solid rgba(0,229,160,0.35)",
-      color: "#e8e8ed",
+      color: "var(--text)",
       fontSize: "0.78rem",
       // top inset clears the notch/status bar; side insets clear landscape cutouts
       padding: "calc(0.5rem + var(--safe-top)) max(1rem, var(--safe-right)) 0.5rem max(1rem, var(--safe-left))",
@@ -130,7 +130,7 @@ export function TrialBanner({ lang = "sk", onCta }) {
       </span>
       <button onClick={click}
         style={{
-          background: "#00e5a0", color: "#0a0a0b",
+          background: "#00e5a0", color: "var(--bg)",
           border: "none", borderRadius: 6,
           padding: "0.3rem 0.85rem",
           fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", fontSize: "0.7rem",
@@ -148,7 +148,7 @@ export function TrialBanner({ lang = "sk", onCta }) {
           fontSize: "0.95rem", lineHeight: 1, padding: "0 0.25rem",
           fontFamily: "inherit",
         }}
-        onMouseEnter={e => e.currentTarget.style.color = "#e8e8ed"}
+        onMouseEnter={e => e.currentTarget.style.color = "var(--text)"}
         onMouseLeave={e => e.currentTarget.style.color = "rgba(232,232,237,0.55)"}
       >✕</button>
     </div>
@@ -222,7 +222,7 @@ export function TrialPopup({ lang = "sk", onCta }) {
         @keyframes trialPopupCard { from { opacity: 0; transform: translateY(12px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
       `}</style>
       <div style={{
-        background: "linear-gradient(180deg, #14141a 0%, #0e0e10 100%)",
+        background: "linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%)",
         border: "1px solid rgba(0,229,160,0.4)",
         borderRadius: 16,
         padding: "2rem 2.25rem",
@@ -236,12 +236,12 @@ export function TrialPopup({ lang = "sk", onCta }) {
           aria-label={L("Zavrieť", "Close")}
           style={{
             position: "absolute", top: 14, right: 14,
-            background: "transparent", border: "none", color: "#8a8a96",
+            background: "transparent", border: "none", color: "var(--text-dim)",
             fontSize: "1.1rem", cursor: "pointer", padding: "0.25rem 0.5rem",
             fontFamily: "inherit", lineHeight: 1,
           }}
-          onMouseEnter={e => e.currentTarget.style.color = "#e8e8ed"}
-          onMouseLeave={e => e.currentTarget.style.color = "#8a8a96"}
+          onMouseEnter={e => e.currentTarget.style.color = "var(--text)"}
+          onMouseLeave={e => e.currentTarget.style.color = "var(--text-dim)"}
         >✕</button>
 
         <div style={{
@@ -257,14 +257,14 @@ export function TrialPopup({ lang = "sk", onCta }) {
         </div>
 
         <h2 id="trial-popup-title" style={{
-          fontSize: "1.4rem", fontWeight: 700, color: "#e8e8ed",
+          fontSize: "1.4rem", fontWeight: 700, color: "var(--text)",
           letterSpacing: "-0.02em", margin: "0 0 0.6rem", lineHeight: 1.25,
         }}>
           {L("7 dní plného Residata — zadarmo", "7 days of the full Residata — on us")}
         </h2>
 
         <p style={{
-          color: "#c0c0c8", fontSize: "0.9rem", lineHeight: 1.55,
+          color: "var(--text-2)", fontSize: "0.9rem", lineHeight: 1.55,
           margin: "0 0 1rem",
         }}>
           {L(
@@ -274,18 +274,18 @@ export function TrialPopup({ lang = "sk", onCta }) {
         </p>
 
         <ul style={{
-          color: "#c4c4cc", fontSize: "0.82rem", lineHeight: 1.65,
+          color: "var(--text-2)", fontSize: "0.82rem", lineHeight: 1.65,
           margin: "0 0 1.25rem", paddingLeft: "1.1rem",
         }}>
-          <li><strong style={{ color: "#e8e8ed" }}>{L("Bez karty", "No card required")}</strong> — {L("kartu pýtame až keby si chcel pokračovať.", "we only ask for a card if you continue afterwards.")}</li>
-          <li><strong style={{ color: "#e8e8ed" }}>{L("Bez strhávania", "No auto-charge")}</strong> — {L("po 7 dňoch jednoducho padneš späť na free.", "after 7 days you simply drop back to the free tier.")}</li>
-          <li><strong style={{ color: "#e8e8ed" }}>30-{L("sekundový signup", "second signup")}</strong> — {L("email + heslo, viac netreba.", "email + password, that's all.")}</li>
+          <li><strong style={{ color: "var(--text)" }}>{L("Bez karty", "No card required")}</strong> — {L("kartu pýtame až keby si chcel pokračovať.", "we only ask for a card if you continue afterwards.")}</li>
+          <li><strong style={{ color: "var(--text)" }}>{L("Bez strhávania", "No auto-charge")}</strong> — {L("po 7 dňoch jednoducho padneš späť na free.", "after 7 days you simply drop back to the free tier.")}</li>
+          <li><strong style={{ color: "var(--text)" }}>30-{L("sekundový signup", "second signup")}</strong> — {L("email + heslo, viac netreba.", "email + password, that's all.")}</li>
         </ul>
 
         <button onClick={cta}
           style={{
             display: "block", width: "100%",
-            background: "#00e5a0", color: "#0a0a0b",
+            background: "#00e5a0", color: "var(--bg)",
             border: "none", borderRadius: 8,
             padding: "0.85rem 1rem",
             fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", fontSize: "0.88rem",
@@ -301,20 +301,20 @@ export function TrialPopup({ lang = "sk", onCta }) {
         <button onClick={() => close("maybe_later")}
           style={{
             display: "block", width: "100%",
-            background: "transparent", color: "#8a8a96",
+            background: "transparent", color: "var(--text-dim)",
             border: "none", borderRadius: 8,
             padding: "0.7rem 1rem", marginTop: "0.4rem",
             fontFamily: "inherit", fontSize: "0.78rem",
             cursor: "pointer",
           }}
-          onMouseEnter={e => e.currentTarget.style.color = "#e8e8ed"}
-          onMouseLeave={e => e.currentTarget.style.color = "#8a8a96"}
+          onMouseEnter={e => e.currentTarget.style.color = "var(--text)"}
+          onMouseLeave={e => e.currentTarget.style.color = "var(--text-dim)"}
         >
           {L("Možno neskôr", "Maybe later")}
         </button>
 
         <p style={{
-          color: "#55555f", fontSize: "0.68rem",
+          color: "var(--text-faint)", fontSize: "0.68rem",
           margin: "0.85rem 0 0", textAlign: "center",
           fontFamily: "'JetBrains Mono', monospace",
         }}>

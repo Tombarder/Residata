@@ -27,11 +27,11 @@ import { pushRoute } from "../lib/routing";
 
 const mono   = "'JetBrains Mono', monospace";
 const green  = "#00e5a0";
-const dim    = "#8a8a96";
-const text   = "#e8e8ed";
-const border = "#222228";
-const bg     = "#0a0a0b";
-const bg2    = "#0e0e10";
+const dim    = "var(--text-dim)";
+const text   = "var(--text)";
+const border = "var(--border)";
+const bg     = "var(--bg)";
+const bg2    = "var(--surface-2)";
 const orange = "#f5a623";
 const red    = "#ff6b6b";
 
@@ -90,7 +90,7 @@ export default function FloatingChat({ lang = "sk", onNavigate }) {
             padding: "0 16px 0 14px",
             borderRadius: 22,
             border: `1px solid rgba(0,229,160,0.5)`,
-            background: "#0e0e10",
+            background: "var(--surface-2)",
             color: text,
             cursor: "pointer",
             display: "inline-flex",
@@ -162,7 +162,7 @@ export default function FloatingChat({ lang = "sk", onNavigate }) {
               width: 28, height: 28, borderRadius: "50%",
               background: green,
               display: "flex", alignItems: "center", justifyContent: "center",
-              color: "#0a0a0b",
+              color: "var(--bg)",
             }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 8v3M10 12h-1M15 12h-1M9.5 9.5l1.8 1.8M14.5 14.5l-1.8-1.8"/>
@@ -228,12 +228,12 @@ export default function FloatingChat({ lang = "sk", onNavigate }) {
                       style={{
                         textAlign: "left", cursor: "pointer",
                         background: "transparent", border: `1px solid ${border}`,
-                        color: "#c4c4cc", padding: "0.45rem 0.65rem",
+                        color: "var(--text-2)", padding: "0.45rem 0.65rem",
                         borderRadius: 7, fontFamily: "inherit", fontSize: "0.76rem",
                         lineHeight: 1.35,
                       }}
                       onMouseEnter={e => { e.currentTarget.style.borderColor = green; e.currentTarget.style.color = text; }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = border; e.currentTarget.style.color = "#c4c4cc"; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = border; e.currentTarget.style.color = "var(--text-2)"; }}
                     >{q}</button>
                   ))}
                 </div>
@@ -292,7 +292,7 @@ export default function FloatingChat({ lang = "sk", onNavigate }) {
               disabled={chat.pending || !chat.input.trim()}
               style={{
                 background: chat.pending || !chat.input.trim() ? "#2a2a30" : green,
-                color: chat.pending || !chat.input.trim() ? dim : "#0a0a0c",
+                color: chat.pending || !chat.input.trim() ? dim : "var(--bg)",
                 border: "none", borderRadius: 8,
                 padding: "0.5rem 0.8rem", fontWeight: 700, fontFamily: mono, fontSize: "0.76rem",
                 cursor: chat.pending || !chat.input.trim() ? "not-allowed" : "pointer",
@@ -374,12 +374,12 @@ export function LimitBanner({ error, lang, compact, onSignIn, onBilling }) {
           </button>
         )}
         {(action === "sign_in" || action === "billing") && onBilling && (
-          <button onClick={onBilling} style={ctaBtn("#0a0a0b", green, "#0a0a0b")}>
+          <button onClick={onBilling} style={ctaBtn("var(--bg)", green, "var(--bg)")}>
             {L("Upgrade na paid", "Upgrade to paid")}
           </button>
         )}
         {action === "contact" && (
-          <a href="mailto:residata@proton.me" style={{ ...ctaBtn("#0a0a0b", green, "#0a0a0b"), textDecoration: "none", display: "inline-block" }}>
+          <a href="mailto:residata@proton.me" style={{ ...ctaBtn("var(--bg)", green, "var(--bg)"), textDecoration: "none", display: "inline-block" }}>
             {L("Napíš Residata", "Contact Residata")}
           </a>
         )}
@@ -391,7 +391,7 @@ export function LimitBanner({ error, lang, compact, onSignIn, onBilling }) {
 function ctaBtn(bg, fg, textColor) {
   return {
     background: bg || green,
-    color: textColor || "#0a0a0b",
+    color: textColor || "var(--bg)",
     border: fg ? `1px solid ${fg}` : "none",
     borderRadius: 7,
     padding: "0.42rem 0.85rem",
@@ -407,7 +407,7 @@ function MiniBubble({ msg, lang, onRate }) {
     <div style={{ display: "flex", justifyContent: isUser ? "flex-end" : "flex-start" }}>
       <div style={{
         maxWidth: "88%",
-        background: isUser ? "rgba(0,229,160,0.12)" : "#14141a",
+        background: isUser ? "rgba(0,229,160,0.12)" : "var(--surface)",
         border: `1px solid ${isUser ? "rgba(0,229,160,0.3)" : border}`,
         borderRadius: 10,
         padding: "0.45rem 0.65rem",
