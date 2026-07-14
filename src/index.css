@@ -91,6 +91,15 @@
   color-scheme: light;
 }
 
+/* Subtle card depth in LIGHT mode only — panels/cards (inline var(--surface) bg +
+   a border-radius) get a soft shadow so they lift off the grounded page naturally,
+   instead of reading flat. Dark mode keeps borders (no shadow). Scoped tightly to
+   surface-backed rounded containers, so chips (accent bg) / inputs (surface-2/3) /
+   native controls are untouched. */
+:root[data-theme="light"] div[style*="var(--surface)"][style*="border-radius"] {
+  box-shadow: 0 1px 2px rgba(23, 26, 32, 0.05), 0 4px 12px rgba(23, 26, 32, 0.05);
+}
+
 /* ── universal box model: borders + padding stay inside declared widths ─── */
 *, *::before, *::after { box-sizing: border-box; }
 
