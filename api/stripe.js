@@ -172,6 +172,10 @@ async function handleSetPrice(req, res) {
     }
     patch.anchor_price_cents = a;
   }
+  // A crossed-out "regular" price must be strictly above the real price.
+  if (patch.anchor_price_cents != null && patch.anchor_price_cents <= cents) {
+    return res.status(400).json({ error: "anchor_price_cents must be higher than monthly_price_cents" });
+  }
 
   // Discount notes — optional free text, length-capped.
   for (const k of ["discount_note_en", "discount_note_sk"]) {

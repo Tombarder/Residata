@@ -194,7 +194,16 @@ function PricingPanel({ uiSK }) {
   const priceCents = toCents(priceEur);
   const anchorCents = anchorEur.trim() === "" ? null : toCents(anchorEur);
   const priceValid = Number.isInteger(priceCents) && priceCents >= 100 && priceCents <= 1000000;
-  const anchorValid = anchorCents === null || (Number.isInteger(anchorCents) && anchorCents >= 100 && anchorCents <= 2000000);
+  // Anchor (the struck-through "regular" price) is optional, but when present it
+  // must be in range AND strictly ABOVE the real price — a crossed price at or
+  // below the actual price is a nonsensical anti-discount.
+  const anchorValid = anchorCents === null || (
+    Number.isInteger(anchorCents) && anchorCents >= 100 && anchorCents <= 2000000 &&
+    (!priceValid || anchorCents > priceCents)
+  );
+  const canSave = seeded && !busy && priceValid && anchorValid;
+  // Clear a stale "saved"/error message the moment the Boss edits again.
+  const edit = (setter) => (e) => { setter(e.target.value); if (msg) setMsg(null); };
 
   async function save() {
     setBusy(true); setMsg(null);
@@ -253,37 +262,39 @@ function PricingPanel({ uiSK }) {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "0.8rem", marginBottom: "0.8rem" }}>
         <div>
           <label style={lbl}>{uiSK ? "Cena / mesiac (€)" : "Price / month (€)"}</label>
-          <input value={priceEur} onChange={(e) => setPriceEur(e.target.value)} inputMode="decimal"
+          <input value={priceEur} onChange={edit(setPriceEur)} inputMode="decimal"
             style={{ ...inputStyle, borderColor: priceValid ? border : "#f85149" }} placeholder="79.99" />
         </div>
         <div>
-          <label style={lbl}>{uiSK ? "Prečiarknutá cena (€)" : "Crossed-out price (€)"}</label>
-          <input value={anchorEur} onChange={(e) => setAnchorEur(e.target.value)} inputMode="decimal"
+          <label style={lbl}>{uiSK ? "Prečiarknutá cena (€) — voliteľné" : "Crossed-out price (€) — optional"}</label>
+          <input value={anchorEur} onChange={edit(setAnchorEur)} inputMode="decimal"
             style={{ ...inputStyle, borderColor: anchorValid ? border : "#f85149" }} placeholder="349.99" />
         </div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "0.7rem", marginBottom: "0.9rem" }}>
         <div>
           <label style={lbl}>{uiSK ? "Text pod cenou — EN" : "Note under price — EN"}</label>
-          <input value={noteEn} onChange={(e) => setNoteEn(e.target.value)} style={inputStyle} />
+          <input value={noteEn} onChange={edit(setNoteEn)} maxLength={400} style={inputStyle} />
         </div>
         <div>
           <label style={lbl}>{uiSK ? "Text pod cenou — SK" : "Note under price — SK"}</label>
-          <input value={noteSk} onChange={(e) => setNoteSk(e.target.value)} style={inputStyle} />
+          <input value={noteSk} onChange={edit(setNoteSk)} maxLength={400} style={inputStyle} />
         </div>
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
-        <button onClick={save} disabled={busy || !priceValid || !anchorValid}
+        <button onClick={save} disabled={!canSave}
           style={{
-            background: (priceValid && anchorValid && !busy) ? green : border,
-            color: (priceValid && anchorValid && !busy) ? "#06140f" : faint,
+            background: canSave ? green : border,
+            color: canSave ? "#06140f" : faint,
             border: "none", borderRadius: 6, padding: "0.55rem 1.1rem", fontFamily: mono,
-            fontSize: "0.8rem", fontWeight: 700, cursor: (priceValid && anchorValid && !busy) ? "pointer" : "not-allowed",
+            fontSize: "0.8rem", fontWeight: 700, cursor: canSave ? "pointer" : "not-allowed",
           }}>
           {busy ? (uiSK ? "Ukladám…" : "Saving…") : (uiSK ? "Uložiť cenu" : "Save price")}
         </button>
-        {!priceValid && <span style={{ fontSize: "0.62rem", color: "#f85149" }}>{uiSK ? "cena musí byť € 1–10 000" : "price must be € 1–10 000"}</span>}
+        {!seeded && <span style={{ fontSize: "0.62rem", color: faint }}>{uiSK ? "načítavam aktuálnu cenu…" : "loading current price…"}</span>}
+        {seeded && !priceValid && <span style={{ fontSize: "0.62rem", color: "#f85149" }}>{uiSK ? "cena musí byť € 1–10 000" : "price must be € 1–10 000"}</span>}
+        {seeded && priceValid && !anchorValid && <span style={{ fontSize: "0.62rem", color: "#f85149" }}>{uiSK ? "prečiarknutá cena musí byť vyššia než cena" : "crossed-out price must be higher than the price"}</span>}
         {msg && <span style={{ fontSize: "0.68rem", color: msg.ok ? green : "#f85149" }}>{msg.text}</span>}
       </div>
     </div>
