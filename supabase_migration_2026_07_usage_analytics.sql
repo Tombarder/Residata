@@ -127,7 +127,7 @@ BEGIN
   SELECT d.day,
          count(DISTINCT ev.user_id) FILTER (WHERE ev.user_id IS NOT NULL),
          count(DISTINCT ev.session_id),
-         count(ev.*),
+         count(ev.day),   -- ev.day is non-null only for matched (real) event rows
          COALESCE(su.n, 0)
   FROM days d
   LEFT JOIN ev ON ev.day = d.day
@@ -137,6 +137,9 @@ BEGIN
 END$$;
 
 -- 2c) Feature adoption ranking (which event types get used, by how many users).
+-- Excludes pure navigation (page_view / page_leave) — those are ~80% of all
+-- events and would drown out the actual features; total nav is already in the
+-- summary's total_events. Signed-in users only for the user count.
 CREATE OR REPLACE FUNCTION public.admin_usage_features(p_days int DEFAULT 30)
 RETURNS TABLE(event_type text, events bigint, users bigint, last_seen timestamptz)
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp
@@ -149,10 +152,11 @@ BEGIN
   RETURN QUERY
   SELECT ua.event_type,
          count(*)::bigint,
-         count(DISTINCT ua.user_id)::bigint,
+         count(DISTINCT ua.user_id) FILTER (WHERE ua.user_id IS NOT NULL)::bigint,
          max(ua.created_at)
   FROM public.user_activity ua
   WHERE ua.created_at >= now() - make_interval(days => p_days)
+    AND ua.event_type NOT IN ('page_view', 'page_leave')
   GROUP BY ua.event_type
   ORDER BY count(*) DESC;
 END$$;

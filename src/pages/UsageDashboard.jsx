@@ -68,11 +68,19 @@ function relTime(iso, lang) {
   if (s < 86400) return `${Math.round(s / 3600)} h`;
   return `${Math.round(s / 86400)} d`;
 }
-const minsLabel = (m, lang) => {
-  if (m == null) return "—";
-  if (m < 1) return lang === "sk" ? "<1 min" : "<1 min";
-  if (m < 60) return `${Math.round(m)} min`;
-  return `${(m / 60).toFixed(1)} h`;
+const minsLabel = (m) => {
+  // bigint/numeric come back from PostgREST as strings — coerce before comparing.
+  const n = m == null ? null : Number(m);
+  if (n == null || Number.isNaN(n)) return "—";
+  if (n <= 0) return "0";
+  if (n < 1) return "<1 min";
+  if (n < 60) return `${Math.round(n)} min`;
+  return `${(n / 60).toFixed(1)} h`;
+};
+// Thousands separator for counts (values may be strings from bigint columns).
+const num = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n.toLocaleString("sk-SK") : (v ?? "—");
 };
 
 export default function UsageDashboard({ lang = "en" }) {
@@ -91,22 +99,22 @@ export default function UsageDashboard({ lang = "en" }) {
 
   const load = useCallback(async () => {
     setLoading(true); setErr(null);
-    try {
-      const [s, d, f, u] = await Promise.all([
-        supabaseData.rpc("admin_usage_summary", { p_days: days }),
-        supabaseData.rpc("admin_usage_daily", { p_days: days }),
-        supabaseData.rpc("admin_usage_features", { p_days: days }),
-        supabaseData.rpc("admin_usage_users", { p_days: Math.max(days, 90) }),
-      ]);
-      const firstErr = s.error || d.error || f.error || u.error;
-      if (firstErr) { setErr(firstErr.message || String(firstErr)); setLoading(false); return; }
-      setSummary(s.data || null);
-      setDaily(d.data || []);
-      setFeatures(f.data || []);
-      setUsers(u.data || []);
-    } catch (e) {
-      setErr(String(e?.message || e));
-    }
+    // Each RPC is settled independently: a failure in one section must not blank
+    // the others. supabaseData never rejects (it resolves {data,error}), but wrap
+    // in case a token/network throw escapes.
+    const call = (fn, args) => supabaseData.rpc(fn, args).then(r => r, e => ({ data: null, error: e }));
+    const [s, d, f, u] = await Promise.all([
+      call("admin_usage_summary", { p_days: days }),
+      call("admin_usage_daily", { p_days: days }),
+      call("admin_usage_features", { p_days: days }),
+      call("admin_usage_users", { p_days: days }),
+    ]);
+    if (!s.error) setSummary(s.data || null);
+    if (!d.error) setDaily(d.data || []);
+    if (!f.error) setFeatures(f.data || []);
+    if (!u.error) setUsers(u.data || []);
+    const errs = [s.error, d.error, f.error, u.error].filter(Boolean);
+    setErr(errs.length ? (errs[0].message || String(errs[0])) : null);
     setLoading(false);
   }, [days]);
 
@@ -161,16 +169,16 @@ export default function UsageDashboard({ lang = "en" }) {
         <>
           {/* KPI grid */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "0.7rem", margin: "1.1rem 0" }}>
-            <Card label={L("Aktívni (7 dní)", "Active (7d)")} value={summary?.wau} color={green} sub={L("prihlásení používatelia", "signed-in users")} />
-            <Card label={L(`Aktívni (${days} dní)`, `Active (${days}d)`)} value={summary?.mau} />
-            <Card label={L("Ø aktívny čas / relácia", "Ø active time / session")} value={minsLabel(summary?.avg_active_min, lang)} sub={L("skutočne strávený čas", "real focused time")} />
-            <Card label={L("Celkový aktívny čas", "Total active time")} value={summary?.active_hours != null ? `${summary.active_hours} h` : "—"} />
-            <Card label={L("Relácie", "Sessions")} value={summary?.total_sessions} sub={L(`+ ${summary?.anon_sessions ?? 0} anonymných`, `+ ${summary?.anon_sessions ?? 0} anonymous`)} />
-            <Card label={L("Exporty", "Exports")} value={summary?.exports} />
-            <Card label={L("Otázky AI", "AI questions")} value={summary?.ai_questions} />
-            <Card label={L("Noví používatelia", "New users")} value={summary?.new_users} color={blue} />
-            <Card label={L("Vracajúci sa", "Returning")} value={summary?.returning_users} sub={L("aktívni ≥2 dni", "active ≥2 days")} />
-            <Card label={L("Pády aplikácie", "App crashes")} value={summary?.crashes} color={summary?.crashes > 0 ? red : text} />
+            <Card label={L("Aktívni (7 dní)", "Active (7d)")} value={num(summary?.wau)} color={green} sub={L("prihlásení používatelia", "signed-in users")} />
+            <Card label={L(`Aktívni (${days} dní)`, `Active (${days}d)`)} value={num(summary?.mau)} />
+            <Card label={L("Ø aktívny čas / relácia", "Ø active time / session")} value={minsLabel(summary?.avg_active_min)} sub={L("skutočne strávený čas", "real focused time")} />
+            <Card label={L("Celkový aktívny čas", "Total active time")} value={summary?.active_hours != null ? `${num(summary.active_hours)} h` : "—"} />
+            <Card label={L("Relácie", "Sessions")} value={num(summary?.total_sessions)} sub={L(`+ ${num(summary?.anon_sessions ?? 0)} anonymných`, `+ ${num(summary?.anon_sessions ?? 0)} anonymous`)} />
+            <Card label={L("Exporty", "Exports")} value={num(summary?.exports)} />
+            <Card label={L("Otázky AI", "AI questions")} value={num(summary?.ai_questions)} />
+            <Card label={L("Noví používatelia", "New users")} value={num(summary?.new_users)} color={blue} />
+            <Card label={L("Vracajúci sa", "Returning")} value={num(summary?.returning_users)} sub={L("aktívni ≥2 dni", "active ≥2 days")} />
+            <Card label={L("Pády aplikácie", "App crashes")} value={num(summary?.crashes)} color={Number(summary?.crashes) > 0 ? red : text} />
           </div>
 
           {/* Daily trend */}
@@ -179,12 +187,16 @@ export default function UsageDashboard({ lang = "en" }) {
               <div style={{ overflowX: "auto" }}>
                 <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 120, minWidth: Math.max(daily.length * 10, 300) }}>
                   {daily.map((d) => {
-                    const h = (Number(d.events) / maxDailyEvents) * 100;
+                    const ev = Number(d.events) || 0;
+                    const h = (ev / maxDailyEvents) * 100;
                     const uh = (Number(d.active_users) / maxDailyUsers) * 100;
+                    // Give any non-zero day a visible sliver so a quiet day next to a
+                    // spike doesn't vanish (linear scale would round it to 0px).
+                    const barH = ev > 0 ? `max(3px, ${h}%)` : "0%";
                     return (
-                      <div key={d.day} title={`${d.day}\n${d.events} ${L("udalostí", "events")}\n${d.active_users} ${L("aktívnych", "active")}\n${d.new_users} ${L("noví", "new")}`}
+                      <div key={d.day} title={`${d.day}\n${num(d.events)} ${L("udalostí", "events")}\n${num(d.active_users)} ${L("aktívnych", "active")}\n${num(d.new_users)} ${L("noví", "new")}`}
                         style={{ flex: 1, minWidth: 6, display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "center", height: "100%", position: "relative" }}>
-                        <div style={{ width: "100%", height: `${h}%`, background: bg2, borderTop: `2px solid ${blue}`, borderRadius: "2px 2px 0 0" }} />
+                        <div style={{ width: "100%", height: barH, background: bg2, borderTop: `2px solid ${blue}`, borderRadius: "2px 2px 0 0" }} />
                         <div style={{ position: "absolute", bottom: `${h}%`, width: 4, height: 4, borderRadius: "50%", background: green, opacity: uh > 0 ? 1 : 0, transform: "translateY(2px)" }} />
                       </div>
                     );
@@ -210,7 +222,7 @@ export default function UsageDashboard({ lang = "en" }) {
                       <div style={{ width: `${(Number(f.events) / maxFeat) * 100}%`, height: "100%", background: green, opacity: 0.75 }} />
                     </div>
                     <span style={{ fontFamily: mono, fontSize: "0.72rem", color: dim, whiteSpace: "nowrap" }}>
-                      {f.events} · {f.users} {L("použ.", "usr")}
+                      {num(f.events)} · {num(f.users)} {L("použ.", "usr")}
                     </span>
                   </div>
                 ))}
@@ -219,7 +231,7 @@ export default function UsageDashboard({ lang = "en" }) {
           </Section>
 
           {/* Per-user table */}
-          <Section title={L("Používatelia", "Users")} sub={L("klikni na riadok pre denník aktivity", "click a row for the activity timeline")}>
+          <Section title={L("Používatelia", "Users")} sub={L(`za posledných ${days} dní · klikni na riadok pre denník aktivity`, `last ${days} days · click a row for the activity timeline`)}>
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.78rem" }}>
                 <thead>
@@ -241,12 +253,12 @@ export default function UsageDashboard({ lang = "en" }) {
                       <td style={{ textAlign: "right", padding: "0.5rem 0.6rem" }}>
                         <span style={{ fontFamily: mono, fontSize: "0.68rem", color: STATUS_COLOR[u.status] || dim }}>● {STATUS_LABEL[u.status]?.[lang] || u.status}</span>
                       </td>
-                      <td style={{ textAlign: "right", padding: "0.5rem 0.6rem", fontFamily: mono }}>{u.sessions}</td>
-                      <td style={{ textAlign: "right", padding: "0.5rem 0.6rem", fontFamily: mono }}>{minsLabel(Number(u.active_min), lang)}</td>
-                      <td style={{ textAlign: "right", padding: "0.5rem 0.6rem", fontFamily: mono }}>{u.days_active}</td>
-                      <td style={{ textAlign: "right", padding: "0.5rem 0.6rem", fontFamily: mono }}>{u.project_views}</td>
-                      <td style={{ textAlign: "right", padding: "0.5rem 0.6rem", fontFamily: mono }}>{u.exports}</td>
-                      <td style={{ textAlign: "right", padding: "0.5rem 0.6rem", fontFamily: mono }}>{u.ai_questions}</td>
+                      <td style={{ textAlign: "right", padding: "0.5rem 0.6rem", fontFamily: mono }}>{num(u.sessions)}</td>
+                      <td style={{ textAlign: "right", padding: "0.5rem 0.6rem", fontFamily: mono }}>{minsLabel(u.active_min)}</td>
+                      <td style={{ textAlign: "right", padding: "0.5rem 0.6rem", fontFamily: mono }}>{num(u.days_active)}</td>
+                      <td style={{ textAlign: "right", padding: "0.5rem 0.6rem", fontFamily: mono }}>{num(u.project_views)}</td>
+                      <td style={{ textAlign: "right", padding: "0.5rem 0.6rem", fontFamily: mono }}>{num(u.exports)}</td>
+                      <td style={{ textAlign: "right", padding: "0.5rem 0.6rem", fontFamily: mono }}>{num(u.ai_questions)}</td>
                       <td style={{ textAlign: "right", padding: "0.5rem 0.6rem", fontFamily: mono, fontSize: "0.72rem", color: dim, whiteSpace: "nowrap" }}>{u.last_seen ? relTime(u.last_seen, lang) : "—"}</td>
                     </tr>
                   ))}
@@ -296,13 +308,29 @@ function Empty({ lang }) {
 // Per-user activity timeline, grouped by session (newest first).
 function UserTimeline({ user, rows, loading, lang, onClose }) {
   const L = (sk, en) => (lang === "sk" ? sk : en);
-  // Group consecutive rows by session_id, preserving newest-first order.
-  const groups = [];
+
+  // Close on Escape + lock the page scroll behind the drawer.
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.removeEventListener("keydown", onKey); document.body.style.overflow = prev; };
+  }, [onClose]);
+
+  // Group by session_id (NOT by consecutive rows): a user can have overlapping
+  // sessions (two tabs), so the same session_id appears non-contiguously in the
+  // time-desc list — consecutive grouping would shatter one session into many.
+  // Bucket by id, then order sessions by their most-recent event.
+  const byId = new Map();
   for (const r of rows) {
-    const last = groups[groups.length - 1];
-    if (last && last.session_id === r.session_id) last.rows.push(r);
-    else groups.push({ session_id: r.session_id, rows: [r] });
+    if (!byId.has(r.session_id)) byId.set(r.session_id, []);
+    byId.get(r.session_id).push(r);
   }
+  const groups = [...byId.entries()]
+    .map(([session_id, rs]) => ({ session_id, rows: rs }))  // rows already time-desc from the RPC
+    .sort((a, b) => new Date(b.rows[0].created_at) - new Date(a.rows[0].created_at));
+
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 1000, display: "flex", justifyContent: "flex-end" }}>
       <div onClick={e => e.stopPropagation()} style={{ width: "min(560px, 100%)", height: "100%", background: bg, borderLeft: `1px solid ${border}`, overflowY: "auto", padding: "1.3rem 1.4rem", color: text }}>
