@@ -1,0 +1,350 @@
+// UsageDashboard — admin-only product-usage view over public.user_activity.
+//
+// Reads PRE-AGGREGATED answers from server-side RPCs (admin_usage_summary /
+// _daily / _features / _users / admin_user_timeline) instead of pulling raw
+// rows to the browser, so it stays correct and fast as the event table grows
+// (the old OverviewPanel capped at the last 1000 rows). All RPCs are admin-
+// gated in the DB (current_user_is_admin()).
+//
+// Answers: are people using it, who, how much focused time, which features,
+// active vs churned — plus a per-user drill-down timeline (what/where/how long).
+import { useState, useEffect, useCallback } from "react";
+import { supabaseData } from "../lib/supabase";
+import { accent as green, dim, text, border, surface as bg, surfaceDark as bg2 } from "../lib/theme";
+
+const mono = "'JetBrains Mono', monospace";
+const red = "#ff6b6b";
+const orange = "#f5a623";
+const blue = "#4aa3ff";
+
+const WINDOWS = [7, 30, 90];
+
+// Friendly labels for the raw event_type slugs.
+const EVENT_LABELS = {
+  page_view:            { sk: "Zobrazenie stránky", en: "Page view" },
+  page_leave:           { sk: "Opustenie stránky", en: "Page leave" },
+  project_view:         { sk: "Zobrazenie projektu", en: "Project view" },
+  csv_exported:         { sk: "Export CSV", en: "CSV export" },
+  xlsx_exported:        { sk: "Export XLSX", en: "XLSX export" },
+  chat_question:        { sk: "Otázka AI asistentovi", en: "AI question" },
+  chat_answer:          { sk: "Odpoveď AI", en: "AI answer" },
+  chat_feedback:        { sk: "Hodnotenie AI odpovede", en: "AI answer rating" },
+  chat_cleared:         { sk: "Vyčistenie chatu", en: "Chat cleared" },
+  country_switched:     { sk: "Prepnutie krajiny", en: "Country switched" },
+  currency_switched:    { sk: "Prepnutie meny", en: "Currency switched" },
+  language_switched:    { sk: "Prepnutie jazyka", en: "Language switched" },
+  flat_sort_applied:    { sk: "Triedenie bytov", en: "Flat sort" },
+  flat_filter_cleared:  { sk: "Vymazanie filtra", en: "Filter cleared" },
+  scatter_dot_clicked:  { sk: "Klik v grafe", en: "Chart dot click" },
+  settings_saved:       { sk: "Uloženie nastavení", en: "Settings saved" },
+  profile_completed:    { sk: "Dokončenie profilu", en: "Profile completed" },
+  platform_crash:       { sk: "Pád aplikácie", en: "App crash" },
+  trial_banner_clicked: { sk: "Klik na trial banner", en: "Trial banner click" },
+  trial_popup_shown:    { sk: "Zobrazenie trial popupu", en: "Trial popup shown" },
+  trial_popup_clicked:  { sk: "Klik na trial popup", en: "Trial popup click" },
+  trial_popup_dismissed:{ sk: "Zavretie trial popupu", en: "Trial popup dismissed" },
+  login_code_requested: { sk: "Žiadosť o prihl. kód", en: "Login code requested" },
+  login_code_success:   { sk: "Úspešné prihlásenie", en: "Login success" },
+};
+const evLabel = (t, lang) => (EVENT_LABELS[t]?.[lang]) || (t || "").replace(/_/g, " ");
+
+const STATUS_COLOR = { active: green, idle: orange, churned: red };
+const STATUS_LABEL = {
+  active:  { sk: "aktívny", en: "active" },
+  idle:    { sk: "utícha",  en: "idle" },
+  churned: { sk: "odišiel", en: "churned" },
+};
+const TIER_COLOR = { admin: blue, paid: green, free: dim, pending: orange, trial: orange };
+
+function fmtDateTime(iso, lang) {
+  try { return new Date(iso).toLocaleString(lang === "sk" ? "sk-SK" : "en-GB", { dateStyle: "medium", timeStyle: "short" }); }
+  catch { return iso; }
+}
+function relTime(iso, lang) {
+  const s = (Date.now() - new Date(iso).getTime()) / 1000;
+  const L = (sk, en) => (lang === "sk" ? sk : en);
+  if (s < 60) return L("pred chvíľou", "just now");
+  if (s < 3600) return `${Math.round(s / 60)} min`;
+  if (s < 86400) return `${Math.round(s / 3600)} h`;
+  return `${Math.round(s / 86400)} d`;
+}
+const minsLabel = (m, lang) => {
+  if (m == null) return "—";
+  if (m < 1) return lang === "sk" ? "<1 min" : "<1 min";
+  if (m < 60) return `${Math.round(m)} min`;
+  return `${(m / 60).toFixed(1)} h`;
+};
+
+export default function UsageDashboard({ lang = "en" }) {
+  const L = (sk, en) => (lang === "sk" ? sk : en);
+  const [days, setDays] = useState(30);
+  const [summary, setSummary] = useState(null);
+  const [daily, setDaily] = useState([]);
+  const [features, setFeatures] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState(null);
+
+  const [selUser, setSelUser] = useState(null);   // { user_id, email }
+  const [timeline, setTimeline] = useState([]);
+  const [tlLoading, setTlLoading] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true); setErr(null);
+    try {
+      const [s, d, f, u] = await Promise.all([
+        supabaseData.rpc("admin_usage_summary", { p_days: days }),
+        supabaseData.rpc("admin_usage_daily", { p_days: days }),
+        supabaseData.rpc("admin_usage_features", { p_days: days }),
+        supabaseData.rpc("admin_usage_users", { p_days: Math.max(days, 90) }),
+      ]);
+      const firstErr = s.error || d.error || f.error || u.error;
+      if (firstErr) { setErr(firstErr.message || String(firstErr)); setLoading(false); return; }
+      setSummary(s.data || null);
+      setDaily(d.data || []);
+      setFeatures(f.data || []);
+      setUsers(u.data || []);
+    } catch (e) {
+      setErr(String(e?.message || e));
+    }
+    setLoading(false);
+  }, [days]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const openUser = useCallback(async (u) => {
+    setSelUser(u); setTimeline([]); setTlLoading(true);
+    try {
+      const { data, error } = await supabaseData.rpc("admin_user_timeline", { p_user_id: u.user_id, p_limit: 500 });
+      if (error) setErr(error.message || String(error));
+      setTimeline(data || []);
+    } catch (e) { setErr(String(e?.message || e)); }
+    setTlLoading(false);
+  }, []);
+
+  const maxDailyEvents = Math.max(1, ...daily.map(d => Number(d.events) || 0));
+  const maxDailyUsers = Math.max(1, ...daily.map(d => Number(d.active_users) || 0));
+  const maxFeat = Math.max(1, ...features.map(f => Number(f.events) || 0));
+
+  return (
+    <div style={{ padding: "1.5rem 1.75rem", maxWidth: 1200, margin: "0 auto", color: text }}>
+      {/* Header + window selector */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "1rem", marginBottom: "0.35rem" }}>
+        <div>
+          <h1 style={{ fontFamily: mono, fontSize: "1.35rem", fontWeight: 700, margin: 0 }}>{L("Používanie", "Usage")}</h1>
+          <p style={{ color: dim, fontSize: "0.82rem", margin: "0.35rem 0 0" }}>
+            {L("Kto platformu používa, ako často, ako dlho a čo v nej robí.", "Who uses the platform, how often, how long, and what they do.")}
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
+          <span style={{ fontSize: "0.7rem", color: dim, fontFamily: mono }}>{L("okno", "window")}</span>
+          {WINDOWS.map(w => (
+            <button key={w} onClick={() => setDays(w)} style={{
+              fontFamily: mono, fontSize: "0.75rem", padding: "0.35rem 0.7rem", borderRadius: 8, cursor: "pointer",
+              border: `1px solid ${days === w ? green : border}`, background: days === w ? green : "transparent",
+              color: days === w ? "#00120c" : text, fontWeight: days === w ? 700 : 400,
+            }}>{w}{L("d", "d")}</button>
+          ))}
+          <button onClick={load} title="reload" style={{ fontFamily: mono, fontSize: "0.75rem", padding: "0.35rem 0.7rem", borderRadius: 8, cursor: "pointer", border: `1px solid ${border}`, background: "transparent", color: dim }}>↻</button>
+        </div>
+      </div>
+
+      {err && (
+        <div style={{ background: "rgba(255,107,107,0.1)", border: `1px solid ${red}`, color: red, borderRadius: 8, padding: "0.7rem 0.9rem", fontFamily: mono, fontSize: "0.78rem", margin: "0.8rem 0" }}>
+          {err}
+        </div>
+      )}
+
+      {loading && !summary ? (
+        <div style={{ color: dim, fontFamily: mono, fontSize: "0.8rem", padding: "2rem 0" }}>{L("Načítavam…", "Loading…")}</div>
+      ) : (
+        <>
+          {/* KPI grid */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "0.7rem", margin: "1.1rem 0" }}>
+            <Card label={L("Aktívni (7 dní)", "Active (7d)")} value={summary?.wau} color={green} sub={L("prihlásení používatelia", "signed-in users")} />
+            <Card label={L(`Aktívni (${days} dní)`, `Active (${days}d)`)} value={summary?.mau} />
+            <Card label={L("Ø aktívny čas / relácia", "Ø active time / session")} value={minsLabel(summary?.avg_active_min, lang)} sub={L("skutočne strávený čas", "real focused time")} />
+            <Card label={L("Celkový aktívny čas", "Total active time")} value={summary?.active_hours != null ? `${summary.active_hours} h` : "—"} />
+            <Card label={L("Relácie", "Sessions")} value={summary?.total_sessions} sub={L(`+ ${summary?.anon_sessions ?? 0} anonymných`, `+ ${summary?.anon_sessions ?? 0} anonymous`)} />
+            <Card label={L("Exporty", "Exports")} value={summary?.exports} />
+            <Card label={L("Otázky AI", "AI questions")} value={summary?.ai_questions} />
+            <Card label={L("Noví používatelia", "New users")} value={summary?.new_users} color={blue} />
+            <Card label={L("Vracajúci sa", "Returning")} value={summary?.returning_users} sub={L("aktívni ≥2 dni", "active ≥2 days")} />
+            <Card label={L("Pády aplikácie", "App crashes")} value={summary?.crashes} color={summary?.crashes > 0 ? red : text} />
+          </div>
+
+          {/* Daily trend */}
+          <Section title={L("Denný trend", "Daily trend")}>
+            {daily.length === 0 ? <Empty lang={lang} /> : (
+              <div style={{ overflowX: "auto" }}>
+                <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 120, minWidth: Math.max(daily.length * 10, 300) }}>
+                  {daily.map((d) => {
+                    const h = (Number(d.events) / maxDailyEvents) * 100;
+                    const uh = (Number(d.active_users) / maxDailyUsers) * 100;
+                    return (
+                      <div key={d.day} title={`${d.day}\n${d.events} ${L("udalostí", "events")}\n${d.active_users} ${L("aktívnych", "active")}\n${d.new_users} ${L("noví", "new")}`}
+                        style={{ flex: 1, minWidth: 6, display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "center", height: "100%", position: "relative" }}>
+                        <div style={{ width: "100%", height: `${h}%`, background: bg2, borderTop: `2px solid ${blue}`, borderRadius: "2px 2px 0 0" }} />
+                        <div style={{ position: "absolute", bottom: `${h}%`, width: 4, height: 4, borderRadius: "50%", background: green, opacity: uh > 0 ? 1 : 0, transform: "translateY(2px)" }} />
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{ display: "flex", gap: "1.2rem", marginTop: "0.5rem", fontSize: "0.68rem", color: dim, fontFamily: mono }}>
+                  <span><span style={{ color: blue }}>▮</span> {L("udalosti / deň", "events / day")}</span>
+                  <span><span style={{ color: green }}>●</span> {L("aktívni používatelia", "active users")}</span>
+                  <span>{daily[0]?.day} → {daily[daily.length - 1]?.day}</span>
+                </div>
+              </div>
+            )}
+          </Section>
+
+          {/* Feature adoption */}
+          <Section title={L("Čo používajú (funkcie)", "What they use (features)")}>
+            {features.length === 0 ? <Empty lang={lang} /> : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                {features.map((f) => (
+                  <div key={f.event_type} style={{ display: "grid", gridTemplateColumns: "minmax(140px,1.6fr) 3fr auto", alignItems: "center", gap: "0.7rem" }}>
+                    <span style={{ fontSize: "0.78rem", color: text }}>{evLabel(f.event_type, lang)}</span>
+                    <div style={{ background: bg2, borderRadius: 5, height: 16, overflow: "hidden" }}>
+                      <div style={{ width: `${(Number(f.events) / maxFeat) * 100}%`, height: "100%", background: green, opacity: 0.75 }} />
+                    </div>
+                    <span style={{ fontFamily: mono, fontSize: "0.72rem", color: dim, whiteSpace: "nowrap" }}>
+                      {f.events} · {f.users} {L("použ.", "usr")}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Section>
+
+          {/* Per-user table */}
+          <Section title={L("Používatelia", "Users")} sub={L("klikni na riadok pre denník aktivity", "click a row for the activity timeline")}>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.78rem" }}>
+                <thead>
+                  <tr style={{ color: dim, fontFamily: mono, fontSize: "0.66rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                    {[L("Používateľ", "User"), "Tier", L("Stav", "Status"), L("Relácie", "Sess."), L("Aktívny čas", "Active"), L("Dni", "Days"), L("Projekty", "Proj."), "Export", "AI", L("Naposledy", "Last seen")].map((h, i) => (
+                      <th key={i} style={{ textAlign: i === 0 ? "left" : "right", padding: "0.5rem 0.6rem", borderBottom: `1px solid ${border}`, whiteSpace: "nowrap" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map((u) => (
+                    <tr key={u.user_id} onClick={() => openUser(u)} style={{ cursor: "pointer", borderBottom: `1px solid ${border}` }}
+                      onMouseEnter={e => e.currentTarget.style.background = bg2}
+                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                      <td style={{ padding: "0.5rem 0.6rem", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {u.email || "(?)"}{u.company ? <span style={{ color: dim }}> · {u.company}</span> : null}
+                      </td>
+                      <td style={{ textAlign: "right", padding: "0.5rem 0.6rem", fontFamily: mono, fontSize: "0.72rem", color: TIER_COLOR[u.tier] || dim }}>{u.tier || "—"}</td>
+                      <td style={{ textAlign: "right", padding: "0.5rem 0.6rem" }}>
+                        <span style={{ fontFamily: mono, fontSize: "0.68rem", color: STATUS_COLOR[u.status] || dim }}>● {STATUS_LABEL[u.status]?.[lang] || u.status}</span>
+                      </td>
+                      <td style={{ textAlign: "right", padding: "0.5rem 0.6rem", fontFamily: mono }}>{u.sessions}</td>
+                      <td style={{ textAlign: "right", padding: "0.5rem 0.6rem", fontFamily: mono }}>{minsLabel(Number(u.active_min), lang)}</td>
+                      <td style={{ textAlign: "right", padding: "0.5rem 0.6rem", fontFamily: mono }}>{u.days_active}</td>
+                      <td style={{ textAlign: "right", padding: "0.5rem 0.6rem", fontFamily: mono }}>{u.project_views}</td>
+                      <td style={{ textAlign: "right", padding: "0.5rem 0.6rem", fontFamily: mono }}>{u.exports}</td>
+                      <td style={{ textAlign: "right", padding: "0.5rem 0.6rem", fontFamily: mono }}>{u.ai_questions}</td>
+                      <td style={{ textAlign: "right", padding: "0.5rem 0.6rem", fontFamily: mono, fontSize: "0.72rem", color: dim, whiteSpace: "nowrap" }}>{u.last_seen ? relTime(u.last_seen, lang) : "—"}</td>
+                    </tr>
+                  ))}
+                  {users.length === 0 && <tr><td colSpan={10} style={{ padding: "1rem", color: dim, textAlign: "center" }}>{L("Žiadni používatelia v okne.", "No users in window.")}</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </Section>
+        </>
+      )}
+
+      {/* Drill-down drawer */}
+      {selUser && (
+        <UserTimeline user={selUser} rows={timeline} loading={tlLoading} lang={lang} onClose={() => setSelUser(null)} />
+      )}
+    </div>
+  );
+}
+
+// KPI card (module-level so it isn't recreated every render).
+function Card({ label, value, sub, color = text }) {
+  return (
+    <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 10, padding: "1rem 1.1rem", minHeight: 88 }}>
+      <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.4rem" }}>{label}</div>
+      <div style={{ fontFamily: mono, fontSize: "1.6rem", fontWeight: 700, color, lineHeight: 1 }}>{value ?? "—"}</div>
+      {sub && <div style={{ fontSize: "0.7rem", color: dim, marginTop: "0.3rem" }}>{sub}</div>}
+    </div>
+  );
+}
+
+function Section({ title, sub, children }) {
+  return (
+    <div style={{ margin: "1.6rem 0" }}>
+      <div style={{ marginBottom: "0.7rem" }}>
+        <h2 style={{ fontFamily: mono, fontSize: "0.95rem", fontWeight: 700, margin: 0, color: text }}>{title}</h2>
+        {sub && <div style={{ fontSize: "0.72rem", color: dim, marginTop: "0.2rem" }}>{sub}</div>}
+      </div>
+      <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 10, padding: "1rem 1.1rem" }}>{children}</div>
+    </div>
+  );
+}
+
+function Empty({ lang }) {
+  return <div style={{ color: dim, fontFamily: mono, fontSize: "0.78rem" }}>{lang === "sk" ? "Žiadne dáta v tomto okne." : "No data in this window."}</div>;
+}
+
+// Per-user activity timeline, grouped by session (newest first).
+function UserTimeline({ user, rows, loading, lang, onClose }) {
+  const L = (sk, en) => (lang === "sk" ? sk : en);
+  // Group consecutive rows by session_id, preserving newest-first order.
+  const groups = [];
+  for (const r of rows) {
+    const last = groups[groups.length - 1];
+    if (last && last.session_id === r.session_id) last.rows.push(r);
+    else groups.push({ session_id: r.session_id, rows: [r] });
+  }
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 1000, display: "flex", justifyContent: "flex-end" }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: "min(560px, 100%)", height: "100%", background: bg, borderLeft: `1px solid ${border}`, overflowY: "auto", padding: "1.3rem 1.4rem", color: text }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem", marginBottom: "1rem" }}>
+          <div>
+            <div style={{ fontFamily: mono, fontSize: "0.66rem", color: dim, textTransform: "uppercase", letterSpacing: "0.08em" }}>{L("Denník aktivity", "Activity timeline")}</div>
+            <div style={{ fontFamily: mono, fontSize: "0.95rem", fontWeight: 700, marginTop: "0.25rem", wordBreak: "break-all" }}>{user.email || user.user_id}</div>
+          </div>
+          <button onClick={onClose} style={{ background: "transparent", border: `1px solid ${border}`, color: dim, borderRadius: 8, cursor: "pointer", fontFamily: mono, fontSize: "0.9rem", padding: "0.2rem 0.6rem" }}>✕</button>
+        </div>
+
+        {loading ? (
+          <div style={{ color: dim, fontFamily: mono, fontSize: "0.8rem" }}>{L("Načítavam…", "Loading…")}</div>
+        ) : rows.length === 0 ? (
+          <div style={{ color: dim, fontFamily: mono, fontSize: "0.8rem" }}>{L("Žiadna aktivita.", "No activity.")}</div>
+        ) : (
+          groups.map((g, gi) => (
+            <div key={gi} style={{ marginBottom: "1.2rem" }}>
+              <div style={{ fontFamily: mono, fontSize: "0.64rem", color: dim, marginBottom: "0.4rem", borderBottom: `1px solid ${border}`, paddingBottom: "0.3rem" }}>
+                {L("Relácia", "Session")} · {fmtDateTime(g.rows[g.rows.length - 1].created_at, lang)} → {fmtDateTime(g.rows[0].created_at, lang)}
+              </div>
+              {g.rows.map((r, ri) => {
+                const active = r.active_ms != null ? Math.round(Number(r.active_ms) / 1000) : null;
+                const dwell = r.dwell_ms != null ? Math.round(Number(r.dwell_ms) / 1000) : null;
+                const dur = r.event_type === "page_leave" ? (active != null ? `${active}s ${L("aktívne", "active")}${dwell != null ? ` / ${dwell}s ${L("celkom", "total")}` : ""}` : null) : null;
+                return (
+                  <div key={ri} style={{ display: "flex", gap: "0.7rem", padding: "0.3rem 0", fontSize: "0.76rem", alignItems: "baseline" }}>
+                    <span style={{ fontFamily: mono, fontSize: "0.66rem", color: dim, whiteSpace: "nowrap", minWidth: 52 }}>
+                      {new Date(r.created_at).toLocaleTimeString(lang === "sk" ? "sk-SK" : "en-GB", { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                    <span style={{ flex: 1 }}>
+                      <span style={{ color: text }}>{evLabel(r.event_type, lang)}</span>
+                      {r.page && <span style={{ color: dim }}> · {r.page}</span>}
+                      {dur && <span style={{ color: green, fontFamily: mono, fontSize: "0.68rem" }}> · {dur}</span>}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}

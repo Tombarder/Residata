@@ -31,3 +31,7 @@ scripts/.build-data.json
 # Vercel CLI local link (project/org ids)
 .vercel
 .env*
+
+# never commit captured auth sessions
+_sess.json
+public/_sess.json
