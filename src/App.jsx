@@ -1,6 +1,7 @@
 import { useState, useEffect, useLayoutEffect, useRef, lazy, Suspense } from "react";
 import { useNavCollapsed } from "./lib/breakpoints";
 import { t } from "./lib/marketingCopy";
+import { usePricing } from "./lib/pricing";
 import { createPortal } from "react-dom";
 import Ticker from "./components/Ticker";
 import LoginModal from "./components/LoginModal";
@@ -1603,7 +1604,17 @@ function DataPage({ setCurrent, l, lang }) {
 /* ─────── PRICING ─────── */
 function PricingPage({ setCurrent, l, lang, onLogin }) {
   const mono = "'JetBrains Mono', monospace";
-  const tiers = l.tiers;
+  // DB-driven price (admin "Pricing" tool). Overrides the in-code price/anchor/
+  // note on the paid tier when available; falls back to marketingCopy otherwise.
+  const pricing = usePricing(lang);
+  const tiers = pricing.ready
+    ? l.tiers.map((ti) => ti.isCustom ? ti : {
+        ...ti,
+        price: pricing.priceDisplay || ti.price,
+        anchor: pricing.anchorDisplay ?? ti.anchor,
+        note: pricing.note || ti.note,
+      })
+    : l.tiers;
   const faqs = l.faqs;
   const { can, showTrialOffer } = useCapabilities();
   const auth = useAuth();

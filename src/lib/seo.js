@@ -110,14 +110,14 @@ const SEO_BY_PAGE = {
   Pricing: {
     path: "/pricing",
     en: {
-      title: "Pricing — Residata | €49.99 / month (launch)",
-      description: "Full access to the Slovak & Czech new-build market dataset for €49.99 / month — launch price (regular €149.99). 7-day free trial, cancel anytime.",
-      keywords: "Residata pricing, real estate data pricing, market intelligence subscription, €49.99 monthly",
+      title: "Pricing — Residata | €79.99 / month",
+      description: "Full access to the Slovak & Czech new-build market dataset for €79.99 / month — summer early-access rate (regular €349.99). 7-day free trial, cancel anytime.",
+      keywords: "Residata pricing, real estate data pricing, market intelligence subscription, €79.99 monthly",
     },
     sk: {
-      title: "Cenník — Residata | €49.99 / mesiac (úvodná cena)",
-      description: "Plný prístup ku kompletným dátam novostavieb na Slovensku a v Česku za €49.99 / mesiac — úvodná cena (bežne €149.99). 7-dňová skúšobná verzia zdarma, zrušenie kedykoľvek.",
-      keywords: "Residata cenník, ceny dát nehnuteľnosti, market intelligence predplatné, €49.99 mesačne",
+      title: "Cenník — Residata | €79.99 / mesiac",
+      description: "Plný prístup ku kompletným dátam novostavieb na Slovensku a v Česku za €79.99 / mesiac — letná úvodná cena (bežne €349.99). 7-dňová skúšobná verzia zdarma, zrušenie kedykoľvek.",
+      keywords: "Residata cenník, ceny dát nehnuteľnosti, market intelligence predplatné, €79.99 mesačne",
     },
   },
   Contact: {

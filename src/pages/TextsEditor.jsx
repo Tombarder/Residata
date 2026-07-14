@@ -42,6 +42,7 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import { t as marketingDict } from "../lib/marketingCopy";
 import { liveT } from "../lib/liveLang";
 import { refreshOverrides } from "../lib/copyOverrides";
+import { usePricingConfig, refreshPricing, formatEurCents } from "../lib/pricing";
 import { PAGES, humanizeKey } from "../lib/copyGroups";
 import {
   accent as green, orange as amber, text as textLight, dim, faint,
@@ -156,6 +157,134 @@ function previewText(v, max = 90) {
   let s = typeof v === "string" ? v : Array.isArray(v) ? v.join(" · ") : JSON.stringify(v);
   s = (s || "").replace(/\s+/g, " ").trim();
   return s.length > max ? s.slice(0, max) + "…" : s;
+}
+
+// ── Pricing panel ────────────────────────────────────────────────────────────
+// The Boss's one-click price control. Shows the current + crossed price, and on
+// Save writes public.pricing_config via the admin-gated api/stripe?action=set-price.
+// That ONE value then drives BOTH the website pricing card AND the live Stripe
+// charge (no code edit, no deploy).
+function PricingPanel({ uiSK }) {
+  const cfg = usePricingConfig();
+  const [priceEur, setPriceEur] = useState("");
+  const [anchorEur, setAnchorEur] = useState("");
+  const [noteEn, setNoteEn] = useState("");
+  const [noteSk, setNoteSk] = useState("");
+  const [seeded, setSeeded] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  useEffect(() => {
+    if (cfg && !seeded) {
+      setPriceEur(cfg.monthly_price_cents != null ? String(cfg.monthly_price_cents / 100) : "");
+      setAnchorEur(cfg.anchor_price_cents != null ? String(cfg.anchor_price_cents / 100) : "");
+      setNoteEn(cfg.discount_note_en || "");
+      setNoteSk(cfg.discount_note_sk || "");
+      setSeeded(true);
+    }
+  }, [cfg, seeded]);
+
+  const toCents = (s) => {
+    const n = Number(String(s).trim().replace(",", "."));
+    return Number.isFinite(n) ? Math.round(n * 100) : NaN;
+  };
+  const priceCents = toCents(priceEur);
+  const anchorCents = anchorEur.trim() === "" ? null : toCents(anchorEur);
+  const priceValid = Number.isInteger(priceCents) && priceCents >= 100 && priceCents <= 1000000;
+  const anchorValid = anchorCents === null || (Number.isInteger(anchorCents) && anchorCents >= 100 && anchorCents <= 2000000);
+
+  async function save() {
+    setBusy(true); setMsg(null);
+    try {
+      const token = storedAccessToken();
+      if (!token) throw new Error(uiSK ? "Relácia vypršala — obnov stránku a prihlás sa." : "Session expired — reload and sign in.");
+      const res = await fetch("/api/stripe?action=set-price", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          monthly_price_cents: priceCents,
+          anchor_price_cents: anchorCents,
+          discount_note_en: noteEn,
+          discount_note_sk: noteSk,
+        }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+      await refreshPricing();
+      setMsg({ ok: true, text: uiSK ? "✓ Uložené — naživo na webe aj v Stripe" : "✓ Saved — live on the website and in Stripe" });
+    } catch (e) {
+      setMsg({ ok: false, text: String(e.message || e) });
+    } finally { setBusy(false); }
+  }
+
+  const inputStyle = {
+    background: bg, border: `1px solid ${border}`, borderRadius: 6, color: textLight,
+    fontFamily: mono, fontSize: "0.85rem", padding: "0.5rem 0.6rem", width: "100%", boxSizing: "border-box",
+  };
+  const lbl = { fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.08em", color: faint, display: "block", marginBottom: 4 };
+
+  return (
+    <div style={{ border: `1px solid ${border}`, borderRadius: 10, background: bg2, padding: "1.1rem 1.2rem", marginBottom: "1.4rem" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.9rem" }}>
+        <h2 style={{ fontSize: "0.95rem", fontWeight: 700, margin: 0, color: textLight }}>
+          {uiSK ? "Cena predplatného" : "Subscription price"}
+        </h2>
+        {/* Live preview of the current price */}
+        <div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: textLight }}>
+          {cfg?.anchor_price_cents != null && (
+            <span style={{ fontSize: "0.8rem", fontWeight: 400, color: faint, textDecoration: "line-through", marginRight: 8 }}>
+              {formatEurCents(cfg.anchor_price_cents)}
+            </span>
+          )}
+          <span style={{ color: green }}>{cfg ? formatEurCents(cfg.monthly_price_cents) : "…"}</span>
+          <span style={{ fontSize: "0.7rem", fontWeight: 400, color: faint }}>{uiSK ? "/mes" : "/mo"}</span>
+        </div>
+      </div>
+
+      <p style={{ color: dim, fontSize: "0.72rem", lineHeight: 1.5, margin: "0 0 0.9rem", maxWidth: 720 }}>
+        {uiSK
+          ? "Zmena tu sa okamžite prejaví na cenníku webu AJ na sume, ktorú platí zákazník cez Stripe. Bez nasadenia. „Prečiarknutá cena“ je len vizuálna kotva — Stripe účtuje len skutočnú cenu."
+          : "A change here goes live instantly on the website pricing card AND on the amount customers pay via Stripe. No deploy. The “crossed-out price” is a visual anchor only — Stripe charges just the real price."}
+      </p>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "0.8rem", marginBottom: "0.8rem" }}>
+        <div>
+          <label style={lbl}>{uiSK ? "Cena / mesiac (€)" : "Price / month (€)"}</label>
+          <input value={priceEur} onChange={(e) => setPriceEur(e.target.value)} inputMode="decimal"
+            style={{ ...inputStyle, borderColor: priceValid ? border : "#f85149" }} placeholder="79.99" />
+        </div>
+        <div>
+          <label style={lbl}>{uiSK ? "Prečiarknutá cena (€)" : "Crossed-out price (€)"}</label>
+          <input value={anchorEur} onChange={(e) => setAnchorEur(e.target.value)} inputMode="decimal"
+            style={{ ...inputStyle, borderColor: anchorValid ? border : "#f85149" }} placeholder="349.99" />
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "0.7rem", marginBottom: "0.9rem" }}>
+        <div>
+          <label style={lbl}>{uiSK ? "Text pod cenou — EN" : "Note under price — EN"}</label>
+          <input value={noteEn} onChange={(e) => setNoteEn(e.target.value)} style={inputStyle} />
+        </div>
+        <div>
+          <label style={lbl}>{uiSK ? "Text pod cenou — SK" : "Note under price — SK"}</label>
+          <input value={noteSk} onChange={(e) => setNoteSk(e.target.value)} style={inputStyle} />
+        </div>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+        <button onClick={save} disabled={busy || !priceValid || !anchorValid}
+          style={{
+            background: (priceValid && anchorValid && !busy) ? green : border,
+            color: (priceValid && anchorValid && !busy) ? "#06140f" : faint,
+            border: "none", borderRadius: 6, padding: "0.55rem 1.1rem", fontFamily: mono,
+            fontSize: "0.8rem", fontWeight: 700, cursor: (priceValid && anchorValid && !busy) ? "pointer" : "not-allowed",
+          }}>
+          {busy ? (uiSK ? "Ukladám…" : "Saving…") : (uiSK ? "Uložiť cenu" : "Save price")}
+        </button>
+        {!priceValid && <span style={{ fontSize: "0.62rem", color: "#f85149" }}>{uiSK ? "cena musí byť € 1–10 000" : "price must be € 1–10 000"}</span>}
+        {msg && <span style={{ fontSize: "0.68rem", color: msg.ok ? green : "#f85149" }}>{msg.text}</span>}
+      </div>
+    </div>
+  );
 }
 
 export default function TextsEditor({ lang = "en" }) {
@@ -337,6 +466,8 @@ export default function TextsEditor({ lang = "en" }) {
           ? "Vľavo vyber stránku, vpravo uprav text priamo v poli. Ulož → ihneď naživo, bez nasadenia. „Reset“ vráti pôvodný text. Každý jazyk je samostatný — nie preklad."
           : "Pick a page on the left, edit the text in place on the right. Save → live instantly, no deploy. “Reset” restores the original. Each language is independent — not a translation."}
       </p>
+
+      <PricingPanel uiSK={uiSK} />
 
       {/* Language tabs */}
       <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", marginBottom: "0.6rem", flexWrap: "wrap" }}>

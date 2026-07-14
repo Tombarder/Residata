@@ -19,10 +19,37 @@ import { isTrustedRequest } from "./_lib/origin.js";
 export const config = { api: { bodyParser: false } };
 export const maxDuration = 15;
 
-// €49.99 / month. THE single place the price lives — change this number and
-// deploy. Checkout defines the price inline (price_data below), so there is NO
-// Stripe Price object, NO STRIPE_PRICE_ID env var, and nothing to set up by hand.
-const MONTHLY_PRICE_CENTS = 4999;
+// €79.99 / month (summer early-access rate; regular €349.99). This constant is
+// the resilient FALLBACK — the live price is read from public.pricing_config at
+// checkout time (see resolvePriceCents) so the Boss can change it from the admin
+// Pricing tool with no code edit or deploy. If the DB read ever fails, checkout
+// falls back to this constant so a customer can always pay. Checkout defines the
+// price inline (price_data below) — NO Stripe Price object, NO STRIPE_PRICE_ID.
+const MONTHLY_PRICE_CENTS = 7999;
+
+// Sanity bounds — a DB-driven price must never charge a nonsensical amount even
+// if the config row is fat-fingered. Outside [€1, €10 000] we ignore it and use
+// the fallback constant. (Cents.)
+const PRICE_MIN_CENTS = 100;
+const PRICE_MAX_CENTS = 1000000;
+
+async function resolvePriceCents(admin) {
+  try {
+    const { data, error } = await admin
+      .from("pricing_config")
+      .select("monthly_price_cents")
+      .eq("id", 1)
+      .maybeSingle();
+    if (error || !data) return MONTHLY_PRICE_CENTS;
+    const c = Number(data.monthly_price_cents);
+    if (!Number.isInteger(c) || c < PRICE_MIN_CENTS || c > PRICE_MAX_CENTS) {
+      return MONTHLY_PRICE_CENTS;
+    }
+    return c;
+  } catch {
+    return MONTHLY_PRICE_CENTS;
+  }
+}
 
 async function readRawBody(req) {
   const chunks = [];
@@ -41,6 +68,7 @@ async function handleCheckout(req, res) {
 
   const stripe = getStripe();
   const origin = requestOrigin(req);
+  const priceCents = await resolvePriceCents(admin);
 
   const params = {
     mode: "subscription",
@@ -49,7 +77,7 @@ async function handleCheckout(req, res) {
       price_data: {
         currency: "eur",
         product_data: { name: "Residata — Full access" },
-        unit_amount: MONTHLY_PRICE_CENTS,
+        unit_amount: priceCents,
         recurring: { interval: "month" },
       },
     }],
@@ -59,7 +87,7 @@ async function handleCheckout(req, res) {
     billing_address_collection: "auto",
     automatic_tax: { enabled: false },
     // Force EUR as the presentment currency. Stripe "Adaptive Pricing" (on by
-    // default) auto-converts the €49.99 price into the visitor's local currency
+    // default) auto-converts the EUR price into the visitor's local currency
     // — so Czech users landed on CZK by default. Disabling it per-session pins
     // checkout to the price's own currency (eur) everywhere. In code, so it's
     // not a dashboard setting that can silently drift back.
@@ -107,6 +135,53 @@ async function handlePortal(req, res) {
     return_url: `${requestOrigin(req)}/app`,
   });
   return res.status(200).json({ url: portal.url });
+}
+
+// ─── set-price (admin) ─────────────────────────────────────────────────────
+// Admin-only write of the DB-driven price. This is the ONLY writer of
+// public.pricing_config (the table has no RLS write policy, so the browser can
+// never write it directly). We verify the caller is an admin and clamp every
+// value to sane bounds before touching a live-money field.
+async function handleSetPrice(req, res) {
+  if (!isTrustedRequest(req)) return res.status(403).json({ error: "untrusted origin" });
+  const admin = getSupabaseAdmin();
+  const { user, profile, error, status } = await getUserFromRequest(req, admin);
+  if (error) return res.status(status).json({ error });
+  if (profile?.tier !== "admin") return res.status(403).json({ error: "admin only" });
+
+  let body;
+  try { body = JSON.parse((await readRawBody(req)).toString("utf8") || "{}"); }
+  catch { return res.status(400).json({ error: "invalid JSON body" }); }
+
+  const patch = { updated_at: new Date().toISOString(), updated_by: user.id };
+
+  // Monthly price (the actual charge) — required, clamped to [€1, €10 000].
+  const cents = Number(body.monthly_price_cents);
+  if (!Number.isInteger(cents) || cents < PRICE_MIN_CENTS || cents > PRICE_MAX_CENTS) {
+    return res.status(400).json({ error: `monthly_price_cents must be an integer in [${PRICE_MIN_CENTS}, ${PRICE_MAX_CENTS}]` });
+  }
+  patch.monthly_price_cents = cents;
+
+  // Anchor (struck-through display price) — optional, clamped or null.
+  if (body.anchor_price_cents === null || body.anchor_price_cents === "") {
+    patch.anchor_price_cents = null;
+  } else if (body.anchor_price_cents !== undefined) {
+    const a = Number(body.anchor_price_cents);
+    if (!Number.isInteger(a) || a < PRICE_MIN_CENTS || a > 2 * PRICE_MAX_CENTS) {
+      return res.status(400).json({ error: "anchor_price_cents out of range" });
+    }
+    patch.anchor_price_cents = a;
+  }
+
+  // Discount notes — optional free text, length-capped.
+  for (const k of ["discount_note_en", "discount_note_sk"]) {
+    if (body[k] !== undefined) patch[k] = String(body[k] ?? "").slice(0, 400);
+  }
+
+  const { data, error: dbErr } = await admin
+    .from("pricing_config").update(patch).eq("id", 1).select().maybeSingle();
+  if (dbErr) return res.status(500).json({ error: "write failed", detail: dbErr.message });
+  return res.status(200).json({ ok: true, config: data });
 }
 
 // ─── webhook ─────────────────────────────────────────────────────────────
@@ -247,6 +322,7 @@ export default async function handler(req, res) {
   try {
     if (action === "checkout") return await handleCheckout(req, res);
     if (action === "portal") return await handlePortal(req, res);
+    if (action === "set-price") return await handleSetPrice(req, res);
     if (action === "webhook") return await handleWebhook(req, res);
     return res.status(400).json({ error: "unknown action" });
   } catch (e) {
