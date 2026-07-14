@@ -122,7 +122,7 @@ it daily, and delivers it as CSV, XLSX, or via API.
 
 ## Pricing
 
-- €49.99 / month for full ongoing access (launch price; regular €149.99)
+- €79.99 / month for full ongoing access (summer early-access price; regular €349.99)
 
 ## Public surfaces
 
@@ -209,7 +209,7 @@ auto-scraped projects in all the public dashboards.
 
 ## Pricing
 
-- Monthly ongoing access: €49.99 / month (launch price; regular €149.99)
+- Monthly ongoing access: €79.99 / month (summer early-access price; regular €349.99)
 
 ## Where to find this
 

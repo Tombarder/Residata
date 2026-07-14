@@ -5,7 +5,7 @@
 // 401s), POST to the API, then hand off to Stripe's hosted pages by
 // redirecting to the returned URL.
 //
-//   startCheckout()      → Stripe Checkout (subscribe €49.99/mo)
+//   startCheckout()      → Stripe Checkout (subscribe at the current DB price)
 //   openBillingPortal()  → Stripe Billing Portal (update card / cancel)
 //
 // Both throw Error("SESSION_EXPIRED") if the session can't be revived, so the

@@ -14,8 +14,8 @@ it daily, and delivers it as CSV, XLSX, or via API.
 
 - Markets: Slovakia (Bratislava) and Czechia (Prague)
 - Total projects in dataset: 327 new-build residential projects (current + sold-out under tracking)
-- Currently active (in market): 274 projects, 33,245 units
-- Currently for sale: 10,021 units · reserved: 2,719 · sold: 19,815
+- Currently active (in market): 274 projects, 33,297 units
+- Currently for sale: 9,811 units · reserved: 2,694 · sold: 19,903
 - Average price across available inventory: €6,188/m²
 - Distinct active developers: 187
 - Data refresh: daily
@@ -30,7 +30,7 @@ it daily, and delivers it as CSV, XLSX, or via API.
 
 ## Pricing
 
-- €49.99 / month for full ongoing access (launch price; regular €149.99)
+- €79.99 / month for full ongoing access (summer early-access price; regular €349.99)
 
 ## Public surfaces
 

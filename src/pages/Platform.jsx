@@ -14,6 +14,7 @@
 import { Component, useState, useEffect, useRef, lazy, Suspense } from "react";
 import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
+import { usePricing } from "../lib/pricing";
 import { useProjects } from "../lib/useData";
 import DashboardHome from "./DashboardHome";
 import { useCountry, isAllCountries } from "../lib/useCountry";
@@ -885,6 +886,9 @@ function PlatformBilling({ lang, setCurrent }) {
   const { tier, baseTier, trialActive, trialDaysLeft, trialUntil, canStartTrial,
           paidActive, paidPaused, paidWindowActive, paidDaysLeft, paidUntil, paidStartedAt } = caps;
   const { profile } = useAuth();
+  const pricing = usePricing(lang);   // DB-driven price (falls back to defaults below)
+  const priceDisplay = pricing.priceDisplay || "€79.99";
+  const anchorDisplay = pricing.ready ? pricing.anchorDisplay : "€349.99";
 
   // Display logic — the "effective" tier (badge shown) and the
   // "base" tier (raw column) can disagree:
@@ -1062,7 +1066,7 @@ function PlatformBilling({ lang, setCurrent }) {
             {lang === "sk" ? "Upgrade na paid" : "Upgrade to paid"}
           </div>
           <h3 style={{ fontSize: "1.4rem", fontWeight: 700, color: textLight, margin: 0, marginBottom: "0.85rem", letterSpacing: "-0.01em" }}>
-            Paid tier · <span style={{ color: dim, fontWeight: 400, textDecoration: "line-through", marginRight: "0.35rem" }}>€149.99</span>€49.99 <span style={{ fontSize: "0.9rem", fontWeight: 400, color: dim }}>{lang === "sk" ? "/ mesiac" : "/ month"}</span>
+            Paid tier · {anchorDisplay && <span style={{ color: dim, fontWeight: 400, textDecoration: "line-through", marginRight: "0.35rem" }}>{anchorDisplay}</span>}{priceDisplay} <span style={{ fontSize: "0.9rem", fontWeight: 400, color: dim }}>{lang === "sk" ? "/ mesiac" : "/ month"}</span>
           </h3>
           <ul style={{ color: "#c0c0c8", fontSize: "0.88rem", lineHeight: 1.7, paddingLeft: "1.1rem", margin: "0.2rem 0 1.25rem" }}>
             <li>{lang === "sk" ? "Plný detail každého aktívneho projektu" : "Full detail of every active project"}</li>
@@ -1073,7 +1077,7 @@ function PlatformBilling({ lang, setCurrent }) {
           </ul>
           <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center" }}>
             <button type="button" onClick={handleSubscribe} disabled={payBusy} className="btn-p" style={{ fontSize: "0.9rem" }}>
-              {payBusy ? "…" : (lang === "sk" ? "Predplatiť · €49.99 / mesiac" : "Subscribe · €49.99 / month")}
+              {payBusy ? "…" : (lang === "sk" ? `Predplatiť · ${priceDisplay} / mesiac` : `Subscribe · ${priceDisplay} / month`)}
             </button>
             <button
               type="button"
@@ -1128,7 +1132,7 @@ function PlatformBilling({ lang, setCurrent }) {
           </p>
           <div style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap", alignItems: "center" }}>
             <button type="button" onClick={handleSubscribe} disabled={payBusy} className="btn-p" style={{ fontSize: "0.88rem" }}>
-              {payBusy ? "…" : (lang === "sk" ? "Obnoviť predplatné · €49.99 / mes." : "Resubscribe · €49.99 / mo")}
+              {payBusy ? "…" : (lang === "sk" ? `Obnoviť predplatné · ${priceDisplay} / mes.` : `Resubscribe · ${priceDisplay} / mo`)}
             </button>
             <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("residata:open-feedback", { detail: { category: "question" } }))} className="btn-s" style={{ fontSize: "0.8rem", cursor: "pointer" }}>{lang === "sk" ? "Napíš nám" : "Contact us"}</button>
           </div>
