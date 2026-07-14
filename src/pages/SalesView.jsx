@@ -27,6 +27,16 @@ const DETAIL_COLS = [
   ["price_per_m2_eur", "€/m²", "€/m²", "per_m2"], ["days_on_market", "Dní na trhu", "Days on mkt", "num"],
   ["detection_method", "Zdroj", "Signal", "sig"], ["kind", "", "", "hide"],
 ];
+// pipeline (reserved / pre-reserved) = current units, no sale-date / days-on-market / signal
+const DETAIL_COLS_PIPE = [
+  ["project_name", "Projekt", "Project", "text"], ["city", "Mesto", "City", "text"],
+  ["typ", "Typ", "Type", "text"], ["izby", "Izby", "Rooms", "num"],
+  ["obytna_plocha", "Plocha", "Area", "area"], ["price_s_dph_eur", "Cena", "Price", "eur"],
+  ["price_per_m2_eur", "€/m²", "€/m²", "per_m2"], ["kolaudacia_label", "Kolaudácia", "Completion", "text"],
+];
+// the three status views
+const STATUSES = [["sold", "Predané", "Sold"], ["reserved", "Rezervované", "Reserved"], ["prereserved", "Predrezervované", "Pre-reserved"]];
+const HEADLINE = { sold: ["Predané (trvalo)", "Sold (stayed)"], reserved: ["Rezervované teraz", "Reserved now"], prereserved: ["Predrezervované teraz", "Pre-reserved now"] };
 
 function isoDaysAgo(n) {
   const d = new Date(); d.setDate(d.getDate() - n);
@@ -52,6 +62,8 @@ export default function SalesView({ lang = "sk" }) {
   const t = (sk, en) => (lang === "sk" ? sk : en);
   useCurrency();
 
+  const [status, setStatus] = useState("sold");
+  const isPipe = status !== "sold";
   const [days, setDays] = useState(45);
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
@@ -85,10 +97,15 @@ export default function SalesView({ lang = "sk" }) {
     return f;
   }, [market, projects, fCity, fDev, fTyp]);
 
-  const common = { date_from, date_to, durable_only: durableOnly, filters: baseFilters };
+  // sale-only sort keys are invalid for the current-pipeline views → fall back to price
+  const effSort = isPipe && (sort.key === "sold_date" || sort.key === "days_on_market") ? { key: "price_s_dph_eur", dir: "desc" } : sort;
+  const detailCols = isPipe ? DETAIL_COLS_PIPE : DETAIL_COLS;
+  const SORTABLE = isPipe ? ["price_s_dph_eur", "price_per_m2_eur", "izby", "obytna_plocha", "city", "project_name"]
+                          : ["sold_date", "price_s_dph_eur", "price_per_m2_eur", "days_on_market", "izby", "obytna_plocha", "city", "project_name"];
+  const common = { status, date_from, date_to, durable_only: durableOnly, filters: baseFilters };
   const summarySpec = useMemo(() => ({ ...common, mode: "summary" }), [JSON.stringify(common)]);       // eslint-disable-line
   const breakdownSpec = useMemo(() => ({ ...common, mode: "breakdown", group_by: groupBy }), [JSON.stringify(common), groupBy]); // eslint-disable-line
-  const detailSpec = useMemo(() => ({ ...common, mode: "detail", sort: [sort], limit: 500 }), [JSON.stringify(common), JSON.stringify(sort)]); // eslint-disable-line
+  const detailSpec = useMemo(() => ({ ...common, mode: "detail", sort: [effSort], limit: 500 }), [JSON.stringify(common), JSON.stringify(effSort)]); // eslint-disable-line
 
   const sum = useSales({ enabled: true, spec: summarySpec });
   const brk = useSales({ enabled: true, spec: breakdownSpec });
@@ -106,7 +123,7 @@ export default function SalesView({ lang = "sk" }) {
   const projFiltered = (projOpts.values || []).filter((v) => !projSearch || v.toLowerCase().includes(projSearch.toLowerCase()));
 
   const exportCsv = () => {
-    const cols = DETAIL_COLS.filter((c) => c[3] !== "hide");
+    const cols = detailCols.filter((c) => c[3] !== "hide");
     const head = cols.map((c) => (lang === "sk" ? c[1] : c[2])).join(";");
     const lines = detRows.map((r) => cols.map((c) => {
       const v = r[c[0]];
@@ -146,19 +163,35 @@ export default function SalesView({ lang = "sk" }) {
         </p>
       </div>
 
-      {/* controls: period + market + durable */}
+      {/* status tabs: Sold / Reserved / Pre-reserved */}
+      <div style={{ display: "inline-flex", border: `1px solid ${border}`, borderRadius: 8, overflow: "hidden", marginBottom: "0.6rem" }}>
+        {STATUSES.map(([s, sk, en]) => (
+          <button key={s} onClick={() => setStatus(s)}
+            style={{ border: "none", padding: "0.5rem 1.1rem", cursor: "pointer", fontFamily: mono, fontSize: "0.78rem", background: status === s ? green : panel, color: status === s ? "#04130d" : dim, fontWeight: status === s ? 700 : 500 }}>
+            {t(sk, en)}
+          </button>
+        ))}
+      </div>
+
+      {/* controls: period (sold only) + market + durable (sold only) */}
       <div style={{ ...card, marginBottom: "0.6rem", display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
-        <span style={{ ...kpiLbl, margin: 0, marginRight: "0.1rem" }}>{t("Obdobie", "Period")}</span>
-        <div style={{ display: "inline-flex", border: `1px solid ${border}`, borderRadius: 7, overflow: "hidden" }}>
-          {PERIODS.map(([d, sk, en]) => (
-            <button key={d} onClick={() => { setDays(d); setCustomFrom(""); setCustomTo(""); }}
-              style={{ border: "none", padding: "0.4rem 0.7rem", cursor: "pointer", fontFamily: mono, fontSize: "0.7rem", background: !customFrom && days === d ? green : "transparent", color: !customFrom && days === d ? "#04130d" : dim, fontWeight: !customFrom && days === d ? 700 : 500 }}>
-              {t(sk, en)}
-            </button>
-          ))}
-        </div>
-        <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} style={{ ...sel, width: 140 }} title={t("od", "from")} />
-        <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} style={{ ...sel, width: 140 }} title={t("do", "to")} />
+        <span style={{ ...kpiLbl, margin: 0, marginRight: "0.1rem" }}>{isPipe ? t("Stav teraz", "Current state") : t("Obdobie", "Period")}</span>
+        {isPipe ? (
+          <span style={{ fontSize: "0.76rem", color: dim, fontStyle: "italic" }}>{t("Aktuálny pipeline — obdobie sa neuplatňuje", "Current pipeline — period doesn't apply")}</span>
+        ) : (
+          <>
+            <div style={{ display: "inline-flex", border: `1px solid ${border}`, borderRadius: 7, overflow: "hidden" }}>
+              {PERIODS.map(([d, sk, en]) => (
+                <button key={d} onClick={() => { setDays(d); setCustomFrom(""); setCustomTo(""); }}
+                  style={{ border: "none", padding: "0.4rem 0.7rem", cursor: "pointer", fontFamily: mono, fontSize: "0.7rem", background: !customFrom && days === d ? green : "transparent", color: !customFrom && days === d ? "#04130d" : dim, fontWeight: !customFrom && days === d ? 700 : 500 }}>
+                  {t(sk, en)}
+                </button>
+              ))}
+            </div>
+            <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} style={{ ...sel, width: 140 }} title={t("od", "from")} />
+            <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} style={{ ...sel, width: 140 }} title={t("do", "to")} />
+          </>
+        )}
         <div style={{ display: "inline-flex", border: `1px solid ${border}`, borderRadius: 7, overflow: "hidden", marginLeft: "0.3rem" }}>
           {[["", "Všetky trhy", "All"], ["sk", "SK", "SK"], ["cz", "CZ", "CZ"]].map(([m, sk, en]) => (
             <button key={m || "all"} onClick={() => setMarket(m)}
@@ -167,10 +200,12 @@ export default function SalesView({ lang = "sk" }) {
             </button>
           ))}
         </div>
-        <label style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem", fontSize: "0.76rem", color: dim, cursor: "pointer", marginLeft: "auto" }} title={t("Zarátaj len predaje ktoré zostali predané (vylúč tie čo sa vrátili na trh)", "Count only sales that stayed sold (exclude fall-throughs)")}>
-          <input type="checkbox" checked={durableOnly} onChange={(e) => setDurableOnly(e.target.checked)} />
-          {t("Len trvalé predaje", "Stayed-sold only")}
-        </label>
+        {!isPipe && (
+          <label style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem", fontSize: "0.76rem", color: dim, cursor: "pointer", marginLeft: "auto" }} title={t("Zarátaj len predaje ktoré zostali predané (vylúč tie čo sa vrátili na trh)", "Count only sales that stayed sold (exclude fall-throughs)")}>
+            <input type="checkbox" checked={durableOnly} onChange={(e) => setDurableOnly(e.target.checked)} />
+            {t("Len trvalé predaje", "Stayed-sold only")}
+          </label>
+        )}
       </div>
 
       {/* filters: projects multi-select + city/dev/typ */}
@@ -206,10 +241,11 @@ export default function SalesView({ lang = "sk" }) {
       {/* KPI row */}
       {sum.error ? <LoadError lang={lang} /> : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "0.6rem", marginBottom: "0.6rem" }}>
-          <div style={card}><div style={kpiLbl}>{t("Predané (trvalo)", "Sold (stayed)")}</div><div style={kpiVal}>{sum.loading ? "…" : dur.toLocaleString("sk-SK")}</div>{reversed > 0 && !durableOnly && <div style={{ fontSize: "0.68rem", color: orange, fontFamily: mono, marginTop: "0.2rem" }}>{t(`+${reversed} vrátených`, `+${reversed} fell through`)}</div>}</div>
-          <div style={card}><div style={kpiLbl}>{t("Objem predaja", "Sold value")}</div><div style={kpiVal}>{sum.loading ? "…" : fmtMoney(S.sold_value_eur)}</div></div>
+          <div style={card}><div style={kpiLbl}>{t(HEADLINE[status][0], HEADLINE[status][1])}</div><div style={kpiVal}>{sum.loading ? "…" : dur.toLocaleString("sk-SK")}</div>{reversed > 0 && !durableOnly && !isPipe && <div style={{ fontSize: "0.68rem", color: orange, fontFamily: mono, marginTop: "0.2rem" }}>{t(`+${reversed} vrátených`, `+${reversed} fell through`)}</div>}</div>
+          <div style={card}><div style={kpiLbl}>{isPipe ? t("Hodnota v ponuke", "Listed value") : t("Objem predaja", "Sold value")}</div><div style={kpiVal}>{sum.loading ? "…" : fmtMoney(S.sold_value_eur)}</div></div>
           <div style={card}><div style={kpiLbl}>{t("Medián ceny", "Median price")}</div><div style={kpiVal}>{sum.loading ? "…" : fmtMoney(S.median_price_eur)}</div></div>
           <div style={card}><div style={kpiLbl}>{t("Medián €/m²", "Median €/m²")}</div><div style={kpiVal}>{sum.loading ? "…" : fmtCell("per_m2", S.median_eur_m2)}</div></div>
+          {!isPipe && (
           <div style={card}>
             <div style={kpiLbl}>{t("Medián dní na trhu", "Median days on market")}</div>
             <div style={kpiVal}>{sum.loading ? "…" : (S.median_days_on_market != null ? Math.round(S.median_days_on_market) : "—")}</div>
@@ -217,6 +253,7 @@ export default function SalesView({ lang = "sk" }) {
               {S.observed_dom_count ? t(`z ${S.observed_dom_count} sledovaných`, `of ${S.observed_dom_count} observed`) : t("zatiaľ málo dát", "building history")}
             </div>
           </div>
+          )}
         </div>
       )}
 
@@ -232,12 +269,12 @@ export default function SalesView({ lang = "sk" }) {
         </div>
         <div style={{ overflowX: "auto" }}>
           <table style={{ borderCollapse: "collapse", width: "100%", fontSize: "0.8rem", minWidth: 480 }}>
-            <thead><tr>{[t("Skupina", "Group"), t("Predané", "Sold"), t("Objem", "Value"), t("Medián €/m²", "Median €/m²"), t("Medián dní", "Median days")].map((h, i) => (
+            <thead><tr>{[t("Skupina", "Group"), isPipe ? t("V ponuke", "Listed") : t("Predané", "Sold"), t("Objem", "Value"), t("Medián €/m²", "Median €/m²"), t("Medián dní", "Median days")].map((h, i) => (
               <th key={h} style={{ textAlign: i === 0 ? "left" : "right", padding: "0.4rem 0.6rem", borderBottom: `1px solid ${border}`, color: dim, fontFamily: mono, fontSize: "0.64rem", textTransform: "uppercase", letterSpacing: "0.04em" }}>{h}</th>
             ))}</tr></thead>
             <tbody>
               {brk.loading && <tr><td colSpan={5} style={{ padding: "1rem", textAlign: "center", color: dim }}>{t("načítavam…", "loading…")}</td></tr>}
-              {!brk.loading && brkRows.length === 0 && <tr><td colSpan={5} style={{ padding: "1.2rem", textAlign: "center", color: dim, fontStyle: "italic" }}>{t("Žiadne predaje pre tento výber.", "No sales for this selection.")}</td></tr>}
+              {!brk.loading && brkRows.length === 0 && <tr><td colSpan={5} style={{ padding: "1.2rem", textAlign: "center", color: dim, fontStyle: "italic" }}>{isPipe ? t("Žiadne jednotky pre tento výber.", "No units for this selection.") : t("Žiadne predaje pre tento výber.", "No sales for this selection.")}</td></tr>}
               {brkRows.map((r, i) => (
                 <tr key={String(r.group) + i} style={{ background: i % 2 ? "#0c0c0f" : "transparent" }}>
                   <td style={{ padding: "0.4rem 0.6rem", color: text }}>{r.group ?? "—"}</td>
@@ -261,9 +298,9 @@ export default function SalesView({ lang = "sk" }) {
         <div style={{ overflowX: "auto", maxHeight: "60vh", overflowY: "auto" }}>
           <table style={{ borderCollapse: "separate", borderSpacing: 0, width: "100%", fontSize: "0.78rem", minWidth: 820 }}>
             <thead style={{ position: "sticky", top: 0, background: "#0e0e10", zIndex: 1 }}><tr>
-              {DETAIL_COLS.filter((c) => c[3] !== "hide").map((c) => {
+              {detailCols.filter((c) => c[3] !== "hide").map((c) => {
                 const numeric = ["num", "eur", "per_m2", "area"].includes(c[3]);
-                const sortable = ["sold_date", "price_s_dph_eur", "price_per_m2_eur", "days_on_market", "izby", "obytna_plocha", "city", "project_name"].includes(c[0]);
+                const sortable = SORTABLE.includes(c[0]);
                 return (
                   <th key={c[0]} onClick={sortable ? () => toggleSort(c[0]) : undefined}
                     style={{ padding: "0.45rem 0.6rem", textAlign: numeric ? "right" : "left", borderBottom: `1px solid ${border}`, color: sort.key === c[0] ? green : "#c4c4cc", cursor: sortable ? "pointer" : "default", fontFamily: mono, fontSize: "0.64rem", textTransform: "uppercase", letterSpacing: "0.03em", whiteSpace: "nowrap", userSelect: "none" }}>
@@ -275,10 +312,10 @@ export default function SalesView({ lang = "sk" }) {
             <tbody>
               {det.loading && <tr><td colSpan={10} style={{ padding: "1.2rem", textAlign: "center", color: dim }}>{t("načítavam…", "loading…")}</td></tr>}
               {det.error && <tr><td colSpan={10} style={{ padding: 0 }}><LoadError lang={lang} /></td></tr>}
-              {!det.loading && !det.error && detRows.length === 0 && <tr><td colSpan={10} style={{ padding: "1.5rem", textAlign: "center", color: dim, fontStyle: "italic" }}>{t("Žiadne predané byty pre tento výber a obdobie.", "No sold units for this selection and period.")}</td></tr>}
+              {!det.loading && !det.error && detRows.length === 0 && <tr><td colSpan={10} style={{ padding: "1.5rem", textAlign: "center", color: dim, fontStyle: "italic" }}>{isPipe ? t("Žiadne jednotky v tomto stave pre tento výber.", "No units in this state for this selection.") : t("Žiadne predané byty pre tento výber a obdobie.", "No sold units for this selection and period.")}</td></tr>}
               {detRows.map((r, i) => (
                 <tr key={(r.project_id || "") + (r.unit_id || "") + i} style={{ background: i % 2 ? "#0c0c0f" : "transparent" }}>
-                  {DETAIL_COLS.filter((c) => c[3] !== "hide").map((c) => {
+                  {detailCols.filter((c) => c[3] !== "hide").map((c) => {
                     const numeric = ["num", "eur", "per_m2", "area"].includes(c[3]);
                     if (c[3] === "sig") {
                       const marked = r.detection_method === "marked";
