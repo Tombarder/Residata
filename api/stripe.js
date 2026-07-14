@@ -35,11 +35,20 @@ const PRICE_MAX_CENTS = 1000000;
 
 async function resolvePriceCents(admin) {
   try {
-    const { data, error } = await admin
+    // Race the read against a 3s timeout: a hung DB read must NEVER stall or fail
+    // checkout — the revenue path falls back to the constant instead.
+    const query = admin
       .from("pricing_config")
       .select("monthly_price_cents")
       .eq("id", 1)
       .maybeSingle();
+    const timeout = new Promise((resolve) => setTimeout(() => resolve({ __timeout: true }), 3000));
+    const res = await Promise.race([query, timeout]);
+    if (res && res.__timeout) {
+      console.warn("[stripe] pricing_config read timed out — using fallback price");
+      return MONTHLY_PRICE_CENTS;
+    }
+    const { data, error } = res;
     if (error || !data) return MONTHLY_PRICE_CENTS;
     const c = Number(data.monthly_price_cents);
     if (!Number.isInteger(c) || c < PRICE_MIN_CENTS || c > PRICE_MAX_CENTS) {

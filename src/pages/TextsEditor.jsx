@@ -223,6 +223,15 @@ function PricingPanel({ uiSK }) {
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
       await refreshPricing();
+      // Reflect the NORMALISED stored value back into the inputs (e.g. "79.999"
+      // was rounded+stored as €80) so what you see matches what's charged.
+      const c = j.config;
+      if (c) {
+        setPriceEur(c.monthly_price_cents != null ? String(c.monthly_price_cents / 100) : "");
+        setAnchorEur(c.anchor_price_cents != null ? String(c.anchor_price_cents / 100) : "");
+        setNoteEn(c.discount_note_en || "");
+        setNoteSk(c.discount_note_sk || "");
+      }
       setMsg({ ok: true, text: uiSK ? "✓ Uložené — naživo na webe aj v Stripe" : "✓ Saved — live on the website and in Stripe" });
     } catch (e) {
       setMsg({ ok: false, text: String(e.message || e) });
