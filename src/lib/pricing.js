@@ -20,7 +20,8 @@ import { supabasePublic, isSupabaseReady } from "./supabase";
 const CACHE_KEY = "residata_pricing_v1";
 
 let CONFIG = readCache();          // { monthly_price_cents, anchor_price_cents, discount_note_en, discount_note_sk } | null
-let fetched = false;
+let netLoaded = false;             // a SUCCESSFUL network refresh happened this session
+let inFlight = false;              // dedupe concurrent refreshes
 const subscribers = new Set();
 
 function readCache() {
@@ -36,6 +37,7 @@ function writeCache(obj) {
 
 /** "€79.99" from 7999; drops the decimals for round euros (8000 → "€80"). */
 export function formatEurCents(cents) {
+  if (cents == null || cents === "") return null;   // Number(null) is 0 (finite) — guard it
   const n = Number(cents);
   if (!Number.isFinite(n)) return null;
   const eur = n / 100;
@@ -43,18 +45,22 @@ export function formatEurCents(cents) {
 }
 
 async function refresh() {
-  if (!isSupabaseReady()) return;
+  if (inFlight || !isSupabaseReady()) return;
+  inFlight = true;
   try {
     const { data, error } = await supabasePublic
       .from("pricing_config")
       .select("monthly_price_cents, anchor_price_cents, discount_note_en, discount_note_sk")
       .eq("id", 1)
       .maybeSingle();
-    if (error || !data) return;
+    if (error || !data) return;   // netLoaded stays false → a later mount retries
     CONFIG = data;
+    netLoaded = true;
     writeCache(data);
     subscribers.forEach((fn) => fn());
-  } catch { /* keep cache / defaults */ }
+  } catch { /* keep cache / defaults; retry on next mount */ } finally {
+    inFlight = false;
+  }
 }
 
 /**
@@ -67,7 +73,7 @@ export function usePricing(lang = "en") {
   useEffect(() => {
     const fn = () => bump((v) => v + 1);
     subscribers.add(fn);
-    if (!fetched) { fetched = true; refresh(); }
+    if (!netLoaded) refresh();   // refresh once per session; retries until first success
     return () => subscribers.delete(fn);
   }, []);
 
@@ -86,7 +92,7 @@ export function usePricingConfig() {
   useEffect(() => {
     const fn = () => bump((v) => v + 1);
     subscribers.add(fn);
-    if (!fetched) { fetched = true; refresh(); }
+    if (!netLoaded) refresh();
     return () => subscribers.delete(fn);
   }, []);
   return CONFIG;

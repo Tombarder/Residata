@@ -181,6 +181,9 @@ async function handleSetPrice(req, res) {
   const { data, error: dbErr } = await admin
     .from("pricing_config").update(patch).eq("id", 1).select().maybeSingle();
   if (dbErr) return res.status(500).json({ error: "write failed", detail: dbErr.message });
+  // No row updated = the singleton config row is missing → surface it, don't
+  // report a silent success (the price would appear "saved" but nothing changed).
+  if (!data) return res.status(500).json({ error: "pricing_config row (id=1) missing — cannot save" });
   return res.status(200).json({ ok: true, config: data });
 }
 

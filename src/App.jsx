@@ -1611,8 +1611,11 @@ function PricingPage({ setCurrent, l, lang, onLogin }) {
     ? l.tiers.map((ti) => ti.isCustom ? ti : {
         ...ti,
         price: pricing.priceDisplay || ti.price,
-        anchor: pricing.anchorDisplay ?? ti.anchor,
-        note: pricing.note || ti.note,
+        // When the DB value is loaded it is AUTHORITATIVE: a null anchor/note means
+        // the Boss deliberately cleared the crossed price / discount note, so we
+        // render none — NOT the in-code default (that would re-add a stale €349.99).
+        anchor: pricing.anchorDisplay,
+        note: pricing.note,
       })
     : l.tiers;
   const faqs = l.faqs;

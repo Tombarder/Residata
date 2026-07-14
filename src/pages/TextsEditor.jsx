@@ -185,7 +185,10 @@ function PricingPanel({ uiSK }) {
   }, [cfg, seeded]);
 
   const toCents = (s) => {
-    const n = Number(String(s).trim().replace(",", "."));
+    // Tolerate a typed € sign, spaces, and comma decimals ("€ 79,99" → 7999).
+    const cleaned = String(s).replace(/[€\s]/g, "").replace(",", ".");
+    if (cleaned === "") return NaN;
+    const n = Number(cleaned);
     return Number.isFinite(n) ? Math.round(n * 100) : NaN;
   };
   const priceCents = toCents(priceEur);
