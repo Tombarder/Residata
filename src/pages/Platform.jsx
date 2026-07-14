@@ -31,6 +31,7 @@ import {
 import ReportsPage from "./Reports";
 import UnitTracker from "./UnitTracker";
 import UnitExplorer from "./UnitExplorer";
+import SalesView from "./SalesView";
 import ChatAssistant from "../components/ChatAssistant";
 import MarketControls from "../components/MarketControls";
 import DataFreshness from "../components/DataFreshness";
@@ -148,6 +149,7 @@ const NAV = [
     { page: "App:Analytics", label: { en: "Analytics",  sk: "Analytika" }, Icon: IconChart,    requires: "view_analytics" },
     { page: "App:UnitTimeline", label: { en: "Unit timeline", sk: "Byt v čase" }, Icon: IconClock, requires: "view_analytics" },
     { page: "App:Explorer", label: { en: "Unit Explorer", sk: "Prieskumník" }, Icon: IconGrid, requires: "view_analytics" },
+    { page: "App:Sales",    label: { en: "Sales",         sk: "Predaje"     }, Icon: IconChart, requires: "view_analytics" },
     { page: "App:Reports",   label: { en: "Reports",    sk: "Reporty"   }, Icon: IconDoc,      requires: "view_monthly_reports" },
     { page: "App:Assistant", label: { en: "Ask AI",     sk: "AI asistent" }, Icon: IconSparkle },
     { page: "App:Exports",   label: { en: "Exports",    sk: "Exporty"   }, Icon: IconDownload, requires: "view_exports_page" },
@@ -509,6 +511,7 @@ function TopBar({ page, lang, setLang, tier }) {
     "App:Analytics":    { en: "Analytics",     sk: "Analytika"    },
     "App:UnitTimeline": { en: "Unit timeline", sk: "Byt v čase"   },
     "App:Explorer":     { en: "Unit Explorer", sk: "Prieskumník"  },
+    "App:Sales":        { en: "Sales",         sk: "Predaje"      },
     "App:Reports":      { en: "Reports",       sk: "Reporty"      },
     "App:Assistant": { en: "AI Assistant",    sk: "AI asistent"  },
     "App:Exports":   { en: "Exports",         sk: "Exporty"      },
@@ -685,6 +688,7 @@ function PageContent({ page, projectId, lang, setCurrent, openLogin }) {
   if (page === "App:Analytics")  return <Gated require="view_analytics"       lang={lang} setCurrent={setCurrent}><LiveAnalytics lang={lang} setCurrent={setCurrent} openLogin={openLogin} /></Gated>;
   if (page === "App:UnitTimeline") return <Gated require="view_analytics"     lang={lang} setCurrent={setCurrent}><UnitTracker lang={lang} setCurrent={setCurrent} /></Gated>;
   if (page === "App:Explorer")   return <Gated require="view_analytics"       lang={lang} setCurrent={setCurrent}><UnitExplorer lang={lang} setCurrent={setCurrent} /></Gated>;
+  if (page === "App:Sales")      return <Gated require="view_analytics"       lang={lang} setCurrent={setCurrent}><SalesView lang={lang} setCurrent={setCurrent} /></Gated>;
   if (page === "App:Reports")    return <Gated require="view_monthly_reports" lang={lang} setCurrent={setCurrent}><ReportsPage lang={lang} /></Gated>;
   if (page === "App:Assistant")  return <ChatAssistant lang={lang} setCurrent={setCurrent} />;
   if (page === "App:Exports")    return <Gated require="view_exports_page"    lang={lang} setCurrent={setCurrent}><PlatformExports lang={lang} setCurrent={setCurrent} /></Gated>;

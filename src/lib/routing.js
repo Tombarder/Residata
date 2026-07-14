@@ -24,6 +24,7 @@ const APP_PAGE_TO_PATH = {
   "App:Analytics": "/app/analytics",
   "App:UnitTimeline": "/app/unit-timeline",
   "App:Explorer":  "/app/explorer",
+  "App:Sales":     "/app/sales",
   "App:Reports":   "/app/reports",
   "App:Exports":   "/app/exports",
   "App:Assistant": "/app/ask",

@@ -1408,6 +1408,34 @@ export function usePivotGrain({ enabled = false, spec = null } = {}) {
   return { grain, loading, error };
 }
 
+/* useSales — the Analytics → Predaje/Sales engine (public.analytics_sales).
+   Generic: pass a spec {projects?, date_from, date_to, mode:'summary'|'breakdown'|'detail',
+   durable_only?, group_by?, filters?, sort?, limit?, offset?}; returns the RPC's jsonb object
+   ({…kpis} / {rows:[…]}). RLS-gated PREMIUM (paid/chosen-project) in the RPC. One call per
+   mode (a page renders summary + breakdown + detail with three useSales instances). */
+export function useSales({ enabled = false, spec = null } = {}) {
+  const { loading: authLoading } = useAuth();
+  const specKey = spec ? JSON.stringify(spec) : "";
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(!!enabled);
+  const [error, setError] = useState(false);
+  useEffect(() => {
+    if (!enabled || !spec) { setData(null); setLoading(false); setError(false); return; }
+    if (!isSupabaseReady() || authLoading) return;
+    let cancelled = false;
+    setLoading(true); setError(false);
+    (async () => {
+      const { data: d, error: e } = await sbRead(supabaseData.rpc("analytics_sales", { p_spec: spec }));
+      if (cancelled) return;
+      if (e) { console.error("[useSales]", e); setData(null); setLoading(false); setError(true); return; }
+      setData(d || null);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [enabled, specKey, authLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+  return { data, loading, error };
+}
+
 // Cache for server-side distinct filter values — one fast pivot_grain(p_dims=[field])
 // call instead of pulling the whole archive (~30k rows) just to populate a dropdown.
 const _pivotDistinctCache = new Map();
