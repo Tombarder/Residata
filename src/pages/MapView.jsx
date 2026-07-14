@@ -34,11 +34,15 @@ import { supabasePublic, isSupabaseReady } from "../lib/supabase";
 
 const mono = "'JetBrains Mono', monospace";
 import { accent as green, orange as amber, dim, text as textLight, border, surfaceDark as bg2 } from "../lib/theme";
+import { getTheme } from "../lib/theme-mode";
 const greyPt = "#6b6b76";
-const panel = "#141418";
+const panel = "var(--surface)";
 
-// CARTO dark-matter vector style — free, no key, ships its own glyphs+sprites.
-const MAP_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
+// CARTO vector basemaps — free, no key. Light (positron) in light theme, dark-matter in dark.
+// Same cartocdn.com host as before, so the CSP already allows it.
+const MAP_STYLE_DARK = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
+const MAP_STYLE_LIGHT = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json";
+const mapStyleUrl = () => (getTheme() === "light" ? MAP_STYLE_LIGHT : MAP_STYLE_DARK);
 // SK/CZ fallback view if there's nothing to fit to.
 const FALLBACK_CENTER = [18.5, 48.7];
 const FALLBACK_ZOOM = 6.2;
@@ -256,7 +260,7 @@ export default function MapView({ lang = "en", setCurrent }) {
     const hadSavedView = savedView != null;
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style: MAP_STYLE,
+      style: mapStyleUrl(),
       center: hadSavedView ? savedView.center : FALLBACK_CENTER,
       zoom: hadSavedView ? savedView.zoom : FALLBACK_ZOOM,
       bearing: hadSavedView ? savedView.bearing : 0,
@@ -462,7 +466,7 @@ export default function MapView({ lang = "en", setCurrent }) {
       {/* Header strip */}
       <div style={{
         display: "flex", alignItems: "center", gap: "1rem", flexWrap: "wrap",
-        padding: "0.85rem 1.25rem", borderBottom: `1px solid ${border}`, background: "#0a0a0b",
+        padding: "0.85rem 1.25rem", borderBottom: `1px solid ${border}`, background: "var(--surface)",
       }}>
         <div style={{ fontSize: "0.82rem", color: textLight }}>
           <strong style={{ color: green, fontFamily: mono }}>{placed}</strong>
@@ -534,7 +538,7 @@ export default function MapView({ lang = "en", setCurrent }) {
                     onMouseEnter={() => setActiveIdx(i)}
                     style={{
                       padding: "8px 11px", cursor: "pointer",
-                      background: i === activeIdx ? "#1d1d22" : "transparent",
+                      background: i === activeIdx ? "var(--surface-3)" : "transparent",
                       borderBottom: i < suggestions.length - 1 ? `1px solid ${border}` : "none",
                     }}
                   >
@@ -615,7 +619,7 @@ export default function MapView({ lang = "en", setCurrent }) {
         {isLoading && (
           <div style={{
             position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
-            color: dim, fontFamily: mono, fontSize: "0.8rem", background: "rgba(10,10,11,0.4)", pointerEvents: "none",
+            color: dim, fontFamily: mono, fontSize: "0.8rem", background: "var(--surface-2)", pointerEvents: "none",
           }}>
             {sk ? "Načítavam mapu…" : "Loading map…"}
           </div>

@@ -38,10 +38,13 @@ import { applyFilters, describe, isComplete } from "../lib/mapFilters";
 
 const mono = "'JetBrains Mono', monospace";
 import { accent as green, orange as amber, dim, text as textLight, border, surfaceDark as bg2 } from "../lib/theme";
+import { getTheme } from "../lib/theme-mode";
 const greyPt = "#6b6b76";
-const panel = "#141418";
+const panel = "var(--surface)";
 
-const MAP_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
+const MAP_STYLE_DARK = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
+const MAP_STYLE_LIGHT = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json";
+const mapStyleUrl = () => (getTheme() === "light" ? MAP_STYLE_LIGHT : MAP_STYLE_DARK);
 const FALLBACK_CENTER = [18.5, 48.7];
 const FALLBACK_ZOOM = 6.2;
 
@@ -499,7 +502,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
     // country — otherwise, after switching markets while unmounted, the map opened
     // over the previous country and the fit was skipped (all pins off-screen).
     const hadSaved = savedView != null && savedView.country === countryRef.current;
-    const map = new maplibregl.Map({ container: containerRef.current, style: MAP_STYLE, center: hadSaved ? savedView.center : FALLBACK_CENTER, zoom: hadSaved ? savedView.zoom : FALLBACK_ZOOM, attributionControl: true });
+    const map = new maplibregl.Map({ container: containerRef.current, style: mapStyleUrl(), center: hadSaved ? savedView.center : FALLBACK_CENTER, zoom: hadSaved ? savedView.zoom : FALLBACK_ZOOM, attributionControl: true });
     mapRef.current = map;
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
     map.on("moveend", () => {
@@ -738,7 +741,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
   return (
     <div className="mv2-root" style={{ height: "calc(100dvh - 64px)", display: "flex", flexDirection: "column", background: bg2 }}>
       {/* Market overview — lens tabs + adaptive insight */}
-      <div style={{ borderBottom: `1px solid ${border}`, background: "#0a0a0b", padding: "0.6rem 1.25rem 0.7rem" }}>
+      <div style={{ borderBottom: `1px solid ${border}`, background: "var(--surface)", padding: "0.6rem 1.25rem 0.7rem" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.8rem", flexWrap: "wrap", marginBottom: 10 }}>
           <span style={{ fontSize: "0.6rem", color: dim, letterSpacing: "0.12em", textTransform: "uppercase" }}>{sk ? "Trh" : "Market"}</span>
           <div style={{ display: "inline-flex", gap: 3, background: bg2, border: `1px solid ${border}`, borderRadius: 999, padding: 3 }}>
@@ -829,7 +832,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
           const minPts = drawTool === "polygon" ? 3 : 2;
           const ok = pts.length >= minPts;
           return (
-            <div style={{ position: "absolute", top: 12, left: "50%", transform: "translateX(-50%)", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", justifyContent: "center", maxWidth: "calc(100% - 24px)", background: "rgba(14,14,16,0.96)", border: `1px solid ${amber}88`, color: textLight, fontSize: "0.74rem", padding: "6px 8px 6px 14px", borderRadius: 20 }}>
+            <div style={{ position: "absolute", top: 12, left: "50%", transform: "translateX(-50%)", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", justifyContent: "center", maxWidth: "calc(100% - 24px)", background: "var(--surface)", border: `1px solid ${amber}88`, color: textLight, fontSize: "0.74rem", padding: "6px 8px 6px 14px", borderRadius: 20 }}>
               {drawTool === "polygon" ? "▱" : "⇢"} {sk
                 ? `Klikaj ${drawTool === "polygon" ? "body oblasti" : "body trasy"} (${pts.length}) — ${drawTool === "polygon" ? "dvojklik/prvý bod" : "dvojklik"} ukončí, Esc zruší`
                 : `Click ${drawTool === "polygon" ? "area points" : "route points"} (${pts.length}) — ${drawTool === "polygon" ? "double-click/first point" : "double-click"} to finish, Esc to cancel`}
@@ -848,7 +851,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
         })()}
 
         {(compareMode || selection || showExplainer || savedAreas.length > 0) && (
-        <div style={{ position: "absolute", top: 12, left: 12, width: 310, maxWidth: "calc(100% - 24px)", maxHeight: "calc(100% - 24px)", overflowY: "auto", background: "rgba(14,14,16,0.97)", border: `1px solid ${border}`, borderRadius: 12, boxShadow: "0 12px 30px rgba(0,0,0,0.5)", padding: "14px 15px", zIndex: 30 }}>
+        <div style={{ position: "absolute", top: 12, left: 12, width: 310, maxWidth: "calc(100% - 24px)", maxHeight: "calc(100% - 24px)", overflowY: "auto", background: "var(--surface)", border: `1px solid ${border}`, borderRadius: 12, boxShadow: "0 12px 30px rgba(0,0,0,0.5)", padding: "14px 15px", zIndex: 30 }}>
           {compareMode ? (
             <ComparePanel
               options={projectOptions} compareIds={compareIds} setCompareIds={setCompareIds}
@@ -1012,7 +1015,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
                       const when = completionWhen(p); const bucket = completionBucket(p); const avail = Number(p.available_units) || 0;
                       return (
                         <button key={p.id} onClick={() => openProject(p.id)} style={{ display: "block", width: "100%", background: "none", border: "none", cursor: "pointer", padding: "4px 5px", textAlign: "left", borderRadius: 6 }}
-                          onMouseEnter={(e) => (e.currentTarget.style.background = "#1d1d22")} onMouseLeave={(e) => (e.currentTarget.style.background = "none")}>
+                          onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-3)")} onMouseLeave={(e) => (e.currentTarget.style.background = "none")}>
                           <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
                             <span style={{ color: textLight, fontSize: "0.76rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(coords && coords[p.id] && !coords[p.id].verified) ? "◍ " : ""}{p.name}</span>
                             <span style={{ color: dim, fontFamily: mono, fontSize: "0.74rem", flexShrink: 0 }}>{ppm2Of(p) ? mM2(ppm2Of(p)) : "—"}</span>
@@ -1039,7 +1042,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
         )}
 
         {isLoading && (
-          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: dim, fontFamily: mono, fontSize: "0.8rem", background: "rgba(10,10,11,0.4)", pointerEvents: "none" }}>{sk ? "Načítavam mapu…" : "Loading map…"}</div>
+          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: dim, fontFamily: mono, fontSize: "0.8rem", background: "var(--surface-2)", pointerEvents: "none" }}>{sk ? "Načítavam mapu…" : "Loading map…"}</div>
         )}
       </div>
 
@@ -1049,8 +1052,8 @@ export default function MapView2({ lang = "en", setCurrent }) {
         .mv2-root input { transition: border-color .12s ease; }
         .mv2-root input:focus { border-color: ${green}66; }
         .mv2-root ::-webkit-scrollbar { width: 9px; height: 9px; }
-        .mv2-root ::-webkit-scrollbar-thumb { background: #2a2a31; border-radius: 6px; }
-        .mv2-root ::-webkit-scrollbar-thumb:hover { background: #3a3a44; }
+        .mv2-root ::-webkit-scrollbar-thumb { background: var(--border-soft); border-radius: 6px; }
+        .mv2-root ::-webkit-scrollbar-thumb:hover { background: var(--border-strong, var(--border-soft)); }
         .mv2-root ::-webkit-scrollbar-track { background: transparent; }
         .maplibregl-popup-content { background:${bg2}; color:${textLight}; border:1px solid ${border}; border-radius:10px; padding:12px 13px; box-shadow:0 8px 30px rgba(0,0,0,0.5); }
         .mv2-hover .maplibregl-popup-content { padding:7px 10px; }
@@ -1065,7 +1068,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
 
 function Stat({ label, value, sub }) {
   return (
-    <div style={{ background: "#141418", borderRadius: 8, padding: "7px 9px" }}>
+    <div style={{ background: "var(--surface)", borderRadius: 8, padding: "7px 9px" }}>
       <div style={{ fontSize: "0.62rem", color: dim }}>{label}</div>
       <div style={{ fontSize: "1rem", color: textLight, fontWeight: 600, fontFamily: mono }}>{value}</div>
       {sub ? <div style={{ fontSize: "0.58rem", color: dim, fontFamily: mono }}>{sub}</div> : null}
@@ -1119,7 +1122,7 @@ function ComparePanel({ options, compareIds, setCompareIds, rows, baselineId, se
               const avail = Number(p.available_units) || 0; const tot = Number(p.total_units) || 0;
               const approx = coords && coords[p.id] && !coords[p.id].verified;
               return (
-                <div key={p.id} style={{ background: isBase ? `${green}12` : "#141418", border: `1px solid ${isBase ? `${green}55` : border}`, borderRadius: 8, padding: "7px 9px" }}>
+                <div key={p.id} style={{ background: isBase ? `${green}12` : "var(--surface)", border: `1px solid ${isBase ? `${green}55` : border}`, borderRadius: 8, padding: "7px 9px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <button onClick={() => setBaseline(p.id)} title={isBase ? (sk ? "Zrušiť ako tvoj základ" : "Unset as your baseline") : (sk ? "Označiť ako tvoj (základ porovnania)" : "Mark as yours (comparison baseline)")} style={{ background: isBase ? `${green}22` : "transparent", border: `1px solid ${isBase ? green : "transparent"}`, color: isBase ? green : dim, cursor: "pointer", borderRadius: 5, width: 21, height: 21, flexShrink: 0, fontSize: "0.72rem", lineHeight: 1 }}>★</button>
                     <button onClick={() => openProject(p.id)} style={{ flex: 1, minWidth: 0, background: "none", border: "none", cursor: "pointer", textAlign: "left", padding: 0, color: isBase ? green : textLight, fontSize: "0.77rem", fontWeight: isBase ? 600 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={sk ? "Otvoriť projekt" : "Open project"}>
@@ -1176,7 +1179,7 @@ function PricingBand({ cs, anchorPpm2, sk }) {
         <span style={{ fontSize: "0.62rem", color: dim, fontFamily: mono }}>{sk ? "stred 50 %" : "middle 50%"} €{fmt(p25)}–€{fmt(p75)}</span>
       </div>
       <div style={{ position: "relative", height: 12, marginBottom: 6 }}>
-        <div style={{ position: "absolute", left: 0, right: 0, top: 5, height: 2, background: "#26262d", borderRadius: 2 }} />
+        <div style={{ position: "absolute", left: 0, right: 0, top: 5, height: 2, background: "var(--border-soft)", borderRadius: 2 }} />
         <div style={{ position: "absolute", left: `${pos(p25)}%`, width: `${Math.max(1, pos(p75) - pos(p25))}%`, top: 2, height: 8, background: `${green}30`, border: `1px solid ${green}66`, borderRadius: 4 }} />
         <div style={{ position: "absolute", left: `${pos(median)}%`, top: 0, width: 2, height: 12, background: green, transform: "translateX(-1px)" }} title={`med €${fmt(median)}`} />
         {aPos != null ? <div style={{ position: "absolute", left: `${aPos}%`, top: -4, transform: "translateX(-5px)", width: 0, height: 0, borderLeft: "5px solid transparent", borderRight: "5px solid transparent", borderTop: `7px solid ${textLight}` }} title={`${sk ? "tento projekt" : "this project"} €${fmt(anchorPpm2)}`} /> : null}
@@ -1240,7 +1243,7 @@ function InventoryBar({ avail, res, sold, sk }) {
   const seg = (v, c, lbl) => (v > 0 ? <div key={lbl} title={`${lbl}: ${fmt(v)}`} style={{ width: `${(v / t) * 100}%`, background: c, height: "100%" }} /> : null);
   return (
     <div style={{ flex: 1, minWidth: 200 }}>
-      <div style={{ display: "flex", height: 18, borderRadius: 5, overflow: "hidden", background: "#17171c", border: `1px solid ${border}` }}>
+      <div style={{ display: "flex", height: 18, borderRadius: 5, overflow: "hidden", background: "var(--surface-3)", border: `1px solid ${border}` }}>
         {seg(avail, green, sk ? "voľné" : "available")}{seg(res, amber, sk ? "rezervované" : "reserved")}{seg(sold, greyPt, sk ? "predané" : "sold")}
       </div>
       <div style={{ display: "flex", gap: 14, fontSize: "0.62rem", color: dim, marginTop: 5, flexWrap: "wrap" }}>
@@ -1256,7 +1259,7 @@ function MovingBar({ moving, count, soldLM, sk }) {
   const staticN = Math.max(0, count - moving);
   return (
     <div style={{ flex: 1, minWidth: 200 }}>
-      <div style={{ display: "flex", height: 18, borderRadius: 5, overflow: "hidden", background: "#17171c", border: `1px solid ${border}` }}>
+      <div style={{ display: "flex", height: 18, borderRadius: 5, overflow: "hidden", background: "var(--surface-3)", border: `1px solid ${border}` }}>
         {moving > 0 ? <div title={String(moving)} style={{ width: `${(moving / t) * 100}%`, background: green, height: "100%" }} /> : null}
         {staticN > 0 ? <div title={String(staticN)} style={{ width: `${(staticN / t) * 100}%`, background: greyPt, height: "100%" }} /> : null}
       </div>
@@ -1273,7 +1276,7 @@ function Pipeline({ comp }) {
   const t = Math.max(1, order.reduce((s, k) => s + comp[k], 0));
   return (
     <div style={{ flex: 1, minWidth: 220 }}>
-      <div style={{ display: "flex", height: 18, borderRadius: 5, overflow: "hidden", background: "#17171c", border: `1px solid ${border}` }}>
+      <div style={{ display: "flex", height: 18, borderRadius: 5, overflow: "hidden", background: "var(--surface-3)", border: `1px solid ${border}` }}>
         {order.map((k) => (comp[k] > 0 ? <div key={k} title={`${COMPLETION[k].label}: ${comp[k]}`} style={{ width: `${(comp[k] / t) * 100}%`, background: COMPLETION[k].color, height: "100%" }} /> : null))}
       </div>
       <div style={{ display: "flex", gap: 12, fontSize: "0.6rem", color: dim, marginTop: 5, flexWrap: "wrap" }}>
