@@ -71,22 +71,22 @@
    stay, but red/blue/yellow are darkened so they read on white. Activated by
    setThemePreference() setting <html data-theme="light"> (see src/lib/theme-mode.js). */
 :root[data-theme="light"] {
-  --bg:            #eceff3;
-  --surface:       #ffffff;
-  --surface-2:     #f3f5f8;
-  --surface-3:     #e7ebf1;
-  --border:        #dce0e6;
-  --border-soft:   #e6e9ee;
+  --bg:            #e3e5ea;   /* grounded light gray page — white cards clearly stand out (not washed) */
+  --surface:       #ffffff;   /* cards / panels */
+  --surface-2:     #eceef2;   /* inset / row-stripe */
+  --surface-3:     #dee1e7;   /* raised / input / hover */
+  --border:        #c9ced7;   /* clearly visible — gives cards / tables / inputs real edges */
+  --border-soft:   #d7dae1;
   --accent:        #00e5a0;
-  --accent-strong: #00b585;
-  --accent-2:      #e2900a;
-  --danger:        #d92d20;
+  --accent-strong: #00a980;
+  --accent-2:      #cc8409;
+  --danger:        #d42a1e;
   --info:          #2563eb;
-  --warning:       #b8860b;
-  --text:          #1a1d23;
-  --text-2:        #3c414b;
-  --text-dim:      #667085;
-  --text-faint:    #98a0ac;
+  --warning:       #a97b09;
+  --text:          #171a20;   /* strong near-black */
+  --text-2:        #353b44;
+  --text-dim:      #545a64;   /* stronger secondary text (less faint) */
+  --text-faint:    #838994;
   --on-accent:     #06140f;
   color-scheme: light;
 }
