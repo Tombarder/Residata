@@ -71,22 +71,26 @@
    stay, but red/blue/yellow are darkened so they read on white. Activated by
    setThemePreference() setting <html data-theme="light"> (see src/lib/theme-mode.js). */
 :root[data-theme="light"] {
-  --bg:            #e3e5ea;   /* grounded light gray page — white cards clearly stand out (not washed) */
-  --surface:       #ffffff;   /* cards / panels */
-  --surface-2:     #eceef2;   /* inset / row-stripe */
-  --surface-3:     #dee1e7;   /* raised / input / hover */
-  --border:        #c9ced7;   /* clearly visible — gives cards / tables / inputs real edges */
-  --border-soft:   #d7dae1;
+  /* A WARM, natural "normal" theme — soft paper-white, not a bleached or dusty-gray
+     wash. Strong warm-black text + clearly-visible warm borders give real contrast,
+     so it reads comfortable/normal rather than faded. (Brand green stays as-is —
+     it's a hardcoded hex used with alpha suffixes + in map paint.) */
+  --bg:            #eae6df;   /* warm soft paper — the page */
+  --surface:       #ffffff;   /* clean white cards — pop crisply against the warm page */
+  --surface-2:     #e6e1d8;   /* inset / row-stripe */
+  --surface-3:     #ded8cd;   /* raised / input / hover */
+  --border:        #d3ccbf;   /* warm, clearly visible edges */
+  --border-soft:   #e0dace;
   --accent:        #00e5a0;
-  --accent-strong: #00a980;
-  --accent-2:      #cc8409;
-  --danger:        #d42a1e;
-  --info:          #2563eb;
-  --warning:       #a97b09;
-  --text:          #171a20;   /* strong near-black */
-  --text-2:        #353b44;
-  --text-dim:      #545a64;   /* stronger secondary text (less faint) */
-  --text-faint:    #838994;
+  --accent-strong: #00a578;
+  --accent-2:      #b3700a;
+  --danger:        #c92a1d;
+  --info:          #2f6bd8;
+  --warning:       #96700a;
+  --text:          #221f19;   /* warm near-black — strong contrast */
+  --text-2:        #46413a;
+  --text-dim:      #6f685d;
+  --text-faint:    #9c948a;
   --on-accent:     #06140f;
   color-scheme: light;
 }
