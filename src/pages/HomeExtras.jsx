@@ -641,7 +641,7 @@ export function MarketPulse({ lang = "en", setCurrent }) {
               placeholder={velocityMature ? null : (lang === "sk" ? "zbierame históriu" : "building history")}
               label={tSoldMonth} accent="#f5a623" />
         <Stat value={inv.ready ? Math.round(inv.value) : null} placeholder={inv.ready ? null : inv.text}
-              suffix={inv.ready ? (lang === "sk" ? " mes." : " mo") : ""} label={tInventory} />
+              suffix={inv.ready ? (lang === "sk" ? " mes." : " months") : ""} label={tInventory} />
         <Stat value={avgEurM2 ? Math.round(moneyFromEur(avgEurM2)) : null} label={tEur} prefix="" suffix={` ${moneySymbol()}`} />
       </div>
 
@@ -690,47 +690,63 @@ function ProjectMini({ project, setCurrent, lang }) {
   const soldDataUnavailable = (project.sold_units || 0) === 0 && (project.reserved_units || 0) === 0 && (project.prereserved_units || 0) === 0;
   const pct = project.sold_percentage ?? 0;
   const barColor = pct >= 80 ? "#ff6b6b" : pct >= 50 ? "#f5a623" : green;
+  const nf = (n) => Number(n || 0).toLocaleString("en-US").replace(/,/g, " ");
+  const soldLastMonth = project.sold_last_month || 0;
+  const sellout = fmtMonthsToSellout(project.available_units, project.sold_last_month, lang);
   return (
     <div
       onClick={() => setCurrent && setCurrent(`Project:${project.id}`)}
       style={{
-        border: `1px solid ${border}`, borderRadius: 10, background: bg, padding: "1.1rem",
+        border: `1px solid ${border}`, borderRadius: 12, background: bg,
+        padding: "1.15rem 1.25rem 1.2rem",
         cursor: "pointer", transition: "transform 0.2s, border-color 0.2s",
+        display: "flex", flexDirection: "column", gap: "0.7rem",
       }}
       onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.borderColor = green; }}
       onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.borderColor = border; }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.25rem" }}>
-        <div style={{ fontSize: "0.95rem", fontWeight: 600, color: "#e8e8ed" }}>{project.name}</div>
-        <div style={{ fontSize: "0.7rem", color: dim, fontFamily: mono }}>{project.district || "—"}</div>
+      {/* Header: name + district */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "0.75rem" }}>
+        <div style={{ fontSize: "1rem", fontWeight: 600, color: "#e8e8ed", letterSpacing: "-0.01em", lineHeight: 1.3 }}>{project.name}</div>
+        <div style={{ fontSize: "0.68rem", color: dim, fontFamily: mono, whiteSpace: "nowrap", flexShrink: 0, marginTop: "0.15rem" }}>{project.district || "—"}</div>
       </div>
-      <div style={{ fontSize: "0.75rem", color: dim, marginBottom: "0.6rem" }}>
-        {(project.sold_last_month || 0) > 0 && (
-          <span style={{ color: "#f5a623", fontWeight: 600 }}>+{project.sold_last_month} {lang === "sk" ? "za mesiac" : "this month"} · </span>
+
+      {/* Metrics */}
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.4rem 0.85rem", fontSize: "0.8rem", color: dim }}>
+        {soldLastMonth > 0 && (
+          <span style={{
+            fontFamily: mono, fontSize: "0.7rem", fontWeight: 600, color: "#f5a623",
+            background: "rgba(245,166,35,0.1)", border: "1px solid rgba(245,166,35,0.22)",
+            borderRadius: 6, padding: "0.12rem 0.45rem", whiteSpace: "nowrap",
+          }}>
+            +{soldLastMonth} {lang === "sk" ? "za mesiac" : "this month"}
+          </span>
         )}
-        {project.available_units} {lang === "sk" ? "voľných" : "avail"}
-        {!soldDataUnavailable && <> · {project.sold_units} {lang === "sk" ? "predaných" : "sold"}</>}
-        {project.avg_price_eur_m2 ? ` · ${Math.round(moneyFromEur(project.avg_price_eur_m2)).toLocaleString("en-US").replace(/,/g, " ")} ${moneySymbol()}/m²` : ""}
+        <span><strong style={{ color: "#e8e8ed", fontWeight: 600 }}>{nf(project.available_units)}</strong> {lang === "sk" ? "voľných" : "available"}</span>
+        {!soldDataUnavailable && <span><strong style={{ color: "#e8e8ed", fontWeight: 600 }}>{nf(project.sold_units)}</strong> {lang === "sk" ? "predaných" : "sold"}</span>}
+        {project.avg_price_eur_m2 ? (
+          <span style={{ fontFamily: mono, color: "#c8c8d0", whiteSpace: "nowrap" }}>{nf(Math.round(moneyFromEur(project.avg_price_eur_m2)))} {moneySymbol()}/m²</span>
+        ) : null}
       </div>
+
+      {/* Progress */}
       {soldDataUnavailable ? (
-        <div style={{ fontSize: "0.65rem", color: dim, fontFamily: mono, letterSpacing: "0.05em", fontStyle: "italic" }}>
+        <div style={{ fontSize: "0.68rem", color: dim, fontFamily: mono, letterSpacing: "0.03em", fontStyle: "italic" }}>
           {lang === "sk" ? "developer nezverejňuje predajnosť" : "developer doesn't publish sales data"}
         </div>
       ) : (
-        <>
-          <div style={{ height: 3, background: "#0e0e10", borderRadius: 2, overflow: "hidden" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+          <div style={{ height: 5, background: "#0e0e10", borderRadius: 3, overflow: "hidden" }}>
             <div style={{
-              width: `${pct}%`, height: "100%", background: barColor,
-              transition: "width 0.6s ease",
+              width: `${Math.min(100, pct)}%`, height: "100%", background: barColor,
+              borderRadius: 3, transition: "width 0.6s ease",
             }} />
           </div>
-          <div style={{ fontSize: "0.65rem", color: dim, fontFamily: mono, marginTop: "0.3rem", letterSpacing: "0.05em" }}>
-            {pct.toFixed(0)}% {lang === "sk" ? "predané" : "sold"}
-            {fmtMonthsToSellout(project.available_units, project.sold_last_month, lang) && (
-              <span style={{ color: green, fontWeight: 600 }}> · {fmtMonthsToSellout(project.available_units, project.sold_last_month, lang)}</span>
-            )}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "0.75rem", fontSize: "0.7rem", color: dim, fontFamily: mono, letterSpacing: "0.03em" }}>
+            <span>{pct.toFixed(0)}% {lang === "sk" ? "predané" : "sold"}</span>
+            {sellout && <span style={{ color: green, fontWeight: 600, whiteSpace: "nowrap" }}>{sellout}</span>}
           </div>
-        </>
+        </div>
       )}
     </div>
   );

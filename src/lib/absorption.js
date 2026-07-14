@@ -22,9 +22,12 @@ export function monthsToSellout(availableUnits, soldLastMonth) {
 export function fmtSelloutValue(availableUnits, soldLastMonth, lang = "en") {
   const m = monthsToSellout(availableUnits, soldLastMonth);
   if (m == null) return null;
-  if (m >= 24) return `~${Math.round(m / 12)} ${lang === "sk" ? "r." : "yr"}`;
+  if (m >= 24) {
+    const y = Math.round(m / 12);
+    return lang === "sk" ? `~${y} r.` : `~${y} ${y === 1 ? "year" : "years"}`;
+  }
   const r = m < 10 ? Math.round(m * 10) / 10 : Math.round(m);
-  return `~${r} ${lang === "sk" ? "mes." : "mo"}`;
+  return lang === "sk" ? `~${r} mes.` : `~${r} ${r === 1 ? "month" : "months"}`;
 }
 
 // Full phrase, e.g. "sells out in ~4 mo" — for inline text next to other copy.
