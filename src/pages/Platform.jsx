@@ -140,6 +140,7 @@ const LocationManager = lazy(() => import("./LocationManager"));
 const DataQA = lazy(() => import("./DataQA"));
 const FeedbackLog = lazy(() => import("./FeedbackLog"));
 const TextsEditor = lazy(() => import("./TextsEditor"));
+const UsageDashboard = lazy(() => import("./UsageDashboard"));
 
 const NAV = [
   { group: "main", items: [
@@ -164,6 +165,7 @@ const NAV = [
     { page: "App:Feedback", label: { en: "Feedback", sk: "Spätná väzba" }, Icon: IconFeedback, adminOnly: true },
     { page: "App:Locations", label: { en: "Locations", sk: "Polohy" }, Icon: IconMap, adminOnly: true },
     { page: "App:Texts", label: { en: "Texts", sk: "Texty" }, Icon: IconDoc, adminOnly: true },
+    { page: "App:Usage", label: { en: "Usage", sk: "Používanie" }, Icon: IconChart, adminOnly: true },
     { page: "App:Admin", label: { en: "Admin", sk: "Admin" }, Icon: IconShield, adminOnly: true },
   ]},
 ];
@@ -532,6 +534,7 @@ function TopBar({ page, lang, setLang, tier }) {
     "App:DataQA":    { en: "Data control",    sk: "Kontrola dát" },
     "App:Feedback":  { en: "Feedback",        sk: "Spätná väzba" },
     "App:Texts":     { en: "Website texts",   sk: "Texty na webe" },
+    "App:Usage":     { en: "Usage",           sk: "Používanie"    },
   };
   const isProjectDetail = typeof page === "string" && page.startsWith("App:ProjectDetail:");
   const title = isProjectDetail
@@ -600,22 +603,28 @@ function TopBar({ page, lang, setLang, tier }) {
           </div>
         )}
 
-        {/* Light / dark theme toggle */}
-        <button
-          onClick={toggleThemeMode}
-          aria-label={lang === "sk" ? "Prepnúť tému" : "Toggle theme"}
-          title={themeMode === "light" ? (lang === "sk" ? "Tmavý režim" : "Dark mode") : (lang === "sk" ? "Svetlý režim" : "Light mode")}
-          style={{
-            display: "inline-flex", alignItems: "center", justifyContent: "center",
-            width: 38, height: 38, borderRadius: 8, cursor: "pointer",
-            background: "transparent", border: `1px solid ${border}`, color: "var(--text-2)",
-            fontSize: "1rem", lineHeight: 1, transition: "border-color 0.15s",
-          }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor = green; }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor = border; }}
-        >
-          {themeMode === "light" ? "🌙" : "☀️"}
-        </button>
+        {/* Light / dark theme toggle — explicit labeled segmented control */}
+        <div role="group" aria-label={lang === "sk" ? "Téma" : "Theme"}
+          style={{ display: "inline-flex", alignItems: "center", border: `1px solid ${border}`, borderRadius: 8, overflow: "hidden", background: "var(--surface)" }}>
+          {[
+            ["light", lang === "sk" ? "Svetlý" : "Light",
+              <svg key="s" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>],
+            ["dark", lang === "sk" ? "Tmavý" : "Dark",
+              <svg key="m" width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" /></svg>],
+          ].map(([mode, label, icon]) => {
+            const active = themeMode === mode;
+            return (
+              <button key={mode} type="button" onClick={() => { if (themeMode !== mode) toggleThemeMode(); }} aria-pressed={active}
+                title={lang === "sk" ? (mode === "light" ? "Svetlý režim" : "Tmavý režim") : (mode === "light" ? "Light mode" : "Dark mode")}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, border: "none", padding: "0.44rem 0.7rem", cursor: "pointer",
+                  fontSize: "0.78rem", fontFamily: "inherit", lineHeight: 1,
+                  background: active ? green : "transparent", color: active ? "#04130d" : "var(--text-2)", fontWeight: active ? 700 : 500,
+                  transition: "background 0.15s, color 0.15s" }}>
+                {icon}<span>{label}</span>
+              </button>
+            );
+          })}
+        </div>
 
         {/* Back-to-marketing button — always visible top-right of the platform.
             Uses a full navigation (window.location) so the marketing bundle
@@ -726,6 +735,7 @@ function PageContent({ page, projectId, lang, setCurrent, openLogin }) {
   if (page === "App:DataQA")     return <AdminGate require="manage_data_qa" lang={lang}><Suspense fallback={<div style={{ padding: "2rem", color: "var(--text-dim)", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.8rem" }}>{lang === "sk" ? "Načítavam…" : "Loading…"}</div>}><DataQA lang={lang} /></Suspense></AdminGate>;
   if (page === "App:Feedback")   return <AdminGate require="view_feedback_log" lang={lang}><Suspense fallback={<div style={{ padding: "2rem", color: "var(--text-dim)", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.8rem" }}>{lang === "sk" ? "Načítavam…" : "Loading…"}</div>}><FeedbackLog lang={lang} /></Suspense></AdminGate>;
   if (page === "App:Texts")      return <AdminGate require="manage_site_content" lang={lang}><Suspense fallback={<div style={{ padding: "2rem", color: "var(--text-dim)", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.8rem" }}>{lang === "sk" ? "Načítavam…" : "Loading…"}</div>}><TextsEditor lang={lang} /></Suspense></AdminGate>;
+  if (page === "App:Usage")      return <AdminGate require="view_activity_log" lang={lang}><Suspense fallback={<div style={{ padding: "2rem", color: "var(--text-dim)", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.8rem" }}>{lang === "sk" ? "Načítavam…" : "Loading…"}</div>}><UsageDashboard lang={lang} /></Suspense></AdminGate>;
   if (typeof page === "string" && page.startsWith("App:ProjectDetail:")) {
     const id = page.slice("App:ProjectDetail:".length);
     return <LiveProjectDetail projectId={id} lang={lang} setCurrent={setCurrent} openLogin={openLogin} />;

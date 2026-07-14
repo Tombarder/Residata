@@ -119,7 +119,7 @@ export default function FloatingChat({ lang = "sk", onNavigate }) {
             .residata-chat-pill:hover {
               transform: translateY(-1px);
               border-color: ${green};
-              background: #121216;
+              background: var(--surface-2);
               box-shadow: 0 10px 28px rgba(0,0,0,0.55), 0 0 0 1px rgba(0,229,160,0.25) inset, 0 0 24px rgba(0,229,160,0.18);
             }
           `}</style>

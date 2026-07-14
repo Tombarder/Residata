@@ -22,11 +22,11 @@ const mono   = "'JetBrains Mono', monospace";
 const green  = "#00e5a0";
 const amber  = "#f5a623";
 const blue   = "#4a9eff";
-const dim    = "#8a8a96";
-const text   = "#e8e8ed";
-const border = "#222228";
-const bg     = "#0a0a0b";
-const bg2    = "#0e0e10";
+const dim    = "var(--text-dim)";
+const text   = "var(--text)";
+const border = "var(--border)";
+const bg     = "var(--bg)";
+const bg2    = "var(--surface)";
 const red    = "#ff6b6b";
 
 const MAX_MESSAGE = 4000;
@@ -302,13 +302,13 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
             position: "absolute", top: -7, right: -7, minWidth: 19, height: 19, padding: "0 5px",
             borderRadius: 10, background: "#ff4d4d", color: "#fff", fontSize: "0.64rem", fontWeight: 700,
             display: "flex", alignItems: "center", justifyContent: "center", fontFamily: mono,
-            border: "2px solid #0a0a0b", lineHeight: 1,
+            border: "2px solid var(--surface)", lineHeight: 1,
           }}>{unread > 9 ? "9+" : unread}</span>
         )}
         <style>{`
           @keyframes rbf-glow { 0%,100% { box-shadow: 0 6px 18px rgba(0,0,0,0.4), 0 0 0 0 rgba(0,229,160,0); } 50% { box-shadow: 0 8px 22px rgba(0,0,0,0.45), 0 0 22px 3px rgba(0,229,160,0.45); } }
           .residata-fb-pill { transition: transform .18s, border-color .18s, background .18s; }
-          .residata-fb-pill:hover { transform: translateY(-1px); border-color: ${green}; background: #121216; animation-play-state: paused; box-shadow: 0 10px 28px rgba(0,0,0,0.55), 0 0 28px 5px rgba(0,229,160,0.55), 0 0 0 1px rgba(0,229,160,0.3) inset; }
+          .residata-fb-pill:hover { transform: translateY(-1px); border-color: ${green}; background: var(--surface-2); animation-play-state: paused; box-shadow: 0 10px 28px rgba(0,0,0,0.55), 0 0 28px 5px rgba(0,229,160,0.55), 0 0 0 1px rgba(0,229,160,0.3) inset; }
           @media (prefers-reduced-motion: reduce) { .residata-fb-pill { animation: none; box-shadow: 0 6px 18px rgba(0,0,0,0.4), 0 0 16px 2px rgba(0,229,160,0.35); } }
         `}</style>
       </button>
@@ -324,7 +324,7 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
     const isUser = m.sender === "user";
     return (
       <div style={{ display: "flex", justifyContent: isUser ? "flex-end" : "flex-start", marginBottom: "0.5rem" }}>
-        <div style={{ maxWidth: "86%", background: isUser ? "rgba(0,229,160,0.1)" : "#14141a", border: `1px solid ${isUser ? "rgba(0,229,160,0.28)" : border}`, borderRadius: 10, padding: "0.5rem 0.65rem" }}>
+        <div style={{ maxWidth: "86%", background: isUser ? "rgba(0,229,160,0.1)" : "var(--surface-2)", border: `1px solid ${isUser ? "rgba(0,229,160,0.28)" : border}`, borderRadius: 10, padding: "0.5rem 0.65rem" }}>
           <div style={{ fontFamily: mono, fontSize: "0.56rem", color: isUser ? green : dim, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 3 }}>
             {isUser ? L("Ty", "You") : "Residata"} · {(m.created_at || "").slice(5, 16).replace("T", " ")}
           </div>

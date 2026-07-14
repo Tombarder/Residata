@@ -1833,7 +1833,7 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
         <div style={{
           fontSize: "0.66rem", color: dim, opacity: 0.9, lineHeight: 1.5,
           padding: "0.45rem 0.6rem", margin: "0 0 0.5rem",
-          borderLeft: `2px solid ${dim}`, background: "rgba(255,255,255,0.03)",
+          borderLeft: `2px solid ${dim}`, background: "var(--surface-2)",
         }}>
           {lang === "sk"
             ? "€/m² je vážený priemer (Σ cena ÷ Σ plocha) cez všetky vybrané záznamy — vrátane predaných bytov, starších mesiacov a projektov v ktoromkoľvek stave. Hlavné číslo na webe počíta len ponukové byty (Stav V/R/PR) v aktívnych projektoch, preto sa môže líšiť. Pre zhodu pridaj filter Stav = V/R/PR."
@@ -2314,7 +2314,7 @@ function ChipInZone({ label, type, agg, filter, level, onDragStart, onDragStartP
                     border: "none", fontFamily: mono, fontSize: "0.72rem",
                     cursor: "pointer",
                   }}
-                  onMouseEnter={(e) => { if (a !== agg) e.currentTarget.style.background = "rgba(255,255,255,0.05)"; }}
+                  onMouseEnter={(e) => { if (a !== agg) e.currentTarget.style.background = "var(--surface-2)"; }}
                   onMouseLeave={(e) => { if (a !== agg) e.currentTarget.style.background = "transparent"; }}
                 >
                   {AGG_LABEL[a]}
@@ -3600,7 +3600,7 @@ function ChartTooltip({ mouseX, mouseY, lines, accentColor }) {
       left: flipLeft ? mouseX - 14 : mouseX + 14,
       top:  flipUp   ? mouseY - 14 : mouseY + 14,
       transform: `${flipLeft ? "translateX(-100%) " : ""}${flipUp ? "translateY(-100%)" : ""}`.trim(),
-      background: "rgba(14, 14, 18, 0.97)",
+      background: "var(--surface)",
       border: `1px solid ${accentColor || green}`,
       borderRadius: 6,
       padding: "0.55rem 0.8rem",
@@ -4397,7 +4397,7 @@ function FilterPopover({ fieldKey, filter, anchorEl, records, distinctOverride =
       id="pivotv2-filter-pop"
       style={{
         ...style, width: popW, maxHeight: "72vh", overflow: "auto",
-        background: "#111116",
+        background: "var(--surface)",
         border: `1px solid ${border}`,
         borderRadius: 10,
         boxShadow: "0 24px 60px rgba(0,0,0,0.55)",
@@ -4619,7 +4619,7 @@ function CheckboxRow({ checked, onChange, label }) {
       padding: "0.35rem 0.55rem", cursor: "pointer", borderRadius: 4,
       fontSize: "0.86rem", color: checked ? text : "var(--text-2)",
     }}
-      onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.04)"}
+      onMouseEnter={(e) => e.currentTarget.style.background = "var(--surface-2)"}
       onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
       <input type="checkbox" checked={checked} onChange={onChange} style={{ accentColor: green, width: 15, height: 15 }} />
       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
@@ -4751,7 +4751,7 @@ function DrillDownModal({ title, records, loading, onClose, lang }) {
             </thead>
             <tbody>
               {records.slice(0, 1000).map((r, i) => (
-                <tr key={(r.id ?? i) + "|" + i} style={{ background: i % 2 ? "transparent" : "rgba(255,255,255,0.015)" }}>
+                <tr key={(r.id ?? i) + "|" + i} style={{ background: i % 2 ? "transparent" : "var(--surface-2)" }}>
                   {DRILL_COLS.map(c => {
                     // cena_s_dph is EUR-denominated money — convert to display
                     // currency. Other columns (text / counts / areas) pass through.

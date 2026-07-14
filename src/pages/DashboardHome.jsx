@@ -793,8 +793,8 @@ function WidgetMenu({ lang, widget, first, last, onConfigure, onToggleWidth, onM
     <div style={{ position: "relative", flexShrink: 0 }}>
       <button aria-label={L(lang, "Možnosti widgetu", "Widget options")} onClick={(e) => { e.stopPropagation(); setOpen(o => !o); }}
         onMouseDown={e => e.stopPropagation()}
-        style={{ width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", background: open ? "rgba(255,255,255,0.06)" : "transparent", border: `1px solid ${open ? border : "transparent"}`, borderRadius: 7, color: dim, cursor: "pointer", fontSize: "1rem", lineHeight: 1 }}
-        onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; e.currentTarget.style.color = textLight; }}
+        style={{ width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", background: open ? "var(--surface-2)" : "transparent", border: `1px solid ${open ? border : "transparent"}`, borderRadius: 7, color: dim, cursor: "pointer", fontSize: "1rem", lineHeight: 1 }}
+        onMouseEnter={e => { e.currentTarget.style.background = "var(--surface-2)"; e.currentTarget.style.color = textLight; }}
         onMouseLeave={e => { if (!open) e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = dim; }}>⋯</button>
       {open && (
         <>
@@ -816,7 +816,7 @@ function MenuItem({ icon, children, onClick, disabled, danger }) {
   return (
     <button onClick={onClick} disabled={disabled}
       style={{ display: "flex", alignItems: "center", gap: "0.6rem", width: "100%", textAlign: "left", padding: "0.5rem 0.6rem", background: "transparent", border: "none", borderRadius: 7, cursor: disabled ? "default" : "pointer", color: disabled ? faint : (danger ? "#ff8a8a" : "#d0d0d6"), fontFamily: "inherit", fontSize: "0.82rem" }}
-      onMouseEnter={e => { if (!disabled) e.currentTarget.style.background = danger ? "rgba(255,107,107,0.1)" : "rgba(255,255,255,0.05)"; }}
+      onMouseEnter={e => { if (!disabled) e.currentTarget.style.background = danger ? "rgba(255,107,107,0.1)" : "var(--surface-2)"; }}
       onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
       <span style={{ width: 16, textAlign: "center", fontSize: "0.8rem", opacity: 0.9 }}>{icon}</span>
       <span>{children}</span>

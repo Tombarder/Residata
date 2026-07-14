@@ -358,7 +358,7 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
                 transform: "translateX(-50%)",
                 pointerEvents: "auto",
                 textAlign: "center",
-                background: "rgba(16,16,18,0.92)",
+                background: "var(--surface)",
                 backdropFilter: "blur(8px)",
                 border: `1px solid rgba(0,229,160,0.3)`,
                 borderRadius: 12,
@@ -764,7 +764,7 @@ export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en
             : (
               <div style={{
                 padding: "2rem 1.5rem", border: `1px dashed ${border}`, borderRadius: 10,
-                background: "rgba(255,255,255,0.02)", textAlign: "center",
+                background: "var(--surface-2)", textAlign: "center",
               }}>
                 <div style={{ fontSize: "1rem", color: "var(--text)", fontWeight: 600, marginBottom: "0.6rem" }}>
                   {lang === "sk" ? "Developer zatiaľ nezverejnil verejný zoznam bytov" : "Developer hasn't published a public unit list yet"}
@@ -1581,7 +1581,7 @@ function TimelineChart({ snaps, lang }) {
         return (
           <div style={{
             position: "fixed", left: hover.mx + 14, top: hover.my + 14,
-            background: "rgba(14,14,18,0.97)", border: `1px solid ${border}`, borderRadius: 8,
+            background: "var(--surface)", border: `1px solid ${border}`, borderRadius: 8,
             padding: "0.6rem 0.85rem", fontFamily: mono, fontSize: "0.74rem",
             color: text, pointerEvents: "none", zIndex: 10000, whiteSpace: "nowrap",
             boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
@@ -1860,7 +1860,7 @@ function TakeupChart({ snaps, lang }) {
         return (
           <div style={{
             position: "fixed", left: hover.mx + 14, top: hover.my + 14,
-            background: "rgba(14,14,18,0.97)", border: `1px solid ${border}`, borderRadius: 8,
+            background: "var(--surface)", border: `1px solid ${border}`, borderRadius: 8,
             padding: "0.6rem 0.85rem", fontFamily: mono, fontSize: "0.74rem",
             color: text, pointerEvents: "none", zIndex: 10000, whiteSpace: "nowrap",
             boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
@@ -4011,7 +4011,7 @@ function OverviewPanel({ activity, users, lang }) {
                   borderBottom: `1px solid ${border}`,
                 }}>
                   <span style={{ fontFamily: mono, fontSize: "0.74rem", color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{type}</span>
-                  <div style={{ height: 8, background: "rgba(255,255,255,0.04)", borderRadius: 4, overflow: "hidden" }}>
+                  <div style={{ height: 8, background: "var(--surface-2)", borderRadius: 4, overflow: "hidden" }}>
                     <div style={{
                       height: "100%",
                       width: `${(n / maxN) * 100}%`,
@@ -4458,12 +4458,12 @@ function AiChatLogsPanel({ users, lang }) {
                 onClick={() => setExpanded(isOpen ? null : s.session_id)}
                 title={lang === "sk" ? "Rozbaliť / zbaliť" : "Expand / collapse"}
                 style={{
-                  width: "100%", textAlign: "left", background: isOpen ? "rgba(255,255,255,0.03)" : "transparent",
+                  width: "100%", textAlign: "left", background: isOpen ? "var(--surface-2)" : "transparent",
                   border: "none", color: text, cursor: "pointer", fontFamily: "inherit",
                   padding: "0.65rem 0.9rem",
                   display: "grid", gridTemplateColumns: "auto 1fr auto auto auto auto auto", gap: "0.6rem", alignItems: "center",
                 }}
-                onMouseEnter={e => { if (!isOpen) e.currentTarget.style.background = "rgba(255,255,255,0.03)"; }}
+                onMouseEnter={e => { if (!isOpen) e.currentTarget.style.background = "var(--surface-2)"; }}
                 onMouseLeave={e => { if (!isOpen) e.currentTarget.style.background = "transparent"; }}>
                 <span style={{ color: green, fontSize: "0.7rem", width: 12 }}>{isOpen ? "▾" : "▸"}</span>
                 <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "0.78rem" }}>
