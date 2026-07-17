@@ -41,7 +41,7 @@ const panel = "var(--surface)";
 // CARTO vector basemaps — free, no key. Light (positron) in light theme, dark-matter in dark.
 // Same cartocdn.com host as before, so the CSP already allows it.
 const MAP_STYLE_DARK = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
-const MAP_STYLE_LIGHT = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json";
+const MAP_STYLE_LIGHT = "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json";
 const mapStyleUrl = () => (getTheme() === "light" ? MAP_STYLE_LIGHT : MAP_STYLE_DARK);
 // SK/CZ fallback view if there's nothing to fit to.
 const FALLBACK_CENTER = [18.5, 48.7];
