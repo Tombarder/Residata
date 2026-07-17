@@ -30,7 +30,7 @@ import {
   LENSES, COMPLETION, NO_DATA, ppm2Of, metricValue, completionBucket,
   tertiles, colorFor, coverage, circlePolygon, computeCompetitiveSet, computePolygonSet, computeCorridorSet,
   corridorBufferRing, polygonAreaKm2, polylineLengthKm, legendForLens, valueRange, heatWeight, hasPublishedPrice,
-  median, percentile, setAbsorptionPct,
+  median, percentile, setAbsorptionPct, completionLabel, completionShort,
 } from "../lib/mapMetrics";
 import MapFilterBuilder from "../components/MapFilterBuilder";
 import Picker from "../components/Picker";
@@ -730,16 +730,13 @@ export default function MapView2({ lang = "en", setCurrent }) {
 
   const openProject = (id) => setCurrentRef.current && setCurrentRef.current("App:ProjectDetail:" + id);
   const isLoading = loading || coords === null;
-  const legend = legendForLens(lens, thresholds, fmt);
+  const legend = legendForLens(lens, thresholds, fmt, sk);
 
   // ── Completion drill-down helpers ──
-  // Year labels come straight from COMPLETION (frozen to the same _NOW_Y that
-  // completionBucket buckets against) so the drill-down years can never drift from the
-  // legend/filter years; only ready/unknown are localised here.
-  const _yr = (k) => COMPLETION[k].label;
-  const COMP_LABEL = sk
-    ? { ready: "hotové", cur: _yr("cur"), soon: _yr("soon"), mid: _yr("mid"), far: _yr("far"), unknown: "neznáme" }
-    : { ready: "done", cur: _yr("cur"), soon: _yr("soon"), mid: _yr("mid"), far: _yr("far"), unknown: "unknown" };
+  // One localised label per bucket, from the shared helper: year buckets are neutral
+  // numbers (frozen to the same _NOW_Y completionBucket buckets against → no drift),
+  // ready/unknown are localised. Same source the legend/filter use, so they never differ.
+  const COMP_LABEL = { ready: completionLabel("ready", sk), cur: completionLabel("cur", sk), soon: completionLabel("soon", sk), mid: completionLabel("mid", sk), far: completionLabel("far", sk), unknown: completionLabel("unknown", sk) };
   // "When it completes" for a project row: a year, "hotové/done", or null (unknown).
   const completionWhen = (p) => {
     const k = (p.kolaudacia || "").toString().trim();

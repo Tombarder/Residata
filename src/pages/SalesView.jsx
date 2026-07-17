@@ -136,10 +136,16 @@ export default function SalesView({ lang = "sk" }) {
 
   const exportCsv = () => {
     const cols = detailCols.filter((c) => c[3] !== "hide");
-    const head = cols.map((c) => (lang === "sk" ? c[1] : c[2])).join(";");
+    // Money columns: export in the SAME display currency the table shows (converted +
+    // symbol in the header), so the CSV never silently disagrees with the on-screen values.
+    const sym = moneySymbol();
+    const head = cols.map((c) => {
+      const base = c[3] === "per_m2" ? `${sym}/m²` : (lang === "sk" ? c[1] : c[2]);
+      return c[3] === "eur" ? `${base} (${sym})` : base;
+    }).join(";");
     const lines = detRows.map((r) => cols.map((c) => {
       const v = r[c[0]];
-      if (c[3] === "eur" || c[3] === "per_m2") return v == null ? "" : Math.round(Number(v));
+      if (c[3] === "eur" || c[3] === "per_m2") return v == null ? "" : Math.round(moneyFromEur(Number(v)));
       return v == null ? "" : String(v).replace(/;/g, ",");
     }).join(";"));
     const blob = new Blob(["﻿" + [head, ...lines].join("\n")], { type: "text/csv;charset=utf-8" });
@@ -256,7 +262,7 @@ export default function SalesView({ lang = "sk" }) {
           <div style={card}><div style={kpiLbl}>{t(HEADLINE[status][0], HEADLINE[status][1])}</div><div style={kpiVal}>{sum.loading ? "…" : dur.toLocaleString("sk-SK")}</div>{reversed > 0 && !durableOnly && !isPipe && <div style={{ fontSize: "0.68rem", color: orange, fontFamily: mono, marginTop: "0.2rem" }}>{t(`+${reversed} vrátených`, `+${reversed} fell through`)}</div>}</div>
           <div style={card}><div style={kpiLbl}>{isPipe ? t("Hodnota v ponuke", "Listed value") : t("Objem predaja", "Sold value")}</div><div style={kpiVal}>{sum.loading ? "…" : fmtMoney(S.sold_value_eur)}</div></div>
           <div style={card}><div style={kpiLbl}>{t("Medián ceny", "Median price")}</div><div style={kpiVal}>{sum.loading ? "…" : fmtMoney(S.median_price_eur)}</div></div>
-          <div style={card}><div style={kpiLbl}>{t("Medián €/m²", "Median €/m²")}</div><div style={kpiVal}>{sum.loading ? "…" : fmtCell("per_m2", S.median_eur_m2)}</div></div>
+          <div style={card}><div style={kpiLbl}>{t("Medián ", "Median ")}{moneySymbol()}/m²</div><div style={kpiVal}>{sum.loading ? "…" : fmtCell("per_m2", S.median_eur_m2)}</div></div>
           {!isPipe && (
           <div style={card}>
             <div style={kpiLbl}>{t("Medián dní na trhu", "Median days on market")}</div>
@@ -281,7 +287,7 @@ export default function SalesView({ lang = "sk" }) {
         </div>
         <div style={{ overflowX: "auto" }}>
           <table style={{ borderCollapse: "collapse", width: "100%", fontSize: "0.8rem", minWidth: 480 }}>
-            <thead><tr>{[t("Skupina", "Group"), isPipe ? t("V ponuke", "Listed") : t("Predané", "Sold"), t("Objem", "Value"), t("Medián €/m²", "Median €/m²"), t("Medián dní", "Median days")].map((h, i) => (
+            <thead><tr>{[t("Skupina", "Group"), isPipe ? t("V ponuke", "Listed") : t("Predané", "Sold"), t("Objem", "Value"), `${t("Medián ", "Median ")}${moneySymbol()}/m²`, t("Medián dní", "Median days")].map((h, i) => (
               <th key={h} style={{ textAlign: i === 0 ? "left" : "right", padding: "0.4rem 0.6rem", borderBottom: `1px solid ${border}`, color: dim, fontFamily: mono, fontSize: "0.64rem", textTransform: "uppercase", letterSpacing: "0.04em" }}>{h}</th>
             ))}</tr></thead>
             <tbody>
@@ -316,7 +322,7 @@ export default function SalesView({ lang = "sk" }) {
                 return (
                   <th key={c[0]} onClick={sortable ? () => toggleSort(c[0]) : undefined}
                     style={{ padding: "0.45rem 0.6rem", textAlign: numeric ? "right" : "left", borderBottom: `1px solid ${border}`, color: sort.key === c[0] ? green : "var(--text-2)", cursor: sortable ? "pointer" : "default", fontFamily: mono, fontSize: "0.64rem", textTransform: "uppercase", letterSpacing: "0.03em", whiteSpace: "nowrap", userSelect: "none" }}>
-                    {t(c[1], c[2])}{sort.key === c[0] ? (sort.dir === "asc" ? " ▲" : " ▼") : ""}
+                    {c[3] === "per_m2" ? `${moneySymbol()}/m²` : t(c[1], c[2])}{effSort.key === c[0] ? (effSort.dir === "asc" ? " ▲" : " ▼") : ""}
                   </th>
                 );
               })}

@@ -31,14 +31,22 @@ export const NO_DATA = "#5b5b66";
 // = genuinely finished (Skolaudované) or past-due; the rest are the actual handover year.
 const _NOW_Y = new Date().getFullYear();
 export const COMPLETION = {
-  ready:   { color: "#00e5a0", label: "hotové",           short: "hotové" },
+  ready:   { color: "#00e5a0", label: "done",             short: "done" },
   cur:     { color: "#25d3a2", label: String(_NOW_Y),     short: String(_NOW_Y) },
   soon:    { color: "#3aa0ff", label: String(_NOW_Y + 1), short: String(_NOW_Y + 1) },
   mid:     { color: "#f5a623", label: String(_NOW_Y + 2), short: String(_NOW_Y + 2) },
   far:     { color: "#ff5d5d", label: (_NOW_Y + 3) + "+", short: (_NOW_Y + 3) + "+" },
-  unknown: { color: NO_DATA,   label: "neznáme",          short: "?" },
+  unknown: { color: NO_DATA,   label: "unknown",          short: "?" },
 };
 export const COMPLETION_ORDER = ["ready", "cur", "soon", "mid", "far", "unknown"];
+
+// Only ready/unknown carry WORDS (the year buckets are language-neutral numbers), so
+// localisation is confined to these two. Every UI label site routes through these
+// helpers so a Slovak user never sees English "done"/"unknown" (and vice-versa) — the
+// COMPLETION.label/short English strings above are just the neutral default/fallback.
+const _COMP_WORDS = { ready: { en: "done", sk: "hotové" }, unknown: { en: "unknown", sk: "neznáme" } };
+export const completionLabel = (k, sk = false) => (_COMP_WORDS[k] ? _COMP_WORDS[k][sk ? "sk" : "en"] : COMPLETION[k]?.label);
+export const completionShort = (k, sk = false) => (k === "unknown" ? "?" : (_COMP_WORDS[k] ? _COMP_WORDS[k][sk ? "sk" : "en"] : COMPLETION[k]?.short));
 
 export const ppm2Of = (p) => Math.round(Number(p.avg_price_eur_m2) || 0);
 
@@ -332,9 +340,9 @@ export function corridorBufferRing(line, widthKm) {
 }
 
 /** Legend rows for the active lens (colour + label). */
-export function legendForLens(lens, thresholds, fmt = (n) => String(Math.round(n))) {
+export function legendForLens(lens, thresholds, fmt = (n) => String(Math.round(n)), sk = false) {
   if (lens === "completion") {
-    return COMPLETION_ORDER.map((k) => ({ color: COMPLETION[k].color, label: COMPLETION[k].label }));
+    return COMPLETION_ORDER.map((k) => ({ color: COMPLETION[k].color, label: completionLabel(k, sk) }));
   }
   const unit = LENSES.find((l) => l.key === lens)?.unit || "";
   if (!thresholds) return [{ color: RAMP[1], label: unit || lens }, { color: NO_DATA, label: "no data" }];

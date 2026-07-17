@@ -296,10 +296,10 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
             <Sel value={fCast} onChange={setFCast} opts={castOpts.values} ph={t("Mestská časť: všetky", "District: all")} />
             <Sel value={fDev} onChange={setFDev} opts={devOpts.values} ph={t("Developer: všetci", "Developer: all")} />
             <Sel value={fStav} onChange={setFStav} opts={stavOpts.values} ph={t("Stav: všetky", "Status: all")} />
-            <input style={{ ...sel, width: 84 }} placeholder={t("cena od", "€ from")} value={pMin} onChange={(e) => setPMin(e.target.value)} inputMode="numeric" />
-            <input style={{ ...sel, width: 84 }} placeholder={t("cena do", "€ to")} value={pMax} onChange={(e) => setPMax(e.target.value)} inputMode="numeric" />
-            <input style={{ ...sel, width: 92 }} placeholder={t("€/m² od", "€/m² from")} value={m2Min} onChange={(e) => setM2Min(e.target.value)} inputMode="numeric" />
-            <input style={{ ...sel, width: 92 }} placeholder={t("€/m² do", "€/m² to")} value={m2Max} onChange={(e) => setM2Max(e.target.value)} inputMode="numeric" />
+            <input style={{ ...sel, width: 84 }} placeholder={`${t("cena od", "price from")} ${moneySymbol()}`} value={pMin} onChange={(e) => setPMin(e.target.value)} inputMode="numeric" />
+            <input style={{ ...sel, width: 84 }} placeholder={`${t("cena do", "price to")} ${moneySymbol()}`} value={pMax} onChange={(e) => setPMax(e.target.value)} inputMode="numeric" />
+            <input style={{ ...sel, width: 92 }} placeholder={`${moneySymbol()}/m² ${t("od", "from")}`} value={m2Min} onChange={(e) => setM2Min(e.target.value)} inputMode="numeric" />
+            <input style={{ ...sel, width: 92 }} placeholder={`${moneySymbol()}/m² ${t("do", "to")}`} value={m2Max} onChange={(e) => setM2Max(e.target.value)} inputMode="numeric" />
             {/* generic per-field filters — one row per chosen field (any field in the list) */}
             {xf.map((r) => (
               <XFilterRow key={r.id} row={r} fields={xfFields} mode={mode} lang={lang} sel={sel}

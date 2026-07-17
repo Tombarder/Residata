@@ -550,7 +550,7 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
             // not reach the DOM). Same masking MetricBody uses.
             const value = locked ? "12 345"
               : gateVelocity ? "—"
-              : mk === "sold30" ? (raw ? `+${fmtCount(raw, lang)}` : "—")
+              : mk === "sold30" ? (raw == null ? "—" : raw > 0 ? `+${fmtCount(raw, lang)}` : "0")
               : mk === "avg_m2" ? (raw != null ? `${Math.round(moneyFromEur(raw)).toLocaleString(localeTag(lang))} ${moneySymbol()}` : "—")
               : fmtMetric(mk, raw, lang);
             const delta = (!locked && !gateVelocity && MOM_METRICS.has(mk)) ? aggMomDelta(mk, overviewIds, snapshots) : null;
@@ -898,7 +898,7 @@ function ProjectBody({ cfg, ctx, lang }) {
         <MiniStat label={L(lang, "Voľné", "Avail")} value={fmtCount(p.available_units, lang)} accent={green} />
         <MiniStat label={L(lang, "Predané", "Sold")} value={p.sold_percentage != null ? `${Math.round(p.sold_percentage)}%` : "—"} />
         <MiniStat label={`${moneySymbol()}/m²`} value={p.avg_price_eur_m2 ? Math.round(moneyFromEur(p.avg_price_eur_m2)).toLocaleString(localeTag(lang)) : "—"} />
-        <MiniStat label={L(lang, "30d", "30d")} value={soldLocked ? "🔒" : (p.sold_last_month ? `+${p.sold_last_month}` : "—")} accent={orange} />
+        <MiniStat label={L(lang, "30d", "30d")} value={soldLocked ? "🔒" : (p.sold_last_month == null ? "—" : p.sold_last_month > 0 ? `+${p.sold_last_month}` : "0")} accent={orange} />
       </div>
     </div>
   );
