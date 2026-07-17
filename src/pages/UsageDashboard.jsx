@@ -106,8 +106,6 @@ export default function UsageDashboard({ lang = "en" }) {
   const [tlLoading, setTlLoading] = useState(false);
   const [tlErr, setTlErr] = useState(null);
 
-  const TL_LIMIT = 500;
-
   const load = useCallback(async () => {
     setLoading(true); setErr(null);
     // Each RPC is settled independently: a failure in one section must not blank
@@ -134,9 +132,21 @@ export default function UsageDashboard({ lang = "en" }) {
   const openUser = useCallback(async (u) => {
     setSelUser(u); setTimeline([]); setTlErr(null); setTlLoading(true);
     try {
-      const { data, error } = await supabaseData.rpc("admin_user_timeline", { p_user_id: u.user_id, p_limit: TL_LIMIT });
-      if (error) setTlErr(error.message || String(error));
-      setTimeline(data || []);
+      // FULL history, no cap (Boss 2026-07-17). The RPC has no SQL LIMIT, but
+      // PostgREST caps a single response at 1000 rows — so page through with
+      // .range() until a short page. (Guard at 200 pages = 200k events so a bug
+      // can't loop forever; far beyond any real user's activity.)
+      const PAGE = 1000;
+      const all = [];
+      for (let from = 0, page = 0; page < 200; from += PAGE, page++) {
+        const { data, error } = await supabaseData
+          .rpc("admin_user_timeline", { p_user_id: u.user_id })
+          .range(from, from + PAGE - 1);
+        if (error) { setTlErr(error.message || String(error)); break; }
+        all.push(...(data || []));
+        if (!data || data.length < PAGE) break;
+      }
+      setTimeline(all);
     } catch (e) { setTlErr(String(e?.message || e)); }
     setTlLoading(false);
   }, []);
@@ -292,12 +302,14 @@ export default function UsageDashboard({ lang = "en" }) {
               </table>
             </div>
           </Section>
+
+          <MaintenancePanel lang={lang} onDeleted={load} />
         </>
       )}
 
       {/* Drill-down drawer */}
       {selUser && (
-        <UserTimeline user={selUser} rows={timeline} loading={tlLoading} err={tlErr} limit={TL_LIMIT} lang={lang} onClose={() => setSelUser(null)} />
+        <UserTimeline user={selUser} rows={timeline} loading={tlLoading} err={tlErr} lang={lang} onClose={() => setSelUser(null)} />
       )}
     </div>
   );
@@ -331,7 +343,7 @@ function Empty({ lang }) {
 }
 
 // Per-user activity timeline, grouped by session (newest first).
-function UserTimeline({ user, rows, loading, err, limit, lang, onClose }) {
+function UserTimeline({ user, rows, loading, err, lang, onClose }) {
   const L = (sk, en) => (lang === "sk" ? sk : en);
 
   // Close on Escape + lock the page scroll behind the drawer.
@@ -375,11 +387,9 @@ function UserTimeline({ user, rows, loading, err, limit, lang, onClose }) {
           <div style={{ color: dim, fontFamily: mono, fontSize: "0.8rem" }}>{L("Žiadna aktivita.", "No activity.")}</div>
         ) : (
           <>
-          {limit && rows.length >= limit && (
-            <div style={{ fontFamily: mono, fontSize: "0.66rem", color: orange, marginBottom: "0.8rem" }}>
-              {L(`Zobrazených posledných ${limit} udalostí (staršie skryté).`, `Showing the latest ${limit} events (older ones hidden).`)}
-            </div>
-          )}
+          <div style={{ fontFamily: mono, fontSize: "0.66rem", color: dim, marginBottom: "0.8rem" }}>
+            {fmtN(rows.length, lang)} {L("udalostí · celá história", "events · full history")}
+          </div>
           {groups.map((g, gi) => (
             <div key={gi} style={{ marginBottom: "1.2rem" }}>
               <div style={{ fontFamily: mono, fontSize: "0.64rem", color: dim, marginBottom: "0.4rem", borderBottom: `1px solid ${border}`, paddingBottom: "0.3rem" }}>
@@ -407,6 +417,100 @@ function UserTimeline({ user, rows, loading, err, limit, lang, onClose }) {
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+// Manual retention control — the admin picks an age cutoff and explicitly deletes
+// events older than it. NOTHING is automatic (Boss 2026-07-17). Preview count first,
+// then a two-step confirm before the destructive call.
+const CUTOFF_DAYS = [30, 90, 180, 365];
+function MaintenancePanel({ lang, onDeleted }) {
+  const L = (sk, en) => (lang === "sk" ? sk : en);
+  const [open, setOpen] = useState(false);
+  const [days, setDays] = useState(180);
+  const [count, setCount] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [confirm, setConfirm] = useState(false);
+  const [msg, setMsg] = useState(null);
+  const [err, setErr] = useState(null);
+  const [cutoffISO, setCutoffISO] = useState(null);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setCount(null); setConfirm(false); setMsg(null); setErr(null);
+    const iso = new Date(Date.now() - days * 86400000).toISOString();   // "now" read in the effect, not during render
+    setCutoffISO(iso);
+    supabaseData.rpc("admin_activity_count_before", { p_before: iso })
+      .then(({ data, error }) => { if (!cancelled) { if (error) setErr(error.message || String(error)); else setCount(Number(data)); } });
+    return () => { cancelled = true; };
+  }, [open, days]);
+
+  const doDelete = async () => {
+    if (!cutoffISO) return;
+    setBusy(true); setErr(null); setMsg(null);
+    const { data, error } = await supabaseData.rpc("admin_delete_activity_before", { p_before: cutoffISO });
+    setBusy(false); setConfirm(false);
+    if (error) { setErr(error.message || String(error)); return; }
+    setMsg(L(`Zmazaných ${fmtN(data, lang)} udalostí.`, `Deleted ${fmtN(data, lang)} events.`));
+    setCount(0);
+    onDeleted && onDeleted();
+  };
+
+  const cutoffLabel = cutoffISO ? new Date(cutoffISO).toLocaleDateString(lang === "sk" ? "sk-SK" : "en-GB", { dateStyle: "medium" }) : "—";
+
+  return (
+    <div style={{ margin: "1.6rem 0 0.5rem" }}>
+      <button onClick={() => setOpen(o => !o)} style={{ background: "none", border: "none", color: dim, cursor: "pointer", fontFamily: mono, fontSize: "0.72rem", padding: "0.3rem 0" }}>
+        {open ? "▾" : "▸"} {L("Údržba — mazanie starých udalostí", "Maintenance — delete old events")}
+      </button>
+      {open && (
+        <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 10, padding: "1rem 1.1rem", marginTop: "0.5rem", maxWidth: 640 }}>
+          <p style={{ color: dim, fontSize: "0.78rem", margin: "0 0 0.8rem" }}>
+            {L("Nič sa nemaže automaticky. Vyber vek a zmaž len staršie udalosti — ručne, keď chceš.",
+               "Nothing is deleted automatically. Pick an age and delete only older events — manually, when you want.")}
+          </p>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+            <span style={{ fontSize: "0.76rem", color: text }}>{L("Zmazať udalosti staršie ako", "Delete events older than")}</span>
+            <select value={days} onChange={e => setDays(Number(e.target.value))} disabled={busy}
+              style={{ fontFamily: mono, fontSize: "0.76rem", padding: "0.3rem 0.5rem", borderRadius: 7, border: `1px solid ${border}`, background: bg2, color: text }}>
+              {CUTOFF_DAYS.map(d => <option key={d} value={d}>{d} {L("dní", "days")}</option>)}
+            </select>
+            <span style={{ fontSize: "0.72rem", color: dim, fontFamily: mono }}>({L("pred", "before")} {cutoffLabel})</span>
+          </div>
+
+          <div style={{ marginTop: "0.8rem", fontSize: "0.8rem", color: text }}>
+            {count == null ? <span style={{ color: dim }}>{L("počítam…", "counting…")}</span>
+              : <span><strong style={{ color: count > 0 ? orange : dim }}>{fmtN(count, lang)}</strong> {L("udalostí na zmazanie", "events would be deleted")}</span>}
+          </div>
+
+          {err && <div style={{ color: red, fontFamily: mono, fontSize: "0.74rem", marginTop: "0.6rem" }}>{err}</div>}
+          {msg && <div style={{ color: green, fontFamily: mono, fontSize: "0.74rem", marginTop: "0.6rem" }}>✓ {msg}</div>}
+
+          <div style={{ marginTop: "0.9rem", display: "flex", gap: "0.5rem", alignItems: "center" }}>
+            {!confirm ? (
+              <button onClick={() => setConfirm(true)} disabled={busy || !count}
+                style={{ fontFamily: mono, fontSize: "0.76rem", padding: "0.4rem 0.9rem", borderRadius: 8, cursor: (busy || !count) ? "default" : "pointer",
+                  border: `1px solid ${count ? red : border}`, background: "transparent", color: count ? red : dim, opacity: (busy || !count) ? 0.5 : 1 }}>
+                {L("Zmazať staré udalosti", "Delete old events")}
+              </button>
+            ) : (
+              <>
+                <span style={{ fontSize: "0.76rem", color: red }}>{L(`Naozaj zmazať ${fmtN(count, lang)} udalostí? Nedá sa vrátiť.`, `Really delete ${fmtN(count, lang)} events? This can't be undone.`)}</span>
+                <button onClick={doDelete} disabled={busy}
+                  style={{ fontFamily: mono, fontSize: "0.76rem", padding: "0.4rem 0.9rem", borderRadius: 8, cursor: "pointer", border: `1px solid ${red}`, background: red, color: "#fff", opacity: busy ? 0.6 : 1 }}>
+                  {busy ? L("mažem…", "deleting…") : L("Áno, zmazať", "Yes, delete")}
+                </button>
+                <button onClick={() => setConfirm(false)} disabled={busy}
+                  style={{ fontFamily: mono, fontSize: "0.76rem", padding: "0.4rem 0.9rem", borderRadius: 8, cursor: "pointer", border: `1px solid ${border}`, background: "transparent", color: dim }}>
+                  {L("Zrušiť", "Cancel")}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

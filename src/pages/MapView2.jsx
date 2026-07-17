@@ -182,8 +182,8 @@ export default function MapView2({ lang = "en", setCurrent }) {
   const [analysisCenter, setAnalysisCenter] = useState(null);
   const [radiusKm, setRadiusKm] = useState(1.5);
   const verifiedOnly = false; // "precise only" toggle removed — include every located project
-  const [showSoldOut, setShowSoldOut] = useState(true); // sold out = no units available
-  const [showNoPrice, setShowNoPrice] = useState(true); // projects with no published price
+  const [showSoldOut, setShowSoldOut] = useState(false); // sold-out projects HIDDEN by default (Boss 2026-07-17)
+  const [showNoPrice, setShowNoPrice] = useState(true);  // projects with no published price shown by default
   const [heatMode, setHeatMode] = useState(false); // dots vs heatmap of the active lens
   const [anchorId, setAnchorId] = useState(null); // project an "◎ Area" was opened from → benchmark vs its set
   const [viewBounds, setViewBounds] = useState(null); // current map viewport → the overview reflects only what's on screen

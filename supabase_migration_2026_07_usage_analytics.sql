@@ -233,7 +233,9 @@ BEGIN
 END$$;
 
 -- 2e) One user's full activity timeline (drill-down), newest first.
-CREATE OR REPLACE FUNCTION public.admin_user_timeline(p_user_id uuid, p_limit int DEFAULT 500)
+-- p_limit NULL (default) = the FULL history, no cap (Boss 2026-07-17). A caller
+-- may still pass a positive limit to page; NULL/<=0 means everything.
+CREATE OR REPLACE FUNCTION public.admin_user_timeline(p_user_id uuid, p_limit int DEFAULT NULL)
 RETURNS TABLE(
   created_at timestamptz, event_type text, page text, page_path text,
   dwell_ms numeric, active_ms numeric, session_id text, event_data jsonb
@@ -258,7 +260,41 @@ BEGIN
   FROM public.user_activity ua
   WHERE ua.user_id = p_user_id
   ORDER BY ua.created_at DESC
-  LIMIT LEAST(GREATEST(p_limit, 1), 2000);
+  LIMIT CASE WHEN p_limit IS NULL OR p_limit <= 0 THEN NULL ELSE p_limit END;
+END$$;
+
+-- 2f) Manual retention: count / delete OLD events before a cutoff. Nothing runs
+-- automatically — the admin picks a cutoff and explicitly triggers the delete
+-- (Boss 2026-07-17). Count first for a preview; delete returns the rows removed.
+CREATE OR REPLACE FUNCTION public.admin_activity_count_before(p_before timestamptz)
+RETURNS bigint
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+DECLARE n bigint;
+BEGIN
+  IF NOT public.current_user_is_admin() THEN
+    RAISE EXCEPTION 'forbidden' USING errcode = '42501';
+  END IF;
+  SELECT count(*) INTO n FROM public.user_activity WHERE created_at < p_before;
+  RETURN n;
+END$$;
+
+CREATE OR REPLACE FUNCTION public.admin_delete_activity_before(p_before timestamptz)
+RETURNS bigint
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+DECLARE n bigint;
+BEGIN
+  IF NOT public.current_user_is_admin() THEN
+    RAISE EXCEPTION 'forbidden' USING errcode = '42501';
+  END IF;
+  -- Guard against an empty/degenerate cutoff wiping everything unintentionally.
+  IF p_before IS NULL THEN
+    RAISE EXCEPTION 'cutoff required' USING errcode = '22004';
+  END IF;
+  DELETE FROM public.user_activity WHERE created_at < p_before;
+  GET DIAGNOSTICS n = ROW_COUNT;
+  RETURN n;
 END$$;
 
 GRANT EXECUTE ON FUNCTION public.admin_usage_summary(int)   TO authenticated;
@@ -266,5 +302,7 @@ GRANT EXECUTE ON FUNCTION public.admin_usage_daily(int)     TO authenticated;
 GRANT EXECUTE ON FUNCTION public.admin_usage_features(int)  TO authenticated;
 GRANT EXECUTE ON FUNCTION public.admin_usage_users(int)     TO authenticated;
 GRANT EXECUTE ON FUNCTION public.admin_user_timeline(uuid, int) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_activity_count_before(timestamptz) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_delete_activity_before(timestamptz) TO authenticated;
 
 COMMIT;

@@ -138,6 +138,8 @@ export default function MapView({ lang = "en", setCurrent }) {
   const [fDistrict, setFDistrict] = useState("");
   const [fDeveloper, setFDeveloper] = useState("");
   const [fStatus, setFStatus] = useState("all");   // all | available | sold
+  const [showSold, setShowSold] = useState(false);      // hide sold-out projects by DEFAULT
+  const [showNoPrice, setShowNoPrice] = useState(true); // show projects without a price by default
   const [priceMin, setPriceMin] = useState("");
   const [priceMax, setPriceMax] = useState("");
   const [showSuggest, setShowSuggest] = useState(false);
@@ -196,6 +198,12 @@ export default function MapView({ lang = "en", setCurrent }) {
       if (fDistrict && p.district !== fDistrict) return false;
       if (fDeveloper && p.developer !== fDeveloper) return false;
       const avail = Number(p.available_units) || 0;
+      const ppm2v = Math.round(Number(p.avg_price_eur_m2) || 0);
+      // Default-hide sold-out projects (avail<=0) unless the toggle is on OR the
+      // user explicitly filters to "sold". Default-show no-price projects; hide
+      // them only when the toggle is turned off.
+      if (!showSold && avail <= 0 && fStatus !== "sold") return false;
+      if (!showNoPrice && ppm2v <= 0) return false;
       if (fStatus === "available" && !(avail > 0)) return false;
       if (fStatus === "sold" && avail > 0) return false;
       if (priceActive) {
@@ -206,7 +214,7 @@ export default function MapView({ lang = "en", setCurrent }) {
       }
       return true;
     });
-  }, [projects, fCity, fDistrict, fDeveloper, fStatus, priceMin, priceMax]);
+  }, [projects, fCity, fDistrict, fDeveloper, fStatus, showSold, showNoPrice, priceMin, priceMax]);
 
   // ── Name query narrows the dropdown-filtered set → what the map shows ──
   const q = norm(query);
@@ -228,7 +236,7 @@ export default function MapView({ lang = "en", setCurrent }) {
     return [...starts, ...contains].slice(0, 8);
   }, [dropdownFiltered, q]);
 
-  const anyFilter = !!(query || fCity || fDistrict || fDeveloper || fStatus !== "all" || priceMin !== "" || priceMax !== "");
+  const anyFilter = !!(query || fCity || fDistrict || fDeveloper || fStatus !== "all" || showSold || !showNoPrice || priceMin !== "" || priceMax !== "");
 
   const fc = useMemo(() => buildFeatures(shown, coords || {}), [shown, coords]);
   useEffect(() => { featuresRef.current = fc; }, [fc]);
@@ -398,17 +406,17 @@ export default function MapView({ lang = "en", setCurrent }) {
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !readyRef.current) return;
-    const active = fCity || fDistrict || fDeveloper || fStatus !== "all" || priceMin !== "" || priceMax !== "";
+    const active = fCity || fDistrict || fDeveloper || fStatus !== "all" || showSold || !showNoPrice || priceMin !== "" || priceMax !== "";
     if (!active) return;                          // "show all" is handled by the country/data fit
     if (featuresRef.current.features.length) fitToData(map, featuresRef.current, true);
-  }, [fCity, fDistrict, fDeveloper, fStatus, priceMin, priceMax]);
+  }, [fCity, fDistrict, fDeveloper, fStatus, showSold, showNoPrice, priceMin, priceMax]);
 
   // ── Country switch: filters are country-scoped, so reset them ──
   const firstCountry = useRef(true);
   useEffect(() => {
     if (firstCountry.current) { firstCountry.current = false; return; }
     setQuery(""); setFCity(""); setFDistrict(""); setFDeveloper("");
-    setFStatus("all"); setPriceMin(""); setPriceMax(""); setShowSuggest(false);
+    setFStatus("all"); setShowSold(false); setShowNoPrice(true); setPriceMin(""); setPriceMax(""); setShowSuggest(false);
   }, [country]);
 
   // ── Close the suggestion dropdown on outside click ──
@@ -450,7 +458,7 @@ export default function MapView({ lang = "en", setCurrent }) {
 
   function clearFilters() {
     setQuery(""); setFCity(""); setFDistrict(""); setFDeveloper("");
-    setFStatus("all"); setPriceMin(""); setPriceMax(""); setShowSuggest(false); setActiveIdx(-1);
+    setFStatus("all"); setShowSold(false); setShowNoPrice(true); setPriceMin(""); setPriceMax(""); setShowSuggest(false); setActiveIdx(-1);
     if (popupRef.current) { popupRef.current.remove(); popupRef.current = null; }
     const map = mapRef.current;
     if (map && readyRef.current) {
@@ -602,6 +610,16 @@ export default function MapView({ lang = "en", setCurrent }) {
             <button key={s.k} onClick={() => setFStatus(s.k)} style={chipStyle(fStatus === s.k)}>{s.label}</button>
           ))}
         </div>
+
+        {/* Visibility toggles — sold-out hidden by default, no-price shown by default */}
+        <label style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: "0.74rem", color: dim, cursor: "pointer", whiteSpace: "nowrap" }}>
+          <input type="checkbox" checked={showSold} onChange={(e) => setShowSold(e.target.checked)} style={{ accentColor: green, cursor: "pointer" }} />
+          {sk ? "Vypredané" : "Sold-out"}
+        </label>
+        <label style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: "0.74rem", color: dim, cursor: "pointer", whiteSpace: "nowrap" }}>
+          <input type="checkbox" checked={showNoPrice} onChange={(e) => setShowNoPrice(e.target.checked)} style={{ accentColor: green, cursor: "pointer" }} />
+          {sk ? "Bez cien" : "No price"}
+        </label>
 
         {anyFilter && (
           <button onClick={clearFilters} style={{
