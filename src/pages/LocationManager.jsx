@@ -156,10 +156,15 @@ export default function LocationManager({ lang = "en" }) {
   const districtOptions = catalog.byCity[cityId] || [];
 
   function nearestCity(lat, lng, list) {
+    // Weight the longitude delta by cos(lat): at SK/CZ latitudes (~49°N) one degree of
+    // longitude is only ~0.65× the ground distance of one degree of latitude, so raw
+    // Euclidean lat/lng overstates east–west separation by ~1.5× and can pick the wrong
+    // nearest town for two cities offset mainly east–west.
+    const kx = Math.cos((lat * Math.PI) / 180);
     let best = null, bestD = Infinity;
     for (const c of list) {
       if (c.lat == null || c.lng == null) continue;
-      const dl = lat - Number(c.lat), dn = lng - Number(c.lng);
+      const dl = lat - Number(c.lat), dn = (lng - Number(c.lng)) * kx;
       const d = dl * dl + dn * dn;
       if (d < bestD) { bestD = d; best = c; }
     }
@@ -368,6 +373,14 @@ export default function LocationManager({ lang = "en" }) {
 
   async function save() {
     if (!selected || !pin || !cityId || deriving) return;
+    // A city WITH a district catalog (smallCity === false) must not be saved with a blank
+    // okres — the amber cue already implies "not allowed", and a blank district persists live
+    // and immediately re-flags under the "no district" filter. Small cities have no catalog
+    // (district defaults to the city name) → allowed.
+    if (!smallCity && !district.trim()) {
+      setToast({ type: "err", msg: t("Pick a district for this city first.", "Najprv vyber mestskú časť.") });
+      return;
+    }
     setSaving(true);
     try {
       const rows = await rpcDirect("admin_set_project_location", {
@@ -481,7 +494,7 @@ export default function LocationManager({ lang = "en" }) {
                         </button>))}
                     </div>)}
                 </div>
-                <button onClick={save} disabled={!pin || !cityId || deriving || saving} style={btn(green, !pin || !cityId || deriving || saving, true)}>{saving ? t("Saving…", "Ukladám…") : deriving ? t("Locating…", "Zisťujem…") : t("Save", "Uložiť")}</button>
+                <button onClick={save} disabled={!pin || !cityId || deriving || saving || (!smallCity && !district.trim())} style={btn(green, !pin || !cityId || deriving || saving || (!smallCity && !district.trim()), true)}>{saving ? t("Saving…", "Ukladám…") : deriving ? t("Locating…", "Zisťujem…") : t("Save", "Uložiť")}</button>
               </div>
 
               <div style={{ display: "flex", gap: 14, alignItems: "center", marginTop: 9, flexWrap: "wrap" }}>

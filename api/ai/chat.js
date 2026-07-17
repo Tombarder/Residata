@@ -85,13 +85,30 @@ function clientIp(req) {
   return req.socket?.remoteAddress || "0.0.0.0";
 }
 
-/* Effective tier: an active trial (trial_until > now) is treated as paid — the
-   same promotion src/lib/capabilities.js does (trial keeps the row tier 'free'). */
+/* Effective tier — MUST mirror src/lib/useCapabilities.js (the single source of truth):
+   the `tier` column is NEVER mutated (audit/billing label); the date columns drive access.
+   Precedence: admin > pending > paused(→free) > paid_until-in-future > trial > expired-paid
+   (→free) > legacy-paid > base. Previously this read only tier+trial_until, so a canceled/
+   expired subscriber (tier stays 'paid' by design, paid_until moved to the past) — or an
+   admin-paused one — kept paid AI entitlements (15/day + historical data) server-side while
+   the frontend correctly locked them out. */
 function effectiveTier(prof) {
   const base = prof?.tier || "anon";
-  if (base === "free" && prof?.trial_until && new Date(prof.trial_until).getTime() > Date.now()) {
-    return "paid";
-  }
+  const now = Date.now();
+  const trialUntil = prof?.trial_until ? new Date(prof.trial_until).getTime() : null;
+  const paidUntil = prof?.paid_until ? new Date(prof.paid_until).getTime() : null;
+  const pausedAt = prof?.paid_pause_started ? new Date(prof.paid_pause_started).getTime() : null;
+  const trialActive = Boolean(trialUntil && trialUntil > now);
+  const paidPaused = Boolean(pausedAt);
+  const paidWindowActive = Boolean(paidUntil && paidUntil > now);
+
+  if (base === "admin") return "admin";
+  if (base === "pending") return "pending";
+  if (paidPaused) return base === "paid" ? "free" : base;   // paused paid → no access
+  if (paidWindowActive) return "paid";                       // paid window in future
+  if (trialActive) return "paid";                            // active trial (free/pending base)
+  if (base === "paid" && paidUntil && paidUntil <= now) return "free"; // expired paid → free
+  if (base === "paid") return "paid";                        // legacy paid (no paid_until)
   return base;
 }
 const isPaidTier = (t) => t === "paid" || t === "admin";
@@ -417,7 +434,7 @@ async function handleInner(req, res, ctx) {
       const { data: { user }, error: authErr } = await admin.auth.getUser(token);
       if (authErr || !user) return res.status(401).json({ error: "invalid or expired token" });
       userId = user.id;
-      const { data: prof } = await admin.from("user_profiles").select("tier, chosen_project_id, trial_until").eq("id", userId).maybeSingle();
+      const { data: prof } = await admin.from("user_profiles").select("tier, chosen_project_id, trial_until, paid_until, paid_pause_started").eq("id", userId).maybeSingle();
       if (prof?.tier === "pending") return res.status(403).json({ error: "account pending approval" });
       tier = effectiveTier(prof);   // trial -> paid
     } catch (_) { return res.status(401).json({ error: "auth verification failed" }); }

@@ -271,9 +271,16 @@ async function handleWebhook(req, res) {
     const sig = req.headers["stripe-signature"];
     if (whSecret) {
       event = stripe.webhooks.constructEvent(raw, sig, whSecret);
+    } else if (process.env.VERCEL_ENV === "production" || process.env.VERCEL_ENV === "preview") {
+      // The webhook is public and signature verification is the ONLY trust boundary. If the
+      // secret is ever missing/misconfigured in a DEPLOYED env, FAIL CLOSED — never parse an
+      // unsigned body, or an attacker could POST a forged subscription grant. The unsigned
+      // fallback below is strictly for local `vercel dev` (VERCEL_ENV unset/development).
+      console.error("[stripe webhook] STRIPE_WEBHOOK_SECRET missing in a deployed env — refusing unsigned webhook");
+      return res.status(500).json({ error: "webhook secret not configured" });
     } else {
       event = JSON.parse(raw.toString("utf8"));
-      console.warn("[stripe webhook] STRIPE_WEBHOOK_SECRET unset — signature NOT verified (dev only)");
+      console.warn("[stripe webhook] STRIPE_WEBHOOK_SECRET unset — signature NOT verified (local dev only)");
     }
   } catch (e) {
     console.error("[stripe webhook] signature verification failed:", e?.message);

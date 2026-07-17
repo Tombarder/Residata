@@ -92,11 +92,18 @@ export default function ProjectsEditor({ lang = "sk" }) {
   };
 
   async function save(row) {
+    // Name is required + goes live on the site/analytics. Unlike the other fields it had
+    // no guard, so clearing the cell and hitting Save pushed a blank name over good data.
+    const name = String(valueOf(row, "name") ?? "").trim();
+    if (!name) {
+      setToast({ ok: false, msg: sk ? "Názov projektu nemôže byť prázdny" : "Project name can't be empty" });
+      return;
+    }
     setSavingId(row.id);
     try {
       const out = await rpcDirect("admin_update_project", {
         p_id: row.id,
-        p_name: valueOf(row, "name"),
+        p_name: name,
         p_status: valueOf(row, "status"),
         p_city_id: valueOf(row, "city_id") || null,
         p_district: valueOf(row, "district") || null,
