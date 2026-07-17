@@ -996,7 +996,7 @@ function PlatformBilling({ lang, setCurrent }) {
   }
 
   return (
-    <div style={{ padding: "2rem", maxWidth: 760 }}>
+    <div style={{ padding: "2.5rem 2rem", maxWidth: 820, margin: "0 auto" }}>
       {/* Return from Stripe Checkout */}
       {checkoutMsg === "success" && (
         <div style={{
