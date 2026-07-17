@@ -1384,7 +1384,7 @@ function PlatformSettings({ lang }) {
     : positions;
 
   return (
-    <div style={{ padding: "2rem", maxWidth: 620 }}>
+    <div style={{ padding: "2.5rem 2rem", maxWidth: 660, margin: "0 auto" }}>
       <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 12, padding: "1.75rem 2rem" }}>
         <div style={{ fontFamily: mono, fontSize: "0.65rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.4rem" }}>
           {lang === "sk" ? "Účet" : "Account"}
