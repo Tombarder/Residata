@@ -796,9 +796,16 @@ export function useProjects(limit) {
     // loading. On a cache HIT we already seeded fresh data + loading=false, so
     // don't flip loading and cause a needless spinner flicker on cached mounts.
     if (!cacheHit) setLoading(true);
-    let q = _eqCountry(supabasePublic.from("projects_live").select("*"), country);
-    if (limit) q = q.eq("is_top20", true).limit(limit);
-    q.order("available_units", { ascending: false }).then(({ data, error }) => {
+    // Fresh builder each attempt (single-shot) so _readPublicWithRetry can re-fire
+    // on a transient first-load read error — same hardening the other public hooks
+    // use. Without it, a single racy first request left the maps/dashboard empty and
+    // logged "[useProjects] …" on every cold load.
+    const runReq = () => {
+      let q = _eqCountry(supabasePublic.from("projects_live").select("*"), country);
+      if (limit) q = q.eq("is_top20", true).limit(limit);
+      return q.order("available_units", { ascending: false });
+    };
+    _readPublicWithRetry(runReq).then(({ data, error }) => {
       if (cancelled) return;
       if (error) {
         console.error("[useProjects]", error);

@@ -80,7 +80,16 @@ export function CountryProvider({ children }) {
   useEffect(() => {
     if (!isSupabaseReady()) { setLoading(false); return; }
     let cancelled = false;
-    supabasePublic.from("projects_live").select("country").then(({ data, error }) => {
+    // Retry once on a transient first-load read error (mirrors useData's
+    // _readPublicWithRetry, kept inline to avoid a circular import). Without it a
+    // single racy first request logged "[useCountry] active-countries fetch failed"
+    // on every cold load even though the read succeeds moments later.
+    const run = () => supabasePublic.from("projects_live").select("country");
+    (async () => {
+      let res = await run();
+      if (res.error) { await new Promise((r) => setTimeout(r, 300)); res = await run(); }
+      return res;
+    })().then(({ data, error }) => {
       if (cancelled) return;
       if (error) {
         console.error("[useCountry] active-countries fetch failed", error);
