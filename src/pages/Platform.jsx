@@ -14,6 +14,7 @@
 import { Component, useState, useEffect, useRef, lazy, Suspense } from "react";
 import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
+import PendingGate from "../components/PendingGate";
 import { usePricing } from "../lib/pricing";
 import { useProjects } from "../lib/useData";
 import DashboardHome from "./DashboardHome";
@@ -716,6 +717,12 @@ class PlatformErrorBoundary extends Component {
 
 // ─── Page router ────────────────────────────────────────────────
 function PageContent({ page, projectId, lang, setCurrent, openLogin }) {
+  const { tier } = useCapabilities();
+  // A logged-in but still-PENDING user (awaiting admin approval) must not reach the real
+  // app pages. The marketing routes gate this; the platform shell didn't, so a pending user
+  // navigating into /app/* saw the real Dashboard/Projects/Map/Assistant. Show the same
+  // "waiting for approval" gate for every /app page (the shell's topbar keeps logout/account).
+  if (tier === "pending") return <PendingGate setCurrent={setCurrent} lang={lang} />;
   // Gated pages with an UpgradeCard fallback for users who lack the capability.
   if (page === "App:Dashboard")  return <DashboardHome lang={lang} setCurrent={setCurrent} />;
   if (page === "App:Projects")   return <PlatformProjects lang={lang} setCurrent={setCurrent} openLogin={openLogin} />;

@@ -23,6 +23,25 @@ const log = (...a) => { if (import.meta.env.DEV) console.log("[useAuth]", ...a);
 
 const AuthContext = createContext(null);
 
+// Read the user's profile, RETRYING on a transient error (network blip / 500 / timeout).
+// A single failed read leaves profile=null, which useCapabilities resolves to 'anon' — so a
+// genuinely paid/admin user loses every paid capability and sees the "upgrade" blur, with no
+// recovery while the tab stays focused ("logged-in page shows denied, hard refresh fixes it").
+// Permission/RLS errors (42xxx / PGRST301) are permanent → not retried. maybeSingle() returns
+// {data:null,error:null} for a genuinely-absent row, which the caller uses to detect a stale
+// session — so we only retry on an actual error, never on a clean "no row".
+async function fetchProfileWithRetry(userId, tries = 3) {
+  let last = { data: null, error: null };
+  for (let i = 0; i < tries; i++) {
+    last = await supabase.from("user_profiles").select("*").eq("id", userId).maybeSingle();
+    if (!last.error) return last;
+    const code = String(last.error.code || "");
+    if (code.startsWith("42") || code === "PGRST301") break; // permission/RLS — won't change
+    if (i < tries - 1) await new Promise((r) => setTimeout(r, 300 * (i + 1)));
+  }
+  return last;
+}
+
 function useAuthInternal() {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -32,7 +51,7 @@ function useAuthInternal() {
   const loadProfile = useCallback(async (userId) => {
     if (!userId) { setProfile(null); return; }
     log("loadProfile start", userId);
-    const { data, error } = await supabase.from("user_profiles").select("*").eq("id", userId).maybeSingle();
+    const { data, error } = await fetchProfileWithRetry(userId);
     if (error) {
       log("loadProfile ERROR", error.message, error);
       setProfileError(error.message);
@@ -69,8 +88,7 @@ function useAuthInternal() {
           // `const {data: check}` without the error, so a transient query
           // failure (data=null) was misread as "user deleted" and logged a
           // valid user out on a momentary network blip.
-          const { data: prof, error: profErr } = await supabase
-            .from("user_profiles").select("*").eq("id", session.user.id).maybeSingle();
+          const { data: prof, error: profErr } = await fetchProfileWithRetry(session.user.id);
           if (profErr) {
             log("loadProfile ERROR (keeping session, NOT signing out)", profErr.message);
             setProfileError(profErr.message);
