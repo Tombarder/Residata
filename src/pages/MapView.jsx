@@ -416,7 +416,9 @@ export default function MapView({ lang = "en", setCurrent }) {
   useEffect(() => {
     if (firstCountry.current) { firstCountry.current = false; return; }
     setQuery(""); setFCity(""); setFDistrict(""); setFDeveloper("");
-    setFStatus("all"); setShowSold(false); setShowNoPrice(true); setPriceMin(""); setPriceMax(""); setShowSuggest(false);
+    setFStatus("all"); setShowSold(false); setShowNoPrice(true); setPriceMin(""); setPriceMax(""); setShowSuggest(false); setActiveIdx(-1);
+    // Drop any popup left open from the previous country's pins.
+    if (popupRef.current) { popupRef.current.remove(); popupRef.current = null; }
   }, [country]);
 
   // ── Close the suggestion dropdown on outside click ──
@@ -613,7 +615,14 @@ export default function MapView({ lang = "en", setCurrent }) {
 
         {/* Visibility toggles — sold-out hidden by default, no-price shown by default */}
         <label style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: "0.74rem", color: dim, cursor: "pointer", whiteSpace: "nowrap" }}>
-          <input type="checkbox" checked={showSold} onChange={(e) => setShowSold(e.target.checked)} style={{ accentColor: green, cursor: "pointer" }} />
+          <input
+            type="checkbox"
+            // Reflect the explicit "Sold out" status chip too, so the checkbox never
+            // reads "hidden" while the chip is forcing sold-only pins on screen.
+            checked={showSold || fStatus === "sold"}
+            onChange={(e) => { setShowSold(e.target.checked); if (!e.target.checked && fStatus === "sold") setFStatus("all"); }}
+            style={{ accentColor: green, cursor: "pointer" }}
+          />
           {sk ? "Vypredané" : "Sold-out"}
         </label>
         <label style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: "0.74rem", color: dim, cursor: "pointer", whiteSpace: "nowrap" }}>

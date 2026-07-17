@@ -8,7 +8,7 @@
 //
 // Answers: are people using it, who, how much focused time, which features,
 // active vs churned — plus a per-user drill-down timeline (what/where/how long).
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabaseData } from "../lib/supabase";
 import { accent as green, dim, text, border, surface as bg, surfaceDark as bg2 } from "../lib/theme";
 
@@ -105,6 +105,7 @@ export default function UsageDashboard({ lang = "en" }) {
   const [timeline, setTimeline] = useState([]);
   const [tlLoading, setTlLoading] = useState(false);
   const [tlErr, setTlErr] = useState(null);
+  const tlReqRef = useRef(0);   // guards against a slower earlier drill-down overwriting a newer one
 
   const load = useCallback(async () => {
     setLoading(true); setErr(null);
@@ -130,25 +131,29 @@ export default function UsageDashboard({ lang = "en" }) {
   useEffect(() => { load(); }, [load]);
 
   const openUser = useCallback(async (u) => {
+    const myReq = ++tlReqRef.current;   // only the latest click may commit results
     setSelUser(u); setTimeline([]); setTlErr(null); setTlLoading(true);
     try {
       // FULL history, no cap (Boss 2026-07-17). The RPC has no SQL LIMIT, but
       // PostgREST caps a single response at 1000 rows — so page through with
-      // .range() until a short page. (Guard at 200 pages = 200k events so a bug
-      // can't loop forever; far beyond any real user's activity.)
+      // .range() until a short page. The RPC orders by (created_at DESC, id DESC),
+      // a TOTAL order, so offset paging can't drop/duplicate same-timestamp rows.
+      // (Guard at 200 pages = 200k events so a bug can't loop forever.)
       const PAGE = 1000;
       const all = [];
       for (let from = 0, page = 0; page < 200; from += PAGE, page++) {
         const { data, error } = await supabaseData
           .rpc("admin_user_timeline", { p_user_id: u.user_id })
           .range(from, from + PAGE - 1);
+        if (tlReqRef.current !== myReq) return;   // a newer drill-down superseded this one
         if (error) { setTlErr(error.message || String(error)); break; }
         all.push(...(data || []));
         if (!data || data.length < PAGE) break;
       }
+      if (tlReqRef.current !== myReq) return;
       setTimeline(all);
-    } catch (e) { setTlErr(String(e?.message || e)); }
-    setTlLoading(false);
+    } catch (e) { if (tlReqRef.current === myReq) setTlErr(String(e?.message || e)); }
+    if (tlReqRef.current === myReq) setTlLoading(false);
   }, []);
 
   const maxDailyEvents = Math.max(1, ...daily.map(d => Number(d.events) || 0));
@@ -225,8 +230,9 @@ export default function UsageDashboard({ lang = "en" }) {
                         style={{ flex: 1, minWidth: 6, display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "center", height: "100%", position: "relative" }}>
                         <div style={{ width: "100%", height: barH, background: bg2, borderTop: `2px solid ${blue}`, borderRadius: "2px 2px 0 0" }} />
                         {/* active-users dot on its OWN scale (was drawn at the events-bar
-                            height, so it carried no active-users info despite the legend). */}
-                        <div style={{ position: "absolute", bottom: `${uh}%`, width: 4, height: 4, borderRadius: "50%", background: green, opacity: uh > 0 ? 1 : 0, transform: "translateY(2px)" }} />
+                            height, so it carried no active-users info despite the legend).
+                            Cap at 95% so the top dot never clips at the container edge. */}
+                        <div style={{ position: "absolute", bottom: `${Math.min(uh, 95)}%`, width: 4, height: 4, borderRadius: "50%", background: green, opacity: uh > 0 ? 1 : 0, transform: "translateY(2px)" }} />
                       </div>
                     );
                   })}

@@ -85,7 +85,7 @@ BEGIN
   )
   SELECT jsonb_build_object(
     'window_days',      p_days,
-    'dau',              (SELECT count(DISTINCT user_id) FROM base WHERE user_id IS NOT NULL AND created_at >= now() - interval '1 day'),
+    'dau',              (SELECT count(DISTINCT user_id) FROM base WHERE user_id IS NOT NULL AND created_at::date = now()::date),  -- calendar TODAY (local tz), not a rolling 24h
     'wau',              (SELECT count(DISTINCT user_id) FROM base WHERE user_id IS NOT NULL AND created_at >= now() - interval '7 days'),
     'mau',              (SELECT count(DISTINCT user_id) FROM base WHERE user_id IS NOT NULL),
     'total_events',     (SELECT count(*) FROM base),
@@ -235,9 +235,11 @@ END$$;
 -- 2e) One user's full activity timeline (drill-down), newest first.
 -- p_limit NULL (default) = the FULL history, no cap (Boss 2026-07-17). A caller
 -- may still pass a positive limit to page; NULL/<=0 means everything.
+-- return-type changed (added id) → must drop before recreate.
+DROP FUNCTION IF EXISTS public.admin_user_timeline(uuid, int);
 CREATE OR REPLACE FUNCTION public.admin_user_timeline(p_user_id uuid, p_limit int DEFAULT NULL)
 RETURNS TABLE(
-  created_at timestamptz, event_type text, page text, page_path text,
+  id bigint, created_at timestamptz, event_type text, page text, page_path text,
   dwell_ms numeric, active_ms numeric, session_id text, event_data jsonb
 )
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp
@@ -249,6 +251,7 @@ BEGIN
 
   RETURN QUERY
   SELECT
+    ua.id,
     ua.created_at,
     ua.event_type,
     COALESCE(ua.event_data->>'page', ua.event_data->>'from_page'),
@@ -259,7 +262,10 @@ BEGIN
     ua.event_data
   FROM public.user_activity ua
   WHERE ua.user_id = p_user_id
-  ORDER BY ua.created_at DESC
+  -- id tiebreaker makes this a TOTAL order — required for correct offset paging
+  -- (created_at alone ties on same-ms page_view/page_leave bursts, which would
+  -- drop/duplicate a tied row straddling a 1000-row .range() page boundary).
+  ORDER BY ua.created_at DESC, ua.id DESC
   LIMIT CASE WHEN p_limit IS NULL OR p_limit <= 0 THEN NULL ELSE p_limit END;
 END$$;
 
