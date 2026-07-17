@@ -418,7 +418,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
       const span = hHi - hLo;
       priced.forEach((v) => { hist[Math.min(N - 1, Math.max(0, Math.floor(((v - hLo) / span) * N)))]++; });
     }
-    const comp = { ready: 0, soon: 0, mid: 0, far: 0, unknown: 0 };
+    const comp = { ready: 0, cur: 0, soon: 0, mid: 0, far: 0, unknown: 0 };
     inView.forEach((p) => { comp[completionBucket(p)]++; });
     const soldLM = sum((p) => p.sold_last_month);
     const moving = inView.filter((p) => (Number(p.sold_last_month) || 0) > 0).length;
@@ -706,9 +706,10 @@ export default function MapView2({ lang = "en", setCurrent }) {
   const legend = legendForLens(lens, thresholds, fmt);
 
   // ── Completion drill-down helpers ──
+  const _ny = new Date().getFullYear();
   const COMP_LABEL = sk
-    ? { ready: "hotové", soon: "o rok", mid: "o 2 roky", far: "neskôr", unknown: "neznáme" }
-    : { ready: "ready", soon: "+1 yr", mid: "+2 yrs", far: "later", unknown: "unknown" };
+    ? { ready: "hotové", cur: String(_ny), soon: String(_ny + 1), mid: String(_ny + 2), far: (_ny + 3) + "+", unknown: "neznáme" }
+    : { ready: "done", cur: String(_ny), soon: String(_ny + 1), mid: String(_ny + 2), far: (_ny + 3) + "+", unknown: "unknown" };
   // "When it completes" for a project row: a year, "hotové/done", or null (unknown).
   const completionWhen = (p) => {
     const k = (p.kolaudacia || "").toString().trim();
@@ -981,7 +982,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
                     {compFilter && <button onClick={() => setCompFilter(null)} style={{ background: "none", border: "none", color: green, cursor: "pointer", fontSize: "0.66rem" }}>{sk ? "zrušiť ✕" : "clear ✕"}</button>}
                   </div>
                   <div style={{ display: "flex", gap: 5, marginBottom: 3 }}>
-                    {["ready", "soon", "mid", "far", "unknown"].map((k) => {
+                    {["ready", "cur", "soon", "mid", "far", "unknown"].map((k) => {
                       const n = compSet.comp[k]; const active = compFilter === k;
                       return (
                         <button key={k} onClick={() => n > 0 && setCompFilter(active ? null : k)} disabled={n === 0}
@@ -1272,7 +1273,7 @@ function MovingBar({ moving, count, soldLM, sk }) {
   );
 }
 function Pipeline({ comp }) {
-  const order = ["ready", "soon", "mid", "far", "unknown"];
+  const order = ["ready", "cur", "soon", "mid", "far", "unknown"];
   const t = Math.max(1, order.reduce((s, k) => s + comp[k], 0));
   return (
     <div style={{ flex: 1, minWidth: 220 }}>

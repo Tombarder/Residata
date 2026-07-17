@@ -26,14 +26,19 @@ export const LENSES = [
 export const RAMP = ["#3aa0ff", "#f5a623", "#ff5d5d"]; // low blue · mid amber · high red
 export const NO_DATA = "#5b5b66";
 
+// Completion buckets are labelled with REAL YEARS (2026, 2027, …) rather than
+// relative terms ("next year") — more precise + clearer for the customer. `ready`
+// = genuinely finished (Skolaudované) or past-due; the rest are the actual handover year.
+const _NOW_Y = new Date().getFullYear();
 export const COMPLETION = {
-  ready:   { color: "#00e5a0", label: "ready / done", short: "ready" },
-  soon:    { color: "#3aa0ff", label: "next year",    short: "+1y" },
-  mid:     { color: "#f5a623", label: "in 2 years",   short: "+2y" },
-  far:     { color: "#ff5d5d", label: "later",        short: "later" },
-  unknown: { color: NO_DATA,   label: "unknown",      short: "?" },
+  ready:   { color: "#00e5a0", label: "hotové",           short: "hotové" },
+  cur:     { color: "#25d3a2", label: String(_NOW_Y),     short: String(_NOW_Y) },
+  soon:    { color: "#3aa0ff", label: String(_NOW_Y + 1), short: String(_NOW_Y + 1) },
+  mid:     { color: "#f5a623", label: String(_NOW_Y + 2), short: String(_NOW_Y + 2) },
+  far:     { color: "#ff5d5d", label: (_NOW_Y + 3) + "+", short: (_NOW_Y + 3) + "+" },
+  unknown: { color: NO_DATA,   label: "neznáme",          short: "?" },
 };
-export const COMPLETION_ORDER = ["ready", "soon", "mid", "far", "unknown"];
+export const COMPLETION_ORDER = ["ready", "cur", "soon", "mid", "far", "unknown"];
 
 export const ppm2Of = (p) => Math.round(Number(p.avg_price_eur_m2) || 0);
 
@@ -58,7 +63,7 @@ export function valueRange(projects, lens) {
   return Number.isFinite(min) ? { min, max } : null;
 }
 
-const COMPLETION_HEAT = { ready: 1, soon: 0.7, mid: 0.4, far: 0.2, unknown: 0 };
+const COMPLETION_HEAT = { ready: 1, cur: 0.85, soon: 0.65, mid: 0.4, far: 0.2, unknown: 0 };
 
 /** 0..1 weight for the heatmap: how "hot" a project is on the active lens. */
 export function heatWeight(p, lens, range) {
@@ -77,7 +82,8 @@ export function completionBucket(p, nowYear = new Date().getFullYear()) {
   const m = k.match(/(20\d{2})/);
   if (m) {
     const y = +m[1];
-    if (y <= nowYear) return "ready";
+    if (y < nowYear) return "ready";       // past-due → treated as done
+    if (y === nowYear) return "cur";        // completing THIS year (real year label)
     if (y === nowYear + 1) return "soon";
     if (y === nowYear + 2) return "mid";
     return "far";
@@ -204,7 +210,7 @@ export function summarizeSet(inside, coords) {
   const totalUnits = inside.reduce((s, p) => s + (Number(p.total_units) || 0), 0);
   const availUnits = inside.reduce((s, p) => s + (Number(p.available_units) || 0), 0);
   const avgAbs = setAbsorptionPct(inside); // unit-weighted, identical to the header
-  const comp = { ready: 0, soon: 0, mid: 0, far: 0, unknown: 0 };
+  const comp = { ready: 0, cur: 0, soon: 0, mid: 0, far: 0, unknown: 0 };
   inside.forEach((p) => { comp[completionBucket(p)]++; });
   const byDev = {};
   inside.forEach((p) => { const d = (p.developer || "").trim() || "—"; (byDev[d] = byDev[d] || []).push(p); });

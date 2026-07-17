@@ -23,7 +23,7 @@ console.log("\n\x1b[1mMap-metrics verification\x1b[0m\n");
 console.log("completionBucket (nowYear=2026)");
 const NY = 2026;
 const cases = [
-  ["2027", "soon"], ["2026-08-31", "ready"], ["Q2 2027", "soon"], ["2Q 2027", "soon"],
+  ["2027", "soon"], ["2026-08-31", "cur"], ["Q2 2027", "soon"], ["2Q 2027", "soon"],
   ["03.2028", "mid"], ["Q4/2028", "mid"], ["2028", "mid"], ["léto 2027", "soon"],
   ["Jar 2027", "soon"], ["Skolaudované", "ready"], ["2Q 2017", "ready"], ["12.2029", "far"],
   ["2027-09", "soon"], ["", "unknown"], ["Vo výstavbe", "unknown"], ["K nasťahovaniu", "ready"],
@@ -64,9 +64,9 @@ const center = { lat: 48.15, lng: 17.11 };
 const near = { lat: 48.151, lng: 17.111 };   // ~0.15 km
 const far = { lat: 48.30, lng: 17.30 };      // ~25 km
 const projects = [
-  { id: "a", avg_price_eur_m2: 4000, total_units: 100, available_units: 40, sold_percentage: 30, developer: "YIT", kolaudacia: "2027" },
-  { id: "b", avg_price_eur_m2: 5000, total_units: 50,  available_units: 10, sold_percentage: 70, developer: "YIT", kolaudacia: "Skolaudované" },
-  { id: "c", avg_price_eur_m2: 6000, total_units: 80,  available_units: 0,  sold_percentage: 90, developer: "Corwin", kolaudacia: "" },
+  { id: "a", avg_price_eur_m2: 4000, total_units: 100, available_units: 40, sold_units: 30, sold_percentage: 30, developer: "YIT", kolaudacia: "2027" },
+  { id: "b", avg_price_eur_m2: 5000, total_units: 50,  available_units: 10, sold_units: 35, sold_percentage: 70, developer: "YIT", kolaudacia: "Skolaudované" },
+  { id: "c", avg_price_eur_m2: 6000, total_units: 80,  available_units: 0,  sold_units: 72, sold_percentage: 90, developer: "Corwin", kolaudacia: "" },
   { id: "x", avg_price_eur_m2: 9000, total_units: 999, available_units: 500, sold_percentage: 5, developer: "Far", kolaudacia: "2029" },
 ];
 const coords = {
@@ -82,16 +82,16 @@ eq("median €/m² of [4000,5000,6000] = 5000", cs.median, 5000);
 eq("price range 4000–6000", [cs.priceLo, cs.priceHi], [4000, 6000]);
 eq("total units 230", cs.totalUnits, 230);
 eq("avail units 50", cs.availUnits, 50);
-eq("avg absorption round((30+70+90)/3)=63", cs.avgAbs, 63);
+eq("avg absorption unit-weighted 137/187=73", cs.avgAbs, 73);
 ok("top dev = YIT with 2", cs.topDevs[0].dev === "YIT" && cs.topDevs[0].n === 2);
-eq("completion buckets", cs.comp, { ready: 1, soon: 1, mid: 0, far: 0, unknown: 1 });
+eq("completion buckets", cs.comp, { ready: 1, cur: 0, soon: 1, mid: 0, far: 0, unknown: 1 });
 const csV = computeCompetitiveSet(projects, coords, center, 1.5, true); // verifiedOnly
 ok("verifiedOnly drops placeholder b → 2 inside", csV.inside.length === 2 && csV.placeholderCount === 0);
 
 // ── legendForLens ──
 console.log("\nlegendForLens");
 ok("price legend has 4 rows incl. no-data", legendForLens("price", [3500, 5000]).length === 4);
-ok("completion legend has 5 rows", legendForLens("completion", null).length === 5);
+ok("completion legend has 6 rows", legendForLens("completion", null).length === 6);
 ok("metricValue supply = available_units", metricValue({ available_units: 12 }, "supply") === 12);
 
 // ── momentum lens + heatmap weight + percentiles (the "whoa" additions) ──
@@ -109,8 +109,8 @@ ok("heatWeight: completion ready → 1", heatWeight({ kolaudacia: "Skolaudované
   const near2 = { lat: 48.151, lng: 17.111 };
   const ps = [2000, 4000, 6000, 8000].map((pr, i) => ({ id: "p" + i, avg_price_eur_m2: pr, sold_last_month: i, total_units: 10, available_units: 5 }));
   const cs2 = computeCompetitiveSet(ps, Object.fromEntries(ps.map((p) => [p.id, { ...near2, verified: true }])), center2, 2);
-  eq("p25 of [2000,4000,6000,8000] = 2000", cs2.p25, 2000);
-  eq("p75 of [2000,4000,6000,8000] = 6000", cs2.p75, 6000);
+  eq("p25 of [2000,4000,6000,8000] = 3500 (type-7)", cs2.p25, 3500);
+  eq("p75 of [2000,4000,6000,8000] = 6500 (type-7)", cs2.p75, 6500);
   eq("soldLastMonth sum 0+1+2+3 = 6", cs2.soldLastMonth, 6);
 }
 

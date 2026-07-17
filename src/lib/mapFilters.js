@@ -39,7 +39,7 @@ export const FIELDS = [
   { key: "status",          label: "Availability", label_sk: "Stav projektu", type: "category", get: (p) => p.status || "",
     optionLabel: (v) => STATUS_LABEL[v] || v },
   { key: "completion",      label: "Completion (when)", label_sk: "Dokončenie (kedy)", type: "category", get: (p) => completionBucket(p),
-    options: ["ready", "soon", "mid", "far", "unknown"], optionLabel: (v) => COMPLETION[v]?.label || v },
+    options: ["ready", "cur", "soon", "mid", "far", "unknown"], optionLabel: (v) => COMPLETION[v]?.label || v },
   // ── Price ──
   { key: "ppm2",            label: "Price per m²",         label_sk: "Cena za m²",            type: "number", get: (p) => ppm2Of(p) || null, fmt: (v) => "€" + Math.round(v).toLocaleString("sk-SK") },
   { key: "min_price",       label: "Cheapest unit price",  label_sk: "Cena najlacnejšieho bytu", type: "number", get: (p) => num(p.min_price), fmt: eur },
