@@ -71,26 +71,27 @@
    stay, but red/blue/yellow are darkened so they read on white. Activated by
    setThemePreference() setting <html data-theme="light"> (see src/lib/theme-mode.js). */
 :root[data-theme="light"] {
-  /* A WARM, natural "normal" theme — soft paper-white, not a bleached or dusty-gray
-     wash. Strong warm-black text + clearly-visible warm borders give real contrast,
-     so it reads comfortable/normal rather than faded. (Brand green stays as-is —
-     it's a hardcoded hex used with alpha suffixes + in map paint.) */
-  --bg:            #eae6df;   /* warm soft paper — the page */
-  --surface:       #ffffff;   /* clean white cards — pop crisply against the warm page */
-  --surface-2:     #e6e1d8;   /* inset / row-stripe */
-  --surface-3:     #ded8cd;   /* raised / input / hover */
-  --border:        #d3ccbf;   /* warm, clearly visible edges */
-  --border-soft:   #e0dace;
+  /* Clean SaaS-dashboard light theme (Stripe / Ramp / Mercury reference) — a cool,
+     neutral light-gray canvas, crisp white cards with soft depth, premium dark-SLATE
+     text. Structure comes from subtle borders + soft shadows (not heavy fills), so it
+     reads like normal professional software — not warm/paper, not washed-out.
+     (Brand green stays — hardcoded hex used with alpha suffixes + in map paint.) */
+  --bg:            #f4f6f9;   /* clean cool light-gray canvas */
+  --surface:       #ffffff;   /* white cards / panels */
+  --surface-2:     #eef1f5;   /* inset / row-stripe */
+  --surface-3:     #e6eaf0;   /* input / raised / hover */
+  --border:        #dfe3ea;   /* subtle, clean (shadows carry the depth) */
+  --border-soft:   #e9ecf1;
   --accent:        #00e5a0;
-  --accent-strong: #00a578;
-  --accent-2:      #b3700a;
-  --danger:        #c92a1d;
-  --info:          #2f6bd8;
-  --warning:       #96700a;
-  --text:          #221f19;   /* warm near-black — strong contrast */
-  --text-2:        #46413a;
-  --text-dim:      #6f685d;
-  --text-faint:    #9c948a;
+  --accent-strong: #00b585;
+  --accent-2:      #b3730a;
+  --danger:        #df1b41;
+  --info:          #2563eb;
+  --warning:       #9a7409;
+  --text:          #1a1f36;   /* dark slate-blue — premium, high contrast */
+  --text-2:        #3c4257;
+  --text-dim:      #626b7d;   /* secondary */
+  --text-faint:    #8a93a3;
   --on-accent:     #06140f;
   color-scheme: light;
 }
@@ -101,7 +102,7 @@
    surface-backed rounded containers, so chips (accent bg) / inputs (surface-2/3) /
    native controls are untouched. */
 :root[data-theme="light"] div[style*="var(--surface)"][style*="border-radius"] {
-  box-shadow: 0 1px 2px rgba(23, 26, 32, 0.05), 0 4px 12px rgba(23, 26, 32, 0.05);
+  box-shadow: 0 1px 1px rgba(26, 31, 54, 0.04), 0 2px 6px rgba(26, 31, 54, 0.06);
 }
 
 /* ── universal box model: borders + padding stay inside declared widths ─── */
