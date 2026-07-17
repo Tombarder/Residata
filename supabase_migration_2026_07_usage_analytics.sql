@@ -52,7 +52,9 @@ END$$;
 -- 2a) Top-line KPIs over a window (single JSON object).
 CREATE OR REPLACE FUNCTION public.admin_usage_summary(p_days int DEFAULT 30)
 RETURNS jsonb
-LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp
+-- timezone pinned so ::date day-bucketing (returning_users active-days) is LOCAL
+-- (Slovak product), not UTC — otherwise late-evening activity lands on the wrong day.
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp SET timezone = 'Europe/Bratislava'
 AS $$
 DECLARE
   result jsonb;
@@ -66,15 +68,20 @@ BEGIN
     WHERE created_at >= now() - make_interval(days => p_days)
   ),
   sess AS (
-    -- One row per (session, user). active_ms = summed FOCUSED time from page_leave
-    -- events (tab visible + interacting). We deliberately do NOT use wall-clock span
-    -- (max-min created_at) for "session length": a session_id is per-tab and survives
-    -- a tab left open idle all day, so span wildly overstates real engagement.
-    SELECT session_id, user_id,
+    -- One row per SESSION (session_id only, NOT session_id+user_id): a user often
+    -- logs in mid-session, so the same session_id carries anon events (login flow)
+    -- then signed-in events. Grouping by (session_id,user_id) would split that one
+    -- visit into a phantom "anon session" + a "signed-in session", inflating both
+    -- counts. max(user_id) attributes the whole session to the signed-in user if
+    -- they ever authenticated in it; a session stays anon only if they never did.
+    -- active_ms = summed FOCUSED time from page_leave (tab visible + interacting);
+    -- we deliberately avoid wall-clock span (an idle-open tab overstates engagement).
+    SELECT session_id,
+           max(user_id::text)::uuid AS user_id,   -- no max(uuid) aggregate; a session has ≤1 signed-in user
            COALESCE(sum((event_data->>'active_ms')::numeric)
                     FILTER (WHERE event_type = 'page_leave'), 0)                        AS active_ms
     FROM base
-    GROUP BY session_id, user_id
+    GROUP BY session_id
   )
   SELECT jsonb_build_object(
     'window_days',      p_days,
@@ -102,7 +109,8 @@ END$$;
 -- 2b) Daily trend for charts.
 CREATE OR REPLACE FUNCTION public.admin_usage_daily(p_days int DEFAULT 30)
 RETURNS TABLE(day date, active_users bigint, sessions bigint, events bigint, new_users bigint)
-LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp
+-- timezone pinned so daily buckets are LOCAL days (Slovak product), not UTC.
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp SET timezone = 'Europe/Bratislava'
 AS $$
 BEGIN
   IF NOT public.current_user_is_admin() THEN
@@ -169,7 +177,8 @@ RETURNS TABLE(
   first_seen timestamptz, last_seen timestamptz, status text,
   exports bigint, ai_questions bigint, project_views bigint, top_features jsonb
 )
-LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp
+-- timezone pinned so days_active counts LOCAL calendar days (Slovak product).
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp SET timezone = 'Europe/Bratislava'
 AS $$
 BEGIN
   IF NOT public.current_user_is_admin() THEN

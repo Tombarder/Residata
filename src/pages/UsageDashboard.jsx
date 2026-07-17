@@ -44,7 +44,14 @@ const EVENT_LABELS = {
   trial_popup_clicked:  { sk: "Klik na trial popup", en: "Trial popup click" },
   trial_popup_dismissed:{ sk: "Zavretie trial popupu", en: "Trial popup dismissed" },
   login_code_requested: { sk: "Žiadosť o prihl. kód", en: "Login code requested" },
+  login_code_submitted: { sk: "Odoslanie prihl. kódu", en: "Login code submitted" },
   login_code_success:   { sk: "Úspešné prihlásenie", en: "Login success" },
+  login_code_error:     { sk: "Chyba prihl. kódu", en: "Login code error" },
+  login_code_request_error: { sk: "Chyba žiadosti o kód", en: "Login code request error" },
+  login_magic_link_requested: { sk: "Žiadosť o magic link", en: "Magic link requested" },
+  login_magic_link_error: { sk: "Chyba magic linku", en: "Magic link error" },
+  login_rejected_personal_email: { sk: "Odmietnutý osobný e-mail", en: "Personal e-mail rejected" },
+  trial_banner_dismissed: { sk: "Zavretie trial banneru", en: "Trial banner dismissed" },
 };
 const evLabel = (t, lang) => (EVENT_LABELS[t]?.[lang]) || (t || "").replace(/_/g, " ");
 
@@ -78,13 +85,14 @@ const minsLabel = (m) => {
   return `${(n / 60).toFixed(1)} h`;
 };
 // Thousands separator for counts (values may be strings from bigint columns).
-const num = (v) => {
+const fmtN = (v, lang = "sk") => {
   const n = Number(v);
-  return Number.isFinite(n) ? n.toLocaleString("sk-SK") : (v ?? "—");
+  return Number.isFinite(n) ? n.toLocaleString(lang === "sk" ? "sk-SK" : "en-GB") : (v ?? "—");
 };
 
 export default function UsageDashboard({ lang = "en" }) {
   const L = (sk, en) => (lang === "sk" ? sk : en);
+  const num = (v) => fmtN(v, lang);   // locale follows the UI language
   const [days, setDays] = useState(30);
   const [summary, setSummary] = useState(null);
   const [daily, setDaily] = useState([]);
@@ -96,6 +104,9 @@ export default function UsageDashboard({ lang = "en" }) {
   const [selUser, setSelUser] = useState(null);   // { user_id, email }
   const [timeline, setTimeline] = useState([]);
   const [tlLoading, setTlLoading] = useState(false);
+  const [tlErr, setTlErr] = useState(null);
+
+  const TL_LIMIT = 500;
 
   const load = useCallback(async () => {
     setLoading(true); setErr(null);
@@ -121,12 +132,12 @@ export default function UsageDashboard({ lang = "en" }) {
   useEffect(() => { load(); }, [load]);
 
   const openUser = useCallback(async (u) => {
-    setSelUser(u); setTimeline([]); setTlLoading(true);
+    setSelUser(u); setTimeline([]); setTlErr(null); setTlLoading(true);
     try {
-      const { data, error } = await supabaseData.rpc("admin_user_timeline", { p_user_id: u.user_id, p_limit: 500 });
-      if (error) setErr(error.message || String(error));
+      const { data, error } = await supabaseData.rpc("admin_user_timeline", { p_user_id: u.user_id, p_limit: TL_LIMIT });
+      if (error) setTlErr(error.message || String(error));
       setTimeline(data || []);
-    } catch (e) { setErr(String(e?.message || e)); }
+    } catch (e) { setTlErr(String(e?.message || e)); }
     setTlLoading(false);
   }, []);
 
@@ -139,7 +150,10 @@ export default function UsageDashboard({ lang = "en" }) {
       {/* Header + window selector */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "1rem", marginBottom: "0.35rem" }}>
         <div>
-          <h1 style={{ fontFamily: mono, fontSize: "1.35rem", fontWeight: 700, margin: 0 }}>{L("Používanie", "Usage")}</h1>
+          <h1 style={{ fontFamily: mono, fontSize: "1.35rem", fontWeight: 700, margin: 0 }}>
+            {L("Používanie", "Usage")}
+            {loading && summary && <span style={{ fontFamily: mono, fontSize: "0.72rem", fontWeight: 400, color: dim, marginLeft: "0.6rem" }}>· {L("aktualizujem…", "updating…")}</span>}
+          </h1>
           <p style={{ color: dim, fontSize: "0.82rem", margin: "0.35rem 0 0" }}>
             {L("Kto platformu používa, ako často, ako dlho a čo v nej robí.", "Who uses the platform, how often, how long, and what they do.")}
           </p>
@@ -147,13 +161,13 @@ export default function UsageDashboard({ lang = "en" }) {
         <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
           <span style={{ fontSize: "0.7rem", color: dim, fontFamily: mono }}>{L("okno", "window")}</span>
           {WINDOWS.map(w => (
-            <button key={w} onClick={() => setDays(w)} style={{
-              fontFamily: mono, fontSize: "0.75rem", padding: "0.35rem 0.7rem", borderRadius: 8, cursor: "pointer",
+            <button key={w} onClick={() => setDays(w)} disabled={loading} style={{
+              fontFamily: mono, fontSize: "0.75rem", padding: "0.35rem 0.7rem", borderRadius: 8, cursor: loading ? "default" : "pointer",
               border: `1px solid ${days === w ? green : border}`, background: days === w ? green : "transparent",
-              color: days === w ? "#00120c" : text, fontWeight: days === w ? 700 : 400,
+              color: days === w ? "#00120c" : text, fontWeight: days === w ? 700 : 400, opacity: loading && days !== w ? 0.5 : 1,
             }}>{w}{L("d", "d")}</button>
           ))}
-          <button onClick={load} title="reload" style={{ fontFamily: mono, fontSize: "0.75rem", padding: "0.35rem 0.7rem", borderRadius: 8, cursor: "pointer", border: `1px solid ${border}`, background: "transparent", color: dim }}>↻</button>
+          <button onClick={load} disabled={loading} title={L("obnoviť", "reload")} aria-label={L("obnoviť", "reload")} style={{ fontFamily: mono, fontSize: "0.75rem", padding: "0.35rem 0.7rem", borderRadius: 8, cursor: loading ? "default" : "pointer", border: `1px solid ${border}`, background: "transparent", color: dim, opacity: loading ? 0.5 : 1 }}>↻</button>
         </div>
       </div>
 
@@ -169,8 +183,11 @@ export default function UsageDashboard({ lang = "en" }) {
         <>
           {/* KPI grid */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "0.7rem", margin: "1.1rem 0" }}>
-            <Card label={L("Aktívni (7 dní)", "Active (7d)")} value={num(summary?.wau)} color={green} sub={L("prihlásení používatelia", "signed-in users")} />
-            <Card label={L(`Aktívni (${days} dní)`, `Active (${days}d)`)} value={num(summary?.mau)} />
+            <Card label={L("Aktívni dnes", "Active today")} value={num(summary?.dau)} color={green} sub={L("prihlásení dnes", "signed-in today")} />
+            <Card label={L("Aktívni (7 dní)", "Active (7d)")} value={num(summary?.wau)} sub={L("prihlásení používatelia", "signed-in users")} />
+            {/* Only show the window-active card when the window is wider than 7d,
+                otherwise it just duplicates the "Active (7d)" card above. */}
+            {days > 7 && <Card label={L(`Aktívni (${days} dní)`, `Active (${days}d)`)} value={num(summary?.mau)} />}
             <Card label={L("Ø aktívny čas / relácia", "Ø active time / session")} value={minsLabel(summary?.avg_active_min)} sub={L("skutočne strávený čas", "real focused time")} />
             <Card label={L("Celkový aktívny čas", "Total active time")} value={summary?.active_hours != null ? `${num(summary.active_hours)} h` : "—"} />
             <Card label={L("Relácie", "Sessions")} value={num(summary?.total_sessions)} sub={L(`+ ${num(summary?.anon_sessions ?? 0)} anonymných`, `+ ${num(summary?.anon_sessions ?? 0)} anonymous`)} />
@@ -197,7 +214,9 @@ export default function UsageDashboard({ lang = "en" }) {
                       <div key={d.day} title={`${d.day}\n${num(d.events)} ${L("udalostí", "events")}\n${num(d.active_users)} ${L("aktívnych", "active")}\n${num(d.new_users)} ${L("noví", "new")}`}
                         style={{ flex: 1, minWidth: 6, display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "center", height: "100%", position: "relative" }}>
                         <div style={{ width: "100%", height: barH, background: bg2, borderTop: `2px solid ${blue}`, borderRadius: "2px 2px 0 0" }} />
-                        <div style={{ position: "absolute", bottom: `${h}%`, width: 4, height: 4, borderRadius: "50%", background: green, opacity: uh > 0 ? 1 : 0, transform: "translateY(2px)" }} />
+                        {/* active-users dot on its OWN scale (was drawn at the events-bar
+                            height, so it carried no active-users info despite the legend). */}
+                        <div style={{ position: "absolute", bottom: `${uh}%`, width: 4, height: 4, borderRadius: "50%", background: green, opacity: uh > 0 ? 1 : 0, transform: "translateY(2px)" }} />
                       </div>
                     );
                   })}
@@ -243,9 +262,15 @@ export default function UsageDashboard({ lang = "en" }) {
                 </thead>
                 <tbody>
                   {users.map((u) => (
-                    <tr key={u.user_id} onClick={() => openUser(u)} style={{ cursor: "pointer", borderBottom: `1px solid ${border}` }}
+                    <tr key={u.user_id} onClick={() => openUser(u)}
+                      tabIndex={0} role="button"
+                      aria-label={L(`Denník aktivity — ${u.email || u.user_id}`, `Activity timeline — ${u.email || u.user_id}`)}
+                      onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openUser(u); } }}
+                      style={{ cursor: "pointer", borderBottom: `1px solid ${border}`, outlineOffset: -2 }}
                       onMouseEnter={e => e.currentTarget.style.background = bg2}
-                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                      onFocus={e => e.currentTarget.style.background = bg2}
+                      onBlur={e => e.currentTarget.style.background = "transparent"}>
                       <td style={{ padding: "0.5rem 0.6rem", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {u.email || "(?)"}{u.company ? <span style={{ color: dim }}> · {u.company}</span> : null}
                       </td>
@@ -272,7 +297,7 @@ export default function UsageDashboard({ lang = "en" }) {
 
       {/* Drill-down drawer */}
       {selUser && (
-        <UserTimeline user={selUser} rows={timeline} loading={tlLoading} lang={lang} onClose={() => setSelUser(null)} />
+        <UserTimeline user={selUser} rows={timeline} loading={tlLoading} err={tlErr} limit={TL_LIMIT} lang={lang} onClose={() => setSelUser(null)} />
       )}
     </div>
   );
@@ -306,7 +331,7 @@ function Empty({ lang }) {
 }
 
 // Per-user activity timeline, grouped by session (newest first).
-function UserTimeline({ user, rows, loading, lang, onClose }) {
+function UserTimeline({ user, rows, loading, err, limit, lang, onClose }) {
   const L = (sk, en) => (lang === "sk" ? sk : en);
 
   // Close on Escape + lock the page scroll behind the drawer.
@@ -339,15 +364,23 @@ function UserTimeline({ user, rows, loading, lang, onClose }) {
             <div style={{ fontFamily: mono, fontSize: "0.66rem", color: dim, textTransform: "uppercase", letterSpacing: "0.08em" }}>{L("Denník aktivity", "Activity timeline")}</div>
             <div style={{ fontFamily: mono, fontSize: "0.95rem", fontWeight: 700, marginTop: "0.25rem", wordBreak: "break-all" }}>{user.email || user.user_id}</div>
           </div>
-          <button onClick={onClose} style={{ background: "transparent", border: `1px solid ${border}`, color: dim, borderRadius: 8, cursor: "pointer", fontFamily: mono, fontSize: "0.9rem", padding: "0.2rem 0.6rem" }}>✕</button>
+          <button onClick={onClose} aria-label={L("Zavrieť", "Close")} title={L("Zavrieť", "Close")} style={{ background: "transparent", border: `1px solid ${border}`, color: dim, borderRadius: 8, cursor: "pointer", fontFamily: mono, fontSize: "0.9rem", padding: "0.2rem 0.6rem" }}>✕</button>
         </div>
 
         {loading ? (
           <div style={{ color: dim, fontFamily: mono, fontSize: "0.8rem" }}>{L("Načítavam…", "Loading…")}</div>
+        ) : err ? (
+          <div style={{ background: "rgba(255,107,107,0.1)", border: `1px solid ${red}`, color: red, borderRadius: 8, padding: "0.7rem 0.9rem", fontFamily: mono, fontSize: "0.76rem" }}>{err}</div>
         ) : rows.length === 0 ? (
           <div style={{ color: dim, fontFamily: mono, fontSize: "0.8rem" }}>{L("Žiadna aktivita.", "No activity.")}</div>
         ) : (
-          groups.map((g, gi) => (
+          <>
+          {limit && rows.length >= limit && (
+            <div style={{ fontFamily: mono, fontSize: "0.66rem", color: orange, marginBottom: "0.8rem" }}>
+              {L(`Zobrazených posledných ${limit} udalostí (staršie skryté).`, `Showing the latest ${limit} events (older ones hidden).`)}
+            </div>
+          )}
+          {groups.map((g, gi) => (
             <div key={gi} style={{ marginBottom: "1.2rem" }}>
               <div style={{ fontFamily: mono, fontSize: "0.64rem", color: dim, marginBottom: "0.4rem", borderBottom: `1px solid ${border}`, paddingBottom: "0.3rem" }}>
                 {L("Relácia", "Session")} · {fmtDateTime(g.rows[g.rows.length - 1].created_at, lang)} → {fmtDateTime(g.rows[0].created_at, lang)}
@@ -370,7 +403,8 @@ function UserTimeline({ user, rows, loading, lang, onClose }) {
                 );
               })}
             </div>
-          ))
+          ))}
+          </>
         )}
       </div>
     </div>
