@@ -303,6 +303,21 @@ BEGIN
   RETURN n;
 END$$;
 
+-- CREATE OR REPLACE FUNCTION resets EXECUTE to the PUBLIC default, so every time this
+-- migration re-runs (each deploy) it silently re-opens EXECUTE to PUBLIC + anon on these
+-- SECURITY DEFINER admin functions. That is a privilege-escalation surface (esp.
+-- admin_delete_activity_before, a DELETE writer) even though each body gates on
+-- current_user_is_admin(). REVOKE from PUBLIC FIRST, then grant only authenticated — so the
+-- lock survives re-creation. (Proven live 2026-07-17: admin_user_timeline re-exposed itself
+-- on a recreate; the scraper repo's integrity_check `secdef_grants` is the daily recurrence net.)
+REVOKE EXECUTE ON FUNCTION public.admin_usage_summary(int)   FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.admin_usage_daily(int)     FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.admin_usage_features(int)  FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.admin_usage_users(int)     FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.admin_user_timeline(uuid, int) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.admin_activity_count_before(timestamptz) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.admin_delete_activity_before(timestamptz) FROM PUBLIC;
+
 GRANT EXECUTE ON FUNCTION public.admin_usage_summary(int)   TO authenticated;
 GRANT EXECUTE ON FUNCTION public.admin_usage_daily(int)     TO authenticated;
 GRANT EXECUTE ON FUNCTION public.admin_usage_features(int)  TO authenticated;
