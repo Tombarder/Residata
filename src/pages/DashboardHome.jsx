@@ -526,7 +526,7 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
             sk={lang === "sk"} onClose={() => setFilterOpen(false)} />
         )}
 
-        <div className="dash-kpi-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "0.7rem" }}>
+        <div className="dash-kpi-grid" style={{ display: "grid", gap: "0.7rem" }}>
           {kpiMetrics.map(mk => {
             const def = METRICS[mk];
             const locked = def.requires && !can(def.requires);
@@ -635,10 +635,13 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
       )}
 
       <style>{`
+        .dash-kpi-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        @media (max-width: 1100px) { .dash-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
         @media (max-width: 720px) {
           .dash-grid { grid-template-columns: 1fr !important; }
           .dash-cell { grid-column: span 1 !important; }
         }
+        @media (max-width: 460px) { .dash-kpi-grid { grid-template-columns: 1fr; } }
       `}</style>
     </div>
   );
