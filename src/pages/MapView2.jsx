@@ -38,13 +38,49 @@ import { applyFilters, describe, isComplete } from "../lib/mapFilters";
 
 const mono = "'JetBrains Mono', monospace";
 import { accent as green, orange as amber, dim, text as textLight, border, surfaceDark as bg2 } from "../lib/theme";
-import { getTheme } from "../lib/theme-mode";
+import { getTheme, useThemeMode } from "../lib/theme-mode";
 const greyPt = "#6b6b76";
 const panel = "var(--surface)";
 
 const MAP_STYLE_DARK = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
 const MAP_STYLE_LIGHT = "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json";
 const mapStyleUrl = () => (getTheme() === "light" ? MAP_STYLE_LIGHT : MAP_STYLE_DARK);
+
+// Install the custom sources + layers on a map. Run on initial load AND after a
+// setStyle() (theme switch) — setStyle drops all custom layers, so they must be
+// re-added on the new base style. `green`/`amber` are theme-invariant hex.
+function installMap2Layers(map, features) {
+  if (map.getSource("projects")) return; // already installed on this style
+  map.addSource("radius", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+  map.addLayer({ id: "radius-fill", type: "fill", source: "radius", paint: { "fill-color": green, "fill-opacity": 0.07 } });
+  map.addLayer({ id: "radius-line", type: "line", source: "radius", paint: { "line-color": green, "line-width": 1.5, "line-dasharray": [2, 2] } });
+  map.addSource("draw", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+  map.addLayer({ id: "draw-fill", type: "fill", source: "draw", filter: ["==", ["geometry-type"], "Polygon"], paint: { "fill-color": amber, "fill-opacity": 0.10 } });
+  map.addLayer({ id: "draw-line", type: "line", source: "draw", filter: ["!=", ["geometry-type"], "Point"], paint: { "line-color": amber, "line-width": 2 } });
+  map.addLayer({ id: "draw-vertex", type: "circle", source: "draw", filter: ["==", ["geometry-type"], "Point"], paint: { "circle-radius": 4, "circle-color": amber, "circle-stroke-width": 2, "circle-stroke-color": "#0a0a0b" } });
+  map.addSource("projects", { type: "geojson", data: features });
+  map.addLayer({
+    id: "heat", type: "heatmap", source: "projects", layout: { visibility: "none" },
+    paint: {
+      "heatmap-weight": ["get", "w"],
+      "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 6, 1, 13, 3],
+      "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 6, 16, 11, 32, 14, 52],
+      "heatmap-opacity": ["interpolate", ["linear"], ["zoom"], 11, 0.9, 14, 0.5],
+      "heatmap-color": ["interpolate", ["linear"], ["heatmap-density"],
+        0, "rgba(0,0,0,0)", 0.15, "rgba(43,76,155,0.5)", 0.4, "#3aa0ff", 0.62, "#f5a623", 0.82, "#ff7a3d", 1, "#ff3d3d"],
+    },
+  });
+  map.addLayer({
+    id: "points", type: "circle", source: "projects",
+    paint: {
+      "circle-color": ["get", "color"],
+      "circle-radius": ["interpolate", ["linear"], ["get", "units"], 0, 5, 30, 7, 80, 11, 200, 16, 500, 22],
+      "circle-opacity": ["case", ["get", "verified"], 0.92, 0.4],
+      "circle-stroke-width": 1.2,
+      "circle-stroke-color": ["case", ["get", "verified"], "#0a0a0b", amber],
+    },
+  });
+}
 const FALLBACK_CENTER = [18.5, 48.7];
 const FALLBACK_ZOOM = 6.2;
 
@@ -188,6 +224,12 @@ export default function MapView2({ lang = "en", setCurrent }) {
   const [anchorId, setAnchorId] = useState(null); // project an "◎ Area" was opened from → benchmark vs its set
   const [viewBounds, setViewBounds] = useState(null); // current map viewport → the overview reflects only what's on screen
   const [extSet, setExtSet] = useState(null); // {nameSet:Set<normName>, count} handed from a filtered analytics view ("Show on map")
+  // Bumped after a theme switch re-styles the base map. setStyle() wipes every custom
+  // source/layer, so every data-setting effect below also depends on styleEpoch to
+  // re-populate its source on the fresh style (no logic duplicated in the theme effect).
+  const [styleEpoch, setStyleEpoch] = useState(0);
+  const [mapReady, setMapReady] = useState(false); // flips true on load → re-runs the theme effect (catches a toggle made DURING the tile-load window)
+  const [themeMode] = useThemeMode();
 
   // ── Compare (separate from Area exploration) ──
   // The user assembles an explicit set of projects — by name search (Picker),
@@ -515,43 +557,10 @@ export default function MapView2({ lang = "en", setCurrent }) {
 
     map.on("load", () => {
       if (mapRef.current !== map) return;
-      map.addSource("radius", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
-      map.addLayer({ id: "radius-fill", type: "fill", source: "radius", paint: { "fill-color": green, "fill-opacity": 0.07 } });
-      map.addLayer({ id: "radius-line", type: "line", source: "radius", paint: { "line-color": green, "line-width": 1.5, "line-dasharray": [2, 2] } });
-
-      // Hand-drawn polygon (in-progress line + vertices, or the finished area).
-      map.addSource("draw", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
-      map.addLayer({ id: "draw-fill", type: "fill", source: "draw", filter: ["==", ["geometry-type"], "Polygon"], paint: { "fill-color": amber, "fill-opacity": 0.10 } });
-      map.addLayer({ id: "draw-line", type: "line", source: "draw", filter: ["!=", ["geometry-type"], "Point"], paint: { "line-color": amber, "line-width": 2 } });
-      map.addLayer({ id: "draw-vertex", type: "circle", source: "draw", filter: ["==", ["geometry-type"], "Point"], paint: { "circle-radius": 4, "circle-color": amber, "circle-stroke-width": 2, "circle-stroke-color": "#0a0a0b" } });
-
-      map.addSource("projects", { type: "geojson", data: featuresRef.current });
-      // Heatmap of the active lens (hidden until "Heat" is toggled). Weight = how
-      // "hot" each project is on the active metric (heatWeight, 0..1).
-      map.addLayer({
-        id: "heat", type: "heatmap", source: "projects", layout: { visibility: "none" },
-        paint: {
-          "heatmap-weight": ["get", "w"],
-          "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 6, 1, 13, 3],
-          "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 6, 16, 11, 32, 14, 52],
-          "heatmap-opacity": ["interpolate", ["linear"], ["zoom"], 11, 0.9, 14, 0.5],
-          "heatmap-color": ["interpolate", ["linear"], ["heatmap-density"],
-            0, "rgba(0,0,0,0)", 0.15, "rgba(43,76,155,0.5)", 0.4, "#3aa0ff", 0.62, "#f5a623", 0.82, "#ff7a3d", 1, "#ff3d3d"],
-        },
-      });
-      map.addLayer({
-        id: "points", type: "circle", source: "projects",
-        paint: {
-          "circle-color": ["get", "color"],
-          "circle-radius": ["interpolate", ["linear"], ["get", "units"], 0, 5, 30, 7, 80, 11, 200, 16, 500, 22],
-          // Placeholder-located projects are rendered faded so verified ones lead the eye.
-          "circle-opacity": ["case", ["get", "verified"], 0.92, 0.4],
-          "circle-stroke-width": 1.2,
-          "circle-stroke-color": ["case", ["get", "verified"], "#0a0a0b", amber],
-        },
-      });
+      installMap2Layers(map, featuresRef.current);
 
       readyRef.current = true;
+      setMapReady(true);
       if (heatModeRef.current) applyHeatMode(map, true);
       if (hadSaved) fitKeyRef.current = countryRef.current;
       else if (featuresRef.current.features.length) { fitToData(map, featuresRef.current, false); fitKeyRef.current = countryRef.current; }
@@ -595,6 +604,24 @@ export default function MapView2({ lang = "en", setCurrent }) {
     };
   }, []);
 
+  // ── Theme switch ── swap the base tiles (voyager ↔ dark-matter) live. setStyle()
+  // drops all custom sources/layers, so on the new style's load we re-install them and
+  // bump styleEpoch — that re-fires every data effect below to repopulate its source.
+  const themeRef = useRef(themeMode);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;                // mapReady (state) re-runs this once load finishes
+    if (themeRef.current === themeMode) return;   // ignore no-op re-renders / already-applied theme
+    themeRef.current = themeMode;
+    map.setStyle(mapStyleUrl());
+    map.once("style.load", () => {
+      if (mapRef.current !== map) return;
+      installMap2Layers(map, featuresRef.current);
+      if (heatModeRef.current) applyHeatMode(map, true);
+      setStyleEpoch((e) => e + 1); // re-run radius/draw/projects data effects onto the new style
+    });
+  }, [themeMode, mapReady]);
+
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !readyRef.current) return;
@@ -604,7 +631,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
     // switch useProjects briefly returns the previous country's array, and
     // fitting to that then latching fitKeyRef made SK zoom to CZ and vice-versa.
     if (fc.features.length && dataCountry === country && fitKeyRef.current !== country) { fitToData(map, fc, fitKeyRef.current !== null); fitKeyRef.current = country; }
-  }, [fc, country, dataCountry]);
+  }, [fc, country, dataCountry, styleEpoch]);
 
   // ── Heat vs dots ── show the heatmap and fade the dots (still clickable) ──
   useEffect(() => {
@@ -634,7 +661,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
       if (src) src.setData({ type: "FeatureCollection", features: [] });
       if (markerRef.current) { markerRef.current.remove(); markerRef.current = null; }
     }
-  }, [analysisCenter, radiusKm]);
+  }, [analysisCenter, radiusKm, styleEpoch]);
 
   // Render the finished shape (polygon fill / corridor buffer + centerline) or the
   // in-progress geometry into the "draw" source. Vertices are draggable Markers (below).
@@ -654,7 +681,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
       if (pts.length >= 2) features.push(line(pts));
     }
     src.setData({ type: "FeatureCollection", features });
-  }, [pts, shape, drawTool, corridorKm]);
+  }, [pts, shape, drawTool, corridorKm, styleEpoch]);
 
   // Draggable vertex handles for the active geometry (in-progress pts or finished shape).
   useEffect(() => {
@@ -706,10 +733,13 @@ export default function MapView2({ lang = "en", setCurrent }) {
   const legend = legendForLens(lens, thresholds, fmt);
 
   // ── Completion drill-down helpers ──
-  const _ny = new Date().getFullYear();
+  // Year labels come straight from COMPLETION (frozen to the same _NOW_Y that
+  // completionBucket buckets against) so the drill-down years can never drift from the
+  // legend/filter years; only ready/unknown are localised here.
+  const _yr = (k) => COMPLETION[k].label;
   const COMP_LABEL = sk
-    ? { ready: "hotové", cur: String(_ny), soon: String(_ny + 1), mid: String(_ny + 2), far: (_ny + 3) + "+", unknown: "neznáme" }
-    : { ready: "done", cur: String(_ny), soon: String(_ny + 1), mid: String(_ny + 2), far: (_ny + 3) + "+", unknown: "unknown" };
+    ? { ready: "hotové", cur: _yr("cur"), soon: _yr("soon"), mid: _yr("mid"), far: _yr("far"), unknown: "neznáme" }
+    : { ready: "done", cur: _yr("cur"), soon: _yr("soon"), mid: _yr("mid"), far: _yr("far"), unknown: "unknown" };
   // "When it completes" for a project row: a year, "hotové/done", or null (unknown).
   const completionWhen = (p) => {
     const k = (p.kolaudacia || "").toString().trim();

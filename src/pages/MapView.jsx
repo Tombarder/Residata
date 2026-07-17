@@ -34,7 +34,7 @@ import { supabasePublic, isSupabaseReady } from "../lib/supabase";
 
 const mono = "'JetBrains Mono', monospace";
 import { accent as green, orange as amber, dim, text as textLight, border, surfaceDark as bg2 } from "../lib/theme";
-import { getTheme } from "../lib/theme-mode";
+import { getTheme, useThemeMode } from "../lib/theme-mode";
 const greyPt = "#6b6b76";
 const panel = "var(--surface)";
 
@@ -43,6 +43,37 @@ const panel = "var(--surface)";
 const MAP_STYLE_DARK = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
 const MAP_STYLE_LIGHT = "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json";
 const mapStyleUrl = () => (getTheme() === "light" ? MAP_STYLE_LIGHT : MAP_STYLE_DARK);
+
+// Install the clustered projects source + layers on a map. Run on initial load AND
+// after setStyle() (theme switch), which drops all custom sources/layers. `green`/
+// `greyPt` are theme-invariant hex, so the pins read on both base styles.
+function installMapLayers(map, features) {
+  if (map.getSource("projects")) return; // already installed on this style
+  map.addSource("projects", {
+    type: "geojson", data: features, cluster: true, clusterRadius: 48, clusterMaxZoom: 13,
+  });
+  map.addLayer({
+    id: "clusters", type: "circle", source: "projects", filter: ["has", "point_count"],
+    paint: {
+      "circle-color": green, "circle-opacity": 0.85,
+      "circle-radius": ["step", ["get", "point_count"], 16, 10, 22, 50, 30],
+      "circle-stroke-width": 2, "circle-stroke-color": "#0a0a0b",
+    },
+  });
+  map.addLayer({
+    id: "cluster-count", type: "symbol", source: "projects", filter: ["has", "point_count"],
+    layout: { "text-field": ["get", "point_count_abbreviated"], "text-font": ["Open Sans Bold"], "text-size": 13 },
+    paint: { "text-color": "#0a0a0b" },
+  });
+  map.addLayer({
+    id: "points", type: "circle", source: "projects", filter: ["!", ["has", "point_count"]],
+    paint: {
+      "circle-color": ["case", ["<=", ["get", "available"], 0], greyPt, green],
+      "circle-radius": 7,
+      "circle-stroke-width": 1.5, "circle-stroke-color": "#0a0a0b",
+    },
+  });
+}
 // SK/CZ fallback view if there's nothing to fit to.
 const FALLBACK_CENTER = [18.5, 48.7];
 const FALLBACK_ZOOM = 6.2;
@@ -145,6 +176,12 @@ export default function MapView({ lang = "en", setCurrent }) {
   const [showSuggest, setShowSuggest] = useState(false);
   const [activeIdx, setActiveIdx] = useState(-1);
   const searchWrapRef = useRef(null);
+  // Theme switch: bumped after the base map is re-styled so the data effect repopulates
+  // the (setStyle-wiped) projects source onto the fresh style.
+  const [styleEpoch, setStyleEpoch] = useState(0);
+  const [mapReady, setMapReady] = useState(false); // flips true on load → re-runs the theme effect (catches a toggle made DURING the tile-load window)
+  const [themeMode] = useThemeMode();
+  const themeRef = useRef(themeMode);
 
   // Keep these refs on the latest values for the once-mounted (deps []) Mapbox load/click
   // handlers — updated post-commit via effects, never written during render
@@ -295,40 +332,10 @@ export default function MapView({ lang = "en", setCurrent }) {
 
     map.on("load", () => {
       if (mapRef.current !== map) return;  // component unmounted before the style finished loading
-      map.addSource("projects", {
-        type: "geojson",
-        data: featuresRef.current,
-        cluster: true,
-        clusterRadius: 48,
-        clusterMaxZoom: 13,
-      });
-
-      // Cluster bubbles
-      map.addLayer({
-        id: "clusters", type: "circle", source: "projects", filter: ["has", "point_count"],
-        paint: {
-          "circle-color": green, "circle-opacity": 0.85,
-          "circle-radius": ["step", ["get", "point_count"], 16, 10, 22, 50, 30],
-          "circle-stroke-width": 2, "circle-stroke-color": "#0a0a0b",
-        },
-      });
-      map.addLayer({
-        id: "cluster-count", type: "symbol", source: "projects", filter: ["has", "point_count"],
-        layout: { "text-field": ["get", "point_count_abbreviated"], "text-font": ["Open Sans Bold"], "text-size": 13 },
-        paint: { "text-color": "#0a0a0b" },
-      });
-
-      // Individual project points — green if anything available, grey if sold out
-      map.addLayer({
-        id: "points", type: "circle", source: "projects", filter: ["!", ["has", "point_count"]],
-        paint: {
-          "circle-color": ["case", ["<=", ["get", "available"], 0], greyPt, green],
-          "circle-radius": 7,
-          "circle-stroke-width": 1.5, "circle-stroke-color": "#0a0a0b",
-        },
-      });
+      installMapLayers(map, featuresRef.current);
 
       readyRef.current = true;
+      setMapReady(true);
       if (hadSavedView) {
         // Restored a previous camera — don't auto-fit over where the user left off.
         fitKeyRef.current = countryRef.current;
@@ -383,6 +390,22 @@ export default function MapView({ lang = "en", setCurrent }) {
     };
   }, []);
 
+  // ── Theme switch ── swap base tiles (voyager ↔ dark-matter) live. setStyle() drops
+  // all custom sources/layers; on the new style's load we re-install them and bump
+  // styleEpoch so the data effect below repopulates the projects source.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;                // mapReady (state) re-runs this once load finishes
+    if (themeRef.current === themeMode) return;   // ignore no-op re-renders / already-applied theme
+    themeRef.current = themeMode;
+    map.setStyle(mapStyleUrl());
+    map.once("style.load", () => {
+      if (mapRef.current !== map) return;
+      installMapLayers(map, featuresRef.current);
+      setStyleEpoch((e) => e + 1);
+    });
+  }, [themeMode, mapReady]);
+
   // ── Push data updates into the map; auto-fit on first data + on country change ──
   useEffect(() => {
     const map = mapRef.current;
@@ -398,7 +421,7 @@ export default function MapView({ lang = "en", setCurrent }) {
       fitToData(map, fc, fitKeyRef.current !== null);
       fitKeyRef.current = country;
     }
-  }, [fc, country, dataCountry]);
+  }, [fc, country, dataCountry, styleEpoch]);
 
   // ── Re-fit to the result set when a NON-search filter narrows it ──
   // (Search typing only filters the pins + offers suggestions; selecting a

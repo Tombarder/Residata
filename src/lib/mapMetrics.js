@@ -74,8 +74,11 @@ export function heatWeight(p, lens, range) {
   return Math.max(0.04, Math.min(1, (v - range.min) / (range.max - range.min)));
 }
 
-/** Bucket a free-text kolaudácia value into a completion category. */
-export function completionBucket(p, nowYear = new Date().getFullYear()) {
+/** Bucket a free-text kolaudácia value into a completion category. Defaults to the
+ *  SAME module-load year the COMPLETION labels are frozen to (_NOW_Y) so the bucket a
+ *  project lands in and the year it is LABELLED with can never disagree — even for a
+ *  session left open across a New-Year boundary. Tests pass an explicit nowYear. */
+export function completionBucket(p, nowYear = _NOW_Y) {
   const k = (p.kolaudacia || "").toString().toLowerCase().trim();
   if (!k) return "unknown";
   if (/skolaud|hotov|dokon|nas[ťt]ah|ready|complet|move/.test(k)) return "ready";
