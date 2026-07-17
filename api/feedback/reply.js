@@ -34,9 +34,11 @@ function cleanText(raw, { max = 200 } = {}) {
 }
 
 function clientIp(req) {
+  // x-real-ip FIRST: on Vercel it's the platform-set, non-spoofable connecting IP. The
+  // leftmost x-forwarded-for token is client-claimed (spoofable → bypass the per-IP cap).
+  if (req.headers["x-real-ip"]) return String(req.headers["x-real-ip"]).trim();
   const fwd = req.headers["x-forwarded-for"];
   if (typeof fwd === "string" && fwd) return fwd.split(",")[0].trim();
-  if (req.headers["x-real-ip"]) return String(req.headers["x-real-ip"]).trim();
   return req.socket?.remoteAddress || "unknown";
 }
 const ipBuckets = new Map();

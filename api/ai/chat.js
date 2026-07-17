@@ -80,6 +80,12 @@ const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS  = 24 * HOUR_MS;
 
 function clientIp(req) {
+  // x-real-ip FIRST: on Vercel the platform sets it to the true connecting IP and a client
+  // cannot spoof it. The leftmost x-forwarded-for token is the client-CLAIMED IP (spoofable
+  // → an attacker could rotate it to bypass the per-IP AI caps and run up Anthropic spend),
+  // so only fall back to XFF when x-real-ip is absent.
+  const real = req.headers["x-real-ip"];
+  if (real) return String(real).trim();
   const fwd = req.headers["x-forwarded-for"];
   if (typeof fwd === "string" && fwd) return fwd.split(",")[0].trim();
   return req.socket?.remoteAddress || "0.0.0.0";

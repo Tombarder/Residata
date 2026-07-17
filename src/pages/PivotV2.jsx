@@ -244,6 +244,9 @@ const FIELD_ORDER = [
    suite; text columns only count / count_distinct. */
 const AGGS_TEXT    = ["count", "count_distinct"];
 const AGGS_NUMBER  = ["count", "count_distinct", "sum", "avg", "min", "max", "median"];
+// Additive measures — the only ones for which "% of total / % of parent" is a real share.
+// avg/min/max/median/measure are non-additive: a row ÷ grand value isn't a share (>100%).
+const SHAREABLE_AGGS = new Set(["count", "count_distinct", "sum"]);
 const AGGS_MEASURE = ["measure"];
 const AGG_LABEL = {
   count:          "count",
@@ -2611,8 +2614,11 @@ function exportPivotCSV(flatRows, grandTotal, rowFields, colFields, effectiveVal
   const parentOf = (n) => (n.level === 0 ? grandTotal : (nodeByPath.get(JSON.stringify(n.path.slice(0, n.level))) || grandTotal));
   // A single value cell honoring the active valueMode (absolute / % total / % parent).
   const cellVal = (raw, i, parentRaw) => {
-    if (valueMode === "pct_total") { const g = grandForCol(i); return raw == null || !g ? "" : `${((raw / g) * 100).toFixed(1)}%`; }
-    if (valueMode === "pct_parent") { return raw == null || !parentRaw ? "" : `${((raw / parentRaw) * 100).toFixed(1)}%`; }
+    // Mirror renderCellValue: % modes only apply to additive aggs (share of a whole);
+    // avg/min/max/median export the raw measure (a "% of total" on an average is nonsense).
+    const shareable = SHAREABLE_AGGS.has(effectiveValues[i]?.agg);
+    if (valueMode === "pct_total" && shareable) { const g = grandForCol(i); return raw == null || !g ? "" : `${((raw / g) * 100).toFixed(1)}%`; }
+    if (valueMode === "pct_parent" && shareable) { return raw == null || !parentRaw ? "" : `${((raw / parentRaw) * 100).toFixed(1)}%`; }
     return fmtMeasure(raw, effectiveValues[i]);
   };
 
@@ -2808,12 +2814,17 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
   const renderCellValue = (raw, valIdx, parentRaw) => {
     if (raw == null || !Number.isFinite(raw)) return "—";
     const v = effectiveValues[valIdx];
-    if (valueMode === "pct_total") {
+    // "% of total/parent" is a SHARE of a whole — only meaningful for additive measures
+    // (count / count_distinct / sum). For avg/min/max/median a row's value ÷ the grand
+    // value is NOT a share and routinely exceeds 100% (a project priced above the global
+    // average would read "142%"). Show the raw formatted value for non-additive aggs.
+    const shareable = SHAREABLE_AGGS.has(v.agg);
+    if (valueMode === "pct_total" && shareable) {
       const g = grandTotal.rollups[valIdx];
       if (g == null || !Number.isFinite(g) || g === 0) return formatValue(raw, v.field, v.agg);
       return `${((raw / g) * 100).toFixed(1)}%`;
     }
-    if (valueMode === "pct_parent") {
+    if (valueMode === "pct_parent" && shareable) {
       if (parentRaw == null || !Number.isFinite(parentRaw) || parentRaw === 0) {
         // parent missing or 0 — show raw so user sees the value rather
         // than a confusing "—".
