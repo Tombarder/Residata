@@ -85,22 +85,22 @@
      Residata's signature block; the workspace is a soft green-neutral canvas with crisp
      white cards + soft depth and deep green-charcoal text; mint green is the sharp accent.
      Cohesive because every neutral shares the green family — the brand green sits native. */
-  --bg:            #eef3f0;   /* soft green-neutral canvas */
+  --bg:            #f3f4f6;   /* clean NEUTRAL light-gray workspace (green lives in the sidebar) */
   --surface:       #ffffff;   /* crisp white cards */
-  --surface-2:     #e5efe9;   /* inset / row-stripe (green-tinted) */
-  --surface-3:     #dce9e2;   /* input / raised / hover */
-  --border:        #d5e2db;   /* green-neutral edges */
-  --border-soft:   #e3ede8;
-  --accent:        #00e5a0;   /* mint — the accent */
+  --surface-2:     #eef0f3;   /* inset / row-stripe (neutral) */
+  --surface-3:     #e6e9ee;   /* input / raised / hover (neutral) */
+  --border:        #dde1e8;   /* clean neutral edges */
+  --border-soft:   #e8ebef;
+  --accent:        #00e5a0;   /* mint — the accent (concentrated, not everywhere) */
   --accent-strong: #009e73;
   --accent-2:      #b3730a;
   --danger:        #cf2f26;
   --info:          #2f6bd8;
   --warning:       #8f6d0a;
-  --text:          #15231d;   /* deep green-charcoal — strong, warm-cool balance */
-  --text-2:        #36453e;
-  --text-dim:      #5a6a63;
-  --text-faint:    #8a978f;
+  --text:          #1a1e27;   /* neutral dark slate — strong, clean */
+  --text-2:        #3a414c;
+  --text-dim:      #5e6672;
+  --text-faint:    #8a919d;
   --on-accent:     #04160f;
   /* deep-emerald sidebar */
   --sidebar-bg:          linear-gradient(180deg, #0f5341 0%, #0b4634 100%);
