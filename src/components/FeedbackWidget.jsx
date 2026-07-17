@@ -380,7 +380,7 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
             {thread && (
               <>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: "0.8rem", flexWrap: "wrap" }}>
-                  <span style={{ fontSize: "0.76rem", color: "#cdd0d6" }}>{catMeta(thread.category)[1]} {L(catMeta(thread.category)[2], catMeta(thread.category)[3])}</span>
+                  <span style={{ fontSize: "0.76rem", color: "var(--text-2)" }}>{catMeta(thread.category)[1]} {L(catMeta(thread.category)[2], catMeta(thread.category)[3])}</span>
                   {(() => { const s = STATUS_META[thread.status] || STATUS_META.new; return <span style={{ fontSize: "0.6rem", fontFamily: mono, color: s[0], border: `1px solid ${s[0]}`, borderRadius: 100, padding: "1px 8px", textTransform: "uppercase", letterSpacing: 0.4 }}>{L(s[1], s[2])}</span>; })()}
                 </div>
                 <div style={{ marginBottom: "0.85rem" }}>
@@ -390,7 +390,7 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
                   placeholder={L("Napíš ďalšiu správu…", "Write a follow-up…")} rows={2}
                   style={{ width: "100%", boxSizing: "border-box", background: bg, border: `1px solid ${border}`, borderRadius: 10, color: text, fontFamily: "inherit", fontSize: "0.84rem", lineHeight: 1.5, padding: "0.55rem 0.65rem", resize: "vertical", outline: "none" }} />
                 <button className="rbf-send" onClick={sendContinue} disabled={continuePhase === "sending" || cleanText(continueMsg, { max: MAX_MESSAGE }).length < 2}
-                  style={{ marginTop: "0.6rem", width: "100%", background: cleanText(continueMsg, { max: MAX_MESSAGE }).length >= 2 ? green : "#1c1c22", color: cleanText(continueMsg, { max: MAX_MESSAGE }).length >= 2 ? "#0a0a0c" : dim, border: "none", borderRadius: 10, padding: "0.6rem", fontWeight: 700, fontFamily: mono, fontSize: "0.8rem", cursor: cleanText(continueMsg, { max: MAX_MESSAGE }).length >= 2 ? "pointer" : "not-allowed" }}>
+                  style={{ marginTop: "0.6rem", width: "100%", background: cleanText(continueMsg, { max: MAX_MESSAGE }).length >= 2 ? green : "var(--surface-3)", color: cleanText(continueMsg, { max: MAX_MESSAGE }).length >= 2 ? "#0a0a0c" : dim, border: "none", borderRadius: 10, padding: "0.6rem", fontWeight: 700, fontFamily: mono, fontSize: "0.8rem", cursor: cleanText(continueMsg, { max: MAX_MESSAGE }).length >= 2 ? "pointer" : "not-allowed" }}>
                   {continuePhase === "sending" ? L("Odosielam…", "Sending…") : `${L("Odoslať", "Send")} →`}
                 </button>
               </>
@@ -413,7 +413,7 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
                 <button key={c.id} className="rbf-conv" onClick={() => openThread(c.id)}
                   style={{ display: "block", width: "100%", textAlign: "left", border: `1px solid ${border}`, borderRadius: 10, padding: "0.7rem 0.8rem", marginBottom: "0.6rem", background: bg, cursor: "pointer", transition: "border-color .15s" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: "0.35rem", flexWrap: "wrap" }}>
-                    <span style={{ fontSize: "0.74rem", color: "#cdd0d6" }}>{cm[1]} {L(cm[2], cm[3])}</span>
+                    <span style={{ fontSize: "0.74rem", color: "var(--text-2)" }}>{cm[1]} {L(cm[2], cm[3])}</span>
                     <span style={{ fontSize: "0.58rem", fontFamily: mono, color: s[0], border: `1px solid ${s[0]}`, borderRadius: 100, padding: "1px 7px", textTransform: "uppercase", letterSpacing: 0.4 }}>{L(s[1], s[2])}</span>
                     {newForUser && <span style={{ fontSize: "0.58rem", fontFamily: mono, color: green }}>● {L("nová odpoveď", "new reply")}</span>}
                     <span style={{ marginLeft: "auto", fontSize: "0.6rem", fontFamily: mono, color: dim }}>{fmtDay(c.activity_at)}</span>
@@ -451,7 +451,7 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
         ) : (
           /* ── Form (new conversation) ───────────────────────────── */
           <>
-            <div style={{ color: "#cdd0d6", fontSize: "0.84rem", lineHeight: 1.55, marginBottom: "1.1rem" }}>
+            <div style={{ color: "var(--text-2)", fontSize: "0.84rem", lineHeight: 1.55, marginBottom: "1.1rem" }}>
               {L("Daj nám vedieť čokoľvek — ak niečo nefunguje, ak vieš o aktívnej novostavbe, ktorá nám chýba, alebo máš otázku či nápad na novú funkciu, ktorú by si uvítal. Tie najlepšie veľmi radi pridáme. 🙌",
                  "Tell us anything — if something's not working, if you know an active new-build we're missing, or if you have a question or a feature you'd love to see. We're always glad to add the best ones. 🙌")}
             </div>
@@ -462,7 +462,7 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
                 const on = category === key;
                 return (
                   <button key={key} className="rbf-cat" onClick={() => pickCategory(key)} aria-pressed={on}
-                    style={{ display: "flex", alignItems: "center", gap: "0.5rem", textAlign: "left", padding: "0.62rem 0.65rem", borderRadius: 10, cursor: "pointer", border: `1px solid ${on ? green : border}`, background: on ? "rgba(0,229,160,0.1)" : bg, color: on ? green : "#cdd0d6", fontFamily: "inherit", fontSize: "0.8rem", fontWeight: on ? 600 : 500 }}>
+                    style={{ display: "flex", alignItems: "center", gap: "0.5rem", textAlign: "left", padding: "0.62rem 0.65rem", borderRadius: 10, cursor: "pointer", border: `1px solid ${on ? green : border}`, background: on ? "rgba(0,229,160,0.1)" : bg, color: on ? green : "var(--text-2)", fontFamily: "inherit", fontSize: "0.8rem", fontWeight: on ? 600 : 500 }}>
                     <span style={{ fontSize: "1.05rem", lineHeight: 1 }} aria-hidden="true">{emoji}</span>
                     <span style={{ flex: 1, minWidth: 0 }}>{L(sk, en)}</span>
                     {on && <span aria-hidden="true" style={{ color: green, fontSize: "0.8rem", fontWeight: 700 }}>✓</span>}
@@ -487,7 +487,7 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
               </div>
             ) : (
               <>
-                <button onClick={() => fileRef.current?.click()} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.45rem", background: bg, border: `1px dashed ${border}`, color: "#cdd0d6", borderRadius: 10, padding: "0.65rem", cursor: "pointer", fontSize: "0.8rem", fontFamily: "inherit" }}
+                <button onClick={() => fileRef.current?.click()} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.45rem", background: bg, border: `1px dashed ${border}`, color: "var(--text-2)", borderRadius: 10, padding: "0.65rem", cursor: "pointer", fontSize: "0.8rem", fontFamily: "inherit" }}
                   onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(0,229,160,0.5)"; }} onMouseLeave={e => { e.currentTarget.style.borderColor = border; }}>
                   <span aria-hidden="true">📎</span> {L("Vložiť (Ctrl/⌘+V) alebo nahrať obrázok", "Paste (Ctrl/⌘+V) or upload an image")}
                 </button>
@@ -512,7 +512,7 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
             {phase === "error" && <div style={{ marginTop: "0.7rem", color: red, fontSize: "0.78rem", fontFamily: mono, display: "flex", alignItems: "center", gap: "0.35rem" }}><span aria-hidden="true">⚠</span> {errorMsg}</div>}
 
             <button className="rbf-send" onClick={submit} disabled={!canSend}
-              style={{ marginTop: "1rem", width: "100%", background: canSend ? green : "#1c1c22", color: canSend ? "#0a0a0c" : dim, border: "none", borderRadius: 10, padding: "0.7rem 0.8rem", fontWeight: 700, fontFamily: mono, fontSize: "0.82rem", cursor: canSend ? "pointer" : "not-allowed", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "0.4rem" }}>
+              style={{ marginTop: "1rem", width: "100%", background: canSend ? green : "var(--surface-3)", color: canSend ? "#0a0a0c" : dim, border: "none", borderRadius: 10, padding: "0.7rem 0.8rem", fontWeight: 700, fontFamily: mono, fontSize: "0.82rem", cursor: canSend ? "pointer" : "not-allowed", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "0.4rem" }}>
               {phase === "sending" ? L("Odosielam…", "Sending…") : <>{L("Odoslať", "Send")} <span aria-hidden="true">→</span></>}
             </button>
 

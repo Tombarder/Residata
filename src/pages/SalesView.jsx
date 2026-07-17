@@ -14,6 +14,7 @@ import { accent as green, orange, dim, border, bg, surfacePanel as panelHi, text
 const panel = "var(--surface-2)";
 const mono = "'JetBrains Mono', ui-monospace, Menlo, monospace";
 
+const DETAIL_LIMIT = 500; // page size for the detail table; the RPC returns +1 as a has-more sentinel
 const PERIODS = [[30, "30 dní", "30 days"], [45, "45 dní", "45 days"], [60, "60 dní", "60 days"], [90, "90 dní", "90 days"]];
 const GROUP_DIMS = [
   ["city", "Mesto", "City"], ["district", "Mestská časť", "District"], ["developer", "Developer", "Developer"],
@@ -38,11 +39,17 @@ const DETAIL_COLS_PIPE = [
 const STATUSES = [["sold", "Predané", "Sold"], ["reserved", "Rezervované", "Reserved"], ["prereserved", "Predrezervované", "Pre-reserved"]];
 const HEADLINE = { sold: ["Predané (trvalo)", "Sold (stayed)"], reserved: ["Rezervované teraz", "Reserved now"], prereserved: ["Predrezervované teraz", "Pre-reserved now"] };
 
+// LOCAL calendar date (YYYY-MM-DD) — NOT toISOString(), which returns the UTC date.
+// Our users are in SK/CZ (UTC+1/+2), so a UTC date shifts the whole "last N days" window
+// back a day for any part of the evening, silently dropping units sold "today".
+function isoLocal(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 function isoDaysAgo(n) {
   const d = new Date(); d.setDate(d.getDate() - n);
-  return d.toISOString().slice(0, 10);
+  return isoLocal(d);
 }
-const isoToday = () => new Date().toISOString().slice(0, 10);
+const isoToday = () => isoLocal(new Date());
 
 function fmtMoney(eur) {
   if (eur == null || !Number.isFinite(Number(eur))) return "—";
@@ -100,12 +107,13 @@ export default function SalesView({ lang = "sk" }) {
   // sale-only sort keys are invalid for the current-pipeline views → fall back to price
   const effSort = isPipe && (sort.key === "sold_date" || sort.key === "days_on_market") ? { key: "price_s_dph_eur", dir: "desc" } : sort;
   const detailCols = isPipe ? DETAIL_COLS_PIPE : DETAIL_COLS;
+  const detailColSpan = detailCols.filter((c) => c[3] !== "hide").length; // full-row cells must span the ACTUAL visible column count (varies sold vs pipeline)
   const SORTABLE = isPipe ? ["price_s_dph_eur", "price_per_m2_eur", "izby", "obytna_plocha", "city", "project_name"]
                           : ["sold_date", "price_s_dph_eur", "price_per_m2_eur", "days_on_market", "izby", "obytna_plocha", "city", "project_name"];
   const common = { status, date_from, date_to, durable_only: durableOnly, filters: baseFilters };
   const summarySpec = useMemo(() => ({ ...common, mode: "summary" }), [JSON.stringify(common)]);       // eslint-disable-line
   const breakdownSpec = useMemo(() => ({ ...common, mode: "breakdown", group_by: groupBy }), [JSON.stringify(common), groupBy]); // eslint-disable-line
-  const detailSpec = useMemo(() => ({ ...common, mode: "detail", sort: [effSort], limit: 500 }), [JSON.stringify(common), JSON.stringify(effSort)]); // eslint-disable-line
+  const detailSpec = useMemo(() => ({ ...common, mode: "detail", sort: [effSort], limit: DETAIL_LIMIT }), [JSON.stringify(common), JSON.stringify(effSort)]); // eslint-disable-line
 
   const sum = useSales({ enabled: true, spec: summarySpec });
   const brk = useSales({ enabled: true, spec: breakdownSpec });
@@ -113,7 +121,11 @@ export default function SalesView({ lang = "sk" }) {
 
   const S = sum.data || {};
   const brkRows = brk.data?.rows || [];
-  const detRows = det.data?.rows || [];
+  // The RPC returns limit+1 rows as a "there's more" sentinel — slice back to the page
+  // size and surface the overflow as a "+" so the table never shows a stray extra row.
+  const _detRaw = det.data?.rows || [];
+  const detHasMore = _detRaw.length > DETAIL_LIMIT;
+  const detRows = detHasMore ? _detRaw.slice(0, DETAIL_LIMIT) : _detRaw;
 
   const toggleProject = (name) => setProjects((p) => p.includes(name) ? p.filter((x) => x !== name) : [...p, name]);
   const clearFilters = () => { setProjects([]); setFCity(""); setFDev(""); setFTyp(""); setMarket(""); };
@@ -292,7 +304,7 @@ export default function SalesView({ lang = "sk" }) {
       {/* detail: the exact units */}
       <div style={card}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem", flexWrap: "wrap", gap: "0.5rem" }}>
-          <span style={kpiLbl}>{t("Konkrétne byty", "The exact units")}{detRows.length ? ` · ${detRows.length}${detRows.length >= 500 ? "+" : ""}` : ""}</span>
+          <span style={kpiLbl}>{t("Konkrétne byty", "The exact units")}{detRows.length ? ` · ${detRows.length}${detHasMore ? "+" : ""}` : ""}</span>
           <button onClick={exportCsv} disabled={!detRows.length} style={{ ...sel, cursor: detRows.length ? "pointer" : "default", color: detRows.length ? "#04130d" : dim, background: detRows.length ? green : bg, borderColor: detRows.length ? green : border, fontFamily: mono, fontSize: "0.72rem", fontWeight: 700 }}>⬇ CSV</button>
         </div>
         <div style={{ overflowX: "auto", maxHeight: "60vh", overflowY: "auto" }}>
@@ -310,9 +322,9 @@ export default function SalesView({ lang = "sk" }) {
               })}
             </tr></thead>
             <tbody>
-              {det.loading && <tr><td colSpan={10} style={{ padding: "1.2rem", textAlign: "center", color: dim }}>{t("načítavam…", "loading…")}</td></tr>}
-              {det.error && <tr><td colSpan={10} style={{ padding: 0 }}><LoadError lang={lang} /></td></tr>}
-              {!det.loading && !det.error && detRows.length === 0 && <tr><td colSpan={10} style={{ padding: "1.5rem", textAlign: "center", color: dim, fontStyle: "italic" }}>{isPipe ? t("Žiadne jednotky v tomto stave pre tento výber.", "No units in this state for this selection.") : t("Žiadne predané byty pre tento výber a obdobie.", "No sold units for this selection and period.")}</td></tr>}
+              {det.loading && <tr><td colSpan={detailColSpan} style={{ padding: "1.2rem", textAlign: "center", color: dim }}>{t("načítavam…", "loading…")}</td></tr>}
+              {det.error && <tr><td colSpan={detailColSpan} style={{ padding: 0 }}><LoadError lang={lang} /></td></tr>}
+              {!det.loading && !det.error && detRows.length === 0 && <tr><td colSpan={detailColSpan} style={{ padding: "1.5rem", textAlign: "center", color: dim, fontStyle: "italic" }}>{isPipe ? t("Žiadne jednotky v tomto stave pre tento výber.", "No units in this state for this selection.") : t("Žiadne predané byty pre tento výber a obdobie.", "No sold units for this selection and period.")}</td></tr>}
               {detRows.map((r, i) => (
                 <tr key={(r.project_id || "") + (r.unit_id || "") + i} style={{ background: i % 2 ? "var(--surface-2)" : "transparent" }}>
                   {detailCols.filter((c) => c[3] !== "hide").map((c) => {

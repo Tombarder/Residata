@@ -115,8 +115,15 @@ function metricValue(metric, scope, ctx) {
       case "sold_total": return (projects || []).reduce((a, p) => a + (p.sold_units || 0), 0);
       case "developers": return t.developersActive;
       case "sold_through": {
-        const sold = (projects || []).reduce((a, p) => a + (p.sold_units || 0), 0);
-        const den = sold + (t.unitsAvailable || 0) + (t.unitsReserved || 0);
+        // Numerator AND denominator from the SAME source (projects) — mixing projects'
+        // sold with marketTotals' available/reserved (a different, active-only aggregate)
+        // could skew the ratio or push it past 100% for paused/archived projects.
+        let sold = 0, den = 0;
+        for (const p of projects || []) {
+          const s = p.sold_units || 0;
+          sold += s;
+          den += s + (p.available_units || 0) + (p.reserved_units || 0) + (p.prereserved_units || 0);
+        }
         return den ? (sold / den) * 100 : null;
       }
       case "inventory":  return (t.soldLastMonth > 0 && t.unitsAvailable != null) ? t.unitsAvailable / t.soldLastMonth : null;
@@ -358,14 +365,18 @@ function KpiCard({ label, value, hint, delta, lang, accent = textLight, locked =
 // shared anon-client useProjectSnapshots() hook returns [] for everyone. The
 // dashboard is always behind auth, so we read it as the logged-in user — paid /
 // admin get the full series, free users get nothing (their trend widgets are
-// capability-blurred anyway). One light query (<1k rows), cached module-level.
-let _historyCache = null;
+// capability-blurred anyway). One light query (<1k rows), cached module-level —
+// KEYED BY user id, because project_snapshots is RLS-gated: a paid user's rows must
+// never be handed to a different (e.g. free) user who logs in during the same module
+// lifetime. (Mirrors useProjects' user-keyed cache in lib/useData.js.)
+let _historyCache = { key: null, rows: null };
 function useProjectHistory() {
   const { user } = useAuth();
-  const [rows, setRows] = useState(_historyCache || []);
+  const [rows, setRows] = useState(() => (_historyCache.key === (user?.id || null) ? _historyCache.rows : null) || []);
   useEffect(() => {
+    const key = user?.id || null;
     if (!user) { setRows([]); return; }
-    if (_historyCache) { setRows(_historyCache); return; }
+    if (_historyCache.key === key && _historyCache.rows) { setRows(_historyCache.rows); return; }
     let cancelled = false;
     supabaseData.from("project_snapshots")
       .select("project_id,snapshot_month,available_units,sold_units,reserved_units,avg_price_eur_m2,district,developer")
@@ -373,8 +384,8 @@ function useProjectHistory() {
       .then(({ data, error }) => {
         if (cancelled) return;
         if (error) { console.error("[useProjectHistory]", error); return; }
-        _historyCache = data || [];
-        setRows(_historyCache);
+        _historyCache = { key, rows: data || [] };
+        setRows(_historyCache.rows);
       });
     return () => { cancelled = true; };
   }, [user?.id]);
@@ -818,7 +829,7 @@ function WidgetMenu({ lang, widget, first, last, onConfigure, onToggleWidth, onM
 function MenuItem({ icon, children, onClick, disabled, danger }) {
   return (
     <button onClick={onClick} disabled={disabled}
-      style={{ display: "flex", alignItems: "center", gap: "0.6rem", width: "100%", textAlign: "left", padding: "0.5rem 0.6rem", background: "transparent", border: "none", borderRadius: 7, cursor: disabled ? "default" : "pointer", color: disabled ? faint : (danger ? "#ff8a8a" : "#d0d0d6"), fontFamily: "inherit", fontSize: "0.82rem" }}
+      style={{ display: "flex", alignItems: "center", gap: "0.6rem", width: "100%", textAlign: "left", padding: "0.5rem 0.6rem", background: "transparent", border: "none", borderRadius: 7, cursor: disabled ? "default" : "pointer", color: disabled ? faint : (danger ? "#ff8a8a" : textLight), fontFamily: "inherit", fontSize: "0.82rem" }}
       onMouseEnter={e => { if (!disabled) e.currentTarget.style.background = danger ? "rgba(255,107,107,0.1)" : "var(--surface-2)"; }}
       onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
       <span style={{ width: 16, textAlign: "center", fontSize: "0.8rem", opacity: 0.9 }}>{icon}</span>

@@ -221,7 +221,7 @@ export default function UsageDashboard({ lang = "en" }) {
                   {daily.map((d) => {
                     const ev = Number(d.events) || 0;
                     const h = (ev / maxDailyEvents) * 100;
-                    const uh = (Number(d.active_users) / maxDailyUsers) * 100;
+                    const uh = ((Number(d.active_users) || 0) / maxDailyUsers) * 100;
                     // Give any non-zero day a visible sliver so a quiet day next to a
                     // spike doesn't vanish (linear scale would round it to 0px).
                     const barH = ev > 0 ? `max(3px, ${h}%)` : "0%";
