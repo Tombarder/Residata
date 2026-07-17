@@ -1890,7 +1890,7 @@ function PlatformExports({ lang, setCurrent }) {
   const doFlats = () => (xfmt === "xlsx" ? xlsxFromFlats() : csvFromFlats());
 
   return (
-    <div style={{ padding: "1rem 2rem 4rem", maxWidth: 720 }}>
+    <div style={{ padding: "2rem 2rem 4rem", maxWidth: 820, margin: "0 auto" }}>
       <p style={{ color: dim, fontSize: "0.9rem", lineHeight: 1.6, marginTop: 0, marginBottom: "1.5rem" }}>
         {lang === "sk"
           ? "Vyber si dátum snapshotu a stiahni dataset ako CSV, alebo ho ťahaj cez REST API do tvojho stacku."
