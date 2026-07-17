@@ -114,8 +114,13 @@ export default function PlatformReports({ lang = "sk" }) {
     if (cities.length)     setCityPick(v => (v && cities.includes(v)) ? v : cities[0]);
     if (districts.length)  setDistPick(v => (v && districts.includes(v)) ? v : districts[0]);
     if (developers.length) setDevPick(v => (v && developers.includes(v)) ? v : developers[0]);
-    if (projects.length)   setProjPick(v => (v && projects.some(p => p.id === v)) ? v : projects[0].id);
-  }, [cities, districts, projects, developers]); // eslint-disable-line
+    // Validate the project pick against ALL projects (incl. paused/sold_out) — the picker
+    // deliberately lists them so the user can pull up a historical project's report. Using
+    // activeProjects here kicked the user off a paused project they explicitly chose on the
+    // next useProjects refetch/tier-flip. Only fall back to an active project when the pick
+    // is invalid in the FULL set (e.g. genuinely gone after a country switch).
+    if (projects.length)   setProjPick(v => (v && allProjects.some(p => p.id === v)) ? v : projects[0].id);
+  }, [cities, districts, projects, developers, allProjects]); // eslint-disable-line
 
   const loading = loadingProjects;
 
@@ -357,7 +362,12 @@ export default function PlatformReports({ lang = "sk" }) {
 /* ─── Header card: title + month + print + scope-aware subtitle ─── */
 function ReportHeader({ projects, lang, scope, scopeLabel }) {
   const month = new Date().toLocaleDateString(localeTag(lang), { month: "long", year: "numeric" });
-  const lastSync = projects[0]?.last_updated?.slice(0, 10) || new Date().toISOString().slice(0, 10);
+  // "Data as of" = the MOST RECENT scrape across the scope's projects (projects[0] is just
+  // the highest-availability project, an arbitrary date). Fallback uses the LOCAL calendar
+  // date, not toISOString() (UTC), which for a SK/CZ user after local midnight is yesterday.
+  const _lu = projects.map(p => p.last_updated).filter(Boolean).sort();
+  const _localToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+  const lastSync = _lu.length ? _lu[_lu.length - 1].slice(0, 10) : _localToday();
   // Unit count from projects_live rollups (honest in v2) — no flats fetch.
   const totalUnits = useMemo(() => summariseProjects(projects).totalUnits, [projects]);
   // Display name of the scope tab ("Trh", "Mesto", "Projekt", …).
@@ -828,7 +838,11 @@ function KpiStrip({ summary, lang, extra = [] }) {
     { label: lang === "sk" ? "Predaných"   : "Sold",       value: summary.sold.toLocaleString("en-US").replace(/,/g, " "), color: orange },
     { label: lang === "sk" ? "Predaných %" : "Sold %",     value: soldPctLabel, color: orange },
     ...(summary.wavgM2 ? [{
-      label: lang === "sk" ? `Ø ${moneySymbol()}/m² (vážené)` : `Ø ${moneySymbol()}/m² (wtd)`,
+      // "Ø €/m²" (average), NOT "(weighted)": this KPI is unit-weighted only in the
+      // market/city/district scope; in the project deep-dive `summary` is the mean-of-ratios
+      // that matches projects_live.avg_price_eur_m2 (kept identical for cross-surface
+      // consistency). A plain "average" label is honest for both, "(weighted)" was not.
+      label: `Ø ${moneySymbol()}/m²`,
       value: Math.round(moneyFromEur(summary.wavgM2)).toLocaleString("en-US").replace(/,/g, " "),
     }] : []),
     ...extra,
@@ -1152,7 +1166,7 @@ function BenchmarkCard({ local, global, scopeLabel, lang }) {
     return ((local[metric] / global[metric]) - 1) * 100;
   };
   const rows = [
-    { label: lang === "sk" ? `Ø ${moneySymbol()}/m² (vážené)` : `Ø ${moneySymbol()}/m² (weighted)`, local: local.wavgM2, global: global.wavgM2, delta: delta("wavgM2"), unit: `${moneySymbol()}/m²`, money: true, lowerIsGood: true },
+    { label: `Ø ${moneySymbol()}/m²`, local: local.wavgM2, global: global.wavgM2, delta: delta("wavgM2"), unit: `${moneySymbol()}/m²`, money: true, lowerIsGood: true },
     { label: lang === "sk" ? "Predaných %"    : "Sold %",             local: local.soldPct, global: global.soldPct, delta: (local.soldPct == null || global.soldPct == null) ? null : local.soldPct - global.soldPct, unit: "%",    lowerIsGood: false, absolute: true },
     { label: lang === "sk" ? "Voľných na projekt" : "Avail / project", local: local.projectCount > 0 ? local.available / local.projectCount : 0, global: global.projectCount > 0 ? global.available / global.projectCount : 0, delta: null, unit: "", lowerIsGood: false },
   ];

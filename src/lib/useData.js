@@ -56,15 +56,23 @@ function _toEurDisplay(rows) {
     // / price_bez_dph_eur are precomputed; cennikova_cena (list price) has no EUR
     // column, so convert it with this rate too — otherwise it stays CZK next to a
     // EUR sale price in CZ/All exports (looked ~24× off). Native preserved.
-    const rate = f.cena_s_dph ? (f.price_s_dph_eur / f.cena_s_dph) : 1;
+    // Effective EUR-per-native rate. Derive from whichever priced pair is available
+    // (s_dph first, then bez_dph) — do NOT default to 1.0 when cena_s_dph is 0/null (a
+    // sold/hidden-price unit), or a CZK list price would pass through unconverted (~24×
+    // off) next to a EUR sale price. If no pair yields a rate, null the native-only
+    // fields rather than emit a CZK number labelled as EUR (better "—" than a wrong €).
+    const rate = (f.cena_s_dph && f.price_s_dph_eur != null) ? (f.price_s_dph_eur / f.cena_s_dph)
+      : (f.cena_bez_dph && f.price_bez_dph_eur != null) ? (f.price_bez_dph_eur / f.cena_bez_dph)
+      : null;
+    const toEur = (native) => (native == null ? native : (rate != null && Number.isFinite(rate) ? native * rate : null));
     return {
       ...f,
       cena_s_dph_native: f.cena_s_dph,
       cena_bez_dph_native: f.cena_bez_dph,
       cennikova_cena_native: f.cennikova_cena,
       cena_s_dph: f.price_s_dph_eur,
-      cena_bez_dph: f.price_bez_dph_eur != null ? f.price_bez_dph_eur : f.cena_bez_dph,
-      cennikova_cena: f.cennikova_cena != null && Number.isFinite(rate) ? f.cennikova_cena * rate : f.cennikova_cena,
+      cena_bez_dph: f.price_bez_dph_eur != null ? f.price_bez_dph_eur : toEur(f.cena_bez_dph),
+      cennikova_cena: toEur(f.cennikova_cena),
     };
   });
 }
@@ -641,7 +649,11 @@ export function useMarketTotals() {
       return;
     }
     const cached = _marketTotalsByCountry.get(country);
+    // On a country switch with no cache for the new country, flip to loading INSTEAD of
+    // leaving the previous country's numbers showing as confident (loading:false). Without
+    // this, DashboardHome/HomeExtras/ticker show the departed country's totals mid-switch.
     if (cached) setTotals(cached);
+    else setTotals(t => ({ ...t, loading: true, error: false }));
     let cancelled = false;
     // "All" → the cross-market combined row (totals_global); else the per-country
     // row. totals_global now includes total_sold_last_month (cross-market velocity,
@@ -1313,12 +1325,20 @@ export function useFlatsArchive(months, dates, enabled = true) {
  *  same monthly cadence, so the count is identical either way. The proper
  *  fix is a backend change: add a country/market_key column to the
  *  archive_months view, then add `.eq("country", country)` here.  */
-let _archiveMonthsCache = null;
+// archive_months is RLS-gated (anon/free callers see ≤1 month), so the cache is keyed
+// by identity and the fetch waits for auth — an anon-first / token-race read must not
+// latch a truncated month list for the rest of a logged-in session.
+let _archiveMonthsCache = new Map();
 export function useArchiveMonths() {
-  const [months, setMonths] = useState(_archiveMonthsCache || []);
-  const [loading, setLoading] = useState(_archiveMonthsCache === null);
+  const { loading: authLoading, user, profile } = useAuth();
+  const key = `${user?.id || "anon"}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}`;
+  const [months, setMonths] = useState(_archiveMonthsCache.get(key) || []);
+  const [loading, setLoading] = useState(!_archiveMonthsCache.has(key));
   useEffect(() => {
     if (!isSupabaseReady()) { setLoading(false); return; }
+    if (authLoading) return; // wait for the session so RLS returns the caller's real rows
+    if (_archiveMonthsCache.has(key)) { setMonths(_archiveMonthsCache.get(key)); setLoading(false); return; }
+    setLoading(true);
     let cancelled = false;
     (async () => {
       const { data, error } = await sbRead(supabaseData
@@ -1341,12 +1361,12 @@ export function useArchiveMonths() {
           arr.push(row.snapshot_month);
         }
       }
-      _archiveMonthsCache = arr;
+      _archiveMonthsCache.set(key, arr);
       setMonths(arr);
       setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [key, authLoading]); // eslint-disable-line react-hooks/exhaustive-deps
   return { months, loading };
 }
 
@@ -1357,14 +1377,22 @@ export function useArchiveMonths() {
  * (decomposable aggs + whitelisted dims + time-only filters). The client rebuilds
  * the tree from the grain; non-server-able configs fall back to the raw path. */
 let _archiveDaysCache = new Map();
-/** Distinct scrape days (YYYY-MM-DD, DESC) for the current country. Light + cached. */
+/** Distinct scrape days (YYYY-MM-DD, DESC) for the current country. Light + cached.
+ *  archive_days is RLS-gated (anon → none; free → only their chosen project's days;
+ *  paid/admin → all), so the cache MUST be keyed by identity (user::tier::chosen), not
+ *  country alone, and the fetch MUST wait for auth — otherwise a token-race anon read
+ *  latches an empty day list for a logged-in paid user, or one tier's list leaks to another. */
 export function useArchiveDays() {
   const { country } = useCountry();
-  const [days, setDays] = useState(_archiveDaysCache.get(country) || []);
-  const [loading, setLoading] = useState(!_archiveDaysCache.has(country));
+  const { loading: authLoading, user, profile } = useAuth();
+  const key = `${user?.id || "anon"}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}::${country}`;
+  const [days, setDays] = useState(_archiveDaysCache.get(key) || []);
+  const [loading, setLoading] = useState(!_archiveDaysCache.has(key));
   useEffect(() => {
     if (!isSupabaseReady()) { setLoading(false); return; }
-    if (_archiveDaysCache.has(country)) { setDays(_archiveDaysCache.get(country)); setLoading(false); return; }
+    if (authLoading) return; // wait for the session so RLS returns the caller's real rows
+    if (_archiveDaysCache.has(key)) { setDays(_archiveDaysCache.get(key)); setLoading(false); return; }
+    setLoading(true);
     let cancelled = false;
     (async () => {
       const { data, error } = await sbRead(_eqCountry(supabaseData.from("archive_days").select("day"), country).order("day", { ascending: false }));
@@ -1372,10 +1400,10 @@ export function useArchiveDays() {
       if (error) { console.error("[useArchiveDays]", error); setLoading(false); return; }
       const seen = new Set(); const arr = [];
       for (const row of data || []) { const d = row.day; if (d && !seen.has(d)) { seen.add(d); arr.push(d); } }
-      _archiveDaysCache.set(country, arr); setDays(arr); setLoading(false);
+      _archiveDaysCache.set(key, arr); setDays(arr); setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [country]);
+  }, [key, authLoading]); // eslint-disable-line react-hooks/exhaustive-deps
   return { days, loading };
 }
 
@@ -1421,7 +1449,11 @@ export function usePivotGrain({ enabled = false, spec = null } = {}) {
    ({…kpis} / {rows:[…]}). RLS-gated PREMIUM (paid/chosen-project) in the RPC. One call per
    mode (a page renders summary + breakdown + detail with three useSales instances). */
 export function useSales({ enabled = false, spec = null } = {}) {
-  const { loading: authLoading } = useAuth();
+  const { loading: authLoading, user, profile } = useAuth();
+  // analytics_sales is RLS-gated by identity (paid/tier/chosen project), so a tier
+  // upgrade or a chosen-project change that does NOT flip authLoading must still refetch
+  // — include identity in the effect key like every other RLS hook (usePivotGrain etc.).
+  const identity = `${user?.id || "anon"}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}`;
   const specKey = spec ? JSON.stringify(spec) : "";
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(!!enabled);
@@ -1439,7 +1471,7 @@ export function useSales({ enabled = false, spec = null } = {}) {
       setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [enabled, specKey, authLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [enabled, specKey, authLoading, identity]); // eslint-disable-line react-hooks/exhaustive-deps
   return { data, loading, error };
 }
 

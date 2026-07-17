@@ -84,7 +84,15 @@ export function CurrencyProvider({ children }) {
     let displayCode = chosen && offered.includes(chosen) ? chosen : "EUR";
     if (!offered.includes(displayCode)) displayCode = "EUR";
     const exch = rates[displayCode]; // EUR per 1 unit
-    const unitsPerEur = displayCode === "EUR" ? 1 : (exch ? 1 / exch : 1);
+    // A non-EUR currency needs a VALID positive rate to convert. Until the rates fetch
+    // lands (or if it fails / a row has a null/0 rate), fall back to EUR display ENTIRELY
+    // — code, symbol AND factor together. Otherwise we'd pair the "Kč" symbol with an
+    // unconverted EUR number (unitsPerEur=1), a ~24× understatement with the wrong symbol.
+    let unitsPerEur = 1;
+    if (displayCode !== "EUR") {
+      if (exch && Number.isFinite(exch) && exch > 0) unitsPerEur = 1 / exch;
+      else displayCode = "EUR"; // rate not (yet) available → show EUR, not wrong Kč
+    }
     return {
       marketNative,
       offered,

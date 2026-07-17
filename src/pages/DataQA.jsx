@@ -264,7 +264,7 @@ export default function DataQA({ lang = "sk" }) {
     rpcDirect("admin_qa_dates", { p_project_id: p.id })
       .then((d) => {
         if (my !== reqRef.current) return;
-        const sorted = [...(Array.isArray(d) ? d : [])].sort((a, b) => (a.scrape_date < b.scrape_date ? 1 : -1));
+        const sorted = [...(Array.isArray(d) ? d : [])].sort((a, b) => (a.scrape_date < b.scrape_date ? 1 : a.scrape_date > b.scrape_date ? -1 : 0));
         setDates(sorted);
         const first = sorted.length ? sorted[0].scrape_date : "";
         setDate(first);
