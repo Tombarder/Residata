@@ -383,8 +383,8 @@ function Sidebar({ page, lang, can, tier, email, onNavigate, onSignOut, mobileOp
         className={`platform-sidebar${mobileOpen ? " is-open" : ""}`}
         style={{
           position: "fixed", left: 0, top: 0, bottom: 0, width: SIDEBAR_W,
-          background: "linear-gradient(180deg, var(--surface-2) 0%, var(--bg) 100%)",
-          borderRight: `1px solid ${border}`,
+          background: "var(--sidebar-bg)",
+          borderRight: `1px solid var(--sidebar-border)`,
           display: "flex", flexDirection: "column",
           zIndex: 50,
         }}
@@ -394,10 +394,10 @@ function Sidebar({ page, lang, can, tier, email, onNavigate, onSignOut, mobileOp
           <div style={{
             width: 32, height: 32, borderRadius: 7, background: green,
             display: "flex", alignItems: "center", justifyContent: "center",
-            fontWeight: 700, color: "var(--bg)", fontFamily: mono, fontSize: 16,
+            fontWeight: 700, color: "var(--on-accent)", fontFamily: mono, fontSize: 16,
           }}>R</div>
           <div>
-            <div style={{ fontWeight: 600, color: textLight, fontSize: "1rem", letterSpacing: "-0.01em", lineHeight: 1 }}>Residata</div>
+            <div style={{ fontWeight: 600, color: "var(--sidebar-text)", fontSize: "1rem", letterSpacing: "-0.01em", lineHeight: 1 }}>Residata</div>
             <div style={{ fontFamily: mono, fontSize: "0.6rem", color: green, letterSpacing: "0.12em", marginTop: 2 }}>PLATFORM</div>
           </div>
         </div>
@@ -412,7 +412,7 @@ function Sidebar({ page, lang, can, tier, email, onNavigate, onSignOut, mobileOp
             if (visibleItems.length === 0) return null;
             return (
               <div key={group.group} style={{ marginBottom: gi < NAV.length - 1 ? "0.85rem" : 0 }}>
-                {gi > 0 && <div style={{ height: 1, background: border, margin: "0.35rem 0.75rem 0.65rem" }} />}
+                {gi > 0 && <div style={{ height: 1, background: "var(--sidebar-border)", margin: "0.35rem 0.75rem 0.65rem" }} />}
                 {visibleItems.map(item => {
                   const active = page === item.page;
                   const locked = item.requires && !can(item.requires);
@@ -423,21 +423,21 @@ function Sidebar({ page, lang, can, tier, email, onNavigate, onSignOut, mobileOp
                       style={{
                         display: "flex", alignItems: "center", gap: "0.7rem",
                         width: "100%", padding: "0.6rem 0.85rem",
-                        background: active ? "rgba(0,229,160,0.12)" : "transparent",
+                        background: active ? "var(--sidebar-active-bg)" : "transparent",
                         border: "none",
                         borderLeft: `3px solid ${active ? green : "transparent"}`,
-                        color: active ? textLight : (locked ? "var(--text-faint)" : "var(--text-2)"),
+                        color: active ? "var(--sidebar-text)" : (locked ? "var(--sidebar-text-faint)" : "var(--sidebar-text-dim)"),
                         cursor: "pointer",
                         fontSize: "0.88rem", fontFamily: "inherit",
                         textAlign: "left", borderRadius: 0,
                         transition: "background 0.15s, color 0.15s",
                       }}
-                      onMouseEnter={e => !active && (e.currentTarget.style.background = "rgba(255,255,255,0.03)", e.currentTarget.style.color = textLight)}
-                      onMouseLeave={e => !active && (e.currentTarget.style.background = "transparent", e.currentTarget.style.color = locked ? "var(--text-faint)" : "var(--text-2)")}
+                      onMouseEnter={e => !active && (e.currentTarget.style.background = "var(--sidebar-hover-bg)", e.currentTarget.style.color = "var(--sidebar-text)")}
+                      onMouseLeave={e => !active && (e.currentTarget.style.background = "transparent", e.currentTarget.style.color = locked ? "var(--sidebar-text-faint)" : "var(--sidebar-text-dim)")}
                     >
                       <span style={{ display: "inline-flex", alignItems: "center", color: active ? green : "inherit" }}><item.Icon /></span>
                       <span style={{ flex: 1 }}>{item.label[lang] || item.label.en}</span>
-                      {locked && <span style={{ color: "var(--text-faint)" }}><IconLock /></span>}
+                      {locked && <span style={{ color: "var(--sidebar-text-faint)" }}><IconLock /></span>}
                     </button>
                   );
                 })}
@@ -453,18 +453,18 @@ function Sidebar({ page, lang, can, tier, email, onNavigate, onSignOut, mobileOp
         </div>
 
         {/* Account card */}
-        <div style={{ padding: "0.75rem", borderTop: `1px solid ${border}` }}>
+        <div style={{ padding: "0.75rem", borderTop: `1px solid var(--sidebar-border)` }}>
           <div style={{
-            background: bg2, border: `1px solid ${border}`, borderRadius: 8,
+            background: "var(--sidebar-card-bg)", border: `1px solid var(--sidebar-border)`, borderRadius: 8,
             padding: "0.65rem 0.75rem", marginBottom: "0.5rem",
           }}>
-            <div style={{ fontSize: "0.72rem", color: textLight, fontFamily: mono, lineHeight: 1.3, wordBreak: "break-all" }}>
+            <div style={{ fontSize: "0.72rem", color: "var(--sidebar-text)", fontFamily: mono, lineHeight: 1.3, wordBreak: "break-all" }}>
               {email}
             </div>
             <div style={{ marginTop: "0.35rem", display: "flex", alignItems: "center", gap: "0.4rem" }}>
               <TierBadgeSmall tier={tier} />
               <a href="/" onClick={e => { e.preventDefault(); window.location.assign("/"); }}
-                style={{ marginLeft: "auto", fontSize: "0.68rem", color: dim, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "0.2rem" }}
+                style={{ marginLeft: "auto", fontSize: "0.68rem", color: "var(--sidebar-text-dim)", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "0.2rem" }}
                 title="Back to marketing site">
                 <IconExternal />
               </a>
@@ -478,12 +478,12 @@ function Sidebar({ page, lang, can, tier, email, onNavigate, onSignOut, mobileOp
             onClick={() => onSignOut()}
             style={{
               width: "100%", padding: "0.55rem", background: "transparent",
-              border: `1px solid ${border}`, color: "var(--text-2)",
+              border: `1px solid var(--sidebar-border)`, color: "var(--sidebar-text-dim)",
               fontSize: "0.78rem", borderRadius: 6, cursor: "pointer",
               fontFamily: "inherit",
             }}
             onMouseEnter={e => e.currentTarget.style.borderColor = "#ff6b6b60"}
-            onMouseLeave={e => e.currentTarget.style.borderColor = border}
+            onMouseLeave={e => e.currentTarget.style.borderColor = "var(--sidebar-border)"}
           >
             {lang === "sk" ? "Odhlásiť" : "Sign out"}
           </button>

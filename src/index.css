@@ -31,6 +31,16 @@
   --text-dim:      #8a8a96;   /* secondary / label text */
   --text-faint:    #55555f;   /* tertiary / disabled */
   --on-accent:     #06140f;   /* text on a green fill (dark, fine on both themes) */
+  /* sidebar — its own token set so light mode can make it a deep-emerald brand block
+     without touching the white cards. Dark values = the current dark sidebar. */
+  --sidebar-bg:          linear-gradient(180deg, #0e0e12 0%, #0a0a0b 100%);
+  --sidebar-text:        #e8e8ed;
+  --sidebar-text-dim:    #8a8a96;
+  --sidebar-text-faint:  #55555f;
+  --sidebar-border:      #222228;
+  --sidebar-active-bg:   rgba(0, 229, 160, 0.12);
+  --sidebar-hover-bg:    rgba(255, 255, 255, 0.03);
+  --sidebar-card-bg:     #0e0e12;
   color-scheme: dark;
 
   /* ── spacing scale (4px base) ─────────────────────────── */
@@ -71,28 +81,36 @@
    stay, but red/blue/yellow are darkened so they read on white. Activated by
    setThemePreference() setting <html data-theme="light"> (see src/lib/theme-mode.js). */
 :root[data-theme="light"] {
-  /* Clean SaaS-dashboard light theme (Stripe / Ramp / Mercury reference) — a cool,
-     neutral light-gray canvas, crisp white cards with soft depth, premium dark-SLATE
-     text. Structure comes from subtle borders + soft shadows (not heavy fills), so it
-     reads like normal professional software — not warm/paper, not washed-out.
-     (Brand green stays — hardcoded hex used with alpha suffixes + in map paint.) */
-  --bg:            #f4f6f9;   /* clean cool light-gray canvas */
-  --surface:       #ffffff;   /* white cards / panels */
-  --surface-2:     #eef1f5;   /* inset / row-stripe */
-  --surface-3:     #e6eaf0;   /* input / raised / hover */
-  --border:        #dfe3ea;   /* subtle, clean (shadows carry the depth) */
-  --border-soft:   #e9ecf1;
-  --accent:        #00e5a0;
-  --accent-strong: #00b585;
+  /* "Emerald brand" light theme (Boss-picked design #4) — a deep-emerald sidebar is
+     Residata's signature block; the workspace is a soft green-neutral canvas with crisp
+     white cards + soft depth and deep green-charcoal text; mint green is the sharp accent.
+     Cohesive because every neutral shares the green family — the brand green sits native. */
+  --bg:            #eef3f0;   /* soft green-neutral canvas */
+  --surface:       #ffffff;   /* crisp white cards */
+  --surface-2:     #e5efe9;   /* inset / row-stripe (green-tinted) */
+  --surface-3:     #dce9e2;   /* input / raised / hover */
+  --border:        #d5e2db;   /* green-neutral edges */
+  --border-soft:   #e3ede8;
+  --accent:        #00e5a0;   /* mint — the accent */
+  --accent-strong: #009e73;
   --accent-2:      #b3730a;
-  --danger:        #df1b41;
-  --info:          #2563eb;
-  --warning:       #9a7409;
-  --text:          #1a1f36;   /* dark slate-blue — premium, high contrast */
-  --text-2:        #3c4257;
-  --text-dim:      #626b7d;   /* secondary */
-  --text-faint:    #8a93a3;
-  --on-accent:     #06140f;
+  --danger:        #cf2f26;
+  --info:          #2f6bd8;
+  --warning:       #8f6d0a;
+  --text:          #15231d;   /* deep green-charcoal — strong, warm-cool balance */
+  --text-2:        #36453e;
+  --text-dim:      #5a6a63;
+  --text-faint:    #8a978f;
+  --on-accent:     #04160f;
+  /* deep-emerald sidebar */
+  --sidebar-bg:          linear-gradient(180deg, #0f5341 0%, #0b4634 100%);
+  --sidebar-text:        #eef7f2;
+  --sidebar-text-dim:    #a6cabd;
+  --sidebar-text-faint:  #6f978a;
+  --sidebar-border:      rgba(255, 255, 255, 0.12);
+  --sidebar-active-bg:   rgba(255, 255, 255, 0.13);
+  --sidebar-hover-bg:    rgba(255, 255, 255, 0.07);
+  --sidebar-card-bg:     rgba(255, 255, 255, 0.07);
   color-scheme: light;
 }
 
