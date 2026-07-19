@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, createContext, useContext } from "react";
+import { useEffect, useState, useCallback, useRef, createContext, useContext } from "react";
 import { supabase, isSupabaseReady } from "./supabase";
 
 // F-104: gate debug log behind import.meta.env.DEV so production builds
@@ -47,6 +47,11 @@ function useAuthInternal() {
   const [profile, setProfile] = useState(null);
   const [profileError, setProfileError] = useState(null);
   const [loading, setLoading] = useState(true);
+  // Latest profile, readable inside the once-created onAuthStateChange callback (which
+  // otherwise closes over a stale `profile`). Used to decide whether a SIGNED_IN needs the
+  // loading spinner (fresh login, no profile yet) vs a no-op re-emit (profile already loaded).
+  const profileRef = useRef(profile);
+  useEffect(() => { profileRef.current = profile; }, [profile]);
 
   const loadProfile = useCallback(async (userId) => {
     if (!userId) { setProfile(null); return; }
@@ -119,8 +124,18 @@ function useAuthInternal() {
       const { data } = supabase.auth.onAuthStateChange(async (event, sess) => {
         log("onAuthStateChange", event, sess?.user?.email || "null");
         setUser(sess?.user || null);
-        if (sess?.user) await loadProfile(sess.user.id);
-        else { setProfile(null); setProfileError(null); }
+        if (sess?.user) {
+          // Fresh in-tab login (SIGNED_IN with no profile yet): raise `loading` so consumers
+          // show the auth spinner instead of briefly resolving the just-logged-in user to
+          // anon/free while the profile fetches — the sub-second "wrong tier flash". We do
+          // NOT raise it on TOKEN_REFRESHED / USER_UPDATED (they fire ~hourly and keep the
+          // existing profile → flashing a spinner there would be worse). finally guarantees
+          // loading can never get stuck on.
+          const freshLogin = event === "SIGNED_IN" && !profileRef.current;
+          if (freshLogin) setLoading(true);
+          try { await loadProfile(sess.user.id); }
+          finally { if (freshLogin) setLoading(false); }
+        } else { setProfile(null); setProfileError(null); }
       });
       unsub = () => data.subscription.unsubscribe();
     })();
