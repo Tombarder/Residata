@@ -38,10 +38,10 @@ import { getTheme, useThemeMode } from "../lib/theme-mode";
 const greyPt = "#6b6b76";
 const panel = "var(--surface)";
 
-// CARTO vector basemaps — free, no key. Dark-matter in BOTH themes: the light basemap read washed/unnatural, a dark map makes markers pop.
+// CARTO vector basemaps — free, no key. Light (positron) in light theme, dark-matter in dark.
 // Same cartocdn.com host as before, so the CSP already allows it.
 const MAP_STYLE_DARK = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
-const MAP_STYLE_LIGHT = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"; // dark-matter in light theme too — the pale basemap read washed; a dark map makes the coloured project markers pop (Boss 2026-07-20)
+const MAP_STYLE_LIGHT = "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json";
 const mapStyleUrl = () => (getTheme() === "light" ? MAP_STYLE_LIGHT : MAP_STYLE_DARK);
 
 // Install the clustered projects source + layers on a map. Run on initial load AND
