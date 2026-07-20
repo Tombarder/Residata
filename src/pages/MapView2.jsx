@@ -37,7 +37,7 @@ import Picker from "../components/Picker";
 import { applyFilters, describe, isComplete } from "../lib/mapFilters";
 
 const mono = "'JetBrains Mono', monospace";
-import { accentPaint as green, orange as amber, dim, text as textLight, border, surfaceDark as bg2 } from "../lib/theme";
+import { accent as green, accentPaint, orange as amber, dim, text as textLight, border, surfaceDark as bg2 } from "../lib/theme";
 import { getTheme, useThemeMode } from "../lib/theme-mode";
 const greyPt = "#6b6b76";
 const panel = "var(--surface)";
@@ -52,8 +52,8 @@ const mapStyleUrl = () => (getTheme() === "light" ? MAP_STYLE_LIGHT : MAP_STYLE_
 function installMap2Layers(map, features) {
   if (map.getSource("projects")) return; // already installed on this style
   map.addSource("radius", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
-  map.addLayer({ id: "radius-fill", type: "fill", source: "radius", paint: { "fill-color": green, "fill-opacity": 0.07 } });
-  map.addLayer({ id: "radius-line", type: "line", source: "radius", paint: { "line-color": green, "line-width": 1.5, "line-dasharray": [2, 2] } });
+  map.addLayer({ id: "radius-fill", type: "fill", source: "radius", paint: { "fill-color": accentPaint, "fill-opacity": 0.07 } });
+  map.addLayer({ id: "radius-line", type: "line", source: "radius", paint: { "line-color": accentPaint, "line-width": 1.5, "line-dasharray": [2, 2] } });
   map.addSource("draw", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
   map.addLayer({ id: "draw-fill", type: "fill", source: "draw", filter: ["==", ["geometry-type"], "Polygon"], paint: { "fill-color": amber, "fill-opacity": 0.10 } });
   map.addLayer({ id: "draw-line", type: "line", source: "draw", filter: ["!=", ["geometry-type"], "Point"], paint: { "line-color": amber, "line-width": 2 } });
@@ -650,7 +650,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
       if (src) src.setData(circlePolygon(analysisCenter, radiusKm));
       if (!markerRef.current) {
         const el = document.createElement("div");
-        el.style.cssText = `width:16px;height:16px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:${green};border:2px solid #0a0a0b;box-shadow:0 0 0 2px ${green}55;cursor:grab`;
+        el.style.cssText = `width:16px;height:16px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:${green};border:2px solid #0a0a0b;box-shadow:0 0 0 2px color-mix(in srgb, var(--accent) 33%, transparent);cursor:grab`;
         const mk = new maplibregl.Marker({ element: el, draggable: true }).setLngLat([analysisCenter.lng, analysisCenter.lat]).addTo(map);
         mk.on("dragend", () => { const ll = mk.getLngLat(); setAnalysisCenter({ lng: ll.lng, lat: ll.lat }); setAnchorId(null); });
         markerRef.current = mk;
@@ -809,7 +809,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
         </button>
         {!showExplainer && <button onClick={reopenExplainer} title={sk ? "Ako to funguje?" : "How it works?"} style={{ ...chipStyle(false), padding: "6px 10px" }}>?</button>}
         {extSet && (
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: `${green}22`, color: green, border: `1px solid ${green}`, borderRadius: 999, padding: "4px 10px", fontSize: "0.72rem", fontWeight: 600 }}
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: `color-mix(in srgb, var(--accent) 13%, transparent)`, color: green, border: `1px solid ${green}`, borderRadius: 999, padding: "4px 10px", fontSize: "0.72rem", fontWeight: 600 }}
             title={sk ? "Zobrazené len projekty vyfiltrované v analytike" : "Showing only the projects filtered in analytics"}>
             🗺 {(() => {
               // Honest count: how many of the handed analytics projects are actually
@@ -824,7 +824,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
           </span>
         )}
         {activeConds.map((c) => (
-          <span key={c.id} style={{ display: "inline-flex", alignItems: "center", gap: 5, background: `${green}14`, color: green, border: `1px solid ${green}40`, borderRadius: 999, padding: "4px 9px", fontSize: "0.7rem", maxWidth: 250 }}>
+          <span key={c.id} style={{ display: "inline-flex", alignItems: "center", gap: 5, background: `color-mix(in srgb, var(--accent) 8%, transparent)`, color: green, border: `1px solid color-mix(in srgb, var(--accent) 25%, transparent)`, borderRadius: 999, padding: "4px 9px", fontSize: "0.7rem", maxWidth: 250 }}>
             <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{describe(c, sk)}</span>
             <span onClick={() => setConditions((cs) => cs.filter((x) => x.id !== c.id))} style={{ cursor: "pointer", flexShrink: 0 }}>×</span>
           </span>
@@ -927,7 +927,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
                       {shape.kind === "polygon" ? "▱" : "⇢"} {shape.kind === "polygon" ? (sk ? "oblasť" : "area") : (sk ? "koridor" : "corridor")}{shapeSize ? ` · ${shapeSize.label}` : ""}
                     </span>
                     <button onClick={() => startDraw(shape.kind)} title={sk ? "Nakresliť znova" : "Redraw"} style={{ background: "none", border: `1px solid ${border}`, color: dim, borderRadius: 6, padding: "3px 9px", fontSize: "0.68rem", cursor: "pointer" }}>{sk ? "Znova" : "Redraw"}</button>
-                    {!saving && <button onClick={beginSave} title={sk ? "Uložiť túto oblasť pre neskôr" : "Save this area for later"} style={{ background: "none", border: `1px solid ${green}55`, color: green, borderRadius: 6, padding: "3px 9px", fontSize: "0.68rem", cursor: "pointer" }}>☆ {sk ? "Uložiť" : "Save"}</button>}
+                    {!saving && <button onClick={beginSave} title={sk ? "Uložiť túto oblasť pre neskôr" : "Save this area for later"} style={{ background: "none", border: `1px solid color-mix(in srgb, var(--accent) 33%, transparent)`, color: green, borderRadius: 6, padding: "3px 9px", fontSize: "0.68rem", cursor: "pointer" }}>☆ {sk ? "Uložiť" : "Save"}</button>}
                   </div>
                   {saving && (
                     <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
@@ -935,7 +935,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
                         onKeyDown={(e) => { if (e.key === "Enter") confirmSave(); if (e.key === "Escape") setSaving(false); }}
                         placeholder={sk ? "Názov oblasti…" : "Name this area…"}
                         style={{ flex: 1, minWidth: 0, boxSizing: "border-box", padding: "6px 9px", background: bg2, border: `1px solid ${border}`, borderRadius: 7, color: textLight, fontSize: "0.8rem", outline: "none" }} />
-                      <button onClick={confirmSave} disabled={!saveName.trim()} style={{ background: saveName.trim() ? green : "transparent", color: saveName.trim() ? "#0a0a0b" : dim, border: `1px solid ${green}55`, borderRadius: 7, padding: "0 12px", fontSize: "0.74rem", fontWeight: 600, cursor: saveName.trim() ? "pointer" : "default" }}>{sk ? "Uložiť" : "Save"}</button>
+                      <button onClick={confirmSave} disabled={!saveName.trim()} style={{ background: saveName.trim() ? green : "transparent", color: saveName.trim() ? "#0a0a0b" : dim, border: `1px solid color-mix(in srgb, var(--accent) 33%, transparent)`, borderRadius: 7, padding: "0 12px", fontSize: "0.74rem", fontWeight: 600, cursor: saveName.trim() ? "pointer" : "default" }}>{sk ? "Uložiť" : "Save"}</button>
                       <button onClick={() => setSaving(false)} title={sk ? "Zrušiť" : "Cancel"} style={{ background: "none", border: `1px solid ${border}`, color: dim, borderRadius: 7, padding: "0 8px", fontSize: "0.85rem", cursor: "pointer" }}>✕</button>
                     </div>
                   )}
@@ -958,7 +958,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
                   <div style={{ display: "flex", gap: 5, marginBottom: 12 }}>
                     {RADIUS_PRESETS.map((p) => {
                       const on = Math.abs(radiusKm - p) < 0.01;
-                      return <button key={p} onClick={() => { setRadiusKm(p); fitToRadius(p); }} style={{ flex: 1, minWidth: 0, padding: "5px 0", borderRadius: 6, fontSize: "0.68rem", cursor: "pointer", border: `1px solid ${on ? `${green}66` : border}`, background: on ? `${green}14` : "transparent", color: on ? green : dim }}>{p} km</button>;
+                      return <button key={p} onClick={() => { setRadiusKm(p); fitToRadius(p); }} style={{ flex: 1, minWidth: 0, padding: "5px 0", borderRadius: 6, fontSize: "0.68rem", cursor: "pointer", border: `1px solid ${on ? `color-mix(in srgb, var(--accent) 40%, transparent)` : border}`, background: on ? `color-mix(in srgb, var(--accent) 8%, transparent)` : "transparent", color: on ? green : dim }}>{p} km</button>;
                     })}
                   </div>
                 </>
@@ -969,7 +969,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
                 const deltaPct = (ap > 0 && compSet.median) ? Math.round(((ap - compSet.median) / compSet.median) * 100) : null;
                 const aAbs = anchor.sold_percentage == null ? null : Math.round(Number(anchor.sold_percentage));
                 return (
-                  <div style={{ background: `${green}10`, border: `1px solid ${green}40`, borderRadius: 8, padding: "8px 10px", marginBottom: 12 }}>
+                  <div style={{ background: `color-mix(in srgb, var(--accent) 6%, transparent)`, border: `1px solid color-mix(in srgb, var(--accent) 25%, transparent)`, borderRadius: 8, padding: "8px 10px", marginBottom: 12 }}>
                     <div style={{ fontSize: "0.68rem", color: green, marginBottom: 3 }}>◎ {sk ? "Tvoj projekt vs okolie" : "This project vs the set"}</div>
                     <div style={{ fontSize: "0.78rem", color: textLight, fontWeight: 600, marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{anchor.name}</div>
                     <div style={{ fontSize: "0.72rem", color: dim, fontFamily: mono, lineHeight: 1.7 }}>
@@ -1078,7 +1078,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
         .mv2-root button { transition: filter .12s ease, background .12s ease, border-color .12s ease, color .12s ease; }
         .mv2-root button:hover { filter: brightness(1.12); }
         .mv2-root input { transition: border-color .12s ease; }
-        .mv2-root input:focus { border-color: ${green}66; }
+        .mv2-root input:focus { border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
         .mv2-root ::-webkit-scrollbar { width: 9px; height: 9px; }
         .mv2-root ::-webkit-scrollbar-thumb { background: var(--border-soft); border-radius: 6px; }
         .mv2-root ::-webkit-scrollbar-thumb:hover { background: var(--border-strong, var(--border-soft)); }
@@ -1125,7 +1125,7 @@ function ComparePanel({ options, compareIds, setCompareIds, rows, baselineId, se
       </div>
       <Picker multi searchable options={options} value={[...compareIds]} onChange={(arr) => setCompareIds(new Set(arr))} placeholder={sk ? "Pridať projekt (hľadaj podľa mena)…" : "Add a project (search by name)…"} width="100%" sk={sk} ariaLabel="Add projects to compare" />
       {areaCount > 0 && (
-        <button onClick={onAddArea} style={{ width: "100%", marginTop: 8, background: `${green}12`, border: `1px solid ${green}55`, color: green, borderRadius: 7, padding: "7px 8px", fontSize: "0.72rem", cursor: "pointer" }}>
+        <button onClick={onAddArea} style={{ width: "100%", marginTop: 8, background: `color-mix(in srgb, var(--accent) 7%, transparent)`, border: `1px solid color-mix(in srgb, var(--accent) 33%, transparent)`, color: green, borderRadius: 7, padding: "7px 8px", fontSize: "0.72rem", cursor: "pointer" }}>
           ➕ {sk ? `Pridať ${areaCount} z nakreslenej oblasti` : `Add ${areaCount} from the drawn area`}
         </button>
       )}
@@ -1150,9 +1150,9 @@ function ComparePanel({ options, compareIds, setCompareIds, rows, baselineId, se
               const avail = Number(p.available_units) || 0; const tot = Number(p.total_units) || 0;
               const approx = coords && coords[p.id] && !coords[p.id].verified;
               return (
-                <div key={p.id} style={{ background: isBase ? `${green}12` : "var(--surface)", border: `1px solid ${isBase ? `${green}55` : border}`, borderRadius: 8, padding: "7px 9px" }}>
+                <div key={p.id} style={{ background: isBase ? `color-mix(in srgb, var(--accent) 7%, transparent)` : "var(--surface)", border: `1px solid ${isBase ? `color-mix(in srgb, var(--accent) 33%, transparent)` : border}`, borderRadius: 8, padding: "7px 9px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <button onClick={() => setBaseline(p.id)} title={isBase ? (sk ? "Zrušiť ako tvoj základ" : "Unset as your baseline") : (sk ? "Označiť ako tvoj (základ porovnania)" : "Mark as yours (comparison baseline)")} style={{ background: isBase ? `${green}22` : "transparent", border: `1px solid ${isBase ? green : "transparent"}`, color: isBase ? green : dim, cursor: "pointer", borderRadius: 5, width: 21, height: 21, flexShrink: 0, fontSize: "0.72rem", lineHeight: 1 }}>★</button>
+                    <button onClick={() => setBaseline(p.id)} title={isBase ? (sk ? "Zrušiť ako tvoj základ" : "Unset as your baseline") : (sk ? "Označiť ako tvoj (základ porovnania)" : "Mark as yours (comparison baseline)")} style={{ background: isBase ? `color-mix(in srgb, var(--accent) 13%, transparent)` : "transparent", border: `1px solid ${isBase ? green : "transparent"}`, color: isBase ? green : dim, cursor: "pointer", borderRadius: 5, width: 21, height: 21, flexShrink: 0, fontSize: "0.72rem", lineHeight: 1 }}>★</button>
                     <button onClick={() => openProject(p.id)} style={{ flex: 1, minWidth: 0, background: "none", border: "none", cursor: "pointer", textAlign: "left", padding: 0, color: isBase ? green : textLight, fontSize: "0.77rem", fontWeight: isBase ? 600 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={sk ? "Otvoriť projekt" : "Open project"}>
                       {approx ? "◍ " : ""}{p.name}{isBase ? <span style={{ color: dim, fontWeight: 400 }}> · {sk ? "tvoj" : "yours"}</span> : ""}
                     </button>
@@ -1178,7 +1178,7 @@ function ComparePanel({ options, compareIds, setCompareIds, rows, baselineId, se
 
 const inputStyle = { boxSizing: "border-box", padding: "7px 11px", background: bg2, border: `1px solid ${border}`, borderRadius: 7, color: textLight, fontSize: "0.82rem", outline: "none" };
 function chipStyle(active) {
-  return { padding: "6px 12px", borderRadius: 999, cursor: "pointer", fontSize: "0.76rem", border: `1px solid ${active ? green : border}`, background: active ? `${green}1a` : "transparent", color: active ? green : dim };
+  return { padding: "6px 12px", borderRadius: 999, cursor: "pointer", fontSize: "0.76rem", border: `1px solid ${active ? green : border}`, background: active ? `color-mix(in srgb, var(--accent) 10%, transparent)` : "transparent", color: active ? green : dim };
 }
 function tabStyle(active) {
   return { padding: "5px 13px", borderRadius: 999, cursor: "pointer", fontSize: "0.75rem", border: "none", background: active ? green : "transparent", color: active ? "#06140f" : dim, fontWeight: active ? 600 : 400 };
@@ -1208,7 +1208,7 @@ function PricingBand({ cs, anchorPpm2, sk }) {
       </div>
       <div style={{ position: "relative", height: 12, marginBottom: 6 }}>
         <div style={{ position: "absolute", left: 0, right: 0, top: 5, height: 2, background: "var(--border-soft)", borderRadius: 2 }} />
-        <div style={{ position: "absolute", left: `${pos(p25)}%`, width: `${Math.max(1, pos(p75) - pos(p25))}%`, top: 2, height: 8, background: `${green}30`, border: `1px solid ${green}66`, borderRadius: 4 }} />
+        <div style={{ position: "absolute", left: `${pos(p25)}%`, width: `${Math.max(1, pos(p75) - pos(p25))}%`, top: 2, height: 8, background: `color-mix(in srgb, var(--accent) 19%, transparent)`, border: `1px solid color-mix(in srgb, var(--accent) 40%, transparent)`, borderRadius: 4 }} />
         <div style={{ position: "absolute", left: `${pos(median)}%`, top: 0, width: 2, height: 12, background: green, transform: "translateX(-1px)" }} title={`med €${fmt(median)}`} />
         {aPos != null ? <div style={{ position: "absolute", left: `${aPos}%`, top: -4, transform: "translateX(-5px)", width: 0, height: 0, borderLeft: "5px solid transparent", borderRight: "5px solid transparent", borderTop: `7px solid ${textLight}` }} title={`${sk ? "tento projekt" : "this project"} €${fmt(anchorPpm2)}`} /> : null}
       </div>
