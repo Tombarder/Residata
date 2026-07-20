@@ -1014,7 +1014,7 @@ function BenchmarkBody({ cfg, ctx, lang }) {
         <div key={r.name + i} style={{ display: "flex", alignItems: "center", gap: "0.6rem", padding: "0.28rem 0" }}>
           <div style={{ width: "38%", minWidth: 0, fontSize: "0.78rem", color: textLight, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={r.name}>{r.name}</div>
           <div style={{ flex: 1, height: 8, background: `${border}`, borderRadius: 3, position: "relative", overflow: "hidden" }}>
-            <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${Math.max(5, (r.val / max) * 100)}%`, background: `linear-gradient(90deg, var(--accent-strong), var(--accent-ink))`, borderRadius: 3 }} />
+            <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${Math.max(5, (r.val / max) * 100)}%`, background: `linear-gradient(90deg, var(--accent-strong), var(--accent))`, borderRadius: 3 }} />
           </div>
           <div style={{ fontFamily: mono, fontSize: "0.72rem", fontWeight: 700, color: textLight, flexShrink: 0, minWidth: 62, textAlign: "right" }}>{fmtM2(r.val, lang)}</div>
         </div>

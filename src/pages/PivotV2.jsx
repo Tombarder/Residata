@@ -3078,7 +3078,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                             {bw > 0 && (
                               <span aria-hidden style={{
                                 position: "absolute", right: 0, bottom: 0, height: 3,
-                                width: `${bw}%`, background: `linear-gradient(90deg, var(--accent-strong), var(--accent-ink))`,
+                                width: `${bw}%`, background: `linear-gradient(90deg, var(--accent-strong), var(--accent))`,
                                 borderBottomRightRadius: 2, pointerEvents: "none",
                               }} />
                             )}
@@ -3104,7 +3104,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                           {bw > 0 && (
                             <span aria-hidden style={{
                               position: "absolute", right: 0, bottom: 0, height: 3,
-                              width: `${bw}%`, background: `linear-gradient(90deg, var(--accent-strong), var(--accent-ink))`,
+                              width: `${bw}%`, background: `linear-gradient(90deg, var(--accent-strong), var(--accent))`,
                               borderBottomRightRadius: 2, pointerEvents: "none",
                             }} />
                           )}
@@ -3129,7 +3129,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                         {bw > 0 && (
                           <span aria-hidden style={{
                             position: "absolute", right: 0, bottom: 0, height: 3,
-                            width: `${bw}%`, background: `linear-gradient(90deg, var(--accent-strong), var(--accent-ink))`,
+                            width: `${bw}%`, background: `linear-gradient(90deg, var(--accent-strong), var(--accent))`,
                             borderBottomRightRadius: 2, pointerEvents: "none",
                           }} />
                         )}

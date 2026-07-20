@@ -1084,7 +1084,7 @@ function RowBin({ bin, max, unit, clickable, active, onClick }) {
         role={clickable ? "button" : undefined}
         style={{ position: "relative", height: 14, background: bg, border: `1px solid ${border}`, borderRadius: 3 }}
       >
-        <div style={{ position: "absolute", inset: 0, width: `${w}%`, background: `linear-gradient(90deg, var(--accent-strong), var(--accent-ink))`, borderRadius: 3 }} />
+        <div style={{ position: "absolute", inset: 0, width: `${w}%`, background: `linear-gradient(90deg, var(--accent-strong), var(--accent))`, borderRadius: 3 }} />
       </div>
       <span
         className={`rep-hist-count ${cls}`}
@@ -1138,7 +1138,7 @@ function AggregateTable({ rows, lang, nameLabel }) {
                 <td style={tdcR}>{r.wavgM2 ? Math.round(moneyFromEur(r.wavgM2)).toLocaleString("en-US").replace(/,/g, " ") : "—"}</td>
                 <td style={{ ...tdc, padding: "0.35rem 0.75rem" }}>
                   <div style={{ position: "relative", height: 10, background: bg, border: `1px solid ${border}`, borderRadius: 2 }}>
-                    <div style={{ position: "absolute", inset: 0, width: `${(r.totalUnits / maxUnits) * 100}%`, background: `linear-gradient(90deg, var(--accent-strong), var(--accent-ink))`, borderRadius: 2 }} />
+                    <div style={{ position: "absolute", inset: 0, width: `${(r.totalUnits / maxUnits) * 100}%`, background: `linear-gradient(90deg, var(--accent-strong), var(--accent))`, borderRadius: 2 }} />
                   </div>
                 </td>
               </tr>
@@ -1369,7 +1369,7 @@ function TrendChart({ snapshots, scopePredicate, lang }) {
               <td style={tdcR}>{s.wavg ? Math.round(moneyFromEur(s.wavg)).toLocaleString("en-US").replace(/,/g, " ") : "—"}</td>
               <td style={{ ...tdc, padding: "0.35rem 0.75rem" }}>
                 <div style={{ position: "relative", height: 8, background: bg, border: `1px solid ${border}`, borderRadius: 2 }}>
-                  <div style={{ position: "absolute", inset: 0, width: `${(s.totalUnits / maxUnits) * 100}%`, background: `linear-gradient(90deg, var(--accent-strong), var(--accent-ink))`, borderRadius: 2 }} />
+                  <div style={{ position: "absolute", inset: 0, width: `${(s.totalUnits / maxUnits) * 100}%`, background: `linear-gradient(90deg, var(--accent-strong), var(--accent))`, borderRadius: 2 }} />
                 </div>
               </td>
             </tr>

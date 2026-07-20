@@ -84,42 +84,41 @@
    stay, but red/blue/yellow are darkened so they read on white. Activated by
    setThemePreference() setting <html data-theme="light"> (see src/lib/theme-mode.js). */
 :root[data-theme="light"] {
-  /* "Emerald brand" light theme (Boss-picked design #4) — a deep-emerald sidebar is
-     Residata's signature block; the workspace is a soft green-neutral canvas with crisp
-     white cards + soft depth and deep green-charcoal text; mint green is the sharp accent.
-     Cohesive because every neutral shares the green family — the brand green sits native. */
-  /* "Clarity" light theme (Boss-picked 2026-07-20) — a calm, professional daylight
-     system, NOT an inverted dark theme. Crisp white cards lifted by soft shadow on a
-     cool green-tinted near-white ground; clearly-stepped neutrals so page / card /
-     inset / border each read distinct; neutral labels (no mint-on-white); green kept
-     as a concentrated accent (deep --accent-ink for text/values so it stays legible). */
-  --bg:            #e6ebe7;   /* deeper green-gray ground so white cards clearly pop */
-  --surface:       #ffffff;   /* crisp white cards (lifted by the light-mode shadow below) */
-  --surface-2:     #dfe6e1;   /* inset / row-stripe — clearly distinct from a white card */
-  --surface-3:     #d2dbd4;   /* input / raised / hover — a clear step darker again */
-  --border:        #c4cfc6;   /* visible, defined card / table edge (was too faint) */
-  --border-soft:   #d6dfd8;   /* hairline dividers inside cards */
-  --accent:        #00e5a0;   /* mint — theme-invariant (map paint / fills) */
-  --accent-strong: #059b6a;
-  --accent-ink:    #076b41;   /* deep, punchy emerald — accent used as TEXT on white */
+  /* Light theme — "Normal/Professional" (Boss-approved redesign 2026-07-20).
+     A standard, well-built SaaS look: a DARK SLATE sidebar as the structural anchor
+     (not green, not black) + a cool light-gray workspace that sits clearly darker than
+     the white cards, so cards pop with real depth. Neutral-first palette; the brand
+     green is a restrained ACCENT (active nav, positive numbers, primary actions, one
+     chart series), never the whole UI. Data/graphs/structure unchanged — skin only. */
+  --bg:            #eef0f3;   /* cool light-gray workspace — clearly darker than cards */
+  --surface:       #ffffff;   /* white cards (lifted by the light-mode shadow below) */
+  --surface-2:     #f1f3f6;   /* inset / card-header / row-stripe */
+  --surface-3:     #e7eaef;   /* input / raised / hover */
+  --border:        #e2e5ea;   /* defined card / table edge */
+  --border-soft:   #eceef2;   /* hairline dividers inside cards */
+  --accent:        #00e5a0;   /* mint brand — theme-invariant (map paint / dark mode) */
+  --accent-strong: #0e9d6b;   /* deep emerald — fills / bars on white */
+  --accent-ink:    #45505f;   /* NEUTRAL slate — former mint text goes calm/neutral so
+                                 labels & values aren't green; green stays only on true
+                                 accents (bars, active nav, deltas, buttons, pills). */
   --accent-2:      #a5680a;
-  --danger:        #c62a20;
-  --info:          #2560cf;
-  --warning:       #886608;
-  --text:          #101a15;   /* near-black green-charcoal — strong, high contrast */
-  --text-2:        #33403a;
-  --text-dim:      #55625b;   /* secondary / body-dim */
-  --text-faint:    #6a746d;   /* neutral labels / captions — punchier than before */
-  --on-accent:     #04160f;
-  /* deep-emerald sidebar */
-  --sidebar-bg:          linear-gradient(180deg, #0f5341 0%, #0b4634 100%);
-  --sidebar-text:        #eef7f2;
-  --sidebar-text-dim:    #a6cabd;
-  --sidebar-text-faint:  #6f978a;
-  --sidebar-border:      rgba(255, 255, 255, 0.12);
-  --sidebar-active-bg:   rgba(255, 255, 255, 0.13);
-  --sidebar-hover-bg:    rgba(255, 255, 255, 0.07);
-  --sidebar-card-bg:     rgba(255, 255, 255, 0.07);
+  --danger:        #e0413e;
+  --info:          #3b74e8;
+  --warning:       #c9860c;
+  --text:          #111319;   /* near-black slate — strong, high contrast */
+  --text-2:        #4a5261;
+  --text-dim:      #5a6474;   /* secondary / body-dim */
+  --text-faint:    #8992a1;   /* neutral labels / captions */
+  --on-accent:     #04140d;
+  /* dark-slate sidebar (the structural anchor) */
+  --sidebar-bg:          #181c23;
+  --sidebar-text:        #e9edf3;   /* brand + active nav */
+  --sidebar-text-dim:    #9aa3b2;   /* inactive nav */
+  --sidebar-text-faint:  #626c7b;   /* group labels / meta */
+  --sidebar-border:      rgba(255, 255, 255, 0.08);
+  --sidebar-active-bg:   rgba(0, 229, 160, 0.15);   /* green-tint active pill */
+  --sidebar-hover-bg:    rgba(255, 255, 255, 0.055);
+  --sidebar-card-bg:     rgba(255, 255, 255, 0.05);
   color-scheme: light;
 }
 

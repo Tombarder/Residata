@@ -22,7 +22,7 @@ const LABEL = {
   fontSize: "0.55rem", letterSpacing: "0.14em", textTransform: "uppercase",
   // var(--text-dim) (=--text-dim) clears WCAG AA (5.6:1 on the dock bg); the old
   // #7a7a86 sat at 4.48:1, a hair under the 4.5:1 threshold.
-  color: "var(--text-dim)", fontWeight: 700, fontFamily: "'JetBrains Mono', monospace",
+  color: "var(--sidebar-text-dim)", fontWeight: 700, fontFamily: "'JetBrains Mono', monospace",
   whiteSpace: "nowrap",
 };
 
@@ -49,10 +49,10 @@ export default function MarketControls({ lang = "en", variant = "panel", style }
       style={{
         display: "flex", flexDirection: "column", gap: "0.7rem",
         padding: "0.85rem 0.9rem",
-        border: "1px solid var(--border)", borderRadius: 12,
-        background: "var(--surface-2)",
+        border: "1px solid var(--sidebar-border)", borderRadius: 12,
+        background: "var(--sidebar-card-bg)",
         backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)",
-        boxShadow: "0 10px 34px rgba(0,0,0,0.4)",
+        boxShadow: "0 4px 16px rgba(0,0,0,0.18)",
         ...style,
       }}
     >
