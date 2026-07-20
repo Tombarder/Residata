@@ -1194,16 +1194,6 @@ function DataPage({ setCurrent, l, lang }) {
   const { country } = useCountry();
   const d = DATA_SAMPLE[country] || DATA_SAMPLE.SK;   // CZ → Praha; SK / All → Bratislava
   const isPaid = can("has_paid_access");
-  // Live count nad "Unit-level sample" tabulkou. Reads from the
-  // `market_totals` view (single source of truth — same number the
-  // homepage MarketPulse and the Ticker show). Always fresh.
-  const { unitsTracked, snapshotMonth } = useMarketTotals();
-  const locale = localeTag(lang);
-  const showingLive = unitsTracked == null
-    ? (lang === "sk" ? "Zobrazených 8 z … záznamov" : "Showing 8 of … records")
-    : (lang === "sk"
-        ? `Zobrazených 8 z ${Number(unitsTracked).toLocaleString(locale)} záznamov`
-        : `Showing 8 of ${Number(unitsTracked).toLocaleString(locale)} records`);
   // F-062 (Boss 2026-05-31): the InsightCards section contains hardcoded
   // illustrative numbers, NOT live derived data. The previous dynamic badge
   // claimed "<Month Year> snapshot · real data" which was misleading. Badge
@@ -1211,12 +1201,6 @@ function DataPage({ setCurrent, l, lang }) {
   // dashboard") so customers don't mistake hand-authored examples for live
   // insights. Live versions ship in the paid dashboard.
   const dynamicInsightsBadge = l.insightsBadge;
-  // Unit-level sample rows — real active projects + real listed prices/€-m²
-  // for the viewed market (Bratislava for SK/All, Praha for CZ), from DATA_SAMPLE.
-  // Unit IDs are anonymized ("—"); everything else is real. Floor column shows
-  // rooms (izby). Refresh DATA_SAMPLE on a major data shift.
-  const rows = d.rows;
-  const statusStyle = { V: { color: "#00e5a0", bg: "rgba(0,229,160,0.08)" }, P: { color: "#f5a623", bg: "rgba(245,166,35,0.08)" }, R: { color: "#55555f", bg: "rgba(85,85,95,0.15)" } };
 
   // Insight card component
   const InsightCard = ({ label, title, children, span2 }) => (
@@ -1242,20 +1226,6 @@ function DataPage({ setCurrent, l, lang }) {
     </div>
   );
 
-  const schemaLines = [
-    { field: "projekt", type: "string", desc: "Development name" },
-    { field: "developer", type: "string", desc: "Developer company" },
-    { field: "okres", type: "string", desc: "City district" },
-    { field: "typ", type: "enum", desc: "byt | apartmán | dom | retail | semidetached | ine" },
-    { field: "oznacenie", type: "string", desc: "Unit label — e.g. A2-304" },
-    { field: "dispozicia", type: "string", desc: "Layout — 1-izbový, 2-izbový..." },
-    { field: "plocha_m2", type: "float", desc: "Floor area in m²" },
-    { field: "cena_eur", type: "int", desc: "Listed price in EUR" },
-    { field: "cena_m2", type: "float", desc: "Price per m² (computed)" },
-    { field: "poschodie", type: "int", desc: "Floor number" },
-    { field: "stav", type: "enum", desc: "V (voľný) | P (predaný) | R (rezervovaný)" },
-    { field: "datum_scrape", type: "date", desc: "Collection date — YYYY-MM-DD" },
-  ];
 
   return (
     <>
@@ -1476,102 +1446,6 @@ function DataPage({ setCurrent, l, lang }) {
             Sell-out windows estimated at standard absorption · refined as velocity history builds.
           </div>
         </InsightCard>
-      </div>
-
-      {/* Unit Table + Schema — two-column layout (stacks to 1col ≤900 via .schema-grid) */}
-      <div style={{ padding: "2rem 2rem clamp(2.5rem,8vw,5rem)", maxWidth: "var(--container)", margin: "0 auto" }}>
-        <div className="schema-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2.5rem", alignItems: "start" }}>
-
-          {/* Left — Real data examples (lighter) */}
-          <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "1rem" }}>
-              <div>
-                <Label>{l.rawLabel}</Label>
-                <h3 style={{ fontSize: "1.1rem", fontWeight: 600 }}>{l.unitSample}</h3>
-              </div>
-              <span style={{ fontFamily: mono, fontSize: "0.7rem", color: "#55555f" }}>{showingLive}</span>
-            </div>
-            <div className="dark-scroll" role="region" aria-label={lang === "sk" ? "Ukážka dát — tabuľka" : "Sample data table"} tabIndex={0} style={{ border: "1px solid #222228", borderRadius: 12, overflowX: "auto", background: "#111113" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.78rem" }}>
-                <thead>
-                  <tr style={{ background: "#111113" }}>
-                    {["Project", "District", "Typ", "m²", "Price €", "€/m²", "Floor", "Stav"].map(h => (
-                      <th key={h} style={{ padding: "0.75rem 0.85rem", textAlign: "left", fontFamily: mono, fontSize: "0.6rem", color: "#55555f", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 500, borderBottom: "1px solid #222228", whiteSpace: "nowrap" }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((r, i) => (
-                    <tr key={i} style={{ borderBottom: i < rows.length - 1 ? "1px solid #1a1a1f" : "none" }}>
-                      {r.filter((_, j) => j !== 3).map((cell, j) => (
-                        <td key={j} style={{
-                          padding: "0.65rem 0.85rem", whiteSpace: "nowrap",
-                          color: j === 0 ? "#e8e8ed" : "#8a8a96",
-                          fontWeight: j === 0 ? 500 : 400,
-                          fontFamily: j >= 2 ? mono : "inherit",
-                          fontSize: j >= 2 ? "0.7rem" : "0.78rem",
-                        }}>
-                          {j === 7 ? (
-                            <span style={{
-                              fontFamily: mono, fontSize: "0.62rem",
-                              padding: "0.15rem 0.5rem", borderRadius: 4, fontWeight: 500,
-                              color: statusStyle[cell]?.color, background: statusStyle[cell]?.bg,
-                            }}>{cell}</span>
-                          ) : cell}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div style={{ marginTop: "0.5rem", fontFamily: mono, fontSize: "0.6rem", color: "#55555f", fontStyle: "italic", lineHeight: 1.5 }}>
-              {lang === "sk"
-                ? "Ilustračná vzorka · Označenia bytov anonymizované. Reálne projekty + ceny."
-                : "Illustrative sample · Unit IDs anonymized. Real projects + prices."}
-            </div>
-          </div>
-
-          {/* Right — Schema / YAML (darker) */}
-          <div>
-            <Label>{l.schemaLabel}</Label>
-            <h3 style={{ fontSize: "1.1rem", fontWeight: 600, marginBottom: "0.5rem" }}>{l.schemaTitle}</h3>
-            <p className="sec-desc" style={{ marginBottom: "1.5rem" }}>{l.schemaDesc}</p>
-            <div style={{ border: "1px solid #1a1a1f", borderRadius: 12, overflow: "hidden", boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.75rem 1.25rem", background: "#0a0a0c", borderBottom: "1px solid #1a1a1f" }}>
-                <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#ff5f57" }} />
-                <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#ffbd2e" }} />
-                <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#28c840" }} />
-                <span style={{ flex: 1, textAlign: "center", fontFamily: mono, fontSize: "0.68rem", color: "#55555f", marginRight: "2rem" }}>residata.schema.yml</span>
-              </div>
-              <div style={{ background: "#07070a", padding: "1.25rem 1.5rem", fontFamily: mono, fontSize: "0.73rem", lineHeight: 1.85 }}>
-                <div style={{ color: "#44444e", marginBottom: "0.25rem" }}># residata output schema v2.4</div>
-                <div style={{ color: "#44444e", marginBottom: "0.75rem" }}>
-                  {lang === "sk" ? "# každý dátový bod ktorý pre vás extrahujeme" : "# every data point we extract per unit"}
-                </div>
-                <div style={{ color: "#44444e", marginBottom: "0.5rem" }}>---</div>
-                <div style={{ marginBottom: "0.25rem" }}><span style={{ color: "#f5a623" }}>fields</span><span style={{ color: "#44444e" }}>:</span></div>
-                {schemaLines.map((s, i) => (
-                  <div key={i} style={{ paddingLeft: "1.25rem", display: "flex", gap: "0.5rem" }}>
-                    <span style={{ color: "#44444e" }}>-</span>
-                    <span style={{ color: "#00e5a0" }}>{s.field}</span>
-                    <span style={{ color: "#44444e" }}>:</span>
-                    <span style={{ color: "#c8c8d4" }}>{s.type}</span>
-                    <span style={{ color: "#44444e", marginLeft: "auto", fontSize: "0.67rem" }}>  # {s.desc}</span>
-                  </div>
-                ))}
-                <div style={{ marginTop: "0.75rem", color: "#44444e" }}>---</div>
-                <div style={{ marginTop: "0.25rem" }}><span style={{ color: "#f5a623" }}>refresh</span><span style={{ color: "#44444e" }}>: </span><span style={{ color: "#c8c8d4" }}>daily</span></div>
-                <div><span style={{ color: "#f5a623" }}>output</span><span style={{ color: "#44444e" }}>: </span><span style={{ color: "#c8c8d4" }}>csv | xlsx | api</span></div>
-                <div><span style={{ color: "#f5a623" }}>encoding</span><span style={{ color: "#44444e" }}>: </span><span style={{ color: "#c8c8d4" }}>utf-8</span></div>
-              </div>
-            </div>
-            <div style={{ marginTop: "0.75rem", fontFamily: mono, fontSize: "0.62rem", color: "#44444e", lineHeight: 1.6 }}>
-              {l.schemaNote}
-            </div>
-          </div>
-
-        </div>
       </div>
 
       <div style={{ padding: "clamp(2.5rem,7vw,4rem) 2rem", textAlign: "center" }}>

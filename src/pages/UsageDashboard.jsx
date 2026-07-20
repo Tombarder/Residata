@@ -228,7 +228,7 @@ export default function UsageDashboard({ lang = "en" }) {
                     return (
                       <div key={d.day} title={`${d.day}\n${num(d.events)} ${L("udalostí", "events")}\n${num(d.active_users)} ${L("aktívnych", "active")}\n${num(d.new_users)} ${L("noví", "new")}`}
                         style={{ flex: 1, minWidth: 6, display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "center", height: "100%", position: "relative" }}>
-                        <div style={{ width: "100%", height: barH, background: bg2, borderTop: `2px solid ${blue}`, borderRadius: "2px 2px 0 0" }} />
+                        <div style={{ width: "100%", height: barH, background: "rgba(74,134,232,0.18)", borderTop: `2px solid ${blue}`, borderRadius: "2px 2px 0 0" }} />
                         {/* active-users dot on its OWN scale (was drawn at the events-bar
                             height, so it carried no active-users info despite the legend).
                             Cap at 95% so the top dot never clips at the container edge. */}

@@ -4064,7 +4064,7 @@ function OverviewPanel({ activity, users, lang }) {
                           fontFamily: mono, fontSize: "0.7rem",
                           padding: "0.15rem 0.5rem", borderRadius: 4,
                           color: r.tier === "paid" ? green : r.tier === "admin" ? "#f5a623" : r.tier === "pending" ? "#888" : "var(--text-2)",
-                          background: r.tier === "paid" ? "rgba(0,229,160,0.08)" : r.tier === "admin" ? "rgba(245,166,35,0.08)" : "rgba(255,255,255,0.04)",
+                          background: r.tier === "paid" ? "rgba(0,229,160,0.08)" : r.tier === "admin" ? "rgba(245,166,35,0.08)" : "var(--surface-2)",
                         }}>{r.tier}</span>
                       </td>
                       <td style={{ ...td, textAlign: "right", fontFamily: mono, color: "var(--text)" }}>{r.totalEvents}</td>
