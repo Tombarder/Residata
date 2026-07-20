@@ -830,13 +830,13 @@ export default function MapView2({ lang = "en", setCurrent }) {
           </span>
         ))}
         <button onClick={() => setShowSoldOut((v) => !v)} title={sk ? "Zobraziť / skryť vypredané projekty (bez voľných bytov)" : "Show / hide sold-out projects (no units available)"}
-          style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 11px", borderRadius: 999, fontSize: "0.74rem", cursor: "pointer", border: `1px solid ${showSoldOut ? border : `${amber}55`}`, background: showSoldOut ? "transparent" : `${amber}14`, color: showSoldOut ? textLight : amber }}>
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 36, padding: "0 12px", borderRadius: 999, fontSize: "0.74rem", cursor: "pointer", border: `1px solid ${showSoldOut ? border : `${amber}55`}`, background: showSoldOut ? "var(--surface)" : `${amber}14`, color: showSoldOut ? "var(--text-2)" : amber, boxShadow: showSoldOut ? "0 1px 2px rgba(28,38,56,0.05)" : "none" }}>
           <EyeIcon off={!showSoldOut} />
           <span style={{ textDecoration: showSoldOut ? "none" : "line-through" }}>{sk ? "Vypredané" : "Sold out"}</span>
           {soldOutCount > 0 && <span style={{ opacity: 0.7, fontFamily: mono, fontSize: "0.66rem" }}>· {soldOutCount}</span>}
         </button>
         <button onClick={() => setShowNoPrice((v) => !v)} title={sk ? "Zobraziť / skryť projekty bez zverejnenej ceny (počítajú sa do prehľadov len keď sú zapnuté)" : "Show / hide projects with no published price (counted in the stats only while shown)"}
-          style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 11px", borderRadius: 999, fontSize: "0.74rem", cursor: "pointer", border: `1px solid ${showNoPrice ? border : `${amber}55`}`, background: showNoPrice ? "transparent" : `${amber}14`, color: showNoPrice ? textLight : amber }}>
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 36, padding: "0 12px", borderRadius: 999, fontSize: "0.74rem", cursor: "pointer", border: `1px solid ${showNoPrice ? border : `${amber}55`}`, background: showNoPrice ? "var(--surface)" : `${amber}14`, color: showNoPrice ? "var(--text-2)" : amber, boxShadow: showNoPrice ? "0 1px 2px rgba(28,38,56,0.05)" : "none" }}>
           <EyeIcon off={!showNoPrice} />
           <span style={{ textDecoration: showNoPrice ? "none" : "line-through" }}>{sk ? "Bez ceny" : "No price"}</span>
           {noPriceCount > 0 && <span style={{ opacity: 0.7, fontFamily: mono, fontSize: "0.66rem" }}>· {noPriceCount}</span>}
@@ -1176,12 +1176,20 @@ function ComparePanel({ options, compareIds, setCompareIds, rows, baselineId, se
   );
 }
 
-const inputStyle = { boxSizing: "border-box", padding: "7px 11px", background: bg2, border: `1px solid ${border}`, borderRadius: 7, color: textLight, fontSize: "0.82rem", outline: "none" };
+const inputStyle = { boxSizing: "border-box", padding: "8px 12px", height: 36, background: "var(--surface)", border: `1px solid ${border}`, borderRadius: 9, color: textLight, fontSize: "0.82rem", outline: "none", boxShadow: "0 1px 2px rgba(28,38,56,0.05)", accentColor: "var(--accent)" };
 function chipStyle(active) {
-  return { padding: "6px 12px", borderRadius: 999, cursor: "pointer", fontSize: "0.76rem", border: `1px solid ${active ? green : border}`, background: active ? `color-mix(in srgb, var(--accent) 10%, transparent)` : "transparent", color: active ? green : dim };
+  return { height: 36, padding: "0 13px", display: "inline-flex", alignItems: "center", gap: 5, borderRadius: 999, cursor: "pointer", fontSize: "0.76rem", fontWeight: 500,
+    border: `1px solid ${active ? green : border}`,
+    background: active ? `color-mix(in srgb, var(--accent) 12%, transparent)` : "var(--surface)",
+    color: active ? green : "var(--text-2)",
+    boxShadow: active ? "none" : "0 1px 2px rgba(28,38,56,0.05)" };
 }
 function tabStyle(active) {
-  return { padding: "5px 13px", borderRadius: 999, cursor: "pointer", fontSize: "0.75rem", border: "none", background: active ? green : "transparent", color: active ? "#06140f" : dim, fontWeight: active ? 600 : 400 };
+  return { padding: "6px 14px", borderRadius: 999, cursor: "pointer", fontSize: "0.76rem", border: "none",
+    background: active ? "var(--surface)" : "transparent",
+    color: active ? green : "var(--text-dim)",
+    fontWeight: active ? 600 : 500,
+    boxShadow: active ? "0 1px 3px rgba(28,38,56,0.12)" : "none" };
 }
 const dot = (c) => ({ width: 8, height: 8, borderRadius: "50%", background: c, display: "inline-block", marginRight: 5 });
 

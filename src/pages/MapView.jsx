@@ -532,7 +532,7 @@ export default function MapView({ lang = "en", setCurrent }) {
       {/* Filter + search bar */}
       <div style={{
         display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap",
-        padding: "0.6rem 1.25rem", borderBottom: `1px solid ${border}`, background: panel,
+        padding: "0.75rem 1.25rem", borderBottom: `1px solid ${border}`, background: panel,
       }}>
         {/* Name search with type-ahead */}
         <div ref={searchWrapRef} style={{ position: "relative", flex: "1 1 240px", minWidth: 200, maxWidth: 360 }}>
@@ -699,21 +699,31 @@ export default function MapView({ lang = "en", setCurrent }) {
   );
 }
 
+// Clean control chrome — white "pill" controls on the toolbar, consistent height,
+// custom chevron on selects (no raw native arrow), emerald accent for the caret.
+const CHEVRON = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7480' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E\")";
 const inputStyle = {
-  width: "100%", boxSizing: "border-box", padding: "7px 26px 7px 11px",
-  background: bg2, border: `1px solid ${border}`, borderRadius: 7,
+  width: "100%", boxSizing: "border-box", padding: "8px 28px 8px 12px", height: 36,
+  background: "var(--surface)", border: `1px solid ${border}`, borderRadius: 9,
   color: textLight, fontSize: "0.82rem", outline: "none",
+  boxShadow: "0 1px 2px rgba(28,38,56,0.05)", accentColor: "var(--accent)",
 };
 const selectStyle = {
-  padding: "7px 9px", background: bg2, border: `1px solid ${border}`, borderRadius: 7,
-  color: textLight, fontSize: "0.8rem", outline: "none", cursor: "pointer", maxWidth: 180,
+  padding: "8px 30px 8px 12px", height: 36, background: "var(--surface)",
+  backgroundImage: CHEVRON, backgroundRepeat: "no-repeat", backgroundPosition: "right 10px center",
+  appearance: "none", WebkitAppearance: "none", MozAppearance: "none",
+  border: `1px solid ${border}`, borderRadius: 9, boxShadow: "0 1px 2px rgba(28,38,56,0.05)",
+  color: textLight, fontSize: "0.8rem", outline: "none", cursor: "pointer", maxWidth: 190,
+  accentColor: "var(--accent)",
 };
 function chipStyle(active) {
   return {
-    padding: "6px 11px", borderRadius: 7, cursor: "pointer", fontSize: "0.74rem",
+    height: 36, padding: "0 14px", display: "inline-flex", alignItems: "center",
+    borderRadius: 9, cursor: "pointer", fontSize: "0.76rem", fontWeight: 500,
     border: `1px solid ${active ? green : border}`,
-    background: active ? `color-mix(in srgb, var(--accent) 10%, transparent)` : "transparent",
-    color: active ? green : dim,
+    background: active ? `color-mix(in srgb, var(--accent) 12%, transparent)` : "var(--surface)",
+    color: active ? green : "var(--text-2)",
+    boxShadow: active ? "none" : "0 1px 2px rgba(28,38,56,0.05)",
   };
 }
 
