@@ -33,7 +33,7 @@ import { moneyFromEur, moneySymbol } from "../lib/money";
 import { supabasePublic, isSupabaseReady } from "../lib/supabase";
 
 const mono = "'JetBrains Mono', monospace";
-import { accentPaint as green, orange as amber, dim, text as textLight, border, surfaceDark as bg2 } from "../lib/theme";
+import { accent as green, accentPaint, orange as amber, dim, text as textLight, border, surfaceDark as bg2 } from "../lib/theme";
 import { getTheme, useThemeMode } from "../lib/theme-mode";
 const greyPt = "#6b6b76";
 const panel = "var(--surface)";
@@ -55,7 +55,7 @@ function installMapLayers(map, features) {
   map.addLayer({
     id: "clusters", type: "circle", source: "projects", filter: ["has", "point_count"],
     paint: {
-      "circle-color": green, "circle-opacity": 0.85,
+      "circle-color": accentPaint, "circle-opacity": 0.85,
       "circle-radius": ["step", ["get", "point_count"], 16, 10, 22, 50, 30],
       "circle-stroke-width": 2, "circle-stroke-color": "#0a0a0b",
     },
@@ -68,7 +68,7 @@ function installMapLayers(map, features) {
   map.addLayer({
     id: "points", type: "circle", source: "projects", filter: ["!", ["has", "point_count"]],
     paint: {
-      "circle-color": ["case", ["<=", ["get", "available"], 0], greyPt, green],
+      "circle-color": ["case", ["<=", ["get", "available"], 0], greyPt, accentPaint],
       "circle-radius": 7,
       "circle-stroke-width": 1.5, "circle-stroke-color": "#0a0a0b",
     },
@@ -712,7 +712,7 @@ function chipStyle(active) {
   return {
     padding: "6px 11px", borderRadius: 7, cursor: "pointer", fontSize: "0.74rem",
     border: `1px solid ${active ? green : border}`,
-    background: active ? `${green}1a` : "transparent",
+    background: active ? `color-mix(in srgb, var(--accent) 10%, transparent)` : "transparent",
     color: active ? green : dim,
   };
 }
