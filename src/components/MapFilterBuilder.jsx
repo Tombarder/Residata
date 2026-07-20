@@ -13,8 +13,8 @@ import {
 import Picker from "./Picker";
 
 import { accent as green, accentInk, dim, text as textLight, surfaceDark as bg2, mono } from "../lib/theme";
-const border = "#26262d";
-const panel = "#161619";
+const border = "var(--border)";
+const panel = "var(--surface)";
 
 let _cid = 0;
 const newId = () => "c" + (++_cid);
@@ -43,8 +43,8 @@ export default function MapFilterBuilder({ conditions, setConditions, projects, 
   // where the big absolute overlay covered half the screen). Default: the original
   // absolute panel anchored top-left (used over the map).
   const rootStyle = asModal
-    ? { width: "100%", background: panel, border: `1px solid ${border}`, borderRadius: 14, boxShadow: "0 24px 64px rgba(0,0,0,0.7)" }
-    : { position: "absolute", top: 8, left: "1.25rem", zIndex: 40, width: 700, maxWidth: "calc(100% - 2.5rem)", background: panel, border: `1px solid ${border}`, borderRadius: 14, boxShadow: "0 22px 60px rgba(0,0,0,0.66)" };
+    ? { width: "100%", background: panel, border: `1px solid ${border}`, borderRadius: 14, boxShadow: "0 20px 52px rgba(15,23,42,0.28)" }
+    : { position: "absolute", top: 8, left: "1.25rem", zIndex: 40, width: 700, maxWidth: "calc(100% - 2.5rem)", background: panel, border: `1px solid ${border}`, borderRadius: 14, boxShadow: "0 18px 48px rgba(15,23,42,0.26)" };
   const body = (
     <div style={rootStyle}>
       <div style={{ display: "flex", alignItems: "center", padding: "15px 18px", borderBottom: `1px solid ${border}` }}>
