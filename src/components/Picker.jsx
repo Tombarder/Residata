@@ -11,9 +11,9 @@ import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 
 import { accent as green, accentInk, dim, text as textLight, surfaceDark as bg2 } from "../lib/theme";
-const border = "#23232a";
+const border = "var(--border)";
 const popBg = "var(--surface)";
-const hover = "#23232a";
+const hover = "var(--surface-2)";
 
 const norm = (s) => (s == null ? "" : String(s)).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
 
@@ -71,7 +71,7 @@ export default function Picker({ value, onChange, options, placeholder = "select
   } else label = options.find((o) => o.value === value)?.label ?? placeholder;
 
   const menu = open && pos ? createPortal(
-    <div ref={popRef} style={{ position: "fixed", left: pos.left, top: pos.top ?? undefined, bottom: pos.bottom ?? undefined, width: pos.w, maxHeight: pos.maxH, zIndex: 1000, background: popBg, border: `1px solid ${border}`, borderRadius: 11, boxShadow: "0 20px 52px rgba(0,0,0,0.72)", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+    <div ref={popRef} style={{ position: "fixed", left: pos.left, top: pos.top ?? undefined, bottom: pos.bottom ?? undefined, width: pos.w, maxHeight: pos.maxH, zIndex: 1000, background: popBg, border: `1px solid ${border}`, borderRadius: 11, boxShadow: "0 16px 44px rgba(15,23,42,0.30)", overflow: "hidden", display: "flex", flexDirection: "column" }}>
       {searchable && (
         <div style={{ padding: 9, borderBottom: `1px solid ${border}`, flexShrink: 0 }}>
           <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={sk ? "hľadať…" : "search…"} style={{ width: "100%", boxSizing: "border-box", padding: "9px 11px", background: bg2, border: `1px solid ${border}`, borderRadius: 8, color: textLight, fontSize: "0.84rem", outline: "none" }} />

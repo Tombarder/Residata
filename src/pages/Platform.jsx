@@ -15,6 +15,7 @@ import { Component, useState, useEffect, useRef, lazy, Suspense } from "react";
 import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
 import PendingGate from "../components/PendingGate";
+import Picker from "../components/Picker";
 import { usePricing } from "../lib/pricing";
 import { useProjects } from "../lib/useData";
 import DashboardHome from "./DashboardHome";
@@ -1410,10 +1411,12 @@ function PlatformSettings({ lang }) {
               style={inputStyle} />
           </SettingsField>
           <SettingsField label={lang === "sk" ? "Pozícia" : "Position"}>
-            <select value={form.position} onChange={e => setForm({ ...form, position: e.target.value })}
-              style={inputStyle}>
-              {positionsRendered.map(p => <option key={p.v} value={p.v}>{p.label}</option>)}
-            </select>
+            <Picker
+              value={form.position}
+              onChange={(v) => setForm({ ...form, position: v })}
+              options={positionsRendered.map(p => ({ value: p.v, label: p.label }))}
+              sk={lang === "sk"}
+            />
           </SettingsField>
           <SettingsField label="LinkedIn URL">
             <input type="url" value={form.linkedin_url} onChange={e => setForm({ ...form, linkedin_url: e.target.value })}
@@ -1910,24 +1913,16 @@ function PlatformExports({ lang, setCurrent }) {
           {lang === "sk" ? "Dátum snapshotu" : "Snapshot date"}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
-          <select
+          <Picker
             value={selectedDay}
-            onChange={(e) => setSelectedDay(e.target.value)}
-            disabled={daysLoading || days.length === 0 || !!exportProgress}
-            style={{
-              background: "var(--surface-2)", color: textLight, border: `1px solid ${border}`,
-              borderRadius: 6, padding: "0.5rem 0.7rem", fontFamily: mono, fontSize: "0.8rem",
-              minWidth: 200, cursor: days.length === 0 ? "default" : "pointer",
-            }}>
-            {days.length === 0 && (
-              <option value="">{daysLoading ? (lang === "sk" ? "Načítavam…" : "Loading…") : (lang === "sk" ? "Žiadne dáta" : "No data")}</option>
-            )}
-            {days.map((d, i) => (
-              <option key={d} value={i === 0 ? "" : d}>
-                {d}{i === 0 ? (lang === "sk" ? "  (najnovší)" : "  (latest)") : ""}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => setSelectedDay(v)}
+            options={days.length === 0
+              ? [{ value: "", label: daysLoading ? (lang === "sk" ? "Načítavam…" : "Loading…") : (lang === "sk" ? "Žiadne dáta" : "No data") }]
+              : days.map((d, i) => ({ value: i === 0 ? "" : d, label: `${d}${i === 0 ? (lang === "sk" ? "  (najnovší)" : "  (latest)") : ""}` }))}
+            width={220}
+            searchable
+            sk={lang === "sk"}
+          />
           <span style={{ color: dim, fontSize: "0.75rem" }}>
             {lang === "sk"
               ? `${days.length} dostupných dátumov · trh: ${isAllCountries(country) ? "všetky" : country}`

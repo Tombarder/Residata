@@ -29,6 +29,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useProjects, useProjectSnapshots, useReportHistogram, fetchReportBinUnits, useReportProjectUnits, useReportComparables } from "../lib/useData";
 import LoadError from "../components/LoadError";
+import Picker from "../components/Picker";
 import { moneyFromEur, moneySymbol } from "../lib/money";
 import { localeTag } from "../lib/locale";
 import { useCurrency } from "../lib/useCurrency";
@@ -549,14 +550,8 @@ function PickerRow({ label, value, options, onChange }) {
   return (
     <div className="no-print rep-picker-row" style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "1rem", padding: "0.55rem 0.7rem", background: bg2, border: `1px solid ${border}`, borderRadius: 6 }}>
       <span style={{ fontFamily: mono, fontSize: "0.62rem", color: dim, letterSpacing: "0.08em", textTransform: "uppercase" }}>{label}</span>
-      <select value={value || ""} onChange={(e) => onChange(e.target.value)}
-        style={{
-          background: bg, border: `1px solid ${border}`, color: text,
-          padding: "0.35rem 0.6rem", borderRadius: 4,
-          fontFamily: mono, fontSize: "0.78rem", minWidth: 200,
-        }}>
-        {opts.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
+      <Picker value={value || ""} onChange={onChange} width={200} searchable ariaLabel={label}
+        options={opts} />
       <span style={{ fontFamily: mono, fontSize: "0.62rem", color: dim }}>{opts.length} {`⋮`}</span>
     </div>
   );
@@ -1775,14 +1770,10 @@ function ComparableTransactionsReport({ projects, lang }) {
           <span style={{ fontSize: "0.72rem", color: dim, letterSpacing: "0.04em", textTransform: "uppercase" }}>
             {lang === "sk" ? "Filtre" : "Filters"}
           </span>
-          <select value={districtPick} onChange={e => setDistrictPick(e.target.value)} style={selectStyle}>
-            <option value="__all__">{lang === "sk" ? "Všetky časti" : "All districts"}</option>
-            {districts.map(d => <option key={d} value={d}>{d}</option>)}
-          </select>
-          <select value={roomPick} onChange={e => setRoomPick(e.target.value)} style={selectStyle}>
-            <option value="__all__">{lang === "sk" ? "Všetky izbovosti" : "All room counts"}</option>
-            {[1, 2, 3, 4, 5].map(n => <option key={n} value={String(n)}>{n}{lang === "sk" ? "-izb." : "-room"}</option>)}
-          </select>
+          <Picker value={districtPick} onChange={setDistrictPick} width={170} searchable sk={lang === "sk"} ariaLabel={lang === "sk" ? "Mestská časť" : "District"}
+            options={[{ value: "__all__", label: lang === "sk" ? "Všetky časti" : "All districts" }, ...districts.map((d) => ({ value: d, label: d }))]} />
+          <Picker value={roomPick} onChange={setRoomPick} width={160} sk={lang === "sk"} ariaLabel={lang === "sk" ? "Izbovosť" : "Room count"}
+            options={[{ value: "__all__", label: lang === "sk" ? "Všetky izbovosti" : "All room counts" }, ...[1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: `${n}${lang === "sk" ? "-izb." : "-room"}` }))]} />
           <button onClick={downloadCsv} style={{
             marginLeft: "auto", background: "transparent", color: accentInk,
             border: `1px solid color-mix(in srgb, var(--accent) 33%, transparent)`, borderRadius: 4, padding: "0.4rem 0.8rem",
