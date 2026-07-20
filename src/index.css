@@ -93,23 +93,23 @@
      cool green-tinted near-white ground; clearly-stepped neutrals so page / card /
      inset / border each read distinct; neutral labels (no mint-on-white); green kept
      as a concentrated accent (deep --accent-ink for text/values so it stays legible). */
-  --bg:            #f4f6f5;   /* cool green-tinted near-white workspace ground */
+  --bg:            #e6ebe7;   /* deeper green-gray ground so white cards clearly pop */
   --surface:       #ffffff;   /* crisp white cards (lifted by the light-mode shadow below) */
-  --surface-2:     #eef2f0;   /* inset / row-stripe — visibly distinct from a white card */
-  --surface-3:     #e4e9e6;   /* input / raised / hover — a clear step darker again */
-  --border:        #e0e6e2;   /* soft but visible card / table edge */
-  --border-soft:   #eaefec;   /* hairline dividers inside cards */
+  --surface-2:     #dfe6e1;   /* inset / row-stripe — clearly distinct from a white card */
+  --surface-3:     #d2dbd4;   /* input / raised / hover — a clear step darker again */
+  --border:        #c4cfc6;   /* visible, defined card / table edge (was too faint) */
+  --border-soft:   #d6dfd8;   /* hairline dividers inside cards */
   --accent:        #00e5a0;   /* mint — theme-invariant (map paint / fills) */
-  --accent-strong: #00b382;
-  --accent-ink:    #0a8f68;   /* deep green — accent used as TEXT, legible on white */
-  --accent-2:      #b3730a;
-  --danger:        #cf2f26;
-  --info:          #2f6bd8;
-  --warning:       #8f6d0a;
-  --text:          #16201c;   /* deep green-charcoal — strong, clean */
-  --text-2:        #38433d;
-  --text-dim:      #5c6862;   /* secondary / body-dim */
-  --text-faint:    #7d877f;   /* neutral labels / captions */
+  --accent-strong: #059b6a;
+  --accent-ink:    #076b41;   /* deep, punchy emerald — accent used as TEXT on white */
+  --accent-2:      #a5680a;
+  --danger:        #c62a20;
+  --info:          #2560cf;
+  --warning:       #886608;
+  --text:          #101a15;   /* near-black green-charcoal — strong, high contrast */
+  --text-2:        #33403a;
+  --text-dim:      #55625b;   /* secondary / body-dim */
+  --text-faint:    #6a746d;   /* neutral labels / captions — punchier than before */
   --on-accent:     #04160f;
   /* deep-emerald sidebar */
   --sidebar-bg:          linear-gradient(180deg, #0f5341 0%, #0b4634 100%);
@@ -130,6 +130,13 @@
    native controls are untouched. */
 :root[data-theme="light"] div[style*="var(--surface)"][style*="border-radius"] {
   box-shadow: 0 1px 2px rgba(20, 32, 26, 0.05), 0 6px 16px rgba(20, 32, 26, 0.06);
+}
+
+/* Light-mode map punch — the CARTO light basemap renders very pale/washed; a
+   saturation + contrast boost gives the land, water and markers more definition
+   without changing tile sources (CSP-safe). Dark map is left untouched. */
+:root[data-theme="light"] .maplibregl-canvas {
+  filter: saturate(1.28) contrast(1.1) brightness(0.965);
 }
 
 /* ── universal box model: borders + padding stay inside declared widths ─── */
