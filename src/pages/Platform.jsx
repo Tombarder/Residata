@@ -41,7 +41,7 @@ import DataFreshness from "../components/DataFreshness";
 // Reports / Pivot where AI doesn't show up at all.
 
 const mono = "'JetBrains Mono', monospace";
-import { accent as green, dim, text as textLight, border, surface as bg, surfaceDark as bg2 } from "../lib/theme";
+import { accent as green, accentInk, dim, text as textLight, border, surface as bg, surfaceDark as bg2 } from "../lib/theme";
 import { useThemeMode, applyTheme, getTheme } from "../lib/theme-mode";
 const SIDEBAR_W = 240;
 
@@ -549,7 +549,7 @@ function TopBar({ page, lang, setLang, tier }) {
       position: "sticky", top: 0, zIndex: 30,
     }} className="platform-topbar">
       <div style={{ paddingLeft: "2.5rem" /* leave room for mobile hamburger */ }} className="platform-topbar-inner">
-        <div style={{ fontFamily: mono, fontSize: "0.65rem", color: green, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.2rem" }}>
+        <div style={{ fontFamily: mono, fontSize: "0.65rem", color: accentInk, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.2rem" }}>
           {lang === "sk" ? "Platforma · " : "Platform · "}{tier.toUpperCase()}
         </div>
         <h1 style={{ margin: 0, fontSize: "1.4rem", fontWeight: 700, letterSpacing: "-0.02em", color: textLight }}>
@@ -873,13 +873,13 @@ function UpgradeOverlay({ lang, requiredFor, currentTier, setCurrent }) {
       <div style={{
         flexShrink: 0,
         width: 30, height: 30, borderRadius: 7,
-        background: "rgba(0,229,160,0.15)", color: green,
+        background: "rgba(0,229,160,0.15)", color: accentInk,
         display: "flex", alignItems: "center", justifyContent: "center",
         fontSize: "0.9rem",
       }}>🔒</div>
       <div style={{ flex: 1, minWidth: 180 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: "0.55rem", flexWrap: "wrap" }}>
-          <span style={{ fontFamily: mono, fontSize: "0.58rem", color: green, letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 700 }}>
+          <span style={{ fontFamily: mono, fontSize: "0.58rem", color: accentInk, letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 700 }}>
             {lang === "sk" ? "Ukážka" : "Preview"}
           </span>
           <span style={{ color: textLight, fontWeight: 700, fontSize: "0.94rem", letterSpacing: "-0.01em" }}>
@@ -1040,7 +1040,7 @@ function PlatformBilling({ lang, setCurrent }) {
             {isAdmin && "Admin"}
           </span>
           {trialActive && (
-            <span style={{ fontSize: "0.75rem", color: green, fontFamily: mono, background: "rgba(0,229,160,0.12)", border: `1px solid ${green}`, borderRadius: 100, padding: "2px 10px" }}>
+            <span style={{ fontSize: "0.75rem", color: accentInk, fontFamily: mono, background: "rgba(0,229,160,0.12)", border: `1px solid ${green}`, borderRadius: 100, padding: "2px 10px" }}>
               🎁 {trialDaysLeft <= 0
                 ? (lang === "sk" ? "Trial · posledný deň" : "Trial · last day")
                 : (lang === "sk" ? `Trial · ${trialDaysLeft} dní zostáva` : `Trial · ${trialDaysLeft} day${trialDaysLeft === 1 ? "" : "s"} left`)}
@@ -1074,7 +1074,7 @@ function PlatformBilling({ lang, setCurrent }) {
           background: "linear-gradient(135deg, rgba(0,229,160,0.14), rgba(0,229,160,0.03))",
           border: `1px solid ${green}`, borderRadius: 12, padding: "1.75rem 2rem", marginBottom: "1.25rem",
         }}>
-          <div style={{ fontFamily: mono, fontSize: "0.65rem", color: green, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.5rem" }}>
+          <div style={{ fontFamily: mono, fontSize: "0.65rem", color: accentInk, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.5rem" }}>
             🎁 {lang === "sk" ? "Darček pre teba" : "A gift for you"}
           </div>
           <h3 style={{ fontSize: "1.25rem", fontWeight: 700, color: textLight, margin: 0, marginBottom: "0.6rem", letterSpacing: "-0.01em" }}>
@@ -1110,7 +1110,7 @@ function PlatformBilling({ lang, setCurrent }) {
           background: "linear-gradient(135deg, rgba(0,229,160,0.08), rgba(0,229,160,0.02))",
           border: "1px solid rgba(0,229,160,0.3)", borderRadius: 12, padding: "1.75rem 2rem", marginBottom: "1.25rem",
         }}>
-          <div style={{ fontFamily: mono, fontSize: "0.65rem", color: green, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.5rem" }}>
+          <div style={{ fontFamily: mono, fontSize: "0.65rem", color: accentInk, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.5rem" }}>
             {lang === "sk" ? "Upgrade na paid" : "Upgrade to paid"}
           </div>
           <h3 style={{ fontSize: "1.4rem", fontWeight: 700, color: textLight, margin: 0, marginBottom: "0.85rem", letterSpacing: "-0.01em" }}>
@@ -1293,8 +1293,8 @@ function SubscriptionCard({ lang, paused, paidWindowActive, paidUntil, paidStart
 
       <p style={{ color: dim, fontSize: "0.78rem", lineHeight: 1.55, margin: "1rem 0 0", fontFamily: mono }}>
         {lang === "sk"
-          ? <>Faktúry, zmena obdobia, zrušenie — spravuj cez <strong style={{ color: "var(--text-2)" }}>Spravovať platbu</strong> alebo napíš na <a href="mailto:residata@proton.me" style={{ color: green }}>residata@proton.me</a>.</>
-          : <>Invoices, period changes, cancellation — use <strong style={{ color: "var(--text-2)" }}>Manage billing</strong> above, or email <a href="mailto:residata@proton.me" style={{ color: green }}>residata@proton.me</a>.</>}
+          ? <>Faktúry, zmena obdobia, zrušenie — spravuj cez <strong style={{ color: "var(--text-2)" }}>Spravovať platbu</strong> alebo napíš na <a href="mailto:residata@proton.me" style={{ color: accentInk }}>residata@proton.me</a>.</>
+          : <>Invoices, period changes, cancellation — use <strong style={{ color: "var(--text-2)" }}>Manage billing</strong> above, or email <a href="mailto:residata@proton.me" style={{ color: accentInk }}>residata@proton.me</a>.</>}
       </p>
     </div>
   );
@@ -1906,7 +1906,7 @@ function PlatformExports({ lang, setCurrent }) {
 
       {/* Snapshot-date picker — always visible; trial users can browse dates too. */}
       <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 12, padding: "1.25rem 1.75rem", marginBottom: "1rem" }}>
-        <div style={{ fontFamily: mono, fontSize: "0.65rem", color: green, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.6rem" }}>
+        <div style={{ fontFamily: mono, fontSize: "0.65rem", color: accentInk, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.6rem" }}>
           {lang === "sk" ? "Dátum snapshotu" : "Snapshot date"}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
@@ -1944,7 +1944,7 @@ function PlatformExports({ lang, setCurrent }) {
       {canExport ? (
       <>
       <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 12, padding: "1.5rem 1.75rem", marginBottom: "1rem" }}>
-        <div style={{ fontFamily: mono, fontSize: "0.65rem", color: green, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.5rem" }}>CSV / EXCEL</div>
+        <div style={{ fontFamily: mono, fontSize: "0.65rem", color: accentInk, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.5rem" }}>CSV / EXCEL</div>
         <h3 style={{ fontSize: "1.05rem", fontWeight: 600, color: textLight, margin: 0, marginBottom: "1rem" }}>
           {lang === "sk" ? "Okamžitý export" : "Instant export"}
         </h3>
@@ -1983,7 +1983,7 @@ function PlatformExports({ lang, setCurrent }) {
       </div>
 
       <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 12, padding: "1.5rem 1.75rem" }}>
-        <div style={{ fontFamily: mono, fontSize: "0.65rem", color: green, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.5rem" }}>API</div>
+        <div style={{ fontFamily: mono, fontSize: "0.65rem", color: accentInk, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.5rem" }}>API</div>
         <h3 style={{ fontSize: "1.05rem", fontWeight: 600, color: textLight, margin: 0, marginBottom: "0.75rem" }}>
           {lang === "sk" ? "REST API cez Supabase" : "REST API via Supabase"}
         </h3>
@@ -1991,7 +1991,7 @@ function PlatformExports({ lang, setCurrent }) {
           {lang === "sk"
             ? "Dataset je dostupný priamo cez Supabase REST endpoint (gated cez tvoju session). Ak potrebuješ dedikovaný API kľúč pre server-to-server integráciu, napíš na "
             : "The dataset is available directly through Supabase REST (gated by your session). For a dedicated server-to-server API key, email "}
-          <a href="mailto:residata@proton.me" style={{ color: green }}>residata@proton.me</a>.
+          <a href="mailto:residata@proton.me" style={{ color: accentInk }}>residata@proton.me</a>.
         </p>
         <pre style={{
           margin: 0, padding: "0.75rem 1rem", background: bg2, borderRadius: 6,

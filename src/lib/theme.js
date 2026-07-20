@@ -7,6 +7,11 @@
 // `var(...)`. Never convert accent/orange/blue/onAccent to var().
 export const accent       = "#00e5a0"; // brand green (theme-invariant; used in map paint)
 export const accentStrong = "#00c98c";
+// accent used as TEXT/value colour. Resolves to a CSS var: mint in dark, deep-green
+// in light — so mint-on-white text stays legible. It is a var(), so it must NEVER be
+// used in maplibre paint or string-concatenated with an opacity suffix (`${accentInk}33`
+// is invalid). Use `accent` (literal) for those. For solid text colour, prefer this.
+export const accentInk    = "var(--accent-ink)";
 export const onAccent     = "#06140f"; // text on a green fill (dark, fine on both themes)
 export const orange       = "#f5a623"; // secondary accent (theme-invariant; map paint)
 export const blue         = "#4a9eff"; // status "reserved" blue (theme-invariant)

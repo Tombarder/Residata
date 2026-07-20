@@ -1258,7 +1258,7 @@ function Histogram({ hist, hLo, hHi, med }) {
   return (
     <div style={{ flex: 1, minWidth: 150 }}>
       <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 36 }}>
-        {hist.map((n, i) => <div key={i} title={String(n)} style={{ flex: 1, height: `${Math.max(7, (n / max) * 100)}%`, background: i === medIdx ? green : "#2c6e59", borderRadius: 2 }} />)}
+        {hist.map((n, i) => <div key={i} title={String(n)} style={{ flex: 1, height: `${Math.max(7, (n / max) * 100)}%`, background: i === medIdx ? green : "var(--accent-strong)", borderRadius: 2 }} />)}
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.58rem", color: dim, fontFamily: mono, marginTop: 4 }}>
         <span>€{fmt(hLo)}</span><span>€{fmt(hHi)}/m²</span>

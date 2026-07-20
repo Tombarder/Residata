@@ -20,8 +20,11 @@
   --surface-3:     #1c1c22;   /* raised / input / hover */
   --border:        #222228;
   --border-soft:   #2c2c34;
-  --accent:        #00e5a0;   /* brand green (theme-invariant) */
+  --accent:        #00e5a0;   /* brand green (theme-invariant; feeds map paint) */
   --accent-strong: #00c98c;
+  --accent-ink:    #00e5a0;   /* accent used as TEXT — mint in dark, deep-green in light
+                                 (so mint labels/values stay legible on white). NEVER
+                                 feed this into maplibre paint — use --accent there. */
   --accent-2:      #f5a623;   /* secondary accent (theme-invariant) */
   --danger:        #ff6b6b;   /* error / negative (theme-invariant) */
   --info:          #4a9eff;   /* reserved / info blue (theme-invariant) */
@@ -85,22 +88,28 @@
      Residata's signature block; the workspace is a soft green-neutral canvas with crisp
      white cards + soft depth and deep green-charcoal text; mint green is the sharp accent.
      Cohesive because every neutral shares the green family — the brand green sits native. */
-  --bg:            #f3f4f6;   /* clean NEUTRAL light-gray workspace (green lives in the sidebar) */
-  --surface:       #ffffff;   /* crisp white cards */
-  --surface-2:     #eef0f3;   /* inset / row-stripe (neutral) */
-  --surface-3:     #e6e9ee;   /* input / raised / hover (neutral) */
-  --border:        #dde1e8;   /* clean neutral edges */
-  --border-soft:   #e8ebef;
-  --accent:        #00e5a0;   /* mint — the accent (concentrated, not everywhere) */
-  --accent-strong: #009e73;
+  /* "Clarity" light theme (Boss-picked 2026-07-20) — a calm, professional daylight
+     system, NOT an inverted dark theme. Crisp white cards lifted by soft shadow on a
+     cool green-tinted near-white ground; clearly-stepped neutrals so page / card /
+     inset / border each read distinct; neutral labels (no mint-on-white); green kept
+     as a concentrated accent (deep --accent-ink for text/values so it stays legible). */
+  --bg:            #f4f6f5;   /* cool green-tinted near-white workspace ground */
+  --surface:       #ffffff;   /* crisp white cards (lifted by the light-mode shadow below) */
+  --surface-2:     #eef2f0;   /* inset / row-stripe — visibly distinct from a white card */
+  --surface-3:     #e4e9e6;   /* input / raised / hover — a clear step darker again */
+  --border:        #e0e6e2;   /* soft but visible card / table edge */
+  --border-soft:   #eaefec;   /* hairline dividers inside cards */
+  --accent:        #00e5a0;   /* mint — theme-invariant (map paint / fills) */
+  --accent-strong: #00b382;
+  --accent-ink:    #0a8f68;   /* deep green — accent used as TEXT, legible on white */
   --accent-2:      #b3730a;
   --danger:        #cf2f26;
   --info:          #2f6bd8;
   --warning:       #8f6d0a;
-  --text:          #1a1e27;   /* neutral dark slate — strong, clean */
-  --text-2:        #3a414c;
-  --text-dim:      #5e6672;
-  --text-faint:    #8a919d;
+  --text:          #16201c;   /* deep green-charcoal — strong, clean */
+  --text-2:        #38433d;
+  --text-dim:      #5c6862;   /* secondary / body-dim */
+  --text-faint:    #7d877f;   /* neutral labels / captions */
   --on-accent:     #04160f;
   /* deep-emerald sidebar */
   --sidebar-bg:          linear-gradient(180deg, #0f5341 0%, #0b4634 100%);
@@ -120,7 +129,7 @@
    surface-backed rounded containers, so chips (accent bg) / inputs (surface-2/3) /
    native controls are untouched. */
 :root[data-theme="light"] div[style*="var(--surface)"][style*="border-radius"] {
-  box-shadow: 0 1px 1px rgba(26, 31, 54, 0.04), 0 2px 6px rgba(26, 31, 54, 0.06);
+  box-shadow: 0 1px 2px rgba(20, 32, 26, 0.05), 0 6px 16px rgba(20, 32, 26, 0.06);
 }
 
 /* ── universal box model: borders + padding stay inside declared widths ─── */

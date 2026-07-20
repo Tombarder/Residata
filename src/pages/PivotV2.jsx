@@ -28,7 +28,7 @@ import { useCurrency } from "../lib/useCurrency";
 */
 
 const mono    = "'JetBrains Mono', ui-monospace, Menlo, monospace";
-import { accent as green, orange, dim, border, bg, surfacePanel as panelHi, text } from "../lib/theme";
+import { accent as green, accentInk, orange, dim, border, bg, surfacePanel as panelHi, text } from "../lib/theme";
 const panel   = "var(--surface-2)";
 
 /* ─── Field registry ─────────────────────────────────────────────
@@ -2171,7 +2171,7 @@ function DropZone({ zoneKey, title, hint, icon, chips, drag, hoverZone, setHover
         <span style={{
           display: "inline-flex", alignItems: "center", justifyContent: "center",
           width: 22, height: 22, borderRadius: 4,
-          background: "rgba(0,229,160,0.12)", color: green,
+          background: "rgba(0,229,160,0.12)", color: accentInk,
           fontFamily: mono, fontSize: "0.76rem", fontWeight: 800,
         }}>{icon}</span>
         <span style={{ fontFamily: mono, fontSize: "0.8rem", color: text, fontWeight: 700, letterSpacing: "0.04em" }}>{title}</span>
@@ -2290,7 +2290,7 @@ function ChipInZone({ label, type, agg, filter, level, onDragStart, onDragStartP
             onBlur={() => setTimeout(() => setMenuOpen(false), 150)}
             style={{
               background: "transparent", border: "none",
-              color: green, cursor: "pointer", padding: 0,
+              color: accentInk, cursor: "pointer", padding: 0,
               fontFamily: mono, fontSize: "0.7rem",
             }}
             title="Zmeň agregáciu"
@@ -2330,7 +2330,7 @@ function ChipInZone({ label, type, agg, filter, level, onDragStart, onDragStartP
       <button
         onClick={(e) => { e.stopPropagation(); onRemove(); }}
         title="Remove"
-        style={{ background: "transparent", border: "none", color: green, cursor: "pointer", padding: 0, fontSize: "0.95rem", lineHeight: 1 }}
+        style={{ background: "transparent", border: "none", color: accentInk, cursor: "pointer", padding: 0, fontSize: "0.95rem", lineHeight: 1 }}
       >×</button>
     </span>
   );
@@ -2487,7 +2487,7 @@ function PaletteField({ field, used, onDragStart, lang }) {
         {typeBadge}
       </span>
       <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fieldLabel(field.key, lang)}</span>
-      {used && <span style={{ fontFamily: mono, fontSize: "0.58rem", color: green, opacity: 0.65 }} title="Už použité inde">✓</span>}
+      {used && <span style={{ fontFamily: mono, fontSize: "0.58rem", color: accentInk, opacity: 0.65 }} title="Už použité inde">✓</span>}
     </div>
   );
 }
@@ -2514,7 +2514,7 @@ function AnalysisToolbar({ valueMode, setValueMode, dataBars, setDataBars, onExp
     color: dim, padding: "0.35rem 0.7rem", borderRadius: 4,
     fontSize: "0.75rem", cursor: "pointer",
   };
-  const btnActive = { ...btnBase, background: "rgba(0,229,160,0.14)", color: green, borderColor: green };
+  const btnActive = { ...btnBase, background: "rgba(0,229,160,0.14)", color: accentInk, borderColor: green };
   const btnDisabled = { ...btnBase, opacity: 0.4, cursor: "not-allowed" };
   const btnPill = (active, disabled) => (disabled ? btnDisabled : (active ? btnActive : btnBase));
 
@@ -2573,7 +2573,7 @@ function AnalysisToolbar({ valueMode, setValueMode, dataBars, setDataBars, onExp
 
       <button style={btnPill(dataBars)} onClick={() => setDataBars(x => !x)}>{lang === "sk" ? "▮ stĺpčeky" : "▮ bars"}</button>
 
-      <button style={{ ...btnBase, marginLeft: "auto", color: green, borderColor: `${green}55` }}
+      <button style={{ ...btnBase, marginLeft: "auto", color: accentInk, borderColor: `${green}55` }}
               onClick={onExportCSV}>
         ⬇ CSV
       </button>
@@ -2755,7 +2755,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
   };
   const sortIndicator = (col) => {
     if (sort.col !== col) return null;
-    return <span style={{ marginLeft: 4, color: green }}>{sort.dir === "desc" ? "▾" : "▴"}</span>;
+    return <span style={{ marginLeft: 4, color: accentInk }}>{sort.dir === "desc" ? "▾" : "▴"}</span>;
   };
 
   // Per-value-column min/max (across LEAF nodes only — subtotals would
@@ -2874,8 +2874,8 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
               <th style={{ ...th, borderBottom: "none" }} colSpan={2}></th>
               {colKeys.map(ck => (
                 <th key={"ctop:" + ck} colSpan={effectiveValues.length}
-                    style={{ ...th, color: green, borderLeft: `1px solid ${border}`, borderBottom: `1px solid ${border}` }}>
-                  <span style={{ opacity: 0.65 }}>{fieldLabel(colFields[0], lang)}:</span> <strong style={{ color: green }}>{ck}</strong>
+                    style={{ ...th, color: accentInk, borderLeft: `1px solid ${border}`, borderBottom: `1px solid ${border}` }}>
+                  <span style={{ opacity: 0.65 }}>{fieldLabel(colFields[0], lang)}:</span> <strong style={{ color: accentInk }}>{ck}</strong>
                 </th>
               ))}
               {/* Grand totals across columns. When there are more distinct column
@@ -2911,7 +2911,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                   effectiveValues.map((v, i) => (
                     <th key={`h:${ck}:${v.key}`}
                         style={{
-                          ...th, textAlign: "right", minWidth: 80, color: green,
+                          ...th, textAlign: "right", minWidth: 80, color: accentInk,
                           borderLeft: i === 0 ? `1px solid ${border}` : undefined,
                         }}>
                       {valueHeaderText(v)}
@@ -2933,7 +2933,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
               </>
             ) : (
               effectiveValues.map((v, i) => (
-                <th key={v.key} style={{ ...th, textAlign: "right", minWidth: 100, color: green, cursor: "pointer" }} onClick={() => clickSort(i)}>
+                <th key={v.key} style={{ ...th, textAlign: "right", minWidth: 100, color: accentInk, cursor: "pointer" }} onClick={() => clickSort(i)}>
                   {valueHeaderText(v)}{sortIndicator(i)}
                 </th>
               ))
@@ -2943,9 +2943,15 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
         <tbody>
           {flatRows.map((n, idx) => {
             const isSubtotal = !n.isLeaf;
-            const shade = ["#12121a", "#0f0f14", "var(--surface-2)", "#0b0b0c", "var(--bg)"][Math.min(n.level, 4)];
+            // Subtotal/group rows: a green-tinted ladder that deepens by level. rgba
+            // accent over the card reads on BOTH themes (was a hardcoded near-black
+            // ladder — a dark-theme leftover that rendered as a black bar in light).
+            const shade = [
+              "rgba(0,229,160,0.15)", "rgba(0,229,160,0.10)",
+              "var(--surface-3)", "var(--surface-2)", "var(--surface-2)",
+            ][Math.min(n.level, 4)];
             const indent = 0.4 + n.level * 0.8;
-            const baseBg = isSubtotal ? shade : (idx % 2 ? "transparent" : "rgba(255,255,255,0.015)");
+            const baseBg = isSubtotal ? shade : (idx % 2 ? "transparent" : "var(--surface-2)");
             // Is THIS row a navigable project? Only when the deepest
             // grouping is project_name, this is a leaf node, and we
             // can resolve a project_id from its records (any record
@@ -2974,7 +2980,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                 onMouseLeave={rowInteractive ? (e) => { e.currentTarget.style.background = baseBg; } : undefined}
                 style={{
                   background: baseBg,
-                  borderTop: n.level === 0 ? `1px solid ${border}` : `1px solid var(--surface)`,
+                  borderTop: n.level === 0 ? `1px solid ${border}` : `1px solid var(--border-soft)`,
                   transition: "background 0.12s",
                 }}>
                 <td style={{
@@ -2990,7 +2996,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                   )}
                   {n.hasChildren ? (
                     <button onClick={(e) => { e.stopPropagation(); onToggle(n.pathKey); }}
-                      style={{ background: "transparent", border: "none", color: green, cursor: "pointer", padding: 0, marginRight: "0.35rem", fontSize: "0.7rem", width: 12, display: "inline-block", verticalAlign: "middle" }}
+                      style={{ background: "transparent", border: "none", color: accentInk, cursor: "pointer", padding: 0, marginRight: "0.35rem", fontSize: "0.7rem", width: 12, display: "inline-block", verticalAlign: "middle" }}
                       title={n.isCollapsed ? "Expand" : "Collapse"}>
                       {n.isCollapsed ? "▸" : "▾"}
                     </button>
@@ -3034,7 +3040,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                     return (
                       <div title={lang === "sk" ? `${f(sp.offer)} v ponuke · ${f(sp.sold)} predaných` : `${f(sp.offer)} on offer · ${f(sp.sold)} sold`}
                            style={{ fontSize: "0.58rem", fontWeight: 400, marginTop: 1, whiteSpace: "nowrap" }}>
-                        <span style={{ color: green }}>{f(sp.offer)}</span>
+                        <span style={{ color: accentInk }}>{f(sp.offer)}</span>
                         <span style={{ opacity: 0.4 }}> · </span>
                         <span style={{ opacity: 0.65 }}>{f(sp.sold)}</span>
                       </div>
@@ -3065,14 +3071,14 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                             data-colkey={i === 0 ? String(ck) : undefined}
                             style={{
                               ...td, textAlign: "right", fontFamily: mono,
-                              color: green, fontWeight: isSubtotal ? 800 : 600,
+                              color: accentInk, fontWeight: isSubtotal ? 800 : 600,
                               borderLeft: i === 0 ? `1px solid ${border}` : undefined,
                               position: "relative",
                             }}>
                             {bw > 0 && (
                               <span aria-hidden style={{
                                 position: "absolute", right: 0, bottom: 0, height: 3,
-                                width: `${bw}%`, background: `linear-gradient(90deg, ${green}33, ${green})`,
+                                width: `${bw}%`, background: `linear-gradient(90deg, var(--accent-strong), var(--accent-ink))`,
                                 borderBottomRightRadius: 2, pointerEvents: "none",
                               }} />
                             )}
@@ -3090,7 +3096,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                       return (
                         <td key={`sum:${v.key}`} style={{
                           ...td, textAlign: "right", fontFamily: mono,
-                          color: green, fontWeight: isSubtotal ? 800 : 700,
+                          color: accentInk, fontWeight: isSubtotal ? 800 : 700,
                           borderLeft: i === 0 ? `2px solid ${green}55` : undefined,
                           background: "rgba(0,229,160,0.03)",
                           position: "relative",
@@ -3098,7 +3104,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                           {bw > 0 && (
                             <span aria-hidden style={{
                               position: "absolute", right: 0, bottom: 0, height: 3,
-                              width: `${bw}%`, background: `linear-gradient(90deg, ${green}33, ${green})`,
+                              width: `${bw}%`, background: `linear-gradient(90deg, var(--accent-strong), var(--accent-ink))`,
                               borderBottomRightRadius: 2, pointerEvents: "none",
                             }} />
                           )}
@@ -3117,13 +3123,13 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                     return (
                       <td key={v.key} style={{
                         ...td, textAlign: "right", fontFamily: mono,
-                        color: green, fontWeight: isSubtotal ? 800 : 600,
+                        color: accentInk, fontWeight: isSubtotal ? 800 : 600,
                         position: "relative",
                       }}>
                         {bw > 0 && (
                           <span aria-hidden style={{
                             position: "absolute", right: 0, bottom: 0, height: 3,
-                            width: `${bw}%`, background: `linear-gradient(90deg, ${green}33, ${green})`,
+                            width: `${bw}%`, background: `linear-gradient(90deg, var(--accent-strong), var(--accent-ink))`,
                             borderBottomRightRadius: 2, pointerEvents: "none",
                           }} />
                         )}
@@ -3141,7 +3147,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
               that's just visual noise; user wants to see the actual
               total they're percenting against. */}
           <tr style={{ background: bg, borderTop: `2px solid ${green}66` }}>
-            <td style={{ ...td, fontWeight: 700, color: green, fontSize: "0.85rem" }}>
+            <td style={{ ...td, fontWeight: 700, color: accentInk, fontSize: "0.85rem" }}>
               Σ {lang === "sk" ? "Spolu" : "Total"}
               {valueMode !== "raw" && (
                 <span style={{ fontSize: "0.65rem", color: dim, marginLeft: "0.4rem", fontWeight: 400 }}>
@@ -3149,7 +3155,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                 </span>
               )}
             </td>
-            <td style={{ ...td, textAlign: "right", fontFamily: mono, color: green, fontWeight: 700 }}>
+            <td style={{ ...td, textAlign: "right", fontFamily: mono, color: accentInk, fontWeight: 700 }}>
               {grandTotal.count.toLocaleString("en-US").replace(/,/g, " ")}
             </td>
             {crossTab ? (
@@ -3157,7 +3163,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                 {colKeys.map((ck) => (
                   effectiveValues.map((v, i) => (
                     <td key={`gt:${ck}:${v.key}`} style={{
-                      ...td, textAlign: "right", fontFamily: mono, color: green,
+                      ...td, textAlign: "right", fontFamily: mono, color: accentInk,
                       fontWeight: 900, fontSize: "0.9rem",
                       borderLeft: i === 0 ? `1px solid ${border}` : undefined,
                     }}>
@@ -3167,7 +3173,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                 ))}
                 {effectiveValues.map((v, i) => (
                   <td key={`gsum:${v.key}`} style={{
-                    ...td, textAlign: "right", fontFamily: mono, color: green,
+                    ...td, textAlign: "right", fontFamily: mono, color: accentInk,
                     fontWeight: 900, fontSize: "0.9rem",
                     borderLeft: i === 0 ? `2px solid ${green}55` : undefined,
                     background: "rgba(0,229,160,0.06)",
@@ -3178,7 +3184,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
               </>
             ) : (
               effectiveValues.map((v, i) => (
-                <td key={v.key} style={{ ...td, textAlign: "right", fontFamily: mono, color: green, fontWeight: 900, fontSize: "0.9rem" }}>
+                <td key={v.key} style={{ ...td, textAlign: "right", fontFamily: mono, color: accentInk, fontWeight: 900, fontSize: "0.9rem" }}>
                   {formatValue(grandTotal.rollups[i], v.field, v.agg)}
                 </td>
               ))
@@ -3471,7 +3477,7 @@ function ChartHeader({ collapsed, setCollapsed, lang, children }) {
           fontWeight: 600, display: "flex", alignItems: "center", gap: "0.5rem",
         }}
       >
-        <span style={{ fontSize: "0.7rem", color: green, transition: "transform 0.15s", transform: collapsed ? "rotate(-90deg)" : "none" }}>▾</span>
+        <span style={{ fontSize: "0.7rem", color: accentInk, transition: "transform 0.15s", transform: collapsed ? "rotate(-90deg)" : "none" }}>▾</span>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={green} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <line x1="12" y1="20" x2="12" y2="10"/>
           <line x1="18" y1="20" x2="18" y2="4"/>
@@ -4727,7 +4733,7 @@ function DrillDownModal({ title, records, loading, onClose, lang }) {
         }}
       >
         <div style={{ padding: "0.9rem 1.1rem", borderBottom: `1px solid ${border}`, display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap" }}>
-          <span style={{ fontFamily: mono, fontSize: "0.62rem", color: green, letterSpacing: "0.12em", textTransform: "uppercase" }}>
+          <span style={{ fontFamily: mono, fontSize: "0.62rem", color: accentInk, letterSpacing: "0.12em", textTransform: "uppercase" }}>
             {lang === "sk" ? "Záznamy" : "Records"}
           </span>
           <strong style={{ color: text, fontSize: "0.9rem" }}>{title}</strong>
@@ -4735,7 +4741,7 @@ function DrillDownModal({ title, records, loading, onClose, lang }) {
             {records.length.toLocaleString("en-US").replace(/,/g, " ")}
           </span>
           <button onClick={downloadCSV} style={{
-            background: "transparent", border: `1px solid ${green}55`, color: green,
+            background: "transparent", border: `1px solid ${green}55`, color: accentInk,
             borderRadius: 4, padding: "0.3rem 0.6rem", cursor: "pointer",
             fontFamily: mono, fontSize: "0.7rem",
           }}>⬇ CSV</button>
@@ -4757,7 +4763,7 @@ function DrillDownModal({ title, records, loading, onClose, lang }) {
                 {DRILL_COLS.map(c => (
                   <th key={c.key} style={{ padding: "0.55rem 0.7rem", fontWeight: 700, borderBottom: `1px solid ${border}`, whiteSpace: "nowrap" }}>{drillColLabel(c)}</th>
                 ))}
-                <th style={{ padding: "0.55rem 0.7rem", fontWeight: 700, borderBottom: `1px solid ${border}`, color: green, textAlign: "right" }}>{moneySymbol()}/m²</th>
+                <th style={{ padding: "0.55rem 0.7rem", fontWeight: 700, borderBottom: `1px solid ${border}`, color: accentInk, textAlign: "right" }}>{moneySymbol()}/m²</th>
               </tr>
             </thead>
             <tbody>
@@ -4780,7 +4786,7 @@ function DrillDownModal({ title, records, loading, onClose, lang }) {
                       </td>
                     );
                   })}
-                  <td style={{ padding: "0.35rem 0.7rem", textAlign: "right", fontFamily: mono, color: green }}>
+                  <td style={{ padding: "0.35rem 0.7rem", textAlign: "right", fontFamily: mono, color: accentInk }}>
                     {cena_m2(r) != null ? Math.round(moneyFromEur(cena_m2(r))).toLocaleString("en-US").replace(/,/g, " ") : "—"}
                   </td>
                 </tr>

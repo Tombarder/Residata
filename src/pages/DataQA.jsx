@@ -31,6 +31,7 @@ import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useSta
 import ProjectsEditor from "../components/ProjectsEditor";
 
 const green = "#00e5a0";
+const greenInk = "var(--accent-ink)";
 const amber = "#f5a623";
 const blue = "#4a9eff";
 const textLight = "var(--text)";
@@ -498,7 +499,7 @@ export default function DataQA({ lang = "sk" }) {
 
           {sel && sel.project_url && (
             <a href={sel.project_url} target="_blank" rel="noopener noreferrer"
-              style={{ ...btn, borderColor: green, color: green, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 7 }}>
+              style={{ ...btn, borderColor: green, color: greenInk, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 7 }}>
               {t("Open developer site", "Otvoriť web developera")} ↗
             </a>
           )}
@@ -519,7 +520,7 @@ export default function DataQA({ lang = "sk" }) {
                 {fmt(selCount)}<span style={{ fontSize: 13, color: dim, fontWeight: 400 }}> / {fmt(snap?.total)}</span>
               </div>
             </div>
-            <div style={card}><div style={cardLabel}>{t("Available", "Voľných")}</div><div style={{ ...cardVal, color: green }}>{fmt(snap?.v)}</div></div>
+            <div style={card}><div style={cardLabel}>{t("Available", "Voľných")}</div><div style={{ ...cardVal, color: greenInk }}>{fmt(snap?.v)}</div></div>
             <div style={card}><div style={cardLabel}>{t("Sold", "Predaných")}</div><div style={cardVal}>{fmt(snap?.p)}</div></div>
             <div style={card}><div style={cardLabel}>{t("Reserved", "Rezervované")}</div><div style={cardVal}>{fmt(snap?.r)}</div></div>
             <div style={card}><div style={cardLabel}>{t("Pre-reserved", "Predrezerv.")}</div><div style={cardVal}>{fmt(snap?.pr)}</div></div>

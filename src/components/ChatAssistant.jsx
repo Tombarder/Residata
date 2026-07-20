@@ -23,7 +23,7 @@ if (typeof document !== "undefined" && !document.getElementById("cb-pulse-anim")
 }
 
 const mono   = "'JetBrains Mono', monospace";
-import { accent as green, dim, text, border, bg, surfaceDark as bg2, orange } from "../lib/theme";
+import { accent as green, accentInk, dim, text, border, bg, surfaceDark as bg2, orange } from "../lib/theme";
 const red    = "#ff6b6b";
 
 /* ChatProgress — the live "what's happening" view shown while an answer is
@@ -57,7 +57,7 @@ export function ChatProgress({ steps = [], showProgress, setShowProgress, lang =
           <div key={i} style={{ display: "flex", gap: "0.4rem", alignItems: "center", color: isLast ? text : dim, fontFamily: mono, fontSize: fs, opacity: isLast ? 1 : 0.6 }}>
             {isLast
               ? <span aria-hidden style={dot} />
-              : <span aria-hidden style={{ color: green, fontSize: "0.7rem", width: 8, flexShrink: 0, textAlign: "center" }}>✓</span>}
+              : <span aria-hidden style={{ color: accentInk, fontSize: "0.7rem", width: 8, flexShrink: 0, textAlign: "center" }}>✓</span>}
             <span>{s}</span>
             {isLast && toggle}
           </div>
@@ -241,8 +241,8 @@ export default function ChatAssistant({ lang = "sk", setCurrent }) {
           onClick={() => chat.send()}
           disabled={chat.pending || !chat.input.trim()}
           style={{
-            background: chat.pending || !chat.input.trim() ? "#2a2a30" : green,
-            color: chat.pending || !chat.input.trim() ? dim : "var(--bg)",
+            background: chat.pending || !chat.input.trim() ? "var(--surface-3)" : green,
+            color: chat.pending || !chat.input.trim() ? "var(--text-faint)" : "var(--on-accent)",
             border: "none", borderRadius: 8,
             padding: "0.7rem 1.1rem", fontWeight: 700, fontFamily: mono, fontSize: "0.82rem",
             cursor: chat.pending || !chat.input.trim() ? "not-allowed" : "pointer",

@@ -20,7 +20,7 @@ const OVERSCAN = 8;        // extra rows rendered above/below the viewport for s
 const DEFAULT_COLS = ["project_name", "city", "cast", "typ", "izby", "obytna_plocha", "cena_s_dph", "price_per_m2", "stav"];
 
 // design tokens — identical to PivotV2 so the two pages feel like one product
-import { accent as green, orange, dim, border, bg, surfacePanel as panelHi, text } from "../lib/theme";
+import { accent as green, accentInk, orange, dim, border, bg, surfacePanel as panelHi, text } from "../lib/theme";
 const panel = "var(--surface-2)";
 const mono = "'JetBrains Mono', ui-monospace, Menlo, monospace";
 
@@ -305,7 +305,7 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
               <XFilterRow key={r.id} row={r} fields={xfFields} mode={mode} lang={lang} sel={sel}
                 onPatch={(patch) => patchXf(r.id, patch)} onRemove={() => removeXf(r.id)} />
             ))}
-            <button onClick={addXf} style={{ ...sel, cursor: "pointer", color: green, fontFamily: mono, fontSize: "0.72rem", borderColor: green }}>+ {t("filter", "filter")}</button>
+            <button onClick={addXf} style={{ ...sel, cursor: "pointer", color: accentInk, fontFamily: mono, fontSize: "0.72rem", borderColor: green }}>+ {t("filter", "filter")}</button>
             {activeFilters > 0 && <button onClick={() => { setFProject(""); setFCity(""); setFCast(""); setFDev(""); setFStav(""); setPMin(""); setPMax(""); setM2Min(""); setM2Max(""); setXf([]); }} style={{ ...sel, cursor: "pointer", color: dim, fontFamily: mono, fontSize: "0.7rem" }}>✕ {t("vyčistiť", "clear")}</button>}
             <button onClick={showOnMap} disabled={mapBusy} title={t("Zobraziť vyfiltrované projekty na mape", "Show the filtered projects on the map")}
               style={{ ...sel, marginLeft: "auto", cursor: mapBusy ? "wait" : "pointer", color: "#04130d", background: green, borderColor: green, fontFamily: mono, fontSize: "0.72rem", fontWeight: 700 }}>
@@ -390,7 +390,7 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
                       onMouseLeave={(e) => { if (!on) e.currentTarget.style.background = "transparent"; }}>
                       <span style={{ fontFamily: mono, fontSize: "0.62rem", width: 16, textAlign: "center", color: typeColor(f.type), fontWeight: 700 }}>{typeBadge(f.type)}</span>
                       <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lang === "sk" ? f.label_sk : f.label_en}</span>
-                      {on && <span style={{ fontFamily: mono, fontSize: "0.62rem", color: green }}>✓</span>}
+                      {on && <span style={{ fontFamily: mono, fontSize: "0.62rem", color: accentInk }}>✓</span>}
                     </div>
                   );
                 })}
