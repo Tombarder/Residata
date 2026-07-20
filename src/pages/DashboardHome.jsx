@@ -36,7 +36,7 @@ import { moneyFromEur, moneySymbol } from "../lib/money";
 import { localeTag } from "../lib/locale";
 import { useActivateTrial } from "../lib/useActivateTrial";
 import {
-  accent as green, orange, blue, dim, faint, text as textLight, border,
+  accent as green, accentInk, orange, blue, dim, faint, text as textLight, border,
   surface as bg, surfaceDark as bg2, surfacePanel, mono,
 } from "../lib/theme";
 import { useDashboardConfig, newWidgetId } from "../lib/useDashboardConfig";
@@ -509,7 +509,7 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
       {/* ═══ ZONE A · Market overview ═══ */}
       <section style={{ marginBottom: "2.25rem", position: "relative" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.55rem", flexWrap: "wrap", marginBottom: "0.85rem" }}>
-          <div style={{ fontFamily: mono, fontSize: "0.68rem", color: green, letterSpacing: "0.12em", textTransform: "uppercase", marginRight: "0.15rem" }}>
+          <div style={{ fontFamily: mono, fontSize: "0.68rem", color: accentInk, letterSpacing: "0.12em", textTransform: "uppercase", marginRight: "0.15rem" }}>
             {L(lang, "Prehľad trhu", "Market overview")}
             <span style={{ color: dim, marginLeft: "0.55rem", textTransform: "none", letterSpacing: 0 }}>
               · {isAllCountries(country) ? L(lang, "všetky trhy", "all markets") : countryName(country, lang)}
@@ -521,7 +521,7 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
             ⚙ {L(lang, "Filtre", "Filters")}{activeConds.length ? ` · ${activeConds.length}` : ""}
           </button>
           {activeConds.map(c => (
-            <span key={c.id} style={{ display: "inline-flex", alignItems: "center", gap: 5, background: `${green}14`, color: green, border: `1px solid ${green}40`, borderRadius: 999, padding: "4px 9px", fontSize: "0.7rem", maxWidth: 260 }}>
+            <span key={c.id} style={{ display: "inline-flex", alignItems: "center", gap: 5, background: `${green}14`, color: accentInk, border: `1px solid ${green}40`, borderRadius: 999, padding: "4px 9px", fontSize: "0.7rem", maxWidth: 260 }}>
               <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{describe(c, lang === "sk")}</span>
               <span onClick={() => setConditions(cs => cs.filter(x => x.id !== c.id))} style={{ cursor: "pointer", flexShrink: 0 }}>×</span>
             </span>
@@ -571,7 +571,7 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
       <section>
         <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap", marginBottom: "0.95rem" }}>
           <div>
-            <div style={{ fontFamily: mono, fontSize: "0.68rem", color: green, letterSpacing: "0.12em", textTransform: "uppercase" }}>
+            <div style={{ fontFamily: mono, fontSize: "0.68rem", color: accentInk, letterSpacing: "0.12em", textTransform: "uppercase" }}>
               {L(lang, "Môj dashboard", "My dashboard")}
               <SavePill saveState={saveState} lang={lang} />
             </div>
@@ -693,7 +693,7 @@ function EmptyState({ lang, onAdd }) {
 function TrialOfferBanner({ lang, onActivate, busy, msg }) {
   return (
     <div style={{ background: "linear-gradient(90deg, rgba(0,229,160,0.14) 0%, rgba(0,229,160,0.04) 70%, transparent 100%)", border: `1px solid ${green}`, borderRadius: 12, padding: "0.95rem 1.2rem", marginBottom: "1.4rem", display: "flex", alignItems: "center", gap: "0.95rem", flexWrap: "wrap" }}>
-      <div style={{ flexShrink: 0, width: 34, height: 34, borderRadius: 8, background: "rgba(0,229,160,0.18)", color: green, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.05rem" }}>🎁</div>
+      <div style={{ flexShrink: 0, width: 34, height: 34, borderRadius: 8, background: "rgba(0,229,160,0.18)", color: accentInk, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.05rem" }}>🎁</div>
       <div style={{ flex: 1, minWidth: 200 }}>
         <div style={{ color: textLight, fontWeight: 700, fontSize: "0.95rem" }}>{L(lang, "7 dní plného Residata — zadarmo", "7 days of the full Residata — on us")}</div>
         <div style={{ color: dim, fontSize: "0.8rem", marginTop: "0.15rem", lineHeight: 1.45 }}>{L(lang, "Všetky projekty, analytika, reporty, exporty. Bez karty. Jedným klikom.", "Every project, analytics, reports, exports. No card required. One-click.")}</div>
@@ -783,7 +783,7 @@ function WidgetCard({ widget, ctx, lang, first, last, dragProps, onConfigure, on
           padding: "0.62rem 0.7rem 0.62rem 0.85rem", borderBottom: `1px solid ${border}`, cursor: "grab" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", minWidth: 0 }}>
           <span title={L(lang, "Ťahaj pre presun", "Drag to reorder")} style={{ color: hover ? dim : faint, fontSize: "0.8rem", lineHeight: 1, letterSpacing: "-2px", transition: "color 0.15s", flexShrink: 0 }}>⠿</span>
-          <span style={{ color: green, fontSize: "0.8rem", flexShrink: 0 }}>{meta.icon}</span>
+          <span style={{ color: accentInk, fontSize: "0.8rem", flexShrink: 0 }}>{meta.icon}</span>
           <span title={title} style={{ fontSize: "0.82rem", fontWeight: 600, color: textLight, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</span>
         </div>
         <WidgetMenu lang={lang} widget={widget} first={first} last={last}
@@ -1025,7 +1025,7 @@ function BenchmarkBody({ cfg, ctx, lang }) {
 
 // trend (sparkline of a project series over the available months)
 const TREND_SERIES = {
-  available: { label: { sk: "Voľné byty", en: "Available units" }, get: r => r.available_units, fmt: "count", color: green },
+  available: { label: { sk: "Voľné byty", en: "Available units" }, get: r => r.available_units, fmt: "count", color: accentInk },
   sold:      { label: { sk: "Predané (spolu)", en: "Sold (total)" }, get: r => r.sold_units, fmt: "count", color: orange },
   avg_m2:    { label: { sk: "Cena /m²", en: "Price /m²" }, get: r => r.avg_price_eur_m2, fmt: "m2", color: blue },
 };
@@ -1210,7 +1210,7 @@ function WidgetEditor({ mode, widget, ctx, lang, onClose, onAdd, onSave }) {
                 onMouseEnter={e => e.currentTarget.style.borderColor = green}
                 onMouseLeave={e => e.currentTarget.style.borderColor = border}>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", marginBottom: "0.3rem" }}>
-                  <span style={{ color: green }}>{WIDGET_META[pt.type].icon}</span>
+                  <span style={{ color: accentInk }}>{WIDGET_META[pt.type].icon}</span>
                   <span style={{ color: textLight, fontWeight: 600, fontSize: "0.86rem" }}>{WIDGET_META[pt.type].title[lang] || WIDGET_META[pt.type].title.en}</span>
                 </div>
                 <div style={{ color: dim, fontSize: "0.72rem", lineHeight: 1.4 }}>{pt.desc[lang] || pt.desc.en}</div>

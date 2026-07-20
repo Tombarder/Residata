@@ -25,7 +25,7 @@ const PHOTON = "https://photon.komoot.io/api/";
 const PHOTON_REVERSE = "https://photon.komoot.io/reverse";
 const BIAS = { SK: { lat: 48.7, lon: 19.5 }, CZ: { lat: 49.8, lon: 15.5 } };
 
-import { accent as green, orange as amber, text as textLight, dim, border, bg, surfaceDark as bg2, mono } from "../lib/theme";
+import { accent as green, accentInk, orange as amber, text as textLight, dim, border, bg, surfaceDark as bg2, mono } from "../lib/theme";
 
 // SK + CZ bounding box (minLon, minLat, maxLon, maxLat) — restricts geocoder
 // suggestions to our region so we never propose places in New Zealand.
@@ -211,7 +211,7 @@ export default function LocationManager({ lang = "en" }) {
     const map = new maplibregl.Map({ container: containerRef.current, style: MAP_STYLE, center: [18.5, 48.7], zoom: 6.2, attributionControl: true });
     mapRef.current = map;
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
-    const marker = new maplibregl.Marker({ draggable: true, color: green });
+    const marker = new maplibregl.Marker({ draggable: true, color: accentInk });
     markerRef.current = marker;
     const onMove = (lat, lng) => { userMovedRef.current = true; pickedTownRef.current = null; pickedRegionRef.current = null; setDeriving(true); setPin({ lat: +lat.toFixed(6), lng: +lng.toFixed(6) }); setSuggestions([]); };
     marker.on("dragend", () => { const ll = marker.getLngLat(); onMove(ll.lat, ll.lng); });
@@ -420,7 +420,7 @@ export default function LocationManager({ lang = "en" }) {
         <div style={{ padding: "1rem 1.1rem 0.75rem", borderBottom: `1px solid ${border}` }}>
           <div style={{ fontSize: "0.95rem", fontWeight: 600 }}>{t("Project locations", "Polohy projektov")}</div>
           <div style={{ fontFamily: mono, fontSize: "0.72rem", color: dim, marginTop: 4 }}>
-            <span style={{ color: green }}>{confirmedCount}</span> / {total} {t("located", "umiestnených")}
+            <span style={{ color: accentInk }}>{confirmedCount}</span> / {total} {t("located", "umiestnených")}
             {noDistrictCount > 0 && <span style={{ marginLeft: 8, color: amber }}>· {noDistrictCount} {t("no district", "bez okresu")}</span>}
           </div>
           <div style={{ height: 4, background: "var(--surface-3)", borderRadius: 3, marginTop: 8, overflow: "hidden" }}>
@@ -490,7 +490,7 @@ export default function LocationManager({ lang = "en" }) {
                       {suggestions.map((s, i) => (
                         <button key={i} onClick={() => pick(s)} style={{ display: "block", textAlign: "left", width: "100%", padding: "8px 11px", background: "transparent", border: "none", borderBottom: i < suggestions.length - 1 ? `1px solid ${border}` : "none", color: textLight, fontSize: "0.78rem", cursor: "pointer", fontFamily: "inherit" }}
                           onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(0,229,160,0.10)")} onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
-                          <span style={{ color: green, marginRight: 7 }}>📍</span>{s.label}{s.cc && s.cc !== "SK" && <span style={{ color: dim, fontFamily: mono, fontSize: "0.64rem", marginLeft: 6 }}>{s.cc}</span>}
+                          <span style={{ color: accentInk, marginRight: 7 }}>📍</span>{s.label}{s.cc && s.cc !== "SK" && <span style={{ color: dim, fontFamily: mono, fontSize: "0.64rem", marginLeft: 6 }}>{s.cc}</span>}
                         </button>))}
                     </div>)}
                 </div>
@@ -517,7 +517,7 @@ export default function LocationManager({ lang = "en" }) {
                   <span>⚠ {t(`The pin is in "${cityWarn}", which isn't one of our cities yet.`,
                              `Pin je v "${cityWarn}", čo zatiaľ nie je jedno z našich miest.`)}</span>
                   <button onClick={addCity} disabled={addingCity || !pin}
-                    style={{ padding: "4px 9px", borderRadius: 6, border: `1px solid ${green}`, background: "rgba(0,229,160,0.12)", color: green, fontSize: "0.7rem", cursor: (addingCity || !pin) ? "default" : "pointer", fontFamily: "inherit" }}>
+                    style={{ padding: "4px 9px", borderRadius: 6, border: `1px solid ${green}`, background: "rgba(0,229,160,0.12)", color: accentInk, fontSize: "0.7rem", cursor: (addingCity || !pin) ? "default" : "pointer", fontFamily: "inherit" }}>
                     {addingCity ? t("Adding…", "Pridávam…") : t(`+ Add "${cityWarn}" as a city`, `+ Pridať "${cityWarn}" ako mesto`)}
                   </button>
                   <span style={{ color: dim, fontSize: "0.64rem" }}>{t("(region auto-set from the nearest city)", "(kraj sa doplní podľa najbližšieho mesta)")}</span>

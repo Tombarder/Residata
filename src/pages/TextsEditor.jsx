@@ -45,7 +45,7 @@ import { refreshOverrides } from "../lib/copyOverrides";
 import { usePricingConfig, refreshPricing, formatEurCents } from "../lib/pricing";
 import { PAGES, humanizeKey } from "../lib/copyGroups";
 import {
-  accent as green, orange as amber, text as textLight, dim, faint,
+  accent as green, accentInk, orange as amber, text as textLight, dim, faint,
   border, bg, surfaceDark as bg2, mono,
 } from "../lib/theme";
 
@@ -257,7 +257,7 @@ function PricingPanel({ uiSK }) {
               {formatEurCents(cfg.anchor_price_cents)}
             </span>
           )}
-          <span style={{ color: green }}>{cfg ? formatEurCents(cfg.monthly_price_cents) : "…"}</span>
+          <span style={{ color: accentInk }}>{cfg ? formatEurCents(cfg.monthly_price_cents) : "…"}</span>
           <span style={{ fontSize: "0.7rem", fontWeight: 400, color: faint }}>{uiSK ? "/mes" : "/mo"}</span>
         </div>
       </div>
@@ -708,7 +708,7 @@ function Row({ item, label, lang, uiSK, stored, draft, fill, onDraft, onClearDra
               {uiSK ? "chýba zástupný symbol " : "missing placeholder "}{dropped.join(" ")}
             </span>
           )}
-          {saved && <span style={{ fontSize: "0.62rem", color: green }}>✓ {uiSK ? "uložené — naživo" : "saved — live"}</span>}
+          {saved && <span style={{ fontSize: "0.62rem", color: accentInk }}>✓ {uiSK ? "uložené — naživo" : "saved — live"}</span>}
           {err && <span style={{ fontSize: "0.62rem", color: amber }}>{err}</span>}
         </div>
       </div>
@@ -891,7 +891,7 @@ function StructuredRow({ item, label, lang, uiSK, stored, draft, fill, onDraft, 
             <div style={{ fontSize: "0.68rem", color: changedFromLive ? green : faint, lineHeight: 1.5, marginBottom: 6 }}>{previewText(working, 170)}</div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
               <button onClick={() => setOpen(true)} style={btn(green, "#06140f")}>{uiSK ? "Upraviť blok" : "Edit block"}</button>
-              {changedFromLive && <span style={{ fontSize: "0.6rem", color: green }}>{uiSK ? "neuložené zmeny" : "unsaved changes"}</span>}
+              {changedFromLive && <span style={{ fontSize: "0.6rem", color: accentInk }}>{uiSK ? "neuložené zmeny" : "unsaved changes"}</span>}
               {hasOverride && (
                 <button onClick={doReset} disabled={busy} style={btn("transparent", dim, border)}>
                   {uiSK ? "Reset na default" : "Reset to default"}
@@ -930,7 +930,7 @@ function StructuredRow({ item, label, lang, uiSK, stored, draft, fill, onDraft, 
               <button onClick={() => setOpen(false)} style={btn("transparent", dim, border)}>
                 {uiSK ? "Zbaliť" : "Collapse"}
               </button>
-              {saved && <span style={{ fontSize: "0.62rem", color: green }}>✓ {uiSK ? "uložené — naživo" : "saved — live"}</span>}
+              {saved && <span style={{ fontSize: "0.62rem", color: accentInk }}>✓ {uiSK ? "uložené — naživo" : "saved — live"}</span>}
               {err && <span style={{ fontSize: "0.62rem", color: amber }}>{err}</span>}
             </div>
           </>
@@ -971,7 +971,7 @@ const rowWrap = { display: "flex", gap: "0.9rem", padding: "0.7rem 0", borderBot
 const keyCol = { width: 196, flexShrink: 0, display: "flex", flexDirection: "column", gap: 3, paddingTop: 2 };
 const fieldName = { fontSize: "0.72rem", color: textLight, fontWeight: 600, lineHeight: 1.3 };
 const keyTag = { fontSize: "0.54rem", color: faint, fontFamily: mono, wordBreak: "break-word" };
-const editedTag = { fontSize: "0.55rem", color: green, fontWeight: 600 };
+const editedTag = { fontSize: "0.55rem", color: accentInk, fontWeight: 600 };
 function btn(bgc, color, bd) {
   return {
     padding: "0.28rem 0.6rem", borderRadius: 6, cursor: "pointer", fontFamily: mono, fontSize: "0.66rem",
@@ -1003,7 +1003,7 @@ function iconBtn(disabled, color) {
 }
 const addBtn = {
   alignSelf: "flex-start", marginTop: 2, padding: "0.25rem 0.6rem", borderRadius: 6,
-  border: `1px dashed ${border}`, background: "transparent", color: green,
+  border: `1px dashed ${border}`, background: "transparent", color: accentInk,
   cursor: "pointer", fontFamily: mono, fontSize: "0.64rem", fontWeight: 600,
 };
 function objWrap(depth) {

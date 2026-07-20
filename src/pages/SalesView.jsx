@@ -156,7 +156,7 @@ export default function SalesView({ lang = "sk" }) {
   };
 
   const sel = { background: bg, border: `1px solid ${border}`, color: text, borderRadius: 5, padding: "0.4rem 0.55rem", fontSize: "0.78rem", fontFamily: "inherit", outline: "none" };
-  const card = { background: panel, border: `1px solid ${border}`, borderRadius: 8, padding: "0.85rem 1rem" };
+  const card = { background: "var(--surface)", border: `1px solid ${border}`, borderRadius: 8, padding: "0.85rem 1rem" };
   const kpiVal = { fontSize: "1.5rem", fontWeight: 700, color: text, fontFamily: mono, fontVariantNumeric: "tabular-nums" };
   const kpiLbl = { fontFamily: mono, fontSize: "0.62rem", color: dim, letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: "0.3rem" };
   const Sel = ({ value, onChange, opts, ph }) => (

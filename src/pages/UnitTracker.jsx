@@ -45,7 +45,7 @@ import { moneyFromEur, moneySymbol } from "../lib/money";
 import { useCurrency } from "../lib/useCurrency";
 
 const mono   = "'JetBrains Mono', monospace";
-import { accent as green, orange, dim, text, border, bg, surfaceDark as bg2, surfacePanel as panel } from "../lib/theme";
+import { accent as green, accentInk, orange, dim, text, border, bg, surfaceDark as bg2, surfacePanel as panel } from "../lib/theme";
 const yellow = "#f5d142";
 const red    = "#ff6b6b";
 const blue   = "#5e9bff";
@@ -655,7 +655,7 @@ function KpiStrip({ lifecycle, primary, onProjectClick, lang }) {
       sub: lifecycle.last.obytna_plocha && lifecycle.last.cena_s_dph
         ? formatPerM2(lifecycle.last.cena_s_dph / lifecycle.last.obytna_plocha)
         : "—",
-      color: green,
+      color: accentInk,
     },
     {
       label: lang === "sk" ? "Aktuálny stav" : "Current status",
@@ -699,7 +699,7 @@ function KpiStrip({ lifecycle, primary, onProjectClick, lang }) {
         display: "flex", alignItems: "center", flexWrap: "wrap", gap: "0.5rem",
         marginBottom: "0.85rem", fontSize: "0.85rem", color: text,
       }}>
-        <strong style={{ color: green, fontSize: "1rem" }}>{primary?.unit_id}</strong>
+        <strong style={{ color: accentInk, fontSize: "1rem" }}>{primary?.unit_id}</strong>
         <span style={{ color: dim }}>·</span>
         {onProjectClick ? (
           <button
@@ -1587,7 +1587,7 @@ function ExportRow({ pickedHistories, lang }) {
     <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1rem" }}>
       <button onClick={downloadCsv}
         style={{
-          background: "transparent", color: green, border: `1px solid ${green}55`,
+          background: "transparent", color: accentInk, border: `1px solid ${green}55`,
           borderRadius: 6, padding: "0.5rem 0.85rem", fontFamily: mono,
           fontSize: "0.78rem", cursor: "pointer",
         }}

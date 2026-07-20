@@ -10,7 +10,7 @@
 import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 
-import { accent as green, dim, text as textLight, surfaceDark as bg2 } from "../lib/theme";
+import { accent as green, accentInk, dim, text as textLight, surfaceDark as bg2 } from "../lib/theme";
 const border = "#23232a";
 const popBg = "var(--surface)";
 const hover = "#23232a";
@@ -89,7 +89,7 @@ export default function Picker({ value, onChange, options, placeholder = "select
                 <span style={{ width: 17, height: 17, borderRadius: 5, border: `1.5px solid ${on ? green : dim}`, background: on ? green : "transparent", flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#06140f", fontSize: "0.72rem", fontWeight: 700 }}>{on ? "✓" : ""}</span>
               )}
               <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.label}</span>
-              {!multi && on && <span style={{ color: green, flexShrink: 0 }}>✓</span>}
+              {!multi && on && <span style={{ color: accentInk, flexShrink: 0 }}>✓</span>}
             </div>
           );
         })}
@@ -97,7 +97,7 @@ export default function Picker({ value, onChange, options, placeholder = "select
       {multi && (
         <div style={{ display: "flex", borderTop: `1px solid ${border}`, flexShrink: 0 }}>
           <button onClick={() => onChange([])} style={{ flex: 1, background: "none", border: "none", color: dim, padding: "10px", fontSize: "0.78rem", cursor: "pointer" }}>{sk ? "Zrušiť výber" : "Clear"}{arr.length ? ` (${arr.length})` : ""}</button>
-          <button onClick={close} style={{ flex: 1, background: "none", border: "none", borderLeft: `1px solid ${border}`, color: green, padding: "10px", fontSize: "0.78rem", fontWeight: 600, cursor: "pointer" }}>{sk ? "Hotovo" : "Done"}</button>
+          <button onClick={close} style={{ flex: 1, background: "none", border: "none", borderLeft: `1px solid ${border}`, color: accentInk, padding: "10px", fontSize: "0.78rem", fontWeight: 600, cursor: "pointer" }}>{sk ? "Hotovo" : "Done"}</button>
         </div>
       )}
     </div>, document.body) : null;

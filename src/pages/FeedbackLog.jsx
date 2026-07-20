@@ -15,7 +15,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 
-import { accent as green, orange as amber, blue, text as textLight, dim, border, bg, surfaceDark as bg2, mono } from "../lib/theme";
+import { accent as green, accentInk, orange as amber, blue, text as textLight, dim, border, bg, surfaceDark as bg2, mono } from "../lib/theme";
 const red = "#ff6b6b";
 
 const SUPA_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -156,7 +156,7 @@ export default function FeedbackLog({ lang = "sk" }) {
   const byCat = stats?.by_category || {};
   const catChips = useMemo(() => Object.keys(CATEGORIES), []);
 
-  const diagBtn = { background: "transparent", border: `1px solid ${border}`, color: green, borderRadius: 6, cursor: "pointer", padding: "3px 8px", fontSize: 12, fontFamily: mono };
+  const diagBtn = { background: "transparent", border: `1px solid ${border}`, color: accentInk, borderRadius: 6, cursor: "pointer", padding: "3px 8px", fontSize: 12, fontFamily: mono };
   function renderDiag(d) {
     if (!d) return null;
     const evs = d.events || [];
@@ -174,7 +174,7 @@ export default function FeedbackLog({ lang = "sk" }) {
               return <div key={i} style={{ color: isErr ? red : dim, marginTop: 2, wordBreak: "break-all" }}>· [{ev.t}] {ev.m}</div>;
             })}
           </div>
-        ) : <div style={{ marginTop: 6, color: green }}>{t("no errors recorded", "žiadne chyby")} ✓</div>}
+        ) : <div style={{ marginTop: 6, color: accentInk }}>{t("no errors recorded", "žiadne chyby")} ✓</div>}
       </div>
     );
   }
@@ -302,7 +302,7 @@ export default function FeedbackLog({ lang = "sk" }) {
           <div style={card}><div style={cardLabel}>{t("Total", "Spolu")}</div><div style={cardVal}>{stats.total ?? 0}</div></div>
           <div style={card}><div style={cardLabel}>{t("New", "Nové")}</div><div style={{ ...cardVal, color: amber }}>{stats.new ?? 0}</div></div>
           <div style={card}><div style={cardLabel}>{t("In progress", "Rieši sa")}</div><div style={{ ...cardVal, color: blue }}>{stats.in_progress ?? 0}</div></div>
-          <div style={card}><div style={cardLabel}>{t("Resolved", "Vyriešené")}</div><div style={{ ...cardVal, color: green }}>{stats.resolved ?? 0}</div></div>
+          <div style={card}><div style={cardLabel}>{t("Resolved", "Vyriešené")}</div><div style={{ ...cardVal, color: accentInk }}>{stats.resolved ?? 0}</div></div>
           <div style={card}><div style={cardLabel}>{t("Won't fix", "Nerieši sa")}</div><div style={cardVal}>{stats.wont_fix ?? 0}</div></div>
         </div>
       )}
@@ -337,13 +337,13 @@ export default function FeedbackLog({ lang = "sk" }) {
               <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginBottom: 10 }}>
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, color: textLight, border: `1px solid ${border}`, borderRadius: 6, padding: "3px 8px" }}>{c[0]} {t(c[1], c[2])}</span>
                 <span style={{ fontSize: 11, fontFamily: mono, color: s[0], border: `1px solid ${s[0]}`, borderRadius: 100, padding: "2px 9px", textTransform: "uppercase", letterSpacing: 0.4 }}>{t(s[1], s[2])}</span>
-                {f.needs_reply && <span style={{ fontSize: 11, fontFamily: mono, color: green }}>● {t("needs reply", "čaká na odpoveď")}</span>}
+                {f.needs_reply && <span style={{ fontSize: 11, fontFamily: mono, color: accentInk }}>● {t("needs reply", "čaká na odpoveď")}</span>}
                 <span style={{ fontSize: 12, color: dim, fontFamily: mono }}>{fmtDate(f.activity_at)}</span>
                 <span style={{ marginLeft: "auto", fontSize: 12, color: dim, fontFamily: mono }}>{f.email || t("anonymous", "anonym")}{f.user_tier ? ` · ${f.user_tier}` : ""}</span>
               </div>
 
               <div style={{ fontSize: 14, lineHeight: 1.55, color: textLight, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                {f.last_sender === "admin" ? <span style={{ color: green, fontFamily: mono, fontSize: 12 }}>↩ </span> : null}{f.last_body}
+                {f.last_sender === "admin" ? <span style={{ color: accentInk, fontFamily: mono, fontSize: 12 }}>↩ </span> : null}{f.last_body}
               </div>
 
               {(f.project_name || f.page_path) && (
@@ -356,7 +356,7 @@ export default function FeedbackLog({ lang = "sk" }) {
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginTop: 12, paddingTop: 12, borderTop: `1px solid ${border}` }}>
                 {statusButtons(f.id, f.status)}
                 <button onClick={() => openConversation(f.id)}
-                  style={{ marginLeft: "auto", padding: "6px 12px", fontSize: 12, borderRadius: 8, cursor: "pointer", border: `1px solid ${green}`, color: green, background: "transparent", whiteSpace: "nowrap" }}>
+                  style={{ marginLeft: "auto", padding: "6px 12px", fontSize: 12, borderRadius: 8, cursor: "pointer", border: `1px solid ${green}`, color: accentInk, background: "transparent", whiteSpace: "nowrap" }}>
                   💬 {t("Open conversation", "Otvoriť konverzáciu")} ({f.msg_count}) →
                 </button>
               </div>

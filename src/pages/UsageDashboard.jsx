@@ -10,7 +10,7 @@
 // active vs churned — plus a per-user drill-down timeline (what/where/how long).
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabaseData } from "../lib/supabase";
-import { accent as green, dim, text, border, surface as bg, surfaceDark as bg2 } from "../lib/theme";
+import { accent as green, accentInk, dim, text, border, surface as bg, surfaceDark as bg2 } from "../lib/theme";
 
 const mono = "'JetBrains Mono', monospace";
 const red = "#ff6b6b";
@@ -239,7 +239,7 @@ export default function UsageDashboard({ lang = "en" }) {
                 </div>
                 <div style={{ display: "flex", gap: "1.2rem", marginTop: "0.5rem", fontSize: "0.68rem", color: dim, fontFamily: mono }}>
                   <span><span style={{ color: blue }}>▮</span> {L("udalosti / deň", "events / day")}</span>
-                  <span><span style={{ color: green }}>●</span> {L("aktívni používatelia", "active users")}</span>
+                  <span><span style={{ color: accentInk }}>●</span> {L("aktívni používatelia", "active users")}</span>
                   <span>{daily[0]?.day} → {daily[daily.length - 1]?.day}</span>
                 </div>
               </div>
@@ -413,7 +413,7 @@ function UserTimeline({ user, rows, loading, err, lang, onClose }) {
                     <span style={{ flex: 1 }}>
                       <span style={{ color: text }}>{evLabel(r.event_type, lang)}</span>
                       {r.page && <span style={{ color: dim }}> · {r.page}</span>}
-                      {dur && <span style={{ color: green, fontFamily: mono, fontSize: "0.68rem" }}> · {dur}</span>}
+                      {dur && <span style={{ color: accentInk, fontFamily: mono, fontSize: "0.68rem" }}> · {dur}</span>}
                     </span>
                   </div>
                 );
@@ -492,7 +492,7 @@ function MaintenancePanel({ lang, onDeleted }) {
           </div>
 
           {err && <div style={{ color: red, fontFamily: mono, fontSize: "0.74rem", marginTop: "0.6rem" }}>{err}</div>}
-          {msg && <div style={{ color: green, fontFamily: mono, fontSize: "0.74rem", marginTop: "0.6rem" }}>✓ {msg}</div>}
+          {msg && <div style={{ color: accentInk, fontFamily: mono, fontSize: "0.74rem", marginTop: "0.6rem" }}>✓ {msg}</div>}
 
           <div style={{ marginTop: "0.9rem", display: "flex", gap: "0.5rem", alignItems: "center" }}>
             {!confirm ? (

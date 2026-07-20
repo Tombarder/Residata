@@ -12,7 +12,7 @@ import {
 } from "../lib/mapFilters";
 import Picker from "./Picker";
 
-import { accent as green, dim, text as textLight, surfaceDark as bg2, mono } from "../lib/theme";
+import { accent as green, accentInk, dim, text as textLight, surfaceDark as bg2, mono } from "../lib/theme";
 const border = "#26262d";
 const panel = "#161619";
 
@@ -50,7 +50,7 @@ export default function MapFilterBuilder({ conditions, setConditions, projects, 
       <div style={{ display: "flex", alignItems: "center", padding: "15px 18px", borderBottom: `1px solid ${border}` }}>
         <span style={{ color: textLight, fontWeight: 600, fontSize: "1rem" }}>{sk ? "Filtre" : "Filters"}</span>
         <span style={{ marginLeft: 12, fontSize: "0.82rem", color: dim, fontFamily: mono }}>
-          <strong style={{ color: green, fontSize: "0.95rem" }}>{matchCount}</strong>{totalCount != null ? <span style={{ color: dim }}> / {totalCount}</span> : null} {sk ? "vyhovuje" : "match"}
+          <strong style={{ color: accentInk, fontSize: "0.95rem" }}>{matchCount}</strong>{totalCount != null ? <span style={{ color: dim }}> / {totalCount}</span> : null} {sk ? "vyhovuje" : "match"}
         </span>
         <button onClick={onClose} style={{ marginLeft: "auto", background: "none", border: "none", color: dim, cursor: "pointer", fontSize: "1.3rem", lineHeight: 1 }} aria-label="Close">×</button>
       </div>
@@ -120,4 +120,4 @@ function ValueEditor({ field, op, value, onChange, projects, sk }) {
 }
 
 const num = { boxSizing: "border-box", padding: "9px 11px", background: bg2, border: `1px solid ${border}`, borderRadius: 8, color: textLight, fontSize: "0.84rem", outline: "none", minWidth: 0 };
-const addBtn = { marginTop: 8, background: "none", border: `1px dashed ${border}`, color: green, borderRadius: 9, padding: "11px 14px", fontSize: "0.84rem", cursor: "pointer", width: "100%", fontWeight: 600 };
+const addBtn = { marginTop: 8, background: "none", border: `1px dashed ${border}`, color: accentInk, borderRadius: 9, padding: "11px 14px", fontSize: "0.84rem", cursor: "pointer", width: "100%", fontWeight: 600 };

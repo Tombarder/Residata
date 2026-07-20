@@ -33,6 +33,7 @@ const KEY = "residata_ai_beta_banner_dismissed_until";
 const HIDE_DAYS = 7;
 
 const green   = "#00e5a0";
+const greenInk = "var(--accent-ink)";
 const orange  = "#f5a623";
 const dim     = "var(--text-dim)";
 const text    = "var(--text)";
@@ -150,7 +151,7 @@ export default function AiBetaBanner({ lang = "sk", compact = false }) {
       <a
         href="mailto:tomas@residata.sk?subject=Residata%20AI%20feedback"
         style={{
-          color: green, textDecoration: "none",
+          color: greenInk, textDecoration: "none",
           padding: "0.25rem 0.55rem", border: `1px solid ${green}55`,
           borderRadius: 4, fontSize: "0.72rem", whiteSpace: "nowrap",
         }}
