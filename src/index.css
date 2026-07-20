@@ -132,12 +132,9 @@
   box-shadow: 0 1px 2px rgba(20, 32, 26, 0.05), 0 6px 16px rgba(20, 32, 26, 0.06);
 }
 
-/* Light-mode map punch — the CARTO light basemap renders very pale/washed; a
-   saturation + contrast boost gives the land, water and markers more definition
-   without changing tile sources (CSP-safe). Dark map is left untouched. */
-:root[data-theme="light"] .maplibregl-canvas {
-  filter: saturate(1.5) contrast(1.18) brightness(0.955);
-}
+/* Map marker vibrancy — a gentle saturation lift so the coloured project
+   markers read vivid on the dark-matter basemap (used in both themes now). */
+.maplibregl-canvas { filter: saturate(1.12); }
 
 /* ── universal box model: borders + padding stay inside declared widths ─── */
 *, *::before, *::after { box-sizing: border-box; }
