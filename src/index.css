@@ -136,7 +136,7 @@
    saturation + contrast boost gives the land, water and markers more definition
    without changing tile sources (CSP-safe). Dark map is left untouched. */
 :root[data-theme="light"] .maplibregl-canvas {
-  filter: saturate(1.28) contrast(1.1) brightness(0.965);
+  filter: saturate(1.5) contrast(1.18) brightness(0.955);
 }
 
 /* ── universal box model: borders + padding stay inside declared widths ─── */
