@@ -341,9 +341,27 @@ function Select({ value, onChange, options, searchable = false, sk = false }) {
 }
 
 // ─── KPI card (Zone A) ─────────────────────────────────────────
-function KpiCard({ label, value, hint, delta, lang, accent = textLight, locked = false }) {
+// Colour-coded metric icons — a small tinted chip per KPI so the cards read rich
+// and scannable (not empty white). Theme-invariant vivid hues, fine on both themes.
+const KPI_ICON = {
+  available:    { c: "#10b981", d: "M3 21V8l9-5 9 5v13M9 21v-6h6v6" },
+  avg_m2:       { c: "#3b74e8", d: "M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" },
+  sold30:       { c: "#e0940f", d: "M3 17l5-5 4 3 8-9M21 6v5h-5" },
+  sold_through: { c: "#e0940f", d: "M21 12a9 9 0 1 1-9-9v9z" },
+  reserved:     { c: "#3b74e8", d: "M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" },
+  inventory:    { c: "#8b5cf6", d: "M20 7l-8-4-8 4m16 0l-8 4-8-4m16 0v10l-8 4m0-14v14" },
+  projects:     { c: "#10b981", d: "M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z" },
+  developers:   { c: "#64748b", d: "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" },
+};
+
+function KpiCard({ label, value, hint, delta, lang, accent = textLight, locked = false, icon }) {
   return (
     <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 12, padding: "0.95rem 1.05rem", minWidth: 0, display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+      {icon && (
+        <div style={{ width: 30, height: 30, borderRadius: 8, display: "grid", placeItems: "center", background: `color-mix(in srgb, ${icon.c} 14%, transparent)`, marginBottom: "0.05rem" }}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={icon.c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={icon.d} /></svg>
+        </div>
+      )}
       <span style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.09em", textTransform: "uppercase", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
       <div style={{ fontFamily: mono, fontSize: "1.4rem", fontWeight: 700, color: accent, letterSpacing: "-0.02em", lineHeight: 1.05, filter: locked ? "blur(6px)" : "none", opacity: locked ? 0.55 : 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{value}</div>
       {locked
@@ -561,6 +579,7 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
                 hint={gateVelocity ? L(lang, "zbierame históriu", "building history") : (def.hint?.[lang] || def.hint?.en)}
                 delta={delta} lang={lang}
                 accent={def.accent || textLight}
+                icon={KPI_ICON[mk]}
                 locked={locked && !gateVelocity} />
             );
           })}
