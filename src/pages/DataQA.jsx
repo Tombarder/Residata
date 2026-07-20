@@ -29,6 +29,7 @@
  */
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import ProjectsEditor from "../components/ProjectsEditor";
+import Picker from "../components/Picker";
 
 const green = "var(--accent)";
 const greenInk = "var(--accent-ink)";
@@ -430,24 +431,18 @@ export default function DataQA({ lang = "sk" }) {
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 12 }}>
           <div style={{ minWidth: 140 }}>
             <label style={cardLabel}>{t("Country", "Krajina")}</label>
-            <select value={fCountry} onChange={(e) => { setFCountry(e.target.value); setFRegion(""); setFCity(""); }} style={selStyle}>
-              <option value="">{t("All", "Všetky")}</option>
-              {opts.countries.map((c) => <option key={c} value={c}>{COUNTRIES[c] || c}</option>)}
-            </select>
+            <Picker value={fCountry} onChange={(v) => { setFCountry(v); setFRegion(""); setFCity(""); }} ariaLabel={t("Country", "Krajina")}
+              options={[{ value: "", label: t("All", "Všetky") }, ...opts.countries.map((c) => ({ value: c, label: COUNTRIES[c] || c }))]} />
           </div>
           <div style={{ minWidth: 170 }}>
             <label style={cardLabel}>{t("Region", "Kraj")}</label>
-            <select value={fRegion} onChange={(e) => { setFRegion(e.target.value); setFCity(""); }} style={selStyle}>
-              <option value="">{t("All", "Všetky")}</option>
-              {opts.regions.map((r) => <option key={r} value={r}>{r}</option>)}
-            </select>
+            <Picker value={fRegion} onChange={(v) => { setFRegion(v); setFCity(""); }} searchable ariaLabel={t("Region", "Kraj")}
+              options={[{ value: "", label: t("All", "Všetky") }, ...opts.regions.map((r) => ({ value: r, label: r }))]} />
           </div>
           <div style={{ minWidth: 150 }}>
             <label style={cardLabel}>{t("City", "Mesto")}</label>
-            <select value={fCity} onChange={(e) => setFCity(e.target.value)} style={selStyle}>
-              <option value="">{t("All", "Všetky")}</option>
-              {opts.cities.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
+            <Picker value={fCity} onChange={(v) => setFCity(v)} searchable ariaLabel={t("City", "Mesto")}
+              options={[{ value: "", label: t("All", "Všetky") }, ...opts.cities.map((c) => ({ value: c, label: c }))]} />
           </div>
           {(fCountry || fRegion || fCity) && (
             <button onClick={() => { setFCountry(""); setFRegion(""); setFCity(""); }} style={{ ...btn, padding: "8px 12px", fontSize: 12 }}>{t("Clear", "Zrušiť filtre")}</button>
@@ -489,12 +484,8 @@ export default function DataQA({ lang = "sk" }) {
 
           <div style={{ minWidth: 170 }}>
             <label style={cardLabel}>{t("Date (snapshot)", "Dátum (snapshot)")}</label>
-            <select value={date} onChange={(e) => changeDate(e.target.value)} disabled={!sel} style={selStyle}>
-              {dates.length === 0 && <option value="">—</option>}
-              {dates.map((d, i) => (
-                <option key={d.scrape_date} value={d.scrape_date}>{d.scrape_date}{i === 0 ? t(" (latest)", " (najnovšie)") : ""} · {d.units}</option>
-              ))}
-            </select>
+            <Picker value={date} onChange={(v) => changeDate(v)} ariaLabel={t("Date (snapshot)", "Dátum (snapshot)")}
+              options={dates.length === 0 ? [{ value: "", label: "—" }] : dates.map((d, i) => ({ value: d.scrape_date, label: `${d.scrape_date}${i === 0 ? t(" (latest)", " (najnovšie)") : ""} · ${d.units}` }))} />
           </div>
 
           {sel && sel.project_url && (

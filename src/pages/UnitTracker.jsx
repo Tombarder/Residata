@@ -37,6 +37,7 @@
  *      who paste comparables into their own reports
  */
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import Picker from "../components/Picker";
 import { useProjects, useUnitSummaries, useUnitHistories, useUnitSearch, useProjectUnitsSeries, useArchiveMonths } from "../lib/useData";
 import { useCapabilities } from "../lib/useCapabilities";
 import { track } from "../lib/track";
@@ -401,18 +402,8 @@ function PickerRow({ projects, globalResults, projectById, loadingGlobal, picked
           <label style={{ display: "block", fontSize: "0.68rem", color: dim, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.35rem", fontWeight: 600 }}>
             {lang === "sk" ? "Projekt" : "Project"}
           </label>
-          <select
-            value={projFilter || ""}
-            onChange={(e) => { setProjFilter(e.target.value || null); setSearch(""); }}
-            style={selectStyle}
-          >
-            <option value="">{lang === "sk" ? "— vyber projekt —" : "— pick a project —"}</option>
-            {activeProjects.map(p => (
-              <option key={p.id} value={p.id}>
-                {p.name}{p.district ? ` (${p.district})` : ""}
-              </option>
-            ))}
-          </select>
+          <Picker value={projFilter || ""} onChange={(v) => { setProjFilter(v || null); setSearch(""); }} searchable sk={lang === "sk"} ariaLabel={lang === "sk" ? "Projekt" : "Project"}
+            options={[{ value: "", label: lang === "sk" ? "— vyber projekt —" : "— pick a project —" }, ...activeProjects.map((p) => ({ value: p.id, label: `${p.name}${p.district ? ` (${p.district})` : ""}` }))]} />
         </div>
 
         <div>

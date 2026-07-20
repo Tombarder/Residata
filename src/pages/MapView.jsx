@@ -34,6 +34,7 @@ import { supabasePublic, isSupabaseReady } from "../lib/supabase";
 
 const mono = "'JetBrains Mono', monospace";
 import { accent as green, accentPaint, orange as amber, dim, text as textLight, border, surfaceDark as bg2 } from "../lib/theme";
+import Picker from "../components/Picker";
 import { getTheme, useThemeMode } from "../lib/theme-mode";
 const greyPt = "#6b6b76";
 const panel = "var(--surface)";
@@ -588,22 +589,16 @@ export default function MapView({ lang = "en", setCurrent }) {
         </div>
 
         {/* City */}
-        <select value={fCity} onChange={(e) => { setFCity(e.target.value); setFDistrict(""); }} style={selectStyle} aria-label={sk ? "Mesto" : "City"}>
-          <option value="">{sk ? "Mesto — všetky" : "City — all"}</option>
-          {cityOptions.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
+        <Picker value={fCity} onChange={(v) => { setFCity(v); setFDistrict(""); }} width={168} searchable ariaLabel={sk ? "Mesto" : "City"} sk={sk}
+          options={[{ value: "", label: sk ? "Mesto — všetky" : "City — all" }, ...cityOptions.map((c) => ({ value: c, label: c }))]} />
 
         {/* District */}
-        <select value={fDistrict} onChange={(e) => setFDistrict(e.target.value)} style={selectStyle} aria-label={sk ? "Časť" : "District"}>
-          <option value="">{sk ? "Časť — všetky" : "District — all"}</option>
-          {districtOptions.map((d) => <option key={d} value={d}>{d}</option>)}
-        </select>
+        <Picker value={fDistrict} onChange={(v) => setFDistrict(v)} width={168} searchable ariaLabel={sk ? "Časť" : "District"} sk={sk}
+          options={[{ value: "", label: sk ? "Časť — všetky" : "District — all" }, ...districtOptions.map((d) => ({ value: d, label: d }))]} />
 
         {/* Developer */}
-        <select value={fDeveloper} onChange={(e) => setFDeveloper(e.target.value)} style={selectStyle} aria-label="Developer">
-          <option value="">{sk ? "Developer — všetci" : "Developer — all"}</option>
-          {developerOptions.map((d) => <option key={d} value={d}>{d}</option>)}
-        </select>
+        <Picker value={fDeveloper} onChange={(v) => setFDeveloper(v)} width={180} searchable ariaLabel="Developer" sk={sk}
+          options={[{ value: "", label: sk ? "Developer — všetci" : "Developer — all" }, ...developerOptions.map((d) => ({ value: d, label: d }))]} />
 
         {/* Price €/m² */}
         <div style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>

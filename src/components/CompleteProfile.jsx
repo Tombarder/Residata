@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { supabase } from "../lib/supabase";
+import Picker from "./Picker";
 import { useAuth } from "../lib/useAuth";
 import { getLiveT } from "../lib/liveLang";
 import { track } from "../lib/track";
@@ -207,9 +208,13 @@ export default function CompleteProfile({ lang = "en" }) {
                 <input value={form.company} maxLength={120} autoComplete="organization" onChange={e => setForm({...form, company: e.target.value})} placeholder={t.cp_company_ph} style={fieldStyle} />
               </Field>
               <Field label={t.cp_position} required>
-                <select value={form.position} onChange={e => setForm({...form, position: e.target.value})} style={fieldStyle}>
-                  {positions.map(p => <option key={p.v} value={p.v} disabled={p.disabled}>{p.label}</option>)}
-                </select>
+                <Picker
+                  value={form.position}
+                  onChange={(v) => setForm({...form, position: v})}
+                  options={positions.filter(p => !p.disabled).map(p => ({ value: p.v, label: p.label }))}
+                  placeholder={t.cp_position_any}
+                  sk={lang === "sk"}
+                />
               </Field>
               <Field label={t.cp_linkedin}>
                 <input type="url" value={form.linkedin_url} maxLength={500} autoComplete="url" onChange={e => setForm({...form, linkedin_url: e.target.value})} placeholder={t.cp_linkedin_ph} style={fieldStyle} />

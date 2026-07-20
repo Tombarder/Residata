@@ -6,6 +6,7 @@ import { useCapabilities } from "../lib/useCapabilities";
 import { useAuth } from "../lib/useAuth";
 import { supabase } from "../lib/supabase";
 import { moneyFromEur, moneySymbol } from "../lib/money";
+import Picker from "../components/Picker";
 import { localeTag } from "../lib/locale";
 import { useCurrency } from "../lib/useCurrency";
 
@@ -3385,19 +3386,14 @@ function PivotChart({ tree, rowFields, colFields: _colFields, effectiveValues, o
               <span style={{ marginLeft: "0.5rem", fontFamily: mono, letterSpacing: "0.04em", textTransform: "uppercase", fontSize: "0.65rem" }}>
                 {lang === "sk" ? "Miera" : "Measure"}
               </span>
-              <select
+              <Picker
                 value={valueIdx}
-                onChange={(e) => setValueIdx(Number(e.target.value))}
-                style={{
-                  background: panel, border: `1px solid ${border}`, color: text,
-                  padding: "0.25rem 0.5rem", borderRadius: 6, fontSize: "0.72rem",
-                  fontFamily: mono,
-                }}
-              >
-                {effectiveValues.map((v, i) => (
-                  <option key={i} value={i}>{labelForMeasure(v, lang)}</option>
-                ))}
-              </select>
+                onChange={(v) => setValueIdx(Number(v))}
+                width={170}
+                sk={lang === "sk"}
+                ariaLabel={lang === "sk" ? "Miera" : "Measure"}
+                options={effectiveValues.map((v, i) => ({ value: i, label: labelForMeasure(v, lang) }))}
+              />
             </>
           )}
           {hiddenCount > 0 && (

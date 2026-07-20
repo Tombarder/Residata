@@ -9,6 +9,7 @@ import { useCurrency } from "../lib/useCurrency";
 import { moneyFromEur, moneySymbol } from "../lib/money";
 import { useSales, usePivotDistinct } from "../lib/useData";
 import LoadError from "../components/LoadError";
+import Picker from "../components/Picker";
 import { accent as green, orange, dim, border, bg, surfacePanel as panelHi, text } from "../lib/theme";
 
 const panel = "var(--surface-2)";
@@ -160,10 +161,8 @@ export default function SalesView({ lang = "sk" }) {
   const kpiVal = { fontSize: "1.5rem", fontWeight: 700, color: text, fontFamily: mono, fontVariantNumeric: "tabular-nums" };
   const kpiLbl = { fontFamily: mono, fontSize: "0.62rem", color: dim, letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: "0.3rem" };
   const Sel = ({ value, onChange, opts, ph }) => (
-    <select value={value} onChange={(e) => onChange(e.target.value)} style={{ ...sel, minWidth: 130, color: value ? text : dim }}>
-      <option value="">{ph}</option>
-      {(opts || []).map((o) => <option key={o} value={o} style={{ color: text }}>{o}</option>)}
-    </select>
+    <Picker value={value} onChange={onChange} width={150} searchable sk={lang === "sk"} placeholder={ph} ariaLabel={ph}
+      options={[{ value: "", label: ph }, ...(opts || []).map((o) => ({ value: o, label: o }))]} />
   );
 
   const dur = S.sold_durable ?? 0;

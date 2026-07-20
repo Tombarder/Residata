@@ -9,6 +9,7 @@
  * (they come from scrapes).
  */
 import { useEffect, useMemo, useState } from "react";
+import Picker from "./Picker";
 
 const SUPA_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPA_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -145,10 +146,17 @@ export default function ProjectsEditor({ lang = "sk" }) {
           placeholder={sk ? "Hľadať projekt / mesto / developera…" : "Search project / city / developer…"}
           style={{ ...inputStyle, width: 320, maxWidth: "70vw" }} />
         {countries.length > 1 && (
-          <select value={fCountry} onChange={(e) => setFCountry(e.target.value)} style={{ ...inputStyle, width: 130 }}>
-            <option value="">{sk ? "Všetky krajiny" : "All countries"}</option>
-            {countries.map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
+          <Picker
+            value={fCountry}
+            onChange={(v) => setFCountry(v)}
+            width={130}
+            ariaLabel={sk ? "Všetky krajiny" : "All countries"}
+            sk={sk}
+            options={[
+              { value: "", label: sk ? "Všetky krajiny" : "All countries" },
+              ...countries.map((c) => ({ value: c, label: c })),
+            ]}
+          />
         )}
         <span style={{ alignSelf: "center", color: MUTED, fontSize: "0.78rem" }}>{filtered.length} / {rows.length}</span>
       </div>
@@ -174,25 +182,43 @@ export default function ProjectsEditor({ lang = "sk" }) {
                 <tr key={row.id} style={{ background: dirty ? "color-mix(in srgb, var(--accent) 10%, transparent)" : "transparent" }}>
                   <td style={td}><input value={valueOf(row, "name")} onChange={(e) => setField(row.id, "name", e.target.value)} style={inputStyle} /></td>
                   <td style={td}>
-                    <select value={valueOf(row, "status")} onChange={(e) => setField(row.id, "status", e.target.value)} style={inputStyle}>
-                      {STATUSES.map((s) => <option key={s.v} value={s.v}>{sk ? s.sk : s.en}</option>)}
-                    </select>
+                    <Picker
+                      value={valueOf(row, "status")}
+                      onChange={(v) => setField(row.id, "status", v)}
+                      ariaLabel={sk ? "Stav" : "Status"}
+                      sk={sk}
+                      options={STATUSES.map((s) => ({ value: s.v, label: sk ? s.sk : s.en }))}
+                    />
                   </td>
                   <td style={td}>
-                    <select value={valueOf(row, "city_id") || ""} onChange={(e) => setField(row.id, "city_id", e.target.value)} style={inputStyle}>
-                      {/* city is required (NOT NULL) — no empty option */}
-                      {!valueOf(row, "city_id") && <option value="">—</option>}
-                      {cities.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
+                    {/* city is required (NOT NULL) — no empty option */}
+                    <Picker
+                      value={valueOf(row, "city_id") || ""}
+                      onChange={(v) => setField(row.id, "city_id", v)}
+                      searchable
+                      ariaLabel={sk ? "Mesto" : "City"}
+                      sk={sk}
+                      options={[
+                        ...(!valueOf(row, "city_id") ? [{ value: "", label: "—" }] : []),
+                        ...cities.map((c) => ({ value: c.id, label: c.name })),
+                      ]}
+                    />
                   </td>
                   <td style={td}><input value={valueOf(row, "district")} onChange={(e) => setField(row.id, "district", e.target.value)} style={inputStyle} /></td>
                   <td style={td}><input value={valueOf(row, "sub_district")} onChange={(e) => setField(row.id, "sub_district", e.target.value)} style={inputStyle} /></td>
                   <td style={td}><input value={valueOf(row, "address")} onChange={(e) => setField(row.id, "address", e.target.value)} style={inputStyle} /></td>
                   <td style={td}>
-                    <select value={valueOf(row, "developer_id") || ""} onChange={(e) => setField(row.id, "developer_id", e.target.value)} style={inputStyle}>
-                      <option value="">—</option>
-                      {developers.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-                    </select>
+                    <Picker
+                      value={valueOf(row, "developer_id") || ""}
+                      onChange={(v) => setField(row.id, "developer_id", v)}
+                      searchable
+                      ariaLabel={sk ? "Developer" : "Developer"}
+                      sk={sk}
+                      options={[
+                        { value: "", label: "—" },
+                        ...developers.map((d) => ({ value: d.id, label: d.name })),
+                      ]}
+                    />
                   </td>
                   <td style={{ ...td, textAlign: "right" }}>
                     <button disabled={!dirty || savingId === row.id} onClick={() => save(row)}

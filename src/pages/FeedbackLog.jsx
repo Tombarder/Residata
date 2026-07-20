@@ -14,6 +14,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
+import Picker from "../components/Picker";
 
 import { accent as green, accentInk, orange as amber, blue, text as textLight, dim, border, bg, surfaceDark as bg2, mono } from "../lib/theme";
 const red = "#ff6b6b";
@@ -310,17 +311,23 @@ export default function FeedbackLog({ lang = "sk" }) {
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 16 }}>
         <div style={{ display: "flex", flexDirection: "column", minWidth: 150 }}>
           <label style={cardLabel}>{t("Status", "Stav")}</label>
-          <select value={fStatus} onChange={(e) => setFStatus(e.target.value)} style={selStyle}>
-            <option value="">{t("All", "Všetky")}</option>
-            {STATUS_ORDER.map((s) => <option key={s} value={s}>{t(st(s)[1], st(s)[2])}</option>)}
-          </select>
+          <Picker
+            value={fStatus}
+            onChange={(v) => setFStatus(v)}
+            options={[{ value: "", label: t("All", "Všetky") }, ...STATUS_ORDER.map((s) => ({ value: s, label: t(st(s)[1], st(s)[2]) }))]}
+            ariaLabel={t("Status", "Stav")}
+            sk={lang === "sk"}
+          />
         </div>
         <div style={{ display: "flex", flexDirection: "column", minWidth: 170 }}>
           <label style={cardLabel}>{t("Type", "Typ")}</label>
-          <select value={fCategory} onChange={(e) => setFCategory(e.target.value)} style={selStyle}>
-            <option value="">{t("All", "Všetky")}</option>
-            {catChips.map((c) => <option key={c} value={c}>{cat(c)[0]} {t(cat(c)[1], cat(c)[2])}{byCat[c] ? ` (${byCat[c]})` : ""}</option>)}
-          </select>
+          <Picker
+            value={fCategory}
+            onChange={(v) => setFCategory(v)}
+            options={[{ value: "", label: t("All", "Všetky") }, ...catChips.map((c) => ({ value: c, label: `${cat(c)[0]} ${t(cat(c)[1], cat(c)[2])}${byCat[c] ? ` (${byCat[c]})` : ""}` }))]}
+            ariaLabel={t("Type", "Typ")}
+            sk={lang === "sk"}
+          />
         </div>
         {(fStatus || fCategory) && <button onClick={() => { setFStatus(""); setFCategory(""); }} style={{ padding: "8px 12px", borderRadius: 8, border: `1px solid ${border}`, background: "transparent", color: textLight, cursor: "pointer", fontSize: 12 }}>{t("Clear", "Zrušiť")}</button>}
         {items && <span style={{ fontSize: 12, color: dim, fontFamily: mono, paddingBottom: 9 }}>{items.length} {t("conversations", "konverzácií")}</span>}

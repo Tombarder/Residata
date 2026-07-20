@@ -10,6 +10,7 @@
 // active vs churned — plus a per-user drill-down timeline (what/where/how long).
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabaseData } from "../lib/supabase";
+import Picker from "../components/Picker";
 import { accent as green, accentInk, dim, text, border, surface as bg, surfaceDark as bg2 } from "../lib/theme";
 
 const mono = "'JetBrains Mono', monospace";
@@ -479,10 +480,14 @@ function MaintenancePanel({ lang, onDeleted }) {
           </p>
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
             <span style={{ fontSize: "0.76rem", color: text }}>{L("Zmazať udalosti staršie ako", "Delete events older than")}</span>
-            <select value={days} onChange={e => setDays(Number(e.target.value))} disabled={busy}
-              style={{ fontFamily: mono, fontSize: "0.76rem", padding: "0.3rem 0.5rem", borderRadius: 7, border: `1px solid ${border}`, background: bg2, color: text }}>
-              {CUTOFF_DAYS.map(d => <option key={d} value={d}>{d} {L("dní", "days")}</option>)}
-            </select>
+            <Picker
+              value={days}
+              onChange={(v) => setDays(Number(v))}
+              options={CUTOFF_DAYS.map(d => ({ value: d, label: `${d} ${L("dní", "days")}` }))}
+              width={140}
+              ariaLabel={L("Vek udalostí", "Event age")}
+              sk={lang === "sk"}
+            />
             <span style={{ fontSize: "0.72rem", color: dim, fontFamily: mono }}>({L("pred", "before")} {cutoffLabel})</span>
           </div>
 

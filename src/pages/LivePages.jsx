@@ -15,6 +15,7 @@ import { goBack } from "../lib/routing";
 import { track } from "../lib/track";
 import { isPersonalEmail } from "../lib/emailValidation";
 import UpgradePrompt from "../components/UpgradePrompt";
+import Picker from "../components/Picker";
 import PivotV2 from "./PivotV2";
 import MapFilterBuilder from "../components/MapFilterBuilder";
 import { applyFilters, describe, isComplete } from "../lib/mapFilters";
@@ -4424,17 +4425,18 @@ function AiChatLogsPanel({ users, lang }) {
               fontSize: "0.72rem", cursor: "pointer", fontFamily: "inherit",
             }}>{f.label}</button>
         ))}
-        <select value={userFilter} onChange={e => setUserFilter(e.target.value)}
-          title={lang === "sk" ? "Vyber užívateľa" : "Pick a user"}
-          style={{
-            background: "var(--surface-2)", color: userFilter === "all" ? dim : green,
-            border: `1px solid ${userFilter === "all" ? border : green}`,
-            borderRadius: 4, padding: "0.3rem 0.5rem", fontSize: "0.72rem",
-            fontFamily: "inherit", cursor: "pointer", maxWidth: 220,
-          }}>
-          <option value="all">{lang === "sk" ? "Všetci užívatelia" : "All users"}</option>
-          {sessionUsers.map(([uid, email]) => <option key={uid} value={uid}>{email}</option>)}
-        </select>
+        <Picker
+          value={userFilter}
+          onChange={v => setUserFilter(v)}
+          width={200}
+          searchable
+          ariaLabel={lang === "sk" ? "Vyber užívateľa" : "Pick a user"}
+          sk={lang === "sk"}
+          options={[
+            { value: "all", label: lang === "sk" ? "Všetci užívatelia" : "All users" },
+            ...sessionUsers.map(([uid, email]) => ({ value: uid, label: email })),
+          ]}
+        />
         <button onClick={load} title={lang === "sk" ? "Obnoviť" : "Refresh"}
           style={{ background: "transparent", border: `1px solid ${border}`, color: dim, borderRadius: 4, padding: "0.3rem 0.6rem", fontSize: "0.72rem", cursor: "pointer", fontFamily: "inherit" }}>
           ↻ {lang === "sk" ? "Obnoviť" : "Refresh"}
@@ -4637,12 +4639,16 @@ function PremiumDomainsPanel({ domains, reload }) {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 140px 1fr auto", gap: "0.5rem", alignItems: "center", marginBottom: "1.5rem" }}>
         <input placeholder="example.com" value={newDomain} onChange={e => setNewDomain(e.target.value)}
           style={{ padding: "0.55rem 0.75rem", background: "var(--surface-2)", border: `1px solid ${border}`, borderRadius: 6, color: "var(--text)", fontSize: "0.85rem", fontFamily: "inherit" }} />
-        <select value={newTier} onChange={e => setNewTier(e.target.value)}
-          style={{ padding: "0.55rem 0.75rem", background: "var(--surface-2)", border: `1px solid ${border}`, borderRadius: 6, color: "var(--text)", fontSize: "0.85rem" }}>
-          <option value="paid">paid</option>
-          <option value="free">free</option>
-          <option value="admin">admin</option>
-        </select>
+        <Picker
+          value={newTier}
+          onChange={v => setNewTier(v)}
+          ariaLabel="Default tier"
+          options={[
+            { value: "paid", label: "paid" },
+            { value: "free", label: "free" },
+            { value: "admin", label: "admin" },
+          ]}
+        />
         <input placeholder="note (e.g. Owner org)" value={newNote} onChange={e => setNewNote(e.target.value)}
           style={{ padding: "0.55rem 0.75rem", background: "var(--surface-2)", border: `1px solid ${border}`, borderRadius: 6, color: "var(--text)", fontSize: "0.85rem", fontFamily: "inherit" }} />
         <button onClick={add} disabled={busy || !newDomain.trim()} className="btn-p" style={{ fontSize: "0.8rem", padding: "0.55rem 1.25rem" }}>Add</button>
@@ -4719,22 +4725,28 @@ function UserTable({ users, setTier, deleteUser, trialAction, subAction, selfId,
                   <td style={td}><TierBadge tier={u.tier} /></td>
                   <td style={{ ...td, color: dim, fontFamily: mono, fontSize: "0.75rem" }}>{u.created_at?.slice(0, 10)}</td>
                   <td style={{ ...td, textAlign: "right", whiteSpace: "nowrap" }}>
-                    <select
-                      value={u.tier}
-                      onChange={e => setTier(u.id, e.target.value)}
-                      disabled={isSelf}
+                    <span
                       title={isSelf ? "Can't change your own tier" : ""}
                       style={{
-                        background: "var(--surface-2)", color: "var(--text)",
-                        border: `1px solid ${border}`, padding: "0.3rem 0.5rem",
-                        borderRadius: 4, fontSize: "0.75rem", marginRight: "0.4rem",
-                        opacity: isSelf ? 0.4 : 1, cursor: isSelf ? "not-allowed" : "pointer",
+                        display: "inline-block", marginRight: "0.4rem", verticalAlign: "middle",
+                        opacity: isSelf ? 0.4 : 1,
+                        pointerEvents: isSelf ? "none" : "auto",
+                        cursor: isSelf ? "not-allowed" : "pointer",
                       }}>
-                      <option value="pending">pending</option>
-                      <option value="free">free</option>
-                      <option value="paid">paid</option>
-                      <option value="admin">admin</option>
-                    </select>
+                      <Picker
+                        value={u.tier}
+                        onChange={v => setTier(u.id, v)}
+                        width={130}
+                        ariaLabel="Tier"
+                        sk={lang === "sk"}
+                        options={[
+                          { value: "pending", label: "pending" },
+                          { value: "free", label: "free" },
+                          { value: "paid", label: "paid" },
+                          { value: "admin", label: "admin" },
+                        ]}
+                      />
+                    </span>
                     {(() => {
                       const trialActive = u.trial_until && new Date(u.trial_until).getTime() > Date.now();
                       const hasTrial = Boolean(u.trial_started_at || u.trial_until);

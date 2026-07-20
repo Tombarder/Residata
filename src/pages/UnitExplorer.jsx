@@ -4,6 +4,7 @@
    UI matches the Analytics/pivot design language (green accent, card panels, JetBrains-Mono
    labels, the POLIA-style field palette). */
 import { useState, useMemo, useEffect, useRef } from "react";
+import Picker from "../components/Picker";
 import { useCountry, isAllCountries } from "../lib/useCountry";
 import { useCurrency } from "../lib/useCurrency";
 import { moneyFromEur, moneySymbol } from "../lib/money";
@@ -74,19 +75,14 @@ function XFilterRow({ row, fields, mode, lang, sel, onPatch, onRemove }) {
   const chip = { cursor: "pointer", background: green, color: "#04130d", borderRadius: 4, padding: "0.1rem 0.4rem", fontSize: "0.72rem", fontWeight: 600, whiteSpace: "nowrap" };
   return (
     <div style={{ display: "inline-flex", gap: "0.3rem", alignItems: "center", background: bg, border: `1px solid ${border}`, borderRadius: 6, padding: "0.2rem 0.3rem", flexWrap: "wrap" }}>
-      <select value={row.key} onChange={(e) => onPatch({ key: e.target.value, op: "in", vals: [], min: "", max: "" })} style={{ ...sel, minWidth: 118, color: row.key ? text : dim }}>
-        <option value="">{t("pole…", "field…")}</option>
-        {fields.map((f) => <option key={f.key} value={f.key} style={{ color: text }}>{label(f)}</option>)}
-      </select>
+      <Picker value={row.key} onChange={(v) => onPatch({ key: v, op: "in", vals: [], min: "", max: "" })} searchable ariaLabel={t("pole…", "field…")} width={140}
+        options={[{ value: "", label: t("pole…", "field…") }, ...fields.map((f) => ({ value: f.key, label: label(f) }))]} />
       {row.key && kind === "text" && (<>
-        <select value={row.op} onChange={(e) => onPatch({ op: e.target.value })} style={{ ...sel }}>
-          <option value="in">{t("je", "is")}</option>
-          <option value="not_in">{t("nie je", "is not")}</option>
-        </select>
-        <select value="" onChange={(e) => { const v = e.target.value; if (v && !(row.vals || []).includes(v)) onPatch({ vals: [...(row.vals || []), v] }); }} style={{ ...sel, minWidth: 120, color: dim }}>
-          <option value="">{distinct.loading ? t("načítavam…", "loading…") : t("+ hodnota", "+ value")}</option>
-          {(distinct.values || []).filter((v) => !(row.vals || []).includes(v)).map((v) => <option key={v} value={v} style={{ color: text }}>{v}</option>)}
-        </select>
+        <Picker value={row.op} onChange={(v) => onPatch({ op: v })} ariaLabel="operator" width={92}
+          options={[{ value: "in", label: t("je", "is") }, { value: "not_in", label: t("nie je", "is not") }]} />
+        <Picker value="" onChange={(v) => { if (v && !(row.vals || []).includes(v)) onPatch({ vals: [...(row.vals || []), v] }); }} searchable width={150}
+          placeholder={distinct.loading ? t("načítavam…", "loading…") : t("+ hodnota", "+ value")} ariaLabel="value"
+          options={(distinct.values || []).filter((v) => !(row.vals || []).includes(v)).map((v) => ({ value: v, label: v }))} />
         {(row.vals || []).map((v) => <span key={v} onClick={() => onPatch({ vals: row.vals.filter((x) => x !== v) })} style={chip} title={t("odstrániť", "remove")}>{v} ✕</span>)}
       </>)}
       {row.key && (kind === "num" || kind === "date") && (<>
@@ -262,10 +258,8 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
 
   const sel = { background: bg, border: `1px solid ${border}`, color: text, borderRadius: 5, padding: "0.4rem 0.55rem", fontSize: "0.78rem", fontFamily: "inherit", outline: "none" };
   const Sel = ({ value, onChange, opts, ph }) => (
-    <select value={value} onChange={(e) => onChange(e.target.value)} style={{ ...sel, minWidth: 128, color: value ? text : dim }}>
-      <option value="">{ph}</option>
-      {(opts || []).map((o) => <option key={o} value={o} style={{ color: text }}>{o}</option>)}
-    </select>
+    <Picker value={value} onChange={onChange} searchable placeholder={ph} ariaLabel={ph} width={150}
+      options={[{ value: "", label: ph }, ...(opts || []).map((o) => ({ value: o, label: o }))]} />
   );
   const typeBadge = (ty) => (ty === "numeric" ? "#" : ty === "date" || ty === "month" ? "📅" : "T");
   const typeColor = (ty) => (ty === "numeric" ? orange : green);
