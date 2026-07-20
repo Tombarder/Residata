@@ -41,7 +41,7 @@ const panel = "var(--surface)";
 // CARTO vector basemaps — free, no key. Light (positron) in light theme, dark-matter in dark.
 // Same cartocdn.com host as before, so the CSP already allows it.
 const MAP_STYLE_DARK = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
-const MAP_STYLE_LIGHT = "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json";
+const MAP_STYLE_LIGHT = "https://tiles.openfreemap.org/styles/liberty"; // OpenFreeMap "liberty" — free, no key, commercial-OK, colourful OSM vector basemap (voyager read washed/faded; Boss 2026-07-20)
 const mapStyleUrl = () => (getTheme() === "light" ? MAP_STYLE_LIGHT : MAP_STYLE_DARK);
 
 // Install the clustered projects source + layers on a map. Run on initial load AND

@@ -90,25 +90,24 @@
      the white cards, so cards pop with real depth. Neutral-first palette; the brand
      green is a restrained ACCENT (active nav, positive numbers, primary actions, one
      chart series), never the whole UI. Data/graphs/structure unchanged — skin only. */
-  --bg:            #eef0f3;   /* cool light-gray workspace — clearly darker than cards */
+  --bg:            #dfe4ec;   /* deeper cool-slate workspace — cards pop hard, not washed */
   --surface:       #ffffff;   /* white cards (lifted by the light-mode shadow below) */
-  --surface-2:     #f1f3f6;   /* inset / card-header / row-stripe */
-  --surface-3:     #e7eaef;   /* input / raised / hover */
-  --border:        #e2e5ea;   /* defined card / table edge */
-  --border-soft:   #eceef2;   /* hairline dividers inside cards */
+  --surface-2:     #eaeef4;   /* inset / card-header / row-stripe — clearly present */
+  --surface-3:     #dde3ec;   /* input / raised / hover */
+  --border:        #cbd3df;   /* strong, defined card / table edge (less faded) */
+  --border-soft:   #dde3ec;   /* dividers inside cards — visible */
   --accent:        #00e5a0;   /* mint brand — theme-invariant (map paint / dark mode) */
   --accent-strong: #0e9d6b;   /* deep emerald — fills / bars on white */
-  --accent-ink:    #45505f;   /* NEUTRAL slate — former mint text goes calm/neutral so
-                                 labels & values aren't green; green stays only on true
-                                 accents (bars, active nav, deltas, buttons, pills). */
-  --accent-2:      #a5680a;
-  --danger:        #e0413e;
-  --info:          #3b74e8;
-  --warning:       #c9860c;
-  --text:          #111319;   /* near-black slate — strong, high contrast */
-  --text-2:        #4a5261;
-  --text-dim:      #5a6474;   /* secondary / body-dim */
-  --text-faint:    #8992a1;   /* neutral labels / captions */
+  --accent-ink:    #2f3a49;   /* strong neutral slate — labels/values read dark & distinct
+                                 (not green, not faded); green stays only on true accents. */
+  --accent-2:      #9c6008;
+  --danger:        #d5352f;
+  --info:          #2c62d8;
+  --warning:       #b87d0a;
+  --text:          #0d1017;   /* near-black — maximum contrast for numbers/data */
+  --text-2:        #333c4b;   /* darker secondary — data reads strong */
+  --text-dim:      #48525f;   /* secondary / body-dim — less faded */
+  --text-faint:    #626c7a;   /* labels / captions — distinct, not washed */
   --on-accent:     #04140d;
   /* dark-slate sidebar (the structural anchor) */
   --sidebar-bg:          #181c23;
@@ -128,14 +127,13 @@
    surface-backed rounded containers, so chips (accent bg) / inputs (surface-2/3) /
    native controls are untouched. */
 :root[data-theme="light"] div[style*="var(--surface)"][style*="border-radius"] {
-  box-shadow: 0 1px 2px rgba(20, 32, 26, 0.05), 0 6px 16px rgba(20, 32, 26, 0.06);
+  box-shadow: 0 1px 2px rgba(28, 38, 56, 0.06), 0 4px 10px rgba(28, 38, 56, 0.07), 0 12px 28px rgba(28, 38, 56, 0.06);
 }
 
-/* Light-mode map punch — the CARTO light basemap renders very pale/washed; a
-   saturation + contrast boost gives the land, water and markers more definition
-   without changing tile sources (CSP-safe). Dark map is left untouched. */
+/* Light-mode map — OpenFreeMap "liberty" is already a rich colourful basemap, so
+   only a gentle lift (keeps water/parks/roads crisp without over-saturating). */
 :root[data-theme="light"] .maplibregl-canvas {
-  filter: saturate(1.5) contrast(1.18) brightness(0.955);
+  filter: saturate(1.06) contrast(1.03);
 }
 
 /* ── universal box model: borders + padding stay inside declared widths ─── */
