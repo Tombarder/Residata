@@ -48,7 +48,7 @@ export default function CountrySwitcher({ lang = "en", hideLabel = false, fill =
               display: "flex", alignItems: "center", justifyContent: "center", gap: "0.3rem",
               padding: "0.4rem 0.55rem", border: "none", cursor: "pointer",
               borderLeft: i ? "1px solid var(--border-soft)" : "none",
-              background: active ? "#00e5a0" : "transparent",
+              background: active ? "var(--accent)" : "transparent",
               color: active ? "#06140f" : "var(--text-dim)",
               fontWeight: active ? 700 : 500, whiteSpace: "nowrap",
               fontFamily: "inherit", fontSize: "inherit", transition: "all 0.15s",

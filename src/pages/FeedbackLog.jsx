@@ -233,7 +233,7 @@ export default function FeedbackLog({ lang = "sk" }) {
                 const isUser = m.sender === "user";
                 return (
                   <div key={m.id} style={{ display: "flex", justifyContent: isUser ? "flex-start" : "flex-end" }}>
-                    <div style={{ maxWidth: "78%", background: isUser ? bg2 : "rgba(0,229,160,0.08)", border: `1px solid ${isUser ? border : "rgba(0,229,160,0.3)"}`, borderRadius: 10, padding: "10px 13px" }}>
+                    <div style={{ maxWidth: "78%", background: isUser ? bg2 : "color-mix(in srgb, var(--accent) 8%, transparent)", border: `1px solid ${isUser ? border : "color-mix(in srgb, var(--accent) 30%, transparent)"}`, borderRadius: 10, padding: "10px 13px" }}>
                       <div style={{ fontFamily: mono, fontSize: 10, color: isUser ? dim : green, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>
                         {isUser ? t("User", "Používateľ") : t("You (Residata)", "Ty (Residata)")} · {fmtDate(m.created_at)}
                       </div>

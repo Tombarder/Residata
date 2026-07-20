@@ -177,7 +177,7 @@ export default function CompleteProfile({ lang = "en" }) {
               {err}
             </p>
             <button onClick={retry} style={{
-              width: "100%", padding: "0.85rem", background: "#00e5a0", color: "var(--bg)",
+              width: "100%", padding: "0.85rem", background: "var(--accent)", color: "var(--bg)",
               fontWeight: 600, borderRadius: 8, border: "none", cursor: "pointer",
               fontSize: "0.95rem",
             }}>
@@ -191,7 +191,7 @@ export default function CompleteProfile({ lang = "en" }) {
         ) : (
           // DEFAULT — the form
           <>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem", color: "#00e5a0", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "0.75rem" }}>
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem", color: "var(--accent)", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "0.75rem" }}>
               {lang === "sk" ? "Krok 2 z 2" : "Step 2 of 2"}
             </div>
             <h2 style={{ fontSize: "1.5rem", fontWeight: 700, letterSpacing: "-0.02em", marginBottom: "0.5rem", color: "var(--text)" }}>{t.cp_title}</h2>
@@ -224,7 +224,7 @@ export default function CompleteProfile({ lang = "en" }) {
                 type="submit"
                 disabled={state === "saving"}
                 style={{
-                  width: "100%", padding: "0.85rem", background: "#00e5a0", color: "var(--bg)",
+                  width: "100%", padding: "0.85rem", background: "var(--accent)", color: "var(--bg)",
                   fontWeight: 600, borderRadius: 8, border: "none",
                   cursor: state === "saving" ? "wait" : "pointer",
                   fontSize: "0.95rem", marginTop: "0.5rem",
@@ -262,7 +262,7 @@ function Field({ label, required, children }) {
   return (
     <div style={{ marginBottom: "0.85rem" }}>
       <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-dim)", marginBottom: "0.35rem", fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.05em", textTransform: "uppercase" }}>
-        {label} {required && <span style={{ color: "#00e5a0" }}>*</span>}
+        {label} {required && <span style={{ color: "var(--accent)" }}>*</span>}
       </label>
       {children}
     </div>

@@ -109,7 +109,7 @@ const styles = {
     fontSize: "0.6rem",
     fontWeight: 700,
     letterSpacing: "0.15em",
-    color: "#00e5a0",
+    color: "var(--accent)",
     borderRight: "1px solid var(--border)",
     height: "100%",
     display: "flex",
@@ -137,7 +137,7 @@ const styles = {
     padding: "0 1.75rem",
   },
   dot: {
-    color: "#00e5a0",
+    color: "var(--accent)",
     fontSize: "0.5rem",
   },
   content: {

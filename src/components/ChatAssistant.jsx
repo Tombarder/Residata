@@ -297,8 +297,8 @@ function MessageBubble({ msg, lang, onRate }) {
     <div style={{ display: "flex", justifyContent: isUser ? "flex-end" : "flex-start" }}>
       <div style={{
         maxWidth: "80%",
-        background: isUser ? "rgba(0,229,160,0.1)" : "transparent",
-        border: `1px solid ${isUser ? "rgba(0,229,160,0.3)" : border}`,
+        background: isUser ? "color-mix(in srgb, var(--accent) 10%, transparent)" : "transparent",
+        border: `1px solid ${isUser ? "color-mix(in srgb, var(--accent) 30%, transparent)" : border}`,
         borderRadius: 12,
         padding: "0.6rem 0.85rem",
         fontSize: "0.88rem", lineHeight: 1.55, color: text,

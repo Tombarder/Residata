@@ -19,7 +19,7 @@ import { cleanText, cleanEmail } from "../lib/sanitize";
 import { getDiagnostics, capturePageScreenshot } from "../lib/diagnostics";
 
 const mono   = "'JetBrains Mono', monospace";
-const green  = "#00e5a0";
+const green  = "var(--accent)";
 const amber  = "#f5a623";
 const blue   = "#4a9eff";
 const dim    = "var(--text-dim)";
@@ -292,7 +292,7 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
   if (!open) {
     return (
       <button onClick={() => { setOpen(true); if (unread > 0) loadMine(); }} aria-label={L("Nahlásiť problém alebo návrh", "Report a problem or suggestion")} className="residata-fb-pill" data-rbf-ignore
-        style={{ position: "fixed", right: "calc(20px + var(--safe-right))", bottom, height: 40, padding: "0 14px 0 12px", borderRadius: 20, border: `1px solid rgba(0,229,160,0.55)`, background: bg2, color: text, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "0.5rem", fontFamily: "inherit", fontSize: "0.78rem", fontWeight: 600, letterSpacing: "-0.005em", zIndex: "var(--z-pill)", animation: "rbf-glow 2.4s ease-in-out infinite" }}>
+        style={{ position: "fixed", right: "calc(20px + var(--safe-right))", bottom, height: 40, padding: "0 14px 0 12px", borderRadius: 20, border: `1px solid color-mix(in srgb, var(--accent) 55%, transparent)`, background: bg2, color: text, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "0.5rem", fontFamily: "inherit", fontSize: "0.78rem", fontWeight: 600, letterSpacing: "-0.005em", zIndex: "var(--z-pill)", animation: "rbf-glow 2.4s ease-in-out infinite" }}>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={green} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
         </svg>
@@ -306,10 +306,10 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
           }}>{unread > 9 ? "9+" : unread}</span>
         )}
         <style>{`
-          @keyframes rbf-glow { 0%,100% { box-shadow: 0 6px 18px rgba(0,0,0,0.4), 0 0 0 0 rgba(0,229,160,0); } 50% { box-shadow: 0 8px 22px rgba(0,0,0,0.45), 0 0 22px 3px rgba(0,229,160,0.45); } }
+          @keyframes rbf-glow { 0%,100% { box-shadow: 0 6px 18px rgba(0,0,0,0.4), 0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent); } 50% { box-shadow: 0 8px 22px rgba(0,0,0,0.45), 0 0 22px 3px color-mix(in srgb, var(--accent) 45%, transparent); } }
           .residata-fb-pill { transition: transform .18s, border-color .18s, background .18s; }
-          .residata-fb-pill:hover { transform: translateY(-1px); border-color: ${green}; background: var(--surface-2); animation-play-state: paused; box-shadow: 0 10px 28px rgba(0,0,0,0.55), 0 0 28px 5px rgba(0,229,160,0.55), 0 0 0 1px rgba(0,229,160,0.3) inset; }
-          @media (prefers-reduced-motion: reduce) { .residata-fb-pill { animation: none; box-shadow: 0 6px 18px rgba(0,0,0,0.4), 0 0 16px 2px rgba(0,229,160,0.35); } }
+          .residata-fb-pill:hover { transform: translateY(-1px); border-color: ${green}; background: var(--surface-2); animation-play-state: paused; box-shadow: 0 10px 28px rgba(0,0,0,0.55), 0 0 28px 5px color-mix(in srgb, var(--accent) 55%, transparent), 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent) inset; }
+          @media (prefers-reduced-motion: reduce) { .residata-fb-pill { animation: none; box-shadow: 0 6px 18px rgba(0,0,0,0.4), 0 0 16px 2px color-mix(in srgb, var(--accent) 35%, transparent); } }
         `}</style>
       </button>
     );
@@ -324,7 +324,7 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
     const isUser = m.sender === "user";
     return (
       <div style={{ display: "flex", justifyContent: isUser ? "flex-end" : "flex-start", marginBottom: "0.5rem" }}>
-        <div style={{ maxWidth: "86%", background: isUser ? "rgba(0,229,160,0.1)" : "var(--surface-2)", border: `1px solid ${isUser ? "rgba(0,229,160,0.28)" : border}`, borderRadius: 10, padding: "0.5rem 0.65rem" }}>
+        <div style={{ maxWidth: "86%", background: isUser ? "color-mix(in srgb, var(--accent) 10%, transparent)" : "var(--surface-2)", border: `1px solid ${isUser ? "color-mix(in srgb, var(--accent) 28%, transparent)" : border}`, borderRadius: 10, padding: "0.5rem 0.65rem" }}>
           <div style={{ fontFamily: mono, fontSize: "0.56rem", color: isUser ? green : dim, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 3 }}>
             {isUser ? L("Ty", "You") : "Residata"} · {(m.created_at || "").slice(5, 16).replace("T", " ")}
           </div>
@@ -341,13 +341,13 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
         @keyframes rbf-panel { from {opacity:0; transform:translateY(12px);} to {opacity:1; transform:translateY(0);} }
         @keyframes rbf-pop { 0% {transform:scale(0.6); opacity:0;} 60% {transform:scale(1.08);} 100% {transform:scale(1); opacity:1;} }
         .rbf-cat { transition: border-color .15s, background .15s, color .15s, transform .12s; }
-        .rbf-cat:hover { border-color: rgba(0,229,160,0.45) !important; transform: translateY(-1px); }
+        .rbf-cat:hover { border-color: color-mix(in srgb, var(--accent) 45%, transparent) !important; transform: translateY(-1px); }
         .rbf-send:not(:disabled):hover { filter: brightness(1.08); }
-        .rbf-conv:hover { border-color: rgba(0,229,160,0.4) !important; }
+        .rbf-conv:hover { border-color: color-mix(in srgb, var(--accent) 40%, transparent) !important; }
       `}</style>
 
       {/* Header */}
-      <div style={{ padding: "0.85rem 0.95rem", display: "flex", alignItems: "center", gap: "0.6rem", borderBottom: `1px solid ${border}`, background: "linear-gradient(180deg, rgba(0,229,160,0.08), transparent)", borderTopLeftRadius: 16, borderTopRightRadius: 16 }}>
+      <div style={{ padding: "0.85rem 0.95rem", display: "flex", alignItems: "center", gap: "0.6rem", borderBottom: `1px solid ${border}`, background: "linear-gradient(180deg, color-mix(in srgb, var(--accent) 8%, transparent), transparent)", borderTopLeftRadius: 16, borderTopRightRadius: 16 }}>
         <div style={{ width: 30, height: 30, borderRadius: "50%", background: green, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0a0a0b" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
@@ -434,7 +434,7 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
         ) : phase === "done" ? (
           /* ── Success ───────────────────────────────────────────── */
           <div style={{ textAlign: "center", padding: "1.6rem 0.5rem 1.2rem" }}>
-            <div style={{ width: 52, height: 52, borderRadius: "50%", background: "rgba(0,229,160,0.14)", border: `1px solid ${green}`, margin: "0 auto 0.85rem", display: "flex", alignItems: "center", justifyContent: "center", animation: "rbf-pop 0.35s ease-out" }}>
+            <div style={{ width: 52, height: 52, borderRadius: "50%", background: "color-mix(in srgb, var(--accent) 14%, transparent)", border: `1px solid ${green}`, margin: "0 auto 0.85rem", display: "flex", alignItems: "center", justifyContent: "center", animation: "rbf-pop 0.35s ease-out" }}>
               <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={green} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
             </div>
             <div style={{ color: text, fontWeight: 700, fontSize: "1rem", marginBottom: "0.4rem" }}>{L("Ďakujeme! 🙌", "Thank you! 🙌")}</div>
@@ -462,7 +462,7 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
                 const on = category === key;
                 return (
                   <button key={key} className="rbf-cat" onClick={() => pickCategory(key)} aria-pressed={on}
-                    style={{ display: "flex", alignItems: "center", gap: "0.5rem", textAlign: "left", padding: "0.62rem 0.65rem", borderRadius: 10, cursor: "pointer", border: `1px solid ${on ? green : border}`, background: on ? "rgba(0,229,160,0.1)" : bg, color: on ? green : "var(--text-2)", fontFamily: "inherit", fontSize: "0.8rem", fontWeight: on ? 600 : 500 }}>
+                    style={{ display: "flex", alignItems: "center", gap: "0.5rem", textAlign: "left", padding: "0.62rem 0.65rem", borderRadius: 10, cursor: "pointer", border: `1px solid ${on ? green : border}`, background: on ? "color-mix(in srgb, var(--accent) 10%, transparent)" : bg, color: on ? green : "var(--text-2)", fontFamily: "inherit", fontSize: "0.8rem", fontWeight: on ? 600 : 500 }}>
                     <span style={{ fontSize: "1.05rem", lineHeight: 1 }} aria-hidden="true">{emoji}</span>
                     <span style={{ flex: 1, minWidth: 0 }}>{L(sk, en)}</span>
                     {on && <span aria-hidden="true" style={{ color: green, fontSize: "0.8rem", fontWeight: 700 }}>✓</span>}
@@ -475,7 +475,7 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
             <textarea ref={taRef} value={message} onChange={e => setMessage(e.target.value.slice(0, MAX_MESSAGE))} onKeyDown={onMsgKey}
               placeholder={L("Napíš nám, čo máš na srdci…", "Write us what's on your mind…")} rows={4}
               style={{ width: "100%", boxSizing: "border-box", minHeight: 92, maxHeight: 220, background: bg, border: `1px solid ${border}`, borderRadius: 10, color: text, fontFamily: "inherit", fontSize: "0.85rem", lineHeight: 1.5, padding: "0.6rem 0.7rem", resize: "vertical", outline: "none" }}
-              onFocus={e => { e.currentTarget.style.borderColor = "rgba(0,229,160,0.5)"; }} onBlur={e => { e.currentTarget.style.borderColor = border; }} />
+              onFocus={e => { e.currentTarget.style.borderColor = "color-mix(in srgb, var(--accent) 50%, transparent)"; }} onBlur={e => { e.currentTarget.style.borderColor = border; }} />
             <div style={{ marginTop: "0.35rem", color: dim, fontSize: "0.62rem", fontFamily: mono, textAlign: "right" }}>{msgLen} / {MAX_MESSAGE}</div>
 
             <div style={{ ...stepLabel, marginTop: "0.85rem", marginBottom: "0.4rem" }}><span style={stepNum}>3</span> {L("Screenshot", "Screenshot")} · {L("nepovinné", "optional")}</div>
@@ -488,7 +488,7 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
             ) : (
               <>
                 <button onClick={() => fileRef.current?.click()} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.45rem", background: bg, border: `1px dashed ${border}`, color: "var(--text-2)", borderRadius: 10, padding: "0.65rem", cursor: "pointer", fontSize: "0.8rem", fontFamily: "inherit" }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(0,229,160,0.5)"; }} onMouseLeave={e => { e.currentTarget.style.borderColor = border; }}>
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = "color-mix(in srgb, var(--accent) 50%, transparent)"; }} onMouseLeave={e => { e.currentTarget.style.borderColor = border; }}>
                   <span aria-hidden="true">📎</span> {L("Vložiť (Ctrl/⌘+V) alebo nahrať obrázok", "Paste (Ctrl/⌘+V) or upload an image")}
                 </button>
                 <input ref={fileRef} type="file" accept="image/*" onChange={onPickFile} style={{ display: "none" }} />

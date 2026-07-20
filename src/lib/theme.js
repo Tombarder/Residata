@@ -5,8 +5,14 @@
 // BRAND / STATUS colours stay literal hex: they are theme-invariant AND some feed
 // straight into maplibre paint (MapView2 fill/circle colours), which cannot take a
 // `var(...)`. Never convert accent/orange/blue/onAccent to var().
-export const accent       = "#00e5a0"; // brand green (theme-invariant; used in map paint)
-export const accentStrong = "#00c98c";
+// Brand green as a THEME-AWARE token: neon mint in dark, deep readable emerald in
+// light (so it never reads as washed pale-green on the light workspace). Resolves to
+// a CSS var, so it must NOT be used in maplibre paint — use accentPaint there.
+export const accent       = "var(--accent)";
+export const accentStrong = "var(--accent-strong)";
+// Literal mint for maplibre paint ONLY (circle/fill/line-color can't take a var()).
+export const accentPaint       = "#00e5a0";
+export const accentStrongPaint = "#00c98c";
 // accent used as TEXT/value colour. Resolves to a CSS var: mint in dark, deep-green
 // in light — so mint-on-white text stays legible. It is a var(), so it must NEVER be
 // used in maplibre paint or string-concatenated with an opacity suffix (`${accentInk}33`

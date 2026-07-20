@@ -26,7 +26,7 @@ import AiBetaBanner from "./AiBetaBanner";
 import { pushRoute } from "../lib/routing";
 
 const mono   = "'JetBrains Mono', monospace";
-const green  = "#00e5a0";
+const green  = "var(--accent)";
 const dim    = "var(--text-dim)";
 const text   = "var(--text)";
 const border = "var(--border)";
@@ -89,7 +89,7 @@ export default function FloatingChat({ lang = "sk", onNavigate }) {
             height: 44,
             padding: "0 16px 0 14px",
             borderRadius: 22,
-            border: `1px solid rgba(0,229,160,0.5)`,
+            border: `1px solid color-mix(in srgb, var(--accent) 50%, transparent)`,
             background: "var(--surface-2)",
             color: text,
             cursor: "pointer",
@@ -100,7 +100,7 @@ export default function FloatingChat({ lang = "sk", onNavigate }) {
             fontSize: "0.82rem",
             fontWeight: 600,
             letterSpacing: "-0.005em",
-            boxShadow: "0 6px 20px rgba(0,0,0,0.45), 0 0 0 1px rgba(0,229,160,0.06) inset",
+            boxShadow: "0 6px 20px rgba(0,0,0,0.45), 0 0 0 1px color-mix(in srgb, var(--accent) 6%, transparent) inset",
             zIndex: "var(--z-pill)",
           }}
         >
@@ -120,7 +120,7 @@ export default function FloatingChat({ lang = "sk", onNavigate }) {
               transform: translateY(-1px);
               border-color: ${green};
               background: var(--surface-2);
-              box-shadow: 0 10px 28px rgba(0,0,0,0.55), 0 0 0 1px rgba(0,229,160,0.25) inset, 0 0 24px rgba(0,229,160,0.18);
+              box-shadow: 0 10px 28px rgba(0,0,0,0.55), 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent) inset, 0 0 24px color-mix(in srgb, var(--accent) 18%, transparent);
             }
           `}</style>
         </button>
@@ -137,7 +137,7 @@ export default function FloatingChat({ lang = "sk", onNavigate }) {
           // panel can never run under the top chrome or the home indicator.
           height: "min(560px, calc(100svh - var(--nav-h, 72px) - var(--safe-bottom) - 40px))",
           background: bg2, border: `1px solid ${border}`, borderRadius: 14,
-          boxShadow: "0 20px 60px rgba(0,0,0,0.65), 0 0 40px rgba(0,229,160,0.08)",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.65), 0 0 40px color-mix(in srgb, var(--accent) 8%, transparent)",
           display: "flex", flexDirection: "column",
           zIndex: "var(--z-pill)",
           animation: "rbs-panel 0.2s ease-out",
@@ -155,7 +155,7 @@ export default function FloatingChat({ lang = "sk", onNavigate }) {
             padding: "0.7rem 0.85rem",
             display: "flex", alignItems: "center", gap: "0.5rem",
             borderBottom: `1px solid ${border}`,
-            background: "linear-gradient(180deg, rgba(0,229,160,0.08), transparent)",
+            background: "linear-gradient(180deg, color-mix(in srgb, var(--accent) 8%, transparent), transparent)",
             borderTopLeftRadius: 14, borderTopRightRadius: 14,
           }}>
             <div style={{
@@ -407,8 +407,8 @@ function MiniBubble({ msg, lang, onRate }) {
     <div style={{ display: "flex", justifyContent: isUser ? "flex-end" : "flex-start" }}>
       <div style={{
         maxWidth: "88%",
-        background: isUser ? "rgba(0,229,160,0.12)" : "var(--surface)",
-        border: `1px solid ${isUser ? "rgba(0,229,160,0.3)" : border}`,
+        background: isUser ? "color-mix(in srgb, var(--accent) 12%, transparent)" : "var(--surface)",
+        border: `1px solid ${isUser ? "color-mix(in srgb, var(--accent) 30%, transparent)" : border}`,
         borderRadius: 10,
         padding: "0.45rem 0.65rem",
         fontSize: "0.82rem", lineHeight: 1.5, color: text,

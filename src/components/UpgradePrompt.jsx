@@ -88,7 +88,7 @@ export default function UpgradePrompt({ feature, variant = "block", onLogin, onG
 }
 
 const inlineStyle = { fontSize: "0.85rem", color: "var(--text-dim)" };
-const linkBtn = { background: "none", border: "none", color: "#00e5a0", cursor: "pointer", padding: 0, fontSize: "inherit", fontFamily: "inherit", textDecoration: "underline" };
+const linkBtn = { background: "none", border: "none", color: "var(--accent)", cursor: "pointer", padding: 0, fontSize: "inherit", fontFamily: "inherit", textDecoration: "underline" };
 
 const translations = {
   en: {

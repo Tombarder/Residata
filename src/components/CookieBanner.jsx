@@ -137,7 +137,7 @@ export default function CookieBanner({ lang = "en" }) {
       <div style={{
         fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
         fontSize: "0.62rem",
-        color: "#00e5a0",
+        color: "var(--accent)",
         letterSpacing: "0.12em",
         textTransform: "uppercase",
         marginBottom: "0.5rem",
@@ -152,7 +152,7 @@ export default function CookieBanner({ lang = "en" }) {
         {" "}
         <a
           href="/privacy"
-          style={{ color: "#00e5a0", textDecoration: "underline" }}
+          style={{ color: "var(--accent)", textDecoration: "underline" }}
         >
           {isSK ? "Viac v zásadách ochrany údajov" : "More in the privacy policy"}
         </a>.
@@ -200,9 +200,9 @@ export default function CookieBanner({ lang = "en" }) {
                 type="checkbox"
                 checked={analytics}
                 onChange={e => setAnalytics(e.target.checked)}
-                style={{ width: 16, height: 16, accentColor: "#00e5a0" }}
+                style={{ width: 16, height: 16, accentColor: "var(--accent)" }}
               />
-              <span style={{ fontSize: "0.78rem", color: analytics ? "#00e5a0" : "var(--text-dim)" }}>
+              <span style={{ fontSize: "0.78rem", color: analytics ? "var(--accent)" : "var(--text-dim)" }}>
                 {analytics ? (isSK ? "povolené" : "allowed") : (isSK ? "blokované" : "blocked")}
               </span>
             </label>
@@ -214,7 +214,7 @@ export default function CookieBanner({ lang = "en" }) {
         <button
           onClick={acceptAll}
           style={{
-            background: "#00e5a0",
+            background: "var(--accent)",
             color: "var(--bg)",
             border: "none",
             padding: "0.55rem 1.1rem",
@@ -261,8 +261,8 @@ export default function CookieBanner({ lang = "en" }) {
             onClick={savePrefs}
             style={{
               background: "transparent",
-              color: "#00e5a0",
-              border: "1px solid #00e5a0",
+              color: "var(--accent)",
+              border: "1px solid var(--accent)",
               padding: "0.55rem 1.1rem",
               borderRadius: 8,
               fontSize: "0.82rem",

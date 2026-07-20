@@ -385,7 +385,7 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
                       onClick={() => toggleCol(f.key)}
                       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleCol(f.key); } }}
                       title={on ? t("Klikni pre skrytie", "Click to hide") : t("Klikni pre zobrazenie", "Click to show")}
-                      style={{ display: "flex", alignItems: "center", gap: "0.45rem", padding: "0.32rem 0.55rem", borderRadius: 4, color: on ? text : dim, fontSize: "0.78rem", cursor: "pointer", userSelect: "none", borderLeft: `2px solid ${on ? green : "transparent"}`, background: on ? "rgba(0,229,160,0.06)" : "transparent" }}
+                      style={{ display: "flex", alignItems: "center", gap: "0.45rem", padding: "0.32rem 0.55rem", borderRadius: 4, color: on ? text : dim, fontSize: "0.78rem", cursor: "pointer", userSelect: "none", borderLeft: `2px solid ${on ? green : "transparent"}`, background: on ? "color-mix(in srgb, var(--accent) 6%, transparent)" : "transparent" }}
                       onMouseEnter={(e) => { if (!on) e.currentTarget.style.background = panelHi; }}
                       onMouseLeave={(e) => { if (!on) e.currentTarget.style.background = "transparent"; }}>
                       <span style={{ fontFamily: mono, fontSize: "0.62rem", width: 16, textAlign: "center", color: typeColor(f.type), fontWeight: 700 }}>{typeBadge(f.type)}</span>

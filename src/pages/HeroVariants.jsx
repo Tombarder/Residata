@@ -13,7 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import { useProjects } from "../lib/useData";
 
 const mono = "'JetBrains Mono', monospace";
-const green = "#00e5a0";
+const green = "var(--accent)";
 const border = "#222228";
 const bg = "#16161a";
 const dim = "#8a8a96";
@@ -105,7 +105,7 @@ export function V1_PanoramaPins({ lang = "en" }) {
             left: `${p.x}%`, top: `${p.y - 8}%`,
             transform: "translate(-50%, -100%)",
             background: "rgba(16,16,18,0.95)", backdropFilter: "blur(10px)",
-            border: `1px solid rgba(0,229,160,0.4)`, borderRadius: 8,
+            border: `1px solid color-mix(in srgb, var(--accent) 40%, transparent)`, borderRadius: 8,
             padding: "0.6rem 0.85rem", whiteSpace: "nowrap",
             boxShadow: "0 8px 24px rgba(0,0,0,0.6)",
             pointerEvents: "none", zIndex: 10,
@@ -188,7 +188,7 @@ export function V2_IsometricFlow({ lang = "en" }) {
                       x={b.x + 6 + col * 16}
                       y={b.y + 8 + row * 24}
                       width={8} height={10}
-                      fill={Math.random() > 0.55 ? "rgba(0,229,160,0.3)" : "rgba(245,166,35,0.2)"}
+                      fill={Math.random() > 0.55 ? "color-mix(in srgb, var(--accent) 30%, transparent)" : "rgba(245,166,35,0.2)"}
                       opacity={0.5 + Math.random() * 0.5}
                     />
                   ))
@@ -302,7 +302,7 @@ const DEVS = [
 ];
 
 const kindColor = {
-  residential: "#00e5a0",
+  residential: "var(--accent)",
   office: "#f5a623",
   mixed: "#4a90e2",
 };
@@ -375,7 +375,7 @@ export function V3_DeveloperGrid({ lang = "en" }) {
         })}
         {/* "+30 more" closer */}
         <div style={{
-          background: "rgba(0,229,160,0.05)",
+          background: "color-mix(in srgb, var(--accent) 5%, transparent)",
           border: `1px dashed ${green}`,
           borderRadius: 8,
           padding: "0.7rem 0.85rem",
@@ -1090,7 +1090,7 @@ export default function HeroLabPage({ setCurrent, lang = "en" }) {
                 <div style={{ display: "inline-flex", gap: "0.5rem", alignItems: "center", marginBottom: "0.4rem" }}>
                   <span style={{
                     fontFamily: mono, fontSize: "0.65rem", color: v.kind === "image" ? green : "#f5a623",
-                    background: v.kind === "image" ? "rgba(0,229,160,0.1)" : "rgba(245,166,35,0.1)",
+                    background: v.kind === "image" ? "color-mix(in srgb, var(--accent) 10%, transparent)" : "rgba(245,166,35,0.1)",
                     padding: "0.2rem 0.55rem", borderRadius: 4, letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700,
                   }}>
                     {v.kind === "image" ? "image" : "creative"}

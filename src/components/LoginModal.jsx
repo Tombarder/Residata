@@ -115,7 +115,7 @@ export default function LoginModal({ open, onClose, lang = "en" }) {
                 </span>
               </div>
             )}
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem", color: "#00e5a0", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "0.75rem" }}>{t.login_label}</div>
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem", color: "var(--accent)", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "0.75rem" }}>{t.login_label}</div>
             <h2 style={{ fontSize: "1.4rem", fontWeight: 700, letterSpacing: "-0.02em", marginBottom: "0.5rem" }}>{t.login_title}</h2>
             <p style={{ fontSize: "0.85rem", color: "var(--text-dim)", lineHeight: 1.6, marginBottom: "1.25rem" }}>
               {t.login_desc}
@@ -138,7 +138,7 @@ export default function LoginModal({ open, onClose, lang = "en" }) {
               </div>
               {error && <div style={{ color: "#ff6b6b", fontSize: "0.8rem", marginBottom: "0.75rem" }}>{error}</div>}
               <button type="submit" disabled={busy || !email || !!emailError} style={{
-                width: "100%", padding: "0.75rem", background: "#00e5a0", color: "var(--bg)",
+                width: "100%", padding: "0.75rem", background: "var(--accent)", color: "var(--bg)",
                 fontWeight: 600, borderRadius: 8, border: "none",
                 cursor: (busy || emailError) ? "not-allowed" : "pointer",
                 fontSize: "0.9rem", opacity: (busy || emailError) ? 0.4 : 1,
@@ -178,7 +178,7 @@ export default function LoginModal({ open, onClose, lang = "en" }) {
               />
               {verifyError && <div style={{ color: "#ff6b6b", fontSize: "0.8rem", marginBottom: "0.6rem", textAlign: "center" }}>{verifyError}</div>}
               <button type="submit" disabled={busyVerify || !code} style={{
-                width: "100%", padding: "0.75rem", background: "#00e5a0", color: "var(--bg)",
+                width: "100%", padding: "0.75rem", background: "var(--accent)", color: "var(--bg)",
                 fontWeight: 600, borderRadius: 8, border: "none",
                 cursor: (busyVerify || !code) ? "not-allowed" : "pointer",
                 fontSize: "0.9rem", opacity: (busyVerify || !code) ? 0.4 : 1,
@@ -186,7 +186,7 @@ export default function LoginModal({ open, onClose, lang = "en" }) {
             </form>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "1rem" }}>
               <button onClick={resend} disabled={busyResend} style={{
-                background: "none", border: "none", color: resent ? "#00e5a0" : "var(--text-dim)",
+                background: "none", border: "none", color: resent ? "var(--accent)" : "var(--text-dim)",
                 fontSize: "0.78rem", cursor: busyResend ? "default" : "pointer", padding: 0,
                 fontFamily: "inherit",
               }}>{resent ? t.login_resent : t.login_resend}</button>

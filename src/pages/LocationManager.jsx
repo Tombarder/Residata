@@ -448,7 +448,7 @@ export default function LocationManager({ lang = "en" }) {
               <button key={p.id} onClick={() => selectProject(p)} style={{
                 display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "0.6rem 0.85rem", textAlign: "left", border: "none",
                 borderLeft: `3px solid ${active ? green : "transparent"}`, borderBottom: `1px solid ${border}`,
-                background: active ? "rgba(0,229,160,0.10)" : "transparent", color: textLight, cursor: "pointer", fontFamily: "inherit" }}>
+                background: active ? "color-mix(in srgb, var(--accent) 10%, transparent)" : "transparent", color: textLight, cursor: "pointer", fontFamily: "inherit" }}>
                 <span style={{ width: 9, height: 9, borderRadius: "50%", flexShrink: 0, background: p.location_verified ? green : amber, boxShadow: p.location_verified ? `0 0 6px ${green}` : "none" }} />
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ display: "block", fontSize: "0.86rem", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
@@ -489,7 +489,7 @@ export default function LocationManager({ lang = "en" }) {
                       {!searching && suggestions.length === 0 && <div style={{ padding: "8px 11px", fontSize: "0.74rem", color: dim }}>{t("No matches — click the map to place it.", "Žiadna zhoda — klikni do mapy.")}</div>}
                       {suggestions.map((s, i) => (
                         <button key={i} onClick={() => pick(s)} style={{ display: "block", textAlign: "left", width: "100%", padding: "8px 11px", background: "transparent", border: "none", borderBottom: i < suggestions.length - 1 ? `1px solid ${border}` : "none", color: textLight, fontSize: "0.78rem", cursor: "pointer", fontFamily: "inherit" }}
-                          onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(0,229,160,0.10)")} onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+                          onMouseEnter={(e) => (e.currentTarget.style.background = "color-mix(in srgb, var(--accent) 10%, transparent)")} onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
                           <span style={{ color: accentInk, marginRight: 7 }}>📍</span>{s.label}{s.cc && s.cc !== "SK" && <span style={{ color: dim, fontFamily: mono, fontSize: "0.64rem", marginLeft: 6 }}>{s.cc}</span>}
                         </button>))}
                     </div>)}
@@ -517,7 +517,7 @@ export default function LocationManager({ lang = "en" }) {
                   <span>⚠ {t(`The pin is in "${cityWarn}", which isn't one of our cities yet.`,
                              `Pin je v "${cityWarn}", čo zatiaľ nie je jedno z našich miest.`)}</span>
                   <button onClick={addCity} disabled={addingCity || !pin}
-                    style={{ padding: "4px 9px", borderRadius: 6, border: `1px solid ${green}`, background: "rgba(0,229,160,0.12)", color: accentInk, fontSize: "0.7rem", cursor: (addingCity || !pin) ? "default" : "pointer", fontFamily: "inherit" }}>
+                    style={{ padding: "4px 9px", borderRadius: 6, border: `1px solid ${green}`, background: "color-mix(in srgb, var(--accent) 12%, transparent)", color: accentInk, fontSize: "0.7rem", cursor: (addingCity || !pin) ? "default" : "pointer", fontFamily: "inherit" }}>
                     {addingCity ? t("Adding…", "Pridávam…") : t(`+ Add "${cityWarn}" as a city`, `+ Pridať "${cityWarn}" ako mesto`)}
                   </button>
                   <span style={{ color: dim, fontSize: "0.64rem" }}>{t("(region auto-set from the nearest city)", "(kraj sa doplní podľa najbližšieho mesta)")}</span>
@@ -533,7 +533,7 @@ export default function LocationManager({ lang = "en" }) {
         </div>
         <div style={{ flex: 1, position: "relative", minHeight: 320 }}>
           <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />
-          {toast && (<div style={{ position: "absolute", top: 14, left: "50%", transform: "translateX(-50%)", zIndex: 5, padding: "8px 16px", borderRadius: 8, fontSize: "0.82rem", fontWeight: 500, background: toast.type === "ok" ? "rgba(0,229,160,0.95)" : "rgba(255,80,80,0.95)", color: toast.type === "ok" ? "#06281d" : "#2a0808", boxShadow: "0 8px 30px rgba(0,0,0,0.5)" }}>{toast.msg}</div>)}
+          {toast && (<div style={{ position: "absolute", top: 14, left: "50%", transform: "translateX(-50%)", zIndex: 5, padding: "8px 16px", borderRadius: 8, fontSize: "0.82rem", fontWeight: 500, background: toast.type === "ok" ? "color-mix(in srgb, var(--accent) 95%, transparent)" : "rgba(255,80,80,0.95)", color: toast.type === "ok" ? "#06281d" : "#2a0808", boxShadow: "0 8px 30px rgba(0,0,0,0.5)" }}>{toast.msg}</div>)}
         </div>
       </div>
 
@@ -543,7 +543,7 @@ export default function LocationManager({ lang = "en" }) {
 }
 
 function Chip({ active, onClick, children }) {
-  return <button onClick={onClick} style={{ padding: "3px 10px", borderRadius: 20, fontSize: "0.72rem", cursor: "pointer", fontFamily: "inherit", border: `1px solid ${active ? green : border}`, background: active ? "rgba(0,229,160,0.14)" : "transparent", color: active ? green : dim }}>{children}</button>;
+  return <button onClick={onClick} style={{ padding: "3px 10px", borderRadius: 20, fontSize: "0.72rem", cursor: "pointer", fontFamily: "inherit", border: `1px solid ${active ? green : border}`, background: active ? "color-mix(in srgb, var(--accent) 14%, transparent)" : "transparent", color: active ? green : dim }}>{children}</button>;
 }
 const inputStyle = { width: "100%", boxSizing: "border-box", padding: "0.5rem 0.7rem", background: bg, border: `1px solid ${border}`, borderRadius: 7, color: textLight, fontSize: "0.84rem", fontFamily: "inherit", outline: "none" };
 const emptyStyle = { padding: "1.5rem 1.1rem", color: dim, fontSize: "0.8rem", fontFamily: mono };

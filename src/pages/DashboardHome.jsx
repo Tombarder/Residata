@@ -324,7 +324,7 @@ function Sparkline({ series, color = green, width = 120, height = 34 }) {
 const filterChip = (active) => ({
   display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 999,
   fontSize: "0.74rem", cursor: "pointer", fontFamily: "inherit",
-  border: `1px solid ${active ? green : border}`, background: active ? `${green}14` : bg2, color: active ? green : textLight,
+  border: `1px solid ${active ? green : border}`, background: active ? `color-mix(in srgb, var(--accent) 8%, transparent)` : bg2, color: active ? green : textLight,
 });
 function Field({ label, children }) {
   return (
@@ -521,7 +521,7 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
             ⚙ {L(lang, "Filtre", "Filters")}{activeConds.length ? ` · ${activeConds.length}` : ""}
           </button>
           {activeConds.map(c => (
-            <span key={c.id} style={{ display: "inline-flex", alignItems: "center", gap: 5, background: `${green}14`, color: accentInk, border: `1px solid ${green}40`, borderRadius: 999, padding: "4px 9px", fontSize: "0.7rem", maxWidth: 260 }}>
+            <span key={c.id} style={{ display: "inline-flex", alignItems: "center", gap: 5, background: `color-mix(in srgb, var(--accent) 8%, transparent)`, color: accentInk, border: `1px solid color-mix(in srgb, var(--accent) 25%, transparent)`, borderRadius: 999, padding: "4px 9px", fontSize: "0.7rem", maxWidth: 260 }}>
               <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{describe(c, lang === "sk")}</span>
               <span onClick={() => setConditions(cs => cs.filter(x => x.id !== c.id))} style={{ cursor: "pointer", flexShrink: 0 }}>×</span>
             </span>
@@ -692,8 +692,8 @@ function EmptyState({ lang, onAdd }) {
 // ─── trial banners ─────────────────────────────────────────────
 function TrialOfferBanner({ lang, onActivate, busy, msg }) {
   return (
-    <div style={{ background: "linear-gradient(90deg, rgba(0,229,160,0.14) 0%, rgba(0,229,160,0.04) 70%, transparent 100%)", border: `1px solid ${green}`, borderRadius: 12, padding: "0.95rem 1.2rem", marginBottom: "1.4rem", display: "flex", alignItems: "center", gap: "0.95rem", flexWrap: "wrap" }}>
-      <div style={{ flexShrink: 0, width: 34, height: 34, borderRadius: 8, background: "rgba(0,229,160,0.18)", color: accentInk, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.05rem" }}>🎁</div>
+    <div style={{ background: "linear-gradient(90deg, color-mix(in srgb, var(--accent) 14%, transparent) 0%, color-mix(in srgb, var(--accent) 4%, transparent) 70%, transparent 100%)", border: `1px solid ${green}`, borderRadius: 12, padding: "0.95rem 1.2rem", marginBottom: "1.4rem", display: "flex", alignItems: "center", gap: "0.95rem", flexWrap: "wrap" }}>
+      <div style={{ flexShrink: 0, width: 34, height: 34, borderRadius: 8, background: "color-mix(in srgb, var(--accent) 18%, transparent)", color: accentInk, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.05rem" }}>🎁</div>
       <div style={{ flex: 1, minWidth: 200 }}>
         <div style={{ color: textLight, fontWeight: 700, fontSize: "0.95rem" }}>{L(lang, "7 dní plného Residata — zadarmo", "7 days of the full Residata — on us")}</div>
         <div style={{ color: dim, fontSize: "0.8rem", marginTop: "0.15rem", lineHeight: 1.45 }}>{L(lang, "Všetky projekty, analytika, reporty, exporty. Bez karty. Jedným klikom.", "Every project, analytics, reports, exports. No card required. One-click.")}</div>
@@ -708,7 +708,7 @@ function TrialOfferBanner({ lang, onActivate, busy, msg }) {
 function TrialRunningBanner({ lang, daysLeft, onOpenBilling }) {
   const ending = daysLeft <= 2; const accent = ending ? orange : green;
   return (
-    <div style={{ background: ending ? "rgba(245,166,35,0.12)" : "rgba(0,229,160,0.12)", border: `1px solid ${accent}60`, borderRadius: 12, padding: "0.8rem 1.1rem", marginBottom: "1.4rem", display: "flex", alignItems: "center", gap: "0.8rem", flexWrap: "wrap", fontSize: "0.85rem" }}>
+    <div style={{ background: ending ? "rgba(245,166,35,0.12)" : "color-mix(in srgb, var(--accent) 12%, transparent)", border: `1px solid color-mix(in srgb, var(--accent) 38%, transparent)`, borderRadius: 12, padding: "0.8rem 1.1rem", marginBottom: "1.4rem", display: "flex", alignItems: "center", gap: "0.8rem", flexWrap: "wrap", fontSize: "0.85rem" }}>
       <span style={{ fontSize: "1.05rem" }}>🎁</span>
       <span style={{ color: textLight, fontWeight: 600 }}>
         {lang === "sk" ? <>Paid trial aktívny — <span style={{ color: accent }}>{daysLeft <= 0 ? "posledný deň" : `${daysLeft} dní zostáva`}</span></> : <>Paid trial active — <span style={{ color: accent }}>{daysLeft <= 0 ? "last day" : `${daysLeft} day${daysLeft === 1 ? "" : "s"} left`}</span></>}

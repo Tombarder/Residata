@@ -43,16 +43,16 @@ export default function PendingGate({ setCurrent, lang = "en" }) {
       <div style={{
         display: "inline-flex", alignItems: "center", gap: "0.5rem",
         padding: "0.35rem 0.85rem",
-        background: "rgba(0,229,160,0.08)",
-        border: "1px solid rgba(0,229,160,0.25)",
+        background: "color-mix(in srgb, var(--accent) 8%, transparent)",
+        border: "1px solid color-mix(in srgb, var(--accent) 25%, transparent)",
         borderRadius: 999,
         fontFamily: "'JetBrains Mono', monospace",
-        fontSize: "0.7rem", color: "#00e5a0", fontWeight: 600,
+        fontSize: "0.7rem", color: "var(--accent)", fontWeight: 600,
         letterSpacing: "0.05em", textTransform: "uppercase",
         marginBottom: "1.5rem",
       }}>
         <span style={{
-          width: 6, height: 6, borderRadius: "50%", background: "#00e5a0",
+          width: 6, height: 6, borderRadius: "50%", background: "var(--accent)",
           animation: "pg-pulse 1.4s ease-in-out infinite",
         }} />
         {lang === "sk" ? "Sledujeme schválenie · live" : "Watching for approval · live"}

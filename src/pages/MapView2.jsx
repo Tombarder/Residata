@@ -37,7 +37,7 @@ import Picker from "../components/Picker";
 import { applyFilters, describe, isComplete } from "../lib/mapFilters";
 
 const mono = "'JetBrains Mono', monospace";
-import { accent as green, orange as amber, dim, text as textLight, border, surfaceDark as bg2 } from "../lib/theme";
+import { accentPaint as green, orange as amber, dim, text as textLight, border, surfaceDark as bg2 } from "../lib/theme";
 import { getTheme, useThemeMode } from "../lib/theme-mode";
 const greyPt = "#6b6b76";
 const panel = "var(--surface)";

@@ -19,7 +19,7 @@ const PANEL_SAMPLE = {
   SK: { avg: "5,525", mom: "+2.1%", rows: [["Downtown Yards", "Staré Mesto", "8,638"], ["Byty Ružinov", "Ružinov", "5,409"]] },
   CZ: { avg: "7,443", mom: "+1.5%", rows: [["Ethos Karlín", "Karlín", "9,960"], ["TOIVO Roztyly", "Chodov", "6,928"]] },
 };
-const green = "#00e5a0";
+const green = "var(--accent)";
 const dim = "var(--text-dim)";
 const border = "var(--border)";
 const bg = "var(--surface)";
@@ -90,7 +90,7 @@ function IsoBuildingsCluster() {
             )}
             {/* Rooftop antenna for tallest */}
             {h > 140 && (
-              <line x1={x + w / 2} y1={y - depth * 0.5} x2={x + w / 2} y2={y - depth * 0.5 - 10} stroke="#00e5a0" strokeWidth="0.6" opacity="0.7" />
+              <line x1={x + w / 2} y1={y - depth * 0.5} x2={x + w / 2} y2={y - depth * 0.5 - 10} stroke="var(--accent)" strokeWidth="0.6" opacity="0.7" />
             )}
           </g>
         );
@@ -110,13 +110,13 @@ function CenterHub({ subtitle }) {
 
       {/* Outer rotating ring — dashed */}
       <g>
-        <circle cx="0" cy="0" r="100" fill="none" stroke="#00e5a0" strokeOpacity="0.35" strokeWidth="1" strokeDasharray="3 6" />
+        <circle cx="0" cy="0" r="100" fill="none" stroke="var(--accent)" strokeOpacity="0.35" strokeWidth="1" strokeDasharray="3 6" />
         <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="22s" repeatCount="indefinite" />
       </g>
 
       {/* Inner counter-rotating ring */}
       <g>
-        <circle cx="0" cy="0" r="80" fill="none" stroke="#00e5a0" strokeOpacity="0.5" strokeWidth="1.2" strokeDasharray="14 4" />
+        <circle cx="0" cy="0" r="80" fill="none" stroke="var(--accent)" strokeOpacity="0.5" strokeWidth="1.2" strokeDasharray="14 4" />
         <animateTransform attributeName="transform" type="rotate" from="360" to="0" dur="14s" repeatCount="indefinite" />
       </g>
 
@@ -125,7 +125,7 @@ function CenterHub({ subtitle }) {
         <polygon
           points="0,-56 48,-28 48,28 0,56 -48,28 -48,-28"
           fill="var(--surface-2)"
-          stroke="#00e5a0"
+          stroke="var(--accent)"
           strokeWidth="1.8"
         >
           <animate attributeName="stroke-opacity" values="0.5;1;0.5" dur="2.6s" repeatCount="indefinite" />
@@ -137,7 +137,7 @@ function CenterHub({ subtitle }) {
           opacity="0.85"
         />
         {/* Icon: three horizontal bars (schema bars) */}
-        <g fill="#00e5a0">
+        <g fill="var(--accent)">
           <rect x="-20" y="-12" width="40" height="3.2" rx="1.2" />
           <rect x="-20" y="-2"  width="28" height="3.2" rx="1.2" opacity="0.7" />
           <rect x="-20" y="8"   width="34" height="3.2" rx="1.2" opacity="0.85" />
@@ -147,15 +147,15 @@ function CenterHub({ subtitle }) {
       {/* Surrounding micro-dots orbiting */}
       {[0, 72, 144, 216, 288].map((deg, i) => (
         <g key={i} transform={`rotate(${deg})`}>
-          <circle cx="90" cy="0" r="2.5" fill="#00e5a0">
+          <circle cx="90" cy="0" r="2.5" fill="var(--accent)">
             <animate attributeName="opacity" values="0.3;1;0.3" dur="2.4s" begin={`${i * 0.2}s`} repeatCount="indefinite" />
           </circle>
         </g>
       ))}
 
       {/* Subtitle tag underneath */}
-      <rect x="-92" y="78" width="184" height="24" rx="12" fill="var(--surface-2)" stroke="#00e5a0" strokeOpacity="0.4" strokeWidth="0.8" />
-      <text x="0" y="94" textAnchor="middle" fill="#00e5a0" fontFamily={mono} fontSize="11" fontWeight="700" letterSpacing="0.06em">
+      <rect x="-92" y="78" width="184" height="24" rx="12" fill="var(--surface-2)" stroke="var(--accent)" strokeOpacity="0.4" strokeWidth="0.8" />
+      <text x="0" y="94" textAnchor="middle" fill="var(--accent)" fontFamily={mono} fontSize="11" fontWeight="700" letterSpacing="0.06em">
         {subtitle}
       </text>
     </g>
@@ -167,8 +167,8 @@ function DashboardPanel({ captionRow1, captionRow2, chipLabels, sample }) {
   return (
     <g>
       {/* Panel frame with glow */}
-      <rect x="0" y="0" width="310" height="260" rx="14" fill="var(--surface-2)" stroke="#00e5a0" strokeOpacity="0.45" strokeWidth="1.3" />
-      <rect x="0" y="0" width="310" height="260" rx="14" fill="none" stroke="#00e5a0" strokeOpacity="0.12" strokeWidth="4" />
+      <rect x="0" y="0" width="310" height="260" rx="14" fill="var(--surface-2)" stroke="var(--accent)" strokeOpacity="0.45" strokeWidth="1.3" />
+      <rect x="0" y="0" width="310" height="260" rx="14" fill="none" stroke="var(--accent)" strokeOpacity="0.12" strokeWidth="4" />
 
       {/* Header bar */}
       <rect x="0" y="0" width="310" height="32" rx="14" fill="var(--surface)" />
@@ -184,7 +184,7 @@ function DashboardPanel({ captionRow1, captionRow2, chipLabels, sample }) {
       <g transform="translate(16, 46)">
         <rect x="0" y="0" width="278" height="100" rx="8" fill="var(--bg)" stroke="var(--surface-3)" strokeWidth="0.6" />
         <text x="10" y="16" fill="var(--text-dim)" fontFamily={mono} fontSize="8" letterSpacing="0.06em">AVG €/M² · 6 MONTHS</text>
-        <text x="268" y="16" textAnchor="end" fill="#00e5a0" fontFamily={mono} fontSize="8" fontWeight="700">{sample.mom} MoM</text>
+        <text x="268" y="16" textAnchor="end" fill="var(--accent)" fontFamily={mono} fontSize="8" fontWeight="700">{sample.mom} MoM</text>
 
         {/* Area under curve */}
         <path
@@ -194,22 +194,22 @@ function DashboardPanel({ captionRow1, captionRow2, chipLabels, sample }) {
         {/* Line */}
         <path
           d="M 12 80 L 52 62 L 92 68 L 132 44 L 172 50 L 212 28 L 262 40"
-          fill="none" stroke="#00e5a0" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
+          fill="none" stroke="var(--accent)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
         />
         {/* Line draw-in animation */}
         <path
           d="M 12 80 L 52 62 L 92 68 L 132 44 L 172 50 L 212 28 L 262 40"
-          fill="none" stroke="#00e5a0" strokeWidth="2.5" strokeLinecap="round"
+          fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round"
           strokeDasharray="400" strokeDashoffset="400"
         >
           <animate attributeName="stroke-dashoffset" from="400" to="0" dur="1.6s" fill="freeze" />
         </path>
         {/* Dots */}
         {[[12,80],[52,62],[92,68],[132,44],[172,50],[212,28],[262,40]].map(([x, y], i) => (
-          <circle key={i} cx={x} cy={y} r="2.2" fill="var(--bg)" stroke="#00e5a0" strokeWidth="1.3" />
+          <circle key={i} cx={x} cy={y} r="2.2" fill="var(--bg)" stroke="var(--accent)" strokeWidth="1.3" />
         ))}
         {/* Current-period marker (rightmost) */}
-        <circle cx="262" cy="40" r="4" fill="#00e5a0">
+        <circle cx="262" cy="40" r="4" fill="var(--accent)">
           <animate attributeName="opacity" values="1;0.3;1" dur="1.4s" repeatCount="indefinite" />
         </circle>
       </g>
@@ -221,12 +221,12 @@ function DashboardPanel({ captionRow1, captionRow2, chipLabels, sample }) {
         {/* Real active projects + avg €/m² from DB, per viewed market. */}
         <text x="10" y="18" fill="var(--text)" fontFamily="'Outfit', sans-serif" fontSize="10" fontWeight="600">{sample.rows[0][0]}</text>
         <text x="150" y="18" fill="var(--text-dim)" fontFamily={mono} fontSize="9">{sample.rows[0][1]}</text>
-        <text x="225" y="18" fill="#00e5a0" fontFamily={mono} fontSize="9" fontWeight="700">{sample.rows[0][2]} €/m²</text>
+        <text x="225" y="18" fill="var(--accent)" fontFamily={mono} fontSize="9" fontWeight="700">{sample.rows[0][2]} €/m²</text>
         {/* Row 2 */}
         <line x1="8" y1="26" x2="270" y2="26" stroke="var(--surface-3)" strokeWidth="0.5" />
         <text x="10" y="42" fill="var(--text)" fontFamily="'Outfit', sans-serif" fontSize="10" fontWeight="600">{sample.rows[1][0]}</text>
         <text x="150" y="42" fill="var(--text-dim)" fontFamily={mono} fontSize="9">{sample.rows[1][1]}</text>
-        <text x="225" y="42" fill="#00e5a0" fontFamily={mono} fontSize="9" fontWeight="700">{sample.rows[1][2]} €/m²</text>
+        <text x="225" y="42" fill="var(--accent)" fontFamily={mono} fontSize="9" fontWeight="700">{sample.rows[1][2]} €/m²</text>
       </g>
 
       {/* Export chips */}
@@ -237,9 +237,9 @@ function DashboardPanel({ captionRow1, captionRow2, chipLabels, sample }) {
           return (
             <g key={label}>
               <rect x={xs[i]} y="0" width={widths[i]} height="24" rx="5"
-                fill="var(--bg)" stroke="#00e5a0" strokeOpacity="0.55" strokeWidth="0.9" />
+                fill="var(--bg)" stroke="var(--accent)" strokeOpacity="0.55" strokeWidth="0.9" />
               <text x={xs[i] + widths[i] / 2} y="16" textAnchor="middle"
-                fill="#00e5a0" fontFamily={mono} fontSize="9" fontWeight="700" letterSpacing="0.08em">
+                fill="var(--accent)" fontFamily={mono} fontSize="9" fontWeight="700" letterSpacing="0.08em">
                 {label}
               </text>
             </g>
@@ -263,7 +263,7 @@ function FlowStream({ x1, y, x2, count = 5, delayOffset = 0, duration = 3.2 }) {
 
       {/* Animated dots */}
       {Array.from({ length: count }).map((_, i) => (
-        <circle key={i} r="3.2" fill="#00e5a0" filter="url(#dot-glow)">
+        <circle key={i} r="3.2" fill="var(--accent)" filter="url(#dot-glow)">
           <animateMotion
             dur={`${duration}s`}
             begin={`${delayOffset + (i * duration) / count}s`}
@@ -394,13 +394,13 @@ export function PipelineFlow({ lang = "en" }) {
             {/* Lit window gradient */}
             <linearGradient id="iso-lit" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="#f5a623" stopOpacity="0.9" />
-              <stop offset="100%" stopColor="#00e5a0" stopOpacity="0.7" />
+              <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.7" />
             </linearGradient>
             {/* Hub halo */}
             <radialGradient id="hub-halo">
-              <stop offset="0%" stopColor="#00e5a0" stopOpacity="0.35" />
-              <stop offset="60%" stopColor="#00e5a0" stopOpacity="0.08" />
-              <stop offset="100%" stopColor="#00e5a0" stopOpacity="0" />
+              <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.35" />
+              <stop offset="60%" stopColor="var(--accent)" stopOpacity="0.08" />
+              <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
             </radialGradient>
             {/* Hub core fill */}
             <linearGradient id="hub-core" x1="0" y1="0" x2="0" y2="1">
@@ -409,14 +409,14 @@ export function PipelineFlow({ lang = "en" }) {
             </linearGradient>
             {/* Flow line gradient */}
             <linearGradient id="flow-gradient" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor="#00e5a0" stopOpacity="0" />
-              <stop offset="50%" stopColor="#00e5a0" stopOpacity="0.7" />
-              <stop offset="100%" stopColor="#00e5a0" stopOpacity="0" />
+              <stop offset="0%" stopColor="var(--accent)" stopOpacity="0" />
+              <stop offset="50%" stopColor="var(--accent)" stopOpacity="0.7" />
+              <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
             </linearGradient>
             {/* Dashboard chart area */}
             <linearGradient id="chart-area" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#00e5a0" stopOpacity="0.25" />
-              <stop offset="100%" stopColor="#00e5a0" stopOpacity="0" />
+              <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.25" />
+              <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
             </linearGradient>
             {/* Glow filter for flow dots */}
             <filter id="dot-glow" x="-100%" y="-100%" width="300%" height="300%">
@@ -444,11 +444,11 @@ export function PipelineFlow({ lang = "en" }) {
 
             {/* Zone 1 label — text top-left */}
             <g transform="translate(-10, -70)">
-              <text x="0" y="0" fill="#00e5a0" fontFamily={mono} fontSize="11" letterSpacing="0.14em" fontWeight="700">01 · COLLECT</text>
+              <text x="0" y="0" fill="var(--accent)" fontFamily={mono} fontSize="11" letterSpacing="0.14em" fontWeight="700">01 · COLLECT</text>
               <text x="0" y="22" fill="#fff" fontFamily="'Outfit', sans-serif" fontSize="20" fontWeight="700" letterSpacing="-0.01em">
                 {T.z1Line1}
               </text>
-              <text x="0" y="42" fill="#00e5a0" fontFamily={mono} fontSize="11.5" fontWeight="600" letterSpacing="0.02em">
+              <text x="0" y="42" fill="var(--accent)" fontFamily={mono} fontSize="11.5" fontWeight="600" letterSpacing="0.02em">
                 {T.z1Live}
               </text>
               <text x="0" y="58" fill={dim} fontFamily="'Outfit', sans-serif" fontSize="11">
@@ -466,7 +466,7 @@ export function PipelineFlow({ lang = "en" }) {
 
             {/* Zone 2 label — above hub */}
             <g transform="translate(0, -190)">
-              <text x="0" y="0" textAnchor="middle" fill="#00e5a0" fontFamily={mono} fontSize="11" letterSpacing="0.14em" fontWeight="700">02 · PROCESS</text>
+              <text x="0" y="0" textAnchor="middle" fill="var(--accent)" fontFamily={mono} fontSize="11" letterSpacing="0.14em" fontWeight="700">02 · PROCESS</text>
               <text x="0" y="22" textAnchor="middle" fill="#fff" fontFamily="'Outfit', sans-serif" fontSize="20" fontWeight="700" letterSpacing="-0.01em">
                 {T.z2Line1}
               </text>
@@ -487,7 +487,7 @@ export function PipelineFlow({ lang = "en" }) {
 
             {/* Zone 3 label — above panel */}
             <g transform="translate(0, -70)">
-              <text x="0" y="0" fill="#00e5a0" fontFamily={mono} fontSize="11" letterSpacing="0.14em" fontWeight="700">03 · DELIVER</text>
+              <text x="0" y="0" fill="var(--accent)" fontFamily={mono} fontSize="11" letterSpacing="0.14em" fontWeight="700">03 · DELIVER</text>
               <text x="0" y="22" fill="#fff" fontFamily="'Outfit', sans-serif" fontSize="20" fontWeight="700" letterSpacing="-0.01em">
                 {T.z3Line1}
               </text>
@@ -624,8 +624,8 @@ export function MarketPulse({ lang = "en", setCurrent }) {
       <div style={{ textAlign: "center", marginBottom: "2.5rem" }}>
         <div style={{
           display: "inline-flex", alignItems: "center", gap: "0.5rem",
-          padding: "0.3rem 0.85rem", background: "rgba(0,229,160,0.08)",
-          border: "1px solid rgba(0,229,160,0.25)", borderRadius: 999,
+          padding: "0.3rem 0.85rem", background: "color-mix(in srgb, var(--accent) 8%, transparent)",
+          border: "1px solid color-mix(in srgb, var(--accent) 25%, transparent)", borderRadius: 999,
           fontFamily: mono, fontSize: "0.65rem", color: green, fontWeight: 600,
           textTransform: "uppercase", letterSpacing: "0.1em",
         }}>
@@ -1007,7 +1007,7 @@ function GeoBarRow({ row, index, max, animate, lang, onClick }) {
 function colorForPrice(avg) {
   if (avg >= 7000) return "#ff6b6b"; // premium
   if (avg >= 5500) return "#f5a623"; // upper
-  if (avg >= 4200) return "#00e5a0"; // mid
+  if (avg >= 4200) return "var(--accent)"; // mid
   return "#4a90e2"; // affordable
 }
 
