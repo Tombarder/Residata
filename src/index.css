@@ -90,12 +90,13 @@
      the white cards, so cards pop with real depth. Neutral-first palette; the brand
      green is a restrained ACCENT (active nav, positive numbers, primary actions, one
      chart series), never the whole UI. Data/graphs/structure unchanged — skin only. */
-  --bg:            #dfe4ec;   /* deeper cool-slate workspace — cards pop hard, not washed */
+  --bg:            #ccd4e0;   /* medium blue-slate workspace — strong contrast so white
+                                 cards POP with real depth (was too pale/washed) */
   --surface:       #ffffff;   /* white cards (lifted by the light-mode shadow below) */
-  --surface-2:     #eaeef4;   /* inset / card-header / row-stripe — clearly present */
-  --surface-3:     #dde3ec;   /* input / raised / hover */
-  --border:        #cbd3df;   /* strong, defined card / table edge (less faded) */
-  --border-soft:   #dde3ec;   /* dividers inside cards — visible */
+  --surface-2:     #dfe5ef;   /* inset / card-header / row-stripe — toned, reads designed */
+  --surface-3:     #d3dae7;   /* input / raised / hover */
+  --border:        #bfc9d8;   /* strong, defined card / table edge */
+  --border-soft:   #d6dce8;   /* dividers inside cards — visible */
   --accent:        #0c8f5d;   /* brand green in LIGHT = deep readable emerald (the neon
                                  mint reads washed on white; map paint keeps literal mint) */
   --accent-strong: #0a7a4e;   /* deeper emerald — bar/fill gradients on white */
