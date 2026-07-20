@@ -129,7 +129,7 @@ export function PrivacyPage({ lang }) {
         )}
         <p>
           {isSK ? "Kontakt vo veciach ochrany osobných údajov:" : "Privacy contact:"} {" "}
-          <a href="mailto:tkamhal@gmail.com" style={{ color: "#00e5a0" }}>
+          <a href="mailto:tkamhal@gmail.com" style={{ color: "var(--accent)" }}>
             tkamhal@gmail.com
           </a>
         </p>
@@ -190,10 +190,10 @@ export function PrivacyPage({ lang }) {
           <>
             <p>Aby sme mohli službu prevádzkovať, využívame nasledovné sprostredkovateľov:</p>
             <ul>
-              <li><strong>Supabase Inc.</strong> — databázové hostovanie a autentifikácia. Údaje sú uložené v regióne Európskej únie (Frankfurt, Nemecko). <a href="https://supabase.com/privacy" style={{ color: "#00e5a0" }} target="_blank" rel="noopener noreferrer">Zásady spoločnosti Supabase</a>.</li>
-              <li><strong>Vercel Inc.</strong> — hosting webovej aplikácie. Globálna CDN sieť s primárnym regiónom v EÚ. <a href="https://vercel.com/legal/privacy-policy" style={{ color: "#00e5a0" }} target="_blank" rel="noopener noreferrer">Zásady spoločnosti Vercel</a>.</li>
-              <li><strong>Anthropic PBC</strong> — náš AI asistent posiela vaše otázky modelu Claude na spracovanie. Spracovanie prebieha v USA. Otázky sa nepoužívajú na trénovanie modelu. <a href="https://www.anthropic.com/legal/privacy" style={{ color: "#00e5a0" }} target="_blank" rel="noopener noreferrer">Zásady spoločnosti Anthropic</a>.</li>
-              <li><strong>Google LLC</strong> — Gmail SMTP službu používame na zasielanie prihlasovacích odkazov a systémových e-mailov. <a href="https://policies.google.com/privacy" style={{ color: "#00e5a0" }} target="_blank" rel="noopener noreferrer">Zásady spoločnosti Google</a>.</li>
+              <li><strong>Supabase Inc.</strong> — databázové hostovanie a autentifikácia. Údaje sú uložené v regióne Európskej únie (Frankfurt, Nemecko). <a href="https://supabase.com/privacy" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">Zásady spoločnosti Supabase</a>.</li>
+              <li><strong>Vercel Inc.</strong> — hosting webovej aplikácie. Globálna CDN sieť s primárnym regiónom v EÚ. <a href="https://vercel.com/legal/privacy-policy" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">Zásady spoločnosti Vercel</a>.</li>
+              <li><strong>Anthropic PBC</strong> — náš AI asistent posiela vaše otázky modelu Claude na spracovanie. Spracovanie prebieha v USA. Otázky sa nepoužívajú na trénovanie modelu. <a href="https://www.anthropic.com/legal/privacy" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">Zásady spoločnosti Anthropic</a>.</li>
+              <li><strong>Google LLC</strong> — Gmail SMTP službu používame na zasielanie prihlasovacích odkazov a systémových e-mailov. <a href="https://policies.google.com/privacy" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">Zásady spoločnosti Google</a>.</li>
             </ul>
             <p>
               Vaše osobné údaje nepredávame ani neposkytujeme tretím stranám
@@ -206,10 +206,10 @@ export function PrivacyPage({ lang }) {
           <>
             <p>To operate the service we rely on the following processors:</p>
             <ul>
-              <li><strong>Supabase Inc.</strong> — database hosting and authentication. Data is stored in an EU region (Frankfurt, Germany). <a href="https://supabase.com/privacy" style={{ color: "#00e5a0" }} target="_blank" rel="noopener noreferrer">Supabase Privacy Policy</a>.</li>
-              <li><strong>Vercel Inc.</strong> — web application hosting. Global CDN with primary EU region. <a href="https://vercel.com/legal/privacy-policy" style={{ color: "#00e5a0" }} target="_blank" rel="noopener noreferrer">Vercel Privacy Policy</a>.</li>
-              <li><strong>Anthropic PBC</strong> — our AI assistant sends your queries to the Claude model for processing. Processing happens in the United States. Queries are not used to train the model. <a href="https://www.anthropic.com/legal/privacy" style={{ color: "#00e5a0" }} target="_blank" rel="noopener noreferrer">Anthropic Privacy Policy</a>.</li>
-              <li><strong>Google LLC</strong> — Gmail SMTP is used to send login links and system emails. <a href="https://policies.google.com/privacy" style={{ color: "#00e5a0" }} target="_blank" rel="noopener noreferrer">Google Privacy Policy</a>.</li>
+              <li><strong>Supabase Inc.</strong> — database hosting and authentication. Data is stored in an EU region (Frankfurt, Germany). <a href="https://supabase.com/privacy" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">Supabase Privacy Policy</a>.</li>
+              <li><strong>Vercel Inc.</strong> — web application hosting. Global CDN with primary EU region. <a href="https://vercel.com/legal/privacy-policy" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">Vercel Privacy Policy</a>.</li>
+              <li><strong>Anthropic PBC</strong> — our AI assistant sends your queries to the Claude model for processing. Processing happens in the United States. Queries are not used to train the model. <a href="https://www.anthropic.com/legal/privacy" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">Anthropic Privacy Policy</a>.</li>
+              <li><strong>Google LLC</strong> — Gmail SMTP is used to send login links and system emails. <a href="https://policies.google.com/privacy" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">Google Privacy Policy</a>.</li>
             </ul>
             <p>
               We do not sell or share your personal data with third parties
@@ -250,11 +250,11 @@ export function PrivacyPage({ lang }) {
               <li>získať vaše údaje v štruktúrovanom strojovo čitateľnom formáte (<strong>prenosnosť</strong>),</li>
               <li><strong>namietať</strong> proti spracúvaniu na základe oprávneného záujmu,</li>
               <li>kedykoľvek <strong>odvolať súhlas</strong>, ktorý ste predtým udelili,</li>
-              <li>podať <strong>sťažnosť</strong> u dozorného orgánu — Úrad na ochranu osobných údajov SR, Hraničná 12, 820 07 Bratislava, <a href="https://dataprotection.gov.sk" style={{ color: "#00e5a0" }} target="_blank" rel="noopener noreferrer">dataprotection.gov.sk</a>.</li>
+              <li>podať <strong>sťažnosť</strong> u dozorného orgánu — Úrad na ochranu osobných údajov SR, Hraničná 12, 820 07 Bratislava, <a href="https://dataprotection.gov.sk" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">dataprotection.gov.sk</a>.</li>
             </ul>
             <p>
               Pre uplatnenie ktoréhokoľvek z týchto práv nám napíšte na
-              {" "}<a href="mailto:tkamhal@gmail.com" style={{ color: "#00e5a0" }}>tkamhal@gmail.com</a>.
+              {" "}<a href="mailto:tkamhal@gmail.com" style={{ color: "var(--accent)" }}>tkamhal@gmail.com</a>.
               Odpovieme do 30 dní.
             </p>
           </>
@@ -269,11 +269,11 @@ export function PrivacyPage({ lang }) {
               <li>receive your data in a structured machine-readable format (<strong>portability</strong>),</li>
               <li><strong>object</strong> to processing based on legitimate interest,</li>
               <li><strong>withdraw consent</strong> at any time,</li>
-              <li>lodge a <strong>complaint</strong> with the supervisory authority — Office for Personal Data Protection of the Slovak Republic, Hraničná 12, 820 07 Bratislava, <a href="https://dataprotection.gov.sk" style={{ color: "#00e5a0" }} target="_blank" rel="noopener noreferrer">dataprotection.gov.sk</a>.</li>
+              <li>lodge a <strong>complaint</strong> with the supervisory authority — Office for Personal Data Protection of the Slovak Republic, Hraničná 12, 820 07 Bratislava, <a href="https://dataprotection.gov.sk" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">dataprotection.gov.sk</a>.</li>
             </ul>
             <p>
               To exercise any of these rights, write to
-              {" "}<a href="mailto:tkamhal@gmail.com" style={{ color: "#00e5a0" }}>tkamhal@gmail.com</a>.
+              {" "}<a href="mailto:tkamhal@gmail.com" style={{ color: "var(--accent)" }}>tkamhal@gmail.com</a>.
               We will respond within 30 days.
             </p>
           </>
@@ -406,8 +406,8 @@ export function TermsPage({ lang }) {
 
       <Section title={isSK ? "9. Ochrana osobných údajov" : "9. Data protection"}>
         <p>{isSK
-          ? <>Spracúvanie osobných údajov upravujú samostatné <a href="/privacy" style={{ color: "#00e5a0" }}>Zásady ochrany osobných údajov</a>, ktoré sú súčasťou týchto podmienok.</>
-          : <>The processing of personal data is governed by our separate <a href="/privacy" style={{ color: "#00e5a0" }}>Privacy Policy</a>, which forms part of these Terms.</>}</p>
+          ? <>Spracúvanie osobných údajov upravujú samostatné <a href="/privacy" style={{ color: "var(--accent)" }}>Zásady ochrany osobných údajov</a>, ktoré sú súčasťou týchto podmienok.</>
+          : <>The processing of personal data is governed by our separate <a href="/privacy" style={{ color: "var(--accent)" }}>Privacy Policy</a>, which forms part of these Terms.</>}</p>
       </Section>
 
       <Section title={isSK ? "10. Vylúčenie záruk a obmedzenie zodpovednosti" : "10. Warranty disclaimer and limitation of liability"}>
@@ -439,7 +439,7 @@ export function TermsPage({ lang }) {
 
       <Section title={isSK ? "14. Kontakt" : "14. Contact"}>
         <p>{isSK ? "Otázky k týmto podmienkam:" : "Questions about these Terms:"}{" "}
-          <a href="mailto:tkamhal@gmail.com" style={{ color: "#00e5a0" }}>tkamhal@gmail.com</a></p>
+          <a href="mailto:tkamhal@gmail.com" style={{ color: "var(--accent)" }}>tkamhal@gmail.com</a></p>
       </Section>
     </LegalPageShell>
   );
@@ -472,11 +472,11 @@ export function ImprintPage({ lang }) {
       <Section title={isSK ? "Kontakt" : "Contact"}>
         <p>
           {isSK ? "E-mail (všeobecný kontakt):" : "Email (general):"} {" "}
-          <a href="mailto:residata@proton.me" style={{ color: "#00e5a0" }}>residata@proton.me</a><br />
+          <a href="mailto:residata@proton.me" style={{ color: "var(--accent)" }}>residata@proton.me</a><br />
           {isSK ? "E-mail (ochrana osobných údajov):" : "Email (privacy matters):"} {" "}
-          <a href="mailto:tkamhal@gmail.com" style={{ color: "#00e5a0" }}>tkamhal@gmail.com</a><br />
+          <a href="mailto:tkamhal@gmail.com" style={{ color: "var(--accent)" }}>tkamhal@gmail.com</a><br />
           {isSK ? "Telefón:" : "Phone:"} {" "}
-          <a href="tel:+421911963909" style={{ color: "#00e5a0" }}>+421 911 963 909</a>
+          <a href="tel:+421911963909" style={{ color: "var(--accent)" }}>+421 911 963 909</a>
         </p>
       </Section>
 
@@ -506,14 +506,14 @@ export function ImprintPage({ lang }) {
             Vo veciach ochrany osobných údajov je dozorným orgánom Úrad na
             ochranu osobných údajov Slovenskej republiky, Hraničná 12, 820 07
             Bratislava 27, {" "}
-            <a href="https://dataprotection.gov.sk" style={{ color: "#00e5a0" }} target="_blank" rel="noopener noreferrer">dataprotection.gov.sk</a>.
+            <a href="https://dataprotection.gov.sk" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">dataprotection.gov.sk</a>.
           </p>
         ) : (
           <p>
             The supervisory authority for personal data matters is the Office
             for Personal Data Protection of the Slovak Republic, Hraničná 12,
             820 07 Bratislava 27, {" "}
-            <a href="https://dataprotection.gov.sk" style={{ color: "#00e5a0" }} target="_blank" rel="noopener noreferrer">dataprotection.gov.sk</a>.
+            <a href="https://dataprotection.gov.sk" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">dataprotection.gov.sk</a>.
           </p>
         )}
       </Section>

@@ -48,7 +48,7 @@ const STATUSES = [
   { v: "sold_out", sk: "Vypredaný", en: "Sold out" },
 ];
 
-const GREEN = "#00e5a0", BORDER = "var(--border)", BG = "var(--surface-2)", FG = "var(--text)", MUTED = "var(--text-dim)";
+const GREEN = "var(--accent)", BORDER = "var(--border)", BG = "var(--surface-2)", FG = "var(--text)", MUTED = "var(--text-dim)";
 const inputStyle = {
   width: "100%", background: "var(--surface-3)", color: FG, border: `1px solid ${BORDER}`,
   borderRadius: 6, padding: "5px 7px", fontSize: "0.8rem", boxSizing: "border-box",
@@ -171,7 +171,7 @@ export default function ProjectsEditor({ lang = "sk" }) {
             {filtered.map((row) => {
               const dirty = isDirty(row);
               return (
-                <tr key={row.id} style={{ background: dirty ? "rgba(0,229,160,0.10)" : "transparent" }}>
+                <tr key={row.id} style={{ background: dirty ? "color-mix(in srgb, var(--accent) 10%, transparent)" : "transparent" }}>
                   <td style={td}><input value={valueOf(row, "name")} onChange={(e) => setField(row.id, "name", e.target.value)} style={inputStyle} /></td>
                   <td style={td}>
                     <select value={valueOf(row, "status")} onChange={(e) => setField(row.id, "status", e.target.value)} style={inputStyle}>
@@ -214,7 +214,7 @@ export default function ProjectsEditor({ lang = "sk" }) {
       {toast && (
         <div style={{
           position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
-          background: toast.ok ? "rgba(0,229,160,0.14)" : "rgba(255,107,107,0.14)", color: toast.ok ? GREEN : "#f85149",
+          background: toast.ok ? "color-mix(in srgb, var(--accent) 14%, transparent)" : "rgba(255,107,107,0.14)", color: toast.ok ? GREEN : "#f85149",
           border: `1px solid ${toast.ok ? GREEN : "#f85149"}55`, padding: "10px 16px",
           borderRadius: 8, fontSize: "0.82rem", zIndex: 100, maxWidth: "90vw",
         }}>{toast.msg}</div>

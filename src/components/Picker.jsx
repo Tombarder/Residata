@@ -82,7 +82,7 @@ export default function Picker({ value, onChange, options, placeholder = "select
         {opts.map((o) => {
           const on = sel(o.value);
           return (
-            <div key={String(o.value)} onClick={() => pick(o.value)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 8, cursor: "pointer", fontSize: "0.84rem", color: on ? green : textLight, background: on ? `${green}14` : "transparent" }}
+            <div key={String(o.value)} onClick={() => pick(o.value)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 8, cursor: "pointer", fontSize: "0.84rem", color: on ? green : textLight, background: on ? `color-mix(in srgb, var(--accent) 8%, transparent)` : "transparent" }}
               onMouseEnter={(e) => { if (!on) e.currentTarget.style.background = hover; }}
               onMouseLeave={(e) => { if (!on) e.currentTarget.style.background = "transparent"; }}>
               {multi && (
@@ -106,7 +106,7 @@ export default function Picker({ value, onChange, options, placeholder = "select
     <div style={{ position: "relative", width, flex: width ? "0 0 auto" : "1 1 auto", minWidth: width ? undefined : 0 }}>
       <button ref={btnRef} type="button" onClick={() => (open ? close() : setOpen(true))} aria-label={ariaLabel} style={{
         width: "100%", display: "flex", alignItems: "center", gap: 8, boxSizing: "border-box",
-        padding: "10px 12px", background: bg2, border: `1px solid ${open ? `${green}66` : border}`, borderRadius: 8,
+        padding: "10px 12px", background: bg2, border: `1px solid ${open ? `color-mix(in srgb, var(--accent) 40%, transparent)` : border}`, borderRadius: 8,
         color: empty ? dim : textLight, fontSize: "0.84rem", cursor: "pointer", outline: "none", textAlign: "left", transition: "border-color .12s",
       }}>
         <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>

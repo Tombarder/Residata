@@ -397,7 +397,7 @@ function ReportHeader({ projects, lang, scope, scopeLabel }) {
           <SubscribeButton scope={scope} scopeLabel={scopeLabel} lang={lang} />
           <button onClick={() => downloadScopeCSV(projects, lang)}
             style={{
-              background: "transparent", color: accentInk, border: `1px solid ${green}55`,
+              background: "transparent", color: accentInk, border: `1px solid color-mix(in srgb, var(--accent) 33%, transparent)`,
               borderRadius: 4, padding: "0.5rem 0.9rem", fontFamily: mono,
               fontSize: "0.78rem", fontWeight: 700, cursor: "pointer",
             }}>
@@ -486,7 +486,7 @@ function SubscribeButton({ scope, scopeLabel, lang }) {
     <button onClick={toggle} disabled={state === "saving" || state === "loading"}
       title={email ? `Posielame na ${email}` : ""}
       style={{
-        background: isOn ? "rgba(0,229,160,0.14)" : "transparent",
+        background: isOn ? "color-mix(in srgb, var(--accent) 14%, transparent)" : "transparent",
         color: isOn ? green : dim,
         border: `1px solid ${isOn ? green : border}`,
         borderRadius: 4, padding: "0.5rem 0.9rem", fontFamily: mono,
@@ -507,7 +507,7 @@ function ScopeTabRow({ label, tabs, active, onClick, lang, border: hasTopBorder 
       gap: "0.4rem 0.5rem",
       padding: "0.55rem 0.7rem",
       borderTop: hasTopBorder ? `1px solid ${border}` : "none",
-      background: hasTopBorder ? "rgba(0,229,160,0.025)" : "transparent",
+      background: hasTopBorder ? "color-mix(in srgb, var(--accent) 2%, transparent)" : "transparent",
     }}>
       <div style={{
         fontFamily: mono, fontSize: "0.6rem", color: dim,
@@ -532,7 +532,7 @@ function ScopeTab({ active, onClick, children }) {
   return (
     <button onClick={onClick}
       style={{
-        background: active ? "rgba(0,229,160,0.14)" : "transparent",
+        background: active ? "color-mix(in srgb, var(--accent) 14%, transparent)" : "transparent",
         border: `1px solid ${active ? green : border}`,
         color: active ? green : dim,
         padding: "0.4rem 0.85rem", borderRadius: 4,
@@ -968,11 +968,11 @@ function Histogram({ bins, lang, unit, onFetchBin, onProjectClick }) {
       <style>{`
         .rep-hist-clickable { cursor: pointer; transition: background 0.12s, border-color 0.12s; }
         .rep-hist-clickable:hover .rep-hist-label { color: var(--text); }
-        .rep-hist-clickable:hover .rep-hist-bar { border-color: #00e5a0; }
-        .rep-hist-clickable:hover .rep-hist-count { color: #00e5a0; }
-        .rep-hist-clickable.is-active .rep-hist-label { color: #00e5a0; font-weight: 700; }
-        .rep-hist-clickable.is-active .rep-hist-bar { border-color: #00e5a0; box-shadow: 0 0 0 1px rgba(0,229,160,0.4); }
-        .rep-hist-clickable.is-active .rep-hist-count { color: #00e5a0; }
+        .rep-hist-clickable:hover .rep-hist-bar { border-color: var(--accent); }
+        .rep-hist-clickable:hover .rep-hist-count { color: var(--accent); }
+        .rep-hist-clickable.is-active .rep-hist-label { color: var(--accent); font-weight: 700; }
+        .rep-hist-clickable.is-active .rep-hist-bar { border-color: var(--accent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent); }
+        .rep-hist-clickable.is-active .rep-hist-count { color: var(--accent); }
       `}</style>
     </div>
   );
@@ -991,7 +991,7 @@ function HistogramDrilldown({ bin, rows, loading, unit, lang, onClose, onProject
   const fmtEur = (v) => v == null ? "—" : Math.round(moneyFromEur(v)).toLocaleString(localeTag(lang));
   return (
     <div style={{ marginTop: "0.75rem", border: `1px solid ${border}`, borderRadius: 8, background: bg }}>
-      <div style={{ padding: "0.6rem 0.85rem", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.5rem", borderBottom: `1px solid ${border}`, background: "rgba(0,229,160,0.04)" }}>
+      <div style={{ padding: "0.6rem 0.85rem", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.5rem", borderBottom: `1px solid ${border}`, background: "color-mix(in srgb, var(--accent) 4%, transparent)" }}>
         <div>
           <div style={{ fontFamily: mono, fontSize: "0.65rem", color: accentInk, letterSpacing: "0.08em", textTransform: "uppercase" }}>
             {lang === "sk" ? "Pásmo" : "Band"} {unit ? (unit === "€/m²" ? `${moneySymbol()}/m²` : unit) : ""}
@@ -1148,7 +1148,7 @@ function AggregateTable({ rows, lang, nameLabel }) {
       </table>
       <style>{`
         .rep-row-hoverable { transition: background 0.12s; }
-        .rep-row-hoverable:hover { background: rgba(0,229,160,0.05); }
+        .rep-row-hoverable:hover { background: color-mix(in srgb, var(--accent) 5%, transparent); }
       `}</style>
     </div>
   );
@@ -1300,9 +1300,9 @@ function ProjectTable({ projects, flats, lang, onProjectClick }) {
       )}
       <style>{`
         .rep-row-clickable { transition: background 0.12s; }
-        .rep-row-clickable:hover { background: rgba(0,229,160,0.08); }
-        .rep-row-clickable:hover td:first-child strong { color: #00e5a0 !important; text-decoration: underline; text-underline-offset: 3px; }
-        .rep-row-clickable:focus { outline: none; background: rgba(0,229,160,0.1); box-shadow: inset 0 0 0 1px #00e5a0; }
+        .rep-row-clickable:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+        .rep-row-clickable:hover td:first-child strong { color: var(--accent) !important; text-decoration: underline; text-underline-offset: 3px; }
+        .rep-row-clickable:focus { outline: none; background: color-mix(in srgb, var(--accent) 10%, transparent); box-shadow: inset 0 0 0 1px var(--accent); }
       `}</style>
     </div>
   );
@@ -1785,7 +1785,7 @@ function ComparableTransactionsReport({ projects, lang }) {
           </select>
           <button onClick={downloadCsv} style={{
             marginLeft: "auto", background: "transparent", color: accentInk,
-            border: `1px solid ${green}55`, borderRadius: 4, padding: "0.4rem 0.8rem",
+            border: `1px solid color-mix(in srgb, var(--accent) 33%, transparent)`, borderRadius: 4, padding: "0.4rem 0.8rem",
             fontSize: "0.78rem", cursor: "pointer", fontFamily: "inherit",
           }}>⬇ CSV ({count})</button>
         </div>
@@ -2057,9 +2057,9 @@ function PricingTensionScatter({ dots, lang, onOpenProject }) {
       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}>
         {/* Quadrant fills */}
         <rect x={padL} y={padT}             width={innerW * 0.5} height={innerH * 0.5} fill="rgba(255,107,107,0.04)"/>
-        <rect x={padL + innerW * 0.5} y={padT}             width={innerW * 0.5} height={innerH * 0.5} fill="rgba(0,229,160,0.06)"/>
+        <rect x={padL + innerW * 0.5} y={padT}             width={innerW * 0.5} height={innerH * 0.5} fill="color-mix(in srgb, var(--accent) 6%, transparent)"/>
         <rect x={padL} y={padT + innerH * 0.5} width={innerW * 0.5} height={innerH * 0.5} fill="rgba(138,138,150,0.04)"/>
-        <rect x={padL + innerW * 0.5} y={padT + innerH * 0.5} width={innerW * 0.5} height={innerH * 0.5} fill="rgba(0,229,160,0.04)"/>
+        <rect x={padL + innerW * 0.5} y={padT + innerH * 0.5} width={innerW * 0.5} height={innerH * 0.5} fill="color-mix(in srgb, var(--accent) 4%, transparent)"/>
 
         {/* Axes */}
         <line x1={padL} y1={xAxis} x2={W - padR} y2={xAxis} stroke={dim} strokeWidth="1"/>

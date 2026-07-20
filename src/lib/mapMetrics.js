@@ -31,7 +31,7 @@ export const NO_DATA = "#5b5b66";
 // = genuinely finished (Skolaudované) or past-due; the rest are the actual handover year.
 const _NOW_Y = new Date().getFullYear();
 export const COMPLETION = {
-  ready:   { color: "#00e5a0", label: "done",             short: "done" },
+  ready:   { color: "var(--accent)", label: "done",             short: "done" },
   cur:     { color: "#25d3a2", label: String(_NOW_Y),     short: String(_NOW_Y) },
   soon:    { color: "#3aa0ff", label: String(_NOW_Y + 1), short: String(_NOW_Y + 1) },
   mid:     { color: "#f5a623", label: String(_NOW_Y + 2), short: String(_NOW_Y + 2) },

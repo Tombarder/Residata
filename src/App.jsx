@@ -378,7 +378,7 @@ function AccountMenu({ user, caps, auth, setCurrent, lang }) {
     : tier === "pending" ? (lang === "sk" ? "Čaká na schválenie" : "Pending approval")
     : (lang === "sk" ? "Free plán" : "Free plan");
   const planColor = !tierKnown ? "#8a8a96"
-    : (tier === "paid" || tier === "admin") ? "#00e5a0"
+    : (tier === "paid" || tier === "admin") ? "var(--accent)"
     : tier === "pending" ? "#f5a623" : "#8a8a96";
   const go = (page) => { setCurrent(page); setOpen(false); };
   const item = { display: "block", width: "100%", textAlign: "left", background: "none", border: "none", color: "#e8e8ed", fontSize: "0.82rem", fontFamily: "inherit", padding: "0.5rem 0.6rem", borderRadius: 6, cursor: "pointer" };
@@ -392,8 +392,8 @@ function AccountMenu({ user, caps, auth, setCurrent, lang }) {
         aria-label={lang === "sk" ? "Účet" : "Account"} title={email}
         style={{
           width: 36, height: 36, borderRadius: "50%",
-          background: "rgba(0,229,160,0.12)", border: "1px solid rgba(0,229,160,0.4)",
-          color: "#00e5a0", fontWeight: 700, fontSize: "0.9rem",
+          background: "color-mix(in srgb, var(--accent) 12%, transparent)", border: "1px solid color-mix(in srgb, var(--accent) 40%, transparent)",
+          color: "var(--accent)", fontWeight: 700, fontSize: "0.9rem",
           display: "flex", alignItems: "center", justifyContent: "center",
           cursor: "pointer", padding: 0, fontFamily: "inherit",
         }}
@@ -411,7 +411,7 @@ function AccountMenu({ user, caps, auth, setCurrent, lang }) {
           </div>
           <div style={{ height: 1, background: "#222228", margin: "0.25rem 0.2rem 0.4rem" }} />
           {isFree ? (
-            <button role="menuitem" onClick={() => go("App:Billing")} style={{ ...item, color: "#00e5a0", fontWeight: 600 }} onMouseEnter={hov("rgba(0,229,160,0.08)")} onMouseLeave={hov("none")}>
+            <button role="menuitem" onClick={() => go("App:Billing")} style={{ ...item, color: "var(--accent)", fontWeight: 600 }} onMouseEnter={hov("color-mix(in srgb, var(--accent) 8%, transparent)")} onMouseLeave={hov("none")}>
               {lang === "sk" ? "Upgradovať na platený" : "Upgrade to paid"}
             </button>
           ) : (
@@ -568,7 +568,7 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
               {/* Primary CTA for logged-in users on marketing pages: jump to platform.
                   nowrap so it never breaks onto two lines when the bar is tight. */}
               <NavLink to="App:Dashboard" onNavigate={setCurrent} className="nav-cta-btn" style={{
-                padding: "0.45rem 1rem", background: "#00e5a0", color: "#0a0a0b",
+                padding: "0.45rem 1rem", background: "var(--accent)", color: "#0a0a0b",
                 fontWeight: 600, borderRadius: 6, fontSize: "0.78rem", cursor: "pointer",
                 textDecoration: "none", whiteSpace: "nowrap",
               }}>{lang === "sk" ? "Otvoriť platformu →" : "Open platform →"}</NavLink>
@@ -589,12 +589,12 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
                 fontSize: "0.78rem", cursor: "pointer", textDecoration: "none",
                 transition: "border-color 0.15s, color 0.15s",
               }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = "#00e5a0"; e.currentTarget.style.color = "#00e5a0"; }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--accent)"; e.currentTarget.style.color = "var(--accent)"; }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = "#222228"; e.currentTarget.style.color = "#e8e8ed"; }}
               title={lang === "sk" ? "Už máš účet? Prihlás sa." : "Already have an account? Sign in."}
               >{lang === "sk" ? "Prihlásiť sa" : "Sign in"}</NavBtn>
               <NavBtn onClick={onLogin} className="nav-cta-btn" style={{
-                padding: "0.5rem 1.15rem", background: "#00e5a0", color: "#0a0a0b",
+                padding: "0.5rem 1.15rem", background: "var(--accent)", color: "#0a0a0b",
                 fontWeight: 700, borderRadius: 6, fontSize: "0.8rem", cursor: "pointer",
                 letterSpacing: "0.01em", textDecoration: "none",
               }}
@@ -852,19 +852,19 @@ function HomePage({ setCurrent, l, lang, onLogin }) {
         <div className="breathing-glow-1" style={{
           position: "absolute", top: "-30%", left: "50%", transform: "translateX(-50%)",
           width: 900, height: 900,
-          background: "radial-gradient(ellipse, rgba(0,229,160,0.12) 0%, transparent 65%)",
+          background: "radial-gradient(ellipse, color-mix(in srgb, var(--accent) 12%, transparent) 0%, transparent 65%)",
           pointerEvents: "none",
         }} />
         <div className="breathing-glow-2" style={{
           position: "absolute", top: "-10%", left: "30%", transform: "translateX(-50%)",
           width: 600, height: 600,
-          background: "radial-gradient(ellipse, rgba(0,229,160,0.12) 0%, transparent 70%)",
+          background: "radial-gradient(ellipse, color-mix(in srgb, var(--accent) 12%, transparent) 0%, transparent 70%)",
           pointerEvents: "none",
         }} />
         <div className="breathing-glow-3" style={{
           position: "absolute", top: "10%", left: "70%", transform: "translateX(-50%)",
           width: 500, height: 500,
-          background: "radial-gradient(ellipse, rgba(0,229,160,0.12) 0%, transparent 70%)",
+          background: "radial-gradient(ellipse, color-mix(in srgb, var(--accent) 12%, transparent) 0%, transparent 70%)",
           pointerEvents: "none",
         }} />
         <div className="hero-anim-1" style={{
@@ -873,13 +873,13 @@ function HomePage({ setCurrent, l, lang, onLogin }) {
           fontSize: "0.75rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace",
           marginBottom: "2.5rem", background: "#111113",
         }}>
-          <span className="pulse-dot" style={{ width: 6, height: 6, borderRadius: "50%", background: "#00e5a0" }} />
+          <span className="pulse-dot" style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--accent)" }} />
           {heroBadgeText}
         </div>
         <h1 className="hero-anim-2" style={{ fontSize: "clamp(2.8rem, 6vw, 5rem)", fontWeight: 700, letterSpacing: "-0.04em", lineHeight: 1.05, maxWidth: 800 }}>
           {l.heroTitle1}<br />
           <span style={{
-            background: "linear-gradient(135deg, #00e5a0 0%, #00b880 100%)",
+            background: "linear-gradient(135deg, var(--accent) 0%, #00b880 100%)",
             WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
           }}>{l.heroTitle2}</span>
         </h1>
@@ -920,7 +920,7 @@ function HomePage({ setCurrent, l, lang, onLogin }) {
           alignItems: "center", flexWrap: "wrap",
         }}>
           <div style={{ flex: 1, minWidth: 260 }}>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem", color: "#00e5a0", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.4rem" }}>
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem", color: "var(--accent)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.4rem" }}>
               {l.valueLabel}
             </div>
             <div style={{ fontSize: "1.05rem", fontWeight: 600, color: "#e8e8ed" }}>{l.valueTitle}</div>
@@ -1007,7 +1007,7 @@ function UseCasesPage({ setCurrent, l, lang }) {
                     position: "absolute",
                     ...(imageLeft ? { right: 0, bottom: 0 } : { left: 0, bottom: 0 }),
                     width: 180, height: 180,
-                    background: "radial-gradient(circle, rgba(0,229,160,0.18) 0%, transparent 70%)",
+                    background: "radial-gradient(circle, color-mix(in srgb, var(--accent) 18%, transparent) 0%, transparent 70%)",
                     pointerEvents: "none",
                   }} />
                   {/* Tag + number in top corner */}
@@ -1018,9 +1018,9 @@ function UseCasesPage({ setCurrent, l, lang }) {
                     <span style={{
                       fontFamily: "'JetBrains Mono', monospace",
                       fontSize: "0.75rem",
-                      color: "#00e5a0",
-                      background: "rgba(0,229,160,0.1)",
-                      border: "1px solid rgba(0,229,160,0.3)",
+                      color: "var(--accent)",
+                      background: "color-mix(in srgb, var(--accent) 10%, transparent)",
+                      border: "1px solid color-mix(in srgb, var(--accent) 30%, transparent)",
                       padding: "0.25rem 0.6rem",
                       borderRadius: 4,
                       fontWeight: 700,
@@ -1070,7 +1070,7 @@ function UseCasesPage({ setCurrent, l, lang }) {
 
                   <div style={{
                     fontSize: "0.7rem",
-                    color: "#00e5a0",
+                    color: "var(--accent)",
                     fontFamily: "'JetBrains Mono', monospace",
                     letterSpacing: "0.12em",
                     textTransform: "uppercase",
@@ -1087,7 +1087,7 @@ function UseCasesPage({ setCurrent, l, lang }) {
                         alignItems: "flex-start",
                       }}>
                         <span style={{
-                          color: "#00e5a0",
+                          color: "var(--accent)",
                           fontSize: "0.85rem",
                           marginTop: "0.15rem",
                           flexShrink: 0,
@@ -1208,7 +1208,7 @@ function DataPage({ setCurrent, l, lang }) {
       border: "1px solid #222228", borderRadius: 12, background: "#16161a", padding: "1.75rem",
       gridColumn: span2 ? "span 2" : "span 1",
     }}>
-      <div style={{ fontFamily: mono, fontSize: "0.6rem", color: "#00e5a0", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.6rem" }}>{label}</div>
+      <div style={{ fontFamily: mono, fontSize: "0.6rem", color: "var(--accent)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.6rem" }}>{label}</div>
       <div style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "1rem", letterSpacing: "-0.01em" }}>{title}</div>
       {children}
     </div>
@@ -1221,7 +1221,7 @@ function DataPage({ setCurrent, l, lang }) {
         <span style={{ fontFamily: mono, fontSize: "0.7rem", color: "#e8e8ed" }}>{value}%</span>
       </div>
       <div style={{ width: "100%", height: 6, background: "#222228", borderRadius: 3 }}>
-        <div style={{ width: `${(value / max) * 100}%`, height: "100%", background: color || "#00e5a0", borderRadius: 3 }} />
+        <div style={{ width: `${(value / max) * 100}%`, height: "100%", background: color || "var(--accent)", borderRadius: 3 }} />
       </div>
     </div>
   );
@@ -1259,7 +1259,7 @@ function DataPage({ setCurrent, l, lang }) {
             //  · cc1a3fa10c00  'zebracka bytovka' (rejected)
             // Restoring 2429e8be8625 — the only one that matches the
             // 'white big building' description.
-            background: `linear-gradient(135deg, rgba(0,229,160,0.06), rgba(0,0,0,0.1)), url("https://images.unsplash.com/photo-1487958449943-2429e8be8625?w=1400&q=85&auto=format&fit=crop") center/cover`,
+            background: `linear-gradient(135deg, color-mix(in srgb, var(--accent) 6%, transparent), rgba(0,0,0,0.1)), url("https://images.unsplash.com/photo-1487958449943-2429e8be8625?w=1400&q=85&auto=format&fit=crop") center/cover`,
           }} role="img" aria-label="Modern residential building" />
         </div>
       </div>
@@ -1268,19 +1268,19 @@ function DataPage({ setCurrent, l, lang }) {
       <div style={{ padding: "3rem 2rem 0", maxWidth: "var(--container)", margin: "0 auto" }}>
         <div className="value-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
           <div style={{ border: "1px solid #222228", borderRadius: 12, background: "#16161a", padding: "2rem" }}>
-            <div style={{ fontFamily: mono, fontSize: "0.65rem", color: "#00e5a0", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "1.25rem" }}>{l.questionsLabel}</div>
+            <div style={{ fontFamily: mono, fontSize: "0.65rem", color: "var(--accent)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "1.25rem" }}>{l.questionsLabel}</div>
             {l.questions.map((q, i) => (
               <div key={i} style={{ display: "flex", gap: "0.75rem", marginBottom: "0.85rem", alignItems: "flex-start" }}>
-                <span style={{ fontFamily: mono, fontSize: "0.72rem", color: "#00e5a0", marginTop: "0.15rem", flexShrink: 0 }}>→</span>
+                <span style={{ fontFamily: mono, fontSize: "0.72rem", color: "var(--accent)", marginTop: "0.15rem", flexShrink: 0 }}>→</span>
                 <span style={{ fontSize: "0.84rem", color: "#8a8a96", lineHeight: 1.55 }}>{q}</span>
               </div>
             ))}
           </div>
           <div style={{ border: "1px solid #222228", borderRadius: 12, background: "#16161a", padding: "2rem" }}>
-            <div style={{ fontFamily: mono, fontSize: "0.65rem", color: "#00e5a0", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "1.25rem" }}>{l.deliveryLabel}</div>
+            <div style={{ fontFamily: mono, fontSize: "0.65rem", color: "var(--accent)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "1.25rem" }}>{l.deliveryLabel}</div>
             {l.deliveryItems.map(([title, desc]) => (
               <div key={title} style={{ display: "flex", gap: "0.75rem", marginBottom: "1.25rem", alignItems: "flex-start" }}>
-                <span style={{ color: "#00e5a0", fontSize: "0.85rem", marginTop: "0.15rem", flexShrink: 0 }}>✓</span>
+                <span style={{ color: "var(--accent)", fontSize: "0.85rem", marginTop: "0.15rem", flexShrink: 0 }}>✓</span>
                 <div>
                   <div style={{ fontSize: "0.9rem", fontWeight: 500, color: "#e8e8ed", marginBottom: "0.2rem" }}>{title}</div>
                   <div style={{ fontSize: "0.8rem", color: "#8a8a96", lineHeight: 1.55 }}>{desc}</div>
@@ -1299,9 +1299,9 @@ function DataPage({ setCurrent, l, lang }) {
         }}>
           <div style={{
             width: 48, height: 48, borderRadius: 10,
-            background: "rgba(0,229,160,0.08)", border: "1px solid rgba(0,229,160,0.15)",
+            background: "color-mix(in srgb, var(--accent) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--accent) 15%, transparent)",
             display: "flex", alignItems: "center", justifyContent: "center",
-            fontFamily: mono, fontSize: "1.1rem", color: "#00e5a0", fontWeight: 700,
+            fontFamily: mono, fontSize: "1.1rem", color: "var(--accent)", fontWeight: 700,
           }}>↗</div>
           <div>
             <div style={{ fontSize: "1.05rem", fontWeight: 600, color: "#e8e8ed", marginBottom: "0.4rem" }}>{l.flexTitle}</div>
@@ -1336,10 +1336,10 @@ function DataPage({ setCurrent, l, lang }) {
         {/* 1 — Sell-through leader (real near-sell-out project) */}
         <InsightCard label={`Sell-through — ${d.fast.project}`} title="In its final units.">
           <div style={{ fontSize: "0.82rem", color: "#8a8a96", lineHeight: 1.6, marginBottom: "1rem" }}>
-            <span style={{ color: "#e8e8ed" }}>{d.fast.project}</span> in {d.fast.district} is <span style={{ color: "#00e5a0", fontWeight: 600 }}>{d.fast.pct} sold</span> — only {d.fast.left} of {d.fast.total} units remain. The kind of signal a developer uses to time a launch into the gap, and a buyer uses before the last units clear.
+            <span style={{ color: "#e8e8ed" }}>{d.fast.project}</span> in {d.fast.district} is <span style={{ color: "var(--accent)", fontWeight: 600 }}>{d.fast.pct} sold</span> — only {d.fast.left} of {d.fast.total} units remain. The kind of signal a developer uses to time a launch into the gap, and a buyer uses before the last units clear.
           </div>
           <div style={{ display: "flex", gap: "1.5rem" }}>
-            <div><div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: "#00e5a0" }}>{d.fast.pct}</div><div style={{ fontSize: "0.68rem", color: "#55555f" }}>sold-through</div></div>
+            <div><div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: "var(--accent)" }}>{d.fast.pct}</div><div style={{ fontSize: "0.68rem", color: "#55555f" }}>sold-through</div></div>
             <div><div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: "#e8e8ed" }}>{d.fast.left}</div><div style={{ fontSize: "0.68rem", color: "#55555f" }}>units left</div></div>
             <div><div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: "#8a8a96" }}>{d.fast.total}</div><div style={{ fontSize: "0.68rem", color: "#55555f" }}>total units</div></div>
           </div>
@@ -1352,14 +1352,14 @@ function DataPage({ setCurrent, l, lang }) {
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "auto 1fr auto", gap: "0.5rem 0.75rem", fontSize: "0.74rem", alignItems: "center" }}>
             <span style={{ fontFamily: mono, color: "#e8e8ed" }}>2-izb</span>
-            <div style={{ height: 8, background: "rgba(0,229,160,0.15)", borderRadius: 4, overflow: "hidden" }}>
-              <div style={{ height: "100%", width: "44%", background: "#00e5a0" }} />
+            <div style={{ height: 8, background: "color-mix(in srgb, var(--accent) 15%, transparent)", borderRadius: 4, overflow: "hidden" }}>
+              <div style={{ height: "100%", width: "44%", background: "var(--accent)" }} />
             </div>
-            <span style={{ fontFamily: mono, color: "#00e5a0", fontSize: "0.68rem" }}>{d.seg[0]}</span>
+            <span style={{ fontFamily: mono, color: "var(--accent)", fontSize: "0.68rem" }}>{d.seg[0]}</span>
 
             <span style={{ fontFamily: mono, color: "#e8e8ed" }}>3-izb</span>
-            <div style={{ height: 8, background: "rgba(0,229,160,0.15)", borderRadius: 4, overflow: "hidden" }}>
-              <div style={{ height: "100%", width: "68%", background: "#00e5a0" }} />
+            <div style={{ height: 8, background: "color-mix(in srgb, var(--accent) 15%, transparent)", borderRadius: 4, overflow: "hidden" }}>
+              <div style={{ height: "100%", width: "68%", background: "var(--accent)" }} />
             </div>
             <span style={{ fontFamily: mono, color: "#8a8a96", fontSize: "0.68rem" }}>{d.seg[1]}</span>
 
@@ -1377,13 +1377,13 @@ function DataPage({ setCurrent, l, lang }) {
         {/* 3 — Price by district — real €/m² + MoM trend (SK real / CZ estimated) */}
         <InsightCard label="Price by District" title={`Market ${d.trend.mom} MoM · ${d.gap} district spread.`}>
           <div style={{ fontSize: "0.82rem", color: "#8a8a96", lineHeight: 1.6, marginBottom: "1rem" }}>
-            Market average is <span style={{ color: "#e8e8ed" }}>€{d.marketAvg}/m²</span>, {d.trend.est ? "an estimated " : ""}<span style={{ color: "#00e5a0", fontWeight: 600 }}>{d.trend.mom}</span> month-over-month. Premium districts price at a <span style={{ color: "#e8e8ed", fontWeight: 600 }}>{d.gap}</span> multiple of the most affordable. €/m² and recent move by district:
+            Market average is <span style={{ color: "#e8e8ed" }}>€{d.marketAvg}/m²</span>, {d.trend.est ? "an estimated " : ""}<span style={{ color: "var(--accent)", fontWeight: 600 }}>{d.trend.mom}</span> month-over-month. Premium districts price at a <span style={{ color: "#e8e8ed", fontWeight: 600 }}>{d.gap}</span> multiple of the most affordable. €/m² and recent move by district:
           </div>
           {d.districts.map(([name, price, units, mom]) => (
             <div key={name} style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: "0.6rem", alignItems: "center", padding: "0.35rem 0", borderBottom: "1px solid #1a1a1f", fontSize: "0.76rem" }}>
               <span style={{ color: "#e8e8ed" }}>{name}</span>
               <span style={{ fontFamily: mono, fontSize: "0.68rem", color: "#55555f" }}>€{price}/m²</span>
-              <span style={{ fontFamily: mono, fontSize: "0.72rem", fontWeight: 600, color: "#00e5a0", minWidth: 48, textAlign: "right" }}>{mom}</span>
+              <span style={{ fontFamily: mono, fontSize: "0.72rem", fontWeight: 600, color: "var(--accent)", minWidth: 48, textAlign: "right" }}>{mom}</span>
             </div>
           ))}
           <div style={{ fontSize: "0.62rem", color: "#55555f", marginTop: "0.7rem", fontStyle: "italic" }}>
@@ -1401,7 +1401,7 @@ function DataPage({ setCurrent, l, lang }) {
                 <span style={{ color: "#e8e8ed", fontWeight: 600 }}>For banks & valuers:</span> this is where comparable evidence is scarcest and most valuable. Once a premium project sells out its transaction history stops updating — and can't be reconstructed retrospectively.
               </div>
               <div style={{ display: "flex", gap: "1.5rem", flexWrap: "wrap" }}>
-                <div><div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: "#00e5a0" }}>{d.top.projects}</div><div style={{ fontSize: "0.68rem", color: "#55555f" }}>active projects</div></div>
+                <div><div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: "var(--accent)" }}>{d.top.projects}</div><div style={{ fontSize: "0.68rem", color: "#55555f" }}>active projects</div></div>
                 <div><div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: "#e8e8ed" }}>{d.top.avail}</div><div style={{ fontSize: "0.68rem", color: "#55555f" }}>units available</div></div>
                 <div><div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: "#f5a623" }}>€{d.top.peak}</div><div style={{ fontSize: "0.68rem", color: "#55555f" }}>peak €/m²</div></div>
               </div>
@@ -1417,7 +1417,7 @@ function DataPage({ setCurrent, l, lang }) {
                       <span style={{ fontFamily: mono, color: "#e8e8ed", fontSize: "0.68rem" }}>€{price}</span>
                     </div>
                     <div style={{ width: "100%", height: 6, background: "#222228", borderRadius: 3 }}>
-                      <div style={{ width: `${Math.round((v / mx) * 100)}%`, height: "100%", background: "#00e5a0", borderRadius: 3 }} />
+                      <div style={{ width: `${Math.round((v / mx) * 100)}%`, height: "100%", background: "var(--accent)", borderRadius: 3 }} />
                     </div>
                   </div>
                 );
@@ -1524,11 +1524,11 @@ function PricingPage({ setCurrent, l, lang, onLogin }) {
         {isAlreadyPaid && (
           <div style={{ marginBottom: "1rem",
             display: "inline-flex", alignItems: "center", gap: "0.5rem",
-            padding: "0.4rem 0.9rem", background: "rgba(0,229,160,0.1)",
-            border: "1px solid rgba(0,229,160,0.3)", borderRadius: 999,
-            fontFamily: "'JetBrains Mono', monospace", fontSize: "0.7rem", color: "#00e5a0", fontWeight: 600,
+            padding: "0.4rem 0.9rem", background: "color-mix(in srgb, var(--accent) 10%, transparent)",
+            border: "1px solid color-mix(in srgb, var(--accent) 30%, transparent)", borderRadius: 999,
+            fontFamily: "'JetBrains Mono', monospace", fontSize: "0.7rem", color: "var(--accent)", fontWeight: 600,
           }}>
-            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#00e5a0" }}></span>
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--accent)" }}></span>
             {lang === "sk" ? "Máš aktívny paid prístup" : "You have active paid access"}
           </div>
         )}
@@ -1545,10 +1545,10 @@ function PricingPage({ setCurrent, l, lang, onLogin }) {
         {showTrialOffer && (
           <div style={{
             marginTop: "2rem", padding: "1.75rem 2rem", maxWidth: 680, width: "100%",
-            background: "linear-gradient(135deg, rgba(0,229,160,0.16), rgba(0,229,160,0.04))",
-            border: "1px solid #00e5a0", borderRadius: 12,
+            background: "linear-gradient(135deg, color-mix(in srgb, var(--accent) 16%, transparent), color-mix(in srgb, var(--accent) 4%, transparent))",
+            border: "1px solid var(--accent)", borderRadius: 12,
           }}>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem", color: "#00e5a0", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "0.5rem", fontWeight: 700 }}>
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem", color: "var(--accent)", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "0.5rem", fontWeight: 700 }}>
               🎁 {lang === "sk" ? "Darček pre teba" : "A gift for you"}
             </div>
             <h2 style={{ fontSize: "1.35rem", fontWeight: 700, color: "#e8e8ed", margin: "0 0 0.5rem", letterSpacing: "-0.01em" }}>
@@ -1575,19 +1575,19 @@ function PricingPage({ setCurrent, l, lang, onLogin }) {
         <div className="pricing-grid" style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "1.5rem", maxWidth: 780, margin: "0 auto" }}>
           {tiers.map(t => (
             <div key={t.tier} style={{
-              border: `1px solid ${t.featured ? "#00e5a0" : "#222228"}`,
+              border: `1px solid ${t.featured ? "var(--accent)" : "#222228"}`,
               borderRadius: 12, background: "#16161a", padding: "2.5rem",
               display: "flex", flexDirection: "column", position: "relative",
             }}>
               {t.featured && (
                 <div style={{
                   position: "absolute", top: "-0.6rem", left: "50%", transform: "translateX(-50%)",
-                  padding: "0.2rem 0.75rem", background: "#00e5a0", color: "#0a0a0b",
+                  padding: "0.2rem 0.75rem", background: "var(--accent)", color: "#0a0a0b",
                   fontFamily: "'JetBrains Mono', monospace", fontSize: "0.6rem", fontWeight: 700,
                   letterSpacing: "0.08em", textTransform: "uppercase", borderRadius: 4,
                 }}>{l.mostPopular}</div>
               )}
-              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.7rem", color: "#00e5a0", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.75rem" }}>{t.tier}</div>
+              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.7rem", color: "var(--accent)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.75rem" }}>{t.tier}</div>
               <h2 style={{ fontSize: "1.3rem", fontWeight: 600, marginBottom: "0.5rem" }}>{t.name}</h2>
               {t.isCustom ? (
                 <div style={{ fontSize: "1.2rem", fontWeight: 600, marginBottom: "0.25rem" }}>{t.price}</div>
@@ -1601,7 +1601,7 @@ function PricingPage({ setCurrent, l, lang, onLogin }) {
               <div style={{ flex: 1, marginBottom: "2rem" }}>
                 {t.features.map(([on, text]) => (
                   <div key={text} style={{ display: "flex", gap: "0.6rem", marginBottom: "0.75rem", alignItems: "flex-start" }}>
-                    <span style={{ color: on ? "#00e5a0" : "#55555f", fontSize: "0.8rem", marginTop: "0.2rem" }}>{on ? "✓" : "—"}</span>
+                    <span style={{ color: on ? "var(--accent)" : "#55555f", fontSize: "0.8rem", marginTop: "0.2rem" }}>{on ? "✓" : "—"}</span>
                     <p style={{ fontSize: "0.82rem", color: "#8a8a96", lineHeight: 1.5 }}>{text}</p>
                   </div>
                 ))}
@@ -1638,10 +1638,10 @@ function PricingPage({ setCurrent, l, lang, onLogin }) {
       <div style={{ padding: "2.5rem 2rem 0", maxWidth: 800, margin: "0 auto" }}>
         <div style={{ 
           borderRadius: 12, background: "#16161a", padding: "2.5rem 3rem", position: "relative",
-          borderLeft: "3px solid #00e5a0",
+          borderLeft: "3px solid var(--accent)",
         }}>
           <div style={{ 
-            fontFamily: mono, fontSize: "0.6rem", color: "#00e5a0", letterSpacing: "0.12em", 
+            fontFamily: mono, fontSize: "0.6rem", color: "var(--accent)", letterSpacing: "0.12em", 
             textTransform: "uppercase", marginBottom: "1.25rem",
           }}>{l.testimonialFrom}</div>
           <div style={{ fontSize: "1.05rem", color: "#e8e8ed", lineHeight: 1.75, fontWeight: 300, fontStyle: "italic", marginBottom: "1.75rem" }}>
@@ -1650,11 +1650,11 @@ function PricingPage({ setCurrent, l, lang, onLogin }) {
           <div style={{ display: "flex", alignItems: "center", gap: "0.85rem" }}>
             <div style={{ 
               width: 40, height: 40, borderRadius: 10, 
-              background: "linear-gradient(135deg, rgba(0,229,160,0.12) 0%, rgba(0,229,160,0.04) 100%)", 
-              border: "1px solid rgba(0,229,160,0.15)",
+              background: "linear-gradient(135deg, color-mix(in srgb, var(--accent) 12%, transparent) 0%, color-mix(in srgb, var(--accent) 4%, transparent) 100%)", 
+              border: "1px solid color-mix(in srgb, var(--accent) 15%, transparent)",
               display: "flex", alignItems: "center", justifyContent: "center",
             }}>
-              <span style={{ fontFamily: mono, fontSize: "0.85rem", color: "#00e5a0", fontWeight: 600 }}>M</span>
+              <span style={{ fontFamily: mono, fontSize: "0.85rem", color: "var(--accent)", fontWeight: 600 }}>M</span>
             </div>
             <div>
               <div style={{ fontSize: "0.88rem", fontWeight: 500, color: "#e8e8ed" }}>{l.testimonialName}</div>
@@ -1679,7 +1679,7 @@ function PricingPage({ setCurrent, l, lang, onLogin }) {
         <div style={{
           position: "absolute", bottom: 0, left: "50%", transform: "translateX(-50%)",
           width: 600, height: 400,
-          background: "radial-gradient(ellipse, rgba(0,229,160,0.15) 0%, transparent 70%)",
+          background: "radial-gradient(ellipse, color-mix(in srgb, var(--accent) 15%, transparent) 0%, transparent 70%)",
           pointerEvents: "none", opacity: 0.3,
         }} />
         <h2 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "1rem" }}>{l.notSure}</h2>
@@ -1718,11 +1718,11 @@ function ContactPage({ l }) {
               </div>
               <div>
                 <div style={{ fontSize: "1.25rem", fontWeight: 600, color: "#e8e8ed", marginBottom: "0.2rem" }}>Tomáš Kamhal</div>
-                <div style={{ fontFamily: mono, fontSize: "0.72rem", color: "#00e5a0", marginBottom: "0.5rem" }}>Founder, Residata</div>
+                <div style={{ fontFamily: mono, fontSize: "0.72rem", color: "var(--accent)", marginBottom: "0.5rem" }}>Founder, Residata</div>
                 <a href="https://www.linkedin.com/in/tomaskamhal/" target="_blank" rel="noopener noreferrer" style={{
                   display: "inline-flex", alignItems: "center", gap: "0.4rem",
                   fontSize: "0.72rem", color: "#8a8a96", textDecoration: "none", transition: "color 0.2s",
-                }} onMouseEnter={e => e.currentTarget.style.color = "#00e5a0"} onMouseLeave={e => e.currentTarget.style.color = "#8a8a96"}>
+                }} onMouseEnter={e => e.currentTarget.style.color = "var(--accent)"} onMouseLeave={e => e.currentTarget.style.color = "#8a8a96"}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
                   LinkedIn
                 </a>
@@ -1732,16 +1732,16 @@ function ContactPage({ l }) {
             {/* Contact methods */}
             <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
               <a href="mailto:residata@proton.me" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: "1rem", color: "#e8e8ed", transition: "color 0.2s" }}
-                onMouseEnter={e => e.currentTarget.style.color = "#00e5a0"}
+                onMouseEnter={e => e.currentTarget.style.color = "var(--accent)"}
                 onMouseLeave={e => e.currentTarget.style.color = "#e8e8ed"}>
-                <span style={{ fontFamily: mono, fontSize: "0.8rem", color: "#00e5a0", width: 20, textAlign: "center", flexShrink: 0 }}>@</span>
+                <span style={{ fontFamily: mono, fontSize: "0.8rem", color: "var(--accent)", width: 20, textAlign: "center", flexShrink: 0 }}>@</span>
                 <span style={{ fontSize: "0.92rem" }}>residata@proton.me</span>
               </a>
 
               <a href="tel:+421911963909" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: "1rem", color: "#e8e8ed", transition: "color 0.2s" }}
-                onMouseEnter={e => e.currentTarget.style.color = "#00e5a0"}
+                onMouseEnter={e => e.currentTarget.style.color = "var(--accent)"}
                 onMouseLeave={e => e.currentTarget.style.color = "#e8e8ed"}>
-                <span style={{ fontFamily: mono, fontSize: "0.8rem", color: "#00e5a0", width: 20, textAlign: "center", flexShrink: 0 }}>☎</span>
+                <span style={{ fontFamily: mono, fontSize: "0.8rem", color: "var(--accent)", width: 20, textAlign: "center", flexShrink: 0 }}>☎</span>
                 <span style={{ fontSize: "0.92rem" }}>+421 911 963 909</span>
               </a>
 
@@ -1751,7 +1751,7 @@ function ContactPage({ l }) {
             <div style={{ marginTop: "1.5rem" }}>
               <a href="https://calendar.app.google/x6vKBohYsVjNKL1A9" target="_blank" rel="noopener noreferrer" style={{
                 display: "block", padding: "0.85rem 2rem", textAlign: "center",
-                background: "#00e5a0", color: "#0a0a0b", fontWeight: 600,
+                background: "var(--accent)", color: "#0a0a0b", fontWeight: 600,
                 fontSize: "0.9rem", borderRadius: 8, textDecoration: "none",
               }}>{l.bookCall}</a>
             </div>
@@ -1759,15 +1759,15 @@ function ContactPage({ l }) {
 
           {/* Right — What to expect */}
           <div style={{ border: "1px solid #222228", borderRadius: 12, background: "#16161a", padding: "2.5rem" }}>
-            <div style={{ fontFamily: mono, fontSize: "0.65rem", color: "#00e5a0", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "1.5rem" }}>{l.whatToExpect}</div>
+            <div style={{ fontFamily: mono, fontSize: "0.65rem", color: "var(--accent)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "1.5rem" }}>{l.whatToExpect}</div>
 
             {l.steps.map(([num, title, desc]) => (
               <div key={num} style={{ display: "flex", gap: "1.25rem", marginBottom: "1.75rem", alignItems: "flex-start" }}>
                 <div style={{
                   width: 32, height: 32, borderRadius: 8, flexShrink: 0,
-                  background: "rgba(0,229,160,0.08)", border: "1px solid rgba(0,229,160,0.15)",
+                  background: "color-mix(in srgb, var(--accent) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--accent) 15%, transparent)",
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  fontFamily: mono, fontSize: "0.75rem", color: "#00e5a0", fontWeight: 700,
+                  fontFamily: mono, fontSize: "0.75rem", color: "var(--accent)", fontWeight: 700,
                 }}>{num}</div>
                 <div>
                   <div style={{ fontSize: "0.95rem", fontWeight: 500, color: "#e8e8ed", marginBottom: "0.3rem" }}>{title}</div>
@@ -1784,7 +1784,7 @@ function ContactPage({ l }) {
 }
 
 function Label({ children }) {
-  return <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.7rem", color: "#00e5a0", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "1rem" }}>{children}</div>;
+  return <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.7rem", color: "var(--accent)", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "1rem" }}>{children}</div>;
 }
 
 // Shown when user is authenticated but profile hasn't finished loading.
@@ -1995,7 +1995,7 @@ export default function App() {
 
         /* Use Cases cards — hover zoom on image + border glow */
         .use-case-card { transition: border-color 0.3s, box-shadow 0.3s; }
-        .use-case-card:hover { border-color: rgba(0,229,160,0.35) !important; box-shadow: 0 8px 32px rgba(0,229,160,0.08); }
+        .use-case-card:hover { border-color: color-mix(in srgb, var(--accent) 35%, transparent) !important; box-shadow: 0 8px 32px color-mix(in srgb, var(--accent) 8%, transparent); }
         .use-case-card:hover .use-case-img { transform: scale(1.05); filter: saturate(1) brightness(0.7) contrast(1.05) !important; }
 
         /* Responsive — stackuj image nad content */
@@ -2097,10 +2097,10 @@ export default function App() {
            Green tint on hover + green accent name + focus ring for keyboard nav.
            Tint kept subtle (7%) so data stays readable; focus ring uses the
            accent colour so it reads as "this is the active target". */
-        .project-row-clickable:hover { background: rgba(0,229,160,0.06); }
-        .project-row-clickable:hover .project-row-name { color: #00e5a0; text-decoration: underline; text-underline-offset: 3px; }
-        .project-row-clickable:focus { outline: none; background: rgba(0,229,160,0.08); box-shadow: inset 0 0 0 1px #00e5a0; }
-        .project-row-clickable:focus .project-row-name { color: #00e5a0; }
+        .project-row-clickable:hover { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+        .project-row-clickable:hover .project-row-name { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+        .project-row-clickable:focus { outline: none; background: color-mix(in srgb, var(--accent) 8%, transparent); box-shadow: inset 0 0 0 1px var(--accent); }
+        .project-row-clickable:focus .project-row-name { color: var(--accent); }
       `}</style>
       <RisingParticles />
       <div style={{ position: "relative", zIndex: 1 }}>

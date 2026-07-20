@@ -30,7 +30,7 @@
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import ProjectsEditor from "../components/ProjectsEditor";
 
-const green = "#00e5a0";
+const green = "var(--accent)";
 const greenInk = "var(--accent-ink)";
 const amber = "#f5a623";
 const blue = "#4a9eff";
@@ -161,7 +161,7 @@ function csvValue(u, key) {
 
 const Row = memo(function Row({ u, cols, isChecked, onToggle, lang }) {
   return (
-    <tr style={{ borderBottom: `1px solid ${border}`, background: isChecked ? "rgba(0,229,160,0.06)" : "transparent" }}>
+    <tr style={{ borderBottom: `1px solid ${border}`, background: isChecked ? "color-mix(in srgb, var(--accent) 6%, transparent)" : "transparent" }}>
       <td style={{ padding: "8px 11px" }}>
         <input type="checkbox" checked={isChecked} onChange={() => onToggle(u.unit_id)}
           aria-label={(lang === "sk" ? "Vybrať byt " : "Select unit ") + u.unit_id} />
@@ -532,7 +532,7 @@ export default function DataQA({ lang = "sk" }) {
             {STAVY.map((s) => {
               const on = stav === s[0];
               return <button key={s[0]} onClick={() => setStav(s[0])}
-                style={{ ...btn, padding: "6px 12px", fontSize: 12, borderColor: on ? green : border, color: on ? green : textLight, background: on ? "rgba(0,229,160,0.08)" : "transparent" }}>{t(s[2], s[1])}</button>;
+                style={{ ...btn, padding: "6px 12px", fontSize: 12, borderColor: on ? green : border, color: on ? green : textLight, background: on ? "color-mix(in srgb, var(--accent) 8%, transparent)" : "transparent" }}>{t(s[2], s[1])}</button>;
             })}
             <input value={uSearch} onChange={(e) => setUSearch(e.target.value)} placeholder={t("search unit…", "hľadať byt…")}
               style={{ marginLeft: "auto", padding: "7px 11px", background: bg2, border: `1px solid ${border}`, borderRadius: 8, color: textLight, fontSize: 13, outline: "none", width: 150 }} />

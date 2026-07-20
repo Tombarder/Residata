@@ -497,8 +497,8 @@ function Sidebar({ page, lang, can, tier, email, onNavigate, onSignOut, mobileOp
 function TierBadgeSmall({ tier }) {
   const palette = {
     free:    { c: "var(--text-2)", bg: "rgba(192,192,200,0.1)"  },
-    paid:    { c: green,     bg: "rgba(0,229,160,0.12)"    },
-    trial:   { c: green,     bg: "rgba(0,229,160,0.12)"    },
+    paid:    { c: green,     bg: "color-mix(in srgb, var(--accent) 12%, transparent)"    },
+    trial:   { c: green,     bg: "color-mix(in srgb, var(--accent) 12%, transparent)"    },
     admin:   { c: "#f5a623", bg: "rgba(245,166,35,0.12)"   },
     pending: { c: "#888",    bg: "rgba(136,136,136,0.12)"  },
     anon:    { c: dim,       bg: "rgba(138,138,150,0.08)"  },
@@ -580,7 +580,7 @@ function TopBar({ page, lang, setLang, tier }) {
                   key={code}
                   onClick={() => { if (lang !== code) { try { track("language_switched", { from: lang, to: code, surface: "platform" }); } catch (_) {} setLang(code); } }}
                   style={{
-                    background: active ? "rgba(0,229,160,0.12)" : "transparent",
+                    background: active ? "color-mix(in srgb, var(--accent) 12%, transparent)" : "transparent",
                     color: active ? green : dim,
                     border: "none",
                     padding: "0.35rem 0.65rem",
@@ -863,8 +863,8 @@ function UpgradeOverlay({ lang, requiredFor, currentTier, setCurrent }) {
   return (
     <div style={{
       margin: "1rem 1.5rem 1.25rem",
-      background: "linear-gradient(90deg, rgba(0,229,160,0.07) 0%, rgba(0,229,160,0.02) 60%, transparent 100%)",
-      border: `1px solid rgba(0,229,160,0.28)`,
+      background: "linear-gradient(90deg, color-mix(in srgb, var(--accent) 7%, transparent) 0%, color-mix(in srgb, var(--accent) 2%, transparent) 60%, transparent 100%)",
+      border: `1px solid color-mix(in srgb, var(--accent) 28%, transparent)`,
       borderRadius: 10,
       padding: "0.85rem 1.1rem",
       display: "flex", alignItems: "center", gap: "0.85rem",
@@ -873,7 +873,7 @@ function UpgradeOverlay({ lang, requiredFor, currentTier, setCurrent }) {
       <div style={{
         flexShrink: 0,
         width: 30, height: 30, borderRadius: 7,
-        background: "rgba(0,229,160,0.15)", color: accentInk,
+        background: "color-mix(in srgb, var(--accent) 15%, transparent)", color: accentInk,
         display: "flex", alignItems: "center", justifyContent: "center",
         fontSize: "0.9rem",
       }}>🔒</div>
@@ -906,7 +906,7 @@ function UpgradeOverlay({ lang, requiredFor, currentTier, setCurrent }) {
           cursor: "pointer",
           transition: "transform 0.15s, box-shadow 0.15s",
         }}
-        onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 6px 18px rgba(0,229,160,0.3)"; }}
+        onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 6px 18px color-mix(in srgb, var(--accent) 30%, transparent)"; }}
         onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = "none"; }}
       >
         {lang === "sk" ? "Upgrade → paid" : "Upgrade → paid"}
@@ -1007,7 +1007,7 @@ function PlatformBilling({ lang, setCurrent }) {
       {/* Return from Stripe Checkout */}
       {checkoutMsg === "success" && (
         <div style={{
-          background: "rgba(0,229,160,0.1)", border: `1px solid ${green}`, borderRadius: 12,
+          background: "color-mix(in srgb, var(--accent) 10%, transparent)", border: `1px solid ${green}`, borderRadius: 12,
           padding: "1rem 1.25rem", marginBottom: "1.25rem", color: textLight, fontSize: "0.9rem", lineHeight: 1.55,
         }}>
           ✓ {lang === "sk"
@@ -1040,7 +1040,7 @@ function PlatformBilling({ lang, setCurrent }) {
             {isAdmin && "Admin"}
           </span>
           {trialActive && (
-            <span style={{ fontSize: "0.75rem", color: accentInk, fontFamily: mono, background: "rgba(0,229,160,0.12)", border: `1px solid ${green}`, borderRadius: 100, padding: "2px 10px" }}>
+            <span style={{ fontSize: "0.75rem", color: accentInk, fontFamily: mono, background: "color-mix(in srgb, var(--accent) 12%, transparent)", border: `1px solid ${green}`, borderRadius: 100, padding: "2px 10px" }}>
               🎁 {trialDaysLeft <= 0
                 ? (lang === "sk" ? "Trial · posledný deň" : "Trial · last day")
                 : (lang === "sk" ? `Trial · ${trialDaysLeft} dní zostáva` : `Trial · ${trialDaysLeft} day${trialDaysLeft === 1 ? "" : "s"} left`)}
@@ -1071,7 +1071,7 @@ function PlatformBilling({ lang, setCurrent }) {
           predicate as every other trial surface. */}
       {canStartTrial && (
         <div style={{
-          background: "linear-gradient(135deg, rgba(0,229,160,0.14), rgba(0,229,160,0.03))",
+          background: "linear-gradient(135deg, color-mix(in srgb, var(--accent) 14%, transparent), color-mix(in srgb, var(--accent) 3%, transparent))",
           border: `1px solid ${green}`, borderRadius: 12, padding: "1.75rem 2rem", marginBottom: "1.25rem",
         }}>
           <div style={{ fontFamily: mono, fontSize: "0.65rem", color: accentInk, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.5rem" }}>
@@ -1107,8 +1107,8 @@ function PlatformBilling({ lang, setCurrent }) {
           for a sale). */}
       {isFree && (
         <div style={{
-          background: "linear-gradient(135deg, rgba(0,229,160,0.08), rgba(0,229,160,0.02))",
-          border: "1px solid rgba(0,229,160,0.3)", borderRadius: 12, padding: "1.75rem 2rem", marginBottom: "1.25rem",
+          background: "linear-gradient(135deg, color-mix(in srgb, var(--accent) 8%, transparent), color-mix(in srgb, var(--accent) 2%, transparent))",
+          border: "1px solid color-mix(in srgb, var(--accent) 30%, transparent)", borderRadius: 12, padding: "1.75rem 2rem", marginBottom: "1.25rem",
         }}>
           <div style={{ fontFamily: mono, fontSize: "0.65rem", color: accentInk, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.5rem" }}>
             {lang === "sk" ? "Upgrade na paid" : "Upgrade to paid"}
@@ -1201,7 +1201,7 @@ function PlatformBilling({ lang, setCurrent }) {
  */
 function SubscriptionCard({ lang, paused, paidWindowActive, paidUntil, paidStartedAt, paidDaysLeft, fmtDate, onManage, manageBusy, manageErr }) {
   const accent = paused ? "#f5a623" : green;
-  const pillBg = paused ? "rgba(245,166,35,0.12)" : "rgba(0,229,160,0.12)";
+  const pillBg = paused ? "rgba(245,166,35,0.12)" : "color-mix(in srgb, var(--accent) 12%, transparent)";
   const status = paused
     ? (lang === "sk" ? "Pozastavené" : "Paused")
     : paidWindowActive
@@ -1224,7 +1224,7 @@ function SubscriptionCard({ lang, paused, paidWindowActive, paidUntil, paidStart
               fontFamily: mono, fontSize: "0.68rem", fontWeight: 700,
               letterSpacing: "0.08em", textTransform: "uppercase",
               color: accent, background: pillBg,
-              border: `1px solid ${accent}55`,
+              border: `1px solid color-mix(in srgb, var(--accent) 33%, transparent)`,
               borderRadius: 100, padding: "3px 10px",
             }}>
               {paused ? "⏸" : "●"} {status}

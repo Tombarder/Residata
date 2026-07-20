@@ -96,8 +96,9 @@
   --surface-3:     #dde3ec;   /* input / raised / hover */
   --border:        #cbd3df;   /* strong, defined card / table edge (less faded) */
   --border-soft:   #dde3ec;   /* dividers inside cards — visible */
-  --accent:        #00e5a0;   /* mint brand — theme-invariant (map paint / dark mode) */
-  --accent-strong: #0e9d6b;   /* deep emerald — fills / bars on white */
+  --accent:        #0c8f5d;   /* brand green in LIGHT = deep readable emerald (the neon
+                                 mint reads washed on white; map paint keeps literal mint) */
+  --accent-strong: #0a7a4e;   /* deeper emerald — bar/fill gradients on white */
   --accent-ink:    #2f3a49;   /* strong neutral slate — labels/values read dark & distinct
                                  (not green, not faded); green stays only on true accents. */
   --accent-2:      #9c6008;

@@ -104,8 +104,8 @@ export function TrialBanner({ lang = "sk", onCta }) {
       position: "fixed",
       top: 0, left: 0, right: 0,
       zIndex: "var(--z-banner)",
-      background: "linear-gradient(90deg, rgba(0,229,160,0.18), rgba(0,229,160,0.08) 60%, rgba(0,229,160,0.04))",
-      borderBottom: "1px solid rgba(0,229,160,0.35)",
+      background: "linear-gradient(90deg, color-mix(in srgb, var(--accent) 18%, transparent), color-mix(in srgb, var(--accent) 8%, transparent) 60%, color-mix(in srgb, var(--accent) 4%, transparent))",
+      borderBottom: "1px solid color-mix(in srgb, var(--accent) 35%, transparent)",
       color: "var(--text)",
       fontSize: "0.78rem",
       // top inset clears the notch/status bar; side insets clear landscape cutouts
@@ -118,7 +118,7 @@ export function TrialBanner({ lang = "sk", onCta }) {
     }}>
       <span style={{ fontSize: "0.95rem" }}>🎁</span>
       <span style={{ flex: "0 1 auto", textAlign: "center", lineHeight: 1.4 }}>
-        <strong style={{ color: "#00e5a0", fontWeight: 700 }}>
+        <strong style={{ color: "var(--accent)", fontWeight: 700 }}>
           {L("7 dní zadarmo", "7 days free")}
         </strong>{" "}
         {/* full copy on wider screens, punchy short copy on phones (see responsive.css) */}
@@ -130,7 +130,7 @@ export function TrialBanner({ lang = "sk", onCta }) {
       </span>
       <button onClick={click}
         style={{
-          background: "#00e5a0", color: "var(--bg)",
+          background: "var(--accent)", color: "var(--bg)",
           border: "none", borderRadius: 6,
           padding: "0.3rem 0.85rem",
           fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", fontSize: "0.7rem",
@@ -223,11 +223,11 @@ export function TrialPopup({ lang = "sk", onCta }) {
       `}</style>
       <div style={{
         background: "linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%)",
-        border: "1px solid rgba(0,229,160,0.4)",
+        border: "1px solid color-mix(in srgb, var(--accent) 40%, transparent)",
         borderRadius: 16,
         padding: "2rem 2.25rem",
         maxWidth: 460, width: "100%",
-        boxShadow: "0 30px 80px rgba(0,0,0,0.7), 0 0 60px rgba(0,229,160,0.1)",
+        boxShadow: "0 30px 80px rgba(0,0,0,0.7), 0 0 60px color-mix(in srgb, var(--accent) 10%, transparent)",
         animation: "trialPopupCard 0.3s ease-out",
         position: "relative",
       }}>
@@ -250,7 +250,7 @@ export function TrialPopup({ lang = "sk", onCta }) {
 
         <div style={{
           fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem",
-          color: "#00e5a0", letterSpacing: "0.14em", textTransform: "uppercase",
+          color: "var(--accent)", letterSpacing: "0.14em", textTransform: "uppercase",
           fontWeight: 700, marginBottom: "0.35rem",
         }}>
           {L("Darček pre teba", "A gift for you")}
@@ -285,14 +285,14 @@ export function TrialPopup({ lang = "sk", onCta }) {
         <button onClick={cta}
           style={{
             display: "block", width: "100%",
-            background: "#00e5a0", color: "var(--bg)",
+            background: "var(--accent)", color: "var(--bg)",
             border: "none", borderRadius: 8,
             padding: "0.85rem 1rem",
             fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", fontSize: "0.88rem",
             cursor: "pointer", letterSpacing: "0.02em",
             transition: "transform 0.15s, box-shadow 0.15s",
           }}
-          onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,229,160,0.4)"; }}
+          onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 8px 24px color-mix(in srgb, var(--accent) 40%, transparent)"; }}
           onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = "none"; }}
         >
           {L("Aktivovať 7-dňový trial", "Activate 7-day trial")}

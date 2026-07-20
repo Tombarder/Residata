@@ -1633,8 +1633,8 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   return (
     <div style={{
       background: `linear-gradient(135deg, var(--surface-2) 0%, var(--bg) 100%)`,
-      border: `1px solid ${green}40`, borderRadius: 12, padding: "1.25rem",
-      boxShadow: "0 0 28px rgba(0,229,160,0.05)",
+      border: `1px solid color-mix(in srgb, var(--accent) 25%, transparent)`, borderRadius: 12, padding: "1.25rem",
+      boxShadow: "0 0 28px color-mix(in srgb, var(--accent) 5%, transparent)",
     }}>
       {/* Local stylesheet — keyframes for the chart-click flash. Scoped
           here (not in the global App.jsx <style>) because nothing else in
@@ -1642,15 +1642,15 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
           that triggers the animation. */}
       <style>{`
         @keyframes pivotFlash {
-          0%   { background-color: rgba(0,229,160,0.00); box-shadow: inset 0 0 0 rgba(0,229,160,0.00); }
-          15%  { background-color: rgba(0,229,160,0.32); box-shadow: inset 0 0 0 2px rgba(0,229,160,0.65); }
-          100% { background-color: rgba(0,229,160,0.00); box-shadow: inset 0 0 0 rgba(0,229,160,0.00); }
+          0%   { background-color: color-mix(in srgb, var(--accent) 0%, transparent); box-shadow: inset 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent); }
+          15%  { background-color: color-mix(in srgb, var(--accent) 32%, transparent); box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 65%, transparent); }
+          100% { background-color: color-mix(in srgb, var(--accent) 0%, transparent); box-shadow: inset 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent); }
         }
         .pivot-flash > td { animation: pivotFlash 1.6s ease-out; }
         @keyframes pivotCellFlash {
-          0%   { box-shadow: inset 0 0 0 0 ${green}, 0 0 0 ${green}; outline-color: rgba(0,229,160,0); }
-          15%  { box-shadow: inset 0 0 0 2px ${green}, 0 0 12px rgba(0,229,160,0.55); outline-color: ${green}; }
-          100% { box-shadow: inset 0 0 0 0 ${green}, 0 0 0 ${green}; outline-color: rgba(0,229,160,0); }
+          0%   { box-shadow: inset 0 0 0 0 ${green}, 0 0 0 ${green}; outline-color: color-mix(in srgb, var(--accent) 0%, transparent); }
+          15%  { box-shadow: inset 0 0 0 2px ${green}, 0 0 12px color-mix(in srgb, var(--accent) 55%, transparent); outline-color: ${green}; }
+          100% { box-shadow: inset 0 0 0 0 ${green}, 0 0 0 ${green}; outline-color: color-mix(in srgb, var(--accent) 0%, transparent); }
         }
         .pivot-cell-flash {
           animation: pivotCellFlash 1.6s ease-out;
@@ -1675,9 +1675,9 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
            stopPropagation's). Keyboard focus ring on the name. */
         .pivot-row-int { cursor: pointer; }
         .pivot-row-int:hover .pivot-label-text {
-          text-decoration: underline; text-decoration-color: #00e5a0; text-underline-offset: 3px;
+          text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 3px;
         }
-        .pivot-label-text:focus-visible { outline: 2px solid #00e5a0; outline-offset: -2px; border-radius: 3px; }
+        .pivot-label-text:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 3px; }
       `}</style>
 
       {/* Initial-load skeleton — shown ONLY while real flats are still
@@ -1752,7 +1752,7 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
           {displayCount.toLocaleString("en-US").replace(/,/g, " ")} {lang === "sk" ? "bytov" : "units"}
           {(stavSplit.offer > 0 || stavSplit.sold > 0) && (
             <span style={{ marginLeft: "0.5rem" }}>
-              · <strong style={{ color: "#00e5a0" }}>{stavSplit.offer.toLocaleString("en-US").replace(/,/g, " ")}</strong> {lang === "sk" ? "v ponuke" : "on offer"}
+              · <strong style={{ color: "var(--accent)" }}>{stavSplit.offer.toLocaleString("en-US").replace(/,/g, " ")}</strong> {lang === "sk" ? "v ponuke" : "on offer"}
               {" · "}<strong style={{ color: "var(--text-dim)" }}>{stavSplit.sold.toLocaleString("en-US").replace(/,/g, " ")}</strong> {lang === "sk" ? "predaných" : "sold"}
             </span>
           )}
@@ -2044,7 +2044,7 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
       {filters.some(isFilterActive) && (
         <div style={{
           marginTop: "0.75rem", padding: "0.5rem 0.75rem",
-          background: "transparent", border: `1px dashed ${green}40`,
+          background: "transparent", border: `1px dashed color-mix(in srgb, var(--accent) 25%, transparent)`,
           borderRadius: 6, display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap",
           fontSize: "0.75rem",
         }}>
@@ -2161,7 +2161,7 @@ function DropZone({ zoneKey, title, hint, icon, chips, drag, hoverZone, setHover
       onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget) && hoverZone === zoneKey) setHoverZone(null); }}
       onDrop={(e) => { e.preventDefault(); onDrop(); }}
       style={{
-        background: isHover ? "rgba(0,229,160,0.07)" : panel,
+        background: isHover ? "color-mix(in srgb, var(--accent) 7%, transparent)" : panel,
         border: `1px dashed ${isHover ? green : (isDragging ? "#2c2c36" : border)}`,
         borderRadius: 8, padding: "0.75rem 0.9rem",
         transition: "background 0.15s, border-color 0.15s",
@@ -2171,7 +2171,7 @@ function DropZone({ zoneKey, title, hint, icon, chips, drag, hoverZone, setHover
         <span style={{
           display: "inline-flex", alignItems: "center", justifyContent: "center",
           width: 22, height: 22, borderRadius: 4,
-          background: "rgba(0,229,160,0.12)", color: accentInk,
+          background: "color-mix(in srgb, var(--accent) 12%, transparent)", color: accentInk,
           fontFamily: mono, fontSize: "0.76rem", fontWeight: 800,
         }}>{icon}</span>
         <span style={{ fontFamily: mono, fontSize: "0.8rem", color: text, fontWeight: 700, letterSpacing: "0.04em" }}>{title}</span>
@@ -2243,7 +2243,7 @@ function ChipInZone({ label, type, agg, filter, level, onDragStart, onDragStartP
       style={{
         display: "inline-flex", alignItems: "center", gap: "0.35rem",
         padding: "0.3rem 0.45rem 0.3rem 0.55rem", borderRadius: 100,
-        background: active ? "rgba(0,229,160,0.14)" : "rgba(138,138,150,0.10)",
+        background: active ? "color-mix(in srgb, var(--accent) 14%, transparent)" : "rgba(138,138,150,0.10)",
         border: `1px solid ${active ? green : "var(--border-soft)"}`,
         color: active ? green : dim,
         fontSize: "0.75rem",
@@ -2312,7 +2312,7 @@ function ChipInZone({ label, type, agg, filter, level, onDragStart, onDragStartP
                   style={{
                     display: "block", width: "100%", textAlign: "left",
                     padding: "0.3rem 0.55rem", borderRadius: 3,
-                    background: a === agg ? "rgba(0,229,160,0.14)" : "transparent",
+                    background: a === agg ? "color-mix(in srgb, var(--accent) 14%, transparent)" : "transparent",
                     color: a === agg ? green : text,
                     border: "none", fontFamily: mono, fontSize: "0.72rem",
                     cursor: "pointer",
@@ -2407,7 +2407,7 @@ function RightPanel({ usedKeys, search, setSearch, drag, setDrag, hoverZone, set
             color: text, fontSize: "0.78rem", fontFamily: "inherit",
             boxSizing: "border-box", outline: "none",
           }}
-          onFocus={(e) => e.currentTarget.style.borderColor = green + "aa"}
+          onFocus={(e) => e.currentTarget.style.borderColor = "color-mix(in srgb, var(--accent) 67%, transparent)"}
           onBlur={(e) => e.currentTarget.style.borderColor = border}
         />
         <span style={{ position: "absolute", left: "0.6rem", top: "50%", transform: "translateY(-50%)", color: dim, fontSize: "0.9rem", pointerEvents: "none" }}>🔍</span>
@@ -2514,7 +2514,7 @@ function AnalysisToolbar({ valueMode, setValueMode, dataBars, setDataBars, onExp
     color: dim, padding: "0.35rem 0.7rem", borderRadius: 4,
     fontSize: "0.75rem", cursor: "pointer",
   };
-  const btnActive = { ...btnBase, background: "rgba(0,229,160,0.14)", color: accentInk, borderColor: green };
+  const btnActive = { ...btnBase, background: "color-mix(in srgb, var(--accent) 14%, transparent)", color: accentInk, borderColor: green };
   const btnDisabled = { ...btnBase, opacity: 0.4, cursor: "not-allowed" };
   const btnPill = (active, disabled) => (disabled ? btnDisabled : (active ? btnActive : btnBase));
 
@@ -2573,7 +2573,7 @@ function AnalysisToolbar({ valueMode, setValueMode, dataBars, setDataBars, onExp
 
       <button style={btnPill(dataBars)} onClick={() => setDataBars(x => !x)}>{lang === "sk" ? "▮ stĺpčeky" : "▮ bars"}</button>
 
-      <button style={{ ...btnBase, marginLeft: "auto", color: accentInk, borderColor: `${green}55` }}
+      <button style={{ ...btnBase, marginLeft: "auto", color: accentInk, borderColor: `color-mix(in srgb, var(--accent) 33%, transparent)` }}
               onClick={onExportCSV}>
         ⬇ CSV
       </button>
@@ -2883,7 +2883,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                   flag the hidden ones — otherwise Σ silently exceeds the sum of the
                   visible columns. */}
               <th colSpan={effectiveValues.length}
-                  style={{ ...th, color: dim, borderLeft: `2px solid ${green}55` }}
+                  style={{ ...th, color: dim, borderLeft: `2px solid color-mix(in srgb, var(--accent) 33%, transparent)` }}
                   title={colOverflow > 0 ? (lang === "sk" ? `Σ zahŕňa aj ${colOverflow} ďalších stĺpcov, ktoré sa nezmestili` : `Σ also includes ${colOverflow} more columns that didn't fit`) : undefined}>
                 Σ {lang === "sk" ? "spolu" : "total"}
                 {colOverflow > 0 && <span style={{ color: orange, fontWeight: 400 }}> · +{colOverflow}</span>}
@@ -2923,7 +2923,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                   <th key={`sum:${v.key}`}
                       style={{
                         ...th, textAlign: "right", minWidth: 90, color: dim,
-                        borderLeft: i === 0 ? `2px solid ${green}55` : undefined,
+                        borderLeft: i === 0 ? `2px solid color-mix(in srgb, var(--accent) 33%, transparent)` : undefined,
                         cursor: "pointer",
                       }}
                       onClick={() => clickSort(i)}>
@@ -2947,7 +2947,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
             // accent over the card reads on BOTH themes (was a hardcoded near-black
             // ladder — a dark-theme leftover that rendered as a black bar in light).
             const shade = [
-              "rgba(0,229,160,0.15)", "rgba(0,229,160,0.10)",
+              "color-mix(in srgb, var(--accent) 15%, transparent)", "color-mix(in srgb, var(--accent) 10%, transparent)",
               "var(--surface-3)", "var(--surface-2)", "var(--surface-2)",
             ][Math.min(n.level, 4)];
             const indent = 0.4 + n.level * 0.8;
@@ -2976,7 +2976,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                 className={rowInteractive ? "pivot-row-int" : undefined}
                 onClick={rowAction}
                 title={canOpenProject ? (lang === "sk" ? `Otvoriť projekt ${n.label}` : `Open project ${n.label}`) : undefined}
-                onMouseEnter={rowInteractive ? (e) => { e.currentTarget.style.background = "rgba(0,229,160,0.11)"; } : undefined}
+                onMouseEnter={rowInteractive ? (e) => { e.currentTarget.style.background = "color-mix(in srgb, var(--accent) 11%, transparent)"; } : undefined}
                 onMouseLeave={rowInteractive ? (e) => { e.currentTarget.style.background = baseBg; } : undefined}
                 style={{
                   background: baseBg,
@@ -3097,8 +3097,8 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                         <td key={`sum:${v.key}`} style={{
                           ...td, textAlign: "right", fontFamily: mono,
                           color: accentInk, fontWeight: isSubtotal ? 800 : 700,
-                          borderLeft: i === 0 ? `2px solid ${green}55` : undefined,
-                          background: "rgba(0,229,160,0.03)",
+                          borderLeft: i === 0 ? `2px solid color-mix(in srgb, var(--accent) 33%, transparent)` : undefined,
+                          background: "color-mix(in srgb, var(--accent) 3%, transparent)",
                           position: "relative",
                         }}>
                           {bw > 0 && (
@@ -3146,7 +3146,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
               mode. In pct_total mode we COULD show "100%" everywhere but
               that's just visual noise; user wants to see the actual
               total they're percenting against. */}
-          <tr style={{ background: bg, borderTop: `2px solid ${green}66` }}>
+          <tr style={{ background: bg, borderTop: `2px solid color-mix(in srgb, var(--accent) 40%, transparent)` }}>
             <td style={{ ...td, fontWeight: 700, color: accentInk, fontSize: "0.85rem" }}>
               Σ {lang === "sk" ? "Spolu" : "Total"}
               {valueMode !== "raw" && (
@@ -3175,8 +3175,8 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                   <td key={`gsum:${v.key}`} style={{
                     ...td, textAlign: "right", fontFamily: mono, color: accentInk,
                     fontWeight: 900, fontSize: "0.9rem",
-                    borderLeft: i === 0 ? `2px solid ${green}55` : undefined,
-                    background: "rgba(0,229,160,0.06)",
+                    borderLeft: i === 0 ? `2px solid color-mix(in srgb, var(--accent) 33%, transparent)` : undefined,
+                    background: "color-mix(in srgb, var(--accent) 6%, transparent)",
                   }}>
                     {formatValue(grandTotal.rollups[i], v.field, v.agg)}
                   </td>
@@ -3251,7 +3251,7 @@ const td = { padding: "0.45rem 0.75rem", borderBottom: "none" };
 */
 
 const CHART_PALETTE = [
-  "#00e5a0", "#f5a623", "#4a90e2", "#ff6b6b",
+  "var(--accent)", "#f5a623", "#4a90e2", "#ff6b6b",
   "#9b59b6", "#1abc9c", "#e84393", "#fab1a0",
   "#74b9ff", "#a29bfe", "#fdcb6e", "#55efc4",
 ];
@@ -3495,7 +3495,7 @@ function ChartTypeBtn({ active, onClick, label }) {
     <button
       onClick={onClick}
       style={{
-        background: active ? "rgba(0,229,160,0.12)" : "transparent",
+        background: active ? "color-mix(in srgb, var(--accent) 12%, transparent)" : "transparent",
         border: `1px solid ${active ? green : border}`,
         color: active ? green : text,
         padding: "0.3rem 0.6rem", borderRadius: 6,
@@ -4433,7 +4433,7 @@ function FilterPopover({ fieldKey, filter, anchorEl, records, distinctOverride =
       {loading && (
         <div style={{
           marginBottom: "0.85rem", padding: "0.5rem 0.7rem",
-          background: "rgba(0,229,160,0.06)", border: `1px solid ${green}33`,
+          background: "color-mix(in srgb, var(--accent) 6%, transparent)", border: `1px solid color-mix(in srgb, var(--accent) 20%, transparent)`,
           borderRadius: 6, fontSize: "0.78rem", color: dim, lineHeight: 1.4,
         }}>
           {lang === "sk" ? "Načítavam hodnoty…" : "Loading values…"}
@@ -4603,7 +4603,7 @@ function ModeBtn({ active, onClick, children }) {
   return (
     <button onClick={onClick}
       style={{
-        background: active ? "rgba(0,229,160,0.14)" : "transparent",
+        background: active ? "color-mix(in srgb, var(--accent) 14%, transparent)" : "transparent",
         border: `1px solid ${active ? green : border}`,
         color: active ? green : "var(--text-2)",
         padding: "0.38rem 0.7rem", borderRadius: 6,
@@ -4623,7 +4623,7 @@ function QuickBtn({ onClick, children }) {
         cursor: "pointer", fontFamily: "inherit", fontSize: "0.74rem",
         transition: "border-color 0.1s, color 0.1s",
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.borderColor = green + "aa"; e.currentTarget.style.color = text; }}
+      onMouseEnter={(e) => { e.currentTarget.style.borderColor = "color-mix(in srgb, var(--accent) 67%, transparent)"; e.currentTarget.style.color = text; }}
       onMouseLeave={(e) => { e.currentTarget.style.borderColor = border; e.currentTarget.style.color = dim; }}>
       {children}
     </button>
@@ -4727,7 +4727,7 @@ function DrillDownModal({ title, records, loading, onClose, lang }) {
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: "var(--bg)", border: `1px solid ${green}55`, borderRadius: 10,
+          background: "var(--bg)", border: `1px solid color-mix(in srgb, var(--accent) 33%, transparent)`, borderRadius: 10,
           width: "min(1200px, 100%)", maxHeight: "88vh", display: "flex", flexDirection: "column",
           boxShadow: "0 20px 64px rgba(0,0,0,0.9)",
         }}
@@ -4741,7 +4741,7 @@ function DrillDownModal({ title, records, loading, onClose, lang }) {
             {records.length.toLocaleString("en-US").replace(/,/g, " ")}
           </span>
           <button onClick={downloadCSV} style={{
-            background: "transparent", border: `1px solid ${green}55`, color: accentInk,
+            background: "transparent", border: `1px solid color-mix(in srgb, var(--accent) 33%, transparent)`, color: accentInk,
             borderRadius: 4, padding: "0.3rem 0.6rem", cursor: "pointer",
             fontFamily: mono, fontSize: "0.7rem",
           }}>⬇ CSV</button>

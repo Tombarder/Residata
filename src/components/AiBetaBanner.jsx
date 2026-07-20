@@ -32,7 +32,7 @@ import { useEffect, useState } from "react";
 const KEY = "residata_ai_beta_banner_dismissed_until";
 const HIDE_DAYS = 7;
 
-const green   = "#00e5a0";
+const green   = "var(--accent)";
 const greenInk = "var(--accent-ink)";
 const orange  = "#f5a623";
 const dim     = "var(--text-dim)";
@@ -152,10 +152,10 @@ export default function AiBetaBanner({ lang = "sk", compact = false }) {
         href="mailto:tomas@residata.sk?subject=Residata%20AI%20feedback"
         style={{
           color: greenInk, textDecoration: "none",
-          padding: "0.25rem 0.55rem", border: `1px solid ${green}55`,
+          padding: "0.25rem 0.55rem", border: `1px solid color-mix(in srgb, var(--accent) 33%, transparent)`,
           borderRadius: 4, fontSize: "0.72rem", whiteSpace: "nowrap",
         }}
-        onMouseEnter={e => e.currentTarget.style.background = "rgba(0,229,160,0.10)"}
+        onMouseEnter={e => e.currentTarget.style.background = "color-mix(in srgb, var(--accent) 10%, transparent)"}
         onMouseLeave={e => e.currentTarget.style.background = "transparent"}
       >
         {T.cta} →

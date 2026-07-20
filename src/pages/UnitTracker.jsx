@@ -530,7 +530,7 @@ function UnitTile({ unit, isPicked, disabled, onClick, lang, compact = false }) 
       onClick={onClick}
       disabled={disabled}
       style={{
-        background: isPicked ? "rgba(0,229,160,0.08)" : "transparent",
+        background: isPicked ? "color-mix(in srgb, var(--accent) 8%, transparent)" : "transparent",
         border: `1px solid ${isPicked ? green : border}`,
         color: text, cursor: disabled ? "not-allowed" : "pointer",
         padding: compact ? "0.45rem 0.65rem" : "0.65rem 0.85rem",
@@ -538,7 +538,7 @@ function UnitTile({ unit, isPicked, disabled, onClick, lang, compact = false }) 
         opacity: disabled ? 0.4 : 1,
         transition: "border-color 0.12s, background 0.12s",
       }}
-      onMouseEnter={e => { if (!disabled && !isPicked) { e.currentTarget.style.borderColor = green; e.currentTarget.style.background = "rgba(0,229,160,0.04)"; } }}
+      onMouseEnter={e => { if (!disabled && !isPicked) { e.currentTarget.style.borderColor = green; e.currentTarget.style.background = "color-mix(in srgb, var(--accent) 4%, transparent)"; } }}
       onMouseLeave={e => { if (!disabled && !isPicked) { e.currentTarget.style.borderColor = border; e.currentTarget.style.background = "transparent"; } }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "0.5rem", marginBottom: "0.2rem" }}>
@@ -707,7 +707,7 @@ function KpiStrip({ lifecycle, primary, onProjectClick, lang }) {
             style={{
               background: "transparent", border: "none", color: text,
               cursor: "pointer", padding: 0, fontSize: "0.85rem", fontFamily: "inherit",
-              textDecoration: "underline", textDecorationColor: `${green}66`, textUnderlineOffset: "3px",
+              textDecoration: "underline", textDecorationColor: `color-mix(in srgb, var(--accent) 40%, transparent)`, textUnderlineOffset: "3px",
             }}
             onMouseEnter={e => { e.currentTarget.style.color = green; }}
             onMouseLeave={e => { e.currentTarget.style.color = text; }}
@@ -857,7 +857,7 @@ function YModeBtn({ active, onClick, children }) {
     <button
       onClick={onClick}
       style={{
-        background: active ? "rgba(0,229,160,0.14)" : "transparent",
+        background: active ? "color-mix(in srgb, var(--accent) 14%, transparent)" : "transparent",
         border: `1px solid ${active ? green : border}`,
         color: active ? green : dim,
         borderRadius: 5, padding: "0.32rem 0.7rem",
@@ -1121,8 +1121,8 @@ function LineChartSVG({ pickedHistories, comparables, allMonths, yOf, fmtY, lang
         {/* Soft baseline gradient backdrop for the plot area */}
         <defs>
           <linearGradient id="ut-plot-bg" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="rgba(0,229,160,0.04)"/>
-            <stop offset="100%" stopColor="rgba(0,229,160,0)"/>
+            <stop offset="0%" stopColor="color-mix(in srgb, var(--accent) 4%, transparent)"/>
+            <stop offset="100%" stopColor="color-mix(in srgb, var(--accent) 0%, transparent)"/>
           </linearGradient>
         </defs>
         <rect x={padL} y={padT} width={innerW} height={innerH} fill="url(#ut-plot-bg)" rx="4"/>
@@ -1488,7 +1488,7 @@ function UnitGrid({ project, units: scopeUnits, loadingScope, search, pickedKeys
               onMouseEnter={e => {
                 if (atMax || selected) return;
                 e.currentTarget.style.borderColor = green;
-                e.currentTarget.style.background = "rgba(0,229,160,0.05)";
+                e.currentTarget.style.background = "color-mix(in srgb, var(--accent) 5%, transparent)";
                 e.currentTarget.style.transform = "translateY(-1px)";
               }}
               onMouseLeave={e => {
@@ -1587,7 +1587,7 @@ function ExportRow({ pickedHistories, lang }) {
     <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1rem" }}>
       <button onClick={downloadCsv}
         style={{
-          background: "transparent", color: accentInk, border: `1px solid ${green}55`,
+          background: "transparent", color: accentInk, border: `1px solid color-mix(in srgb, var(--accent) 33%, transparent)`,
           borderRadius: 6, padding: "0.5rem 0.85rem", fontFamily: mono,
           fontSize: "0.78rem", cursor: "pointer",
         }}

@@ -20,7 +20,7 @@ import MapFilterBuilder from "../components/MapFilterBuilder";
 import { applyFilters, describe, isComplete } from "../lib/mapFilters";
 
 const mono = "'JetBrains Mono', monospace";
-const green = "#00e5a0";
+const green = "var(--accent)";
 const greenInk = "var(--accent-ink)";
 const dim = "var(--text-dim)";
 const border = "var(--border)";
@@ -36,9 +36,9 @@ const orange = "#f5a623";
 // Projects filters look identical to the rest of the platform.
 const filterInput = { boxSizing: "border-box", padding: "7px 11px", background: bg2, border: `1px solid ${border}`, borderRadius: 7, color: text, fontSize: "0.82rem", outline: "none" };
 function filterChip(active) {
-  return { padding: "6px 12px", borderRadius: 999, cursor: "pointer", fontSize: "0.76rem", border: `1px solid ${active ? green : border}`, background: active ? `${green}1a` : "transparent", color: active ? green : dim };
+  return { padding: "6px 12px", borderRadius: 999, cursor: "pointer", fontSize: "0.76rem", border: `1px solid ${active ? green : border}`, background: active ? `color-mix(in srgb, var(--accent) 10%, transparent)` : "transparent", color: active ? green : dim };
 }
-const chipTag = { display: "inline-flex", alignItems: "center", gap: 5, background: `${green}14`, color: greenInk, border: `1px solid ${green}40`, borderRadius: 999, padding: "4px 9px", fontSize: "0.7rem", maxWidth: 260 };
+const chipTag = { display: "inline-flex", alignItems: "center", gap: 5, background: `color-mix(in srgb, var(--accent) 8%, transparent)`, color: greenInk, border: `1px solid color-mix(in srgb, var(--accent) 25%, transparent)`, borderRadius: 999, padding: "4px 9px", fontSize: "0.7rem", maxWidth: 260 };
 
 /* ── ProtectedData ─────────────────────────────────────────
    Wraps a data region (tables, pivot output, etc.) to discourage
@@ -80,7 +80,7 @@ function ProtectedData({ children, lang = "en", style, ...rest }) {
           position: "fixed", bottom: "1.5rem", left: "50%", transform: "translateX(-50%)",
           background: "var(--surface-2)", border: `1px solid ${green}`, color: "var(--text)",
           padding: "0.7rem 1.1rem", borderRadius: 8, fontSize: "0.82rem",
-          boxShadow: `0 12px 32px rgba(0,0,0,0.75), 0 0 22px rgba(0,229,160,0.2)`,
+          boxShadow: `0 12px 32px rgba(0,0,0,0.75), 0 0 22px color-mix(in srgb, var(--accent) 20%, transparent)`,
           zIndex: 99999, fontFamily: "inherit",
           display: "flex", alignItems: "center", gap: "0.55rem",
           pointerEvents: "none",
@@ -361,10 +361,10 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
                 textAlign: "center",
                 background: "var(--surface)",
                 backdropFilter: "blur(8px)",
-                border: `1px solid rgba(0,229,160,0.3)`,
+                border: `1px solid color-mix(in srgb, var(--accent) 30%, transparent)`,
                 borderRadius: 12,
                 padding: "1.15rem 1.75rem",
-                boxShadow: "0 10px 40px rgba(0,0,0,0.6), 0 0 32px rgba(0,229,160,0.08)",
+                boxShadow: "0 10px 40px rgba(0,0,0,0.6), 0 0 32px color-mix(in srgb, var(--accent) 8%, transparent)",
                 maxWidth: "calc(100% - 2rem)",
               }}>
                 <div style={{ fontSize: "0.95rem", color: "var(--text)", marginBottom: "0.4rem", fontWeight: 500 }}>
@@ -507,7 +507,7 @@ function StatusBadge({ status, lang }) {
     sold_out: { bg: "rgba(245,166,35,0.12)", fg: "#f5a623", label: lang === "sk" ? "Vypredané" : "Sold out" },
     paused:   { bg: "rgba(138,138,150,0.12)", fg: "#a0a0aa", label: lang === "sk" ? "Pauza"     : "Paused" },
     archived: { bg: "rgba(255,107,107,0.10)", fg: "#ff6b6b", label: lang === "sk" ? "Archív"    : "Archived" },
-    active:   { bg: "rgba(0,229,160,0.10)",   fg: green,     label: lang === "sk" ? "Aktívne"   : "Active" },
+    active:   { bg: "color-mix(in srgb, var(--accent) 10%, transparent)",   fg: green,     label: lang === "sk" ? "Aktívne"   : "Active" },
   };
   const c = cfg[status] || cfg.active;
   return (
@@ -2474,7 +2474,7 @@ function median(arr) {
 
 function FlatsTable({ flats, t, lang, highlightedFlatId }) {
   const stavStyle = {
-    V: { color: "#00e5a0", bg: "rgba(0,229,160,0.08)" },
+    V: { color: "var(--accent)", bg: "color-mix(in srgb, var(--accent) 8%, transparent)" },
     P: { color: "#f5a623", bg: "rgba(245,166,35,0.08)" },
     R: { color: "#888", bg: "rgba(136,136,136,0.08)" },
     PR: { color: "#aaa", bg: "rgba(170,170,170,0.08)" },
@@ -2670,7 +2670,7 @@ function FlatsTable({ flats, t, lang, highlightedFlatId }) {
             items={STAV_VALUES.map(s => ({
               key: s, label: stavLabel(s),
               active: stavSel.has(s),
-              color: s === "V" ? "#00e5a0" : s === "P" ? "#f5a623" : "#888",
+              color: s === "V" ? "var(--accent)" : s === "P" ? "#f5a623" : "#888",
               onClick: () => toggleStav(s),
             }))}
           />
@@ -2682,7 +2682,7 @@ function FlatsTable({ flats, t, lang, highlightedFlatId }) {
             items={ROOM_VALUES.map(v => ({
               key: String(v), label: `${v}`,
               active: roomSel.has(String(v)),
-              color: "#00e5a0",
+              color: "var(--accent)",
               onClick: () => toggleRoom(String(v)),
             }))}
           />
@@ -2801,8 +2801,8 @@ function FlatsTable({ flats, t, lang, highlightedFlatId }) {
           Keyframes defined inline so FlatsTable is self-contained. */}
       <style>{`
         @keyframes flatRowFlash {
-          0%   { background-color: rgba(0,229,160,0.35); box-shadow: inset 0 0 0 2px rgba(0,229,160,0.6); }
-          60%  { background-color: rgba(0,229,160,0.12); box-shadow: inset 0 0 0 1px rgba(0,229,160,0.3); }
+          0%   { background-color: color-mix(in srgb, var(--accent) 35%, transparent); box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 60%, transparent); }
+          60%  { background-color: color-mix(in srgb, var(--accent) 12%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent); }
           100% { background-color: transparent; box-shadow: none; }
         }
         .flat-row-flash > td { animation: flatRowFlash 3s ease-out; }
@@ -3354,11 +3354,11 @@ function RankBarList({ rows, setCurrent, suffix = "", color = green, getChildren
     <div>
       <style>{`
         .${cls}-row { cursor: pointer; transition: background 0.15s; border-radius: 4px; }
-        .${cls}-row:hover { background: rgba(0,229,160,0.07); }
-        .${cls}-row:hover .${cls}-name { text-decoration: underline; text-decoration-color: rgba(0,229,160,0.5); text-underline-offset: 3px; }
+        .${cls}-row:hover { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+        .${cls}-row:hover .${cls}-name { text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--accent) 50%, transparent); text-underline-offset: 3px; }
         .${cls}-row * { cursor: inherit; }
         .${cls}-child { cursor: pointer; transition: background 0.12s; border-radius: 4px; }
-        .${cls}-child:hover { background: rgba(0,229,160,0.06); }
+        .${cls}-child:hover { background: color-mix(in srgb, var(--accent) 6%, transparent); }
         .${cls}-child:hover .${cls}-childname { color: ${green}; text-decoration: underline; text-underline-offset: 3px; }
       `}</style>
       {rows.map((r, i) => {
@@ -4064,7 +4064,7 @@ function OverviewPanel({ activity, users, lang }) {
                           fontFamily: mono, fontSize: "0.7rem",
                           padding: "0.15rem 0.5rem", borderRadius: 4,
                           color: r.tier === "paid" ? green : r.tier === "admin" ? "#f5a623" : r.tier === "pending" ? "#888" : "var(--text-2)",
-                          background: r.tier === "paid" ? "rgba(0,229,160,0.08)" : r.tier === "admin" ? "rgba(245,166,35,0.08)" : "var(--surface-2)",
+                          background: r.tier === "paid" ? "color-mix(in srgb, var(--accent) 8%, transparent)" : r.tier === "admin" ? "rgba(245,166,35,0.08)" : "var(--surface-2)",
                         }}>{r.tier}</span>
                       </td>
                       <td style={{ ...td, textAlign: "right", fontFamily: mono, color: "var(--text)" }}>{r.totalEvents}</td>
@@ -4417,7 +4417,7 @@ function AiChatLogsPanel({ users, lang }) {
           <button key={f.key}
             onClick={() => setFilter(f.key)}
             style={{
-              background: filter === f.key ? "rgba(0,229,160,0.14)" : "transparent",
+              background: filter === f.key ? "color-mix(in srgb, var(--accent) 14%, transparent)" : "transparent",
               color: filter === f.key ? green : dim,
               border: `1px solid ${filter === f.key ? green : border}`,
               borderRadius: 4, padding: "0.3rem 0.65rem",
@@ -4488,7 +4488,7 @@ function AiChatLogsPanel({ users, lang }) {
                 <div style={{ padding: "0.2rem 0.9rem 0.9rem 1.5rem", background: bg }}>
                   <button
                     onClick={() => setViewFull(s)}
-                    style={{ marginBottom: "0.7rem", background: "rgba(0,229,160,0.12)", color: greenInk, border: `1px solid ${green}`, borderRadius: 7, padding: "0.45rem 0.85rem", fontSize: "0.78rem", cursor: "pointer", fontFamily: "inherit", fontWeight: 600 }}>
+                    style={{ marginBottom: "0.7rem", background: "color-mix(in srgb, var(--accent) 12%, transparent)", color: greenInk, border: `1px solid ${green}`, borderRadius: 7, padding: "0.45rem 0.85rem", fontSize: "0.78rem", cursor: "pointer", fontFamily: "inherit", fontWeight: 600 }}>
                     {lang === "sk" ? "Zobraziť celú konverzáciu →" : "Open full conversation →"}
                   </button>
                   {s.turns.map((t, j) => (
@@ -4542,8 +4542,8 @@ function FullConversationView({ session, email, lang, onBack }) {
           return (
             <div key={t.id || j} style={{ display: "flex", justifyContent: isUser ? "flex-end" : "flex-start" }}>
               <div style={{ maxWidth: isUser ? "80%" : "92%",
-                background: isUser ? "rgba(0,229,160,0.10)" : (isErr ? "rgba(255,107,107,0.10)" : "#15151b"),
-                border: `1px solid ${isUser ? "rgba(0,229,160,0.28)" : (isErr ? "rgba(255,107,107,0.4)" : border)}`,
+                background: isUser ? "color-mix(in srgb, var(--accent) 10%, transparent)" : (isErr ? "rgba(255,107,107,0.10)" : "#15151b"),
+                border: `1px solid ${isUser ? "color-mix(in srgb, var(--accent) 28%, transparent)" : (isErr ? "rgba(255,107,107,0.4)" : border)}`,
                 borderRadius: 14, padding: "0.85rem 1.05rem", color: text, fontSize: "0.95rem", lineHeight: 1.6 }}>
                 <div style={{ whiteSpace: "pre-wrap" }}>
                   {t.content || (isErr ? <span style={{ color: red, fontStyle: "italic" }}>{t.error_message || "(error)"}</span> : <span style={{ color: dim, fontStyle: "italic" }}>(empty)</span>)}
@@ -4703,7 +4703,7 @@ function UserTable({ users, setTier, deleteUser, trialAction, subAction, selfId,
               const isSelf = u.id === selfId;
               const rowBg = isSelf
                 ? "rgba(245,166,35,0.08)"
-                : isPremium ? "rgba(0,229,160,0.05)"
+                : isPremium ? "color-mix(in srgb, var(--accent) 5%, transparent)"
                 : isPersonal ? "rgba(245,166,35,0.04)" : "transparent";
               return (
                 <tr key={u.id} style={{ borderTop: `1px solid ${border}`, background: rowBg }}>
@@ -4743,7 +4743,7 @@ function UserTable({ users, setTier, deleteUser, trialAction, subAction, selfId,
                       const paidPaused = Boolean(u.paid_pause_started);
                       const paidDays = paidActive ? daysUntil(u.paid_until) : null;
                       const subBtnStyle = (active, accent = green) => ({
-                        background: active ? `${accent}1f` : "transparent",
+                        background: active ? `color-mix(in srgb, var(--accent) 12%, transparent)` : "transparent",
                         color: isSelf ? "var(--text-faint)" : (active ? accent : "var(--text-2)"),
                         border: `1px solid ${active ? accent : border}`,
                         padding: "0.3rem 0.6rem", borderRadius: 4,
@@ -4862,7 +4862,7 @@ function CountBadge({ n }) {
 
 function TierBadge({ tier }) {
   const map = {
-    paid: "#00e5a0",
+    paid: "var(--accent)",
     admin: "#f5a623",
     pending: "#888",
     free: "var(--text-2)",
@@ -4873,7 +4873,7 @@ function TierBadge({ tier }) {
 
 function EventBadge({ type }) {
   const m = {
-    new_signup: { color: "#00e5a0", label: "NEW" },
+    new_signup: { color: "var(--accent)", label: "NEW" },
     new_signup_personal_email: { color: "#f5a623", label: "PERSONAL EMAIL" },
     new_signup_suspicious_org: { color: "#ff6b6b", label: "SUSPICIOUS ORG" },
   };

@@ -22,7 +22,7 @@ export default function LoadError({ lang = "en", onRetry, compact = false }) {
       <button
         onClick={onRetry || (() => window.location.reload())}
         style={{
-          background: "#00e5a0", color: "#06251a", border: 0, borderRadius: 8,
+          background: "var(--accent)", color: "#06251a", border: 0, borderRadius: 8,
           padding: "0.55rem 1.15rem", fontSize: "0.85rem", fontWeight: 600, cursor: "pointer",
           fontFamily: "inherit",
         }}>
