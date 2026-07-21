@@ -42,6 +42,7 @@ import {
 import { useDashboardConfig, newWidgetId } from "../lib/useDashboardConfig";
 import MapFilterBuilder from "../components/MapFilterBuilder";
 import Picker from "../components/Picker";
+import InfoTip from "../components/InfoTip";
 import { applyFilters, describe, isComplete } from "../lib/mapFilters";
 
 const L = (lang, sk, en) => (lang === "sk" ? sk : en);
@@ -63,16 +64,16 @@ const fmtMonths = (m, lang) => {
 // hint = one-line plain-language clarification shown under the number, so a
 // non-analyst instantly knows what "Reserved" or "All units" actually means.
 const METRICS = {
-  available:   { label: { sk: "Voľné byty",     en: "Available"    }, hint: { sk: "aktuálne v predaji",         en: "on the market now"      }, fmt: "count", accent: green },
-  avg_m2:      { label: { sk: "Priem. cena/m²", en: "Avg price/m²" }, hint: { sk: "ponuková, s DPH",            en: "asking, incl. VAT"      }, fmt: "m2" },
-  sold30:      { label: { sk: "Predané/30 dní", en: "Sold/30 days" }, hint: { sk: "tempo predaja",              en: "sales pace"             }, fmt: "count", accent: orange, requires: "view_sold_velocity" },
+  available:   { label: { sk: "Voľné byty",     en: "Available"    }, hint: { sk: "aktuálne v predaji",         en: "on the market now"      }, fmt: "count", accent: green, info: { sk: "Počet bytov aktuálne v ponuke naprieč zvolenými projektmi — voľné, ešte nepredané a nerezervované. Nezahŕňa predané ani rezervované byty.", en: "Units currently for sale across the selected projects — free, not yet sold or reserved. Excludes sold and reserved units." } },
+  avg_m2:      { label: { sk: "Priem. cena/m²", en: "Avg price/m²" }, hint: { sk: "ponuková, s DPH",            en: "asking, incl. VAT"      }, fmt: "m2", info: { sk: "Priemerná ponuková cena za m² (s DPH) voľných bytov, vážená počtom bytov. Je to cena, ktorú pýtajú developeri — nie realizovaná predajná cena.", en: "Average asking price per m² (incl. VAT) of available units, weighted by unit count. This is the developers' asking price — not the achieved sale price." } },
+  sold30:      { label: { sk: "Predané/30 dní", en: "Sold/30 days" }, hint: { sk: "tempo predaja",              en: "sales pace"             }, fmt: "count", accent: orange, requires: "view_sold_velocity", info: { sk: "Koľko bytov sa predalo za posledných 30 dní — teda zmizli z ponuky ako predané. Ukazuje aktuálne tempo predaja na trhu.", en: "How many units sold in the last 30 days — i.e. left the market as sold. Shows the current sales pace." } },
   sold_total:  { label: { sk: "Predané spolu",  en: "Sold total"   }, hint: { sk: "kumulatívne doteraz",        en: "cumulative to date"     }, fmt: "count" },
-  sold_through:{ label: { sk: "Vypredanosť",    en: "Sold-through" }, hint: { sk: "podiel už predaných",        en: "share already sold"     }, fmt: "pct", accent: orange },
-  reserved:    { label: { sk: "Rezervované",    en: "Reserved"     }, hint: { sk: "vr. predrezervovaných",      en: "incl. pre-reserved"     }, fmt: "count", accent: blue },
+  sold_through:{ label: { sk: "Vypredanosť",    en: "Sold-through" }, hint: { sk: "podiel už predaných",        en: "share already sold"     }, fmt: "pct", accent: orange, info: { sk: "Podiel už predaných bytov z celkového počtu bytov v projektoch (predané ÷ všetky byty). Napr. 68 % znamená, že z každých 100 bytov je 68 predaných.", en: "Share of units already sold out of all units in the projects (sold ÷ total units). E.g. 68% means 68 of every 100 units are sold." } },
+  reserved:    { label: { sk: "Rezervované",    en: "Reserved"     }, hint: { sk: "vr. predrezervovaných",      en: "incl. pre-reserved"     }, fmt: "count", accent: blue, info: { sk: "Počet bytov aktuálne rezervovaných (vrátane predrezervovaných). Rezervácia ešte nie je predaj — byt sa môže vrátiť do ponuky.", en: "Units currently reserved (including pre-reserved). A reservation isn't a sale — the unit can return to the market." } },
   tracked:     { label: { sk: "Všetky byty",    en: "All units"    }, hint: { sk: "vrátane predaných",          en: "incl. sold"             }, fmt: "count" },
-  projects:    { label: { sk: "Projekty",       en: "Projects"     }, hint: { sk: "aktívne v predaji",          en: "active in market"       }, fmt: "count" },
-  developers:  { label: { sk: "Developeri",     en: "Developers"   }, hint: { sk: "aktívni na trhu",            en: "active in market"       }, fmt: "count" },
-  inventory:   { label: { sk: "Zásoba",         en: "Inventory"    }, hint: { sk: "mesiacov pri dnešnom tempe", en: "months at today's pace" }, fmt: "months" },
+  projects:    { label: { sk: "Projekty",       en: "Projects"     }, hint: { sk: "aktívne v predaji",          en: "active in market"       }, fmt: "count", info: { sk: "Počet aktívnych projektov vo zvolenom výbere, ktoré majú aspoň jeden byt v ponuke.", en: "Number of active projects in the current selection that have at least one unit for sale." } },
+  developers:  { label: { sk: "Developeri",     en: "Developers"   }, hint: { sk: "aktívni na trhu",            en: "active in market"       }, fmt: "count", info: { sk: "Počet rôznych developerov s aktívnou ponukou vo zvolenom výbere.", en: "Number of distinct developers with active offerings in the current selection." } },
+  inventory:   { label: { sk: "Zásoba",         en: "Inventory"    }, hint: { sk: "mesiacov pri dnešnom tempe", en: "months at today's pace" }, fmt: "months", info: { sk: "Za koľko mesiacov by sa vypredali všetky voľné byty pri súčasnom tempe predaja (voľné byty ÷ mesačné tempo). Nižšie číslo = rýchlejší trh.", en: "How many months it would take to sell all available units at the current pace (available units ÷ monthly pace). Lower = a faster market." } },
 };
 // Metrics that support a month-over-month delta (derivable from project history).
 const MOM_METRICS = new Set(["available", "avg_m2", "reserved", "sold_total", "sold_through"]);
@@ -354,19 +355,21 @@ const KPI_ICON = {
   developers:   { c: "#64748b", d: "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" },
 };
 
-function KpiCard({ label, value, hint, delta, lang, accent = textLight, locked = false, icon }) {
-  const k = icon?.c;
+function KpiCard({ label, value, hint, delta, lang, accent = textLight, locked = false, icon, info }) {
+  // Calm, single-accent chrome: every card shares the brand-accent icon chip and a
+  // neutral value colour — no per-metric rainbow. Only the ▲/▼ change chip carries
+  // colour, because up/down actually means something.
   return (
-    <div style={{ position: "relative", overflow: "hidden",
-      background: k ? `linear-gradient(180deg, color-mix(in srgb, ${k} 9%, var(--surface)) 0%, var(--surface) 46%)` : bg,
+    <div style={{ position: "relative",
+      background: "var(--surface)",
       border: `1px solid ${border}`, borderRadius: 12, padding: "0.95rem 1.05rem", minWidth: 0, display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-      {k && <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: k, opacity: 0.85 }} />}
+      {info && <div style={{ position: "absolute", top: 8, right: 8 }}><InfoTip text={info[lang] || info.en} label={label} /></div>}
       {icon && (
-        <div style={{ width: 30, height: 30, borderRadius: 8, display: "grid", placeItems: "center", background: `color-mix(in srgb, ${icon.c} 14%, transparent)`, marginBottom: "0.05rem" }}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={icon.c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={icon.d} /></svg>
+        <div style={{ width: 30, height: 30, borderRadius: 8, display: "grid", placeItems: "center", background: "color-mix(in srgb, var(--accent) 10%, transparent)", marginBottom: "0.05rem" }}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={icon.d} /></svg>
         </div>
       )}
-      <span style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.09em", textTransform: "uppercase", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+      <span style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.09em", textTransform: "uppercase", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", paddingRight: info ? "1.2rem" : 0 }}>{label}</span>
       <div style={{ fontFamily: mono, fontSize: "1.4rem", fontWeight: 700, color: accent, letterSpacing: "-0.02em", lineHeight: 1.05, filter: locked ? "blur(6px)" : "none", opacity: locked ? 0.55 : 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{value}</div>
       {locked
         ? <div style={{ fontSize: "0.62rem", color: orange, fontFamily: mono }}>{L(lang, "len pre paid", "paid only")}</div>
@@ -586,8 +589,8 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
                 value={value}
                 hint={gateVelocity ? L(lang, "zbierame históriu", "building history") : (def.hint?.[lang] || def.hint?.en)}
                 delta={delta} lang={lang}
-                accent={def.accent || textLight}
                 icon={KPI_ICON[mk]}
+                info={def.info}
                 locked={locked && !gateVelocity} />
             );
           })}
