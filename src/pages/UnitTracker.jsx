@@ -843,7 +843,7 @@ function ChartCard({ pickedHistories, comparables, yMode, setYMode, lang }) {
         </div>
         {presentStavs.length > 0 && (
           <div style={{ display: "flex", gap: "0.85rem", flexWrap: "wrap", alignItems: "center", fontSize: "0.7rem", color: dim }}>
-            <span style={{ color: faint }}>{lang === "sk" ? "Bodky = stav:" : "Dots = status:"}</span>
+            <span style={{ color: dim, fontWeight: 600 }}>{lang === "sk" ? "Bodky = stav:" : "Dots = status:"}</span>
             {presentStavs.map(s => (
               <span key={s} style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
                 <span style={{ width: 9, height: 9, borderRadius: "50%", background: STAV_COLOR[s], display: "inline-block" }}/>
