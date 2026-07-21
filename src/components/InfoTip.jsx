@@ -31,12 +31,10 @@ export default function InfoTip({ text, label }) {
   const toggle = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
-    setPinned(prev => {
-      const next = !prev;
-      if (next) place(); else setPos(null);
-      return next;
-    });
-  }, [place]);
+    const next = !pinned;   // fresh: `pinned` is in this callback's deps
+    setPinned(next);
+    if (next) place(); else setPos(null);
+  }, [pinned, place]);
 
   // While pinned, close on any outside tap/click or on Escape.
   useEffect(() => {

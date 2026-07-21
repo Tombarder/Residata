@@ -643,6 +643,7 @@ function TopBar({ page, lang, setLang, tier }) {
         <a
           href="/"
           onClick={e => { e.preventDefault(); window.location.assign("/"); }}
+          aria-label={lang === "sk" ? "Otvoriť webstránku" : "Open website"}
           style={{
             display: "inline-flex", alignItems: "center", gap: "0.45rem",
             padding: "0.5rem 0.95rem", borderRadius: 8,
@@ -674,7 +675,7 @@ function TopBar({ page, lang, setLang, tier }) {
           .platform-topbar { padding: 0.85rem 1rem !important; flex-wrap: wrap; row-gap: 0.55rem; }
           .platform-topbar h1 { font-size: 1.15rem !important; }
           .platform-topbar-freshness { display: none !important; }
-          .platform-topbar-controls { margin-left: auto; }
+          .platform-topbar-controls { margin-left: auto; flex-wrap: wrap; justify-content: flex-end; gap: 0.4rem; }
           .ptb-theme-label, .ptb-website-label { display: none !important; }
         }
       `}</style>

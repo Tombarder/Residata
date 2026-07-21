@@ -138,8 +138,21 @@
   filter: saturate(1.06) contrast(1.03);
 }
 
-/* ── themed date input (components/DateField.jsx) — accent focus ring + an
-   accent-tinted calendar icon, on-theme in light and dark ─────────────────── */
+/* ── themed date input (components/DateField.jsx) — box chrome lives here (NOT
+   inline) so the :focus rule below can actually override the border-color. Uses
+   var(--bg) to match the sibling text inputs it replaced (inset contrast on a
+   surface card), on-theme in light and dark. ─────────────────────────────── */
+.date-field {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 0.4rem 0.55rem;
+  font-size: 0.78rem;
+  font-family: inherit;
+  outline: none;
+  box-sizing: border-box;
+}
 .date-field:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent);
