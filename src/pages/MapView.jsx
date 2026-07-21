@@ -333,14 +333,6 @@ export default function MapView({ lang = "en", setCurrent }) {
 
     map.on("load", () => {
       if (mapRef.current !== map) return;  // component unmounted before the style finished loading
-      // Force a resize once the style has loaded. The map can initialise before its
-      // flex container has its final height (the ResizeObserver above doesn't always
-      // re-fire once the size settles), leaving the viewport computed at a stale size
-      // so MapLibre requests ZERO tiles and paints a blank page until something nudges
-      // it. Recompute here — and again on the next frame — so tiles load on first open.
-      // (Boss 2026-07-21: Map view + Market Radar rendered blank until a manual resize.)
-      map.resize();
-      requestAnimationFrame(() => { if (mapRef.current === map) map.resize(); });
       installMapLayers(map, featuresRef.current);
 
       readyRef.current = true;

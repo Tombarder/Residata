@@ -1955,11 +1955,19 @@ export default function App() {
         .btn-s:active { transform: scale(0.985); border-color: var(--accent); }
         
         @keyframes ticker-slide { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+        /* Opacity-only fade. It deliberately does NOT animate transform:
+           animation-fill-mode both would leave a lingering transform on the
+           wrapper, and MapLibre breaks when ANY ancestor of its container has a
+           CSS transform — the map inits under it, never starts its tile loop and
+           paints blank until a manual resize (Boss 2026-07-21: Map view + Market
+           Radar rendered blank on first open). A transform here also forced the
+           Analytics/Reports modals to portal to body to escape the containing
+           block. Opacity-only keeps the fade and removes both problems. */
         @keyframes pageFade {
-          from { opacity: 0; transform: translateY(8px); }
-          to { opacity: 1; transform: translateY(0); }
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
-        .page-transition { animation: pageFade 0.35s ease-out both; }
+        .page-transition { animation: pageFade 0.3s ease-out both; }
 
         /* Home hero fills the viewport. min-height is declared twice on purpose:
            old browsers use 100vh; modern phones use 100svh (the SMALL viewport,
