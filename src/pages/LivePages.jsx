@@ -199,8 +199,7 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
   return (
     <main style={{ padding: "5rem 2rem 4rem", maxWidth: 1200, margin: "0 auto" }}>
       <div style={{ position: "relative", overflow: "hidden", borderRadius: 16, border: "1px solid var(--border)", padding: "1.5rem 1.7rem 1.55rem", marginBottom: "1.8rem", background: "radial-gradient(120% 140% at 2% -20%, rgba(18,185,129,0.13) 0%, transparent 46%), linear-gradient(135deg, color-mix(in srgb, var(--accent) 5%, var(--surface)) 0%, var(--bg) 75%)" }}>
-        <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: 3, background: "linear-gradient(90deg, var(--accent), #3b74e8 55%, #8b5cf6)" }} />
-      <Label>{t.live_label}</Label>
+              <Label>{t.live_label}</Label>
       <h1 className="sec-title" style={{ margin: "0.15rem 0 0" }}>{t.live_title}</h1>
       {/* Landing page už má marketing copy a summary metriky (MarketPulse).
           Live stránka je čistý dátový pohľad. Necháme len prípadný tier-
@@ -746,8 +745,7 @@ export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en
       <button onClick={() => onBack()} style={{ ...linkBtn, marginBottom: "1rem" }}>{t.back_to_projects}</button>
 
       <div style={{ position: "relative", overflow: "hidden", borderRadius: 16, border: "1px solid var(--border)", padding: "1.4rem 1.6rem 1.5rem", marginBottom: "2rem", background: "radial-gradient(120% 140% at 2% -20%, rgba(18,185,129,0.13) 0%, transparent 46%), linear-gradient(135deg, color-mix(in srgb, var(--accent) 5%, var(--surface)) 0%, var(--bg) 75%)" }}>
-        <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: 3, background: "linear-gradient(90deg, var(--accent), #3b74e8 55%, #8b5cf6)" }} />
-        <Label>{[project?.city, project?.district].filter(Boolean).join(" · ") || "—"}</Label>
+                <Label>{[project?.city, project?.district].filter(Boolean).join(" · ") || "—"}</Label>
         <h1 className="sec-title" style={{ margin: "0.25rem 0 0" }}>{project?.name || projectId}</h1>
         <p className="sec-desc" style={{ marginBottom: 0 }}>
           {project ? `${project.total_units} ${t.tbl_units.toLowerCase()} · ${project.available_units} ${t.tbl_available.toLowerCase()} · ${project.sold_percentage ?? "?"}% ${t.tbl_sold.toLowerCase()}` : ""}

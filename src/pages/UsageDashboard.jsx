@@ -165,8 +165,7 @@ export default function UsageDashboard({ lang = "en" }) {
     <div style={{ padding: "1.5rem 1.75rem", maxWidth: 1200, margin: "0 auto", color: text }}>
       {/* Hero panel — title + description */}
       <div style={{ position: "relative", overflow: "hidden", borderRadius: 16, border: "1px solid var(--border)", padding: "1.4rem 1.6rem 1.5rem", marginBottom: "1.5rem", background: "radial-gradient(120% 140% at 2% -20%, rgba(18,185,129,0.13) 0%, transparent 46%), linear-gradient(135deg, color-mix(in srgb, var(--accent) 5%, var(--surface)) 0%, var(--bg) 75%)" }}>
-        <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: 3, background: "linear-gradient(90deg, var(--accent), #3b74e8 55%, #8b5cf6)" }} />
-        <h1 style={{ fontFamily: mono, fontSize: "1.35rem", fontWeight: 700, margin: 0 }}>
+                <h1 style={{ fontFamily: mono, fontSize: "1.35rem", fontWeight: 700, margin: 0 }}>
           {L("Používanie", "Usage")}
           {loading && summary && <span style={{ fontFamily: mono, fontSize: "0.72rem", fontWeight: 400, color: dim, marginLeft: "0.6rem" }}>· {L("aktualizujem…", "updating…")}</span>}
         </h1>

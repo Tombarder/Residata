@@ -482,8 +482,7 @@ export default function TextsEditor({ lang = "en" }) {
   return (
     <div style={{ padding: "1.5rem 1.25rem", maxWidth: 1140, margin: "0 auto", color: textLight, fontFamily: mono }}>
       <div style={{ position: "relative", overflow: "hidden", borderRadius: 16, border: "1px solid var(--border)", padding: "1.4rem 1.6rem 1.5rem", marginBottom: "1.5rem", background: "radial-gradient(120% 140% at 2% -20%, rgba(18,185,129,0.13) 0%, transparent 46%), linear-gradient(135deg, color-mix(in srgb, var(--accent) 5%, var(--surface)) 0%, var(--bg) 75%)" }}>
-        <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: 3, background: "linear-gradient(90deg, var(--accent), #3b74e8 55%, #8b5cf6)" }} />
-        <h1 style={{ fontSize: "1.15rem", fontWeight: 700, margin: "0 0 0.3rem" }}>
+                <h1 style={{ fontSize: "1.15rem", fontWeight: 700, margin: "0 0 0.3rem" }}>
           {uiSK ? "Texty na webe" : "Website texts"}
         </h1>
         <p style={{ color: dim, fontSize: "0.78rem", lineHeight: 1.5, margin: 0, maxWidth: 760 }}>

@@ -519,8 +519,7 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
     <div>
       {/* ═══ HERO BAND — greeting + market overview, a distinct tinted zone ═══ */}
       <div style={{ position: "relative", padding: "1.75rem 2rem 1.9rem", borderBottom: "1px solid var(--border)", background: "radial-gradient(130% 150% at 2% -10%, rgba(18,185,129,0.13) 0%, transparent 44%), radial-gradient(120% 130% at 100% 0%, rgba(59,116,232,0.08) 0%, transparent 42%), linear-gradient(135deg, color-mix(in srgb, var(--accent) 5%, var(--surface)) 0%, var(--bg) 72%)" }}>
-        <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: 3, background: "linear-gradient(90deg, var(--accent), #3b74e8 55%, #8b5cf6)" }} />
-        <div style={{ maxWidth: 1280 }}>
+                <div style={{ maxWidth: 1280 }}>
       {/* Greeting + freshness line */}
       <h2 style={{ fontSize: "1.5rem", fontWeight: 600, color: textLight, margin: "0 0 0.2rem" }}>{greeting}</h2>
       <p style={{ color: dim, fontSize: "0.9rem", lineHeight: 1.55, margin: "0 0 1.4rem" }}>

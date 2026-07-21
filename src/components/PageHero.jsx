@@ -23,7 +23,6 @@ export default function PageHero({ eyebrow, title, subtitle, right, children, st
         ...style,
       }}
     >
-      <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: 3, background: "linear-gradient(90deg, var(--accent), #3b74e8 55%, #8b5cf6)" }} />
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}>
         <div style={{ minWidth: 0 }}>
           {eyebrow && (

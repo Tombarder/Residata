@@ -176,8 +176,7 @@ export default function SalesView({ lang = "sk" }) {
     <div style={{ color: text, fontFamily: "'Inter', system-ui, sans-serif" }}>
       {/* header */}
       <div style={{ position: "relative", overflow: "hidden", borderRadius: 16, border: "1px solid var(--border)", padding: "1.4rem 1.6rem 1.5rem", marginBottom: "1.5rem", background: "radial-gradient(120% 140% at 2% -20%, rgba(18,185,129,0.13) 0%, transparent 46%), linear-gradient(135deg, color-mix(in srgb, var(--accent) 5%, var(--surface)) 0%, var(--bg) 75%)" }}>
-        <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: 3, background: "linear-gradient(90deg, var(--accent), #3b74e8 55%, #8b5cf6)" }} />
-        <h1 style={{ fontSize: "1.4rem", margin: "0 0 0.2rem" }}>{t("Predaje", "Sales")}</h1>
+                <h1 style={{ fontSize: "1.4rem", margin: "0 0 0.2rem" }}>{t("Predaje", "Sales")}</h1>
         <p style={{ color: dim, fontSize: "0.8rem", margin: 0 }}>
           {t("Koľko a KTORÉ byty sa predali — a zostali predané — vo zvolenom období, pre projekty ktoré si vyberieš.",
              "How many and WHICH units sold — and stayed sold — in the chosen period, for the projects you pick.")}
