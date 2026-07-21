@@ -39,6 +39,7 @@ import { applyFilters, describe, isComplete } from "../lib/mapFilters";
 const mono = "'JetBrains Mono', monospace";
 import { accent as green, accentPaint, orange as amber, dim, text as textLight, border, surfaceDark as bg2 } from "../lib/theme";
 import { getTheme, useThemeMode } from "../lib/theme-mode";
+import { kickFirstRender } from "../lib/mapRenderKick";
 const greyPt = "#6b6b76";
 const panel = "var(--surface)";
 
@@ -557,6 +558,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
 
     map.on("load", () => {
       if (mapRef.current !== map) return;
+      kickFirstRender(map);
       installMap2Layers(map, featuresRef.current);
 
       readyRef.current = true;
