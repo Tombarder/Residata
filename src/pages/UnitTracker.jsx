@@ -618,9 +618,6 @@ function DetailView({ pickedHistories, comparables, loadingDetail, yMode, setYMo
         lang={lang}
       />
 
-      {/* Status timeline strip — one row per picked unit */}
-      <StatusTimelineCard pickedHistories={pickedHistories} lang={lang} />
-
       {/* CSV export */}
       <ExportRow pickedHistories={pickedHistories} lang={lang} />
     </>
@@ -784,6 +781,14 @@ function ChartCard({ pickedHistories, comparables, yMode, setYMode, lang }) {
 
   const isSinglePoint = allMonths.length === 1;
 
+  // Legend data. stavLbl → lang-aware status name. presentStavs → only the
+  // statuses that actually occur in the picked units (so the key shows nothing
+  // irrelevant). hasStatusChange → whether any unit ever changed status (the
+  // dashed ring on the line marks those points).
+  const stavLbl = (s) => (({ V: ["Voľný", "Available"], R: ["Rezervovaný", "Reserved"], PR: ["Predrezervovaný", "Pre-reserved"], P: ["Predaný", "Sold"], "Ešte nie v ponuke": ["Ešte nie v ponuke", "Not yet listed"], ERROR: ["Chyba", "Error"] }[s] || [])[lang === "sk" ? 0 : 1]) || s;
+  const presentStavs = ["V", "R", "PR", "P", "Ešte nie v ponuke", "ERROR"].filter(s => pickedHistories.some(h => h.rows.some(r => r.stav === s)));
+  const hasStatusChange = pickedHistories.some(h => new Set(h.rows.map(r => r.stav)).size > 1);
+
   return (
     <div style={{
       background: `linear-gradient(180deg, ${bg2} 0%, ${bg} 100%)`,
@@ -818,8 +823,45 @@ function ChartCard({ pickedHistories, comparables, yMode, setYMode, lang }) {
         lang={lang}
       />
 
+      {/* Legend — which coloured line is which unit (+ its current status), and
+          what the status dots along each line mean. Replaces the old separate
+          status-timeline strip: the line already carries the status over time. */}
+      <div style={{ marginTop: "0.95rem", paddingTop: "0.85rem", borderTop: `1px solid ${border}`, display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+        <div style={{ display: "flex", gap: "1.1rem", flexWrap: "wrap", alignItems: "center" }}>
+          {pickedHistories.map((h, hi) => {
+            const color = COMPARE_PALETTE[hi % COMPARE_PALETTE.length];
+            const last = h.rows[h.rows.length - 1];
+            const scol = STAV_COLOR[last?.stav] || dim;
+            return (
+              <span key={h.key} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem", fontSize: "0.78rem" }}>
+                <span style={{ width: 20, height: 3, borderRadius: 2, background: color, display: "inline-block", flexShrink: 0 }}/>
+                <span style={{ color: text, fontWeight: 600, fontFamily: mono }}>{h.rows[0]?.unit_id}</span>
+                {last?.stav && <span style={{ color: scol, fontSize: "0.66rem", fontWeight: 700, padding: "0.05rem 0.4rem", background: `${scol}1a`, borderRadius: 3 }}>{stavLbl(last.stav)}</span>}
+              </span>
+            );
+          })}
+        </div>
+        {presentStavs.length > 0 && (
+          <div style={{ display: "flex", gap: "0.85rem", flexWrap: "wrap", alignItems: "center", fontSize: "0.7rem", color: dim }}>
+            <span style={{ color: faint }}>{lang === "sk" ? "Bodky = stav:" : "Dots = status:"}</span>
+            {presentStavs.map(s => (
+              <span key={s} style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
+                <span style={{ width: 9, height: 9, borderRadius: "50%", background: STAV_COLOR[s], display: "inline-block" }}/>
+                {stavLbl(s)}
+              </span>
+            ))}
+            {hasStatusChange && (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
+                <span style={{ width: 10, height: 10, borderRadius: "50%", border: `1.5px dashed ${dim}`, display: "inline-block" }}/>
+                {lang === "sk" ? "zmena stavu" : "status change"}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Below-chart hints — single-point and comparables */}
-      <div style={{ marginTop: "0.85rem", display: "flex", flexDirection: "column", gap: "0.35rem", fontSize: "0.74rem" }}>
+      <div style={{ marginTop: "0.6rem", display: "flex", flexDirection: "column", gap: "0.35rem", fontSize: "0.74rem" }}>
         {isSinglePoint && (
           <div style={{ color: orange, display: "flex", alignItems: "center", gap: "0.4rem" }}>
             <span style={{ width: 6, height: 6, borderRadius: "50%", background: orange, display: "inline-block" }}/>
@@ -1317,61 +1359,6 @@ function LineChartSVG({ pickedHistories, comparables, allMonths, yOf, fmtY, lang
         </div>
         );
       })()}
-    </div>
-  );
-}
-
-// ── Status timeline strip ───────────────────────────────────────
-
-function StatusTimelineCard({ pickedHistories, lang }) {
-  if (pickedHistories.length === 0) return null;
-
-  return (
-    <div style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 10, padding: "1rem 1.1rem", marginBottom: "1rem" }}>
-      <div style={{ fontSize: "0.78rem", color: dim, fontFamily: mono, letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: "0.85rem" }}>
-        <span style={{ display: "inline-block", width: 3, height: 12, borderRadius: 2, background: "var(--accent)", marginRight: "0.5rem", verticalAlign: "middle" }} />{lang === "sk" ? "Časová os stavov" : "Status timeline"}
-      </div>
-
-      {pickedHistories.map((h, hi) => {
-        const r0 = h.rows[0];
-        const color = COMPARE_PALETTE[hi % COMPARE_PALETTE.length];
-        return (
-          <div key={h.key} style={{ marginBottom: hi < pickedHistories.length - 1 ? "0.85rem" : 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.3rem" }}>
-              <span style={{ width: 8, height: 8, borderRadius: "50%", background: color, display: "inline-block" }}/>
-              <span style={{ fontSize: "0.78rem", color: text, fontWeight: 600 }}>
-                {r0?.unit_id} <span style={{ color: dim, fontWeight: 400 }}>· {r0?.project_name}</span>
-              </span>
-            </div>
-            <div style={{ display: "flex", height: 18, borderRadius: 4, overflow: "hidden", border: `1px solid ${border}` }}>
-              {h.rows.map((r, i) => {
-                const fill = STAV_COLOR[r.stav] || dim;
-                return (
-                  <div key={i}
-                       style={{ flex: 1, background: fill, position: "relative" }}
-                       title={`${formatTs(tsOf(r), lang)} · ${STAV_LABEL[r.stav] || r.stav}`}>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })}
-
-      {/* Legend */}
-      <div style={{ marginTop: "0.85rem", display: "flex", gap: "0.85rem", flexWrap: "wrap", fontSize: "0.7rem", color: dim }}>
-        {[
-          { stav: "V", label: lang === "sk" ? "Voľný" : "Available" },
-          { stav: "R", label: lang === "sk" ? "Rezervovaný" : "Reserved" },
-          { stav: "PR", label: lang === "sk" ? "Predrezervovaný" : "Pre-reserved" },
-          { stav: "P", label: lang === "sk" ? "Predaný" : "Sold" },
-        ].map(it => (
-          <span key={it.stav} style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
-            <span style={{ width: 11, height: 11, borderRadius: 2, background: STAV_COLOR[it.stav], display: "inline-block" }}/>
-            {it.label}
-          </span>
-        ))}
-      </div>
     </div>
   );
 }
