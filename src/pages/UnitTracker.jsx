@@ -394,6 +394,13 @@ function PickerRow({ projects, globalResults, projectById, loadingGlobal, picked
       border: `1px solid ${border}`, borderRadius: 12,
       padding: "1.1rem 1.25rem", marginBottom: "1.25rem",
     }}>
+      <style>{`
+        /* Two 240px-min columns don't fit a phone — stack them below 640px so the
+           picker never forces a horizontal page scroll. */
+        @media (max-width: 640px) {
+          .ut-picker-grid { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
       <div style={{ display: "grid", gridTemplateColumns: "minmax(240px, 1fr) minmax(240px, 1fr) auto", gap: "0.85rem", alignItems: "end" }} className="ut-picker-grid">
         <div>
           <label style={{ display: "block", fontSize: "0.68rem", color: dim, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.35rem", fontWeight: 600 }}>
