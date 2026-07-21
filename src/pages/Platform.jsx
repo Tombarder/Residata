@@ -286,8 +286,15 @@ export default function PlatformShell({ page, projectId, lang = "en", setLang, s
             but hook state (useProjects etc) survives remount via module-
             level cache — so we don't see the "zeros flash". Wrapped in
             ErrorBoundary so a render crash in any sub-page shows a
-            readable error panel instead of a black screen. */}
-        <div style={{ flex: 1 }} key={page} className="page-transition">
+            readable error panel instead of a black screen.
+            Map pages (WebGL) skip the fade: MapLibre won't start its render
+            loop while an ancestor is mid-animation, so the fade forced a
+            ~0.5s blank map on first open. No fade → the map paints instantly. */}
+        <div
+          style={{ flex: 1 }}
+          key={page}
+          className={page === "App:Map" || page === "App:Map2" ? undefined : "page-transition"}
+        >
           <PlatformErrorBoundary lang={lang}>
             <PageContent
               page={page}

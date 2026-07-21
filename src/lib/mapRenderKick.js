@@ -6,17 +6,17 @@
    resized. Root-caused live (Boss 2026-07-21: Map view + Market Radar blank on
    first open).
 
-   Two things matter:
-   1. A plain map.resize() is a NO-OP when the container size is unchanged, so it
-      never re-triggers tile loading. The reliable kick is a resize with a REAL
-      dimension delta — briefly shrink the container, resize, restore, resize —
-      all in one synchronous frame so the intermediate size is never painted and
-      the user sees no flicker.
-   2. TIMING: the map mounts *inside* the page-transition fade (a 0.3s CSS
-      animation). Kicking during that animation doesn't take; the render loop only
-      starts reliably once layout has settled. So we kick when the ancestor's
-      animation ends — with an immediate attempt (in case there's no animation or
-      it already finished) and a timeout fallback (reduced-motion / no wrapper). */
+   Why a plain resize() doesn't fix it: MapLibre no-ops resize() when the container
+   size is unchanged, so nothing re-triggers tile loading. The reliable kick is a
+   resize with a REAL dimension delta — briefly shrink the container, resize,
+   restore, resize — all in one synchronous frame, so the intermediate size is
+   never painted and the user sees no flicker.
+
+   Timing: the map must not be mid-layout-animation when kicked. Map pages now skip
+   the page-transition fade (see Platform.jsx), so layout is stable at 'load' and we
+   kick immediately + on the next two animation frames — the map paints instantly.
+   The animationend listener + timeout stay as belt-and-suspenders for any context
+   where the map still mounts inside an animated ancestor. */
 export function kickFirstRender(map) {
   const kick = () => {
     try {
@@ -34,18 +34,20 @@ export function kickFirstRender(map) {
     }
   };
 
-  kick(); // layout may already be stable (load fired after the fade finished)
+  // Instant path: layout is stable (map pages don't fade), so kick right away and
+  // again on the next two frames to catch the moment the WebGL context is ready.
+  kick();
+  if (typeof requestAnimationFrame !== "undefined") {
+    requestAnimationFrame(() => { kick(); requestAnimationFrame(kick); });
+  }
 
-  // Primary trigger: kick again once the page-transition fade on an ancestor ends,
-  // when layout is truly settled and the render loop will actually start.
+  // Fallbacks for any context where the map DOES mount inside an animated ancestor
+  // (kick once the fade ends, and a timed net for reduced-motion / no wrapper).
   try {
     const wrapper = map.getContainer()?.closest(".page-transition");
     if (wrapper) wrapper.addEventListener("animationend", kick, { once: true });
   } catch {
-    /* closest() unsupported — the fallback below still covers it. */
+    /* closest() unsupported — the timeout below still covers it. */
   }
-
-  // Fallback safety net if no animationend fires (no wrapper / reduced-motion).
-  // Comfortably past the 0.3s fade.
   setTimeout(kick, 450);
 }
