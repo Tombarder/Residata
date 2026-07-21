@@ -567,7 +567,7 @@ function TopBar({ page, lang, setLang, tier }) {
         </h1>
       </div>
 
-      <div style={{ display: "inline-flex", alignItems: "center", gap: "0.6rem" }}>
+      <div style={{ display: "inline-flex", alignItems: "center", gap: "0.6rem" }} className="platform-topbar-controls">
         {/* When the displayed market's data is from (latest COMPLETE snapshot). A
             stuck batch shows an older date here — the visible "go fix it" signal,
             and it sits next to the market switcher it tracks. */}
@@ -631,7 +631,7 @@ function TopBar({ page, lang, setLang, tier }) {
                   fontSize: "0.78rem", fontFamily: "inherit", lineHeight: 1,
                   background: active ? green : "transparent", color: active ? "#04130d" : "var(--text-2)", fontWeight: active ? 700 : 500,
                   transition: "background 0.15s, color 0.15s" }}>
-                {icon}<span>{label}</span>
+                {icon}<span className="ptb-theme-label">{label}</span>
               </button>
             );
           })}
@@ -656,7 +656,7 @@ function TopBar({ page, lang, setLang, tier }) {
           title={lang === "sk" ? "Otvoriť webstránku" : "Open website"}
         >
           <span style={{ fontSize: "0.9rem", lineHeight: 1 }}>←</span>
-          <span>{lang === "sk" ? "Webstránka" : "Website"}</span>
+          <span className="ptb-website-label">{lang === "sk" ? "Webstránka" : "Website"}</span>
         </a>
       </div>
 
@@ -666,11 +666,16 @@ function TopBar({ page, lang, setLang, tier }) {
         }
         /* Phones: the header competed for width (freshness + language + Website
            button all crowded the title). Drop the secondary "data updated" chip
-           (the page body still shows it), tighten padding, shrink the title. */
+           (the page body still shows it), tighten padding, shrink the title, let
+           the control cluster WRAP to its own line (never a horizontal scroll),
+           and compact the theme/website controls to icon-only so line 2 fits even
+           with the longer Slovak labels. */
         @media (max-width: 640px) {
-          .platform-topbar { padding: 0.85rem 1rem !important; }
+          .platform-topbar { padding: 0.85rem 1rem !important; flex-wrap: wrap; row-gap: 0.55rem; }
           .platform-topbar h1 { font-size: 1.15rem !important; }
           .platform-topbar-freshness { display: none !important; }
+          .platform-topbar-controls { margin-left: auto; }
+          .ptb-theme-label, .ptb-website-label { display: none !important; }
         }
       `}</style>
     </header>
