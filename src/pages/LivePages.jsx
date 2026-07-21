@@ -3213,7 +3213,7 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
         </div>
       </ASection>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(480px, 1fr))", gap: "1.25rem" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 480px), 1fr))", gap: "1.25rem" }}>
         {/* ═══ TOP VELOCITY ═══ */}
         <ASection
           label={lang === "sk" ? "Rýchlosť predaja" : "Sales velocity"}
