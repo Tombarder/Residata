@@ -1217,15 +1217,25 @@ function LineChartSVG({ pickedHistories, comparables, allMonths, yOf, fmtY, lang
                     {showEndpointLabel && (() => {
                       const labelText = fmtCompact(moneyFromEur(p.rawY));
                       const lblW = Math.max(46, labelText.length * 7);
-                      // Place label inside chart area: first → right of dot,
-                      // last → left of dot, to avoid clipping at edges.
-                      const placeRight = isFirst;
-                      const lblX = placeRight ? p.x + 8 : p.x - 8 - lblW;
+                      // Horizontal: first → right of dot, last → left of dot, then
+                      // clamp so the box always stays inside the plot (never clipped
+                      // by the Y axis or the right edge).
+                      let lblX = isFirst ? p.x + 8 : p.x - 8 - lblW;
+                      lblX = Math.max(padL + 2, Math.min(lblX, W - padR - lblW - 2));
+                      // Vertical: LIFT the label off the line. The data dots sit on
+                      // the line, so a label centred on the line gets covered by them
+                      // (a flat price = every dot at the label's height). Sit it above
+                      // the point; flip below only if that would clip the plot top.
+                      const above = p.y - 34 >= padT;
+                      const lblCy = above ? p.y - 24 : p.y + 24;
+                      const boxEdgeY = above ? lblCy + 10 : lblCy - 10;
                       return (
                         <g>
-                          <rect x={lblX} y={p.y - 10} width={lblW} height={20}
-                                fill="rgba(14,14,18,0.95)" stroke={color} strokeWidth="1" rx="3" opacity="0.95"/>
-                          <text x={lblX + lblW / 2} y={p.y + 4}
+                          <line x1={p.x} y1={p.y} x2={lblX + lblW / 2} y2={boxEdgeY}
+                                stroke={color} strokeWidth="1" opacity="0.35"/>
+                          <rect x={lblX} y={lblCy - 10} width={lblW} height={20}
+                                fill="var(--surface)" stroke={color} strokeWidth="1" rx="3"/>
+                          <text x={lblX + lblW / 2} y={lblCy + 4}
                                 fill={text} fontSize="10.5" fontWeight="700" textAnchor="middle" fontFamily={mono}>
                             {labelText}
                           </text>
