@@ -295,9 +295,8 @@ export default function FeedbackLog({ lang = "sk" }) {
   return (
     <div style={{ minHeight: "100vh", background: bg, color: textLight, padding: "1.5rem 1.75rem" }}>
       <div style={{ marginBottom: "1.5rem", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-        <div style={{ position: "relative", overflow: "hidden", borderRadius: 16, border: "1px solid var(--border)", padding: "1.4rem 1.6rem 1.5rem", flex: "1 1 340px", background: "radial-gradient(120% 140% at 2% -20%, rgba(18,185,129,0.13) 0%, transparent 46%), linear-gradient(135deg, color-mix(in srgb, var(--accent) 5%, var(--surface)) 0%, var(--bg) 75%)" }}>
-                    <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>{t("Feedback", "Spätná väzba")}</h1>
-          <p style={{ margin: "4px 0 0", color: dim, fontSize: 13 }}>{t("Conversations — newest activity first. Open one to see the full thread + reply.", "Konverzácie — najnovšie hore. Otvor konverzáciu pre celé vlákno + odpoveď.")}</p>
+        <div style={{ position: "relative", overflow: "hidden", borderRadius: 16, border: "1px solid var(--border)", padding: "1.15rem 1.6rem", flex: "1 1 340px", background: "radial-gradient(120% 140% at 2% -20%, rgba(18,185,129,0.13) 0%, transparent 46%), linear-gradient(135deg, color-mix(in srgb, var(--accent) 5%, var(--surface)) 0%, var(--bg) 75%)" }}>
+          <p style={{ margin: 0, color: dim, fontSize: 13 }}>{t("Conversations — newest activity first. Open one to see the full thread + reply.", "Konverzácie — najnovšie hore. Otvor konverzáciu pre celé vlákno + odpoveď.")}</p>
         </div>
         <button onClick={load} style={{ padding: "8px 14px", borderRadius: 8, border: `1px solid ${border}`, background: "transparent", color: textLight, cursor: "pointer", fontSize: 13 }}>{t("Refresh", "Obnoviť")} ↻</button>
       </div>

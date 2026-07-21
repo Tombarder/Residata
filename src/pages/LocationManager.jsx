@@ -418,9 +418,8 @@ export default function LocationManager({ lang = "en" }) {
       {/* Left list */}
       <div style={{ width: 360, minWidth: 360, borderRight: `1px solid ${border}`, display: "flex", flexDirection: "column", background: bg2 }}>
         <div style={{ padding: "1rem 1.1rem 0", borderBottom: `1px solid ${border}` }}>
-          <div style={{ position: "relative", overflow: "hidden", borderRadius: 16, border: "1px solid var(--border)", padding: "1.4rem 1.6rem 1.5rem", marginBottom: "1.5rem", background: "radial-gradient(120% 140% at 2% -20%, rgba(18,185,129,0.13) 0%, transparent 46%), linear-gradient(135deg, color-mix(in srgb, var(--accent) 5%, var(--surface)) 0%, var(--bg) 75%)" }}>
-                        <div style={{ fontSize: "0.95rem", fontWeight: 600 }}>{t("Project locations", "Polohy projektov")}</div>
-            <div style={{ fontFamily: mono, fontSize: "0.72rem", color: dim, marginTop: 4 }}>
+          <div style={{ position: "relative", overflow: "hidden", borderRadius: 16, border: "1px solid var(--border)", padding: "1.1rem 1.3rem", marginBottom: "1.5rem", background: "radial-gradient(120% 140% at 2% -20%, rgba(18,185,129,0.13) 0%, transparent 46%), linear-gradient(135deg, color-mix(in srgb, var(--accent) 5%, var(--surface)) 0%, var(--bg) 75%)" }}>
+            <div style={{ fontFamily: mono, fontSize: "0.72rem", color: dim }}>
               <span style={{ color: accentInk }}>{confirmedCount}</span> / {total} {t("located", "umiestnených")}
               {noDistrictCount > 0 && <span style={{ marginLeft: 8, color: amber }}>· {noDistrictCount} {t("no district", "bez okresu")}</span>}
             </div>

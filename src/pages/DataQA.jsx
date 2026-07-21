@@ -406,9 +406,8 @@ export default function DataQA({ lang = "sk" }) {
 
   return (
     <div style={{ minHeight: "100vh", background: bg, color: textLight, padding: "1.5rem 1.75rem" }}>
-      <div style={{ position: "relative", overflow: "hidden", borderRadius: 16, border: "1px solid var(--border)", padding: "1.4rem 1.6rem 1.5rem", marginBottom: "1.5rem", background: "radial-gradient(120% 140% at 2% -20%, rgba(18,185,129,0.13) 0%, transparent 46%), linear-gradient(135deg, color-mix(in srgb, var(--accent) 5%, var(--surface)) 0%, var(--bg) 75%)" }}>
-                <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>{t("Data control", "Kontrola dát")}</h1>
-        <p style={{ margin: "4px 0 0", color: dim, fontSize: 13 }}>
+      <div style={{ position: "relative", overflow: "hidden", borderRadius: 16, border: "1px solid var(--border)", padding: "1.15rem 1.6rem", marginBottom: "1.5rem", background: "radial-gradient(120% 140% at 2% -20%, rgba(18,185,129,0.13) 0%, transparent 46%), linear-gradient(135deg, color-mix(in srgb, var(--accent) 5%, var(--surface)) 0%, var(--bg) 75%)" }}>
+        <p style={{ margin: 0, color: dim, fontSize: 13 }}>
           {t("Pick a project + date, compare our data against the developer's website.",
              "Vyber projekt + dátum, porovnaj naše dáta s webom developera.")}
         </p>

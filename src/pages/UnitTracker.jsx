@@ -303,11 +303,8 @@ export default function UnitTracker({ lang = "sk", setCurrent }) {
 
   return (
     <div style={{ padding: "1.5rem 2rem 4rem", maxWidth: 1280, margin: "0 auto" }}>
-      <div style={{ position: "relative", overflow: "hidden", borderRadius: 16, border: "1px solid var(--border)", padding: "1.4rem 1.6rem 1.5rem", marginBottom: "1.5rem", background: "radial-gradient(120% 140% at 2% -20%, rgba(18,185,129,0.13) 0%, transparent 46%), linear-gradient(135deg, color-mix(in srgb, var(--accent) 5%, var(--surface)) 0%, var(--bg) 75%)" }}>
-                <h2 style={{ fontSize: "1.5rem", fontWeight: 700, color: text, margin: 0, letterSpacing: "-0.01em" }}>
-          ⏱ {L("Byt v čase", "Unit timeline")}
-        </h2>
-        <p style={{ color: dim, fontSize: "0.88rem", lineHeight: 1.55, margin: "0.4rem 0 0", maxWidth: 720 }}>
+      <div style={{ position: "relative", overflow: "hidden", borderRadius: 16, border: "1px solid var(--border)", padding: "1.25rem 1.6rem", marginBottom: "1.5rem", background: "radial-gradient(120% 140% at 2% -20%, rgba(18,185,129,0.13) 0%, transparent 46%), linear-gradient(135deg, color-mix(in srgb, var(--accent) 5%, var(--surface)) 0%, var(--bg) 75%)" }}>
+        <p style={{ color: dim, fontSize: "0.88rem", lineHeight: 1.55, margin: 0, maxWidth: 720 }}>
           {L(
             "Vyber projekt → klikni na byt a uvidíš jeho cenu, stav a kľúčové udalosti v čase. Chceš porovnať? Klikni na ďalšie byty (max 4 naraz, nech graf zostane čitateľný). Dáta pribúdajú po každom scrape — graf rastie sám.",
             "Pick a project → click a unit to see its price, status and key events over time. Want to compare? Click more units (up to 4 at once, so the chart stays readable). Data grows with every scrape."

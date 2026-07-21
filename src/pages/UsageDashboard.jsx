@@ -164,13 +164,10 @@ export default function UsageDashboard({ lang = "en" }) {
   return (
     <div style={{ padding: "1.5rem 1.75rem", maxWidth: 1200, margin: "0 auto", color: text }}>
       {/* Hero panel — title + description */}
-      <div style={{ position: "relative", overflow: "hidden", borderRadius: 16, border: "1px solid var(--border)", padding: "1.4rem 1.6rem 1.5rem", marginBottom: "1.5rem", background: "radial-gradient(120% 140% at 2% -20%, rgba(18,185,129,0.13) 0%, transparent 46%), linear-gradient(135deg, color-mix(in srgb, var(--accent) 5%, var(--surface)) 0%, var(--bg) 75%)" }}>
-                <h1 style={{ fontFamily: mono, fontSize: "1.35rem", fontWeight: 700, margin: 0 }}>
-          {L("Používanie", "Usage")}
-          {loading && summary && <span style={{ fontFamily: mono, fontSize: "0.72rem", fontWeight: 400, color: dim, marginLeft: "0.6rem" }}>· {L("aktualizujem…", "updating…")}</span>}
-        </h1>
-        <p style={{ color: dim, fontSize: "0.82rem", margin: "0.35rem 0 0" }}>
+      <div style={{ position: "relative", overflow: "hidden", borderRadius: 16, border: "1px solid var(--border)", padding: "1.25rem 1.6rem", marginBottom: "1.5rem", background: "radial-gradient(120% 140% at 2% -20%, rgba(18,185,129,0.13) 0%, transparent 46%), linear-gradient(135deg, color-mix(in srgb, var(--accent) 5%, var(--surface)) 0%, var(--bg) 75%)" }}>
+        <p style={{ color: dim, fontSize: "0.82rem", margin: 0 }}>
           {L("Kto platformu používa, ako často, ako dlho a čo v nej robí.", "Who uses the platform, how often, how long, and what they do.")}
+          {loading && summary && <span style={{ fontFamily: mono, fontSize: "0.72rem", fontWeight: 400, color: dim, marginLeft: "0.6rem" }}>· {L("aktualizujem…", "updating…")}</span>}
         </p>
       </div>
 

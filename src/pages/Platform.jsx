@@ -1016,7 +1016,6 @@ function PlatformBilling({ lang, setCurrent }) {
     <div style={{ padding: "2.5rem 2rem", maxWidth: 820, margin: "0 auto" }}>
       <PageHero
         eyebrow={lang === "sk" ? "Účet" : "Account"}
-        title={lang === "sk" ? "Platba a tier" : "Billing & tier"}
         subtitle={lang === "sk"
           ? "Tvoj aktuálny prístup, trial a správa predplatného."
           : "Your current access, trial and subscription management."}
@@ -1411,7 +1410,6 @@ function PlatformSettings({ lang }) {
     <div style={{ padding: "2.5rem 2rem", maxWidth: 660, margin: "0 auto" }}>
       <PageHero
         eyebrow={lang === "sk" ? "Účet" : "Account"}
-        title={lang === "sk" ? "Nastavenia" : "Settings"}
         subtitle={user?.email}
       />
       <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 12, padding: "1.75rem 2rem" }}>
@@ -1918,7 +1916,6 @@ function PlatformExports({ lang, setCurrent }) {
     <div style={{ padding: "2rem 2rem 4rem", maxWidth: 820, margin: "0 auto" }}>
       <PageHero
         eyebrow={lang === "sk" ? "CSV / API" : "CSV / API"}
-        title={lang === "sk" ? "Exporty" : "Exports"}
         subtitle={lang === "sk"
           ? "Vyber si dátum snapshotu a stiahni dataset ako CSV, alebo ho ťahaj cez REST API do tvojho stacku."
           : "Pick a snapshot date and download the dataset as CSV, or pull it via the REST API straight into your stack."}
