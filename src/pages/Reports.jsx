@@ -30,6 +30,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useProjects, useProjectSnapshots, useReportHistogram, fetchReportBinUnits, useReportProjectUnits, useReportComparables } from "../lib/useData";
 import LoadError from "../components/LoadError";
 import Picker from "../components/Picker";
+import InfoTip from "../components/InfoTip";
 import { moneyFromEur, moneySymbol } from "../lib/money";
 import { localeTag } from "../lib/locale";
 import { useCurrency } from "../lib/useCurrency";
@@ -828,11 +829,11 @@ function KpiStrip({ summary, lang, extra = [] }) {
   // a real "0%" so users don't read the absence as "nothing has sold".
   const soldPctLabel = summary.soldPct == null ? "n/a" : `${summary.soldPct.toFixed(0)}%`;
   const items = [
-    { label: lang === "sk" ? "Projektov"   : "Projects",   value: summary.projectCount.toLocaleString("en-US").replace(/,/g, " "), accent: "#10b981" },
-    { label: lang === "sk" ? "Bytov"       : "Units",      value: summary.totalUnits.toLocaleString("en-US").replace(/,/g, " "), accent: "#64748b" },
-    { label: lang === "sk" ? "Voľných"     : "Available",  value: summary.available.toLocaleString("en-US").replace(/,/g, " "), color: accentInk, accent: "#10b981" },
-    { label: lang === "sk" ? "Predaných"   : "Sold",       value: summary.sold.toLocaleString("en-US").replace(/,/g, " "), color: orange, accent: "#e0940f" },
-    { label: lang === "sk" ? "Predaných %" : "Sold %",     value: soldPctLabel, color: orange, accent: "#e0940f" },
+    { label: lang === "sk" ? "Projektov"   : "Projects",   value: summary.projectCount.toLocaleString("en-US").replace(/,/g, " "), accent: "#10b981", info: lang === "sk" ? "Počet projektov v tomto výbere." : "Number of projects in this selection." },
+    { label: lang === "sk" ? "Bytov"       : "Units",      value: summary.totalUnits.toLocaleString("en-US").replace(/,/g, " "), accent: "#64748b", info: lang === "sk" ? "Celková kapacita — všetky byty v projektoch (voľné, rezervované aj predané spolu)." : "Total capacity — all units in the projects (available, reserved and sold combined)." },
+    { label: lang === "sk" ? "Voľných"     : "Available",  value: summary.available.toLocaleString("en-US").replace(/,/g, " "), color: accentInk, accent: "#10b981", info: lang === "sk" ? "Byty aktuálne v ponuke — ešte nepredané a nerezervované." : "Units currently for sale — not yet sold or reserved." },
+    { label: lang === "sk" ? "Predaných"   : "Sold",       value: summary.sold.toLocaleString("en-US").replace(/,/g, " "), color: orange, accent: "#e0940f", info: lang === "sk" ? "Byty už predané (kumulatívne doteraz)." : "Units already sold (cumulative to date)." },
+    { label: lang === "sk" ? "Predaných %" : "Sold %",     value: soldPctLabel, color: orange, accent: "#e0940f", info: lang === "sk" ? "Podiel predaných z celku (predané ÷ všetky byty). „n/a“ keď developer nezverejňuje info o predaných bytoch." : "Share sold out of the total (sold ÷ all units). “n/a” when the developer doesn't publish sold info." },
     ...(summary.wavgM2 ? [{
       // "Ø €/m²" (average), NOT "(weighted)": this KPI is unit-weighted only in the
       // market/city/district scope; in the project deep-dive `summary` is the mean-of-ratios
@@ -841,6 +842,7 @@ function KpiStrip({ summary, lang, extra = [] }) {
       label: `Ø ${moneySymbol()}/m²`,
       value: Math.round(moneyFromEur(summary.wavgM2)).toLocaleString("en-US").replace(/,/g, " "),
       accent: "#3b74e8",
+      info: lang === "sk" ? "Priemerná ponuková cena za m² (s DPH) v tomto výbere." : "Average asking price per m² (incl. VAT) in this selection.",
     }] : []),
     ...extra,
   ];
@@ -851,7 +853,8 @@ function KpiStrip({ summary, lang, extra = [] }) {
         // (no per-metric rainbow), to match the Dashboard market-overview strip.
         <div key={i} style={{ position: "relative", overflow: "hidden", background: "var(--surface)", border: `1px solid ${border}`, borderRadius: 8, padding: "0.65rem 0.9rem 0.65rem 1rem" }}>
           <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: "var(--accent)", opacity: 0.7 }} />
-          <div style={{ fontSize: "0.7rem", color: dim, marginBottom: "0.2rem" }}>{k.label}</div>
+          {k.info && <div style={{ position: "absolute", top: 6, right: 6 }}><InfoTip text={k.info} label={k.label} /></div>}
+          <div style={{ fontSize: "0.7rem", color: dim, marginBottom: "0.2rem", paddingRight: k.info ? "1.1rem" : 0 }}>{k.label}</div>
           <div className="report-accent" style={{ fontSize: "1.15rem", fontWeight: 700, color: text }}>{k.value}</div>
         </div>
       ))}

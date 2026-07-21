@@ -17,6 +17,7 @@ import { isPersonalEmail } from "../lib/emailValidation";
 import UpgradePrompt from "../components/UpgradePrompt";
 import Picker from "../components/Picker";
 import PageHero from "../components/PageHero";
+import InfoTip from "../components/InfoTip";
 import PivotV2 from "./PivotV2";
 import MapFilterBuilder from "../components/MapFilterBuilder";
 import { applyFilters, describe, isComplete } from "../lib/mapFilters";
@@ -3151,11 +3152,15 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
     <main style={{ padding: "1rem 2rem 4rem", maxWidth: 1240, margin: "0 auto" }}>
       {/* ═══ KPI STRIP ═══ */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.85rem", marginBottom: "2rem" }}>
-        <AKpi label={lang === "sk" ? "Sledované byty" : "Units tracked"}   value={totalUnits.toLocaleString(localeTag(lang))} color="#64748b" />
-        <AKpi label={lang === "sk" ? "Voľné byty" : "Available"}            value={totalAvail.toLocaleString(localeTag(lang))} accent={green} color="#10b981" />
+        <AKpi label={lang === "sk" ? "Sledované byty" : "Units tracked"}   value={totalUnits.toLocaleString(localeTag(lang))} color="#64748b"
+              info={lang === "sk" ? "Celkový počet bytov naprieč sledovanými projektmi — voľné, rezervované aj predané spolu." : "Total units across the tracked projects — available, reserved and sold combined."} />
+        <AKpi label={lang === "sk" ? "Voľné byty" : "Available"}            value={totalAvail.toLocaleString(localeTag(lang))} accent={green} color="#10b981"
+              info={lang === "sk" ? "Byty aktuálne v ponuke — ešte nepredané a nerezervované." : "Units currently on the market — not yet sold or reserved."} />
         <AKpi label={lang === "sk" ? "Predané (30d)" : "Sold (30d)"}        value={totalSold30 ? `+${totalSold30}` : "—"} accent="#f5a623" color="#e0940f"
-              sub={lang === "sk" ? `${absorptionPct}% absorpcia` : `${absorptionPct}% absorption`} />
-        <AKpi label={lang === "sk" ? `Priem. ${moneySymbol()}/m²` : `Avg ${moneySymbol()}/m²`}            value={avgEurM2 ? Math.round(moneyFromEur(avgEurM2)).toLocaleString(localeTag(lang)) : "—"} color="#3b74e8" />
+              sub={lang === "sk" ? `${absorptionPct}% absorpcia` : `${absorptionPct}% absorption`}
+              info={lang === "sk" ? "Koľko bytov zmizlo z ponuky ako predané za posledných 30 dní. Absorpcia = podiel celkovej ponuky predaný za mesiac." : "How many units left the market as sold in the last 30 days. Absorption = share of inventory sold per month."} />
+        <AKpi label={lang === "sk" ? `Priem. ${moneySymbol()}/m²` : `Avg ${moneySymbol()}/m²`}            value={avgEurM2 ? Math.round(moneyFromEur(avgEurM2)).toLocaleString(localeTag(lang)) : "—"} color="#3b74e8"
+              info={lang === "sk" ? "Priemerná ponuková cena za m² (s DPH) voľných bytov, vážená počtom bytov. Cena ktorú pýtajú developeri, nie realizovaná predajná." : "Average asking price per m² (incl. VAT) of available units, weighted by unit count. The developers' asking price, not the achieved sale price."} />
       </div>
 
       {/* ═══ PIVOT — drag & drop builder ═══ */}
@@ -3336,11 +3341,12 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
 // Calm, uniform KPI card: one brand-accent bar + neutral value on every card, to
 // match the Dashboard market-overview strip (no per-metric rainbow). Any accent/
 // color props from call sites are intentionally ignored.
-function AKpi({ label, value, sub }) {
+function AKpi({ label, value, sub, info }) {
   return (
     <div style={{ position: "relative", overflow: "hidden", background: "var(--surface)", border: `1px solid ${border}`, borderRadius: 10, padding: "1.1rem 1.2rem 1.1rem 1.35rem" }}>
       <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: "var(--accent)", opacity: 0.7 }} />
-      <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.4rem" }}>{label}</div>
+      {info && <div style={{ position: "absolute", top: 8, right: 8 }}><InfoTip text={info} label={label} /></div>}
+      <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.4rem", paddingRight: info ? "1.2rem" : 0 }}>{label}</div>
       <div style={{ fontFamily: mono, fontSize: "1.8rem", fontWeight: 700, color: "var(--text)", letterSpacing: "-0.02em", lineHeight: 1 }}>{value}</div>
       {sub && <div style={{ fontSize: "0.7rem", color: dim, marginTop: "0.4rem" }}>{sub}</div>}
     </div>

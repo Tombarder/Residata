@@ -11,6 +11,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabaseData } from "../lib/supabase";
 import Picker from "../components/Picker";
+import InfoTip from "../components/InfoTip";
 import { accent as green, accentInk, dim, text, border, surface as bg, surfaceDark as bg2 } from "../lib/theme";
 
 const mono = "'JetBrains Mono', monospace";
@@ -196,19 +197,30 @@ export default function UsageDashboard({ lang = "en" }) {
         <>
           {/* KPI grid */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "0.7rem", margin: "1.1rem 0" }}>
-            <Card label={L("Aktívni dnes", "Active today")} value={num(summary?.dau)} color={green} bar="#10b981" sub={L("prihlásení dnes", "signed-in today")} />
-            <Card label={L("Aktívni (7 dní)", "Active (7d)")} value={num(summary?.wau)} bar="#10b981" sub={L("prihlásení používatelia", "signed-in users")} />
+            <Card label={L("Aktívni dnes", "Active today")} value={num(summary?.dau)} color={green} bar="#10b981" sub={L("prihlásení dnes", "signed-in today")}
+                  info={L("Počet používateľov, ktorí sa dnes prihlásili a boli aktívni.", "Users who signed in and were active today.")} />
+            <Card label={L("Aktívni (7 dní)", "Active (7d)")} value={num(summary?.wau)} bar="#10b981" sub={L("prihlásení používatelia", "signed-in users")}
+                  info={L("Unikátni prihlásení používatelia za posledných 7 dní.", "Unique signed-in users over the last 7 days.")} />
             {/* Only show the window-active card when the window is wider than 7d,
                 otherwise it just duplicates the "Active (7d)" card above. */}
-            {days > 7 && <Card label={L(`Aktívni (${days} dní)`, `Active (${days}d)`)} value={num(summary?.mau)} bar="#10b981" />}
-            <Card label={L("Ø aktívny čas / relácia", "Ø active time / session")} value={minsLabel(summary?.avg_active_min)} bar="#3b74e8" sub={L("skutočne strávený čas", "real focused time")} />
-            <Card label={L("Celkový aktívny čas", "Total active time")} value={summary?.active_hours != null ? `${num(summary.active_hours)} h` : "—"} bar="#3b74e8" />
-            <Card label={L("Relácie", "Sessions")} value={num(summary?.total_sessions)} bar="#3b74e8" sub={L(`+ ${num(summary?.anon_sessions ?? 0)} anonymných`, `+ ${num(summary?.anon_sessions ?? 0)} anonymous`)} />
-            <Card label={L("Exporty", "Exports")} value={num(summary?.exports)} bar="#8b5cf6" />
-            <Card label={L("Otázky AI", "AI questions")} value={num(summary?.ai_questions)} bar="#8b5cf6" />
-            <Card label={L("Noví používatelia", "New users")} value={num(summary?.new_users)} color={blue} bar="#10b981" />
-            <Card label={L("Vracajúci sa", "Returning")} value={num(summary?.returning_users)} bar="#10b981" sub={L("aktívni ≥2 dni", "active ≥2 days")} />
-            <Card label={L("Pády aplikácie", "App crashes")} value={num(summary?.crashes)} color={Number(summary?.crashes) > 0 ? red : text} bar="#e0413e" />
+            {days > 7 && <Card label={L(`Aktívni (${days} dní)`, `Active (${days}d)`)} value={num(summary?.mau)} bar="#10b981"
+                  info={L("Unikátni prihlásení používatelia za zvolené okno.", "Unique signed-in users over the selected window.")} />}
+            <Card label={L("Ø aktívny čas / relácia", "Ø active time / session")} value={minsLabel(summary?.avg_active_min)} bar="#3b74e8" sub={L("skutočne strávený čas", "real focused time")}
+                  info={L("Priemerný skutočne strávený (aktívny) čas na jednu reláciu — nie čas s otvorenou, ale nečinnou kartou.", "Average real focused time per session — not time with an open but idle tab.")} />
+            <Card label={L("Celkový aktívny čas", "Total active time")} value={summary?.active_hours != null ? `${num(summary.active_hours)} h` : "—"} bar="#3b74e8"
+                  info={L("Súčet skutočne aktívneho času všetkých relácií za zvolené okno.", "Sum of real active time across all sessions in the window.")} />
+            <Card label={L("Relácie", "Sessions")} value={num(summary?.total_sessions)} bar="#3b74e8" sub={L(`+ ${num(summary?.anon_sessions ?? 0)} anonymných`, `+ ${num(summary?.anon_sessions ?? 0)} anonymous`)}
+                  info={L("Počet prihlásených relácií za okno; + anonymné návštevy bez prihlásenia.", "Number of signed-in sessions in the window; + anonymous visits without login.")} />
+            <Card label={L("Exporty", "Exports")} value={num(summary?.exports)} bar="#8b5cf6"
+                  info={L("Počet stiahnutí/exportov dát (CSV/XLSX) za okno.", "Number of data downloads/exports (CSV/XLSX) in the window.")} />
+            <Card label={L("Otázky AI", "AI questions")} value={num(summary?.ai_questions)} bar="#8b5cf6"
+                  info={L("Počet otázok položených AI asistentovi za okno.", "Number of questions asked to the AI assistant in the window.")} />
+            <Card label={L("Noví používatelia", "New users")} value={num(summary?.new_users)} color={blue} bar="#10b981"
+                  info={L("Používatelia, ktorí sa zaregistrovali prvýkrát v tomto okne.", "Users who signed up for the first time in this window.")} />
+            <Card label={L("Vracajúci sa", "Returning")} value={num(summary?.returning_users)} bar="#10b981" sub={L("aktívni ≥2 dni", "active ≥2 days")}
+                  info={L("Používatelia aktívni aspoň 2 rôzne dni — vracajú sa, nie jednorazoví.", "Users active on at least 2 distinct days — returning, not one-off.")} />
+            <Card label={L("Pády aplikácie", "App crashes")} value={num(summary?.crashes)} color={Number(summary?.crashes) > 0 ? red : text} bar="#e0413e"
+                  info={L("Počet zachytených pádov/chýb aplikácie za okno. Ideál je 0.", "Number of caught app crashes/errors in the window. 0 is ideal.")} />
           </div>
 
           {/* Daily trend */}
@@ -320,11 +332,12 @@ export default function UsageDashboard({ lang = "en" }) {
 }
 
 // KPI card (module-level so it isn't recreated every render).
-function Card({ label, value, sub, color = text, bar = "#64748b" }) {
+function Card({ label, value, sub, color = text, bar = "#64748b", info }) {
   return (
     <div style={{ background: `linear-gradient(180deg, color-mix(in srgb, ${bar} 9%, var(--surface)) 0%, var(--surface) 46%)`, border: `1px solid ${border}`, borderRadius: 10, padding: "1rem 1.1rem", minHeight: 88, position: "relative", overflow: "hidden" }}>
       <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: bar, opacity: 0.85 }} />
-      <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.4rem" }}>{label}</div>
+      {info && <div style={{ position: "absolute", top: 8, right: 8 }}><InfoTip text={info} label={label} /></div>}
+      <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.4rem", paddingRight: info ? "1.2rem" : 0 }}>{label}</div>
       <div style={{ fontFamily: mono, fontSize: "1.6rem", fontWeight: 700, color, lineHeight: 1 }}>{value ?? "—"}</div>
       {sub && <div style={{ fontSize: "0.7rem", color: dim, marginTop: "0.3rem" }}>{sub}</div>}
     </div>

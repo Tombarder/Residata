@@ -10,6 +10,7 @@ import { useCurrency } from "../lib/useCurrency";
 import { moneyFromEur, moneySymbol } from "../lib/money";
 import { useUnitsInfinite, useAnalyticsRegistry, usePivotDistinct } from "../lib/useData";
 import LoadError from "../components/LoadError";
+import DateField from "../components/DateField";
 import { supabaseData } from "../lib/supabase";
 
 // sessionStorage key: the project set handed from a filtered analytics view to the map.
@@ -85,10 +86,13 @@ function XFilterRow({ row, fields, mode, lang, sel, onPatch, onRemove }) {
           options={(distinct.values || []).filter((v) => !(row.vals || []).includes(v)).map((v) => ({ value: v, label: v }))} />
         {(row.vals || []).map((v) => <span key={v} onClick={() => onPatch({ vals: row.vals.filter((x) => x !== v) })} style={chip} title={t("odstrániť", "remove")}>{v} ✕</span>)}
       </>)}
-      {row.key && (kind === "num" || kind === "date") && (<>
-        <input type={kind === "date" ? "date" : "text"} value={row.min} placeholder={t("od", "from")} onChange={(e) => onPatch({ min: e.target.value })} style={{ ...sel, width: kind === "date" ? 132 : 76 }} inputMode={kind === "num" ? "numeric" : undefined} />
-        <input type={kind === "date" ? "date" : "text"} value={row.max} placeholder={t("do", "to")} onChange={(e) => onPatch({ max: e.target.value })} style={{ ...sel, width: kind === "date" ? 132 : 76 }} inputMode={kind === "num" ? "numeric" : undefined} />
-      </>)}
+      {row.key && (kind === "num" || kind === "date") && (kind === "date" ? (<>
+        <DateField value={row.min} onChange={(e) => onPatch({ min: e.target.value })} width={132} title={t("od", "from")} />
+        <DateField value={row.max} onChange={(e) => onPatch({ max: e.target.value })} width={132} title={t("do", "to")} />
+      </>) : (<>
+        <input type="text" value={row.min} placeholder={t("od", "from")} onChange={(e) => onPatch({ min: e.target.value })} style={{ ...sel, width: 76 }} inputMode="numeric" />
+        <input type="text" value={row.max} placeholder={t("do", "to")} onChange={(e) => onPatch({ max: e.target.value })} style={{ ...sel, width: 76 }} inputMode="numeric" />
+      </>))}
       <button onClick={onRemove} style={{ ...sel, cursor: "pointer", color: dim, padding: "0.2rem 0.45rem" }} title={t("odstrániť filter", "remove filter")}>✕</button>
     </div>
   );

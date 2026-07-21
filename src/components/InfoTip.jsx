@@ -1,15 +1,18 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { createPortal } from "react-dom";
 
-/* InfoTip — a small "i" icon that reveals a styled explanation popover on hover
-   or keyboard focus. The popover is portaled to <body> so it is never clipped by
-   a card's overflow, and positioned from the icon's live rect (clamped to the
+/* InfoTip — a small "i" icon that reveals a styled explanation popover.
+   Desktop: opens on hover or keyboard focus. Touch/mobile: TAP the icon to
+   toggle it open (hover doesn't exist on touch), and it closes on an outside
+   tap or Escape. The popover is portaled to <body> so it is never clipped by a
+   card's overflow, and positioned from the icon's live rect (clamped to the
    viewport). Theme-aware via CSS var tokens — works in Normal (light) and dark. */
 export default function InfoTip({ text, label }) {
-  const [pos, setPos] = useState(null); // {top,left,above} while visible; null = hidden
+  const [pos, setPos] = useState(null);   // {top,left,above} while visible; null = hidden
+  const [pinned, setPinned] = useState(false); // tapped-open (sticky until outside tap / Esc)
   const ref = useRef(null);
 
-  const show = useCallback(() => {
+  const place = useCallback(() => {
     const el = ref.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
@@ -20,7 +23,30 @@ export default function InfoTip({ text, label }) {
     const below = r.bottom + 150 < window.innerHeight;
     setPos({ left, top: below ? r.bottom + 8 : r.top - 8, above: !below });
   }, []);
-  const hide = useCallback(() => setPos(null), []);
+
+  const show = useCallback(() => place(), [place]);
+  // Hover-out only hides when NOT tapped-open, so a pinned popover survives the mouse leaving.
+  const hide = useCallback(() => { setPos(p => (pinned ? p : null)); }, [pinned]);
+
+  const toggle = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setPinned(prev => {
+      const next = !prev;
+      if (next) place(); else setPos(null);
+      return next;
+    });
+  }, [place]);
+
+  // While pinned, close on any outside tap/click or on Escape.
+  useEffect(() => {
+    if (!pinned) return;
+    const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) { setPinned(false); setPos(null); } };
+    const onKey = (e) => { if (e.key === "Escape") { setPinned(false); setPos(null); } };
+    document.addEventListener("pointerdown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("pointerdown", onDoc); document.removeEventListener("keydown", onKey); };
+  }, [pinned]);
 
   return (
     <>
@@ -28,15 +54,16 @@ export default function InfoTip({ text, label }) {
         ref={ref}
         type="button"
         aria-label={label ? `${label} — info` : "info"}
+        aria-expanded={!!pos}
         onMouseEnter={show}
         onMouseLeave={hide}
         onFocus={show}
         onBlur={hide}
-        onClick={(e) => e.preventDefault()}
+        onClick={toggle}
         style={{
           display: "grid", placeItems: "center", width: 17, height: 17, padding: 0,
           borderRadius: "50%", border: "1px solid var(--border)", background: "transparent",
-          color: "var(--text-faint)", cursor: "help", lineHeight: 0,
+          color: "var(--text-faint)", cursor: "pointer", lineHeight: 0,
         }}
       >
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">

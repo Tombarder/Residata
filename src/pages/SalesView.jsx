@@ -10,6 +10,8 @@ import { moneyFromEur, moneySymbol } from "../lib/money";
 import { useSales, usePivotDistinct } from "../lib/useData";
 import LoadError from "../components/LoadError";
 import Picker from "../components/Picker";
+import InfoTip from "../components/InfoTip";
+import DateField from "../components/DateField";
 import { accent as green, orange, dim, border, bg, surfacePanel as panelHi, text } from "../lib/theme";
 
 const panel = "var(--surface-2)";
@@ -164,6 +166,7 @@ export default function SalesView({ lang = "sk" }) {
   // kept in the signatures so the call sites don't change, but ignored.
   const statCard = () => ({ ...card, position: "relative", overflow: "hidden", background: "var(--surface)", paddingLeft: "1rem" });
   const StatBar = () => <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: "var(--accent)", opacity: 0.7 }} />;
+  const StatInfo = ({ sk, en, label }) => <div style={{ position: "absolute", top: 6, right: 6 }}><InfoTip text={t(sk, en)} label={label} /></div>;
   const kpiVal = { fontSize: "1.5rem", fontWeight: 700, color: text, fontFamily: mono, fontVariantNumeric: "tabular-nums" };
   const kpiLbl = { fontFamily: mono, fontSize: "0.62rem", color: dim, letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: "0.3rem" };
   const Sel = ({ value, onChange, opts, ph }) => (
@@ -210,8 +213,8 @@ export default function SalesView({ lang = "sk" }) {
                 </button>
               ))}
             </div>
-            <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} style={{ ...sel, width: 140 }} title={t("od", "from")} />
-            <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} style={{ ...sel, width: 140 }} title={t("do", "to")} />
+            <DateField value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} width={140} title={t("od", "from")} />
+            <DateField value={customTo} onChange={(e) => setCustomTo(e.target.value)} width={140} title={t("do", "to")} />
           </>
         )}
         <div style={{ display: "inline-flex", border: `1px solid ${border}`, borderRadius: 7, overflow: "hidden", marginLeft: "0.3rem" }}>
@@ -263,14 +266,15 @@ export default function SalesView({ lang = "sk" }) {
       {/* KPI row */}
       {sum.error ? <LoadError lang={lang} /> : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "0.6rem", marginBottom: "0.6rem" }}>
-          <div style={statCard("#10b981")}><StatBar color="#10b981" /><div style={kpiLbl}>{t(HEADLINE[status][0], HEADLINE[status][1])}</div><div style={kpiVal}>{sum.loading ? "…" : dur.toLocaleString("sk-SK")}</div>{reversed > 0 && !durableOnly && !isPipe && <div style={{ fontSize: "0.68rem", color: orange, fontFamily: mono, marginTop: "0.2rem" }}>{t(`+${reversed} vrátených`, `+${reversed} fell through`)}</div>}</div>
-          <div style={statCard("#3b74e8")}><StatBar color="#3b74e8" /><div style={kpiLbl}>{isPipe ? t("Hodnota v ponuke", "Listed value") : t("Objem predaja", "Sold value")}</div><div style={kpiVal}>{sum.loading ? "…" : fmtMoney(S.sold_value_eur)}</div></div>
-          <div style={statCard("#3b74e8")}><StatBar color="#3b74e8" /><div style={kpiLbl}>{t("Medián ceny", "Median price")}</div><div style={kpiVal}>{sum.loading ? "…" : fmtMoney(S.median_price_eur)}</div></div>
-          <div style={statCard("#8b5cf6")}><StatBar color="#8b5cf6" /><div style={kpiLbl}>{t("Medián ", "Median ")}{moneySymbol()}/m²</div><div style={kpiVal}>{sum.loading ? "…" : fmtCell("per_m2", S.median_eur_m2)}</div></div>
+          <div style={statCard("#10b981")}><StatBar color="#10b981" /><StatInfo label={t(HEADLINE[status][0], HEADLINE[status][1])} sk="Počet bytov v tomto stave za zvolené obdobie (pri predaných: tie, ktoré zostali predané). „+N vrátených“ = predaje, ktoré sa vrátili späť na trh." en="Units in this state for the selected period (for sold: those that stayed sold). “+N fell through” = sales that returned to the market." /><div style={{ ...kpiLbl, paddingRight: "1.1rem" }}>{t(HEADLINE[status][0], HEADLINE[status][1])}</div><div style={kpiVal}>{sum.loading ? "…" : dur.toLocaleString("sk-SK")}</div>{reversed > 0 && !durableOnly && !isPipe && <div style={{ fontSize: "0.68rem", color: orange, fontFamily: mono, marginTop: "0.2rem" }}>{t(`+${reversed} vrátených`, `+${reversed} fell through`)}</div>}</div>
+          <div style={statCard("#3b74e8")}><StatBar color="#3b74e8" /><StatInfo label={isPipe ? t("Hodnota v ponuke", "Listed value") : t("Objem predaja", "Sold value")} sk="Súčet cien (s DPH) bytov v tomto výbere." en="Sum of prices (incl. VAT) of the units in this selection." /><div style={{ ...kpiLbl, paddingRight: "1.1rem" }}>{isPipe ? t("Hodnota v ponuke", "Listed value") : t("Objem predaja", "Sold value")}</div><div style={kpiVal}>{sum.loading ? "…" : fmtMoney(S.sold_value_eur)}</div></div>
+          <div style={statCard("#3b74e8")}><StatBar color="#3b74e8" /><StatInfo label={t("Medián ceny", "Median price")} sk="Stredná cena bytu — polovica je lacnejšia, polovica drahšia. Odolnejšia voči extrémom než priemer." en="The middle unit price — half are cheaper, half dearer. More robust to outliers than the average." /><div style={{ ...kpiLbl, paddingRight: "1.1rem" }}>{t("Medián ceny", "Median price")}</div><div style={kpiVal}>{sum.loading ? "…" : fmtMoney(S.median_price_eur)}</div></div>
+          <div style={statCard("#8b5cf6")}><StatBar color="#8b5cf6" /><StatInfo label={t("Medián €/m²", "Median €/m²")} sk="Stredná cena za m² (s DPH) v tomto výbere." en="The middle price per m² (incl. VAT) in this selection." /><div style={{ ...kpiLbl, paddingRight: "1.1rem" }}>{t("Medián ", "Median ")}{moneySymbol()}/m²</div><div style={kpiVal}>{sum.loading ? "…" : fmtCell("per_m2", S.median_eur_m2)}</div></div>
           {!isPipe && (
           <div style={statCard("#e0940f")}>
             <StatBar color="#e0940f" />
-            <div style={kpiLbl}>{t("Medián dní na trhu", "Median days on market")}</div>
+            <StatInfo label={t("Medián dní na trhu", "Median days on market")} sk="Stredný počet dní, ktoré sa byt predával — od prvého zachytenia po predaj. „z N sledovaných“ = na koľkých bytoch to vieme zmerať." en="Median number of days a unit took to sell — from first seen to sold. “of N observed” = how many units we can measure it on." />
+            <div style={{ ...kpiLbl, paddingRight: "1.1rem" }}>{t("Medián dní na trhu", "Median days on market")}</div>
             <div style={kpiVal}>{sum.loading ? "…" : (S.median_days_on_market != null ? Math.round(S.median_days_on_market) : "—")}</div>
             <div style={{ fontSize: "0.64rem", color: dim, fontFamily: mono, marginTop: "0.2rem" }}>
               {S.observed_dom_count ? t(`z ${S.observed_dom_count} sledovaných`, `of ${S.observed_dom_count} observed`) : t("zatiaľ málo dát", "building history")}

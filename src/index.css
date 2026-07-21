@@ -138,6 +138,18 @@
   filter: saturate(1.06) contrast(1.03);
 }
 
+/* ── themed date input (components/DateField.jsx) — accent focus ring + an
+   accent-tinted calendar icon, on-theme in light and dark ─────────────────── */
+.date-field:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.date-field::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.65;
+}
+.date-field::-webkit-calendar-picker-indicator:hover { opacity: 1; }
+
 /* ── universal box model: borders + padding stay inside declared widths ─── */
 *, *::before, *::after { box-sizing: border-box; }
 
