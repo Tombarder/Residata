@@ -163,28 +163,29 @@ export default function UsageDashboard({ lang = "en" }) {
 
   return (
     <div style={{ padding: "1.5rem 1.75rem", maxWidth: 1200, margin: "0 auto", color: text }}>
-      {/* Header + window selector */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "1rem", marginBottom: "0.35rem" }}>
-        <div>
-          <h1 style={{ fontFamily: mono, fontSize: "1.35rem", fontWeight: 700, margin: 0 }}>
-            {L("Používanie", "Usage")}
-            {loading && summary && <span style={{ fontFamily: mono, fontSize: "0.72rem", fontWeight: 400, color: dim, marginLeft: "0.6rem" }}>· {L("aktualizujem…", "updating…")}</span>}
-          </h1>
-          <p style={{ color: dim, fontSize: "0.82rem", margin: "0.35rem 0 0" }}>
-            {L("Kto platformu používa, ako často, ako dlho a čo v nej robí.", "Who uses the platform, how often, how long, and what they do.")}
-          </p>
-        </div>
-        <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
-          <span style={{ fontSize: "0.7rem", color: dim, fontFamily: mono }}>{L("okno", "window")}</span>
-          {WINDOWS.map(w => (
-            <button key={w} onClick={() => setDays(w)} disabled={loading} style={{
-              fontFamily: mono, fontSize: "0.75rem", padding: "0.35rem 0.7rem", borderRadius: 8, cursor: loading ? "default" : "pointer",
-              border: `1px solid ${days === w ? green : border}`, background: days === w ? green : "transparent",
-              color: days === w ? "#00120c" : text, fontWeight: days === w ? 700 : 400, opacity: loading && days !== w ? 0.5 : 1,
-            }}>{w}{L("d", "d")}</button>
-          ))}
-          <button onClick={load} disabled={loading} title={L("obnoviť", "reload")} aria-label={L("obnoviť", "reload")} style={{ fontFamily: mono, fontSize: "0.75rem", padding: "0.35rem 0.7rem", borderRadius: 8, cursor: loading ? "default" : "pointer", border: `1px solid ${border}`, background: "transparent", color: dim, opacity: loading ? 0.5 : 1 }}>↻</button>
-        </div>
+      {/* Hero panel — title + description */}
+      <div style={{ position: "relative", overflow: "hidden", borderRadius: 16, border: "1px solid var(--border)", padding: "1.4rem 1.6rem 1.5rem", marginBottom: "1.5rem", background: "radial-gradient(120% 140% at 2% -20%, rgba(18,185,129,0.13) 0%, transparent 46%), linear-gradient(135deg, color-mix(in srgb, var(--accent) 5%, var(--surface)) 0%, var(--bg) 75%)" }}>
+        <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: 3, background: "linear-gradient(90deg, var(--accent), #3b74e8 55%, #8b5cf6)" }} />
+        <h1 style={{ fontFamily: mono, fontSize: "1.35rem", fontWeight: 700, margin: 0 }}>
+          {L("Používanie", "Usage")}
+          {loading && summary && <span style={{ fontFamily: mono, fontSize: "0.72rem", fontWeight: 400, color: dim, marginLeft: "0.6rem" }}>· {L("aktualizujem…", "updating…")}</span>}
+        </h1>
+        <p style={{ color: dim, fontSize: "0.82rem", margin: "0.35rem 0 0" }}>
+          {L("Kto platformu používa, ako často, ako dlho a čo v nej robí.", "Who uses the platform, how often, how long, and what they do.")}
+        </p>
+      </div>
+
+      {/* Window selector */}
+      <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", justifyContent: "flex-end", flexWrap: "wrap", marginBottom: "0.35rem" }}>
+        <span style={{ fontSize: "0.7rem", color: dim, fontFamily: mono }}>{L("okno", "window")}</span>
+        {WINDOWS.map(w => (
+          <button key={w} onClick={() => setDays(w)} disabled={loading} style={{
+            fontFamily: mono, fontSize: "0.75rem", padding: "0.35rem 0.7rem", borderRadius: 8, cursor: loading ? "default" : "pointer",
+            border: `1px solid ${days === w ? green : border}`, background: days === w ? green : "transparent",
+            color: days === w ? "#00120c" : text, fontWeight: days === w ? 700 : 400, opacity: loading && days !== w ? 0.5 : 1,
+          }}>{w}{L("d", "d")}</button>
+        ))}
+        <button onClick={load} disabled={loading} title={L("obnoviť", "reload")} aria-label={L("obnoviť", "reload")} style={{ fontFamily: mono, fontSize: "0.75rem", padding: "0.35rem 0.7rem", borderRadius: 8, cursor: loading ? "default" : "pointer", border: `1px solid ${border}`, background: "transparent", color: dim, opacity: loading ? 0.5 : 1 }}>↻</button>
       </div>
 
       {err && (
@@ -199,19 +200,19 @@ export default function UsageDashboard({ lang = "en" }) {
         <>
           {/* KPI grid */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "0.7rem", margin: "1.1rem 0" }}>
-            <Card label={L("Aktívni dnes", "Active today")} value={num(summary?.dau)} color={green} sub={L("prihlásení dnes", "signed-in today")} />
-            <Card label={L("Aktívni (7 dní)", "Active (7d)")} value={num(summary?.wau)} sub={L("prihlásení používatelia", "signed-in users")} />
+            <Card label={L("Aktívni dnes", "Active today")} value={num(summary?.dau)} color={green} bar="#10b981" sub={L("prihlásení dnes", "signed-in today")} />
+            <Card label={L("Aktívni (7 dní)", "Active (7d)")} value={num(summary?.wau)} bar="#10b981" sub={L("prihlásení používatelia", "signed-in users")} />
             {/* Only show the window-active card when the window is wider than 7d,
                 otherwise it just duplicates the "Active (7d)" card above. */}
-            {days > 7 && <Card label={L(`Aktívni (${days} dní)`, `Active (${days}d)`)} value={num(summary?.mau)} />}
-            <Card label={L("Ø aktívny čas / relácia", "Ø active time / session")} value={minsLabel(summary?.avg_active_min)} sub={L("skutočne strávený čas", "real focused time")} />
-            <Card label={L("Celkový aktívny čas", "Total active time")} value={summary?.active_hours != null ? `${num(summary.active_hours)} h` : "—"} />
-            <Card label={L("Relácie", "Sessions")} value={num(summary?.total_sessions)} sub={L(`+ ${num(summary?.anon_sessions ?? 0)} anonymných`, `+ ${num(summary?.anon_sessions ?? 0)} anonymous`)} />
-            <Card label={L("Exporty", "Exports")} value={num(summary?.exports)} />
-            <Card label={L("Otázky AI", "AI questions")} value={num(summary?.ai_questions)} />
-            <Card label={L("Noví používatelia", "New users")} value={num(summary?.new_users)} color={blue} />
-            <Card label={L("Vracajúci sa", "Returning")} value={num(summary?.returning_users)} sub={L("aktívni ≥2 dni", "active ≥2 days")} />
-            <Card label={L("Pády aplikácie", "App crashes")} value={num(summary?.crashes)} color={Number(summary?.crashes) > 0 ? red : text} />
+            {days > 7 && <Card label={L(`Aktívni (${days} dní)`, `Active (${days}d)`)} value={num(summary?.mau)} bar="#10b981" />}
+            <Card label={L("Ø aktívny čas / relácia", "Ø active time / session")} value={minsLabel(summary?.avg_active_min)} bar="#3b74e8" sub={L("skutočne strávený čas", "real focused time")} />
+            <Card label={L("Celkový aktívny čas", "Total active time")} value={summary?.active_hours != null ? `${num(summary.active_hours)} h` : "—"} bar="#3b74e8" />
+            <Card label={L("Relácie", "Sessions")} value={num(summary?.total_sessions)} bar="#3b74e8" sub={L(`+ ${num(summary?.anon_sessions ?? 0)} anonymných`, `+ ${num(summary?.anon_sessions ?? 0)} anonymous`)} />
+            <Card label={L("Exporty", "Exports")} value={num(summary?.exports)} bar="#8b5cf6" />
+            <Card label={L("Otázky AI", "AI questions")} value={num(summary?.ai_questions)} bar="#8b5cf6" />
+            <Card label={L("Noví používatelia", "New users")} value={num(summary?.new_users)} color={blue} bar="#10b981" />
+            <Card label={L("Vracajúci sa", "Returning")} value={num(summary?.returning_users)} bar="#10b981" sub={L("aktívni ≥2 dni", "active ≥2 days")} />
+            <Card label={L("Pády aplikácie", "App crashes")} value={num(summary?.crashes)} color={Number(summary?.crashes) > 0 ? red : text} bar="#e0413e" />
           </div>
 
           {/* Daily trend */}
@@ -323,9 +324,10 @@ export default function UsageDashboard({ lang = "en" }) {
 }
 
 // KPI card (module-level so it isn't recreated every render).
-function Card({ label, value, sub, color = text }) {
+function Card({ label, value, sub, color = text, bar = "#64748b" }) {
   return (
-    <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 10, padding: "1rem 1.1rem", minHeight: 88 }}>
+    <div style={{ background: `linear-gradient(180deg, color-mix(in srgb, ${bar} 9%, var(--surface)) 0%, var(--surface) 46%)`, border: `1px solid ${border}`, borderRadius: 10, padding: "1rem 1.1rem", minHeight: 88, position: "relative", overflow: "hidden" }}>
+      <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: bar, opacity: 0.85 }} />
       <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.4rem" }}>{label}</div>
       <div style={{ fontFamily: mono, fontSize: "1.6rem", fontWeight: 700, color, lineHeight: 1 }}>{value ?? "—"}</div>
       {sub && <div style={{ fontSize: "0.7rem", color: dim, marginTop: "0.3rem" }}>{sub}</div>}
@@ -337,7 +339,10 @@ function Section({ title, sub, children }) {
   return (
     <div style={{ margin: "1.6rem 0" }}>
       <div style={{ marginBottom: "0.7rem" }}>
-        <h2 style={{ fontFamily: mono, fontSize: "0.95rem", fontWeight: 700, margin: 0, color: text }}>{title}</h2>
+        <h2 style={{ fontFamily: mono, fontSize: "0.95rem", fontWeight: 700, margin: 0, color: text }}>
+          <span style={{ display: "inline-block", width: 3, height: 12, borderRadius: 2, background: "var(--accent)", marginRight: "0.5rem", verticalAlign: "middle" }} />
+          {title}
+        </h2>
         {sub && <div style={{ fontSize: "0.72rem", color: dim, marginTop: "0.2rem" }}>{sub}</div>}
       </div>
       <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 10, padding: "1rem 1.1rem" }}>{children}</div>

@@ -303,7 +303,8 @@ export default function UnitTracker({ lang = "sk", setCurrent }) {
 
   return (
     <div style={{ padding: "1.5rem 2rem 4rem", maxWidth: 1280, margin: "0 auto" }}>
-      <div style={{ marginBottom: "1.5rem" }}>
+      <div style={{ position: "relative", overflow: "hidden", borderRadius: 16, border: "1px solid var(--border)", padding: "1.4rem 1.6rem 1.5rem", marginBottom: "1.5rem", background: "radial-gradient(120% 140% at 2% -20%, rgba(18,185,129,0.13) 0%, transparent 46%), linear-gradient(135deg, color-mix(in srgb, var(--accent) 5%, var(--surface)) 0%, var(--bg) 75%)" }}>
+        <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: 3, background: "linear-gradient(90deg, var(--accent), #3b74e8 55%, #8b5cf6)" }} />
         <h2 style={{ fontSize: "1.5rem", fontWeight: 700, color: text, margin: 0, letterSpacing: "-0.01em" }}>
           ⏱ {L("Byt v čase", "Unit timeline")}
         </h2>
@@ -796,7 +797,7 @@ function ChartCard({ pickedHistories, comparables, yMode, setYMode, lang }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
         <div>
           <div style={{ fontSize: "0.7rem", color: dim, fontFamily: mono, letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 600 }}>
-            {lang === "sk" ? "Vývoj ceny v čase" : "Price evolution over time"}
+            <span style={{ display: "inline-block", width: 3, height: 12, borderRadius: 2, background: "var(--accent)", marginRight: "0.5rem", verticalAlign: "middle" }} />{lang === "sk" ? "Vývoj ceny v čase" : "Price evolution over time"}
           </div>
           <div style={{ fontSize: "0.74rem", color: dim, marginTop: "0.2rem" }}>
             {lang === "sk" ? "X = dátum scrapu · Y = " : "X = scrape date · Y = "}{yMode === "perm2" ? `${moneySymbol()}/m²` : (lang === "sk" ? `celková cena (${moneySymbol()})` : `total price (${moneySymbol()})`)}
@@ -1322,7 +1323,7 @@ function StatusTimelineCard({ pickedHistories, lang }) {
   return (
     <div style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 10, padding: "1rem 1.1rem", marginBottom: "1rem" }}>
       <div style={{ fontSize: "0.78rem", color: dim, fontFamily: mono, letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: "0.85rem" }}>
-        {lang === "sk" ? "Časová os stavov" : "Status timeline"}
+        <span style={{ display: "inline-block", width: 3, height: 12, borderRadius: 2, background: "var(--accent)", marginRight: "0.5rem", verticalAlign: "middle" }} />{lang === "sk" ? "Časová os stavov" : "Status timeline"}
       </div>
 
       {pickedHistories.map((h, hi) => {

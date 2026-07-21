@@ -42,6 +42,12 @@ const bg = "var(--bg)";
 const bg2 = "var(--surface-2)";
 const mono = "'JetBrains Mono', monospace";
 
+// ── "Normal theme" shared visual helpers (visual-only) ──────────────
+const eyebrowBar = <span style={{ display: "inline-block", width: 3, height: 12, borderRadius: 2, background: "var(--accent)", marginRight: "0.5rem", verticalAlign: "middle" }} />;
+const cardBar = (color) => <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: color, opacity: 0.85 }} />;
+const tintBg = (color) => `linear-gradient(180deg, color-mix(in srgb, ${color} 9%, var(--surface)) 0%, var(--surface) 46%)`;
+const C_GREEN = "#10b981", C_BLUE = "#3b74e8", C_AMBER = "#e0940f", C_SLATE = "#64748b";
+
 const SUPA_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPA_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
@@ -400,7 +406,8 @@ export default function DataQA({ lang = "sk" }) {
 
   return (
     <div style={{ minHeight: "100vh", background: bg, color: textLight, padding: "1.5rem 1.75rem" }}>
-      <div style={{ marginBottom: 18 }}>
+      <div style={{ position: "relative", overflow: "hidden", borderRadius: 16, border: "1px solid var(--border)", padding: "1.4rem 1.6rem 1.5rem", marginBottom: "1.5rem", background: "radial-gradient(120% 140% at 2% -20%, rgba(18,185,129,0.13) 0%, transparent 46%), linear-gradient(135deg, color-mix(in srgb, var(--accent) 5%, var(--surface)) 0%, var(--bg) 75%)" }}>
+        <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: 3, background: "linear-gradient(90deg, var(--accent), #3b74e8 55%, #8b5cf6)" }} />
         <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>{t("Data control", "Kontrola dát")}</h1>
         <p style={{ margin: "4px 0 0", color: dim, fontSize: 13 }}>
           {t("Pick a project + date, compare our data against the developer's website.",
@@ -430,17 +437,17 @@ export default function DataQA({ lang = "sk" }) {
         <>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 12 }}>
           <div style={{ minWidth: 140 }}>
-            <label style={cardLabel}>{t("Country", "Krajina")}</label>
+            <label style={cardLabel}>{eyebrowBar}{t("Country", "Krajina")}</label>
             <Picker value={fCountry} onChange={(v) => { setFCountry(v); setFRegion(""); setFCity(""); }} ariaLabel={t("Country", "Krajina")}
               options={[{ value: "", label: t("All", "Všetky") }, ...opts.countries.map((c) => ({ value: c, label: COUNTRIES[c] || c }))]} />
           </div>
           <div style={{ minWidth: 170 }}>
-            <label style={cardLabel}>{t("Region", "Kraj")}</label>
+            <label style={cardLabel}>{eyebrowBar}{t("Region", "Kraj")}</label>
             <Picker value={fRegion} onChange={(v) => { setFRegion(v); setFCity(""); }} searchable ariaLabel={t("Region", "Kraj")}
               options={[{ value: "", label: t("All", "Všetky") }, ...opts.regions.map((r) => ({ value: r, label: r }))]} />
           </div>
           <div style={{ minWidth: 150 }}>
-            <label style={cardLabel}>{t("City", "Mesto")}</label>
+            <label style={cardLabel}>{eyebrowBar}{t("City", "Mesto")}</label>
             <Picker value={fCity} onChange={(v) => setFCity(v)} searchable ariaLabel={t("City", "Mesto")}
               options={[{ value: "", label: t("All", "Všetky") }, ...opts.cities.map((c) => ({ value: c, label: c }))]} />
           </div>
@@ -463,7 +470,7 @@ export default function DataQA({ lang = "sk" }) {
 
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 16 }}>
           <div ref={boxRef} style={{ position: "relative", flex: "1 1 280px", minWidth: 240 }}>
-            <label style={cardLabel}>{t("Project", "Projekt")}</label>
+            <label style={cardLabel}>{eyebrowBar}{t("Project", "Projekt")}</label>
             <input value={query} onChange={(e) => { setQuery(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)}
               role="combobox" aria-expanded={open} aria-autocomplete="list"
               placeholder={t("type to search…", "píš pre hľadanie…")}
@@ -483,7 +490,7 @@ export default function DataQA({ lang = "sk" }) {
           </div>
 
           <div style={{ minWidth: 170 }}>
-            <label style={cardLabel}>{t("Date (snapshot)", "Dátum (snapshot)")}</label>
+            <label style={cardLabel}>{eyebrowBar}{t("Date (snapshot)", "Dátum (snapshot)")}</label>
             <Picker value={date} onChange={(v) => changeDate(v)} ariaLabel={t("Date (snapshot)", "Dátum (snapshot)")}
               options={dates.length === 0 ? [{ value: "", label: "—" }] : dates.map((d, i) => ({ value: d.scrape_date, label: `${d.scrape_date}${i === 0 ? t(" (latest)", " (najnovšie)") : ""} · ${d.units}` }))} />
           </div>
@@ -504,19 +511,20 @@ export default function DataQA({ lang = "sk" }) {
             {t("Snapshot of", "Snapshot k")} <span style={{ color: textLight }}>{date || "—"}</span> · {fmt(snap?.total)}{t(" units", " bytov")}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(118px,1fr))", gap: 10, marginBottom: 16 }}>
-            <div style={card}><div style={cardLabel}>{t("Units total", "Bytov spolu")}</div><div style={cardVal}>{fmt(snap?.total)}</div></div>
-            <div style={{ ...card, borderColor: selCount ? green : border }}>
+            <div style={{ ...card, position: "relative", overflow: "hidden", background: tintBg(C_SLATE) }}>{cardBar(C_SLATE)}<div style={cardLabel}>{t("Units total", "Bytov spolu")}</div><div style={cardVal}>{fmt(snap?.total)}</div></div>
+            <div style={{ ...card, position: "relative", overflow: "hidden", background: tintBg(C_GREEN), borderColor: selCount ? green : border }}>
+              {cardBar(C_GREEN)}
               <div style={cardLabel}>{t("Selected", "Vybrané")}</div>
               <div style={{ ...cardVal, color: selCount ? green : textLight }}>
                 {fmt(selCount)}<span style={{ fontSize: 13, color: dim, fontWeight: 400 }}> / {fmt(snap?.total)}</span>
               </div>
             </div>
-            <div style={card}><div style={cardLabel}>{t("Available", "Voľných")}</div><div style={{ ...cardVal, color: greenInk }}>{fmt(snap?.v)}</div></div>
-            <div style={card}><div style={cardLabel}>{t("Sold", "Predaných")}</div><div style={cardVal}>{fmt(snap?.p)}</div></div>
-            <div style={card}><div style={cardLabel}>{t("Reserved", "Rezervované")}</div><div style={cardVal}>{fmt(snap?.r)}</div></div>
-            <div style={card}><div style={cardLabel}>{t("Pre-reserved", "Predrezerv.")}</div><div style={cardVal}>{fmt(snap?.pr)}</div></div>
-            <div style={card}><div style={cardLabel}>{t("Avg €/m²", "Priemer €/m²")}</div><div style={cardVal}>{fmt(snap?.avgPsm)}</div></div>
-            <div style={card}><div style={cardLabel}>{t("Price from–to", "Cena od–do")}</div><div style={{ ...cardVal, fontSize: 15 }}>{fmt(snap?.minP)} – {fmt(snap?.maxP)} €</div></div>
+            <div style={{ ...card, position: "relative", overflow: "hidden", background: tintBg(C_GREEN) }}>{cardBar(C_GREEN)}<div style={cardLabel}>{t("Available", "Voľných")}</div><div style={{ ...cardVal, color: greenInk }}>{fmt(snap?.v)}</div></div>
+            <div style={{ ...card, position: "relative", overflow: "hidden", background: tintBg(C_SLATE) }}>{cardBar(C_SLATE)}<div style={cardLabel}>{t("Sold", "Predaných")}</div><div style={cardVal}>{fmt(snap?.p)}</div></div>
+            <div style={{ ...card, position: "relative", overflow: "hidden", background: tintBg(C_AMBER) }}>{cardBar(C_AMBER)}<div style={cardLabel}>{t("Reserved", "Rezervované")}</div><div style={cardVal}>{fmt(snap?.r)}</div></div>
+            <div style={{ ...card, position: "relative", overflow: "hidden", background: tintBg(C_BLUE) }}>{cardBar(C_BLUE)}<div style={cardLabel}>{t("Pre-reserved", "Predrezerv.")}</div><div style={cardVal}>{fmt(snap?.pr)}</div></div>
+            <div style={{ ...card, position: "relative", overflow: "hidden", background: tintBg(C_SLATE) }}>{cardBar(C_SLATE)}<div style={cardLabel}>{t("Avg €/m²", "Priemer €/m²")}</div><div style={cardVal}>{fmt(snap?.avgPsm)}</div></div>
+            <div style={{ ...card, position: "relative", overflow: "hidden", background: tintBg(C_SLATE) }}>{cardBar(C_SLATE)}<div style={cardLabel}>{t("Price from–to", "Cena od–do")}</div><div style={{ ...cardVal, fontSize: 15 }}>{fmt(snap?.minP)} – {fmt(snap?.maxP)} €</div></div>
           </div>
 
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
@@ -538,7 +546,7 @@ export default function DataQA({ lang = "sk" }) {
             <div style={{ ...card, marginBottom: 12 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
                 <span style={{ ...cardLabel, fontSize: 12 }}>
-                  {t("Columns", "Stĺpce")} — {visibleCols.length}/{ALL_COLS.length} {t("shown", "zobrazených")}{hiddenCount ? `, ${hiddenCount} ${t("hidden", "skrytých")}` : ""}
+                  {eyebrowBar}{t("Columns", "Stĺpce")} — {visibleCols.length}/{ALL_COLS.length} {t("shown", "zobrazených")}{hiddenCount ? `, ${hiddenCount} ${t("hidden", "skrytých")}` : ""}
                 </span>
                 <button onClick={showAllCols} style={{ ...btn, padding: "5px 10px", fontSize: 12, marginLeft: "auto" }}>{t("Show all", "Zobraziť všetky")}</button>
                 <button onClick={resetCols} style={{ ...btn, padding: "5px 10px", fontSize: 12, borderColor: amber, color: amber }}

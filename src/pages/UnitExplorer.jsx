@@ -268,7 +268,8 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
     <div style={{ color: text, fontFamily: "'Inter', system-ui, sans-serif" }}>
       {/* header + mode toggle */}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: "0.75rem", marginBottom: "0.9rem" }}>
-        <div>
+        <div style={{ position: "relative", overflow: "hidden", borderRadius: 16, border: "1px solid var(--border)", padding: "1.4rem 1.6rem 1.5rem", marginBottom: "1.5rem", background: "radial-gradient(120% 140% at 2% -20%, rgba(18,185,129,0.13) 0%, transparent 46%), linear-gradient(135deg, color-mix(in srgb, var(--accent) 5%, var(--surface)) 0%, var(--bg) 75%)" }}>
+          <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: 3, background: "linear-gradient(90deg, var(--accent), #3b74e8 55%, #8b5cf6)" }} />
           <h1 style={{ fontSize: "1.4rem", margin: "0 0 0.2rem" }}>{t("Prieskumník bytov", "Unit Explorer")}</h1>
           <p style={{ color: dim, fontSize: "0.8rem", margin: 0 }}>{t("Surové dáta po jednotlivých bytoch — vyber stĺpce vpravo, filtruj, zoraď klikom na hlavičku.", "Raw per-unit data — pick columns on the right, filter, sort by clicking a header.")}</p>
         </div>
@@ -284,7 +285,7 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
         <div style={{ flex: 1, minWidth: 0 }}>
           {/* filter toolbar */}
           <div style={{ background: panel, border: `1px solid ${border}`, borderRadius: 8, padding: "0.6rem 0.7rem", marginBottom: "0.6rem", display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
-            <span style={{ fontFamily: mono, fontSize: "0.62rem", color: dim, letterSpacing: "0.08em", textTransform: "uppercase", marginRight: "0.1rem" }}>{t("Filtre", "Filters")}{activeFilters ? ` · ${activeFilters}` : ""}</span>
+            <span style={{ fontFamily: mono, fontSize: "0.62rem", color: dim, letterSpacing: "0.08em", textTransform: "uppercase", marginRight: "0.1rem" }}><span style={{ display: "inline-block", width: 3, height: 12, borderRadius: 2, background: "var(--accent)", marginRight: "0.5rem", verticalAlign: "middle" }} />{t("Filtre", "Filters")}{activeFilters ? ` · ${activeFilters}` : ""}</span>
             <Sel value={fProject} onChange={setFProject} opts={projOpts.values} ph={t("Projekt: všetky", "Project: all")} />
             <Sel value={fCity} onChange={setFCity} opts={cityOpts.values} ph={t("Mesto: všetky", "City: all")} />
             <Sel value={fCast} onChange={setFCast} opts={castOpts.values} ph={t("Mestská časť: všetky", "District: all")} />
@@ -360,7 +361,7 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
         {/* field palette (POLIA-style) */}
         <div style={{ width: 268, flexShrink: 0, background: panel, border: `1px solid ${border}`, borderRadius: 8, padding: "0.75rem", display: "flex", flexDirection: "column", maxHeight: 640 }}>
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.55rem" }}>
-            <span style={{ fontFamily: mono, fontSize: "0.7rem", color: text, fontWeight: 700, letterSpacing: "0.06em" }}>{t("STĹPCE", "COLUMNS")}</span>
+            <span style={{ fontFamily: mono, fontSize: "0.7rem", color: text, fontWeight: 700, letterSpacing: "0.06em" }}><span style={{ display: "inline-block", width: 3, height: 12, borderRadius: 2, background: "var(--accent)", marginRight: "0.5rem", verticalAlign: "middle" }} />{t("STĹPCE", "COLUMNS")}</span>
             <span style={{ fontFamily: mono, fontSize: "0.6rem", color: dim }}>{cols.length}/{fields.length}</span>
           </div>
           <div style={{ position: "relative", marginBottom: "0.55rem" }}>

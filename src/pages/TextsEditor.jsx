@@ -481,20 +481,24 @@ export default function TextsEditor({ lang = "en" }) {
 
   return (
     <div style={{ padding: "1.5rem 1.25rem", maxWidth: 1140, margin: "0 auto", color: textLight, fontFamily: mono }}>
-      <h1 style={{ fontSize: "1.15rem", fontWeight: 700, margin: "0 0 0.3rem" }}>
-        {uiSK ? "Texty na webe" : "Website texts"}
-      </h1>
-      <p style={{ color: dim, fontSize: "0.78rem", lineHeight: 1.5, margin: "0 0 1rem", maxWidth: 760 }}>
-        {uiSK
-          ? "Vľavo vyber stránku, vpravo uprav text priamo v poli. Ulož → ihneď naživo, bez nasadenia. „Reset“ vráti pôvodný text. Každý jazyk je samostatný — nie preklad."
-          : "Pick a page on the left, edit the text in place on the right. Save → live instantly, no deploy. “Reset” restores the original. Each language is independent — not a translation."}
-      </p>
+      <div style={{ position: "relative", overflow: "hidden", borderRadius: 16, border: "1px solid var(--border)", padding: "1.4rem 1.6rem 1.5rem", marginBottom: "1.5rem", background: "radial-gradient(120% 140% at 2% -20%, rgba(18,185,129,0.13) 0%, transparent 46%), linear-gradient(135deg, color-mix(in srgb, var(--accent) 5%, var(--surface)) 0%, var(--bg) 75%)" }}>
+        <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: 3, background: "linear-gradient(90deg, var(--accent), #3b74e8 55%, #8b5cf6)" }} />
+        <h1 style={{ fontSize: "1.15rem", fontWeight: 700, margin: "0 0 0.3rem" }}>
+          {uiSK ? "Texty na webe" : "Website texts"}
+        </h1>
+        <p style={{ color: dim, fontSize: "0.78rem", lineHeight: 1.5, margin: 0, maxWidth: 760 }}>
+          {uiSK
+            ? "Vľavo vyber stránku, vpravo uprav text priamo v poli. Ulož → ihneď naživo, bez nasadenia. „Reset“ vráti pôvodný text. Každý jazyk je samostatný — nie preklad."
+            : "Pick a page on the left, edit the text in place on the right. Save → live instantly, no deploy. “Reset” restores the original. Each language is independent — not a translation."}
+        </p>
+      </div>
 
       <PricingPanel uiSK={uiSK} />
 
       {/* Language tabs */}
       <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", marginBottom: "0.6rem", flexWrap: "wrap" }}>
         <span style={{ fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.1em", color: faint, marginRight: 4 }}>
+          <span style={{ display: "inline-block", width: 3, height: 12, borderRadius: 2, background: "var(--accent)", marginRight: "0.5rem", verticalAlign: "middle" }} />
           {uiSK ? "Jazyk" : "Language"}
         </span>
         {LANGS.map((L) => {
@@ -558,7 +562,7 @@ export default function TextsEditor({ lang = "en" }) {
             {q && <div style={{ fontSize: "0.62rem", color: amber, marginBottom: 10 }}>{uiSK ? "Hľadanie naprieč stránkami" : "Searching across pages"}</div>}
             {navGroups.map((g) => (
               <div key={g.group} style={{ marginBottom: 14 }}>
-                <div style={navGroupLabel}>{g.group}</div>
+                <div style={navGroupLabel}><span style={{ display: "inline-block", width: 3, height: 12, borderRadius: 2, background: "var(--accent)", marginRight: "0.5rem", verticalAlign: "middle" }} />{g.group}</div>
                 {g.pages.map((p) => {
                   const active = !q && p.id === activePage?.id;
                   const ed = editedInPage(p);
@@ -584,7 +588,7 @@ export default function TextsEditor({ lang = "en" }) {
                 return groups.map(({ p, items }) => (
                   <section key={p.id} style={{ marginBottom: 20 }}>
                     <div style={pageHead}>
-                      <span style={{ fontSize: "0.58rem", color: faint, textTransform: "uppercase", letterSpacing: "0.08em" }}>{p.group}</span>
+                      <span style={{ fontSize: "0.58rem", color: faint, textTransform: "uppercase", letterSpacing: "0.08em" }}><span style={{ display: "inline-block", width: 3, height: 12, borderRadius: 2, background: "var(--accent)", marginRight: "0.5rem", verticalAlign: "middle" }} />{p.group}</span>
                       <h2 style={{ margin: "1px 0 0", fontSize: "0.9rem", fontWeight: 700 }}>{p.label} <span style={{ color: faint, fontWeight: 400, fontSize: "0.7rem" }}>· {items.length}</span></h2>
                     </div>
                     {items.map(renderRow)}
@@ -594,7 +598,7 @@ export default function TextsEditor({ lang = "en" }) {
             ) : activePage ? (
               <>
                 <div style={pageHead}>
-                  <span style={{ fontSize: "0.58rem", color: faint, textTransform: "uppercase", letterSpacing: "0.08em" }}>{activePage.group}</span>
+                  <span style={{ fontSize: "0.58rem", color: faint, textTransform: "uppercase", letterSpacing: "0.08em" }}><span style={{ display: "inline-block", width: 3, height: 12, borderRadius: 2, background: "var(--accent)", marginRight: "0.5rem", verticalAlign: "middle" }} />{activePage.group}</span>
                   <h2 style={{ margin: "1px 0 1px", fontSize: "1rem", fontWeight: 700 }}>{activePage.label}</h2>
                   <div style={{ fontSize: "0.66rem", color: dim }}>{activePage.blurb}</div>
                 </div>

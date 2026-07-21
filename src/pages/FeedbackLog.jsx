@@ -19,6 +19,12 @@ import Picker from "../components/Picker";
 import { accent as green, accentInk, orange as amber, blue, text as textLight, dim, border, bg, surfaceDark as bg2, mono } from "../lib/theme";
 const red = "#ff6b6b";
 
+// ── "Normal theme" shared visual helpers (visual-only) ──────────────
+const eyebrowBar = <span style={{ display: "inline-block", width: 3, height: 12, borderRadius: 2, background: "var(--accent)", marginRight: "0.5rem", verticalAlign: "middle" }} />;
+const cardBar = (color) => <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: color, opacity: 0.85 }} />;
+const tintBg = (color) => `linear-gradient(180deg, color-mix(in srgb, ${color} 9%, var(--surface)) 0%, var(--surface) 46%)`;
+const C_GREEN = "#10b981", C_BLUE = "#3b74e8", C_AMBER = "#e0940f", C_SLATE = "#64748b";
+
 const SUPA_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPA_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
@@ -216,7 +222,7 @@ export default function FeedbackLog({ lang = "sk" }) {
             </div>
 
             <div style={{ ...card, marginBottom: 14 }}>
-              <div style={{ ...cardLabel, marginBottom: 6 }}>{t("Status", "Stav")}</div>
+              <div style={{ ...cardLabel, marginBottom: 6 }}>{eyebrowBar}{t("Status", "Stav")}</div>
               {statusButtons(conv.id, conv.status)}
               <div style={{ display: "flex", gap: 8, alignItems: "flex-start", marginTop: 12 }}>
                 <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("Private note (only admins)…", "Súkromná poznámka (len admin)…")}
@@ -265,7 +271,7 @@ export default function FeedbackLog({ lang = "sk" }) {
 
             {/* reply box */}
             <div style={{ ...card }}>
-              <div style={{ ...cardLabel, marginBottom: 6 }}>{t("Reply", "Odpovedať")}{conv.email ? ` → ${conv.email}` : ""}</div>
+              <div style={{ ...cardLabel, marginBottom: 6 }}>{eyebrowBar}{t("Reply", "Odpovedať")}{conv.email ? ` → ${conv.email}` : ""}</div>
               {conv.email ? (
                 <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
                   <textarea value={replyDraft} onChange={(e) => setReplyDraft(e.target.value)} placeholder={t("Write your reply (emails the user)…", "Napíš odpoveď (pošle e-mail používateľovi)…")} rows={3}
@@ -288,8 +294,9 @@ export default function FeedbackLog({ lang = "sk" }) {
   // ── List view ──────────────────────────────────────────────────
   return (
     <div style={{ minHeight: "100vh", background: bg, color: textLight, padding: "1.5rem 1.75rem" }}>
-      <div style={{ marginBottom: 18, display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-        <div>
+      <div style={{ marginBottom: "1.5rem", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+        <div style={{ position: "relative", overflow: "hidden", borderRadius: 16, border: "1px solid var(--border)", padding: "1.4rem 1.6rem 1.5rem", flex: "1 1 340px", background: "radial-gradient(120% 140% at 2% -20%, rgba(18,185,129,0.13) 0%, transparent 46%), linear-gradient(135deg, color-mix(in srgb, var(--accent) 5%, var(--surface)) 0%, var(--bg) 75%)" }}>
+          <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: 3, background: "linear-gradient(90deg, var(--accent), #3b74e8 55%, #8b5cf6)" }} />
           <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>{t("Feedback", "Spätná väzba")}</h1>
           <p style={{ margin: "4px 0 0", color: dim, fontSize: 13 }}>{t("Conversations — newest activity first. Open one to see the full thread + reply.", "Konverzácie — najnovšie hore. Otvor konverzáciu pre celé vlákno + odpoveď.")}</p>
         </div>
@@ -300,17 +307,17 @@ export default function FeedbackLog({ lang = "sk" }) {
 
       {stats && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(118px,1fr))", gap: 10, marginBottom: 16 }}>
-          <div style={card}><div style={cardLabel}>{t("Total", "Spolu")}</div><div style={cardVal}>{stats.total ?? 0}</div></div>
-          <div style={card}><div style={cardLabel}>{t("New", "Nové")}</div><div style={{ ...cardVal, color: amber }}>{stats.new ?? 0}</div></div>
-          <div style={card}><div style={cardLabel}>{t("In progress", "Rieši sa")}</div><div style={{ ...cardVal, color: blue }}>{stats.in_progress ?? 0}</div></div>
-          <div style={card}><div style={cardLabel}>{t("Resolved", "Vyriešené")}</div><div style={{ ...cardVal, color: accentInk }}>{stats.resolved ?? 0}</div></div>
-          <div style={card}><div style={cardLabel}>{t("Won't fix", "Nerieši sa")}</div><div style={cardVal}>{stats.wont_fix ?? 0}</div></div>
+          <div style={{ ...card, position: "relative", overflow: "hidden", background: tintBg(C_SLATE) }}>{cardBar(C_SLATE)}<div style={cardLabel}>{t("Total", "Spolu")}</div><div style={cardVal}>{stats.total ?? 0}</div></div>
+          <div style={{ ...card, position: "relative", overflow: "hidden", background: tintBg(C_AMBER) }}>{cardBar(C_AMBER)}<div style={cardLabel}>{t("New", "Nové")}</div><div style={{ ...cardVal, color: amber }}>{stats.new ?? 0}</div></div>
+          <div style={{ ...card, position: "relative", overflow: "hidden", background: tintBg(C_BLUE) }}>{cardBar(C_BLUE)}<div style={cardLabel}>{t("In progress", "Rieši sa")}</div><div style={{ ...cardVal, color: blue }}>{stats.in_progress ?? 0}</div></div>
+          <div style={{ ...card, position: "relative", overflow: "hidden", background: tintBg(C_GREEN) }}>{cardBar(C_GREEN)}<div style={cardLabel}>{t("Resolved", "Vyriešené")}</div><div style={{ ...cardVal, color: accentInk }}>{stats.resolved ?? 0}</div></div>
+          <div style={{ ...card, position: "relative", overflow: "hidden", background: tintBg(C_SLATE) }}>{cardBar(C_SLATE)}<div style={cardLabel}>{t("Won't fix", "Nerieši sa")}</div><div style={cardVal}>{stats.wont_fix ?? 0}</div></div>
         </div>
       )}
 
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 16 }}>
         <div style={{ display: "flex", flexDirection: "column", minWidth: 150 }}>
-          <label style={cardLabel}>{t("Status", "Stav")}</label>
+          <label style={cardLabel}>{eyebrowBar}{t("Status", "Stav")}</label>
           <Picker
             value={fStatus}
             onChange={(v) => setFStatus(v)}
@@ -320,7 +327,7 @@ export default function FeedbackLog({ lang = "sk" }) {
           />
         </div>
         <div style={{ display: "flex", flexDirection: "column", minWidth: 170 }}>
-          <label style={cardLabel}>{t("Type", "Typ")}</label>
+          <label style={cardLabel}>{eyebrowBar}{t("Type", "Typ")}</label>
           <Picker
             value={fCategory}
             onChange={(v) => setFCategory(v)}
