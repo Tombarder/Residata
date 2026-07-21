@@ -557,6 +557,12 @@ export default function MapView2({ lang = "en", setCurrent }) {
 
     map.on("load", () => {
       if (mapRef.current !== map) return;
+      // Force a resize once the style loads — the map can init before its flex
+      // container has settled its final height, so the viewport is computed at a
+      // stale size, ZERO tiles are requested, and the map paints blank until nudged.
+      // (Boss 2026-07-21: Map view + Market Radar rendered blank until a manual resize.)
+      map.resize();
+      requestAnimationFrame(() => { if (mapRef.current === map) map.resize(); });
       installMap2Layers(map, featuresRef.current);
 
       readyRef.current = true;
