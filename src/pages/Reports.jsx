@@ -381,7 +381,8 @@ function ReportHeader({ projects, lang, scope, scopeLabel }) {
     if (p) scopeLabelDisplay = p.name;
   }
   return (
-    <div style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 12, padding: "1.5rem 1.75rem", marginBottom: "1rem" }}>
+    <div style={{ position: "relative", overflow: "hidden", borderRadius: 16, border: "1px solid var(--border)", padding: "1.4rem 1.6rem 1.5rem", marginBottom: "1.5rem", background: "radial-gradient(120% 140% at 2% -20%, rgba(18,185,129,0.13) 0%, transparent 46%), linear-gradient(135deg, color-mix(in srgb, var(--accent) 5%, var(--surface)) 0%, var(--bg) 75%)" }}>
+      <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: 3, background: "linear-gradient(90deg, var(--accent), #3b74e8 55%, #8b5cf6)" }} />
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem", flexWrap: "wrap" }}>
         <div>
           <div style={{ fontSize: "0.78rem", color: dim, marginBottom: "0.3rem" }}>
@@ -516,6 +517,7 @@ function ScopeTabRow({ label, tabs, active, onClick, lang, border: hasTopBorder 
         marginRight: "0.4rem", flex: "0 0 auto",
         minWidth: 64,
       }}>
+        <span style={{ display: "inline-block", width: 3, height: 12, borderRadius: 2, background: "var(--accent)", marginRight: "0.5rem", verticalAlign: "middle" }} />
         {label}
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem", flex: 1 }}>
@@ -549,7 +551,7 @@ function PickerRow({ label, value, options, onChange }) {
   const opts = options.map(o => (typeof o === "string" ? { value: o, label: o } : o));
   return (
     <div className="no-print rep-picker-row" style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "1rem", padding: "0.55rem 0.7rem", background: bg2, border: `1px solid ${border}`, borderRadius: 6 }}>
-      <span style={{ fontFamily: mono, fontSize: "0.62rem", color: dim, letterSpacing: "0.08em", textTransform: "uppercase" }}>{label}</span>
+      <span style={{ fontFamily: mono, fontSize: "0.62rem", color: dim, letterSpacing: "0.08em", textTransform: "uppercase" }}><span style={{ display: "inline-block", width: 3, height: 12, borderRadius: 2, background: "var(--accent)", marginRight: "0.5rem", verticalAlign: "middle" }} />{label}</span>
       <Picker value={value || ""} onChange={onChange} width={200} searchable ariaLabel={label}
         options={opts} />
       <span style={{ fontFamily: mono, fontSize: "0.62rem", color: dim }}>{opts.length} {`⋮`}</span>
@@ -827,11 +829,11 @@ function KpiStrip({ summary, lang, extra = [] }) {
   // a real "0%" so users don't read the absence as "nothing has sold".
   const soldPctLabel = summary.soldPct == null ? "n/a" : `${summary.soldPct.toFixed(0)}%`;
   const items = [
-    { label: lang === "sk" ? "Projektov"   : "Projects",   value: summary.projectCount.toLocaleString("en-US").replace(/,/g, " ") },
-    { label: lang === "sk" ? "Bytov"       : "Units",      value: summary.totalUnits.toLocaleString("en-US").replace(/,/g, " ") },
-    { label: lang === "sk" ? "Voľných"     : "Available",  value: summary.available.toLocaleString("en-US").replace(/,/g, " "), color: accentInk },
-    { label: lang === "sk" ? "Predaných"   : "Sold",       value: summary.sold.toLocaleString("en-US").replace(/,/g, " "), color: orange },
-    { label: lang === "sk" ? "Predaných %" : "Sold %",     value: soldPctLabel, color: orange },
+    { label: lang === "sk" ? "Projektov"   : "Projects",   value: summary.projectCount.toLocaleString("en-US").replace(/,/g, " "), accent: "#10b981" },
+    { label: lang === "sk" ? "Bytov"       : "Units",      value: summary.totalUnits.toLocaleString("en-US").replace(/,/g, " "), accent: "#64748b" },
+    { label: lang === "sk" ? "Voľných"     : "Available",  value: summary.available.toLocaleString("en-US").replace(/,/g, " "), color: accentInk, accent: "#10b981" },
+    { label: lang === "sk" ? "Predaných"   : "Sold",       value: summary.sold.toLocaleString("en-US").replace(/,/g, " "), color: orange, accent: "#e0940f" },
+    { label: lang === "sk" ? "Predaných %" : "Sold %",     value: soldPctLabel, color: orange, accent: "#e0940f" },
     ...(summary.wavgM2 ? [{
       // "Ø €/m²" (average), NOT "(weighted)": this KPI is unit-weighted only in the
       // market/city/district scope; in the project deep-dive `summary` is the mean-of-ratios
@@ -839,17 +841,22 @@ function KpiStrip({ summary, lang, extra = [] }) {
       // consistency). A plain "average" label is honest for both, "(weighted)" was not.
       label: `Ø ${moneySymbol()}/m²`,
       value: Math.round(moneyFromEur(summary.wavgM2)).toLocaleString("en-US").replace(/,/g, " "),
+      accent: "#3b74e8",
     }] : []),
     ...extra,
   ];
   return (
     <div className="rep-kpi-strip" style={{ display: "grid", gridTemplateColumns: `repeat(auto-fit, minmax(130px, 1fr))`, gap: "0.5rem", marginBottom: "1.25rem" }}>
-      {items.map((k, i) => (
-        <div key={i} style={{ background: "var(--surface)", border: `1px solid ${border}`, borderRadius: 8, padding: "0.65rem 0.9rem" }}>
+      {items.map((k, i) => {
+        const COLOR = k.accent || "#64748b";
+        return (
+        <div key={i} style={{ position: "relative", overflow: "hidden", background: `linear-gradient(180deg, color-mix(in srgb, ${COLOR} 9%, var(--surface)) 0%, var(--surface) 46%)`, border: `1px solid ${border}`, borderRadius: 8, padding: "0.65rem 0.9rem" }}>
+          <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: COLOR, opacity: 0.85 }} />
           <div style={{ fontSize: "0.7rem", color: dim, marginBottom: "0.2rem" }}>{k.label}</div>
           <div className="report-accent" style={{ fontSize: "1.15rem", fontWeight: 700, color: k.color || text }}>{k.value}</div>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -989,6 +996,7 @@ function HistogramDrilldown({ bin, rows, loading, unit, lang, onClose, onProject
       <div style={{ padding: "0.6rem 0.85rem", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.5rem", borderBottom: `1px solid ${border}`, background: "color-mix(in srgb, var(--accent) 4%, transparent)" }}>
         <div>
           <div style={{ fontFamily: mono, fontSize: "0.65rem", color: accentInk, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+            <span style={{ display: "inline-block", width: 3, height: 12, borderRadius: 2, background: "var(--accent)", marginRight: "0.5rem", verticalAlign: "middle" }} />
             {lang === "sk" ? "Pásmo" : "Band"} {unit ? (unit === "€/m²" ? `${moneySymbol()}/m²` : unit) : ""}
           </div>
           <div style={{ fontSize: "0.92rem", color: text, fontWeight: 600, marginTop: 2 }}>
@@ -1401,6 +1409,7 @@ function FooterCard({ lang }) {
   return (
     <div className="no-print" style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8, padding: "0.85rem 1.1rem", marginTop: "1.5rem" }}>
       <div style={{ fontFamily: mono, fontSize: "0.62rem", color: dim, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.3rem" }}>
+        <span style={{ display: "inline-block", width: 3, height: 12, borderRadius: 2, background: "var(--accent)", marginRight: "0.5rem", verticalAlign: "middle" }} />
         {lang === "sk" ? "Čo ďalej" : "What's next"}
       </div>
       <p style={{ color: "var(--text-2)", fontSize: "0.82rem", lineHeight: 1.6, margin: 0 }}>

@@ -3137,11 +3137,11 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
     <main style={{ padding: "1rem 2rem 4rem", maxWidth: 1240, margin: "0 auto" }}>
       {/* ═══ KPI STRIP ═══ */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.85rem", marginBottom: "2rem" }}>
-        <AKpi label={lang === "sk" ? "Sledované byty" : "Units tracked"}   value={totalUnits.toLocaleString(localeTag(lang))} />
-        <AKpi label={lang === "sk" ? "Voľné byty" : "Available"}            value={totalAvail.toLocaleString(localeTag(lang))} accent={green} />
-        <AKpi label={lang === "sk" ? "Predané (30d)" : "Sold (30d)"}        value={totalSold30 ? `+${totalSold30}` : "—"} accent="#f5a623"
+        <AKpi label={lang === "sk" ? "Sledované byty" : "Units tracked"}   value={totalUnits.toLocaleString(localeTag(lang))} color="#64748b" />
+        <AKpi label={lang === "sk" ? "Voľné byty" : "Available"}            value={totalAvail.toLocaleString(localeTag(lang))} accent={green} color="#10b981" />
+        <AKpi label={lang === "sk" ? "Predané (30d)" : "Sold (30d)"}        value={totalSold30 ? `+${totalSold30}` : "—"} accent="#f5a623" color="#e0940f"
               sub={lang === "sk" ? `${absorptionPct}% absorpcia` : `${absorptionPct}% absorption`} />
-        <AKpi label={lang === "sk" ? `Priem. ${moneySymbol()}/m²` : `Avg ${moneySymbol()}/m²`}            value={avgEurM2 ? Math.round(moneyFromEur(avgEurM2)).toLocaleString(localeTag(lang)) : "—"} />
+        <AKpi label={lang === "sk" ? `Priem. ${moneySymbol()}/m²` : `Avg ${moneySymbol()}/m²`}            value={avgEurM2 ? Math.round(moneyFromEur(avgEurM2)).toLocaleString(localeTag(lang)) : "—"} color="#3b74e8" />
       </div>
 
       {/* ═══ PIVOT — drag & drop builder ═══ */}
@@ -3319,9 +3319,10 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
 
 
 // ─── Analytics primitives ────────────────────────────────
-function AKpi({ label, value, accent = "var(--text)", sub }) {
+function AKpi({ label, value, accent = "var(--text)", sub, color = "#64748b" }) {
   return (
-    <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 10, padding: "1.1rem 1.2rem" }}>
+    <div style={{ position: "relative", overflow: "hidden", background: `linear-gradient(180deg, color-mix(in srgb, ${color} 9%, var(--surface)) 0%, var(--surface) 46%)`, border: `1px solid ${border}`, borderRadius: 10, padding: "1.1rem 1.2rem" }}>
+      <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: color, opacity: 0.85 }} />
       <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.4rem" }}>{label}</div>
       <div style={{ fontFamily: mono, fontSize: "1.8rem", fontWeight: 700, color: accent, letterSpacing: "-0.02em", lineHeight: 1 }}>{value}</div>
       {sub && <div style={{ fontSize: "0.7rem", color: dim, marginTop: "0.4rem" }}>{sub}</div>}
