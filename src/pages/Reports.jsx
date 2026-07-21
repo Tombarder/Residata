@@ -846,16 +846,15 @@ function KpiStrip({ summary, lang, extra = [] }) {
   ];
   return (
     <div className="rep-kpi-strip" style={{ display: "grid", gridTemplateColumns: `repeat(auto-fit, minmax(130px, 1fr))`, gap: "0.5rem", marginBottom: "1.25rem" }}>
-      {items.map((k, i) => {
-        const COLOR = k.accent || "#64748b";
-        return (
-        <div key={i} style={{ position: "relative", overflow: "hidden", background: `linear-gradient(180deg, color-mix(in srgb, ${COLOR} 9%, var(--surface)) 0%, var(--surface) 46%)`, border: `1px solid ${border}`, borderRadius: 8, padding: "0.65rem 0.9rem" }}>
-          <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: COLOR, opacity: 0.85 }} />
+      {items.map((k, i) => (
+        // Calm, uniform cards: one brand-accent bar + neutral value on every card
+        // (no per-metric rainbow), to match the Dashboard market-overview strip.
+        <div key={i} style={{ position: "relative", overflow: "hidden", background: "var(--surface)", border: `1px solid ${border}`, borderRadius: 8, padding: "0.65rem 0.9rem 0.65rem 1rem" }}>
+          <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: "var(--accent)", opacity: 0.7 }} />
           <div style={{ fontSize: "0.7rem", color: dim, marginBottom: "0.2rem" }}>{k.label}</div>
-          <div className="report-accent" style={{ fontSize: "1.15rem", fontWeight: 700, color: k.color || text }}>{k.value}</div>
+          <div className="report-accent" style={{ fontSize: "1.15rem", fontWeight: 700, color: text }}>{k.value}</div>
         </div>
-        );
-      })}
+      ))}
     </div>
   );
 }

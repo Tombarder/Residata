@@ -159,8 +159,11 @@ export default function SalesView({ lang = "sk" }) {
   const sel = { background: bg, border: `1px solid ${border}`, color: text, borderRadius: 5, padding: "0.4rem 0.55rem", fontSize: "0.78rem", fontFamily: "inherit", outline: "none" };
   const card = { background: "var(--surface)", border: `1px solid ${border}`, borderRadius: 8, padding: "0.85rem 1rem" };
   // colour-coded stat card: metric colour as a left-accent bar + faint wash (theme-aware; keeps "var(--surface)" so the light-mode shadow still applies)
-  const statCard = (color) => ({ ...card, position: "relative", overflow: "hidden", background: `linear-gradient(180deg, color-mix(in srgb, ${color} 9%, var(--surface)) 0%, var(--surface) 46%)` });
-  const StatBar = ({ color }) => <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: color, opacity: 0.85 }} />;
+  // Calm, uniform cards: one brand-accent bar on every card (no per-metric
+  // rainbow), matching the Dashboard market-overview strip. The `color` args are
+  // kept in the signatures so the call sites don't change, but ignored.
+  const statCard = () => ({ ...card, position: "relative", overflow: "hidden", background: "var(--surface)", paddingLeft: "1rem" });
+  const StatBar = () => <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: "var(--accent)", opacity: 0.7 }} />;
   const kpiVal = { fontSize: "1.5rem", fontWeight: 700, color: text, fontFamily: mono, fontVariantNumeric: "tabular-nums" };
   const kpiLbl = { fontFamily: mono, fontSize: "0.62rem", color: dim, letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: "0.3rem" };
   const Sel = ({ value, onChange, opts, ph }) => (
