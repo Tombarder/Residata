@@ -546,7 +546,8 @@ function TopBar({ page, lang, setLang, tier }) {
   return (
     <header style={{
       padding: "1.25rem 2rem", display: "flex", alignItems: "center", justifyContent: "space-between",
-      borderBottom: `1px solid ${border}`, background: "var(--bg)",
+      borderBottom: `1px solid ${border}`, background: "var(--surface)",
+      boxShadow: "0 1px 0 rgba(15,20,27,0.03), 0 6px 18px rgba(15,20,27,0.05)",
       position: "sticky", top: 0, zIndex: 30,
     }} className="platform-topbar">
       <div style={{ paddingLeft: "2.5rem" /* leave room for mobile hamburger */ }} className="platform-topbar-inner">
