@@ -1105,6 +1105,14 @@ function RowBin({ bin, max, unit, clickable, active, onClick }) {
 }
 
 /* ─── AggregateTable — generic "group name + KPIs + bar" table ─── */
+// Small "i" explainer for a table-header cell (reuses the shared InfoTip).
+function HdrInfo({ sk, en, lang }) {
+  return (
+    <span style={{ marginLeft: 4, display: "inline-block", verticalAlign: "middle" }}>
+      <InfoTip text={lang === "sk" ? sk : en} label={lang === "sk" ? sk : en} />
+    </span>
+  );
+}
 function AggregateTable({ rows, lang, nameLabel }) {
   if (!rows.length) return <div style={{ color: dim, fontSize: "0.85rem" }}>{lang === "sk" ? "Žiadne dáta." : "No data."}</div>;
   const maxUnits = Math.max(...rows.map(r => r.totalUnits), 1);
@@ -1117,9 +1125,9 @@ function AggregateTable({ rows, lang, nameLabel }) {
             <th style={tdhR}>{lang === "sk" ? "Projekty" : "Projects"}</th>
             <th style={tdhR}>{lang === "sk" ? "Bytov"    : "Units"}</th>
             <th style={tdhR}>{lang === "sk" ? "Voľných"  : "Available"}</th>
-            <th style={tdhR}>{lang === "sk" ? "Pred. %"  : "Sold %"}</th>
-            <th style={tdhR}>Ø {moneySymbol()}/m²</th>
-            <th style={{ ...tdh, minWidth: 90 }}>{lang === "sk" ? "Relatívne" : "Relative"}</th>
+            <th style={tdhR}>{lang === "sk" ? "Pred. %" : "Sold %"}<HdrInfo lang={lang} sk="Podiel už predaných z celku v skupine. V agregovaných pohľadoch (trh/mesto/časť) je to odhad z registrových údajov developera — pre presné počty predaných pozri stránku Predaje." en="Share already sold of the group's total. In aggregate views (market/city/district) this is an estimate from developers' registry data — for exact sold counts see the Sales page." /></th>
+            <th style={tdhR}>Ø {moneySymbol()}/m²<HdrInfo lang={lang} sk="Priemerná ponuková cena za m² (s DPH) voľných bytov v skupine, vážená počtom bytov." en="Average asking price per m² (incl. VAT) of available units in the group, weighted by unit count." /></th>
+            <th style={{ ...tdh, minWidth: 90 }}>{lang === "sk" ? "Relatívne" : "Relative"}<HdrInfo lang={lang} sk="Vizuálne porovnanie veľkosti skupín podľa počtu bytov — najväčšia skupina má plnú lištu." en="Visual size comparison of the groups by unit count — the largest group has a full bar." /></th>
           </tr>
         </thead>
         <tbody>
