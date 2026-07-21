@@ -355,8 +355,12 @@ const KPI_ICON = {
 };
 
 function KpiCard({ label, value, hint, delta, lang, accent = textLight, locked = false, icon }) {
+  const k = icon?.c;
   return (
-    <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 12, padding: "0.95rem 1.05rem", minWidth: 0, display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+    <div style={{ position: "relative", overflow: "hidden",
+      background: k ? `linear-gradient(180deg, color-mix(in srgb, ${k} 9%, var(--surface)) 0%, var(--surface) 46%)` : bg,
+      border: `1px solid ${border}`, borderRadius: 12, padding: "0.95rem 1.05rem", minWidth: 0, display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+      {k && <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: k, opacity: 0.85 }} />}
       {icon && (
         <div style={{ width: 30, height: 30, borderRadius: 8, display: "grid", placeItems: "center", background: `color-mix(in srgb, ${icon.c} 14%, transparent)`, marginBottom: "0.05rem" }}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={icon.c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={icon.d} /></svg>
@@ -512,7 +516,11 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
   };
 
   return (
-    <div style={{ padding: "1.75rem 2rem 4rem", maxWidth: 1280 }}>
+    <div>
+      {/* ═══ HERO BAND — greeting + market overview, a distinct tinted zone ═══ */}
+      <div style={{ position: "relative", padding: "1.75rem 2rem 1.9rem", borderBottom: "1px solid var(--border)", background: "radial-gradient(130% 150% at 2% -10%, rgba(18,185,129,0.13) 0%, transparent 44%), radial-gradient(120% 130% at 100% 0%, rgba(59,116,232,0.08) 0%, transparent 42%), linear-gradient(135deg, color-mix(in srgb, var(--accent) 5%, var(--surface)) 0%, var(--bg) 72%)" }}>
+        <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: 3, background: "linear-gradient(90deg, var(--accent), #3b74e8 55%, #8b5cf6)" }} />
+        <div style={{ maxWidth: 1280 }}>
       {/* Greeting + freshness line */}
       <h2 style={{ fontSize: "1.5rem", fontWeight: 600, color: textLight, margin: "0 0 0.2rem" }}>{greeting}</h2>
       <p style={{ color: dim, fontSize: "0.9rem", lineHeight: 1.55, margin: "0 0 1.4rem" }}>
@@ -527,6 +535,7 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
       {/* ═══ ZONE A · Market overview ═══ */}
       <section style={{ marginBottom: "2.25rem", position: "relative" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.55rem", flexWrap: "wrap", marginBottom: "0.85rem" }}>
+          <div style={{ width: 3, height: 14, borderRadius: 2, background: "var(--accent)", flexShrink: 0 }} />
           <div style={{ fontFamily: mono, fontSize: "0.68rem", color: accentInk, letterSpacing: "0.12em", textTransform: "uppercase", marginRight: "0.15rem" }}>
             {L(lang, "Prehľad trhu", "Market overview")}
             <span style={{ color: dim, marginLeft: "0.55rem", textTransform: "none", letterSpacing: 0 }}>
@@ -585,7 +594,10 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
           })}
         </div>
       </section>
-
+        </div>
+      </div>
+      {/* ═══ CANVAS — my dashboard on the plain workspace ═══ */}
+      <div style={{ padding: "1.6rem 2rem 4rem", maxWidth: 1280 }}>
       {/* ═══ ZONE B · My dashboard ═══ */}
       <section>
         <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap", marginBottom: "0.95rem" }}>
@@ -673,6 +685,7 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
         }
         @media (max-width: 460px) { .dash-kpi-grid { grid-template-columns: 1fr; } }
       `}</style>
+      </div>
     </div>
   );
 }

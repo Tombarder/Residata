@@ -112,9 +112,9 @@
   --text-faint:    #626c7a;   /* labels / captions — distinct, not washed */
   --on-accent:     #04140d;
   /* dark-slate sidebar (the structural anchor) */
-  --sidebar-bg:          #181c23;
+  --sidebar-bg:          linear-gradient(180deg, #26333f 0%, #212c39 55%, #1e2833 100%);
   --sidebar-text:        #e9edf3;   /* brand + active nav */
-  --sidebar-text-dim:    #9aa3b2;   /* inactive nav */
+  --sidebar-text-dim:    #a4b0c2;   /* inactive nav */
   --sidebar-text-faint:  #626c7b;   /* group labels / meta */
   --sidebar-border:      rgba(255, 255, 255, 0.08);
   --sidebar-active-bg:   rgba(0, 229, 160, 0.15);   /* green-tint active pill */
