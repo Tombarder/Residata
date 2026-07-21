@@ -9,6 +9,7 @@ import { useEffect, useRef } from "react";
 import { useChat, GENERAL_KNOWLEDGE_RE } from "../lib/useChat";
 import { LimitBanner } from "./FloatingChat";
 import AiBetaBanner from "./AiBetaBanner";
+import PageHero from "./PageHero";
 
 // Pulse animation for the pending indicator. Mounted ONCE at module load
 // (idempotent — id="cb-pulse-anim" prevents duplicate insertion on HMR or
@@ -123,18 +124,13 @@ export default function ChatAssistant({ lang = "sk", setCurrent }) {
           panel on marketing). Hidden when dismissed (7-day localStorage). */}
       <AiBetaBanner lang={lang} />
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem", flexWrap: "wrap", marginBottom: "0.75rem" }}>
-        <div>
-          <h2 style={{ fontSize: "1.4rem", fontWeight: 700, color: text, margin: 0, letterSpacing: "-0.02em" }}>
-            ✨ {L("Opýtaj sa čokoľvek o trhu", "Ask anything about the market")}
-          </h2>
-          <p style={{ color: dim, fontSize: "0.85rem", lineHeight: 1.55, marginTop: "0.35rem", marginBottom: 0, maxWidth: 640 }}>
-            {L(
-              "AI asistent odpovedá z dát Residata. Pri všeobecnej znalosti (mimo nášho datasetu) označí časť odpovede \"[všeobecná znalosť, nie dáta Residata]\" aby si vedel čo je odkiaľ.",
-              "Grounded AI answers drawn from Residata's dataset. When the assistant reaches outside our data (e.g. general market context), it tags that part \"[general knowledge, not Residata data]\" so you know the provenance."
-            )}
-          </p>
-        </div>
+      <PageHero
+        title={`✨ ${L("Opýtaj sa čokoľvek o trhu", "Ask anything about the market")}`}
+        subtitle={L(
+          "AI asistent odpovedá z dát Residata. Pri všeobecnej znalosti (mimo nášho datasetu) označí časť odpovede \"[všeobecná znalosť, nie dáta Residata]\" aby si vedel čo je odkiaľ.",
+          "Grounded AI answers drawn from Residata's dataset. When the assistant reaches outside our data (e.g. general market context), it tags that part \"[general knowledge, not Residata data]\" so you know the provenance."
+        )}
+        right={(
         <div style={{ textAlign: "right" }}>
           <div style={{ fontFamily: mono, fontSize: "0.62rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.2rem" }}>
             {L("Denný limit", "Daily limit")}
@@ -146,7 +142,8 @@ export default function ChatAssistant({ lang = "sk", setCurrent }) {
             tier: <span style={{ color: text }}>{chat.tier}</span>
           </div>
         </div>
-      </div>
+        )}
+      />
 
       <div ref={scrollRef} style={{
         background: bg2, border: `1px solid ${border}`, borderRadius: 12,

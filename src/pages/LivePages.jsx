@@ -16,6 +16,7 @@ import { track } from "../lib/track";
 import { isPersonalEmail } from "../lib/emailValidation";
 import UpgradePrompt from "../components/UpgradePrompt";
 import Picker from "../components/Picker";
+import PageHero from "../components/PageHero";
 import PivotV2 from "./PivotV2";
 import MapFilterBuilder from "../components/MapFilterBuilder";
 import { applyFilters, describe, isComplete } from "../lib/mapFilters";
@@ -3683,8 +3684,7 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
 
   return (
     <main style={{ padding: "5rem 2rem 4rem", maxWidth: 1200, margin: "0 auto" }}>
-      <Label>{t.admin_label}</Label>
-      <h1 className="sec-title">{t.admin_title}</h1>
+      <PageHero eyebrow={t.admin_label} title={t.admin_title} />
       {err && <div style={{ color: "#ff6b6b" }}>{err}</div>}
 
       {/* Tier stats strip */}
@@ -3693,16 +3693,19 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
         gap: "0.75rem", marginTop: "1.5rem", marginBottom: "1rem",
       }}>
         {[
-          { k: "total",   label: lang === "sk" ? "Celkom" : "Total",   n: users.length,             color: "var(--text)" },
-          { k: "free",    label: "Free",                               n: tierCount.free    || 0,    color: "var(--text-2)" },
-          { k: "paid",    label: "Paid",                               n: tierCount.paid    || 0,    color: greenInk },
-          { k: "admin",   label: "Admin",                              n: tierCount.admin   || 0,    color: "#f5a623" },
-          { k: "pending", label: "Pending",                            n: tierCount.pending || 0,    color: "#888" },
+          { k: "total",   label: lang === "sk" ? "Celkom" : "Total",   n: users.length,             color: "var(--text)", bar: "#64748b" },
+          { k: "free",    label: "Free",                               n: tierCount.free    || 0,    color: "var(--text-2)", bar: "#64748b" },
+          { k: "paid",    label: "Paid",                               n: tierCount.paid    || 0,    color: greenInk, bar: "#10b981" },
+          { k: "admin",   label: "Admin",                              n: tierCount.admin   || 0,    color: "#f5a623", bar: "#e0940f" },
+          { k: "pending", label: "Pending",                            n: tierCount.pending || 0,    color: "#888", bar: "#3b74e8" },
         ].map(s => (
           <div key={s.k} style={{
-            background: bg, border: `1px solid ${border}`, borderRadius: 10,
+            position: "relative", overflow: "hidden",
+            background: `linear-gradient(180deg, color-mix(in srgb, ${s.bar} 9%, var(--surface)) 0%, var(--surface) 46%)`,
+            border: `1px solid ${border}`, borderRadius: 10,
             padding: "0.9rem 1.1rem",
           }}>
+            <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: s.bar, opacity: 0.85 }} />
             <div style={{ fontFamily: mono, fontSize: "0.65rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.3rem" }}>{s.label}</div>
             <div style={{ fontFamily: mono, fontSize: "1.6rem", fontWeight: 700, color: s.color, lineHeight: 1 }}>{s.n}</div>
           </div>

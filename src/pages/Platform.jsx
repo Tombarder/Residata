@@ -16,6 +16,7 @@ import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
 import PendingGate from "../components/PendingGate";
 import Picker from "../components/Picker";
+import PageHero from "../components/PageHero";
 import { usePricing } from "../lib/pricing";
 import { useProjects } from "../lib/useData";
 import DashboardHome from "./DashboardHome";
@@ -1006,6 +1007,13 @@ function PlatformBilling({ lang, setCurrent }) {
 
   return (
     <div style={{ padding: "2.5rem 2rem", maxWidth: 820, margin: "0 auto" }}>
+      <PageHero
+        eyebrow={lang === "sk" ? "Účet" : "Account"}
+        title={lang === "sk" ? "Platba a tier" : "Billing & tier"}
+        subtitle={lang === "sk"
+          ? "Tvoj aktuálny prístup, trial a správa predplatného."
+          : "Your current access, trial and subscription management."}
+      />
       {/* Return from Stripe Checkout */}
       {checkoutMsg === "success" && (
         <div style={{
@@ -1394,13 +1402,12 @@ function PlatformSettings({ lang }) {
 
   return (
     <div style={{ padding: "2.5rem 2rem", maxWidth: 660, margin: "0 auto" }}>
+      <PageHero
+        eyebrow={lang === "sk" ? "Účet" : "Account"}
+        title={lang === "sk" ? "Nastavenia" : "Settings"}
+        subtitle={user?.email}
+      />
       <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 12, padding: "1.75rem 2rem" }}>
-        <div style={{ fontFamily: mono, fontSize: "0.65rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.4rem" }}>
-          {lang === "sk" ? "Účet" : "Account"}
-        </div>
-        <h3 style={{ fontSize: "1.15rem", fontWeight: 600, color: textLight, margin: 0, marginBottom: "1rem" }}>
-          {user?.email}
-        </h3>
 
         <form onSubmit={save}>
           <SettingsField label={lang === "sk" ? "Meno a priezvisko" : "Full name"}>
@@ -1902,11 +1909,13 @@ function PlatformExports({ lang, setCurrent }) {
 
   return (
     <div style={{ padding: "2rem 2rem 4rem", maxWidth: 820, margin: "0 auto" }}>
-      <p style={{ color: dim, fontSize: "0.9rem", lineHeight: 1.6, marginTop: 0, marginBottom: "1.5rem" }}>
-        {lang === "sk"
+      <PageHero
+        eyebrow={lang === "sk" ? "CSV / API" : "CSV / API"}
+        title={lang === "sk" ? "Exporty" : "Exports"}
+        subtitle={lang === "sk"
           ? "Vyber si dátum snapshotu a stiahni dataset ako CSV, alebo ho ťahaj cez REST API do tvojho stacku."
           : "Pick a snapshot date and download the dataset as CSV, or pull it via the REST API straight into your stack."}
-      </p>
+      />
 
       {/* Snapshot-date picker — always visible; trial users can browse dates too. */}
       <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 12, padding: "1.25rem 1.75rem", marginBottom: "1rem" }}>
