@@ -197,8 +197,10 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
 
   return (
     <main style={{ padding: "5rem 2rem 4rem", maxWidth: 1200, margin: "0 auto" }}>
+      <div style={{ position: "relative", overflow: "hidden", borderRadius: 16, border: "1px solid var(--border)", padding: "1.5rem 1.7rem 1.55rem", marginBottom: "1.8rem", background: "radial-gradient(120% 140% at 2% -20%, rgba(18,185,129,0.13) 0%, transparent 46%), linear-gradient(135deg, color-mix(in srgb, var(--accent) 5%, var(--surface)) 0%, var(--bg) 75%)" }}>
+        <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: 3, background: "linear-gradient(90deg, var(--accent), #3b74e8 55%, #8b5cf6)" }} />
       <Label>{t.live_label}</Label>
-      <h1 className="sec-title">{t.live_title}</h1>
+      <h1 className="sec-title" style={{ margin: "0.15rem 0 0" }}>{t.live_title}</h1>
       {/* Landing page už má marketing copy a summary metriky (MarketPulse).
           Live stránka je čistý dátový pohľad. Necháme len prípadný tier-
           špecifický upsell (anonymous → register, free → upgrade); bez
@@ -211,11 +213,12 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
           {showUpgradeToPaid && <><button onClick={() => setCurrent && setCurrent("Pricing")} style={linkBtn}>{t.upgrade_to_paid}</button> — {ll(t.live_desc_free, { n: projects.length })}</>}
         </p>
       )}
+      </div>
 
       <div style={{ marginTop: "2rem" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "1rem", flexWrap: "wrap", gap: "1rem" }}>
           <div>
-            <div style={labelStyle}>{t.projects_section_label}</div>
+            <div style={{ ...labelStyle, display: "flex", alignItems: "center", gap: "0.5rem" }}><span style={{ width: 3, height: 12, borderRadius: 2, background: "var(--accent)" }} />{t.projects_section_label}</div>
             <h2 style={{ fontSize: "1.6rem", fontWeight: 700 }}>
               {hasFullAccess
                 ? ll(t.projects_title_all, { n: projects.length })
