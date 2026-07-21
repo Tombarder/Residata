@@ -589,7 +589,7 @@ function MarketReport({ projects, onOpenProject, lang }) {
     <>
       <KpiStrip summary={summary} lang={lang} />
 
-      <ReportSection label={lang === "sk" ? "Executive summary" : "Executive summary"} title={title}>
+      <ReportSection label={lang === "sk" ? "Zhrnutie" : "Executive summary"} title={title}>
         {/* Priciest district for the summary line. groupAggregates sorts by unit
             COUNT (not €/m²), so districts[0] was actually the LARGEST district —
             mislabeled "most expensive". Pick the highest-€/m² NAMED district (skip
@@ -1544,13 +1544,14 @@ function SellOutForecastReport({ projects, lang, onOpenProject }) {
         {/* Headline KPIs */}
         <div className="rep-kpi-strip" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "0.5rem", marginBottom: "1.25rem" }}>
           {[
-            { label: lang === "sk" ? "Voľných bytov" : "Available units", value: totalAvail.toLocaleString("en-US").replace(/,/g, " "), color: accentInk },
-            { label: lang === "sk" ? "Predaných (1 mes.)" : "Sold (last mo.)", value: totalVelocity.toLocaleString("en-US").replace(/,/g, " "), color: orange },
-            { label: lang === "sk" ? "Trh sa vypredá za" : "Market sell-out", value: marketMonths != null ? `${marketMonths.toFixed(1)} ${lang === "sk" ? "mes." : "mo."}` : "—" },
-            { label: lang === "sk" ? "Rýchlych projektov (<6 mes.)" : "Fast sellers (<6 mo.)", value: `${fastSellers}`, color: red },
+            { label: lang === "sk" ? "Voľných bytov" : "Available units", value: totalAvail.toLocaleString("en-US").replace(/,/g, " "), color: accentInk, info: lang === "sk" ? "Počet voľných (nepredaných) bytov naprieč projektmi vo výbere." : "Number of available (unsold) units across the projects in scope." },
+            { label: lang === "sk" ? "Predaných (1 mes.)" : "Sold (last mo.)", value: totalVelocity.toLocaleString("en-US").replace(/,/g, " "), color: orange, info: lang === "sk" ? "Koľko bytov sa predalo za posledný mesačný cyklus dát. Poznámka: táto stránka používa mesačné tempo z projektových dát — presné predaje po dňoch nájdeš na stránke Predaje." : "How many units sold in the last monthly data cycle. Note: this page uses the monthly pace from project data — for exact day-level sales see the Sales page." },
+            { label: lang === "sk" ? "Trh sa vypredá za" : "Market sell-out", value: marketMonths != null ? `${marketMonths.toFixed(1)} ${lang === "sk" ? "mes." : "mo."}` : "—", info: lang === "sk" ? "Za koľko mesiacov by sa vypredali všetky voľné byty pri súčasnom tempe predaja (voľné byty ÷ mesačné tempo). Nižšie číslo = rýchlejší trh." : "How many months until all available units sell out at the current pace (available ÷ monthly pace). Lower = a faster market." },
+            { label: lang === "sk" ? "Rýchlych projektov (<6 mes.)" : "Fast sellers (<6 mo.)", value: `${fastSellers}`, color: red, info: lang === "sk" ? "Počet projektov, ktoré sa pri dnešnom tempe vypredajú do 6 mesiacov." : "Number of projects that would sell out within 6 months at today's pace." },
           ].map((k, i) => (
-            <div key={i} style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8, padding: "0.65rem 0.9rem" }}>
-              <div style={{ fontSize: "0.7rem", color: dim, marginBottom: "0.2rem" }}>{k.label}</div>
+            <div key={i} style={{ position: "relative", overflow: "hidden", background: bg2, border: `1px solid ${border}`, borderRadius: 8, padding: "0.65rem 0.9rem" }}>
+              {k.info && <div style={{ position: "absolute", top: 6, right: 6 }}><InfoTip text={k.info} label={k.label} /></div>}
+              <div style={{ fontSize: "0.7rem", color: dim, marginBottom: "0.2rem", paddingRight: k.info ? "1.1rem" : 0 }}>{k.label}</div>
               <div className="report-accent" style={{ fontSize: "1.15rem", fontWeight: 700, color: k.color || text }}>{k.value}</div>
             </div>
           ))}
@@ -1771,8 +1772,8 @@ function ComparableTransactionsReport({ projects, lang }) {
       >
         <p style={{ color: "var(--text-2)", fontSize: "0.9rem", lineHeight: 1.65, margin: "0 0 1rem" }}>
           {lang === "sk"
-            ? "Všetky reálne predané byty (stav „P\") z aktívnej databázy. Pre valuérov, banky a stanovenie kolaterálu — tu sú porovnateľné transakcie, nie marketingové cenníky. Filtrami sa zúži výber, CSV-export pre Excel."
-            : "Every actually-sold unit (stav 'P') from our active database. For valuers, banks, and collateral assessment — these are comparable transactions, not marketing list-prices. Filters narrow the set; CSV export drops into Excel."}
+            ? "Všetky reálne predané byty z našej databázy. Pre valuérov, banky a stanovenie kolaterálu — tu sú porovnateľné transakcie (reálne predaje), nie marketingové cenníky. Filtrami sa zúži výber, CSV-export pre Excel."
+            : "Every actually-sold unit from our database. For valuers, banks, and collateral assessment — these are comparable transactions (real sales), not marketing list-prices. Filters narrow the set; CSV export drops into Excel."}
         </p>
 
         {/* Filter row */}
@@ -1794,15 +1795,16 @@ function ComparableTransactionsReport({ projects, lang }) {
         {/* KPIs */}
         <div className="rep-kpi-strip" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "0.5rem", marginBottom: "1.25rem" }}>
           {[
-            { label: lang === "sk" ? "Predaných"  : "Sold",         value: count.toLocaleString("en-US").replace(/,/g, " "), color: accentInk },
-            { label: lang === "sk" ? `Ø ${moneySymbol()}/m²`     : `Avg ${moneySymbol()}/m²`,     value: avgEm2 ? Math.round(moneyFromEur(avgEm2)).toLocaleString("en-US").replace(/,/g, " ") : "—" },
-            { label: lang === "sk" ? `Medián ${moneySymbol()}/m²`: `Median ${moneySymbol()}/m²`,  value: medEm2 ? Math.round(moneyFromEur(medEm2)).toLocaleString("en-US").replace(/,/g, " ") : "—" },
-            { label: lang === "sk" ? `Min ${moneySymbol()}/m²`   : `Min ${moneySymbol()}/m²`,     value: minEm2 ? Math.round(moneyFromEur(minEm2)).toLocaleString("en-US").replace(/,/g, " ") : "—", color: accentInk },
-            { label: lang === "sk" ? `Max ${moneySymbol()}/m²`   : `Max ${moneySymbol()}/m²`,     value: maxEm2 ? Math.round(moneyFromEur(maxEm2)).toLocaleString("en-US").replace(/,/g, " ") : "—", color: orange },
-            { label: lang === "sk" ? `Objem (${moneySymbol()})`  : `Volume (${moneySymbol()})`,   value: totalRevenue ? Math.round(moneyFromEur(totalRevenue)).toLocaleString("en-US").replace(/,/g, " ") : "—" },
+            { label: lang === "sk" ? "Predaných"  : "Sold",         value: count.toLocaleString("en-US").replace(/,/g, " "), color: accentInk, info: lang === "sk" ? "Počet predaných bytov vo výbere — reálne transakcie (predané byty), nie ponukové ceny." : "Number of sold units in the selection — real transactions (sold units), not asking prices." },
+            { label: lang === "sk" ? `Ø ${moneySymbol()}/m²`     : `Avg ${moneySymbol()}/m²`,     value: avgEm2 ? Math.round(moneyFromEur(avgEm2)).toLocaleString("en-US").replace(/,/g, " ") : "—", info: lang === "sk" ? "Priemerná cena za m² (s DPH) predaných bytov vo výbere." : "Average price per m² (incl. VAT) of the sold units in the selection." },
+            { label: lang === "sk" ? `Medián ${moneySymbol()}/m²`: `Median ${moneySymbol()}/m²`,  value: medEm2 ? Math.round(moneyFromEur(medEm2)).toLocaleString("en-US").replace(/,/g, " ") : "—", info: lang === "sk" ? "Stredná cena za m² (s DPH) — polovica bytov je lacnejšia, polovica drahšia. Odolnejšia voči extrémom než priemer." : "Median price per m² (incl. VAT) — half the units are cheaper, half dearer. More robust to outliers than the average." },
+            { label: lang === "sk" ? `Min ${moneySymbol()}/m²`   : `Min ${moneySymbol()}/m²`,     value: minEm2 ? Math.round(moneyFromEur(minEm2)).toLocaleString("en-US").replace(/,/g, " ") : "—", color: accentInk, info: lang === "sk" ? "Najnižšia cena za m² spomedzi predaných bytov výberu." : "Lowest €/m² among the sold units in the selection." },
+            { label: lang === "sk" ? `Max ${moneySymbol()}/m²`   : `Max ${moneySymbol()}/m²`,     value: maxEm2 ? Math.round(moneyFromEur(maxEm2)).toLocaleString("en-US").replace(/,/g, " ") : "—", color: orange, info: lang === "sk" ? "Najvyššia cena za m² spomedzi predaných bytov výberu." : "Highest €/m² among the sold units in the selection." },
+            { label: lang === "sk" ? `Objem (${moneySymbol()})`  : `Volume (${moneySymbol()})`,   value: totalRevenue ? Math.round(moneyFromEur(totalRevenue)).toLocaleString("en-US").replace(/,/g, " ") : "—", info: lang === "sk" ? "Súčet cien (s DPH) všetkých predaných bytov vo výbere." : "Sum of prices (incl. VAT) of all sold units in the selection." },
           ].map((k, i) => (
-            <div key={i} style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8, padding: "0.65rem 0.9rem" }}>
-              <div style={{ fontSize: "0.7rem", color: dim, marginBottom: "0.2rem" }}>{k.label}</div>
+            <div key={i} style={{ position: "relative", overflow: "hidden", background: bg2, border: `1px solid ${border}`, borderRadius: 8, padding: "0.65rem 0.9rem" }}>
+              {k.info && <div style={{ position: "absolute", top: 6, right: 6 }}><InfoTip text={k.info} label={k.label} /></div>}
+              <div style={{ fontSize: "0.7rem", color: dim, marginBottom: "0.2rem", paddingRight: k.info ? "1.1rem" : 0 }}>{k.label}</div>
               <div className="report-accent" style={{ fontSize: "1.05rem", fontWeight: 700, color: k.color || text }}>{k.value}</div>
             </div>
           ))}
@@ -1945,20 +1947,21 @@ function PricingTensionReport({ projects, lang, onOpenProject }) {
       >
         <p style={{ color: "var(--text-2)", fontSize: "0.9rem", lineHeight: 1.65, margin: "0 0 1rem" }}>
           {lang === "sk"
-            ? "Matrix: ako stojí €/m² každého projektu voči mediánu jeho časti mesta (X), proti rýchlosti predaja % za mesiac (Y). Pravý-horný kvadrant = projekty čo sa predávajú napriek prémii — investorský signál „perceived undervaluation\". Krížový mesačný delta (rast ceny vs. velocity) sa aktivuje po druhom syncu — zatiaľ statický pozičný pohľad."
-            : "Matrix: how each project's €/m² compares to its district median (X) vs. monthly sell-through rate (Y). Top-right = projects selling despite a premium — investor signal of \"perceived undervaluation\". Cross-month rising-price-vs-velocity delta activates after the second monthly sync — for now, a static positioning view."}
+            ? "Každý bod je projekt. Vodorovná os (X) = ako drahý je oproti mediánu svojej časti mesta (vpravo = prémia). Zvislá os (Y) = ako rýchlo sa predáva (hore = rýchlejšie). Pravý-horný kvadrant = predáva sa napriek prémii → možný signál podhodnotenia. Veľkosť bodu = počet voľných bytov."
+            : "Each dot is a project. Horizontal axis (X) = how expensive it is vs its district median (right = a premium). Vertical axis (Y) = how fast it sells (up = faster). Top-right = selling despite a premium → a possible undervaluation signal. Dot size = number of available units."}
         </p>
 
         {/* Quadrant tallies */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "0.5rem", marginBottom: "1.25rem" }}>
           {[
-            { label: lang === "sk" ? "↗ Prémia + predaj" : "↗ Premium + selling",     value: q.TR, color: accentInk,  hint: lang === "sk" ? "Perceived undervaluation" : "Perceived undervaluation" },
-            { label: lang === "sk" ? "↘ Lacné + predaj"  : "↘ Low + selling",         value: q.BR, color: accentInk,  hint: lang === "sk" ? "Cenovo dostupné, ide" : "Affordable, in demand" },
-            { label: lang === "sk" ? "↖ Prémia, stojí"   : "↖ Premium, stuck",        value: q.TL, color: red,    hint: lang === "sk" ? "Pravdepodobne predražené" : "Likely overpriced" },
-            { label: lang === "sk" ? "↙ Lacné, stojí"    : "↙ Low, stuck",            value: q.BL, color: dim,    hint: lang === "sk" ? "Slabá poptávka" : "Weak demand" },
+            { label: lang === "sk" ? "↗ Prémia + predaj" : "↗ Premium + selling",     value: q.TR, color: accentInk,  hint: lang === "sk" ? "Vnímané podhodnotenie" : "Perceived undervaluation", info: lang === "sk" ? "Projekty drahšie než medián ich časti mesta, ktoré sa napriek tomu dobre predávajú — kupujúci akceptujú prémiu (možný signál podhodnotenia)." : "Projects priced above their district median that still sell well — buyers accept the premium (a possible undervaluation signal)." },
+            { label: lang === "sk" ? "↘ Lacné + predaj"  : "↘ Low + selling",         value: q.BR, color: accentInk,  hint: lang === "sk" ? "Cenovo dostupné, je záujem" : "Affordable, in demand", info: lang === "sk" ? "Lacnejšie než medián časti mesta a predávajú sa dobre — cenovo dostupné, je o ne dopyt." : "Below the district median and selling well — affordable and in demand." },
+            { label: lang === "sk" ? "↖ Prémia, stojí"   : "↖ Premium, stuck",        value: q.TL, color: red,    hint: lang === "sk" ? "Pravdepodobne predražené" : "Likely overpriced", info: lang === "sk" ? "Drahšie než medián časti mesta a predávajú sa pomaly — pravdepodobne predražené." : "Above the district median and selling slowly — likely overpriced." },
+            { label: lang === "sk" ? "↙ Lacné, stojí"    : "↙ Low, stuck",            value: q.BL, color: dim,    hint: lang === "sk" ? "Slabý dopyt" : "Weak demand", info: lang === "sk" ? "Lacnejšie než medián a napriek tomu sa predávajú pomaly — slabý dopyt v danej lokalite." : "Below the median yet selling slowly — weak demand in that location." },
           ].map((k, i) => (
-            <div key={i} style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8, padding: "0.65rem 0.9rem" }}>
-              <div style={{ fontSize: "0.7rem", color: dim, marginBottom: "0.2rem" }}>{k.label}</div>
+            <div key={i} style={{ position: "relative", overflow: "hidden", background: bg2, border: `1px solid ${border}`, borderRadius: 8, padding: "0.65rem 0.9rem" }}>
+              {k.info && <div style={{ position: "absolute", top: 6, right: 6 }}><InfoTip text={k.info} label={k.label} /></div>}
+              <div style={{ fontSize: "0.7rem", color: dim, marginBottom: "0.2rem", paddingRight: k.info ? "1.1rem" : 0 }}>{k.label}</div>
               <div className="report-accent" style={{ fontSize: "1.15rem", fontWeight: 700, color: k.color }}>{k.value}</div>
               <div style={{ fontSize: "0.66rem", color: dim, marginTop: "0.15rem" }}>{k.hint}</div>
             </div>

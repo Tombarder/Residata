@@ -153,7 +153,7 @@ const NAV = [
     { page: "App:Map2",      label: { en: "Market Radar", sk: "Trhový radar" }, Icon: IconMap, requires: "view_analytics" },
     { page: "App:Analytics", label: { en: "Analytics",  sk: "Analytika" }, Icon: IconChart,    requires: "view_analytics" },
     { page: "App:UnitTimeline", label: { en: "Unit timeline", sk: "Byt v čase" }, Icon: IconClock, requires: "view_analytics" },
-    { page: "App:Explorer", label: { en: "Unit Explorer", sk: "Prieskumník" }, Icon: IconGrid, requires: "view_analytics" },
+    { page: "App:Explorer", label: { en: "Unit database", sk: "Databáza bytov" }, Icon: IconGrid, requires: "view_analytics" },
     { page: "App:Sales",    label: { en: "Sales",         sk: "Predaje"     }, Icon: IconChart, requires: "view_analytics" },
     { page: "App:Reports",   label: { en: "Reports",    sk: "Reporty"   }, Icon: IconDoc,      requires: "view_monthly_reports" },
     { page: "App:Assistant", label: { en: "Ask AI",     sk: "AI asistent" }, Icon: IconSparkle },
