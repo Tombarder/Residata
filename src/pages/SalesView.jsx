@@ -38,6 +38,16 @@ const DETAIL_COLS_PIPE = [
   ["obytna_plocha", "Plocha", "Area", "area"], ["price_s_dph_eur", "Cena", "Price", "eur"],
   ["price_per_m2_eur", "€/m²", "€/m²", "per_m2"], ["kolaudacia_label", "Kolaudácia", "Completion", "text"],
 ];
+// Per-column plain-language explainers (rendered as an "i" tooltip on the header),
+// for the columns whose meaning / calculation isn't self-evident. Same voice as the
+// Dashboard metric explainers. Keyed by column key.
+const COL_INFO = {
+  obytna_plocha:    { sk: "Obytná plocha bytu v m² (nie celková/podlahová).", en: "Living area of the unit in m² (not total/floor area)." },
+  price_s_dph_eur:  { sk: "Cena s DPH, zafixovaná v čase predaja — posledná reálna cena, ktorú developer zverejnil pred tým, než byt zmizol/označil ako predaný. „—“ = developer cenu nezverejnil.", en: "Price incl. VAT, frozen at sale time — the last real price the developer published before the unit sold. “—” = the developer never published a price." },
+  price_per_m2_eur: { sk: "Cena za m² obytnej plochy, s DPH, v čase predaja (cena ÷ obytná plocha).", en: "Price per m² of living area, incl. VAT, at sale time (price ÷ living area)." },
+  days_on_market:   { sk: "Počet dní od prvého zachytenia po predaj. Ak sme byt videli pribudnúť, je to skutočný čas na trhu; „≥“ znamená, že byt bol v ponuke už keď sme začali sledovať (máj 2026), takže rátame od prvého zachytenia a skutočný čas môže byť dlhší.", en: "Days from first sight to sold. If we saw the unit appear, it's the true time on market; “≥” means the unit was already listed when we began tracking (May 2026), so we count from first sight and the true figure may be longer." },
+  detection_method: { sk: "Ako sme predaj zistili: „označené“ = developer označil byt ako predaný; „zmizol“ = byt zmizol z ponuky (developer predané neoznačuje, tak berieme zmiznutie ako predaj).", en: "How we detected the sale: “marked” = the developer flagged it as sold; “delisted” = it disappeared from the listing (the developer doesn't mark sold, so a disappearance is taken as a sale)." },
+};
 // the three status views
 const STATUSES = [["sold", "Predané", "Sold"], ["reserved", "Rezervované", "Reserved"], ["prereserved", "Predrezervované", "Pre-reserved"]];
 const HEADLINE = { sold: ["Predané (trvalo)", "Sold (stayed)"], reserved: ["Rezervované teraz", "Reserved now"], prereserved: ["Predrezervované teraz", "Pre-reserved now"] };
@@ -276,11 +286,13 @@ export default function SalesView({ lang = "sk" }) {
           {!isPipe && (
           <div style={statCard("#e0940f")}>
             <StatBar color="#e0940f" />
-            {statInfo("Stredný počet dní, ktoré sa byt predával — od prvého zachytenia po predaj. „z N sledovaných“ = na koľkých bytoch to vieme zmerať.", "Median number of days a unit took to sell — from first seen to sold. “of N observed” = how many units we can measure it on.", t("Medián dní na trhu", "Median days on market"))}
+            {statInfo("Stredný počet dní, počas ktorých sa byt predával — od prvého zachytenia po predaj. Ak sme byt videli pribudnúť, je to skutočný čas na trhu; ak už bol v ponuke keď sme začali sledovať (máj 2026), rátame od prvého zachytenia (označené „≥“) a skutočná hodnota môže byť vyššia.", "Median number of days units were on the market — from first sight to sold. If we saw a unit appear it's the true time on market; if it was already listed when we began tracking (May 2026) we count from first sight (marked “≥”) and the real figure may be higher.", t("Medián dní na trhu", "Median days on market"))}
             <div style={{ ...kpiLbl, paddingRight: "1.1rem" }}>{t("Medián dní na trhu", "Median days on market")}</div>
             <div style={kpiVal}>{sum.loading ? "…" : (S.median_days_on_market != null ? Math.round(S.median_days_on_market) : "—")}</div>
             <div style={{ fontSize: "0.64rem", color: dim, fontFamily: mono, marginTop: "0.2rem" }}>
-              {S.observed_dom_count ? t(`z ${S.observed_dom_count} sledovaných`, `of ${S.observed_dom_count} observed`) : t("zatiaľ málo dát", "building history")}
+              {S.observed_dom_count
+                ? <>{t(`z ${S.observed_dom_count} predaných`, `of ${S.observed_dom_count} sold`)}{S.censored_count ? t(` · z toho ${S.censored_count}× „≥“`, ` · ${S.censored_count}× are ≥`) : ""}</>
+                : t("zatiaľ málo dát", "building history")}
             </div>
           </div>
           )}
@@ -299,8 +311,16 @@ export default function SalesView({ lang = "sk" }) {
         </div>
         <div style={{ overflowX: "auto" }}>
           <table style={{ borderCollapse: "collapse", width: "100%", fontSize: "0.8rem", minWidth: 480 }}>
-            <thead><tr>{[t("Skupina", "Group"), isPipe ? t("V ponuke", "Listed") : t("Predané", "Sold"), t("Objem", "Value"), `${t("Medián ", "Median ")}${moneySymbol()}/m²`, t("Medián dní", "Median days")].map((h, i) => (
-              <th key={h} style={{ textAlign: i === 0 ? "left" : "right", padding: "0.4rem 0.6rem", borderBottom: `1px solid ${border}`, color: dim, fontFamily: mono, fontSize: "0.64rem", textTransform: "uppercase", letterSpacing: "0.04em" }}>{h}</th>
+            <thead><tr>{[
+              { h: t("Skupina", "Group") },
+              { h: isPipe ? t("V ponuke", "Listed") : t("Predané", "Sold"), info: isPipe ? null : t("Počet bytov, ktoré sa v období predali a zostali predané.", "Units that sold — and stayed sold — in the period.") },
+              { h: t("Objem", "Value"), info: t("Súčet cien (s DPH) predaných bytov v skupine.", "Sum of prices (incl. VAT) of the sold units in the group.") },
+              { h: `${t("Medián ", "Median ")}${moneySymbol()}/m²`, info: t("Stredná cena za m² (s DPH) predaných bytov v skupine.", "Median price per m² (incl. VAT) of the sold units in the group.") },
+              { h: t("Medián dní", "Median days"), info: t("Stredný počet dní na trhu (od prvého zachytenia po predaj). Zahŕňa aj byty rátané od prvého zachytenia („≥“), takže hodnota môže byť konzervatívna.", "Median days on market (first sight to sold). Includes units counted from first sight (“≥”), so the figure can be conservative.") },
+            ].map((o, i) => (
+              <th key={o.h} style={{ textAlign: i === 0 ? "left" : "right", padding: "0.4rem 0.6rem", borderBottom: `1px solid ${border}`, color: dim, fontFamily: mono, fontSize: "0.64rem", textTransform: "uppercase", letterSpacing: "0.04em", whiteSpace: "nowrap" }}>
+                {o.h}{o.info && <span style={{ marginLeft: 5, display: "inline-block", verticalAlign: "middle" }}><InfoTip text={o.info} label={o.h} /></span>}
+              </th>
             ))}</tr></thead>
             <tbody>
               {brk.loading && <tr><td colSpan={5} style={{ padding: "1rem", textAlign: "center", color: dim }}>{t("načítavam…", "loading…")}</td></tr>}
@@ -335,6 +355,7 @@ export default function SalesView({ lang = "sk" }) {
                   <th key={c[0]} onClick={sortable ? () => toggleSort(c[0]) : undefined}
                     style={{ padding: "0.45rem 0.6rem", textAlign: numeric ? "right" : "left", borderBottom: `1px solid ${border}`, color: sort.key === c[0] ? green : "var(--text-2)", cursor: sortable ? "pointer" : "default", fontFamily: mono, fontSize: "0.64rem", textTransform: "uppercase", letterSpacing: "0.03em", whiteSpace: "nowrap", userSelect: "none" }}>
                     {c[3] === "per_m2" ? `${moneySymbol()}/m²` : t(c[1], c[2])}{effSort.key === c[0] ? (effSort.dir === "asc" ? " ▲" : " ▼") : ""}
+                    {COL_INFO[c[0]] && <span style={{ marginLeft: 5, display: "inline-block", verticalAlign: "middle" }}><InfoTip text={t(COL_INFO[c[0]].sk, COL_INFO[c[0]].en)} label={t(c[1], c[2])} /></span>}
                   </th>
                 );
               })}
@@ -355,7 +376,13 @@ export default function SalesView({ lang = "sk" }) {
                       </td>;
                     }
                     return <td key={c[0]} style={{ padding: "0.35rem 0.6rem", textAlign: numeric ? "right" : "left", borderTop: `1px solid var(--surface)`, color: "var(--text-2)", fontFamily: numeric ? mono : "inherit", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
-                      {c[0] === "days_on_market" && r.left_censored ? <span title={t("Byt bol v ponuke ešte pred spustením sledovania — presný čas na trhu nepoznáme", "Listed before tracking began — true days-on-market unknown")} style={{ color: dim }}>—</span> : fmtCell(c[3], r[c[0]])}
+                      {c[0] === "days_on_market"
+                        ? (r.days_on_market == null
+                            ? <span title={t("Skutočný čas na trhu zatiaľ nevieme", "True days-on-market not known yet")} style={{ color: dim }}>—</span>
+                            : r.left_censored
+                              ? <span title={t("Merané od prvého zachytenia — byt bol v ponuke už keď sme začali sledovať, skutočný čas môže byť dlhší", "Measured from first sight — the unit was already listed when tracking began, so the true figure may be longer")} style={{ color: "var(--text-2)" }}>≥ {Math.round(r.days_on_market)}</span>
+                              : fmtCell(c[3], r.days_on_market))
+                        : fmtCell(c[3], r[c[0]])}
                     </td>;
                   })}
                 </tr>
