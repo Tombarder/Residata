@@ -158,6 +158,9 @@ export default function SalesView({ lang = "sk" }) {
 
   const sel = { background: bg, border: `1px solid ${border}`, color: text, borderRadius: 5, padding: "0.4rem 0.55rem", fontSize: "0.78rem", fontFamily: "inherit", outline: "none" };
   const card = { background: "var(--surface)", border: `1px solid ${border}`, borderRadius: 8, padding: "0.85rem 1rem" };
+  // colour-coded stat card: metric colour as a left-accent bar + faint wash (theme-aware; keeps "var(--surface)" so the light-mode shadow still applies)
+  const statCard = (color) => ({ ...card, position: "relative", overflow: "hidden", background: `linear-gradient(180deg, color-mix(in srgb, ${color} 9%, var(--surface)) 0%, var(--surface) 46%)` });
+  const StatBar = ({ color }) => <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: color, opacity: 0.85 }} />;
   const kpiVal = { fontSize: "1.5rem", fontWeight: 700, color: text, fontFamily: mono, fontVariantNumeric: "tabular-nums" };
   const kpiLbl = { fontFamily: mono, fontSize: "0.62rem", color: dim, letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: "0.3rem" };
   const Sel = ({ value, onChange, opts, ph }) => (
@@ -172,7 +175,8 @@ export default function SalesView({ lang = "sk" }) {
   return (
     <div style={{ color: text, fontFamily: "'Inter', system-ui, sans-serif" }}>
       {/* header */}
-      <div style={{ marginBottom: "0.9rem" }}>
+      <div style={{ position: "relative", overflow: "hidden", borderRadius: 16, border: "1px solid var(--border)", padding: "1.4rem 1.6rem 1.5rem", marginBottom: "1.5rem", background: "radial-gradient(120% 140% at 2% -20%, rgba(18,185,129,0.13) 0%, transparent 46%), linear-gradient(135deg, color-mix(in srgb, var(--accent) 5%, var(--surface)) 0%, var(--bg) 75%)" }}>
+        <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: 3, background: "linear-gradient(90deg, var(--accent), #3b74e8 55%, #8b5cf6)" }} />
         <h1 style={{ fontSize: "1.4rem", margin: "0 0 0.2rem" }}>{t("Predaje", "Sales")}</h1>
         <p style={{ color: dim, fontSize: "0.8rem", margin: 0 }}>
           {t("Koľko a KTORÉ byty sa predali — a zostali predané — vo zvolenom období, pre projekty ktoré si vyberieš.",
@@ -258,12 +262,13 @@ export default function SalesView({ lang = "sk" }) {
       {/* KPI row */}
       {sum.error ? <LoadError lang={lang} /> : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "0.6rem", marginBottom: "0.6rem" }}>
-          <div style={card}><div style={kpiLbl}>{t(HEADLINE[status][0], HEADLINE[status][1])}</div><div style={kpiVal}>{sum.loading ? "…" : dur.toLocaleString("sk-SK")}</div>{reversed > 0 && !durableOnly && !isPipe && <div style={{ fontSize: "0.68rem", color: orange, fontFamily: mono, marginTop: "0.2rem" }}>{t(`+${reversed} vrátených`, `+${reversed} fell through`)}</div>}</div>
-          <div style={card}><div style={kpiLbl}>{isPipe ? t("Hodnota v ponuke", "Listed value") : t("Objem predaja", "Sold value")}</div><div style={kpiVal}>{sum.loading ? "…" : fmtMoney(S.sold_value_eur)}</div></div>
-          <div style={card}><div style={kpiLbl}>{t("Medián ceny", "Median price")}</div><div style={kpiVal}>{sum.loading ? "…" : fmtMoney(S.median_price_eur)}</div></div>
-          <div style={card}><div style={kpiLbl}>{t("Medián ", "Median ")}{moneySymbol()}/m²</div><div style={kpiVal}>{sum.loading ? "…" : fmtCell("per_m2", S.median_eur_m2)}</div></div>
+          <div style={statCard("#10b981")}><StatBar color="#10b981" /><div style={kpiLbl}>{t(HEADLINE[status][0], HEADLINE[status][1])}</div><div style={kpiVal}>{sum.loading ? "…" : dur.toLocaleString("sk-SK")}</div>{reversed > 0 && !durableOnly && !isPipe && <div style={{ fontSize: "0.68rem", color: orange, fontFamily: mono, marginTop: "0.2rem" }}>{t(`+${reversed} vrátených`, `+${reversed} fell through`)}</div>}</div>
+          <div style={statCard("#3b74e8")}><StatBar color="#3b74e8" /><div style={kpiLbl}>{isPipe ? t("Hodnota v ponuke", "Listed value") : t("Objem predaja", "Sold value")}</div><div style={kpiVal}>{sum.loading ? "…" : fmtMoney(S.sold_value_eur)}</div></div>
+          <div style={statCard("#3b74e8")}><StatBar color="#3b74e8" /><div style={kpiLbl}>{t("Medián ceny", "Median price")}</div><div style={kpiVal}>{sum.loading ? "…" : fmtMoney(S.median_price_eur)}</div></div>
+          <div style={statCard("#8b5cf6")}><StatBar color="#8b5cf6" /><div style={kpiLbl}>{t("Medián ", "Median ")}{moneySymbol()}/m²</div><div style={kpiVal}>{sum.loading ? "…" : fmtCell("per_m2", S.median_eur_m2)}</div></div>
           {!isPipe && (
-          <div style={card}>
+          <div style={statCard("#e0940f")}>
+            <StatBar color="#e0940f" />
             <div style={kpiLbl}>{t("Medián dní na trhu", "Median days on market")}</div>
             <div style={kpiVal}>{sum.loading ? "…" : (S.median_days_on_market != null ? Math.round(S.median_days_on_market) : "—")}</div>
             <div style={{ fontSize: "0.64rem", color: dim, fontFamily: mono, marginTop: "0.2rem" }}>
@@ -277,7 +282,7 @@ export default function SalesView({ lang = "sk" }) {
       {/* breakdown */}
       <div style={{ ...card, marginBottom: "0.6rem" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem", flexWrap: "wrap" }}>
-          <span style={kpiLbl}>{t("Rozklad podľa", "Break down by")}</span>
+          <span style={kpiLbl}><span style={{ display: "inline-block", width: 3, height: 12, borderRadius: 2, background: "var(--accent)", marginRight: "0.5rem", verticalAlign: "middle" }} />{t("Rozklad podľa", "Break down by")}</span>
           <div style={{ display: "inline-flex", gap: "0.25rem", flexWrap: "wrap" }}>
             {GROUP_DIMS.map(([k, sk, en]) => (
               <button key={k} onClick={() => setGroupBy(k)} style={{ ...sel, cursor: "pointer", padding: "0.28rem 0.55rem", fontFamily: mono, fontSize: "0.7rem", background: groupBy === k ? green : bg, color: groupBy === k ? "#04130d" : dim, borderColor: groupBy === k ? green : border, fontWeight: groupBy === k ? 700 : 500 }}>{t(sk, en)}</button>
@@ -309,7 +314,7 @@ export default function SalesView({ lang = "sk" }) {
       {/* detail: the exact units */}
       <div style={card}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem", flexWrap: "wrap", gap: "0.5rem" }}>
-          <span style={kpiLbl}>{t("Konkrétne byty", "The exact units")}{detRows.length ? ` · ${detRows.length}${detHasMore ? "+" : ""}` : ""}</span>
+          <span style={kpiLbl}><span style={{ display: "inline-block", width: 3, height: 12, borderRadius: 2, background: "var(--accent)", marginRight: "0.5rem", verticalAlign: "middle" }} />{t("Konkrétne byty", "The exact units")}{detRows.length ? ` · ${detRows.length}${detHasMore ? "+" : ""}` : ""}</span>
           <button onClick={exportCsv} disabled={!detRows.length} style={{ ...sel, cursor: detRows.length ? "pointer" : "default", color: detRows.length ? "#04130d" : dim, background: detRows.length ? green : bg, borderColor: detRows.length ? green : border, fontFamily: mono, fontSize: "0.72rem", fontWeight: 700 }}>⬇ CSV</button>
         </div>
         <div style={{ overflowX: "auto", maxHeight: "60vh", overflowY: "auto" }}>
