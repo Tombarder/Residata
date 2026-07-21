@@ -1085,7 +1085,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
         .mv2-root ::-webkit-scrollbar-thumb { background: var(--border-soft); border-radius: 6px; }
         .mv2-root ::-webkit-scrollbar-thumb:hover { background: var(--border-strong, var(--border-soft)); }
         .mv2-root ::-webkit-scrollbar-track { background: transparent; }
-        .maplibregl-popup-content { background:${bg2}; color:${textLight}; border:1px solid ${border}; border-radius:10px; padding:12px 13px; box-shadow:0 8px 30px rgba(0,0,0,0.5); }
+        .maplibregl-popup-content { background:${bg2}; color:${textLight}; border:1px solid ${border}; border-radius:10px; padding:12px 13px; box-shadow:0 10px 30px rgba(15,23,42,0.22); }
         .mv2-hover .maplibregl-popup-content { padding:7px 10px; }
         .maplibregl-popup-tip { border-top-color:${bg2} !important; border-bottom-color:${bg2} !important; }
         .maplibregl-popup-close-button { color:${dim}; font-size:16px; padding:2px 6px; }

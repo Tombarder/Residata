@@ -683,10 +683,11 @@ export default function MapView({ lang = "en", setCurrent }) {
         )}
       </div>
 
-      {/* Dark popup theming */}
+      {/* Popup theming — theme-aware via CSS var tokens (surface-2 / text / border),
+          so the card is dark in dark mode and light in Normal. */}
       <style>{`
         .maplibregl-popup-content { background:${bg2}; color:${textLight}; border:1px solid ${border};
-          border-radius:10px; padding:12px 13px; box-shadow:0 8px 30px rgba(0,0,0,0.5); }
+          border-radius:10px; padding:12px 13px; box-shadow:0 10px 30px rgba(15,23,42,0.22); }
         .maplibregl-popup-tip { border-top-color:${bg2} !important; border-bottom-color:${bg2} !important; }
         .maplibregl-popup-close-button { color:${dim}; font-size:16px; padding:2px 6px; }
         .maplibregl-ctrl-attrib { font-size:9px; }
