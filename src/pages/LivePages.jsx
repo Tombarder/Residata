@@ -744,15 +744,18 @@ export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en
     <main style={{ padding: "5rem 2rem 4rem", maxWidth: 1200, margin: "0 auto" }}>
       <button onClick={() => onBack()} style={{ ...linkBtn, marginBottom: "1rem" }}>{t.back_to_projects}</button>
 
-      <Label>{[project?.city, project?.district].filter(Boolean).join(" · ") || "—"}</Label>
-      <h1 className="sec-title">{project?.name || projectId}</h1>
-      <p className="sec-desc" style={{ marginBottom: "2rem" }}>
-        {project ? `${project.total_units} ${t.tbl_units.toLowerCase()} · ${project.available_units} ${t.tbl_available.toLowerCase()} · ${project.sold_percentage ?? "?"}% ${t.tbl_sold.toLowerCase()}` : ""}
-        {!can("view_historical_data") && <span style={{ display: "block", marginTop: "0.5rem", color: dim, fontSize: "0.85rem" }}>
-          {t.snapshot_notice}{" "}
-          <button onClick={() => setCurrent && setCurrent("Pricing")} style={linkBtn}>{t.paid_tier}</button>.
-        </span>}
-      </p>
+      <div style={{ position: "relative", overflow: "hidden", borderRadius: 16, border: "1px solid var(--border)", padding: "1.4rem 1.6rem 1.5rem", marginBottom: "2rem", background: "radial-gradient(120% 140% at 2% -20%, rgba(18,185,129,0.13) 0%, transparent 46%), linear-gradient(135deg, color-mix(in srgb, var(--accent) 5%, var(--surface)) 0%, var(--bg) 75%)" }}>
+        <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: 3, background: "linear-gradient(90deg, var(--accent), #3b74e8 55%, #8b5cf6)" }} />
+        <Label>{[project?.city, project?.district].filter(Boolean).join(" · ") || "—"}</Label>
+        <h1 className="sec-title" style={{ margin: "0.25rem 0 0" }}>{project?.name || projectId}</h1>
+        <p className="sec-desc" style={{ marginBottom: 0 }}>
+          {project ? `${project.total_units} ${t.tbl_units.toLowerCase()} · ${project.available_units} ${t.tbl_available.toLowerCase()} · ${project.sold_percentage ?? "?"}% ${t.tbl_sold.toLowerCase()}` : ""}
+          {!can("view_historical_data") && <span style={{ display: "block", marginTop: "0.5rem", color: dim, fontSize: "0.85rem" }}>
+            {t.snapshot_notice}{" "}
+            <button onClick={() => setCurrent && setCurrent("Pricing")} style={linkBtn}>{t.paid_tier}</button>.
+          </span>}
+        </p>
+      </div>
 
       {loading ? <div style={{ color: dim }}>{t.loading_generic}</div> :
         error ? <div style={{ color: "#ff6b6b" }}>Error: {error.message}</div> :
@@ -954,6 +957,7 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
       value: project.available_units ?? "—",
       sub: project.total_units ? `${fmtPct(((project.available_units || 0) / project.total_units) * 100)} ${L("z celku", "of total")}` : null,
       tint: green,
+      color: "#10b981",
     },
     // PRICE KPI (filtered out when noPrices)
     {
@@ -967,6 +971,7 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
               : <span style={{ color: dim }}>{L("bez zmeny", "no change")} MoM</span>)
         : L("žiadna história", "no history yet"),
       tint: "var(--text)",
+      color: "#3b74e8",
       isPriceKpi: true,
     },
     // FALLBACK KPI shown only when noPrices=true (replaces Avg €/m²)
@@ -975,6 +980,7 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
       value: avgArea ? `${avgArea.toFixed(1)} m²` : "—",
       sub: availForArea.length ? `${availForArea.length} ${L("voľných", "avail")}` : null,
       tint: "var(--text)",
+      color: "#3b74e8",
       isFallbackKpi: true,
     },
     {
@@ -982,6 +988,7 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
       value: fastestRoom ? `${fastestRoom.room}-${L("izb", "room")}` : "—",
       sub: fastestRoom ? `${fmtPct((fastestRoom.sold / fastestRoom.total) * 100)} ${L("predané", "sold")}` : null,
       tint: "#f5a623",
+      color: "#e0940f",
     },
     // PRICE KPI (filtered out when noPrices)
     {
@@ -989,6 +996,7 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
       value: topPrice ? fmtEur(topPrice) : "—",
       sub: availPrices.length ? `${availPrices.length} ${L("voľných s cenou", "units with price available")}` : null,
       tint: "var(--text)",
+      color: "#8b5cf6",
       isPriceKpi: true,
       onClick: (() => {
         const topFlat = availFlats.find(f => Number(f.cena_s_dph) === topPrice);
@@ -1003,6 +1011,7 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
         ? `${largestAreaFlat.izby ? largestAreaFlat.izby + "-izb · " : ""}${largestAreaFlat.unit_id || ""}`
         : null,
       tint: "var(--text)",
+      color: "#8b5cf6",
       isFallbackKpi: true,
       onClick: (largestAreaFlat && onSelectFlat) ? () => onSelectFlat(largestAreaFlat.id) : null,
     },
@@ -1011,6 +1020,7 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
   return (
     <section style={{ marginBottom: "2rem" }}>
       <div style={{ fontFamily: mono, fontSize: "0.65rem", color: greenInk, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.85rem" }}>
+        <span style={{ display: "inline-block", width: 3, height: 12, borderRadius: 2, background: "var(--accent)", marginRight: "0.5rem", verticalAlign: "middle" }} />
         {L("Prehľad projektu", "Project insights")}
       </div>
 
@@ -1064,10 +1074,15 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
           return true;
         }).map((k, i) => (
           <div key={i} onClick={k.onClick || undefined} style={{
-            background: bg, border: `1px solid ${border}`, borderRadius: 10,
+            position: "relative", overflow: "hidden",
+            background: k.color
+              ? `linear-gradient(180deg, color-mix(in srgb, ${k.color} 9%, var(--surface)) 0%, var(--surface) 46%)`
+              : "var(--surface)",
+            border: `1px solid ${border}`, borderRadius: 10,
             padding: "1rem 1.1rem",
             cursor: k.onClick ? "pointer" : "default",
           }}>
+            {k.color && <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: k.color, opacity: 0.85 }} />}
             <div style={{ fontFamily: mono, fontSize: "0.58rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.45rem" }}>
               {k.label}
             </div>
