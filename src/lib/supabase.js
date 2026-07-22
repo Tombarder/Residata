@@ -32,6 +32,12 @@ import { initAuthTokenSync, getDataAccessToken } from "./authToken";
 const url = import.meta.env.VITE_SUPABASE_URL;
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
+// The project URL + publishable (anon) key are PUBLIC — already shipped in this
+// client bundle — so they're safe to surface in the Exports API example. RLS gates
+// what any request can actually read; the key is not a secret.
+export const SUPABASE_URL = url;
+export const SUPABASE_ANON_KEY = key;
+
 if (!url || !key) {
   console.warn("Supabase env missing — running in offline/fallback mode");
 }

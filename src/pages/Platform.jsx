@@ -22,7 +22,7 @@ import { useProjects } from "../lib/useData";
 import DashboardHome from "./DashboardHome";
 import { useCountry, isAllCountries } from "../lib/useCountry";
 import { localeTag, PUBLIC_LANGS } from "../lib/locale";
-import { supabase, supabaseData } from "../lib/supabase";
+import { supabase, supabaseData, SUPABASE_URL, SUPABASE_ANON_KEY } from "../lib/supabase";
 import { useActivateTrial } from "../lib/useActivateTrial";
 import { startCheckout, openBillingPortal } from "../lib/billing";
 import { pushRoute } from "../lib/routing";
@@ -1463,10 +1463,10 @@ function PlatformSettings({ lang }) {
           what the form is operating on (especially helpful for legacy
           values surfaced via F-222 fix). */}
       <div style={{ marginTop: "1.25rem", padding: "1rem 1.25rem", background: bg2, border: `1px solid ${border}`, borderRadius: 10, fontSize: "0.78rem", color: dim, fontFamily: mono, lineHeight: 1.7 }}>
-        <div>user_id: {user?.id}</div>
-        {profile?.created_at && <div>created: {new Date(profile.created_at).toLocaleString(localeTag(lang), { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Bratislava" })}</div>}
-        <div>tier: {profile?.tier || "—"}</div>
-        <div>position: {profile?.position || "—"}</div>
+        <div>{lang === "sk" ? "ID účtu" : "Account ID"}: {user?.id}</div>
+        {profile?.created_at && <div>{lang === "sk" ? "Účet vytvorený" : "Member since"}: {new Date(profile.created_at).toLocaleString(localeTag(lang), { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Bratislava" })}</div>}
+        <div>{lang === "sk" ? "Plán" : "Plan"}: {profile?.tier || "—"}</div>
+        {profile?.position && <div>{lang === "sk" ? "Pozícia" : "Position"}: {profile.position}</div>}
       </div>
     </div>
   );
@@ -1683,6 +1683,23 @@ function formatCsvCell(numberCols, dateCols, column, value) {
   return csvEscapeCell(value);
 }
 
+// A labelled value with a one-click Copy button (for the API endpoint / apikey).
+// The value shows truncated (long JWT keys) but Copy grabs the full string.
+function CopyField({ label, value, lang }) {
+  const [copied, setCopied] = useState(false);
+  const doCopy = () => {
+    try { navigator.clipboard.writeText(value); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch (_) {}
+  };
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "0.5rem" }}>
+      <span style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, textTransform: "uppercase", letterSpacing: "0.06em", minWidth: 110, flexShrink: 0 }}>{label}</span>
+      <code style={{ flex: 1, minWidth: 0, fontFamily: mono, fontSize: "0.72rem", color: "var(--text-2)", background: bg2, padding: "0.4rem 0.6rem", borderRadius: 6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{value || "—"}</code>
+      <button onClick={doCopy} disabled={!value} style={{ flexShrink: 0, background: copied ? green : "transparent", color: copied ? "#04130d" : accentInk, border: `1px solid ${copied ? green : border}`, borderRadius: 6, padding: "0.4rem 0.7rem", fontFamily: mono, fontSize: "0.68rem", fontWeight: 700, cursor: value ? "pointer" : "default" }}>
+        {copied ? (lang === "sk" ? "✓ Skopírované" : "✓ Copied") : (lang === "sk" ? "Kopírovať" : "Copy")}
+      </button>
+    </div>
+  );
+}
 function PlatformExports({ lang, setCurrent }) {
   const { projects } = useProjects();
   const { user } = useAuth();
@@ -2004,24 +2021,20 @@ function PlatformExports({ lang, setCurrent }) {
         </h3>
         <p style={{ color: "var(--text-2)", fontSize: "0.85rem", lineHeight: 1.6, marginBottom: "1rem" }}>
           {lang === "sk"
-            ? "Dataset je dostupný priamo cez Supabase REST endpoint (gated cez tvoju session). Ak potrebuješ dedikovaný API kľúč pre server-to-server integráciu, napíš na "
-            : "The dataset is available directly through Supabase REST (gated by your session). For a dedicated server-to-server API key, email "}
+            ? "Celý dataset je dostupný cez REST API. Kým si prihlásený, tvoja session autorizuje čítanie — ideálne na rýchly pull alebo do notebooku. Pre automatizovaný server-to-server prístup (stály API kľúč) napíš na "
+            : "The full dataset is available over a REST API. While you're signed in, your session authorizes reads — handy for a quick pull or a notebook. For automated server-to-server access (a permanent API key), email "}
           <a href="mailto:residata@proton.me" style={{ color: accentInk }}>residata@proton.me</a>.
         </p>
+        <CopyField label={lang === "sk" ? "Endpoint" : "Endpoint"} value={`${SUPABASE_URL || "https://mtclsrswxtjseewyrcbx.supabase.co"}/rest/v1/projects`} lang={lang} />
+        <CopyField label={lang === "sk" ? "apikey (verejný)" : "apikey (public)"} value={SUPABASE_ANON_KEY || ""} lang={lang} />
         <pre style={{
-          margin: 0, padding: "0.75rem 1rem", background: bg2, borderRadius: 6,
-          fontSize: "0.75rem", color: "var(--text-2)", fontFamily: mono, overflowX: "auto",
+          margin: "0.6rem 0 0", padding: "0.75rem 1rem", background: bg2, borderRadius: 6,
+          fontSize: "0.72rem", color: "var(--text-2)", fontFamily: mono, overflowX: "auto",
         }}>
-{`GET https://mtclsrswxtjseewyrcbx.supabase.co/rest/v1/projects
-  Headers:
-    apikey: <anon key>
-    Authorization: Bearer <your session token>`}
+{`curl "${SUPABASE_URL || "https://…supabase.co"}/rest/v1/projects?select=*" \\
+  -H "apikey: <${lang === "sk" ? "apikey vyššie" : "apikey above"}>" \\
+  -H "Authorization: Bearer <${lang === "sk" ? "tvoj session token" : "your session token"}>"`}
         </pre>
-        {user && (
-          <p style={{ fontSize: "0.72rem", color: dim, marginTop: "0.85rem", fontFamily: mono }}>
-            user_id: {user.id}
-          </p>
-        )}
       </div>
       </>
       ) : (
