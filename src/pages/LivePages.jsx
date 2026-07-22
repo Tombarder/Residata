@@ -254,9 +254,13 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
                   {sk ? "Vyčistiť" : "Clear"}
                 </button>
               )}
-              <span style={{ marginLeft: "auto", fontSize: "0.74rem", color: dim, fontFamily: mono }}>
-                {filteredActive.length}{hasFilters ? ` / ${activeProjects.length}` : ""} {sk ? "projektov" : "projects"}
-              </span>
+              {/* Only show the count here when FILTERING (X / total) — otherwise it
+                  just duplicates the "N projects" heading above. */}
+              {hasFilters && (
+                <span style={{ marginLeft: "auto", fontSize: "0.74rem", color: dim, fontFamily: mono }}>
+                  {filteredActive.length} / {activeProjects.length} {sk ? "projektov" : "projects"}
+                </span>
+              )}
             </div>
             {/* zero-height anchor so the floating builder panel drops below the bar */}
             <div style={{ position: "relative", zIndex: 5 }}>
@@ -300,8 +304,8 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
                     <SortableTh sortKey="district"         align="left"  current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t.tbl_district}</SortableTh>
                     <SortableTh sortKey="total_units"      align="right" current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t.tbl_units}</SortableTh>
                     <SortableTh sortKey="available_units"  align="right" current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t.tbl_available}</SortableTh>
-                    <SortableTh sortKey="sold_units"       align="right" current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t.tbl_sold}</SortableTh>
-                    <SortableTh sortKey="sold_percentage"  align="right" current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t.tbl_sold_pct}</SortableTh>
+                    <SortableTh sortKey="sold_units"       align="right" current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t.tbl_sold}<HeaderInfo lang={lang} sk="Počet bytov, ktoré sme zaznamenali ako predané odkedy projekt sledujeme. Pri projektoch, ktoré sme začali sledovať neskôr, môže byť nižší než celková vypredanosť (stĺpec Predané %)." en="Units we've recorded as sold since we began tracking this project. For projects we started tracking later, this can be lower than the overall sold-through (the Sold % column)." /></SortableTh>
+                    <SortableTh sortKey="sold_percentage"  align="right" current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t.tbl_sold_pct}<HeaderInfo lang={lang} sk="Celková vypredanosť projektu podľa developera — podiel už predaných z celku, vrátane predajov spred nášho sledovania. Preto môže byť vysoká, aj keď stĺpec „Predané“ (naše zaznamenané predaje) je nízky." en="The project's overall sold-through per the developer — share already sold of the total, including sales from before we tracked it. That's why it can be high even when the “Sold” column (our recorded sales) is low." /></SortableTh>
                     <SortableTh sortKey="avg_price_eur_m2" align="right" current={sort} onClick={onHeaderClick} arrow={sortArrow}>{moneySymbol() + "/m²"}</SortableTh>
                     {/* Sold velocity — header viditeľný vždy, obsah blurred pre non-paid */}
                     <SortableTh sortKey="sold_last_month"  align="right" current={sort} onClick={onHeaderClick} arrow={sortArrow} title={can("view_sold_velocity") ? t.tbl_sold_30d_tooltip_paid : t.tbl_sold_30d_tooltip_locked}>
@@ -485,6 +489,15 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
  * Active column shows the green ▴/▾; inactive show a dim ↕ to hint
  * "I'm clickable too". Keyboard accessible via tabIndex + Enter.
  */
+// Small "i" explainer for a sortable table header. InfoTip stops click-propagation,
+// so tapping the "i" opens the tip without triggering the column sort.
+function HeaderInfo({ sk, en, lang }) {
+  return (
+    <span style={{ marginLeft: 4, display: "inline-block", verticalAlign: "middle" }} onClick={(e) => e.stopPropagation()}>
+      <InfoTip text={lang === "sk" ? sk : en} label={lang === "sk" ? sk : en} />
+    </span>
+  );
+}
 function SortableTh({ sortKey, align = "left", current, onClick, arrow, title, children }) {
   const active = current?.key === sortKey;
   return (
