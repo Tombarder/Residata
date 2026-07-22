@@ -132,7 +132,7 @@ const FIELDS = {
      `type: "measure"` → only valid in Values zone, single fixed agg.
      `measureCompute(records)` runs on the group's record set. */
   abs_rate: {
-    label: "Absorption rate",
+    label: "Miera absorpcie",
     group: "measure", type: "measure", unit: "%", derived: true,
     // Accessor unused for measure types but kept for parity
     accessor: () => null,
