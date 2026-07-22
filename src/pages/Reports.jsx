@@ -1114,8 +1114,13 @@ function HdrInfo({ sk, en, lang }) {
   );
 }
 function AggregateTable({ rows, lang, nameLabel }) {
+  const [showAll, setShowAll] = useState(false);
   if (!rows.length) return <div style={{ color: dim, fontSize: "0.85rem" }}>{lang === "sk" ? "Žiadne dáta." : "No data."}</div>;
   const maxUnits = Math.max(...rows.map(r => r.totalUnits), 1);
+  // Long lists (e.g. ~90 districts) are overwhelming — show the biggest 15 by default
+  // with a one-click expand. Rank is already by size (groupAggregates sorts by units).
+  const LIMIT = 15;
+  const shown = showAll ? rows : rows.slice(0, LIMIT);
   return (
     <div className="rep-table-wrap" style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8 }}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem", minWidth: 560 }}>
@@ -1131,7 +1136,7 @@ function AggregateTable({ rows, lang, nameLabel }) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((r, i) => {
+          {shown.map((r, i) => {
             // Sold % is null when developer doesn't publish sold info
             // for this group at all — render "n/a" rather than a
             // misleading 0%. Everything else always renders numbers.
@@ -1158,6 +1163,14 @@ function AggregateTable({ rows, lang, nameLabel }) {
           })}
         </tbody>
       </table>
+      {rows.length > LIMIT && (
+        <button onClick={() => setShowAll(v => !v)}
+          style={{ width: "100%", background: "transparent", border: "none", borderTop: `1px solid ${border}`, color: green, cursor: "pointer", fontFamily: mono, fontSize: "0.72rem", padding: "0.6rem", fontWeight: 600 }}>
+          {showAll
+            ? (lang === "sk" ? "▲ Zobraziť menej" : "▲ Show less")
+            : (lang === "sk" ? `▼ Zobraziť všetkých ${rows.length}` : `▼ Show all ${rows.length}`)}
+        </button>
+      )}
       <style>{`
         .rep-row-hoverable { transition: background 0.12s; }
         .rep-row-hoverable:hover { background: color-mix(in srgb, var(--accent) 5%, transparent); }
@@ -2057,7 +2070,13 @@ function PricingTensionScatter({ dots, lang, onOpenProject }) {
 
   // Symmetric x range (-X, +X) so 0 is centered.
   const maxAbsPremium = Math.max(20, ...dots.map(d => Math.abs(d.premiumPct)));
-  const maxVelocity = Math.max(15, ...dots.map(d => d.velocityPct));
+  // Robust Y-axis: cap at the 90th-percentile velocity. A near-sold-out project with a
+  // tiny remaining inventory can post a 300–400 %/mo "sell-through" that would otherwise
+  // stretch the axis and squish every normal project onto the baseline (the bug that made
+  // the scatter look empty). Such outliers clamp to the top edge (dot y is already clamped).
+  const _vels = dots.map(d => d.velocityPct).filter(v => Number.isFinite(v)).sort((a, b) => a - b);
+  const _p90 = _vels.length ? _vels[Math.min(_vels.length - 1, Math.floor(_vels.length * 0.9))] : 15;
+  const maxVelocity = Math.min(60, Math.max(15, _p90));
   const xScale = (px) => padL + innerW * 0.5 + (px / maxAbsPremium) * (innerW * 0.5);
   const yScale = (vy) => padT + innerH - (vy / maxVelocity) * innerH;
 
