@@ -406,7 +406,7 @@ function ReportHeader({ projects, lang, scope, scopeLabel }) {
             ⬇ CSV
           </button>
           <button onClick={() => window.print()} className="btn-p" style={{ fontSize: "0.78rem", padding: "0.5rem 0.9rem" }}>
-            🖨 {lang === "sk" ? "Stiahnuť PDF" : "Save as PDF"}
+            🖨 {lang === "sk" ? "Uložiť ako PDF" : "Save as PDF"}
           </button>
         </div>
       </div>
