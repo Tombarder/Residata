@@ -90,7 +90,12 @@ export function pathToPage(pathname) {
     "/admin": "App:Admin",
     "/hero-lab": "HeroLab",   // hidden — page picker pre Home hero variant
   };
-  return map[clean] || "Home";
+  if (map[clean]) return map[clean];
+  // Unknown /app/* path (typo, renamed/removed route, stale bookmark): keep a
+  // logged-in user INSIDE the platform — land on the Dashboard rather than bounce
+  // them out to the marketing home (which reads as "logged out / broken").
+  if (clean.startsWith("/app")) return "App:Dashboard";
+  return "Home";
 }
 
 /** True if the page key belongs to the platform shell (/app/*). */
