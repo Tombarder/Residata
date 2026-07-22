@@ -161,23 +161,23 @@ function hoverLabel(props, lens) {
   return COMPLETION[props.completion].label;
 }
 
-function showProjectPopup(map, lngLat, props, handlers, popupRef) {
+function showProjectPopup(map, lngLat, props, handlers, popupRef, sk = false) {
   const el = document.createElement("div");
   el.style.minWidth = "186px";
   const loc = [props.city, props.district].filter(Boolean).join(" · ");
   const price = props.ppm2 > 0 ? mM2(props.ppm2) : "—";
-  const approx = props.verified ? "" : `<div style="font-size:0.64rem;color:${amber};margin-bottom:6px">◍ approximate location</div>`;
+  const approx = props.verified ? "" : `<div style="font-size:0.64rem;color:${amber};margin-bottom:6px">◍ ${sk ? "približná poloha" : "approximate location"}</div>`;
   el.innerHTML =
     `<div style="font-weight:600;font-size:0.92rem;color:${textLight};margin-bottom:2px">${escapeHtml(props.name)}</div>` +
     `<div style="font-size:0.72rem;color:${dim};margin-bottom:6px">${escapeHtml(loc)} · ${escapeHtml(props.developer || "—")}</div>` + approx +
     `<div style="font-family:${mono};font-size:0.72rem;color:${textLight};line-height:1.6">` +
-    `<div><span style="color:${dim}">Avg</span> &nbsp;${price}</div>` +
-    `<div><span style="color:${dim}">Available</span> &nbsp;${props.available} / ${props.total}</div>` +
-    `<div><span style="color:${dim}">Absorbed</span> &nbsp;${props.soldPct == null ? "—" : props.soldPct + "%"}</div></div>` +
+    `<div><span style="color:${dim}">${sk ? "Priem." : "Avg"}</span> &nbsp;${price}</div>` +
+    `<div><span style="color:${dim}">${sk ? "Voľné" : "Available"}</span> &nbsp;${props.available} / ${props.total}</div>` +
+    `<div><span style="color:${dim}">${sk ? "Vypredanosť" : "Absorbed"}</span> &nbsp;${props.soldPct == null ? "—" : props.soldPct + "%"}</div></div>` +
     `<div style="display:flex;gap:6px;margin-top:10px">` +
-    `<button id="mv2-analyze" style="flex:1;padding:7px 8px;background:transparent;color:${green};border:1px solid ${green};border-radius:6px;font-weight:600;font-size:0.72rem;cursor:pointer">◎ Area</button>` +
-    `<button id="mv2-compare" style="flex:1;padding:7px 8px;background:transparent;color:${textLight};border:1px solid ${border};border-radius:6px;font-weight:600;font-size:0.72rem;cursor:pointer">⇄ Compare</button>` +
-    `<button id="mv2-open" style="flex:1.3;padding:7px 8px;background:${green};color:#0a0a0b;border:none;border-radius:6px;font-weight:600;font-size:0.72rem;cursor:pointer">Open →</button>` +
+    `<button id="mv2-analyze" style="flex:1;padding:7px 8px;background:transparent;color:${green};border:1px solid ${green};border-radius:6px;font-weight:600;font-size:0.72rem;cursor:pointer">◎ ${sk ? "Oblasť" : "Area"}</button>` +
+    `<button id="mv2-compare" style="flex:1;padding:7px 8px;background:transparent;color:${textLight};border:1px solid ${border};border-radius:6px;font-weight:600;font-size:0.72rem;cursor:pointer">⇄ ${sk ? "Porovnať" : "Compare"}</button>` +
+    `<button id="mv2-open" style="flex:1.3;padding:7px 8px;background:${green};color:#0a0a0b;border:none;border-radius:6px;font-weight:600;font-size:0.72rem;cursor:pointer">${sk ? "Otvoriť" : "Open"} →</button>` +
     `</div>`;
   const open = el.querySelector("#mv2-open");
   const analyze = el.querySelector("#mv2-analyze");
@@ -211,6 +211,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
   const lensRef = useRef("price");
   const onAnalyzeRef = useRef(() => {});
   const onCompareRef = useRef(() => {});
+  const skRef = useRef(false);   // fresh `sk` for the once-registered pin-click handler
 
   const [lens, setLens] = useState("price");
   const [conditions, setConditions] = useState([]);
@@ -384,6 +385,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
   }, []);
 
   useEffect(() => { setCurrentRef.current = setCurrent; }, [setCurrent]);
+  useEffect(() => { skRef.current = sk; }, [sk]);
   useEffect(() => { countryRef.current = country; }, [country]);
   useEffect(() => { lensRef.current = lens; }, [lens]);
   useEffect(() => { onAnalyzeRef.current = (p) => { setAnalysisCenter({ lng: p.lng, lat: p.lat }); setAnchorId(p.id || null); }; }, []);
@@ -586,7 +588,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
           onOpen: (id) => setCurrentRef.current && setCurrentRef.current("App:ProjectDetail:" + id),
           onAnalyze: (ll) => onAnalyzeRef.current(ll),
           onCompare: (p) => onCompareRef.current(p),
-        }, popupRef);
+        }, popupRef, skRef.current);
       });
       map.on("click", (e) => mapClickRef.current(e, map));
       map.on("dblclick", (e) => {
@@ -775,7 +777,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
         <div style={{ display: "flex", alignItems: "center", gap: "0.8rem", flexWrap: "wrap", marginBottom: 10 }}>
           <span style={{ fontSize: "0.6rem", color: dim, letterSpacing: "0.12em", textTransform: "uppercase" }}>{sk ? "Trh" : "Market"}</span>
           <div style={{ display: "inline-flex", gap: 3, background: bg2, border: `1px solid ${border}`, borderRadius: 999, padding: 3 }}>
-            {LENSES.map((l) => <button key={l.key} onClick={() => setLens(l.key)} style={tabStyle(lens === l.key)} title={l.desc}>{l.label}</button>)}
+            {LENSES.map((l) => <button key={l.key} onClick={() => setLens(l.key)} style={tabStyle(lens === l.key)} title={sk ? (l.desc_sk || l.desc) : l.desc}>{sk ? (l.label_sk || l.label) : l.label}</button>)}
           </div>
           <button onClick={() => setHeatMode((v) => !v)} style={chipStyle(heatMode)} title={sk ? "Tepelná mapa aktívnej metriky" : "Heatmap of the active metric"}>
             {heatMode ? "◉" : "○"} {sk ? "Teplo" : "Heat"}
@@ -1336,7 +1338,7 @@ function HeatLegend({ lens, sk }) {
       <span>{sk ? "menej" : "low"}</span>
       <span style={{ width: 84, height: 9, borderRadius: 5, background: "linear-gradient(90deg, #2b4c9b, #3aa0ff, #f5a623, #ff7a3d, #ff3d3d)", display: "inline-block" }} />
       <span style={{ color: textLight }}>{sk ? "viac" : "high"}</span>
-      {L ? <span style={{ opacity: 0.7 }}>· {L.label}</span> : null}
+      {L ? <span style={{ opacity: 0.7 }}>· {sk ? (L.label_sk || L.label) : L.label}</span> : null}
     </span>
   );
 }

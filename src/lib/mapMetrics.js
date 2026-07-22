@@ -16,11 +16,11 @@
  */
 
 export const LENSES = [
-  { key: "price",      label: "Price €/m²",  unit: "€/m²", desc: "Average asking price per m² — where the market runs rich vs soft." },
-  { key: "supply",     label: "Supply",      unit: "u",    desc: "Units still available — where competing inventory is concentrated." },
-  { key: "absorption", label: "Absorption",  unit: "%",    desc: "Share already sold/reserved — what's clearing fast vs sitting." },
-  { key: "momentum",   label: "Sold / mo",   unit: "u",    desc: "Units sold in the last month — where demand is actually moving." },
-  { key: "completion", label: "Completion",  unit: "",     desc: "When competing supply hands over (sparse data — many unknown)." },
+  { key: "price",      label: "Price €/m²",  label_sk: "Cena €/m²",       unit: "€/m²", desc: "Average asking price per m² — where the market runs rich vs soft.",            desc_sk: "Priemerná ponuková cena za m² — kde je trh drahý vs mäkký." },
+  { key: "supply",     label: "Supply",      label_sk: "Ponuka",          unit: "u",    desc: "Units still available — where competing inventory is concentrated.",           desc_sk: "Voľné byty — kde je sústredená konkurenčná ponuka." },
+  { key: "absorption", label: "Absorption",  label_sk: "Vypredanosť",     unit: "%",    desc: "Share already sold/reserved — what's clearing fast vs sitting.",               desc_sk: "Podiel už predaných/rezervovaných — čo sa míňa rýchlo vs stojí." },
+  { key: "momentum",   label: "Sold / mo",   label_sk: "Predané / mes.",  unit: "u",    desc: "Units sold in the last month — where demand is actually moving.",              desc_sk: "Byty predané za posledný mesiac — kde sa dopyt reálne hýbe." },
+  { key: "completion", label: "Completion",  label_sk: "Dokončenie",      unit: "",     desc: "When competing supply hands over (sparse data — many unknown).",               desc_sk: "Kedy sa konkurenčná ponuka odovzdáva (riedke dáta — veľa neznámych)." },
 ];
 
 export const RAMP = ["#3aa0ff", "#f5a623", "#ff5d5d"]; // low blue · mid amber · high red
@@ -345,12 +345,13 @@ export function legendForLens(lens, thresholds, fmt = (n) => String(Math.round(n
     return COMPLETION_ORDER.map((k) => ({ color: COMPLETION[k].color, label: completionLabel(k, sk) }));
   }
   const unit = LENSES.find((l) => l.key === lens)?.unit || "";
-  if (!thresholds) return [{ color: RAMP[1], label: unit || lens }, { color: NO_DATA, label: "no data" }];
+  const noData = sk ? "žiadne dáta" : "no data";
+  if (!thresholds) return [{ color: RAMP[1], label: unit || lens }, { color: NO_DATA, label: noData }];
   const [t1, t2] = thresholds;
   return [
     { color: RAMP[0], label: `< ${fmt(t1)}${unit}` },
     { color: RAMP[1], label: `${fmt(t1)}–${fmt(t2)}` },
     { color: RAMP[2], label: `≥ ${fmt(t2)}${unit}` },
-    { color: NO_DATA, label: "no data" },
+    { color: NO_DATA, label: noData },
   ];
 }
