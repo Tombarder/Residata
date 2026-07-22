@@ -1370,7 +1370,10 @@ function TrendChart({ snapshots, scopePredicate, lang }) {
       : null;
     return { m, totalUnits, sold, avail, wavg };
   });
-  const maxUnits = Math.max(...series.map(s => s.totalUnits), 1);
+  // The bar visualises SOLD per month (which actually moves month-to-month) — the
+  // old bar encoded total units, which barely changes, so every bar rendered ~full
+  // and said nothing.
+  const maxSold = Math.max(...series.map(s => s.sold), 1);
   return (
     <div className="rep-table-wrap" style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 8, padding: "0.85rem 1rem" }}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.78rem", minWidth: 480 }}>
@@ -1381,7 +1384,7 @@ function TrendChart({ snapshots, scopePredicate, lang }) {
             <th style={tdhR}>{lang === "sk" ? "Voľných"  : "Available"}</th>
             <th style={tdhR}>{lang === "sk" ? "Predaných" : "Sold"}</th>
             <th style={tdhR}>{moneySymbol()}/m²</th>
-            <th style={{ ...tdh, minWidth: 80 }}>{lang === "sk" ? "Trend" : "Trend"}</th>
+            <th style={{ ...tdh, minWidth: 80 }}>{lang === "sk" ? "Predané →" : "Sold →"}</th>
           </tr>
         </thead>
         <tbody>
@@ -1394,7 +1397,7 @@ function TrendChart({ snapshots, scopePredicate, lang }) {
               <td style={tdcR}>{s.wavg ? Math.round(moneyFromEur(s.wavg)).toLocaleString("en-US").replace(/,/g, " ") : "—"}</td>
               <td style={{ ...tdc, padding: "0.35rem 0.75rem" }}>
                 <div style={{ position: "relative", height: 8, background: bg, border: `1px solid ${border}`, borderRadius: 2 }}>
-                  <div style={{ position: "absolute", inset: 0, width: `${(s.totalUnits / maxUnits) * 100}%`, background: `linear-gradient(90deg, var(--accent-strong), var(--accent))`, borderRadius: 2 }} />
+                  <div style={{ position: "absolute", inset: 0, width: `${(s.sold / maxSold) * 100}%`, background: `linear-gradient(90deg, var(--accent-strong), var(--accent))`, borderRadius: 2 }} />
                 </div>
               </td>
             </tr>

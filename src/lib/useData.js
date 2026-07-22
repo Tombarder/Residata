@@ -1027,29 +1027,35 @@ export function useProjectFlats(projectId) {
 
 /** Monthly project snapshots — full time-series of the projects table.
  *  Public historical data (same shape for anon + auth callers). */
-let _snapshotsCache = null;
+// project_snapshots is RLS-gated (monthly history is a paid capability), so this
+// MUST read via the AUTHED client (supabaseData) — the anon supabasePublic client
+// returned [] for everyone, silently killing the Reports "Historical trend" chart
+// AND the Analytics ProjectInsights month-over-month deltas / Pivot history. The
+// cache is therefore keyed by user id (mirrors useProjectHistory in DashboardHome):
+// a paid user's rows must never be handed to a different user who logs in during the
+// same module lifetime.
+let _snapshotsCache = { key: null, rows: null };
 export function useProjectSnapshots() {
-  const [snapshots, setSnapshots] = useState(_snapshotsCache || []);
-  const [loading, setLoading] = useState(_snapshotsCache === null);
+  const { loading: authLoading, user } = useAuth();
+  const key = user?.id || null;
+  const [snapshots, setSnapshots] = useState(() => (_snapshotsCache.key === key ? _snapshotsCache.rows : null) || []);
+  const [loading, setLoading] = useState(_snapshotsCache.key !== key);
   useEffect(() => {
-    if (!isSupabaseReady()) { setLoading(false); return; }
+    if (authLoading) return;                       // wait for auth to settle
+    if (!isSupabaseReady() || !user) { setSnapshots([]); setLoading(false); return; }  // anon/free → RLS gives [] anyway
+    if (_snapshotsCache.key === key && _snapshotsCache.rows) { setSnapshots(_snapshotsCache.rows); setLoading(false); return; }
     let cancelled = false;
-    supabasePublic.from("project_snapshots").select("*")
-      .order("snapshot_month", { ascending: false })
+    sbRead(supabaseData.from("project_snapshots").select("*").order("snapshot_month", { ascending: false }))
       .then(({ data, error }) => {
         if (cancelled) return;
-        if (error) {
-          console.error("[useProjectSnapshots]", error);
-          setLoading(false);
-          return;
-        }
+        if (error) { console.error("[useProjectSnapshots]", error); setLoading(false); return; }
         const arr = data || [];
-        _snapshotsCache = arr;
+        _snapshotsCache = { key, rows: arr };
         setSnapshots(arr);
         setLoading(false);
       });
     return () => { cancelled = true; };
-  }, []);
+  }, [authLoading, user?.id]);
   return { snapshots, loading };
 }
 
