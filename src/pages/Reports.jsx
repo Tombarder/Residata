@@ -39,7 +39,7 @@ import { supabase, supabaseData } from "../lib/supabase";
 
 // ── Visual language (mirrors Platform.jsx) ───────────────────────
 const mono = "'JetBrains Mono', monospace";
-import { accent as green, accentInk, dim, text, border, bg, surfaceDark as bg2, surfacePanel as panel, orange } from "../lib/theme";
+import { accent as green, accentInk, dim, text, border, bg, surfaceDark as bg2, orange } from "../lib/theme";
 const red = "#ff6b6b";
 
 // ── Scope definitions ────────────────────────────────────────────
@@ -1883,12 +1883,6 @@ function ComparableTransactionsReport({ projects, lang }) {
     </>
   );
 }
-
-const selectStyle = {
-  background: bg2, color: text, border: `1px solid ${border}`,
-  borderRadius: 4, padding: "0.35rem 0.55rem", fontSize: "0.78rem",
-  fontFamily: "inherit", cursor: "pointer",
-};
 
 /* ─── 3. Pricing tension ───────────────────────────────────────────
    2-axis matrix: how does each project's avg €/m² compare to the
