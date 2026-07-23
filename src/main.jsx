@@ -5,6 +5,7 @@ import RootErrorBoundary from './components/RootErrorBoundary.jsx'
 import { AuthProvider } from './lib/useAuth'
 import { CountryProvider } from './lib/useCountry'
 import { CurrencyProvider } from './lib/useCurrency'
+import AccountPrefsSync from './lib/AccountPrefsSync'
 import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
@@ -13,6 +14,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       <AuthProvider>
         <CountryProvider>
           <CurrencyProvider>
+            <AccountPrefsSync />
             <App />
           </CurrencyProvider>
         </CountryProvider>

@@ -115,6 +115,7 @@ export function CurrencyProvider({ children }) {
     unitsPerEur: derived.unitsPerEur,
     currencies: derived.offered,
     setCurrency,
+    chosen,   // the raw explicit choice (ISO code) or null — for cross-device account sync
     // legacy aliases — keep Ticker + any other subscribers working unchanged
     mode: derived.displayCode === "EUR" ? "eur" : "native",
     setMode: (m) => setCurrency(m === "eur" ? "EUR" : derived.marketNative),
@@ -123,7 +124,7 @@ export function CurrencyProvider({ children }) {
     hasNativeAlt: derived.offered.length > 1,
   }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [derived]);
+    [derived, chosen]);
 
   return <CurrencyContext.Provider value={value}>{children}</CurrencyContext.Provider>;
 }
