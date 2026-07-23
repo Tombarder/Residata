@@ -285,10 +285,6 @@ export default function MapView({ lang = "en", setCurrent }) {
     () => (coords ? (projects || []).filter((p) => coords[p.id]).length : 0),
     [projects, coords]
   );
-  const placeholderCount = useMemo(() => {
-    if (!coords) return 0;
-    return fc.features.filter((f) => coords[f.properties.id] && !coords[f.properties.id].verified).length;
-  }, [fc, coords]);
 
   function fitToData(map, data, animate) {
     if (!data.features.length) {
@@ -519,17 +515,6 @@ export default function MapView({ lang = "en", setCurrent }) {
             <Dot color={greyPt} /> {sk ? "vypredané" : "sold out"}
           </span>
         </div>
-        {placeholderCount > 0 && (
-          <div style={{
-            marginLeft: "auto", fontSize: "0.7rem", color: amber,
-            border: `1px solid ${amber}40`, background: `${amber}12`,
-            padding: "3px 9px", borderRadius: 20,
-          }}>
-            📍 {sk
-              ? `${placeholderCount} dočasných polôh (presné pozície sa dopĺňajú)`
-              : `${placeholderCount} placeholder locations — exact positions being added`}
-          </div>
-        )}
       </div>
 
       {/* Filter + search bar */}
