@@ -9,6 +9,7 @@ import { moneyFromEur, moneySymbol } from "../lib/money";
 import Picker from "../components/Picker";
 import { localeTag } from "../lib/locale";
 import { useCurrency } from "../lib/useCurrency";
+import { orderPivotColKeys } from "../lib/pivotColOrder";
 
 /* ═══════════════════════════════════════════════════════════════════
    Pivot v2 — Excel-style drag-and-drop pivot
@@ -266,6 +267,28 @@ const MAX_ROWS = 6;
 const MAX_VALUES = 4;
 const MAX_COLS = 1;    // cross-tab: 1 column field for now (keeps header legible)
 const MAX_COL_VALUES = 12; // cap distinct column values so table stays readable
+
+/* Column dimensions with a meaningful non-alphabetical order. Values not listed
+   fall back after the known ones (locale-sorted). Everything else orders by type
+   (numeric asc / chronological / locale) — see orderPivotColKeys. */
+const COL_ORDINAL_ORDER = {
+  stav: ["V", "R", "PR", "P", "Ešte nie v ponuke", "ERROR"], // canonical funnel order (matches the platform)
+};
+
+/* Pick which distinct column values survive the MAX_COL_VALUES cap (most-populated
+   first, so the visible columns carry the most data), THEN order those for display
+   in a logical left→right order (rooms 1<2<3<4, handover chronological, stav funnel,
+   names natural, blanks last) — reliable for any dimension / filter / dataset. */
+function orderCappedColKeys(countEntries, colField) {
+  const topN = [...countEntries]
+    .sort((a, b) => b[1] - a[1])        // frequency desc → selection
+    .slice(0, MAX_COL_VALUES)
+    .map(([k]) => k);
+  return orderPivotColKeys(topN, {
+    isNumber: FIELDS[colField]?.type === "number",
+    ordinal: COL_ORDINAL_ORDER[colField],
+  });
+}
 
 /* Path separator: unicode char unlikely to appear in any real value. */
 const SEP = "\u2016";
@@ -583,9 +606,9 @@ function compute(field, agg, records) {
   }
 }
 
-/* Distinct values of a column field across the dataset, ordered by
-   frequency desc. Capped to MAX_COL_VALUES so the header stays legible.
-   Empty values get folded into the (prázdne) bucket. */
+/* Distinct values of a column field across the dataset. Capped to MAX_COL_VALUES
+   (most-populated first) so the header stays legible, then ordered logically for
+   display (see orderCappedColKeys). Empty values fold into the (prázdne) bucket. */
 function distinctColValues(records, colField) {
   const f = FIELDS[colField];
   if (!f) return [];
@@ -594,8 +617,7 @@ function distinctColValues(records, colField) {
     const v = normKey(f.accessor(r));
     counts.set(v, (counts.get(v) || 0) + 1);
   }
-  const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]);
-  return sorted.slice(0, MAX_COL_VALUES).map(([k]) => k);
+  return orderCappedColKeys(counts.entries(), colField);
 }
 
 /* Build the pivot tree. Rolls up rollups[] per node from its own records
@@ -858,7 +880,7 @@ function buildTreeFromGrain(grain, rowFields, colFields, valueDefs) {
   if (hasCol) {
     const counts = new Map();
     for (const g of safe) { const ck = normKey(g.d[colIdx]); counts.set(ck, (counts.get(ck) || 0) + (+g.m.n || 0)); }
-    colKeys = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, MAX_COL_VALUES).map(([k]) => k);
+    colKeys = orderCappedColKeys(counts.entries(), colFields[0]);
     colOverflow = Math.max(0, counts.size - colKeys.length);
   }
   const rollupsFor = (rows) => { const c = emptyComp(); for (const g of rows) addComp(c, g.m); return valueDefs.map(v => computeFromComp(v, c)); };
