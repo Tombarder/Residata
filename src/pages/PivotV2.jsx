@@ -1317,7 +1317,14 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
       return;
     }
     const dbPrefs = ownProfile.pivot_prefs ? sanitizePivotState(ownProfile.pivot_prefs) : null;
-    applyPrefs(dbPrefs || loadPivotState(user.id) || DEFAULT_BUNDLE);  // sets the synced baseline
+    const localPrefs = loadPivotState(user.id);
+    applyPrefs(dbPrefs || localPrefs || DEFAULT_BUNDLE);  // sets the synced baseline
+    // Back-fill: the account has nothing saved yet but THIS device already has a setup
+    // (from before this fix / prior sessions) → push it so it reaches the user's OTHER
+    // devices without them redoing it. Clearing the baseline makes the save effect fire
+    // once; it's a one-off (pivot_prefs is non-null on the next load). A fresh device with
+    // no local setup keeps the DEFAULT baseline above and does NOT pollute the account.
+    if (!dbPrefs && localPrefs) lastSyncedRef.current = null;
     setHydratedScope(scopeId);               // finalized → saving enabled for this account
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, scopeId, user, profile]);

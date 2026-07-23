@@ -1,6 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "./useAuth";
-import { useCountry } from "./useCountry";
+import { useCountry, ALL_COUNTRIES } from "./useCountry";
 import { useCurrency } from "./useCurrency";
 import { supabaseData } from "./supabase";
 
@@ -14,10 +14,10 @@ import { supabaseData } from "./supabase";
  * read both selectors) and below AuthProvider (so it can read the profile).
  *
  * Robustness mirrors the pivot fix (which was silently never saving for 3 weeks):
- *   · effects key off the primitive selector VALUE + a stable scope string — never an
+ *   · save effects key off the primitive selector VALUE + the hydration scope — never an
  *     unstable object — so a re-render can't churn the debounce;
- *   · a per-key "last synced" baseline replaces any fragile ref flag, so we save ONLY a
- *     real change and never echo the just-hydrated value back;
+ *   · a per-key "last synced" baseline replaces any fragile flag, so we save ONLY a real
+ *     change and never echo the just-hydrated value back;
  *   · writes go through supabaseData (reliable token attachment → auth.uid() resolves),
  *     surface errors, and record the baseline only on SUCCESS so a failed save retries.
  */
@@ -27,36 +27,48 @@ export default function AccountPrefsSync() {
   const { chosen, setCurrency } = useCurrency();
 
   const scopeId = user?.id || "anon";
-  const hydratedRef = useRef(null);            // scope whose account prefs are applied
+  // STATE (not a ref) so the save effects re-run the MOMENT hydration finalizes — that's
+  // what lets a back-fill fire even when the selector value itself didn't change on load.
+  const [hydratedScope, setHydratedScope] = useState(null);
   const syncedMarketRef = useRef(undefined);   // market value currently persisted to the account
   const syncedCurrencyRef = useRef(undefined); // currency (ISO) currently persisted
 
   // Hydrate the account's selectors once its OWN profile has loaded. Account values
-  // override the per-browser localStorage; absent keys leave the local choice in place
-  // (and baseline = current value, so we don't save until the user actually changes it).
+  // override the per-browser localStorage; an absent key leaves the local choice in place.
   useEffect(() => {
     if (authLoading) return;
-    if (hydratedRef.current === scopeId) return;
-    if (!user) { hydratedRef.current = "anon"; return; }   // anon → localStorage only
+    if (hydratedScope === scopeId) return;
+    if (!user) { setHydratedScope("anon"); return; }   // anon → localStorage only
     const own = profile && profile.id === user.id ? profile : null;
-    if (!own) return;                                       // wait for THIS account's profile
+    if (!own) return;                                  // wait for THIS account's profile
     const prefs = own.ui_prefs && typeof own.ui_prefs === "object" ? own.ui_prefs : {};
 
-    if (typeof prefs.market === "string") setCountry(prefs.market);
-    syncedMarketRef.current = typeof prefs.market === "string" ? prefs.market : country;
+    if (typeof prefs.market === "string") {
+      setCountry(prefs.market);
+      syncedMarketRef.current = prefs.market;
+    } else {
+      // No account market yet. A non-default LOCAL choice back-fills (baseline left
+      // undefined → the effect saves it once); a plain default ("all") stays put
+      // (baseline = current value → no save, so a fresh device never pollutes the account).
+      syncedMarketRef.current = country === ALL_COUNTRIES ? country : undefined;
+    }
 
-    // Only explicit currency choices are synced (null = "follow the market", nothing to
-    // restore). Guards against writing the string "null" into localStorage via setCurrency.
-    if (typeof prefs.currency === "string") setCurrency(prefs.currency);
-    syncedCurrencyRef.current = typeof prefs.currency === "string" ? prefs.currency : chosen;
+    if (typeof prefs.currency === "string") {
+      setCurrency(prefs.currency);
+      syncedCurrencyRef.current = prefs.currency;
+    } else {
+      // No account currency: back-fill an explicit local choice; leave null (follow the
+      // market) untouched. setCurrency(null) would also write the string "null" locally.
+      syncedCurrencyRef.current = typeof chosen === "string" ? undefined : chosen;
+    }
 
-    hydratedRef.current = scopeId;
+    setHydratedScope(scopeId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, scopeId, user, profile]);
 
-  // Persist a market change to the account (debounced), once hydrated.
+  // Persist a market change (or a first-load back-fill) to the account, debounced.
   useEffect(() => {
-    if (scopeId === "anon" || hydratedRef.current !== scopeId) return;
+    if (scopeId === "anon" || hydratedScope !== scopeId) return;
     if (country === syncedMarketRef.current) return;   // unchanged / hydration echo
     const value = country;
     const t = setTimeout(() => {
@@ -66,11 +78,11 @@ export default function AccountPrefsSync() {
       );
     }, 500);
     return () => clearTimeout(t);
-  }, [country, scopeId]);
+  }, [country, hydratedScope, scopeId]);
 
-  // Persist a currency change to the account. Only real ISO choices are stored.
+  // Persist a currency change (or back-fill) to the account. Only real ISO choices stored.
   useEffect(() => {
-    if (scopeId === "anon" || hydratedRef.current !== scopeId) return;
+    if (scopeId === "anon" || hydratedScope !== scopeId) return;
     if (typeof chosen !== "string") return;            // null = follow market → nothing to store
     if (chosen === syncedCurrencyRef.current) return;  // unchanged / hydration echo
     const value = chosen;
@@ -81,7 +93,7 @@ export default function AccountPrefsSync() {
       );
     }, 500);
     return () => clearTimeout(t);
-  }, [chosen, scopeId]);
+  }, [chosen, hydratedScope, scopeId]);
 
   return null;
 }
