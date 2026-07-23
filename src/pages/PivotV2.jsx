@@ -4,7 +4,7 @@ import { useProjects, useFlatsArchive, useFlatsCurrent, useArchiveMonths, useArc
 import { useCountry, isAllCountries } from "../lib/useCountry";
 import { useCapabilities } from "../lib/useCapabilities";
 import { useAuth } from "../lib/useAuth";
-import { supabase } from "../lib/supabase";
+import { supabaseData } from "../lib/supabase";
 import { moneyFromEur, moneySymbol } from "../lib/money";
 import Picker from "../components/Picker";
 import { localeTag } from "../lib/locale";
@@ -1255,19 +1255,42 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   // hydrated account — never writing one account's state into another's slot during a
   // logout→login switch.
   const [hydratedScope, setHydratedScope] = useState(null);
-  const justAppliedRef = useRef(false);
-  const dbSaveTimer    = useRef(null);
+  // Serialized snapshot of what's currently persisted for this account — set on
+  // hydration and after each successful save. The save effect fires ONLY when the
+  // live setup diverges from this, so it never echoes the just-loaded value back,
+  // and (crucially) it keys off a STABLE string instead of the `user` object, whose
+  // per-render identity churn used to re-run the effect every render and cancel the
+  // debounce timer before it could fire — so no account's setup ever reached the DB
+  // (silently, for 3 weeks: the old code both never fired AND swallowed every error).
+  const lastSyncedRef = useRef(null);
   const scopeId = user?.id || "anon";
 
-  // Helper: apply a full prefs bundle to the live pivot state.
+  // Canonical bundle shape — used BOTH to apply prefs to state and to serialize the
+  // synced baseline, so the two always compare equal (key order is significant).
+  const normalizeBundle = (p) => ({
+    rows: p.rows ?? DEFAULT_ROWS,
+    cols: p.cols ?? DEFAULT_COLS,
+    values: p.values ?? DEFAULT_VALUES,
+    filters: p.filters ?? DEFAULT_FILTERS,
+    valueMode: p.valueMode ?? DEFAULT_VALUE_MODE,
+    dataBars: typeof p.dataBars === "boolean" ? p.dataBars : DEFAULT_DATA_BARS,
+    sort: p.sort ?? DEFAULT_SORT,
+  });
+  // A stable string that changes ONLY when the setup content changes. The persistence
+  // effects depend on this (not the individual state refs), so unrelated re-renders
+  // can't churn the debounce.
+  const payloadSer = useMemo(
+    () => JSON.stringify(normalizeBundle({ rows, cols, values, filters, valueMode, dataBars, sort })),
+    [rows, cols, values, filters, valueMode, dataBars, sort]
+  );
+
+  // Apply a full prefs bundle to the live pivot state AND record it as the synced
+  // baseline, so hydrating (or re-hydrating) never triggers a redundant save.
   const applyPrefs = (p) => {
-    setRows(p.rows ?? DEFAULT_ROWS);
-    setCols(p.cols ?? DEFAULT_COLS);
-    setValues(p.values ?? DEFAULT_VALUES);
-    setFilters(p.filters ?? DEFAULT_FILTERS);
-    setValueMode(p.valueMode ?? DEFAULT_VALUE_MODE);
-    setDataBars(typeof p.dataBars === "boolean" ? p.dataBars : DEFAULT_DATA_BARS);
-    setSort(p.sort ?? DEFAULT_SORT);
+    const b = normalizeBundle(p);
+    setRows(b.rows); setCols(b.cols); setValues(b.values); setFilters(b.filters);
+    setValueMode(b.valueMode); setDataBars(b.dataBars); setSort(b.sort);
+    lastSyncedRef.current = JSON.stringify(b);
   };
 
   useEffect(() => { purgeLegacyPivotState(); }, []);   // drop the pre-fix shared key once
@@ -1284,44 +1307,47 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
     if (hydratedScope === scopeId) return;   // already finalized for this account
 
     if (!user) {                             // anon → per-browser "anon" cache only
-      justAppliedRef.current = true;
       applyPrefs(loadPivotState("anon") || DEFAULT_BUNDLE);
       setHydratedScope("anon");
       return;
     }
     const ownProfile = profile && profile.id === user.id ? profile : null;
     if (!ownProfile) {                       // this account's profile not loaded yet
-      justAppliedRef.current = true;         // placeholder; do NOT finalize (saves stay off)
-      applyPrefs(loadPivotState(user.id) || DEFAULT_BUNDLE);
+      applyPrefs(loadPivotState(user.id) || DEFAULT_BUNDLE);  // placeholder; do NOT finalize
       return;
     }
     const dbPrefs = ownProfile.pivot_prefs ? sanitizePivotState(ownProfile.pivot_prefs) : null;
-    justAppliedRef.current = true;           // the apply below must not echo straight back to the DB
-    applyPrefs(dbPrefs || loadPivotState(user.id) || DEFAULT_BUNDLE);
+    applyPrefs(dbPrefs || loadPivotState(user.id) || DEFAULT_BUNDLE);  // sets the synced baseline
     setHydratedScope(scopeId);               // finalized → saving enabled for this account
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, scopeId, user, profile]);
 
-  // Persist on every change to the CURRENT account's localStorage key (or "anon") —
-  // ONLY once that account is fully hydrated, so we never write a placeholder / another
-  // account's state into this account's slot.
+  // Persist to this account's localStorage cache on every real change, once hydrated.
+  // Keyed on the STABLE payloadSer (not the churning `user` ref).
   useEffect(() => {
     if (hydratedScope !== scopeId) return;
-    savePivotState(user?.id, { rows, cols, values, filters, valueMode, dataBars, sort });
-  }, [hydratedScope, scopeId, user, rows, cols, values, filters, valueMode, dataBars, sort]);
+    savePivotState(scopeId === "anon" ? null : scopeId, JSON.parse(payloadSer));
+  }, [payloadSer, hydratedScope, scopeId]);
 
   // Persist to the ACCOUNT (debounced) so the same login shows the same setup on every
-  // device. Gated on the finalized current scope; anon users skip this (localStorage only).
+  // device. Fires ONLY on a real change (payloadSer diverges from the synced baseline),
+  // and its deps are stable strings — so a re-render can never cancel the debounce.
   useEffect(() => {
-    if (!user || hydratedScope !== scopeId) return;
-    if (justAppliedRef.current) { justAppliedRef.current = false; return; }
-    clearTimeout(dbSaveTimer.current);
-    const payload = { rows, cols, values, filters, valueMode, dataBars, sort };
-    dbSaveTimer.current = setTimeout(() => {
-      supabase.rpc("set_pivot_prefs", { p_prefs: payload }).catch(() => { /* offline / transient — localStorage still holds it */ });
-    }, 700);
-    return () => clearTimeout(dbSaveTimer.current);
-  }, [user, hydratedScope, scopeId, rows, cols, values, filters, valueMode, dataBars, sort]);
+    if (scopeId === "anon" || hydratedScope !== scopeId) return;
+    if (payloadSer === lastSyncedRef.current) return;   // unchanged / hydration echo → nothing to save
+    const toSave = payloadSer;
+    const t = setTimeout(() => {
+      // supabaseData reliably attaches the user's token (no getSession/lock dance), so
+      // auth.uid() always resolves and the row actually updates. Record the synced
+      // baseline only on SUCCESS — on failure we leave it so the next change retries,
+      // instead of silently losing the setup.
+      supabaseData.rpc("set_pivot_prefs", { p_prefs: JSON.parse(toSave) }).then(
+        ({ error }) => { if (error) console.warn("pivot prefs sync failed:", error.message); else lastSyncedRef.current = toSave; },
+        (e) => { console.warn("pivot prefs sync error:", e?.message || e); }
+      );
+    }, 600);
+    return () => clearTimeout(t);
+  }, [payloadSer, hydratedScope, scopeId]);
 
   // "Predvolené" → restore the opening layout. "Vyčistiť" → wipe rows/cols/values/
   // filters to a clean slate (no field-by-field removal). Both persist via the effect.
