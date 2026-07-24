@@ -27,6 +27,7 @@ import { useEffect, useRef, useState, useMemo } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useProjects } from "../lib/useData";
+import { useAccountPrefState } from "../lib/useAccountUiPref";
 import { useCountry } from "../lib/useCountry";
 import { useCurrency } from "../lib/useCurrency";
 import { moneyFromEur, moneySymbol } from "../lib/money";
@@ -175,6 +176,24 @@ export default function MapView({ lang = "en", setCurrent }) {
   const [showNoPrice, setShowNoPrice] = useState(true); // show projects without a price by default
   const [priceMin, setPriceMin] = useState("");
   const [priceMax, setPriceMax] = useState("");
+
+  // Remember the Map filters per-account, across devices.
+  useAccountPrefState(
+    "mapFilters",
+    { query, fCity, fDistrict, fDeveloper, fStatus, showSold, showNoPrice, priceMin, priceMax },
+    (s) => {
+      if (s.query !== undefined) setQuery(s.query);
+      if (s.fCity !== undefined) setFCity(s.fCity);
+      if (s.fDistrict !== undefined) setFDistrict(s.fDistrict);
+      if (s.fDeveloper !== undefined) setFDeveloper(s.fDeveloper);
+      if (s.fStatus !== undefined) setFStatus(s.fStatus);
+      if (typeof s.showSold === "boolean") setShowSold(s.showSold);
+      if (typeof s.showNoPrice === "boolean") setShowNoPrice(s.showNoPrice);
+      if (s.priceMin !== undefined) setPriceMin(s.priceMin);
+      if (s.priceMax !== undefined) setPriceMax(s.priceMax);
+    },
+  );
+
   const [showSuggest, setShowSuggest] = useState(false);
   const [activeIdx, setActiveIdx] = useState(-1);
   const searchWrapRef = useRef(null);

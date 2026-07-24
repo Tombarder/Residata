@@ -9,6 +9,7 @@ import { useCountry, isAllCountries } from "../lib/useCountry";
 import { useCurrency } from "../lib/useCurrency";
 import { moneyFromEur, moneySymbol } from "../lib/money";
 import { useUnitsInfinite, useAnalyticsRegistry, usePivotDistinct } from "../lib/useData";
+import { useAccountPrefState } from "../lib/useAccountUiPref";
 import LoadError from "../components/LoadError";
 import DateField from "../components/DateField";
 import { supabaseData } from "../lib/supabase";
@@ -135,6 +136,32 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
   const scrollRef = useRef(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [viewH, setViewH] = useState(560);
+
+  // Remember the Unit-database filters per-account, across devices.
+  useAccountPrefState(
+    "explorerFilters",
+    { mode, cols, fProject, fCity, fCast, fDev, fStav, pMin, pMax, m2Min, m2Max, xf, sort, search },
+    (s) => {
+      if (s.mode !== undefined) setMode(s.mode);
+      if (Array.isArray(s.cols)) setCols(s.cols);
+      if (s.fProject !== undefined) setFProject(s.fProject);
+      if (s.fCity !== undefined) setFCity(s.fCity);
+      if (s.fCast !== undefined) setFCast(s.fCast);
+      if (s.fDev !== undefined) setFDev(s.fDev);
+      if (s.fStav !== undefined) setFStav(s.fStav);
+      if (s.pMin !== undefined) setPMin(s.pMin);
+      if (s.pMax !== undefined) setPMax(s.pMax);
+      if (s.m2Min !== undefined) setM2Min(s.m2Min);
+      if (s.m2Max !== undefined) setM2Max(s.m2Max);
+      if (Array.isArray(s.xf)) {
+        setXf(s.xf);
+        const maxId = s.xf.reduce((m, r) => Math.max(m, Number(r?.id) || 0), 0);
+        if (xfId.current <= maxId) xfId.current = maxId + 1;   // keep new-row ids unique
+      }
+      if (s.sort && typeof s.sort === "object") setSort(s.sort);
+      if (s.search !== undefined) setSearch(s.search);
+    },
+  );
 
   // dropdown option lists follow the chosen scope (audit M4): in "História" they include
   // values that exist only historically (e.g. a now-sold-out project), not just current ones.

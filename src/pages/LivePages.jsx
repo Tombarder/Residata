@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
 import { useProjects, useProjectFlats, useProjectSnapshots, useMarketTotals, useTotalsList } from "../lib/useData";
+import { useAccountPrefState } from "../lib/useAccountUiPref";
 import { moneyFromEur, moneySymbol } from "../lib/money";
 import { localeTag } from "../lib/locale";
 import { daysUntil } from "../lib/dates";
@@ -159,6 +160,19 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
     sold_last_month:{ kind: "num",  get: p => p.sold_last_month },
   };
   const [sort, setSort] = useState({ key: "name", dir: "asc" });
+
+  // Remember the Projects filters (name/dev search + composable conditions + sort)
+  // per-account, across devices.
+  useAccountPrefState(
+    "projectsFilters",
+    { conditions, nameQuery, sort },
+    (s) => {
+      if (Array.isArray(s.conditions)) setConditions(s.conditions);
+      if (s.nameQuery !== undefined) setNameQuery(s.nameQuery);
+      if (s.sort && typeof s.sort === "object") setSort(s.sort);
+    },
+  );
+
   const onHeaderClick = (key) => {
     setSort(prev => prev.key === key
       ? { key, dir: prev.dir === "asc" ? "desc" : "asc" }

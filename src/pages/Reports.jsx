@@ -33,6 +33,7 @@ import Picker from "../components/Picker";
 import InfoTip from "../components/InfoTip";
 import { moneyFromEur, moneySymbol } from "../lib/money";
 import { localeTag } from "../lib/locale";
+import { useAccountPrefState } from "../lib/useAccountUiPref";
 import { useCurrency } from "../lib/useCurrency";
 import { useCountry, isAllCountries } from "../lib/useCountry";
 import { supabase, supabaseData } from "../lib/supabase";
@@ -96,6 +97,19 @@ export default function PlatformReports({ lang = "sk" }) {
   const [distPick, setDistPick]   = useState(null);
   const [projPick, setProjPick]   = useState(null);
   const [devPick,  setDevPick]    = useState(null);
+
+  // Remember the Report scope + entity picks per-account, across devices.
+  useAccountPrefState(
+    "reportsFilters",
+    { scope, cityPick, distPick, projPick, devPick },
+    (s) => {
+      if (s.scope !== undefined) setScope(s.scope);
+      if (s.cityPick !== undefined) setCityPick(s.cityPick);
+      if (s.distPick !== undefined) setDistPick(s.distPick);
+      if (s.projPick !== undefined) setProjPick(s.projPick);
+      if (s.devPick !== undefined) setDevPick(s.devPick);
+    },
+  );
 
   // Derive pickers from active set so the dropdowns don't list cities /
   // districts that only have paused / sold-out projects with no current

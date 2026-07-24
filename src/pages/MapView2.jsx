@@ -22,6 +22,7 @@ import { useEffect, useRef, useState, useMemo } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useProjects } from "../lib/useData";
+import { useAccountPrefState } from "../lib/useAccountUiPref";
 import { useCountry } from "../lib/useCountry";
 import { useCurrency } from "../lib/useCurrency";
 import { moneyFromEur, moneySymbol } from "../lib/money";
@@ -249,6 +250,24 @@ export default function MapView2({ lang = "en", setCurrent }) {
   const [pts, setPts] = useState([]);
   const [shape, setShape] = useState(null);
   const [corridorKm, setCorridorKm] = useState(0.4);
+
+  // Remember the Market-Radar view settings + filters per-account, across devices.
+  // (Transient state — draw tools, compare mode, viewport, saved areas — is excluded.)
+  useAccountPrefState(
+    "marketRadarFilters",
+    { lens, showSoldOut, showNoPrice, heatMode, conditions, radiusKm, corridorKm, nameQuery },
+    (s) => {
+      if (s.lens !== undefined) setLens(s.lens);
+      if (typeof s.showSoldOut === "boolean") setShowSoldOut(s.showSoldOut);
+      if (typeof s.showNoPrice === "boolean") setShowNoPrice(s.showNoPrice);
+      if (typeof s.heatMode === "boolean") setHeatMode(s.heatMode);
+      if (Array.isArray(s.conditions)) setConditions(s.conditions);
+      if (typeof s.radiusKm === "number") setRadiusKm(s.radiusKm);
+      if (typeof s.corridorKm === "number") setCorridorKm(s.corridorKm);
+      if (s.nameQuery !== undefined) setNameQuery(s.nameQuery);
+    },
+  );
+
   const [savedAreas, setSavedAreas] = useState(loadSavedAreas);
   const [showExplainer, setShowExplainer] = useState(() => { try { return localStorage.getItem("residata_map_explainer_hidden") !== "1"; } catch (_) { return true; } });
   const [saving, setSaving] = useState(false);   // inline "name this area" input open
