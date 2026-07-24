@@ -178,7 +178,9 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
 
   // Changing the city invalidates a previously-picked mestská časť (it belongs to the old
   // city), so clear it — otherwise the table would filter to an empty intersection.
+  const firstCityRun = useRef(true);
   useEffect(() => {
+    if (firstCityRun.current) { firstCityRun.current = false; return; }     // skip the mount run (don't consume the guard)
     if (hydratingCast.current) { hydratingCast.current = false; return; }   // keep a just-hydrated (city, časť) pair
     setFCast("");
   }, [fCity]);
