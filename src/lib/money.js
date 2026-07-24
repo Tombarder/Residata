@@ -30,3 +30,13 @@ export function moneyFromEur(eur) {
   if (!Number.isFinite(n)) return eur;
   return n * _money.unitsPerEur;
 }
+
+/** Inverse of moneyFromEur: convert a number typed in the current DISPLAY currency
+ *  back to EUR — for sending user-entered money thresholds to EUR-denominated columns
+ *  (e.g. the Sales detail price filters, which the DB stores in EUR). */
+export function moneyToEur(disp) {
+  if (disp == null) return disp;
+  const n = Number(disp);
+  if (!Number.isFinite(n)) return disp;
+  return _money.unitsPerEur ? n / _money.unitsPerEur : n;
+}

@@ -6,7 +6,7 @@
    Built for the comparable-projects pricing workflow (e.g. Nitra). */
 import { useState, useMemo } from "react";
 import { useCurrency } from "../lib/useCurrency";
-import { moneyFromEur, moneySymbol } from "../lib/money";
+import { moneyFromEur, moneySymbol, moneyToEur } from "../lib/money";
 import { useSales, usePivotDistinct } from "../lib/useData";
 import { useAccountPrefState } from "../lib/useAccountUiPref";
 import LoadError from "../components/LoadError";
@@ -39,6 +39,17 @@ const DETAIL_COLS_PIPE = [
   ["obytna_plocha", "Plocha", "Area", "area"], ["price_s_dph_eur", "Cena", "Price", "eur"],
   ["price_per_m2_eur", "€/m²", "€/m²", "per_m2"], ["kolaudacia_label", "Kolaudácia", "Completion", "text"],
 ];
+// Per-column FILTER kind for the detail-table column filters (server-side via
+// analytics_sales detail_filters). "cat" = in-list dropdown, "num" = min/max range,
+// "date" = from/to. Columns not listed here get no filter control.
+const COL_FILTER_KIND = {
+  sold_date: "date",
+  project_name: "cat", city: "cat", typ: "cat", detection_method: "cat", kolaudacia_label: "cat",
+  izby: "num", obytna_plocha: "num", price_s_dph_eur: "num", price_per_m2_eur: "num", days_on_market: "num",
+};
+// Money columns are stored in EUR but typed by the user in the DISPLAY currency → convert.
+const MONEY_COLS = new Set(["price_s_dph_eur", "price_per_m2_eur"]);
+
 // Per-column plain-language explainers (rendered as an "i" tooltip on the header),
 // for the columns whose meaning / calculation isn't self-evident. Same voice as the
 // Dashboard metric explainers. Keyed by column key.
@@ -98,11 +109,14 @@ export default function SalesView({ lang = "sk" }) {
   const [sort, setSort] = useState({ key: "sold_date", dir: "desc" });
   const [projSearch, setProjSearch] = useState("");
   const [projOpen, setProjOpen] = useState(false);
+  // Per-column filters on the detail table. Shape per column: "cat" → string value;
+  // "num" → { min, max } (display-currency strings for money cols); "date" → { from, to }.
+  const [colFilters, setColFilters] = useState({});
 
   // Remember the Sales filters per-account, across devices (localStorage + ui_prefs).
   useAccountPrefState(
     "salesFilters",
-    { status, days, customFrom, customTo, market, durableOnly, projects, fCity, fDev, fTyp, groupBy, sort },
+    { status, days, customFrom, customTo, market, durableOnly, projects, fCity, fDev, fTyp, groupBy, sort, colFilters },
     (s) => {
       if (s.status !== undefined) setStatus(s.status);
       if (s.days !== undefined) setDays(s.days);
@@ -116,6 +130,7 @@ export default function SalesView({ lang = "sk" }) {
       if (s.fTyp !== undefined) setFTyp(s.fTyp);
       if (s.groupBy !== undefined) setGroupBy(s.groupBy);
       if (s.sort && typeof s.sort === "object") setSort(s.sort);
+      if (s.colFilters && typeof s.colFilters === "object") setColFilters(s.colFilters);
     },
   );
 
@@ -144,10 +159,40 @@ export default function SalesView({ lang = "sk" }) {
   const detailColSpan = detailCols.filter((c) => c[3] !== "hide").length; // full-row cells must span the ACTUAL visible column count (varies sold vs pipeline)
   const SORTABLE = isPipe ? ["price_s_dph_eur", "price_per_m2_eur", "izby", "obytna_plocha", "city", "project_name"]
                           : ["sold_date", "price_s_dph_eur", "price_per_m2_eur", "days_on_market", "izby", "obytna_plocha", "city", "project_name"];
+  // ── detail-table per-column filters → server-side `detail_filters` ──
+  // Only columns VISIBLE in the current mode are applied (sold vs pipeline differ), so a
+  // dormant sold-only filter (e.g. signal) doesn't silently narrow the pipeline view —
+  // and it's preserved for when the user switches back. Money thresholds are typed in the
+  // display currency → converted to EUR (curSym is a dep so they re-convert on a switch).
+  const curSym = moneySymbol();
+  const visibleColKeys = useMemo(() => new Set(detailCols.filter((c) => c[3] !== "hide").map((c) => c[0])), [detailCols]);
+  const detailFilters = useMemo(() => {
+    const out = {};
+    for (const [key, val] of Object.entries(colFilters)) {
+      const kind = COL_FILTER_KIND[key];
+      if (!kind || val == null || !visibleColKeys.has(key)) continue;
+      if (kind === "cat") {
+        if (val) out[key] = { values: [val] };
+      } else if (kind === "num") {
+        const conv = MONEY_COLS.has(key) ? (x) => moneyToEur(Number(x)) : (x) => Number(x);
+        const o = {};
+        if (val.min != null && val.min !== "" && !Number.isNaN(Number(val.min))) o.min = conv(val.min);
+        if (val.max != null && val.max !== "" && !Number.isNaN(Number(val.max))) o.max = conv(val.max);
+        if ("min" in o || "max" in o) out[key] = o;
+      } else if (kind === "date") {
+        const o = {};
+        if (val.from) o.from = val.from;
+        if (val.to) o.to = val.to;
+        if ("from" in o || "to" in o) out[key] = o;
+      }
+    }
+    return out;
+  }, [colFilters, visibleColKeys, curSym]); // eslint-disable-line -- curSym: re-convert money thresholds on currency switch
+
   const common = { status, date_from, date_to, durable_only: durableOnly, filters: baseFilters };
   const summarySpec = useMemo(() => ({ ...common, mode: "summary" }), [JSON.stringify(common)]);       // eslint-disable-line
   const breakdownSpec = useMemo(() => ({ ...common, mode: "breakdown", group_by: groupBy }), [JSON.stringify(common), groupBy]); // eslint-disable-line
-  const detailSpec = useMemo(() => ({ ...common, mode: "detail", sort: [effSort], limit: DETAIL_LIMIT }), [JSON.stringify(common), JSON.stringify(effSort)]); // eslint-disable-line
+  const detailSpec = useMemo(() => ({ ...common, mode: "detail", sort: [effSort], limit: DETAIL_LIMIT, detail_filters: detailFilters }), [JSON.stringify(common), JSON.stringify(effSort), JSON.stringify(detailFilters)]); // eslint-disable-line
 
   const sum = useSales({ enabled: true, spec: summarySpec });
   const brk = useSales({ enabled: true, spec: breakdownSpec });
@@ -165,6 +210,28 @@ export default function SalesView({ lang = "sk" }) {
   const clearFilters = () => { setProjects([]); setFCity(""); setFDev(""); setFTyp(""); setMarket(""); };
   const activeFilters = projects.length + [market, fCity, fDev, fTyp].filter(Boolean).length;
   const toggleSort = (k) => setSort((s) => (s.key === k ? { key: k, dir: s.dir === "asc" ? "desc" : "asc" } : { key: k, dir: "desc" }));
+
+  // ── detail-table column-filter helpers ──
+  const setColCat = (key, v) => setColFilters((f) => { const n = { ...f }; if (v) n[key] = v; else delete n[key]; return n; });
+  const setColBound = (key, bound, v) => setColFilters((f) => {
+    const cur = (f[key] && typeof f[key] === "object") ? f[key] : {};
+    const nv = { ...cur, [bound]: v };
+    const empty = ["min", "max", "from", "to"].every((b) => (nv[b] ?? "") === "");
+    const n = { ...f };
+    if (empty) delete n[key]; else n[key] = nv;
+    return n;
+  });
+  const clearColFilters = () => setColFilters({});
+  const activeColCount = Object.keys(detailFilters).length;
+  const colOptions = (key) => {
+    const plain = (arr) => (arr || []).map((v) => ({ value: v, label: v }));
+    if (key === "city") return plain(cityOpts.values);
+    if (key === "typ") return plain(typOpts.values);
+    if (key === "project_name") return plain(projOpts.values);
+    if (key === "detection_method") return [{ value: "marked", label: t("označené", "marked") }, { value: "disappeared", label: t("zmizol", "delisted") }];
+    if (key === "kolaudacia_label") return plain(Array.from(new Set(detRows.map((r) => r.kolaudacia_label).filter(Boolean))).sort());
+    return [];
+  };
 
   const projFiltered = (projOpts.values || []).filter((v) => !projSearch || v.toLowerCase().includes(projSearch.toLowerCase()));
 
@@ -191,6 +258,8 @@ export default function SalesView({ lang = "sk" }) {
 
   const sel = { background: bg, border: `1px solid ${border}`, color: text, borderRadius: 5, padding: "0.4rem 0.55rem", fontSize: "0.78rem", fontFamily: "inherit", outline: "none" };
   const card = { background: "var(--surface)", border: `1px solid ${border}`, borderRadius: 8, padding: "0.85rem 1rem" };
+  // compact control for the per-column detail filters
+  const fInput = { background: bg, border: `1px solid ${border}`, color: text, borderRadius: 4, padding: "0.18rem 0.3rem", fontSize: "0.68rem", fontFamily: "inherit", outline: "none", boxSizing: "border-box" };
   // colour-coded stat card: metric colour as a left-accent bar + faint wash (theme-aware; keeps "var(--surface)" so the light-mode shadow still applies)
   // Calm, uniform cards: one brand-accent bar on every card (no per-metric
   // rainbow), matching the Dashboard market-overview strip. The `color` args are
@@ -363,8 +432,18 @@ export default function SalesView({ lang = "sk" }) {
       {/* detail: the exact units */}
       <div style={card}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem", flexWrap: "wrap", gap: "0.5rem" }}>
-          <span style={kpiLbl}><span style={{ display: "inline-block", width: 3, height: 12, borderRadius: 2, background: "var(--accent)", marginRight: "0.5rem", verticalAlign: "middle" }} />{t("Konkrétne byty", "The exact units")}{detRows.length ? ` · ${detRows.length}${detHasMore ? "+" : ""}` : ""}</span>
-          <button onClick={exportCsv} disabled={!detRows.length} style={{ ...sel, cursor: detRows.length ? "pointer" : "default", color: detRows.length ? "#04130d" : dim, background: detRows.length ? green : bg, borderColor: detRows.length ? green : border, fontFamily: mono, fontSize: "0.72rem", fontWeight: 700 }}>⬇ CSV</button>
+          <span style={kpiLbl}><span style={{ display: "inline-block", width: 3, height: 12, borderRadius: 2, background: "var(--accent)", marginRight: "0.5rem", verticalAlign: "middle" }} />{t("Konkrétne byty", "The exact units")}{detRows.length ? ` · ${detRows.length}${detHasMore ? "+" : ""}` : ""}
+            <span style={{ marginLeft: 5, display: "inline-block", verticalAlign: "middle" }}><InfoTip label={t("Filtre stĺpcov", "Column filters")} text={t("Filtre pod hlavičkou tabuľky zúžia TENTO zoznam bytov (na serveri, cez celý výber — nie len zobrazených 500). Súhrny a rozpad hore ostávajú za celé zvolené obdobie.", "The filters under the table header narrow THIS list of units (server-side, across the whole selection — not just the 500 shown). The totals and breakdown above stay for the full selected period.")} /></span>
+          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+            {activeColCount > 0 && (
+              <button onClick={clearColFilters} title={t("Zrušiť filtre stĺpcov", "Clear column filters")}
+                style={{ ...sel, cursor: "pointer", color: orange, borderColor: orange, fontFamily: mono, fontSize: "0.68rem", fontWeight: 700 }}>
+                ✕ {t("Filtre", "Filters")} ({activeColCount})
+              </button>
+            )}
+            <button onClick={exportCsv} disabled={!detRows.length} style={{ ...sel, cursor: detRows.length ? "pointer" : "default", color: detRows.length ? "#04130d" : dim, background: detRows.length ? green : bg, borderColor: detRows.length ? green : border, fontFamily: mono, fontSize: "0.72rem", fontWeight: 700 }}>⬇ CSV</button>
+          </div>
         </div>
         <div style={{ overflowX: "auto", maxHeight: "60vh", overflowY: "auto" }}>
           <table style={{ borderCollapse: "separate", borderSpacing: 0, width: "100%", fontSize: "0.78rem", minWidth: 820 }}>
@@ -377,6 +456,39 @@ export default function SalesView({ lang = "sk" }) {
                     style={{ padding: "0.45rem 0.6rem", textAlign: numeric ? "right" : "left", borderBottom: `1px solid ${border}`, color: sort.key === c[0] ? green : "var(--text-2)", cursor: sortable ? "pointer" : "default", fontFamily: mono, fontSize: "0.64rem", textTransform: "uppercase", letterSpacing: "0.03em", whiteSpace: "nowrap", userSelect: "none" }}>
                     {c[3] === "per_m2" ? `${moneySymbol()}/m²` : t(c[1], c[2])}{effSort.key === c[0] ? (effSort.dir === "asc" ? " ▲" : " ▼") : ""}
                     {COL_INFO[c[0]] && <span style={{ marginLeft: 5, display: "inline-block", verticalAlign: "middle" }}><InfoTip text={t(COL_INFO[c[0]].sk, COL_INFO[c[0]].en)} label={t(c[1], c[2])} /></span>}
+                  </th>
+                );
+              })}
+            </tr>
+            {/* per-column filter row (server-side; narrows THIS list, not the totals above) */}
+            <tr>
+              {detailCols.filter((c) => c[3] !== "hide").map((c) => {
+                const kind = COL_FILTER_KIND[c[0]];
+                const money = MONEY_COLS.has(c[0]);
+                const cur = colFilters[c[0]];
+                return (
+                  <th key={c[0]} style={{ padding: "0.2rem 0.4rem 0.35rem", borderBottom: `1px solid ${border}`, background: "var(--surface-2)", verticalAlign: "top", fontWeight: 400 }}>
+                    {kind === "cat" && (
+                      <select value={typeof cur === "string" ? cur : ""} onChange={(e) => setColCat(c[0], e.target.value)}
+                        aria-label={t(c[1], c[2])} style={{ ...fInput, width: "100%", cursor: "pointer", color: cur ? green : "var(--text-2)" }}>
+                        <option value="">{t("Všetky", "All")}</option>
+                        {colOptions(c[0]).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      </select>
+                    )}
+                    {kind === "num" && (
+                      <div style={{ display: "flex", gap: 3, justifyContent: "flex-end" }}>
+                        <input type="number" inputMode="numeric" placeholder={money ? `${t("od", "min")} ${curSym}` : t("od", "min")} value={cur?.min ?? ""}
+                          aria-label={`${t(c[1], c[2])} ${t("od", "min")}`} onChange={(e) => setColBound(c[0], "min", e.target.value)} style={{ ...fInput, width: 60, textAlign: "right" }} />
+                        <input type="number" inputMode="numeric" placeholder={t("do", "max")} value={cur?.max ?? ""}
+                          aria-label={`${t(c[1], c[2])} ${t("do", "max")}`} onChange={(e) => setColBound(c[0], "max", e.target.value)} style={{ ...fInput, width: 60, textAlign: "right" }} />
+                      </div>
+                    )}
+                    {kind === "date" && (
+                      <div style={{ display: "flex", gap: 3 }}>
+                        <input type="date" value={cur?.from ?? ""} aria-label={`${t(c[1], c[2])} ${t("od", "from")}`} onChange={(e) => setColBound(c[0], "from", e.target.value)} style={{ ...fInput, width: 116 }} />
+                        <input type="date" value={cur?.to ?? ""} aria-label={`${t(c[1], c[2])} ${t("do", "to")}`} onChange={(e) => setColBound(c[0], "to", e.target.value)} style={{ ...fInput, width: 116 }} />
+                      </div>
+                    )}
                   </th>
                 );
               })}
