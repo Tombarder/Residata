@@ -1724,6 +1724,14 @@ function ComparableTransactionsReport({ projects, lang }) {
   );
   const [districtPick, setDistrictPick] = useState("__all__");
   const [roomPick, setRoomPick] = useState("__all__");
+  useAccountPrefState(
+    "reportsComparables",
+    { districtPick, roomPick },
+    (s) => {
+      if (s.districtPick !== undefined) setDistrictPick(s.districtPick);
+      if (s.roomPick !== undefined) setRoomPick(s.roomPick);
+    },
+  );
 
   const filtered = useMemo(() => {
     return soldFlats.filter(f => {

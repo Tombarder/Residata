@@ -137,6 +137,9 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
   const [scrollTop, setScrollTop] = useState(0);
   const [viewH, setViewH] = useState(560);
 
+  // The [fCity] effect below clears fCast (a časť belongs to a city). On hydration we're
+  // restoring a VALID (city, časť) pair, so signal that one clear to be skipped.
+  const hydratingCast = useRef(false);
   // Remember the Unit-database filters per-account, across devices.
   useAccountPrefState(
     "explorerFilters",
@@ -145,7 +148,7 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
       if (s.mode !== undefined) setMode(s.mode);
       if (Array.isArray(s.cols)) setCols(s.cols);
       if (s.fProject !== undefined) setFProject(s.fProject);
-      if (s.fCity !== undefined) setFCity(s.fCity);
+      if (s.fCity !== undefined) { if (s.fCast) hydratingCast.current = true; setFCity(s.fCity); }
       if (s.fCast !== undefined) setFCast(s.fCast);
       if (s.fDev !== undefined) setFDev(s.fDev);
       if (s.fStav !== undefined) setFStav(s.fStav);
@@ -175,7 +178,10 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
 
   // Changing the city invalidates a previously-picked mestská časť (it belongs to the old
   // city), so clear it — otherwise the table would filter to an empty intersection.
-  useEffect(() => { setFCast(""); }, [fCity]);
+  useEffect(() => {
+    if (hydratingCast.current) { hydratingCast.current = false; return; }   // keep a just-hydrated (city, časť) pair
+    setFCast("");
+  }, [fCity]);
 
   // fields available to the generic "+ filter" picker: everything EXCEPT the ones already
   // driven by a dedicated quick control (so no confusing double-filter on the same field).

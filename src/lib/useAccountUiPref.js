@@ -3,6 +3,27 @@ import { useAuth } from "./useAuth";
 import { supabaseData } from "./supabase";
 
 /**
+ * useAccountHydrated — a ref that is `false` until this account's prefs have had a chance
+ * to hydrate (profile loaded + a short settle), then `true`. Anon → `true` immediately.
+ *
+ * Use it to GATE side-effects that must not fire for the initial account-driven hydration
+ * — e.g. "when the market changes, reset the map filters": that reset should run for a
+ * USER market switch, but NOT for the account-market value being restored on load (which
+ * would wipe the just-hydrated filters on a fresh device).
+ */
+export function useAccountHydrated() {
+  const { user, profile } = useAuth();
+  const ready = useRef(false);
+  useEffect(() => {
+    if (!user) { ready.current = true; return; }        // anon → no account hydration to wait for
+    if (!profile) return;                               // wait for THIS account's profile
+    const id = setTimeout(() => { ready.current = true; }, 800);   // let market + filters land
+    return () => clearTimeout(id);
+  }, [user, profile]);
+  return ready;
+}
+
+/**
  * useAccountUiPref — sync ONE string preference to the user's account (ui_prefs[key])
  * so it follows the login across devices, reusing the robust pattern proven for the
  * pivot / market / currency sync:

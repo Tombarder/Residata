@@ -39,6 +39,7 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import Picker from "../components/Picker";
 import { useProjects, useUnitSummaries, useUnitHistories, useUnitSearch, useProjectUnitsSeries, useArchiveMonths } from "../lib/useData";
+import { useAccountPrefState } from "../lib/useAccountUiPref";
 import { useCapabilities } from "../lib/useCapabilities";
 import { track } from "../lib/track";
 import { localeTag } from "../lib/locale";
@@ -192,6 +193,18 @@ export default function UnitTracker({ lang = "sk", setCurrent }) {
   const [projFilter, setProjFilter] = useState(null); // selected project (picker + mini-grid)
   const [search, setSearch] = useState("");           // unit / project search text
   const [yMode, setYMode] = useState("total");        // chart Y-axis: total price vs €/m²
+
+  // Remember the Unit-timeline selection + filters per-account, across devices.
+  useAccountPrefState(
+    "unitTimeline",
+    { pickedKeys, projFilter, search, yMode },
+    (s) => {
+      if (Array.isArray(s.pickedKeys)) setPickedKeys(s.pickedKeys);
+      if (s.projFilter !== undefined) setProjFilter(s.projFilter);
+      if (s.search !== undefined) setSearch(s.search);
+      if (s.yMode !== undefined) setYMode(s.yMode);
+    },
+  );
 
   const togglePick = (key) => {
     setPickedKeys(prev => {

@@ -22,7 +22,7 @@ import { useEffect, useRef, useState, useMemo } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useProjects } from "../lib/useData";
-import { useAccountPrefState } from "../lib/useAccountUiPref";
+import { useAccountPrefState, useAccountHydrated } from "../lib/useAccountUiPref";
 import { useCountry } from "../lib/useCountry";
 import { useCurrency } from "../lib/useCurrency";
 import { moneyFromEur, moneySymbol } from "../lib/money";
@@ -193,6 +193,7 @@ function showProjectPopup(map, lngLat, props, handlers, popupRef, sk = false) {
 export default function MapView2({ lang = "en", setCurrent }) {
   const { projects, loading, dataCountry } = useProjects();
   const { country } = useCountry();
+  const acctReady = useAccountHydrated();   // false until account prefs hydrate (gates the market-switch reset)
   useCurrency(); // subscribe so €/m² readouts re-render in the selected currency
   const sk = lang === "sk";
 
@@ -748,6 +749,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
   const firstCountry = useRef(true);
   useEffect(() => {
     if (firstCountry.current) { firstCountry.current = false; return; }
+    if (!acctReady.current) return;   // ignore the initial account-market hydration (don't wipe restored filters)
     setConditions([]); setNameQuery(""); setAnalysisCenter(null); setAnchorId(null); setExtSet(null); setShape(null); setPts([]); setDrawTool(null);
   }, [country]);
 

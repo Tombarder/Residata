@@ -27,7 +27,7 @@ import { useEffect, useRef, useState, useMemo } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useProjects } from "../lib/useData";
-import { useAccountPrefState } from "../lib/useAccountUiPref";
+import { useAccountPrefState, useAccountHydrated } from "../lib/useAccountUiPref";
 import { useCountry } from "../lib/useCountry";
 import { useCurrency } from "../lib/useCurrency";
 import { moneyFromEur, moneySymbol } from "../lib/money";
@@ -453,9 +453,13 @@ export default function MapView({ lang = "en", setCurrent }) {
   }, [fCity, fDistrict, fDeveloper, fStatus, showSold, showNoPrice, priceMin, priceMax]);
 
   // ── Country switch: filters are country-scoped, so reset them ──
+  // BUT not for the account-market value being restored on load (that would wipe the
+  // just-hydrated map filters on a fresh device) — only for a real USER market switch.
+  const acctReady = useAccountHydrated();
   const firstCountry = useRef(true);
   useEffect(() => {
     if (firstCountry.current) { firstCountry.current = false; return; }
+    if (!acctReady.current) return;   // ignore the initial account-market hydration
     setQuery(""); setFCity(""); setFDistrict(""); setFDeveloper("");
     setFStatus("all"); setShowSold(false); setShowNoPrice(true); setPriceMin(""); setPriceMax(""); setShowSuggest(false); setActiveIdx(-1);
     // Drop any popup left open from the previous country's pins.

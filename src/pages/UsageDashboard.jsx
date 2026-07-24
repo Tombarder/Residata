@@ -10,6 +10,7 @@
 // active vs churned — plus a per-user drill-down timeline (what/where/how long).
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabaseData } from "../lib/supabase";
+import { useAccountPrefState } from "../lib/useAccountUiPref";
 import Picker from "../components/Picker";
 import InfoTip from "../components/InfoTip";
 import { accent as green, accentInk, dim, text, border, surface as bg, surfaceDark as bg2 } from "../lib/theme";
@@ -96,6 +97,7 @@ export default function UsageDashboard({ lang = "en" }) {
   const L = (sk, en) => (lang === "sk" ? sk : en);
   const num = (v) => fmtN(v, lang);   // locale follows the UI language
   const [days, setDays] = useState(30);
+  useAccountPrefState("usageDays", { days }, (s) => { if (typeof s.days === "number") setDays(s.days); });
   const [summary, setSummary] = useState(null);
   const [daily, setDaily] = useState([]);
   const [features, setFeatures] = useState([]);
