@@ -165,4 +165,18 @@ export function useAccountPrefState(key, snapshot, apply) {
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serialized, hydratedScope, scopeId]);
+
+  // Flush a pending change on UNMOUNT (navigate away) so a quick change-then-leave isn't
+  // dropped from the account — localStorage already has it, but the debounced DB write's
+  // timer gets cleared on unmount before it fires. Only writes when there's a real unsaved
+  // change for the current, hydrated account.
+  const flushRef = useRef(null);
+  flushRef.current = { serialized, scopeId, hydratedScope };
+  useEffect(() => () => {
+    const f = flushRef.current;
+    if (!f || f.scopeId === "anon" || f.hydratedScope !== f.scopeId || f.serialized === lastSyncedRef.current) return;
+    lastSyncedRef.current = f.serialized;
+    supabaseData.rpc("set_ui_pref", { p_key: key, p_value: JSON.parse(f.serialized) }).then(() => {}, () => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
 }
