@@ -13,6 +13,7 @@
  */
 import { Component, useState, useEffect, useRef, lazy, Suspense } from "react";
 import { useAuth } from "../lib/useAuth";
+import { useAccountUiPref } from "../lib/useAccountUiPref";
 import { useCapabilities } from "../lib/useCapabilities";
 import PendingGate from "../components/PendingGate";
 import Picker from "../components/Picker";
@@ -1721,8 +1722,11 @@ function PlatformExports({ lang, setCurrent }) {
   // streaming. Disables the export button + shows a row counter so users
   // know the click did something even for large exports.
   const [exportProgress, setExportProgress] = useState(null);
-  // Download format for the two dataset buttons: "csv" | "xlsx".
+  // Download format for the two dataset buttons: "csv" | "xlsx". Remembered per-account
+  // across devices — a standing preference (which file type you export), unlike the
+  // snapshot day which sensibly defaults to the latest each session.
   const [xfmt, setXfmt] = useState("csv");
+  useAccountUiPref("exportFormat", xfmt, (v) => { if (v === "csv" || v === "xlsx") setXfmt(v); }, { defaultValue: "csv" });
 
   useEffect(() => {
     let cancelled = false;

@@ -165,11 +165,12 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
   // per-account, across devices.
   useAccountPrefState(
     "projectsFilters",
-    { conditions, nameQuery, sort },
+    { conditions, nameQuery, sort, showHistorical },
     (s) => {
       if (Array.isArray(s.conditions)) setConditions(s.conditions);
       if (s.nameQuery !== undefined) setNameQuery(s.nameQuery);
       if (s.sort && typeof s.sort === "object") setSort(s.sort);
+      if (typeof s.showHistorical === "boolean") setShowHistorical(s.showHistorical);
     },
   );
 

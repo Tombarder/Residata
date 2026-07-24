@@ -4,6 +4,7 @@ import { useProjects, useFlatsArchive, useFlatsCurrent, useArchiveMonths, useArc
 import { useCountry, isAllCountries } from "../lib/useCountry";
 import { useCapabilities } from "../lib/useCapabilities";
 import { useAuth } from "../lib/useAuth";
+import { useAccountPrefState } from "../lib/useAccountUiPref";
 import { supabaseData } from "../lib/supabase";
 import { moneyFromEur, moneySymbol } from "../lib/money";
 import Picker from "../components/Picker";
@@ -3334,6 +3335,19 @@ function PivotChart({ tree, rowFields, colFields: _colFields, effectiveValues, o
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (valueIdx >= effectiveValues.length) setValueIdx(0);
   }, [effectiveValues.length, valueIdx]);
+
+  // Persist the chart's view choices (type / which measure / folded) per-account,
+  // across devices — alongside the pivot config itself. A stale valueIdx that points
+  // past the current values is harmlessly re-clamped to 0 by the effect above.
+  useAccountPrefState(
+    "pivotChart",
+    { chartType, valueIdx, collapsed },
+    (s) => {
+      if (typeof s.chartType === "string") setChartType(s.chartType);
+      if (typeof s.valueIdx === "number") setValueIdx(s.valueIdx);
+      if (typeof s.collapsed === "boolean") setCollapsed(s.collapsed);
+    },
+  );
 
   // Top-level rows = the first row dimension's groups. The chart is
   // intentionally one level deep — nested rollups would need a tree-
