@@ -1356,6 +1356,18 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
     return () => clearTimeout(t);
   }, [payloadSer, hydratedScope, scopeId]);
 
+  // Flush a pending change on UNMOUNT (navigating away from Analytics) so a quick
+  // change-then-leave isn't dropped from the account — the debounced write's timer is
+  // cleared on unmount before it fires. Only writes a real unsaved change.
+  const pivotFlushRef = useRef(null);
+  pivotFlushRef.current = { payloadSer, scopeId, hydratedScope };
+  useEffect(() => () => {
+    const f = pivotFlushRef.current;
+    if (!f || f.scopeId === "anon" || f.hydratedScope !== f.scopeId || f.payloadSer === lastSyncedRef.current) return;
+    lastSyncedRef.current = f.payloadSer;
+    supabaseData.rpc("set_pivot_prefs", { p_prefs: JSON.parse(f.payloadSer) }).then(() => {}, () => {});
+  }, []);
+
   // "Predvolené" → restore the opening layout. "Vyčistiť" → wipe rows/cols/values/
   // filters to a clean slate (no field-by-field removal). Both persist via the effect.
   const resetToDefault = () => {
