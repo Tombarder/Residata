@@ -33,6 +33,7 @@ import { PrivacyPage, ImprintPage, TermsPage } from "./pages/LegalPages";
 import CookieBanner from "./components/CookieBanner";
 import { useAuth } from "./lib/useAuth";
 import { useCapabilities } from "./lib/useCapabilities";
+import { useAccountUiPref } from "./lib/useAccountUiPref";
 import { useCountry } from "./lib/useCountry";
 import { useMarketTotals } from "./lib/useData";
 import { pushRoute, pathToPage, isAppPage, pageToPath } from "./lib/routing";
@@ -1836,6 +1837,10 @@ export default function App() {
     setLangRaw(newLang);
     try { window.localStorage.setItem(LANG_STORAGE_KEY, newLang); } catch (_) {}
   };
+  // Language follows the ACCOUNT across devices too (logged-in users). localStorage stays
+  // the per-browser cache; the account is the cross-device source of truth. Anon visitors
+  // keep browser-detected language (the hook never writes for them).
+  useAccountUiPref("language", lang, setLang);
   const [loginOpen, setLoginOpen] = useState(false);
   // Country-aware marketing copy: base t[lang], with per-country overrides for
   // market-named strings (hero / value prop). SK returns t[lang] unchanged.

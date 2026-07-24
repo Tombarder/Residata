@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { useAuth } from "./useAuth";
 import { useCountry, ALL_COUNTRIES } from "./useCountry";
 import { useCurrency } from "./useCurrency";
+import { useThemeMode, setTheme } from "./theme-mode";
+import { useAccountUiPref } from "./useAccountUiPref";
 import { supabaseData } from "./supabase";
 
 /**
@@ -27,6 +29,12 @@ export default function AccountPrefsSync() {
   const { chosen, setCurrency } = useCurrency();
 
   const scopeId = user?.id || "anon";
+
+  // Theme (light/dark) is a global preference too — sync it via the shared hook. Default
+  // is "dark", so only an explicit "light" gets back-filled from a device that had it.
+  const [themeMode] = useThemeMode();
+  useAccountUiPref("theme", themeMode, setTheme, { defaultValue: "dark" });
+
   // STATE (not a ref) so the save effects re-run the MOMENT hydration finalizes — that's
   // what lets a back-fill fire even when the selector value itself didn't change on load.
   const [hydratedScope, setHydratedScope] = useState(null);
