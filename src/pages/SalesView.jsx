@@ -8,6 +8,7 @@ import { useState, useMemo } from "react";
 import { useCurrency } from "../lib/useCurrency";
 import { moneyFromEur, moneySymbol } from "../lib/money";
 import { useSales, usePivotDistinct } from "../lib/useData";
+import { useAccountPrefState } from "../lib/useAccountUiPref";
 import LoadError from "../components/LoadError";
 import Picker from "../components/Picker";
 import InfoTip from "../components/InfoTip";
@@ -97,6 +98,26 @@ export default function SalesView({ lang = "sk" }) {
   const [sort, setSort] = useState({ key: "sold_date", dir: "desc" });
   const [projSearch, setProjSearch] = useState("");
   const [projOpen, setProjOpen] = useState(false);
+
+  // Remember the Sales filters per-account, across devices (localStorage + ui_prefs).
+  useAccountPrefState(
+    "salesFilters",
+    { status, days, customFrom, customTo, market, durableOnly, projects, fCity, fDev, fTyp, groupBy, sort },
+    (s) => {
+      if (s.status !== undefined) setStatus(s.status);
+      if (s.days !== undefined) setDays(s.days);
+      if (s.customFrom !== undefined) setCustomFrom(s.customFrom);
+      if (s.customTo !== undefined) setCustomTo(s.customTo);
+      if (s.market !== undefined) setMarket(s.market);
+      if (typeof s.durableOnly === "boolean") setDurableOnly(s.durableOnly);
+      if (Array.isArray(s.projects)) setProjects(s.projects);
+      if (s.fCity !== undefined) setFCity(s.fCity);
+      if (s.fDev !== undefined) setFDev(s.fDev);
+      if (s.fTyp !== undefined) setFTyp(s.fTyp);
+      if (s.groupBy !== undefined) setGroupBy(s.groupBy);
+      if (s.sort && typeof s.sort === "object") setSort(s.sort);
+    },
+  );
 
   const date_from = customFrom || isoDaysAgo(days);
   const date_to = customTo || isoToday();
