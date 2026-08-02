@@ -13,7 +13,7 @@
 
 **Effective date:** TO BE FILLED
 **Controller:** Residata (sole trader / s.r.o. — whichever entity)
-**Contact:** residata@proton.me
+**Contact:** info@residata.eu
 
 ## 1. What data we collect
 
@@ -93,7 +93,7 @@ Clauses with our US sub-processors (Vercel, Anthropic, Google).
 ## 6. Your rights (GDPR Art. 15-22)
 
 - **Access**: request a copy of everything we store about you — email
-  residata@proton.me. We respond within 30 days.
+  info@residata.eu. We respond within 30 days.
 - **Correction**: fix inaccurate data through the profile settings or
   by emailing us.
 - **Deletion** ("right to be forgotten"): email us from the account

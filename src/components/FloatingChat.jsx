@@ -379,7 +379,7 @@ export function LimitBanner({ error, lang, compact, onSignIn, onBilling }) {
           </button>
         )}
         {action === "contact" && (
-          <a href="mailto:residata@proton.me" style={{ ...ctaBtn("var(--bg)", green, "var(--bg)"), textDecoration: "none", display: "inline-block" }}>
+          <a href="mailto:info@residata.eu" style={{ ...ctaBtn("var(--bg)", green, "var(--bg)"), textDecoration: "none", display: "inline-block" }}>
             {L("Napíš Residata", "Contact Residata")}
           </a>
         )}

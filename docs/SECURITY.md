@@ -369,7 +369,7 @@ If you suspect a breach:
 5. **Notify affected users within 72 hours** (GDPR requirement).
 6. **Write a retrospective**: add findings to this doc's change log.
 
-Contact: residata@proton.me
+Contact: info@residata.eu
 
 ---
 

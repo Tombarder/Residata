@@ -472,7 +472,7 @@ export function ImprintPage({ lang }) {
       <Section title={isSK ? "Kontakt" : "Contact"}>
         <p>
           {isSK ? "E-mail (všeobecný kontakt):" : "Email (general):"} {" "}
-          <a href="mailto:residata@proton.me" style={{ color: "var(--accent)" }}>residata@proton.me</a><br />
+          <a href="mailto:info@residata.eu" style={{ color: "var(--accent)" }}>info@residata.eu</a><br />
           {isSK ? "E-mail (ochrana osobných údajov):" : "Email (privacy matters):"} {" "}
           <a href="mailto:tkamhal@gmail.com" style={{ color: "var(--accent)" }}>tkamhal@gmail.com</a><br />
           {isSK ? "Telefón:" : "Phone:"} {" "}

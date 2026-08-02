@@ -92,7 +92,7 @@ export const liveT = {
     analytics_label: "Analytics",
     analytics_title: "Trends & insights",
     analytics_desc: "Price trends over time, district heat maps, data export, and monthly reports.",
-    analytics_placeholder: "Detailed charts and trend analytics — questions? email residata@proton.me",
+    analytics_placeholder: "Detailed charts and trend analytics — questions? email info@residata.eu",
 
     // Admin
     admin_label: "Admin",
@@ -245,7 +245,7 @@ export const liveT = {
     analytics_label: "Analytics",
     analytics_title: "Trendy a insights",
     analytics_desc: "Grafy cien v čase, heat mapy okresov, export dát a mesačné reporty.",
-    analytics_placeholder: "Detailné grafy a trend analytika — otázky? napíš na residata@proton.me",
+    analytics_placeholder: "Detailné grafy a trend analytika — otázky? napíš na info@residata.eu",
 
     admin_label: "Admin",
     admin_title: "Správa tier-ov užívateľov",

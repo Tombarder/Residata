@@ -1453,8 +1453,8 @@ function FooterCard({ lang }) {
       </div>
       <p style={{ color: "var(--text-2)", fontSize: "0.82rem", lineHeight: 1.6, margin: 0 }}>
         {lang === "sk"
-          ? "Potrebuješ špecifický uhol (časová rada, porovnanie dvoch projektov, e-mail report)? Napíš na residata@proton.me — vieme pridať."
-          : "Need a specific angle (time series, side-by-side, email report)? Email residata@proton.me."}
+          ? "Potrebuješ špecifický uhol (časová rada, porovnanie dvoch projektov, e-mail report)? Napíš na info@residata.eu — vieme pridať."
+          : "Need a specific angle (time series, side-by-side, email report)? Email info@residata.eu."}
       </p>
     </div>
   );

@@ -737,7 +737,7 @@ function Footer({ lang = "en", setCurrent }) {
       }}>
         <span style={{ fontSize: "0.78rem", color: "#8a8a96" }}>© {new Date().getFullYear()} Residata · Krasovského 13, Bratislava</span>
         <div style={{ display: "flex", gap: "1.5rem", flexWrap: "wrap" }}>
-          <a href="mailto:residata@proton.me" style={linkStyle}>residata@proton.me</a>
+          <a href="mailto:info@residata.eu" style={linkStyle}>info@residata.eu</a>
           <a href="tel:+421911963909" style={linkStyle}>+421 911 963 909</a>
         </div>
       </div>
@@ -1732,11 +1732,11 @@ function ContactPage({ l }) {
 
             {/* Contact methods */}
             <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-              <a href="mailto:residata@proton.me" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: "1rem", color: "#e8e8ed", transition: "color 0.2s" }}
+              <a href="mailto:info@residata.eu" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: "1rem", color: "#e8e8ed", transition: "color 0.2s" }}
                 onMouseEnter={e => e.currentTarget.style.color = "var(--accent)"}
                 onMouseLeave={e => e.currentTarget.style.color = "#e8e8ed"}>
                 <span style={{ fontFamily: mono, fontSize: "0.8rem", color: "var(--accent)", width: 20, textAlign: "center", flexShrink: 0 }}>@</span>
-                <span style={{ fontSize: "0.92rem" }}>residata@proton.me</span>
+                <span style={{ fontSize: "0.92rem" }}>info@residata.eu</span>
               </a>
 
               <a href="tel:+421911963909" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: "1rem", color: "#e8e8ed", transition: "color 0.2s" }}

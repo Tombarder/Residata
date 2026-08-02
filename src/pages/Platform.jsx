@@ -1012,7 +1012,7 @@ function PlatformBilling({ lang, setCurrent }) {
       await openBillingPortal(); // opens Stripe portal in a new tab
     } catch (e) {
       setPayErr(e?.status === 400
-        ? (lang === "sk" ? "Online správa nie je dostupná pre tento účet — napíš nám na residata@proton.me." : "Online management isn't available for this account — email residata@proton.me.")
+        ? (lang === "sk" ? "Online správa nie je dostupná pre tento účet — napíš nám na info@residata.eu." : "Online management isn't available for this account — email info@residata.eu.")
         : (lang === "sk" ? "Nepodarilo sa otvoriť správu predplatného." : "Couldn't open billing management."));
     } finally {
       setPayBusy(false);
@@ -1316,8 +1316,8 @@ function SubscriptionCard({ lang, paused, paidWindowActive, paidUntil, paidStart
 
       <p style={{ color: dim, fontSize: "0.78rem", lineHeight: 1.55, margin: "1rem 0 0", fontFamily: mono }}>
         {lang === "sk"
-          ? <>Faktúry, zmena obdobia, zrušenie — spravuj cez <strong style={{ color: "var(--text-2)" }}>Spravovať platbu</strong> alebo napíš na <a href="mailto:residata@proton.me" style={{ color: accentInk }}>residata@proton.me</a>.</>
-          : <>Invoices, period changes, cancellation — use <strong style={{ color: "var(--text-2)" }}>Manage billing</strong> above, or email <a href="mailto:residata@proton.me" style={{ color: accentInk }}>residata@proton.me</a>.</>}
+          ? <>Faktúry, zmena obdobia, zrušenie — spravuj cez <strong style={{ color: "var(--text-2)" }}>Spravovať platbu</strong> alebo napíš na <a href="mailto:info@residata.eu" style={{ color: accentInk }}>info@residata.eu</a>.</>
+          : <>Invoices, period changes, cancellation — use <strong style={{ color: "var(--text-2)" }}>Manage billing</strong> above, or email <a href="mailto:info@residata.eu" style={{ color: accentInk }}>info@residata.eu</a>.</>}
       </p>
     </div>
   );
@@ -2027,7 +2027,7 @@ function PlatformExports({ lang, setCurrent }) {
           {lang === "sk"
             ? "Celý dataset je dostupný cez REST API. Kým si prihlásený, tvoja session autorizuje čítanie — ideálne na rýchly pull alebo do notebooku. Pre automatizovaný server-to-server prístup (stály API kľúč) napíš na "
             : "The full dataset is available over a REST API. While you're signed in, your session authorizes reads — handy for a quick pull or a notebook. For automated server-to-server access (a permanent API key), email "}
-          <a href="mailto:residata@proton.me" style={{ color: accentInk }}>residata@proton.me</a>.
+          <a href="mailto:info@residata.eu" style={{ color: accentInk }}>info@residata.eu</a>.
         </p>
         <CopyField label={lang === "sk" ? "Endpoint" : "Endpoint"} value={`${SUPABASE_URL || "https://mtclsrswxtjseewyrcbx.supabase.co"}/rest/v1/projects`} lang={lang} />
         <CopyField label={lang === "sk" ? "apikey (verejný)" : "apikey (public)"} value={SUPABASE_ANON_KEY || ""} lang={lang} />
