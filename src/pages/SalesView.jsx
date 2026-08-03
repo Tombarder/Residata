@@ -8,11 +8,13 @@ import { useState, useMemo } from "react";
 import { useCurrency } from "../lib/useCurrency";
 import { moneyFromEur, moneySymbol, moneyToEur } from "../lib/money";
 import { useSales, usePivotDistinct } from "../lib/useData";
+import { useCountry, isAllCountries } from "../lib/useCountry";
 import { useAccountPrefState } from "../lib/useAccountUiPref";
 import LoadError from "../components/LoadError";
 import Picker from "../components/Picker";
 import InfoTip from "../components/InfoTip";
 import DateField from "../components/DateField";
+import CountrySwitcher from "../components/CountrySwitcher";
 import { accent as green, orange, dim, border, bg, surfacePanel as panelHi, text } from "../lib/theme";
 
 const panel = "var(--surface-2)";
@@ -93,13 +95,13 @@ function fmtCell(kind, v) {
 export default function SalesView({ lang = "sk" }) {
   const t = (sk, en) => (lang === "sk" ? sk : en);
   useCurrency();
+  const { country } = useCountry();   // global market switcher (left dock) — single source of truth
 
   const [status, setStatus] = useState("sold");
   const isPipe = status !== "sold";
   const [days, setDays] = useState(45);
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
-  const [market, setMarket] = useState("");      // '' = all | 'sk' | 'cz'
   const [durableOnly, setDurableOnly] = useState(true);
   const [projects, setProjects] = useState([]);  // selected project_name[]
   const [fCity, setFCity] = useState("");
@@ -116,13 +118,12 @@ export default function SalesView({ lang = "sk" }) {
   // Remember the Sales filters per-account, across devices (localStorage + ui_prefs).
   useAccountPrefState(
     "salesFilters",
-    { status, days, customFrom, customTo, market, durableOnly, projects, fCity, fDev, fTyp, groupBy, sort, colFilters },
+    { status, days, customFrom, customTo, durableOnly, projects, fCity, fDev, fTyp, groupBy, sort, colFilters },
     (s) => {
       if (s.status !== undefined) setStatus(s.status);
       if (s.days !== undefined) setDays(s.days);
       if (s.customFrom !== undefined) setCustomFrom(s.customFrom);
       if (s.customTo !== undefined) setCustomTo(s.customTo);
-      if (s.market !== undefined) setMarket(s.market);
       if (typeof s.durableOnly === "boolean") setDurableOnly(s.durableOnly);
       if (Array.isArray(s.projects)) setProjects(s.projects);
       if (s.fCity !== undefined) setFCity(s.fCity);
@@ -145,13 +146,15 @@ export default function SalesView({ lang = "sk" }) {
 
   const baseFilters = useMemo(() => {
     const f = {};
-    if (market) f.market_key = [market];
+    // Global country → market_key. Country codes are 'SK'/'CZ'; the sale facts
+    // key markets lowercase ('sk'/'cz'). 'all' drops the filter (every market).
+    if (!isAllCountries(country)) f.market_key = [country.toLowerCase()];
     if (projects.length) f.project_name = projects;
     if (fCity) f.city = [fCity];
     if (fDev) f.developer = [fDev];
     if (fTyp) f.typ = [fTyp];
     return f;
-  }, [market, projects, fCity, fDev, fTyp]);
+  }, [country, projects, fCity, fDev, fTyp]);
 
   // sale-only sort keys are invalid for the current-pipeline views → fall back to price
   const effSort = isPipe && (sort.key === "sold_date" || sort.key === "days_on_market") ? { key: "price_s_dph_eur", dir: "desc" } : sort;
@@ -207,8 +210,8 @@ export default function SalesView({ lang = "sk" }) {
   const detRows = detHasMore ? _detRaw.slice(0, DETAIL_LIMIT) : _detRaw;
 
   const toggleProject = (name) => setProjects((p) => p.includes(name) ? p.filter((x) => x !== name) : [...p, name]);
-  const clearFilters = () => { setProjects([]); setFCity(""); setFDev(""); setFTyp(""); setMarket(""); };
-  const activeFilters = projects.length + [market, fCity, fDev, fTyp].filter(Boolean).length;
+  const clearFilters = () => { setProjects([]); setFCity(""); setFDev(""); setFTyp(""); };
+  const activeFilters = projects.length + [fCity, fDev, fTyp].filter(Boolean).length;
   const toggleSort = (k) => setSort((s) => (s.key === k ? { key: k, dir: s.dir === "asc" ? "desc" : "asc" } : { key: k, dir: "desc" }));
 
   // ── detail-table column-filter helpers ──
@@ -320,14 +323,6 @@ export default function SalesView({ lang = "sk" }) {
             <DateField value={customTo} onChange={(e) => setCustomTo(e.target.value)} width={140} title={t("do", "to")} />
           </>
         )}
-        <div style={{ display: "inline-flex", border: `1px solid ${border}`, borderRadius: 7, overflow: "hidden", marginLeft: "0.3rem" }}>
-          {[["", "Všetky trhy", "All"], ["sk", "SK", "SK"], ["cz", "CZ", "CZ"]].map(([m, sk, en]) => (
-            <button key={m || "all"} onClick={() => setMarket(m)}
-              style={{ border: "none", padding: "0.4rem 0.7rem", cursor: "pointer", fontFamily: mono, fontSize: "0.7rem", background: market === m ? green : "transparent", color: market === m ? "#04130d" : dim, fontWeight: market === m ? 700 : 500 }}>
-              {t(sk, en)}
-            </button>
-          ))}
-        </div>
         {!isPipe && (
           <label style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem", fontSize: "0.76rem", color: dim, cursor: "pointer", marginLeft: "auto" }} title={t("Zarátaj len predaje ktoré zostali predané (vylúč tie čo sa vrátili na trh)", "Count only sales that stayed sold (exclude fall-throughs)")}>
             <input type="checkbox" checked={durableOnly} onChange={(e) => setDurableOnly(e.target.checked)} />
@@ -339,6 +334,11 @@ export default function SalesView({ lang = "sk" }) {
       {/* filters: projects multi-select + city/dev/typ */}
       <div style={{ ...card, marginBottom: "0.6rem", display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center", position: "relative" }}>
         <span style={{ ...kpiLbl, margin: 0, marginRight: "0.1rem" }}>{t("Filtre", "Filters")}{activeFilters ? ` · ${activeFilters}` : ""}</span>
+        {/* Country / market — the shared global switcher (same state as the left dock).
+            Scopes the sold/reserved facts AND every option list to SK / CZ / All, so the
+            sidebar switcher now filters Sales like every other page. Renders nothing while
+            only one market is active. */}
+        <CountrySwitcher lang={lang} />
         {/* project multi-select */}
         <div style={{ position: "relative" }}>
           <button onClick={() => setProjOpen((o) => !o)} style={{ ...sel, cursor: "pointer", minWidth: 150, textAlign: "left", color: projects.length ? text : dim }}>
