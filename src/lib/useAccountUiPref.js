@@ -171,7 +171,9 @@ export function useAccountPrefState(key, snapshot, apply) {
   // timer gets cleared on unmount before it fires. Only writes when there's a real unsaved
   // change for the current, hydrated account.
   const flushRef = useRef(null);
-  flushRef.current = { serialized, scopeId, hydratedScope };
+  // Keep the ref current from an effect (not during render — react-hooks/refs),
+  // so the unmount-only flush below reads the latest committed values.
+  useEffect(() => { flushRef.current = { serialized, scopeId, hydratedScope }; });
   useEffect(() => () => {
     const f = flushRef.current;
     if (!f || f.scopeId === "anon" || f.hydratedScope !== f.scopeId || f.serialized === lastSyncedRef.current) return;

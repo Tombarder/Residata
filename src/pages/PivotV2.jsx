@@ -1361,7 +1361,9 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   // change-then-leave isn't dropped from the account — the debounced write's timer is
   // cleared on unmount before it fires. Only writes a real unsaved change.
   const pivotFlushRef = useRef(null);
-  pivotFlushRef.current = { payloadSer, scopeId, hydratedScope };
+  // Keep the ref current from an effect (not during render — react-hooks/refs),
+  // so the unmount-only flush below reads the latest committed values.
+  useEffect(() => { pivotFlushRef.current = { payloadSer, scopeId, hydratedScope }; });
   useEffect(() => () => {
     const f = pivotFlushRef.current;
     if (!f || f.scopeId === "anon" || f.hydratedScope !== f.scopeId || f.payloadSer === lastSyncedRef.current) return;

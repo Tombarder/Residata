@@ -66,11 +66,11 @@ export function dateSortKey(value) {
 
 // A string that is ENTIRELY a number (optional sign, digits, spaces as thousands,
 // one decimal separator). "1.0" ✓  "-1" ✓  "2 939" ✓  "2026-05" ✗  "1Q 2026" ✗.
-const NUM_RE = /^-?\d[\d  ]*(?:[.,]\d+)?$/;
+const NUM_RE = /^-?\d[\d \u00A0]*(?:[.,]\d+)?$/;
 function toNumber(value) {
   const s = String(value == null ? "" : value).trim();
   if (!NUM_RE.test(s)) return NaN;
-  const cleaned = s.replace(/[  ]/g, "").replace(",", ".");
+  const cleaned = s.replace(/[ \u00A0]/g, "").replace(",", ".");
   const n = Number(cleaned);
   return Number.isFinite(n) ? n : NaN;
 }
