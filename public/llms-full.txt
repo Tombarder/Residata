@@ -38,7 +38,6 @@ Petržalka (4 projects, 4,956 units, €5,103/m² avg), Ružinov (21 projects, 2
 ## Data delivery
 
 - CSV / XLSX exports (any daily snapshot)
-- REST API access (paid tier)
 - Live dashboard, analytics/pivot, and unit-level explorer
 - AI assistant that answers questions over the dataset
 
@@ -55,7 +54,7 @@ auto-scraped projects in all the public dashboards.
 
 ## Pricing
 
-- Monthly ongoing access: €79.99 / month (summer early-access price; regular €349.99)
+- Monthly ongoing access: €349.99 / month (early-access price; regular €479.99)
 
 ## Where to find this
 

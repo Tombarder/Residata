@@ -348,8 +348,8 @@ export function TermsPage({ lang }) {
   // DB-driven price (public.pricing_config) so a price change in the admin
   // editor propagates here too; falls back to the launch price if not loaded.
   const pricing = usePricing(lang);
-  const priceStr = pricing.priceDisplay || "€79.99";
-  const anchorStr = pricing.ready ? pricing.anchorDisplay : "€349.99";
+  const priceStr = pricing.priceDisplay || "€349.99";
+  const anchorStr = pricing.ready ? pricing.anchorDisplay : "€479.99";
 
   useDocumentTitle(
     isSK ? "Obchodné podmienky · Residata" : "Terms of Service · Residata",

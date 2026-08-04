@@ -952,7 +952,7 @@ function PlatformBilling({ lang, setCurrent }) {
           paidActive, paidPaused, paidWindowActive, paidDaysLeft, paidUntil, paidStartedAt } = caps;
   const { profile } = useAuth();
   const pricing = usePricing(lang);   // DB-driven price (falls back to defaults below)
-  const priceDisplay = pricing.priceDisplay || "€79.99";
+  const priceDisplay = pricing.priceDisplay || "€349.99";
   const anchorDisplay = pricing.ready ? pricing.anchorDisplay : "€349.99";
 
   // Display logic — the "effective" tier (badge shown) and the
@@ -1942,10 +1942,10 @@ function PlatformExports({ lang, setCurrent }) {
   return (
     <div style={{ padding: "2rem 2rem 4rem", maxWidth: 820, margin: "0 auto" }}>
       <PageHero
-        eyebrow={lang === "sk" ? "CSV / API" : "CSV / API"}
+        eyebrow={lang === "sk" ? "CSV / Excel" : "CSV / Excel"}
         subtitle={lang === "sk"
-          ? "Vyber si dátum snapshotu a stiahni dataset ako CSV, alebo ho ťahaj cez REST API do tvojho stacku."
-          : "Pick a snapshot date and download the dataset as CSV, or pull it via the REST API straight into your stack."}
+          ? "Vyber si dátum snapshotu a stiahni dataset ako CSV alebo Excel (.xlsx)."
+          : "Pick a snapshot date and download the dataset as CSV or Excel (.xlsx)."}
       />
 
       {/* Snapshot-date picker — always visible; trial users can browse dates too. */}
