@@ -1,9 +1,14 @@
-// One-time LIVE-mode billing setup.
+// One-time LIVE-mode billing setup (product + webhook). Already run — kept as a
+// record / for re-creating the webhook if ever needed.
 //
 // Your LIVE secret key stays in YOUR terminal — it is never shared with Claude
-// or committed anywhere. This script just uses it to create the live product,
-// the €49.99/mo price, and the live webhook, then prints the 3 values to paste
-// into Vercel.
+// or committed anywhere. This script creates the live product, a placeholder
+// price, and the live webhook, then prints values for Vercel.
+//
+// ⚠️ The price this creates is NOT the live subscription price. The live price
+// is DB-driven (public.pricing_config, edited in the admin Pricing editor) and
+// checkout builds the charge from it via inline price_data — STRIPE_PRICE_ID is
+// NOT read at runtime. To change the price, use the admin editor, not a script.
 //
 // Usage (from the residata-frontend folder):
 //   STRIPE_SECRET_KEY=sk_live_xxxxxxxx node scripts/setup_stripe_live.mjs
