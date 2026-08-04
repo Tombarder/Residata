@@ -58,18 +58,20 @@ export default async function handler(req, res) {
   if (pErr) {
     return res.status(500).json({ error: `profile fetch failed: ${pErr.message}` });
   }
-  if (!callerProfile || callerProfile.tier !== "admin") {
-    return res.status(403).json({ error: "not admin" });
-  }
-
   // ── Parse body ──
   const body = typeof req.body === "string" ? (req.body ? JSON.parse(req.body) : {}) : (req.body || {});
   const targetId = body.user_id;
   if (!targetId) {
     return res.status(400).json({ error: "missing user_id in body" });
   }
-  if (targetId === callerId) {
-    return res.status(400).json({ error: "refusing to delete yourself" });
+  // Authorization: a user may delete THEIR OWN account (GDPR right to erasure /
+  // self-service DSAR from Settings); an admin may delete anyone. Deleting
+  // someone ELSE requires admin. (Kept in this one function so we don't add a
+  // new Vercel serverless function — the Hobby plan is at its 12-function cap.)
+  const isSelfDelete = targetId === callerId;
+  const isAdmin = !!callerProfile && callerProfile.tier === "admin";
+  if (!isSelfDelete && !isAdmin) {
+    return res.status(403).json({ error: "not admin" });
   }
 
   // ── Capture target details BEFORE deletion for the audit log ──
@@ -98,7 +100,7 @@ export default async function handler(req, res) {
     await sb.from("admin_audit_log").insert({
       actor_id:    callerId,
       actor_email: actorEmail,
-      action:      "delete_user",
+      action:      isSelfDelete ? "self_delete_user" : "delete_user",
       target_id:   targetId,
       payload:     targetProfile || null,
       ip:          clientIp,

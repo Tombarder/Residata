@@ -1325,7 +1325,63 @@ function SubscriptionCard({ lang, paused, paidWindowActive, paidUntil, paidStart
 
 // ─── Settings page ──────────────────────────────────────────────
 function PlatformSettings({ lang }) {
-  const { user, profile, setProfile } = useAuth();
+  const { user, profile, setProfile, signOut } = useAuth();
+  // GDPR self-service (DSAR): export own data + delete own account.
+  const [danger, setDanger] = useState(false);
+  const [dbusy, setDbusy] = useState(false);
+  const [dmsg, setDmsg] = useState(null);
+
+  const exportMyData = () => {
+    setDmsg(null);
+    try {
+      const payload = {
+        exported_at: new Date().toISOString(),
+        account: {
+          id: user?.id, email: user?.email,
+          full_name: profile?.full_name ?? null, company: profile?.company ?? null,
+          position: profile?.position ?? null, phone: profile?.phone ?? null,
+          linkedin_url: profile?.linkedin_url ?? null,
+          tier: profile?.tier ?? null, created_at: profile?.created_at ?? null,
+          paid_until: profile?.paid_until ?? null, trial_until: profile?.trial_until ?? null,
+        },
+        note: "This export contains the personal data held in your Residata account profile. For any additional processing records (e.g. usage logs) or questions, contact info@residata.eu.",
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `residata-my-data-${(user?.email || "account").replace(/[^a-z0-9]+/gi, "_")}.json`;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+      track("data_export");
+      setDmsg({ type: "ok", text: lang === "sk" ? "Stiahnuté ✓" : "Downloaded ✓" });
+      setTimeout(() => setDmsg(null), 2500);
+    } catch (e) {
+      setDmsg({ type: "err", text: String(e.message || e) });
+    }
+  };
+
+  const deleteMyAccount = async () => {
+    setDbusy(true); setDmsg(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) throw new Error(lang === "sk" ? "Relácia vypršala — obnov stránku a prihlás sa." : "Session expired — reload and sign in.");
+      const res = await fetch("/api/admin/delete-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ user_id: user.id }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+      track("account_deleted");
+      // Account (auth user + profile) is gone — tear down the session + hard reload.
+      if (signOut) await signOut(); else window.location.assign("/");
+    } catch (e) {
+      setDbusy(false);
+      setDmsg({ type: "err", text: String(e.message || e) });
+    }
+  };
   const [form, setForm] = useState({
     full_name: profile?.full_name || "",
     company:   profile?.company || "",
@@ -1468,6 +1524,49 @@ function PlatformSettings({ lang }) {
         {profile?.created_at && <div>{lang === "sk" ? "Účet vytvorený" : "Member since"}: {new Date(profile.created_at).toLocaleString(localeTag(lang), { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Bratislava" })}</div>}
         <div>{lang === "sk" ? "Plán" : "Plan"}: {profile?.tier || "—"}</div>
         {profile?.position && <div>{lang === "sk" ? "Pozícia" : "Position"}: {profile.position}</div>}
+      </div>
+
+      {/* GDPR — self-service data access + erasure (DSAR) */}
+      <div style={{ marginTop: "1.25rem", padding: "1.25rem 1.5rem", background: bg2, border: `1px solid ${border}`, borderRadius: 12 }}>
+        <h3 style={{ fontSize: "0.95rem", fontWeight: 700, margin: "0 0 0.35rem", color: "var(--text)" }}>
+          {lang === "sk" ? "Údaje a súkromie" : "Data & privacy"}
+        </h3>
+        <p style={{ fontSize: "0.78rem", color: dim, margin: "0 0 1rem", lineHeight: 1.5 }}>
+          {lang === "sk"
+            ? "Stiahni si kópiu svojich osobných údajov, alebo natrvalo zmaž svoj účet a údaje (GDPR)."
+            : "Download a copy of your personal data, or permanently delete your account and data (GDPR)."}
+        </p>
+        <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center" }}>
+          <button type="button" onClick={exportMyData}
+            style={{ background: "transparent", color: "var(--text)", border: `1px solid ${border}`, borderRadius: 6, padding: "0.5rem 1rem", fontSize: "0.82rem", cursor: "pointer" }}>
+            {lang === "sk" ? "Stiahnuť moje údaje" : "Export my data"}
+          </button>
+          {!danger ? (
+            <button type="button" onClick={() => { setDanger(true); setDmsg(null); }}
+              style={{ background: "transparent", color: "#ff6b6b", border: "1px solid #ff6b6b55", borderRadius: 6, padding: "0.5rem 1rem", fontSize: "0.82rem", cursor: "pointer" }}>
+              {lang === "sk" ? "Zmazať účet" : "Delete account"}
+            </button>
+          ) : (
+            <span style={{ display: "inline-flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+              <span style={{ fontSize: "0.78rem", color: "#ff6b6b" }}>
+                {lang === "sk" ? "Naozaj? Toto je nevratné." : "Are you sure? This is irreversible."}
+              </span>
+              <button type="button" disabled={dbusy} onClick={deleteMyAccount}
+                style={{ background: "#ff6b6b", color: "#1a0b0b", border: "none", borderRadius: 6, padding: "0.5rem 1rem", fontSize: "0.82rem", fontWeight: 600, cursor: dbusy ? "default" : "pointer", opacity: dbusy ? 0.6 : 1 }}>
+                {dbusy ? (lang === "sk" ? "Mažem…" : "Deleting…") : (lang === "sk" ? "Áno, zmazať navždy" : "Yes, delete forever")}
+              </button>
+              <button type="button" onClick={() => setDanger(false)}
+                style={{ background: "transparent", color: dim, border: `1px solid ${border}`, borderRadius: 6, padding: "0.5rem 1rem", fontSize: "0.82rem", cursor: "pointer" }}>
+                {lang === "sk" ? "Zrušiť" : "Cancel"}
+              </button>
+            </span>
+          )}
+        </div>
+        {dmsg && (
+          <div style={{ fontSize: "0.8rem", marginTop: "0.7rem", color: dmsg.type === "ok" ? green : "#ff6b6b" }}>
+            {dmsg.text}
+          </div>
+        )}
       </div>
     </div>
   );
