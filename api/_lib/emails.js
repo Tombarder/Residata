@@ -316,18 +316,42 @@ export function feedbackReceiptHtml(fb, webUrl, lang = "sk", convId = null) {
 }
 
 // ──────────────────────────────────────────────────────────
-// SMTP send helper (Gmail)
-// ──────────────────────────────────────────────────────────
-export async function sendEmail({ to, subject, html, from, gmailUser, gmailPassword }) {
+// SMTP send helper — env-driven so outbound can send AS a domain address
+// (info@residata.eu) for FREE, without a paid mailbox. Two free paths, both
+// work with zero further code changes — just set env vars:
+//
+//   (a) Gmail "send mail as" alias — quickest, no new account/DNS:
+//         SMTP_USER = <your real gmail>       (SMTP login; keep GMAIL_APP_PASSWORD)
+//         SMTP_PASS = <that gmail app pwd>
+//         MAIL_FROM = info@residata.eu        (a verified send-as alias in Gmail)
+//       Gmail signs it; deliverability is good, not domain-DKIM-aligned.
+//
+//   (b) Free transactional provider (Resend/Brevo/…) with domain SPF+DKIM —
+//       best inbox placement, the proper long-term setup:
+//         SMTP_HOST = smtp.resend.com   SMTP_PORT = 465
+//         SMTP_USER = resend            SMTP_PASS = <api key>
+//         MAIL_FROM = info@residata.eu  (after adding residata.eu SPF/DKIM DNS)
+//
+// KEY FIX: the From address is now DECOUPLED from the SMTP login — previously
+// `from || gmailUser` forced From = the authenticating account, so sending as
+// info@ required info@ to BE the Gmail account. Falls back to the legacy Gmail
+// params passed by callers, so nothing breaks before the env is configured.
+export async function sendEmail({ to, subject, html, from, gmailUser, gmailPassword, replyTo }) {
+  const host = process.env.SMTP_HOST || "smtp.gmail.com";
+  const port = Number(process.env.SMTP_PORT || 465);
+  const user = process.env.SMTP_USER || gmailUser;          // SMTP LOGIN (auth) — the real account
+  const pass = process.env.SMTP_PASS || gmailPassword;
+  const fromAddr = process.env.MAIL_FROM || from || user;   // visible From — independent of the login
   const transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 465,
-    secure: true,
-    auth: { user: gmailUser, pass: gmailPassword },
+    host,
+    port,
+    secure: port === 465,   // 465 = implicit TLS; 587 = STARTTLS (provider-dependent)
+    auth: { user, pass },
   });
   await transporter.sendMail({
-    from: `Residata <${from || gmailUser}>`,
+    from: `Residata <${fromAddr}>`,
     to,
+    ...(replyTo ? { replyTo } : {}),
     subject,
     html,
   });
