@@ -100,3 +100,18 @@ export function usePricingConfig() {
 
 /** Force a re-read (call after the admin saves a new price). */
 export function refreshPricing() { return refresh(); }
+
+/**
+ * Current price display strings for NON-hook consumers (e.g. SEO meta in
+ * seo.js). Reads the live CONFIG or the synchronous localStorage cache so it's
+ * correct for returning visitors on first paint; falls back to the launch price
+ * only if neither is available. Kicks a background refresh so it self-heals.
+ */
+export function currentPriceStrings() {
+  if (!netLoaded && !CONFIG) refresh();
+  const c = CONFIG || readCache();
+  return {
+    price: formatEurCents(c?.monthly_price_cents) || "€349.99",
+    anchor: (c && c.anchor_price_cents != null ? formatEurCents(c.anchor_price_cents) : null) || "€479.99",
+  };
+}

@@ -40,6 +40,13 @@ function residataIndexHtmlContent() {
         __SCHEMA_TOTAL_PROJECTS__:         data.total_projects         != null ? Number(data.total_projects).toLocaleString('en-US')         : '60+',
         __SCHEMA_TOTAL_PROJECTS_TRACKED__: data.total_projects_tracked != null ? Number(data.total_projects_tracked).toLocaleString('en-US') : (data.total_projects != null ? Number(data.total_projects).toLocaleString('en-US') : '60+'),
         __SCHEMA_MONTH_LABEL__:            data.month_label            || 'the latest snapshot',
+        // Subscription price from public.pricing_config (single source of truth,
+        // edited in the admin Pricing editor). Injected at build so index.html's
+        // JSON-LD Offer + FAQ follow the editor per deploy. Fallback = current
+        // launch price if build-data is absent.
+        __SCHEMA_MONTHLY_PRICE__:          data.monthly_price          || '€349.99',
+        __SCHEMA_MONTHLY_PRICE_NUM__:      data.monthly_price_num      || '349.99',
+        __SCHEMA_ANCHOR_PRICE__:           data.anchor_price           || '€479.99',
         // PERF Step 2: the FULL build-time snapshot, injected as JSON into an
         // inline <script> so window.__RESIDATA_SNAPSHOT__ exists before any app
         // JS runs. src/lib/useData.js seeds useMarketTotals from it → the hero

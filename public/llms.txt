@@ -8,7 +8,7 @@
 Residata tracks every new residential development across Slovakia and
 Czechia (Bratislava and Prague and their wider markets). It normalizes
 data from developer websites into a single consistent schema, refreshes
-it daily, and delivers it as CSV, XLSX, or via API.
+it daily, and delivers it as CSV and XLSX.
 
 ## Scope (updated daily; snapshot July 2026)
 
@@ -30,7 +30,7 @@ it daily, and delivers it as CSV, XLSX, or via API.
 
 ## Pricing
 
-- €79.99 / month for full ongoing access (summer early-access price; regular €349.99)
+- €349.99 / month for full ongoing access (early-access price; regular €479.99)
 
 ## Public surfaces
 

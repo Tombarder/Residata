@@ -76,7 +76,7 @@
 
     <!-- Structured data: Organization — helps Google + LLMs understand who we are.
          Multi-schema @graph so one block covers Organization + WebSite + SoftwareApplication.
-         SoftwareApplication price reflects the current pricing page (€79.99 monthly — summer early-access price).
+         SoftwareApplication price is injected at build from public.pricing_config (the admin Pricing editor) via vite.config.js __SCHEMA_MONTHLY_PRICE_NUM__ — do not hardcode.
          offers → single monthly subscription Offer. -->
     <script type="application/ld+json">
     {
@@ -129,7 +129,7 @@
           "offers": {
             "@type": "Offer",
             "priceCurrency": "EUR",
-            "price": "79.99"
+            "price": "__SCHEMA_MONTHLY_PRICE_NUM__"
           },
           "featureList": [
             "Every new-build residential project across Slovakia & Czechia",
@@ -211,7 +211,7 @@
           "name": "How much does Residata cost?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "€79.99 per month for full ongoing access with fresh data every day — a summer early-access price (regular €349.99). A 7-day free trial is available."
+            "text": "__SCHEMA_MONTHLY_PRICE__ per month for full ongoing access with fresh data every day — an early-access price (regular __SCHEMA_ANCHOR_PRICE__). A 7-day free trial is available."
           }
         }
       ]

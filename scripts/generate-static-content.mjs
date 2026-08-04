@@ -80,6 +80,23 @@ try {
   process.exit(0);
 }
 
+// Live subscription price — single source of truth is public.pricing_config
+// (id=1), edited from the in-app admin Pricing editor. Read here at build time
+// so the static/SEO surfaces (llms.txt, index.html JSON-LD) follow the editor on
+// each deploy; the live app surfaces read the same row at runtime via usePricing.
+let pricing = null;
+try {
+  [pricing] = await fetchView('pricing_config', { id: 'eq.1', select: 'monthly_price_cents,anchor_price_cents' });
+} catch { /* keep null → fall back to current launch price below */ }
+const fmtEur = (cents) => {
+  if (cents == null) return null;
+  const eur = Number(cents) / 100;
+  return '€' + (Number.isInteger(eur) ? String(eur) : eur.toFixed(2));
+};
+const priceStr = fmtEur(pricing?.monthly_price_cents) || '€349.99';
+const anchorStr = fmtEur(pricing?.anchor_price_cents) || '€479.99';
+const priceNum = pricing?.monthly_price_cents != null ? (Number(pricing.monthly_price_cents) / 100).toFixed(2) : '349.99';
+
 const fmtN = (n) => n == null ? '—' : Number(n).toLocaleString('en-US');
 const today = new Date().toISOString().slice(0, 10);
 const month = skMeta?.snapshot_month || today.slice(0, 7);
@@ -100,7 +117,7 @@ const llms = `# Residata
 Residata tracks every new residential development across Slovakia and
 Czechia (Bratislava and Prague and their wider markets). It normalizes
 data from developer websites into a single consistent schema, refreshes
-it daily, and delivers it as CSV, XLSX, or via API.
+it daily, and delivers it as CSV and XLSX.
 
 ## Scope (updated daily; snapshot ${monthLabel})
 
@@ -122,7 +139,7 @@ it daily, and delivers it as CSV, XLSX, or via API.
 
 ## Pricing
 
-- €79.99 / month for full ongoing access (summer early-access price; regular €349.99)
+- ${priceStr} / month for full ongoing access (early-access price; regular ${anchorStr})
 
 ## Public surfaces
 
@@ -192,7 +209,6 @@ ${topProjList}
 ## Data delivery
 
 - CSV / XLSX exports (any daily snapshot)
-- REST API access (paid tier)
 - Live dashboard, analytics/pivot, and unit-level explorer
 - AI assistant that answers questions over the dataset
 
@@ -209,7 +225,7 @@ auto-scraped projects in all the public dashboards.
 
 ## Pricing
 
-- Monthly ongoing access: €79.99 / month (summer early-access price; regular €349.99)
+- Monthly ongoing access: ${priceStr} / month (early-access price; regular ${anchorStr})
 
 ## Where to find this
 
@@ -278,6 +294,11 @@ const buildData = {
   avg_eur_m2: market?.avg_eur_m2,
   snapshot_month: market?.snapshot_month,
   month_label: monthLabel,
+  // Subscription price from public.pricing_config (single source of truth) so
+  // index.html's JSON-LD Offer + FAQ price follow the admin editor per deploy.
+  monthly_price: priceStr,       // display, e.g. "€349.99"
+  monthly_price_num: priceNum,   // JSON-LD numeric, e.g. "349.99"
+  anchor_price: anchorStr,       // display, e.g. "€479.99"
   // The build-time snapshot is the SK market (the generator queries market_totals
   // which is country-agnostic but our default/primary market is SK).
   country: 'SK',
