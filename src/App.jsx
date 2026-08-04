@@ -1889,9 +1889,13 @@ export default function App() {
   // /use-cases separately. `country` localizes the visible copy (a CZ visitor
   // sees "Praha"/"Prague" in the tab title + og tags) without changing the
   // per-route canonical/hreflang. See src/lib/seo.js for what gets set.
+  // Re-apply SEO when the live price loads/changes too, so the __PRICE__/__ANCHOR__
+  // tokens in the title/meta follow the admin Pricing editor (single source of truth)
+  // instead of sticking at the first-paint fallback.
+  const seoPrice = usePricing(lang).priceDisplay;
   useEffect(() => {
     applySeo(current, lang, country);
-  }, [current, lang, country]);
+  }, [current, lang, country, seoPrice]);
 
   const handleNav = (page) => {
     const resolved = typeof page === "string" && page.startsWith("Project:")

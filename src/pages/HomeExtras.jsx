@@ -753,12 +753,25 @@ function ProjectMini({ project, setCurrent, lang }) {
 }
 
 function useAnimatedNumber(target, dur = 1200, delayMs = 0) {
-  const [value, setValue] = useState(0);
-  const ref = useRef({ raf: 0, from: 0, timer: 0 });
+  const [value, setValue] = useState(target == null ? 0 : target);
+  const ref = useRef({ raf: 0, from: target == null ? 0 : target, timer: 0, seeded: target != null });
   useEffect(() => {
     if (target == null) return;
-    const from = ref.current.from;
+    // First real value → show it IMMEDIATELY (no count-up-from-0). The old
+    // count-up relied on requestAnimationFrame, which is throttled to zero frames
+    // in background tabs, headless/screenshot/crawler contexts, and for
+    // prefers-reduced-motion users — leaving the number stuck at "0", i.e. the
+    // homepage rendering "0 units tracked / €0" on the sales page + in SEO snapshots.
+    if (!ref.current.seeded) {
+      ref.current.seeded = true; ref.current.from = target; setValue(target); return;
+    }
     const to = target;
+    const from = ref.current.from;
+    const reduce = typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce) { ref.current.from = to; setValue(to); return; }
+    clearTimeout(ref.current.timer);
+    // Guarantee we land on `to` even if rAF never fires (throttled contexts).
+    const settle = setTimeout(() => { ref.current.from = to; setValue(to); }, dur + 150);
     const run = () => {
       const start = performance.now();
       cancelAnimationFrame(ref.current.raf);
@@ -767,14 +780,13 @@ function useAnimatedNumber(target, dur = 1200, delayMs = 0) {
         const eased = 1 - Math.pow(1 - p, 3); // easeOutCubic
         setValue(Math.round(from + (to - from) * eased));
         if (p < 1) ref.current.raf = requestAnimationFrame(step);
-        else ref.current.from = to;
+        else { ref.current.from = to; clearTimeout(settle); }
       };
       ref.current.raf = requestAnimationFrame(step);
     };
-    clearTimeout(ref.current.timer);
     if (delayMs > 0) ref.current.timer = setTimeout(run, delayMs);
     else run();
-    return () => { cancelAnimationFrame(ref.current.raf); clearTimeout(ref.current.timer); };
+    return () => { cancelAnimationFrame(ref.current.raf); clearTimeout(ref.current.timer); clearTimeout(settle); };
   }, [target, dur, delayMs]);
   return value;
 }
@@ -935,7 +947,12 @@ function GeoBarRow({ row, index, max, animate, lang, onClick }) {
   const pct = (row.avg / max) * 100;
   const color = colorForPrice(row.avg);
   const delay = 0.08 * index;
-  const animatedAvg = useAnimatedNumber(animate ? Math.round(moneyFromEur(row.avg)) : 0, 1100, delay * 1000);
+  // Show the REAL €/m² immediately (no count-up-from-0). The count-up looked
+  // "live" for a scrolling user but rendered a literal "0 €" in every non-scroll
+  // snapshot — screenshots, crawlers, and the split-second before the section
+  // animates in — which read as "the market is €0". The bar fill + row fade +
+  // shimmer below still animate on scroll, so the section stays lively.
+  const avgDisplay = Math.round(moneyFromEur(row.avg) || 0);
   const clickable = typeof onClick === "function";
 
   return (
@@ -998,7 +1015,7 @@ function GeoBarRow({ row, index, max, animate, lang, onClick }) {
         textAlign: "right", fontVariantNumeric: "tabular-nums",
         textShadow: `0 0 8px ${color}22`, whiteSpace: "nowrap",
       }}>
-        {animatedAvg.toLocaleString("en-US").replace(/,/g, " ")} {moneySymbol()}
+        {avgDisplay.toLocaleString("en-US").replace(/,/g, " ")} {moneySymbol()}
       </div>
     </div>
   );
