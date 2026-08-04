@@ -329,7 +329,7 @@ export function PipelineFlow({ lang = "en" }) {
 
     z3Line1: "Živý trhový prehľad",
     z3Foot: "pre vaše rozhodnutia podložené dátami",
-    z3Chips: ["CSV", "Excel", "API"],
+    z3Chips: ["CSV", "Excel"],
     z3Cap1: "DENNÁ AKTUALIZÁCIA",
     z3Cap2: "vždy aktuálny stav trhu",
 
@@ -354,7 +354,7 @@ export function PipelineFlow({ lang = "en" }) {
 
     z3Line1: "Real-time market intelligence",
     z3Foot: "for your data-driven decisions",
-    z3Chips: ["CSV", "Excel", "API"],
+    z3Chips: ["CSV", "Excel"],
     z3Cap1: "DAILY AUTO-REFRESH",
     z3Cap2: "always the current market",
 

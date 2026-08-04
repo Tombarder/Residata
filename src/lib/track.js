@@ -7,6 +7,7 @@
  * Session ID is stable for the browser tab (sessionStorage).
  */
 import { supabase, isSupabaseReady } from "./supabase";
+import { hasAnalyticsConsent } from "./consent";
 
 let _sessionId = null;
 function sessionId() {
@@ -26,6 +27,10 @@ function sessionId() {
 
 export async function track(eventType, data = {}) {
   if (!isSupabaseReady()) return;
+  // GDPR/ePrivacy: first-party usage analytics run ONLY with explicit consent.
+  // No cookie choice yet, or "Reject" in the banner → no-op (honors the banner,
+  // which was previously cosmetic). Essential/session behavior is elsewhere.
+  if (!hasAnalyticsConsent()) return;
   try {
     // F-116: getSession() reads from local storage (no network call);
     // getUser() would round-trip to /auth/v1/user on every track()

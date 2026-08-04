@@ -149,7 +149,7 @@ export default function AiBetaBanner({ lang = "sk", compact = false }) {
         {T.msg}
       </span>
       <a
-        href="mailto:tomas@residata.sk?subject=Residata%20AI%20feedback"
+        href="mailto:info@residata.eu?subject=Residata%20AI%20feedback"
         style={{
           color: greenInk, textDecoration: "none",
           padding: "0.25rem 0.55rem", border: `1px solid color-mix(in srgb, var(--accent) 33%, transparent)`,
