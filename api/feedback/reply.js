@@ -101,7 +101,7 @@ async function handleInner(req, res) {
   if (!fb.email) return res.status(400).json({ error: "no email to reply to" });
 
   // ── Send the reply email (this is the point of the endpoint — must succeed) ──
-  if (!GMAIL_APP_PASSWORD) return res.status(500).json({ error: "email not configured" });
+  if (!process.env.SMTP_PASS && !GMAIL_APP_PASSWORD) return res.status(500).json({ error: "email not configured" });
   try {
     await sendEmail({
       to: fb.email,

@@ -355,4 +355,7 @@ export async function sendEmail({ to, subject, html, from, gmailUser, gmailPassw
     subject,
     html,
   });
+  // Success breadcrumb (no PII beyond the From) so a send is verifiable in the
+  // Vercel runtime logs — the helpers only log on FAILURE otherwise.
+  console.log(`[email] sent via ${host} from ${fromAddr}`);
 }

@@ -46,7 +46,7 @@ export default async function handler(req, res) {
   const GMAIL_FROM = process.env.GMAIL_FROM || "tkamhal@gmail.com";
   const WEB_URL = process.env.WEB_URL || "https://residata.eu";
 
-  if (!SUPABASE_URL || !SUPABASE_SECRET_KEY || !APPROVAL_HMAC_SECRET || !GMAIL_APP_PASSWORD) {
+  if (!SUPABASE_URL || !SUPABASE_SECRET_KEY || !APPROVAL_HMAC_SECRET || (!process.env.SMTP_PASS && !GMAIL_APP_PASSWORD)) {
     return res.status(500).json({ error: "server misconfigured: missing required env" });
   }
 

@@ -150,7 +150,7 @@ async function handleInner(req, res) {
   const page_url  = cleanText(body.page_url,  { max: MAX_SHORT_LEN }) || null;
 
   async function notifyAdmin(category, projectName, email, isReply) {
-    if (!GMAIL_APP_PASSWORD) return;
+    if (!process.env.SMTP_PASS && !GMAIL_APP_PASSWORD) return;
     const meta = FEEDBACK_CATEGORY_LABELS[category] || FEEDBACK_CATEGORY_LABELS.other;
     try {
       await sendEmail({

@@ -71,8 +71,8 @@ export default async function handler(req, res) {
   // GMAIL_APP_PASSWORD, with a hard-coded default sender.
   const GMAIL_FROM         = (await secretOrFallback("GMAIL_FROM")) || "tkamhal@gmail.com";
   const GMAIL_APP_PASSWORD = await secretOrFallback("GMAIL_APP_PASSWORD");
-  if (!GMAIL_APP_PASSWORD) {
-    return res.status(500).json({ error: "GMAIL_APP_PASSWORD missing (neither Vercel env nor app_secrets row found)" });
+  if (!process.env.SMTP_PASS && !GMAIL_APP_PASSWORD) {
+    return res.status(500).json({ error: "no email credential (set SMTP_PASS for the provider, or GMAIL_APP_PASSWORD)" });
   }
 
   // ── Load subscribers ──
