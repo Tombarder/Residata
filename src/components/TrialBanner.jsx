@@ -312,14 +312,6 @@ export function TrialPopup({ lang = "sk", onCta }) {
         >
           {L("Možno neskôr", "Maybe later")}
         </button>
-
-        <p style={{
-          color: "var(--text-faint)", fontSize: "0.68rem",
-          margin: "0.85rem 0 0", textAlign: "center",
-          fontFamily: "'JetBrains Mono', monospace",
-        }}>
-          {L("Otvorí sa znova keď nabudúce otvoríš Residata.", "Re-appears next time you open Residata.")}
-        </p>
       </div>
     </div>
   );

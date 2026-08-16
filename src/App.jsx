@@ -1803,22 +1803,23 @@ function AuthLoadingSpinner() {
 
 // F-024 fix: persist user's language choice across navigations + sessions.
 // Was previously reset to "en" on every fresh mount, which made SK users
-// lose their choice every time they navigated. localStorage keeps the
-// pick durable; falls back to browser language on first visit so a SK
-// browser lands in SK by default.
+// lose their choice every time they navigated. localStorage keeps the pick
+// durable.
+//
+// Boss 2026-08-15: a FIRST-TIME visitor always lands in English. The old
+// browser-language sniff sent a Slovak browser to SK, which contradicted the
+// intended default (EN / All markets / EUR) and made the landing experience
+// depend on the visitor's OS settings. Only an explicit pick changes the
+// language now, and that pick still sticks across sessions and devices.
 const LANG_STORAGE_KEY = "residata-lang";
 function readInitialLang() {
-  if (typeof window === "undefined") return "en";
+  if (typeof window === "undefined") return DEFAULT_LANG;
   try {
     const stored = window.localStorage.getItem(LANG_STORAGE_KEY);
     // Only honour a stored pick that is still public (a returning visitor's stale
-    // 'cs' falls through to browser detection / default rather than sticking).
+    // 'cs' falls through to the default rather than sticking).
     if (isPublicLang(stored)) return stored;
   } catch (_) { /* private mode etc. */ }
-  // First visit: detect from browser, but only into a public language.
-  const browserLang = (typeof navigator !== "undefined" && navigator.language) || "";
-  if (isPublicLang("sk") && browserLang.toLowerCase().startsWith("sk")) return "sk";
-  if (isPublicLang("cs") && browserLang.toLowerCase().startsWith("cs")) return "cs";
   return DEFAULT_LANG;
 }
 
