@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect, useRef, lazy, Suspense } from "react";
+import { Fragment, useState, useEffect, useLayoutEffect, useRef, lazy, Suspense } from "react";
 import { useNavCollapsed } from "./lib/breakpoints";
 import { t } from "./lib/marketingCopy";
 import { usePricing } from "./lib/pricing";
@@ -1227,6 +1227,43 @@ function useSampleData() {
 
   const seg = [2, 3, 4].map(r => eur(sample.segments?.[String(r)]));
 
+  // ── How price position relates to how fast a project sells ────────────────
+  // The question a developer actually has before setting a price sheet: if I come
+  // in under the going rate for this district, how much faster does it move?
+  //
+  // Each project is placed against ITS OWN district's average €/m² (an absolute
+  // price tells you nothing without the local benchmark), and speed is measured as
+  // the SHARE of the project sold per 30 days, not the raw count — otherwise one
+  // 500-unit project outweighs ten small ones and the signal disappears. Computed
+  // here from projects_live, which this page already loads, so it re-derives
+  // itself every night with no separate pipeline to keep in sync.
+  const priced = active.filter(p => p.avg_price_eur_m2 && p.district && (p.total_units || 0) > 0);
+  const districtAvg = {};
+  priced.forEach(p => {
+    (districtAvg[p.district] = districtAvg[p.district] || []).push(Number(p.avg_price_eur_m2));
+  });
+  Object.keys(districtAvg).forEach(k => {
+    const a = districtAvg[k];
+    districtAvg[k] = a.reduce((x, y) => x + y, 0) / a.length;
+  });
+  const BANDS = [
+    { key: "under", lo: -Infinity, hi: 0.90 },
+    { key: "at",    lo: 0.90,      hi: 1.10 },
+    { key: "over",  lo: 1.10,      hi: Infinity },
+  ];
+  const bandStats = BANDS.map(b => {
+    const rows = priced.filter(p => {
+      const ratio = Number(p.avg_price_eur_m2) / districtAvg[p.district];
+      return ratio >= b.lo && ratio < b.hi;
+    });
+    const rate = rows.length
+      ? rows.reduce((acc, p) => acc + (100 * (Number(p.sold_last_month) || 0) / Number(p.total_units)), 0) / rows.length
+      : null;
+    return { key: b.key, projects: rows.length, rate };
+  });
+  const underRate = bandStats[0].rate, overRate = bandStats[2].rate;
+  const speedMultiple = (underRate && overRate) ? (underRate / overRate) : null;
+
   // No `rows` here: the old constant carried 8 unit rows for a unit-level table
   // that this page no longer renders — dead data. Not reintroduced, and the DB
   // view deliberately publishes no unit rows either.
@@ -1247,6 +1284,7 @@ function useSampleData() {
       avail: topD.avail, m2: nf(topD.m2),
       peak: nf(sample.peaks?.[topD.name]),
     } : { district: "—", projects: 0, units: 0, avail: 0, m2: "—", peak: "—" },
+    priceSpeed: { bands: bandStats, multiple: speedMultiple },
     fast: f ? {
       project: f.name, district: f.district || "—",
       total: Number(f.total_units) || 0, left: Number(f.available_units) || 0,
@@ -1264,15 +1302,6 @@ function DataPage({ setCurrent, l, lang }) {
   const { country } = useCountry();
   const d = useSampleData();
   const isPaid = can("has_paid_access");
-  // F-062 (Boss 2026-05-31) made this badge say "illustrative", correctly: the
-  // InsightCards were fed by a hardcoded constant that had gone stale. That
-  // constant is gone as of 2026-08-18 — the cards read the live serving layer
-  // (data_sample + district_totals + projects_live + market_totals, all refreshed
-  // nightly), so l.insightsBadge now says "Live · from the latest snapshot".
-  // The rule behind F-062 still stands: this badge must describe what the numbers
-  // ACTUALLY are. If they ever go back to being hand-authored, change it back.
-  const dynamicInsightsBadge = l.insightsBadge;
-
   // Insight card component
   const InsightCard = ({ label, title, children, span2 }) => (
     <div className={span2 ? "insight-span2" : undefined} style={{
@@ -1387,9 +1416,8 @@ function DataPage({ setCurrent, l, lang }) {
       <div style={{ padding: "2rem 2rem 1rem", maxWidth: "var(--container)", margin: "0 auto" }}>
         <Label>{l.insightsLabel}</Label>
         <h2 className="sec-title" style={{ marginBottom: "0.5rem" }}>{l.insightsTitle}</h2>
-        <div className="insights-intro" style={{ display: "flex", alignItems: "center", gap: "1.5rem", marginBottom: "2rem" }}>
+        <div className="insights-intro" style={{ marginBottom: "2rem" }}>
           <p className="sec-desc" style={{ marginBottom: 0 }}>{l.insightsDesc}</p>
-          <span style={{ fontFamily: mono, fontSize: "0.6rem", color: "#55555f", background: "#111113", border: "1px solid #222228", padding: "0.3rem 0.75rem", borderRadius: 6, whiteSpace: "nowrap", flexShrink: 0 }}>{dynamicInsightsBadge}</span>
         </div>
       </div>
 
@@ -1445,27 +1473,45 @@ function DataPage({ setCurrent, l, lang }) {
           </div>
         </InsightCard>
 
-        {/* 3 — Price by district — live €/m² and depth, straight from district_totals.
-             The month-over-month column is GONE: it was a hand-entered figure (and
-             for CZ an openly "estimated" one), and this page has no live price
-             history to derive it from. Showing tracked depth instead means every
-             number here is one we can actually stand behind. */}
-        <InsightCard label="Price by District" title={`${d.gap} district spread.`}>
+        {/* 3 — Pricing vs sales speed.
+             This slot used to hold a "Price by District" table that listed the same
+             districts at the same €/m² as the card immediately to its right — the
+             same information twice, side by side, and neither instance answered a
+             question. Replaced with the one thing a developer actually needs before
+             signing off a price sheet: what pricing under or over the local going
+             rate does to how fast the project moves. Its one unique column, the
+             30-day price move, survives in the district list next door. */}
+        <InsightCard
+          label="Pricing vs Sales Speed"
+          title={d.priceSpeed.multiple
+            ? `Priced under the district, projects move ${d.priceSpeed.multiple.toFixed(1)}× faster.`
+            : "How price position moves inventory."}>
           <div style={{ fontSize: "0.82rem", color: "#8a8a96", lineHeight: 1.6, marginBottom: "1rem" }}>
-            Market average is <span style={{ color: "#e8e8ed" }}>€{d.marketAvg}/m²</span>. Premium districts price at a <span style={{ color: "#e8e8ed", fontWeight: 600 }}>{d.gap}</span> multiple of the most affordable. €/m² and tracked units by district:
+            Every tracked project measured against <span style={{ color: "#e8e8ed" }}>its own district's average €/m²</span>, and the share of it that sells in 30 days. This is the question behind a price sheet: come in under the local rate and how much faster does it clear?
           </div>
-          {d.districts.map(([name, price, units, mom]) => (
-            <div key={name} style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: "0.6rem", alignItems: "center", padding: "0.35rem 0", borderBottom: "1px solid #1a1a1f", fontSize: "0.76rem" }}>
-              <span style={{ color: "#e8e8ed" }}>{name}</span>
-              <span style={{ fontFamily: mono, fontSize: "0.68rem", color: "#55555f" }}>€{price}/m² · {units}u</span>
-              <span style={{
-                fontFamily: mono, fontSize: "0.72rem", fontWeight: 600, minWidth: 52, textAlign: "right",
-                color: mom == null ? "#55555f" : (mom.startsWith("-") ? "#e08a7a" : "var(--accent)"),
-              }}>{mom == null ? "—" : mom}</span>
-            </div>
-          ))}
+          <div style={{ display: "grid", gridTemplateColumns: "auto 1fr auto", gap: "0.55rem 0.75rem", alignItems: "center", fontSize: "0.74rem" }}>
+            {[
+              { k: "under", label: "10%+ under", color: "var(--accent)" },
+              { k: "at",    label: "at the rate", color: "#e0a53c" },
+              { k: "over",  label: "10%+ over",  color: "#dd6b32" },
+            ].map(row => {
+              const b = d.priceSpeed.bands.find(x => x.key === row.k) || {};
+              const max = Math.max(...d.priceSpeed.bands.map(x => x.rate || 0), 0.001);
+              return (
+                <Fragment key={row.k}>
+                  <span style={{ fontFamily: mono, color: "#e8e8ed", whiteSpace: "nowrap" }}>{row.label}</span>
+                  <span style={{ height: 8, background: "#1a1a1f", borderRadius: 4, overflow: "hidden", display: "block" }}>
+                    <span style={{ display: "block", height: "100%", width: `${((b.rate || 0) / max) * 100}%`, background: row.color, borderRadius: "0 4px 4px 0" }} />
+                  </span>
+                  <span style={{ fontFamily: mono, color: row.color, fontWeight: 600, whiteSpace: "nowrap" }}>
+                    {b.rate == null ? "—" : `${b.rate.toFixed(1)}%`}
+                  </span>
+                </Fragment>
+              );
+            })}
+          </div>
           <div style={{ fontSize: "0.62rem", color: "#55555f", marginTop: "0.7rem", fontStyle: "italic" }}>
-            △ 30-day move, same flats priced at both ends — coverage growth cannot show up as a price move. Districts with too few comparable flats show “—”.
+            △ share of each project sold per 30 days, averaged per band — not raw counts, so one large project cannot carry the result. {d.priceSpeed.bands.map(b => b.projects).reduce((a, c) => a + c, 0)} projects.
           </div>
         </InsightCard>
 
@@ -1476,7 +1522,11 @@ function DataPage({ setCurrent, l, lang }) {
               <div style={{ fontSize: "0.82rem", color: "#8a8a96", lineHeight: 1.65, marginBottom: "1rem" }}>
                 {d.top.district} is the city's priciest cluster — <span style={{ color: "#e8e8ed" }}>{d.top.projects} active {d.top.projects === 1 ? "project" : "projects"}</span> and <span style={{ color: "#e8e8ed" }}>{d.top.units} units</span> tracked ({d.top.avail} still available) at <span style={{ color: "#e8e8ed" }}>€{d.top.m2}/m²</span> average, peaking at <span style={{ color: "#e8e8ed" }}>€{d.top.peak}/m²</span>.
                 <br /><br />
-                <span style={{ color: "#e8e8ed", fontWeight: 600 }}>For banks & valuers:</span> this is where comparable evidence is scarcest and most valuable. Once a premium project sells out its transaction history stops updating — and can't be reconstructed retrospectively.
+                {/* The old line claimed comparable evidence disappears when a project
+                    sells out — true of EVERY project, not premium ones, so it read as
+                    a generic sales pitch parked under a specific heading. This says
+                    what is actually specific to the priciest cluster: the spread. */}
+                <span style={{ color: "#e8e8ed", fontWeight: 600 }}>Why this cluster:</span> it sets the ceiling the whole market is priced against. Its dearest unit runs at <span style={{ color: "#e8e8ed" }}>€{d.top.peak}/m²</span> against a <span style={{ color: "#e8e8ed" }}>€{d.top.m2}/m²</span> district average — the gap between an ordinary flat here and a top-floor one, which is exactly the range a valuation or a competing price sheet has to sit inside.
               </div>
               <div style={{ display: "flex", gap: "1.5rem", flexWrap: "wrap" }}>
                 <div><div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: "var(--accent)" }}>{d.top.projects}</div><div style={{ fontSize: "0.68rem", color: "#55555f" }}>active {d.top.projects === 1 ? "project" : "projects"}</div></div>
@@ -1485,17 +1535,24 @@ function DataPage({ setCurrent, l, lang }) {
               </div>
             </div>
             <div>
-              <div style={{ fontSize: "0.78rem", color: "#55555f", marginBottom: "0.6rem" }}>Top districts · avg €/m²</div>
+              <div style={{ fontSize: "0.78rem", color: "#55555f", marginBottom: "0.6rem" }}>Top districts · avg €/m² · 30-day move</div>
               {/* Guarded: with live data this list is EMPTY on the first render, and
                   the old constant meant it never could be. Reading [0][1] then threw
                   and took the whole page down to the error boundary. */}
-              {(() => { const mx = parseInt((d.districts[0]?.[1] || "0").replace(/,/g, ""), 10) || 1; return d.districts.slice(0, 5).map(([name, price]) => {
+              {(() => { const mx = parseInt((d.districts[0]?.[1] || "0").replace(/,/g, ""), 10) || 1; return d.districts.slice(0, 5).map(([name, price, , mom]) => {
                 const v = parseInt(price.replace(/,/g, ""), 10) || 0;
                 return (
                   <div key={name} style={{ marginBottom: "0.6rem" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.2rem", fontSize: "0.72rem" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.2rem", fontSize: "0.72rem", gap: "0.5rem" }}>
                       <span style={{ color: "#8a8a96" }}>{name}</span>
-                      <span style={{ fontFamily: mono, color: "#e8e8ed", fontSize: "0.68rem" }}>€{price}</span>
+                      <span style={{ fontFamily: mono, fontSize: "0.68rem", whiteSpace: "nowrap" }}>
+                        <span style={{ color: "#e8e8ed" }}>€{price}</span>
+                        {/* The 30-day move, carried over from the Price-by-District card
+                            this replaced — it was that card's one non-duplicated column. */}
+                        <span style={{ color: mom == null ? "#55555f" : (mom.startsWith("-") ? "#dd6b32" : "var(--accent)"), marginLeft: 8 }}>
+                          {mom == null ? "—" : mom}
+                        </span>
+                      </span>
                     </div>
                     <div style={{ width: "100%", height: 6, background: "#222228", borderRadius: 3 }}>
                       <div style={{ width: `${Math.round((v / mx) * 100)}%`, height: "100%", background: "var(--accent)", borderRadius: 3 }} />

@@ -355,7 +355,7 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ color: text, fontWeight: 700, fontSize: "0.92rem", letterSpacing: "-0.01em" }}>{L("Spätná väzba", "Feedback")}</div>
-          <div style={{ color: dim, fontSize: "0.7rem", lineHeight: 1.3 }}>{L("Pomôž nám zlepšiť Residatu", "Help us make Residata better")}</div>
+          <div style={{ color: dim, fontSize: "0.7rem", lineHeight: 1.3 }}>{L("Pomôž nám zlepšiť Residata", "Help us make Residata better")}</div>
         </div>
         <button onClick={close} title={L("Zavrieť", "Close")} aria-label={L("Zavrieť", "Close")} style={{ background: "transparent", border: `1px solid ${border}`, color: dim, borderRadius: 7, cursor: "pointer", padding: "0.3rem 0.55rem", fontSize: "0.75rem", fontFamily: mono, lineHeight: 1 }}
           onMouseEnter={e => { e.currentTarget.style.color = red; e.currentTarget.style.borderColor = red; }} onMouseLeave={e => { e.currentTarget.style.color = dim; e.currentTarget.style.borderColor = border; }}>✕</button>

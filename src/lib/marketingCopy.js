@@ -129,7 +129,7 @@ export const t = {
     ],
     // Tiers
     tiers: [
-      { tier: "Standard", name: "Full access", price: "€349.99", priceSuffix: "/mo", anchor: "€479.99", note: "Summer offer — early-access rate for the first 50 members (until 31 Aug 2026). Billed monthly, cancel anytime.",
+      { tier: "Standard", name: "Full access", price: "€349.99", priceSuffix: "/mo", anchor: "€479.99", note: "Summer offer — early-access rate for the first 50 members (until 30 Sep 2026). Billed monthly, cancel anytime.",
         features: [[true, "Live dashboard + full market report"], [true, "Raw + cleaned datasets included"], [true, "Historical snapshots & trend analysis"], [true, "Absorption rates & sell-out tracking"], [true, "CSV & Excel (.xlsx) export"]], featured: true, cta: "Get Started" },
       { tier: "Custom", name: "On-Demand & Enterprise", price: "Let's talk.", isCustom: true, note: "Tailored scope, frequency, and delivery",
         features: [[true, "Everything in Standard"], [true, "Custom refresh cadence & priority support"], [true, "Coverage beyond Slovakia & Czechia"], [true, "Additional markets or property types"], [true, "Custom integrations and output formats"]], cta: "Contact Us" },
@@ -170,7 +170,7 @@ export const t = {
     flexDesc: "Týždenné aktualizácie? Rozšírenie do Poľska, Rakúska alebo iného trhu? Iný formát? Žiadny problém — rozsah, frekvenciu aj doručenie nastavíme podľa vašich preferencií.",
     useCasesLabel: "Využitie",
     useCasesTitle: "Pre profesionálov, ktorí potrebujú\nrozumieť trhu.",
-    useCasesDesc: "Rôzne role, podobná potreba — aktuálne a spoľahlivé dáta o rezidenčnom trhu. Tu je to, ako rôzne tímy využívajú Residatu.",
+    useCasesDesc: "Rôzne role, podobná potreba — aktuálne a spoľahlivé dáta o rezidenčnom trhu. Takto rôzne tímy využívajú Residata.",
     useCases: [
       { tag: "Developeri a obchodné tímy", title: "Spoľahlivé podklady na nacenenie.",
         desc: "Spúšťate novú fázu a riešite ceny. Koľko si účtuje konkurencia? Ako rýchlo sa podobný projekt predáva? Naceňujete byty správne?",
@@ -182,7 +182,7 @@ export const t = {
         desc: "Potrebujete trhové komparatívy na ocenenie alebo kolaterál — ale zbierať ich ručne z roztrúsených webov developerov a transformovať ich do použiteľného formátu trvá týždne. A získanie historických dát spätne je nemožné. My sme to urobili za vás.",
         benefits: [["Štruktúrované ponuky", "ceny podľa lokality, typu, plochy a dostupnosti — filtrovateľné a exportovateľné"], ["Hĺbka trhu", "koľko projektov a bytov je v okrese aktívnych — kontext pre každé ocenenie"], ["Vždy aktuálne", "komparatívy nikdy nie sú staršie ako 1 deň"]] },
       { tag: "Konzultanti a analytici", title: "Hodiny práce, hotové za vás.",
-        desc: "Klient chce prehľad bratislavského trhu. Buď strávite týždne zbieraním dát po weboch — alebo otvoríte jeden sheet, kde je všetko pripravené.",
+        desc: "Klient chce prehľad bratislavského trhu. Buď strávite týždne zbieraním, čistením, validovaním a updatovaním dát po weboch — alebo otvoríte našu analytickú platformu, kde je všetko pripravené.",
         benefits: [["Dáta na prezentáciu", "normalizované stĺpce naprieč každým aktívnym projektom — rovno do modelov, grafov alebo klientskych prezentácií"], ["Trendy zahrnuté", "cenový smer a trhové posuny ukážete bez ďalšej práce"], ["Kompletné pokrytie", "byty, domy, apartmány — žiadne medzery"]] },
     ],
     useCasesCta: "Hľadáte riešenie na mieru?",
@@ -240,7 +240,7 @@ export const t = {
       ["4", "Priebežná výhoda", "Každá dodávka = jasný pohľad na trh. Ceny, absorpcia, ponuka, signály vypredania. Rozhodujete sa na dátach, nie na pocite."],
     ],
     tiers: [
-      { tier: "Standard", name: "Plný prístup", price: "€349.99", priceSuffix: "/mes", anchor: "€479.99", note: "Letná ponuka — cena pre prvých 50 členov (do 31. augusta 2026). Fakturované mesačne, zrušenie kedykoľvek.",
+      { tier: "Standard", name: "Plný prístup", price: "€349.99", priceSuffix: "/mes", anchor: "€479.99", note: "Letná ponuka — cena pre prvých 50 členov (do 30. septembra 2026). Fakturované mesačne, zrušenie kedykoľvek.",
         features: [[true, "Live dashboard + kompletný report"], [true, "Surové + vyčistené datasety"], [true, "Historické dáta a vývoj trendov"], [true, "Absorpcia a sledovanie vypredania"], [true, "Export do CSV a Excelu (.xlsx)"]], featured: true, cta: "Mám záujem" },
       { tier: "Custom", name: "On-Demand & Enterprise", price: "Ozvite sa.", isCustom: true, note: "Rozsah a frekvencia podľa vás",
         features: [[true, "Všetko v Standard"], [true, "Vlastná frekvencia aktualizácií a prioritná podpora"], [true, "Pokrytie akejkoľvek lokality (aj mimo Slovenska)"], [true, "Ďalšie trhy alebo typy nehnuteľností"], [true, "Vlastné integrácie a formáty"]], cta: "Kontaktovať" },
