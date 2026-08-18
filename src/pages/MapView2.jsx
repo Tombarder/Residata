@@ -29,8 +29,8 @@ import { moneyFromEur, moneySymbol } from "../lib/money";
 import { supabase, supabaseData, supabasePublic, isSupabaseReady } from "../lib/supabase";
 import {
   LENSES, COMPLETION, NO_DATA, ppm2Of, metricValue, completionBucket,
-  tertiles, colorFor, coverage, circlePolygon, computeCompetitiveSet, computePolygonSet, computeCorridorSet,
-  corridorBufferRing, polygonAreaKm2, polylineLengthKm, legendForLens, valueRange, heatWeight, hasPublishedPrice,
+  tertiles, colorFor, circlePolygon, computeCompetitiveSet, computePolygonSet, computeCorridorSet,
+  corridorBufferRing, polygonAreaKm2, polylineLengthKm, legendForLens, valueRange, heatWeight,
   median, percentile, setAbsorptionPct, completionLabel, completionShort,
 } from "../lib/mapMetrics";
 import MapFilterBuilder from "../components/MapFilterBuilder";
@@ -223,7 +223,8 @@ export default function MapView2({ lang = "en", setCurrent }) {
   const [radiusKm, setRadiusKm] = useState(1.5);
   const verifiedOnly = false; // "precise only" toggle removed — include every located project
   const [showSoldOut, setShowSoldOut] = useState(false); // sold-out projects HIDDEN by default (Boss 2026-07-17)
-  const [showNoPrice, setShowNoPrice] = useState(true);  // projects with no published price shown by default
+  // Projects with no published price are always shown; the toggle that hid them
+  // was noise on a map where nearly every project has one (Boss 2026-08-18).
   const [heatMode, setHeatMode] = useState(false); // dots vs heatmap of the active lens
   const [anchorId, setAnchorId] = useState(null); // project an "◎ Area" was opened from → benchmark vs its set
   const [viewBounds, setViewBounds] = useState(null); // current map viewport → the overview reflects only what's on screen
@@ -256,11 +257,10 @@ export default function MapView2({ lang = "en", setCurrent }) {
   // (Transient state — draw tools, compare mode, viewport, saved areas — is excluded.)
   useAccountPrefState(
     "marketRadarFilters",
-    { lens, showSoldOut, showNoPrice, heatMode, conditions, radiusKm, corridorKm, nameQuery },
+    { lens, showSoldOut, heatMode, conditions, radiusKm, corridorKm, nameQuery },
     (s) => {
       if (s.lens !== undefined) setLens(s.lens);
       if (typeof s.showSoldOut === "boolean") setShowSoldOut(s.showSoldOut);
-      if (typeof s.showNoPrice === "boolean") setShowNoPrice(s.showNoPrice);
       if (typeof s.heatMode === "boolean") setHeatMode(s.heatMode);
       if (Array.isArray(s.conditions)) setConditions(s.conditions);
       if (typeof s.radiusKm === "number") setRadiusKm(s.radiusKm);
@@ -450,17 +450,14 @@ export default function MapView2({ lang = "en", setCurrent }) {
   const candidatePool = useMemo(() => {
     let s = candidates;
     if (!showSoldOut) s = s.filter((p) => (Number(p.available_units) || 0) > 0);
-    if (!showNoPrice) s = s.filter(hasPublishedPrice);
     return s;
-  }, [candidates, showSoldOut, showNoPrice]);
+  }, [candidates, showSoldOut]);
   const soldOutCount = useMemo(() => baseSet.filter((p) => (Number(p.available_units) || 0) === 0).length, [baseSet]);
-  const noPriceCount = useMemo(() => baseSet.filter((p) => !hasPublishedPrice(p)).length, [baseSet]);
   const shown = useMemo(() => {
     let s = baseSet;
     if (!showSoldOut) s = s.filter((p) => (Number(p.available_units) || 0) > 0);
-    if (!showNoPrice) s = s.filter(hasPublishedPrice);
     return s;
-  }, [baseSet, showSoldOut, showNoPrice]);
+  }, [baseSet, showSoldOut]);
   const activeConds = useMemo(() => conditions.filter(isComplete), [conditions]);
 
   // Projects currently on screen = filters ∩ the map viewport. The overview reads
@@ -475,7 +472,6 @@ export default function MapView2({ lang = "en", setCurrent }) {
 
   const thresholds = useMemo(() => (lens === "completion" ? null : tertiles(shown.map((p) => metricValue(p, lens)))), [shown, lens]);
   const heatRange = useMemo(() => valueRange(shown, lens), [shown, lens]);
-  const lensCoverage = useMemo(() => coverage(inView, lens), [inView, lens]);
   const fc = useMemo(() => buildFeatures(shown, coords || {}, lens, thresholds, verifiedOnly, heatRange), [shown, coords, lens, thresholds, verifiedOnly, heatRange]);
   useEffect(() => { featuresRef.current = fc; }, [fc]);
 
@@ -823,7 +819,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
                   <strong style={{ color: textLight }}>{marketStats.count}</strong> {sk ? "v zábere" : "in view"}
                   {marketStats.count === 0 && shown.length > 0
                     ? <span style={{ color: amber }}> · {sk ? "oddiaľ pre všetky" : "zoom out for all"}</span>
-                    : <> · <span style={{ color: lensCoverage < 0.4 ? amber : dim }}>{pct(lensCoverage)} {sk ? "s dátami" : "with data"}</span></>}
+                    : null}
                 </>}
           </span>
         </div>
@@ -872,12 +868,6 @@ export default function MapView2({ lang = "en", setCurrent }) {
           <EyeIcon off={!showSoldOut} />
           <span style={{ textDecoration: showSoldOut ? "none" : "line-through" }}>{sk ? "Vypredané" : "Sold out"}</span>
           {soldOutCount > 0 && <span style={{ opacity: 0.7, fontFamily: mono, fontSize: "0.66rem" }}>· {soldOutCount}</span>}
-        </button>
-        <button onClick={() => setShowNoPrice((v) => !v)} title={sk ? "Zobraziť / skryť projekty bez zverejnenej ceny (počítajú sa do prehľadov len keď sú zapnuté)" : "Show / hide projects with no published price (counted in the stats only while shown)"}
-          style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 36, padding: "0 12px", borderRadius: 999, fontSize: "0.74rem", cursor: "pointer", border: `1px solid ${showNoPrice ? border : `${amber}55`}`, background: showNoPrice ? "var(--surface)" : `${amber}14`, color: showNoPrice ? "var(--text-2)" : amber, boxShadow: showNoPrice ? "0 1px 2px rgba(28,38,56,0.05)" : "none" }}>
-          <EyeIcon off={!showNoPrice} />
-          <span style={{ textDecoration: showNoPrice ? "none" : "line-through" }}>{sk ? "Bez ceny" : "No price"}</span>
-          {noPriceCount > 0 && <span style={{ opacity: 0.7, fontFamily: mono, fontSize: "0.66rem" }}>· {noPriceCount}</span>}
         </button>
         <div style={{ display: "inline-flex", alignItems: "center", gap: 9, marginLeft: "auto", fontSize: "0.66rem", color: dim, flexWrap: "wrap" }}>
           {heatMode
@@ -1271,29 +1261,41 @@ function MarketInsight({ lens, stats, sk }) {
   const s = stats;
   let headline, visual;
   if (lens === "price") {
-    headline = <Headline big={s.med ? `€${fmt(s.med)}` : "—"} unit="/m²" sub={s.pMin ? `${sk ? "medián · rozsah" : "median · range"} €${fmt(s.pMin)}–€${fmt(s.pMax)}` : (sk ? "bez zverejnených cien" : "no published prices")} />;
+    headline = <Headline label={sk ? "Medián ceny" : "Median price"} big={s.med ? `€${fmt(s.med)}` : "—"} unit="/m²"
+      sub={s.pMin ? `${sk ? "najlacnejší" : "cheapest"} €${fmt(s.pMin)} · ${sk ? "najdrahší" : "priciest"} €${fmt(s.pMax)}` : (sk ? "žiadne zverejnené ceny" : "no published prices")} />;
     visual = <Histogram hist={s.hist} hLo={s.hLo} hHi={s.hHi} med={s.med} />;
   } else if (lens === "completion") {
     const known = s.count - s.comp.unknown;
-    headline = <Headline big={s.count ? `${Math.round((known / s.count) * 100)}%` : "—"} sub={sk ? "má termín dokončenia" : "have a completion date"} />;
+    headline = <Headline label={sk ? "So známym termínom" : "With a known date"} big={s.count ? `${Math.round((known / s.count) * 100)}%` : "—"}
+      sub={`${known} ${sk ? "z" : "of"} ${s.count} ${sk ? "projektov" : "projects"}`} />;
     visual = <Pipeline comp={s.comp} />;
   } else if (lens === "supply") {
-    headline = <Headline big={fmtK(s.available)} sub={`${sk ? "voľných · z" : "units available · of"} ${fmtK(s.invTotal)}`} />;
+    headline = <Headline label={sk ? "Voľné byty" : "Available units"} big={fmtK(s.available)}
+      sub={`${sk ? "z celkových" : "of"} ${fmtK(s.invTotal)}`} />;
     visual = <InventoryBar avail={s.available} res={s.reserved} sold={s.sold} sk={sk} />;
   } else if (lens === "momentum") {
-    headline = <Headline big={fmtK(s.soldLM)} sub={`${sk ? "predaných za mesiac · " : "sold last month · "}${s.moving}/${s.count} ${sk ? "v pohybe" : "moving"}`} />;
+    headline = <Headline label={sk ? "Predané za mesiac" : "Sold last month"} big={fmtK(s.soldLM)}
+      sub={`${s.moving} ${sk ? "z" : "of"} ${s.count} ${sk ? "projektov predávalo" : "projects moved"}`} />;
     visual = <MovingBar moving={s.moving} count={s.count} soldLM={s.soldLM} sk={sk} />;
   } else {
-    headline = <Headline big={s.soldPct != null ? `${s.soldPct}%` : "—"} sub={`${sk ? "predané · " : "sold · "}${fmtK(s.sold)} ${sk ? "z" : "of"} ${fmtK(s.invTotal)}`} />;
+    headline = <Headline label={sk ? "Vypredanosť" : "Sold through"} big={s.soldPct != null ? `${s.soldPct}%` : "—"}
+      sub={`${fmtK(s.sold)} ${sk ? "z" : "of"} ${fmtK(s.invTotal)} ${sk ? "jednotiek" : "units"}`} />;
     visual = <InventoryBar avail={s.available} res={s.reserved} sold={s.sold} sk={sk} />;
   }
   return <div style={{ display: "flex", alignItems: "center", gap: 20 }}>{headline}{visual}</div>;
 }
-function Headline({ big, unit, sub }) {
+// Three lines, in the order a reader needs them: what the number IS, the number,
+// then the spread around it. Before this the big figure carried no label at all
+// and the line underneath ran "medián · rozsah €2 067–€11 139" — three different
+// facts in one string, with nothing saying which belonged to the number above.
+function Headline({ label, big, unit, sub }) {
   return (
-    <div style={{ minWidth: 124, flexShrink: 0 }}>
-      <div style={{ fontSize: "1.5rem", fontWeight: 700, color: textLight, fontFamily: mono, lineHeight: 1 }}>{big}{unit ? <span style={{ fontSize: "0.78rem", color: dim, fontWeight: 400 }}>{unit}</span> : null}</div>
-      <div style={{ fontSize: "0.64rem", color: dim, marginTop: 4 }}>{sub}</div>
+    <div style={{ minWidth: 150, flexShrink: 0 }}>
+      {label ? (
+        <div style={{ fontSize: "0.58rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 3 }}>{label}</div>
+      ) : null}
+      <div style={{ fontSize: "1.5rem", fontWeight: 700, color: textLight, fontFamily: mono, lineHeight: 1 }}>{big}{unit ? <span style={{ fontSize: "0.78rem", color: dim, fontWeight: 400, marginLeft: 1 }}>{unit}</span> : null}</div>
+      {sub ? <div style={{ fontSize: "0.64rem", color: dim, marginTop: 5, lineHeight: 1.3 }}>{sub}</div> : null}
     </div>
   );
 }
