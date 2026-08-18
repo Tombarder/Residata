@@ -59,7 +59,7 @@ async function rpcDirect(fn, body, { timeoutMs = 30000 } = {}) {
 
 const CATEGORIES = {
   data:     ["📊", "Data quality",      "Kvalita dát"],
-  bug:      ["🐞", "Bug / not working", "Chyba / nefunguje"],
+  bug:      ["🐞", "Bug / problem",     "Chyba / problém"],
   website:  ["🖥️", "Website / display", "Web / zobrazenie"],
   question: ["❓", "Question",          "Otázka"],
   idea:     ["💡", "Suggestion",        "Návrh / funkcia"],
