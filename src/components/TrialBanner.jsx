@@ -123,8 +123,8 @@ export function TrialBanner({ lang = "sk", onCta }) {
         </strong>{" "}
         {/* full copy on wider screens, punchy short copy on phones (see responsive.css) */}
         <span className="trial-banner-long">— {L(
-          "celý Residata: analytika, reporty, AI asistent. Žiadna karta.",
-          "the full Residata: analytics, reports, AI assistant. No card required.",
+          "prístup k Residata Premium: pokročilá analytika, reporty, mapy, AI asistent. Bez potreby vyplniť platobné údaje.",
+          "access to Residata Premium: advanced analytics, reports, maps, AI assistant. No payment details needed.",
         )}</span>
         <span className="trial-banner-short">— {L("plný prístup, bez karty.", "full access, no card.")}</span>
       </span>
@@ -253,14 +253,14 @@ export function TrialPopup({ lang = "sk", onCta }) {
           color: "var(--accent)", letterSpacing: "0.14em", textTransform: "uppercase",
           fontWeight: 700, marginBottom: "0.35rem",
         }}>
-          {L("Darček pre teba", "A gift for you")}
+          {L("Darček od nás", "A gift from us")}
         </div>
 
         <h2 id="trial-popup-title" style={{
           fontSize: "1.4rem", fontWeight: 700, color: "var(--text)",
           letterSpacing: "-0.02em", margin: "0 0 0.6rem", lineHeight: 1.25,
         }}>
-          {L("7 dní plného Residata — zadarmo", "7 days of the full Residata — on us")}
+          {L("Prístup k Residata Premium na 7 dní zadarmo", "7 days of Residata Premium — free")}
         </h2>
 
         <p style={{
@@ -268,19 +268,10 @@ export function TrialPopup({ lang = "sk", onCta }) {
           margin: "0 0 1rem",
         }}>
           {L(
-            "Vyskúšaj všetky projekty, analytiku, reporty, exporty + AI asistenta na týždeň naplno.",
-            "Try every project, analytics, reports, exports + the AI assistant for a full week.",
+            "Vyskúšaj pokročilú analytiku, reporty, prehľady trhu + AI asistenta na týždeň naplno. Bez karty, bez záväzkov.",
+            "Try the advanced analytics, reports, market overviews + the AI assistant for a full week. No card, no commitment.",
           )}
         </p>
-
-        <ul style={{
-          color: "var(--text-2)", fontSize: "0.82rem", lineHeight: 1.65,
-          margin: "0 0 1.25rem", paddingLeft: "1.1rem",
-        }}>
-          <li><strong style={{ color: "var(--text)" }}>{L("Bez karty", "No card required")}</strong> — {L("kartu pýtame až keby si chcel pokračovať.", "we only ask for a card if you continue afterwards.")}</li>
-          <li><strong style={{ color: "var(--text)" }}>{L("Bez strhávania", "No auto-charge")}</strong> — {L("po 7 dňoch jednoducho padneš späť na free.", "after 7 days you simply drop back to the free tier.")}</li>
-          <li><strong style={{ color: "var(--text)" }}>30-{L("sekundový signup", "second signup")}</strong> — {L("email + heslo, viac netreba.", "email + password, that's all.")}</li>
-        </ul>
 
         <button onClick={cta}
           style={{
@@ -297,6 +288,13 @@ export function TrialPopup({ lang = "sk", onCta }) {
         >
           {L("Aktivovať 7-dňový trial", "Activate 7-day trial")}
         </button>
+
+        <div style={{
+          textAlign: "center", marginTop: "0.6rem",
+          fontFamily: "'JetBrains Mono', monospace", fontSize: "0.72rem", color: "var(--text-dim)",
+        }}>
+          {L("30s signup", "30s signup")}
+        </div>
 
         <button onClick={() => close("maybe_later")}
           style={{

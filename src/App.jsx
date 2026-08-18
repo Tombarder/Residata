@@ -48,13 +48,13 @@ import { startPageEngagement, stopPageEngagement } from "./lib/engagement";
 const PlatformShell = lazy(() => import("./pages/Platform"));
 import { track } from "./lib/track";
 
-const pagesEN = ["Home", "Live", "What we deliver", "Use Cases", "Pricing", "Contact"];
-const pagesSK = ["Domov", "Live", "Čo dostanete", "Využitie", "Cenník", "Kontakt"];
+const pagesEN = ["Home", "Live", "What we deliver", "Use Cases", "Pricing"];
+const pagesSK = ["Domov", "Live", "Čo dostanete", "Využitie", "Cenník"];
 // Czech nav labels. Like pagesSK these are structural UI (not part of the
 // Texts-editable `t` dict), so CZ visitors get Czech nav even before body copy
 // is authored in the admin tool. Display-only: routing always keys off
 // pagesEN[i] (see Nav), so these never need pageMap entries.
-const pagesCS = ["Domů", "Live", "Co dostanete", "Využití", "Ceník", "Kontakt"];
+const pagesCS = ["Domů", "Live", "Co dostanete", "Využití", "Ceník"];
 // Nav labels → internal page key. "Data" is the historical internal
 // name for the what-we-deliver / sample page; we keep it for route
 // stability (/sample URL still resolves) but the user-facing label
@@ -1699,7 +1699,17 @@ function DataPage({ setCurrent, l, lang }) {
 }
 
 /* ─────── PRICING ─────── */
-function PricingPage({ setCurrent, l, lang, onLogin }) {
+function PricingPage({ setCurrent, l, lang, onLogin, scrollToContact = false }) {
+  // Arriving via /contact (or any "ozvite sa" CTA) should land on the contact
+  // block, not at the top of the price table. Runs after paint so the section
+  // exists; "auto" rather than "smooth" because a deep link should already BE
+  // there, not animate down from a page the visitor never asked to see.
+  useEffect(() => {
+    if (!scrollToContact) return;
+    const el = document.getElementById("kontakt");
+    if (el) el.scrollIntoView({ behavior: "auto", block: "start" });
+  }, [scrollToContact]);
+
   const mono = "'JetBrains Mono', monospace";
   // DB-driven price (admin "Pricing" tool). Overrides the in-code price/anchor/
   // note on the paid tier when available; falls back to marketingCopy otherwise.
@@ -1772,23 +1782,23 @@ function PricingPage({ setCurrent, l, lang, onLogin }) {
             border: "1px solid var(--accent)", borderRadius: 12,
           }}>
             <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem", color: "var(--accent)", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "0.5rem", fontWeight: 700 }}>
-              🎁 {lang === "sk" ? "Darček pre teba" : "A gift for you"}
+              {lang === "sk" ? "Darček od nás" : "A gift from us"}
             </div>
             <h2 style={{ fontSize: "1.35rem", fontWeight: 700, color: "#e8e8ed", margin: "0 0 0.5rem", letterSpacing: "-0.01em" }}>
-              {lang === "sk" ? "7 dní plného Residata — zadarmo" : "7 days of the full Residata — on us"}
+              {lang === "sk" ? "Prístup k Residata Premium na 7 dní zadarmo" : "7 days of Residata Premium — free"}
             </h2>
             <p style={{ fontSize: "0.92rem", color: "#c0c0c8", lineHeight: 1.55, margin: "0 0 1rem" }}>
               {lang === "sk"
-                ? <>Vyskúšaj všetky projekty, analytiku, reporty, exporty + AI asistenta na týždeň naplno. <strong style={{ color: "#e8e8ed" }}>Bez karty</strong> — kartu pýtame až keby si chcel pokračovať po trial-e.</>
-                : <>Try every project, analytics, reports, exports + the AI assistant for a full week. <strong style={{ color: "#e8e8ed" }}>No card required</strong> — we only ask for one if you decide to continue after the trial.</>}
+                ? <>Vyskúšaj pokročilú analytiku, reporty, prehľady trhu + AI asistenta na týždeň naplno. <strong style={{ color: "#e8e8ed" }}>Bez karty, bez záväzkov.</strong></>
+                : <>Try the advanced analytics, reports, market overviews + the AI assistant for a full week. <strong style={{ color: "#e8e8ed" }}>No card, no commitment.</strong></>}
             </p>
-            <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center", flexWrap: "wrap", alignItems: "center" }}>
+            <div style={{ textAlign: "center" }}>
               <button type="button" onClick={startTrial} className="btn-p" style={{ cursor: "pointer" }}>
                 {lang === "sk" ? "Aktivovať 7-dňový trial" : "Activate 7-day trial"}
               </button>
-              <span style={{ fontSize: "0.72rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace" }}>
-                {lang === "sk" ? "30s signup · žiadna karta · bez strhávania" : "30s signup · no card · no auto-charge"}
-              </span>
+              <div style={{ fontSize: "0.72rem", color: "#8a8a96", fontFamily: "'JetBrains Mono', monospace", marginTop: "0.6rem" }}>
+                30s signup
+              </div>
             </div>
           </div>
         )}
@@ -1907,14 +1917,23 @@ function PricingPage({ setCurrent, l, lang, onLogin }) {
         }} />
         <h2 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "1rem" }}>{l.notSure}</h2>
         <p style={{ color: "#8a8a96", maxWidth: 480, margin: "0 auto 2rem", fontWeight: 300 }}>{l.notSureDesc}</p>
-        <button type="button" onClick={() => setCurrent("Contact")} className="btn-p" style={{ cursor: "pointer" }}>{l.getInTouch}</button>
+        {/* Contact now lives at the foot of this same page, so this scrolls
+            rather than navigating away. */}
+        <a href="#kontakt"
+           onClick={(e) => { e.preventDefault(); document.getElementById("kontakt")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}
+           className="btn-p" style={{ cursor: "pointer", display: "inline-block", textDecoration: "none" }}>{l.getInTouch}</a>
+      </div>
+
+      {/* ─── Contact, merged in under the pricing (Boss) ─── */}
+      <div style={{ borderTop: "1px solid #1a1a1f" }}>
+        <ContactSection l={l} />
       </div>
     </>
   );
 }
 
 /* ─────── CONTACT ─────── */
-function ContactPage({ l }) {
+function ContactSection({ l }) {
   const mono = "'JetBrains Mono', monospace";
   // Live proof instead of filler. The page used to run two columns — the contact
   // card and a four-step "how it works" list Boss had removed — and dropping that
@@ -1945,7 +1964,7 @@ function ContactPage({ l }) {
 
   return (
     <>
-      <div style={{ padding: "8rem 2rem 2.5rem", maxWidth: 680, margin: "0 auto", textAlign: "center" }}>
+      <div id="kontakt" style={{ padding: "clamp(3rem,8vw,5rem) 2rem 2.5rem", maxWidth: 680, margin: "0 auto", textAlign: "center", scrollMarginTop: "6rem" }}>
         <Label>{l.contactLabel}</Label>
         <h1 className="sec-title">{l.contactTitle}</h1>
         <p className="sec-desc" style={{ margin: "0 auto" }}>{l.contactDesc}</p>
@@ -2419,8 +2438,12 @@ export default function App() {
 
             {current === "Use Cases" && <UseCasesPage setCurrent={handleNav} l={l} lang={lang} />}
             {current === "Data" && <DataPage setCurrent={handleNav} l={l} lang={lang} />}
-            {current === "Pricing" && <PricingPage setCurrent={handleNav} l={l} lang={lang} onLogin={() => setLoginOpen(true)} />}
-            {current === "Contact" && <ContactPage l={l} />}
+            {/* Cenník and Kontakt are ONE page (Boss). /contact stays a real route —
+                old links, the footer and every "ozvite sa" CTA still point at it —
+                it just lands on the same page and scrolls to the contact block. */}
+            {(current === "Pricing" || current === "Contact") &&
+              <PricingPage setCurrent={handleNav} l={l} lang={lang} onLogin={() => setLoginOpen(true)}
+                           scrollToContact={current === "Contact"} />}
             {/* F-051 (Boss 2026-05-31) — legal pages */}
             {current === "Privacy" && <PrivacyPage lang={lang} />}
             {current === "Imprint" && <ImprintPage lang={lang} />}

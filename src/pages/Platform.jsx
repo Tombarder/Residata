@@ -1098,10 +1098,10 @@ function PlatformBilling({ lang, setCurrent }) {
           border: `1px solid ${green}`, borderRadius: 12, padding: "1.75rem 2rem", marginBottom: "1.25rem",
         }}>
           <div style={{ fontFamily: mono, fontSize: "0.65rem", color: accentInk, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.5rem" }}>
-            🎁 {lang === "sk" ? "Darček pre teba" : "A gift for you"}
+            {lang === "sk" ? "Darček od nás" : "A gift from us"}
           </div>
           <h3 style={{ fontSize: "1.25rem", fontWeight: 700, color: textLight, margin: 0, marginBottom: "0.6rem", letterSpacing: "-0.01em" }}>
-            {lang === "sk" ? "7 dní plného Residata — zadarmo" : "7 days of the full Residata — on us"}
+            {lang === "sk" ? "Prístup k Residata Premium na 7 dní zadarmo" : "7 days of Residata Premium — free"}
           </h3>
           <p style={{ color: "var(--text-2)", fontSize: "0.9rem", lineHeight: 1.6, margin: "0 0 1rem" }}>
             {lang === "sk"

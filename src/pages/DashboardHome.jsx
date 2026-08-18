@@ -729,7 +729,7 @@ function TrialOfferBanner({ lang, onActivate, busy, msg }) {
     <div style={{ background: "linear-gradient(90deg, color-mix(in srgb, var(--accent) 14%, transparent) 0%, color-mix(in srgb, var(--accent) 4%, transparent) 70%, transparent 100%)", border: `1px solid ${green}`, borderRadius: 12, padding: "0.95rem 1.2rem", marginBottom: "1.4rem", display: "flex", alignItems: "center", gap: "0.95rem", flexWrap: "wrap" }}>
       <div style={{ flexShrink: 0, width: 34, height: 34, borderRadius: 8, background: "color-mix(in srgb, var(--accent) 18%, transparent)", color: accentInk, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.05rem" }}>🎁</div>
       <div style={{ flex: 1, minWidth: 200 }}>
-        <div style={{ color: textLight, fontWeight: 700, fontSize: "0.95rem" }}>{L(lang, "7 dní plného Residata — zadarmo", "7 days of the full Residata — on us")}</div>
+        <div style={{ color: textLight, fontWeight: 700, fontSize: "0.95rem" }}>{L(lang, "Prístup k Residata Premium na 7 dní zadarmo", "7 days of Residata Premium — free")}</div>
         <div style={{ color: dim, fontSize: "0.8rem", marginTop: "0.15rem", lineHeight: 1.45 }}>{L(lang, "Všetky projekty, analytika, reporty, exporty. Bez karty. Jedným klikom.", "Every project, analytics, reports, exports. No card required. One-click.")}</div>
       </div>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "0.3rem" }}>
