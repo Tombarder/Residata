@@ -666,13 +666,20 @@ const _marketTotalsByCountry = new Map();  // country code → mapped totals obj
   } catch (_e) { /* a seed must never break the app */ }
 })();
 
-export function useMarketTotals() {
+/** @param {string|null} countryOverride  Pin the totals to one market instead of
+ *  following the country switcher. Only for surfaces that are themselves pinned:
+ *  the public "Ukážka dát" page resolves its districts and peaks to SK, so on the
+ *  default "All" view it was captioning a Slovak district list with the combined
+ *  SK+CZ average (€5,920/m² against Slovakia's €4,723). Omit it and nothing
+ *  changes — every other caller still follows useCountry. */
+export function useMarketTotals(countryOverride = null) {
   // Auth-settle signal (mirrors usePivotDistinct): re-fetch once auth resolves.
   // Public read via supabasePublic, so no GATE — just a fresh attempt on settle,
   // plus a transient-error retry below. Fixes the "/app dashboard KPI cards empty
   // on first load right after login" race.
   const { loading: authLoading, user } = useAuth();
-  const { country } = useCountry();
+  const { country: _ctxCountry } = useCountry();
+  const country = countryOverride || _ctxCountry;
   const [totals, setTotals] = useState(() => _marketTotalsByCountry.get(country) || {
     loading: true, error: false,
     unitsTracked: null, unitsAvailable: null, unitsReserved: null,
@@ -886,8 +893,15 @@ const _HOME_PROJECT_COLS =
   "future_units,sold_last_month,sold_percentage,avg_price_eur_m2,min_price,max_price";
 let _homeProjectsCache = null;
 let _homeProjectsCacheKey = null;
-export function useHomeProjects() {
-  const { country } = useCountry();
+/** @param {string|null} countryOverride  Pin to one market instead of following
+ *  the country switcher — same purpose as the argument on useMarketTotals, and
+ *  needed by the same page: the public "Ukážka dát" sample resolves its districts,
+ *  peaks and market average to SK, so on the default "All" view these cards
+ *  headlined a Praha project above a Slovak district table. Omit it and nothing
+ *  changes for the homepage, which genuinely wants the whole market. */
+export function useHomeProjects(countryOverride = null) {
+  const { country: _ctxCountry } = useCountry();
+  const country = countryOverride || _ctxCountry;
   const key = country;
   const cacheHit = _homeProjectsCacheKey === key;
   const [projects, setProjects] = useState(cacheHit ? (_homeProjectsCache || []) : []);
