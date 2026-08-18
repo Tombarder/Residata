@@ -1755,15 +1755,15 @@ function PricingPage({ setCurrent, l, lang, onLogin, scrollToContact = false }) 
   };
   return (
     <>
-      {/* The top of this page is TWO standalone parts (Boss): pricing on the left
-          at two thirds, contact on the right at one third — not a contact card
-          wedged in as a third plan. Everything below (testimonial, FAQ) stays
-          full-width and centred as it was. */}
-      <div className="pricing-split" style={{
-        display: "grid", gridTemplateColumns: "2fr 1fr", gap: "2rem",
-        padding: "8rem 2rem 4rem", maxWidth: 1280, margin: "0 auto", alignItems: "start",
-      }}>
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+      {/* Page header and the trial offer run FULL WIDTH; only the plans and the
+          contact panel are split. That is what makes the split work: putting the
+          heading and the promo inside the left column stacked four things there
+          against one card on the right, and the columns came out 1146px vs 477px
+          — 669px of dead space beside the contact card. With only the two plan
+          cards on the left the two sides are within ~150px of each other, and the
+          contact panel stretches to close the rest, so both columns end on the
+          same line with nothing invented to fill them. */}
+      <div style={{ padding: "8rem 2rem 2.5rem", maxWidth: 1280, margin: "0 auto", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
         {isAlreadyPaid && (
           <div style={{ marginBottom: "1rem",
             display: "inline-flex", alignItems: "center", gap: "0.5rem",
@@ -1777,7 +1777,7 @@ function PricingPage({ setCurrent, l, lang, onLogin, scrollToContact = false }) 
         )}
         <Label>{l.pricingLabel}</Label>
         <h1 className="sec-title">{l.pricingTitle}</h1>
-        <p className="sec-desc" style={{ textAlign: "left", marginLeft: 0 }}>{l.pricingDesc}</p>
+        <p className="sec-desc" style={{ textAlign: "center" }}>{l.pricingDesc}</p>
 
         {/* 7-day free trial card — front and centre on Pricing for
             anon + free users. Mirrors the Billing-page version so the
@@ -1787,7 +1787,7 @@ function PricingPage({ setCurrent, l, lang, onLogin, scrollToContact = false }) 
             lives. */}
         {showTrialOffer && (
           <div style={{
-            marginTop: "2rem", padding: "1.75rem 2rem", maxWidth: 680, width: "100%",
+            marginTop: "2rem", padding: "1.75rem 2rem", maxWidth: 1256, width: "100%",
             background: "linear-gradient(135deg, color-mix(in srgb, var(--accent) 16%, transparent), color-mix(in srgb, var(--accent) 4%, transparent))",
             border: "1px solid var(--accent)", borderRadius: 12,
           }}>
@@ -1812,7 +1812,14 @@ function PricingPage({ setCurrent, l, lang, onLogin, scrollToContact = false }) 
             </div>
           </div>
         )}
-        <div className="pricing-grid" style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "1.5rem", width: "100%", marginTop: "2rem", alignItems: "stretch" }}>
+      </div>
+
+      {/* The split: two plans (2/3) and contact as its own part (1/3). */}
+      <div className="pricing-split" style={{
+        display: "grid", gridTemplateColumns: "2fr 1px 1fr", columnGap: "2.75rem",
+        padding: "0 2rem 4rem", maxWidth: 1320, margin: "0 auto", alignItems: "stretch",
+      }}>
+        <div className="pricing-grid" style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "1.5rem", alignItems: "stretch" }}>
           {tiers.map(t => (
             <div key={t.tier} style={{
               border: `1px solid ${t.featured ? "var(--accent)" : "#222228"}`,
@@ -1872,10 +1879,15 @@ function PricingPage({ setCurrent, l, lang, onLogin, scrollToContact = false }) 
             </div>
           ))}
         </div>
-      </div>
 
-      {/* RIGHT third — contact as its own standalone part, not a plan card. */}
-      <ContactSection l={l} />
+        {/* The divider from Boss's sketch. It is what separates "the plans" from
+            "talk to us"; three same-width boxes in a row read as three plans
+            however the third is styled. */}
+        <div className="pricing-rule" style={{ background: "linear-gradient(180deg, transparent, #24242c 12%, #24242c 88%, transparent)" }} />
+
+        {/* RIGHT third — its own part, deliberately NOT a card: it sits on the
+            page beside the plans rather than in a box competing with them. */}
+        <ContactSection l={l} />
       </div>
 
       {/* Testimonial */}
@@ -1950,9 +1962,12 @@ function ContactSection({ l }) {
 
   return (
     <div id="kontakt" style={{
-      border: "1px solid #222228", borderRadius: 12, background: "#16161a",
-      padding: "2.5rem", scrollMarginTop: "6rem",
-      display: "flex", flexDirection: "column",
+      // No border, no card background: a plan is something you buy and belongs in
+      // a box; this is a person you talk to. Sitting directly on the page, behind
+      // the divider rule, it reads as the other half of the row instead of a
+      // third, cheaper tier.
+      padding: "0.25rem 0 0", scrollMarginTop: "6rem",
+      display: "flex", flexDirection: "column", alignSelf: "start",
     }}>
       <div style={{ fontFamily: mono, fontSize: "0.68rem", color: "var(--accent)", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "1.25rem" }}>
         {l.contactLabel}
@@ -1987,7 +2002,7 @@ function ContactSection({ l }) {
       {/* Pushed to the bottom edge so this button lines up with the plan CTAs
           beside it however tall the tiers grow. */}
       <a href="https://calendar.app.google/x6vKBohYsVjNKL1A9" target="_blank" rel="noopener noreferrer" style={{
-        display: "block", padding: "0.85rem 1.5rem", textAlign: "center", marginTop: "auto",
+        display: "block", padding: "0.85rem 1.5rem", textAlign: "center",
         background: "var(--accent)", color: "#0a0a0b", fontWeight: 600,
         fontSize: "0.9rem", borderRadius: 8, textDecoration: "none",
       }}>{l.bookCall}</a>
@@ -2313,7 +2328,9 @@ export default function App() {
            narrow to read a feature list in. Contact drops under the pricing and
            becomes full-width there. */
         @media (max-width: 1050px) {
-          .pricing-split { grid-template-columns: 1fr !important; padding-top: 6rem !important; }
+          .pricing-split { grid-template-columns: 1fr !important; row-gap: 2.5rem; }
+          /* The vertical rule becomes a horizontal one once the parts stack. */
+          .pricing-rule { height: 1px; background: #24242c !important; }
         }
         @media (max-width: 900px) {
           .value-grid { grid-template-columns: 1fr !important; }
