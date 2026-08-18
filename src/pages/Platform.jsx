@@ -1654,11 +1654,14 @@ const FLATS_CSV_COLUMNS = [
   "stav", "kolaudacia", "orientacia",
   // Country
   "country", "currency",
-  // Financing schedules — one column per scheme (uniform DB, Boss 2026-07-03).
-  // Order MUST match export_units_csv concat_ws in
-  // v2/migrations/2026-07-03_financing_columns_uniform.sql.
+  // Payment schedules — one column per scheme. Column ORDER must match
+  // export_units_csv's concat_ws: the six original columns, then the ten the
+  // 2026-08-18 migration appended. Source of truth: v2/lib/financing_schemes.py.
   "fin_10_90", "fin_20_80", "fin_30_40_30",
   "fin_10_40_40_10", "fin_70_30", "fin_30_50_20",
+  "fin_95_5", "fin_90_10", "fin_80_20", "fin_60_40",
+  "fin_50_50", "fin_40_60", "fin_30_70", "fin_5_95",
+  "fin_20_50_30", "fin_5_15_80",
   // Audit
   "created_at",
 ];
@@ -1675,6 +1678,12 @@ const FLATS_NUMBER_COLUMNS = new Set([
   "izby", "obytna_plocha", "balkon_plocha", "loggia_plocha", "terasa_plocha",
   "zahrada_plocha", "exterier_plocha", "kobka_plocha", "celkova_plocha",
   "cena_bez_dph", "cena_s_dph", "cennikova_cena",
+  // Payment-schedule prices are prices too — they were exporting as text, so
+  // Excel could not sort or sum them (2026-08-18).
+  "fin_95_5", "fin_90_10", "fin_80_20", "fin_70_30",
+  "fin_60_40", "fin_50_50", "fin_40_60", "fin_30_70",
+  "fin_20_80", "fin_10_90", "fin_5_95", "fin_30_50_20",
+  "fin_30_40_30", "fin_20_50_30", "fin_5_15_80", "fin_10_40_40_10",
 ]);
 
 // Minimal RFC-4180 CSV parser → array of string-cell rows. Handles quoted fields
