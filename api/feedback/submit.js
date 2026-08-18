@@ -21,7 +21,7 @@ const MAX_MESSAGE_LEN = 4000;
 const MAX_SHORT_LEN   = 500;
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 const IMAGE_MIME_EXT  = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
-const VALID_CATEGORIES = new Set(["data", "bug", "website", "question", "idea", "other"]);
+const VALID_CATEGORIES = new Set(["bug", "question", "idea", "other"]);
 
 
 function cleanText(raw, { max = 200 } = {}) {

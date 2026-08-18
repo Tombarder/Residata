@@ -34,9 +34,6 @@ const MAX_SHOT_DATAURL = 3.6 * 1024 * 1024;
 
 // [key, sk, en] — no emoji column. Six emoji in a 2-column grid was the loudest
 // thing in the panel and told the reader nothing the label didn't.
-// Na výber sú tieto štyri. Zrušené kategórie („data" = Kvalita dát, „website" = Web/zobrazenie)
-// zámerne ostávajú v RETIRED_CATEGORIES nižšie — nové správy sa už nimi označiť nedajú, ale staré
-// vlákna sa musia naďalej zobraziť pod svojím pôvodným názvom, nie ako „Iné".
 const CATEGORIES = [
   ["bug",      "Chyba / problém",   "Bug / problem"],
   ["question", "Otázka",            "Question"],
@@ -85,15 +82,7 @@ function downscaleImage(file, maxDim = 1600, quality = 0.82) {
     reader.onerror = reject; reader.readAsDataURL(file);
   });
 }
-// už nevoliteľné, ale historické vlákna ich stále nesú
-const RETIRED_CATEGORIES = [
-  ["data",    "Kvalita dát",      "Data quality"],
-  ["website", "Web / zobrazenie", "Website / display"],
-];
-const catMeta = (k) =>
-  CATEGORIES.find((x) => x[0] === k) ||
-  RETIRED_CATEGORIES.find((x) => x[0] === k) ||
-  ["other", "Iné", "Other"];
+const catMeta = (k) => CATEGORIES.find((x) => x[0] === k) || ["other", "Iné", "Other"];
 const fmtDay = (s) => (s ? String(s).slice(0, 10) : "");
 
 // ── Unread tracking (in-app "new reply" alert) ─────────────────────────────
