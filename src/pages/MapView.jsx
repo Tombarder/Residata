@@ -26,6 +26,7 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import { priceBasisNote, usePriceSchedules } from "../lib/priceBasis";
 import { useProjects } from "../lib/useData";
 import { useAccountPrefState, useAccountHydrated } from "../lib/useAccountUiPref";
 import { useCountry } from "../lib/useCountry";
@@ -126,17 +127,27 @@ function buildFeatures(projects, coords) {
 
 // Build + show the project popup. Shared by the map's point-click handler and by
 // search-select, so a clicked pin and a chosen suggestion render the same card.
-function showProjectPopup(map, lngLat, props, lang, onOpen, popupRef) {
+function showProjectPopup(map, lngLat, props, lang, onOpen, popupRef, schedules = {}) {
   const el = document.createElement("div");
   el.style.minWidth = "180px";
   const loc = [props.city, props.district].filter(Boolean).join(" · ");
   const price = Number(props.ppm2) > 0 ? `${moneySymbol()}${Math.round(moneyFromEur(Number(props.ppm2))).toLocaleString("sk-SK")}/m²` : "—";
+  // A price that only holds under a payment schedule says so here too — the map
+  // is where most people meet a project first, and an unlabelled 90/10 price
+  // reads as an ordinary one.
+  const sched = schedules[props.name] || schedules[props.id] || "";
+  const schedMark = sched ? `<sup style="color:${amber};margin-left:0.15em;font-size:0.72em">*</sup>` : "";
+  const schedLine = sched
+    ? `<div style="margin-top:6px;font-size:0.66rem;line-height:1.4;color:${dim}">` +
+      `${escapeHtml(priceBasisNote(sched, lang))}</div>`
+    : "";
   el.innerHTML =
     `<div style="font-weight:600;font-size:0.92rem;color:${textLight};margin-bottom:2px">${escapeHtml(props.name)}</div>` +
     `<div style="font-size:0.72rem;color:${dim};margin-bottom:8px">${escapeHtml(loc)}</div>` +
     `<div style="font-family:${mono};font-size:0.72rem;color:${textLight};line-height:1.5">` +
     `<div><span style="color:${dim}">${lang === "sk" ? "Voľné" : "Available"}</span> &nbsp;${props.available} / ${props.total}</div>` +
-    `<div><span style="color:${dim}">${lang === "sk" ? "Priem." : "Avg"}</span> &nbsp;${price}</div></div>` +
+    `<div><span style="color:${dim}">${lang === "sk" ? "Priem." : "Avg"}</span> &nbsp;${price}${schedMark}</div></div>` +
+    schedLine +
     `<button id="mv-open" style="margin-top:10px;width:100%;padding:7px 10px;background:${green};color:#0a0a0b;` +
     `border:none;border-radius:6px;font-weight:600;font-size:0.78rem;cursor:pointer">` +
     `${lang === "sk" ? "Otvoriť projekt" : "Open project"} →</button>`;
@@ -164,6 +175,11 @@ export default function MapView({ lang = "en", setCurrent }) {
   const langRef = useRef(lang);
   const countryRef = useRef(country);   // latest country, readable inside the once-mounted load handler
   const fitKeyRef = useRef(null);        // country we've already auto-fitted to (once data was present)
+  const priceSchedules = usePriceSchedules();
+  // The pin-click handler is registered once when the map loads, so it reads the
+  // schedules through a ref — a captured value would be the empty first render.
+  const schedulesRef = useRef(priceSchedules);
+  useEffect(() => { schedulesRef.current = priceSchedules; }, [priceSchedules]);
   const popupRef = useRef(null);         // single active popup — clicking pins must not stack popups
 
   // ── Filter + search state ──
@@ -391,7 +407,7 @@ export default function MapView({ lang = "en", setCurrent }) {
         showProjectPopup(
           map, f.geometry.coordinates, f.properties, langRef.current,
           (id) => { setCurrentRef.current && setCurrentRef.current("App:ProjectDetail:" + id); },
-          popupRef
+          popupRef, schedulesRef.current
         );
       });
 
@@ -486,7 +502,7 @@ export default function MapView({ lang = "en", setCurrent }) {
       showProjectPopup(
         map, [c.lng, c.lat], projectProps(p), langRef.current,
         (id) => { setCurrentRef.current && setCurrentRef.current("App:ProjectDetail:" + id); },
-        popupRef
+        popupRef, schedulesRef.current
       );
     }
   }
