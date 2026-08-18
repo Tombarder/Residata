@@ -1148,9 +1148,11 @@ function UseCasesPage({ setCurrent, l, lang }) {
 // On the page whose whole purpose is to demonstrate our data quality.
 //
 // It is now assembled from live sources on every render (see useSampleData below):
-//   · public.data_sample   — the 8 sample units, price-per-room ladder, peak €/m²
-//                            (a 2-row matview: the only unit-level detail anon may
-//                            read, since RLS keeps final.units closed)
+//   · public.data_sample   — price-per-room ladder + peak €/m² per district. NOT
+//                            unit rows: it is a 2-row matview (one per country)
+//                            holding only aggregates OVER units, because RLS keeps
+//                            final.units closed to anon and that gate is the paid
+//                            product. Nothing here publishes a single unit.
 //   · public.district_totals — €/m², units and project counts per district
 //   · public.projects_live   — sell-through for the near-sellout + fastest cards
 //   · public.market_totals   — the market average
@@ -1170,14 +1172,21 @@ function useSampleData() {
   const { country } = useCountry();
   // This page has always shown ONE market (its copy says "bratislavskom"), and the
   // sample matview has a row per country — so "All" resolves to SK here, matching
-  // the page's own convention. Districts must resolve the SAME way or the cards
-  // disagree: unfiltered district_totals put Bubeneč (CZ) at the top while the
-  // sample's peaks were Slovak, so the premium-cluster card looked up a Czech
-  // district in a Slovak map and printed "peaking at €—/m²".
+  // the page's own convention.
+  //
+  // EVERY source below must resolve the same way, or the cards quietly contradict
+  // each other — and because the site opens on "All" by default, a mismatch here is
+  // what a first-time visitor sees. All four have been caught doing it:
+  //   · districts — unfiltered, they put Bubeneč (CZ) top while the peaks map was
+  //     Slovak, so the premium card printed "peaking at €—/m²"
+  //   · market average — returned the blended SK+CZ €5,920/m² as the caption above
+  //     a wholly Slovak district table (Slovakia's own average is €4,723)
+  //   · projects — headlined "Novy Rohan in Praha is 99% sold" on that same page
+  // So: pin them all to `cc`. If you add a fifth source here, pin it too.
   const cc = country === "CZ" ? "CZ" : "SK";
-  const sample = useDataSample();                       // 8 units + room ladder + peaks
-  const totals = useMarketTotals();                     // market average
-  const { projects } = useHomeProjects();               // sell-through cards
+  const sample = useDataSample();                       // room ladder + district peaks
+  const totals = useMarketTotals(cc);                   // market average
+  const { projects } = useHomeProjects(cc);             // sell-through cards
   const districtQ = useTotalsList("district", { country: cc });   // €/m² + depth per district
 
   const nf = (n) => (n == null ? "—" : Math.round(Number(n)).toLocaleString("en-US"));
@@ -1255,12 +1264,13 @@ function DataPage({ setCurrent, l, lang }) {
   const { country } = useCountry();
   const d = useSampleData();
   const isPaid = can("has_paid_access");
-  // F-062 (Boss 2026-05-31): the InsightCards section contains hardcoded
-  // illustrative numbers, NOT live derived data. The previous dynamic badge
-  // claimed "<Month Year> snapshot · real data" which was misleading. Badge
-  // text now comes from l.insightsBadge ("Illustrative examples · live in
-  // dashboard") so customers don't mistake hand-authored examples for live
-  // insights. Live versions ship in the paid dashboard.
+  // F-062 (Boss 2026-05-31) made this badge say "illustrative", correctly: the
+  // InsightCards were fed by a hardcoded constant that had gone stale. That
+  // constant is gone as of 2026-08-18 — the cards read the live serving layer
+  // (data_sample + district_totals + projects_live + market_totals, all refreshed
+  // nightly), so l.insightsBadge now says "Live · from the latest snapshot".
+  // The rule behind F-062 still stands: this badge must describe what the numbers
+  // ACTUALLY are. If they ever go back to being hand-authored, change it back.
   const dynamicInsightsBadge = l.insightsBadge;
 
   // Insight card component
@@ -1464,12 +1474,12 @@ function DataPage({ setCurrent, l, lang }) {
           <div className="ic-split" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
             <div>
               <div style={{ fontSize: "0.82rem", color: "#8a8a96", lineHeight: 1.65, marginBottom: "1rem" }}>
-                {d.top.district} is the city's priciest cluster — <span style={{ color: "#e8e8ed" }}>{d.top.projects} active projects</span> and <span style={{ color: "#e8e8ed" }}>{d.top.units} units</span> tracked ({d.top.avail} still available) at <span style={{ color: "#e8e8ed" }}>€{d.top.m2}/m²</span> average, peaking at <span style={{ color: "#e8e8ed" }}>€{d.top.peak}/m²</span>.
+                {d.top.district} is the city's priciest cluster — <span style={{ color: "#e8e8ed" }}>{d.top.projects} active {d.top.projects === 1 ? "project" : "projects"}</span> and <span style={{ color: "#e8e8ed" }}>{d.top.units} units</span> tracked ({d.top.avail} still available) at <span style={{ color: "#e8e8ed" }}>€{d.top.m2}/m²</span> average, peaking at <span style={{ color: "#e8e8ed" }}>€{d.top.peak}/m²</span>.
                 <br /><br />
                 <span style={{ color: "#e8e8ed", fontWeight: 600 }}>For banks & valuers:</span> this is where comparable evidence is scarcest and most valuable. Once a premium project sells out its transaction history stops updating — and can't be reconstructed retrospectively.
               </div>
               <div style={{ display: "flex", gap: "1.5rem", flexWrap: "wrap" }}>
-                <div><div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: "var(--accent)" }}>{d.top.projects}</div><div style={{ fontSize: "0.68rem", color: "#55555f" }}>active projects</div></div>
+                <div><div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: "var(--accent)" }}>{d.top.projects}</div><div style={{ fontSize: "0.68rem", color: "#55555f" }}>active {d.top.projects === 1 ? "project" : "projects"}</div></div>
                 <div><div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: "#e8e8ed" }}>{d.top.avail}</div><div style={{ fontSize: "0.68rem", color: "#55555f" }}>units available</div></div>
                 <div><div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: "#f5a623" }}>€{d.top.peak}</div><div style={{ fontSize: "0.68rem", color: "#55555f" }}>peak €/m²</div></div>
               </div>
