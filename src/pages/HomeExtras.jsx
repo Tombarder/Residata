@@ -19,6 +19,16 @@ const PANEL_SAMPLE = {
   SK: { avg: "5,525", mom: "+2.1%", rows: [["Downtown Yards", "Staré Mesto", "8,638"], ["Byty Ružinov", "Ružinov", "5,409"]] },
   CZ: { avg: "7,443", mom: "+1.5%", rows: [["Ethos Karlín", "Karlín", "9,960"], ["TOIVO Roztyly", "Chodov", "6,928"]] },
 };
+// PipelineFlow scene layout — ONE source of truth for the canvas geometry.
+// The three zones are laid out on a single horizontal axis with a single
+// header row, so the scene reads as symmetric instead of hand-placed.
+//   ZONE_CX — optical centre (x) of each zone: buildings / hub / dashboard
+//   AXIS_Y  — the shared vertical centre every zone visual sits on
+//   HEAD_Y  — baseline of the first header line, identical for all zones
+const ZONE_CX = [205, 700, 1190];
+const AXIS_Y  = 270;
+const HEAD_Y  = 44;
+
 const green = "var(--accent)";
 const dim = "var(--text-dim)";
 const border = "var(--border)";
@@ -153,11 +163,22 @@ function CenterHub({ subtitle }) {
         </g>
       ))}
 
-      {/* Subtitle tag underneath */}
-      <rect x="-92" y="78" width="184" height="24" rx="12" fill="var(--surface-2)" stroke="var(--accent)" strokeOpacity="0.4" strokeWidth="0.8" />
-      <text x="0" y="94" textAnchor="middle" fill="var(--accent)" fontFamily={mono} fontSize="11" fontWeight="700" letterSpacing="0.06em">
-        {subtitle}
-      </text>
+      {/* Subtitle tag underneath — the pill is sized FROM the label, not a fixed
+          width: a monospace glyph advance is exactly 0.6em, so at 11px with
+          0.06em letter-spacing every character costs 7.26px. The old hardcoded
+          184px fitted "READY · DEDUPED" but was ~5px too narrow for the Slovak
+          "PRIPRAVENÉ · DEDUPLIKOVANÉ", which bled over its own border. */}
+      {(() => {
+        const pillW = Math.round(subtitle.length * (11 * 0.6 + 11 * 0.06)) + 28;
+        return (
+          <>
+            <rect x={-pillW / 2} y="78" width={pillW} height="24" rx="12" fill="var(--surface-2)" stroke="var(--accent)" strokeOpacity="0.4" strokeWidth="0.8" />
+            <text x="0" y="94" textAnchor="middle" fill="var(--accent)" fontFamily={mono} fontSize="11" fontWeight="700" letterSpacing="0.06em">
+              {subtitle}
+            </text>
+          </>
+        );
+      })()}
     </g>
   );
 }
@@ -322,9 +343,9 @@ export function PipelineFlow({ lang = "en" }) {
 
     z1Line1: "Dáta zbierame",
     z1Live: `z ${fmt(devCount, "sk-SK")} developerov · ${fmt(projCount, "sk-SK")} projektov`,
-    z1Foot: "každý deň, bez výnimiek",
 
     z2Line1: "Normalizácia a validácia",
+    z2Foot: "jednotný formát pre celý trh",
     z2Chip: "PRIPRAVENÉ · DEDUPLIKOVANÉ",
 
     z3Line1: "Živý trhový prehľad",
@@ -347,9 +368,9 @@ export function PipelineFlow({ lang = "en" }) {
 
     z1Line1: "Data collected",
     z1Live: `from ${fmt(devCount, "en-US")} developers · ${fmt(projCount, "en-US")} projects`,
-    z1Foot: "every day",
 
     z2Line1: "Standardize & validate",
+    z2Foot: "one comparable format",
     z2Chip: "READY · DEDUPED",
 
     z3Line1: "Real-time market intelligence",
@@ -384,7 +405,7 @@ export function PipelineFlow({ lang = "en" }) {
         border: `1px solid ${border}`, borderRadius: 16, overflow: "hidden",
         marginBottom: "1.5rem",
       }}>
-        <svg viewBox="0 0 1400 520" style={{ width: "100%", height: "auto", display: "block" }}>
+        <svg viewBox="0 0 1400 440" style={{ width: "100%", height: "auto", display: "block" }}>
           <defs>
             {/* Building gradient */}
             <linearGradient id="iso-wall" x1="0" y1="0" x2="0" y2="1">
@@ -433,68 +454,62 @@ export function PipelineFlow({ lang = "en" }) {
           </defs>
 
           {/* Subtle dot-grid backdrop */}
-          <rect x="0" y="0" width="1400" height="520" fill="url(#dot-grid)" opacity="0.35" />
+          <rect x="0" y="0" width="1400" height="440" fill="url(#dot-grid)" opacity="0.35" />
 
           {/* Radial glow centered on hub */}
-          <circle cx="700" cy="260" r="260" fill="url(#hub-halo)" opacity="0.4" />
+          <circle cx="700" cy={AXIS_Y} r="260" fill="url(#hub-halo)" opacity="0.4" />
 
-          {/* ═══ ZONE 1: Iso buildings cluster (x: 40–340) ═══ */}
-          <g transform="translate(60, 100)">
-            <IsoBuildingsCluster />
-
-            {/* Zone 1 label — text top-left */}
-            <g transform="translate(-10, -70)">
-              <text x="0" y="0" fill="var(--accent)" fontFamily={mono} fontSize="11" letterSpacing="0.14em" fontWeight="700">01 · COLLECT</text>
-              <text x="0" y="22" fill="#fff" fontFamily="'Outfit', sans-serif" fontSize="20" fontWeight="700" letterSpacing="-0.01em">
-                {T.z1Line1}
+          {/* ═══ ZONE HEADERS ═══
+              All three headers share ONE geometry: same three baselines
+              (eyebrow / title / caption), same centre-anchoring, each block
+              centred on its own zone's optical centre (ZONE_CX). Previously
+              they sat at three different heights (y 30 / 70 / 60) with mixed
+              left/centre anchoring and 4 / 2 / 3 lines, which read as crooked.
+              Keep them symmetric — edit the constants, not individual <text>. */}
+          {[
+            { key: "z1", cx: ZONE_CX[0], eyebrow: "01 · COLLECT", title: T.z1Line1, sub: T.z1Live, subAccent: true },
+            { key: "z2", cx: ZONE_CX[1], eyebrow: "02 · PROCESS", title: T.z2Line1, sub: T.z2Foot },
+            { key: "z3", cx: ZONE_CX[2], eyebrow: "03 · DELIVER", title: T.z3Line1, sub: T.z3Foot },
+          ].map(z => (
+            <g key={z.key} transform={`translate(${z.cx}, ${HEAD_Y})`}>
+              <text x="0" y="0" textAnchor="middle" fill="var(--accent)" fontFamily={mono} fontSize="11" letterSpacing="0.14em" fontWeight="700">
+                {z.eyebrow}
               </text>
-              <text x="0" y="42" fill="var(--accent)" fontFamily={mono} fontSize="11.5" fontWeight="600" letterSpacing="0.02em">
-                {T.z1Live}
+              <text x="0" y="27" textAnchor="middle" fill="#fff" fontFamily="'Outfit', sans-serif" fontSize="20" fontWeight="700" letterSpacing="-0.01em">
+                {z.title}
               </text>
-              <text x="0" y="58" fill={dim} fontFamily="'Outfit', sans-serif" fontSize="11">
-                {T.z1Foot}
+              <text x="0" y="50" textAnchor="middle" fontFamily={z.subAccent ? mono : "'Outfit', sans-serif"} fontSize="11.5" fill={z.subAccent ? "var(--accent)" : dim} fontWeight={z.subAccent ? 600 : 400}>
+                {z.sub}
               </text>
             </g>
+          ))}
+
+          {/* ═══ ZONE 1: Iso buildings cluster ═══
+              Origin picked so the cluster's optical centre (local ~128, ~170)
+              lands on ZONE_CX[0] / AXIS_Y. */}
+          <g transform={`translate(${ZONE_CX[0] - 128}, ${AXIS_Y - 170})`}>
+            <IsoBuildingsCluster />
           </g>
 
           {/* ═══ FLOW 1 → 2 ═══ */}
-          <FlowStream x1={360} y={260} x2={540} count={5} delayOffset={0} duration={2.8} />
+          <FlowStream x1={375} y={AXIS_Y} x2={540} count={5} delayOffset={0} duration={2.8} />
 
-          {/* ═══ ZONE 2: Central hub (x: 540–860) ═══ */}
-          <g transform="translate(700, 260)">
+          {/* ═══ ZONE 2: Central hub (already drawn around its own origin) ═══ */}
+          <g transform={`translate(${ZONE_CX[1]}, ${AXIS_Y})`}>
             <CenterHub subtitle={T.z2Chip} />
-
-            {/* Zone 2 label — above hub */}
-            <g transform="translate(0, -190)">
-              <text x="0" y="0" textAnchor="middle" fill="var(--accent)" fontFamily={mono} fontSize="11" letterSpacing="0.14em" fontWeight="700">02 · PROCESS</text>
-              <text x="0" y="22" textAnchor="middle" fill="#fff" fontFamily="'Outfit', sans-serif" fontSize="20" fontWeight="700" letterSpacing="-0.01em">
-                {T.z2Line1}
-              </text>
-            </g>
           </g>
 
           {/* ═══ FLOW 2 → 3 ═══ */}
-          <FlowStream x1={860} y={260} x2={1040} count={5} delayOffset={0.6} duration={2.8} />
+          <FlowStream x1={860} y={AXIS_Y} x2={1025} count={5} delayOffset={0.6} duration={2.8} />
 
-          {/* ═══ ZONE 3: Dashboard panel (x: 1040–1350) ═══ */}
-          <g transform="translate(1040, 130)">
+          {/* ═══ ZONE 3: Dashboard panel (310 × 260, drawn from its top-left) ═══ */}
+          <g transform={`translate(${ZONE_CX[2] - 155}, ${AXIS_Y - 130})`}>
             <DashboardPanel
               captionRow1={T.z3Cap1}
               captionRow2={T.z3Cap2}
               chipLabels={T.z3Chips}
               sample={panelSample}
             />
-
-            {/* Zone 3 label — above panel */}
-            <g transform="translate(0, -70)">
-              <text x="0" y="0" fill="var(--accent)" fontFamily={mono} fontSize="11" letterSpacing="0.14em" fontWeight="700">03 · DELIVER</text>
-              <text x="0" y="22" fill="#fff" fontFamily="'Outfit', sans-serif" fontSize="20" fontWeight="700" letterSpacing="-0.01em">
-                {T.z3Line1}
-              </text>
-              <text x="0" y="42" fill={dim} fontFamily="'Outfit', sans-serif" fontSize="11.5">
-                {T.z3Foot}
-              </text>
-            </g>
           </g>
         </svg>
       </div>
