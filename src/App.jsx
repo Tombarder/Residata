@@ -715,6 +715,7 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
 
 function Footer({ lang = "en", setCurrent }) {
   const isSK = lang === "sk";
+  const mono = "'JetBrains Mono', monospace";
   // F-051: legal links + cookie settings re-opener. The "Cookie settings"
   // link calls the global the CookieBanner registers on mount — this lets
   // users revisit their consent any time without a separate page.
@@ -728,39 +729,87 @@ function Footer({ lang = "en", setCurrent }) {
       window.residataReopenCookieBanner();
     }
   };
-  const linkStyle = { fontSize: "0.78rem", color: "#8a8a96", textDecoration: "none" };
+
+  // Everything used to sit in two undifferentiated rows — the copyright line and
+  // the address glued together on the left, the email and phone floating right,
+  // then four legal links in a bare row underneath. Nothing said which of those
+  // were contact details and which were legal pages, so it read as a pile of
+  // links. They are now grouped by what they ARE, each group under its own
+  // heading, with the copyright on its own baseline underneath.
+  const linkStyle = {
+    fontSize: "0.8rem", color: "#8a8a96", textDecoration: "none",
+    transition: "color 0.15s", display: "inline-block",
+  };
+  const hoverOn = (e) => { e.currentTarget.style.color = "var(--accent)"; };
+  const hoverOff = (e) => { e.currentTarget.style.color = "#8a8a96"; };
+  const heading = {
+    fontFamily: mono, fontSize: "0.65rem", color: "#55555f",
+    letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: "0.9rem",
+  };
+  const col = { display: "flex", flexDirection: "column", gap: "0.6rem", alignItems: "flex-start" };
+
   return (
-    <footer style={{
-      padding: "2.5rem var(--gutter-safe) calc(2.5rem + var(--safe-bottom))", borderTop: "1px solid #222228",
+    <footer className="site-footer" style={{
+      padding: "3.5rem var(--gutter-safe) calc(2rem + var(--safe-bottom))",
+      borderTop: "1px solid #222228",
       maxWidth: "var(--container)", margin: "0 auto",
     }}>
-      <div style={{
-        display: "flex", justifyContent: "space-between", alignItems: "center",
-        flexWrap: "wrap", gap: "1rem",
+      <div className="footer-grid" style={{
+        display: "grid", gridTemplateColumns: "1.6fr 1fr 1fr", gap: "2.5rem",
+        alignItems: "start",
       }}>
-        <span style={{ fontSize: "0.78rem", color: "#8a8a96" }}>© {new Date().getFullYear()} Residata · Krasovského 13, Bratislava</span>
-        <div style={{ display: "flex", gap: "1.5rem", flexWrap: "wrap" }}>
-          <a href="mailto:info@residata.eu" style={linkStyle}>info@residata.eu</a>
-          <a href="tel:+421911963909" style={linkStyle}>+421 911 963 909</a>
+        {/* Who we are */}
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "0.9rem" }}>
+            <div style={{
+              width: 26, height: 26, background: "var(--accent)", borderRadius: "var(--r-sm)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontFamily: mono, fontWeight: 700, fontSize: 13, color: "var(--bg)",
+            }}>R</div>
+            <span style={{ fontWeight: 600, fontSize: "1rem", color: "var(--text)", letterSpacing: "-0.02em" }}>Residata</span>
+          </div>
+          <p style={{ fontSize: "0.8rem", color: "#8a8a96", lineHeight: 1.6, margin: 0, maxWidth: 320 }}>
+            {isSK
+              ? "Denne aktualizované dáta o novostavbách na Slovensku a v Česku."
+              : "Daily-updated new-build market data for Slovakia and Czechia."}
+          </p>
+        </div>
+
+        {/* Contact details, labelled as such */}
+        <div>
+          <div style={heading}>{isSK ? "Kontakt" : "Contact"}</div>
+          <div style={col}>
+            <a href="mailto:info@residata.eu" style={linkStyle} onMouseEnter={hoverOn} onMouseLeave={hoverOff}>info@residata.eu</a>
+            <a href="tel:+421911963909" style={linkStyle} onMouseEnter={hoverOn} onMouseLeave={hoverOff}>+421 911 963 909</a>
+            <span style={{ fontSize: "0.8rem", color: "#55555f", lineHeight: 1.5 }}>Krasovského 13<br />Bratislava</span>
+          </div>
+        </div>
+
+        {/* Legal, labelled as such */}
+        <div>
+          <div style={heading}>{isSK ? "Právne" : "Legal"}</div>
+          <div style={col}>
+            <a href="/privacy" onClick={handleNav("Privacy")} style={linkStyle} onMouseEnter={hoverOn} onMouseLeave={hoverOff}>
+              {isSK ? "Ochrana údajov" : "Privacy"}
+            </a>
+            <a href="/terms" onClick={handleNav("Terms")} style={linkStyle} onMouseEnter={hoverOn} onMouseLeave={hoverOff}>
+              {isSK ? "Obchodné podmienky" : "Terms"}
+            </a>
+            <a href="/imprint" onClick={handleNav("Imprint")} style={linkStyle} onMouseEnter={hoverOn} onMouseLeave={hoverOff}>
+              {isSK ? "Impressum" : "Imprint"}
+            </a>
+            <a href="#" onClick={reopenCookies} style={linkStyle} onMouseEnter={hoverOn} onMouseLeave={hoverOff}>
+              {isSK ? "Nastavenia cookies" : "Cookie settings"}
+            </a>
+          </div>
         </div>
       </div>
+
       <div style={{
-        display: "flex", gap: "1.5rem", flexWrap: "wrap",
-        marginTop: "0.85rem", paddingTop: "0.85rem",
-        borderTop: "1px solid #1a1a20",
+        marginTop: "2.5rem", paddingTop: "1.25rem", borderTop: "1px solid #1a1a20",
+        fontSize: "0.75rem", color: "#55555f",
       }}>
-        <a href="/privacy" onClick={handleNav("Privacy")} style={linkStyle}>
-          {isSK ? "Ochrana údajov" : "Privacy"}
-        </a>
-        <a href="/terms" onClick={handleNav("Terms")} style={linkStyle}>
-          {isSK ? "Obchodné podmienky" : "Terms"}
-        </a>
-        <a href="/imprint" onClick={handleNav("Imprint")} style={linkStyle}>
-          {isSK ? "Impressum" : "Imprint"}
-        </a>
-        <a href="#" onClick={reopenCookies} style={linkStyle}>
-          {isSK ? "Nastavenia cookies" : "Cookie settings"}
-        </a>
+        © {new Date().getFullYear()} Residata
       </div>
     </footer>
   );
@@ -1947,10 +1996,6 @@ function ContactSection({ l }) {
   // It opens the same way a plan card does — eyebrow, then a title at the same
   // 1.3rem — because that shared rhythm is what makes the three columns read as
   // one row rather than two cards and a leftover.
-  const totals = useMarketTotals();
-  const nf = (n) => (n == null ? "…" : Number(n).toLocaleString("en-US").replace(/,/g, " "));
-  const isSk = l.contactLabel === "Kontakt";
-
   const method = (href, icon, text) => (
     <a href={href} style={{
       textDecoration: "none", display: "flex", alignItems: "center", gap: "0.85rem",
@@ -2010,15 +2055,6 @@ function ContactSection({ l }) {
         fontSize: "0.95rem", borderRadius: 10, textDecoration: "none",
       }}>{l.bookCall}</a>
 
-      <div style={{
-        display: "flex", justifyContent: "space-between", gap: "0.5rem",
-        marginTop: "1.75rem", paddingTop: "1.35rem", borderTop: "1px solid #222228",
-        fontFamily: mono, fontSize: "0.7rem", color: "#55555f",
-      }}>
-        <span><span style={{ color: "var(--accent)" }}>{nf(totals.projectsActive)}</span> {isSk ? "projektov" : "projects"}</span>
-        <span><span style={{ color: "var(--accent)" }}>{nf(totals.unitsTracked)}</span> {isSk ? "bytov" : "units"}</span>
-        <span style={{ color: "var(--accent)" }}>{isSk ? "denne" : "daily"}</span>
-      </div>
     </div>
   );
 }
@@ -2336,6 +2372,9 @@ export default function App() {
           .pricing-rule { height: 1px; background: #24242c !important; }
         }
         @media (max-width: 900px) {
+          /* Brand block over the two link columns, rather than three cramped ones. */
+          .footer-grid { grid-template-columns: 1fr 1fr !important; row-gap: 2rem !important; }
+          .footer-grid > *:first-child { grid-column: 1 / -1; }
           .value-grid { grid-template-columns: 1fr !important; }
           .wwd-hero { grid-template-columns: 1fr !important; gap: 1.5rem !important; }
           .case-card-grid { grid-template-columns: 1fr !important; }
@@ -2493,6 +2532,12 @@ export default function App() {
             .mc-dock { position: fixed; left: calc(1.25rem + var(--safe-left)); bottom: calc(1.25rem + var(--safe-bottom)); z-index: 90; width: 208px; max-width: calc(100vw - 2.5rem); }
             @media (max-width: 1180px) {
               .mc-dock { display: none; }
+            }
+            /* The dock is pinned to the VIEWPORT, so at full scroll it lands on the
+               footer's bottom-left — on top of the brand block and the copyright.
+               Reserve its height there so it comes to rest in empty space instead. */
+            @media (min-width: 1181px) {
+              .site-footer { padding-bottom: calc(11rem + var(--safe-bottom)) !important; }
             }
           `}</style>
           <div className="mc-dock" role="region" aria-label={lang === "sk" ? "Trh a mena" : lang === "cs" ? "Trh a měna" : "Market and currency"}>
