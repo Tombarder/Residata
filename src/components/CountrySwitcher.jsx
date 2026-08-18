@@ -45,8 +45,13 @@ export default function CountrySwitcher({ lang = "en", hideLabel = false, fill =
             aria-pressed={active}
             style={{
               flex: fill ? "1 1 0" : undefined,
+              // minWidth:0 is what actually makes the segments equal. A flex item
+              // defaults to min-width:auto, so it refuses to shrink below its own
+              // content — "🌍 Všetky" is wider than a third of the panel, so it
+              // stole width from CZ and SK and the control looked lopsided.
+              minWidth: fill ? 0 : undefined,
               display: "flex", alignItems: "center", justifyContent: "center", gap: "0.3rem",
-              padding: "0.4rem 0.55rem", border: "none", cursor: "pointer",
+              padding: "0.4rem 0.5rem", border: "none", cursor: "pointer",
               borderLeft: i ? "1px solid var(--border-soft)" : "none",
               background: active ? "var(--accent)" : "transparent",
               color: active ? "#06140f" : "var(--text-dim)",
@@ -56,7 +61,12 @@ export default function CountrySwitcher({ lang = "en", hideLabel = false, fill =
             onMouseEnter={(e) => { if (!active) e.currentTarget.style.color = "var(--text)"; }}
             onMouseLeave={(e) => { if (!active) e.currentTarget.style.color = "var(--text-dim)"; }}
           >
-            {c === "all" && <span style={{ fontSize: "0.82rem", lineHeight: 1 }}>{FLAG[c] || "🌍"}</span>}
+            {/* The globe is dropped in `fill` mode. With equal-width segments the
+                widest label decides how wide the whole control must be, and
+                "🌍 Všetky" needs ~30% more room than a plain "Všetky" — so the
+                emoji alone pushed its own text against the segment borders. It
+                stays in the content-sized inline variant, where it costs nothing. */}
+            {c === "all" && !fill && <span style={{ fontSize: "0.82rem", lineHeight: 1 }}>{FLAG[c] || "🌍"}</span>}
             {c === "all" ? countryName("all", lang) : c}
           </button>
         );

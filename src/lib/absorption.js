@@ -36,7 +36,10 @@ export function fmtSelloutValue(availableUnits, soldLastMonth, lang = "en") {
 export function fmtMonthsToSellout(availableUnits, soldLastMonth, lang = "en") {
   const v = fmtSelloutValue(availableUnits, soldLastMonth, lang);
   if (v == null) return null;
-  return lang === "sk" ? `vypredané o ${v}` : `sells out in ${v}`;
+  // "vypredá sa o …" (a forecast), not "vypredané o …": the card now also carries
+  // "56 % vypredané" for the share already gone, and the same word doing two jobs
+  // one line apart read as a contradiction.
+  return lang === "sk" ? `vypredá sa o ${v}` : `sells out in ${v}`;
 }
 
 // --- per-MARKET: "months of inventory" -----------------------------------------

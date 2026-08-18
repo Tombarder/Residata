@@ -12,13 +12,12 @@ import { marketInventoryDisplay, fmtMonthsToSellout } from "../lib/absorption";
 
 const mono = "'JetBrains Mono', monospace";
 
-// Real per-market sample rows for the decorative "live dashboard" mockup in the
-// PipelineFlow scene (Bratislava for SK / All, Praha for CZ). Real projects +
-// avg €/m² from the live DB so even the illustration isn't wrong.
-const PANEL_SAMPLE = {
-  SK: { avg: "5,525", mom: "+2.1%", rows: [["Downtown Yards", "Staré Mesto", "8,638"], ["Byty Ružinov", "Ružinov", "5,409"]] },
-  CZ: { avg: "7,443", mom: "+1.5%", rows: [["Ethos Karlín", "Karlín", "9,960"], ["TOIVO Roztyly", "Chodov", "6,928"]] },
-};
+// The "live dashboard" mock-up in the PipelineFlow scene reads LIVE data — see
+// PipelineFlow below. It used to hold a hand-copied snapshot of the DB, which had
+// silently rotted: it showed Downtown Yards in "Staré Mesto" at 8 638 €/m² when the
+// project is in Ružinov at 7 133 €/m², and an SK market average of 5 525 against a
+// real 4 719. A panel captioned "live dashboard" must not be able to go stale, so
+// nothing here is hardcoded any more.
 // PipelineFlow scene layout — ONE source of truth for the canvas geometry.
 // The three zones are laid out on a single horizontal axis with a single
 // header row, so the scene reads as symmetric instead of hand-placed.
@@ -183,8 +182,11 @@ function CenterHub({ subtitle }) {
   );
 }
 
+// Trim a label to a character budget for SVG text, which has no text-overflow.
+const clip = (t, n) => (t && t.length > n ? `${t.slice(0, n - 1).trimEnd()}…` : (t || ''));
+
 // ── Dashboard panel — right-side terminal/dashboard target ──
-function DashboardPanel({ captionRow1, captionRow2, chipLabels, sample }) {
+function DashboardPanel({ captionRow1, captionRow2, chipLabels, avgLabel, rows, chartLabel }) {
   return (
     <g>
       {/* Panel frame with glow */}
@@ -204,8 +206,11 @@ function DashboardPanel({ captionRow1, captionRow2, chipLabels, sample }) {
       {/* Chart card — €/m² trend */}
       <g transform="translate(16, 46)">
         <rect x="0" y="0" width="278" height="100" rx="8" fill="var(--bg)" stroke="var(--surface-3)" strokeWidth="0.6" />
-        <text x="10" y="16" fill="var(--text-dim)" fontFamily={mono} fontSize="8" letterSpacing="0.06em">AVG €/M² · 6 MONTHS</text>
-        <text x="268" y="16" textAnchor="end" fill="var(--accent)" fontFamily={mono} fontSize="8" fontWeight="700">{sample.mom} MoM</text>
+        {/* The sparkline below is decoration — we have no 6-month series on this page.
+            It therefore carries NO number of its own: the figure on the right is the
+            live market average. The old panel printed a fabricated "+2.1% MoM" here. */}
+        <text x="10" y="16" fill="var(--text-dim)" fontFamily={mono} fontSize="8" letterSpacing="0.06em">{chartLabel}</text>
+        <text x="268" y="16" textAnchor="end" fill="var(--accent)" fontFamily={mono} fontSize="8" fontWeight="700">{avgLabel}</text>
 
         {/* Area under curve */}
         <path
@@ -238,16 +243,20 @@ function DashboardPanel({ captionRow1, captionRow2, chipLabels, sample }) {
       {/* Mini table row */}
       <g transform="translate(16, 160)">
         <rect x="0" y="0" width="278" height="50" rx="6" fill="var(--bg)" stroke="var(--surface-3)" strokeWidth="0.6" />
-        {/* Row 1 */}
-        {/* Real active projects + avg €/m² from DB, per viewed market. */}
-        <text x="10" y="18" fill="var(--text)" fontFamily="'Outfit', sans-serif" fontSize="10" fontWeight="600">{sample.rows[0][0]}</text>
-        <text x="150" y="18" fill="var(--text-dim)" fontFamily={mono} fontSize="9">{sample.rows[0][1]}</text>
-        <text x="225" y="18" fill="var(--accent)" fontFamily={mono} fontSize="9" fontWeight="700">{sample.rows[0][2]} €/m²</text>
-        {/* Row 2 */}
+        {/* Two REAL projects from the market currently being viewed. */}
         <line x1="8" y1="26" x2="270" y2="26" stroke="var(--surface-3)" strokeWidth="0.5" />
-        <text x="10" y="42" fill="var(--text)" fontFamily="'Outfit', sans-serif" fontSize="10" fontWeight="600">{sample.rows[1][0]}</text>
-        <text x="150" y="42" fill="var(--text-dim)" fontFamily={mono} fontSize="9">{sample.rows[1][1]}</text>
-        <text x="225" y="42" fill="var(--accent)" fontFamily={mono} fontSize="9" fontWeight="700">{sample.rows[1][2]} €/m²</text>
+        {rows.map((r, i) => (
+          <g key={i} transform={`translate(0, ${i * 24})`}>
+            {/* SVG text does not wrap or ellipsize, so the columns are clipped by
+                character budget instead: real project names run long ("Rohan City –
+                Diamanty Karlín") and would otherwise run straight through the
+                district column. The price is END-anchored at the row's right edge so
+                a wider number (13 076 €/m²) grows leftwards instead of out of the panel. */}
+            <text x="10" y="18" fill="var(--text)" fontFamily="'Outfit', sans-serif" fontSize="10" fontWeight="600">{clip(r.name, 24)}</text>
+            <text x="150" y="18" fill="var(--text-dim)" fontFamily={mono} fontSize="9">{clip(r.district, 11)}</text>
+            <text x="270" y="18" textAnchor="end" fill="var(--accent)" fontFamily={mono} fontSize="9" fontWeight="700">{r.price}</text>
+          </g>
+        ))}
       </g>
 
       {/* Export chips */}
@@ -321,8 +330,25 @@ export function PipelineFlow({ lang = "en" }) {
   // (full registry incl. paused/sold-out) which is misleading on a
   // "live pipeline" panel.
   const marketTotals = useMarketTotals();
-  const { country } = useCountry();
-  const panelSample = PANEL_SAMPLE[country] || PANEL_SAMPLE.SK;   // CZ → Praha; SK / All → Bratislava
+
+  // LIVE content for the "live dashboard" mock-up in zone 3. `useHomeProjects`
+  // is already fetched (and module-cached) for MarketPulse further down the same
+  // page, so this costs no extra request. Top 2 active projects by €/m² — the
+  // column the rows actually show, so the list is self-consistent, and it follows
+  // the market switch (SK / CZ / All) for free.
+  const { projects: homeProjects } = useHomeProjects();
+  const panelRows = [...(homeProjects || [])]
+    .filter(p => (p.status || "active") === "active" && p.avg_price_eur_m2 && p.district)
+    .sort((a, b) => b.avg_price_eur_m2 - a.avg_price_eur_m2)
+    .slice(0, 2)
+    .map(p => ({
+      name: p.name,
+      district: p.district,
+      price: `${Math.round(moneyFromEur(p.avg_price_eur_m2)).toLocaleString("en-US").replace(/,/g, " ")} ${moneySymbol()}/m²`,
+    }));
+  const panelAvg = marketTotals.avgPriceM2
+    ? `${Math.round(moneyFromEur(marketTotals.avgPriceM2)).toLocaleString("en-US").replace(/,/g, " ")} ${moneySymbol()}/m²`
+    : "…";
   const devCount  = marketTotals.developersActive ?? null;
   // projCount is used in two places:
   //   z1Live ("z X developerov · Y projektov") — flow description of where
@@ -351,6 +377,7 @@ export function PipelineFlow({ lang = "en" }) {
     z3Line1: "Živý trhový prehľad",
     z3Foot: "pre vaše rozhodnutia podložené dátami",
     z3Chips: ["CSV", "Excel"],
+    z3ChartLabel: "PRIEMER TRHU €/m²",
     z3Cap1: "DENNÁ AKTUALIZÁCIA",
     z3Cap2: "vždy aktuálny stav trhu",
 
@@ -376,6 +403,7 @@ export function PipelineFlow({ lang = "en" }) {
     z3Line1: "Real-time market intelligence",
     z3Foot: "for your data-driven decisions",
     z3Chips: ["CSV", "Excel"],
+    z3ChartLabel: "MARKET AVG €/m²",
     z3Cap1: "DAILY AUTO-REFRESH",
     z3Cap2: "always the current market",
 
@@ -508,7 +536,9 @@ export function PipelineFlow({ lang = "en" }) {
               captionRow1={T.z3Cap1}
               captionRow2={T.z3Cap2}
               chipLabels={T.z3Chips}
-              sample={panelSample}
+              chartLabel={T.z3ChartLabel}
+              avgLabel={panelAvg}
+              rows={panelRows}
             />
           </g>
         </svg>
@@ -723,9 +753,9 @@ function ProjectMini({ project, setCurrent, lang }) {
   const soldDataUnavailable = sold === 0 && reserved === 0;
 
   // `sold_percentage` from the DB is (sold + reserved + pre-reserved) / offered — so
-  // it is NOT the share sold, and calling it "% predané" (as this card used to) was
-  // simply wrong: Milrose reads 56% off 58 sold + 42 reserved out of 178. It is the
-  // share that is no longer available, so it is labelled "obsadené" / "taken".
+  // it is NOT the share sold: Milrose reads 56% off 58 sold + 42 reserved out of 178.
+  // It is the share of the project that is gone from the market, which the Slovak
+  // trade calls "vypredanosť" — Boss's wording, and the industry's.
   const takenPct = Number(project.sold_percentage ?? (base ? (100 * (sold + reserved)) / base : 0));
   const pctOf = (n) => (base > 0 ? (100 * n) / base : 0);
 
@@ -817,7 +847,7 @@ function ProjectMini({ project, setCurrent, lang }) {
 
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "0.75rem", fontSize: "0.7rem", color: dim, fontFamily: mono, letterSpacing: "0.03em" }}>
             {/* Slovak puts a space before the percent sign, English does not. */}
-            <span>{takenPct.toFixed(0)}{L(" %", "%")} {L("obsadené", "taken")}</span>
+            <span>{takenPct.toFixed(0)}{L(" %", "%")} {L("vypredané", "taken")}</span>
             {sellout && <span style={{ color: green, fontWeight: 600, whiteSpace: "nowrap" }}>{sellout}</span>}
           </div>
         </div>
@@ -889,6 +919,36 @@ function useInView(rootMargin = "0px") {
   return [ref, inView];
 }
 
+// One hue for every bar in the pricing map.
+//
+// The rows are regions — nominal identity, not an ordered scale — and the bar's
+// LENGTH already encodes the price, with the exact figure printed beside it. The
+// old chart also painted each bar by which of four hardcoded price brackets it
+// fell into (≥7000 red / ≥5500 amber / ≥4200 green / else blue), which:
+//   · spent the colour channel re-encoding what length already showed,
+//   · was a rainbow ramp for a magnitude — the classic misuse,
+//   · collapsed the whole bottom of the table into one flat blue, because six of
+//     ten Slovak regions sit under €4 200 (Boss's complaint), and
+//   · went stale by construction: the brackets are absolute prices, so ordinary
+//     market drift silently repaints the chart.
+// A single brand hue removes all four problems at once.
+// A single hue, stepped light→dark by value: the sequential form. Every row gets a
+// visibly different shade (the old chart flattened the bottom six Slovak regions into
+// one identical blue), but there is still only ONE hue, so it never becomes a rainbow
+// pretending that a colour change means a category change. The step is derived from
+// the rows on screen, not from absolute price brackets, so it re-scales itself as the
+// market moves and as you drill from kraj → mesto → mestská časť.
+const BAR_MIX_MIN = 34;   // % accent for the cheapest row on screen
+const BAR_MIX_MAX = 100;  // % accent for the dearest row on screen
+
+function barHue(avg, min, max) {
+  const t = max > min ? (avg - min) / (max - min) : 1;
+  const mix = BAR_MIX_MIN + t * (BAR_MIX_MAX - BAR_MIX_MIN);
+  // color-mix keeps this a valid declaration for any input, which the old
+  // `${color}33` string concat did not.
+  return `color-mix(in srgb, var(--accent) ${mix.toFixed(1)}%, var(--surface-3))`;
+}
+
 // Empty drill state helper (top level = whole country, by kraj).
 const _emptyDrill = { level: "region", regionId: null, regionName: null, cityId: null, cityName: null };
 
@@ -930,6 +990,7 @@ export function DistrictPulse({ lang = "en", setCurrent }) {  // eslint-disable-
     .map(d => ({ ...d, avg: Number(d.avg), units: Number(d.units) || 0, count: Number(d.count) || 0 }))
     .sort((a, b) => b.avg - a.avg);
   const max = rows.length > 0 ? Math.max(...rows.map(r => r.avg)) : 1;
+  const min = rows.length > 0 ? Math.min(...rows.map(r => r.avg)) : 0;
 
   const cName = countryName(country, lang);
   const label = lang === "sk" ? `Cenová mapa — ${cName}` : `${cName} pricing map`;
@@ -1006,6 +1067,7 @@ export function DistrictPulse({ lang = "en", setCurrent }) {  // eslint-disable-
               row={r}
               index={i}
               max={max}
+              min={min}
               animate={inView}
               lang={lang}
               onClick={drillable ? handleRowClick : null}
@@ -1017,9 +1079,9 @@ export function DistrictPulse({ lang = "en", setCurrent }) {  // eslint-disable-
   );
 }
 
-function GeoBarRow({ row, index, max, animate, lang, onClick }) {
+function GeoBarRow({ row, index, max, min, animate, lang, onClick }) {
   const pct = (row.avg / max) * 100;
-  const color = colorForPrice(row.avg);
+  const hue = barHue(row.avg, min, max);
   const delay = 0.08 * index;
   // Show the REAL €/m² immediately (no count-up-from-0). The count-up looked
   // "live" for a scrolling user but rendered a literal "0 €" in every non-scroll
@@ -1028,6 +1090,9 @@ function GeoBarRow({ row, index, max, animate, lang, onClick }) {
   // shimmer below still animate on scroll, so the section stays lively.
   const avgDisplay = Math.round(moneyFromEur(row.avg) || 0);
   const clickable = typeof onClick === "function";
+  const barTitle = `${row.name}: ${avgDisplay.toLocaleString("en-US").replace(/,/g, " ")} ${moneySymbol()}/m² · `
+    + `${row.count} ${lang === "sk" ? "projektov" : "projects"} · `
+    + `${row.units.toLocaleString("en-US").replace(/,/g, " ")} ${lang === "sk" ? "bytov" : "units"}`;
 
   return (
     <div
@@ -1059,15 +1124,24 @@ function GeoBarRow({ row, index, max, animate, lang, onClick }) {
 
       {/* Bar — cleaner, no overlay text so the fill color stays readable
           and no mix-blend-mode paint cost. */}
-      <div style={{
-        height: 28, background: "var(--surface-2)", borderRadius: 6, overflow: "hidden", position: "relative",
-        border: `1px solid ${border}`,
-      }}>
+      <div
+        title={barTitle}
+        style={{
+          height: 20, background: "var(--surface-2)", borderRadius: 4,
+          overflow: "hidden", position: "relative",
+        }}
+      >
         <div style={{
           width: animate ? `${pct}%` : "0%",
           height: "100%",
-          background: `linear-gradient(90deg, ${color}33, ${color})`,
-          borderRight: `2px solid ${color}`,
+          // Wash → solid along the bar. color-mix keeps this a VALID declaration:
+          // the old code built `${color}33` by string concat, and when colorForPrice
+          // returned the CSS variable "var(--accent)" that produced the nonsense
+          // `var(--accent)33`. The browser dropped the whole gradient, so every row
+          // in that price band rendered as an empty black bar on the live site.
+          background: `linear-gradient(90deg, color-mix(in srgb, ${hue} 30%, transparent), ${hue})`,
+          // 4px rounded data-end, square at the baseline.
+          borderRadius: "0 4px 4px 0",
           transition: `width 1.1s cubic-bezier(0.2, 0.85, 0.25, 1) ${delay}s`,
           position: "relative",
           willChange: "width",
@@ -1083,23 +1157,17 @@ function GeoBarRow({ row, index, max, animate, lang, onClick }) {
         </div>
       </div>
 
-      {/* Right: animated €/m² — the main figure, high contrast colored. */}
+      {/* Right: the €/m² figure. Text wears an INK token, never the mark's colour —
+          the old row printed the number in its price-band colour, which is what made
+          the lower half of the table a wall of identical blue numerals. */}
       <div style={{
-        fontFamily: mono, fontSize: "1.05rem", fontWeight: 700, color,
-        textAlign: "right", fontVariantNumeric: "tabular-nums",
-        textShadow: `0 0 8px ${color}22`, whiteSpace: "nowrap",
+        fontFamily: mono, fontSize: "1.05rem", fontWeight: 700, color: "var(--text)",
+        textAlign: "right", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap",
       }}>
         {avgDisplay.toLocaleString("en-US").replace(/,/g, " ")} {moneySymbol()}
       </div>
     </div>
   );
-}
-
-function colorForPrice(avg) {
-  if (avg >= 7000) return "#ff6b6b"; // premium
-  if (avg >= 5500) return "#f5a623"; // upper
-  if (avg >= 4200) return "var(--accent)"; // mid
-  return "#4a90e2"; // affordable
 }
 
 /* HowItWorksFlow + its 4 icon helpers used to live here. Replaced on

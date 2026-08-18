@@ -47,8 +47,11 @@ export default function CurrencySwitcher({ lang = "en", fill = false }) {
             title={code}
             style={{
               flex: fill ? "1 1 0" : undefined,
+              // See CountrySwitcher: without minWidth:0 the wider symbol keeps more
+              // than its share and the two halves come out uneven.
+              minWidth: fill ? 0 : undefined,
               display: "flex", alignItems: "center", justifyContent: "center",
-              padding: "0.4rem 0.62rem", border: "none", cursor: "pointer",
+              padding: "0.4rem 0.5rem", border: "none", cursor: "pointer",
               borderLeft: i ? "1px solid var(--border-soft)" : "none",
               background: active ? "var(--accent)" : "transparent",
               color: active ? "#06140f" : "var(--text-dim)",
