@@ -544,7 +544,7 @@ const _totalsListCache = new Map();
  */
 export function useDataSample() {
   const { country } = useCountry();
-  const [state, setState] = useState({ loading: true, segments: {}, peaks: {}, mom: {} });
+  const [state, setState] = useState({ loading: true, segments: {}, peaks: {}, mom: {}, benchmark: {}, supply: {} });
   useEffect(() => {
     if (!isSupabaseReady()) { setState(s => ({ ...s, loading: false })); return; }
     let cancelled = false;
@@ -552,11 +552,11 @@ export function useDataSample() {
     // of this page's SK-for-All convention.
     const cc = isAllCountries(country) ? "SK" : country;
     _readPublicWithRetry(() =>
-      supabasePublic.from("data_sample").select("segments,peaks,mom").eq("country", cc).maybeSingle()
+      supabasePublic.from("data_sample").select("segments,peaks,mom,benchmark,supply").eq("country", cc).maybeSingle()
     ).then(({ data, error }) => {
       if (cancelled) return;
-      if (error) { console.error("[useDataSample]", error); setState({ loading: false, segments: {}, peaks: {}, mom: {} }); return; }
-      setState({ loading: false, segments: data?.segments || {}, peaks: data?.peaks || {}, mom: data?.mom || {} });
+      if (error) { console.error("[useDataSample]", error); setState({ loading: false, segments: {}, peaks: {}, mom: {}, benchmark: {}, supply: {} }); return; }
+      setState({ loading: false, segments: data?.segments || {}, peaks: data?.peaks || {}, mom: data?.mom || {}, benchmark: data?.benchmark || {}, supply: data?.supply || {} });
     });
     return () => { cancelled = true; };
   }, [country]);

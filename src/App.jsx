@@ -1285,6 +1285,18 @@ function useSampleData() {
       peak: nf(sample.peaks?.[topD.name]),
     } : { district: "—", projects: 0, units: 0, avail: 0, m2: "—", peak: "—" },
     priceSpeed: { bands: bandStats, multiple: speedMultiple },
+    // Boss's selling point #2: what a given layout costs per m² in each city, so a
+    // developer can price their own project against the local going rate.
+    benchmark: Object.entries(sample.benchmark || {})
+      .map(([city, layouts]) => ({ city, layouts }))
+      .sort((a, b) => (b.layouts?.["2"]?.units || 0) - (a.layouts?.["2"]?.units || 0))
+      .slice(0, 5),
+    // Units entering the market against units leaving it — the launch question.
+    supply: Object.entries(sample.supply || {})
+      .map(([city, v]) => ({ city, ...v }))
+      .filter(x => (x.available || 0) > 0)
+      .sort((a, b) => (b.available || 0) - (a.available || 0))
+      .slice(0, 5),
     fast: f ? {
       project: f.name, district: f.district || "—",
       total: Number(f.total_units) || 0, left: Number(f.available_units) || 0,
@@ -1512,6 +1524,79 @@ function DataPage({ setCurrent, l, lang }) {
           </div>
           <div style={{ fontSize: "0.62rem", color: "#55555f", marginTop: "0.7rem", fontStyle: "italic" }}>
             △ share of each project sold per 30 days, averaged per band — not raw counts, so one large project cannot carry the result. {d.priceSpeed.bands.map(b => b.projects).reduce((a, c) => a + c, 0)} projects.
+          </div>
+        </InsightCard>
+
+        {/* 3b — Boss's selling point #2: price your own project against the local
+             going rate. Absolute €/m² is useless without knowing which city and
+             which layout it refers to, so this is the grid a price sheet is
+             actually built from. */}
+        <InsightCard label="Pricing Benchmark" title="What a layout costs per m², city by city." span2>
+          <div style={{ fontSize: "0.82rem", color: "#8a8a96", lineHeight: 1.6, marginBottom: "1rem" }}>
+            The going rate for each layout in each city, across every unit currently for sale. This is the sheet you price a new project against — and the reason a single "market average" is not enough: in one city a 1-room unit carries a premium per m², in another it does not.
+          </div>
+          {d.benchmark.length === 0 ? (
+            <div style={{ color: "#55555f", fontSize: "0.75rem" }}>—</div>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.74rem", minWidth: 360 }}>
+                <thead>
+                  <tr style={{ color: "#55555f", fontFamily: mono, fontSize: "0.66rem" }}>
+                    <th style={{ textAlign: "left", padding: "0.3rem 0.5rem 0.5rem 0" }}>mesto</th>
+                    {["1", "2", "3", "4"].map(r => (
+                      <th key={r} style={{ textAlign: "right", padding: "0.3rem 0 0.5rem 0.75rem", whiteSpace: "nowrap" }}>{r}-izb €/m²</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {d.benchmark.map(({ city, layouts }) => (
+                    <tr key={city} style={{ borderTop: "1px solid #1a1a1f" }}>
+                      <td style={{ color: "#e8e8ed", padding: "0.4rem 0.5rem 0.4rem 0", whiteSpace: "nowrap" }}>{city}</td>
+                      {["1", "2", "3", "4"].map(r => {
+                        const cell = layouts?.[r];
+                        return (
+                          <td key={r} style={{ textAlign: "right", padding: "0.4rem 0 0.4rem 0.75rem", fontFamily: mono, color: cell ? "#e8e8ed" : "#55555f", whiteSpace: "nowrap" }}>
+                            {cell ? `€${Number(cell.eur_m2).toLocaleString("en-US")}` : "—"}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <div style={{ fontSize: "0.62rem", color: "#55555f", marginTop: "0.7rem", fontStyle: "italic" }}>
+            △ average €/m² of every unit currently for sale, by layout. Empty cells mean that city has no such units on the market right now.
+          </div>
+        </InsightCard>
+
+        {/* 3c — Supply vs demand: the launch question. */}
+        <InsightCard label="Supply vs Demand" title="What enters the market against what leaves it.">
+          <div style={{ fontSize: "0.82rem", color: "#8a8a96", lineHeight: 1.6, marginBottom: "1rem" }}>
+            New units listed in the last 30 days against units sold in the same window. A city taking in more than it clears is filling up — which is what decides whether your launch lands into demand or into a queue.
+          </div>
+          {d.supply.length === 0 ? (
+            <div style={{ color: "#55555f", fontSize: "0.75rem" }}>—</div>
+          ) : d.supply.map(c => {
+            const absorbing = (c.sold_30d || 0) >= (c.new_30d || 0);
+            return (
+              <div key={c.city} style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "0.4rem", padding: "0.35rem 0", borderBottom: "1px solid #1a1a1f", fontSize: "0.74rem", alignItems: "baseline" }}>
+                <span style={{ color: "#e8e8ed" }}>{c.city}</span>
+                <span style={{ fontFamily: mono, fontSize: "0.7rem", whiteSpace: "nowrap" }}>
+                  <span style={{ color: "#dd6b32" }}>+{c.new_30d ?? 0}</span>
+                  <span style={{ color: "#55555f" }}> nových / </span>
+                  <span style={{ color: "var(--accent)" }}>−{c.sold_30d ?? 0}</span>
+                  <span style={{ color: "#55555f" }}> predaných</span>
+                  <span style={{ color: absorbing ? "var(--accent)" : "#dd6b32", marginLeft: 8 }}>
+                    {absorbing ? "↓" : "↑"}
+                  </span>
+                </span>
+              </div>
+            );
+          })}
+          <div style={{ fontSize: "0.62rem", color: "#55555f", marginTop: "0.7rem", fontStyle: "italic" }}>
+            △ ↓ = the city is absorbing faster than it adds; ↑ = inventory is building up.
           </div>
         </InsightCard>
 
