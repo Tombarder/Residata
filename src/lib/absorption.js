@@ -27,7 +27,9 @@ export function fmtSelloutValue(availableUnits, soldLastMonth, lang = "en") {
     return lang === "sk" ? `~${y} r.` : `~${y} ${y === 1 ? "year" : "years"}`;
   }
   const r = m < 10 ? Math.round(m * 10) / 10 : Math.round(m);
-  return lang === "sk" ? `~${r} mes.` : `~${r} ${r === 1 ? "month" : "months"}`;
+  // Slovak writes decimals with a comma ("4,1"), not a dot — the rest of the UI
+  // already formats numbers the Slovak way ("6 357"), so this kept it inconsistent.
+  return lang === "sk" ? `~${String(r).replace(".", ",")} mes.` : `~${r} ${r === 1 ? "month" : "months"}`;
 }
 
 // Full phrase, e.g. "sells out in ~4 mo" — for inline text next to other copy.

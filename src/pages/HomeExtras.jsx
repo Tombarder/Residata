@@ -602,27 +602,23 @@ export function MarketPulse({ lang = "en", setCurrent }) {
   const tSoldMonth = lang === "sk" ? "predaných za mesiac" : "sold last month";
   const tInventory = lang === "sk" ? "zásoba na trhu" : "market supply";
   const tEur = lang === "sk" ? `priemer ${moneySymbol()}/m²` : `avg ${moneySymbol()}/m²`;
-  const topTitle = lang === "sk" ? "Najaktívnejšie projekty" : "Most active projects";
   const openAll = lang === "sk" ? "Všetky projekty →" : "View all projects →";
 
-  // "Most active" = most units sold in the last month. This is a per-
-  // project delta the sync script fills in as `sold_last_month` (count
-  // of P flats that flipped since last batch, plus a manual_total-
-  // based velocity estimate for projects like Bory / Slnecnice where
-  // the developer doesn't publish P explicitly).
+  // Ranked by units SOLD in the last 30 days. Verified against the live DB
+  // 2026-08-18: `sold_last_month` is a date-windowed per-unit count coming from
+  // reference.unit_ledger (each unit carries its own `sold_at`), surfaced via
+  // reference.project_lifecycle_state.sold_last_30d — not a snapshot-to-snapshot
+  // diff. It is therefore cadence-independent and safe to label as real sales.
   //
-  // Caveat: the v1→v2 cutover (2026-05-28) backfilled per-project
-  // snapshots with sold_count = 0, so the project_sold_last_month view
-  // currently computes inflated deltas (`sold_now - 0` ≈ cumulative
-  // sold) for projects whose only "30-day-old" snapshot is one of the
-  // backfilled rows. Self-corrects ~30 days post-cutover as real daily
-  // history accumulates. See audit_findings.md F-042 for the full
-  // root cause + fix options. When `anyVelocity === false` (no real
-  // deltas yet) we fall back to sorting by available_units so the
-  // section isn't empty, with the honest note below.
-  // Limit to active projects so paused/sold_out don't show as "most
-  // active" with stale availability/velocity. Manual projects
-  // (status='active') stay in.
+  // (Historical note: this block used to describe a snapshot-delta metric and the
+  // F-042 v1-backfill inflation that came with it. Both are gone — the ledger
+  // replaced that mechanism, so the old caveat no longer applies.)
+  //
+  // When no project has a velocity signal yet (a brand-new market), fall back to
+  // ranking by available units so the section isn't empty — and say so in the
+  // heading rather than passing it off as a sales ranking.
+  // Active projects only, so paused / sold-out ones don't show up with stale
+  // availability. Manual projects (status='active') stay in.
   const activeProjects = projects.filter(p => (p.status || "active") === "active");
   const anyVelocity = activeProjects.some(p => (p.sold_last_month || 0) > 0);
   const top = anyVelocity
@@ -661,7 +657,18 @@ export function MarketPulse({ lang = "en", setCurrent }) {
       </div>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: "0.25rem 1rem", marginBottom: anyVelocity ? "1rem" : "0.3rem" }}>
-        <h3 style={{ fontSize: "1.1rem", fontWeight: 600, color: "var(--text)", fontFamily: mono, letterSpacing: "0.02em" }}>{topTitle}</h3>
+        <div>
+          <h3 style={{ fontSize: "1.1rem", fontWeight: 600, color: "var(--text)", fontFamily: mono, letterSpacing: "0.02em", margin: 0 }}>
+            {anyVelocity
+              ? (lang === "sk" ? "Najpredávanejšie projekty" : "Fastest-selling projects")
+              : (lang === "sk" ? "Najväčšia ponuka" : "Largest offer")}
+          </h3>
+          <div style={{ fontSize: "0.72rem", color: dim, marginTop: "0.25rem" }}>
+            {anyVelocity
+              ? (lang === "sk" ? "podľa počtu bytov predaných za posledných 30 dní" : "by units sold in the last 30 days")
+              : (lang === "sk" ? "podľa počtu voľných bytov" : "by units still available")}
+          </div>
+        </div>
         <button onClick={() => setCurrent && setCurrent("Live")} style={{ background: "none", border: "none", color: green, fontSize: "0.85rem", cursor: "pointer", fontFamily: "inherit", padding: 0, whiteSpace: "nowrap" }}>{openAll}</button>
       </div>
       {!anyVelocity && (
@@ -702,12 +709,46 @@ function Stat({ value, label, prefix = "", suffix = "", accent = "var(--text)", 
 }
 
 function ProjectMini({ project, setCurrent, lang }) {
-  const soldDataUnavailable = (project.sold_units || 0) === 0 && (project.reserved_units || 0) === 0 && (project.prereserved_units || 0) === 0;
-  const pct = project.sold_percentage ?? 0;
-  const barColor = pct >= 80 ? "#ff6b6b" : pct >= 50 ? "#f5a623" : green;
+  const L = (sk, en) => (lang === "sk" ? sk : en);
   const nf = (n) => Number(n || 0).toLocaleString("en-US").replace(/,/g, " ");
+
+  // The card shows a project's inventory as three mutually exclusive buckets that
+  // add up to the whole. Pre-reserved folds into "reserved": for a buyer both mean
+  // "spoken for, but not sold yet", and splitting it out bought precision nobody
+  // reading a homepage card needs.
+  const sold     = Number(project.sold_units || 0);
+  const reserved = Number(project.reserved_units || 0) + Number(project.prereserved_units || 0);
+  const free     = Number(project.available_units || 0);
+  const base     = sold + reserved + free;
+  const soldDataUnavailable = sold === 0 && reserved === 0;
+
+  // `sold_percentage` from the DB is (sold + reserved + pre-reserved) / offered — so
+  // it is NOT the share sold, and calling it "% predané" (as this card used to) was
+  // simply wrong: Milrose reads 56% off 58 sold + 42 reserved out of 178. It is the
+  // share that is no longer available, so it is labelled "obsadené" / "taken".
+  const takenPct = Number(project.sold_percentage ?? (base ? (100 * (sold + reserved)) / base : 0));
+  const pctOf = (n) => (base > 0 ? (100 * n) / base : 0);
+
+  // Verified against the live ledger 2026-08-18: this is a real per-unit sale count —
+  // units whose status flipped to SOLD within 30 days of the project's latest scrape
+  // (reference.unit_ledger.sold_at → project_lifecycle_state.sold_last_30d). Milrose's
+  // 19 are individually dated between 21 Jul and 15 Aug. The old badge said only
+  // "+19 za mesiac", which never said WHAT went up.
   const soldLastMonth = project.sold_last_month || 0;
   const sellout = fmtMonthsToSellout(project.available_units, project.sold_last_month, lang);
+
+  // `free` doubles as the bar's track colour, so the bar always spans the whole
+  // project and the empty part IS the free stock. --surface-3 was too close to the
+  // card background to see; --text-faint is a defined token that stays legible.
+  const COLORS = { sold: green, reserved: "#f5a623", free: "var(--text-faint)" };
+  // Empty buckets are dropped: "0 rezervovaných" is noise, not information.
+  const legend = [
+    { c: COLORS.sold,     n: sold,     t: L("predaných", "sold") },
+    { c: COLORS.reserved, n: reserved, t: L("rezervovaných", "reserved") },
+    { c: COLORS.free,     n: free,     t: L("voľných", "available") },
+  ].filter(l => l.n > 0);
+  const breakdown = legend.map(l => `${nf(l.n)} ${l.t}`).join(" · ");
+
   return (
     <div
       onClick={() => setCurrent && setCurrent(`Project:${project.id}`)}
@@ -715,7 +756,7 @@ function ProjectMini({ project, setCurrent, lang }) {
         border: `1px solid ${border}`, borderRadius: 12, background: bg,
         padding: "1.15rem 1.25rem 1.2rem",
         cursor: "pointer", transition: "transform 0.2s, border-color 0.2s",
-        display: "flex", flexDirection: "column", gap: "0.7rem",
+        display: "flex", flexDirection: "column", gap: "0.85rem",
       }}
       onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.borderColor = green; }}
       onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.borderColor = border; }}
@@ -726,39 +767,57 @@ function ProjectMini({ project, setCurrent, lang }) {
         <div style={{ fontSize: "0.68rem", color: dim, fontFamily: mono, whiteSpace: "nowrap", flexShrink: 0, marginTop: "0.15rem" }}>{project.district || "—"}</div>
       </div>
 
-      {/* Metrics */}
-      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.4rem 0.85rem", fontSize: "0.8rem", color: dim }}>
+      {/* Price + the sales badge, which now says what it counts */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
+        <span style={{ fontFamily: mono, fontSize: "0.95rem", fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap" }}>
+          {project.avg_price_eur_m2 ? `${nf(Math.round(moneyFromEur(project.avg_price_eur_m2)))} ${moneySymbol()}/m²` : "—"}
+        </span>
         {soldLastMonth > 0 && (
-          <span style={{
-            fontFamily: mono, fontSize: "0.7rem", fontWeight: 600, color: "#f5a623",
-            background: "rgba(245,166,35,0.1)", border: "1px solid rgba(245,166,35,0.22)",
-            borderRadius: 6, padding: "0.12rem 0.45rem", whiteSpace: "nowrap",
-          }}>
-            +{soldLastMonth} {lang === "sk" ? "za mesiac" : "this month"}
+          <span
+            title={L(`${soldLastMonth} bytov sa predalo za posledných 30 dní`, `${soldLastMonth} units sold in the last 30 days`)}
+            style={{
+              fontFamily: mono, fontSize: "0.68rem", fontWeight: 600, color: green,
+              background: "rgba(0,229,160,0.1)", border: "1px solid rgba(0,229,160,0.28)",
+              borderRadius: 6, padding: "0.15rem 0.5rem", whiteSpace: "nowrap",
+            }}>
+            ▲ {soldLastMonth} {L("predaných / 30 dní", "sold / 30 days")}
           </span>
         )}
-        <span><strong style={{ color: "var(--text)", fontWeight: 600 }}>{nf(project.available_units)}</strong> {lang === "sk" ? "voľných" : "available"}</span>
-        {!soldDataUnavailable && <span><strong style={{ color: "var(--text)", fontWeight: 600 }}>{nf(project.sold_units)}</strong> {lang === "sk" ? "predaných" : "sold"}</span>}
-        {project.avg_price_eur_m2 ? (
-          <span style={{ fontFamily: mono, color: "#c8c8d0", whiteSpace: "nowrap" }}>{nf(Math.round(moneyFromEur(project.avg_price_eur_m2)))} {moneySymbol()}/m²</span>
-        ) : null}
       </div>
 
-      {/* Progress */}
       {soldDataUnavailable ? (
         <div style={{ fontSize: "0.68rem", color: dim, fontFamily: mono, letterSpacing: "0.03em", fontStyle: "italic" }}>
-          {lang === "sk" ? "developer nezverejňuje predajnosť" : "developer doesn't publish sales data"}
+          {L("developer nezverejňuje predajnosť", "developer doesn't publish sales data")}
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-          <div style={{ height: 5, background: "var(--surface-2)", borderRadius: 3, overflow: "hidden" }}>
-            <div style={{
-              width: `${Math.min(100, pct)}%`, height: "100%", background: barColor,
-              borderRadius: 3, transition: "width 0.6s ease",
-            }} />
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+          {/* One stacked bar showing the whole project: sold | reserved | free.
+              The old bar drew a single sold-percentage fill whose COLOUR silently
+              encoded a heat threshold (green <50, amber <80, red above) — a code
+              nobody could read off the card. Segments say the same thing out loud. */}
+          <div
+            role="img"
+            aria-label={breakdown}
+            title={breakdown}
+            style={{ display: "flex", height: 7, background: COLORS.free, borderRadius: 4, overflow: "hidden" }}
+          >
+            <div style={{ width: `${pctOf(sold)}%`,     background: COLORS.sold,     transition: "width 0.6s ease" }} />
+            <div style={{ width: `${pctOf(reserved)}%`, background: COLORS.reserved, transition: "width 0.6s ease" }} />
           </div>
+
+          {/* Legend — every number on the card is now spelled out */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.25rem 0.8rem", fontSize: "0.72rem", color: dim }}>
+            {legend.map(l => (
+              <span key={l.t} style={{ display: "inline-flex", alignItems: "center", gap: "0.32rem", whiteSpace: "nowrap" }}>
+                <span style={{ width: 7, height: 7, borderRadius: 2, background: l.c, flexShrink: 0 }} />
+                <strong style={{ color: "var(--text)", fontWeight: 600 }}>{nf(l.n)}</strong> {l.t}
+              </span>
+            ))}
+          </div>
+
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "0.75rem", fontSize: "0.7rem", color: dim, fontFamily: mono, letterSpacing: "0.03em" }}>
-            <span>{pct.toFixed(0)}% {lang === "sk" ? "predané" : "sold"}</span>
+            {/* Slovak puts a space before the percent sign, English does not. */}
+            <span>{takenPct.toFixed(0)}{L(" %", "%")} {L("obsadené", "taken")}</span>
             {sellout && <span style={{ color: green, fontWeight: 600, whiteSpace: "nowrap" }}>{sellout}</span>}
           </div>
         </div>
