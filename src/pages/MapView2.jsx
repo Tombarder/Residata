@@ -434,12 +434,25 @@ export default function MapView2({ lang = "en", setCurrent }) {
 
   // Base set = name search + the filter builder. The sold-out toggle then trims
   // it; we keep the base so we can show how many sold-out it would hide.
-  const baseSet = useMemo(() => {
+  // Everything the filter builder could act on: the name search and any external
+  // set, but NOT the builder's own conditions.
+  const candidates = useMemo(() => {
     const q = norm(nameQuery);
     let named = q ? (projects || []).filter((p) => norm(p.name).includes(q)) : (projects || []);
     if (extSet) named = named.filter((p) => extSet.nameSet.has(norm(p.name)));
-    return applyFilters(named, conditions);
-  }, [projects, nameQuery, conditions, extSet]);
+    return named;
+  }, [projects, nameQuery, extSet]);
+  const baseSet = useMemo(() => applyFilters(candidates, conditions), [candidates, conditions]);
+  // Same pool with the two view toggles applied — what the filter panel counts
+  // against. Counting against every project instead made the panel read
+  // "N / <all projects>" even with no conditions set, because sold-out projects
+  // are hidden by default and were missing from the numerator only.
+  const candidatePool = useMemo(() => {
+    let s = candidates;
+    if (!showSoldOut) s = s.filter((p) => (Number(p.available_units) || 0) > 0);
+    if (!showNoPrice) s = s.filter(hasPublishedPrice);
+    return s;
+  }, [candidates, showSoldOut, showNoPrice]);
   const soldOutCount = useMemo(() => baseSet.filter((p) => (Number(p.available_units) || 0) === 0).length, [baseSet]);
   const noPriceCount = useMemo(() => baseSet.filter((p) => !hasPublishedPrice(p)).length, [baseSet]);
   const shown = useMemo(() => {
@@ -878,7 +891,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
         <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />
 
         {filterOpen && (
-          <MapFilterBuilder conditions={conditions} setConditions={setConditions} projects={projects || []} matchCount={shown.length} totalCount={(projects || []).length} sk={sk} onClose={() => setFilterOpen(false)} />
+          <MapFilterBuilder conditions={conditions} setConditions={setConditions} projects={projects || []} matchCount={shown.length} totalCount={candidatePool.length} sk={sk} onClose={() => setFilterOpen(false)} />
         )}
 
         {drawTool && (() => {

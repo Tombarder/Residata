@@ -484,11 +484,21 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
   // Base set: active projects by default; if the user added a "Availability"
   // (status) condition, filter over ALL projects so they can explicitly pull in
   // sold-out / paused. Then apply the rest of their conditions.
-  const overviewProjects = useMemo(() => {
+  // The pool the filters choose FROM. Split out from the result so the filter
+  // panel can count against it: it used to show "340 / 467", where 340 was the
+  // active projects and 467 was every project ever tracked (340 active + 69
+  // sold-out + 58 paused). With no filters set that reads as though 127 projects
+  // had been filtered out — by filters the visitor never added. The fraction now
+  // compares like with like, so it means what a filter counter should: how many
+  // candidates your conditions kept.
+  const overviewBase = useMemo(() => {
     const hasStatus = activeConds.some(c => c.field === "status");
-    const base = hasStatus ? (projects || []) : (projects || []).filter(p => (p.status || "active") === "active");
-    return applyFilters(base, activeConds);
+    return hasStatus ? (projects || []) : (projects || []).filter(p => (p.status || "active") === "active");
   }, [projects, activeConds]);
+  const overviewProjects = useMemo(
+    () => applyFilters(overviewBase, activeConds),
+    [overviewBase, activeConds],
+  );
   const overviewAgg = useMemo(() => aggregateProjects(overviewProjects), [overviewProjects]);
   const overviewIds = useMemo(() => new Set(overviewProjects.map(p => p.id)), [overviewProjects]);
 
@@ -562,7 +572,7 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
 
         {filterOpen && (
           <MapFilterBuilder asModal conditions={conditions} setConditions={setConditions}
-            projects={(projects || [])} matchCount={overviewProjects.length} totalCount={(projects || []).length}
+            projects={(projects || [])} matchCount={overviewProjects.length} totalCount={overviewBase.length}
             sk={lang === "sk"} onClose={() => setFilterOpen(false)} />
         )}
 
