@@ -22,7 +22,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useAuth } from "./useAuth";
 import { supabase, supabaseData } from "./supabase";
 
-export const DASHBOARD_VERSION = 1;
+export const DASHBOARD_VERSION = 2;
 
 // A fresh id for a widget instance. crypto.randomUUID is available in every
 // browser we support; the fallback keeps it from throwing in exotic contexts.
@@ -45,7 +45,13 @@ export function defaultConfig() {
       { id: newWidgetId(), type: "ranking",   w: 1, cfg: { entity: "projects", metric: "sold30",    dir: "top", n: 5 } },
       { id: newWidgetId(), type: "benchmark",  w: 1, cfg: { by: "district", metric: "avg_m2", n: 8 } },
       { id: newWidgetId(), type: "ranking",   w: 1, cfg: { entity: "projects", metric: "available", dir: "top", n: 5 } },
-      { id: newWidgetId(), type: "metric",     w: 1, cfg: { metric: "inventory", scope: { kind: "market" } } },
+      // NOT a market-scope metric card: the KPI strip directly above already
+      // carries every market-wide number, so a fourth widget repeating one of
+      // them (this slot used to show market inventory — the same "~18 mesiacov"
+      // shown two rows up) spent a card to say nothing new. Developers ranked by
+      // what they have sold in 30 days is the one view the strip cannot give:
+      // it is per-competitor, not per-market.
+      { id: newWidgetId(), type: "ranking",   w: 1, cfg: { entity: "developers", metric: "sold30", dir: "top", n: 5 } },
     ],
   };
 }
@@ -65,7 +71,7 @@ function normalize(raw) {
         ? raw.overview.filters.map(c => ({ ...c, id: "f" + Math.random().toString(36).slice(2, 9) }))
         : [],
     },
-    widgets: raw.widgets
+    widgets: migrateV1Widgets(raw)
       .filter(w => w && typeof w === "object" && typeof w.type === "string")
       .map(w => ({
         id: w.id || newWidgetId(),
@@ -74,6 +80,30 @@ function normalize(raw) {
         cfg: w.cfg && typeof w.cfg === "object" ? w.cfg : {},
       })),
   };
+}
+
+/**
+ * v1 → v2: the starter dashboard's fourth card was a market-scope metric widget
+ * showing inventory — the identical figure the KPI strip renders two rows above
+ * it. Changing defaultConfig() alone would only have helped brand-new accounts;
+ * everyone who already had the starter layout saved would have kept staring at
+ * the duplicate. This swaps that one card for the developer ranking.
+ *
+ * Deliberately narrow: it only touches a metric widget whose scope is the whole
+ * market AND whose metric is inventory, and only while the stored config is
+ * still on v1. Anything a user has since added, moved or reconfigured is left
+ * exactly as it is.
+ */
+function migrateV1Widgets(raw) {
+  const widgets = raw.widgets;
+  if ((raw.version || 1) >= 2) return widgets;
+  return widgets.map(w => {
+    const isMarketInventory = w?.type === "metric"
+      && w?.cfg?.metric === "inventory"
+      && (w?.cfg?.scope?.kind || "market") === "market";
+    if (!isMarketInventory) return w;
+    return { ...w, type: "ranking", cfg: { entity: "developers", metric: "sold30", dir: "top", n: 5 } };
+  });
 }
 
 export function useDashboardConfig() {

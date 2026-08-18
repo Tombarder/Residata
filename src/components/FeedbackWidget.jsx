@@ -32,13 +32,15 @@ const red    = "#ff6b6b";
 const MAX_MESSAGE = 4000;
 const MAX_SHOT_DATAURL = 3.6 * 1024 * 1024;
 
+// [key, sk, en] — no emoji column. Six emoji in a 2-column grid was the loudest
+// thing in the panel and told the reader nothing the label didn't.
 const CATEGORIES = [
-  ["data",     "📊", "Kvalita dát",       "Data quality"],
-  ["bug",      "🐞", "Chyba / nefunguje", "Bug / not working"],
-  ["website",  "🖥️", "Web / zobrazenie",  "Website / display"],
-  ["question", "❓", "Otázka",            "Question"],
-  ["idea",     "💡", "Návrh / funkcia",   "Suggestion"],
-  ["other",    "💬", "Iné",               "Other"],
+  ["data",     "Kvalita dát",       "Data quality"],
+  ["bug",      "Chyba / nefunguje", "Bug / not working"],
+  ["website",  "Web / zobrazenie",  "Website / display"],
+  ["question", "Otázka",            "Question"],
+  ["idea",     "Návrh / funkcia",   "Suggestion"],
+  ["other",    "Iné",               "Other"],
 ];
 const STATUS_META = {
   new:         [amber, "Nové",      "New"],
@@ -82,7 +84,7 @@ function downscaleImage(file, maxDim = 1600, quality = 0.82) {
     reader.onerror = reject; reader.readAsDataURL(file);
   });
 }
-const catMeta = (k) => CATEGORIES.find((x) => x[0] === k) || ["other", "💬", "Iné", "Other"];
+const catMeta = (k) => CATEGORIES.find((x) => x[0] === k) || ["other", "Iné", "Other"];
 const fmtDay = (s) => (s ? String(s).slice(0, 10) : "");
 
 // ── Unread tracking (in-app "new reply" alert) ─────────────────────────────
@@ -137,7 +139,6 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
   // Offsets include the iOS home-bar / cutout inset so the pill + panel never
   // sit under the home indicator (env() is 0px on devices without a safe area).
   const bottom = raised ? "calc(78px + var(--safe-bottom))" : "calc(20px + var(--safe-bottom))";
-  const msgLen = message.trim().length;
 
   function resetForm() { setCategory(null); setMessage(""); setEmail(""); setScreenshot(null); setShotName(""); setPhase("idle"); setErrorMsg(""); }
   function close() { setOpen(false); if (phase === "done") { resetForm(); setView("form"); } }
@@ -316,8 +317,6 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
   }
 
   // ── Panel ──────────────────────────────────────────────────────
-  const stepLabel = { color: dim, fontFamily: mono, fontSize: "0.62rem", letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: "0.5rem", display: "flex", alignItems: "center", gap: "0.4rem" };
-  const stepNum = { color: green, fontWeight: 700 };
   const tabStyle = (active) => ({ flex: 1, padding: "0.5rem 0.6rem", cursor: "pointer", background: "transparent", border: "none", color: active ? text : dim, fontFamily: "inherit", fontSize: "0.78rem", fontWeight: active ? 700 : 500, borderBottom: `2px solid ${active ? green : "transparent"}` });
 
   function Bubble({ m }) {
@@ -380,7 +379,7 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
             {thread && (
               <>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: "0.8rem", flexWrap: "wrap" }}>
-                  <span style={{ fontSize: "0.76rem", color: "var(--text-2)" }}>{catMeta(thread.category)[1]} {L(catMeta(thread.category)[2], catMeta(thread.category)[3])}</span>
+                  <span style={{ fontSize: "0.76rem", color: "var(--text-2)" }}>{L(catMeta(thread.category)[1], catMeta(thread.category)[2])}</span>
                   {(() => { const s = STATUS_META[thread.status] || STATUS_META.new; return <span style={{ fontSize: "0.6rem", fontFamily: mono, color: s[0], border: `1px solid ${s[0]}`, borderRadius: 100, padding: "1px 8px", textTransform: "uppercase", letterSpacing: 0.4 }}>{L(s[1], s[2])}</span>; })()}
                 </div>
                 <div style={{ marginBottom: "0.85rem" }}>
@@ -413,7 +412,7 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
                 <button key={c.id} className="rbf-conv" onClick={() => openThread(c.id)}
                   style={{ display: "block", width: "100%", textAlign: "left", border: `1px solid ${border}`, borderRadius: 10, padding: "0.7rem 0.8rem", marginBottom: "0.6rem", background: bg, cursor: "pointer", transition: "border-color .15s" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: "0.35rem", flexWrap: "wrap" }}>
-                    <span style={{ fontSize: "0.74rem", color: "var(--text-2)" }}>{cm[1]} {L(cm[2], cm[3])}</span>
+                    <span style={{ fontSize: "0.74rem", color: "var(--text-2)" }}>{L(cm[1], cm[2])}</span>
                     <span style={{ fontSize: "0.58rem", fontFamily: mono, color: s[0], border: `1px solid ${s[0]}`, borderRadius: 100, padding: "1px 7px", textTransform: "uppercase", letterSpacing: 0.4 }}>{L(s[1], s[2])}</span>
                     {newForUser && <span style={{ fontSize: "0.58rem", fontFamily: mono, color: green }}>● {L("nová odpoveď", "new reply")}</span>}
                     <span style={{ marginLeft: "auto", fontSize: "0.6rem", fontFamily: mono, color: dim }}>{fmtDay(c.activity_at)}</span>
@@ -437,7 +436,7 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
             <div style={{ width: 52, height: 52, borderRadius: "50%", background: "color-mix(in srgb, var(--accent) 14%, transparent)", border: `1px solid ${green}`, margin: "0 auto 0.85rem", display: "flex", alignItems: "center", justifyContent: "center", animation: "rbf-pop 0.35s ease-out" }}>
               <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={green} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
             </div>
-            <div style={{ color: text, fontWeight: 700, fontSize: "1rem", marginBottom: "0.4rem" }}>{L("Ďakujeme! 🙌", "Thank you! 🙌")}</div>
+            <div style={{ color: text, fontWeight: 700, fontSize: "1rem", marginBottom: "0.4rem" }}>{L("Ďakujeme!", "Thank you!")}</div>
             <div style={{ color: dim, fontSize: "0.83rem", lineHeight: 1.55, marginBottom: "1.2rem", maxWidth: 280, marginLeft: "auto", marginRight: "auto" }}>
               {loggedIn
                 ? L("Máme to. Odpoveď uvidíš tu v „Moje konverzácie“ aj e-mailom.", "Got it. You'll see our reply here under \"My conversations\" and by email.")
@@ -451,57 +450,56 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
         ) : (
           /* ── Form (new conversation) ───────────────────────────── */
           <>
-            <div style={{ color: "var(--text-2)", fontSize: "0.84rem", lineHeight: 1.55, marginBottom: "1.1rem" }}>
-              {L("Daj nám vedieť čokoľvek — ak niečo nefunguje, ak vieš o aktívnej novostavbe, ktorá nám chýba, alebo máš otázku či nápad na novú funkciu, ktorú by si uvítal. Tie najlepšie veľmi radi pridáme. 🙌",
-                 "Tell us anything — if something's not working, if you know an active new-build we're missing, or if you have a question or a feature you'd love to see. We're always glad to add the best ones. 🙌")}
-            </div>
-
-            <div style={stepLabel}><span style={stepNum}>1</span> {L("O čom to je?", "What's it about?")}</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem", marginBottom: "1.15rem" }}>
-              {CATEGORIES.map(([key, emoji, sk, en]) => {
+            {/* Rebuilt (Boss: "otrasne neintuitívne"). What went:
+                  · a five-line intro paragraph explaining what feedback is
+                  · six emoji, one per category
+                  · numbered STEP 1 / 2 / 3 headers over a three-field form
+                  · a how-to on taking a screenshot, with Mac and Windows
+                    keyboard shortcuts, above the upload button
+                  · a two-line checkbox label
+                Everything left is either an input or the one word naming it. */}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem", marginBottom: "0.85rem" }}>
+              {CATEGORIES.map(([key, sk, en]) => {
                 const on = category === key;
                 return (
                   <button key={key} className="rbf-cat" onClick={() => pickCategory(key)} aria-pressed={on}
-                    style={{ display: "flex", alignItems: "center", gap: "0.5rem", textAlign: "left", padding: "0.62rem 0.65rem", borderRadius: 10, cursor: "pointer", border: `1px solid ${on ? green : border}`, background: on ? "color-mix(in srgb, var(--accent) 10%, transparent)" : bg, color: on ? green : "var(--text-2)", fontFamily: "inherit", fontSize: "0.8rem", fontWeight: on ? 600 : 500 }}>
-                    <span style={{ fontSize: "1.05rem", lineHeight: 1 }} aria-hidden="true">{emoji}</span>
-                    <span style={{ flex: 1, minWidth: 0 }}>{L(sk, en)}</span>
-                    {on && <span aria-hidden="true" style={{ color: green, fontSize: "0.8rem", fontWeight: 700 }}>✓</span>}
+                    style={{ padding: "0.4rem 0.7rem", borderRadius: 999, cursor: "pointer",
+                             border: `1px solid ${on ? green : border}`,
+                             background: on ? "color-mix(in srgb, var(--accent) 12%, transparent)" : "transparent",
+                             color: on ? green : "var(--text-2)", fontFamily: "inherit",
+                             fontSize: "0.76rem", fontWeight: on ? 600 : 500, whiteSpace: "nowrap" }}>
+                    {L(sk, en)}
                   </button>
                 );
               })}
             </div>
 
-            <div style={stepLabel}><span style={stepNum}>2</span> {L("Tvoja správa", "Your message")}</div>
             <textarea ref={taRef} value={message} onChange={e => setMessage(e.target.value.slice(0, MAX_MESSAGE))} onKeyDown={onMsgKey}
-              placeholder={L("Napíš nám, čo máš na srdci…", "Write us what's on your mind…")} rows={4}
-              style={{ width: "100%", boxSizing: "border-box", minHeight: 92, maxHeight: 220, background: bg, border: `1px solid ${border}`, borderRadius: 10, color: text, fontFamily: "inherit", fontSize: "0.85rem", lineHeight: 1.5, padding: "0.6rem 0.7rem", resize: "vertical", outline: "none" }}
+              placeholder={L("Čo sa deje? Čím konkrétnejšie, tým lepšie.", "What's going on? The more specific, the better.")} rows={5}
+              style={{ width: "100%", boxSizing: "border-box", minHeight: 110, maxHeight: 240, background: bg, border: `1px solid ${border}`, borderRadius: 10, color: text, fontFamily: "inherit", fontSize: "0.85rem", lineHeight: 1.5, padding: "0.65rem 0.75rem", resize: "vertical", outline: "none" }}
               onFocus={e => { e.currentTarget.style.borderColor = "color-mix(in srgb, var(--accent) 50%, transparent)"; }} onBlur={e => { e.currentTarget.style.borderColor = border; }} />
-            <div style={{ marginTop: "0.35rem", color: dim, fontSize: "0.62rem", fontFamily: mono, textAlign: "right" }}>{msgLen} / {MAX_MESSAGE}</div>
 
-            <div style={{ ...stepLabel, marginTop: "0.85rem", marginBottom: "0.4rem" }}><span style={stepNum}>3</span> {L("Screenshot", "Screenshot")} · {L("nepovinné", "optional")}</div>
             {screenshot ? (
-              <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", border: `1px solid ${border}`, borderRadius: 10, padding: "0.5rem 0.6rem", background: bg }}>
-                <img src={screenshot} alt="" style={{ width: 46, height: 46, objectFit: "cover", borderRadius: 6, border: `1px solid ${border}` }} />
+              <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginTop: "0.6rem", border: `1px solid ${border}`, borderRadius: 10, padding: "0.5rem 0.6rem", background: bg }}>
+                <img src={screenshot} alt="" style={{ width: 40, height: 40, objectFit: "cover", borderRadius: 6, border: `1px solid ${border}` }} />
                 <span style={{ flex: 1, minWidth: 0, fontSize: "0.74rem", color: dim, fontFamily: mono, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{shotName}</span>
                 <button onClick={() => { setScreenshot(null); setShotName(""); }} title={L("Odstrániť", "Remove")} style={{ background: "transparent", border: `1px solid ${border}`, color: dim, borderRadius: 6, cursor: "pointer", padding: "0.25rem 0.5rem", fontSize: "0.72rem", fontFamily: mono }}>✕</button>
               </div>
             ) : (
               <>
-                <button onClick={() => fileRef.current?.click()} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.45rem", background: bg, border: `1px dashed ${border}`, color: "var(--text-2)", borderRadius: 10, padding: "0.65rem", cursor: "pointer", fontSize: "0.8rem", fontFamily: "inherit" }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = "color-mix(in srgb, var(--accent) 50%, transparent)"; }} onMouseLeave={e => { e.currentTarget.style.borderColor = border; }}>
-                  <span aria-hidden="true">📎</span> {L("Vložiť (Ctrl/⌘+V) alebo nahrať obrázok", "Paste (Ctrl/⌘+V) or upload an image")}
+                <button onClick={() => fileRef.current?.click()}
+                  style={{ marginTop: "0.6rem", width: "100%", background: "transparent", border: `1px dashed ${border}`, color: dim, borderRadius: 10, padding: "0.55rem", cursor: "pointer", fontSize: "0.76rem", fontFamily: "inherit" }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = "color-mix(in srgb, var(--accent) 50%, transparent)"; e.currentTarget.style.color = text; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = border; e.currentTarget.style.color = dim; }}>
+                  {L("Priložiť obrázok — alebo ho sem vlož cez Ctrl/⌘+V", "Attach an image — or paste it here with Ctrl/⌘+V")}
                 </button>
                 <input ref={fileRef} type="file" accept="image/*" onChange={onPickFile} style={{ display: "none" }} />
-                <div style={{ marginTop: "0.45rem", color: dim, fontSize: "0.66rem", lineHeight: 1.5 }}>
-                  {L("Screenshot nám veľmi pomôže. Ako naň:", "A screenshot helps us a lot. How to take one:")}<br />
-                  <span style={{ fontFamily: mono }}>Mac: ⌘ + Shift + 4</span> · <span style={{ fontFamily: mono }}>Windows: ⊞ + Shift + S</span>
-                </div>
               </>
             )}
 
-            <label style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem", marginTop: "0.8rem", cursor: "pointer", color: dim, fontSize: "0.68rem", lineHeight: 1.5 }}>
-              <input type="checkbox" checked={includeShot} onChange={e => setIncludeShot(e.target.checked)} style={{ marginTop: 2, accentColor: green }} />
-              <span>{L("Automaticky priložiť screenshot tejto stránky + technické info (chyby, prehliadač) — pomôže nám rýchlo nájsť problém.", "Automatically attach a screenshot of this page + technical info (errors, browser) — helps us find the problem fast.")}</span>
+            <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.7rem", cursor: "pointer", color: dim, fontSize: "0.72rem" }}>
+              <input type="checkbox" checked={includeShot} onChange={e => setIncludeShot(e.target.checked)} style={{ accentColor: green }} />
+              <span>{L("Priložiť snímku tejto stránky a technické info", "Attach a snapshot of this page and technical info")}</span>
             </label>
 
             {!accountEmail && (
@@ -513,7 +511,7 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
 
             <button className="rbf-send" onClick={submit} disabled={!canSend}
               style={{ marginTop: "1rem", width: "100%", background: canSend ? green : "var(--surface-3)", color: canSend ? "#0a0a0c" : dim, border: "none", borderRadius: 10, padding: "0.7rem 0.8rem", fontWeight: 700, fontFamily: mono, fontSize: "0.82rem", cursor: canSend ? "pointer" : "not-allowed", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "0.4rem" }}>
-              {phase === "sending" ? L("Odosielam…", "Sending…") : <>{L("Odoslať", "Send")} <span aria-hidden="true">→</span></>}
+              {phase === "sending" ? L("Odosielam…", "Sending…") : <>{L("Odoslať", "Send")}</>}
             </button>
 
             <div style={{ marginTop: "0.6rem", color: dim, fontSize: "0.64rem", fontFamily: mono, textAlign: "center", lineHeight: 1.5 }}>

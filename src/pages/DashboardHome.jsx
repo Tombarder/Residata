@@ -56,8 +56,10 @@ const fmtM2 = (eur, lang) =>
 const fmtPct = (v) => (v == null || !Number.isFinite(Number(v))) ? "—" : `${Math.round(Number(v))}%`;
 const fmtMonths = (m, lang) => {
   if (m == null || !Number.isFinite(m)) return "—";
-  if (m >= 24) return `~${(m / 12).toFixed(1)} ${L(lang, "r", "yr")}`;
-  return `~${m < 10 ? m.toFixed(1) : Math.round(m)} ${L(lang, "mes", "mo")}`;
+  // Spelled out rather than "mes"/"r" — the unit now carries the whole meaning,
+  // since the hint under it no longer repeats the word "mesiacov" (Boss).
+  if (m >= 24) return `~${(m / 12).toFixed(1)} ${L(lang, "rokov", "yr")}`;
+  return `~${m < 10 ? m.toFixed(1) : Math.round(m)} ${L(lang, "mesiacov", "mo")}`;
 };
 
 // ─── metric registry (shared by KPI strip + metric widget) ─────
@@ -65,15 +67,15 @@ const fmtMonths = (m, lang) => {
 // non-analyst instantly knows what "Reserved" or "All units" actually means.
 const METRICS = {
   available:   { label: { sk: "Voľné byty",     en: "Available"    }, hint: { sk: "aktuálne v predaji",         en: "on the market now"      }, fmt: "count", accent: green, info: { sk: "Počet bytov aktuálne v ponuke naprieč zvolenými projektmi — voľné, ešte nepredané a nerezervované. Nezahŕňa predané ani rezervované byty.", en: "Units currently for sale across the selected projects — free, not yet sold or reserved. Excludes sold and reserved units." } },
-  avg_m2:      { label: { sk: "Priem. cena/m²", en: "Avg price/m²" }, hint: { sk: "ponuková, s DPH",            en: "asking, incl. VAT"      }, fmt: "m2", info: { sk: "Priemerná ponuková cena za m² (s DPH) voľných bytov, vážená počtom bytov. Je to cena, ktorú pýtajú developeri — nie realizovaná predajná cena.", en: "Average asking price per m² (incl. VAT) of available units, weighted by unit count. This is the developers' asking price — not the achieved sale price." } },
-  sold30:      { label: { sk: "Predané/30 dní", en: "Sold/30 days" }, hint: { sk: "tempo predaja",              en: "sales pace"             }, fmt: "count", accent: orange, requires: "view_sold_velocity", info: { sk: "Koľko bytov sa predalo za posledných 30 dní — teda zmizli z ponuky ako predané. Ukazuje aktuálne tempo predaja na trhu.", en: "How many units sold in the last 30 days — i.e. left the market as sold. Shows the current sales pace." } },
+  avg_m2:      { label: { sk: "Priem. cena/m²", en: "Avg price/m²" }, hint: { sk: "predajná, s DPH",            en: "sale price, incl. VAT"  }, fmt: "m2", info: { sk: "Priemerná cena za m² (s DPH) bytov, ktoré sú aktuálne v predaji, vážená počtom bytov.", en: "Average price per m² (incl. VAT) of units currently for sale, weighted by unit count." } },
+  sold30:      { label: { sk: "Predané jednotky/30 dní", en: "Units sold/30 days" }, hint: { sk: "tempo predaja",         en: "sales pace"             }, fmt: "count", accent: orange, requires: "view_sold_velocity", info: { sk: "Koľko bytov sa predalo za posledných 30 dní — teda zmizli z ponuky ako predané. Ukazuje aktuálne tempo predaja na trhu.", en: "How many units sold in the last 30 days — i.e. left the market as sold. Shows the current sales pace." } },
   sold_total:  { label: { sk: "Predané spolu",  en: "Sold total"   }, hint: { sk: "kumulatívne doteraz",        en: "cumulative to date"     }, fmt: "count" },
-  sold_through:{ label: { sk: "Vypredanosť",    en: "Sold-through" }, hint: { sk: "podiel už predaných",        en: "share already sold"     }, fmt: "pct", accent: orange, info: { sk: "Podiel už predaných bytov z celkového počtu bytov v projektoch (predané ÷ všetky byty). Napr. 68 % znamená, že z každých 100 bytov je 68 predaných.", en: "Share of units already sold out of all units in the projects (sold ÷ total units). E.g. 68% means 68 of every 100 units are sold." } },
-  reserved:    { label: { sk: "Rezervované",    en: "Reserved"     }, hint: { sk: "vr. predrezervovaných",      en: "incl. pre-reserved"     }, fmt: "count", accent: blue, info: { sk: "Počet bytov aktuálne rezervovaných (vrátane predrezervovaných). Rezervácia ešte nie je predaj — byt sa môže vrátiť do ponuky.", en: "Units currently reserved (including pre-reserved). A reservation isn't a sale — the unit can return to the market." } },
+  sold_through:{ label: { sk: "Podiel predaných a voľných jednotiek", en: "Sold vs available units" }, hint: { sk: "v sledovaných novostavbách", en: "across tracked developments" }, fmt: "pct", accent: orange, info: { sk: "Podiel už predaných bytov z celkového počtu bytov v projektoch (predané ÷ všetky byty). Napr. 68 % znamená, že z každých 100 bytov je 68 predaných.", en: "Share of units already sold out of all units in the projects (sold ÷ total units). E.g. 68% means 68 of every 100 units are sold." } },
+  reserved:    { label: { sk: "Rezervované jednotky", en: "Reserved units" }, hint: { sk: "vrátane predrezervovaných", en: "incl. pre-reserved"     }, fmt: "count", accent: blue, info: { sk: "Počet bytov aktuálne rezervovaných (vrátane predrezervovaných). Rezervácia ešte nie je predaj — byt sa môže vrátiť do ponuky.", en: "Units currently reserved (including pre-reserved). A reservation isn't a sale — the unit can return to the market." } },
   tracked:     { label: { sk: "Všetky byty",    en: "All units"    }, hint: { sk: "vrátane predaných",          en: "incl. sold"             }, fmt: "count" },
   projects:    { label: { sk: "Projekty",       en: "Projects"     }, hint: { sk: "aktívne v predaji",          en: "active in market"       }, fmt: "count", info: { sk: "Počet aktívnych projektov vo zvolenom výbere, ktoré majú aspoň jeden byt v ponuke.", en: "Number of active projects in the current selection that have at least one unit for sale." } },
   developers:  { label: { sk: "Developeri",     en: "Developers"   }, hint: { sk: "aktívni na trhu",            en: "active in market"       }, fmt: "count", info: { sk: "Počet rôznych developerov s aktívnou ponukou vo zvolenom výbere.", en: "Number of distinct developers with active offerings in the current selection." } },
-  inventory:   { label: { sk: "Zásoba",         en: "Inventory"    }, hint: { sk: "mesiacov pri dnešnom tempe", en: "months at today's pace" }, fmt: "months", info: { sk: "Za koľko mesiacov by sa vypredali všetky voľné byty pri súčasnom tempe predaja (voľné byty ÷ mesačné tempo). Nižšie číslo = rýchlejší trh.", en: "How many months it would take to sell all available units at the current pace (available units ÷ monthly pace). Lower = a faster market." } },
+  inventory:   { label: { sk: "Zásoba",         en: "Inventory"    }, hint: { sk: "pri aktuálnom tempe predaja", en: "at the current sales pace" }, fmt: "months", info: { sk: "Za koľko mesiacov by sa vypredali všetky voľné byty pri súčasnom tempe predaja (voľné byty ÷ mesačné tempo). Nižšie číslo = rýchlejší trh.", en: "How many months it would take to sell all available units at the current pace (available units ÷ monthly pace). Lower = a faster market." } },
 };
 // Metrics that support a month-over-month delta (derivable from project history).
 const MOM_METRICS = new Set(["available", "avg_m2", "reserved", "sold_total", "sold_through"]);
@@ -589,7 +591,7 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
             // not reach the DOM). Same masking MetricBody uses.
             const value = locked ? "12 345"
               : gateVelocity ? "—"
-              : mk === "sold30" ? (raw == null ? "—" : raw > 0 ? `+${fmtCount(raw, lang)}` : "0")
+              : mk === "sold30" ? (raw == null ? "—" : fmtCount(raw, lang))
               : mk === "avg_m2" ? (raw != null ? `${Math.round(moneyFromEur(raw)).toLocaleString(localeTag(lang))} ${moneySymbol()}` : "—")
               : fmtMetric(mk, raw, lang);
             const delta = (!locked && !gateVelocity && MOM_METRICS.has(mk)) ? aggMomDelta(mk, overviewIds, snapshots) : null;
@@ -614,16 +616,16 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
       <section>
         <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap", marginBottom: "0.95rem" }}>
           <div>
-            <div style={{ fontFamily: mono, fontSize: "0.68rem", color: accentInk, letterSpacing: "0.12em", textTransform: "uppercase" }}>
-              {L(lang, "Môj dashboard", "My dashboard")}
+            {/* The how-to line under this heading is gone (Boss). Dragging a card
+                and opening a ⋯ menu are discoverable by doing them; spelling both
+                out under every visit made the section start with instructions
+                instead of with the section. The heading takes the space. */}
+            <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+              <h2 style={{ fontSize: "1.35rem", fontWeight: 600, color: textLight, letterSpacing: "-0.01em", margin: 0 }}>
+                {L(lang, "Môj dashboard", "My dashboard")}
+              </h2>
               <SavePill saveState={saveState} lang={lang} />
             </div>
-            {widgets.length > 0 && (
-              <div style={{ fontSize: "0.72rem", color: faint, marginTop: "0.4rem" }}>
-                {L(lang, "Ťahaj karty pre presun · ⋯ pre nastavenia · zmeny sa ukladajú samé",
-                      "Drag cards to reorder · ⋯ for options · changes save automatically")}
-              </div>
-            )}
           </div>
           <div style={{ display: "inline-flex", gap: "0.5rem", alignItems: "center" }}>
             <button onClick={() => setEditor({ mode: "add" })}

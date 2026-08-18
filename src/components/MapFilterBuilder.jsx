@@ -50,7 +50,7 @@ export default function MapFilterBuilder({ conditions, setConditions, projects, 
       <div style={{ display: "flex", alignItems: "center", padding: "15px 18px", borderBottom: `1px solid ${border}` }}>
         <span style={{ color: textLight, fontWeight: 600, fontSize: "1rem" }}>{sk ? "Filtre" : "Filters"}</span>
         <span style={{ marginLeft: 12, fontSize: "0.82rem", color: dim, fontFamily: mono }}>
-          <strong style={{ color: accentInk, fontSize: "0.95rem" }}>{matchCount}</strong>{totalCount != null ? <span style={{ color: dim }}> / {totalCount}</span> : null} {sk ? "vyhovuje" : "match"}
+          <strong style={{ color: accentInk, fontSize: "0.95rem" }}>{matchCount}</strong>{totalCount != null ? <span style={{ color: dim }}> / {totalCount}</span> : null} {sk ? "vyhovuje zadaným kritériám" : "match your criteria"}
         </span>
         <button onClick={onClose} style={{ marginLeft: "auto", background: "none", border: "none", color: dim, cursor: "pointer", fontSize: "1.3rem", lineHeight: 1 }} aria-label="Close">×</button>
       </div>
