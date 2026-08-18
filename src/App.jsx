@@ -1755,7 +1755,15 @@ function PricingPage({ setCurrent, l, lang, onLogin, scrollToContact = false }) 
   };
   return (
     <>
-      <div style={{ padding: "8rem 2rem 3rem", maxWidth: "var(--container)", margin: "0 auto", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
+      {/* The top of this page is TWO standalone parts (Boss): pricing on the left
+          at two thirds, contact on the right at one third — not a contact card
+          wedged in as a third plan. Everything below (testimonial, FAQ) stays
+          full-width and centred as it was. */}
+      <div className="pricing-split" style={{
+        display: "grid", gridTemplateColumns: "2fr 1fr", gap: "2rem",
+        padding: "8rem 2rem 4rem", maxWidth: 1280, margin: "0 auto", alignItems: "start",
+      }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
         {isAlreadyPaid && (
           <div style={{ marginBottom: "1rem",
             display: "inline-flex", alignItems: "center", gap: "0.5rem",
@@ -1769,7 +1777,7 @@ function PricingPage({ setCurrent, l, lang, onLogin, scrollToContact = false }) 
         )}
         <Label>{l.pricingLabel}</Label>
         <h1 className="sec-title">{l.pricingTitle}</h1>
-        <p className="sec-desc" style={{ textAlign: "center" }}>{l.pricingDesc}</p>
+        <p className="sec-desc" style={{ textAlign: "left", marginLeft: 0 }}>{l.pricingDesc}</p>
 
         {/* 7-day free trial card — front and centre on Pricing for
             anon + free users. Mirrors the Billing-page version so the
@@ -1804,14 +1812,7 @@ function PricingPage({ setCurrent, l, lang, onLogin, scrollToContact = false }) 
             </div>
           </div>
         )}
-      </div>
-
-      <div style={{ padding: "0 2rem 4rem", maxWidth: "var(--container)", margin: "0 auto" }}>
-        {/* Three peers: the two plans and the way to ask about them. Contact sits
-            BESIDE the pricing rather than under it (Boss) — which is also why the
-            old "not sure which plan?" panel could go: the answer to that question
-            is now in view at the same moment as the question. */}
-        <div className="pricing-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1.5rem", maxWidth: 1180, margin: "0 auto", alignItems: "stretch" }}>
+        <div className="pricing-grid" style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "1.5rem", width: "100%", marginTop: "2rem", alignItems: "stretch" }}>
           {tiers.map(t => (
             <div key={t.tier} style={{
               border: `1px solid ${t.featured ? "var(--accent)" : "#222228"}`,
@@ -1870,9 +1871,11 @@ function PricingPage({ setCurrent, l, lang, onLogin, scrollToContact = false }) 
               )}
             </div>
           ))}
-
-          <ContactSection l={l} />
         </div>
+      </div>
+
+      {/* RIGHT third — contact as its own standalone part, not a plan card. */}
+      <ContactSection l={l} />
       </div>
 
       {/* Testimonial */}
@@ -2306,11 +2309,11 @@ export default function App() {
           .contact-methods { grid-template-columns: 1fr !important; }
         }
         /* Responsive grids */
-        /* The pricing grid carries THREE cards now (2 plans + contact), so it needs
-           an intermediate step — at tablet widths three columns are too narrow to
-           read, but one column is a needlessly long scroll. */
-        @media (max-width: 1100px) and (min-width: 901px) {
-          .pricing-grid { grid-template-columns: repeat(2, 1fr) !important; max-width: 780px !important; }
+        /* Below ~1050 the 2/3 + 1/3 split stops working: the plan cards get too
+           narrow to read a feature list in. Contact drops under the pricing and
+           becomes full-width there. */
+        @media (max-width: 1050px) {
+          .pricing-split { grid-template-columns: 1fr !important; padding-top: 6rem !important; }
         }
         @media (max-width: 900px) {
           .value-grid { grid-template-columns: 1fr !important; }
