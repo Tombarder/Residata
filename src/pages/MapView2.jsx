@@ -1263,7 +1263,7 @@ function MarketInsight({ lens, stats, sk }) {
   if (lens === "price") {
     headline = <Headline label={sk ? "Medián ceny" : "Median price"} big={s.med ? `€${fmt(s.med)}` : "—"} unit="/m²"
       sub={s.pMin ? `${sk ? "najlacnejší" : "cheapest"} €${fmt(s.pMin)} · ${sk ? "najdrahší" : "priciest"} €${fmt(s.pMax)}` : (sk ? "žiadne zverejnené ceny" : "no published prices")} />;
-    visual = <Histogram hist={s.hist} hLo={s.hLo} hHi={s.hHi} med={s.med} />;
+    visual = <Histogram hist={s.hist} hLo={s.hLo} hHi={s.hHi} med={s.med} sk={sk} />;
   } else if (lens === "completion") {
     const known = s.count - s.comp.unknown;
     headline = <Headline label={sk ? "So známym termínom" : "With a known date"} big={s.count ? `${Math.round((known / s.count) * 100)}%` : "—"}
@@ -1299,17 +1299,35 @@ function Headline({ label, big, unit, sub }) {
     </div>
   );
 }
-function Histogram({ hist, hLo, hHi, med }) {
+function Histogram({ hist, hLo, hHi, med, sk }) {
+  const [hover, setHover] = useState(null);
   if (!hist || !hist.some((n) => n > 0)) return <div style={{ flex: 1, fontSize: "0.7rem", color: dim }}>—</div>;
   const max = Math.max(...hist, 1);
   const medIdx = (med != null && hHi > hLo) ? Math.min(hist.length - 1, Math.max(0, Math.floor(((med - hLo) / (hHi - hLo)) * hist.length))) : -1;
+  const step = (hHi - hLo) / hist.length;
+  // A bar on its own says nothing: hovering names the price band it covers and
+  // how many projects sit in it, in words rather than a bare count.
+  const bandLabel = (i) => {
+    const lo = Math.round(hLo + i * step), hi = Math.round(hLo + (i + 1) * step);
+    const n = hist[i];
+    const projects = sk ? (n === 1 ? "projekt" : n < 5 ? "projekty" : "projektov") : (n === 1 ? "project" : "projects");
+    return `€${fmt(lo)} – €${fmt(hi)}/m² · ${n} ${projects}${i === medIdx ? (sk ? " · medián" : " · median") : ""}`;
+  };
   return (
     <div style={{ flex: 1, minWidth: 150 }}>
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 36 }}>
-        {hist.map((n, i) => <div key={i} title={String(n)} style={{ flex: 1, height: `${Math.max(7, (n / max) * 100)}%`, background: i === medIdx ? green : "var(--accent-strong)", borderRadius: 2 }} />)}
+      <div style={{ height: 13, fontSize: "0.6rem", color: hover == null ? "transparent" : textLight, fontFamily: mono, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+        {hover == null ? "·" : bandLabel(hover)}
+      </div>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 36 }} onMouseLeave={() => setHover(null)}>
+        {hist.map((n, i) => (
+          <div key={i} title={bandLabel(i)} onMouseEnter={() => setHover(i)}
+            style={{ flex: 1, height: `${Math.max(7, (n / max) * 100)}%`, cursor: "default",
+                     background: i === hover ? textLight : i === medIdx ? green : "var(--accent-strong)",
+                     borderRadius: 2, transition: "background 90ms" }} />
+        ))}
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.58rem", color: dim, fontFamily: mono, marginTop: 4 }}>
-        <span>€{fmt(hLo)}</span><span>€{fmt(hHi)}/m²</span>
+        <span>€{fmt(hLo)}/m²</span><span>€{fmt(hHi)}/m²</span>
       </div>
     </div>
   );
