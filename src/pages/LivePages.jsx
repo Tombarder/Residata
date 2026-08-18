@@ -633,7 +633,7 @@ function ProjectRow({ p, t, lang, setCurrent, canVelocity }) {
                 title = lang === "sk"
                   ? "Ceny zverejnené, ale chýbajú obytné plochy — €/m² nemožno spočítať"
                   : "Prices published but living areas missing — can't compute €/m²";
-                label = lang === "sk" ? "chýbajú plochy" : "areas missing";
+                label = lang === "sk" ? "developer nezverejňuje relevantné plochy" : "developer doesn't publish the relevant areas";
               } else if (!hasInventory) {
                 title = lang === "sk"
                   ? "Žiadne byty na predaj — projekt je vypredaný alebo pred štartom"
@@ -641,10 +641,18 @@ function ProjectRow({ p, t, lang, setCurrent, canVelocity }) {
                 label = "—";
               } else {
                 title = lang === "sk" ? "Developer nezverejňuje ceny" : "Developer doesn't publish prices";
-                label = lang === "sk" ? "nezverejnené" : "not published";
+                label = lang === "sk" ? "developer nezverejňuje ceny" : "developer doesn't publish prices";
               }
               return (
-                <span title={title} style={{ color: dim, fontStyle: "italic", fontSize: "0.75rem" }}>
+                // Spelled out in full (Boss), so it has to be allowed to wrap: the
+                // old placeholders were two words and this is a sentence. Normal
+                // white-space + a max width keeps it inside the €/m² column instead
+                // of stretching the whole table.
+                <span title={title} style={{
+                  color: dim, fontStyle: "italic", fontSize: "0.68rem",
+                  whiteSpace: "normal", lineHeight: 1.25,
+                  display: "inline-block", maxWidth: 150, textAlign: "right",
+                }}>
                   {label}
                 </span>
               );
@@ -845,7 +853,7 @@ function ProjectAggregateOnly({ project, lang, t, canVelocity }) {
     { label: lang === "sk" ? "Voľné" : "Available",          value: fmt(project.available_units), accent: green },
     { label: lang === "sk" ? "Predané" : "Sold",             value: soldDataMissing ? "—" : fmt(project.sold_units), accent: "#f5a623", sub: soldDataMissing ? (lang === "sk" ? "developer nezverejňuje" : "developer doesn't publish") : null },
     { label: lang === "sk" ? "Predaných %" : "Sold %",       value: soldPct || "—", accent: "#f5a623" },
-    { label: `${moneySymbol()}/m²`,                          value: eurM2 ? fmt(eurM2) : (lang === "sk" ? "nezverejnené" : "not published"), accent: eurM2 ? "var(--text)" : dim },
+    { label: `${moneySymbol()}/m²`,                          value: eurM2 ? fmt(eurM2) : "—", accent: eurM2 ? "var(--text)" : dim, sub: eurM2 ? null : (lang === "sk" ? "developer nezverejňuje ceny" : "developer doesn't publish prices") },
     ...(canVelocity && project.sold_last_month != null ? [{
       label: lang === "sk" ? "Predané (30d)" : "Sold (30d)",
       value: project.sold_last_month > 0 ? `+${project.sold_last_month}` : "0",
