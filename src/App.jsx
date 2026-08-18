@@ -35,7 +35,8 @@ import { useAuth } from "./lib/useAuth";
 import { useCapabilities } from "./lib/useCapabilities";
 import { useAccountUiPref } from "./lib/useAccountUiPref";
 import { useCountry } from "./lib/useCountry";
-import { useMarketTotals } from "./lib/useData";
+import { useMarketTotals, useDataSample, useHomeProjects, useTotalsList } from "./lib/useData";
+import { fmtSelloutValue } from "./lib/absorption";
 import { pushRoute, pathToPage, isAppPage, pageToPath } from "./lib/routing";
 import { applySeo } from "./lib/seo";
 import { localeTag, PUBLIC_LANGS, DEFAULT_LANG, LANG_LABELS, isPublicLang, coercePublicLang } from "./lib/locale";
@@ -1140,60 +1141,114 @@ function UseCasesPage({ setCurrent, l, lang }) {
 }
 
 /* ─────── DATA ─────── */
-// Real per-market sample data for the public "Sample Output" page. Pulled from
-// the live DB (current snapshot) so the demo numbers are ACCURATE, not invented:
-// Bratislava for SK / All, Praha for CZ. Prices are real listed units (unit IDs
-// anonymized); districts/€-m²/sold-through are real current aggregates. Static
-// snapshot example — refresh on a major data shift.
-const DATA_SAMPLE = {
-  SK: {
-    rows: [
-      ["Downtown Yards", "Staré Mesto", "byt", "—", "111.4", "961,860",   "8,638", "4", "V"],
-      ["Drotárska 15",   "Staré Mesto", "byt", "—", "110.5", "765,000",   "6,924", "4", "P"],
-      ["Byty Ružinov",   "Ružinov",     "byt", "—", "61.5",  "332,625",   "5,409", "2", "V"],
-      ["Danubius",       "Ružinov",     "byt", "—", "215.4", "1,135,595", "5,272", "3", "V"],
-      ["Galvania",       "Nové Mesto",  "byt", "—", "80.2",  "495,000",   "6,175", "3", "V"],
-      ["Agáty",          "Dúbravka",    "byt", "—", "87.0",  "587,552",   "6,753", "4", "V"],
-      ["Bory",           "Lamač",       "byt", "—", "137.4", "581,000",   "4,229", "5", "P"],
-      ["Floret",         "Rovinka",     "byt", "—", "59.7",  "229,990",   "3,853", "2", "V"],
-    ],
-    marketAvg: "5,525", gap: "1.9×",
-    trend: { mom: "+2.1%", est: false },   // REAL: latest May vs June Bratislava avg €/m²
-    // [district, €/m², units, MoM %] — MoM is REAL (latest May vs June snapshot)
-    districts: [["Staré Mesto","7,521",1469,"+2.7%"],["Ružinov","6,188",1885,"+0.6%"],["Karlova Ves","5,786",40,"+1.3%"],["Nové Mesto","5,684",859,"+3.4%"],["Dúbravka","5,277",649,"+2.4%"],["Rača","5,131",223,"+1.3%"]],
-    seg: ["€281k", "€418k", "€642k"],
-    // [name, district, total, remaining, sold%, est. months-to-sell-out at standard absorption]
-    nearSellout: [["Livana","Záhorská Bystrica",117,1,"99%","<1 mo"],["Svrčina","Karlova Ves",30,1,"97%","<1 mo"],["Drotárska 15","Staré Mesto",30,1,"97%","<1 mo"],["Pristavná 1","Ružinov",207,7,"97%","~1 mo"],["Rowink","Petržalka",80,5,"94%","~2 mo"]],
-    top: { district: "Staré Mesto", projects: 20, units: 1469, avail: 468, m2: "7,521", peak: "15,916" },
-    fast: { project: "Pristavná 1", district: "Ružinov", total: 207, left: 7, pct: "97%" },
-  },
-  CZ: {
-    rows: [
-      ["Ethos Karlín",       "Karlín",   "byt", "—", "112.3", "1,118,457", "9,960", "4", "V"],
-      ["Rezidence Parková",  "Žižkov",   "byt", "—", "60.6",  "517,888",   "8,546", "2", "V"],
-      ["Bohdalecké zahrady", "Michle",   "byt", "—", "91.0",  "720,436",   "7,917", "3", "V"],
-      ["D.O.K. Dřevák",      "Radlice",  "byt", "—", "119.9", "850,654",   "7,095", "4", "R"],
-      ["TOIVO Roztyly II",   "Chodov",   "byt", "—", "49.6",  "343,638",   "6,928", "2", "P"],
-      ["Albatros Kbely",     "Kbely",    "byt", "—", "80.9",  "565,862",   "6,995", "3", "V"],
-      ["Viladomy Střížkov",  "Střížkov", "byt", "—", "34.5",  "268,312",   "7,777", "1", "V"],
-      ["Lihovar Smíchov",    "Smíchov",  "byt", "—", "149.7", "1,418,170", "9,473", "4", "V"],
-    ],
-    marketAvg: "7,443", gap: "1.6×",
-    trend: { mom: "+1.5%", est: true },    // ESTIMATED — Praha history starts now (2 days so far); model-based, adjust when real
-    // [district, €/m², units, MoM %] — MoM ESTIMATED (scaled to price tier) until Praha banks history
-    districts: [["Karlín","9,616",147,"+1.9%"],["Smíchov","9,109",162,"+1.8%"],["Žižkov","8,570",104,"+1.7%"],["Chodov","7,762",115,"+1.6%"],["Jinonice","7,506",488,"+1.5%"],["Uhříněves","6,932",263,"+1.4%"]],
-    seg: ["€407k", "€554k", "€794k"],
-    nearSellout: [["D.O.K. Dřevák","Radlice",26,1,"96%","~1 mo"],["Viladomy Uhříněves","Uhříněves",151,22,"85%","~4 mo"],["JITRO Vršovice","Vršovice",155,25,"84%","~4 mo"],["TOIVO Roztyly II","Chodov",112,26,"77%","~6 mo"],["NEAR living","Palmovka",212,32,"74%","~4 mo"]],
-    top: { district: "Karlín", projects: 2, units: 147, avail: 147, m2: "9,616", peak: "12,071" },
-    fast: { project: "D.O.K. Dřevák", district: "Radlice", total: 26, left: 1, pct: "96%" },
-  },
-};
+// The "Ukážka dát" page used to ship a hand-copied constant, DATA_SAMPLE, holding
+// a snapshot of the database typed out by hand. It rotted: by 2026-08-18 it still
+// advertised "Downtown Yards, Staré Mesto, 8 638 €/m²" for a project that is in
+// RUŽINOV at 7 133 €/m², and a Slovak market average of 5 525 against a live 4 719.
+// On the page whose whole purpose is to demonstrate our data quality.
+//
+// It is now assembled from live sources on every render (see useSampleData below):
+//   · public.data_sample   — the 8 sample units, price-per-room ladder, peak €/m²
+//                            (a 2-row matview: the only unit-level detail anon may
+//                            read, since RLS keeps final.units closed)
+//   · public.district_totals — €/m², units and project counts per district
+//   · public.projects_live   — sell-through for the near-sellout + fastest cards
+//   · public.market_totals   — the market average
+// All of them are refreshed by reference.refresh_serving_matviews(), so this page
+// now updates itself nightly instead of whenever someone remembers to retype it.
+
+/** Assembles the "Ukážka dát" page's content from live sources.
+ *
+ *  Returns the same shape the old hardcoded constant had, so the page's JSX stays
+ *  as it was — only the origin of the numbers changed, from typed-in to derived.
+ *  Everything degrades to a safe placeholder while loading, and nothing here can
+ *  invent a figure: if a source has no data the card shows "—" rather than a
+ *  plausible-looking number, which is the failure mode that made the old constant
+ *  dangerous in the first place.
+ */
+function useSampleData() {
+  const { country } = useCountry();
+  // This page has always shown ONE market (its copy says "bratislavskom"), and the
+  // sample matview has a row per country — so "All" resolves to SK here, matching
+  // the page's own convention. Districts must resolve the SAME way or the cards
+  // disagree: unfiltered district_totals put Bubeneč (CZ) at the top while the
+  // sample's peaks were Slovak, so the premium-cluster card looked up a Czech
+  // district in a Slovak map and printed "peaking at €—/m²".
+  const cc = country === "CZ" ? "CZ" : "SK";
+  const sample = useDataSample();                       // 8 units + room ladder + peaks
+  const totals = useMarketTotals();                     // market average
+  const { projects } = useHomeProjects();               // sell-through cards
+  const districtQ = useTotalsList("district", { country: cc });   // €/m² + depth per district
+
+  const nf = (n) => (n == null ? "—" : Math.round(Number(n)).toLocaleString("en-US"));
+  const eur = (n) => (n == null ? "—" : `€${Math.round(Number(n) / 1000)}k`);
+
+  // Districts ranked by €/m², which is what the card is about.
+  const districts = (districtQ.rows || [])
+    .filter(r => r.avg_eur_m2 != null && r.district)
+    .map(r => ({
+      name: r.district,
+      m2: Number(r.avg_eur_m2),
+      units: Number(r.total_units) || 0,
+      avail: Number(r.available_units) || 0,
+      projects: Number(r.project_count) || 0,
+    }))
+    .sort((a, b) => b.m2 - a.m2);
+
+  const topD = districts[0] || null;
+  const cheapest = districts.length ? districts[districts.length - 1] : null;
+  const gap = topD && cheapest && cheapest.m2 > 0 ? `${(topD.m2 / cheapest.m2).toFixed(1)}×` : "—";
+
+  // Sell-through, from the same live figures the homepage cards use.
+  // "In its final units" / "Remaining inventory" — so a project must still HAVE
+  // units left to belong on these cards. Ranking on sold_percentage alone surfaced
+  // fully closed projects and rendered "0 of 11 units remain · 100% sold-through",
+  // which is a sold-out project, not the signal the card is about.
+  const active = (projects || []).filter(p => (p.status || "active") === "active"
+                                            && (p.total_units || 0) > 0
+                                            && (p.available_units || 0) > 0
+                                            && p.sold_percentage != null);
+  const bySellThrough = [...active].sort((a, b) => Number(b.sold_percentage) - Number(a.sold_percentage));
+  const nearSellout = bySellThrough.slice(0, 5).map(p => [
+    p.name, p.district || "—", Number(p.total_units) || 0, Number(p.available_units) || 0,
+    `${Math.round(Number(p.sold_percentage))}%`,
+    fmtSelloutValue(p.available_units, p.sold_last_month, lang0()) || "—",
+  ]);
+  const f = bySellThrough[0];
+
+  const seg = [2, 3, 4].map(r => eur(sample.segments?.[String(r)]));
+
+  // No `rows` here: the old constant carried 8 unit rows for a unit-level table
+  // that this page no longer renders — dead data. Not reintroduced, and the DB
+  // view deliberately publishes no unit rows either.
+  return {
+    loading: sample.loading || districtQ.loading,
+    marketAvg: nf(totals.avgPriceM2),
+    gap,
+    districts: districts.slice(0, 6).map(x => [x.name, nf(x.m2), x.units]),
+    seg,
+    nearSellout,
+    top: topD ? {
+      district: topD.name, projects: topD.projects, units: topD.units,
+      avail: topD.avail, m2: nf(topD.m2),
+      peak: nf(sample.peaks?.[topD.name]),
+    } : { district: "—", projects: 0, units: 0, avail: 0, m2: "—", peak: "—" },
+    fast: f ? {
+      project: f.name, district: f.district || "—",
+      total: Number(f.total_units) || 0, left: Number(f.available_units) || 0,
+      pct: `${Math.round(Number(f.sold_percentage))}%`,
+    } : { project: "—", district: "—", total: 0, left: 0, pct: "—" },
+  };
+}
+
+// This page is English-only marketing copy; the sell-out phrase follows suit.
+const lang0 = () => "en";
 
 function DataPage({ setCurrent, l, lang }) {
   const mono = "'JetBrains Mono', monospace";
   const { can } = useCapabilities();
   const { country } = useCountry();
-  const d = DATA_SAMPLE[country] || DATA_SAMPLE.SK;   // CZ → Praha; SK / All → Bratislava
+  const d = useSampleData();
   const isPaid = can("has_paid_access");
   // F-062 (Boss 2026-05-31): the InsightCards section contains hardcoded
   // illustrative numbers, NOT live derived data. The previous dynamic badge
@@ -1375,20 +1430,24 @@ function DataPage({ setCurrent, l, lang }) {
           </div>
         </InsightCard>
 
-        {/* 3 — Price by district — real €/m² + MoM trend (SK real / CZ estimated) */}
-        <InsightCard label="Price by District" title={`Market ${d.trend.mom} MoM · ${d.gap} district spread.`}>
+        {/* 3 — Price by district — live €/m² and depth, straight from district_totals.
+             The month-over-month column is GONE: it was a hand-entered figure (and
+             for CZ an openly "estimated" one), and this page has no live price
+             history to derive it from. Showing tracked depth instead means every
+             number here is one we can actually stand behind. */}
+        <InsightCard label="Price by District" title={`${d.gap} district spread.`}>
           <div style={{ fontSize: "0.82rem", color: "#8a8a96", lineHeight: 1.6, marginBottom: "1rem" }}>
-            Market average is <span style={{ color: "#e8e8ed" }}>€{d.marketAvg}/m²</span>, {d.trend.est ? "an estimated " : ""}<span style={{ color: "var(--accent)", fontWeight: 600 }}>{d.trend.mom}</span> month-over-month. Premium districts price at a <span style={{ color: "#e8e8ed", fontWeight: 600 }}>{d.gap}</span> multiple of the most affordable. €/m² and recent move by district:
+            Market average is <span style={{ color: "#e8e8ed" }}>€{d.marketAvg}/m²</span>. Premium districts price at a <span style={{ color: "#e8e8ed", fontWeight: 600 }}>{d.gap}</span> multiple of the most affordable. €/m² and tracked units by district:
           </div>
-          {d.districts.map(([name, price, units, mom]) => (
+          {d.districts.map(([name, price, units]) => (
             <div key={name} style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: "0.6rem", alignItems: "center", padding: "0.35rem 0", borderBottom: "1px solid #1a1a1f", fontSize: "0.76rem" }}>
               <span style={{ color: "#e8e8ed" }}>{name}</span>
               <span style={{ fontFamily: mono, fontSize: "0.68rem", color: "#55555f" }}>€{price}/m²</span>
-              <span style={{ fontFamily: mono, fontSize: "0.72rem", fontWeight: 600, color: "var(--accent)", minWidth: 48, textAlign: "right" }}>{mom}</span>
+              <span style={{ fontFamily: mono, fontSize: "0.72rem", fontWeight: 600, color: "var(--accent)", minWidth: 64, textAlign: "right" }}>{units} units</span>
             </div>
           ))}
           <div style={{ fontSize: "0.62rem", color: "#55555f", marginTop: "0.7rem", fontStyle: "italic" }}>
-            {d.trend.est ? "△ estimated — Praha banks live trend data from this month on." : "△ €/m² month-over-month, latest snapshots."}
+            △ live €/m² from the latest approved snapshot, refreshed nightly.
           </div>
         </InsightCard>
 
@@ -1409,7 +1468,10 @@ function DataPage({ setCurrent, l, lang }) {
             </div>
             <div>
               <div style={{ fontSize: "0.78rem", color: "#55555f", marginBottom: "0.6rem" }}>Top districts · avg €/m²</div>
-              {(() => { const mx = parseInt(d.districts[0][1].replace(/,/g, ""), 10) || 1; return d.districts.slice(0, 5).map(([name, price]) => {
+              {/* Guarded: with live data this list is EMPTY on the first render, and
+                  the old constant meant it never could be. Reading [0][1] then threw
+                  and took the whole page down to the error boundary. */}
+              {(() => { const mx = parseInt((d.districts[0]?.[1] || "0").replace(/,/g, ""), 10) || 1; return d.districts.slice(0, 5).map(([name, price]) => {
                 const v = parseInt(price.replace(/,/g, ""), 10) || 0;
                 return (
                   <div key={name} style={{ marginBottom: "0.6rem" }}>

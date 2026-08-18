@@ -75,11 +75,13 @@ export const t = {
     dataContextSub: "Daily snapshot · all active residential projects",
     insightsLabel: "Market Insights",
     insightsTitle: "What the data tells you.",
-    insightsDesc: "Examples of the insights you can extract from the daily-refreshed data. The kind of edge that's hard to build in-house — and expensive to live without. The five cards below are illustrative examples — paid subscribers see the live versions in their dashboard, derived from the current snapshot.",
-    // F-062 (Boss 2026-05-31): these cards contain illustrative numbers, not
-    // live derived values. Badge wording made explicit so customers don't
-    // read them as live insights. Real numbers ship in the paid dashboard.
-    insightsBadge: "Illustrative examples · live in dashboard",
+    insightsDesc: "Examples of the insights you can extract from the daily-refreshed data. The kind of edge that's hard to build in-house — and expensive to live without. Every number on the five cards below is live, from the latest approved snapshot — paid subscribers get the same insights across the whole market in their dashboard.",
+    // F-062 (Boss 2026-05-31) told this badge to say "illustrative", because the
+    // cards were fed by a hardcoded constant that had gone stale. As of 2026-08-18
+    // they read the live serving layer (public.data_sample + district_totals +
+    // projects_live + market_totals, all refreshed nightly), so calling them
+    // illustrative would now UNDERSELL them — and be its own kind of untrue.
+    insightsBadge: "Live · from the latest snapshot",
     rawLabel: "Raw Data",
     unitSample: "Unit-level sample",
     // `showing` is overridden per render in DataPage with live units-tracked
@@ -194,8 +196,8 @@ export const t = {
     dataContextSub: "Denný prehľad · všetky aktívne projekty",
     insightsLabel: "Trhové insighty",
     insightsTitle: "Čo z toho vidíte.",
-    insightsDesc: "Príklady insightov z denne aktualizovaných dát. Informačná výhoda proti konkurencii. Päť kariet nižšie sú ilustračné príklady — platiaci klienti vidia živé verzie vo svojom dashboarde, vypočítané z aktuálneho snapshotu.",
-    insightsBadge: "Ilustračné príklady · live v dashboarde",
+    insightsDesc: "Príklady insightov z denne aktualizovaných dát. Informačná výhoda proti konkurencii. Všetky čísla na piatich kartách nižšie sú živé, z posledného schváleného snapshotu — platiaci klienti majú tie isté insighty pre celý trh vo svojom dashboarde.",
+    insightsBadge: "Živé dáta · z posledného snapshotu",
     rawLabel: "Surové dáta",
     unitSample: "Ukážka na úrovni bytov",
     // Prepisujeme live v DataPage cez useMarketTotals; fallback kým sa načíta.

@@ -527,6 +527,41 @@ export function useTotals(level, id = null) {
 // unconditionally (Rules of Hooks) and only the active one fetches.
 // =============================================================================
 const _totalsListCache = new Map();
+/** Live content for the public "Ukážka dát" sample page.
+ *
+ *  Reads public.data_sample — a 2-row materialized view (one per country) holding
+ *  the only two figures on that page anonymous visitors cannot derive themselves:
+ *  average price per room count and peak €/m² per district. Both are aggregates
+ *  OVER units, and RLS keeps final.units closed to anon; the view exposes no unit
+ *  rows at all. Everything else on the page comes from district_totals /
+ *  projects_live / market_totals, which anon can already read.
+ *
+ *  This replaced a hardcoded constant in App.jsx that had gone stale (it showed a
+ *  real project in the wrong district at a 21%-wrong price). The view is refreshed
+ *  by reference.refresh_serving_matviews(), i.e. on every approval and by the
+ *  nightly cron, so the page cannot drift out of date again.
+ */
+export function useDataSample() {
+  const { country } = useCountry();
+  const [state, setState] = useState({ loading: true, segments: {}, peaks: {} });
+  useEffect(() => {
+    if (!isSupabaseReady()) { setState(s => ({ ...s, loading: false })); return; }
+    let cancelled = false;
+    // "All" has no sample row of its own — show the Slovak one, matching the rest
+    // of this page's SK-for-All convention.
+    const cc = isAllCountries(country) ? "SK" : country;
+    _readPublicWithRetry(() =>
+      supabasePublic.from("data_sample").select("segments,peaks").eq("country", cc).maybeSingle()
+    ).then(({ data, error }) => {
+      if (cancelled) return;
+      if (error) { console.error("[useDataSample]", error); setState({ loading: false, segments: {}, peaks: {} }); return; }
+      setState({ loading: false, segments: data?.segments || {}, peaks: data?.peaks || {} });
+    });
+    return () => { cancelled = true; };
+  }, [country]);
+  return state;
+}
+
 export function useTotalsList(level, { country = null, filterCol = null, filterId = null } = {}) {
   // Auth-settle signal (mirrors usePivotDistinct): re-fetch once auth resolves.
   // Public read via supabasePublic, so no GATE — just a fresh attempt on settle,
