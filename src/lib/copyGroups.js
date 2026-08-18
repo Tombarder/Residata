@@ -47,14 +47,14 @@ export const PAGES = [
     label: "Pricing", blurb: "Plans, testimonial, FAQ",
     sections: [
       { label: "Plans", keys: ["pricingLabel", "pricingTitle", "pricingDesc", "tiers", "mostPopular", "seePricing"] },
-      { label: "Testimonial & FAQ", keys: ["testimonial", "testimonialFrom", "testimonialName", "testimonialRole", "commonQ", "faqs", "notSure", "notSureDesc"] },
+      { label: "Testimonial & FAQ", keys: ["testimonial", "testimonialFrom", "testimonialName", "testimonialRole", "commonQ", "faqs"] },
     ],
   },
   {
     ns: "mk", group: "Marketing site", id: "mk-contact",
     label: "Contact", blurb: "Contact page + what to expect",
     sections: [
-      { label: "Contact", keys: ["getInTouch", "contactLabel", "contactTitle", "contactDesc", "emailDesc", "phoneDesc", "bookCall", "sendEmail"] },
+      { label: "Contact", keys: ["contactLabel", "contactDesc", "emailDesc", "phoneDesc", "bookCall", "sendEmail"] },
     ],
   },
 

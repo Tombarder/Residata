@@ -48,13 +48,13 @@ import { startPageEngagement, stopPageEngagement } from "./lib/engagement";
 const PlatformShell = lazy(() => import("./pages/Platform"));
 import { track } from "./lib/track";
 
-const pagesEN = ["Home", "Live", "What we deliver", "Use Cases", "Pricing"];
-const pagesSK = ["Domov", "Live", "Čo dostanete", "Využitie", "Cenník"];
+const pagesEN = ["Home", "Live", "What we deliver", "Use Cases", "Pricing & Contact"];
+const pagesSK = ["Domov", "Live", "Čo dostanete", "Využitie", "Cenník & Kontakt"];
 // Czech nav labels. Like pagesSK these are structural UI (not part of the
 // Texts-editable `t` dict), so CZ visitors get Czech nav even before body copy
 // is authored in the admin tool. Display-only: routing always keys off
 // pagesEN[i] (see Nav), so these never need pageMap entries.
-const pagesCS = ["Domů", "Live", "Co dostanete", "Využití", "Ceník"];
+const pagesCS = ["Domů", "Live", "Co dostanete", "Využití", "Ceník & Kontakt"];
 // Nav labels → internal page key. "Data" is the historical internal
 // name for the what-we-deliver / sample page; we keep it for route
 // stability (/sample URL still resolves) but the user-facing label
@@ -64,10 +64,12 @@ const pageMap = {
   "Ukážka": "Data",             // legacy SK label still resolves
   "Čo dostanete": "Data",
   "Využitie": "Use Cases",
-  "Cenník": "Pricing",
+  "Cenník & Kontakt": "Pricing",
+  "Cenník": "Pricing",          // legacy label still resolves
   "Kontakt": "Contact",
   "Sample": "Data",             // legacy EN label still resolves
   "What we deliver": "Data",
+  "Pricing & Contact": "Pricing",
 };
 
 // `t` (marketing copy dict) now lives in lib/marketingCopy.js — imported above.
@@ -1805,7 +1807,11 @@ function PricingPage({ setCurrent, l, lang, onLogin, scrollToContact = false }) 
       </div>
 
       <div style={{ padding: "0 2rem 4rem", maxWidth: "var(--container)", margin: "0 auto" }}>
-        <div className="pricing-grid" style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "1.5rem", maxWidth: 780, margin: "0 auto" }}>
+        {/* Three peers: the two plans and the way to ask about them. Contact sits
+            BESIDE the pricing rather than under it (Boss) — which is also why the
+            old "not sure which plan?" panel could go: the answer to that question
+            is now in view at the same moment as the question. */}
+        <div className="pricing-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1.5rem", maxWidth: 1180, margin: "0 auto", alignItems: "stretch" }}>
           {tiers.map(t => (
             <div key={t.tier} style={{
               border: `1px solid ${t.featured ? "var(--accent)" : "#222228"}`,
@@ -1864,6 +1870,8 @@ function PricingPage({ setCurrent, l, lang, onLogin, scrollToContact = false }) 
               )}
             </div>
           ))}
+
+          <ContactSection l={l} />
         </div>
       </div>
 
@@ -1908,26 +1916,6 @@ function PricingPage({ setCurrent, l, lang, onLogin, scrollToContact = false }) 
         ))}
       </div>
 
-      <div style={{ padding: "clamp(2.5rem,7vw,4rem) 2rem clamp(3rem,9vw,6rem)", textAlign: "center", position: "relative" }}>
-        <div style={{
-          position: "absolute", bottom: 0, left: "50%", transform: "translateX(-50%)",
-          width: 600, height: 400,
-          background: "radial-gradient(ellipse, color-mix(in srgb, var(--accent) 15%, transparent) 0%, transparent 70%)",
-          pointerEvents: "none", opacity: 0.3,
-        }} />
-        <h2 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "1rem" }}>{l.notSure}</h2>
-        <p style={{ color: "#8a8a96", maxWidth: 480, margin: "0 auto 2rem", fontWeight: 300 }}>{l.notSureDesc}</p>
-        {/* Contact now lives at the foot of this same page, so this scrolls
-            rather than navigating away. */}
-        <a href="#kontakt"
-           onClick={(e) => { e.preventDefault(); document.getElementById("kontakt")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}
-           className="btn-p" style={{ cursor: "pointer", display: "inline-block", textDecoration: "none" }}>{l.getInTouch}</a>
-      </div>
-
-      {/* ─── Contact, merged in under the pricing (Boss) ─── */}
-      <div style={{ borderTop: "1px solid #1a1a1f" }}>
-        <ContactSection l={l} />
-      </div>
     </>
   );
 }
@@ -1935,101 +1923,82 @@ function PricingPage({ setCurrent, l, lang, onLogin, scrollToContact = false }) 
 /* ─────── CONTACT ─────── */
 function ContactSection({ l }) {
   const mono = "'JetBrains Mono', monospace";
-  // Live proof instead of filler. The page used to run two columns — the contact
-  // card and a four-step "how it works" list Boss had removed — and dropping that
-  // column left a half-width card floating beside dead space. Rather than pad it
-  // back out with copy, the page is now ONE centred composition, closed off with
-  // three numbers that are true at the moment of reading.
+  // A CARD, not a section: it sits as the third cell of the pricing grid, beside
+  // the two plans (Boss). That placement is why it carries no hero of its own —
+  // a "Napíšte nám" headline here would have been the third invitation to get in
+  // touch within one screen, after the plan CTAs and the panel that used to sit
+  // below. The card states who you reach and how, and nothing else.
   const totals = useMarketTotals();
   const nf = (n) => (n == null ? "…" : Number(n).toLocaleString("en-US").replace(/,/g, " "));
   const isSk = l.contactLabel === "Kontakt";
-  const proof = [
-    { v: nf(totals.projectsActive), k: isSk ? "sledovaných projektov" : "projects tracked" },
-    { v: nf(totals.unitsTracked),   k: isSk ? "bytov v dátach" : "units in the data" },
-    { v: isSk ? "denne" : "daily",  k: isSk ? "aktualizácia" : "refresh" },
-  ];
 
   const method = (href, icon, text) => (
     <a href={href} style={{
-      textDecoration: "none", display: "flex", alignItems: "center", gap: "0.85rem",
+      textDecoration: "none", display: "flex", alignItems: "center", gap: "0.7rem",
       color: "#e8e8ed", transition: "border-color 0.2s, color 0.2s",
-      border: "1px solid #222228", borderRadius: 10, padding: "0.9rem 1.1rem", background: "#121216",
+      border: "1px solid #222228", borderRadius: 10, padding: "0.7rem 0.9rem", background: "#121216",
     }}
       onMouseEnter={e => { e.currentTarget.style.color = "var(--accent)"; e.currentTarget.style.borderColor = "color-mix(in srgb, var(--accent) 35%, transparent)"; }}
       onMouseLeave={e => { e.currentTarget.style.color = "#e8e8ed"; e.currentTarget.style.borderColor = "#222228"; }}>
-      <span style={{ fontFamily: mono, fontSize: "0.85rem", color: "var(--accent)", width: 18, textAlign: "center", flexShrink: 0 }}>{icon}</span>
-      <span style={{ fontSize: "0.92rem", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{text}</span>
+      <span style={{ fontFamily: mono, fontSize: "0.8rem", color: "var(--accent)", width: 16, textAlign: "center", flexShrink: 0 }}>{icon}</span>
+      <span style={{ fontSize: "0.85rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{text}</span>
     </a>
   );
 
   return (
-    <>
-      <div id="kontakt" style={{ padding: "clamp(3rem,8vw,5rem) 2rem 2.5rem", maxWidth: 680, margin: "0 auto", textAlign: "center", scrollMarginTop: "6rem" }}>
-        <Label>{l.contactLabel}</Label>
-        <h1 className="sec-title">{l.contactTitle}</h1>
-        <p className="sec-desc" style={{ margin: "0 auto" }}>{l.contactDesc}</p>
+    <div id="kontakt" style={{
+      border: "1px solid #222228", borderRadius: 12, background: "#16161a",
+      padding: "2.5rem", scrollMarginTop: "6rem",
+      display: "flex", flexDirection: "column",
+    }}>
+      <div style={{ fontFamily: mono, fontSize: "0.68rem", color: "var(--accent)", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "1.25rem" }}>
+        {l.contactLabel}
       </div>
 
-      <div style={{ padding: "0 2rem clamp(3rem,9vw,6rem)", maxWidth: 680, margin: "0 auto", position: "relative" }}>
-        {/* Soft halo behind the card so the centred layout has a focal point
-            rather than reading as one lonely box on a black field. */}
-        <div aria-hidden style={{
-          position: "absolute", top: -40, left: "50%", transform: "translateX(-50%)",
-          width: 560, height: 320, pointerEvents: "none",
-          background: "radial-gradient(ellipse, color-mix(in srgb, var(--accent) 10%, transparent) 0%, transparent 70%)",
-        }} />
-
-        <div style={{
-          position: "relative", border: "1px solid #222228", borderRadius: 16,
-          background: "#16161a", padding: "clamp(1.75rem,4vw,2.75rem)",
-        }}>
-          {/* Who you are actually writing to */}
-          <div style={{ display: "flex", gap: "1.25rem", alignItems: "center", marginBottom: "1.75rem" }}>
-            <div style={{ width: 76, height: 76, borderRadius: 14, flexShrink: 0, border: "1px solid #333", overflow: "hidden" }}>
-              <img src="/photo.jpg" style={{ width: "100%", height: "100%", objectFit: "cover" }} alt="Tomáš Kamhal" />
-            </div>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: "1.25rem", fontWeight: 600, color: "#e8e8ed", marginBottom: "0.2rem" }}>Tomáš Kamhal</div>
-              <div style={{ fontFamily: mono, fontSize: "0.72rem", color: "var(--accent)", marginBottom: "0.5rem" }}>Founder, Residata</div>
-              <a href="https://www.linkedin.com/in/tomaskamhal/" target="_blank" rel="noopener noreferrer" style={{
-                display: "inline-flex", alignItems: "center", gap: "0.4rem",
-                fontSize: "0.72rem", color: "#8a8a96", textDecoration: "none", transition: "color 0.2s",
-              }} onMouseEnter={e => e.currentTarget.style.color = "var(--accent)"} onMouseLeave={e => e.currentTarget.style.color = "#8a8a96"}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
-                LinkedIn
-              </a>
-            </div>
-          </div>
-
-          {/* Email and phone side by side — two short lines fill the width the old
-              single column left ragged. */}
-          <div className="contact-methods" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "1.1rem" }}>
-            {method("mailto:info@residata.eu", "@", "info@residata.eu")}
-            {method("tel:+421911963909", "☎", "+421 911 963 909")}
-          </div>
-
-          <a href="https://calendar.app.google/x6vKBohYsVjNKL1A9" target="_blank" rel="noopener noreferrer" style={{
-            display: "block", padding: "0.95rem 2rem", textAlign: "center",
-            background: "var(--accent)", color: "#0a0a0b", fontWeight: 600,
-            fontSize: "0.92rem", borderRadius: 10, textDecoration: "none",
-          }}>{l.bookCall}</a>
-
-          {/* Three live numbers — what you would be getting access to, true as of
-              this page load rather than a claim written once and left to rot. */}
-          <div style={{
-            display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.5rem",
-            marginTop: "1.75rem", paddingTop: "1.5rem", borderTop: "1px solid #222228",
-          }}>
-            {proof.map(x => (
-              <div key={x.k} style={{ textAlign: "center" }}>
-                <div style={{ fontFamily: mono, fontSize: "1.05rem", fontWeight: 700, color: "var(--accent)" }}>{x.v}</div>
-                <div style={{ fontSize: "0.66rem", color: "#55555f", marginTop: "0.25rem", letterSpacing: "0.04em" }}>{x.k}</div>
-              </div>
-            ))}
-          </div>
+      <div style={{ display: "flex", gap: "1rem", alignItems: "center", marginBottom: "1.25rem" }}>
+        <div style={{ width: 60, height: 60, borderRadius: 12, flexShrink: 0, border: "1px solid #333", overflow: "hidden" }}>
+          <img src="/photo.jpg" style={{ width: "100%", height: "100%", objectFit: "cover" }} alt="Tomáš Kamhal" />
+        </div>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: "1.05rem", fontWeight: 600, color: "#e8e8ed" }}>Tomáš Kamhal</div>
+          <div style={{ fontFamily: mono, fontSize: "0.68rem", color: "var(--accent)", marginBottom: "0.35rem" }}>Founder, Residata</div>
+          <a href="https://www.linkedin.com/in/tomaskamhal/" target="_blank" rel="noopener noreferrer" style={{
+            display: "inline-flex", alignItems: "center", gap: "0.35rem",
+            fontSize: "0.7rem", color: "#8a8a96", textDecoration: "none", transition: "color 0.2s",
+          }} onMouseEnter={e => e.currentTarget.style.color = "var(--accent)"} onMouseLeave={e => e.currentTarget.style.color = "#8a8a96"}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+            LinkedIn
+          </a>
         </div>
       </div>
-    </>
+
+      <p style={{ fontSize: "0.82rem", color: "#8a8a96", lineHeight: 1.6, margin: "0 0 1.25rem" }}>
+        {l.contactDesc}
+      </p>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem", marginBottom: "1.25rem" }}>
+        {method("mailto:info@residata.eu", "@", "info@residata.eu")}
+        {method("tel:+421911963909", "☎", "+421 911 963 909")}
+      </div>
+
+      {/* Pushed to the bottom edge so this button lines up with the plan CTAs
+          beside it however tall the tiers grow. */}
+      <a href="https://calendar.app.google/x6vKBohYsVjNKL1A9" target="_blank" rel="noopener noreferrer" style={{
+        display: "block", padding: "0.85rem 1.5rem", textAlign: "center", marginTop: "auto",
+        background: "var(--accent)", color: "#0a0a0b", fontWeight: 600,
+        fontSize: "0.9rem", borderRadius: 8, textDecoration: "none",
+      }}>{l.bookCall}</a>
+
+      <div style={{
+        display: "flex", justifyContent: "space-between", gap: "0.5rem",
+        marginTop: "1.5rem", paddingTop: "1.25rem", borderTop: "1px solid #222228",
+        fontFamily: mono, fontSize: "0.66rem", color: "#55555f",
+      }}>
+        <span><span style={{ color: "var(--accent)" }}>{nf(totals.projectsActive)}</span> {isSk ? "projektov" : "projects"}</span>
+        <span><span style={{ color: "var(--accent)" }}>{nf(totals.unitsTracked)}</span> {isSk ? "bytov" : "units"}</span>
+        <span><span style={{ color: "var(--accent)" }}>{isSk ? "denne" : "daily"}</span></span>
+      </div>
+    </div>
   );
 }
 
@@ -2337,6 +2306,12 @@ export default function App() {
           .contact-methods { grid-template-columns: 1fr !important; }
         }
         /* Responsive grids */
+        /* The pricing grid carries THREE cards now (2 plans + contact), so it needs
+           an intermediate step — at tablet widths three columns are too narrow to
+           read, but one column is a needlessly long scroll. */
+        @media (max-width: 1100px) and (min-width: 901px) {
+          .pricing-grid { grid-template-columns: repeat(2, 1fr) !important; max-width: 780px !important; }
+        }
         @media (max-width: 900px) {
           .value-grid { grid-template-columns: 1fr !important; }
           .wwd-hero { grid-template-columns: 1fr !important; gap: 1.5rem !important; }
@@ -2344,6 +2319,7 @@ export default function App() {
           .stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
           .insight-grid { grid-template-columns: 1fr 1fr !important; }
           .pricing-grid { grid-template-columns: 1fr !important; max-width: 420px; margin-left: auto !important; margin-right: auto !important; }
+          .contact-methods { grid-template-columns: 1fr !important; }
           .chart-grid { grid-template-columns: 1fr !important; }
           .schema-grid { grid-template-columns: 1fr !important; }
           .flex-scope { grid-template-columns: 1fr !important; text-align: center; }
