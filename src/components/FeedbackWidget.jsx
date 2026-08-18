@@ -34,10 +34,11 @@ const MAX_SHOT_DATAURL = 3.6 * 1024 * 1024;
 
 // [key, sk, en] — no emoji column. Six emoji in a 2-column grid was the loudest
 // thing in the panel and told the reader nothing the label didn't.
+// Na výber sú tieto štyri. Zrušené kategórie („data" = Kvalita dát, „website" = Web/zobrazenie)
+// zámerne ostávajú v RETIRED_CATEGORIES nižšie — nové správy sa už nimi označiť nedajú, ale staré
+// vlákna sa musia naďalej zobraziť pod svojím pôvodným názvom, nie ako „Iné".
 const CATEGORIES = [
-  ["data",     "Kvalita dát",       "Data quality"],
-  ["bug",      "Chyba / nefunguje", "Bug / not working"],
-  ["website",  "Web / zobrazenie",  "Website / display"],
+  ["bug",      "Chyba / problém",   "Bug / problem"],
   ["question", "Otázka",            "Question"],
   ["idea",     "Návrh / funkcia",   "Suggestion"],
   ["other",    "Iné",               "Other"],
@@ -84,7 +85,15 @@ function downscaleImage(file, maxDim = 1600, quality = 0.82) {
     reader.onerror = reject; reader.readAsDataURL(file);
   });
 }
-const catMeta = (k) => CATEGORIES.find((x) => x[0] === k) || ["other", "Iné", "Other"];
+// už nevoliteľné, ale historické vlákna ich stále nesú
+const RETIRED_CATEGORIES = [
+  ["data",    "Kvalita dát",      "Data quality"],
+  ["website", "Web / zobrazenie", "Website / display"],
+];
+const catMeta = (k) =>
+  CATEGORIES.find((x) => x[0] === k) ||
+  RETIRED_CATEGORIES.find((x) => x[0] === k) ||
+  ["other", "Iné", "Other"];
 const fmtDay = (s) => (s ? String(s).slice(0, 10) : "");
 
 // ── Unread tracking (in-app "new reply" alert) ─────────────────────────────
@@ -363,7 +372,7 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
       {/* Tabs (logged-in) */}
       {loggedIn && phase !== "done" && (
         <div style={{ display: "flex", borderBottom: `1px solid ${border}` }}>
-          <button style={tabStyle(view === "form")} onClick={() => setView("form")}>{L("Napísať", "Write")}</button>
+          <button style={tabStyle(view === "form")} onClick={() => setView("form")}>{L("Poslať správu", "Send a message")}</button>
           <button style={tabStyle(view === "mine" || view === "thread")} onClick={loadMine}>{L("Moje konverzácie", "My conversations")}</button>
         </div>
       )}
@@ -475,7 +484,7 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
             </div>
 
             <textarea ref={taRef} value={message} onChange={e => setMessage(e.target.value.slice(0, MAX_MESSAGE))} onKeyDown={onMsgKey}
-              placeholder={L("Čo sa deje? Čím konkrétnejšie, tým lepšie.", "What's going on? The more specific, the better.")} rows={5}
+              placeholder={L("Prosím popíš problém / otázku čo najkonkrétnejšie.", "Please describe the problem or question as specifically as you can.")} rows={5}
               style={{ width: "100%", boxSizing: "border-box", minHeight: 110, maxHeight: 240, background: bg, border: `1px solid ${border}`, borderRadius: 10, color: text, fontFamily: "inherit", fontSize: "0.85rem", lineHeight: 1.5, padding: "0.65rem 0.75rem", resize: "vertical", outline: "none" }}
               onFocus={e => { e.currentTarget.style.borderColor = "color-mix(in srgb, var(--accent) 50%, transparent)"; }} onBlur={e => { e.currentTarget.style.borderColor = border; }} />
 
@@ -491,7 +500,7 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
                   style={{ marginTop: "0.6rem", width: "100%", background: "transparent", border: `1px dashed ${border}`, color: dim, borderRadius: 10, padding: "0.55rem", cursor: "pointer", fontSize: "0.76rem", fontFamily: "inherit" }}
                   onMouseEnter={e => { e.currentTarget.style.borderColor = "color-mix(in srgb, var(--accent) 50%, transparent)"; e.currentTarget.style.color = text; }}
                   onMouseLeave={e => { e.currentTarget.style.borderColor = border; e.currentTarget.style.color = dim; }}>
-                  {L("Priložiť obrázok — alebo ho sem vlož cez Ctrl/⌘+V", "Attach an image — or paste it here with Ctrl/⌘+V")}
+                  {L("Priložiť obrázok", "Attach an image")}
                 </button>
                 <input ref={fileRef} type="file" accept="image/*" onChange={onPickFile} style={{ display: "none" }} />
               </>
