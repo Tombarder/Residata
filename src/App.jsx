@@ -512,19 +512,23 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
   // config-driven — re-enabling Czech is one edit there, no markup change here.
   const langToggle = (
     <div role="group" aria-label={lang === "en" ? "Language" : "Jazyk"} style={{
-      display: "flex", borderRadius: "var(--r-sm)", overflow: "hidden",
+      display: "flex", borderRadius: 6, overflow: "hidden", height: 34,
       border: "1px solid var(--border)", fontSize: "0.72rem",
-      fontFamily: "'JetBrains Mono', monospace",
+      fontFamily: "'JetBrains Mono', monospace", alignItems: "stretch",
     }}>
       {PUBLIC_LANGS.map((code, i) => (
         <button key={code} type="button" aria-pressed={lang === code}
           onClick={() => { if (lang !== code) { track("language_switched", { from: lang, to: code }); setLang(code); } }}
           style={{
-            padding: "0.4rem 0.8rem", border: "none", cursor: "pointer",
-            borderLeft: i ? "1px solid var(--border)" : undefined,
+            // `borderLeft: undefined` here used to REMOVE the property rather than
+            // leave it at "none", which let the browser's default button border
+            // back in — the first segment was drawing a 2px WHITE bar down the left
+            // edge of the toggle. Always give it a real value.
+            padding: "0 0.8rem", height: 32, border: "none", borderLeft: i ? "1px solid var(--border)" : "none",
+            display: "inline-flex", alignItems: "center", cursor: "pointer",
             background: lang === code ? "var(--border)" : "transparent",
             color: lang === code ? "var(--text)" : "var(--text-dim)",
-            fontFamily: "inherit", fontSize: "inherit", transition: "all 0.2s",
+            fontFamily: "inherit", fontSize: "inherit", transition: "background 0.2s, color 0.2s",
           }}>{LANG_LABELS[code] || code.toUpperCase()}</button>
       ))}
     </div>
@@ -588,7 +592,11 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
             // confusion the user reported.
             <div style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
               <NavBtn onClick={onLogin} className="nav-signin-btn" style={{
-                padding: "0.45rem 0.95rem", background: "transparent", color: "#e8e8ed",
+                // nowrap: without it "Prihlásiť sa" broke after the first word and
+                // the button grew to two lines, throwing the whole cluster out of
+                // alignment. Fixed height so it matches the toggle and the CTA.
+                padding: "0 0.95rem", height: 34, display: "inline-flex", alignItems: "center",
+                background: "transparent", color: "#e8e8ed", whiteSpace: "nowrap",
                 border: "1px solid #222228", fontWeight: 500, borderRadius: 6,
                 fontSize: "0.78rem", cursor: "pointer", textDecoration: "none",
                 transition: "border-color 0.15s, color 0.15s",
@@ -598,10 +606,15 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
               title={lang === "sk" ? "Už máš účet? Prihlás sa." : "Already have an account? Sign in."}
               >{lang === "sk" ? "Prihlásiť sa" : "Sign in"}</NavBtn>
               <NavBtn onClick={onLogin} className="nav-cta-btn" style={{
-                padding: "0.5rem 1.15rem", background: "var(--accent)", color: "#0a0a0b",
+                // Same story: the trailing arrow was dropping to its own line.
+                padding: "0 1.15rem", height: 34, display: "inline-flex", alignItems: "center",
+                background: "var(--accent)", color: "#0a0a0b", whiteSpace: "nowrap",
                 fontWeight: 700, borderRadius: 6, fontSize: "0.8rem", cursor: "pointer",
                 letterSpacing: "0.01em", textDecoration: "none",
+                transition: "filter 0.15s",
               }}
+              onMouseEnter={e => { e.currentTarget.style.filter = "brightness(1.07)"; }}
+              onMouseLeave={e => { e.currentTarget.style.filter = ""; }}
               title={lang === "sk" ? "Nový tu? Zaregistruj sa za 30s a dostaneš 7-dňový paid trial zadarmo." : "New here? 30s sign-up → 7-day paid trial free."}
               >{lang === "sk" ? "Začať zadarmo →" : "Get started free →"}</NavBtn>
             </div>
