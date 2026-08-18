@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "../lib/useAuth";
 import { getLiveT } from "../lib/liveLang";
-import { validateBusinessEmail } from "../lib/emailValidation";
+import { validateBusinessEmail, signupEmailAllowed } from "../lib/emailValidation";
 import { track } from "../lib/track";
 import { useBreakpointDown, BP } from "../lib/breakpoints";
 
@@ -25,14 +25,34 @@ export default function LoginModal({ open, onClose, lang = "en" }) {
   const [resent, setResent] = useState(false);
   const { signIn, verifyCode } = useAuth();
 
+  // Instant local verdict — no round-trip while typing.
+  const localEmailError = email ? validateBusinessEmail(email, lang) : null;
+
+  // …but exemptions live in the database, so when the local rule WOULD block a
+  // syntactically valid address we ask the server whether this one is exempt.
+  // Without this the submit button stays disabled for an exempt address and the
+  // person simply cannot sign up, however permissive the server is.
+  const [exempt, setExempt] = useState(false);
+  useEffect(() => {
+    setExempt(false);
+    if (!email || !email.includes("@") || !localEmailError) return;
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      const ok = await signupEmailAllowed(email);
+      if (!cancelled) setExempt(ok);
+    }, 400);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [email, localEmailError]);
+
+  const emailError = exempt ? null : localEmailError;
+
   if (!open) return null;
 
-  const emailError = email ? validateBusinessEmail(email, lang) : null;
 
   const submit = async (e) => {
     e.preventDefault();
     const err = validateBusinessEmail(email, lang);
-    if (err) {
+    if (err && !(await signupEmailAllowed(email))) {
       setError(err);
       track("login_rejected_personal_email", { domain: email.split("@")[1] });
       return;

@@ -25,24 +25,45 @@ const PERSONAL_DOMAINS = new Set([
 ]);
 
 /**
- * Whitelist — these personal emails bypass the business-only check.
- * Keep this list minimal. Intended for founders/admins who legitimately
- * need access through a personal account.
+ * EXEMPTIONS LIVE IN THE DATABASE, not here.
+ *
+ * This file used to carry its own whitelist, which held exactly one address.
+ * The moment Boss named three more, the form would have kept rejecting them
+ * while the server let them through — the two lists had already drifted apart
+ * on their first day. Exemptions are now rows in reference.signup_email_policy
+ * and are read through `signupEmailAllowed()` below, so adding one is an UPDATE
+ * rather than a deploy, and the form and the gate can never disagree.
+ *
+ * The domain list above stays local ON PURPOSE: it drives instant feedback as
+ * the visitor types, with no round-trip. It is a mirror of
+ * public.is_personal_email(); the authority is the BEFORE INSERT trigger on
+ * auth.users, which uses the Postgres one.
  */
-const EMAIL_WHITELIST = new Set([
-  "tkamhal@gmail.com",
-]);
-
-export function isWhitelistedEmail(email) {
-  if (!email) return false;
-  return EMAIL_WHITELIST.has(email.toLowerCase().trim());
-}
-
 export function isPersonalEmail(email) {
   if (!email || !email.includes("@")) return false;
-  if (isWhitelistedEmail(email)) return false;
   const domain = email.split("@")[1].toLowerCase().trim();
   return PERSONAL_DOMAINS.has(domain);
+}
+
+/**
+ * Ask the server whether this address may register — the single source of truth
+ * for exemptions. Only worth calling when the local rule would block: that is
+ * the only case an exemption can change.
+ *
+ * Fails CLOSED: if the check cannot be reached we keep the local verdict, so a
+ * network blip can never quietly open sign-up to every consumer domain.
+ */
+export async function signupEmailAllowed(email) {
+  if (!email || !email.includes("@")) return false;
+  try {
+    const { supabasePublic, isSupabaseReady } = await import("./supabase");
+    if (!isSupabaseReady()) return false;
+    const { data, error } = await supabasePublic.rpc("signup_email_allowed", { p_email: email });
+    if (error) return false;
+    return data === true;
+  } catch {
+    return false;
+  }
 }
 
 export function emailDomain(email) {
