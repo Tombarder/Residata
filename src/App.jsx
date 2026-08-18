@@ -2118,12 +2118,44 @@ export default function App() {
   // keep browser-detected language (the hook never writes for them).
   useAccountUiPref("language", lang, setLang);
   const [loginOpen, setLoginOpen] = useState(false);
+  // The bottom-left dock steps aside when the footer arrives, so it never sits on
+  // top of the footer's own content and the page needs no padding to make room.
+  const [footerInView, setFooterInView] = useState(false);
   // Country-aware marketing copy: base t[lang], with per-country overrides for
   // market-named strings (hero / value prop). SK returns t[lang] unchanged.
   const { country } = useCountry();
   const l = localizedCopy(lang, country);
   const auth = useAuth();
   const caps = useCapabilities();
+
+  // The bottom-left dock steps aside when the footer reaches the strip it sits in,
+  // so it never covers the footer's own content and the page needs no padding to
+  // make room for it.
+  //
+  // Deliberately a scroll listener rather than IntersectionObserver: the geometry
+  // here is a plain comparison (has the footer's top edge crossed into the dock's
+  // band?), it costs one getBoundingClientRect per scroll, and unlike an observer
+  // its result can be asserted directly at any scroll position. DOCK_BAND is the
+  // dock's own height plus its offset from the bottom.
+  useEffect(() => {
+    const DOCK_BAND = 160;
+    const update = () => {
+      const el = document.querySelector(".site-footer");
+      if (!el) { setFooterInView(false); return; }
+      setFooterInView(el.getBoundingClientRect().top < window.innerHeight - DOCK_BAND);
+    };
+    update();
+    // The footer can mount a beat after this effect runs (the marketing tree
+    // renders inside Suspense), so re-check briefly rather than give up on one miss.
+    const t1 = setTimeout(update, 300), t2 = setTimeout(update, 1200);
+    window.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+    return () => {
+      clearTimeout(t1); clearTimeout(t2);
+      window.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+    };
+  }, [current]);
 
   // Listen to browser back/forward — sync state with URL
   useEffect(() => {
@@ -2533,14 +2565,17 @@ export default function App() {
             @media (max-width: 1180px) {
               .mc-dock { display: none; }
             }
-            /* The dock is pinned to the VIEWPORT, so at full scroll it lands on the
-               footer's bottom-left — on top of the brand block and the copyright.
-               Reserve its height there so it comes to rest in empty space instead. */
-            @media (min-width: 1181px) {
-              .site-footer { padding-bottom: calc(11rem + var(--safe-bottom)) !important; }
-            }
+            /* The dock is pinned to the VIEWPORT, so at full scroll it would land on
+               the footer's bottom-left, over the brand block and the copyright. The
+               first fix reserved its height as footer padding — which traded the
+               overlap for a screen of empty page to scroll through, which is worse.
+               The dock yields instead: it fades out once the footer comes into view,
+               the way a floating control should. Nothing is reserved, nothing
+               overlaps, and the page ends where the content ends. */
+            .mc-dock { transition: opacity 0.25s ease, transform 0.25s ease; }
+            .mc-dock[data-hidden="true"] { opacity: 0; transform: translateY(10px); pointer-events: none; }
           `}</style>
-          <div className="mc-dock" role="region" aria-label={lang === "sk" ? "Trh a mena" : lang === "cs" ? "Trh a měna" : "Market and currency"}>
+          <div className="mc-dock" data-hidden={footerInView ? "true" : "false"} aria-hidden={footerInView} role="region" aria-label={lang === "sk" ? "Trh a mena" : lang === "cs" ? "Trh a měna" : "Market and currency"}>
             <MarketControls lang={lang} />
           </div>
         </>
