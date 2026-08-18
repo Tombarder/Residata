@@ -367,14 +367,18 @@ export function PipelineFlow({ lang = "en" }) {
     title: "Od webov developerov k živému trhovému prehľadu.",
     sub: "3-krokový automatizovaný flow",
 
+    // All three step titles are the same grammatical form — "we do X" — so the
+    // scene reads as one sentence in three beats. It used to mix a verb phrase
+    // ("Dáta zbierame") with two bare nouns ("Normalizácia a validácia" /
+    // "Živý trhový prehľad").
     z1Line1: "Dáta zbierame",
     z1Live: `z ${fmt(devCount, "sk-SK")} developerov · ${fmt(projCount, "sk-SK")} projektov`,
 
-    z2Line1: "Normalizácia a validácia",
+    z2Line1: "Normalizujeme a validujeme",
     z2Foot: "jednotný formát pre celý trh",
     z2Chip: "PRIPRAVENÉ · DEDUPLIKOVANÉ",
 
-    z3Line1: "Živý trhový prehľad",
+    z3Line1: "Vytvárame živý trhový prehľad",
     z3Foot: "pre vaše rozhodnutia podložené dátami",
     z3Chips: ["CSV", "Excel"],
     z3ChartLabel: "PRIEMER TRHU €/m²",
@@ -393,14 +397,14 @@ export function PipelineFlow({ lang = "en" }) {
     title: "From scattered developer sites to live market intelligence.",
     sub: "3-step automated flow",
 
-    z1Line1: "Data collected",
+    z1Line1: "We collect the data",
     z1Live: `from ${fmt(devCount, "en-US")} developers · ${fmt(projCount, "en-US")} projects`,
 
-    z2Line1: "Standardize & validate",
+    z2Line1: "We standardise and validate",
     z2Foot: "one comparable format",
     z2Chip: "READY · DEDUPED",
 
-    z3Line1: "Real-time market intelligence",
+    z3Line1: "We build the live market view",
     z3Foot: "for your data-driven decisions",
     z3Chips: ["CSV", "Excel"],
     z3ChartLabel: "MARKET AVG €/m²",
@@ -495,7 +499,7 @@ export function PipelineFlow({ lang = "en" }) {
               left/centre anchoring and 4 / 2 / 3 lines, which read as crooked.
               Keep them symmetric — edit the constants, not individual <text>. */}
           {[
-            { key: "z1", cx: ZONE_CX[0], eyebrow: "01 · COLLECT", title: T.z1Line1, sub: T.z1Live, subAccent: true },
+            { key: "z1", cx: ZONE_CX[0], eyebrow: "01 · COLLECT", title: T.z1Line1, sub: T.z1Live },
             { key: "z2", cx: ZONE_CX[1], eyebrow: "02 · PROCESS", title: T.z2Line1, sub: T.z2Foot },
             { key: "z3", cx: ZONE_CX[2], eyebrow: "03 · DELIVER", title: T.z3Line1, sub: T.z3Foot },
           ].map(z => (
@@ -506,7 +510,10 @@ export function PipelineFlow({ lang = "en" }) {
               <text x="0" y="27" textAnchor="middle" fill="#fff" fontFamily="'Outfit', sans-serif" fontSize="20" fontWeight="700" letterSpacing="-0.01em">
                 {z.title}
               </text>
-              <text x="0" y="50" textAnchor="middle" fontFamily={z.subAccent ? mono : "'Outfit', sans-serif"} fontSize="11.5" fill={z.subAccent ? "var(--accent)" : dim} fontWeight={z.subAccent ? 600 : 400}>
+              {/* One treatment for all three caption lines. The first one used to be
+                  accent-green mono while the other two were dim sans, so three lines
+                  sitting on the same baseline looked like two different kinds of thing. */}
+              <text x="0" y="50" textAnchor="middle" fontFamily="'Outfit', sans-serif" fontSize="11.5" fill={dim} fontWeight="400">
                 {z.sub}
               </text>
             </g>
@@ -932,21 +939,64 @@ function useInView(rootMargin = "0px") {
 //   · went stale by construction: the brackets are absolute prices, so ordinary
 //     market drift silently repaints the chart.
 // A single brand hue removes all four problems at once.
-// A single hue, stepped light→dark by value: the sequential form. Every row gets a
-// visibly different shade (the old chart flattened the bottom six Slovak regions into
-// one identical blue), but there is still only ONE hue, so it never becomes a rainbow
-// pretending that a colour change means a category change. The step is derived from
-// the rows on screen, not from absolute price brackets, so it re-scales itself as the
-// market moves and as you drill from kraj → mesto → mestská časť.
-const BAR_MIX_MIN = 34;   // % accent for the cheapest row on screen
-const BAR_MIX_MAX = 100;  // % accent for the dearest row on screen
+// ── Pricing-map colour: a DIVERGING scale, rebuilt from the rows on screen ──
+//
+// Colour answers "expensive or cheap for this market?", which the bar length alone
+// can't say: warm = above the typical price here, cool = below it, neutral grey at
+// the typical price itself. Blue↔red is the CVD-safe diverging pair (validated
+// against this surface: worst-pair ΔE 23.6 protan / 31.9 normal, both poles ≥3:1
+// contrast), and grey — not a third hue — sits at the midpoint so "typical" reads
+// as "nothing to report".
+//
+// TWO details make it survive changing data, and both were what broke the old
+// version (four hardcoded price brackets: ≥7000 red / ≥5500 amber / ≥4200 green /
+// else blue):
+//
+//   1. The scale is derived from the rows being displayed, never from absolute
+//      prices. So it re-fits itself every night as the market moves, and it works
+//      unchanged at every drill level — kraj, mesto, mestská časť — and in CZK as
+//      well as EUR. The old brackets were tuned for Slovak regions, which is why
+//      six of them fell into one identical blue.
+//   2. Each ARM is normalised by its own spread. A single shared spread (or a
+//      units-weighted mean, which Praha and Bratislava drag upward) squashes the
+//      whole cheap end into one indistinguishable colour — the exact failure the
+//      brackets had. Per-arm normalisation spends the full range on each side, so
+//      neighbouring rows stay apart whatever the distribution looks like.
+const PRICE_COOL = '#3987e5';  // below the typical price
+const PRICE_WARM = '#e34948';  // above it
+const PRICE_MID  = '#6b6b78';  // neutral midpoint
 
-function barHue(avg, min, max) {
-  const t = max > min ? (avg - min) / (max - min) : 1;
-  const mix = BAR_MIX_MIN + t * (BAR_MIX_MAX - BAR_MIX_MIN);
-  // color-mix keeps this a valid declaration for any input, which the old
-  // `${color}33` string concat did not.
-  return `color-mix(in srgb, var(--accent) ${mix.toFixed(1)}%, var(--surface-3))`;
+/** Fit the diverging scale to the values currently on screen. */
+function priceScale(values) {
+  if (!values.length) return { mid: 0, up: 1, down: 1 };
+  const sorted = [...values].sort((a, b) => a - b);
+  const h = Math.floor(sorted.length / 2);
+  // Median, not mean: the mean is pulled toward whichever end holds the big
+  // markets, which tilts the whole chart to one colour.
+  const mid = sorted.length % 2 ? sorted[h] : (sorted[h - 1] + sorted[h]) / 2;
+  let up = 0, down = 0;
+  for (const v of values) {
+    if (v > mid) up = Math.max(up, v - mid);
+    else down = Math.max(down, mid - v);
+  }
+  return { mid, up: up || 1, down: down || 1 };
+}
+
+//: Pulls mid-range rows toward their pole instead of leaving them muddy grey.
+//: Linear mixing left most of the table hovering near the neutral midpoint, which
+//: looked washed out; the curve keeps grey for rows that really are near-typical
+//: while letting everything else show its colour. Purely cosmetic — it changes how
+//: strongly a deviation is drawn, never its sign or its order.
+const PRICE_CURVE = 0.6;
+
+function barHue(avg, scale) {
+  const t = avg >= scale.mid ? (avg - scale.mid) / scale.up : -(scale.mid - avg) / scale.down;
+  const pole = t >= 0 ? PRICE_WARM : PRICE_COOL;
+  const pct = Math.min(100, Math.pow(Math.abs(t), PRICE_CURVE) * 100);
+  // color-mix keeps this valid for every input — the old code built the fill by
+  // string concat as `${color}33`, which produced the invalid `var(--accent)33`
+  // and made the browser drop the gradient, rendering those rows as black bars.
+  return `color-mix(in srgb, ${pole} ${pct.toFixed(1)}%, ${PRICE_MID})`;
 }
 
 // Empty drill state helper (top level = whole country, by kraj).
@@ -990,7 +1040,7 @@ export function DistrictPulse({ lang = "en", setCurrent }) {  // eslint-disable-
     .map(d => ({ ...d, avg: Number(d.avg), units: Number(d.units) || 0, count: Number(d.count) || 0 }))
     .sort((a, b) => b.avg - a.avg);
   const max = rows.length > 0 ? Math.max(...rows.map(r => r.avg)) : 1;
-  const min = rows.length > 0 ? Math.min(...rows.map(r => r.avg)) : 0;
+  const scale = priceScale(rows.map(r => r.avg));
 
   const cName = countryName(country, lang);
   const label = lang === "sk" ? `Cenová mapa — ${cName}` : `${cName} pricing map`;
@@ -1030,7 +1080,30 @@ export function DistrictPulse({ lang = "en", setCurrent }) {  // eslint-disable-
         {label}
       </div>
       <h2 className="sec-title" style={{ marginBottom: "0.5rem" }}>{title}</h2>
-      <p className="sec-desc" style={{ marginBottom: "1.25rem" }}>{desc}</p>
+      <p className="sec-desc" style={{ marginBottom: "0.9rem" }}>{desc}</p>
+
+      {/* Colour carries a second reading, so it gets a one-line key — otherwise the
+          hues are just decoration the reader has to guess at. */}
+      {rows.length > 1 && (
+        <div style={{
+          display: "flex", alignItems: "center", flexWrap: "wrap", gap: "0.45rem",
+          fontFamily: mono, fontSize: "0.68rem", color: dim, marginBottom: "1.6rem",
+          letterSpacing: "0.03em",
+        }}>
+          <span style={{ width: 22, height: 7, borderRadius: 2, background: PRICE_COOL, flexShrink: 0 }} />
+          <span>{lang === "sk" ? "pod typickou cenou" : "below typical"}</span>
+          <span style={{ width: 22, height: 7, borderRadius: 2, background: PRICE_MID, margin: "0 0 0 0.5rem", flexShrink: 0 }} />
+          <span>
+            {lang === "sk" ? "typická" : "typical"}
+            {" "}
+            <span style={{ color: "var(--text)" }}>
+              {Math.round(moneyFromEur(scale.mid) || 0).toLocaleString("en-US").replace(/,/g, " ")} {moneySymbol()}/m²
+            </span>
+          </span>
+          <span style={{ width: 22, height: 7, borderRadius: 2, background: PRICE_WARM, margin: "0 0 0 0.5rem", flexShrink: 0 }} />
+          <span>{lang === "sk" ? "nad ňou" : "above typical"}</span>
+        </div>
+      )}
 
       {/* Breadcrumb — only once drilled below the top level. */}
       {crumbs.length > 1 && (
@@ -1067,7 +1140,7 @@ export function DistrictPulse({ lang = "en", setCurrent }) {  // eslint-disable-
               row={r}
               index={i}
               max={max}
-              min={min}
+              scale={scale}
               animate={inView}
               lang={lang}
               onClick={drillable ? handleRowClick : null}
@@ -1079,9 +1152,9 @@ export function DistrictPulse({ lang = "en", setCurrent }) {  // eslint-disable-
   );
 }
 
-function GeoBarRow({ row, index, max, min, animate, lang, onClick }) {
+function GeoBarRow({ row, index, max, scale, animate, lang, onClick }) {
   const pct = (row.avg / max) * 100;
-  const hue = barHue(row.avg, min, max);
+  const hue = barHue(row.avg, scale);
   const delay = 0.08 * index;
   // Show the REAL €/m² immediately (no count-up-from-0). The count-up looked
   // "live" for a scrolling user but rendered a literal "0 €" in every non-scroll
@@ -1139,7 +1212,7 @@ function GeoBarRow({ row, index, max, min, animate, lang, onClick }) {
           // returned the CSS variable "var(--accent)" that produced the nonsense
           // `var(--accent)33`. The browser dropped the whole gradient, so every row
           // in that price band rendered as an empty black bar on the live site.
-          background: `linear-gradient(90deg, color-mix(in srgb, ${hue} 30%, transparent), ${hue})`,
+          background: `linear-gradient(90deg, color-mix(in srgb, ${hue} 55%, transparent), ${hue})`,
           // 4px rounded data-end, square at the baseline.
           borderRadius: "0 4px 4px 0",
           transition: `width 1.1s cubic-bezier(0.2, 0.85, 0.25, 1) ${delay}s`,
