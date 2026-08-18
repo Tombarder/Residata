@@ -36,7 +36,7 @@ export const PAGES = [
     label: "Sample data", blurb: "The /sample preview page",
     sections: [
       { label: "Data preview", keys: ["dataLabel", "dataTitle", "dataDesc", "dataContext", "dataContextSub"] },
-      { label: "Insights", keys: ["insightsLabel", "insightsTitle", "insightsDesc", "insightsBadge"] },
+      { label: "Insights", keys: ["insightsLabel", "insightsTitle", "insightsDesc"] },
       { label: "Raw sample", keys: ["rawLabel", "unitSample", "showing"] },
       { label: "Schema", keys: ["schemaLabel", "schemaTitle", "schemaDesc", "schemaNote"] },
       { label: "Call to action", keys: ["wantFull", "wantFullDesc"] },

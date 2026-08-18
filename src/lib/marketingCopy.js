@@ -76,12 +76,10 @@ export const t = {
     insightsLabel: "Market Insights",
     insightsTitle: "What the data tells you.",
     insightsDesc: "Examples of the insights you can extract from the daily-refreshed data. The kind of edge that's hard to build in-house — and expensive to live without. Every number on the five cards below is live, from the latest approved snapshot — paid subscribers get the same insights across the whole market in their dashboard.",
-    // F-062 (Boss 2026-05-31) told this badge to say "illustrative", because the
     // cards were fed by a hardcoded constant that had gone stale. As of 2026-08-18
     // they read the live serving layer (public.data_sample + district_totals +
     // projects_live + market_totals, all refreshed nightly), so calling them
     // illustrative would now UNDERSELL them — and be its own kind of untrue.
-    insightsBadge: "Live · from the latest snapshot",
     rawLabel: "Raw Data",
     unitSample: "Unit-level sample",
     // `showing` is overridden per render in DataPage with live units-tracked
@@ -197,7 +195,6 @@ export const t = {
     insightsLabel: "Trhové insighty",
     insightsTitle: "Čo z toho vidíte.",
     insightsDesc: "Príklady insightov z denne aktualizovaných dát. Informačná výhoda proti konkurencii. Všetky čísla na piatich kartách nižšie sú živé, z posledného schváleného snapshotu — platiaci klienti majú tie isté insighty pre celý trh vo svojom dashboarde.",
-    insightsBadge: "Živé dáta · z posledného snapshotu",
     rawLabel: "Surové dáta",
     unitSample: "Ukážka na úrovni bytov",
     // Prepisujeme live v DataPage cez useMarketTotals; fallback kým sa načíta.
