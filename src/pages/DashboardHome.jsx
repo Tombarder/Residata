@@ -232,10 +232,16 @@ function DeltaChip({ delta, lang }) {
   if (delta.metric === "avg_m2") txt = `${Math.round(moneyFromEur(mag)).toLocaleString(localeTag(lang))} ${moneySymbol()}`;
   else if (delta.metric === "sold_through") txt = `${mag.toFixed(1)} pp`;
   else txt = fmtCount(Math.round(mag), lang);
+  // The period is SPELLED OUT rather than left in a hover title (Boss): an arrow
+  // and a number on their own say something changed but not since when, and a
+  // tooltip you have to find doesn't answer it either. It is a true
+  // month-over-month figure — aggHistory buckets the snapshots by
+  // snapshot_month and this compares the latest bucket with the one before it —
+  // so it says exactly that, not "last 30 days".
   return (
-    <span title={L(lang, "oproti minulému mesiacu", "vs last month")}
-      style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, whiteSpace: "nowrap" }}>
+    <span style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, lineHeight: 1.3, overflowWrap: "anywhere" }}>
       <span style={{ color: up ? green : "#ff8a8a" }}>{up ? "▲" : "▼"}</span> {txt}
+      <span style={{ color: faint }}> {L(lang, "vs. minulý mesiac", "vs last month")}</span>
     </span>
   );
 }
@@ -376,11 +382,15 @@ function KpiCard({ label, value, hint, delta, lang, accent = textLight, locked =
       {locked
         ? <div style={{ fontSize: "0.62rem", color: orange, fontFamily: mono }}>{L(lang, "len pre paid", "paid only")}</div>
         : (hint || delta) && (
-          // hint WRAPS (no ellipsis) so the full label is always readable — the cards
-          // are narrow (7 across) and truncating cut "aktuálne v predaji" → "…preda…".
-          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "0.4rem" }}>
-            <span style={{ fontFamily: mono, fontSize: "0.63rem", color: faint, lineHeight: 1.3, flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{hint}</span>
-            <div style={{ flexShrink: 0 }}><DeltaChip delta={delta} lang={lang} /></div>
+          // hint WRAPS (no ellipsis) so the full label is always readable —
+          // truncating used to cut "aktuálne v predaji" → "…preda…".
+          // The delta sits on its own line rather than beside the hint: now that it
+          // names its period, sharing a row would squeeze the hint. The strip is
+          // four across (~277px of inner card width), so the delta line itself
+          // sits comfortably on one line.
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem", minWidth: 0 }}>
+            <span style={{ fontFamily: mono, fontSize: "0.63rem", color: faint, lineHeight: 1.3, overflowWrap: "anywhere" }}>{hint}</span>
+            <DeltaChip delta={delta} lang={lang} />
           </div>
         )}
     </div>
