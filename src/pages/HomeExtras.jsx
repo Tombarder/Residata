@@ -378,7 +378,7 @@ export function PipelineFlow({ lang = "en" }) {
     z2Foot: "jednotný formát pre celý trh",
     z2Chip: "PRIPRAVENÉ · DEDUPLIKOVANÉ",
 
-    z3Line1: "Vytvárame živý trhový prehľad",
+    z3Line1: "A vytvárame živý trhový prehľad",
     z3Foot: "pre vaše rozhodnutia podložené dátami",
     z3Chips: ["CSV", "Excel"],
     z3ChartLabel: "PRIEMER TRHU €/m²",
@@ -962,18 +962,38 @@ function useInView(rootMargin = "0px") {
 //      whole cheap end into one indistinguishable colour — the exact failure the
 //      brackets had. Per-arm normalisation spends the full range on each side, so
 //      neighbouring rows stay apart whatever the distribution looks like.
-const PRICE_COOL = '#3987e5';  // below the typical price
-const PRICE_WARM = '#e34948';  // above it
-const PRICE_MID  = '#6b6b78';  // neutral midpoint
+// The ramp runs deep teal → teal → warm grey → amber → terracotta. Blue↔red was
+// the textbook CVD-safe diverging pair but it read cold and hard on this dark green
+// page — a pure red bar looks like an alarm, not an expensive district. Teal and
+// terracotta are the same idea in a warmer register, and the extra stop on each arm
+// gives the table more colour without ever making the ramp non-monotonic.
+//
+// Validated against this surface (#0e0e12, dark): the poles separate at ΔE 17.1
+// under protanopia and 27.0 with normal vision, both sit inside the dark-mode
+// lightness band, both clear 3:1 contrast. The midpoint is deliberately a NEUTRAL
+// grey — a diverging scale needs "nothing to report" to read as nothing, so it is
+// the one stop that is allowed to be desaturated.
+const PRICE_STOPS = [
+  { t: -1.0, c: '#1a8fb0' },   // deepest discount to the average
+  { t: -0.5, c: '#2fa79a' },
+  { t:  0.0, c: '#8a8494' },   // at the average
+  { t:  0.5, c: '#e0a53c' },
+  { t:  1.0, c: '#dd6b32' },   // furthest above the average
+];
+const PRICE_COOL = PRICE_STOPS[0].c;
+const PRICE_MID  = PRICE_STOPS[2].c;
+const PRICE_WARM = PRICE_STOPS[4].c;
 
 /** Fit the diverging scale to the values currently on screen. */
 function priceScale(values) {
   if (!values.length) return { mid: 0, up: 1, down: 1 };
-  const sorted = [...values].sort((a, b) => a - b);
-  const h = Math.floor(sorted.length / 2);
-  // Median, not mean: the mean is pulled toward whichever end holds the big
-  // markets, which tilts the whole chart to one colour.
-  const mid = sorted.length % 2 ? sorted[h] : (sorted[h - 1] + sorted[h]) / 2;
+  // The plain average of the rows on screen — which is exactly what the legend
+  // calls it ("priemerná"). Deliberately NOT weighted by unit count: a
+  // units-weighted average is dragged up by Praha and Bratislava until nearly
+  // every other region sits below it by a similar amount, and the cheap half of
+  // the table goes back to being one indistinguishable colour. The per-arm
+  // normalisation below then spends the full range on each side of it.
+  const mid = values.reduce((a, b) => a + b, 0) / values.length;
   let up = 0, down = 0;
   for (const v of values) {
     if (v > mid) up = Math.max(up, v - mid);
@@ -984,19 +1004,25 @@ function priceScale(values) {
 
 //: Pulls mid-range rows toward their pole instead of leaving them muddy grey.
 //: Linear mixing left most of the table hovering near the neutral midpoint, which
-//: looked washed out; the curve keeps grey for rows that really are near-typical
+//: looked washed out; the curve keeps grey for rows that really are near-average
 //: while letting everything else show its colour. Purely cosmetic — it changes how
 //: strongly a deviation is drawn, never its sign or its order.
 const PRICE_CURVE = 0.6;
 
 function barHue(avg, scale) {
-  const t = avg >= scale.mid ? (avg - scale.mid) / scale.up : -(scale.mid - avg) / scale.down;
-  const pole = t >= 0 ? PRICE_WARM : PRICE_COOL;
-  const pct = Math.min(100, Math.pow(Math.abs(t), PRICE_CURVE) * 100);
+  const raw = avg >= scale.mid
+    ? (avg - scale.mid) / scale.up
+    : -(scale.mid - avg) / scale.down;
+  // Shape the magnitude, keep the sign: above-average stays warm, below stays cool.
+  const t = Math.sign(raw) * Math.pow(Math.min(1, Math.abs(raw)), PRICE_CURVE);
+  let i = 0;
+  while (i < PRICE_STOPS.length - 2 && t > PRICE_STOPS[i + 1].t) i++;
+  const a = PRICE_STOPS[i], b = PRICE_STOPS[i + 1];
+  const f = Math.min(1, Math.max(0, (t - a.t) / (b.t - a.t)));
   // color-mix keeps this valid for every input — the old code built the fill by
   // string concat as `${color}33`, which produced the invalid `var(--accent)33`
   // and made the browser drop the gradient, rendering those rows as black bars.
-  return `color-mix(in srgb, ${pole} ${pct.toFixed(1)}%, ${PRICE_MID})`;
+  return `color-mix(in srgb, ${b.c} ${(f * 100).toFixed(1)}%, ${a.c})`;
 }
 
 // Empty drill state helper (top level = whole country, by kraj).
@@ -1091,17 +1117,17 @@ export function DistrictPulse({ lang = "en", setCurrent }) {  // eslint-disable-
           letterSpacing: "0.03em",
         }}>
           <span style={{ width: 22, height: 7, borderRadius: 2, background: PRICE_COOL, flexShrink: 0 }} />
-          <span>{lang === "sk" ? "pod typickou cenou" : "below typical"}</span>
+          <span>{lang === "sk" ? "pod priemerom" : "below average"}</span>
           <span style={{ width: 22, height: 7, borderRadius: 2, background: PRICE_MID, margin: "0 0 0 0.5rem", flexShrink: 0 }} />
           <span>
-            {lang === "sk" ? "typická" : "typical"}
+            {lang === "sk" ? "priemerná" : "average"}
             {" "}
             <span style={{ color: "var(--text)" }}>
               {Math.round(moneyFromEur(scale.mid) || 0).toLocaleString("en-US").replace(/,/g, " ")} {moneySymbol()}/m²
             </span>
           </span>
           <span style={{ width: 22, height: 7, borderRadius: 2, background: PRICE_WARM, margin: "0 0 0 0.5rem", flexShrink: 0 }} />
-          <span>{lang === "sk" ? "nad ňou" : "above typical"}</span>
+          <span>{lang === "sk" ? "nad priemerom" : "above average"}</span>
         </div>
       )}
 

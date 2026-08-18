@@ -531,7 +531,8 @@ const _totalsListCache = new Map();
  *
  *  Reads public.data_sample — a 2-row materialized view (one per country) holding
  *  the only two figures on that page anonymous visitors cannot derive themselves:
- *  average price per room count and peak €/m² per district. Both are aggregates
+ *  average price per room count, peak €/m² per district, and a like-for-like
+ *  30-day price move per district. All are aggregates
  *  OVER units, and RLS keeps final.units closed to anon; the view exposes no unit
  *  rows at all. Everything else on the page comes from district_totals /
  *  projects_live / market_totals, which anon can already read.
@@ -543,7 +544,7 @@ const _totalsListCache = new Map();
  */
 export function useDataSample() {
   const { country } = useCountry();
-  const [state, setState] = useState({ loading: true, segments: {}, peaks: {} });
+  const [state, setState] = useState({ loading: true, segments: {}, peaks: {}, mom: {} });
   useEffect(() => {
     if (!isSupabaseReady()) { setState(s => ({ ...s, loading: false })); return; }
     let cancelled = false;
@@ -551,11 +552,11 @@ export function useDataSample() {
     // of this page's SK-for-All convention.
     const cc = isAllCountries(country) ? "SK" : country;
     _readPublicWithRetry(() =>
-      supabasePublic.from("data_sample").select("segments,peaks").eq("country", cc).maybeSingle()
+      supabasePublic.from("data_sample").select("segments,peaks,mom").eq("country", cc).maybeSingle()
     ).then(({ data, error }) => {
       if (cancelled) return;
-      if (error) { console.error("[useDataSample]", error); setState({ loading: false, segments: {}, peaks: {} }); return; }
-      setState({ loading: false, segments: data?.segments || {}, peaks: data?.peaks || {} });
+      if (error) { console.error("[useDataSample]", error); setState({ loading: false, segments: {}, peaks: {}, mom: {} }); return; }
+      setState({ loading: false, segments: data?.segments || {}, peaks: data?.peaks || {}, mom: data?.mom || {} });
     });
     return () => { cancelled = true; };
   }, [country]);

@@ -1225,7 +1225,12 @@ function useSampleData() {
     loading: sample.loading || districtQ.loading,
     marketAvg: nf(totals.avgPriceM2),
     gap,
-    districts: districts.slice(0, 6).map(x => [x.name, nf(x.m2), x.units]),
+    // 4th cell = like-for-like 30-day price move, or null where the district has
+    // too few comparable units to say anything honest (see public.data_sample).
+    districts: districts.slice(0, 6).map(x => {
+      const m = sample.mom?.[x.name];
+      return [x.name, nf(x.m2), x.units, m == null ? null : `${Number(m) > 0 ? "+" : ""}${Number(m).toFixed(1)}%`];
+    }),
     seg,
     nearSellout,
     top: topD ? {
@@ -1439,15 +1444,18 @@ function DataPage({ setCurrent, l, lang }) {
           <div style={{ fontSize: "0.82rem", color: "#8a8a96", lineHeight: 1.6, marginBottom: "1rem" }}>
             Market average is <span style={{ color: "#e8e8ed" }}>€{d.marketAvg}/m²</span>. Premium districts price at a <span style={{ color: "#e8e8ed", fontWeight: 600 }}>{d.gap}</span> multiple of the most affordable. €/m² and tracked units by district:
           </div>
-          {d.districts.map(([name, price, units]) => (
+          {d.districts.map(([name, price, units, mom]) => (
             <div key={name} style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: "0.6rem", alignItems: "center", padding: "0.35rem 0", borderBottom: "1px solid #1a1a1f", fontSize: "0.76rem" }}>
               <span style={{ color: "#e8e8ed" }}>{name}</span>
-              <span style={{ fontFamily: mono, fontSize: "0.68rem", color: "#55555f" }}>€{price}/m²</span>
-              <span style={{ fontFamily: mono, fontSize: "0.72rem", fontWeight: 600, color: "var(--accent)", minWidth: 64, textAlign: "right" }}>{units} units</span>
+              <span style={{ fontFamily: mono, fontSize: "0.68rem", color: "#55555f" }}>€{price}/m² · {units}u</span>
+              <span style={{
+                fontFamily: mono, fontSize: "0.72rem", fontWeight: 600, minWidth: 52, textAlign: "right",
+                color: mom == null ? "#55555f" : (mom.startsWith("-") ? "#e08a7a" : "var(--accent)"),
+              }}>{mom == null ? "—" : mom}</span>
             </div>
           ))}
           <div style={{ fontSize: "0.62rem", color: "#55555f", marginTop: "0.7rem", fontStyle: "italic" }}>
-            △ live €/m² from the latest approved snapshot, refreshed nightly.
+            △ 30-day move, same flats priced at both ends — coverage growth cannot show up as a price move. Districts with too few comparable flats show “—”.
           </div>
         </InsightCard>
 
