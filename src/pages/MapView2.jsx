@@ -823,7 +823,16 @@ export default function MapView2({ lang = "en", setCurrent }) {
                 </>}
           </span>
         </div>
-        <MarketInsight lens={lens} stats={marketStats} sk={sk} />
+        <MarketInsight lens={lens} stats={marketStats} sk={sk} onBand={(lo, hi) => {
+          // Clicking a bar narrows the whole board — map, list and stats — to the
+          // projects inside that price band. Replacing any previous band keeps a
+          // second click from stacking contradictory ranges.
+          setConditions((cs) => [
+            ...cs.filter((c) => !(c.field === "ppm2" && c.op === "between")),
+            { id: `band-${lo}-${hi}`, field: "ppm2", op: "between", value: [lo, hi] },
+          ]);
+          setFilterOpen(true);
+        }} />
       </div>
 
       {/* Filter bar + legend */}
@@ -1257,13 +1266,13 @@ function PricingBand({ cs, anchorPpm2, sk }) {
     </div>
   );
 }
-function MarketInsight({ lens, stats, sk }) {
+function MarketInsight({ lens, stats, sk, onBand }) {
   const s = stats;
   let headline, visual;
   if (lens === "price") {
     headline = <Headline label={sk ? "Medián ceny" : "Median price"} big={s.med ? `€${fmt(s.med)}` : "—"} unit="/m²"
       sub={s.pMin ? `${sk ? "najlacnejší" : "cheapest"} €${fmt(s.pMin)} · ${sk ? "najdrahší" : "priciest"} €${fmt(s.pMax)}` : (sk ? "žiadne zverejnené ceny" : "no published prices")} />;
-    visual = <Histogram hist={s.hist} hLo={s.hLo} hHi={s.hHi} med={s.med} sk={sk} />;
+    visual = <Histogram hist={s.hist} hLo={s.hLo} hHi={s.hHi} med={s.med} sk={sk} onBand={onBand} />;
   } else if (lens === "completion") {
     const known = s.count - s.comp.unknown;
     headline = <Headline label={sk ? "So známym termínom" : "With a known date"} big={s.count ? `${Math.round((known / s.count) * 100)}%` : "—"}
@@ -1299,7 +1308,7 @@ function Headline({ label, big, unit, sub }) {
     </div>
   );
 }
-function Histogram({ hist, hLo, hHi, med, sk }) {
+function Histogram({ hist, hLo, hHi, med, sk, onBand }) {
   const [hover, setHover] = useState(null);
   if (!hist || !hist.some((n) => n > 0)) return <div style={{ flex: 1, fontSize: "0.7rem", color: dim }}>—</div>;
   const max = Math.max(...hist, 1);
@@ -1320,8 +1329,10 @@ function Histogram({ hist, hLo, hHi, med, sk }) {
       </div>
       <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 36 }} onMouseLeave={() => setHover(null)}>
         {hist.map((n, i) => (
-          <div key={i} title={bandLabel(i)} onMouseEnter={() => setHover(i)}
-            style={{ flex: 1, height: `${Math.max(7, (n / max) * 100)}%`, cursor: "default",
+          <div key={i} title={n ? `${bandLabel(i)} — ${sk ? "klikni pre zobrazenie" : "click to see them"}` : bandLabel(i)}
+            onMouseEnter={() => setHover(i)}
+            onClick={n && onBand ? () => onBand(Math.round(hLo + i * step), Math.round(hLo + (i + 1) * step)) : undefined}
+            style={{ flex: 1, height: `${Math.max(7, (n / max) * 100)}%`, cursor: n && onBand ? "pointer" : "default",
                      background: i === hover ? textLight : i === medIdx ? green : "var(--accent-strong)",
                      borderRadius: 2, transition: "background 90ms" }} />
         ))}
