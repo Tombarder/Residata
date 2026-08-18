@@ -35,3 +35,6 @@ scripts/.build-data.json
 # never commit captured auth sessions
 _sess.json
 public/_sess.json
+
+# Supabase CLI — dočasné údaje o pripojení k projektu (netreba a nemá byť v gite)
+supabase/.temp
