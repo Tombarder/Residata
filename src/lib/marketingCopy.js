@@ -118,13 +118,6 @@ export const t = {
     phoneDesc: "Quick questions or scheduling a call",
     bookCall: "Book a 20-min intro call",
     sendEmail: "Send an Email",
-    whatToExpect: "What to expect",
-    steps: [
-      ["1", "Intro call or email exchange", "We learn about your use case — what decisions you're making, what data you're currently missing, and what format works for you."],
-      ["2", "Sample delivery", "You get a real sample from the latest pipeline run — not a demo, actual data — so you can evaluate the quality and depth firsthand."],
-      ["3", "Tailored setup", "We configure scope, frequency, and output format to match your workflow. You get ongoing access to the market, refreshed daily."],
-      ["4", "Ongoing market edge", "Every delivery gives you a clear view of the market — competitive pricing, absorption trends, supply shifts, and sell-out signals. The kind of insight that turns guesswork into confident decisions."],
-    ],
     // Tiers
     tiers: [
       { tier: "Standard", name: "Full access", price: "€349.99", priceSuffix: "/mo", anchor: "€479.99", note: "Summer offer — early-access rate for the first 50 members (until 30 Sep 2026). Billed monthly, cancel anytime.",
@@ -214,8 +207,8 @@ export const t = {
     testimonialRole: "Riaditeľ rezidenčného developmentu v Bratislave",
     commonQ: "Časté otázky",
     faqs: [
-      ["Čo presne dostanem?", "Trhovú správu s insightmi, vizualizáciami a odporúčaniami — cenové trendy, absorpcia, konkurenčné porovnanie, dynamika ponuky. Súčasťou sú aj surové a vyčistené datasety pre vlastnú analýzu."],
-      ["Ako často sa dáta aktualizujú?", "Denne. Každý aktívny projekt sťahujeme každý deň, takže to čo vidíte nie je nikdy staršie ako jeden deň — vždy pracujete s aktuálnym stavom trhu."],
+      ["Čo presne dostanem?", "Trhový prehľad s insightmi, vizualizáciami, cenovými trendami, absorpciou, konkurenčným porovnaním a dynamikou ponuky. V prípade enterprise plánu sú súčasťou aj surové a vyčistené datasety pre vlastnú analýzu."],
+      ["Ako často sa dáta aktualizujú?", "Denne. Každý aktívny projekt analyzujeme každý deň. Vždy pracujete s aktuálnym stavom trhu."],
       ["Pokrývate aj iné mestá?", "Áno. Systém funguje pre akékoľvek mesto s verejne dostupnými dátami. Táto služba spadá pod Custom plán a nacenenie záleží na požadovaných špecifikách."],
       ["Dá sa pridať konkrétny projekt?", "Samozrejme. Ak je verejne dostupný a nie je v našom datasete, prosím ozvite sa nám a radi ho pridáme. Custom klienti môžu požiadať aj o pridanie alebo analýzu projektu mimo Slovenska a Česka."],
     ],
@@ -229,13 +222,6 @@ export const t = {
     phoneDesc: "Rýchle otázky alebo dohodnutie hovoru",
     bookCall: "Dohodnúť si 20-min hovor",
     sendEmail: "Napísať email",
-    whatToExpect: "Ako to prebieha",
-    steps: [
-      ["1", "Úvodný hovor alebo email", "Zistíme čo riešite, aké dáta vám chýbajú a v akom formáte ich chcete."],
-      ["2", "Ukážka na reálnych dátach", "Pošleme vám ukážku z posledného behu — reálne dáta, nie demo."],
-      ["3", "Nastavenie na mieru", "Nastavíme rozsah, frekvenciu a formát podľa vás. Začnete dostávať pravidelné dodávky."],
-      ["4", "Priebežná výhoda", "Každá dodávka = jasný pohľad na trh. Ceny, absorpcia, ponuka, signály vypredania. Rozhodujete sa na dátach, nie na pocite."],
-    ],
     tiers: [
       { tier: "Standard", name: "Plný prístup", price: "€349.99", priceSuffix: "/mes", anchor: "€479.99", note: "Letná ponuka — cena pre prvých 50 členov (do 30. septembra 2026). Fakturované mesačne, zrušenie kedykoľvek.",
         features: [[true, "Live dashboard + kompletný report"], [true, "Surové + vyčistené datasety"], [true, "Historické dáta a vývoj trendov"], [true, "Absorpcia a sledovanie vypredania"], [true, "Export do CSV a Excelu (.xlsx)"]], featured: true, cta: "Mám záujem" },

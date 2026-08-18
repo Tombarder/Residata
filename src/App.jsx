@@ -1916,90 +1916,98 @@ function PricingPage({ setCurrent, l, lang, onLogin }) {
 /* ─────── CONTACT ─────── */
 function ContactPage({ l }) {
   const mono = "'JetBrains Mono', monospace";
+  // Live proof instead of filler. The page used to run two columns — the contact
+  // card and a four-step "how it works" list Boss had removed — and dropping that
+  // column left a half-width card floating beside dead space. Rather than pad it
+  // back out with copy, the page is now ONE centred composition, closed off with
+  // three numbers that are true at the moment of reading.
+  const totals = useMarketTotals();
+  const nf = (n) => (n == null ? "…" : Number(n).toLocaleString("en-US").replace(/,/g, " "));
+  const isSk = l.contactLabel === "Kontakt";
+  const proof = [
+    { v: nf(totals.projectsActive), k: isSk ? "sledovaných projektov" : "projects tracked" },
+    { v: nf(totals.unitsTracked),   k: isSk ? "bytov v dátach" : "units in the data" },
+    { v: isSk ? "denne" : "daily",  k: isSk ? "aktualizácia" : "refresh" },
+  ];
+
+  const method = (href, icon, text) => (
+    <a href={href} style={{
+      textDecoration: "none", display: "flex", alignItems: "center", gap: "0.85rem",
+      color: "#e8e8ed", transition: "border-color 0.2s, color 0.2s",
+      border: "1px solid #222228", borderRadius: 10, padding: "0.9rem 1.1rem", background: "#121216",
+    }}
+      onMouseEnter={e => { e.currentTarget.style.color = "var(--accent)"; e.currentTarget.style.borderColor = "color-mix(in srgb, var(--accent) 35%, transparent)"; }}
+      onMouseLeave={e => { e.currentTarget.style.color = "#e8e8ed"; e.currentTarget.style.borderColor = "#222228"; }}>
+      <span style={{ fontFamily: mono, fontSize: "0.85rem", color: "var(--accent)", width: 18, textAlign: "center", flexShrink: 0 }}>{icon}</span>
+      <span style={{ fontSize: "0.92rem", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{text}</span>
+    </a>
+  );
+
   return (
     <>
-      <div style={{ padding: "8rem 2rem 3rem", maxWidth: "var(--container)", margin: "0 auto" }}>
+      <div style={{ padding: "8rem 2rem 2.5rem", maxWidth: 680, margin: "0 auto", textAlign: "center" }}>
         <Label>{l.contactLabel}</Label>
         <h1 className="sec-title">{l.contactTitle}</h1>
-        <p className="sec-desc">{l.contactDesc}</p>
+        <p className="sec-desc" style={{ margin: "0 auto" }}>{l.contactDesc}</p>
       </div>
 
-      <div style={{ padding: "0 2rem clamp(2.5rem,8vw,5rem)", maxWidth: "var(--container)", margin: "0 auto" }}>
-        <div className="contact-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
+      <div style={{ padding: "0 2rem clamp(3rem,9vw,6rem)", maxWidth: 680, margin: "0 auto", position: "relative" }}>
+        {/* Soft halo behind the card so the centred layout has a focal point
+            rather than reading as one lonely box on a black field. */}
+        <div aria-hidden style={{
+          position: "absolute", top: -40, left: "50%", transform: "translateX(-50%)",
+          width: 560, height: 320, pointerEvents: "none",
+          background: "radial-gradient(ellipse, color-mix(in srgb, var(--accent) 10%, transparent) 0%, transparent 70%)",
+        }} />
 
-          {/* Left — Contact card */}
-          <div style={{ border: "1px solid #222228", borderRadius: 12, background: "#16161a", padding: "2.5rem" }}>
-            {/* Profile */}
-            <div style={{ display: "flex", gap: "1.5rem", alignItems: "center", marginBottom: "2rem" }}>
-              {/* Photo placeholder */}
-              <div style={{
-                width: 80, height: 80, borderRadius: 12, flexShrink: 0,
-                border: "1px solid #333",
-                overflow: "hidden",
-              }}>
-                <img src="/photo.jpg" style={{ width: "100%", height: "100%", objectFit: "cover" }} alt="Tomáš Kamhal" />
-              </div>
-              <div>
-                <div style={{ fontSize: "1.25rem", fontWeight: 600, color: "#e8e8ed", marginBottom: "0.2rem" }}>Tomáš Kamhal</div>
-                <div style={{ fontFamily: mono, fontSize: "0.72rem", color: "var(--accent)", marginBottom: "0.5rem" }}>Founder, Residata</div>
-                <a href="https://www.linkedin.com/in/tomaskamhal/" target="_blank" rel="noopener noreferrer" style={{
-                  display: "inline-flex", alignItems: "center", gap: "0.4rem",
-                  fontSize: "0.72rem", color: "#8a8a96", textDecoration: "none", transition: "color 0.2s",
-                }} onMouseEnter={e => e.currentTarget.style.color = "var(--accent)"} onMouseLeave={e => e.currentTarget.style.color = "#8a8a96"}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
-                  LinkedIn
-                </a>
-              </div>
+        <div style={{
+          position: "relative", border: "1px solid #222228", borderRadius: 16,
+          background: "#16161a", padding: "clamp(1.75rem,4vw,2.75rem)",
+        }}>
+          {/* Who you are actually writing to */}
+          <div style={{ display: "flex", gap: "1.25rem", alignItems: "center", marginBottom: "1.75rem" }}>
+            <div style={{ width: 76, height: 76, borderRadius: 14, flexShrink: 0, border: "1px solid #333", overflow: "hidden" }}>
+              <img src="/photo.jpg" style={{ width: "100%", height: "100%", objectFit: "cover" }} alt="Tomáš Kamhal" />
             </div>
-
-            {/* Contact methods */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-              <a href="mailto:info@residata.eu" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: "1rem", color: "#e8e8ed", transition: "color 0.2s" }}
-                onMouseEnter={e => e.currentTarget.style.color = "var(--accent)"}
-                onMouseLeave={e => e.currentTarget.style.color = "#e8e8ed"}>
-                <span style={{ fontFamily: mono, fontSize: "0.8rem", color: "var(--accent)", width: 20, textAlign: "center", flexShrink: 0 }}>@</span>
-                <span style={{ fontSize: "0.92rem" }}>info@residata.eu</span>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: "1.25rem", fontWeight: 600, color: "#e8e8ed", marginBottom: "0.2rem" }}>Tomáš Kamhal</div>
+              <div style={{ fontFamily: mono, fontSize: "0.72rem", color: "var(--accent)", marginBottom: "0.5rem" }}>Founder, Residata</div>
+              <a href="https://www.linkedin.com/in/tomaskamhal/" target="_blank" rel="noopener noreferrer" style={{
+                display: "inline-flex", alignItems: "center", gap: "0.4rem",
+                fontSize: "0.72rem", color: "#8a8a96", textDecoration: "none", transition: "color 0.2s",
+              }} onMouseEnter={e => e.currentTarget.style.color = "var(--accent)"} onMouseLeave={e => e.currentTarget.style.color = "#8a8a96"}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+                LinkedIn
               </a>
-
-              <a href="tel:+421911963909" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: "1rem", color: "#e8e8ed", transition: "color 0.2s" }}
-                onMouseEnter={e => e.currentTarget.style.color = "var(--accent)"}
-                onMouseLeave={e => e.currentTarget.style.color = "#e8e8ed"}>
-                <span style={{ fontFamily: mono, fontSize: "0.8rem", color: "var(--accent)", width: 20, textAlign: "center", flexShrink: 0 }}>☎</span>
-                <span style={{ fontSize: "0.92rem" }}>+421 911 963 909</span>
-              </a>
-
-            </div>
-
-            {/* CTA */}
-            <div style={{ marginTop: "1.5rem" }}>
-              <a href="https://calendar.app.google/x6vKBohYsVjNKL1A9" target="_blank" rel="noopener noreferrer" style={{
-                display: "block", padding: "0.85rem 2rem", textAlign: "center",
-                background: "var(--accent)", color: "#0a0a0b", fontWeight: 600,
-                fontSize: "0.9rem", borderRadius: 8, textDecoration: "none",
-              }}>{l.bookCall}</a>
             </div>
           </div>
 
-          {/* Right — What to expect */}
-          <div style={{ border: "1px solid #222228", borderRadius: 12, background: "#16161a", padding: "2.5rem" }}>
-            <div style={{ fontFamily: mono, fontSize: "0.65rem", color: "var(--accent)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "1.5rem" }}>{l.whatToExpect}</div>
+          {/* Email and phone side by side — two short lines fill the width the old
+              single column left ragged. */}
+          <div className="contact-methods" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "1.1rem" }}>
+            {method("mailto:info@residata.eu", "@", "info@residata.eu")}
+            {method("tel:+421911963909", "☎", "+421 911 963 909")}
+          </div>
 
-            {l.steps.map(([num, title, desc]) => (
-              <div key={num} style={{ display: "flex", gap: "1.25rem", marginBottom: "1.75rem", alignItems: "flex-start" }}>
-                <div style={{
-                  width: 32, height: 32, borderRadius: 8, flexShrink: 0,
-                  background: "color-mix(in srgb, var(--accent) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--accent) 15%, transparent)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontFamily: mono, fontSize: "0.75rem", color: "var(--accent)", fontWeight: 700,
-                }}>{num}</div>
-                <div>
-                  <div style={{ fontSize: "0.95rem", fontWeight: 500, color: "#e8e8ed", marginBottom: "0.3rem" }}>{title}</div>
-                  <div style={{ fontSize: "0.82rem", color: "#8a8a96", lineHeight: 1.6 }}>{desc}</div>
-                </div>
+          <a href="https://calendar.app.google/x6vKBohYsVjNKL1A9" target="_blank" rel="noopener noreferrer" style={{
+            display: "block", padding: "0.95rem 2rem", textAlign: "center",
+            background: "var(--accent)", color: "#0a0a0b", fontWeight: 600,
+            fontSize: "0.92rem", borderRadius: 10, textDecoration: "none",
+          }}>{l.bookCall}</a>
+
+          {/* Three live numbers — what you would be getting access to, true as of
+              this page load rather than a claim written once and left to rot. */}
+          <div style={{
+            display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.5rem",
+            marginTop: "1.75rem", paddingTop: "1.5rem", borderTop: "1px solid #222228",
+          }}>
+            {proof.map(x => (
+              <div key={x.k} style={{ textAlign: "center" }}>
+                <div style={{ fontFamily: mono, fontSize: "1.05rem", fontWeight: 700, color: "var(--accent)" }}>{x.v}</div>
+                <div style={{ fontSize: "0.66rem", color: "#55555f", marginTop: "0.25rem", letterSpacing: "0.04em" }}>{x.k}</div>
               </div>
             ))}
           </div>
-
         </div>
       </div>
     </>
@@ -2307,11 +2315,10 @@ export default function App() {
            it. The nav swap is fully owned by responsive.css at 1180.) */
         @media (max-width: 640px) {
           .nav-right { gap: 0.75rem !important; }
-          .contact-grid { grid-template-columns: 1fr !important; }
+          .contact-methods { grid-template-columns: 1fr !important; }
         }
         /* Responsive grids */
         @media (max-width: 900px) {
-          .contact-grid { grid-template-columns: 1fr !important; }
           .value-grid { grid-template-columns: 1fr !important; }
           .wwd-hero { grid-template-columns: 1fr !important; gap: 1.5rem !important; }
           .case-card-grid { grid-template-columns: 1fr !important; }
