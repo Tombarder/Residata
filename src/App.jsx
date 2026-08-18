@@ -1938,83 +1938,86 @@ function PricingPage({ setCurrent, l, lang, onLogin, scrollToContact = false }) 
 /* ─────── CONTACT ─────── */
 function ContactSection({ l }) {
   const mono = "'JetBrains Mono', monospace";
-  // A CARD, not a section: it sits as the third cell of the pricing grid, beside
-  // the two plans (Boss). That placement is why it carries no hero of its own —
-  // a "Napíšte nám" headline here would have been the third invitation to get in
-  // touch within one screen, after the plan CTAs and the panel that used to sit
-  // below. The card states who you reach and how, and nothing else.
+  // Scaled to the column it lives in. The previous version squeezed a 60px photo
+  // and 0.8rem type into the top ~440px and left ~250px of the column empty under
+  // it — small content AND a gap, which is the worst of both. The column is ~400px
+  // wide and as tall as the plan cards beside it, so the type, the portrait and the
+  // spacing are sized for that space instead of for a narrow sidebar.
+  //
+  // It opens the same way a plan card does — eyebrow, then a title at the same
+  // 1.3rem — because that shared rhythm is what makes the three columns read as
+  // one row rather than two cards and a leftover.
   const totals = useMarketTotals();
   const nf = (n) => (n == null ? "…" : Number(n).toLocaleString("en-US").replace(/,/g, " "));
   const isSk = l.contactLabel === "Kontakt";
 
   const method = (href, icon, text) => (
     <a href={href} style={{
-      textDecoration: "none", display: "flex", alignItems: "center", gap: "0.7rem",
+      textDecoration: "none", display: "flex", alignItems: "center", gap: "0.85rem",
       color: "#e8e8ed", transition: "border-color 0.2s, color 0.2s",
-      border: "1px solid #222228", borderRadius: 10, padding: "0.7rem 0.9rem", background: "#121216",
+      border: "1px solid #222228", borderRadius: 10, padding: "0.95rem 1.1rem", background: "#121216",
     }}
       onMouseEnter={e => { e.currentTarget.style.color = "var(--accent)"; e.currentTarget.style.borderColor = "color-mix(in srgb, var(--accent) 35%, transparent)"; }}
       onMouseLeave={e => { e.currentTarget.style.color = "#e8e8ed"; e.currentTarget.style.borderColor = "#222228"; }}>
-      <span style={{ fontFamily: mono, fontSize: "0.8rem", color: "var(--accent)", width: 16, textAlign: "center", flexShrink: 0 }}>{icon}</span>
-      <span style={{ fontSize: "0.85rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{text}</span>
+      <span style={{ fontFamily: mono, fontSize: "0.9rem", color: "var(--accent)", width: 18, textAlign: "center", flexShrink: 0 }}>{icon}</span>
+      <span style={{ fontSize: "0.95rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{text}</span>
     </a>
   );
 
   return (
     <div id="kontakt" style={{
-      // No border, no card background: a plan is something you buy and belongs in
-      // a box; this is a person you talk to. Sitting directly on the page, behind
-      // the divider rule, it reads as the other half of the row instead of a
-      // third, cheaper tier.
+      // No card chrome: the divider rule already separates this from the plans,
+      // and a box here would put it back in competition with them.
       padding: "0.25rem 0 0", scrollMarginTop: "6rem",
       display: "flex", flexDirection: "column", alignSelf: "start",
     }}>
-      <div style={{ fontFamily: mono, fontSize: "0.68rem", color: "var(--accent)", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "1.25rem" }}>
+      <div style={{ fontFamily: mono, fontSize: "0.7rem", color: "var(--accent)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: "0.75rem" }}>
         {l.contactLabel}
       </div>
+      <h2 style={{ fontSize: "1.3rem", fontWeight: 600, color: "#e8e8ed", margin: "0 0 1.5rem", letterSpacing: "-0.01em" }}>
+        {l.contactTitle}
+      </h2>
 
-      <div style={{ display: "flex", gap: "1rem", alignItems: "center", marginBottom: "1.25rem" }}>
-        <div style={{ width: 60, height: 60, borderRadius: 12, flexShrink: 0, border: "1px solid #333", overflow: "hidden" }}>
+      <div style={{ display: "flex", gap: "1.15rem", alignItems: "center", marginBottom: "1.5rem" }}>
+        <div style={{ width: 92, height: 92, borderRadius: 16, flexShrink: 0, border: "1px solid #333", overflow: "hidden" }}>
           <img src="/photo.jpg" style={{ width: "100%", height: "100%", objectFit: "cover" }} alt="Tomáš Kamhal" />
         </div>
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: "1.05rem", fontWeight: 600, color: "#e8e8ed" }}>Tomáš Kamhal</div>
-          <div style={{ fontFamily: mono, fontSize: "0.68rem", color: "var(--accent)", marginBottom: "0.35rem" }}>Founder, Residata</div>
+          <div style={{ fontSize: "1.15rem", fontWeight: 600, color: "#e8e8ed", lineHeight: 1.25 }}>Tomáš Kamhal</div>
+          <div style={{ fontFamily: mono, fontSize: "0.74rem", color: "var(--accent)", margin: "0.2rem 0 0.5rem" }}>Founder, Residata</div>
           <a href="https://www.linkedin.com/in/tomaskamhal/" target="_blank" rel="noopener noreferrer" style={{
-            display: "inline-flex", alignItems: "center", gap: "0.35rem",
-            fontSize: "0.7rem", color: "#8a8a96", textDecoration: "none", transition: "color 0.2s",
+            display: "inline-flex", alignItems: "center", gap: "0.4rem",
+            fontSize: "0.76rem", color: "#8a8a96", textDecoration: "none", transition: "color 0.2s",
           }} onMouseEnter={e => e.currentTarget.style.color = "var(--accent)"} onMouseLeave={e => e.currentTarget.style.color = "#8a8a96"}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
             LinkedIn
           </a>
         </div>
       </div>
 
-      <p style={{ fontSize: "0.82rem", color: "#8a8a96", lineHeight: 1.6, margin: "0 0 1.25rem" }}>
+      <p style={{ fontSize: "0.9rem", color: "#8a8a96", lineHeight: 1.65, margin: "0 0 1.5rem" }}>
         {l.contactDesc}
       </p>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem", marginBottom: "1.25rem" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "0.7rem", marginBottom: "1.5rem" }}>
         {method("mailto:info@residata.eu", "@", "info@residata.eu")}
         {method("tel:+421911963909", "☎", "+421 911 963 909")}
       </div>
 
-      {/* Pushed to the bottom edge so this button lines up with the plan CTAs
-          beside it however tall the tiers grow. */}
       <a href="https://calendar.app.google/x6vKBohYsVjNKL1A9" target="_blank" rel="noopener noreferrer" style={{
-        display: "block", padding: "0.85rem 1.5rem", textAlign: "center",
+        display: "block", padding: "0.95rem 1.5rem", textAlign: "center",
         background: "var(--accent)", color: "#0a0a0b", fontWeight: 600,
-        fontSize: "0.9rem", borderRadius: 8, textDecoration: "none",
+        fontSize: "0.95rem", borderRadius: 10, textDecoration: "none",
       }}>{l.bookCall}</a>
 
       <div style={{
         display: "flex", justifyContent: "space-between", gap: "0.5rem",
-        marginTop: "1.5rem", paddingTop: "1.25rem", borderTop: "1px solid #222228",
-        fontFamily: mono, fontSize: "0.66rem", color: "#55555f",
+        marginTop: "1.75rem", paddingTop: "1.35rem", borderTop: "1px solid #222228",
+        fontFamily: mono, fontSize: "0.7rem", color: "#55555f",
       }}>
         <span><span style={{ color: "var(--accent)" }}>{nf(totals.projectsActive)}</span> {isSk ? "projektov" : "projects"}</span>
         <span><span style={{ color: "var(--accent)" }}>{nf(totals.unitsTracked)}</span> {isSk ? "bytov" : "units"}</span>
-        <span><span style={{ color: "var(--accent)" }}>{isSk ? "denne" : "daily"}</span></span>
+        <span style={{ color: "var(--accent)" }}>{isSk ? "denne" : "daily"}</span>
       </div>
     </div>
   );

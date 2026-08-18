@@ -54,7 +54,7 @@ export const PAGES = [
     ns: "mk", group: "Marketing site", id: "mk-contact",
     label: "Contact", blurb: "Contact page + what to expect",
     sections: [
-      { label: "Contact", keys: ["contactLabel", "contactDesc", "emailDesc", "phoneDesc", "bookCall", "sendEmail"] },
+      { label: "Contact", keys: ["contactLabel", "contactTitle", "contactDesc", "emailDesc", "phoneDesc", "bookCall", "sendEmail"] },
     ],
   },
 

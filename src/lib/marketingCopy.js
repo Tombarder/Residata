@@ -109,6 +109,7 @@ export const t = {
     ],
     // Contact
     contactLabel: "Contact",
+    contactTitle: "Talk to us",
     contactDesc: "Whether you want to see a demo, explore a specific plan, or simply learn how Residata can support your market decisions — we'd love to hear from you.",
     emailDesc: "Detailed inquiries & data requests",
     phoneDesc: "Quick questions or scheduling a call",
@@ -209,6 +210,7 @@ export const t = {
       ["Dá sa pridať konkrétny projekt?", "Samozrejme. Ak je verejne dostupný a nie je v našom datasete, prosím ozvite sa nám a radi ho pridáme. Custom klienti môžu požiadať aj o pridanie alebo analýzu projektu mimo Slovenska a Česka."],
     ],
     contactLabel: "Kontakt",
+    contactTitle: "Ozvite sa",
     contactDesc: "Chcete demo, máte otázky, alebo chcete vedieť či vám Residata pomôže — radi sa porozprávame.",
     emailDesc: "Podrobné otázky a žiadosti o dáta",
     phoneDesc: "Rýchle otázky alebo dohodnutie hovoru",
