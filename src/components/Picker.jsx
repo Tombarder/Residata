@@ -2,6 +2,9 @@
  * Picker — a dark, on-theme dropdown (single / multi / searchable) that replaces
  * the native <select> on the map so the menu colours match the rest of the app.
  *
+ * Options are `{ value, label, hint? }` — `hint` renders right-aligned and dim
+ * (used for live facet counts) and is deliberately not searched.
+ *
  * The menu renders in a PORTAL with fixed positioning, so it floats above
  * everything and is never clipped by a scrolling/overflow container (the filter
  * panel). It flips upward when there isn't room below, follows the trigger on
@@ -89,6 +92,11 @@ export default function Picker({ value, onChange, options, placeholder = "select
                 <span style={{ width: 17, height: 17, borderRadius: 5, border: `1.5px solid ${on ? green : dim}`, background: on ? green : "transparent", flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#06140f", fontSize: "0.72rem", fontWeight: 700 }}>{on ? "✓" : ""}</span>
               )}
               <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.label}</span>
+              {/* `hint` is a secondary right-aligned note (e.g. how many rows an option still
+                  matches). Kept OUT of `label` on purpose so the search box matches names only. */}
+              {o.hint != null && o.hint !== "" && (
+                <span style={{ flexShrink: 0, color: dim, fontSize: "0.74rem", fontVariantNumeric: "tabular-nums" }}>{o.hint}</span>
+              )}
               {!multi && on && <span style={{ color: accentInk, flexShrink: 0 }}>✓</span>}
             </div>
           );

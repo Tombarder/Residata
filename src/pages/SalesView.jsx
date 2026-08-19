@@ -7,7 +7,7 @@
 import { useState, useMemo } from "react";
 import { useCurrency } from "../lib/useCurrency";
 import { moneyFromEur, moneySymbol, moneyToEur } from "../lib/money";
-import { useSales, usePivotDistinct } from "../lib/useData";
+import { useSales } from "../lib/useData";
 import { useCountry, isAllCountries } from "../lib/useCountry";
 import { useAccountPrefState } from "../lib/useAccountUiPref";
 import LoadError from "../components/LoadError";
@@ -51,6 +51,9 @@ const COL_FILTER_KIND = {
 };
 // Money columns are stored in EUR but typed by the user in the DISPLAY currency → convert.
 const MONEY_COLS = new Set(["price_s_dph_eur", "price_per_m2_eur"]);
+// The scope filters at the top of the page. Their option lists are recomputed live from the
+// current selection (analytics_sales mode:'facets'), each one excluding its own filter.
+const BASE_FACETS = ["city", "developer", "typ", "project_name"];
 
 // Per-column plain-language explainers (rendered as an "i" tooltip on the header),
 // for the columns whose meaning / calculation isn't self-evident. Same voice as the
@@ -77,6 +80,24 @@ function isoDaysAgo(n) {
   return isoLocal(d);
 }
 const isoToday = () => isoLocal(new Date());
+
+const fmtInt = (n) => (n == null ? "" : Number(n).toLocaleString("sk-SK").replace(/,/g, " "));
+
+// "what's still available here" line under a numeric / date column filter. Money bounds are
+// stored in EUR and shown in the display currency, exactly like the values in the table.
+function fmtRange(kind, r) {
+  if (!r || r.min == null || r.max == null) return null;
+  const one = (v) => {
+    if (kind === "date") return String(v);
+    const n = Number(v);
+    if (!Number.isFinite(n)) return String(v);
+    if (kind === "eur" || kind === "per_m2") return fmtInt(Math.round(moneyFromEur(n)));
+    if (kind === "area") return n.toLocaleString("sk-SK", { maximumFractionDigits: 1 });
+    return fmtInt(Math.round(n));
+  };
+  const lo = one(r.min), hi = one(r.max);
+  return lo === hi ? lo : `${lo} – ${hi}`;
+}
 
 function fmtMoney(eur) {
   if (eur == null || !Number.isFinite(Number(eur))) return "—";
@@ -138,12 +159,6 @@ export default function SalesView({ lang = "sk" }) {
   const date_from = customFrom || isoDaysAgo(days);
   const date_to = customTo || isoToday();
 
-  // option lists (server-side distinct, latest scope is fine for the picker)
-  const projOpts = usePivotDistinct({ enabled: true, field: "project_name", mode: "archive" });
-  const cityOpts = usePivotDistinct({ enabled: true, field: "city", mode: "archive" });
-  const devOpts = usePivotDistinct({ enabled: true, field: "developer", mode: "archive" });
-  const typOpts = usePivotDistinct({ enabled: true, field: "typ", mode: "archive" });
-
   const baseFilters = useMemo(() => {
     const f = {};
     // Global country → market_key. Country codes are 'SK'/'CZ'; the sale facts
@@ -197,9 +212,28 @@ export default function SalesView({ lang = "sk" }) {
   const breakdownSpec = useMemo(() => ({ ...common, mode: "breakdown", group_by: groupBy }), [JSON.stringify(common), groupBy]); // eslint-disable-line
   const detailSpec = useMemo(() => ({ ...common, mode: "detail", sort: [effSort], limit: DETAIL_LIMIT, detail_filters: detailFilters }), [JSON.stringify(common), JSON.stringify(effSort), JSON.stringify(detailFilters)]); // eslint-disable-line
 
+  // ── LIVE FACETS: what can still be picked, given everything already picked ──
+  // Both filter rows are populated from the SAME facts the page is showing, not from a
+  // global list — so City only offers cities with sales in this period/market, Developer
+  // only developers still present in the chosen city, and so on. Each field's own filter
+  // is excluded server-side, so choosing a city never collapses the city list to that one
+  // city. `base` = the scope row at the top; `detail` = the per-column row above the unit
+  // list, which additionally sees the other column filters (it drills inside the scope).
+  const baseFacetSpec = useMemo(() => ({ ...common, mode: "facets", facet_scope: "base", facets: BASE_FACETS }), [JSON.stringify(common)]); // eslint-disable-line
+  const detailFacetKeys = useMemo(
+    () => detailCols.filter((c) => c[3] !== "hide" && COL_FILTER_KIND[c[0]]).map((c) => c[0]),
+    [detailCols],
+  );
+  const detailFacetSpec = useMemo(
+    () => ({ ...common, mode: "facets", facet_scope: "detail", facets: detailFacetKeys, detail_filters: detailFilters }),
+    [JSON.stringify(common), JSON.stringify(detailFacetKeys), JSON.stringify(detailFilters)], // eslint-disable-line
+  );
+
   const sum = useSales({ enabled: true, spec: summarySpec });
   const brk = useSales({ enabled: true, spec: breakdownSpec });
   const det = useSales({ enabled: true, spec: detailSpec });
+  const fac = useSales({ enabled: true, spec: baseFacetSpec });
+  const facDet = useSales({ enabled: true, spec: detailFacetSpec });
 
   const S = sum.data || {};
   const brkRows = brk.data?.rows || [];
@@ -208,6 +242,26 @@ export default function SalesView({ lang = "sk" }) {
   const _detRaw = det.data?.rows || [];
   const detHasMore = _detRaw.length > DETAIL_LIMIT;
   const detRows = detHasMore ? _detRaw.slice(0, DETAIL_LIMIT) : _detRaw;
+
+  // Facet lists → picker options. A value that is STILL SELECTED but no longer available
+  // (another filter moved under it) is kept in the list showing 0, so the control never
+  // displays a value it doesn't offer and the user can see why the table went empty.
+  const facetOptions = (facets, key, selected, labelOf) => {
+    const list = facets?.values?.[key] || [];
+    const opts = list.map((o) => ({ value: o.v, label: labelOf ? labelOf(o.v) : o.v, hint: fmtInt(o.n) }));
+    const chosen = Array.isArray(selected) ? selected : (selected ? [selected] : []);
+    for (const v of chosen) {
+      // server matching is case-insensitive → compare the same way before re-adding
+      if (v && !list.some((o) => String(o.v).toLowerCase() === String(v).toLowerCase())) {
+        opts.push({ value: v, label: labelOf ? labelOf(v) : v, hint: "0" });
+      }
+    }
+    return opts.sort((a, b) => String(a.label).localeCompare(String(b.label), undefined, { numeric: true }));
+  };
+  const cityOptions = useMemo(() => facetOptions(fac.data, "city", fCity), [fac.data, fCity]);
+  const devOptions  = useMemo(() => facetOptions(fac.data, "developer", fDev), [fac.data, fDev]);
+  const typOptions  = useMemo(() => facetOptions(fac.data, "typ", fTyp), [fac.data, fTyp]);
+  const projOptions = useMemo(() => facetOptions(fac.data, "project_name", projects), [fac.data, projects]);
 
   const toggleProject = (name) => setProjects((p) => p.includes(name) ? p.filter((x) => x !== name) : [...p, name]);
   const clearFilters = () => { setProjects([]); setFCity(""); setFDev(""); setFTyp(""); };
@@ -226,17 +280,15 @@ export default function SalesView({ lang = "sk" }) {
   });
   const clearColFilters = () => setColFilters({});
   const activeColCount = Object.keys(detailFilters).length;
-  const colOptions = (key) => {
-    const plain = (arr) => (arr || []).map((v) => ({ value: v, label: v }));
-    if (key === "city") return plain(cityOpts.values);
-    if (key === "typ") return plain(typOpts.values);
-    if (key === "project_name") return plain(projOpts.values);
-    if (key === "detection_method") return [{ value: "marked", label: t("označené", "marked") }, { value: "disappeared", label: t("zmizol", "delisted") }];
-    if (key === "kolaudacia_label") return plain(Array.from(new Set(detRows.map((r) => r.kolaudacia_label).filter(Boolean))).sort());
-    return [];
-  };
+  // Column-filter options come from the DETAIL facets — the values present across the WHOLE
+  // selection, not just the 500 rows fetched for the page (which is what the kolaudácia list
+  // used to be built from, so it silently offered only what happened to be on screen).
+  const colOptions = (key) => facetOptions(facDet.data, key, colFilters[key],
+    key === "detection_method" ? (v) => (v === "marked" ? t("označené", "marked") : v === "disappeared" ? t("zmizol", "delisted") : v) : null);
+  // Available min/max for a numeric / date column, under every OTHER active filter.
+  const colRange = (key) => facDet.data?.ranges?.[key] || null;
 
-  const projFiltered = (projOpts.values || []).filter((v) => !projSearch || v.toLowerCase().includes(projSearch.toLowerCase()));
+  const projFiltered = projOptions.filter((o) => !projSearch || o.label.toLowerCase().includes(projSearch.toLowerCase()));
 
   const exportCsv = () => {
     const cols = detailCols.filter((c) => c[3] !== "hide");
@@ -275,9 +327,10 @@ export default function SalesView({ lang = "sk" }) {
   const statInfo = (sk, en, label) => <div style={{ position: "absolute", top: 6, right: 6 }}><InfoTip text={t(sk, en)} label={label} /></div>;
   const kpiVal = { fontSize: "1.5rem", fontWeight: 700, color: text, fontFamily: mono, fontVariantNumeric: "tabular-nums" };
   const kpiLbl = { fontFamily: mono, fontSize: "0.62rem", color: dim, letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: "0.3rem" };
+  // `opts` are live facet options ({value,label,hint}) — see facetOptions().
   const Sel = ({ value, onChange, opts, ph }) => (
     <Picker value={value} onChange={onChange} width={150} searchable sk={lang === "sk"} placeholder={ph} ariaLabel={ph}
-      options={[{ value: "", label: ph }, ...(opts || []).map((o) => ({ value: o, label: o }))]} />
+      options={[{ value: "", label: ph }, ...(opts || [])]} />
   );
 
   const dur = S.sold_durable ?? 0;
@@ -348,20 +401,22 @@ export default function SalesView({ lang = "sk" }) {
             <div style={{ position: "absolute", zIndex: 20, top: "110%", left: 0, width: 280, maxHeight: 320, overflowY: "auto", background: panel, border: `1px solid ${border}`, borderRadius: 8, padding: "0.5rem", boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}>
               <input autoFocus value={projSearch} onChange={(e) => setProjSearch(e.target.value)} placeholder={t("hľadať…", "search…")} style={{ ...sel, width: "100%", boxSizing: "border-box", marginBottom: "0.4rem" }} />
               {projects.length > 0 && <div onClick={() => setProjects([])} style={{ cursor: "pointer", color: dim, fontSize: "0.72rem", fontFamily: mono, padding: "0.2rem 0.3rem" }}>✕ {t("zrušiť výber", "clear")}</div>}
-              {projOpts.loading && <div style={{ color: dim, fontSize: "0.75rem", padding: "0.3rem" }}>{t("načítavam…", "loading…")}</div>}
-              {projFiltered.map((v) => (
-                <label key={v} style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.28rem 0.3rem", fontSize: "0.78rem", cursor: "pointer", color: projects.includes(v) ? text : "var(--text-2)", borderRadius: 4 }}
+              {fac.loading && !projOptions.length && <div style={{ color: dim, fontSize: "0.75rem", padding: "0.3rem" }}>{t("načítavam…", "loading…")}</div>}
+              {!fac.loading && !projFiltered.length && <div style={{ color: dim, fontSize: "0.75rem", padding: "0.3rem", fontStyle: "italic" }}>{t("žiadny projekt pre tento výber", "no project for this selection")}</div>}
+              {projFiltered.map((o) => (
+                <label key={o.value} style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.28rem 0.3rem", fontSize: "0.78rem", cursor: "pointer", color: projects.includes(o.value) ? text : "var(--text-2)", borderRadius: 4 }}
                   onMouseEnter={(e) => (e.currentTarget.style.background = panelHi)} onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
-                  <input type="checkbox" checked={projects.includes(v)} onChange={() => toggleProject(v)} />
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v}</span>
+                  <input type="checkbox" checked={projects.includes(o.value)} onChange={() => toggleProject(o.value)} />
+                  <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.label}</span>
+                  <span style={{ flexShrink: 0, color: dim, fontSize: "0.7rem", fontFamily: mono, fontVariantNumeric: "tabular-nums" }}>{o.hint}</span>
                 </label>
               ))}
             </div>
           )}
         </div>
-        <Sel value={fCity} onChange={setFCity} opts={cityOpts.values} ph={t("Mesto: všetky", "City: all")} />
-        <Sel value={fDev} onChange={setFDev} opts={devOpts.values} ph={t("Developer: všetci", "Developer: all")} />
-        <Sel value={fTyp} onChange={setFTyp} opts={typOpts.values} ph={t("Typ: všetky", "Type: all")} />
+        <Sel value={fCity} onChange={setFCity} opts={cityOptions} ph={t("Mesto: všetky", "City: all")} />
+        <Sel value={fDev} onChange={setFDev} opts={devOptions} ph={t("Developer: všetci", "Developer: all")} />
+        <Sel value={fTyp} onChange={setFTyp} opts={typOptions} ph={t("Typ: všetky", "Type: all")} />
         {projects.map((p) => <span key={p} onClick={() => toggleProject(p)} style={{ cursor: "pointer", background: green, color: "#04130d", borderRadius: 4, padding: "0.15rem 0.45rem", fontSize: "0.72rem", fontWeight: 600 }}>{p} ✕</span>)}
         {activeFilters > 0 && <button onClick={clearFilters} style={{ ...sel, cursor: "pointer", color: dim, fontFamily: mono, fontSize: "0.7rem" }}>✕ {t("vyčistiť", "clear")}</button>}
       </div>
@@ -466,27 +521,42 @@ export default function SalesView({ lang = "sk" }) {
                 const kind = COL_FILTER_KIND[c[0]];
                 const money = MONEY_COLS.has(c[0]);
                 const cur = colFilters[c[0]];
+                const opts = kind === "cat" ? colOptions(c[0]) : null;
+                // Live range for this column under every OTHER active filter. Shown as a hint
+                // line AND fed to the input's own min/max, so the control can't offer a value
+                // that would return nothing. Money bounds convert EUR → display currency.
+                const rng = kind === "num" || kind === "date" ? colRange(c[0]) : null;
+                const rngTxt = rng ? fmtRange(c[3], rng) : null;
+                const bound = (v) => (v == null ? undefined : (money ? Math.round(moneyFromEur(Number(v))) : v));
                 return (
                   <th key={c[0]} style={{ padding: "0.2rem 0.4rem 0.35rem", borderBottom: `1px solid ${border}`, background: "var(--surface-2)", verticalAlign: "top", fontWeight: 400 }}>
                     {kind === "cat" && (
                       <select value={typeof cur === "string" ? cur : ""} onChange={(e) => setColCat(c[0], e.target.value)}
                         aria-label={t(c[1], c[2])} style={{ ...fInput, width: "100%", cursor: "pointer", color: cur ? green : "var(--text-2)" }}>
-                        <option value="">{t("Všetky", "All")}</option>
-                        {colOptions(c[0]).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                        <option value="">{t("Všetky", "All")}{opts.length ? ` (${opts.length})` : ""}</option>
+                        {opts.map((o) => <option key={o.value} value={o.value}>{o.label}{o.hint ? ` · ${o.hint}` : ""}</option>)}
                       </select>
                     )}
                     {kind === "num" && (
                       <div style={{ display: "flex", gap: 3, justifyContent: "flex-end" }}>
                         <input type="number" inputMode="numeric" placeholder={money ? `${t("od", "min")} ${curSym}` : t("od", "min")} value={cur?.min ?? ""}
+                          min={bound(rng?.min)} max={bound(rng?.max)}
                           aria-label={`${t(c[1], c[2])} ${t("od", "min")}`} onChange={(e) => setColBound(c[0], "min", e.target.value)} style={{ ...fInput, width: 60, textAlign: "right" }} />
                         <input type="number" inputMode="numeric" placeholder={t("do", "max")} value={cur?.max ?? ""}
+                          min={bound(rng?.min)} max={bound(rng?.max)}
                           aria-label={`${t(c[1], c[2])} ${t("do", "max")}`} onChange={(e) => setColBound(c[0], "max", e.target.value)} style={{ ...fInput, width: 60, textAlign: "right" }} />
                       </div>
                     )}
                     {kind === "date" && (
                       <div style={{ display: "flex", gap: 3 }}>
-                        <input type="date" value={cur?.from ?? ""} aria-label={`${t(c[1], c[2])} ${t("od", "from")}`} onChange={(e) => setColBound(c[0], "from", e.target.value)} style={{ ...fInput, width: 116 }} />
-                        <input type="date" value={cur?.to ?? ""} aria-label={`${t(c[1], c[2])} ${t("do", "to")}`} onChange={(e) => setColBound(c[0], "to", e.target.value)} style={{ ...fInput, width: 116 }} />
+                        <input type="date" value={cur?.from ?? ""} min={rng?.min} max={rng?.max} aria-label={`${t(c[1], c[2])} ${t("od", "from")}`} onChange={(e) => setColBound(c[0], "from", e.target.value)} style={{ ...fInput, width: 116 }} />
+                        <input type="date" value={cur?.to ?? ""} min={rng?.min} max={rng?.max} aria-label={`${t(c[1], c[2])} ${t("do", "to")}`} onChange={(e) => setColBound(c[0], "to", e.target.value)} style={{ ...fInput, width: 116 }} />
+                      </div>
+                    )}
+                    {rngTxt && (
+                      <div title={t("Čo je ešte dostupné pri aktuálnom výbere", "What is still available under the current selection")}
+                        style={{ marginTop: 2, textAlign: kind === "num" ? "right" : "left", color: dim, fontFamily: mono, fontSize: "0.6rem", whiteSpace: "nowrap", fontWeight: 400 }}>
+                        {rngTxt}
                       </div>
                     )}
                   </th>
