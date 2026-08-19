@@ -1,8 +1,18 @@
 /* SalesView — Analytics → Predaje / Sales.
    "How many and WHICH units sold — and STAYED sold — in a period, for the projects I pick."
-   Reads public.analytics_sales (summary / breakdown / detail) over analytics.sale_events:
-   durable sale detection (delete-on-sale aware, relist-reversed), frozen sale price/€m²/
-   days-on-market. Same design language as the Explorer/pivot (dark, green accent, mono labels).
+   Reads public.analytics_sales (summary / breakdown / detail / facets) over
+   analytics.sale_events: durable sale detection (delete-on-sale aware, relist-reversed),
+   frozen sale price/€m²/days-on-market.
+
+   LOOK: built on the shared UI kit in styles/ui.css (`.rd-card`, `.rd-deck`, `.rd-tabs`,
+   `.rd-seg`, `.rd-field`, `.rd-btn`, `.rd-kpi`, `.rd-table`) — one card holding the
+   controls, underline tabs for the view, a grey-track segmented control for the small
+   switches, and one table style with a sticky head. Dropdowns are always <Picker>, never
+   a native <select>: the OS menu can't show the live facet counts and paints itself with
+   the OS palette. Nothing here sets a colour that isn't a token, so light and dark both
+   work. (Redesigned 2026-08-19 — Boss: "the whole sales page is old looking… especially
+   the bottom half… also the data in the dropdown menus".)
+
    Built for the comparable-projects pricing workflow (e.g. Nitra). */
 import { useState, useMemo } from "react";
 import { useCurrency } from "../lib/useCurrency";
@@ -10,15 +20,13 @@ import { moneyFromEur, moneySymbol, moneyToEur } from "../lib/money";
 import { useSales } from "../lib/useData";
 import { useCountry, isAllCountries } from "../lib/useCountry";
 import { useAccountPrefState } from "../lib/useAccountUiPref";
+import { localeTag } from "../lib/locale";
 import LoadError from "../components/LoadError";
 import Picker from "../components/Picker";
 import InfoTip from "../components/InfoTip";
 import DateField from "../components/DateField";
 import CountrySwitcher from "../components/CountrySwitcher";
-import { accent as green, orange, dim, border, bg, surfacePanel as panelHi, text } from "../lib/theme";
-
-const panel = "var(--surface-2)";
-const mono = "'JetBrains Mono', ui-monospace, Menlo, monospace";
+import { text } from "../lib/theme";
 
 const DETAIL_LIMIT = 500; // page size for the detail table; the RPC returns +1 as a has-more sentinel
 const PERIODS = [[30, "30 dní", "30 days"], [45, "45 dní", "45 days"], [60, "60 dní", "60 days"], [90, "90 dní", "90 days"]];
@@ -48,6 +56,14 @@ const COL_FILTER_KIND = {
   sold_date: "date",
   project_name: "cat", city: "cat", typ: "cat", detection_method: "cat", kolaudacia_label: "cat",
   izby: "num", obytna_plocha: "num", price_s_dph_eur: "num", price_per_m2_eur: "num", days_on_market: "num",
+};
+// Width of each column's filter control. Fixed, because a table in auto layout sizes a
+// column to its widest content: an elastic dropdown holding "Rezidencia Mierová" would
+// drag the whole column that wide and shove the money columns off the screen.
+const COL_FILTER_W = {
+  sold_date: 108, project_name: 146, city: 104, typ: 88, detection_method: 100,
+  kolaudacia_label: 112, izby: 50, obytna_plocha: 58, price_s_dph_eur: 68,
+  price_per_m2_eur: 62, days_on_market: 56,
 };
 // Money columns are stored in EUR but typed by the user in the DISPLAY currency → convert.
 const MONEY_COLS = new Set(["price_s_dph_eur", "price_per_m2_eur"]);
@@ -83,12 +99,21 @@ const isoToday = () => isoLocal(new Date());
 
 const fmtInt = (n) => (n == null ? "" : Number(n).toLocaleString("sk-SK").replace(/,/g, " "));
 
+/* A stored date is an ISO day; a reader wants "18. aug 2026", not "2026-08-18".
+   Short month, never a bare number pair, so 08/09 can't be read as September. */
+function fmtDay(v, lang) {
+  if (!v) return "—";
+  const d = new Date(`${String(v).slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return String(v);
+  return d.toLocaleDateString(localeTag(lang), { day: "numeric", month: "short", year: "numeric" });
+}
+
 // "what's still available here" line under a numeric / date column filter. Money bounds are
 // stored in EUR and shown in the display currency, exactly like the values in the table.
-function fmtRange(kind, r) {
+function fmtRange(kind, r, lang) {
   if (!r || r.min == null || r.max == null) return null;
   const one = (v) => {
-    if (kind === "date") return String(v);
+    if (kind === "date") return fmtDay(v, lang);
     const n = Number(v);
     if (!Number.isFinite(n)) return String(v);
     if (kind === "eur" || kind === "per_m2") return fmtInt(Math.round(moneyFromEur(n)));
@@ -103,14 +128,29 @@ function fmtMoney(eur) {
   if (eur == null || !Number.isFinite(Number(eur))) return "—";
   return moneySymbol() + Math.round(moneyFromEur(Number(eur))).toLocaleString("sk-SK").replace(/,/g, " ");
 }
-function fmtCell(kind, v) {
+function fmtCell(kind, v, lang) {
   if (v == null || v === "") return "—";
   const n = Number(v);
   if (kind === "eur") return fmtMoney(v);
   if (kind === "per_m2") return Number.isFinite(n) ? Math.round(moneyFromEur(n)).toLocaleString("sk-SK").replace(/,/g, " ") + " " + moneySymbol() : "—";
   if (kind === "area") return Number.isFinite(n) ? n.toLocaleString("sk-SK", { maximumFractionDigits: 1 }) + " m²" : "—";
-  if (kind === "date") return String(v);
+  if (kind === "date") return fmtDay(v, lang);
   return String(v);
+}
+
+/* One KPI card. Declared at MODULE level on purpose: a component defined inside
+   SalesView would be a brand-new element type on every render, so React would
+   remount its InfoTip and a tapped-open tooltip would vanish the moment sales
+   data or the currency refreshed. */
+function Kpi({ label, value, sub, subWarn, info, loading }) {
+  return (
+    <div className="rd-kpi">
+      {info && <div className="rd-kpi__info"><InfoTip text={info} label={label} /></div>}
+      <div className="rd-kpi__lbl">{label}</div>
+      <div className="rd-kpi__val">{loading ? "…" : value}</div>
+      {sub && <div className={subWarn ? "rd-kpi__sub rd-kpi__sub--warn" : "rd-kpi__sub"}>{sub}</div>}
+    </div>
+  );
 }
 
 export default function SalesView({ lang = "sk" }) {
@@ -130,8 +170,6 @@ export default function SalesView({ lang = "sk" }) {
   const [fTyp, setFTyp] = useState("");
   const [groupBy, setGroupBy] = useState("city");
   const [sort, setSort] = useState({ key: "sold_date", dir: "desc" });
-  const [projSearch, setProjSearch] = useState("");
-  const [projOpen, setProjOpen] = useState(false);
   // Per-column filters on the detail table. Shape per column: "cat" → string value;
   // "num" → { min, max } (display-currency strings for money cols); "date" → { from, to }.
   const [colFilters, setColFilters] = useState({});
@@ -174,7 +212,8 @@ export default function SalesView({ lang = "sk" }) {
   // sale-only sort keys are invalid for the current-pipeline views → fall back to price
   const effSort = isPipe && (sort.key === "sold_date" || sort.key === "days_on_market") ? { key: "price_s_dph_eur", dir: "desc" } : sort;
   const detailCols = isPipe ? DETAIL_COLS_PIPE : DETAIL_COLS;
-  const detailColSpan = detailCols.filter((c) => c[3] !== "hide").length; // full-row cells must span the ACTUAL visible column count (varies sold vs pipeline)
+  const visibleCols = detailCols.filter((c) => c[3] !== "hide");
+  const detailColSpan = visibleCols.length; // full-row cells must span the ACTUAL visible column count (varies sold vs pipeline)
   const SORTABLE = isPipe ? ["price_s_dph_eur", "price_per_m2_eur", "izby", "obytna_plocha", "city", "project_name"]
                           : ["sold_date", "price_s_dph_eur", "price_per_m2_eur", "days_on_market", "izby", "obytna_plocha", "city", "project_name"];
   // ── detail-table per-column filters → server-side `detail_filters` ──
@@ -183,7 +222,7 @@ export default function SalesView({ lang = "sk" }) {
   // and it's preserved for when the user switches back. Money thresholds are typed in the
   // display currency → converted to EUR (curSym is a dep so they re-convert on a switch).
   const curSym = moneySymbol();
-  const visibleColKeys = useMemo(() => new Set(detailCols.filter((c) => c[3] !== "hide").map((c) => c[0])), [detailCols]);
+  const visibleColKeys = useMemo(() => new Set(visibleCols.map((c) => c[0])), [detailCols]); // eslint-disable-line
   const detailFilters = useMemo(() => {
     const out = {};
     for (const [key, val] of Object.entries(colFilters)) {
@@ -221,8 +260,8 @@ export default function SalesView({ lang = "sk" }) {
   // list, which additionally sees the other column filters (it drills inside the scope).
   const baseFacetSpec = useMemo(() => ({ ...common, mode: "facets", facet_scope: "base", facets: BASE_FACETS }), [JSON.stringify(common)]); // eslint-disable-line
   const detailFacetKeys = useMemo(
-    () => detailCols.filter((c) => c[3] !== "hide" && COL_FILTER_KIND[c[0]]).map((c) => c[0]),
-    [detailCols],
+    () => visibleCols.filter((c) => COL_FILTER_KIND[c[0]]).map((c) => c[0]),
+    [detailCols], // eslint-disable-line
   );
   const detailFacetSpec = useMemo(
     () => ({ ...common, mode: "facets", facet_scope: "detail", facets: detailFacetKeys, detail_filters: detailFilters }),
@@ -237,6 +276,8 @@ export default function SalesView({ lang = "sk" }) {
 
   const S = sum.data || {};
   const brkRows = brk.data?.rows || [];
+  // Longest bar in the breakdown = the biggest group, so the column reads as a chart.
+  const brkMax = brkRows.reduce((m, r) => Math.max(m, Number(r.sold) || 0), 0);
   // The RPC returns limit+1 rows as a "there's more" sentinel — slice back to the page
   // size and surface the overflow as a "+" so the table never shows a stray extra row.
   const _detRaw = det.data?.rows || [];
@@ -288,18 +329,15 @@ export default function SalesView({ lang = "sk" }) {
   // Available min/max for a numeric / date column, under every OTHER active filter.
   const colRange = (key) => facDet.data?.ranges?.[key] || null;
 
-  const projFiltered = projOptions.filter((o) => !projSearch || o.label.toLowerCase().includes(projSearch.toLowerCase()));
-
   const exportCsv = () => {
-    const cols = detailCols.filter((c) => c[3] !== "hide");
     // Money columns: export in the SAME display currency the table shows (converted +
     // symbol in the header), so the CSV never silently disagrees with the on-screen values.
     const sym = moneySymbol();
-    const head = cols.map((c) => {
+    const head = visibleCols.map((c) => {
       const base = c[3] === "per_m2" ? `${sym}/m²` : (lang === "sk" ? c[1] : c[2]);
       return c[3] === "eur" ? `${base} (${sym})` : base;
     }).join(";");
-    const lines = detRows.map((r) => cols.map((c) => {
+    const lines = detRows.map((r) => visibleCols.map((c) => {
       const v = r[c[0]];
       if (c[3] === "eur" || c[3] === "per_m2") return v == null ? "" : Math.round(moneyFromEur(Number(v)));
       return v == null ? "" : String(v).replace(/;/g, ",");
@@ -311,172 +349,169 @@ export default function SalesView({ lang = "sk" }) {
     a.click(); URL.revokeObjectURL(a.href);
   };
 
-  const sel = { background: bg, border: `1px solid ${border}`, color: text, borderRadius: 5, padding: "0.4rem 0.55rem", fontSize: "0.78rem", fontFamily: "inherit", outline: "none" };
-  const card = { background: "var(--surface)", border: `1px solid ${border}`, borderRadius: 8, padding: "0.85rem 1rem" };
-  // compact control for the per-column detail filters
-  const fInput = { background: bg, border: `1px solid ${border}`, color: text, borderRadius: 4, padding: "0.18rem 0.3rem", fontSize: "0.68rem", fontFamily: "inherit", outline: "none", boxSizing: "border-box" };
-  // colour-coded stat card: metric colour as a left-accent bar + faint wash (theme-aware; keeps "var(--surface)" so the light-mode shadow still applies)
-  // Calm, uniform cards: one brand-accent bar on every card (no per-metric
-  // rainbow), matching the Dashboard market-overview strip. The `color` args are
-  // kept in the signatures so the call sites don't change, but ignored.
-  const statCard = () => ({ ...card, position: "relative", overflow: "hidden", background: "var(--surface)", paddingLeft: "1rem" });
-  const StatBar = () => <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: "var(--accent)", opacity: 0.7 }} />;
-  // Element factory (NOT a component rendered as <StatInfo/>): returning the node
-  // keeps InfoTip's own identity stable across SalesView re-renders, so a tapped-
-  // open tooltip isn't remounted (and closed) when sales data / currency updates.
-  const statInfo = (sk, en, label) => <div style={{ position: "absolute", top: 6, right: 6 }}><InfoTip text={t(sk, en)} label={label} /></div>;
-  const kpiVal = { fontSize: "1.5rem", fontWeight: 700, color: text, fontFamily: mono, fontVariantNumeric: "tabular-nums" };
-  const kpiLbl = { fontFamily: mono, fontSize: "0.62rem", color: dim, letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: "0.3rem" };
-  // `opts` are live facet options ({value,label,hint}) — see facetOptions().
-  const Sel = ({ value, onChange, opts, ph }) => (
-    <Picker value={value} onChange={onChange} width={150} searchable sk={lang === "sk"} placeholder={ph} ariaLabel={ph}
+  // A scope filter: one Picker, live facet options, each option's own count as the
+  // hint. An element factory, NOT a component declared in the render — a fresh
+  // function identity each render would remount the Picker and slam an open
+  // dropdown shut the moment new facet data arrived.
+  const scopeFilter = (value, onChange, opts, ph, w = 152) => (
+    <Picker value={value} onChange={onChange} width={w} searchable sk={lang === "sk"} placeholder={ph} ariaLabel={ph}
       options={[{ value: "", label: ph }, ...(opts || [])]} />
   );
 
   const dur = S.sold_durable ?? 0;
   const gross = S.sold_all ?? 0;
   const reversed = Math.max(0, gross - dur);
+  const rangeLabel = `${fmtDay(date_from, lang)} – ${fmtDay(date_to, lang)}`;
 
   return (
     <div style={{ color: text, fontFamily: "'Inter', system-ui, sans-serif" }}>
-      {/* header */}
-      <div style={{ position: "relative", overflow: "hidden", borderRadius: 16, border: "1px solid var(--border)", padding: "1.25rem 1.6rem", marginBottom: "1.5rem", background: "radial-gradient(120% 140% at 2% -20%, rgba(18,185,129,0.13) 0%, transparent 46%), linear-gradient(135deg, color-mix(in srgb, var(--accent) 5%, var(--surface)) 0%, var(--bg) 75%)" }}>
-        <p style={{ color: dim, fontSize: "0.8rem", margin: 0 }}>
+      {/* intro band — what this page answers, and over which window */}
+      <div style={{ position: "relative", overflow: "hidden", borderRadius: 14, border: "1px solid var(--border)", padding: "0.95rem 1.2rem", marginBottom: "1rem", display: "flex", alignItems: "center", gap: "1rem", flexWrap: "wrap", background: "radial-gradient(120% 140% at 2% -20%, color-mix(in srgb, var(--accent) 13%, transparent) 0%, transparent 46%), linear-gradient(135deg, color-mix(in srgb, var(--accent) 5%, var(--surface)) 0%, var(--bg) 75%)" }}>
+        <p style={{ color: "var(--text-dim)", fontSize: "0.82rem", margin: 0, lineHeight: 1.55, flex: "1 1 320px" }}>
           {t("Koľko a KTORÉ byty sa predali — a zostali predané — vo zvolenom období, pre projekty ktoré si vyberieš.",
              "How many and WHICH units sold — and stayed sold — in the chosen period, for the projects you pick.")}
         </p>
+        {!isPipe && (
+          <span className="rd-label" style={{ fontSize: "0.66rem", color: "var(--accent-ink)", letterSpacing: "0.04em", textTransform: "none" }}>{rangeLabel}</span>
+        )}
       </div>
 
-      {/* status tabs: Sold / Reserved / Pre-reserved */}
-      <div style={{ display: "inline-flex", border: `1px solid ${border}`, borderRadius: 8, overflow: "hidden", marginBottom: "0.6rem" }}>
+      {/* status: the three views of the same facts */}
+      <div className="rd-tabs" role="tablist" style={{ marginBottom: "0.9rem" }}>
         {STATUSES.map(([s, sk, en]) => (
-          <button key={s} onClick={() => setStatus(s)}
-            style={{ border: "none", padding: "0.5rem 1.1rem", cursor: "pointer", fontFamily: mono, fontSize: "0.78rem", background: status === s ? green : panel, color: status === s ? "#04130d" : dim, fontWeight: status === s ? 700 : 500 }}>
+          <button key={s} role="tab" className="rd-tab" aria-selected={status === s} onClick={() => setStatus(s)}>
             {t(sk, en)}
           </button>
         ))}
       </div>
 
-      {/* controls: period (sold only) + market + durable (sold only) */}
-      <div style={{ ...card, marginBottom: "0.6rem", display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
-        <span style={{ ...kpiLbl, margin: 0, marginRight: "0.1rem" }}>{isPipe ? t("Stav teraz", "Current state") : t("Obdobie", "Period")}</span>
-        {isPipe ? (
-          <span style={{ fontSize: "0.76rem", color: dim, fontStyle: "italic" }}>{t("Aktuálny pipeline — obdobie sa neuplatňuje", "Current pipeline — period doesn't apply")}</span>
-        ) : (
-          <>
-            <div style={{ display: "inline-flex", border: `1px solid ${border}`, borderRadius: 7, overflow: "hidden" }}>
-              {PERIODS.map(([d, sk, en]) => (
-                <button key={d} onClick={() => { setDays(d); setCustomFrom(""); setCustomTo(""); }}
-                  style={{ border: "none", padding: "0.4rem 0.7rem", cursor: "pointer", fontFamily: mono, fontSize: "0.7rem", background: !customFrom && days === d ? green : "transparent", color: !customFrom && days === d ? "#04130d" : dim, fontWeight: !customFrom && days === d ? 700 : 500 }}>
-                  {t(sk, en)}
+      {/* control deck — period + scope filters in ONE card, hairline-separated */}
+      <div className="rd-card rd-deck" style={{ marginBottom: "0.7rem" }}>
+        <div className="rd-deck__row">
+          <span className="rd-label">{isPipe ? t("Stav teraz", "Current state") : t("Obdobie", "Period")}</span>
+          {isPipe ? (
+            <span style={{ fontSize: "0.78rem", color: "var(--text-dim)" }}>
+              {t("Aktuálny pipeline — obdobie sa neuplatňuje", "Current pipeline — period doesn't apply")}
+            </span>
+          ) : (
+            <>
+              <div className="rd-seg">
+                {PERIODS.map(([d, sk, en]) => (
+                  <button key={d} className="rd-seg__btn" aria-pressed={!customFrom && !customTo && days === d}
+                    onClick={() => { setDays(d); setCustomFrom(""); setCustomTo(""); }}>
+                    {t(sk, en)}
+                  </button>
+                ))}
+              </div>
+              <span style={{ color: "var(--text-faint)", fontSize: "0.72rem" }}>{t("alebo", "or")}</span>
+              <DateField value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} width={132} title={t("od", "from")} />
+              <span style={{ color: "var(--text-faint)" }}>–</span>
+              <DateField value={customTo} onChange={(e) => setCustomTo(e.target.value)} width={132} title={t("do", "to")} />
+              {(customFrom || customTo) && (
+                <button className="rd-btn rd-btn--ghost rd-btn--sm" onClick={() => { setCustomFrom(""); setCustomTo(""); }}>
+                  ✕ {t("vlastné", "custom")}
                 </button>
-              ))}
-            </div>
-            <DateField value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} width={140} title={t("od", "from")} />
-            <DateField value={customTo} onChange={(e) => setCustomTo(e.target.value)} width={140} title={t("do", "to")} />
-          </>
-        )}
-        {!isPipe && (
-          <label style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem", fontSize: "0.76rem", color: dim, cursor: "pointer", marginLeft: "auto" }} title={t("Zarátaj len predaje ktoré zostali predané (vylúč tie čo sa vrátili na trh)", "Count only sales that stayed sold (exclude fall-throughs)")}>
-            <input type="checkbox" checked={durableOnly} onChange={(e) => setDurableOnly(e.target.checked)} />
-            {t("Len trvalé predaje", "Stayed-sold only")}
-          </label>
-        )}
-      </div>
-
-      {/* filters: projects multi-select + city/dev/typ */}
-      <div style={{ ...card, marginBottom: "0.6rem", display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center", position: "relative" }}>
-        <span style={{ ...kpiLbl, margin: 0, marginRight: "0.1rem" }}>{t("Filtre", "Filters")}{activeFilters ? ` · ${activeFilters}` : ""}</span>
-        {/* Country / market — the shared global switcher (same state as the left dock).
-            Scopes the sold/reserved facts AND every option list to SK / CZ / All, so the
-            sidebar switcher now filters Sales like every other page. Renders nothing while
-            only one market is active. */}
-        <CountrySwitcher lang={lang} />
-        {/* project multi-select */}
-        <div style={{ position: "relative" }}>
-          <button onClick={() => setProjOpen((o) => !o)} style={{ ...sel, cursor: "pointer", minWidth: 150, textAlign: "left", color: projects.length ? text : dim }}>
-            {projects.length ? t(`${projects.length} projektov`, `${projects.length} projects`) : t("Projekty: všetky ▾", "Projects: all ▾")}
-          </button>
-          {projOpen && (
-            <div style={{ position: "absolute", zIndex: 20, top: "110%", left: 0, width: 280, maxHeight: 320, overflowY: "auto", background: panel, border: `1px solid ${border}`, borderRadius: 8, padding: "0.5rem", boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}>
-              <input autoFocus value={projSearch} onChange={(e) => setProjSearch(e.target.value)} placeholder={t("hľadať…", "search…")} style={{ ...sel, width: "100%", boxSizing: "border-box", marginBottom: "0.4rem" }} />
-              {projects.length > 0 && <div onClick={() => setProjects([])} style={{ cursor: "pointer", color: dim, fontSize: "0.72rem", fontFamily: mono, padding: "0.2rem 0.3rem" }}>✕ {t("zrušiť výber", "clear")}</div>}
-              {fac.loading && !projOptions.length && <div style={{ color: dim, fontSize: "0.75rem", padding: "0.3rem" }}>{t("načítavam…", "loading…")}</div>}
-              {!fac.loading && !projFiltered.length && <div style={{ color: dim, fontSize: "0.75rem", padding: "0.3rem", fontStyle: "italic" }}>{t("žiadny projekt pre tento výber", "no project for this selection")}</div>}
-              {projFiltered.map((o) => (
-                <label key={o.value} style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.28rem 0.3rem", fontSize: "0.78rem", cursor: "pointer", color: projects.includes(o.value) ? text : "var(--text-2)", borderRadius: 4 }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = panelHi)} onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
-                  <input type="checkbox" checked={projects.includes(o.value)} onChange={() => toggleProject(o.value)} />
-                  <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.label}</span>
-                  <span style={{ flexShrink: 0, color: dim, fontSize: "0.7rem", fontFamily: mono, fontVariantNumeric: "tabular-nums" }}>{o.hint}</span>
-                </label>
-              ))}
-            </div>
+              )}
+              <label style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem", fontSize: "0.78rem", color: "var(--text-dim)", cursor: "pointer", marginLeft: "auto" }}
+                title={t("Zarátaj len predaje ktoré zostali predané (vylúč tie čo sa vrátili na trh)", "Count only sales that stayed sold (exclude fall-throughs)")}>
+                <input type="checkbox" checked={durableOnly} onChange={(e) => setDurableOnly(e.target.checked)} />
+                {t("Len trvalé predaje", "Stayed-sold only")}
+              </label>
+            </>
           )}
         </div>
-        <Sel value={fCity} onChange={setFCity} opts={cityOptions} ph={t("Mesto: všetky", "City: all")} />
-        <Sel value={fDev} onChange={setFDev} opts={devOptions} ph={t("Developer: všetci", "Developer: all")} />
-        <Sel value={fTyp} onChange={setFTyp} opts={typOptions} ph={t("Typ: všetky", "Type: all")} />
-        {projects.map((p) => <span key={p} onClick={() => toggleProject(p)} style={{ cursor: "pointer", background: green, color: "#04130d", borderRadius: 4, padding: "0.15rem 0.45rem", fontSize: "0.72rem", fontWeight: 600 }}>{p} ✕</span>)}
-        {activeFilters > 0 && <button onClick={clearFilters} style={{ ...sel, cursor: "pointer", color: dim, fontFamily: mono, fontSize: "0.7rem" }}>✕ {t("vyčistiť", "clear")}</button>}
+
+        <div className="rd-deck__row">
+          <span className="rd-label">{t("Filtre", "Filters")}{activeFilters ? ` · ${activeFilters}` : ""}</span>
+          {/* Country / market — the shared global switcher (same state as the left dock).
+              Scopes the sold/reserved facts AND every option list to SK / CZ / All, so the
+              sidebar switcher now filters Sales like every other page. Renders nothing while
+              only one market is active. */}
+          <CountrySwitcher lang={lang} hideLabel />
+          {/* Projects: the app's own multi-select — searchable, live counts, closes on an
+              outside click. (Was a hand-rolled panel with native checkboxes that stayed
+              open until you clicked its button again.) */}
+          <Picker multi searchable width={186} sk={lang === "sk"} value={projects} onChange={setProjects}
+            options={projOptions} ariaLabel={t("Projekty", "Projects")}
+            placeholder={fac.loading && !projOptions.length ? t("načítavam…", "loading…") : t("Projekty: všetky", "Projects: all")} />
+          {scopeFilter(fCity, setFCity, cityOptions, t("Mesto: všetky", "City: all"))}
+          {scopeFilter(fDev, setFDev, devOptions, t("Developer: všetci", "Developer: all"), 166)}
+          {scopeFilter(fTyp, setFTyp, typOptions, t("Typ: všetky", "Type: all"), 128)}
+          {projects.map((p) => (
+            <span key={p} className="rd-chip" onClick={() => toggleProject(p)} title={t("Odobrať z výberu", "Remove from selection")}>
+              <span className="rd-chip__label">{p}</span><span className="rd-chip__x">✕</span>
+            </span>
+          ))}
+          {activeFilters > 0 && (
+            <button className="rd-btn rd-btn--ghost rd-btn--sm" onClick={clearFilters}>✕ {t("vyčistiť", "clear")}</button>
+          )}
+        </div>
       </div>
 
       {/* KPI row */}
       {sum.error ? <LoadError lang={lang} /> : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "0.6rem", marginBottom: "0.6rem" }}>
-          <div style={statCard("#10b981")}><StatBar color="#10b981" />{statInfo("Počet bytov v tomto stave za zvolené obdobie (pri predaných: tie, ktoré zostali predané). „+N vrátených“ = predaje, ktoré sa vrátili späť na trh.", "Units in this state for the selected period (for sold: those that stayed sold). “+N fell through” = sales that returned to the market.", t(HEADLINE[status][0], HEADLINE[status][1]))}<div style={{ ...kpiLbl, paddingRight: "1.1rem" }}>{t(HEADLINE[status][0], HEADLINE[status][1])}</div><div style={kpiVal}>{sum.loading ? "…" : dur.toLocaleString("sk-SK")}</div>{reversed > 0 && !durableOnly && !isPipe && <div style={{ fontSize: "0.68rem", color: orange, fontFamily: mono, marginTop: "0.2rem" }}>{t(`+${reversed} vrátených`, `+${reversed} fell through`)}</div>}</div>
-          <div style={statCard("#3b74e8")}><StatBar color="#3b74e8" />{statInfo("Súčet cien (s DPH) bytov v tomto výbere.", "Sum of prices (incl. VAT) of the units in this selection.", isPipe ? t("Hodnota v ponuke", "Listed value") : t("Objem predaja", "Sold value"))}<div style={{ ...kpiLbl, paddingRight: "1.1rem" }}>{isPipe ? t("Hodnota v ponuke", "Listed value") : t("Objem predaja", "Sold value")}</div><div style={kpiVal}>{sum.loading ? "…" : fmtMoney(S.sold_value_eur)}</div></div>
-          <div style={statCard("#3b74e8")}><StatBar color="#3b74e8" />{statInfo("Stredná cena bytu — polovica je lacnejšia, polovica drahšia. Odolnejšia voči extrémom než priemer.", "The middle unit price — half are cheaper, half dearer. More robust to outliers than the average.", t("Medián ceny", "Median price"))}<div style={{ ...kpiLbl, paddingRight: "1.1rem" }}>{t("Medián ceny", "Median price")}</div><div style={kpiVal}>{sum.loading ? "…" : fmtMoney(S.median_price_eur)}</div></div>
-          <div style={statCard("#8b5cf6")}><StatBar color="#8b5cf6" />{statInfo("Stredná cena za m² (s DPH) v tomto výbere.", "The middle price per m² (incl. VAT) in this selection.", t("Medián €/m²", "Median €/m²"))}<div style={{ ...kpiLbl, paddingRight: "1.1rem" }}>{t("Medián ", "Median ")}{moneySymbol()}/m²</div><div style={kpiVal}>{sum.loading ? "…" : fmtCell("per_m2", S.median_eur_m2)}</div></div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(172px, 1fr))", gap: "0.7rem", marginBottom: "0.7rem" }}>
+          <Kpi loading={sum.loading} label={t(HEADLINE[status][0], HEADLINE[status][1])} value={dur.toLocaleString("sk-SK")}
+            sub={reversed > 0 && !durableOnly && !isPipe ? t(`+${reversed} vrátených`, `+${reversed} fell through`) : null} subWarn
+            info={t("Počet bytov v tomto stave za zvolené obdobie (pri predaných: tie, ktoré zostali predané). „+N vrátených“ = predaje, ktoré sa vrátili späť na trh.",
+                    "Units in this state for the selected period (for sold: those that stayed sold). “+N fell through” = sales that returned to the market.")} />
+          <Kpi loading={sum.loading} label={isPipe ? t("Hodnota v ponuke", "Listed value") : t("Objem predaja", "Sold value")} value={fmtMoney(S.sold_value_eur)}
+            info={t("Súčet cien (s DPH) bytov v tomto výbere.", "Sum of prices (incl. VAT) of the units in this selection.")} />
+          <Kpi loading={sum.loading} label={t("Medián ceny", "Median price")} value={fmtMoney(S.median_price_eur)}
+            info={t("Stredná cena bytu — polovica je lacnejšia, polovica drahšia. Odolnejšia voči extrémom než priemer.",
+                    "The middle unit price — half are cheaper, half dearer. More robust to outliers than the average.")} />
+          <Kpi loading={sum.loading} label={`${t("Medián ", "Median ")}${moneySymbol()}/m²`} value={fmtCell("per_m2", S.median_eur_m2, lang)}
+            info={t("Stredná cena za m² (s DPH) v tomto výbere.", "The middle price per m² (incl. VAT) in this selection.")} />
           {!isPipe && (
-          <div style={statCard("#e0940f")}>
-            <StatBar color="#e0940f" />
-            {statInfo("Stredný počet dní, počas ktorých sa byt predával — od prvého zachytenia po predaj. Ak sme byt videli pribudnúť, je to skutočný čas na trhu; ak už bol v ponuke keď sme začali sledovať (máj 2026), rátame od prvého zachytenia (označené „≥“) a skutočná hodnota môže byť vyššia.", "Median number of days units were on the market — from first sight to sold. If we saw a unit appear it's the true time on market; if it was already listed when we began tracking (May 2026) we count from first sight (marked “≥”) and the real figure may be higher.", t("Medián dní na trhu", "Median days on market"))}
-            <div style={{ ...kpiLbl, paddingRight: "1.1rem" }}>{t("Medián dní na trhu", "Median days on market")}</div>
-            <div style={kpiVal}>{sum.loading ? "…" : (S.median_days_on_market != null ? Math.round(S.median_days_on_market) : "—")}</div>
-            <div style={{ fontSize: "0.64rem", color: dim, fontFamily: mono, marginTop: "0.2rem" }}>
-              {S.observed_dom_count
-                ? <>{t(`z ${S.observed_dom_count} predaných`, `of ${S.observed_dom_count} sold`)}{S.censored_count ? t(` · z toho ${S.censored_count}× „≥“`, ` · ${S.censored_count}× are ≥`) : ""}</>
+            <Kpi loading={sum.loading} label={t("Medián dní na trhu", "Median days on market")}
+              value={S.median_days_on_market != null ? Math.round(S.median_days_on_market) : "—"}
+              sub={S.observed_dom_count
+                ? `${t(`z ${S.observed_dom_count} predaných`, `of ${S.observed_dom_count} sold`)}${S.censored_count ? t(` · z toho ${S.censored_count}× „≥“`, ` · ${S.censored_count}× are ≥`) : ""}`
                 : t("zatiaľ málo dát", "building history")}
-            </div>
-          </div>
+              info={t("Stredný počet dní, počas ktorých sa byt predával — od prvého zachytenia po predaj. Ak sme byt videli pribudnúť, je to skutočný čas na trhu; ak už bol v ponuke keď sme začali sledovať (máj 2026), rátame od prvého zachytenia (označené „≥“) a skutočná hodnota môže byť vyššia.",
+                      "Median number of days units were on the market — from first sight to sold. If we saw a unit appear it's the true time on market; if it was already listed when we began tracking (May 2026) we count from first sight (marked “≥”) and the real figure may be higher.")} />
           )}
         </div>
       )}
 
       {/* breakdown */}
-      <div style={{ ...card, marginBottom: "0.6rem" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem", flexWrap: "wrap" }}>
-          <span style={kpiLbl}><span style={{ display: "inline-block", width: 3, height: 12, borderRadius: 2, background: "var(--accent)", marginRight: "0.5rem", verticalAlign: "middle" }} />{t("Rozklad podľa", "Break down by")}</span>
-          <div style={{ display: "inline-flex", gap: "0.25rem", flexWrap: "wrap" }}>
+      <div className="rd-card rd-card--pad" style={{ marginBottom: "0.7rem" }}>
+        <div className="rd-sect" style={{ marginBottom: "0.7rem" }}>
+          <span className="rd-sect__tick" />
+          <span className="rd-sect__name">{t("Rozklad podľa", "Break down by")}</span>
+          <div className="rd-seg rd-seg--wrap">
             {GROUP_DIMS.map(([k, sk, en]) => (
-              <button key={k} onClick={() => setGroupBy(k)} style={{ ...sel, cursor: "pointer", padding: "0.28rem 0.55rem", fontFamily: mono, fontSize: "0.7rem", background: groupBy === k ? green : bg, color: groupBy === k ? "#04130d" : dim, borderColor: groupBy === k ? green : border, fontWeight: groupBy === k ? 700 : 500 }}>{t(sk, en)}</button>
+              <button key={k} className="rd-seg__btn" aria-pressed={groupBy === k} onClick={() => setGroupBy(k)}>{t(sk, en)}</button>
             ))}
           </div>
         </div>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ borderCollapse: "collapse", width: "100%", fontSize: "0.8rem", minWidth: 480 }}>
+        <div className="rd-scroll">
+          <table className="rd-table" style={{ minWidth: 520 }}>
             <thead><tr>{[
               { h: t("Skupina", "Group") },
-              { h: isPipe ? t("V ponuke", "Listed") : t("Predané", "Sold"), info: isPipe ? null : t("Počet bytov, ktoré sa v období predali a zostali predané.", "Units that sold — and stayed sold — in the period.") },
-              { h: t("Objem", "Value"), info: t("Súčet cien (s DPH) predaných bytov v skupine.", "Sum of prices (incl. VAT) of the sold units in the group.") },
-              { h: `${t("Medián ", "Median ")}${moneySymbol()}/m²`, info: t("Stredná cena za m² (s DPH) predaných bytov v skupine.", "Median price per m² (incl. VAT) of the sold units in the group.") },
-              { h: t("Medián dní", "Median days"), info: t("Stredný počet dní na trhu (od prvého zachytenia po predaj). Zahŕňa aj byty rátané od prvého zachytenia („≥“), takže hodnota môže byť konzervatívna.", "Median days on market (first sight to sold). Includes units counted from first sight (“≥”), so the figure can be conservative.") },
-            ].map((o, i) => (
-              <th key={o.h} style={{ textAlign: i === 0 ? "left" : "right", padding: "0.4rem 0.6rem", borderBottom: `1px solid ${border}`, color: dim, fontFamily: mono, fontSize: "0.64rem", textTransform: "uppercase", letterSpacing: "0.04em", whiteSpace: "nowrap" }}>
+              { h: isPipe ? t("V ponuke", "Listed") : t("Predané", "Sold"), num: true, info: isPipe ? null : t("Počet bytov, ktoré sa v období predali a zostali predané.", "Units that sold — and stayed sold — in the period.") },
+              { h: t("Objem", "Value"), num: true, info: t("Súčet cien (s DPH) predaných bytov v skupine.", "Sum of prices (incl. VAT) of the sold units in the group.") },
+              { h: `${t("Medián ", "Median ")}${moneySymbol()}/m²`, num: true, info: t("Stredná cena za m² (s DPH) predaných bytov v skupine.", "Median price per m² (incl. VAT) of the sold units in the group.") },
+              { h: t("Medián dní", "Median days"), num: true, info: t("Stredný počet dní na trhu (od prvého zachytenia po predaj). Zahŕňa aj byty rátané od prvého zachytenia („≥“), takže hodnota môže byť konzervatívna.", "Median days on market (first sight to sold). Includes units counted from first sight (“≥”), so the figure can be conservative.") },
+            ].map((o) => (
+              <th key={o.h} className={o.num ? "num" : undefined}>
                 {o.h}{o.info && <span style={{ marginLeft: 5, display: "inline-block", verticalAlign: "middle" }}><InfoTip text={o.info} label={o.h} /></span>}
               </th>
             ))}</tr></thead>
             <tbody>
-              {brk.loading && <tr><td colSpan={5} style={{ padding: "1rem", textAlign: "center", color: dim }}>{t("načítavam…", "loading…")}</td></tr>}
-              {!brk.loading && brkRows.length === 0 && <tr><td colSpan={5} style={{ padding: "1.2rem", textAlign: "center", color: dim, fontStyle: "italic" }}>{isPipe ? t("Žiadne jednotky pre tento výber.", "No units for this selection.") : t("Žiadne predaje pre tento výber.", "No sales for this selection.")}</td></tr>}
+              {brk.loading && <tr><td className="rd-td--empty" colSpan={5} style={{ fontStyle: "normal" }}>{t("načítavam…", "loading…")}</td></tr>}
+              {!brk.loading && brkRows.length === 0 && <tr><td className="rd-td--empty" colSpan={5}>{isPipe ? t("Žiadne jednotky pre tento výber.", "No units for this selection.") : t("Žiadne predaje pre tento výber.", "No sales for this selection.")}</td></tr>}
               {brkRows.map((r, i) => (
-                <tr key={String(r.group) + i} style={{ background: i % 2 ? "var(--surface-2)" : "transparent" }}>
-                  <td style={{ padding: "0.4rem 0.6rem", color: text }}>{r.group ?? "—"}</td>
-                  <td style={{ padding: "0.4rem 0.6rem", textAlign: "right", fontFamily: mono, color: text }}>{Number(r.sold).toLocaleString("sk-SK")}</td>
-                  <td style={{ padding: "0.4rem 0.6rem", textAlign: "right", fontFamily: mono, color: "var(--text-2)" }}>{fmtMoney(r.sold_value_eur)}</td>
-                  <td style={{ padding: "0.4rem 0.6rem", textAlign: "right", fontFamily: mono, color: "var(--text-2)" }}>{fmtCell("per_m2", r.median_eur_m2)}</td>
-                  <td style={{ padding: "0.4rem 0.6rem", textAlign: "right", fontFamily: mono, color: "var(--text-2)" }}>{r.median_days_on_market != null ? Math.round(r.median_days_on_market) : "—"}</td>
+                <tr key={String(r.group) + i}>
+                  <td className="rd-td--key">{r.group ?? "—"}</td>
+                  {/* the count doubles as a bar, so the biggest groups are visible at a glance */}
+                  <td className="num" style={{ color: "var(--text)", minWidth: 96 }}>
+                    {Number(r.sold).toLocaleString("sk-SK")}
+                    {brkMax > 0 && <span className="rd-bar"><span className="rd-bar__fill" style={{ width: `${Math.max(2, (Number(r.sold) / brkMax) * 100)}%` }} /></span>}
+                  </td>
+                  <td className="num">{fmtMoney(r.sold_value_eur)}</td>
+                  <td className="num">{fmtCell("per_m2", r.median_eur_m2, lang)}</td>
+                  <td className="num">{r.median_days_on_market != null ? Math.round(r.median_days_on_market) : "—"}</td>
                 </tr>
               ))}
             </tbody>
@@ -485,107 +520,119 @@ export default function SalesView({ lang = "sk" }) {
       </div>
 
       {/* detail: the exact units */}
-      <div style={card}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem", flexWrap: "wrap", gap: "0.5rem" }}>
-          <span style={kpiLbl}><span style={{ display: "inline-block", width: 3, height: 12, borderRadius: 2, background: "var(--accent)", marginRight: "0.5rem", verticalAlign: "middle" }} />{t("Konkrétne byty", "The exact units")}{detRows.length ? ` · ${detRows.length}${detHasMore ? "+" : ""}` : ""}
-            <span style={{ marginLeft: 5, display: "inline-block", verticalAlign: "middle" }}><InfoTip label={t("Filtre stĺpcov", "Column filters")} text={t("Filtre pod hlavičkou tabuľky zúžia TENTO zoznam bytov (na serveri, cez celý výber — nie len zobrazených 500). Súhrny a rozpad hore ostávajú za celé zvolené obdobie.", "The filters under the table header narrow THIS list of units (server-side, across the whole selection — not just the 500 shown). The totals and breakdown above stay for the full selected period.")} /></span>
-          </span>
+      <div className="rd-card rd-card--pad">
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.6rem", flexWrap: "wrap", gap: "0.5rem" }}>
+          <div className="rd-sect">
+            <span className="rd-sect__tick" />
+            <span className="rd-sect__name">{t("Konkrétne byty", "The exact units")}</span>
+            {detRows.length > 0 && <span className="rd-sect__count">{fmtInt(detRows.length)}{detHasMore ? "+" : ""}</span>}
+            <InfoTip label={t("Filtre stĺpcov", "Column filters")} text={t("Filtre pod hlavičkou tabuľky zúžia TENTO zoznam bytov (na serveri, cez celý výber — nie len zobrazených 500). Súhrny a rozpad hore ostávajú za celé zvolené obdobie.", "The filters under the table header narrow THIS list of units (server-side, across the whole selection — not just the 500 shown). The totals and breakdown above stay for the full selected period.")} />
+          </div>
           <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
             {activeColCount > 0 && (
-              <button onClick={clearColFilters} title={t("Zrušiť filtre stĺpcov", "Clear column filters")}
-                style={{ ...sel, cursor: "pointer", color: orange, borderColor: orange, fontFamily: mono, fontSize: "0.68rem", fontWeight: 700 }}>
-                ✕ {t("Filtre", "Filters")} ({activeColCount})
+              <button className="rd-btn rd-btn--warn rd-btn--sm" onClick={clearColFilters} title={t("Zrušiť filtre stĺpcov", "Clear column filters")}>
+                ✕ {t("Filtre stĺpcov", "Column filters")} ({activeColCount})
               </button>
             )}
-            <button onClick={exportCsv} disabled={!detRows.length} style={{ ...sel, cursor: detRows.length ? "pointer" : "default", color: detRows.length ? "#04130d" : dim, background: detRows.length ? green : bg, borderColor: detRows.length ? green : border, fontFamily: mono, fontSize: "0.72rem", fontWeight: 700 }}>⬇ CSV</button>
+            <button className="rd-btn rd-btn--primary rd-btn--sm" onClick={exportCsv} disabled={!detRows.length}>⬇ CSV</button>
           </div>
         </div>
-        <div style={{ overflowX: "auto", maxHeight: "60vh", overflowY: "auto" }}>
-          <table style={{ borderCollapse: "separate", borderSpacing: 0, width: "100%", fontSize: "0.78rem", minWidth: 820 }}>
-            <thead style={{ position: "sticky", top: 0, background: "var(--surface-2)", zIndex: 1 }}><tr>
-              {detailCols.filter((c) => c[3] !== "hide").map((c) => {
-                const numeric = ["num", "eur", "per_m2", "area"].includes(c[3]);
-                const sortable = SORTABLE.includes(c[0]);
-                return (
-                  <th key={c[0]} onClick={sortable ? () => toggleSort(c[0]) : undefined}
-                    style={{ padding: "0.45rem 0.6rem", textAlign: numeric ? "right" : "left", borderBottom: `1px solid ${border}`, color: sort.key === c[0] ? green : "var(--text-2)", cursor: sortable ? "pointer" : "default", fontFamily: mono, fontSize: "0.64rem", textTransform: "uppercase", letterSpacing: "0.03em", whiteSpace: "nowrap", userSelect: "none" }}>
-                    {c[3] === "per_m2" ? `${moneySymbol()}/m²` : t(c[1], c[2])}{effSort.key === c[0] ? (effSort.dir === "asc" ? " ▲" : " ▼") : ""}
-                    {COL_INFO[c[0]] && <span style={{ marginLeft: 5, display: "inline-block", verticalAlign: "middle" }}><InfoTip text={t(COL_INFO[c[0]].sk, COL_INFO[c[0]].en)} label={t(c[1], c[2])} /></span>}
-                  </th>
-                );
-              })}
-            </tr>
-            {/* per-column filter row (server-side; narrows THIS list, not the totals above) */}
-            <tr>
-              {detailCols.filter((c) => c[3] !== "hide").map((c) => {
-                const kind = COL_FILTER_KIND[c[0]];
-                const money = MONEY_COLS.has(c[0]);
-                const cur = colFilters[c[0]];
-                const opts = kind === "cat" ? colOptions(c[0]) : null;
-                // Live range for this column under every OTHER active filter. Shown as a hint
-                // line AND fed to the input's own min/max, so the control can't offer a value
-                // that would return nothing. Money bounds convert EUR → display currency.
-                const rng = kind === "num" || kind === "date" ? colRange(c[0]) : null;
-                const rngTxt = rng ? fmtRange(c[3], rng) : null;
-                const bound = (v) => (v == null ? undefined : (money ? Math.round(moneyFromEur(Number(v))) : v));
-                return (
-                  <th key={c[0]} style={{ padding: "0.2rem 0.4rem 0.35rem", borderBottom: `1px solid ${border}`, background: "var(--surface-2)", verticalAlign: "top", fontWeight: 400 }}>
-                    {kind === "cat" && (
-                      <select value={typeof cur === "string" ? cur : ""} onChange={(e) => setColCat(c[0], e.target.value)}
-                        aria-label={t(c[1], c[2])} style={{ ...fInput, width: "100%", cursor: "pointer", color: cur ? green : "var(--text-2)" }}>
-                        <option value="">{t("Všetky", "All")}{opts.length ? ` (${opts.length})` : ""}</option>
-                        {opts.map((o) => <option key={o.value} value={o.value}>{o.label}{o.hint ? ` · ${o.hint}` : ""}</option>)}
-                      </select>
-                    )}
-                    {kind === "num" && (
-                      <div style={{ display: "flex", gap: 3, justifyContent: "flex-end" }}>
-                        <input type="number" inputMode="numeric" placeholder={money ? `${t("od", "min")} ${curSym}` : t("od", "min")} value={cur?.min ?? ""}
-                          min={bound(rng?.min)} max={bound(rng?.max)}
-                          aria-label={`${t(c[1], c[2])} ${t("od", "min")}`} onChange={(e) => setColBound(c[0], "min", e.target.value)} style={{ ...fInput, width: 60, textAlign: "right" }} />
-                        <input type="number" inputMode="numeric" placeholder={t("do", "max")} value={cur?.max ?? ""}
-                          min={bound(rng?.min)} max={bound(rng?.max)}
-                          aria-label={`${t(c[1], c[2])} ${t("do", "max")}`} onChange={(e) => setColBound(c[0], "max", e.target.value)} style={{ ...fInput, width: 60, textAlign: "right" }} />
-                      </div>
-                    )}
-                    {kind === "date" && (
-                      <div style={{ display: "flex", gap: 3 }}>
-                        <input type="date" value={cur?.from ?? ""} min={rng?.min} max={rng?.max} aria-label={`${t(c[1], c[2])} ${t("od", "from")}`} onChange={(e) => setColBound(c[0], "from", e.target.value)} style={{ ...fInput, width: 116 }} />
-                        <input type="date" value={cur?.to ?? ""} min={rng?.min} max={rng?.max} aria-label={`${t(c[1], c[2])} ${t("do", "to")}`} onChange={(e) => setColBound(c[0], "to", e.target.value)} style={{ ...fInput, width: 116 }} />
-                      </div>
-                    )}
-                    {rngTxt && (
-                      <div title={t("Čo je ešte dostupné pri aktuálnom výbere", "What is still available under the current selection")}
-                        style={{ marginTop: 2, textAlign: kind === "num" ? "right" : "left", color: dim, fontFamily: mono, fontSize: "0.6rem", whiteSpace: "nowrap", fontWeight: 400 }}>
-                        {rngTxt}
-                      </div>
-                    )}
-                  </th>
-                );
-              })}
-            </tr></thead>
+
+        <div className="rd-scroll" style={{ maxHeight: "58vh" }}>
+          <table className="rd-table rd-table--sticky" style={{ minWidth: isPipe ? 900 : 1040 }}>
+            <thead>
+              <tr>
+                {visibleCols.map((c) => {
+                  const numeric = ["num", "eur", "per_m2", "area"].includes(c[3]);
+                  const sortable = SORTABLE.includes(c[0]);
+                  const on = effSort.key === c[0];
+                  return (
+                    <th key={c[0]} onClick={sortable ? () => toggleSort(c[0]) : undefined}
+                      className={[numeric ? "num" : "", sortable ? "rd-th--sortable" : "", on ? "rd-th--on" : ""].filter(Boolean).join(" ")}
+                      title={sortable ? t("Klikni pre zoradenie", "Click to sort") : undefined}>
+                      {c[3] === "per_m2" ? `${moneySymbol()}/m²` : t(c[1], c[2])}
+                      {on && <span style={{ marginLeft: 3 }}>{effSort.dir === "asc" ? "▲" : "▼"}</span>}
+                      {COL_INFO[c[0]] && <span style={{ marginLeft: 5, display: "inline-block", verticalAlign: "middle" }}><InfoTip text={t(COL_INFO[c[0]].sk, COL_INFO[c[0]].en)} label={t(c[1], c[2])} /></span>}
+                    </th>
+                  );
+                })}
+              </tr>
+              {/* per-column filter row (server-side; narrows THIS list, not the totals above) */}
+              <tr>
+                {visibleCols.map((c) => {
+                  const kind = COL_FILTER_KIND[c[0]];
+                  const money = MONEY_COLS.has(c[0]);
+                  const cur = colFilters[c[0]];
+                  const w = COL_FILTER_W[c[0]];
+                  // Live range for this column under every OTHER active filter. Shown as a hint
+                  // line AND fed to the input's own min/max, so the control can't offer a value
+                  // that would return nothing. Money bounds convert EUR → display currency.
+                  const rng = kind === "num" || kind === "date" ? colRange(c[0]) : null;
+                  const rngTxt = rng ? fmtRange(c[3], rng, lang) : null;
+                  const bound = (v) => (v == null ? undefined : (money ? Math.round(moneyFromEur(Number(v))) : v));
+                  return (
+                    <th key={c[0]} className="rd-th--filter">
+                      {kind === "cat" && (
+                        <Picker small searchable width={w} sk={lang === "sk"}
+                          value={typeof cur === "string" ? cur : ""} onChange={(v) => setColCat(c[0], v)}
+                          ariaLabel={t(c[1], c[2])} placeholder={t("Všetky", "All")}
+                          options={[{ value: "", label: t("Všetky", "All") }, ...colOptions(c[0])]} />
+                      )}
+                      {kind === "num" && (
+                        <div style={{ display: "flex", gap: 3, justifyContent: "flex-end" }}>
+                          <input type="number" inputMode="numeric" className="rd-field rd-field--sm rd-field--num" placeholder={t("od", "min")} value={cur?.min ?? ""}
+                            min={bound(rng?.min)} max={bound(rng?.max)} style={{ width: w }}
+                            aria-label={`${t(c[1], c[2])} ${t("od", "min")}`} onChange={(e) => setColBound(c[0], "min", e.target.value)} />
+                          <input type="number" inputMode="numeric" className="rd-field rd-field--sm rd-field--num" placeholder={t("do", "max")} value={cur?.max ?? ""}
+                            min={bound(rng?.min)} max={bound(rng?.max)} style={{ width: w }}
+                            aria-label={`${t(c[1], c[2])} ${t("do", "max")}`} onChange={(e) => setColBound(c[0], "max", e.target.value)} />
+                        </div>
+                      )}
+                      {kind === "date" && (
+                        <div style={{ display: "flex", gap: 3 }}>
+                          <DateField small value={cur?.from ?? ""} width={w} ariaLabel={`${t(c[1], c[2])} ${t("od", "from")}`}
+                            onChange={(e) => setColBound(c[0], "from", e.target.value)} style={{ minWidth: 0 }} />
+                          <DateField small value={cur?.to ?? ""} width={w} ariaLabel={`${t(c[1], c[2])} ${t("do", "to")}`}
+                            onChange={(e) => setColBound(c[0], "to", e.target.value)} style={{ minWidth: 0 }} />
+                        </div>
+                      )}
+                      {rngTxt && (
+                        <div className="rd-filter-hint" title={t("Čo je ešte dostupné pri aktuálnom výbere", "What is still available under the current selection")}
+                          style={{ textAlign: kind === "num" ? "right" : "left" }}>
+                          {rngTxt}
+                        </div>
+                      )}
+                    </th>
+                  );
+                })}
+              </tr>
+            </thead>
             <tbody>
-              {det.loading && <tr><td colSpan={detailColSpan} style={{ padding: "1.2rem", textAlign: "center", color: dim }}>{t("načítavam…", "loading…")}</td></tr>}
+              {det.loading && <tr><td className="rd-td--empty" colSpan={detailColSpan} style={{ fontStyle: "normal" }}>{t("načítavam…", "loading…")}</td></tr>}
               {det.error && <tr><td colSpan={detailColSpan} style={{ padding: 0 }}><LoadError lang={lang} /></td></tr>}
-              {!det.loading && !det.error && detRows.length === 0 && <tr><td colSpan={detailColSpan} style={{ padding: "1.5rem", textAlign: "center", color: dim, fontStyle: "italic" }}>{isPipe ? t("Žiadne jednotky v tomto stave pre tento výber.", "No units in this state for this selection.") : t("Žiadne predané byty pre tento výber a obdobie.", "No sold units for this selection and period.")}</td></tr>}
+              {!det.loading && !det.error && detRows.length === 0 && <tr><td className="rd-td--empty" colSpan={detailColSpan}>{isPipe ? t("Žiadne jednotky v tomto stave pre tento výber.", "No units in this state for this selection.") : t("Žiadne predané byty pre tento výber a obdobie.", "No sold units for this selection and period.")}</td></tr>}
               {detRows.map((r, i) => (
-                <tr key={(r.project_id || "") + (r.unit_id || "") + i} style={{ background: i % 2 ? "var(--surface-2)" : "transparent" }}>
-                  {detailCols.filter((c) => c[3] !== "hide").map((c) => {
+                <tr key={(r.project_id || "") + (r.unit_id || "") + i}>
+                  {visibleCols.map((c) => {
                     const numeric = ["num", "eur", "per_m2", "area"].includes(c[3]);
                     if (c[3] === "sig") {
                       const marked = r.detection_method === "marked";
-                      return <td key={c[0]} style={{ padding: "0.35rem 0.6rem", borderTop: `1px solid var(--surface)` }}>
-                        <span title={marked ? t("Developer označil ako predané", "Developer marked as sold") : t("Zmizol z ponuky (developer neoznačuje predané)", "Removed from listing (developer doesn't mark sold)")}
-                          style={{ fontFamily: mono, fontSize: "0.62rem", color: marked ? green : orange }}>{marked ? t("označené", "marked") : t("zmizol", "delisted")}</span>
+                      return <td key={c[0]}>
+                        <span className={marked ? "rd-badge rd-badge--ok" : "rd-badge rd-badge--warn"}
+                          title={marked ? t("Developer označil ako predané", "Developer marked as sold") : t("Zmizol z ponuky (developer neoznačuje predané)", "Removed from listing (developer doesn't mark sold)")}>
+                          {marked ? t("označené", "marked") : t("zmizol", "delisted")}
+                        </span>
                       </td>;
                     }
-                    return <td key={c[0]} style={{ padding: "0.35rem 0.6rem", textAlign: numeric ? "right" : "left", borderTop: `1px solid var(--surface)`, color: "var(--text-2)", fontFamily: numeric ? mono : "inherit", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+                    const isKey = c[0] === "project_name";
+                    return <td key={c[0]} className={[numeric ? "num" : "", isKey ? "rd-td--key" : ""].filter(Boolean).join(" ") || undefined}>
                       {c[0] === "days_on_market"
                         ? (r.days_on_market == null
-                            ? <span title={t("Skutočný čas na trhu zatiaľ nevieme", "True days-on-market not known yet")} style={{ color: dim }}>—</span>
+                            ? <span title={t("Skutočný čas na trhu zatiaľ nevieme", "True days-on-market not known yet")} style={{ color: "var(--text-faint)" }}>—</span>
                             : r.left_censored
-                              ? <span title={t("Merané od prvého zachytenia — byt bol v ponuke už keď sme začali sledovať, skutočný čas môže byť dlhší", "Measured from first sight — the unit was already listed when tracking began, so the true figure may be longer")} style={{ color: "var(--text-2)" }}>≥ {Math.round(r.days_on_market)}</span>
-                              : fmtCell(c[3], r.days_on_market))
-                        : fmtCell(c[3], r[c[0]])}
+                              ? <span title={t("Merané od prvého zachytenia — byt bol v ponuke už keď sme začali sledovať, skutočný čas môže byť dlhší", "Measured from first sight — the unit was already listed when tracking began, so the true figure may be longer")}>≥ {Math.round(r.days_on_market)}</span>
+                              : fmtCell(c[3], r.days_on_market, lang))
+                        : fmtCell(c[3], r[c[0]], lang)}
                     </td>;
                   })}
                 </tr>
@@ -593,9 +640,9 @@ export default function SalesView({ lang = "sk" }) {
             </tbody>
           </table>
         </div>
-        <div style={{ marginTop: "0.5rem", fontSize: "0.68rem", color: dim, fontFamily: mono }}>
-          {t("„Dní na trhu" + '"' + " je dostupné len pre byty ktoré sme videli pribudnúť aj predať — sledovanie beží od mája 2026.",
-             "\"Days on market\" is only known for units we saw both list and sell — tracking started May 2026.")}
+        <div className="rd-note" style={{ marginTop: "0.6rem" }}>
+          {t("„Dní na trhu“ je dostupné len pre byty ktoré sme videli pribudnúť aj predať — sledovanie beží od mája 2026.",
+             "“Days on market” is only known for units we saw both list and sell — tracking started May 2026.")}
         </div>
       </div>
     </div>

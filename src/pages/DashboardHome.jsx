@@ -491,6 +491,7 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
     return { ...c, overview: { ...c.overview, filters: value } };
   });
   const [filterOpen, setFilterOpen] = useState(false);
+  const filterBtnRef = useRef(null);   // handed to the builder so its outside-click dismissal doesn't fight this toggle
   const activeConds = useMemo(() => (conditions || []).filter(isComplete), [conditions]);
 
   // Base set: active projects by default; if the user added a "Availability"
@@ -568,7 +569,7 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
             </span>
           </div>
           {/* Filters — the exact same builder as the Map / Projects list */}
-          <button onClick={() => setFilterOpen(o => !o)} style={filterChip(filterOpen || activeConds.length > 0)}>
+          <button ref={filterBtnRef} onClick={() => setFilterOpen(o => !o)} style={filterChip(filterOpen || activeConds.length > 0)}>
             ⚙ {L(lang, "Filtre", "Filters")}{activeConds.length ? ` · ${activeConds.length}` : ""}
           </button>
           {activeConds.map(c => (
@@ -585,7 +586,7 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
         {filterOpen && (
           <MapFilterBuilder asModal conditions={conditions} setConditions={setConditions}
             projects={(projects || [])} matchCount={overviewProjects.length} totalCount={overviewBase.length}
-            sk={lang === "sk"} onClose={() => setFilterOpen(false)} />
+            sk={lang === "sk"} onClose={() => setFilterOpen(false)} triggerRef={filterBtnRef} />
         )}
 
         <div className="dash-kpi-grid" style={{ display: "grid", gap: "0.7rem" }}>

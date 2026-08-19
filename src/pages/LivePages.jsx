@@ -131,6 +131,7 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
   const sk = lang === "sk";
   const [conditions, setConditions] = useState([]);
   const [filterOpen, setFilterOpen] = useState(false);
+  const filterBtnRef = useRef(null);   // handed to the builder so its outside-click dismissal doesn't fight this toggle
   const [nameQuery, setNameQuery] = useState("");
   const nameMatch = (p) => {
     const q = nameQuery.trim().toLowerCase();
@@ -255,7 +256,7 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
                 placeholder={sk ? "Hľadať projekt alebo developera…" : "Find project or developer…"}
                 style={{ ...filterInput, flex: "1 1 180px", maxWidth: 260 }}
               />
-              <button onClick={() => setFilterOpen((v) => !v)} style={filterChip(filterOpen || activeConds.length > 0)}>
+              <button ref={filterBtnRef} onClick={() => setFilterOpen((v) => !v)} style={filterChip(filterOpen || activeConds.length > 0)}>
                 ⚙ {sk ? "Filtre" : "Filters"}{activeConds.length > 0 ? ` · ${activeConds.length}` : ""}
               </button>
               {activeConds.map((c) => (
@@ -288,6 +289,7 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
                   totalCount={activeProjects.length}
                   sk={sk}
                   onClose={() => setFilterOpen(false)}
+                  triggerRef={filterBtnRef}
                 />
               )}
             </div>

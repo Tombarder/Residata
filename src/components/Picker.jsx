@@ -1,6 +1,8 @@
 /**
- * Picker — a dark, on-theme dropdown (single / multi / searchable) that replaces
- * the native <select> on the map so the menu colours match the rest of the app.
+ * Picker — THE dropdown of the platform (single / multi / searchable). Every
+ * screen uses this one, never a native <select>: the native menu paints itself
+ * with the OS palette and can only show plain text, so option rows can't carry
+ * the live facet counts the app relies on.
  *
  * Options are `{ value, label, hint? }` — `hint` renders right-aligned and dim
  * (used for live facet counts) and is deliberately not searched.
@@ -8,19 +10,21 @@
  * The menu renders in a PORTAL with fixed positioning, so it floats above
  * everything and is never clipped by a scrolling/overflow container (the filter
  * panel). It flips upward when there isn't room below, follows the trigger on
- * scroll/resize, and closes on outside-click or Escape.
+ * scroll/resize, and closes on outside-click or Escape (shared `useDismiss`).
+ *
+ * `data-popover-layer` on the portal marks it as a nested layer: clicking inside
+ * it must not dismiss the filter panel that opened it (see lib/useDismiss.js).
+ *
+ * Styling lives in styles/ui.css (`.rd-field`, `.rd-menu*`) so it themes with
+ * the rest of the app in both light and dark.
  */
 import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
-
-import { accent as green, accentInk, dim, text as textLight, surfaceDark as bg2 } from "../lib/theme";
-const border = "var(--border)";
-const popBg = "var(--surface)";
-const hover = "var(--surface-2)";
+import useDismiss from "../lib/useDismiss";
 
 const norm = (s) => (s == null ? "" : String(s)).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
 
-export default function Picker({ value, onChange, options, placeholder = "select…", multi = false, searchable = false, width, ariaLabel, sk = false }) {
+export default function Picker({ value, onChange, options, placeholder = "select…", multi = false, searchable = false, width, ariaLabel, sk = false, small = false }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [pos, setPos] = useState(null);
@@ -28,6 +32,7 @@ export default function Picker({ value, onChange, options, placeholder = "select
   const popRef = useRef(null);
 
   const close = () => { setOpen(false); setQ(""); };
+  const rootRef = useDismiss(open, close, [popRef]);
   const place = () => {
     const b = btnRef.current?.getBoundingClientRect();
     if (!b) return;
@@ -43,16 +48,10 @@ export default function Picker({ value, onChange, options, placeholder = "select
   useLayoutEffect(() => { if (open) place(); }, [open]);
   useEffect(() => {
     if (!open) return;
-    const onDown = (e) => { if (!btnRef.current?.contains(e.target) && !popRef.current?.contains(e.target)) close(); };
-    const onKey = (e) => { if (e.key === "Escape") close(); };
     const onMove = () => place();
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
     window.addEventListener("scroll", onMove, true);
     window.addEventListener("resize", onMove);
     return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
       window.removeEventListener("scroll", onMove, true);
       window.removeEventListener("resize", onMove);
     };
@@ -74,51 +73,55 @@ export default function Picker({ value, onChange, options, placeholder = "select
   } else label = options.find((o) => o.value === value)?.label ?? placeholder;
 
   const menu = open && pos ? createPortal(
-    <div ref={popRef} style={{ position: "fixed", left: pos.left, top: pos.top ?? undefined, bottom: pos.bottom ?? undefined, width: pos.w, maxHeight: pos.maxH, zIndex: 1000, background: popBg, border: `1px solid ${border}`, borderRadius: 11, boxShadow: "0 16px 44px rgba(15,23,42,0.30)", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+    <div ref={popRef} data-popover-layer className="rd-menu" role="listbox" aria-multiselectable={multi || undefined}
+      style={{ position: "fixed", left: pos.left, top: pos.top ?? undefined, bottom: pos.bottom ?? undefined, width: pos.w, maxHeight: pos.maxH, zIndex: 1000 }}>
       {searchable && (
-        <div style={{ padding: 9, borderBottom: `1px solid ${border}`, flexShrink: 0 }}>
-          <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={sk ? "hľadať…" : "search…"} style={{ width: "100%", boxSizing: "border-box", padding: "9px 11px", background: bg2, border: `1px solid ${border}`, borderRadius: 8, color: textLight, fontSize: "0.84rem", outline: "none" }} />
+        <div className="rd-menu__head">
+          <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={sk ? "hľadať…" : "search…"}
+            className="rd-field" style={{ width: "100%", background: "var(--bg)" }} />
         </div>
       )}
-      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 6 }}>
-        {opts.length === 0 && <div style={{ padding: "11px 12px", fontSize: "0.82rem", color: dim }}>{sk ? "žiadne výsledky" : "no matches"}</div>}
+      <div className="rd-menu__opts">
+        {opts.length === 0 && <div className="rd-menu__empty">{sk ? "žiadne výsledky" : "no matches"}</div>}
         {opts.map((o) => {
           const on = sel(o.value);
           return (
-            <div key={String(o.value)} onClick={() => pick(o.value)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 8, cursor: "pointer", fontSize: "0.84rem", color: on ? green : textLight, background: on ? `color-mix(in srgb, var(--accent) 8%, transparent)` : "transparent" }}
-              onMouseEnter={(e) => { if (!on) e.currentTarget.style.background = hover; }}
-              onMouseLeave={(e) => { if (!on) e.currentTarget.style.background = "transparent"; }}>
-              {multi && (
-                <span style={{ width: 17, height: 17, borderRadius: 5, border: `1.5px solid ${on ? green : dim}`, background: on ? green : "transparent", flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#06140f", fontSize: "0.72rem", fontWeight: 700 }}>{on ? "✓" : ""}</span>
-              )}
-              <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.label}</span>
+            <div key={String(o.value)} role="option" aria-selected={on} className="rd-menu__opt" onClick={() => pick(o.value)}>
+              {multi && <span className="rd-menu__box">{on ? "✓" : ""}</span>}
+              <span className="rd-menu__opt-label">{o.label}</span>
               {/* `hint` is a secondary right-aligned note (e.g. how many rows an option still
                   matches). Kept OUT of `label` on purpose so the search box matches names only. */}
-              {o.hint != null && o.hint !== "" && (
-                <span style={{ flexShrink: 0, color: dim, fontSize: "0.74rem", fontVariantNumeric: "tabular-nums" }}>{o.hint}</span>
-              )}
-              {!multi && on && <span style={{ color: accentInk, flexShrink: 0 }}>✓</span>}
+              {o.hint != null && o.hint !== "" && <span className="rd-menu__hint">{o.hint}</span>}
+              {!multi && on && <span style={{ flexShrink: 0, color: "var(--accent-ink)" }}>✓</span>}
             </div>
           );
         })}
       </div>
       {multi && (
-        <div style={{ display: "flex", borderTop: `1px solid ${border}`, flexShrink: 0 }}>
-          <button onClick={() => onChange([])} style={{ flex: 1, background: "none", border: "none", color: dim, padding: "10px", fontSize: "0.78rem", cursor: "pointer" }}>{sk ? "Zrušiť výber" : "Clear"}{arr.length ? ` (${arr.length})` : ""}</button>
-          <button onClick={close} style={{ flex: 1, background: "none", border: "none", borderLeft: `1px solid ${border}`, color: accentInk, padding: "10px", fontSize: "0.78rem", fontWeight: 600, cursor: "pointer" }}>{sk ? "Hotovo" : "Done"}</button>
+        <div className="rd-menu__foot">
+          <button className="rd-btn rd-btn--ghost" style={{ flex: 1, borderRadius: 0, height: 36 }} onClick={() => onChange([])}>
+            {sk ? "Zrušiť výber" : "Clear"}{arr.length ? ` (${arr.length})` : ""}
+          </button>
+          <button className="rd-btn rd-btn--ghost" style={{ flex: 1, borderRadius: 0, height: 36, borderLeft: "1px solid var(--border-soft)", color: "var(--accent-ink)", fontWeight: 600 }} onClick={close}>
+            {sk ? "Hotovo" : "Done"}
+          </button>
         </div>
       )}
     </div>, document.body) : null;
 
   return (
-    <div style={{ position: "relative", width, flex: width ? "0 0 auto" : "1 1 auto", minWidth: width ? undefined : 0 }}>
-      <button ref={btnRef} type="button" onClick={() => (open ? close() : setOpen(true))} aria-label={ariaLabel} style={{
-        width: "100%", display: "flex", alignItems: "center", gap: 8, boxSizing: "border-box",
-        padding: "10px 12px", background: bg2, border: `1px solid ${open ? `color-mix(in srgb, var(--accent) 40%, transparent)` : border}`, borderRadius: 8,
-        color: empty ? dim : textLight, fontSize: "0.84rem", cursor: "pointer", outline: "none", textAlign: "left", transition: "border-color .12s",
-      }}>
+    <div ref={rootRef} style={{ position: "relative", width, flex: width ? "0 0 auto" : "1 1 auto", minWidth: width ? undefined : 0 }}>
+      <button ref={btnRef} type="button" onClick={() => (open ? close() : setOpen(true))} aria-label={ariaLabel}
+        aria-expanded={open} aria-haspopup="listbox"
+        className={`rd-field${small ? " rd-field--sm" : ""}${empty ? "" : " rd-field--on"}`}
+        style={{
+          width: "100%", display: "flex", alignItems: "center", gap: 8, cursor: "pointer", textAlign: "left",
+          color: empty ? "var(--text-faint)" : undefined,
+          borderColor: open ? "var(--accent)" : undefined,
+          boxShadow: open ? "0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent)" : undefined,
+        }}>
         <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
-        <span style={{ color: dim, fontSize: "0.62rem", flexShrink: 0, transform: open ? "rotate(180deg)" : "none", transition: "transform .15s" }}>▼</span>
+        <span style={{ color: "var(--text-faint)", fontSize: small ? "0.5rem" : "0.58rem", flexShrink: 0, transform: open ? "rotate(180deg)" : "none", transition: "transform .15s" }}>▼</span>
       </button>
       {menu}
     </div>

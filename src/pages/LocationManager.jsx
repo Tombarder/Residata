@@ -18,6 +18,7 @@
  */
 import { useEffect, useRef, useState, useMemo } from "react";
 import maplibregl from "maplibre-gl";
+import useDismiss from "../lib/useDismiss";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 const MAP_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
@@ -100,6 +101,10 @@ export default function LocationManager({ lang = "en" }) {
   const [district, setDistrict] = useState("");
   const [suggestions, setSuggestions] = useState([]);
   const [searching, setSearching] = useState(false);
+  // The address suggestion list closes on an outside click / Esc, like every
+  // other layer in the app (shared lib/useDismiss).
+  const addrRef = useDismiss(searching || suggestions.length > 0,
+    () => { setSuggestions([]); setSearching(false); });
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
 
@@ -481,8 +486,8 @@ export default function LocationManager({ lang = "en" }) {
               </div>
 
               <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                <div style={{ position: "relative", flex: 1, minWidth: 240 }}>
-                  <input value={addr} onChange={(e) => onAddrChange(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") setSuggestions([]); }}
+                <div ref={addrRef} style={{ position: "relative", flex: 1, minWidth: 240 }}>
+                  <input value={addr} onChange={(e) => onAddrChange(e.target.value)}
                     placeholder={t("Type an address or place — e.g. Sky Park, Bratislava", "Zadaj adresu alebo názov — napr. Sky Park, Bratislava")} style={inputStyle} autoComplete="off" />
                   {(searching || suggestions.length > 0) && (
                     <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 20, background: bg2, border: `1px solid ${border}`, borderRadius: 8, boxShadow: "0 10px 34px rgba(0,0,0,0.55)", overflow: "hidden", maxHeight: 240, overflowY: "auto" }}>

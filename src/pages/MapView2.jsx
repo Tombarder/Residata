@@ -218,6 +218,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
   const [lens, setLens] = useState("price");
   const [conditions, setConditions] = useState([]);
   const [filterOpen, setFilterOpen] = useState(false);
+  const filterBtnRef = useRef(null);   // handed to the builder so its outside-click dismissal doesn't fight this toggle
   const [nameQuery, setNameQuery] = useState("");
   const [analysisCenter, setAnalysisCenter] = useState(null);
   const [radiusKm, setRadiusKm] = useState(1.5);
@@ -838,7 +839,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
       {/* Filter bar + legend */}
       <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap", padding: "0.55rem 1.25rem", borderBottom: `1px solid ${border}`, background: panel }}>
         <input value={nameQuery} onChange={(e) => setNameQuery(e.target.value)} placeholder={sk ? "Hľadať projekt…" : "Find project…"} style={{ ...inputStyle, flex: "1 1 160px", maxWidth: 220 }} />
-        <button onClick={() => setFilterOpen((v) => !v)} style={chipStyle(filterOpen || activeConds.length > 0)}>
+        <button ref={filterBtnRef} onClick={() => setFilterOpen((v) => !v)} style={chipStyle(filterOpen || activeConds.length > 0)}>
           ⚙ {sk ? "Filtre" : "Filters"}{activeConds.length > 0 ? ` · ${activeConds.length}` : ""}
         </button>
         <button onClick={() => (drawTool === "polygon" ? cancelDraw() : startDraw("polygon"))} style={chipStyle(drawTool === "polygon" || shape?.kind === "polygon")} title={sk ? "Nakresli vlastnú oblasť (polygón)" : "Draw a custom area (polygon)"}>
@@ -890,7 +891,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
         <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />
 
         {filterOpen && (
-          <MapFilterBuilder conditions={conditions} setConditions={setConditions} projects={projects || []} matchCount={shown.length} totalCount={candidatePool.length} sk={sk} onClose={() => setFilterOpen(false)} />
+          <MapFilterBuilder conditions={conditions} setConditions={setConditions} projects={projects || []} matchCount={shown.length} totalCount={candidatePool.length} sk={sk} onClose={() => setFilterOpen(false)} triggerRef={filterBtnRef} />
         )}
 
         {drawTool && (() => {

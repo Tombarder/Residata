@@ -11,6 +11,7 @@ import Picker from "../components/Picker";
 import { localeTag } from "../lib/locale";
 import { useCurrency } from "../lib/useCurrency";
 import { orderPivotColKeys } from "../lib/pivotColOrder";
+import useDismiss from "../lib/useDismiss";
 
 /* ═══════════════════════════════════════════════════════════════════
    Pivot v2 — Excel-style drag-and-drop pivot
@@ -2278,6 +2279,10 @@ function DropZone({ zoneKey, title, hint, icon, chips, drag, hoverZone, setHover
    dropdown directly — click to cycle or pick from a menu. */
 function ChipInZone({ label, type, agg, filter, level, onDragStart, onDragStartPayload, onRemove, onChangeAgg, onClick, lang }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  // One dismissal behaviour for every layer in the app: an outside click or Esc
+  // closes it. (This used to lean on the button's onBlur + a 150ms timeout,
+  // which never fired when the click didn't move focus.)
+  const chipRef = useDismiss(menuOpen, () => setMenuOpen(false));
   const aggs = type === "measure" ? AGGS_MEASURE
              : type === "number" ? AGGS_NUMBER
              : AGGS_TEXT;
@@ -2297,6 +2302,7 @@ function ChipInZone({ label, type, agg, filter, level, onDragStart, onDragStartP
   const canDrag = !isFilterChip;
   return (
     <span
+      ref={chipRef}
       className="pivotv2-chip"
       draggable={canDrag}
       title={isFilterChip ? (active ? "Klikni pre úpravu filtra" : "Klikni pre nastavenie filtra") : undefined}
@@ -2358,7 +2364,6 @@ function ChipInZone({ label, type, agg, filter, level, onDragStart, onDragStartP
           <span style={{ color: dim, opacity: 0.5, fontSize: "0.58rem" }}>·</span>
           <button
             onClick={(e) => { e.stopPropagation(); setMenuOpen(o => !o); }}
-            onBlur={() => setTimeout(() => setMenuOpen(false), 150)}
             style={{
               background: "transparent", border: "none",
               color: accentInk, cursor: "pointer", padding: 0,

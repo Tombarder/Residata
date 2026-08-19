@@ -1,0 +1,457 @@
+/* ============================================================================
+   ui.css — the platform's shared UI kit.
+
+   Two jobs:
+
+   1. GLOBAL POLISH (§1) — every page gets it for free: native checkboxes in the
+      brand colour, thin modern scrollbars, date/number inputs that stop looking
+      like OS widgets. No page has to opt in.
+
+   2. THE `.rd-*` COMPONENT LAYER (§2+) — card, table, field, button, segmented
+      control, tab, chip, KPI, badge. Classes, not inline styles, so a page reads
+      as markup and every screen shares one look. Colours are ALWAYS tokens from
+      index.css, so light and dark both work without a second set of rules.
+
+   Written 2026-08-19 for the Sales-page redesign (Boss: "the whole sales page is
+   old looking… this applies also to other pages"). New screens should reach for
+   these classes before inventing another inline style.
+   ============================================================================ */
+
+:root {
+  /* A RAISED surface — the active pill of a segmented control, a hovering card.
+     It has to go the opposite way in each theme (lighter than the card in dark,
+     pure white in light), which no existing token does. */
+  --rd-raised: #24242d;
+  --rd-raised-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --rd-row-hover: color-mix(in srgb, var(--accent) 6%, transparent);
+  --rd-ctrl-h: 34px;   /* one height for every control in a toolbar row */
+  --rd-ctrl-h-sm: 27px;
+  /* Height of a table's label row. Declared, not inherited from font metrics,
+     because a two-row sticky head has to offset the second row by EXACTLY the
+     first row's height — one token sets both, so they cannot drift apart. */
+  --rd-head-h: 32px;
+}
+:root[data-theme="light"] {
+  --rd-raised: #ffffff;
+  --rd-raised-shadow: 0 1px 2px rgba(28, 38, 56, 0.10), 0 2px 6px rgba(28, 38, 56, 0.07);
+  --rd-row-hover: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+
+/* ══ §1  GLOBAL POLISH ═══════════════════════════════════════════════════ */
+
+/* Native checkboxes / radios / ranges in the brand colour instead of OS blue. */
+:root { accent-color: var(--accent); }
+input[type="checkbox"], input[type="radio"] { width: 15px; height: 15px; cursor: pointer; }
+
+/* Thin, on-theme scrollbars — the single biggest "this feels modern" detail on
+   a data-dense app, and it applies to every scroll container in the platform. */
+* { scrollbar-width: thin; scrollbar-color: var(--border-soft) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--border-soft);
+  border: 2px solid transparent;
+  background-clip: content-box;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--text-faint); background-clip: content-box; }
+::-webkit-scrollbar-corner { background: transparent; }
+
+/* ══ §2  SURFACES ════════════════════════════════════════════════════════ */
+
+.rd-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+.rd-card--pad { padding: 0.9rem 1.05rem; }
+/* Light mode grounds cards with a shadow (index.css does this for inline-styled
+   panels; class-based cards need the same treatment or they read flat). */
+:root[data-theme="light"] .rd-card,
+:root[data-theme="light"] .rd-kpi {
+  box-shadow: 0 1px 2px rgba(28, 38, 56, 0.06), 0 4px 10px rgba(28, 38, 56, 0.07), 0 12px 28px rgba(28, 38, 56, 0.06);
+}
+
+/* A "control deck": one card holding several toolbar rows, hairline-separated —
+   replaces a stack of three near-identical cards that never lined up. */
+.rd-deck { display: flex; flex-direction: column; }
+.rd-deck__row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding: 0.6rem 1rem;
+  min-height: calc(var(--rd-ctrl-h) + 1.2rem);
+}
+.rd-deck__row + .rd-deck__row { border-top: 1px solid var(--border-soft); }
+
+/* micro-label in front of a control row */
+.rd-label {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* section heading inside a card: accent tick + name + count */
+.rd-sect { display: flex; align-items: center; gap: 0.55rem; flex-wrap: wrap; }
+.rd-sect__tick { width: 3px; height: 13px; border-radius: 2px; background: var(--accent); flex-shrink: 0; }
+.rd-sect__name {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.rd-sect__count { font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-dim); }
+
+.rd-note { font-size: 0.7rem; color: var(--text-dim); line-height: 1.5; }
+
+/* ══ §3  FIELDS ══════════════════════════════════════════════════════════ */
+
+.rd-field {
+  height: var(--rd-ctrl-h);
+  padding: 0 0.6rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.82rem;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.14s var(--ease), box-shadow 0.14s var(--ease);
+}
+.rd-field::placeholder { color: var(--text-faint); }
+.rd-field:hover { border-color: var(--border-soft); }
+.rd-field:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+.rd-field--sm { height: var(--rd-ctrl-h-sm); border-radius: 7px; font-size: 0.72rem; padding: 0 0.4rem; }
+.rd-field--num { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+/* Spinner arrows are noise in a min/max filter — the keyboard and the range hint
+   do the job, and the arrows steal a third of a 60px box. */
+.rd-field[type="number"] { -moz-appearance: textfield; }
+.rd-field[type="number"]::-webkit-inner-spin-button,
+.rd-field[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.rd-field[type="date"] { font-family: var(--font-mono); font-size: 0.7rem; }
+/* An empty date input still prints "dd/mm/yyyy" — that is a placeholder, not a
+   value, so it must not read at full text weight. (No CSS selector knows an
+   input is empty; DateField adds the class.) */
+.rd-field--unset::-webkit-datetime-edit { color: var(--text-faint); }
+.rd-field[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; opacity: 0.5; }
+.rd-field[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; }
+/* an active filter announces itself */
+.rd-field--on { border-color: color-mix(in srgb, var(--accent) 55%, transparent); color: var(--accent-ink); }
+
+/* ══ §4  BUTTONS ═════════════════════════════════════════════════════════ */
+
+.rd-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  height: var(--rd-ctrl-h);
+  padding: 0 0.8rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  color: var(--text-2);
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.14s var(--ease), border-color 0.14s var(--ease), color 0.14s var(--ease);
+}
+.rd-btn:hover { background: var(--surface-3); color: var(--text); border-color: var(--border-soft); }
+.rd-btn--sm { height: var(--rd-ctrl-h-sm); padding: 0 0.6rem; font-size: 0.72rem; border-radius: 7px; }
+.rd-btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+.rd-btn--primary:hover { background: var(--accent-strong); border-color: var(--accent-strong); color: var(--on-accent); }
+.rd-btn--ghost { background: transparent; border-color: transparent; color: var(--text-faint); }
+.rd-btn--ghost:hover { background: var(--surface-2); color: var(--text-2); border-color: transparent; }
+.rd-btn--warn { background: transparent; border-color: color-mix(in srgb, var(--accent-2) 50%, transparent); color: var(--accent-2); }
+.rd-btn--warn:hover { background: color-mix(in srgb, var(--accent-2) 12%, transparent); border-color: var(--accent-2); color: var(--accent-2); }
+.rd-btn:disabled { cursor: default; opacity: 0.45; }
+.rd-btn:disabled:hover { background: var(--surface-2); color: var(--text-2); border-color: var(--border); }
+
+/* ══ §5  SEGMENTED CONTROL + TABS ════════════════════════════════════════ */
+
+/* Segmented control — a grey track with ONE raised pill. Replaces the flat
+   solid-green blocks: the accent is reserved for the primary action, so a row
+   of switches stops shouting. */
+.rd-seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.rd-seg--wrap { flex-wrap: wrap; }
+.rd-seg__btn {
+  border: none;
+  background: transparent;
+  border-radius: 7px;
+  padding: 0 0.62rem;
+  height: calc(var(--rd-ctrl-h) - 8px);
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.14s var(--ease), color 0.14s var(--ease);
+}
+.rd-seg__btn:hover { color: var(--text); }
+.rd-seg__btn[aria-pressed="true"] {
+  background: var(--rd-raised);
+  box-shadow: var(--rd-raised-shadow);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Underline tabs — the top-level view switcher. */
+.rd-tabs { display: flex; gap: 0.15rem; border-bottom: 1px solid var(--border); }
+.rd-tab {
+  position: relative;
+  border: none;
+  background: transparent;
+  padding: 0.55rem 0.9rem;
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: 0.86rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.14s var(--ease);
+}
+.rd-tab:hover { color: var(--text); }
+.rd-tab[aria-selected="true"] { color: var(--text); font-weight: 600; }
+.rd-tab[aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  left: 0.55rem; right: 0.55rem; bottom: -1px;
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: var(--accent);
+}
+.rd-tab__n {
+  margin-left: 0.45rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+.rd-tab[aria-selected="true"] .rd-tab__n { color: var(--accent-ink); }
+
+/* ══ §6  CHIPS ═══════════════════════════════════════════════════════════ */
+
+.rd-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  height: var(--rd-ctrl-h-sm);
+  padding: 0 0.5rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 13%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 38%, transparent);
+  color: var(--accent-ink);
+  font-size: 0.74rem;
+  font-weight: 500;
+  cursor: pointer;
+  max-width: 210px;
+}
+.rd-chip:hover { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+.rd-chip__x { color: var(--text-faint); font-size: 0.82rem; line-height: 1; flex-shrink: 0; }
+.rd-chip:hover .rd-chip__x { color: var(--text); }
+.rd-chip__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ══ §7  KPI CARDS ═══════════════════════════════════════════════════════ */
+
+.rd-kpi {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 0.8rem 0.95rem 0.85rem 1.05rem;
+  transition: border-color 0.16s var(--ease), transform 0.16s var(--ease);
+}
+.rd-kpi::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: linear-gradient(180deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 15%, transparent) 100%);
+}
+.rd-kpi:hover { border-color: color-mix(in srgb, var(--accent) 38%, transparent); }
+.rd-kpi__lbl {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 0.35rem;
+  padding-right: 1.2rem;
+  line-height: 1.35;
+}
+.rd-kpi__val {
+  font-family: var(--font-mono);
+  font-size: 1.55rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.rd-kpi__sub {
+  margin-top: 0.3rem;
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  color: var(--text-dim);
+  line-height: 1.4;
+}
+.rd-kpi__sub--warn { color: var(--accent-2); }
+.rd-kpi__info { position: absolute; top: 7px; right: 7px; }
+
+/* ══ §8  TABLES ══════════════════════════════════════════════════════════ */
+
+.rd-scroll { overflow: auto; border-radius: 10px; }
+
+.rd-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.8rem;
+}
+.rd-table th {
+  padding: 0.5rem 0.7rem;
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  white-space: nowrap;
+  background: var(--surface-2);
+  box-shadow: inset 0 -1px 0 var(--border);
+}
+.rd-table thead tr:first-child th:first-child { border-top-left-radius: 10px; }
+.rd-table thead tr:first-child th:last-child { border-top-right-radius: 10px; }
+/* The label row's height is fixed by the token above (see --rd-head-h). */
+.rd-table thead tr:first-child th { height: var(--rd-head-h); padding-top: 0; padding-bottom: 0; }
+/* header rows stay put while the body scrolls */
+.rd-table--sticky thead th { position: sticky; top: 0; z-index: 2; }
+.rd-table--sticky thead tr:nth-child(2) th { top: var(--rd-head-h); z-index: 1; }
+
+.rd-table th.rd-th--sortable { cursor: pointer; user-select: none; }
+.rd-table th.rd-th--sortable:hover { color: var(--text); }
+.rd-table th.rd-th--on { color: var(--accent-ink); }
+.rd-table th.num, .rd-table td.num { text-align: right; }
+
+.rd-table td {
+  padding: 0.45rem 0.7rem;
+  border-top: 1px solid var(--border-soft);
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.rd-table td.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.rd-table td.rd-td--key { color: var(--text); font-weight: 500; }
+.rd-table tbody tr { transition: background 0.1s linear; }
+.rd-table tbody tr:hover td { background: var(--rd-row-hover); }
+.rd-table td.rd-td--empty {
+  padding: 1.6rem 0.7rem;
+  text-align: center;
+  color: var(--text-faint);
+  font-style: italic;
+  white-space: normal;
+}
+/* the filter row under the header */
+.rd-table th.rd-th--filter {
+  padding: 0.3rem 0.4rem 0.4rem;
+  vertical-align: top;
+  background: var(--surface-2);
+  box-shadow: inset 0 -1px 0 var(--border);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.rd-filter-hint {
+  margin-top: 3px;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+/* inline share bar behind a count — turns a column of numbers into a chart */
+.rd-bar { position: relative; display: block; height: 5px; border-radius: 3px; background: var(--surface-3); overflow: hidden; margin-top: 4px; }
+.rd-bar__fill { position: absolute; inset: 0 auto 0 0; border-radius: 3px; background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 55%, transparent), var(--accent)); }
+
+/* ══ §9  BADGES ══════════════════════════════════════════════════════════ */
+
+.rd-badge {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.02em;
+  border: 1px solid transparent;
+}
+.rd-badge--ok { color: var(--accent-ink); background: color-mix(in srgb, var(--accent) 12%, transparent); border-color: color-mix(in srgb, var(--accent) 32%, transparent); }
+.rd-badge--warn { color: var(--accent-2); background: color-mix(in srgb, var(--accent-2) 12%, transparent); border-color: color-mix(in srgb, var(--accent-2) 32%, transparent); }
+
+/* ══ §10  MENUS (the shared dropdown surface — components/Picker.jsx) ════ */
+
+.rd-menu {
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18), 0 18px 48px rgba(0, 0, 0, 0.30);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+:root[data-theme="light"] .rd-menu { box-shadow: 0 4px 12px rgba(28, 38, 56, 0.10), 0 18px 48px rgba(28, 38, 56, 0.18); }
+.rd-menu__opts { flex: 1; min-height: 0; overflow-y: auto; padding: 5px; }
+.rd-menu__opt {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: var(--text-2);
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+}
+.rd-menu__opt:hover { background: var(--surface-2); color: var(--text); }
+.rd-menu__opt[aria-selected="true"] { background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--accent-ink); font-weight: 500; }
+.rd-menu__opt-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rd-menu__hint { flex-shrink: 0; font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.rd-menu__opt[aria-selected="true"] .rd-menu__hint { color: var(--accent-ink); }
+.rd-menu__box {
+  width: 16px; height: 16px; border-radius: 5px; flex-shrink: 0;
+  border: 1.5px solid var(--text-faint);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 0.7rem; font-weight: 700; color: var(--on-accent);
+  transition: background 0.12s var(--ease), border-color 0.12s var(--ease);
+}
+.rd-menu__opt[aria-selected="true"] .rd-menu__box { background: var(--accent); border-color: var(--accent); }
+.rd-menu__head { padding: 7px; border-bottom: 1px solid var(--border-soft); flex-shrink: 0; }
+.rd-menu__foot { display: flex; border-top: 1px solid var(--border-soft); flex-shrink: 0; }
+.rd-menu__empty { padding: 0.7rem 0.75rem; font-size: 0.8rem; color: var(--text-faint); font-style: italic; }

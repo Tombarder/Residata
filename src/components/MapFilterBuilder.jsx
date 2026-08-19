@@ -7,6 +7,7 @@
  * this is just the editor.
  */
 import { createPortal } from "react-dom";
+import useDismiss from "../lib/useDismiss";
 import {
   FIELDS, FIELD_BY_KEY, opsForField, defaultOpForField, fieldOptions,
 } from "../lib/mapFilters";
@@ -33,7 +34,14 @@ function makeCondition(fieldKey = FIELDS[0].key) {
   return { id: newId(), field: fieldKey, op, value: defaultValueFor(f, op) };
 }
 
-export default function MapFilterBuilder({ conditions, setConditions, projects, matchCount, totalCount, sk, onClose, asModal = false }) {
+export default function MapFilterBuilder({ conditions, setConditions, projects, matchCount, totalCount, sk, onClose, asModal = false, triggerRef }) {
+  // Clicking anywhere outside the panel — the map, the page, another control —
+  // closes it, and so does Esc (shared lib/useDismiss). `triggerRef` is the
+  // "⚙ Filtre" chip that opened it: a pointer-down there must NOT auto-close,
+  // or its own onClick would immediately re-open and the chip would look dead.
+  // The Pickers inside render in portals and carry data-popover-layer, so using
+  // one never closes the panel underneath it.
+  const panelRef = useDismiss(true, onClose, triggerRef ? [triggerRef] : undefined);
   const update = (id, patch) => setConditions(conditions.map((c) => (c.id === id ? { ...c, ...patch } : c)));
   const remove = (id) => setConditions(conditions.filter((c) => c.id !== id));
   const onField = (id, fieldKey) => { const f = FIELD_BY_KEY[fieldKey]; const op = defaultOpForField(f); update(id, { field: fieldKey, op, value: defaultValueFor(f, op) }); };
@@ -46,7 +54,7 @@ export default function MapFilterBuilder({ conditions, setConditions, projects, 
     ? { width: "100%", background: panel, border: `1px solid ${border}`, borderRadius: 14, boxShadow: "0 20px 52px rgba(15,23,42,0.28)" }
     : { position: "absolute", top: 8, left: "1.25rem", zIndex: 40, width: 700, maxWidth: "calc(100% - 2.5rem)", background: panel, border: `1px solid ${border}`, borderRadius: 14, boxShadow: "0 18px 48px rgba(15,23,42,0.26)" };
   const body = (
-    <div style={rootStyle}>
+    <div ref={panelRef} style={rootStyle}>
       <div style={{ display: "flex", alignItems: "center", padding: "15px 18px", borderBottom: `1px solid ${border}` }}>
         <span style={{ color: textLight, fontWeight: 600, fontSize: "1rem" }}>{sk ? "Filtre" : "Filters"}</span>
         <span style={{ marginLeft: 12, fontSize: "0.82rem", color: dim, fontFamily: mono }}>
