@@ -10,7 +10,7 @@ import FloatingChat from "./components/FloatingChat";
 import FeedbackWidget from "./components/FeedbackWidget";
 import "./lib/diagnostics";   // installs the error/network collector at startup
 import { TrialBanner, TrialPopup } from "./components/TrialBanner";
-import { setTrialIntent, activateTrial } from "./lib/trial";
+import { setTrialIntent, activateTrial, settleTrialIntent } from "./lib/trial";
 import { applyOverrides, useCopyVersion } from "./lib/copyOverrides";
 import PendingGate from "./components/PendingGate";
 import Feature from "./components/Feature";
@@ -2217,6 +2217,22 @@ export default function App() {
   useEffect(() => {
     applySeo(current, lang, country);
   }, [current, lang, country, seoPrice]);
+
+  // Redeem a trial that was asked for before the account existed, if the attempt
+  // at sign-up didn't get through. CompleteProfile tries once and now KEEPS the
+  // intent when the failure was transient, so this is where that retry lands:
+  // once per load, only for a signed-in user whose profile is done, and it is a
+  // no-op unless the flag is actually still set. Without a retry point the kept
+  // flag would just sit there and the promised week of Premium would never arrive.
+  const trialRetried = useRef(false);
+  useEffect(() => {
+    if (trialRetried.current) return;
+    if (!auth.user || !auth.profile?.profile_completed) return;
+    trialRetried.current = true;
+    settleTrialIntent()
+      .then((r) => { if (r?.started) window.location.reload(); })   // unlock the paid capabilities
+      .catch(() => {});
+  }, [auth.user, auth.profile?.profile_completed]);
 
   const handleNav = (page) => {
     const resolved = typeof page === "string" && page.startsWith("Project:")

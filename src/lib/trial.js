@@ -71,3 +71,39 @@ export async function activateTrial() {
   e.data = data;
   throw e;
 }
+
+/**
+ * Redeem the trial a visitor asked for BEFORE they had an account, and only
+ * give up on it when the answer is final.
+ *
+ * The promise on the marketing page is "30s sign-up → 7-day trial": they click
+ * "Activate 7-day trial" while anonymous, we remember the intent, and it has to
+ * be honoured once they have a profile. It used to be honoured exactly once, in
+ * CompleteProfile, with the intent cleared no matter what happened —
+ *
+ *     if (hasTrialIntent()) { try { await activateTrial(); } catch {} clearTrialIntent(); }
+ *
+ * — so one network blip, one 500, one momentarily-stale session at that exact
+ * moment and the trial was gone for good. The user had clicked the button, been
+ * told they had a week of Premium, and silently landed on the free tier with
+ * nothing to explain it and nothing anywhere to retry it.
+ *
+ * The intent is now cleared only when it CANNOT usefully be retried:
+ *   · the trial started                        → done
+ *   · 409, already used or already paid        → it can never start; stop asking
+ * Anything else (offline, 5xx, expired session) leaves the flag set, so the next
+ * load tries again. One attempt per load, so it cannot spin.
+ *
+ * Safe to call on every load: it does nothing unless the flag is actually set.
+ */
+export async function settleTrialIntent() {
+  if (!hasTrialIntent()) return { settled: false };
+  try {
+    const res = await activateTrial();
+    clearTrialIntent();                       // started, or 409 = can never start
+    return { settled: true, started: !!res.ok, reason: res.reason };
+  } catch (e) {
+    // Keep the intent: this is a "not right now", not a "never".
+    return { settled: false, error: e };
+  }
+}

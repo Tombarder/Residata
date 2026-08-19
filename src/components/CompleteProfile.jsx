@@ -5,7 +5,7 @@ import { useAuth } from "../lib/useAuth";
 import { getLiveT } from "../lib/liveLang";
 import { track } from "../lib/track";
 import { cleanText, cleanUrl, cleanPhone } from "../lib/sanitize";
-import { hasTrialIntent, clearTrialIntent, activateTrial } from "../lib/trial";
+import { settleTrialIntent } from "../lib/trial";
 import { dangerInk } from "../lib/theme";
 
 /**
@@ -55,6 +55,25 @@ export default function CompleteProfile({ lang = "en" }) {
   const [err, setErr] = useState(null);
   // A slow save says so instead of silently reloading the page out from under them.
   const [slow, setSlow] = useState(false);
+
+  // The ONE way into the app once the profile is known to be complete — however we
+  // found that out. It used to live only on the happy path, so the two recovery
+  // branches below (the save looked like it failed but the row was in fact written)
+  // redirected straight to /app and silently skipped the trial. Someone who clicked
+  // "Activate 7-day trial", signed up, and hit a dropped response would have landed
+  // in the product on the free tier with no trial and no way to tell why.
+  const enterApp = async () => {
+    // Honour the "30s sign-up → 7-day trial" promise: if they arrived via a trial
+    // CTA (intent flag set while anon), start it now that the auto-approve trigger
+    // has flipped them to 'free'. settleTrialIntent keeps the flag on a transient
+    // failure so the next load retries — the old code cleared it unconditionally,
+    // which turned one blip into a permanently lost trial. Never blocks the
+    // redirect; the endpoint refuses double-trials, so a retry is safe.
+    try { await settleTrialIntent(); } catch (_) { /* never block entry on this */ }
+    // Hard redirect rather than a re-render: the previous setProfile + pushRoute
+    // approach stalled in practice. Overkill on the happy path, but 100% reliable.
+    window.location.replace("/app");
+  };
 
   const submit = async (e) => {
     e.preventDefault();
@@ -123,10 +142,7 @@ export default function CompleteProfile({ lang = "en" }) {
         // already committed. Ask the database what it actually holds before
         // telling the user their details were lost, otherwise we send someone
         // whose profile IS complete back to fill the same form again.
-        if (await profileAlreadyComplete(user.id)) {
-          window.location.replace("/app");
-          return;
-        }
+        if (await profileAlreadyComplete(user.id)) { await enterApp(); return; }
         setState("error");
         setErr(error
           ? `${error.message}${error.details ? " — " + error.details : ""}`
@@ -147,32 +163,14 @@ export default function CompleteProfile({ lang = "en" }) {
       // Update shared context first so in-memory state matches DB.
       setProfile(data[0]);
 
-      // Honour the "30s sign-up → 7-day trial" promise: if the user arrived
-      // via a trial CTA (intent flag set while anon), auto-start their trial
-      // now that the auto-approve trigger has flipped them to 'free'. Best-
-      // effort — never block the redirect on it; the endpoint refuses double-
-      // trials so this is safe even if somehow retried.
-      if (hasTrialIntent()) {
-        try { await activateTrial(); } catch (_) { /* non-fatal — they can start it from Billing */ }
-        clearTrialIntent();
-      }
-
-      // Hard redirect to /app (platform dashboard) — reliable unmount + clean
-      // state. The previous approach (setProfile + pushRoute, relying on React
-      // re-render to unmount CompleteProfile) sometimes stalled in practice.
-      // A full page reload here is overkill for a happy path but cheap and
-      // 100 % reliable. New users land directly in the platform, as they should.
       clearTimeout(slowHint);
-      window.location.replace("/app");
+      await enterApp();
     } catch (e) {
       clearTimeout(slowHint);
       if (import.meta.env.DEV) console.error("[CompleteProfile] exception", e);
       // Same reasoning as above: a thrown fetch (abort / timeout / dropped
       // socket) says nothing about whether the row was written.
-      if (await profileAlreadyComplete(user.id)) {
-        window.location.replace("/app");
-        return;
-      }
+      if (await profileAlreadyComplete(user.id)) { await enterApp(); return; }
       setState("error");
       setErr(e.message || String(e));
     }

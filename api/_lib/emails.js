@@ -185,8 +185,14 @@ export function approvedUserHtml(user, webUrl) {
     <div style="${S.eyebrow}">Welcome</div>
     <h1 style="${S.h1}">You're approved 🎉</h1>
     <p style="${S.p}">Hi ${name},</p>
-    <p style="${S.p}">Your Residata account is now active as <strong style="color:${GREEN}">${tier}</strong>. You can sign in and start exploring the Bratislava residential market.</p>
-    <a href="${webUrl}/live" style="${S.btnGreen}">Open dashboard →</a>
+    <p style="${S.p}">Your Residata account is now active as <strong style="color:${GREEN}">${tier}</strong>. You can sign in and start exploring the Slovak and Czech new-build market.</p>
+    <!-- /app, NOT /live. This button said "Open dashboard" and sent brand-new users to
+         the PUBLIC marketing page (Boss, 2026-08-19: "the link that i got after signing
+         up linked me to the live view … should link me to the PLATFORM dashboard").
+         Every other email in this file already points into /app; this one was the
+         outlier. It also claimed we cover "the Bratislava residential market" — we
+         track both countries, so that read as a much smaller product than it is. -->
+    <a href="${webUrl}/app" style="${S.btnGreen}">Open dashboard →</a>
     <p style="${S.p};font-size:13px;color:${TEXT_DIM};margin-top:20px">${tierDescr}</p>`;
   return shell({
     title: "Welcome to Residata",
