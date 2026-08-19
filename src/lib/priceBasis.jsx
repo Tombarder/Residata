@@ -1,5 +1,39 @@
 /* What a published price ASSUMES — and how to say so on screen.
  *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * 🔴 TWO THINGS CHANGE WHAT A PRICE MEANS. THIS FILE HANDLES ONE OF THEM.
+ *
+ *   1. PAYMENT SCHEDULE (implemented below) — WHEN you pay. A price valid only
+ *      under 90/10 is cheaper than one on ordinary terms.
+ *   2. FIT-OUT LEVEL (**NOT IMPLEMENTED — the gap**) — WHAT you get. The same
+ *      flat has one price as a bare shell (`holobyt`), another with the
+ *      developer's finish (`standard`), another above that (`plne_zariadeny`).
+ *
+ * The scraper already stores all of it. Every unit row carries:
+ *      fitout_level          'holobyt' | 'standard' | 'plne_zariadeny' | null
+ *      cena_holobyt          each level the developer publishes, so a project
+ *      cena_standard         selling several keeps them all
+ *      cena_plne_zariadeny
+ *      cena_s_dph            the ONE price to display — already chosen by the
+ *                            scraper (standard → holobyt → plne_zariadeny)
+ *
+ * WHAT IS MISSING: a non-standard price must be MARKED, the same way a payment
+ * schedule is marked below. Boss 2026-08-19: "the two except standard then will
+ * get a small note or sign displayed everywhere on the website platform etc
+ * explaining that these are different than others, that this price is actually
+ * ... (holobyt/plne zariadeny)."
+ *
+ *      242 928 € · holobyt        ← a shell price, marked
+ *      303 879 €                  ← standard, the baseline, no mark needed
+ *
+ * WHY IT MATTERS: on 17 Aug 2026 the platform showed Zion flat 2.03 at
+ * 283 854 € — the BARE SHELL price — beside rivals' finished-flat prices, which
+ * made the project look ~7% cheaper than it is. A non-standard price shown
+ * without its mark is a wrong price.
+ *
+ * Full spec: novostavby/v2/docs/FITOUT_LEVELS.md
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
  * Almost every developer quotes one price on ordinary terms: 98.6% of the flats
  * we hold (37 216 of 37 753) carry no payment schedule at all, so that is the
  * baseline and it needs no explanation.
