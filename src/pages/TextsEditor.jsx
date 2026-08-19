@@ -44,9 +44,10 @@ import { liveT } from "../lib/liveLang";
 import { refreshOverrides } from "../lib/copyOverrides";
 import { usePricingConfig, refreshPricing, formatEurCents } from "../lib/pricing";
 import { PAGES, humanizeKey } from "../lib/copyGroups";
+import { textarea } from "../lib/controls";
 import {
   accent as green, accentInk, orange as amber, text as textLight, dim, faint,
-  border, bg, surfaceDark as bg2, mono,
+  border, bg, surfaceDark as bg2, mono, orangeInk as amberInk,
 } from "../lib/theme";
 
 // ── Direct PostgREST RPC (same rationale as LocationManager) ─────────────────
@@ -238,10 +239,10 @@ function PricingPanel({ uiSK }) {
     } finally { setBusy(false); }
   }
 
-  const inputStyle = {
-    background: bg, border: `1px solid ${border}`, borderRadius: 6, color: textLight,
-    fontFamily: mono, fontSize: "0.85rem", padding: "0.5rem 0.6rem", width: "100%", boxSizing: "border-box",
-  };
+  // Shared control box (lib/controls.js) but keeping the mono face + free height:
+  // these edit the site's copy, so the text must read exactly as it will ship and a
+  // long string has to be able to wrap.
+  const inputStyle = { ...textarea, fontFamily: mono };
   const lbl = { fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.08em", color: faint, display: "block", marginBottom: 4 };
 
   return (
@@ -515,7 +516,7 @@ export default function TextsEditor({ lang = "en" }) {
           );
         })}
         {dirtyCount > 0 && (
-          <span style={{ marginLeft: "auto", fontSize: "0.66rem", color: amber, fontWeight: 600 }}>
+          <span style={{ marginLeft: "auto", fontSize: "0.66rem", color: amberInk, fontWeight: 600 }}>
             {uiSK ? `${dirtyCount} neuložených` : `${dirtyCount} unsaved`}
           </span>
         )}
@@ -546,7 +547,7 @@ export default function TextsEditor({ lang = "en" }) {
 
       {loading && <div style={{ color: dim, fontSize: "0.8rem", padding: "1rem 0" }}>{uiSK ? "Načítavam…" : "Loading…"}</div>}
       {error && (
-        <div style={{ color: amber, fontSize: "0.78rem", padding: "0.6rem 0.8rem", border: `1px solid ${amber}`, borderRadius: 7, marginBottom: "1rem" }}>
+        <div style={{ color: amberInk, fontSize: "0.78rem", padding: "0.6rem 0.8rem", border: `1px solid ${amber}`, borderRadius: 7, marginBottom: "1rem" }}>
           {error}
         </div>
       )}
@@ -555,7 +556,7 @@ export default function TextsEditor({ lang = "en" }) {
         <div style={{ display: "flex", gap: 18, alignItems: "flex-start", flexWrap: "wrap" }}>
           {/* ── Page navigator ── */}
           <nav style={navCol}>
-            {q && <div style={{ fontSize: "0.62rem", color: amber, marginBottom: 10 }}>{uiSK ? "Hľadanie naprieč stránkami" : "Searching across pages"}</div>}
+            {q && <div style={{ fontSize: "0.62rem", color: amberInk, marginBottom: 10 }}>{uiSK ? "Hľadanie naprieč stránkami" : "Searching across pages"}</div>}
             {navGroups.map((g) => (
               <div key={g.group} style={{ marginBottom: 14 }}>
                 <div style={navGroupLabel}><span style={{ display: "inline-block", width: 3, height: 12, borderRadius: 2, background: "var(--accent)", marginRight: "0.5rem", verticalAlign: "middle" }} />{g.group}</div>
@@ -704,12 +705,12 @@ function Row({ item, label, lang, uiSK, stored, draft, fill, onDraft, onClearDra
             <span style={{ fontSize: "0.58rem", color: faint }}>{uiSK ? "jeden riadok = jedna položka" : "one line = one item"}</span>
           )}
           {dropped.length > 0 && (
-            <span style={{ fontSize: "0.6rem", color: amber }}>
+            <span style={{ fontSize: "0.6rem", color: amberInk }}>
               {uiSK ? "chýba zástupný symbol " : "missing placeholder "}{dropped.join(" ")}
             </span>
           )}
           {saved && <span style={{ fontSize: "0.62rem", color: accentInk }}>✓ {uiSK ? "uložené — naživo" : "saved — live"}</span>}
-          {err && <span style={{ fontSize: "0.62rem", color: amber }}>{err}</span>}
+          {err && <span style={{ fontSize: "0.62rem", color: amberInk }}>{err}</span>}
         </div>
       </div>
     </div>
@@ -931,7 +932,7 @@ function StructuredRow({ item, label, lang, uiSK, stored, draft, fill, onDraft, 
                 {uiSK ? "Zbaliť" : "Collapse"}
               </button>
               {saved && <span style={{ fontSize: "0.62rem", color: accentInk }}>✓ {uiSK ? "uložené — naživo" : "saved — live"}</span>}
-              {err && <span style={{ fontSize: "0.62rem", color: amber }}>{err}</span>}
+              {err && <span style={{ fontSize: "0.62rem", color: amberInk }}>{err}</span>}
             </div>
           </>
         )}

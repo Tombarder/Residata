@@ -107,9 +107,12 @@
   --accent-strong: #0a7a4e;   /* deeper emerald — bar/fill gradients on white */
   --accent-ink:    #2f3a49;   /* strong neutral slate — labels/values read dark & distinct
                                  (not green, not faded); green stays only on true accents. */
-  --accent-2:      #9c6008;
-  --danger:        #d5352f;
-  --info:          #2c62d8;
+  /* Status colours, darkened for the light workspace (2026-08-19). Measured as
+     TEXT: #9c6008 / #d5352f / #2c62d8 read at 3.2–3.7:1 on the --bg slate, under
+     the 4.5:1 minimum; these land at 4.2–4.9:1 there and 4.95–6.3:1 on a card. */
+  --accent-2:      #8a5407;
+  --danger:        #b8261f;
+  --info:          #2354b8;
   --warning:       #b87d0a;
   --text:          #0d1017;   /* near-black — maximum contrast for numbers/data */
   --text-2:        #333c4b;   /* darker secondary — data reads strong */

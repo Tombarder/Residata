@@ -24,6 +24,7 @@ import { useChat } from "../lib/useChat";
 import { renderAssistantText, ChatProgress } from "./ChatAssistant";
 import AiBetaBanner from "./AiBetaBanner";
 import { pushRoute } from "../lib/routing";
+import { useEscape } from "../lib/useDismiss";
 
 const mono   = "'JetBrains Mono', monospace";
 const green  = "var(--accent)";
@@ -37,6 +38,9 @@ const red    = "#ff6b6b";
 
 export default function FloatingChat({ lang = "sk", onNavigate }) {
   const [open, setOpen] = useState(false);
+  // Escape closes the chat. NOT an outside click — the panel holds a conversation,
+  // and clicking the page behind it must not discard what is on screen.
+  useEscape(open, () => setOpen(false));
   const { user } = useAuth();
   const chat = useChat({ lang });
   const L = (sk, en) => lang === "sk" ? sk : en;

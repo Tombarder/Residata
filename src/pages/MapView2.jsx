@@ -35,12 +35,13 @@ import {
 } from "../lib/mapMetrics";
 import MapFilterBuilder from "../components/MapFilterBuilder";
 import Picker from "../components/Picker";
-import { applyFilters, describe, isComplete } from "../lib/mapFilters";
+import { applyFilters, describe, isComplete, pruneStale } from "../lib/mapFilters";
 
 const mono = "'JetBrains Mono', monospace";
-import { accent as green, accentPaint, orange as amber, dim, text as textLight, border, surfaceDark as bg2 } from "../lib/theme";
+import { accent as green, accentPaint, orange as amber, dim, text as textLight, border, surfaceDark as bg2 , orangeInk as amberInk} from "../lib/theme";
 import { getTheme, useThemeMode } from "../lib/theme-mode";
 import { kickFirstRender } from "../lib/mapRenderKick";
+import { field } from "../lib/controls";
 const greyPt = "#6b6b76";
 const panel = "var(--surface)";
 
@@ -263,7 +264,9 @@ export default function MapView2({ lang = "en", setCurrent }) {
       if (s.lens !== undefined) setLens(s.lens);
       if (typeof s.showSoldOut === "boolean") setShowSoldOut(s.showSoldOut);
       if (typeof s.heatMode === "boolean") setHeatMode(s.heatMode);
-      if (Array.isArray(s.conditions)) setConditions(s.conditions);
+      // pruneStale: drop saved filters naming a field/operator the code no longer
+      // has, so they cannot linger as unfixable empty rows in the builder.
+      if (Array.isArray(s.conditions)) setConditions(pruneStale(s.conditions));
       if (typeof s.radiusKm === "number") setRadiusKm(s.radiusKm);
       if (typeof s.corridorKm === "number") setCorridorKm(s.corridorKm);
       if (s.nameQuery !== undefined) setNameQuery(s.nameQuery);
@@ -815,11 +818,11 @@ export default function MapView2({ lang = "en", setCurrent }) {
           </button>
           <span style={{ marginLeft: "auto", fontSize: "0.7rem", color: dim, fontFamily: mono }}>
             {coordsError
-              ? <span style={{ color: amber }}>⚠ {sk ? "polohy sa nenačítali — obnov stránku" : "locations failed to load — refresh"}</span>
+              ? <span style={{ color: amberInk }}>⚠ {sk ? "polohy sa nenačítali — obnov stránku" : "locations failed to load — refresh"}</span>
               : <>
                   <strong style={{ color: textLight }}>{marketStats.count}</strong> {sk ? "v zábere" : "in view"}
                   {marketStats.count === 0 && shown.length > 0
-                    ? <span style={{ color: amber }}> · {sk ? "oddiaľ pre všetky" : "zoom out for all"}</span>
+                    ? <span style={{ color: amberInk }}> · {sk ? "oddiaľ pre všetky" : "zoom out for all"}</span>
                     : null}
                 </>}
           </span>
@@ -941,8 +944,8 @@ export default function MapView2({ lang = "en", setCurrent }) {
                   <div style={{ color: dim, fontSize: "0.66rem", textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 7 }}>{sk ? "Ako začať — 3 spôsoby" : "How to start — 3 ways"}</div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
                     <div><span style={{ color: green, fontWeight: 600 }}>◎ {sk ? "Klikni na mapu" : "Click the map"}</span><br />{sk ? "okruh okolo bodu — jeho veľkosť si nastavíš posuvníkom." : "a radius around that point — set its size with the slider."}</div>
-                    <div><span style={{ color: amber, fontWeight: 600 }}>▱ {sk ? "Oblasť" : "Area"}</span> <span style={{ color: dim }}>({sk ? "tlačidlo hore" : "button above"})</span><br />{sk ? "nakresli vlastný tvar: klikaj rohy, dvojklik ukončí." : "draw a custom shape: click the corners, double-click to finish."}</div>
-                    <div><span style={{ color: amber, fontWeight: 600 }}>⇢ {sk ? "Koridor" : "Corridor"}</span> <span style={{ color: dim }}>({sk ? "tlačidlo hore" : "button above"})</span><br />{sk ? "nakresli trasu + šírku — napr. pás okolo električky." : "draw a route + a width — e.g. a band along a tram line."}</div>
+                    <div><span style={{ color: amberInk, fontWeight: 600 }}>▱ {sk ? "Oblasť" : "Area"}</span> <span style={{ color: dim }}>({sk ? "tlačidlo hore" : "button above"})</span><br />{sk ? "nakresli vlastný tvar: klikaj rohy, dvojklik ukončí." : "draw a custom shape: click the corners, double-click to finish."}</div>
+                    <div><span style={{ color: amberInk, fontWeight: 600 }}>⇢ {sk ? "Koridor" : "Corridor"}</span> <span style={{ color: dim }}>({sk ? "tlačidlo hore" : "button above"})</span><br />{sk ? "nakresli trasu + šírku — napr. pás okolo električky." : "draw a route + a width — e.g. a band along a tram line."}</div>
                   </div>
                   <div style={{ fontSize: "0.68rem", color: dim, marginTop: 10, fontStyle: "italic" }}>{sk ? "Tip: body sa dajú ťahať, oblasť sa dá uložiť." : "Tip: drag the points to reshape, and save an area to reuse it."}</div>
                 </div>
@@ -961,7 +964,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
               {shape ? (
                 <div style={{ marginBottom: 12 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-                    <span style={{ fontSize: "0.7rem", color: amber, background: `${amber}14`, border: `1px solid ${amber}44`, borderRadius: 6, padding: "3px 8px" }}>
+                    <span style={{ fontSize: "0.7rem", color: amberInk, background: `${amber}14`, border: `1px solid ${amber}44`, borderRadius: 6, padding: "3px 8px" }}>
                       {shape.kind === "polygon" ? "▱" : "⇢"} {shape.kind === "polygon" ? (sk ? "oblasť" : "area") : (sk ? "koridor" : "corridor")}{shapeSize ? ` · ${shapeSize.label}` : ""}
                     </span>
                     <button onClick={() => startDraw(shape.kind)} title={sk ? "Nakresliť znova" : "Redraw"} style={{ background: "none", border: `1px solid ${border}`, color: dim, borderRadius: 6, padding: "3px 9px", fontSize: "0.68rem", cursor: "pointer" }}>{sk ? "Znova" : "Redraw"}</button>
@@ -1035,7 +1038,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
               )}
 
               {compSet && compSet.placeholderCount > 0 && (
-                <div style={{ fontSize: "0.66rem", color: amber, background: `${amber}12`, border: `1px solid ${amber}33`, borderRadius: 6, padding: "5px 8px", marginBottom: 12 }}>
+                <div style={{ fontSize: "0.66rem", color: amberInk, background: `${amber}12`, border: `1px solid ${amber}33`, borderRadius: 6, padding: "5px 8px", marginBottom: 12 }}>
                   ◍ {compSet.placeholderCount} {sk ? "z nich má len približnú (mestskú) polohu" : `of these are approximate (city-level) locations`}
                 </div>
               )}
@@ -1214,7 +1217,10 @@ function ComparePanel({ options, compareIds, setCompareIds, rows, baselineId, se
   );
 }
 
-const inputStyle = { boxSizing: "border-box", padding: "8px 12px", height: 36, background: "var(--surface)", border: `1px solid ${border}`, borderRadius: 9, color: textLight, fontSize: "0.82rem", outline: "none", boxShadow: "0 1px 2px rgba(28,38,56,0.05)", accentColor: "var(--accent)" };
+// Shared control box (lib/controls.js), nothing overridden — the toolbar is
+// --surface, so an inset --surface-2 field reads correctly against it and matches
+// the <Picker>s in the same row (see the note in MapView.jsx).
+const inputStyle = { ...field };
 function chipStyle(active) {
   return { height: 36, padding: "0 13px", display: "inline-flex", alignItems: "center", gap: 5, borderRadius: 999, cursor: "pointer", fontSize: "0.76rem", fontWeight: 500,
     border: `1px solid ${active ? green : border}`,

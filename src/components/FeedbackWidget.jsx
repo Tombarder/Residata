@@ -17,6 +17,7 @@ import { useAuth } from "../lib/useAuth";
 import { supabase } from "../lib/supabase";
 import { cleanText, cleanEmail } from "../lib/sanitize";
 import { getDiagnostics, capturePageScreenshot } from "../lib/diagnostics";
+import { useEscape } from "../lib/useDismiss";
 
 const mono   = "'JetBrains Mono', monospace";
 const green  = "var(--accent)";
@@ -140,6 +141,9 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
 
   function resetForm() { setCategory(null); setMessage(""); setEmail(""); setScreenshot(null); setShotName(""); setPhase("idle"); setErrorMsg(""); }
   function close() { setOpen(false); if (phase === "done") { resetForm(); setView("form"); } }
+  // Escape closes the panel. NOT an outside click: this form holds a message the
+  // user has typed, and a stray click must not throw it away.
+  useEscape(open, close);
   function pickCategory(key) { setCategory(key); setTimeout(() => taRef.current?.focus(), 60); }
 
   // Recompute the pill's unread-reply badge from the user's conversations.

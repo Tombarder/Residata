@@ -24,6 +24,7 @@ import { localeTag } from "../lib/locale";
 import LoadError from "../components/LoadError";
 import Picker from "../components/Picker";
 import InfoTip from "../components/InfoTip";
+import Kpi from "../components/Kpi";
 import DateField from "../components/DateField";
 import CountrySwitcher from "../components/CountrySwitcher";
 import { text } from "../lib/theme";
@@ -136,21 +137,6 @@ function fmtCell(kind, v, lang) {
   if (kind === "area") return Number.isFinite(n) ? n.toLocaleString("sk-SK", { maximumFractionDigits: 1 }) + " m²" : "—";
   if (kind === "date") return fmtDay(v, lang);
   return String(v);
-}
-
-/* One KPI card. Declared at MODULE level on purpose: a component defined inside
-   SalesView would be a brand-new element type on every render, so React would
-   remount its InfoTip and a tapped-open tooltip would vanish the moment sales
-   data or the currency refreshed. */
-function Kpi({ label, value, sub, subWarn, info, loading }) {
-  return (
-    <div className="rd-kpi">
-      {info && <div className="rd-kpi__info"><InfoTip text={info} label={label} /></div>}
-      <div className="rd-kpi__lbl">{label}</div>
-      <div className="rd-kpi__val">{loading ? "…" : value}</div>
-      {sub && <div className={subWarn ? "rd-kpi__sub rd-kpi__sub--warn" : "rd-kpi__sub"}>{sub}</div>}
-    </div>
-  );
 }
 
 export default function SalesView({ lang = "sk" }) {

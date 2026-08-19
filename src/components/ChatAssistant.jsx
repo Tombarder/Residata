@@ -24,7 +24,7 @@ if (typeof document !== "undefined" && !document.getElementById("cb-pulse-anim")
 }
 
 const mono   = "'JetBrains Mono', monospace";
-import { accent as green, accentInk, dim, text, border, bg, surfaceDark as bg2, orange } from "../lib/theme";
+import { accent as green, accentInk, dim, text, border, bg, surfaceDark as bg2, orange , orangeInk} from "../lib/theme";
 const red    = "#ff6b6b";
 
 /* ChatProgress — the live "what's happening" view shown while an answer is
@@ -275,7 +275,7 @@ export default function ChatAssistant({ lang = "sk", setCurrent }) {
         borderRadius: 8,
         color: dim, fontSize: "0.72rem", lineHeight: 1.5,
       }}>
-        <strong style={{ color: orange, fontFamily: mono, fontSize: "0.6rem", letterSpacing: "0.08em", textTransform: "uppercase", marginRight: "0.4rem" }}>
+        <strong style={{ color: orangeInk, fontFamily: mono, fontSize: "0.6rem", letterSpacing: "0.08em", textTransform: "uppercase", marginRight: "0.4rem" }}>
           {L("Právna poznámka", "Legal notice")}:
         </strong>
         {L(
@@ -380,7 +380,7 @@ export function renderAssistantText(raw) {
       <span key={key++} style={{
         display: "inline-block",
         fontFamily: mono, fontSize: "0.66rem",
-        color: orange, background: "rgba(245,166,35,0.12)",
+        color: orangeInk, background: "rgba(245,166,35,0.12)",
         border: "1px solid rgba(245,166,35,0.35)",
         padding: "1px 6px", borderRadius: 4,
         margin: "0 2px", letterSpacing: "0.04em",

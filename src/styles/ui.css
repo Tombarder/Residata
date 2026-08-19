@@ -26,6 +26,18 @@
   --rd-row-hover: color-mix(in srgb, var(--accent) 6%, transparent);
   --rd-ctrl-h: 34px;   /* one height for every control in a toolbar row */
   --rd-ctrl-h-sm: 27px;
+  /* Geometry of a control's box, in ONE place. `.rd-field` below is built from
+     these, and so is the `field` object in lib/controls.js that pages spread into
+     inline styles — so a hand-styled input and a class-styled one are the same box
+     by construction. (Before this the app had NINE definitions of "an input":
+     heights 34/36/auto, radii 6/7/8/9, font sizes 0.8–0.88rem/14px. That is what
+     made every toolbar look slightly misaligned.) */
+  --rd-field-r: 9px;
+  --rd-field-px: 0.6rem;
+  --rd-field-fs: 0.82rem;
+  --rd-field-r-sm: 7px;
+  --rd-field-px-sm: 0.4rem;
+  --rd-field-fs-sm: 0.72rem;
   /* Height of a table's label row. Declared, not inherited from font metrics,
      because a two-row sticky head has to offset the second row by EXACTLY the
      first row's height — one token sets both, so they cannot drift apart. */
@@ -114,13 +126,13 @@ input[type="checkbox"], input[type="radio"] { width: 15px; height: 15px; cursor:
 
 .rd-field {
   height: var(--rd-ctrl-h);
-  padding: 0 0.6rem;
+  padding: 0 var(--rd-field-px);
   background: var(--surface-2);
   border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: var(--rd-field-r);
   color: var(--text);
   font-family: inherit;
-  font-size: 0.82rem;
+  font-size: var(--rd-field-fs);
   outline: none;
   box-sizing: border-box;
   transition: border-color 0.14s var(--ease), box-shadow 0.14s var(--ease);
@@ -131,7 +143,7 @@ input[type="checkbox"], input[type="radio"] { width: 15px; height: 15px; cursor:
   border-color: var(--accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
 }
-.rd-field--sm { height: var(--rd-ctrl-h-sm); border-radius: 7px; font-size: 0.72rem; padding: 0 0.4rem; }
+.rd-field--sm { height: var(--rd-ctrl-h-sm); border-radius: var(--rd-field-r-sm); font-size: var(--rd-field-fs-sm); padding: 0 var(--rd-field-px-sm); }
 .rd-field--num { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 /* Spinner arrows are noise in a min/max filter — the keyboard and the range hint
    do the job, and the arrows steal a third of a 60px box. */

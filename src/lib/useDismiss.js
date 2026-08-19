@@ -28,10 +28,12 @@
 import { useEffect, useRef } from "react";
 
 // Which layers are open right now, outer-most first. Only the last one reacts to
-// Escape, so closing a dropdown inside a panel doesn't also close the panel.
+// Escape, so closing a dropdown inside a panel doesn't also close the panel — and a
+// Picker opened inside a modal takes the first Escape, the modal the second.
 const openLayers = [];
 
-export default function useDismiss(open, onClose, extraRefs) {
+/** The shared machinery. `outside: false` binds Escape only. */
+function useLayer(open, onClose, extraRefs, outside) {
   const ref = useRef(null);
   // The listeners are bound once per open (not per render), so they read the
   // callback and the extra refs through this box — written after every commit,
@@ -60,15 +62,35 @@ export default function useDismiss(open, onClose, extraRefs) {
       if (openLayers[openLayers.length - 1] !== layer) return;   // inner-most only
       latest.current.onClose?.();
     };
-    document.addEventListener("pointerdown", onDown, true);
+    if (outside) document.addEventListener("pointerdown", onDown, true);
     document.addEventListener("keydown", onKey, true);
     return () => {
       const i = openLayers.indexOf(layer);
       if (i !== -1) openLayers.splice(i, 1);
-      document.removeEventListener("pointerdown", onDown, true);
+      if (outside) document.removeEventListener("pointerdown", onDown, true);
       document.removeEventListener("keydown", onKey, true);
     };
-  }, [open]);
+  }, [open, outside]);
 
   return ref;
+}
+
+export default function useDismiss(open, onClose, extraRefs) {
+  return useLayer(open, onClose, extraRefs, true);
+}
+
+/**
+ * useEscape — Escape closes it, an outside click does NOT.
+ *
+ * For a layer where a stray click must not dismiss: a modal that already closes on
+ * its own backdrop (LoginModal), or a panel holding text the user has typed (the
+ * feedback form, the chat). Losing a half-written message to a misplaced click is a
+ * worse bug than the one this file exists to fix — but Escape should always work,
+ * and before this nothing in the app closed on Escape at all.
+ *
+ * Shares the layer stack with useDismiss, so Escape hits the inner-most layer: a
+ * <Picker> open inside a modal closes first, the modal on the next press.
+ */
+export function useEscape(open, onClose) {
+  useLayer(open, onClose, undefined, false);
 }

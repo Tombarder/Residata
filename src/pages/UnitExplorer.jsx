@@ -25,6 +25,7 @@ const DEFAULT_COLS = ["project_name", "city", "cast", "typ", "izby", "obytna_plo
 // design tokens — identical to PivotV2 so the two pages feel like one product
 import { accent as green, accentInk, orange, dim, border, bg, surfacePanel as panelHi, text } from "../lib/theme";
 import { usePriceSchedules, PriceBasisMark, priceBasisLegend } from "../lib/priceBasis";
+import { field } from "../lib/controls";
 const panel = "var(--surface-2)";
 const mono = "'JetBrains Mono', ui-monospace, Menlo, monospace";
 
@@ -304,11 +305,10 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
     return groups;
   }, [fields, search, lang]);
 
-  // Same geometry and colours as the shared `.rd-field` / `.rd-btn` (styles/ui.css),
-  // so this page's inputs and chips line up with the Sales toolbar and the Pickers
-  // they sit next to. Inline rather than a class because every call site sets its
-  // own width and several reuse it as a button.
-  const sel = { background: "var(--surface-2)", border: `1px solid ${border}`, color: text, borderRadius: 9, height: 34, padding: "0 0.6rem", fontSize: "0.8rem", fontFamily: "inherit", outline: "none", boxSizing: "border-box" };
+  // The shared control box (lib/controls.js), so this page's inputs and chips line
+  // up with the Pickers they sit next to. Inline rather than the class because every
+  // call site sets its own width and several reuse it as a button.
+  const sel = { ...field };
   const Sel = ({ value, onChange, opts, ph }) => (
     <Picker value={value} onChange={onChange} searchable placeholder={ph} ariaLabel={ph} width={150}
       options={[{ value: "", label: ph }, ...(opts || []).map((o) => ({ value: o, label: o }))]} />

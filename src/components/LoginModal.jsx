@@ -4,6 +4,7 @@ import { getLiveT } from "../lib/liveLang";
 import { validateBusinessEmail, signupEmailAllowed } from "../lib/emailValidation";
 import { track } from "../lib/track";
 import { useBreakpointDown, BP } from "../lib/breakpoints";
+import { useEscape } from "../lib/useDismiss";
 
 // `onSignedIn` fires once a human has actually completed a login here, so the app
 // can take them into the platform. Deliberately NOT inferred from "a user exists"
@@ -11,6 +12,10 @@ import { useBreakpointDown, BP } from "../lib/breakpoints";
 // yank a logged-in visitor off /pricing every time they refreshed it.
 export default function LoginModal({ open, onClose, onSignedIn, lang = "en" }) {
   const t = getLiveT(lang);
+  // Escape closes it, like every other layer in the app. An outside click already
+  // does (the backdrop's own onClick) — useEscape deliberately does NOT add another
+  // outside-click listener, so a click inside the form can never dismiss it.
+  useEscape(open, onClose);
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [error, setError] = useState(null);

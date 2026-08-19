@@ -46,6 +46,7 @@ import DataFreshness from "../components/DataFreshness";
 const mono = "'JetBrains Mono', monospace";
 import { accent as green, accentInk, dim, text as textLight, border, surface as bg, surfaceDark as bg2 } from "../lib/theme";
 import { useThemeMode, applyTheme, getTheme } from "../lib/theme-mode";
+import { fieldBlock } from "../lib/controls";
 const SIDEBAR_W = 240;
 
 // ─── Icons — inline SVG, same weight as HowItWorks ──────────────
@@ -1583,12 +1584,8 @@ function SettingsField({ label, children }) {
   );
 }
 
-const inputStyle = {
-  width: "100%", padding: "0.6rem 0.85rem",
-  background: bg2, border: `1px solid ${border}`, borderRadius: 8,
-  color: textLight, fontSize: "0.88rem", fontFamily: "inherit",
-  boxSizing: "border-box", outline: "none",
-};
+// Shared control box — the same input as every toolbar elsewhere in the platform.
+const inputStyle = { ...fieldBlock };
 
 // ─── Exports page — CSV downloads + API hint ──────────────
 // F-089 (Boss 2026-05-31, option b): paginated streaming CSV builder.

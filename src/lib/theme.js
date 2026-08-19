@@ -22,6 +22,16 @@ export const onAccent     = "#06140f"; // text on a green fill (dark, fine on bo
 export const orange       = "#f5a623"; // secondary accent (theme-invariant; map paint)
 export const blue         = "#4a9eff"; // status "reserved" blue (theme-invariant)
 export const danger       = "#ff6b6b"; // error / negative (theme-invariant)
+// The same three status colours as TEXT. They resolve to CSS vars, so they darken
+// on the light theme — measured 2026-08-19 on the live light workspace, the literals
+// above read at 1.36:1 contrast (WCAG asks 4.5:1), which made every warning number,
+// "paid only" label and error line all but invisible. The ink variants land at
+// 4.2–6.3:1. Same rule as accentInk: NEVER feed an ink into maplibre paint and never
+// string-concatenate it with an alpha suffix (`${orangeInk}14` is not a colour) —
+// use the literal above for those.
+export const orangeInk    = "var(--accent-2)";
+export const dangerInk    = "var(--danger)";
+export const infoInk      = "var(--info)";
 
 // neutrals — CSS variables, so they theme-switch
 export const dim          = "var(--text-dim)";

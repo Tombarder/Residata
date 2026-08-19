@@ -35,10 +35,11 @@ import { moneyFromEur, moneySymbol } from "../lib/money";
 import { supabasePublic, isSupabaseReady } from "../lib/supabase";
 
 const mono = "'JetBrains Mono', monospace";
-import { accent as green, accentPaint, orange as amber, dim, text as textLight, border, surfaceDark as bg2 } from "../lib/theme";
+import { accent as green, accentPaint, orange as amber, dim, text as textLight, border, surfaceDark as bg2 , orangeInk as amberInk} from "../lib/theme";
 import Picker from "../components/Picker";
 import { getTheme, useThemeMode } from "../lib/theme-mode";
 import { kickFirstRender } from "../lib/mapRenderKick";
+import { fieldBlock } from "../lib/controls";
 const greyPt = "#6b6b76";
 const panel = "var(--surface)";
 
@@ -604,7 +605,7 @@ export default function MapView({ lang = "en", setCurrent }) {
                   >
                     <div style={{ fontSize: "0.82rem", color: textLight, display: "flex", justifyContent: "space-between", gap: 8 }}>
                       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
-                      {!hasCoord && <span style={{ color: amber, fontSize: "0.62rem", flexShrink: 0 }}>{sk ? "bez polohy" : "no pin"}</span>}
+                      {!hasCoord && <span style={{ color: amberInk, fontSize: "0.62rem", flexShrink: 0 }}>{sk ? "bez polohy" : "no pin"}</span>}
                     </div>
                     {loc && <div style={{ fontSize: "0.68rem", color: dim, marginTop: 1 }}>{loc}</div>}
                   </div>
@@ -647,13 +648,16 @@ export default function MapView({ lang = "en", setCurrent }) {
         </div>
 
         {/* Status chips */}
-        <div style={{ display: "inline-flex", gap: 4 }}>
+        {/* The platform's segmented control (.rd-seg, styles/ui.css) — one grey track,
+            one raised pill. Was three separately outlined chips, a look this app now
+            has exactly one of. */}
+        <div className="rd-seg">
           {[
             { k: "all", label: sk ? "Všetky" : "All" },
             { k: "available", label: sk ? "Voľné" : "Available" },
             { k: "sold", label: sk ? "Vypredané" : "Sold out" },
           ].map((s) => (
-            <button key={s.k} onClick={() => setFStatus(s.k)} style={chipStyle(fStatus === s.k)}>{s.label}</button>
+            <button key={s.k} className="rd-seg__btn" aria-pressed={fStatus === s.k} onClick={() => setFStatus(s.k)}>{s.label}</button>
           ))}
         </div>
 
@@ -723,31 +727,13 @@ export default function MapView({ lang = "en", setCurrent }) {
 
 // Clean control chrome — white "pill" controls on the toolbar, consistent height,
 // custom chevron on selects (no raw native arrow), emerald accent for the caret.
-const CHEVRON = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7480' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E\")";
-const inputStyle = {
-  width: "100%", boxSizing: "border-box", padding: "8px 28px 8px 12px", height: 36,
-  background: "var(--surface)", border: `1px solid ${border}`, borderRadius: 9,
-  color: textLight, fontSize: "0.82rem", outline: "none",
-  boxShadow: "0 1px 2px rgba(28,38,56,0.05)", accentColor: "var(--accent)",
-};
-const selectStyle = {
-  padding: "8px 30px 8px 12px", height: 36, background: "var(--surface)",
-  backgroundImage: CHEVRON, backgroundRepeat: "no-repeat", backgroundPosition: "right 10px center",
-  appearance: "none", WebkitAppearance: "none", MozAppearance: "none",
-  border: `1px solid ${border}`, borderRadius: 9, boxShadow: "0 1px 2px rgba(28,38,56,0.05)",
-  color: textLight, fontSize: "0.8rem", outline: "none", cursor: "pointer", maxWidth: 190,
-  accentColor: "var(--accent)",
-};
-function chipStyle(active) {
-  return {
-    height: 36, padding: "0 14px", display: "inline-flex", alignItems: "center",
-    borderRadius: 9, cursor: "pointer", fontSize: "0.76rem", fontWeight: 500,
-    border: `1px solid ${active ? green : border}`,
-    background: active ? `color-mix(in srgb, var(--accent) 12%, transparent)` : "var(--surface)",
-    color: active ? green : "var(--text-2)",
-    boxShadow: active ? "none" : "0 1px 2px rgba(28,38,56,0.05)",
-  };
-}
+// The shared control box (lib/controls.js) — nothing overridden. Measured on the
+// live page: the filter bar is itself --surface, so the old `background: var(--surface)`
+// here painted the input the EXACT colour of the bar behind it (only its border showed)
+// while the <Picker>s beside it were --surface-2. Now the whole row is inset the same way.
+// (A hand-rolled CHEVRON + appearance:none select style also sat here for native
+// <select>s; those became <Picker>s and the styles were left behind, dead.)
+const inputStyle = { ...fieldBlock };
 
 function Dot({ color }) {
   return <span style={{ width: 9, height: 9, borderRadius: "50%", background: color, display: "inline-block" }} />;

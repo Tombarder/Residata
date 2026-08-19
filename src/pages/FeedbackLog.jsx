@@ -16,7 +16,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 import Picker from "../components/Picker";
 
-import { accent as green, accentInk, orange as amber, blue, text as textLight, dim, border, bg, surfaceDark as bg2, mono } from "../lib/theme";
+import { accent as green, accentInk, orange as amber, blue, text as textLight, dim, border, bg, surfaceDark as bg2, mono , orangeInk as amberInk, infoInk} from "../lib/theme";
 const red = "#ff6b6b";
 
 // ── "Normal theme" shared visual helpers (visual-only) ──────────────
@@ -157,7 +157,6 @@ export default function FeedbackLog({ lang = "sk" }) {
   const card = { background: bg2, border: `1px solid ${border}`, borderRadius: 10, padding: "12px 14px" };
   const cardLabel = { fontSize: 11, color: dim, fontFamily: mono, textTransform: "uppercase", letterSpacing: 0.4 };
   const cardVal = { fontSize: 22, fontWeight: 600, color: textLight, marginTop: 4 };
-  const selStyle = { marginTop: 5, padding: "9px 12px", background: bg2, border: `1px solid ${border}`, borderRadius: 8, color: textLight, fontSize: 14, outline: "none" };
   const byCat = stats?.by_category || {};
   const catChips = useMemo(() => Object.keys(CATEGORIES), []);
 
@@ -167,7 +166,7 @@ export default function FeedbackLog({ lang = "sk" }) {
     const evs = d.events || [];
     return (
       <div style={{ marginTop: 8, background: bg, border: `1px solid ${border}`, borderRadius: 8, padding: "9px 11px", fontFamily: mono, fontSize: 11, color: dim, lineHeight: 1.7 }}>
-        {d.screenshot_error && <div style={{ color: amber, marginBottom: 4 }}>⚠ {t("screenshot failed", "screenshot zlyhal")}: {d.screenshot_error}</div>}
+        {d.screenshot_error && <div style={{ color: amberInk, marginBottom: 4 }}>⚠ {t("screenshot failed", "screenshot zlyhal")}: {d.screenshot_error}</div>}
         {d.page && <div><span style={{ color: "var(--text-2)" }}>page:</span> {d.url || d.page}</div>}
         {d.viewport && <div>viewport: {d.viewport.w}×{d.viewport.h}{d.dpr ? ` · dpr ${d.dpr}` : ""}{typeof d.online === "boolean" ? ` · online ${d.online}` : ""}{d.lang ? ` · ${d.lang}` : ""}</div>}
         {d.ua && <div style={{ wordBreak: "break-all" }}>browser: {d.ua}</div>}
@@ -207,7 +206,7 @@ export default function FeedbackLog({ lang = "sk" }) {
     return (
       <div style={{ minHeight: "100vh", background: bg, color: textLight, padding: "1.5rem 1.75rem" }}>
         <button onClick={backToList} style={{ background: "transparent", border: "none", color: dim, cursor: "pointer", fontFamily: mono, fontSize: 13, padding: 0, marginBottom: 14 }}>← {t("Back to all feedback", "Späť na zoznam")}</button>
-        {err && <div style={{ ...card, borderColor: amber, color: amber, marginBottom: 14 }}>{err}</div>}
+        {err && <div style={{ ...card, borderColor: amber, color: amberInk, marginBottom: 14 }}>{err}</div>}
         {convLoading && <div style={{ color: dim, fontFamily: mono, fontSize: 13 }}>{t("Loading…", "Načítavam…")}</div>}
         {conv && (
           <>
@@ -299,13 +298,13 @@ export default function FeedbackLog({ lang = "sk" }) {
         <button onClick={load} style={{ padding: "8px 14px", borderRadius: 8, border: `1px solid ${border}`, background: "transparent", color: textLight, cursor: "pointer", fontSize: 13 }}>{t("Refresh", "Obnoviť")} ↻</button>
       </div>
 
-      {err && <div style={{ ...card, borderColor: amber, color: amber, marginBottom: 14 }}>{err}</div>}
+      {err && <div style={{ ...card, borderColor: amber, color: amberInk, marginBottom: 14 }}>{err}</div>}
 
       {stats && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(118px,1fr))", gap: 10, marginBottom: 16 }}>
           <div style={{ ...card, position: "relative", overflow: "hidden", background: tintBg(C_SLATE) }}>{cardBar(C_SLATE)}<div style={cardLabel}>{t("Total", "Spolu")}</div><div style={cardVal}>{stats.total ?? 0}</div></div>
-          <div style={{ ...card, position: "relative", overflow: "hidden", background: tintBg(C_AMBER) }}>{cardBar(C_AMBER)}<div style={cardLabel}>{t("New", "Nové")}</div><div style={{ ...cardVal, color: amber }}>{stats.new ?? 0}</div></div>
-          <div style={{ ...card, position: "relative", overflow: "hidden", background: tintBg(C_BLUE) }}>{cardBar(C_BLUE)}<div style={cardLabel}>{t("In progress", "Rieši sa")}</div><div style={{ ...cardVal, color: blue }}>{stats.in_progress ?? 0}</div></div>
+          <div style={{ ...card, position: "relative", overflow: "hidden", background: tintBg(C_AMBER) }}>{cardBar(C_AMBER)}<div style={cardLabel}>{t("New", "Nové")}</div><div style={{ ...cardVal, color: amberInk }}>{stats.new ?? 0}</div></div>
+          <div style={{ ...card, position: "relative", overflow: "hidden", background: tintBg(C_BLUE) }}>{cardBar(C_BLUE)}<div style={cardLabel}>{t("In progress", "Rieši sa")}</div><div style={{ ...cardVal, color: infoInk }}>{stats.in_progress ?? 0}</div></div>
           <div style={{ ...card, position: "relative", overflow: "hidden", background: tintBg(C_GREEN) }}>{cardBar(C_GREEN)}<div style={cardLabel}>{t("Resolved", "Vyriešené")}</div><div style={{ ...cardVal, color: accentInk }}>{stats.resolved ?? 0}</div></div>
           <div style={{ ...card, position: "relative", overflow: "hidden", background: tintBg(C_SLATE) }}>{cardBar(C_SLATE)}<div style={cardLabel}>{t("Won't fix", "Nerieši sa")}</div><div style={cardVal}>{stats.wont_fix ?? 0}</div></div>
         </div>

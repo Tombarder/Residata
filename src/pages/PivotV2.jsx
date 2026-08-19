@@ -32,7 +32,7 @@ import useDismiss from "../lib/useDismiss";
 */
 
 const mono    = "'JetBrains Mono', ui-monospace, Menlo, monospace";
-import { accent as green, accentInk, orange, dim, border, bg, surfacePanel as panelHi, text } from "../lib/theme";
+import { accent as green, accentInk, orange, dim, border, bg, surfacePanel as panelHi, text , orangeInk} from "../lib/theme";
 const panel   = "var(--surface-2)";
 
 /* ─── Field registry ─────────────────────────────────────────────
@@ -1778,7 +1778,9 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
             {[1, 2, 3, 4, 5].map(i => (
               <div key={i} className="pivot-loading-pulse" style={{
                 height: 18,
-                background: `linear-gradient(90deg, ${border} 0%, ${border}80 50%, ${border} 100%)`,
+                // `${border}80` appended a hex-alpha to a var() → invalid gradient →
+                // the skeleton had no background at all. color-mix keeps the token.
+                background: `linear-gradient(90deg, ${border} 0%, color-mix(in srgb, ${border} 50%, transparent) 50%, ${border} 100%)`,
                 borderRadius: 4,
                 width: `${100 - i * 8}%`,
                 animationDelay: `${i * 0.12}s`,
@@ -2962,7 +2964,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                   style={{ ...th, color: dim, borderLeft: `2px solid color-mix(in srgb, var(--accent) 33%, transparent)` }}
                   title={colOverflow > 0 ? (lang === "sk" ? `Σ zahŕňa aj ${colOverflow} ďalších stĺpcov, ktoré sa nezmestili` : `Σ also includes ${colOverflow} more columns that didn't fit`) : undefined}>
                 Σ {lang === "sk" ? "spolu" : "total"}
-                {colOverflow > 0 && <span style={{ color: orange, fontWeight: 400 }}> · +{colOverflow}</span>}
+                {colOverflow > 0 && <span style={{ color: orangeInk, fontWeight: 400 }}> · +{colOverflow}</span>}
               </th>
             </tr>
           )}
@@ -3485,7 +3487,7 @@ function PivotChart({ tree, rowFields, colFields: _colFields, effectiveValues, o
             </>
           )}
           {hiddenCount > 0 && (
-            <span style={{ marginLeft: "auto", fontSize: "0.72rem", color: orange }}>
+            <span style={{ marginLeft: "auto", fontSize: "0.72rem", color: orangeInk }}>
               {lang === "sk"
                 ? `Top 20 z ${sortedData.length} (+${hiddenCount} ďalších v tabuľke)`
                 : `Top 20 of ${sortedData.length} (+${hiddenCount} more in table)`}
@@ -4538,7 +4540,7 @@ function FilterPopover({ fieldKey, filter, anchorEl, records, distinctOverride =
           borderRadius: 6,
           fontSize: "0.74rem", color: text, lineHeight: 1.4,
         }}>
-          <span style={{ color: orange, fontWeight: 700 }}>ⓘ </span>
+          <span style={{ color: orangeInk, fontWeight: 700 }}>ⓘ </span>
           {lang === "sk"
             ? `Tvoje ostatné filtre (${otherFilterCount}) zužujú výber na 0 riadkov. Zobrazujem hodnoty z celej databázy — keď tu niečo zaškrtneš, výber sa znova prepočíta.`
             : `Your other filters (${otherFilterCount}) narrow the dataset to 0 rows. Showing values from the full data — picking here will re-evaluate the result set.`}

@@ -10,6 +10,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import Picker from "./Picker";
+import { fieldSmBlock } from "../lib/controls";
 
 const SUPA_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPA_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -50,10 +51,9 @@ const STATUSES = [
 ];
 
 const GREEN = "var(--accent)", BORDER = "var(--border)", BG = "var(--surface-2)", FG = "var(--text)", MUTED = "var(--text-dim)";
-const inputStyle = {
-  width: "100%", background: "var(--surface-3)", color: FG, border: `1px solid ${BORDER}`,
-  borderRadius: 6, padding: "5px 7px", fontSize: "0.8rem", boxSizing: "border-box",
-};
+// Dense variant of the shared control box (lib/controls.js): this table puts an
+// input in every cell, so it uses the same box as a column filter, not a toolbar one.
+const inputStyle = { ...fieldSmBlock, background: "var(--surface-3)" };
 const th = { textAlign: "left", padding: "8px 10px", fontSize: "0.7rem", textTransform: "uppercase",
   letterSpacing: "0.05em", color: MUTED, borderBottom: `1px solid ${BORDER}`, position: "sticky", top: 0, background: BG, whiteSpace: "nowrap" };
 const td = { padding: "5px 6px", borderBottom: `1px solid ${BORDER}`, verticalAlign: "middle" };

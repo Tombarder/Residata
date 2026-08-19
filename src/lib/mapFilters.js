@@ -121,6 +121,34 @@ export function applyFilters(projects, conditions) {
   return projects.filter((p) => active.every((c) => { const f = FIELD_BY_KEY[c.field]; return f ? matchCond(p, f, c) : true; }));
 }
 
+/** Drop saved conditions the code can no longer honour.
+ *
+ * A saved filter outlives the code that defined it: `country` was deliberately
+ * removed from FIELDS (see the note above) and an operator set can change the same
+ * way. `isComplete` already refuses such a condition, so it never filters anything
+ * wrong — but it stays in the stored array, and the EDITOR still renders a row for
+ * it: two empty "select…" dropdowns the user can't fix, which reads as broken UI.
+ * (Found live 2026-08-19: one account's dashboard still held
+ * `{field:"country", op:"in", value:["SK"]}`.)
+ *
+ * So conditions are pruned where they are READ BACK from storage, not patched in
+ * the editor: the next save then writes the clean array and the ghost is gone for
+ * good. The warning is deliberate — the next field rename should be noticeable in
+ * dev rather than silently eating someone's filter. */
+export function pruneStale(conditions) {
+  if (!Array.isArray(conditions)) return [];
+  const ok = (c) => {
+    const f = FIELD_BY_KEY[c?.field];
+    return !!f && opsForField(f).some((o) => o.key === c.op);
+  };
+  const kept = conditions.filter(ok);
+  if (kept.length !== conditions.length) {
+    const gone = conditions.filter((c) => !ok(c)).map((c) => `${c?.field ?? "?"}/${c?.op ?? "?"}`);
+    console.warn(`[mapFilters] dropped ${gone.length} saved filter(s) naming a field or operator that no longer exists: ${gone.join(", ")}`);
+  }
+  return kept;
+}
+
 /** A condition only filters once it has the value its operator needs. */
 export function isComplete(c) {
   const f = FIELD_BY_KEY[c?.field];

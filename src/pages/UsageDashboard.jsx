@@ -12,6 +12,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { supabaseData } from "../lib/supabase";
 import { useAccountPrefState } from "../lib/useAccountUiPref";
 import Picker from "../components/Picker";
+import Kpi from "../components/Kpi";
 import InfoTip from "../components/InfoTip";
 import { accent as green, accentInk, dim, text, border, surface as bg, surfaceDark as bg2 } from "../lib/theme";
 
@@ -176,15 +177,16 @@ export default function UsageDashboard({ lang = "en" }) {
 
       {/* Window selector */}
       <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", justifyContent: "flex-end", flexWrap: "wrap", marginBottom: "0.35rem" }}>
-        <span style={{ fontSize: "0.7rem", color: dim, fontFamily: mono }}>{L("okno", "window")}</span>
-        {WINDOWS.map(w => (
-          <button key={w} onClick={() => setDays(w)} disabled={loading} style={{
-            fontFamily: mono, fontSize: "0.75rem", padding: "0.35rem 0.7rem", borderRadius: 8, cursor: loading ? "default" : "pointer",
-            border: `1px solid ${days === w ? green : border}`, background: days === w ? green : "transparent",
-            color: days === w ? "#00120c" : text, fontWeight: days === w ? 700 : 400, opacity: loading && days !== w ? 0.5 : 1,
-          }}>{w}{L("d", "d")}</button>
-        ))}
-        <button onClick={load} disabled={loading} title={L("obnoviť", "reload")} aria-label={L("obnoviť", "reload")} style={{ fontFamily: mono, fontSize: "0.75rem", padding: "0.35rem 0.7rem", borderRadius: 8, cursor: loading ? "default" : "pointer", border: `1px solid ${border}`, background: "transparent", color: dim, opacity: loading ? 0.5 : 1 }}>↻</button>
+        <span className="rd-label">{L("okno", "window")}</span>
+        {/* Shared segmented control + shared button — same switch as everywhere else. */}
+        <div className="rd-seg">
+          {WINDOWS.map(w => (
+            <button key={w} className="rd-seg__btn" aria-pressed={days === w} disabled={loading}
+              style={{ opacity: loading && days !== w ? 0.5 : 1 }} onClick={() => setDays(w)}>{w}{L("d", "d")}</button>
+          ))}
+        </div>
+        <button className="rd-btn rd-btn--sm" onClick={load} disabled={loading}
+          title={L("obnoviť", "reload")} aria-label={L("obnoviť", "reload")}>↻</button>
       </div>
 
       {err && (
@@ -199,29 +201,29 @@ export default function UsageDashboard({ lang = "en" }) {
         <>
           {/* KPI grid */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "0.7rem", margin: "1.1rem 0" }}>
-            <Card label={L("Aktívni dnes", "Active today")} value={num(summary?.dau)} color={green} bar="#10b981" sub={L("prihlásení dnes", "signed-in today")}
+            <Kpi label={L("Aktívni dnes", "Active today")} value={num(summary?.dau)} sub={L("prihlásení dnes", "signed-in today")}
                   info={L("Počet používateľov, ktorí sa dnes prihlásili a boli aktívni.", "Users who signed in and were active today.")} />
-            <Card label={L("Aktívni (7 dní)", "Active (7d)")} value={num(summary?.wau)} bar="#10b981" sub={L("prihlásení používatelia", "signed-in users")}
+            <Kpi label={L("Aktívni (7 dní)", "Active (7d)")} value={num(summary?.wau)} sub={L("prihlásení používatelia", "signed-in users")}
                   info={L("Unikátni prihlásení používatelia za posledných 7 dní.", "Unique signed-in users over the last 7 days.")} />
             {/* Only show the window-active card when the window is wider than 7d,
                 otherwise it just duplicates the "Active (7d)" card above. */}
-            {days > 7 && <Card label={L(`Aktívni (${days} dní)`, `Active (${days}d)`)} value={num(summary?.mau)} bar="#10b981"
+            {days > 7 && <Kpi label={L(`Aktívni (${days} dní)`, `Active (${days}d)`)} value={num(summary?.mau)}
                   info={L("Unikátni prihlásení používatelia za zvolené okno.", "Unique signed-in users over the selected window.")} />}
-            <Card label={L("Ø aktívny čas / relácia", "Ø active time / session")} value={minsLabel(summary?.avg_active_min)} bar="#3b74e8" sub={L("skutočne strávený čas", "real focused time")}
+            <Kpi label={L("Ø aktívny čas / relácia", "Ø active time / session")} value={minsLabel(summary?.avg_active_min)} sub={L("skutočne strávený čas", "real focused time")}
                   info={L("Priemerný skutočne strávený (aktívny) čas na jednu reláciu — nie čas s otvorenou, ale nečinnou kartou.", "Average real focused time per session — not time with an open but idle tab.")} />
-            <Card label={L("Celkový aktívny čas", "Total active time")} value={summary?.active_hours != null ? `${num(summary.active_hours)} h` : "—"} bar="#3b74e8"
+            <Kpi label={L("Celkový aktívny čas", "Total active time")} value={summary?.active_hours != null ? `${num(summary.active_hours)} h` : "—"}
                   info={L("Súčet skutočne aktívneho času všetkých relácií za zvolené okno.", "Sum of real active time across all sessions in the window.")} />
-            <Card label={L("Relácie", "Sessions")} value={num(summary?.total_sessions)} bar="#3b74e8" sub={L(`+ ${num(summary?.anon_sessions ?? 0)} anonymných`, `+ ${num(summary?.anon_sessions ?? 0)} anonymous`)}
+            <Kpi label={L("Relácie", "Sessions")} value={num(summary?.total_sessions)} sub={L(`+ ${num(summary?.anon_sessions ?? 0)} anonymných`, `+ ${num(summary?.anon_sessions ?? 0)} anonymous`)}
                   info={L("Počet prihlásených relácií za okno; + anonymné návštevy bez prihlásenia.", "Number of signed-in sessions in the window; + anonymous visits without login.")} />
-            <Card label={L("Exporty", "Exports")} value={num(summary?.exports)} bar="#8b5cf6"
+            <Kpi label={L("Exporty", "Exports")} value={num(summary?.exports)}
                   info={L("Počet stiahnutí/exportov dát (CSV/XLSX) za okno.", "Number of data downloads/exports (CSV/XLSX) in the window.")} />
-            <Card label={L("Otázky AI", "AI questions")} value={num(summary?.ai_questions)} bar="#8b5cf6"
+            <Kpi label={L("Otázky AI", "AI questions")} value={num(summary?.ai_questions)}
                   info={L("Počet otázok položených AI asistentovi za okno.", "Number of questions asked to the AI assistant in the window.")} />
-            <Card label={L("Noví používatelia", "New users")} value={num(summary?.new_users)} color={blue} bar="#10b981"
+            <Kpi label={L("Noví používatelia", "New users")} value={num(summary?.new_users)}
                   info={L("Používatelia, ktorí sa zaregistrovali prvýkrát v tomto okne.", "Users who signed up for the first time in this window.")} />
-            <Card label={L("Vracajúci sa", "Returning")} value={num(summary?.returning_users)} bar="#10b981" sub={L("aktívni ≥2 dni", "active ≥2 days")}
+            <Kpi label={L("Vracajúci sa", "Returning")} value={num(summary?.returning_users)} sub={L("aktívni ≥2 dni", "active ≥2 days")}
                   info={L("Používatelia aktívni aspoň 2 rôzne dni — vracajú sa, nie jednorazoví.", "Users active on at least 2 distinct days — returning, not one-off.")} />
-            <Card label={L("Pády aplikácie", "App crashes")} value={num(summary?.crashes)} color={Number(summary?.crashes) > 0 ? red : text} bar="#e0413e"
+            <Kpi label={L("Pády aplikácie", "App crashes")} value={num(summary?.crashes)} color={Number(summary?.crashes) > 0 ? red : text}
                   info={L("Počet zachytených pádov/chýb aplikácie za okno. Ideál je 0.", "Number of caught app crashes/errors in the window. 0 is ideal.")} />
           </div>
 
@@ -334,18 +336,6 @@ export default function UsageDashboard({ lang = "en" }) {
 }
 
 // KPI card (module-level so it isn't recreated every render).
-function Card({ label, value, sub, color = text, bar = "#64748b", info }) {
-  return (
-    <div style={{ background: `linear-gradient(180deg, color-mix(in srgb, ${bar} 9%, var(--surface)) 0%, var(--surface) 46%)`, border: `1px solid ${border}`, borderRadius: 10, padding: "1rem 1.1rem", minHeight: 88, position: "relative", overflow: "hidden" }}>
-      <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: bar, opacity: 0.85 }} />
-      {info && <div style={{ position: "absolute", top: 8, right: 8 }}><InfoTip text={info} label={label} /></div>}
-      <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.4rem", paddingRight: info ? "1.2rem" : 0 }}>{label}</div>
-      <div style={{ fontFamily: mono, fontSize: "1.6rem", fontWeight: 700, color, lineHeight: 1 }}>{value ?? "—"}</div>
-      {sub && <div style={{ fontSize: "0.7rem", color: dim, marginTop: "0.3rem" }}>{sub}</div>}
-    </div>
-  );
-}
-
 function Section({ title, sub, children }) {
   return (
     <div style={{ margin: "1.6rem 0" }}>

@@ -37,13 +37,13 @@ import { localeTag } from "../lib/locale";
 import { useActivateTrial } from "../lib/useActivateTrial";
 import {
   accent as green, accentInk, orange, blue, dim, faint, text as textLight, border,
-  surface as bg, surfaceDark as bg2, surfacePanel, mono,
+  surface as bg, surfaceDark as bg2, surfacePanel, mono, orangeInk, infoInk,
 } from "../lib/theme";
 import { useDashboardConfig, newWidgetId } from "../lib/useDashboardConfig";
 import MapFilterBuilder from "../components/MapFilterBuilder";
 import Picker from "../components/Picker";
 import InfoTip from "../components/InfoTip";
-import { applyFilters, describe, isComplete } from "../lib/mapFilters";
+import { applyFilters, describe, isComplete, pruneStale } from "../lib/mapFilters";
 
 const L = (lang, sk, en) => (lang === "sk" ? sk : en);
 
@@ -380,7 +380,7 @@ function KpiCard({ label, value, hint, delta, lang, accent = textLight, locked =
       <span style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.09em", textTransform: "uppercase", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", paddingRight: info ? "1.2rem" : 0 }}>{label}</span>
       <div style={{ fontFamily: mono, fontSize: "1.4rem", fontWeight: 700, color: accent, letterSpacing: "-0.02em", lineHeight: 1.05, filter: locked ? "blur(6px)" : "none", opacity: locked ? 0.55 : 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{value}</div>
       {locked
-        ? <div style={{ fontSize: "0.62rem", color: orange, fontFamily: mono }}>{L(lang, "len pre paid", "paid only")}</div>
+        ? <div style={{ fontSize: "0.62rem", color: orangeInk, fontFamily: mono }}>{L(lang, "len pre paid", "paid only")}</div>
         : (hint || delta) && (
           // hint WRAPS (no ellipsis) so the full label is always readable —
           // truncating used to cut "aktuálne v predaji" → "…preda…".
@@ -485,7 +485,11 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
   // Same composable filter engine as the Map / Projects list (applyFilters over
   // projects_live). Conditions AND together; the KPI strip is computed live from
   // the matching subset — any dimension, not a single pre-baked district.
-  const conditions = config?.overview?.filters || [];
+  // pruneStale: a saved filter can name a field the code has since dropped — it
+  // never filters anything (isComplete refuses it) but it WOULD render as an
+  // unfixable empty row in the builder. Cleared on read; the next save persists
+  // the clean array. See lib/mapFilters.js.
+  const conditions = useMemo(() => pruneStale(config?.overview?.filters), [config?.overview?.filters]);
   const setConditions = (next) => setConfig(c => {
     const value = typeof next === "function" ? next(c.overview?.filters || []) : next;
     return { ...c, overview: { ...c.overview, filters: value } };
@@ -927,7 +931,7 @@ function MetricBody({ cfg, ctx, lang }) {
         {!locked && <DeltaChip delta={delta} lang={lang} />}
       </div>
       <div style={{ fontFamily: mono, fontSize: "0.66rem", color: dim, marginTop: "0.55rem" }}>
-        {locked ? <span style={{ color: orange }}>{L(lang, "len pre paid", "paid only")}</span>
+        {locked ? <span style={{ color: orangeInk }}>{L(lang, "len pre paid", "paid only")}</span>
           : <>{def.label[lang] || def.label.en} · {scopeLabel(cfg.scope, lang)} · <span style={{ color: faint }}>{def.hint?.[lang] || def.hint?.en}</span></>}
       </div>
     </div>
@@ -1035,7 +1039,7 @@ function RankingBody({ cfg, ctx, lang }) {
       {rows.map((r, i) => (
         <div key={r.key} role={r.clickId ? "button" : undefined} tabIndex={r.clickId ? 0 : undefined}
           onClick={r.clickId ? () => setCurrent(`App:ProjectDetail:${r.clickId}`) : undefined}
-          style={{ display: "flex", alignItems: "center", gap: "0.6rem", padding: "0.32rem 0", cursor: r.clickId ? "pointer" : "default", borderBottom: i < rows.length - 1 ? `1px solid ${border}55` : "none" }}>
+          style={{ display: "flex", alignItems: "center", gap: "0.6rem", padding: "0.32rem 0", cursor: r.clickId ? "pointer" : "default", borderBottom: i < rows.length - 1 ? `1px solid color-mix(in srgb, ${border} 33%, transparent)` : "none" }}>
           <span style={{ fontFamily: mono, fontSize: "0.66rem", color: faint, width: 14, flexShrink: 0 }}>{i + 1}</span>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: "0.82rem", color: textLight, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</div>
@@ -1083,8 +1087,8 @@ function BenchmarkBody({ cfg, ctx, lang }) {
 // trend (sparkline of a project series over the available months)
 const TREND_SERIES = {
   available: { label: { sk: "Voľné byty", en: "Available units" }, get: r => r.available_units, fmt: "count", color: accentInk },
-  sold:      { label: { sk: "Predané (spolu)", en: "Sold (total)" }, get: r => r.sold_units, fmt: "count", color: orange },
-  avg_m2:    { label: { sk: "Cena /m²", en: "Price /m²" }, get: r => r.avg_price_eur_m2, fmt: "m2", color: blue },
+  sold:      { label: { sk: "Predané (spolu)", en: "Sold (total)" }, get: r => r.sold_units, fmt: "count", color: orangeInk },
+  avg_m2:    { label: { sk: "Cena /m²", en: "Price /m²" }, get: r => r.avg_price_eur_m2, fmt: "m2", color: infoInk },
 };
 const monthShort = (m, lang) => {
   try { const [y, mo] = String(m).split("-"); return new Date(+y, +mo - 1, 1).toLocaleDateString(localeTag(lang), { month: "short" }); }

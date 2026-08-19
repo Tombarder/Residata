@@ -21,7 +21,8 @@ import PageHero from "../components/PageHero";
 import InfoTip from "../components/InfoTip";
 import PivotV2 from "./PivotV2";
 import MapFilterBuilder from "../components/MapFilterBuilder";
-import { applyFilters, describe, isComplete } from "../lib/mapFilters";
+import { applyFilters, describe, isComplete, pruneStale } from "../lib/mapFilters";
+import { field } from "../lib/controls";
 
 const mono = "'JetBrains Mono', monospace";
 const green = "var(--accent)";
@@ -38,7 +39,7 @@ const orange = "#f5a623";
 
 // Filter-bar styling — matched to the map's filter bar (MapView2) so the
 // Projects filters look identical to the rest of the platform.
-const filterInput = { boxSizing: "border-box", padding: "7px 11px", background: bg2, border: `1px solid ${border}`, borderRadius: 7, color: text, fontSize: "0.82rem", outline: "none" };
+const filterInput = { ...field };   // shared control box — see lib/controls.js
 function filterChip(active) {
   return { padding: "6px 12px", borderRadius: 999, cursor: "pointer", fontSize: "0.76rem", border: `1px solid ${active ? green : border}`, background: active ? `color-mix(in srgb, var(--accent) 10%, transparent)` : "transparent", color: active ? green : dim };
 }
@@ -168,7 +169,9 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
     "projectsFilters",
     { conditions, nameQuery, sort, showHistorical },
     (s) => {
-      if (Array.isArray(s.conditions)) setConditions(s.conditions);
+      // pruneStale: drop saved filters naming a field/operator the code no longer
+      // has, so they cannot linger as unfixable empty rows in the builder.
+      if (Array.isArray(s.conditions)) setConditions(pruneStale(s.conditions));
       if (s.nameQuery !== undefined) setNameQuery(s.nameQuery);
       if (s.sort && typeof s.sort === "object") setSort(s.sort);
       if (typeof s.showHistorical === "boolean") setShowHistorical(s.showHistorical);

@@ -19,6 +19,7 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import maplibregl from "maplibre-gl";
 import useDismiss from "../lib/useDismiss";
+import { fieldBlock } from "../lib/controls";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 const MAP_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
@@ -26,7 +27,7 @@ const PHOTON = "https://photon.komoot.io/api/";
 const PHOTON_REVERSE = "https://photon.komoot.io/reverse";
 const BIAS = { SK: { lat: 48.7, lon: 19.5 }, CZ: { lat: 49.8, lon: 15.5 } };
 
-import { accent as green, accentInk, orange as amber, text as textLight, dim, border, bg, surfaceDark as bg2, mono } from "../lib/theme";
+import { accent as green, accentInk, orange as amber, text as textLight, dim, border, bg, surfaceDark as bg2, mono , orangeInk as amberInk} from "../lib/theme";
 
 // SK + CZ bounding box (minLon, minLat, maxLon, maxLat) — restricts geocoder
 // suggestions to our region so we never propose places in New Zealand.
@@ -426,7 +427,7 @@ export default function LocationManager({ lang = "en" }) {
           <div style={{ position: "relative", overflow: "hidden", borderRadius: 16, border: "1px solid var(--border)", padding: "1.1rem 1.3rem", marginBottom: "1.5rem", background: "radial-gradient(120% 140% at 2% -20%, rgba(18,185,129,0.13) 0%, transparent 46%), linear-gradient(135deg, color-mix(in srgb, var(--accent) 5%, var(--surface)) 0%, var(--bg) 75%)" }}>
             <div style={{ fontFamily: mono, fontSize: "0.72rem", color: dim }}>
               <span style={{ color: accentInk }}>{confirmedCount}</span> / {total} {t("located", "umiestnených")}
-              {noDistrictCount > 0 && <span style={{ marginLeft: 8, color: amber }}>· {noDistrictCount} {t("no district", "bez okresu")}</span>}
+              {noDistrictCount > 0 && <span style={{ marginLeft: 8, color: amberInk }}>· {noDistrictCount} {t("no district", "bez okresu")}</span>}
             </div>
             <div style={{ height: 4, background: "var(--surface-3)", borderRadius: 3, marginTop: 8, overflow: "hidden" }}>
               <div style={{ width: total ? `${(confirmedCount / total) * 100}%` : "0%", height: "100%", background: green, transition: "width 0.3s" }} />
@@ -460,8 +461,8 @@ export default function LocationManager({ lang = "en" }) {
                   <span style={{ display: "block", fontSize: "0.86rem", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
                   <span style={{ display: "block", fontSize: "0.7rem", color: dim, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {p.city_name || p.city_id || "—"}{p.district && p.district.trim() ? " · " + p.district : ""}
-                    {flagND && <span style={{ color: amber, marginLeft: 6 }}>⚠ {t("no district", "bez okresu")}</span>}
-                    {p.status !== "active" && <span style={{ color: amber, marginLeft: 6 }}>· {p.status}</span>}
+                    {flagND && <span style={{ color: amberInk, marginLeft: 6 }}>⚠ {t("no district", "bez okresu")}</span>}
+                    {p.status !== "active" && <span style={{ color: amberInk, marginLeft: 6 }}>· {p.status}</span>}
                   </span>
                 </span>
                 <span style={{ fontFamily: mono, fontSize: "0.62rem", color: p.country_code === "CZ" ? "#8aa0ff" : dim }}>{p.country_code}</span>
@@ -519,7 +520,7 @@ export default function LocationManager({ lang = "en" }) {
               </div>
 
               {cityWarn && (
-                <div style={{ marginTop: 7, fontSize: "0.7rem", color: amber, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <div style={{ marginTop: 7, fontSize: "0.7rem", color: amberInk, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                   <span>⚠ {t(`The pin is in "${cityWarn}", which isn't one of our cities yet.`,
                              `Pin je v "${cityWarn}", čo zatiaľ nie je jedno z našich miest.`)}</span>
                   <button onClick={addCity} disabled={addingCity || !pin}
@@ -551,7 +552,7 @@ export default function LocationManager({ lang = "en" }) {
 function Chip({ active, onClick, children }) {
   return <button onClick={onClick} style={{ padding: "3px 10px", borderRadius: 20, fontSize: "0.72rem", cursor: "pointer", fontFamily: "inherit", border: `1px solid ${active ? green : border}`, background: active ? "color-mix(in srgb, var(--accent) 14%, transparent)" : "transparent", color: active ? green : dim }}>{children}</button>;
 }
-const inputStyle = { width: "100%", boxSizing: "border-box", padding: "0.5rem 0.7rem", background: bg, border: `1px solid ${border}`, borderRadius: 7, color: textLight, fontSize: "0.84rem", fontFamily: "inherit", outline: "none" };
+const inputStyle = { ...fieldBlock };   // shared control box — see lib/controls.js
 const emptyStyle = { padding: "1.5rem 1.1rem", color: dim, fontSize: "0.8rem", fontFamily: mono };
 function btn(color, disabled, filled = false) {
   return { padding: "0.5rem 0.95rem", borderRadius: 7, fontSize: "0.82rem", fontWeight: 600, whiteSpace: "nowrap", cursor: disabled ? "not-allowed" : "pointer", fontFamily: "inherit", border: `1px solid ${color}`, background: disabled ? "var(--surface-3)" : (filled ? color : "transparent"), color: disabled ? "var(--text-faint)" : (filled ? "#06281d" : color), opacity: disabled ? 0.7 : 1, transition: "opacity 0.15s" };

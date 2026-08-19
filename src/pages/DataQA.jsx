@@ -30,6 +30,7 @@
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import ProjectsEditor from "../components/ProjectsEditor";
 import Picker from "../components/Picker";
+import { fieldBlock } from "../lib/controls";
 
 const green = "var(--accent)";
 const greenInk = "var(--accent-ink)";
@@ -148,7 +149,6 @@ function loadColCfg() {
 
 const tdStyle = (type) => ({ padding: "8px 11px", textAlign: type === "n" ? "right" : "left", color: textLight, fontSize: 13, whiteSpace: "nowrap" });
 const thStyle = (type) => ({ padding: "9px 11px", textAlign: type === "n" ? "right" : "left", color: dim, fontFamily: mono, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.3, cursor: "pointer", whiteSpace: "nowrap", userSelect: "none", borderBottom: `1px solid ${border}` });
-const selStyle = { display: "block", width: "100%", boxSizing: "border-box", marginTop: 5, padding: "9px 12px", background: bg2, border: `1px solid ${border}`, borderRadius: 8, color: textLight, fontSize: 14, outline: "none" };
 
 function cellNode(u, key) {
   if (key === "stav") return <span style={{ color: stavColor(u.stav), fontWeight: 600 }}>{u.stav || "—"}</span>;
@@ -472,7 +472,7 @@ export default function DataQA({ lang = "sk" }) {
             <input value={query} onChange={(e) => { setQuery(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)}
               role="combobox" aria-expanded={open} aria-autocomplete="list"
               placeholder={t("type to search…", "píš pre hľadanie…")}
-              style={{ width: "100%", boxSizing: "border-box", marginTop: 5, padding: "9px 12px", background: bg2, border: `1px solid ${border}`, borderRadius: 8, color: textLight, fontSize: 14, outline: "none" }} />
+              style={{ ...fieldBlock, marginTop: 5 }} />
             {open && matches.length > 0 && (
               <div role="listbox" style={{ position: "absolute", zIndex: 30, top: "100%", left: 0, right: 0, marginTop: 4, maxHeight: 320, overflowY: "auto", background: bg2, border: `1px solid ${border}`, borderRadius: 8 }}>
                 {matches.map((p) => (

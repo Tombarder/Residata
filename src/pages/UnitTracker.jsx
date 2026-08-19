@@ -47,7 +47,8 @@ import { moneyFromEur, moneySymbol } from "../lib/money";
 import { useCurrency } from "../lib/useCurrency";
 
 const mono   = "'JetBrains Mono', monospace";
-import { accent as green, accentInk, orange, dim, text, border, bg, surfaceDark as bg2, surfacePanel as panel } from "../lib/theme";
+import { accent as green, accentInk, orange, dim, text, border, bg, surfaceDark as bg2, surfacePanel as panel , orangeInk} from "../lib/theme";
+import { fieldBlock } from "../lib/controls";
 const yellow = "#f5d142";
 const red    = "#ff6b6b";
 const blue   = "#5e9bff";
@@ -568,12 +569,9 @@ function UnitTile({ unit, isPicked, disabled, onClick, lang, compact = false }) 
   );
 }
 
-const selectStyle = {
-  width: "100%", padding: "0.55rem 0.7rem",
-  background: bg, color: text, border: `1px solid ${border}`,
-  borderRadius: 6, fontSize: "0.85rem", fontFamily: "inherit",
-  outline: "none", boxSizing: "border-box",
-};
+// Shared control box, so the unit search sits level with the project <Picker>
+// beside it (they were 6px apart in height, which is what made the row look off).
+const selectStyle = { ...fieldBlock };
 
 // ── Detail view (KPIs + chart + status timeline) ────────────────
 
@@ -883,7 +881,7 @@ function ChartCard({ pickedHistories, comparables, yMode, setYMode, lang }) {
       {/* Below-chart hints — single-point and comparables */}
       <div style={{ marginTop: "0.6rem", display: "flex", flexDirection: "column", gap: "0.35rem", fontSize: "0.74rem" }}>
         {isSinglePoint && (
-          <div style={{ color: orange, display: "flex", alignItems: "center", gap: "0.4rem" }}>
+          <div style={{ color: orangeInk, display: "flex", alignItems: "center", gap: "0.4rem" }}>
             <span style={{ width: 6, height: 6, borderRadius: "50%", background: orange, display: "inline-block" }}/>
             {lang === "sk"
               ? "Zatiaľ máme len 1 záznam pre tento byt. Pri ďalšom scrape pribudne ďalší bod a krivka začne mať tvar."
@@ -1548,7 +1546,7 @@ function EmptyState({ lang, canFull, archiveMonths }) {
           : "Then click a unit to see its price evolution, status changes, when it first appeared and when it sold. Click more units (up to 4) to compare."}
       </div>
       {months <= 1 && (
-        <div style={{ marginTop: "1rem", fontSize: "0.78rem", color: orange, fontStyle: "italic", maxWidth: 540, margin: "1rem auto 0" }}>
+        <div style={{ marginTop: "1rem", fontSize: "0.78rem", color: orangeInk, fontStyle: "italic", maxWidth: 540, margin: "1rem auto 0" }}>
           {lang === "sk"
             ? "Po každom scrape pribudne nový dátový bod a krivka sa rozšíri."
             : "After each scrape a new data point will appear and the curve will grow."}

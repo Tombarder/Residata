@@ -2,6 +2,7 @@
 #
 # Primary goals:
 #   · Catch syntax / import errors BEFORE they reach Vercel
+#   · Run the node:test unit tests in src/**/*.test.mjs
 #   · Catch dependency audit issues (npm audit) on every PR
 #   · Ensure the bundle builds at all (`vite build` would fail on
 #     unresolved imports, missing modules, etc.)
@@ -42,6 +43,11 @@ jobs:
 
       - name: Lint
         run: npm run lint
+
+      - name: Unit tests
+        # node:test, zero deps. There were test files in src/lib that NOTHING ran —
+        # a test nobody runs is a test that rots, so CI runs them now.
+        run: npm test
 
       - name: Build (Vite)
         run: npm run build
