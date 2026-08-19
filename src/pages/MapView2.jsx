@@ -600,6 +600,17 @@ export default function MapView2({ lang = "en", setCurrent }) {
       }
     }, 15000);
     map.on("style.load", () => { clearTimeout(watchdogRef.current); setMapFail(null); });
+    // See MapView.jsx: the style can load while the machine still draws nothing.
+    map.once("idle", () => {
+      setTimeout(() => {
+        if (mapRef.current !== map) return;
+        let drawn = 0;
+        try { drawn = map.queryRenderedFeatures().length; } catch { return; }
+        if (drawn === 0) {
+          setMapFail({ reason: "gpu", detail: "The map style and its tiles loaded, but nothing was rendered — the browser's graphics layer is not drawing." });
+        }
+      }, 4000);
+    });
     mapRef.current = map;
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
     map.on("moveend", () => {

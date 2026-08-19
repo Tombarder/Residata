@@ -383,6 +383,20 @@ export default function MapView({ lang = "en", setCurrent }) {
       }
     }, 15000);
     map.on("style.load", () => { clearTimeout(styleWatchdog); setMapFail(null); });
+    // Second watchdog: the style loaded, so the DATA is here — but did anything
+    // actually get drawn? If the basemap renders zero features over Central Europe
+    // the machine's graphics stack is not painting (broken driver, hardware
+    // acceleration half-on). Checked once, well after the first idle.
+    map.once("idle", () => {
+      setTimeout(() => {
+        if (mapRef.current !== map) return;
+        let drawn = 0;
+        try { drawn = map.queryRenderedFeatures().length; } catch { return; }
+        if (drawn === 0) {
+          setMapFail({ reason: "gpu", detail: "The map style and its tiles loaded, but nothing was rendered — the browser's graphics layer is not drawing." });
+        }
+      }, 4000);
+    });
     watchdogRef.current = styleWatchdog;
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
     // Remember the camera on every settle, so navigating away + back restores it.

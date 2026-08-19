@@ -18,16 +18,26 @@ export default function MapUnavailable({ reason, detail, sk = true, onRetry }) {
   // `reason` comes from lib/webgl.js (the browser can't start a map) or from
   // maplibre's own error event (the map started but the map DATA won't load).
   const noWebGL = reason === "no-webgl" || reason === "context-threw" || reason === "canvas-failed";
+  // "gpu" = the map loaded and maplibre is running (the readouts above it update as
+  // you pan) but the graphics card draws nothing or garbage. Different problem from
+  // "no WebGL at all", and it needs the OPPOSITE advice: turn hardware acceleration
+  // OFF, so the browser falls back to software rendering and draws correctly.
+  const gpuDead = reason === "gpu";
 
   const title = noWebGL
     ? t("Mapa sa v tomto prehliadači nedá zobraziť", "This browser can't display the map")
-    : t("Mapu sa nepodarilo načítať", "The map didn't load");
+    : gpuDead
+      ? t("Mapa sa načítala, ale grafika ju nevykreslila", "The map loaded, but your graphics didn't draw it")
+      : t("Mapu sa nepodarilo načítať", "The map didn't load");
 
   const body = noWebGL
     ? t("Mapa potrebuje hardvérové zrýchlenie (WebGL). V tomto prehliadači je vypnuté alebo ho blokuje grafický ovládač. Zvyšok platformy funguje normálne — týka sa to len mapy.",
         "The map needs hardware acceleration (WebGL). It is switched off in this browser, or the graphics driver is blocking it. The rest of the platform works normally — this affects the map only.")
-    : t("Podkladová mapa sa nenačítala. Býva to dočasný výpadok siete alebo poskytovateľa mapy.",
-        "The base map didn't load. This is usually a temporary network or map-provider outage.");
+    : gpuDead
+      ? t("Dáta mapy dorazili a mapa beží — čísla nad ňou sa menia, keď ňou pohneš. Nevykresľuje ju grafická karta tohto počítača (starý alebo chybný ovládač). Nie je to chyba dát ani pripojenia.",
+          "The map data arrived and the map is running — the figures above it change as you move it. What isn't working is this computer's graphics drawing it (an old or faulty driver). It is not a data or connection problem.")
+      : t("Podkladová mapa sa nenačítala. Býva to dočasný výpadok siete alebo poskytovateľa mapy.",
+          "The base map didn't load. This is usually a temporary network or map-provider outage.");
 
   const steps = noWebGL
     ? [
@@ -38,7 +48,16 @@ export default function MapUnavailable({ reason, detail, sk = true, onRetry }) {
         t("Firefox: about:config → gfx.webrender.all = true, alebo skús iný prehliadač.",
           "Firefox: about:config → gfx.webrender.all = true, or try another browser."),
       ]
-    : [];
+    : gpuDead
+      ? [
+          t("Skús to najprv naopak: Chrome / Edge → Nastavenia → Systém → VYPNI „Použiť hardvérové zrýchlenie, ak je k dispozícii“ a reštartuj prehliadač. Prehliadač potom kreslí mapu procesorom — pomalšie, ale správne.",
+            "Try the opposite first: Chrome / Edge → Settings → System → turn OFF “Use hardware acceleration when available”, then restart the browser. It will draw the map on the CPU instead — slower, but correct."),
+          t("Ak to pomohlo, trvalé riešenie je aktualizovať ovládač grafickej karty (Windows Update alebo stránka výrobcu).",
+            "If that helps, the permanent fix is updating the graphics driver (Windows Update, or the vendor's site)."),
+          t("chrome://gpu ukáže, ktorý ovládač sa používa a či je na zozname problémových.",
+            "chrome://gpu shows which driver is in use and whether it is on the blocklist."),
+        ]
+      : [];
 
   const copy = async () => {
     try {
