@@ -20,12 +20,15 @@ import { useEffect, useRef, useState, useMemo } from "react";
 import maplibregl from "maplibre-gl";
 import useDismiss from "../lib/useDismiss";
 import { fieldBlock } from "../lib/controls";
+import { checkWebGL } from "../lib/webgl";
+import MapUnavailable from "../components/MapUnavailable";
 import "maplibre-gl/dist/maplibre-gl.css";
 
-// Same basemap as the Map / Market Radar pages — OpenFreeMap "liberty". It was CARTO
-// "dark-matter" until 2026-08-19; measured, that style painted 84% of the canvas one
-// near-black colour, which is no way to place a pin on a street (detail in MapView.jsx).
-const MAP_STYLE = "https://tiles.openfreemap.org/styles/liberty";
+// VersaTiles "eclipse" — the platform's dark basemap. This picker sits in a dark
+// admin panel and does not follow the light theme, so it always uses the dark one.
+// It was CARTO "dark-matter" until 2026-08-19; measured, that style had stopped
+// carrying roads at all, which is no way to place a pin on a street (see MapView.jsx).
+const MAP_STYLE = "https://tiles.versatiles.org/assets/styles/eclipse/style.json";
 const PHOTON = "https://photon.komoot.io/api/";
 const PHOTON_REVERSE = "https://photon.komoot.io/reverse";
 const BIAS = { SK: { lat: 48.7, lon: 19.5 }, CZ: { lat: 49.8, lon: 15.5 } };
@@ -103,6 +106,8 @@ export default function LocationManager({ lang = "en" }) {
   const [addingCity, setAddingCity] = useState(false); // adding cityWarn as a new city
   const [deriving, setDeriving] = useState(false); // reverse-geocode in flight after a user pin-move
   const [district, setDistrict] = useState("");
+  // Never leave a blank map — see lib/webgl.js.
+  const [mapFail] = useState(() => { const g = checkWebGL(); return g.ok ? null : g; });
   const [suggestions, setSuggestions] = useState([]);
   const [searching, setSearching] = useState(false);
   // The address suggestion list closes on an outside click / Esc, like every
@@ -217,6 +222,7 @@ export default function LocationManager({ lang = "en" }) {
   // ── Map ──
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
+    if (!checkWebGL().ok) return;   // nothing to initialise — MapUnavailable is showing instead
     const map = new maplibregl.Map({ container: containerRef.current, style: MAP_STYLE, center: [18.5, 48.7], zoom: 6.2, attributionControl: true });
     mapRef.current = map;
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
@@ -543,6 +549,7 @@ export default function LocationManager({ lang = "en" }) {
         </div>
         <div style={{ flex: 1, position: "relative", minHeight: 320 }}>
           <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />
+          {mapFail && <MapUnavailable reason={mapFail.reason} detail={mapFail.detail} sk={false} onRetry={() => window.location.reload()} />}
           {toast && (<div style={{ position: "absolute", top: 14, left: "50%", transform: "translateX(-50%)", zIndex: 5, padding: "8px 16px", borderRadius: 8, fontSize: "0.82rem", fontWeight: 500, background: toast.type === "ok" ? "color-mix(in srgb, var(--accent) 95%, transparent)" : "rgba(255,80,80,0.95)", color: toast.type === "ok" ? "#06281d" : "#2a0808", boxShadow: "0 8px 30px rgba(0,0,0,0.5)" }}>{toast.msg}</div>)}
         </div>
       </div>

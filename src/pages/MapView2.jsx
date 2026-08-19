@@ -42,14 +42,17 @@ import { accent as green, accentPaint, orange as amber, dim, text as textLight, 
 import { getTheme, useThemeMode } from "../lib/theme-mode";
 import { kickFirstRender } from "../lib/mapRenderKick";
 import { field } from "../lib/controls";
+import { checkWebGL } from "../lib/webgl";
+import MapUnavailable from "../components/MapUnavailable";
 const greyPt = "#6b6b76";
 const panel = "var(--surface)";
 
-// Basemap: OpenFreeMap "liberty" for BOTH themes — see the measurements in
-// MapView.jsx for why the dark theme stopped using CARTO "dark-matter" on 2026-08-19
-// (its free tiles now carry almost no data, so the map rendered as a black rectangle).
+// Same pair as the Map page: OpenFreeMap "liberty" (light) + VersaTiles "eclipse"
+// (dark). See MapView.jsx for the measurements behind dropping CARTO "dark-matter"
+// on 2026-08-19 — its free tiles had stopped carrying a map (164 rendered features
+// against eclipse's 1536).
 const MAP_STYLE_LIGHT = "https://tiles.openfreemap.org/styles/liberty";
-const MAP_STYLE_DARK = MAP_STYLE_LIGHT;
+const MAP_STYLE_DARK = "https://tiles.versatiles.org/assets/styles/eclipse/style.json";
 const mapStyleUrl = () => (getTheme() === "light" ? MAP_STYLE_LIGHT : MAP_STYLE_DARK);
 
 // Install the custom sources + layers on a map. Run on initial load AND after a
@@ -222,6 +225,10 @@ export default function MapView2({ lang = "en", setCurrent }) {
   const [lens, setLens] = useState("price");
   const [conditions, setConditions] = useState([]);
   const [filterOpen, setFilterOpen] = useState(false);
+  // Never leave a blank map — see lib/webgl.js. If WebGL is unavailable the map
+  // cannot start, and an empty container looks exactly like a broken basemap.
+  const [mapFail, setMapFail] = useState(() => { const g = checkWebGL(); return g.ok ? null : g; });
+  const watchdogRef = useRef(null);
   const filterBtnRef = useRef(null);   // handed to the builder so its outside-click dismissal doesn't fight this toggle
   const [nameQuery, setNameQuery] = useState("");
   const [analysisCenter, setAnalysisCenter] = useState(null);
@@ -583,7 +590,16 @@ export default function MapView2({ lang = "en", setCurrent }) {
     // country — otherwise, after switching markets while unmounted, the map opened
     // over the previous country and the fit was skipped (all pins off-screen).
     const hadSaved = savedView != null && savedView.country === countryRef.current;
+    if (!checkWebGL().ok) return;   // nothing to initialise — MapUnavailable is showing instead
     const map = new maplibregl.Map({ container: containerRef.current, style: mapStyleUrl(), center: hadSaved ? savedView.center : FALLBACK_CENTER, zoom: hadSaved ? savedView.zoom : FALLBACK_ZOOM, attributionControl: true });
+    // Watchdog: a basemap that never arrives (outage, proxy, blocking extension)
+    // must say so rather than sit blank. Cleared when the style loads.
+    watchdogRef.current = setTimeout(() => {
+      if (mapRef.current === map && !map.isStyleLoaded()) {
+        setMapFail({ reason: "basemap", detail: "The base map style did not load within 15s (network, proxy or provider)." });
+      }
+    }, 15000);
+    map.on("style.load", () => { clearTimeout(watchdogRef.current); setMapFail(null); });
     mapRef.current = map;
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
     map.on("moveend", () => {
@@ -895,6 +911,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
       {/* Map + competitive panel */}
       <div style={{ position: "relative", flex: 1, minHeight: 360 }}>
         <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />
+        {mapFail && <MapUnavailable reason={mapFail.reason} detail={mapFail.detail} sk={sk} onRetry={() => window.location.reload()} />}
 
         {filterOpen && (
           <MapFilterBuilder conditions={conditions} setConditions={setConditions} projects={projects || []} matchCount={shown.length} totalCount={candidatePool.length} sk={sk} onClose={() => setFilterOpen(false)} triggerRef={filterBtnRef} />

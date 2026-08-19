@@ -40,28 +40,33 @@ import Picker from "../components/Picker";
 import { getTheme, useThemeMode } from "../lib/theme-mode";
 import { kickFirstRender } from "../lib/mapRenderKick";
 import { fieldBlock } from "../lib/controls";
+import { checkWebGL } from "../lib/webgl";
+import MapUnavailable from "../components/MapUnavailable";
 const greyPt = "#6b6b76";
 const panel = "var(--surface)";
 
-// Basemap: OpenFreeMap "liberty" — free, no key, commercial-OK, full OSM street map.
+// Basemaps. Both free, no key, commercial-OK, OpenStreetMap data.
+//   light = OpenFreeMap "liberty"            — full colour street map
+//   dark  = VersaTiles "eclipse"             — a real dark street map
 //
-// ONE basemap for both themes, deliberately. Until 2026-08-19 the dark theme used
-// CARTO "dark-matter" and Boss reported both map pages as "grey, cant see shit".
-// Root-caused by reading the rendered canvas back with gl.readPixels (60x34 grid,
-// zoom 11 over Bratislava) rather than by eye:
-//   carto dark-matter    84% of the canvas ONE colour rgb(14,14,14),  9% of pixels above near-black
-//   openfreemap dark     85% one colour rgb(12,12,12),                7% above near-black
-//   openfreemap liberty  no colour above 23%,                       100% above near-black
-// maplibre was healthy the whole time — tiles fetched, features rendered, our pins
-// painted. The basemap had simply stopped containing anything: CARTO's free tiles now
-// serve little more than water, boundaries and place dots (no roads, no landuse), and
-// their sprites are down to a SINGLE icon across dark-matter / positron / voyager. So
-// this got worse without anyone touching our code, and no dark style on OpenFreeMap is
-// usable either — both of theirs are near-black-on-near-black at our zooms.
-// If a dark map comes back it has to be a real one (liberty's data with a dark palette),
-// not another near-black style; a map you cannot read is worse than a light one.
+// The dark theme used CARTO "dark-matter" until 2026-08-19, when Boss reported both
+// map pages as "grey, cant see shit". It was not our code: maplibre was healthy —
+// style loaded, layers installed, our pins painting — the BASEMAP had stopped
+// carrying anything to draw. CARTO's free tiles now serve little more than water,
+// boundaries and place dots, and their sprites are down to a SINGLE icon across
+// dark-matter, positron AND voyager, so every icon layer draws nothing.
+//
+// Measured on the rendered canvas (gl.readPixels + queryRenderedFeatures — a WebGL
+// canvas does not survive a screenshot, so counting is the only honest way):
+//   carto dark-matter      164 features ·  84% of the canvas ONE colour rgb(14,14,14)
+//   openfreemap "dark"      (same near-black problem — swapping to it fixes nothing)
+//   openfreemap "fiord"     (a PALE GREY map despite the name)
+//   openfreemap liberty     905 features · legible, but it is a LIGHT map
+//   versatiles eclipse     1536 features · dark, with amber roads + readable labels
+// Feature count is the signal that matters; "how bright is it" is not, or it would
+// pick a light map for a dark theme.
 const MAP_STYLE_LIGHT = "https://tiles.openfreemap.org/styles/liberty";
-const MAP_STYLE_DARK = MAP_STYLE_LIGHT;
+const MAP_STYLE_DARK = "https://tiles.versatiles.org/assets/styles/eclipse/style.json";
 const mapStyleUrl = () => (getTheme() === "light" ? MAP_STYLE_LIGHT : MAP_STYLE_DARK);
 
 // Install the clustered projects source + layers on a map. Run on initial load AND
@@ -232,7 +237,13 @@ export default function MapView({ lang = "en", setCurrent }) {
   // Theme switch: bumped after the base map is re-styled so the data effect repopulates
   // the (setStyle-wiped) projects source onto the fresh style.
   const [styleEpoch, setStyleEpoch] = useState(0);
-  const [mapReady, setMapReady] = useState(false); // flips true on load → re-runs the theme effect (catches a toggle made DURING the tile-load window)
+  const [mapReady, setMapReady] = useState(false);
+  // Never leave a blank map. If the browser can't run WebGL (hardware acceleration
+  // off, blocked driver) maplibre fails to start and the container would stay empty —
+  // indistinguishable from a broken basemap, which is what cost a day on 2026-08-19.
+  const [mapFail, setMapFail] = useState(() => { const g = checkWebGL(); return g.ok ? null : g; });
+  const watchdogRef = useRef(null);
+ // flips true on load → re-runs the theme effect (catches a toggle made DURING the tile-load window)
   const [themeMode] = useThemeMode();
   const themeRef = useRef(themeMode);
 
@@ -350,6 +361,7 @@ export default function MapView({ lang = "en", setCurrent }) {
   // ── Initialise the map once ──
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
+    if (!checkWebGL().ok) return;   // nothing to initialise — MapUnavailable is showing instead
     // Restore the camera from the last time the map was open this session.
     const hadSavedView = savedView != null;
     const map = new maplibregl.Map({
@@ -362,6 +374,16 @@ export default function MapView({ lang = "en", setCurrent }) {
       attributionControl: true,
     });
     mapRef.current = map;
+    // Watchdog: if the basemap never arrives (provider outage, a corporate proxy or
+    // an extension blocking tiles.openfreemap.org) the canvas would sit blank
+    // forever. Say so instead. Cleared the moment the style loads.
+    const styleWatchdog = setTimeout(() => {
+      if (mapRef.current === map && !map.isStyleLoaded()) {
+        setMapFail({ reason: "basemap", detail: "The base map style did not load within 15s (network, proxy or provider)." });
+      }
+    }, 15000);
+    map.on("style.load", () => { clearTimeout(styleWatchdog); setMapFail(null); });
+    watchdogRef.current = styleWatchdog;
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
     // Remember the camera on every settle, so navigating away + back restores it.
     map.on("moveend", () => {
@@ -435,12 +457,13 @@ export default function MapView({ lang = "en", setCurrent }) {
 
     return () => {
       if (ro) ro.disconnect();
+      if (watchdogRef.current) { clearTimeout(watchdogRef.current); watchdogRef.current = null; }
       if (popupRef.current) { popupRef.current.remove(); popupRef.current = null; }
       map.remove(); mapRef.current = null; readyRef.current = false;
     };
   }, []);
 
-  // ── Theme switch ── swap base tiles (voyager ↔ dark-matter) live. setStyle() drops
+  // ── Theme switch ── re-apply the style live. setStyle() drops
   // all custom sources/layers; on the new style's load we re-install them and bump
   // styleEpoch so the data effect below repopulates the projects source.
   useEffect(() => {
@@ -706,6 +729,7 @@ export default function MapView({ lang = "en", setCurrent }) {
       {/* Map */}
       <div style={{ position: "relative", flex: 1, minHeight: 360 }}>
         <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />
+        {mapFail && <MapUnavailable reason={mapFail.reason} detail={mapFail.detail} sk={sk} onRetry={() => window.location.reload()} />}
         {isLoading && (
           <div style={{
             position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
