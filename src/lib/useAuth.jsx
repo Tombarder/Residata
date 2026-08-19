@@ -157,7 +157,11 @@ function useAuthInternal() {
     if (!isSupabaseReady()) return { error: "Supabase offline" };
     return supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: window.location.origin + "/" },
+      // Where the email's link lands, for any template that carries one. The
+      // platform, not the marketing homepage — someone who has just signed up
+      // wants the product, not the sales page. (The code-entry path in
+      // LoginModal routes there too, so both ways in agree.)
+      options: { emailRedirectTo: window.location.origin + "/app" },
     });
   };
 

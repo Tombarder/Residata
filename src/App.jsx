@@ -2610,7 +2610,8 @@ export default function App() {
           onCta={handleTrialCta}
         />
       )}
-      <LoginModal open={loginOpen} onClose={() => setLoginOpen(false)} lang={lang} />
+      <LoginModal open={loginOpen} onClose={() => setLoginOpen(false)} lang={lang}
+        onSignedIn={() => { if (!isAppPage(current)) handleNav("App:Dashboard"); }} />
       {/* Force profile completion after login */}
       {auth.user && auth.profile && !auth.profile.profile_completed && (
         <CompleteProfile lang={lang} />

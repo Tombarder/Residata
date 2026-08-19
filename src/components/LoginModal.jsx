@@ -4,9 +4,18 @@ import { getLiveT } from "../lib/liveLang";
 import { validateBusinessEmail, signupEmailAllowed } from "../lib/emailValidation";
 import { track } from "../lib/track";
 import { useBreakpointDown, BP } from "../lib/breakpoints";
+import { useEscape } from "../lib/useDismiss";
 
-export default function LoginModal({ open, onClose, lang = "en" }) {
+// `onSignedIn` fires once a human has actually completed a login here, so the app
+// can take them into the platform. Deliberately NOT inferred from "a user exists"
+// higher up: that is also true on every page load with a stored session, and would
+// yank a logged-in visitor off /pricing every time they refreshed it.
+export default function LoginModal({ open, onClose, onSignedIn, lang = "en" }) {
   const t = getLiveT(lang);
+  // Escape closes it, like every other layer in the app. An outside click already
+  // does (the backdrop's own onClick) — useEscape deliberately does NOT add another
+  // outside-click listener, so a click inside the form can never dismiss it.
+  useEscape(open, onClose);
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [error, setError] = useState(null);
@@ -85,6 +94,18 @@ export default function LoginModal({ open, onClose, lang = "en" }) {
       // Auth context picks up SIGNED_IN and re-renders the app logged-in;
       // closing the modal hands off to the app's tier/profile gating.
       onClose();
+      // …and then TAKE THEM TO THE PLATFORM. Closing the modal used to be the
+      // whole of it, which left a brand-new user standing on the marketing page
+      // they happened to sign up from — they had just been emailed a code,
+      // typed it, and were rewarded with the same public homepage. (Boss,
+      // 2026-08-19: "the link that i got after signing up linked me to the
+      // 'live' view … should link me to the PLATFORM dashboard". The activity
+      // trail agrees: login_code_success was logged at page_path "/".)
+      //
+      // App owns the navigation because only App can re-render the page —
+      // pushRoute alone rewrites the URL and leaves the marketing page on
+      // screen, which is worse than not moving at all.
+      onSignedIn?.();
     }
   };
 

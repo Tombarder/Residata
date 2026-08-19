@@ -8,6 +8,22 @@ import { cleanText, cleanUrl, cleanPhone } from "../lib/sanitize";
 import { hasTrialIntent, clearTrialIntent, activateTrial } from "../lib/trial";
 
 /**
+ * Did the row actually get written? Used whenever the save LOOKS like it failed —
+ * the write and the answer to "did it work" travel separately, so a lost response
+ * is not proof of a lost write. Deliberately quiet: any problem reading it means
+ * we fall through to the normal error path with the form still filled in.
+ */
+async function profileAlreadyComplete(userId) {
+  try {
+    const { data } = await supabase
+      .from("user_profiles").select("profile_completed").eq("id", userId).maybeSingle();
+    return !!data?.profile_completed;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Povinný post-login krok. Full-screen overlay ak user je authenticated +
  * profile.profile_completed === false. Žiadny close button.
  *
@@ -36,6 +52,8 @@ export default function CompleteProfile({ lang = "en" }) {
   // "form" (initial) | "saving" (button disabled) | "error" (rollback)
   const [state, setState] = useState("form");
   const [err, setErr] = useState(null);
+  // A slow save says so instead of silently reloading the page out from under them.
+  const [slow, setSlow] = useState(false);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -45,16 +63,24 @@ export default function CompleteProfile({ lang = "en" }) {
     }
     setErr(null);
     setState("saving");
+    setSlow(false);
+    const slowHint = setTimeout(() => setSlow(true), 6000);
     const t0 = performance.now();
     if (import.meta.env.DEV) console.log(`[CompleteProfile] submit start`, { user: user?.id });
 
-    // Hard-reload fallback — if for any reason the in-app re-render path fails
-    // (stale closure, race, network hiccup), force a full page reload to /app
-    // after a timeout. Guarantees the user doesn't sit stuck forever.
-    const hardReloadFallback = setTimeout(() => {
-      if (import.meta.env.DEV) console.warn("[CompleteProfile] slow submit — forcing hard reload to /app");
-      window.location.replace("/app");
-    }, 10000);
+    // NO reload race here. There used to be a 10-second "safety net" that
+    // hard-reloaded to /app if the save hadn't finished — and it was the reason
+    // a real sign-up (2026-08-19 07:47) bounced back to a BLANK form: the write
+    // on this client is allowed 35s (DATA_FETCH_TIMEOUT_MS), so any save taking
+    // 10–35s was cancelled mid-flight by the navigation, the form remounted
+    // empty, and everything the user had typed was gone. The activity trail
+    // shows it exactly: a page_view of /app at 07:47:11 with NO profile_completed
+    // event, then the real save 12s later on the second attempt.
+    //
+    // A safety net that destroys the user's input is worse than the hang it
+    // guards against. The request is already bounded — if it fails we land in
+    // catch(), show the error, and the form KEEPS what they typed so retry is
+    // one click. `slow` only changes the button label, never the page.
 
     try {
       // Sanitize at the intake boundary — see src/lib/sanitize.js for why.
@@ -88,19 +114,24 @@ export default function CompleteProfile({ lang = "en" }) {
 
       if (import.meta.env.DEV) console.log(`[CompleteProfile] update returned after ${Math.round(performance.now() - t0)}ms`, { hasData: !!data?.length, error });
 
-      if (error) {
-        clearTimeout(hardReloadFallback);
-        if (import.meta.env.DEV) console.error("[CompleteProfile] ERROR", error);
+      if (error || !data || data.length === 0) {
+        clearTimeout(slowHint);
+        if (import.meta.env.DEV) console.error("[CompleteProfile] save did not confirm", error);
+        // The write may STILL have landed — a dropped response, an aborted fetch
+        // or a returning-rows quirk all look like failure here while the row is
+        // already committed. Ask the database what it actually holds before
+        // telling the user their details were lost, otherwise we send someone
+        // whose profile IS complete back to fill the same form again.
+        if (await profileAlreadyComplete(user.id)) {
+          window.location.replace("/app");
+          return;
+        }
         setState("error");
-        setErr(`${error.message}${error.details ? " — " + error.details : ""}`);
-        return;
-      }
-      if (!data || data.length === 0) {
-        clearTimeout(hardReloadFallback);
-        setState("error");
-        setErr(lang === "sk"
-          ? "Update sa nezapísal (RLS / prihlasovací token). Skús sa odhlásiť a prihlásiť znova."
-          : "Update didn't persist (RLS / session issue). Try signing out and back in.");
+        setErr(error
+          ? `${error.message}${error.details ? " — " + error.details : ""}`
+          : (lang === "sk"
+              ? "Údaje sa neuložili. Skús to prosím znova — nič si nemusíš prepisovať."
+              : "Your details weren't saved. Please try again — nothing you typed was lost."));
         return;
       }
 
@@ -130,11 +161,17 @@ export default function CompleteProfile({ lang = "en" }) {
       // re-render to unmount CompleteProfile) sometimes stalled in practice.
       // A full page reload here is overkill for a happy path but cheap and
       // 100 % reliable. New users land directly in the platform, as they should.
-      clearTimeout(hardReloadFallback);
+      clearTimeout(slowHint);
       window.location.replace("/app");
     } catch (e) {
-      clearTimeout(hardReloadFallback);
+      clearTimeout(slowHint);
       if (import.meta.env.DEV) console.error("[CompleteProfile] exception", e);
+      // Same reasoning as above: a thrown fetch (abort / timeout / dropped
+      // socket) says nothing about whether the row was written.
+      if (await profileAlreadyComplete(user.id)) {
+        window.location.replace("/app");
+        return;
+      }
       setState("error");
       setErr(e.message || String(e));
     }
@@ -246,7 +283,10 @@ export default function CompleteProfile({ lang = "en" }) {
                     animation: "cp-spin 0.7s linear infinite",
                   }} />
                 )}
-                {state === "saving" ? (lang === "sk" ? "Ukladám…" : "Saving…") : t.cp_submit}
+                {state === "saving"
+                  ? (slow ? (lang === "sk" ? "Stále ukladám…" : "Still saving…")
+                          : (lang === "sk" ? "Ukladám…" : "Saving…"))
+                  : t.cp_submit}
               </button>
 
               <button type="button" onClick={() => signOut()} disabled={state === "saving"} style={{
