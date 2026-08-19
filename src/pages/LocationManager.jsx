@@ -22,7 +22,10 @@ import useDismiss from "../lib/useDismiss";
 import { fieldBlock } from "../lib/controls";
 import "maplibre-gl/dist/maplibre-gl.css";
 
-const MAP_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
+// Same basemap as the Map / Market Radar pages — OpenFreeMap "liberty". It was CARTO
+// "dark-matter" until 2026-08-19; measured, that style painted 84% of the canvas one
+// near-black colour, which is no way to place a pin on a street (detail in MapView.jsx).
+const MAP_STYLE = "https://tiles.openfreemap.org/styles/liberty";
 const PHOTON = "https://photon.komoot.io/api/";
 const PHOTON_REVERSE = "https://photon.komoot.io/reverse";
 const BIAS = { SK: { lat: 48.7, lon: 19.5 }, CZ: { lat: 49.8, lon: 15.5 } };

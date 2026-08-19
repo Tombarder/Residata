@@ -43,10 +43,25 @@ import { fieldBlock } from "../lib/controls";
 const greyPt = "#6b6b76";
 const panel = "var(--surface)";
 
-// CARTO vector basemaps — free, no key. Light (positron) in light theme, dark-matter in dark.
-// Same cartocdn.com host as before, so the CSP already allows it.
-const MAP_STYLE_DARK = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
-const MAP_STYLE_LIGHT = "https://tiles.openfreemap.org/styles/liberty"; // OpenFreeMap "liberty" — free, no key, commercial-OK, colourful OSM vector basemap (voyager read washed/faded; Boss 2026-07-20)
+// Basemap: OpenFreeMap "liberty" — free, no key, commercial-OK, full OSM street map.
+//
+// ONE basemap for both themes, deliberately. Until 2026-08-19 the dark theme used
+// CARTO "dark-matter" and Boss reported both map pages as "grey, cant see shit".
+// Root-caused by reading the rendered canvas back with gl.readPixels (60x34 grid,
+// zoom 11 over Bratislava) rather than by eye:
+//   carto dark-matter    84% of the canvas ONE colour rgb(14,14,14),  9% of pixels above near-black
+//   openfreemap dark     85% one colour rgb(12,12,12),                7% above near-black
+//   openfreemap liberty  no colour above 23%,                       100% above near-black
+// maplibre was healthy the whole time — tiles fetched, features rendered, our pins
+// painted. The basemap had simply stopped containing anything: CARTO's free tiles now
+// serve little more than water, boundaries and place dots (no roads, no landuse), and
+// their sprites are down to a SINGLE icon across dark-matter / positron / voyager. So
+// this got worse without anyone touching our code, and no dark style on OpenFreeMap is
+// usable either — both of theirs are near-black-on-near-black at our zooms.
+// If a dark map comes back it has to be a real one (liberty's data with a dark palette),
+// not another near-black style; a map you cannot read is worse than a light one.
+const MAP_STYLE_LIGHT = "https://tiles.openfreemap.org/styles/liberty";
+const MAP_STYLE_DARK = MAP_STYLE_LIGHT;
 const mapStyleUrl = () => (getTheme() === "light" ? MAP_STYLE_LIGHT : MAP_STYLE_DARK);
 
 // Install the clustered projects source + layers on a map. Run on initial load AND
