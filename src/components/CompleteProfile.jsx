@@ -16,33 +16,52 @@ import { dangerInk } from "../lib/theme";
  */
 async function profileAlreadyComplete(userId) {
   try {
-    const { data } = await supabase
-      .from("user_profiles").select("profile_completed").eq("id", userId).maybeSingle();
-    return !!data?.profile_completed;
+    // BOUNDED. This runs precisely when the save has just failed — and the most
+    // likely reason for that is the very client this read goes through being slow
+    // or wedged, where a request is allowed 35 seconds. Unbounded, a failed save
+    // could leave someone watching "Still saving…" for 35s and then another 35s
+    // before being told anything at all. 8s is far longer than this one-row read
+    // ever needs; if it has not answered by then, treat it as "don't know" and
+    // show the error, which keeps everything they typed either way.
+    const answer = await Promise.race([
+      supabase.from("user_profiles").select("profile_completed").eq("id", userId).maybeSingle(),
+      new Promise((resolve) => setTimeout(() => resolve({ data: null, timedOut: true }), 8000)),
+    ]);
+    return !!answer?.data?.profile_completed;
   } catch {
     return false;
   }
 }
 
 /**
- * Povinný post-login krok. Full-screen overlay ak user je authenticated +
- * profile.profile_completed === false. Žiadny close button.
+ * The mandatory post-login step: a full-screen overlay shown whenever the user is
+ * authenticated but `profile.profile_completed` is false. No close button — this is
+ * the last thing between signing up and being in the product.
  *
- * FLOW (freemium + direct context update):
- *   1. Klik Save → state='saving' (form disabled, tiny spinner on button)
- *   2. supabase UPDATE profile_completed=true  → DB trigger auto-sets
- *      tier='free' and approved_at=NOW() synchronously.
- *   3. UPDATE returns the fresh row. We push it DIRECTLY into AuthContext
- *      via setProfile(). No round-trip reloadProfile() needed, no wait.
- *   4. App.jsx sees profile_completed=true → unmounts us → dashboard shows.
- *   5. We also pushRoute("Live") so the URL + page match explicitly, even
- *      if something delays the re-render.
+ * WHAT HAPPENS ON SUBMIT
+ *   1. The button goes to "Saving…", and to "Still saving…" after 6s. Nothing else
+ *      moves — see the long note in submit() for why there is no timer racing the
+ *      request any more.
+ *   2. UPDATE user_profiles SET …, profile_completed = true. A BEFORE trigger sets
+ *      tier='free' + approved_at; an AFTER trigger queues the welcome + admin mails.
+ *   3. Whatever the outcome, we end up in ONE of two places:
+ *        · the row is written → enterApp(): redeem any trial they asked for while
+ *          anonymous, then hard-redirect to /app.
+ *        · the row is not written → the error screen, with the form still filled
+ *          in, so "Try again" costs one click and no retyping.
+ *      An apparent failure is re-checked against the database first: a dropped
+ *      response is not proof of a dropped write.
  *
- * Before this: we had an "optimistic success" screen that sat at "Loading
- * profile…" for N seconds because reloadProfile() was causing a stale-
- * closure race. The direct setProfile approach makes the transition
- * instant — the form submit resolves, the new profile hits context, and
- * the parent unmounts the overlay in the same render tick.
+ * WHY A HARD REDIRECT rather than letting App unmount this overlay on the next
+ * render: the setProfile + re-render path stalled in practice ("Loading profile…"
+ * for several seconds, a stale-closure race in reloadProfile). A full reload is
+ * overkill on the happy path and completely reliable, which is the better trade
+ * for the one screen a new customer cannot get past.
+ *
+ * It redirects to /app — the PLATFORM. This comment previously described routing
+ * to "Live", the public marketing page, which is exactly what Boss hit on
+ * 2026-08-19 ("should link me to the PLATFORM dashboard not website view"). Do not
+ * reintroduce it.
  */
 export default function CompleteProfile({ lang = "en" }) {
   const t = getLiveT(lang);
