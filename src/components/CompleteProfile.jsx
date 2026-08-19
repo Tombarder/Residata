@@ -6,6 +6,7 @@ import { getLiveT } from "../lib/liveLang";
 import { track } from "../lib/track";
 import { cleanText, cleanUrl, cleanPhone } from "../lib/sanitize";
 import { hasTrialIntent, clearTrialIntent, activateTrial } from "../lib/trial";
+import { dangerInk } from "../lib/theme";
 
 /**
  * Did the row actually get written? Used whenever the save LOOKS like it failed —
@@ -211,7 +212,7 @@ export default function CompleteProfile({ lang = "en" }) {
             <h2 style={{ fontSize: "1.3rem", fontWeight: 700, textAlign: "center", marginBottom: "0.75rem", color: "var(--text)" }}>
               {lang === "sk" ? "Uloženie zlyhalo" : "Save failed"}
             </h2>
-            <p style={{ color: "#ff6b6b", fontSize: "0.85rem", textAlign: "center", marginBottom: "1.5rem", lineHeight: 1.5 }}>
+            <p style={{ color: dangerInk, fontSize: "0.85rem", textAlign: "center", marginBottom: "1.5rem", lineHeight: 1.5 }}>
               {err}
             </p>
             <button onClick={retry} style={{
@@ -260,7 +261,7 @@ export default function CompleteProfile({ lang = "en" }) {
                 <input type="tel" value={form.phone} maxLength={32} autoComplete="tel" onChange={e => setForm({...form, phone: e.target.value})} placeholder={t.cp_phone_ph} style={fieldStyle} />
               </Field>
 
-              {err && <div style={{ color: "#ff6b6b", fontSize: "0.8rem", marginBottom: "0.75rem" }}>{err}</div>}
+              {err && <div style={{ color: dangerInk, fontSize: "0.8rem", marginBottom: "0.75rem" }}>{err}</div>}
 
               <button
                 type="submit"

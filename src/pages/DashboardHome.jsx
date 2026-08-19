@@ -37,8 +37,7 @@ import { localeTag } from "../lib/locale";
 import { useActivateTrial } from "../lib/useActivateTrial";
 import {
   accent as green, accentInk, orange, blue, dim, faint, text as textLight, border,
-  surface as bg, surfaceDark as bg2, surfacePanel, mono, orangeInk, infoInk,
-} from "../lib/theme";
+  surface as bg, surfaceDark as bg2, surfacePanel, mono, orangeInk, infoInk, dangerInk } from "../lib/theme";
 import { useDashboardConfig, newWidgetId } from "../lib/useDashboardConfig";
 import MapFilterBuilder from "../components/MapFilterBuilder";
 import Picker from "../components/Picker";
@@ -240,7 +239,7 @@ function DeltaChip({ delta, lang }) {
   // so it says exactly that, not "last 30 days".
   return (
     <span style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, lineHeight: 1.3, overflowWrap: "anywhere" }}>
-      <span style={{ color: up ? green : "#ff8a8a" }}>{up ? "▲" : "▼"}</span> {txt}
+      <span style={{ color: up ? green : dangerInk }}>{up ? "▲" : "▼"}</span> {txt}
       <span style={{ color: faint }}> {L(lang, "vs. minulý mesiac", "vs last month")}</span>
     </span>
   );
@@ -651,7 +650,7 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
               <span style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem" }}>
                 <span style={{ fontSize: "0.72rem", color: dim, fontFamily: mono }}>{L(lang, "Obnoviť predvolené?", "Reset to default?")}</span>
                 <button onClick={() => { resetToDefault(); setConfirmReset(false); }}
-                  style={{ background: "transparent", color: "#ff8a8a", border: "1px solid #ff8a8a55", borderRadius: 8, padding: "0.45rem 0.7rem", fontFamily: mono, fontSize: "0.72rem", cursor: "pointer" }}>
+                  style={{ background: "transparent", color: dangerInk, border: "1px solid #ff8a8a55", borderRadius: 8, padding: "0.45rem 0.7rem", fontFamily: mono, fontSize: "0.72rem", cursor: "pointer" }}>
                   {L(lang, "Áno", "Yes")}
                 </button>
                 <button onClick={() => setConfirmReset(false)}
@@ -761,7 +760,7 @@ function TrialOfferBanner({ lang, onActivate, busy, msg }) {
       </div>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "0.3rem" }}>
         <button onClick={onActivate} disabled={busy} className="btn-p" style={{ fontSize: "0.82rem", cursor: busy ? "wait" : "pointer", opacity: busy ? 0.7 : 1 }}>{busy ? "…" : L(lang, "Aktivovať trial", "Activate trial")}</button>
-        {msg && <span style={{ fontSize: "0.72rem", fontFamily: mono, color: msg.kind === "ok" ? green : "#ff6b6b" }}>{msg.text}</span>}
+        {msg && <span style={{ fontSize: "0.72rem", fontFamily: mono, color: msg.kind === "ok" ? green : dangerInk }}>{msg.text}</span>}
       </div>
     </div>
   );
@@ -890,7 +889,7 @@ function WidgetMenu({ lang, widget, first, last, onConfigure, onToggleWidth, onM
 function MenuItem({ icon, children, onClick, disabled, danger }) {
   return (
     <button onClick={onClick} disabled={disabled}
-      style={{ display: "flex", alignItems: "center", gap: "0.6rem", width: "100%", textAlign: "left", padding: "0.5rem 0.6rem", background: "transparent", border: "none", borderRadius: 7, cursor: disabled ? "default" : "pointer", color: disabled ? faint : (danger ? "#ff8a8a" : textLight), fontFamily: "inherit", fontSize: "0.82rem" }}
+      style={{ display: "flex", alignItems: "center", gap: "0.6rem", width: "100%", textAlign: "left", padding: "0.5rem 0.6rem", background: "transparent", border: "none", borderRadius: 7, cursor: disabled ? "default" : "pointer", color: disabled ? faint : (danger ? dangerInk : textLight), fontFamily: "inherit", fontSize: "0.82rem" }}
       onMouseEnter={e => { if (!disabled) e.currentTarget.style.background = danger ? "rgba(255,107,107,0.1)" : "var(--surface-2)"; }}
       onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
       <span style={{ width: 16, textAlign: "center", fontSize: "0.8rem", opacity: 0.9 }}>{icon}</span>
@@ -1182,7 +1181,7 @@ function TrendBody({ cfg, ctx, lang }) {
         <div style={{ textAlign: "right", flexShrink: 0 }}>
           <div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: textLight, lineHeight: 1.1 }}>{fmtRankVal(sdef.fmt, last, lang)}</div>
           {delta != null && delta !== 0 && (
-            <div style={{ fontFamily: mono, fontSize: "0.68rem", color: delta > 0 ? green : "#ff6b6b" }}>{delta > 0 ? "▲" : "▼"} {fmtRankVal(sdef.fmt, Math.abs(delta), lang)}</div>
+            <div style={{ fontFamily: mono, fontSize: "0.68rem", color: delta > 0 ? green : dangerInk }}>{delta > 0 ? "▲" : "▼"} {fmtRankVal(sdef.fmt, Math.abs(delta), lang)}</div>
           )}
         </div>
       </div>

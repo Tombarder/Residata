@@ -108,10 +108,13 @@
   --accent-ink:    #2f3a49;   /* strong neutral slate — labels/values read dark & distinct
                                  (not green, not faded); green stays only on true accents. */
   /* Status colours, darkened for the light workspace (2026-08-19). Measured as
-     TEXT: #9c6008 / #d5352f / #2c62d8 read at 3.2–3.7:1 on the --bg slate, under
-     the 4.5:1 minimum; these land at 4.2–4.9:1 there and 4.95–6.3:1 on a card. */
-  --accent-2:      #8a5407;
-  --danger:        #b8261f;
+     TEXT against the three light backgrounds — the page slate (#ccd4e0), an inset
+     (#dfe5ef) and a white card: the originals (#9c6008 / #d5352f / #2c62d8) read at
+     3.2–3.7:1 on the slate, under the 4.5:1 minimum, and some tables sit straight on
+     it. These clear 4.5:1 on ALL THREE (4.6–4.9 slate, 5.4–5.8 inset, 6.9–7.3 card).
+     Dark mode keeps the bright literals (see lib/theme.js). */
+  --accent-2:      #7d4b06;
+  --danger:        #a81f19;
   --info:          #2354b8;
   --warning:       #b87d0a;
   --text:          #0d1017;   /* near-black — maximum contrast for numbers/data */

@@ -27,7 +27,7 @@ const PHOTON = "https://photon.komoot.io/api/";
 const PHOTON_REVERSE = "https://photon.komoot.io/reverse";
 const BIAS = { SK: { lat: 48.7, lon: 19.5 }, CZ: { lat: 49.8, lon: 15.5 } };
 
-import { accent as green, accentInk, orange as amber, text as textLight, dim, border, bg, surfaceDark as bg2, mono , orangeInk as amberInk} from "../lib/theme";
+import { accent as green, accentInk, orange as amber, text as textLight, dim, border, bg, surfaceDark as bg2, mono , orangeInk as amberInk, dangerInk } from "../lib/theme";
 
 // SK + CZ bounding box (minLon, minLat, maxLon, maxLat) — restricts geocoder
 // suggestions to our region so we never propose places in New Zealand.
@@ -446,7 +446,7 @@ export default function LocationManager({ lang = "en" }) {
         </div>
         <div style={{ flex: 1, overflowY: "auto" }}>
           {projects === null && <div style={emptyStyle}>{t("Loading…", "Načítavam…")}</div>}
-          {err && <div style={{ ...emptyStyle, color: "#ff6b6b" }}>{err}</div>}
+          {err && <div style={{ ...emptyStyle, color: dangerInk }}>{err}</div>}
           {projects && !err && filtered.length === 0 && <div style={emptyStyle}>{t("Nothing here.", "Nič tu nie je.")}</div>}
           {filtered.map((p) => {
             const active = p.id === selectedId;

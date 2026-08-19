@@ -38,7 +38,7 @@ import Picker from "../components/Picker";
 import { applyFilters, describe, isComplete, pruneStale } from "../lib/mapFilters";
 
 const mono = "'JetBrains Mono', monospace";
-import { accent as green, accentPaint, orange as amber, dim, text as textLight, border, surfaceDark as bg2 , orangeInk as amberInk} from "../lib/theme";
+import { accent as green, accentPaint, orange as amber, dim, text as textLight, border, surfaceDark as bg2 , orangeInk as amberInk, accentInk, dangerInk } from "../lib/theme";
 import { getTheme, useThemeMode } from "../lib/theme-mode";
 import { kickFirstRender } from "../lib/mapRenderKick";
 import { field } from "../lib/controls";
@@ -856,7 +856,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
         </button>
         {!showExplainer && <button onClick={reopenExplainer} title={sk ? "Ako to funguje?" : "How it works?"} style={{ ...chipStyle(false), padding: "6px 10px" }}>?</button>}
         {extSet && (
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: `color-mix(in srgb, var(--accent) 13%, transparent)`, color: green, border: `1px solid ${green}`, borderRadius: 999, padding: "4px 10px", fontSize: "0.72rem", fontWeight: 600 }}
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: `color-mix(in srgb, var(--accent) 13%, transparent)`, color: accentInk, border: `1px solid ${green}`, borderRadius: 999, padding: "4px 10px", fontSize: "0.72rem", fontWeight: 600 }}
             title={sk ? "Zobrazené len projekty vyfiltrované v analytike" : "Showing only the projects filtered in analytics"}>
             🗺 {(() => {
               // Honest count: how many of the handed analytics projects are actually
@@ -871,7 +871,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
           </span>
         )}
         {activeConds.map((c) => (
-          <span key={c.id} style={{ display: "inline-flex", alignItems: "center", gap: 5, background: `color-mix(in srgb, var(--accent) 8%, transparent)`, color: green, border: `1px solid color-mix(in srgb, var(--accent) 25%, transparent)`, borderRadius: 999, padding: "4px 9px", fontSize: "0.7rem", maxWidth: 250 }}>
+          <span key={c.id} style={{ display: "inline-flex", alignItems: "center", gap: 5, background: `color-mix(in srgb, var(--accent) 8%, transparent)`, color: accentInk, border: `1px solid color-mix(in srgb, var(--accent) 25%, transparent)`, borderRadius: 999, padding: "4px 9px", fontSize: "0.7rem", maxWidth: 250 }}>
             <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{describe(c, sk)}</span>
             <span onClick={() => setConditions((cs) => cs.filter((x) => x.id !== c.id))} style={{ cursor: "pointer", flexShrink: 0 }}>×</span>
           </span>
@@ -943,7 +943,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
                   </div>
                   <div style={{ color: dim, fontSize: "0.66rem", textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 7 }}>{sk ? "Ako začať — 3 spôsoby" : "How to start — 3 ways"}</div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-                    <div><span style={{ color: green, fontWeight: 600 }}>◎ {sk ? "Klikni na mapu" : "Click the map"}</span><br />{sk ? "okruh okolo bodu — jeho veľkosť si nastavíš posuvníkom." : "a radius around that point — set its size with the slider."}</div>
+                    <div><span style={{ color: accentInk, fontWeight: 600 }}>◎ {sk ? "Klikni na mapu" : "Click the map"}</span><br />{sk ? "okruh okolo bodu — jeho veľkosť si nastavíš posuvníkom." : "a radius around that point — set its size with the slider."}</div>
                     <div><span style={{ color: amberInk, fontWeight: 600 }}>▱ {sk ? "Oblasť" : "Area"}</span> <span style={{ color: dim }}>({sk ? "tlačidlo hore" : "button above"})</span><br />{sk ? "nakresli vlastný tvar: klikaj rohy, dvojklik ukončí." : "draw a custom shape: click the corners, double-click to finish."}</div>
                     <div><span style={{ color: amberInk, fontWeight: 600 }}>⇢ {sk ? "Koridor" : "Corridor"}</span> <span style={{ color: dim }}>({sk ? "tlačidlo hore" : "button above"})</span><br />{sk ? "nakresli trasu + šírku — napr. pás okolo električky." : "draw a route + a width — e.g. a band along a tram line."}</div>
                   </div>
@@ -951,7 +951,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
                 </div>
               )}
               {!showExplainer && !savedAreasBlock && (
-                <div style={{ fontSize: "0.78rem" }}>{sk ? "Klikni na mapu, alebo použi ▱ Oblasť / ⇢ Koridor." : "Click the map, or use ▱ Area / ⇢ Corridor."} <button onClick={reopenExplainer} style={{ background: "none", border: "none", color: green, cursor: "pointer", fontSize: "0.78rem", padding: 0 }}>{sk ? "Ako?" : "How?"}</button></div>
+                <div style={{ fontSize: "0.78rem" }}>{sk ? "Klikni na mapu, alebo použi ▱ Oblasť / ⇢ Koridor." : "Click the map, or use ▱ Area / ⇢ Corridor."} <button onClick={reopenExplainer} style={{ background: "none", border: "none", color: accentInk, cursor: "pointer", fontSize: "0.78rem", padding: 0 }}>{sk ? "Ako?" : "How?"}</button></div>
               )}
               {savedAreasBlock}
             </div>
@@ -968,7 +968,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
                       {shape.kind === "polygon" ? "▱" : "⇢"} {shape.kind === "polygon" ? (sk ? "oblasť" : "area") : (sk ? "koridor" : "corridor")}{shapeSize ? ` · ${shapeSize.label}` : ""}
                     </span>
                     <button onClick={() => startDraw(shape.kind)} title={sk ? "Nakresliť znova" : "Redraw"} style={{ background: "none", border: `1px solid ${border}`, color: dim, borderRadius: 6, padding: "3px 9px", fontSize: "0.68rem", cursor: "pointer" }}>{sk ? "Znova" : "Redraw"}</button>
-                    {!saving && <button onClick={beginSave} title={sk ? "Uložiť túto oblasť pre neskôr" : "Save this area for later"} style={{ background: "none", border: `1px solid color-mix(in srgb, var(--accent) 33%, transparent)`, color: green, borderRadius: 6, padding: "3px 9px", fontSize: "0.68rem", cursor: "pointer" }}>☆ {sk ? "Uložiť" : "Save"}</button>}
+                    {!saving && <button onClick={beginSave} title={sk ? "Uložiť túto oblasť pre neskôr" : "Save this area for later"} style={{ background: "none", border: `1px solid color-mix(in srgb, var(--accent) 33%, transparent)`, color: accentInk, borderRadius: 6, padding: "3px 9px", fontSize: "0.68rem", cursor: "pointer" }}>☆ {sk ? "Uložiť" : "Save"}</button>}
                   </div>
                   {saving && (
                     <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
@@ -981,7 +981,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
                     </div>
                   )}
                   {justSaved && !saving && (
-                    <div style={{ fontSize: "0.7rem", color: green, marginBottom: 6 }}>✓ {sk ? `Uložené ako „${justSaved}" — nájdeš to nižšie.` : `Saved as "${justSaved}" — see below.`}</div>
+                    <div style={{ fontSize: "0.7rem", color: accentInk, marginBottom: 6 }}>✓ {sk ? `Uložené ako „${justSaved}" — nájdeš to nižšie.` : `Saved as "${justSaved}" — see below.`}</div>
                   )}
                   {shape.kind === "corridor" && (
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1011,11 +1011,11 @@ export default function MapView2({ lang = "en", setCurrent }) {
                 const aAbs = anchor.sold_percentage == null ? null : Math.round(Number(anchor.sold_percentage));
                 return (
                   <div style={{ background: `color-mix(in srgb, var(--accent) 6%, transparent)`, border: `1px solid color-mix(in srgb, var(--accent) 25%, transparent)`, borderRadius: 8, padding: "8px 10px", marginBottom: 12 }}>
-                    <div style={{ fontSize: "0.68rem", color: green, marginBottom: 3 }}>◎ {sk ? "Tvoj projekt vs okolie" : "This project vs the set"}</div>
+                    <div style={{ fontSize: "0.68rem", color: accentInk, marginBottom: 3 }}>◎ {sk ? "Tvoj projekt vs okolie" : "This project vs the set"}</div>
                     <div style={{ fontSize: "0.78rem", color: textLight, fontWeight: 600, marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{anchor.name}</div>
                     <div style={{ fontSize: "0.72rem", color: dim, fontFamily: mono, lineHeight: 1.7 }}>
-                      <div>€{ap ? fmt(ap) : "—"}/m²{deltaPct != null ? <span style={{ color: deltaPct > 0 ? "#ff8a8a" : "#7ee0b6" }}> · {deltaPct > 0 ? "+" : ""}{deltaPct}% {sk ? "vs medián" : "vs median"}</span> : ""}</div>
-                      <div>{aAbs == null ? "—" : aAbs + "%"} {sk ? "predané" : "sold"}{compSet.avgAbs != null && aAbs != null ? <span style={{ color: aAbs >= compSet.avgAbs ? "#7ee0b6" : "#ff8a8a" }}> · {sk ? "okolie" : "set"} {compSet.avgAbs}%</span> : ""}</div>
+                      <div>€{ap ? fmt(ap) : "—"}/m²{deltaPct != null ? <span style={{ color: deltaPct > 0 ? dangerInk : accentInk }}> · {deltaPct > 0 ? "+" : ""}{deltaPct}% {sk ? "vs medián" : "vs median"}</span> : ""}</div>
+                      <div>{aAbs == null ? "—" : aAbs + "%"} {sk ? "predané" : "sold"}{compSet.avgAbs != null && aAbs != null ? <span style={{ color: aAbs >= compSet.avgAbs ? accentInk : dangerInk }}> · {sk ? "okolie" : "set"} {compSet.avgAbs}%</span> : ""}</div>
                     </div>
                   </div>
                 );
@@ -1033,7 +1033,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
               )}
               {compSet && compSet.soldLastMonth > 0 && (
                 <div style={{ fontSize: "0.66rem", color: dim, marginBottom: 12 }}>
-                  ▴ <span style={{ color: green, fontFamily: mono }}>{compSet.soldLastMonth}</span> {sk ? `bytov predaných ${shape ? "v tejto oblasti" : "v tomto okruhu"} za posledný mesiac` : "units sold in this area last month"}
+                  ▴ <span style={{ color: accentInk, fontFamily: mono }}>{compSet.soldLastMonth}</span> {sk ? `bytov predaných ${shape ? "v tejto oblasti" : "v tomto okruhu"} za posledný mesiac` : "units sold in this area last month"}
                 </div>
               )}
 
@@ -1047,7 +1047,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
                 <>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                     <span style={{ fontSize: "0.7rem", color: dim }}>{sk ? "Kedy sa dokončia" : "When they complete"}</span>
-                    {compFilter && <button onClick={() => setCompFilter(null)} style={{ background: "none", border: "none", color: green, cursor: "pointer", fontSize: "0.66rem" }}>{sk ? "zrušiť ✕" : "clear ✕"}</button>}
+                    {compFilter && <button onClick={() => setCompFilter(null)} style={{ background: "none", border: "none", color: accentInk, cursor: "pointer", fontSize: "0.66rem" }}>{sk ? "zrušiť ✕" : "clear ✕"}</button>}
                   </div>
                   <div style={{ display: "flex", gap: 5, marginBottom: 3 }}>
                     {["ready", "cur", "soon", "mid", "far", "unknown"].map((k) => {
@@ -1098,7 +1098,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
                     })}
                   </div>
                   {compFilter && listProjects.length === 0 && (
-                    <div style={{ color: dim, fontSize: "0.72rem", padding: "6px 2px" }}>{sk ? "Žiadne projekty s týmto dokončením — " : "No projects with this timing — "}<button onClick={() => setCompFilter(null)} style={{ background: "none", border: "none", color: green, cursor: "pointer", fontSize: "0.72rem", padding: 0 }}>{sk ? "zobraziť všetky" : "show all"}</button></div>
+                    <div style={{ color: dim, fontSize: "0.72rem", padding: "6px 2px" }}>{sk ? "Žiadne projekty s týmto dokončením — " : "No projects with this timing — "}<button onClick={() => setCompFilter(null)} style={{ background: "none", border: "none", color: accentInk, cursor: "pointer", fontSize: "0.72rem", padding: 0 }}>{sk ? "zobraziť všetky" : "show all"}</button></div>
                   )}
                 </>
               ) : (
@@ -1166,7 +1166,7 @@ function ComparePanel({ options, compareIds, setCompareIds, rows, baselineId, se
       </div>
       <Picker multi searchable options={options} value={[...compareIds]} onChange={(arr) => setCompareIds(new Set(arr))} placeholder={sk ? "Pridať projekt (hľadaj podľa mena)…" : "Add a project (search by name)…"} width="100%" sk={sk} ariaLabel="Add projects to compare" />
       {areaCount > 0 && (
-        <button onClick={onAddArea} style={{ width: "100%", marginTop: 8, background: `color-mix(in srgb, var(--accent) 7%, transparent)`, border: `1px solid color-mix(in srgb, var(--accent) 33%, transparent)`, color: green, borderRadius: 7, padding: "7px 8px", fontSize: "0.72rem", cursor: "pointer" }}>
+        <button onClick={onAddArea} style={{ width: "100%", marginTop: 8, background: `color-mix(in srgb, var(--accent) 7%, transparent)`, border: `1px solid color-mix(in srgb, var(--accent) 33%, transparent)`, color: accentInk, borderRadius: 7, padding: "7px 8px", fontSize: "0.72rem", cursor: "pointer" }}>
           ➕ {sk ? `Pridať ${areaCount} z nakreslenej oblasti` : `Add ${areaCount} from the drawn area`}
         </button>
       )}
@@ -1200,7 +1200,7 @@ function ComparePanel({ options, compareIds, setCompareIds, rows, baselineId, se
                     <button onClick={() => onRemove(p.id)} title={sk ? "Odobrať z porovnania" : "Remove from comparison"} style={{ background: "none", border: "none", color: dim, cursor: "pointer", fontSize: "0.8rem", flexShrink: 0, padding: "0 2px" }}>✕</button>
                   </div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 10px", fontSize: "0.66rem", color: dim, fontFamily: mono, marginTop: 4, paddingLeft: 27 }}>
-                    <span style={{ color: textLight }}>{ppm ? mM2(ppm) : "—"}{d != null ? <span style={{ color: d > 0 ? "#ff8a8a" : "#7ee0b6" }}> {d > 0 ? "+" : ""}{d}% {refLabel}</span> : ""}</span>
+                    <span style={{ color: textLight }}>{ppm ? mM2(ppm) : "—"}{d != null ? <span style={{ color: d > 0 ? dangerInk : accentInk }}> {d > 0 ? "+" : ""}{d}% {refLabel}</span> : ""}</span>
                     <span>{abs == null ? "—" : abs + "%"} {sk ? "pred." : "sold"}</span>
                     <span>{avail}/{tot} {sk ? "voľ." : "free"}</span>
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: COMPLETION[bucket].color, display: "inline-block" }} />{when || (sk ? "termín ?" : "date ?")}</span>
@@ -1266,7 +1266,7 @@ function PricingBand({ cs, anchorPpm2, sk }) {
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.6rem", color: dim, fontFamily: mono }}>
         <span>€{fmt(priceLo)}</span>
-        <span style={{ color: green }}>med €{fmt(median)}</span>
+        <span style={{ color: accentInk }}>med €{fmt(median)}</span>
         <span>€{fmt(priceHi)}</span>
       </div>
       {aQuart ? <div style={{ fontSize: "0.64rem", color: dim, marginTop: 7 }}>{sk ? "Tento projekt " : "This project "}<span style={{ color: textLight, fontFamily: mono }}>€{fmt(anchorPpm2)}/m²</span> · {aQuart}</div> : null}
@@ -1378,7 +1378,7 @@ function MovingBar({ moving, count, soldLM, sk }) {
       <div style={{ display: "flex", gap: 14, fontSize: "0.62rem", color: dim, marginTop: 5, flexWrap: "wrap" }}>
         <span><span style={dot(green)} />{moving} {sk ? "v pohybe" : "selling"}</span>
         <span><span style={dot(greyPt)} />{staticN} {sk ? "bez predaja" : "no sales"}</span>
-        {soldLM > 0 ? <span style={{ fontFamily: mono, color: green }}>{soldLM} {sk ? "ks/mes." : "units/mo"}</span> : null}
+        {soldLM > 0 ? <span style={{ fontFamily: mono, color: accentInk }}>{soldLM} {sk ? "ks/mes." : "units/mo"}</span> : null}
       </div>
     </div>
   );

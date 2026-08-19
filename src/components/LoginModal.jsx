@@ -5,6 +5,7 @@ import { validateBusinessEmail, signupEmailAllowed } from "../lib/emailValidatio
 import { track } from "../lib/track";
 import { useBreakpointDown, BP } from "../lib/breakpoints";
 import { useEscape } from "../lib/useDismiss";
+import { dangerInk, orangeInk } from "../lib/theme";
 
 // `onSignedIn` fires once a human has actually completed a login here, so the app
 // can take them into the platform. Deliberately NOT inferred from "a user exists"
@@ -149,9 +150,9 @@ export default function LoginModal({ open, onClose, onSignedIn, lang = "en" }) {
                 <span aria-hidden style={{ fontSize: "1rem", lineHeight: 1.4, flexShrink: 0 }}>💻</span>
                 <span>
                   {lang === "sk" ? (
-                    <><strong style={{ color: "#f5a623", fontWeight: 700 }}>Najlepšie na počítači.</strong> Platforma Residata (analytika, mapy, dátové tabuľky) je navrhnutá pre desktop a na telefóne nebude vyzerať ani fungovať správne. Prihlásiť sa môžeš aj tu, no pre plný zážitok ju otvor na notebooku.</>
+                    <><strong style={{ color: orangeInk, fontWeight: 700 }}>Najlepšie na počítači.</strong> Platforma Residata (analytika, mapy, dátové tabuľky) je navrhnutá pre desktop a na telefóne nebude vyzerať ani fungovať správne. Prihlásiť sa môžeš aj tu, no pre plný zážitok ju otvor na notebooku.</>
                   ) : (
-                    <><strong style={{ color: "#f5a623", fontWeight: 700 }}>Best on a computer.</strong> The Residata platform — analytics, maps and full data tables — is built for desktop and won't look or work well on a phone. You can still sign in here, but open it on a laptop for the full experience.</>
+                    <><strong style={{ color: orangeInk, fontWeight: 700 }}>Best on a computer.</strong> The Residata platform — analytics, maps and full data tables — is built for desktop and won't look or work well on a phone. You can still sign in here, but open it on a laptop for the full experience.</>
                   )}
                 </span>
               </div>
@@ -174,10 +175,10 @@ export default function LoginModal({ open, onClose, onSignedIn, lang = "en" }) {
                   boxSizing: "border-box", outline: "none",
                 }}
               />
-              <div style={{ fontSize: "0.7rem", color: emailError ? "#ff6b6b" : "var(--text-faint)", marginBottom: "0.75rem", minHeight: "1rem" }}>
+              <div style={{ fontSize: "0.7rem", color: emailError ? dangerInk : "var(--text-faint)", marginBottom: "0.75rem", minHeight: "1rem" }}>
                 {emailError || t.login_biz_email_hint}
               </div>
-              {error && <div style={{ color: "#ff6b6b", fontSize: "0.8rem", marginBottom: "0.75rem" }}>{error}</div>}
+              {error && <div style={{ color: dangerInk, fontSize: "0.8rem", marginBottom: "0.75rem" }}>{error}</div>}
               <button type="submit" disabled={busy || !email || !!emailError} style={{
                 width: "100%", padding: "0.75rem", background: "var(--accent)", color: "var(--bg)",
                 fontWeight: 600, borderRadius: 8, border: "none",
@@ -217,7 +218,7 @@ export default function LoginModal({ open, onClose, onSignedIn, lang = "en" }) {
                   letterSpacing: "0.4em", marginBottom: "0.5rem", boxSizing: "border-box", outline: "none",
                 }}
               />
-              {verifyError && <div style={{ color: "#ff6b6b", fontSize: "0.8rem", marginBottom: "0.6rem", textAlign: "center" }}>{verifyError}</div>}
+              {verifyError && <div style={{ color: dangerInk, fontSize: "0.8rem", marginBottom: "0.6rem", textAlign: "center" }}>{verifyError}</div>}
               <button type="submit" disabled={busyVerify || !code} style={{
                 width: "100%", padding: "0.75rem", background: "var(--accent)", color: "var(--bg)",
                 fontWeight: 600, borderRadius: 8, border: "none",

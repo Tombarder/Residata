@@ -35,7 +35,7 @@ import { moneyFromEur, moneySymbol } from "../lib/money";
 import { supabasePublic, isSupabaseReady } from "../lib/supabase";
 
 const mono = "'JetBrains Mono', monospace";
-import { accent as green, accentPaint, orange as amber, dim, text as textLight, border, surfaceDark as bg2 , orangeInk as amberInk} from "../lib/theme";
+import { accent as green, accentPaint, orange as amber, dim, text as textLight, border, surfaceDark as bg2 , orangeInk as amberInk, accentInk } from "../lib/theme";
 import Picker from "../components/Picker";
 import { getTheme, useThemeMode } from "../lib/theme-mode";
 import { kickFirstRender } from "../lib/mapRenderKick";
@@ -541,7 +541,7 @@ export default function MapView({ lang = "en", setCurrent }) {
         padding: "0.85rem 1.25rem", borderBottom: `1px solid ${border}`, background: "var(--surface)",
       }}>
         <div style={{ fontSize: "0.82rem", color: textLight }}>
-          <strong style={{ color: green, fontFamily: mono }}>{placed}</strong>
+          <strong style={{ color: accentInk, fontFamily: mono }}>{placed}</strong>
           {anyFilter && totalPlaced > 0 && (
             <span style={{ color: dim }}> {sk ? "z" : "of"} <span style={{ fontFamily: mono }}>{totalPlaced}</span></span>
           )}{" "}

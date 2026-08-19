@@ -34,8 +34,16 @@ const bg = "var(--surface)";
 const text = "var(--text)";
 const bg2 = "var(--surface-2)";
 const panel = "var(--surface)";
+// Literals, because these get concatenated into tints and borders (`${red}22`),
+// which a var() cannot do.
 const red = "#ff6b6b";
 const orange = "#f5a623";
+// The same three as TEXT. They resolve to the theme tokens, so they darken on the
+// light workspace — as literals they measured 2.0–2.8:1 there (WCAG asks 4.5:1).
+// Same rule as lib/theme.js: never concatenate an ink, never feed one to map paint.
+const redInk = "var(--danger)";
+const orangeInk = "var(--accent-2)";
+const infoInk = "var(--info)";
 
 // Filter-bar styling — matched to the map's filter bar (MapView2) so the
 // Projects filters look identical to the rest of the platform.
@@ -305,7 +313,7 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
             only — non-paid see a blurred placeholder, not a dash) so a column of "—"
             doesn't read as broken. Self-heals once a second monthly snapshot lands. */}
         {!loading && can("view_sold_velocity") && clearRows.length > 0 && clearRows.every(p => p.sold_last_month == null) && (
-          <div style={{ background: "rgba(245,166,35,0.10)", border: "1px solid rgba(245,166,35,0.30)", borderRadius: 8, padding: "0.6rem 0.85rem", marginBottom: "1rem", color: "#c8c8d0", fontSize: "0.82rem", lineHeight: 1.5 }}>
+          <div style={{ background: "rgba(245,166,35,0.10)", border: "1px solid rgba(245,166,35,0.30)", borderRadius: 8, padding: "0.6rem 0.85rem", marginBottom: "1rem", color: "var(--text-2)", fontSize: "0.82rem", lineHeight: 1.5 }}>
             ⓘ {lang === "sk"
               ? "Stĺpec „Predané 30d“ sa ešte napĺňa — počíta sa z dvoch mesiacov dát a zatiaľ máme prvý. Prvé čísla pribudnú po najbližšom mesačnom behu."
               : "The “Sold 30d” column is still building — it's computed from two months of data and we only have the first. Figures appear after the next monthly run."}
@@ -366,7 +374,7 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
                       <td style={{ ...td, color: dim }}>{p.district || "—"}</td>
                       <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{p.total_units}</td>
                       <td style={{ ...td, textAlign: "right", fontFamily: mono, color: greenInk }}>{p.available_units}</td>
-                      <td style={{ ...td, textAlign: "right", fontFamily: mono, color: "#f5a623" }}>{p.sold_units}</td>
+                      <td style={{ ...td, textAlign: "right", fontFamily: mono, color: orangeInk }}>{p.sold_units}</td>
                       <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{p.sold_percentage != null ? `${p.sold_percentage}%` : "—"}</td>
                       <td style={{ ...td, textAlign: "right", fontFamily: mono }}>
                         {p.avg_price_eur_m2 ? Math.round(moneyFromEur(p.avg_price_eur_m2)).toLocaleString("en-US") : "—"}
@@ -615,7 +623,7 @@ function ProjectRow({ p, t, lang, setCurrent, canVelocity }) {
       <td style={{ ...td, color: dim }}>{p.district || "—"}</td>
       <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{p.total_units}</td>
       <td style={{ ...td, textAlign: "right", fontFamily: mono, color: greenInk }}>{p.available_units}</td>
-      <td style={{ ...td, textAlign: "right", fontFamily: mono, color: soldDataUnavailable ? dim : "#f5a623" }}>
+      <td style={{ ...td, textAlign: "right", fontFamily: mono, color: soldDataUnavailable ? dim : orangeInk }}>
         {soldDataUnavailable ? "—" : p.sold_units}
       </td>
       <td style={{ ...td, textAlign: "right", fontFamily: mono }}>
@@ -799,7 +807,7 @@ export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en
       </div>
 
       {loading ? <div style={{ color: dim }}>{t.loading_generic}</div> :
-        error ? <div style={{ color: "#ff6b6b" }}>Error: {error.message}</div> :
+        error ? <div style={{ color: redInk }}>Error: {error.message}</div> :
         flats.length === 0 ? (
           // No flat-level rows yet (scraper hasn't pulled per-unit
           // detail for this project). But the projects table almost
@@ -1006,7 +1014,7 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
       value: project.avg_price_eur_m2 ? Math.round(moneyFromEur(project.avg_price_eur_m2)).toLocaleString("en-US").replace(/,/g, " ") : "—",
       sub: pricemomDelta != null
         ? (pricemomDelta > 0
-            ? <span style={{ color: "#f5a623" }}>+{Math.round(moneyFromEur(pricemomDelta))} {moneySymbol()}/m² {L("MoM", "MoM")}</span>
+            ? <span style={{ color: orangeInk }}>+{Math.round(moneyFromEur(pricemomDelta))} {moneySymbol()}/m² {L("MoM", "MoM")}</span>
             : pricemomDelta < 0
               ? <span style={{ color: greenInk }}>{Math.round(moneyFromEur(pricemomDelta))} {moneySymbol()}/m² {L("MoM", "MoM")}</span>
               : <span style={{ color: dim }}>{L("bez zmeny", "no change")} MoM</span>)
@@ -1029,7 +1037,7 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
       value: fastestRoom ? `${fastestRoom.room}-${L("izb", "room")}` : "—",
       sub: fastestRoom ? `${fmtPct((fastestRoom.sold / fastestRoom.total) * 100)} ${L("predané", "sold")}` : null,
       tint: "#f5a623",
-      color: "#e0940f",
+      color: orangeInk,
     },
     // PRICE KPI (filtered out when noPrices)
     {
@@ -1079,7 +1087,7 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
           color: "var(--text)",
           lineHeight: 1.5,
         }}>
-          <strong style={{ color: "#f5a623" }}>⚠ {L("Bez cien", "No prices")}:</strong>{" "}
+          <strong style={{ color: orangeInk }}>⚠ {L("Bez cien", "No prices")}:</strong>{" "}
           {L(
             "Developer nezverejňuje ceny bytov v aktuálnej ponuke. Cenové grafy (rozdelenie cien, €/m² scatter) a KPIs s cenou sú skryté — nemôžu byť zmysluplné bez dát. Dostupnosť, izbovosť a plochy sú uvedené normálne.",
             "Developer doesn't publish prices for any for-sale units. Price-based charts (price distribution, area × price scatter) and price KPIs are hidden — they can't be meaningful without the data. Availability, room-type and area data below are still shown normally.",
@@ -1097,7 +1105,7 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
           color: dim,
           lineHeight: 1.5,
         }}>
-          <strong style={{ color: "#f5a623" }}>ⓘ</strong>{" "}
+          <strong style={{ color: orangeInk }}>ⓘ</strong>{" "}
           {L(
             `Developer publikuje ceny iba pre ${pricedForSaleFlats.length} z ${forSaleFlats.length} bytov v ponuke — cenové grafy a priemery sú počítané iba z tejto podmnožiny.`,
             `Developer publishes prices for only ${pricedForSaleFlats.length} of ${forSaleFlats.length} for-sale units — price charts and averages are computed on this subset only.`,
@@ -2355,7 +2363,7 @@ function AreaPriceScatter({ flats, lang, onSelectFlat }) {
     stav === "Ešte nie v ponuke" ? "N" : null;
   const CATS = [
     { key: "V", label: lang === "sk" ? "Voľné"             : "Available",      color: greenInk },
-    { key: "P", label: lang === "sk" ? "Predané"           : "Sold",           color: "#f5a623" },
+    { key: "P", label: lang === "sk" ? "Predané"           : "Sold",           color: orangeInk },
     { key: "R", label: lang === "sk" ? "Rezervované"       : "Reserved",       color: "#888" },
     { key: "N", label: lang === "sk" ? "Ešte nie v ponuke" : "Not yet listed", color: COMING },
   ];
@@ -2535,7 +2543,7 @@ function median(arr) {
 function FlatsTable({ flats, t, lang, highlightedFlatId }) {
   const stavStyle = {
     V: { color: "var(--accent)", bg: "color-mix(in srgb, var(--accent) 8%, transparent)" },
-    P: { color: "#f5a623", bg: "rgba(245,166,35,0.08)" },
+    P: { color: orangeInk, bg: "rgba(245,166,35,0.08)" },
     R: { color: "#888", bg: "rgba(136,136,136,0.08)" },
     PR: { color: "#aaa", bg: "rgba(170,170,170,0.08)" },
   };
@@ -2730,7 +2738,7 @@ function FlatsTable({ flats, t, lang, highlightedFlatId }) {
             items={STAV_VALUES.map(s => ({
               key: s, label: stavLabel(s),
               active: stavSel.has(s),
-              color: s === "V" ? "var(--accent)" : s === "P" ? "#f5a623" : "#888",
+              color: s === "V" ? "var(--accent)" : s === "P" ? orangeInk : "#888",
               onClick: () => toggleStav(s),
             }))}
           />
@@ -3043,7 +3051,7 @@ function ChooseProjectGate({ projectId, projectName, profile, reloadProfile, set
           : <>Your free account unlocks full detail of <strong style={{ color: greenInk }}>1 project</strong>. Do you want to track <strong style={{ color: greenInk }}>{projectName}</strong>?</>}
       </p>
       <div style={{ padding: "1rem 1.25rem", background: "rgba(245,166,35,0.08)", border: "1px solid rgba(245,166,35,0.3)", borderRadius: 8, marginBottom: "1.25rem", fontSize: "0.85rem", color: "var(--text)" }}>
-        <strong style={{ color: "#f5a623" }}>⚠ {lang === "sk" ? "Pozor" : "Heads up"}:</strong>{" "}
+        <strong style={{ color: orangeInk }}>⚠ {lang === "sk" ? "Pozor" : "Heads up"}:</strong>{" "}
         {lang === "sk"
           ? "výber je po potvrdení uzamknutý. Budeš vidieť len tento jeden projekt. Pre viac projektov je potrebný paid tier."
           : "this choice is locked once confirmed. You'll only see this one project. More projects require paid tier."}
@@ -3054,7 +3062,7 @@ function ChooseProjectGate({ projectId, projectName, profile, reloadProfile, set
         </button>
         <button className="btn-s" onClick={() => goBack(setCurrent, typeof window !== "undefined" && window.location.pathname.startsWith("/app") ? "App:Projects" : "Live")}>{t.choose_back}</button>
       </div>
-      {err && <div style={{ color: "#ff6b6b", marginTop: "0.75rem" }}>{err}</div>}
+      {err && <div style={{ color: redInk, marginTop: "0.75rem" }}>{err}</div>}
       <p style={{ fontSize: "0.8rem", color: dim, marginTop: "2rem" }}>
         {ll(t.choose_upgrade_hint, { n: trackedProjCount })} <button onClick={() => setCurrent("Pricing")} style={linkBtn}>{t.upgrade_to_paid}</button>.
       </p>
@@ -3232,7 +3240,7 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
                 <tr key={`${d.city || ""}·${d.district}`} style={{ borderTop: `1px solid ${border}` }}>
                   <td style={{ ...td, color: dim }}>{d.city || "—"}</td>
                   <td style={{ ...td, fontWeight: 600 }}>{d.district}</td>
-                  <td style={{ ...td, textAlign: "right", fontFamily: mono, color: d.avgPrice && d.avgPrice >= 5500 ? "#f5a623" : d.avgPrice && d.avgPrice >= 4200 ? green : "#4a90e2", fontWeight: 600 }}>
+                  <td style={{ ...td, textAlign: "right", fontFamily: mono, color: d.avgPrice && d.avgPrice >= 5500 ? orangeInk : d.avgPrice && d.avgPrice >= 4200 ? green : infoInk, fontWeight: 600 }}>
                     {d.avgPrice ? Math.round(moneyFromEur(d.avgPrice)).toLocaleString("en-US").replace(/,/g, " ") : "—"}
                   </td>
                   <td style={{ ...td, textAlign: "right", fontFamily: mono, color: dim }}>{d.count}</td>
@@ -3241,7 +3249,7 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
                   {/* Sold (30d) — legitimately empty for new projects
                       until 2 monthly snapshots have run. "—" reads as
                       "not yet available" rather than a hard zero. */}
-                  <td style={{ ...td, textAlign: "right", fontFamily: mono, color: d.sold30 > 0 ? "#f5a623" : dim }}>
+                  <td style={{ ...td, textAlign: "right", fontFamily: mono, color: d.sold30 > 0 ? orangeInk : dim }}>
                     {d.sold30 > 0 ? `+${d.sold30}` : "—"}
                   </td>
                   <td style={{ ...td, textAlign: "right", fontFamily: mono, color: d.absorption > 5 ? green : dim }}>
@@ -3345,7 +3353,7 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
                       {p.district || "—"} · {p.available_units} {lang === "sk" ? "voľných z" : "left of"} {p.total_units}
                     </div>
                   </div>
-                  <div style={{ fontFamily: mono, fontSize: "0.85rem", color: "#ff6b6b", fontWeight: 700 }}>
+                  <div style={{ fontFamily: mono, fontSize: "0.85rem", color: redInk, fontWeight: 700 }}>
                     {p.sold_percentage.toFixed(0)}%
                   </div>
                 </div>
@@ -3733,7 +3741,7 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
   return (
     <main style={{ padding: "5rem 2rem 4rem", maxWidth: 1200, margin: "0 auto" }}>
       <PageHero eyebrow={t.admin_label} title={t.admin_title} />
-      {err && <div style={{ color: "#ff6b6b" }}>{err}</div>}
+      {err && <div style={{ color: redInk }}>{err}</div>}
 
       {/* Tier stats strip */}
       <div style={{
@@ -3744,7 +3752,7 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
           { k: "total",   label: lang === "sk" ? "Celkom" : "Total",   n: users.length,             color: "var(--text)", bar: "#64748b" },
           { k: "free",    label: "Free",                               n: tierCount.free    || 0,    color: "var(--text-2)", bar: "#64748b" },
           { k: "paid",    label: "Paid",                               n: tierCount.paid    || 0,    color: greenInk, bar: "#10b981" },
-          { k: "admin",   label: "Admin",                              n: tierCount.admin   || 0,    color: "#f5a623", bar: "#e0940f" },
+          { k: "admin",   label: "Admin",                              n: tierCount.admin   || 0,    color: orangeInk, bar: "#e0940f" },
           { k: "pending", label: "Pending",                            n: tierCount.pending || 0,    color: "#888", bar: "#3b74e8" },
         ].map(s => (
           <div key={s.k} style={{
@@ -3857,7 +3865,7 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
                         <td style={td}><EventBadge type={e.event_type} /></td>
                         <td style={td}>{e.new_value?.email || "—"}</td>
                         <td style={{ ...td, color: dim, fontFamily: mono }}>{e.new_value?.domain || "—"}</td>
-                        <td style={{ ...td, fontFamily: mono, color: (e.new_value?.org_count || 0) > 3 ? "#f5a623" : dim }}>{e.new_value?.org_count ?? "—"}</td>
+                        <td style={{ ...td, fontFamily: mono, color: (e.new_value?.org_count || 0) > 3 ? orangeInk : dim }}>{e.new_value?.org_count ?? "—"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -4134,7 +4142,7 @@ function OverviewPanel({ activity, users, lang }) {
                         <span style={{
                           fontFamily: mono, fontSize: "0.7rem",
                           padding: "0.15rem 0.5rem", borderRadius: 4,
-                          color: r.tier === "paid" ? green : r.tier === "admin" ? "#f5a623" : r.tier === "pending" ? "#888" : "var(--text-2)",
+                          color: r.tier === "paid" ? green : r.tier === "admin" ? orangeInk : r.tier === "pending" ? "#888" : "var(--text-2)",
                           background: r.tier === "paid" ? "color-mix(in srgb, var(--accent) 8%, transparent)" : r.tier === "admin" ? "rgba(245,166,35,0.08)" : "var(--surface-2)",
                         }}>{r.tier}</span>
                       </td>
@@ -4434,7 +4442,7 @@ function AiChatLogsPanel({ users, lang }) {
     return <div style={{ color: dim, padding: "1rem", fontFamily: mono, fontSize: "0.82rem" }}>{lang === "sk" ? "Načítavam logy…" : "Loading logs…"}</div>;
   }
   if (err) {
-    return <div style={{ color: red, padding: "1rem", fontFamily: mono, fontSize: "0.82rem" }}>⚠ {err}</div>;
+    return <div style={{ color: redInk, padding: "1rem", fontFamily: mono, fontSize: "0.82rem" }}>⚠ {err}</div>;
   }
   if (rows.length === 0) {
     return <div style={{ color: dim, padding: "1rem", fontFamily: mono, fontSize: "0.82rem", fontStyle: "italic" }}>
@@ -4618,7 +4626,7 @@ function FullConversationView({ session, email, lang, onBack }) {
                 border: `1px solid ${isUser ? "color-mix(in srgb, var(--accent) 28%, transparent)" : (isErr ? "rgba(255,107,107,0.4)" : border)}`,
                 borderRadius: 14, padding: "0.85rem 1.05rem", color: text, fontSize: "0.95rem", lineHeight: 1.6 }}>
                 <div style={{ whiteSpace: "pre-wrap" }}>
-                  {t.content || (isErr ? <span style={{ color: red, fontStyle: "italic" }}>{t.error_message || "(error)"}</span> : <span style={{ color: dim, fontStyle: "italic" }}>(empty)</span>)}
+                  {t.content || (isErr ? <span style={{ color: redInk, fontStyle: "italic" }}>{t.error_message || "(error)"}</span> : <span style={{ color: dim, fontStyle: "italic" }}>(empty)</span>)}
                 </div>
                 {!isUser && (
                   <div style={{ marginTop: "0.6rem", paddingTop: "0.45rem", borderTop: `1px dashed ${border}`, color: dim, fontFamily: mono, fontSize: "0.62rem", display: "flex", gap: "0.7rem", flexWrap: "wrap" }}>
@@ -4666,7 +4674,7 @@ function AiTurnRow({ turn }) {
         {isError && turn.http_status && <span style={{ color: red }}>HTTP {turn.http_status}</span>}
       </div>
       <div style={{ whiteSpace: "pre-wrap", color: text, fontSize: "0.82rem", lineHeight: 1.45 }}>
-        {turn.content || (isError ? <span style={{ color: red, fontStyle: "italic" }}>{turn.error_message || "(no content)"}</span> : <span style={{ color: dim, fontStyle: "italic" }}>(empty)</span>)}
+        {turn.content || (isError ? <span style={{ color: redInk, fontStyle: "italic" }}>{turn.error_message || "(no content)"}</span> : <span style={{ color: dim, fontStyle: "italic" }}>(empty)</span>)}
       </div>
     </div>
   );
@@ -4723,7 +4731,7 @@ function PremiumDomainsPanel({ domains, reload }) {
           style={{ padding: "0.55rem 0.75rem", background: "var(--surface-2)", border: `1px solid ${border}`, borderRadius: 6, color: "var(--text)", fontSize: "0.85rem", fontFamily: "inherit" }} />
         <button onClick={add} disabled={busy || !newDomain.trim()} className="btn-p" style={{ fontSize: "0.8rem", padding: "0.55rem 1.25rem" }}>Add</button>
       </div>
-      {err && <div style={{ color: "#ff6b6b", marginBottom: "1rem" }}>{err}</div>}
+      {err && <div style={{ color: redInk, marginBottom: "1rem" }}>{err}</div>}
 
       {/* Existing */}
       <div style={{ border: `1px solid ${border}`, borderRadius: 12, overflow: "hidden" }}>
@@ -4743,7 +4751,7 @@ function PremiumDomainsPanel({ domains, reload }) {
                 <td style={td}><TierBadge tier={d.default_tier} /></td>
                 <td style={{ ...td, color: dim }}>{d.note || "—"}</td>
                 <td style={td}>
-                  <button onClick={() => remove(d.domain)} style={{ background: "none", border: `1px solid ${border}`, color: "#ff6b6b", padding: "0.25rem 0.65rem", borderRadius: 4, fontSize: "0.72rem", cursor: "pointer" }}>Remove</button>
+                  <button onClick={() => remove(d.domain)} style={{ background: "none", border: `1px solid ${border}`, color: redInk, padding: "0.25rem 0.65rem", borderRadius: 4, fontSize: "0.72rem", cursor: "pointer" }}>Remove</button>
                 </td>
               </tr>
             ))}
@@ -4785,9 +4793,9 @@ function UserTable({ users, setTier, deleteUser, trialAction, subAction, selfId,
                 <tr key={u.id} style={{ borderTop: `1px solid ${border}`, background: rowBg }}>
                   <td style={td}>
                     {u.email}{" "}
-                    {isSelf && <span title="That's you" style={{ color: "#f5a623", fontSize: "0.7rem", marginLeft: 4, fontFamily: mono }}>YOU</span>}
+                    {isSelf && <span title="That's you" style={{ color: orangeInk, fontSize: "0.7rem", marginLeft: 4, fontFamily: mono }}>YOU</span>}
                     {isPremium && !isSelf && <span title="Premium domain" style={{ color: greenInk, fontSize: "0.7rem", marginLeft: 4 }}>⭐</span>}
-                    {isPersonal && !isSelf && <span title="Personal email" style={{ color: "#f5a623", fontSize: "0.7rem", marginLeft: 4 }}>⚠</span>}
+                    {isPersonal && !isSelf && <span title="Personal email" style={{ color: orangeInk, fontSize: "0.7rem", marginLeft: 4 }}>⚠</span>}
                   </td>
                   <td style={{ ...td, color: dim }}>{u.full_name || "—"}</td>
                   <td style={{ ...td, color: dim }}>{u.company || "—"}</td>
@@ -4914,7 +4922,7 @@ function UserTable({ users, setTier, deleteUser, trialAction, subAction, selfId,
                       title={isSelf ? "Can't delete yourself" : "Delete user (permanent)"}
                       style={{
                         background: "transparent",
-                        color: isSelf ? "var(--text-faint)" : "#ff6b6b",
+                        color: isSelf ? "var(--text-faint)" : redInk,
                         border: `1px solid ${isSelf ? border : "rgba(255,107,107,0.4)"}`,
                         padding: "0.3rem 0.65rem", borderRadius: 4,
                         fontSize: "0.75rem",
@@ -4956,8 +4964,8 @@ function TierBadge({ tier }) {
 function EventBadge({ type }) {
   const m = {
     new_signup: { color: "var(--accent)", label: "NEW" },
-    new_signup_personal_email: { color: "#f5a623", label: "PERSONAL EMAIL" },
-    new_signup_suspicious_org: { color: "#ff6b6b", label: "SUSPICIOUS ORG" },
+    new_signup_personal_email: { color: orangeInk, label: "PERSONAL EMAIL" },
+    new_signup_suspicious_org: { color: redInk, label: "SUSPICIOUS ORG" },
   };
   const x = m[type] || { color: dim, label: type };
   return <span style={{ fontFamily: mono, fontSize: "0.65rem", color: x.color, border: `1px solid ${x.color}`, padding: "1px 6px", borderRadius: 3, fontWeight: 700, letterSpacing: "0.05em" }}>{x.label}</span>;

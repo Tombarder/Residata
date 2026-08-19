@@ -227,7 +227,10 @@ input[type="checkbox"], input[type="radio"] { width: 15px; height: 15px; cursor:
 .rd-seg__btn[aria-pressed="true"] {
   background: var(--rd-raised);
   box-shadow: var(--rd-raised-shadow);
-  color: var(--accent);
+  /* accent-STRONG, not accent: the label sits on the white raised pill, where
+     --accent measures 4.1:1 (under the 4.5:1 minimum for this size) and
+     --accent-strong 5.4:1. Dark mode is a deeper mint, still 8.5:1. */
+  color: var(--accent-strong);
   font-weight: 600;
 }
 

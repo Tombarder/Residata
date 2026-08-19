@@ -41,7 +41,7 @@ import { supabase, supabaseData } from "../lib/supabase";
 
 // ── Visual language (mirrors Platform.jsx) ───────────────────────
 const mono = "'JetBrains Mono', monospace";
-import { accent as green, accentInk, dim, text, border, bg, surfaceDark as bg2, orange , orangeInk} from "../lib/theme";
+import { accent as green, accentInk, dim, text, border, bg, surfaceDark as bg2, orange , orangeInk, infoInk } from "../lib/theme";
 const red = "#ff6b6b";
 
 // ── Scope definitions ────────────────────────────────────────────
@@ -1170,7 +1170,7 @@ function AggregateTable({ rows, lang, nameLabel }) {
       </table>
       {rows.length > LIMIT && (
         <button onClick={() => setShowAll(v => !v)}
-          style={{ width: "100%", background: "transparent", border: "none", borderTop: `1px solid ${border}`, color: green, cursor: "pointer", fontFamily: mono, fontSize: "0.72rem", padding: "0.6rem", fontWeight: 600 }}>
+          style={{ width: "100%", background: "transparent", border: "none", borderTop: `1px solid ${border}`, color: accentInk, cursor: "pointer", fontFamily: mono, fontSize: "0.72rem", padding: "0.6rem", fontWeight: 600 }}>
           {showAll
             ? (lang === "sk" ? "▲ Zobraziť menej" : "▲ Show less")
             : (lang === "sk" ? `▼ Zobraziť všetkých ${rows.length}` : `▼ Show all ${rows.length}`)}
@@ -1513,7 +1513,7 @@ function SellOutForecastReport({ projects, lang, onOpenProject }) {
     { key: "3to6",  labelSk: "3–6 mes.",     labelEn: "3–6 months",    color: orange },
     { key: "6to12", labelSk: "6–12 mes.",    labelEn: "6–12 months",   color: "#f5d142" },
     { key: "1to2y", labelSk: "1–2 roky",     labelEn: "1–2 years",     color: accentInk },
-    { key: "gt2y",  labelSk: "> 2 roky",     labelEn: "> 2 years",     color: "#5e9bff" },
+    { key: "gt2y",  labelSk: "> 2 roky",     labelEn: "> 2 years",     color: infoInk },
     { key: "none",  labelSk: "Bez signálu",  labelEn: "No signal",     color: dim },
   ];
   const tally = Object.fromEntries(buckets.map(b => [b.key, 0]));

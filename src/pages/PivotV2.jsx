@@ -32,7 +32,7 @@ import useDismiss from "../lib/useDismiss";
 */
 
 const mono    = "'JetBrains Mono', ui-monospace, Menlo, monospace";
-import { accent as green, accentInk, orange, dim, border, bg, surfacePanel as panelHi, text , orangeInk} from "../lib/theme";
+import { accent as green, accentInk, orange, dim, border, bg, surfacePanel as panelHi, text , orangeInk, dangerInk } from "../lib/theme";
 const panel   = "var(--surface-2)";
 
 /* ─── Field registry ─────────────────────────────────────────────
@@ -2467,7 +2467,7 @@ function RightPanel({ usedKeys, search, setSearch, drag, setDrag, hoverZone, set
         </span>
         <span style={{ fontFamily: mono, fontSize: "0.6rem", color: dim }}>{filtered.length}/{FIELD_ORDER.length}</span>
         {isHover && (
-          <span style={{ marginLeft: "auto", fontFamily: mono, fontSize: "0.62rem", color: "#ff6b6b", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+          <span style={{ marginLeft: "auto", fontFamily: mono, fontSize: "0.62rem", color: dangerInk, letterSpacing: "0.08em", textTransform: "uppercase" }}>
             ↓ {lang === "sk" ? "pusti pre odstránenie" : "drop to remove"}
           </span>
         )}

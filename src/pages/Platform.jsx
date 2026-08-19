@@ -44,7 +44,7 @@ import DataFreshness from "../components/DataFreshness";
 // Reports / Pivot where AI doesn't show up at all.
 
 const mono = "'JetBrains Mono', monospace";
-import { accent as green, accentInk, dim, text as textLight, border, surface as bg, surfaceDark as bg2 } from "../lib/theme";
+import { accent as green, accentInk, dim, text as textLight, border, surface as bg, surfaceDark as bg2, dangerInk, orangeInk } from "../lib/theme";
 import { useThemeMode, applyTheme, getTheme } from "../lib/theme-mode";
 import { fieldBlock } from "../lib/controls";
 const SIDEBAR_W = 240;
@@ -410,7 +410,7 @@ function Sidebar({ page, lang, can, tier, email, onNavigate, onSignOut, mobileOp
           }}>R</div>
           <div>
             <div style={{ fontWeight: 600, color: "var(--sidebar-text)", fontSize: "1rem", letterSpacing: "-0.01em", lineHeight: 1 }}>Residata</div>
-            <div style={{ fontFamily: mono, fontSize: "0.6rem", color: green, letterSpacing: "0.12em", marginTop: 2 }}>PLATFORM</div>
+            <div style={{ fontFamily: mono, fontSize: "0.6rem", color: accentInk, letterSpacing: "0.12em", marginTop: 2 }}>PLATFORM</div>
           </div>
         </div>
 
@@ -1118,7 +1118,7 @@ function PlatformBilling({ lang, setCurrent }) {
             </span>
           </div>
           {trialMsg && (
-            <div style={{ marginTop: "0.6rem", fontSize: "0.82rem", color: trialMsg.kind === "ok" ? green : "#ff6b6b", fontFamily: mono }}>
+            <div style={{ marginTop: "0.6rem", fontSize: "0.82rem", color: trialMsg.kind === "ok" ? green : dangerInk, fontFamily: mono }}>
               {trialMsg.text}
             </div>
           )}
@@ -1159,7 +1159,7 @@ function PlatformBilling({ lang, setCurrent }) {
             </button>
           </div>
           {payErr && (
-            <div style={{ marginTop: "0.6rem", fontSize: "0.82rem", color: "#ff6b6b", fontFamily: mono }}>{payErr}</div>
+            <div style={{ marginTop: "0.6rem", fontSize: "0.82rem", color: dangerInk, fontFamily: mono }}>{payErr}</div>
           )}
           <p style={{ fontSize: "0.72rem", color: dim, marginTop: "1rem", fontFamily: mono }}>
             {lang === "sk"
@@ -1191,7 +1191,7 @@ function PlatformBilling({ lang, setCurrent }) {
           background: "linear-gradient(135deg, rgba(245,166,35,0.1), rgba(245,166,35,0.02))",
           border: "1px solid rgba(245,166,35,0.4)", borderRadius: 12, padding: "1.75rem 2rem", marginBottom: "1.25rem",
         }}>
-          <div style={{ fontFamily: mono, fontSize: "0.65rem", color: "#f5a623", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.5rem", fontWeight: 700 }}>
+          <div style={{ fontFamily: mono, fontSize: "0.65rem", color: orangeInk, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.5rem", fontWeight: 700 }}>
             ⚠ {lang === "sk" ? "Predplatné vypršalo" : "Subscription expired"}
           </div>
           <h3 style={{ fontSize: "1.2rem", fontWeight: 700, color: textLight, margin: "0 0 0.5rem" }}>
@@ -1209,7 +1209,7 @@ function PlatformBilling({ lang, setCurrent }) {
             <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("residata:open-feedback", { detail: { category: "question" } }))} className="btn-s" style={{ fontSize: "0.8rem", cursor: "pointer" }}>{lang === "sk" ? "Napíš nám" : "Contact us"}</button>
           </div>
           {payErr && (
-            <div style={{ marginTop: "0.6rem", fontSize: "0.82rem", color: "#ff6b6b", fontFamily: mono }}>{payErr}</div>
+            <div style={{ marginTop: "0.6rem", fontSize: "0.82rem", color: dangerInk, fontFamily: mono }}>{payErr}</div>
           )}
         </div>
       )}
@@ -1312,7 +1312,7 @@ function SubscriptionCard({ lang, paused, paidWindowActive, paidUntil, paidStart
       )}
 
       {manageErr && (
-        <div style={{ marginTop: "0.8rem", fontSize: "0.8rem", color: "#ff6b6b", fontFamily: mono }}>{manageErr}</div>
+        <div style={{ marginTop: "0.8rem", fontSize: "0.8rem", color: dangerInk, fontFamily: mono }}>{manageErr}</div>
       )}
 
       <p style={{ color: dim, fontSize: "0.78rem", lineHeight: 1.55, margin: "1rem 0 0", fontFamily: mono }}>
@@ -1507,7 +1507,7 @@ function PlatformSettings({ lang }) {
           {msg && (
             <div style={{
               fontSize: "0.82rem", marginTop: "0.5rem",
-              color: msg.type === "ok" ? green : "#ff6b6b",
+              color: msg.type === "ok" ? green : dangerInk,
             }}>{msg.text}</div>
           )}
 
@@ -1544,12 +1544,12 @@ function PlatformSettings({ lang }) {
           </button>
           {!danger ? (
             <button type="button" onClick={() => { setDanger(true); setDmsg(null); }}
-              style={{ background: "transparent", color: "#ff6b6b", border: "1px solid #ff6b6b55", borderRadius: 6, padding: "0.5rem 1rem", fontSize: "0.82rem", cursor: "pointer" }}>
+              style={{ background: "transparent", color: dangerInk, border: "1px solid #ff6b6b55", borderRadius: 6, padding: "0.5rem 1rem", fontSize: "0.82rem", cursor: "pointer" }}>
               {lang === "sk" ? "Zmazať účet" : "Delete account"}
             </button>
           ) : (
             <span style={{ display: "inline-flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
-              <span style={{ fontSize: "0.78rem", color: "#ff6b6b" }}>
+              <span style={{ fontSize: "0.78rem", color: dangerInk }}>
                 {lang === "sk" ? "Naozaj? Toto je nevratné." : "Are you sure? This is irreversible."}
               </span>
               <button type="button" disabled={dbusy} onClick={deleteMyAccount}
@@ -1564,7 +1564,7 @@ function PlatformSettings({ lang }) {
           )}
         </div>
         {dmsg && (
-          <div style={{ fontSize: "0.8rem", marginTop: "0.7rem", color: dmsg.type === "ok" ? green : "#ff6b6b" }}>
+          <div style={{ fontSize: "0.8rem", marginTop: "0.7rem", color: dmsg.type === "ok" ? green : dangerInk }}>
             {dmsg.text}
           </div>
         )}
@@ -2149,7 +2149,7 @@ function PlatformExports({ lang, setCurrent }) {
       ) : (
       /* Trial / non-paying: can reach the page + pick a date, but export is real-paid only. */
       <div style={{ background: bg, border: `1px solid #f5a62355`, borderRadius: 12, padding: "1.5rem 1.75rem" }}>
-        <div style={{ fontFamily: mono, fontSize: "0.65rem", color: "#f5a623", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.5rem" }}>
+        <div style={{ fontFamily: mono, fontSize: "0.65rem", color: orangeInk, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.5rem" }}>
           {lang === "sk" ? "Len pre platený plán" : "Paid plan only"}
         </div>
         <h3 style={{ fontSize: "1.05rem", fontWeight: 600, color: textLight, margin: 0, marginBottom: "0.75rem" }}>
