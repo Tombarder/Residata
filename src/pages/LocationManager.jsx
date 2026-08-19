@@ -24,11 +24,11 @@ import { checkWebGL } from "../lib/webgl";
 import MapUnavailable from "../components/MapUnavailable";
 import "maplibre-gl/dist/maplibre-gl.css";
 
-// VersaTiles "eclipse" — the platform's dark basemap. This picker sits in a dark
+// The platform's dark basemap (public/basemap-dark.json). This picker sits in a dark
 // admin panel and does not follow the light theme, so it always uses the dark one.
 // It was CARTO "dark-matter" until 2026-08-19; measured, that style had stopped
 // carrying roads at all, which is no way to place a pin on a street (see MapView.jsx).
-const MAP_STYLE = "https://tiles.versatiles.org/assets/styles/eclipse/style.json";
+const MAP_STYLE = "/basemap-dark.json";
 const PHOTON = "https://photon.komoot.io/api/";
 const PHOTON_REVERSE = "https://photon.komoot.io/reverse";
 const BIAS = { SK: { lat: 48.7, lon: 19.5 }, CZ: { lat: 49.8, lon: 15.5 } };

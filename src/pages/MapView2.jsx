@@ -47,12 +47,11 @@ import MapUnavailable from "../components/MapUnavailable";
 const greyPt = "#6b6b76";
 const panel = "var(--surface)";
 
-// Same pair as the Map page: OpenFreeMap "liberty" (light) + VersaTiles "eclipse"
-// (dark). See MapView.jsx for the measurements behind dropping CARTO "dark-matter"
-// on 2026-08-19 — its free tiles had stopped carrying a map (164 rendered features
-// against eclipse's 1536).
+// Same pair as the Map page: OpenFreeMap "liberty" (light) + our own neutral dark
+// style built into public/ (scripts/build-dark-basemap.mjs). See MapView.jsx for
+// why CARTO "dark-matter" had to go on 2026-08-19 and how the grey was matched.
 const MAP_STYLE_LIGHT = "https://tiles.openfreemap.org/styles/liberty";
-const MAP_STYLE_DARK = "https://tiles.versatiles.org/assets/styles/eclipse/style.json";
+const MAP_STYLE_DARK = "/basemap-dark.json";
 const mapStyleUrl = () => (getTheme() === "light" ? MAP_STYLE_LIGHT : MAP_STYLE_DARK);
 
 // Install the custom sources + layers on a map. Run on initial load AND after a

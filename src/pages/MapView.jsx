@@ -46,27 +46,28 @@ const greyPt = "#6b6b76";
 const panel = "var(--surface)";
 
 // Basemaps. Both free, no key, commercial-OK, OpenStreetMap data.
-//   light = OpenFreeMap "liberty"            — full colour street map
-//   dark  = VersaTiles "eclipse"             — a real dark street map
+//   light = OpenFreeMap "liberty" — full-colour street map
+//   dark  = /basemap-dark.json    — OUR dark style, built by scripts/build-dark-basemap.mjs
 //
-// The dark theme used CARTO "dark-matter" until 2026-08-19, when Boss reported both
-// map pages as "grey, cant see shit". It was not our code: maplibre was healthy —
-// style loaded, layers installed, our pins painting — the BASEMAP had stopped
-// carrying anything to draw. CARTO's free tiles now serve little more than water,
-// boundaries and place dots, and their sprites are down to a SINGLE icon across
-// dark-matter, positron AND voyager, so every icon layer draws nothing.
+// The dark theme ran on CARTO "dark-matter" for months and Boss liked it: a quiet,
+// NEUTRAL dark grey map. On 2026-08-19 he reported both maps as "grey, cant see
+// shit". It was not our code — maplibre was healthy the whole time, our pins were
+// painting — CARTO's free tiles had simply stopped carrying a map. Confirmed by
+// eye and by count: borders, water and a couple of place names, no roads, no
+// cities, no landuse. 164 rendered features where a healthy source gives 1536.
+// Their sprites are gutted too (ONE icon across dark-matter, positron and voyager).
 //
-// Measured on the rendered canvas (gl.readPixels + queryRenderedFeatures — a WebGL
-// canvas does not survive a screenshot, so counting is the only honest way):
-//   carto dark-matter      164 features ·  84% of the canvas ONE colour rgb(14,14,14)
-//   openfreemap "dark"      (same near-black problem — swapping to it fixes nothing)
-//   openfreemap "fiord"     (a PALE GREY map despite the name)
-//   openfreemap liberty     905 features · legible, but it is a LIGHT map
-//   versatiles eclipse     1536 features · dark, with amber roads + readable labels
-// Feature count is the signal that matters; "how bright is it" is not, or it would
-// pick a light map for a dark theme.
+// The replacement has VersaTiles "eclipse" data with its warm brown palette pulled
+// toward grey, which lands back on dark-matter's character — near-black land, grey
+// roads, a hint of blue in water. Generated at BUILD time into public/, so there is
+// no runtime fetch, no re-colour flash, and the basemap cannot change under us
+// again without someone re-running the script.
+//
+// Tried and rejected, measured not guessed: openfreemap "dark" (as empty as
+// dark-matter), openfreemap "fiord" (a PALE GREY map despite the name), and
+// liberty-in-both-themes (legible, but a light map inside a dark app).
 const MAP_STYLE_LIGHT = "https://tiles.openfreemap.org/styles/liberty";
-const MAP_STYLE_DARK = "https://tiles.versatiles.org/assets/styles/eclipse/style.json";
+const MAP_STYLE_DARK = "/basemap-dark.json";
 const mapStyleUrl = () => (getTheme() === "light" ? MAP_STYLE_LIGHT : MAP_STYLE_DARK);
 
 // Install the clustered projects source + layers on a map. Run on initial load AND
