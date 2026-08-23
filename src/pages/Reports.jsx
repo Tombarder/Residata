@@ -27,7 +27,7 @@
  * analysis — no LLM calls, no ai_usage_log writes.
  */
 import { useState, useMemo, useEffect } from "react";
-import { usePriceSchedules, PriceBasisMark } from "../lib/priceBasis";
+import { usePriceSchedules, PriceBasisMark, useProjectFitout, FitoutMark } from "../lib/priceBasis";
 import { useProjects, useProjectSnapshots, useReportHistogram, fetchReportBinUnits, useReportProjectUnits, useReportComparables } from "../lib/useData";
 import LoadError from "../components/LoadError";
 import Picker from "../components/Picker";
@@ -71,6 +71,7 @@ export default function PlatformReports({ lang = "sk" }) {
   const { projects: allProjects, loading: loadingProjects } = useProjects();
   // Projects whose price assumes a payment schedule rather than ordinary terms.
   const priceSchedules = usePriceSchedules();
+  const projectFitout = useProjectFitout();
 
   // Active subset — used for every "current market" aggregate (Market /
   // City / District / Developer scopes). Headline numbers must match
@@ -1247,6 +1248,7 @@ function ProjectTable({ projects, flats, lang, onProjectClick }) {
   // Which of these projects price under a payment schedule rather than ordinary
   // terms — the €/m² below is their schedule price, not a comparable one.
   const priceSchedules = usePriceSchedules();
+  const projectFitout = useProjectFitout();
   const haveFlats = Array.isArray(flats);
   // Pre-bucket flats by project once so per-row enrich is O(1).
   const byProject = useMemo(() => {
@@ -1321,7 +1323,7 @@ function ProjectTable({ projects, flats, lang, onProjectClick }) {
               <td style={tdcR}>{p._realTotal.toLocaleString("en-US").replace(/,/g, " ")}</td>
               <td style={{ ...tdcR, color: accentInk }}>{p._realAvail.toLocaleString("en-US").replace(/,/g, " ")}</td>
               <td style={{ ...tdcR, color: orangeInk }}>{p._realSoldPct != null ? p._realSoldPct.toFixed(0) + "%" : "—"}</td>
-              <td style={tdcR}>{p.avg_price_eur_m2 ? Math.round(moneyFromEur(p.avg_price_eur_m2)).toLocaleString("en-US").replace(/,/g, " ") : "—"}<PriceBasisMark schedule={priceSchedules[p.name]} lang={lang} /></td>
+              <td style={tdcR}>{p.avg_price_eur_m2 ? Math.round(moneyFromEur(p.avg_price_eur_m2)).toLocaleString("en-US").replace(/,/g, " ") : "—"}<PriceBasisMark schedule={priceSchedules[p.name]} lang={lang} /><FitoutMark level={projectFitout[p.name]} lang={lang} /></td>
             </tr>
           ))}
         </tbody>

@@ -24,7 +24,8 @@ const DEFAULT_COLS = ["project_name", "city", "cast", "typ", "izby", "obytna_plo
 
 // design tokens — identical to PivotV2 so the two pages feel like one product
 import { accent as green, accentInk, orange, dim, border, bg, surfacePanel as panelHi, text } from "../lib/theme";
-import { usePriceSchedules, PriceBasisMark, priceBasisLegend } from "../lib/priceBasis";
+import { usePriceSchedules, PriceBasisMark, priceBasisLegend,
+         useProjectFitout, FitoutMark, fitoutLegend } from "../lib/priceBasis";
 import { field } from "../lib/controls";
 const panel = "var(--surface-2)";
 const mono = "'JetBrains Mono', ui-monospace, Menlo, monospace";
@@ -111,6 +112,7 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
   const { dimensions, measures } = useAnalyticsRegistry();
   // Which projects price under a payment schedule rather than ordinary terms.
   const priceSchedules = usePriceSchedules();
+  const projectFitout = useProjectFitout();
 
   // unified field list (dedup dim/measure on key); keep label + type + format
   const fields = useMemo(() => {
@@ -259,8 +261,12 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
   const legendNote = useMemo(() => {
     if (!cols.includes("cena_s_dph")) return "";
     const seen = visible.map((r) => priceSchedules[r.project_name]).filter(Boolean);
-    return priceBasisLegend(seen, lang);
-  }, [visible, priceSchedules, cols, lang]);
+    // …and every fit-out level on screen, so a shell price is explained and not
+    // merely flagged. A unit states its own level when the developer does.
+    const levels = visible.map((r) => r.fitout_level || projectFitout[r.project_name]);
+    return [priceBasisLegend(seen, lang), fitoutLegend(levels, lang)]
+      .filter(Boolean).join("  ");
+  }, [visible, priceSchedules, projectFitout, cols, lang]);
   const padTop = startIdx * ROW_H;
   const padBottom = Math.max(0, (total - endIdx) * ROW_H);
 
@@ -394,7 +400,12 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
                         // one-character mark, so a right-aligned money column keeps
                         // its shape. The sentence lives in the tooltip and the legend.
                         const basis = k === "cena_s_dph" ? priceSchedules[r.project_name] : null;
-                        return <td key={k} style={{ height: ROW_H, boxSizing: "border-box", padding: "0 0.7rem", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: numeric ? "right" : "left", borderTop: `1px solid var(--surface)`, color: k === sort.key ? text : "var(--text-2)", fontFamily: numeric ? mono : "inherit", fontVariantNumeric: "tabular-nums" }}>{fmtVal(k, r[k], fmtByKey)}<PriceBasisMark schedule={basis} lang={lang} /></td>;
+                        // What the price BUYS. The unit's own level wins — Nová
+                        // Myslivna sells one Shell&Core unit inside a standard
+                        // project — and the project's answers for the rest.
+                        const level = k === "cena_s_dph"
+                          ? (r.fitout_level || projectFitout[r.project_name]) : null;
+                        return <td key={k} style={{ height: ROW_H, boxSizing: "border-box", padding: "0 0.7rem", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: numeric ? "right" : "left", borderTop: `1px solid var(--surface)`, color: k === sort.key ? text : "var(--text-2)", fontFamily: numeric ? mono : "inherit", fontVariantNumeric: "tabular-nums" }}>{fmtVal(k, r[k], fmtByKey)}<PriceBasisMark schedule={basis} lang={lang} /><FitoutMark level={level} lang={lang} /></td>;
                       })}
                     </tr>
                   );

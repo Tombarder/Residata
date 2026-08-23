@@ -26,7 +26,7 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { priceBasisNote, usePriceSchedules } from "../lib/priceBasis";
+import { priceBasisNote, usePriceSchedules, useProjectFitout, fitoutNote, fitoutLabel } from "../lib/priceBasis";
 import { useProjects } from "../lib/useData";
 import { useAccountPrefState, useAccountHydrated } from "../lib/useAccountUiPref";
 import { useCountry } from "../lib/useCountry";
@@ -149,7 +149,7 @@ function buildFeatures(projects, coords) {
 
 // Build + show the project popup. Shared by the map's point-click handler and by
 // search-select, so a clicked pin and a chosen suggestion render the same card.
-function showProjectPopup(map, lngLat, props, lang, onOpen, popupRef, schedules = {}) {
+function showProjectPopup(map, lngLat, props, lang, onOpen, popupRef, schedules = {}, fitout = {}) {
   const el = document.createElement("div");
   el.style.minWidth = "180px";
   const loc = [props.city, props.district].filter(Boolean).join(" · ");
@@ -163,13 +163,26 @@ function showProjectPopup(map, lngLat, props, lang, onOpen, popupRef, schedules 
     ? `<div style="margin-top:6px;font-size:0.66rem;line-height:1.4;color:${dim}">` +
       `${escapeHtml(priceBasisNote(sched, lang))}</div>`
     : "";
+  // …and what that average price BUYS. A project selling bare shells shows a
+  // €/m² a fifth below the finished ones around it, and the map is where most
+  // people meet a project first.
+  const level = fitout[props.name] || fitout[props.id] || "";
+  const levelMark = level
+    ? `<span style="margin-left:0.45em;font-size:0.62rem;font-weight:700;padding:0.1em 0.42em;` +
+      `border:1px solid ${amber};border-radius:999px;color:${amber}">${escapeHtml(fitoutLabel(level, lang))}</span>`
+    : "";
+  const levelLine = level
+    ? `<div style="margin-top:6px;font-size:0.66rem;line-height:1.4;color:${dim}">` +
+      `${escapeHtml(fitoutNote(level, lang))}</div>`
+    : "";
   el.innerHTML =
     `<div style="font-weight:600;font-size:0.92rem;color:${textLight};margin-bottom:2px">${escapeHtml(props.name)}</div>` +
     `<div style="font-size:0.72rem;color:${dim};margin-bottom:8px">${escapeHtml(loc)}</div>` +
     `<div style="font-family:${mono};font-size:0.72rem;color:${textLight};line-height:1.5">` +
     `<div><span style="color:${dim}">${lang === "sk" ? "Voľné" : "Available"}</span> &nbsp;${props.available} / ${props.total}</div>` +
-    `<div><span style="color:${dim}">${lang === "sk" ? "Priem." : "Avg"}</span> &nbsp;${price}${schedMark}</div></div>` +
+    `<div><span style="color:${dim}">${lang === "sk" ? "Priem." : "Avg"}</span> &nbsp;${price}${schedMark}${levelMark}</div></div>` +
     schedLine +
+    levelLine +
     `<button id="mv-open" style="margin-top:10px;width:100%;padding:7px 10px;background:${green};color:#0a0a0b;` +
     `border:none;border-radius:6px;font-weight:600;font-size:0.78rem;cursor:pointer">` +
     `${lang === "sk" ? "Otvoriť projekt" : "Open project"} →</button>`;
@@ -198,10 +211,13 @@ export default function MapView({ lang = "en", setCurrent }) {
   const countryRef = useRef(country);   // latest country, readable inside the once-mounted load handler
   const fitKeyRef = useRef(null);        // country we've already auto-fitted to (once data was present)
   const priceSchedules = usePriceSchedules();
+  const projectFitout = useProjectFitout();
   // The pin-click handler is registered once when the map loads, so it reads the
   // schedules through a ref — a captured value would be the empty first render.
   const schedulesRef = useRef(priceSchedules);
   useEffect(() => { schedulesRef.current = priceSchedules; }, [priceSchedules]);
+  const fitoutRef = useRef(projectFitout);
+  useEffect(() => { fitoutRef.current = projectFitout; }, [projectFitout]);
   const popupRef = useRef(null);         // single active popup — clicking pins must not stack popups
 
   // ── Filter + search state ──
@@ -460,7 +476,7 @@ export default function MapView({ lang = "en", setCurrent }) {
         showProjectPopup(
           map, f.geometry.coordinates, f.properties, langRef.current,
           (id) => { setCurrentRef.current && setCurrentRef.current("App:ProjectDetail:" + id); },
-          popupRef, schedulesRef.current
+          popupRef, schedulesRef.current, fitoutRef.current
         );
       });
 
@@ -556,7 +572,7 @@ export default function MapView({ lang = "en", setCurrent }) {
       showProjectPopup(
         map, [c.lng, c.lat], projectProps(p), langRef.current,
         (id) => { setCurrentRef.current && setCurrentRef.current("App:ProjectDetail:" + id); },
-        popupRef, schedulesRef.current
+        popupRef, schedulesRef.current, fitoutRef.current
       );
     }
   }
