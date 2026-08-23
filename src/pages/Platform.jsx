@@ -1659,6 +1659,11 @@ const FLATS_CSV_COLUMNS = [
   "fin_95_5", "fin_90_10", "fin_80_20", "fin_60_40",
   "fin_50_50", "fin_40_60", "fin_30_70", "fin_5_95",
   "fin_20_50_30", "fin_5_15_80",
+  // What the price BUYS. export_units_csv has emitted these four since the
+  // fit-out columns shipped, but this list did not name them — so `created_at`
+  // sat over the fit-out data and four columns went out unlabelled. Column ORDER
+  // must match export_units_csv's concat_ws.
+  "fitout_level", "cena_holobyt", "cena_standard", "cena_plne_zariadeny",
   // Audit
   "created_at",
 ];
@@ -1681,6 +1686,9 @@ const FLATS_NUMBER_COLUMNS = new Set([
   "fin_60_40", "fin_50_50", "fin_40_60", "fin_30_70",
   "fin_20_80", "fin_10_90", "fin_5_95", "fin_30_50_20",
   "fin_30_40_30", "fin_20_50_30", "fin_5_15_80", "fin_10_40_40_10",
+  // Fit-out prices are prices too — one column per level the developer publishes.
+  // fitout_level itself stays TEXT: it is a word, not a number.
+  "cena_holobyt", "cena_standard", "cena_plne_zariadeny",
 ]);
 
 // Minimal RFC-4180 CSV parser → array of string-cell rows. Handles quoted fields
