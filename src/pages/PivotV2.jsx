@@ -1760,14 +1760,15 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
           text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 3px;
         }
         .pivot-label-text:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 3px; }
-        /* Drag handle on a field chip. Dim until you go near it, so four zones
-           full of chips don't read as a field of dots. */
-        .pivotv2-grip:hover { opacity: 1 !important; }
-        .pivotv2-grip:active { cursor: grabbing; }
-        .pivotv2-grip:focus-visible {
-          outline: 2px solid var(--accent); outline-offset: 1px;
-          border-radius: 3px; opacity: 1 !important;
+        /* A field chip is grabbable anywhere on its body. The ⠿ is the hint,
+           dim until the pointer is on the chip so four zones full of chips
+           don't read as a field of dots. */
+        .pivotv2-chip:hover .pivotv2-grip { opacity: 0.95 !important; }
+        .pivotv2-chip:active { cursor: grabbing; }
+        .pivotv2-chip:focus-visible {
+          outline: 2px solid var(--accent); outline-offset: 2px;
         }
+        .pivotv2-chip:focus-visible .pivotv2-grip { opacity: 0.95 !important; }
         /* The pivot's own horizontal scrollbar — visible enough to be found,
            quiet enough not to compete with the data. */
         .pivot-scroll { --pv-label-w: 300px; --pv-count-w: 96px; scrollbar-width: thin; }
@@ -2369,13 +2370,45 @@ function DropZone({ zoneKey, title, hint, icon, chips, drag, hoverZone, setHover
 }
 
 /* A chip inside a drop zone. In Values zone the chip carries an agg
-   dropdown directly — click to cycle or pick from a menu. */
+   dropdown directly — click to cycle or pick from a menu.
+
+   THE WHOLE CHIP IS THE HANDLE. Boss: "i want it fully modular — both
+   inputting them but also taking and reordering them once they are already
+   in." So you grab a chip anywhere on its body and move it: to another slot,
+   to another zone, or back to the palette. The ⠿ is a hint that it is
+   grabbable, not the only place you may grab.
+
+   That used to be impossible to combine with the chip's own click. Making a
+   chip draggable puts the browser's dragstart-vs-click dance on top of it, and
+   a filter chip's click (open its editor) was getting swallowed — reported
+   twice — so dragging was switched off for filter chips altogether, which is
+   why they could not be re-ordered at all.
+
+   The fix is to stop relying on the native `click` event, which is the flaky
+   half. A press is a CLICK when the pointer comes back up near where it went
+   down and no drag ever started; anything else is a drag. Both readings come
+   from pointer events we own, so neither can eat the other:
+
+     pointerdown → remember where, and whether it landed on an inner control
+     pointermove → past 3px this is a drag, not a press (below the browser's
+                   own ~5px drag threshold, so it is always decided in time)
+     dragstart   → refuse it outright when the press began on the × or the agg
+                   button; those are buttons, not grips
+     pointerup   → no drag + still within CLICK_SLOP of the start = a click
+
+   Keyboard: the chip is focusable, ←/→ move it one slot, Enter/Space is the
+   click. Reordering never needs a mouse. */
+const CLICK_SLOP = 5;      // px — a press that travels further was a drag
+const DRAG_SLOP  = 3;      // px — past this a press can become a drag
+
 function ChipInZone({ label, type, agg, filter, level, reorderable, isDragged, onDragStart, onDragStartPayload, onNudge, onRemove, onChangeAgg, onClick, lang }) {
   const [menuOpen, setMenuOpen] = useState(false);
   // One dismissal behaviour for every layer in the app: an outside click or Esc
   // closes it. (This used to lean on the button's onBlur + a 150ms timeout,
   // which never fired when the click didn't move focus.)
   const chipRef = useDismiss(menuOpen, () => setMenuOpen(false));
+  const pressRef = useRef(null);      // { x, y, onControl, moved } for the press in flight
+  const draggedRef = useRef(false);
   const aggs = type === "measure" ? AGGS_MEASURE
              : type === "number" ? AGGS_NUMBER
              : AGGS_TEXT;
@@ -2387,35 +2420,58 @@ function ChipInZone({ label, type, agg, filter, level, reorderable, isDragged, o
   const active = isFilterChip ? isFilterActive(filter) : true;
   const filterSummary = isFilterChip ? summariseFilter(filter, type, lang) : null;
 
-  /* THE GRIP, and why the whole chip is no longer the drag handle.
-     Making the chip itself draggable put the browser's dragstart-vs-click dance
-     on top of the chip's own click — which swallowed clicks, twice reported.
-     The old fix was to switch dragging OFF for filter chips, which is why a
-     filter could not be re-ordered at all. A dedicated grip fixes both ends:
-     the chip keeps its click (configure the filter, open the agg menu) and
-     EVERY zone can be re-ordered, filters included. */
-  const startDrag = (e) => {
-    e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", label);
-    // Drag the whole chip, not the 8px grip, so the ghost reads as the field.
-    if (chipRef.current && e.dataTransfer.setDragImage) {
-      const r = chipRef.current.getBoundingClientRect();
-      e.dataTransfer.setDragImage(chipRef.current, e.clientX - r.left, e.clientY - r.top);
-    }
-    const payload = onDragStartPayload();
-    if (onDragStart) onDragStart();
-    window.__pivotv2_drag = payload;
-    window.dispatchEvent(new CustomEvent("pivotv2-drag-start", { detail: payload }));
-  };
+  const nudge = (dir) => { if (onNudge) onNudge(dir); };
 
   return (
     <span
       ref={chipRef}
       data-chip
       className="pivotv2-chip"
-      title={isFilterChip ? (active ? "Klikni pre úpravu filtra" : "Klikni pre nastavenie filtra") : undefined}
-      onClick={(e) => {
-        if (onClick) { e.stopPropagation(); onClick(e); }
+      draggable
+      tabIndex={0}
+      role="button"
+      aria-label={label}
+      title={isFilterChip
+        ? (active ? "Klikni pre úpravu filtra · ťahaj pre presun" : "Klikni pre nastavenie filtra · ťahaj pre presun")
+        : (lang === "sk" ? "Ťahaj pre presun / zmenu poradia (alebo ←/→)" : "Drag to move or reorder (or ←/→)")}
+      onPointerDown={(e) => {
+        draggedRef.current = false;
+        pressRef.current = {
+          x: e.clientX, y: e.clientY, moved: false,
+          // A press that starts on the × or the agg button is that button's,
+          // never a drag of the chip around it.
+          onControl: !!(e.target.closest && e.target.closest("[data-chip-control]")),
+        };
+      }}
+      onPointerMove={(e) => {
+        const p = pressRef.current;
+        if (p && !p.moved && Math.hypot(e.clientX - p.x, e.clientY - p.y) > DRAG_SLOP) p.moved = true;
+      }}
+      onPointerUp={(e) => {
+        const p = pressRef.current;
+        pressRef.current = null;
+        if (!onClick || !p || p.onControl || draggedRef.current) return;
+        if (Math.hypot(e.clientX - p.x, e.clientY - p.y) > CLICK_SLOP) return;
+        onClick(e);
+      }}
+      onPointerCancel={() => { pressRef.current = null; }}
+      onDragStart={(e) => {
+        const p = pressRef.current;
+        if (p && p.onControl) { e.preventDefault(); return; }
+        draggedRef.current = true;
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", label);
+        const payload = onDragStartPayload();
+        if (onDragStart) onDragStart();
+        window.__pivotv2_drag = payload;
+        window.dispatchEvent(new CustomEvent("pivotv2-drag-start", { detail: payload }));
+      }}
+      onDragEnd={() => { pressRef.current = null; }}
+      onKeyDown={(e) => {
+        if (e.target !== e.currentTarget) return;         // let the inner buttons keep their keys
+        if (e.key === "ArrowLeft")  { e.preventDefault(); nudge(-1); }
+        else if (e.key === "ArrowRight") { e.preventDefault(); nudge(1); }
+        else if ((e.key === "Enter" || e.key === " ") && onClick) { e.preventDefault(); onClick(e); }
       }}
       style={{
         display: "inline-flex", alignItems: "center", gap: "0.35rem",
@@ -2424,35 +2480,22 @@ function ChipInZone({ label, type, agg, filter, level, reorderable, isDragged, o
         border: `1px solid ${active ? green : "var(--border-soft)"}`,
         color: active ? green : dim,
         fontSize: "0.75rem",
-        cursor: onClick ? "pointer" : "default",
+        cursor: "grab",
         userSelect: "none", position: "relative",
         opacity: isDragged ? 0.4 : 1,
         transition: "opacity 0.12s",
       }}
     >
-      {/* Drag handle. Also keyboard-reachable: ←/→ moves the chip one slot, so
-          the order is reachable without a mouse (and without a drag at all). */}
+      {/* Grab hint. Not the handle — the whole chip is — just the thing that
+          says so at a glance. Dim until the pointer is on the chip. */}
       <span
+        aria-hidden
         className="pivotv2-grip"
-        draggable
-        role="button"
-        tabIndex={0}
-        aria-label={lang === "sk" ? `Presunúť ${label}` : `Move ${label}`}
-        title={lang === "sk"
-          ? "Ťahaj pre zmenu poradia (alebo šípky ←/→)"
-          : "Drag to reorder (or use ←/→)"}
-        onDragStart={startDrag}
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => {
-          if (!onNudge) return;
-          if (e.key === "ArrowLeft")  { e.preventDefault(); e.stopPropagation(); onNudge(-1); }
-          if (e.key === "ArrowRight") { e.preventDefault(); e.stopPropagation(); onNudge(1); }
-        }}
         style={{
-          cursor: "grab", lineHeight: 1, padding: "0 1px",
+          lineHeight: 1, padding: "0 1px",
           fontSize: "0.72rem", letterSpacing: "-0.5px",
-          opacity: reorderable ? 0.55 : 0.28,
-          color: "currentColor",
+          opacity: reorderable ? 0.5 : 0.25,
+          color: "currentColor", pointerEvents: "none",
         }}
       >⠿</span>
       {level != null && (
@@ -2469,7 +2512,7 @@ function ChipInZone({ label, type, agg, filter, level, reorderable, isDragged, o
         {label}
       </span>
       {/* Filter chip meta: inline summary when configured, subtle hint
-          when idle. Whole chip is clickable (span's onClick handles it),
+          when idle. Whole chip is clickable (the pointerup handler above),
           so no loud orange pseudo-button is needed. */}
       {isFilterChip && (
         <span style={{
@@ -2490,6 +2533,7 @@ function ChipInZone({ label, type, agg, filter, level, reorderable, isDragged, o
         <>
           <span style={{ color: dim, opacity: 0.5, fontSize: "0.58rem" }}>·</span>
           <button
+            data-chip-control
             onClick={(e) => { e.stopPropagation(); setMenuOpen(o => !o); }}
             style={{
               background: "transparent", border: "none",
@@ -2501,7 +2545,7 @@ function ChipInZone({ label, type, agg, filter, level, reorderable, isDragged, o
             {AGG_LABEL[agg] || agg} ▾
           </button>
           {menuOpen && (
-            <div style={{
+            <div data-chip-control style={{
               position: "absolute", top: "100%", left: 0, marginTop: 4,
               background: "var(--surface-2)", border: `1px solid ${green}`,
               borderRadius: 6, padding: "0.25rem",
@@ -2511,6 +2555,7 @@ function ChipInZone({ label, type, agg, filter, level, reorderable, isDragged, o
               {aggs.map(a => (
                 <button
                   key={a}
+                  data-chip-control
                   onClick={() => { onChangeAgg(a); setMenuOpen(false); }}
                   style={{
                     display: "block", width: "100%", textAlign: "left",
@@ -2531,6 +2576,7 @@ function ChipInZone({ label, type, agg, filter, level, reorderable, isDragged, o
         </>
       )}
       <button
+        data-chip-control
         onClick={(e) => { e.stopPropagation(); onRemove(); }}
         title="Remove"
         style={{ background: "transparent", border: "none", color: accentInk, cursor: "pointer", padding: 0, fontSize: "0.95rem", lineHeight: 1 }}
