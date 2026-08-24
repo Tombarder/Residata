@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useLayoutEffect, Fragment } from "react";
 import { createPortal } from "react-dom";
 import { useProjects, useFlatsArchive, useFlatsCurrent, useArchiveMonths, useArchiveDays, usePivotGrain, usePivotDistinct, usePivotFieldStats, fetchFlatsForProjects } from "../lib/useData";
 import { useCountry, isAllCountries } from "../lib/useCountry";
@@ -11,6 +11,8 @@ import Picker from "../components/Picker";
 import { localeTag } from "../lib/locale";
 import { useCurrency } from "../lib/useCurrency";
 import { orderPivotColKeys } from "../lib/pivotColOrder";
+import { toCSV, copyTable } from "../lib/tableClipboard";
+import { insertAt, moveToIndex, keyOfString, keyOfObject, dropIndexFor } from "../lib/zoneOrder";
 import useDismiss from "../lib/useDismiss";
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -1229,6 +1231,9 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   const [search,  setSearch]  = useState("");
   const [drag,    setDrag]    = useState(null);
   const [hoverZone, setHoverZone] = useState(null);
+  // Slot the drop caret is currently sitting in, inside `hoverZone`. Null while
+  // the pointer is over a zone's chrome rather than its chip row (= append).
+  const [dropIndex, setDropIndex] = useState(null);
   const [collapsed, setCollapsed] = useState(() => new Set());
   // Sort state: { col: "label" | "count" | valueIdx (0..n-1), dir: "asc"|"desc" }
   const [sort, setSort] = useState(persisted?.sort ?? DEFAULT_SORT);
@@ -1398,7 +1403,12 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   ]), [rows, cols, values]);
 
   // ── Actions ───────────────────────────────────────────────────
-  const addToZone = (fieldKey, zone) => {
+  /* `atIndex` is the slot the drop caret was sitting in (null = append). A field
+     already IN the target zone is a RE-ORDER, not a duplicate drop — that is
+     what makes dragging a chip sideways change the order instead of doing
+     nothing (which is what it used to do: the user had to delete the chip and
+     re-add it in the order they wanted). */
+  const addToZone = (fieldKey, zone, atIndex = null) => {
     // Rows ↔ Values are mutually exclusive (same field can't be a
     // group-by AND a measure at the same time — that's not a pivot,
     // it's a tautology). But Filters can COEXIST with either:
@@ -1415,9 +1425,9 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
       setValues(v => v.filter(x => x.key !== fieldKey));
       setCols(c => c.filter(k => k !== fieldKey));
       setRows(r => {
-        if (r.includes(fieldKey)) return r;
+        if (r.includes(fieldKey)) return moveToIndex(r, keyOfString, fieldKey, atIndex ?? r.length);
         if (r.length >= MAX_ROWS) return r;
-        return [...r, fieldKey];
+        return insertAt(r, fieldKey, atIndex);
       });
     } else if (zone === "cols") {
       // Cross-tab axis: drop mutually exclusive with rows/values.
@@ -1426,24 +1436,24 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
       setRows(r => r.filter(k => k !== fieldKey));
       setValues(v => v.filter(x => x.key !== fieldKey));
       setCols(c => {
-        if (c.includes(fieldKey)) return c;
+        if (c.includes(fieldKey)) return moveToIndex(c, keyOfString, fieldKey, atIndex ?? c.length);
         if (c.length >= MAX_COLS) return [fieldKey]; // replace existing (cap=1)
-        return [...c, fieldKey];
+        return insertAt(c, fieldKey, atIndex);
       });
     } else if (zone === "values") {
       setRows(r => r.filter(k => k !== fieldKey));
       setCols(c => c.filter(k => k !== fieldKey));
       setValues(v => {
-        if (v.find(x => x.key === fieldKey)) return v;
+        if (v.find(x => x.key === fieldKey)) return moveToIndex(v, keyOfObject, fieldKey, atIndex ?? v.length);
         if (v.length >= MAX_VALUES) return v;
         const fld = FIELDS[fieldKey];
-        return [...v, { key: fieldKey, field: fieldKey, agg: defaultAggFor(fld) }];
+        return insertAt(v, { key: fieldKey, field: fieldKey, agg: defaultAggFor(fld) }, atIndex);
       });
     } else if (zone === "filters") {
       // Filters coexist with Rows / Cols / Values — no mutual-exclusion.
       setFilters(f => {
-        if (f.find(x => x.key === fieldKey)) return f;
-        return [...f, { key: fieldKey }];
+        if (f.find(x => x.key === fieldKey)) return moveToIndex(f, keyOfObject, fieldKey, atIndex ?? f.length);
+        return insertAt(f, { key: fieldKey }, atIndex);
       });
     } else if (zone === "palette") {
       // Drag back to palette = full remove from wherever it was.
@@ -1750,6 +1760,32 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
           text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 3px;
         }
         .pivot-label-text:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 3px; }
+        /* Drag handle on a field chip. Dim until you go near it, so four zones
+           full of chips don't read as a field of dots. */
+        .pivotv2-grip:hover { opacity: 1 !important; }
+        .pivotv2-grip:active { cursor: grabbing; }
+        .pivotv2-grip:focus-visible {
+          outline: 2px solid var(--accent); outline-offset: 1px;
+          border-radius: 3px; opacity: 1 !important;
+        }
+        /* The pivot's own horizontal scrollbar — visible enough to be found,
+           quiet enough not to compete with the data. */
+        .pivot-scroll { --pv-label-w: 300px; --pv-count-w: 96px; scrollbar-width: thin; }
+        .pivot-scroll::-webkit-scrollbar { height: 10px; width: 10px; }
+        .pivot-scroll::-webkit-scrollbar-thumb {
+          background: color-mix(in srgb, var(--text) 22%, transparent);
+          border-radius: 6px;
+        }
+        .pivot-scroll::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--text) 34%, transparent); }
+        /* On a phone a 300px frozen column would eat the whole viewport, so it
+           shrinks instead of being switched off — the row keeps its name, which is
+           the entire point of freezing it. */
+        @media (max-width: 820px) {
+          .pivot-scroll { --pv-label-w: 200px; --pv-count-w: 80px; }
+        }
+        @media (max-width: 560px) {
+          .pivot-scroll { --pv-label-w: 130px; --pv-count-w: 56px; }
+        }
       `}</style>
 
       {/* Initial-load skeleton — shown ONLY while real flats are still
@@ -1871,7 +1907,13 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
           rows={rows} cols={cols} values={values} filters={filters}
           drag={drag} setDrag={setDrag}
           hoverZone={hoverZone} setHoverZone={setHoverZone}
-          onDropToZone={(zone) => { if (!drag) return; addToZone(drag.fieldKey, zone); setDrag(null); setHoverZone(null); }}
+          dropIndex={dropIndex} setDropIndex={setDropIndex}
+          onDropToZone={(zone, atIndex) => {
+            if (!drag) return;
+            addToZone(drag.fieldKey, zone, atIndex);
+            setDrag(null); setHoverZone(null); setDropIndex(null);
+          }}
+          onReorder={(zone, fieldKey, toIndex) => addToZone(fieldKey, zone, toIndex)}
           removeFromZone={removeFromZone}
           changeValueAgg={changeValueAgg}
           openFilter={(key, anchorEl) => setFilterPopup({ key, anchorEl })}
@@ -1884,7 +1926,7 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
           hoverZone={hoverZone} setHoverZone={setHoverZone}
           onDropBack={() => {
             if (drag && drag.fromZone !== "palette") addToZone(drag.fieldKey, "palette");
-            setDrag(null); setHoverZone(null);
+            setDrag(null); setHoverZone(null); setDropIndex(null);
           }}
           lang={lang}
         />
@@ -1896,6 +1938,7 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
           valueMode={valueMode} setValueMode={setValueMode}
           dataBars={dataBars}   setDataBars={setDataBars}
           onExportCSV={() => exportPivotCSV(flatRows, sortedTree, rows, cols, effectiveValues, valueMode, lang)}
+          onCopyTable={() => copyPivotTable(flatRows, sortedTree, rows, cols, effectiveValues, valueMode, lang)}
           effectiveValues={effectiveValues}
           lang={lang}
         />
@@ -2159,51 +2202,46 @@ const miniBtn = {
 };
 
 /* ─── LEFT PANEL ─────────────────────────────────────────────── */
-function LeftPanel({ rows, cols, values, filters, drag, setDrag, hoverZone, setHoverZone, onDropToZone, removeFromZone, changeValueAgg, openFilter, lang }) {
+function LeftPanel({ rows, cols, values, filters, drag, setDrag, hoverZone, setHoverZone, dropIndex, setDropIndex, onDropToZone, onReorder, removeFromZone, changeValueAgg, openFilter, lang }) {
+  const shared = {
+    drag, setDrag, hoverZone, setHoverZone, dropIndex, setDropIndex, lang,
+    onDrop: onDropToZone, onReorder,
+  };
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
       <DropZone
-        zoneKey="rows" 
-        lang={lang}
+        {...shared}
+        zoneKey="rows"
         title={lang === "sk" ? "Riadky" : "Rows"}
         hint={lang === "sk" ? "Potiahni pole sem — bude group-by os (hierarchia)." : "Drop a field here — becomes a group-by axis."}
         icon="↓"
         chips={rows.map(k => ({ key: k, label: fieldLabel(k, lang) || k, type: FIELDS[k]?.type }))}
-        drag={drag} setDrag={setDrag}
-        hoverZone={hoverZone} setHoverZone={setHoverZone}
-        onDrop={() => onDropToZone("rows")}
         onRemove={(k) => removeFromZone("rows", k)}
       />
       <DropZone
-        zoneKey="cols" 
-        lang={lang}
+        {...shared}
+        zoneKey="cols"
         title={lang === "sk" ? "Stĺpce" : "Columns"}
         hint={lang === "sk"
           ? "Potiahni text-pole sem — každá hodnota dostane vlastný stĺpec (cross-tab, napr. Stav: V/P/R)."
           : "Drop a text field here — each value becomes its own column (cross-tab)."}
         icon="→"
         chips={cols.map(k => ({ key: k, label: fieldLabel(k, lang) || k, type: FIELDS[k]?.type }))}
-        drag={drag} setDrag={setDrag}
-        hoverZone={hoverZone} setHoverZone={setHoverZone}
-        onDrop={() => onDropToZone("cols")}
         onRemove={(k) => removeFromZone("cols", k)}
       />
       <DropZone
-        zoneKey="values" 
-        lang={lang}
+        {...shared}
+        zoneKey="values"
         title={lang === "sk" ? "Hodnoty" : "Values"}
         hint={lang === "sk" ? "Potiahni pole sem — bude sa agregovať (default: count; zmeň kliknutím na chip)." : "Drop a field here — aggregated (default: count; click the chip to change)."}
         icon="Σ"
         chips={values.map(v => ({ key: v.key, label: fieldLabel(v.key, lang) || v.key, type: FIELDS[v.key]?.type, agg: v.agg }))}
-        drag={drag} setDrag={setDrag}
-        hoverZone={hoverZone} setHoverZone={setHoverZone}
-        onDrop={() => onDropToZone("values")}
         onRemove={(k) => removeFromZone("values", k)}
         onChangeAgg={changeValueAgg}
       />
       <DropZone
-        zoneKey="filters" 
-        lang={lang}
+        {...shared}
+        zoneKey="filters"
         title={lang === "sk" ? "Filtre" : "Filters"}
         hint={lang === "sk"
           ? "Potiahni pole sem — vylúč / zahrň konkrétne hodnoty. Platí na celý pivot (pred agregáciou)."
@@ -2216,9 +2254,6 @@ function LeftPanel({ rows, cols, values, filters, drag, setDrag, hoverZone, setH
           // Full filter object passed through so the chip can render its summary
           filter: f,
         }))}
-        drag={drag} setDrag={setDrag}
-        hoverZone={hoverZone} setHoverZone={setHoverZone}
-        onDrop={() => onDropToZone("filters")}
         onRemove={(k) => removeFromZone("filters", k)}
         onChipClick={openFilter}
       />
@@ -2226,14 +2261,58 @@ function LeftPanel({ rows, cols, values, filters, drag, setDrag, hoverZone, setH
   );
 }
 
-function DropZone({ zoneKey, title, hint, icon, chips, drag, hoverZone, setHoverZone, onDrop, onRemove, onChangeAgg, onChipClick, lang }) {
+/**
+ * A drop zone, and — since 2026-08-24 — a re-orderable list.
+ *
+ * Order is meaning here: Rows is the hierarchy (L1 › L2 › L3), Values is the
+ * left-to-right column order of the result table. Before this, changing it
+ * meant removing a chip and adding it back in the order you wanted. Now the
+ * pointer position picks a slot, a caret shows it, and the drop lands there.
+ *
+ * The slot arithmetic (and the drag-right off-by-one it hides) lives in
+ * lib/zoneOrder.js with tests; this component only reports rectangles.
+ */
+function DropZone({ zoneKey, title, hint, icon, chips, drag, hoverZone, setHoverZone, dropIndex, setDropIndex, onDrop, onReorder, onRemove, onChangeAgg, onChipClick, lang }) {
   const isHover = hoverZone === zoneKey && drag;
   const isDragging = drag != null;
+  const rowRef = useRef(null);
+
+  /* Which slot is the pointer asking for? Measured from the live chip
+     rectangles, so it is correct however the chips have wrapped. */
+  const slotAt = (e) => {
+    const host = rowRef.current;
+    if (!host) return chips.length;
+    const rects = Array.from(host.querySelectorAll("[data-chip]")).map(el => el.getBoundingClientRect());
+    return dropIndexFor(rects, e.clientX, e.clientY);
+  };
+
+  const trackPointer = (e) => {
+    if (!drag) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (hoverZone !== zoneKey) setHoverZone(zoneKey);
+    const slot = slotAt(e);
+    if (slot !== dropIndex) setDropIndex(slot);
+  };
+
+  const caret = (i) => (
+    isHover && dropIndex === i
+      ? <span key={"caret" + i} aria-hidden style={{
+          width: 2, alignSelf: "stretch", minHeight: 22, borderRadius: 1,
+          background: green, boxShadow: `0 0 6px ${green}`,
+        }} />
+      : null
+  );
+
   return (
     <div
-      onDragOver={(e) => { if (!drag) return; e.preventDefault(); e.dataTransfer.dropEffect = "move"; setHoverZone(zoneKey); }}
-      onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget) && hoverZone === zoneKey) setHoverZone(null); }}
-      onDrop={(e) => { e.preventDefault(); onDrop(); }}
+      onDragOver={trackPointer}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget) && hoverZone === zoneKey) {
+          setHoverZone(null); setDropIndex(null);
+        }
+      }}
+      onDrop={(e) => { e.preventDefault(); onDrop(zoneKey, drag ? slotAt(e) : null); }}
       style={{
         background: isHover ? "color-mix(in srgb, var(--accent) 7%, transparent)" : panel,
         border: `1px dashed ${isHover ? green : (isDragging ? "#2c2c36" : border)}`,
@@ -2254,23 +2333,35 @@ function DropZone({ zoneKey, title, hint, icon, chips, drag, hoverZone, setHover
       {chips.length === 0 ? (
         <div style={{ fontSize: "0.74rem", color: dim, fontStyle: "italic", lineHeight: 1.45 }}>{hint}</div>
       ) : (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem" }}>
+        <div ref={rowRef} style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.3rem" }}>
           {chips.map((c, idx) => (
-            <ChipInZone
-              key={c.key}
-              label={c.label}
-              type={c.type}
-              agg={c.agg}
-              filter={c.filter}
-              level={zoneKey === "rows" ? idx : null}
-              onDragStart={() => setHoverZone(null)}
-              onDragStartPayload={() => ({ fromZone: zoneKey, fieldKey: c.key })}
-              onRemove={() => onRemove(c.key)}
-              onChangeAgg={onChangeAgg ? (a) => onChangeAgg(c.key, a) : null}
-              onClick={onChipClick ? (e) => onChipClick(c.key, e.currentTarget) : null}
-              lang={lang}
-            />
+            <Fragment key={c.key}>
+              {caret(idx)}
+              <ChipInZone
+                label={c.label}
+                type={c.type}
+                agg={c.agg}
+                filter={c.filter}
+                level={zoneKey === "rows" ? idx : null}
+                reorderable={chips.length > 1}
+                isDragged={drag?.fromZone === zoneKey && drag?.fieldKey === c.key}
+                onDragStart={() => setHoverZone(null)}
+                onDragStartPayload={() => ({ fromZone: zoneKey, fieldKey: c.key })}
+                /* Keyboard equivalent of a one-slot drag. Goes through onReorder,
+                   not onDrop, because there is no drag in flight to read from. */
+                onNudge={(dir) => {
+                  const slot = dir < 0 ? idx - 1 : idx + 2;
+                  if (slot < 0 || slot > chips.length) return;   // already at the edge
+                  onReorder(zoneKey, c.key, slot);
+                }}
+                onRemove={() => onRemove(c.key)}
+                onChangeAgg={onChangeAgg ? (a) => onChangeAgg(c.key, a) : null}
+                onClick={onChipClick ? (e) => onChipClick(c.key, e.currentTarget) : null}
+                lang={lang}
+              />
+            </Fragment>
           ))}
+          {caret(chips.length)}
         </div>
       )}
     </div>
@@ -2279,7 +2370,7 @@ function DropZone({ zoneKey, title, hint, icon, chips, drag, hoverZone, setHover
 
 /* A chip inside a drop zone. In Values zone the chip carries an agg
    dropdown directly — click to cycle or pick from a menu. */
-function ChipInZone({ label, type, agg, filter, level, onDragStart, onDragStartPayload, onRemove, onChangeAgg, onClick, lang }) {
+function ChipInZone({ label, type, agg, filter, level, reorderable, isDragged, onDragStart, onDragStartPayload, onNudge, onRemove, onChangeAgg, onClick, lang }) {
   const [menuOpen, setMenuOpen] = useState(false);
   // One dismissal behaviour for every layer in the app: an outside click or Esc
   // closes it. (This used to lean on the button's onBlur + a 150ms timeout,
@@ -2296,40 +2387,74 @@ function ChipInZone({ label, type, agg, filter, level, onDragStart, onDragStartP
   const active = isFilterChip ? isFilterActive(filter) : true;
   const filterSummary = isFilterChip ? summariseFilter(filter, type, lang) : null;
 
-  // Filter chips are NOT draggable — the browser's dragstart vs click
-  // dance on a draggable element was swallowing clicks in some cases
-  // (Tomáš reported it twice). Filter chips are configured via a click,
-  // removed via ×; no drag needed. Other zones (Rows/Cols/Values) keep
-  // drag to allow re-ordering / moving between zones.
-  const canDrag = !isFilterChip;
+  /* THE GRIP, and why the whole chip is no longer the drag handle.
+     Making the chip itself draggable put the browser's dragstart-vs-click dance
+     on top of the chip's own click — which swallowed clicks, twice reported.
+     The old fix was to switch dragging OFF for filter chips, which is why a
+     filter could not be re-ordered at all. A dedicated grip fixes both ends:
+     the chip keeps its click (configure the filter, open the agg menu) and
+     EVERY zone can be re-ordered, filters included. */
+  const startDrag = (e) => {
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", label);
+    // Drag the whole chip, not the 8px grip, so the ghost reads as the field.
+    if (chipRef.current && e.dataTransfer.setDragImage) {
+      const r = chipRef.current.getBoundingClientRect();
+      e.dataTransfer.setDragImage(chipRef.current, e.clientX - r.left, e.clientY - r.top);
+    }
+    const payload = onDragStartPayload();
+    if (onDragStart) onDragStart();
+    window.__pivotv2_drag = payload;
+    window.dispatchEvent(new CustomEvent("pivotv2-drag-start", { detail: payload }));
+  };
+
   return (
     <span
       ref={chipRef}
+      data-chip
       className="pivotv2-chip"
-      draggable={canDrag}
       title={isFilterChip ? (active ? "Klikni pre úpravu filtra" : "Klikni pre nastavenie filtra") : undefined}
-      onDragStart={canDrag ? (e) => {
-        e.dataTransfer.effectAllowed = "move";
-        e.dataTransfer.setData("text/plain", label);
-        const payload = onDragStartPayload();
-        if (onDragStart) onDragStart();
-        window.__pivotv2_drag = payload;
-        window.dispatchEvent(new CustomEvent("pivotv2-drag-start", { detail: payload }));
-      } : undefined}
       onClick={(e) => {
         if (onClick) { e.stopPropagation(); onClick(e); }
       }}
       style={{
         display: "inline-flex", alignItems: "center", gap: "0.35rem",
-        padding: "0.3rem 0.45rem 0.3rem 0.55rem", borderRadius: 100,
+        padding: "0.3rem 0.45rem 0.3rem 0.3rem", borderRadius: 100,
         background: active ? "color-mix(in srgb, var(--accent) 14%, transparent)" : "rgba(138,138,150,0.10)",
         border: `1px solid ${active ? green : "var(--border-soft)"}`,
         color: active ? green : dim,
         fontSize: "0.75rem",
-        cursor: onClick ? "pointer" : "grab",
+        cursor: onClick ? "pointer" : "default",
         userSelect: "none", position: "relative",
+        opacity: isDragged ? 0.4 : 1,
+        transition: "opacity 0.12s",
       }}
     >
+      {/* Drag handle. Also keyboard-reachable: ←/→ moves the chip one slot, so
+          the order is reachable without a mouse (and without a drag at all). */}
+      <span
+        className="pivotv2-grip"
+        draggable
+        role="button"
+        tabIndex={0}
+        aria-label={lang === "sk" ? `Presunúť ${label}` : `Move ${label}`}
+        title={lang === "sk"
+          ? "Ťahaj pre zmenu poradia (alebo šípky ←/→)"
+          : "Drag to reorder (or use ←/→)"}
+        onDragStart={startDrag}
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => {
+          if (!onNudge) return;
+          if (e.key === "ArrowLeft")  { e.preventDefault(); e.stopPropagation(); onNudge(-1); }
+          if (e.key === "ArrowRight") { e.preventDefault(); e.stopPropagation(); onNudge(1); }
+        }}
+        style={{
+          cursor: "grab", lineHeight: 1, padding: "0 1px",
+          fontSize: "0.72rem", letterSpacing: "-0.5px",
+          opacity: reorderable ? 0.55 : 0.28,
+          color: "currentColor",
+        }}
+      >⠿</span>
       {level != null && (
         <span style={{ opacity: 0.65, fontSize: "0.58rem", padding: "0 2px" }}>L{level + 1}</span>
       )}
@@ -2585,7 +2710,16 @@ function groupLabel(g, lang) {
 }
 
 /* ─── ANALYSIS TOOLBAR ────────────────────────────────────────── */
-function AnalysisToolbar({ valueMode, setValueMode, dataBars, setDataBars, onExportCSV, effectiveValues = [], lang }) {
+function AnalysisToolbar({ valueMode, setValueMode, dataBars, setDataBars, onExportCSV, onCopyTable, effectiveValues = [], lang }) {
+  // "copied" / "failed" flash on the copy button. A clipboard write can be
+  // refused (permissions, non-secure context) and a button that silently does
+  // nothing is indistinguishable from a broken one — so it always says which.
+  const [copyState, setCopyState] = useState(null);   // null | "ok" | "fail"
+  useEffect(() => {
+    if (!copyState) return undefined;
+    const t = setTimeout(() => setCopyState(null), 1800);
+    return () => clearTimeout(t);
+  }, [copyState]);
   const btnBase = {
     background: "transparent",
     border: `1px solid ${border}`,
@@ -2651,7 +2785,23 @@ function AnalysisToolbar({ valueMode, setValueMode, dataBars, setDataBars, onExp
 
       <button style={btnPill(dataBars)} onClick={() => setDataBars(x => !x)}>{lang === "sk" ? "▮ stĺpčeky" : "▮ bars"}</button>
 
-      <button style={{ ...btnBase, marginLeft: "auto", color: accentInk, borderColor: `color-mix(in srgb, var(--accent) 33%, transparent)` }}
+      <button
+        style={{
+          ...btnBase, marginLeft: "auto",
+          color: copyState === "fail" ? "#ff6b6b" : accentInk,
+          borderColor: copyState === "fail" ? "#ff6b6b" : `color-mix(in srgb, var(--accent) 33%, transparent)`,
+          background: copyState === "ok" ? "color-mix(in srgb, var(--accent) 14%, transparent)" : "transparent",
+        }}
+        onClick={async () => setCopyState((await onCopyTable()) ? "ok" : "fail")}
+        title={lang === "sk"
+          ? "Skopíruje celú tabuľku do schránky ako tabuľku — v Exceli ju vlož cez Ctrl+V a padne do buniek (čísla ako čísla)."
+          : "Copies the whole table to the clipboard as a table — paste it into Excel with Ctrl+V and it lands in cells (numbers as numbers)."}
+      >
+        {copyState === "ok" ? (lang === "sk" ? "✓ skopírované" : "✓ copied")
+          : copyState === "fail" ? (lang === "sk" ? "✕ nepodarilo sa" : "✕ copy failed")
+          : (lang === "sk" ? "⧉ Kopírovať pre Excel" : "⧉ Copy for Excel")}
+      </button>
+      <button style={{ ...btnBase, color: accentInk, borderColor: `color-mix(in srgb, var(--accent) 33%, transparent)` }}
               onClick={onExportCSV}>
         ⬇ CSV
       </button>
@@ -2659,17 +2809,20 @@ function AnalysisToolbar({ valueMode, setValueMode, dataBars, setDataBars, onExp
   );
 }
 
-/* ─── CSV EXPORT ──────────────────────────────────────────────── */
-function exportPivotCSV(flatRows, grandTotal, rowFields, colFields, effectiveValues, valueMode, lang = "sk") {
-  const esc = (v) => {
-    if (v == null) return "";
-    const s = String(v);
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  };
+/* ─── EXPORT / CLIPBOARD ──────────────────────────────────────────
+   ONE builder, two destinations. The .csv download and the "copy for Excel"
+   button both render the SAME matrix, so they can never disagree about what a
+   number is. Serialization (locale decimal mark, list separator, formula
+   guard, the HTML clipboard flavour) lives in lib/tableClipboard.js.
+
+   Cells are values, not display strings: a number stays a number, a % stays a
+   percentage, text stays text. That is the whole reason a paste into Excel
+   lands as figures you can sum instead of left-aligned text. */
+function buildPivotMatrix(flatRows, grandTotal, rowFields, colFields, effectiveValues, valueMode, lang = "sk") {
   // Headers follow the active UI language (fieldLabel), same as every on-screen label —
   // an EN user must not get Slovak column names in their export.
   // Measure unit → header + currency conversion, mirroring the on-screen
-  // formatValue so the CSV matches what the user sees (currency + unit).
+  // formatValue so the export matches what the user sees (currency + unit).
   const measureUnit = (v) => v.key === "__count__" ? null : FIELDS[v.field]?.unit;
   const valueHeader = (v) => {
     if (v.key === "__count__") return "Count";
@@ -2677,30 +2830,38 @@ function exportPivotCSV(flatRows, grandTotal, rowFields, colFields, effectiveVal
     const unit = isMoneyUnit(u) ? ` (${displayMoneyUnit(u)})` : (u ? ` (${u})` : "");
     return `${AGG_LABEL[v.agg]}(${fieldLabel(v.field, lang)})${unit}`;
   };
-  const fmtMeasure = (raw, v) => {
-    if (raw == null || !Number.isFinite(raw)) return "";
-    const val = isMoneyUnit(measureUnit(v)) ? moneyFromEur(raw) : raw;
-    return Number.isInteger(val) ? String(val) : String(Math.round(val * 100) / 100);
+  /* A measure as a NUMBER in the display currency. Rounding to 2 places is the
+     serializer's job — here we only convert. null → an empty cell (not 0). */
+  const measureNum = (raw, v) => {
+    if (raw == null || !Number.isFinite(raw)) return null;
+    return isMoneyUnit(measureUnit(v)) ? moneyFromEur(raw) : raw;
   };
 
   const crossTab = colFields.length > 0;
   const colKeys = crossTab ? (grandTotal.colKeys || []) : [];
+  const grandForCol = (i) => grandTotal.rollups[i];
 
   // Parent-node lookup for the "% of parent" value mode (level-0 → grand total).
   const nodeByPath = new Map();
   for (const n of flatRows) nodeByPath.set(JSON.stringify(n.path.slice(0, n.level + 1)), n);
   const parentOf = (n) => (n.level === 0 ? grandTotal : (nodeByPath.get(JSON.stringify(n.path.slice(0, n.level))) || grandTotal));
+
   // A single value cell honoring the active valueMode (absolute / % total / % parent).
+  // Mirror renderCellValue: % modes only apply to additive aggs (share of a whole);
+  // avg/min/max/median export the raw measure (a "% of total" on an average is nonsense).
   const cellVal = (raw, i, parentRaw) => {
-    // Mirror renderCellValue: % modes only apply to additive aggs (share of a whole);
-    // avg/min/max/median export the raw measure (a "% of total" on an average is nonsense).
     const shareable = SHAREABLE_AGGS.has(effectiveValues[i]?.agg);
-    if (valueMode === "pct_total" && shareable) { const g = grandForCol(i); return raw == null || !g ? "" : `${((raw / g) * 100).toFixed(1)}%`; }
-    if (valueMode === "pct_parent" && shareable) { return raw == null || !parentRaw ? "" : `${((raw / parentRaw) * 100).toFixed(1)}%`; }
-    return fmtMeasure(raw, effectiveValues[i]);
+    if (valueMode === "pct_total" && shareable) {
+      const g = grandForCol(i);
+      return (raw == null || !g) ? null : { v: (raw / g) * 100, pct: true };
+    }
+    if (valueMode === "pct_parent" && shareable) {
+      return (raw == null || !parentRaw) ? null : { v: (raw / parentRaw) * 100, pct: true };
+    }
+    return measureNum(raw, effectiveValues[i]);
   };
 
-  // Build header
+  // Header
   const header = [
     ...rowFields.map((f, i) => `L${i + 1}·${fieldLabel(f, lang)}`),
     "Count",
@@ -2714,12 +2875,11 @@ function exportPivotCSV(flatRows, grandTotal, rowFields, colFields, effectiveVal
     for (const v of effectiveValues) header.push(valueHeader(v));
   }
 
-  const lines = [header.map(esc).join(",")];
-  const grandForCol = (i) => grandTotal.rollups[i];
+  const matrix = [header];
 
   for (const n of flatRows) {
     const labelCols = rowFields.map((_, i) => i <= n.level ? (n.path[i] || "") : "");
-    const row = [...labelCols, String(n.count)];
+    const row = [...labelCols, n.count];
     const par = parentOf(n);
     if (crossTab) {
       for (const ck of colKeys) {
@@ -2727,34 +2887,34 @@ function exportPivotCSV(flatRows, grandTotal, rowFields, colFields, effectiveVal
           row.push(cellVal(n.colRollups?.[ck]?.[i], i, par.colRollups?.[ck]?.[i]));
         }
       }
-      for (let i = 0; i < effectiveValues.length; i++) {
-        row.push(cellVal(n.rollups[i], i, par.rollups?.[i]));
-      }
-    } else {
-      for (let i = 0; i < effectiveValues.length; i++) {
-        row.push(cellVal(n.rollups[i], i, par.rollups?.[i]));
-      }
     }
-    lines.push(row.map(esc).join(","));
+    for (let i = 0; i < effectiveValues.length; i++) {
+      row.push(cellVal(n.rollups[i], i, par.rollups?.[i]));
+    }
+    matrix.push(row);
   }
 
-  // Grand total row
   // Grand total row is always ABSOLUTE (currency-converted) — clearest anchor
   // regardless of the % value mode.
-  const gt = ["TOTAL", ...rowFields.slice(1).map(() => ""), String(grandTotal.count)];
+  const gt = ["TOTAL", ...rowFields.slice(1).map(() => ""), grandTotal.count];
   if (crossTab) {
     for (const ck of colKeys) {
       for (let i = 0; i < effectiveValues.length; i++) {
-        gt.push(fmtMeasure(grandTotal.colRollups?.[ck]?.[i], effectiveValues[i]));
+        gt.push(measureNum(grandTotal.colRollups?.[ck]?.[i], effectiveValues[i]));
       }
     }
-    for (let i = 0; i < effectiveValues.length; i++) gt.push(fmtMeasure(grandTotal.rollups[i], effectiveValues[i]));
-  } else {
-    for (let i = 0; i < effectiveValues.length; i++) gt.push(fmtMeasure(grandTotal.rollups[i], effectiveValues[i]));
   }
-  lines.push(gt.map(esc).join(","));
+  for (let i = 0; i < effectiveValues.length; i++) {
+    gt.push(measureNum(grandTotal.rollups[i], effectiveValues[i]));
+  }
+  matrix.push(gt);
 
-  const csv = lines.join("\n");
+  return matrix;
+}
+
+function exportPivotCSV(flatRows, grandTotal, rowFields, colFields, effectiveValues, valueMode, lang = "sk") {
+  const csv = toCSV(buildPivotMatrix(flatRows, grandTotal, rowFields, colFields, effectiveValues, valueMode, lang), lang);
+  // BOM so Excel opens it as UTF-8 rather than mangling ž/é/ô.
   const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -2764,6 +2924,16 @@ function exportPivotCSV(flatRows, grandTotal, rowFields, colFields, effectiveVal
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/* Copy the pivot to the clipboard as a real table — HTML flavour for
+   Excel/Sheets/Numbers (real cells, right there on Ctrl+V) plus a TSV flavour
+   for anything that only takes text. Resolves to true when it landed. */
+function copyPivotTable(flatRows, grandTotal, rowFields, colFields, effectiveValues, valueMode, lang = "sk") {
+  return copyTable(
+    buildPivotMatrix(flatRows, grandTotal, rowFields, colFields, effectiveValues, valueMode, lang),
+    { lang, headerRows: 1 }
+  );
 }
 
 /* On-offer (V+PR+R) vs sold (P) split for a tree node — from its stav comp
@@ -2799,6 +2969,26 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
   const colKeys = colFields.length ? (grandTotal.colKeys || []) : null;
   const colOverflow = grandTotal.colOverflow || 0;   // # column values folded into Σ but not shown
   const crossTab = !!colKeys;
+
+  /* The cross-tab header is two rows deep. To freeze the SECOND one we need
+     the real pixel height of the FIRST — which changes with font size, zoom and
+     the browser's own metrics, so it is measured rather than guessed. A hard-coded
+     offset here is exactly the kind of magic number that looks fine on one machine
+     and leaves a 3px seam of scrolling rows on another. */
+  const headRow1Ref = useRef(null);
+  const [headRow1H, setHeadRow1H] = useState(0);
+  useLayoutEffect(() => {
+    const el = headRow1Ref.current;
+    if (!el) { setHeadRow1H(0); return undefined; }
+    const measure = () => setHeadRow1H(el.getBoundingClientRect().height);
+    measure();
+    if (typeof ResizeObserver === "undefined") return undefined;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [crossTab, colKeys?.length, effectiveValues.length]);
+  const row2Top = crossTab ? headRow1H : 0;
+
   if (!rowFields.length) {
     return (
       <div style={{
@@ -2940,19 +3130,28 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
   })();
 
   return (
-    <div style={{
+    <div className="pivot-scroll" style={{
       border: `1px solid ${border}`, borderRadius: 8, overflow: "auto",
       background: panel, maxHeight: 720,
+      // The scroll stays inside this panel: the page never gains a sideways
+      // scrollbar because a pivot grew a 40th column.
+      overscrollBehaviorX: "contain",
+      maxWidth: "100%",
     }}>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
-        <thead style={{ background: "var(--surface-2)", position: "sticky", top: 0, zIndex: 2 }}>
+      <table style={{
+        width: "max-content", minWidth: "100%",
+        borderCollapse: "separate", borderSpacing: 0,
+        fontSize: "0.82rem",
+      }}>
+        <thead>
           {crossTab && (
             /* Top header row: col-field name spanning all per-col groups */
-            <tr style={{ textAlign: "center", color: dim, fontFamily: mono, fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-              <th style={{ ...th, borderBottom: "none" }} colSpan={2}></th>
+            <tr ref={headRow1Ref} style={{ textAlign: "center", color: dim, fontFamily: mono, fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+              <th style={{ ...th, borderBottom: "none", position: "sticky", top: 0, left: 0, zIndex: 6 }} colSpan={2}></th>
               {colKeys.map(ck => (
                 <th key={"ctop:" + ck} colSpan={effectiveValues.length}
-                    style={{ ...th, color: accentInk, borderLeft: `1px solid ${border}`, borderBottom: `1px solid ${border}` }}>
+                    style={{ ...th, color: accentInk, borderLeft: `1px solid ${border}`, borderBottom: `1px solid ${border}`,
+                             position: "sticky", top: 0, zIndex: 3 }}>
                   <span style={{ opacity: 0.65 }}>{fieldLabel(colFields[0], lang)}:</span> <strong style={{ color: accentInk }}>{ck}</strong>
                 </th>
               ))}
@@ -2961,7 +3160,8 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                   flag the hidden ones — otherwise Σ silently exceeds the sum of the
                   visible columns. */}
               <th colSpan={effectiveValues.length}
-                  style={{ ...th, color: dim, borderLeft: `2px solid color-mix(in srgb, var(--accent) 33%, transparent)` }}
+                  style={{ ...th, color: dim, borderLeft: `2px solid color-mix(in srgb, var(--accent) 33%, transparent)`,
+                           position: "sticky", top: 0, zIndex: 3 }}
                   title={colOverflow > 0 ? (lang === "sk" ? `Σ zahŕňa aj ${colOverflow} ďalších stĺpcov, ktoré sa nezmestili` : `Σ also includes ${colOverflow} more columns that didn't fit`) : undefined}>
                 Σ {lang === "sk" ? "spolu" : "total"}
                 {colOverflow > 0 && <span style={{ color: orangeInk, fontWeight: 400 }}> · +{colOverflow}</span>}
@@ -2971,16 +3171,24 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
           <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.64rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
             {/* Hierarchy label column — spans the row-fields, labelled with the
                 chain (L1 Cast › L2 Developer › …) */}
-            <th style={{ ...th, minWidth: 260, cursor: "pointer" }} onClick={() => clickSort("label")}>
-              {rowFields.map((f, i) => (
-                <span key={f} style={{ color: i === 0 ? green : dim }}>
-                  {i > 0 && <span style={{ color: dim, opacity: 0.5, margin: "0 0.3rem" }}>›</span>}
-                  <span style={{ opacity: 0.65, marginRight: 3 }}>L{i + 1}</span>{fieldLabel(f, lang)}
-                </span>
-              ))}
-              {sortIndicator("label")}
+            {/* The row-field chain can be long (L1 Mesto › L2 Developer › L3 Projekt).
+                It gets the fixed label width like every other cell in this column and
+                ellipsises rather than widening it; the full chain is in the tooltip. */}
+            <th style={{ ...th, ...stickyLeft("label", 5, "var(--surface-2)"), top: row2Top, cursor: "pointer" }}
+                title={rowFields.map((f, i) => `L${i + 1} ${fieldLabel(f, lang)}`).join(" › ")}
+                onClick={() => clickSort("label")}>
+              <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {rowFields.map((f, i) => (
+                  <span key={f} style={{ color: i === 0 ? green : dim }}>
+                    {i > 0 && <span style={{ color: dim, opacity: 0.5, margin: "0 0.3rem" }}>›</span>}
+                    <span style={{ opacity: 0.65, marginRight: 3 }}>L{i + 1}</span>{fieldLabel(f, lang)}
+                  </span>
+                ))}
+                {sortIndicator("label")}
+              </div>
             </th>
-            <th style={{ ...th, textAlign: "right", minWidth: 60, cursor: "pointer" }} onClick={() => clickSort("count")}>
+            <th style={{ ...th, ...stickyLeft("count", 5, "var(--surface-2)"), top: row2Top, textAlign: "right", cursor: "pointer" }}
+                onClick={() => clickSort("count")}>
               #{sortIndicator("count")}
             </th>
             {crossTab ? (
@@ -2989,7 +3197,8 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                   effectiveValues.map((v, i) => (
                     <th key={`h:${ck}:${v.key}`}
                         style={{
-                          ...th, textAlign: "right", minWidth: 80, color: accentInk,
+                          ...th, position: "sticky", top: row2Top, zIndex: 2,
+                          textAlign: "right", minWidth: 80, color: accentInk,
                           borderLeft: i === 0 ? `1px solid ${border}` : undefined,
                         }}>
                       {valueHeaderText(v)}
@@ -3000,7 +3209,8 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                 {effectiveValues.map((v, i) => (
                   <th key={`sum:${v.key}`}
                       style={{
-                        ...th, textAlign: "right", minWidth: 90, color: dim,
+                        ...th, position: "sticky", top: row2Top, zIndex: 2,
+                        textAlign: "right", minWidth: 90, color: dim,
                         borderLeft: i === 0 ? `2px solid color-mix(in srgb, var(--accent) 33%, transparent)` : undefined,
                         cursor: "pointer",
                       }}
@@ -3011,7 +3221,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
               </>
             ) : (
               effectiveValues.map((v, i) => (
-                <th key={v.key} style={{ ...th, textAlign: "right", minWidth: 100, color: accentInk, cursor: "pointer" }} onClick={() => clickSort(i)}>
+                <th key={v.key} style={{ ...th, position: "sticky", top: row2Top, zIndex: 2, textAlign: "right", minWidth: 100, color: accentInk, cursor: "pointer" }} onClick={() => clickSort(i)}>
                   {valueHeaderText(v)}{sortIndicator(i)}
                 </th>
               ))
@@ -3024,12 +3234,21 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
             // Subtotal/group rows: a green-tinted ladder that deepens by level. rgba
             // accent over the card reads on BOTH themes (was a hardcoded near-black
             // ladder — a dark-theme leftover that rendered as a black bar in light).
+            /* Every row background is OPAQUE — mixed against the panel colour, not
+               against `transparent`. The frozen label/count cells inherit this colour,
+               and a semi-transparent one would let the scrolling body show straight
+               through them. Same shades on screen, just composited here instead of
+               by the browser. */
             const shade = [
-              "color-mix(in srgb, var(--accent) 15%, transparent)", "color-mix(in srgb, var(--accent) 10%, transparent)",
+              "color-mix(in srgb, var(--accent) 15%, var(--surface-2))", "color-mix(in srgb, var(--accent) 10%, var(--surface-2))",
               "var(--surface-3)", "var(--surface-2)", "var(--surface-2)",
             ][Math.min(n.level, 4)];
             const indent = 0.4 + n.level * 0.8;
-            const baseBg = isSubtotal ? shade : (idx % 2 ? "transparent" : "var(--surface-2)");
+            const baseBg = isSubtotal ? shade
+              : (idx % 2 ? "var(--surface-2)" : "color-mix(in srgb, var(--text) 3%, var(--surface-2))");
+            // border-collapse:separate ignores borders on <tr>, so the row rule
+            // rides on the cells instead.
+            const rowRule = { borderTop: n.level === 0 ? `1px solid ${border}` : `1px solid var(--border-soft)` };
             // Is THIS row a navigable project? Only when the deepest
             // grouping is project_name, this is a leaf node, and we
             // can resolve a project_id from its records (any record
@@ -3058,56 +3277,61 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                 onMouseLeave={rowInteractive ? (e) => { e.currentTarget.style.background = baseBg; } : undefined}
                 style={{
                   background: baseBg,
-                  borderTop: n.level === 0 ? `1px solid ${border}` : `1px solid var(--border-soft)`,
                   transition: "background 0.12s",
                 }}>
                 <td style={{
-                  ...td, paddingLeft: `${indent}rem`,
+                  ...td, ...rowRule, ...stickyLeft("label", 1),
+                  paddingLeft: `${indent}rem`,
                   fontWeight: isSubtotal ? 700 : 400,
                   color: isSubtotal ? text : "var(--text-2)",
-                  whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                 }}>
-                  {isSubtotal && (
-                    <span style={{ color: dim, fontSize: "0.62rem", marginRight: "0.35rem", verticalAlign: "middle" }}>
-                      L{n.level + 1}
-                    </span>
-                  )}
-                  {n.hasChildren ? (
-                    <button onClick={(e) => { e.stopPropagation(); onToggle(n.pathKey); }}
-                      style={{ background: "transparent", border: "none", color: accentInk, cursor: "pointer", padding: 0, marginRight: "0.35rem", fontSize: "0.7rem", width: 12, display: "inline-block", verticalAlign: "middle" }}
-                      title={n.isCollapsed ? "Expand" : "Collapse"}>
-                      {n.isCollapsed ? "▸" : "▾"}
-                    </button>
-                  ) : (
-                    <span style={{ display: "inline-block", width: 12, marginRight: "0.35rem" }} />
-                  )}
-                  {/* Whole ROW is the click target (see <tr onClick>). The name
-                      is the keyboard-focusable button + carries the underline
-                      affordance (.pivot-row-int:hover .pivot-label-text). Its own
-                      onClick stopPropagation's so a name-click opens once (not
-                      twice via the row). Non-project rows stay plain text. */}
-                  {canOpenProject ? (
-                    <span
-                      className="pivot-label-text"
-                      role="button" tabIndex={0}
-                      title={lang === "sk" ? `Otvoriť projekt ${n.label}` : `Open project ${n.label}`}
-                      onClick={(e) => { e.stopPropagation(); onProjectOpen(projectId); }}
-                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onProjectOpen(projectId); } }}
-                      style={{ color: "var(--text)" }}
-                    >{n.label}</span>
-                  ) : (
-                    <span title={n.label}>{n.label}</span>
-                  )}
-                  {isSubtotal && n.isCollapsed && (
-                    <span style={{ marginLeft: "0.5rem", fontSize: "0.64rem", color: dim, fontFamily: mono, opacity: 0.7 }}>
-                      ({n.children.length} {lang === "sk" ? "pod" : "sub"})
-                    </span>
-                  )}
+                  {/* One flex line: the fixed-size affordances hold their width and
+                      only the NAME shrinks (min-width:0 + ellipsis), so a 60-character
+                      project title can never widen the column or push the row to two
+                      lines. Full text stays available in the tooltip. */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", minWidth: 0 }}>
+                    {isSubtotal && (
+                      <span style={{ color: dim, fontSize: "0.62rem", flex: "0 0 auto" }}>
+                        L{n.level + 1}
+                      </span>
+                    )}
+                    {n.hasChildren ? (
+                      <button onClick={(e) => { e.stopPropagation(); onToggle(n.pathKey); }}
+                        style={{ background: "transparent", border: "none", color: accentInk, cursor: "pointer", padding: 0, fontSize: "0.7rem", width: 12, flex: "0 0 auto" }}
+                        title={n.isCollapsed ? "Expand" : "Collapse"}>
+                        {n.isCollapsed ? "▸" : "▾"}
+                      </button>
+                    ) : (
+                      <span style={{ display: "inline-block", width: 12, flex: "0 0 auto" }} />
+                    )}
+                    {/* Whole ROW is the click target (see <tr onClick>). The name
+                        is the keyboard-focusable button + carries the underline
+                        affordance (.pivot-row-int:hover .pivot-label-text). Its own
+                        onClick stopPropagation's so a name-click opens once (not
+                        twice via the row). Non-project rows stay plain text. */}
+                    {canOpenProject ? (
+                      <span
+                        className="pivot-label-text"
+                        role="button" tabIndex={0}
+                        title={lang === "sk" ? `Otvoriť projekt ${n.label}` : `Open project ${n.label}`}
+                        onClick={(e) => { e.stopPropagation(); onProjectOpen(projectId); }}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onProjectOpen(projectId); } }}
+                        style={{ color: "var(--text)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                      >{n.label}</span>
+                    ) : (
+                      <span title={n.label} style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{n.label}</span>
+                    )}
+                    {isSubtotal && n.isCollapsed && (
+                      <span style={{ fontSize: "0.64rem", color: dim, fontFamily: mono, opacity: 0.7, flex: "0 0 auto" }}>
+                        ({n.children.length} {lang === "sk" ? "pod" : "sub"})
+                      </span>
+                    )}
+                  </div>
                 </td>
                 {/* # count — always clickable to drill down into records.
                     Cursor changed from outdated 'zoom-in' (browser-default
                     magnifier) to 'pointer' (universal, modern). */}
-                <td style={{ ...td, textAlign: "right", fontFamily: mono, color: isSubtotal ? "var(--text-2)" : dim, fontWeight: isSubtotal ? 600 : 400, cursor: onDrillDown ? "pointer" : "default" }}
+                <td style={{ ...td, ...rowRule, ...stickyLeft("count", 1), textAlign: "right", fontFamily: mono, color: isSubtotal ? "var(--text-2)" : dim, fontWeight: isSubtotal ? 600 : 400, cursor: onDrillDown ? "pointer" : "default" }}
                     title={onDrillDown ? (lang === "sk" ? "Zobraziť záznamy v tejto skupine" : "Show records in this group") : undefined}
                     onClick={onDrillDown ? (e) => { e.stopPropagation(); onDrillDown(n); } : undefined}>
                   {n.count.toLocaleString("en-US").replace(/,/g, " ")}
@@ -3148,7 +3372,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                                so the highlight stays visually compact. */
                             data-colkey={i === 0 ? String(ck) : undefined}
                             style={{
-                              ...td, textAlign: "right", fontFamily: mono,
+                              ...td, ...rowRule, textAlign: "right", fontFamily: mono,
                               color: accentInk, fontWeight: isSubtotal ? 800 : 600,
                               borderLeft: i === 0 ? `1px solid ${border}` : undefined,
                               position: "relative",
@@ -3173,7 +3397,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                       const bw = dataBars && n.isLeaf ? barWidth(raw, i) : 0;
                       return (
                         <td key={`sum:${v.key}`} style={{
-                          ...td, textAlign: "right", fontFamily: mono,
+                          ...td, ...rowRule, textAlign: "right", fontFamily: mono,
                           color: accentInk, fontWeight: isSubtotal ? 800 : 700,
                           borderLeft: i === 0 ? `2px solid color-mix(in srgb, var(--accent) 33%, transparent)` : undefined,
                           background: "color-mix(in srgb, var(--accent) 3%, transparent)",
@@ -3200,7 +3424,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                     const bw = dataBars && n.isLeaf ? barWidth(raw, i) : 0;
                     return (
                       <td key={v.key} style={{
-                        ...td, textAlign: "right", fontFamily: mono,
+                        ...td, ...rowRule, textAlign: "right", fontFamily: mono,
                         color: accentInk, fontWeight: isSubtotal ? 800 : 600,
                         position: "relative",
                       }}>
@@ -3224,16 +3448,20 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
               mode. In pct_total mode we COULD show "100%" everywhere but
               that's just visual noise; user wants to see the actual
               total they're percenting against. */}
-          <tr style={{ background: bg, borderTop: `2px solid color-mix(in srgb, var(--accent) 40%, transparent)` }}>
-            <td style={{ ...td, fontWeight: 700, color: accentInk, fontSize: "0.85rem" }}>
-              Σ {lang === "sk" ? "Spolu" : "Total"}
-              {valueMode !== "raw" && (
-                <span style={{ fontSize: "0.65rem", color: dim, marginLeft: "0.4rem", fontWeight: 400 }}>
-                  ({lang === "sk" ? "absolútne" : "absolute"})
-                </span>
-              )}
+          {/* Σ row: frozen to the BOTTOM as well as the left, so the total the user
+              is reading against stays on screen however far down the pivot goes. */}
+          <tr style={{ background: bg }}>
+            <td style={{ ...td, ...stickyLeft("label", 3), ...totalRule, position: "sticky", left: 0, bottom: 0, zIndex: 4, background: bg, fontWeight: 700, color: accentInk, fontSize: "0.85rem" }}>
+              <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                Σ {lang === "sk" ? "Spolu" : "Total"}
+                {valueMode !== "raw" && (
+                  <span style={{ fontSize: "0.65rem", color: dim, marginLeft: "0.4rem", fontWeight: 400 }}>
+                    ({lang === "sk" ? "absolútne" : "absolute"})
+                  </span>
+                )}
+              </div>
             </td>
-            <td style={{ ...td, textAlign: "right", fontFamily: mono, color: accentInk, fontWeight: 700 }}>
+            <td style={{ ...td, ...stickyLeft("count", 3), ...totalRule, position: "sticky", left: "var(--pv-label-w)", bottom: 0, zIndex: 4, background: bg, textAlign: "right", fontFamily: mono, color: accentInk, fontWeight: 700 }}>
               {grandTotal.count.toLocaleString("en-US").replace(/,/g, " ")}
             </td>
             {crossTab ? (
@@ -3241,7 +3469,8 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                 {colKeys.map((ck) => (
                   effectiveValues.map((v, i) => (
                     <td key={`gt:${ck}:${v.key}`} style={{
-                      ...td, textAlign: "right", fontFamily: mono, color: accentInk,
+                      ...td, ...totalRule, position: "sticky", bottom: 0, zIndex: 2, background: bg,
+                      textAlign: "right", fontFamily: mono, color: accentInk,
                       fontWeight: 900, fontSize: "0.9rem",
                       borderLeft: i === 0 ? `1px solid ${border}` : undefined,
                     }}>
@@ -3251,10 +3480,11 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                 ))}
                 {effectiveValues.map((v, i) => (
                   <td key={`gsum:${v.key}`} style={{
-                    ...td, textAlign: "right", fontFamily: mono, color: accentInk,
+                    ...td, ...totalRule, position: "sticky", bottom: 0, zIndex: 2,
+                    textAlign: "right", fontFamily: mono, color: accentInk,
                     fontWeight: 900, fontSize: "0.9rem",
                     borderLeft: i === 0 ? `2px solid color-mix(in srgb, var(--accent) 33%, transparent)` : undefined,
-                    background: "color-mix(in srgb, var(--accent) 6%, transparent)",
+                    background: `color-mix(in srgb, var(--accent) 6%, ${bg})`,
                   }}>
                     {formatValue(grandTotal.rollups[i], v.field, v.agg)}
                   </td>
@@ -3262,7 +3492,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
               </>
             ) : (
               effectiveValues.map((v, i) => (
-                <td key={v.key} style={{ ...td, textAlign: "right", fontFamily: mono, color: accentInk, fontWeight: 900, fontSize: "0.9rem" }}>
+                <td key={v.key} style={{ ...td, ...totalRule, position: "sticky", bottom: 0, zIndex: 2, background: bg, textAlign: "right", fontFamily: mono, color: accentInk, fontWeight: 900, fontSize: "0.9rem" }}>
                   {formatValue(grandTotal.rollups[i], v.field, v.agg)}
                 </td>
               ))
@@ -3274,8 +3504,71 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
   );
 }
 
-const th = { padding: "0.65rem 0.75rem", fontWeight: 700, borderBottom: `1px solid ${border}` };
-const td = { padding: "0.45rem 0.75rem", borderBottom: "none" };
+/* ─── TABLE LAYOUT RULES ──────────────────────────────────────────
+   Four rules, and between them the table cannot break however many rows,
+   columns or values are dropped into it:
+
+   1. NOTHING WRAPS.  Every cell is `white-space: nowrap`. A header like
+      "Σ Priemer · Cena s DPH (€)" used to fold onto a second line and shove
+      the row heights out of alignment — that is the "goes to 2 rows in one".
+
+   2. THE TABLE IS AS WIDE AS ITS CONTENT, NOT AS WIDE AS THE BOX.
+      `width: max-content; min-width: 100%`. With plain `width: 100%` the
+      browser squeezed columns to fit the panel, which is what forced the
+      wrapping and the mid-word clipping. Now columns take the width they
+      need and the surplus becomes a horizontal scrollbar INSIDE the panel —
+      the page itself never spills sideways.
+
+   3. THE ROW IDENTITY IS FROZEN.  The label and the count column are
+      `position: sticky` on the left, so scrolling right never leaves you
+      staring at a grid of numbers with nothing to name them. That is why the
+      label column has a FIXED width: the count column's sticky offset has to
+      be an exact number of pixels. The name inside ellipsises (full text on
+      hover) instead of stretching the column.
+
+   4. THE HEADER IS FROZEN TOO — both rows of it in cross-tab mode, the
+      second one offset by the measured height of the first.
+
+   Sticky + `border-collapse: collapse` is a broken pair in every engine
+   (borders detach from the cell and float), so the table is
+   `border-collapse: separate; border-spacing: 0` and the row rules live on
+   the cells. Sticky cells must also be opaque or the content scrolls THROUGH
+   them, hence `background: inherit` — it picks up the <tr>'s own colour, and
+   keeps picking it up when the hover handler changes it. */
+/* The two frozen columns' widths live in CSS variables declared on .pivot-scroll in
+   the page's stylesheet — NOT inline here. An inline custom property would win over
+   the media query and the columns would still be 300px wide on a 375px phone. The
+   count column's sticky offset IS the label width, which is exactly why the label
+   column is a fixed size rather than content-sized. */
+
+const th = {
+  padding: "0.65rem 0.75rem", fontWeight: 700,
+  borderBottom: `1px solid ${border}`,
+  whiteSpace: "nowrap",
+  background: "var(--surface-2)",   // a sticky cell must paint its own background
+};
+const td = {
+  padding: "0.45rem 0.75rem", borderBottom: "none",
+  whiteSpace: "nowrap",
+  fontVariantNumeric: "tabular-nums",   // digits line up column-wise
+};
+/* Frozen-pane styles. `zBase` keeps the header's corner cells above the body's. */
+/* The Σ row's own top rule — again on the cells, not the <tr>. */
+const totalRule = { borderTop: `2px solid color-mix(in srgb, var(--accent) 40%, transparent)` };
+const stickyLeft = (which, zBase, opaque) => {
+  const isCount = which === "count";
+  const w = isCount ? "var(--pv-count-w)" : "var(--pv-label-w)";
+  return {
+    position: "sticky",
+    left: isCount ? "var(--pv-label-w)" : 0,
+    zIndex: zBase,
+    background: opaque || "inherit",
+    width: w, minWidth: w, maxWidth: w,
+    // Only the outer edge of the frozen pair casts the shadow that says
+    // "there is more table to the right of this".
+    ...(isCount ? { boxShadow: "8px 0 10px -8px rgba(0,0,0,0.55)" } : null),
+  };
+};
 
 
 /* ═══════════════════════════════════════════════════════════════════
