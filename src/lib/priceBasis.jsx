@@ -175,11 +175,29 @@ export function useProjectFitout() {
   return map;
 }
 
+/** What to mark beside a PROJECT's average price.
+ *
+ * The average is built from priced, for-sale flats, so the mark has to describe
+ * those flats. A project's own recorded level is the wrong answer twice over: it
+ * is empty for a project whose parser labels every flat individually (PANORÁMA
+ * Košice has no project level and 241 of its 260 flats are shells), and it says
+ * one word for a project that sells two things (Žít Braník prices shells and
+ * finished flats side by side). projects_live carries both, so prefer the levels
+ * actually behind the number and fall back to the recorded one.
+ */
+export function projectPriceLevel(row) {
+  const behind = (row?.fitout_levels_priced || []).filter(Boolean);
+  if (behind.length > 1) return "mixed";
+  if (behind.length === 1) return behind[0];
+  return row?.fitout_level || "";
+}
+
 /** The word that goes beside the price. Empty for standard — the baseline. */
 export function fitoutLabel(level, lang) {
   const sk = lang === "sk";
   if (level === "holobyt") return sk ? "holobyt" : "shell";
   if (level === "plne_zariadeny") return sk ? "zariadený" : "furnished";
+  if (level === "mixed") return sk ? "rôzny štandard" : "mixed finish";
   return "";
 }
 
@@ -203,6 +221,13 @@ export function fitoutNote(level, lang) {
       : "This price is for a FULLY FURNISHED flat — above the developer's ordinary "
         + "standard (a fitted kitchen with appliances, furniture). It is therefore "
         + "higher than comparable flats sold at standard finish.";
+  }
+  if (level === "mixed") {
+    return sk
+      ? "Tento projekt predáva byty v rôznych stupňoch dokončenia (holobyt aj "
+        + "štandard), takže priemerná cena mieša dva odlišné produkty."
+      : "This project sells flats at different finish levels (a bare shell and a "
+        + "finished flat), so its average price mixes two different products.";
   }
   return "";
 }

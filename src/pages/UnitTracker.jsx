@@ -45,6 +45,7 @@ import { track } from "../lib/track";
 import { localeTag } from "../lib/locale";
 import { moneyFromEur, moneySymbol } from "../lib/money";
 import { useCurrency } from "../lib/useCurrency";
+import { FitoutMark } from "../lib/priceBasis";
 
 const mono   = "'JetBrains Mono', monospace";
 import { accent as green, accentInk, orange, dim, text, border, bg, surfaceDark as bg2, surfacePanel as panel , orangeInk} from "../lib/theme";
@@ -654,7 +655,14 @@ function KpiStrip({ lifecycle, primary, onProjectClick, lang }) {
     },
     {
       label: lang === "sk" ? "Posledná cena" : "Last price",
-      value: formatPrice(lifecycle.last.cena_s_dph),
+      // A price means nothing without what it buys: a shell and a finished flat
+      // at the same number are not the same offer (v2/docs/FITOUT_LEVELS.md).
+      value: (
+        <>
+          {formatPrice(lifecycle.last.cena_s_dph)}
+          <FitoutMark level={lifecycle.last.fitout_level} lang={lang} />
+        </>
+      ),
       sub: lifecycle.last.obytna_plocha && lifecycle.last.cena_s_dph
         ? formatPerM2(lifecycle.last.cena_s_dph / lifecycle.last.obytna_plocha)
         : "—",
@@ -669,7 +677,12 @@ function KpiStrip({ lifecycle, primary, onProjectClick, lang }) {
     lifecycle.sold ? {
       label: lang === "sk" ? "Predaný" : "Sold",
       value: formatTs(tsOf(lifecycle.sold), lang),
-      sub: formatPrice(lifecycle.sold.cena_s_dph),
+      sub: (
+        <>
+          {formatPrice(lifecycle.sold.cena_s_dph)}
+          <FitoutMark level={lifecycle.sold.fitout_level} lang={lang} />
+        </>
+      ),
       color: red,
     } : {
       label: lang === "sk" ? "Predaný" : "Sold",

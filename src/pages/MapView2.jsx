@@ -22,6 +22,7 @@ import { useEffect, useRef, useState, useMemo } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useProjects } from "../lib/useData";
+import { projectPriceLevel, fitoutLabel, fitoutNote } from "../lib/priceBasis";
 import { useAccountPrefState, useAccountHydrated } from "../lib/useAccountUiPref";
 import { useCountry } from "../lib/useCountry";
 import { useCurrency } from "../lib/useCurrency";
@@ -124,6 +125,9 @@ function projectProps(p, c, lens, thresholds, heatRange) {
     units: Number(p.total_units) || Number(p.available_units) || 0,
     completion: completionBucket(p),
     verified: !!(c && c.verified),
+    // what the average price buys — a shell average beside a finished one is a
+    // comparison nobody can make (v2/docs/FITOUT_LEVELS.md)
+    fitout: projectPriceLevel(p),
     color: colorFor(p, lens, thresholds),
     w: heatWeight(p, lens, heatRange),
     lng: c.lng, lat: c.lat,
@@ -168,6 +172,15 @@ function hoverLabel(props, lens) {
   return COMPLETION[props.completion].label;
 }
 
+function fitoutTag(level, sk) {
+  const label = fitoutLabel(level, sk ? "sk" : "en");
+  if (!label) return "";
+  const colour = level === "holobyt" ? amber : green;
+  return `<span title="${escapeHtml(fitoutNote(level, sk ? "sk" : "en"))}" style="margin-left:0.45em;`
+    + `font-size:0.62rem;font-weight:700;padding:0.1em 0.42em;border-radius:999px;`
+    + `border:1px solid ${colour};color:${colour};cursor:help">${escapeHtml(label)}</span>`;
+}
+
 function showProjectPopup(map, lngLat, props, handlers, popupRef, sk = false) {
   const el = document.createElement("div");
   el.style.minWidth = "186px";
@@ -178,7 +191,7 @@ function showProjectPopup(map, lngLat, props, handlers, popupRef, sk = false) {
     `<div style="font-weight:600;font-size:0.92rem;color:${textLight};margin-bottom:2px">${escapeHtml(props.name)}</div>` +
     `<div style="font-size:0.72rem;color:${dim};margin-bottom:6px">${escapeHtml(loc)} · ${escapeHtml(props.developer || "—")}</div>` + approx +
     `<div style="font-family:${mono};font-size:0.72rem;color:${textLight};line-height:1.6">` +
-    `<div><span style="color:${dim}">${sk ? "Priem." : "Avg"}</span> &nbsp;${price}</div>` +
+    `<div><span style="color:${dim}">${sk ? "Priem." : "Avg"}</span> &nbsp;${price}${fitoutTag(props.fitout, sk)}</div>` +
     `<div><span style="color:${dim}">${sk ? "Voľné" : "Available"}</span> &nbsp;${props.available} / ${props.total}</div>` +
     `<div><span style="color:${dim}">${sk ? "Vypredanosť" : "Absorbed"}</span> &nbsp;${props.soldPct == null ? "—" : props.soldPct + "%"}</div></div>` +
     `<div style="display:flex;gap:6px;margin-top:10px">` +
