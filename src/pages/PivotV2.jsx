@@ -1761,10 +1761,10 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
         }
         .pivot-label-text:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 3px; }
         /* A field chip is grabbable anywhere on its body — cursor:grab says so,
-           and that is the whole affordance. It used to carry a ⠿ as well; once the
-           body became the handle the dots were decoration on top of a cue that
-           already worked, so they are gone (Boss 2026-08-24). No pivot builder
-           worth copying draws them. */
+           and that is the whole affordance. It briefly carried a braille-dots grip
+           as well; once the body became the handle those dots were decoration on
+           top of a cue that already worked, so they are gone (Boss 2026-08-24).
+           No pivot builder worth copying draws them. */
         .pivotv2-chip:active { cursor: grabbing; }
         .pivotv2-chip:focus-visible {
           outline: 2px solid var(--accent); outline-offset: 2px;
