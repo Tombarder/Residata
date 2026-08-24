@@ -1760,15 +1760,15 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
           text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 3px;
         }
         .pivot-label-text:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 3px; }
-        /* A field chip is grabbable anywhere on its body. The ⠿ is the hint,
-           dim until the pointer is on the chip so four zones full of chips
-           don't read as a field of dots. */
-        .pivotv2-chip:hover .pivotv2-grip { opacity: 0.95 !important; }
+        /* A field chip is grabbable anywhere on its body — cursor:grab says so,
+           and that is the whole affordance. It used to carry a ⠿ as well; once the
+           body became the handle the dots were decoration on top of a cue that
+           already worked, so they are gone (Boss 2026-08-24). No pivot builder
+           worth copying draws them. */
         .pivotv2-chip:active { cursor: grabbing; }
         .pivotv2-chip:focus-visible {
           outline: 2px solid var(--accent); outline-offset: 2px;
         }
-        .pivotv2-chip:focus-visible .pivotv2-grip { opacity: 0.95 !important; }
         /* The pivot's own horizontal scrollbar — visible enough to be found,
            quiet enough not to compete with the data. */
         .pivot-scroll { --pv-label-w: 300px; --pv-count-w: 96px; scrollbar-width: thin; }
@@ -2344,7 +2344,6 @@ function DropZone({ zoneKey, title, hint, icon, chips, drag, hoverZone, setHover
                 agg={c.agg}
                 filter={c.filter}
                 level={zoneKey === "rows" ? idx : null}
-                reorderable={chips.length > 1}
                 isDragged={drag?.fromZone === zoneKey && drag?.fieldKey === c.key}
                 onDragStart={() => setHoverZone(null)}
                 onDragStartPayload={() => ({ fromZone: zoneKey, fieldKey: c.key })}
@@ -2375,8 +2374,7 @@ function DropZone({ zoneKey, title, hint, icon, chips, drag, hoverZone, setHover
    THE WHOLE CHIP IS THE HANDLE. Boss: "i want it fully modular — both
    inputting them but also taking and reordering them once they are already
    in." So you grab a chip anywhere on its body and move it: to another slot,
-   to another zone, or back to the palette. The ⠿ is a hint that it is
-   grabbable, not the only place you may grab.
+   to another zone, or back to the palette. cursor:grab is the whole affordance.
 
    That used to be impossible to combine with the chip's own click. Making a
    chip draggable puts the browser's dragstart-vs-click dance on top of it, and
@@ -2401,7 +2399,7 @@ function DropZone({ zoneKey, title, hint, icon, chips, drag, hoverZone, setHover
 const CLICK_SLOP = 5;      // px — a press that travels further was a drag
 const DRAG_SLOP  = 3;      // px — past this a press can become a drag
 
-function ChipInZone({ label, type, agg, filter, level, reorderable, isDragged, onDragStart, onDragStartPayload, onNudge, onRemove, onChangeAgg, onClick, lang }) {
+function ChipInZone({ label, type, agg, filter, level, isDragged, onDragStart, onDragStartPayload, onNudge, onRemove, onChangeAgg, onClick, lang }) {
   const [menuOpen, setMenuOpen] = useState(false);
   // One dismissal behaviour for every layer in the app: an outside click or Esc
   // closes it. (This used to lean on the button's onBlur + a 150ms timeout,
@@ -2475,7 +2473,7 @@ function ChipInZone({ label, type, agg, filter, level, reorderable, isDragged, o
       }}
       style={{
         display: "inline-flex", alignItems: "center", gap: "0.35rem",
-        padding: "0.3rem 0.45rem 0.3rem 0.3rem", borderRadius: 100,
+        padding: "0.3rem 0.45rem 0.3rem 0.6rem", borderRadius: 100,
         background: active ? "color-mix(in srgb, var(--accent) 14%, transparent)" : "rgba(138,138,150,0.10)",
         border: `1px solid ${active ? green : "var(--border-soft)"}`,
         color: active ? green : dim,
@@ -2486,18 +2484,6 @@ function ChipInZone({ label, type, agg, filter, level, reorderable, isDragged, o
         transition: "opacity 0.12s",
       }}
     >
-      {/* Grab hint. Not the handle — the whole chip is — just the thing that
-          says so at a glance. Dim until the pointer is on the chip. */}
-      <span
-        aria-hidden
-        className="pivotv2-grip"
-        style={{
-          lineHeight: 1, padding: "0 1px",
-          fontSize: "0.72rem", letterSpacing: "-0.5px",
-          opacity: reorderable ? 0.5 : 0.25,
-          color: "currentColor", pointerEvents: "none",
-        }}
-      >⠿</span>
       {level != null && (
         <span style={{ opacity: 0.65, fontSize: "0.58rem", padding: "0 2px" }}>L{level + 1}</span>
       )}
