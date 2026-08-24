@@ -42,6 +42,7 @@ import { kickFirstRender } from "../lib/mapRenderKick";
 import { fieldBlock } from "../lib/controls";
 import { checkWebGL } from "../lib/webgl";
 import MapUnavailable from "../components/MapUnavailable";
+import { watchMapHealth } from "../lib/mapHealth";
 const greyPt = "#6b6b76";
 const panel = "var(--surface)";
 
@@ -260,6 +261,7 @@ export default function MapView({ lang = "en", setCurrent }) {
   // indistinguishable from a broken basemap, which is what cost a day on 2026-08-19.
   const [mapFail, setMapFail] = useState(() => { const g = checkWebGL(); return g.ok ? null : g; });
   const watchdogRef = useRef(null);
+  const healthRef = useRef(null);   // stops the paint / context-loss watch on unmount
  // flips true on load → re-runs the theme effect (catches a toggle made DURING the tile-load window)
   const [themeMode] = useThemeMode();
   const themeRef = useRef(themeMode);
@@ -400,19 +402,14 @@ export default function MapView({ lang = "en", setCurrent }) {
       }
     }, 15000);
     map.on("style.load", () => { clearTimeout(styleWatchdog); setMapFail(null); });
-    // Second watchdog: the style loaded, so the DATA is here — but did anything
-    // actually get drawn? If the basemap renders zero features over Central Europe
-    // the machine's graphics stack is not painting (broken driver, hardware
-    // acceleration half-on). Checked once, well after the first idle.
-    map.once("idle", () => {
-      setTimeout(() => {
-        if (mapRef.current !== map) return;
-        let drawn = 0;
-        try { drawn = map.queryRenderedFeatures().length; } catch { return; }
-        if (drawn === 0) {
-          setMapFail({ reason: "gpu", detail: "The map style and its tiles loaded, but nothing was rendered — the browser's graphics layer is not drawing." });
-        }
-      }, 4000);
+    // Second guard: the style loaded, so the DATA is here — but is this machine
+    // painting it, and does it KEEP painting? Both questions live in lib/mapHealth,
+    // which only accuses the machine after several agreeing readings and takes the
+    // accusation back if the map turns out to be drawing after all.
+    healthRef.current = watchMapHealth(map, {
+      isCurrent: () => mapRef.current === map,
+      onFail: (f) => setMapFail(f),
+      onOk: () => setMapFail(null),
     });
     watchdogRef.current = styleWatchdog;
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
@@ -489,6 +486,7 @@ export default function MapView({ lang = "en", setCurrent }) {
     return () => {
       if (ro) ro.disconnect();
       if (watchdogRef.current) { clearTimeout(watchdogRef.current); watchdogRef.current = null; }
+      if (healthRef.current) { healthRef.current(); healthRef.current = null; }
       if (popupRef.current) { popupRef.current.remove(); popupRef.current = null; }
       map.remove(); mapRef.current = null; readyRef.current = false;
     };

@@ -22,6 +22,7 @@ import useDismiss from "../lib/useDismiss";
 import { fieldBlock } from "../lib/controls";
 import { checkWebGL } from "../lib/webgl";
 import MapUnavailable from "../components/MapUnavailable";
+import { watchMapHealth } from "../lib/mapHealth";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 // The platform's dark basemap (public/basemap-dark.json). This picker sits in a dark
@@ -107,7 +108,8 @@ export default function LocationManager({ lang = "en" }) {
   const [deriving, setDeriving] = useState(false); // reverse-geocode in flight after a user pin-move
   const [district, setDistrict] = useState("");
   // Never leave a blank map — see lib/webgl.js.
-  const [mapFail] = useState(() => { const g = checkWebGL(); return g.ok ? null : g; });
+  const [mapFail, setMapFail] = useState(() => { const g = checkWebGL(); return g.ok ? null : g; });
+  const healthRef = useRef(null);   // stops the paint / context-loss watch on unmount
   const [suggestions, setSuggestions] = useState([]);
   const [searching, setSearching] = useState(false);
   // The address suggestion list closes on an outside click / Esc, like every
@@ -233,7 +235,18 @@ export default function LocationManager({ lang = "en" }) {
     map.on("click", (e) => onMove(e.lngLat.lat, e.lngLat.lng));
     const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => map.resize()) : null;
     if (ro && containerRef.current) ro.observe(containerRef.current);
-    return () => { if (ro) ro.disconnect(); marker.remove(); map.remove(); mapRef.current = null; };
+    // Same guard as the two platform maps: a pin picker whose map silently went
+    // black is a picker you place pins blind with.
+    healthRef.current = watchMapHealth(map, {
+      isCurrent: () => mapRef.current === map,
+      onFail: (f) => setMapFail(f),
+      onOk: () => setMapFail(null),
+    });
+    return () => {
+      if (ro) ro.disconnect();
+      if (healthRef.current) { healthRef.current(); healthRef.current = null; }
+      marker.remove(); map.remove(); mapRef.current = null;
+    };
   }, []);
 
   useEffect(() => {

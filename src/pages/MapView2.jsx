@@ -45,6 +45,7 @@ import { kickFirstRender } from "../lib/mapRenderKick";
 import { field } from "../lib/controls";
 import { checkWebGL } from "../lib/webgl";
 import MapUnavailable from "../components/MapUnavailable";
+import { watchMapHealth } from "../lib/mapHealth";
 const greyPt = "#6b6b76";
 const panel = "var(--surface)";
 
@@ -241,6 +242,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
   // cannot start, and an empty container looks exactly like a broken basemap.
   const [mapFail, setMapFail] = useState(() => { const g = checkWebGL(); return g.ok ? null : g; });
   const watchdogRef = useRef(null);
+  const healthRef = useRef(null);   // stops the paint / context-loss watch on unmount
   const filterBtnRef = useRef(null);   // handed to the builder so its outside-click dismissal doesn't fight this toggle
   const [nameQuery, setNameQuery] = useState("");
   const [analysisCenter, setAnalysisCenter] = useState(null);
@@ -612,16 +614,12 @@ export default function MapView2({ lang = "en", setCurrent }) {
       }
     }, 15000);
     map.on("style.load", () => { clearTimeout(watchdogRef.current); setMapFail(null); });
-    // See MapView.jsx: the style can load while the machine still draws nothing.
-    map.once("idle", () => {
-      setTimeout(() => {
-        if (mapRef.current !== map) return;
-        let drawn = 0;
-        try { drawn = map.queryRenderedFeatures().length; } catch { return; }
-        if (drawn === 0) {
-          setMapFail({ reason: "gpu", detail: "The map style and its tiles loaded, but nothing was rendered — the browser's graphics layer is not drawing." });
-        }
-      }, 4000);
+    // See MapView.jsx / lib/mapHealth.js: the style can load while the machine
+    // draws nothing, and a context can die under a map that was working.
+    healthRef.current = watchMapHealth(map, {
+      isCurrent: () => mapRef.current === map,
+      onFail: (f) => setMapFail(f),
+      onOk: () => setMapFail(null),
     });
     mapRef.current = map;
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
@@ -675,6 +673,8 @@ export default function MapView2({ lang = "en", setCurrent }) {
 
     return () => {
       if (ro) ro.disconnect();
+      if (watchdogRef.current) { clearTimeout(watchdogRef.current); watchdogRef.current = null; }
+      if (healthRef.current) { healthRef.current(); healthRef.current = null; }
       if (popupRef.current) { popupRef.current.remove(); popupRef.current = null; }
       if (hoverPopupRef.current) { hoverPopupRef.current.remove(); hoverPopupRef.current = null; }
       if (markerRef.current) { markerRef.current.remove(); markerRef.current = null; }
