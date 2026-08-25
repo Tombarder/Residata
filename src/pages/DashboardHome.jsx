@@ -72,12 +72,29 @@ const METRICS = {
   sold_through:{ label: { sk: "Podiel predaných a voľných jednotiek", en: "Sold vs available units" }, hint: { sk: "v sledovaných novostavbách", en: "across tracked developments" }, fmt: "pct", accent: orange, info: { sk: "Podiel už predaných bytov z celkového počtu bytov v projektoch.", en: "Share of units already sold out of all units in the projects." } },
   reserved:    { label: { sk: "Rezervované jednotky", en: "Reserved units" }, hint: { sk: "vrátane predrezervovaných", en: "incl. pre-reserved"     }, fmt: "count", accent: blue, info: { sk: "Počet bytov aktuálne rezervovaných (vrátane predrezervovaných). Rezervácia ešte nie je predaj — byt sa môže vrátiť do ponuky.", en: "Units currently reserved (including pre-reserved). A reservation isn't a sale — the unit can return to the market." } },
   tracked:     { label: { sk: "Všetky byty",    en: "All units"    }, hint: { sk: "vrátane predaných",          en: "incl. sold"             }, fmt: "count" },
-  projects:    { label: { sk: "Projekty",       en: "Projects"     }, hint: { sk: "aktívne v predaji",          en: "active in market"       }, fmt: "count", info: { sk: "Počet aktívnych projektov vo zvolenom výbere, ktoré majú aspoň jeden byt v ponuke.", en: "Number of active projects in the current selection that have at least one unit for sale." } },
-  developers:  { label: { sk: "Developeri",     en: "Developers"   }, hint: { sk: "aktívni na trhu",            en: "active in market"       }, fmt: "count", info: { sk: "Počet rôznych developerov s aktívnou ponukou vo zvolenom výbere.", en: "Number of distinct developers with active offerings in the current selection." } },
+  projects:    { label: { sk: "Projekty",       en: "Projects"     }, hint: { sk: "aktívne v predaji",          en: "active in market"       }, fmt: "count", info: { sk: "Počet aktívnych projektov vo zvolenom výbere, ktoré majú aspoň jeden byt v ponuke. Pozor pri zmene oproti minulému mesiacu: väčšinou znamená, že sme začali sledovať ďalšie projekty, nie že ich na trhu pribudlo. Projekt z čísla vypadne aj keď sa vypredá.", en: "Active projects in the current selection with at least one unit for sale. Careful with the month-over-month change: it usually means WE started tracking more projects, not that more launched. A project also drops out when it sells out." } },
+  developers:  { label: { sk: "Developeri",     en: "Developers"   }, hint: { sk: "aktívni na trhu",            en: "active in market"       }, fmt: "count", info: { sk: "Počet rôznych developerov s aktívnou ponukou vo zvolenom výbere. Rovnako ako pri projektoch: zmena oproti minulému mesiacu väčšinou odráža rozšírenie nášho pokrytia, nie príchod nových developerov na trh.", en: "Distinct developers with active offerings in the current selection. Same caveat as Projects: a month-over-month change usually reflects our coverage widening, not developers entering the market." } },
   inventory:   { label: { sk: "Zásoba",         en: "Inventory"    }, hint: { sk: "pri aktuálnom tempe predaja", en: "at the current sales pace" }, fmt: "months", info: { sk: "Za koľko mesiacov by sa vypredali všetky voľné byty pri súčasnom tempe predaja (voľné byty ÷ mesačné tempo).", en: "How many months it would take to sell all available units at the current pace (available units ÷ monthly pace)." } },
 };
-// Metrics that support a month-over-month delta (derivable from project history).
-const MOM_METRICS = new Set(["available", "avg_m2", "reserved", "sold_total", "sold_through"]);
+// Metrics that support a month-over-month delta.
+//
+// The five originals come straight out of project_snapshots. `projects` and
+// `developers` are counted from the same rows (a project is "in the market" that
+// month only if it had something for sale) — but READ THEIR TOOLTIP FIRST: their
+// month-over-month move is usually US, not the market. Bratislava went 76 -> 96
+// projects between July and August 2026 and 23 of those 24 were projects we
+// onboarded, not projects that launched.
+//
+// `sold30` and `inventory` are still OUT, and not by oversight. The only sales
+// figure in project_snapshots is the cumulative sold_units column, and its
+// month-over-month delta UNDERCOUNTS badly: for Bratislava in August 2026 it says
+// 107 sales where analytics.sale_events — the durable-sale fact the Sales page runs
+// on — says 174. The 67 it misses are sales at developers who DELETE a sold flat
+// instead of marking it sold, which a cumulative column cannot see. Deriving a
+// sales pace here would put a number on the dashboard that is 38 % low, so those
+// two need the analytics_sales RPC instead.
+const MOM_METRICS = new Set(["available", "avg_m2", "reserved", "sold_total", "sold_through",
+                             "projects", "developers"]);
 const fmtMetric = (key, val, lang) => {
   const f = METRICS[key]?.fmt;
   if (f === "m2") return fmtM2(val, lang);
@@ -195,20 +212,25 @@ function scopeHistory(scope, snapshots, countryIds) {
   for (const r of rows) {
     const m = r.snapshot_month; if (!m) continue;
     let a = byMonth.get(m);
-    if (!a) { a = { available: 0, sold: 0, reserved: 0, wSum: 0, wTot: 0 }; byMonth.set(m, a); }
+    if (!a) { a = { available: 0, sold: 0, reserved: 0, wSum: 0, wTot: 0, projects: new Set(), developers: new Set() }; byMonth.set(m, a); }
     a.available += r.available_units || 0;
     a.sold += r.sold_units || 0;
     a.reserved += r.reserved_units || 0;
+    // Counted the same way the live cards count them: a project is in the market
+    // that month only if it actually had something for sale.
+    if ((r.available_units || 0) > 0) { a.projects.add(r.project_id); if (r.developer) a.developers.add(r.developer); }
     if (r.avg_price_eur_m2) { const w = r.available_units || 1; a.wSum += r.avg_price_eur_m2 * w; a.wTot += w; }
   }
   return [...byMonth.keys()].sort().map(m => {
     const a = byMonth.get(m), den = a.sold + a.available + a.reserved;
     return { month: m, available: a.available, sold: a.sold, reserved: a.reserved,
+             projects: a.projects.size, developers: a.developers.size,
              avg_m2: a.wTot ? a.wSum / a.wTot : null, sold_through: den ? (a.sold / den) * 100 : null };
   });
 }
 function momDelta(metric, scope, ctx) {
-  const key = { available: "available", avg_m2: "avg_m2", reserved: "reserved", sold_total: "sold", sold_through: "sold_through" }[metric];
+  const key = { available: "available", avg_m2: "avg_m2", reserved: "reserved", sold_total: "sold",
+                sold_through: "sold_through", projects: "projects", developers: "developers" }[metric];
   if (!key) return null;
   // ctx.projects is already country-scoped → its id set restricts the history to
   // the current market (mirrors the KPI strip's aggMomDelta(overviewIds,…)).
@@ -279,15 +301,17 @@ function aggHistory(idSet, snapshots) {
     if (!idSet.has(r.project_id)) continue;
     const m = r.snapshot_month; if (!m) continue;
     let a = byMonth.get(m);
-    if (!a) { a = { available: 0, sold: 0, reserved: 0, wSum: 0, wTot: 0 }; byMonth.set(m, a); }
+    if (!a) { a = { available: 0, sold: 0, reserved: 0, wSum: 0, wTot: 0, projects: new Set(), developers: new Set() }; byMonth.set(m, a); }
     a.available += r.available_units || 0;
     a.sold += r.sold_units || 0;
     a.reserved += r.reserved_units || 0;
+    if ((r.available_units || 0) > 0) { a.projects.add(r.project_id); if (r.developer) a.developers.add(r.developer); }
     if (r.avg_price_eur_m2) { const w = r.available_units || 1; a.wSum += r.avg_price_eur_m2 * w; a.wTot += w; }
   }
   return [...byMonth.keys()].sort().map(m => {
     const a = byMonth.get(m), den = a.sold + a.available + a.reserved;
     return { available: a.available, sold_total: a.sold, reserved: a.reserved,
+             projects: a.projects.size, developers: a.developers.size,
              avg_m2: a.wTot ? a.wSum / a.wTot : null, sold_through: den ? (a.sold / den) * 100 : null };
   });
 }
