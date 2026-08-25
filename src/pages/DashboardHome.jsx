@@ -77,7 +77,8 @@ const METRICS = {
   inventory:   { label: { sk: "Zásoba",         en: "Inventory"    }, hint: { sk: "pri aktuálnom tempe predaja", en: "at the current sales pace" }, fmt: "months", info: { sk: "Za koľko mesiacov by sa vypredali všetky voľné byty pri súčasnom tempe predaja (voľné byty ÷ mesačné tempo).", en: "How many months it would take to sell all available units at the current pace (available units ÷ monthly pace)." } },
 };
 // Metrics that support a month-over-month delta (derivable from project history).
-const MOM_METRICS = new Set(["available", "avg_m2", "reserved", "sold_total", "sold_through"]);
+const MOM_METRICS = new Set(["available", "avg_m2", "reserved", "sold_total", "sold_through",
+                             "projects", "developers"]);
 const fmtMetric = (key, val, lang) => {
   const f = METRICS[key]?.fmt;
   if (f === "m2") return fmtM2(val, lang);
@@ -195,20 +196,25 @@ function scopeHistory(scope, snapshots, countryIds) {
   for (const r of rows) {
     const m = r.snapshot_month; if (!m) continue;
     let a = byMonth.get(m);
-    if (!a) { a = { available: 0, sold: 0, reserved: 0, wSum: 0, wTot: 0 }; byMonth.set(m, a); }
+    if (!a) { a = { available: 0, sold: 0, reserved: 0, wSum: 0, wTot: 0, projects: new Set(), developers: new Set() }; byMonth.set(m, a); }
     a.available += r.available_units || 0;
     a.sold += r.sold_units || 0;
     a.reserved += r.reserved_units || 0;
+    // Counted the way the live cards count them: in the market that month only if it
+    // actually had something for sale.
+    if ((r.available_units || 0) > 0) { a.projects.add(r.project_id); if (r.developer) a.developers.add(r.developer); }
     if (r.avg_price_eur_m2) { const w = r.available_units || 1; a.wSum += r.avg_price_eur_m2 * w; a.wTot += w; }
   }
   return [...byMonth.keys()].sort().map(m => {
     const a = byMonth.get(m), den = a.sold + a.available + a.reserved;
     return { month: m, available: a.available, sold: a.sold, reserved: a.reserved,
+             projects: a.projects.size, developers: a.developers.size,
              avg_m2: a.wTot ? a.wSum / a.wTot : null, sold_through: den ? (a.sold / den) * 100 : null };
   });
 }
 function momDelta(metric, scope, ctx) {
-  const key = { available: "available", avg_m2: "avg_m2", reserved: "reserved", sold_total: "sold", sold_through: "sold_through" }[metric];
+  const key = { available: "available", avg_m2: "avg_m2", reserved: "reserved", sold_total: "sold",
+                sold_through: "sold_through", projects: "projects", developers: "developers" }[metric];
   if (!key) return null;
   // ctx.projects is already country-scoped → its id set restricts the history to
   // the current market (mirrors the KPI strip's aggMomDelta(overviewIds,…)).
@@ -279,15 +285,17 @@ function aggHistory(idSet, snapshots) {
     if (!idSet.has(r.project_id)) continue;
     const m = r.snapshot_month; if (!m) continue;
     let a = byMonth.get(m);
-    if (!a) { a = { available: 0, sold: 0, reserved: 0, wSum: 0, wTot: 0 }; byMonth.set(m, a); }
+    if (!a) { a = { available: 0, sold: 0, reserved: 0, wSum: 0, wTot: 0, projects: new Set(), developers: new Set() }; byMonth.set(m, a); }
     a.available += r.available_units || 0;
     a.sold += r.sold_units || 0;
     a.reserved += r.reserved_units || 0;
+    if ((r.available_units || 0) > 0) { a.projects.add(r.project_id); if (r.developer) a.developers.add(r.developer); }
     if (r.avg_price_eur_m2) { const w = r.available_units || 1; a.wSum += r.avg_price_eur_m2 * w; a.wTot += w; }
   }
   return [...byMonth.keys()].sort().map(m => {
     const a = byMonth.get(m), den = a.sold + a.available + a.reserved;
     return { available: a.available, sold_total: a.sold, reserved: a.reserved,
+             projects: a.projects.size, developers: a.developers.size,
              avg_m2: a.wTot ? a.wSum / a.wTot : null, sold_through: den ? (a.sold / den) * 100 : null };
   });
 }
