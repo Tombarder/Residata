@@ -27,8 +27,7 @@ import { createPortal } from "react-dom";
 import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
 import {
-  useProjects, useMarketTotals, useVelocityMature, useDistrictTotals, useFreshness,
-} from "../lib/useData";
+  useProjects, useMarketTotals, useVelocityMature, useDistrictTotals, useFreshness, useSales } from "../lib/useData";
 import { supabaseData } from "../lib/supabase";
 import { useCountry, isAllCountries, countryName } from "../lib/useCountry";
 import { useCurrency } from "../lib/useCurrency";
@@ -236,6 +235,8 @@ function DeltaChip({ delta, lang }) {
   let txt;
   if (delta.metric === "avg_m2") txt = `${Math.round(moneyFromEur(mag)).toLocaleString(localeTag(lang))} ${moneySymbol()}`;
   else if (delta.metric === "sold_through") txt = `${mag.toFixed(1)} pp`;
+  // Inventory is months. "▲ 2" under a card reading "~16 mo" says nothing without it.
+  else if (delta.metric === "inventory") txt = `${mag < 10 ? mag.toFixed(1) : Math.round(mag)} ${L(lang, "mes.", "mo")}`;
   else txt = fmtCount(Math.round(mag), lang);
   // The period is SPELLED OUT rather than left in a hover title (Boss): an arrow
   // and a number on their own say something changed but not since when, and a
@@ -526,6 +527,24 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
   const overviewAgg = useMemo(() => aggregateProjects(overviewProjects), [overviewProjects]);
   const overviewIds = useMemo(() => new Set(overviewProjects.map(p => p.id)), [overviewProjects]);
 
+  // ── the sales pace a month ago ────────────────────────────────────────
+  // Units sold/30 days and Inventory are the two cards whose history is NOT in
+  // project_snapshots. Its only sales column is a cumulative count of flats the
+  // developer MARKED sold, which misses every sale at a developer who deletes the
+  // flat instead — 107 against the true 174 for Bratislava in August 2026. So the
+  // pace comes from analytics.sale_events, the same durable-sale fact the live card
+  // already shows, asked for the PREVIOUS 30-day window.
+  //
+  // If this read fails or the user is not entitled to it, useSales returns null and
+  // these two cards simply have no arrow. It cannot affect the other six.
+  const prevPaceSpec = useMemo(() => {
+    if (!overviewIds.size) return null;
+    const d = (daysAgo) => new Date(Date.now() - daysAgo * 86400000).toISOString().slice(0, 10);
+    return { mode: "summary", date_from: d(60), date_to: d(30), projects: [...overviewIds] };
+  }, [overviewIds]);
+  const prevPace = useSales({ enabled: !!prevPaceSpec, spec: prevPaceSpec });
+  const prevSold = Number(prevPace?.data?.sold_durable);
+
   const kpiMetrics = ["available", "avg_m2", "sold30", "sold_through", "reserved", "inventory", "projects", "developers"];
 
   // ── widget mutations ──
@@ -616,7 +635,23 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
               : mk === "sold30" ? (raw == null ? "—" : fmtCount(raw, lang))
               : mk === "avg_m2" ? (raw != null ? `${Math.round(moneyFromEur(raw)).toLocaleString(localeTag(lang))} ${moneySymbol()}` : "—")
               : fmtMetric(mk, raw, lang);
-            const delta = (!locked && !gateVelocity && MOM_METRICS.has(mk)) ? aggMomDelta(mk, overviewIds, snapshots) : null;
+            let delta = (!locked && !gateVelocity && MOM_METRICS.has(mk)) ? aggMomDelta(mk, overviewIds, snapshots) : null;
+            // sold30 / inventory: their previous value needs the real sales pace, which
+            // only analytics.sale_events has. Both sides of each comparison use the same
+            // definition, so the arrow is honest.
+            if (!locked && !gateVelocity && Number.isFinite(prevSold) && prevSold > 0) {
+              if (mk === "sold30" && raw != null) {
+                const abs = raw - prevSold;
+                if (Math.abs(abs) >= 1) delta = { abs, metric: "sold30" };
+              } else if (mk === "inventory" && raw != null) {
+                const hist = aggHistory(overviewIds, snapshots);
+                const prevAvail = hist.length >= 2 ? hist[hist.length - 2].available : null;
+                if (prevAvail != null) {
+                  const abs = raw - (prevAvail / prevSold);
+                  if (Math.abs(abs) >= 0.1) delta = { abs, metric: "inventory" };
+                }
+              }
+            }
             return (
               <KpiCard key={mk}
                 label={def.label[lang] || def.label.en}
