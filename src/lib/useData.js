@@ -1012,21 +1012,28 @@ export function useProjectFlats(projectId) {
     // Their data is STILL VALID, just slightly older. Fetch the most
     // recent batch that exists for THIS project specifically.
     const fetchMostRecentForProject = async () => {
-      // First: find most recent batch_timestamp for this project
+      // Keyed on batch_timestamp, NOT batch_id. batch_id stopped being written on
+      // 2026-07-01 (final.units has no such column), so every row since is null —
+      // `.eq("batch_id", null)` matches nothing and this fallback silently returned
+      // an empty list. It matters more since current views went active-only: the 13
+      // sold-out projects that still hold unit data reach the page ONLY through here.
+      // batch_timestamp is 100% populated and one value per scrape run, so it
+      // identifies a batch exactly as batch_id was meant to.
       const probe = await sbRead(supabaseData.from("flats_archive")
-        .select("batch_id, batch_timestamp")
+        .select("batch_timestamp")
         .eq("project_id", projectId)
         .order("batch_timestamp", { ascending: false, nullsFirst: false })
         .limit(1));
       if (probe.error || !probe.data || probe.data.length === 0) {
         return { data: [], error: probe.error };
       }
-      const latestBatch = probe.data[0].batch_id;
-      // Then fetch all flats for that specific batch
+      const latestBatch = probe.data[0].batch_timestamp;
+      if (latestBatch == null) return { data: [], error: null };
+      // Then fetch all flats from that one scrape run
       return await sbRead(supabaseData.from("flats_archive")
         .select("*")
         .eq("project_id", projectId)
-        .eq("batch_id", latestBatch)
+        .eq("batch_timestamp", latestBatch)
         .order("poschodie", { ascending: true }));
     };
 

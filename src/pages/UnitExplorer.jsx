@@ -38,7 +38,7 @@ const CATEGORY = {
   cena_s_dph: "price", cena_bez_dph: "price", price_per_m2: "price",
   obytna_plocha: "area", celkova_plocha: "area", balkon: "area", loggia: "area",
   terasa: "area", zahrada: "area", exterier: "area", kobka: "area",
-  snapshot_month: "time", datum: "time", batch_id: "time",
+  snapshot_month: "time", datum: "time",
 };
 const CAT_ORDER = ["loc", "proj", "unit", "price", "area", "time"];
 const CAT_LABEL = {

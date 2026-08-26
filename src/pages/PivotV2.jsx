@@ -60,7 +60,6 @@ const FIELDS = {
                       }},
   batch_timestamp:   { label: "Batch (presný čas)",         group: "meta",     type: "text",   accessor: (r) => r.batch_timestamp || null },
   snapshot_month:    { label: "Mesiac",                     group: "meta",     type: "text",   accessor: (r) => r.snapshot_month },
-  batch_id:          { label: "Batch ID",                   group: "meta",     type: "text",   accessor: (r) => r.batch_id },
   import_status:     { label: "Import status",              group: "meta",     type: "text",   accessor: (r) => r.project_status || "active" },
 
   // Identity
@@ -106,6 +105,12 @@ const FIELDS = {
   // palette: most rows are null. The values still live in projects.* and
   // can be exposed again later if a use case emerges.
   //
+  // 2026-08-26: `batch_id` RETIRED for the same reason, found by the field sweep.
+  // It stopped being written on 2026-07-01 (final.units has no such column) — 0 of
+  // 42 126 current rows carried one — so "Batch ID" was a palette entry that could
+  // never show a value, and picking it forced a full-archive scan to return nothing.
+  // `batch_timestamp` already identifies every scrape run uniquely (16 runs, 16
+  // distinct timestamps, 100% populated), so nothing is lost.
   // 2026-06-29 cleanup: `ulica_detail` / `budova_stav` / `standard` were
   // REMOVED — those columns don't exist on reference.projects (nor on the
   // flats views), so their accessors returned null for EVERY row: dead
@@ -248,7 +253,7 @@ function fieldLabel(fieldKey, lang) {
    user's mental model stays intact when they switch between Residata and
    their Excel pivot. */
 const FIELD_ORDER = [
-  "datum", "snapshot_month", "batch_id", "batch_timestamp", "import_status",
+  "datum", "snapshot_month", "batch_timestamp", "import_status",
   "project_name", "developer", "unit_id", "typ", "etapa", "budova",
   "poschodie", "izby", "obytna_plocha", "balkon", "loggia", "terasa",
   "zahrada", "exterier", "kobka", "celkova_plocha",
@@ -759,7 +764,7 @@ const SERVERABLE_DIMS = new Set([
   "project_name", "developer", "typ", "etapa", "budova", "unit_id",
   "izby", "poschodie", "stav", "kolaudacia", "orientacia",
   "country", "city", "cast", "sub_district",
-  "import_status", "snapshot_month", "datum", "batch_id", "batch_timestamp",
+  "import_status", "snapshot_month", "datum", "batch_timestamp",
 ]);
 // numeric field key → component prefix in the grain's `m` object
 const COMP_FIELD = {
