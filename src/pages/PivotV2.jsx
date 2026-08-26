@@ -1215,6 +1215,12 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
         // preview rows don't, so fall back to the project's country so the
         // Krajina dimension is populated on the free-tier demo too.
         country:           f.country ?? p?.country ?? null,
+        // Mesto — same shape as country, and for the same reason. flats_archive
+        // carries `city`, flats_current does NOT, and synthetic preview rows
+        // carry neither, so without the project fallback the Mesto dimension
+        // collapsed to "(prázdne)" for EVERY row in the default current view.
+        // (Only the drill-down enrichment had it; this one was missed.)
+        city:              f.city ?? p?.city ?? null,
         project_name:      p?.name || f.project_id,
         project_status:    p?.status || "active",
         developer:         p?.developer || null,
