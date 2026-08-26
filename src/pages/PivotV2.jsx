@@ -1792,7 +1792,12 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
           {(stavSplit.offer > 0 || stavSplit.sold > 0) && (
             <span style={{ marginLeft: "0.5rem" }}>
               · <strong style={{ color: "var(--accent)" }}>{stavSplit.offer.toLocaleString("en-US").replace(/,/g, " ")}</strong> {lang === "sk" ? "v ponuke" : "on offer"}
-              {" · "}<strong style={{ color: "var(--text-dim)" }}>{stavSplit.sold.toLocaleString("en-US").replace(/,/g, " ")}</strong> {lang === "sk" ? "predaných" : "sold"}
+              {" · "}<strong style={{ color: "var(--text-dim)" }}>{stavSplit.sold.toLocaleString("en-US").replace(/,/g, " ")}</strong>{" "}
+              <span title={lang === "sk"
+                ? "Byty, ktoré developer v cenníku označuje ako Predané. Developeri, čo predaný byt z cenníka zmažú, tu nie sú — skutočné predaje sú v Analytika → Predaje."
+                : "Flats a developer currently labels sold on their price list. Developers who delete a sold flat are not here — actual sales are in Analytics → Sales."}>
+                {lang === "sk" ? "predaných (v cenníku)" : "sold (on the price list)"}
+              </span>
             </span>
           )}
           {!configServerable && filteredRecords.length !== records.length && (
