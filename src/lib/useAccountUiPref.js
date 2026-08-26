@@ -1,21 +1,35 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "./useAuth";
-import { supabaseData } from "./supabase";
+import { seedAccount, seedAnon, isSeeded, readPref, writePref, adoptPref } from "./accountPrefs";
 
 /**
- * useAccountHydrated — a ref that is `false` until this account's prefs have had a chance
- * to hydrate (profile loaded + a short settle), then `true`. Anon → `true` immediately.
+ * The three hooks every page uses to remember its settings for the logged-in
+ * account. They are thin: the state itself lives in `accountPrefs.js`, which is
+ * the browser's single owner of `user_profiles.ui_prefs` / `.pivot_prefs`.
  *
- * Use it to GATE side-effects that must not fire for the initial account-driven hydration
- * — e.g. "when the market changes, reset the map filters": that reset should run for a
- * USER market switch, but NOT for the account-market value being restored on load (which
- * would wipe the just-hydrated filters on a fresh device).
+ * That indirection is the whole point. These hooks used to read the account
+ * straight off `useAuth().profile` — a snapshot taken once per page load and
+ * never refreshed after a save — so remounting a page (navigate away, come back)
+ * re-applied the page-load values over whatever the user had set since. See the
+ * header of `accountPrefs.js` for the full account of that bug.
+ */
+
+/**
+ * useAccountHydrated — a ref that is `false` until this account's prefs have had a
+ * chance to hydrate, then `true`. Anon → `true` immediately, and so is a remount
+ * onto an account whose prefs are already loaded.
+ *
+ * Use it to GATE side-effects that must not fire for the initial account-driven
+ * hydration — e.g. "when the market changes, reset the map filters": that reset
+ * should run for a USER market switch, but NOT for the account's market being
+ * restored on load (which would wipe the just-hydrated filters on a fresh device).
  */
 export function useAccountHydrated() {
   const { user, profile } = useAuth();
   const ready = useRef(false);
   useEffect(() => {
     if (!user) { ready.current = true; return; }        // anon → no account hydration to wait for
+    if (isSeeded(user.id)) { ready.current = true; return; }  // already loaded earlier this session
     if (!profile) return;                               // wait for THIS account's profile
     const id = setTimeout(() => { ready.current = true; }, 800);   // let market + filters land
     return () => clearTimeout(id);
@@ -24,83 +38,81 @@ export function useAccountHydrated() {
 }
 
 /**
- * useAccountUiPref — sync ONE string preference to the user's account (ui_prefs[key])
- * so it follows the login across devices, reusing the robust pattern proven for the
- * pivot / market / currency sync:
- *   · hydrate from the account the moment ITS profile loads (account = source of truth);
- *   · persist changes debounced, through supabaseData (reliable auth.uid()), surfacing
- *     errors and recording the baseline only on success so a failed save retries;
- *   · effects key off the primitive value + the hydration scope (never an unstable
- *     object), and a baseline-diff means we never echo the just-hydrated value back.
+ * Seed this account's preference store the first time its own profile arrives.
+ * Returns true once the store speaks for `scopeId` and the page may finalize.
  *
- * The preference keeps its OWN local store (localStorage etc.) as the instant per-browser
- * cache; this hook only bridges it to the account. Anon visitors are never written.
+ * Until then we are looking at either nobody (auth still resolving) or somebody
+ * else's profile — a mid-session account switch briefly leaves the previous
+ * account's row in context, and trusting it would leak one user's saved view into
+ * another's.
+ */
+function ensureSeeded(scopeId, user, profile) {
+  if (isSeeded(scopeId)) return true;
+  if (!user) { seedAnon(); return true; }
+  const own = profile && profile.id === user.id ? profile : null;
+  if (!own) return false;
+  seedAccount(scopeId, own);
+  return true;
+}
+
+/**
+ * useAccountUiPref — sync ONE string preference to the account (ui_prefs[key]) so
+ * it follows the login across devices.
+ *
+ * The preference keeps its OWN local store (the theme's / language's / market's
+ * existing localStorage) as the instant per-browser cache; this hook bridges it to
+ * the account. Anon visitors are never written.
  *
  * @param {string} key          ui_prefs key, e.g. "theme" | "language"
  * @param {string} value        the preference's current value (from its own store)
  * @param {(v:string)=>void} apply   apply an account value on hydration (its setter)
- * @param {{defaultValue?: string}} [opts]  when the account has nothing saved, a value
- *        that differs from defaultValue is back-filled (pushed up) so an existing local
- *        choice reaches other devices; a value equal to defaultValue stays put.
+ * @param {{defaultValue?: string}} [opts]  when the account has nothing saved, a
+ *        value that differs from defaultValue is pushed up so an existing local
+ *        choice reaches the user's other devices; a default value stays put, so a
+ *        fresh device never writes noise into the account.
  */
 export function useAccountUiPref(key, value, apply, opts = {}) {
   const { defaultValue } = opts;
   const { user, profile, loading: authLoading } = useAuth();
   const scopeId = user?.id || "anon";
   const [hydratedScope, setHydratedScope] = useState(null);
-  const syncedRef = useRef(undefined);
 
-  // Hydrate from the account once its OWN profile has loaded.
   useEffect(() => {
     if (authLoading) return;
     if (hydratedScope === scopeId) return;
-    if (!user) { setHydratedScope("anon"); return; }          // anon → local store only
-    const own = profile && profile.id === user.id ? profile : null;
-    if (!own) return;                                         // wait for THIS account's profile
-    const prefs = own.ui_prefs && typeof own.ui_prefs === "object" ? own.ui_prefs : {};
-    const stored = prefs[key];
-    if (typeof stored === "string") {
+    if (!ensureSeeded(scopeId, user, profile)) return;   // this account's profile not in yet
+
+    const { value: stored, source } = readPref(scopeId, key);
+    if (source && typeof stored === "string") {
       apply(stored);
-      syncedRef.current = stored;
-    } else {
-      // No account value yet: back-fill a non-default local choice (baseline undefined →
-      // the save effect pushes it once); a default value stays put (baseline = current).
-      syncedRef.current = (defaultValue !== undefined && value !== defaultValue) ? undefined : value;
+      if (source === "local") writePref(scopeId, key, stored);   // this browser's choice → push it up
+    } else if (defaultValue !== undefined && value !== defaultValue) {
+      writePref(scopeId, key, value);                            // a real local choice, back-filled
+    } else if (typeof value === "string") {
+      adoptPref(scopeId, key, value);                            // just the default — hold it, don't publish it
     }
     setHydratedScope(scopeId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, scopeId, user, profile]);
 
-  // Persist a change (or a first-load back-fill) to the account, debounced.
+  // Persist a later change. writePref ignores an unchanged value, so re-applying
+  // what we just hydrated never writes.
   useEffect(() => {
-    if (scopeId === "anon" || hydratedScope !== scopeId) return;
-    if (typeof value !== "string" || value === syncedRef.current) return;
-    const v = value;
-    const t = setTimeout(() => {
-      supabaseData.rpc("set_ui_pref", { p_key: key, p_value: v }).then(
-        ({ error }) => { if (error) console.warn(`${key} pref sync failed:`, error.message); else syncedRef.current = v; },
-        (e) => console.warn(`${key} pref sync error:`, e?.message || e),
-      );
-    }, 500);
-    return () => clearTimeout(t);
+    if (hydratedScope !== scopeId) return;
+    if (typeof value !== "string") return;
+    writePref(scopeId, key, value);
   }, [value, hydratedScope, scopeId, key]);
 }
 
 /**
- * useAccountPrefState — persist a page's filter/settings SNAPSHOT to localStorage
- * (per-account, instant) AND the account (ui_prefs[key], cross-device), so a page
- * remembers its filters and they follow the login across devices.
+ * useAccountPrefState — remember a page's filter/settings SNAPSHOT for the account,
+ * so the page comes back exactly as the user left it: within the session, across
+ * navigations, after a reload, and on their other devices.
  *
- * The page passes its CURRENT persistent filter values as `snapshot` (a plain object
- * with a FIXED key set) and an `apply(saved)` that pushes a saved snapshot back into its
- * state. Mirrors the pivot's applyPrefs + payloadSer, generalized. Leave TRANSIENT UI
- * state (open dropdowns, scroll position, map viewport) OUT of the snapshot.
- *
- * Robust: hydrate on this account's profile load (account = source of truth) → local
- * cache → current; debounced supabaseData writes; errors surfaced; a key-order-safe
- * baseline-diff (jsonb loses key order, so a saved object is re-serialized through the
- * snapshot's own key order before comparing) prevents echo saves; an existing local-only
- * snapshot is back-filled to the account on first load.
+ * The page passes its CURRENT persistent filter values as `snapshot` (a plain
+ * object with a FIXED key set) and an `apply(saved)` that pushes a saved snapshot
+ * back into its state. Leave TRANSIENT UI state (open dropdowns, scroll position,
+ * map viewport) OUT of the snapshot.
  *
  * @param {string} key       ui_prefs key, e.g. "salesFilters"
  * @param {object} snapshot  current persistent filter values (fixed key set)
@@ -110,75 +122,37 @@ export function useAccountPrefState(key, snapshot, apply) {
   const { user, profile, loading: authLoading } = useAuth();
   const scopeId = user?.id || "anon";
   const [hydratedScope, setHydratedScope] = useState(null);
-  const lastSyncedRef = useRef(null);
-
-  const lsKey = (sc) => `residata.pref.${key}.${sc || "anon"}`;
   const serialized = JSON.stringify(snapshot);
-  // Re-serialize a saved object through the CURRENT snapshot's key set + order, so the
-  // baseline equals what `serialized` becomes once `apply(saved)` lands (echo-safe).
-  const canon = (saved) => {
-    const out = {};
-    for (const k of Object.keys(snapshot)) out[k] = (saved && k in saved) ? saved[k] : snapshot[k];
-    return JSON.stringify(out);
-  };
 
   useEffect(() => {
     if (authLoading) return;
     if (hydratedScope === scopeId) return;
-    const readLS = (sc) => {
-      try { const r = localStorage.getItem(lsKey(sc)); const v = r ? JSON.parse(r) : undefined; return (v && typeof v === "object") ? v : undefined; }
-      catch { return undefined; }
-    };
-    if (!user) {                                   // anon → per-browser cache only
-      const ls = readLS("anon");
-      if (ls) { apply(ls); lastSyncedRef.current = canon(ls); } else lastSyncedRef.current = serialized;
-      setHydratedScope("anon");
+
+    if (!ensureSeeded(scopeId, user, profile)) {
+      // This account's profile hasn't arrived. Show the per-browser cache so the
+      // page isn't blank-defaulted for a beat, but do NOT finalize — nothing may
+      // be saved until we know whose settings these are.
+      const { value } = readPref(scopeId, key);
+      if (value && typeof value === "object") apply(value);
       return;
     }
-    const own = profile && profile.id === user.id ? profile : null;
-    if (!own) { const ls = readLS(user.id); if (ls) apply(ls); return; }   // placeholder; don't finalize
-    const prefs = own.ui_prefs && typeof own.ui_prefs === "object" ? own.ui_prefs : {};
-    const dbVal = prefs[key];
-    const fromAccount = dbVal && typeof dbVal === "object";
-    const ls = readLS(user.id);
-    const saved = fromAccount ? dbVal : (ls || null);
-    if (saved) apply(saved);
-    if (fromAccount) lastSyncedRef.current = canon(dbVal);   // account value → no echo save
-    else if (saved) lastSyncedRef.current = null;            // local-only → back-fill (save once)
-    else lastSyncedRef.current = serialized;                 // fresh → no save
+
+    const { value, source } = readPref(scopeId, key);
+    if (value && typeof value === "object") apply(value);
     setHydratedScope(scopeId);
+    // A choice this browser made before the preference was ever synced: push it up
+    // once so the user's other devices get it too. Nothing saved anywhere: hold the
+    // page's own defaults so a remount stays put, without publishing them.
+    if (source === "local") writePref(scopeId, key, value);
+    else if (!source) adoptPref(scopeId, key, JSON.parse(serialized));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, scopeId, user, profile]);
 
+  // Persist every real change. The store owns the debounce (module-level, so
+  // navigating away cannot cancel it) and ignores an unchanged value, so the
+  // hydration echo never causes a write.
   useEffect(() => {
     if (hydratedScope !== scopeId) return;
-    try { localStorage.setItem(lsKey(scopeId), serialized); } catch { /* ignore */ }
-    if (scopeId === "anon") return;
-    if (serialized === lastSyncedRef.current) return;
-    const toSave = serialized;
-    const t = setTimeout(() => {
-      supabaseData.rpc("set_ui_pref", { p_key: key, p_value: JSON.parse(toSave) }).then(
-        ({ error }) => { if (error) console.warn(`${key} pref sync failed:`, error.message); else lastSyncedRef.current = toSave; },
-        (e) => console.warn(`${key} pref sync error:`, e?.message || e),
-      );
-    }, 600);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [serialized, hydratedScope, scopeId]);
-
-  // Flush a pending change on UNMOUNT (navigate away) so a quick change-then-leave isn't
-  // dropped from the account — localStorage already has it, but the debounced DB write's
-  // timer gets cleared on unmount before it fires. Only writes when there's a real unsaved
-  // change for the current, hydrated account.
-  const flushRef = useRef(null);
-  // Keep the ref current from an effect (not during render — react-hooks/refs),
-  // so the unmount-only flush below reads the latest committed values.
-  useEffect(() => { flushRef.current = { serialized, scopeId, hydratedScope }; });
-  useEffect(() => () => {
-    const f = flushRef.current;
-    if (!f || f.scopeId === "anon" || f.hydratedScope !== f.scopeId || f.serialized === lastSyncedRef.current) return;
-    lastSyncedRef.current = f.serialized;
-    supabaseData.rpc("set_ui_pref", { p_key: key, p_value: JSON.parse(f.serialized) }).then(() => {}, () => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
+    writePref(scopeId, key, JSON.parse(serialized));
+  }, [serialized, hydratedScope, scopeId, key]);
 }

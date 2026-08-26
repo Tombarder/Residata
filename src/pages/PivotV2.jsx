@@ -5,7 +5,7 @@ import { useCountry, isAllCountries } from "../lib/useCountry";
 import { useCapabilities } from "../lib/useCapabilities";
 import { useAuth } from "../lib/useAuth";
 import { useAccountPrefState } from "../lib/useAccountUiPref";
-import { supabaseData } from "../lib/supabase";
+import { PIVOT_KEY as PIVOT_PREF_KEY } from "../lib/accountPrefs";
 import { moneyFromEur, moneySymbol } from "../lib/money";
 import Picker from "../components/Picker";
 import { localeTag } from "../lib/locale";
@@ -319,6 +319,22 @@ const DEFAULT_BUNDLE = {
   valueMode: DEFAULT_VALUE_MODE, dataBars: DEFAULT_DATA_BARS, sort: DEFAULT_SORT,
 };
 
+/* The canonical shape of a saved setup — used BOTH to build the snapshot that gets
+   persisted and to apply one back onto the live state, so the two can never drift
+   apart (a key present in one and missing from the other would read as a change on
+   every mount and re-save the same content forever). */
+function normalizeBundle(p) {
+  return {
+    rows: p.rows ?? DEFAULT_ROWS,
+    cols: p.cols ?? DEFAULT_COLS,
+    values: p.values ?? DEFAULT_VALUES,
+    filters: p.filters ?? DEFAULT_FILTERS,
+    valueMode: p.valueMode ?? DEFAULT_VALUE_MODE,
+    dataBars: typeof p.dataBars === "boolean" ? p.dataBars : DEFAULT_DATA_BARS,
+    sort: p.sort ?? DEFAULT_SORT,
+  };
+}
+
 /* Persist the pivot setup (rows/cols/values/filters + display options) to localStorage
    so it SURVIVES navigating away (to Reports, etc.) and back + refreshes.
    ── ACCOUNT-SCOPED (2026-06-29) ──
@@ -389,9 +405,6 @@ function loadPivotState(scope) {
     const raw = typeof window !== "undefined" && window.localStorage.getItem(pivotStateKey(scope));
     return raw ? sanitizePivotState(JSON.parse(raw)) : null;
   } catch { return null; }
-}
-function savePivotState(scope, s) {
-  try { window.localStorage.setItem(pivotStateKey(scope), JSON.stringify(s)); } catch { /* private mode / quota — ignore */ }
 }
 /* One-time cleanup of the pre-2026-06-29 SHARED key (the leak source). */
 function purgeLegacyPivotState() {
@@ -1028,7 +1041,7 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   const { country } = useCountry();   // for targeted drill-down fetch
   const { can } = useCapabilities();
   const canViewAnalytics = can("view_analytics");
-  const { user, profile, loading: authLoading } = useAuth();   // for per-account pivot persistence
+  const { user } = useAuth();   // account id → the per-account localStorage cache read below
 
   // Mesiac/Datum is a regular filterable dimension. The pivot opens pinned to the
   // latest scrape (the seeding effect below), so we drive the archive FETCH off
@@ -1042,10 +1055,10 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   // Default filter: show only the on-market units a buyer is actually shopping —
   // Voľné (V) + Predrezervované (PR). Pushed to the grain RPC (p_stav) so the
   // default stays instant. The user can edit/clear the chip to see all statuses.
-  // Restore the persisted setup ONCE on mount (survives navigating to Reports etc.
-  // and back, and across refreshes). Scoped to the current account id (or "anon" when
-  // not yet known) so it NEVER shows another account's setup. The hydration effect
-  // below re-applies the authoritative source once auth + profile resolve.
+  // First paint reads this account's local cache so the pivot never flashes the
+  // default layout before the saved one lands. Scoped to the account id (or "anon"
+  // when not yet known) so it can NEVER show another account's setup; the hook below
+  // then applies the authoritative value from the account's preference store.
   const [persisted] = useState(() => loadPivotState(user?.id));
   // Default filter: show only the on-market units a buyer is actually shopping —
   // Voľné (V) + Predrezervované (PR). Pushed to the grain RPC (p_stav) so the
@@ -1255,133 +1268,29 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   const [valueMode, setValueMode] = useState(persisted?.valueMode ?? DEFAULT_VALUE_MODE);
   const [dataBars,  setDataBars]  = useState(persisted?.dataBars ?? DEFAULT_DATA_BARS);
 
-  // ── Per-ACCOUNT persistence (the setup sticks to the ACCOUNT, not the browser) ──
-  // For a logged-in user the account is the SOURCE OF TRUTH: their saved setup comes
-  // from user_profiles.pivot_prefs (cross-device) with the per-account localStorage as
-  // an instant cache. We ALWAYS apply the account's source on hydration — so a previous
-  // session's / another account's local state can never bleed through. Anon visitors use
-  // the "anon" localStorage only. `scopeId` re-hydrates when the account changes
-  // (logout→login) without needing a full reload.
-  // `hydratedScope` = the account whose AUTHORITATIVE setup is currently applied. It's
-  // STATE (not a ref) so the save effects re-evaluate the moment it flips, and it holds
-  // the *scope string* (not just a bool) so saves only ever fire for the CURRENT, fully
-  // hydrated account — never writing one account's state into another's slot during a
-  // logout→login switch.
-  const [hydratedScope, setHydratedScope] = useState(null);
-  // Serialized snapshot of what's currently persisted for this account — set on
-  // hydration and after each successful save. The save effect fires ONLY when the
-  // live setup diverges from this, so it never echoes the just-loaded value back,
-  // and (crucially) it keys off a STABLE string instead of the `user` object, whose
-  // per-render identity churn used to re-run the effect every render and cancel the
-  // debounce timer before it could fire — so no account's setup ever reached the DB
-  // (silently, for 3 weeks: the old code both never fired AND swallowed every error).
-  const lastSyncedRef = useRef(null);
-  const scopeId = user?.id || "anon";
-
-  // Canonical bundle shape — used BOTH to apply prefs to state and to serialize the
-  // synced baseline, so the two always compare equal (key order is significant).
-  const normalizeBundle = (p) => ({
-    rows: p.rows ?? DEFAULT_ROWS,
-    cols: p.cols ?? DEFAULT_COLS,
-    values: p.values ?? DEFAULT_VALUES,
-    filters: p.filters ?? DEFAULT_FILTERS,
-    valueMode: p.valueMode ?? DEFAULT_VALUE_MODE,
-    dataBars: typeof p.dataBars === "boolean" ? p.dataBars : DEFAULT_DATA_BARS,
-    sort: p.sort ?? DEFAULT_SORT,
-  });
-  // A stable string that changes ONLY when the setup content changes. The persistence
-  // effects depend on this (not the individual state refs), so unrelated re-renders
-  // can't churn the debounce.
-  const payloadSer = useMemo(
-    () => JSON.stringify(normalizeBundle({ rows, cols, values, filters, valueMode, dataBars, sort })),
-    [rows, cols, values, filters, valueMode, dataBars, sort]
-  );
-
-  // Apply a full prefs bundle to the live pivot state AND record it as the synced
-  // baseline, so hydrating (or re-hydrating) never triggers a redundant save.
+  // Apply a whole saved bundle onto the live pivot state.
   const applyPrefs = (p) => {
     const b = normalizeBundle(p);
     setRows(b.rows); setCols(b.cols); setValues(b.values); setFilters(b.filters);
     setValueMode(b.valueMode); setDataBars(b.dataBars); setSort(b.sort);
-    lastSyncedRef.current = JSON.stringify(b);
   };
 
+  // ── Per-ACCOUNT persistence (the setup sticks to the ACCOUNT, not the browser) ──
+  // The saved setup is one snapshot under the account, handled by the same hook every
+  // other settings page uses — so the pivot cannot drift from them, and the store in
+  // accountPrefs.js keeps the user's latest choice authoritative for the whole session
+  // (a remount can no longer re-apply a page-load snapshot over it).
+  //
+  // A persisted blob is UNTRUSTED input — localStorage is user-writable and pivot_prefs
+  // round-trips through the DB — so it is sanitised against the current FIELDS registry
+  // on the way in; a stale or malformed key can never wedge the pivot.
+  const pivotBundle = useMemo(
+    () => normalizeBundle({ rows, cols, values, filters, valueMode, dataBars, sort }),
+    [rows, cols, values, filters, valueMode, dataBars, sort]
+  );
+  useAccountPrefState(PIVOT_PREF_KEY, pivotBundle, (saved) => applyPrefs(sanitizePivotState(saved) || DEFAULT_BUNDLE));
+
   useEffect(() => { purgeLegacyPivotState(); }, []);   // drop the pre-fix shared key once
-
-  // Hydrate the CURRENT account's authoritative setup. Re-runs on account / profile
-  // change. The cross-device source of truth is the user's OWN profile row
-  // (profile.id === user.id). During a mid-session account switch the AuthContext may
-  // briefly still hold the PREVIOUS account's profile — we must NOT trust it, or one
-  // account's saved view would bleed into another. So we finalize (mark the scope
-  // hydrated → enable saving) ONLY once the matching profile has loaded; until then we
-  // show this account's local cache (or a clean default) as a non-persisted placeholder.
-  useEffect(() => {
-    if (authLoading) return;                 // wait until we know who (if anyone) is logged in
-    if (hydratedScope === scopeId) return;   // already finalized for this account
-
-    if (!user) {                             // anon → per-browser "anon" cache only
-      applyPrefs(loadPivotState("anon") || DEFAULT_BUNDLE);
-      setHydratedScope("anon");
-      return;
-    }
-    const ownProfile = profile && profile.id === user.id ? profile : null;
-    if (!ownProfile) {                       // this account's profile not loaded yet
-      applyPrefs(loadPivotState(user.id) || DEFAULT_BUNDLE);  // placeholder; do NOT finalize
-      return;
-    }
-    const dbPrefs = ownProfile.pivot_prefs ? sanitizePivotState(ownProfile.pivot_prefs) : null;
-    const localPrefs = loadPivotState(user.id);
-    applyPrefs(dbPrefs || localPrefs || DEFAULT_BUNDLE);  // sets the synced baseline
-    // Back-fill: the account has nothing saved yet but THIS device already has a setup
-    // (from before this fix / prior sessions) → push it so it reaches the user's OTHER
-    // devices without them redoing it. Clearing the baseline makes the save effect fire
-    // once; it's a one-off (pivot_prefs is non-null on the next load). A fresh device with
-    // no local setup keeps the DEFAULT baseline above and does NOT pollute the account.
-    if (!dbPrefs && localPrefs) lastSyncedRef.current = null;
-    setHydratedScope(scopeId);               // finalized → saving enabled for this account
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, scopeId, user, profile]);
-
-  // Persist to this account's localStorage cache on every real change, once hydrated.
-  // Keyed on the STABLE payloadSer (not the churning `user` ref).
-  useEffect(() => {
-    if (hydratedScope !== scopeId) return;
-    savePivotState(scopeId === "anon" ? null : scopeId, JSON.parse(payloadSer));
-  }, [payloadSer, hydratedScope, scopeId]);
-
-  // Persist to the ACCOUNT (debounced) so the same login shows the same setup on every
-  // device. Fires ONLY on a real change (payloadSer diverges from the synced baseline),
-  // and its deps are stable strings — so a re-render can never cancel the debounce.
-  useEffect(() => {
-    if (scopeId === "anon" || hydratedScope !== scopeId) return;
-    if (payloadSer === lastSyncedRef.current) return;   // unchanged / hydration echo → nothing to save
-    const toSave = payloadSer;
-    const t = setTimeout(() => {
-      // supabaseData reliably attaches the user's token (no getSession/lock dance), so
-      // auth.uid() always resolves and the row actually updates. Record the synced
-      // baseline only on SUCCESS — on failure we leave it so the next change retries,
-      // instead of silently losing the setup.
-      supabaseData.rpc("set_pivot_prefs", { p_prefs: JSON.parse(toSave) }).then(
-        ({ error }) => { if (error) console.warn("pivot prefs sync failed:", error.message); else lastSyncedRef.current = toSave; },
-        (e) => { console.warn("pivot prefs sync error:", e?.message || e); }
-      );
-    }, 600);
-    return () => clearTimeout(t);
-  }, [payloadSer, hydratedScope, scopeId]);
-
-  // Flush a pending change on UNMOUNT (navigating away from Analytics) so a quick
-  // change-then-leave isn't dropped from the account — the debounced write's timer is
-  // cleared on unmount before it fires. Only writes a real unsaved change.
-  const pivotFlushRef = useRef(null);
-  // Keep the ref current from an effect (not during render — react-hooks/refs),
-  // so the unmount-only flush below reads the latest committed values.
-  useEffect(() => { pivotFlushRef.current = { payloadSer, scopeId, hydratedScope }; });
-  useEffect(() => () => {
-    const f = pivotFlushRef.current;
-    if (!f || f.scopeId === "anon" || f.hydratedScope !== f.scopeId || f.payloadSer === lastSyncedRef.current) return;
-    lastSyncedRef.current = f.payloadSer;
-    supabaseData.rpc("set_pivot_prefs", { p_prefs: JSON.parse(f.payloadSer) }).then(() => {}, () => {});
-  }, []);
 
   // "Predvolené" → restore the opening layout. "Vyčistiť" → wipe rows/cols/values/
   // filters to a clean slate (no field-by-field removal). Both persist via the effect.
