@@ -136,8 +136,21 @@ const FIELDS = {
      These aren't per-record values but group-level calculations.
      `type: "measure"` → only valid in Values zone, single fixed agg.
      `measureCompute(records)` runs on the group's record set. */
+  /* ── WHAT "SOLD" MEANS HERE, AND WHY IT IS LABELLED ──────────────────────
+     The Pivot is a cube of what the developers' price lists SAY, flat by flat.
+     117 active projects delete a flat from their list when it sells, so those
+     flats have no row here at all and never will — "sold" in this tool can only
+     ever mean "currently carries a Predané label". That is a legitimate thing to
+     count, and it is not the same thing as a sale.
+
+     Actual sales — including every flat that simply vanished — live on
+     Analytics → Predaje, which reads the durable sale fact (analytics.sale_events).
+     So both measures below say ON THE LABEL that they count the price list, and
+     the two tools stop looking like they disagree with each other.
+     (integrity_check._LISTING_SOLD_IS_INTENDED records the same reasoning for the
+     views underneath.) */
   abs_rate: {
-    label: "Miera absorpcie", label_en: "Absorption rate",
+    label: "Miera absorpcie (v cenníku)", label_en: "Absorption rate (on the price list)",
     group: "measure", type: "measure", unit: "%", derived: true,
     // Accessor unused for measure types but kept for parity
     accessor: () => null,
@@ -177,7 +190,7 @@ const FIELDS = {
     },
   },
   sold_count: {
-    label: "Predaných",
+    label: "Predaných (v cenníku)", label_en: "Sold (on the price list)",
     group: "measure", type: "measure", unit: "", derived: true,
     accessor: () => null,
     measureCompute: (records) => {
@@ -218,7 +231,7 @@ const FIELD_LABEL_EN = {
   country: "Country", city: "City", cast: "District", sub_district: "Sub-district",
   import_status: "Project status",
   cena_na_m2_obytnej: "Price per m² (living)",
-  sold_count: "Sold", available_count: "Available",
+  sold_count: "Sold (on the price list)", available_count: "Available",
 };
 
 /** Field label in the active UI language. EN prefers an inline `label_en`, then
