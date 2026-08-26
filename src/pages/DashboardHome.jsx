@@ -77,8 +77,18 @@ const METRICS = {
   inventory:   { label: { sk: "Zásoba",         en: "Inventory"    }, hint: { sk: "pri aktuálnom tempe predaja", en: "at the current sales pace" }, fmt: "months", info: { sk: "Za koľko mesiacov by sa vypredali všetky voľné byty pri súčasnom tempe predaja (voľné byty ÷ mesačné tempo).", en: "How many months it would take to sell all available units at the current pace (available units ÷ monthly pace)." } },
 };
 // Metrics that support a month-over-month delta (derivable from project history).
-const MOM_METRICS = new Set(["available", "avg_m2", "reserved", "sold_total", "sold_through",
-                             "projects", "developers"]);
+// Which metrics carry a "▲ N vs last month" line. ONE gate for both the market
+// overview strip and the metric widget.
+//
+// 🔴 `projects` and `developers` are deliberately NOT here (Boss 2026-08-26).
+// Their month-on-month change measures OUR onboarding, not the market: a project
+// enters the count when we find it, and we add them in batches, so a month we
+// happened to onboard 96 projects reads as the market growing by 96. The counts
+// themselves are true; the delta beside them is an artefact of our own work, and
+// a number that looks like a market signal but is not one is worse than none.
+// Do not add them back without a way to date a project by when it started
+// selling rather than by when we started tracking it.
+const MOM_METRICS = new Set(["available", "avg_m2", "reserved", "sold_total", "sold_through"]);
 const fmtMetric = (key, val, lang) => {
   const f = METRICS[key]?.fmt;
   if (f === "m2") return fmtM2(val, lang);
