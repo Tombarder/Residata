@@ -216,24 +216,37 @@ export default function MapView({ lang = "en", setCurrent }) {
   const [fCity, setFCity] = useState("");
   const [fDistrict, setFDistrict] = useState("");
   const [fDeveloper, setFDeveloper] = useState("");
-  const [fStatus, setFStatus] = useState("all");   // all | available | sold
-  const [showSold, setShowSold] = useState(false);      // hide sold-out projects by DEFAULT
-  const [showNoPrice, setShowNoPrice] = useState(true); // show projects without a price by default
+  // ONE status control, and it is a true partition: available ∪ sold = all.
+  // (Boss 2026-08-26: the bar used to carry a three-way chip AND a "sold-out"
+  // checkbox. Because sold-out projects were hidden by default, "All" and
+  // "Available" selected exactly the same pins until you found the checkbox —
+  // two buttons doing the same thing, "Sold out" written twice, and code whose
+  // only job was keeping the two in sync. Now: one control, three mutually
+  // exclusive answers, nothing left to contradict.)
+  const [fStatus, setFStatus] = useState("available");  // available | sold | all
+  // The one genuinely different axis: does the developer publish a price at all?
+  // OFF by default — those projects are part of the market and belong on the map;
+  // ticking it narrows to the ones you can actually compare on price.
+  const [onlyPriced, setOnlyPriced] = useState(false);
   const [priceMin, setPriceMin] = useState("");
   const [priceMax, setPriceMax] = useState("");
 
   // Remember the Map filters per-account, across devices.
   useAccountPrefState(
     "mapFilters",
-    { query, fCity, fDistrict, fDeveloper, fStatus, showSold, showNoPrice, priceMin, priceMax },
+    { query, fCity, fDistrict, fDeveloper, fStatus, onlyPriced, priceMin, priceMax },
     (s) => {
       if (s.query !== undefined) setQuery(s.query);
       if (s.fCity !== undefined) setFCity(s.fCity);
       if (s.fDistrict !== undefined) setFDistrict(s.fDistrict);
       if (s.fDeveloper !== undefined) setFDeveloper(s.fDeveloper);
-      if (s.fStatus !== undefined) setFStatus(s.fStatus);
-      if (typeof s.showSold === "boolean") setShowSold(s.showSold);
-      if (typeof s.showNoPrice === "boolean") setShowNoPrice(s.showNoPrice);
+      // A bar saved in the old two-control shape still has to land somewhere
+      // sensible: its "all" meant "available" unless the sold-out box was on.
+      if (s.fStatus !== undefined) {
+        setFStatus(s.fStatus === "all" && s.showSold !== true ? "available" : s.fStatus);
+      }
+      if (typeof s.onlyPriced === "boolean") setOnlyPriced(s.onlyPriced);
+      else if (typeof s.showNoPrice === "boolean") setOnlyPriced(!s.showNoPrice);
       if (s.priceMin !== undefined) setPriceMin(s.priceMin);
       if (s.priceMax !== undefined) setPriceMax(s.priceMax);
     },
@@ -309,13 +322,12 @@ export default function MapView({ lang = "en", setCurrent }) {
       if (fDeveloper && p.developer !== fDeveloper) return false;
       const avail = Number(p.available_units) || 0;
       const ppm2v = Math.round(Number(p.avg_price_eur_m2) || 0);
-      // Default-hide sold-out projects (avail<=0) unless the toggle is on OR the
-      // user explicitly filters to "sold". Default-show no-price projects; hide
-      // them only when the toggle is turned off.
-      if (!showSold && avail <= 0 && fStatus !== "sold") return false;
-      if (!showNoPrice && ppm2v <= 0) return false;
-      if (fStatus === "available" && !(avail > 0)) return false;
+      // Status partitions the map — a project either still has something for
+      // sale or it does not, and "all" restricts nothing. No second control can
+      // disagree with it.
+      if (fStatus === "available" && avail <= 0) return false;
       if (fStatus === "sold" && avail > 0) return false;
+      if (onlyPriced && ppm2v <= 0) return false;
       if (priceActive) {
         const ppm2 = Math.round(Number(p.avg_price_eur_m2) || 0);
         if (ppm2 <= 0) return false;                       // unknown price can't be confirmed in-range
@@ -324,7 +336,7 @@ export default function MapView({ lang = "en", setCurrent }) {
       }
       return true;
     });
-  }, [projects, fCity, fDistrict, fDeveloper, fStatus, showSold, showNoPrice, priceMin, priceMax]);
+  }, [projects, fCity, fDistrict, fDeveloper, fStatus, onlyPriced, priceMin, priceMax]);
 
   // ── Name query narrows the dropdown-filtered set → what the map shows ──
   const q = norm(query);
@@ -346,7 +358,7 @@ export default function MapView({ lang = "en", setCurrent }) {
     return [...starts, ...contains].slice(0, 8);
   }, [dropdownFiltered, q]);
 
-  const anyFilter = !!(query || fCity || fDistrict || fDeveloper || fStatus !== "all" || showSold || !showNoPrice || priceMin !== "" || priceMax !== "");
+  const anyFilter = !!(query || fCity || fDistrict || fDeveloper || fStatus !== "available" || onlyPriced || priceMin !== "" || priceMax !== "");
 
   const fc = useMemo(() => buildFeatures(shown, coords || {}), [shown, coords]);
   useEffect(() => { featuresRef.current = fc; }, [fc]);
@@ -521,10 +533,10 @@ export default function MapView({ lang = "en", setCurrent }) {
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !readyRef.current) return;
-    const active = fCity || fDistrict || fDeveloper || fStatus !== "all" || showSold || !showNoPrice || priceMin !== "" || priceMax !== "";
+    const active = fCity || fDistrict || fDeveloper || fStatus !== "available" || onlyPriced || priceMin !== "" || priceMax !== "";
     if (!active) return;                          // "show all" is handled by the country/data fit
     if (featuresRef.current.features.length) fitToData(map, featuresRef.current, true);
-  }, [fCity, fDistrict, fDeveloper, fStatus, showSold, showNoPrice, priceMin, priceMax]);
+  }, [fCity, fDistrict, fDeveloper, fStatus, onlyPriced, priceMin, priceMax]);
 
   // ── Country switch: filters are country-scoped, so reset them ──
   // BUT not for the account-market value being restored on load (that would wipe the
@@ -535,7 +547,7 @@ export default function MapView({ lang = "en", setCurrent }) {
     if (firstCountry.current) { firstCountry.current = false; return; }
     if (!acctReady.current) return;   // ignore the initial account-market hydration
     setQuery(""); setFCity(""); setFDistrict(""); setFDeveloper("");
-    setFStatus("all"); setShowSold(false); setShowNoPrice(true); setPriceMin(""); setPriceMax(""); setShowSuggest(false); setActiveIdx(-1);
+    setFStatus("available"); setOnlyPriced(false); setPriceMin(""); setPriceMax(""); setShowSuggest(false); setActiveIdx(-1);
     // Drop any popup left open from the previous country's pins.
     if (popupRef.current) { popupRef.current.remove(); popupRef.current = null; }
   }, [country]);
@@ -579,7 +591,7 @@ export default function MapView({ lang = "en", setCurrent }) {
 
   function clearFilters() {
     setQuery(""); setFCity(""); setFDistrict(""); setFDeveloper("");
-    setFStatus("all"); setShowSold(false); setShowNoPrice(true); setPriceMin(""); setPriceMax(""); setShowSuggest(false); setActiveIdx(-1);
+    setFStatus("available"); setOnlyPriced(false); setPriceMin(""); setPriceMax(""); setShowSuggest(false); setActiveIdx(-1);
     if (popupRef.current) { popupRef.current.remove(); popupRef.current = null; }
     const map = mapRef.current;
     if (map && readyRef.current) {
@@ -704,35 +716,26 @@ export default function MapView({ lang = "en", setCurrent }) {
           <span style={{ color: dim, fontSize: "0.72rem", fontFamily: mono }}>€/m²</span>
         </div>
 
-        {/* Status chips */}
-        {/* The platform's segmented control (.rd-seg, styles/ui.css) — one grey track,
-            one raised pill. Was three separately outlined chips, a look this app now
-            has exactly one of. */}
+        {/* Status — the platform's segmented control (.rd-seg, styles/ui.css).
+            Three answers to ONE question, and they partition the map: a project
+            either still has something for sale or it doesn't. "Všetky" is the
+            union, so it is the only one that ever shows more than the others. */}
         <div className="rd-seg">
           {[
-            { k: "all", label: sk ? "Všetky" : "All" },
             { k: "available", label: sk ? "Voľné" : "Available" },
             { k: "sold", label: sk ? "Vypredané" : "Sold out" },
+            { k: "all", label: sk ? "Všetky" : "All" },
           ].map((s) => (
             <button key={s.k} className="rd-seg__btn" aria-pressed={fStatus === s.k} onClick={() => setFStatus(s.k)}>{s.label}</button>
           ))}
         </div>
 
-        {/* Visibility toggles — sold-out hidden by default, no-price shown by default */}
+        {/* A different question entirely: whether the developer publishes a price.
+            Worded as what ticking it DOES, so it cannot be read backwards the way
+            a ticked box labelled "No price" could. */}
         <label style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: "0.74rem", color: dim, cursor: "pointer", whiteSpace: "nowrap" }}>
-          <input
-            type="checkbox"
-            // Reflect the explicit "Sold out" status chip too, so the checkbox never
-            // reads "hidden" while the chip is forcing sold-only pins on screen.
-            checked={showSold || fStatus === "sold"}
-            onChange={(e) => { setShowSold(e.target.checked); if (!e.target.checked && fStatus === "sold") setFStatus("all"); }}
-            style={{ accentColor: green, cursor: "pointer" }}
-          />
-          {sk ? "Vypredané" : "Sold-out"}
-        </label>
-        <label style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: "0.74rem", color: dim, cursor: "pointer", whiteSpace: "nowrap" }}>
-          <input type="checkbox" checked={showNoPrice} onChange={(e) => setShowNoPrice(e.target.checked)} style={{ accentColor: green, cursor: "pointer" }} />
-          {sk ? "Bez cien" : "No price"}
+          <input type="checkbox" checked={onlyPriced} onChange={(e) => setOnlyPriced(e.target.checked)} style={{ accentColor: green, cursor: "pointer" }} />
+          {sk ? "Len so zverejnenou cenou" : "With published price only"}
         </label>
 
         {anyFilter && (
