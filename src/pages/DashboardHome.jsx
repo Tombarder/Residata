@@ -95,7 +95,7 @@ function developerAgg(projects, developer) {
     avail    += p.available_units || 0;
     sold     += p.sold_units || 0;
     tracked  += p.total_units || 0;
-    reserved += p.reserved_units || 0;
+    reserved += (p.reserved_units || 0) + (p.prereserved_units || 0);
     sold30   += p.sold_last_month || 0;
     if (p.avg_price_eur_m2) { const w = p.available_units || p.total_units || 1; wSum += p.avg_price_eur_m2 * w; wTot += w; }
   }
@@ -198,7 +198,7 @@ function scopeHistory(scope, snapshots, countryIds) {
     if (!a) { a = { available: 0, sold: 0, reserved: 0, wSum: 0, wTot: 0, projects: new Set(), developers: new Set() }; byMonth.set(m, a); }
     a.available += r.available_units || 0;
     a.sold += r.sold_units || 0;
-    a.reserved += r.reserved_units || 0;
+    a.reserved += (r.reserved_units || 0) + (r.prereserved_units || 0);
     // Counted the way the live cards count them: in the market that month only if it
     // actually had something for sale.
     if ((r.available_units || 0) > 0) { a.projects.add(r.project_id); if (r.developer) a.developers.add(r.developer); }
@@ -262,7 +262,7 @@ function aggregateProjects(list) {
   for (const p of list || []) {
     available += p.available_units || 0;
     sold      += p.sold_units || 0;
-    reserved  += p.reserved_units || 0;
+    reserved  += (p.reserved_units || 0) + (p.prereserved_units || 0);
     tracked   += p.total_units || 0;
     sold30    += p.sold_last_month || 0;
     if (p.developer && String(p.developer).trim()) devs.add(String(p.developer).trim());
@@ -289,7 +289,7 @@ function aggHistory(idSet, snapshots) {
     if (!a) { a = { available: 0, sold: 0, reserved: 0, wSum: 0, wTot: 0, projects: new Set(), developers: new Set() }; byMonth.set(m, a); }
     a.available += r.available_units || 0;
     a.sold += r.sold_units || 0;
-    a.reserved += r.reserved_units || 0;
+    a.reserved += (r.reserved_units || 0) + (r.prereserved_units || 0);
     if ((r.available_units || 0) > 0) { a.projects.add(r.project_id); if (r.developer) a.developers.add(r.developer); }
     if (r.avg_price_eur_m2) { const w = r.available_units || 1; a.wSum += r.avg_price_eur_m2 * w; a.wTot += w; }
   }
@@ -424,7 +424,7 @@ function useProjectHistory() {
     if (_historyCache.key === key && _historyCache.rows) { setRows(_historyCache.rows); return; }
     let cancelled = false;
     supabaseData.from("project_snapshots")
-      .select("project_id,snapshot_month,available_units,sold_units,reserved_units,avg_price_eur_m2,district,developer")
+      .select("project_id,snapshot_month,available_units,sold_units,reserved_units,prereserved_units,avg_price_eur_m2,district,developer")
       .order("snapshot_month", { ascending: true })
       .then(({ data, error }) => {
         if (cancelled) return;
@@ -1027,6 +1027,8 @@ const RANK_METRICS = {
     available:   { label: { sk: "Voľné byty", en: "Available" }, get: d => d.available_units, fmt: "count" },
     avg_m2:      { label: { sk: "Cena /m²", en: "Price /m²" }, get: d => d.avg_eur_m2, fmt: "m2" },
     sold_total:  { label: { sk: "Predané", en: "Sold" }, get: d => d.sold_units, fmt: "count" },
+    // district rows come from totals_by_district, whose reserved_units already sums
+    // reserved AND pre-reserved — unlike a projects_live row, which keeps them apart
     sold_through:{ label: { sk: "Vypredanosť", en: "Sold-through" }, get: d => { const den = (d.sold_units || 0) + (d.available_units || 0) + (d.reserved_units || 0); return den ? (d.sold_units || 0) / den * 100 : null; }, fmt: "pct" },
     projects:    { label: { sk: "Projekty", en: "Projects" }, get: d => d.project_count, fmt: "count" },
   },
@@ -1242,6 +1244,7 @@ function SegmentBody({ cfg, ctx, lang }) {
     { label: L(lang, "Voľné", "Available"), value: fmtCount(row.available_units, lang), accent: green },
     { label: L(lang, "Predané", "Sold"), value: fmtCount(row.sold_units, lang) },
     { label: `${moneySymbol()}/m²`, value: row.avg_eur_m2 ? Math.round(moneyFromEur(row.avg_eur_m2)).toLocaleString(localeTag(lang)) : "—" },
+    // reserved_units here already includes pre-reserved (totals_by_district sums both)
     { label: L(lang, "Rezerv.", "Reserved"), value: fmtCount(row.reserved_units, lang), accent: blue },
     { label: L(lang, "Projekty", "Projects"), value: fmtCount(row.project_count, lang) },
     { label: L(lang, "Spolu", "Total"), value: fmtCount(row.total_units, lang) },

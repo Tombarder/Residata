@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
-import { useProjects, useProjectFlats, useProjectSnapshots, useMarketTotals, useTotalsList } from "../lib/useData";
+import { useProjects, useProjectFlats, useProjectSnapshots, useMarketTotals, useTotalsList, useSales } from "../lib/useData";
 import { useAccountPrefState } from "../lib/useAccountUiPref";
 import { moneyFromEur, moneySymbol } from "../lib/money";
 import { localeTag } from "../lib/locale";
@@ -858,7 +858,9 @@ export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en
             )
         ) :
         <>
-          {project && <ProjectInsights project={project} flats={flats} snapshots={snapshots} lang={lang} onSelectFlat={onSelectFlat} />}
+          {project && <ProjectInsights project={project} flats={flats} snapshots={snapshots} lang={lang}
+                                     coverageMode={specificsData[projectId]?.coverage_mode ?? project.coverage_mode}
+                                     onSelectFlat={onSelectFlat} />}
           <FlatsTable flats={flats} t={t} lang={lang} highlightedFlatId={highlightedFlatId} />
         </>}
     </main>
@@ -943,7 +945,7 @@ function ProjectAggregateOnly({ project, lang, t, canVelocity }) {
    client-side from whatever flats / snapshots we already load — no
    extra backend work. Every chart is self-contained (no deps, just
    React + SVG) so bundle stays small. */
-function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
+function ProjectInsights({ project, flats, snapshots, lang, coverageMode, onSelectFlat }) {
   const locale = localeTag(lang);
   const fmtEur = (v) => v == null || !Number.isFinite(v) ? "—" : `${Math.round(moneyFromEur(v)).toLocaleString("en-US").replace(/,/g, " ")} ${moneySymbol()}`;
   const fmtPct = (v) => v == null || !Number.isFinite(v) ? "—" : `${(Math.round(v * 10) / 10).toFixed(1)}%`;
@@ -1000,9 +1002,47 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
   const roomRows = Object.values(byRoom)
     .filter(r => r.room !== "?" && r.total >= 2)
     .sort((a, b) => Number(a.room) - Number(b.room));
-  const fastestRoom = [...roomRows]
-    .filter(r => r.total >= 3)
-    .sort((a, b) => (b.sold / b.total) - (a.sold / a.total))[0];
+
+  // ── Fastest moving ────────────────────────────────────────────────────────
+  // `flats` is the developer's CURRENT price list. Where they label their sales it
+  // contains the sold flats and the sold-share per room type is right. Where they
+  // DELETE a flat when it sells it cannot: every room type reads 0 sold, and the card
+  // said "1-room · 0.0% sold" about a project that had sold 17 flats. For those we ask
+  // the sale fact instead (analytics.sale_events, grouped by room count), which knows
+  // the flats the price list no longer mentions. No double counting: the branch is on
+  // whether the listing publishes sold rows at all.
+  const publishesSold = flats.some(f => f.stav === "P");
+  const roomSalesSpec = useMemo(
+    () => (publishesSold || !project?.id ? null : {
+      mode: "breakdown", group_by: "izby", status: "sold", durable_only: true,
+      projects: [project.id],
+      // the whole tracked history, not the RPC's default recent window — this KPI is
+      // "how much of this room type has gone", not "how fast is it going right now"
+      date_from: "2000-01-01", date_to: "2999-12-31",
+    }),
+    [publishesSold, project?.id],
+  );
+  const roomSales = useSales({ enabled: !!roomSalesSpec, spec: roomSalesSpec });
+  const soldByRoom = useMemo(() => {
+    const m = {};
+    for (const r of (roomSales.data?.rows || [])) {
+      if (r.group == null) continue;
+      m[String(Number(r.group))] = Number(r.sold) || 0;
+    }
+    return m;
+  }, [roomSales.data]);
+
+  const fastestRoom = useMemo(() => {
+    const rows = roomRows.map(r => {
+      const extraSold = publishesSold ? 0 : (soldByRoom[r.room] || 0);
+      const sold = r.sold + extraSold;
+      return { ...r, sold, total: r.total + extraSold };
+    }).filter(r => r.total >= 3);
+    // Nothing has sold anywhere yet, or we are not entitled to the sale fact — then
+    // "fastest moving" has no answer, and "0.0% sold" is not one.
+    if (!rows.some(r => r.sold > 0)) return null;
+    return [...rows].sort((a, b) => (b.sold / b.total) - (a.sold / a.total))[0];
+  }, [roomRows, soldByRoom, publishesSold]);
 
   // ── KPI strip ─────────────────────────────────────────────────
   // Cards tagged isPriceKpi=true are filtered out when the developer
@@ -1055,7 +1095,9 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
     {
       label: L("Najrýchlejšie sa predáva", "Fastest moving"),
       value: fastestRoom ? `${fastestRoom.room}-${L("izb", "room")}` : "—",
-      sub: fastestRoom ? `${fmtPct((fastestRoom.sold / fastestRoom.total) * 100)} ${L("predané", "sold")}` : null,
+      sub: fastestRoom
+        ? `${fmtPct((fastestRoom.sold / fastestRoom.total) * 100)} ${L("predané", "sold")}`
+        : L("zatiaľ bez zaznamenaných predajov", "no sales recorded yet"),
       tint: "#f5a623",
       color: orangeInk,
     },
@@ -1085,6 +1127,18 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
       onClick: (largestAreaFlat && onSelectFlat) ? () => onSelectFlat(largestAreaFlat.id) : null,
     },
   ];
+
+  // How this developer announces a sale, said out loud under the two sales charts.
+  // A developer who deletes a sold flat publishes no "Predané" row ever, so a reader
+  // who does not know that reads a perfectly confident chart as "nothing has sold here".
+  // The number itself is right either way — it comes from the ledger — but where it
+  // comes from is part of the number.
+  const salesNote = coverageMode === "available_only" ? (
+    <div style={{ fontSize: "0.72rem", color: dim, marginTop: "0.6rem", lineHeight: 1.5, fontStyle: "italic" }}>
+      {L("Developer nezverejňuje predané byty — pri predaji byt z cenníka zmizne. Predaje tu rátame z týchto zmiznutí.",
+         "This developer doesn't publish sold flats — a flat disappears from the price list when it sells. The sales here are counted from those disappearances.")}
+    </div>
+  ) : null;
 
   return (
     <section style={{ marginBottom: "2rem" }}>
@@ -1172,12 +1226,14 @@ function ProjectInsights({ project, flats, snapshots, lang, onSelectFlat }) {
               `${projectSnaps.length} months · project composition`
             )}>
             <TimelineChart snaps={projectSnaps} lang={lang} />
+            {salesNote}
           </ChartCard>
         )}
         {projectSnaps.length >= 2 && (
           <ChartCard title={L("Tempo predaja", "Sales pace")}
             subtitle={L("predaných bytov za mesiac", "units sold per month")}>
             <TakeupChart snaps={projectSnaps} lang={lang} />
+            {salesNote}
           </ChartCard>
         )}
         {roomRows.length > 0 && (() => {
@@ -1376,12 +1432,18 @@ function TimelineChart({ snaps, lang }) {
   const svgRef = useRef(null);
   const [hover, setHover] = useState(null);
 
+  // RESERVED means reserved: R and PR together. Reading `reserved_units` alone dropped
+  // every PRE-reserved flat — 755 of them across 98 active projects, and at 53 of those
+  // it is the ONLY held status they use, so the chart drew "0 reserved" while the
+  // room-mix bars directly underneath (which do count both) showed them. Danubius: all
+  // 17 of its held flats are pre-reserved.
   const points = snaps.map((s) => ({
     month: s.snapshot_month,
     avail: s.available_units || 0,
-    res:   s.reserved_units  || 0,
+    res:   (s.reserved_units || 0) + (s.prereserved_units || 0),
     sold:  s.sold_units      || 0,
-    total: (s.available_units || 0) + (s.reserved_units || 0) + (s.sold_units || 0),
+    total: (s.available_units || 0) + (s.reserved_units || 0) + (s.prereserved_units || 0)
+           + (s.sold_units || 0),
   }));
 
   // Forward projection: extrapolate 3 months ahead based on velocity.
@@ -1726,6 +1788,11 @@ function TakeupChart({ snaps, lang }) {
   const svgRef = useRef(null);
   const [hover, setHover] = useState(null);
 
+  // sold_units is the LEDGER's cumulative count (see the migration
+  // 2026-08-26_sold_history_from_the_ledger_part3.sql), so it can only ever rise and a
+  // month-on-month difference is a real number of sales. It used to be the count of rows
+  // a developer still labelled "Predané": zero for ever at a developer who deletes them,
+  // and it could FALL when one tidied old sold rows away — Ponava City by 155 in a night.
   const deltas = [];
   for (let i = 1; i < snaps.length; i++) {
     const d = (snaps[i].sold_units || 0) - (snaps[i - 1].sold_units || 0);
