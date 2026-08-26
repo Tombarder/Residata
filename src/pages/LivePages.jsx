@@ -19,7 +19,7 @@ import UpgradePrompt from "../components/UpgradePrompt";
 import Picker from "../components/Picker";
 import PageHero from "../components/PageHero";
 import InfoTip from "../components/InfoTip";
-import { useSpecifics, SpecificsMark, SpecificsPanel } from "../lib/projectSpecifics";
+import { useSpecifics, SpecificsMark, SpecificsPanel, UnitPriceMarks } from "../lib/projectSpecifics";
 import PivotV2 from "./PivotV2";
 import MapFilterBuilder from "../components/MapFilterBuilder";
 import { applyFilters, describe, isComplete, pruneStale } from "../lib/mapFilters";
@@ -2641,6 +2641,10 @@ function median(arr) {
 }
 
 function FlatsTable({ flats, t, lang, highlightedFlatId }) {
+  // What each individual flat's price assumes. The project-level panel in the
+  // header covers the project; this covers the flats that differ from it.
+  const spec = useSpecifics(lang);
+  const unitMarks = (f) => spec.unit(f, f.project_id || f.project_name);
   const stavStyle = {
     V: { color: "var(--accent)", bg: "color-mix(in srgb, var(--accent) 8%, transparent)" },
     P: { color: orangeInk, bg: "rgba(245,166,35,0.08)" },
@@ -2943,6 +2947,12 @@ function FlatsTable({ flats, t, lang, highlightedFlatId }) {
                 <td style={{ ...compactTd, textAlign: "right", fontFamily: mono }}>
                   {f.cena_s_dph != null ? `${Math.round(moneyFromEur(f.cena_s_dph)).toLocaleString(locale)} ${moneySymbol()}` :
                     f.cena_s_dph_text ? <span style={{ color: dim }}>{f.cena_s_dph_text}</span> : "—"}
+                  {/* A flat can carry its OWN fit-out level inside an otherwise
+                      standard project (Sky Park Tower prices 84 furnished units
+                      that way), so the per-flat mark is not covered by the
+                      project panel above. Compact: this table has a fixed
+                      layout, so a word would be clipped mid-way. */}
+                  <UnitPriceMarks items={unitMarks(f)} lang={lang} compact />
                 </td>
                 <td style={{ ...compactTd, textAlign: "right", fontFamily: mono, color: dim }}>
                   {(f.cena_s_dph != null && f.obytna_plocha != null && Number(f.obytna_plocha) > 0)

@@ -124,6 +124,10 @@ const ALL_COLS = [
   { key: "stav",         sk: "Stav",         en: "Status",          type: "t" },
   { key: "orientacia",   sk: "Orient.",      en: "Orient.",         type: "t" },
   { key: "kolaudacia",   sk: "Kolaudácia",   en: "Completion",      type: "t" },
+  // What the price BUYS — the one field that decides whether a €/m² is
+  // comparable at all (v2/docs/FITOUT_LEVELS.md). Empty here means the unit
+  // inherits its project's level, not that nothing is known.
+  { key: "fitout_level", sk: "Štandard",     en: "Fit-out",         type: "t" },
 ];
 const COL_MAP = Object.fromEntries(ALL_COLS.map((c) => [c.key, c]));
 const DEFAULT_ORDER = ALL_COLS.map((c) => c.key);

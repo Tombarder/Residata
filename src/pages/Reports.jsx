@@ -739,6 +739,9 @@ function ProjectReport({ project, siblings, lang }) {
         project: project?.name, district: project?.district, izby: f.izby,
         area: f.obytna_plocha == null ? null : Number(f.obytna_plocha),
         price: f.cena_s_dph == null ? null : Number(f.cena_s_dph), m2: Math.round(m2),
+        // carry the unit's own fit-out level into the drill-down row (a project
+        // can sell shells and finished flats side by side — Žít Braník, PANORÁMA)
+        fitout_level: f.fitout_level ?? null,
       }))
       .sort((a, b) => a.m2 - b.m2)
   ), [flats, project]);

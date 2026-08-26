@@ -269,9 +269,10 @@ function specificLines(p, isEn) {
   return out;
 }
 
-/** The amber `*` after a project name, plus its explanation for the footnote. */
+/** The amber `*` after a project name. Language is irrelevant here — only
+ *  whether the project HAS anything unusual — so it asks in either one. */
 function specMark(p, amberHex) {
-  return specificLines(p, true).length ? `<span style="color:${amberHex};font-weight:700">*</span>` : "";
+  return specificLines(p, false).length ? `<span style="color:${amberHex};font-weight:700">*</span>` : "";
 }
 
 /* ─── Summarise (mirrors Reports.jsx summariseProjects) ─── */
@@ -357,15 +358,14 @@ function renderReportEmailHtml({ subscriberEmail, month, scope, scopeLabel, summ
 
   // One footnote naming only the specifics that actually appear above, so an
   // ordinary month's email carries no legend at all.
-  const isEnLegend = /^(Top sellers|Market)/.test(T.topSellersTitle);
   const legendSeen = [];
   for (const p of [...summary.topSellers, ...summary.soldOutWatch]) {
-    for (const line of specificLines(p, isEnLegend)) if (!legendSeen.includes(line)) legendSeen.push(line);
+    for (const line of specificLines(p, isEn)) if (!legendSeen.includes(line)) legendSeen.push(line);
   }
   const specNote = legendSeen.length
     ? `<p style="margin:14px 0 0;font-size:11px;line-height:1.6;color:${textDim}">`
       + `<span style="color:${orange};font-weight:700">*</span> `
-      + `${escHtml(isEnLegend ? "Project specifics" : "Špecifiká projektu")} — ${escHtml(legendSeen.join("; "))}.</p>`
+      + `${escHtml(isEn ? "Project specifics" : "Špecifiká projektu")} — ${escHtml(legendSeen.join("; "))}.</p>`
     : "";
 
   const topList = summary.topSellers.length

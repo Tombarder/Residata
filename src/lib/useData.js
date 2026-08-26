@@ -1872,6 +1872,8 @@ export async function fetchReportBinUnits({ country = null, scopeType = "market"
     area: r.area == null ? null : Number(r.area),
     price: r.price_s_dph_eur == null ? null : Number(r.price_s_dph_eur),
     m2: r.m2 == null ? null : Number(r.m2),
+    // what THIS flat's price buys — the drill-down marks it beside the €/m²
+    fitout_level: r.fitout_level ?? null,
   }));
 }
 

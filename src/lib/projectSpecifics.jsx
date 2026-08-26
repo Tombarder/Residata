@@ -362,10 +362,29 @@ export function SpecificsPanel({ items, lang }) {
  * pill. Both are `white-space: nowrap` and sit AFTER the number with no space
  * in front of the `*`, so a money column never gains a wrapped orphan.
  */
-export function UnitPriceMarks({ items, lang }) {
+export function UnitPriceMarks({ items, lang, compact = false }) {
   if (!items?.length) return null;
   const sched = items.find((i) => i.key === "financing");
   const fit = items.find((i) => i.key === "fitout");
+  // COMPACT — for a fixed-layout table whose cells truncate with an ellipsis
+  // (the unit database gives every column an equal 150 px, so in CZK a price
+  // plus the word "zariadený" is cut off mid-word). There the mark is one
+  // character, exactly like the project-level `*`: the words live in the
+  // tooltip and in the legend under the table, which names every level and
+  // schedule actually on screen. A mark that cannot be read is worse than a
+  // mark that points at its own explanation.
+  if (compact) {
+    const tip = items.map((i) => (i.note ? `${i.text} — ${i.note}` : i.text)).join("  ");
+    return (
+      <sup
+        title={tip}
+        style={{
+          marginLeft: "0.1em", color: "var(--accent-2)", cursor: "help",
+          fontSize: "0.78em", fontWeight: 700, lineHeight: 0,
+        }}
+      >*</sup>
+    );
+  }
   return (
     <>
       {sched ? (

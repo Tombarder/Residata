@@ -24,8 +24,7 @@ const DEFAULT_COLS = ["project_name", "city", "cast", "typ", "izby", "obytna_plo
 
 // design tokens — identical to PivotV2 so the two pages feel like one product
 import { accent as green, accentInk, orange, dim, border, bg, surfacePanel as panelHi, text } from "../lib/theme";
-import { usePriceSchedules, PriceBasisMark, priceBasisLegend,
-         useProjectFitout, FitoutMark, fitoutLegend } from "../lib/priceBasis";
+import { useSpecifics, UnitPriceMarks, specificsLegend } from "../lib/projectSpecifics";
 import { field } from "../lib/controls";
 const panel = "var(--surface-2)";
 const mono = "'JetBrains Mono', ui-monospace, Menlo, monospace";
@@ -111,8 +110,7 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
   const _money1 = moneyFromEur(1) || 1;
   const { dimensions, measures } = useAnalyticsRegistry();
   // Which projects price under a payment schedule rather than ordinary terms.
-  const priceSchedules = usePriceSchedules();
-  const projectFitout = useProjectFitout();
+  const marksFor = useSpecifics(lang);
 
   // unified field list (dedup dim/measure on key); keep label + type + format
   const fields = useMemo(() => {
@@ -230,7 +228,12 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
           : { min: r.min || null, max: r.max || null };
       }
     }
-    const s = { columns: cols, filters, mode, sort: [sort] };   // limit/offset managed by useUnitsInfinite
+    // Always fetch fitout_level even when the user isn't showing that column:
+    // the mark beside the price needs the UNIT's own level, and a project can
+    // price shells and finished flats side by side (PANORÁMA Košice sells 241
+    // shells and 19 finished, and carries no project-level answer at all).
+    const s = { columns: cols.includes("fitout_level") ? cols : [...cols, "fitout_level"],
+                filters, mode, sort: [sort] };   // limit/offset managed by useUnitsInfinite
     if (Object.keys(filters_not).length) s.filters_not = filters_not;
     if (Object.keys(ranges).length) s.ranges = ranges;
     return s;
@@ -260,13 +263,10 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
   // The legend names only the schedules a reader can actually see on screen.
   const legendNote = useMemo(() => {
     if (!cols.includes("cena_s_dph")) return "";
-    const seen = visible.map((r) => priceSchedules[r.project_name]).filter(Boolean);
-    // …and every fit-out level on screen, so a shell price is explained and not
-    // merely flagged. A unit states its own level when the developer does.
-    const levels = visible.map((r) => r.fitout_level || projectFitout[r.project_name]);
-    return [priceBasisLegend(seen, lang), fitoutLegend(levels, lang)]
-      .filter(Boolean).join("  ");
-  }, [visible, priceSchedules, projectFitout, cols, lang]);
+    // Every schedule AND every fit-out level actually on screen, explained once
+    // under the table by the same module that draws the marks.
+    return specificsLegend(visible.map((r) => marksFor.unit(r, r.project_id || r.project_name)), lang);
+  }, [visible, marksFor, cols, lang]);
   const padTop = startIdx * ROW_H;
   const padBottom = Math.max(0, (total - endIdx) * ROW_H);
 
@@ -399,13 +399,12 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
                         // A price that only holds under a payment schedule gets a
                         // one-character mark, so a right-aligned money column keeps
                         // its shape. The sentence lives in the tooltip and the legend.
-                        const basis = k === "cena_s_dph" ? priceSchedules[r.project_name] : null;
-                        // What the price BUYS. The unit's own level wins — Nová
-                        // Myslivna sells one Shell&Core unit inside a standard
-                        // project — and the project's answers for the rest.
-                        const level = k === "cena_s_dph"
-                          ? (r.fitout_level || projectFitout[r.project_name]) : null;
-                        return <td key={k} style={{ height: ROW_H, boxSizing: "border-box", padding: "0 0.7rem", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: numeric ? "right" : "left", borderTop: `1px solid var(--surface)`, color: k === sort.key ? text : "var(--text-2)", fontFamily: numeric ? mono : "inherit", fontVariantNumeric: "tabular-nums" }}>{fmtVal(k, r[k], fmtByKey)}<PriceBasisMark schedule={basis} lang={lang} /><FitoutMark level={level} lang={lang} /></td>;
+                        // What this price assumes: the payment schedule and what
+                        // it BUYS. The unit's own level wins over the project's —
+                        // Nová Myslivna sells one Shell&Core unit inside an
+                        // otherwise standard project.
+                        const marks = k === "cena_s_dph" ? marksFor.unit(r, r.project_id || r.project_name) : null;
+                        return <td key={k} style={{ height: ROW_H, boxSizing: "border-box", padding: "0 0.7rem", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: numeric ? "right" : "left", borderTop: `1px solid var(--surface)`, color: k === sort.key ? text : "var(--text-2)", fontFamily: numeric ? mono : "inherit", fontVariantNumeric: "tabular-nums" }}>{fmtVal(k, r[k], fmtByKey)}<UnitPriceMarks items={marks} lang={lang} compact /></td>;
                       })}
                     </tr>
                   );
