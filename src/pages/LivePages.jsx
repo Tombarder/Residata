@@ -19,6 +19,7 @@ import UpgradePrompt from "../components/UpgradePrompt";
 import Picker from "../components/Picker";
 import PageHero from "../components/PageHero";
 import InfoTip from "../components/InfoTip";
+import { useProjectSpecificsData, projectSpecifics, SpecificsMark, SpecificsPanel } from "../lib/projectSpecifics";
 import PivotV2 from "./PivotV2";
 import MapFilterBuilder from "../components/MapFilterBuilder";
 import { applyFilters, describe, isComplete, pruneStale } from "../lib/mapFilters";
@@ -121,6 +122,9 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
   useCurrency(); // subscribe: re-render €/m² columns on currency toggle
   const { can } = useCapabilities();
   const { projects: allProjects, loading } = useProjects();
+  // The three "project specifics" projects_live doesn't carry (payment schedule,
+  // coverage mode, whether we hold living areas) — one cached read for the page.
+  const specificsData = useProjectSpecificsData();
   // Partition projects by status — active goes in the main table, the rest
   // (sold_out / paused / archived) drops into an expandable "Historické"
   // section below so live market numbers aren't diluted. Rows without a
@@ -344,7 +348,7 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {clearRows.map(p => <ProjectRow key={p.id} p={p} t={t} lang={lang} setCurrent={setCurrent} canVelocity={can("view_sold_velocity")} />)}
+                  {clearRows.map(p => <ProjectRow key={p.id} p={p} t={t} lang={lang} setCurrent={setCurrent} canVelocity={can("view_sold_velocity")} specifics={projectSpecifics(p, specificsData[p.id], lang)} />)}
 
                   {clearRows.length === 0 && (
                     <tr>
@@ -565,7 +569,7 @@ function StatusBadge({ status, lang }) {
   );
 }
 
-function ProjectRow({ p, t, lang, setCurrent, canVelocity }) {
+function ProjectRow({ p, t, lang, setCurrent, canVelocity, specifics = [] }) {
   const soldDataUnavailable = (p.sold_units || 0) === 0 && (p.reserved_units || 0) === 0 && (p.prereserved_units || 0) === 0;
   // Detail is openable for any project that exists in the registry.
   // Even if total_units = 0 in the latest month (manual projects whose
@@ -612,13 +616,16 @@ function ProjectRow({ p, t, lang, setCurrent, canVelocity }) {
       style={{ borderTop: `1px solid ${border}`, cursor: clickable ? "pointer" : "default", transition: "background 0.12s" }}
     >
       <td style={td}>
+        {/* The specifics mark is INLINE and sits with no whitespace between it and
+            the name, so there is no line-break opportunity in front of it: a long
+            name wraps normally and the `*` always stays glued to its last word.
+            Its fixed-width slot renders on every row, marked or not, so the
+            Project column is exactly as wide either way. */}
         {clickable ? (
-          <span className="project-row-name" style={{ color: "var(--text)", fontWeight: 600 }}>
-            {p.name}
-          </span>
+          <span className="project-row-name" style={{ color: "var(--text)", fontWeight: 600 }}>{p.name}</span>
         ) : (
           <strong>{p.name}</strong>
-        )}
+        )}<SpecificsMark items={specifics} lang={lang} />
       </td>
       <td style={{ ...td, color: dim }}>{p.district || "—"}</td>
       <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{p.total_units}</td>
@@ -702,6 +709,10 @@ export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en
   // at module level so nav-ing between projects doesn't refetch.
   const { snapshots } = useProjectSnapshots();
   const project = projects.find(p => p.id === projectId);
+  // What is unusual about THIS project — payment schedule, fit-out level,
+  // whether the developer publishes sold units, whether we hold living areas.
+  const specificsData = useProjectSpecificsData();
+  const specifics = projectSpecifics(project, specificsData[projectId], lang);
 
   // Scatter-plot → table handoff: clicking a dot in AreaPriceScatter
   // scrolls the matching row into view and flashes it briefly. The ID
@@ -795,15 +806,24 @@ export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en
       <button onClick={() => onBack()} style={{ ...linkBtn, marginBottom: "1rem" }}>{t.back_to_projects}</button>
 
       <div style={{ position: "relative", overflow: "hidden", borderRadius: 16, border: "1px solid var(--border)", padding: "1.4rem 1.6rem 1.5rem", marginBottom: "2rem", background: "radial-gradient(120% 140% at 2% -20%, rgba(18,185,129,0.13) 0%, transparent 46%), linear-gradient(135deg, color-mix(in srgb, var(--accent) 5%, var(--surface)) 0%, var(--bg) 75%)" }}>
-                <Label>{[project?.city, project?.district].filter(Boolean).join(" · ") || "—"}</Label>
-        <h1 className="sec-title" style={{ margin: "0.25rem 0 0" }}>{project?.name || projectId}</h1>
-        <p className="sec-desc" style={{ marginBottom: 0 }}>
-          {project ? `${project.total_units} ${t.tbl_units.toLowerCase()} · ${project.available_units} ${t.tbl_available.toLowerCase()} · ${project.sold_percentage ?? "?"}% ${t.tbl_sold.toLowerCase()}` : ""}
-          {!can("view_historical_data") && <span style={{ display: "block", marginTop: "0.5rem", color: dim, fontSize: "0.85rem" }}>
-            {t.snapshot_notice}{" "}
-            <button onClick={() => setCurrent && setCurrent("Pricing")} style={linkBtn}>{t.paid_tier}</button>.
-          </span>}
-        </p>
+        {/* Title block and specifics panel are flex siblings, both allowed to
+            shrink. On a narrow card the panel wraps onto its own full-width
+            line under the title — it can never overlap the project name, and
+            `flex-basis: clamp(...)` stops it stretching on a wide screen. */}
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", gap: "1rem 1.5rem" }}>
+          <div style={{ flex: "1 1 320px", minWidth: 0 }}>
+            <Label>{[project?.city, project?.district].filter(Boolean).join(" · ") || "—"}</Label>
+            <h1 className="sec-title" style={{ margin: "0.25rem 0 0" }}>{project?.name || projectId}</h1>
+            <p className="sec-desc" style={{ marginBottom: 0 }}>
+              {project ? `${project.total_units} ${t.tbl_units.toLowerCase()} · ${project.available_units} ${t.tbl_available.toLowerCase()} · ${project.sold_percentage ?? "?"}% ${t.tbl_sold.toLowerCase()}` : ""}
+              {!can("view_historical_data") && <span style={{ display: "block", marginTop: "0.5rem", color: dim, fontSize: "0.85rem" }}>
+                {t.snapshot_notice}{" "}
+                <button onClick={() => setCurrent && setCurrent("Pricing")} style={linkBtn}>{t.paid_tier}</button>.
+              </span>}
+            </p>
+          </div>
+          <SpecificsPanel items={specifics} lang={lang} />
+        </div>
       </div>
 
       {loading ? <div style={{ color: dim }}>{t.loading_generic}</div> :
