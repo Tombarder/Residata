@@ -815,7 +815,17 @@ export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en
             <Label>{[project?.city, project?.district].filter(Boolean).join(" · ") || "—"}</Label>
             <h1 className="sec-title" style={{ margin: "0.25rem 0 0" }}>{project?.name || projectId}</h1>
             <p className="sec-desc" style={{ marginBottom: 0 }}>
-              {project ? `${project.total_units} ${t.tbl_units.toLowerCase()} · ${project.available_units} ${t.tbl_available.toLowerCase()} · ${project.sold_percentage ?? "?"}% ${t.tbl_sold.toLowerCase()}` : ""}
+              {/* sold_percentage is (sold + reserved + pre-reserved) / offered — flats that
+                  are GONE, not flats that are sold. Calling it "sold" put 23.3 % three
+                  inches from a chart correctly saying 12 % sold, on the same screen, about
+                  the same project. It says what it counts now, and the hover spells it out. */}
+              {project ? (
+                <span title={lang === "sk"
+                  ? `Obsadené = predané + rezervované + predrezervované z ponuky. Z ${project.total_units} bytov: ${project.sold_units ?? 0} predaných, ${(project.reserved_units || 0) + (project.prereserved_units || 0)} rezervovaných.`
+                  : `Taken = sold + reserved + pre-reserved, out of what is offered. Of ${project.total_units} flats: ${project.sold_units ?? 0} sold, ${(project.reserved_units || 0) + (project.prereserved_units || 0)} reserved.`}>
+                  {`${project.total_units} ${t.tbl_units.toLowerCase()} · ${project.available_units} ${t.tbl_available.toLowerCase()} · ${project.sold_percentage ?? "?"}% ${lang === "sk" ? "obsadené" : "taken"}`}
+                </span>
+              ) : ""}
               {!can("view_historical_data") && <span style={{ display: "block", marginTop: "0.5rem", color: dim, fontSize: "0.85rem" }}>
                 {t.snapshot_notice}{" "}
                 <button onClick={() => setCurrent && setCurrent("Pricing")} style={linkBtn}>{t.paid_tier}</button>.
@@ -881,7 +891,11 @@ function ProjectAggregateOnly({ project, lang, t, canVelocity }) {
   const fmt = (n) => n == null ? "—" : Number(n).toLocaleString(locale);
   const eurM2 = project.avg_price_eur_m2 ? Math.round(moneyFromEur(project.avg_price_eur_m2)) : null;
   const soldPct = project.sold_percentage != null ? `${project.sold_percentage}%` : null;
-  const soldDataMissing = (project.sold_units || 0) === 0 && (project.reserved_units || 0) === 0;
+  // pre-reserved counts as held inventory here too — a project with 5 PR flats and no
+  // R ones has plenty of sold/held data, and claiming "developer doesn't publish" would
+  // be wrong. Same omission the trajectory chart had.
+  const soldDataMissing = (project.sold_units || 0) === 0
+    && (project.reserved_units || 0) === 0 && (project.prereserved_units || 0) === 0;
 
   const kpis = [
     { label: lang === "sk" ? "Bytov spolu" : "Total units",  value: fmt(project.total_units), accent: "var(--text)" },
