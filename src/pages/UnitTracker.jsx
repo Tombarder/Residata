@@ -45,7 +45,7 @@ import { track } from "../lib/track";
 import { localeTag } from "../lib/locale";
 import { moneyFromEur, moneySymbol } from "../lib/money";
 import { useCurrency } from "../lib/useCurrency";
-import { FitoutMark } from "../lib/priceBasis";
+import { useSpecifics, UnitPriceMarks } from "../lib/projectSpecifics";
 
 const mono   = "'JetBrains Mono', monospace";
 import { accent as green, accentInk, orange, dim, text, border, bg, surfaceDark as bg2, surfacePanel as panel , orangeInk} from "../lib/theme";
@@ -646,6 +646,10 @@ function DetailView({ pickedHistories, comparables, loadingDetail, yMode, setYMo
 // ── KPI strip ───────────────────────────────────────────────────
 
 function KpiStrip({ lifecycle, primary, onProjectClick, lang }) {
+  // What THIS flat's price assumes — its own fit-out level, and the project's
+  // payment schedule if it has one.
+  const spec = useSpecifics(lang);
+  const pk = lifecycle?.last?.project_id || lifecycle?.last?.project_name;
   const items = [
     {
       label: lang === "sk" ? "Prvýkrát videný" : "First seen",
@@ -660,7 +664,7 @@ function KpiStrip({ lifecycle, primary, onProjectClick, lang }) {
       value: (
         <>
           {formatPrice(lifecycle.last.cena_s_dph)}
-          <FitoutMark level={lifecycle.last.fitout_level} lang={lang} />
+          <UnitPriceMarks items={spec.unit(lifecycle.last, pk)} lang={lang} />
         </>
       ),
       sub: lifecycle.last.obytna_plocha && lifecycle.last.cena_s_dph
@@ -680,7 +684,7 @@ function KpiStrip({ lifecycle, primary, onProjectClick, lang }) {
       sub: (
         <>
           {formatPrice(lifecycle.sold.cena_s_dph)}
-          <FitoutMark level={lifecycle.sold.fitout_level} lang={lang} />
+          <UnitPriceMarks items={spec.unit(lifecycle.sold, pk)} lang={lang} />
         </>
       ),
       color: red,
@@ -1573,7 +1577,7 @@ function EmptyState({ lang, canFull, archiveMonths }) {
 
 function ExportRow({ pickedHistories, lang }) {
   const downloadCsv = () => {
-    const head = ["project_id", "project_name", "unit_id", "batch_timestamp", "snapshot_month", "batch_id", "stav", "cena_s_dph", "cena_bez_dph", "obytna_plocha", "izby", "developer", "district"];
+    const head = ["project_id", "project_name", "unit_id", "batch_timestamp", "snapshot_month", "batch_id", "stav", "cena_s_dph", "cena_bez_dph", "obytna_plocha", "izby", "developer", "district", "fitout_level"];
     const out = [head.join(",")];
     for (const h of pickedHistories) {
       for (const r of h.rows) {
@@ -1584,6 +1588,7 @@ function ExportRow({ pickedHistories, lang }) {
           r.cena_s_dph || "", r.cena_bez_dph || "",
           r.obytna_plocha || "", r.izby || "",
           JSON.stringify(r.developer || ""), JSON.stringify(r.district || ""),
+          r.fitout_level || "",
         ].join(","));
       }
     }

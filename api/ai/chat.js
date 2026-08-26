@@ -240,13 +240,26 @@ function buildRanges(a, { withFloor = false, withArea = false } = {}) {
   }
   return r;
 }
+/* What a project's price ASSUMES — the same four specifics the platform marks on
+ * screen (src/lib/projectSpecifics.jsx). Without these the assistant will quote a
+ * bare-shell €/m² as though it were comparable with a finished flat's. Only the
+ * unusual values are attached, so an ordinary project costs no tokens. */
+function projectSpecifics(p) {
+  const out = {};
+  if (p.fitout_level && p.fitout_level !== "standard") out.price_buys = p.fitout_level;
+  if (p.price_schedule && p.price_schedule !== "20/80") out.payment_schedule = p.price_schedule;
+  if (p.coverage_mode === "available_only") out.listing_shows = "available units only";
+  if (p.has_interior_area === false) out.living_area_published = false;
+  return out;
+}
+
 const num = (v) => (v == null ? null : Number(v));
 const round = (v) => (v == null ? null : Math.round(Number(v)));
 
 async function toolMarketOverview(admin) {
   const { data, error } = await admin
     .from("projects")
-    .select("name, country, city, district, developer, status, total_units, available_units, sold_units, reserved_units, sold_last_month, avg_price_eur_m2")
+    .select("name, country, city, district, developer, status, total_units, available_units, sold_units, reserved_units, sold_last_month, avg_price_eur_m2, fitout_level, price_schedule, coverage_mode, has_interior_area")
     .limit(400);
   if (error) throw new Error(error.message);
   const all = (data || []).filter((p) => (p.status || "active") === "active");
@@ -265,7 +278,7 @@ async function toolMarketOverview(admin) {
   }));
   const top_sellers_30d = [...all].filter((p) => (p.sold_last_month || 0) > 0)
     .sort((a, b) => (b.sold_last_month || 0) - (a.sold_last_month || 0)).slice(0, 10)
-    .map((p) => ({ project: p.name, country: p.country, city: p.city, district: p.district, sold_last_30d: p.sold_last_month, avg_eur_per_m2: round(p.avg_price_eur_m2) }));
+    .map((p) => ({ project: p.name, country: p.country, city: p.city, district: p.district, sold_last_30d: p.sold_last_month, avg_eur_per_m2: round(p.avg_price_eur_m2), ...projectSpecifics(p) }));
   const byDev = {};
   for (const p of all) { if (!p.developer) continue; const d = (byDev[p.developer] ||= { developer: p.developer, projects: 0, units: 0, sold_30d: 0 }); d.projects++; d.units += p.total_units || 0; d.sold_30d += p.sold_last_month || 0; }
   const top_developers = Object.values(byDev).sort((a, b) => b.units - a.units).slice(0, 10);
@@ -300,7 +313,7 @@ async function toolSearchApartments(admin, a, allowHistorical) {
   const status = a.status || "available";
   const reqLimit = Math.min(Math.max(a.limit || 50, 1), 100);
   const spec = {
-    columns: ["project_name", "unit_id", "city", "cast", "izby", "poschodie", "obytna_plocha", "cena_s_dph", "price_per_m2", "stav"],
+    columns: ["project_name", "unit_id", "city", "cast", "izby", "poschodie", "obytna_plocha", "cena_s_dph", "price_per_m2", "stav", "fitout_level"],
     filters: buildFilters({ ...a, status }),
     ranges: buildRanges(a, { withFloor: true, withArea: true }),
     sort: [{ key: sortMap[a.sort || "price"], dir: a.order === "desc" ? "desc" : "asc" }],
@@ -310,6 +323,11 @@ async function toolSearchApartments(admin, a, allowHistorical) {
   const { data, error } = await admin.rpc("analytics_units", { p_spec: spec });
   if (error) throw new Error(error.message);
   const STATUS_LABEL = { V: "available", P: "sold", R: "reserved", PR: "pre-reserved" };
+  // A "cheapest 3-room" that turns out to be a bare shell is the classic wrong
+  // answer, so each unit carries what its own price buys and its project's
+  // payment schedule. One small read, cached per invocation.
+  const { data: pdata } = await admin.from("projects").select("name, fitout_level, price_schedule").limit(1000);
+  const byProject = new Map((pdata || []).map((p) => [p.name, p]));
   const raw = (data && data.rows) || [];
   const has_more = raw.length > reqLimit; // engine fetched limit+1 to signal a next page
   const rows = raw.slice(0, reqLimit).map((r) => ({
@@ -318,6 +336,14 @@ async function toolSearchApartments(admin, a, allowHistorical) {
     floor: r.poschodie, area_m2: num(r.obytna_plocha),
     price_eur: round(r.cena_s_dph), eur_per_m2: round(r.price_per_m2),
     status: STATUS_LABEL[r.stav] || r.stav,
+    ...(() => {
+      const p = byProject.get(r.project_name) || {};
+      const level = r.fitout_level || p.fitout_level;
+      const out = {};
+      if (level && level !== "standard") out.price_buys = level;
+      if (p.price_schedule && p.price_schedule !== "20/80") out.payment_schedule = p.price_schedule;
+      return out;
+    })(),
   }));
   return { mode, count: rows.length, has_more, apartments: rows };
 }
@@ -370,6 +396,7 @@ function systemPrompt(lang, allowHistorical) {
     "Metrics: €/m² = price (incl. VAT) ÷ LIVING area — the cleanest cross-project comparison; always judge a project's €/m² against its city/district peers, not the whole market. Price (cena s DPH) = what the buyer actually pays, VAT included (SK 23%, CZ 21%) — the headline price. Availability = units on the market now; high availability can mean a fresh/large launch OR slow absorption — pair it with velocity and completion, never assume. Completion (kolaudácia): sooner = less wait/risk; far-out = more uncertainty + usually staged pricing. Floor / orientation / view drive price WITHIN a project (top floors + good orientation carry a premium).",
     "Geography: every unit is tagged country + city + district. Always say where a project is; default across all covered markets unless asked for one; never merge same-named districts across countries.",
     "No-price projects: some developers don't publish prices — that's 'price on request', NOT sold.",
+    "PROJECT SPECIFICS — a price only means something with what it assumes. Some rows carry extra fields, and when they do you MUST say so beside the number, never silently compare it: price_buys='holobyt' means the price is for a BARE SHELL (no floors, tiles, interior doors or sanitary ware) so it is NOT comparable with finished flats and sits well below them; price_buys='plne_zariadeny' means fully furnished, above the developer's standard, so it sits above them; payment_schedule (e.g. '90/10') means the price only holds under that instalment plan and is the cheapest way to buy, so it undercuts neighbours quoting ordinary terms; listing_shows='available units only' means the developer publishes no sold units, so that project's sell-through and velocity are measured only from when we began tracking it and read LOW; living_area_published=false means no €/m² exists for that project. A project without these fields is the ordinary case and needs no caveat.",
     "Never invent or back-calculate a number you don't have. If a figure isn't in the data, say so in one sentence — don't pass an estimate off as ours.",
     "",
     "## 5. Be an advisor, not a lookup",

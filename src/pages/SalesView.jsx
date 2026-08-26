@@ -28,6 +28,7 @@ import Kpi from "../components/Kpi";
 import DateField from "../components/DateField";
 import CountrySwitcher from "../components/CountrySwitcher";
 import { text } from "../lib/theme";
+import { useSpecifics, SpecificsMark, UnitPriceMarks } from "../lib/projectSpecifics";
 
 const DETAIL_LIMIT = 500; // page size for the detail table; the RPC returns +1 as a has-more sentinel
 const PERIODS = [[30, "30 dní", "30 days"], [45, "45 dní", "45 days"], [60, "60 dní", "60 days"], [90, "90 dní", "90 days"]];
@@ -155,6 +156,7 @@ export default function SalesView({ lang = "sk" }) {
   const [fDev, setFDev] = useState("");
   const [fTyp, setFTyp] = useState("");
   const [groupBy, setGroupBy] = useState("city");
+  const spec = useSpecifics(lang);
   const [sort, setSort] = useState({ key: "sold_date", dir: "desc" });
   // Per-column filters on the detail table. Shape per column: "cat" → string value;
   // "num" → { min, max } (display-currency strings for money cols); "date" → { from, to }.
@@ -489,7 +491,9 @@ export default function SalesView({ lang = "sk" }) {
               {!brk.loading && brkRows.length === 0 && <tr><td className="rd-td--empty" colSpan={5}>{isPipe ? t("Žiadne jednotky pre tento výber.", "No units for this selection.") : t("Žiadne predaje pre tento výber.", "No sales for this selection.")}</td></tr>}
               {brkRows.map((r, i) => (
                 <tr key={String(r.group) + i}>
-                  <td className="rd-td--key">{r.group ?? "—"}</td>
+                  <td className="rd-td--key">{r.group ?? "—"}
+                    {groupBy === "project_name" ? <SpecificsMark items={spec.project(r.group)} lang={lang} /> : null}
+                  </td>
                   {/* the count doubles as a bar, so the biggest groups are visible at a glance */}
                   <td className="num" style={{ color: "var(--text)", minWidth: 96 }}>
                     {Number(r.sold).toLocaleString("sk-SK")}
@@ -612,6 +616,9 @@ export default function SalesView({ lang = "sk" }) {
                     }
                     const isKey = c[0] === "project_name";
                     return <td key={c[0]} className={[numeric ? "num" : "", isKey ? "rd-td--key" : ""].filter(Boolean).join(" ") || undefined}>
+                      {/* project cell → the project mark; the EUR/m2 cell → what THIS
+                          price assumes. Both sit after the value with no break
+                          opportunity in front, so neither column can gain an orphan. */}
                       {c[0] === "days_on_market"
                         ? (r.days_on_market == null
                             ? <span title={t("Skutočný čas na trhu zatiaľ nevieme", "True days-on-market not known yet")} style={{ color: "var(--text-faint)" }}>—</span>
@@ -619,6 +626,8 @@ export default function SalesView({ lang = "sk" }) {
                               ? <span title={t("Merané od prvého zachytenia — byt bol v ponuke už keď sme začali sledovať, skutočný čas môže byť dlhší", "Measured from first sight — the unit was already listed when tracking began, so the true figure may be longer")}>≥ {Math.round(r.days_on_market)}</span>
                               : fmtCell(c[3], r.days_on_market, lang))
                         : fmtCell(c[3], r[c[0]], lang)}
+                      {isKey ? <SpecificsMark items={spec.project(r.project_id || r.project_name)} lang={lang} /> : null}
+                      {c[0] === "price_per_m2_eur" ? <UnitPriceMarks items={spec.unit(r, r.project_id || r.project_name)} lang={lang} /> : null}
                     </td>;
                   })}
                 </tr>

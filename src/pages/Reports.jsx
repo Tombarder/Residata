@@ -27,7 +27,8 @@
  * analysis — no LLM calls, no ai_usage_log writes.
  */
 import { useState, useMemo, useEffect } from "react";
-import { usePriceSchedules, PriceBasisMark, useProjectFitout, FitoutMark } from "../lib/priceBasis";
+import { useSpecifics, useProjectSpecificsData, SpecificsMark, SpecificsPanel,
+         UnitPriceMarks, AggregateSpecificsNote } from "../lib/projectSpecifics";
 import { useProjects, useProjectSnapshots, useReportHistogram, fetchReportBinUnits, useReportProjectUnits, useReportComparables } from "../lib/useData";
 import LoadError from "../components/LoadError";
 import Picker from "../components/Picker";
@@ -69,9 +70,6 @@ const SCOPES = [
 export default function PlatformReports({ lang = "sk" }) {
   useCurrency(); // subscribe: re-render every report price/€/m² on currency toggle
   const { projects: allProjects, loading: loadingProjects } = useProjects();
-  // Projects whose price assumes a payment schedule rather than ordinary terms.
-  const priceSchedules = usePriceSchedules();
-  const projectFitout = useProjectFitout();
 
   // Active subset — used for every "current market" aggregate (Market /
   // City / District / Developer scopes). Headline numbers must match
@@ -381,6 +379,7 @@ export default function PlatformReports({ lang = "sk" }) {
 
 /* ─── Header card: title + month + print + scope-aware subtitle ─── */
 function ReportHeader({ projects, lang, scope, scopeLabel }) {
+  const specData = useProjectSpecificsData();
   const month = new Date().toLocaleDateString(localeTag(lang), { month: "long", year: "numeric" });
   // "Data as of" = the MOST RECENT scrape across the scope's projects (projects[0] is just
   // the highest-availability project, an arbitrary date). Fallback uses the LOCAL calendar
@@ -415,7 +414,7 @@ function ReportHeader({ projects, lang, scope, scopeLabel }) {
         </div>
         <div className="no-print" style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
           <SubscribeButton scope={scope} scopeLabel={scopeLabel} lang={lang} />
-          <button onClick={() => downloadScopeCSV(projects, lang)}
+          <button onClick={() => downloadScopeCSV(projects, lang, specData)}
             style={{
               background: "transparent", color: accentInk, border: `1px solid color-mix(in srgb, var(--accent) 33%, transparent)`,
               borderRadius: 4, padding: "0.5rem 0.9rem", fontFamily: mono,
@@ -569,6 +568,7 @@ function PickerRow({ label, value, options, onChange }) {
    Market report — global, "where the Slovak new-build market stands"
    ══════════════════════════════════════════════════════════════════ */
 function MarketReport({ projects, onOpenProject, lang }) {
+  const specData = useProjectSpecificsData();
   const { snapshots } = useProjectSnapshots();
   const { country } = useCountry();
   const { bins: priceSeries } = useReportHistogram({ scopeType: "market", nbins: 12 });
@@ -601,6 +601,7 @@ function MarketReport({ projects, onOpenProject, lang }) {
             mislabeled "most expensive". Pick the highest-€/m² NAMED district (skip
             the "(neznáme)"/"(unknown)" no-district bucket); the full table below
             still lists every bucket honestly. */}
+        <AggregateSpecificsNote projects={projects} data={specData} lang={lang} style={{ margin: "0 0 0.9rem" }} />
         <ExecSummary summary={summary} lang={lang} extraDistrict={
           [...districts]
             .filter(d => d.name !== "(neznáme)" && d.name !== "(unknown)" && d.wavgM2 != null)
@@ -641,6 +642,7 @@ function MarketReport({ projects, onOpenProject, lang }) {
           `projects` + `flats` are already filtered to that slice.
    ══════════════════════════════════════════════════════════════════ */
 function FilteredReport({ scopeLabel, scopeType, rpcScopeType, rpcScopeValue, projects, allProjects, onOpenProject, lang, breakdownBy, breakdownLabel }) {
+  const specData = useProjectSpecificsData();
   const { snapshots } = useProjectSnapshots();
   const { country } = useCountry();
   const { bins: priceSeries } = useReportHistogram({ scopeType: rpcScopeType, scopeValue: rpcScopeValue, nbins: 12 });
@@ -665,6 +667,7 @@ function FilteredReport({ scopeLabel, scopeType, rpcScopeType, rpcScopeValue, pr
       <KpiStrip summary={summary} lang={lang} />
 
       <ReportSection label={scopeType} title={title}>
+        <AggregateSpecificsNote projects={projects} data={specData} lang={lang} style={{ margin: "0 0 0.9rem" }} />
         <ExecSummary summary={summary} lang={lang} compared={{ label: lang === "sk" ? "trh" : "market", summary: globalSummary }} />
       </ReportSection>
 
@@ -703,6 +706,8 @@ function FilteredReport({ scopeLabel, scopeType, rpcScopeType, rpcScopeValue, pr
    Project report — single-project deep dive.
    ══════════════════════════════════════════════════════════════════ */
 function ProjectReport({ project, siblings, lang }) {
+  const spec = useSpecifics(lang);
+  const specData = useProjectSpecificsData();
   // Hoist all hooks before any early return to keep hook ordering stable
   // across renders (rules-of-hooks).
   const { snapshots } = useProjectSnapshots();
@@ -752,6 +757,12 @@ function ProjectReport({ project, siblings, lang }) {
       ]} />
 
       <ReportSection label={lang === "sk" ? "Profil projektu" : "Project profile"} title={title}>
+        {/* What this project's prices assume, before a single number is read.
+            The panel wraps under the prose on a narrow page and never
+            stretches past its clamp on a wide one. */}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem 1.5rem", alignItems: "flex-start", marginBottom: "0.9rem" }}>
+          <SpecificsPanel items={spec.project(project)} lang={lang} />
+        </div>
         <p style={{ color: "var(--text-2)", lineHeight: 1.7, margin: 0 }}>
           {lang === "sk" ? (
             <><strong style={{ color: text }}>{project.name}</strong> od developera <strong style={{ color: text }}>{project.developer || "—"}</strong> v časti <strong style={{ color: text }}>{project.district || "—"}</strong>.
@@ -795,6 +806,7 @@ function ProjectReport({ project, siblings, lang }) {
 
       <ReportSection label={lang === "sk" ? "Benchmark" : "Benchmark"} title={lang === "sk" ? `Projekt vs. časť mesta (${project.district || "—"})` : `Project vs. its district (${project.district || "—"})`}>
         <BenchmarkCard local={summary} global={districtSummary} scopeLabel={project.name} lang={lang} />
+        <AggregateSpecificsNote projects={districtSiblings} data={specData} lang={lang} />
       </ReportSection>
 
       {snapshots && snapshots.length > 0 && (
@@ -995,6 +1007,7 @@ function Histogram({ bins, lang, unit, onFetchBin, onProjectClick }) {
  * ProjectTable uses), so the user can jump to the Project scope.
  */
 function HistogramDrilldown({ bin, rows, loading, unit, lang, onClose, onProjectClick }) {
+  const spec = useSpecifics(lang);
   if (!bin) return null;
   const clickable = typeof onProjectClick === "function";
   const fmtEur = (v) => v == null ? "—" : Math.round(moneyFromEur(v)).toLocaleString(localeTag(lang));
@@ -1056,7 +1069,7 @@ function HistogramDrilldown({ bin, rows, loading, unit, lang, onClose, onProject
                   <td style={tdcR}>{r.izby ?? "—"}</td>
                   <td style={tdcR}>{r.area ? r.area.toFixed(1) : "—"}</td>
                   <td style={tdcR}>{fmtEur(r.price)}</td>
-                  <td style={{ ...tdcR, color: accentInk, fontWeight: 700 }}>{fmtEur(r.m2)}</td>
+                  <td style={{ ...tdcR, color: accentInk, fontWeight: 700 }}>{fmtEur(r.m2)}<UnitPriceMarks items={spec.unit(r, r.projectId || r.project)} lang={lang} /></td>
                 </tr>
               ))}
             </tbody>
@@ -1245,10 +1258,10 @@ function BenchmarkCard({ local, global, scopeLabel, lang }) {
  * projects but at least the table doesn't lead with a 4000-row Slnečnice).
  */
 function ProjectTable({ projects, flats, lang, onProjectClick }) {
-  // Which of these projects price under a payment schedule rather than ordinary
-  // terms — the €/m² below is their schedule price, not a comparable one.
-  const priceSchedules = usePriceSchedules();
-  const projectFitout = useProjectFitout();
+  // Everything unusual about each of these projects — the mark goes on the
+  // NAME, the same place and the same shape as on the Projects list, so the
+  // reader learns one symbol for the whole platform.
+  const spec = useSpecifics(lang);
   const haveFlats = Array.isArray(flats);
   // Pre-bucket flats by project once so per-row enrich is O(1).
   const byProject = useMemo(() => {
@@ -1317,13 +1330,13 @@ function ProjectTable({ projects, flats, lang, onProjectClick }) {
               role={clickable ? "link" : undefined}
               title={clickable ? (lang === "sk" ? "Otvoriť projekt-report" : "Open project report") : p.name}
             >
-              <td style={tdc}><strong style={{ color: text }}>{p.name}</strong></td>
+              <td style={tdc}><strong style={{ color: text }}>{p.name}</strong><SpecificsMark items={spec.project(p)} lang={lang} /></td>
               <td style={tdc}>{p.developer || "—"}</td>
               <td style={tdc}>{p.district || "—"}</td>
               <td style={tdcR}>{p._realTotal.toLocaleString("en-US").replace(/,/g, " ")}</td>
               <td style={{ ...tdcR, color: accentInk }}>{p._realAvail.toLocaleString("en-US").replace(/,/g, " ")}</td>
               <td style={{ ...tdcR, color: orangeInk }}>{p._realSoldPct != null ? p._realSoldPct.toFixed(0) + "%" : "—"}</td>
-              <td style={tdcR}>{p.avg_price_eur_m2 ? Math.round(moneyFromEur(p.avg_price_eur_m2)).toLocaleString("en-US").replace(/,/g, " ") : "—"}<PriceBasisMark schedule={priceSchedules[p.name]} lang={lang} /><FitoutMark level={projectFitout[p.name]} lang={lang} /></td>
+              <td style={tdcR}>{p.avg_price_eur_m2 ? Math.round(moneyFromEur(p.avg_price_eur_m2)).toLocaleString("en-US").replace(/,/g, " ") : "—"}</td>
             </tr>
           ))}
         </tbody>
@@ -1420,6 +1433,7 @@ function TrendChart({ snapshots, scopePredicate, lang }) {
 
 /* ─── Top-seller list (Market scope) ─── */
 function TopSellerList({ projects, lang }) {
+  const spec = useSpecifics(lang);
   const tops = [...projects]
     .filter(p => (p.sold_last_month || 0) > 0)
     .sort((a, b) => (b.sold_last_month || 0) - (a.sold_last_month || 0))
@@ -1431,7 +1445,7 @@ function TopSellerList({ projects, lang }) {
     <ol style={{ paddingLeft: "1.25rem", margin: 0, color: "var(--text-2)", fontSize: "0.88rem", lineHeight: 1.8 }}>
       {tops.map(p => (
         <li key={p.id}>
-          <strong style={{ color: text }}>{p.name}</strong> ({p.district || "—"}) — <span style={{ color: accentInk, fontFamily: mono, fontWeight: 700 }}>+{p.sold_last_month}</span> {lang === "sk" ? "predaných" : "sold"}
+          <strong style={{ color: text }}>{p.name}</strong><SpecificsMark items={spec.project(p)} lang={lang} /> ({p.district || "—"}) — <span style={{ color: accentInk, fontFamily: mono, fontWeight: 700 }}>+{p.sold_last_month}</span> {lang === "sk" ? "predaných" : "sold"}
           {p.avg_price_eur_m2 && <span style={{ color: dim, fontFamily: mono }}> · {Math.round(moneyFromEur(p.avg_price_eur_m2)).toLocaleString("en-US").replace(/,/g, " ")} {moneySymbol()}/m²</span>}
         </li>
       ))}
@@ -1485,6 +1499,7 @@ function FooterCard({ lang }) {
    will be gone in <3 months → if you're a competitor with similar
    inventory, your price has room". */
 function SellOutForecastReport({ projects, lang, onOpenProject }) {
+  const spec = useSpecifics(lang);
   // Compute forecast for every project. Return rows with the math
   // exposed so we can show velocity / inventory / forecast all in
   // the same row.
@@ -1632,7 +1647,7 @@ function SellOutForecastReport({ projects, lang, onOpenProject }) {
                     style={{ borderTop: i > 0 ? `1px solid ${border}` : "none", cursor: clickable ? "pointer" : "default" }}
                     onClick={clickable ? () => onOpenProject(p.id) : undefined}
                   >
-                    <td style={tdc}><strong style={{ color: text }}>{p.name}</strong></td>
+                    <td style={tdc}><strong style={{ color: text }}>{p.name}</strong><SpecificsMark items={spec.project(p)} lang={lang} /></td>
                     <td style={tdc}>{p.district || "—"}</td>
                     <td style={{ ...tdcR, color: accentInk }}>{p.forecast_remaining.toLocaleString("en-US").replace(/,/g, " ")}</td>
                     <td style={{ ...tdcR, color: orangeInk }}>{p.forecast_velocity > 0 ? p.forecast_velocity : "—"}</td>
@@ -1702,6 +1717,7 @@ function ForecastHistogram({ rows, lang }) {
    relax this — flats from sold-out-under-tracking projects are
    genuine historical comps.) */
 function ComparableTransactionsReport({ projects, lang }) {
+  const spec = useSpecifics(lang);
   // Sold-with-price comparables fetched server-side (report_comparables, ~3k
   // rows) only when this tab opens — not from the old 32k global pull.
   const { units: flats, loading: compLoading, error: compFailed } = useReportComparables();
@@ -1891,7 +1907,7 @@ function ComparableTransactionsReport({ projects, lang }) {
                       <td style={tdcR}>{f.izby || "—"}</td>
                       <td style={tdcR}>{Number(f.obytna_plocha).toFixed(1)}</td>
                       <td style={tdcR}>{Math.round(moneyFromEur(f.cena_s_dph)).toLocaleString("en-US").replace(/,/g, " ")}</td>
-                      <td style={{ ...tdcR, color: orangeInk, fontWeight: 700 }}>{Math.round(moneyFromEur(em2)).toLocaleString("en-US").replace(/,/g, " ")}</td>
+                      <td style={{ ...tdcR, color: orangeInk, fontWeight: 700 }}>{Math.round(moneyFromEur(em2)).toLocaleString("en-US").replace(/,/g, " ")}<UnitPriceMarks items={spec.unit(f, f.project_id)} lang={lang} /></td>
                       <td style={tdcR}>{f.poschodie ?? "—"}</td>
                     </tr>
                   );
@@ -1927,6 +1943,7 @@ function ComparableTransactionsReport({ projects, lang }) {
    about). Until then it's a static positioning matrix, which is
    already a useful surface for spotting outliers. */
 function PricingTensionReport({ projects, lang, onOpenProject }) {
+  const spec = useSpecifics(lang);
   // PA-11: key districts by CITY+district — district names repeat across cities
   // under unified SK, so a bare district key would merge e.g. two "Centrum"s.
   // For BA today (unique district names) this is byte-identical.
@@ -2048,7 +2065,7 @@ function PricingTensionReport({ projects, lang, onOpenProject }) {
                     style={{ borderTop: i > 0 ? `1px solid ${border}` : "none", cursor: clickable ? "pointer" : "default" }}
                     onClick={clickable ? () => onOpenProject(p.id) : undefined}
                   >
-                    <td style={tdc}><strong style={{ color: text }}>{p.name}</strong></td>
+                    <td style={tdc}><strong style={{ color: text }}>{p.name}</strong><SpecificsMark items={spec.project(p)} lang={lang} /></td>
                     <td style={tdc}>{p.district || "—"}</td>
                     <td style={tdcR}>{Math.round(moneyFromEur(p.avg_price_eur_m2)).toLocaleString("en-US").replace(/,/g, " ")}</td>
                     <td style={{ ...tdcR, color: p.premiumPct >= 0 ? orange : green, fontWeight: 700 }}>
@@ -2480,11 +2497,14 @@ function priceDistribution(flats, nBins) {
   return bins;
 }
 /* CSV download for the current scope — project-level. */
-function downloadScopeCSV(projects, lang) {
+function downloadScopeCSV(projects, lang, specData) {
   const headers = [
     "id", "name", "developer", "city", "district",
     "total_units", "available_units", "sold_units", "sold_last_month", "sold_percentage",
     "avg_price_eur_m2", "min_price", "max_price", "last_updated",
+    // What each project's price assumes — the same four the platform marks on
+    // screen, so a downloaded file can be read without the platform open.
+    "fitout_level", "price_schedule", "coverage_mode", "has_interior_area",
   ];
   const esc = (v) => {
     if (v == null) return "";
@@ -2492,7 +2512,13 @@ function downloadScopeCSV(projects, lang) {
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const lines = [headers.join(",")];
-  for (const p of projects) lines.push(headers.map(h => esc(p[h])).join(","));
+  for (const p of projects) {
+    const extra = specData?.[p.id] || specData?.[p.name] || {};
+    const row = { ...p, fitout_level: p.fitout_level ?? extra.fitout_level,
+                  price_schedule: extra.price_schedule, coverage_mode: extra.coverage_mode,
+                  has_interior_area: extra.has_interior_area };
+    lines.push(headers.map(h => esc(row[h])).join(","));
+  }
   const blob = new Blob(["\ufeff" + lines.join("\n")], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");

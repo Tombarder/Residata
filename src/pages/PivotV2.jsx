@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useRef, useLayoutEffect, Fragment } from "react";
 import { createPortal } from "react-dom";
+import { useSpecifics, SpecificsMark } from "../lib/projectSpecifics";
 import { useProjects, useFlatsArchive, useFlatsCurrent, useArchiveMonths, useArchiveDays, usePivotGrain, usePivotDistinct, usePivotFieldStats, fetchFlatsForProjects } from "../lib/useData";
 import { useCountry, isAllCountries } from "../lib/useCountry";
 import { useCapabilities } from "../lib/useCapabilities";
@@ -2925,6 +2926,7 @@ function stavSplitOf(n) {
 
 /* ─── RESULT TABLE ────────────────────────────────────────────── */
 function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, collapsed: _collapsed, onToggle, sort, setSort, grandTotal, lang, valueMode = "raw", dataBars = false, onDrillDown, onProjectOpen }) {
+  const spec = useSpecifics(lang);
   // Project-name column support:
   // When the deepest row field is project_name, rows ARE individual
   // projects — we offer a click-to-navigate on the name cell.
@@ -3225,6 +3227,11 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
             const isProjectRow = projectRowsActive && n.isLeaf && n.records && n.records.length > 0;
             const projectId = isProjectRow ? n.records[0]?.project_id : null;
             const canOpenProject = Boolean(isProjectRow && projectId && onProjectOpen);
+            // The MARK doesn't need a project_id — the label is the project name,
+            // which the specifics map is keyed by. Gating it on `isProjectRow`
+            // would silently drop it on every server-aggregated pivot, where the
+            // client holds no records (that is the common case).
+            const isProjectLabel = Boolean(deepestRowField === "project_name" && n.isLeaf);
             const canToggle = Boolean(n.hasChildren);
             // Whole-row click target where it logically makes sense: a project
             // leaf opens the project, a group header expands/collapses.
@@ -3290,6 +3297,9 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                     ) : (
                       <span title={n.label} style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{n.label}</span>
                     )}
+                    {/* `flex: none` — this label truncates with an ellipsis, so an
+                        inline mark would be the first thing clipped. */}
+                    {isProjectLabel ? <SpecificsMark items={spec.project(projectId || n.label)} lang={lang} style={{ flex: "0 0 auto" }} /> : null}
                     {isSubtotal && n.isCollapsed && (
                       <span style={{ fontSize: "0.64rem", color: dim, fontFamily: mono, opacity: 0.7, flex: "0 0 auto" }}>
                         ({n.children.length} {lang === "sk" ? "pod" : "sub"})

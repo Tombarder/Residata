@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useSpecifics, useProjectSpecificsData, SpecificsMark, AggregateSpecificsNote } from "../lib/projectSpecifics";
 import { useMarketTotals, useHomeProjects, useTotalsList, useVelocityMature } from "../lib/useData";
 import { useCountry, countryName } from "../lib/useCountry";
 import { moneyFromEur, moneySymbol } from "../lib/money";
@@ -746,6 +747,7 @@ function Stat({ value, label, prefix = "", suffix = "", accent = "var(--text)", 
 }
 
 function ProjectMini({ project, setCurrent, lang }) {
+  const spec = useSpecifics(lang);
   const L = (sk, en) => (lang === "sk" ? sk : en);
   const nf = (n) => Number(n || 0).toLocaleString("en-US").replace(/,/g, " ");
 
@@ -800,7 +802,7 @@ function ProjectMini({ project, setCurrent, lang }) {
     >
       {/* Header: name + district */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "0.75rem" }}>
-        <div style={{ fontSize: "1rem", fontWeight: 600, color: "var(--text)", letterSpacing: "-0.01em", lineHeight: 1.3 }}>{project.name}</div>
+        <div style={{ fontSize: "1rem", fontWeight: 600, color: "var(--text)", letterSpacing: "-0.01em", lineHeight: 1.3, minWidth: 0 }}>{project.name}<SpecificsMark items={spec.project(project)} lang={lang} /></div>
         <div style={{ fontSize: "0.68rem", color: dim, fontFamily: mono, whiteSpace: "nowrap", flexShrink: 0, marginTop: "0.15rem" }}>{project.district || "—"}</div>
       </div>
 
@@ -1030,6 +1032,11 @@ const _emptyDrill = { level: "region", regionId: null, regionName: null, cityId:
 
 export function DistrictPulse({ lang = "en", setCurrent }) {  // eslint-disable-line no-unused-vars
   useCurrency(); // subscribe: re-render the per-district €/m² bars on currency toggle
+  // An area average blends every project inside it — shells included. Boss
+  // 2026-08-26 chose to SAY SO rather than drop those projects, because
+  // excluding them would make the average disagree with the project list.
+  const { projects: pulseProjects } = useHomeProjects();
+  const pulseSpecData = useProjectSpecificsData();
   const { country } = useCountry();
   const [sectionRef, inView] = useInView();
 
@@ -1174,6 +1181,8 @@ export function DistrictPulse({ lang = "en", setCurrent }) {  // eslint-disable-
           ))}
         </div>
       )}
+      <AggregateSpecificsNote projects={pulseProjects} data={pulseSpecData} lang={lang}
+        style={{ margin: "0.9rem auto 0", maxWidth: 720, textAlign: "center" }} />
     </section>
   );
 }

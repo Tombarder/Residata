@@ -19,7 +19,7 @@ import UpgradePrompt from "../components/UpgradePrompt";
 import Picker from "../components/Picker";
 import PageHero from "../components/PageHero";
 import InfoTip from "../components/InfoTip";
-import { useProjectSpecificsData, projectSpecifics, SpecificsMark, SpecificsPanel } from "../lib/projectSpecifics";
+import { useSpecifics, SpecificsMark, SpecificsPanel } from "../lib/projectSpecifics";
 import PivotV2 from "./PivotV2";
 import MapFilterBuilder from "../components/MapFilterBuilder";
 import { applyFilters, describe, isComplete, pruneStale } from "../lib/mapFilters";
@@ -122,9 +122,8 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
   useCurrency(); // subscribe: re-render €/m² columns on currency toggle
   const { can } = useCapabilities();
   const { projects: allProjects, loading } = useProjects();
-  // The three "project specifics" projects_live doesn't carry (payment schedule,
-  // coverage mode, whether we hold living areas) — one cached read for the page.
-  const specificsData = useProjectSpecificsData();
+  // Everything unusual about each project — one cached read, shared platform-wide.
+  const spec = useSpecifics(lang);
   // Partition projects by status — active goes in the main table, the rest
   // (sold_out / paused / archived) drops into an expandable "Historické"
   // section below so live market numbers aren't diluted. Rows without a
@@ -348,7 +347,7 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {clearRows.map(p => <ProjectRow key={p.id} p={p} t={t} lang={lang} setCurrent={setCurrent} canVelocity={can("view_sold_velocity")} specifics={projectSpecifics(p, specificsData[p.id], lang)} />)}
+                  {clearRows.map(p => <ProjectRow key={p.id} p={p} t={t} lang={lang} setCurrent={setCurrent} canVelocity={can("view_sold_velocity")} specifics={spec.project(p)} />)}
 
                   {clearRows.length === 0 && (
                     <tr>
@@ -711,8 +710,8 @@ export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en
   const project = projects.find(p => p.id === projectId);
   // What is unusual about THIS project — payment schedule, fit-out level,
   // whether the developer publishes sold units, whether we hold living areas.
-  const specificsData = useProjectSpecificsData();
-  const specifics = projectSpecifics(project, specificsData[projectId], lang);
+  const spec = useSpecifics(lang);
+  const specifics = spec.project(project || projectId);
 
   // Scatter-plot → table handoff: clicking a dot in AreaPriceScatter
   // scrolls the matching row into view and flashes it briefly. The ID
@@ -869,7 +868,7 @@ export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en
         ) :
         <>
           {project && <ProjectInsights project={project} flats={flats} snapshots={snapshots} lang={lang}
-                                     coverageMode={specificsData[projectId]?.coverage_mode ?? project.coverage_mode}
+                                     coverageMode={spec.data[projectId]?.coverage_mode ?? project.coverage_mode}
                                      onSelectFlat={onSelectFlat} />}
           <FlatsTable flats={flats} t={t} lang={lang} highlightedFlatId={highlightedFlatId} />
         </>}

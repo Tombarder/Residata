@@ -11,12 +11,13 @@
  * render with a small 🔒 icon and clicking them lands on an upgrade card
  * instead of the actual feature. Admin-only items are hidden for non-admins.
  */
-import { Component, useState, useEffect, useRef, lazy, Suspense } from "react";
+import { Component, useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
 import { useAuth } from "../lib/useAuth";
 import { useAccountUiPref } from "../lib/useAccountUiPref";
 import { useCapabilities } from "../lib/useCapabilities";
 import PendingGate from "../components/PendingGate";
 import Picker from "../components/Picker";
+import { useProjectSpecificsData } from "../lib/projectSpecifics";
 import PageHero from "../components/PageHero";
 import { usePricing } from "../lib/pricing";
 import { useProjects } from "../lib/useData";
@@ -1748,6 +1749,10 @@ const PROJECTS_CSV_COLUMNS = [
   "total_units", "available_units", "sold_units", "sold_last_month",
   "sold_percentage", "avg_price_eur_m2", "min_price", "max_price",
   "kolaudacia", "country", "status", "last_updated",
+  // What each project's prices assume — the same four specifics the platform
+  // marks on screen, so a downloaded file reads correctly on its own. The unit
+  // export already carries fitout_level + every payment-schedule price.
+  "fitout_level", "price_schedule", "coverage_mode", "has_interior_area",
 ];
 const PROJECTS_NUMBER_COLUMNS = new Set([
   "total_units", "available_units", "sold_units", "sold_last_month",
@@ -1815,7 +1820,16 @@ function CopyField({ label, value, lang }) {
   );
 }
 function PlatformExports({ lang, setCurrent }) {
-  const { projects } = useProjects();
+  const { projects: projectsRaw } = useProjects();
+  // projects_live carries fitout_level but not the other three specifics —
+  // merge them in so an exported file says what every price assumes.
+  const specData = useProjectSpecificsData();
+  const projects = useMemo(() => (projectsRaw || []).map((p) => {
+    const x = specData[p.id] || specData[p.name] || {};
+    return { ...p, fitout_level: p.fitout_level ?? x.fitout_level,
+             price_schedule: x.price_schedule, coverage_mode: x.coverage_mode,
+             has_interior_area: x.has_interior_area };
+  }), [projectsRaw, specData]);
   const { user } = useAuth();
   // export_data is granted ONLY to real-paid + admin (see useCapabilities). Trial
   // users reach this page (view_exports_page) and can pick a date, but the actual

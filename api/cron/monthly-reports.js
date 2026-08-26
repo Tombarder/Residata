@@ -102,8 +102,15 @@ export default async function handler(req, res) {
   // Read from projects_live VIEW so per-project totals reflect real
   // flat counts (not the inflated total_units / sold_units stored on
   // the projects table for manual_total override projects).
-  const { data: projects, error: pErr } = await admin.from("projects_live").select("*");
+  const { data: projectsRaw, error: pErr } = await admin.from("projects_live").select("*");
   if (pErr) return res.status(500).json({ error: `projects query: ${pErr.message}` });
+  // What each project's price ASSUMES — the same four specifics the platform
+  // marks on screen (src/lib/projectSpecifics.jsx). An emailed report is read
+  // away from the app, so it has to carry them itself.
+  const { data: specRows } = await admin.from("projects")
+    .select("id, price_schedule, coverage_mode, has_interior_area, fitout_level");
+  const specById = new Map((specRows || []).map((r) => [r.id, r]));
+  const projects = (projectsRaw || []).map((p) => ({ ...p, _spec: specById.get(p.id) || {} }));
 
   const results = [];
   // F-257 fix: response-body month label needs an outer-scope value. The
@@ -245,6 +252,28 @@ function scopeTitle(scope, lang) {
 }
 function capitalize(s) { return s ? s[0].toUpperCase() + s.slice(1) : s; }
 
+/* ─── Project specifics (mirrors src/lib/projectSpecifics.jsx) ─── */
+function specificLines(p, isEn) {
+  const x = p._spec || {};
+  const level = p.fitout_level || x.fitout_level;
+  const out = [];
+  if (level === "holobyt") out.push(isEn ? "shell price, not standard finish" : "cena za holobyt, nie za štandard");
+  else if (level === "plne_zariadeny") out.push(isEn ? "fully furnished price" : "cena za plne zariadený byt");
+  if (x.price_schedule && x.price_schedule !== "20/80")
+    out.push(isEn ? `${x.price_schedule} payment schedule, not the usual 20/80`
+                  : `financovanie ${x.price_schedule}, nie bežné 20/80`);
+  if (x.coverage_mode === "available_only")
+    out.push(isEn ? "developer lists only available units" : "developer zverejňuje len voľné byty");
+  if (x.has_interior_area === false && (p.total_units || 0) > 0)
+    out.push(isEn ? "no living area published" : "bez obytnej plochy");
+  return out;
+}
+
+/** The amber `*` after a project name, plus its explanation for the footnote. */
+function specMark(p, amberHex) {
+  return specificLines(p, true).length ? `<span style="color:${amberHex};font-weight:700">*</span>` : "";
+}
+
 /* ─── Summarise (mirrors Reports.jsx summariseProjects) ─── */
 function summariseProjects(projects) {
   const totalUnits = projects.reduce((a, p) => a + (p.total_units || 0), 0);
@@ -326,12 +355,25 @@ function renderReportEmailHtml({ subscriberEmail, month, scope, scopeLabel, summ
     : escHtml(scopeTitle(scope, lang));
   const cap = escHtml(capitalize(month));
 
+  // One footnote naming only the specifics that actually appear above, so an
+  // ordinary month's email carries no legend at all.
+  const isEnLegend = /^(Top sellers|Market)/.test(T.topSellersTitle);
+  const legendSeen = [];
+  for (const p of [...summary.topSellers, ...summary.soldOutWatch]) {
+    for (const line of specificLines(p, isEnLegend)) if (!legendSeen.includes(line)) legendSeen.push(line);
+  }
+  const specNote = legendSeen.length
+    ? `<p style="margin:14px 0 0;font-size:11px;line-height:1.6;color:${textDim}">`
+      + `<span style="color:${orange};font-weight:700">*</span> `
+      + `${escHtml(isEnLegend ? "Project specifics" : "Špecifiká projektu")} — ${escHtml(legendSeen.join("; "))}.</p>`
+    : "";
+
   const topList = summary.topSellers.length
-    ? summary.topSellers.map(p => `<li style="margin:4px 0"><strong style="color:${textLight}">${escHtml(p.name)}</strong> <span style="color:${textDim}">(${escHtml(p.district || T.dashEmpty)})</span> — <span style="color:${green};font-weight:700">+${p.sold_last_month}</span> ${T.topSellerSuffix}</li>`).join("")
+    ? summary.topSellers.map(p => `<li style="margin:4px 0"><strong style="color:${textLight}">${escHtml(p.name)}</strong>${specMark(p, orange)} <span style="color:${textDim}">(${escHtml(p.district || T.dashEmpty)})</span> — <span style="color:${green};font-weight:700">+${p.sold_last_month}</span> ${T.topSellerSuffix}</li>`).join("")
     : `<li style="color:${textDim};list-style:none">${T.topSellersEmpty}</li>`;
 
   const soldOutList = summary.soldOutWatch.length
-    ? summary.soldOutWatch.map(p => `<li style="margin:4px 0"><strong style="color:${textLight}">${escHtml(p.name)}</strong> — ${T.soldOutSuffix(Math.round(p.sold_percentage), p.available_units)}</li>`).join("")
+    ? summary.soldOutWatch.map(p => `<li style="margin:4px 0"><strong style="color:${textLight}">${escHtml(p.name)}</strong>${specMark(p, orange)} — ${T.soldOutSuffix(Math.round(p.sold_percentage), p.available_units)}</li>`).join("")
     : `<li style="color:${textDim};list-style:none">${T.soldOutEmpty}</li>`;
 
   return `<!DOCTYPE html>
@@ -370,6 +412,7 @@ function renderReportEmailHtml({ subscriberEmail, month, scope, scopeLabel, summ
     <ul style="margin:0;padding-left:18px;font-size:14px;color:#c0c0c8">${topList}</ul>
     <h3 style="font-size:14px;margin:24px 0 8px;color:${textLight};letter-spacing:0.02em">${T.soldOutTitle}</h3>
     <ul style="margin:0;padding-left:18px;font-size:14px;color:#c0c0c8">${soldOutList}</ul>
+    ${specNote}
     <div style="margin-top:24px;padding-top:16px;border-top:1px solid #2a2a32">
       <a href="${webUrl}/app/reports" style="display:inline-block;background:${green};color:#0a0a0b;padding:12px 20px;border-radius:8px;font-weight:600;font-size:14px;text-decoration:none">
         ${T.ctaOpenReport}

@@ -23,6 +23,7 @@
  * are capability-gated (blurred + upgrade nudge for free users).
  */
 import { useState, useMemo, useRef, useEffect, useId } from "react";
+import { useSpecifics, SpecificsMark } from "../lib/projectSpecifics";
 import { createPortal } from "react-dom";
 import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
@@ -981,6 +982,7 @@ function MetricBody({ cfg, ctx, lang }) {
 }
 
 function ProjectBody({ cfg, ctx, lang }) {
+  const spec = useSpecifics(lang);
   const { projects, seriesByProject, setCurrent, can } = ctx;
   const p = (projects || []).find(x => x.id === cfg.projectId);
   if (!p) return <Muted lang={lang} text={L(lang, "Projekt nenájdený — vyber iný ⚙", "Project not found — pick another ⚙")} />;
@@ -992,7 +994,12 @@ function ProjectBody({ cfg, ctx, lang }) {
       style={{ cursor: "pointer" }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: "0.6rem", alignItems: "flex-start" }}>
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontWeight: 600, color: textLight, fontSize: "0.98rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</div>
+          {/* name truncates with an ellipsis, so the mark is a `flex: none`
+              sibling — inline it would be the first thing clipped. */}
+          <div style={{ display: "flex", alignItems: "baseline", minWidth: 0 }}>
+            <span style={{ fontWeight: 600, color: textLight, fontSize: "0.98rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{p.name}</span>
+            <SpecificsMark items={spec.project(p)} lang={lang} style={{ flex: "0 0 auto" }} />
+          </div>
           <div style={{ fontFamily: mono, fontSize: "0.68rem", color: dim, marginTop: 2 }}>{p.district || "—"}{p.developer ? ` · ${p.developer}` : ""}</div>
         </div>
         <Sparkline series={series} color={green} width={92} height={30} />
@@ -1047,6 +1054,7 @@ function fmtRankVal(fmt, v, lang) {
   return fmtCount(v, lang);
 }
 function RankingBody({ cfg, ctx, lang }) {
+  const spec = useSpecifics(lang);
   const { projects, districts, can, setCurrent } = ctx;
   const entity = cfg.entity || "projects";
   const mdef = (RANK_METRICS[entity] || RANK_METRICS.projects)[cfg.metric] || Object.values(RANK_METRICS[entity])[0];
@@ -1056,7 +1064,7 @@ function RankingBody({ cfg, ctx, lang }) {
   let rows = [];
   if (entity === "projects") {
     rows = (projects || []).filter(p => (p.status || "active") === "active" && mdef.get(p) != null)
-      .map(p => ({ key: p.id, name: p.name, sub: p.district || "—", val: mdef.get(p), clickId: p.id }));
+      .map(p => ({ key: p.id, name: p.name, sub: p.district || "—", val: mdef.get(p), clickId: p.id, project: p }));
   } else if (entity === "districts") {
     rows = (districts || []).filter(d => d.district && mdef.get(d) != null)
       .map(d => ({ key: `${d.city_id}:${d.district}`, name: d.district, sub: d.city_name || "—", val: mdef.get(d) }));
@@ -1086,7 +1094,10 @@ function RankingBody({ cfg, ctx, lang }) {
           style={{ display: "flex", alignItems: "center", gap: "0.6rem", padding: "0.32rem 0", cursor: r.clickId ? "pointer" : "default", borderBottom: i < rows.length - 1 ? `1px solid color-mix(in srgb, ${border} 33%, transparent)` : "none" }}>
           <span style={{ fontFamily: mono, fontSize: "0.66rem", color: faint, width: 14, flexShrink: 0 }}>{i + 1}</span>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: "0.82rem", color: textLight, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</div>
+            <div style={{ display: "flex", alignItems: "baseline", minWidth: 0 }}>
+              <span style={{ fontSize: "0.82rem", color: textLight, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{r.name}</span>
+              {r.project && !locked ? <SpecificsMark items={spec.project(r.project)} lang={lang} style={{ flex: "0 0 auto" }} /> : null}
+            </div>
             <div style={{ position: "relative", height: 3, background: `${border}`, borderRadius: 2, marginTop: 4 }}>
               <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${Math.max(4, (Math.abs(r.val) / max) * 100)}%`, background: green, borderRadius: 2, opacity: 0.7 }} />
             </div>

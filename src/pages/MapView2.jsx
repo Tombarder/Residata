@@ -22,7 +22,8 @@ import { useEffect, useRef, useState, useMemo } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useProjects } from "../lib/useData";
-import { projectPriceLevel, fitoutLabel, fitoutNote } from "../lib/priceBasis";
+import { projectPriceLevel, fitoutLabel } from "../lib/priceBasis";
+import { useSpecifics, specificsHTML } from "../lib/projectSpecifics";
 import { useAccountPrefState, useAccountHydrated } from "../lib/useAccountUiPref";
 import { useCountry } from "../lib/useCountry";
 import { useCurrency } from "../lib/useCurrency";
@@ -173,28 +174,32 @@ function hoverLabel(props, lens) {
   return COMPLETION[props.completion].label;
 }
 
-function fitoutTag(level, sk) {
-  const label = fitoutLabel(level, sk ? "sk" : "en");
-  if (!label) return "";
-  const colour = level === "holobyt" ? amber : green;
-  return `<span title="${escapeHtml(fitoutNote(level, sk ? "sk" : "en"))}" style="margin-left:0.45em;`
+function fitoutTag(items, sk) {
+  const fit = (items || []).find((i) => i.key === "fitout");
+  if (!fit) return "";
+  const label = fitoutLabel(fit.level || "", sk ? "sk" : "en") || fit.text;
+  const colour = fit.level === "holobyt" ? amber : green;
+  return `<span title="${escapeHtml(fit.note || "")}" style="margin-left:0.45em;`
     + `font-size:0.62rem;font-weight:700;padding:0.1em 0.42em;border-radius:999px;`
     + `border:1px solid ${colour};color:${colour};cursor:help">${escapeHtml(label)}</span>`;
 }
 
-function showProjectPopup(map, lngLat, props, handlers, popupRef, sk = false) {
+function showProjectPopup(map, lngLat, props, handlers, popupRef, sk = false, specProject = null) {
   const el = document.createElement("div");
   el.style.minWidth = "186px";
   const loc = [props.city, props.district].filter(Boolean).join(" · ");
   const price = props.ppm2 > 0 ? mM2(props.ppm2) : "—";
   const approx = props.verified ? "" : `<div style="font-size:0.64rem;color:${amber};margin-bottom:6px">◍ ${sk ? "približná poloha" : "approximate location"}</div>`;
+  // Everything unusual about this project, from the one module that decides it.
+  const items = specProject ? specProject(props.id || props.name) : [];
   el.innerHTML =
     `<div style="font-weight:600;font-size:0.92rem;color:${textLight};margin-bottom:2px">${escapeHtml(props.name)}</div>` +
     `<div style="font-size:0.72rem;color:${dim};margin-bottom:6px">${escapeHtml(loc)} · ${escapeHtml(props.developer || "—")}</div>` + approx +
     `<div style="font-family:${mono};font-size:0.72rem;color:${textLight};line-height:1.6">` +
-    `<div><span style="color:${dim}">${sk ? "Priem." : "Avg"}</span> &nbsp;${price}${fitoutTag(props.fitout, sk)}</div>` +
+    `<div><span style="color:${dim}">${sk ? "Priem." : "Avg"}</span> &nbsp;${price}${fitoutTag(items, sk)}</div>` +
     `<div><span style="color:${dim}">${sk ? "Voľné" : "Available"}</span> &nbsp;${props.available} / ${props.total}</div>` +
     `<div><span style="color:${dim}">${sk ? "Vypredanosť" : "Absorbed"}</span> &nbsp;${props.soldPct == null ? "—" : props.soldPct + "%"}</div></div>` +
+    specificsHTML(items, sk ? "sk" : "en") +
     `<div style="display:flex;gap:6px;margin-top:10px">` +
     `<button id="mv2-analyze" style="flex:1;padding:7px 8px;background:transparent;color:${green};border:1px solid ${green};border-radius:6px;font-weight:600;font-size:0.72rem;cursor:pointer">◎ ${sk ? "Oblasť" : "Area"}</button>` +
     `<button id="mv2-compare" style="flex:1;padding:7px 8px;background:transparent;color:${textLight};border:1px solid ${border};border-radius:6px;font-weight:600;font-size:0.72rem;cursor:pointer">⇄ ${sk ? "Porovnať" : "Compare"}</button>` +
@@ -234,6 +239,9 @@ export default function MapView2({ lang = "en", setCurrent }) {
   const onAnalyzeRef = useRef(() => {});
   const onCompareRef = useRef(() => {});
   const skRef = useRef(false);   // fresh `sk` for the once-registered pin-click handler
+  const spec = useSpecifics(lang);
+  const specRef = useRef(spec);
+  useEffect(() => { specRef.current = spec; }, [spec]);
 
   const [lens, setLens] = useState("price");
   const [conditions, setConditions] = useState([]);
@@ -661,7 +669,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
           onOpen: (id) => setCurrentRef.current && setCurrentRef.current("App:ProjectDetail:" + id),
           onAnalyze: (ll) => onAnalyzeRef.current(ll),
           onCompare: (p) => onCompareRef.current(p),
-        }, popupRef, skRef.current);
+        }, popupRef, skRef.current, (k) => specRef.current.project(k));
       });
       map.on("click", (e) => mapClickRef.current(e, map));
       map.on("dblclick", (e) => {
