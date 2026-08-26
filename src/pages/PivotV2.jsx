@@ -2685,9 +2685,13 @@ function AnalysisToolbar({ valueMode, setValueMode, dataBars, setDataBars, onExp
     const t = setTimeout(() => setCopyState(null), 1800);
     return () => clearTimeout(t);
   }, [copyState]);
+  // Long-hand border, not the `border` shorthand: btnActive below tints the pill by
+  // overriding `borderColor`, and mixing the two in one React style object means the
+  // pill LOSES its border the moment it goes inactive again (React clears borderColor
+  // while the shorthand still stands) — plus a console warning on every toggle.
   const btnBase = {
     background: "transparent",
-    border: `1px solid ${border}`,
+    borderWidth: "1px", borderStyle: "solid", borderColor: border,
     color: dim, padding: "0.35rem 0.7rem", borderRadius: 4,
     fontSize: "0.75rem", cursor: "pointer",
   };

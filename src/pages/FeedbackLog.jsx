@@ -154,7 +154,10 @@ export default function FeedbackLog({ lang = "sk" }) {
   const cat = (k) => CATEGORIES[k] || CATEGORIES.other;
   const st = (k) => STATUSES[k] || STATUSES.new;
 
-  const card = { background: bg2, border: `1px solid ${border}`, borderRadius: 10, padding: "12px 14px" };
+  // Long-hand border: the error banners below spread this card and override
+  // `borderColor` with amber. `border` + `borderColor` in one React style object
+  // means the card loses its border when the tint goes away on a later render.
+  const card = { background: bg2, borderWidth: "1px", borderStyle: "solid", borderColor: border, borderRadius: 10, padding: "12px 14px" };
   const cardLabel = { fontSize: 11, color: dim, fontFamily: mono, textTransform: "uppercase", letterSpacing: 0.4 };
   const cardVal = { fontSize: 22, fontWeight: 600, color: textLight, marginTop: 4 };
   const byCat = stats?.by_category || {};

@@ -397,10 +397,14 @@ export default function DataQA({ lang = "sk" }) {
     URL.revokeObjectURL(a.href);
   }
 
-  const card = { background: bg2, border: `1px solid ${border}`, borderRadius: 10, padding: "12px 14px" };
+  // Long-hand border on both bases below: call sites tint them by overriding
+  // `borderColor` (amber for an error, green for a selection), and one React style
+  // object must never hold `border` AND `borderColor` — when the tint drops on a
+  // later render React clears the colour and the element loses its border entirely.
+  const card = { background: bg2, borderWidth: "1px", borderStyle: "solid", borderColor: border, borderRadius: 10, padding: "12px 14px" };
   const cardLabel = { fontSize: 11, color: dim, fontFamily: mono, textTransform: "uppercase", letterSpacing: 0.4 };
   const cardVal = { fontSize: 22, fontWeight: 600, color: textLight, marginTop: 4 };
-  const btn = { padding: "8px 14px", borderRadius: 8, border: `1px solid ${border}`, background: "transparent", color: textLight, cursor: "pointer", fontSize: 13 };
+  const btn = { padding: "8px 14px", borderRadius: 8, borderWidth: "1px", borderStyle: "solid", borderColor: border, background: "transparent", color: textLight, cursor: "pointer", fontSize: 13 };
   const navBtn = (enabled) => ({ padding: "7px 11px", borderRadius: 8, border: `1px solid ${border}`, background: bg2, color: enabled ? textLight : dim, cursor: enabled ? "pointer" : "not-allowed", fontSize: 14, lineHeight: 1 });
   const miniBtn = (enabled) => ({ padding: "1px 6px", borderRadius: 5, border: `1px solid ${border}`, background: "transparent", color: enabled ? textLight : dim, cursor: enabled ? "pointer" : "not-allowed", fontSize: 12, lineHeight: 1.4 });
 

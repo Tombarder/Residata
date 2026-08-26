@@ -29,7 +29,18 @@ export const field = {
   height: "var(--rd-ctrl-h)",
   padding: "0 var(--rd-field-px)",
   background: "var(--surface-2)",
-  border: "1px solid var(--border)",
+  // LONG-HAND on purpose — never `border: "1px solid var(--border)"`. Call sites
+  // tint this box by overriding `borderColor` (an invalid value, an active filter,
+  // a selected chip), and a React style object must not carry the shorthand AND
+  // the long-hand for the same value: when the override falls away on a later
+  // render React clears `borderColor` while `border` is still set, which blanks
+  // the box's whole border and logs "Removing a style property during rerender
+  // (borderColor) when a conflicting property is set (border)". Long-hand over
+  // long-hand simply changes the colour, so the border survives. `.rd-field` in
+  // styles/ui.css can keep the shorthand — CSS has a cascade, React has a diff.
+  borderWidth: "1px",
+  borderStyle: "solid",
+  borderColor: "var(--border)",
   borderRadius: "var(--rd-field-r)",
   color: "var(--text)",
   fontFamily: "inherit",
