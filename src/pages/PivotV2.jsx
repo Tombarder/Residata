@@ -3224,14 +3224,16 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
             // grouping is project_name, this is a leaf node, and we
             // can resolve a project_id from its records (any record
             // in the group has it since all records share the project).
-            const isProjectRow = projectRowsActive && n.isLeaf && n.records && n.records.length > 0;
-            const projectId = isProjectRow ? n.records[0]?.project_id : null;
-            const canOpenProject = Boolean(isProjectRow && projectId && onProjectOpen);
-            // The MARK doesn't need a project_id — the label is the project name,
-            // which the specifics map is keyed by. Gating it on `isProjectRow`
-            // would silently drop it on every server-aggregated pivot, where the
-            // client holds no records (that is the common case).
+            // A row IS a project whenever the deepest grouping is the project
+            // name — whether or not the client happens to hold its records.
             const isProjectLabel = Boolean(deepestRowField === "project_name" && n.isLeaf);
+            // Its id comes from the records when the pivot aggregated client-side,
+            // and otherwise from the specifics map, which is keyed by name as well
+            // as by id. Without that fallback every SERVER-aggregated pivot — the
+            // common case — rendered project rows that could not be opened.
+            const projectId = (n.records && n.records.length ? n.records[0]?.project_id : null)
+                              || (isProjectLabel ? spec.data?.[n.label]?.id : null) || null;
+            const canOpenProject = Boolean(projectRowsActive && isProjectLabel && projectId && onProjectOpen);
             const canToggle = Boolean(n.hasChildren);
             // Whole-row click target where it logically makes sense: a project
             // leaf opens the project, a group header expands/collapses.

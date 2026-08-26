@@ -48,6 +48,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { supabasePublic } from "./supabase";
+import HoverCard from "../components/HoverCard";
 import { priceBasisNote, fitoutNote, fitoutLabel, projectPriceLevel } from "./priceBasis";
 
 /** The ordinary case. Anything else is a specific worth showing. */
@@ -71,6 +72,16 @@ const sk = (lang) => lang === "sk";
  * composition first, because it changes what a number MEANS; coverage and
  * missing areas after, because they change what we can measure.
  */
+/** The one sentence that describes a fit-out level. Both the project rule and
+ *  the unit rule word it identically, so a flat and its project never explain
+ *  the same thing two different ways. */
+function fitoutText(level, lang) {
+  if (level === "holobyt") return sk(lang) ? "Cena za holobyt, nie za štandard" : "Shell price, not standard finish";
+  if (level === "plne_zariadeny") return sk(lang) ? "Cena za plne zariadený byt" : "Fully furnished price, above standard";
+  if (level === "mixed") return sk(lang) ? "Rôzny štandard v rámci projektu" : "Mixed finish across the project";
+  return sk(lang) ? `Štandard: ${fitoutLabel(level, lang) || level}` : `Finish: ${fitoutLabel(level, lang) || level}`;
+}
+
 const RULES = [
   // 1 · Payment schedule — WHEN you pay changes the price.
   ({ row, extra, lang }) => {
@@ -92,16 +103,7 @@ const RULES = [
     // to the registry copy rather than silently dropping the specific there.
     const level = projectPriceLevel(row) || extra?.fitout_level;
     if (!level || level === ORDINARY.fitout_level) return null;
-    const text = level === "holobyt"
-      ? (sk(lang) ? "Cena za holobyt, nie za štandard" : "Shell price, not standard finish")
-      : level === "plne_zariadeny"
-        ? (sk(lang) ? "Cena za plne zariadený byt" : "Fully furnished price, above standard")
-        : level === "mixed"
-          ? (sk(lang) ? "Rôzny štandard v rámci projektu" : "Mixed finish across the project")
-          // A level we have not written a line for yet: name it rather than drop it.
-          : (sk(lang) ? `Štandard: ${fitoutLabel(level, lang) || level}`
-                      : `Finish: ${fitoutLabel(level, lang) || level}`);
-    return { key: "fitout", text, note: fitoutNote(level, lang) };
+    return { key: "fitout", text: fitoutText(level, lang), note: fitoutNote(level, lang), level };
   },
 
   // 3 · Coverage — does the developer publish what they've already sold?
@@ -259,12 +261,51 @@ export function unitSpecifics(unitRow, extra, lang) {
   if (level && level !== ORDINARY.fitout_level) {
     out.push({
       key: "fitout",
-      text: fitoutLabel(level, lang) || level,
+      // `text` is the sentence a reader gets — the same wording the project
+      // panel uses, because a hover card saying only "zariadený" explains
+      // nothing. `label` is the bare word, which is all a pill has room for.
+      text: fitoutText(level, lang),
+      label: fitoutLabel(level, lang) || level,
       note: fitoutNote(level, lang),
       level,
     });
   }
   return out;
+}
+
+/* ── The list itself — rendered identically by the panel and by the hover
+ * card, so the small popover really is "the project page's panel, but small".
+ */
+function SpecificsLines({ items }) {
+  return (
+    <ul style={{
+      listStyle: "none", margin: 0, padding: 0,
+      display: "flex", flexDirection: "column", gap: "0.4rem",
+    }}>
+      {items.map((it) => (
+        <li key={it.key} style={{
+          display: "flex", gap: "0.45rem", alignItems: "flex-start",
+          fontSize: "0.78rem", lineHeight: 1.4, color: "var(--text-2)",
+        }}>
+          <span style={{ flex: "none", color: "var(--accent-2)", fontWeight: 700, lineHeight: 1.35 }}>*</span>
+          <span style={{ minWidth: 0, overflowWrap: "anywhere" }}>{it.text}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** The eyebrow both surfaces share. */
+function SpecificsHeading({ lang }) {
+  return (
+    <div style={{
+      fontFamily: "var(--font-mono, ui-monospace, monospace)", fontSize: "0.6rem",
+      letterSpacing: "0.12em", textTransform: "uppercase",
+      color: "var(--accent-2)", marginBottom: "0.5rem",
+    }}>
+      {sk(lang) ? "Špecifiká projektu" : "Project specifics"}
+    </div>
+  );
 }
 
 /* ── The mark on a list row ────────────────────────────────────────────────
@@ -281,27 +322,26 @@ export function unitSpecifics(unitRow, extra, lang) {
  */
 export function SpecificsMark({ items, lang, style }) {
   const n = items?.length || 0;
-  const tip = n
-    ? `${sk(lang) ? "Špecifiká projektu" : "Project specifics"}: ${items.map((i) => i.text).join(" · ")}`
-    : undefined;
+  const base = {
+    display: "inline", marginLeft: "0.15em", color: "var(--accent-2)",
+    fontWeight: 700, userSelect: "none",
+    cursor: n ? "help" : "default",
+    visibility: n ? "visible" : "hidden",
+    // Escape hatch for FLEX containers (the pivot's label cell truncates its
+    // name with an ellipsis, so there the mark must be a `flex: none` sibling
+    // or the ellipsis eats it).
+    ...style,
+  };
+  // An ordinary project still renders the slot — hidden and inert — so the
+  // column measures the same whether anything on screen is marked.
+  if (!n) return <span aria-hidden="true" style={base}>*</span>;
+  const label = sk(lang) ? "Špecifiká projektu" : "Project specifics";
   return (
-    <span
-      title={tip}
-      aria-hidden={n === 0 ? "true" : undefined}
-      style={{
-        display: "inline", marginLeft: "0.15em", color: "var(--accent-2)",
-        fontWeight: 700, userSelect: "none",
-        cursor: n ? "help" : "default",
-        visibility: n ? "visible" : "hidden",
-        // Escape hatch for FLEX containers (the pivot's label cell truncates its
-        // name with an ellipsis, so there the mark must be a `flex: none`
-        // sibling or the ellipsis eats it).
-        ...style,
-      }}
-    >
-      *
-      {n ? <span className="sr-only">{tip}</span> : null}
-    </span>
+    <HoverCard label={`${label}: ${items.map((i) => i.text).join(" · ")}`}
+      trigger={(p) => <span {...p} style={{ ...base, outlineOffset: 2 }}>*</span>}>
+      <SpecificsHeading lang={lang} />
+      <SpecificsLines items={items} />
+    </HoverCard>
   );
 }
 
@@ -326,32 +366,8 @@ export function SpecificsPanel({ items, lang }) {
         padding: "0.7rem 0.85rem 0.75rem",
       }}
     >
-      <div style={{
-        fontFamily: "var(--font-mono, ui-monospace, monospace)", fontSize: "0.6rem",
-        letterSpacing: "0.12em", textTransform: "uppercase",
-        color: "var(--accent-2)", marginBottom: "0.5rem",
-      }}>
-        {sk(lang) ? "Špecifiká projektu" : "Project specifics"}
-      </div>
-      <ul style={{
-        listStyle: "none", margin: 0, padding: 0,
-        display: "flex", flexDirection: "column", gap: "0.4rem",
-      }}>
-        {items.map((it) => (
-          <li
-            key={it.key}
-            title={it.note || undefined}
-            style={{
-              display: "flex", gap: "0.45rem", alignItems: "flex-start",
-              fontSize: "0.78rem", lineHeight: 1.4, color: "var(--text-2)",
-              cursor: it.note ? "help" : "default",
-            }}
-          >
-            <span style={{ flex: "none", color: "var(--accent-2)", fontWeight: 700, lineHeight: 1.35 }}>*</span>
-            <span style={{ minWidth: 0, overflowWrap: "anywhere" }}>{it.text}</span>
-          </li>
-        ))}
-      </ul>
+      <SpecificsHeading lang={lang} />
+      <SpecificsLines items={items} />
     </aside>
   );
 }
@@ -374,38 +390,49 @@ export function UnitPriceMarks({ items, lang, compact = false }) {
   // schedule actually on screen. A mark that cannot be read is worse than a
   // mark that points at its own explanation.
   if (compact) {
-    const tip = items.map((i) => (i.note ? `${i.text} — ${i.note}` : i.text)).join("  ");
     return (
-      <sup
-        title={tip}
-        style={{
-          marginLeft: "0.1em", color: "var(--accent-2)", cursor: "help",
-          fontSize: "0.78em", fontWeight: 700, lineHeight: 0,
-        }}
-      >*</sup>
+      <HoverCard label={items.map((i) => i.text).join(" · ")}
+        trigger={(p) => (
+          <sup {...p} style={{
+            marginLeft: "0.1em", color: "var(--accent-2)", cursor: "help",
+            fontSize: "0.78em", fontWeight: 700, lineHeight: 0, outlineOffset: 2,
+          }}>*</sup>
+        )}>
+        <SpecificsHeading lang={lang} />
+        <SpecificsLines items={items} />
+        {items.filter((i) => i.note).map((i) => (
+          <p key={i.key} style={{ margin: "0.45rem 0 0", fontSize: "0.72rem", lineHeight: 1.45, color: "var(--text-dim)" }}>{i.note}</p>
+        ))}
+      </HoverCard>
     );
   }
   return (
     <>
       {sched ? (
-        <sup
-          title={sched.note}
-          style={{
+        <HoverCard label={sched.text} trigger={(p) => (
+          <sup {...p} style={{
             marginLeft: "0.1em", color: "var(--accent-2)", cursor: "help",
-            fontSize: "0.72em", fontWeight: 700, lineHeight: 0,
-          }}
-        >*</sup>
+            fontSize: "0.72em", fontWeight: 700, lineHeight: 0, outlineOffset: 2,
+          }}>*</sup>
+        )}>
+          <SpecificsHeading lang={lang} />
+          <SpecificsLines items={[sched]} />
+          <p style={{ margin: "0.45rem 0 0", fontSize: "0.72rem", lineHeight: 1.45, color: "var(--text-dim)" }}>{sched.note}</p>
+        </HoverCard>
       ) : null}
       {fit ? (
-        <span
-          title={fit.note}
-          style={{
+        <HoverCard label={fit.text} trigger={(p) => (
+          <span {...p} style={{
             marginLeft: "0.4em", cursor: "help", fontSize: "0.68em", fontWeight: 700,
             letterSpacing: "0.02em", textTransform: "lowercase", whiteSpace: "nowrap",
             padding: "0.1em 0.42em", borderRadius: "999px", verticalAlign: "middle",
             color: "var(--accent-2)", border: "1px solid var(--accent-2)", opacity: 0.9,
-          }}
-        >{fit.text}</span>
+            outlineOffset: 2,
+          }}>{fit.label || fit.text}</span>
+        )}>
+          <SpecificsHeading lang={lang} />
+          <p style={{ margin: 0, fontSize: "0.78rem", lineHeight: 1.45, color: "var(--text-2)" }}>{fit.note}</p>
+        </HoverCard>
       ) : null}
     </>
   );
