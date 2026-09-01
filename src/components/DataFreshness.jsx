@@ -20,8 +20,8 @@ export default function DataFreshness({ lang = "sk", style, className }) {
   const formatted = `${d}.${mo}.${y}`;
   const label = lang === "sk" ? "Dáta aktualizované" : "Data updated";
   const tip = lang === "sk"
-    ? "Dátum posledného kompletného stiahnutia dát pre vybraný trh."
-    : "Date of the last complete data pull for the selected market.";
+    ? "Dátum posledného kompletného stiahnutia dát pre vybraný trh. Kým sa celý trh nestiahne kompletne, dátum sa neposunie — vidíš tak, že dáta sú o pár dní staršie."
+    : "Date of the last complete data pull for the selected market. The date does not advance until the whole market scrapes — so you can see when the data is a few days old.";
   return (
     <span title={tip} className={className} style={{
       fontFamily: "var(--font-mono)",

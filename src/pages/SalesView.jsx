@@ -80,8 +80,8 @@ const COL_INFO = {
   obytna_plocha:    { sk: "Obytná plocha bytu v m² (nie celková/podlahová).", en: "Living area of the unit in m² (not total/floor area)." },
   price_s_dph_eur:  { sk: "Cena s DPH, zafixovaná v čase predaja — posledná reálna cena, ktorú developer zverejnil pred tým, než byt zmizol/označil ako predaný. „—“ = developer cenu nezverejnil.", en: "Price incl. VAT, frozen at sale time — the last real price the developer published before the unit sold. “—” = the developer never published a price." },
   price_per_m2_eur: { sk: "Cena za m² obytnej plochy, s DPH, v čase predaja (cena ÷ obytná plocha).", en: "Price per m² of living area, incl. VAT, at sale time (price ÷ living area)." },
-  days_on_market:   { sk: "Počet dní od prvého zachytenia po predaj. „≥“ = byt bol v ponuke už na začiatku sledovania, takže skutočný čas môže byť dlhší.", en: "Days from first sight to sold. “≥” = the unit was already listed when tracking began, so the real figure may be longer." },
-  detection_method: { sk: "Ako bol predaj zistený: „označené“ = developer byt označil ako predaný; „zmizol“ = byt zmizol z ponuky.", en: "How the sale was detected: “marked” = the developer flagged it sold; “delisted” = it left the listing." },
+  days_on_market:   { sk: "Počet dní od prvého zachytenia po predaj. Ak sme byt videli pribudnúť, je to skutočný čas na trhu; „≥“ znamená, že byt bol v ponuke už keď sme začali sledovať (máj 2026), takže rátame od prvého zachytenia a skutočný čas môže byť dlhší.", en: "Days from first sight to sold. If we saw the unit appear, it's the true time on market; “≥” means the unit was already listed when we began tracking (May 2026), so we count from first sight and the true figure may be longer." },
+  detection_method: { sk: "Ako sme predaj zistili: „označené“ = developer označil byt ako predaný; „zmizol“ = byt zmizol z ponuky (developer predané neoznačuje, tak berieme zmiznutie ako predaj).", en: "How we detected the sale: “marked” = the developer flagged it as sold; “delisted” = it disappeared from the listing (the developer doesn't mark sold, so a disappearance is taken as a sale)." },
 };
 // the three status views
 const STATUSES = [["sold", "Predané", "Sold"], ["reserved", "Rezervované", "Reserved"], ["prereserved", "Predrezervované", "Pre-reserved"]];
@@ -456,8 +456,8 @@ export default function SalesView({ lang = "sk" }) {
               sub={S.observed_dom_count
                 ? `${t(`z ${S.observed_dom_count} predaných`, `of ${S.observed_dom_count} sold`)}${S.censored_count ? t(` · z toho ${S.censored_count}× „≥“`, ` · ${S.censored_count}× are ≥`) : ""}`
                 : t("zatiaľ málo dát", "building history")}
-              info={t("Stredný počet dní od prvého zachytenia po predaj. Byty označené „≥“ boli v ponuke už na začiatku sledovania, takže skutočná hodnota môže byť vyššia.",
-                      "Median days from first sight to sold. Units marked “≥” were already listed when tracking began, so the real figure may be higher.")} />
+              info={t("Stredný počet dní, počas ktorých sa byt predával — od prvého zachytenia po predaj. Ak sme byt videli pribudnúť, je to skutočný čas na trhu; ak už bol v ponuke keď sme začali sledovať (máj 2026), rátame od prvého zachytenia (označené „≥“) a skutočná hodnota môže byť vyššia.",
+                      "Median number of days units were on the market — from first sight to sold. If we saw a unit appear it's the true time on market; if it was already listed when we began tracking (May 2026) we count from first sight (marked “≥”) and the real figure may be higher.")} />
           )}
         </div>
       )}

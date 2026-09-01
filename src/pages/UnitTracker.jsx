@@ -321,8 +321,8 @@ export default function UnitTracker({ lang = "sk", setCurrent }) {
       <div style={{ position: "relative", overflow: "hidden", borderRadius: 16, border: "1px solid var(--border)", padding: "1.25rem 1.6rem", marginBottom: "1.5rem", background: "radial-gradient(120% 140% at 2% -20%, rgba(18,185,129,0.13) 0%, transparent 46%), linear-gradient(135deg, color-mix(in srgb, var(--accent) 5%, var(--surface)) 0%, var(--bg) 75%)" }}>
         <p style={{ color: dim, fontSize: "0.88rem", lineHeight: 1.55, margin: 0, maxWidth: 720 }}>
           {L(
-            "Vyber projekt → klikni na byt a uvidíš jeho cenu, stav a kľúčové udalosti v čase. Chceš porovnať? Klikni na ďalšie byty (max 4 naraz, nech graf zostane čitateľný). Dáta pribúdajú každý deň — graf rastie sám.",
-            "Pick a project → click a unit to see its price, status and key events over time. Want to compare? Click more units (up to 4 at once, so the chart stays readable). Data grows every day."
+            "Vyber projekt → klikni na byt a uvidíš jeho cenu, stav a kľúčové udalosti v čase. Chceš porovnať? Klikni na ďalšie byty (max 4 naraz, nech graf zostane čitateľný). Dáta pribúdajú po každom scrape — graf rastie sám.",
+            "Pick a project → click a unit to see its price, status and key events over time. Want to compare? Click more units (up to 4 at once, so the chart stays readable). Data grows with every scrape."
           )}
         </p>
       </div>
@@ -808,8 +808,8 @@ function ChartCard({ pickedHistories, comparables, yMode, setYMode, lang }) {
     return (
       <div style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 12, padding: "1.5rem", marginBottom: "1rem", color: dim, fontSize: "0.88rem", textAlign: "center" }}>
         {lang === "sk"
-          ? "Tento byt zatiaľ nemá cenové body — prvý pribudne pri zajtrajšej aktualizácii."
-          : "No price points for this unit yet — the first one arrives with tomorrow's update."}
+          ? "Tento byt nemá zatiaľ žiadne cenové body. Po ďalšom mesačnom syncu bude mať svoj prvý záznam."
+          : "No price points yet for this unit. After the next monthly sync it will have its first record."}
       </div>
     );
   }
@@ -901,8 +901,8 @@ function ChartCard({ pickedHistories, comparables, yMode, setYMode, lang }) {
           <div style={{ color: orangeInk, display: "flex", alignItems: "center", gap: "0.4rem" }}>
             <span style={{ width: 6, height: 6, borderRadius: "50%", background: orange, display: "inline-block" }}/>
             {lang === "sk"
-              ? "Zatiaľ 1 záznam — ďalší bod pribudne zajtra a krivka začne mať tvar."
-              : "1 record so far — tomorrow adds another point and the line takes shape."}
+              ? "Zatiaľ máme len 1 záznam pre tento byt. Pri ďalšom scrape pribudne ďalší bod a krivka začne mať tvar."
+              : "Only 1 record for this unit so far. After the next scrape another point will appear and the line will take shape."}
           </div>
         )}
         {comparables.length > 0 && pickedHistories.length === 1 && (
@@ -1242,7 +1242,7 @@ function LineChartSVG({ pickedHistories, comparables, allMonths, yOf, fmtY, lang
             <g opacity="0.45">
               <path d={`M ${cx} ${cy} L ${W - padR - 8} ${cy}`} stroke={green} strokeWidth="1.5" fill="none" strokeDasharray="3,4"/>
               <text x={W - padR - 8} y={cy - 8} fill={green} fontSize="10" textAnchor="end" fontFamily={mono} opacity="0.85">
-                {lang === "sk" ? "→ ďalší bod zajtra" : "→ next point tomorrow"}
+                {lang === "sk" ? "→ ďalší bod po najbližšom scrape" : "→ next data point after next scrape"}
               </text>
             </g>
           );
@@ -1565,8 +1565,8 @@ function EmptyState({ lang, canFull, archiveMonths }) {
       {months <= 1 && (
         <div style={{ marginTop: "1rem", fontSize: "0.78rem", color: orangeInk, fontStyle: "italic", maxWidth: 540, margin: "1rem auto 0" }}>
           {lang === "sk"
-            ? "Každý deň pribudne nový dátový bod a krivka sa rozšíri."
-            : "A new data point lands every day and the curve grows."}
+            ? "Po každom scrape pribudne nový dátový bod a krivka sa rozšíri."
+            : "After each scrape a new data point will appear and the curve will grow."}
         </div>
       )}
     </div>

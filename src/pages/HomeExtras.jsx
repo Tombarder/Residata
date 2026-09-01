@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useSpecifics, SpecificsMark } from "../lib/projectSpecifics";
+import { useSpecifics, useProjectSpecificsData, SpecificsMark, AggregateSpecificsNote } from "../lib/projectSpecifics";
 import { useMarketTotals, useHomeProjects, useTotalsList, useVelocityMature } from "../lib/useData";
 import { useCountry, countryName } from "../lib/useCountry";
 import { moneyFromEur, moneySymbol } from "../lib/money";
@@ -1032,6 +1032,11 @@ const _emptyDrill = { level: "region", regionId: null, regionName: null, cityId:
 
 export function DistrictPulse({ lang = "en", setCurrent }) {  // eslint-disable-line no-unused-vars
   useCurrency(); // subscribe: re-render the per-district €/m² bars on currency toggle
+  // An area average blends every project inside it — shells included. Boss
+  // 2026-08-26 chose to SAY SO rather than drop those projects, because
+  // excluding them would make the average disagree with the project list.
+  const { projects: pulseProjects } = useHomeProjects();
+  const pulseSpecData = useProjectSpecificsData();
   const { country } = useCountry();
   const [sectionRef, inView] = useInView();
 
@@ -1176,6 +1181,8 @@ export function DistrictPulse({ lang = "en", setCurrent }) {  // eslint-disable-
           ))}
         </div>
       )}
+      <AggregateSpecificsNote projects={pulseProjects} data={pulseSpecData} lang={lang}
+        style={{ margin: "0.9rem auto 0", maxWidth: 720, textAlign: "center" }} />
     </section>
   );
 }

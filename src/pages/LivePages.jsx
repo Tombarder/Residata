@@ -318,8 +318,8 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
         {!loading && can("view_sold_velocity") && clearRows.length > 0 && clearRows.every(p => p.sold_last_month == null) && (
           <div style={{ background: "rgba(245,166,35,0.10)", border: "1px solid rgba(245,166,35,0.30)", borderRadius: 8, padding: "0.6rem 0.85rem", marginBottom: "1rem", color: "var(--text-2)", fontSize: "0.82rem", lineHeight: 1.5 }}>
             ⓘ {lang === "sk"
-              ? "Stĺpec „Predané 30d“ sa počíta z dvoch mesiacov dát — prvé čísla pribudnú budúci mesiac."
-              : "The “Sold 30d” column is computed from two months of data — the first figures appear next month."}
+              ? "Stĺpec „Predané 30d“ sa ešte napĺňa — počíta sa z dvoch mesiacov dát a zatiaľ máme prvý. Prvé čísla pribudnú po najbližšom mesačnom behu."
+              : "The “Sold 30d” column is still building — it's computed from two months of data and we only have the first. Figures appear after the next monthly run."}
           </div>
         )}
 
@@ -1347,8 +1347,8 @@ function ProjectInsights({ project, flats, snapshots, lang, coverageMode, onSele
         } else if (hasV) {
           title = L("Plocha × cena (len voľné byty)", "Area × price (available units only)");
           scopeNote = L(
-            `Developer zverejňuje iba voľné byty.`,
-            `Developer publishes only available units.`,
+            `Developer zverejňuje iba voľné byty. Predané a rezervované v grafe nie sú, lebo ich nemáme.`,
+            `Developer publishes only available units. Sold / reserved aren't plotted because we don't have them.`,
           );
         } else if (hasP && !hasV) {
           // Sold-out scenario — every plotted unit is already sold. Worth
