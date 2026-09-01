@@ -224,10 +224,8 @@ export function fitoutNote(level, lang) {
   }
   if (level === "mixed") {
     return sk
-      ? "Tento projekt predáva byty v rôznych stupňoch dokončenia (holobyt aj "
-        + "štandard), takže priemerná cena mieša dva odlišné produkty."
-      : "This project sells flats at different finish levels (a bare shell and a "
-        + "finished flat), so its average price mixes two different products.";
+      ? "Tento projekt predáva byty v rôznych stupňoch dokončenia — holobyt aj štandard."
+      : "This project sells flats at two finish levels — bare shell and finished.";
   }
   return "";
 }

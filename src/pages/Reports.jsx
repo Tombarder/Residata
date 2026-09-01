@@ -28,7 +28,7 @@
  */
 import { useState, useMemo, useEffect } from "react";
 import { useSpecifics, useProjectSpecificsData, SpecificsMark, SpecificsPanel,
-         UnitPriceMarks, AggregateSpecificsNote } from "../lib/projectSpecifics";
+         UnitPriceMarks } from "../lib/projectSpecifics";
 import { useProjects, useProjectSnapshots, useReportHistogram, fetchReportBinUnits, useReportProjectUnits, useReportComparables } from "../lib/useData";
 import LoadError from "../components/LoadError";
 import Picker from "../components/Picker";
@@ -568,7 +568,6 @@ function PickerRow({ label, value, options, onChange }) {
    Market report — global, "where the Slovak new-build market stands"
    ══════════════════════════════════════════════════════════════════ */
 function MarketReport({ projects, onOpenProject, lang }) {
-  const specData = useProjectSpecificsData();
   const { snapshots } = useProjectSnapshots();
   const { country } = useCountry();
   const { bins: priceSeries } = useReportHistogram({ scopeType: "market", nbins: 12 });
@@ -601,7 +600,6 @@ function MarketReport({ projects, onOpenProject, lang }) {
             mislabeled "most expensive". Pick the highest-€/m² NAMED district (skip
             the "(neznáme)"/"(unknown)" no-district bucket); the full table below
             still lists every bucket honestly. */}
-        <AggregateSpecificsNote projects={projects} data={specData} lang={lang} style={{ margin: "0 0 0.9rem" }} />
         <ExecSummary summary={summary} lang={lang} extraDistrict={
           [...districts]
             .filter(d => d.name !== "(neznáme)" && d.name !== "(unknown)" && d.wavgM2 != null)
@@ -642,7 +640,6 @@ function MarketReport({ projects, onOpenProject, lang }) {
           `projects` + `flats` are already filtered to that slice.
    ══════════════════════════════════════════════════════════════════ */
 function FilteredReport({ scopeLabel, scopeType, rpcScopeType, rpcScopeValue, projects, allProjects, onOpenProject, lang, breakdownBy, breakdownLabel }) {
-  const specData = useProjectSpecificsData();
   const { snapshots } = useProjectSnapshots();
   const { country } = useCountry();
   const { bins: priceSeries } = useReportHistogram({ scopeType: rpcScopeType, scopeValue: rpcScopeValue, nbins: 12 });
@@ -667,7 +664,6 @@ function FilteredReport({ scopeLabel, scopeType, rpcScopeType, rpcScopeValue, pr
       <KpiStrip summary={summary} lang={lang} />
 
       <ReportSection label={scopeType} title={title}>
-        <AggregateSpecificsNote projects={projects} data={specData} lang={lang} style={{ margin: "0 0 0.9rem" }} />
         <ExecSummary summary={summary} lang={lang} compared={{ label: lang === "sk" ? "trh" : "market", summary: globalSummary }} />
       </ReportSection>
 
@@ -707,7 +703,6 @@ function FilteredReport({ scopeLabel, scopeType, rpcScopeType, rpcScopeValue, pr
    ══════════════════════════════════════════════════════════════════ */
 function ProjectReport({ project, siblings, lang }) {
   const spec = useSpecifics(lang);
-  const specData = useProjectSpecificsData();
   // Hoist all hooks before any early return to keep hook ordering stable
   // across renders (rules-of-hooks).
   const { snapshots } = useProjectSnapshots();
@@ -809,7 +804,6 @@ function ProjectReport({ project, siblings, lang }) {
 
       <ReportSection label={lang === "sk" ? "Benchmark" : "Benchmark"} title={lang === "sk" ? `Projekt vs. časť mesta (${project.district || "—"})` : `Project vs. its district (${project.district || "—"})`}>
         <BenchmarkCard local={summary} global={districtSummary} scopeLabel={project.name} lang={lang} />
-        <AggregateSpecificsNote projects={districtSiblings} data={specData} lang={lang} />
       </ReportSection>
 
       {snapshots && snapshots.length > 0 && (
@@ -1588,8 +1582,8 @@ function SellOutForecastReport({ projects, lang, onOpenProject }) {
             color: text, fontSize: "0.82rem",
           }}>
             ⓘ {lang === "sk"
-              ? "Toto je prvý mesiac sledovania — ešte nemáme month-over-month delta na výpočet velocity. Forecast sa aktivuje od ďalšieho mesačného syncu."
-              : "This is our first month of tracking — no month-over-month delta yet to compute velocity. Forecasts activate after the next monthly sync."}
+              ? "Prognóza vypredania sa počíta z dvoch mesiacov histórie — zobrazí sa budúci mesiac."
+              : "Sell-out forecasts are computed from two months of history — they appear next month."}
           </div>
         )}
 
