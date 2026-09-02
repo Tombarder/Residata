@@ -440,17 +440,18 @@ export function UnitPriceMarks({ items, lang, compact = false }) {
 
 /* ── The footnote under a table ────────────────────────────────────────────
  * Names only what is actually on screen, so a table of ordinary projects
- * carries no legend at all. Returns "" when there is nothing to say — callers
- * render nothing rather than an empty box.
+ * carries no legend at all. LABELS ONLY — the one-sentence explanation lives on
+ * the hover card, never as prose under the table (Boss 2026-09-01). Returns ""
+ * when there is nothing to say — callers render nothing rather than an empty box.
  */
 export function specificsLegend(itemLists, lang) {
-  const seen = new Map();
+  const seen = new Set();
   for (const items of itemLists || []) {
-    for (const it of items || []) if (!seen.has(it.text)) seen.set(it.text, it.note);
+    for (const it of items || []) if (it?.text) seen.add(it.text);
   }
   if (!seen.size) return "";
   const head = sk(lang) ? "* Špecifiká projektu" : "* Project specifics";
-  return `${head} — ${[...seen.entries()].map(([t, n]) => (n ? `${t}: ${n}` : t)).join("  ")}`;
+  return `${head} — ${[...seen].join(" · ")}`;
 }
 
 /** The footnote as a styled block. Never rendered when there is nothing to say. */
@@ -462,48 +463,6 @@ export function SpecificsLegend({ itemLists, lang }) {
       margin: "0.6rem 0 0", fontSize: "0.7rem", lineHeight: 1.5,
       color: "var(--text-dim)", maxWidth: "80ch", overflowWrap: "anywhere",
     }}>{txt}</p>
-  );
-}
-
-/* ── The note under an AGGREGATE average (Boss 2026-08-26, decision 1) ─────
- * A district's average €/m² blends every project inside it, shells included.
- * Boss chose a NOTE over excluding them: dropping projects would make the
- * district average disagree with the project list printed underneath it.
- * Counts only what actually distorts a price comparison — fit-out level and
- * payment schedule. Coverage and missing areas don't move an average.
- */
-export function aggregateSpecificsNote(projects, data, lang) {
-  let shell = 0, furnished = 0, sched = 0;
-  for (const p of projects || []) {
-    const extra = data?.[p?.id] || data?.[p?.name];
-    const level = projectPriceLevel(p) || extra?.fitout_level;
-    if (level === "holobyt") shell++;
-    else if (level === "plne_zariadeny") furnished++;
-    const s = extra?.price_schedule;
-    if (s && s !== ORDINARY.price_schedule) sched++;
-  }
-  if (!shell && !furnished && !sched) return "";
-  const parts = [];
-  if (shell) parts.push(sk(lang) ? `${shell} s cenou za holobyt` : `${shell} priced as a shell`);
-  if (furnished) parts.push(sk(lang) ? `${furnished} plne zariadených` : `${furnished} fully furnished`);
-  if (sched) parts.push(sk(lang) ? `${sched} s iným splátkovým kalendárom`
-                                 : `${sched} on a different payment schedule`);
-  return sk(lang)
-    ? `Priemer zahŕňa ${parts.join(", ")} — tieto ceny nekupujú to isté, takže priemer mieša odlišné produkty.`
-    : `The average includes ${parts.join(", ")} — those prices don't buy the same thing, so it blends different products.`;
-}
-
-/** The aggregate note as a styled block. Renders nothing when there is nothing to say. */
-export function AggregateSpecificsNote({ projects, data, lang, style }) {
-  const txt = aggregateSpecificsNote(projects, data, lang);
-  if (!txt) return null;
-  return (
-    <p style={{
-      margin: "0.5rem 0 0", fontSize: "0.7rem", lineHeight: 1.5, color: "var(--text-dim)",
-      maxWidth: "80ch", overflowWrap: "anywhere", ...style,
-    }}>
-      <span style={{ color: "var(--accent-2)", fontWeight: 700 }}>*&nbsp;</span>{txt}
-    </p>
   );
 }
 
