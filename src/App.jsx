@@ -856,9 +856,12 @@ function HomePage({ setCurrent, l, lang, onLogin }) {
   } else if (liveProjCount === 0) {
     heroBadgeText = lang === "sk" ? "Live — žiadne aktívne projekty" : "Live — no active projects";
   } else {
+    // Say WHAT the number counts. "Live — 390 active" left a first-time visitor to
+    // guess whether that was projects, flats or something else — on the one badge
+    // that carries the whole pitch.
     heroBadgeText = lang === "sk"
-      ? `Live — ${liveProjCount} aktívnych`
-      : `Live — ${liveProjCount} active`;
+      ? `Live — ${liveProjCount} aktívnych projektov`
+      : `Live — ${liveProjCount} active projects`;
   }
   // Hero CTA logika podľa tier-u
   let heroButtons;

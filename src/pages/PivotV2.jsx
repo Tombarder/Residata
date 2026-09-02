@@ -327,7 +327,15 @@ const EMPTY_SENTINEL = "__EMPTY__";
 const DEFAULT_ROWS    = ["country", "project_name"];
 const DEFAULT_COLS    = [];
 const DEFAULT_VALUES  = [{ key: "cena_na_m2_obytnej", field: "cena_na_m2_obytnej", agg: "avg" }];
-const DEFAULT_FILTERS = [{ key: "stav", mode: "in", values: ["V", "PR"] }];
+// V/R/PR — the same "on offer" set the homepage, the reports and every district
+// average use. It used to be V+PR, which silently dropped reserved units and made
+// the pivot disagree with the headline number for no reason a customer could see;
+// the page carried a standing paragraph explaining the discrepancy instead of not
+// having one. (That paragraph was also wrong on its own terms: it claimed the
+// pivot included sold units, past months and any project status, when the default
+// is this filter, the current snapshot, and active projects only.) A saved pivot
+// keeps whatever the user chose — this is only the starting point.
+const DEFAULT_FILTERS = [{ key: "stav", mode: "in", values: ["V", "R", "PR"] }];
 const DEFAULT_VALUE_MODE = "raw";
 const DEFAULT_DATA_BARS  = true;
 const DEFAULT_SORT       = { col: "count", dir: "desc" };

@@ -310,16 +310,19 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
           </>
         )}
 
-        {/* Sold-velocity is computed month-over-month; right after the June market-key
-            unification the active markets only have one monthly snapshot, so every
-            project's sold_last_month is null. Show a clear "building history" note (paid
-            only — non-paid see a blurred placeholder, not a dash) so a column of "—"
-            doesn't read as broken. Self-heals once a second monthly snapshot lands. */}
+        {/* Fires only when NOT ONE visible row has a 30-day figure, so a column of "—"
+            does not read as broken (paid only — non-paid see a blurred placeholder).
+            It was written right after the June market-key unification, when the active
+            markets genuinely had a single monthly snapshot, and it still said so. They
+            now have five (May 2026 on) and 410 of 511 projects carry a figure, so the
+            only way this appears today is a scope whose projects are themselves too
+            new — a market just added, or a filter narrowed to new projects. Worded from
+            that condition rather than from a moment in our own history. */}
         {!loading && can("view_sold_velocity") && clearRows.length > 0 && clearRows.every(p => p.sold_last_month == null) && (
           <div style={{ background: "rgba(245,166,35,0.10)", border: "1px solid rgba(245,166,35,0.30)", borderRadius: 8, padding: "0.6rem 0.85rem", marginBottom: "1rem", color: "var(--text-2)", fontSize: "0.82rem", lineHeight: 1.5 }}>
             ⓘ {lang === "sk"
-              ? "Stĺpec „Predané 30d“ sa počíta z dvoch mesiacov dát — prvé čísla pribudnú budúci mesiac."
-              : "The “Sold 30d” column is computed from two months of data — the first figures appear next month."}
+              ? "„Predané 30d“ porovnáva stav spred mesiaca — tieto projekty zatiaľ tak ďaleko nesledujeme."
+              : "“Sold 30d” compares against a month ago — these projects aren't tracked that far back yet."}
           </div>
         )}
 

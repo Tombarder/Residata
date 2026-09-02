@@ -1560,7 +1560,13 @@ function SellOutForecastReport({ projects, lang, onOpenProject }) {
     return a.forecast_months - b.forecast_months;
   });
 
-  // Edge-case banner for first month of tracking
+  // Fires only when NOT ONE project in scope has a velocity signal. That used to be
+  // read as "we are new" and the banner said so — but SK and CZ have five months
+  // of history (May 2026 on) and 410 of 511 projects carry a figure, so it has not
+  // fired in months and the sentence was simply false. What it really means is that
+  // THESE projects lack a month of history: a market we have just added, or a filter
+  // narrowed to brand-new projects. Worded from that condition it stays true
+  // whenever it appears, and never needs revisiting.
   const allNoSignal = rows.length > 0 && rows.every(r => r.forecast_velocity === 0);
 
   return (
@@ -1582,8 +1588,8 @@ function SellOutForecastReport({ projects, lang, onOpenProject }) {
             color: text, fontSize: "0.82rem",
           }}>
             ⓘ {lang === "sk"
-              ? "Prognóza vypredania sa počíta z dvoch mesiacov histórie — zobrazí sa budúci mesiac."
-              : "Sell-out forecasts are computed from two months of history — they appear next month."}
+              ? "Tempo vypredania sa počíta z mesiaca histórie — tieto projekty ju zatiaľ nemajú."
+              : "Sell-out pace is computed from a month of history — these projects don't have one yet."}
           </div>
         )}
 
