@@ -20,6 +20,7 @@ import Picker from "../components/Picker";
 import PageHero from "../components/PageHero";
 import InfoTip from "../components/InfoTip";
 import { useSpecifics, SpecificsMark, SpecificsPanel, UnitPriceMarks } from "../lib/projectSpecifics";
+import ParkingCard from "../lib/parkingPrices";
 import PivotV2 from "./PivotV2";
 import MapFilterBuilder from "../components/MapFilterBuilder";
 import { applyFilters, describe, isComplete, pruneStale } from "../lib/mapFilters";
@@ -870,6 +871,10 @@ export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en
             )
         ) :
         <>
+          {/* Parking and storage, every kind side by side. Above the insights
+              because it answers a question the charts never can: what does the
+              bay cost, and do you have to buy one. */}
+          {project && <ParkingCard projectId={projectId} reviewed={project.parking_reviewed} lang={lang} />}
           {project && <ProjectInsights project={project} flats={flats} snapshots={snapshots} lang={lang}
                                      coverageMode={spec.data[projectId]?.coverage_mode ?? project.coverage_mode}
                                      onSelectFlat={onSelectFlat} />}

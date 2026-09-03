@@ -1795,10 +1795,20 @@ const PROJECTS_CSV_COLUMNS = [
   // marks on screen, so a downloaded file reads correctly on its own. The unit
   // export already carries fitout_level + every payment-schedule price.
   "fitout_level", "price_schedule", "coverage_mode", "has_interior_area",
+  // Parking, every kind in its own column. A garage and an outdoor bay differ by
+  // 40–105 % in the same project, so one merged "parking" column would be wrong
+  // for one of the two on every row. Prices are EUR, like every other price here.
+  "parking_garage_price_from", "parking_outside_price_from",
+  "parking_unspecified_price_from", "parking_storage_price_from",
+  "parking_garage_availability", "parking_outside_availability",
+  "parking_availability", "parking_bays_listed", "parking_reviewed",
 ];
 const PROJECTS_NUMBER_COLUMNS = new Set([
   "total_units", "available_units", "sold_units", "sold_last_month",
   "sold_percentage", "avg_price_eur_m2", "min_price", "max_price",
+  "parking_garage_price_from", "parking_outside_price_from",
+  "parking_unspecified_price_from", "parking_storage_price_from",
+  "parking_bays_listed",
 ]);
 const PROJECTS_DATE_COLUMNS = new Set(["last_updated"]);
 

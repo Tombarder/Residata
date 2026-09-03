@@ -9,6 +9,7 @@
  * the user asked for: is any of / is none of / has a value / is empty / between /
  * ≥ / ≤ / contains. Conditions AND together. Pure + unit-tested (no React).
  */
+import { moneyFromEur, moneySymbol } from "./money.js";
 import { ppm2Of, completionBucket, COMPLETION } from "./mapMetrics.js";
 
 const norm = (s) => (s == null ? "" : String(s)).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
@@ -17,7 +18,14 @@ const num = (v) => (v == null || v === "" || Number.isNaN(Number(v)) ? null : Nu
 // Readable labels for the raw project status values (Slovak-first — the switcher is
 // language-aware elsewhere; these keep the filter dropdown human, not "sold_out").
 const STATUS_LABEL = { active: "v ponuke", sold_out: "vypredané", paused: "pozastavené", archived: "archív", "": "—" };
-const eur = (v) => "€" + Math.round(v).toLocaleString("sk-SK");
+// Money in the currency the VIEWER chose, not a hardcoded euro sign. Every
+// price this file filters on — min_price, max_price, and the parking prices —
+// is stored in EUR, so it all goes through the platform's own converter. The
+// euro sign used to be typed in here, which was merely inconsistent for a
+// Czech viewer looking at flat prices and became a real fault the moment
+// parking arrived: those columns briefly carried raw CZK, and a 926 000 Kč
+// garage would have printed as "€926 000" beside a €310 035 flat.
+const eur = (v) => Math.round(moneyFromEur(v)).toLocaleString("sk-SK") + " " + moneySymbol();
 
 // What the developer says about getting a parking space. Mirrors AVAILABILITY in
 // v2/lib/parking.py — that module is the source of truth; this is the display copy.
@@ -52,7 +60,7 @@ export const FIELDS = [
   { key: "completion",      label: "Completion (when)", label_sk: "Dokončenie (kedy)", type: "category", get: (p) => completionBucket(p),
     options: ["ready", "cur", "soon", "mid", "far", "unknown"], optionLabel: (v) => COMPLETION[v]?.label || v },
   // ── Price ──
-  { key: "ppm2",            label: "Price per m²",         label_sk: "Cena za m²",            type: "number", get: (p) => ppm2Of(p) || null, fmt: (v) => "€" + Math.round(v).toLocaleString("sk-SK") },
+  { key: "ppm2",            label: "Price per m²",         label_sk: "Cena za m²",            type: "number", get: (p) => ppm2Of(p) || null, fmt: eur },
   { key: "min_price",       label: "Cheapest unit price",  label_sk: "Cena najlacnejšieho bytu", type: "number", get: (p) => num(p.min_price), fmt: eur },
   { key: "max_price",       label: "Priciest unit price",  label_sk: "Cena najdrahšieho bytu",   type: "number", get: (p) => num(p.max_price), fmt: eur },
   // ── Size & sales ──

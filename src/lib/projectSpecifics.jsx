@@ -49,6 +49,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { supabasePublic } from "./supabase";
+import { moneyFromEur, moneySymbol } from "./money";
 import HoverCard from "../components/HoverCard";
 import { priceBasisNote, fitoutNote, fitoutLabel, projectPriceLevel } from "./priceBasis";
 
@@ -64,7 +65,8 @@ export const ORDINARY = {
 /** Columns `public.projects` must serve for the rules below to work. */
 const SPECIFICS_COLUMNS =
   "id,name,price_schedule,coverage_mode,has_interior_area,fitout_level,total_units," +
-  "parking_availability,parking_garage_price_from,parking_outside_price_from";
+  "parking_availability,parking_garage_availability,parking_outside_availability," +
+  "parking_garage_price_from,parking_outside_price_from";
 
 const sk = (lang) => lang === "sk";
 
@@ -151,18 +153,30 @@ const RULES = [
   // an unreviewed project (parking_availability null) says nothing at all.
   ({ extra, lang }) => {
     if (extra?.parking_availability !== "mandatory") return null;
-    const from = extra?.parking_garage_price_from ?? extra?.parking_outside_price_from;
-    const price = from
-      ? new Intl.NumberFormat(sk(lang) ? "sk-SK" : "en-GB",
-          { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(from)
-      : null;
+    // WHICH kind is compulsory, and at WHICH price — never the two merged. A
+    // garage and an outdoor bay differ by 40–105 % in the same project (Evergreen:
+    // 16 122 € vs 7 854 €), so "parking from X" would be wrong for one of them
+    // every time. The first cut of this rule read `garage ?? outside`; it is the
+    // mistake this comment exists to stop coming back.
+    const money = (v) => v == null ? null
+      : Math.round(moneyFromEur(Number(v))).toLocaleString("sk-SK") + " " + moneySymbol();
+    const parts = [];
+    if (extra.parking_garage_availability === "mandatory" || extra.parking_garage_price_from != null) {
+      const p = money(extra.parking_garage_price_from);
+      parts.push((sk(lang) ? "garáž" : "garage") + (p ? ` ${sk(lang) ? "od" : "from"} ${p}` : ""));
+    }
+    if (extra.parking_outside_availability === "mandatory" || extra.parking_outside_price_from != null) {
+      const p = money(extra.parking_outside_price_from);
+      parts.push((sk(lang) ? "vonkajšie státie" : "outdoor bay") + (p ? ` ${sk(lang) ? "od" : "from"} ${p}` : ""));
+    }
+    const detail = parts.join(sk(lang) ? " · " : " · ");
     return {
       key: "parking_mandatory",
       text: sk(lang)
-        ? (price ? `Parkovanie je povinné — od ${price} navyše`
-                 : "Parkovanie je povinné — nie je v cene bytu")
-        : (price ? `Parking is compulsory — from ${price} on top`
-                 : "Parking is compulsory — not included in the flat price"),
+        ? (detail ? `Parkovanie je povinné — ${detail}`
+                  : "Parkovanie je povinné — nie je v cene bytu")
+        : (detail ? `Parking is compulsory — ${detail}`
+                  : "Parking is compulsory — not included in the flat price"),
       note: sk(lang)
         ? "Developer predáva byt len spolu s parkovacím miestom, takže skutočná cena "
           + "je vyššia než tá v cenníku. Cena státia sa do ceny bytu ani do ceny za m² "
@@ -227,6 +241,8 @@ export function useProjectSpecificsData() {
               fitout_level: r.fitout_level,
               total_units: r.total_units,
               parking_availability: r.parking_availability,
+              parking_garage_availability: r.parking_garage_availability,
+              parking_outside_availability: r.parking_outside_availability,
               parking_garage_price_from: r.parking_garage_price_from,
               parking_outside_price_from: r.parking_outside_price_from,
             };
