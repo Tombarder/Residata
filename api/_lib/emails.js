@@ -347,32 +347,48 @@ export function feedbackReceiptHtml(fb, webUrl, lang = "sk", convId = null) {
 }
 
 // ──────────────────────────────────────────────────────────
-// SMTP send helper — env-driven so outbound can send AS a domain address
-// (info@residata.eu) for FREE, without a paid mailbox. Two free paths, both
-// work with zero further code changes — just set env vars:
+// SMTP send helper.
 //
-//   (a) Gmail "send mail as" alias — quickest, no new account/DNS:
-//         SMTP_USER = <your real gmail>       (SMTP login; keep GMAIL_APP_PASSWORD)
-//         SMTP_PASS = <that gmail app pwd>
-//         MAIL_FROM = info@residata.eu        (a verified send-as alias in Gmail)
-//       Gmail signs it; deliverability is good, not domain-DKIM-aligned.
+// HOW IT SENDS (live): Resend, over SMTP. `SMTP_HOST=smtp.resend.com`,
+// `SMTP_PORT=465`, `SMTP_USER=resend`, `SMTP_PASS=<api key>` in Vercel. Resend
+// verifies the DOMAIN residata.eu (DKIM at `resend._domainkey.residata.eu`,
+// envelope sender on `send.residata.eu`), so ANY @residata.eu address is a valid
+// From — which is what lets the role-based senders below work without further setup.
 //
-//   (b) Free transactional provider (Resend/Brevo/…) with domain SPF+DKIM —
-//       best inbox placement, the proper long-term setup:
-//         SMTP_HOST = smtp.resend.com   SMTP_PORT = 465
-//         SMTP_USER = resend            SMTP_PASS = <api key>
-//         MAIL_FROM = info@residata.eu  (after adding residata.eu SPF/DKIM DNS)
+// The From address is DECOUPLED from the SMTP login: `resend` is the login, the
+// visible sender is chosen by role. There is deliberately no MAIL_FROM variable set
+// in Vercel any more — Vercel marks these write-only, so `vercel env pull` returns
+// an empty value and nobody, including the person who set it, can read back which
+// address the product actually sends as. The constants below are the source of
+// truth precisely because they can be read. MAIL_FROM is still honoured if someone
+// sets it, but nothing depends on it.
+// ── WHO THE MAIL COMES FROM — one place, decided by ROLE (Boss 2026-09-03) ──
+// residata.eu has three mailboxes and each has exactly one job:
 //
-// KEY FIX: the From address is now DECOUPLED from the SMTP login — previously
-// `from || gmailUser` forced From = the authenticating account, so sending as
-// info@ required info@ to BE the Gmail account. Falls back to the legacy Gmail
-// params passed by callers, so nothing breaks before the env is configured.
-export async function sendEmail({ to, subject, html, from, gmailUser, gmailPassword, replyTo }) {
+//   noreply@  machine mail nobody is expected to answer (welcome, resets, reports,
+//             invoices). It IS a real mailbox that copies to his Gmail, so even a
+//             reply sent to it in spite of the name is never lost.
+//   info@     anything a person may legitimately reply to.
+//   tomas@    him personally — his contact card and sales. NEVER a machine sender.
+//
+// The caller does not pick an address, it declares whether the mail is part of a
+// conversation; that way a new email cannot accidentally introduce a fourth
+// sender, and there is no second place where an address is written down.
+// Automated mail still carries Reply-To: info@, so a customer who hits reply
+// reaches a monitored mailbox instead of the void.
+const FROM_AUTOMATED      = process.env.MAIL_FROM              || "noreply@residata.eu";
+const FROM_CONVERSATIONAL = process.env.MAIL_FROM_CONVERSATIONAL || "info@residata.eu";
+
+export async function sendEmail({ to, subject, html, from, gmailUser, gmailPassword, replyTo, conversational = false }) {
   const host = process.env.SMTP_HOST || "smtp.gmail.com";
   const port = Number(process.env.SMTP_PORT || 465);
   const user = process.env.SMTP_USER || gmailUser;          // SMTP LOGIN (auth) — the real account
   const pass = process.env.SMTP_PASS || gmailPassword;
-  const fromAddr = process.env.MAIL_FROM || from || user;   // visible From — independent of the login
+  // `from` is the pre-2026-09 Gmail-era parameter. It is deliberately NOT consulted:
+  // MAIL_FROM already overrode it in production, so ignoring it changes nothing that
+  // ran, and it stops a caller quietly reintroducing tkamhal@gmail.com as a sender.
+  const fromAddr = conversational ? FROM_CONVERSATIONAL : FROM_AUTOMATED;
+  const replyAddr = replyTo || (conversational ? undefined : FROM_CONVERSATIONAL);
   const transporter = nodemailer.createTransport({
     host,
     port,
@@ -382,7 +398,7 @@ export async function sendEmail({ to, subject, html, from, gmailUser, gmailPassw
   await transporter.sendMail({
     from: `Residata <${fromAddr}>`,
     to,
-    ...(replyTo ? { replyTo } : {}),
+    ...(replyAddr ? { replyTo: replyAddr } : {}),
     subject,
     html,
   });
