@@ -47,10 +47,16 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
   process.exit(0);
 }
 
-// Single switch for the canonical domain: set VITE_SITE_BASE (or SITE_BASE) in
-// the Vercel build env when the custom domain goes live (e.g. https://residata.sk)
-// and the generated index.html + sitemap.xml pick it up. Matches src/lib/seo.js.
-const HOME = process.env.VITE_SITE_BASE || process.env.SITE_BASE || 'https://residata-gamma.vercel.app';
+// Single switch for the canonical domain: VITE_SITE_BASE (or SITE_BASE) in the
+// Vercel build env; the generated index.html, sitemap.xml, llms.txt, robots.txt
+// and security.txt all pick it up. Matches src/lib/seo.js.
+//
+// The default is the LIVE domain, not a vercel.app preview URL as it was until
+// 2026-09-03. Unlike seo.js this file has no window.location to fall back on, so
+// a build that lost the env var would have written a preview hostname into the
+// sitemap, the canonical tags and every public file — silently, since the build
+// still succeeds. The default now cannot be wrong.
+const HOME = process.env.VITE_SITE_BASE || process.env.SITE_BASE || 'https://residata.eu';
 
 async function fetchView(table, params = {}) {
   const qs = new URLSearchParams(params).toString();

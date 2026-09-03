@@ -10,111 +10,111 @@
         xmlns:xhtml="http://www.w3.org/1999/xhtml">
 
   <url>
-    <loc>https://residata-gamma.vercel.app/</loc>
+    <loc>https://residata.eu/</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://residata-gamma.vercel.app/" />
-    <xhtml:link rel="alternate" hreflang="sk" href="https://residata-gamma.vercel.app/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata-gamma.vercel.app/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://residata.eu/" />
+    <xhtml:link rel="alternate" hreflang="sk" href="https://residata.eu/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/" />
   </url>
   <url>
-    <loc>https://residata-gamma.vercel.app/live</loc>
+    <loc>https://residata.eu/live</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://residata-gamma.vercel.app/live" />
-    <xhtml:link rel="alternate" hreflang="sk" href="https://residata-gamma.vercel.app/live" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata-gamma.vercel.app/live" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://residata.eu/live" />
+    <xhtml:link rel="alternate" hreflang="sk" href="https://residata.eu/live" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/live" />
   </url>
   <url>
-    <loc>https://residata-gamma.vercel.app/pricing</loc>
+    <loc>https://residata.eu/pricing</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://residata-gamma.vercel.app/pricing" />
-    <xhtml:link rel="alternate" hreflang="sk" href="https://residata-gamma.vercel.app/pricing" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata-gamma.vercel.app/pricing" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://residata.eu/pricing" />
+    <xhtml:link rel="alternate" hreflang="sk" href="https://residata.eu/pricing" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/pricing" />
   </url>
   <url>
-    <loc>https://residata-gamma.vercel.app/about</loc>
+    <loc>https://residata.eu/about</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://residata-gamma.vercel.app/about" />
-    <xhtml:link rel="alternate" hreflang="sk" href="https://residata-gamma.vercel.app/about" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata-gamma.vercel.app/about" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://residata.eu/about" />
+    <xhtml:link rel="alternate" hreflang="sk" href="https://residata.eu/about" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/about" />
   </url>
   <url>
-    <loc>https://residata-gamma.vercel.app/use-cases</loc>
+    <loc>https://residata.eu/use-cases</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://residata-gamma.vercel.app/use-cases" />
-    <xhtml:link rel="alternate" hreflang="sk" href="https://residata-gamma.vercel.app/use-cases" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata-gamma.vercel.app/use-cases" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://residata.eu/use-cases" />
+    <xhtml:link rel="alternate" hreflang="sk" href="https://residata.eu/use-cases" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/use-cases" />
   </url>
   <url>
-    <loc>https://residata-gamma.vercel.app/data</loc>
+    <loc>https://residata.eu/data</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://residata-gamma.vercel.app/data" />
-    <xhtml:link rel="alternate" hreflang="sk" href="https://residata-gamma.vercel.app/data" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata-gamma.vercel.app/data" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://residata.eu/data" />
+    <xhtml:link rel="alternate" hreflang="sk" href="https://residata.eu/data" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/data" />
   </url>
   <url>
-    <loc>https://residata-gamma.vercel.app/contact</loc>
+    <loc>https://residata.eu/contact</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://residata-gamma.vercel.app/contact" />
-    <xhtml:link rel="alternate" hreflang="sk" href="https://residata-gamma.vercel.app/contact" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata-gamma.vercel.app/contact" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://residata.eu/contact" />
+    <xhtml:link rel="alternate" hreflang="sk" href="https://residata.eu/contact" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/contact" />
   </url>
   <url>
-    <loc>https://residata-gamma.vercel.app/status</loc>
+    <loc>https://residata.eu/status</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.4</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://residata-gamma.vercel.app/status" />
-    <xhtml:link rel="alternate" hreflang="sk" href="https://residata-gamma.vercel.app/status" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata-gamma.vercel.app/status" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://residata.eu/status" />
+    <xhtml:link rel="alternate" hreflang="sk" href="https://residata.eu/status" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/status" />
   </url>
   <url>
-    <loc>https://residata-gamma.vercel.app/data-sources</loc>
+    <loc>https://residata.eu/data-sources</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://residata-gamma.vercel.app/data-sources" />
-    <xhtml:link rel="alternate" hreflang="sk" href="https://residata-gamma.vercel.app/data-sources" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata-gamma.vercel.app/data-sources" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://residata.eu/data-sources" />
+    <xhtml:link rel="alternate" hreflang="sk" href="https://residata.eu/data-sources" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/data-sources" />
   </url>
   <url>
-    <loc>https://residata-gamma.vercel.app/imprint</loc>
+    <loc>https://residata.eu/imprint</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://residata-gamma.vercel.app/imprint" />
-    <xhtml:link rel="alternate" hreflang="sk" href="https://residata-gamma.vercel.app/imprint" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata-gamma.vercel.app/imprint" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://residata.eu/imprint" />
+    <xhtml:link rel="alternate" hreflang="sk" href="https://residata.eu/imprint" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/imprint" />
   </url>
   <url>
-    <loc>https://residata-gamma.vercel.app/terms</loc>
+    <loc>https://residata.eu/terms</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://residata-gamma.vercel.app/terms" />
-    <xhtml:link rel="alternate" hreflang="sk" href="https://residata-gamma.vercel.app/terms" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata-gamma.vercel.app/terms" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://residata.eu/terms" />
+    <xhtml:link rel="alternate" hreflang="sk" href="https://residata.eu/terms" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/terms" />
   </url>
   <url>
-    <loc>https://residata-gamma.vercel.app/privacy</loc>
+    <loc>https://residata.eu/privacy</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://residata-gamma.vercel.app/privacy" />
-    <xhtml:link rel="alternate" hreflang="sk" href="https://residata-gamma.vercel.app/privacy" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata-gamma.vercel.app/privacy" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://residata.eu/privacy" />
+    <xhtml:link rel="alternate" hreflang="sk" href="https://residata.eu/privacy" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/privacy" />
   </url>
 </urlset>

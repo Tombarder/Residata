@@ -42,8 +42,8 @@ Full details: https://residata.eu/imprint
 
 ## Public surfaces
 
-- Marketing site: https://residata-gamma.vercel.app/
-- Live dashboard (every active project): https://residata-gamma.vercel.app/live
-- Live analytics with district + developer breakdowns: https://residata-gamma.vercel.app/live/analytics
+- Marketing site: https://residata.eu/
+- Live dashboard (every active project): https://residata.eu/live
+- Live analytics with district + developer breakdowns: https://residata.eu/live/analytics
 
 Numbers above are regenerated from the live database on every deploy.

@@ -62,6 +62,6 @@ auto-scraped projects in all the public dashboards.
 
 ## Where to find this
 
-Available at https://residata-gamma.vercel.app/. Numbers in this file are regenerated from
+Available at https://residata.eu/. Numbers in this file are regenerated from
 the live database on every deploy — what you read here matches what
 the public dashboard shows at the same point in time.
