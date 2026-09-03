@@ -97,7 +97,7 @@ and sells dashboards / analytics / reports to developers, agents, funds, banks.
 The moat is the clean, historical, cross-developer **transaction-direction data**
 (what's available / reserved / sold, price/m², absorption, velocity).
 
-- **Live site:** https://residata-gamma.vercel.app
+- **Live site:** https://residata.eu  (`residata-gamma.vercel.app` still resolves — it is the Vercel preview URL, not the customer-facing domain)
 - **Founder / the user ("Boss"):** Tomáš Kamhal — CEO of Sympatia Group, finance
   background (PwC). **Non-developer** but tech-literate. Slovak-first.
 

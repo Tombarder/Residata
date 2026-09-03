@@ -139,7 +139,7 @@ Môžeš to pozrieť/otestovať na:
 
 ### Manuálny trigger (admin only)
 ```bash
-curl -X POST https://residata-gamma.vercel.app/api/cron/monthly-reports \
+curl -X POST https://residata.eu/api/cron/monthly-reports \
      -H "Authorization: Bearer $(cat /tmp/cron_secret.txt)"
 ```
 
@@ -149,7 +149,7 @@ curl -X POST https://residata-gamma.vercel.app/api/cron/monthly-reports \
 
 ## Verifikácia
 
-1. **AI end-to-end** — otvor <https://residata-gamma.vercel.app/app/reports>,
+1. **AI end-to-end** — otvor <https://residata.eu/app/reports>,
    klikni `✨ Vygenerovať` v ľubovoľnom scope. Mal by prísť ~5-odsekový SK text.
 2. **Rate limit** — stlač Vygenerovať 6× rýchlo za sebou. Šiesty klik
    (alebo 31. ak si paid) vráti žltý "limit reached" hint.

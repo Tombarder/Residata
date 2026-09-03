@@ -338,11 +338,19 @@ These should rotate at least every 90 days, sooner on any suspicion:
 | `GMAIL_APP_PASSWORD` | Vercel env + `app_secrets` | Low — Google account → App passwords |
 | `CRON_SECRET` | Vercel env | Low — generate new random string, update |
 
-## Audit log (not yet implemented)
+## Audit log — ✅ IMPLEMENTED (verified 2026-09-02)
 
-Currently no record of admin actions (`delete-user`, tier changes).
-Should be added before first paying customer who depends on auditable
-access control.
+`public.admin_audit_log` records every admin action with actor, target, payload,
+IP, user agent and success/error. Live and in use: 21 rows covering exactly the
+actions this section used to say were unrecorded — `delete_user` (7),
+`trial_grant` (6), `trial_revoke` (6), `subscription_update` (2).
+
+This heading said "not yet implemented" for months after it was. A security
+document claiming a control is MISSING when it exists is worse than one that is
+merely out of date: it invites someone to build it twice, or to tell a customer
+we cannot audit access when we can.
+
+The proposed schema kept below is what was actually built.
 
 ### Proposed schema
 ```sql
