@@ -193,6 +193,27 @@ const SEO_BY_PAGE = {
       description: "Živá dostupnosť a aktuálnosť dát Residata, meraná priamo vo vašom prehliadači.",
     },
   },
+  // /hero-lab — the internal picker for Home hero variants. It had NO entry, and
+  // applySeo returns early for an unknown page, so it silently kept whatever meta
+  // was already in the head: the previous page's on a client-side navigation, and
+  // index.html's homepage meta WITH `index, follow` for a crawler landing cold.
+  // robots.txt disallows it for `User-agent: *` but NOT for the AI crawlers we
+  // explicitly welcome (GPTBot, PerplexityBot, ClaudeBot…), which only exclude
+  // /app/, /api/ and /admin — so an internal tool was theirs to index under the
+  // homepage's title. Saying noindex on the page itself covers every crawler,
+  // named or not. Same defect that was found on /status; this was the last one.
+  HeroLab: {
+    path: "/hero-lab",
+    en: {
+      title: "Hero variants (internal) — Residata",
+      description: "Internal tool for previewing homepage hero variants. Not a public page.",
+    },
+    sk: {
+      title: "Varianty hero (interné) — Residata",
+      description: "Interný nástroj na náhľad variantov úvodnej sekcie. Nie je to verejná stránka.",
+    },
+    noindex: true,
+  },
   Terms: {
     path: "/terms",
     en: {

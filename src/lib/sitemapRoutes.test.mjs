@@ -87,6 +87,30 @@ test("no known dead, alias or duplicate url creeps back in", () => {
   }
 });
 
+test("every public route has its own SEO entry", () => {
+  // applySeo RETURNS EARLY for a page it does not know, leaving whatever meta is
+  // already in the head — the previous page's on a client-side navigation, and
+  // index.html's homepage meta WITH `index, follow` for a crawler landing cold.
+  // That is how /status shipped inheriting another page's identity, and how
+  // /hero-lab — an internal tool — was left indexable under the homepage title.
+  const routing = readFileSync(join(HERE, "routing.js"), "utf8");
+  const map = routing.match(/const map = \{([\s\S]*?)\n  \};/);
+  assert.ok(map, "could not find routing.js's path→page map; this test is vacuous without it");
+
+  const routed = new Set(
+    [...map[1].matchAll(/"[^"]+":\s*"([^"]+)"/g)]
+      .map((m) => m[1])
+      .filter((p) => !p.startsWith("App:") && !p.startsWith("Project:")), // both have explicit fallbacks
+  );
+  const start = SEO.indexOf("const SEO_BY_PAGE = {");
+  const table = SEO.slice(start, SEO.indexOf("\n};", start));
+  const known = new Set([...table.matchAll(/\n  "?([A-Za-z][A-Za-z ]*)"?:\s*\{/g)].map((m) => m[1].trim()));
+
+  const orphans = [...routed].filter((p) => !known.has(p)).sort();
+  assert.deepEqual(orphans, [],
+    "these routes would silently wear another page's title, description and robots tag");
+});
+
 test("two urls never claim to be the canonical of the same content", () => {
   // Pricing and Contact are ONE page. Each self-canonicalising was duplicate
   // content: Google picks one arbitrarily and splits the ranking signals.
