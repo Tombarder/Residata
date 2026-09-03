@@ -1298,10 +1298,38 @@ function SubscriptionCard({ lang, paused, paidWindowActive, paidUntil, paidStart
             {lang === "sk" ? "Spôsob platby" : "Billing"}
           </div>
           <div style={{ color: "var(--text-2)", fontSize: "0.86rem" }}>
-            {lang === "sk" ? "Manuálna fakturácia" : "Manual invoicing"}
+            {/* This said "Manual invoicing" for everyone, including subscribers
+                paying by card through Stripe. Say what is actually true. */}
+            {profile?.stripe_customer_id
+              ? (lang === "sk" ? "Karta — automaticky mesačne" : "Card — billed monthly")
+              : (lang === "sk" ? "Faktúra na prevod (dohodou)" : "Invoice by bank transfer (agreed)")}
           </div>
         </div>
       </div>
+
+      {/* What will appear on the invoice. A business buyer needs to be able to
+          SEE this and fix it before their accountant rejects the document. */}
+      {(profile?.billing_company_name || profile?.billing_company_id || profile?.billing_vat_id) && (
+        <div style={{ marginTop: "1rem", borderTop: `1px solid ${border}`, paddingTop: "1rem" }}>
+          <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.4rem" }}>
+            {lang === "sk" ? "Fakturačné údaje" : "Invoiced to"}
+          </div>
+          <div style={{ color: "var(--text-2)", fontSize: "0.86rem", lineHeight: 1.6 }}>
+            {profile.billing_company_name && <>{profile.billing_company_name}<br /></>}
+            {profile.billing_address?.line1 && <>{profile.billing_address.line1}<br /></>}
+            {(profile.billing_address?.postal_code || profile.billing_address?.city) && (
+              <>{[profile.billing_address.postal_code, profile.billing_address.city].filter(Boolean).join(" ")}<br /></>
+            )}
+            {profile.billing_company_id && <>IČO: {profile.billing_company_id}<br /></>}
+            {profile.billing_vat_id && <>{lang === "sk" ? "IČ DPH" : "VAT ID"}: {profile.billing_vat_id}<br /></>}
+          </div>
+          <div style={{ color: dim, fontSize: "0.78rem", marginTop: "0.45rem" }}>
+            {lang === "sk"
+              ? "Zmeniť ich viete cez „Spravovať platbu“."
+              : "Change these under “Manage billing”."}
+          </div>
+        </div>
+      )}
 
       {paused && (
         <div style={{

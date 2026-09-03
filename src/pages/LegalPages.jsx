@@ -419,8 +419,12 @@ export function TermsPage({ lang }) {
 
       <Section title={isSK ? "4. Účet a oprávnenie" : "4. Account and eligibility"}>
         <p>{isSK
-          ? "Na časti Služby je potrebná registrácia. Zaväzujete sa poskytnúť pravdivé údaje, chrániť svoje prihlasovacie údaje a nezdieľať prístup s tretími osobami. Za aktivitu na svojom účte zodpovedáte vy. Službu môžu využívať osoby staršie ako 18 rokov konajúce v rámci svojej podnikateľskej alebo profesijnej činnosti."
-          : "Parts of the Service require registration. You agree to provide truthful information, keep your credentials secure, and not share access with third parties. You are responsible for activity on your account. The Service is available to persons over 18 acting in the course of their business or profession."}</p>
+          ? "Na časti Služby je potrebná registrácia. Zaväzujete sa poskytnúť pravdivé údaje, chrániť svoje prihlasovacie údaje a nezdieľať prístup s tretími osobami. Za aktivitu na svojom účte zodpovedáte vy."
+          : "Parts of the Service require registration. You agree to provide truthful information, keep your credentials secure, and not share access with third parties. You are responsible for activity on your account."}</p>
+
+        <p>{isSK
+          ? "Služba je určená výlučne osobám starším ako 18 rokov konajúcim v rámci svojej podnikateľskej alebo profesijnej činnosti. Objednaním platenej úrovne potvrdzujete, že konáte ako podnikateľ a nie ako spotrebiteľ; preto pri objednávke uvádzate obchodné meno, sídlo a IČO. Službu neponúkame spotrebiteľom."
+          : "The Service is intended solely for persons over 18 acting in the course of their business or profession. By ordering a paid tier you confirm that you are acting as a business and not as a consumer, which is why the order asks for your business name, registered seat and company registration number. We do not offer the Service to consumers."}</p>
       </Section>
 
       <Section title={isSK ? "5. Predplatné, skúšobná verzia a platby" : "5. Subscription, trial and payment"}>
@@ -447,8 +451,16 @@ export function TermsPage({ lang }) {
 
       <Section title={isSK ? "8. Dostupnosť a beta funkcie" : "8. Availability and beta features"}>
         <p>{isSK
-          ? "Službu sa snažíme poskytovať spoľahlivo, no NEZARUČUJEME nepretržitú dostupnosť; môže dochádzať k výpadkom, údržbe a zmenám. Niektoré funkcie (napr. AI asistent) sú v skúšobnom/beta režime a môžu byť obmedzené alebo zmenené. AI výstupy môžu obsahovať chyby a nie sú zdrojom pravdy — smerodajné sú čísla v Analytike a Reportoch."
-          : "We aim to provide the Service reliably but DO NOT guarantee uninterrupted availability; outages, maintenance, and changes may occur. Some features (e.g. the AI assistant) are in trial/beta and may be limited or changed. AI outputs may contain errors and are not a source of truth — the figures in Analytics and Reports are authoritative."}</p>
+          ? "Niektoré funkcie (napr. AI asistent) sú v skúšobnom/beta režime a môžu byť obmedzené alebo zmenené. AI výstupy môžu obsahovať chyby a nie sú zdrojom pravdy — smerodajné sú čísla v Analytike a Reportoch."
+          : "Some features (e.g. the AI assistant) are in trial/beta and may be limited or changed. AI outputs may contain errors and are not a source of truth — the figures in Analytics and Reports are authoritative."}</p>
+
+        <p>{isSK
+          ? "Pre platené predplatné sa zaväzujeme k mesačnej dostupnosti Služby na úrovni 99,5 %. Do výpadku sa nezapočítava plánovaná údržba oznámená aspoň 48 hodín vopred, výpadky na strane vašej siete alebo zariadenia a okolnosti vylúčené vyššou mocou. Ak dostupnosť v danom mesiaci klesne pod uvedenú úroveň, na požiadanie zaslané do 30 dní vám poskytneme pomernú kreditovú náhradu za daný mesiac."
+          : "For paid subscriptions we commit to 99.5 % monthly availability of the Service. Excluded from downtime: scheduled maintenance announced at least 48 hours in advance, failures in your own network or device, and events of force majeure. If availability in a given month falls below that level, we will provide a pro-rata credit for that month on request made within 30 days."}</p>
+
+        <p>{isSK
+          ? "Denná aktualizácia dát je cieľom prevádzky, nie zárukou; zdrojové stránky developerov môžu byť dočasne nedostupné alebo zmenené. Výpadok jedného zdroja neznamená nedostupnosť Služby."
+          : "The daily data refresh is an operational target, not a warranty; developer source sites may be temporarily unavailable or change. An outage at a single source does not constitute unavailability of the Service."}</p>
       </Section>
 
       <Section title={isSK ? "9. Ochrana osobných údajov" : "9. Data protection"}>
@@ -459,8 +471,8 @@ export function TermsPage({ lang }) {
 
       <Section title={isSK ? "10. Vylúčenie záruk a obmedzenie zodpovednosti" : "10. Warranty disclaimer and limitation of liability"}>
         <p style={{ marginTop: 0 }}>{isSK
-          ? "Služba sa poskytuje „tak ako je“ a „ako je dostupná“, bez akýchkoľvek výslovných či implicitných záruk (vrátane záruky presnosti, vhodnosti na účel alebo neprerušovanej prevádzky) v maximálnom rozsahu povolenom právom."
-          : "The Service is provided “as is” and “as available”, without any express or implied warranties (including accuracy, fitness for purpose, or uninterrupted operation) to the maximum extent permitted by law."}</p>
+          ? "Služba sa poskytuje „tak ako je“ a „ako je dostupná“, bez akýchkoľvek výslovných či implicitných záruk (vrátane záruky presnosti, vhodnosti na účel alebo neprerušovanej prevádzky) v maximálnom rozsahu povolenom právom. Tým nie je dotknutý výslovný záväzok dostupnosti podľa článku 8, ktorý platí prednostne."
+          : "The Service is provided “as is” and “as available”, without any express or implied warranties (including accuracy, fitness for purpose, or uninterrupted operation) to the maximum extent permitted by law. This does not affect the express availability commitment in clause 8, which prevails."}</p>
         <p>{isSK
           ? "V maximálnom rozsahu povolenom právom nezodpovedáme za nepriame, následné alebo náhodné škody ani za ušlý zisk či rozhodnutia prijaté na základe dát zo Služby. Naša celková zodpovednosť voči vám je obmedzená sumou, ktorú ste za Službu zaplatili počas 12 mesiacov predchádzajúcich udalosti, ktorá zakladá nárok. Týmto nie sú dotknuté práva spotrebiteľa ani zodpovednosť, ktorú nemožno podľa práva vylúčiť."
           : "To the maximum extent permitted by law, we are not liable for indirect, consequential, or incidental damages, lost profits, or decisions made based on data from the Service. Our total liability to you is limited to the amount you paid for the Service in the 12 months preceding the event giving rise to the claim. This does not affect consumer rights or liability that cannot be excluded under applicable law."}</p>

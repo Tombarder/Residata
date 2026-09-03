@@ -97,7 +97,33 @@ async function handleCheckout(req, res) {
     client_reference_id: user.id,
     subscription_data: { metadata: { supabase_user_id: user.id } },
     allow_promotion_codes: true,
-    billing_address_collection: "auto",
+    // REQUIRED, not "auto". An invoice that cannot state the buyer's address is
+    // not a document a Slovak or Czech accountant can book, and "auto" means
+    // Stripe asks only when it feels like it.
+    billing_address_collection: "required",
+    // Collects the buyer's VAT number (IČ DPH / DIČ / VAT ID) and attaches it to
+    // the customer, so Stripe prints it on every invoice by itself. It is also
+    // the fact that decides reverse charge: an EU VAT number outside Slovakia
+    // means the tax is the buyer's to account for, not ours.
+    tax_id_collection: { enabled: true },
+    // The company registration number has no native Stripe field, so it is a
+    // custom field. Optional on purpose — a sole trader or a foreign buyer may
+    // legitimately not have one, and a hard requirement would block the sale.
+    // The webhook copies whatever is entered onto the customer, from where it
+    // prints on every future invoice.
+    custom_fields: [
+      {
+        key: "company_id",
+        label: { type: "custom", custom: "IČO / Company registration number" },
+        type: "text",
+        optional: true,
+        text: { maximum_length: 32 },
+      },
+    ],
+    // We are not VAT-registered, so there is no tax to calculate yet. When the
+    // company registers, this becomes { enabled: true } and Stripe applies the
+    // rate and the reverse charge using the address and VAT number collected
+    // above — which is why collecting them now matters even while tax is off.
     automatic_tax: { enabled: false },
     // Force EUR as the presentment currency. Stripe "Adaptive Pricing" (on by
     // default) auto-converts the EUR price into the visitor's local currency
@@ -111,7 +137,14 @@ async function handleCheckout(req, res) {
   // Returning subscriber → reuse their Stripe customer. New user → let Checkout
   // create the customer from their email (skips a separate customers.create call
   // = one less round-trip = faster). The webhook stores the customer id afterward.
-  if (profile?.stripe_customer_id) params.customer = profile.stripe_customer_id;
+  if (profile?.stripe_customer_id) {
+    params.customer = profile.stripe_customer_id;
+    // When an existing customer is passed, Checkout will NOT save the name or
+    // address it just collected unless it is told it may. Without this, a
+    // returning subscriber's invoice silently keeps whatever was on file before
+    // — which today is nothing.
+    params.customer_update = { name: "auto", address: "auto" };
+  }
   else if (user.email) params.customer_email = user.email;
 
   let session;
@@ -131,6 +164,73 @@ async function handleCheckout(req, res) {
     }
   }
   return res.status(200).json({ url: session.url });
+}
+
+/**
+ * Store the buyer's billing identity and make it print on their invoices.
+ *
+ * Two separate jobs, and both matter:
+ *
+ *  1. Write it to OUR database, so the invoice details are ours and survive
+ *     independently of Stripe — needed for the EU sales list (a Czech business
+ *     customer has to be reported monthly by VAT number) and for any invoice we
+ *     ever issue outside Stripe.
+ *
+ *  2. Write the company registration number onto the STRIPE CUSTOMER as an
+ *     invoice custom field, because that is what makes it appear on every
+ *     future invoice for that subscription — not just this first one. The VAT
+ *     number needs no such step: tax_id_collection attaches it to the customer
+ *     and Stripe prints it automatically.
+ *
+ * Never throws. A billing detail that fails to save is worth a log line, not a
+ * failed webhook that Stripe will retry and that could double-apply elsewhere.
+ */
+async function persistBillingIdentity(admin, stripe, session) {
+  const userId = session.client_reference_id
+    || session.metadata?.supabase_user_id
+    || null;
+  if (!userId) return;
+
+  const details = session.customer_details || {};
+  const address = details.address || null;
+  // Checkout returns the custom field under whichever type it was declared as.
+  const companyId = (session.custom_fields || [])
+    .find((f) => f.key === "company_id")?.text?.value?.trim() || null;
+  // tax_ids is an array; a buyer can in principle supply more than one, but
+  // Checkout collects a single VAT number, so take the first non-empty value.
+  const vatId = (details.tax_ids || [])
+    .map((t) => t?.value)
+    .find((v) => v && String(v).trim()) || null;
+
+  const patch = {
+    billing_company_name: details.name || null,
+    billing_company_id: companyId,
+    billing_vat_id: vatId,
+    billing_address: address,
+    billing_country: address?.country || null,
+    billing_updated_at: new Date().toISOString(),
+  };
+  // Do not blank a detail we already hold just because this session did not
+  // collect it — a returning customer may check out without re-entering
+  // everything, and an invoice losing the buyer's IČO is worse than a stale one.
+  for (const k of Object.keys(patch)) {
+    if (patch[k] === null && k !== "billing_updated_at") delete patch[k];
+  }
+  if (Object.keys(patch).length <= 1) return;
+
+  const { error } = await admin.from("user_profiles").update(patch).eq("id", userId);
+  if (error) throw new Error(`user_profiles update: ${error.message}`);
+
+  // Mirror the registration number onto the Stripe customer so it prints on
+  // every invoice from here on, not only the one this checkout created.
+  const customerId = typeof session.customer === "string" ? session.customer : session.customer?.id;
+  if (customerId && companyId) {
+    await stripe.customers.update(customerId, {
+      invoice_settings: {
+        custom_fields: [{ name: "IČO", value: companyId.slice(0, 30) }],
+      },
+    });
+  }
 }
 
 // ─── portal ──────────────────────────────────────────────────────────────
@@ -296,6 +396,12 @@ async function handleWebhook(req, res) {
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object;
+        // Capture WHO is buying before anything else. This is the only moment
+        // the company name, registration number and VAT number exist in one
+        // place; a failure here must never cost the subscription, so it is
+        // caught inside and logged rather than thrown.
+        await persistBillingIdentity(admin, stripe, session).catch((e) =>
+          console.warn("[stripe] billing identity not stored:", e?.message || e));
         if (session.mode === "subscription" && session.subscription) {
           const subId = typeof session.subscription === "string" ? session.subscription : session.subscription.id;
           const sub = await stripe.subscriptions.retrieve(subId);

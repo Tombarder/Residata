@@ -39,6 +39,7 @@ const S = {
   rowLabel:  `color:${TEXT_DIM};font-family:'JetBrains Mono',Consolas,monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;margin-right:8px`,
   actions:   `margin-top:16px;padding-top:16px;border-top:1px solid ${CARD_BORDER}`,
   footer:    `margin-top:20px;font-size:12px;color:${TEXT_DIM};text-align:center;line-height:1.6`,
+  legalFooter: `margin-top:10px;padding-top:10px;border-top:1px solid #23232b;font-size:11px;color:${TEXT_DIM};line-height:1.55`,
 };
 
 /**
@@ -83,7 +84,8 @@ function shell({ title, preheader = "", inner, footer }) {
         <table role="presentation" width="560" cellspacing="0" cellpadding="0" border="0" style="max-width:560px;width:100%">
           <tr>
             <td style="${S.footer}">
-              ${footer || "Residata · realitné dáta o bratislavskom trhu novostavieb"}
+              ${footer || "Residata · dáta o trhu novostavieb na Slovensku a v Česku"}
+              <div style="${S.legalFooter}">${legalFooterHtml()}</div>
             </td>
           </tr>
         </table>
@@ -110,6 +112,28 @@ function emailDomain(email) {
 // HMAC-signed approve URL (mirrors notify_auth_events.py)
 // ──────────────────────────────────────────────────────────
 import { createHmac } from "crypto";
+import { COMPANY, addressOneLine, registrationLine } from "../../src/lib/company.js";
+
+/**
+ * The sender's legal identity, in the footer of every email we send.
+ *
+ * § 3a of the Commercial Code applies to a registered company's "business
+ * documents ... in written or electronic form" — which includes the emails we
+ * send customers, not only the website. It was on neither until today.
+ *
+ * Read from lib/company like every other surface, so the day the DIČ or IČ DPH
+ * is issued it appears here too without anyone remembering that emails exist.
+ */
+function legalFooterHtml() {
+  const ids = [`IČO: ${COMPANY.ico}`];
+  if (COMPANY.dic) ids.push(`DIČ: ${COMPANY.dic}`);
+  if (COMPANY.icDph) ids.push(`IČ DPH: ${COMPANY.icDph}`);
+  return [
+    `${COMPANY.legalName}, ${addressOneLine("sk")}`,
+    `${ids.join(" · ")}`,
+    registrationLine("sk"),
+  ].join("<br>");
+}
 
 export function approveUrl(userId, tier, supabaseUrl, hmacSecret, ttlSec = 7 * 86400) {
   const exp = Math.floor(Date.now() / 1000) + ttlSec;
