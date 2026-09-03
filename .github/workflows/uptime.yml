@@ -64,8 +64,11 @@ jobs:
           # goes stale on its own and every scanner starts treating it as invalid
           # — silently, because the file still returns 200. Check the date, not
           # just the presence.
+          # Strip the "Expires:" prefix rather than splitting on ':' — an
+          # ISO-8601 timestamp is full of colons, so a field split returns
+          # "2027-09-03T12" and the check compares against a truncated date.
           sec_exp=$(curl -sS --max-time 20 https://residata.eu/.well-known/security.txt \
-                    | awk -F': *' '/^Expires:/ {print $2; exit}')
+                    | sed -n 's/^Expires:[[:space:]]*//p' | head -1 | tr -d '\r')
           if [ -n "$sec_exp" ]; then
             # RFC 9116 writes Expires as ISO-8601 with fractional seconds
             # (2027-09-03T08:52:22.000Z). GNU date cannot parse that form and
