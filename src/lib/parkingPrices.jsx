@@ -51,10 +51,25 @@ export const PARKING_KINDS = [
   { key: "storage",         sk: "Kobka / pivnica",      en: "Storage" },
 ];
 
-/** Mirrors AVAILABILITY in v2/lib/parking.py — that module is the source of truth. */
+/** Mirrors AVAILABILITY in v2/lib/parking.py — that module is the source of truth.
+ *
+ * Boss 2026-09-03: *"make sure u also record somewhere if the garage is already in
+ * price of the apartment, or if its mandatory, or if not mandatory. very important
+ * differences."* They are, and they point in opposite directions, so they must not
+ * look alike:
+ *
+ *   included   the flat price already covers a bay → the project is CHEAPER than a
+ *              rival quoting the same flat price without one.   (ok, green)
+ *   mandatory  the buyer cannot decline → the project is DEARER than its own price
+ *              list says.                                        (warn, amber)
+ *   optional   a separate product, the price list stands.        (plain chip)
+ *
+ * Three identical grey chips would bury the only part of this card that changes
+ * what a buyer actually pays.
+ */
 const TERMS = {
-  mandatory:   { sk: "POVINNÉ",       en: "COMPULSORY",  strong: true },
-  included:    { sk: "v cene bytu",   en: "in the flat price" },
+  mandatory:   { sk: "POVINNÉ",       en: "COMPULSORY",        tone: "warn" },
+  included:    { sk: "V CENE BYTU",   en: "IN THE FLAT PRICE",  tone: "ok" },
   optional:    { sk: "voliteľné",     en: "optional" },
   on_request:  { sk: "na vyžiadanie", en: "on request" },
   not_offered: { sk: "nepredáva sa",  en: "not sold" },
@@ -198,9 +213,16 @@ export default function ParkingCard({ projectId, reviewed, lang = "en" }) {
               </div>
               <div style={{ fontSize: "1.05rem", fontWeight: 700, color: "var(--text)" }}>
                 {price
-                  ? (r.price_max_eur == null
-                      ? <>{sk(lang) ? "od " : "from "}{price}</>
-                      : price)
+                  ? (r.availability === "included"
+                      // The buyer does not pay this on top — it is what the
+                      // developer says the included bay is worth. Printing it like
+                      // any other price would read as a surcharge.
+                      ? <span style={{ fontWeight: 600, fontSize: "0.9rem" }}>
+                          {sk(lang) ? "hodnota " : "value "}{price}
+                        </span>
+                      : r.price_max_eur == null
+                        ? <>{sk(lang) ? "od " : "from "}{price}</>
+                        : price)
                   : <span style={{ color: "var(--text-2)", fontWeight: 400, fontSize: "0.85rem" }}>
                       {sk(lang) ? "cena nezverejnená" : "price not published"}
                     </span>}
@@ -212,7 +234,7 @@ export default function ParkingCard({ projectId, reviewed, lang = "en" }) {
               )}
               <div style={{ marginTop: 6, display: "flex", gap: 6, flexWrap: "wrap" }}>
                 {terms && (
-                  <span className={strong ? "rd-badge rd-badge--warn" : "rd-chip"}
+                  <span className={tone ? `rd-badge rd-badge--${tone}` : "rd-chip"}
                         style={{ fontSize: "0.65rem" }}>
                     {terms}
                   </span>

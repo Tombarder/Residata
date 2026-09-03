@@ -12,7 +12,11 @@
  *      coverage           ordinary = the site lists SOLD units as well as free
  *      living area        ordinary = we hold obytná plocha, so a price per m²
  *                                    can be computed
- *      parking            ordinary = a bay is optional; buying one is a choice
+ *      parking            ordinary = a bay is optional; buying one is a choice.
+ *                                    Both departures are marked: compulsory (you
+ *                                    pay more than the price list says) and
+ *                                    included (you pay less than a rival asking
+ *                                    the same for the flat alone).
  *
  * A price that assumes something unusual, shown without saying so, is a wrong
  * price — that is the whole point (see lib/priceBasis.jsx for the case that
@@ -59,7 +63,7 @@ export const ORDINARY = {
   fitout_level: "standard",
   coverage_mode: "full",     // the developer publishes sold units too
   has_interior_area: true,
-  parking_mandatory: false,  // you may buy a bay; you don't have to
+  parking_availability: "optional",  // you may buy a bay; you neither must nor get one free
 };
 
 /** Columns `public.projects` must serve for the rules below to work. */
@@ -152,7 +156,24 @@ const RULES = [
   // `mandatory` fires: everything else is either ordinary or simply unknown, and
   // an unreviewed project (parking_availability null) says nothing at all.
   ({ extra, lang }) => {
-    if (extra?.parking_availability !== "mandatory") return null;
+    const av = extra?.parking_availability;
+    // INCLUDED is a specific too, and it points the other way: a project whose flat
+    // price already covers a bay is CHEAPER than a rival quoting the same number
+    // without one. Boss 2026-09-03 named the three cases as "very important
+    // differences", and comparing a project that includes a bay against one
+    // charging 25 000 € for it is exactly the comparison the mark exists for.
+    if (av === "included") {
+      return {
+        key: "parking_included",
+        text: sk(lang) ? "Parkovanie je v cene bytu" : "Parking is included in the flat price",
+        note: sk(lang)
+          ? "Developer dáva k bytu parkovacie miesto v základnej cene. Pri porovnaní "
+            + "s projektom, kde sa státie dokupuje, je tento projekt o jeho cenu lacnejší."
+          : "The developer includes a parking space in the base price. Against a project "
+            + "where a bay is bought separately, this one is cheaper by that amount.",
+      };
+    }
+    if (av !== "mandatory") return null;
     // WHICH kind is compulsory, and at WHICH price — never the two merged. A
     // garage and an outdoor bay differ by 40–105 % in the same project (Evergreen:
     // 16 122 € vs 7 854 €), so "parking from X" would be wrong for one of them
