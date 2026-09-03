@@ -1,0 +1,14 @@
+# Residata — security contact
+# Operated by Kamhal & Co. s. r. o., Krasovského 13, 851 01 Bratislava – Petržalka, Slovak Republic
+# Company ID (ICO): 57849471
+
+Contact: mailto:info@residata.eu
+Expires: 2027-09-03T08:51:23.000Z
+Preferred-Languages: sk, en, cs
+Canonical: https://residata.eu/.well-known/security.txt
+Policy: https://residata.eu/terms
+
+# Found a security issue in Residata? Email the address above with enough
+# detail to reproduce it. We acknowledge within 3 working days. Please do not
+# access, modify or exfiltrate other users' data, and please give us reasonable
+# time to fix an issue before disclosing it publicly.

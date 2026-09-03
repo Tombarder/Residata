@@ -36,6 +36,8 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { COMPANY, addressOneLine } from '../src/lib/company.js';
+import { FALLBACK_MONTHLY_CENTS, FALLBACK_MONTHLY_DISPLAY, FALLBACK_ANCHOR_DISPLAY } from '../src/lib/pricingDefaults.js';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -63,9 +65,9 @@ async function fetchView(table, params = {}) {
 // `market` uses public.totals_global (SK + CZ combined) so the static/LLM surfaces
 // match the daily multi-market product — NOT market_totals, which is SK-only and
 // would undercount coverage. market_totals is still fetched for snapshot_month.
-let market, districts, topProjects, skMeta;
+let market, districts, topProjects, skMeta, cities;
 try {
-  [[market], districts, topProjects, [skMeta]] = await Promise.all([
+  [[market], districts, topProjects, [skMeta], cities] = await Promise.all([
     fetchView('totals_global'),
     fetchView('district_totals', { order: 'total_units.desc' }),
     fetchView('projects_live', {
@@ -74,6 +76,10 @@ try {
       limit: '15',
     }),
     fetchView('market_totals'),
+    // Coverage is no longer "Bratislava and Prague" — it has been every town
+    // with an actively-sold new-build since the 2026-06-08 market unification.
+    // Counted, not asserted, so the claim cannot go stale again.
+    fetchView('totals_by_city', { select: 'city_id' }).catch(() => []),
   ]);
 } catch (e) {
   console.warn('[gen-static] Supabase fetch failed — keeping existing files. Error:', e.message);
@@ -93,11 +99,17 @@ const fmtEur = (cents) => {
   const eur = Number(cents) / 100;
   return '€' + (Number.isInteger(eur) ? String(eur) : eur.toFixed(2));
 };
-const priceStr = fmtEur(pricing?.monthly_price_cents) || '€349.99';
-const anchorStr = fmtEur(pricing?.anchor_price_cents) || '€479.99';
-const priceNum = pricing?.monthly_price_cents != null ? (Number(pricing.monthly_price_cents) / 100).toFixed(2) : '349.99';
+const priceStr = fmtEur(pricing?.monthly_price_cents) || FALLBACK_MONTHLY_DISPLAY;
+const anchorStr = fmtEur(pricing?.anchor_price_cents) || FALLBACK_ANCHOR_DISPLAY;
+const priceNum = ((pricing?.monthly_price_cents ?? FALLBACK_MONTHLY_CENTS) / 100).toFixed(2);
 
 const fmtN = (n) => n == null ? '—' : Number(n).toLocaleString('en-US');
+// How coverage is described wherever a static surface states it. Counted from
+// the live data — never a hand-written city list.
+const cityCount = Array.isArray(cities) ? cities.length : 0;
+const coverageLine = cityCount
+  ? `Slovakia and Czechia — ${cityCount} towns and cities with actively sold new-build projects`
+  : 'Slovakia and Czechia — every town with actively sold new-build projects';
 const today = new Date().toISOString().slice(0, 10);
 const month = skMeta?.snapshot_month || today.slice(0, 7);
 const monthLabel = (() => {
@@ -115,13 +127,14 @@ const llms = `# Residata
 > banks, valuers, and investors.
 
 Residata tracks every new residential development across Slovakia and
-Czechia (Bratislava and Prague and their wider markets). It normalizes
+Czechia — every town where new-builds are actively sold, not just the two
+capitals. It normalizes
 data from developer websites into a single consistent schema, refreshes
 it daily, and delivers it as CSV and XLSX.
 
 ## Scope (updated daily; snapshot ${monthLabel})
 
-- Markets: Slovakia (Bratislava) and Czechia (Prague)
+- Markets: ${coverageLine}
 - Total projects in dataset: ${fmtN(market?.total_projects_tracked ?? market?.total_projects_active)} new-build residential projects (current + sold-out under tracking)
 - Currently active (in market): ${fmtN(market?.total_projects_active)} projects, ${fmtN(market?.total_units_tracked)} units
 - Currently for sale: ${fmtN(market?.total_available)} units · reserved: ${fmtN(market?.total_reserved)} · sold: ${fmtN(market?.total_sold)}
@@ -181,8 +194,8 @@ const topProjList = topProjects.length > 0
 const llmsFull = `# Residata — full coverage profile (for AI agents)
 
 Residata is a market intelligence service for new-build residential
-real estate across Slovakia and Czechia (Bratislava, Prague, and their
-wider markets). We track every active development project, normalize data
+real estate across Slovakia and Czechia — ${coverageLine.replace(/^Slovakia and Czechia — /, '')},
+not just the two capitals. We track every active development project, normalize data
 from developer websites into one schema, and refresh the dataset daily.
 
 ## Market coverage (updated daily; snapshot ${monthLabel})
@@ -236,6 +249,31 @@ the public dashboard shows at the same point in time.
 
 fs.writeFileSync(path.resolve('public/llms-full.txt'), llmsFull);
 console.log(`[gen-static] public/llms-full.txt — ${llmsFull.length} chars`);
+
+// ─────────────── .well-known/security.txt — vulnerability contact ───────────────
+// Written from src/lib/company.js so the company details in it can never drift
+// from the Imprint. `Expires` is required by RFC 9116 and must be in the future
+// or scanners treat the file as stale — one year from each build keeps it valid
+// as long as the site is deployed at all.
+const secExpires = new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString().replace(/\.\d{3}Z$/, '.000Z');
+const securityTxt = `# Residata — security contact
+# Operated by ${COMPANY.legalName}, ${addressOneLine('en')}
+# Company ID (ICO): ${COMPANY.icoPlain}
+
+Contact: mailto:${COMPANY.email}
+Expires: ${secExpires}
+Preferred-Languages: sk, en, cs
+Canonical: https://residata.eu/.well-known/security.txt
+Policy: https://residata.eu/terms
+
+# Found a security issue in Residata? Email the address above with enough
+# detail to reproduce it. We acknowledge within 3 working days. Please do not
+# access, modify or exfiltrate other users' data, and please give us reasonable
+# time to fix an issue before disclosing it publicly.
+`;
+fs.mkdirSync(path.resolve('public/.well-known'), { recursive: true });
+fs.writeFileSync(path.resolve('public/.well-known/security.txt'), securityTxt);
+console.log(`[gen-static] public/.well-known/security.txt — ${securityTxt.length} chars`);
 
 // ───────────────────── sitemap.xml — refresh lastmod ─────────────────────
 const SITEMAP_URLS = [

@@ -6,18 +6,19 @@
 > banks, valuers, and investors.
 
 Residata tracks every new residential development across Slovakia and
-Czechia (Bratislava and Prague and their wider markets). It normalizes
+Czechia — every town where new-builds are actively sold, not just the two
+capitals. It normalizes
 data from developer websites into a single consistent schema, refreshes
 it daily, and delivers it as CSV and XLSX.
 
-## Scope (updated daily; snapshot July 2026)
+## Scope (updated daily; snapshot September 2026)
 
-- Markets: Slovakia (Bratislava) and Czechia (Prague)
-- Total projects in dataset: 327 new-build residential projects (current + sold-out under tracking)
-- Currently active (in market): 274 projects, 33,297 units
-- Currently for sale: 9,811 units · reserved: 2,694 · sold: 19,903
-- Average price across available inventory: €6,188/m²
-- Distinct active developers: 187
+- Markets: Slovakia and Czechia — 47 towns and cities with actively sold new-build projects
+- Total projects in dataset: 511 new-build residential projects (current + sold-out under tracking)
+- Currently active (in market): 389 projects, 41,461 units
+- Currently for sale: 12,223 units · reserved: 3,420 · sold: 25,003
+- Average price across available inventory: €5,936/m²
+- Distinct active developers: 231
 - Data refresh: daily
 - Languages: Slovak and English
 
@@ -30,7 +31,7 @@ it daily, and delivers it as CSV and XLSX.
 
 ## Pricing
 
-- €349.99 / month for full ongoing access (early-access price; regular €479.99)
+- €279.99 / month for full ongoing access (early-access price; regular €479.99)
 
 ## Public surfaces
 

@@ -16,6 +16,7 @@
  */
 import { useEffect, useState } from "react";
 import { supabasePublic, isSupabaseReady } from "./supabase";
+import { FALLBACK_MONTHLY_DISPLAY, FALLBACK_ANCHOR_DISPLAY } from "./pricingDefaults";
 
 const CACHE_KEY = "residata_pricing_v1";
 
@@ -114,7 +115,7 @@ export function currentPriceStrings() {
   // beat. Kept roughly current so even that split-second isn't wildly wrong.
   const c = CONFIG || readCache();
   return {
-    price: formatEurCents(c?.monthly_price_cents) || "€279.99",
-    anchor: (c && c.anchor_price_cents != null ? formatEurCents(c.anchor_price_cents) : null) || "€479.99",
+    price: formatEurCents(c?.monthly_price_cents) || FALLBACK_MONTHLY_DISPLAY,
+    anchor: (c && c.anchor_price_cents != null ? formatEurCents(c.anchor_price_cents) : null) || FALLBACK_ANCHOR_DISPLAY,
   };
 }

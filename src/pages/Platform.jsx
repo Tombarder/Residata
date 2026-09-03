@@ -20,6 +20,7 @@ import Picker from "../components/Picker";
 import { useProjectSpecificsData } from "../lib/projectSpecifics";
 import PageHero from "../components/PageHero";
 import { usePricing } from "../lib/pricing";
+import { FALLBACK_MONTHLY_DISPLAY, FALLBACK_ANCHOR_DISPLAY } from "../lib/pricingDefaults";
 import { useProjects } from "../lib/useData";
 import DashboardHome from "./DashboardHome";
 import { useCountry, isAllCountries } from "../lib/useCountry";
@@ -954,8 +955,10 @@ function PlatformBilling({ lang, setCurrent }) {
           paidActive, paidPaused, paidWindowActive, paidDaysLeft, paidUntil, paidStartedAt } = caps;
   const { profile } = useAuth();
   const pricing = usePricing(lang);   // DB-driven price (falls back to defaults below)
-  const priceDisplay = pricing.priceDisplay || "€349.99";
-  const anchorDisplay = pricing.ready ? pricing.anchorDisplay : "€349.99";
+  const priceDisplay = pricing.priceDisplay || FALLBACK_MONTHLY_DISPLAY;
+  // Was "€349.99" — identical to the price fallback, so the struck-through
+  // "regular price" showed the same number as the price it was discounting.
+  const anchorDisplay = pricing.ready ? pricing.anchorDisplay : FALLBACK_ANCHOR_DISPLAY;
 
   // Display logic — the "effective" tier (badge shown) and the
   // "base" tier (raw column) can disagree:

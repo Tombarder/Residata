@@ -2,6 +2,7 @@ import { Fragment, useState, useEffect, useLayoutEffect, useRef, lazy, Suspense 
 import { useNavCollapsed } from "./lib/breakpoints";
 import { t } from "./lib/marketingCopy";
 import { usePricing } from "./lib/pricing";
+import { COMPANY, registrationLine } from "./lib/company";
 import { createPortal } from "react-dom";
 import Ticker from "./components/Ticker";
 import LoginModal from "./components/LoginModal";
@@ -794,7 +795,9 @@ function Footer({ lang = "en", setCurrent }) {
           <div style={col}>
             <a href="mailto:info@residata.eu" style={linkStyle} onMouseEnter={hoverOn} onMouseLeave={hoverOff}>info@residata.eu</a>
             <a href="tel:+421911963909" style={linkStyle} onMouseEnter={hoverOn} onMouseLeave={hoverOff}>+421 911 963 909</a>
-            <span style={{ fontSize: "0.8rem", color: "#55555f", lineHeight: 1.5 }}>Krasovského 13<br />Bratislava</span>
+            <span style={{ fontSize: "0.8rem", color: "#55555f", lineHeight: 1.5 }}>
+              {COMPANY.street}<br />{COMPANY.postalCode} {isSK ? COMPANY.citySk : COMPANY.cityEn}
+            </span>
           </div>
         </div>
 
@@ -822,7 +825,9 @@ function Footer({ lang = "en", setCurrent }) {
         marginTop: "2.5rem", paddingTop: "1.25rem", borderTop: "1px solid #1a1a20",
         fontSize: "0.75rem", color: "#55555f",
       }}>
-        © {new Date().getFullYear()} Residata
+        © {new Date().getFullYear()} {COMPANY.legalName} — {isSK ? "prevádzkovateľ služby Residata" : "operator of the Residata service"}
+        <br />
+        IČO: {COMPANY.ico} · {registrationLine(isSK ? "sk" : "en")}
       </div>
     </footer>
   );

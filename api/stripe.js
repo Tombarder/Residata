@@ -15,17 +15,21 @@
 
 import { getStripe, getSupabaseAdmin, getUserFromRequest, requestOrigin } from "./_lib/stripe.js";
 import { isTrustedRequest } from "./_lib/origin.js";
+import { FALLBACK_MONTHLY_CENTS } from "../src/lib/pricingDefaults.js";
 
 export const config = { api: { bodyParser: false } };
 export const maxDuration = 15;
 
-// €79.99 / month (summer early-access rate; regular €349.99). This constant is
-// the resilient FALLBACK — the live price is read from public.pricing_config at
-// checkout time (see resolvePriceCents) so the Boss can change it from the admin
-// Pricing tool with no code edit or deploy. If the DB read ever fails, checkout
-// falls back to this constant so a customer can always pay. Checkout defines the
-// price inline (price_data below) — NO Stripe Price object, NO STRIPE_PRICE_ID.
-const MONTHLY_PRICE_CENTS = 7999;
+// The resilient FALLBACK price. The live price is read from public.pricing_config
+// at checkout time (see resolvePriceCents) so it can be changed from the admin
+// Pricing tool with no code edit or deploy; if that read fails, checkout falls
+// back to this so a customer can always pay. Checkout defines the price inline
+// (price_data below) — NO Stripe Price object, NO STRIPE_PRICE_ID.
+//
+// It is IMPORTED, not written here. This used to be a local 7999 while the site
+// displayed €279.99 — a failed DB read would have subscribed someone at €79.99
+// for the life of their subscription. One shared constant, one number.
+const MONTHLY_PRICE_CENTS = FALLBACK_MONTHLY_CENTS;
 
 // Sanity bounds — a DB-driven price must never charge a nonsensical amount even
 // if the config row is fat-fingered. Outside [€1, €10 000] we ignore it and use

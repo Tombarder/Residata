@@ -1,26 +1,40 @@
 /**
  * Privacy Policy + Terms + Imprint pages — EN + SK.
  *
- * Paid subscriptions are LIVE (Stripe self-serve checkout). The operator is
- * Tomáš Kamhal; a legal entity registration is IN PROGRESS (2026-08) — once
- * it completes, add the company name + IČO/DIČ/IČ DPH to the Imprint and this
- * header, and revise the "natural person / not VAT-registered" wording.
- * Public contact email is info@residata.eu (forwards to the operator).
+ * The operator is Kamhal & Co. s. r. o. (incorporated 2026-09-03). NOTHING
+ * about the company is written on this page: the operator's name, seat, IČO,
+ * register entry, VAT status and contact all come from lib/company, which is
+ * the single source for all six surfaces that name it. To change a company
+ * detail, edit lib/company — not this file.
+ *
+ * The VAT wording is not written here either. `vatNotice()` says "not VAT
+ * registered" while COMPANY.icDph is empty and switches to the correct VAT
+ * sentence by itself when it is filled in. Do not hand-write either version.
  *
  * Not lawyer-reviewed. Revise when:
- *   - The legal entity is formed → Imprint IČO/DIČ + VAT wording
- *   - Any new third-party data processor is added → update Privacy list
+ *   - Any new third-party data processor is added → update the Privacy list
+ *   - The service stops being business-only → consumer withdrawal rights,
+ *     a complaints procedure and an ODR link all become mandatory
  *
- * Third parties currently disclosed (verified in codebase):
- *   - Supabase (data hosting — EU region, Frankfurt)
+ * Third parties currently disclosed (each verified against the running system,
+ * not against an earlier version of this list):
+ *   - Supabase (data hosting + authentication — EU region, Frankfurt)
  *   - Vercel (web hosting — global CDN, primary region EU)
- *   - Anthropic (AI chat assistant — sends user prompts to US)
- *   - Google (Gmail SMTP for sending login + system emails)
+ *   - Anthropic (AI assistant — sends user prompts to the US)
+ *   - Resend (sending transactional email — DKIM/SPF on residata.eu)
+ *   - Forward Email (receiving mail to info@residata.eu — the domain's MX)
+ *   - Google (the operator's own mailbox, where forwarded mail lands)
  *   - Stripe (subscription billing — processes payment + billing data)
  */
 
 import { useEffect } from "react";
 import { usePricing } from "../lib/pricing";
+import { FALLBACK_MONTHLY_DISPLAY, FALLBACK_ANCHOR_DISPLAY } from "../lib/pricingDefaults";
+import {
+  COMPANY, DPA_AUTHORITY, TRADE_AUTHORITY,
+  statutoryWebsiteData, bankDetails, operatorInSentence, vatNotice,
+  addressOneLine, registrationLine,
+} from "../lib/company";
 
 // Shared layout shell for both legal pages.
 //
@@ -95,7 +109,7 @@ function Section({ title, children }) {
 
 export function PrivacyPage({ lang }) {
   const isSK = lang === "sk";
-  const lastUpdated = isSK ? "Posledná aktualizácia: 1. august 2026" : "Last updated: 1 August 2026";
+  const lastUpdated = isSK ? "Posledná aktualizácia: 3. september 2026" : "Last updated: 3 September 2026";
 
   useDocumentTitle(
     isSK ? "Ochrana osobných údajov · Residata" : "Privacy Policy · Residata",
@@ -112,22 +126,37 @@ export function PrivacyPage({ lang }) {
 
       <Section title={isSK ? "1. Kto sme" : "1. Who we are"}>
         {isSK ? (
-          <p>
-            Residata je projekt prevádzkovaný fyzickou osobou Tomáš Kamhal,
-            so sídlom Krasovského 13, Bratislava, Slovenská republika. Projekt
-            v súčasnosti nie je registrovaný ako samostatný podnikateľský
-            subjekt; jeho právna forma sa môže v budúcnosti zmeniť (živnosť
-            alebo obchodná spoločnosť), pričom tieto zásady budú zodpovedajúco
-            aktualizované.
-          </p>
+          <>
+            <p>
+              Prevádzkovateľom osobných údajov v zmysle čl. 4 ods. 7 GDPR je
+              spoločnosť <strong>{COMPANY.legalName}</strong>, so sídlom{" "}
+              {addressOneLine("sk")}, IČO: {COMPANY.ico},{" "}
+              {registrationLine("sk").charAt(0).toLowerCase() + registrationLine("sk").slice(1)}
+              {" "}(ďalej len „prevádzkovateľ“, „my“).
+            </p>
+            <p>
+              Prevádzkovateľ prevádzkuje službu <strong>Residata</strong>{" "}
+              dostupnú na residata.eu. Nemenovali sme zodpovednú osobu (DPO),
+              pretože nespĺňame podmienky čl. 37 GDPR; vo všetkých otázkach
+              ochrany údajov nás kontaktujte priamo na adrese nižšie.
+            </p>
+          </>
         ) : (
-          <p>
-            Residata is a project operated by Tomáš Kamhal, a natural person,
-            located at Krasovského 13, Bratislava, Slovak Republic. The project
-            is not currently registered as a separate business entity; its
-            legal form may change in the future (sole trader or limited
-            company), and this policy will be updated accordingly.
-          </p>
+          <>
+            <p>
+              The controller of personal data within the meaning of Art. 4(7)
+              GDPR is <strong>{COMPANY.legalName}</strong>, with its registered
+              seat at {addressOneLine("en")}, company ID (IČO): {COMPANY.ico},{" "}
+              {registrationLine("en").charAt(0).toLowerCase() + registrationLine("en").slice(1)}
+              {" "}(“the controller”, “we”).
+            </p>
+            <p>
+              The controller operates the <strong>Residata</strong> service at
+              residata.eu. We have not appointed a Data Protection Officer, as
+              we do not meet the conditions of Art. 37 GDPR; for any data
+              protection matter contact us directly at the address below.
+            </p>
+          </>
         )}
         <p>
           {isSK ? "Kontakt vo veciach ochrany osobných údajov:" : "Privacy contact:"} {" "}
@@ -195,14 +224,16 @@ export function PrivacyPage({ lang }) {
               <li><strong>Supabase Inc.</strong> — databázové hostovanie a autentifikácia. Údaje sú uložené v regióne Európskej únie (Frankfurt, Nemecko). <a href="https://supabase.com/privacy" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">Zásady spoločnosti Supabase</a>.</li>
               <li><strong>Vercel Inc.</strong> — hosting webovej aplikácie. Globálna CDN sieť s primárnym regiónom v EÚ. <a href="https://vercel.com/legal/privacy-policy" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">Zásady spoločnosti Vercel</a>.</li>
               <li><strong>Anthropic PBC</strong> — náš AI asistent posiela vaše otázky modelu Claude na spracovanie. Spracovanie prebieha v USA. Otázky sa nepoužívajú na trénovanie modelu. <a href="https://www.anthropic.com/legal/privacy" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">Zásady spoločnosti Anthropic</a>.</li>
-              <li><strong>Google LLC</strong> — Gmail SMTP službu používame na zasielanie prihlasovacích odkazov a systémových e-mailov. <a href="https://policies.google.com/privacy" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">Zásady spoločnosti Google</a>.</li>
+              <li><strong>Resend (Plus Five Five, Inc.)</strong> — odosielanie transakčných e-mailov (prihlasovacie odkazy, systémové oznámenia) z domény residata.eu. <a href="https://resend.com/legal/privacy-policy" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">Zásady spoločnosti Resend</a>.</li>
+              <li><strong>Forward Email LLC</strong> — doručovanie e-mailov zaslaných na adresu info@residata.eu (MX záznamy domény). <a href="https://forwardemail.net/privacy" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">Zásady spoločnosti Forward Email</a>.</li>
+              <li><strong>Google LLC</strong> — poštová schránka prevádzkovateľa, do ktorej sa preposiela korešpondencia zaslaná na info@residata.eu. <a href="https://policies.google.com/privacy" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">Zásady spoločnosti Google</a>.</li>
               <li><strong>Stripe Payments Europe, Ltd.</strong> — spracovanie platieb a správa predplatného. Spracúva platobné a fakturačné údaje; údaje o platobných kartách uchováva Stripe, nie my. <a href="https://stripe.com/privacy" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">Zásady spoločnosti Stripe</a>.</li>
             </ul>
             <p>
               Vaše osobné údaje nepredávame ani neposkytujeme tretím stranám
               na ich vlastné marketingové účely. Prenos údajov mimo EÚ
-              (Anthropic, Google) sa uskutočňuje na základe štandardných
-              zmluvných doložiek EÚ.
+              (Anthropic, Resend, Forward Email, Google) sa uskutočňuje na
+              základe štandardných zmluvných doložiek EÚ.
             </p>
           </>
         ) : (
@@ -212,13 +243,16 @@ export function PrivacyPage({ lang }) {
               <li><strong>Supabase Inc.</strong> — database hosting and authentication. Data is stored in an EU region (Frankfurt, Germany). <a href="https://supabase.com/privacy" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">Supabase Privacy Policy</a>.</li>
               <li><strong>Vercel Inc.</strong> — web application hosting. Global CDN with primary EU region. <a href="https://vercel.com/legal/privacy-policy" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">Vercel Privacy Policy</a>.</li>
               <li><strong>Anthropic PBC</strong> — our AI assistant sends your queries to the Claude model for processing. Processing happens in the United States. Queries are not used to train the model. <a href="https://www.anthropic.com/legal/privacy" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">Anthropic Privacy Policy</a>.</li>
-              <li><strong>Google LLC</strong> — Gmail SMTP is used to send login links and system emails. <a href="https://policies.google.com/privacy" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">Google Privacy Policy</a>.</li>
+              <li><strong>Resend (Plus Five Five, Inc.)</strong> — sends transactional email (login links, system notifications) from the residata.eu domain. <a href="https://resend.com/legal/privacy-policy" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">Resend Privacy Policy</a>.</li>
+              <li><strong>Forward Email LLC</strong> — delivers mail sent to info@residata.eu (the domain's MX provider). <a href="https://forwardemail.net/privacy" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">Forward Email Privacy Policy</a>.</li>
+              <li><strong>Google LLC</strong> — the operator's own mailbox, where correspondence sent to info@residata.eu is forwarded. <a href="https://policies.google.com/privacy" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">Google Privacy Policy</a>.</li>
               <li><strong>Stripe Payments Europe, Ltd.</strong> — payment processing and subscription management. Processes payment + billing data; card details are held by Stripe, not by us. <a href="https://stripe.com/privacy" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">Stripe Privacy Policy</a>.</li>
             </ul>
             <p>
               We do not sell or share your personal data with third parties
               for their own marketing purposes. Transfers outside the EU
-              (Anthropic, Google) happen under EU Standard Contractual Clauses.
+              (Anthropic, Resend, Forward Email, Google) happen under EU
+              Standard Contractual Clauses.
             </p>
           </>
         )}
@@ -344,12 +378,12 @@ export function PrivacyPage({ lang }) {
 
 export function TermsPage({ lang }) {
   const isSK = lang === "sk";
-  const lastUpdated = isSK ? "Účinné od: 1. august 2026" : "Effective: 1 August 2026";
+  const lastUpdated = isSK ? "Účinné od: 3. september 2026" : "Effective: 3 September 2026";
   // DB-driven price (public.pricing_config) so a price change in the admin
   // editor propagates here too; falls back to the launch price if not loaded.
   const pricing = usePricing(lang);
-  const priceStr = pricing.priceDisplay || "€349.99";
-  const anchorStr = pricing.ready ? pricing.anchorDisplay : "€479.99";
+  const priceStr = pricing.priceDisplay || FALLBACK_MONTHLY_DISPLAY;
+  const anchorStr = pricing.ready ? pricing.anchorDisplay : FALLBACK_ANCHOR_DISPLAY;
 
   useDocumentTitle(
     isSK ? "Obchodné podmienky · Residata" : "Terms of Service · Residata",
@@ -364,8 +398,8 @@ export function TermsPage({ lang }) {
 
       <Section title={isSK ? "1. Úvod a súhlas" : "1. Introduction and acceptance"}>
         <p>{isSK
-          ? "Tieto obchodné podmienky upravujú prístup k službe Residata a jej používanie („Služba“). Prevádzkovateľom je Tomáš Kamhal, so sídlom Krasovského 13, Bratislava, Slovenská republika („my“, „prevádzkovateľ“). Vytvorením účtu alebo používaním Služby potvrdzujete, že ste si tieto podmienky prečítali a súhlasíte s nimi. Ak s nimi nesúhlasíte, Službu nepoužívajte."
-          : "These Terms govern access to and use of the Residata service (the “Service”). The Service is operated by Tomáš Kamhal, located at Krasovského 13, Bratislava, Slovak Republic (“we”, “the operator”). By creating an account or using the Service you confirm that you have read and agree to these Terms. If you do not agree, do not use the Service."}</p>
+          ? `Tieto obchodné podmienky upravujú prístup k službe Residata a jej používanie („Služba“). Poskytovateľom Služby a zmluvnou stranou je ${operatorInSentence("sk")}, ${registrationLine("sk").charAt(0).toLowerCase() + registrationLine("sk").slice(1)} („my“, „poskytovateľ“). Vytvorením účtu alebo používaním Služby potvrdzujete, že ste si tieto podmienky prečítali a súhlasíte s nimi. Ak s nimi nesúhlasíte, Službu nepoužívajte.`
+          : `These Terms govern access to and use of the Residata service (the “Service”). The provider of the Service and your contracting party is ${operatorInSentence("en")}, ${registrationLine("en").charAt(0).toLowerCase() + registrationLine("en").slice(1)} (“we”, “the provider”). By creating an account or using the Service you confirm that you have read and agree to these Terms. If you do not agree, do not use the Service.`}</p>
       </Section>
 
       <Section title={isSK ? "2. Predmet služby" : "2. What the Service provides"}>
@@ -393,6 +427,10 @@ export function TermsPage({ lang }) {
         <p>{isSK
           ? `Služba sa poskytuje vo viacerých úrovniach (bezplatná, skúšobná a platená). Bezplatná skúšobná verzia (spravidla 7 dní) poskytuje rozšírený prístup bez nutnosti platobnej karty. Platená úroveň sa poskytuje za priebežný poplatok (aktuálne ${priceStr} / mesiac${anchorStr ? ` — úvodná cena, bežne ${anchorStr}` : ""}), fakturovaný mesačne cez náš online checkout (Stripe); predplatné môžete kedykoľvek zrušiť v sekcii fakturácie. Už zaplatené obdobie sa spravidla nevracia, ak nie je dohodnuté inak.`
           : `The Service is offered in several tiers (free, trial, and paid). The free trial (typically 7 days) provides extended access without requiring a payment card. The paid tier is provided for a recurring fee (currently ${priceStr} / month${anchorStr ? ` — launch price, regularly ${anchorStr}` : ""}), billed monthly via our online checkout (Stripe); you can cancel anytime in the billing section. An already-paid period is generally non-refundable unless agreed otherwise.`}</p>
+
+        <p>{isSK
+          ? `${vatNotice("sk")} Ku každej platbe vystavíme faktúru (daňový doklad) elektronicky; sprístupňujeme ju v sekcii fakturácie a zasielame na e-mail uvedený v účte. Ak objednávate ako podnikateľ, uveďte pri objednávke obchodné meno, sídlo a IČO — bez týchto údajov nevieme vystaviť faktúru použiteľnú pre vaše účtovníctvo.`
+          : `${vatNotice("en")} We issue an invoice (tax document) electronically for every payment; it is available in the billing section and sent to the email address on the account. If you are ordering as a business, provide your business name, registered seat and company ID at checkout — without them we cannot issue an invoice your accounting can use.`}</p>
       </Section>
 
       <Section title={isSK ? "6. Prijateľné používanie" : "6. Acceptable use"}>
@@ -464,67 +502,77 @@ export function ImprintPage({ lang }) {
   useDocumentTitle(
     isSK ? "Impressum · Residata" : "Imprint · Residata",
     isSK
-      ? "Informácie o prevádzkovateľovi webu Residata."
-      : "Information about the operator of the Residata website.",
+      ? "Identifikačné údaje prevádzkovateľa služby Residata."
+      : "Identification details of the operator of the Residata service.",
   );
+
+  // § 3a of the Commercial Code requires business name, registered seat, legal
+  // form, IČO and the register entry on the website. The list comes from
+  // lib/company so none of them can be dropped in a later edit, and so the
+  // DIČ / IČ DPH rows appear by themselves the day those numbers are issued.
+  const rows = statutoryWebsiteData(lang);
+  const bank = bankDetails(lang);
+
+  const dt = { fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-dim)", margin: 0 };
+  const dd = { margin: "0 0 0.9rem 0", color: "var(--text)", lineHeight: 1.55 };
 
   return (
     <LegalPageShell title={isSK ? "Impressum" : "Imprint"}>
       <Section title={isSK ? "Prevádzkovateľ" : "Operator"}>
-        <p>
-          <strong>Tomáš Kamhal</strong><br />
-          {isSK ? "Krasovského 13" : "Krasovského 13"}<br />
-          {isSK ? "Bratislava, Slovenská republika" : "Bratislava, Slovak Republic"}
-        </p>
+        <p style={{ marginTop: 0 }}>{isSK
+          ? <>Službu <strong>Residata</strong> prevádzkuje spoločnosť:</>
+          : <>The <strong>Residata</strong> service is operated by:</>}</p>
+        <dl style={{ margin: "1rem 0 0 0" }}>
+          {rows.map((r) => (
+            <div key={r.label}>
+              <dt style={dt}>{r.label}</dt>
+              <dd style={dd}>{r.value}</dd>
+            </div>
+          ))}
+          <div>
+            <dt style={dt}>{isSK ? "Štatutárny orgán" : "Statutory body"}</dt>
+            <dd style={dd}>{isSK ? "konateľ: " : "Managing director: "}{COMPANY.director}</dd>
+          </div>
+          {bank.map((r) => (
+            <div key={r.label}>
+              <dt style={dt}>{r.label}</dt>
+              <dd style={dd}>{r.value}</dd>
+            </div>
+          ))}
+        </dl>
       </Section>
 
       <Section title={isSK ? "Kontakt" : "Contact"}>
-        <p>
+        <p style={{ marginTop: 0 }}>
           {isSK ? "E-mail (všeobecný kontakt):" : "Email (general):"} {" "}
-          <a href="mailto:info@residata.eu" style={{ color: "var(--accent)" }}>info@residata.eu</a><br />
+          <a href={`mailto:${COMPANY.email}`} style={{ color: "var(--accent)" }}>{COMPANY.email}</a><br />
           {isSK ? "E-mail (ochrana osobných údajov):" : "Email (privacy matters):"} {" "}
-          <a href="mailto:info@residata.eu" style={{ color: "var(--accent)" }}>info@residata.eu</a><br />
+          <a href={`mailto:${COMPANY.privacyEmail}`} style={{ color: "var(--accent)" }}>{COMPANY.privacyEmail}</a><br />
           {isSK ? "Telefón:" : "Phone:"} {" "}
-          <a href="tel:+421911963909" style={{ color: "var(--accent)" }}>+421 911 963 909</a>
+          <a href={`tel:${COMPANY.phoneHref}`} style={{ color: "var(--accent)" }}>{COMPANY.phone}</a>
         </p>
+        <p>{isSK
+          ? "Korešpondenčná adresa je zhodná so sídlom spoločnosti uvedeným vyššie."
+          : "Correspondence address is the registered seat stated above."}</p>
       </Section>
 
-      <Section title={isSK ? "Právny stav" : "Legal status"}>
-        {isSK ? (
-          <p>
-            Residata je v súčasnosti prevádzkovaná ako osobný projekt fyzickou
-            osobou. Projekt nie je registrovaný ako samostatný podnikateľský
-            subjekt (živnosť ani obchodná spoločnosť) a nie je platiteľom DPH.
-            Identifikačné a daňové údaje budú doplnené po formálnej registrácii
-            právnej formy.
-          </p>
-        ) : (
-          <p>
-            Residata is currently operated as a personal project by a natural
-            person. The project is not registered as a separate business
-            entity (sole trader or limited company) and is not VAT-registered.
-            Registration and tax identification numbers will be added once a
-            legal form is formally established.
-          </p>
-        )}
+      <Section title={isSK ? "Dozorné orgány" : "Supervisory authorities"}>
+        <p style={{ marginTop: 0 }}>{isSK
+          ? <>Vo veciach <strong>ochrany osobných údajov</strong>: {DPA_AUTHORITY.nameSk}, {DPA_AUTHORITY.address}, {" "}
+              <a href={DPA_AUTHORITY.url} style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">dataprotection.gov.sk</a>.</>
+          : <>For <strong>personal data</strong> matters: {DPA_AUTHORITY.nameEn}, {DPA_AUTHORITY.address}, {" "}
+              <a href={DPA_AUTHORITY.url} style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">dataprotection.gov.sk</a>.</>}</p>
+        <p>{isSK
+          ? <>Vo veciach <strong>dozoru nad podnikaním</strong>: {TRADE_AUTHORITY.nameSk}, {TRADE_AUTHORITY.address}, {" "}
+              <a href={`mailto:${TRADE_AUTHORITY.email}`} style={{ color: "var(--accent)" }}>{TRADE_AUTHORITY.email}</a>, {" "}
+              <a href={TRADE_AUTHORITY.url} style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">soi.sk</a>.</>
+          : <>For <strong>trade supervision</strong>: {TRADE_AUTHORITY.nameEn}, {TRADE_AUTHORITY.address}, {" "}
+              <a href={`mailto:${TRADE_AUTHORITY.email}`} style={{ color: "var(--accent)" }}>{TRADE_AUTHORITY.email}</a>, {" "}
+              <a href={TRADE_AUTHORITY.url} style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">soi.sk</a>.</>}</p>
       </Section>
 
-      <Section title={isSK ? "Dozorný orgán" : "Supervisory authority"}>
-        {isSK ? (
-          <p>
-            Vo veciach ochrany osobných údajov je dozorným orgánom Úrad na
-            ochranu osobných údajov Slovenskej republiky, Hraničná 12, 820 07
-            Bratislava 27, {" "}
-            <a href="https://dataprotection.gov.sk" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">dataprotection.gov.sk</a>.
-          </p>
-        ) : (
-          <p>
-            The supervisory authority for personal data matters is the Office
-            for Personal Data Protection of the Slovak Republic, Hraničná 12,
-            820 07 Bratislava 27, {" "}
-            <a href="https://dataprotection.gov.sk" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">dataprotection.gov.sk</a>.
-          </p>
-        )}
+      <Section title={isSK ? "Ceny a DPH" : "Prices and VAT"}>
+        <p style={{ marginTop: 0 }}>{vatNotice(lang)}</p>
       </Section>
     </LegalPageShell>
   );
