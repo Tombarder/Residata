@@ -38,7 +38,6 @@ const SURFACES = [
   "src/lib/marketingCopy.js",
   "src/lib/pricing.js",
   "src/pages/StatusPage.jsx",
-  "src/pages/DataSourcesPage.jsx",
   "api/stripe.js",
   "api/_lib/emails.js",
   "vite.config.js",

@@ -168,12 +168,10 @@ const SEO_BY_PAGE = {
     },
     noindex: true,
   },
-  // /status and /data-sources were added on 2026-09-03 and had NO entry here.
-  // applySeo returns early for an unknown page, so both silently inherited the
-  // title, description, canonical and og tags of whatever page the visitor came
-  // from — and a crawler landing on them cold got the homepage's meta. For
-  // /data-sources that is the page we tell developers to find when they want to
-  // object, and it was in the sitemap while not being indexable as itself.
+  // /status was added on 2026-09-03 and had NO entry here. applySeo returns
+  // early for an unknown page, so it silently inherited the title, description,
+  // canonical and og tags of whatever page the visitor came from, and a crawler
+  // landing on it cold got the homepage's meta.
   Status: {
     path: "/status",
     en: {
@@ -183,17 +181,6 @@ const SEO_BY_PAGE = {
     sk: {
       title: "Stav služby · Residata",
       description: "Živá dostupnosť a aktuálnosť dát Residata, meraná priamo vo vašom prehliadači.",
-    },
-  },
-  DataSources: {
-    path: "/data-sources",
-    en: {
-      title: "Data sources and objections · Residata",
-      description: "Where Residata's data comes from, and how a developer can have it corrected or have collection stopped.",
-    },
-    sk: {
-      title: "Zdroje dát a námietky · Residata",
-      description: "Odkiaľ Residata berie údaje a ako môže developer požiadať o opravu alebo o zastavenie zberu.",
     },
   },
   Terms: {
@@ -249,18 +236,33 @@ const SEO_COUNTRY_OVERRIDES = {
       ["Slovensko", "Česko"],
     ],
   },
-  // "all" = combined SK+CZ view (the default country). Only the visible page
-  // TITLES are broadened off Bratislava-only; descriptions/keywords keep the
-  // base copy (Bratislava keywords still carry SEO value). Precise full-phrase
-  // rules → no bare-token double-replacement risk.
+  // "all" = combined SK+CZ view, and the country a crawler gets. Broadens the
+  // TITLES and the DESCRIPTIONS off Bratislava-only; KEYWORDS deliberately keep
+  // the base copy, because "novostavby Bratislava" is the highest-volume search
+  // term in this market and targeting it is intentional.
+  //
+  // The descriptions were added on 2026-09-03. index.html's static meta was
+  // already correct ("across Slovakia and Czechia"), but applySeo OVERWRITES it
+  // once the app boots — and Google executes JavaScript, so what it indexed was
+  // the downgrade: "Every new residential development in Bratislava". The
+  // product covers 47 towns in two countries, so the description in the search
+  // result was understating it by about an order of magnitude, and contradicting
+  // the pricing page, which already sells "the Slovak & Czech new-build market".
+  //
+  // Rules stay ordered most-specific-first so the longer phrase wins before any
+  // shorter one contained inside it.
   all: {
     en: [
       ["New-Build Market Intelligence for Bratislava", "New-Build Market Intelligence for Slovakia & Czechia"],
       ["Bratislava New-Build Market", "Slovak & Czech New-Build Market"],
+      ["Every new residential development in Bratislava", "Every new residential development across Slovakia and Czechia"],
+      ["every active new-build residential project in Bratislava", "every active new-build residential project across Slovakia and Czechia"],
     ],
     sk: [
       ["Dátový prehľad trhu novostavieb Bratislava", "Dátový prehľad trhu novostavieb — Slovensko a Česko"],
       ["Trh novostavieb Bratislava", "Trh novostavieb — Slovensko a Česko"],
+      ["Každý aktívny projekt novostavby v Bratislave", "Každý aktívny projekt novostavby na Slovensku a v Česku"],
+      ["každý aktívny projekt novostavby v Bratislave", "každý aktívny projekt novostavby na Slovensku a v Česku"],
     ],
   },
 };
@@ -336,8 +338,10 @@ function resolvePageSeo(page, lang) {
     return {
       path: "/live",
       ...(lang === "sk"
-        ? { title: "Detail projektu — Residata", description: "Detailné dáta konkrétneho projektu novostavby v Bratislave.", keywords: "novostavba detail Bratislava" }
-        : { title: "Project Detail — Residata", description: "Detailed data on a specific new-build residential project in Bratislava.", keywords: "new-build project detail Bratislava" }),
+        // No city here: this page is used for projects in 47 towns across two
+        // countries, so naming Bratislava was wrong for most of them.
+        ? { title: "Detail projektu — Residata", description: "Detailné dáta konkrétneho projektu novostavby — ceny, dostupnosť a vývoj predaja.", keywords: "novostavba detail, ceny bytov, dostupnosť" }
+        : { title: "Project Detail — Residata", description: "Detailed data on a specific new-build residential project — pricing, availability and sales progress.", keywords: "new-build project detail, unit prices, availability" }),
       noindex: true,
     };
   }
