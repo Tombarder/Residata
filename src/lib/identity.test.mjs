@@ -38,6 +38,7 @@ const SURFACES = [
   "src/lib/marketingCopy.js",
   "src/lib/pricing.js",
   "api/stripe.js",
+  "api/_lib/emails.js",
   "vite.config.js",
   "scripts/generate-static-content.mjs",
 ];
@@ -124,4 +125,38 @@ test("index.html reads the company from the build, not from a typed-in copy", ()
   assert.ok(html.includes("__COMPANY_LEGAL_NAME__"), "index.html must take legalName from the build token");
   assert.ok(html.includes("__COMPANY_ICO__"), "index.html must take the IČO from the build token");
   assert.ok(!html.includes(COMPANY.icoPlain), "index.html hardcodes the IČO");
+});
+
+test("Stripe checkout parameters obey the API's own constraints", () => {
+  // A rejected parameter fails the WHOLE session, so a typo here is not a
+  // degraded invoice — it is a checkout that does not open. This shipped once:
+  // the custom field key was "company_id", and Stripe requires the key to be
+  // alphanumeric, so every checkout would have failed.
+  const src = read("api/stripe.js");
+
+  for (const m of src.matchAll(/key:\s*"([^"]+)"/g)) {
+    assert.match(m[1], /^[A-Za-z0-9]+$/,
+      `Stripe custom_fields.key "${m[1]}" must be alphanumeric — no underscores, dashes or spaces`);
+    assert.ok(m[1].length <= 200, `custom_fields.key "${m[1]}" exceeds 200 characters`);
+  }
+  for (const m of src.matchAll(/custom:\s*"([^"]+)"/g)) {
+    assert.ok([...m[1]].length <= 50,
+      `Stripe custom_fields.label.custom "${m[1]}" exceeds the documented 50-character limit`);
+  }
+
+  // The enhancements that make an invoice usable must be able to fall away
+  // without taking checkout down with them.
+  assert.match(src, /const DEGRADABLE = \[/,
+    "checkout must degrade rather than fail when Stripe rejects an optional parameter");
+  for (const p of ["adaptive_pricing", "custom_fields", "tax_id_collection", "customer_update"]) {
+    assert.ok(new RegExp(`DEGRADABLE = \\[[^\\]]*"${p}"`, "s").test(src),
+      `"${p}" is sent to Stripe but is not in DEGRADABLE — a version mismatch would break checkout`);
+  }
+
+  // The webhook must look for the same key checkout writes.
+  const sent = [...src.matchAll(/key:\s*"([^"]+)"/g)].map((m) => m[1]);
+  for (const k of sent) {
+    assert.ok(src.includes(`f.key === "${k}"`),
+      `checkout collects custom field "${k}" but nothing reads it back in the webhook`);
+  }
 });

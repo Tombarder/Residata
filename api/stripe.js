@@ -113,7 +113,10 @@ async function handleCheckout(req, res) {
     // prints on every future invoice.
     custom_fields: [
       {
-        key: "company_id",
+        // ALPHANUMERIC ONLY — Stripe rejects the whole session otherwise, and
+        // "company_id" (with the underscore) did exactly that. Label is capped
+        // at 50 characters by the API.
+        key: "companyid",
         label: { type: "custom", custom: "IČO / Company registration number" },
         type: "text",
         optional: true,
@@ -147,20 +150,35 @@ async function handleCheckout(req, res) {
   }
   else if (user.email) params.customer_email = user.email;
 
+  // Everything in here is an ENHANCEMENT: the currency pin, and the three fields
+  // that make an invoice usable for a business. Each is only understood by
+  // recent Stripe API versions, and a rejected parameter fails the whole session
+  // — which would take the revenue path down entirely. So a rejection drops that
+  // one parameter and tries again, rather than turning a nicety into an outage.
+  // Required parameters (mode, line_items, urls) are never in this set: if one
+  // of those is wrong, failing loudly is correct.
+  const DEGRADABLE = ["adaptive_pricing", "custom_fields", "tax_id_collection", "customer_update"];
   let session;
-  try {
-    session = await stripe.checkout.sessions.create(params);
-  } catch (e) {
-    // adaptive_pricing is only recognised on recent Stripe API versions. If this
-    // account's version rejects it, DON'T fail checkout — retry once without the
-    // EUR pin (currency then follows Stripe's default). Logged so the fallback is
-    // visible if it ever triggers. Any other error is real → rethrow.
-    if (e?.param === "adaptive_pricing" || /adaptive_pricing/i.test(String(e?.message || ""))) {
-      console.warn("[stripe] adaptive_pricing rejected by API version — retrying without EUR pin");
-      const retry = { ...params }; delete retry.adaptive_pricing;
-      session = await stripe.checkout.sessions.create(retry);
-    } else {
-      throw e;
+  {
+    const attempt = { ...params };
+    const dropped = [];
+    for (;;) {
+      try {
+        session = await stripe.checkout.sessions.create(attempt);
+        break;
+      } catch (e) {
+        const msg = String(e?.message || "");
+        const bad = DEGRADABLE.find((k) => e?.param === k || (k in attempt && msg.includes(k)));
+        if (!bad) throw e;                       // a real error — do not paper over it
+        delete attempt[bad];
+        dropped.push(bad);
+        console.warn(`[stripe] "${bad}" rejected by this API version — retrying without it`);
+      }
+    }
+    if (dropped.length) {
+      // Loud, because a checkout that quietly stopped collecting the buyer's
+      // company details still produces an invoice nobody can book.
+      console.warn(`[stripe] checkout created WITHOUT: ${dropped.join(", ")} — invoices may be missing buyer details`);
     }
   }
   return res.status(200).json({ url: session.url });
@@ -195,7 +213,7 @@ async function persistBillingIdentity(admin, stripe, session) {
   const address = details.address || null;
   // Checkout returns the custom field under whichever type it was declared as.
   const companyId = (session.custom_fields || [])
-    .find((f) => f.key === "company_id")?.text?.value?.trim() || null;
+    .find((f) => f.key === "companyid")?.text?.value?.trim() || null;
   // tax_ids is an array; a buyer can in principle supply more than one, but
   // Checkout collects a single VAT number, so take the first non-empty value.
   const vatId = (details.tax_ids || [])

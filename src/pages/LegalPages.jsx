@@ -449,8 +449,8 @@ export function TermsPage({ lang }) {
           : `The Service is offered in several tiers (free, trial, and paid). The free trial (typically 7 days) provides extended access without requiring a payment card. The paid tier is provided for a recurring fee (currently ${priceStr} / month${anchorStr ? ` — launch price, regularly ${anchorStr}` : ""}), billed monthly via our online checkout (Stripe); you can cancel anytime in the billing section. An already-paid period is generally non-refundable unless agreed otherwise.`}</p>
 
         <p>{isSK
-          ? `${vatNotice("sk")} Ku každej platbe vystavíme faktúru (daňový doklad) elektronicky; sprístupňujeme ju v sekcii fakturácie a zasielame na e-mail uvedený v účte. Ak objednávate ako podnikateľ, uveďte pri objednávke obchodné meno, sídlo a IČO — bez týchto údajov nevieme vystaviť faktúru použiteľnú pre vaše účtovníctvo.`
-          : `${vatNotice("en")} We issue an invoice (tax document) electronically for every payment; it is available in the billing section and sent to the email address on the account. If you are ordering as a business, provide your business name, registered seat and company ID at checkout — without them we cannot issue an invoice your accounting can use.`}</p>
+          ? `${vatNotice("sk")} Ku každej platbe vystavíme faktúru (daňový doklad) elektronicky a sprístupníme vám ju; na vyžiadanie ju zašleme aj e-mailom. Ak objednávate ako podnikateľ, uveďte pri objednávke obchodné meno, sídlo a IČO — bez týchto údajov nevieme vystaviť faktúru použiteľnú pre vaše účtovníctvo.`
+          : `${vatNotice("en")} We issue an invoice (tax document) electronically for every payment and make it available to you; on request we will also send it by email. If you are ordering as a business, provide your business name, registered seat and company ID at checkout — without them we cannot issue an invoice your accounting can use.`}</p>
       </Section>
 
       <Section title={isSK ? "6. Prijateľné používanie" : "6. Acceptable use"}>

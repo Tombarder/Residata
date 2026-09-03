@@ -1186,6 +1186,13 @@ function PlatformBilling({ lang, setCurrent }) {
           onManage={handleManage}
           manageBusy={payBusy}
           manageErr={payErr}
+          billing={{
+            byCard: Boolean(profile?.stripe_customer_id),
+            companyName: profile?.billing_company_name || null,
+            companyId: profile?.billing_company_id || null,
+            vatId: profile?.billing_vat_id || null,
+            address: profile?.billing_address || null,
+          }}
         />
       )}
 
@@ -1227,7 +1234,7 @@ function PlatformBilling({ lang, setCurrent }) {
  * (started / renews) with a Manage button. Pause-state branch
  * inverts the colour scheme to amber so the user can't miss it.
  */
-function SubscriptionCard({ lang, paused, paidWindowActive, paidUntil, paidStartedAt, paidDaysLeft, fmtDate, onManage, manageBusy, manageErr }) {
+function SubscriptionCard({ lang, paused, paidWindowActive, paidUntil, paidStartedAt, paidDaysLeft, fmtDate, onManage, manageBusy, manageErr, billing = {} }) {
   const accent = paused ? "#f5a623" : green;
   const pillBg = paused ? "rgba(245,166,35,0.12)" : "color-mix(in srgb, var(--accent) 12%, transparent)";
   const status = paused
@@ -1300,7 +1307,7 @@ function SubscriptionCard({ lang, paused, paidWindowActive, paidUntil, paidStart
           <div style={{ color: "var(--text-2)", fontSize: "0.86rem" }}>
             {/* This said "Manual invoicing" for everyone, including subscribers
                 paying by card through Stripe. Say what is actually true. */}
-            {profile?.stripe_customer_id
+            {billing.byCard
               ? (lang === "sk" ? "Karta — automaticky mesačne" : "Card — billed monthly")
               : (lang === "sk" ? "Faktúra na prevod (dohodou)" : "Invoice by bank transfer (agreed)")}
           </div>
@@ -1309,19 +1316,19 @@ function SubscriptionCard({ lang, paused, paidWindowActive, paidUntil, paidStart
 
       {/* What will appear on the invoice. A business buyer needs to be able to
           SEE this and fix it before their accountant rejects the document. */}
-      {(profile?.billing_company_name || profile?.billing_company_id || profile?.billing_vat_id) && (
+      {(billing.companyName || billing.companyId || billing.vatId) && (
         <div style={{ marginTop: "1rem", borderTop: `1px solid ${border}`, paddingTop: "1rem" }}>
           <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.4rem" }}>
             {lang === "sk" ? "Fakturačné údaje" : "Invoiced to"}
           </div>
           <div style={{ color: "var(--text-2)", fontSize: "0.86rem", lineHeight: 1.6 }}>
-            {profile.billing_company_name && <>{profile.billing_company_name}<br /></>}
-            {profile.billing_address?.line1 && <>{profile.billing_address.line1}<br /></>}
-            {(profile.billing_address?.postal_code || profile.billing_address?.city) && (
-              <>{[profile.billing_address.postal_code, profile.billing_address.city].filter(Boolean).join(" ")}<br /></>
+            {billing.companyName && <>{billing.companyName}<br /></>}
+            {billing.address?.line1 && <>{billing.address.line1}<br /></>}
+            {(billing.address?.postal_code || billing.address?.city) && (
+              <>{[billing.address.postal_code, billing.address.city].filter(Boolean).join(" ")}<br /></>
             )}
-            {profile.billing_company_id && <>IČO: {profile.billing_company_id}<br /></>}
-            {profile.billing_vat_id && <>{lang === "sk" ? "IČ DPH" : "VAT ID"}: {profile.billing_vat_id}<br /></>}
+            {billing.companyId && <>IČO: {billing.companyId}<br /></>}
+            {billing.vatId && <>{lang === "sk" ? "IČ DPH" : "VAT ID"}: {billing.vatId}<br /></>}
           </div>
           <div style={{ color: dim, fontSize: "0.78rem", marginTop: "0.45rem" }}>
             {lang === "sk"
