@@ -29,7 +29,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useSpecifics, useProjectSpecificsData, SpecificsMark, SpecificsPanel,
          UnitPriceMarks } from "../lib/projectSpecifics";
-import { useProjects, useProjectSnapshots, useReportHistogram, fetchReportBinUnits, useReportProjectUnits, useReportComparables } from "../lib/useData";
+import { useProjects, useProjectSnapshots, useReportHistogram, fetchReportBinUnits, useReportProjectUnits, useReportComparables, useScopeRoomPrices } from "../lib/useData";
 import LoadError from "../components/LoadError";
 import Picker from "../components/Picker";
 import InfoTip from "../components/InfoTip";
@@ -681,6 +681,15 @@ function FilteredReport({ scopeLabel, scopeType, rpcScopeType, rpcScopeValue, pr
 
       <ReportSection label={lang === "sk" ? "Kontext" : "Context"} title={lang === "sk" ? "Porovnanie so širším trhom" : "Benchmark against wider market"}>
         <BenchmarkCard local={summary} global={globalSummary} scopeLabel={scopeLabel} lang={lang} />
+      </ReportSection>
+
+      <ReportSection
+        label={lang === "sk" ? "Konkurenčný profil" : "Competitive profile"}
+        title={lang === "sk"
+          ? `Čo ktorý projekt v lokalite ponúka \u2014 štandard, parkovanie, kobka, financovanie`
+          : `What each project in the locality offers \u2014 fit-out, parking, storage, financing`}>
+        <CompetitiveProfile projects={projects} scopeType={rpcScopeType}
+                            scopeValue={rpcScopeValue} lang={lang} />
       </ReportSection>
 
       <ReportSection label={lang === "sk" ? "Projekty v scope" : "Projects in scope"} title={lang === "sk" ? `Kompletný zoznam (${projects.length}) \u2014 klik otvorí projekt-report` : `Full list (${projects.length}) \u2014 click to open project report`}>
@@ -1349,6 +1358,203 @@ function ProjectTable({ projects, flats, lang, onProjectClick }) {
         .rep-row-clickable:hover td:first-child strong { color: var(--accent) !important; text-decoration: underline; text-underline-offset: 3px; }
         .rep-row-clickable:focus { outline: none; background: color-mix(in srgb, var(--accent) 10%, transparent); box-shadow: inset 0 0 0 1px var(--accent); }
       `}</style>
+    </div>
+  );
+}
+
+/* ─── Competitive profile — one row per project, every attribute side by side ───
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * This is the table Boss asked for on 2026-09-03, in his words:
+ *
+ *   "potreboval by som nejaky sposob ako zanalyzovat konkurencne prostredie v
+ *    danej lokalite (napr nitra) … pri projektoch ake maju standardy, ci
+ *    pouzivaju garaze, v akych cenach za aky typ, aky je financing"
+ *
+ * Four questions, and until today only one of them could be answered on a screen.
+ * The fit-out standard was recorded for every project and shown nowhere but a
+ * tooltip; parking did not exist as data at all; financing existed per flat and
+ * never per project. They now sit in one row each, so a developer can read a
+ * locality the way a buyer does — not "what does a flat cost here" but "what does
+ * this project actually ask of me, against the one next door".
+ *
+ * WHY THE COLUMNS ARE SEPARATE AND STAY SEPARATE
+ * ───────────────────────────────────────────────────────────────────────────
+ * Garage and outdoor bay are two columns, never one. On the live data a garage
+ * runs 41–105 % above an outdoor space IN THE SAME PROJECT (Evergreen 16 122 €
+ * vs 7 854 €), so a merged "parking" figure is wrong for one of them every time.
+ * Same reason storage is its own column and not folded into parking.
+ *
+ * A price is never shown without what it assumes: the fit-out level says what the
+ * €/m² buys, and the parking column says whether the bay is compulsory (the
+ * project is dearer than its price list) or already in the flat price (cheaper
+ * than a rival quoting the same number).
+ *
+ * EMPTY IS NOT ZERO. A blank parking cell means nobody has reviewed that project
+ * yet, or the developer publishes no price — never "this project has no parking".
+ * The dash is deliberate and the tooltip says which.
+ */
+function CompetitiveProfile({ projects, scopeType, scopeValue, lang }) {
+  useCurrency();
+  const spec = useSpecifics(lang);
+  const { rows: roomRows, loading } = useScopeRoomPrices({ scopeType, scopeValue });
+  const sk = lang === "sk";
+
+  // project → { 1: eur_m2, 2: …, … } for the per-room columns.
+  const byProject = useMemo(() => {
+    const m = new Map();
+    for (const r of roomRows) {
+      if (!m.has(r.project_id)) m.set(r.project_id, {});
+      m.get(r.project_id)[r.izby] = r;
+    }
+    return m;
+  }, [roomRows]);
+
+  // Which room counts this locality actually offers — no empty 6-room column.
+  const rooms = useMemo(() => {
+    const seen = new Set(roomRows.map(r => Number(r.izby)).filter(n => n > 0));
+    return [...seen].sort((a, b) => a - b).slice(0, 5);
+  }, [roomRows]);
+
+  const money = (v) => v == null ? "—"
+    : Math.round(moneyFromEur(Number(v))).toLocaleString("sk-SK") + " " + moneySymbol();
+  const perM2 = (v) => v == null ? "—"
+    : Math.round(moneyFromEur(Number(v))).toLocaleString("sk-SK");
+
+  const FITOUT = {
+    holobyt: sk ? "holobyt" : "shell",
+    standard: sk ? "štandard" : "standard",
+    plne_zariadeny: sk ? "zariadený" : "furnished",
+    mixed: sk ? "rôzny" : "mixed",
+  };
+  const TERMS = {
+    mandatory: sk ? "povinné" : "compulsory",
+    included: sk ? "v cene" : "included",
+    optional: sk ? "voliteľné" : "optional",
+    on_request: sk ? "na vyžiadanie" : "on request",
+    not_offered: sk ? "nie je" : "none",
+    unknown: sk ? "neuvedené" : "not stated",
+  };
+
+  const sorted = useMemo(
+    () => [...projects].sort((a, b) => (b.total_units || 0) - (a.total_units || 0)),
+    [projects]);
+
+  const csv = () => {
+    const cols = ["projekt", "developer", "cast", "bytov", "volne", "predane_pct",
+      "eur_m2", ...rooms.map(r => `eur_m2_${r}izb`), "standard",
+      "garaz_od_eur", "vonkajsie_od_eur", "kobka_od_eur", "parkovanie_podmienky",
+      "kobka_podmienky", "financovanie_schem", "financovanie_rozdiel_pct",
+      "cena_plati_pri"];
+    const esc = (v) => {
+      if (v == null) return "";
+      const s = String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const lines = sorted.map(p => {
+      const rp = byProject.get(p.id) || {};
+      return [p.name, p.developer, p.district, p.total_units, p.available_units,
+        p.sold_percentage, p.avg_price_eur_m2,
+        ...rooms.map(r => rp[r]?.eur_m2 ?? ""),
+        p.fitout_level, p.parking_garage_price_from, p.parking_outside_price_from,
+        p.parking_storage_price_from, p.parking_availability,
+        p.parking_storage_availability, p.financing_scheme_count,
+        p.financing_spread_pct, p.price_schedule].map(esc).join(",");
+    });
+    const blob = new Blob(["﻿" + [cols.join(","), ...lines].join("\n")],
+                          { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `residata-profil-${(scopeValue || "scope").toLowerCase()}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  const th = { ...tdh, whiteSpace: "nowrap" };
+  const thR = { ...tdhR, whiteSpace: "nowrap" };
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
+                    marginBottom: "0.5rem", gap: "0.75rem", flexWrap: "wrap" }}>
+        <div style={{ fontSize: "0.75rem", color: dim }}>
+          {sk ? "Prázdna bunka pri parkovaní znamená, že projekt sme ešte neprešli alebo "
+              + "developer cenu nezverejňuje — nie že parkovanie nemá."
+              : "A blank parking cell means we haven't reviewed that project yet, or the "
+              + "developer publishes no price — not that the project has none."}
+        </div>
+        <button className="rd-btn rd-btn--sm" onClick={csv} style={{ whiteSpace: "nowrap" }}>
+          ⬇ CSV
+        </button>
+      </div>
+      <div className="rep-table-wrap" style={{ background: bg2, border: `1px solid ${border}`,
+                                               borderRadius: 8, overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.78rem",
+                        minWidth: 1180 }}>
+          <thead>
+            <tr style={{ background: bg, textAlign: "left", color: dim, fontFamily: mono,
+                         fontSize: "0.58rem", textTransform: "uppercase", letterSpacing: "0.07em" }}>
+              <th style={th}>{sk ? "Projekt" : "Project"}</th>
+              <th style={th}>Developer</th>
+              <th style={thR}>{sk ? "Bytov" : "Units"}</th>
+              <th style={thR}>{sk ? "Voľné" : "Free"}</th>
+              <th style={thR}>{sk ? "Pred." : "Sold"}</th>
+              <th style={thR}>{moneySymbol()}/m²</th>
+              {rooms.map(r => <th key={r} style={thR}>{r}-{sk ? "izb" : "rm"}</th>)}
+              <th style={th}>{sk ? "Štandard" : "Fit-out"}</th>
+              <th style={thR}>{sk ? "Garáž od" : "Garage from"}</th>
+              <th style={thR}>{sk ? "Vonk. od" : "Outdoor from"}</th>
+              <th style={thR}>{sk ? "Kobka od" : "Storage from"}</th>
+              <th style={th}>{sk ? "Parkovanie" : "Parking terms"}</th>
+              <th style={th}>{sk ? "Financovanie" : "Financing"}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((p, i) => {
+              const rp = byProject.get(p.id) || {};
+              const fin = p.financing_scheme_count > 1
+                ? `${p.financing_scheme_count}× ${p.financing_spread_pct != null ? `(+${p.financing_spread_pct} %)` : ""}`
+                : (p.price_schedule || "—");
+              return (
+                <tr key={p.id} style={{ borderTop: i > 0 ? `1px solid ${border}` : "none" }}>
+                  <td style={{ ...tdc, whiteSpace: "nowrap" }}>
+                    <strong style={{ color: text }}>{p.name}</strong>
+                    <SpecificsMark items={spec.project(p)} lang={lang} />
+                  </td>
+                  <td style={{ ...tdc, whiteSpace: "nowrap" }}>{p.developer || "—"}</td>
+                  <td style={tdcR}>{p.total_units ?? "—"}</td>
+                  <td style={{ ...tdcR, color: accentInk }}>{p.available_units ?? "—"}</td>
+                  <td style={{ ...tdcR, color: orangeInk }}>
+                    {p.sold_percentage != null ? Math.round(p.sold_percentage) + "%" : "—"}</td>
+                  <td style={tdcR}>{perM2(p.avg_price_eur_m2)}</td>
+                  {rooms.map(r => (
+                    <td key={r} style={tdcR}
+                        title={rp[r] ? `${rp[r].units} ${sk ? "bytov" : "units"} · ${money(rp[r].price)}` : ""}>
+                      {rp[r] ? perM2(rp[r].eur_m2) : "—"}
+                    </td>
+                  ))}
+                  <td style={tdc}>{FITOUT[p.fitout_level] || "—"}</td>
+                  <td style={tdcR}>{money(p.parking_garage_price_from)}</td>
+                  <td style={tdcR}>{money(p.parking_outside_price_from)}</td>
+                  <td style={tdcR}>{money(p.parking_storage_price_from)}</td>
+                  <td style={{ ...tdc, whiteSpace: "nowrap",
+                               color: p.parking_availability === "mandatory" ? orangeInk
+                                    : p.parking_availability === "included" ? accentInk : undefined }}>
+                    {p.parking_reviewed ? (TERMS[p.parking_availability] || "—")
+                                        : <span style={{ color: dim }}>{sk ? "neprešlo" : "not reviewed"}</span>}
+                  </td>
+                  <td style={{ ...tdc, whiteSpace: "nowrap" }}>{fin}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {loading && (
+        <div style={{ padding: "0.5rem", color: dim, fontSize: "0.72rem", fontFamily: mono }}>
+          {sk ? "Načítavam ceny podľa dispozície…" : "Loading prices per room count…"}
+        </div>
+      )}
     </div>
   );
 }

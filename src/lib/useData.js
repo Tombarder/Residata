@@ -1832,6 +1832,46 @@ export function useProjectUnitsSeries(projectId) {
 let _reportHistCache = new Map();
 /** Adaptive €/m² histogram bins for a Reports scope. Returns {bins:[{from,to,count}],loading}.
  *  Bins are EUR (price_s_dph_eur basis) — Histogram converts to display currency. */
+/* useScopeRoomPrices — average price and €/m² per ROOM COUNT, per project, for one
+ * locality. The last column of the competitive profile Boss asked for: "at what
+ * prices for what type".
+ *
+ * One RPC for the whole scope. The alternative was a call per project, or pulling
+ * every flat in the city into the browser to group it there — a city like Prague is
+ * 115 projects and tens of thousands of units. Same cache shape as the histogram
+ * beside it, keyed on identity because the RPC reads an RLS-gated view.
+ */
+const _roomPriceCache = new Map();
+
+export function useScopeRoomPrices({ scopeType = "city", scopeValue = null, enabled = true } = {}) {
+  const { loading: authLoading, user, profile } = useAuth();
+  const { country } = useCountry();
+  const key = `${user?.id || "anon"}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}::${country}::${scopeType}::${scopeValue || ""}`;
+  const [rows, setRows] = useState(_roomPriceCache.get(key) || null);
+  const [loading, setLoading] = useState(enabled && !_roomPriceCache.has(key));
+  useEffect(() => {
+    if (!enabled || !scopeValue) { setLoading(false); return; }
+    if (!isSupabaseReady()) { setLoading(false); return; }
+    if (authLoading) return;
+    if (_roomPriceCache.has(key)) { setRows(_roomPriceCache.get(key)); setLoading(false); return; }
+    let cancelled = false;
+    setLoading(true);
+    (async () => {
+      const { data, error } = await sbRead(supabaseData.rpc("report_scope_room_prices", {
+        p_country: _pCountry(country), p_scope_type: scopeType, p_scope_value: scopeValue,
+      }));
+      if (cancelled) return;
+      if (error) { console.error("[useScopeRoomPrices]", error); setRows([]); setLoading(false); return; }
+      const arr = Array.isArray(data) ? data : [];
+      _roomPriceCache.set(key, arr);
+      setRows(arr);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [authLoading, key, enabled]); // eslint-disable-line react-hooks/exhaustive-deps
+  return { rows: rows || [], loading };
+}
+
 export function useReportHistogram({ scopeType = "market", scopeValue = null, nbins = 12 } = {}) {
   const { loading: authLoading, user, profile } = useAuth();
   const { country } = useCountry();
