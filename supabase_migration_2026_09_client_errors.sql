@@ -54,6 +54,17 @@ create policy client_errors_read_admin on public.client_errors
   for select to authenticated
   using (public.current_user_is_admin());
 
+-- GRANTS — separate from RLS, and easy to forget precisely because RLS looks
+-- like the whole story. A policy decides which ROWS a role may touch; it does
+-- not give the role permission to touch the table at all. Supabase's default
+-- privileges did not reach this table (it was created outside the dashboard),
+-- so without these two lines every browser insert is refused before any policy
+-- runs — and because the reporter swallows its own failures, error reporting
+-- would have looked installed and collected nothing, forever.
+grant insert on public.client_errors to authenticated;
+grant select on public.client_errors to authenticated;   -- narrowed to admins by the policy above
+grant usage, select on sequence public.client_errors_id_seq to authenticated;
+
 -- Retention. Stack traces are diagnostic, not history: an error nobody looked
 -- at in three months is not going to be looked at. Called by the existing daily
 -- housekeeping cron; safe to run by hand.

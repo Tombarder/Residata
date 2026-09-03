@@ -101,8 +101,14 @@ if (supabase) initAuthTokenSync(supabase);
  *
  * IMPORTANT: never call `supabaseData.auth.*` — a client configured with
  * `accessToken` throws on any auth access. Session management stays entirely on
- * the `supabase` (auth) client, used only by useAuth / sessionGuard. This client
- * is READ-ONLY plumbing for RLS-gated data.
+ * the `supabase` (auth) client, used only by useAuth / sessionGuard.
+ *
+ * It carries the user's bearer token, so it is also the right client for the
+ * rare WRITE that has to be attributed to the signed-in user — today that is
+ * lib/errorReport inserting into `client_errors`. (It said "read-only" here for
+ * a while, which was true when it was written.) The auth client is still the
+ * wrong choice for any data traffic: routing reads through it is what caused
+ * the Loading-hang this client exists to cure.
  *
  * A distinct storageKey keeps it fully isolated from both other clients.
  */
