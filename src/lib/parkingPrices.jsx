@@ -63,7 +63,7 @@ export function useProjectParking(projectId) {
     supabaseData
       .from("project_parking")
       .select("kind,availability,vat_basis,price_min,price_max,currency,price_min_eur,"
-              + "price_max_eur,capacity,evidence,note,confirmed,origin")
+              + "price_max_eur,capacity,evidence,note,confirmed,origin,price_basis")
       .eq("project_id", projectId)
       .then(({ data, error }) => {
         if (cancelled) return;
@@ -78,14 +78,22 @@ export function useProjectParking(projectId) {
   return { rows, loading };
 }
 
-/** "od 25 000 €" / "25 000 – 30 000 €" in the viewer's chosen currency. */
+/** "od 25 000 €" / "25 000 – 30 000 €" / "37 000 Kč / m²", in the viewer's currency.
+ *
+ * The "/ m²" is not decoration. Storage is routinely sold by the square metre —
+ * Nové Chabry quote 37 000 CZK/m² — and a reader who takes that for the price of a
+ * cellar is out by a factor of nine. The unit travels with the number everywhere it
+ * is printed, and `project_parking_summary` keeps per-m² prices out of the
+ * comparable columns entirely.
+ */
 function priceText(row) {
   if (row.price_min_eur == null) return null;
   const from = Math.round(moneyFromEur(Number(row.price_min_eur))).toLocaleString("sk-SK");
   const to = row.price_max_eur != null
     ? Math.round(moneyFromEur(Number(row.price_max_eur))).toLocaleString("sk-SK")
     : null;
-  return to ? `${from} – ${to} ${moneySymbol()}` : `${from} ${moneySymbol()}`;
+  const per = row.price_basis === "per_m2" ? " / m²" : "";
+  return (to ? `${from} – ${to} ${moneySymbol()}` : `${from} ${moneySymbol()}`) + per;
 }
 
 /** The developer's own figure, shown only when it is NOT what we just printed —
@@ -174,7 +182,7 @@ export default function ParkingCard({ projectId, reviewed, lang = "en" }) {
                       ? <span style={{ fontWeight: 600, fontSize: "0.9rem" }}>
                           {sk(lang) ? "hodnota " : "value "}{price}
                         </span>
-                      : r.price_max_eur == null
+                      : r.price_max_eur == null && r.price_basis !== "per_m2"
                         ? <>{sk(lang) ? "od " : "from "}{price}</>
                         : price)
                   : <span style={{ color: "var(--text-2)", fontWeight: 400, fontSize: "0.85rem" }}>
