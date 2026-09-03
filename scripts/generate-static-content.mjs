@@ -36,7 +36,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { COMPANY, addressOneLine } from '../src/lib/company.js';
+import { COMPANY, addressOneLine, registrationLine } from '../src/lib/company.js';
 import { FALLBACK_MONTHLY_CENTS, FALLBACK_MONTHLY_DISPLAY, FALLBACK_ANCHOR_DISPLAY } from '../src/lib/pricingDefaults.js';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
@@ -143,6 +143,13 @@ it daily, and delivers it as CSV and XLSX.
 - Data refresh: daily
 - Languages: Slovak and English
 
+## Who operates Residata
+
+Residata is operated by ${COMPANY.legalName}, a Slovak limited liability
+company, IČO ${COMPANY.icoPlain}, registered at ${addressOneLine('en')}.
+${registrationLine('en')}. Contact: ${COMPANY.email}.
+Full details: https://residata.eu/imprint
+
 ## What Residata is for
 
 - **Developers** — price new projects against real comparables; track absorption of your and competitors' inventory; spot supply gaps by district and segment.
@@ -197,6 +204,10 @@ Residata is a market intelligence service for new-build residential
 real estate across Slovakia and Czechia — ${coverageLine.replace(/^Slovakia and Czechia — /, '')},
 not just the two capitals. We track every active development project, normalize data
 from developer websites into one schema, and refresh the dataset daily.
+
+Operated by ${COMPANY.legalName} (IČO ${COMPANY.icoPlain}), a Slovak limited
+liability company at ${addressOneLine('en')}.
+${registrationLine('en')}. Contact ${COMPANY.email} · https://residata.eu/imprint
 
 ## Market coverage (updated daily; snapshot ${monthLabel})
 
@@ -284,6 +295,12 @@ const SITEMAP_URLS = [
   { loc: '/use-cases', priority: '0.6', changefreq: 'monthly' },
   { loc: '/data', priority: '0.6', changefreq: 'monthly' },
   { loc: '/contact', priority: '0.4', changefreq: 'monthly' },
+  // § 3a of the Commercial Code requires the company's identity to be ON the
+  // website; a page nothing links to in a machine-readable way is easy to miss
+  // and easy to forget. Low priority, but present.
+  { loc: '/imprint', priority: '0.3', changefreq: 'yearly' },
+  { loc: '/terms',   priority: '0.3', changefreq: 'yearly' },
+  { loc: '/privacy', priority: '0.3', changefreq: 'yearly' },
 ];
 
 const sitemap = `<?xml version="1.0" encoding="UTF-8"?>

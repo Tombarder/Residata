@@ -54,10 +54,10 @@ const S = {
  * will still show the dark card legibly because text colors are
  * explicitly set on the card's inner cells.
  */
-function shell({ title, preheader = "", inner, footer }) {
+function shell({ title, preheader = "", inner, footer, lang = "sk" }) {
   const safePreheader = String(preheader || "").replace(/</g, "&lt;");
   return `<!DOCTYPE html>
-<html lang="sk">
+<html lang="${lang}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -85,7 +85,7 @@ function shell({ title, preheader = "", inner, footer }) {
           <tr>
             <td style="${S.footer}">
               ${footer || "Residata · dáta o trhu novostavieb na Slovensku a v Česku"}
-              <div style="${S.legalFooter}">${legalFooterHtml()}</div>
+              <div style="${S.legalFooter}">${legalFooterHtml(lang)}</div>
             </td>
           </tr>
         </table>
@@ -124,14 +124,15 @@ import { COMPANY, addressOneLine, registrationLine } from "../../src/lib/company
  * Read from lib/company like every other surface, so the day the DIČ or IČ DPH
  * is issued it appears here too without anyone remembering that emails exist.
  */
-function legalFooterHtml() {
+function legalFooterHtml(lang = "sk") {
+  const isSK = lang === "sk";
   const ids = [`IČO: ${COMPANY.ico}`];
   if (COMPANY.dic) ids.push(`DIČ: ${COMPANY.dic}`);
   if (COMPANY.icDph) ids.push(`IČ DPH: ${COMPANY.icDph}`);
   return [
-    `${COMPANY.legalName}, ${addressOneLine("sk")}`,
+    `${COMPANY.legalName}, ${addressOneLine(lang)}`,
     `${ids.join(" · ")}`,
-    registrationLine("sk"),
+    registrationLine(lang),
   ].join("<br>");
 }
 
@@ -311,7 +312,7 @@ export function feedbackReplyHtml(reply, original, webUrl, lang = "sk", convId =
     ${original ? `<p style="${S.p};font-size:12px;color:${TEXT_DIM};margin-bottom:2px">${t("Tvoja pôvodná správa:", "Your original message:")}</p>${origBlock}` : ""}
     <a href="${convLink}" style="${S.btnGreen};margin-top:14px">${t("Otvoriť konverzáciu na platforme", "Open the conversation on the platform")} →</a>
     <p style="${S.p};font-size:12px;color:${TEXT_DIM};margin-top:12px">${t("Odpovedať môžeš priamo tu v e-maile aj v aplikácii.", "You can reply right here by email or in the app.")}</p>`;
-  return shell({
+  return shell({ lang,
     title: t("Odpoveď od Residata", "Reply from Residata"),
     preheader: String(reply || "").slice(0, 80),
     inner,
@@ -337,7 +338,7 @@ export function feedbackReceiptHtml(fb, webUrl, lang = "sk", convId = null) {
     <p style="${S.p}">${t("Ďakujeme! Ozveme sa ti čo najskôr — odpoveď uvidíš tu v e-maile aj v aplikácii v sekcii „Moje konverzácie“.", "Thanks! We'll get back to you shortly — you'll see the reply here by email and in the app under \"My conversations\".")}</p>
     <div style="padding:16px 18px;border:1px solid ${CARD_BORDER};border-radius:8px;margin:14px 0;background:${INNER_BOX};color:${TEXT_HI};font-size:15px;line-height:1.6">${msgHtml}</div>
     <a href="${convLink}" style="${S.btnGreen};margin-top:6px">${t("Otvoriť konverzáciu", "Open the conversation")} →</a>`;
-  return shell({
+  return shell({ lang,
     title: t("Máme tvoju správu", "We received your message"),
     preheader: t("Ďakujeme — ozveme sa ti čoskoro.", "Thanks — we'll get back to you soon."),
     inner,
@@ -388,4 +389,58 @@ export async function sendEmail({ to, subject, html, from, gmailUser, gmailPassw
   // Success breadcrumb (no PII beyond the From) so a send is verifiable in the
   // Vercel runtime logs — the helpers only log on FAILURE otherwise.
   console.log(`[email] sent via ${host} from ${fromAddr}`);
+}
+
+
+/**
+ * The invoice email we send ourselves after a successful payment.
+ *
+ * Stripe can email invoices, but only if someone switches it on in the
+ * dashboard — and the Terms promise the customer a document. Sending it from
+ * here means the promise is kept by code that is reviewed and tested, in the
+ * customer's own language, carrying our legal identity like every other email,
+ * and it keeps working whoever is administering the Stripe account.
+ *
+ * `inv` is the Stripe Invoice object. Both links come from Stripe and are
+ * long-lived signed URLs; we never attach the PDF ourselves.
+ */
+export function invoicePaidHtml(inv, webUrl, lang = "sk") {
+  const sk = lang === "sk";
+  const t = (a, b) => (sk ? a : b);
+  const amount = ((inv.amount_paid ?? inv.total ?? 0) / 100).toFixed(2);
+  const currency = String(inv.currency || "eur").toUpperCase();
+  const number = inv.number || inv.id || "";
+  const period = inv.status_transitions?.paid_at
+    ? new Date(inv.status_transitions.paid_at * 1000).toLocaleDateString(sk ? "sk-SK" : "en-GB")
+    : "";
+
+  const rows = [
+    [t("Číslo faktúry", "Invoice number"), escHtml(number)],
+    [t("Suma", "Amount"), `${amount} ${currency}`],
+    period ? [t("Dátum úhrady", "Paid on"), period] : null,
+  ].filter(Boolean);
+
+  const inner = `
+    <div style="${S.eyebrow}">${t("Faktúra", "Invoice")}</div>
+    <div style="${S.h1}">${t("Ďakujeme za platbu", "Thank you for your payment")}</div>
+    <p style="${S.p}">${t(
+      "Nižšie je vaša faktúra za predplatné Residata. Je to daňový doklad — stiahnite si ju pre svoje účtovníctvo.",
+      "Below is your invoice for the Residata subscription. It is a tax document — download it for your records.",
+    )}</p>
+    ${rows.map(([k, v]) => `<div style="${S.row}"><span style="${S.rowLabel}">${k}</span><span style="color:${TEXT_HI}">${v}</span></div>`).join("")}
+    ${inv.hosted_invoice_url ? `<p style="${S.p}"><a href="${inv.hosted_invoice_url}" style="${S.btnGreen}">${t("Otvoriť faktúru", "View invoice")}</a></p>` : ""}
+    ${inv.invoice_pdf ? `<p style="${S.p}"><a href="${inv.invoice_pdf}" style="color:${GREEN}">${t("Stiahnuť PDF", "Download PDF")}</a></p>` : ""}
+    <p style="${S.p}">${t(
+      "Predplatné sa obnovuje automaticky; zrušiť ho môžete kedykoľvek v sekcii fakturácie.",
+      "The subscription renews automatically; you can cancel any time in the billing section.",
+    )}</p>
+  `;
+
+  return shell({
+    lang,
+    title: t("Faktúra od Residata", "Invoice from Residata"),
+    preheader: t(`Faktúra ${number} · ${amount} ${currency}`, `Invoice ${number} · ${amount} ${currency}`),
+    inner,
+    footer: t("Residata · doklad k vášmu predplatnému", "Residata · receipt for your subscription"),
+  });
 }

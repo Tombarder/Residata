@@ -59,6 +59,21 @@ jobs:
           probe "https://residata.eu/llms.txt"                  "Total projects in dataset"
           probe "https://residata.eu/.well-known/security.txt"  "Contact: mailto:"
 
+          # security.txt carries its own expiry date (RFC 9116) and it is written
+          # at build time, one year out. If nothing deploys for a year the file
+          # goes stale on its own and every scanner starts treating it as invalid
+          # — silently, because the file still returns 200. Check the date, not
+          # just the presence.
+          sec_exp=$(curl -sS --max-time 20 https://residata.eu/.well-known/security.txt \
+                    | awk -F': *' '/^Expires:/ {print $2; exit}')
+          if [ -n "$sec_exp" ]; then
+            sec_days=$(( ( $(date -d "$sec_exp" +%s) - $(date +%s) ) / 86400 ))
+            echo "sec   security.txt expires in $sec_days days"
+            [ "$sec_days" -lt 30 ] && fail="$fail\n- security.txt expires in $sec_days days — redeploy to refresh it"
+          else
+            fail="$fail\n- security.txt has no Expires field, which RFC 9116 requires"
+          fi
+
           # The API must reject an unauthenticated checkout — a 200 here would
           # mean the paywall is open, which is worse than the site being down.
           code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 \

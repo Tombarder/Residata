@@ -190,7 +190,16 @@ export function statutoryWebsiteData(lang = "sk") {
   ];
 }
 
-/** Bank details for invoices / bank transfer — empty until the account exists. */
+/**
+ * Bank details — for INVOICES and for a customer paying by transfer.
+ *
+ * 🔴 Deliberately NOT rendered on the public Imprint. An IBAN published on a
+ * website is the raw material for invoice-redirection fraud: someone copies the
+ * layout, swaps the account number and emails "your invoice" to our customers.
+ * The account number belongs on the document that is actually a payment
+ * instruction, sent to a party who already knows they owe us — not on a page
+ * anyone can scrape.
+ */
 export function bankDetails(lang = "sk") {
   if (!COMPANY.iban) return [];
   const isSK = lang === "sk";
@@ -209,6 +218,39 @@ export function operatorInSentence(lang = "sk") {
   return lang === "sk"
     ? `${COMPANY.legalName}, so sídlom ${addressOneLine("sk")}, IČO: ${COMPANY.ico}`
     : `${COMPANY.legalName}, with its registered seat at ${addressOneLine("en")}, company ID (IČO): ${COMPANY.ico}`;
+}
+
+/**
+ * The seller block that goes on every invoice.
+ *
+ * Stripe prints the seller from the ACCOUNT's business profile, which is a
+ * dashboard setting and — until the account is moved to the company — still
+ * says a private individual. This is set on the customer's invoice footer from
+ * our own code instead, so the legally required identification is on the
+ * document regardless of what the dashboard says, and it gains the DIČ and the
+ * IBAN by itself the day those exist.
+ *
+ * Plain text: Stripe renders the footer without markup.
+ */
+export function invoiceSellerFooter(lang = "sk") {
+  const isSK = lang === "sk";
+  const ids = [`IČO: ${COMPANY.ico}`];
+  if (COMPANY.dic) ids.push(`DIČ: ${COMPANY.dic}`);
+  if (COMPANY.icDph) ids.push(`IČ DPH: ${COMPANY.icDph}`);
+
+  const lines = [
+    isSK ? "Dodávateľ:" : "Supplier:",
+    `${COMPANY.legalName}, ${addressOneLine(lang)}`,
+    ids.join(" · "),
+    registrationLine(lang),
+  ];
+  if (COMPANY.iban) {
+    lines.push(isSK
+      ? `Bankové spojenie: ${COMPANY.iban}${COMPANY.bankName ? ` (${COMPANY.bankName})` : ""}`
+      : `Bank: ${COMPANY.iban}${COMPANY.bankName ? ` (${COMPANY.bankName})` : ""}`);
+  }
+  lines.push(vatNotice(lang));
+  return lines.join("\n");
 }
 
 /** The Slovak data-protection authority — where a GDPR complaint is filed. */

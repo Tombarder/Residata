@@ -5,6 +5,10 @@ real estate across Slovakia and Czechia — 47 towns and cities with actively so
 not just the two capitals. We track every active development project, normalize data
 from developer websites into one schema, and refresh the dataset daily.
 
+Operated by Kamhal & Co. s. r. o. (IČO 57849471), a Slovak limited
+liability company at Krasovského 13, 851 01 Bratislava – Petržalka, Slovak Republic.
+Registered in the Commercial Register of the Municipal Court Bratislava III, section: Sro, insert no. 203519/B. Contact info@residata.eu · https://residata.eu/imprint
+
 ## Market coverage (updated daily; snapshot September 2026)
 
 - 511 total projects in dataset (currently active + projects that sold out under our tracking — both groups have full historical price/availability snapshots)

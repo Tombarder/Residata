@@ -22,6 +22,13 @@ it daily, and delivers it as CSV and XLSX.
 - Data refresh: daily
 - Languages: Slovak and English
 
+## Who operates Residata
+
+Residata is operated by Kamhal & Co. s. r. o., a Slovak limited liability
+company, IČO 57849471, registered at Krasovského 13, 851 01 Bratislava – Petržalka, Slovak Republic.
+Registered in the Commercial Register of the Municipal Court Bratislava III, section: Sro, insert no. 203519/B. Contact: info@residata.eu.
+Full details: https://residata.eu/imprint
+
 ## What Residata is for
 
 - **Developers** — price new projects against real comparables; track absorption of your and competitors' inventory; spot supply gaps by district and segment.

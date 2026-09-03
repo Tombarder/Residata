@@ -16,6 +16,7 @@
 import { getStripe, getSupabaseAdmin, getUserFromRequest, requestOrigin } from "./_lib/stripe.js";
 import { isTrustedRequest } from "./_lib/origin.js";
 import { FALLBACK_MONTHLY_CENTS } from "../src/lib/pricingDefaults.js";
+import { invoiceSellerFooter } from "../src/lib/company.js";
 
 export const config = { api: { bodyParser: false } };
 export const maxDuration = 15;
@@ -239,16 +240,66 @@ async function persistBillingIdentity(admin, stripe, session) {
   const { error } = await admin.from("user_profiles").update(patch).eq("id", userId);
   if (error) throw new Error(`user_profiles update: ${error.message}`);
 
-  // Mirror the registration number onto the Stripe customer so it prints on
-  // every invoice from here on, not only the one this checkout created.
+  // Put both sides of the invoice onto the Stripe customer, so they print on
+  // every invoice from here on rather than only the one this checkout created.
+  //
+  //   custom_fields → the BUYER's registration number
+  //   footer        → OUR identification as the supplier
+  //
+  // The footer matters more than it looks: Stripe prints the seller from the
+  // account's business profile, which is a dashboard setting and — until the
+  // account is moved to the company — still names a private individual. Writing
+  // it here means the legally required supplier details are on the document
+  // either way, and they pick up the DIČ and IBAN by themselves once those
+  // exist. Best effort: an invoice detail is never worth failing a webhook that
+  // Stripe would then retry.
   const customerId = typeof session.customer === "string" ? session.customer : session.customer?.id;
-  if (customerId && companyId) {
-    await stripe.customers.update(customerId, {
-      invoice_settings: {
-        custom_fields: [{ name: "IČO", value: companyId.slice(0, 30) }],
-      },
-    });
+  if (customerId) {
+    const invoice_settings = { footer: invoiceSellerFooter("sk") };
+    if (companyId) invoice_settings.custom_fields = [{ name: "IČO", value: companyId.slice(0, 30) }];
+    await stripe.customers.update(customerId, { invoice_settings })
+      .catch((e) => console.warn("[stripe] invoice settings not written:", e?.message || e));
   }
+}
+
+/**
+ * Email the paid invoice to the customer, in their own language.
+ *
+ * Never throws: the caller catches, and an email that fails must not fail the
+ * webhook — Stripe would retry it and re-apply the subscription. A missing
+ * email is a support request; a retried webhook is a data problem.
+ */
+async function sendInvoiceEmail(admin, inv) {
+  const to = inv.customer_email || null;
+  if (!to) return;
+  // Only real, payable invoices. A zero-amount one (a fully discounted period,
+  // a trial conversion) is not something to email as a receipt.
+  if (!(inv.amount_paid > 0)) return;
+
+  // The customer's own language. The key is `language` — `lang` is what the
+  // browser uses in localStorage, and reading that name here would have quietly
+  // emailed every English-speaking customer in Slovak.
+  let lang = "sk";
+  const customerId = typeof inv.customer === "string" ? inv.customer : inv.customer?.id;
+  if (customerId) {
+    const { data } = await admin
+      .from("user_profiles")
+      .select("ui_prefs")
+      .eq("stripe_customer_id", customerId)
+      .maybeSingle();
+    const pref = data?.ui_prefs?.language;
+    if (pref === "en" || pref === "sk") lang = pref;
+  }
+
+  const { invoicePaidHtml, sendEmail } = await import("./_lib/emails.js");
+  await sendEmail({
+    to,
+    subject: `${lang === "sk" ? "Faktúra" : "Invoice"} ${inv.number || ""} · Residata`.replace(/\s+/g, " ").trim(),
+    html: invoicePaidHtml(inv, "https://residata.eu", lang),
+    from: process.env.MAIL_FROM || process.env.GMAIL_FROM,
+    gmailUser: process.env.GMAIL_FROM,
+    gmailPassword: process.env.GMAIL_APP_PASSWORD,
+  });
 }
 
 // ─── portal ──────────────────────────────────────────────────────────────
@@ -453,6 +504,16 @@ async function handleWebhook(req, res) {
         if (subRef) {
           const sub = await stripe.subscriptions.retrieve(typeof subRef === "string" ? subRef : subRef.id);
           await applySubscription(admin, stripe, sub);
+        }
+        // Send the invoice ourselves. Stripe can email invoices, but only if
+        // someone ticks a box in the dashboard, and the Terms promise the
+        // customer a document — a promise should not depend on a setting nobody
+        // can see from the code. Sent from `invoice.paid` ONLY: Stripe fires
+        // invoice.payment_succeeded for the same invoice, and both arriving here
+        // would send the customer two copies.
+        if (event.type === "invoice.paid") {
+          await sendInvoiceEmail(admin, event.data.object)
+            .catch((e) => console.warn("[stripe] invoice email not sent:", e?.message || e));
         }
         break;
       }
