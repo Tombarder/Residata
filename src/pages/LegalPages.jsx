@@ -330,6 +330,14 @@ export function PrivacyPage({ lang }) {
               Svoje preferencie cookies môžete kedykoľvek upraviť cez odkaz
               „Nastavenia cookies" v päte stránky.
             </p>
+            <p>
+              Okrem cookies ukladáme vo vašom prehliadači (v tzv. local storage)
+              niekoľko technických údajov, ktoré neopúšťajú vaše zariadenie a
+              neslúžia na sledovanie: zvolený jazyk a farebnú tému, vaše
+              rozhodnutie o cookies, nastavenia filtrov a zostáv v aplikácii,
+              a krátkodobú vyrovnávaciu pamäť cennníka a textov, aby sa stránka
+              vykreslila okamžite. Vymazaním údajov prehliadača sa odstránia.
+            </p>
           </>
         ) : (
           <>
@@ -341,6 +349,14 @@ export function PrivacyPage({ lang }) {
             <p>
               You can update your cookie preferences at any time via the
               "Cookie settings" link in the site footer.
+            </p>
+            <p>
+              Besides cookies we keep a few technical values in your browser's
+              local storage. They never leave your device and are not used for
+              tracking: your chosen language and colour theme, your cookie
+              decision, your filter and report settings inside the app, and a
+              short-lived cache of the price list and site copy so the page can
+              paint immediately. Clearing your browser data removes them.
             </p>
           </>
         )}
