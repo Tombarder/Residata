@@ -78,6 +78,9 @@
          Multi-schema @graph so one block covers Organization + WebSite + SoftwareApplication.
          SoftwareApplication price is injected at build from public.pricing_config (the admin Pricing editor) via vite.config.js __SCHEMA_MONTHLY_PRICE_NUM__ — do not hardcode.
          offers → single monthly subscription Offer. -->
+    <!-- Which deploy this is. Read by lib/errorReport so a fixed bug stops
+         accumulating error rows against the build that no longer has it. -->
+    <meta name="build-id" content="__BUILD_ID__" />
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",

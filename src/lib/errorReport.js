@@ -46,10 +46,19 @@ function safePath() {
   }
 }
 
-/** Which deploy this is, so a fixed bug stops accumulating rows. */
+/**
+ * Which deploy this is, so a fixed bug stops accumulating rows against it.
+ *
+ * Filled from the <meta name="build-id"> tag that vite writes at build time.
+ * This used to also try import.meta.env.VITE_BUILD_ID — a variable nothing ever
+ * set — and the meta tag did not exist either, so every stored error had a null
+ * build while the comment claimed otherwise. Both ends now exist.
+ */
 function buildId() {
   try {
-    return clip(document.querySelector('meta[name="build-id"]')?.content || import.meta.env?.VITE_BUILD_ID || null, 100);
+    const v = document.querySelector('meta[name="build-id"]')?.content || null;
+    // An unsubstituted token means the build plugin did not run (dev server).
+    return v && !v.startsWith("__") ? clip(v, 100) : null;
   } catch {
     return null;
   }

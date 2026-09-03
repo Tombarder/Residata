@@ -43,7 +43,12 @@ export async function getUserFromRequest(req, admin) {
 
   const { data: profile } = await admin
     .from("user_profiles")
-    .select("id, email, tier, stripe_customer_id")
+    // paid_until and stripe_subscription_id are needed by the "already
+    // subscribed" guard in handleCheckout. They were NOT selected when that
+    // guard was written, so both read as undefined and the guard silently never
+    // fired — a check that looks like protection and is dead code. If you add a
+    // condition that reads a profile field, add the field here in the same edit.
+    .select("id, email, tier, stripe_customer_id, stripe_subscription_id, paid_until, paid_pause_started")
     .eq("id", user.id)
     .maybeSingle();
 

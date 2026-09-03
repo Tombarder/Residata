@@ -82,9 +82,17 @@ export default function StatusPage({ lang = "sk" }) {
     let cancelled = false;
     if (!isSupabaseReady()) { setApi({ state: "bad", detail: t("nenakonfigurované", "not configured") }); return; }
     const t0 = performance.now();
+    // projects_live carries a real per-project timestamp. The first version of
+    // this page used market_totals.snapshot_month instead — which is a MONTH,
+    // so a dataset 25 days stale still read as current, while the text beside it
+    // promised "whether last night's prices are in". The claim and the
+    // measurement have to be the same thing.
     supabasePublic
-      .from("market_totals")
-      .select("country, snapshot_month, total_projects_active, total_units_tracked")
+      .from("projects_live")
+      .select("country, last_seen_at")
+      .eq("status", "active")
+      .order("last_seen_at", { ascending: false })
+      .limit(1000)
       .then(({ data: rows, error }) => {
         if (cancelled) return;
         const ms = Math.round(performance.now() - t0);
@@ -95,22 +103,31 @@ export default function StatusPage({ lang = "sk" }) {
         }
         setApi({ state: ms > 3000 ? "warn" : "ok", detail: `${ms} ms` });
 
-        // Freshness is judged against the month, because that is the grain the
-        // public view exposes. A dataset still on last month at any point after
-        // the first few days of this one has stopped refreshing.
-        const now = new Date();
-        const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-        const dayOfMonth = now.getDate();
+        // Newest refresh per market, and how many projects that market holds.
+        const by = new Map();
+        for (const r of rows) {
+          const c = r.country || "?";
+          const g = by.get(c) || { country: c, newest: null, count: 0 };
+          g.count += 1;
+          if (r.last_seen_at && (!g.newest || r.last_seen_at > g.newest)) g.newest = r.last_seen_at;
+          by.set(c, g);
+        }
+
+        // The scrape runs nightly, so under ~26 hours old is a run that landed.
+        // Past ~50 hours two nights have been missed and that is worth saying
+        // out loud rather than colouring green.
+        const now = Date.now();
         setData({
           state: "ok",
-          rows: rows
-            .slice()
-            .sort((a, b) => String(a.country).localeCompare(String(b.country)))
-            .map((r) => {
-              const month = String(r.snapshot_month || "").slice(0, 7);
-              const current = month >= thisMonth;
-              const state = current ? "ok" : dayOfMonth > 3 ? "warn" : "ok";
-              return { ...r, month, state };
+          rows: [...by.values()]
+            .sort((a, b) => a.country.localeCompare(b.country))
+            .map((g) => {
+              const hours = g.newest ? (now - new Date(g.newest).getTime()) / 3600000 : Infinity;
+              return {
+                ...g,
+                hours,
+                state: hours < 26 ? "ok" : hours < 50 ? "warn" : "bad",
+              };
             }),
         });
       });
@@ -155,16 +172,24 @@ export default function StatusPage({ lang = "sk" }) {
              "More important than the website being up: whether last night's prices are in. Collection runs nightly.")}
         </p>
         {data.rows.length === 0 && <Row label={t("Trhy", "Markets")} state={data.state} detail="" />}
-        {data.rows.map((r) => (
-          <Row
-            key={r.country}
-            label={r.country === "SK" ? t("Slovensko", "Slovakia") : r.country === "CZ" ? t("Česko", "Czechia") : r.country}
-            state={r.state}
-            detail={r.month}
-            note={t(`${Number(r.total_projects_active).toLocaleString("sk-SK")} aktívnych projektov · ${Number(r.total_units_tracked).toLocaleString("sk-SK")} bytov`,
-                    `${Number(r.total_projects_active).toLocaleString("en-GB")} active projects · ${Number(r.total_units_tracked).toLocaleString("en-GB")} units`)}
-          />
-        ))}
+        {data.rows.map((r) => {
+          const h = Math.floor(r.hours);
+          const age = !Number.isFinite(r.hours)
+            ? t("neznáme", "unknown")
+            : h < 1 ? t("pred chvíľou", "just now")
+            : h < 48 ? t(`pred ${h} h`, `${h}h ago`)
+            : t(`pred ${Math.floor(h / 24)} dňami`, `${Math.floor(h / 24)}d ago`);
+          return (
+            <Row
+              key={r.country}
+              label={r.country === "SK" ? t("Slovensko", "Slovakia") : r.country === "CZ" ? t("Česko", "Czechia") : r.country}
+              state={r.state}
+              detail={age}
+              note={t(`Posledný zber · ${r.count.toLocaleString("sk-SK")} aktívnych projektov`,
+                      `Last collected · ${r.count.toLocaleString("en-GB")} active projects`)}
+            />
+          );
+        })}
 
         <h2 style={{ fontSize: "1.05rem", fontWeight: 600, margin: "2.5rem 0 0.6rem" }}>
           {t("Náš záväzok", "Our commitment")}

@@ -191,6 +191,16 @@ test("checkout cannot be bought twice by an impatient customer", () => {
   assert.match(src, /already subscribed/i,
     "checkout must refuse to open for an account that already has an active subscription");
 
+  // A guard is only real if the data it reads is actually fetched. This one was
+  // written reading profile.paid_until and profile.stripe_subscription_id while
+  // getUserFromRequest selected neither — so both were undefined and the guard
+  // never fired. It looked like protection and was dead code.
+  const lib = read("api/_lib/stripe.js");
+  for (const field of (src.match(/profile\?\.(\w+)/g) || []).map((m) => m.split(".")[1])) {
+    assert.ok(lib.includes(field),
+      `handleCheckout reads profile.${field} but api/_lib/stripe.js does not select it — the check is dead code`);
+  }
+
   // Stripe's Node SDK takes the idempotency key as a REQUEST OPTION, not a body
   // parameter. As a body parameter it is an unknown field that buys nothing —
   // and it looks correct, which is worse. (The Python SDK does accept it inline,

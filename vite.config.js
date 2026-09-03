@@ -61,6 +61,12 @@ function residataIndexHtmlContent() {
         // (graceful fallback → current live-fetch behaviour). Must be valid JS.
         __BUILD_SNAPSHOT_JSON__:           (data && Object.keys(data).length) ? JSON.stringify(data) : 'null',
         // Legal identity — one source (src/lib/company.js), same as the Imprint.
+        // The deploy's own identity. Vercel exposes the commit SHA; locally the
+        // build time is enough to tell two builds apart. errorReport stores it,
+        // so an error can be attributed to the build that had the bug — without
+        // it, that field was always null while the code claimed otherwise.
+        __BUILD_ID__: (process.env.VERCEL_GIT_COMMIT_SHA || '').slice(0, 8)
+                      || new Date().toISOString().slice(0, 16).replace('T', ' '),
         __COMPANY_LEGAL_NAME__:            COMPANY.legalName,
         __COMPANY_ICO__:                   COMPANY.icoPlain,
         __COMPANY_STREET__:                COMPANY.street,

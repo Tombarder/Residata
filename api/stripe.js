@@ -403,13 +403,26 @@ async function sendInvoiceEmail(admin, inv) {
   }
 
   const { invoicePaidHtml, sendEmail } = await import("./_lib/emails.js");
-  await sendEmail({
-    to,
-    subject: `${lang === "sk" ? "Faktúra" : "Invoice"} ${inv.number || ""} · Residata`.replace(/\s+/g, " ").trim(),
-    html: invoicePaidHtml(inv, "https://residata.eu", lang),
-    gmailUser: process.env.GMAIL_FROM,
-    gmailPassword: process.env.GMAIL_APP_PASSWORD,
-  });
+  // No `conversational` flag: an invoice is machine mail, so it goes from
+  // noreply@ per api/_lib/senders.js, which names invoices explicitly.
+  try {
+    await sendEmail({
+      to,
+      subject: `${lang === "sk" ? "Faktúra" : "Invoice"} ${inv.number || ""} · Residata`.replace(/\s+/g, " ").trim(),
+      html: invoicePaidHtml(inv, "https://residata.eu", lang),
+      gmailUser: process.env.GMAIL_FROM,
+      gmailPassword: process.env.GMAIL_APP_PASSWORD,
+    });
+  } catch (e) {
+    // RELEASE THE CLAIM. The row above exists to stop a redelivered webhook
+    // sending a SECOND copy — it must not also stop the FIRST one. Without
+    // this, one SMTP hiccup means the claim stands, every Stripe retry sees it
+    // and returns, and the customer never receives the invoice the Terms
+    // promise them. A duplicate is embarrassing; silence is a tax document
+    // they never got and cannot book.
+    await admin.from("invoice_emails_sent").delete().eq("invoice_id", inv.id);
+    throw e;
+  }
 
   // Record which language actually went out — the claim above was written
   // before we knew it, and support answering "what did they receive?" wants it.
