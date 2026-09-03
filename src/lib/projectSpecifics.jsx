@@ -70,7 +70,8 @@ export const ORDINARY = {
 const SPECIFICS_COLUMNS =
   "id,name,price_schedule,coverage_mode,has_interior_area,fitout_level,total_units," +
   "parking_availability,parking_garage_availability,parking_outside_availability," +
-  "parking_garage_price_from,parking_outside_price_from";
+  "parking_storage_availability,parking_garage_price_from,parking_outside_price_from," +
+  "parking_storage_price_from";
 
 const sk = (lang) => lang === "sk";
 
@@ -207,6 +208,41 @@ const RULES = [
           + "into the flat price or the €/m² — it is a separate product.",
     };
   },
+
+  // 6 · The cellar — its own product, its own terms.
+  //
+  // 🔴 It gets its own rule because folding it into the parking one stated things
+  // the developer never said: Páno Poprad's cellar is in the flat price and its
+  // garage says nothing about compulsion, and the project-wide headline read
+  // "included" — i.e. the platform would have claimed PARKING was in the price.
+  // A storage room is a separate product; it is reported as one.
+  ({ extra, lang }) => {
+    const av = extra?.parking_storage_availability;
+    if (av === "included") {
+      return {
+        key: "storage_included",
+        text: sk(lang) ? "Kobka/pivnica je v cene bytu" : "Storage room included in the flat price",
+        note: sk(lang)
+          ? "Developer dáva k bytu pivničnú kobku (alebo sklad) v základnej cene. "
+            + "Pri projektoch, kde sa kobka dokupuje, je to rozdiel v desiatkach tisíc."
+          : "The developer includes a cellar or storage room in the base price. Against "
+            + "a project where one is bought separately, that is a real difference.",
+      };
+    }
+    if (av === "mandatory") {
+      return {
+        key: "storage_mandatory",
+        text: sk(lang) ? "Kobka/pivnica je povinná — nie je v cene bytu"
+                       : "A storage room is compulsory — not in the flat price",
+        note: sk(lang)
+          ? "Developer predáva byt len spolu s kobkou, ktorá nie je zarátaná v cene "
+            + "bytu — skutočná cena je teda vyššia než tá v cenníku."
+          : "The developer only sells a flat together with a storage room whose price "
+            + "is not in the flat price, so the real cost is higher than the price list.",
+      };
+    }
+    return null;
+  },
 ];
 
 /**
@@ -264,8 +300,10 @@ export function useProjectSpecificsData() {
               parking_availability: r.parking_availability,
               parking_garage_availability: r.parking_garage_availability,
               parking_outside_availability: r.parking_outside_availability,
+              parking_storage_availability: r.parking_storage_availability,
               parking_garage_price_from: r.parking_garage_price_from,
               parking_outside_price_from: r.parking_outside_price_from,
+              parking_storage_price_from: r.parking_storage_price_from,
             };
             if (r.id) out[r.id] = v;
             if (r.name) out[r.name] = v;

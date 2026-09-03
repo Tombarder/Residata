@@ -186,6 +186,20 @@ async function handleCheckout(req, res) {
   // where the SDK folds request options into the same call, which is exactly the
   // kind of difference that gets copied across languages and silently does
   // nothing.
+  //
+  // AND YES, ONE KEY IS CORRECT ACROSS THE RETRY LOOP BELOW — do not "fix" this
+  // by varying the key per attempt. Reusing a key with different parameters is
+  // normally an error ("the idempotency layer compares incoming parameters to
+  // those of the original request and errors if they're not the same"), which
+  // makes the loop look broken. It is not, because of the exception that applies
+  // to exactly this case: Stripe saves a result "only after the execution of an
+  // endpoint begins. If incoming parameters fail validation [...] we don't save
+  // the idempotent result [...] You can retry these requests."
+  // (https://docs.stripe.com/api/idempotent_requests, read 2026-09-03.)
+  //
+  // A rejected DEGRADABLE parameter IS a validation failure, so the key is never
+  // burned and the retry is free. Varying the key per attempt would instead
+  // reopen the double-charge window the key exists to close.
   const idempotencyKey = `checkout:${user.id}:${priceCents}:${Math.floor(Date.now() / 600000)}`;
 
   let session;

@@ -63,13 +63,34 @@ export const COMPANY = {
   // simulation on 2026-09-03: filled test values, walked every surface,
   // reverted. Nothing else in the frontend needs editing.
   //
-  // THREE things are NOT automatic and are the reason to read the runbook first
+  // FIVE things are NOT automatic and are the reason to read the runbook first
   // (docs/legal/DPH_PREPNUTIE_RUNBOOK.md in novostavby-scraper):
   //   1. `pricesVatMode` below — does the customer keep paying the same number,
   //      or does VAT get added on top? A commercial decision, not a technical one.
   //   2. `automatic_tax` in api/stripe.js is OFF. If the answer to (1) is "net",
   //      it has to be switched on or Stripe will not actually add the tax.
   //   3. KamhalCo has its own copy: stripe_billing._DODAVATEL + its Terms.
+  //   4. TWO FIELDS IN THE STRIPE DASHBOARD, which no test here can see:
+  //      Settings → Business → Tax details holds "VAT number (IČ DPH)" and
+  //      "Tax Identification Number", both empty today. Filling them starts a
+  //      7-day grace period in which Stripe may ask for more, so it is done
+  //      deliberately and not on the last day before an invoice is due.
+  //   5. Settings → Billing → Invoices → "Default item prices" is set to
+  //      "Include inclusive tax", which is right for `gross` and wrong for
+  //      `net`.
+  //
+  // ⚠️ THE STRIPE DASHBOARD ALSO HOLDS A SECOND COPY OF THE IDENTITY BELOW.
+  // Its account-level "Default footer" (Settings → Billing → Invoices) repeats
+  // the name, seat, IČO and register entry, because a customer created by hand
+  // in the dashboard never passes through invoiceSellerFooter() and would
+  // otherwise get an invoice with no seller identification at all. Stripe
+  // applies customer-level settings ahead of account-level ones, so it never
+  // doubles up on a real subscriber's invoice.
+  //
+  // That copy is deliberately limited to the facts that DO NOT change with VAT
+  // status — no VAT sentence, no bank line — so it cannot end up contradicting
+  // this file. Keep it that way: anything VAT-dependent belongs here, where the
+  // tests can see it, not in a dashboard field they cannot.
   //
   // The tests that currently assert an unissued identifier is never displayed
   // will fail the moment these are filled. That is deliberate — they are the
