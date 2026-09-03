@@ -323,6 +323,8 @@ export default function UsageDashboard({ lang = "en" }) {
             </div>
           </Section>
 
+          <ClientErrorsPanel lang={lang} />
+
           <MaintenancePanel lang={lang} onDeleted={load} />
         </>
       )}
@@ -438,6 +440,85 @@ function UserTimeline({ user, rows, loading, err, lang, onClose }) {
 // events older than it. NOTHING is automatic (Boss 2026-07-17). Preview count first,
 // then a two-step confirm before the destructive call.
 const CUTOFF_DAYS = [30, 90, 180, 365];
+/**
+ * What is throwing in signed-in users' browsers.
+ *
+ * Collecting errors nobody looks at is worse than not collecting them, because
+ * it feels like coverage. This is the looking. Grouped by message rather than
+ * listed, because one broken page produces one defect and fifty rows, and the
+ * count is what says how bad it is.
+ */
+function ClientErrorsPanel({ lang }) {
+  const L = (sk, en) => (lang === "sk" ? sk : en);
+  const [rows, setRows] = useState(null);
+  const [err, setErr] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    supabaseData
+      .from("client_errors")
+      .select("message, kind, path, build, occurred_at")
+      .gte("occurred_at", new Date(Date.now() - 30 * 86400000).toISOString())
+      .order("occurred_at", { ascending: false })
+      .limit(500)
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) { setErr(error.message || String(error)); return; }
+        const by = new Map();
+        for (const r of data || []) {
+          const k = `${r.kind}\u0000${r.message}`;
+          const g = by.get(k) || { ...r, count: 0, paths: new Set() };
+          g.count += 1;
+          if (r.path) g.paths.add(r.path);
+          if (r.occurred_at > g.occurred_at) g.occurred_at = r.occurred_at;
+          by.set(k, g);
+        }
+        setRows([...by.values()].sort((a, b) => b.count - a.count).slice(0, 25));
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  return (
+    <Section
+      title={L("Chyby v prehliadači", "Browser errors")}
+      sub={L("Posledných 30 dní, len prihlásení používatelia, zoskupené podľa hlásenia.",
+             "Last 30 days, signed-in users only, grouped by message.")}
+    >
+      {err && <div style={{ color: "#f85149", fontSize: "0.85rem" }}>{err}</div>}
+      {!err && rows === null && <div style={{ color: dim, fontSize: "0.85rem" }}>…</div>}
+      {!err && rows?.length === 0 && (
+        <div style={{ color: dim, fontSize: "0.85rem" }}>
+          {L("Žiadne chyby. To je dobrá správa — a zároveň dôvod sem občas pozrieť.",
+             "No errors. Which is good news, and also the reason to look here now and then.")}
+        </div>
+      )}
+      {!err && rows?.length > 0 && (
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
+            <thead>
+              <tr>
+                {[L("Počet", "Count"), L("Hlásenie", "Message"), L("Kde", "Where"), L("Naposledy", "Last seen")].map((h) => (
+                  <th key={h} style={{ textAlign: "left", padding: "0.4rem 0.6rem 0.4rem 0", color: dim, fontFamily: mono, fontSize: "0.68rem", textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: `1px solid ${border}` }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => (
+                <tr key={i}>
+                  <td style={{ padding: "0.45rem 0.6rem 0.45rem 0", fontFamily: mono, color: r.count > 5 ? "#f0883e" : text, borderBottom: `1px solid ${border}` }}>{r.count}</td>
+                  <td style={{ padding: "0.45rem 0.6rem 0.45rem 0", color: text, borderBottom: `1px solid ${border}`, maxWidth: 460, overflowWrap: "anywhere" }}>{r.message}</td>
+                  <td style={{ padding: "0.45rem 0.6rem 0.45rem 0", color: dim, fontFamily: mono, fontSize: "0.74rem", borderBottom: `1px solid ${border}` }}>{[...r.paths].slice(0, 3).join(", ")}</td>
+                  <td style={{ padding: "0.45rem 0.6rem 0.45rem 0", color: dim, whiteSpace: "nowrap", borderBottom: `1px solid ${border}` }}>{relTime(r.occurred_at, lang)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Section>
+  );
+}
+
 function MaintenancePanel({ lang, onDeleted }) {
   const L = (sk, en) => (lang === "sk" ? sk : en);
   const [open, setOpen] = useState(false);

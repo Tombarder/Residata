@@ -263,6 +263,41 @@ async function persistBillingIdentity(admin, stripe, session) {
 }
 
 /**
+ * Apply a Stripe Customer's current billing identity to our own record.
+ *
+ * `checkout.session.completed` catches the details as they are first entered.
+ * This catches every later change — a customer correcting their company name
+ * or adding a VAT number in the billing portal, which they can now do because
+ * the portal allows it. Without this the invoice would be right and our
+ * database wrong, and the database is what the EU sales list is built from.
+ *
+ * Only ever fills IN. A Stripe update that carries no address (a default
+ * payment-method change, for instance) must not blank the address we hold.
+ */
+async function syncCustomerBillingIdentity(admin, customer) {
+  if (!customer?.id) return;
+  const addr = customer.address || null;
+  const vatId = (customer.tax_ids?.data || [])
+    .map((t) => t?.value)
+    .find((v) => v && String(v).trim()) || null;
+  const companyId = (customer.invoice_settings?.custom_fields || [])
+    .find((f) => f?.name === "IČO")?.value || null;
+
+  const patch = { billing_updated_at: new Date().toISOString() };
+  if (customer.name) patch.billing_company_name = customer.name;
+  if (addr) { patch.billing_address = addr; if (addr.country) patch.billing_country = addr.country; }
+  if (vatId) patch.billing_vat_id = vatId;
+  if (companyId) patch.billing_company_id = companyId;
+  if (Object.keys(patch).length <= 1) return;
+
+  const { error } = await admin
+    .from("user_profiles")
+    .update(patch)
+    .eq("stripe_customer_id", customer.id);
+  if (error) throw new Error(`user_profiles update: ${error.message}`);
+}
+
+/**
  * The company's bank details, for the payment line on an invoice.
  *
  * They live in public.app_secrets — RLS on with ZERO policies, so no client
@@ -303,11 +338,31 @@ async function sendInvoiceEmail(admin, inv) {
   // a trial conversion) is not something to email as a receipt.
   if (!(inv.amount_paid > 0)) return;
 
+  // CLAIM THE SEND BEFORE SENDING. Stripe redelivers a webhook whenever the
+  // handler does not return 2xx, and plenty can fail after an email has gone
+  // out — so the insert, not the send, is what decides whether this delivery is
+  // the one that mails the customer. A retry collides with the primary key and
+  // returns here. Two invoices for one payment is what a finance department
+  // escalates.
+  const customerId = typeof inv.customer === "string" ? inv.customer : inv.customer?.id;
+  const { error: claimErr } = await admin.from("invoice_emails_sent").insert({
+    invoice_id: inv.id,
+    customer_id: customerId || null,
+    sent_to: to,
+    amount_cents: inv.amount_paid,
+    currency: inv.currency || "eur",
+  });
+  if (claimErr) {
+    // 23505 = unique violation = already sent. Anything else is a real problem,
+    // and we would rather skip one email than risk sending it twice.
+    if (claimErr.code !== "23505") throw new Error(`invoice_emails_sent: ${claimErr.message}`);
+    return;
+  }
+
   // The customer's own language. The key is `language` — `lang` is what the
   // browser uses in localStorage, and reading that name here would have quietly
   // emailed every English-speaking customer in Slovak.
   let lang = "sk";
-  const customerId = typeof inv.customer === "string" ? inv.customer : inv.customer?.id;
   if (customerId) {
     const { data } = await admin
       .from("user_profiles")
@@ -327,6 +382,10 @@ async function sendInvoiceEmail(admin, inv) {
     gmailUser: process.env.GMAIL_FROM,
     gmailPassword: process.env.GMAIL_APP_PASSWORD,
   });
+
+  // Record which language actually went out — the claim above was written
+  // before we knew it, and support answering "what did they receive?" wants it.
+  await admin.from("invoice_emails_sent").update({ lang }).eq("invoice_id", inv.id);
 }
 
 // ─── portal ──────────────────────────────────────────────────────────────
@@ -506,6 +565,14 @@ async function handleWebhook(req, res) {
           }
           await applySubscription(admin, stripe, sub);
         }
+        break;
+      }
+      // A customer who edits their company name, address or VAT number in the
+      // billing portal changes it at Stripe — and until now, nowhere else. Our
+      // copy is what the EU sales list is built from, so it has to follow.
+      case "customer.updated": {
+        await syncCustomerBillingIdentity(admin, event.data.object)
+          .catch((e) => console.warn("[stripe] customer.updated not applied:", e?.message || e));
         break;
       }
       case "customer.subscription.created":

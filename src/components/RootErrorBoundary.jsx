@@ -1,4 +1,5 @@
 import { Component } from 'react'
+import { reportError } from '../lib/errorReport'
 
 /**
  * Top-level error boundary — wraps the ENTIRE app (App + every context provider),
@@ -23,6 +24,9 @@ class RootErrorBoundary extends Component {
   componentDidCatch(err, info) {
     // eslint-disable-next-line no-console
     console.error('[RootErrorBoundary]', err, info)
+    // A crash a signed-in user sees is one we would otherwise never hear about.
+    // reportError never throws and is a no-op when signed out.
+    reportError('boundary', err?.message || String(err), err?.stack || info?.componentStack)
   }
 
   render() {

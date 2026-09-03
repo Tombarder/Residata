@@ -20,6 +20,7 @@ import Picker from "../components/Picker";
 import { useProjectSpecificsData } from "../lib/projectSpecifics";
 import PageHero from "../components/PageHero";
 import { usePricing } from "../lib/pricing";
+import { reportError } from "../lib/errorReport";
 import { FALLBACK_MONTHLY_DISPLAY, FALLBACK_ANCHOR_DISPLAY } from "../lib/pricingDefaults";
 import { useProjects } from "../lib/useData";
 import DashboardHome from "./DashboardHome";
@@ -704,6 +705,9 @@ class PlatformErrorBoundary extends Component {
   componentDidCatch(err, info) {
     console.error("[PlatformErrorBoundary]", err, info);
     try { track && track("platform_crash", { message: String(err?.message || err).slice(0, 200) }); } catch (_) {}
+    // The platform is behind the paywall, so this is the boundary our own
+    // testing can least often reach — and the one that matters most.
+    reportError("boundary", err?.message || String(err), err?.stack || info?.componentStack);
   }
   render() {
     if (!this.state.err) return this.props.children;

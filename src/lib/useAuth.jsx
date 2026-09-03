@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef, createContext, useContext } from "react";
 import { supabase, isSupabaseReady } from "./supabase";
+import { installErrorReporting } from "./errorReport";
 
 // F-104: gate debug log behind import.meta.env.DEV so production builds
 // don't stream auth state (email, user_id, tier, profile_completed) into
@@ -260,6 +261,17 @@ function useAuthInternal() {
  */
 export function AuthProvider({ children }) {
   const value = useAuthInternal();
+
+  // Start reporting runtime errors from signed-in browsers. Installed here
+  // because this is the one place that always knows who is signed in, and the
+  // reporter reads the id at report time rather than capturing it — so someone
+  // signing in mid-session becomes covered without anything re-mounting.
+  const userRef = useRef(null);
+  userRef.current = value?.user?.id || null;
+  useEffect(() => {
+    installErrorReporting(() => userRef.current);
+  }, []);
+
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
