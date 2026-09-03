@@ -37,15 +37,6 @@
     <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/pricing" />
   </url>
   <url>
-    <loc>https://residata.eu/about</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://residata.eu/about" />
-    <xhtml:link rel="alternate" hreflang="sk" href="https://residata.eu/about" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/about" />
-  </url>
-  <url>
     <loc>https://residata.eu/use-cases</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>monthly</changefreq>
@@ -55,13 +46,13 @@
     <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/use-cases" />
   </url>
   <url>
-    <loc>https://residata.eu/data</loc>
+    <loc>https://residata.eu/sample</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://residata.eu/data" />
-    <xhtml:link rel="alternate" hreflang="sk" href="https://residata.eu/data" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/data" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://residata.eu/sample" />
+    <xhtml:link rel="alternate" hreflang="sk" href="https://residata.eu/sample" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/sample" />
   </url>
   <url>
     <loc>https://residata.eu/contact</loc>
@@ -80,32 +71,5 @@
     <xhtml:link rel="alternate" hreflang="en" href="https://residata.eu/status" />
     <xhtml:link rel="alternate" hreflang="sk" href="https://residata.eu/status" />
     <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/status" />
-  </url>
-  <url>
-    <loc>https://residata.eu/imprint</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>yearly</changefreq>
-    <priority>0.3</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://residata.eu/imprint" />
-    <xhtml:link rel="alternate" hreflang="sk" href="https://residata.eu/imprint" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/imprint" />
-  </url>
-  <url>
-    <loc>https://residata.eu/terms</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>yearly</changefreq>
-    <priority>0.3</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://residata.eu/terms" />
-    <xhtml:link rel="alternate" hreflang="sk" href="https://residata.eu/terms" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/terms" />
-  </url>
-  <url>
-    <loc>https://residata.eu/privacy</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>yearly</changefreq>
-    <priority>0.3</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://residata.eu/privacy" />
-    <xhtml:link rel="alternate" hreflang="sk" href="https://residata.eu/privacy" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/privacy" />
   </url>
 </urlset>

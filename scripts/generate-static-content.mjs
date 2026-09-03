@@ -293,21 +293,42 @@ fs.writeFileSync(path.resolve('public/.well-known/security.txt'), securityTxt);
 console.log(`[gen-static] public/.well-known/security.txt — ${securityTxt.length} chars`);
 
 // ───────────────────── sitemap.xml — refresh lastmod ─────────────────────
+// A sitemap is a list of pages we are ASKING Google to index. Two rules follow
+// from that, and this list broke both until 2026-09-03:
+//
+//   1. every entry must be a REAL route, at its PRIMARY url. `/about` was listed
+//      and is not a route at all — the SPA falls through to Home, so we were
+//      inviting Google to index a second copy of the homepage under a made-up
+//      address. `/data` was listed too, but routing.js makes `/sample` the
+//      primary and keeps `/data` only for backward compatibility; the page's own
+//      canonical says `/sample`, so the sitemap was pointing at a url that
+//      immediately declares a different one — wasted crawl on a sales page.
+//
+//   2. nothing marked noindex belongs here. /privacy, /imprint and /terms are
+//      deliberately noindex in src/lib/seo.js (they earn no search traffic and
+//      dilute what Google thinks Residata is). Listing them anyway is a
+//      contradiction Search Console reports as "Submitted URL marked noindex".
+//
+//      They were added here on purpose, with a good reason: § 3a of the
+//      Commercial Code requires the company's identity to be ON the website, and
+//      a page nothing references in a machine-readable way is easy to forget.
+//      That reason is met without the sitemap entry — the imprint is linked from
+//      the footer of every page, so it is on the website and reachable, which is
+//      all § 3a asks. It does not require the page to be INDEXABLE. Keeping the
+//      entry would have meant either living with the contradiction or dropping
+//      the noindex, and indexing the legal pages is the thing seo.js explicitly
+//      decided against. Removing the entry satisfies both.
+//
+// src/lib/sitemapRoutes.test.mjs enforces both against routing.js and seo.js.
+// /status stays: it is indexable on purpose and nothing links to it prominently.
 const SITEMAP_URLS = [
   { loc: '/', priority: '1.0', changefreq: 'weekly' },
   { loc: '/live', priority: '0.9', changefreq: 'weekly' },
   { loc: '/pricing', priority: '0.7', changefreq: 'monthly' },
-  { loc: '/about', priority: '0.5', changefreq: 'monthly' },
   { loc: '/use-cases', priority: '0.6', changefreq: 'monthly' },
-  { loc: '/data', priority: '0.6', changefreq: 'monthly' },
+  { loc: '/sample', priority: '0.6', changefreq: 'monthly' },
   { loc: '/contact', priority: '0.4', changefreq: 'monthly' },
-  // § 3a of the Commercial Code requires the company's identity to be ON the
-  // website; a page nothing links to in a machine-readable way is easy to miss
-  // and easy to forget. Low priority, but present.
   { loc: '/status',  priority: '0.4', changefreq: 'daily'  },
-  { loc: '/imprint', priority: '0.3', changefreq: 'yearly' },
-  { loc: '/terms',   priority: '0.3', changefreq: 'yearly' },
-  { loc: '/privacy', priority: '0.3', changefreq: 'yearly' },
 ];
 
 const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
