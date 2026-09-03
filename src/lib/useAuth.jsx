@@ -266,11 +266,13 @@ export function AuthProvider({ children }) {
   // because this is the one place that always knows who is signed in, and the
   // reporter reads the id at report time rather than capturing it — so someone
   // signing in mid-session becomes covered without anything re-mounting.
+  // The ref is written in an effect, not during render: React may render a
+  // component more than once before committing, and a ref written in the render
+  // body can be left holding a value from a render that was thrown away.
   const userRef = useRef(null);
-  userRef.current = value?.user?.id || null;
-  useEffect(() => {
-    installErrorReporting(() => userRef.current);
-  }, []);
+  const userId = value?.user?.id || null;
+  useEffect(() => { userRef.current = userId; }, [userId]);
+  useEffect(() => { installErrorReporting(() => userRef.current); }, []);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
