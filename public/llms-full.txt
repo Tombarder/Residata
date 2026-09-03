@@ -11,7 +11,7 @@ Registered in the Commercial Register of the Municipal Court Bratislava III, sec
 
 ## Market coverage (updated daily; snapshot September 2026)
 
-- 522 total projects in dataset (currently active + projects that sold out under our tracking — both groups have full historical price/availability snapshots)
+- 524 total projects in dataset (currently active + projects that sold out under our tracking — both groups have full historical price/availability snapshots)
 - 389 of them are currently active in the market
 - 231 distinct active developers
 - 41,490 individual units tracked across active projects (current snapshot)

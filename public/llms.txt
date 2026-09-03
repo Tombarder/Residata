@@ -14,7 +14,7 @@ it daily, and delivers it as CSV and XLSX.
 ## Scope (updated daily; snapshot September 2026)
 
 - Markets: Slovakia and Czechia — 47 towns and cities with actively sold new-build projects
-- Total projects in dataset: 522 new-build residential projects (current + sold-out under tracking)
+- Total projects in dataset: 524 new-build residential projects (current + sold-out under tracking)
 - Currently active (in market): 389 projects, 41,490 units
 - Currently for sale: 12,223 units · reserved: 3,420 · sold: 25,017
 - Average price across available inventory: €5,936/m²
