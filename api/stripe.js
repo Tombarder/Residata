@@ -159,13 +159,42 @@ async function handleCheckout(req, res) {
   // Required parameters (mode, line_items, urls) are never in this set: if one
   // of those is wrong, failing loudly is correct.
   const DEGRADABLE = ["adaptive_pricing", "custom_fields", "tax_id_collection", "customer_update"];
+  // TWO GUARDS AGAINST BUYING THE SAME SUBSCRIPTION TWICE. The sister product
+  // has had these since its billing was written; this one did not, and the
+  // failure they prevent is the worst kind — the customer is charged twice,
+  // notices before we do, and their first experience of paying us is a refund
+  // request.
+  //
+  //   1. Already subscribed → do not open checkout at all. An active
+  //      subscription plus a second one is two charges a month, forever, until
+  //      somebody spots it.
+  //   2. Idempotency key → two rapid attempts (a double-click, an impatient
+  //      retry, two tabs) collapse into ONE Checkout Session at Stripe rather
+  //      than creating two. The key changes every 10 minutes, which is longer
+  //      than any double-click and shorter than a genuine change of mind; by
+  //      the time it rotates, the webhook has normally landed and guard 1
+  //      catches the repeat instead.
+  if (profile?.stripe_subscription_id && profile?.paid_until && new Date(profile.paid_until) > new Date()) {
+    return res.status(409).json({
+      error: "already subscribed",
+      detail: "This account already has an active subscription. Manage it under Billing.",
+    });
+  }
+  // NOTE: in the Node SDK the idempotency key is a REQUEST OPTION (second
+  // argument), not a body parameter. Putting it in `params` would send Stripe an
+  // unknown field and buy no protection at all — the sister product is Python,
+  // where the SDK folds request options into the same call, which is exactly the
+  // kind of difference that gets copied across languages and silently does
+  // nothing.
+  const idempotencyKey = `checkout:${user.id}:${priceCents}:${Math.floor(Date.now() / 600000)}`;
+
   let session;
   {
     const attempt = { ...params };
     const dropped = [];
     for (;;) {
       try {
-        session = await stripe.checkout.sessions.create(attempt);
+        session = await stripe.checkout.sessions.create(attempt, { idempotencyKey });
         break;
       } catch (e) {
         const msg = String(e?.message || "");

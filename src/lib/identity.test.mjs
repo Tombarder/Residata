@@ -180,3 +180,23 @@ test("the bank account never reaches the browser or the repository", () => {
       `src/lib/company.js declares ${field} — bank details belong in app_secrets, not in a browser bundle`);
   }
 });
+
+test("checkout cannot be bought twice by an impatient customer", () => {
+  // A double-click, two tabs, or an impatient retry must not create two live
+  // subscriptions. The customer is charged twice, notices before we do, and
+  // their first experience of paying us is asking for a refund. The sister
+  // product has had both guards since its billing was written; this one did not.
+  const src = read("api/stripe.js");
+
+  assert.match(src, /already subscribed/i,
+    "checkout must refuse to open for an account that already has an active subscription");
+
+  // Stripe's Node SDK takes the idempotency key as a REQUEST OPTION, not a body
+  // parameter. As a body parameter it is an unknown field that buys nothing —
+  // and it looks correct, which is worse. (The Python SDK does accept it inline,
+  // so this is exactly the mistake a port from the other product produces.)
+  assert.ok(!/idempotency_key\s*:/.test(src),
+    "idempotency_key as a body parameter does nothing in the Node SDK — pass { idempotencyKey } as the second argument");
+  assert.match(src, /sessions\.create\([^)]*,\s*\{\s*idempotencyKey\s*\}/,
+    "checkout must send an idempotency key as a request option");
+});
