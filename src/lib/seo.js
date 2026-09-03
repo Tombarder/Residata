@@ -168,6 +168,34 @@ const SEO_BY_PAGE = {
     },
     noindex: true,
   },
+  // /status and /data-sources were added on 2026-09-03 and had NO entry here.
+  // applySeo returns early for an unknown page, so both silently inherited the
+  // title, description, canonical and og tags of whatever page the visitor came
+  // from — and a crawler landing on them cold got the homepage's meta. For
+  // /data-sources that is the page we tell developers to find when they want to
+  // object, and it was in the sitemap while not being indexable as itself.
+  Status: {
+    path: "/status",
+    en: {
+      title: "Service status · Residata",
+      description: "Live availability and data freshness for Residata, measured in your own browser.",
+    },
+    sk: {
+      title: "Stav služby · Residata",
+      description: "Živá dostupnosť a aktuálnosť dát Residata, meraná priamo vo vašom prehliadači.",
+    },
+  },
+  DataSources: {
+    path: "/data-sources",
+    en: {
+      title: "Data sources and objections · Residata",
+      description: "Where Residata's data comes from, and how a developer can have it corrected or have collection stopped.",
+    },
+    sk: {
+      title: "Zdroje dát a námietky · Residata",
+      description: "Odkiaľ Residata berie údaje a ako môže developer požiadať o opravu alebo o zastavenie zberu.",
+    },
+  },
   Terms: {
     path: "/terms",
     en: {

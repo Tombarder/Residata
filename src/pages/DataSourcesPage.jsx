@@ -20,7 +20,6 @@
  * promise about data we may have a legitimate reason to keep, and a promise
  * made here that we later argue about is worse than no page at all.
  */
-import { useEffect } from "react";
 import { COMPANY, operatorInSentence } from "../lib/company";
 
 const H2 = { fontSize: "1.1rem", fontWeight: 600, color: "var(--text)", margin: "2.2rem 0 0.7rem", letterSpacing: "-0.01em" };
@@ -31,9 +30,6 @@ export default function DataSourcesPage({ lang = "sk" }) {
   const isSK = lang === "sk";
   const t = (sk, en) => (isSK ? sk : en);
 
-  useEffect(() => {
-    document.title = t("Zdroje dát a námietky · Residata", "Data sources and objections · Residata");
-  }, [lang]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const mail = (subject) => `mailto:${COMPANY.email}?subject=${encodeURIComponent(subject)}`;
 

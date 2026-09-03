@@ -59,9 +59,6 @@ export default function StatusPage({ lang = "sk" }) {
   const [api, setApi] = useState({ state: null });
   const [data, setData] = useState({ state: null, rows: [] });
 
-  useEffect(() => {
-    document.title = t("Stav služby · Residata", "Service status · Residata");
-  }, [lang]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The website itself. A static file, so this times the edge and not a query.
   useEffect(() => {
