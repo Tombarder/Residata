@@ -347,6 +347,11 @@ const buildData = {
   // sold-out under tracking). Falls back to active if older view shape.
   total_projects_tracked: market?.total_projects_tracked ?? market?.total_projects_active,
   total_developers: market?.total_developers_active,
+  // Towns/cities with actively-sold projects. Added 2026-09-03 so the per-route
+  // SEO copy can state real coverage instead of a hardcoded city name — see
+  // src/lib/seo.js coveragePhrase(). Same snapshot as llms.txt, so the two
+  // cannot disagree about how big the product is.
+  total_cities: cityCount || undefined,
   total_available: market?.total_available,
   // PERF Step 2: reserved + sold included so the build-time snapshot is a
   // complete seed for the hero/headline (useMarketTotals) — see vite.config.js

@@ -65,27 +65,27 @@ const SEO_BY_PAGE = {
   Home: {
     path: "/",
     en: {
-      title: "Residata — New-Build Market Intelligence for Bratislava",
-      description: "Every new residential development in Bratislava, structured and refreshed daily. Pricing, availability, absorption, and trends — built for developers, banks, valuers, and investors.",
-      keywords: "Bratislava real estate, new-build market data, residential market intelligence, absorption rate, property market Slovakia, €/m² trends",
+      title: "Residata — New-Build Market Intelligence for Slovakia & Czechia",
+      description: "__COVERAGE__ — structured and refreshed daily. Pricing, availability, absorption, and trends, built for developers, banks, valuers, and investors.",
+      keywords: "novostavby Bratislava, Bratislava real estate, new-build market data Slovakia, Czech new-build data, residential market intelligence, absorption rate, €/m² trends",
     },
     sk: {
-      title: "Residata — Dátový prehľad trhu novostavieb Bratislava",
-      description: "Každý aktívny projekt novostavby v Bratislave na jednom mieste. Ceny, dostupnosť, rýchlosť predaja a trendy — aktualizované každý deň. Pre developerov, banky, odhadcov a investorov.",
-      keywords: "novostavby Bratislava, trh novostavieb, ceny bytov, market intelligence, dáta nehnuteľnosti, €/m² trendy, rýchlosť predaja",
+      title: "Residata — Dátový prehľad trhu novostavieb na Slovensku a v Česku",
+      description: "__COVERAGE__ — aktualizované každý deň. Ceny, dostupnosť, rýchlosť predaja a trendy pre developerov, banky, odhadcov a investorov.",
+      keywords: "novostavby Bratislava, novostavby Slovensko, novostavby Praha, trh novostavieb, ceny bytov, market intelligence, dáta nehnuteľnosti, €/m² trendy, rýchlosť predaja",
     },
   },
   Live: {
     path: "/live",
     en: {
-      title: "Live Dashboard — Residata | Bratislava New-Build Market",
-      description: "Explore every active new-build residential project in Bratislava: units available, sold percentage, €/m² by project and district, and sell-out watch list.",
-      keywords: "live dashboard Bratislava real estate, new-build projects, units available, sold percentage, €/m² by project",
+      title: "Live Dashboard — Residata | Slovak & Czech New-Build Market",
+      description: "Explore every active new-build project across Slovakia and Czechia: units available, sold percentage, €/m² by project and district, and the sell-out watch list. __COVERAGE__.",
+      keywords: "live dashboard Bratislava real estate, novostavby Slovensko, Czech new-build projects, units available, sold percentage, €/m² by project",
     },
     sk: {
-      title: "Live dashboard — Residata | Trh novostavieb Bratislava",
-      description: "Pozrite si každý aktívny projekt novostavby v Bratislave: voľné byty, percento predaja, €/m² podľa projektu a okresu, sledovanie blížiacich sa sell-out-ov.",
-      keywords: "live dashboard Bratislava, novostavby projekty, voľné byty, % predaja, €/m² podľa projektu",
+      title: "Live dashboard — Residata | Trh novostavieb SK a CZ",
+      description: "Pozrite si každý aktívny projekt novostavby na Slovensku a v Česku: voľné byty, percento predaja, €/m² podľa projektu a okresu, sledovanie blížiacich sa sell-out-ov. __COVERAGE__.",
+      keywords: "live dashboard Bratislava, novostavby Slovensko, novostavby Praha, voľné byty, % predaja, €/m² podľa projektu",
     },
   },
   "Use Cases": {
@@ -220,51 +220,46 @@ const SEO_BY_PAGE = {
  * To add a market: add a block keyed by ISO code with `en`/`sk` rule lists.
  */
 const SEO_COUNTRY_OVERRIDES = {
+  // 🔴 These rules run against the BASE copy, which since 2026-09-03 already
+  // names both countries. A bare ["Slovakia", "Czechia"] rule therefore turns
+  // "…for Slovakia & Czechia" into "…for Czechia & Czechia" — so the bare
+  // country and city rules that used to live here are GONE on purpose. What is
+  // left reorders the pair to put the reader's own market first, which is the
+  // point of localising, without asserting anything false.
   CZ: {
     en: [
+      ["Slovakia & Czechia", "Czechia & Slovakia"],
+      ["Slovakia and Czechia", "Czechia and Slovakia"],
+      ["Slovak & Czech", "Czech & Slovak"],
       ["novostavby Bratislava", "novostavby Praha"],
       ["Bratislava real estate", "Prague real estate"],
+      ["new-build market data Slovakia", "new-build market data Czechia"],
       ["property market Slovakia", "property market Czechia"],
       ["market data Slovakia", "market data Czechia"],
-      ["Bratislava", "Prague"],
-      ["Slovakia", "Czechia"],
     ],
     sk: [
+      ["na Slovensku a v Česku", "v Česku a na Slovensku"],
+      ["Slovensku a v Česku", "Česku a na Slovensku"],
+      ["SK a CZ", "CZ a SK"],
       ["novostavby Bratislava", "novostavby Praha"],
-      ["v Bratislave", "v Prahe"],
-      ["Bratislava", "Praha"],
-      ["Slovensko", "Česko"],
+      ["novostavby Slovensko", "novostavby Česko"],
     ],
   },
-  // "all" = combined SK+CZ view, and the country a crawler gets. Broadens the
-  // TITLES and the DESCRIPTIONS off Bratislava-only; KEYWORDS deliberately keep
-  // the base copy, because "novostavby Bratislava" is the highest-volume search
-  // term in this market and targeting it is intentional.
+  // There is deliberately NO "all" block any more.
   //
-  // The descriptions were added on 2026-09-03. index.html's static meta was
-  // already correct ("across Slovakia and Czechia"), but applySeo OVERWRITES it
-  // once the app boots — and Google executes JavaScript, so what it indexed was
-  // the downgrade: "Every new residential development in Bratislava". The
-  // product covers 47 towns in two countries, so the description in the search
-  // result was understating it by about an order of magnitude, and contradicting
-  // the pricing page, which already sells "the Slovak & Czech new-build market".
+  // One was added earlier on 2026-09-03 to rewrite the Bratislava-only titles
+  // and descriptions into "Slovakia & Czechia" for the combined view. It was
+  // the right diagnosis — index.html's static meta was already correct, but
+  // applySeo overwrites it once the app boots, and Google executes JavaScript,
+  // so what got indexed was the downgrade. The fix was applied in the wrong
+  // place though: a find→replace over the output only works while the base copy
+  // still contains the exact string it is hunting for, and it silently does
+  // nothing the moment somebody edits that copy — with no test to notice.
   //
-  // Rules stay ordered most-specific-first so the longer phrase wins before any
-  // shorter one contained inside it.
-  all: {
-    en: [
-      ["New-Build Market Intelligence for Bratislava", "New-Build Market Intelligence for Slovakia & Czechia"],
-      ["Bratislava New-Build Market", "Slovak & Czech New-Build Market"],
-      ["Every new residential development in Bratislava", "Every new residential development across Slovakia and Czechia"],
-      ["every active new-build residential project in Bratislava", "every active new-build residential project across Slovakia and Czechia"],
-    ],
-    sk: [
-      ["Dátový prehľad trhu novostavieb Bratislava", "Dátový prehľad trhu novostavieb — Slovensko a Česko"],
-      ["Trh novostavieb Bratislava", "Trh novostavieb — Slovensko a Česko"],
-      ["Každý aktívny projekt novostavby v Bratislave", "Každý aktívny projekt novostavby na Slovensku a v Česku"],
-      ["každý aktívny projekt novostavby v Bratislave", "každý aktívny projekt novostavby na Slovensku a v Česku"],
-    ],
-  },
+  // The base copy now states the truth directly, so every reader gets it:
+  // the combined view, the SK view, an unknown market, and any crawler. The
+  // override layer is back to doing only what it is good at — swapping ONE
+  // market's wording for another's, in the CZ block above.
 };
 
 /**
@@ -378,6 +373,49 @@ function resolvePageSeo(page, lang) {
  * html[lang] logic is per-route and country-agnostic by design (one SPA, no
  * per-country URLs). SK / unknown country → base copy, byte-identical.
  */
+/**
+ * How big the product is, in words, for the __COVERAGE__ token.
+ *
+ * WHY THIS EXISTS. Until 2026-09-03 the per-route titles and descriptions said
+ * the product covered "Bratislava". It has covered Slovakia AND Czechia for
+ * months, and — worse — these values OVERWRITE the correct ones that the build
+ * bakes into index.html, so a crawler that runs JavaScript (Google does) saw the
+ * smaller claim, as did LinkedIn when the link was shared. The product was
+ * advertising itself as a fraction of what it is.
+ *
+ * A hardcoded replacement would rot exactly the same way, so the numbers come
+ * from the SAME build-time snapshot the hero and llms.txt use
+ * (`window.__RESIDATA_SNAPSHOT__`, written by scripts/generate-static-content.mjs
+ * and injected by vite.config.js). Every deploy refreshes them; nobody has to
+ * remember. It is read synchronously — the inline script in index.html runs
+ * during HTML parse, before this module — so there is no async flicker and no
+ * moment where a crawler could capture a half-filled sentence.
+ *
+ * The fallback is a sentence with no numbers in it rather than a stale number:
+ * if the snapshot is missing (a build without DB access), the copy still reads
+ * correctly and simply says less. It must never assert a figure it cannot see.
+ */
+export function coveragePhrase(lang, snapshot) {
+  const s = snapshot ?? (typeof window !== "undefined" ? window.__RESIDATA_SNAPSHOT__ : null);
+  const projects = Number(s?.total_projects) || 0;
+  const towns = Number(s?.total_cities) || 0;
+  const sk = lang === "sk" || lang === "cs";
+
+  if (projects && towns) {
+    return sk
+      ? `${projects} aktívnych projektov novostavieb v ${towns} mestách na Slovensku a v Česku`
+      : `${projects} active new-build projects across ${towns} towns in Slovakia and Czechia`;
+  }
+  if (projects) {
+    return sk
+      ? `${projects} aktívnych projektov novostavieb na Slovensku a v Česku`
+      : `${projects} active new-build projects across Slovakia and Czechia`;
+  }
+  return sk
+    ? "Každý aktívny projekt novostavby na Slovensku a v Česku"
+    : "Every active new-build residential project across Slovakia and Czechia";
+}
+
 export function applySeo(page, lang, country) {
   if (typeof document === "undefined") return;
   const resolved = resolvePageSeo(page, lang);
@@ -391,9 +429,13 @@ export function applySeo(page, lang, country) {
   // editor automatically — never hardcode a price string in this file.
   {
     const { price, anchor } = currentPriceStrings();
+    const coverage = coveragePhrase(lang);
     for (const k of ["title", "description", "keywords"]) {
       if (typeof meta[k] === "string") {
-        meta[k] = meta[k].split("__PRICE__").join(price).split("__ANCHOR__").join(anchor);
+        meta[k] = meta[k]
+          .split("__PRICE__").join(price)
+          .split("__ANCHOR__").join(anchor)
+          .split("__COVERAGE__").join(coverage);
       }
     }
   }
