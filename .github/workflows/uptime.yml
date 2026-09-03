@@ -67,10 +67,24 @@ jobs:
           sec_exp=$(curl -sS --max-time 20 https://residata.eu/.well-known/security.txt \
                     | awk -F': *' '/^Expires:/ {print $2; exit}')
           if [ -n "$sec_exp" ]; then
-            sec_days=$(( ( $(date -d "$sec_exp" +%s) - $(date +%s) ) / 86400 ))
+            # RFC 9116 writes Expires as ISO-8601 with fractional seconds
+            # (2027-09-03T08:52:22.000Z). GNU date cannot parse that form and
+            # silently returns 0, which came out as "expires in -20699 days" —
+            # a false alarm on the first run. Strip the fraction first, and
+            # treat an unparseable date as a fault rather than as an expiry.
+            sec_clean=$(echo "$sec_exp" | sed -E 's/\.[0-9]+Z?$/Z/')
+            sec_epoch=$(date -d "$sec_clean" +%s 2>/dev/null || echo "")
+            if [ -z "$sec_epoch" ] || [ "$sec_epoch" = "0" ]; then
+              echo "BAD   security.txt Expires unparseable: $sec_exp"
+              fail="$fail\n- security.txt has an Expires field this probe cannot read: $sec_exp"
+              sec_epoch=""
+            fi
+          fi
+          if [ -n "${sec_epoch:-}" ]; then
+            sec_days=$(( ( sec_epoch - $(date +%s) ) / 86400 ))
             echo "sec   security.txt expires in $sec_days days"
             [ "$sec_days" -lt 30 ] && fail="$fail\n- security.txt expires in $sec_days days — redeploy to refresh it"
-          else
+          elif [ -z "$sec_exp" ]; then
             fail="$fail\n- security.txt has no Expires field, which RFC 9116 requires"
           fi
 
