@@ -93,5 +93,17 @@ Allow: /
 Disallow: /app/
 Disallow: /api/
 
+# ── Are you a developer whose site we read? ─────────────────────────
+# Residata collects publicly published price lists from new-build developers'
+# own websites. If you have found us in your logs, or found your project in
+# our product, this is the page that says what we hold, how to have it
+# corrected, and how to have collection stopped:
+#
+#     https://residata.eu/data-sources
+#     info@residata.eu
+#
+# We answer. Objections do not need a reason and do not need a lawyer.
+# Operated by Kamhal & Co. s. r. o., IČO 57849471, Bratislava, Slovakia.
+
 # ── Sitemap ─────────────────────────────────────────────────────────
 Sitemap: https://residata.eu/sitemap.xml

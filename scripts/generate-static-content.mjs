@@ -299,6 +299,8 @@ const SITEMAP_URLS = [
   // website; a page nothing links to in a machine-readable way is easy to miss
   // and easy to forget. Low priority, but present.
   { loc: '/status',  priority: '0.4', changefreq: 'daily'  },
+  // A developer looking for how to object should be able to FIND this page.
+  { loc: '/data-sources', priority: '0.5', changefreq: 'yearly' },
   { loc: '/imprint', priority: '0.3', changefreq: 'yearly' },
   { loc: '/terms',   priority: '0.3', changefreq: 'yearly' },
   { loc: '/privacy', priority: '0.3', changefreq: 'yearly' },

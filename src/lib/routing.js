@@ -89,6 +89,11 @@ export function pathToPage(pathname) {
     // derives "/status" from the page name on its own, so only this direction
     // needs an entry.
     "/status": "Status",
+    // /data-sources — where the data comes from and how a developer objects.
+    // Public on purpose: a developer who cannot find a way to complain to us
+    // reaches for a lawyer instead, which is the expensive version of the same
+    // conversation.
+    "/data-sources": "DataSources",
     // Legacy URLs → new platform pages (for backward compat of email links etc)
     "/analytics": "App:Analytics",
     "/admin": "App:Admin",

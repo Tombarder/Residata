@@ -32,6 +32,7 @@ const HeroLabPage = lazy(() => import("./pages/HeroVariants"));
 // Legal pages + cookie banner (F-051 — Boss-mandated 2026-05-31 night).
 import { PrivacyPage, ImprintPage, TermsPage } from "./pages/LegalPages";
 import StatusPage from "./pages/StatusPage";
+import DataSourcesPage from "./pages/DataSourcesPage";
 import CookieBanner from "./components/CookieBanner";
 import { useAuth } from "./lib/useAuth";
 import { useCapabilities } from "./lib/useCapabilities";
@@ -817,6 +818,9 @@ function Footer({ lang = "en", setCurrent }) {
             </a>
             <a href="/status" onClick={handleNav("Status")} style={linkStyle} onMouseEnter={hoverOn} onMouseLeave={hoverOff}>
               {isSK ? "Stav služby" : "Service status"}
+            </a>
+            <a href="/data-sources" onClick={handleNav("DataSources")} style={linkStyle} onMouseEnter={hoverOn} onMouseLeave={hoverOff}>
+              {isSK ? "Zdroje dát" : "Data sources"}
             </a>
             <a href="#" onClick={reopenCookies} style={linkStyle} onMouseEnter={hoverOn} onMouseLeave={hoverOff}>
               {isSK ? "Nastavenia cookies" : "Cookie settings"}
@@ -2559,6 +2563,7 @@ export default function App() {
             {current === "Privacy" && <PrivacyPage lang={lang} />}
             {current === "Imprint" && <ImprintPage lang={lang} />}
             {current === "Status" && <StatusPage lang={lang} />}
+            {current === "DataSources" && <DataSourcesPage lang={lang} />}
             {current === "Terms" && <TermsPage lang={lang} />}
             {/* Hidden hero-variant preview page — not in Nav, only reachable via /hero-lab URL */}
             {current === "HeroLab" && (
