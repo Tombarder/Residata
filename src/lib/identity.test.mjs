@@ -37,6 +37,8 @@ const SURFACES = [
   "src/pages/Platform.jsx",
   "src/lib/marketingCopy.js",
   "src/lib/pricing.js",
+  "src/pages/StatusPage.jsx",
+  "src/pages/DataSourcesPage.jsx",
   "api/stripe.js",
   "api/_lib/emails.js",
   "vite.config.js",
@@ -209,4 +211,44 @@ test("checkout cannot be bought twice by an impatient customer", () => {
     "idempotency_key as a body parameter does nothing in the Node SDK — pass { idempotencyKey } as the second argument");
   assert.match(src, /sessions\.create\([^)]*,\s*\{\s*idempotencyKey\s*\}/,
     "checkout must send an idempotency key as a request option");
+});
+
+test("every parameter we send to Stripe checkout exists in the SDK", () => {
+  // A parameter Stripe does not recognise fails the WHOLE session — nobody can
+  // subscribe. That happened today: custom_fields.key was "company_id" and the
+  // underscore made Stripe reject the request outright. The SDK ships the
+  // authoritative parameter list for the version we have installed, so there is
+  // no reason to find out from a customer instead.
+  const src = read("api/stripe.js");
+
+  // Top-level keys of the `const params = { ... }` literal, plus later
+  // `params.x = ...` assignments.
+  const start = src.indexOf("const params = {");
+  assert.ok(start > 0, "could not find the checkout params object");
+  let depth = 0, i = start + "const params = ".length;
+  for (;; i++) {
+    if (src[i] === "{") depth++;
+    else if (src[i] === "}" && --depth === 0) break;
+  }
+  const body = src.slice(start, i + 1);
+
+  const keys = new Set();
+  let d = 0;
+  for (const line of body.split("\n")) {
+    const m = line.trim().match(/^([a-z_][a-zA-Z0-9_]*)\s*:/);
+    if (d === 1 && m) keys.add(m[1]);
+    d += (line.match(/[{[]/g) || []).length - (line.match(/[}\]]/g) || []).length;
+  }
+  for (const m of src.matchAll(/params\.([a-z_][a-zA-Z0-9_]*)\s*=/g)) keys.add(m[1]);
+
+  const dts = read("node_modules/stripe/esm/resources/Checkout/Sessions.d.ts");
+  const from = dts.indexOf("interface SessionCreateParams");
+  const to = dts.indexOf("\n    namespace SessionCreateParams", from);
+  const valid = new Set([...dts.slice(from, to).matchAll(/^ {8}(\w+)\??:/gm)].map((m) => m[1]));
+
+  for (const k of keys) {
+    assert.ok(valid.has(k),
+      `checkout sends "${k}", which is not a parameter of SessionCreateParams in the installed Stripe SDK — Stripe rejects the whole session, so nobody can subscribe`);
+  }
+  assert.ok(keys.size >= 10, "params extraction found suspiciously few keys — the test is not reading the object");
 });
