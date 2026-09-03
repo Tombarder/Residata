@@ -125,12 +125,12 @@ const SEO_BY_PAGE = {
     path: "/contact",
     en: {
       title: "Contact — Residata",
-      description: "Get in touch with Residata — for sample reports, custom delivery, or enterprise pricing. Email: info@residata.eu",
+      description: "Get in touch with Residata — for sample reports, custom delivery, or enterprise pricing. Email: tomas@residata.eu",
       keywords: "Residata contact, real estate data contact, custom market report Bratislava",
     },
     sk: {
       title: "Kontakt — Residata",
-      description: "Kontaktujte Residata — pre ukážkový report, custom dodávku alebo enterprise ceny. Email: info@residata.eu",
+      description: "Kontaktujte Residata — pre ukážkový report, custom dodávku alebo enterprise ceny. Email: tomas@residata.eu",
       keywords: "Residata kontakt, dáta nehnuteľnosti kontakt, custom report Bratislava",
     },
   },

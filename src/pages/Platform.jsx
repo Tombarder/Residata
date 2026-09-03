@@ -2206,7 +2206,7 @@ function PlatformExports({ lang, setCurrent }) {
           {lang === "sk"
             ? "Celý dataset je dostupný cez REST API. Kým si prihlásený, tvoja session autorizuje čítanie — ideálne na rýchly pull alebo do notebooku. Pre automatizovaný server-to-server prístup (stály API kľúč) napíš na "
             : "The full dataset is available over a REST API. While you're signed in, your session authorizes reads — handy for a quick pull or a notebook. For automated server-to-server access (a permanent API key), email "}
-          <a href="mailto:info@residata.eu" style={{ color: accentInk }}>info@residata.eu</a>.
+          <a href="mailto:tomas@residata.eu" style={{ color: accentInk }}>tomas@residata.eu</a>.
         </p>
         <CopyField label={lang === "sk" ? "Endpoint" : "Endpoint"} value={`${SUPABASE_URL || "https://mtclsrswxtjseewyrcbx.supabase.co"}/rest/v1/projects`} lang={lang} />
         <CopyField label={lang === "sk" ? "apikey (verejný)" : "apikey (public)"} value={SUPABASE_ANON_KEY || ""} lang={lang} />

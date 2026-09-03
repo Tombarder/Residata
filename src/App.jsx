@@ -2070,7 +2070,7 @@ function ContactSection({ l }) {
       </p>
 
       <div style={{ display: "flex", flexDirection: "column", gap: "0.7rem", marginBottom: "1.5rem" }}>
-        {method("mailto:info@residata.eu", "@", "info@residata.eu")}
+        {method("mailto:tomas@residata.eu", "@", "tomas@residata.eu")}
         {method("tel:+421911963909", "☎", "+421 911 963 909")}
       </div>
 
