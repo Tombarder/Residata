@@ -73,6 +73,15 @@
     <xhtml:link rel="alternate" hreflang="x-default" href="https://residata-gamma.vercel.app/contact" />
   </url>
   <url>
+    <loc>https://residata-gamma.vercel.app/status</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.4</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://residata-gamma.vercel.app/status" />
+    <xhtml:link rel="alternate" hreflang="sk" href="https://residata-gamma.vercel.app/status" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata-gamma.vercel.app/status" />
+  </url>
+  <url>
     <loc>https://residata-gamma.vercel.app/imprint</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>yearly</changefreq>

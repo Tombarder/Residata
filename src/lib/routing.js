@@ -85,6 +85,10 @@ export function pathToPage(pathname) {
     "/privacy": "Privacy",
     "/imprint": "Imprint",
     "/terms": "Terms",
+    // /status — public service status, linked from the footer. pageToPath()
+    // derives "/status" from the page name on its own, so only this direction
+    // needs an entry.
+    "/status": "Status",
     // Legacy URLs → new platform pages (for backward compat of email links etc)
     "/analytics": "App:Analytics",
     "/admin": "App:Admin",

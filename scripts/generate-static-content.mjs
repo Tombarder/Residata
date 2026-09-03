@@ -298,6 +298,7 @@ const SITEMAP_URLS = [
   // § 3a of the Commercial Code requires the company's identity to be ON the
   // website; a page nothing links to in a machine-readable way is easy to miss
   // and easy to forget. Low priority, but present.
+  { loc: '/status',  priority: '0.4', changefreq: 'daily'  },
   { loc: '/imprint', priority: '0.3', changefreq: 'yearly' },
   { loc: '/terms',   priority: '0.3', changefreq: 'yearly' },
   { loc: '/privacy', priority: '0.3', changefreq: 'yearly' },
