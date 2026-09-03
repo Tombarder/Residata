@@ -378,7 +378,6 @@ async function sendInvoiceEmail(admin, inv) {
     to,
     subject: `${lang === "sk" ? "Faktúra" : "Invoice"} ${inv.number || ""} · Residata`.replace(/\s+/g, " ").trim(),
     html: invoicePaidHtml(inv, "https://residata.eu", lang),
-    from: process.env.MAIL_FROM || process.env.GMAIL_FROM,
     gmailUser: process.env.GMAIL_FROM,
     gmailPassword: process.env.GMAIL_APP_PASSWORD,
   });

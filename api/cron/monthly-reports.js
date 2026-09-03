@@ -153,7 +153,6 @@ export default async function handler(req, res) {
         to: sub.email,
         subject: `Residata · ${capitalize(month)} · ${subjectScopeTitle}`,
         html,
-        from: GMAIL_FROM,
         gmailUser: GMAIL_FROM,
         gmailPassword: GMAIL_APP_PASSWORD,
       });

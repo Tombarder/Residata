@@ -107,7 +107,7 @@ async function handleInner(req, res) {
       to: fb.email,
       subject: fb.app_lang === "en" ? "Reply from Residata" : "Odpoveď od Residata",
       html: feedbackReplyHtml(reply, fb.message, WEB_URL, fb.app_lang === "en" ? "en" : "sk", feedback_id),
-      from: GMAIL_FROM, gmailUser: GMAIL_FROM, gmailPassword: GMAIL_APP_PASSWORD,
+      gmailUser: GMAIL_FROM, gmailPassword: GMAIL_APP_PASSWORD,
       // A human answering a support thread — it must come from a mailbox the
       // customer can reply to, never from noreply@. See sendEmail's sender note.
       conversational: true,

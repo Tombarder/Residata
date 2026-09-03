@@ -157,7 +157,7 @@ async function handleInner(req, res) {
         to: ADMIN_EMAIL,
         subject: `[Residata Feedback]${isReply ? " ↩" : ""} ${meta.label} — ${email || "anonymous"}`,
         html: feedbackHtml({ category, message, email, user_tier, page_path, page_url, project_name: projectName, has_attachment: !!img, is_reply: isReply, created_at: new Date().toISOString() }, WEB_URL),
-        from: GMAIL_FROM, gmailUser: GMAIL_FROM, gmailPassword: GMAIL_APP_PASSWORD,
+        gmailUser: GMAIL_FROM, gmailPassword: GMAIL_APP_PASSWORD,
       });
     } catch (e) { console.error("[feedback] notify email failed:", String(e?.message || e).slice(0, 160)); }
   }
@@ -166,13 +166,18 @@ async function handleInner(req, res) {
   // conversation, and only when we have an address. Non-fatal — a failed receipt
   // must never fail the submit (the message is already saved + admin notified).
   async function notifyUser(category, toEmail, convId) {
-    if (!GMAIL_APP_PASSWORD || !toEmail) return;
+    // Same credential test as every other send: the product runs on Resend
+    // (SMTP_PASS) and Gmail is only the legacy fallback. Checking GMAIL_APP_PASSWORD
+    // alone meant that dropping the obsolete Gmail password would silently stop the
+    // customer's "we got your message" receipt while the admin notification —
+    // which gates correctly — kept working. Nobody would ever notice.
+    if ((!process.env.SMTP_PASS && !GMAIL_APP_PASSWORD) || !toEmail) return;
     try {
       await sendEmail({
         to: toEmail,
         subject: app_lang === "en" ? "We received your message — Residata" : "Máme tvoju správu — Residata",
         html: feedbackReceiptHtml({ category, message }, WEB_URL, app_lang === "en" ? "en" : "sk", convId),
-        from: GMAIL_FROM, gmailUser: GMAIL_FROM, gmailPassword: GMAIL_APP_PASSWORD,
+        gmailUser: GMAIL_FROM, gmailPassword: GMAIL_APP_PASSWORD,
       });
     } catch (e) { console.error("[feedback] user receipt failed:", String(e?.message || e).slice(0, 160)); }
   }

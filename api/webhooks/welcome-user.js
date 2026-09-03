@@ -73,7 +73,6 @@ export default async function handler(req, res) {
       to: user.email,
       subject: "Your Residata account is approved",
       html: approvedUserHtml(user, WEB_URL),
-      from: GMAIL_FROM,
       gmailUser: GMAIL_FROM,
       gmailPassword: GMAIL_APP_PASSWORD,
     });

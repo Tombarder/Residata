@@ -10,6 +10,7 @@
 // one, change the other.
 
 import nodemailer from "nodemailer";
+import { resolveSender } from "./senders.js";
 
 const GREEN     = "#00e5a0";
 const CARD_BG   = "#0e0e10";   // dark Residata card
@@ -376,9 +377,6 @@ export function feedbackReceiptHtml(fb, webUrl, lang = "sk", convId = null) {
 // sender, and there is no second place where an address is written down.
 // Automated mail still carries Reply-To: info@, so a customer who hits reply
 // reaches a monitored mailbox instead of the void.
-const FROM_AUTOMATED      = process.env.MAIL_FROM              || "noreply@residata.eu";
-const FROM_CONVERSATIONAL = process.env.MAIL_FROM_CONVERSATIONAL || "info@residata.eu";
-
 export async function sendEmail({ to, subject, html, from, gmailUser, gmailPassword, replyTo, conversational = false }) {
   const host = process.env.SMTP_HOST || "smtp.gmail.com";
   const port = Number(process.env.SMTP_PORT || 465);
@@ -387,8 +385,7 @@ export async function sendEmail({ to, subject, html, from, gmailUser, gmailPassw
   // `from` is the pre-2026-09 Gmail-era parameter. It is deliberately NOT consulted:
   // MAIL_FROM already overrode it in production, so ignoring it changes nothing that
   // ran, and it stops a caller quietly reintroducing tkamhal@gmail.com as a sender.
-  const fromAddr = conversational ? FROM_CONVERSATIONAL : FROM_AUTOMATED;
-  const replyAddr = replyTo || (conversational ? undefined : FROM_CONVERSATIONAL);
+  const { from: fromAddr, replyTo: replyAddr } = resolveSender({ conversational, replyTo });
   const transporter = nodemailer.createTransport({
     host,
     port,

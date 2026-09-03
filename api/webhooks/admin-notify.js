@@ -78,7 +78,6 @@ export default async function handler(req, res) {
       to: ADMIN_EMAIL,
       subject: `[Residata] New free signup: ${user.email}`,
       html: adminDigestHtml(user, WEB_URL, SUPABASE_URL, APPROVAL_HMAC_SECRET),
-      from: GMAIL_FROM,
       gmailUser: GMAIL_FROM,
       gmailPassword: GMAIL_APP_PASSWORD,
     });
