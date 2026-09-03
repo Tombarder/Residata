@@ -40,56 +40,10 @@ import { useEffect, useState } from "react";
 import { supabaseData } from "./supabase";
 import { moneyFromEur, moneySymbol } from "./money";
 import { useCurrency } from "./useCurrency";
+import { PARKING_KINDS, VAT, kindLabel, termsLabel, termsTone } from "./parkingTerms.js";
+export { PARKING_KINDS, kindLabel, termsLabel, termsTone };
 
 const sk = (lang) => lang === "sk";
-
-/** The kinds, in the order they are shown. Mirrors unit_kinds.REGISTER_KINDS. */
-export const PARKING_KINDS = [
-  { key: "parking_garage",  sk: "Garáž / kryté státie", en: "Garage (indoor)" },
-  { key: "parking_outside", sk: "Vonkajšie státie",     en: "Outdoor bay" },
-  { key: "parking",         sk: "Parkovanie",           en: "Parking" },
-  { key: "storage",         sk: "Kobka / pivnica",      en: "Storage" },
-];
-
-/** Mirrors AVAILABILITY in v2/lib/parking.py — that module is the source of truth.
- *
- * Boss 2026-09-03: *"make sure u also record somewhere if the garage is already in
- * price of the apartment, or if its mandatory, or if not mandatory. very important
- * differences."* They are, and they point in opposite directions, so they must not
- * look alike:
- *
- *   included   the flat price already covers a bay → the project is CHEAPER than a
- *              rival quoting the same flat price without one.   (ok, green)
- *   mandatory  the buyer cannot decline → the project is DEARER than its own price
- *              list says.                                        (warn, amber)
- *   optional   a separate product, the price list stands.        (plain chip)
- *
- * Three identical grey chips would bury the only part of this card that changes
- * what a buyer actually pays.
- */
-const TERMS = {
-  mandatory:   { sk: "POVINNÉ",       en: "COMPULSORY",        tone: "warn" },
-  included:    { sk: "V CENE BYTU",   en: "IN THE FLAT PRICE",  tone: "ok" },
-  optional:    { sk: "voliteľné",     en: "optional" },
-  on_request:  { sk: "na vyžiadanie", en: "on request" },
-  not_offered: { sk: "nepredáva sa",  en: "not sold" },
-  unknown:     { sk: "neuvedené",     en: "not stated" },
-};
-
-const VAT = {
-  s_dph:   { sk: "s DPH",   en: "incl. VAT" },
-  bez_dph: { sk: "bez DPH", en: "excl. VAT" },
-};
-
-export function kindLabel(kind, lang) {
-  const k = PARKING_KINDS.find((x) => x.key === kind);
-  return k ? (sk(lang) ? k.sk : k.en) : kind;
-}
-
-export function termsLabel(availability, lang) {
-  const t = TERMS[availability];
-  return t ? (sk(lang) ? t.sk : t.en) : null;
-}
 
 /* ── the data ──────────────────────────────────────────────────────────────
  * One read of public.project_parking per project, cached at module level for the
@@ -202,7 +156,7 @@ export default function ParkingCard({ projectId, reviewed, lang = "en" }) {
           const native = nativeText(r);
           const terms = termsLabel(r.availability, lang);
           const vat = VAT[r.vat_basis];
-          const strong = TERMS[r.availability]?.strong;
+          const tone = termsTone(r.availability);
           return (
             <div key={key} style={{
               border: "1px solid var(--border)", borderRadius: 8,

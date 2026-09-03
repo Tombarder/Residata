@@ -112,3 +112,25 @@ test("the parking options are spelled out, not derived from the data", () => {
     ["mandatory", "included", "optional", "on_request", "not_offered", "unknown"]);
   assert.equal(FIELD_BY_KEY.parking.optionLabel("mandatory"), "Povinné dokúpenie");
 });
+
+// ── Parking terms: the three cases must not look alike (2026-09-03) ────────
+// Boss: "if the garage is already in price of the apartment, or if its mandatory,
+// or if not mandatory. very important differences." They point in opposite
+// directions, so they get different badges.
+//
+// This test exists because the tone lookup lived INLINE in the card component and
+// a rename missed its declaration: `tone is not defined`, a blank project page in
+// production. The build cannot see that and no test could either, because nothing
+// rendered the card. So the decision is a pure function now, and this is it.
+
+test("included and mandatory earn opposite badges; the rest stay plain", async () => {
+  const { termsTone, termsLabel } = await import("./parkingTerms.js");
+  assert.equal(termsTone("included"), "ok");      // cheaper than it looks
+  assert.equal(termsTone("mandatory"), "warn");   // dearer than it looks
+  assert.equal(termsTone("optional"), null);
+  assert.equal(termsTone("on_request"), null);
+  assert.equal(termsTone("unknown"), null);
+  assert.equal(termsTone(undefined), null);
+  assert.equal(termsLabel("included", "sk"), "V CENE BYTU");
+  assert.equal(termsLabel("mandatory", "sk"), "POVINNÉ");
+});
