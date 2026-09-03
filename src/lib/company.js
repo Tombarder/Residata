@@ -54,6 +54,26 @@ export const COMPANY = {
   countryCode: "SK",
 
   // ── identifiers ─────────────────────────────────────────────────────────
+  //
+  // 🔵 THE VAT SWITCH LIVES HERE. Filling `dic` and `icDph` below is the whole
+  // change on this side — the imprint grows two rows, the Terms stop saying "we
+  // are not VAT registered" and start stating the rate and the reverse charge,
+  // the pricing page gains the VAT sentence, the email footer gains both
+  // numbers, and Stripe invoices carry the supplier's VAT number. Verified by
+  // simulation on 2026-09-03: filled test values, walked every surface,
+  // reverted. Nothing else in the frontend needs editing.
+  //
+  // THREE things are NOT automatic and are the reason to read the runbook first
+  // (docs/legal/DPH_PREPNUTIE_RUNBOOK.md in novostavby-scraper):
+  //   1. `pricesVatMode` below — does the customer keep paying the same number,
+  //      or does VAT get added on top? A commercial decision, not a technical one.
+  //   2. `automatic_tax` in api/stripe.js is OFF. If the answer to (1) is "net",
+  //      it has to be switched on or Stripe will not actually add the tax.
+  //   3. KamhalCo has its own copy: stripe_billing._DODAVATEL + its Terms.
+  //
+  // The tests that currently assert an unissued identifier is never displayed
+  // will fail the moment these are filled. That is deliberate — they are the
+  // checklist, not an obstacle.
   ico: "57 849 471",        // display form, with the customary spacing
   icoPlain: "57849471",     // machine form — structured data, APIs, invoices
   dic: "",                  // ← tax office, ≤ 60 days from incorporation
