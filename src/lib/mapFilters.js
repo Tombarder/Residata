@@ -19,6 +19,17 @@ const num = (v) => (v == null || v === "" || Number.isNaN(Number(v)) ? null : Nu
 const STATUS_LABEL = { active: "v ponuke", sold_out: "vypredané", paused: "pozastavené", archived: "archív", "": "—" };
 const eur = (v) => "€" + Math.round(v).toLocaleString("sk-SK");
 
+// What the developer says about getting a parking space. Mirrors AVAILABILITY in
+// v2/lib/parking.py — that module is the source of truth; this is the display copy.
+const PARKING_LABEL = {
+  mandatory:   "Povinné dokúpenie",
+  included:    "V cene bytu",
+  optional:    "Voliteľné dokúpenie",
+  on_request:  "Na vyžiadanie",
+  not_offered: "Nie je v ponuke",
+  unknown:     "Neuvedené",
+};
+
 // The user-facing filter columns. label: English · label_sk: Slovak. `get` reads the
 // value from a projects_live row. Kept intentionally small + intuitive — internal /
 // confusing columns (reserved counts, sold counts, "manually maintained", top-20,
@@ -49,6 +60,23 @@ export const FIELDS = [
   { key: "available_units", label: "Flats available now",        label_sk: "Voľných bytov (počet)",          type: "number", get: (p) => Number(p.available_units) || 0 },
   { key: "sold_percentage", label: "Sold so far (%)",            label_sk: "Vypredanosť (%)",                type: "number", get: (p) => num(p.sold_percentage), fmt: (v) => Math.round(v) + "%" },
   { key: "sold_last_month", label: "Sold in the last month",     label_sk: "Predané za posledný mesiac",     type: "number", get: (p) => Number(p.sold_last_month) || 0 },
+  // ── Parking ──
+  // A garage is bought separately from the flat, so its price never belongs in
+  // min_price / ppm2 — but when it is COMPULSORY it is part of what a buyer pays,
+  // and that is what `parking` filters on. Values come from
+  // reference.project_parking, which a person fills in with the developer's own
+  // wording attached; a project nobody has reviewed reads empty, not "no parking".
+  { key: "parking",         label: "Parking",  label_sk: "Parkovanie", type: "category",
+    get: (p) => p.parking_availability || "",
+    // Spelled out rather than derived from the data: a filter that only offers the
+    // values already present would hide "mandatory" until the first mandatory
+    // project is reviewed, which is exactly when somebody wants to look for one.
+    options: ["mandatory", "included", "optional", "on_request", "not_offered", "unknown"],
+    optionLabel: (v) => PARKING_LABEL[v] || v },
+  { key: "parking_garage_price", label: "Garage price (from)", label_sk: "Cena garáže (od)",
+    type: "number", get: (p) => num(p.parking_garage_price_from), fmt: eur },
+  { key: "parking_outside_price", label: "Outdoor bay price (from)", label_sk: "Cena vonkajšieho státia (od)",
+    type: "number", get: (p) => num(p.parking_outside_price_from), fmt: eur },
 ];
 
 export const FIELD_BY_KEY = Object.fromEntries(FIELDS.map((f) => [f.key, f]));

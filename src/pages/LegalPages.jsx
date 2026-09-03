@@ -22,7 +22,7 @@
  *   - Vercel (web hosting — global CDN, primary region EU)
  *   - Anthropic (AI assistant — sends user prompts to the US)
  *   - Resend (sending transactional email — DKIM/SPF on residata.eu)
- *   - Forward Email (receiving mail to info@residata.eu — the domain's MX)
+ *   - Webglobe (the domain's MX + our mailboxes — replaced Forward Email 2026-09-03)
  *   - Google (the operator's own mailbox, where forwarded mail lands)
  *   - Stripe (subscription billing — processes payment + billing data)
  */
@@ -231,15 +231,16 @@ export function PrivacyPage({ lang }) {
               <li><strong>Vercel Inc.</strong> — hosting webovej aplikácie. Globálna CDN sieť s primárnym regiónom v EÚ. <a href="https://vercel.com/legal/privacy-policy" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">Zásady spoločnosti Vercel</a>.</li>
               <li><strong>Anthropic PBC</strong> — náš AI asistent posiela vaše otázky modelu Claude na spracovanie. Spracovanie prebieha v USA. Otázky sa nepoužívajú na trénovanie modelu. <a href="https://www.anthropic.com/legal/privacy" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">Zásady spoločnosti Anthropic</a>.</li>
               <li><strong>Resend (Plus Five Five, Inc.)</strong> — odosielanie transakčných e-mailov (prihlasovacie odkazy, systémové oznámenia) z domény residata.eu. <a href="https://resend.com/legal/privacy-policy" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">Zásady spoločnosti Resend</a>.</li>
-              <li><strong>Forward Email LLC</strong> — doručovanie e-mailov zaslaných na adresu info@residata.eu (MX záznamy domény). <a href="https://forwardemail.net/privacy" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">Zásady spoločnosti Forward Email</a>.</li>
+              <li><strong>Webglobe, s. r. o.</strong> — poštové servery domény residata.eu (MX záznamy) a naše e-mailové schránky; doručuje a uchováva korešpondenciu zaslanú na adresy @residata.eu. Servery sú v Európskej únii (Slovensko). <a href="https://www.webglobe.sk/gdpr" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">Zásady spoločnosti Webglobe</a>.</li>
               <li><strong>Google LLC</strong> — poštová schránka prevádzkovateľa, do ktorej sa preposiela korešpondencia zaslaná na info@residata.eu. <a href="https://policies.google.com/privacy" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">Zásady spoločnosti Google</a>.</li>
               <li><strong>Stripe Payments Europe, Ltd.</strong> — spracovanie platieb a správa predplatného. Spracúva platobné a fakturačné údaje; údaje o platobných kartách uchováva Stripe, nie my. <a href="https://stripe.com/privacy" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">Zásady spoločnosti Stripe</a>.</li>
             </ul>
             <p>
               Vaše osobné údaje nepredávame ani neposkytujeme tretím stranám
               na ich vlastné marketingové účely. Prenos údajov mimo EÚ
-              (Anthropic, Resend, Forward Email, Google) sa uskutočňuje na
-              základe štandardných zmluvných doložiek EÚ.
+              (Anthropic, Resend, Google) sa uskutočňuje na
+              základe štandardných zmluvných doložiek EÚ. Webglobe spracúva
+              našu poštu výlučne na serveroch v EÚ.
             </p>
           </>
         ) : (
@@ -250,15 +251,16 @@ export function PrivacyPage({ lang }) {
               <li><strong>Vercel Inc.</strong> — web application hosting. Global CDN with primary EU region. <a href="https://vercel.com/legal/privacy-policy" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">Vercel Privacy Policy</a>.</li>
               <li><strong>Anthropic PBC</strong> — our AI assistant sends your queries to the Claude model for processing. Processing happens in the United States. Queries are not used to train the model. <a href="https://www.anthropic.com/legal/privacy" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">Anthropic Privacy Policy</a>.</li>
               <li><strong>Resend (Plus Five Five, Inc.)</strong> — sends transactional email (login links, system notifications) from the residata.eu domain. <a href="https://resend.com/legal/privacy-policy" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">Resend Privacy Policy</a>.</li>
-              <li><strong>Forward Email LLC</strong> — delivers mail sent to info@residata.eu (the domain's MX provider). <a href="https://forwardemail.net/privacy" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">Forward Email Privacy Policy</a>.</li>
+              <li><strong>Webglobe, s. r. o.</strong> — mail servers for the residata.eu domain (its MX records) and our mailboxes; delivers and stores correspondence sent to @residata.eu addresses. Servers are in the European Union (Slovakia). <a href="https://www.webglobe.sk/gdpr" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">Webglobe Privacy Policy</a>.</li>
               <li><strong>Google LLC</strong> — the operator's own mailbox, where correspondence sent to info@residata.eu is forwarded. <a href="https://policies.google.com/privacy" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">Google Privacy Policy</a>.</li>
               <li><strong>Stripe Payments Europe, Ltd.</strong> — payment processing and subscription management. Processes payment + billing data; card details are held by Stripe, not by us. <a href="https://stripe.com/privacy" style={{ color: "var(--accent)" }} target="_blank" rel="noopener noreferrer">Stripe Privacy Policy</a>.</li>
             </ul>
             <p>
               We do not sell or share your personal data with third parties
               for their own marketing purposes. Transfers outside the EU
-              (Anthropic, Resend, Forward Email, Google) happen under EU
-              Standard Contractual Clauses.
+              (Anthropic, Resend, Google) happen under EU
+              Standard Contractual Clauses. Webglobe processes our mail
+              exclusively on servers within the EU.
             </p>
           </>
         )}

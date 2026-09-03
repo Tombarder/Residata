@@ -12,6 +12,7 @@
  *      coverage           ordinary = the site lists SOLD units as well as free
  *      living area        ordinary = we hold obytná plocha, so a price per m²
  *                                    can be computed
+ *      parking            ordinary = a bay is optional; buying one is a choice
  *
  * A price that assumes something unusual, shown without saying so, is a wrong
  * price — that is the whole point (see lib/priceBasis.jsx for the case that
@@ -57,11 +58,13 @@ export const ORDINARY = {
   fitout_level: "standard",
   coverage_mode: "full",     // the developer publishes sold units too
   has_interior_area: true,
+  parking_mandatory: false,  // you may buy a bay; you don't have to
 };
 
 /** Columns `public.projects` must serve for the rules below to work. */
 const SPECIFICS_COLUMNS =
-  "id,name,price_schedule,coverage_mode,has_interior_area,fitout_level,total_units";
+  "id,name,price_schedule,coverage_mode,has_interior_area,fitout_level,total_units," +
+  "parking_availability,parking_garage_price_from,parking_outside_price_from";
 
 const sk = (lang) => lang === "sk";
 
@@ -139,6 +142,36 @@ const RULES = [
           + "per m² — and no €/m² comparison against other projects — is offered for it.",
     };
   },
+
+  // 5 · Compulsory parking — the price list is not the whole price.
+  // A bay you MAY buy is a separate product and says nothing about the flat's
+  // price. A bay you MUST buy is part of what the buyer pays, and leaving it
+  // unsaid understates the project exactly the way a shell price does. Only
+  // `mandatory` fires: everything else is either ordinary or simply unknown, and
+  // an unreviewed project (parking_availability null) says nothing at all.
+  ({ extra, lang }) => {
+    if (extra?.parking_availability !== "mandatory") return null;
+    const from = extra?.parking_garage_price_from ?? extra?.parking_outside_price_from;
+    const price = from
+      ? new Intl.NumberFormat(sk(lang) ? "sk-SK" : "en-GB",
+          { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(from)
+      : null;
+    return {
+      key: "parking_mandatory",
+      text: sk(lang)
+        ? (price ? `Parkovanie je povinné — od ${price} navyše`
+                 : "Parkovanie je povinné — nie je v cene bytu")
+        : (price ? `Parking is compulsory — from ${price} on top`
+                 : "Parking is compulsory — not included in the flat price"),
+      note: sk(lang)
+        ? "Developer predáva byt len spolu s parkovacím miestom, takže skutočná cena "
+          + "je vyššia než tá v cenníku. Cena státia sa do ceny bytu ani do ceny za m² "
+          + "nezapočítava — je to samostatný produkt."
+        : "The developer only sells a flat together with a parking space, so the real "
+          + "price is higher than the price list shows. The bay's price is never folded "
+          + "into the flat price or the €/m² — it is a separate product.",
+    };
+  },
 ];
 
 /**
@@ -193,6 +226,9 @@ export function useProjectSpecificsData() {
               has_interior_area: r.has_interior_area,
               fitout_level: r.fitout_level,
               total_units: r.total_units,
+              parking_availability: r.parking_availability,
+              parking_garage_price_from: r.parking_garage_price_from,
+              parking_outside_price_from: r.parking_outside_price_from,
             };
             if (r.id) out[r.id] = v;
             if (r.name) out[r.name] = v;

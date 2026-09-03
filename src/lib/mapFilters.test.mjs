@@ -77,3 +77,38 @@ test("isComplete refuses an unknown field and an unknown operator", () => {
 test("country really is gone from FIELDS (this test is the reminder if it comes back)", () => {
   assert.equal(FIELD_BY_KEY.country, undefined);
 });
+
+// ── Parking (2026-09-03) ───────────────────────────────────────────────────
+// A garage is bought separately from the flat, so its price is in neither
+// min_price nor €/m². These three fields are the only way to reach it, and each
+// reads a column public.projects_live actually serves — the pair of assertions
+// below is what would catch a column being renamed on one side only.
+
+test("the parking fields read the columns projects_live serves", () => {
+  const row = {
+    parking_availability: "mandatory",
+    parking_garage_price_from: 25000,
+    parking_outside_price_from: 16000,
+  };
+  assert.equal(FIELD_BY_KEY.parking.get(row), "mandatory");
+  assert.equal(FIELD_BY_KEY.parking_garage_price.get(row), 25000);
+  assert.equal(FIELD_BY_KEY.parking_outside_price.get(row), 16000);
+});
+
+test("a project nobody has reviewed filters as empty, never as 'no parking'", () => {
+  const unreviewed = {};
+  assert.equal(FIELD_BY_KEY.parking.get(unreviewed), "");
+  assert.equal(FIELD_BY_KEY.parking_garage_price.get(unreviewed), null);
+  // …and it must not be caught by a filter looking for projects WITHOUT parking.
+  const kept = applyFilters([unreviewed],
+    [{ id: 1, field: "parking", op: "in", value: ["not_offered"] }]);
+  assert.equal(kept.length, 0);
+});
+
+test("the parking options are spelled out, not derived from the data", () => {
+  // Otherwise 'mandatory' would be unofferable until the first mandatory project
+  // is reviewed — which is exactly when somebody wants to search for one.
+  assert.deepEqual(FIELD_BY_KEY.parking.options,
+    ["mandatory", "included", "optional", "on_request", "not_offered", "unknown"]);
+  assert.equal(FIELD_BY_KEY.parking.optionLabel("mandatory"), "Povinné dokúpenie");
+});
