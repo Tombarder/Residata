@@ -77,11 +77,31 @@ test("the homepage is still submitted — the one url that must be there", () =>
   assert.ok(sitemapPaths().includes("/"), "the sitemap lost the homepage");
 });
 
-test("no known dead or alias url creeps back in", () => {
+test("no known dead, alias or duplicate url creeps back in", () => {
   const submitted = sitemapPaths();
-  for (const dead of ["/about", "/data", "/home", "/data-sources"]) {
+  for (const dead of ["/about", "/data", "/home", "/data-sources", "/contact"]) {
     assert.ok(!submitted.includes(dead),
-      `${dead} is not a primary route — /data is a back-compat alias for /sample, ` +
-      `/about and /data-sources are not pages at all`);
+      `${dead} must not be submitted — /data is a back-compat alias for /sample, ` +
+      `/contact serves the same page as /pricing, and /about and /data-sources ` +
+      `are not pages at all`);
   }
+});
+
+test("two urls never claim to be the canonical of the same content", () => {
+  // Pricing and Contact are ONE page. Each self-canonicalising was duplicate
+  // content: Google picks one arbitrarily and splits the ranking signals.
+  const table = (() => {
+    const start = SEO.indexOf("const SEO_BY_PAGE = {");
+    return SEO.slice(start, SEO.indexOf("\n};", start) + 3);
+  })();
+  const contact = table.slice(table.indexOf("  Contact: {"));
+  const contactPath = contact.match(/path:\s*"([^"]+)"/)?.[1];
+  assert.equal(contactPath, "/pricing",
+    "the nav reads 'Cenník & Kontakt' and points at /pricing, and /contact serves " +
+    "identical content — so its canonical must point there. If the pages were " +
+    "genuinely split again, change this test in the same commit.");
+
+  const submitted = sitemapPaths();
+  assert.equal(new Set(submitted).size, submitted.length,
+    "the sitemap lists the same url twice");
 });

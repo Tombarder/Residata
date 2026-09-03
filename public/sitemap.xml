@@ -55,15 +55,6 @@
     <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/sample" />
   </url>
   <url>
-    <loc>https://residata.eu/contact</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://residata.eu/contact" />
-    <xhtml:link rel="alternate" hreflang="sk" href="https://residata.eu/contact" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/contact" />
-  </url>
-  <url>
     <loc>https://residata.eu/status</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>daily</changefreq>

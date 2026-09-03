@@ -327,7 +327,9 @@ const SITEMAP_URLS = [
   { loc: '/pricing', priority: '0.7', changefreq: 'monthly' },
   { loc: '/use-cases', priority: '0.6', changefreq: 'monthly' },
   { loc: '/sample', priority: '0.6', changefreq: 'monthly' },
-  { loc: '/contact', priority: '0.4', changefreq: 'monthly' },
+  // No /contact: Pricing and Contact are ONE page (the nav reads "Cenník &
+  // Kontakt" and points at /pricing), so /contact serves identical content and
+  // now canonicalises to /pricing. Submitting both would be duplicate content.
   { loc: '/status',  priority: '0.4', changefreq: 'daily'  },
 ];
 

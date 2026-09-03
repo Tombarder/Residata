@@ -128,7 +128,17 @@ const SEO_BY_PAGE = {
     },
   },
   Contact: {
-    path: "/contact",
+    // 🔴 /pricing ON PURPOSE, not a typo. Pricing and Contact were merged into
+    // ONE page — the nav says "Cenník & Kontakt" and points at /pricing — so
+    // /contact serves BYTE-IDENTICAL content (verified live: same 4323 chars).
+    // Two indexable urls with the same content, each claiming to be canonical,
+    // is duplicate content: Google picks one arbitrarily and the ranking signals
+    // split between them. `path` feeds canonical, og:url and the hreflang
+    // alternates, so pointing it at /pricing tells Google which one is real
+    // while /contact keeps working for anyone who has the link or types it.
+    // It is also dropped from the sitemap for the same reason.
+    // If the pages are ever split again, this must go back to "/contact".
+    path: "/pricing",
     en: {
       title: "Contact — Residata",
       description: "Get in touch with Residata — for sample reports, custom delivery, or enterprise pricing. Email: tomas@residata.eu",
