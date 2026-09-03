@@ -57,7 +57,8 @@ test("§ 3a: the imprint data set is complete", () => {
 test("unissued identifiers stay empty and are never rendered as placeholders", () => {
   // DIČ and IČ DPH do not exist yet. If someone fills one in, this test should
   // be updated in the same change — deliberately, not by accident.
-  for (const [field, value] of Object.entries({ dic: COMPANY.dic, icDph: COMPANY.icDph, iban: COMPANY.iban })) {
+  // `iban` is deliberately absent from COMPANY — see the bank-account test below.
+  for (const [field, value] of Object.entries({ dic: COMPANY.dic, icDph: COMPANY.icDph })) {
     assert.equal(typeof value, "string", `${field} must be a string`);
     assert.ok(!/[-–—?xX]{2,}|TBD|TODO|N\/A/.test(value), `${field} must be empty or a real value, never a placeholder`);
   }
@@ -158,5 +159,24 @@ test("Stripe checkout parameters obey the API's own constraints", () => {
   for (const k of sent) {
     assert.ok(src.includes(`f.key === "${k}"`),
       `checkout collects custom field "${k}" but nothing reads it back in the webhook`);
+  }
+});
+
+test("the bank account never reaches the browser or the repository", () => {
+  // This repo is public and src/ is bundled into the client. An IBAN in either
+  // is downloadable by anyone and permanent in git history — which is exactly
+  // what invoice-redirection fraud is built from. The account number lives in
+  // public.app_secrets and is read server-side only.
+  const IBAN = /\bSK\s?\d{2}[\s\d]{18,26}\b/;
+  for (const f of ["src/lib/company.js", ...SURFACES]) {
+    if (f.startsWith("api/")) continue;          // server-side is where it belongs
+    assert.ok(!IBAN.test(read(f)),
+      `${f} contains what looks like an IBAN — bank details are server-side only, from app_secrets`);
+  }
+  // And nothing may reintroduce the fields on the shared company object.
+  const company = read("src/lib/company.js");
+  for (const field of ["iban:", "bankName:", "swift:"]) {
+    assert.ok(!new RegExp(`^\\s*${field}`, "m").test(company),
+      `src/lib/company.js declares ${field} — bank details belong in app_secrets, not in a browser bundle`);
   }
 });

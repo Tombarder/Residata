@@ -76,10 +76,18 @@ export const COMPANY = {
   phone: "+421 911 963 909",
   phoneHref: "+421911963909",
 
-  // ── banking (for invoices and bank-transfer payment) ────────────────────
-  iban: "",                 // ← company account not open yet
-  bankName: "",
-  swift: "",
+  // ── banking ─────────────────────────────────────────────────────────────
+  // 🔴 THE BANK ACCOUNT IS DELIBERATELY NOT HERE, and must never be added.
+  // This file is imported by the React app, so anything in it is bundled into
+  // the browser and downloadable by anyone — and this repository is PUBLIC, so
+  // it would also be permanent in git history. A published account number is
+  // the raw material for invoice-redirection fraud: someone copies our invoice
+  // layout, swaps the number, and emails "your invoice" to our customers.
+  //
+  // The IBAN lives in public.app_secrets (RLS on, ZERO policies, so no client
+  // can read it) and is fetched server-side by the Stripe webhook when it
+  // writes the supplier block onto an invoice. See bankDetailsFromSecrets()
+  // in api/stripe.js.
 
   /**
    * How the displayed price relates to VAT ONCE `icDph` is filled in. Until
@@ -191,25 +199,6 @@ export function statutoryWebsiteData(lang = "sk") {
 }
 
 /**
- * Bank details — for INVOICES and for a customer paying by transfer.
- *
- * 🔴 Deliberately NOT rendered on the public Imprint. An IBAN published on a
- * website is the raw material for invoice-redirection fraud: someone copies the
- * layout, swaps the account number and emails "your invoice" to our customers.
- * The account number belongs on the document that is actually a payment
- * instruction, sent to a party who already knows they owe us — not on a page
- * anyone can scrape.
- */
-export function bankDetails(lang = "sk") {
-  if (!COMPANY.iban) return [];
-  const isSK = lang === "sk";
-  const out = [{ label: "IBAN", value: COMPANY.iban }];
-  if (COMPANY.bankName) out.push({ label: isSK ? "Banka" : "Bank", value: COMPANY.bankName });
-  if (COMPANY.swift) out.push({ label: "SWIFT/BIC", value: COMPANY.swift });
-  return out;
-}
-
-/**
  * How the operator is named in running prose — in Terms, Privacy and anywhere
  * a sentence needs it. Includes the seat, because a contracting party in a
  * contract is identified by name AND seat, not by name alone.
@@ -231,8 +220,13 @@ export function operatorInSentence(lang = "sk") {
  * IBAN by itself the day those exist.
  *
  * Plain text: Stripe renders the footer without markup.
+ *
+ * `bank` is passed in by the caller — it comes from public.app_secrets and is
+ * only ever available server-side. Called without it, the footer is still a
+ * complete and correct supplier identification; it simply has no payment line,
+ * which is right for anything that is not an invoice.
  */
-export function invoiceSellerFooter(lang = "sk") {
+export function invoiceSellerFooter(lang = "sk", bank = {}) {
   const isSK = lang === "sk";
   const ids = [`IČO: ${COMPANY.ico}`];
   if (COMPANY.dic) ids.push(`DIČ: ${COMPANY.dic}`);
@@ -244,10 +238,10 @@ export function invoiceSellerFooter(lang = "sk") {
     ids.join(" · "),
     registrationLine(lang),
   ];
-  if (COMPANY.iban) {
+  if (bank.iban) {
     lines.push(isSK
-      ? `Bankové spojenie: ${COMPANY.iban}${COMPANY.bankName ? ` (${COMPANY.bankName})` : ""}`
-      : `Bank: ${COMPANY.iban}${COMPANY.bankName ? ` (${COMPANY.bankName})` : ""}`);
+      ? `Bankové spojenie: ${bank.iban}${bank.bankName ? ` (${bank.bankName})` : ""}`
+      : `Bank: ${bank.iban}${bank.bankName ? ` (${bank.bankName})` : ""}`);
   }
   lines.push(vatNotice(lang));
   return lines.join("\n");

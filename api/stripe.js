@@ -255,10 +255,37 @@ async function persistBillingIdentity(admin, stripe, session) {
   // Stripe would then retry.
   const customerId = typeof session.customer === "string" ? session.customer : session.customer?.id;
   if (customerId) {
-    const invoice_settings = { footer: invoiceSellerFooter("sk") };
+    const invoice_settings = { footer: invoiceSellerFooter("sk", await bankDetailsFromSecrets(admin)) };
     if (companyId) invoice_settings.custom_fields = [{ name: "IČO", value: companyId.slice(0, 30) }];
     await stripe.customers.update(customerId, { invoice_settings })
       .catch((e) => console.warn("[stripe] invoice settings not written:", e?.message || e));
+  }
+}
+
+/**
+ * The company's bank details, for the payment line on an invoice.
+ *
+ * They live in public.app_secrets — RLS on with ZERO policies, so no client
+ * key can read the table at all — and never in src/lib/company.js, which is
+ * bundled into the browser and sits in a public repository. An IBAN a customer
+ * receives on their own invoice is a payment instruction; an IBAN anyone can
+ * download is an invitation to send our customers a forged one.
+ *
+ * Returns {} if the row is missing, and the caller then produces a footer with
+ * no payment line rather than failing — a supplier block without bank details
+ * is still a valid supplier block.
+ */
+async function bankDetailsFromSecrets(admin) {
+  try {
+    const { data } = await admin
+      .from("app_secrets")
+      .select("key, value")
+      .in("key", ["company_iban", "company_bank_name"]);
+    const by = Object.fromEntries((data || []).map((r) => [r.key, r.value]));
+    return { iban: by.company_iban || "", bankName: by.company_bank_name || "" };
+  } catch (e) {
+    console.warn("[stripe] bank details unavailable:", e?.message || e);
+    return {};
   }
 }
 
