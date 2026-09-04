@@ -1478,10 +1478,13 @@ function CompetitiveProfile({ projects, scopeType, scopeValue, lang }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
                     marginBottom: "0.5rem", gap: "0.75rem", flexWrap: "wrap" }}>
         <div style={{ fontSize: "0.75rem", color: dim }}>
-          {sk ? "Prázdna bunka pri parkovaní znamená, že projekt sme ešte neprešli alebo "
-              + "developer cenu nezverejňuje — nie že parkovanie nemá."
-              : "A blank parking cell means we haven't reviewed that project yet, or the "
-              + "developer publishes no price — not that the project has none."}
+          {/* Every active project has been through the parking review (2026-09-04),
+              so a blank cell is a finding about the developer, not a gap in our work.
+              The only exception is a project onboarded since, and its own page says so. */}
+          {sk ? "Prázdna bunka pri parkovaní znamená, že developer cenu nezverejňuje — "
+              + "nie že projekt parkovanie nemá. Každý projekt sme prešli ručne."
+              : "A blank parking cell means the developer publishes no price — not that the "
+              + "project has none. Every project has been reviewed by hand."}
         </div>
         <button className="rd-btn rd-btn--sm" onClick={csv} style={{ whiteSpace: "nowrap" }}>
           ⬇ CSV
