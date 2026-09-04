@@ -97,13 +97,19 @@ function priceText(row) {
 }
 
 /** The developer's own figure, shown only when it is NOT what we just printed —
- *  i.e. a Czech project quoting Kč while the reader is looking at euro. */
+ *  i.e. a Czech project quoting Kč while the reader is looking at euro.
+ *
+ *  It carries "/ m²" for the same reason the converted price does. Muse7's cellar
+ *  is 100 000 Kč PER SQUARE METRE; printing "developer uvádza 100 000 CZK" under
+ *  a line that says "4 129 € / m²" invites the reader to take the Czech figure
+ *  for the price of a cellar, which would be roughly four times the truth. */
 function nativeText(row) {
   if (row.price_min == null || !row.currency) return null;
   const shown = Math.round(moneyFromEur(Number(row.price_min_eur ?? 0)));
   const native = Math.round(Number(row.price_min));
   if (shown === native) return null;
-  return `${native.toLocaleString("sk-SK")} ${row.currency}`;
+  const per = row.price_basis === "per_m2" ? " / m²" : "";
+  return `${native.toLocaleString("sk-SK")} ${row.currency}${per}`;
 }
 
 /**
