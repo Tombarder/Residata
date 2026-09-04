@@ -1443,7 +1443,8 @@ function CompetitiveProfile({ projects, scopeType, scopeValue, lang }) {
   const csv = () => {
     const cols = ["projekt", "developer", "cast", "bytov", "volne", "predane_pct",
       "eur_m2", ...rooms.map(r => `eur_m2_${r}izb`), "standard",
-      "garaz_od_eur", "vonkajsie_od_eur", "kobka_od_eur", "parkovanie_podmienky",
+      "garaz_od_eur", "vonkajsie_od_eur", "statie_od_eur", "kobka_od_eur",
+      "parkovanie_podmienky",
       "kobka_podmienky", "financovanie_schem", "financovanie_rozdiel_pct",
       "cena_plati_pri"];
     const esc = (v) => {
@@ -1457,6 +1458,7 @@ function CompetitiveProfile({ projects, scopeType, scopeValue, lang }) {
         p.sold_percentage, p.avg_price_eur_m2,
         ...rooms.map(r => rp[r]?.eur_m2 ?? ""),
         p.fitout_level, p.parking_garage_price_from, p.parking_outside_price_from,
+        p.parking_unspecified_price_from,
         p.parking_storage_price_from, p.parking_availability,
         p.parking_storage_availability, p.financing_scheme_count,
         p.financing_spread_pct, p.price_schedule].map(esc).join(",");
@@ -1507,6 +1509,12 @@ function CompetitiveProfile({ projects, scopeType, scopeValue, lang }) {
               <th style={th}>{sk ? "Štandard" : "Fit-out"}</th>
               <th style={thR}>{sk ? "Garáž od" : "Garage from"}</th>
               <th style={thR}>{sk ? "Vonk. od" : "Outdoor from"}</th>
+              {/* The kind a developer does not state is a THIRD thing, not a gap. 34
+                  projects publish a bay price without saying indoor or outdoor —
+                  Muse7's 38 231 € is the dearest parking in the register — and with
+                  only garage/outdoor/storage columns every one of them read as
+                  "no parking price" in exactly the comparison this table exists for. */}
+              <th style={thR}>{sk ? "Státie od" : "Bay from"}</th>
               <th style={thR}>{sk ? "Kobka od" : "Storage from"}</th>
               <th style={th}>{sk ? "Parkovanie" : "Parking terms"}</th>
               <th style={th}>{sk ? "Financovanie" : "Financing"}</th>
@@ -1539,6 +1547,9 @@ function CompetitiveProfile({ projects, scopeType, scopeValue, lang }) {
                   <td style={tdc}>{FITOUT[p.fitout_level] || "—"}</td>
                   <td style={tdcR}>{money(p.parking_garage_price_from)}</td>
                   <td style={tdcR}>{money(p.parking_outside_price_from)}</td>
+                  <td style={tdcR} title={sk ? "Developer neuvádza, či je kryté alebo vonkajšie"
+                                             : "The developer does not say whether it is indoor or outdoor"}>
+                    {money(p.parking_unspecified_price_from)}</td>
                   <td style={tdcR}>{money(p.parking_storage_price_from)}</td>
                   <td style={{ ...tdc, whiteSpace: "nowrap",
                                color: p.parking_availability === "mandatory" ? orangeInk
