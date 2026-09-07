@@ -178,6 +178,50 @@ const SEO_BY_PAGE = {
     },
     noindex: true,
   },
+  // ── Analýzy ───────────────────────────────────────────────────────────────
+  // The published market analyses. This section exists to be FOUND and CITED, so
+  // unlike /project/<id> every article is indexable and carries its OWN entry:
+  // applySeo returns early for a page it does not know, and an article wearing
+  // the previous page's title is an article nobody can cite.
+  //
+  // Adding an issue = one entry here (keyed "Analyza:<slug>", path
+  // "/analyzy/<slug>") + one line in SITEMAP_URLS in
+  // scripts/generate-static-content.mjs. sitemapRoutes.test.mjs fails if the two
+  // ever disagree, which is what keeps this from rotting.
+  Insights: {
+    path: "/analyzy",
+    en: {
+      title: "New-build market analyses · Residata",
+      description:
+        "Monthly analysis of the Slovak and Czech new-build market, built from developer price lists read every night. The whole country, not just the capital.",
+      keywords: "analýza trhu novostavieb, ceny novostavieb, realitný trh Slovensko",
+    },
+    sk: {
+      title: "Analýzy trhu novostavieb · Residata",
+      description:
+        "Pravidelná analýza trhu novostavieb na Slovensku a v Česku, postavená na cenníkoch developerov čítaných každú noc. Celé Slovensko, nielen Bratislava.",
+      keywords: "analýza trhu novostavieb, ceny novostavieb, ponuka bytov, realitný trh Slovensko",
+    },
+  },
+  "Analyza:trh-novostavieb-2026-09": {
+    path: "/analyzy/trh-novostavieb-2026-09",
+    // Per-article share image, so a link posted to LinkedIn shows THIS article's
+    // chart instead of the site-wide default from index.html.
+    ogImage: "/analyzy/og-2026-09.png",
+    ogType: "article",
+    en: {
+      title: "Two-room flats drive half of new-build sales · Residata",
+      description:
+        "Two-room flats are 42.6 % of Slovak new-build supply but 50.9 % of sales; three-room flats are 33.5 % of supply and 23.9 % of sales. Analysis of 248 projects.",
+      keywords: "novostavby Slovensko, skladba bytov, predaj novostavieb, ceny bytov",
+    },
+    sk: {
+      title: "Dvojizbové byty ťahajú polovicu predajov novostavieb · Residata",
+      description:
+        "Dvojizbové byty tvoria 42,6 % ponuky novostavieb na Slovensku, ale 50,9 % predajov. Pri trojizbových je pomer opačný. Analýza 248 projektov, dáta k septembru 2026.",
+      keywords: "novostavby Slovensko, dvojizbové byty, trojizbové byty, predaj novostavieb, ceny bytov",
+    },
+  },
   // /status was added on 2026-09-03 and had NO entry here. applySeo returns
   // early for an unknown page, so it silently inherited the title, description,
   // canonical and og tags of whatever page the visitor came from, and a crawler
@@ -382,6 +426,19 @@ function resolvePageSeo(page, lang) {
     };
   }
   const entry = SEO_BY_PAGE[page];
+  // An analysis slug we don't know: a renamed article, a typo, an old newsletter
+  // link. The page component falls back to the index, so the meta must too —
+  // returning null here would leave the PREVIOUS page's title and canonical in
+  // the head, which is exactly how /status shipped wearing the homepage's identity.
+  // noindex because this URL is not a real article and must not be indexed as one.
+  if (!entry && typeof page === "string" && page.startsWith("Analyza:")) {
+    const index = SEO_BY_PAGE.Insights;
+    return {
+      path: index.path,
+      noindex: true,
+      ...index[lang === "sk" ? "sk" : "en"],
+    };
+  }
   if (!entry) return null;
   // Preserve top-level entry-wide flags (e.g. noindex) alongside the
   // language-specific copy. Without this spread the noindex flag set on
@@ -390,6 +447,8 @@ function resolvePageSeo(page, lang) {
   return {
     path: entry.path,
     noindex: entry.noindex,
+    ogImage: entry.ogImage,
+    ogType: entry.ogType,
     ...entry[lang === "sk" ? "sk" : "en"],
   };
 }
@@ -505,7 +564,19 @@ export function applySeo(page, lang, country) {
   setMeta("property", "og:url", url);
   setMeta("property", "og:locale", locale);
   setMeta("property", "og:site_name", "Residata");
-  setMeta("property", "og:type", "website");
+  setMeta("property", "og:type", meta.ogType || "website");
+
+  // og:image — index.html carries a site-wide default, which is right for every
+  // marketing page. An ANALYSIS wants its own chart in the LinkedIn card instead:
+  // the whole point of publishing one is that people share the link, and a card
+  // showing the finding travels further than a card showing the product.
+  // Only overridden when an entry asks for it, so nothing else changes behaviour.
+  if (meta.ogImage) {
+    const img = meta.ogImage.startsWith("http") ? meta.ogImage : SITE_BASE + meta.ogImage;
+    setMeta("property", "og:image", img);
+    setMeta("property", "og:image:alt", meta.title);
+    setMeta("name", "twitter:image", img);
+  }
 
   // Twitter / X
   setMeta("name", "twitter:card", "summary_large_image");

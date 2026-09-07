@@ -1,0 +1,228 @@
+{
+  "asOf": "2026-09-07",
+  "generatedAt": "2026-09-07T17:16:03+00:00",
+  "coverage": {
+    "skActiveProjects": 248,
+    "czActiveProjects": 154
+  },
+  "bratislava": {
+    "projects": 84,
+    "available": 2854,
+    "medianM2": 5370
+  },
+  "restOfSk": {
+    "projects": 119,
+    "available": 3047,
+    "medianM2": 3675,
+    "towns": 43
+  },
+  "sales90d": {
+    "bratislava": 597,
+    "restOfSk": 513
+  },
+  "topCities": [
+    {
+      "city": "Trnava",
+      "available": 401,
+      "medianM2": 3833
+    },
+    {
+      "city": "Košice",
+      "available": 374,
+      "medianM2": 4543
+    },
+    {
+      "city": "Prešov",
+      "available": 294,
+      "medianM2": 3614
+    },
+    {
+      "city": "Nitra",
+      "available": 280,
+      "medianM2": 3421
+    },
+    {
+      "city": "Trenčín",
+      "available": 236,
+      "medianM2": 3826
+    },
+    {
+      "city": "Zvolen",
+      "available": 201,
+      "medianM2": 3502
+    }
+  ],
+  "mixSk": {
+    "rows": [
+      {
+        "izby": 1.0,
+        "available": 567,
+        "sold": 120,
+        "stockPct": 8.3,
+        "salesPct": 10.5
+      },
+      {
+        "izby": 1.5,
+        "available": 133,
+        "sold": 54,
+        "stockPct": 2.0,
+        "salesPct": 4.7
+      },
+      {
+        "izby": 2.0,
+        "available": 2894,
+        "sold": 581,
+        "stockPct": 42.6,
+        "salesPct": 50.9
+      },
+      {
+        "izby": 2.5,
+        "available": 39,
+        "sold": 5,
+        "stockPct": 0.6,
+        "salesPct": 0.4
+      },
+      {
+        "izby": 3.0,
+        "available": 2276,
+        "sold": 273,
+        "stockPct": 33.5,
+        "salesPct": 23.9
+      },
+      {
+        "izby": 3.5,
+        "available": 8,
+        "sold": 3,
+        "stockPct": 0.1,
+        "salesPct": 0.3
+      },
+      {
+        "izby": 4.0,
+        "available": 813,
+        "sold": 100,
+        "stockPct": 12.0,
+        "salesPct": 8.8
+      },
+      {
+        "izby": 5.0,
+        "available": 69,
+        "sold": 5,
+        "stockPct": 1.0,
+        "salesPct": 0.4
+      }
+    ],
+    "totalAvailable": 6799,
+    "totalSold": 1141
+  },
+  "mixCz": {
+    "rows": [
+      {
+        "izby": 1.0,
+        "available": 956,
+        "sold": 324,
+        "stockPct": 18.9,
+        "salesPct": 27.9
+      },
+      {
+        "izby": 1.5,
+        "available": 57,
+        "sold": 17,
+        "stockPct": 1.1,
+        "salesPct": 1.5
+      },
+      {
+        "izby": 2.0,
+        "available": 2253,
+        "sold": 461,
+        "stockPct": 44.5,
+        "salesPct": 39.7
+      },
+      {
+        "izby": 2.5,
+        "available": 13,
+        "sold": 1,
+        "stockPct": 0.3,
+        "salesPct": 0.1
+      },
+      {
+        "izby": 3.0,
+        "available": 1301,
+        "sold": 252,
+        "stockPct": 25.7,
+        "salesPct": 21.7
+      },
+      {
+        "izby": 4.0,
+        "available": 450,
+        "sold": 88,
+        "stockPct": 8.9,
+        "salesPct": 7.6
+      },
+      {
+        "izby": 5.0,
+        "available": 36,
+        "sold": 17,
+        "stockPct": 0.7,
+        "salesPct": 1.5
+      }
+    ],
+    "totalAvailable": 5066,
+    "totalSold": 1160
+  },
+  "quartiles": {
+    "rows": [
+      {
+        "quartile": 1,
+        "projects": 22,
+        "avgM2": 3145,
+        "available": 934,
+        "sold": 102,
+        "pctSold": 9.8
+      },
+      {
+        "quartile": 2,
+        "projects": 22,
+        "avgM2": 3874,
+        "available": 1427,
+        "sold": 154,
+        "pctSold": 9.7
+      },
+      {
+        "quartile": 3,
+        "projects": 22,
+        "avgM2": 4899,
+        "available": 1583,
+        "sold": 273,
+        "pctSold": 14.7
+      },
+      {
+        "quartile": 4,
+        "projects": 22,
+        "avgM2": 6981,
+        "available": 1038,
+        "sold": 300,
+        "pctSold": 22.4
+      }
+    ]
+  },
+  "priceMoves90d": {
+    "moves": 2206,
+    "projects": 70,
+    "up": 1759,
+    "down": 447,
+    "pctUp": 79.7,
+    "medianPct": 2.6
+  },
+  "caveats": {
+    "leftCensoredPct": 93.1,
+    "parkingCoveragePct": 28.6
+  },
+  "benchmark": {
+    "source": "Bencont Investments",
+    "period": "Q2 2026",
+    "city": "Bratislava",
+    "avgM2": 5341,
+    "note": "priemerná ponuková cena novostavby, s DPH"
+  },
+  "slug": "trh-novostavieb-2026-09"
+}

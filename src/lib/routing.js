@@ -53,6 +53,13 @@ export function pageToPath(page) {
   // "Data" page je v Nav-e prezentovaná ako "Sample" — preto /sample URL
   // (čitateľnejšie a odráža to marketing-preview charakter stránky).
   if (page === "Data") return "/sample";
+  // Analýzy — the published market analyses. The URL is Slovak because both the
+  // audience and the search terms are ("analýza trhu novostavieb"); the internal
+  // page key stays English like every other page. Same key/path split as Data.
+  if (page === "Insights") return "/analyzy";
+  if (typeof page === "string" && page.startsWith("Analyza:")) {
+    return "/analyzy/" + page.slice("Analyza:".length);
+  }
   if (page === "HeroLab") return "/hero-lab";
   return "/" + page.toLowerCase().replace(/\s+/g, "-");
 }
@@ -73,6 +80,15 @@ export function pathToPage(pathname) {
   // Public project detail — /project/<id>
   if (clean.startsWith("/project/")) return "Project:" + clean.slice(9);
 
+  // Published analysis — /analyzy/<slug>. Unlike /project/<id> these are meant to
+  // be indexed and cited, so each one carries its own SEO entry in seo.js; an
+  // unknown slug falls back to the index rather than to Home, which keeps a stale
+  // link inside the section it was pointing at.
+  if (clean.startsWith("/analyzy/")) {
+    const slug = clean.slice("/analyzy/".length);
+    return slug ? "Analyza:" + slug : "Insights";
+  }
+
   const map = {
     "/home": "Home",
     "/live": "Live",
@@ -89,6 +105,7 @@ export function pathToPage(pathname) {
     // derives "/status" from the page name on its own, so only this direction
     // needs an entry.
     "/status": "Status",
+    "/analyzy": "Insights",
     // Legacy URLs → new platform pages (for backward compat of email links etc)
     "/analytics": "App:Analytics",
     "/admin": "App:Admin",
@@ -100,6 +117,11 @@ export function pathToPage(pathname) {
   // them out to the marketing home (which reads as "logged out / broken").
   if (clean.startsWith("/app")) return "App:Dashboard";
   return "Home";
+}
+
+/** True if the page key is the analyses index or one of the articles (/analyzy*). */
+export function isInsightsPage(page) {
+  return typeof page === "string" && (page === "Insights" || page.startsWith("Analyza:"));
 }
 
 /** True if the page key belongs to the platform shell (/app/*). */

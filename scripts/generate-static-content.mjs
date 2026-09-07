@@ -331,6 +331,15 @@ const SITEMAP_URLS = [
   // Kontakt" and points at /pricing), so /contact serves identical content and
   // now canonicalises to /pricing. Submitting both would be duplicate content.
   { loc: '/status',  priority: '0.4', changefreq: 'daily'  },
+  // Analýzy — the published market analyses. These are the pages the section
+  // exists for: they are what ranks for "ceny novostavieb" / "analýza trhu
+  // novostavieb", and what a journalist links when citing us. Every article
+  // gets a line here AND an entry in seo.js; sitemapRoutes.test.mjs fails if the
+  // two disagree, which is what stops this list rotting the way /about did.
+  // changefreq yearly on an article: its figures are a dated snapshot and are
+  // deliberately never rewritten — a new month is a new URL, not an edit.
+  { loc: '/analyzy', priority: '0.8', changefreq: 'monthly' },
+  { loc: '/analyzy/trh-novostavieb-2026-09', priority: '0.7', changefreq: 'yearly' },
 ];
 
 const sitemap = `<?xml version="1.0" encoding="UTF-8"?>

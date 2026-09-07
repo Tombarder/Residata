@@ -32,6 +32,10 @@ const HeroLabPage = lazy(() => import("./pages/HeroVariants"));
 // Legal pages + cookie banner (F-051 — Boss-mandated 2026-05-31 night).
 import { PrivacyPage, ImprintPage, TermsPage } from "./pages/LegalPages";
 import StatusPage from "./pages/StatusPage";
+// Analýzy — published market analyses. Code-split: the section carries article
+// content and is never part of the marketing first paint.
+const InsightsIndexPage = lazy(() => import("./pages/Insights").then((m) => ({ default: m.InsightsIndex })));
+const InsightsArticlePage = lazy(() => import("./pages/Insights").then((m) => ({ default: m.InsightsArticle })));
 import CookieBanner from "./components/CookieBanner";
 import { useAuth } from "./lib/useAuth";
 import { useCapabilities } from "./lib/useCapabilities";
@@ -39,7 +43,7 @@ import { useAccountUiPref } from "./lib/useAccountUiPref";
 import { useCountry } from "./lib/useCountry";
 import { useMarketTotals, useDataSample, useHomeProjects, useTotalsList } from "./lib/useData";
 import { fmtSelloutValue } from "./lib/absorption";
-import { pushRoute, pathToPage, isAppPage, pageToPath } from "./lib/routing";
+import { pushRoute, pathToPage, isAppPage, isInsightsPage, pageToPath } from "./lib/routing";
 import { applySeo } from "./lib/seo";
 import { localeTag, PUBLIC_LANGS, DEFAULT_LANG, LANG_LABELS, isPublicLang, coercePublicLang } from "./lib/locale";
 import { startPageEngagement, stopPageEngagement } from "./lib/engagement";
@@ -50,13 +54,13 @@ import { startPageEngagement, stopPageEngagement } from "./lib/engagement";
 const PlatformShell = lazy(() => import("./pages/Platform"));
 import { track } from "./lib/track";
 
-const pagesEN = ["Home", "Live", "What we deliver", "Use Cases", "Pricing & Contact"];
-const pagesSK = ["Domov", "Live", "Čo dostanete", "Využitie", "Cenník & Kontakt"];
+const pagesEN = ["Home", "Live", "What we deliver", "Use Cases", "Insights", "Pricing & Contact"];
+const pagesSK = ["Domov", "Live", "Čo dostanete", "Využitie", "Analýzy", "Cenník & Kontakt"];
 // Czech nav labels. Like pagesSK these are structural UI (not part of the
 // Texts-editable `t` dict), so CZ visitors get Czech nav even before body copy
 // is authored in the admin tool. Display-only: routing always keys off
 // pagesEN[i] (see Nav), so these never need pageMap entries.
-const pagesCS = ["Domů", "Live", "Co dostanete", "Využití", "Ceník & Kontakt"];
+const pagesCS = ["Domů", "Live", "Co dostanete", "Využití", "Analýzy", "Ceník & Kontakt"];
 // Nav labels → internal page key. "Data" is the historical internal
 // name for the what-we-deliver / sample page; we keep it for route
 // stability (/sample URL still resolves) but the user-facing label
@@ -72,6 +76,10 @@ const pageMap = {
   "Sample": "Data",             // legacy EN label still resolves
   "What we deliver": "Data",
   "Pricing & Contact": "Pricing",
+  // Analýzy — the published market analyses. Slovak label in all three languages
+  // because the analyses themselves are written in Slovak for a Slovak market;
+  // the EN nav label is "Insights", which is also the internal page key.
+  "Analýzy": "Insights",
 };
 
 // `t` (marketing copy dict) now lives in lib/marketingCopy.js — imported above.
@@ -2560,6 +2568,21 @@ export default function App() {
             {current === "Imprint" && <ImprintPage lang={lang} />}
             {current === "Status" && <StatusPage lang={lang} />}
             {current === "Terms" && <TermsPage lang={lang} />}
+            {/* Analýzy — /analyzy index and /analyzy/<slug> articles */}
+            {current === "Insights" && (
+              <Suspense fallback={<AuthLoadingSpinner />}>
+                <InsightsIndexPage navigate={handleNav} lang={lang} />
+              </Suspense>
+            )}
+            {typeof current === "string" && current.startsWith("Analyza:") && (
+              <Suspense fallback={<AuthLoadingSpinner />}>
+                <InsightsArticlePage
+                  slug={current.slice("Analyza:".length)}
+                  navigate={handleNav}
+                  lang={lang}
+                />
+              </Suspense>
+            )}
             {/* Hidden hero-variant preview page — not in Nav, only reachable via /hero-lab URL */}
             {current === "HeroLab" && (
               <Suspense fallback={<AuthLoadingSpinner />}>
@@ -2632,8 +2655,14 @@ export default function App() {
       {/* TrialPopup — marketing pages only. ANON-only modal that fires 1.5s
           after EVERY page load (incl. refresh) so the offer can't be missed;
           never shown once the visitor is signed in. CTA opens the login /
-          sign-up modal. */}
-      {!isAppPage(current) && (
+          sign-up modal.
+
+          NOT on /analyzy. The analyses exist to be read by a journalist or a
+          developer arriving cold from a link and to be citable afterwards; a
+          trial modal covering the article turns a piece of research into a
+          lead-gen funnel at exactly the moment credibility is being formed.
+          The offer is not lost — the sticky TrialBanner is still on the page. */}
+      {!isAppPage(current) && !isInsightsPage(current) && (
         <TrialPopup
           lang={lang}
           onCta={handleTrialCta}
