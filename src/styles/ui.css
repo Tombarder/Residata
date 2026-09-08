@@ -470,3 +470,47 @@ input[type="checkbox"], input[type="radio"] { width: 15px; height: 15px; cursor:
 .rd-menu__head { padding: 7px; border-bottom: 1px solid var(--border-soft); flex-shrink: 0; }
 .rd-menu__foot { display: flex; border-top: 1px solid var(--border-soft); flex-shrink: 0; }
 .rd-menu__empty { padding: 0.7rem 0.75rem; font-size: 0.8rem; color: var(--text-faint); font-style: italic; }
+
+/* ─── Analýzy (/analyzy) — keyboard focus + print ──────────────────────────
+ *
+ * The analyses are the one part of the site meant to be printed and forwarded:
+ * a journalist saves the piece to PDF, a developer prints it for a meeting.
+ * The site is dark, so printing it untouched wastes a cartridge and looks
+ * broken — this inverts the article for paper and drops the furniture around it.
+ * There is deliberately no separate PDF layout to maintain: the charts are
+ * generated LIGHT once and serve the page, the share card and this. */
+
+.rd-analysis a:focus-visible,
+.rd-analysis button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+@media print {
+  /* Everything that is not the article. */
+  nav, header, footer,
+  .residata-fb-pill, .residata-chat-pill,
+  .rd-analysis ~ *, [data-print-hide] { display: none !important; }
+
+  html, body, .rd-analysis {
+    background: #fff !important;
+    color: #14181f !important;
+  }
+  /* The 9rem top padding exists to clear the fixed nav + ticker, neither of
+     which prints. */
+  .rd-analysis > div { padding: 0 !important; max-width: 100% !important; }
+  .rd-analysis h1, .rd-analysis h2 { color: #14181f !important; }
+  .rd-analysis p, .rd-analysis td, .rd-analysis li { color: #2c3340 !important; }
+  .rd-analysis th { color: #14181f !important; border-bottom-color: #c8ccd4 !important; }
+  .rd-analysis td { border-bottom-color: #e4e7ec !important; }
+  .rd-analysis figcaption { color: #6b7280 !important; }
+
+  /* A chart split across a page break is a chart nobody can read. */
+  .rd-analysis figure { break-inside: avoid; page-break-inside: avoid; }
+  .rd-analysis figure > div { border: 1px solid #e4e7ec !important; box-shadow: none !important; }
+  .rd-analysis h2 { break-after: avoid; page-break-after: avoid; }
+
+  /* Where it came from, on the paper. */
+  .rd-analysis a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 0.75em; color: #6b7280; }
+}

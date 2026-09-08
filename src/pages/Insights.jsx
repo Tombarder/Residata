@@ -20,7 +20,7 @@
  *   drift between issues and `method` cannot be forgotten. See content/analyzy/format.js.
  */
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { ARTICLES, getArticle } from "../content/analyzy";
 import { dateSk, monthSk } from "../content/analyzy/format";
 import { SITE_BASE } from "../lib/seo";
@@ -39,12 +39,28 @@ const EYEBROW = {
 
 function Shell({ children }) {
   return (
-    <div style={{ background: "var(--bg)", minHeight: "100vh", color: "var(--text)" }}>
+    <div className="rd-analysis" style={{ background: "var(--bg)", minHeight: "100vh", color: "var(--text)" }}>
       <div style={{ maxWidth: MEASURE, margin: "0 auto", padding: "9rem 2rem 6rem" }}>
         {children}
       </div>
     </div>
   );
+}
+
+/**
+ * Land at the headline, not wherever the previous page was scrolled to.
+ *
+ * App's handleNav already calls scrollTo({behavior:"smooth"}), but the smooth
+ * animation gets cancelled when the outgoing page unmounts and the document
+ * height changes underneath it — measured: clicking an article from the index
+ * at scroll 600 left the reader at 600, i.e. halfway down the piece. An instant
+ * reset on mount is unconditional and also covers arriving by direct URL.
+ */
+function useScrollToTop(key) {
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }, [key]);
 }
 
 /* ─────────────────────────── block renderers ─────────────────────────── */
@@ -58,7 +74,10 @@ function Figure({ src, alt, caption }) {
         background: "#fff",
         borderRadius: 12,
         padding: "0.75rem",
-        boxShadow: "0 1px 3px rgba(0,0,0,0.35)",
+        // Hairline + shadow so the white card reads as a mounted figure rather
+        // than a hole punched in the page.
+        border: "1px solid rgba(255,255,255,0.10)",
+        boxShadow: "0 2px 10px rgba(0,0,0,0.35)",
       }}>
         <img src={src} alt={alt} loading="lazy"
              style={{ width: "100%", height: "auto", display: "block", borderRadius: 6 }} />
@@ -194,8 +213,55 @@ function useArticleSchema(article) {
 
 /* ────────────────────────────── the pages ────────────────────────────── */
 
+/**
+ * One row in the index. A card the whole of which is clickable needs to SAY so —
+ * a pointer cursor alone is the difference between "a list" and "a list you can
+ * use". Hover lifts the title to the accent and warms the row; the arrow slides.
+ */
+function ArticleCard({ article, navigate, sk }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <a
+      href={`/analyzy/${article.slug}`}
+      onClick={(e) => { e.preventDefault(); navigate("Analyza:" + article.slug); }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      onFocus={() => setHover(true)}
+      onBlur={() => setHover(false)}
+      style={{
+        display: "block", textDecoration: "none", color: "inherit",
+        padding: "1.6rem 1rem 1.6rem 1rem", margin: "0 -1rem",
+        borderTop: "1px solid rgba(255,255,255,0.12)",
+        borderRadius: hover ? 10 : 0,
+        background: hover ? "rgba(255,255,255,0.035)" : "transparent",
+        transition: "background 160ms ease, border-radius 160ms ease",
+      }}
+    >
+      <div style={{ ...EYEBROW, marginBottom: "0.55rem" }}>{monthSk(article.date)}</div>
+      <div style={{
+        fontSize: "1.15rem", fontWeight: 650, lineHeight: 1.35,
+        color: hover ? "var(--accent)" : "var(--text)",
+        marginBottom: "0.55rem", transition: "color 160ms ease",
+      }}>{article.title}</div>
+      <div style={{ fontSize: "0.92rem", lineHeight: 1.6, color: "#a5a5b0" }}>{article.perex}</div>
+      <div style={{
+        marginTop: "0.9rem", fontSize: "0.85rem", color: "var(--accent)",
+        opacity: hover ? 1 : 0.72, transition: "opacity 160ms ease",
+      }}>
+        {sk ? "Čítať analýzu" : "Read the analysis"}
+        <span style={{
+          display: "inline-block", marginLeft: "0.4rem",
+          transform: hover ? "translateX(3px)" : "none",
+          transition: "transform 160ms ease",
+        }}>→</span>
+      </div>
+    </a>
+  );
+}
+
 export function InsightsIndex({ navigate, lang }) {
   const sk = lang !== "en";
+  useScrollToTop("index");
   return (
     <Shell>
       <div style={EYEBROW}>Residata · {sk ? "Analýzy" : "Insights"}</div>
@@ -211,35 +277,43 @@ export function InsightsIndex({ navigate, lang }) {
           : "A regular read on the Slovak and Czech new-build market, built from developer price lists we read every night. The whole country, not just the capital."}
       </p>
 
-      {ARTICLES.map((a) => (
-        <a
-          key={a.slug}
-          href={`/analyzy/${a.slug}`}
-          onClick={(e) => { e.preventDefault(); navigate("Analyza:" + a.slug); }}
-          style={{
-            display: "block", textDecoration: "none", color: "inherit",
-            padding: "1.5rem 0", borderTop: "1px solid rgba(255,255,255,0.12)",
-          }}
-        >
-          <div style={{ ...EYEBROW, marginBottom: "0.55rem" }}>{monthSk(a.date)}</div>
-          <div style={{
-            fontSize: "1.15rem", fontWeight: 650, lineHeight: 1.35,
-            color: "var(--text)", marginBottom: "0.55rem",
-          }}>{a.title}</div>
-          <div style={{ fontSize: "0.92rem", lineHeight: 1.6, color: "#a5a5b0" }}>{a.perex}</div>
-        </a>
-      ))}
+      {ARTICLES.map((a) => <ArticleCard key={a.slug} article={a} navigate={navigate} sk={sk} />)}
 
       {ARTICLES.length === 0 && (
         <p style={{ color: "#8b8b95" }}>{sk ? "Zatiaľ nič." : "Nothing published yet."}</p>
       )}
+
+      {/* Closes the page rather than leaving a void under a short list, and does
+          the one job the index otherwise has no way of doing: telling a reader
+          who wants their own town's figures how to ask for them. */}
+      <div style={{
+        marginTop: "3.5rem", padding: "1.6rem 1.7rem",
+        border: "1px solid rgba(255,255,255,0.14)", borderRadius: 12,
+        background: "rgba(255,255,255,0.025)",
+      }}>
+        <div style={{ ...EYEBROW, marginBottom: "0.7rem" }}>
+          {sk ? "Ďalšie číslo" : "Next issue"}
+        </div>
+        <p style={{ margin: "0 0 0.9rem", fontSize: "0.95rem", lineHeight: 1.7, color: "#c5c5cc" }}>
+          {sk
+            ? "Analýzu vydávame raz mesačne — ponuka, predaje a ceny za celé Slovensko a Česko, z cenníkov, ktoré čítame každú noc."
+            : "A new analysis every month — supply, sales and prices across Slovakia and Czechia, from price lists we read every night."}
+        </p>
+        <p style={{ margin: 0, fontSize: "0.95rem", lineHeight: 1.7, color: "#c5c5cc" }}>
+          {sk ? "Chcete čísla za svoje mesto alebo mestskú časť? Napíšte na " : "Want the figures for your own town or district? Write to "}
+          <a href={`mailto:${COMPANY.email}`} style={{ color: "var(--accent)" }}>{COMPANY.email}</a>
+          {sk ? " a pošleme vám ich." : " and we'll send them."}
+        </p>
+      </div>
     </Shell>
   );
 }
 
 export function InsightsArticle({ slug, navigate, lang }) {
   const article = getArticle(slug);
+  const [backHover, setBackHover] = useState(false);
   useArticleSchema(article);
+  useScrollToTop(slug);
 
   // Unknown slug: land on the index rather than a dead end. A stale link stays
   // inside the section it pointed at, which is what a visitor from a shared URL
@@ -251,9 +325,19 @@ export function InsightsArticle({ slug, navigate, lang }) {
       <a
         href="/analyzy"
         onClick={(e) => { e.preventDefault(); navigate("Insights"); }}
-        style={{ ...EYEBROW, display: "inline-block", textDecoration: "none" }}
+        onMouseEnter={() => setBackHover(true)}
+        onMouseLeave={() => setBackHover(false)}
+        style={{
+          ...EYEBROW, display: "inline-block", textDecoration: "none",
+          opacity: backHover ? 1 : 0.78, transition: "opacity 150ms ease",
+        }}
       >
-        ← Residata · Analýzy
+        <span style={{
+          display: "inline-block", marginRight: "0.35rem",
+          transform: backHover ? "translateX(-3px)" : "none",
+          transition: "transform 150ms ease",
+        }}>←</span>
+        Residata · Analýzy
       </a>
 
       <h1 style={{

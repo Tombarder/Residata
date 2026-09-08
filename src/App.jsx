@@ -446,6 +446,18 @@ function AccountMenu({ user, caps, auth, setCurrent, lang }) {
   );
 }
 
+/**
+ * Is this nav item the one the visitor is currently inside?
+ *
+ * Usually an exact page match, but a SECTION has to stay lit while you are on a
+ * page inside it: reading /analyzy/<slug> is still being in Analýzy, and losing
+ * the underline there makes the article feel like it fell off the site.
+ */
+function navKeyIsActive(internalKey, current) {
+  if (current === internalKey) return true;
+  return internalKey === "Insights" && isInsightsPage(current);
+}
+
 function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
   const pages = lang === "sk" ? pagesSK : lang === "cs" ? pagesCS : pagesEN;
   const user = auth?.user;
@@ -570,7 +582,7 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
             // (see pageMap). Resolve it the same way so the active-state
             // underline picks up when we're on /sample.
             const internalKey = pageMap[key] || key;
-            const isActive = current === internalKey;
+            const isActive = navKeyIsActive(internalKey, current);
             return (
               <NavLink key={key} to={internalKey} onNavigate={setCurrent} className={"nav-link" + (isActive ? " nav-link--active" : "")} aria-current={isActive ? "page" : undefined}>{p}</NavLink>
             );
@@ -677,7 +689,7 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
               {pages.map((p, i) => {
                 const key = pagesEN[i];
                 const internalKey = pageMap[key] || key;
-                const isActive = current === internalKey;
+                const isActive = navKeyIsActive(internalKey, current);
                 return (
                   <NavLink key={key} to={internalKey} onNavigate={go} className={"nav-menu-link" + (isActive ? " nav-menu-link--active" : "")} aria-current={isActive ? "page" : undefined}>{p}</NavLink>
                 );
