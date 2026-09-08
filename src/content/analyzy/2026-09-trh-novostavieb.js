@@ -37,6 +37,7 @@ const cities = d.monthsToClear.byCity;
 const fastest = cities[0];
 const slowest = cities[cities.length - 1];
 const scope = d.monthsToClear.byScope;
+const pair = d.closestPricedPair;
 const pb = d.priceBehaviour;
 const slug = d.slug;
 
@@ -193,17 +194,16 @@ export default {
     {
       type: "p",
       text: {
-        sk: `Bratislava by svoju ponuku vypredala za ${months(scope.bratislava.monthsDisplay)}, ` +
-            `zvyšok Slovenska za ${months(scope.rest.monthsDisplay)}. Priemer ale zakrýva ` +
-            `to podstatné: ${fastest.city} ${months(fastest.monthsDisplay)}, ` +
-            `${slowest.city} ${months(slowest.monthsDisplay)}. Rozdiely medzi jednotlivými ` +
-            `mestami sú väčšie než rozdiel medzi Bratislavou a regiónmi ako celkom.`,
-        en: `Bratislava would clear its supply in ${months(scope.bratislava.monthsDisplay, "en")}, ` +
-            `the rest of Slovakia in ${months(scope.rest.monthsDisplay, "en")}. The average ` +
-            `hides what matters: ${fastest.city} would take ` +
-            `${months(fastest.monthsDisplay, "en")}, ${slowest.city} ` +
-            `${months(slowest.monthsDisplay, "en")}. The differences between individual towns ` +
-            `are larger than the difference between Bratislava and the regions as a whole.`,
+        sk: `Rozpätie medzi slovenskými mestami je od ${months(fastest.monthsDisplay)} ` +
+            `(${fastest.city}) po ${months(slowest.monthsDisplay)} (${slowest.city}). ` +
+            `Bratislava je presne v strede rebríčka — ${months(scope.bratislava.monthsDisplay)}. ` +
+            `Krajné mestá rebríčka delí ${months(slowest.monthsDisplay - fastest.monthsDisplay)}, ` +
+            `viac než delí ktorékoľvek z nich od hlavného mesta.`,
+        en: `The spread between Slovak towns runs from ${months(fastest.monthsDisplay, "en")} ` +
+            `(${fastest.city}) to ${months(slowest.monthsDisplay, "en")} (${slowest.city}). ` +
+            `Bratislava sits exactly in the middle of the table, at ` +
+            `${months(scope.bratislava.monthsDisplay, "en")}. The gap between two regional ` +
+            `capitals is therefore wider than the gap between either of them and the capital.`,
       },
     },
     {
@@ -222,21 +222,27 @@ export default {
     {
       type: "p",
       text: {
-        sk: `Ani tu to nie je o cene. ${slowest.city} má ${n(slowest.available)} voľných ` +
-            `bytov a najpomalšie tempo zo sledovaných miest pri mediáne ` +
-            `${eurM2(slowest.medianM2)}. Najrýchlejšie tempo má pritom mesto s ešte nižším ` +
-            `mediánom: ${fastest.city}, ${eurM2(fastest.medianM2)} a ` +
-            `${months(fastest.monthsDisplay)} do vypredania. ` +
-            `Pre developera, ktorý zvažuje regionálny projekt, z toho vyplýva jedno: ` +
+        sk: `Ani tu to nie je o cene. ${pair.a.city} a ${pair.b.city} majú prakticky ` +
+            `rovnaký medián — ${eurM2(pair.a.medianM2)} a ${eurM2(pair.b.medianM2)}, ` +
+            `rozdiel ${pair.priceGap} € na meter. Čas do vypredania je pritom ` +
+            `${months(pair.a.monthsDisplay)} a ${months(pair.b.monthsDisplay)}. Rovnaká ` +
+            `cena, dvojnásobný čas.`,
+        en: `Here too it is not about price. ${pair.a.city} and ${pair.b.city} have ` +
+            `practically the same median — ${eurM2(pair.a.medianM2)} and ` +
+            `${eurM2(pair.b.medianM2)}, ${pair.priceGap} € per metre apart. Their clearing ` +
+            `times are ${months(pair.a.monthsDisplay, "en")} and ` +
+            `${months(pair.b.monthsDisplay, "en")}. Same price, twice the time.`,
+      },
+    },
+    {
+      type: "p",
+      text: {
+        sk: `Pre developera, ktorý zvažuje regionálny projekt, z toho vyplýva jedno: ` +
             `lacnejší trh sám o sebe nesľubuje rýchlejší predaj. Ako rýchlo sa predáva ` +
             `v konkrétnom meste, to sa dá zistiť vopred.`,
-        en: `Here too it is not about price. ${slowest.city} has ${n(slowest.available)} ` +
-            `available flats and the slowest pace of the towns tracked, at a median of ` +
-            `${eurM2(slowest.medianM2)}. ${fastest.city} is cheaper still — ` +
-            `${eurM2(fastest.medianM2)} — and would clear almost three times faster. For a ` +
-            `developer weighing a regional project, one thing follows: a cheaper market does ` +
-            `not in itself promise a faster sale. How fast a given town actually sells can be ` +
-            `established in advance.`,
+        en: `For a developer weighing a regional project, one thing follows: a cheaper ` +
+            `market does not in itself promise a faster sale. How fast a given town ` +
+            `actually sells can be established in advance.`,
       },
     },
   ],
