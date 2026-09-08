@@ -59,6 +59,11 @@ const czPremium = Math.round((priceCz["3"] / priceSk["3"] - 1) * 100);
 export default {
   slug,
   date: d.asOf,
+  // WITHDRAWN 2026-09-08 on Boss's instruction — the writing did not meet the bar.
+  // The page stays in the repo and its URL still resolves, so nothing 404s for
+  // anyone who already has the link, but it is not listed, not in the sitemap and
+  // carries noindex. Flip to true only when an issue is approved for publication.
+  published: false,
   title: {
     sk: "Trojizbový byt sa na Slovensku predáva o rok dlhšie než dvojizbový",
     en: "A three-room flat in Slovakia takes a year longer to sell than a two-room one",

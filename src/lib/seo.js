@@ -190,6 +190,8 @@ const SEO_BY_PAGE = {
   // ever disagree, which is what keeps this from rotting.
   Insights: {
     path: "/analyzy",
+    // noindex while nothing is published — see content/analyzy/index.js.
+    noindex: true,
     en: {
       title: "New-build market analyses · Residata",
       description:
@@ -205,6 +207,8 @@ const SEO_BY_PAGE = {
   },
   "Analyza:trh-novostavieb-2026-09": {
     path: "/analyzy/trh-novostavieb-2026-09",
+    // Withdrawn 2026-09-08 — reachable by direct link, never indexed.
+    noindex: true,
     // Per-article share image, so a link posted to LinkedIn shows THIS article's
     // chart instead of the site-wide default from index.html.
     ogImage: "/analyzy/og-2026-09.png",

@@ -338,8 +338,9 @@ const SITEMAP_URLS = [
   // two disagree, which is what stops this list rotting the way /about did.
   // changefreq yearly on an article: its figures are a dated snapshot and are
   // deliberately never rewritten — a new month is a new URL, not an edit.
-  { loc: '/analyzy', priority: '0.8', changefreq: 'monthly' },
-  { loc: '/analyzy/trh-novostavieb-2026-09', priority: '0.7', changefreq: 'yearly' },
+  // No /analyzy entries while nothing is published — sitemapRoutes.test.mjs
+  // refuses a submitted url that seo.js marks noindex, which is the guard doing
+  // exactly its job. Add the line back with the article when one goes live.
 ];
 
 const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
