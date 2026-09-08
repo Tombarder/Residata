@@ -1,15 +1,14 @@
 /**
- * The article registry.
+ * SEED DATA ONLY — the live site reads public.articles, not this folder.
  *
- * Adding an issue is three edits, and all three are checked:
- *   1. drop the content module here,
- *   2. add its SEO entry in lib/seo.js (applySeo returns early for an unknown
- *      page — a missing entry means Google indexes the article under whatever
- *      meta happened to be in the head),
- *   3. add its path to SITEMAP_URLS in scripts/generate-static-content.mjs.
- * src/lib/sitemapRoutes.test.mjs fails if 2 and 3 disagree.
+ * These modules are how an issue is FIRST authored: prose with figures
+ * interpolated from the generated report JSON, which is then resolved to plain
+ * strings and inserted into the table. After that the table is the source of
+ * truth, because Boss edits and publishes from /app/articles without a deploy.
+ *
+ * Keep a module here when you author a new issue; do not edit one expecting the
+ * site to change.
  */
-
 import september2026 from "./2026-09-trh-novostavieb";
 
 /** Newest first — the index page renders them in this order. */

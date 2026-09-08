@@ -21,9 +21,9 @@
  */
 
 import { useEffect, useState } from "react";
-import { ARTICLES, getArticle } from "../content/analyzy";
+import { useArticles, useArticle } from "../lib/useArticles";
 import { t, dateLong, monthLong } from "../content/analyzy/format";
-import { SITE_BASE } from "../lib/seo";
+import { SITE_BASE, applyArticleSeo } from "../lib/seo";
 import { COMPANY } from "../lib/company";
 
 const MEASURE = 760;
@@ -263,6 +263,7 @@ function ArticleCard({ article, navigate, sk, lang }) {
 
 export function InsightsIndex({ navigate, lang }) {
   const sk = lang !== "en";
+  const { articles, loading } = useArticles();
   useScrollToTop("index");
   return (
     <Shell>
@@ -279,9 +280,12 @@ export function InsightsIndex({ navigate, lang }) {
           : "A regular read on the Slovak and Czech new-build market, built from developer price lists we read every night. The whole country, not just the capital."}
       </p>
 
-      {ARTICLES.map((a) => <ArticleCard key={a.slug} article={a} navigate={navigate} sk={sk} lang={lang} />)}
+      {articles.map((a) => <ArticleCard key={a.slug} article={a} navigate={navigate} sk={sk} lang={lang} />)}
 
-      {ARTICLES.length === 0 && (
+      {loading && (
+        <p style={{ color: "#8b8b95" }}>{sk ? "Načítavam…" : "Loading…"}</p>
+      )}
+      {!loading && articles.length === 0 && (
         <p style={{ color: "#8b8b95" }}>{sk ? "Zatiaľ nič." : "Nothing published yet."}</p>
       )}
 
@@ -312,14 +316,28 @@ export function InsightsIndex({ navigate, lang }) {
 }
 
 export function InsightsArticle({ slug, navigate, lang }) {
-  const article = getArticle(slug);
+  const { article, loading } = useArticle(slug);
   const [backHover, setBackHover] = useState(false);
   useArticleSchema(article, lang);
   useScrollToTop(slug);
 
-  // Unknown slug: land on the index rather than a dead end. A stale link stays
-  // inside the section it pointed at, which is what a visitor from a shared URL
-  // or an old newsletter actually wants.
+  // Content is no longer in the bundle, so the page must set its own <title>,
+  // description, canonical and og:image once the row arrives — applySeo ran on
+  // navigation with nothing to go on.
+  useEffect(() => { if (article) applyArticleSeo(article, lang); }, [article, lang]);
+
+  if (loading) {
+    return (
+      <Shell>
+        <div style={{ ...EYEBROW }}>Residata · Analýzy</div>
+        <p style={{ color: "#8b8b95" }}>{lang === "en" ? "Loading…" : "Načítavam…"}</p>
+      </Shell>
+    );
+  }
+
+  // Unknown or unpublished slug: land on the index rather than a dead end. A
+  // stale link stays inside the section it pointed at, which is what a visitor
+  // from a shared URL or an old newsletter actually wants.
   if (!article) return <InsightsIndex navigate={navigate} lang={lang} />;
 
   return (

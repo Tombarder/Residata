@@ -36,6 +36,7 @@ const APP_PAGE_TO_PATH = {
   "App:Feedback":  "/app/feedback",
   "App:Texts":     "/app/texts",
   "App:Usage":     "/app/usage",
+  "App:Articles":  "/app/articles",
 };
 const APP_PATH_TO_PAGE = Object.fromEntries(
   Object.entries(APP_PAGE_TO_PATH).map(([k, v]) => [v, k])

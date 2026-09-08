@@ -50,6 +50,7 @@ const mono = "'JetBrains Mono', monospace";
 import { accent as green, accentInk, dim, text as textLight, border, surface as bg, surfaceDark as bg2, dangerInk, orangeInk } from "../lib/theme";
 import { useThemeMode, applyTheme, getTheme } from "../lib/theme-mode";
 import { fieldBlock } from "../lib/controls";
+import ArticlesAdmin from "./ArticlesAdmin";
 const SIDEBAR_W = 240;
 
 // ─── Icons — inline SVG, same weight as HowItWorks ──────────────
@@ -174,6 +175,7 @@ const NAV = [
     { page: "App:Locations", label: { en: "Locations", sk: "Polohy" }, Icon: IconMap, adminOnly: true },
     { page: "App:Texts", label: { en: "Texts", sk: "Texty" }, Icon: IconDoc, adminOnly: true },
     { page: "App:Usage", label: { en: "Usage", sk: "Používanie" }, Icon: IconChart, adminOnly: true },
+    { page: "App:Articles", label: { en: "Analyses", sk: "Analýzy" }, Icon: IconFeedback, adminOnly: true },
     { page: "App:Admin", label: { en: "Admin", sk: "Admin" }, Icon: IconShield, adminOnly: true },
   ]},
 ];
@@ -550,6 +552,7 @@ function TopBar({ page, lang, setLang, tier }) {
     "App:Feedback":  { en: "Feedback",        sk: "Spätná väzba" },
     "App:Texts":     { en: "Website texts",   sk: "Texty na webe" },
     "App:Usage":     { en: "Usage",           sk: "Používanie"    },
+    "App:Articles":  { en: "Analyses",        sk: "Analýzy"       },
   };
   const isProjectDetail = typeof page === "string" && page.startsWith("App:ProjectDetail:");
   const title = isProjectDetail
@@ -761,6 +764,7 @@ function PageContent({ page, projectId, lang, setCurrent, openLogin }) {
   if (page === "App:Exports")    return <Gated require="view_exports_page"    lang={lang} setCurrent={setCurrent}><PlatformExports lang={lang} setCurrent={setCurrent} /></Gated>;
   if (page === "App:Billing")    return <PlatformBilling lang={lang} setCurrent={setCurrent} />;
   if (page === "App:Settings")   return <PlatformSettings lang={lang} />;
+  if (page === "App:Articles")   return <AdminGate require="manage_users" lang={lang}><ArticlesAdmin lang={lang} /></AdminGate>;
   if (page === "App:Admin")      return <AdminGate require="manage_users" lang={lang}><LiveAdmin lang={lang} setCurrent={setCurrent} /></AdminGate>;
   if (page === "App:Locations")  return <AdminGate require="manage_locations" lang={lang}><Suspense fallback={<div style={{ padding: "2rem", color: "var(--text-dim)", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.8rem" }}>{lang === "sk" ? "Načítavam…" : "Loading…"}</div>}><LocationManager lang={lang} /></Suspense></AdminGate>;
   if (page === "App:DataQA")     return <AdminGate require="manage_data_qa" lang={lang}><Suspense fallback={<div style={{ padding: "2rem", color: "var(--text-dim)", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.8rem" }}>{lang === "sk" ? "Načítavam…" : "Loading…"}</div>}><DataQA lang={lang} /></Suspense></AdminGate>;

@@ -53,23 +53,14 @@ import { startPageEngagement, stopPageEngagement } from "./lib/engagement";
 // critical bundle. Rendered inside a <Suspense> below.
 const PlatformShell = lazy(() => import("./pages/Platform"));
 import { track } from "./lib/track";
-import { ARTICLES as PUBLISHED_ANALYSES } from "./content/analyzy";
-const ARTICLE_COUNT = PUBLISHED_ANALYSES.length;
 
-// Analýzy is in the nav only while something is actually published — an empty
-// section reads as an unfinished site. The route keeps working either way, which
-// is what makes an unlisted draft URL a usable preview.
-const HAS_ANALYSES = ARTICLE_COUNT > 0;
-const pagesEN = ["Home", "Live", "What we deliver", "Use Cases",
-                 ...(HAS_ANALYSES ? ["Insights"] : []), "Pricing & Contact"];
-const pagesSK = ["Domov", "Live", "Čo dostanete", "Využitie",
-                 ...(HAS_ANALYSES ? ["Analýzy"] : []), "Cenník & Kontakt"];
+const pagesEN = ["Home", "Live", "What we deliver", "Use Cases", "Insights", "Pricing & Contact"];
+const pagesSK = ["Domov", "Live", "Čo dostanete", "Využitie", "Analýzy", "Cenník & Kontakt"];
 // Czech nav labels. Like pagesSK these are structural UI (not part of the
 // Texts-editable `t` dict), so CZ visitors get Czech nav even before body copy
 // is authored in the admin tool. Display-only: routing always keys off
 // pagesEN[i] (see Nav), so these never need pageMap entries.
-const pagesCS = ["Domů", "Live", "Co dostanete", "Využití",
-                 ...(HAS_ANALYSES ? ["Analýzy"] : []), "Ceník & Kontakt"];
+const pagesCS = ["Domů", "Live", "Co dostanete", "Využití", "Analýzy", "Ceník & Kontakt"];
 // Nav labels → internal page key. "Data" is the historical internal
 // name for the what-we-deliver / sample page; we keep it for route
 // stability (/sample URL still resolves) but the user-facing label

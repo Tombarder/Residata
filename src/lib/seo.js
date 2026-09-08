@@ -190,8 +190,6 @@ const SEO_BY_PAGE = {
   // ever disagree, which is what keeps this from rotting.
   Insights: {
     path: "/analyzy",
-    // noindex while nothing is published — see content/analyzy/index.js.
-    noindex: true,
     en: {
       title: "New-build market analyses · Residata",
       description:
@@ -203,27 +201,6 @@ const SEO_BY_PAGE = {
       description:
         "Pravidelná analýza trhu novostavieb na Slovensku a v Česku, postavená na cenníkoch developerov čítaných každú noc. Celé Slovensko, nielen Bratislava.",
       keywords: "analýza trhu novostavieb, ceny novostavieb, ponuka bytov, realitný trh Slovensko",
-    },
-  },
-  "Analyza:trh-novostavieb-2026-09": {
-    path: "/analyzy/trh-novostavieb-2026-09",
-    // Withdrawn 2026-09-08 — reachable by direct link, never indexed.
-    noindex: true,
-    // Per-article share image, so a link posted to LinkedIn shows THIS article's
-    // chart instead of the site-wide default from index.html.
-    ogImage: "/analyzy/og-2026-09.png",
-    ogType: "article",
-    en: {
-      title: "Three-room flats take a year longer to sell · Residata",
-      description:
-        "Slovak three-room supply would take 32 months to clear, two-room 19. Czech three-room flats cost 71 % more and clear in half the time — so it is not the price. Analysis of 246 projects.",
-      keywords: "novostavby Slovensko, skladba bytov, predaj novostavieb, ceny bytov",
-    },
-    sk: {
-      title: "Trojizbový byt sa predáva o rok dlhšie než dvojizbový · Residata",
-      description:
-        "Ponuka trojizbových bytov by sa vypredávala 32 mesiacov, dvojizbových 19. V Česku stojí trojizbový byt o 71 % viac a vypredá sa za polovičný čas — nie je to teda cenou. Analýza 246 projektov.",
-      keywords: "novostavby Slovensko, dvojizbové byty, trojizbové byty, predaj novostavieb, ceny bytov, analýza trhu",
     },
   },
   // /status was added on 2026-09-03 and had NO entry here. applySeo returns
@@ -436,9 +413,13 @@ function resolvePageSeo(page, lang) {
   // the head, which is exactly how /status shipped wearing the homepage's identity.
   // noindex because this URL is not a real article and must not be indexed as one.
   if (!entry && typeof page === "string" && page.startsWith("Analyza:")) {
+    // Articles live in public.articles, so their meta arrives with the row.
+    // Until then use the section's own copy, marked noindex so a crawler that
+    // gives up before the fetch never indexes a placeholder. applyArticleSeo()
+    // overwrites all of it — including robots — the moment the article loads.
     const index = SEO_BY_PAGE.Insights;
     return {
-      path: index.path,
+      path: "/analyzy/" + page.slice("Analyza:".length),
       noindex: true,
       ...index[lang === "sk" ? "sk" : "en"],
     };
@@ -586,4 +567,43 @@ export function applySeo(page, lang, country) {
   setMeta("name", "twitter:card", "summary_large_image");
   setMeta("name", "twitter:title", meta.title);
   setMeta("name", "twitter:description", meta.description);
+}
+
+/**
+ * Apply an article's own metadata after its row loads.
+ *
+ * The analyses moved into the database so they can be edited without a deploy,
+ * which means their titles and descriptions are no longer in the bundle for
+ * applySeo to find. This runs from the article page with the loaded row and
+ * sets everything applySeo would have: title, description, canonical, robots,
+ * og:* and the share image. Google executes JS, so this does reach the index.
+ */
+export function applyArticleSeo(article, lang) {
+  if (typeof document === "undefined" || !article) return;
+  const L = (v) => (v && (lang === "en" ? v.en : v.sk)) || v?.sk || v?.en || "";
+  const title = L(article.seoTitle) || `${L(article.title)} · Residata`;
+  const description = L(article.perex);
+  const url = `${SITE_BASE}/analyzy/${article.slug}`;
+
+  document.title = title;
+  setMeta("name", "description", description);
+  const kw = L(article.seoKeywords);
+  if (kw) setMeta("name", "keywords", kw);
+  // A draft is reachable by direct link on purpose — that is how it gets
+  // reviewed — but it must never be indexed.
+  setMeta("name", "robots", article.published
+    ? "index, follow, max-image-preview:large, max-snippet:-1"
+    : "noindex, nofollow");
+  setLink("canonical", url);
+  setMeta("property", "og:title", title);
+  setMeta("property", "og:description", description);
+  setMeta("property", "og:url", url);
+  setMeta("property", "og:type", "article");
+  setMeta("name", "twitter:title", title);
+  setMeta("name", "twitter:description", description);
+  if (article.ogImage) {
+    const img = article.ogImage.startsWith("http") ? article.ogImage : SITE_BASE + article.ogImage;
+    setMeta("property", "og:image", img);
+    setMeta("name", "twitter:image", img);
+  }
 }

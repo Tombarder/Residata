@@ -338,10 +338,22 @@ const SITEMAP_URLS = [
   // two disagree, which is what stops this list rotting the way /about did.
   // changefreq yearly on an article: its figures are a dated snapshot and are
   // deliberately never rewritten — a new month is a new URL, not an edit.
-  // No /analyzy entries while nothing is published — sitemapRoutes.test.mjs
-  // refuses a submitted url that seo.js marks noindex, which is the guard doing
-  // exactly its job. Add the line back with the article when one goes live.
+  { loc: '/analyzy', priority: '0.8', changefreq: 'monthly' },
 ];
+
+// Published analyses, straight from the table that renders them, so a piece
+// published from /app/articles reaches Google on the next deploy without anyone
+// editing this file. Deliberately appended AFTER the literal above rather than
+// into it: sitemapRoutes.test.mjs validates that literal against seo.js's static
+// SEO table, and article meta is applied at runtime from the row instead.
+let articleUrls = [];
+try {
+  const rows = await fetchView('articles', { select: 'slug', published: 'eq.true' });
+  articleUrls = rows.map((r) => ({ loc: `/analyzy/${r.slug}`, priority: '0.7', changefreq: 'yearly' }));
+} catch (e) {
+  console.warn('[gen-static] could not read articles for the sitemap:', e.message);
+}
+const ALL_SITEMAP_URLS = [...SITEMAP_URLS, ...articleUrls];
 
 const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <!--
@@ -353,7 +365,7 @@ const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
         xmlns:xhtml="http://www.w3.org/1999/xhtml">
-${SITEMAP_URLS.map(({ loc, priority, changefreq }) => `
+${ALL_SITEMAP_URLS.map(({ loc, priority, changefreq }) => `
   <url>
     <loc>${HOME}${loc}</loc>
     <lastmod>${today}</lastmod>
@@ -367,7 +379,7 @@ ${SITEMAP_URLS.map(({ loc, priority, changefreq }) => `
 `;
 
 fs.writeFileSync(path.resolve('public/sitemap.xml'), sitemap);
-console.log(`[gen-static] public/sitemap.xml — ${sitemap.length} chars, ${SITEMAP_URLS.length} URLs`);
+console.log(`[gen-static] public/sitemap.xml — ${sitemap.length} chars, ${ALL_SITEMAP_URLS.length} URLs`);
 
 // ───────────────── data export for vite plugin ─────────────────
 // vite.config.js's transformIndexHtml plugin reads this JSON to inject
