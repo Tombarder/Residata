@@ -267,7 +267,7 @@ function ArticleCard({ article, navigate, sk, lang }) {
 
 export function InsightsIndex({ navigate, lang }) {
   const sk = lang !== "en";
-  const { articles, loading } = useArticles();
+  const { articles, loading, error } = useArticles();
   useScrollToTop("index");
   // Reached either directly or as the fallback for a withdrawn article, and in
   // that second case the head still carries the dead article's canonical and its
@@ -294,7 +294,15 @@ export function InsightsIndex({ navigate, lang }) {
       {loading && (
         <p style={{ color: "#8b8b95" }}>{sk ? "Načítavam…" : "Loading…"}</p>
       )}
-      {!loading && articles.length === 0 && (
+      {/* A failed load must not read as "we publish nothing" — that is a claim
+          about the product, made by a network error. */}
+      {!loading && error && (
+        <p style={{ color: "#c98b8b" }}>
+          {sk ? "Analýzy sa nepodarilo načítať. Skúste stránku obnoviť."
+              : "The analyses could not be loaded. Please refresh the page."}
+        </p>
+      )}
+      {!loading && !error && articles.length === 0 && (
         <p style={{ color: "#8b8b95" }}>{sk ? "Zatiaľ nič." : "Nothing published yet."}</p>
       )}
 

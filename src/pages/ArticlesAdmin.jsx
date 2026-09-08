@@ -24,7 +24,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useArticles, useArticle, setArticlePublished, saveArticle, createArticle } from "../lib/useArticles";
+import { useArticles, useArticle, setArticlePublished, saveArticle, createArticle, deleteArticle } from "../lib/useArticles";
 import { SITE_BASE } from "../lib/seo";
 
 /**
@@ -40,6 +40,24 @@ import { SITE_BASE } from "../lib/seo";
  * which the database already provides through updated_at and a re-seed.
  */
 const HISTORY_LIMIT = 20;
+
+/** Block kinds an editor can add. `lead` is excluded: an article has one, first. */
+const ADDABLE = ["h2", "p", "figure", "table", "bullets"];
+
+let keySeq = 0;
+/** Give every block a stable React key. Index keys reuse the wrong input the
+ *  moment a block moves, which lands your cursor in a different paragraph. */
+const withKeys = (blocks) => (blocks || []).map((b) => ({ ...b, _k: b._k ?? `k${++keySeq}` }));
+/** …and take them off again, so a client-side id never reaches the database. */
+const stripKeys = (blocks) => (blocks || []).map(({ _k, ...rest }) => rest);
+
+function emptyBlock(type) {
+  const pair = { sk: "", en: "" };
+  if (type === "figure") return { type, src: "", srcEn: "", alt: { ...pair }, caption: { ...pair } };
+  if (type === "table") return { type, head: { sk: [], en: [] }, rows: [], caption: { ...pair } };
+  if (type === "bullets") return { type, items: [{ ...pair }] };
+  return { type, text: { ...pair } };
+}
 
 /**
  * Edit history for the editor.
@@ -104,6 +122,17 @@ const LABEL = {
     date: "Dátum článku", ogImage: "Zdieľaný obrázok (cesta k súboru)",
     alt: "Alternatívny text obrázka (pre čítačky a vyhľadávače)",
     newArticle: "Nový článok", newSlug: "URL nového článku (napr. trh-novostavieb-2026-10)",
+    addBlock: "Pridať", up: "Hore", down: "Dole", removeBlock: "Zmazať blok",
+    confirmRemoveBlock: "Zmazať tento blok? Undo (⌘Z) ho vráti.",
+    bAddP: "Odsek", bAddH2: "Nadpis", bAddFigure: "Graf", bAddTable: "Tabuľka", bAddBullets: "Odrážky",
+    imgPath: "Cesta k obrázku (SK)", imgPathEn: "Cesta k obrázku (EN)",
+    deleteArticle: "Zmazať článok",
+    confirmDeleteArticle: "Nenávratne zmazať tento článok? Publikovaný článok najprv stiahnite.",
+    cannotDeletePublished: "Publikovaný článok sa nedá zmazať — najprv ho stiahnite z webu.",
+    loadFailed: "Články sa nepodarilo načítať.",
+    conflict: "Článok medzitým zmenil niekto iný. Načítajte ho znova, inak prepíšete jeho zmeny.",
+    reloadArticle: "Načítať znova",
+    methodTooShort: "Metodika musí mať aspoň 40 znakov v oboch jazykoch.",
   },
   en: {
     heading: "Analyses", sub: "Manage the articles at /analyzy",
@@ -124,6 +153,17 @@ const LABEL = {
     date: "Article date", ogImage: "Share image (file path)",
     alt: "Image alt text (for screen readers and search)",
     newArticle: "New article", newSlug: "URL for the new article (e.g. trh-novostavieb-2026-10)",
+    addBlock: "Add", up: "Up", down: "Down", removeBlock: "Delete block",
+    confirmRemoveBlock: "Delete this block? Undo (⌘Z) brings it back.",
+    bAddP: "Paragraph", bAddH2: "Heading", bAddFigure: "Chart", bAddTable: "Table", bAddBullets: "Bullets",
+    imgPath: "Image path (SK)", imgPathEn: "Image path (EN)",
+    deleteArticle: "Delete article",
+    confirmDeleteArticle: "Permanently delete this article? Withdraw it from the site first.",
+    cannotDeletePublished: "A published article cannot be deleted — withdraw it from the site first.",
+    loadFailed: "The articles could not be loaded.",
+    conflict: "Someone else changed this article in the meantime. Reload it, or you will overwrite their changes.",
+    reloadArticle: "Reload",
+    methodTooShort: "The method note needs at least 40 characters in both languages.",
   },
 };
 
@@ -181,9 +221,18 @@ function BiField({ label, value, onChange, rows = 3, mono = false }) {
 
 function ArticleList({ lang, onEdit }) {
   const t = LABEL[lang === "en" ? "en" : "sk"];
-  const { articles, loading, reload } = useArticles({ admin: true });
+  const { articles, loading, error, reload } = useArticles({ admin: true });
   const [busy, setBusy] = useState(null);
   const [creating, setCreating] = useState(false);
+
+  async function remove(a) {
+    if (a.published) { alert(t.cannotDeletePublished); return; }
+    if (!window.confirm(t.confirmDeleteArticle)) return;
+    setBusy(a.id);
+    try { await deleteArticle(a.id); await reload(); }
+    catch (e) { alert(e.code === "PUBLISHED" ? t.cannotDeletePublished : e.message); }
+    finally { setBusy(null); }
+  }
 
   async function create() {
     const slug = window.prompt(t.newSlug, `trh-novostavieb-${new Date().toISOString().slice(0, 7)}`);
@@ -205,6 +254,14 @@ function ArticleList({ lang, onEdit }) {
   }
 
   if (loading) return <div style={{ color: "var(--text-dim)" }}>{t.loading}</div>;
+  if (error) {
+    return (
+      <div style={{
+        padding: "0.8rem 1rem", borderRadius: 8, color: "#ffb3b3",
+        background: "rgba(255,107,107,0.10)", border: "1px solid rgba(255,107,107,0.35)",
+      }}>⚠ {t.loadFailed} <span style={{ opacity: 0.7 }}>({error})</span></div>
+    );
+  }
 
   return (
     <div style={{ display: "grid", gap: "0.7rem" }}>
@@ -242,6 +299,10 @@ function ArticleList({ lang, onEdit }) {
             </button>
             <a className="rd-btn rd-btn--sm rd-btn--ghost" href={`${SITE_BASE}/analyzy/${a.slug}`}
                target="_blank" rel="noreferrer">{t.view}</a>
+            {!a.published && (
+              <button className="rd-btn rd-btn--sm rd-btn--ghost" disabled={busy === a.id}
+                      onClick={() => remove(a)}>{t.deleteArticle}</button>
+            )}
           </div>
         </div>
       ))}
@@ -262,15 +323,19 @@ function ArticleEditor({ slug, lang, onBack, onChanged }) {
   // in the history stack: undo after publishing would otherwise show KONCEPT
   // while the database said published.
   const [published, setPublished] = useState(false);
+  const [version, setVersion] = useState(null);   // updated_at we based this edit on
+  const [conflict, setConflict] = useState(false);
   const hist = useHistory();
   const draft = hist.value;
 
   useEffect(() => {
     if (!article) return;
     const { published: pub, ...content } = JSON.parse(JSON.stringify(article));
+    content.blocks = withKeys(content.blocks);
     hist.reset(content);
     setSaved(content);
     setPublished(pub);
+    setVersion(article.updatedAt || null);
   }, [article]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const setDraft = useCallback((updater) => {
@@ -290,6 +355,11 @@ function ArticleEditor({ slug, lang, onBack, onChanged }) {
     const out = [];
     if (!draft.title?.sk?.trim() || !draft.title?.en?.trim()) out.push(t.emptyTitle);
     if (!draft.perex?.sk?.trim() || !draft.perex?.en?.trim()) out.push(t.emptyPerex);
+    // The table refuses a method note under 40 characters in either language.
+    // Say so here rather than letting Save fail on a constraint.
+    if ((draft.method?.sk || "").trim().length <= 40 || (draft.method?.en || "").trim().length <= 40) {
+      out.push(t.methodTooShort);
+    }
     return out;
   }, [draft, t]);
 
@@ -326,16 +396,41 @@ function ArticleEditor({ slug, lang, onBack, onChanged }) {
     });
   }
 
+  function addBlock(type) {
+    setDraft((d) => ({ ...d, blocks: [...d.blocks, ...withKeys([emptyBlock(type)])] }));
+  }
+
+  function removeBlock(i) {
+    if (!window.confirm(t.confirmRemoveBlock)) return;
+    setDraft((d) => ({ ...d, blocks: d.blocks.filter((_, x) => x !== i) }));
+  }
+
+  function moveBlock(i, delta) {
+    const j = i + delta;
+    setDraft((d) => {
+      if (j < 0 || j >= d.blocks.length) return d;
+      const blocks = d.blocks.slice();
+      [blocks[i], blocks[j]] = [blocks[j], blocks[i]];
+      return { ...d, blocks };
+    });
+  }
+
   async function save() {
     if (problems.length) { setErr(problems[0]); return; }
-    setState("saving"); setErr(null);
+    setState("saving"); setErr(null); setConflict(false);
     try {
-      await saveArticle(draft.id, draft);
+      const next = await saveArticle(
+        draft.id, { ...draft, blocks: stripKeys(draft.blocks) }, { expectUpdatedAt: version });
       setSaved(JSON.parse(JSON.stringify(draft)));
+      setVersion(next);
       setState("saved");
       onChanged?.();
       setTimeout(() => setState("idle"), 2200);
-    } catch (e) { setErr(e.message); setState("idle"); }
+    } catch (e) {
+      if (e.code === "CONFLICT") { setConflict(true); setErr(t.conflict); }
+      else setErr(e.message);
+      setState("idle");
+    }
   }
 
   /** Publish / withdraw from inside the editor — not only from the list. */
@@ -353,7 +448,7 @@ function ArticleEditor({ slug, lang, onBack, onChanged }) {
 
   if (loading || !draft) return <div style={{ color: "var(--text-dim)" }}>{t.loading}</div>;
 
-  const blockLabel = (b) => ({ lead: t.lead, h2: t.h2, p: t.p, figure: t.figure, table: t.table }[b.type] || b.type);
+  const blockLabel = (b) => ({ lead: t.lead, h2: t.h2, p: t.p, figure: t.figure, table: t.table, bullets: t.bAddBullets }[b.type] || b.type);
 
   return (
     <div>
@@ -427,7 +522,15 @@ function ArticleEditor({ slug, lang, onBack, onChanged }) {
             marginTop: "0.6rem", padding: "0.5rem 0.7rem", borderRadius: 7,
             background: "rgba(255,107,107,0.10)", border: "1px solid rgba(255,107,107,0.35)",
             color: "#ffb3b3", fontSize: "0.78rem",
-          }}>{err}</div>
+            display: "flex", gap: "0.7rem", alignItems: "center",
+          }}>
+            <span style={{ flex: 1 }}>{err}</span>
+            {conflict && (
+              <button className="rd-btn rd-btn--sm" onClick={() => window.location.reload()}>
+                {t.reloadArticle}
+              </button>
+            )}
+          </div>
         )}
       </div>
 
@@ -473,12 +576,20 @@ function ArticleEditor({ slug, lang, onBack, onChanged }) {
       }}>{t.blocks}</div>
 
       {draft.blocks.map((b, i) => (
-        <div key={i} style={{ ...box, marginBottom: "0.9rem" }}>
-          <div style={{
-            fontFamily: MONO, fontSize: "0.62rem", letterSpacing: "0.09em",
-            textTransform: "uppercase", color: "var(--text-faint)", marginBottom: "0.6rem",
-          }}>
-            {i + 1}. {blockLabel(b)}
+        <div key={b._k || i} style={{ ...box, marginBottom: "0.9rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "0.6rem" }}>
+            <div style={{
+              fontFamily: MONO, fontSize: "0.62rem", letterSpacing: "0.09em",
+              textTransform: "uppercase", color: "var(--text-faint)", flex: 1,
+            }}>
+              {i + 1}. {blockLabel(b)}
+            </div>
+            <button className="rd-btn rd-btn--sm rd-btn--ghost" title={t.up}
+                    disabled={i === 0} onClick={() => moveBlock(i, -1)}>↑</button>
+            <button className="rd-btn rd-btn--sm rd-btn--ghost" title={t.down}
+                    disabled={i === draft.blocks.length - 1} onClick={() => moveBlock(i, 1)}>↓</button>
+            <button className="rd-btn rd-btn--sm rd-btn--ghost" title={t.removeBlock}
+                    onClick={() => removeBlock(i)}>✕</button>
           </div>
 
           {(b.type === "lead" || b.type === "p" || b.type === "h2") && (
@@ -486,17 +597,47 @@ function ArticleEditor({ slug, lang, onBack, onChanged }) {
                      onChange={(v) => setBlock(i, { text: v })} />
           )}
 
+          {b.type === "bullets" && (
+            <>
+              {(b.items || []).map((it, k) => (
+                <BiField key={k} label={`• ${k + 1}`} rows={2} value={it}
+                         onChange={(v) => setBlock(i, {
+                           items: (b.items || []).map((x, y) => (y === k ? v : x)),
+                         })} />
+              ))}
+              <button className="rd-btn rd-btn--sm rd-btn--ghost"
+                      onClick={() => setBlock(i, { items: [...(b.items || []), { sk: "", en: "" }] })}>
+                + {t.addBlock}
+              </button>
+            </>
+          )}
+
           {(b.type === "figure" || b.type === "table") && (
             <>
-              {b.src && (
+              {b.src ? (
                 <div style={{ marginBottom: "0.8rem" }}>
                   <img src={b.src} alt="" style={{
                     width: "100%", maxWidth: 420, borderRadius: 8, background: "#fff",
                     display: "block", border: "1px solid var(--border-soft)",
                   }} />
-                  <div style={{ fontFamily: MONO, fontSize: "0.62rem", color: "var(--text-faint)", marginTop: "0.35rem" }}>
-                    {b.src}
-                  </div>
+                </div>
+              ) : null}
+              {b.type === "figure" && (
+                <div style={{ display: "grid", gap: "0.55rem", gridTemplateColumns: "1fr 1fr", marginBottom: "1.1rem" }}>
+                  {[["src", t.imgPath], ["srcEn", t.imgPathEn]].map(([field, label]) => (
+                    <div key={field}>
+                      <div style={{ fontSize: "0.65rem", color: "var(--text-faint)", marginBottom: "0.25rem" }}>
+                        {label}
+                      </div>
+                      <input value={b[field] || ""} placeholder="/analyzy/…svg"
+                             onChange={(e) => setBlock(i, { [field]: e.target.value })}
+                             style={{
+                               width: "100%", background: "var(--bg)", color: "var(--text)",
+                               border: "1px solid var(--border-soft)", borderRadius: 7,
+                               padding: "0.55rem 0.7rem", fontSize: "0.82rem", fontFamily: MONO,
+                             }} />
+                    </div>
+                  ))}
                 </div>
               )}
               <BiField label={t.caption} rows={2} value={b.caption}
@@ -507,6 +648,17 @@ function ArticleEditor({ slug, lang, onBack, onChanged }) {
           )}
         </div>
       ))}
+
+      <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", alignItems: "center", marginTop: "0.4rem" }}>
+        <span style={{ fontFamily: MONO, fontSize: "0.66rem", color: "var(--text-dim)" }}>
+          {t.addBlock}:
+        </span>
+        {ADDABLE.map((type) => (
+          <button key={type} className="rd-btn rd-btn--sm rd-btn--ghost" onClick={() => addBlock(type)}>
+            + {{ h2: t.bAddH2, p: t.bAddP, figure: t.bAddFigure, table: t.bAddTable, bullets: t.bAddBullets }[type]}
+          </button>
+        ))}
+      </div>
 
       <div style={{ marginTop: "2rem", paddingTop: "1rem", borderTop: "1px solid var(--border-soft)" }}>
         <BiField label={t.method} rows={6} value={draft.method}

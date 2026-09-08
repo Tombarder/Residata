@@ -132,19 +132,24 @@ export async function createArticle({ slug, date }) {
  * Save an edited analysis. Only the fields an editor can touch are sent, so a
  * stale client can never blank a column it did not know about.
  */
-export async function saveArticle(id, patch) {
+export async function saveArticle(id, patch, { expectUpdatedAt } = {}) {
+  // Optimistic concurrency. Two admins editing the same analysis used to be a
+  // silent last-write-wins; the row already carried updated_at, it was simply
+  // never checked. If the timestamp moved under us the update matches no row and
+  // the caller is told, instead of the other person's work disappearing.
   const body = {};
   if (patch.title) body.title = patch.title;
   if (patch.perex) body.perex = patch.perex;
   if (patch.blocks) body.blocks = patch.blocks;
   if (patch.method) body.method = patch.method;
   if (patch.date) body.article_date = patch.date;
-  if (patch.slug) body.slug = patch.slug;
   if ("ogImage" in patch) body.og_image = patch.ogImage || null;
   const { data: session } = await supabase.auth.getUser();
   if (session?.user?.id) body.updated_by = session.user.id;
 
-  const { error } = await supabase.from("articles").update(body).eq("id", id);
+  let q = supabase.from("articles").update(body).eq("id", id);
+  if (expectUpdatedAt) q = q.eq("updated_at", expectUpdatedAt);
+  const { data: rows, error } = await q.select("updated_at");
   // The method-note CHECK constraint is deliberate: an analysis that does not
   // say where its numbers came from is not publishable. Surface it in words
   // rather than as a Postgres error code.
@@ -162,4 +167,29 @@ export async function saveArticle(id, patch) {
     }
     throw new Error(m);
   }
+  if (expectUpdatedAt && (!rows || rows.length === 0)) {
+    const err = new Error("CONFLICT");
+    err.code = "CONFLICT";
+    throw err;
+  }
+  return rows?.[0]?.updated_at || null;
+}
+
+/**
+ * Delete an analysis for good.
+ *
+ * Only a withdrawn one: deleting something the public is currently reading is
+ * not an editing mistake to undo, it is a page that vanishes mid-visit. Withdraw
+ * first — that step is one click and reversible.
+ */
+export async function deleteArticle(id) {
+  const { data: row } = await supabaseData
+    .from("articles").select("published").eq("id", id).maybeSingle();
+  if (row?.published) {
+    const err = new Error("PUBLISHED");
+    err.code = "PUBLISHED";
+    throw err;
+  }
+  const { error } = await supabase.from("articles").delete().eq("id", id);
+  if (error) throw new Error(error.message);
 }
