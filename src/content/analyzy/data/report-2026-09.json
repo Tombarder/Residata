@@ -1,20 +1,20 @@
 {
   "asOf": "2026-09-08",
-  "generatedAt": "2026-09-08T07:09:05+00:00",
+  "generatedAt": "2026-09-08T07:27:11+00:00",
   "coverage": {
-    "skActiveProjects": 247,
+    "skActiveProjects": 246,
     "czActiveProjects": 154
   },
   "bratislava": {
     "projects": 84,
     "available": 2857,
-    "medianM2": 5374
+    "medianM2": 5360
   },
   "restOfSk": {
     "projects": 119,
-    "available": 3045,
-    "medianM2": 3675,
-    "towns": 43
+    "available": 3031,
+    "medianM2": 3679,
+    "towns": 44
   },
   "sales90d": {
     "bratislava": 584,
@@ -23,13 +23,13 @@
   "topCities": [
     {
       "city": "Trnava",
-      "available": 401,
+      "available": 397,
       "medianM2": 3833
     },
     {
       "city": "Košice",
-      "available": 373,
-      "medianM2": 4536
+      "available": 372,
+      "medianM2": 4555
     },
     {
       "city": "Prešov",
@@ -38,8 +38,8 @@
     },
     {
       "city": "Nitra",
-      "available": 280,
-      "medianM2": 3421
+      "available": 276,
+      "medianM2": 3417
     },
     {
       "city": "Trenčín",
@@ -57,35 +57,35 @@
     "rows": [
       {
         "izby": 1.0,
-        "available": 568,
+        "available": 566,
         "sold": 120,
-        "stockPct": 8.4,
+        "stockPct": 8.3,
         "salesPct": 10.5
       },
       {
         "izby": 1.5,
-        "available": 133,
+        "available": 132,
         "sold": 54,
-        "stockPct": 2.0,
+        "stockPct": 1.9,
         "salesPct": 4.7
       },
       {
         "izby": 2.0,
-        "available": 2896,
+        "available": 2902,
         "sold": 581,
         "stockPct": 42.6,
         "salesPct": 50.9
       },
       {
         "izby": 2.5,
-        "available": 39,
+        "available": 38,
         "sold": 5,
         "stockPct": 0.6,
         "salesPct": 0.4
       },
       {
         "izby": 3.0,
-        "available": 2275,
+        "available": 2281,
         "sold": 273,
         "stockPct": 33.5,
         "salesPct": 23.9
@@ -99,20 +99,20 @@
       },
       {
         "izby": 4.0,
-        "available": 813,
+        "available": 811,
         "sold": 100,
-        "stockPct": 12.0,
+        "stockPct": 11.9,
         "salesPct": 8.8
       },
       {
         "izby": 5.0,
-        "available": 69,
+        "available": 68,
         "sold": 5,
         "stockPct": 1.0,
         "salesPct": 0.4
       }
     ],
-    "totalAvailable": 6801,
+    "totalAvailable": 6806,
     "totalSold": 1141
   },
   "mixCz": {
@@ -176,35 +176,35 @@
     "rows": [
       {
         "izby": 1.0,
-        "available": 568,
+        "available": 566,
         "sold": 117,
-        "stockPct": 8.4,
+        "stockPct": 8.3,
         "salesPct": 10.8
       },
       {
         "izby": 1.5,
-        "available": 133,
+        "available": 132,
         "sold": 47,
-        "stockPct": 2.0,
+        "stockPct": 1.9,
         "salesPct": 4.4
       },
       {
         "izby": 2.0,
-        "available": 2896,
+        "available": 2902,
         "sold": 547,
         "stockPct": 42.6,
         "salesPct": 50.7
       },
       {
         "izby": 2.5,
-        "available": 39,
+        "available": 38,
         "sold": 5,
         "stockPct": 0.6,
         "salesPct": 0.5
       },
       {
         "izby": 3.0,
-        "available": 2275,
+        "available": 2281,
         "sold": 264,
         "stockPct": 33.5,
         "salesPct": 24.5
@@ -218,27 +218,27 @@
       },
       {
         "izby": 4.0,
-        "available": 813,
+        "available": 811,
         "sold": 91,
-        "stockPct": 12.0,
+        "stockPct": 11.9,
         "salesPct": 8.4
       },
       {
         "izby": 5.0,
-        "available": 69,
+        "available": 68,
         "sold": 5,
         "stockPct": 1.0,
         "salesPct": 0.5
       }
     ],
-    "totalAvailable": 6801,
+    "totalAvailable": 6806,
     "totalSold": 1079
   },
   "window": {
     "sk": {
       "from": "2026-05-16",
-      "to": "2026-09-07",
-      "days": 114
+      "to": "2026-09-08",
+      "days": 115
     },
     "cz": {
       "from": "2026-06-09",
@@ -256,47 +256,185 @@
         "quartile": 1,
         "projects": 22,
         "avgM2": 3145,
-        "available": 934,
+        "available": 931,
         "sold": 102,
-        "pctSold": 9.8
+        "medianStock": 35,
+        "monthsToClear": 34.5
       },
       {
         "quartile": 2,
         "projects": 22,
-        "avgM2": 3873,
-        "available": 1426,
-        "sold": 154,
-        "pctSold": 9.7
+        "avgM2": 3900,
+        "available": 1559,
+        "sold": 174,
+        "medianStock": 59,
+        "monthsToClear": 33.9
       },
       {
         "quartile": 3,
         "projects": 22,
-        "avgM2": 4904,
-        "available": 1586,
-        "sold": 273,
-        "pctSold": 14.7
+        "avgM2": 4927,
+        "available": 1453,
+        "sold": 265,
+        "medianStock": 54,
+        "monthsToClear": 20.7
       },
       {
         "quartile": 4,
         "projects": 22,
-        "avgM2": 6983,
-        "available": 1039,
+        "avgM2": 6986,
+        "available": 1029,
         "sold": 300,
-        "pctSold": 22.4
+        "medianStock": 35,
+        "monthsToClear": 13.0
       }
     ]
   },
+  "monthsToClear": {
+    "sk": [
+      {
+        "izby": 1.0,
+        "available": 566,
+        "sold": 120,
+        "months": 17.8
+      },
+      {
+        "izby": 1.5,
+        "available": 132,
+        "sold": 54,
+        "months": 9.2
+      },
+      {
+        "izby": 2.0,
+        "available": 2902,
+        "sold": 581,
+        "months": 18.9
+      },
+      {
+        "izby": 3.0,
+        "available": 2281,
+        "sold": 273,
+        "months": 31.6
+      },
+      {
+        "izby": 4.0,
+        "available": 811,
+        "sold": 100,
+        "months": 30.6
+      }
+    ],
+    "cz": [
+      {
+        "izby": 1.0,
+        "available": 975,
+        "sold": 324,
+        "months": 9.0
+      },
+      {
+        "izby": 2.0,
+        "available": 2285,
+        "sold": 461,
+        "months": 14.8
+      },
+      {
+        "izby": 3.0,
+        "available": 1305,
+        "sold": 252,
+        "months": 15.5
+      },
+      {
+        "izby": 4.0,
+        "available": 457,
+        "sold": 88,
+        "months": 15.5
+      }
+    ],
+    "byCity": [
+      {
+        "city": "Prešov",
+        "available": 298,
+        "sold": 95,
+        "months": 11.9
+      },
+      {
+        "city": "Žilina",
+        "available": 155,
+        "sold": 40,
+        "months": 14.6
+      },
+      {
+        "city": "Trenčín",
+        "available": 240,
+        "sold": 55,
+        "months": 16.5
+      },
+      {
+        "city": "Bratislava",
+        "available": 3400,
+        "sold": 659,
+        "months": 19.5
+      },
+      {
+        "city": "Martin",
+        "available": 102,
+        "sold": 19,
+        "months": 20.3
+      },
+      {
+        "city": "Nitra",
+        "available": 438,
+        "sold": 64,
+        "months": 25.9
+      },
+      {
+        "city": "Košice",
+        "available": 426,
+        "sold": 58,
+        "months": 27.7
+      },
+      {
+        "city": "Trnava",
+        "available": 455,
+        "sold": 54,
+        "months": 31.8
+      },
+      {
+        "city": "Poprad",
+        "available": 265,
+        "sold": 17,
+        "months": 58.9
+      }
+    ],
+    "byScope": {
+      "bratislava": {
+        "available": 3400,
+        "sold": 659,
+        "months": 19.5
+      },
+      "rest": {
+        "available": 3861,
+        "sold": 513,
+        "months": 28.4
+      }
+    }
+  },
+  "priceBehaviour": {
+    "tracked": 30901,
+    "changed": 2591,
+    "pctChanged": 8.4,
+    "pctOfChangesUp": 86.6
+  },
   "priceMoves90d": {
-    "moves": 2140,
-    "projects": 70,
-    "up": 1726,
-    "down": 414,
-    "pctUp": 80.7,
+    "moves": 2165,
+    "projects": 72,
+    "up": 1757,
+    "down": 408,
+    "pctUp": 81.2,
     "medianPct": 2.5
   },
   "caveats": {
     "leftCensoredPct": 93.1,
-    "parkingCoveragePct": 28.3
+    "parkingCoveragePct": 28.5
   },
   "benchmark": {
     "source": "Bencont Investments",

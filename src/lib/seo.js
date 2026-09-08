@@ -210,15 +210,15 @@ const SEO_BY_PAGE = {
     ogImage: "/analyzy/og-2026-09.png",
     ogType: "article",
     en: {
-      title: "Two-room flats account for half of all new-build sales · Residata",
+      title: "Three-room flats take a year longer to sell · Residata",
       description:
-        "Two-room flats are 42.6 % of Slovak new-build supply but 50.9 % of sales; three-room flats are 33.5 % of supply and 23.9 % of sales. Analysis of 248 active projects.",
+        "At the current pace, Slovakia's two-room supply clears in 19 months and its three-room supply in 32. In Czechia the same gap is one month. Analysis of 246 active projects.",
       keywords: "novostavby Slovensko, skladba bytov, predaj novostavieb, ceny bytov",
     },
     sk: {
-      title: "Dvojizbové byty tvoria polovicu predajov novostavieb · Residata",
+      title: "Trojizbový byt sa predáva o rok dlhšie než dvojizbový · Residata",
       description:
-        "Dvojizbové byty tvoria 42,6 % ponuky novostavieb na Slovensku, ale 50,9 % predajov. Pri trojizbových je pomer opačný. Analýza 248 aktívnych projektov, september 2026.",
+        "Pri súčasnom tempe sa ponuka dvojizbových bytov na Slovensku vypredá za 19 mesiacov, trojizbových za 32. V Česku je ten istý rozdiel jeden mesiac. Analýza 246 projektov.",
       keywords: "novostavby Slovensko, dvojizbové byty, trojizbové byty, predaj novostavieb, ceny bytov, analýza trhu",
     },
   },
