@@ -1,18 +1,18 @@
 {
   "asOf": "2026-09-08",
-  "generatedAt": "2026-09-08T06:41:32+00:00",
+  "generatedAt": "2026-09-08T07:09:05+00:00",
   "coverage": {
-    "skActiveProjects": 248,
+    "skActiveProjects": 247,
     "czActiveProjects": 154
   },
   "bratislava": {
     "projects": 84,
-    "available": 2854,
-    "medianM2": 5370
+    "available": 2857,
+    "medianM2": 5374
   },
   "restOfSk": {
     "projects": 119,
-    "available": 3047,
+    "available": 3045,
     "medianM2": 3675,
     "towns": 43
   },
@@ -28,8 +28,8 @@
     },
     {
       "city": "Košice",
-      "available": 374,
-      "medianM2": 4543
+      "available": 373,
+      "medianM2": 4536
     },
     {
       "city": "Prešov",
@@ -57,9 +57,9 @@
     "rows": [
       {
         "izby": 1.0,
-        "available": 567,
+        "available": 568,
         "sold": 120,
-        "stockPct": 8.3,
+        "stockPct": 8.4,
         "salesPct": 10.5
       },
       {
@@ -71,7 +71,7 @@
       },
       {
         "izby": 2.0,
-        "available": 2894,
+        "available": 2896,
         "sold": 581,
         "stockPct": 42.6,
         "salesPct": 50.9
@@ -85,7 +85,7 @@
       },
       {
         "izby": 3.0,
-        "available": 2276,
+        "available": 2275,
         "sold": 273,
         "stockPct": 33.5,
         "salesPct": 23.9
@@ -112,7 +112,7 @@
         "salesPct": 0.4
       }
     ],
-    "totalAvailable": 6799,
+    "totalAvailable": 6801,
     "totalSold": 1141
   },
   "mixCz": {
@@ -120,9 +120,9 @@
     "rows": [
       {
         "izby": 1.0,
-        "available": 956,
+        "available": 975,
         "sold": 324,
-        "stockPct": 18.9,
+        "stockPct": 19.0,
         "salesPct": 27.9
       },
       {
@@ -134,9 +134,9 @@
       },
       {
         "izby": 2.0,
-        "available": 2253,
+        "available": 2285,
         "sold": 461,
-        "stockPct": 44.5,
+        "stockPct": 44.6,
         "salesPct": 39.7
       },
       {
@@ -148,27 +148,27 @@
       },
       {
         "izby": 3.0,
-        "available": 1301,
+        "available": 1305,
         "sold": 252,
-        "stockPct": 25.7,
+        "stockPct": 25.5,
         "salesPct": 21.7
       },
       {
         "izby": 4.0,
-        "available": 450,
+        "available": 457,
         "sold": 88,
         "stockPct": 8.9,
         "salesPct": 7.6
       },
       {
         "izby": 5.0,
-        "available": 36,
+        "available": 34,
         "sold": 17,
         "stockPct": 0.7,
         "salesPct": 1.5
       }
     ],
-    "totalAvailable": 5066,
+    "totalAvailable": 5126,
     "totalSold": 1160
   },
   "mixSkCommon": {
@@ -176,9 +176,9 @@
     "rows": [
       {
         "izby": 1.0,
-        "available": 567,
+        "available": 568,
         "sold": 117,
-        "stockPct": 8.3,
+        "stockPct": 8.4,
         "salesPct": 10.8
       },
       {
@@ -190,7 +190,7 @@
       },
       {
         "izby": 2.0,
-        "available": 2894,
+        "available": 2896,
         "sold": 547,
         "stockPct": 42.6,
         "salesPct": 50.7
@@ -204,7 +204,7 @@
       },
       {
         "izby": 3.0,
-        "available": 2276,
+        "available": 2275,
         "sold": 264,
         "stockPct": 33.5,
         "salesPct": 24.5
@@ -231,19 +231,19 @@
         "salesPct": 0.5
       }
     ],
-    "totalAvailable": 6799,
+    "totalAvailable": 6801,
     "totalSold": 1079
   },
   "window": {
     "sk": {
       "from": "2026-05-16",
-      "to": "2026-09-06",
-      "days": 113
+      "to": "2026-09-07",
+      "days": 114
     },
     "cz": {
       "from": "2026-06-09",
-      "to": "2026-09-06",
-      "days": 89
+      "to": "2026-09-08",
+      "days": 91
     },
     "common": {
       "from": "2026-06-09"
@@ -263,40 +263,40 @@
       {
         "quartile": 2,
         "projects": 22,
-        "avgM2": 3874,
-        "available": 1427,
+        "avgM2": 3873,
+        "available": 1426,
         "sold": 154,
         "pctSold": 9.7
       },
       {
         "quartile": 3,
         "projects": 22,
-        "avgM2": 4899,
-        "available": 1583,
+        "avgM2": 4904,
+        "available": 1586,
         "sold": 273,
         "pctSold": 14.7
       },
       {
         "quartile": 4,
         "projects": 22,
-        "avgM2": 6981,
-        "available": 1038,
+        "avgM2": 6983,
+        "available": 1039,
         "sold": 300,
         "pctSold": 22.4
       }
     ]
   },
   "priceMoves90d": {
-    "moves": 2190,
+    "moves": 2140,
     "projects": 70,
-    "up": 1751,
-    "down": 439,
-    "pctUp": 80.0,
-    "medianPct": 2.6
+    "up": 1726,
+    "down": 414,
+    "pctUp": 80.7,
+    "medianPct": 2.5
   },
   "caveats": {
     "leftCensoredPct": 93.1,
-    "parkingCoveragePct": 28.6
+    "parkingCoveragePct": 28.3
   },
   "benchmark": {
     "source": "Bencont Investments",

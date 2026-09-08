@@ -6,7 +6,7 @@
   <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
-    <dc:date>2026-09-08T08:41:35.672016</dc:date>
+    <dc:date>2026-09-08T09:09:10.124872</dc:date>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
@@ -39,11 +39,11 @@ z
    </g>
    <g id="patch_3">
     <path d="M 112.32 241.194869 
-L 208.321548 241.194869 
-L 208.321548 275.005193 
+L 209.478194 241.194869 
+L 209.478194 275.005193 
 L 112.32 275.005193 
 z
-" clip-path="url(#p1b00ea4ed6)" style="fill: #c2c8d0"/>
+" clip-path="url(#paf92695481)" style="fill: #c2c8d0"/>
    </g>
    <g id="patch_4">
     <path d="M 112.32 207.384545 
@@ -51,7 +51,7 @@ L 233.767742 207.384545
 L 233.767742 241.194869 
 L 112.32 241.194869 
 z
-" clip-path="url(#p1b00ea4ed6)" style="fill: #1f6f6b"/>
+" clip-path="url(#paf92695481)" style="fill: #1f6f6b"/>
    </g>
    <g id="patch_5">
     <path d="M 112.32 335.112435 
@@ -59,7 +59,7 @@ L 135.452903 335.112435
 L 135.452903 368.922758 
 L 112.32 368.922758 
 z
-" clip-path="url(#p1b00ea4ed6)" style="fill: #c2c8d0"/>
+" clip-path="url(#paf92695481)" style="fill: #c2c8d0"/>
    </g>
    <g id="patch_6">
     <path d="M 112.32 301.302111 
@@ -67,7 +67,7 @@ L 166.682323 301.302111
 L 166.682323 335.112435 
 L 112.32 335.112435 
 z
-" clip-path="url(#p1b00ea4ed6)" style="fill: #1f6f6b"/>
+" clip-path="url(#paf92695481)" style="fill: #1f6f6b"/>
    </g>
    <g id="patch_7">
     <path d="M 112.32 429.03 
@@ -75,7 +75,7 @@ L 605.050839 429.03
 L 605.050839 462.840324 
 L 112.32 462.840324 
 z
-" clip-path="url(#p1b00ea4ed6)" style="fill: #c2c8d0"/>
+" clip-path="url(#paf92695481)" style="fill: #c2c8d0"/>
    </g>
    <g id="patch_8">
     <path d="M 112.32 395.219676 
@@ -83,7 +83,7 @@ L 701.052387 395.219676
 L 701.052387 429.03 
 L 112.32 429.03 
 z
-" clip-path="url(#p1b00ea4ed6)" style="fill: #1f6f6b"/>
+" clip-path="url(#paf92695481)" style="fill: #1f6f6b"/>
    </g>
    <g id="patch_9">
     <path d="M 112.32 522.947565 
@@ -91,7 +91,7 @@ L 499.796129 522.947565
 L 499.796129 556.757889 
 L 112.32 556.757889 
 z
-" clip-path="url(#p1b00ea4ed6)" style="fill: #c2c8d0"/>
+" clip-path="url(#paf92695481)" style="fill: #c2c8d0"/>
    </g>
    <g id="patch_10">
     <path d="M 112.32 489.137242 
@@ -99,7 +99,7 @@ L 388.758194 489.137242
 L 388.758194 522.947565 
 L 112.32 522.947565 
 z
-" clip-path="url(#p1b00ea4ed6)" style="fill: #1f6f6b"/>
+" clip-path="url(#paf92695481)" style="fill: #1f6f6b"/>
    </g>
    <g id="patch_11">
     <path d="M 112.32 616.865131 
@@ -107,7 +107,7 @@ L 251.117419 616.865131
 L 251.117419 650.675455 
 L 112.32 650.675455 
 z
-" clip-path="url(#p1b00ea4ed6)" style="fill: #c2c8d0"/>
+" clip-path="url(#paf92695481)" style="fill: #c2c8d0"/>
    </g>
    <g id="patch_12">
     <path d="M 112.32 583.054807 
@@ -115,7 +115,7 @@ L 214.104774 583.054807
 L 214.104774 616.865131 
 L 112.32 616.865131 
 z
-" clip-path="url(#p1b00ea4ed6)" style="fill: #1f6f6b"/>
+" clip-path="url(#paf92695481)" style="fill: #1f6f6b"/>
    </g>
    <g id="matplotlib.axis_1"/>
    <g id="matplotlib.axis_2">
@@ -385,8 +385,8 @@ L 829.44 672.84
 " style="fill: none; stroke: #e4e7ec; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
    </g>
    <g id="text_6">
-    <!-- 8,3 % -->
-    <g style="fill: #7a828e" transform="translate(218.731355 261.606867) scale(0.135 -0.135)">
+    <!-- 8,4 % -->
+    <g style="fill: #7a828e" transform="translate(219.888 261.606867) scale(0.135 -0.135)">
      <defs>
       <path id="DejaVuSans-1b" d="M 2034 2216 
 Q 1584 2216 1326 1975 
@@ -478,7 +478,7 @@ z
      </defs>
      <use xlink:href="#DejaVuSans-1b"/>
      <use xlink:href="#DejaVuSans-f" transform="translate(63.625 0)"/>
-     <use xlink:href="#DejaVuSans-16" transform="translate(95.40625 0)"/>
+     <use xlink:href="#DejaVuSans-17" transform="translate(95.40625 0)"/>
      <use xlink:href="#DejaVuSans-3" transform="translate(159.03125 0)"/>
      <use xlink:href="#DejaVuSans-8" transform="translate(190.8125 0)"/>
     </g>
@@ -1973,7 +1973,7 @@ z
     <use xlink:href="#DejaVuSans-46" transform="translate(2538.03125 0)"/>
     <use xlink:href="#DejaVuSans-4b" transform="translate(2593.015625 0)"/>
    </g>
-   <!-- od 16. mája 2026 · n = 6 799 voľných bytov, 1 141 predaných -->
+   <!-- od 16. mája 2026 · n = 6 801 voľných bytov, 1 141 predaných -->
    <g style="fill: #7a828e" transform="translate(51.84 117.393115) scale(0.145 -0.145)">
     <defs>
      <path id="DejaVuSans-50" d="M 3328 2828 
@@ -2059,16 +2059,6 @@ L 678 1631
 z
 " transform="scale(0.015625)"/>
      <path id="DejaVuSans-62" transform="scale(0.015625)"/>
-     <path id="DejaVuSans-1a" d="M 525 4666 
-L 3525 4666 
-L 3525 4397 
-L 1831 0 
-L 1172 0 
-L 2766 4134 
-L 525 4134 
-L 525 4666 
-z
-" transform="scale(0.015625)"/>
      <path id="DejaVuSans-100" d="M 1778 4862 
 L 2400 4862 
 L 2034 3687 
@@ -2152,9 +2142,9 @@ z
     <use xlink:href="#DejaVuSans-3" transform="translate(1155.59375 0)"/>
     <use xlink:href="#DejaVuSans-19" transform="translate(1187.375 0)"/>
     <use xlink:href="#DejaVuSans-62" transform="translate(1251 0)"/>
-    <use xlink:href="#DejaVuSans-1a" transform="translate(1282.78125 0)"/>
-    <use xlink:href="#DejaVuSans-1c" transform="translate(1346.40625 0)"/>
-    <use xlink:href="#DejaVuSans-1c" transform="translate(1410.03125 0)"/>
+    <use xlink:href="#DejaVuSans-1b" transform="translate(1282.78125 0)"/>
+    <use xlink:href="#DejaVuSans-13" transform="translate(1346.40625 0)"/>
+    <use xlink:href="#DejaVuSans-14" transform="translate(1410.03125 0)"/>
     <use xlink:href="#DejaVuSans-3" transform="translate(1473.65625 0)"/>
     <use xlink:href="#DejaVuSans-59" transform="translate(1505.4375 0)"/>
     <use xlink:href="#DejaVuSans-52" transform="translate(1564.625 0)"/>
@@ -2189,7 +2179,7 @@ z
    </g>
   </g>
   <g id="text_21">
-   <!-- Zdroj: Residata — denné čítanie cenníkov 248 slovenských projektov. Dáta k 8. 9. 2026. -->
+   <!-- Zdroj: Residata — denné čítanie cenníkov 247 slovenských projektov. Dáta k 8. 9. 2026. -->
    <g style="fill: #7a828e" transform="translate(51.84 729.54) scale(0.105 -0.105)">
     <defs>
      <path id="DejaVuSans-3d" d="M 359 4666 
@@ -2286,6 +2276,16 @@ M 891 3584
 L 891 3584 
 z
 " transform="scale(0.015625)"/>
+     <path id="DejaVuSans-1a" d="M 525 4666 
+L 3525 4666 
+L 3525 4397 
+L 1831 0 
+L 1172 0 
+L 2766 4134 
+L 525 4134 
+L 525 4666 
+z
+" transform="scale(0.015625)"/>
      <path id="DejaVuSans-27" d="M 1259 4147 
 L 1259 519 
 L 2022 519 
@@ -2349,7 +2349,7 @@ z
     <use xlink:href="#DejaVuSans-3" transform="translate(2079.109375 0)"/>
     <use xlink:href="#DejaVuSans-15" transform="translate(2110.890625 0)"/>
     <use xlink:href="#DejaVuSans-17" transform="translate(2174.515625 0)"/>
-    <use xlink:href="#DejaVuSans-1b" transform="translate(2238.140625 0)"/>
+    <use xlink:href="#DejaVuSans-1a" transform="translate(2238.140625 0)"/>
     <use xlink:href="#DejaVuSans-3" transform="translate(2301.765625 0)"/>
     <use xlink:href="#DejaVuSans-56" transform="translate(2333.546875 0)"/>
     <use xlink:href="#DejaVuSans-4f" transform="translate(2385.640625 0)"/>
@@ -2396,7 +2396,7 @@ z
   </g>
  </g>
  <defs>
-  <clipPath id="p1b00ea4ed6">
+  <clipPath id="paf92695481">
    <rect x="112.32" y="185.22" width="717.12" height="487.62"/>
   </clipPath>
  </defs>

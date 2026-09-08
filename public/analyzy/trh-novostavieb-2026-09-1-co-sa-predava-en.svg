@@ -6,7 +6,7 @@
   <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
-    <dc:date>2026-09-08T08:41:36.154236</dc:date>
+    <dc:date>2026-09-08T09:09:10.652135</dc:date>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
@@ -39,11 +39,11 @@ z
    </g>
    <g id="patch_3">
     <path d="M 112.32 241.194869 
-L 208.321548 241.194869 
-L 208.321548 275.005193 
+L 209.478194 241.194869 
+L 209.478194 275.005193 
 L 112.32 275.005193 
 z
-" clip-path="url(#pbc71f4ec1d)" style="fill: #c2c8d0"/>
+" clip-path="url(#p51c64bde7d)" style="fill: #c2c8d0"/>
    </g>
    <g id="patch_4">
     <path d="M 112.32 207.384545 
@@ -51,7 +51,7 @@ L 233.767742 207.384545
 L 233.767742 241.194869 
 L 112.32 241.194869 
 z
-" clip-path="url(#pbc71f4ec1d)" style="fill: #1f6f6b"/>
+" clip-path="url(#p51c64bde7d)" style="fill: #1f6f6b"/>
    </g>
    <g id="patch_5">
     <path d="M 112.32 335.112435 
@@ -59,7 +59,7 @@ L 135.452903 335.112435
 L 135.452903 368.922758 
 L 112.32 368.922758 
 z
-" clip-path="url(#pbc71f4ec1d)" style="fill: #c2c8d0"/>
+" clip-path="url(#p51c64bde7d)" style="fill: #c2c8d0"/>
    </g>
    <g id="patch_6">
     <path d="M 112.32 301.302111 
@@ -67,7 +67,7 @@ L 166.682323 301.302111
 L 166.682323 335.112435 
 L 112.32 335.112435 
 z
-" clip-path="url(#pbc71f4ec1d)" style="fill: #1f6f6b"/>
+" clip-path="url(#p51c64bde7d)" style="fill: #1f6f6b"/>
    </g>
    <g id="patch_7">
     <path d="M 112.32 429.03 
@@ -75,7 +75,7 @@ L 605.050839 429.03
 L 605.050839 462.840324 
 L 112.32 462.840324 
 z
-" clip-path="url(#pbc71f4ec1d)" style="fill: #c2c8d0"/>
+" clip-path="url(#p51c64bde7d)" style="fill: #c2c8d0"/>
    </g>
    <g id="patch_8">
     <path d="M 112.32 395.219676 
@@ -83,7 +83,7 @@ L 701.052387 395.219676
 L 701.052387 429.03 
 L 112.32 429.03 
 z
-" clip-path="url(#pbc71f4ec1d)" style="fill: #1f6f6b"/>
+" clip-path="url(#p51c64bde7d)" style="fill: #1f6f6b"/>
    </g>
    <g id="patch_9">
     <path d="M 112.32 522.947565 
@@ -91,7 +91,7 @@ L 499.796129 522.947565
 L 499.796129 556.757889 
 L 112.32 556.757889 
 z
-" clip-path="url(#pbc71f4ec1d)" style="fill: #c2c8d0"/>
+" clip-path="url(#p51c64bde7d)" style="fill: #c2c8d0"/>
    </g>
    <g id="patch_10">
     <path d="M 112.32 489.137242 
@@ -99,7 +99,7 @@ L 388.758194 489.137242
 L 388.758194 522.947565 
 L 112.32 522.947565 
 z
-" clip-path="url(#pbc71f4ec1d)" style="fill: #1f6f6b"/>
+" clip-path="url(#p51c64bde7d)" style="fill: #1f6f6b"/>
    </g>
    <g id="patch_11">
     <path d="M 112.32 616.865131 
@@ -107,7 +107,7 @@ L 251.117419 616.865131
 L 251.117419 650.675455 
 L 112.32 650.675455 
 z
-" clip-path="url(#pbc71f4ec1d)" style="fill: #c2c8d0"/>
+" clip-path="url(#p51c64bde7d)" style="fill: #c2c8d0"/>
    </g>
    <g id="patch_12">
     <path d="M 112.32 583.054807 
@@ -115,7 +115,7 @@ L 214.104774 583.054807
 L 214.104774 616.865131 
 L 112.32 616.865131 
 z
-" clip-path="url(#pbc71f4ec1d)" style="fill: #1f6f6b"/>
+" clip-path="url(#p51c64bde7d)" style="fill: #1f6f6b"/>
    </g>
    <g id="matplotlib.axis_1"/>
    <g id="matplotlib.axis_2">
@@ -404,8 +404,8 @@ L 829.44 672.84
 " style="fill: none; stroke: #e4e7ec; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
    </g>
    <g id="text_6">
-    <!-- 8,3 % -->
-    <g style="fill: #7a828e" transform="translate(218.731355 261.606867) scale(0.135 -0.135)">
+    <!-- 8,4 % -->
+    <g style="fill: #7a828e" transform="translate(219.888 261.606867) scale(0.135 -0.135)">
      <defs>
       <path id="DejaVuSans-1b" d="M 2034 2216 
 Q 1584 2216 1326 1975 
@@ -506,7 +506,7 @@ z
      </defs>
      <use xlink:href="#DejaVuSans-1b"/>
      <use xlink:href="#DejaVuSans-f" transform="translate(63.625 0)"/>
-     <use xlink:href="#DejaVuSans-16" transform="translate(95.40625 0)"/>
+     <use xlink:href="#DejaVuSans-17" transform="translate(95.40625 0)"/>
      <use xlink:href="#DejaVuSans-3" transform="translate(159.03125 0)"/>
      <use xlink:href="#DejaVuSans-8" transform="translate(190.8125 0)"/>
     </g>
@@ -1804,7 +1804,7 @@ z
     <use xlink:href="#DejaVuSans-48" transform="translate(2066.703125 0)"/>
     <use xlink:href="#DejaVuSans-56" transform="translate(2128.234375 0)"/>
    </g>
-   <!-- since 16 May 2026 · n = 6 799 available, 1 141 sold -->
+   <!-- since 16 May 2026 · n = 6 801 available, 1 141 sold -->
    <g style="fill: #7a828e" transform="translate(51.84 116.813115) scale(0.145 -0.145)">
     <defs>
      <path id="DejaVuSans-51" d="M 3513 2113 
@@ -1877,16 +1877,6 @@ L 678 1631
 z
 " transform="scale(0.015625)"/>
      <path id="DejaVuSans-62" transform="scale(0.015625)"/>
-     <path id="DejaVuSans-1a" d="M 525 4666 
-L 3525 4666 
-L 3525 4397 
-L 1831 0 
-L 1172 0 
-L 2766 4134 
-L 525 4134 
-L 525 4666 
-z
-" transform="scale(0.015625)"/>
      <path id="DejaVuSans-45" d="M 3116 1747 
 Q 3116 2381 2855 2742 
 Q 2594 3103 2138 3103 
@@ -1966,9 +1956,9 @@ z
     <use xlink:href="#DejaVuSans-3" transform="translate(1217.90625 0)"/>
     <use xlink:href="#DejaVuSans-19" transform="translate(1249.6875 0)"/>
     <use xlink:href="#DejaVuSans-62" transform="translate(1313.3125 0)"/>
-    <use xlink:href="#DejaVuSans-1a" transform="translate(1345.09375 0)"/>
-    <use xlink:href="#DejaVuSans-1c" transform="translate(1408.71875 0)"/>
-    <use xlink:href="#DejaVuSans-1c" transform="translate(1472.34375 0)"/>
+    <use xlink:href="#DejaVuSans-1b" transform="translate(1345.09375 0)"/>
+    <use xlink:href="#DejaVuSans-13" transform="translate(1408.71875 0)"/>
+    <use xlink:href="#DejaVuSans-14" transform="translate(1472.34375 0)"/>
     <use xlink:href="#DejaVuSans-3" transform="translate(1535.96875 0)"/>
     <use xlink:href="#DejaVuSans-44" transform="translate(1567.75 0)"/>
     <use xlink:href="#DejaVuSans-59" transform="translate(1629.03125 0)"/>
@@ -1994,7 +1984,7 @@ z
    </g>
   </g>
   <g id="text_21">
-   <!-- Source: Residata — daily reading of 248 Slovak project price lists. Data as of 8 September 2026. -->
+   <!-- Source: Residata — daily reading of 247 Slovak project price lists. Data as of 8 September 2026. -->
    <g style="fill: #7a828e" transform="translate(51.84 729.54) scale(0.105 -0.105)">
     <defs>
      <path id="DejaVuSans-35" d="M 2841 2188 
@@ -2087,6 +2077,16 @@ L 3481 3500
 L 3481 434 
 z
 " transform="scale(0.015625)"/>
+     <path id="DejaVuSans-1a" d="M 525 4666 
+L 3525 4666 
+L 3525 4397 
+L 1831 0 
+L 1172 0 
+L 2766 4134 
+L 525 4134 
+L 525 4666 
+z
+" transform="scale(0.015625)"/>
      <path id="DejaVuSans-4d" d="M 603 3500 
 L 1178 3500 
 L 1178 -63 
@@ -2164,7 +2164,7 @@ z
     <use xlink:href="#DejaVuSans-3" transform="translate(1783.46875 0)"/>
     <use xlink:href="#DejaVuSans-15" transform="translate(1815.25 0)"/>
     <use xlink:href="#DejaVuSans-17" transform="translate(1878.875 0)"/>
-    <use xlink:href="#DejaVuSans-1b" transform="translate(1942.5 0)"/>
+    <use xlink:href="#DejaVuSans-1a" transform="translate(1942.5 0)"/>
     <use xlink:href="#DejaVuSans-3" transform="translate(2006.125 0)"/>
     <use xlink:href="#DejaVuSans-36" transform="translate(2037.90625 0)"/>
     <use xlink:href="#DejaVuSans-4f" transform="translate(2101.390625 0)"/>
@@ -2226,7 +2226,7 @@ z
   </g>
  </g>
  <defs>
-  <clipPath id="pbc71f4ec1d">
+  <clipPath id="p51c64bde7d">
    <rect x="112.32" y="185.22" width="717.12" height="487.62"/>
   </clipPath>
  </defs>
