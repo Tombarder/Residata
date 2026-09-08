@@ -17,13 +17,13 @@
  *
  * BLOCKS
  *   Content is a list of typed blocks, not Markdown, so the house style cannot
- *   drift between issues and `method` cannot be forgotten. See content/analyzy/format.js.
+ *   drift between issues and `method` cannot be forgotten. See lib/articleFormat.js.
  */
 
 import { useEffect, useState } from "react";
 import { useArticles, useArticle } from "../lib/useArticles";
-import { t, dateLong, monthLong } from "../content/analyzy/format";
-import { SITE_BASE, applyArticleSeo } from "../lib/seo";
+import { t, dateLong, monthLong } from "../lib/articleFormat";
+import { SITE_BASE, applySeo, applyArticleSeo } from "../lib/seo";
 import { COMPANY } from "../lib/company";
 
 const MEASURE = 760;
@@ -137,6 +137,10 @@ function Table({ head, rows, caption, lang }) {
 }
 
 function Block({ block, lang }) {
+  // Clearing a paragraph in the editor left an empty <p> holding its margin, so
+  // the page grew a gap where the text had been. Nothing to say, nothing to lay out.
+  if (["lead", "h2", "p"].includes(block.type) && !t(block.text, lang).trim()) return null;
+
   switch (block.type) {
     case "lead":
       return (
@@ -265,6 +269,11 @@ export function InsightsIndex({ navigate, lang }) {
   const sk = lang !== "en";
   const { articles, loading } = useArticles();
   useScrollToTop("index");
+  // Reached either directly or as the fallback for a withdrawn article, and in
+  // that second case the head still carries the dead article's canonical and its
+  // noindex. Re-assert the section's own metadata so the page never advertises
+  // a url that no longer exists.
+  useEffect(() => { applySeo("Insights", lang); }, [lang]);
   return (
     <Shell>
       <div style={EYEBROW}>Residata · {sk ? "Analýzy" : "Insights"}</div>
@@ -375,7 +384,7 @@ export function InsightsArticle({ slug, navigate, lang }) {
       <div style={{ fontSize: "0.97rem", lineHeight: 1.78, color: "#c5c5cc" }}>
         {article.blocks.map((b, i) => <Block key={i} block={b} lang={lang} />)}
 
-        {/* Methodology is a required field on every article — see content/analyzy/format.js.
+        {/* Methodology is a required field on every article — the table refuses one without it.
             It is what makes the piece quotable instead of promotional, so it is
             rendered as part of the article, not as a footnote to be skipped. */}
         <div style={{

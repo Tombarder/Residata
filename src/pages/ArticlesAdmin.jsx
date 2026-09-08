@@ -24,7 +24,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useArticles, useArticle, setArticlePublished, saveArticle } from "../lib/useArticles";
+import { useArticles, useArticle, setArticlePublished, saveArticle, createArticle } from "../lib/useArticles";
 import { SITE_BASE } from "../lib/seo";
 
 /**
@@ -101,6 +101,9 @@ const LABEL = {
     emptyPerex: "Perex nesmie byť prázdny — zobrazuje sa v zozname a vo vyhľadávaní.",
     liveNow: "Článok je na webe", draftNow: "Článok nie je na webe",
     confirmUnpublish: "Stiahnuť článok z webu? Prestane byť verejne dostupný.",
+    date: "Dátum článku", ogImage: "Zdieľaný obrázok (cesta k súboru)",
+    alt: "Alternatívny text obrázka (pre čítačky a vyhľadávače)",
+    newArticle: "Nový článok", newSlug: "URL nového článku (napr. trh-novostavieb-2026-10)",
   },
   en: {
     heading: "Analyses", sub: "Manage the articles at /analyzy",
@@ -118,6 +121,9 @@ const LABEL = {
     emptyPerex: "The standfirst cannot be empty — it is shown in the list and in search results.",
     liveNow: "Live on the site", draftNow: "Not on the site",
     confirmUnpublish: "Withdraw from the site? It will stop being publicly available.",
+    date: "Article date", ogImage: "Share image (file path)",
+    alt: "Image alt text (for screen readers and search)",
+    newArticle: "New article", newSlug: "URL for the new article (e.g. trh-novostavieb-2026-10)",
   },
 };
 
@@ -177,6 +183,19 @@ function ArticleList({ lang, onEdit }) {
   const t = LABEL[lang === "en" ? "en" : "sk"];
   const { articles, loading, reload } = useArticles({ admin: true });
   const [busy, setBusy] = useState(null);
+  const [creating, setCreating] = useState(false);
+
+  async function create() {
+    const slug = window.prompt(t.newSlug, `trh-novostavieb-${new Date().toISOString().slice(0, 7)}`);
+    if (!slug) return;
+    setCreating(true);
+    try {
+      const made = await createArticle({ slug: slug.trim(), date: new Date().toISOString().slice(0, 10) });
+      await reload();
+      onEdit(made);                       // straight into the editor, which is the point
+    } catch (e) { alert(e.message); }
+    finally { setCreating(false); }
+  }
 
   async function toggle(a) {
     setBusy(a.id);
@@ -186,10 +205,15 @@ function ArticleList({ lang, onEdit }) {
   }
 
   if (loading) return <div style={{ color: "var(--text-dim)" }}>{t.loading}</div>;
-  if (!articles.length) return <div style={{ color: "var(--text-dim)" }}>{t.empty}</div>;
 
   return (
     <div style={{ display: "grid", gap: "0.7rem" }}>
+      <div style={{ marginBottom: "0.3rem" }}>
+        <button className="rd-btn rd-btn--sm rd-btn--primary" disabled={creating} onClick={create}>
+          {creating ? "…" : "+ " + t.newArticle}
+        </button>
+      </div>
+      {!articles.length && <div style={{ color: "var(--text-dim)" }}>{t.empty}</div>}
       {articles.map((a) => (
         <div key={a.id} style={{ ...box, display: "flex", gap: "1rem", alignItems: "flex-start" }}>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -234,14 +258,19 @@ function ArticleEditor({ slug, lang, onBack, onChanged }) {
   const [state, setState] = useState("idle");    // idle | saving | saved
   const [err, setErr] = useState(null);
   const [busyPub, setBusyPub] = useState(false);
+  // `published` is a live fact about the row, not editable content, so it is NOT
+  // in the history stack: undo after publishing would otherwise show KONCEPT
+  // while the database said published.
+  const [published, setPublished] = useState(false);
   const hist = useHistory();
   const draft = hist.value;
 
   useEffect(() => {
     if (!article) return;
-    const copy = JSON.parse(JSON.stringify(article));
-    hist.reset(copy);
-    setSaved(copy);
+    const { published: pub, ...content } = JSON.parse(JSON.stringify(article));
+    hist.reset(content);
+    setSaved(content);
+    setPublished(pub);
   }, [article]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const setDraft = useCallback((updater) => {
@@ -311,13 +340,12 @@ function ArticleEditor({ slug, lang, onBack, onChanged }) {
 
   /** Publish / withdraw from inside the editor — not only from the list. */
   async function togglePublished() {
-    const next = !draft.published;
+    const next = !published;
     if (!next && !window.confirm(t.confirmUnpublish)) return;
     setBusyPub(true); setErr(null);
     try {
       await setArticlePublished(draft.id, next);
-      setDraft((d) => ({ ...d, published: next }));
-      setSaved((sv) => (sv ? { ...sv, published: next } : sv));
+      setPublished(next);
       onChanged?.();
     } catch (e) { setErr(e.message); }
     finally { setBusyPub(false); }
@@ -340,10 +368,10 @@ function ArticleEditor({ slug, lang, onBack, onChanged }) {
           {/* Publish state and its control together — the badge says what is true,
               the button next to it is what changes it. Previously this lived only
               on the list and was not findable from inside the editor. */}
-          <Pill on={draft.published}>{draft.published ? t.published : t.draft}</Pill>
-          <button className={"rd-btn rd-btn--sm" + (draft.published ? "" : " rd-btn--primary")}
+          <Pill on={published}>{published ? t.published : t.draft}</Pill>
+          <button className={"rd-btn rd-btn--sm" + (published ? "" : " rd-btn--primary")}
                   disabled={busyPub} onClick={togglePublished}>
-            {busyPub ? "…" : (draft.published ? t.unpublish : t.publish)}
+            {busyPub ? "…" : (published ? t.unpublish : t.publish)}
           </button>
           <a className="rd-btn rd-btn--sm rd-btn--ghost"
              href={`${SITE_BASE}/analyzy/${draft.slug}`} target="_blank" rel="noreferrer">
@@ -379,8 +407,8 @@ function ArticleEditor({ slug, lang, onBack, onChanged }) {
           <span style={{ fontFamily: MONO, fontSize: "0.68rem", color: "var(--text-faint)" }}>
             /analyzy/{draft.slug}
           </span>
-          <span style={{ fontSize: "0.72rem", color: draft.published ? "var(--accent)" : "var(--text-faint)" }}>
-            {draft.published ? "● " + t.liveNow : "○ " + t.draftNow}
+          <span style={{ fontSize: "0.72rem", color: published ? "var(--accent)" : "var(--text-faint)" }}>
+            {published ? "● " + t.liveNow : "○ " + t.draftNow}
           </span>
         </div>
 
@@ -401,6 +429,36 @@ function ArticleEditor({ slug, lang, onBack, onChanged }) {
             color: "#ffb3b3", fontSize: "0.78rem",
           }}>{err}</div>
         )}
+      </div>
+
+      <div style={{ display: "grid", gap: "0.55rem", gridTemplateColumns: "200px 1fr", marginBottom: "1.1rem" }}>
+        <div>
+          <div style={{
+            fontFamily: MONO, fontSize: "0.66rem", letterSpacing: "0.09em",
+            textTransform: "uppercase", color: "var(--text-dim)", marginBottom: "0.45rem",
+          }}>{t.date}</div>
+          <input type="date" value={draft.date || ""}
+                 onChange={(e) => setDraft((d) => ({ ...d, date: e.target.value }))}
+                 style={{
+                   width: "100%", background: "var(--bg)", color: "var(--text)",
+                   border: "1px solid var(--border-soft)", borderRadius: 7,
+                   padding: "0.6rem 0.7rem", fontSize: "0.88rem", fontFamily: MONO,
+                 }} />
+        </div>
+        <div>
+          <div style={{
+            fontFamily: MONO, fontSize: "0.66rem", letterSpacing: "0.09em",
+            textTransform: "uppercase", color: "var(--text-dim)", marginBottom: "0.45rem",
+          }}>{t.ogImage}</div>
+          <input value={draft.ogImage || ""}
+                 onChange={(e) => setDraft((d) => ({ ...d, ogImage: e.target.value }))}
+                 placeholder="/analyzy/og-2026-09.png"
+                 style={{
+                   width: "100%", background: "var(--bg)", color: "var(--text)",
+                   border: "1px solid var(--border-soft)", borderRadius: 7,
+                   padding: "0.6rem 0.7rem", fontSize: "0.88rem", fontFamily: MONO,
+                 }} />
+        </div>
       </div>
 
       <BiField label={t.title} rows={2} value={draft.title}
@@ -443,6 +501,8 @@ function ArticleEditor({ slug, lang, onBack, onChanged }) {
               )}
               <BiField label={t.caption} rows={2} value={b.caption}
                        onChange={(v) => setBlock(i, { caption: v })} />
+              <BiField label={t.alt} rows={1} value={b.alt}
+                       onChange={(v) => setBlock(i, { alt: v })} />
             </>
           )}
         </div>

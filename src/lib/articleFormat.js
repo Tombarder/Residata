@@ -1,6 +1,10 @@
 /**
  * Shared formatting + the block vocabulary every analysis is written in.
  *
+ * Lives in lib/ because the LIVE article page imports it. It used to sit under
+ * content/analyzy, a folder documented as seed data only — code that runs on
+ * every visit should not live in a folder that says it does not run.
+ *
  * WHY BLOCKS AND NOT MARKDOWN
  *   The point of this section is to copy the house style Slovak market analyses
  *   are written in — declarative headline, headline number in the first sentence,

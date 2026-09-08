@@ -587,8 +587,11 @@ export function applyArticleSeo(article, lang) {
 
   document.title = title;
   setMeta("name", "description", description);
-  const kw = L(article.seoKeywords);
-  if (kw) setMeta("name", "keywords", kw);
+  // Always WRITE keywords, never conditionally: leaving the tag alone kept the
+  // previous page's keywords on the article.
+  setMeta("name", "keywords", L(article.seoKeywords) || (lang === "en"
+    ? "Slovak new-build market analysis, ceny novostavieb, absorption"
+    : "analýza trhu novostavieb, ceny novostavieb, predaj novostavieb"));
   // A draft is reachable by direct link on purpose — that is how it gets
   // reviewed — but it must never be indexed.
   setMeta("name", "robots", article.published
@@ -604,6 +607,17 @@ export function applyArticleSeo(article, lang) {
   if (article.ogImage) {
     const img = article.ogImage.startsWith("http") ? article.ogImage : SITE_BASE + article.ogImage;
     setMeta("property", "og:image", img);
+    setMeta("property", "og:image:alt", title);
     setMeta("name", "twitter:image", img);
   }
+
+  // The rest of what applySeo owns. Without these an article kept the locale,
+  // site name and hreflang of whatever page the visitor arrived from.
+  const locale = { sk: "sk_SK", cs: "cs_CZ" }[lang] || "en_US";
+  setMeta("property", "og:locale", locale);
+  setMeta("property", "og:site_name", "Residata");
+  setMeta("name", "twitter:card", "summary_large_image");
+  document.documentElement.setAttribute("lang", { sk: "sk", cs: "cs" }[lang] || "en");
+  PUBLIC_LANGS.forEach((code) => setLink("alternate", url, code));
+  setLink("alternate", url, "x-default");
 }

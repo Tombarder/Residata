@@ -51,11 +51,12 @@ export function useArticles({ admin = false } = {}) {
   const load = useCallback(async () => {
     if (!supabaseData) { setLoading(false); return; }
     setLoading(true);
-    // The admin screen must see drafts, which RLS only returns to a logged-in
-    // admin — so it reads through the AUTH client, whose session carries the
-    // claim. The public list stays on supabaseData.
-    const client = admin ? supabase : supabaseData;
-    let q = client.from("articles").select(PUBLIC_COLS).order("article_date", { ascending: false });
+    // Always supabaseData, never the auth client: reading data through the auth
+    // client is what makes a logged-in page hang on "Loading", and it is not
+    // needed here — supabaseData attaches the session token, so RLS already sees
+    // the admin claim and returns drafts. `admin` only decides the filter.
+    let q = supabaseData.from("articles").select(PUBLIC_COLS)
+      .order("article_date", { ascending: false });
     if (!admin) q = q.eq("published", true);
     const { data, error: err } = await q;
     if (err) setError(err.message);
@@ -68,7 +69,7 @@ export function useArticles({ admin = false } = {}) {
 }
 
 /** One analysis by slug. Returns null once loaded if there is no such row. */
-export function useArticle(slug, { admin = false } = {}) {
+export function useArticle(slug) {
   const [article, setArticle] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -77,13 +78,14 @@ export function useArticle(slug, { admin = false } = {}) {
     (async () => {
       if (!supabaseData || !slug) { setLoading(false); return; }
       setLoading(true);
-      const client = admin ? supabase : supabaseData;
-      const { data } = await client
+      // Same reasoning as useArticles: one client for reads. An admin sees a
+      // draft because RLS lets them, not because of a different client.
+      const { data } = await supabaseData
         .from("articles").select(PUBLIC_COLS).eq("slug", slug).maybeSingle();
       if (!cancelled) { setArticle(toArticle(data)); setLoading(false); }
     })();
     return () => { cancelled = true; };
-  }, [slug, admin]);
+  }, [slug]);
 
   return { article, loading };
 }
@@ -97,6 +99,36 @@ export async function setArticlePublished(id, published) {
 }
 
 /**
+ * Create an empty draft. Everything is editable afterwards, so this only has to
+ * satisfy the table's constraints — a title, a standfirst and a method note.
+ */
+export async function createArticle({ slug, date }) {
+  const stub = (sk, en) => ({ sk, en });
+  const { data, error } = await supabase.from("articles").insert({
+    slug,
+    article_date: date,
+    published: false,
+    title: stub("Nová analýza", "New analysis"),
+    perex: stub("Krátke zhrnutie, ktoré sa zobrazí v zozname.",
+                "A short summary shown in the list."),
+    blocks: [{ type: "lead", text: stub("", "") }],
+    method: stub(
+      "Dáta pochádzajú z verejne publikovaných cenníkov developerov, ktoré Residata zaznamenáva denne.",
+      "Data come from developers' publicly published price lists, recorded daily by Residata."),
+  }).select("slug").maybeSingle();
+  if (error) {
+    if (String(error.message).includes("articles_slug_shape")) {
+      throw new Error("URL smie obsahovať len malé písmená bez diakritiky, číslice a pomlčky (napr. trh-novostavieb-2026-10).");
+    }
+    if (String(error.message).includes("duplicate key")) {
+      throw new Error("Článok s touto URL už existuje.");
+    }
+    throw new Error(error.message);
+  }
+  return data?.slug || slug;
+}
+
+/**
  * Save an edited analysis. Only the fields an editor can touch are sent, so a
  * stale client can never blank a column it did not know about.
  */
@@ -107,6 +139,7 @@ export async function saveArticle(id, patch) {
   if (patch.blocks) body.blocks = patch.blocks;
   if (patch.method) body.method = patch.method;
   if (patch.date) body.article_date = patch.date;
+  if (patch.slug) body.slug = patch.slug;
   if ("ogImage" in patch) body.og_image = patch.ogImage || null;
   const { data: session } = await supabase.auth.getUser();
   if (session?.user?.id) body.updated_by = session.user.id;
