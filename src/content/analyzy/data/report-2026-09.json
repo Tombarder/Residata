@@ -1,6 +1,6 @@
 {
-  "asOf": "2026-09-07",
-  "generatedAt": "2026-09-07T17:16:03+00:00",
+  "asOf": "2026-09-08",
+  "generatedAt": "2026-09-08T06:41:32+00:00",
   "coverage": {
     "skActiveProjects": 248,
     "czActiveProjects": 154
@@ -17,8 +17,8 @@
     "towns": 43
   },
   "sales90d": {
-    "bratislava": 597,
-    "restOfSk": 513
+    "bratislava": 584,
+    "restOfSk": 512
   },
   "topCities": [
     {
@@ -53,6 +53,7 @@
     }
   ],
   "mixSk": {
+    "since": "2026-05-16",
     "rows": [
       {
         "izby": 1.0,
@@ -115,6 +116,7 @@
     "totalSold": 1141
   },
   "mixCz": {
+    "since": "2026-06-09",
     "rows": [
       {
         "izby": 1.0,
@@ -169,7 +171,86 @@
     "totalAvailable": 5066,
     "totalSold": 1160
   },
+  "mixSkCommon": {
+    "since": "2026-06-09",
+    "rows": [
+      {
+        "izby": 1.0,
+        "available": 567,
+        "sold": 117,
+        "stockPct": 8.3,
+        "salesPct": 10.8
+      },
+      {
+        "izby": 1.5,
+        "available": 133,
+        "sold": 47,
+        "stockPct": 2.0,
+        "salesPct": 4.4
+      },
+      {
+        "izby": 2.0,
+        "available": 2894,
+        "sold": 547,
+        "stockPct": 42.6,
+        "salesPct": 50.7
+      },
+      {
+        "izby": 2.5,
+        "available": 39,
+        "sold": 5,
+        "stockPct": 0.6,
+        "salesPct": 0.5
+      },
+      {
+        "izby": 3.0,
+        "available": 2276,
+        "sold": 264,
+        "stockPct": 33.5,
+        "salesPct": 24.5
+      },
+      {
+        "izby": 3.5,
+        "available": 8,
+        "sold": 3,
+        "stockPct": 0.1,
+        "salesPct": 0.3
+      },
+      {
+        "izby": 4.0,
+        "available": 813,
+        "sold": 91,
+        "stockPct": 12.0,
+        "salesPct": 8.4
+      },
+      {
+        "izby": 5.0,
+        "available": 69,
+        "sold": 5,
+        "stockPct": 1.0,
+        "salesPct": 0.5
+      }
+    ],
+    "totalAvailable": 6799,
+    "totalSold": 1079
+  },
+  "window": {
+    "sk": {
+      "from": "2026-05-16",
+      "to": "2026-09-06",
+      "days": 113
+    },
+    "cz": {
+      "from": "2026-06-09",
+      "to": "2026-09-06",
+      "days": 89
+    },
+    "common": {
+      "from": "2026-06-09"
+    }
+  },
   "quartiles": {
+    "since": "2026-05-16",
     "rows": [
       {
         "quartile": 1,
@@ -206,11 +287,11 @@
     ]
   },
   "priceMoves90d": {
-    "moves": 2206,
+    "moves": 2190,
     "projects": 70,
-    "up": 1759,
-    "down": 447,
-    "pctUp": 79.7,
+    "up": 1751,
+    "down": 439,
+    "pctUp": 80.0,
     "medianPct": 2.6
   },
   "caveats": {

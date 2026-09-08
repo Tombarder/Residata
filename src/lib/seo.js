@@ -210,16 +210,16 @@ const SEO_BY_PAGE = {
     ogImage: "/analyzy/og-2026-09.png",
     ogType: "article",
     en: {
-      title: "Two-room flats drive half of new-build sales · Residata",
+      title: "Three-room flats: more of supply than of sales · Residata",
       description:
-        "Two-room flats are 42.6 % of Slovak new-build supply but 50.9 % of sales; three-room flats are 33.5 % of supply and 23.9 % of sales. Analysis of 248 projects.",
+        "Three-room flats are 33.5 % of Slovak new-build supply but 23.9 % of sales. Not alarming — worth watching. First findings from 113 days of daily price-list data across 248 projects.",
       keywords: "novostavby Slovensko, skladba bytov, predaj novostavieb, ceny bytov",
     },
     sk: {
-      title: "Dvojizbové byty ťahajú polovicu predajov novostavieb · Residata",
+      title: "Trojizbových bytov je v ponuke viac, než sa ich predáva · Residata",
       description:
-        "Dvojizbové byty tvoria 42,6 % ponuky novostavieb na Slovensku, ale 50,9 % predajov. Pri trojizbových je pomer opačný. Analýza 248 projektov, dáta k septembru 2026.",
-      keywords: "novostavby Slovensko, dvojizbové byty, trojizbové byty, predaj novostavieb, ceny bytov",
+        "Trojizbové byty tvoria 33,5 % ponuky novostavieb na Slovensku, ale 23,9 % predajov. Nie je to alarmujúce, ale stojí to za sledovanie. Prvé zistenia zo 113 dní denných dát z 248 projektov.",
+      keywords: "novostavby Slovensko, dvojizbové byty, trojizbové byty, predaj novostavieb, ceny bytov, analýza trhu",
     },
   },
   // /status was added on 2026-09-03 and had NO entry here. applySeo returns

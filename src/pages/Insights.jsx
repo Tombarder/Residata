@@ -22,7 +22,7 @@
 
 import { useEffect, useState } from "react";
 import { ARTICLES, getArticle } from "../content/analyzy";
-import { dateSk, monthSk } from "../content/analyzy/format";
+import { t, dateLong, monthLong } from "../content/analyzy/format";
 import { SITE_BASE } from "../lib/seo";
 import { COMPANY } from "../lib/company";
 
@@ -65,7 +65,8 @@ function useScrollToTop(key) {
 
 /* ─────────────────────────── block renderers ─────────────────────────── */
 
-function Figure({ src, alt, caption }) {
+function Figure({ src, srcEn, alt, caption, lang }) {
+  const source = lang === "en" && srcEn ? srcEn : src;
   return (
     <figure style={{ margin: "2.4rem 0" }}>
       {/* Light card on a dark page. The chart is generated light once and reused
@@ -79,26 +80,27 @@ function Figure({ src, alt, caption }) {
         border: "1px solid rgba(255,255,255,0.10)",
         boxShadow: "0 2px 10px rgba(0,0,0,0.35)",
       }}>
-        <img src={src} alt={alt} loading="lazy"
+        <img src={source} alt={t(alt, lang)} loading="lazy"
              style={{ width: "100%", height: "auto", display: "block", borderRadius: 6 }} />
       </div>
       {caption && (
         <figcaption style={{
           fontSize: "0.8rem", color: "#8b8b95", marginTop: "0.7rem", lineHeight: 1.5,
-        }}>{caption}</figcaption>
+        }}>{t(caption, lang)}</figcaption>
       )}
     </figure>
   );
 }
 
-function Table({ head, rows, caption }) {
+function Table({ head, rows, caption, lang }) {
+  const heads = t(head, lang) || head;
   return (
     <figure style={{ margin: "2.4rem 0" }}>
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.9rem" }}>
           <thead>
             <tr>
-              {head.map((h, i) => (
+              {heads.map((h, i) => (
                 <th key={h} style={{
                   textAlign: i === 0 ? "left" : "right",
                   padding: "0.6rem 0.75rem",
@@ -127,43 +129,43 @@ function Table({ head, rows, caption }) {
       </div>
       {caption && (
         <figcaption style={{ fontSize: "0.8rem", color: "#8b8b95", marginTop: "0.7rem" }}>
-          {caption}
+          {t(caption, lang)}
         </figcaption>
       )}
     </figure>
   );
 }
 
-function Block({ block }) {
+function Block({ block, lang }) {
   switch (block.type) {
     case "lead":
       return (
         <p style={{
           fontSize: "1.12rem", lineHeight: 1.65, color: "#e4e4ea",
           margin: "0 0 2rem", fontWeight: 500,
-        }}>{block.text}</p>
+        }}>{t(block.text, lang)}</p>
       );
     case "h2":
       return (
         <h2 style={{
           fontSize: "1.28rem", fontWeight: 650, letterSpacing: "-0.015em",
           color: "var(--text)", margin: "2.8rem 0 1rem", lineHeight: 1.3,
-        }}>{block.text}</h2>
+        }}>{t(block.text, lang)}</h2>
       );
     case "p":
-      return <p style={{ margin: "0 0 1.15rem" }}>{block.text}</p>;
+      return <p style={{ margin: "0 0 1.15rem" }}>{t(block.text, lang)}</p>;
     case "bullets":
       return (
         <ul style={{ margin: "0 0 1.4rem", paddingLeft: "1.1rem" }}>
           {block.items.map((it, i) => (
-            <li key={i} style={{ margin: "0 0 0.5rem" }}>{it}</li>
+            <li key={i} style={{ margin: "0 0 0.5rem" }}>{t(it, lang)}</li>
           ))}
         </ul>
       );
     case "figure":
-      return <Figure {...block} />;
+      return <Figure {...block} lang={lang} />;
     case "table":
-      return <Table {...block} />;
+      return <Table {...block} lang={lang} />;
     default:
       return null;
   }
@@ -177,7 +179,7 @@ function Block({ block }) {
  * what a citation surface needs. Removed on unmount so a client-side navigation
  * never leaves a previous article's schema behind on an unrelated page.
  */
-function useArticleSchema(article) {
+function useArticleSchema(article, lang) {
   useEffect(() => {
     if (!article || typeof document === "undefined") return undefined;
     const url = `${SITE_BASE}/analyzy/${article.slug}`;
@@ -187,11 +189,11 @@ function useArticleSchema(article) {
     el.textContent = JSON.stringify({
       "@context": "https://schema.org",
       "@type": "Article",
-      headline: article.title,
-      description: article.perex,
+      headline: t(article.title, lang),
+      description: t(article.perex, lang),
       datePublished: article.date,
       dateModified: article.date,
-      inLanguage: "sk",
+      inLanguage: lang === "en" ? "en" : "sk",
       mainEntityOfPage: { "@type": "WebPage", "@id": url },
       url,
       image: article.ogImage ? SITE_BASE + article.ogImage : undefined,
@@ -208,7 +210,7 @@ function useArticleSchema(article) {
     });
     document.head.appendChild(el);
     return () => { document.getElementById("ld-article")?.remove(); };
-  }, [article]);
+  }, [article, lang]);
 }
 
 /* ────────────────────────────── the pages ────────────────────────────── */
@@ -218,7 +220,7 @@ function useArticleSchema(article) {
  * a pointer cursor alone is the difference between "a list" and "a list you can
  * use". Hover lifts the title to the accent and warms the row; the arrow slides.
  */
-function ArticleCard({ article, navigate, sk }) {
+function ArticleCard({ article, navigate, sk, lang }) {
   const [hover, setHover] = useState(false);
   return (
     <a
@@ -237,13 +239,13 @@ function ArticleCard({ article, navigate, sk }) {
         transition: "background 160ms ease, border-radius 160ms ease",
       }}
     >
-      <div style={{ ...EYEBROW, marginBottom: "0.55rem" }}>{monthSk(article.date)}</div>
+      <div style={{ ...EYEBROW, marginBottom: "0.55rem" }}>{monthLong(article.date, lang)}</div>
       <div style={{
         fontSize: "1.15rem", fontWeight: 650, lineHeight: 1.35,
         color: hover ? "var(--accent)" : "var(--text)",
         marginBottom: "0.55rem", transition: "color 160ms ease",
-      }}>{article.title}</div>
-      <div style={{ fontSize: "0.92rem", lineHeight: 1.6, color: "#a5a5b0" }}>{article.perex}</div>
+      }}>{t(article.title, lang)}</div>
+      <div style={{ fontSize: "0.92rem", lineHeight: 1.6, color: "#a5a5b0" }}>{t(article.perex, lang)}</div>
       <div style={{
         marginTop: "0.9rem", fontSize: "0.85rem", color: "var(--accent)",
         opacity: hover ? 1 : 0.72, transition: "opacity 160ms ease",
@@ -277,7 +279,7 @@ export function InsightsIndex({ navigate, lang }) {
           : "A regular read on the Slovak and Czech new-build market, built from developer price lists we read every night. The whole country, not just the capital."}
       </p>
 
-      {ARTICLES.map((a) => <ArticleCard key={a.slug} article={a} navigate={navigate} sk={sk} />)}
+      {ARTICLES.map((a) => <ArticleCard key={a.slug} article={a} navigate={navigate} sk={sk} lang={lang} />)}
 
       {ARTICLES.length === 0 && (
         <p style={{ color: "#8b8b95" }}>{sk ? "Zatiaľ nič." : "Nothing published yet."}</p>
@@ -312,7 +314,7 @@ export function InsightsIndex({ navigate, lang }) {
 export function InsightsArticle({ slug, navigate, lang }) {
   const article = getArticle(slug);
   const [backHover, setBackHover] = useState(false);
-  useArticleSchema(article);
+  useArticleSchema(article, lang);
   useScrollToTop(slug);
 
   // Unknown slug: land on the index rather than a dead end. A stale link stays
@@ -343,17 +345,17 @@ export function InsightsArticle({ slug, navigate, lang }) {
       <h1 style={{
         fontSize: "clamp(1.7rem, 3.2vw, 2.35rem)", fontWeight: 700,
         letterSpacing: "-0.03em", margin: "0 0 1rem", lineHeight: 1.2,
-      }}>{article.title}</h1>
+      }}>{t(article.title, lang)}</h1>
 
       <div style={{
         fontSize: "0.83rem", color: "#8b8b95", marginBottom: "2.4rem",
         paddingBottom: "1.6rem", borderBottom: "1px solid rgba(255,255,255,0.12)",
       }}>
-        {dateSk(article.date)} · Residata
+        {dateLong(article.date, lang)} · Residata
       </div>
 
       <div style={{ fontSize: "0.97rem", lineHeight: 1.78, color: "#c5c5cc" }}>
-        {article.blocks.map((b, i) => <Block key={i} block={b} />)}
+        {article.blocks.map((b, i) => <Block key={i} block={b} lang={lang} />)}
 
         {/* Methodology is a required field on every article — see content/analyzy/format.js.
             It is what makes the piece quotable instead of promotional, so it is
@@ -363,15 +365,18 @@ export function InsightsArticle({ slug, navigate, lang }) {
           border: "1px solid rgba(255,255,255,0.14)", borderRadius: 10,
           background: "rgba(255,255,255,0.025)",
         }}>
-          <div style={{ ...EYEBROW, marginBottom: "0.6rem" }}>Metodika</div>
+          <div style={{ ...EYEBROW, marginBottom: "0.6rem" }}>
+            {lang === "en" ? "Method" : "Metodika"}
+          </div>
           <p style={{ margin: 0, fontSize: "0.87rem", lineHeight: 1.7, color: "#a5a5b0" }}>
-            {article.method}
+            {t(article.method, lang)}
           </p>
         </div>
 
         <p style={{ marginTop: "2rem", fontSize: "0.87rem", color: "#8b8b95", lineHeight: 1.7 }}>
-          Analýzu môžete voľne citovať s uvedením zdroja (Residata) a odkazom na túto stránku.
-          Ak chcete čísla za konkrétne mesto alebo mestskú časť, napíšte na{" "}
+          {lang === "en"
+            ? "You are welcome to quote this analysis, citing Residata and linking to this page. For the figures on a specific town or district, write to "
+            : "Analýzu môžete voľne citovať s uvedením zdroja (Residata) a odkazom na túto stránku. Ak chcete čísla za konkrétne mesto alebo mestskú časť, napíšte na "}
           <a href={`mailto:${COMPANY.email}`} style={{ color: "var(--accent)" }}>{COMPANY.email}</a>.
         </p>
       </div>
