@@ -116,11 +116,17 @@ export async function saveArticle(id, patch) {
   // say where its numbers came from is not publishable. Surface it in words
   // rather than as a Postgres error code.
   if (error) {
-    if (String(error.message).includes("articles_method_present")) {
-      throw new Error(
-        "Metodika musí zostať vyplnená (aspoň 40 znakov) — bez nej analýza nie je citovateľná."
-      );
+    // The table refuses an article that would render broken. Say which, in words.
+    const m = String(error.message);
+    if (m.includes("articles_method_present")) {
+      throw new Error("Metodika musí zostať vyplnená (aspoň 40 znakov) — bez nej analýza nie je citovateľná.");
     }
-    throw new Error(error.message);
+    if (m.includes("articles_title_present")) {
+      throw new Error("Titulok musí byť vyplnený v oboch jazykoch — inak je článok na webe bez nadpisu.");
+    }
+    if (m.includes("articles_perex_present")) {
+      throw new Error("Perex musí byť vyplnený v oboch jazykoch — zobrazuje sa v zozname a vo vyhľadávaní.");
+    }
+    throw new Error(m);
   }
 }

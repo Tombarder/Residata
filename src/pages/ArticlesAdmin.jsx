@@ -23,9 +23,64 @@
  *   something actually changed, and leaving with unsaved edits asks first.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useArticles, useArticle, setArticlePublished, saveArticle } from "../lib/useArticles";
 import { SITE_BASE } from "../lib/seo";
+
+/**
+ * Edit history for the editor.
+ *
+ * Boss cleared the Slovak title while trying the editor and there was no way
+ * back — the previous value only existed in the database, and only until Save.
+ * This keeps the last HISTORY_LIMIT states in memory so ⌘Z walks backwards and
+ * ⇧⌘Z forwards, the same as any editor.
+ *
+ * Deliberately in memory and not persisted: it covers the mistake it exists for
+ * (a wrong keystroke in this sitting) without pretending to be version history,
+ * which the database already provides through updated_at and a re-seed.
+ */
+const HISTORY_LIMIT = 20;
+
+/**
+ * Edit history for the editor.
+ *
+ * Boss cleared the Slovak title while trying the editor and there was no way
+ * back — the previous value existed only in the database, and only until Save.
+ * This keeps the last HISTORY_LIMIT states so ⌘Z walks backwards and ⇧⌘Z
+ * forwards, like any editor.
+ *
+ * The stack and the cursor live in ONE state object on purpose. The first
+ * version held them separately with a ref to bridge them, and they desynced:
+ * publishing from the editor wrote to the database but the badge never moved,
+ * because that update pushed a state the cursor never advanced onto. Two pieces
+ * of state that must always agree should not be two pieces of state.
+ *
+ * In memory rather than persisted: it covers the mistake it exists for — a
+ * wrong keystroke in this sitting — without pretending to be version history.
+ */
+function useHistory() {
+  const [h, setH] = useState({ stack: [], at: -1 });
+
+  const reset = useCallback((value) => setH({ stack: [value], at: 0 }), []);
+
+  const push = useCallback((value) => setH((p) => {
+    const kept = p.stack.slice(0, p.at + 1);          // a new edit drops the redo tail
+    const next = [...kept, value];
+    const trimmed = next.length > HISTORY_LIMIT ? next.slice(next.length - HISTORY_LIMIT) : next;
+    return { stack: trimmed, at: trimmed.length - 1 };
+  }), []);
+
+  const undo = useCallback(() => setH((p) => ({ ...p, at: Math.max(0, p.at - 1) })), []);
+  const redo = useCallback(() => setH((p) => ({ ...p, at: Math.min(p.stack.length - 1, p.at + 1) })), []);
+
+  return {
+    value: h.at >= 0 ? h.stack[h.at] : undefined,
+    push, reset, undo, redo,
+    canUndo: h.at > 0,
+    canRedo: h.at >= 0 && h.at < h.stack.length - 1,
+    depth: h.stack.length,
+  };
+}
 
 const MONO = "ui-monospace, SFMono-Regular, Menlo, monospace";
 
@@ -40,6 +95,12 @@ const LABEL = {
     table: "Tabuľka — popis", caption: "Popis pod grafom", empty: "Zatiaľ žiadne články.",
     loading: "Načítavam…", unsaved: "Máte neuložené zmeny. Naozaj odísť?",
     lastEdit: "Naposledy upravené",
+    undo: "Späť", redo: "Dopredu", revert: "Zahodiť všetky zmeny",
+    steps: "krokov v pamäti",
+    emptyTitle: "Titulok nesmie byť prázdny — bez neho je článok na webe bez nadpisu.",
+    emptyPerex: "Perex nesmie byť prázdny — zobrazuje sa v zozname a vo vyhľadávaní.",
+    liveNow: "Článok je na webe", draftNow: "Článok nie je na webe",
+    confirmUnpublish: "Stiahnuť článok z webu? Prestane byť verejne dostupný.",
   },
   en: {
     heading: "Analyses", sub: "Manage the articles at /analyzy",
@@ -51,6 +112,12 @@ const LABEL = {
     table: "Table — caption", caption: "Caption", empty: "No articles yet.",
     loading: "Loading…", unsaved: "You have unsaved changes. Leave anyway?",
     lastEdit: "Last edited",
+    undo: "Undo", redo: "Redo", revert: "Discard all changes",
+    steps: "steps remembered",
+    emptyTitle: "The title cannot be empty — the article would have no headline.",
+    emptyPerex: "The standfirst cannot be empty — it is shown in the list and in search results.",
+    liveNow: "Live on the site", draftNow: "Not on the site",
+    confirmUnpublish: "Withdraw from the site? It will stop being publicly available.",
   },
 };
 
@@ -160,19 +227,54 @@ function ArticleList({ lang, onEdit }) {
 
 /* ───────────────────────────── the editor ───────────────────────────── */
 
-function ArticleEditor({ slug, lang, onBack }) {
+function ArticleEditor({ slug, lang, onBack, onChanged }) {
   const t = LABEL[lang === "en" ? "en" : "sk"];
   const { article, loading } = useArticle(slug, { admin: true });
-  const [draft, setDraft] = useState(null);
-  const [state, setState] = useState("idle");   // idle | saving | saved
+  const [saved, setSaved] = useState(null);      // last state known to be in the DB
+  const [state, setState] = useState("idle");    // idle | saving | saved
   const [err, setErr] = useState(null);
+  const [busyPub, setBusyPub] = useState(false);
+  const hist = useHistory();
+  const draft = hist.value;
 
-  useEffect(() => { if (article) setDraft(JSON.parse(JSON.stringify(article))); }, [article]);
+  useEffect(() => {
+    if (!article) return;
+    const copy = JSON.parse(JSON.stringify(article));
+    hist.reset(copy);
+    setSaved(copy);
+  }, [article]);   // eslint-disable-line react-hooks/exhaustive-deps
+
+  const setDraft = useCallback((updater) => {
+    hist.push(typeof updater === "function" ? updater(hist.value) : updater);
+  }, [hist]);
 
   const dirty = useMemo(
-    () => !!draft && !!article && JSON.stringify(draft) !== JSON.stringify(article),
-    [draft, article]
+    () => !!draft && !!saved && JSON.stringify(draft) !== JSON.stringify(saved),
+    [draft, saved]
   );
+
+  // Empty required text is how the title was lost the first time: the field
+  // cleared, the save succeeded, and the public page had no headline. Blocked
+  // at the button rather than discovered on the site.
+  const problems = useMemo(() => {
+    if (!draft) return [];
+    const out = [];
+    if (!draft.title?.sk?.trim() || !draft.title?.en?.trim()) out.push(t.emptyTitle);
+    if (!draft.perex?.sk?.trim() || !draft.perex?.en?.trim()) out.push(t.emptyPerex);
+    return out;
+  }, [draft, t]);
+
+  // ⌘Z / ⇧⌘Z anywhere in the editor, including inside a textarea — the browser's
+  // own undo only covers the focused field, not a block you deleted.
+  useEffect(() => {
+    const onKey = (e) => {
+      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "z") return;
+      e.preventDefault();
+      if (e.shiftKey) hist.redo(); else hist.undo();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [hist]);
 
   // Losing an edit to a stray click is the one unrecoverable thing here.
   useEffect(() => {
@@ -196,12 +298,29 @@ function ArticleEditor({ slug, lang, onBack }) {
   }
 
   async function save() {
+    if (problems.length) { setErr(problems[0]); return; }
     setState("saving"); setErr(null);
     try {
       await saveArticle(draft.id, draft);
+      setSaved(JSON.parse(JSON.stringify(draft)));
       setState("saved");
+      onChanged?.();
       setTimeout(() => setState("idle"), 2200);
     } catch (e) { setErr(e.message); setState("idle"); }
+  }
+
+  /** Publish / withdraw from inside the editor — not only from the list. */
+  async function togglePublished() {
+    const next = !draft.published;
+    if (!next && !window.confirm(t.confirmUnpublish)) return;
+    setBusyPub(true); setErr(null);
+    try {
+      await setArticlePublished(draft.id, next);
+      setDraft((d) => ({ ...d, published: next }));
+      setSaved((sv) => (sv ? { ...sv, published: next } : sv));
+      onChanged?.();
+    } catch (e) { setErr(e.message); }
+    finally { setBusyPub(false); }
   }
 
   if (loading || !draft) return <div style={{ color: "var(--text-dim)" }}>{t.loading}</div>;
@@ -211,22 +330,77 @@ function ArticleEditor({ slug, lang, onBack }) {
   return (
     <div>
       <div style={{
-        display: "flex", alignItems: "center", gap: "0.8rem", marginBottom: "1.4rem",
         position: "sticky", top: 0, zIndex: 5, background: "var(--bg)",
-        paddingBottom: "0.8rem", borderBottom: "1px solid var(--border-soft)",
+        paddingBottom: "0.8rem", marginBottom: "1.4rem",
+        borderBottom: "1px solid var(--border-soft)",
       }}>
-        <button className="rd-btn rd-btn--sm rd-btn--ghost" onClick={leave}>{t.back}</button>
-        <Pill on={draft.published}>{draft.published ? t.published : t.draft}</Pill>
-        <span style={{ fontFamily: MONO, fontSize: "0.7rem", color: "var(--text-faint)" }}>
-          /analyzy/{draft.slug}
-        </span>
-        <div style={{ flex: 1 }} />
-        {err && <span style={{ color: "var(--danger, #ff6b6b)", fontSize: "0.8rem" }}>{err}</span>}
-        {state === "saved" && <span style={{ color: "var(--accent)", fontSize: "0.8rem" }}>✓ {t.saved}</span>}
-        <button className="rd-btn rd-btn--sm rd-btn--primary" disabled={!dirty || state === "saving"}
-                onClick={save}>
-          {state === "saving" ? t.saving : (dirty ? t.save : t.noChanges)}
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap" }}>
+          <button className="rd-btn rd-btn--sm rd-btn--ghost" onClick={leave}>{t.back}</button>
+
+          {/* Publish state and its control together — the badge says what is true,
+              the button next to it is what changes it. Previously this lived only
+              on the list and was not findable from inside the editor. */}
+          <Pill on={draft.published}>{draft.published ? t.published : t.draft}</Pill>
+          <button className={"rd-btn rd-btn--sm" + (draft.published ? "" : " rd-btn--primary")}
+                  disabled={busyPub} onClick={togglePublished}>
+            {busyPub ? "…" : (draft.published ? t.unpublish : t.publish)}
+          </button>
+          <a className="rd-btn rd-btn--sm rd-btn--ghost"
+             href={`${SITE_BASE}/analyzy/${draft.slug}`} target="_blank" rel="noreferrer">
+            {t.view}
+          </a>
+
+          <span style={{ width: 1, height: 20, background: "var(--border-soft)", margin: "0 0.2rem" }} />
+
+          {/* Undo / redo. The browser's own undo only covers the focused field,
+              so a deleted block or a cleared title had no way back. */}
+          <button className="rd-btn rd-btn--sm rd-btn--ghost" onClick={hist.undo}
+                  disabled={!hist.canUndo} title="⌘Z">↶ {t.undo}</button>
+          <button className="rd-btn rd-btn--sm rd-btn--ghost" onClick={hist.redo}
+                  disabled={!hist.canRedo} title="⇧⌘Z">↷ {t.redo}</button>
+          <button className="rd-btn rd-btn--sm rd-btn--ghost" disabled={!dirty}
+                  onClick={() => { if (window.confirm(t.revert + "?")) hist.reset(JSON.parse(JSON.stringify(saved))); }}>
+            {t.revert}
+          </button>
+          <span style={{ fontFamily: MONO, fontSize: "0.62rem", color: "var(--text-faint)" }}>
+            {hist.depth}/{HISTORY_LIMIT} {t.steps}
+          </span>
+
+          <div style={{ flex: 1 }} />
+          {state === "saved" && <span style={{ color: "var(--accent)", fontSize: "0.8rem" }}>✓ {t.saved}</span>}
+          <button className="rd-btn rd-btn--sm rd-btn--primary"
+                  disabled={!dirty || state === "saving" || problems.length > 0}
+                  onClick={save}>
+            {state === "saving" ? t.saving : (dirty ? t.save : t.noChanges)}
+          </button>
+        </div>
+
+        <div style={{ display: "flex", gap: "0.7rem", alignItems: "center", marginTop: "0.5rem" }}>
+          <span style={{ fontFamily: MONO, fontSize: "0.68rem", color: "var(--text-faint)" }}>
+            /analyzy/{draft.slug}
+          </span>
+          <span style={{ fontSize: "0.72rem", color: draft.published ? "var(--accent)" : "var(--text-faint)" }}>
+            {draft.published ? "● " + t.liveNow : "○ " + t.draftNow}
+          </span>
+        </div>
+
+        {/* A required field left blank is how the title was lost the first time:
+            cleared, saved, and the public page had no headline. Save stays off
+            until it is filled. */}
+        {problems.map((msg) => (
+          <div key={msg} style={{
+            marginTop: "0.6rem", padding: "0.5rem 0.7rem", borderRadius: 7,
+            background: "rgba(255,107,107,0.10)", border: "1px solid rgba(255,107,107,0.35)",
+            color: "#ffb3b3", fontSize: "0.78rem",
+          }}>⚠ {msg}</div>
+        ))}
+        {err && (
+          <div style={{
+            marginTop: "0.6rem", padding: "0.5rem 0.7rem", borderRadius: 7,
+            background: "rgba(255,107,107,0.10)", border: "1px solid rgba(255,107,107,0.35)",
+            color: "#ffb3b3", fontSize: "0.78rem",
+          }}>{err}</div>
+        )}
       </div>
 
       <BiField label={t.title} rows={2} value={draft.title}
@@ -287,6 +461,9 @@ function ArticleEditor({ slug, lang, onBack }) {
 export default function ArticlesAdmin({ lang = "sk" }) {
   const t = LABEL[lang === "en" ? "en" : "sk"];
   const [editing, setEditing] = useState(null);
+  // Bumped whenever the editor publishes or saves, so returning to the list
+  // shows the change rather than a cached row.
+  const [rev, setRev] = useState(0);
 
   return (
     <div style={{ padding: "1.5rem 1.75rem 4rem", maxWidth: 1000 }}>
@@ -300,8 +477,9 @@ export default function ArticlesAdmin({ lang = "sk" }) {
       <p style={{ color: "var(--text-dim)", fontSize: "0.86rem", margin: "0 0 1.8rem" }}>{t.sub}</p>
 
       {editing
-        ? <ArticleEditor slug={editing} lang={lang} onBack={() => setEditing(null)} />
-        : <ArticleList lang={lang} onEdit={setEditing} />}
+        ? <ArticleEditor slug={editing} lang={lang} onBack={() => setEditing(null)}
+                         onChanged={() => setRev((r) => r + 1)} />
+        : <ArticleList key={rev} lang={lang} onEdit={setEditing} />}
     </div>
   );
 }
