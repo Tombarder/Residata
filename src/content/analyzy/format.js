@@ -93,6 +93,20 @@ export function windowDays(win, lang = "sk") {
   return lang === "en" ? `over ${win.days} days` : `za ${win.days} dní`;
 }
 
+/**
+ * Slovak needs three forms of "mesiac" and picks by the number in front of it:
+ * 1 mesiac · 2–4 mesiace · 5+ mesiacov (and 0 takes the genitive plural too).
+ * The first version handled only 1 and then said "mesiace" for everything else,
+ * so any value of five or more would have printed "5 mesiace".
+ */
+export function months(count, lang = "sk") {
+  if (lang === "en") return `${count} month${count === 1 ? "" : "s"}`;
+  const k = Math.abs(Math.round(count));
+  if (k === 1) return "1 mesiac";
+  if (k >= 2 && k <= 4) return `${k} mesiace`;
+  return `${k} mesiacov`;
+}
+
 /** Pick one row out of the disposition mix by room count. */
 export function byIzby(mix, izby) {
   const row = mix.rows.find((r) => r.izby === izby);

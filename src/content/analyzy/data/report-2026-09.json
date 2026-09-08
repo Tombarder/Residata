@@ -1,6 +1,6 @@
 {
   "asOf": "2026-09-08",
-  "generatedAt": "2026-09-08T07:27:11+00:00",
+  "generatedAt": "2026-09-08T07:54:14+00:00",
   "coverage": {
     "skActiveProjects": 246,
     "czActiveProjects": 154
@@ -259,7 +259,8 @@
         "available": 931,
         "sold": 102,
         "medianStock": 35,
-        "monthsToClear": 34.5
+        "monthsToClear": 34.5,
+        "monthsDisplay": 35
       },
       {
         "quartile": 2,
@@ -268,7 +269,8 @@
         "available": 1559,
         "sold": 174,
         "medianStock": 59,
-        "monthsToClear": 33.9
+        "monthsToClear": 33.9,
+        "monthsDisplay": 34
       },
       {
         "quartile": 3,
@@ -277,7 +279,8 @@
         "available": 1453,
         "sold": 265,
         "medianStock": 54,
-        "monthsToClear": 20.7
+        "monthsToClear": 20.7,
+        "monthsDisplay": 21
       },
       {
         "quartile": 4,
@@ -286,7 +289,8 @@
         "available": 1029,
         "sold": 300,
         "medianStock": 35,
-        "monthsToClear": 13.0
+        "monthsToClear": 13.0,
+        "monthsDisplay": 13
       }
     ]
   },
@@ -296,31 +300,36 @@
         "izby": 1.0,
         "available": 566,
         "sold": 120,
-        "months": 17.8
+        "months": 17.8,
+        "monthsDisplay": 18
       },
       {
         "izby": 1.5,
         "available": 132,
         "sold": 54,
-        "months": 9.2
+        "months": 9.2,
+        "monthsDisplay": 9
       },
       {
         "izby": 2.0,
         "available": 2902,
         "sold": 581,
-        "months": 18.9
+        "months": 18.9,
+        "monthsDisplay": 19
       },
       {
         "izby": 3.0,
         "available": 2281,
         "sold": 273,
-        "months": 31.6
+        "months": 31.6,
+        "monthsDisplay": 32
       },
       {
         "izby": 4.0,
         "available": 811,
         "sold": 100,
-        "months": 30.6
+        "months": 30.6,
+        "monthsDisplay": 31
       }
     ],
     "cz": [
@@ -328,25 +337,29 @@
         "izby": 1.0,
         "available": 975,
         "sold": 324,
-        "months": 9.0
+        "months": 9.0,
+        "monthsDisplay": 9
       },
       {
         "izby": 2.0,
         "available": 2285,
         "sold": 461,
-        "months": 14.8
+        "months": 14.8,
+        "monthsDisplay": 15
       },
       {
         "izby": 3.0,
         "available": 1305,
         "sold": 252,
-        "months": 15.5
+        "months": 15.5,
+        "monthsDisplay": 16
       },
       {
         "izby": 4.0,
         "available": 457,
         "sold": 88,
-        "months": 15.5
+        "months": 15.5,
+        "monthsDisplay": 16
       }
     ],
     "byCity": [
@@ -354,67 +367,71 @@
         "city": "Prešov",
         "available": 298,
         "sold": 95,
-        "months": 11.9
+        "months": 11.9,
+        "monthsDisplay": 12,
+        "medianM2": 3614
       },
       {
         "city": "Žilina",
         "available": 155,
         "sold": 40,
-        "months": 14.6
+        "months": 14.6,
+        "monthsDisplay": 15,
+        "medianM2": 4015
       },
       {
         "city": "Trenčín",
         "available": 240,
         "sold": 55,
-        "months": 16.5
+        "months": 16.5,
+        "monthsDisplay": 17,
+        "medianM2": 3826
       },
       {
         "city": "Bratislava",
         "available": 3400,
         "sold": 659,
-        "months": 19.5
-      },
-      {
-        "city": "Martin",
-        "available": 102,
-        "sold": 19,
-        "months": 20.3
+        "months": 19.5,
+        "monthsDisplay": 20,
+        "medianM2": 5360
       },
       {
         "city": "Nitra",
         "available": 438,
         "sold": 64,
-        "months": 25.9
+        "months": 25.9,
+        "monthsDisplay": 26,
+        "medianM2": 3417
       },
       {
         "city": "Košice",
         "available": 426,
         "sold": 58,
-        "months": 27.7
+        "months": 27.7,
+        "monthsDisplay": 28,
+        "medianM2": 4555
       },
       {
         "city": "Trnava",
         "available": 455,
         "sold": 54,
-        "months": 31.8
-      },
-      {
-        "city": "Poprad",
-        "available": 265,
-        "sold": 17,
-        "months": 58.9
+        "months": 31.8,
+        "monthsDisplay": 32,
+        "medianM2": 3833
       }
     ],
     "byScope": {
       "bratislava": {
         "available": 3400,
         "sold": 659,
-        "months": 19.5
+        "months": 19.5,
+        "monthsDisplay": 20
       },
       "rest": {
         "available": 3861,
         "sold": 513,
-        "months": 28.4
+        "months": 28.4,
+        "monthsDisplay": 28
       }
     }
   },
@@ -425,12 +442,12 @@
     "pctOfChangesUp": 86.6
   },
   "priceMoves90d": {
-    "moves": 2165,
+    "moves": 2231,
     "projects": 72,
-    "up": 1757,
-    "down": 408,
-    "pctUp": 81.2,
-    "medianPct": 2.5
+    "up": 1790,
+    "down": 441,
+    "pctUp": 80.2,
+    "medianPct": 2.6
   },
   "caveats": {
     "leftCensoredPct": 93.1,
