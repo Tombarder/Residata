@@ -1,49 +1,60 @@
 /**
  * Analýza — september 2026, in Slovak and English.
  *
- * ONE THESIS, AND EVERY SECTION SERVES IT: this market adjusts in TIME, not in
- * price. Slovak developers effectively never cut a list price, so stock that is
- * mis-mixed or mis-located does not get discounted — it ages. That makes
- * months-to-clear the number worth planning around, and it varies by more than
- * a year on decisions taken before construction starts.
+ * THE RULE THIS DRAFT WAS WRITTEN UNDER, after Boss rejected three earlier ones:
+ * do not invent a belief nobody holds and then refute it. "A cheaper market does
+ * not promise a faster sale" is not a finding — nobody thought it did. Every
+ * section has to tell a developer something they could not have worked out from
+ * first principles, and the evidence has to be inside the sentence.
  *
- * WHY MONTHS AND NOT "% SOLD" — Boss killed the first metric and was right:
- * "% of supply sold" rewards a nearly-finished project disposing of its last
- * units and punishes a fresh 200-unit project selling four times as many flats.
- * It measures size and age, not performance.
+ * The three that survived that test:
  *
- * EVERY MONTH FIGURE COMES FROM `monthsDisplay`, never from rounding `months`
- * here. Python's format() rounds 34.5 to 34 (half-to-even) and JavaScript's
- * Math.round gives 35 — so the article once said 35 months beside a chart that
- * said 34. The generator now rounds once and both read that integer.
+ *  1. The Slovak three-room slowdown is NOT price and NOT the product. Czech
+ *     three-room flats cost 70 % MORE in absolute terms (523 613 € against
+ *     307 100 €) and clear in half the time. What differs is how much of each
+ *     market is built that way — 34.8 % of Slovak supply against 26.0 % Czech,
+ *     while Slovakia holds barely 8.6 % in one-room flats against 19.4 %. The
+ *     penalty is a supply condition, which is why the same flat behaves
+ *     differently across a border and why it can change.
  *
- * Slovak month counts go through months() for the 1 / 2–4 / 5+ declension.
+ *  2. A competitor's price list carries no information about how they are doing
+ *     and, if anything, points the wrong way: projects clearing within 18 months
+ *     moved a price in 2.9 % of observations with 78.4 % of those up; projects
+ *     sitting on 30+ months moved one in 9.1 % with 93.3 % up. The projects in
+ *     trouble raise prices MORE. This is the most useful thing in the dataset,
+ *     and the first three drafts buried it as a supporting statistic.
  *
- * Ours: supply, sales, months-to-clear, quartiles, price behaviour. Theirs: one
- * figure, Bencont's Q2 Bratislava average, attributed where used.
+ *  3. Clearing time runs 12 to 32 months across towns and price does not order
+ *     the list — Trenčín and Trnava are 7 € per m² apart and 15 months apart.
+ *     Stated as the fact it is, with NO speculation about the cause: supply per
+ *     head does not explain it either (checked — Košice has the least stock per
+ *     inhabitant and is second slowest), and three months cannot carry a causal
+ *     claim.
+ *
+ * Figures interpolate from report-2026-09.json; month counts always come from
+ * `monthsDisplay`, never rounded here. Slovak counts go through months() for the
+ * 1 / 2–4 / 5+ declension, and no sentence declines a generated town name.
  */
 
 import data from "./data/report-2026-09.json";
-import { n, pct, eurM2, windowPhrase, months } from "./format";
+import { n, pct, eurM2, months } from "./format";
 
 const d = data;
-const W = d.window.sk;
 const sk = Object.fromEntries(d.monthsToClear.sk.map((r) => [r.izby, r]));
 const cz = Object.fromEntries(d.monthsToClear.cz.map((r) => [r.izby, r]));
-const q = d.quartiles.rows;
-const cheap = q[0];
-const dear = q[q.length - 1];
+const mixSk = d.supplyMix.sk;
+const mixCz = d.supplyMix.cz;
+const priceSk = d.medianPriceBySize.sk;
+const priceCz = d.medianPriceBySize.cz;
+const ps = d.priceSignal;
 const cities = d.monthsToClear.byCity;
 const fastest = cities[0];
 const slowest = cities[cities.length - 1];
-const scope = d.monthsToClear.byScope;
 const pair = d.closestPricedPair;
-const pb = d.priceBehaviour;
 const slug = d.slug;
 
-const skGap = sk[3].monthsDisplay - sk[2].monthsDisplay;
-const czGap = cz[3].monthsDisplay - cz[2].monthsDisplay;
-const win = { sk: windowPhrase(W, "sk"), en: windowPhrase(W, "en") };
+const eur = (v) => `${n(v)} €`;
+const czPremium = Math.round((priceCz["3"] / priceSk["3"] - 1) * 100);
 
 export default {
   slug,
@@ -53,12 +64,12 @@ export default {
     en: "A three-room flat in Slovakia takes a year longer to sell than a two-room one",
   },
   perex: {
-    sk: `Pri súčasnom tempe predaja by sa ponuka dvojizbových bytov na Slovensku vypredala ` +
-        `za ${months(sk[2].monthsDisplay)}, trojizbových za ${months(sk[3].monthsDisplay)}. ` +
-        `V Česku sa pritom obe dispozície predávajú takmer rovnako rýchlo.`,
-    en: `At the current pace of sales, Slovakia's two-room supply would clear in ` +
-        `${months(sk[2].monthsDisplay, "en")} and its three-room supply in ` +
-        `${months(sk[3].monthsDisplay, "en")}. In Czechia the two sell at almost the same speed.`,
+    sk: `Ponuka trojizbových bytov by sa pri súčasnom tempe vypredávala ` +
+        `${months(sk[3].monthsDisplay)}, dvojizbových ${months(sk[2].monthsDisplay)}. ` +
+        `V Česku stojí trojizbový byt o ${czPremium} % viac a vypredá sa za polovičný čas.`,
+    en: `At the current pace, three-room supply would take ${months(sk[3].monthsDisplay, "en")} ` +
+        `to clear and two-room supply ${months(sk[2].monthsDisplay, "en")}. In Czechia a ` +
+        `three-room flat costs ${czPremium} % more and clears in half the time.`,
   },
   ogImage: "/analyzy/og-2026-09.png",
 
@@ -66,18 +77,16 @@ export default {
     {
       type: "lead",
       text: {
-        sk: `Pri súčasnom tempe predaja by sa ponuka dvojizbových bytov na Slovensku ` +
-            `vypredala za ${months(sk[2].monthsDisplay)}, trojizbových za ` +
-            `${months(sk[3].monthsDisplay)} — rozdiel ${months(skGap)} na tom istom trhu. ` +
-            `V Česku, kde sledujeme ${d.coverage.czActiveProjects} projektov rovnakým ` +
-            `spôsobom, sa dvojizbové a trojizbové byty predávajú takmer rovnako rýchlo; ` +
-            `delí ich ${months(czGap)}.`,
-        en: `At the current pace of sales, Slovakia's two-room supply would clear in ` +
-            `${months(sk[2].monthsDisplay, "en")} and its three-room supply in ` +
-            `${months(sk[3].monthsDisplay, "en")} — ${months(skGap, "en")} apart on the same ` +
-            `market. In Czechia, where we track ${d.coverage.czActiveProjects} projects the ` +
-            `same way, two- and three-room flats sell at almost the same speed, ` +
-            `${months(czGap, "en")} apart.`,
+        sk: `Ponuka trojizbových bytov na Slovensku by sa pri súčasnom tempe predaja ` +
+            `vypredávala ${months(sk[3].monthsDisplay)}, dvojizbových ` +
+            `${months(sk[2].monthsDisplay)}. V Česku, kde sledujeme ` +
+            `${d.coverage.czActiveProjects} projektov rovnakým spôsobom, sa trojizbové byty ` +
+            `vypredajú za ${months(cz[3].monthsDisplay)} — a stoja pritom o ${czPremium} % viac.`,
+        en: `At the current pace of sales, Slovakia's three-room supply would take ` +
+            `${months(sk[3].monthsDisplay, "en")} to clear and its two-room supply ` +
+            `${months(sk[2].monthsDisplay, "en")}. In Czechia, where we track ` +
+            `${d.coverage.czActiveProjects} projects the same way, three-room flats clear in ` +
+            `${months(cz[3].monthsDisplay, "en")} — and cost ${czPremium} % more.`,
       },
     },
     {
@@ -89,121 +98,138 @@ export default {
         en: "Months to clear supply by flat size, Slovakia and Czechia",
       },
       caption: {
-        sk: `Zásoba delená mesačným tempom predaja. Na Slovensku je voľných ` +
-            `${n(sk[3].available)} trojizbových bytov; ${win.sk} sa ich predalo ` +
-            `${n(sk[3].sold)}.`,
-        en: `Stock divided by the monthly pace of sales. Slovakia has ` +
-            `${n(sk[3].available)} three-room flats available; ${n(sk[3].sold)} have sold ` +
-            `${win.en}.`,
+        sk: "Zásoba delená mesačným tempom predaja, obe krajiny rovnakou metódou.",
+        en: "Stock divided by the monthly pace of sales, both countries on the same method.",
       },
     },
 
     {
       type: "h2",
       text: {
-        sk: "Prečo sa to prejaví na čase, a nie na cene",
-        en: "Why this shows up as time and not as price",
+        sk: "Nie je to cenou ani samotným bytom",
+        en: "It is not the price, and not the flat",
       },
     },
     {
       type: "p",
       text: {
-        sk: `Z ${n(pb.tracked)} medzimesačných porovnaní ceny toho istého bytu sa cena ` +
-            `zmenila v ${pct(pb.pctChanged)} prípadov — a z tých zmien ` +
-            `${pct(pb.pctOfChangesUp)} smerovalo nahor. Slovenskí developeri cenníky ` +
-            `prakticky neznižujú.`,
-        en: `Across ${n(pb.tracked)} month-on-month comparisons of the same flat's price, ` +
-            `the price changed in ${pct(pb.pctChanged, "en")} of cases — and ` +
-            `${pct(pb.pctOfChangesUp, "en")} of those changes were increases. Slovak ` +
-            `developers effectively do not cut their price lists.`,
+        sk: `Medián ceny trojizbového bytu je na Slovensku ${eur(priceSk["3"])}, v Česku ` +
+            `${eur(priceCz["3"])}. Český kupujúci zaplatí za porovnateľný byt o ` +
+            `${czPremium} % viac — a napriek tomu sa tam takéto byty vypredajú dvakrát ` +
+            `rýchlejšie. Vysvetlenie, že trojizbové byty sú drahé, a preto ležia, tým padá.`,
+        en: `The median three-room flat costs ${eur(priceSk["3"])} in Slovakia and ` +
+            `${eur(priceCz["3"])} in Czechia. A Czech buyer pays ${czPremium} % more for a ` +
+            `comparable flat — and those flats still clear twice as fast. The explanation ` +
+            `that three-room flats are expensive and therefore sit does not survive that.`,
       },
     },
     {
       type: "p",
       text: {
-        sk: `To má praktický dôsledok. Ak sa ponuka nepredáva cez zľavu, predáva sa cez ` +
-            `čas — a zle zvolená skladba projektu sa neprejaví na cenníku, ale na tom, ako ` +
-            `dlho ho developer drží. Rozhodnutie o pomere dvojizbových a trojizbových bytov ` +
-            `je preto zároveň rozhodnutím o dĺžke predaja a padá ešte pred začiatkom výstavby.`,
-        en: `That has a practical consequence. If supply does not sell through discounts, ` +
-            `it sells through time — and a badly chosen unit mix shows up not in the price ` +
-            `list but in how long the developer carries it. Deciding the ratio of two- to ` +
-            `three-room flats is therefore also a decision about the length of the sales ` +
-            `period, and it is taken before construction begins.`,
+        sk: `Rozdiel je v tom, koľko ich kde stojí. Na Slovensku tvoria trojizbové byty ` +
+            `${pct(mixSk["3"])} celej ponuky novostavieb, v Česku ${pct(mixCz["3"])}. ` +
+            `Pri najmenších bytoch je to opačne: na Slovensku ${pct(mixSk["1"])} ponuky, ` +
+            `v Česku ${pct(mixCz["1"])}. Slovenský trh má ťažisko vyššie — a práve tam sa ` +
+            `zásoba hromadí.`,
+        en: `The difference is how many of them stand where. Three-room flats are ` +
+            `${pct(mixSk["3"], "en")} of all Slovak new-build supply and ` +
+            `${pct(mixCz["3"], "en")} of Czech. The smallest flats run the other way: ` +
+            `${pct(mixSk["1"], "en")} of supply in Slovakia against ` +
+            `${pct(mixCz["1"], "en")} in Czechia. The Slovak market's centre of gravity sits ` +
+            `higher — and that is where the stock accumulates.`,
+      },
+    },
+    {
+      type: "p",
+      text: {
+        sk: `Dĺžka predaja trojizbového bytu teda nie je vlastnosť toho bytu, ale stav trhu, ` +
+            `do ktorého ho developer postaví. Ten istý byt sa za hranicou správa inak.`,
+        en: `So the selling time of a three-room flat is not a property of the flat but the ` +
+            `condition of the market it is built into. The same flat behaves differently ` +
+            `across the border.`,
       },
     },
 
     {
       type: "h2",
       text: {
-        sk: "Lacnejší projekt sa nepredáva rýchlejšie",
-        en: "A cheaper project does not sell faster",
+        sk: "Cenník konkurencie nie je signál",
+        en: "A competitor's price list is not a signal",
       },
     },
     {
       type: "p",
       text: {
-        sk: `Slovenské projekty s aspoň 20 voľnými bytmi sme rozdelili do štvrtín podľa ` +
-            `ceny za m². Najlacnejšej štvrtine (≈ ${eurM2(cheap.avgM2)}) by vypredanie ` +
-            `trvalo ${months(cheap.monthsDisplay)}, najdrahšej (≈ ${eurM2(dear.avgM2)}) ` +
-            `${months(dear.monthsDisplay)}. Veľkosťou projektov to nie je — mediánová ` +
-            `ponuka je v oboch krajných štvrtinách rovnako veľká.`,
-        en: `We split Slovak projects with at least 20 available flats into quartiles by ` +
-            `price per m². The cheapest quartile (≈ ${eurM2(cheap.avgM2)}) would take ` +
-            `${months(cheap.monthsDisplay, "en")} to clear, the priciest ` +
-            `(≈ ${eurM2(dear.avgM2)}) ${months(dear.monthsDisplay, "en")}. It is not project ` +
-            `size — median supply is the same in both outer quartiles.`,
+        sk: `Projekty, ktoré by sa pri súčasnom tempe vypredali do 18 mesiacov, zmenili cenu ` +
+            `v ${pct(ps.fast.pctChanged)} pozorovaní a ${pct(ps.fast.pctUp)} tých zmien ` +
+            `smerovalo nahor. Projekty, ktoré na to potrebujú viac než 30 mesiacov, menili ` +
+            `cenu v ${pct(ps.slow.pctChanged)} pozorovaní a nahor ich smerovalo ` +
+            `${pct(ps.slow.pctUp)}. Projekty, ktoré sa nepredávajú, teda zdražujú častejšie ` +
+            `aj ochotnejšie než tie, ktoré sa predávajú.`,
+        en: `Projects on track to clear within 18 months changed a price in ` +
+            `${pct(ps.fast.pctChanged, "en")} of observations, and ` +
+            `${pct(ps.fast.pctUp, "en")} of those changes were increases. Projects needing ` +
+            `more than 30 months changed a price in ${pct(ps.slow.pctChanged, "en")} of ` +
+            `observations, with ${pct(ps.slow.pctUp, "en")} of them increases. The projects ` +
+            `that are not selling raise prices both more often and more readily than the ` +
+            `ones that are.`,
       },
     },
     {
       type: "figure",
-      src: `/analyzy/${slug}-3-cena-vs-cas.svg`,
-      srcEn: `/analyzy/${slug}-3-cena-vs-cas-en.svg`,
+      src: `/analyzy/${slug}-3-cennik-signal.svg`,
+      srcEn: `/analyzy/${slug}-3-cennik-signal-en.svg`,
       alt: {
-        sk: "Mesiace do vypredania podľa cenovej štvrtiny projektu",
-        en: "Months to clear by project price quartile",
+        sk: "Podiel zmien cenníka smerujúcich nahor podľa rýchlosti predaja projektu",
+        en: "Share of price-list changes that were increases, by project sales speed",
       },
       caption: {
-        sk: `Slovenské projekty s 20 a viac voľnými bytmi. n = ${q.reduce((s, r) => s + r.projects, 0)} projektov.`,
-        en: `Slovak projects with 20 or more available flats. n = ${q.reduce((s, r) => s + r.projects, 0)} projects.`,
+        sk: `Slovenské projekty s 20 a viac voľnými bytmi: ${ps.fast.projects} rýchlych, ` +
+            `${ps.slow.projects} pomalých.`,
+        en: `Slovak projects with 20 or more available flats: ${ps.fast.projects} fast, ` +
+            `${ps.slow.projects} slow.`,
       },
     },
     {
       type: "p",
       text: {
-        sk: `Vzťah platí medzi projektmi, nie vnútri nich — v rámci jedného projektu sa ` +
-            `lacnejšie byty predávajú skôr. Čo z toho vyplýva: cenová hladina nehovorí nič ` +
-            `o tom, ako rýchlo sa projekt vypredá. Projekt, ktorý stojí, spravidla nemá ` +
-            `privysokú cenu — problém býva v polohe alebo v samotnom produkte, a zľava ` +
-            `nezmení ani jedno.`,
-        en: `The relationship holds between projects, not inside them — within a single ` +
-            `project the cheaper flats sell first. What follows: price level says nothing ` +
-            `about how fast a project clears. A project that is stuck usually is not priced ` +
-            `too high — the problem tends to be the location or the product itself, and a ` +
-            `discount changes neither.`,
+        sk: `Bežný spôsob, ako si developer overí vlastnú cenu, je pozrieť sa, za koľko ` +
+            `ponúka konkurencia. Tieto čísla hovoria, že z cenníka sa o konkurencii nedá ` +
+            `zistiť, ako sa jej darí — pohybuje sa nezávisle od predaja, a ak už niečo ` +
+            `naznačuje, tak opačne. Porovnávať sa treba s tým, ako rýchlo sa v okolí ` +
+            `predáva, nie s tým, čo je napísané v susedovom cenníku.`,
+        en: `The usual way a developer sanity-checks their own price is to look at what the ` +
+            `competition is asking. These figures say the price list reveals nothing about ` +
+            `how the competition is doing — it moves independently of sales and, if it ` +
+            `signals anything, points the wrong way. The comparison worth making is how fast ` +
+            `the neighbours are selling, not what their price list says.`,
       },
     },
 
     {
       type: "h2",
       text: {
-        sk: "„Regióny“ nie sú jeden trh",
-        en: "“The regions” are not one market",
+        sk: "Rovnaká cena, dvojnásobný čas",
+        en: "Same price, twice the time",
       },
     },
     {
       type: "p",
       text: {
-        sk: `Rozpätie medzi slovenskými mestami je od ${months(fastest.monthsDisplay)} ` +
-            `(${fastest.city}) po ${months(slowest.monthsDisplay)} (${slowest.city}). ` +
-            `Bratislava je presne v strede rebríčka — ${months(scope.bratislava.monthsDisplay)}. ` +
-            `Krajné mestá rebríčka delí ${months(slowest.monthsDisplay - fastest.monthsDisplay)}, ` +
-            `viac než delí ktorékoľvek z nich od hlavného mesta.`,
-        en: `The spread between Slovak towns runs from ${months(fastest.monthsDisplay, "en")} ` +
-            `(${fastest.city}) to ${months(slowest.monthsDisplay, "en")} (${slowest.city}). ` +
-            `Bratislava sits exactly in the middle of the table, at ` +
-            `${months(scope.bratislava.monthsDisplay, "en")}. The gap between two regional ` +
-            `capitals is therefore wider than the gap between either of them and the capital.`,
+        sk: `${pair.a.city} a ${pair.b.city} majú prakticky rovnaký medián ceny — ` +
+            `${eurM2(pair.a.medianM2)} a ${eurM2(pair.b.medianM2)}, rozdiel ` +
+            `${pair.priceGap} € na meter. Čas do vypredania je pritom ` +
+            `${months(pair.a.monthsDisplay)} a ${months(pair.b.monthsDisplay)}. Naprieč ` +
+            `sledovanými mestami sa pohybuje od ${months(fastest.monthsDisplay)} ` +
+            `(${fastest.city}) po ${months(slowest.monthsDisplay)} (${slowest.city}) a ` +
+            `poradie nekopíruje cenu.`,
+        en: `${pair.a.city} and ${pair.b.city} have practically the same median price — ` +
+            `${eurM2(pair.a.medianM2)} and ${eurM2(pair.b.medianM2)}, ${pair.priceGap} € per ` +
+            `metre apart. Their clearing times are ${months(pair.a.monthsDisplay, "en")} and ` +
+            `${months(pair.b.monthsDisplay, "en")}. Across the towns tracked the figure runs ` +
+            `from ${months(fastest.monthsDisplay, "en")} (${fastest.city}) to ` +
+            `${months(slowest.monthsDisplay, "en")} (${slowest.city}), and the order does not ` +
+            `follow price.`,
       },
     },
     {
@@ -211,62 +237,44 @@ export default {
       src: `/analyzy/${slug}-2-mesta.svg`,
       srcEn: `/analyzy/${slug}-2-mesta-en.svg`,
       alt: {
-        sk: "Mesiace do vypredania ponuky podľa mesta",
-        en: "Months to clear supply, by town",
+        sk: "Medián ceny a mesiace do vypredania v slovenských mestách",
+        en: "Median price against months to clear, Slovak towns",
       },
       caption: {
-        sk: "Slovenské mestá so 100 a viac voľnými bytmi v novostavbách.",
-        en: "Slovak towns with 100 or more available new-build flats.",
+        sk: "Mestá so 100 a viac voľnými bytmi a aspoň 25 predajmi za sledované obdobie.",
+        en: "Towns with 100 or more available flats and at least 25 sales in the observed period.",
       },
     },
     {
       type: "p",
       text: {
-        sk: `Ani tu to nie je o cene. ${pair.a.city} a ${pair.b.city} majú prakticky ` +
-            `rovnaký medián — ${eurM2(pair.a.medianM2)} a ${eurM2(pair.b.medianM2)}, ` +
-            `rozdiel ${pair.priceGap} € na meter. Čas do vypredania je pritom ` +
-            `${months(pair.a.monthsDisplay)} a ${months(pair.b.monthsDisplay)}. Rovnaká ` +
-            `cena, dvojnásobný čas.`,
-        en: `Here too it is not about price. ${pair.a.city} and ${pair.b.city} have ` +
-            `practically the same median — ${eurM2(pair.a.medianM2)} and ` +
-            `${eurM2(pair.b.medianM2)}, ${pair.priceGap} € per metre apart. Their clearing ` +
-            `times are ${months(pair.a.monthsDisplay, "en")} and ` +
-            `${months(pair.b.monthsDisplay, "en")}. Same price, twice the time.`,
-      },
-    },
-    {
-      type: "p",
-      text: {
-        sk: `Pre developera, ktorý zvažuje regionálny projekt, z toho vyplýva jedno: ` +
-            `lacnejší trh sám o sebe nesľubuje rýchlejší predaj. Ako rýchlo sa predáva ` +
-            `v konkrétnom meste, to sa dá zistiť vopred.`,
-        en: `For a developer weighing a regional project, one thing follows: a cheaper ` +
-            `market does not in itself promise a faster sale. How fast a given town ` +
-            `actually sells can be established in advance.`,
+        sk: `Ten istý projekt sa teda podľa mesta predáva rok alebo dva a z cenovej hladiny ` +
+            `mesta sa vopred nedá povedať, ktoré z toho. Pri kúpe pozemku je to rozdiel, ` +
+            `ktorý sa počíta v rokoch financovania.`,
+        en: `The same project therefore sells over one year or over two depending on the ` +
+            `town, and the town's price level will not tell you which in advance. When buying ` +
+            `land that difference is measured in years of financing.`,
       },
     },
   ],
 
   method: {
     sk: `Dáta pochádzajú z verejne publikovaných cenníkov developerov, ktoré Residata ` +
-        `zaznamenáva denne ${win.sk}. Mesiace do vypredania = aktuálna ponuka delená ` +
-        `priemerným mesačným počtom predajov za sledované obdobie; údaj predpokladá, že ` +
-        `tempo zostane rovnaké. Predaje sa identifikujú zo zmien stavu bytu v cenníku ` +
-        `developera; zahrnuté sú len byty, nie parkovacie státia, pivnice ani nebytové ` +
-        `priestory. Cena za m² sa počíta z obytnej plochy vrátane DPH; uvádzame mediány. ` +
-        `V prehľade miest sú len mestá so 100 a viac voľnými bytmi a aspoň 25 predajmi. ` +
-        `Priemerná ponuková cena za Bratislavu za ${d.benchmark.period} ` +
-        `(${n(d.benchmark.avgM2)} €/m²) pochádza od spoločnosti ${d.benchmark.source}; ` +
-        `ostatné čísla sú z vlastných dát.`,
+        `zaznamenáva denne od 16. mája 2026 (Česko od 9. júna). Mesiace do vypredania = ` +
+        `aktuálna ponuka delená priemerným mesačným počtom predajov za sledované obdobie; ` +
+        `údaj predpokladá, že tempo zostane rovnaké. Predaje sa identifikujú zo zmien stavu ` +
+        `bytu v cenníku developera; zahrnuté sú len byty, nie parkovacie státia, pivnice ani ` +
+        `nebytové priestory. Cena za m² sa počíta z obytnej plochy vrátane DPH; uvádzame ` +
+        `mediány. V grafe miest sú mestá so 100 a viac voľnými bytmi a aspoň 25 predajmi. ` +
+        `České ceny sú prepočítané kurzom ku dňu zberu. Všetky čísla sú z vlastných dát.`,
     en: `Data come from developers' publicly published price lists, recorded daily by ` +
-        `Residata ${win.en}. Months to clear = current supply divided by the average monthly ` +
-        `number of sales over the observed period; the figure assumes the pace stays the ` +
-        `same. Sales are identified from changes of status in the developer's own price ` +
-        `list; flats only — no parking spaces, storage or commercial units. Price per m² is ` +
-        `calculated on living area including VAT; figures are medians. The town table ` +
-        `includes only towns with 100 or more available flats and at least 25 sales. The ` +
-        `Bratislava average asking price for ${d.benchmark.period} ` +
-        `(${n(d.benchmark.avgM2)} €/m²) is published by ${d.benchmark.source}; all other ` +
-        `figures are our own.`,
+        `Residata since 16 May 2026 (Czechia from 9 June). Months to clear = current supply ` +
+        `divided by the average monthly number of sales over the observed period; the figure ` +
+        `assumes the pace stays the same. Sales are identified from changes of status in the ` +
+        `developer's own price list; flats only — no parking spaces, storage or commercial ` +
+        `units. Price per m² is calculated on living area including VAT; figures are medians. ` +
+        `The town chart includes towns with 100 or more available flats and at least 25 ` +
+        `sales. Czech prices are converted at the rate on the day of collection. All figures ` +
+        `are our own.`,
   },
 };

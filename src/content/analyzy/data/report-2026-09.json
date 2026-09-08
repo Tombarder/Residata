@@ -1,6 +1,6 @@
 {
   "asOf": "2026-09-08",
-  "generatedAt": "2026-09-08T08:06:30+00:00",
+  "generatedAt": "2026-09-08T08:22:22+00:00",
   "coverage": {
     "skActiveProjects": 246,
     "czActiveProjects": 154
@@ -448,6 +448,51 @@
     },
     "priceGap": 7,
     "monthsGap": 15
+  },
+  "priceSignal": {
+    "fast": {
+      "projects": 25,
+      "pctChanged": 2.9,
+      "pctUp": 78.4
+    },
+    "mid": {
+      "projects": 10,
+      "pctChanged": 24.9,
+      "pctUp": 97.5
+    },
+    "slow": {
+      "projects": 56,
+      "pctChanged": 9.1,
+      "pctUp": 93.3
+    }
+  },
+  "supplyMix": {
+    "sk": {
+      "1": 8.6,
+      "2": 44.2,
+      "3": 34.8,
+      "4": 12.4
+    },
+    "cz": {
+      "1": 19.4,
+      "2": 45.5,
+      "3": 26.0,
+      "4": 9.1
+    }
+  },
+  "medianPriceBySize": {
+    "sk": {
+      "1": 174900,
+      "2": 232875,
+      "3": 307100,
+      "4": 458215
+    },
+    "cz": {
+      "1": 266395,
+      "2": 379867,
+      "3": 523613,
+      "4": 755044
+    }
   },
   "priceBehaviour": {
     "tracked": 30901,

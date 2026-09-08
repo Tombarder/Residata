@@ -212,13 +212,13 @@ const SEO_BY_PAGE = {
     en: {
       title: "Three-room flats take a year longer to sell · Residata",
       description:
-        "At the current pace, Slovakia's two-room supply clears in 19 months and its three-room supply in 32. In Czechia the same gap is one month. Analysis of 246 active projects.",
+        "Slovak three-room supply would take 32 months to clear, two-room 19. Czech three-room flats cost 71 % more and clear in half the time — so it is not the price. Analysis of 246 projects.",
       keywords: "novostavby Slovensko, skladba bytov, predaj novostavieb, ceny bytov",
     },
     sk: {
       title: "Trojizbový byt sa predáva o rok dlhšie než dvojizbový · Residata",
       description:
-        "Pri súčasnom tempe sa ponuka dvojizbových bytov na Slovensku vypredá za 19 mesiacov, trojizbových za 32. V Česku je ten istý rozdiel jeden mesiac. Analýza 246 projektov.",
+        "Ponuka trojizbových bytov by sa vypredávala 32 mesiacov, dvojizbových 19. V Česku stojí trojizbový byt o 71 % viac a vypredá sa za polovičný čas — nie je to teda cenou. Analýza 246 projektov.",
       keywords: "novostavby Slovensko, dvojizbové byty, trojizbové byty, predaj novostavieb, ceny bytov, analýza trhu",
     },
   },
