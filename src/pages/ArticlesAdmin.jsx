@@ -51,6 +51,10 @@ const withKeys = (blocks) => (blocks || []).map((b) => ({ ...b, _k: b._k ?? `k${
 /** …and take them off again, so a client-side id never reaches the database. */
 const stripKeys = (blocks) => (blocks || []).map(({ _k, ...rest }) => rest);
 
+/** "a | b | c" -> ["a","b","c"]; empty string -> []. */
+const splitCells = (line) =>
+  (line || "").split("|").map((c) => c.trim()).filter((c, i, all) => c || i < all.length - 1);
+
 function emptyBlock(type) {
   const pair = { sk: "", en: "" };
   if (type === "figure") return { type, src: "", srcEn: "", alt: { ...pair }, caption: { ...pair } };
@@ -117,6 +121,7 @@ const LABEL = {
     steps: "krokov v pamäti",
     emptyTitle: "Titulok nesmie byť prázdny — bez neho je článok na webe bez nadpisu.",
     emptyPerex: "Perex nesmie byť prázdny — zobrazuje sa v zozname a vo vyhľadávaní.",
+    emptyDate: "Dátum musí byť vyplnený — určuje poradie článkov na webe.",
     liveNow: "Článok je na webe", draftNow: "Článok nie je na webe",
     confirmUnpublish: "Stiahnuť článok z webu? Prestane byť verejne dostupný.",
     date: "Dátum článku", ogImage: "Zdieľaný obrázok (cesta k súboru)",
@@ -126,6 +131,7 @@ const LABEL = {
     confirmRemoveBlock: "Zmazať tento blok? Undo (⌘Z) ho vráti.",
     bAddP: "Odsek", bAddH2: "Nadpis", bAddFigure: "Graf", bAddTable: "Tabuľka", bAddBullets: "Odrážky",
     imgPath: "Cesta k obrázku (SK)", imgPathEn: "Cesta k obrázku (EN)",
+    tableHead: "Hlavička (stĺpce oddelené |)", tableRows: "Riadky (bunky |, riadok na nový riadok)",
     deleteArticle: "Zmazať článok",
     confirmDeleteArticle: "Nenávratne zmazať tento článok? Publikovaný článok najprv stiahnite.",
     cannotDeletePublished: "Publikovaný článok sa nedá zmazať — najprv ho stiahnite z webu.",
@@ -148,6 +154,7 @@ const LABEL = {
     steps: "steps remembered",
     emptyTitle: "The title cannot be empty — the article would have no headline.",
     emptyPerex: "The standfirst cannot be empty — it is shown in the list and in search results.",
+    emptyDate: "The date is required — it orders the articles on the site.",
     liveNow: "Live on the site", draftNow: "Not on the site",
     confirmUnpublish: "Withdraw from the site? It will stop being publicly available.",
     date: "Article date", ogImage: "Share image (file path)",
@@ -157,6 +164,7 @@ const LABEL = {
     confirmRemoveBlock: "Delete this block? Undo (⌘Z) brings it back.",
     bAddP: "Paragraph", bAddH2: "Heading", bAddFigure: "Chart", bAddTable: "Table", bAddBullets: "Bullets",
     imgPath: "Image path (SK)", imgPathEn: "Image path (EN)",
+    tableHead: "Header (columns separated by |)", tableRows: "Rows (cells by |, one row per line)",
     deleteArticle: "Delete article",
     confirmDeleteArticle: "Permanently delete this article? Withdraw it from the site first.",
     cannotDeletePublished: "A published article cannot be deleted — withdraw it from the site first.",
@@ -360,6 +368,9 @@ function ArticleEditor({ slug, lang, onBack, onChanged }) {
     if ((draft.method?.sk || "").trim().length <= 40 || (draft.method?.en || "").trim().length <= 40) {
       out.push(t.methodTooShort);
     }
+    // article_date is NOT NULL and it orders the public index, so an empty date
+    // is a failed save with an unreadable Postgres error rather than a warning.
+    if (!draft.date) out.push(t.emptyDate);
     return out;
   }, [draft, t]);
 
@@ -640,10 +651,40 @@ function ArticleEditor({ slug, lang, onBack, onChanged }) {
                   ))}
                 </div>
               )}
+              {b.type === "table" && (
+                <>
+                  {/* A table's contents had no editor at all, so "+ Tabuľka"
+                      could only ever produce an empty table. Pipes and newlines
+                      keep it typeable without a grid widget. */}
+                  <BiField label={t.tableHead} rows={1}
+                           value={{ sk: (b.head?.sk || []).join(" | "), en: (b.head?.en || []).join(" | ") }}
+                           onChange={(v) => setBlock(i, {
+                             head: { sk: splitCells(v.sk), en: splitCells(v.en) },
+                           })} />
+                  <div style={{ marginBottom: "1.1rem" }}>
+                    <div style={{
+                      fontFamily: MONO, fontSize: "0.66rem", letterSpacing: "0.09em",
+                      textTransform: "uppercase", color: "var(--text-dim)", marginBottom: "0.45rem",
+                    }}>{t.tableRows}</div>
+                    <textarea rows={5} value={(b.rows || []).map((r) => r.join(" | ")).join("\n")}
+                              onChange={(e) => setBlock(i, {
+                                rows: e.target.value.split("\n").filter((l) => l.trim()).map(splitCells),
+                              })}
+                              style={{
+                                width: "100%", background: "var(--bg)", color: "var(--text)",
+                                border: "1px solid var(--border-soft)", borderRadius: 7,
+                                padding: "0.6rem 0.7rem", fontSize: "0.85rem", fontFamily: MONO,
+                                lineHeight: 1.6, resize: "vertical",
+                              }} />
+                  </div>
+                </>
+              )}
               <BiField label={t.caption} rows={2} value={b.caption}
                        onChange={(v) => setBlock(i, { caption: v })} />
-              <BiField label={t.alt} rows={1} value={b.alt}
-                       onChange={(v) => setBlock(i, { alt: v })} />
+              {b.type === "figure" && (
+                <BiField label={t.alt} rows={1} value={b.alt}
+                         onChange={(v) => setBlock(i, { alt: v })} />
+              )}
             </>
           )}
         </div>

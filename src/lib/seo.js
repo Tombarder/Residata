@@ -604,12 +604,14 @@ export function applyArticleSeo(article, lang) {
   setMeta("property", "og:type", "article");
   setMeta("name", "twitter:title", title);
   setMeta("name", "twitter:description", description);
-  if (article.ogImage) {
-    const img = article.ogImage.startsWith("http") ? article.ogImage : SITE_BASE + article.ogImage;
-    setMeta("property", "og:image", img);
-    setMeta("property", "og:image:alt", title);
-    setMeta("name", "twitter:image", img);
-  }
+  // ALWAYS write og:image, never conditionally: an article without its own share
+  // card used to keep the previous article's, so a link preview showed the wrong
+  // chart. Falling back to the site card is correct; inheriting is not.
+  const share = article.ogImage || "/og-image.png";
+  const img = share.startsWith("http") ? share : SITE_BASE + share;
+  setMeta("property", "og:image", img);
+  setMeta("property", "og:image:alt", title);
+  setMeta("name", "twitter:image", img);
 
   // The rest of what applySeo owns. Without these an article kept the locale,
   // site name and hreflang of whatever page the visitor arrived from.
