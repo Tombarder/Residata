@@ -9,6 +9,7 @@ import { useAccountPrefState } from "../lib/useAccountUiPref";
 import { PIVOT_KEY as PIVOT_PREF_KEY } from "../lib/accountPrefs";
 import { moneyFromEur, moneySymbol } from "../lib/money";
 import Picker from "../components/Picker";
+import InfoTip from "../components/InfoTip";
 import { localeTag } from "../lib/locale";
 import { useCurrency } from "../lib/useCurrency";
 import { orderPivotColKeys } from "../lib/pivotColOrder";
@@ -488,6 +489,66 @@ function isFilterActive(f) {
   if (f.mode === "empty" || f.mode === "not_empty") return true;
   if (f.mode === "between") return f.min != null || f.max != null;
   return Array.isArray(f.values) && f.values.length > 0;
+}
+
+/* ── PRICE SCOPE — one population the moment money enters the calculation ────
+   A pivot row sets averages side by side, and a reader combines them: avg price
+   divided by avg area ought to be the avg EUR/m2 in the next column. That only
+   holds if all three describe the SAME flats — and they did not. Developers
+   delete a flat's price when it sells, so 59% of listed flats carry no price
+   (measured 2026-09-09: 17 799 priced of 43 059 current). The price columns were
+   therefore computed on the priced minority while the area columns were computed
+   on everything. Dostupne byvanie Nitra, 2-izbove: 27 of 141 flats priced, and
+   those 27 average 57.4 m2 against 51.2 m2 for all 141 — so the table showed
+   184 663 EUR beside 51.2 m2 beside 3 213 EUR/m2, and 184 663 / 51.2 = 3 605.
+   No single number was wrong; no two of them agreed either.
+
+   This is not occasional noise. EUR/m2 moves systematically with flat size, so a
+   mixed population is reliably wrong, in a direction nobody can predict.
+
+   THE RULE (Boss, 2026-09-09): as soon as a price is in the equation, the
+   population IS "flats with a published price" — automatically, never an opt-in.
+   A pivot that touches no price ("how big are the flats here?") is untouched and
+   still sees every flat.
+
+   WHY A FILTER, rather than special-cased maths: every consumer in this file
+   already honours filters — the server spec, the client record path, the
+   drill-down list and the CSV export. Expressing the scope as one ordinary
+   filter keeps all four consistent, and covers every field added LATER without
+   naming it here. The server needs no migration either: analytics_pivot's
+   null-filter branch already accepts a measure key ("dim OR measure (e.g. price
+   'has value')"), and the facts path it routes to costs ~43 ms.
+
+   cena_s_dph alone is enough: cena_bez_dph has IDENTICAL coverage (17 799 each,
+   zero rows carrying one without the other) because dph_normalizer always
+   derives one from the other. */
+const PRICE_VALUE_FIELDS = new Set(["cena_s_dph", "cena_bez_dph", "cena_na_m2_obytnej", "wavg_m2_price"]);
+const PRICE_SCOPE_FILTER = Object.freeze({ key: "cena_s_dph", mode: "not_empty" });
+
+/* Measures that count the PRICE LIST rather than averaging money per flat. They
+   must never be read as if they described the priced subset: sold flats are
+   precisely the ones that lose their price, so absorption computed inside the
+   price scope collapses (it reads ~10% where the list says ~60%). They stay in
+   the table — a count cannot be multiplied against an average, so they are not
+   part of the reconciliation problem — but they are flagged, because a number
+   that quietly changed meaning is the whole reason this scope exists. Real
+   sales live on Analytics -> Predaje (analytics.sale_events). */
+const STATUS_MEASURES = new Set(["abs_rate", "sold_count", "available_count"]);
+
+/* Thin-space thousands, matching how the rest of the pivot renders counts. */
+const fmtCount = (n) => Number(n || 0).toLocaleString("en-US").replace(/,/g, " ");
+
+/* Is money in the equation? A value on a price field, or a filter narrowing one.
+   An explicit "empty" filter on a price field is the deliberate opposite request
+   — show me the flats WITHOUT a price — and must not be overruled into an empty
+   table. */
+function priceIsInPlay(valueDefs, filters) {
+  for (const f of (filters || [])) {
+    if (isFilterActive(f) && PRICE_VALUE_FIELDS.has(f.key) && f.mode === "empty") return false;
+  }
+  for (const v of (valueDefs || [])) if (v && PRICE_VALUE_FIELDS.has(v.field)) return true;
+  for (const f of (filters || [])) if (isFilterActive(f) && PRICE_VALUE_FIELDS.has(f.key)) return true;
+  return false;
 }
 
 function passesFilter(record, filter) {
@@ -1463,11 +1524,30 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
     [values]
   );
 
+  // ── Price scope ── see PRICE_VALUE_FIELDS. When money is in the equation the
+  // population becomes "flats with a published price", so every column in the
+  // table describes the same flats and price / area reconciles with the EUR/m2.
+  // Appended to the user's own filters rather than pushed INTO filter state: it
+  // must not be deletable, must not be saved into a view, and must re-evaluate
+  // the instant a price column is added or removed.
+  const priceScope = useMemo(() => priceIsInPlay(effectiveValues, filters), [effectiveValues, filters]);
+  const effectiveFilters = useMemo(
+    () => (priceScope ? [...filters, PRICE_SCOPE_FILTER] : filters),
+    [filters, priceScope]
+  );
+
   // Apply filters BEFORE tree build. Inactive filters (chip dropped but not
   // yet configured) pass everything through — see isFilterActive.
   const filteredRecords = useMemo(
-    () => records.filter(r => filters.every(f => passesFilter(r, f))),
-    [records, filters]
+    () => records.filter(r => effectiveFilters.every(f => passesFilter(r, f))),
+    [records, effectiveFilters]
+  );
+  // The same records WITHOUT the price scope — the denominator behind "27 of
+  // 141". Record path only; the grain path gets its denominator from a parallel
+  // unscoped RPC below.
+  const unscopedRecords = useMemo(
+    () => (priceScope ? records.filter(r => filters.every(f => passesFilter(r, f))) : filteredRecords),
+    [priceScope, records, filters, filteredRecords]
   );
 
   // ── Server-side aggregation gate (forever perf fix) ───────────────
@@ -1477,8 +1557,8 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   // independent: it pulls records for a drill-down (table stays on the grain)
   // or to back a non-server-able config (median / ad-hoc filter / rare field).
   const configServerable = useMemo(
-    () => canViewAnalytics && isServerable(rows, cols, effectiveValues, filters),
-    [canViewAnalytics, rows, cols, effectiveValues, filters]
+    () => canViewAnalytics && isServerable(rows, cols, effectiveValues, effectiveFilters),
+    [canViewAnalytics, rows, cols, effectiveValues, effectiveFilters]
   );
   const gDims = useMemo(() => [...rows, ...cols], [rows, cols]);
   // Full server-side spec — ALL active filters (any dim, any mode) go to the engine,
@@ -1486,10 +1566,19 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   // (`isCurrent` already accounts for a time group-by — see its definition — so a
   // Datum/Mesiac dimension in Rows correctly switches the engine into archive mode.)
   const pivotSpec = useMemo(
-    () => buildPivotSpec({ dims: gDims, filters, country, isCurrent }),
-    [gDims, filters, country, isCurrent]
+    () => buildPivotSpec({ dims: gDims, filters: effectiveFilters, country, isCurrent }),
+    [gDims, effectiveFilters, country, isCurrent]
   );
   const { grain, loading: grainLoading, error: grainError } = usePivotGrain({ enabled: configServerable, spec: pivotSpec });
+  // Denominator for the price-scope note: the SAME grouping without the price
+  // scope, so the note can say "27 of 141" concretely instead of hand-waving.
+  // Fired concurrently with the scoped call (both effects run in one render), so
+  // it costs a connection rather than wall-clock, and only while the scope is on.
+  const pivotSpecUnscoped = useMemo(
+    () => (priceScope ? buildPivotSpec({ dims: gDims, filters, country, isCurrent }) : null),
+    [priceScope, gDims, filters, country, isCurrent]
+  );
+  const { grain: grainUnscoped } = usePivotGrain({ enabled: configServerable && priceScope, spec: pivotSpecUnscoped });
   // A non-server-able config needs records — pull them (sticky once needed).
   useEffect(() => {
     if (canViewAnalytics && !configServerable && !forceRaw) setForceRaw(true);
@@ -1552,6 +1641,34 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
 
   // Header unit count + loading skeleton, source-aware.
   const displayCount = useGrain ? (rawTree?.count || 0) : records.length;
+
+  // How many flats the price scope kept and how many it set aside — the concrete
+  // "27 of 141" that makes the note land instead of sounding like a disclaimer.
+  // Grain path sums the two RPCs; record path counts the two record sets. Returns
+  // null while the second RPC is still in flight, so the note degrades to its
+  // sentence rather than flashing a wrong ratio.
+  const priceCoverage = useMemo(() => {
+    if (!priceScope) return null;
+    let included, total;
+    if (useGrain) {
+      if (!grain || !grainUnscoped) return null;
+      included = grain.reduce((acc, g) => acc + (+g?.m?.n || 0), 0);
+      total    = grainUnscoped.reduce((acc, g) => acc + (+g?.m?.n || 0), 0);
+    } else {
+      included = filteredRecords.length;
+      total    = unscopedRecords.length;
+    }
+    if (!(total > 0) || total < included) return null;
+    return { included, total, excluded: total - included };
+  }, [priceScope, useGrain, grain, grainUnscoped, filteredRecords, unscopedRecords]);
+
+  // Status measures inside the price scope read LOW (sold flats are the ones
+  // that lose their price) — see STATUS_MEASURES. Named explicitly so the
+  // warning points at the column the user actually picked.
+  const statusMeasuresInPlay = useMemo(
+    () => (priceScope ? effectiveValues.filter(v => STATUS_MEASURES.has(v.field)).map(v => fieldLabel(v.field, lang)) : []),
+    [priceScope, effectiveValues, lang]
+  );
 
   // Stav split for the header — so the unit count is never misread as "all on
   // the market". On-market = V (voľné) + PR (predrezervované) + R (rezervované);
@@ -1892,6 +2009,67 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
         />
       )}
 
+      {/* Price scope — says, in one line, which flats every number below is
+          about. Persistent rather than a dismissable toast: it stays true for as
+          long as a price column is in the table, so it stays readable that long.
+          It appears and disappears with the scope itself, which is the "it just
+          turned on" signal. */}
+      {rows.length > 0 && priceScope && (
+        <div className="pivot-price-scope" style={{
+          margin: "0.6rem 0 0", padding: "0.55rem 0.75rem",
+          border: "1px solid color-mix(in srgb, var(--accent) 32%, transparent)",
+          background: "color-mix(in srgb, var(--accent) 7%, transparent)",
+          borderRadius: 8, display: "flex", alignItems: "center", gap: "0.5rem",
+          flexWrap: "wrap", fontSize: "0.76rem", lineHeight: 1.5,
+        }}>
+          <span style={{
+            display: "inline-flex", alignItems: "center", gap: "0.3rem", whiteSpace: "nowrap",
+            padding: "0.15rem 0.45rem", borderRadius: 999,
+            background: "color-mix(in srgb, var(--accent) 16%, transparent)",
+            color: "var(--accent)", fontWeight: 600,
+          }}>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="4" y="10" width="16" height="10" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" />
+            </svg>
+            {lang === "sk" ? "Len byty s cenou" : "Priced units only"}
+          </span>
+          <span style={{ color: text }}>
+            {lang === "sk"
+              ? "Pracuješ s cenou, tak počítame len z bytov, ktoré cenu majú."
+              : "You are working with price, so only units that have one are counted."}
+          </span>
+          {priceCoverage && (
+            <span style={{ color: dim }}>
+              {lang === "sk"
+                ? `Zahrnutých ${fmtCount(priceCoverage.included)} z ${fmtCount(priceCoverage.total)} · ${fmtCount(priceCoverage.excluded)} bez ceny je mimo výpočtu.`
+                : `${fmtCount(priceCoverage.included)} of ${fmtCount(priceCoverage.total)} included · ${fmtCount(priceCoverage.excluded)} with no price left out.`}
+            </span>
+          )}
+          <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center" }}>
+            <InfoTip
+              label={lang === "sk" ? "Len byty s cenou" : "Priced units only"}
+              text={lang === "sk"
+                ? "Developer väčšinou zmaže cenu, keď sa byt predá — bez ceny je dnes zhruba 6 z 10 bytov v cenníkoch. Keby sa priemerná plocha rátala zo všetkých bytov a priemerná cena len z tých, čo cenu majú, každý stĺpec by opisoval iné byty a cena ÷ plocha by nesedela na €/m². Preto sa pri práci s cenou automaticky počíta len z bytov s cenou. Chceš všetky byty? Odober cenové stĺpce."
+                : "Developers usually delete the price when a unit sells — about 6 in 10 listed units carry no price today. If average area came from every unit while average price came only from priced ones, each column would describe a different set and price ÷ area would not match the €/m². So whenever a price is in play, only units that have one are counted. Want every unit? Remove the price columns."}
+            />
+          </span>
+          {statusMeasuresInPlay.length > 0 && (
+            <span style={{
+              flexBasis: "100%", display: "flex", gap: "0.35rem", alignItems: "flex-start",
+              color: "#f59e0b", marginTop: "0.15rem",
+            }}>
+              <span aria-hidden="true">⚠</span>
+              <span>
+                {lang === "sk"
+                  ? `${statusMeasuresInPlay.join(", ")}: predané byty cenu spravidla nemajú, takže v tomto výbere vychádza nižšie, než aký je cenník naozaj. Skutočný predaj je v Analytics → Predaje.`
+                  : `${statusMeasuresInPlay.join(", ")}: sold units usually carry no price, so inside this scope it reads lower than the price list really is. Actual sales live in Analytics → Predaje.`}
+              </span>
+            </span>
+          )}
+        </div>
+      )}
+
       <ResultTable
         rowFields={rows}
         colFields={cols}
@@ -1949,7 +2127,7 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
           // the filtered cell number the user actually clicked.
           const filtered = enriched.filter((r) =>
             path.every((pv, i) => { const f = FIELDS[rows[i]]; return f && normKey(f.accessor(r)) === pv; })
-            && filters.every((flt) => passesFilter(r, flt))
+            && effectiveFilters.every((flt) => passesFilter(r, flt))
           );
           setDrillDown((d) => (d && d.pathKey === node.pathKey ? { ...d, records: filtered, loading: false } : d));
         }}
@@ -2113,6 +2291,9 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
       )}
 
       <style>{`
+        @keyframes pivotScopeIn { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+        .pivot-price-scope { animation: pivotScopeIn 180ms ease-out; }
+        @media (prefers-reduced-motion: reduce) { .pivot-price-scope { animation: none; } }
         @media (max-width: 820px) {
           .pivotv2-grid { grid-template-columns: 1fr !important; }
         }
