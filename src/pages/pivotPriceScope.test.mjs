@@ -30,6 +30,9 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 const SRC = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "PivotV2.jsx"), "utf8");
+// The home predicate is shared with Reports, so it is a real module and is imported
+// (not lifted from source like the pivot-only helpers below).
+const { HOME_UNIT_TYPES, isHomeUnit } = await import("../lib/unitKinds.js");
 
 /* Evaluate the scope's pure logic straight out of the source. It depends on
    nothing but isFilterActive and two Sets, so it lifts cleanly — and testing the
@@ -46,10 +49,13 @@ new Function(
   "exports",
   lift("function isFilterActive(f) {", "\n}") + "\n" +
   lift("const PRICE_VALUE_FIELDS", "\n") + "\n" +
+  lift("const HOME_SCOPE_OPT_OUT_FIELDS", "\n") + "\n" +
   lift("function priceIsInPlay(valueDefs, filters) {", "\n}") + "\n" +
-  "exports.priceIsInPlay = priceIsInPlay; exports.PRICE_VALUE_FIELDS = PRICE_VALUE_FIELDS;",
+  lift("function homeScopeApplies(rowFields, colFields, filters) {", "\n}") + "\n" +
+  "exports.priceIsInPlay = priceIsInPlay; exports.PRICE_VALUE_FIELDS = PRICE_VALUE_FIELDS;" +
+  "exports.homeScopeApplies = homeScopeApplies;",
 )(scope);
-const { priceIsInPlay, PRICE_VALUE_FIELDS } = scope;
+const { priceIsInPlay, PRICE_VALUE_FIELDS, homeScopeApplies } = scope;
 
 const V = (field, agg = "avg") => ({ key: field, field, agg });
 
@@ -137,4 +143,71 @@ test("status measures are named so the scope can warn about them", () => {
   for (const k of ["abs_rate", "sold_count", "available_count"]) {
     assert.ok(m[1].includes(`"${k}"`), `${k} must be in STATUS_MEASURES`);
   }
+});
+
+
+/* ── HOME SCOPE ────────────────────────────────────────────────────────────────
+   The second half of the same disease, found by the deeper audit on 2026-09-09:
+   a price list carries garages, cellars, shops, offices and plots, and the pivot
+   averaged money across all of them. 45 active projects had a distorted average
+   price, 8 of them by 20% or more — Na Kacici showed 98 391 EUR where its homes
+   average 353 536 EUR. Market-wide the error is under 1%, which is why it
+   survived: invisible in the total, severe in the single project someone is
+   actually deciding on. */
+
+test("the home allow-list matches reference.is_home_type exactly", () => {
+  // GENERATED in the DB from v2/lib/unit_kinds.py::HOME_TYPES. Re-verify with:
+  //   SELECT prosrc FROM pg_proc WHERE proname = 'is_home_type';
+  // Pinned here so a silent edit on either side shows up as a failing test rather
+  // than as a quietly different average.
+  assert.deepEqual([...HOME_UNIT_TYPES].sort(),
+    ["apartment", "flat", "house", "semi-detached house", "studio"]);
+});
+
+test("no stated kind means a flat — and every non-home kind is excluded", () => {
+  // NULL is a home: the parser stated no kind, and on a residential price list
+  // that is a flat. This mirrors the SQL function's `typ IS NULL OR ...`.
+  for (const v of [null, undefined, "", "flat", "Flat", " APARTMENT ", "house", "studio", "semi-detached house"]) {
+    assert.equal(isHomeUnit(v), true, `${JSON.stringify(v)} should count as a home`);
+  }
+  for (const v of ["parking", "parking_garage", "parking_outside", "storage", "land", "retail", "office", "other"]) {
+    assert.equal(isHomeUnit(v), false, `${v} must never enter a money average`);
+  }
+});
+
+test("homes-only applies by default whenever money is in play", () => {
+  assert.equal(homeScopeApplies(["project_name"], [], []), true);
+  assert.equal(homeScopeApplies(["city"], ["izby"], [{ key: "stav", mode: "in", values: ["V"] }]), true);
+});
+
+test("homes-only stands down when the user brought unit types into the question", () => {
+  // Type in Rows/Columns already splits homes from garages into separate rows, so
+  // nothing is blended — and dropping the garage row would be the surprising act.
+  assert.equal(homeScopeApplies(["typ"], [], []), false);
+  assert.equal(homeScopeApplies(["project_name"], ["typ"], []), false);
+  // An explicit filter is the user's own choice and must not be overruled.
+  assert.equal(homeScopeApplies(["project_name"], [], [{ key: "typ", mode: "in", values: ["parking"] }]), false);
+  assert.equal(homeScopeApplies(["project_name"], [], [{ key: "is_home", mode: "in", values: ["false"] }]), false);
+  // ...but an inactive, unconfigured chip is not a choice.
+  assert.equal(homeScopeApplies(["project_name"], [], [{ key: "typ" }]), true);
+});
+
+test("is_home is wired for the server and hidden from the palette", () => {
+  assert.ok(/"is_home",\s*\/\/ registered in analytics\.dim_registry/.test(SRC),
+    "is_home must be in SERVERABLE_DIMS so the engine applies the filter server-side");
+  const orderBlock = SRC.slice(SRC.indexOf("const FIELD_ORDER"), SRC.indexOf("];", SRC.indexOf("const FIELD_ORDER")));
+  assert.ok(!orderBlock.includes('"is_home"'),
+    "is_home is an internal scope, not a palette field — it must stay out of FIELD_ORDER");
+  assert.ok(SRC.includes("  is_home:           {"), "is_home must exist in FIELDS for the client record path");
+  assert.ok(SRC.includes('import { isHomeUnit } from "../lib/unitKinds"'),
+    "the home predicate must come from the shared module, not a second local copy");
+});
+
+test("both scopes are appended to the filter list, never written into user state", () => {
+  const idx = SRC.indexOf("const effectiveFilters = useMemo");
+  const block = SRC.slice(idx, idx + 400);
+  assert.ok(block.includes("PRICE_SCOPE_FILTER"), "price scope must be appended");
+  assert.ok(block.includes("HOME_SCOPE_FILTER"), "home scope must be appended");
+  // setFilters would persist the scope into a saved view and let the user delete it.
+  assert.ok(!block.includes("setFilters"), "scopes must never be pushed into filter state");
 });

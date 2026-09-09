@@ -30,6 +30,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useSpecifics, useProjectSpecificsData, SpecificsMark, SpecificsPanel,
          UnitPriceMarks } from "../lib/projectSpecifics";
 import { useProjects, useProjectSnapshots, useReportHistogram, fetchReportBinUnits, useReportProjectUnits, useReportComparables, useScopeRoomPrices } from "../lib/useData";
+import { isHomeUnit } from "../lib/unitKinds";
 import LoadError from "../components/LoadError";
 import Picker from "../components/Picker";
 import InfoTip from "../components/InfoTip";
@@ -735,6 +736,7 @@ function ProjectReport({ project, siblings, lang }) {
   // (EUR basis — useReportProjectUnits overlays price_s_dph_eur onto cena_s_dph).
   const fetchBin = useMemo(() => (from, to) => Promise.resolve(
     (flats || [])
+      .filter(f => isHomeUnit(f.typ))   // must list exactly what priceDistribution counted
       .filter(f => (f.stav === "V" || f.stav === "R" || f.stav === "PR") && f.cena_s_dph > 0 && f.obytna_plocha > 0)
       .map(f => ({ f, m2: f.cena_s_dph / f.obytna_plocha }))
       .filter(x => x.m2 >= from && x.m2 < to)
@@ -776,7 +778,11 @@ function ProjectReport({ project, siblings, lang }) {
             {summary.hasUnitData
               ? <> Celkovo {summary.totalUnits} bytov, {summary.soldPct != null ? summary.soldPct.toFixed(0) : "—"}% predaných.</>
               : <> Jednotkové dáta pre tento projekt ešte neposielame (registrový záznam).</>}
-            {summary.wavgM2 && <> Vážený priemer <strong style={{ color: text }}>{Math.round(moneyFromEur(summary.wavgM2)).toLocaleString("sk-SK")} {moneySymbol()}/m²</strong>.</>}</>
+            {/* NOT "vážený": in the project deep-dive this is the mean of each flat's own
+                €/m² (the same statistic as projects_live.avg_price_eur_m2, kept identical so
+                the two surfaces agree). Calling it weighted was simply the wrong word — the
+                KPI tile above dropped the same claim for the same reason. */}
+            {summary.wavgM2 && <> Priemerná cena <strong style={{ color: text }}>{Math.round(moneyFromEur(summary.wavgM2)).toLocaleString("sk-SK")} {moneySymbol()}/m²</strong>.</>}</>
           ) : (
             <><strong style={{ color: text }}>{project.name}</strong> by <strong style={{ color: text }}>{project.developer || "—"}</strong> in <strong style={{ color: text }}>{project.district || "—"}</strong>.
             {summary.hasUnitData
@@ -1156,7 +1162,11 @@ function AggregateTable({ rows, lang, nameLabel }) {
             <th style={tdhR}>{lang === "sk" ? "Bytov"    : "Units"}</th>
             <th style={tdhR}>{lang === "sk" ? "Voľných"  : "Available"}</th>
             <th style={tdhR}>{lang === "sk" ? "Pred. %" : "Sold %"}<HdrInfo lang={lang} sk="Podiel už predaných z celku v skupine. V agregovaných pohľadoch (trh/mesto/časť) je to odhad z registrových údajov developera — pre presné počty predaných pozri stránku Predaje." en="Share already sold of the group's total. In aggregate views (market/city/district) this is an estimate from developers' registry data — for exact sold counts see the Sales page." /></th>
-            <th style={tdhR}>Ø {moneySymbol()}/m²<HdrInfo lang={lang} sk="Priemerná ponuková cena za m² (s DPH) voľných bytov v skupine, vážená počtom bytov." en="Average asking price per m² (incl. VAT) of available units in the group, weighted by unit count." /></th>
+            {/* No weighting claim: this table is fed from two places — the by-izby/typ/poschodie
+                rows weight by floor area (Σ cena ÷ Σ plocha), the locality rows weight by
+                unit count. One tooltip cannot be true of both, and naming the wrong one is
+                worse than naming neither. Same call as the Ø €/m² KPI tile. */}
+            <th style={tdhR}>Ø {moneySymbol()}/m²<HdrInfo lang={lang} sk="Priemerná ponuková cena za m² (s DPH) voľných bytov v skupine." en="Average asking price per m² (incl. VAT) of available units in the group." /></th>
             <th style={{ ...tdh, minWidth: 90 }}>{lang === "sk" ? "Relatívne" : "Relative"}<HdrInfo lang={lang} sk="Vizuálne porovnanie veľkosti skupín podľa počtu bytov — najväčšia skupina má plnú lištu." en="Visual size comparison of the groups by unit count — the largest group has a full bar." /></th>
           </tr>
         </thead>
@@ -1273,7 +1283,11 @@ function ProjectTable({ projects, flats, lang, onProjectClick }) {
   const byProject = useMemo(() => {
     if (!haveFlats) return null;
     const m = new Map();
-    for (const f of flats) {
+    // Homes only, so a per-project count here can never contradict projects_live
+    // (which reads final.home_units). Currently no caller passes `flats`, so this
+    // branch is dormant — the filter is here so reviving it cannot quietly count
+    // parking bays as units. See src/lib/unitKinds.js.
+    for (const f of flats.filter(x => isHomeUnit(x.typ))) {
       let r = m.get(f.project_id);
       if (!r) { r = { total: 0, V: 0, P: 0, R: 0, PR: 0, future: 0, err: 0 }; m.set(f.project_id, r); }
       r.total++;
@@ -2478,13 +2492,22 @@ function summariseProjects(projects, flats) {
   const haveFlats = Array.isArray(flats);
 
   if (haveFlats) {
-    const total       = flats.length;
-    const available   = flats.filter(f => f.stav === "V").length;
-    const sold        = flats.filter(f => f.stav === "P").length;
-    const reserved    = flats.filter(f => f.stav === "R").length;
-    const prereserved = flats.filter(f => f.stav === "PR").length;
-    const future      = flats.filter(f => f.stav === "Ešte nie v ponuke").length;
-    const errored     = flats.filter(f => f.stav === "ERROR").length;
+    // Homes only. A price list carries parking bays, cellars, shops and plots, and
+    // counting them here made this page contradict every other surface in the app:
+    // projects_live reports Na Kacici as 18 units (it reads final.home_units) while
+    // this counted its 86 price-list rows — and averaged their money together, which
+    // is 98 391 EUR against the 353 536 EUR its flats actually average. The comment
+    // below already claimed to match projects_live; now it does. The caller keeps the
+    // unfiltered rows, so the per-type breakdown still shows every bay and shop.
+    // See src/lib/unitKinds.js.
+    const homes = flats.filter(f => isHomeUnit(f.typ));
+    const total       = homes.length;
+    const available   = homes.filter(f => f.stav === "V").length;
+    const sold        = homes.filter(f => f.stav === "P").length;
+    const reserved    = homes.filter(f => f.stav === "R").length;
+    const prereserved = homes.filter(f => f.stav === "PR").length;
+    const future      = homes.filter(f => f.stav === "Ešte nie v ponuke").length;
+    const errored     = homes.filter(f => f.stav === "ERROR").length;
     // 30-day velocity stays per-project (real, computed from stav
     // transitions in the sync). Sum across the projects in scope.
     const sold30      = projects.reduce((a, p) => a + (p.sold_last_month || 0), 0);
@@ -2500,7 +2523,7 @@ function summariseProjects(projects, flats) {
     // them retain a price field but those are old transactions that
     // bias the headline downward. Matches projects_live.avg_price_eur_m2
     // which filters the same way at the DB layer.
-    const m2List = flats
+    const m2List = homes
       .filter(f => (f.stav === "V" || f.stav === "R" || f.stav === "PR")
                 && f.cena_s_dph > 0 && f.obytna_plocha > 0)
       .map(f => f.cena_s_dph / f.obytna_plocha);
@@ -2634,8 +2657,14 @@ function groupAggregates(projects, key, lang, allFlats) {
    For numeric-looking keys (izby, poschodie) we sort numerically so
    1,2,3,4,10 doesn't come back as 1,10,2,3,4. */
 function groupAggregatesFromFlats(flats, key) {
+  // Homes only — a garage averaged in with the flats compares different products
+  // (see src/lib/unitKinds.js). The one exception is grouping BY type: there each
+  // bucket is already a single kind, nothing is blended, and dropping the garage
+  // bucket would delete the very rows this table exists to show. Same rule the
+  // Pivot follows when Typ sits in Rows.
+  const rows = key === "typ" ? flats : flats.filter(f => isHomeUnit(f.typ));
   const buckets = {};
-  for (const f of flats) {
+  for (const f of rows) {
     const k = f[key] == null || f[key] === "" ? "(—)" : String(f[key]);
     (buckets[k] = buckets[k] || []).push(f);
   }
@@ -2693,7 +2722,9 @@ function bandLabel(bin) {
 }
 
 function priceDistribution(flats, nBins) {
+  // Homes only, matching report_price_histogram server-side (see src/lib/unitKinds.js).
   const values = flats
+    .filter(f => isHomeUnit(f.typ))
     .filter(f => f.stav === "V" || f.stav === "R" || f.stav === "PR")
     .map(f => {
       const p = Number(f.cena_s_dph), m = Number(f.obytna_plocha);

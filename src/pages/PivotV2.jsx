@@ -8,6 +8,7 @@ import { useAuth } from "../lib/useAuth";
 import { useAccountPrefState } from "../lib/useAccountUiPref";
 import { PIVOT_KEY as PIVOT_PREF_KEY } from "../lib/accountPrefs";
 import { moneyFromEur, moneySymbol } from "../lib/money";
+import { isHomeUnit } from "../lib/unitKinds";
 import Picker from "../components/Picker";
 import InfoTip from "../components/InfoTip";
 import { localeTag } from "../lib/locale";
@@ -67,6 +68,11 @@ const FIELDS = {
   project_name:      { label: "Project name",               group: "identity", type: "text",   accessor: (r) => r.project_name },
   unit_id:           { label: "Unit ID",                    group: "identity", type: "text",   accessor: (r) => r.unit_id },
   typ:               { label: "Typ",                        group: "identity", type: "text",   accessor: (r) => r.typ },
+  /* INTERNAL — deliberately absent from FIELD_ORDER, so it is never offered in the
+     palette. It exists so the home scope (see HOME_SCOPE_FILTER) can be expressed as
+     an ordinary filter on the client record path, exactly as the server expresses it
+     through the analytics.dim_registry row of the same name. */
+  is_home:           { label: "Byt alebo dom",                group: "identity", type: "text",   accessor: (r) => (isHomeUnit(r.typ) ? "true" : "false") },
   etapa:             { label: "Etapa",                      group: "identity", type: "text",   accessor: (r) => r.etapa },
   budova:            { label: "Budova",                     group: "identity", type: "text",   accessor: (r) => r.budova },
   developer:         { label: "Developer",                  group: "identity", type: "text",   accessor: (r) => r.developer },
@@ -525,6 +531,37 @@ function isFilterActive(f) {
 const PRICE_VALUE_FIELDS = new Set(["cena_s_dph", "cena_bez_dph", "cena_na_m2_obytnej", "wavg_m2_price"]);
 const PRICE_SCOPE_FILTER = Object.freeze({ key: "cena_s_dph", mode: "not_empty" });
 
+/* ── HOME SCOPE — a garage is not a flat ─────────────────────────────────────
+   The same disease as the price scope, one level up: a price list carries bays,
+   cellars, shops, offices and building plots alongside the homes, and averaging
+   money across them compares different products. Measured 2026-09-09 on the live
+   catalogue, with no home filter in the Pivot:
+     Na Kacici            avg price   98 391 EUR  vs  353 536 EUR for its homes
+     Rezidencia Timravy   avg price   59 647 EUR  vs  201 692 EUR ; EUR/m2 -29.5%
+     ALFA CITY Residence  avg price  140 024 EUR  vs  341 776 EUR
+     Rezidencia Alzbetina EUR/m2       3 102      vs    4 433       (-30.0%)
+   45 active projects distorted, 21 by 5% or more, 8 by 20% or more. Market-wide
+   it is under 1%, which is exactly why it survived: it is invisible in the total
+   and severe in the individual project somebody is deciding on.
+
+   Every other money surface already got this right — final.home_units in the
+   serving views, analytics.v_home_unit_facts in market_report.py — so this closes
+   the last hole rather than inventing a new rule.
+
+   NOT applied when the user has deliberately brought unit types into the
+   question: `typ` in Rows/Columns already splits homes from garages into separate
+   rows (nothing is blended, and silently dropping the garage row would be the
+   surprise), and an explicit typ / is_home filter is the user's own choice, which
+   the app must not overrule. Same principle as the "empty" price filter. */
+const HOME_SCOPE_FILTER = Object.freeze({ key: "is_home", mode: "in", values: ["true"] });
+const HOME_SCOPE_OPT_OUT_FIELDS = new Set(["typ", "is_home"]);
+
+function homeScopeApplies(rowFields, colFields, filters) {
+  for (const d of [...(rowFields || []), ...(colFields || [])]) if (HOME_SCOPE_OPT_OUT_FIELDS.has(d)) return false;
+  for (const f of (filters || [])) if (isFilterActive(f) && HOME_SCOPE_OPT_OUT_FIELDS.has(f.key)) return false;
+  return true;
+}
+
 /* Measures that count the PRICE LIST rather than averaging money per flat. They
    must never be read as if they described the priced subset: sold flats are
    precisely the ones that lose their price, so absorption computed inside the
@@ -834,6 +871,7 @@ const SERVERABLE_DIMS = new Set([
   "izby", "poschodie", "stav", "kolaudacia", "orientacia",
   "country", "city", "cast", "sub_district",
   "import_status", "snapshot_month", "datum", "batch_timestamp",
+  "is_home",   // registered in analytics.dim_registry 2026-09-09; see HOME_SCOPE_FILTER
 ]);
 // numeric field key → component prefix in the grain's `m` object
 const COMP_FIELD = {
@@ -1531,10 +1569,18 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   // must not be deletable, must not be saved into a view, and must re-evaluate
   // the instant a price column is added or removed.
   const priceScope = useMemo(() => priceIsInPlay(effectiveValues, filters), [effectiveValues, filters]);
-  const effectiveFilters = useMemo(
-    () => (priceScope ? [...filters, PRICE_SCOPE_FILTER] : filters),
-    [filters, priceScope]
+  // Homes-only rides on the same trigger — money in the equation — but stands down
+  // when the user has put unit types into the question themselves. See HOME_SCOPE_FILTER.
+  const homeScope = useMemo(
+    () => priceScope && homeScopeApplies(rows, cols, filters),
+    [priceScope, rows, cols, filters]
   );
+  const effectiveFilters = useMemo(() => {
+    if (!priceScope) return filters;
+    const out = [...filters, PRICE_SCOPE_FILTER];
+    if (homeScope) out.push(HOME_SCOPE_FILTER);
+    return out;
+  }, [filters, priceScope, homeScope]);
 
   // Apply filters BEFORE tree build. Inactive filters (chip dropped but not
   // yet configured) pass everything through — see isFilterActive.
@@ -1665,6 +1711,15 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   // Status measures inside the price scope read LOW (sold flats are the ones
   // that lose their price) — see STATUS_MEASURES. Named explicitly so the
   // warning points at the column the user actually picked.
+  // The EUR/m2 column is the mean of each flat's own EUR/m2, NOT avg price / avg
+  // area — the two differ whenever flat sizes vary (1.3% on average across the
+  // catalogue, 12.6% at the extreme), so the pivot says which one it is rather
+  // than leaving a reader to discover it by multiplying. The ratio-of-sums is
+  // already available as the "Priem. (vážené)" measure.
+  const perM2InPlay = useMemo(
+    () => (effectiveValues || []).some(v => v && v.field === "cena_na_m2_obytnej"),
+    [effectiveValues]
+  );
   const statusMeasuresInPlay = useMemo(
     () => (priceScope ? effectiveValues.filter(v => STATUS_MEASURES.has(v.field)).map(v => fieldLabel(v.field, lang)) : []),
     [priceScope, effectiveValues, lang]
@@ -2034,26 +2089,61 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
             </svg>
             {lang === "sk" ? "Len byty s cenou" : "Priced units only"}
           </span>
+          {homeScope && (
+            <span style={{
+              display: "inline-flex", alignItems: "center", gap: "0.3rem", whiteSpace: "nowrap",
+              padding: "0.15rem 0.45rem", borderRadius: 999,
+              background: "color-mix(in srgb, var(--accent) 16%, transparent)",
+              color: "var(--accent)", fontWeight: 600,
+            }}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M3 11l9-7 9 7" /><path d="M5 10v10h14V10" />
+              </svg>
+              {lang === "sk" ? "Len byty a domy" : "Homes only"}
+            </span>
+          )}
           <span style={{ color: text }}>
             {lang === "sk"
-              ? "Pracuješ s cenou, tak počítame len z bytov, ktoré cenu majú."
-              : "You are working with price, so only units that have one are counted."}
+              ? (homeScope
+                  ? "Pracuješ s cenou — počítame len byty a domy, ktoré cenu majú."
+                  : "Pracuješ s cenou, tak počítame len z bytov, ktoré cenu majú.")
+              : (homeScope
+                  ? "You are working with price, so only homes that have one are counted."
+                  : "You are working with price, so only units that have one are counted.")}
           </span>
           {priceCoverage && (
             <span style={{ color: dim }}>
               {lang === "sk"
-                ? `Zahrnutých ${fmtCount(priceCoverage.included)} z ${fmtCount(priceCoverage.total)} · ${fmtCount(priceCoverage.excluded)} bez ceny je mimo výpočtu.`
-                : `${fmtCount(priceCoverage.included)} of ${fmtCount(priceCoverage.total)} included · ${fmtCount(priceCoverage.excluded)} with no price left out.`}
+                ? `Zahrnutých ${fmtCount(priceCoverage.included)} z ${fmtCount(priceCoverage.total)} · ${fmtCount(priceCoverage.excluded)} mimo výpočtu (${homeScope ? "bez ceny alebo nebytové" : "bez ceny"}).`
+                : `${fmtCount(priceCoverage.included)} of ${fmtCount(priceCoverage.total)} included · ${fmtCount(priceCoverage.excluded)} left out (${homeScope ? "no price, or not a home" : "no price"}).`}
             </span>
           )}
           <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center" }}>
             <InfoTip
-              label={lang === "sk" ? "Len byty s cenou" : "Priced units only"}
-              text={lang === "sk"
-                ? "Developer väčšinou zmaže cenu, keď sa byt predá — bez ceny je dnes zhruba 6 z 10 bytov v cenníkoch. Keby sa priemerná plocha rátala zo všetkých bytov a priemerná cena len z tých, čo cenu majú, každý stĺpec by opisoval iné byty a cena ÷ plocha by nesedela na €/m². Preto sa pri práci s cenou automaticky počíta len z bytov s cenou. Chceš všetky byty? Odober cenové stĺpce."
-                : "Developers usually delete the price when a unit sells — about 6 in 10 listed units carry no price today. If average area came from every unit while average price came only from priced ones, each column would describe a different set and price ÷ area would not match the €/m². So whenever a price is in play, only units that have one are counted. Want every unit? Remove the price columns."}
+              label={lang === "sk" ? "Rozsah výpočtu" : "What is counted"}
+              text={
+                <span style={{ display: "block", whiteSpace: "pre-line" }}>
+                  {lang === "sk"
+                    ? "Keď je v hre cena, platia dve pravidlá — obe automaticky.\n\n" +
+                      "① Len byty s cenou. Developer väčšinou zmaže cenu, keď sa byt predá, takže ju dnes nemá zhruba 6 z 10 bytov v cenníkoch. Keby sa plocha rátala zo všetkých a cena len z tých s cenou, každý stĺpec by opisoval iné byty.\n\n" +
+                      "② Len byty a domy. V cenníku sú aj garáže, pivnice, obchody a pozemky. Priemer, ktorý ich mieša s bytmi, porovnáva rôzne veci — v jednom projekte to robilo 98 391 € namiesto 353 536 €.\n\n" +
+                      "Chceš vidieť všetko? Odober cenové stĺpce, alebo si daj Typ do riadkov — vtedy sa každý typ ukáže zvlášť a nič sa nemieša."
+                    : "When a price is in play, two rules apply — both automatically.\n\n" +
+                      "① Priced units only. Developers usually delete the price when a unit sells, so about 6 in 10 listed units carry none. If area came from every unit while price came only from priced ones, each column would describe a different set.\n\n" +
+                      "② Homes only. A price list also carries garages, cellars, shops and plots. An average that blends them with flats compares different products — in one project that was 98 391 € instead of 353 536 €.\n\n" +
+                      "Want to see everything? Remove the price columns, or put Type in Rows — then each type is shown separately and nothing is blended."}
+                </span>
+              }
             />
           </span>
+          {perM2InPlay && (
+            <span style={{ flexBasis: "100%", color: dim, marginTop: "0.15rem" }}>
+              {lang === "sk"
+                ? "€/m² je priemer z €/m² jednotlivých bytov — nie priemerná cena ÷ priemerná plocha. Pri rôznych veľkostiach bytov sa tie dve čísla líšia (typicky do 2 %). Podiel súčtov dáva meradlo „Priem. (vážené)\"."
+                : "€/m² is the mean of each unit's own €/m² — not average price ÷ average area. Those two differ when unit sizes vary (typically under 2%). For the ratio of sums use the \"Priem. (vážené)\" measure."}
+            </span>
+          )}
           {statusMeasuresInPlay.length > 0 && (
             <span style={{
               flexBasis: "100%", display: "flex", gap: "0.35rem", alignItems: "flex-start",
