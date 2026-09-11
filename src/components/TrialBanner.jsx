@@ -22,6 +22,9 @@
  * paid, admin and pending. Both hide on /app/*.
  */
 import { useEffect, useLayoutEffect, useState, useRef } from "react";
+// readConsent() returns null until the visitor answers the cookie banner — that
+// is how this component knows whether it would be talking over it.
+import { readConsent } from "../lib/consent";
 import { useCapabilities } from "../lib/useCapabilities";
 import { track } from "../lib/track";
 
@@ -176,11 +179,33 @@ export function TrialPopup({ lang = "sk", onCta }) {
     // mounted, so it does NOT re-pop on every click; dismissing closes it for
     // the current page view and the next load/refresh brings it back. Delay so
     // the page paints first (less pushy).
-    const t = setTimeout(() => {
-      setOpen(true);
-      track("trial_popup_shown");
-    }, 1500);
-    return () => clearTimeout(t);
+    //
+    // 🔴 BUT NEVER WHILE THE COOKIE BANNER IS STILL ASKING (2026-09-11).
+    // Both surfaces fired on a timer, so a FIRST-TIME visitor — which is every
+    // visitor arriving from a shared link — got two modals stacked on top of
+    // each other and saw none of the actual site. On a 375px phone the consent
+    // banner covered the lower half of this popup. Measured live on residata.eu,
+    // desktop and mobile both.
+    //
+    // So the promo waits for the consent question to be ANSWERED (either way —
+    // we are not waiting for a yes, just for the banner to be gone). Boss's rule
+    // is unchanged: the offer keeps coming back until the trial is actually
+    // started. It just no longer talks over a legal prompt.
+    let timer = null;
+    const arm = () => {
+      if (timer !== null) return;
+      timer = setTimeout(() => {
+        setOpen(true);
+        track("trial_popup_shown");
+      }, 1500);
+    };
+    const onConsentAnswered = () => arm();
+    if (readConsent()) arm();                       // returning visitor: already chose
+    else window.addEventListener("residata-consent-changed", onConsentAnswered);
+    return () => {
+      window.removeEventListener("residata-consent-changed", onConsentAnswered);
+      if (timer !== null) clearTimeout(timer);
+    };
   }, [eligible]);
 
   if (!open) return null;

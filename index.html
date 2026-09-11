@@ -31,11 +31,18 @@
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
     <meta name="googlebot" content="index, follow" />
 
-    <!-- Canonical + language alternates (updated per-route at runtime) -->
+    <!-- Canonical + language alternates (updated per-route at runtime).
+
+         🔴 THIS LIST MUST MATCH `PUBLIC_LANGS` in src/lib/locale.js, and a test
+         fails if it does not. `applySeo` only ever UPDATES a tag it finds and
+         never removes one, so a language left here outlives its removal from
+         PUBLIC_LANGS and keeps telling Google that version exists. That is what
+         happened to `cs`: Czech was built and then deliberately held back from
+         launch, locale.js promised "one edit to re-expose it" — and this file
+         went on advertising a Czech site that nobody could reach. -->
     <link rel="canonical" href="https://residata.eu/" />
     <link rel="alternate" hreflang="en" href="https://residata.eu/" />
     <link rel="alternate" hreflang="sk" href="https://residata.eu/" />
-    <link rel="alternate" hreflang="cs" href="https://residata.eu/" />
     <link rel="alternate" hreflang="x-default" href="https://residata.eu/" />
 
     <!-- Open Graph / LinkedIn / Facebook -->
@@ -50,7 +57,6 @@
     <meta property="og:url" content="https://residata.eu/" />
     <meta property="og:locale" content="en_US" />
     <meta property="og:locale:alternate" content="sk_SK" />
-    <meta property="og:locale:alternate" content="cs_CZ" />
 
     <!-- Twitter / X -->
     <meta name="twitter:card" content="summary_large_image" />

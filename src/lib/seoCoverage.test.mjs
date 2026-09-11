@@ -114,3 +114,52 @@ test("the build actually supplies the town count the copy asks for", () => {
   assert.ok(/total_cities:/.test(GEN),
     "coveragePhrase reads total_cities from the build snapshot; the generator must write it");
 });
+
+// ── hreflang: three files, one list of languages (2026-09-11) ──────────────
+//
+// `applySeo` only ever UPDATES a <link rel=alternate> it finds and never removes
+// one, so a language that leaves PUBLIC_LANGS survives in index.html forever and
+// goes on telling Google that version exists. Live on 2026-09-11 the homepage
+// advertised `hreflang="cs"` — Czech was built, then deliberately held back from
+// launch, and a Czech search result would have landed on the English site.
+// locale.js promises that re-exposing a language is ONE edit; it can only be
+// true if the static HTML and the sitemap generator follow the same list.
+const INDEX_HTML = readFileSync(join(HERE, "..", "..", "index.html"), "utf8");
+const LOCALE = readFileSync(join(HERE, "locale.js"), "utf8");
+
+/** The languages locale.js actually exposes, read from the source. */
+function publicLangs() {
+  const m = /export const PUBLIC_LANGS = \[([^\]]*)\]/.exec(LOCALE);
+  assert.ok(m, "PUBLIC_LANGS not found in locale.js — this guard would read nothing");
+  const langs = [...m[1].matchAll(/"([a-z]{2})"/g)].map((x) => x[1]);
+  assert.ok(langs.length > 0, "PUBLIC_LANGS parsed as empty — the guard would pass vacuously");
+  return langs;
+}
+
+const hreflangsIn = (src) =>
+  [...src.matchAll(/hreflang="([a-z-]+)"/g)].map((m) => m[1]);
+
+test("index.html advertises exactly the languages locale.js exposes", () => {
+  const want = [...publicLangs(), "x-default"].sort();
+  const got = [...new Set(hreflangsIn(INDEX_HTML))].sort();
+  assert.deepEqual(got, want,
+    "index.html hreflang set drifted from PUBLIC_LANGS — a language listed here " +
+    "but not public is advertised to Google and lands the visitor on another one");
+});
+
+test("the sitemap generator advertises the same languages", () => {
+  const want = [...publicLangs(), "x-default"].sort();
+  const got = [...new Set(hreflangsIn(GEN))].sort();
+  assert.deepEqual(got, want, "sitemap hreflang set drifted from PUBLIC_LANGS");
+});
+
+test("no og:locale:alternate names a language that is not public", () => {
+  const langs = publicLangs();
+  const alts = [...INDEX_HTML.matchAll(/og:locale:alternate"\s+content="([a-z]{2})_/g)]
+    .map((m) => m[1]);
+  assert.ok(alts.length > 0, "no og:locale:alternate found — guard would read nothing");
+  for (const a of alts) {
+    assert.ok(langs.includes(a),
+      `og:locale:alternate names "${a}" which is not in PUBLIC_LANGS (${langs.join(", ")})`);
+  }
+});
