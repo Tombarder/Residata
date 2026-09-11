@@ -71,9 +71,9 @@ async function fetchView(table, params = {}) {
 // `market` uses public.totals_global (SK + CZ combined) so the static/LLM surfaces
 // match the daily multi-market product — NOT market_totals, which is SK-only and
 // would undercount coverage. market_totals is still fetched for snapshot_month.
-let market, districts, topProjects, skMeta, cities;
+let market, districts, topProjects, skMeta, cities, maturity;
 try {
-  [[market], districts, topProjects, [skMeta], cities] = await Promise.all([
+  [[market], districts, topProjects, [skMeta], cities, maturity] = await Promise.all([
     fetchView('totals_global'),
     fetchView('district_totals', { order: 'total_units.desc' }),
     fetchView('projects_live', {
@@ -86,6 +86,11 @@ try {
     // with an actively-sold new-build since the 2026-06-08 market unification.
     // Counted, not asserted, so the claim cannot go stale again.
     fetchView('totals_by_city', { select: 'city_id' }).catch(() => []),
+    // How far back the series actually goes. public.velocity_maturity carries
+    // `oldest_real` per country — the first observation we can stand behind.
+    // Read, never typed: /use-cases sold "6–12 months of price history" on
+    // 2026-09-11 while the real figures were 3.9 (SK) and 3.1 (CZ) months.
+    fetchView('velocity_maturity', { select: 'country_code,oldest_real' }).catch(() => []),
   ]);
 } catch (e) {
   console.warn('[gen-static] Supabase fetch failed — keeping existing files. Error:', e.message);
@@ -385,6 +390,16 @@ console.log(`[gen-static] public/sitemap.xml — ${sitemap.length} chars, ${ALL_
 // vite.config.js's transformIndexHtml plugin reads this JSON to inject
 // the same numbers into index.html's JSON-LD block. Same source, same
 // snapshot — guarantees consistency.
+// Earliest `oldest_real` across every market we track — the honest start of the
+// series. undefined when the view did not answer, and the phrase then says less
+// rather than asserting a date it cannot see.
+const historySince = ((maturity || [])
+  .map((r) => r?.oldest_real)
+  .filter(Boolean)
+  .map((d) => String(d).slice(0, 10))
+  .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d))
+  .sort())[0];
+
 const buildData = {
   total_units: market?.total_units_tracked,
   total_projects: market?.total_projects_active,
@@ -397,6 +412,11 @@ const buildData = {
   // src/lib/seo.js coveragePhrase(). Same snapshot as llms.txt, so the two
   // cannot disagree about how big the product is.
   total_cities: cityCount || undefined,
+  // First observation across all markets, YYYY-MM-DD. Feeds
+  // src/lib/seo.js historySincePhrase(), which is what the marketing copy states
+  // instead of counting months: a count cannot be checked by the build and
+  // decays in both directions, a start date only gets stronger.
+  history_since: historySince,
   total_available: market?.total_available,
   // PERF Step 2: reserved + sold included so the build-time snapshot is a
   // complete seed for the hero/headline (useMarketTotals) — see vite.config.js

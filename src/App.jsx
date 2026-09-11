@@ -44,7 +44,7 @@ import { useCountry } from "./lib/useCountry";
 import { useMarketTotals, useDataSample, useHomeProjects, useTotalsList } from "./lib/useData";
 import { fmtSelloutValue } from "./lib/absorption";
 import { pushRoute, pathToPage, isAppPage, isInsightsPage, pageToPath } from "./lib/routing";
-import { applySeo } from "./lib/seo";
+import { applySeo, historySincePhrase } from "./lib/seo";
 import { localeTag, PUBLIC_LANGS, DEFAULT_LANG, LANG_LABELS, isPublicLang, coercePublicLang } from "./lib/locale";
 import { startPageEngagement, stopPageEngagement } from "./lib/engagement";
 // PERF Step 5: code-split — the platform shell pulls in the heaviest modules
@@ -1049,6 +1049,9 @@ const USE_CASE_IMAGES = [
 function UseCasesPage({ setCurrent, l, lang }) {
   const { can } = useCapabilities();
   const isPaid = can("has_paid_access");
+  // How far back the price series goes — read from the build snapshot, never
+  // written into the copy. The copy carries __HISTORY_SINCE__ and this fills it.
+  const historySince = historySincePhrase(lang);
   return (
     <>
       <div style={{ padding: "8rem 2rem 3rem", maxWidth: "var(--container)", margin: "0 auto", textAlign: "center" }}>
@@ -1177,7 +1180,11 @@ function UseCasesPage({ setCurrent, l, lang }) {
                   }}>{l.whatYouGet}</div>
 
                   <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
-                    {c.benefits.map(([b, d]) => (
+                    {c.benefits.map(([b, dRaw]) => {
+                      // __HISTORY_SINCE__ comes from the live snapshot, never
+                      // typed into the copy — see seo.js historySincePhrase().
+                      const d = dRaw.split("__HISTORY_SINCE__").join(historySince);
+                      return (
                       <li key={b} style={{
                         display: "flex",
                         gap: "0.75rem",
@@ -1200,7 +1207,8 @@ function UseCasesPage({ setCurrent, l, lang }) {
                           <strong style={{ color: "#e8e8ed", fontWeight: 500 }}>{b}</strong> — {d}
                         </p>
                       </li>
-                    ))}
+                      );
+                    })}
                   </ul>
                 </div>
               </article>

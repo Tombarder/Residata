@@ -69,7 +69,11 @@ test("coverage degrades to a sentence with NO number when data is missing", () =
   // A build without DB access must not assert a figure it cannot see, and must
   // not fall back to a hardcoded one that then rots.
   const fn = SEO.slice(SEO.indexOf("export function coveragePhrase"));
-  const body = fn.slice(0, fn.indexOf("\nexport function applySeo"));
+  // End at the NEXT top-level export, whatever it is. Naming applySeo here meant
+  // that inserting any helper between the two silently re-pointed this test at
+  // the new function's fallback instead of coveragePhrase's — which is exactly
+  // what happened when historySincePhrase was added on 2026-09-11.
+  const body = fn.slice(0, fn.indexOf("\nexport ", 1));
   const fallback = body.slice(body.lastIndexOf("return sk"));
   assert.ok(!/\d/.test(fallback), "the no-data fallback must contain no digits");
   assert.ok(/Slovensku a v Česku/.test(fallback) && /Slovakia and Czechia/.test(fallback),
@@ -209,12 +213,29 @@ test("no marketing copy states how many months of history we hold", () => {
   }
 });
 
-test("the history copy names the date observation actually started", () => {
-  // Once per language. The date is what replaced the unverifiable month count,
-  // so losing it means the claim went back to being unanchored.
-  const years = historyClaims().join(" ").match(/2026/g) || [];
-  assert.ok(years.length >= 2,
-    `the history copy names a start year ${years.length} time(s), expected one per ` +
-    "language — without it a reader cannot tell how far back the series goes, " +
-    "which is the thing they are buying");
+test("the history copy takes its start date from the data, not from the file", () => {
+  // Once per language. A date TYPED here would be right today and wrong the day
+  // the archive is rebuilt or a market is added — the same decay as a month
+  // count, just slower. The token is filled from public.velocity_maturity.
+  const tokens = historyClaims().join(" ").match(/__HISTORY_SINCE__/g) || [];
+  assert.equal(tokens.length, 2,
+    `the history copy carries the __HISTORY_SINCE__ token ${tokens.length} time(s), ` +
+    "expected one per language (EN + SK)");
+  for (const claim of historyClaims()) {
+    assert.ok(!/\b(19|20)\d{2}\b/.test(claim),
+      `"${claim}" has a year typed into it — use __HISTORY_SINCE__ so it follows the data`);
+  }
+});
+
+test("the history token is actually substituted, like coverage and price are", () => {
+  const APP = readFileSync(join(HERE, "..", "App.jsx"), "utf8");
+  assert.match(APP, /__HISTORY_SINCE__/,
+    "nothing fills __HISTORY_SINCE__ — the page would print the raw token to visitors");
+  assert.match(SEO, /export function historySincePhrase/,
+    "historySincePhrase() is gone; the token has no source");
+  // …and the build must actually put the date in the snapshot it reads.
+  assert.match(GEN, /history_since:/,
+    "the build no longer exports history_since, so the phrase falls back forever");
+  assert.match(GEN, /velocity_maturity/,
+    "the build no longer reads velocity_maturity — history_since would be undefined");
 });

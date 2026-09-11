@@ -449,6 +449,40 @@ function resolvePageSeo(page, lang) {
  * per-country URLs). SK / unknown country → base copy, byte-identical.
  */
 /**
+ * How far back our price series goes, as a TIME EXPRESSION that slots into
+ * "since …" / "od …" — e.g. "May 2026" / "mája 2026".
+ *
+ * WHY A DATE AND NOT A COUNT OF MONTHS: on 2026-09-11 /use-cases sold
+ * "6–12 months of €/m² movement" to Investors & Private Equity while the real
+ * series was 3.9 months (SK, from 2026-05-27) and 3.1 (CZ, from 2026-06-09).
+ * The same shape of error had already shipped once, in the first published
+ * article (six months claimed on 113 days). A count is unverifiable at build
+ * time and decays in BOTH directions — it overclaims today and would underclaim
+ * next year. A start date is a fact that does not decay and strengthens on its
+ * own, and `public.velocity_maturity.oldest_real` supplies it per deploy.
+ *
+ * Same rule as coveragePhrase: with no snapshot it returns a phrase carrying NO
+ * date rather than a stale one. It must never assert a date it cannot see.
+ */
+const MONTHS_EN = ["January", "February", "March", "April", "May", "June",
+                   "July", "August", "September", "October", "November", "December"];
+// Genitive — the form that follows "od" ("od mája 2026").
+const MONTHS_SK = ["januára", "februára", "marca", "apríla", "mája", "júna",
+                   "júla", "augusta", "septembra", "októbra", "novembra", "decembra"];
+
+export function historySincePhrase(lang, snapshot) {
+  const s = snapshot ?? (typeof window !== "undefined" ? window.__RESIDATA_SNAPSHOT__ : null);
+  const iso = typeof s?.history_since === "string" ? s.history_since : "";
+  const sk = lang === "sk" || lang === "cs";
+  const m = /^(\d{4})-(\d{2})-\d{2}$/.exec(iso);
+  if (!m) return sk ? "začiatku nášho merania" : "we began tracking";
+  const year = m[1];
+  const idx = Number(m[2]) - 1;
+  if (idx < 0 || idx > 11) return sk ? "začiatku nášho merania" : "we began tracking";
+  return sk ? `${MONTHS_SK[idx]} ${year}` : `${MONTHS_EN[idx]} ${year}`;
+}
+
+/**
  * How big the product is, in words, for the __COVERAGE__ token.
  *
  * WHY THIS EXISTS. Until 2026-09-03 the per-route titles and descriptions said

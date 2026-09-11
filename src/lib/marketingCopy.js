@@ -54,7 +54,7 @@ export const t = {
         benefits: [["Side-by-side competitor pricing", "see €/m² across every comparable project in your district — broken down by unit type, floor, and phase"], ["Sell-through velocity ranking", "know which projects moved the most units last month — and which ones are sitting still"], ["Inventory countdown", "track how many units your competitors have left — time your launches to hit gaps in supply"]] },
       { tag: "Investors & Private Equity", title: "Underwrite with market reality.",
         desc: "You're evaluating a resi development deal. The developer says demand is strong and prices are rising. But is that true — and is it true for your specific district, unit mix, and price point?",
-        benefits: [["Absorption rates by segment", "how many units actually sell per month in each district — the number that makes or breaks your IRR"], ["Historical price trajectories", "every €/m² movement we have observed since May 2026, captured daily — model on measured trends, not assumptions"], ["Feasibility stress test", "compare your target sell price against what the market is actually paying — by m², type, and location"]] },
+        benefits: [["Absorption rates by segment", "how many units actually sell per month in each district — the number that makes or breaks your IRR"], ["Historical price trajectories", "every €/m² movement we have observed since __HISTORY_SINCE__, captured daily — model on measured trends, not assumptions"], ["Feasibility stress test", "compare your target sell price against what the market is actually paying — by m², type, and location"]] },
       { tag: "Banks & Valuers", title: "Comparable data, ready to use.",
         desc: "You need market comparables for a valuation or collateral assessment — but gathering them manually from scattered developer websites and transforming them into a usable format takes weeks. And getting historical data retrospectively is impossible. We've already done it for you.",
         benefits: [["Structured comparable listings", "pricing by location, unit type, floor area, and availability — filterable and exportable"], ["Market depth overview", "how many active projects and units exist in a given district — essential context for any valuation"], ["Daily refresh", "your comparables are never more than a day old — no more working with stale data from last quarter"]] },
@@ -118,7 +118,7 @@ export const t = {
     sendEmail: "Send an Email",
     // Tiers
     tiers: [
-      { tier: "Standard", name: "Full access", price: FALLBACK_MONTHLY_DISPLAY, priceSuffix: "/mo", anchor: FALLBACK_ANCHOR_DISPLAY, note: "Summer offer — early-access rate for the first 50 members (until 30 Sep 2026). Billed monthly, cancel anytime.",
+      { tier: "Standard", name: "Full access", price: FALLBACK_MONTHLY_DISPLAY, priceSuffix: "/mo", anchor: FALLBACK_ANCHOR_DISPLAY, note: "Early autumn offer — early-access rate for the first 50 members (until 30 Sep 2026). Billed monthly, cancel anytime.",
         features: [[true, "Live dashboard + full market report"], [true, "Raw + cleaned datasets included"], [true, "Historical snapshots & trend analysis"], [true, "Absorption rates & sell-out tracking"], [true, "CSV & Excel (.xlsx) export"]], featured: true, cta: "Get Started" },
       { tier: "Custom", name: "On-Demand & Enterprise", price: "Let's talk.", isCustom: true, note: "Tailored scope, frequency, and delivery",
         features: [[true, "Everything in Standard"], [true, "Custom refresh cadence & priority support"], [true, "Coverage beyond Slovakia & Czechia"], [true, "Additional markets or property types"], [true, "Custom integrations and output formats"]], cta: "Contact Us" },
@@ -166,7 +166,7 @@ export const t = {
         benefits: [["Prehľady cien konkurencie", "€/m² za každý porovnateľný projekt vo vami zvolenej lokalite — podľa typu, poschodia a fázy"], ["Kto predáva najrýchlejšie", "ktoré projekty predali najviac bytov minulý mesiac — a ktoré stoja"], ["Koľko kapacity zostáva u konkurencie voľnej?", "sledujte voľné jednotky a medzery na trhu"]] },
       { tag: "Investori a Private Equity", title: "Investícia podložená dátami.",
         desc: "Posudzujete development deal. Developer tvrdí, že dopyt je silný a ceny rastú. Platí to aj pre váš konkrétny okres, mix bytov a cenovú hladinu?",
-        benefits: [["Absorpcia podľa segmentu", "koľko bytov sa reálne predá mesačne v každom okrese — číslo, na ktorom stojí vaše IRR"], ["Vývoj cien od mája 2026", "každý pohyb €/m², ktorý sme zaznamenali — denne, nie štvrťročne. Modelujete na meraných trendoch, nie na odhadoch"], ["Stress test feasibility", "porovnajte cieľovú cenu s tým, čo trh reálne platí"]] },
+        benefits: [["Absorpcia podľa segmentu", "koľko bytov sa reálne predá mesačne v každom okrese — číslo, na ktorom stojí vaše IRR"], ["Vývoj cien", "každý pohyb €/m² od __HISTORY_SINCE__, ktorý sme zaznamenali — denne, nie štvrťročne. Modelujete na meraných trendoch, nie na odhadoch"], ["Stress test feasibility", "porovnajte cieľovú cenu s tým, čo trh reálne platí"]] },
       { tag: "Banky a znalci", title: "Komparatívy hotové na použitie.",
         desc: "Potrebujete trhové komparatívy na ocenenie alebo kolaterál — ale zbierať ich ručne z roztrúsených webov developerov a transformovať ich do použiteľného formátu trvá týždne. A získanie historických dát spätne je nemožné. My sme to urobili za vás.",
         benefits: [["Štruktúrované ponuky", "ceny podľa lokality, typu, plochy a dostupnosti — filtrovateľné a exportovateľné"], ["Hĺbka trhu", "koľko projektov a bytov je v okrese aktívnych — kontext pre každé ocenenie"], ["Vždy aktuálne", "komparatívy nikdy nie sú staršie ako 1 deň"]] },
@@ -218,7 +218,7 @@ export const t = {
     bookCall: "Dohodnúť si 20-min hovor",
     sendEmail: "Napísať email",
     tiers: [
-      { tier: "Standard", name: "Plný prístup", price: FALLBACK_MONTHLY_DISPLAY, priceSuffix: "/mes", anchor: FALLBACK_ANCHOR_DISPLAY, note: "Letná ponuka — cena pre prvých 50 členov (do 30. septembra 2026). Fakturované mesačne, zrušenie kedykoľvek.",
+      { tier: "Standard", name: "Plný prístup", price: FALLBACK_MONTHLY_DISPLAY, priceSuffix: "/mes", anchor: FALLBACK_ANCHOR_DISPLAY, note: "Jesenná ponuka — cena pre prvých 50 členov (do 30. septembra 2026). Fakturované mesačne, zrušenie kedykoľvek.",
         features: [[true, "Live dashboard + kompletný report"], [true, "Surové + vyčistené datasety"], [true, "Historické dáta a vývoj trendov"], [true, "Absorpcia a sledovanie vypredania"], [true, "Export do CSV a Excelu (.xlsx)"]], featured: true, cta: "Mám záujem" },
       { tier: "Custom", name: "On-Demand & Enterprise", price: "Ozvite sa.", isCustom: true, note: "Rozsah a frekvencia podľa vás",
         features: [[true, "Všetko v Standard"], [true, "Vlastná frekvencia aktualizácií a prioritná podpora"], [true, "Pokrytie akejkoľvek lokality (aj mimo Slovenska)"], [true, "Ďalšie trhy alebo typy nehnuteľností"], [true, "Vlastné integrácie a formáty"]], cta: "Kontaktovať" },
