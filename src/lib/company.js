@@ -7,22 +7,33 @@
  * no second place where a company detail is written down, so the six surfaces
  * cannot drift apart, and a change is a one-line edit here.
  *
- * ─── THE EMPTY FIELDS ARE DELIBERATE ────────────────────────────────────────
- * `dic`, `icDph`, `iban` and `bankName` are empty strings on purpose. They are
- * facts that do not exist yet:
+ * ─── THE IDENTIFIERS, AND WHICH ONE MEANS WHAT ──────────────────────────────
  *
- *   dic     — the tax office issues it within 60 days of incorporation
- *   icDph   — issued on VAT registration (§ 7a first, § 4 at the turnover
- *             threshold); we are NOT VAT-registered today
- *   iban    — the company bank account is not open yet
+ *   dic     — ✅ 2123312356, issued 2026-09-11. INCOME tax. Says nothing about VAT.
+ *   icDph   — VAT number. Empty = we are not VAT-registered. Read the trap below.
+ *   iban    — never in this file at all; see the banking section further down.
  *
- * Every renderer below treats an empty field as "do not display this line".
- * The moment a value is filled in here, it appears everywhere it belongs AND
- * the VAT wording across the site flips by itself (see vatNotice). That is the
- * point: the site is built as a fully-equipped company site, and the fields
- * light up as reality catches up — without anyone claiming something untrue in
- * the meantime. Never fill one of these in "in advance": a website that
- * announces a VAT number it does not have is a tax problem, not a shortcut.
+ * Every renderer treats an empty field as "do not display this line", so an
+ * identifier appears everywhere it belongs the moment it is filled in, and never
+ * before. Never fill one in "in advance": a website announcing a number the
+ * company does not hold is a tax problem, not a shortcut.
+ *
+ * 🔴 ONLY `icDph` CONTROLS THE VAT WORDING — and the difference is about to matter.
+ * `isVatRegistered()` reads `icDph` and nothing else, so filling the DIČ changed
+ * no sentence anywhere. That is correct: a DIČ is an income-tax number.
+ *
+ * The trap is the registration that comes next. A **§ 7a** registration also
+ * issues an IČ DPH — but it does NOT make the company a platiteľ DPH. Under § 7a
+ * we still charge our customers no VAT and the site must go on saying
+ * "nie sme platiteľmi DPH", which stays true. Filling `icDph` on the strength of
+ * a § 7a registration would flip every price on the site to "vrátane DPH 23 %",
+ * put a VAT number on invoices that must not carry one, and state on a legal page
+ * a tax status the company does not have.
+ *
+ * **`icDph` is filled ONLY on a § 4 registration** (the turnover threshold, or a
+ * deliberate voluntary registration). If a § 7a number arrives and someone wants
+ * it recorded, it belongs in a separate field with its own wording — not here.
+ * Runbook: docs/legal/DPH_PREPNUTIE_RUNBOOK.md in novostavby-scraper.
  *
  * ─── SOURCE OF THE DATA ─────────────────────────────────────────────────────
  * Everything below is copied from the company's own entry in the Slovak
@@ -97,8 +108,26 @@ export const COMPANY = {
   // checklist, not an obstacle.
   ico: "57 849 471",        // display form, with the customary spacing
   icoPlain: "57849471",     // machine form — structured data, APIs, invoices
-  dic: "",                  // ← tax office, ≤ 60 days from incorporation
+  // Issued 2026-09-11 by Daňový úrad Bratislava, decision 103230733/2026 —
+  // registration for CORPORATE INCOME TAX, made automatically from the register
+  // (§ 67 ods. 11 daňového poriadku + § 49a zákona o dani z príjmov). Nobody
+  // applied for it. 🔴 A DIČ is NOT a VAT number: this changes nothing about our
+  // VAT status, which is why `isVatRegistered()` reads `icDph` and never this.
+  dic: "2123312356",
   icDph: "",                // ← on VAT registration; empty = not VAT-registered
+
+  /**
+   * WHICH registration the `icDph` above came from. "" while there is none.
+   *
+   * This exists because the two registrations issue the SAME kind of number and
+   * mean opposite things for every price on the site:
+   *   "§7a" — cross-border services. We are NOT a platiteľ DPH, charge our
+   *           customers no VAT, and the site must go on saying so.
+   *   "§4"  — a real VAT payer. This, and only this, flips the wording.
+   * `isVatRegistered()` demands "§4", so an IČ DPH can be recorded truthfully
+   * the day a § 7a registration lands without falsifying a single page.
+   */
+  vatRegistrationBasis: "",
 
   // ── register entry ──────────────────────────────────────────────────────
   registerSk: "Obchodný register Mestského súdu Bratislava III",
@@ -153,9 +182,16 @@ export const COMPANY = {
 // derived views — every consumer uses these, nobody re-assembles the fields
 // ─────────────────────────────────────────────────────────────────────────
 
-/** True once the company actually holds a VAT number. Never hardcode this. */
+/**
+ * True only when the company is a REAL VAT payer (§ 4) — which is what every
+ * price sentence on the site depends on. Never hardcode this.
+ *
+ * A § 7a registration also issues an IČ DPH and does NOT make us a platiteľ DPH,
+ * so the number alone is deliberately not enough: `vatRegistrationBasis` has to
+ * say § 4. See the comment on that field.
+ */
 export function isVatRegistered() {
-  return Boolean(COMPANY.icDph);
+  return Boolean(COMPANY.icDph) && COMPANY.vatRegistrationBasis === "§4";
 }
 
 /** The registered seat, as lines. Same order Slovak addresses are written in. */

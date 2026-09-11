@@ -55,9 +55,8 @@ test("§ 3a: the imprint data set is complete", () => {
   assert.ok(COMPANY.legalName && COMPANY.ico && COMPANY.street && COMPANY.postalCode);
 });
 
-test("unissued identifiers stay empty and are never rendered as placeholders", () => {
-  // DIČ and IČ DPH do not exist yet. If someone fills one in, this test should
-  // be updated in the same change — deliberately, not by accident.
+test("identifiers are empty or real — never placeholders", () => {
+  // DIČ arrived 2026-09-11 (income tax). IČ DPH still does not exist.
   // `iban` is deliberately absent from COMPANY — see the bank-account test below.
   for (const [field, value] of Object.entries({ dic: COMPANY.dic, icDph: COMPANY.icDph })) {
     assert.equal(typeof value, "string", `${field} must be a string`);
@@ -66,6 +65,30 @@ test("unissued identifiers stay empty and are never rendered as placeholders", (
   // A value that exists must actually look like the thing it claims to be.
   if (COMPANY.icDph) assert.match(COMPANY.icDph, /^SK\d{10}$/, "IČ DPH must be SK + 10 digits");
   if (COMPANY.dic) assert.match(COMPANY.dic, /^\d{10}$/, "DIČ must be 10 digits");
+});
+
+test("a VAT number alone never flips the site — the basis has to say § 4", () => {
+  // The trap this exists for: a § 7a registration ALSO issues an IČ DPH, and it
+  // does NOT make the company a platiteľ DPH. Filling `icDph` from a § 7a number
+  // would put "vrátane DPH 23 %" on every price and a VAT number on invoices
+  // that must not carry one. So the number is deliberately not sufficient.
+  const ALLOWED = ["", "§7a", "§4"];
+  assert.ok(ALLOWED.includes(COMPANY.vatRegistrationBasis),
+    `vatRegistrationBasis must be one of ${ALLOWED.map((v) => `"${v}"`).join(", ")}`);
+
+  if (COMPANY.icDph) {
+    assert.notEqual(COMPANY.vatRegistrationBasis, "",
+      "an IČ DPH was filled in without saying which registration it came from (§7a or §4)");
+  }
+  if (COMPANY.vatRegistrationBasis && !COMPANY.icDph) {
+    assert.fail("a VAT registration basis is set but there is no IČ DPH to go with it");
+  }
+  // § 7a holds a number and is still not a VAT payer — the sentence must not move.
+  if (COMPANY.vatRegistrationBasis === "§7a") {
+    assert.equal(isVatRegistered(), false, "§ 7a is not a platiteľ DPH");
+    assert.match(vatNotice("sk"), /Nie sme platiteľmi DPH/);
+  }
+  assert.equal(isVatRegistered(), Boolean(COMPANY.icDph) && COMPANY.vatRegistrationBasis === "§4");
 });
 
 test("VAT wording follows the VAT number, and is never hand-written", () => {
