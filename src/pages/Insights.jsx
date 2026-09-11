@@ -346,7 +346,7 @@ export function InsightsArticle({ slug, navigate, lang }) {
   if (loading) {
     return (
       <Shell>
-        <div style={{ ...EYEBROW }}>Residata · Analýzy</div>
+        <div style={{ ...EYEBROW }}>Residata · {lang === "en" ? "Insights" : "Analýzy"}</div>
         <p style={{ color: "#8b8b95" }}>{lang === "en" ? "Loading…" : "Načítavam…"}</p>
       </Shell>
     );
@@ -374,7 +374,10 @@ export function InsightsArticle({ slug, navigate, lang }) {
           transform: backHover ? "translateX(-3px)" : "none",
           transition: "transform 150ms ease",
         }}>←</span>
-        Residata · Analýzy
+        {/* The section name follows the reader's language, like the index does.
+            Hardcoded Slovak here put "ANALÝZY" at the top of a fully English
+            article — the one page a shared link lands on. */}
+        Residata · {lang === "en" ? "Insights" : "Analýzy"}
       </a>
 
       <h1 style={{
