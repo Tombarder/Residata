@@ -163,3 +163,58 @@ test("no og:locale:alternate names a language that is not public", () => {
       `og:locale:alternate names "${a}" which is not in PUBLIC_LANGS (${langs.join(", ")})`);
   }
 });
+
+// ── how much history we claim to have (2026-09-11) ─────────────────────────
+//
+// /use-cases sold "6–12 months of €/m² movement so you can model scenarios" to
+// Investors & Private Equity. Measured the same day against final.snapshots:
+// Slovakia had 118 days (3.9 months, from 2026-05-16) and Czechia 94 days
+// (3.1 months, from 2026-06-09). Off by two to three times, on the page aimed at
+// the one audience that would build a model on it and then check.
+//
+// This is the SECOND time: the first published article claimed six months of
+// sales on 113 days of data. Both times the figures underneath were real and
+// only the label was wrong, which is exactly why nobody caught it by looking at
+// the charts.
+//
+// A span of history is therefore never written as a COUNT. Nothing in the build
+// can verify a count, and it silently decays in both directions — wrong today
+// because we overclaimed, wrong next year because we would be underclaiming. A
+// START DATE is a fact that does not decay and gets stronger on its own.
+const COPY = readFileSync(join(HERE, "marketingCopy.js"), "utf8");
+
+/** Copy strings that talk about our price history, in any language.
+ *
+ * A benefit is TWO strings — a label and a description — and the claim can sit
+ * in either. The first version of this guard filtered on words that only appear
+ * in the label, so it read half the copy and reported the other half missing.
+ */
+function historyClaims() {
+  const hits = [...COPY.matchAll(/"([^"\\]{15,400})"/g)]
+    .map((m) => m[1])
+    .filter((s) => /histor|trajector|vývoj cien|movement|pohyb €\/m²/i.test(s));
+  assert.ok(hits.length >= 4,
+    `found ${hits.length} history strings in marketingCopy.js, expected the EN and ` +
+    "SK label+description pairs — this guard must not pass by reading nothing");
+  return hits;
+}
+
+test("no marketing copy states how many months of history we hold", () => {
+  for (const claim of historyClaims()) {
+    const span = /(\d+)\s*(?:[–-]\s*\d+\s*)?(months?|mesiac|mesiacov|rok|rokov|years?)/i.exec(claim);
+    assert.equal(span, null,
+      `"${claim}" asserts a span of history ("${span && span[0]}"). Nothing in the ` +
+      `build can check that number and it was wrong by 2–3x the last time. State ` +
+      `the date we started observing instead.`);
+  }
+});
+
+test("the history copy names the date observation actually started", () => {
+  // Once per language. The date is what replaced the unverifiable month count,
+  // so losing it means the claim went back to being unanchored.
+  const years = historyClaims().join(" ").match(/2026/g) || [];
+  assert.ok(years.length >= 2,
+    `the history copy names a start year ${years.length} time(s), expected one per ` +
+    "language — without it a reader cannot tell how far back the series goes, " +
+    "which is the thing they are buying");
+});
