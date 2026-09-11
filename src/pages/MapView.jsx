@@ -24,7 +24,8 @@
  * links straight to the project detail page.
  */
 import { useEffect, useRef, useState, useMemo } from "react";
-import maplibregl from "maplibre-gl";
+// maplibre-gl v6 je ESM-only a default export zrušil — musí to byť namespace import.
+import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { fitoutLabel } from "../lib/priceBasis";
 import { useSpecifics, specificsHTML } from "../lib/projectSpecifics";

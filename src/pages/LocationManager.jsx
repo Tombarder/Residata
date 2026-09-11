@@ -17,7 +17,8 @@
  * by-region/district/city views update immediately; the pivot cube refreshes nightly.
  */
 import { useEffect, useRef, useState, useMemo } from "react";
-import maplibregl from "maplibre-gl";
+// maplibre-gl v6 je ESM-only a default export zrušil — musí to byť namespace import.
+import * as maplibregl from "maplibre-gl";
 import useDismiss from "../lib/useDismiss";
 import { fieldBlock } from "../lib/controls";
 import { checkWebGL } from "../lib/webgl";
