@@ -3558,15 +3558,21 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                 only on the rows where something was marked sold, so they read as
                 two mystery figures that some rows had and others did not (Boss,
                 2026-09-14). They are now on every row and the header says what they
-                are — and says "v cenníku", because that is the honest scope: this
-                tool counts what the developer's price list SAYS today. A developer
-                who deletes a flat when it sells shows 0 here forever, which is why
-                real sales live on Predaje. */}
+                are. Re-checked against the database on the same day and the
+                arithmetic is exact (Dostupné bývanie Nitra 110 · 100 · 10), but the
+                FIRST wording was not: it said "v cenníku", implying the whole price
+                list, when these count only the rows the table includes — and once a
+                price is in the question that is the PRICED subset (110 of the
+                project's 284 flats). Sold flats are precisely the ones a developer
+                strips the price from, so the two scopes differ most exactly where
+                this number is read. The note above the table already states the
+                population; the label now agrees with it instead of overclaiming, and
+                still sends real sales to Predaje. */}
             <th style={{ ...th, ...stickyLeft("count", 5, "var(--surface-2)"), top: row2Top, textAlign: "right", cursor: "pointer" }}
                 onClick={() => clickSort("count")}
                 title={lang === "sk"
-                  ? "Počet bytov v skupine. Pod ním: koľko je v ponuke (voľné + rezervované) a koľko je v cenníku označených ako predané. Skutočné predaje — vrátane bytov, ktoré developer z cenníka zmazal — sú v Analytika → Predaje."
-                  : "Flats in this group. Below: how many are on offer (available + reserved) and how many the price list marks as sold. Real sales — including flats the developer deleted from the list — live in Analytics → Sales."}>
+                  ? "Počet bytov v skupine — z tých, ktoré sú zahrnuté v tabuľke (pozri poznámku nad ňou). Pod ním: koľko z nich je v ponuke (voľné + rezervované) a koľko má cenník označené ako predané. Byty bez ceny sú mimo výpočtu a developeri cenu pri predaji väčšinou zmažú, takže tu predané vychádza nízko. Skutočné predaje — vrátane bytov zmazaných z cenníka — sú v Analytika → Predaje."
+                  : "Flats in this group — among the rows the table includes (see the note above it). Below: how many of them are on offer (available + reserved) and how many the price list marks as sold. Flats with no price are outside the calculation, and developers usually strip the price when a flat sells, so sold reads low here. Real sales — including flats deleted from the list — live in Analytics → Sales."}>
               #{sortIndicator("count")}
               <div style={{ fontSize: "0.52rem", fontWeight: 400, letterSpacing: "0.02em",
                             color: "var(--text-2)", opacity: 0.75, marginTop: 1, whiteSpace: "nowrap" }}>
@@ -3749,8 +3755,8 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                     const f = (x) => x.toLocaleString("en-US").replace(/,/g, " ");
                     return (
                       <div title={lang === "sk"
-                             ? `${f(sp.offer)} v ponuke · ${f(sp.sold)} v cenníku označených ako predané`
-                             : `${f(sp.offer)} on offer · ${f(sp.sold)} marked sold on the price list`}
+                             ? `${f(sp.offer)} v ponuke · ${f(sp.sold)} označených ako predané (z bytov zahrnutých v tabuľke)`
+                             : `${f(sp.offer)} on offer · ${f(sp.sold)} marked sold (of the flats the table includes)`}
                            style={{ fontSize: "0.58rem", fontWeight: 400, marginTop: 1, whiteSpace: "nowrap" }}>
                         <span style={{ color: accentInk }}>{f(sp.offer)}</span>
                         <span style={{ opacity: 0.4 }}> · </span>
