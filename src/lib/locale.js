@@ -101,3 +101,23 @@ export const byLabel = (lang) => {
   };
 };
 
+
+/**
+ * formatPercent — a percentage, written the way the reader's language writes one.
+ *
+ * Eleven places built one by hand as `${n.toFixed(1)}%`, which is an English percentage.
+ * A Slovak page showed "7.3% absorpcia" and a table column of "0.0%" — a DOT where a
+ * Slovak reader expects a comma, and no space before the sign. Slovak (and Czech) put a
+ * non-breaking space between the number and the %; English does not.
+ *
+ * `digits` defaults to 1 because that is what every converted site used. A whole-number
+ * percentage still goes through here, so the space rule holds there too.
+ */
+export function formatPercent(value, lang = "sk", digits = 1) {
+  const n = Number(value);
+  if (value == null || value === "" || !Number.isFinite(n)) return "—";
+  const tag = localeTag(lang);
+  const num = n.toLocaleString(tag, { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  // Non-breaking space so a percentage never wraps away from its sign.
+  return tag.startsWith("en") ? `${num}%` : `${num}\u00A0%`;
+}

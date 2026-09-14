@@ -35,7 +35,7 @@ import LoadError from "../components/LoadError";
 import Picker from "../components/Picker";
 import InfoTip from "../components/InfoTip";
 import { moneyFromEur, moneySymbol, formatMoney } from "../lib/money";
-import { localeTag } from "../lib/locale";
+import { localeTag, formatPercent } from "../lib/locale";
 import { useAccountPrefState } from "../lib/useAccountUiPref";
 import { useCurrency } from "../lib/useCurrency";
 import { useCountry, isAllCountries } from "../lib/useCountry";
@@ -906,7 +906,7 @@ function ExecSummary({ summary, lang, extraDistrict, compared }) {
           const delta = ((summary.wavgM2 / compared.summary.wavgM2) - 1) * 100;
           const sign = delta >= 0 ? "+" : "";
           const color = Math.abs(delta) < 2 ? dim : (delta > 0 ? red : green);
-          return <> Oproti {compared.label}u je to <strong style={{ color }}>{sign}{delta.toFixed(1)}%</strong>.</>;
+          return <> Oproti {compared.label}u je to <strong style={{ color }}>{sign}{formatPercent(delta, lang)}</strong>.</>;
         })()}
         </>
       ) : (
@@ -1897,7 +1897,7 @@ function SellOutForecastReport({ projects, lang, onOpenProject }) {
                     <td style={{ ...tdcR, color: accentInk }}>{p.forecast_remaining.toLocaleString("en-US").replace(/,/g, " ")}</td>
                     <td style={{ ...tdcR, color: orangeInk }}>{p.forecast_velocity > 0 ? p.forecast_velocity : "—"}</td>
                     <td style={{ ...tdcR, color: monthColor, fontWeight: 700 }}>{monthLabel}</td>
-                    <td style={tdcR}>{p.absorption_pct != null ? `${p.absorption_pct.toFixed(1)}%` : "—"}</td>
+                    <td style={tdcR}>{formatPercent(p.absorption_pct, lang)}</td>
                   </tr>
                 );
               })}
@@ -2314,9 +2314,9 @@ function PricingTensionReport({ projects, lang, onOpenProject }) {
                     <td style={tdc}>{p.district || "—"}</td>
                     <td style={tdcR}>{Math.round(moneyFromEur(p.avg_price_eur_m2)).toLocaleString("en-US").replace(/,/g, " ")}</td>
                     <td style={{ ...tdcR, color: p.premiumPct >= 0 ? orange : green, fontWeight: 700 }}>
-                      {p.premiumPct >= 0 ? "+" : ""}{p.premiumPct.toFixed(1)}%
+                      {p.premiumPct >= 0 ? "+" : ""}{formatPercent(p.premiumPct, lang)}
                     </td>
-                    <td style={{ ...tdcR, color: p.velocityPct >= 5 ? green : dim }}>{p.velocityPct.toFixed(1)}%</td>
+                    <td style={{ ...tdcR, color: p.velocityPct >= 5 ? green : dim }}>{formatPercent(p.velocityPct, lang)}</td>
                     <td style={{ ...tdcR, color: signalColor, fontWeight: 700 }}>{signal}</td>
                   </tr>
                 );
@@ -2415,7 +2415,7 @@ function PricingTensionScatter({ dots, lang, onOpenProject }) {
             <g key={d.id || i} style={{ cursor: onClick ? "pointer" : "default" }} onClick={onClick}>
               <circle cx={cx} cy={cy} r={Math.min(12, 4 + Math.sqrt(d.available_units || 0) * 0.5)}
                       fill={fill} opacity="0.65" stroke={fill} strokeWidth="1.2">
-                <title>{`${d.name} (${d.district || "?"})\n${moneySymbol()}/m²: ${Math.round(moneyFromEur(d.avg_price_eur_m2)).toLocaleString("sk-SK")} (${d.premiumPct >= 0 ? "+" : ""}${d.premiumPct.toFixed(1)}% vs ${lang === "sk" ? "medián" : "median"})\nVelocity: ${d.velocityPct.toFixed(1)} %/mes.\nVoľných: ${d.available_units}`}</title>
+                <title>{`${d.name} (${d.district || "?"})\n${moneySymbol()}/m²: ${Math.round(moneyFromEur(d.avg_price_eur_m2)).toLocaleString("sk-SK")} (${d.premiumPct >= 0 ? "+" : ""}${formatPercent(d.premiumPct, lang)} vs ${lang === "sk" ? "medián" : "median"})\nVelocity: ${formatPercent(d.velocityPct, lang)}/mes.\nVoľných: ${d.available_units}`}</title>
               </circle>
             </g>
           );

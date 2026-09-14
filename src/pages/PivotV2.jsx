@@ -8,10 +8,13 @@ import { useAuth } from "../lib/useAuth";
 import { useAccountPrefState } from "../lib/useAccountUiPref";
 import { PIVOT_KEY as PIVOT_PREF_KEY } from "../lib/accountPrefs";
 import { moneyFromEur, moneySymbol } from "../lib/money";
+import { formatDimNumber } from "../lib/locale";
+import { statusLabel } from "../lib/unitStatus";
+import { unitKindLabel } from "../lib/unitKinds";
 import { isHomeUnit } from "../lib/unitKinds";
 import Picker from "../components/Picker";
 import InfoTip from "../components/InfoTip";
-import { localeTag } from "../lib/locale";
+import { localeTag, formatPercent } from "../lib/locale";
 import { useCurrency } from "../lib/useCurrency";
 import { orderPivotColKeys } from "../lib/pivotColOrder";
 import { toCSV, copyTable } from "../lib/tableClipboard";
@@ -272,6 +275,23 @@ export function setPivotRegistryLabels(reg) {
     if (f.label_en) en[f.key] = f.label_en;
   }
   _regLabels = { sk, en };
+}
+
+/* A dimension VALUE, written for a reader.
+ *
+ * The grain speaks the database's words, and this page printed them straight into its row
+ * and column headers: a rooms column read "Izby: 1.0" (Postgres serialises `numeric` as a
+ * string), a status read "V", a type read "flat" — beside a Unit database that already
+ * said 1, Voľný and Byt for the very same rows.
+ *
+ * Display only. The grouping key, the sort, the drill-down and the CSV all keep the stored
+ * value, which is what makes a pivot cell still find its units. */
+function dimValueLabel(fieldKey, value, lang) {
+  if (value == null || value === "") return value;
+  if (fieldKey === "stav") return statusLabel(value, lang, "one");
+  if (fieldKey === "typ") return unitKindLabel(value, lang);
+  if (FIELDS[fieldKey]?.type === "number") return String(formatDimNumber(value));
+  return String(value);
 }
 
 /** Field label in the active UI language: the registry's name first, then this page's
@@ -1151,8 +1171,13 @@ function displayMoneyUnit(u) { return u === "€" ? moneySymbol() : u === "€/m
      · Area / rooms / floor, via
        avg / median / min / max    → 1 decimal                   "65.4 m²", "2.3"
 */
-const _fmtWhole = (x) => Math.round(x).toLocaleString("en-US").replace(/,/g, " ");
-const _fmtDec1  = (x) => (Math.round(x * 10) / 10).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).replace(/,/g, " ");
+/* en-US with the thousands commas swapped for spaces until 2026-09-14 — which produced
+   the right grouping and the WRONG decimal mark, so this page wrote "35.1 m²" and "99.3%"
+   beside a Unit database writing "35,1 m²" for the same flats. sk-SK gives both: a
+   non-breaking space between thousands and a comma before the decimal, matching money.js
+   and every other number on the platform. */
+const _fmtWhole = (x) => Math.round(x).toLocaleString("sk-SK").replace(/,/g, " ");
+const _fmtDec1  = (x) => (Math.round(x * 10) / 10).toLocaleString("sk-SK", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
 function formatValue(value, fieldKey, agg) {
   if (value == null || !Number.isFinite(value)) return "—";
@@ -3497,7 +3522,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
     if (valueMode === "pct_total" && shareable) {
       const g = grandTotal.rollups[valIdx];
       if (g == null || !Number.isFinite(g) || g === 0) return formatValue(raw, v.field, v.agg);
-      return `${((raw / g) * 100).toFixed(1)}%`;
+      return formatPercent((raw / g) * 100, lang);
     }
     if (valueMode === "pct_parent" && shareable) {
       if (parentRaw == null || !Number.isFinite(parentRaw) || parentRaw === 0) {
@@ -3505,7 +3530,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
         // than a confusing "—".
         return formatValue(raw, v.field, v.agg);
       }
-      return `${((raw / parentRaw) * 100).toFixed(1)}%`;
+      return formatPercent((raw / parentRaw) * 100, lang);
     }
     return formatValue(raw, v.field, v.agg);
   };
@@ -3585,7 +3610,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                 <th key={"ctop:" + ck} colSpan={effectiveValues.length}
                     style={{ ...th, color: accentInk, borderLeft: `1px solid ${border}`, borderBottom: `1px solid ${border}`,
                              position: "sticky", top: 0, zIndex: 3 }}>
-                  <span style={{ opacity: 0.65 }}>{fieldLabel(colFields[0], lang)}:</span> <strong style={{ color: accentInk }}>{ck}</strong>
+                  <span style={{ opacity: 0.65 }}>{fieldLabel(colFields[0], lang)}:</span> <strong style={{ color: accentInk }}>{dimValueLabel(colFields[0], ck, lang)}</strong>
                 </th>
               ))}
               {/* Grand totals across columns. When there are more distinct column
@@ -3774,9 +3799,9 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                         onClick={(e) => { e.stopPropagation(); onProjectOpen(projectId); }}
                         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onProjectOpen(projectId); } }}
                         style={{ color: "var(--text)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-                      >{n.label}</span>
+                      >{dimValueLabel(rowFields[n.level], n.label, lang)}</span>
                     ) : (
-                      <span title={n.label} style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{n.label}</span>
+                      <span title={dimValueLabel(rowFields[n.level], n.label, lang)} style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{dimValueLabel(rowFields[n.level], n.label, lang)}</span>
                     )}
                     {/* `flex: none` — this label truncates with an ellipsis, so an
                         inline mark would be the first thing clipped. */}
@@ -4084,7 +4109,7 @@ const CHART_PALETTE = [
   "#74b9ff", "#a29bfe", "#fdcb6e", "#55efc4",
 ];
 
-function PivotChart({ tree, rowFields, colFields: _colFields, effectiveValues, onSelect, lang }) {
+function PivotChart({ tree, rowFields, colFields = [], effectiveValues, onSelect, lang }) {
   const [collapsed, setCollapsed] = useState(false);
   const [chartType, setChartType] = useState("auto");
   const [valueIdx, setValueIdx] = useState(0);
@@ -4167,7 +4192,9 @@ function PivotChart({ tree, rowFields, colFields: _colFields, effectiveValues, o
   // in the table via the data-pathkey attribute.
   const dataPoints = topRows
     .map((node, i) => ({
-      label: node.label || "—",
+      // The chart axis showed the stored value, so a rooms chart was labelled 1.0, 2.0, 3.0
+      // under a table whose own header said 1, 2, 3.
+      label: dimValueLabel(rowFields[0], node.label, lang) || "—",
       pathKey: node.pathKey,
       value: node.rollups?.[valueIdx] ?? null,
       colRollups: node.colRollups || null,
@@ -4261,7 +4288,7 @@ function PivotChart({ tree, rowFields, colFields: _colFields, effectiveValues, o
           <BarChartSVG data={truncated} measureField={measureField} measureAgg={measureAgg} onSelect={onSelect} lang={lang} />
         )}
         {effectiveType === "stacked" && stackedAvailable && (
-          <StackedBarSVG data={truncated} colKeys={colKeys} valueIdx={valueIdx} measureField={measureField} measureAgg={measureAgg} onSelect={onSelect} lang={lang} />
+          <StackedBarSVG data={truncated} colKeys={colKeys} colField={colFields[0]} valueIdx={valueIdx} measureField={measureField} measureAgg={measureAgg} onSelect={onSelect} lang={lang} />
         )}
         {effectiveType === "stacked" && !stackedAvailable && (
           <BarChartSVG data={truncated} measureField={measureField} measureAgg={measureAgg} onSelect={onSelect} lang={lang} />
@@ -4276,7 +4303,7 @@ function PivotChart({ tree, rowFields, colFields: _colFields, effectiveValues, o
           <BarChartSVG data={truncated} measureField={measureField} measureAgg={measureAgg} onSelect={onSelect} lang={lang} />
         )}
         {effectiveType === "heatmap" && heatmapAvailable && (
-          <HeatmapSVG topRows={topRows.slice(0, TRUNCATE)} colKeys={colKeys} valueIdx={valueIdx} measureField={measureField} measureAgg={measureAgg} onSelect={onSelect} lang={lang} />
+          <HeatmapSVG topRows={topRows.slice(0, TRUNCATE)} colKeys={colKeys} colField={colFields[0]} valueIdx={valueIdx} measureField={measureField} measureAgg={measureAgg} onSelect={onSelect} lang={lang} />
         )}
         {effectiveType === "heatmap" && !heatmapAvailable && (
           <BarChartSVG data={truncated} measureField={measureField} measureAgg={measureAgg} onSelect={onSelect} lang={lang} />
@@ -4425,12 +4452,11 @@ function formatValueWhole(value, fieldKey, agg) {
   if (isMoneyUnit(f?.unit)) value = moneyFromEur(value);
   const unit = f?.unit ? ` ${isMoneyUnit(f.unit) ? displayMoneyUnit(f.unit) : f.unit}` : "";
   if (f?.unit === "%") {
-    return `${(Math.round(value * 10) / 10).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).replace(/,/g, " ")}${unit}`;
+    return `${_fmtDec1(value)}${unit}`;
   }
   // counts, sums, averages, prices, areas, €/m² — all displayed as
   // whole-unit integers in tooltips (no "5965.6 €/m²", just "5 966").
-  const rounded = Math.round(value);
-  return `${rounded.toLocaleString("en-US").replace(/,/g, " ")}${unit}`;
+  return `${_fmtWhole(value)}${unit}`;
 }
 
 /* ChartTooltip — floating box anchored to the mouse position via
@@ -4605,7 +4631,7 @@ function BarChartSVG({ data, measureField, measureAgg, onSelect, lang }) {
    gets a distinct palette colour. Click a segment → flash the matching
    (row, colKey) cell in the table. Click outside any segment (X label)
    → flash just the row. */
-function StackedBarSVG({ data, colKeys, valueIdx, measureField, measureAgg, onSelect, lang }) {
+function StackedBarSVG({ data, colKeys, colField, valueIdx, measureField, measureAgg, onSelect, lang }) {
   const W = 880, H = 380;
   const padL = 56, padR = 16, padT = 32, padB = data.length > 8 ? 144 : 104;
   const innerW = W - padL - padR;
@@ -4709,7 +4735,7 @@ function StackedBarSVG({ data, colKeys, valueIdx, measureField, measureAgg, onSe
           const y = legendY + row * 18;
           if (y + 12 > H) return null;
           const fill = CHART_PALETTE[j % CHART_PALETTE.length];
-          const ckText = String(ck);
+          const ckText = String(dimValueLabel(colField, ck, lang));
           const truncated = ckText.length > 18 ? ckText.slice(0, 17) + "…" : ckText;
           return (
             <g key={j}>
@@ -4918,7 +4944,7 @@ function PieChartSVG({ data, measureField, measureAgg, onSelect, lang }) {
                onMouseEnter={onEnter} onMouseMove={onMove} onMouseLeave={onLeave}>
               <rect x={W / 2 + 60} y={y - 9} width={14} height={14} fill={s.fill} rx="2"/>
               <text x={W / 2 + 80} y={y} fill={text} fontSize="12" dominantBaseline="middle" fontFamily={mono}>
-                {(s.label.length > 22 ? s.label.slice(0, 21) + "…" : s.label)} — {(s.share * 100).toFixed(1)}%
+                {(s.label.length > 22 ? s.label.slice(0, 21) + "…" : s.label)} — {formatPercent(s.share * 100, lang)}
               </text>
             </g>
           );
@@ -4930,7 +4956,7 @@ function PieChartSVG({ data, measureField, measureAgg, onSelect, lang }) {
           accentColor={hover.s.fill}
           lines={[
             { text: hover.s.label, bold: true },
-            { text: `${formatValueWhole(hover.s.value, measureField, measureAgg)}  ·  ${(hover.s.share * 100).toFixed(1)}%`, accent: true },
+            { text: `${formatValueWhole(hover.s.value, measureField, measureAgg)}  ·  ${formatPercent(hover.s.share * 100, lang)}`, accent: true },
             { text: lang === "sk" ? "klik → riadok v tabuľke" : "click → row in table", muted: true, small: true },
           ]}
         />
@@ -4944,7 +4970,7 @@ function PieChartSVG({ data, measureField, measureAgg, onSelect, lang }) {
    (null / 0) get a hatched look. Each cell is clickable → flashes the
    matching (row, colKey) cell in the table. Row labels are clickable
    too — flash the whole row. */
-function HeatmapSVG({ topRows, colKeys, valueIdx, measureField, measureAgg, onSelect, lang }) {
+function HeatmapSVG({ topRows, colKeys, colField, valueIdx, measureField, measureAgg, onSelect, lang }) {
   const W = 880, H = Math.max(240, 44 + topRows.length * 30 + 16);
   const padL = 220, padR = 16, padT = 44, padB = 16;
   const innerW = W - padL - padR;
@@ -4991,7 +5017,7 @@ function HeatmapSVG({ topRows, colKeys, valueIdx, measureField, measureAgg, onSe
         {/* col headers */}
         {colKeys.map((ck, j) => {
           const x = padL + j * cellW + cellW / 2;
-          const ckText = String(ck);
+          const ckText = String(dimValueLabel(colField, ck, lang));
           const truncated = ckText.length > 14 ? ckText.slice(0, 13) + "…" : ckText;
           return (
             <text key={j} x={x} y={padT - 8} fill={text} fontSize="11" fontWeight="600" textAnchor="middle" fontFamily={mono}>
@@ -5228,9 +5254,9 @@ function FilterPopover({ fieldKey, filter, anchorEl, records, distinctOverride =
 
   const fmt = (n) => {
     if (!Number.isFinite(n)) return "—";
-    return Number.isInteger(n)
-      ? n.toLocaleString("en-US").replace(/,/g, " ")
-      : (Math.round(n * 100) / 100).toLocaleString("en-US").replace(/,/g, " ");
+    /* The non-integer branch wrote a DOT decimal — a range slider on a Slovak page
+       offering "35.12" beside a table cell reading "35,1". sk-SK gives both marks right. */
+    return n.toLocaleString("sk-SK", { maximumFractionDigits: Number.isInteger(n) ? 0 : 2 });
   };
   // Money-field display helpers: convert the EUR stat/bound into the current
   // currency for what the user sees (dispNum) and label it (fmtStat).

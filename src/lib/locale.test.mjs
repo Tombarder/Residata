@@ -64,3 +64,29 @@ test("the labelled unit kinds come out alphabetically", () => {
 test("mixed numbers and text do not throw", () => {
   assert.equal(order(["5", "Bratislava", "1"]).length, 3);
 });
+
+/* formatPercent — written after a Slovak page showed "7.3% absorpcia" and "0.0%". */
+import { formatPercent } from "./locale.js";
+
+test("Slovak uses a comma and a non-breaking space before the sign", () => {
+  assert.equal(formatPercent(7.3, "sk"), "7,3 %");
+  assert.equal(formatPercent(0, "sk"), "0,0 %");
+  assert.equal(formatPercent(61, "sk", 0), "61 %");
+});
+
+test("English keeps the dot and no space", () => {
+  assert.equal(formatPercent(7.3, "en"), "7.3%");
+  assert.equal(formatPercent(61, "en", 0), "61%");
+});
+
+test("Czech follows the Slovak convention, not the English one", () => {
+  assert.equal(formatPercent(7.3, "cs"), "7,3 %");
+});
+
+test("a missing percentage is a dash, never NaN%", () => {
+  for (const v of [null, undefined, "", NaN, "n/a"]) assert.equal(formatPercent(v, "sk"), "—");
+});
+
+test("the space never lets the sign wrap onto its own line", () => {
+  assert.ok(!/ %$/.test(formatPercent(5, "sk")));
+});

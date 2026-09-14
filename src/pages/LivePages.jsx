@@ -5,7 +5,7 @@ import { useCapabilities } from "../lib/useCapabilities";
 import { useProjects, useProjectFlats, useProjectSnapshots, useMarketTotals, useTotalsList, useSales } from "../lib/useData";
 import { useAccountPrefState } from "../lib/useAccountUiPref";
 import { moneyFromEur, moneySymbol } from "../lib/money";
-import { localeTag } from "../lib/locale";
+import { localeTag, formatPercent } from "../lib/locale";
 import { daysUntil } from "../lib/dates";
 import { fmtSelloutValue } from "../lib/absorption";
 import { useCurrency } from "../lib/useCurrency";
@@ -970,7 +970,7 @@ function ProjectAggregateOnly({ project, lang, t, canVelocity }) {
 function ProjectInsights({ project, flats, snapshots, lang, coverageMode, onSelectFlat }) {
   const locale = localeTag(lang);
   const fmtEur = (v) => v == null || !Number.isFinite(v) ? "—" : `${Math.round(moneyFromEur(v)).toLocaleString("en-US").replace(/,/g, " ")} ${moneySymbol()}`;
-  const fmtPct = (v) => v == null || !Number.isFinite(v) ? "—" : `${(Math.round(v * 10) / 10).toFixed(1)}%`;
+  const fmtPct = (v) => formatPercent(v, lang);
   const L = (sk, en) => lang === "sk" ? sk : en;
 
   // ── Data prep ─────────────────────────────────────────────────
@@ -3328,7 +3328,7 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
         <AKpi label={lang === "sk" ? "Voľné byty" : "Available"}            value={totalAvail.toLocaleString(localeTag(lang))} accent={green} color="#10b981"
               info={lang === "sk" ? "Byty aktuálne v ponuke — ešte nepredané a nerezervované." : "Units currently on the market — not yet sold or reserved."} />
         <AKpi label={lang === "sk" ? "Predané (30d)" : "Sold (30d)"}        value={totalSold30 ? `+${totalSold30}` : "—"} accent="#f5a623" color="#e0940f"
-              sub={lang === "sk" ? `${absorptionPct}% absorpcia` : `${absorptionPct}% absorption`}
+              sub={lang === "sk" ? `${formatPercent(absorptionPct, lang)} absorpcia` : `${formatPercent(absorptionPct, lang)} absorption`}
               info={lang === "sk" ? "Koľko bytov zmizlo z ponuky ako predané za posledných 30 dní. Absorpcia = podiel celkovej ponuky predaný za mesiac." : "How many units left the market as sold in the last 30 days. Absorption = share of inventory sold per month."} />
         <AKpi label={lang === "sk" ? `Priem. ${moneySymbol()}/m²` : `Avg ${moneySymbol()}/m²`}            value={avgEurM2 ? Math.round(moneyFromEur(avgEurM2)).toLocaleString(localeTag(lang)) : "—"} color="#3b74e8"
               info={lang === "sk" ? "Priemerná ponuková cena za m² (s DPH) voľných bytov, vážená počtom bytov. Cena ktorú pýtajú developeri, nie realizovaná predajná." : "Average asking price per m² (incl. VAT) of available units, weighted by unit count. The developers' asking price, not the achieved sale price."} />
@@ -3375,7 +3375,7 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
                     {d.sold30 > 0 ? `+${d.sold30}` : "—"}
                   </td>
                   <td style={{ ...td, textAlign: "right", fontFamily: mono, color: d.absorption > 5 ? green : dim }}>
-                    {d.absorption.toFixed(1)}%
+                    {formatPercent(d.absorption, lang)}
                   </td>
                 </tr>
               ))}
@@ -3598,7 +3598,12 @@ function RankBarList({ rows, setCurrent, suffix = "", color = green, getChildren
                 </div>
               </div>
               <div style={{ fontFamily: mono, fontSize: "0.85rem", color: color, fontWeight: 700, textAlign: "right" }}>
-                {typeof r.value === "number" ? (r.value % 1 !== 0 ? r.value.toFixed(1) : r.value) : r.value}{suffix}
+                {/* toFixed writes an English decimal, so this list showed "99.3%" on a
+                    Slovak page. sk-SK gives the comma AND groups the thousands, which the
+                    raw number never did. One decimal only when there is one, as before. */}
+                {typeof r.value === "number"
+                  ? r.value.toLocaleString("sk-SK", { maximumFractionDigits: r.value % 1 !== 0 ? 1 : 0 })
+                  : r.value}{suffix}
               </div>
               {expandable
                 ? <span style={{ fontSize: "0.7rem", color: dim, transform: isOpen ? "rotate(90deg)" : "none", transition: "transform 0.15s", textAlign: "center" }}>›</span>
