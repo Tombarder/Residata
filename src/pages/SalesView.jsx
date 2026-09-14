@@ -275,8 +275,12 @@ export default function SalesView({ lang = "sk" }) {
     return f;
   }, [country, liveFilters, curSymForFilters]);
 
-  // sale-only sort keys are invalid for the current-pipeline views → fall back to price
-  const effSort = isPipe && (sort.key === "sold_date" || sort.key === "days_on_market") ? { key: "price_s_dph_eur", dir: "desc" } : sort;
+  /* Sale-only sort keys are invalid on the pipeline views, and a sort on a column the user
+     has SINCE HIDDEN is invisible — the rows come back in an order with no explanation on
+     screen. Both fall back to the first sortable column that is actually showing. */
+  const sortableNow = isPipe
+    ? ["price_s_dph_eur", "price_per_m2_eur", "izby", "obytna_plocha", "city", "project_name"]
+    : ["sold_date", "price_s_dph_eur", "price_per_m2_eur", "days_on_market", "izby", "obytna_plocha", "city", "project_name"];
   /* The columns are CHOSEN now. The table used to hard-code ten of the twenty-five fields
      every detail row already carries, which is what made the page feel restrictive — the
      data was there and there was no way to ask for it. Kept in the [key, sk, en, kind]
@@ -284,6 +288,19 @@ export default function SalesView({ lang = "sk" }) {
   const visibleCols = useMemo(() => {
     const avail = SALES_FIELDS.filter((f) => f.col && !(isPipe && f.sold));
     const chosen = cols.filter((k) => avail.some((f) => f.key === k));
+    /* No silent substitution. The first cut fell back to the defaults when the list came
+       out empty, so pressing "✕ žiadne" appeared to do nothing — a control that does not
+       do what it says is worse than one that is missing. An empty choice renders an empty
+       state that explains itself; a chosen set that is empty only because the SOLD-only
+       columns were dropped on a pipeline tab still falls back, because the user did not
+       ask for that. */
+    /* An EMPTY cols list can only come from the user pressing "žiadne" — the state starts
+       as the defaults and is never empty otherwise. That is an instruction, so it is
+       obeyed and explained. A NON-empty cols whose members all happen to be sold-only on a
+       pipeline tab is a different thing entirely: the user did not ask for a blank table,
+       so that one falls back to the defaults. (The first version tested these the wrong way
+       round, so "žiadne" appeared to do nothing.) */
+    if (!cols.length) return [];
     const use = chosen.length ? chosen : (isPipe ? SALES_DEFAULT_COLS_PIPE : SALES_DEFAULT_COLS).filter((k) => avail.some((f) => f.key === k));
     return use.map((k) => { const f = avail.find((x) => x.key === k); return [f.key, f.sk, f.en, f.col]; });
   }, [cols, isPipe]);
@@ -293,9 +310,14 @@ export default function SalesView({ lang = "sk" }) {
                      type: ["num", "eur", "per_m2", "area"].includes(f.col) ? "numeric" : f.col === "date" ? "date" : "text" })),
     [isPipe],
   );
+  const effSort = useMemo(() => {
+    const shown = new Set(visibleCols.map((c) => c[0]));
+    if (sortableNow.includes(sort.key) && shown.has(sort.key)) return sort;
+    const fallback = sortableNow.find((k) => shown.has(k));
+    return fallback ? { key: fallback, dir: "desc" } : sort;
+  }, [sort, visibleCols, sortableNow]);
   const detailColSpan = visibleCols.length; // full-row cells must span the ACTUAL visible column count (varies sold vs pipeline)
-  const SORTABLE = isPipe ? ["price_s_dph_eur", "price_per_m2_eur", "izby", "obytna_plocha", "city", "project_name"]
-                          : ["sold_date", "price_s_dph_eur", "price_per_m2_eur", "days_on_market", "izby", "obytna_plocha", "city", "project_name"];
+  const SORTABLE = sortableNow;
   const common = { status, date_from, date_to, durable_only: durableOnly, filters: baseFilters };
   const summarySpec = useMemo(() => ({ ...common, mode: "summary" }), [JSON.stringify(common)]);       // eslint-disable-line
   const breakdownSpec = useMemo(() => ({ ...common, mode: "breakdown", group_by: groupBy }), [JSON.stringify(common), groupBy]); // eslint-disable-line
@@ -408,7 +430,12 @@ export default function SalesView({ lang = "sk" }) {
     const lines = detRows.map((r) => visibleCols.map((c) => {
       const v = r[c[0]];
       if (c[3] === "eur" || c[3] === "per_m2") return v == null ? "" : Math.round(moneyFromEur(Number(v)));
-      return v == null ? "" : String(v).replace(/;/g, ",");
+      /* The file says what the screen says. The sale signal renders as "označené" in the
+         table and was exporting as "marked" — a column whose meaning changes between the
+         page and the download is the same fault as a currency that does. */
+      const pretty = prettyValue(c[0]);
+      const shown = pretty && v != null ? pretty(v) : v;
+      return shown == null ? "" : String(shown).replace(/;/g, ",");
     }).join(";"));
     const blob = new Blob(["﻿" + [head, ...lines].join("\n")], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a");
@@ -618,6 +645,22 @@ export default function SalesView({ lang = "sk" }) {
           </div>
         </div>
 
+        {visibleCols.length === 0 ? (
+          /* The user pressed "žiadne". Say so and offer the way back, instead of a table
+             with no columns or — worse — the defaults quietly put back. */
+          <div className="rd-note" style={{ textAlign: "center", padding: "2rem 1rem" }}>
+            <div style={{ color: "var(--text)", fontSize: "0.86rem", marginBottom: "0.3rem" }}>
+              {t("Nie je vybraný žiadny stĺpec.", "No columns are selected.")}
+            </div>
+            <div style={{ marginBottom: "0.9rem" }}>
+              {t("Zoznam bytov nemá čo zobraziť — vyber stĺpce v paneli vpravo.", "The unit list has nothing to show — choose columns in the panel on the right.")}
+            </div>
+            <button className="rd-btn rd-btn--primary rd-btn--sm"
+              onClick={() => { setCols(isPipe ? SALES_DEFAULT_COLS_PIPE : SALES_DEFAULT_COLS); setPanelTab("cols"); }}>
+              ↺ {t("Obnoviť predvolené stĺpce", "Restore the default columns")}
+            </button>
+          </div>
+        ) : (
         <div className="rd-scroll" style={{ maxHeight: "58vh" }}>
           <table className="rd-table rd-table--sticky" style={{ minWidth: isPipe ? 900 : 1040 }}>
             <thead>
@@ -675,7 +718,7 @@ export default function SalesView({ lang = "sk" }) {
               ))}
             </tbody>
           </table>
-        </div>
+        </div>)}
         <div className="rd-note" style={{ marginTop: "0.6rem" }}>
           {t("„Dní na trhu“ je dostupné len pre byty ktoré sme videli pribudnúť aj predať — sledovanie beží od mája 2026.",
              "“Days on market” is only known for units we saw both list and sell — tracking started May 2026.")}
@@ -684,7 +727,7 @@ export default function SalesView({ lang = "sk" }) {
         </div>
 
         <FieldPanel
-          lang={lang} sel={{}}
+          lang={lang}
           tab={panelTab} setTab={setPanelTab}
           adding={adding} setAdding={setAdding}
           search={search} setSearch={setSearch}

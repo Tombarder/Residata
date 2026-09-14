@@ -15,6 +15,7 @@
  * own live facets, while the control they draw is the same one.
  */
 import Picker from "./Picker";
+import { field as sharedField } from "../lib/controls";
 import DateField from "./DateField";
 import { accent as green, accentInk, orange, dim, border, bg, surfacePanel as panelHi, text } from "../lib/theme";
 import { EMPTY_SENTINEL, MODE_LABEL, isFilterActive } from "../lib/filterModel";
@@ -185,7 +186,11 @@ function FilterCard({ f, field, caps, unit, lang, sel, useValues, onPatch, onRem
  * @param columns     null to hide the columns tab entirely
  */
 export default function FieldPanel({
-  lang = "sk", sel, tab, setTab, adding, setAdding, search, setSearch,
+  /* `sel` is the shared control box. It defaults to the kit's own rather than being
+     required from the caller: Sales passed {} and its range inputs came out as raw browser
+     boxes — white, 2px inset grey, 22px tall — inside a dark panel. A component that draws
+     controls should not depend on every page remembering to hand it their styling. */
+  lang = "sk", sel = sharedField, tab, setTab, adding, setAdding, search, setSearch,
   fields, catOf, catOrder, catLabel, capsOf, unitOf, useValues,
   filters, onAdd, onPatch, onRemove,
   cols = [], onToggleCol, onSetCols, defaultCols = [], showColumns = true,
