@@ -26,6 +26,9 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 // maplibre-gl v6 je ESM-only a default export zrušil — musí to byť namespace import.
 import * as maplibregl from "maplibre-gl";
+// Tells MapLibre where its tile worker is. Without it the map paints only its
+// background colour — see the module for why nothing reports the failure.
+import "../lib/maplibreWorker";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { fitoutLabel } from "../lib/priceBasis";
 import { useSpecifics, specificsHTML } from "../lib/projectSpecifics";
