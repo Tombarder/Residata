@@ -341,10 +341,14 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
     const isMoneyKey = (k) => fmtByKey[k] === "eur" || fmtByKey[k] === "per_m2";
     const built = filtersToSpec(filters, { isMoneyKey, toEur, isDateKey: (k) => capsSets.dateKeys.has(k) });
 
-    // The country toggle is a scope, not one of the user's filters — it belongs to the
-    // whole platform and is not something to remove from this panel.
+    /* The sidebar's market toggle is an ambient scope, not one of these filters. It
+       applies UNLESS the user has said something about country here — otherwise adding
+       "Krajina is Česko" while the sidebar says SK would be silently overwritten and the
+       chip on screen would describe a query that never ran. An explicit choice beats an
+       ambient one, and the chip then tells the truth. */
     const withCountry = { ...(built.filters || {}) };
-    if (!isAllCountries(country)) withCountry.country = [country];
+    const userSetCountry = filters.some((f) => f.key === "country" && isFilterActive(f));
+    if (!isAllCountries(country) && !userSetCountry) withCountry.country = [country];
 
     // Always fetch fitout_level even when the user isn't showing that column:
     // the mark beside the price needs the UNIT's own level, and a project can
@@ -595,7 +599,11 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
         <div style={{ width: 300, flexShrink: 0, background: panel, border: `1px solid ${border}`, borderRadius: 8, display: "flex", flexDirection: "column", maxHeight: "78vh" }}>
           {/* tabs */}
           <div style={{ display: "flex", borderBottom: `1px solid ${border}` }}>
-            {[["filters", t("FILTRE", "FILTERS"), activeFilters || null],
+            {/* Each badge counts what is IN that tab. The query bar above the table counts
+                what is actually narrowing the result, which is a different number whenever
+                a filter has been added but not yet given a value — showing the active count
+                here made two cards look like one. */}
+            {[["filters", t("FILTRE", "FILTERS"), filters.length || null],
               ["cols", t("STĹPCE", "COLUMNS"), cols.length]].map(([key, label, badge]) => {
               const on = panelTab === key;
               return (
