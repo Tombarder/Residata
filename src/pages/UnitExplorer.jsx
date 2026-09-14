@@ -8,7 +8,7 @@ import Picker from "../components/Picker";
 import FieldPanel from "../components/FieldPanel";
 import { useCountry, isAllCountries } from "../lib/useCountry";
 import { useCurrency } from "../lib/useCurrency";
-import { moneyFromEur, moneySymbol } from "../lib/money";
+import { moneyFromEur, moneySymbol, formatMoney, formatPerM2 } from "../lib/money";
 import { formatDimNumber } from "../lib/locale";
 import { statusLabel } from "../lib/unitStatus";
 import { useUnitsInfinite, useAnalyticsRegistry, usePivotDistinct } from "../lib/useData";
@@ -62,8 +62,8 @@ function fmtVal(key, val, fmtByKey, numeric, lang) {
   if (val == null || val === "") return "—";
   const f = fmtByKey[key];
   const n = Number(val);
-  if (f === "eur" && Number.isFinite(n)) return moneySymbol() + Math.round(moneyFromEur(n)).toLocaleString("sk-SK").replace(/,/g, " ");
-  if (f === "per_m2" && Number.isFinite(n)) return Math.round(moneyFromEur(n)).toLocaleString("sk-SK").replace(/,/g, " ") + " " + moneySymbol() + "/m²";
+  if (f === "eur") return formatMoney(val);
+  if (f === "per_m2") return formatPerM2(val);
   if (f === "area" && Number.isFinite(n)) return n.toLocaleString("sk-SK", { maximumFractionDigits: 1 }) + " m²";
   if (numeric && Number.isFinite(n)) return formatDimNumber(val);
   /* "V" told the reader nothing. The scraper's codes are right in the database and wrong

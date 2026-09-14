@@ -40,3 +40,40 @@ export function moneyToEur(disp) {
   if (!Number.isFinite(n)) return disp;
   return _money.unitsPerEur ? n / _money.unitsPerEur : n;
 }
+
+/**
+ * formatMoney / formatPerM2 — how a price is WRITTEN, in one place.
+ *
+ * The module docstring above says formatting "lives in ~15 plain functions scattered
+ * across pages", and that scattering produced a real fault: eleven of those sites put the
+ * symbol after the number with a space ("204 342 €"), and two put it in front with none.
+ * In EUR that only looked foreign. In CZK it printed "Kč4 958 193" — a Czech reader never
+ * writes it that way, and the Unit database and Sales were the two pages doing it.
+ *
+ * So: the amount, a non-breaking space, then the symbol. The space is NBSP because a
+ * price must never wrap between the number and its currency.
+ *
+ * Grouping is sk-SK, which is what every one of those sites already used — including the
+ * ones that reached it the long way round via en-US plus a comma swap.
+ */
+const GROUPED = (n) => Math.round(n).toLocaleString("sk-SK").replace(/,/g, " ");
+
+/* A MISSING price is not a free one. `moneyFromEur` deliberately hands null and "" back
+   untouched so each formatter can keep its own empty handling — and Number(null) is 0, so
+   the first cut of these printed "0 €" for a flat with no published price. Guard the input,
+   not the product. (Caught by money.test.mjs before it ever rendered.) */
+const NO_AMOUNT = (v) => v == null || v === "";
+
+/** A price: "204 342 €" / "4 958 193 Kč". Takes a EUR-denominated number. */
+export function formatMoney(eur) {
+  if (NO_AMOUNT(eur)) return "—";
+  const n = Number(moneyFromEur(eur));
+  return Number.isFinite(n) ? GROUPED(n) + " " + moneySymbol() : "—";
+}
+
+/** A unit rate: "4 813 €/m²" / "116 700 Kč/m²". Takes a EUR-denominated number. */
+export function formatPerM2(eur) {
+  if (NO_AMOUNT(eur)) return "—";
+  const n = Number(moneyFromEur(eur));
+  return Number.isFinite(n) ? GROUPED(n) + " " + moneySymbol() + "/m²" : "—";
+}

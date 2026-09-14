@@ -53,7 +53,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { supabasePublic } from "./supabase";
-import { moneyFromEur, moneySymbol } from "./money";
+import { formatMoney } from "./money";
 import HoverCard from "../components/HoverCard";
 import { priceBasisNote, fitoutNote, fitoutLabel, projectPriceLevel } from "./priceBasis";
 
@@ -180,8 +180,8 @@ const RULES = [
     // 16 122 € vs 7 854 €), so "parking from X" would be wrong for one of them
     // every time. The first cut of this rule read `garage ?? outside`; it is the
     // mistake this comment exists to stop coming back.
-    const money = (v) => v == null ? null
-      : Math.round(moneyFromEur(Number(v))).toLocaleString("sk-SK") + " " + moneySymbol();
+    // null, NOT "—": the caller drops the line entirely when there is no price.
+    const money = (v) => (v == null ? null : formatMoney(v));
     const parts = [];
     if (extra.parking_garage_availability === "mandatory" || extra.parking_garage_price_from != null) {
       const p = money(extra.parking_garage_price_from);

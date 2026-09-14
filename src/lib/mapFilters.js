@@ -9,7 +9,7 @@
  * the user asked for: is any of / is none of / has a value / is empty / between /
  * ≥ / ≤ / contains. Conditions AND together. Pure + unit-tested (no React).
  */
-import { moneyFromEur, moneySymbol } from "./money.js";
+import { formatMoney } from "./money.js";
 import { ppm2Of, completionBucket, COMPLETION } from "./mapMetrics.js";
 
 const norm = (s) => (s == null ? "" : String(s)).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
@@ -25,7 +25,7 @@ const STATUS_LABEL = { active: "v ponuke", sold_out: "vypredané", paused: "poza
 // Czech viewer looking at flat prices and became a real fault the moment
 // parking arrived: those columns briefly carried raw CZK, and a 926 000 Kč
 // garage would have printed as "€926 000" beside a €310 035 flat.
-const eur = (v) => Math.round(moneyFromEur(v)).toLocaleString("sk-SK") + " " + moneySymbol();
+const eur = formatMoney;
 
 // What the developer says about getting a parking space. Mirrors AVAILABILITY in
 // v2/lib/parking.py — that module is the source of truth; this is the display copy.

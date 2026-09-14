@@ -44,7 +44,7 @@ import { useAccountPrefState } from "../lib/useAccountUiPref";
 import { useCapabilities } from "../lib/useCapabilities";
 import { track } from "../lib/track";
 import { localeTag } from "../lib/locale";
-import { moneyFromEur, moneySymbol } from "../lib/money";
+import { moneyFromEur, moneySymbol, formatMoney, formatPerM2 as formatPerM2Money } from "../lib/money";
 import { useCurrency } from "../lib/useCurrency";
 import { useSpecifics, UnitPriceMarks } from "../lib/projectSpecifics";
 
@@ -125,14 +125,10 @@ function isComparable(target, candidate) {
   return true;
 }
 
-function formatPrice(n) {
-  if (n == null || !Number.isFinite(n)) return "—";
-  return Math.round(moneyFromEur(n)).toLocaleString("en-US").replace(/,/g, " ") + " " + moneySymbol();
-}
-function formatPerM2(n) {
-  if (n == null || !Number.isFinite(n)) return "—";
-  return Math.round(moneyFromEur(n)).toLocaleString("en-US").replace(/,/g, " ") + " " + moneySymbol() + "/m²";
-}
+// Grouped via en-US plus a comma swap until 2026-09-14, which reached the same digits
+// by a longer road than every other page. One formatter now.
+const formatPrice = formatMoney;
+const formatPerM2 = formatPerM2Money;
 /** Format the canonical time axis for display.
  *
  *  Accepts either:

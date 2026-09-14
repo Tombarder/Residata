@@ -34,7 +34,7 @@ import { isHomeUnit } from "../lib/unitKinds";
 import LoadError from "../components/LoadError";
 import Picker from "../components/Picker";
 import InfoTip from "../components/InfoTip";
-import { moneyFromEur, moneySymbol } from "../lib/money";
+import { moneyFromEur, moneySymbol, formatMoney } from "../lib/money";
 import { localeTag } from "../lib/locale";
 import { useAccountPrefState } from "../lib/useAccountUiPref";
 import { useCurrency } from "../lib/useCurrency";
@@ -1430,8 +1430,7 @@ function CompetitiveProfile({ projects, scopeType, scopeValue, lang }) {
     return [...seen].sort((a, b) => a - b).slice(0, 5);
   }, [roomRows]);
 
-  const money = (v) => v == null ? "—"
-    : Math.round(moneyFromEur(Number(v))).toLocaleString("sk-SK") + " " + moneySymbol();
+  const money = formatMoney;
   const perM2 = (v) => v == null ? "—"
     : Math.round(moneyFromEur(Number(v))).toLocaleString("sk-SK");
 

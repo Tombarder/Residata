@@ -16,7 +16,7 @@
    Built for the comparable-projects pricing workflow (e.g. Nitra). */
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useCurrency } from "../lib/useCurrency";
-import { moneyFromEur, moneySymbol, moneyToEur } from "../lib/money";
+import { moneyFromEur, moneySymbol, moneyToEur, formatMoney, formatPerM2 } from "../lib/money";
 import { formatDimNumber } from "../lib/locale";
 import { useSales } from "../lib/useData";
 import { useCountry, isAllCountries } from "../lib/useCountry";
@@ -167,15 +167,13 @@ function fmtRange(kind, r, lang) {
   return lo === hi ? lo : `${lo} – ${hi}`;
 }
 
-function fmtMoney(eur) {
-  if (eur == null || !Number.isFinite(Number(eur))) return "—";
-  return moneySymbol() + Math.round(moneyFromEur(Number(eur))).toLocaleString("sk-SK").replace(/,/g, " ");
-}
+const fmtMoney = formatMoney;   // "204 342 €", never "€204 342" — see money.js
+
 function fmtCell(kind, v, lang) {
   if (v == null || v === "") return "—";
   const n = Number(v);
   if (kind === "eur") return fmtMoney(v);
-  if (kind === "per_m2") return Number.isFinite(n) ? Math.round(moneyFromEur(n)).toLocaleString("sk-SK").replace(/,/g, " ") + " " + moneySymbol() : "—";
+  if (kind === "per_m2") return formatPerM2(v);
   if (kind === "area") return Number.isFinite(n) ? n.toLocaleString("sk-SK", { maximumFractionDigits: 1 }) + " m²" : "—";
   if (kind === "date") return fmtDay(v, lang);
   /* A numeric column arrives from Postgres as a STRING, so String(v) printed "6.0" for a
