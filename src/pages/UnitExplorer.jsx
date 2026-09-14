@@ -10,6 +10,8 @@ import { useCurrency } from "../lib/useCurrency";
 import { moneyFromEur, moneySymbol } from "../lib/money";
 import { useUnitsInfinite, useAnalyticsRegistry, usePivotDistinct } from "../lib/useData";
 import { useAccountPrefState } from "../lib/useAccountUiPref";
+import { EMPTY_SENTINEL, MODE_LABEL, capabilitiesOf, newFilter, sanitizeFilter,
+         isFilterActive, summariseFilter, filtersToSpec, migrateLegacyFilters } from "../lib/filterModel";
 import LoadError from "../components/LoadError";
 import DateField from "../components/DateField";
 import { supabaseData } from "../lib/supabase";
@@ -56,47 +58,105 @@ function fmtVal(key, val, fmtByKey) {
   return String(val);
 }
 
-// kind of filter control a field needs, from its registry type
-function fieldKind(meta) {
-  if (!meta) return "text";
-  if (meta.type === "numeric") return "num";
-  if (meta.type === "date") return "date";   // from/to range (engine supports date-dim ranges)
-  // 'month' (snapshot_month, 'YYYY-MM') → a value picker, not a date range: a calendar input
-  // can't express "YYYY-MM" and the engine filters months as an IN list, not a range.
-  return "text";
-}
 
-/* One generic "filter on any field" row. Rendered per active extra-filter so it can call
-   usePivotDistinct for its own text field (stable per React key). Text → is / is-not a set of
-   values (chips); number/date → from/to range. Feeds the same analytics_units spec the quick
-   filters do (filters / filters_not / ranges), so ANY field in the list is filterable. */
-function XFilterRow({ row, fields, mode, lang, sel, onPatch, onRemove }) {
+/* One filter, drawn as a card in the right-hand panel.
+
+   It replaces a row of controls that lived squeezed into the toolbar above the table,
+   where a field with a dozen chosen values pushed everything else off the line. Here
+   each filter owns its own block, all of them are visible at once, and the operators
+   offered are the ones the ENGINE accepts for that field — capabilitiesOf reads the
+   registry, so a numeric dimension like "izby" offers "is 2 or 3" (which works) rather
+   than a range (which the engine would reject). */
+function FilterCard({ f, field, caps, scopeMode, cityScope, lang, onPatch, onRemove, sel }) {
   const t = (sk, en) => (lang === "sk" ? sk : en);
-  const label = (f) => (lang === "sk" ? f.label_sk : f.label_en);
-  const meta = fields.find((f) => f.key === row.key);
-  const kind = fieldKind(meta);
-  const distinct = usePivotDistinct({ enabled: kind === "text" && !!row.key, field: row.key, mode });
-  const chip = { cursor: "pointer", background: green, color: "#04130d", borderRadius: 4, padding: "0.1rem 0.4rem", fontSize: "0.72rem", fontWeight: 600, whiteSpace: "nowrap" };
+  const wantsValues = f.mode === "in" || f.mode === "not_in";
+  const isDate = field?.type === "date";
+  /* A mestska cast belongs to a city (Bratislava's are not Praha's), so when the query
+     has narrowed to ONE city its district list narrows with it. The old page did this
+     with a hard-coded pair of dropdowns; worth keeping now that both are ordinary
+     filters, because the alternative is every district in two countries. */
+  const distinct = usePivotDistinct({
+    enabled: caps.valued && wantsValues && !!f.key, field: f.key, mode: scopeMode,
+    city: f.key === 'cast' ? (cityScope || null) : null,
+  });
+  const L = MODE_LABEL[lang === "sk" ? "sk" : "en"];
+  const active = isFilterActive(f);
+  const label = field ? (lang === "sk" ? field.label_sk : field.label_en) : f.key;
+
+  const chip = {
+    display: "inline-flex", alignItems: "center", gap: "0.25rem", cursor: "pointer",
+    background: "color-mix(in srgb, var(--accent) 16%, var(--surface-2))",
+    color: "var(--text)", border: `1px solid ${green}`, borderRadius: 4,
+    padding: "0.08rem 0.34rem", fontSize: "0.7rem", fontWeight: 500, whiteSpace: "nowrap",
+  };
+  const vLabel = (v) => (v === EMPTY_SENTINEL ? t("(prázdne)", "(empty)") : v);
+
   return (
-    <div style={{ display: "inline-flex", gap: "0.3rem", alignItems: "center", background: bg, border: `1px solid ${border}`, borderRadius: 6, padding: "0.2rem 0.3rem", flexWrap: "wrap" }}>
-      <Picker value={row.key} onChange={(v) => onPatch({ key: v, op: "in", vals: [], min: "", max: "" })} searchable ariaLabel={t("pole…", "field…")} width={140}
-        options={[{ value: "", label: t("pole…", "field…") }, ...fields.map((f) => ({ value: f.key, label: label(f) }))]} />
-      {row.key && kind === "text" && (<>
-        <Picker value={row.op} onChange={(v) => onPatch({ op: v })} ariaLabel="operator" width={92}
-          options={[{ value: "in", label: t("je", "is") }, { value: "not_in", label: t("nie je", "is not") }]} />
-        <Picker value="" onChange={(v) => { if (v && !(row.vals || []).includes(v)) onPatch({ vals: [...(row.vals || []), v] }); }} searchable width={150}
-          placeholder={distinct.loading ? t("načítavam…", "loading…") : t("+ hodnota", "+ value")} ariaLabel="value"
-          options={(distinct.values || []).filter((v) => !(row.vals || []).includes(v)).map((v) => ({ value: v, label: v }))} />
-        {(row.vals || []).map((v) => <span key={v} onClick={() => onPatch({ vals: row.vals.filter((x) => x !== v) })} style={chip} title={t("odstrániť", "remove")}>{v} ✕</span>)}
-      </>)}
-      {row.key && (kind === "num" || kind === "date") && (kind === "date" ? (<>
-        <DateField value={row.min} onChange={(e) => onPatch({ min: e.target.value })} width={132} title={t("od", "from")} />
-        <DateField value={row.max} onChange={(e) => onPatch({ max: e.target.value })} width={132} title={t("do", "to")} />
-      </>) : (<>
-        <input type="text" value={row.min} placeholder={t("od", "from")} onChange={(e) => onPatch({ min: e.target.value })} style={{ ...sel, width: 76 }} inputMode="numeric" />
-        <input type="text" value={row.max} placeholder={t("do", "to")} onChange={(e) => onPatch({ max: e.target.value })} style={{ ...sel, width: 76 }} inputMode="numeric" />
-      </>))}
-      <button onClick={onRemove} style={{ ...sel, cursor: "pointer", color: dim, padding: "0.2rem 0.45rem" }} title={t("odstrániť filter", "remove filter")}>✕</button>
+    <div style={{
+      background: bg, border: `1px solid ${active ? green : border}`, borderRadius: 6,
+      padding: "0.4rem 0.45rem 0.45rem", marginBottom: "0.4rem",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", marginBottom: "0.35rem" }}>
+        <span style={{ flex: 1, minWidth: 0, fontSize: "0.76rem", fontWeight: 600, color: text,
+                       overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+        <button onClick={onRemove} title={t("Odstrániť filter", "Remove filter")} aria-label={t("Odstrániť filter", "Remove filter")}
+          style={{ border: "none", background: "transparent", color: dim, cursor: "pointer", fontSize: "0.8rem", lineHeight: 1, padding: "0.1rem 0.2rem" }}>✕</button>
+      </div>
+
+      <Picker value={f.mode} onChange={(v) => onPatch({ mode: v })} ariaLabel={t("operátor", "operator")} width="100%"
+        options={caps.modes.map((m) => ({ value: m, label: L[m] }))} />
+
+      {wantsValues && caps.valued && (
+        <div style={{ marginTop: "0.35rem" }}>
+          <Picker value="" width="100%" searchable
+            placeholder={distinct.loading ? t("načítavam…", "loading…") : t("+ hodnota", "+ value")}
+            ariaLabel={t("hodnota", "value")}
+            onChange={(v) => { if (v && !(f.values || []).includes(v)) onPatch({ values: [...(f.values || []), v] }); }}
+            options={[
+              /* "(empty)" is offered as a value because that is how a person thinks about
+                 it; filtersToSpec turns it into a presence test, which is what the engine
+                 can actually answer. */
+              ...((f.values || []).includes(EMPTY_SENTINEL) ? [] : [{ value: EMPTY_SENTINEL, label: t("(prázdne)", "(empty)") }]),
+              ...(distinct.values || []).filter((v) => !(f.values || []).includes(v)).map((v) => ({ value: v, label: v })),
+            ]} />
+          {(f.values || []).length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.22rem", marginTop: "0.3rem" }}>
+              {(f.values || []).map((v) => (
+                <span key={v} style={chip} title={t("Odstrániť", "Remove")}
+                  onClick={() => onPatch({ values: f.values.filter((x) => x !== v) })}>
+                  {vLabel(v)}<span style={{ color: dim }}>✕</span>
+                </span>
+              ))}
+              {(f.values || []).length > 1 && (
+                <span onClick={() => onPatch({ values: [] })} style={{ ...chip, background: "transparent", borderColor: border, color: dim }}>
+                  {t("vyčistiť", "clear")}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {f.mode === "between" && (
+        <div style={{ display: "flex", gap: "0.3rem", marginTop: "0.35rem" }}>
+          {isDate ? (<>
+            <DateField value={f.min} onChange={(e) => onPatch({ min: e.target.value })} width="100%" title={t("od", "from")} />
+            <DateField value={f.max} onChange={(e) => onPatch({ max: e.target.value })} width="100%" title={t("do", "to")} />
+          </>) : (<>
+            <input type="text" inputMode="decimal" value={f.min} placeholder={t("od", "from")}
+              onChange={(e) => onPatch({ min: e.target.value })} style={{ ...sel, width: "50%", minWidth: 0, boxSizing: "border-box" }} />
+            <input type="text" inputMode="decimal" value={f.max} placeholder={t("do", "to")}
+              onChange={(e) => onPatch({ max: e.target.value })} style={{ ...sel, width: "50%", minWidth: 0, boxSizing: "border-box" }} />
+          </>)}
+        </div>
+      )}
+
+      {(f.mode === "empty" || f.mode === "not_empty") && (
+        <div style={{ marginTop: "0.3rem", fontSize: "0.68rem", color: dim, fontStyle: "italic" }}>
+          {f.mode === "empty" ? t("len byty bez tejto hodnoty", "only units missing this value")
+                              : t("len byty, ktoré túto hodnotu majú", "only units that have this value")}
+        </div>
+      )}
     </div>
   );
 }
@@ -128,116 +188,114 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
 
   const [mode, setMode] = useState("latest");
   const [cols, setCols] = useState(DEFAULT_COLS);
-  const [fProject, setFProject] = useState(""); const [fCity, setFCity] = useState(""); const [fCast, setFCast] = useState(""); const [fDev, setFDev] = useState(""); const [fStav, setFStav] = useState("");
-  const [pMin, setPMin] = useState(""); const [pMax, setPMax] = useState("");
-  const [m2Min, setM2Min] = useState(""); const [m2Max, setM2Max] = useState("");
-  // generic "filter on any field" rows — {id, key, op, vals[], min, max}. Cover EVERY field
-  // not already handled by a dedicated quick control above.
-  const [xf, setXf] = useState([]);
-  const xfId = useRef(0);
+  /* ONE list of filters the user builds, on any field, in any mode the engine accepts.
+     It replaces nine hard-coded controls (project / city / district / developer / status
+     / price from-to / €-m² from-to) plus a cramped "+ filter" for the leftovers. Boss,
+     2026-09-14: he wants to build the filters he wants rather than be handed a fixed set
+     and allowed only to add columns. Nothing is pre-selected — an empty list means the
+     whole market, which is the honest starting point. */
+  const [filters, setFilters] = useState([]);
+  const fId = useRef(0);
+  /* The right-hand panel does two jobs now and they are NOT the same job, so it says
+     which one it is doing rather than leaving it to be guessed from behaviour. */
+  const [panelTab, setPanelTab] = useState("filters");
   const [sort, setSort] = useState({ key: "cena_s_dph", dir: "desc" });
   const [search, setSearch] = useState("");
   const scrollRef = useRef(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [viewH, setViewH] = useState(560);
 
-  // The [fCity] effect below clears fCast (a časť belongs to a city). On hydration we're
-  // restoring a VALID (city, časť) pair, so signal that one clear to be skipped.
-  const hydratingCast = useRef(false);
-  // Remember the Unit-database filters per-account, across devices.
+  // Remember the Unit-database view per-account, across devices.
   useAccountPrefState(
     "explorerFilters",
-    { mode, cols, fProject, fCity, fCast, fDev, fStav, pMin, pMax, m2Min, m2Max, xf, sort, search },
+    /* `search` is deliberately NOT persisted. It is find-as-you-type over the field
+       list, not a setting, and saving it meant opening the page with a stale word in
+       the box and almost every field hidden — which reads as "the product only has
+       three fields" rather than "you searched for this once". Found on 2026-09-14 with
+       "cena" left in the box from a previous session. */
+    { mode, cols, filters, sort, panelTab },
     (s) => {
       if (s.mode !== undefined) setMode(s.mode);
       if (Array.isArray(s.cols)) setCols(s.cols);
-      if (s.fProject !== undefined) setFProject(s.fProject);
-      if (s.fCity !== undefined) { if (s.fCast) hydratingCast.current = true; setFCity(s.fCity); }
-      if (s.fCast !== undefined) setFCast(s.fCast);
-      if (s.fDev !== undefined) setFDev(s.fDev);
-      if (s.fStav !== undefined) setFStav(s.fStav);
-      if (s.pMin !== undefined) setPMin(s.pMin);
-      if (s.pMax !== undefined) setPMax(s.pMax);
-      if (s.m2Min !== undefined) setM2Min(s.m2Min);
-      if (s.m2Max !== undefined) setM2Max(s.m2Max);
-      if (Array.isArray(s.xf)) {
-        setXf(s.xf);
-        const maxId = s.xf.reduce((m, r) => Math.max(m, Number(r?.id) || 0), 0);
-        if (xfId.current <= maxId) xfId.current = maxId + 1;   // keep new-row ids unique
+      if (s.panelTab === "filters" || s.panelTab === "cols") setPanelTab(s.panelTab);
+      /* A saved set is either the NEW list or the OLD nine-control shape. Both are
+         restored: a migration that quietly dropped the old one would mean opening the
+         rebuilt page and seeing the whole market with no sign that anything was lost.
+         Everything is sanitised on the way in — this blob is user-writable. */
+      const incoming = Array.isArray(s.filters) ? s.filters : migrateLegacyFilters(s, 1);
+      if (incoming.length || Array.isArray(s.filters)) {
+        const clean = incoming.map((f, i) => sanitizeFilter(f, i + 1)).filter(Boolean);
+        setFilters(clean);
+        fId.current = clean.reduce((m, f) => Math.max(m, Number(f.id) || 0), 0);
       }
       if (s.sort && typeof s.sort === "object") setSort(s.sort);
-      if (s.search !== undefined) setSearch(s.search);
     },
   );
 
-  // dropdown option lists follow the chosen scope (audit M4): in "História" they include
-  // values that exist only historically (e.g. a now-sold-out project), not just current ones.
-  const cityOpts = usePivotDistinct({ enabled: true, field: "city", mode });
-  // Mestská časť options narrow to the chosen city (Bratislava's časti ≠ Praha's) — same
-  // parent-scopes-child behaviour as the Map filter. With no city picked, all časti show.
-  const castOpts = usePivotDistinct({ enabled: true, field: "cast", mode, city: fCity || null });
-  const devOpts = usePivotDistinct({ enabled: true, field: "developer", mode });
-  const projOpts = usePivotDistinct({ enabled: true, field: "project_name", mode });
-  const stavOpts = usePivotDistinct({ enabled: true, field: "stav", mode });
+  /* Registry-derived capability sets. The engine resolves `filters` through the
+     DIMENSION registry and `ranges` through the MEASURE registry, so which operators a
+     field may offer is a fact about the registry, not about the field's look. Building
+     these once here means a field added to the registry tomorrow is filterable that day
+     without anyone editing a list. */
+  const capsSets = useMemo(() => ({
+    dimensionKeys: new Set(dimensions.map((d) => d.key)),
+    measureKeys: new Set(measures.map((m) => m.key)),
+    dateKeys: new Set(dimensions.filter((d) => d.data_type === "date").map((d) => d.key)),
+  }), [dimensions, measures]);
+  const capsOf = (key) => capabilitiesOf(key, capsSets);
 
-  // Changing the city invalidates a previously-picked mestská časť (it belongs to the old
-  // city), so clear it — otherwise the table would filter to an empty intersection.
-  const firstCityRun = useRef(true);
-  useEffect(() => {
-    if (firstCityRun.current) { firstCityRun.current = false; return; }     // skip the mount run (don't consume the guard)
-    if (hydratingCast.current) { hydratingCast.current = false; return; }   // keep a just-hydrated (city, časť) pair
-    setFCast("");
-  }, [fCity]);
+  /* A mestská časť belongs to a city (Bratislava's are not Praha's), so when the user
+     has narrowed to one city the district value list narrows with it. Kept from the old
+     page — it was the one thing the hard-coded controls did better than a generic row. */
+  const cityScope = useMemo(() => {
+    const f = filters.find((x) => x.key === "city" && x.mode === "in" && (x.values || []).length === 1);
+    return f ? f.values[0] : null;
+  }, [filters]);
 
-  // fields available to the generic "+ filter" picker: everything EXCEPT the ones already
-  // driven by a dedicated quick control (so no confusing double-filter on the same field).
-  const QUICK_COVERED = useMemo(() => new Set(["country", "city", "cast", "developer", "stav", "project_name", "cena_s_dph", "price_per_m2"]), []);
-  const xfFields = useMemo(() => fields.filter((f) => !QUICK_COVERED.has(f.key)), [fields, QUICK_COVERED]);
-  const xfActive = xf.filter((r) => r.key && ((r.vals && r.vals.length) || r.min || r.max));
+  const addFilter = (key) => {
+    const caps = capsOf(key);
+    if (!caps.modes.length) return;
+    setFilters((a) => (a.some((f) => f.key === key) ? a : [...a, newFilter(key, caps, ++fId.current)]));
+    setPanelTab("filters");
+  };
+  const patchFilter = (id, patch) => setFilters((a) => a.map((f) => {
+    if (f.id !== id) return f;
+    const next = { ...f, ...patch };
+    /* Switching operator must not carry the old operand along: leaving a values list on
+       a range, or bounds on an "is", makes a filter that reads one way and acts another. */
+    if (patch.mode && patch.mode !== f.mode) {
+      if (patch.mode === "between") { next.values = []; }
+      else if (patch.mode === "in" || patch.mode === "not_in") { next.min = ""; next.max = ""; }
+      else { next.values = []; next.min = ""; next.max = ""; }
+    }
+    return next;
+  }));
+  const removeFilter = (id) => setFilters((a) => a.filter((f) => f.id !== id));
 
   const spec = useMemo(() => {
-    const filters = {};
-    const filters_not = {};
-    const ranges = {};
-    if (!isAllCountries(country)) filters.country = [country];
-    if (fProject) filters.project_name = [fProject];
-    if (fCity) filters.city = [fCity];
-    if (fCast) filters.cast = [fCast];
-    if (fDev) filters.developer = [fDev];
-    if (fStav) filters.stav = [fStav];
-    // Currency fix (2026-07-11): the table renders money via moneyFromEur (EUR->display),
-    // but analytics_units stores/filters money in EUR. Convert money range inputs from the
-    // DISPLAY currency back to EUR, else in CZK mode a typed CZK band is compared against EUR
-    // values -> empty/nonsensical results. Mirrors PivotV2's dispToEur.
-    const dispToEur = (v) => (v === null || v === undefined || v === "" ? null : Number(v) / _money1);
-    if (pMin || pMax) ranges.cena_s_dph = { min: dispToEur(pMin), max: dispToEur(pMax) };
-    if (m2Min || m2Max) ranges.price_per_m2 = { min: dispToEur(m2Min), max: dispToEur(m2Max) };
-    // generic per-field filters → same spec shape the engine already supports
-    for (const r of xf) {
-      if (!r.key) continue;
-      const meta = fields.find((f) => f.key === r.key);
-      const kind = fieldKind(meta);
-      if (kind === "text" && r.vals && r.vals.length) {
-        if (r.op === "not_in") filters_not[r.key] = r.vals;
-        else filters[r.key] = r.vals;
-      } else if ((kind === "num" || kind === "date") && (r.min || r.max)) {
-        // money fields (eur / per_m2) are stored in EUR -> convert the typed display value.
-        const isMoney = fmtByKey[r.key] === "eur" || fmtByKey[r.key] === "per_m2";
-        ranges[r.key] = isMoney
-          ? { min: dispToEur(r.min), max: dispToEur(r.max) }
-          : { min: r.min || null, max: r.max || null };
-      }
-    }
+    /* Money is stored and compared in EUR; the box the user types into follows the
+       currency toggle. Convert at the edge, or a CZK band typed in CZK mode is compared
+       against EUR values and returns nonsense. (Same conversion the pivot does.) */
+    const toEur = (v) => Number(v) / _money1;
+    const isMoneyKey = (k) => fmtByKey[k] === "eur" || fmtByKey[k] === "per_m2";
+    const built = filtersToSpec(filters, { isMoneyKey, toEur });
+
+    // The country toggle is a scope, not one of the user's filters — it belongs to the
+    // whole platform and is not something to remove from this panel.
+    const withCountry = { ...(built.filters || {}) };
+    if (!isAllCountries(country)) withCountry.country = [country];
+
     // Always fetch fitout_level even when the user isn't showing that column:
     // the mark beside the price needs the UNIT's own level, and a project can
     // price shells and finished flats side by side (PANORÁMA Košice sells 241
     // shells and 19 finished, and carries no project-level answer at all).
-    const s = { columns: cols.includes("fitout_level") ? cols : [...cols, "fitout_level"],
-                filters, mode, sort: [sort] };   // limit/offset managed by useUnitsInfinite
-    if (Object.keys(filters_not).length) s.filters_not = filters_not;
-    if (Object.keys(ranges).length) s.ranges = ranges;
-    return s;
-  }, [country, fProject, fCity, fCast, fDev, fStav, pMin, pMax, m2Min, m2Max, cols, mode, sort, xf, fields, fmtByKey, _money1]);
+    const out = { columns: cols.includes("fitout_level") ? cols : [...cols, "fitout_level"],
+                  filters: withCountry, mode, sort: [sort] };   // limit/offset from useUnitsInfinite
+    if (built.filters_not) out.filters_not = built.filters_not;
+    if (built.ranges) out.ranges = built.ranges;
+    if (built.nulls) out.nulls = built.nulls;
+    return out;
+  }, [country, filters, cols, mode, sort, fmtByKey, _money1]);
 
   const { rows, hasMore, loading, loadMore, error: loadFailed } = useUnitsInfinite({ enabled: cols.length > 0, spec, pageSize: PAGE });
 
@@ -272,10 +330,7 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
 
   const toggleSort = (k) => setSort((s) => (s.key === k ? { key: k, dir: s.dir === "asc" ? "desc" : "asc" } : { key: k, dir: "asc" }));
   const toggleCol = (k) => setCols((c) => (c.includes(k) ? c.filter((x) => x !== k) : [...c, k]));
-  const activeFilters = [fProject, fCity, fCast, fDev, fStav, pMin, pMax, m2Min, m2Max].filter(Boolean).length + xfActive.length;
-  const addXf = () => setXf((a) => [...a, { id: ++xfId.current, key: "", op: "in", vals: [], min: "", max: "" }]);
-  const patchXf = (id, patch) => setXf((a) => a.map((r) => (r.id === id ? { ...r, ...patch } : r)));
-  const removeXf = (id) => setXf((a) => a.filter((r) => r.id !== id));
+  const activeFilters = filters.filter(isFilterActive).length;
 
   // "Show on map" — hand the CURRENT filtered set's distinct projects to the map. One pivot
   // call (dims=[project_name], same filters) yields exactly the projects behind these units,
@@ -315,10 +370,6 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
   // up with the Pickers they sit next to. Inline rather than the class because every
   // call site sets its own width and several reuse it as a button.
   const sel = { ...field };
-  const Sel = ({ value, onChange, opts, ph }) => (
-    <Picker value={value} onChange={onChange} searchable placeholder={ph} ariaLabel={ph} width={150}
-      options={[{ value: "", label: ph }, ...(opts || []).map((o) => ({ value: o, label: o }))]} />
-  );
   const typeBadge = (ty) => (ty === "numeric" ? "#" : ty === "date" || ty === "month" ? "📅" : "T");
   const typeColor = (ty) => (ty === "numeric" ? orange : green);
 
@@ -327,7 +378,7 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
       {/* header + mode toggle */}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: "0.75rem", marginBottom: "0.9rem" }}>
         <div style={{ position: "relative", overflow: "hidden", borderRadius: 16, border: "1px solid var(--border)", padding: "1.25rem 1.6rem", marginBottom: "1.5rem", background: "radial-gradient(120% 140% at 2% -20%, rgba(18,185,129,0.13) 0%, transparent 46%), linear-gradient(135deg, color-mix(in srgb, var(--accent) 5%, var(--surface)) 0%, var(--bg) 75%)" }}>
-          <p style={{ color: dim, fontSize: "0.8rem", margin: 0 }}>{t("Surové dáta po jednotlivých bytoch — vyber stĺpce vpravo, filtruj, zoraď klikom na hlavičku.", "Raw per-unit data — pick columns on the right, filter, sort by clicking a header.")}</p>
+          <p style={{ color: dim, fontSize: "0.8rem", margin: 0 }}>{t("Surové dáta po jednotlivých bytoch. Vpravo si postav filtre na ľubovoľné pole a zvlášť vyber stĺpce; zoradíš klikom na hlavičku.", "Raw per-unit data. Build filters on any field on the right, choose your columns separately, and sort by clicking a header.")}</p>
         </div>
         <div style={{ display: "inline-flex", border: `1px solid ${border}`, borderRadius: 7, overflow: "hidden", background: panel }}>
           {[["latest", t("Aktuálne", "Current")], ["archive", t("História", "All history")]].map(([m, label]) => (
@@ -339,25 +390,49 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
       {/* two-column: main (filters + table) | palette */}
       <div style={{ display: "flex", gap: "0.9rem", alignItems: "flex-start" }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          {/* filter toolbar */}
-          <div style={{ background: panel, border: `1px solid ${border}`, borderRadius: 8, padding: "0.6rem 0.7rem", marginBottom: "0.6rem", display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
-            <span style={{ fontFamily: mono, fontSize: "0.62rem", color: dim, letterSpacing: "0.08em", textTransform: "uppercase", marginRight: "0.1rem" }}><span style={{ display: "inline-block", width: 3, height: 12, borderRadius: 2, background: "var(--accent)", marginRight: "0.5rem", verticalAlign: "middle" }} />{t("Filtre", "Filters")}{activeFilters ? ` · ${activeFilters}` : ""}</span>
-            <Sel value={fProject} onChange={setFProject} opts={projOpts.values} ph={t("Projekt: všetky", "Project: all")} />
-            <Sel value={fCity} onChange={setFCity} opts={cityOpts.values} ph={t("Mesto: všetky", "City: all")} />
-            <Sel value={fCast} onChange={setFCast} opts={castOpts.values} ph={t("Mestská časť: všetky", "District: all")} />
-            <Sel value={fDev} onChange={setFDev} opts={devOpts.values} ph={t("Developer: všetci", "Developer: all")} />
-            <Sel value={fStav} onChange={setFStav} opts={stavOpts.values} ph={t("Stav: všetky", "Status: all")} />
-            <input style={{ ...sel, width: 84 }} placeholder={`${t("cena od", "price from")} ${moneySymbol()}`} value={pMin} onChange={(e) => setPMin(e.target.value)} inputMode="numeric" />
-            <input style={{ ...sel, width: 84 }} placeholder={`${t("cena do", "price to")} ${moneySymbol()}`} value={pMax} onChange={(e) => setPMax(e.target.value)} inputMode="numeric" />
-            <input style={{ ...sel, width: 92 }} placeholder={`${moneySymbol()}/m² ${t("od", "from")}`} value={m2Min} onChange={(e) => setM2Min(e.target.value)} inputMode="numeric" />
-            <input style={{ ...sel, width: 92 }} placeholder={`${moneySymbol()}/m² ${t("do", "to")}`} value={m2Max} onChange={(e) => setM2Max(e.target.value)} inputMode="numeric" />
-            {/* generic per-field filters — one row per chosen field (any field in the list) */}
-            {xf.map((r) => (
-              <XFilterRow key={r.id} row={r} fields={xfFields} mode={mode} lang={lang} sel={sel}
-                onPatch={(patch) => patchXf(r.id, patch)} onRemove={() => removeXf(r.id)} />
-            ))}
-            <button onClick={addXf} style={{ ...sel, cursor: "pointer", color: accentInk, fontFamily: mono, fontSize: "0.72rem", borderColor: green }}>+ {t("filter", "filter")}</button>
-            {activeFilters > 0 && <button onClick={() => { setFProject(""); setFCity(""); setFCast(""); setFDev(""); setFStav(""); setPMin(""); setPMax(""); setM2Min(""); setM2Max(""); setXf([]); }} style={{ ...sel, cursor: "pointer", color: dim, fontFamily: mono, fontSize: "0.7rem" }}>✕ {t("vyčistiť", "clear")}</button>}
+          {/* Query bar. The CONTROLS moved to the right-hand panel; what stays here is a
+              readable statement of the query that is running, so the filter set is visible
+              even while the panel is showing columns. Each chip removes its own filter. */}
+          <div style={{ background: panel, border: `1px solid ${border}`, borderRadius: 8, padding: "0.5rem 0.6rem", marginBottom: "0.6rem", display: "flex", gap: "0.4rem", flexWrap: "wrap", alignItems: "center" }}>
+            <span style={{ fontFamily: mono, fontSize: "0.62rem", color: dim, letterSpacing: "0.08em", textTransform: "uppercase", marginRight: "0.1rem" }}>
+              <span style={{ display: "inline-block", width: 3, height: 12, borderRadius: 2, background: "var(--accent)", marginRight: "0.5rem", verticalAlign: "middle" }} />
+              {t("Filtre", "Filters")}{activeFilters ? ` · ${activeFilters}` : ""}
+            </span>
+
+            {filters.length === 0 && (
+              <button onClick={() => setPanelTab("filters")}
+                style={{ ...sel, cursor: "pointer", color: accentInk, borderColor: green, fontFamily: mono, fontSize: "0.72rem" }}>
+                + {t("Pridaj filter vpravo", "Add a filter on the right")}
+              </button>
+            )}
+
+            {filters.map((f) => {
+              const on = isFilterActive(f);
+              return (
+                <span key={f.id} onClick={() => setPanelTab("filters")}
+                  title={t("Upraviť v paneli vpravo", "Edit in the panel on the right")}
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: "0.35rem", cursor: "pointer",
+                    background: on ? "color-mix(in srgb, var(--accent) 12%, var(--surface-2))" : bg,
+                    border: `1px solid ${on ? green : border}`, borderRadius: 5,
+                    padding: "0.12rem 0.4rem", fontSize: "0.72rem", color: on ? text : dim, maxWidth: 260,
+                  }}>
+                  <span style={{ fontWeight: 600 }}>{lbl(f.key)}</span>
+                  <span style={{ color: dim, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {on ? summariseFilter(f, lang) : t("(nenastavený)", "(not set)")}
+                  </span>
+                  <span onClick={(e) => { e.stopPropagation(); removeFilter(f.id); }}
+                    title={t("Odstrániť", "Remove")} style={{ color: dim, fontSize: "0.78rem" }}>✕</span>
+                </span>
+              );
+            })}
+
+            {filters.length > 0 && (
+              <button onClick={() => setFilters([])} style={{ ...sel, cursor: "pointer", color: dim, fontFamily: mono, fontSize: "0.7rem" }}>
+                ✕ {t("vyčistiť", "clear")}
+              </button>
+            )}
+
             <button onClick={showOnMap} disabled={mapBusy} title={t("Zobraziť vyfiltrované projekty na mape", "Show the filtered projects on the map")}
               style={{ ...sel, marginLeft: "auto", cursor: mapBusy ? "wait" : "pointer", color: "#04130d", background: green, borderColor: green, fontFamily: mono, fontSize: "0.72rem", fontWeight: 700 }}>
               🗺 {mapBusy ? t("otváram…", "opening…") : t("Zobraziť na mape", "Show on map")}
@@ -429,42 +504,118 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
           )}
         </div>
 
-        {/* field palette (POLIA-style) */}
-        <div style={{ width: 268, flexShrink: 0, background: panel, border: `1px solid ${border}`, borderRadius: 8, padding: "0.75rem", display: "flex", flexDirection: "column", maxHeight: 640 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.55rem" }}>
-            <span style={{ fontFamily: mono, fontSize: "0.7rem", color: text, fontWeight: 700, letterSpacing: "0.06em" }}><span style={{ display: "inline-block", width: 3, height: 12, borderRadius: 2, background: "var(--accent)", marginRight: "0.5rem", verticalAlign: "middle" }} />{t("STĹPCE", "COLUMNS")}</span>
-            <span style={{ fontFamily: mono, fontSize: "0.6rem", color: dim }}>{cols.length}/{fields.length}</span>
+        {/* THE PANEL. It used to do one job — pick columns — while filtering happened in a
+            cramped strip above the table, which is backwards: the panel is where anyone
+            would go to build a query. It now does both jobs and says which one it is on,
+            because they are genuinely two different things (Boss, 2026-09-14). Every field
+            appears under both tabs; nothing is pre-selected and nothing is off-limits. */}
+        <div style={{ width: 300, flexShrink: 0, background: panel, border: `1px solid ${border}`, borderRadius: 8, display: "flex", flexDirection: "column", maxHeight: "78vh" }}>
+          {/* tabs */}
+          <div style={{ display: "flex", borderBottom: `1px solid ${border}` }}>
+            {[["filters", t("FILTRE", "FILTERS"), activeFilters || null],
+              ["cols", t("STĹPCE", "COLUMNS"), cols.length]].map(([key, label, badge]) => {
+              const on = panelTab === key;
+              return (
+                <button key={key} onClick={() => setPanelTab(key)}
+                  style={{
+                    flex: 1, border: "none", background: on ? "color-mix(in srgb, var(--accent) 10%, transparent)" : "transparent",
+                    color: on ? text : dim, cursor: "pointer", padding: "0.6rem 0.4rem",
+                    fontFamily: mono, fontSize: "0.66rem", letterSpacing: "0.09em", fontWeight: on ? 700 : 500,
+                    borderBottom: `2px solid ${on ? green : "transparent"}`,
+                  }}>
+                  {label}{badge ? <span style={{ marginLeft: "0.4rem", color: on ? accentInk : dim }}>{badge}</span> : null}
+                </button>
+              );
+            })}
           </div>
-          <div style={{ position: "relative", marginBottom: "0.55rem" }}>
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("Hľadať pole…", "Search fields…")}
-              style={{ width: "100%", padding: "0.45rem 0.65rem 0.45rem 1.9rem", background: bg, border: `1px solid ${border}`, borderRadius: 5, color: text, fontSize: "0.78rem", fontFamily: "inherit", boxSizing: "border-box", outline: "none" }} />
-            <span style={{ position: "absolute", left: "0.6rem", top: "50%", transform: "translateY(-50%)", color: dim, fontSize: "0.85rem", pointerEvents: "none" }}>🔍</span>
-          </div>
-          <div style={{ flex: 1, overflowY: "auto", background: bg, border: `1px solid ${border}`, borderRadius: 5, padding: "0.3rem" }}>
-            {CAT_ORDER.filter((g) => palette[g]?.length).concat(palette.other ? ["other"] : []).map((g) => (
-              <div key={g} style={{ marginBottom: "0.35rem" }}>
-                <div style={{ fontFamily: mono, fontSize: "0.56rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", padding: "0.3rem 0.45rem 0.15rem" }}>{CAT_LABEL[lang === "sk" ? "sk" : "en"][g]}</div>
-                {palette[g].map((f) => {
-                  const on = cols.includes(f.key);
-                  return (
-                    <div key={f.key} role="checkbox" aria-checked={on} tabIndex={0}
-                      onClick={() => toggleCol(f.key)}
-                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleCol(f.key); } }}
-                      title={on ? t("Klikni pre skrytie", "Click to hide") : t("Klikni pre zobrazenie", "Click to show")}
-                      style={{ display: "flex", alignItems: "center", gap: "0.45rem", padding: "0.32rem 0.55rem", borderRadius: 4, color: on ? text : dim, fontSize: "0.78rem", cursor: "pointer", userSelect: "none", borderLeft: `2px solid ${on ? green : "transparent"}`, background: on ? "color-mix(in srgb, var(--accent) 6%, transparent)" : "transparent" }}
-                      onMouseEnter={(e) => { if (!on) e.currentTarget.style.background = panelHi; }}
-                      onMouseLeave={(e) => { if (!on) e.currentTarget.style.background = "transparent"; }}>
-                      <span style={{ fontFamily: mono, fontSize: "0.62rem", width: 16, textAlign: "center", color: typeColor(f.type), fontWeight: 700 }}>{typeBadge(f.type)}</span>
-                      <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lang === "sk" ? f.label_sk : f.label_en}</span>
-                      {on && <span style={{ fontFamily: mono, fontSize: "0.62rem", color: accentInk }}>✓</span>}
-                    </div>
-                  );
-                })}
+
+          <div style={{ padding: "0.6rem 0.6rem 0.5rem", display: "flex", flexDirection: "column", minHeight: 0, flex: 1 }}>
+            {/* active filters, on the filters tab, above the palette that adds more */}
+            {panelTab === "filters" && (
+              <div style={{ maxHeight: "42vh", overflowY: "auto", marginBottom: filters.length ? "0.55rem" : 0 }}>
+                {filters.length === 0 ? (
+                  <div style={{ color: dim, fontSize: "0.74rem", lineHeight: 1.5, padding: "0.2rem 0.1rem 0.5rem" }}>
+                    {t("Zatiaľ žiadne filtre — tabuľka ukazuje celý trh. Klikni na pole nižšie a pridaj filter.",
+                       "No filters yet — the table shows the whole market. Click a field below to add one.")}
+                  </div>
+                ) : filters.map((f) => (
+                  <FilterCard key={f.id} f={f} field={fields.find((x) => x.key === f.key)} caps={capsOf(f.key)}
+                    scopeMode={mode} cityScope={cityScope} lang={lang} sel={sel}
+                    onPatch={(patch) => patchFilter(f.id, patch)} onRemove={() => removeFilter(f.id)} />
+                ))}
               </div>
-            ))}
-            {fields.length > 0 && Object.keys(palette).length === 0 && (
-              <div style={{ padding: "1rem 0.45rem", color: dim, fontSize: "0.74rem", textAlign: "center", fontStyle: "italic" }}>{t("Žiadne zhody.", "No matches.")}</div>
             )}
+
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.45rem" }}>
+              <span style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.09em", textTransform: "uppercase" }}>
+                {panelTab === "filters" ? t("Pridať filter na pole", "Add a filter on") : t("Zobrazené stĺpce", "Shown columns")}
+              </span>
+              <span style={{ marginLeft: "auto", fontFamily: mono, fontSize: "0.6rem", color: dim }}>
+                {panelTab === "cols" ? `${cols.length}/${fields.length}` : `${fields.length}`}
+              </span>
+            </div>
+
+            {panelTab === "cols" && (
+              <div style={{ display: "flex", gap: "0.3rem", marginBottom: "0.45rem" }}>
+                <button onClick={() => setCols(DEFAULT_COLS)} style={{ ...sel, flex: 1, cursor: "pointer", color: dim, fontFamily: mono, fontSize: "0.66rem" }}>
+                  ↺ {t("predvolené", "default")}
+                </button>
+                <button onClick={() => setCols([])} disabled={!cols.length} style={{ ...sel, flex: 1, cursor: cols.length ? "pointer" : "default", color: dim, fontFamily: mono, fontSize: "0.66rem", opacity: cols.length ? 1 : 0.5 }}>
+                  ✕ {t("žiadne", "none")}
+                </button>
+              </div>
+            )}
+
+            <div style={{ position: "relative", marginBottom: "0.5rem" }}>
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("Hľadať pole…", "Search fields…")}
+                style={{ width: "100%", padding: "0.45rem 0.65rem 0.45rem 1.9rem", background: bg, border: `1px solid ${border}`, borderRadius: 5, color: text, fontSize: "0.78rem", fontFamily: "inherit", boxSizing: "border-box", outline: "none" }} />
+              <span style={{ position: "absolute", left: "0.6rem", top: "50%", transform: "translateY(-50%)", color: dim, fontSize: "0.85rem", pointerEvents: "none" }}>🔍</span>
+            </div>
+
+            <div style={{ flex: 1, overflowY: "auto", background: bg, border: `1px solid ${border}`, borderRadius: 5, padding: "0.3rem", minHeight: 120 }}>
+              {CAT_ORDER.filter((g) => palette[g]?.length).concat(palette.other ? ["other"] : []).map((g) => (
+                <div key={g} style={{ marginBottom: "0.35rem" }}>
+                  <div style={{ fontFamily: mono, fontSize: "0.56rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", padding: "0.3rem 0.45rem 0.15rem" }}>{CAT_LABEL[lang === "sk" ? "sk" : "en"][g]}</div>
+                  {palette[g].map((f) => {
+                    const filtering = panelTab === "filters";
+                    /* On the FILTERS tab a field is "on" when it already has a filter, and
+                       unavailable when the engine cannot filter it at all — showing it as
+                       clickable and then doing nothing would be the worse lie. */
+                    const caps = filtering ? capsOf(f.key) : null;
+                    const unavailable = filtering && caps.modes.length === 0;
+                    const on = filtering ? filters.some((x) => x.key === f.key) : cols.includes(f.key);
+                    const act = () => {
+                      if (filtering) { if (!unavailable && !on) addFilter(f.key); }
+                      else toggleCol(f.key);
+                    };
+                    return (
+                      <div key={f.key} role={filtering ? "button" : "checkbox"} aria-checked={filtering ? undefined : on}
+                        aria-disabled={unavailable || undefined} tabIndex={unavailable ? -1 : 0}
+                        onClick={act}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); act(); } }}
+                        title={unavailable ? t("Toto pole sa nedá filtrovať", "This field cannot be filtered")
+                          : filtering ? (on ? t("Filter už je pridaný", "Filter already added") : t("Klikni pre pridanie filtra", "Click to add a filter"))
+                          : (on ? t("Klikni pre skrytie stĺpca", "Click to hide the column") : t("Klikni pre zobrazenie stĺpca", "Click to show the column"))}
+                        style={{ display: "flex", alignItems: "center", gap: "0.45rem", padding: "0.32rem 0.55rem", borderRadius: 4,
+                                 color: unavailable ? dim : (on ? text : dim), fontSize: "0.78rem",
+                                 cursor: unavailable ? "default" : (filtering && on ? "default" : "pointer"), userSelect: "none",
+                                 opacity: unavailable ? 0.45 : 1,
+                                 borderLeft: `2px solid ${on ? green : "transparent"}`,
+                                 background: on ? "color-mix(in srgb, var(--accent) 6%, transparent)" : "transparent" }}
+                        onMouseEnter={(e) => { if (!on && !unavailable) e.currentTarget.style.background = panelHi; }}
+                        onMouseLeave={(e) => { if (!on) e.currentTarget.style.background = "transparent"; }}>
+                        <span style={{ fontFamily: mono, fontSize: "0.62rem", width: 16, textAlign: "center", color: typeColor(f.type), fontWeight: 700 }}>{typeBadge(f.type)}</span>
+                        <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lang === "sk" ? f.label_sk : f.label_en}</span>
+                        {on && <span style={{ fontFamily: mono, fontSize: "0.62rem", color: accentInk }}>{filtering ? "•" : "✓"}</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+              {fields.length > 0 && Object.keys(palette).length === 0 && (
+                <div style={{ padding: "1rem 0.45rem", color: dim, fontSize: "0.74rem", textAlign: "center", fontStyle: "italic" }}>{t("Žiadne zhody.", "No matches.")}</div>
+              )}
+            </div>
           </div>
         </div>
       </div>
