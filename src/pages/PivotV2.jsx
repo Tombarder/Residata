@@ -1455,9 +1455,11 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
           the one that never loses the user: the product is still visibly around
           the table, Escape always returns, and nothing about the layout has to
           be re-learned.
-     So: (5). It anchors to --platform-content-left (published by Platform.jsx)
-     and --platform-topbar-h (measured there, because the bar's height changes
-     with viewport and font size). */
+     So: (5) — but taking the WHOLE WINDOW, not the content area. The first cut
+     stopped at the sidebar and the top bar so navigation stayed on screen; Boss
+     used it and said it is not across the usable part of the screen. He is right:
+     the chrome is the thing you are trying to get out of the way, and Esc plus a
+     labelled Close is enough of a way back. */
   const [expanded, setExpanded] = useState(false);
   useEffect(() => {
     if (!expanded) return;
@@ -1937,31 +1939,37 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
         /* FOCUS MODE — the table fills the app's own content area: from the right
            edge of the sidebar to the right edge of the window, from under the top
            bar to the bottom. Both offsets are read from variables the shell
-           publishes (--platform-content-left is a constant there,
-           --platform-topbar-h is MEASURED), so the panel stays glued to the chrome
-           when the bar wraps to two lines or the user changes their font size.
-           z-index sits above page content and the sticky top bar, below the
-           sidebar (50) — navigation stays reachable, which is the whole reason
-           this is focus mode and not browser fullscreen. */
+           TAKES THE WHOLE WINDOW, deliberately. The first cut stopped at the
+           sidebar and the top bar, on the reasoning that navigation should stay
+           reachable. Boss used it and said it is not across the usable part of the
+           screen — and he is right about what "maximise" means: the chrome is
+           exactly what you are trying to get out of the way. Esc and a labelled
+           Close are the way back, which is all that reachability needs to mean. */
         .pivot-focus.is-on {
           position: fixed;
-          left: var(--platform-content-left, 0px);
-          top: var(--platform-topbar-h, 86px);
-          right: 0; bottom: 0;
-          z-index: 45;
+          inset: 0;
+          z-index: 60;
           background: var(--bg);
-          padding: 0.75rem 1rem 1rem;
-          display: flex; flex-direction: column; gap: 0.5rem;
+          padding: 0.7rem 1rem 0.9rem;
+          display: flex; flex-direction: column; gap: 0.55rem;
           animation: pivotFocusIn 0.16s ease-out;
         }
         /* Opacity only — deliberately NO transform. A transform on a
            position:fixed element re-anchors it to itself, so the panel came up
-           4px inside the content area on every edge instead of flush against the
-           sidebar and the top bar; and because React re-renders restart the
-           animation, the scale kept being re-applied rather than settling. */
+           4px inside on every edge instead of flush; and because React re-renders
+           restart the animation, the scale kept being re-applied. */
         @keyframes pivotFocusIn { from { opacity: 0; } to { opacity: 1; } }
         @media (prefers-reduced-motion: reduce) { .pivot-focus.is-on { animation: none; } }
-        .pivot-focus.is-on .pivot-scroll { border-radius: 10px; }
+        /* No frame in focus mode. With the page gone the panel IS the workspace, so
+           an outlined box around a table shorter than the screen just draws a large
+           empty rectangle under it — 329px of it on Boss's screen, which is most of
+           what made this look broken. The sticky header gives the table its edge. */
+        .pivot-focus.is-on .pivot-scroll {
+          border: none; border-radius: 0; background: transparent;
+        }
+        @media (max-width: 840px) {
+          .pivot-focus.is-on { padding: 0.5rem 0.6rem 0.7rem; }
+        }
         .pivot-focus-bar {
           display: flex; align-items: center; justify-content: space-between;
           gap: 1rem; flex: none;
@@ -3284,23 +3292,6 @@ function copyPivotTable(flatRows, grandTotal, rowFields, colFields, effectiveVal
   );
 }
 
-/* On-offer (V+PR+R) vs sold (P) split for a tree node — from its stav comp
-   (grain rows) or its records (raw mode). Lets every row show the split so the
-   count is never misread as "all on the market". */
-function stavSplitOf(n) {
-  const c = n.comp;
-  if (c) return { offer: (+c.avail || 0) + (+c.res || 0) + (+c.prer || 0), sold: +c.sold || 0 };
-  if (n.records && n.records.length) {
-    let offer = 0, sold = 0;
-    for (const r of n.records) {
-      const s = (r.stav || "").trim().toUpperCase();
-      if (s === "P") sold++;
-      else if (s === "V" || s === "R" || s === "PR") offer++;
-    }
-    return { offer, sold };
-  }
-  return null;
-}
 
 /* ─── RESULT TABLE ────────────────────────────────────────────── */
 function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, collapsed: _collapsed, onToggle, sort, setSort, grandTotal, lang, valueMode = "raw", dataBars = false, onDrillDown, onProjectOpen, expanded = false, onToggleExpand }) {
@@ -3505,7 +3496,12 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
       maxWidth: "100%",
     }}>
       <table style={{
-        width: "max-content", minWidth: "100%",
+        width: "max-content",
+        /* Stretched to the container, five columns spread across 1 436px with
+           chasms between them — the single ugliest thing about the first focus
+           mode. Natural widths in focus mode: the table is as wide as it needs and
+           the space beside it is just workspace, the way every spreadsheet does it. */
+        minWidth: expanded ? undefined : "100%",
         borderCollapse: "separate", borderSpacing: 0,
         fontSize: "0.82rem",
       }}>
@@ -3553,31 +3549,16 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                 {sortIndicator("label")}
               </div>
             </th>
-            {/* The count column carries a second line under the total: on offer ·
-                sold. Those two numbers used to appear with no label anywhere and
-                only on the rows where something was marked sold, so they read as
-                two mystery figures that some rows had and others did not (Boss,
-                2026-09-14). They are now on every row and the header says what they
-                are. Re-checked against the database on the same day and the
-                arithmetic is exact (Dostupné bývanie Nitra 110 · 100 · 10), but the
-                FIRST wording was not: it said "v cenníku", implying the whole price
-                list, when these count only the rows the table includes — and once a
-                price is in the question that is the PRICED subset (110 of the
-                project's 284 flats). Sold flats are precisely the ones a developer
-                strips the price from, so the two scopes differ most exactly where
-                this number is read. The note above the table already states the
-                population; the label now agrees with it instead of overclaiming, and
-                still sends real sales to Predaje. */}
+            {/* Just the count. It briefly carried an on-offer/sold second line;
+                Boss had it removed (2026-09-14) — the split it could honestly show is
+                scoped to the rows the table includes, which is not the number anyone
+                reads a count column for. Real sales are a page of their own. */}
             <th style={{ ...th, ...stickyLeft("count", 5, "var(--surface-2)"), top: row2Top, textAlign: "right", cursor: "pointer" }}
                 onClick={() => clickSort("count")}
                 title={lang === "sk"
-                  ? "Počet bytov v skupine — z tých, ktoré sú zahrnuté v tabuľke (pozri poznámku nad ňou). Pod ním: koľko z nich je v ponuke (voľné + rezervované) a koľko má cenník označené ako predané. Byty bez ceny sú mimo výpočtu a developeri cenu pri predaji väčšinou zmažú, takže tu predané vychádza nízko. Skutočné predaje — vrátane bytov zmazaných z cenníka — sú v Analytika → Predaje."
-                  : "Flats in this group — among the rows the table includes (see the note above it). Below: how many of them are on offer (available + reserved) and how many the price list marks as sold. Flats with no price are outside the calculation, and developers usually strip the price when a flat sells, so sold reads low here. Real sales — including flats deleted from the list — live in Analytics → Sales."}>
+                  ? "Počet záznamov v tejto skupine."
+                  : "Records in this group."}>
               #{sortIndicator("count")}
-              <div style={{ fontSize: "0.52rem", fontWeight: 400, letterSpacing: "0.02em",
-                            color: "var(--text-2)", opacity: 0.75, marginTop: 1, whiteSpace: "nowrap" }}>
-                {lang === "sk" ? "v ponuke · predané" : "on offer · sold"}
-              </div>
             </th>
             {crossTab ? (
               <>
@@ -3743,27 +3724,6 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                     title={onDrillDown ? (lang === "sk" ? "Zobraziť záznamy v tejto skupine" : "Show records in this group") : undefined}
                     onClick={onDrillDown ? (e) => { e.stopPropagation(); onDrillDown(n); } : undefined}>
                   {n.count.toLocaleString("en-US").replace(/,/g, " ")}
-                  {(() => {
-                    const sp = stavSplitOf(n);
-                    // Shown on EVERY row that has a stav breakdown, including the
-                    // rows where nothing is marked sold. It used to be hidden when
-                    // sold was 0, which made the split look arbitrary — and worse,
-                    // silence and "nothing sold" became indistinguishable. A zero
-                    // here is a real statement about the price list and the header
-                    // says so.
-                    if (!sp || (sp.offer <= 0 && sp.sold <= 0)) return null;
-                    const f = (x) => x.toLocaleString("en-US").replace(/,/g, " ");
-                    return (
-                      <div title={lang === "sk"
-                             ? `${f(sp.offer)} v ponuke · ${f(sp.sold)} označených ako predané (z bytov zahrnutých v tabuľke)`
-                             : `${f(sp.offer)} on offer · ${f(sp.sold)} marked sold (of the flats the table includes)`}
-                           style={{ fontSize: "0.58rem", fontWeight: 400, marginTop: 1, whiteSpace: "nowrap" }}>
-                        <span style={{ color: accentInk }}>{f(sp.offer)}</span>
-                        <span style={{ opacity: 0.4 }}> · </span>
-                        <span style={{ opacity: 0.65 }}>{f(sp.sold)}</span>
-                      </div>
-                    );
-                  })()}
                 </td>
                 {crossTab ? (
                   <>

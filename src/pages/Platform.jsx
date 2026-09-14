@@ -11,7 +11,7 @@
  * render with a small 🔒 icon and clicking them lands on an upgrade card
  * instead of the actual feature. Admin-only items are hidden for non-admins.
  */
-import { Component, useState, useEffect, useLayoutEffect, useMemo, useRef, lazy, Suspense } from "react";
+import { Component, useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
 import { useAuth } from "../lib/useAuth";
 import { useAccountUiPref } from "../lib/useAccountUiPref";
 import { useCapabilities } from "../lib/useCapabilities";
@@ -559,27 +559,9 @@ function TopBar({ page, lang, setLang, tier }) {
     ? (lang === "sk" ? "Detail projektu" : "Project detail")
     : (titles[page]?.[lang] || titles[page]?.en || "Residata");
 
-  // Publish the bar's REAL measured height as --platform-topbar-h, the same way
-  // App.jsx publishes --nav-h for the public nav. A panel that expands to fill
-  // the content area has to start exactly below this bar, and the height is not
-  // a constant: the bar wraps to two lines under 840px, drops the freshness
-  // chip, and changes with the user's font size. A hard-coded 86px looks right
-  // on one machine and leaves a seam of scrolling rows on another.
-  const barRef = useRef(null);
-  useLayoutEffect(() => {
-    const el = barRef.current;
-    if (!el) return;
-    const root = document.documentElement;
-    const apply = () => root.style.setProperty("--platform-topbar-h", el.offsetHeight + "px");
-    apply();
-    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(apply) : null;
-    if (ro) ro.observe(el);
-    window.addEventListener("resize", apply);
-    return () => { if (ro) ro.disconnect(); window.removeEventListener("resize", apply); };
-  }, []);
 
   return (
-    <header ref={barRef} style={{
+    <header style={{
       padding: "1.25rem 2rem", display: "flex", alignItems: "center", justifyContent: "space-between",
       borderBottom: `1px solid ${border}`, background: "var(--surface)",
       boxShadow: "0 1px 0 rgba(15,20,27,0.03), 0 6px 18px rgba(15,20,27,0.05)",
