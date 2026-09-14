@@ -34,10 +34,16 @@ import { useSpecifics, SpecificsMark, UnitPriceMarks } from "../lib/projectSpeci
 
 const DETAIL_LIMIT = 500; // page size for the detail table; the RPC returns +1 as a has-more sentinel
 const PERIODS = [[30, "30 dní", "30 days"], [45, "45 dní", "45 days"], [60, "60 dní", "60 days"], [90, "90 dní", "90 days"]];
+/* What the breakdown can group by. The engine allows every dimension; this list offered
+   seven of them, so "which floors sell" or "how many sales did we see marked versus simply
+   delisted" could not be asked at all — the same restriction the fixed column list put on
+   the unit table. `sold` marks the ones that only exist once a unit has sold. */
 const GROUP_DIMS = [
-  ["city", "Mesto", "City"], ["district", "Mestská časť", "District"], ["developer", "Developer", "Developer"],
-  ["project_name", "Projekt", "Project"], ["typ", "Typ", "Type"], ["izby", "Izby", "Rooms"],
-  ["kolaudacia_label", "Kolaudácia", "Completion"],
+  ["city", "Mesto", "City"], ["district", "Mestská časť", "District"], ["sub_district", "Podčasť", "Sub-district"],
+  ["developer", "Developer", "Developer"], ["project_name", "Projekt", "Project"],
+  ["typ", "Typ", "Type"], ["izby", "Izby", "Rooms"], ["poschodie", "Poschodie", "Floor"],
+  ["orientacia", "Orientácia", "Orientation"], ["kolaudacia_label", "Kolaudácia", "Completion"],
+  ["detection_method", "Zdroj predaja", "Sale signal", true],
 ];
 const DETAIL_COLS = [
   ["sold_date", "Predané", "Sold", "date"], ["project_name", "Projekt", "Project", "text"],
@@ -318,9 +324,14 @@ export default function SalesView({ lang = "sk" }) {
   }, [sort, visibleCols, sortableNow]);
   const detailColSpan = visibleCols.length; // full-row cells must span the ACTUAL visible column count (varies sold vs pipeline)
   const SORTABLE = sortableNow;
+  /* A sold-only grouping is invalid on the pipeline tabs and the engine raises on it, so
+     the group falls back rather than blanking the page — same reasoning as the sale-only
+     filters. It is not written back to state, so it returns when you go back to Predané. */
+  const effGroupBy = (isPipe && (GROUP_DIMS.find(([k]) => k === groupBy) || [])[3]) ? "city" : groupBy;
+
   const common = { status, date_from, date_to, durable_only: durableOnly, filters: baseFilters };
   const summarySpec = useMemo(() => ({ ...common, mode: "summary" }), [JSON.stringify(common)]);       // eslint-disable-line
-  const breakdownSpec = useMemo(() => ({ ...common, mode: "breakdown", group_by: groupBy }), [JSON.stringify(common), groupBy]); // eslint-disable-line
+  const breakdownSpec = useMemo(() => ({ ...common, mode: "breakdown", group_by: effGroupBy }), [JSON.stringify(common), effGroupBy]); // eslint-disable-line
   const detailSpec = useMemo(() => ({ ...common, mode: "detail", sort: [effSort], limit: DETAIL_LIMIT }), [JSON.stringify(common), JSON.stringify(effSort)]); // eslint-disable-line
 
   // ── LIVE FACETS: what can still be picked, given everything already picked ──
@@ -589,8 +600,8 @@ export default function SalesView({ lang = "sk" }) {
           <span className="rd-sect__tick" />
           <span className="rd-sect__name">{t("Rozklad podľa", "Break down by")}</span>
           <div className="rd-seg rd-seg--wrap">
-            {GROUP_DIMS.map(([k, sk, en]) => (
-              <button key={k} className="rd-seg__btn" aria-pressed={groupBy === k} onClick={() => setGroupBy(k)}>{t(sk, en)}</button>
+            {GROUP_DIMS.filter(([, , , sold]) => !(isPipe && sold)).map(([k, sk, en]) => (
+              <button key={k} className="rd-seg__btn" aria-pressed={effGroupBy === k} onClick={() => setGroupBy(k)}>{t(sk, en)}</button>
             ))}
           </div>
         </div>
@@ -612,8 +623,14 @@ export default function SalesView({ lang = "sk" }) {
               {!brk.loading && brkRows.length === 0 && <tr><td className="rd-td--empty" colSpan={5}>{isPipe ? t("Žiadne jednotky pre tento výber.", "No units for this selection.") : t("Žiadne predaje pre tento výber.", "No sales for this selection.")}</td></tr>}
               {brkRows.map((r, i) => (
                 <tr key={String(r.group) + i}>
-                  <td className="rd-td--key">{r.group ?? "—"}
-                    {groupBy === "project_name" ? <SpecificsMark items={spec.project(r.group)} lang={lang} /> : null}
+                  {/* The group is a stored value; show the readable one, the same as the
+                      table, the chips and the CSV. Grouping by sale signal otherwise reads
+                      "marked / disappeared" on a Slovak page. */}
+                  <td className="rd-td--key">{(() => {
+                    const pretty = prettyValue(effGroupBy);
+                    return r.group == null ? "—" : (pretty ? pretty(r.group) : r.group);
+                  })()}
+                    {effGroupBy === "project_name" ? <SpecificsMark items={spec.project(r.group)} lang={lang} /> : null}
                   </td>
                   {/* the count doubles as a bar, so the biggest groups are visible at a glance */}
                   <td className="num" style={{ color: "var(--text)", minWidth: 96 }}>

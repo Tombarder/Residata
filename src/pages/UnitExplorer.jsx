@@ -209,6 +209,14 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
   }));
   const removeFilter = (id) => setFilters((a) => a.filter((f) => f.id !== id));
 
+  /* Never order by a column that is not on screen. Hide the sorted column and the rows keep
+     that order with nothing on the page explaining it — the indicator goes with the header.
+     The sort follows the first column still showing. (Same fault, same fix, on Sales.) */
+  const effSort = useMemo(
+    () => (cols.includes(sort.key) || !cols.length ? sort : { key: cols[0], dir: sort.dir }),
+    [sort, cols],
+  );
+
   const spec = useMemo(() => {
     /* Money is stored and compared in EUR; the box the user types into follows the
        currency toggle. Convert at the edge, or a CZK band typed in CZK mode is compared
@@ -231,12 +239,12 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
     // price shells and finished flats side by side (PANORÁMA Košice sells 241
     // shells and 19 finished, and carries no project-level answer at all).
     const out = { columns: cols.includes("fitout_level") ? cols : [...cols, "fitout_level"],
-                  filters: withCountry, mode, sort: [sort] };   // limit/offset from useUnitsInfinite
+                  filters: withCountry, mode, sort: [effSort] };   // limit/offset from useUnitsInfinite
     if (built.filters_not) out.filters_not = built.filters_not;
     if (built.ranges) out.ranges = built.ranges;
     if (built.nulls) out.nulls = built.nulls;
     return out;
-  }, [country, filters, cols, mode, sort, fmtByKey, _money1, capsSets]);
+  }, [country, filters, cols, mode, effSort, fmtByKey, _money1, capsSets]);
 
   const { rows, hasMore, loading, loadMore, error: loadFailed } = useUnitsInfinite({ enabled: cols.length > 0, spec, pageSize: PAGE });
 
@@ -429,8 +437,8 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
                     const numeric = fields.find((f) => f.key === k)?.type === "numeric";
                     return (
                       <th key={k} onClick={() => toggleSort(k)} title={t("Klikni pre zoradenie", "Click to sort")}
-                        style={{ padding: "0.55rem 0.7rem", textAlign: numeric ? "right" : "left", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", cursor: "pointer", borderBottom: `1px solid ${border}`, color: sort.key === k ? green : "var(--text-2)", userSelect: "none", fontFamily: mono, fontSize: "0.68rem", letterSpacing: "0.04em", textTransform: "uppercase", fontWeight: 700 }}>
-                        {lbl(k)}{sort.key === k ? (sort.dir === "asc" ? " ▲" : " ▼") : ""}
+                        style={{ padding: "0.55rem 0.7rem", textAlign: numeric ? "right" : "left", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", cursor: "pointer", borderBottom: `1px solid ${border}`, color: effSort.key === k ? green : "var(--text-2)", userSelect: "none", fontFamily: mono, fontSize: "0.68rem", letterSpacing: "0.04em", textTransform: "uppercase", fontWeight: 700 }}>
+                        {lbl(k)}{effSort.key === k ? (effSort.dir === "asc" ? " ▲" : " ▼") : ""}
                       </th>
                     );
                   })}
@@ -454,7 +462,7 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
                         // Nová Myslivna sells one Shell&Core unit inside an
                         // otherwise standard project.
                         const marks = k === "cena_s_dph" ? marksFor.unit(r, r.project_id || r.project_name) : null;
-                        return <td key={k} style={{ height: ROW_H, boxSizing: "border-box", padding: "0 0.7rem", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: numeric ? "right" : "left", borderTop: `1px solid var(--surface)`, color: k === sort.key ? text : "var(--text-2)", fontFamily: numeric ? mono : "inherit", fontVariantNumeric: "tabular-nums" }}>{fmtVal(k, r[k], fmtByKey)}<UnitPriceMarks items={marks} lang={lang} compact /></td>;
+                        return <td key={k} style={{ height: ROW_H, boxSizing: "border-box", padding: "0 0.7rem", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: numeric ? "right" : "left", borderTop: `1px solid var(--surface)`, color: k === effSort.key ? text : "var(--text-2)", fontFamily: numeric ? mono : "inherit", fontVariantNumeric: "tabular-nums" }}>{fmtVal(k, r[k], fmtByKey)}<UnitPriceMarks items={marks} lang={lang} compact /></td>;
                       })}
                     </tr>
                   );
