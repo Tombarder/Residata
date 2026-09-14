@@ -262,7 +262,13 @@ export default function SalesView({ lang = "sk" }) {
   // user's own doing — but it is said out loud rather than answered with an empty table.
   const rangeInverted = date_from > date_to;
 
-  const curSymForFilters = moneySymbol();   // dep: re-convert typed money bounds on a currency switch
+  const curSymForFilters = moneySymbol();
+  /* "€/m²" is written into the field's name, and the figures follow the currency toggle —
+     so in Kč mode the label contradicted the column under it. Swapped at render. */
+  const salesLabel = (f, l) => {
+    const raw = l === "sk" ? f.sk : f.en;
+    return f.money && curSymForFilters !== "€" ? raw.replace(/€/g, curSymForFilters) : raw;
+  };   // dep: re-convert typed money bounds on a currency switch
   /* Sale-only fields (the signal, days on market) do not exist on the reserved /
      pre-reserved relations, and analytics_sales RAISES on an unknown filter — which blanks
      the page. They are dropped from the QUERY here rather than only hidden from the picker:
@@ -328,7 +334,7 @@ export default function SalesView({ lang = "sk" }) {
   }, [cols, isPipe]);
   const colFields = useMemo(
     () => SALES_FIELDS.filter((f) => f.col && !(isPipe && f.sold))
-      .map((f) => ({ key: f.key, label_sk: f.sk, label_en: f.en,
+      .map((f) => ({ key: f.key, label_sk: salesLabel(f, "sk"), label_en: salesLabel(f, "en"),
                      type: ["num", "eur", "per_m2", "area"].includes(f.col) ? "numeric" : f.col === "date" ? "date" : "text" })),
     [isPipe],
   );
@@ -436,9 +442,9 @@ export default function SalesView({ lang = "sk" }) {
      no entry to look its name up in and rendered the raw column key. */
   const panelFields = useMemo(
     () => SALES_FIELDS.filter((f) => f.filter)
-      .map((f) => ({ key: f.key, label_sk: f.sk, label_en: f.en,
+      .map((f) => ({ key: f.key, label_sk: salesLabel(f, "sk"), label_en: salesLabel(f, "en"),
                      type: f.filter === "between" ? "numeric" : f.col === "date" ? "date" : "text" })),
-    [],
+    [curSymForFilters],   // eslint-disable-line -- relabel on a currency switch
   );
   const addFilter = (key) => {
     const caps = capsOf(key);

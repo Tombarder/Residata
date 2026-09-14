@@ -99,7 +99,13 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
     return [...seen.values()];
   }, [dimensions, measures]);
   const fmtByKey = useMemo(() => Object.fromEntries(fields.filter((f) => f.fmt).map((f) => [f.key, f.fmt])), [fields]);
-  const lbl = (k) => { const f = fields.find((x) => x.key === k); return f ? (lang === "sk" ? f.label_sk : f.label_en) : k; };
+  const curSymForLabels = moneySymbol();
+  const lblFor = (f, l) => {
+    const raw = l === "sk" ? f.label_sk : f.label_en;
+    return (f.fmt === "eur" || f.fmt === "per_m2") && curSymForLabels !== "€" ? raw.replace(/€/g, curSymForLabels) : raw;
+  };
+  const lbl = (k) => { const f = fields.find((x) => x.key === k); return f ? lblFor(f, lang === "sk" ? "sk" : "en") : k; };
+
   /* What a typed bound is measured in. Money follows the currency toggle, so it is read at
      render time rather than baked into the field list. */
   const unitOf = (k) => {
@@ -109,6 +115,13 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
     if (fmt === "area") return "m²";
     return "";
   };
+
+  /* The panel lists the same fields, so it needs the same currency-aware labels — its
+     palette and its filter cards would otherwise say "€/m²" beside Kč figures. */
+  const panelFields = useMemo(
+    () => fields.map((f) => ({ ...f, label_sk: lblFor(f, "sk"), label_en: lblFor(f, "en") })),
+    [fields, curSymForLabels, lang],   // eslint-disable-line -- symbol: relabel on a currency switch
+  );
 
   const [mode, setMode] = useState("latest");
   const [cols, setCols] = useState(DEFAULT_COLS);
@@ -505,7 +518,7 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
           tab={panelTab} setTab={setPanelTab}
           adding={adding} setAdding={setAdding}
           search={search} setSearch={setSearch}
-          fields={fields}
+          fields={panelFields}
           catOf={(k) => CATEGORY[k] || "other"} catOrder={CAT_ORDER} catLabel={CAT_LABEL}
           capsOf={capsOf} unitOf={unitOf}
           useValues={useValues}
