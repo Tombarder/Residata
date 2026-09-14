@@ -857,7 +857,7 @@ function KpiStrip({ summary, lang, extra = [] }) {
   // has sold when the truth is "we don't know".
   // n/a when developer doesn't publish sold info — distinct from
   // a real "0%" so users don't read the absence as "nothing has sold".
-  const soldPctLabel = summary.soldPct == null ? "n/a" : `${summary.soldPct.toFixed(0)}%`;
+  const soldPctLabel = summary.soldPct == null ? "n/a" : formatPercent(summary.soldPct, lang, 0);
   const items = [
     { label: lang === "sk" ? "Projektov"   : "Projects",   value: summary.projectCount.toLocaleString("en-US").replace(/,/g, " "), accent: "#10b981", info: lang === "sk" ? "Počet projektov v tomto výbere." : "Number of projects in this selection." },
     { label: lang === "sk" ? "Bytov"       : "Units",      value: summary.totalUnits.toLocaleString("en-US").replace(/,/g, " "), accent: "#64748b", info: lang === "sk" ? "Celková kapacita — všetky byty v projektoch (voľné, rezervované aj predané spolu)." : "Total capacity — all units in the projects (available, reserved and sold combined)." },
@@ -1186,7 +1186,7 @@ function AggregateTable({ rows, lang, nameLabel, nameFormat, countsAllKinds }) {
             // misleading 0%. Everything else always renders numbers.
             const soldCell = r.soldPct == null
               ? <span style={{ color: dim, fontStyle: "italic" }}>n/a</span>
-              : `${r.soldPct.toFixed(0)}%`;
+              : formatPercent(r.soldPct, lang, 0);
             return (
               <tr key={r.name + i} className="rep-row-hoverable" style={{ borderTop: `1px solid ${border}` }}>
                 <td style={tdc} title={nameFormat ? nameFormat(r.name) : r.name}>
@@ -1264,7 +1264,13 @@ function BenchmarkCard({ local, global, scopeLabel, lang }) {
                 <td style={tdcR}>{r.local == null ? "—" : Math.round(r.money ? moneyFromEur(r.local) : r.local).toLocaleString("en-US").replace(/,/g, " ") + (r.unit ? " " + r.unit : "")}</td>
                 <td style={tdcR}>{r.global == null ? "—" : Math.round(r.money ? moneyFromEur(r.global) : r.global).toLocaleString("en-US").replace(/,/g, " ") + (r.unit ? " " + r.unit : "")}</td>
                 <td style={{ ...tdcR, color: deltaColor, fontWeight: 700 }}>
-                  {r.delta == null ? "—" : `${sign}${r.delta.toFixed(1)}${r.absolute ? " pp" : "%"}`}
+                  {/* Two units share this cell: a percentage and percentage POINTS.
+                      Both were hand-built with toFixed, so both printed an English
+                      decimal — "+63.1%" beside a table already writing "63,1 %". */}
+                  {r.delta == null ? "—"
+                    : r.absolute
+                      ? `${sign}${r.delta.toLocaleString(localeTag(lang), { minimumFractionDigits: 1, maximumFractionDigits: 1 })}\u00A0pp`
+                      : `${sign}${formatPercent(r.delta, lang)}`}
                 </td>
               </tr>
             );
@@ -1364,7 +1370,7 @@ function ProjectTable({ projects, flats, lang, onProjectClick }) {
               <td style={tdc}>{p.district || "—"}</td>
               <td style={tdcR}>{p._realTotal.toLocaleString("en-US").replace(/,/g, " ")}</td>
               <td style={{ ...tdcR, color: accentInk }}>{p._realAvail.toLocaleString("en-US").replace(/,/g, " ")}</td>
-              <td style={{ ...tdcR, color: orangeInk }}>{p._realSoldPct != null ? p._realSoldPct.toFixed(0) + "%" : "—"}</td>
+              <td style={{ ...tdcR, color: orangeInk }}>{formatPercent(p._realSoldPct, lang, 0)}</td>
               <td style={tdcR}>{p.avg_price_eur_m2 ? Math.round(moneyFromEur(p.avg_price_eur_m2)).toLocaleString("en-US").replace(/,/g, " ") : "—"}</td>
             </tr>
           ))}
@@ -1942,7 +1948,7 @@ function ForecastHistogram({ rows, lang }) {
             }} />
           </div>
           <div className="rep-hist-count" style={{ fontFamily: mono, fontSize: "0.85rem", color: text, fontWeight: 700, textAlign: "right" }}>
-            {r.count} <span style={{ color: dim, fontWeight: 400, fontSize: "0.7rem" }}>({r.pct.toFixed(0)}%)</span>
+            {r.count} <span style={{ color: dim, fontWeight: 400, fontSize: "0.7rem" }}>({formatPercent(r.pct, lang, 0)})</span>
           </div>
         </div>
       ))}
@@ -2385,7 +2391,7 @@ function PricingTensionScatter({ dots, lang, onOpenProject }) {
             <g key={i}>
               <line x1={x} y1={padT} x2={x} y2={padT + innerH} stroke={border} strokeDasharray="2,3"/>
               <text x={x} y={padT + innerH + 16} fill={dim} fontSize="10" textAnchor="middle" fontFamily={mono}>
-                {t === 0 ? (lang === "sk" ? "medián" : "median") : `${t > 0 ? "+" : ""}${(t * maxAbsPremium).toFixed(0)}%`}
+                {t === 0 ? (lang === "sk" ? "medián" : "median") : `${t > 0 ? "+" : ""}${formatPercent(t * maxAbsPremium, lang, 0)}`}
               </text>
             </g>
           );
@@ -2396,7 +2402,7 @@ function PricingTensionScatter({ dots, lang, onOpenProject }) {
             <g key={i}>
               <line x1={padL} y1={y} x2={W - padR} y2={y} stroke={border} strokeDasharray="2,3"/>
               <text x={padL - 8} y={y} fill={dim} fontSize="10" textAnchor="end" dominantBaseline="middle" fontFamily={mono}>
-                {(t * maxVelocity).toFixed(0)}%
+                {formatPercent(t * maxVelocity, lang, 0)}
               </text>
             </g>
           );
