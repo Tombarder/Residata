@@ -30,7 +30,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useSpecifics, useProjectSpecificsData, SpecificsMark, SpecificsPanel,
          UnitPriceMarks } from "../lib/projectSpecifics";
 import { useProjects, useProjectSnapshots, useReportHistogram, fetchReportBinUnits, useReportProjectUnits, useReportComparables, useScopeRoomPrices } from "../lib/useData";
-import { isHomeUnit } from "../lib/unitKinds";
+import { isHomeUnit, unitKindLabel } from "../lib/unitKinds";
 import LoadError from "../components/LoadError";
 import Picker from "../components/Picker";
 import InfoTip from "../components/InfoTip";
@@ -801,7 +801,7 @@ function ProjectReport({ project, siblings, lang }) {
 
       {byTyp.length > 0 && (
         <ReportSection label={lang === "sk" ? "Mix typov" : "Unit types"} title={lang === "sk" ? "Ponuka podľa typu" : "Supply by type"}>
-          <AggregateTable rows={byTyp} lang={lang} nameLabel="Typ" />
+          <AggregateTable rows={byTyp} lang={lang} nameLabel={lang === "sk" ? "Typ" : "Type"} nameFormat={(v) => unitKindLabel(v, lang)} countsAllKinds />
         </ReportSection>
       )}
 
@@ -1144,7 +1144,10 @@ function HdrInfo({ sk, en, lang }) {
     </span>
   );
 }
-function AggregateTable({ rows, lang, nameLabel }) {
+/* `nameFormat` turns a stored value into a readable one — the Typ table grouped by
+   the scraper's word and printed "flat" and "retail" into a Slovak page. The
+   SORT still runs on the stored name, which is what keeps floors numeric. */
+function AggregateTable({ rows, lang, nameLabel, nameFormat, countsAllKinds }) {
   const [showAll, setShowAll] = useState(false);
   if (!rows.length) return <div style={{ color: dim, fontSize: "0.85rem" }}>{lang === "sk" ? "Žiadne dáta." : "No data."}</div>;
   const maxUnits = Math.max(...rows.map(r => r.totalUnits), 1);
@@ -1159,7 +1162,13 @@ function AggregateTable({ rows, lang, nameLabel }) {
           <tr style={{ background: bg, textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
             <th style={tdh}>{nameLabel}</th>
             <th style={tdhR}>{lang === "sk" ? "Projekty" : "Projects"}</th>
-            <th style={tdhR}>{lang === "sk" ? "Bytov"    : "Units"}</th>
+            {/* What the column COUNTS, said out loud. Every table here is homes-only
+                (groupAggregatesFromFlats filters on isHomeUnit) except the one grouped BY
+                type, which must keep its garage and shop buckets — so that one counted 65
+                "Iné" under a header reading "Bytov". The two languages also disagreed: SK
+                said Bytov where EN said Units. */}
+            <th style={tdhR}>{countsAllKinds ? (lang === "sk" ? "Jednotiek" : "Units")
+                                             : (lang === "sk" ? "Bytov" : "Homes")}</th>
             <th style={tdhR}>{lang === "sk" ? "Voľných"  : "Available"}</th>
             <th style={tdhR}>{lang === "sk" ? "Pred. %" : "Sold %"}<HdrInfo lang={lang} sk="Podiel už predaných z celku v skupine. V agregovaných pohľadoch (trh/mesto/časť) je to odhad z registrových údajov developera — pre presné počty predaných pozri stránku Predaje." en="Share already sold of the group's total. In aggregate views (market/city/district) this is an estimate from developers' registry data — for exact sold counts see the Sales page." /></th>
             {/* No weighting claim: this table is fed from two places — the by-izby/typ/poschodie
@@ -1167,7 +1176,7 @@ function AggregateTable({ rows, lang, nameLabel }) {
                 unit count. One tooltip cannot be true of both, and naming the wrong one is
                 worse than naming neither. Same call as the Ø €/m² KPI tile. */}
             <th style={tdhR}>Ø {moneySymbol()}/m²<HdrInfo lang={lang} sk="Priemerná ponuková cena za m² (s DPH) voľných bytov v skupine." en="Average asking price per m² (incl. VAT) of available units in the group." /></th>
-            <th style={{ ...tdh, minWidth: 90 }}>{lang === "sk" ? "Relatívne" : "Relative"}<HdrInfo lang={lang} sk="Vizuálne porovnanie veľkosti skupín podľa počtu bytov — najväčšia skupina má plnú lištu." en="Visual size comparison of the groups by unit count — the largest group has a full bar." /></th>
+            <th style={{ ...tdh, minWidth: 90 }}>{lang === "sk" ? "Relatívne" : "Relative"}<HdrInfo lang={lang} sk={`Vizuálne porovnanie veľkosti skupín podľa počtu ${countsAllKinds ? "jednotiek" : "bytov"} — najväčšia skupina má plnú lištu.`} en={`Visual size comparison of the groups by ${countsAllKinds ? "unit" : "home"} count — the largest group has a full bar.`} /></th>
           </tr>
         </thead>
         <tbody>
@@ -1180,8 +1189,8 @@ function AggregateTable({ rows, lang, nameLabel }) {
               : `${r.soldPct.toFixed(0)}%`;
             return (
               <tr key={r.name + i} className="rep-row-hoverable" style={{ borderTop: `1px solid ${border}` }}>
-                <td style={tdc} title={r.name}>
-                  <strong style={{ color: text }}>{r.name}</strong>
+                <td style={tdc} title={nameFormat ? nameFormat(r.name) : r.name}>
+                  <strong style={{ color: text }}>{nameFormat ? nameFormat(r.name) : r.name}</strong>
                 </td>
                 <td style={tdcR}>{r.projectCount}</td>
                 <td style={tdcR}>{r.totalUnits.toLocaleString("en-US").replace(/,/g, " ")}</td>
