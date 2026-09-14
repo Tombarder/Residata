@@ -209,11 +209,17 @@ export default function FieldPanel({
   emptyHint, unavailableNote,
 }) {
   const t = (sk, en) => (lang === "sk" ? sk : en);
+  const q = (search || "").trim().toLowerCase();
+  /* Search matched ONLY the label in the current UI language, so a Slovak page could not
+     find a field by the English name printed on the very same field's tooltip — and
+     neither language could find one by its column name, which is what a person who knows
+     the data actually types. All three now. */
+  const matches = (f) =>
+    !q || `${f.label_sk || ""} ${f.label_en || ""} ${f.key}`.toLowerCase().includes(q);
+  const shown = fields.filter(matches);
   const palette = (() => {
-    const q = (search || "").trim().toLowerCase();
     const groups = {};
-    for (const f of fields) {
-      if (q && !(lang === "sk" ? f.label_sk : f.label_en).toLowerCase().includes(q)) continue;
+    for (const f of shown) {
       const g = catOf(f.key) || "other";
       (groups[g] = groups[g] || []).push(f);
     }
@@ -229,11 +235,14 @@ export default function FieldPanel({
         }}>
           {/* tabs */}
           <div style={{ display: "flex", borderBottom: `1px solid ${border}`, flexShrink: 0 }}>
-            {[["filters", t("FILTRE", "FILTERS"), filters.length || null],
+            {/* The ACTIVE count, not the number of cards. Two empty cards used to badge
+                this "2" while the table showed the whole market — and the page's own
+                heading, two centimetres away, said nothing was filtered. One number. */}
+            {[["filters", t("FILTRE", "FILTERS"), filters.filter(isFilterActive).length || null],
               ...(showColumns ? [["cols", t("STĹPCE", "COLUMNS"), cols.length]] : [])].map(([key, label, badge]) => {
               const on = tab === key;
               return (
-                <button key={key} onClick={() => { setTab(key); setAdding(false); }}
+                <button key={key} onClick={() => { setTab(key); setAdding(false); setSearch(""); }}
                   style={{
                     flex: 1, border: "none", background: on ? "color-mix(in srgb, var(--accent) 10%, transparent)" : "transparent",
                     color: on ? text : dim, cursor: "pointer", padding: "0.7rem 0.4rem",
@@ -290,7 +299,10 @@ export default function FieldPanel({
                       {picking ? t("Vyber pole na filtrovanie", "Pick a field to filter on") : t("Zobrazené stĺpce", "Shown columns")}
                     </span>
                     <span style={{ marginLeft: "auto", fontFamily: mono, fontSize: "0.62rem", color: dim }}>
-                      {picking ? fields.length : `${cols.length}/${fields.length}`}
+                      {/* While searching, the count is what you can SEE — it read "34"
+                          above three visible rows. */}
+                      {q ? `${shown.length}/${fields.length}`
+                         : picking ? fields.length : `${cols.length}/${fields.length}`}
                     </span>
                   </div>
                   {!picking && (
