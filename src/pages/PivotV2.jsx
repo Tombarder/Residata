@@ -1970,6 +1970,8 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
            what made this look broken. The sticky header gives the table its edge. */
         .pivot-focus.is-on .pivot-scroll {
           border: none; border-radius: 0; background: transparent;
+          /* the frozen widths are px and would stay narrow beside the larger type */
+          --pv-label-w: 360px; --pv-count-w: 112px;
         }
         @media (max-width: 840px) {
           .pivot-focus.is-on { padding: 0.5rem 0.6rem 0.7rem; }
@@ -3517,7 +3519,11 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
            the space beside it is just workspace, the way every spreadsheet does it. */
         minWidth: expanded ? undefined : "100%",
         borderCollapse: "separate", borderSpacing: 0,
-        fontSize: "0.82rem",
+        /* Boss asked for the table to be BIGGER ("chcem to vacsie"), and the first
+           focus mode gave him a bigger BOX around the same small table. A screen's
+           worth of room is only worth taking if the thing you came to read grows
+           into it, so the type goes up a fifth and the padding (in em) follows. */
+        fontSize: expanded ? "1rem" : "0.82rem",
       }}>
         <thead>
           {crossTab && (
@@ -3933,13 +3939,16 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
    column is a fixed size rather than content-sized. */
 
 const th = {
-  padding: "0.65rem 0.75rem", fontWeight: 700,
+  /* em, not rem, so padding scales with the table's font-size — which focus mode
+     raises. 0.79em x 0.82rem = the 0.65rem this was, so nothing moves at the
+     default size. */
+  padding: "0.79em 0.91em", fontWeight: 700,
   borderBottom: `1px solid ${border}`,
   whiteSpace: "nowrap",
   background: "var(--surface-2)",   // a sticky cell must paint its own background
 };
 const td = {
-  padding: "0.45rem 0.75rem", borderBottom: "none",
+  padding: "0.55em 0.91em", borderBottom: "none",
   whiteSpace: "nowrap",
   fontVariantNumeric: "tabular-nums",   // digits line up column-wise
 };
