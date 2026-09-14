@@ -31,13 +31,13 @@ import { useSpecifics, specificsHTML } from "../lib/projectSpecifics";
 import { useAccountPrefState, useAccountHydrated } from "../lib/useAccountUiPref";
 import { useCountry } from "../lib/useCountry";
 import { useCurrency } from "../lib/useCurrency";
-import { moneyFromEur, moneySymbol } from "../lib/money";
+import { moneyFromEur, moneySymbol, formatMoney, formatPerM2 } from "../lib/money";
 import { supabase, supabaseData, supabasePublic, isSupabaseReady } from "../lib/supabase";
 import {
   LENSES, COMPLETION, NO_DATA, ppm2Of, metricValue, completionBucket,
   tertiles, colorFor, circlePolygon, computeCompetitiveSet, computePolygonSet, computeCorridorSet,
   corridorBufferRing, polygonAreaKm2, polylineLengthKm, legendForLens, valueRange, heatWeight,
-  median, percentile, setAbsorptionPct, completionLabel, completionShort,
+  median, percentile, setAbsorptionPct, completionLabel, completionShort, lensLabel,
 } from "../lib/mapMetrics";
 import MapFilterBuilder from "../components/MapFilterBuilder";
 import Picker from "../components/Picker";
@@ -111,8 +111,13 @@ const norm = (s) => (s || "").toString().toLowerCase().normalize("NFD").replace(
 const fmt = (n) => Number(Math.round(n)).toLocaleString("sk-SK");
 // Currency-aware money display — EUR value → the toggled currency + symbol. (fmt
 // stays currency-agnostic; it's also used for counts/areas which must NOT convert.)
-const mVal = (eur) => `${moneySymbol()}${fmt(moneyFromEur(eur))}`;
-const mM2  = (eur) => `${mVal(eur)}/m²`;
+/* Prices on this page were written as a HARDCODED "€" in front of an unconverted
+   number at fourteen render sites, so switching the platform to Kč left the whole
+   Market Radar quoting euros beside a Projects page quoting crowns. These convert,
+   and they put the symbol AFTER the amount like every other price on the platform. */
+const mVal = (eur) => formatMoney(eur);
+const mM2  = (eur) => formatPerM2(eur);
+const mUnit = () => `${moneySymbol()}/m²`;
 const fmtK = (n) => (n >= 10000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1) + "k" : fmt(n));
 const pct = (x) => `${Math.round(x * 100)}%`;
 
@@ -865,7 +870,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
         <div style={{ display: "flex", alignItems: "center", gap: "0.8rem", flexWrap: "wrap", marginBottom: 10 }}>
           <span style={{ fontSize: "0.6rem", color: dim, letterSpacing: "0.12em", textTransform: "uppercase" }}>{sk ? "Trh" : "Market"}</span>
           <div style={{ display: "inline-flex", gap: 3, background: bg2, border: `1px solid ${border}`, borderRadius: 999, padding: 3 }}>
-            {LENSES.map((l) => <button key={l.key} onClick={() => setLens(l.key)} style={tabStyle(lens === l.key)} title={sk ? (l.desc_sk || l.desc) : l.desc}>{sk ? (l.label_sk || l.label) : l.label}</button>)}
+            {LENSES.map((l) => <button key={l.key} onClick={() => setLens(l.key)} style={tabStyle(lens === l.key)} title={sk ? (l.desc_sk || l.desc) : l.desc}>{lensLabel(l, sk ? "sk" : "en", moneySymbol())}</button>)}
           </div>
           <button onClick={() => setHeatMode((v) => !v)} style={chipStyle(heatMode)} title={sk ? "Tepelná mapa aktívnej metriky" : "Heatmap of the active metric"}>
             {heatMode ? "◉" : "○"} {sk ? "Teplo" : "Heat"}
@@ -993,8 +998,8 @@ export default function MapView2({ lang = "en", setCurrent }) {
                   <div style={{ color: textLight, fontWeight: 700, marginBottom: 4, fontSize: "0.92rem", paddingRight: 16 }}>{sk ? "Prieskum konkurencie v okolí" : "Competition in an area"}</div>
                   <div style={{ marginBottom: 12 }}>
                     {sk
-                      ? "Vyber si oblasť na mape a ukážem ti všetky projekty vnútri — medián €/m², vypredanosť, developerov, dokončenie aj celý zoznam."
-                      : "Pick an area on the map and I'll summarise every project inside — median €/m², absorption, developers, completion and the full list."}
+                      ? `Vyber si oblasť na mape a ukážem ti všetky projekty vnútri — medián ${mUnit()}, vypredanosť, developerov, dokončenie aj celý zoznam.`
+                      : `Pick an area on the map and I'll summarise every project inside — median ${mUnit()}, absorption, developers, completion and the full list.`}
                   </div>
                   <div style={{ color: dim, fontSize: "0.66rem", textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 7 }}>{sk ? "Ako začať — 3 spôsoby" : "How to start — 3 ways"}</div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
@@ -1069,7 +1074,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
                     <div style={{ fontSize: "0.68rem", color: accentInk, marginBottom: 3 }}>◎ {sk ? "Tvoj projekt vs okolie" : "This project vs the set"}</div>
                     <div style={{ fontSize: "0.78rem", color: textLight, fontWeight: 600, marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{anchor.name}</div>
                     <div style={{ fontSize: "0.72rem", color: dim, fontFamily: mono, lineHeight: 1.7 }}>
-                      <div>€{ap ? fmt(ap) : "—"}/m²{deltaPct != null ? <span style={{ color: deltaPct > 0 ? dangerInk : accentInk }}> · {deltaPct > 0 ? "+" : ""}{deltaPct}% {sk ? "vs medián" : "vs median"}</span> : ""}</div>
+                      <div>{ap ? mM2(ap) : "—"}{deltaPct != null ? <span style={{ color: deltaPct > 0 ? dangerInk : accentInk }}> · {deltaPct > 0 ? "+" : ""}{deltaPct}% {sk ? "vs medián" : "vs median"}</span> : ""}</div>
                       <div>{aAbs == null ? "—" : aAbs + "%"} {sk ? "predané" : "sold"}{compSet.avgAbs != null && aAbs != null ? <span style={{ color: aAbs >= compSet.avgAbs ? accentInk : dangerInk }}> · {sk ? "okolie" : "set"} {compSet.avgAbs}%</span> : ""}</div>
                     </div>
                   </div>
@@ -1234,7 +1239,7 @@ function ComparePanel({ options, compareIds, setCompareIds, rows, baselineId, se
       ) : (
         <>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.64rem", color: dim, fontFamily: mono, margin: "11px 0 6px" }}>
-            <span>{sk ? "Medián setu" : "Set median"}: €{setMed ? fmt(setMed) : "—"}/m²</span>
+            <span>{sk ? "Medián setu" : "Set median"}: {setMed ? mM2(setMed) : "—"}</span>
             <span>{setAbs != null ? `${setAbs}% ${sk ? "predané" : "sold"}` : ""}</span>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -1310,21 +1315,21 @@ function PricingBand({ cs, anchorPpm2, sk }) {
   return (
     <div style={{ marginBottom: 12 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
-        <span style={{ fontSize: "0.6rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase" }}>{sk ? "Cenové pásmo €/m²" : "Pricing band €/m²"}</span>
-        <span style={{ fontSize: "0.62rem", color: dim, fontFamily: mono }}>{sk ? "stred 50 %" : "middle 50%"} €{fmt(p25)}–€{fmt(p75)}</span>
+        <span style={{ fontSize: "0.6rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase" }}>{sk ? `Cenové pásmo ${mUnit()}` : `Pricing band ${mUnit()}`}</span>
+        <span style={{ fontSize: "0.62rem", color: dim, fontFamily: mono }}>{sk ? "stred 50 %" : "middle 50%"} {mVal(p25)}–{mVal(p75)}</span>
       </div>
       <div style={{ position: "relative", height: 12, marginBottom: 6 }}>
         <div style={{ position: "absolute", left: 0, right: 0, top: 5, height: 2, background: "var(--border-soft)", borderRadius: 2 }} />
         <div style={{ position: "absolute", left: `${pos(p25)}%`, width: `${Math.max(1, pos(p75) - pos(p25))}%`, top: 2, height: 8, background: `color-mix(in srgb, var(--accent) 19%, transparent)`, border: `1px solid color-mix(in srgb, var(--accent) 40%, transparent)`, borderRadius: 4 }} />
-        <div style={{ position: "absolute", left: `${pos(median)}%`, top: 0, width: 2, height: 12, background: green, transform: "translateX(-1px)" }} title={`med €${fmt(median)}`} />
-        {aPos != null ? <div style={{ position: "absolute", left: `${aPos}%`, top: -4, transform: "translateX(-5px)", width: 0, height: 0, borderLeft: "5px solid transparent", borderRight: "5px solid transparent", borderTop: `7px solid ${textLight}` }} title={`${sk ? "tento projekt" : "this project"} €${fmt(anchorPpm2)}`} /> : null}
+        <div style={{ position: "absolute", left: `${pos(median)}%`, top: 0, width: 2, height: 12, background: green, transform: "translateX(-1px)" }} title={`med ${mVal(median)}`} />
+        {aPos != null ? <div style={{ position: "absolute", left: `${aPos}%`, top: -4, transform: "translateX(-5px)", width: 0, height: 0, borderLeft: "5px solid transparent", borderRight: "5px solid transparent", borderTop: `7px solid ${textLight}` }} title={`${sk ? "tento projekt" : "this project"} ${mVal(anchorPpm2)}`} /> : null}
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.6rem", color: dim, fontFamily: mono }}>
-        <span>€{fmt(priceLo)}</span>
-        <span style={{ color: accentInk }}>med €{fmt(median)}</span>
-        <span>€{fmt(priceHi)}</span>
+        <span>{mVal(priceLo)}</span>
+        <span style={{ color: accentInk }}>med {mVal(median)}</span>
+        <span>{mVal(priceHi)}</span>
       </div>
-      {aQuart ? <div style={{ fontSize: "0.64rem", color: dim, marginTop: 7 }}>{sk ? "Tento projekt " : "This project "}<span style={{ color: textLight, fontFamily: mono }}>€{fmt(anchorPpm2)}/m²</span> · {aQuart}</div> : null}
+      {aQuart ? <div style={{ fontSize: "0.64rem", color: dim, marginTop: 7 }}>{sk ? "Tento projekt " : "This project "}<span style={{ color: textLight, fontFamily: mono }}>{mM2(anchorPpm2)}</span> · {aQuart}</div> : null}
     </div>
   );
 }
@@ -1332,8 +1337,8 @@ function MarketInsight({ lens, stats, sk, onBand }) {
   const s = stats;
   let headline, visual;
   if (lens === "price") {
-    headline = <Headline label={sk ? "Medián ceny" : "Median price"} big={s.med ? `€${fmt(s.med)}` : "—"} unit="/m²"
-      sub={s.pMin ? `${sk ? "najlacnejší" : "cheapest"} €${fmt(s.pMin)} · ${sk ? "najdrahší" : "priciest"} €${fmt(s.pMax)}` : (sk ? "žiadne zverejnené ceny" : "no published prices")} />;
+    headline = <Headline label={sk ? "Medián ceny" : "Median price"} big={s.med ? mVal(s.med) : "—"} unit="/m²"
+      sub={s.pMin ? `${sk ? "najlacnejší" : "cheapest"} ${mVal(s.pMin)} · ${sk ? "najdrahší" : "priciest"} ${mVal(s.pMax)}` : (sk ? "žiadne zverejnené ceny" : "no published prices")} />;
     visual = <Histogram hist={s.hist} hLo={s.hLo} hHi={s.hHi} med={s.med} sk={sk} onBand={onBand} />;
   } else if (lens === "completion") {
     const known = s.count - s.comp.unknown;
@@ -1382,7 +1387,7 @@ function Histogram({ hist, hLo, hHi, med, sk, onBand }) {
     const lo = Math.round(hLo + i * step), hi = Math.round(hLo + (i + 1) * step);
     const n = hist[i];
     const projects = sk ? (n === 1 ? "projekt" : n < 5 ? "projekty" : "projektov") : (n === 1 ? "project" : "projects");
-    return `€${fmt(lo)} – €${fmt(hi)}/m² · ${n} ${projects}${i === medIdx ? (sk ? " · medián" : " · median") : ""}`;
+    return `${mVal(lo)} – ${mM2(hi)} · ${n} ${projects}${i === medIdx ? (sk ? " · medián" : " · median") : ""}`;
   };
   return (
     <div style={{ flex: 1, minWidth: 150 }}>
@@ -1400,7 +1405,7 @@ function Histogram({ hist, hLo, hHi, med, sk, onBand }) {
         ))}
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.58rem", color: dim, fontFamily: mono, marginTop: 4 }}>
-        <span>€{fmt(hLo)}/m²</span><span>€{fmt(hHi)}/m²</span>
+        <span>{mM2(hLo)}</span><span>{mM2(hHi)}</span>
       </div>
     </div>
   );
@@ -1465,7 +1470,7 @@ function HeatLegend({ lens, sk }) {
       <span>{sk ? "menej" : "low"}</span>
       <span style={{ width: 84, height: 9, borderRadius: 5, background: "linear-gradient(90deg, #2b4c9b, #3aa0ff, #f5a623, #ff7a3d, #ff3d3d)", display: "inline-block" }} />
       <span style={{ color: textLight }}>{sk ? "viac" : "high"}</span>
-      {L ? <span style={{ opacity: 0.7 }}>· {sk ? (L.label_sk || L.label) : L.label}</span> : null}
+      {L ? <span style={{ opacity: 0.7 }}>· {lensLabel(L, sk ? "sk" : "en", moneySymbol())}</span> : null}
     </span>
   );
 }

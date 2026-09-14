@@ -15,6 +15,15 @@
  *   · price / absorption / developer are partial — "no data" must be first-class.
  */
 
+/* The price lens names its own unit, and that unit follows the currency toggle. The
+   label is a module constant so the "€" is baked in — swapped at read time, the same
+   way the Pivot swaps the registry's money labels. Nothing else on this page may print
+   a bare € : in CZK mode it would sit over crowns. */
+export function lensLabel(lens, lang, symbol) {
+  const raw = (lang === "sk" ? lens.label_sk : lens.label) || lens.label;
+  return symbol && symbol !== "€" ? raw.replace(/€/g, symbol) : raw;
+}
+
 export const LENSES = [
   { key: "price",      label: "Price €/m²",  label_sk: "Cena €/m²",       unit: "€/m²", desc: "Average asking price per m² — where the market runs rich vs soft.",            desc_sk: "Priemerná ponuková cena za m² — kde je trh drahý vs mäkký." },
   { key: "supply",     label: "Supply",      label_sk: "Ponuka",          unit: "u",    desc: "Units still available — where competing inventory is concentrated.",           desc_sk: "Voľné byty — kde je sústredená konkurenčná ponuka." },
