@@ -10,6 +10,7 @@ import { useCountry, isAllCountries } from "../lib/useCountry";
 import { useCurrency } from "../lib/useCurrency";
 import { moneyFromEur, moneySymbol } from "../lib/money";
 import { formatDimNumber } from "../lib/locale";
+import { statusLabel } from "../lib/unitStatus";
 import { useUnitsInfinite, useAnalyticsRegistry, usePivotDistinct } from "../lib/useData";
 import { useAccountPrefState } from "../lib/useAccountUiPref";
 import { EMPTY_SENTINEL, MODE_LABEL, capabilitiesOf, newFilter, sanitizeFilter,
@@ -57,7 +58,7 @@ const CAT_LABEL = {
   en: { loc: "Location", proj: "Project", unit: "Unit", price: "Price", area: "Areas", time: "Time", other: "Other" },
 };
 
-function fmtVal(key, val, fmtByKey, numeric) {
+function fmtVal(key, val, fmtByKey, numeric, lang) {
   if (val == null || val === "") return "—";
   const f = fmtByKey[key];
   const n = Number(val);
@@ -65,6 +66,9 @@ function fmtVal(key, val, fmtByKey, numeric) {
   if (f === "per_m2" && Number.isFinite(n)) return Math.round(moneyFromEur(n)).toLocaleString("sk-SK").replace(/,/g, " ") + " " + moneySymbol() + "/m²";
   if (f === "area" && Number.isFinite(n)) return n.toLocaleString("sk-SK", { maximumFractionDigits: 1 }) + " m²";
   if (numeric && Number.isFinite(n)) return formatDimNumber(val);
+  /* "V" told the reader nothing. The scraper's codes are right in the database and wrong
+     on a page; each row here is ONE flat, so it takes the singular. */
+  if (key === "stav") return statusLabel(val, lang, "one");
   return String(val);
 }
 
@@ -503,7 +507,7 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
                         // Nová Myslivna sells one Shell&Core unit inside an
                         // otherwise standard project.
                         const marks = k === "cena_s_dph" ? marksFor.unit(r, r.project_id || r.project_name) : null;
-                        return <td key={k} style={{ height: ROW_H, boxSizing: "border-box", padding: "0 0.7rem", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: numeric ? "right" : "left", borderTop: `1px solid var(--surface)`, color: k === effSort.key ? text : "var(--text-2)", fontFamily: numeric ? mono : "inherit", fontVariantNumeric: "tabular-nums" }}>{fmtVal(k, r[k], fmtByKey, numeric)}<UnitPriceMarks items={marks} lang={lang} compact /></td>;
+                        return <td key={k} style={{ height: ROW_H, boxSizing: "border-box", padding: "0 0.7rem", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: numeric ? "right" : "left", borderTop: `1px solid var(--surface)`, color: k === effSort.key ? text : "var(--text-2)", fontFamily: numeric ? mono : "inherit", fontVariantNumeric: "tabular-nums" }}>{fmtVal(k, r[k], fmtByKey, numeric, lang)}<UnitPriceMarks items={marks} lang={lang} compact /></td>;
                       })}
                     </tr>
                   );

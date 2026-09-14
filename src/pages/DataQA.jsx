@@ -28,6 +28,8 @@
  * memoised rows + deferred search for big projects, localized errors, select-all.
  */
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { statusLabel } from "../lib/unitStatus";
+import { formatDimNumber } from "../lib/locale";
 import ProjectsEditor from "../components/ProjectsEditor";
 import Picker from "../components/Picker";
 import { fieldBlock } from "../lib/controls";
@@ -92,10 +94,16 @@ const norm = (s) => (s == null ? "" : String(s)).toLowerCase().normalize("NFD").
 const fin = (v) => { if (v == null || v === "") return null; const n = Number(v); return Number.isFinite(n) ? n : null; };
 const fmt = (n) => { const x = fin(n); return x == null ? "—" : Math.round(x).toLocaleString("sk-SK"); };
 const fmt1 = (n) => { const x = fin(n); return x == null ? "—" : x.toFixed(1); };
-const izbyTxt = (s) => (s == null ? "—" : String(s).replace(/\.0$/, ""));
+/* Display only. The fourth hand-rolled spelling of this on 2026-09-14 — it tidied "6.0"
+   but left "2.5" with a dot in a Slovak page. csvValue keeps the RAW dot-decimal number,
+   because a file whose areas read "76.25" must not carry "2,5" beside them. */
+const izbyTxt = (s) => (s == null ? "—" : String(formatDimNumber(s)));
 const avgFin = (arr, f) => { const v = arr.map((r) => fin(f(r))).filter((n) => n != null); return v.length ? v.reduce((a, n) => a + n, 0) / v.length : null; };
 
-const STAVY = [["all", "Všetky", "All"], ["V", "Voľné", "Available"], ["P", "Predané", "Sold"], ["R", "Rezervované", "Reserved"], ["PR", "Predrezerv.", "Pre-reserved"]];
+/* Counts of units, so the collective form. "Predrezerv." is this page's own
+   abbreviation — the pills are narrow here — and stays a local override. */
+const STAVY = [["all", "Všetky", "All"],
+  ...["V", "P", "R", "PR"].map((c) => [c, c === "PR" ? "Predrezerv." : statusLabel(c, "sk", "many"), statusLabel(c, "en", "many")])];
 const stavColor = (s) => (s === "V" ? green : s === "P" ? dim : s === "R" ? amber : s === "PR" ? blue : textLight);
 const COUNTRIES = { SK: "Slovensko", CZ: "Česko" };
 
@@ -154,8 +162,10 @@ function loadColCfg() {
 const tdStyle = (type) => ({ padding: "8px 11px", textAlign: type === "n" ? "right" : "left", color: textLight, fontSize: 13, whiteSpace: "nowrap" });
 const thStyle = (type) => ({ padding: "9px 11px", textAlign: type === "n" ? "right" : "left", color: dim, fontFamily: mono, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.3, cursor: "pointer", whiteSpace: "nowrap", userSelect: "none", borderBottom: `1px solid ${border}` });
 
-function cellNode(u, key) {
-  if (key === "stav") return <span style={{ color: stavColor(u.stav), fontWeight: 600 }}>{u.stav || "—"}</span>;
+function cellNode(u, key, lang) {
+  // The scraper's code belongs in the database, not in a column a person reads. Each row
+  // is ONE flat, so the singular. The CSV still exports the raw code — it is the join key.
+  if (key === "stav") return <span style={{ color: stavColor(u.stav), fontWeight: 600 }}>{u.stav ? statusLabel(u.stav, lang, "one") : "—"}</span>;
   if (key === "izby") return izbyTxt(u.izby);
   if (AREA.has(key)) return fmt1(u[key]);
   if (key === "cena") return u.cena != null ? fmt(u.cena) : (u.cena_text || "—");
@@ -165,7 +175,7 @@ function cellNode(u, key) {
 }
 // Raw value for CSV (no JSX, no "—" placeholders).
 function csvValue(u, key) {
-  if (key === "izby") return izbyTxt(u.izby) === "—" ? "" : izbyTxt(u.izby);
+  if (key === "izby") return u.izby == null ? "" : String(u.izby).replace(/\.0$/, "");
   if (key === "cena") return u.cena != null ? u.cena : (u.cena_text || "");
   return u[key] == null ? "" : u[key];
 }
@@ -177,7 +187,7 @@ const Row = memo(function Row({ u, cols, isChecked, onToggle, lang }) {
         <input type="checkbox" checked={isChecked} onChange={() => onToggle(u.unit_id)}
           aria-label={(lang === "sk" ? "Vybrať byt " : "Select unit ") + u.unit_id} />
       </td>
-      {cols.map((c) => <td key={c.key} style={tdStyle(c.type)}>{cellNode(u, c.key)}</td>)}
+      {cols.map((c) => <td key={c.key} style={tdStyle(c.type)}>{cellNode(u, c.key, lang)}</td>)}
     </tr>
   );
 });

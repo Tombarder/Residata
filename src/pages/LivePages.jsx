@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { statusLabel } from "../lib/unitStatus";
 import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
 import { useProjects, useProjectFlats, useProjectSnapshots, useMarketTotals, useTotalsList, useSales } from "../lib/useData";
@@ -2470,10 +2471,13 @@ function AreaPriceScatter({ flats, lang, onSelectFlat }) {
     (stav === "R" || stav === "PR") ? "R" :
     stav === "Ešte nie v ponuke" ? "N" : null;
   const CATS = [
-    { key: "V", label: lang === "sk" ? "Voľné"             : "Available",      color: greenInk },
-    { key: "P", label: lang === "sk" ? "Predané"           : "Sold",           color: orangeInk },
-    { key: "R", label: lang === "sk" ? "Rezervované"       : "Reserved",       color: "#888" },
-    { key: "N", label: lang === "sk" ? "Ešte nie v ponuke" : "Not yet listed", color: COMING },
+    /* Colours are this map's own; the WORDS come from the one place that knows them.
+       "R" here deliberately covers R and PR together — a legend with four buckets is
+       read at a glance and a fifth would not be. */
+    { key: "V", label: statusLabel("V", lang, "many"), color: greenInk },
+    { key: "P", label: statusLabel("P", lang, "many"), color: orangeInk },
+    { key: "R", label: statusLabel("R", lang, "many"), color: "#888" },
+    { key: "N", label: statusLabel("Ešte nie v ponuke", lang, "many"), color: COMING },
   ];
   const countOf = (key) => points.reduce((n, p) => n + (catKeyOf(p.stav) === key ? 1 : 0), 0);
   const presentCats = CATS.map(c => ({ ...c, count: countOf(c.key) })).filter(c => c.count > 0);

@@ -37,6 +37,7 @@
  *      who paste comparables into their own reports
  */
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { statusLabel } from "../lib/unitStatus";
 import Picker from "../components/Picker";
 import { useProjects, useUnitSummaries, useUnitHistories, useUnitSearch, useProjectUnitsSeries, useArchiveMonths } from "../lib/useData";
 import { useAccountPrefState } from "../lib/useAccountUiPref";
@@ -820,7 +821,7 @@ function ChartCard({ pickedHistories, comparables, yMode, setYMode, lang }) {
   // statuses that actually occur in the picked units (so the key shows nothing
   // irrelevant). hasStatusChange → whether any unit ever changed status (the
   // dashed ring on the line marks those points).
-  const stavLbl = (s) => (({ V: ["Voľný", "Available"], R: ["Rezervovaný", "Reserved"], PR: ["Predrezervovaný", "Pre-reserved"], P: ["Predaný", "Sold"], "Ešte nie v ponuke": ["Ešte nie v ponuke", "Not yet listed"], ERROR: ["Chyba", "Error"] }[s] || [])[lang === "sk" ? 0 : 1]) || s;
+  const stavLbl = (s) => statusLabel(s, lang, "one");   // one unit, so the singular
   const presentStavs = ["V", "R", "PR", "P", "Ešte nie v ponuke", "ERROR"].filter(s => pickedHistories.some(h => h.rows.some(r => r.stav === s)));
   const hasStatusChange = pickedHistories.some(h => new Set(h.rows.map(r => r.stav)).size > 1);
 
