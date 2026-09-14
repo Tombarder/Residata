@@ -35,3 +35,50 @@ export function isHomeUnit(typ) {
   if (typ == null || typ === "") return true;
   return HOME_UNIT_TYPES.has(String(typ).trim().toLowerCase());
 }
+
+/* ── What the kind is CALLED on screen ──────────────────────────────────────
+ *
+ * The codes above are the scraper's vocabulary and belong in the database. On a page
+ * they are not an answer: the Unit database's Typ column printed "flat" and
+ * "parking_garage" verbatim into a Slovak UI, and Sales did the same.
+ *
+ * Every kind that exists in the live catalogue is here (measured 2026-09-14):
+ *   flat 3 075 211 · apartment 164 426 · (null) 36 052 · other 20 477 · studio 19 256
+ *   house 16 709 · retail 15 452 · office 4 628 · semi-detached house 1 761
+ *   parking 1 476 · land 830 · storage 750 · parking_garage 530
+ * plus parking_outside, which the vocabulary defines and no project uses yet.
+ *
+ * Two renderings were chosen deliberately rather than by dictionary:
+ *
+ *  · `studio` is NOT "garsónka". A garsónka is one room with no separate kitchen;
+ *    these rows carry 1–2 rooms and 32–64 m², so they are studio/apartmán units and
+ *    calling them garsónky would assert something the data does not say.
+ *  · `apartment` stays "Apartmán", which in SK/CZ is a distinct legal category from a
+ *    byt — not a synonym — and collapsing the two would erase a real distinction.
+ *
+ * An UNKNOWN kind is returned unchanged, never blanked: a kind nobody has labelled is
+ * a question about the parser, and "—" is how it stays unasked.
+ */
+const KIND_LABELS = {
+  flat:                   ["Byt", "Flat"],
+  apartment:              ["Apartmán", "Apartment"],
+  studio:                 ["Štúdio", "Studio"],
+  house:                  ["Dom", "House"],
+  "semi-detached house":  ["Dvojdom", "Semi-detached house"],
+  parking_garage:         ["Garážové státie", "Garage space"],
+  parking_outside:        ["Vonkajšie parkovanie", "Outdoor parking"],
+  parking:                ["Parkovanie", "Parking"],
+  storage:                ["Pivnica / kobka", "Storage"],
+  retail:                 ["Obchodný priestor", "Retail"],
+  office:                 ["Kancelária", "Office"],
+  land:                   ["Pozemok", "Land"],
+  other:                  ["Iné", "Other"],
+};
+
+/** The human name for a unit kind. An unstated kind on a price list is a flat —
+ *  the same reading `isHomeUnit` and `reference.is_home_type()` already take. */
+export function unitKindLabel(typ, lang = "sk") {
+  if (typ == null || typ === "") return lang === "sk" ? "Byt" : "Flat";
+  const hit = KIND_LABELS[String(typ).trim().toLowerCase()];
+  return hit ? hit[lang === "sk" ? 0 : 1] : String(typ);
+}

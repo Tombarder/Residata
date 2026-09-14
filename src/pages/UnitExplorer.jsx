@@ -11,6 +11,7 @@ import { useCurrency } from "../lib/useCurrency";
 import { moneyFromEur, moneySymbol, formatMoney, formatPerM2 } from "../lib/money";
 import { formatDimNumber } from "../lib/locale";
 import { statusLabel } from "../lib/unitStatus";
+import { unitKindLabel } from "../lib/unitKinds";
 import { useUnitsInfinite, useAnalyticsRegistry, usePivotDistinct } from "../lib/useData";
 import { useAccountPrefState } from "../lib/useAccountUiPref";
 import { EMPTY_SENTINEL, MODE_LABEL, capabilitiesOf, newFilter, sanitizeFilter,
@@ -69,6 +70,7 @@ function fmtVal(key, val, fmtByKey, numeric, lang) {
   /* "V" told the reader nothing. The scraper's codes are right in the database and wrong
      on a page; each row here is ONE flat, so it takes the singular. */
   if (key === "stav") return statusLabel(val, lang, "one");
+  if (key === "typ") return unitKindLabel(val, lang);
   return String(val);
 }
 
@@ -205,17 +207,25 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
       enabled, field: key, mode,
       city: key === "cast" ? (cityScope || null) : null,
     });
-    /* The value list came straight from the grain, so a room filter offered "1.0" and
-       "2.0" while the column beside it said 1 and 2. The ENGINE still receives the stored
-       value — only the label is tidied, which is why these go out as {value,label}. */
+    /* The value list comes straight from the grain, so it speaks the DATABASE's words: a
+       room filter offered "1.0" and "2.0" beside a column reading 1 and 2, and a type
+       filter offered "flat" and "parking_garage" beside one reading Byt and Garážové
+       státie. A filter that names its values differently from the column it filters is
+       two vocabularies in one panel. The ENGINE still receives the stored value — only
+       the label is tidied, which is why these go out as {value,label} pairs. */
     const numeric = fields.find((f) => f.key === key)?.type === "numeric";
+    const label = numeric ? (v) => String(formatDimNumber(v))
+      : key === "typ" ? (v) => unitKindLabel(v, lang)
+      : key === "stav" ? (v) => statusLabel(v, lang, "one")
+      : null;
+    /* Keyed on primitives, not on `label` — a fresh arrow every render would rebuild the
+       array every render and the memo would be decoration. */
     return useMemo(() => {
-      if (!numeric) return res;
-      return { ...res, values: (res.values || []).map((v) => {
-        if (v && typeof v === "object") return v;
-        return { value: v, label: String(formatDimNumber(v)) };
-      }) };
-    }, [res, numeric]);
+      if (!label) return res;
+      return { ...res, values: (res.values || []).map((v) => (
+        v && typeof v === "object" ? v : { value: v, label: label(v) }
+      )) };
+    }, [res, key, lang, numeric]);   // eslint-disable-line react-hooks/exhaustive-deps
   };
 
   const cityScope = useMemo(() => {

@@ -18,6 +18,7 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import { useCurrency } from "../lib/useCurrency";
 import { moneyFromEur, moneySymbol, moneyToEur, formatMoney, formatPerM2 } from "../lib/money";
 import { formatDimNumber } from "../lib/locale";
+import { unitKindLabel } from "../lib/unitKinds";
 import { useSales } from "../lib/useData";
 import { useCountry, isAllCountries } from "../lib/useCountry";
 import { useAccountPrefState } from "../lib/useAccountUiPref";
@@ -169,7 +170,7 @@ function fmtRange(kind, r, lang) {
 
 const fmtMoney = formatMoney;   // "204 342 €", never "€204 342" — see money.js
 
-function fmtCell(kind, v, lang) {
+function fmtCell(kind, v, lang, key) {
   if (v == null || v === "") return "—";
   const n = Number(v);
   if (kind === "eur") return fmtMoney(v);
@@ -179,6 +180,7 @@ function fmtCell(kind, v, lang) {
   /* A numeric column arrives from Postgres as a STRING, so String(v) printed "6.0" for a
      room count — and this page said "1.5" where the Unit database said "1,5" for the same
      flat. Both read locale.js now. */
+  if (key === "typ") return unitKindLabel(v, lang);   // "flat" is the scraper's word, not a reader's
   if (kind === "num") return String(formatDimNumber(v));
   return String(v);
 }
@@ -440,6 +442,7 @@ export default function SalesView({ lang = "sk" }) {
      flat. The label is tidied, the VALUE sent to the engine is untouched. */
   const prettyValue = (key) => {
     if (key === "detection_method") return (v) => (v === "marked" ? t("označené", "marked") : v === "disappeared" ? t("zmizol", "delisted") : v);
+    if (key === "typ") return (v) => unitKindLabel(v, lang);
     /* Was `String(v).replace(/\.0$/, "")` — which tidied "6.0" but left "2.5" with a DOT,
        so this page and the Unit database printed the same room count two different ways.
        One formatter now, in locale.js. */
@@ -799,8 +802,8 @@ export default function SalesView({ lang = "sk" }) {
                             ? <span title={t("Skutočný čas na trhu zatiaľ nevieme", "True days-on-market not known yet")} style={{ color: "var(--text-faint)" }}>—</span>
                             : r.left_censored
                               ? <span title={t("Merané od prvého zachytenia — byt bol v ponuke už keď sme začali sledovať, skutočný čas môže byť dlhší", "Measured from first sight — the unit was already listed when tracking began, so the true figure may be longer")}>≥ {Math.round(r.days_on_market)}</span>
-                              : fmtCell(c[3], r.days_on_market, lang))
-                        : fmtCell(c[3], r[c[0]], lang)}
+                              : fmtCell(c[3], r.days_on_market, lang, c[0]))
+                        : fmtCell(c[3], r[c[0]], lang, c[0])}
                       {isKey ? <SpecificsMark items={spec.project(r.project_id || r.project_name)} lang={lang} /> : null}
                       {c[0] === "price_per_m2_eur" ? <UnitPriceMarks items={spec.unit(r, r.project_id || r.project_name)} lang={lang} /> : null}
                     </td>;

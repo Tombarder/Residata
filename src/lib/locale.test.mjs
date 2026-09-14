@@ -31,3 +31,36 @@ test("a non-number passes through untouched, so text dimensions are safe", () =>
   assert.equal(formatDimNumber(null), null);
   assert.equal(formatDimNumber(undefined), undefined);
 });
+
+/* byLabel — ordering a filter's value list by what the READER sees.
+ * Written after labelling the values scrambled the order: "Garážové státie" landed
+ * between Parkovanie and Obchodný priestor, alphabetical in the DATABASE's vocabulary. */
+import { byLabel } from "./locale.js";
+
+const order = (labels, lang = "sk") =>
+  labels.map((label) => ({ label })).sort(byLabel(lang)).map((o) => o.label);
+
+test("numbers sort as NUMBERS — a floor list runs -2 to 44", () => {
+  assert.deepEqual(order(["10", "2", "1", "44", "0", "-1", "-2", "36"]),
+    ["-2", "-1", "0", "1", "2", "10", "36", "44"]);
+});
+
+test("a half room sits between its neighbours, not after them", () => {
+  assert.deepEqual(order(["2", "1,5", "1", "2,5", "3"]), ["1", "1,5", "2", "2,5", "3"]);
+});
+
+test("Slovak diacritics sort where a Slovak reader looks for them", () => {
+  // Č after C, before D — a plain a<b comparison puts Č after Z.
+  const out = order(["Dom", "Časť", "Byt", "Apartmán"]);
+  assert.deepEqual(out, ["Apartmán", "Byt", "Časť", "Dom"]);
+});
+
+test("the labelled unit kinds come out alphabetically", () => {
+  assert.deepEqual(
+    order(["Parkovanie", "Garážové státie", "Byt", "Obchodný priestor", "Apartmán"]),
+    ["Apartmán", "Byt", "Garážové státie", "Obchodný priestor", "Parkovanie"]);
+});
+
+test("mixed numbers and text do not throw", () => {
+  assert.equal(order(["5", "Bratislava", "1"]).length, 3);
+});

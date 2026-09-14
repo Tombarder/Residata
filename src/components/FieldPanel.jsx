@@ -19,6 +19,7 @@ import { field as sharedField } from "../lib/controls";
 import DateField from "./DateField";
 import { accent as green, accentInk, orange, dim, border, bg, surfacePanel as panelHi, text } from "../lib/theme";
 import { EMPTY_SENTINEL, MODE_LABEL, isFilterActive } from "../lib/filterModel";
+import { byLabel } from "../lib/locale";
 
 const mono = "'JetBrains Mono', ui-monospace, Menlo, monospace";
 const panel = "var(--surface-2)";
@@ -114,8 +115,14 @@ function FilterCard({ f, field, caps, unit, lang, sel, useValues, onPatch, onRem
                  exists because the stored value is not always the readable one: a sale
                  signal is "marked", and a numeric room count comes back as "2.0" — nobody
                  asks for a 2.0-room flat. The VALUE sent to the engine is never touched. */
+              /* Sorted by what the READER sees, not by the stored value. The source hands
+                 these back in the database's order, so once labels arrived "Garážové
+                 státie" sat between Parkovanie and Obchodný priestor — alphabetical in a
+                 vocabulary nobody on this page is reading. localeCompare so Č sorts after
+                 C and before D, which "a < b" does not do. */
               ...(distinct.values || []).map((v) => (v && typeof v === "object" ? v : { value: v, label: String(v) }))
-                   .filter((o) => !(f.values || []).includes(o.value)),
+                   .filter((o) => !(f.values || []).includes(o.value))
+                   .sort(byLabel(lang)),
             ]} />
           {(f.values || []).length > 0 && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: "0.22rem", marginTop: "0.3rem" }}>

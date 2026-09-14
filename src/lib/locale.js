@@ -79,3 +79,25 @@ export function formatDimNumber(v) {
   const n = Number(v);
   return Number.isFinite(n) ? n.toLocaleString("sk-SK", { maximumFractionDigits: 2 }) : String(v);
 }
+
+/* Ordering a value list by its LABEL, which is what the reader is scanning.
+ *
+ * Numbers first, as numbers: a floor list runs −2 to 44 and a text sort puts 10 between
+ * 1 and 2 and −1 before −2. Intl's `numeric` collation gets the first of those right and
+ * the second wrong — it reads "-" as punctuation, not as a sign — so a real numeric
+ * comparison runs first and the collator only handles what is not a number.
+ *
+ * Slovak collation for the rest, so Č sorts after C rather than after Z. */
+const asNumber = (x) => {
+  const n = Number(String(x).replace(",", ".").replace(/\s/g, ""));
+  return Number.isFinite(n) ? n : null;
+};
+export const byLabel = (lang) => {
+  const collator = new Intl.Collator(lang === "sk" ? "sk" : "en", { numeric: true });
+  return (a, b) => {
+    const na = asNumber(a.label), nb = asNumber(b.label);
+    if (na !== null && nb !== null) return na - nb;
+    return collator.compare(String(a.label), String(b.label));
+  };
+};
+
