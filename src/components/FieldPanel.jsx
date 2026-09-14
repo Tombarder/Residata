@@ -211,10 +211,9 @@ export default function FieldPanel({
   const typeColor = (ty) => (ty === "numeric" ? orange : green);
 
   return (
-        <aside style={{
-          width: 340, flexShrink: 0, position: "sticky", top: "0.5rem", alignSelf: "flex-start",
+        <aside className="rd-workbench__panel" style={{
           background: panel, border: `1px solid ${border}`, borderRadius: 10,
-          display: "flex", flexDirection: "column", height: "calc(100vh - 150px)", minHeight: 420, overflow: "hidden",
+          display: "flex", flexDirection: "column", overflow: "hidden",
         }}>
           {/* tabs */}
           <div style={{ display: "flex", borderBottom: `1px solid ${border}`, flexShrink: 0 }}>

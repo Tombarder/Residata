@@ -348,8 +348,8 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
       </div>
 
       {/* two-column: main (filters + table) | palette */}
-      <div style={{ display: "flex", gap: "0.9rem", alignItems: "flex-start" }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
+      <div className="rd-workbench">
+        <div className="rd-workbench__main">
           {/* Query bar. The CONTROLS moved to the right-hand panel; what stays here is a
               readable statement of the query that is running, so the filter set is visible
               even while the panel is showing columns. Each chip removes its own filter. */}

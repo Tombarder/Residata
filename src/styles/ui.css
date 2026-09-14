@@ -328,6 +328,19 @@ input[type="checkbox"], input[type="radio"] { width: 15px; height: 15px; cursor:
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
 }
+/* A headline number must not be cut in half. It cannot wrap — the Slovak formatter
+   groups thousands with a NON-BREAKING space, so "€323 438 840" is one unbreakable
+   word — and the card clips its overflow, so on a phone the sold-value KPI simply
+   lost its last digits with nothing to show it had. Found at 390px, where the value
+   wanted 176px in a 155px card. The card gets narrower on small screens, so the
+   figure in it gets smaller too. */
+@media (max-width: 900px) {
+  .rd-kpi__val { font-size: 1.3rem; }
+}
+@media (max-width: 560px) {
+  .rd-kpi { padding: 0.7rem 0.7rem 0.75rem 0.85rem; }
+  .rd-kpi__val { font-size: 1.12rem; letter-spacing: -0.02em; }
+}
 .rd-kpi__sub {
   margin-top: 0.3rem;
   font-family: var(--font-mono);
@@ -513,4 +526,41 @@ input[type="checkbox"], input[type="radio"] { width: 15px; height: 15px; cursor:
 
   /* Where it came from, on the paper. */
   .rd-analysis a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 0.75em; color: #6b7280; }
+}
+
+/* ── WORKBENCH: a table beside the field panel ───────────────────────────────
+   Used by the Unit database and Sales. It lives here rather than inline because
+   the important half is a MEDIA QUERY, and an inline style cannot hold one — the
+   first version was inline, so on a 375px phone the 340px panel simply took the
+   room and the content column was squeezed to TWENTY-ONE PIXELS. The table was
+   effectively gone and nothing said why.
+
+   Below 900px the two stack: the panel goes full width under the content and
+   stops being sticky (a sticky element taller than the viewport just fights the
+   scroll), capped so it cannot bury the table it belongs to. */
+.rd-workbench { display: flex; gap: 0.9rem; align-items: flex-start; }
+.rd-workbench__main { flex: 1; min-width: 0; }
+.rd-workbench__panel {
+  width: 340px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0.5rem;
+  align-self: flex-start;
+  height: calc(100vh - 150px);
+  min-height: 420px;
+}
+@media (max-width: 900px) {
+  /* 🔴 align-items means the CROSS axis, so the flex-start that keeps the panel from
+     stretching to the table's height in a row becomes "size to your content" once the
+     direction flips — the content column grew to its widest table (1 202px inside a 375px
+     phone) and the whole page scrolled sideways. Stretch is what stacking wants. */
+  .rd-workbench { flex-direction: column; align-items: stretch; }
+  .rd-workbench__main { width: 100%; min-width: 0; }
+  .rd-workbench__panel {
+    width: 100%;
+    position: static;
+    height: auto;
+    min-height: 0;
+    max-height: 70vh;
+  }
 }

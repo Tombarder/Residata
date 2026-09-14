@@ -566,8 +566,8 @@ export default function SalesView({ lang = "sk" }) {
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: "0.9rem", alignItems: "flex-start" }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
+      <div className="rd-workbench">
+        <div className="rd-workbench__main">
       {/* KPI row */}
       {sum.error ? <LoadError lang={lang} /> : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(172px, 1fr))", gap: "0.7rem", marginBottom: "0.7rem" }}>
