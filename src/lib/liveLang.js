@@ -37,7 +37,7 @@ export const liveT = {
     tbl_units: "Units",
     tbl_available: "Available",
     tbl_sold: "Sold",
-    tbl_sold_pct: "Sold %",
+    tbl_sold_pct: "Taken %",     // sold + reserved + pre-reserved — NOT sold alone
     tbl_eur_m2: "€/m²",
     tbl_sold_30d: "Sold 30d",
     tbl_sold_30d_tooltip_paid: "Units sold in the last 30 days — key sales velocity metric",
@@ -192,8 +192,9 @@ export const liveT = {
     tbl_district: "Okres",
     tbl_units: "Bytov",
     tbl_available: "Voľné",
-    tbl_sold: "Vypredané",
-    tbl_sold_pct: "% predané",
+    tbl_sold: "Predané",        // a COUNT of sold flats. "Vypredané" is the sold-OUT project status — a different thing, and it was on both.
+
+    tbl_sold_pct: "% obsadené",  // predané + rezervované + predrezervované — NIE len predané
     tbl_eur_m2: "€/m²",
     tbl_sold_30d: "Predané 30d",
     tbl_sold_30d_tooltip_paid: "Predané byty za posledných 30 dní — kľúčový ukazovateľ rýchlosti predaja",
