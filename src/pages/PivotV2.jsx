@@ -1433,6 +1433,46 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   // Drill-down modal: clicked cell → shows underlying records
   const [drillDown, setDrillDown] = useState(null);
 
+  /* ── FOCUS MODE ────────────────────────────────────────────────────────────
+     A wide cross-tab does not fit in a 720px-tall panel inside a scrolling page,
+     and reading one while the page scrolls underneath is the worst of both.
+     Boss asked for the table at full size (2026-09-14): "cez celú časť obrazovky
+     ktorá patrí platforme".
+
+     Five patterns are in use across analytics tools, and they are not equal here:
+       1. Browser fullscreen (requestFullscreen) — Tableau. Takes the whole
+          monitor, drops the app chrome, and an Escape lands you somewhere that
+          no longer looks like the product. Too much.
+       2. Pop out into a new window — Power BI. Great for two monitors, but it
+          needs a second React root and its own auth/session story for one table.
+       3. Drag-to-resize the panel — Hex, Observable. Infinitely adjustable and
+          therefore never right; the user does work the app should have done.
+       4. Collapse the surrounding chrome — Notion, Linear. Reversible and cheap,
+          but it hides the navigation the user needs to leave the page.
+       5. FOCUS MODE — expand the panel to fill the app's own content area,
+          keeping the sidebar and the top bar. Power BI's Focus mode, Grafana's
+          view-panel, Metabase's maximise. This is the one Boss described, and
+          the one that never loses the user: the product is still visibly around
+          the table, Escape always returns, and nothing about the layout has to
+          be re-learned.
+     So: (5). It anchors to --platform-content-left (published by Platform.jsx)
+     and --platform-topbar-h (measured there, because the bar's height changes
+     with viewport and font size). */
+  const [expanded, setExpanded] = useState(false);
+  useEffect(() => {
+    if (!expanded) return;
+    const onKey = (e) => { if (e.key === "Escape") setExpanded(false); };
+    // The page behind must not scroll while the panel owns the screen — otherwise
+    // closing focus mode drops you somewhere you never scrolled to.
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [expanded]);
+
   // Palette "used" greying: a field is "in use" only when it's in Rows,
   // Cols or Values. Being in Filters doesn't count — because Filters
   // coexist with any of those (user might want cena in Values AND in
@@ -1837,12 +1877,21 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
           the app needs it; inline keeps it co-located with the component
           that triggers the animation. */}
       <style>{`
+        /* Every background a row cell can take mixes against --pv-row-bg, the row's
+           own opaque base, never against transparent. A frozen column is only frozen
+           if it is OPAQUE — the moment one of these states goes translucent, the
+           columns scrolling beneath show through it. */
         @keyframes pivotFlash {
-          0%   { background-color: color-mix(in srgb, var(--accent) 0%, transparent); box-shadow: inset 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent); }
-          15%  { background-color: color-mix(in srgb, var(--accent) 32%, transparent); box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 65%, transparent); }
-          100% { background-color: color-mix(in srgb, var(--accent) 0%, transparent); box-shadow: inset 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent); }
+          0%   { background-color: color-mix(in srgb, var(--accent) 0%, var(--pv-row-bg, var(--surface-2))); box-shadow: inset 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent); }
+          15%  { background-color: color-mix(in srgb, var(--accent) 32%, var(--pv-row-bg, var(--surface-2))); box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 65%, transparent); }
+          100% { background-color: color-mix(in srgb, var(--accent) 0%, var(--pv-row-bg, var(--surface-2))); box-shadow: inset 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent); }
         }
         .pivot-flash > td { animation: pivotFlash 1.6s ease-out; }
+        /* Hover lives here rather than in two inline JS handlers, so the row and its
+           frozen cells are painted by ONE rule and cannot drift apart. */
+        .pivot-row-int:hover > td {
+          background-color: color-mix(in srgb, var(--accent) 11%, var(--pv-row-bg, var(--surface-2)));
+        }
         @keyframes pivotCellFlash {
           0%   { box-shadow: inset 0 0 0 0 ${green}, 0 0 0 ${green}; outline-color: color-mix(in srgb, var(--accent) 0%, transparent); }
           15%  { box-shadow: inset 0 0 0 2px ${green}, 0 0 12px color-mix(in srgb, var(--accent) 55%, transparent); outline-color: ${green}; }
@@ -1885,6 +1934,43 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
         }
         /* The pivot's own horizontal scrollbar — visible enough to be found,
            quiet enough not to compete with the data. */
+        /* FOCUS MODE — the table fills the app's own content area: from the right
+           edge of the sidebar to the right edge of the window, from under the top
+           bar to the bottom. Both offsets are read from variables the shell
+           publishes (--platform-content-left is a constant there,
+           --platform-topbar-h is MEASURED), so the panel stays glued to the chrome
+           when the bar wraps to two lines or the user changes their font size.
+           z-index sits above page content and the sticky top bar, below the
+           sidebar (50) — navigation stays reachable, which is the whole reason
+           this is focus mode and not browser fullscreen. */
+        .pivot-focus.is-on {
+          position: fixed;
+          left: var(--platform-content-left, 0px);
+          top: var(--platform-topbar-h, 86px);
+          right: 0; bottom: 0;
+          z-index: 45;
+          background: var(--bg);
+          padding: 0.75rem 1rem 1rem;
+          display: flex; flex-direction: column; gap: 0.5rem;
+          animation: pivotFocusIn 0.16s ease-out;
+        }
+        /* Opacity only — deliberately NO transform. A transform on a
+           position:fixed element re-anchors it to itself, so the panel came up
+           4px inside the content area on every edge instead of flush against the
+           sidebar and the top bar; and because React re-renders restart the
+           animation, the scale kept being re-applied rather than settling. */
+        @keyframes pivotFocusIn { from { opacity: 0; } to { opacity: 1; } }
+        @media (prefers-reduced-motion: reduce) { .pivot-focus.is-on { animation: none; } }
+        .pivot-focus.is-on .pivot-scroll { border-radius: 10px; }
+        .pivot-focus-bar {
+          display: flex; align-items: center; justify-content: space-between;
+          gap: 1rem; flex: none;
+        }
+        /* On a phone the sidebar is already off-canvas, so focus mode simply
+           takes the screen below the bar. */
+        @media (max-width: 840px) {
+          .pivot-focus.is-on { left: 0; padding: 0.5rem 0.6rem 0.7rem; }
+        }
         .pivot-scroll { --pv-label-w: 300px; --pv-count-w: 96px; scrollbar-width: thin; }
         .pivot-scroll::-webkit-scrollbar { height: 10px; width: 10px; }
         .pivot-scroll::-webkit-scrollbar-thumb {
@@ -2160,6 +2246,28 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
         </div>
       )}
 
+      <div className={expanded ? "pivot-focus is-on" : "pivot-focus"}>
+        {expanded && (
+          <div className="pivot-focus-bar">
+            <div style={{ display: "flex", alignItems: "baseline", gap: "0.6rem", minWidth: 0 }}>
+              <span style={{ fontFamily: mono, fontSize: "0.62rem", letterSpacing: "0.12em",
+                             textTransform: "uppercase", color: accentInk }}>
+                {lang === "sk" ? "Tabuľka na celú plochu" : "Table in focus"}
+              </span>
+              <span style={{ fontSize: "0.72rem", color: "var(--text-2)", overflow: "hidden",
+                             textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {[...rows, ...cols].map((k) => fieldLabel(k, lang)).join(" · ")}
+              </span>
+            </div>
+            <button type="button" className="btn-s" onClick={() => setExpanded(false)}
+                    title={lang === "sk" ? "Zavrieť (Esc)" : "Close (Esc)"}>
+              {lang === "sk" ? "Zavrieť" : "Close"}
+              <kbd style={{ marginLeft: "0.45rem", fontFamily: mono, fontSize: "0.6rem",
+                            opacity: 0.7, border: `1px solid ${border}`, borderRadius: 4,
+                            padding: "0 0.3rem" }}>Esc</kbd>
+            </button>
+          </div>
+        )}
       <ResultTable
         rowFields={rows}
         colFields={cols}
@@ -2171,6 +2279,8 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
         grandTotal={sortedTree}
         valueMode={valueMode}
         dataBars={dataBars}
+        expanded={expanded}
+        onToggleExpand={() => setExpanded((v) => !v)}
         onDrillDown={async (node) => {
           const title = node.path.length ? node.path.join(" › ") : (lang === "sk" ? "Všetky záznamy" : "All records");
           // Record-mode node already carries its records (non-serverable config).
@@ -2224,6 +2334,7 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
         onProjectOpen={setCurrent ? (projectId) => setCurrent(`App:ProjectDetail:${projectId}`) : undefined}
         lang={lang}
       />
+      </div>
 
       {/* Chart panel — derived from the same tree as the table.
           Always rendered (even with no rows) so the user can discover
@@ -3192,7 +3303,7 @@ function stavSplitOf(n) {
 }
 
 /* ─── RESULT TABLE ────────────────────────────────────────────── */
-function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, collapsed: _collapsed, onToggle, sort, setSort, grandTotal, lang, valueMode = "raw", dataBars = false, onDrillDown, onProjectOpen }) {
+function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, collapsed: _collapsed, onToggle, sort, setSort, grandTotal, lang, valueMode = "raw", dataBars = false, onDrillDown, onProjectOpen, expanded = false, onToggleExpand }) {
   const spec = useSpecifics(lang);
   // Project-name column support:
   // When the deepest row field is project_name, rows ARE individual
@@ -3368,9 +3479,26 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
   })();
 
   return (
+    <>
+    {onToggleExpand && !expanded && (
+      /* The affordance sits directly above the panel it grows, which is where
+         Power BI, Grafana and Metabase all put it — never buried in a menu. */
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.4rem" }}>
+        <button type="button" className="btn-s" onClick={onToggleExpand}
+                title={lang === "sk" ? "Roztiahnuť tabuľku na celú plochu" : "Expand the table to fill the workspace"}>
+          <span aria-hidden="true" style={{ marginRight: "0.4rem" }}>⤢</span>
+          {lang === "sk" ? "Na celú plochu" : "Expand"}
+        </button>
+      </div>
+    )}
     <div className="pivot-scroll" style={{
       border: `1px solid ${border}`, borderRadius: 8, overflow: "auto",
-      background: panel, maxHeight: 720,
+      background: panel,
+      // In focus mode the panel owns the whole content area, so the height cap
+      // that keeps it polite inside a scrolling page would defeat the point.
+      maxHeight: expanded ? "none" : 720,
+      flex: expanded ? 1 : undefined,
+      minHeight: expanded ? 0 : undefined,
       // The scroll stays inside this panel: the page never gains a sideways
       // scrollbar because a pivot grew a 40th column.
       overscrollBehaviorX: "contain",
@@ -3425,9 +3553,25 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                 {sortIndicator("label")}
               </div>
             </th>
+            {/* The count column carries a second line under the total: on offer ·
+                sold. Those two numbers used to appear with no label anywhere and
+                only on the rows where something was marked sold, so they read as
+                two mystery figures that some rows had and others did not (Boss,
+                2026-09-14). They are now on every row and the header says what they
+                are — and says "v cenníku", because that is the honest scope: this
+                tool counts what the developer's price list SAYS today. A developer
+                who deletes a flat when it sells shows 0 here forever, which is why
+                real sales live on Predaje. */}
             <th style={{ ...th, ...stickyLeft("count", 5, "var(--surface-2)"), top: row2Top, textAlign: "right", cursor: "pointer" }}
-                onClick={() => clickSort("count")}>
+                onClick={() => clickSort("count")}
+                title={lang === "sk"
+                  ? "Počet bytov v skupine. Pod ním: koľko je v ponuke (voľné + rezervované) a koľko je v cenníku označených ako predané. Skutočné predaje — vrátane bytov, ktoré developer z cenníka zmazal — sú v Analytika → Predaje."
+                  : "Flats in this group. Below: how many are on offer (available + reserved) and how many the price list marks as sold. Real sales — including flats the developer deleted from the list — live in Analytics → Sales."}>
               #{sortIndicator("count")}
+              <div style={{ fontSize: "0.52rem", fontWeight: 400, letterSpacing: "0.02em",
+                            color: "var(--text-2)", opacity: 0.75, marginTop: 1, whiteSpace: "nowrap" }}>
+                {lang === "sk" ? "v ponuke · predané" : "on offer · sold"}
+              </div>
             </th>
             {crossTab ? (
               <>
@@ -3518,10 +3662,20 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                 className={rowInteractive ? "pivot-row-int" : undefined}
                 onClick={rowAction}
                 title={canOpenProject ? (lang === "sk" ? `Otvoriť projekt ${n.label}` : `Open project ${n.label}`) : undefined}
-                onMouseEnter={rowInteractive ? (e) => { e.currentTarget.style.background = "color-mix(in srgb, var(--accent) 11%, transparent)"; } : undefined}
-                onMouseLeave={rowInteractive ? (e) => { e.currentTarget.style.background = baseBg; } : undefined}
+                /* 🔴 THE ROW'S BASE COLOUR IS PUBLISHED, NOT JUST PAINTED, and every
+                   transient state mixes AGAINST it. Hover used to be set here in JS as
+                   color-mix(--accent 11%, TRANSPARENT); the frozen name/count cells take
+                   their background from the row, so on hover they became 89% see-through
+                   and the columns scrolling underneath showed straight through them
+                   (Boss, 2026-09-14 — visible the moment you scroll right and hover).
+                   Resting rows were opaque, which is why it only ever appeared on hover.
+                   Mixing against --pv-row-bg instead of transparent keeps every state
+                   opaque AND preserves the zebra stripe under the tint. The hover itself
+                   now lives in CSS (.pivot-row-int:hover > td) so the row and its frozen
+                   cells can never disagree about what colour they are. */
                 style={{
-                  background: baseBg,
+                  "--pv-row-bg": baseBg,
+                  background: "var(--pv-row-bg)",
                   transition: "background 0.12s",
                 }}>
                 <td style={{
@@ -3585,10 +3739,18 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                   {n.count.toLocaleString("en-US").replace(/,/g, " ")}
                   {(() => {
                     const sp = stavSplitOf(n);
-                    if (!sp || sp.sold <= 0) return null;
+                    // Shown on EVERY row that has a stav breakdown, including the
+                    // rows where nothing is marked sold. It used to be hidden when
+                    // sold was 0, which made the split look arbitrary — and worse,
+                    // silence and "nothing sold" became indistinguishable. A zero
+                    // here is a real statement about the price list and the header
+                    // says so.
+                    if (!sp || (sp.offer <= 0 && sp.sold <= 0)) return null;
                     const f = (x) => x.toLocaleString("en-US").replace(/,/g, " ");
                     return (
-                      <div title={lang === "sk" ? `${f(sp.offer)} v ponuke · ${f(sp.sold)} predaných` : `${f(sp.offer)} on offer · ${f(sp.sold)} sold`}
+                      <div title={lang === "sk"
+                             ? `${f(sp.offer)} v ponuke · ${f(sp.sold)} v cenníku označených ako predané`
+                             : `${f(sp.offer)} on offer · ${f(sp.sold)} marked sold on the price list`}
                            style={{ fontSize: "0.58rem", fontWeight: 400, marginTop: 1, whiteSpace: "nowrap" }}>
                         <span style={{ color: accentInk }}>{f(sp.offer)}</span>
                         <span style={{ opacity: 0.4 }}> · </span>
@@ -3749,6 +3911,7 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
         </tbody>
       </table>
     </div>
+    </>
   );
 }
 
@@ -3810,7 +3973,13 @@ const stickyLeft = (which, zBase, opaque) => {
     position: "sticky",
     left: isCount ? "var(--pv-label-w)" : 0,
     zIndex: zBase,
-    background: opaque || "inherit",
+    // 🔴 NEVER `inherit` here. A frozen column is only frozen while it is OPAQUE,
+    // and `inherit` faithfully copies whatever the row is — including a translucent
+    // hover tint, which turns the frozen pair into a window onto the columns
+    // scrolling underneath. --pv-row-bg is the row's opaque base and always resolves
+    // to a solid colour; the surface-2 fallback covers the header rows, which set
+    // their own `opaque` anyway.
+    background: opaque || "var(--pv-row-bg, var(--surface-2))",
     width: w, minWidth: w, maxWidth: w,
     // Only the outer edge of the frozen pair casts the shadow that says
     // "there is more table to the right of this".
