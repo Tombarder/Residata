@@ -33,7 +33,7 @@ import { supabaseData } from "../lib/supabase";
 import { useCountry, isAllCountries, countryName } from "../lib/useCountry";
 import { useCurrency } from "../lib/useCurrency";
 import { moneyFromEur, moneySymbol } from "../lib/money";
-import { localeTag } from "../lib/locale";
+import { localeTag, formatPercent } from "../lib/locale";
 import { useActivateTrial } from "../lib/useActivateTrial";
 import {
   accent as green, accentInk, orange, blue, dim, faint, text as textLight, border,
@@ -52,13 +52,18 @@ const fmtCount = (v, lang) =>
 const fmtM2 = (eur, lang) =>
   (eur == null || Number.isNaN(Number(eur))) ? "—"
     : `${Math.round(moneyFromEur(Number(eur))).toLocaleString(localeTag(lang))} ${moneySymbol()}/m²`;
-const fmtPct = (v) => (v == null || !Number.isFinite(Number(v))) ? "—" : `${Math.round(Number(v))}%`;
+/* Decimals were built with toFixed all over this page, which is an English decimal
+   point — the KPI deltas read "5.6 pp" and "2.6 mes." under KPIs correctly reading
+   "7 127" and "4 723 €". SVG path coordinates keep toFixed: those are machine
+   numbers and MUST stay dot-decimal. */
+const dec1 = (v, lang) => Number(v).toLocaleString(localeTag(lang), { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const fmtPct = (v, lang) => (v == null || !Number.isFinite(Number(v))) ? "—" : formatPercent(Number(v), lang, 0);
 const fmtMonths = (m, lang) => {
   if (m == null || !Number.isFinite(m)) return "—";
   // Spelled out rather than "mes"/"r" — the unit now carries the whole meaning,
   // since the hint under it no longer repeats the word "mesiacov" (Boss).
-  if (m >= 24) return `~${(m / 12).toFixed(1)} ${L(lang, "rokov", "yr")}`;
-  return `~${m < 10 ? m.toFixed(1) : Math.round(m)} ${L(lang, "mesiacov", "mo")}`;
+  if (m >= 24) return `~${dec1(m / 12, lang)} ${L(lang, "rokov", "yr")}`;
+  return `~${m < 10 ? dec1(m, lang) : Math.round(m)} ${L(lang, "mesiacov", "mo")}`;
 };
 
 // ─── metric registry (shared by KPI strip + metric widget) ─────
@@ -93,7 +98,7 @@ const fmtMetric = (key, val, lang) => {
   const f = METRICS[key]?.fmt;
   if (f === "m2") return fmtM2(val, lang);
   if (f === "months") return fmtMonths(val, lang);
-  if (f === "pct") return fmtPct(val);
+  if (f === "pct") return fmtPct(val, lang);
   return fmtCount(val, lang);
 };
 
@@ -245,9 +250,9 @@ function DeltaChip({ delta, lang }) {
   const mag = Math.abs(delta.abs);
   let txt;
   if (delta.metric === "avg_m2") txt = `${Math.round(moneyFromEur(mag)).toLocaleString(localeTag(lang))} ${moneySymbol()}`;
-  else if (delta.metric === "sold_through") txt = `${mag.toFixed(1)} pp`;
+  else if (delta.metric === "sold_through") txt = `${dec1(mag, lang)}\u00A0pp`;
   // Inventory is months. "▲ 2" under a card reading "~16 mo" says nothing without it.
-  else if (delta.metric === "inventory") txt = `${mag < 10 ? mag.toFixed(1) : Math.round(mag)} ${L(lang, "mes.", "mo")}`;
+  else if (delta.metric === "inventory") txt = `${mag < 10 ? dec1(mag, lang) : Math.round(mag)} ${L(lang, "mes.", "mo")}`;
   else txt = fmtCount(Math.round(mag), lang);
   // The period is SPELLED OUT rather than left in a hover title (Boss): an arrow
   // and a number on their own say something changed but not since when, and a
