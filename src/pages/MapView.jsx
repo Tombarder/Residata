@@ -36,7 +36,7 @@ import { useProjects } from "../lib/useData";
 import { useAccountPrefState, useAccountHydrated } from "../lib/useAccountUiPref";
 import { useCountry } from "../lib/useCountry";
 import { useCurrency } from "../lib/useCurrency";
-import { moneyFromEur, moneySymbol } from "../lib/money";
+import { moneyFromEur, moneyToEur, moneySymbol, formatPerM2 } from "../lib/money";
 import { supabasePublic, isSupabaseReady } from "../lib/supabase";
 
 const mono = "'JetBrains Mono', monospace";
@@ -159,7 +159,7 @@ function showProjectPopup(map, lngLat, props, lang, onOpen, popupRef, specProjec
   const el = document.createElement("div");
   el.style.minWidth = "180px";
   const loc = [props.city, props.district].filter(Boolean).join(" · ");
-  const price = Number(props.ppm2) > 0 ? `${moneySymbol()}${Math.round(moneyFromEur(Number(props.ppm2))).toLocaleString("sk-SK")}/m²` : "—";
+  const price = Number(props.ppm2) > 0 ? formatPerM2(Number(props.ppm2)) : "—";
   // Everything unusual about this project, from the one place that decides it.
   // The map is where most people meet a project first, so an unlabelled 90/10
   // or bare-shell price here reads as an ordinary one.
@@ -303,6 +303,23 @@ export default function MapView({ lang = "en", setCurrent }) {
     [projects, fCity]
   );
   const developerOptions = useMemo(() => uniqueSorted((projects || []).map((p) => p.developer)), [projects]);
+  /* A typed money bound keeps its DIGITS when the currency changes, so "at least 6000"
+     silently became 6000 crowns — a quarter of what the user asked for — and the filter
+     did not even recompute, because its memo has no currency dependency. Convert the
+     bound so the question stays the same one; the state change re-runs the filter.
+     Same fix, same helper, as the Unit database. */
+  const rateRef = useRef(moneyFromEur(1) || 1);
+  useEffect(() => {
+    const rate = moneyFromEur(1) || 1;
+    const prev = rateRef.current;
+    rateRef.current = rate;
+    if (prev && rate && prev !== rate) {
+      const conv = (v) => (v === "" ? "" : String(Math.round(Number(v) * (rate / prev))));
+      setPriceMin((v) => conv(v));
+      setPriceMax((v) => conv(v));
+    }
+  });
+
   const priceBounds = useMemo(() => {
     let lo = Infinity, hi = 0;
     for (const p of projects || []) {
@@ -314,8 +331,12 @@ export default function MapView({ lang = "en", setCurrent }) {
 
   // ── Apply the dropdown/range filters (everything except the name query) ──
   const dropdownFiltered = useMemo(() => {
-    let pMin = priceMin === "" ? null : Number(priceMin);
-    let pMax = priceMax === "" ? null : Number(priceMax);
+    /* What the user TYPES is in the currency the page is showing; avg_price_eur_m2 is
+       EUR. Compared raw, a Czech customer typing a crown figure into a box labelled
+       €/m² filtered against euros and got an empty map with no explanation. Convert the
+       bound, not the data — same direction the Unit database converts its own. */
+    let pMin = priceMin === "" ? null : moneyToEur(Number(priceMin));
+    let pMax = priceMax === "" ? null : moneyToEur(Number(priceMax));
     // Tolerate an inverted range (min > max) by swapping, so the user gets the obvious
     // intent instead of a silently-empty map.
     if (pMin != null && pMax != null && pMin > pMax) { const t = pMin; pMin = pMax; pMax = t; }
@@ -705,19 +726,19 @@ export default function MapView({ lang = "en", setCurrent }) {
           <input
             type="number" inputMode="numeric" min="0" value={priceMin}
             onChange={(e) => setPriceMin(e.target.value.replace(/[^\d]/g, ""))}
-            placeholder={priceBounds.hi ? String(priceBounds.lo) : (sk ? "od" : "min")}
-            aria-label={sk ? "Cena od €/m²" : "Price from €/m²"}
+            placeholder={priceBounds.hi ? String(Math.round(moneyFromEur(priceBounds.lo))) : (sk ? "od" : "min")}
+            aria-label={sk ? `Cena od ${moneySymbol()}/m²` : `Price from ${moneySymbol()}/m²`}
             style={{ ...inputStyle, width: 74, paddingRight: 8 }}
           />
           <span style={{ color: dim, fontSize: "0.72rem" }}>–</span>
           <input
             type="number" inputMode="numeric" min="0" value={priceMax}
             onChange={(e) => setPriceMax(e.target.value.replace(/[^\d]/g, ""))}
-            placeholder={priceBounds.hi ? String(priceBounds.hi) : (sk ? "do" : "max")}
-            aria-label={sk ? "Cena do €/m²" : "Price to €/m²"}
+            placeholder={priceBounds.hi ? String(Math.round(moneyFromEur(priceBounds.hi))) : (sk ? "do" : "max")}
+            aria-label={sk ? `Cena do ${moneySymbol()}/m²` : `Price to ${moneySymbol()}/m²`}
             style={{ ...inputStyle, width: 74, paddingRight: 8 }}
           />
-          <span style={{ color: dim, fontSize: "0.72rem", fontFamily: mono }}>€/m²</span>
+          <span style={{ color: dim, fontSize: "0.72rem", fontFamily: mono }}>{`${moneySymbol()}/m²`}</span>
         </div>
 
         {/* Status — the platform's segmented control (.rd-seg, styles/ui.css).
