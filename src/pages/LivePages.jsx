@@ -27,6 +27,11 @@ import MapFilterBuilder from "../components/MapFilterBuilder";
 import { applyFilters, describe, isComplete, pruneStale } from "../lib/mapFilters";
 import { field } from "../lib/controls";
 
+/* One grouped number for this page. It formatted its €/m² with localeTag(lang) while
+   printing unit counts raw — so Slnecnice, the largest project in the country, read
+   "4626" beside a price reading "3 757". */
+const num = (lang, v) => (v == null ? "—" : Number(v).toLocaleString(localeTag(lang)));
+
 const mono = "'JetBrains Mono', monospace";
 const green = "var(--accent)";
 const greenInk = "var(--accent-ink)";
@@ -380,12 +385,12 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
                     }} aria-hidden="true">
                       <td style={td}><strong>{p.name}</strong></td>
                       <td style={{ ...td, color: dim }}>{p.district || "—"}</td>
-                      <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{p.total_units}</td>
-                      <td style={{ ...td, textAlign: "right", fontFamily: mono, color: greenInk }}>{p.available_units}</td>
-                      <td style={{ ...td, textAlign: "right", fontFamily: mono, color: orangeInk }}>{p.sold_units}</td>
-                      <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{p.sold_percentage != null ? `${p.sold_percentage}%` : "—"}</td>
+                      <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{num(lang, p.total_units)}</td>
+                      <td style={{ ...td, textAlign: "right", fontFamily: mono, color: greenInk }}>{num(lang, p.available_units)}</td>
+                      <td style={{ ...td, textAlign: "right", fontFamily: mono, color: orangeInk }}>{num(lang, p.sold_units)}</td>
+                      <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{formatPercent(p.sold_percentage, lang)}</td>
                       <td style={{ ...td, textAlign: "right", fontFamily: mono }}>
-                        {p.avg_price_eur_m2 ? Math.round(moneyFromEur(p.avg_price_eur_m2)).toLocaleString("en-US") : "—"}
+                        {p.avg_price_eur_m2 ? num(lang, Math.round(moneyFromEur(p.avg_price_eur_m2))) : "—"}
                       </td>
                       <td style={{ ...td, textAlign: "right", fontFamily: mono, color: greenInk }}>+{Math.max(1, Math.min(18, Math.round((p.sold_units || 0) * 0.08) || 5))}</td>
                       <td style={{ ...td, textAlign: "right" }}>—</td>
@@ -497,9 +502,9 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
                           <td style={td}>
                             <StatusBadge status={p.status} lang={lang} />
                           </td>
-                          <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{p.total_units || "—"}</td>
-                          <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{p.sold_percentage != null ? `${p.sold_percentage}%` : "—"}</td>
-                          <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{p.avg_price_eur_m2 ? Math.round(moneyFromEur(p.avg_price_eur_m2)).toLocaleString("en-US") : "—"}</td>
+                          <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{p.total_units ? num(lang, p.total_units) : "—"}</td>
+                          <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{formatPercent(p.sold_percentage, lang)}</td>
+                          <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{p.avg_price_eur_m2 ? num(lang, Math.round(moneyFromEur(p.avg_price_eur_m2))) : "—"}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -632,13 +637,13 @@ function ProjectRow({ p, t, lang, setCurrent, canVelocity, specifics = [] }) {
         )}<SpecificsMark items={specifics} lang={lang} />
       </td>
       <td style={{ ...td, color: dim }}>{p.district || "—"}</td>
-      <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{p.total_units}</td>
-      <td style={{ ...td, textAlign: "right", fontFamily: mono, color: greenInk }}>{p.available_units}</td>
+      <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{num(lang, p.total_units)}</td>
+      <td style={{ ...td, textAlign: "right", fontFamily: mono, color: greenInk }}>{num(lang, p.available_units)}</td>
       <td style={{ ...td, textAlign: "right", fontFamily: mono, color: soldDataUnavailable ? dim : orangeInk }}>
-        {soldDataUnavailable ? "—" : p.sold_units}
+        {soldDataUnavailable ? "—" : num(lang, p.sold_units)}
       </td>
       <td style={{ ...td, textAlign: "right", fontFamily: mono }}>
-        {soldDataUnavailable ? <span style={{ color: dim }}>n/a</span> : (p.sold_percentage != null ? `${p.sold_percentage}%` : "—")}
+        {soldDataUnavailable ? <span style={{ color: dim }}>n/a</span> : (formatPercent(p.sold_percentage, lang))}
       </td>
       <td style={{ ...td, textAlign: "right", fontFamily: mono }}>
         {p.avg_price_eur_m2
