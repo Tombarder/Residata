@@ -255,6 +255,9 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
   /* The right-hand panel does two jobs now and they are NOT the same job, so it says
      which one it is doing rather than leaving it to be guessed from behaviour. */
   const [panelTab, setPanelTab] = useState("filters");
+  /* Adding a filter is a STEP, not a second list competing for the same panel. While this
+     is on, the field list owns the panel; picking a field hands it straight back. */
+  const [adding, setAdding] = useState(false);
   const [sort, setSort] = useState({ key: "cena_s_dph", dir: "desc" });
   const [search, setSearch] = useState("");
   const scrollRef = useRef(null);
@@ -317,7 +320,6 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
     const caps = capsOf(key);
     if (!caps.modes.length) return;
     setFilters((a) => (a.some((f) => f.key === key) ? a : [...a, newFilter(key, caps, ++fId.current)]));
-    setPanelTab("filters");
   };
   const patchFilter = (id, patch) => setFilters((a) => a.map((f) => {
     if (f.id !== id) return f;
@@ -468,7 +470,7 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
             </span>
 
             {filters.length === 0 && (
-              <button onClick={() => setPanelTab("filters")}
+              <button onClick={() => { setPanelTab("filters"); setAdding(true); }}
                 style={{ ...sel, cursor: "pointer", color: accentInk, borderColor: green, fontFamily: mono, fontSize: "0.72rem" }}>
                 + {t("Pridaj filter vpravo", "Add a filter on the right")}
               </button>
@@ -477,7 +479,7 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
             {filters.map((f) => {
               const on = isFilterActive(f);
               return (
-                <span key={f.id} onClick={() => setPanelTab("filters")}
+                <span key={f.id} onClick={() => { setPanelTab("filters"); setAdding(false); }}
                   title={t("Upraviť v paneli vpravo", "Edit in the panel on the right")}
                   style={{
                     display: "inline-flex", alignItems: "center", gap: "0.35rem", cursor: "pointer",
@@ -591,27 +593,33 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
           )}
         </div>
 
-        {/* THE PANEL. It used to do one job — pick columns — while filtering happened in a
-            cramped strip above the table, which is backwards: the panel is where anyone
-            would go to build a query. It now does both jobs and says which one it is on,
-            because they are genuinely two different things (Boss, 2026-09-14). Every field
-            appears under both tabs; nothing is pre-selected and nothing is off-limits. */}
-        <div style={{ width: 300, flexShrink: 0, background: panel, border: `1px solid ${border}`, borderRadius: 8, display: "flex", flexDirection: "column", maxHeight: "78vh" }}>
+        {/* THE PANEL — rebuilt 2026-09-14 after Boss used the first one.
+            It had TWO scrolling lists stacked inside one narrow column: the filter cards
+            in a 42vh box, and under them the whole field palette in another. With four
+            filters the cards were clipped mid-card and ran straight into the palette, so
+            the thing you were editing and the thing you were browsing shared a border and
+            neither had room. "How the fuck should I use this" is the correct reaction.
+
+            One list at a time now. The panel shows your filters, full height, one scroll.
+            Adding one is a STEP — the field list takes the whole panel until you pick,
+            then gives it back. Columns are the other tab and own the panel outright.
+            Wider (340), sticky, so it stays put while the table scrolls. */}
+        <aside style={{
+          width: 340, flexShrink: 0, position: "sticky", top: "0.5rem", alignSelf: "flex-start",
+          background: panel, border: `1px solid ${border}`, borderRadius: 10,
+          display: "flex", flexDirection: "column", height: "calc(100vh - 150px)", minHeight: 420, overflow: "hidden",
+        }}>
           {/* tabs */}
-          <div style={{ display: "flex", borderBottom: `1px solid ${border}` }}>
-            {/* Each badge counts what is IN that tab. The query bar above the table counts
-                what is actually narrowing the result, which is a different number whenever
-                a filter has been added but not yet given a value — showing the active count
-                here made two cards look like one. */}
+          <div style={{ display: "flex", borderBottom: `1px solid ${border}`, flexShrink: 0 }}>
             {[["filters", t("FILTRE", "FILTERS"), filters.length || null],
               ["cols", t("STĹPCE", "COLUMNS"), cols.length]].map(([key, label, badge]) => {
               const on = panelTab === key;
               return (
-                <button key={key} onClick={() => setPanelTab(key)}
+                <button key={key} onClick={() => { setPanelTab(key); setAdding(false); }}
                   style={{
                     flex: 1, border: "none", background: on ? "color-mix(in srgb, var(--accent) 10%, transparent)" : "transparent",
-                    color: on ? text : dim, cursor: "pointer", padding: "0.6rem 0.4rem",
-                    fontFamily: mono, fontSize: "0.66rem", letterSpacing: "0.09em", fontWeight: on ? 700 : 500,
+                    color: on ? text : dim, cursor: "pointer", padding: "0.7rem 0.4rem",
+                    fontFamily: mono, fontSize: "0.68rem", letterSpacing: "0.09em", fontWeight: on ? 700 : 500,
                     borderBottom: `2px solid ${on ? green : "transparent"}`,
                   }}>
                   {label}{badge ? <span style={{ marginLeft: "0.4rem", color: on ? accentInk : dim }}>{badge}</span> : null}
@@ -620,14 +628,25 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
             })}
           </div>
 
-          <div style={{ padding: "0.6rem 0.6rem 0.5rem", display: "flex", flexDirection: "column", minHeight: 0, flex: 1 }}>
-            {/* active filters, on the filters tab, above the palette that adds more */}
-            {panelTab === "filters" && (
-              <div style={{ maxHeight: "42vh", overflowY: "auto", marginBottom: filters.length ? "0.55rem" : 0 }}>
+          {/* ── FILTERS: your filters, or the field list while you add one ── */}
+          {panelTab === "filters" && !adding && (
+            <>
+              <div style={{ padding: "0.6rem 0.65rem", borderBottom: `1px solid ${border}`, flexShrink: 0 }}>
+                <button onClick={() => setAdding(true)}
+                  style={{ width: "100%", padding: "0.55rem", borderRadius: 6, cursor: "pointer",
+                           background: green, color: "#04130d", border: `1px solid ${green}`,
+                           fontFamily: mono, fontSize: "0.74rem", fontWeight: 700, letterSpacing: "0.04em" }}>
+                  + {t("Pridať filter", "Add a filter")}
+                </button>
+              </div>
+              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0.65rem" }}>
                 {filters.length === 0 ? (
-                  <div style={{ color: dim, fontSize: "0.74rem", lineHeight: 1.5, padding: "0.2rem 0.1rem 0.5rem" }}>
-                    {t("Zatiaľ žiadne filtre — tabuľka ukazuje celý trh. Klikni na pole nižšie a pridaj filter.",
-                       "No filters yet — the table shows the whole market. Click a field below to add one.")}
+                  <div style={{ color: dim, fontSize: "0.78rem", lineHeight: 1.55, textAlign: "center", padding: "2rem 0.5rem" }}>
+                    {t("Zatiaľ žiadne filtre.", "No filters yet.")}<br />
+                    <span style={{ fontSize: "0.74rem" }}>
+                      {t("Tabuľka ukazuje celý trh — pridaj filter tlačidlom vyššie.",
+                         "The table shows the whole market — add one with the button above.")}
+                    </span>
                   </div>
                 ) : filters.map((f) => (
                   <FilterCard key={f.id} f={f} field={fields.find((x) => x.key === f.key)} caps={capsOf(f.key)}
@@ -635,80 +654,95 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
                     onPatch={(patch) => patchFilter(f.id, patch)} onRemove={() => removeFilter(f.id)} />
                 ))}
               </div>
-            )}
+            </>
+          )}
 
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.45rem" }}>
-              <span style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.09em", textTransform: "uppercase" }}>
-                {panelTab === "filters" ? t("Pridať filter na pole", "Add a filter on") : t("Zobrazené stĺpce", "Shown columns")}
-              </span>
-              <span style={{ marginLeft: "auto", fontFamily: mono, fontSize: "0.6rem", color: dim }}>
-                {panelTab === "cols" ? `${cols.length}/${fields.length}` : `${fields.length}`}
-              </span>
-            </div>
-
-            {panelTab === "cols" && (
-              <div style={{ display: "flex", gap: "0.3rem", marginBottom: "0.45rem" }}>
-                <button onClick={() => setCols(DEFAULT_COLS)} style={{ ...sel, flex: 1, cursor: "pointer", color: dim, fontFamily: mono, fontSize: "0.66rem" }}>
-                  ↺ {t("predvolené", "default")}
-                </button>
-                <button onClick={() => setCols([])} disabled={!cols.length} style={{ ...sel, flex: 1, cursor: cols.length ? "pointer" : "default", color: dim, fontFamily: mono, fontSize: "0.66rem", opacity: cols.length ? 1 : 0.5 }}>
-                  ✕ {t("žiadne", "none")}
-                </button>
-              </div>
-            )}
-
-            <div style={{ position: "relative", marginBottom: "0.5rem" }}>
-              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("Hľadať pole…", "Search fields…")}
-                style={{ width: "100%", padding: "0.45rem 0.65rem 0.45rem 1.9rem", background: bg, border: `1px solid ${border}`, borderRadius: 5, color: text, fontSize: "0.78rem", fontFamily: "inherit", boxSizing: "border-box", outline: "none" }} />
-              <span style={{ position: "absolute", left: "0.6rem", top: "50%", transform: "translateY(-50%)", color: dim, fontSize: "0.85rem", pointerEvents: "none" }}>🔍</span>
-            </div>
-
-            <div style={{ flex: 1, overflowY: "auto", background: bg, border: `1px solid ${border}`, borderRadius: 5, padding: "0.3rem", minHeight: 120 }}>
-              {CAT_ORDER.filter((g) => palette[g]?.length).concat(palette.other ? ["other"] : []).map((g) => (
-                <div key={g} style={{ marginBottom: "0.35rem" }}>
-                  <div style={{ fontFamily: mono, fontSize: "0.56rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", padding: "0.3rem 0.45rem 0.15rem" }}>{CAT_LABEL[lang === "sk" ? "sk" : "en"][g]}</div>
-                  {palette[g].map((f) => {
-                    const filtering = panelTab === "filters";
-                    /* On the FILTERS tab a field is "on" when it already has a filter, and
-                       unavailable when the engine cannot filter it at all — showing it as
-                       clickable and then doing nothing would be the worse lie. */
-                    const caps = filtering ? capsOf(f.key) : null;
-                    const unavailable = filtering && caps.modes.length === 0;
-                    const on = filtering ? filters.some((x) => x.key === f.key) : cols.includes(f.key);
-                    const act = () => {
-                      if (filtering) { if (!unavailable && !on) addFilter(f.key); }
-                      else toggleCol(f.key);
-                    };
-                    return (
-                      <div key={f.key} role={filtering ? "button" : "checkbox"} aria-checked={filtering ? undefined : on}
-                        aria-disabled={unavailable || undefined} tabIndex={unavailable ? -1 : 0}
-                        onClick={act}
-                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); act(); } }}
-                        title={unavailable ? t("Toto pole sa nedá filtrovať", "This field cannot be filtered")
-                          : filtering ? (on ? t("Filter už je pridaný", "Filter already added") : t("Klikni pre pridanie filtra", "Click to add a filter"))
-                          : (on ? t("Klikni pre skrytie stĺpca", "Click to hide the column") : t("Klikni pre zobrazenie stĺpca", "Click to show the column"))}
-                        style={{ display: "flex", alignItems: "center", gap: "0.45rem", padding: "0.32rem 0.55rem", borderRadius: 4,
-                                 color: unavailable ? dim : (on ? text : dim), fontSize: "0.78rem",
-                                 cursor: unavailable ? "default" : (filtering && on ? "default" : "pointer"), userSelect: "none",
-                                 opacity: unavailable ? 0.45 : 1,
-                                 borderLeft: `2px solid ${on ? green : "transparent"}`,
-                                 background: on ? "color-mix(in srgb, var(--accent) 6%, transparent)" : "transparent" }}
-                        onMouseEnter={(e) => { if (!on && !unavailable) e.currentTarget.style.background = panelHi; }}
-                        onMouseLeave={(e) => { if (!on) e.currentTarget.style.background = "transparent"; }}>
-                        <span style={{ fontFamily: mono, fontSize: "0.62rem", width: 16, textAlign: "center", color: typeColor(f.type), fontWeight: 700 }}>{typeBadge(f.type)}</span>
-                        <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lang === "sk" ? f.label_sk : f.label_en}</span>
-                        {on && <span style={{ fontFamily: mono, fontSize: "0.62rem", color: accentInk }}>{filtering ? "•" : "✓"}</span>}
-                      </div>
-                    );
-                  })}
+          {/* ── the field list: adding a filter, or choosing columns ── */}
+          {(adding || panelTab === "cols") && (() => {
+            const picking = adding;                       // true = add a filter, false = toggle columns
+            return (
+              <>
+                <div style={{ padding: "0.6rem 0.65rem 0.5rem", borderBottom: `1px solid ${border}`, flexShrink: 0 }}>
+                  {picking && (
+                    <button onClick={() => setAdding(false)}
+                      style={{ ...sel, width: "100%", marginBottom: "0.45rem", cursor: "pointer", color: dim, fontFamily: mono, fontSize: "0.7rem" }}>
+                      ← {t("Späť na filtre", "Back to filters")}
+                    </button>
+                  )}
+                  <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginBottom: "0.45rem" }}>
+                    <span style={{ fontFamily: mono, fontSize: "0.62rem", color: picking ? accentInk : dim, letterSpacing: "0.09em", textTransform: "uppercase" }}>
+                      {picking ? t("Vyber pole na filtrovanie", "Pick a field to filter on") : t("Zobrazené stĺpce", "Shown columns")}
+                    </span>
+                    <span style={{ marginLeft: "auto", fontFamily: mono, fontSize: "0.62rem", color: dim }}>
+                      {picking ? fields.length : `${cols.length}/${fields.length}`}
+                    </span>
+                  </div>
+                  {!picking && (
+                    <div style={{ display: "flex", gap: "0.3rem", marginBottom: "0.45rem" }}>
+                      <button onClick={() => setCols(DEFAULT_COLS)} style={{ ...sel, flex: 1, cursor: "pointer", color: dim, fontFamily: mono, fontSize: "0.68rem" }}>
+                        ↺ {t("predvolené", "default")}
+                      </button>
+                      <button onClick={() => setCols([])} disabled={!cols.length}
+                        style={{ ...sel, flex: 1, cursor: cols.length ? "pointer" : "default", color: dim, fontFamily: mono, fontSize: "0.68rem", opacity: cols.length ? 1 : 0.5 }}>
+                        ✕ {t("žiadne", "none")}
+                      </button>
+                    </div>
+                  )}
+                  <div style={{ position: "relative" }}>
+                    <input value={search} onChange={(e) => setSearch(e.target.value)} autoFocus={picking}
+                      placeholder={t("Hľadať pole…", "Search fields…")}
+                      style={{ width: "100%", padding: "0.5rem 0.65rem 0.5rem 2rem", background: bg, border: `1px solid ${border}`, borderRadius: 6, color: text, fontSize: "0.8rem", fontFamily: "inherit", boxSizing: "border-box", outline: "none" }} />
+                    <span style={{ position: "absolute", left: "0.65rem", top: "50%", transform: "translateY(-50%)", color: dim, fontSize: "0.85rem", pointerEvents: "none" }}>🔍</span>
+                  </div>
                 </div>
-              ))}
-              {fields.length > 0 && Object.keys(palette).length === 0 && (
-                <div style={{ padding: "1rem 0.45rem", color: dim, fontSize: "0.74rem", textAlign: "center", fontStyle: "italic" }}>{t("Žiadne zhody.", "No matches.")}</div>
-              )}
-            </div>
-          </div>
-        </div>
+
+                <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0.35rem 0.5rem 0.6rem" }}>
+                  {CAT_ORDER.filter((g) => palette[g]?.length).concat(palette.other ? ["other"] : []).map((g) => (
+                    <div key={g} style={{ marginBottom: "0.4rem" }}>
+                      <div style={{ fontFamily: mono, fontSize: "0.58rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", padding: "0.45rem 0.4rem 0.2rem" }}>{CAT_LABEL[lang === "sk" ? "sk" : "en"][g]}</div>
+                      {palette[g].map((f) => {
+                        const caps = picking ? capsOf(f.key) : null;
+                        const unavailable = picking && caps.modes.length === 0;
+                        const already = picking && filters.some((x) => x.key === f.key);
+                        const on = picking ? already : cols.includes(f.key);
+                        const act = () => {
+                          if (picking) { if (!unavailable && !already) { addFilter(f.key); setAdding(false); setSearch(""); } }
+                          else toggleCol(f.key);
+                        };
+                        const inert = unavailable || already;
+                        return (
+                          <div key={f.key} role={picking ? "button" : "checkbox"} aria-checked={picking ? undefined : on}
+                            aria-disabled={inert || undefined} tabIndex={inert ? -1 : 0}
+                            onClick={act}
+                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); act(); } }}
+                            title={unavailable ? t("Toto pole sa nedá filtrovať", "This field cannot be filtered")
+                              : already ? t("Filter na toto pole už máš", "You already have a filter on this field")
+                              : picking ? t("Klikni a pridaj filter", "Click to add a filter")
+                              : (on ? t("Klikni a skry stĺpec", "Click to hide the column") : t("Klikni a zobraz stĺpec", "Click to show the column"))}
+                            style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.42rem 0.55rem", borderRadius: 5,
+                                     color: inert ? dim : (on ? text : "var(--text-2)"), fontSize: "0.8rem",
+                                     cursor: inert ? "default" : "pointer", userSelect: "none",
+                                     opacity: unavailable ? 0.45 : 1,
+                                     borderLeft: `2px solid ${on ? green : "transparent"}`,
+                                     background: on ? "color-mix(in srgb, var(--accent) 7%, transparent)" : "transparent" }}
+                            onMouseEnter={(e) => { if (!on && !inert) e.currentTarget.style.background = panelHi; }}
+                            onMouseLeave={(e) => { if (!on) e.currentTarget.style.background = "transparent"; }}>
+                            <span style={{ fontFamily: mono, fontSize: "0.64rem", width: 16, textAlign: "center", color: typeColor(f.type), fontWeight: 700 }}>{typeBadge(f.type)}</span>
+                            <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lang === "sk" ? f.label_sk : f.label_en}</span>
+                            {on && <span style={{ fontFamily: mono, fontSize: "0.64rem", color: accentInk }}>{picking ? "•" : "✓"}</span>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))}
+                  {fields.length > 0 && Object.keys(palette).length === 0 && (
+                    <div style={{ padding: "1.2rem 0.5rem", color: dim, fontSize: "0.76rem", textAlign: "center", fontStyle: "italic" }}>{t("Žiadne zhody.", "No matches.")}</div>
+                  )}
+                </div>
+              </>
+            );
+          })()}
+        </aside>
       </div>
     </div>
   );
