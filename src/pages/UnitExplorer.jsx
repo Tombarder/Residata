@@ -38,6 +38,12 @@ const CATEGORY = {
   typ: "unit", etapa: "unit", budova: "unit", unit_detail: "unit", unit_id: "unit",
   izby: "unit", poschodie: "unit", stav: "unit", kolaudacia: "unit", orientacia: "unit",
   cena_s_dph: "price", cena_bez_dph: "price", price_per_m2: "price",
+  // Fit-out is part of what a price MEANS (what it buys), so it sits beside the prices.
+  fitout_level: "price",
+  // These three had quietly collected in "Ostatné" because this map is hand-kept while the
+  // registry grew past it. A palette whose "Other" bucket holds a chunk of the interesting
+  // fields reads as unfinished.
+  is_home: "unit", kolaudacia_date: "time", batch_timestamp: "time",
   obytna_plocha: "area", celkova_plocha: "area", balkon: "area", loggia: "area",
   terasa: "area", zahrada: "area", exterier: "area", kobka: "area",
   snapshot_month: "time", datum: "time",
@@ -67,8 +73,28 @@ function fmtVal(key, val, fmtByKey) {
    offered are the ones the ENGINE accepts for that field — capabilitiesOf reads the
    registry, so a numeric dimension like "izby" offers "is 2 or 3" (which works) rather
    than a range (which the engine would reject). */
-function FilterCard({ f, field, caps, scopeMode, cityScope, lang, onPatch, onRemove, sel }) {
+function FilterCard({ f, field, caps, scopeMode, cityScope, unit, lang, onPatch, onRemove, sel }) {
   const t = (sk, en) => (lang === "sk" ? sk : en);
+  /* A saved filter can name a field the registry no longer has — renamed, disabled, gone.
+     An operator picker with no operators is a dead card that can neither be set nor
+     understood, so it says what happened and offers the only useful action. */
+  if (!caps.modes.length) {
+    return (
+      <div style={{ background: bg, border: `1px solid ${orange}`, borderRadius: 6, padding: "0.45rem", marginBottom: "0.4rem" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+          <span style={{ flex: 1, minWidth: 0, fontSize: "0.74rem", color: text, overflow: "hidden", textOverflow: "ellipsis" }}>
+            {field ? (lang === "sk" ? field.label_sk : field.label_en) : f.key}
+          </span>
+          <button onClick={onRemove} aria-label={lang === "sk" ? "Odstrániť filter" : "Remove filter"}
+            style={{ border: "none", background: "transparent", color: dim, cursor: "pointer", fontSize: "0.8rem" }}>✕</button>
+        </div>
+        <div style={{ fontSize: "0.66rem", color: dim, marginTop: "0.2rem", lineHeight: 1.4 }}>
+          {lang === "sk" ? "Toto pole sa už nedá filtrovať — odstráň filter." : "This field can no longer be filtered — remove the filter."}
+        </div>
+      </div>
+    );
+  }
+
   const wantsValues = f.mode === "in" || f.mode === "not_in";
   const isDate = field?.type === "date";
   /* A mestska cast belongs to a city (Bratislava's are not Praha's), so when the query
@@ -161,9 +187,12 @@ function FilterCard({ f, field, caps, scopeMode, cityScope, lang, onPatch, onRem
             <DateField value={f.min} onChange={(e) => onPatch({ min: e.target.value })} width="100%" title={t("od", "from")} />
             <DateField value={f.max} onChange={(e) => onPatch({ max: e.target.value })} width="100%" title={t("do", "to")} />
           </>) : (<>
-            <input type="text" inputMode="decimal" value={f.min} placeholder={t("od", "from")}
+            {/* The unit is on the box. Without it a price band is two bare numbers and the
+                reader cannot tell € from Kč from m² — and the money boxes follow the
+                currency toggle, so the answer genuinely changes with it. */}
+            <input type="text" inputMode="decimal" value={f.min} placeholder={unit ? `${t("od", "from")} ${unit}` : t("od", "from")}
               onChange={(e) => onPatch({ min: e.target.value })} style={{ ...sel, width: "50%", minWidth: 0, boxSizing: "border-box" }} />
-            <input type="text" inputMode="decimal" value={f.max} placeholder={t("do", "to")}
+            <input type="text" inputMode="decimal" value={f.max} placeholder={unit ? `${t("do", "to")} ${unit}` : t("do", "to")}
               onChange={(e) => onPatch({ max: e.target.value })} style={{ ...sel, width: "50%", minWidth: 0, boxSizing: "border-box" }} />
           </>)}
         </div>
@@ -203,6 +232,15 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
   }, [dimensions, measures]);
   const fmtByKey = useMemo(() => Object.fromEntries(fields.filter((f) => f.fmt).map((f) => [f.key, f.fmt])), [fields]);
   const lbl = (k) => { const f = fields.find((x) => x.key === k); return f ? (lang === "sk" ? f.label_sk : f.label_en) : k; };
+  /* What a typed bound is measured in. Money follows the currency toggle, so it is read at
+     render time rather than baked into the field list. */
+  const unitOf = (k) => {
+    const fmt = fmtByKey[k];
+    if (fmt === "eur") return moneySymbol();
+    if (fmt === "per_m2") return `${moneySymbol()}/m²`;
+    if (fmt === "area") return "m²";
+    return "";
+  };
 
   const [mode, setMode] = useState("latest");
   const [cols, setCols] = useState(DEFAULT_COLS);
@@ -256,7 +294,12 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
      these once here means a field added to the registry tomorrow is filterable that day
      without anyone editing a list. */
   const capsSets = useMemo(() => ({
-    dimensionKeys: new Set(dimensions.map((d) => d.key)),
+    /* `filterable` is the registry's own say on whether a dimension may be filtered, and
+       the engine honours it. Ignoring it would offer a value list for a field meant to be
+       SHOWN and not queried. Every dimension is filterable today — which is exactly why a
+       missing check would go unnoticed until the day one is not. Excluded here, a field is
+       still perfectly available as a COLUMN. */
+    dimensionKeys: new Set(dimensions.filter((d) => d.filterable !== false).map((d) => d.key)),
     measureKeys: new Set(measures.map((m) => m.key)),
     dateKeys: new Set(dimensions.filter((d) => d.data_type === "date").map((d) => d.key)),
   }), [dimensions, measures]);
@@ -580,7 +623,7 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
                   </div>
                 ) : filters.map((f) => (
                   <FilterCard key={f.id} f={f} field={fields.find((x) => x.key === f.key)} caps={capsOf(f.key)}
-                    scopeMode={mode} cityScope={cityScope} lang={lang} sel={sel}
+                    scopeMode={mode} cityScope={cityScope} unit={unitOf(f.key)} lang={lang} sel={sel}
                     onPatch={(patch) => patchFilter(f.id, patch)} onRemove={() => removeFilter(f.id)} />
                 ))}
               </div>
