@@ -23,7 +23,7 @@ import { EMPTY_SENTINEL, MODE_LABEL, isFilterActive } from "../lib/filterModel";
 const mono = "'JetBrains Mono', ui-monospace, Menlo, monospace";
 const panel = "var(--surface-2)";
 
-function FilterCard({ f, field, caps, unit, lang, sel, useValues, onPatch, onRemove }) {
+function FilterCard({ f, field, caps, unit, lang, sel, useValues, onPatch, onRemove, unavailableNote }) {
   const t = (sk, en) => (lang === "sk" ? sk : en);
   /* A saved filter can name a field the registry no longer has — renamed, disabled, gone.
      An operator picker with no operators is a dead card that can neither be set nor
@@ -50,7 +50,7 @@ function FilterCard({ f, field, caps, unit, lang, sel, useValues, onPatch, onRem
             style={{ border: "none", background: "transparent", color: dim, cursor: "pointer", fontSize: "0.8rem" }}>✕</button>
         </div>
         <div style={{ fontSize: "0.66rem", color: dim, marginTop: "0.2rem", lineHeight: 1.4 }}>
-          {lang === "sk" ? "Toto pole sa už nedá filtrovať — odstráň filter." : "This field can no longer be filtered — remove the filter."}
+          {unavailableNote || (lang === "sk" ? "Toto pole sa už nedá filtrovať — odstráň filter." : "This field can no longer be filtered — remove the filter.")}
         </div>
       </div>
     );
@@ -194,7 +194,7 @@ export default function FieldPanel({
   fields, catOf, catOrder, catLabel, capsOf, unitOf, useValues,
   filters, onAdd, onPatch, onRemove,
   cols = [], onToggleCol, onSetCols, defaultCols = [], showColumns = true,
-  emptyHint,
+  emptyHint, unavailableNote,
 }) {
   const t = (sk, en) => (lang === "sk" ? sk : en);
   const palette = (() => {
@@ -254,6 +254,7 @@ export default function FieldPanel({
                 ) : filters.map((f) => (
                   <FilterCard key={f.id} f={f} field={fields.find((x) => x.key === f.key)} caps={capsOf(f.key)}
                     unit={unitOf(f.key)} lang={lang} sel={sel} useValues={useValues}
+                    unavailableNote={typeof unavailableNote === "function" ? unavailableNote(f.key) : unavailableNote}
                     onPatch={(patch) => onPatch(f.id, patch)} onRemove={() => onRemove(f.id)} />
                 ))}
               </div>

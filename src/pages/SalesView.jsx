@@ -429,11 +429,16 @@ export default function SalesView({ lang = "sk" }) {
     values: enabled ? facetOptions(fac.data, key, null, prettyValue(key)) : [],
     loading: fac.loading,
   });
+  /* EVERY filterable field, including the sale-only ones on a reservations tab. They are
+     not removed from the list: capsOf returns no operators for them there, so the palette
+     greys them out and says why — the same treatment the Unit database gives a field the
+     engine cannot filter. Hiding them also cost the LABEL: a parked "Dní na trhu" card had
+     no entry to look its name up in and rendered the raw column key. */
   const panelFields = useMemo(
-    () => SALES_FIELDS.filter((f) => !(isPipe && f.sold))
+    () => SALES_FIELDS.filter((f) => f.filter)
       .map((f) => ({ key: f.key, label_sk: f.sk, label_en: f.en,
                      type: f.filter === "between" ? "numeric" : f.col === "date" ? "date" : "text" })),
-    [isPipe],
+    [],
   );
   const addFilter = (key) => {
     const caps = capsOf(key);
@@ -573,8 +578,8 @@ export default function SalesView({ lang = "sk" }) {
           })}
           {filters.length > liveFilters.length && (
             <span style={{ fontSize: "0.72rem", color: "var(--text-faint)" }}
-              title={t("Filtre na polia, ktoré pri rezerváciách neexistujú (zdroj predaja, dní na trhu) — vrátia sa pri Predané.",
-                       "Filters on fields that do not exist for reservations (sale signal, days on market) — they return on Sold.")}>
+              title={t("Filtre na polia, ktoré pri rezerváciách neexistujú — nájdeš ich v paneli vpravo a vrátia sa pri Predané.",
+                       "Filters on fields that do not exist for reservations — they are in the panel on the right and return on Sold.")}>
               +{filters.length - liveFilters.length} {t("neaktívnych", "inactive")}
             </span>
           )}
@@ -773,11 +778,17 @@ export default function SalesView({ lang = "sk" }) {
           catOf={(k) => (SALES_FIELDS.find((f) => f.key === k) || {}).cat || "other"}
           catOrder={SALES_CAT_ORDER} catLabel={SALES_CAT_LABEL}
           capsOf={capsOf} unitOf={unitOf} useValues={useValues}
-          filters={liveFilters} onAdd={addFilter} onPatch={patchFilter} onRemove={removeFilter}
+          filters={filters} onAdd={addFilter} onPatch={patchFilter} onRemove={removeFilter}
           cols={cols} onToggleCol={toggleCol} onSetCols={setCols}
           defaultCols={isPipe ? SALES_DEFAULT_COLS_PIPE : SALES_DEFAULT_COLS}
           emptyHint={t("Súhrny aj zoznam ukazujú celé zvolené obdobie — pridaj filter tlačidlom vyššie.",
                        "The totals and the list cover the whole selected period — add one with the button above.")}
+          /* A sale-only filter is not BROKEN on a reservations tab — it simply has nothing
+             to bite on, and it comes back on Predané. Saying "can no longer be filtered"
+             there would be a lie, and leaving it out of the panel entirely (the first cut)
+             left a "+1 neaktívnych" note with no way to act on it. */
+          unavailableNote={t("Toto pole existuje len pri predaných bytoch — pri rezerváciách sa neuplatní. Vráti sa na karte Predané.",
+                             "This field exists only for sold units — it does not apply to reservations. It returns on the Sold tab.")}
         />
       </div>
     </div>
