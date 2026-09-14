@@ -1461,6 +1461,10 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
      the chrome is the thing you are trying to get out of the way, and Esc plus a
      labelled Close is enough of a way back. */
   const [expanded, setExpanded] = useState(false);
+  /* Identity while inline, document.body while expanded. Keeping ONE subtree (rather
+     than rendering the table twice) means the table cannot drift between the two
+     modes — there is only ever one of it. */
+  const withPortal = (node) => (expanded ? createPortal(node, document.body) : node);
   useEffect(() => {
     if (!expanded) return;
     const onKey = (e) => { if (e.key === "Escape") setExpanded(false); };
@@ -2254,6 +2258,15 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
         </div>
       )}
 
+      {/* PORTALLED WHEN EXPANDED, and it has to be. In the page the panel sits under
+          an ancestor with position:relative + z-index:1 — a stacking context — so
+          its own z-index is resolved INSIDE that, and a full-window overlay asking
+          for 60 lost to a sidebar asking for 50. The panel covered the viewport
+          exactly and the chrome painted straight over it, clipping the frozen
+          column. An overlay that means to cover the window cannot live inside the
+          page's content; document.body is the only parent where its z-index means
+          what it says. */}
+      {withPortal(
       <div className={expanded ? "pivot-focus is-on" : "pivot-focus"}>
         {expanded && (
           <div className="pivot-focus-bar">
@@ -2343,6 +2356,7 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
         lang={lang}
       />
       </div>
+      )}
 
       {/* Chart panel — derived from the same tree as the table.
           Always rendered (even with no rows) so the user can discover
