@@ -95,8 +95,15 @@ export function isFilterActive(f) {
   return Array.isArray(f.values) && f.values.length > 0;
 }
 
-/** One short human line for a chip or a title. */
-export function summariseFilter(f, lang = "sk") {
+/**
+ * One short human line for a chip or a title.
+ *
+ * `labelOf` exists because a stored value is not always the readable one: a sale signal is
+ * "marked", and a numeric room count comes back as "2.0" — a chip reading "Izby · je 2.0"
+ * is the database talking, not the product.
+ */
+export function summariseFilter(f, lang = "sk", labelOf = null) {
+  const show = (v) => (labelOf ? labelOf(v) : v);
   const L = MODE_LABEL[lang === "sk" ? "sk" : "en"];
   if (!f) return "";
   if (f.mode === "empty" || f.mode === "not_empty") return L[f.mode];
@@ -107,7 +114,7 @@ export function summariseFilter(f, lang = "sk") {
   }
   const vals = f.values || [];
   if (!vals.length) return lang === "sk" ? "(bez hodnoty)" : "(no value)";
-  const shown = vals.slice(0, 2).map((v) => (v === EMPTY_SENTINEL ? (lang === "sk" ? "(prázdne)" : "(empty)") : v)).join(", ");
+  const shown = vals.slice(0, 2).map((v) => (v === EMPTY_SENTINEL ? (lang === "sk" ? "(prázdne)" : "(empty)") : show(v))).join(", ");
   const rest = vals.length > 2 ? ` +${vals.length - 2}` : "";
   return `${L[f.mode]} ${shown}${rest}`;
 }

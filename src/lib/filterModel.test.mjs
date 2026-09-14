@@ -163,3 +163,15 @@ test("a new date filter opens on a range, not on a list of every distinct day", 
   assert.equal(newFilter("datum", capabilitiesOf("datum", REG), 1).mode, "between");
   assert.equal(newFilter("city", capabilitiesOf("city", REG), 2).mode, "in", "a plain dimension still opens on is");
 });
+
+
+test("a chip shows the readable value, not the stored one", () => {
+  // Sales stores rooms as a numeric, so a facet hands back "2.0"; a chip reading
+  // "Izby · je 2.0" is the database talking. The VALUE is untouched either way.
+  const tidy = (v) => String(v).replace(/\.0$/, "");
+  assert.equal(summariseFilter({ key: "izby", mode: "in", values: ["2.0", "3.0"] }, "sk", tidy), "je 2, 3");
+  assert.equal(summariseFilter({ key: "izby", mode: "in", values: ["2.0"] }, "sk"), "je 2.0",
+    "without a resolver the raw value still shows — the caller opts in");
+  const sig = (v) => (v === "marked" ? "označené" : v);
+  assert.equal(summariseFilter({ key: "detection_method", mode: "in", values: ["marked"] }, "sk", sig), "je označené");
+});
