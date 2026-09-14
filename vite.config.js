@@ -90,6 +90,69 @@ function residataIndexHtmlContent() {
   };
 }
 
+/**
+ * maplibreWorkerAssets
+ * --------------------
+ * MapLibre 6 does not inline its tile worker. It builds one at RUNTIME from a file
+ * it expects to find beside itself, and that worker then imports a second file
+ * beside IT:
+ *
+ *   maplibre-gl.mjs  ->  new URL("./maplibre-gl-worker.mjs", import.meta.url)
+ *   maplibre-gl-worker.mjs  ->  import ... from "./maplibre-gl-shared.mjs"
+ *
+ * No bundler can see either edge: the first is a runtime-built URL, the second
+ * lives inside a file nothing imports. So Vite emitted neither, the SPA rewrite
+ * answered both requests with index.html, and `new Worker(anHtmlPage, {type:
+ * "module"})` failed the way module workers fail — in total silence. The map
+ * mounted, sized its canvas, drew its controls, loaded its sprite and glyphs, and
+ * painted nothing but the style's background colour. Boss got a black rectangle
+ * with working buttons on it (2026-09-14).
+ *
+ * `?url` is not enough on its own, which is how the first fix missed: it copies
+ * the worker verbatim and still emits nothing for the `./maplibre-gl-shared.mjs`
+ * the copy imports. Both files have to land, KEEPING THEIR NAMES, in ONE folder.
+ *
+ * The folder carries the package version, so upgrading MapLibre changes the URL
+ * on its own and no stale worker can be served from cache against a new library.
+ * Nothing here is hand-maintained: the version and the file list come from the
+ * installed package.
+ *
+ * Dev and build are served from the same declaration deliberately. The upgrade
+ * that caused this was verified in `vite dev`, where MapLibre's own resolution
+ * happens to work — a difference between dev and prod is exactly what hid it.
+ */
+function maplibreWorkerAssets() {
+  const version = JSON.parse(
+    fs.readFileSync(path.resolve(__dirname, 'node_modules/maplibre-gl/package.json'), 'utf-8'),
+  ).version;
+  const dir = `maplibre/${version}`;
+  // The worker, and the module the worker imports. Names are load-bearing:
+  // maplibre-gl-worker.mjs asks for "./maplibre-gl-shared.mjs" by that exact name.
+  const FILES = ['maplibre-gl-worker.mjs', 'maplibre-gl-shared.mjs'];
+  const srcOf = (f) => path.resolve(__dirname, 'node_modules/maplibre-gl/dist', f);
+
+  return {
+    name: 'residata-maplibre-worker-assets',
+    config() {
+      // The app reads this to call setWorkerUrl — one source for the path.
+      return { define: { __MAPLIBRE_WORKER_URL__: JSON.stringify(`/${dir}/${FILES[0]}`) } };
+    },
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const hit = FILES.find((f) => req.url && req.url.split('?')[0].endsWith(`/${dir}/${f}`));
+        if (!hit) return next();
+        res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+        res.end(fs.readFileSync(srcOf(hit)));
+      });
+    },
+    generateBundle() {
+      for (const f of FILES) {
+        this.emitFile({ type: 'asset', fileName: `${dir}/${f}`, source: fs.readFileSync(srcOf(f)) });
+      }
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react(), residataIndexHtmlContent()],
+  plugins: [react(), residataIndexHtmlContent(), maplibreWorkerAssets()],
 })

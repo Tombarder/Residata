@@ -19,10 +19,11 @@
    basemap that colour is rgb(14,13,12). Boss got a black rectangle with working
    buttons on it, on both map pages, and nothing anywhere said why.
 
-   `setWorkerUrl` is MapLibre's supported answer, and `?url` is how Vite is told
-   to emit a file it would otherwise never notice and to hand back the hashed
-   path it emitted it to. Importing this module for its side effect, before any
-   Map is constructed, is the whole fix.
+   `setWorkerUrl` is MapLibre's supported answer. Getting the FILES there is the
+   other half, and it takes a build plugin rather than an import, because the
+   worker imports a sibling of its own — see maplibreWorkerAssets in
+   vite.config.js. Importing this module for its side effect, before any Map is
+   constructed, is what wires the two together.
 
    🔴 Two things must stay true or this silently stops working again:
    - `worker-src` in vercel.json must allow 'self'. The URL below is same-origin,
@@ -31,8 +32,12 @@
    - every module that constructs a maplibregl.Map must import this one.
      src/lib/maplibreWorker.test.mjs fails if a new map page forgets. */
 import { setWorkerUrl } from "maplibre-gl";
-import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
+
+/* Emitted (and dev-served) by maplibreWorkerAssets in vite.config.js, which puts
+   maplibre-gl-worker.mjs and the maplibre-gl-shared.mjs it imports side by side
+   under a version-stamped folder. `?url` alone was NOT enough and that is worth
+   remembering: it copies the worker and emits nothing for the sibling the copy
+   imports, so the worker still died — just one 404 further along. */
+export const workerUrl = __MAPLIBRE_WORKER_URL__;
 
 setWorkerUrl(workerUrl);
-
-export { workerUrl };

@@ -1,52 +1,85 @@
 /**
  * Run with:  node --test src/lib/maplibreWorker.test.mjs
  *
- * These tests exist because of a bug that produced NO error of any kind. MapLibre 6
- * loads its tile worker from a sibling file resolved at runtime; Vite never emitted
- * it, the SPA rewrite answered the request with index.html, and the map went black
- * while every other sign of health — mount, canvas size, controls, attribution,
- * sprite, glyphs — stayed green. It shipped because nothing could catch it: the
- * build was clean, the tests passed, and the only proof is a WebGL composite that
- * neither browser surface available here will render.
+ * These exist because of a bug that produced no error of any kind: MapLibre 6 builds
+ * its tile worker at runtime from a file Vite never emitted, the SPA rewrite answered
+ * with index.html, and `new Worker(anHtmlPage, {type:"module"})` failed silently. The
+ * map went black while mount, canvas size, controls, sprite and glyphs all stayed
+ * green. A clean build and a green suite could not see it.
  *
- * So the three facts the fix rests on are asserted as facts, statically.
+ * The FIRST fix could not see it either. `?url` emitted the worker and nothing for
+ * the `./maplibre-gl-shared.mjs` the worker imports, so it still died — one 404
+ * further along. That is why the central test here is not "is the worker emitted"
+ * but "is EVERY file the worker reaches for emitted with it".
  */
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync, existsSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const read = (p) => readFileSync(join(root, p), "utf8");
+const DIST = "node_modules/maplibre-gl/dist";
 
-test("the worker file we point at is really in the package", () => {
-  const spec = "node_modules/maplibre-gl/dist/maplibre-gl-worker.mjs";
-  assert.ok(
-    existsSync(join(root, spec)),
-    `${spec} is gone — MapLibre renamed or moved its worker. Update the import in ` +
-      `src/lib/maplibreWorker.js to the new name; do NOT delete it, or the map goes ` +
-      `black with no error anywhere.`,
+/** The file list the build plugin ships, read from the config rather than retyped. */
+function shippedFiles() {
+  const cfg = read("vite.config.js");
+  const m = /const FILES = \[([^\]]*)\]/.exec(cfg);
+  assert.ok(m, "maplibreWorkerAssets lost its FILES list");
+  return [...m[1].matchAll(/['"]([^'"]+)['"]/g)].map((x) => x[1]);
+}
+
+test("every module the worker imports is shipped beside it", () => {
+  const shipped = shippedFiles();
+  const entry = "maplibre-gl-worker.mjs";
+  assert.ok(shipped.includes(entry), `the worker itself (${entry}) is not in FILES`);
+
+  // Walk the worker's relative imports transitively — the same graph the browser
+  // walks when it loads the worker as a module.
+  const seen = new Set();
+  const queue = [entry];
+  const missing = [];
+  while (queue.length) {
+    const f = queue.shift();
+    if (seen.has(f)) continue;
+    seen.add(f);
+    const p = join(DIST, f);
+    assert.ok(existsSync(join(root, p)), `${p} is not in the package — MapLibre moved or renamed it`);
+    for (const m of read(p).matchAll(/from\s*["'](\.\/[^"']+)["']/g)) {
+      const dep = m[1].replace(/^\.\//, "");
+      if (!shipped.includes(dep)) missing.push(`${f} imports ${dep}`);
+      queue.push(dep);
+    }
+  }
+  assert.deepEqual(
+    missing,
+    [],
+    "the worker reaches for files the build does not emit, so it will 404 and the map " +
+      "will go black with no error anywhere. Add them to FILES in vite.config.js: " +
+      missing.join("; "),
   );
-  assert.match(read("src/lib/maplibreWorker.js"), /maplibre-gl\/dist\/maplibre-gl-worker\.mjs\?url/);
-  assert.match(read("src/lib/maplibreWorker.js"), /setWorkerUrl\(workerUrl\)/);
+});
+
+test("the build plugin is registered and the app uses the URL it defines", () => {
+  const cfg = read("vite.config.js");
+  assert.match(cfg, /plugins:\s*\[[^\]]*maplibreWorkerAssets\(\)/, "plugin not registered");
+  assert.match(cfg, /__MAPLIBRE_WORKER_URL__/, "plugin no longer defines the worker URL");
+  assert.match(cfg, /configureServer/, "dev would stop serving the worker, so dev and prod could diverge again");
+  const app = read("src/lib/maplibreWorker.js");
+  assert.match(app, /setWorkerUrl\(workerUrl\)/);
+  assert.match(app, /__MAPLIBRE_WORKER_URL__/);
 });
 
 test("every page that builds a map says where the worker is", () => {
-  const pages = readdirSync(join(root, "src", "pages")).filter((f) => /\.jsx?$/.test(f));
+  const pages = ["MapView.jsx", "MapView2.jsx", "LocationManager.jsx"];
   const offenders = [];
   for (const f of pages) {
     const src = read(join("src", "pages", f));
     if (!/new\s+maplibregl\.Map\s*\(/.test(src)) continue;
-    if (!/from\s+["']maplibre-gl["']|import\s+\*\s+as\s+maplibregl/.test(src)) continue;
     if (!/lib\/maplibreWorker/.test(src)) offenders.push(f);
   }
-  assert.deepEqual(
-    offenders,
-    [],
-    `these construct a MapLibre map without importing lib/maplibreWorker, so they will ` +
-      `render a black rectangle in production and report nothing: ${offenders.join(", ")}`,
-  );
+  assert.deepEqual(offenders, [], `these construct a map without importing lib/maplibreWorker: ${offenders.join(", ")}`);
 });
 
 test("the CSP still allows the same-origin worker the fix depends on", () => {
