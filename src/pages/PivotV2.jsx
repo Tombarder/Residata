@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef, useLayoutEffect, Fragment } from "react";
 import { createPortal } from "react-dom";
 import { useSpecifics, SpecificsMark } from "../lib/projectSpecifics";
-import { useProjects, useFlatsArchive, useFlatsCurrent, useArchiveMonths, useArchiveDays, usePivotGrain, usePivotDistinct, usePivotFieldStats, fetchFlatsForProjects } from "../lib/useData";
+import { useAnalyticsRegistry, useProjects, useFlatsArchive, useFlatsCurrent, useArchiveMonths, useArchiveDays, usePivotGrain, usePivotDistinct, usePivotFieldStats, fetchFlatsForProjects } from "../lib/useData";
 import { useCountry, isAllCountries } from "../lib/useCountry";
 import { useCapabilities } from "../lib/useCapabilities";
 import { useAuth } from "../lib/useAuth";
@@ -140,7 +140,10 @@ const FIELDS = {
   sub_district:      { label: "Podčasť",                     group: "location", type: "text",   accessor: (r) => r.sub_district },
 
   // Derived metric
-  cena_na_m2_obytnej:{ label: "Cena na m2 obytnej",         group: "derived",  type: "number", unit: "€/m²", derived: true, accessor: (r) => {
+  /* Derived here, so the registry has no row to name it — and it is the SAME number
+     measure_registry calls price_per_m2, so it takes that wording rather than a third
+     spelling. It used to read "Cena na m2 obytnej", with neither diacritic. */
+  cena_na_m2_obytnej:{ label: "€/m² (obytná)", label_en: "€/m² (living)", group: "derived",  type: "number", unit: "€/m²", derived: true, accessor: (r) => {
                         const p = num(r.cena_s_dph), m = num(r.obytna_plocha);
                         return (p != null && m != null && m > 0) ? p / m : null;
                       }},
@@ -243,17 +246,45 @@ const FIELD_LABEL_EN = {
   stav: "Status", kolaudacia: "Handover", orientacia: "Orientation",
   country: "Country", city: "City", cast: "District", sub_district: "Sub-district",
   import_status: "Project status",
-  cena_na_m2_obytnej: "Price per m² (living)",
   sold_count: "Sold (on the price list)", available_count: "Available",
 };
 
-/** Field label in the active UI language. EN prefers an inline `label_en`, then
-    the FIELD_LABEL_EN map, else falls back to the (Slovak-primary) `.label`. */
+/* THE REGISTRY NAMES THE FIELD; FIELDS DESCRIBES HOW IT BEHAVES.
+ *
+ * analytics.dim_registry / measure_registry already carry a label_sk and a label_en for
+ * every dimension and measure, and the Unit database and Sales read them live. This page
+ * kept a second set of names by hand, and on 2026-09-14 the two had drifted far enough to
+ * see: the Slovak page called a project "Project name", a unit "Unit ID", a status "Import
+ * status", and spelled two fields without their diacritics — "Obytna plocha", "Cena na m2
+ * obytnej" — beside "#izieb" for what every other page calls "Izby". Rename a dimension in
+ * the database and only half the platform would have followed.
+ *
+ * So the NAME comes from the registry whenever it has one. FIELDS keeps what the registry
+ * does not know — the accessor, the group, the type, the unit, whether it is derived — and
+ * its own label survives as the fallback for the derived measures the registry has no row
+ * for (cena_na_m2_obytnej, sold_count, available_count, the count pseudo-field). */
+let _regLabels = { sk: {}, en: {} };
+export function setPivotRegistryLabels(reg) {
+  const sk = {}, en = {};
+  for (const f of [...(reg?.dimensions || []), ...(reg?.measures || [])]) {
+    if (!f?.key) continue;
+    if (f.label_sk) sk[f.key] = f.label_sk;
+    if (f.label_en) en[f.key] = f.label_en;
+  }
+  _regLabels = { sk, en };
+}
+
+/** Field label in the active UI language: the registry's name first, then this page's
+    own (EN via an inline `label_en` or the FIELD_LABEL_EN map, SK via `.label`). */
 function fieldLabel(fieldKey, lang) {
+  const l = lang === "sk" ? "sk" : "en";
   const f = FIELDS[fieldKey];
-  if (!f) return fieldKey;
-  if (lang === "sk") return f.label;
-  return f.label_en || FIELD_LABEL_EN[fieldKey] || f.label;
+  const raw = _regLabels[l][fieldKey]
+    || (!f ? fieldKey : l === "sk" ? f.label : (f.label_en || FIELD_LABEL_EN[fieldKey] || f.label));
+  /* The registry writes its money names in euros — "Cena s DPH (€)" — because that is how
+     the values are STORED. The page may be showing Kč, and a column headed € over Czech
+     crowns is the same fault the parking prices had. Same swap the Unit database makes. */
+  return moneySymbol() === "€" ? raw : String(raw).replace(/€/g, moneySymbol());
 }
 
 /* Order of fields in the palette. Mirrors Clean Master column order so the
@@ -1162,6 +1193,18 @@ function defaultAggFor(field) {
 
 /* ══════════════════════════ Main component ════════════════════════ */
 export default function PivotV2({ lang = "sk", setCurrent }) {
+  /* Field NAMES come from analytics.dim_registry / measure_registry — the same source the
+     Unit database and Sales read — so the platform cannot call one field two things. The
+     registry is cached process-wide after the first fetch; until it arrives, fieldLabel
+     falls back to this page's own labels, so nothing is ever blank. */
+  const registry = useAnalyticsRegistry();
+  /* Applied during RENDER, not in an effect. fieldLabel reads a module-level map (it is
+     called from twenty places, most of them outside this component), and writing that map
+     from an effect does not re-render — so with the registry already cached from an earlier
+     visit, `loading` never flips, nothing re-renders, and the first paint kept this page's
+     old names. useMemo runs before the JSX is built, so the very first paint has them. */
+  useMemo(() => setPivotRegistryLabels(registry), [registry.dimensions, registry.measures]);
+
   useCurrency(); // subscribe: re-render pivot tables/charts/drill-down on currency toggle
   const { projects, loading: loadingProjects } = useProjects();
   const { country } = useCountry();   // for targeted drill-down fetch
@@ -2239,9 +2282,11 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
           </span>
           {perM2InPlay && (
             <span style={{ flexBasis: "100%", color: dim, marginTop: "0.15rem" }}>
+              {/* The note explains the column beside it, so it is written in the currency
+                  that column is showing — it said €/m² over a Kč/m² column. */}
               {lang === "sk"
-                ? "€/m² je priemer z €/m² jednotlivých bytov — nie priemerná cena ÷ priemerná plocha. Pri rôznych veľkostiach bytov sa tie dve čísla líšia (typicky do 2 %). Podiel súčtov dáva meradlo „Priem. (vážené)\"."
-                : "€/m² is the mean of each unit's own €/m² — not average price ÷ average area. Those two differ when unit sizes vary (typically under 2%). For the ratio of sums use the \"Priem. (vážené)\" measure."}
+                ? `${moneySymbol()}/m² je priemer z ${moneySymbol()}/m² jednotlivých bytov — nie priemerná cena ÷ priemerná plocha. Pri rôznych veľkostiach bytov sa tie dve čísla líšia (typicky do 2 %). Podiel súčtov dáva meradlo „Priem. (vážené)".`
+                : `${moneySymbol()}/m² is the mean of each unit's own ${moneySymbol()}/m² — not average price ÷ average area. Those two differ when unit sizes vary (typically under 2%). For the ratio of sums use the "Priem. (vážené)" measure.`}
             </span>
           )}
           {statusMeasuresInPlay.length > 0 && (
@@ -2929,7 +2974,9 @@ function RightPanel({ usedKeys, search, setSearch, drag, setDrag, hoverZone, set
   const q = search.trim().toLowerCase();
   const filtered = FIELD_ORDER
     .map(k => ({ key: k, ...FIELDS[k] }))
-    .filter(f => !q || (f.label + " " + fieldLabel(f.key, "en")).toLowerCase().includes(q));
+    /* Search what the user SEES: the SK label now comes from the registry, so matching
+       on the page-local `.label` would miss a field it no longer displays. */
+    .filter(f => !q || (fieldLabel(f.key, "sk") + " " + fieldLabel(f.key, "en")).toLowerCase().includes(q));
 
   // Group
   const groups = useMemo(() => {
@@ -3200,7 +3247,11 @@ function buildPivotMatrix(flatRows, grandTotal, rowFields, colFields, effectiveV
     if (v.key === "__count__") return "Count";
     const u = measureUnit(v);
     const unit = isMoneyUnit(u) ? ` (${displayMoneyUnit(u)})` : (u ? ` (${u})` : "");
-    return `${AGG_LABEL[v.agg]}(${fieldLabel(v.field, lang)})${unit}`;
+    const base = fieldLabel(v.field, lang);
+    /* The registry's names already END in their unit — "Obytná plocha (m²)" — so appending
+       one produced "avg(Obytná plocha (m²)) (m²)". Append only what is not already said. */
+    const tail = unit && base.endsWith(unit.trim()) ? "" : unit;
+    return `${AGG_LABEL[v.agg]}(${base})${tail}`;
   };
   /* A measure as a NUMBER in the display currency. Rounding to 2 places is the
      serializer's job — here we only convert. null → an empty cell (not 0). */
@@ -4241,8 +4292,10 @@ function labelForType(t, lang) {
   return (lang === "sk" ? sk : en)[t] || t;
 }
 function labelForMeasure(v, lang) {
-  const f = FIELDS[v.field];
-  const fname = f?.label || v.field || (lang === "sk" ? "počet" : "count");
+  /* Read `f.label` directly until 2026-09-14, so a chart title ignored the UI language
+     entirely AND skipped the registry — "avg(Obytna plocha)" above a table whose own
+     column said "Obytná plocha (m²)". */
+  const fname = v.field ? fieldLabel(v.field, lang) : (lang === "sk" ? "počet" : "count");
   return `${aggLabel(v)}(${fname})`;
 }
 
