@@ -25,21 +25,17 @@ const panel = "var(--surface-2)";
 
 function FilterCard({ f, field, caps, unit, lang, sel, useValues, onPatch, onRemove, unavailableNote }) {
   const t = (sk, en) => (lang === "sk" ? sk : en);
+  const wantsValues = f.mode === "in" || f.mode === "not_in";
+  /* EVERY hook runs before the early return below. The dead-field card used to return
+     first, so a card whose field disappeared (a sale-only filter + the Rezervácie tab, or
+     a currency switch) rendered one hook fewer than the render before it and React threw.
+     A disabled fetch costs nothing; an unstable hook order costs the page. */
+  const distinct = useValues(f.key, caps.valued && wantsValues && !!f.key);
   /* A saved filter can name a field the registry no longer has — renamed, disabled, gone.
      An operator picker with no operators is a dead card that can neither be set nor
      understood, so it says what happened and offers the only useful action. */
   if (!caps.modes.length) {
-    /* THE PANEL — rebuilt 2026-09-14 after Boss used the first one.
-            It had TWO scrolling lists stacked inside one narrow column: the filter cards
-            in a 42vh box, and under them the whole field palette in another. With four
-            filters the cards were clipped mid-card and ran straight into the palette, so
-            the thing you were editing and the thing you were browsing shared a border and
-            neither had room. "How the fuck should I use this" is the correct reaction.
 
-            One list at a time now. The panel shows your filters, full height, one scroll.
-            Adding one is a STEP — the field list takes the whole panel until you pick,
-            then gives it back. Columns are the other tab and own the panel outright.
-            Wider (340), sticky, so it stays put while the table scrolls. */
   return (
       <div style={{ background: bg, border: `1px solid ${orange}`, borderRadius: 6, padding: "0.45rem", marginBottom: "0.4rem" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
@@ -56,9 +52,7 @@ function FilterCard({ f, field, caps, unit, lang, sel, useValues, onPatch, onRem
     );
   }
 
-  const wantsValues = f.mode === "in" || f.mode === "not_in";
   const isDate = field?.type === "date";
-  const distinct = useValues(f.key, caps.valued && wantsValues && !!f.key);
   const L = MODE_LABEL[lang === "sk" ? "sk" : "en"];
   const active = isFilterActive(f);
   const label = field ? (lang === "sk" ? field.label_sk : field.label_en) : f.key;
@@ -185,6 +179,17 @@ function FilterCard({ f, field, caps, unit, lang, sel, useValues, onPatch, onRem
  * @param useValues   hook (key, enabled) => {values[], loading}
  * @param columns     null to hide the columns tab entirely
  */
+  /* THE PANEL — rebuilt 2026-09-14 after Boss used the first one.
+          It had TWO scrolling lists stacked inside one narrow column: the filter cards
+          in a 42vh box, and under them the whole field palette in another. With four
+          filters the cards were clipped mid-card and ran straight into the palette, so
+          the thing you were editing and the thing you were browsing shared a border and
+          neither had room. "How the fuck should I use this" is the correct reaction.
+
+          One list at a time now. The panel shows your filters, full height, one scroll.
+          Adding one is a STEP — the field list takes the whole panel until you pick,
+          then gives it back. Columns are the other tab and own the panel outright.
+          Wider (340), sticky, so it stays put while the table scrolls. */
 export default function FieldPanel({
   /* `sel` is the shared control box. It defaults to the kit's own rather than being
      required from the caller: Sales passed {} and its range inputs came out as raw browser

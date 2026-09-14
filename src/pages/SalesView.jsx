@@ -224,6 +224,10 @@ export default function SalesView({ lang = "sk" }) {
   const [groupBy, setGroupBy] = useState("city");
   const spec = useSpecifics(lang);
   const [sort, setSort] = useState({ key: "sold_date", dir: "desc" });
+  /* Lost in the state rewrite that gave this page choosable columns, so EVERY header
+     click threw instead of sorting. A new column opens descending (newest sale, biggest
+     price first); clicking the active one flips it. */
+  const toggleSort = (k) => setSort((s) => (s.key === k ? { key: k, dir: s.dir === "asc" ? "desc" : "asc" } : { key: k, dir: "desc" }));
 
   // Remember the Sales filters per-account, across devices (localStorage + ui_prefs).
   useAccountPrefState(
@@ -306,9 +310,15 @@ export default function SalesView({ lang = "sk" }) {
   /* Sale-only sort keys are invalid on the pipeline views, and a sort on a column the user
      has SINCE HIDDEN is invisible — the rows come back in an order with no explanation on
      screen. Both fall back to the first sortable column that is actually showing. */
-  const sortableNow = isPipe
-    ? ["price_s_dph_eur", "price_per_m2_eur", "izby", "obytna_plocha", "city", "project_name"]
-    : ["sold_date", "price_s_dph_eur", "price_per_m2_eur", "days_on_market", "izby", "obytna_plocha", "city", "project_name"];
+  /* Anything the list can SHOW, it can sort by — the engine's allow-list is now its
+     detail-column list (novostavby migration 2026-09-14_sales_sort_every_shown_column).
+     It used to be eight keys against ten fixed columns; with eighteen choosable columns
+     most headers simply did not respond when clicked. Sale-only columns stay out on the
+     reservations tabs, where they do not exist. */
+  const sortableNow = useMemo(
+    () => SALES_FIELDS.filter((f) => f.col && !(isPipe && f.sold)).map((f) => f.key),
+    [isPipe],
+  );
   /* The columns are CHOSEN now. The table used to hard-code ten of the twenty-five fields
      every detail row already carries, which is what made the page feel restrictive — the
      data was there and there was no way to ask for it. Kept in the [key, sk, en, kind]

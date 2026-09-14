@@ -36,7 +36,10 @@ export default defineConfig([
     ],
     languageOptions: {
       ecmaVersion: 2020,
-      globals: globals.browser,
+      // Build-time constants injected by vite.config.js `define`. They are real at run
+      // time but invisible to the linter, and `no-undef` is worth far more than the two
+      // lines it costs to declare them — it caught four crashes on 2026-09-14 alone.
+      globals: { ...globals.browser, __MAPLIBRE_WORKER_URL__: 'readonly' },
       parserOptions: {
         ecmaVersion: 'latest',
         ecmaFeatures: { jsx: true },

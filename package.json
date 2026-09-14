@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "prebuild": "node scripts/generate-static-content.mjs",
+    "prebuild": "eslint . --quiet && node scripts/generate-static-content.mjs",
     "build": "vite build",
     "lint": "eslint .",
     "test": "node --test \"src/**/*.test.mjs\"",
