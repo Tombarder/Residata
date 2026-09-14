@@ -55,3 +55,27 @@ export function isPublicLang(lang) {
 export function coercePublicLang(lang) {
   return isPublicLang(lang) ? lang : DEFAULT_LANG;
 }
+
+/**
+ * formatDimNumber — one way to print a NUMERIC DIMENSION value (rooms, floor).
+ *
+ * PostgREST serialises a Postgres `numeric` as a STRING, so anything that printed one
+ * straight showed "6.0" for a six-room flat and "1.0" for the first floor — in the table
+ * on the Unit database, and again in the filter's own value list beside it. Sales had a
+ * third spelling: it stripped ".0" but left "2.5" with a dot inside a Slovak page.
+ *
+ * Never rounded to a whole number. 1,5- and 2,5-izbový are real categories, with 78 426
+ * and 14 145 units behind them — rounding would merge them into their neighbours.
+ *
+ * Grouping follows the same sk-SK presentation the surrounding money and area columns
+ * already use, so one row never mixes two conventions. That app-wide choice lives with
+ * `money.js` and the price renderers; this helper deliberately does not diverge from it.
+ *
+ * Returns the input untouched when it is not a number, so a text dimension is safe to
+ * pass through.
+ */
+export function formatDimNumber(v) {
+  if (v === null || v === undefined || v === "") return v;
+  const n = Number(v);
+  return Number.isFinite(n) ? n.toLocaleString("sk-SK", { maximumFractionDigits: 2 }) : String(v);
+}

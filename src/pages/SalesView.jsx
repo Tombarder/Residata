@@ -17,6 +17,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useCurrency } from "../lib/useCurrency";
 import { moneyFromEur, moneySymbol, moneyToEur } from "../lib/money";
+import { formatDimNumber } from "../lib/locale";
 import { useSales } from "../lib/useData";
 import { useCountry, isAllCountries } from "../lib/useCountry";
 import { useAccountPrefState } from "../lib/useAccountUiPref";
@@ -177,6 +178,10 @@ function fmtCell(kind, v, lang) {
   if (kind === "per_m2") return Number.isFinite(n) ? Math.round(moneyFromEur(n)).toLocaleString("sk-SK").replace(/,/g, " ") + " " + moneySymbol() : "—";
   if (kind === "area") return Number.isFinite(n) ? n.toLocaleString("sk-SK", { maximumFractionDigits: 1 }) + " m²" : "—";
   if (kind === "date") return fmtDay(v, lang);
+  /* A numeric column arrives from Postgres as a STRING, so String(v) printed "6.0" for a
+     room count — and this page said "1.5" where the Unit database said "1,5" for the same
+     flat. Both read locale.js now. */
+  if (kind === "num") return String(formatDimNumber(v));
   return String(v);
 }
 
@@ -437,7 +442,10 @@ export default function SalesView({ lang = "sk" }) {
      flat. The label is tidied, the VALUE sent to the engine is untouched. */
   const prettyValue = (key) => {
     if (key === "detection_method") return (v) => (v === "marked" ? t("označené", "marked") : v === "disappeared" ? t("zmizol", "delisted") : v);
-    if (key === "izby" || key === "poschodie") return (v) => String(v).replace(/\.0$/, "");
+    /* Was `String(v).replace(/\.0$/, "")` — which tidied "6.0" but left "2.5" with a DOT,
+       so this page and the Unit database printed the same room count two different ways.
+       One formatter now, in locale.js. */
+    if (key === "izby" || key === "poschodie") return (v) => String(formatDimNumber(v));
     return null;
   };
   const useValues = (key, enabled) => ({
@@ -483,17 +491,31 @@ export default function SalesView({ lang = "sk" }) {
     // Money columns: export in the SAME display currency the table shows (converted +
     // symbol in the header), so the CSV never silently disagrees with the on-screen values.
     const sym = moneySymbol();
-    const head = visibleCols.map((c) => {
+    /* "Days on market" renders as "≥ 90" on screen when the unit was already listed before
+       tracking began — the number is a FLOOR, not a measurement. Exporting a bare 90 hands
+       the reader a figure that looks exact and is not, and an average built on those is
+       wrong in one direction. The number stays numeric so Excel can still use it, and the
+       censoring rides beside it in its own column instead of being dropped. */
+    const censorAfter = visibleCols.findIndex((c) => c[0] === "days_on_market");
+    const censorHead = t("Od prvého zachytenia", "From first sight");
+    const withCensor = (arr) => (censorAfter < 0 ? arr : [...arr.slice(0, censorAfter + 1), null, ...arr.slice(censorAfter + 1)]);
+    const head = withCensor(visibleCols.map((c) => {
       const base = c[3] === "per_m2" ? `${sym}/m²` : (lang === "sk" ? c[1] : c[2]);
       return c[3] === "eur" ? `${base} (${sym})` : base;
-    }).join(";");
-    const lines = detRows.map((r) => visibleCols.map((c) => {
+    })).map((h) => (h === null ? censorHead : h)).join(";");
+    const lines = detRows.map((r) => withCensor(visibleCols).map((c) => {
+      if (c === null) return r.left_censored ? t("áno", "yes") : t("nie", "no");
       const v = r[c[0]];
       if (c[3] === "eur" || c[3] === "per_m2") return v == null ? "" : Math.round(moneyFromEur(Number(v)));
       /* The file says what the screen says. The sale signal renders as "označené" in the
          table and was exporting as "marked" — a column whose meaning changes between the
          page and the download is the same fault as a currency that does. */
-      const pretty = prettyValue(c[0]);
+      /* Display formatting is NOT export formatting. A numeric column exports its raw
+         number: the areas and prices in this file are dot-decimal, and sending "2,5" for
+         a room count beside "76.25" for an area makes one file speak two conventions.
+         Text enums still go out as the screen shows them — that is the "označené" vs
+         "marked" rule, and it does not apply to numbers. */
+      const pretty = c[3] === "num" ? null : prettyValue(c[0]);
       const shown = pretty && v != null ? pretty(v) : v;
       return shown == null ? "" : String(shown).replace(/;/g, ",");
     }).join(";"));

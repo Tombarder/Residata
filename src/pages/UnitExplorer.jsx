@@ -9,6 +9,7 @@ import FieldPanel from "../components/FieldPanel";
 import { useCountry, isAllCountries } from "../lib/useCountry";
 import { useCurrency } from "../lib/useCurrency";
 import { moneyFromEur, moneySymbol } from "../lib/money";
+import { formatDimNumber } from "../lib/locale";
 import { useUnitsInfinite, useAnalyticsRegistry, usePivotDistinct } from "../lib/useData";
 import { useAccountPrefState } from "../lib/useAccountUiPref";
 import { EMPTY_SENTINEL, MODE_LABEL, capabilitiesOf, newFilter, sanitizeFilter,
@@ -56,13 +57,14 @@ const CAT_LABEL = {
   en: { loc: "Location", proj: "Project", unit: "Unit", price: "Price", area: "Areas", time: "Time", other: "Other" },
 };
 
-function fmtVal(key, val, fmtByKey) {
+function fmtVal(key, val, fmtByKey, numeric) {
   if (val == null || val === "") return "—";
   const f = fmtByKey[key];
   const n = Number(val);
   if (f === "eur" && Number.isFinite(n)) return moneySymbol() + Math.round(moneyFromEur(n)).toLocaleString("sk-SK").replace(/,/g, " ");
   if (f === "per_m2" && Number.isFinite(n)) return Math.round(moneyFromEur(n)).toLocaleString("sk-SK").replace(/,/g, " ") + " " + moneySymbol() + "/m²";
   if (f === "area" && Number.isFinite(n)) return n.toLocaleString("sk-SK", { maximumFractionDigits: 1 }) + " m²";
+  if (numeric && Number.isFinite(n)) return formatDimNumber(val);
   return String(val);
 }
 
@@ -194,10 +196,23 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
      page — it was the one thing the hard-coded controls did better than a generic row. */
   /* How the panel gets values for a categorical filter. Passed in rather than imported by
      the panel, so Sales can hand it its own live facets while the control stays identical. */
-  const useValues = (key, enabled) => usePivotDistinct({
-    enabled, field: key, mode,
-    city: key === "cast" ? (cityScope || null) : null,
-  });
+  const useValues = (key, enabled) => {
+    const res = usePivotDistinct({
+      enabled, field: key, mode,
+      city: key === "cast" ? (cityScope || null) : null,
+    });
+    /* The value list came straight from the grain, so a room filter offered "1.0" and
+       "2.0" while the column beside it said 1 and 2. The ENGINE still receives the stored
+       value — only the label is tidied, which is why these go out as {value,label}. */
+    const numeric = fields.find((f) => f.key === key)?.type === "numeric";
+    return useMemo(() => {
+      if (!numeric) return res;
+      return { ...res, values: (res.values || []).map((v) => {
+        if (v && typeof v === "object") return v;
+        return { value: v, label: String(formatDimNumber(v)) };
+      }) };
+    }, [res, numeric]);
+  };
 
   const cityScope = useMemo(() => {
     const f = filters.find((x) => x.key === "city" && x.mode === "in" && (x.values || []).length === 1);
@@ -488,7 +503,7 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
                         // Nová Myslivna sells one Shell&Core unit inside an
                         // otherwise standard project.
                         const marks = k === "cena_s_dph" ? marksFor.unit(r, r.project_id || r.project_name) : null;
-                        return <td key={k} style={{ height: ROW_H, boxSizing: "border-box", padding: "0 0.7rem", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: numeric ? "right" : "left", borderTop: `1px solid var(--surface)`, color: k === effSort.key ? text : "var(--text-2)", fontFamily: numeric ? mono : "inherit", fontVariantNumeric: "tabular-nums" }}>{fmtVal(k, r[k], fmtByKey)}<UnitPriceMarks items={marks} lang={lang} compact /></td>;
+                        return <td key={k} style={{ height: ROW_H, boxSizing: "border-box", padding: "0 0.7rem", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: numeric ? "right" : "left", borderTop: `1px solid var(--surface)`, color: k === effSort.key ? text : "var(--text-2)", fontFamily: numeric ? mono : "inherit", fontVariantNumeric: "tabular-nums" }}>{fmtVal(k, r[k], fmtByKey, numeric)}<UnitPriceMarks items={marks} lang={lang} compact /></td>;
                       })}
                     </tr>
                   );
