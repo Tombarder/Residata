@@ -576,6 +576,78 @@ async function applySubscription(admin, stripe, sub, { deleted = false } = {}) {
   else console.log(`[stripe webhook] ${deleted ? "deleted" : status} → user ${userId} paid_until=${patch.paid_until || "(unchanged)"}`);
 }
 
+/**
+ * reconcile — the safety net for a webhook that never arrived.
+ *
+ * 🔴 WHY THIS EXISTS (2026-09-14). The webhook was the ONLY thing that ever
+ * wrote `paid_until`, and on this date the Stripe account's only destination
+ * turned out to point at the OTHER product's server: Residata's own endpoint was
+ * registered nowhere. Nothing had been lost — there were no subscriptions yet —
+ * but the first customer to convert would have been charged and left on the free
+ * tier, permanently, with no process that would ever notice.
+ *
+ * A single delivery path with no second chance is the actual defect; the wrong
+ * URL was only how it surfaced. KamhalCo, the sister product, has had exactly
+ * this net since its own audit (`stripe_reconcile.py`, "a net for lost/failed
+ * webhooks") and that is why its billing survived the same misconfiguration.
+ *
+ * Stripe is the source of truth here and we simply re-apply it, which is safe
+ * because `applySubscription` is idempotent by construction: it extends
+ * `paid_until` only FORWARD, sets `paid_started_at` only when unset, and leaves
+ * grace states untouched.
+ *
+ * 🔴 TERMINAL SUBSCRIPTIONS ARE DELIBERATELY SKIPPED, and the reason matters.
+ * A missed *cancellation* costs nothing: `paid_until` still holds the period end
+ * the customer already paid for, so access lapses on its own. Re-applying one
+ * here would instead stamp `paid_until = now()` on every run, so a user who
+ * cancelled months ago would read as "paid until today" forever — a cosmetic lie
+ * that grows every night. The harm worth fixing is the opposite one: somebody
+ * PAID and did not get access.
+ */
+async function handleReconcile(req, res) {
+  // Same auth as the monthly-reports cron: Vercel's bearer token when CRON_SECRET
+  // is configured, otherwise the header Vercel always adds to cron invocations.
+  const secret = process.env.CRON_SECRET;
+  const authHeader = req.headers.authorization || req.headers.Authorization || "";
+  const isVercelCron = req.headers["x-vercel-cron"] === "1";
+  const tokenOk = secret && authHeader === `Bearer ${secret}`;
+  if (secret ? !tokenOk : !isVercelCron) return res.status(401).json({ error: "unauthorized" });
+
+  const stripe = getStripe();
+  const admin = getSupabaseAdmin();
+
+  const TERMINAL = ["canceled", "unpaid", "incomplete_expired"];
+  // A ceiling so one bad day cannot run the function out of time. Far above any
+  // plausible book for a long while; when it is ever hit, the response says so
+  // rather than silently reconciling a subset.
+  const MAX = 1000;
+
+  let scanned = 0, applied = 0, skipped = 0, failed = 0, truncated = false;
+  const problems = [];
+
+  for await (const sub of stripe.subscriptions.list({ status: "all", limit: 100 })) {
+    if (scanned >= MAX) { truncated = true; break; }
+    scanned++;
+    if (TERMINAL.includes(sub.status)) { skipped++; continue; }
+    try {
+      await applySubscription(admin, stripe, sub);
+      applied++;
+    } catch (e) {
+      failed++;
+      problems.push({ subscription: sub.id, error: String(e?.message || e).slice(0, 200) });
+    }
+  }
+
+  // Loud in the log when something did not apply — a reconcile that quietly
+  // fails is the same blind spot it was built to remove.
+  if (failed) console.error(`[stripe reconcile] ${failed} of ${scanned} failed`, problems);
+  else console.log(`[stripe reconcile] scanned=${scanned} applied=${applied} skipped=${skipped}`);
+
+  return res.status(failed ? 500 : 200).json({
+    ok: failed === 0, scanned, applied, skipped, failed, truncated, problems,
+  });
+}
+
 async function handleWebhook(req, res) {
   const stripe = getStripe();
   const whSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -685,6 +757,7 @@ export default async function handler(req, res) {
     if (action === "portal") return await handlePortal(req, res);
     if (action === "set-price") return await handleSetPrice(req, res);
     if (action === "webhook") return await handleWebhook(req, res);
+    if (action === "reconcile") return await handleReconcile(req, res);
     return res.status(400).json({ error: "unknown action" });
   } catch (e) {
     console.error("[stripe] crash", e);
