@@ -14,7 +14,7 @@
    the bottom half… also the data in the dropdown menus".)
 
    Built for the comparable-projects pricing workflow (e.g. Nitra). */
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useCurrency } from "../lib/useCurrency";
 import { moneyFromEur, moneySymbol, moneyToEur } from "../lib/money";
 import { useSales } from "../lib/useData";
@@ -51,27 +51,32 @@ const DETAIL_COLS_PIPE = [
   ["obytna_plocha", "Plocha", "Area", "area"], ["price_s_dph_eur", "Cena", "Price", "eur"],
   ["price_per_m2_eur", "€/m²", "€/m²", "per_m2"], ["kolaudacia_label", "Kolaudácia", "Completion", "text"],
 ];
-// Per-column FILTER kind for the detail-table column filters (server-side via
-// analytics_sales detail_filters). "cat" = in-list dropdown, "num" = min/max range,
-// "date" = from/to. Columns not listed here get no filter control.
-const COL_FILTER_KIND = {
-  sold_date: "date",
-  project_name: "cat", city: "cat", typ: "cat", detection_method: "cat", kolaudacia_label: "cat",
-  izby: "num", obytna_plocha: "num", price_s_dph_eur: "num", price_per_m2_eur: "num", days_on_market: "num",
-};
-// Width of each column's filter control. Fixed, because a table in auto layout sizes a
-// column to its widest content: an elastic dropdown holding "Rezidencia Mierová" would
-// drag the whole column that wide and shove the money columns off the screen.
-const COL_FILTER_W = {
-  sold_date: 108, project_name: 146, city: 104, typ: 88, detection_method: 100,
-  kolaudacia_label: 112, izby: 50, obytna_plocha: 58, price_s_dph_eur: 68,
-  price_per_m2_eur: 62, days_on_market: 56,
-};
-// Money columns are stored in EUR but typed by the user in the DISPLAY currency → convert.
-const MONEY_COLS = new Set(["price_s_dph_eur", "price_per_m2_eur"]);
 // The scope filters at the top of the page. Their option lists are recomputed live from the
 // current selection (analytics_sales mode:'facets'), each one excluding its own filter.
 const BASE_FACETS = ["city", "developer", "typ", "project_name"];
+
+/* Everything else you can narrow by, added on demand instead of standing there as a wall.
+   Until 2026-09-14 these lived in a SECOND filter row under the table header, which
+   narrowed only the unit list while the KPIs and the breakdown above went on describing
+   the whole period — so the page could read "324 predaných · €98m" over a list of forty,
+   and project / city / type / date appeared in BOTH rows doing different things. Boss:
+   masses of filters, duplicates, no telling what is for what.
+
+   There is one scope now. analytics_sales learned numeric ranges the same day, so each of
+   these narrows the totals, the breakdown and the list together — which is the only way
+   the three numbers on screen can be read against each other. */
+const EXTRA_FIELDS = [
+  { key: "district",         sk: "Mestská časť",  en: "District",      kind: "cat" },
+  { key: "izby",             sk: "Izby",          en: "Rooms",         kind: "cat" },
+  { key: "kolaudacia_label", sk: "Kolaudácia",    en: "Completion",    kind: "cat" },
+  { key: "poschodie",        sk: "Poschodie",     en: "Floor",         kind: "cat" },
+  { key: "orientacia",       sk: "Orientácia",    en: "Orientation",   kind: "cat" },
+  { key: "detection_method", sk: "Zdroj predaja", en: "Sale signal",   kind: "cat", soldOnly: true },
+  { key: "price_s_dph_eur",  sk: "Cena",          en: "Price",         kind: "num", money: true },
+  { key: "price_per_m2_eur", sk: "€/m²",          en: "€/m²",          kind: "num", money: true },
+  { key: "obytna_plocha",    sk: "Plocha (m²)",   en: "Area (m²)",     kind: "num" },
+  { key: "days_on_market",   sk: "Dní na trhu",   en: "Days on market", kind: "num", soldOnly: true },
+];
 
 // Per-column plain-language explainers (rendered as an "i" tooltip on the header),
 // for the columns whose meaning / calculation isn't self-evident. Same voice as the
@@ -160,12 +165,17 @@ export default function SalesView({ lang = "sk" }) {
   const [sort, setSort] = useState({ key: "sold_date", dir: "desc" });
   // Per-column filters on the detail table. Shape per column: "cat" → string value;
   // "num" → { min, max } (display-currency strings for money cols); "date" → { from, to }.
-  const [colFilters, setColFilters] = useState({});
+  /* Extra scope filters the user adds — {id, key, values[], min, max}. One scope: these go
+     into the SAME `filters` the four pickers above use, so they narrow the KPIs, the
+     breakdown and the unit list together. */
+  const [extra, setExtra] = useState([]);
+  const xId = useRef(0);
+  const [addingFilter, setAddingFilter] = useState(false);
 
   // Remember the Sales filters per-account, across devices (localStorage + ui_prefs).
   useAccountPrefState(
     "salesFilters",
-    { status, days, customFrom, customTo, durableOnly, projects, fCity, fDev, fTyp, groupBy, sort, colFilters },
+    { status, days, customFrom, customTo, durableOnly, projects, fCity, fDev, fTyp, groupBy, sort, extra },
     (s) => {
       if (s.status !== undefined) setStatus(s.status);
       if (s.days !== undefined) setDays(s.days);
@@ -178,13 +188,21 @@ export default function SalesView({ lang = "sk" }) {
       if (s.fTyp !== undefined) setFTyp(s.fTyp);
       if (s.groupBy !== undefined) setGroupBy(s.groupBy);
       if (s.sort && typeof s.sort === "object") setSort(s.sort);
-      if (s.colFilters && typeof s.colFilters === "object") setColFilters(s.colFilters);
+      if (Array.isArray(s.extra)) {
+        const clean = s.extra
+          .filter((x) => x && typeof x.key === "string" && EXTRA_FIELDS.some((f) => f.key === x.key))
+          .map((x, i) => ({ id: i + 1, key: x.key, values: Array.isArray(x.values) ? x.values.map(String) : [],
+                            min: x.min == null ? "" : String(x.min), max: x.max == null ? "" : String(x.max) }));
+        setExtra(clean);
+        xId.current = clean.length;
+      }
     },
   );
 
   const date_from = customFrom || isoDaysAgo(days);
   const date_to = customTo || isoToday();
 
+  const curSymForFilters = moneySymbol();   // dep: re-convert typed money bounds on a currency switch
   const baseFilters = useMemo(() => {
     const f = {};
     // Global country → market_key. Country codes are 'SK'/'CZ'; the sale facts
@@ -194,8 +212,25 @@ export default function SalesView({ lang = "sk" }) {
     if (fCity) f.city = [fCity];
     if (fDev) f.developer = [fDev];
     if (fTyp) f.typ = [fTyp];
+    /* The extras join the SAME object. A categorical one is an in-list; a numeric one is a
+       {min,max} range, which analytics_sales accepts on the scope since 2026-09-14 — before
+       that a price band could only narrow the list, which is what made this page need two
+       of everything. Money is typed in the display currency and stored in EUR. */
+    for (const x of extra) {
+      const meta = EXTRA_FIELDS.find((m) => m.key === x.key);
+      if (!meta) continue;
+      if (meta.kind === "cat") {
+        if (x.values && x.values.length) f[x.key] = x.values;
+      } else {
+        const conv = meta.money ? (v) => moneyToEur(Number(v)) : (v) => Number(v);
+        const o = {};
+        if (x.min !== "" && !Number.isNaN(Number(x.min))) o.min = conv(x.min);
+        if (x.max !== "" && !Number.isNaN(Number(x.max))) o.max = conv(x.max);
+        if ("min" in o || "max" in o) f[x.key] = o;
+      }
+    }
     return f;
-  }, [country, projects, fCity, fDev, fTyp]);
+  }, [country, projects, fCity, fDev, fTyp, extra, curSymForFilters]);
 
   // sale-only sort keys are invalid for the current-pipeline views → fall back to price
   const effSort = isPipe && (sort.key === "sold_date" || sort.key === "days_on_market") ? { key: "price_s_dph_eur", dir: "desc" } : sort;
@@ -204,40 +239,10 @@ export default function SalesView({ lang = "sk" }) {
   const detailColSpan = visibleCols.length; // full-row cells must span the ACTUAL visible column count (varies sold vs pipeline)
   const SORTABLE = isPipe ? ["price_s_dph_eur", "price_per_m2_eur", "izby", "obytna_plocha", "city", "project_name"]
                           : ["sold_date", "price_s_dph_eur", "price_per_m2_eur", "days_on_market", "izby", "obytna_plocha", "city", "project_name"];
-  // ── detail-table per-column filters → server-side `detail_filters` ──
-  // Only columns VISIBLE in the current mode are applied (sold vs pipeline differ), so a
-  // dormant sold-only filter (e.g. signal) doesn't silently narrow the pipeline view —
-  // and it's preserved for when the user switches back. Money thresholds are typed in the
-  // display currency → converted to EUR (curSym is a dep so they re-convert on a switch).
-  const curSym = moneySymbol();
-  const visibleColKeys = useMemo(() => new Set(visibleCols.map((c) => c[0])), [detailCols]); // eslint-disable-line
-  const detailFilters = useMemo(() => {
-    const out = {};
-    for (const [key, val] of Object.entries(colFilters)) {
-      const kind = COL_FILTER_KIND[key];
-      if (!kind || val == null || !visibleColKeys.has(key)) continue;
-      if (kind === "cat") {
-        if (val) out[key] = { values: [val] };
-      } else if (kind === "num") {
-        const conv = MONEY_COLS.has(key) ? (x) => moneyToEur(Number(x)) : (x) => Number(x);
-        const o = {};
-        if (val.min != null && val.min !== "" && !Number.isNaN(Number(val.min))) o.min = conv(val.min);
-        if (val.max != null && val.max !== "" && !Number.isNaN(Number(val.max))) o.max = conv(val.max);
-        if ("min" in o || "max" in o) out[key] = o;
-      } else if (kind === "date") {
-        const o = {};
-        if (val.from) o.from = val.from;
-        if (val.to) o.to = val.to;
-        if ("from" in o || "to" in o) out[key] = o;
-      }
-    }
-    return out;
-  }, [colFilters, visibleColKeys, curSym]); // eslint-disable-line -- curSym: re-convert money thresholds on currency switch
-
   const common = { status, date_from, date_to, durable_only: durableOnly, filters: baseFilters };
   const summarySpec = useMemo(() => ({ ...common, mode: "summary" }), [JSON.stringify(common)]);       // eslint-disable-line
   const breakdownSpec = useMemo(() => ({ ...common, mode: "breakdown", group_by: groupBy }), [JSON.stringify(common), groupBy]); // eslint-disable-line
-  const detailSpec = useMemo(() => ({ ...common, mode: "detail", sort: [effSort], limit: DETAIL_LIMIT, detail_filters: detailFilters }), [JSON.stringify(common), JSON.stringify(effSort), JSON.stringify(detailFilters)]); // eslint-disable-line
+  const detailSpec = useMemo(() => ({ ...common, mode: "detail", sort: [effSort], limit: DETAIL_LIMIT }), [JSON.stringify(common), JSON.stringify(effSort)]); // eslint-disable-line
 
   // ── LIVE FACETS: what can still be picked, given everything already picked ──
   // Both filter rows are populated from the SAME facts the page is showing, not from a
@@ -246,21 +251,20 @@ export default function SalesView({ lang = "sk" }) {
   // is excluded server-side, so choosing a city never collapses the city list to that one
   // city. `base` = the scope row at the top; `detail` = the per-column row above the unit
   // list, which additionally sees the other column filters (it drills inside the scope).
-  const baseFacetSpec = useMemo(() => ({ ...common, mode: "facets", facet_scope: "base", facets: BASE_FACETS }), [JSON.stringify(common)]); // eslint-disable-line
-  const detailFacetKeys = useMemo(
-    () => visibleCols.filter((c) => COL_FILTER_KIND[c[0]]).map((c) => c[0]),
-    [detailCols], // eslint-disable-line
-  );
-  const detailFacetSpec = useMemo(
-    () => ({ ...common, mode: "facets", facet_scope: "detail", facets: detailFacetKeys, detail_filters: detailFilters }),
-    [JSON.stringify(common), JSON.stringify(detailFacetKeys), JSON.stringify(detailFilters)], // eslint-disable-line
-  );
-
+  /* ONE facet request now, not two. The second one existed only to feed the per-column
+     filter row; with a single scope, the same call feeds the four pickers and whatever
+     extra categorical filters are on screen — so every interaction costs one round trip
+     instead of two, and no two option lists can be computed from different scopes. */
+  const facetKeys = useMemo(() => {
+    const extraCat = extra.map((x) => x.key)
+      .filter((k) => EXTRA_FIELDS.some((f) => f.key === k && f.kind === "cat"));
+    return [...new Set([...BASE_FACETS, ...extraCat])];
+  }, [extra]);
+  const baseFacetSpec = useMemo(() => ({ ...common, mode: "facets", facet_scope: "base", facets: facetKeys }), [JSON.stringify(common), JSON.stringify(facetKeys)]); // eslint-disable-line
   const sum = useSales({ enabled: true, spec: summarySpec });
   const brk = useSales({ enabled: true, spec: breakdownSpec });
   const det = useSales({ enabled: true, spec: detailSpec });
   const fac = useSales({ enabled: true, spec: baseFacetSpec });
-  const facDet = useSales({ enabled: true, spec: detailFacetSpec });
 
   const S = sum.data || {};
   const brkRows = brk.data?.rows || [];
@@ -293,29 +297,24 @@ export default function SalesView({ lang = "sk" }) {
   const projOptions = useMemo(() => facetOptions(fac.data, "project_name", projects), [fac.data, projects]);
 
   const toggleProject = (name) => setProjects((p) => p.includes(name) ? p.filter((x) => x !== name) : [...p, name]);
-  const clearFilters = () => { setProjects([]); setFCity(""); setFDev(""); setFTyp(""); };
-  const activeFilters = projects.length + [fCity, fDev, fTyp].filter(Boolean).length;
-  const toggleSort = (k) => setSort((s) => (s.key === k ? { key: k, dir: s.dir === "asc" ? "desc" : "asc" } : { key: k, dir: "desc" }));
-
-  // ── detail-table column-filter helpers ──
-  const setColCat = (key, v) => setColFilters((f) => { const n = { ...f }; if (v) n[key] = v; else delete n[key]; return n; });
-  const setColBound = (key, bound, v) => setColFilters((f) => {
-    const cur = (f[key] && typeof f[key] === "object") ? f[key] : {};
-    const nv = { ...cur, [bound]: v };
-    const empty = ["min", "max", "from", "to"].every((b) => (nv[b] ?? "") === "");
-    const n = { ...f };
-    if (empty) delete n[key]; else n[key] = nv;
-    return n;
-  });
-  const clearColFilters = () => setColFilters({});
-  const activeColCount = Object.keys(detailFilters).length;
-  // Column-filter options come from the DETAIL facets — the values present across the WHOLE
-  // selection, not just the 500 rows fetched for the page (which is what the kolaudácia list
-  // used to be built from, so it silently offered only what happened to be on screen).
-  const colOptions = (key) => facetOptions(facDet.data, key, colFilters[key],
+  const clearFilters = () => { setProjects([]); setFCity(""); setFDev(""); setFTyp(""); setExtra([]); };
+  const extraActive = (x) => {
+    const meta = EXTRA_FIELDS.find((m) => m.key === x.key);
+    return meta && (meta.kind === "cat" ? (x.values || []).length > 0 : x.min !== "" || x.max !== "");
+  };
+  const activeFilters = projects.length + [fCity, fDev, fTyp].filter(Boolean).length + extra.filter(extraActive).length;
+  const addExtra = (key) => { setExtra((a) => (a.some((x) => x.key === key) ? a : [...a, { id: ++xId.current, key, values: [], min: "", max: "" }])); setAddingFilter(false); };
+  const patchExtra = (id, patch) => setExtra((a) => a.map((x) => (x.id === id ? { ...x, ...patch } : x)));
+  const removeExtra = (id) => setExtra((a) => a.filter((x) => x.id !== id));
+  /* Options for an extra categorical filter come from the same facet call as the pickers,
+     so every list describes the same scope. */
+  const extraOptions = (key) => facetOptions(fac.data, key, extra.find((x) => x.key === key)?.values,
     key === "detection_method" ? (v) => (v === "marked" ? t("označené", "marked") : v === "disappeared" ? t("zmizol", "delisted") : v) : null);
-  // Available min/max for a numeric / date column, under every OTHER active filter.
-  const colRange = (key) => facDet.data?.ranges?.[key] || null;
+  /* Sale-only fields make no sense on the reserved / pre-reserved views — the unit has not
+     sold, so it has no signal and no days-on-market. They are hidden rather than offered
+     and then rejected by the engine. */
+  const availableExtras = EXTRA_FIELDS.filter((f) => !(isPipe && f.soldOnly) && !extra.some((x) => x.key === f.key));
+  const toggleSort = (k) => setSort((s) => (s.key === k ? { key: k, dir: s.dir === "asc" ? "desc" : "asc" } : { key: k, dir: "desc" }));
 
   const exportCsv = () => {
     // Money columns: export in the SAME display currency the table shows (converted +
@@ -430,6 +429,50 @@ export default function SalesView({ lang = "sk" }) {
               <span className="rd-chip__label">{p}</span><span className="rd-chip__x">✕</span>
             </span>
           ))}
+
+          {/* Extra scope filters, added on demand. Same row and the same `filters` object as
+              the four pickers, so nothing here means something different from anything
+              there — which is the whole point of removing the second scope. */}
+          {extra.map((x) => {
+            const meta = EXTRA_FIELDS.find((m) => m.key === x.key);
+            if (!meta) return null;
+            const label = t(meta.sk, meta.en);
+            return (
+              <span key={x.id} style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem",
+                     border: `1px solid ${extraActive(x) ? "var(--accent)" : "var(--border)"}`, borderRadius: 6,
+                     padding: "0.12rem 0.3rem 0.12rem 0.45rem", background: "var(--bg)" }}>
+                <span style={{ fontSize: "0.72rem", color: "var(--text-dim)", whiteSpace: "nowrap" }}>{label}</span>
+                {meta.kind === "cat" ? (
+                  <Picker multi searchable width={138} sk={lang === "sk"}
+                    value={x.values} onChange={(v) => patchExtra(x.id, { values: v })}
+                    options={extraOptions(x.key)} ariaLabel={label}
+                    placeholder={t("všetky", "all")} />
+                ) : (<>
+                  <input className="rd-field rd-field--sm" style={{ width: 74 }} inputMode="decimal"
+                    value={x.min} onChange={(e) => patchExtra(x.id, { min: e.target.value })}
+                    placeholder={meta.money ? `${t("od", "from")} ${moneySymbol()}` : t("od", "from")} aria-label={`${label} ${t("od", "from")}`} />
+                  <input className="rd-field rd-field--sm" style={{ width: 74 }} inputMode="decimal"
+                    value={x.max} onChange={(e) => patchExtra(x.id, { max: e.target.value })}
+                    placeholder={meta.money ? `${t("do", "to")} ${moneySymbol()}` : t("do", "to")} aria-label={`${label} ${t("do", "to")}`} />
+                </>)}
+                <span onClick={() => removeExtra(x.id)} title={t("Odstrániť filter", "Remove filter")}
+                  style={{ cursor: "pointer", color: "var(--text-faint)", fontSize: "0.78rem", padding: "0 0.15rem" }}>✕</span>
+              </span>
+            );
+          })}
+
+          {availableExtras.length > 0 && (
+            addingFilter ? (
+              <Picker searchable width={178} sk={lang === "sk"} value="" onChange={(v) => v && addExtra(v)}
+                ariaLabel={t("Ďalší filter", "Another filter")} placeholder={t("vyber pole…", "pick a field…")}
+                options={availableExtras.map((f) => ({ value: f.key, label: t(f.sk, f.en) }))} />
+            ) : (
+              <button className="rd-btn rd-btn--ghost rd-btn--sm" onClick={() => setAddingFilter(true)}>
+                + {t("Ďalší filter", "Another filter")}
+              </button>
+            )
+          )}
+
           {activeFilters > 0 && (
             <button className="rd-btn rd-btn--ghost rd-btn--sm" onClick={clearFilters}>✕ {t("vyčistiť", "clear")}</button>
           )}
@@ -516,14 +559,10 @@ export default function SalesView({ lang = "sk" }) {
             <span className="rd-sect__tick" />
             <span className="rd-sect__name">{t("Konkrétne byty", "The exact units")}</span>
             {detRows.length > 0 && <span className="rd-sect__count">{fmtInt(detRows.length)}{detHasMore ? "+" : ""}</span>}
-            <InfoTip label={t("Filtre stĺpcov", "Column filters")} text={t("Filtre pod hlavičkou tabuľky zúžia TENTO zoznam bytov (na serveri, cez celý výber — nie len zobrazených 500). Súhrny a rozpad hore ostávajú za celé zvolené obdobie.", "The filters under the table header narrow THIS list of units (server-side, across the whole selection — not just the 500 shown). The totals and breakdown above stay for the full selected period.")} />
+            {/* The tooltip that used to live here explained why this list could disagree
+                with the totals above it. With one scope there is nothing to explain. */}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-            {activeColCount > 0 && (
-              <button className="rd-btn rd-btn--warn rd-btn--sm" onClick={clearColFilters} title={t("Zrušiť filtre stĺpcov", "Clear column filters")}>
-                ✕ {t("Filtre stĺpcov", "Column filters")} ({activeColCount})
-              </button>
-            )}
             <button className="rd-btn rd-btn--primary rd-btn--sm" onClick={exportCsv} disabled={!detRows.length}>⬇ CSV</button>
           </div>
         </div>
@@ -543,55 +582,6 @@ export default function SalesView({ lang = "sk" }) {
                       {c[3] === "per_m2" ? `${moneySymbol()}/m²` : t(c[1], c[2])}
                       {on && <span style={{ marginLeft: 3 }}>{effSort.dir === "asc" ? "▲" : "▼"}</span>}
                       {COL_INFO[c[0]] && <span style={{ marginLeft: 5, display: "inline-block", verticalAlign: "middle" }}><InfoTip text={t(COL_INFO[c[0]].sk, COL_INFO[c[0]].en)} label={t(c[1], c[2])} /></span>}
-                    </th>
-                  );
-                })}
-              </tr>
-              {/* per-column filter row (server-side; narrows THIS list, not the totals above) */}
-              <tr>
-                {visibleCols.map((c) => {
-                  const kind = COL_FILTER_KIND[c[0]];
-                  const money = MONEY_COLS.has(c[0]);
-                  const cur = colFilters[c[0]];
-                  const w = COL_FILTER_W[c[0]];
-                  // Live range for this column under every OTHER active filter. Shown as a hint
-                  // line AND fed to the input's own min/max, so the control can't offer a value
-                  // that would return nothing. Money bounds convert EUR → display currency.
-                  const rng = kind === "num" || kind === "date" ? colRange(c[0]) : null;
-                  const rngTxt = rng ? fmtRange(c[3], rng, lang) : null;
-                  const bound = (v) => (v == null ? undefined : (money ? Math.round(moneyFromEur(Number(v))) : v));
-                  return (
-                    <th key={c[0]} className="rd-th--filter">
-                      {kind === "cat" && (
-                        <Picker small searchable width={w} sk={lang === "sk"}
-                          value={typeof cur === "string" ? cur : ""} onChange={(v) => setColCat(c[0], v)}
-                          ariaLabel={t(c[1], c[2])} placeholder={t("Všetky", "All")}
-                          options={[{ value: "", label: t("Všetky", "All") }, ...colOptions(c[0])]} />
-                      )}
-                      {kind === "num" && (
-                        <div style={{ display: "flex", gap: 3, justifyContent: "flex-end" }}>
-                          <input type="number" inputMode="numeric" className="rd-field rd-field--sm rd-field--num" placeholder={t("od", "min")} value={cur?.min ?? ""}
-                            min={bound(rng?.min)} max={bound(rng?.max)} style={{ width: w }}
-                            aria-label={`${t(c[1], c[2])} ${t("od", "min")}`} onChange={(e) => setColBound(c[0], "min", e.target.value)} />
-                          <input type="number" inputMode="numeric" className="rd-field rd-field--sm rd-field--num" placeholder={t("do", "max")} value={cur?.max ?? ""}
-                            min={bound(rng?.min)} max={bound(rng?.max)} style={{ width: w }}
-                            aria-label={`${t(c[1], c[2])} ${t("do", "max")}`} onChange={(e) => setColBound(c[0], "max", e.target.value)} />
-                        </div>
-                      )}
-                      {kind === "date" && (
-                        <div style={{ display: "flex", gap: 3 }}>
-                          <DateField small value={cur?.from ?? ""} width={w} ariaLabel={`${t(c[1], c[2])} ${t("od", "from")}`}
-                            onChange={(e) => setColBound(c[0], "from", e.target.value)} style={{ minWidth: 0 }} />
-                          <DateField small value={cur?.to ?? ""} width={w} ariaLabel={`${t(c[1], c[2])} ${t("do", "to")}`}
-                            onChange={(e) => setColBound(c[0], "to", e.target.value)} style={{ minWidth: 0 }} />
-                        </div>
-                      )}
-                      {rngTxt && (
-                        <div className="rd-filter-hint" title={t("Čo je ešte dostupné pri aktuálnom výbere", "What is still available under the current selection")}
-                          style={{ textAlign: kind === "num" ? "right" : "left" }}>
-                          {rngTxt}
-                        </div>
-                      )}
                     </th>
                   );
                 })}
