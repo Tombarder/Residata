@@ -445,14 +445,22 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
 
   return (
     <div style={{ color: text, fontFamily: "'Inter', system-ui, sans-serif" }}>
-      {/* header + mode toggle */}
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: "0.75rem", marginBottom: "0.9rem" }}>
-        <div style={{ position: "relative", overflow: "hidden", borderRadius: 16, border: "1px solid var(--border)", padding: "1.25rem 1.6rem", marginBottom: "1.5rem", background: "radial-gradient(120% 140% at 2% -20%, rgba(18,185,129,0.13) 0%, transparent 46%), linear-gradient(135deg, color-mix(in srgb, var(--accent) 5%, var(--surface)) 0%, var(--bg) 75%)" }}>
-          <p style={{ color: dim, fontSize: "0.8rem", margin: 0 }}>{t("Surové dáta po jednotlivých bytoch. Vpravo si postav filtre na ľubovoľné pole a zvlášť vyber stĺpce; zoradíš klikom na hlavičku.", "Raw per-unit data. Build filters on any field on the right, choose your columns separately, and sort by clicking a header.")}</p>
-        </div>
-        <div style={{ display: "inline-flex", border: `1px solid ${border}`, borderRadius: 7, overflow: "hidden", background: panel }}>
+      {/* One compact row. The help text used to sit in a 16px-radius gradient card with
+          1.25rem of padding and 1.5rem of margin under it — roughly 90px of the screen
+          spent on one sentence, while the table below it was the reason for the page. It
+          is a hint; it reads as a hint. The scope toggle sits on the same line, vertically
+          centred with it, instead of floating beside a tall box. */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.75rem", marginBottom: "0.7rem" }}>
+        <p style={{ color: dim, fontSize: "0.78rem", margin: 0, lineHeight: 1.5, maxWidth: "62ch" }}>
+          {t("Surové dáta po jednotlivých bytoch. Vpravo si postav filtre na ľubovoľné pole a zvlášť vyber stĺpce; zoradíš klikom na hlavičku.",
+             "Raw per-unit data. Build filters on any field on the right, choose your columns separately, and sort by clicking a header.")}
+        </p>
+        <div style={{ display: "inline-flex", border: `1px solid ${border}`, borderRadius: 7, overflow: "hidden", background: panel, flexShrink: 0 }}>
           {[["latest", t("Aktuálne", "Current")], ["archive", t("História", "All history")]].map(([m, label]) => (
-            <button key={m} onClick={() => setMode(m)} style={{ border: "none", padding: "0.4rem 0.85rem", cursor: "pointer", fontFamily: mono, fontSize: "0.72rem", letterSpacing: "0.03em", background: mode === m ? green : "transparent", color: mode === m ? "#04130d" : dim, fontWeight: mode === m ? 700 : 500 }}>{label}</button>
+            <button key={m} onClick={() => setMode(m)}
+              title={m === "latest" ? t("Iba aktuálny stav trhu", "Only the current state of the market")
+                                    : t("Všetky pozorovania v čase — byt sa objaví raz za deň, keď bol v ponuke", "Every observation over time — a unit appears once per day it was listed")}
+              style={{ border: "none", padding: "0.45rem 0.9rem", cursor: "pointer", fontFamily: mono, fontSize: "0.72rem", letterSpacing: "0.03em", background: mode === m ? green : "transparent", color: mode === m ? "#04130d" : dim, fontWeight: mode === m ? 700 : 500 }}>{label}</button>
           ))}
         </div>
       </div>
@@ -535,7 +543,11 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
               near the bottom auto-loads the next page (handles arbitrarily large result sets) */}
           {cols.length > 0 && <div ref={scrollRef}
             onScroll={(e) => { const el = e.currentTarget; setScrollTop(el.scrollTop); if (hasMore && !loading && el.scrollHeight - el.scrollTop - el.clientHeight < 500) loadMore(); }}
-            style={{ overflow: "auto", height: "62vh", border: `1px solid ${border}`, borderRadius: 8, background: panel }}>
+            /* Same bottom edge as the panel beside it. The table was a flat 62vh while the
+               panel ran to the foot of the window, so the two columns ended at different
+               heights and the page looked unfinished at any size. The 56px is the query
+               bar above the table plus its gap — the panel starts that much higher. */
+            style={{ overflow: "auto", height: "calc(100vh - 206px)", minHeight: 364, border: `1px solid ${border}`, borderRadius: 8, background: panel }}>
             <table style={{ borderCollapse: "separate", borderSpacing: 0, tableLayout: "fixed", width: "100%", minWidth: Math.max(1, cols.length) * 150, fontSize: "0.8rem" }}>
               <thead style={{ background: "var(--surface-2)", position: "sticky", top: 0, zIndex: 1 }}>
                 <tr>
