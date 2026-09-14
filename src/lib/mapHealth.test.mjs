@@ -36,7 +36,8 @@ function fakeMap({ drawn = 0, styleLoaded = true, size = [800, 600] } = {}) {
     _drawn: drawn,
     canvasHandlers,
     getCanvas: () => canvas,
-    isStyleLoaded: () => styleLoaded,
+    _styleLoaded: styleLoaded,
+    isStyleLoaded() { return this._styleLoaded; },
     queryRenderedFeatures() { return new Array(this._drawn).fill({}); },
     resize() {}, triggerRepaint() {},
     once: (evt, fn) => { (listeners[evt] ||= []).push(fn); },
@@ -114,13 +115,74 @@ test("a hidden tab is never evidence — the browser stops painting it on purpos
   });
 });
 
+/* This test used to model "a style swap in flight" as a style that is NEVER
+   loaded, and assert that nothing is ever reported. That is not a swap — it is a
+   map that never loads, and asserting silence for it is precisely what let both
+   maps sit black for three days in September 2026 while this module said nothing.
+   A swap is TEMPORARY, so it is now modelled temporarily, and the permanent case
+   has a test of its own below saying the opposite. */
 test("a style swap in flight is never evidence (the theme toggle empties the map)", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  withVisibleDocument(() => {
+    const map = fakeMap({ drawn: 3, styleLoaded: false });
+    const [calls, cbs] = collect();
+    watchMapHealth(map, cbs);
+    map.fire("idle");
+    advance(t, 8000);                 // the empty moment during setStyle
+    map._styleLoaded = true;          // …and the new style arrives
+    advance(t, 300000);
+    assert.equal(calls.fail.length, 0, "a theme toggle must never accuse anything");
+  });
+});
+
+test("a map whose style NEVER loads is reported — it used to be the one silent failure", (t) => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
   withVisibleDocument(() => {
     const map = fakeMap({ drawn: 0, styleLoaded: false });
     const [calls, cbs] = collect();
     watchMapHealth(map, cbs);
-    map.fire("idle");
+    // Deliberately fire NEITHER load nor idle: when the style never completes,
+    // maplibre never fires them, which is half of why this went unseen.
+    advance(t, 300000);
+    assert.equal(calls.fail.length, 1, "exactly one verdict, not a stream of them");
+    assert.equal(calls.fail[0].reason, "never-loaded");
+    assert.match(calls.fail[0].detail, /not your computer/i,
+      "the copy must not send the user off to change graphics settings for our bug");
+  });
+});
+
+test("a late-loading style takes the accusation back", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  withVisibleDocument(() => {
+    const map = fakeMap({ drawn: 4, styleLoaded: false });
+    const [calls, cbs] = collect();
+    watchMapHealth(map, cbs);
+    advance(t, 60000);
+    assert.equal(calls.fail.length, 1, "accused after a minute of nothing");
+    map._styleLoaded = true;
+    advance(t, 60000);
+    assert.equal(calls.ok, 1, "a map that arrives late must get its screen back");
+  });
+});
+
+test("an unloaded style on a hidden tab is never evidence", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  withVisibleDocument((doc) => {
+    doc.visibilityState = "hidden";
+    const map = fakeMap({ drawn: 0, styleLoaded: false });
+    const [calls, cbs] = collect();
+    watchMapHealth(map, cbs);
+    advance(t, 300000);
+    assert.equal(calls.fail.length, 0, "a background tab loads nothing on purpose");
+  });
+});
+
+test("an unloaded style on a zero-size canvas is never evidence", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  withVisibleDocument(() => {
+    const map = fakeMap({ drawn: 0, styleLoaded: false, size: [0, 0] });
+    const [calls, cbs] = collect();
+    watchMapHealth(map, cbs);
     advance(t, 300000);
     assert.equal(calls.fail.length, 0);
   });

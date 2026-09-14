@@ -28,6 +28,20 @@ const CONFIRM_BLANKS = 3;
 const CONFIRM_EVERY_MS = 5000;
 /** After a verdict — keep looking, so we can hand the map back if it recovers. */
 const RECHECK_EVERY_MS = 20000;
+/**
+ * How long a VISIBLE, sized map may go without its style finishing before that is
+ * itself the failure. Counted in eligible time only, so a tab left in the
+ * background for an hour is not accused the moment it is looked at.
+ *
+ * This exists because of 2026-09-14, when both maps were black for three days and
+ * this module said nothing at all. MapLibre 6 could not load its tile worker, so
+ * the style never finished; `load` and `idle` therefore never fired, so the
+ * sampler below was never even started; and `meaningful` requires isStyleLoaded(),
+ * so every reading would have been skipped anyway. The one shape of failure
+ * MapUnavailable exists to catch — a black rectangle — was the one shape this
+ * watcher was structurally unable to see.
+ */
+const NEVER_LOADED_AFTER_MS = 25000;
 
 /**
  * Watch one maplibre map. Returns a stop() to call on unmount.
@@ -110,16 +124,53 @@ export function watchMapHealth(map, { onFail, onOk, isCurrent = () => true }) {
   }
 
   // ── Failure mode 1: start looking once the map claims to have settled ──
-  // Whichever of load/idle comes first: "idle" alone would never arrive on a map
-  // whose tiles never finish, and that map deserves an answer too.
+  // Whichever of load/idle comes first.
   let started = false;
   const begin = () => { if (started) return; started = true; schedule(CONFIRM_EVERY_MS); };
   map.once("idle", begin);
   map.once("load", begin);
 
+  // ── Failure mode 3: the map never finishes loading at all ──
+  // The comment above used to claim load/idle covered a map whose tiles never
+  // arrive. It does not: when the style itself never completes, NEITHER event
+  // fires, and the watcher simply never runs. So this one starts on its own,
+  // immediately, and owes no debt to either event.
+  let ungraded = 0;
+  let neverLoaded = false;
+  let watchdog = null;
+  const eligible = () => {
+    const c = typeof map.getCanvas === "function" ? map.getCanvas() : null;
+    return (typeof document === "undefined" || document.visibilityState === "visible")
+      && !!c && c.width > 0 && c.height > 0;
+  };
+  const tick = () => {
+    if (stopped || !isCurrent()) return;
+    let loaded = false;
+    try { loaded = map.isStyleLoaded(); } catch { loaded = false; }
+    if (loaded) {
+      // It got there. Hand over to the normal sampler and withdraw any accusation.
+      if (neverLoaded) { neverLoaded = false; accused = false; onOk && onOk(); }
+      begin();
+      return;                       // no further watchdog ticks — sample() owns it now
+    }
+    if (eligible()) ungraded += CONFIRM_EVERY_MS;
+    if (ungraded >= NEVER_LOADED_AFTER_MS && !neverLoaded && !accused) {
+      neverLoaded = true;
+      accused = true;
+      onFail && onFail({
+        reason: "never-loaded",
+        detail: `The map's style did not finish loading after ${NEVER_LOADED_AFTER_MS / 1000}s on screen — `
+              + "the base map or its tile worker did not load. This is not your computer.",
+      });
+    }
+    watchdog = setTimeout(tick, CONFIRM_EVERY_MS);
+  };
+  watchdog = setTimeout(tick, CONFIRM_EVERY_MS);
+
   return function stop() {
     stopped = true;
     clearTimeout(timer);
+    clearTimeout(watchdog);
     if (canvas) {
       canvas.removeEventListener("webglcontextlost", onLost, false);
       canvas.removeEventListener("webglcontextrestored", onRestored, false);

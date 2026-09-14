@@ -36,6 +36,9 @@ export default function MapUnavailable({ reason, detail, sk = true, onRetry }) {
   // "gpu-lost" = it WAS drawing and the browser then lost the graphics context —
   // the canvas goes black mid-session. Same advice, different story to tell.
   const gpuLost = reason === "gpu-lost";
+  // "never-loaded" = the style never finished at all (lib/mapHealth.js). Falls
+  // through to the generic branch on purpose: it is NOT the user's machine, so it
+  // must never offer driver advice or be dismissible.
   // A guess about the user's hardware never gets to hide the map.
   const soft = gpuDead || gpuLost;
 
@@ -58,8 +61,14 @@ export default function MapUnavailable({ reason, detail, sk = true, onRetry }) {
       : gpuDead
         ? t("Dáta mapy dorazili a mapa beží — čísla nad ňou sa menia, keď ňou pohneš. Nevykresľuje ju grafická karta tohto počítača (starý alebo chybný ovládač). Nie je to chyba dát ani pripojenia.",
             "The map data arrived and the map is running — the figures above it change as you move it. What isn't working is this computer's graphics drawing it (an old or faulty driver). It is not a data or connection problem.")
-        : t("Podkladová mapa sa nenačítala. Býva to dočasný výpadok siete alebo poskytovateľa mapy.",
-            "The base map didn't load. This is usually a temporary network or map-provider outage.");
+        /* Deliberately does NOT name a cause. The old wording said "usually a
+           temporary network or map-provider outage", and on 2026-09-14 it would
+           have been wrong on both counts: both providers were healthy and the
+           fault was ours — a build that stopped shipping MapLibre's tile worker.
+           Telling someone their connection is at fault when it is our bug sends
+           them to change browser settings, which has already happened here once. */
+        : t("Podkladová mapa sa nenačítala. Nie je to chybou tvojho počítača ani prehliadača. Skús to znova; ak to trvá, pošli nám diagnostiku nižšie.",
+            "The base map didn't load. This is not your computer or your browser. Try again — and if it persists, send us the diagnostic below.");
 
   const steps = noWebGL
     ? [
