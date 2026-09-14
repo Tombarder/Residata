@@ -59,12 +59,15 @@ export function capabilitiesOf(key, { dimensionKeys, measureKeys, dateKeys }) {
   if (isMeasure || isDate) modes.push("between");
   // Presence works for anything the engine can name at all.
   if (isDim || isMeasure) modes.push("empty", "not_empty");
-  return { modes, valued: isDim, ranged: isMeasure || isDate };
+  return { modes, valued: isDim, ranged: isMeasure || isDate, isDate };
 }
 
 /** A fresh filter for a field, opened on the most useful mode it supports. */
 export function newFilter(key, caps, id) {
-  const mode = caps.modes.includes("in") ? "in" : caps.modes.includes("between") ? "between" : (caps.modes[0] || "in");
+  /* A date dimension can do both, and "between 1 March and today" is the question people
+     have about a date — offering it a value list of every distinct day first is useless. */
+  const prefer = caps.isDate ? ["between", "in"] : ["in", "between"];
+  const mode = prefer.find((m) => caps.modes.includes(m)) || caps.modes[0] || "in";
   return { id, key, mode, values: [], min: "", max: "" };
 }
 
@@ -116,14 +119,33 @@ export function summariseFilter(f, lang = "sk") {
  * the engine stores money in EUR, so in CZK mode a typed CZK band would otherwise be
  * compared against EUR values and return nonsense. Same conversion the pivot does.
  */
-export function filtersToSpec(filters, { isMoneyKey = () => false, toEur = (v) => v } = {}) {
+/**
+ * A typed number, the way people actually type one.
+ * "50,5" is how a decimal is written in Slovak and Czech, and Number() makes NaN of it,
+ * which JSON turns into null — so the bound silently disappears rather than failing.
+ */
+export function parseNumeric(v) {
+  if (v === "" || v === null || v === undefined) return null;
+  const n = Number(String(v).replace(/\s/g, "").replace(",", "."));
+  return Number.isFinite(n) ? n : null;
+}
+
+export function filtersToSpec(filters, { isMoneyKey = () => false, isDateKey = () => false, toEur = (v) => v } = {}) {
   const out = { filters: {}, filters_not: {}, ranges: {}, nulls: {} };
   for (const f of filters || []) {
     if (!isFilterActive(f)) continue;
     if (f.mode === "empty" || f.mode === "not_empty") { out.nulls[f.key] = f.mode; continue; }
     if (f.mode === "between") {
+      /* 🔴 A DATE IS NOT A NUMBER. The engine casts date-dimension bounds itself and wants
+         the string; Number("2026-01-01") is NaN, JSON writes NaN as null, and the filter
+         then does NOTHING while looking perfectly set on screen. That is exactly the shape
+         of bug this page is supposed to stop producing. */
+      if (isDateKey(f.key)) {
+        out.ranges[f.key] = { min: f.min || null, max: f.max || null };
+        continue;
+      }
       const money = isMoneyKey(f.key);
-      const n = (v) => (v === "" ? null : (money ? toEur(v) : Number(v)));
+      const n = (v) => { const x = parseNumeric(v); return x === null ? null : (money ? toEur(x) : x); };
       out.ranges[f.key] = { min: n(f.min), max: n(f.max) };
       continue;
     }
@@ -134,6 +156,11 @@ export function filtersToSpec(filters, { isMoneyKey = () => false, toEur = (v) =
     if (vals.length) {
       const bucket = f.mode === "not_in" ? out.filters_not : out.filters;
       bucket[f.key] = (bucket[f.key] || []).concat(vals);
+      /* "is not P and not blank" is two conditions ANDed, which the spec CAN say — and
+         dropping the second half answered a narrower question than the one asked.
+         ("is V or blank" is an OR and the spec cannot say it at all, so the editor stops
+          that combination from being built rather than quietly answering something else.) */
+      if (wantsEmpty && f.mode === "not_in") out.nulls[f.key] = "not_empty";
     } else if (wantsEmpty) {
       out.nulls[f.key] = f.mode === "not_in" ? "not_empty" : "empty";
     }

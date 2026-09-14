@@ -11,7 +11,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   EMPTY_SENTINEL, capabilitiesOf, newFilter, sanitizeFilter, isFilterActive,
-  summariseFilter, filtersToSpec, migrateLegacyFilters,
+  summariseFilter, filtersToSpec, migrateLegacyFilters, parseNumeric,
 } from "./filterModel.js";
 
 const REG = {
@@ -122,4 +122,44 @@ test("a summary says what the filter does, and does not run off the chip", () =>
   assert.equal(summariseFilter({ key: "cena_s_dph", mode: "between", min: "", max: "300000" }, "sk"), "… – 300000");
   assert.equal(summariseFilter({ key: "cena_s_dph", mode: "not_empty" }, "en"), "has a value");
   assert.equal(summariseFilter({ key: "x", mode: "in", values: [EMPTY_SENTINEL] }, "sk"), "je (prázdne)");
+});
+
+
+/* ── the four defects found by re-reading the first cut (2026-09-14) ──────────
+   Each one produced a filter that LOOKED set on screen and did something else, or
+   nothing, which is the worst failure mode a filter can have. */
+
+test("a date range is sent as dates — Number() would silently erase it", () => {
+  const spec = filtersToSpec(
+    [{ key: "datum", mode: "between", min: "2026-01-01", max: "2026-06-30" }],
+    { isDateKey: (k) => k === "datum" },
+  );
+  assert.deepEqual(spec.ranges.datum, { min: "2026-01-01", max: "2026-06-30" });
+  // The bug: Number("2026-01-01") is NaN, JSON writes NaN as null, and the filter is
+  // then a no-op while the date sits in the box looking applied.
+  const broken = filtersToSpec([{ key: "datum", mode: "between", min: "2026-01-01", max: "" }]);
+  assert.notDeepEqual(broken.ranges.datum, { min: "2026-01-01", max: null },
+    "without isDateKey the old path is still lossy — the caller must pass it");
+});
+
+test("a decimal typed the Slovak way is a number", () => {
+  assert.equal(parseNumeric("50,5"), 50.5);
+  assert.equal(parseNumeric("1 250"), 1250, "a thousands space is how the app prints them back");
+  assert.equal(parseNumeric("abc"), null);
+  assert.equal(parseNumeric(""), null);
+  assert.equal(parseNumeric("0"), 0, "zero is a bound");
+  const spec = filtersToSpec([{ key: "obytna_plocha", mode: "between", min: "50,5", max: "" }]);
+  assert.deepEqual(spec.ranges.obytna_plocha, { min: 50.5, max: null });
+});
+
+test("\"is not X and not blank\" sends both halves — it is an AND and the spec can say it", () => {
+  const spec = filtersToSpec([{ key: "stav", mode: "not_in", values: ["P", EMPTY_SENTINEL] }]);
+  assert.deepEqual(spec.filters_not, { stav: ["P"] });
+  assert.deepEqual(spec.nulls, { stav: "not_empty" },
+    "dropping this answered a narrower question than the one on screen");
+});
+
+test("a new date filter opens on a range, not on a list of every distinct day", () => {
+  assert.equal(newFilter("datum", capabilitiesOf("datum", REG), 1).mode, "between");
+  assert.equal(newFilter("city", capabilitiesOf("city", REG), 2).mode, "in", "a plain dimension still opens on is");
 });

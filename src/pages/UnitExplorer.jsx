@@ -111,7 +111,18 @@ function FilterCard({ f, field, caps, scopeMode, cityScope, lang, onPatch, onRem
           <Picker value="" width="100%" searchable
             placeholder={distinct.loading ? t("načítavam…", "loading…") : t("+ hodnota", "+ value")}
             ariaLabel={t("hodnota", "value")}
-            onChange={(v) => { if (v && !(f.values || []).includes(v)) onPatch({ values: [...(f.values || []), v] }); }}
+            /* 🔴 "(empty)" is EXCLUSIVE under "is". "city is Nitra OR blank" is an OR, and the
+               engine's spec is a conjunction — there is no way to say it. The first cut just
+               dropped the "(empty)" on the way out, which answers a narrower question than
+               the one on screen. Under "is not" it is an AND ("not Nitra AND not blank") and
+               both halves are sent, so no exclusion is needed there. */
+            onChange={(v) => {
+              if (!v || (f.values || []).includes(v)) return;
+              const exclusive = f.mode === "in";
+              if (exclusive && v === EMPTY_SENTINEL) return onPatch({ values: [EMPTY_SENTINEL] });
+              const kept = exclusive ? (f.values || []).filter((x) => x !== EMPTY_SENTINEL) : (f.values || []);
+              onPatch({ values: [...kept, v] });
+            }}
             options={[
               /* "(empty)" is offered as a value because that is how a person thinks about
                  it; filtersToSpec turns it into a presence test, which is what the engine
@@ -134,6 +145,13 @@ function FilterCard({ f, field, caps, scopeMode, cityScope, lang, onPatch, onRem
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {wantsValues && f.mode === "in" && (f.values || []).includes(EMPTY_SENTINEL) && (
+        <div style={{ marginTop: "0.3rem", fontSize: "0.66rem", color: dim, lineHeight: 1.4 }}>
+          {t("„(prázdne)“ sa pýta len na chýbajúcu hodnotu, preto stojí samo. Ak chceš „toto alebo prázdne“, filter zmaž.",
+             "“(empty)” asks only for the missing value, so it stands alone. For “this or empty”, remove the filter.")}
         </div>
       )}
 
@@ -278,7 +296,7 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
        against EUR values and returns nonsense. (Same conversion the pivot does.) */
     const toEur = (v) => Number(v) / _money1;
     const isMoneyKey = (k) => fmtByKey[k] === "eur" || fmtByKey[k] === "per_m2";
-    const built = filtersToSpec(filters, { isMoneyKey, toEur });
+    const built = filtersToSpec(filters, { isMoneyKey, toEur, isDateKey: (k) => capsSets.dateKeys.has(k) });
 
     // The country toggle is a scope, not one of the user's filters — it belongs to the
     // whole platform and is not something to remove from this panel.
@@ -295,7 +313,7 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
     if (built.ranges) out.ranges = built.ranges;
     if (built.nulls) out.nulls = built.nulls;
     return out;
-  }, [country, filters, cols, mode, sort, fmtByKey, _money1]);
+  }, [country, filters, cols, mode, sort, fmtByKey, _money1, capsSets]);
 
   const { rows, hasMore, loading, loadMore, error: loadFailed } = useUnitsInfinite({ enabled: cols.length > 0, spec, pageSize: PAGE });
 
@@ -342,6 +360,9 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
       const p_spec = { dims: ["project_name"], filters: spec.filters, mode: spec.mode };
       if (spec.filters_not) p_spec.filters_not = spec.filters_not;
       if (spec.ranges) p_spec.ranges = spec.ranges;
+      // …including the presence filters. Without this line the map answers a WIDER
+      // question than the table it was opened from, and the two disagree on screen.
+      if (spec.nulls) p_spec.nulls = spec.nulls;
       const { data, error } = await supabaseData.rpc("analytics_pivot", { p_spec });
       const names = error ? [] : (Array.isArray(data) ? data : []).map((r) => r?.d?.[0]).filter(Boolean);
       sessionStorage.setItem(MAP_PROJECT_SET_KEY, JSON.stringify({ names, count: names.length, source: "explorer", ts: Date.now() }));
@@ -442,9 +463,28 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
             </span>
           </div>
 
+          {/* No columns means no query is even sent (useUnitsInfinite is disabled), which
+              without this reads as "the filters returned nothing" — a wrong and alarming
+              answer. The COLUMNS tab now has a "none" button, so this state is one click
+              away and has to explain itself and offer the way back. */}
+          {cols.length === 0 && (
+            <div style={{ border: `1px solid ${border}`, borderRadius: 8, background: panel, padding: "2.2rem 1rem", textAlign: "center" }}>
+              <div style={{ color: text, fontSize: "0.86rem", marginBottom: "0.3rem" }}>
+                {t("Nie je vybraný žiadny stĺpec.", "No columns are selected.")}
+              </div>
+              <div style={{ color: dim, fontSize: "0.76rem", marginBottom: "0.9rem" }}>
+                {t("Tabuľka nemá čo zobraziť — vyber stĺpce v paneli vpravo.", "There is nothing for the table to show — choose columns in the panel on the right.")}
+              </div>
+              <button onClick={() => { setCols(DEFAULT_COLS); setPanelTab("cols"); }}
+                style={{ ...sel, cursor: "pointer", color: "#04130d", background: green, borderColor: green, fontFamily: mono, fontSize: "0.74rem", fontWeight: 700 }}>
+                ↺ {t("Obnoviť predvolené stĺpce", "Restore the default columns")}
+              </button>
+            </div>
+          )}
+
           {/* virtualized scrolling table — only the visible row window is in the DOM; scrolling
               near the bottom auto-loads the next page (handles arbitrarily large result sets) */}
-          <div ref={scrollRef}
+          {cols.length > 0 && <div ref={scrollRef}
             onScroll={(e) => { const el = e.currentTarget; setScrollTop(el.scrollTop); if (hasMore && !loading && el.scrollHeight - el.scrollTop - el.clientHeight < 500) loadMore(); }}
             style={{ overflow: "auto", height: "62vh", border: `1px solid ${border}`, borderRadius: 8, background: panel }}>
             <table style={{ borderCollapse: "separate", borderSpacing: 0, tableLayout: "fixed", width: "100%", minWidth: Math.max(1, cols.length) * 150, fontSize: "0.8rem" }}>
@@ -489,11 +529,11 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
                   <tr><td colSpan={cols.length || 1} style={{ padding: 0 }}><LoadError lang={lang} /></td></tr>
                 )}
                 {!loading && rows.length === 0 && !loadFailed && (
-                  <tr><td colSpan={cols.length || 1} style={{ padding: "2rem", textAlign: "center", color: dim, fontStyle: "italic" }}>{cols.length === 0 ? t("Vyber aspoň jeden stĺpec vpravo →", "Pick at least one column on the right →") : t("Žiadne byty pre tento filter.", "No units match this filter.")}</td></tr>
+                  <tr><td colSpan={cols.length || 1} style={{ padding: "2rem", textAlign: "center", color: dim, fontStyle: "italic" }}>{t("Žiadne byty pre tento filter.", "No units match this filter.")}</td></tr>
                 )}
               </tbody>
             </table>
-          </div>
+          </div>}
           {loading && rows.length > 0 && <div style={{ marginTop: "0.45rem", fontFamily: mono, fontSize: "0.7rem", color: dim }}>{t("načítavam ďalšie…", "loading more…")}</div>}
           {/* Only shown when a marked price is actually on screen — a legend for
               something the reader cannot see is just clutter. */}
