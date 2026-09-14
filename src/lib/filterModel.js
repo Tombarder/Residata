@@ -213,3 +213,32 @@ export function migrateLegacyFilters(saved, startId = 1) {
   }
   return out;
 }
+
+/**
+ * Re-express money bounds when the display currency changes.
+ *
+ * A typed "300 000" is a PRICE, not a digit string. Switching € → Kč used to leave the
+ * number where it was and simply relabel the box, so the same filter silently became
+ * 300 000 CZK — about €12 000 — and the result went from 529 sales to 1 005 with nothing
+ * on screen admitting the question had changed. Every other money figure on the page
+ * converts; the one the user typed has to as well.
+ *
+ * @param factor  newRatePerEur / oldRatePerEur (1 = nothing to do)
+ * @param isMoneyKey which fields hold money
+ * @returns the same array when nothing changes, so it is safe in an effect
+ */
+export function convertMoneyBounds(filters, factor, isMoneyKey = () => false) {
+  if (!Number.isFinite(factor) || factor === 1) return filters;
+  let touched = false;
+  const out = filters.map((f) => {
+    if (f.mode !== "between" || !isMoneyKey(f.key)) return f;
+    const conv = (v) => {
+      const n = parseNumeric(v);
+      if (n === null) return v;
+      touched = true;
+      return String(Math.round(n * factor));
+    };
+    return { ...f, min: conv(f.min), max: conv(f.max) };
+  });
+  return touched ? out : filters;
+}

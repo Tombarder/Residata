@@ -11,7 +11,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   EMPTY_SENTINEL, capabilitiesOf, newFilter, sanitizeFilter, isFilterActive,
-  summariseFilter, filtersToSpec, migrateLegacyFilters, parseNumeric,
+  summariseFilter, filtersToSpec, migrateLegacyFilters, parseNumeric, convertMoneyBounds,
 } from "./filterModel.js";
 
 const REG = {
@@ -174,4 +174,30 @@ test("a chip shows the readable value, not the stored one", () => {
     "without a resolver the raw value still shows — the caller opts in");
   const sig = (v) => (v === "marked" ? "označené" : v);
   assert.equal(summariseFilter({ key: "detection_method", mode: "in", values: ["marked"] }, "sk", sig), "je označené");
+});
+
+
+test("a typed money bound is a PRICE, so it follows the currency", () => {
+  // € 300 000 with the rate at 24.264 CZK/€ is 7 279 257 Kč — the same filter, said in
+  // the other currency. Leaving the digits alone silently turned a €300k floor into a
+  // 300 000 Kč one (about €12k) and took the result from 529 sales to 1 005.
+  const isMoney = (k) => k === "price_s_dph_eur";
+  const out = convertMoneyBounds(
+    [{ key: "price_s_dph_eur", mode: "between", min: "300000", max: "" },
+     { key: "obytna_plocha", mode: "between", min: "50", max: "80" }],
+    24.264097, isMoney,
+  );
+  assert.equal(out[0].min, "7279229");
+  assert.equal(out[0].max, "", "an open bound stays open");
+  assert.deepEqual(out[1], { key: "obytna_plocha", mode: "between", min: "50", max: "80" },
+    "square metres are not money and must not move");
+});
+
+test("converting money returns the SAME array when nothing changes", () => {
+  // It runs in an effect, so a new array every render would loop forever.
+  const fs = [{ key: "price_s_dph_eur", mode: "between", min: "300000", max: "" }];
+  assert.equal(convertMoneyBounds(fs, 1, () => true), fs, "no rate change, no new array");
+  assert.equal(convertMoneyBounds(fs, NaN, () => true), fs, "a bad rate is not a reason to rewrite");
+  const cats = [{ key: "city", mode: "in", values: ["Nitra"] }];
+  assert.equal(convertMoneyBounds(cats, 25, () => true), cats, "nothing to convert, same array");
 });

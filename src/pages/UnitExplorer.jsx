@@ -12,7 +12,8 @@ import { moneyFromEur, moneySymbol } from "../lib/money";
 import { useUnitsInfinite, useAnalyticsRegistry, usePivotDistinct } from "../lib/useData";
 import { useAccountPrefState } from "../lib/useAccountUiPref";
 import { EMPTY_SENTINEL, MODE_LABEL, capabilitiesOf, newFilter, sanitizeFilter,
-         isFilterActive, summariseFilter, filtersToSpec, migrateLegacyFilters } from "../lib/filterModel";
+         isFilterActive, summariseFilter, filtersToSpec, migrateLegacyFilters,
+         convertMoneyBounds } from "../lib/filterModel";
 import LoadError from "../components/LoadError";
 import DateField from "../components/DateField";
 import { supabaseData } from "../lib/supabase";
@@ -216,6 +217,18 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
     () => (cols.includes(sort.key) || !cols.length ? sort : { key: cols[0], dir: sort.dir }),
     [sort, cols],
   );
+
+  /* The display currency can change under a typed money bound. Convert it, or the same
+     filter silently asks a different question — see convertMoneyBounds. */
+  const rateRef = useRef(moneyFromEur(1) || 1);
+  useEffect(() => {
+    const rate = moneyFromEur(1) || 1;
+    const prev = rateRef.current;
+    rateRef.current = rate;
+    if (prev && rate && prev !== rate) {
+      setFilters((a) => convertMoneyBounds(a, rate / prev, (k) => fmtByKey[k] === "eur" || fmtByKey[k] === "per_m2"));
+    }
+  });
 
   const spec = useMemo(() => {
     /* Money is stored and compared in EUR; the box the user types into follows the

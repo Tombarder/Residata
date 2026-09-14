@@ -14,7 +14,7 @@
    the bottom half… also the data in the dropdown menus".)
 
    Built for the comparable-projects pricing workflow (e.g. Nitra). */
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useCurrency } from "../lib/useCurrency";
 import { moneyFromEur, moneySymbol, moneyToEur } from "../lib/money";
 import { useSales } from "../lib/useData";
@@ -24,7 +24,7 @@ import { localeTag } from "../lib/locale";
 import LoadError from "../components/LoadError";
 import Picker from "../components/Picker";
 import FieldPanel from "../components/FieldPanel";
-import { isFilterActive, newFilter, sanitizeFilter, summariseFilter } from "../lib/filterModel";
+import { isFilterActive, newFilter, sanitizeFilter, summariseFilter, convertMoneyBounds } from "../lib/filterModel";
 import InfoTip from "../components/InfoTip";
 import Kpi from "../components/Kpi";
 import DateField from "../components/DateField";
@@ -447,6 +447,18 @@ export default function SalesView({ lang = "sk" }) {
   };
   const patchFilter = (id, patch) => setFilters((a) => a.map((f) => (f.id === id ? { ...f, ...patch } : f)));
   const removeFilter = (id) => setFilters((a) => a.filter((f) => f.id !== id));
+  /* The display currency can change under a typed money bound. Convert it, or the same
+     filter silently asks a different question — see convertMoneyBounds. */
+  const rateRef = useRef(moneyFromEur(1) || 1);
+  useEffect(() => {
+    const rate = moneyFromEur(1) || 1;
+    const prev = rateRef.current;
+    rateRef.current = rate;
+    if (prev && rate && prev !== rate) {
+      setFilters((a) => convertMoneyBounds(a, rate / prev, (k) => (SALES_FIELDS.find((f) => f.key === k) || {}).money === true));
+    }
+  });
+
   const clearFilters = () => setFilters([]);
   const activeFilters = liveFilters.filter(isFilterActive).length;
   const toggleCol = (k) => setCols((c) => (c.includes(k) ? c.filter((x) => x !== k) : [...c, k]));
