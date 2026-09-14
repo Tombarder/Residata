@@ -43,7 +43,7 @@ import { useProjects, useUnitSummaries, useUnitHistories, useUnitSearch, useProj
 import { useAccountPrefState } from "../lib/useAccountUiPref";
 import { useCapabilities } from "../lib/useCapabilities";
 import { track } from "../lib/track";
-import { localeTag } from "../lib/locale";
+import { localeTag, formatDimNumber } from "../lib/locale";
 import { moneyFromEur, moneySymbol, formatMoney, formatPerM2 as formatPerM2Money } from "../lib/money";
 import { useCurrency } from "../lib/useCurrency";
 import { useSpecifics, UnitPriceMarks } from "../lib/projectSpecifics";
@@ -550,16 +550,18 @@ function UnitTile({ unit, isPicked, disabled, onClick, lang, compact = false }) 
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "0.5rem", marginBottom: "0.2rem" }}>
         <strong style={{ color: isPicked ? green : text, fontSize: "0.86rem" }}>{unit.unit_id}</strong>
-        <span style={{ color: stavCol, fontSize: "0.7rem", fontWeight: 700 }}>{unit.latest_stav}</span>
+        <span style={{ color: stavCol, fontSize: "0.7rem", fontWeight: 700 }}>{statusLabel(unit.latest_stav, lang, "one")}</span>
       </div>
       <div style={{ fontSize: "0.7rem", color: dim, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
         {unit.project_name}
       </div>
       {(unit.izby || unit.obytna_plocha || unit.latest_price) && (
         <div style={{ fontSize: "0.7rem", color: dim, marginTop: "0.25rem" }}>
-          {unit.izby ? `${unit.izby}izb` : ""}
+          {/* Postgres hands `numeric` back as a STRING, so these read "2.0izb" and
+              "76.25 m²" — a dot decimal, no space, on a Slovak page. */}
+          {unit.izby ? `${formatDimNumber(unit.izby)} izb` : ""}
           {unit.izby && unit.obytna_plocha ? " · " : ""}
-          {unit.obytna_plocha ? `${unit.obytna_plocha} m²` : ""}
+          {unit.obytna_plocha ? `${Number(unit.obytna_plocha).toLocaleString(localeTag(lang), { maximumFractionDigits: 1 })} m²` : ""}
           {unit.latest_price ? <span style={{ color: text, marginLeft: "0.5rem", fontWeight: 600, fontFamily: mono }}>{formatPrice(unit.latest_price)}</span> : ""}
         </div>
       )}
@@ -743,7 +745,7 @@ function KpiStrip({ lifecycle, primary, onProjectClick, lang }) {
         {primary?.izby && (
           <>
             <span style={{ color: dim }}>·</span>
-            <span style={{ color: dim }}>{primary.izby}izb</span>
+            <span style={{ color: dim }}>{formatDimNumber(primary.izby)} izb</span>
           </>
         )}
         {primary?.obytna_plocha && (
@@ -1384,7 +1386,7 @@ function LineChartSVG({ pickedHistories, comparables, allMonths, yOf, fmtY, lang
               <span style={{ marginLeft: "auto", fontWeight: 700 }}>{fmtY(yOf(row))}</span>
               <span style={{ color: STAV_COLOR[row.stav] || dim, fontSize: "0.68rem",
                              padding: "0.05rem 0.3rem", border: `1px solid ${STAV_COLOR[row.stav] || dim}`, borderRadius: 3 }}>
-                {row.stav}
+                {statusLabel(row.stav, lang, "one")}
               </span>
             </div>
           ))}
@@ -1520,13 +1522,13 @@ function UnitGrid({ project, units: scopeUnits, loadingScope, search, pickedKeys
                   {selected ? "✓ " : ""}{u.unit_id}
                 </strong>
                 <span style={{ color: stavCol, fontSize: "0.7rem", fontWeight: 700, padding: "0.1rem 0.4rem", background: `${stavCol}1a`, borderRadius: 3 }}>
-                  {u.latest_stav}
+                  {statusLabel(u.latest_stav, lang, "one")}
                 </span>
               </div>
               <div style={{ fontSize: "0.74rem", color: dim, lineHeight: 1.45 }}>
-                {u.izby ? `${u.izby}-izb` : ""}
+                {u.izby ? `${formatDimNumber(u.izby)}-izb` : ""}
                 {u.izby && u.obytna_plocha ? " · " : ""}
-                {u.obytna_plocha ? `${u.obytna_plocha} m²` : ""}
+                {u.obytna_plocha ? `${Number(u.obytna_plocha).toLocaleString(localeTag(lang), { maximumFractionDigits: 1 })} m²` : ""}
                 {(u.izby || u.obytna_plocha) && u.latest_price ? <br/> : ""}
                 {u.latest_price && (
                   <span style={{ color: text, fontWeight: 600, fontFamily: mono, fontSize: "0.8rem" }}>{formatPrice(u.latest_price)}</span>

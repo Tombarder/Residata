@@ -1630,7 +1630,7 @@ function TimelineChart({ snaps, lang }) {
         <g>
           {/* Big sold % — whole, like every other sold-through % in the app */}
           <text x={pad.l} y={26} fill={text} fontFamily={mono} fontSize={26} fontWeight={700}>
-            {pctSold.toFixed(0)}%
+            {formatPercent(pctSold, lang, 0)}
           </text>
           <text x={pad.l + 80} y={26} fill={dim} fontFamily={mono} fontSize={11}>
             {lang === "sk" ? "predaných" : "sold"}
@@ -2411,7 +2411,7 @@ function PriceHistogram({ prices, lang = "en" }) {
               <span style={{ color: dim }}>{L("Bytov", "Units")}</span>
               <span style={{ fontFamily: mono, color: greenInk, fontWeight: 600 }}>{c}</span>
               <span style={{ color: dim }}>{L("Z celku", "Of total")}</span>
-              <span style={{ fontFamily: mono }}>{pct.toFixed(0)}%</span>
+              <span style={{ fontFamily: mono }}>{formatPercent(pct, lang, 0)}</span>
             </div>
           </div>
         );
@@ -2983,8 +2983,8 @@ function FlatsTable({ flats, t, lang, highlightedFlatId }) {
                     <span style={{
                       padding: "2px 6px", borderRadius: 4, fontFamily: mono, fontSize: "0.64rem", fontWeight: 600,
                       color: stavStyle[f.stav].color, background: stavStyle[f.stav].bg,
-                    }}>{f.stav}</span>
-                  ) : <span style={{ color: dim, fontSize: "0.7rem" }}>{f.stav || "—"}</span>}
+                    }}>{statusLabel(f.stav, lang, "one")}</span>
+                  ) : <span style={{ color: dim, fontSize: "0.7rem" }}>{f.stav ? statusLabel(f.stav, lang, "one") : "—"}</span>}
                 </td>
               </tr>
               );
@@ -3481,7 +3481,7 @@ export function LiveAnalytics({ setCurrent, openLogin, lang = "en" }) {
                     </div>
                   </div>
                   <div style={{ fontFamily: mono, fontSize: "0.85rem", color: redInk, fontWeight: 700 }}>
-                    {p.sold_percentage.toFixed(0)}%
+                    {formatPercent(p.sold_percentage, lang, 0)}
                   </div>
                 </div>
               ))}
