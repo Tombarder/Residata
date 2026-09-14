@@ -130,6 +130,14 @@ function isoDaysAgo(n) {
   return isoLocal(d);
 }
 const isoToday = () => isoLocal(new Date());
+/** n days before a given YYYY-MM-DD (local calendar), so a window keeps its LENGTH when
+ *  its end is moved rather than silently re-anchoring to today. */
+function isoDaysBefore(iso, n) {
+  const [y, m, d] = String(iso).split("-").map(Number);
+  const dt = new Date(y, (m || 1) - 1, d || 1);
+  dt.setDate(dt.getDate() - n);
+  return isoLocal(dt);
+}
 
 const fmtInt = (n) => (n == null ? "" : Number(n).toLocaleString("sk-SK").replace(/,/g, " "));
 
@@ -243,8 +251,16 @@ export default function SalesView({ lang = "sk" }) {
     },
   );
 
-  const date_from = customFrom || isoDaysAgo(days);
+  /* The window. A custom bound on ONE side used to leave the other anchored to TODAY, so
+     typing only a "do" of 30 June with the 45-day preset selected produced 31 July – 30
+     June: a range running backwards, which the engine answers honestly with zero and the
+     page reported as "no sales for this selection". The chosen preset is a LENGTH, so an
+     open "from" is measured back from whatever "to" is. */
   const date_to = customTo || isoToday();
+  const date_from = customFrom || isoDaysBefore(date_to, days);
+  // An explicitly inverted pair (both typed, from after to) is still possible and is the
+  // user's own doing — but it is said out loud rather than answered with an empty table.
+  const rangeInverted = date_from > date_to;
 
   const curSymForFilters = moneySymbol();   // dep: re-convert typed money bounds on a currency switch
   /* Sale-only fields (the signal, days on market) do not exist on the reserved /
@@ -478,7 +494,9 @@ export default function SalesView({ lang = "sk" }) {
              "How many and WHICH units sold — and stayed sold — in the chosen period, for the projects you pick.")}
         </p>
         {!isPipe && (
-          <span className="rd-label" style={{ fontSize: "0.66rem", color: "var(--accent-ink)", letterSpacing: "0.04em", textTransform: "none" }}>{rangeLabel}</span>
+          <span className="rd-label" style={{ fontSize: "0.66rem", color: rangeInverted ? "var(--accent-2)" : "var(--accent-ink)", letterSpacing: "0.04em", textTransform: "none" }}>
+            {rangeLabel}{rangeInverted ? ` — ${t("obdobie beží pozadu", "the period runs backwards")}` : ""}
+          </span>
         )}
       </div>
 
@@ -701,7 +719,10 @@ export default function SalesView({ lang = "sk" }) {
             <tbody>
               {det.loading && <tr><td className="rd-td--empty" colSpan={detailColSpan} style={{ fontStyle: "normal" }}>{t("načítavam…", "loading…")}</td></tr>}
               {det.error && <tr><td colSpan={detailColSpan} style={{ padding: 0 }}><LoadError lang={lang} /></td></tr>}
-              {!det.loading && !det.error && detRows.length === 0 && <tr><td className="rd-td--empty" colSpan={detailColSpan}>{isPipe ? t("Žiadne jednotky v tomto stave pre tento výber.", "No units in this state for this selection.") : t("Žiadne predané byty pre tento výber a obdobie.", "No sold units for this selection and period.")}</td></tr>}
+              {!det.loading && !det.error && detRows.length === 0 && <tr><td className="rd-td--empty" colSpan={detailColSpan}>{rangeInverted
+                  ? t("Dátum „od“ je neskôr ako „do“ — oprav obdobie hore.", "The “from” date is after the “to” date — fix the period above.")
+                  : isPipe ? t("Žiadne jednotky v tomto stave pre tento výber.", "No units in this state for this selection.")
+                           : t("Žiadne predané byty pre tento výber a obdobie.", "No sold units for this selection and period.")}</td></tr>}
               {detRows.map((r, i) => (
                 <tr key={(r.project_id || "") + (r.unit_id || "") + i}>
                   {visibleCols.map((c) => {
