@@ -1467,6 +1467,16 @@ function DataPage({ setCurrent, l, lang }) {
           <div style={{
             borderRadius: 14, overflow: "hidden",
             border: "1px solid #222228",
+            // 🔴 width MUST be pinned alongside aspect-ratio + min-height.
+            // Without it the box has an intrinsic MINIMUM WIDTH of
+            // min-height x ratio = 280 x 4/3 = 373.33px, which it keeps even
+            // when its grid column is narrower. Measured live on /sample at
+            // 375px: the page scrolled sideways (scrollWidth 405) because this
+            // one element refused to fit. Pinning width makes the ratio derive
+            // the height from the column instead of the other way round —
+            // 311x280 on a phone, unchanged on desktop. Every other
+            // aspect-ratio box in the codebase already does this.
+            width: "100%", maxWidth: "100%",
             aspectRatio: "4 / 3", minHeight: 280,
             // Image trace (log for future iterations):
             //  · 2429e8be8625  modern geometric tall white ← this is the
