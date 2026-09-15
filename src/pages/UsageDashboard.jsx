@@ -14,6 +14,7 @@ import { useAccountPrefState } from "../lib/useAccountUiPref";
 import Picker from "../components/Picker";
 import Kpi from "../components/Kpi";
 import InfoTip from "../components/InfoTip";
+import { SortableTh, useTableSort } from "../components/SortableTable";
 import { accent as green, accentInk, dim, text, border, surface as bg, surfaceDark as bg2 } from "../lib/theme";
 
 const mono = "'JetBrains Mono', monospace";
@@ -94,7 +95,27 @@ const fmtN = (v, lang = "sk") => {
   return Number.isFinite(n) ? n.toLocaleString(lang === "sk" ? "sk-SK" : "en-GB") : (v ?? "—");
 };
 
+/* What each column of the user table holds, so the shared sorter can compare it.
+   `kind` decides the opening direction too: a number column opens biggest-first, which
+   is what "sort by sessions" means to anyone who clicks it. */
+const USER_COLS = [
+  { key: "email",         label: ["Používateľ", "User"],   kind: "text", get: (u) => u.email || "" },
+  { key: "tier",          label: ["Tier", "Tier"],         kind: "text", get: (u) => u.tier || "" },
+  { key: "status",        label: ["Stav", "Status"],       kind: "text", get: (u) => u.status || "" },
+  { key: "sessions",      label: ["Relácie", "Sess."],     kind: "num",  get: (u) => u.sessions },
+  { key: "active_min",    label: ["Aktívny čas", "Active"],kind: "num",  get: (u) => u.active_min },
+  { key: "days_active",   label: ["Dni", "Days"],          kind: "num",  get: (u) => u.days_active },
+  { key: "project_views", label: ["Projekty", "Proj."],    kind: "num",  get: (u) => u.project_views },
+  { key: "exports",       label: ["Export", "Export"],     kind: "num",  get: (u) => u.exports },
+  { key: "ai_questions",  label: ["AI", "AI"],             kind: "num",  get: (u) => u.ai_questions },
+  { key: "last_seen",     label: ["Naposledy", "Last seen"],kind: "date",get: (u) => u.last_seen },
+];
+const USER_COL_MAP = Object.fromEntries(USER_COLS.map((c) => [c.key, c]));
+
 export default function UsageDashboard({ lang = "en" }) {
+  /* Opens on the most recently seen account — the question an admin actually arrives
+     with is "who is here now", not "who is alphabetically first". */
+  const { sort, onHeaderClick, sortArrow, sortRows } = useTableSort(USER_COL_MAP, { key: "last_seen", dir: "desc" }, lang);
   const L = (sk, en) => (lang === "sk" ? sk : en);
   const num = (v) => fmtN(v, lang);   // locale follows the UI language
   const [days, setDays] = useState(30);
@@ -285,13 +306,22 @@ export default function UsageDashboard({ lang = "en" }) {
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.78rem" }}>
                 <thead>
                   <tr style={{ color: dim, fontFamily: mono, fontSize: "0.66rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                    {[L("Používateľ", "User"), "Tier", L("Stav", "Status"), L("Relácie", "Sess."), L("Aktívny čas", "Active"), L("Dni", "Days"), L("Projekty", "Proj."), "Export", "AI", L("Naposledy", "Last seen")].map((h, i) => (
-                      <th key={i} style={{ textAlign: i === 0 ? "left" : "right", padding: "0.5rem 0.6rem", borderBottom: `1px solid ${border}`, whiteSpace: "nowrap" }}>{h}</th>
+                    {/* Ten columns of "who uses this most" and no way to rank by any of
+                        them — you could not ask which account has the most sessions, or
+                        who has not been back. Every column sorts now, through the shared
+                        header the rest of the platform uses. */}
+                    {USER_COLS.map((c, i) => (
+                      <SortableTh key={c.key} sortKey={c.key} align={i === 0 ? "left" : "right"}
+                        current={sort} onClick={onHeaderClick} arrow={sortArrow}
+                        title={L("Klikni pre zoradenie", "Click to sort")}
+                        style={{ padding: "0.5rem 0.6rem", borderBottom: `1px solid ${border}` }}>
+                        {c.label[lang === "sk" ? 0 : 1]}
+                      </SortableTh>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {users.map((u) => (
+                  {sortRows(users).map((u) => (
                     <tr key={u.user_id} onClick={() => openUser(u)}
                       tabIndex={0} role="button"
                       aria-label={L(`Denník aktivity — ${u.email || u.user_id}`, `Activity timeline — ${u.email || u.user_id}`)}
