@@ -2086,8 +2086,15 @@ function ComparableTransactionsReport({ projects, lang }) {
       >
         <p style={{ color: "var(--text-2)", fontSize: "0.9rem", lineHeight: 1.65, margin: "0 0 1rem" }}>
           {lang === "sk"
-            ? "Všetky reálne predané byty z našej databázy. Pre valuérov, banky a stanovenie kolaterálu — tu sú porovnateľné transakcie (reálne predaje), nie marketingové cenníky. Filtrami sa zúži výber, CSV-export pre Excel."
-            : "Every actually-sold unit from our database. For valuers, banks, and collateral assessment — these are comparable transactions (real sales), not marketing list-prices. Filters narrow the set; CSV export drops into Excel."}
+            /* It said "Všetky reálne predané byty z našej databázy" / "Every actually-sold
+               unit". It is not every one: report_comparables reads durable sale EVENTS —
+               2 535 today, of which 2 053 carry a price — while the ledger knows 27 237
+               flats as sold. The difference is everything that had already sold before we
+               started watching on 2026-05-28, which we can count but never witnessed a
+               price for. Saying "every" to valuers and banks sizing collateral is the one
+               audience where that matters most. */
+            ? "Predaje, ktoré sme zaznamenali odkedy trh sledujeme, a ktoré predané zostali — nie marketingové cenníky. Pre valuérov, banky a stanovenie kolaterálu. Byty predané ešte pred začiatkom nášho sledovania tu nie sú: vieme, že sa predali, ale cenu, za ktorú sa predali, sme nikdy nevideli. Filtrami sa zúži výber, CSV-export pre Excel."
+            : "Sales we recorded since we began tracking the market, and which stayed sold — not marketing list-prices. For valuers, banks and collateral assessment. Units sold before our tracking began are not here: we know they sold, but we never saw the price they sold at. Filters narrow the set; CSV export drops into Excel."}
         </p>
 
         {/* Filter row */}
