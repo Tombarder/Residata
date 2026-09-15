@@ -872,7 +872,7 @@ function KpiStrip({ summary, lang, extra = [] }) {
       label: `Ø ${moneySymbol()}/m²`,
       value: Math.round(moneyFromEur(summary.wavgM2)).toLocaleString("en-US").replace(/,/g, " "),
       accent: "#3b74e8",
-      info: lang === "sk" ? "Priemerná ponuková cena za m² (s DPH) v tomto výbere." : "Average asking price per m² (incl. VAT) in this selection.",
+      info: lang === "sk" ? "Priemerná ponuková cena za m² (s DPH) v tomto výbere. Ráta sa len z bytov, ktoré majú zverejnenú cenu aj plochu. Byty bez ceny (veľká časť ponuky) do priemeru nevstupujú, takže priemer pokrýva menej bytov než počty vedľa neho." : "Average asking price per m² (incl. VAT) in this selection. Computed only from units with a published price and area. Units without a price — a large share of the offer — are not in the average, so it covers fewer units than the counts beside it.",
     }] : []),
     ...extra,
   ];
@@ -1175,7 +1175,7 @@ function AggregateTable({ rows, lang, nameLabel, nameFormat, countsAllKinds }) {
                 rows weight by floor area (Σ cena ÷ Σ plocha), the locality rows weight by
                 unit count. One tooltip cannot be true of both, and naming the wrong one is
                 worse than naming neither. Same call as the Ø €/m² KPI tile. */}
-            <th style={tdhR}>Ø {moneySymbol()}/m²<HdrInfo lang={lang} sk="Priemerná ponuková cena za m² (s DPH) voľných bytov v skupine." en="Average asking price per m² (incl. VAT) of available units in the group." /></th>
+            <th style={tdhR}>Ø {moneySymbol()}/m²<HdrInfo lang={lang} sk="Priemerná ponuková cena za m² (s DPH) voľných bytov v skupine. Ráta sa len z bytov, ktoré majú zverejnenú cenu aj plochu. Byty bez ceny (veľká časť ponuky) do priemeru nevstupujú, takže priemer pokrýva menej bytov než počty vedľa neho." en="Average asking price per m² (incl. VAT) of available units in the group. Computed only from units with a published price and area. Units without a price — a large share of the offer — are not in the average, so it covers fewer units than the counts beside it." /></th>
             <th style={{ ...tdh, minWidth: 90 }}>{lang === "sk" ? "Relatívne" : "Relative"}<HdrInfo lang={lang} sk={`Vizuálne porovnanie veľkosti skupín podľa počtu ${countsAllKinds ? "jednotiek" : "bytov"} — najväčšia skupina má plnú lištu.`} en={`Visual size comparison of the groups by ${countsAllKinds ? "unit" : "home"} count — the largest group has a full bar.`} /></th>
           </tr>
         </thead>

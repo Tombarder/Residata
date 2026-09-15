@@ -1337,7 +1337,12 @@ function MarketInsight({ lens, stats, sk, onBand }) {
   const s = stats;
   let headline, visual;
   if (lens === "price") {
+    /* The median is over the projects that PUBLISH a price; the "N v zábere" count
+       beside it is every project in the area. Saying so is the second half of the
+       price-population rule — the maths was already right, the label was silent. */
     headline = <Headline label={sk ? "Medián ceny" : "Median price"} big={s.med ? mVal(s.med) : "—"} unit="/m²"
+      title={sk ? "Medián sa ráta len z projektov, ktoré cenu zverejňujú. Projekty bez zverejnenej ceny doň nevstupujú, takže pokrýva menej projektov než počet v zábere."
+                : "The median covers only projects that publish a price. Projects without one are not in it, so it covers fewer projects than the count in view."}
       sub={s.pMin ? `${sk ? "najlacnejší" : "cheapest"} ${mVal(s.pMin)} · ${sk ? "najdrahší" : "priciest"} ${mVal(s.pMax)}` : (sk ? "žiadne zverejnené ceny" : "no published prices")} />;
     visual = <Histogram hist={s.hist} hLo={s.hLo} hHi={s.hHi} med={s.med} sk={sk} onBand={onBand} />;
   } else if (lens === "completion") {
@@ -1364,9 +1369,9 @@ function MarketInsight({ lens, stats, sk, onBand }) {
 // then the spread around it. Before this the big figure carried no label at all
 // and the line underneath ran "medián · rozsah €2 067–€11 139" — three different
 // facts in one string, with nothing saying which belonged to the number above.
-function Headline({ label, big, unit, sub }) {
+function Headline({ label, big, unit, sub, title }) {
   return (
-    <div style={{ minWidth: 150, flexShrink: 0 }}>
+    <div style={{ minWidth: 150, flexShrink: 0 }} title={title}>
       {label ? (
         <div style={{ fontSize: "0.58rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 3 }}>{label}</div>
       ) : null}
