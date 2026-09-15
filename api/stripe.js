@@ -749,9 +749,40 @@ async function handleWebhook(req, res) {
 }
 
 // ─── router ──────────────────────────────────────────────────────────────
+/**
+ * Which HTTP methods each action answers — declared beside the router, per action.
+ *
+ * 🔴 WHY IT IS A TABLE AND NOT ONE RULE (2026-09-15). This handler opened with
+ * `if (req.method !== "POST") return 405`, which is correct for the three
+ * browser-driven actions and for Stripe's webhook, and wrong for a cron:
+ * **Vercel invokes a scheduled job with a plain GET.** So from the moment the
+ * nightly reconcile shipped it answered 405 at the door, before its own auth
+ * check was ever reached — the safety net that exists precisely because billing
+ * had a single delivery path had itself never run, not once.
+ *
+ * Nothing surfaced it because a cron on Hobby leaves only a runtime log, and
+ * that log is discarded after an hour; by the time anyone looks, 04:00 is gone.
+ * The guard is now `src/lib/billingSafetyNet.test.mjs`, which reads the cron
+ * paths out of vercel.json and asserts this table admits GET for each of them —
+ * the deploy and the test therefore read the same source of truth, and a future
+ * cron action cannot repeat this by being added to only one of them.
+ */
+const METHODS = {
+  checkout: ["POST"],
+  portal: ["POST"],
+  "set-price": ["POST"],
+  webhook: ["POST"],              // Stripe POSTs its events
+  reconcile: ["GET", "POST"],     // Vercel cron GETs; POST stays for a manual run with the secret
+};
+
 export default async function handler(req, res) {
-  if (req.method !== "POST") return res.status(405).json({ error: "method not allowed" });
   const action = req.query.action;
+  const allowed = METHODS[action];
+  if (!allowed) return res.status(400).json({ error: "unknown action" });
+  if (!allowed.includes(req.method)) {
+    res.setHeader("Allow", allowed.join(", "));
+    return res.status(405).json({ error: "method not allowed" });
+  }
   try {
     if (action === "checkout") return await handleCheckout(req, res);
     if (action === "portal") return await handlePortal(req, res);

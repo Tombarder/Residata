@@ -95,3 +95,62 @@ test("the webhook still fails closed when its secret is missing", () => {
   assert.match(STRIPE_API, /refusing unsigned webhook/,
     "the deployed-env fail-closed branch is gone — a forged POST could grant a subscription");
 });
+
+/**
+ * 🔴 A CRON GETS. (2026-09-15, the day the net was found never to have run.)
+ *
+ * The tests above proved the reconcile was routed and scheduled, and it was
+ * both — yet every 04:00 invocation since it shipped came back 405, because the
+ * handler opened with a blanket `req.method !== "POST"` and Vercel calls a
+ * scheduled job with a plain GET. Routed + scheduled + unreachable is exactly
+ * the shape a guard is supposed to catch, so the guard now also reads the door.
+ *
+ * It derives the actions from vercel.json rather than naming "reconcile", so a
+ * second cron action added later is covered the day it is added.
+ */
+function methodsTable() {
+  const start = STRIPE_API.indexOf("const METHODS = {");
+  assert.ok(start > 0, "the per-action method table is gone — a blanket method gate is back");
+  const body = STRIPE_API.slice(start, STRIPE_API.indexOf("};", start));
+  assert.ok(body.length > 60, "METHODS read as almost nothing — this guard would pass vacuously");
+  const table = {};
+  for (const m of body.matchAll(/["']?([a-z-]+)["']?\s*:\s*\[([^\]]*)\]/g)) {
+    table[m[1]] = [...m[2].matchAll(/["']([A-Z]+)["']/g)].map((x) => x[1]);
+  }
+  return table;
+}
+
+test("every cron that calls this endpoint is allowed the method a cron uses", () => {
+  const table = methodsTable();
+  const stripeCrons = (VERCEL.crons || []).filter((c) => String(c.path).startsWith("/api/stripe"));
+  assert.ok(stripeCrons.length >= 1, "no cron points at /api/stripe — billingSafetyNet reads nothing");
+
+  for (const c of stripeCrons) {
+    const action = new URLSearchParams(String(c.path).split("?")[1] || "").get("action");
+    assert.ok(action, `cron path "${c.path}" carries no ?action=`);
+    assert.ok(table[action],
+      `cron calls ?action=${action} but METHODS does not list that action, so the ` +
+      `dispatcher answers 400 "unknown action" every night`);
+    assert.ok(table[action].includes("GET"),
+      `cron calls ?action=${action} but it only accepts ${table[action].join("/")}. ` +
+      `Vercel invokes a scheduled job with GET, so this job answers 405 before its ` +
+      `auth check — which is how the reconcile ran zero times between 2026-09-14 and 15.`);
+  }
+});
+
+test("the browser-driven actions stay POST-only", () => {
+  // The fix widened one door; it must not have widened the others. A GET that
+  // starts a Checkout Session or writes a price is a CSRF hole.
+  const table = methodsTable();
+  for (const action of ["checkout", "portal", "set-price", "webhook"]) {
+    assert.deepEqual(table[action], ["POST"],
+      `${action} must stay POST-only — it is reached from a browser or from Stripe, never a cron`);
+  }
+});
+
+test("an unknown action is rejected before any handler runs", () => {
+  assert.match(STRIPE_API, /const allowed = METHODS\[action\];/,
+    "the dispatcher no longer decides from the table");
+  assert.match(STRIPE_API, /if \(!allowed\) return res\.status\(400\)/,
+    "an action missing from the table must 400, not fall through to a handler");
+});
