@@ -1,9 +1,17 @@
 # Reports layer — setup
 
-> **Stav pre Tomáša (2026-04-22):** všetko je už nakonfigurované. Migrácie
-> bežia, secrets (ANTHROPIC_API_KEY, CRON_SECRET, GMAIL_APP_PASSWORD) sú
-> uložené v `app_secrets` tabuľke v Supabase. Nič v Vercel env UI
-> prenastavovať netreba. Skok rovno na [Verifikácia](#verifikácia).
+> **🔴 OPRAVA 2026-09-15 — táto veta tu stála päť mesiacov a bola nepravdivá:**
+> *„Nič v Vercel env UI prenastavovať netreba."* Pri `CRON_SECRET` to neplatí a
+> stálo to každý mesačný report od 2026-04-22.
+>
+> **Vercel podpíše cron request hlavičkou `Authorization: Bearer $CRON_SECRET`
+> IBA vtedy, keď je premenná v prostredí projektu.** Kópia v `app_secrets` je
+> hodnota, ktorú žiadny cron nikdy nepredloží — endpoint z nej usúdi, že secret
+> je nastavený, a potom odmietne vlastný cron. `api/_lib/cronAuth.js` preto číta
+> **výhradne `process.env.CRON_SECRET`** a iný zdroj neexistuje.
+>
+> `ANTHROPIC_API_KEY` a `GMAIL_APP_PASSWORD` v `app_secrets` zostávajú v poriadku
+> — tie si aplikácia číta sama za behu, nikto ich nepredkladá zvonku.
 
 ## Čo Reports stránka robí
 
@@ -54,11 +62,12 @@ Aktuálne uložené secrets (overené `select key, length(value)`):
 | key                  | dĺžka | účel                                  |
 |----------------------|-------|---------------------------------------|
 | `ANTHROPIC_API_KEY`  | 108   | Claude Messages API                   |
-| `CRON_SECRET`        | 64    | Bearer token pre manuálny trigger cronu |
+| `CRON_SECRET`        | 64    | ⚠️ mŕtva kópia — platí iba tá vo **Vercel env** |
 | `GMAIL_APP_PASSWORD` | 16    | SMTP heslo pre monthly email          |
 
-CRON_SECRET je uložený v `/tmp/cron_secret.txt` na tvojom Macu, keby si
-ho potreboval pre manuálny test.
+`CRON_SECRET` bol kedysi aj v `/tmp/cron_secret.txt` na Macu — ten súbor už
+neexistuje (overené 2026-09-15) a `/tmp` nikdy nebolo miesto pre secret.
+Jediná platná hodnota je tá vo **Vercel → residata → Environment Variables**.
 
 ## Databázová štruktúra (už nainštalovaná)
 
@@ -139,11 +148,16 @@ Môžeš to pozrieť/otestovať na:
 
 ### Manuálny trigger (admin only)
 ```bash
+# hodnotu vytiahni z Vercelu, nie z DB ani z /tmp:
+export CRON_SECRET="$(cd ~/residata-frontend && vercel env pull /dev/stdout --environment=production 2>/dev/null | grep '^CRON_SECRET=' | cut -d= -f2- | tr -d '\"')"
+
 curl -X POST https://residata.eu/api/cron/monthly-reports \
-     -H "Authorization: Bearer $(cat /tmp/cron_secret.txt)"
+     -H "Authorization: Bearer $CRON_SECRET"
 ```
 
-(alebo si pozri CRON_SECRET vyššie / v app_secrets tabuľke)
+Cron beží `0 8 1 * *` (monthly-reports) a `0 4 * * *` (stripe reconcile) — oba
+podľa `vercel.json`. Bez `CRON_SECRET` v prostredí oba odpovedajú 401 a ticho
+nerobia nič; `cronAuth.js` ten prípad loguje ako samostatnú chybu, práve preto.
 
 ---
 

@@ -213,8 +213,15 @@ Calendar reminder: rotate these 4 secrets quarterly. Takes 10 min total.
 
 ### CRON_SECRET
 1. Generate a random string: `openssl rand -base64 32`
-2. Update Vercel env var `CRON_SECRET` to the new value
-3. Redeploy (monthly cron next month will use it)
+2. Set it as a Vercel env var `CRON_SECRET` on **Production** — this is the ONLY
+   place it may live. A copy in `app_secrets` authenticates nothing: Vercel signs
+   a cron request with `Authorization: Bearer $CRON_SECRET` only when the value is
+   in the project environment, so a database-only secret makes every cron 401
+   against itself. That is exactly what happened between 2026-04-22 and 2026-09-15.
+3. Redeploy — env vars only reach a deployment built after they were set.
+4. Verify, do not assume: `vercel env ls production | grep CRON_SECRET`, then
+   `curl -X POST https://residata.eu/api/cron/monthly-reports -H "Authorization: Bearer $CRON_SECRET"`
+   must answer 200, and the same call without the header must answer 401.
 
 ---
 
