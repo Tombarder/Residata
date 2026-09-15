@@ -643,6 +643,25 @@ async function handleReconcile(req, res) {
   if (failed) console.error(`[stripe reconcile] ${failed} of ${scanned} failed`, problems);
   else console.log(`[stripe reconcile] scanned=${scanned} applied=${applied} skipped=${skipped}`);
 
+  // 🔴 LEAVE A TRACE THAT OUTLIVES THE LOG (2026-09-15). Everything above this
+  // line is a console line on a Hobby plan, which is discarded after an hour —
+  // so "did the net run last night?" had no answer by the time anyone asked,
+  // and that is the only reason this endpoint could go from its first deploy to
+  // its first real run without executing once. The scraper's helper crons have
+  // self-reported into reference.cron_heartbeats since June and a stale one
+  // shows up in the digest Boss already gets daily; this joins them.
+  //
+  // It must never be able to fail the reconcile it is reporting on.
+  try {
+    await admin.rpc("record_cron_heartbeat", {
+      p_job: "residata_stripe_reconcile",
+      p_ok: failed === 0,
+      p_detail: `scanned=${scanned} applied=${applied} skipped=${skipped} failed=${failed}`,
+    });
+  } catch (e) {
+    console.error("[stripe reconcile] heartbeat not recorded", String(e?.message || e));
+  }
+
   return res.status(failed ? 500 : 200).json({
     ok: failed === 0, scanned, applied, skipped, failed, truncated, problems,
   });

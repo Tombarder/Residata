@@ -177,11 +177,31 @@ export default async function handler(req, res) {
     }
   } catch (_) { /* ignore */ }
 
+  const sentOk = results.filter(r => r.ok).length;
+  const sentFail = results.filter(r => !r.ok).length;
+
+  // 🔴 A TRACE THAT OUTLIVES THE LOG (2026-09-15). This endpoint refused its own
+  // cron every month from April to September and the only symptom was a runtime
+  // log that Hobby discards after an hour — so nobody could have noticed without
+  // happening to look inside the right 60 minutes of the 1st. It now reports into
+  // reference.cron_heartbeats, where integrity_check has watched the scraper's
+  // helper crons since June and surfaces a stale one in Boss's daily digest.
+  // Never allowed to fail the run it is reporting on.
+  try {
+    await admin.rpc("record_cron_heartbeat", {
+      p_job: "residata_monthly_reports",
+      p_ok: sentFail === 0,
+      p_detail: `month=${responseMonth} subscribers=${subs?.length || 0} sent_ok=${sentOk} sent_fail=${sentFail}`,
+    });
+  } catch (e) {
+    console.error("[monthly-reports] heartbeat not recorded", String(e?.message || e));
+  }
+
   return res.status(200).json({
     month: responseMonth,
     subscribers: subs?.length || 0,
-    sent_ok:   results.filter(r => r.ok).length,
-    sent_fail: results.filter(r => !r.ok).length,
+    sent_ok:   sentOk,
+    sent_fail: sentFail,
     pruned_usage_rows: pruned,
     results,
   });

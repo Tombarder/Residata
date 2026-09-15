@@ -138,3 +138,48 @@ test("every scheduled endpoint goes through this one door", () => {
       `measured getting a 200 in production on 2026-09-15`);
   }
 });
+
+/**
+ * 🔴 AND EVERY SCHEDULED ENDPOINT LEAVES A TRACE THAT OUTLIVES ITS LOG.
+ *
+ * Both crons on this project were dead — one had never executed at all, the
+ * other had been refusing itself since April — and neither was noticed, because
+ * the only evidence a Vercel Hobby cron leaves is a runtime log discarded after
+ * an hour. Whoever asks "did it run last night?" asks after the answer is gone.
+ *
+ * reference.cron_heartbeats already solves this for the scraper's seven helper
+ * crons: they self-report, integrity_check flags a stale one against its own
+ * window, and it rides the digest Boss reads daily. These two now report into
+ * the same table through public.record_cron_heartbeat.
+ */
+const REGISTERED_JOBS = new Set(["residata_stripe_reconcile", "residata_monthly_reports"]);
+
+test("every scheduled endpoint reports a heartbeat, under a registered job name", () => {
+  for (const c of VERCEL.crons || []) {
+    const file = join(ROOT, String(c.path).split("?")[0].replace(/^\//, "") + ".js");
+    const src = readFileSync(file, "utf8");
+    assert.match(src, /record_cron_heartbeat/,
+      `${c.path} records nothing durable, so a night it does not run looks exactly ` +
+      `like a night it runs and finds nothing`);
+    const names = [...src.matchAll(/p_job:\s*["']([^"']+)["']/g)].map((m) => m[1]);
+    assert.ok(names.length >= 1, `${c.path} calls the heartbeat RPC without naming a job`);
+    for (const n of names) {
+      assert.ok(REGISTERED_JOBS.has(n),
+        `${c.path} reports as "${n}", which no migration registered — ` +
+        `record_cron_heartbeat raises on an unknown job rather than inventing a row ` +
+        `nobody decided to watch`);
+    }
+  }
+});
+
+test("a failed heartbeat can never fail the job it is reporting on", () => {
+  for (const c of VERCEL.crons || []) {
+    const file = join(ROOT, String(c.path).split("?")[0].replace(/^\//, "") + ".js");
+    const src = readFileSync(file, "utf8");
+    const i = src.indexOf("record_cron_heartbeat");
+    const before = src.slice(Math.max(0, i - 200), i);
+    assert.match(before, /try\s*\{/,
+      `${c.path} calls the heartbeat outside a try — a monitoring write that can ` +
+      `break the work it monitors is worse than no monitoring`);
+  }
+});
