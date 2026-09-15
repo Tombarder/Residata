@@ -302,7 +302,8 @@ function aggHistory(idSet, snapshots) {
     if (!idSet.has(r.project_id)) continue;
     const m = r.snapshot_month; if (!m) continue;
     let a = byMonth.get(m);
-    if (!a) { a = { available: 0, sold: 0, reserved: 0, wSum: 0, wTot: 0, projects: new Set(), developers: new Set() }; byMonth.set(m, a); }
+    if (!a) { a = { available: 0, sold: 0, reserved: 0, wSum: 0, wTot: 0, projects: new Set(), developers: new Set(), seen: new Set() }; byMonth.set(m, a); }
+    a.seen.add(r.project_id);
     a.available += r.available_units || 0;
     a.sold += r.sold_units || 0;
     a.reserved += (r.reserved_units || 0) + (r.prereserved_units || 0);
@@ -313,14 +314,51 @@ function aggHistory(idSet, snapshots) {
     const a = byMonth.get(m), den = a.sold + a.available + a.reserved;
     return { available: a.available, sold_total: a.sold, reserved: a.reserved,
              projects: a.projects.size, developers: a.developers.size,
+             // every project that reported in this month — what aggMomDelta needs to
+             // hold the population constant. Not `projects`, which counts only the
+             // ones still selling.
+             ids: a.seen,
              avg_m2: a.wTot ? a.wSum / a.wTot : null, sold_through: den ? (a.sold / den) * 100 : null };
   });
 }
+
+// 🔴 METRICS WHOSE VALUE DEPENDS ON *WHICH* PROJECTS ARE IN THE BUCKET.
+//
+// A count grows because we onboarded projects, and saying so is correct — 12 242
+// → 12 311 available units IS more inventory. An AVERAGE and a RATIO are not
+// like that: add eleven cheaper projects and the average falls without a single
+// price moving.
+//
+// Measured 2026-08 → 2026-09, the two buckets this compares (2026-09-15):
+//     avg €/m²      all projects  5 924 → 5 913   ▼ 11
+//                   like-for-like 5 920 → 5 942   ▲ 22
+//     sold-through  all projects  62,15 → 62,02   ▼ 0,13 pp
+//                   like-for-like 61,49 → 62,19   ▲ 0,70 pp
+//
+// Both arrows pointed the WRONG WAY — on the first card of the first page. The
+// eleven projects that joined in September are cheaper than the book, so the
+// average fell while prices rose. This is the board's caveat d5532b ("the ONLY
+// valid price time series is the same-unit comparison") arriving on a surface.
+//
+// So these two are compared over the projects present in BOTH months, and the
+// counts are left alone.
+const COMPOSITION_SENSITIVE = new Set(["avg_m2", "sold_through"]);
 function aggMomDelta(metric, idSet, snapshots) {
   if (!MOM_METRICS.has(metric)) return null;
   const h = aggHistory(idSet, snapshots);
   if (h.length < 2) return null;
-  const cur = h[h.length - 1][metric], prev = h[h.length - 2][metric];
+  let cur = h[h.length - 1][metric], prev = h[h.length - 2][metric];
+  if (COMPOSITION_SENSITIVE.has(metric)) {
+    // Hold the population constant: only the projects that reported in BOTH of
+    // the two months being compared. Anything else measures our onboarding.
+    const a = h[h.length - 1].ids, b = h[h.length - 2].ids;
+    const both = new Set([...a].filter((id) => b.has(id)));
+    if (both.size === 0) return null;
+    const hl = aggHistory(both, snapshots);
+    if (hl.length < 2) return null;
+    cur = hl[hl.length - 1][metric];
+    prev = hl[hl.length - 2][metric];
+  }
   if (cur == null || prev == null) return null;
   const abs = cur - prev;
   if (Math.abs(abs) < 1e-9) return null;
