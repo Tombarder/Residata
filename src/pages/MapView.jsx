@@ -100,9 +100,14 @@ function installMapLayers(map, features) {
   map.addLayer({
     id: "points", type: "circle", source: "projects", filter: ["!", ["has", "point_count"]],
     paint: {
+      // Colour keeps meaning AVAILABILITY. Whether the position is surveyed is a
+      // different fact, so it rides on opacity and the ring instead of stealing
+      // the colour channel: a faded dot with a grey ring reads as "about here".
       "circle-color": ["case", ["<=", ["get", "available"], 0], greyPt, accentPaint],
+      "circle-opacity": ["case", ["get", "approx"], 0.4, 0.95],
       "circle-radius": 7,
-      "circle-stroke-width": 1.5, "circle-stroke-color": "#0a0a0b",
+      "circle-stroke-width": 1.5,
+      "circle-stroke-color": ["case", ["get", "approx"], "#6b6b76", "#0a0a0b"],
     },
   });
 }
@@ -147,7 +152,15 @@ function buildFeatures(projects, coords) {
     feats.push({
       type: "Feature",
       geometry: { type: "Point", coordinates: [c.lng, c.lat] },
-      properties: projectProps(p),
+      // 🔴 `approx` says this pin is a GUESS: location_source='placeholder',
+      // i.e. dropped somewhere inside the right city rather than at the project.
+      // On 2026-09-14 that was 201 of 399 active projects — half the map — and
+      // nothing anywhere said so. They are not stacked on one point, so they
+      // look exactly like a surveyed pin. For a product whose pitch is "where
+      // the market is", a wrong pin a client acts on is worse than a missing one.
+      // The coords loader had been reading location_verified since the start and
+      // then never using it; this is the first thing that reads it.
+      properties: { ...projectProps(p), approx: !c.verified },
     });
   }
   return { type: "FeatureCollection", features: feats };
@@ -174,9 +187,20 @@ function showProjectPopup(map, lngLat, props, lang, onOpen, popupRef, specProjec
     : "";
   // The full list (including coverage and missing living areas) goes underneath.
   const specBlock = specificsHTML(items, lang);
+  // A faded pin is a hint; this is the sentence. Said in the popup because that
+  // is where somebody decides to act on a location, and because a client who
+  // drives to a placeholder pin finds a different street.
+  const approxNote = props.approx
+    ? `<div style="font-size:0.68rem;color:${amber};margin:-4px 0 8px;line-height:1.4">` +
+      (lang === "sk"
+        ? "Poloha je približná — bod je umiestnený v meste, nie na projekte."
+        : "Approximate location — pinned in the town, not at the project.") +
+      `</div>`
+    : "";
   el.innerHTML =
     `<div style="font-weight:600;font-size:0.92rem;color:${textLight};margin-bottom:2px">${escapeHtml(props.name)}</div>` +
     `<div style="font-size:0.72rem;color:${dim};margin-bottom:8px">${escapeHtml(loc)}</div>` +
+    approxNote +
     `<div style="font-family:${mono};font-size:0.72rem;color:${textLight};line-height:1.5">` +
     `<div><span style="color:${dim}">${lang === "sk" ? "Voľné" : "Available"}</span> &nbsp;${props.available} / ${props.total}</div>` +
     `<div><span style="color:${dim}">${lang === "sk" ? "Priem." : "Avg"}</span> &nbsp;${price}${schedMark}${levelMark}</div></div>` +
@@ -595,7 +619,9 @@ export default function MapView({ lang = "en", setCurrent }) {
     if (c) {
       map.flyTo({ center: [c.lng, c.lat], zoom: Math.max(map.getZoom(), 14), duration: 700 });
       showProjectPopup(
-        map, [c.lng, c.lat], projectProps(p), langRef.current,
+        // Same flag as a clicked pin — a project reached through search must not
+        // silently lose the warning that its position is a guess.
+        map, [c.lng, c.lat], { ...projectProps(p), approx: !c.verified }, langRef.current,
         (id) => { setCurrentRef.current && setCurrentRef.current("App:ProjectDetail:" + id); },
         popupRef, (k) => specRef.current.project(k)
       );
@@ -647,6 +673,11 @@ export default function MapView({ lang = "en", setCurrent }) {
           </span>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
             <Dot color={greyPt} /> {sk ? "vypredané" : "sold out"}
+          </span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}
+                title={sk ? "Bod je umiestnený v meste, nie na projekte."
+                          : "Pinned in the town, not at the project."}>
+            <Dot color={green} faded /> {sk ? "približná poloha" : "approximate location"}
           </span>
         </div>
       </div>
@@ -821,8 +852,14 @@ export default function MapView({ lang = "en", setCurrent }) {
 // <select>s; those became <Picker>s and the styles were left behind, dead.)
 const inputStyle = { ...fieldBlock };
 
-function Dot({ color }) {
-  return <span style={{ width: 9, height: 9, borderRadius: "50%", background: color, display: "inline-block" }} />;
+function Dot({ color, faded = false }) {
+  // `faded` mirrors the map's own treatment for an unverified position — same
+  // opacity and ring as the "points" layer, so the key and the pin agree.
+  return <span style={{
+    width: 9, height: 9, borderRadius: "50%", background: color, display: "inline-block",
+    opacity: faded ? 0.4 : 1,
+    boxShadow: faded ? "0 0 0 1.5px #6b6b76" : "none",
+  }} />;
 }
 
 function escapeHtml(s) {
