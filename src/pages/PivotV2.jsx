@@ -2140,13 +2140,39 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
               ? "Toto nie je prázdny výsledok — požiadavka zlyhala. Skús to znova."
               : "This isn't an empty result — the request failed. Please try again."}
           </div>
-          <button onClick={() => window.location.reload()} style={{
-            marginTop: "0.3rem", background: green, color: "var(--bg)", border: "none",
-            borderRadius: 8, padding: "0.55rem 1.1rem", fontFamily: mono, fontSize: "0.8rem",
-            fontWeight: 700, cursor: "pointer",
-          }}>
-            {lang === "sk" ? "Skúsiť znova" : "Try again"}
-          </button>
+          {/* 🔴 A RELOAD IS NOT AN ESCAPE, AND FOR MONTHS IT WAS THE ONLY BUTTON.
+              The pivot layout is persisted per user (useAccountPrefState), and
+              this error branch hides the ENTIRE editing UI — LeftPanel, the field
+              palette, "Predvolené", "Vyčistiť" — because they live inside the
+              !grainErrored gate below. So a config that makes the engine fail
+              locks the user out permanently: reload, rehydrate the same config,
+              fail again. Verified 2026-09-15 by putting Mesiac in Rows with a
+              price measure, which times out (see the has_price migration): after
+              the failure the page offered 0 draggable chips, no reset and no
+              clear, and survived a full reload in that state.
+              Resetting is therefore not a convenience, it is the way out. */}
+          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", justifyContent: "center" }}>
+            <button onClick={() => window.location.reload()} style={{
+              marginTop: "0.3rem", background: green, color: "var(--bg)", border: "none",
+              borderRadius: 8, padding: "0.55rem 1.1rem", fontFamily: mono, fontSize: "0.8rem",
+              fontWeight: 700, cursor: "pointer",
+            }}>
+              {lang === "sk" ? "Skúsiť znova" : "Try again"}
+            </button>
+            <button onClick={resetToDefault} style={{
+              marginTop: "0.3rem", background: "transparent", color: text,
+              border: "1px solid var(--border)", borderRadius: 8,
+              padding: "0.55rem 1.1rem", fontFamily: mono, fontSize: "0.8rem",
+              fontWeight: 700, cursor: "pointer",
+            }}>
+              ↺ {lang === "sk" ? "Obnoviť predvolené zobrazenie" : "Reset to the default view"}
+            </button>
+          </div>
+          <div style={{ color: dim, fontSize: "0.75rem", maxWidth: 420, lineHeight: 1.5 }}>
+            {lang === "sk"
+              ? "Ak sa chyba opakuje aj po obnovení stránky, vráťte sa na predvolené zobrazenie — vaše nastavenie sa ukladá, takže opakované načítanie skúša to isté."
+              : "If it keeps failing after a reload, reset to the default view — your layout is saved, so reloading just tries the same thing again."}
+          </div>
         </div>
       )}
 
@@ -2169,6 +2195,17 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
               ? `Vybrali ste približne ${archiveTooLarge.estimate.toLocaleString("sk-SK")} riadkov; naraz ich vieme spoľahlivo spracovať ${archiveTooLarge.cap.toLocaleString("sk-SK")}. Výsledok by bol počítaný len z časti dát, preto ho radšej neukazujeme. Zúžte výber — napríklad jeden mesiac alebo jeden deň, alebo pridajte filter na mesto či projekt.`
               : `This selection is about ${archiveTooLarge.estimate.toLocaleString("en-GB")} rows; we can process ${archiveTooLarge.cap.toLocaleString("en-GB")} at once. The result would be computed from part of the data only, so we are not showing one. Narrow the selection — a single month or day, or add a city or project filter.`}
           </div>
+          {/* This branch hides the editing UI exactly like the error branch above,
+              so "narrow the selection" would be advice the user cannot follow.
+              Same escape hatch, same reason. */}
+          <button onClick={resetToDefault} style={{
+            marginTop: "0.3rem", background: "transparent", color: text,
+            border: "1px solid var(--border)", borderRadius: 8,
+            padding: "0.55rem 1.1rem", fontFamily: mono, fontSize: "0.8rem",
+            fontWeight: 700, cursor: "pointer",
+          }}>
+            ↺ {lang === "sk" ? "Obnoviť predvolené zobrazenie" : "Reset to the default view"}
+          </button>
         </div>
       )}
 
