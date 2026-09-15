@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { statusLabel } from "../lib/unitStatus";
+import { isHomeUnit } from "../lib/unitKinds";
 import { SortableTh } from "../components/SortableTable";
 import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
@@ -951,7 +952,16 @@ function ProjectAggregateOnly({ project, lang, t, canVelocity }) {
    client-side from whatever flats / snapshots we already load — no
    extra backend work. Every chart is self-contained (no deps, just
    React + SVG) so bundle stays small. */
-function ProjectInsights({ project, flats, snapshots, lang, coverageMode, onSelectFlat }) {
+function ProjectInsights({ project, flats: allRows, snapshots, lang, coverageMode, onSelectFlat }) {
+  /* Every analysis below is about the RESIDENTIAL product — the room-type breakdown, the
+     price coverage, the availability, and the detector for whether this developer marks
+     sold flats at all. useProjectFlats selects * from flats_current, so it hands over the
+     shops, offices, bays and cellars too, and 104 of those carry an `izby` value: 63
+     retail units and 41 offices, which land in the room breakdown as if they were flats.
+     Pri Mlynoch has 32 of them against 92 homes, so a third of that project's "fastest
+     moving room type" was shops. The line is drawn ONCE, here, the way Reports and the
+     Pivot draw it. See src/lib/unitKinds.js. */
+  const flats = useMemo(() => (allRows || []).filter(f => isHomeUnit(f.typ)), [allRows]);
   const locale = localeTag(lang);
   const fmtEur = (v) => v == null || !Number.isFinite(v) ? "—" : `${Math.round(moneyFromEur(v)).toLocaleString("en-US").replace(/,/g, " ")} ${moneySymbol()}`;
   const fmtPct = (v) => formatPercent(v, lang);
