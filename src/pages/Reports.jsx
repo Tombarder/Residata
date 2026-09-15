@@ -776,7 +776,7 @@ function ProjectReport({ project, siblings, lang }) {
           {lang === "sk" ? (
             <><strong style={{ color: text }}>{project.name}</strong> od developera <strong style={{ color: text }}>{project.developer || "—"}</strong> v časti <strong style={{ color: text }}>{project.district || "—"}</strong>.
             {summary.hasUnitData
-              ? <> Celkovo {summary.totalUnits} bytov, {summary.soldPct != null ? summary.soldPct.toFixed(0) : "—"}% predaných.</>
+              ? <> Celkovo {summary.totalUnits} bytov, {formatPercent(summary.soldPct, lang, 0)} obsadených (predané + rezervované).</>
               : <> Jednotkové dáta pre tento projekt ešte neposielame (registrový záznam).</>}
             {/* NOT "vážený": in the project deep-dive this is the mean of each flat's own
                 €/m² (the same statistic as projects_live.avg_price_eur_m2, kept identical so
@@ -786,7 +786,7 @@ function ProjectReport({ project, siblings, lang }) {
           ) : (
             <><strong style={{ color: text }}>{project.name}</strong> by <strong style={{ color: text }}>{project.developer || "—"}</strong> in <strong style={{ color: text }}>{project.district || "—"}</strong>.
             {summary.hasUnitData
-              ? <> {summary.totalUnits} units, {summary.soldPct != null ? summary.soldPct.toFixed(0) : "—"}% sold.</>
+              ? <> {summary.totalUnits} units, {formatPercent(summary.soldPct, lang, 0)} taken (sold + reserved).</>
               : <> Unit-level data not tracked yet (registry-only entry).</>}
             {summary.wavgM2 && <> Weighted avg <strong style={{ color: text }}>{Math.round(moneyFromEur(summary.wavgM2)).toLocaleString("en-US")} {moneySymbol()}/m²</strong>.</>}</>
           )}
@@ -862,8 +862,8 @@ function KpiStrip({ summary, lang, extra = [] }) {
     { label: lang === "sk" ? "Projektov"   : "Projects",   value: summary.projectCount.toLocaleString("en-US").replace(/,/g, " "), accent: "#10b981", info: lang === "sk" ? "Počet projektov v tomto výbere." : "Number of projects in this selection." },
     { label: lang === "sk" ? "Bytov"       : "Units",      value: summary.totalUnits.toLocaleString("en-US").replace(/,/g, " "), accent: "#64748b", info: lang === "sk" ? "Celková kapacita — všetky byty v projektoch (voľné, rezervované aj predané spolu)." : "Total capacity — all units in the projects (available, reserved and sold combined)." },
     { label: lang === "sk" ? "Voľných"     : "Available",  value: summary.available.toLocaleString("en-US").replace(/,/g, " "), color: accentInk, accent: "#10b981", info: lang === "sk" ? "Byty aktuálne v ponuke — ešte nepredané a nerezervované." : "Units currently for sale — not yet sold or reserved." },
-    { label: lang === "sk" ? "Predaných"   : "Sold",       value: summary.sold.toLocaleString("en-US").replace(/,/g, " "), color: orangeInk, accent: "#e0940f", info: lang === "sk" ? "Byty už predané (kumulatívne doteraz)." : "Units already sold (cumulative to date)." },
-    { label: lang === "sk" ? "Predaných %" : "Sold %",     value: soldPctLabel, color: orangeInk, accent: "#e0940f", info: lang === "sk" ? "Podiel predaných z celku (predané ÷ všetky byty). „n/a“ keď developer nezverejňuje info o predaných bytoch." : "Share sold out of the total (sold ÷ all units). “n/a” when the developer doesn't publish sold info." },
+    { label: lang === "sk" ? "Predaných"   : "Sold",       value: summary.sold.toLocaleString("en-US").replace(/,/g, " "), color: orangeInk, accent: "#e0940f", info: lang === "sk" ? "Byty predané odkedy projekt sledujeme, podľa evidencie predajov — nie podľa toho, čo je v cenníku označené ako predané. Veľká časť developerov byt z cenníka po predaji zmaže." : "Units sold since we began tracking, from the sale ledger — not from what the price list marks as sold. A large minority of developers delete a flat from the list once it sells." },
+    { label: lang === "sk" ? "Obsadených %" : "Taken %",   value: soldPctLabel, color: orangeInk, accent: "#e0940f", info: lang === "sk" ? "Podiel bytov, ktoré už nie sú v ponuke — predané + rezervované + predrezervované, delené celkom. Nie sú to len predané: rezervácia sa môže zrušiť. Skutočné predaje ukazuje dlaždica „Predaných“. „n/a“ keď developer o obsadenosti nič nezverejňuje." : "Share of units no longer on offer — sold + reserved + pre-reserved, over the total. Not sold alone: a reservation can fall through. Actual sales are the “Sold” tile. “n/a” when the developer publishes nothing about it." },
     ...(summary.wavgM2 ? [{
       // "Ø €/m²" (average), NOT "(weighted)": this KPI is unit-weighted only in the
       // market/city/district scope; in the project deep-dive `summary` is the mean-of-ratios
@@ -2515,9 +2515,26 @@ function summariseProjects(projects, flats) {
     // unfiltered rows, so the per-type breakdown still shows every bay and shop.
     // See src/lib/unitKinds.js.
     const homes = flats.filter(f => isHomeUnit(f.typ));
-    const total       = homes.length;
+    /* The project's TRUE size, not the number of rows still on the price list. A large
+       minority of developers delete a flat once it sells, so the list is short by exactly
+       the flats that sold: Rezidencni ctvrt Tesla Hloubetin lists 188 rows and the ledger
+       knows 270 (171 available + 17 reserved + 82 sold). Counting the list made this page
+       report a project 30 % smaller than it is, and then divide by that number.
+       `total_units` is ledger-backed and reconciles: verified today on the two projects the
+       comment above names as manual_total risks — Slnecnice 4 626 against a ledger of 4 638
+       and a list of 4 624, Bory 925 = 925 = 925. The "~5-10k inflation" that warning
+       describes was a v1 state (it cites sync_to_supabase.py) and is not the case now.
+       Falls back to the list for any project row that carries no total. */
+    const total = projects.reduce((a, p) => a + (p.total_units || 0), 0) || homes.length;
     const available   = homes.filter(f => f.stav === "V").length;
-    const sold        = homes.filter(f => f.stav === "P").length;
+    /* 🔴 NOT `homes.filter(stav === "P")`. A large minority of developers DELETE a flat
+       from the price list when it sells, so that count is permanently zero for them —
+       measured today: Nad Arboretem 220 sold and 0 rows marked P, Tu je to IN 168 and 0,
+       Pekna Vyhliadka 135 and 0. This page would have reported "0 predaných" about a
+       project that has sold out. The ledger already answers it, per-project, and this
+       function is handed those very rows (it sums p.sold_last_month two lines below).
+       See rules_sold_from_the_ledger / Boss 2026-08-26. */
+    const sold        = projects.reduce((a, p) => a + (p.sold_units || 0), 0);
     const reserved    = homes.filter(f => f.stav === "R").length;
     const prereserved = homes.filter(f => f.stav === "PR").length;
     const future      = homes.filter(f => f.stav === "Ešte nie v ponuke").length;
@@ -2529,6 +2546,10 @@ function summariseProjects(projects, flats) {
     // as sync's aggregate_project so % matches across surfaces.
     const activeTotal = total - future - errored;
     const hasSoldData = sold > 0 || reserved > 0 || prereserved > 0;
+    /* Taken, not sold — it adds reservations, and it is labelled that way at every render
+       site. Numerator and denominator now come from the same reconciled picture: the
+       ledger's sold plus the list's reservations, over the project's true size. Built from
+       the list alone it read 9 % for a project that is 37 % gone. */
     const soldPct = activeTotal > 0 && hasSoldData
       ? ((sold + reserved + prereserved) / activeTotal) * 100
       : null;
