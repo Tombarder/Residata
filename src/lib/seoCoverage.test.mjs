@@ -276,3 +276,38 @@ test("the historical-trends claim names the same-unit method", () => {
   assert.equal(trend.length, 2,
     `expected the EN and SK historical-trends copy to name the per-unit method, found ${trend.length}`);
 });
+
+// ── what we may claim about our own uptime probe (2026-09-15) ─────────────
+//
+// The status page said the independent probe runs "every 15 minutes". Measured
+// across its entire history the same day: 88 runs over 11.9 days, MEDIAN gap
+// 3 hours, longest 7, and 2 of 87 gaps under 20 minutes — the stated cadence
+// happened 2 % of the time. GitHub throttles scheduled workflows on public repos
+// and drops them under load, so */15 buys about eight checks a day.
+//
+// That sentence sat on the one page whose whole argument is "do not take our word
+// for it, the history is public" — so a reader who did the thing we invited found
+// the claim contradicted by the evidence we linked. Worse than not saying it.
+//
+// A minute-figure is therefore banned here: it cannot be verified from the build,
+// and it rots silently every time GitHub retunes throttling.
+const STATUS_PAGE = readFileSync(join(HERE, "..", "pages", "StatusPage.jsx"), "utf8");
+
+test("the status page states no probe cadence in minutes", () => {
+  // Only the visible copy — the explanatory comment above it deliberately quotes
+  // the measured numbers, and banning those would remove the reason.
+  const copy = STATUS_PAGE.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  assert.ok(copy.length > 500, "stripped the file to nothing — guard would be vacuous");
+  const claim = /(\d+)\s*(minút|minutes|min\b)/i.exec(copy);
+  assert.equal(claim, null,
+    `the status page claims a probe cadence ("${claim && claim[0]}"). Measured reality is ` +
+    `a 3-hour median, so a minute figure is false and unverifiable from here — say ` +
+    `"several times a day" / "viackrát denne".`);
+});
+
+test("it still says the probe is independent and the history public", () => {
+  // The cadence was the false part; the valuable part must survive the edit.
+  assert.match(STATUS_PAGE, /independent probe outside our hosting/, "EN claim lost");
+  assert.match(STATUS_PAGE, /nezávislá sonda mimo nášho hostingu/, "SK claim lost");
+  assert.match(STATUS_PAGE, /uptime\.yml/, "the link to the public history is gone");
+});

@@ -17,7 +17,7 @@
  *     answered; they care whether last night's prices are in. That is the
  *     outage that matters here and it is invisible to an uptime checker.
  *   · WHERE THE EVIDENCE IS. The independent probe runs outside our hosting,
- *     every 15 minutes, in a public repository — linked rather than summarised,
+ *     in a public repository — linked rather than summarised,
  *     because a number we compute about ourselves is not evidence.
  */
 import { useEffect, useState } from "react";
@@ -196,10 +196,18 @@ export default function StatusPage({ lang = "sk" }) {
              <>For paid subscriptions we commit to <strong>99.5 %</strong> monthly availability. The exact wording, including exclusions and the credit, is clause 8 of the <a href="/terms" style={{ color: "var(--accent)" }}>Terms</a>.</>)}
         </p>
         <p style={{ color: "var(--text-2)", lineHeight: 1.65, margin: "0 0 1rem", maxWidth: "62ch" }}>
-          {t(<>Dostupnosť meria nezávislá sonda mimo nášho hostingu, každých 15 minút. Jej úplná história je verejná — {" "}
+          {/* 🔴 NEUVÁDZAJ TU FREKVENCIU V MINÚTACH (zmerané 15. 9. 2026).
+              Workflow žiada beh každých 15 minút, ale GitHub plánované behy silno škrtí: za
+              11,9 dňa prebehlo 88 kontrol, medián medzery 3 hodiny, a pod 20
+              minút sa zmestili 2 z 87 medzier (2 %). Stránka predtým tvrdila
+              „každých 15 minút" — na stránke, ktorej celý zmysel je „neverte
+              nám, prečítajte si históriu". Kto si ju prečítal, našiel opak.
+              „Viackrát denne" je pravda pri mediáne 3 h a nezostarne, keď
+              GitHub frekvenciu znova zmení. */}
+          {t(<>Dostupnosť meria nezávislá sonda mimo nášho hostingu, viackrát denne. Jej úplná história je verejná — {" "}
               <a href={PROBE_HISTORY} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)" }}>pozrite si ju</a>{" "}
               namiesto toho, aby ste verili číslu, ktoré si o sebe vypočítame sami.</>,
-             <>Availability is measured by an independent probe outside our hosting, every 15 minutes. Its full history is public — {" "}
+             <>Availability is measured by an independent probe outside our hosting, several times a day. Its full history is public — {" "}
               <a href={PROBE_HISTORY} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)" }}>read it</a>{" "}
               rather than trusting a number we compute about ourselves.</>)}
         </p>

@@ -12,9 +12,25 @@ name: Uptime probe
 # subscription and no vendor holding another credential, and the Terms now
 # promise 99.5 % monthly availability, so the evidence should be ours.
 #
-# Every 15 minutes is the practical floor — GitHub throttles scheduled workflows
-# under load and does not guarantee the minute, so treat this as "roughly every
-# quarter hour", not a stopwatch.
+# 🔴 THE CRON BELOW SAYS 15 MINUTES. IT DOES NOT HAPPEN. Measured 2026-09-15 over
+# the whole history: 88 runs across 11.9 days — MEDIAN gap 3 hours, longest 7, and
+# only 2 of 87 gaps came in under 20 minutes. GitHub throttles scheduled workflows
+# hard on public repos and drops runs entirely under load; asking for */15 buys
+# roughly eight checks a day, not ninety-six.
+#
+# The schedule stays as-is because a tighter ask is still the best way to get more
+# samples out of GitHub, and the runs it does produce are genuine. What changed is
+# that nothing is allowed to QUOTE the 15 minutes as a fact: the public status page
+# now says "several times a day", which is true and does not rot when GitHub
+# retunes its throttling. A test fails if a minute-figure comes back.
+#
+# 🔴 AND IT IS NOT ENOUGH TO SUBSTANTIATE THE SLA. Clause 8 of the Terms promises
+# 99.5 % monthly availability with a credit — that allows about 3.6 hours of
+# downtime a month, which is roughly ONE sampling gap. A probe on this cadence can
+# miss an entire month's allowance between two checks, so it is honest evidence of
+# "the site was up when we looked" and not a measurement of 99.5 %. Closing that
+# properly needs a probe that actually samples every few minutes; it is a decision
+# with a commitment behind it, so it belongs to Boss, not to a quiet code change.
 
 on:
   schedule:
