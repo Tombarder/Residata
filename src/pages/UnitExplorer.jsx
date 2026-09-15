@@ -351,7 +351,13 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
     if (!cols.length || csvBusy) return;
     setCsvBusy(true);
     try {
-      const { rows: all, capped } = await fetchUnitsForExport(spec);
+      const { rows: all, capped, failed } = await fetchUnitsForExport(spec);
+      /* No file at all beats a file that is quietly short. A half-written export looks
+         exactly like a complete one once it is open in a spreadsheet. */
+      if (failed) {
+        window.alert(t("Export sa nepodaril — skús to znova.", "The export failed — please try again."));
+        return;
+      }
       const sym = moneySymbol();
       const head = cols.map((k) => {
         const f = fields.find((x) => x.key === k);

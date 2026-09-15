@@ -1527,18 +1527,19 @@ const SALES_EXPORT_PAGE = 2000;
 const SALES_EXPORT_MAX_ROWS = 50000;
 
 export async function fetchSalesForExport(spec, { onProgress } = {}) {
-  if (!isSupabaseReady() || !spec) return { rows: [], capped: false };
+  if (!isSupabaseReady() || !spec) return { rows: [], capped: false, failed: true };
   const out = [];
   for (let offset = 0; offset < SALES_EXPORT_MAX_ROWS; offset += SALES_EXPORT_PAGE) {
     const pageSpec = { ...spec, limit: SALES_EXPORT_PAGE, offset };
     const { data, error } = await sbRead(supabaseData.rpc("analytics_sales", { p_spec: pageSpec }));
-    if (error) { console.error("[fetchSalesForExport]", error); break; }
+    // See fetchUnitsForExport: a failed page is a failed export, not a short one.
+    if (error) { console.error("[fetchSalesForExport]", error); return { rows: out, capped: false, failed: true }; }
     const rows = Array.isArray(data?.rows) ? data.rows : [];
     out.push(...rows.slice(0, SALES_EXPORT_PAGE));
     if (onProgress) onProgress(out.length);
     if (rows.length <= SALES_EXPORT_PAGE) break;   // limit+1 is the RPC's has-more sentinel
   }
-  return { rows: out, capped: out.length >= SALES_EXPORT_MAX_ROWS };
+  return { rows: out, capped: out.length >= SALES_EXPORT_MAX_ROWS, failed: false };
 }
 
 export function useSales({ enabled = false, spec = null } = {}) {
@@ -2032,18 +2033,22 @@ const EXPORT_PAGE = 1000;          // the RPC's own maximum
 const EXPORT_MAX_ROWS = 50000;     // > any single market; a guard, not a cap on real use
 
 export async function fetchUnitsForExport(spec, { onProgress } = {}) {
-  if (!isSupabaseReady() || !spec) return { rows: [], capped: false };
+  if (!isSupabaseReady() || !spec) return { rows: [], capped: false, failed: true };
   const out = [];
   for (let offset = 0; offset < EXPORT_MAX_ROWS; offset += EXPORT_PAGE) {
     const pageSpec = { ...spec, limit: EXPORT_PAGE, offset };
     const { data, error } = await sbRead(supabaseData.rpc("analytics_units", { p_spec: pageSpec }));
-    if (error) { console.error("[fetchUnitsForExport]", error); break; }
+    /* A page that fails mid-walk must NOT come back as a finished export. The first cut
+       of this broke out of the loop and returned what it had, so a network blip on page
+       three of ten produced a 2000-row file that looked complete — the very fault this
+       function was written to remove. The caller refuses to save a partial. */
+    if (error) { console.error("[fetchUnitsForExport]", error); return { rows: out, capped: false, failed: true }; }
     const rows = Array.isArray(data?.rows) ? data.rows : [];
     out.push(...rows.slice(0, EXPORT_PAGE));
     if (onProgress) onProgress(out.length);
     if (rows.length <= EXPORT_PAGE) break;     // the RPC returns limit+1 as its has-more sentinel
   }
-  return { rows: out, capped: out.length >= EXPORT_MAX_ROWS };
+  return { rows: out, capped: out.length >= EXPORT_MAX_ROWS, failed: false };
 }
 
 /* ── Unit Explorer (Phase 3.1) — raw per-unit detail rows from analytics_units ──

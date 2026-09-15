@@ -513,7 +513,12 @@ export default function SalesView({ lang = "sk" }) {
     /* The TABLE asks for 500 and badges "500+" when there are more. The FILE used to
        carry those same 500 with nothing saying it was short — and the default 90-day
        window holds well over two thousand sales. It re-walks the spec to the end. */
-    const { rows: allRows, capped } = await fetchSalesForExport({ ...detailSpec, limit: undefined, offset: undefined });
+    const { rows: allRows, capped, failed } = await fetchSalesForExport({ ...detailSpec, limit: undefined, offset: undefined });
+    // No file at all beats a file that is quietly short.
+    if (failed) {
+      window.alert(t("Export sa nepodaril — skús to znova.", "The export failed — please try again."));
+      return;
+    }
     const lines = allRows.map((r) => withCensor(visibleCols).map((c) => {
       if (c === null) return r.left_censored ? t("áno", "yes") : t("nie", "no");
       const v = r[c[0]];
