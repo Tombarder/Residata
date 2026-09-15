@@ -1511,6 +1511,36 @@ export function usePivotGrain({ enabled = false, spec = null } = {}) {
    durable_only?, group_by?, filters?, sort?, limit?, offset?}; returns the RPC's jsonb object
    ({…kpis} / {rows:[…]}). RLS-gated PREMIUM (paid/chosen-project) in the RPC. One call per
    mode (a page renders summary + breakdown + detail with three useSales instances). */
+/**
+ * fetchSalesForExport — the WHOLE matched set, for the Predaje CSV.
+ *
+ * The detail table asks for 500 and honestly badges "500+" when there are more. The CSV
+ * did NOT: it serialised the same 500 rows into a file with nothing in it saying so.
+ * Measured 2026-09-15, the default 90-day window holds 2 341 sales and even 30 days
+ * holds 984 — so the export was routinely handing over a fifth of the answer and
+ * looking complete doing it.
+ *
+ * analytics_sales clamps its own limit to 2000, so this pages. Same ceiling reasoning as
+ * fetchUnitsForExport: a guard, far above any real window, and the caller is told.
+ */
+const SALES_EXPORT_PAGE = 2000;
+const SALES_EXPORT_MAX_ROWS = 50000;
+
+export async function fetchSalesForExport(spec, { onProgress } = {}) {
+  if (!isSupabaseReady() || !spec) return { rows: [], capped: false };
+  const out = [];
+  for (let offset = 0; offset < SALES_EXPORT_MAX_ROWS; offset += SALES_EXPORT_PAGE) {
+    const pageSpec = { ...spec, limit: SALES_EXPORT_PAGE, offset };
+    const { data, error } = await sbRead(supabaseData.rpc("analytics_sales", { p_spec: pageSpec }));
+    if (error) { console.error("[fetchSalesForExport]", error); break; }
+    const rows = Array.isArray(data?.rows) ? data.rows : [];
+    out.push(...rows.slice(0, SALES_EXPORT_PAGE));
+    if (onProgress) onProgress(out.length);
+    if (rows.length <= SALES_EXPORT_PAGE) break;   // limit+1 is the RPC's has-more sentinel
+  }
+  return { rows: out, capped: out.length >= SALES_EXPORT_MAX_ROWS };
+}
+
 export function useSales({ enabled = false, spec = null } = {}) {
   const { loading: authLoading, user, profile } = useAuth();
   // analytics_sales is RLS-gated by identity (paid/tier/chosen project), so a tier

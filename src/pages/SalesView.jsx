@@ -19,7 +19,7 @@ import { useCurrency } from "../lib/useCurrency";
 import { moneyFromEur, moneySymbol, moneyToEur, formatMoney, formatPerM2 } from "../lib/money";
 import { formatDimNumber } from "../lib/locale";
 import { unitKindLabel } from "../lib/unitKinds";
-import { useSales } from "../lib/useData";
+import { useSales, fetchSalesForExport } from "../lib/useData";
 import { useCountry, isAllCountries } from "../lib/useCountry";
 import { useAccountPrefState } from "../lib/useAccountUiPref";
 import { localeTag } from "../lib/locale";
@@ -488,7 +488,13 @@ export default function SalesView({ lang = "sk" }) {
   const activeFilters = liveFilters.filter(isFilterActive).length;
   const toggleCol = (k) => setCols((c) => (c.includes(k) ? c.filter((x) => x !== k) : [...c, k]));
 
-  const exportCsv = () => {
+  const [csvBusy, setCsvBusy] = useState(false);
+  const exportCsv = async () => {
+    if (csvBusy) return;
+    setCsvBusy(true);
+    try { await buildCsv(); } finally { setCsvBusy(false); }
+  };
+  const buildCsv = async () => {
     // Money columns: export in the SAME display currency the table shows (converted +
     // symbol in the header), so the CSV never silently disagrees with the on-screen values.
     const sym = moneySymbol();
@@ -504,7 +510,11 @@ export default function SalesView({ lang = "sk" }) {
       const base = c[3] === "per_m2" ? `${sym}/m²` : (lang === "sk" ? c[1] : c[2]);
       return c[3] === "eur" ? `${base} (${sym})` : base;
     })).map((h) => (h === null ? censorHead : h)).join(";");
-    const lines = detRows.map((r) => withCensor(visibleCols).map((c) => {
+    /* The TABLE asks for 500 and badges "500+" when there are more. The FILE used to
+       carry those same 500 with nothing saying it was short — and the default 90-day
+       window holds well over two thousand sales. It re-walks the spec to the end. */
+    const { rows: allRows, capped } = await fetchSalesForExport({ ...detailSpec, limit: undefined, offset: undefined });
+    const lines = allRows.map((r) => withCensor(visibleCols).map((c) => {
       if (c === null) return r.left_censored ? t("áno", "yes") : t("nie", "no");
       const v = r[c[0]];
       if (c[3] === "eur" || c[3] === "per_m2") return v == null ? "" : Math.round(moneyFromEur(Number(v)));
@@ -525,6 +535,9 @@ export default function SalesView({ lang = "sk" }) {
     a.href = URL.createObjectURL(blob);
     a.download = `predaje_${date_from}_${date_to}.csv`;
     a.click(); URL.revokeObjectURL(a.href);
+    if (capped) window.alert(t(
+      "Export je orezaný na 50 000 riadkov. Zúž obdobie alebo filtre a stiahni znova.",
+      "The export was capped at 50,000 rows. Narrow the period or the filters and download again."));
   };
 
   // A scope filter: one Picker, live facet options, each option's own count as the
@@ -732,7 +745,7 @@ export default function SalesView({ lang = "sk" }) {
                 with the totals above it. With one scope there is nothing to explain. */}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-            <button className="rd-btn rd-btn--primary rd-btn--sm" onClick={exportCsv} disabled={!detRows.length}>⬇ CSV</button>
+            <button className="rd-btn rd-btn--primary rd-btn--sm" onClick={exportCsv} disabled={csvBusy || !detRows.length}>⬇ {csvBusy ? t("sťahujem…", "preparing…") : "CSV"}</button>
           </div>
         </div>
 
