@@ -1263,24 +1263,38 @@ export function useFlatsArchive(months, dates, enabled = true) {
   const [flats, setFlats] = useState(_archiveCacheKey === identityKey ? (_archiveCache || []) : []);
   const [loading, setLoading] = useState(_archiveCacheKey !== identityKey);
   const [progress, setProgress] = useState(0);
+  // Everything this hook knows about the QUALITY of what it returned. Only a
+  // cached-complete result is allowed to leave all three clear.
+  const [error, setError] = useState(null);
+  const [truncated, setTruncated] = useState(false);
+  const [tooLarge, setTooLarge] = useState(null);
 
   useEffect(() => {
-    if (!enabled) { setFlats([]); setProgress(0); setLoading(false); return; }
+    if (!enabled) {
+      setFlats([]); setProgress(0); setLoading(false);
+      setError(null); setTruncated(false); setTooLarge(null);
+      return;
+    }
     if (!isSupabaseReady()) { setLoading(false); return; }
     if (authLoading) return;
 
     if (_archiveCacheKey === identityKey && _archiveCache) {
       setFlats(_archiveCache);
       setLoading(false);
+      // The cache is only ever written for a clean, complete read (see below),
+      // so a cache hit is proof of completeness rather than a gap in reporting.
+      setError(null); setTruncated(false); setTooLarge(null);
       return;
     }
 
     let cancelled = false;
     setLoading(true);
     setProgress(0);
+    setError(null); setTruncated(false); setTooLarge(null);
     (async () => {
       const all = [];
       let hadError = false;
+      let lastError = null;
       // PostgREST default max-rows is 1000 per request. We REQUEST 5000
       // hoping the server config allows it (cuts wall-clock by 5x); if
       // the server caps lower we still continue paginating until an
@@ -1297,6 +1311,79 @@ export function useFlatsArchive(months, dates, enabled = true) {
       // Safety cap to prevent runaway loops if a misconfigured server
       // returns a tiny page size for a huge table.
       const MAX_TOTAL = 500_000;
+
+      // 🔴 THE CAP IS REACHED IN NORMAL USE, AND USED TO BE REACHED IN SILENCE.
+      //
+      // Measured 2026-09-15 against analytics.unit_facts, which is what
+      // flats_archive reads:
+      //
+      //     SK 2026-08   854 269 rows      ← ONE month, 1.7x the cap
+      //     SK 2026-07   553 928 rows      ← also over
+      //     SK, no month filter   2 174 864 rows
+      //     CZ, no month filter   1 204 726 rows
+      //
+      // The second case is not exotic: putting "Mesiac" in Rows with a median
+      // (a config the server-side grain path cannot do, so forceRaw) sends this
+      // hook through the whole country archive with no month filter at all.
+      // It stopped at 500 000 and console.warn'd, so the pivot drew medians and
+      // counts over 23 % of SK and told nobody. Silent truncation of an
+      // aggregate is worse than an error: an error is visible.
+      //
+      // Two changes, and the first is the one that matters.
+      //
+      // 1. ASK HOW BIG IT IS BEFORE FETCHING IT. `count: "estimated"` reads the
+      //    planner's own row estimate — one instant request, no scan — so a
+      //    scope that cannot be answered honestly is refused UP FRONT instead of
+      //    after ~435 round trips that end in a wrong number. The caller gets
+      //    `tooLarge` and shows the user what to narrow.
+      // 2. Whatever happens after that is REPORTED. `error` and `truncated` now
+      //    leave this hook, because until today its whole return was
+      //    { flats, loading, progress } — a caller could not have told a
+      //    complete dataset from half of one even if it wanted to.
+      //
+      // 🔴 `truncated` is NOT made redundant by the probe, and measuring proved
+      // it: the planner's estimate runs LOW. Against the live database on
+      // 2026-09-15 it answered 1 534 732 for the SK archive that actually holds
+      // 2 174 864 rows, and 570 434 for the 854 269 of SK 2026-08 — right order
+      // of magnitude, ~30 % under. A scope sitting just below the cap on the
+      // estimate can therefore still overflow it while paging, so the loop keeps
+      // its own guard and reports separately. The probe is an optimisation that
+      // makes the common refusal instant; it is not the correctness boundary.
+      // (Both probes ran in ~120 ms, versus ~435 round trips to be wrong.)
+      //
+      // The cap itself stays where it is. It is not a tuning knob: 500 000 rows
+      // is already far past what belongs in a browser tab, and raising it would
+      // trade a visible refusal for a slow one. The real answer for these
+      // configs is a server-side aggregate, which is why this refuses loudly
+      // rather than pretending.
+      let estimated = null;
+      {
+        let cq = _eqCountry(
+          supabaseData.from("flats_archive").select("id", { count: "estimated", head: true }),
+          country
+        );
+        if (Array.isArray(months) && months.length > 0) cq = cq.in("snapshot_month", months);
+        if (datesArr) {
+          const hi0 = new Date(datesArr[datesArr.length - 1] + "T00:00:00Z");
+          hi0.setUTCDate(hi0.getUTCDate() + 1);
+          cq = cq.gte("batch_timestamp", datesArr[0]).lt("batch_timestamp", hi0.toISOString().slice(0, 10));
+        }
+        const probe = await sbRead(cq);
+        if (cancelled) return;
+        // A failed probe is not a reason to refuse — it is only an estimate, and
+        // the paging loop below still protects itself. Fall through silently.
+        if (!probe.error && typeof probe.count === "number") estimated = probe.count;
+      }
+      if (estimated != null && estimated > MAX_TOTAL) {
+        setFlats([]);
+        setProgress(0);
+        setTooLarge({ estimate: estimated, cap: MAX_TOTAL });
+        setError(null);
+        setTruncated(false);
+        setLoading(false);
+        return;
+      }
+
       while (offset < MAX_TOTAL) {
         let q = _eqCountry(supabaseData.from("flats_archive").select("*"), country)
           .range(offset, offset + REQUESTED_PAGE - 1)
@@ -1318,6 +1405,7 @@ export function useFlatsArchive(months, dates, enabled = true) {
         if (error) {
           console.error("[useFlatsArchive]", error);
           hadError = true;
+          lastError = error;
           break;
         }
         const got = data?.length || 0;
@@ -1338,7 +1426,8 @@ export function useFlatsArchive(months, dates, enabled = true) {
           lastPageSize = got;
         }
       }
-      if (offset >= MAX_TOTAL) {
+      const hitCap = offset >= MAX_TOTAL;
+      if (hitCap) {
         console.warn("[useFlatsArchive] reached safety cap of", MAX_TOTAL, "rows");
       }
       if (cancelled) return;
@@ -1347,18 +1436,28 @@ export function useFlatsArchive(months, dates, enabled = true) {
       // the analytics Pivot's heavy archive read would otherwise leave the
       // user with truncated time-series for the rest of the session until
       // hard reload. Best-effort render what we got, but don't cache.
+      //
+      // The cap now disqualifies a result from the cache for the same reason an
+      // error does: a truncated archive that got cached was wrong for the rest
+      // of the session, and re-reading it would at least have had a chance of
+      // being right.
       const all_eur = _toEurDisplay(all);
-      if (!hadError) {
+      if (!hadError && !hitCap) {
         _archiveCache = all_eur;
         _archiveCacheKey = identityKey;
       }
       setFlats(all_eur);
+      setTruncated(hitCap);
+      setError(hadError ? (lastError || { message: "archive read failed" }) : null);
       setLoading(false);
     })();
     return () => { cancelled = true; };
   }, [authLoading, identityKey, monthsKey, datesKey, country, enabled]);
 
-  return { flats, loading, progress };
+  // 🔴 `flats` alone does not tell you whether it is the whole answer. A caller
+  // that aggregates (the Pivot medians, any count) MUST look at truncated /
+  // tooLarge / error before presenting a number as the market's.
+  return { flats, loading, progress, error, truncated, tooLarge };
 }
 
 /** Distinct snapshot months available in the archive — small fast call

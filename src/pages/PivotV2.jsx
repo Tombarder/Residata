@@ -1315,7 +1315,15 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   // Records are fetched ONLY when forceRaw (non-server-able config or drill-down).
   // Current view pulls flats_current (cross-market current); time-travel pulls the
   // day/month-scoped archive.
-  const { flats: archiveFlats, loading: loadingArchive, progress: flatsProgress } = useFlatsArchive(fetchMonths, fetchDates, forceRaw && !isCurrent);
+  const {
+    flats: archiveFlats, loading: loadingArchive, progress: flatsProgress,
+    // Whether the archive we just drew conclusions from was the whole archive.
+    // Measured 2026-09-15: SK 2026-08 is 854 269 rows and the unfiltered SK
+    // archive is 2 174 864, both past the hook's 500 000 safety cap — so a
+    // median grouped by Mesiac was being computed over a fraction of the data
+    // and presented as the market's. These three are that fraction, made loud.
+    truncated: archiveTruncated, tooLarge: archiveTooLarge, error: archiveError,
+  } = useFlatsArchive(fetchMonths, fetchDates, forceRaw && !isCurrent);
   const { flats: currentFlatsRaw, loading: loadingCurrent } = useFlatsCurrent(forceRaw && isCurrent);
   const realFlats = isCurrent ? currentFlatsRaw : archiveFlats;
   const loadingFlats = isCurrent ? loadingCurrent : loadingArchive;
@@ -2142,10 +2150,57 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
         </div>
       )}
 
+      {/* Scope too big to answer honestly — a REFUSAL, not an error and not an
+          empty result. We know the row count up front (planner estimate) and it
+          is past what a browser can aggregate, so nothing was fetched: the
+          alternative is ~435 requests ending in a median over a fraction of the
+          data, which is what this page used to do in silence. */}
+      {!isInitialLoading && !grainErrored && archiveTooLarge && (
+        <div style={{
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+          padding: "4rem 1.25rem", gap: "0.9rem", minHeight: 280, textAlign: "center",
+        }}>
+          <div style={{ fontSize: "1.6rem" }}>🔎</div>
+          <div style={{ color: text, fontWeight: 600, fontSize: "0.95rem" }}>
+            {lang === "sk" ? "Tento výber je príliš veľký" : "This selection is too large"}
+          </div>
+          <div style={{ color: dim, fontSize: "0.82rem", maxWidth: 460, lineHeight: 1.5 }}>
+            {lang === "sk"
+              ? `Vybrali ste približne ${archiveTooLarge.estimate.toLocaleString("sk-SK")} riadkov; naraz ich vieme spoľahlivo spracovať ${archiveTooLarge.cap.toLocaleString("sk-SK")}. Výsledok by bol počítaný len z časti dát, preto ho radšej neukazujeme. Zúžte výber — napríklad jeden mesiac alebo jeden deň, alebo pridajte filter na mesto či projekt.`
+              : `This selection is about ${archiveTooLarge.estimate.toLocaleString("en-GB")} rows; we can process ${archiveTooLarge.cap.toLocaleString("en-GB")} at once. The result would be computed from part of the data only, so we are not showing one. Narrow the selection — a single month or day, or add a city or project filter.`}
+          </div>
+        </div>
+      )}
+
       {/* Header — record count + expand/collapse. Mesiac scope is part
           of the standard Filters zone (drag the field there, pick months
           from the popup) — no special top-bar selector. */}
-      {!isInitialLoading && !grainErrored && (<>
+      {!isInitialLoading && !grainErrored && !archiveTooLarge && (<>
+
+      {/* Partial data — the estimate said it would fit and it did not, or a page
+          failed part-way. The numbers below ARE from less than the full archive,
+          so this sits above them and does not dismiss. */}
+      {(archiveTruncated || archiveError) && (
+        <div style={{
+          display: "flex", alignItems: "flex-start", gap: "0.6rem",
+          background: "rgba(234, 179, 8, 0.10)", border: "1px solid rgba(234, 179, 8, 0.35)",
+          borderRadius: 8, padding: "0.7rem 0.9rem", marginBottom: "1rem",
+        }}>
+          <div style={{ fontSize: "1rem", lineHeight: 1.2 }}>⚠️</div>
+          <div style={{ color: text, fontSize: "0.8rem", lineHeight: 1.5 }}>
+            <strong>
+              {lang === "sk" ? "Čísla nižšie sú z neúplných dát." : "The numbers below are from incomplete data."}
+            </strong>{" "}
+            {archiveTruncated
+              ? (lang === "sk"
+                  ? `Načítali sme prvých ${flatsProgress.toLocaleString("sk-SK")} riadkov a zvyšok sme už nestihli. Priemery a mediány preto nezodpovedajú celému trhu — zúžte výber a zobrazia sa správne.`
+                  : `We loaded the first ${flatsProgress.toLocaleString("en-GB")} rows and stopped there. Averages and medians therefore do not describe the whole market — narrow the selection and they will.`)
+              : (lang === "sk"
+                  ? "Načítavanie dát sa prerušilo, takže časť riadkov chýba. Skúste to znova."
+                  : "The data load was interrupted, so some rows are missing. Please try again.")}
+          </div>
+        </div>
+      )}
 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
         <span style={{ fontSize: "0.78rem", color: dim }}>
