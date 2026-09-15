@@ -15,6 +15,7 @@
 
 import { getStripe, getSupabaseAdmin, getUserFromRequest, requestOrigin } from "./_lib/stripe.js";
 import { isTrustedRequest } from "./_lib/origin.js";
+import { rejectIfNotCron } from "./_lib/cronAuth.js";
 import { FALLBACK_MONTHLY_CENTS } from "../src/lib/pricingDefaults.js";
 import { invoiceSellerFooter } from "../src/lib/company.js";
 
@@ -605,13 +606,12 @@ async function applySubscription(admin, stripe, sub, { deleted = false } = {}) {
  * PAID and did not get access.
  */
 async function handleReconcile(req, res) {
-  // Same auth as the monthly-reports cron: Vercel's bearer token when CRON_SECRET
-  // is configured, otherwise the header Vercel always adds to cron invocations.
-  const secret = process.env.CRON_SECRET;
-  const authHeader = req.headers.authorization || req.headers.Authorization || "";
-  const isVercelCron = req.headers["x-vercel-cron"] === "1";
-  const tokenOk = secret && authHeader === `Bearer ${secret}`;
-  if (secret ? !tokenOk : !isVercelCron) return res.status(401).json({ error: "unauthorized" });
+  // One shared definition of a genuine cron — see api/_lib/cronAuth.js for the
+  // two production measurements behind it. The version this replaces fell back
+  // to `x-vercel-cron: 1` whenever CRON_SECRET was unset, and CRON_SECRET WAS
+  // unset: a hand-sent header from a laptop reached this handler and got a 200,
+  // so the nightly net was callable by anyone who guessed the query string.
+  if (rejectIfNotCron(req, res, "stripe reconcile")) return;
 
   const stripe = getStripe();
   const admin = getSupabaseAdmin();

@@ -7,17 +7,24 @@
 //   3. Emails it to the subscriber's address via the existing Gmail SMTP.
 //   4. Stamps `last_sent_at` so the admin can see delivery history.
 //
-// Auth: Vercel injects an `Authorization: Bearer <CRON_SECRET>` header when
-// calling Cron endpoints if CRON_SECRET env is configured. We check it so
-// the endpoint isn't callable by random POSTs. If CRON_SECRET isn't set,
-// we fall back to verifying `x-vercel-cron: 1` which Vercel always adds
-// on cron invocations (present since Jan 2024).
+// Auth: api/_lib/cronAuth.js, shared with the Stripe reconcile cron. Vercel
+// signs a scheduled request with `Authorization: Bearer $CRON_SECRET` only when
+// that variable is in the project ENVIRONMENT. This file used to resolve the
+// secret through `secretOrFallback`, which also looks in `public.app_secrets` —
+// and that is where the secret actually was. So it saw a configured secret,
+// demanded a bearer token Vercel had no way to send, and refused its own cron:
+// the newest row in report_subscriptions.last_sent_at is 2026-04-22, the day
+// the endpoint was tested by hand. Five monthly firings answered 401 in silence.
 //
-// Manual trigger: anyone with CRON_SECRET can POST to test. Without the
-// secret + without the vercel header, the endpoint refuses.
+// The DB fallback still serves the mail credentials below, which are genuinely
+// stored there. It must never serve CRON_SECRET again.
+//
+// Manual trigger: anyone holding the env CRON_SECRET can call it with the same
+// bearer token.
 
 import { createClient } from "@supabase/supabase-js";
 import { sendEmail } from "../_lib/emails.js";
+import { rejectIfNotCron } from "../_lib/cronAuth.js";
 
 // Gmail SMTP sends are sequential and can take ~2-5s each. With 20+
 // subscribers plus the retention prune, default 10s timeout is tight.
@@ -30,6 +37,11 @@ const textDim = "#8a8a96";
 const orange = "#f5a623";
 
 export default async function handler(req, res) {
+  // ── Auth, before anything else ──
+  // Nothing above this line: an unauthenticated caller should cost us no env
+  // reads, no Supabase client and no DB round-trip.
+  if (rejectIfNotCron(req, res, "monthly-reports")) return;
+
   // ── Env (needed early so we can resolve secrets from app_secrets
   //    if they aren't in the Vercel env) ──
   const SUPABASE_URL        = process.env.SUPABASE_URL;
@@ -52,20 +64,6 @@ export default async function handler(req, res) {
     } catch (_) { return null; }
   };
 
-  // ── Auth ──
-  // When a CRON_SECRET is configured it is the ONLY accepted proof: Vercel sends it
-  // as `Authorization: Bearer $CRON_SECRET` for genuine cron runs, and the
-  // `x-vercel-cron` header alone is spoofable — so a configured secret must NOT be
-  // bypassable by that header (otherwise anyone could trigger a subscriber-email
-  // blast). Only when no secret is configured do we fall back to the weaker header
-  // check, so a cron that predates the secret isn't silently broken.
-  const secret = await secretOrFallback("CRON_SECRET");
-  const authHeader = req.headers.authorization || req.headers.Authorization || "";
-  const isVercelCron = req.headers["x-vercel-cron"] === "1";
-  const tokenOk = secret && authHeader === `Bearer ${secret}`;
-  if (secret ? !tokenOk : !isVercelCron) {
-    return res.status(401).json({ error: "unauthorized" });
-  }
 
   // Matches the existing welcome-user webhook convention: GMAIL_FROM +
   // GMAIL_APP_PASSWORD, with a hard-coded default sender.

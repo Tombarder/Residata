@@ -74,11 +74,25 @@ test("terminal subscriptions are skipped, or paid_until creeps forward forever",
 });
 
 test("the endpoint refuses anyone who is not Vercel's cron", () => {
+  // 2026-09-15: this used to require exactly the two things that turned out to
+  // be the hole. It accepted `x-vercel-cron` as a FALLBACK when CRON_SECRET was
+  // unset — and it was unset, so a header sent by hand from a laptop got a 200
+  // out of production. The auth now lives in api/_lib/cronAuth.js, shared with
+  // the monthly-reports cron and tested for real in cronAuth.test.mjs; what
+  // belongs here is only that this endpoint goes through it before doing work.
   const body = reconcileBody();
-  assert.match(body, /CRON_SECRET/, "no shared secret check");
-  assert.match(body, /x-vercel-cron/, "no fallback to Vercel's own cron header");
-  assert.match(body, /status\(401\)/,
-    "an unauthenticated caller must be refused — this endpoint grants paid access");
+  assert.match(body, /rejectIfNotCron\(req, res/,
+    "the reconcile no longer authenticates through the shared cron door");
+  const firstWork = Math.min(
+    ...["getStripe()", "getSupabaseAdmin()"].map((n) => {
+      const i = body.indexOf(n);
+      return i < 0 ? Number.POSITIVE_INFINITY : i;
+    })
+  );
+  assert.ok(Number.isFinite(firstWork), "the handler no longer reaches Stripe or Supabase at all");
+  assert.ok(body.indexOf("rejectIfNotCron(req, res") < firstWork,
+    "auth must run BEFORE Stripe or Supabase are touched — otherwise an unauthenticated " +
+    "caller still costs us the API calls the 401 was meant to prevent");
 });
 
 test("a failed reconcile is loud and returns non-200", () => {
