@@ -1077,6 +1077,20 @@ export function DistrictPulse({ lang = "en", setCurrent }) {  // eslint-disable-
     : drill.level === "city"
       ? (lang === "sk" ? "podľa mesta" : "by city")
       : (lang === "sk" ? "podľa mestskej časti" : "by district");
+  // 🔴 WHAT THE COLOUR SCALE'S MIDPOINT IS A MIDPOINT *OF* (2026-09-15).
+  // The legend used to read "priemerná 4 705 €/m²" while the hero on the same
+  // screen read "PRIEMER TRHU 5 895 €/m²" — two numbers 25 % apart, both called
+  // the average, on one page. Both are correct and they are not the same thing:
+  // 5 895 is the market, 4 705 is the unweighted mean of the ELEVEN ROWS shown
+  // (deliberately unweighted — see priceScale — and it moves as you drill).
+  // The number is right; the word was borrowed. So the legend now names its own
+  // population, which also makes "above average" stop implying the market:
+  // Bratislavský kraj at 5 598 sits above these rows and below the market.
+  const rowsWord = drill.level === "region"
+    ? (lang === "sk" ? "krajov" : "regions")
+    : drill.level === "city"
+      ? (lang === "sk" ? "miest" : "cities")
+      : (lang === "sk" ? "mestských častí" : "districts");
   const title = lang === "sk" ? `Priemerná cena ${moneySymbol()}/m² ${levelWord}` : `Average ${moneySymbol()}/m² ${levelWord}`;
   const desc = lang === "sk"
     ? "Skutočné dáta z aktívnych projektov. Klikni na riadok pre rozpad nižšie. Updatuje sa každý deň."
@@ -1119,17 +1133,17 @@ export function DistrictPulse({ lang = "en", setCurrent }) {  // eslint-disable-
           letterSpacing: "0.03em",
         }}>
           <span style={{ width: 22, height: 7, borderRadius: 2, background: PRICE_COOL, flexShrink: 0 }} />
-          <span>{lang === "sk" ? "pod priemerom" : "below average"}</span>
+          <span>{lang === "sk" ? `pod priemerom ${rowsWord}` : `below the ${rowsWord} average`}</span>
           <span style={{ width: 22, height: 7, borderRadius: 2, background: PRICE_MID, margin: "0 0 0 0.5rem", flexShrink: 0 }} />
           <span>
-            {lang === "sk" ? "priemerná" : "average"}
+            {lang === "sk" ? `priemer ${rowsWord}` : `${rowsWord} average`}
             {" "}
             <span style={{ color: "var(--text)" }}>
               {Math.round(moneyFromEur(scale.mid) || 0).toLocaleString("en-US").replace(/,/g, " ")} {moneySymbol()}/m²
             </span>
           </span>
           <span style={{ width: 22, height: 7, borderRadius: 2, background: PRICE_WARM, margin: "0 0 0 0.5rem", flexShrink: 0 }} />
-          <span>{lang === "sk" ? "nad priemerom" : "above average"}</span>
+          <span>{lang === "sk" ? `nad priemerom ${rowsWord}` : `above the ${rowsWord} average`}</span>
         </div>
       )}
 
