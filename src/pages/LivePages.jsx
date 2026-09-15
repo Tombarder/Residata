@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { statusLabel } from "../lib/unitStatus";
+import { SortableTh } from "../components/SortableTable";
 import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
 import { useProjects, useProjectFlats, useProjectSnapshots, useMarketTotals, useTotalsList, useSales } from "../lib/useData";
@@ -341,15 +342,15 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
                 <thead style={{ background: "var(--surface-2)" }}>
                   <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                    <SortableTh sortKey="name"             align="left"  current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t.tbl_project}</SortableTh>
-                    <SortableTh sortKey="district"         align="left"  current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t.tbl_district}</SortableTh>
-                    <SortableTh sortKey="total_units"      align="right" current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t.tbl_units}</SortableTh>
-                    <SortableTh sortKey="available_units"  align="right" current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t.tbl_available}</SortableTh>
-                    <SortableTh sortKey="sold_units"       align="right" current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t.tbl_sold}<HeaderInfo lang={lang} sk="Počet bytov, ktoré sme zaznamenali ako PREDANÉ odkedy projekt sledujeme. Pri projektoch, ktoré sme začali sledovať neskôr, býva nižší než stĺpec „% obsadené“ — ten ráta aj rezervácie a aj to, čo bolo obsadené pred naším sledovaním." en="Flats we have recorded as SOLD since we began tracking this project. For projects we started tracking later it is usually lower than the “Taken %” column — that one also counts reservations, and what was taken before we tracked it." /></SortableTh>
-                    <SortableTh sortKey="sold_percentage"  align="right" current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t.tbl_sold_pct}<HeaderInfo lang={lang} sk="Podiel bytov, ktoré už NIE SÚ v ponuke — predané + rezervované + predrezervované, z celku. Nie sú to len predané: rezervácia sa môže zrušiť. Skutočné predaje ukazuje stĺpec „Predané“. Zahŕňa aj obsadenosť spred nášho sledovania, preto môže byť vysoká, aj keď „Predané“ je nízke." en="Share of flats that are no longer on offer — sold + reserved + pre-reserved, out of the total. Not sold alone: a reservation can fall through. Actual sales are the “Sold” column. It includes what was taken before we began tracking, which is why it can be high while “Sold” is low." /></SortableTh>
-                    <SortableTh sortKey="avg_price_eur_m2" align="right" current={sort} onClick={onHeaderClick} arrow={sortArrow}>{moneySymbol() + "/m²"}</SortableTh>
+                    <SortableTh style={th} sortKey="name"             align="left"  current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t.tbl_project}</SortableTh>
+                    <SortableTh style={th} sortKey="district"         align="left"  current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t.tbl_district}</SortableTh>
+                    <SortableTh style={th} sortKey="total_units"      align="right" current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t.tbl_units}</SortableTh>
+                    <SortableTh style={th} sortKey="available_units"  align="right" current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t.tbl_available}</SortableTh>
+                    <SortableTh style={th} sortKey="sold_units"       align="right" current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t.tbl_sold}<HeaderInfo lang={lang} sk="Počet bytov, ktoré sme zaznamenali ako PREDANÉ odkedy projekt sledujeme. Pri projektoch, ktoré sme začali sledovať neskôr, býva nižší než stĺpec „% obsadené“ — ten ráta aj rezervácie a aj to, čo bolo obsadené pred naším sledovaním." en="Flats we have recorded as SOLD since we began tracking this project. For projects we started tracking later it is usually lower than the “Taken %” column — that one also counts reservations, and what was taken before we tracked it." /></SortableTh>
+                    <SortableTh style={th} sortKey="sold_percentage"  align="right" current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t.tbl_sold_pct}<HeaderInfo lang={lang} sk="Podiel bytov, ktoré už NIE SÚ v ponuke — predané + rezervované + predrezervované, z celku. Nie sú to len predané: rezervácia sa môže zrušiť. Skutočné predaje ukazuje stĺpec „Predané“. Zahŕňa aj obsadenosť spred nášho sledovania, preto môže byť vysoká, aj keď „Predané“ je nízke." en="Share of flats that are no longer on offer — sold + reserved + pre-reserved, out of the total. Not sold alone: a reservation can fall through. Actual sales are the “Sold” column. It includes what was taken before we began tracking, which is why it can be high while “Sold” is low." /></SortableTh>
+                    <SortableTh style={th} sortKey="avg_price_eur_m2" align="right" current={sort} onClick={onHeaderClick} arrow={sortArrow}>{moneySymbol() + "/m²"}</SortableTh>
                     {/* Sold velocity — header viditeľný vždy, obsah blurred pre non-paid */}
-                    <SortableTh sortKey="sold_last_month"  align="right" current={sort} onClick={onHeaderClick} arrow={sortArrow} title={can("view_sold_velocity") ? t.tbl_sold_30d_tooltip_paid : t.tbl_sold_30d_tooltip_locked}>
+                    <SortableTh style={th} sortKey="sold_last_month"  align="right" current={sort} onClick={onHeaderClick} arrow={sortArrow} title={can("view_sold_velocity") ? t.tbl_sold_30d_tooltip_paid : t.tbl_sold_30d_tooltip_locked}>
                       {t.tbl_sold_30d}
                       {!can("view_sold_velocity") && <span style={{ marginLeft: 4, color: greenInk, fontSize: "0.6rem" }}>🔒</span>}
                     </SortableTh>
@@ -539,28 +540,6 @@ function HeaderInfo({ sk, en, lang }) {
     </span>
   );
 }
-function SortableTh({ sortKey, align = "left", current, onClick, arrow, title, children }) {
-  const active = current?.key === sortKey;
-  return (
-    <th
-      onClick={() => onClick(sortKey)}
-      onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(sortKey); } }}
-      tabIndex={0}
-      title={title || "Click to sort"}
-      style={{
-        ...th,
-        textAlign: align,
-        cursor: "pointer",
-        color: active ? "var(--text)" : dim,
-        userSelect: "none",
-        whiteSpace: "nowrap",
-      }}
-    >
-      {children}{arrow(sortKey)}
-    </th>
-  );
-}
-
 function StatusBadge({ status, lang }) {
   const cfg = {
     sold_out: { bg: "rgba(245,166,35,0.12)", fg: "#f5a623", label: lang === "sk" ? "Vypredané" : "Sold out" },
