@@ -731,7 +731,26 @@ export default function SalesView({ lang = "sk" }) {
                   </td>
                   <td className="num">{fmtMoney(r.sold_value_eur)}</td>
                   <td className="num">{fmtCell("per_m2", r.median_eur_m2, lang)}</td>
-                  <td className="num">{r.median_days_on_market != null ? Math.round(r.median_days_on_market) : "—"}</td>
+                  {/* 🔴 A breakdown median is a FLOOR while most of its sales are
+                      left-censored, and this is the column a reader compares cities and
+                      developers on. Measured 2026-09-15 over the default window: 90 % of
+                      CZ sales and 92 % of SK ones are censored, and Prešov's "76 days" is
+                      95 of 95 — entirely a floor. The KPI above already says so and the
+                      detail table prints "≥ 44" per row; this said nothing. Marked the
+                      same way, from the counts the breakdown now returns. */}
+                  <td className="num">{(() => {
+                    if (r.median_days_on_market == null) return "—";
+                    const dom = Math.round(r.median_days_on_market);
+                    const mostlyFloor = r.dom_observed > 0 && r.dom_censored > r.dom_observed / 2;
+                    if (!mostlyFloor) return dom;
+                    return (
+                      <span title={t(
+                        `${r.dom_censored} z ${r.dom_observed} predajov v tejto skupine bolo v ponuke už keď sme začali sledovať, takže skutočný čas na trhu je dlhší.`,
+                        `${r.dom_censored} of ${r.dom_observed} sales in this group were already listed when tracking began, so the real time on market is longer.`)}>
+                        ≥ {dom}
+                      </span>
+                    );
+                  })()}</td>
                 </tr>
               ))}
             </tbody>
