@@ -589,6 +589,35 @@ function isFilterActive(f) {
 const PRICE_VALUE_FIELDS = new Set(["cena_s_dph", "cena_bez_dph", "cena_na_m2_obytnej", "wavg_m2_price"]);
 const PRICE_SCOPE_FILTER = Object.freeze({ key: "cena_s_dph", mode: "not_empty" });
 
+/* 🔴 THE SAME SCOPE, WRITTEN SO THE ENGINE CAN STAY ON THE CUBE.
+
+   `cena_s_dph` is a MEASURE, and analytics_pivot drops to the raw fact table for
+   ANY filter key it finds in measure_registry:
+
+       PERFORM 1 FROM analytics.measure_registry WHERE key = k AND enabled;
+       IF FOUND THEN use_cube := false;          -- measure filter → facts
+
+   So the price scope — which Boss made automatic whenever money is in play
+   (board 4bbfd7) — moved every query from analytics.unit_cube (81 316 rows) to
+   analytics.unit_facts (3 379 590, 41x). Measured 2026-09-15, same dims,
+   archive mode: no scope 1 157 ms · home scope 1 674 ms · PRICE SCOPE 8 099 ms
+   → 500, statement timeout. Latest mode survived only because the engine also
+   appends is_current AND project_id IN active_projects (~27k rows), which is why
+   the default view worked and this went unnoticed.
+
+   `has_price` is the same test written as a cube DIMENSION — exactly the fix
+   is_home got on 2026-09-09, and it is a dimension precisely so the cube can
+   answer it. Migration: 2026-09-15_the_price_scope_knocked_every_pivot_off_the_cube.
+
+   WHY THIS IS CHOSEN AT RUNTIME rather than just swapped: the dimension only
+   exists once that migration is applied, and analytics_pivot RAISEs
+   'unknown dim has_price' until then — correctly, but it would break the page.
+   Reading the live registry removes the ordering constraint entirely: this ships
+   safely before the migration, and the moment the migration lands the page gets
+   fast on its own, with no second deploy and nobody having to remember. */
+const PRICE_SCOPE_FILTER_CUBE = Object.freeze({ key: "has_price", mode: "in", values: ["true"] });
+const PRICE_SCOPE_DIM = "has_price";
+
 /* ── HOME SCOPE — a garage is not a flat ─────────────────────────────────────
    The same disease as the price scope, one level up: a price list carries bays,
    cellars, shops, offices and building plots alongside the homes, and averaging
@@ -930,6 +959,11 @@ const SERVERABLE_DIMS = new Set([
   "country", "city", "cast", "sub_district",
   "import_status", "snapshot_month", "datum", "batch_timestamp",
   "is_home",   // registered in analytics.dim_registry 2026-09-09; see HOME_SCOPE_FILTER
+  // has_price is only ever EMITTED when the live registry reports it (see
+  // priceScopeIsCubeable), so listing it here early is safe: an unlisted key would
+  // make isServerable() false and push the whole query onto the raw-record path,
+  // which is the slow road this exists to avoid.
+  "has_price",
 ]);
 // numeric field key → component prefix in the grain's `m` object
 const COMP_FIELD = {
@@ -1704,12 +1738,20 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
     () => priceScope && homeScopeApplies(rows, cols, filters),
     [priceScope, rows, cols, filters]
   );
+  // Does this database know has_price as a dimension yet? (See PRICE_SCOPE_FILTER_CUBE.)
+  // The registry is the engine's own source of truth, so asking it is the same
+  // question analytics_pivot will ask, not a guess about deploy order.
+  const priceScopeIsCubeable = useMemo(
+    () => (registry.dimensions || []).some((d) => d.key === PRICE_SCOPE_DIM),
+    [registry.dimensions]
+  );
   const effectiveFilters = useMemo(() => {
     if (!priceScope) return filters;
-    const out = [...filters, PRICE_SCOPE_FILTER];
+    const out = [...filters,
+      priceScopeIsCubeable ? PRICE_SCOPE_FILTER_CUBE : PRICE_SCOPE_FILTER];
     if (homeScope) out.push(HOME_SCOPE_FILTER);
     return out;
-  }, [filters, priceScope, homeScope]);
+  }, [filters, priceScope, homeScope, priceScopeIsCubeable]);
 
   // Apply filters BEFORE tree build. Inactive filters (chip dropped but not
   // yet configured) pass everything through — see isFilterActive.
