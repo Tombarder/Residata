@@ -1712,9 +1712,39 @@ const FLATS_CSV_COLUMNS = [
   // sat over the fit-out data and four columns went out unlabelled. Column ORDER
   // must match export_units_csv's concat_ws.
   "fitout_level", "cena_holobyt", "cena_standard", "cena_plne_zariadeny",
+  // The three schedules added after the fit-out block — appended at the END of
+  // export_units_csv's concat_ws, not beside the other fin_* columns, because
+  // that is the order the DB columns were created in. This list did not name
+  // them (found 2026-09-15), so the CSV shipped three unlabelled trailing
+  // columns with `created_at` sitting over a PRICE, and the Excel path — which
+  // maps header→cell by index — dropped all three and formatted a payment
+  // schedule as a date. The identical thing had already happened once with the
+  // four fit-out columns; see the comment above them.
+  "fin_15_45_25_15", "fin_15_85", "fin_15_70_15",
   // Audit
   "created_at",
 ];
+
+// 🔴 The header above is a hand-kept mirror of a list that lives in the DB, and
+// it has now drifted TWICE. Until the two are one thing, this makes the drift
+// impossible to ship silently: a server row with more fields than we have names
+// for keeps every column and labels the extras, and one with fewer is refused
+// outright rather than shifting every name one place to the left.
+function headersForServerRow(firstRow) {
+  const fields = parseCsvRows(firstRow).flat().length;
+  if (fields === FLATS_CSV_COLUMNS.length) return FLATS_CSV_COLUMNS;
+  if (fields > FLATS_CSV_COLUMNS.length) {
+    const extra = Array.from({ length: fields - FLATS_CSV_COLUMNS.length },
+                             (_, i) => `unknown_${i + 1}`);
+    console.warn(`[export] server sent ${fields} columns, this build names ` +
+                 `${FLATS_CSV_COLUMNS.length} — the extras are exported as ` +
+                 `${extra.join(", ")}. Add them to FLATS_CSV_COLUMNS.`);
+    return [...FLATS_CSV_COLUMNS, ...extra];
+  }
+  throw new Error(`export column mismatch: the server sent ${fields} columns ` +
+                  `and this build expects ${FLATS_CSV_COLUMNS.length}. Refusing ` +
+                  `to build a file whose headers would not match its data.`);
+}
 
 // (The flats CSV is now built + formatted server-side by export_units_csv, so the
 // per-column number/date formatting sets that used to live here were removed — the
@@ -1728,15 +1758,15 @@ const FLATS_NUMBER_COLUMNS = new Set([
   "izby", "obytna_plocha", "balkon_plocha", "loggia_plocha", "terasa_plocha",
   "zahrada_plocha", "exterier_plocha", "kobka_plocha", "celkova_plocha",
   "cena_bez_dph", "cena_s_dph", "cennikova_cena",
-  // Payment-schedule prices are prices too — they were exporting as text, so
-  // Excel could not sort or sum them (2026-08-18).
-  "fin_95_5", "fin_90_10", "fin_80_20", "fin_70_30",
-  "fin_60_40", "fin_50_50", "fin_40_60", "fin_30_70",
-  "fin_20_80", "fin_10_90", "fin_5_95", "fin_30_50_20",
-  "fin_30_40_30", "fin_20_50_30", "fin_5_15_80", "fin_10_40_40_10",
   // Fit-out prices are prices too — one column per level the developer publishes.
   // fitout_level itself stays TEXT: it is a word, not a number.
   "cena_holobyt", "cena_standard", "cena_plne_zariadeny",
+  // Payment-schedule prices are prices too — they were exporting as text, so
+  // Excel could not sort or sum them (2026-08-18). DERIVED from the header
+  // rather than typed out again (2026-09-15): the typed-out copy had gone stale
+  // by three schemes, so a newly added schedule exported as text even once it
+  // was labelled. Every fin_* column is a price; there is nothing to decide.
+  ...FLATS_CSV_COLUMNS.filter((c) => c.startsWith("fin_")),
 ]);
 
 // Minimal RFC-4180 CSV parser → array of string-cell rows. Handles quoted fields
@@ -2013,7 +2043,8 @@ function PlatformExports({ lang, setCurrent }) {
       });
 
       // Header (fixed order — must match export_units_csv column order) + server-built rows.
-      const csv = [FLATS_CSV_COLUMNS.join(","), ...parts].join("\n");
+      const csvHeaders = headersForServerRow(parts[0].split("\n")[0]);
+      const csv = [csvHeaders.join(","), ...parts].join("\n");
       const totalRows = csv.split("\n").length - 1;  // minus header
       const pCountry = isAllCountries(country) ? "all" : country;
       // UTF-8 BOM so Windows Excel renders SK/CZ diacritics correctly.
@@ -2095,13 +2126,14 @@ function PlatformExports({ lang, setCurrent }) {
         return;
       }
       setExportProgress({ current: 0, total: null, label: lang === "sk" ? "Vytváram Excel…" : "Building Excel…" });
-      const csvText = [FLATS_CSV_COLUMNS.join(","), ...parts].join("\n");
+      const xlsxHeaders = headersForServerRow(parts[0].split("\n")[0]);
+      const csvText = [xlsxHeaders.join(","), ...parts].join("\n");
       const bodyRows = parseCsvRows(csvText).slice(1).filter((r) => r.length > 1); // drop header row
-      const header = FLATS_CSV_COLUMNS.map((h) => ({ value: h, fontWeight: "bold" }));
-      const body = bodyRows.map((r) => FLATS_CSV_COLUMNS.map((col, ci) => xlsxCell(col, r[ci], FLATS_NUMBER_COLUMNS)));
+      const header = xlsxHeaders.map((h) => ({ value: h, fontWeight: "bold" }));
+      const body = bodyRows.map((r) => xlsxHeaders.map((col, ci) => xlsxCell(col, r[ci], FLATS_NUMBER_COLUMNS)));
       const pCountry = isAllCountries(country) ? "all" : country;
       await saveXlsx([header, ...body], {
-        columns: xlsxColWidths(FLATS_CSV_COLUMNS),
+        columns: xlsxColWidths(xlsxHeaders),
         sheet: lang === "sk" ? "Byty" : "Flats",
         fileName: `residata-flats-${pCountry}-${fileDay}.xlsx`,
       });
