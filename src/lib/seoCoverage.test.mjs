@@ -239,3 +239,40 @@ test("the history token is actually substituted, like coverage and price are", (
   assert.match(GEN, /velocity_maturity/,
     "the build no longer reads velocity_maturity — history_since would be undefined");
 });
+
+// ── the price series we may not promise (2026-09-15) ──────────────────────
+//
+// /sample sold "Month-over-month snapshots let you track pricing direction".
+// Our own measurement says that series is not ours to publish: coverage grew
+// from 14 475 to 180 453 units between May and August 2026, so the SK median
+// available €/m² fell 5 330 → 4 441 purely because cheaper towns were onboarded.
+// The number moves for a reason that is not the market.
+//
+// The valid comparison is the SAME UNIT over time, which the product genuinely
+// has (UnitTracker, "Byt v čase", reading flats_archive per project+unit). So
+// the copy now promises that — truthful, and a stronger claim to a valuer or an
+// investor than a market median that shifts with our own onboarding.
+test("no marketing copy promises a month-over-month price series", () => {
+  const banned = /month[- ]over[- ]month|medzimesa[čc]n|mesiac po mesiaci/i;
+  const strings = [...COPY.matchAll(/"([^"\\]{15,400})"/g)].map((m) => m[1]);
+  assert.ok(strings.length > 50, "read almost no copy — this guard would pass vacuously");
+  for (const claim of strings) {
+    // A month-over-month SALES or ABSORPTION count is fine and is not what this
+    // bans: the contamination is specific to averaging PRICES over a population
+    // that grew. Only flag it when the sentence is about price.
+    // "pric" not "price": the very sentence this guard was written for says
+    // "pricing direction", and /price/ does not match "pricing" — the first
+    // version of this test read straight past its own motivating example.
+    if (!/pric|cen[ay]|€\/m²|eur\/m²/i.test(claim)) continue;
+    assert.ok(!banned.test(claim),
+      `"${claim}" promises a month-over-month PRICE series. Coverage growth moves ` +
+      `that number on its own; publish the same-unit comparison instead.`);
+  }
+});
+
+test("the historical-trends claim names the same-unit method", () => {
+  const strings = [...COPY.matchAll(/"([^"\\]{15,400})"/g)].map((m) => m[1]);
+  const trend = strings.filter((c) => /unit by unit|byt po byte/i.test(c));
+  assert.equal(trend.length, 2,
+    `expected the EN and SK historical-trends copy to name the per-unit method, found ${trend.length}`);
+});
