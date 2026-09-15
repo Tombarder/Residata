@@ -354,7 +354,7 @@ export default function MapView({ lang = "en", setCurrent }) {
   }, [projects]);
 
   // ── Apply the dropdown/range filters (everything except the name query) ──
-  const dropdownFiltered = useMemo(() => {
+  const filterPass = useMemo(() => {
     /* What the user TYPES is in the currency the page is showing; avg_price_eur_m2 is
        EUR. Compared raw, a Czech customer typing a crown figure into a box labelled
        €/m² filtered against euros and got an empty map with no explanation. Convert the
@@ -365,29 +365,44 @@ export default function MapView({ lang = "en", setCurrent }) {
     // intent instead of a silently-empty map.
     if (pMin != null && pMax != null && pMin > pMax) { const t = pMin; pMin = pMax; pMax = t; }
     const priceActive = pMin != null || pMax != null;
-    return (projects || []).filter((p) => {
-      if (fCity && p.city !== fCity) return false;
-      if (fDistrict && p.district !== fDistrict) return false;
-      if (fDeveloper && p.developer !== fDeveloper) return false;
+    // 🔴 COUNT WHAT THE PRICE CONTROLS REMOVE FOR HAVING NO PRICE AT ALL.
+    // Boss saw 6 Nitra projects where there are 9: the three missing ones
+    // publish no price (Šindolka, Jelenecká 2, Brezový háj — 158 available
+    // flats between them) and both price controls drop a priceless project
+    // without a word. The counter said how many were PLACED and never how many
+    // were taken away, so the map looked like the whole city.
+    // Counted in the same pass rather than re-running the predicates, so the
+    // number cannot drift from the filter it describes.
+    const kept = [];
+    const pricelessHidden = [];
+    for (const p of projects || []) {
+      if (fCity && p.city !== fCity) continue;
+      if (fDistrict && p.district !== fDistrict) continue;
+      if (fDeveloper && p.developer !== fDeveloper) continue;
       const avail = Number(p.available_units) || 0;
-      const ppm2v = Math.round(Number(p.avg_price_eur_m2) || 0);
+      const ppm2 = Math.round(Number(p.avg_price_eur_m2) || 0);
       // Status partitions the map — a project either still has something for
       // sale or it does not, and "all" restricts nothing. No second control can
       // disagree with it.
-      if (fStatus === "available" && avail <= 0) return false;
-      if (fStatus === "sold" && avail > 0) return false;
-      if (onlyPriced && ppm2v <= 0) return false;
+      if (fStatus === "available" && avail <= 0) continue;
+      if (fStatus === "sold" && avail > 0) continue;
+      // Everything below is the PRICE decision. A project with no published
+      // price is a different case from one priced out of range: it is not a
+      // "no", it is an unknown, and that is the one worth reporting.
+      const priceless = ppm2 <= 0;
+      if (priceless && (onlyPriced || priceActive)) { pricelessHidden.push(p); continue; }
       if (priceActive) {
-        const ppm2 = Math.round(Number(p.avg_price_eur_m2) || 0);
-        if (ppm2 <= 0) return false;                       // unknown price can't be confirmed in-range
-        if (pMin != null && ppm2 < pMin) return false;
-        if (pMax != null && ppm2 > pMax) return false;
+        if (pMin != null && ppm2 < pMin) continue;
+        if (pMax != null && ppm2 > pMax) continue;
       }
-      return true;
-    });
+      kept.push(p);
+    }
+    return { kept, pricelessHidden };
   }, [projects, fCity, fDistrict, fDeveloper, fStatus, onlyPriced, priceMin, priceMax]);
 
   // ── Name query narrows the dropdown-filtered set → what the map shows ──
+  const dropdownFiltered = filterPass.kept;
+
   const q = norm(query);
   const shown = useMemo(() => {
     if (!q) return dropdownFiltered;
@@ -413,6 +428,14 @@ export default function MapView({ lang = "en", setCurrent }) {
   useEffect(() => { featuresRef.current = fc; }, [fc]);
 
   const placed = fc.features.length;
+  // Held to the SAME tests as `placed`: it has a pin, and it survives the name
+  // query. Otherwise the notice would promise projects that still would not show.
+  const hiddenNoPrice = useMemo(() => {
+    const c = coords || {};
+    return filterPass.pricelessHidden.filter(
+      (p) => c[p.id] && (!q || norm(p.name).includes(q))
+    ).length;
+  }, [filterPass, coords, q]);
   const totalPlaced = useMemo(
     () => (coords ? (projects || []).filter((p) => coords[p.id]).length : 0),
     [projects, coords]
@@ -666,6 +689,17 @@ export default function MapView({ lang = "en", setCurrent }) {
             <span style={{ color: dim }}> {sk ? "z" : "of"} <span style={{ fontFamily: mono }}>{totalPlaced}</span></span>
           )}{" "}
           {sk ? "projektov na mape" : "projects on the map"}
+          {hiddenNoPrice > 0 && (
+            <span
+              style={{ color: amber, marginLeft: "0.5rem" }}
+              title={sk
+                ? "Tieto projekty sú na trhu, ale developer pri nich nezverejňuje cenu. Cenový filter ich preto nevie posúdiť a skryje ich."
+                : "These projects are on the market, but the developer publishes no price. The price filter cannot judge them, so it hides them."}
+            >
+              · {hiddenNoPrice}{" "}
+              {sk ? "skrytých — bez zverejnenej ceny" : "hidden — no published price"}
+            </span>
+          )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "0.9rem", fontSize: "0.72rem", color: dim }}>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
