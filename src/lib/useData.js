@@ -1984,6 +1984,38 @@ export function useReportComparables() {
   return { units, loading, error };
 }
 
+/**
+ * fetchUnitsForExport — the WHOLE filtered set, for the Unit database's CSV.
+ *
+ * The page itself reads through useUnitsInfinite, which accumulates 100-row pages as you
+ * scroll — so exporting "what is loaded" would hand somebody 100 rows out of a filter
+ * that matched three thousand, and look like a complete file. This walks the same spec
+ * to the end instead.
+ *
+ * analytics_units clamps its own `limit` to 1000 (LEAST(…, 1000) in the RPC), so paging
+ * is not a choice. The ceiling below is a runaway guard, not a product limit: it is
+ * comfortably above the largest market we track (SK, ~27k units), so a real filtered set
+ * never reaches it — and if one ever does, the caller is told rather than handed a file
+ * that is quietly short.
+ */
+const EXPORT_PAGE = 1000;          // the RPC's own maximum
+const EXPORT_MAX_ROWS = 50000;     // > any single market; a guard, not a cap on real use
+
+export async function fetchUnitsForExport(spec, { onProgress } = {}) {
+  if (!isSupabaseReady() || !spec) return { rows: [], capped: false };
+  const out = [];
+  for (let offset = 0; offset < EXPORT_MAX_ROWS; offset += EXPORT_PAGE) {
+    const pageSpec = { ...spec, limit: EXPORT_PAGE, offset };
+    const { data, error } = await sbRead(supabaseData.rpc("analytics_units", { p_spec: pageSpec }));
+    if (error) { console.error("[fetchUnitsForExport]", error); break; }
+    const rows = Array.isArray(data?.rows) ? data.rows : [];
+    out.push(...rows.slice(0, EXPORT_PAGE));
+    if (onProgress) onProgress(out.length);
+    if (rows.length <= EXPORT_PAGE) break;     // the RPC returns limit+1 as its has-more sentinel
+  }
+  return { rows: out, capped: out.length >= EXPORT_MAX_ROWS };
+}
+
 /* ── Unit Explorer (Phase 3.1) — raw per-unit detail rows from analytics_units ──
    spec = { columns:[field keys], filters/filters_not/ranges/nulls:{…}, mode:'latest'|'archive',
             sort:[{key,dir}], limit, offset }. RLS-gated in the RPC (archive = paid/chosen-project).

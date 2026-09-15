@@ -12,7 +12,7 @@ import { moneyFromEur, moneySymbol, formatMoney, formatPerM2 } from "../lib/mone
 import { formatDimNumber } from "../lib/locale";
 import { statusLabel } from "../lib/unitStatus";
 import { unitKindLabel } from "../lib/unitKinds";
-import { useUnitsInfinite, useAnalyticsRegistry, usePivotDistinct } from "../lib/useData";
+import { useUnitsInfinite, useAnalyticsRegistry, usePivotDistinct, fetchUnitsForExport } from "../lib/useData";
 import { useAccountPrefState } from "../lib/useAccountUiPref";
 import { EMPTY_SENTINEL, MODE_LABEL, capabilitiesOf, newFilter, sanitizeFilter,
          isFilterActive, summariseFilter, filtersToSpec, migrateLegacyFilters,
@@ -336,6 +336,57 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
   const toggleCol = (k) => setCols((c) => (c.includes(k) ? c.filter((x) => x !== k) : [...c, k]));
   const activeFilters = filters.filter(isFilterActive).length;
 
+  /* ── CSV of the filtered set ───────────────────────────────────────────────
+     This page let you build a filter across 34 fields, choose your columns and sort
+     them, and then gave you no way to take any of it with you — Predaje has had that
+     since it was built. The file follows the screen: the columns you chose, in the
+     order you chose them, sorted the way the table is sorted.
+
+     Money goes out as a NUMBER in the display currency with the symbol in the HEADER,
+     and the text enums go out as the screen shows them ("Byt", "Voľný") while the
+     numerics keep their dot decimal — the same split Predaje settled on, because a
+     spreadsheet has to parse the numbers and a person has to read the words. */
+  const [csvBusy, setCsvBusy] = useState(false);
+  const exportCsv = async () => {
+    if (!cols.length || csvBusy) return;
+    setCsvBusy(true);
+    try {
+      const { rows: all, capped } = await fetchUnitsForExport(spec);
+      const sym = moneySymbol();
+      const head = cols.map((k) => {
+        const f = fields.find((x) => x.key === k);
+        const base = f ? lblFor(f, lang === "sk" ? "sk" : "en") : k;
+        /* lblFor already swaps € for the display symbol, so the registry label carries
+           the currency itself — appending it produced "Cena s DPH (Kč) (Kč)". Add it
+           only when the label does not already say it. */
+        return fmtByKey[k] === "eur" && !base.includes(sym) ? `${base} (${sym})` : base;
+      }).join(";");
+      const numericKeys = new Set(fields.filter((f) => f.type === "numeric").map((f) => f.key));
+      const cell = (k, v) => {
+        if (v == null || v === "") return "";
+        const fmt = fmtByKey[k];
+        const n = Number(v);
+        if ((fmt === "eur" || fmt === "per_m2") && Number.isFinite(n)) return String(Math.round(moneyFromEur(n)));
+        if (k === "stav") return statusLabel(v, lang, "one");
+        if (k === "typ") return unitKindLabel(v, lang);
+        /* Postgres sends `numeric` as a string, so a room count arrives as "1.0". The
+           file keeps the DOT (a spreadsheet has to parse it) but not the empty tail —
+           the same shape Predaje exports. */
+        if (numericKeys.has(k) && Number.isFinite(n)) return String(v).replace(/\.0+$/, "");
+        return String(v).replace(/;/g, ",");
+      };
+      const lines = all.map((r) => cols.map((k) => cell(k, r[k])).join(";"));
+      const blob = new Blob(["\ufeff" + [head, ...lines].join("\n")], { type: "text/csv;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `databaza_bytov_${new Date().toISOString().slice(0, 10)}${capped ? "_orezane" : ""}.csv`;
+      a.click(); URL.revokeObjectURL(a.href);
+      if (capped) window.alert(t(
+        "Export je orezaný na 50 000 riadkov. Zúž filter a stiahni znova.",
+        "The export was capped at 50,000 rows. Narrow the filter and download again."));
+    } finally { setCsvBusy(false); }
+  };
+
   // "Show on map" — hand the CURRENT filtered set's distinct projects to the map. One pivot
   // call (dims=[project_name], same filters) yields exactly the projects behind these units,
   // even for unit-level filters (izby, plocha…) the project-level map can't express itself.
@@ -448,8 +499,15 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
               </button>
             )}
 
+            <button onClick={exportCsv} disabled={csvBusy || !cols.length}
+              title={t("Stiahnuť vyfiltrované byty ako CSV", "Download the filtered units as CSV")}
+              style={{ ...sel, marginLeft: "auto", cursor: csvBusy ? "wait" : (cols.length ? "pointer" : "default"),
+                       color: dim, fontFamily: mono, fontSize: "0.72rem", opacity: cols.length ? 1 : 0.5 }}>
+              ⬇ {csvBusy ? t("sťahujem…", "preparing…") : "CSV"}
+            </button>
+
             <button onClick={showOnMap} disabled={mapBusy} title={t("Zobraziť vyfiltrované projekty na mape", "Show the filtered projects on the map")}
-              style={{ ...sel, marginLeft: "auto", cursor: mapBusy ? "wait" : "pointer", color: "#04130d", background: green, borderColor: green, fontFamily: mono, fontSize: "0.72rem", fontWeight: 700 }}>
+              style={{ ...sel, cursor: mapBusy ? "wait" : "pointer", color: "#04130d", background: green, borderColor: green, fontFamily: mono, fontSize: "0.72rem", fontWeight: 700 }}>
               🗺 {mapBusy ? t("otváram…", "opening…") : t("Zobraziť na mape", "Show on map")}
             </button>
             <span style={{ fontFamily: mono, fontSize: "0.72rem", color: dim }}>
