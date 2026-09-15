@@ -8,6 +8,7 @@ import { useAuth } from "../lib/useAuth";
 import { useAccountPrefState } from "../lib/useAccountUiPref";
 import { PIVOT_KEY as PIVOT_PREF_KEY } from "../lib/accountPrefs";
 import { moneyFromEur, moneySymbol } from "../lib/money";
+import { FILTER_MODES } from "../lib/filterModel";
 import { formatDimNumber } from "../lib/locale";
 import { statusLabel } from "../lib/unitStatus";
 import { unitKindLabel } from "../lib/unitKinds";
@@ -441,7 +442,13 @@ function _knownDim(k) { return !!FIELDS[k]; }
 // (localStorage is user-writable; pivot_prefs round-trips through the DB), so we
 // validate STRUCTURE, not just field keys — a malformed/oversized filter or sort
 // must never reach buildPivotSpec / the SQL engine / the sort logic.
-const VALID_FILTER_MODES = new Set(["in", "not_in", "between", "empty", "not_empty"]);
+/* The SAME five the Unit database and Predaje offer — read from filterModel.js rather
+   than written out again, because a fourth hand-kept copy of a vocabulary is how the
+   status labels, the money format and the sortable header each drifted this week. The
+   pivot's filter UI is its own (chips in a drag-and-drop zone, not cards in a panel);
+   only the vocabulary is shared, which is the part that must not diverge — a saved
+   config travels between these pages through the same account preferences. */
+const VALID_FILTER_MODES = new Set(FILTER_MODES);
 const VALID_AGGS = new Set(["count", "count_distinct", "sum", "avg", "min", "max", "median", "measure"]);
 const MAX_FILTERS = 50;          // generous; a real pivot uses a handful
 const MAX_FILTER_VALUES = 300;   // e.g. selecting many cities; bounded
