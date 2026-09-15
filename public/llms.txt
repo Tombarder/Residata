@@ -13,12 +13,12 @@ it daily, and delivers it as CSV and XLSX.
 
 ## Scope (updated daily; snapshot September 2026)
 
-- Markets: Slovakia and Czechia — 47 towns and cities with actively sold new-build projects
+- Markets: Slovakia and Czechia — 52 towns and cities with actively sold new-build projects
 - Total projects in dataset: 524 new-build residential projects (current + sold-out under tracking)
-- Currently active (in market): 389 projects, 41,490 units
-- Currently for sale: 12,223 units · reserved: 3,420 · sold: 25,017
-- Average price across available inventory: €5,936/m²
-- Distinct active developers: 231
+- Currently active (in market): 399 projects, 42,279 units
+- Currently for sale: 12,283 units · reserved: 3,491 · sold: 25,773
+- Average price across available inventory: €5,897/m² (priced units only — roughly one available home in nine carries no published price, so it is an average over what developers actually publish)
+- Distinct active developers: 237
 - Data refresh: daily
 - Languages: Slovak and English
 
@@ -44,6 +44,7 @@ Full details: https://residata.eu/imprint
 
 - Marketing site: https://residata.eu/
 - Live dashboard (every active project): https://residata.eu/live
-- Live analytics with district + developer breakdowns: https://residata.eu/live/analytics
+- What the data looks like, with live figures: https://residata.eu/sample
+- Published market analyses (Slovak, monthly): https://residata.eu/analyzy
 
 Numbers above are regenerated from the live database on every deploy.

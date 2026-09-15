@@ -129,3 +129,40 @@ test("two urls never claim to be the canonical of the same content", () => {
   assert.equal(new Set(submitted).size, submitted.length,
     "the sitemap lists the same url twice");
 });
+
+// ── what we hand to AI crawlers (2026-09-15) ──────────────────────────────
+//
+// llms.txt is the file written FOR machines: an agent reads it and follows the
+// URLs it lists. It advertised "Live analytics with district + developer
+// breakdowns: /live/analytics" — a path that does not exist. Verified live: the
+// app's router has no entry for it, falls through to Home, and the page comes
+// back with the homepage title and a canonical of "/". So an agent sent there
+// would describe our homepage as our analytics product.
+//
+// A dead link in a sitemap gets a crawl error somebody eventually sees. A dead
+// link here is answered with 200 and plausible content, so nothing ever
+// complains — which is exactly why it needs a test.
+test("every residata url in llms.txt is a route the app actually has", () => {
+  const routing = readFileSync(join(HERE, "routing.js"), "utf8");
+  const map = routing.match(/const map = \{([\s\S]*?)\n  \};/);
+  assert.ok(map, "could not find routing.js's path→page map; this test is vacuous without it");
+
+  const realPaths = new Set([...map[1].matchAll(/"([^"]+)":/g)].map((m) => m[1]));
+  realPaths.add("/");                       // Home, handled before the map
+  const prefixes = ["/analyzy/", "/project/", "/app"];   // handled by prefix, not the map
+
+  // The template, not the built file — the built one is regenerated and a stale
+  // copy on disk would make this pass while the next deploy reintroduces the URL.
+  const block = GEN.slice(GEN.indexOf("## Public surfaces"));
+  assert.ok(block.length > 80, "llms.txt public-surfaces block not found — guard reads nothing");
+
+  const advertised = [...block.matchAll(/\$\{HOME\}(\/[A-Za-z0-9/_-]*)/g)].map((m) => m[1]);
+  assert.ok(advertised.length >= 2, `found ${advertised.length} advertised urls, expected several`);
+
+  for (const p of advertised) {
+    const ok = realPaths.has(p) || prefixes.some((pre) => p.startsWith(pre));
+    assert.ok(ok,
+      `llms.txt sends crawlers to "${p}", which the router does not know. It will answer ` +
+      `200 with the HOMEPAGE, so nothing will ever report it as broken.`);
+  }
+});

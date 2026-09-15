@@ -149,7 +149,7 @@ it daily, and delivers it as CSV and XLSX.
 - Total projects in dataset: ${fmtN(market?.total_projects_tracked ?? market?.total_projects_active)} new-build residential projects (current + sold-out under tracking)
 - Currently active (in market): ${fmtN(market?.total_projects_active)} projects, ${fmtN(market?.total_units_tracked)} units
 - Currently for sale: ${fmtN(market?.total_available)} units · reserved: ${fmtN(market?.total_reserved)} · sold: ${fmtN(market?.total_sold)}
-- Average price across available inventory: €${fmtN(market?.avg_eur_m2)}/m²
+- Average price across available inventory: €${fmtN(market?.avg_eur_m2)}/m² (priced units only — roughly one available home in nine carries no published price, so it is an average over what developers actually publish)
 - Distinct active developers: ${fmtN(market?.total_developers_active)}
 - Data refresh: daily
 - Languages: Slovak and English
@@ -176,7 +176,8 @@ Full details: https://residata.eu/imprint
 
 - Marketing site: ${HOME}/
 - Live dashboard (every active project): ${HOME}/live
-- Live analytics with district + developer breakdowns: ${HOME}/live/analytics
+- What the data looks like, with live figures: ${HOME}/sample
+- Published market analyses (Slovak, monthly): ${HOME}/analyzy
 
 Numbers above are regenerated from the live database on every deploy.
 `;
@@ -229,7 +230,7 @@ ${registrationLine('en')}. Contact ${COMPANY.email} · https://residata.eu/impri
 - ${fmtN(market?.total_available)} units currently available (for sale)
 - ${fmtN(market?.total_reserved)} reserved
 - ${fmtN(market?.total_sold)} explicitly sold
-- Average price: €${fmtN(market?.avg_eur_m2)} per square meter (across available inventory)
+- Average price: €${fmtN(market?.avg_eur_m2)} per square meter (across available inventory that carries a published price; roughly one home in nine has none)
 
 The "total projects" number grows over time as developments sell out and new ones enter the market — the dataset accumulates historical comparable transactions, which is why valuers and banks use Residata for collateral assessment.
 

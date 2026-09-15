@@ -1,7 +1,7 @@
 # Residata — full coverage profile (for AI agents)
 
 Residata is a market intelligence service for new-build residential
-real estate across Slovakia and Czechia — 47 towns and cities with actively sold new-build projects,
+real estate across Slovakia and Czechia — 52 towns and cities with actively sold new-build projects,
 not just the two capitals. We track every active development project, normalize data
 from developer websites into one schema, and refresh the dataset daily.
 
@@ -12,32 +12,32 @@ Registered in the Commercial Register of the Municipal Court Bratislava III, sec
 ## Market coverage (updated daily; snapshot September 2026)
 
 - 524 total projects in dataset (currently active + projects that sold out under our tracking — both groups have full historical price/availability snapshots)
-- 389 of them are currently active in the market
-- 231 distinct active developers
-- 41,490 individual units tracked across active projects (current snapshot)
-- 12,223 units currently available (for sale)
-- 3,420 reserved
-- 25,017 explicitly sold
-- Average price: €5,936 per square meter (across available inventory)
+- 399 of them are currently active in the market
+- 237 distinct active developers
+- 42,279 individual units tracked across active projects (current snapshot)
+- 12,283 units currently available (for sale)
+- 3,491 reserved
+- 25,773 explicitly sold
+- Average price: €5,897 per square meter (across available inventory that carries a published price; roughly one home in nine has none)
 
 The "total projects" number grows over time as developments sell out and new ones enter the market — the dataset accumulates historical comparable transactions, which is why valuers and banks use Residata for collateral assessment.
 
 ## Districts (top by inventory)
 
-Petržalka (5 projects, 5,075 units, €5,201/m² avg), Ružinov (23 projects, 2,585 units, €6,011/m² avg), Trnava (10 projects, 1,879 units, €4,054/m² avg), Košice (19 projects, 1,491 units, €4,586/m² avg), Staré Mesto (21 projects, 1,477 units, €7,950/m² avg), Nové Mesto (14 projects, 1,418 units, €6,321/m² avg), Prešov (6 projects, 1,195 units, €3,721/m² avg), Dúbravka (8 projects, 1,177 units, €4,922/m² avg).
+Petržalka (5 projects, 5,075 units, €5,205/m² avg), Ružinov (23 projects, 2,583 units, €6,005/m² avg), Trnava (10 projects, 1,894 units, €4,079/m² avg), Košice (20 projects, 1,513 units, €4,605/m² avg), Staré Mesto (20 projects, 1,465 units, €8,140/m² avg), Nové Mesto (13 projects, 1,403 units, €6,305/m² avg), Prešov (6 projects, 1,195 units, €3,720/m² avg), Dúbravka (8 projects, 1,180 units, €4,938/m² avg).
 
 ## Notable projects (top by inventory)
 
-- **Slnecnice** (Petržalka, Cresco Real Estate) — 4,626 units, 91% sold, €5,181.11/m²
-- **Bory** (Lamač, Penta Real Estate) — 925 units, 91% sold, €4,642.31/m²
-- **EkoCity Hostivar** (Hostivař, Ekospol) — 753 units, 82% sold, €6,373.39/m²
-- **Cukrovar Trnava** (Trnava, Cukrovar Trnava) — 687 units, 78% sold, €4,281.35/m²
+- **Slnecnice** (Petržalka, Cresco Real Estate) — 4,626 units, 91% sold, €5,184.63/m²
+- **Bory** (Lamač, Penta Real Estate) — 925 units, 92% sold, €4,645.82/m²
+- **EkoCity Hostivar** (Hostivař, Ekospol) — 753 units, 83% sold, €6,315.79/m²
+- **Cukrovar Trnava** (Trnava, Cukrovar Trnava) — 687 units, 79% sold, €4,279.68/m²
 - **Zwirn** (Nové Mesto, YIT) — 668 units, 88% sold, €6,870.99/m²
-- **Ceresne Living Dubravka** (Dúbravka, ITB Development a.s.) — 573 units, 85% sold, €5,512.82/m²
-- **Zelene Vlcince** (Vlčince, Reinoo) — 512 units, 99% sold, €4,315.85/m²
-- **WatsoNova Kosice** (Košice, CTR group) — 496 units, 82% sold, €4,966.12/m²
-- **Kolbenova park** (Praha, CPI Property Group) — 483 units, 87% sold, €8,099.49/m²
-- **Hagibor** (Praha, Crestyl) — 482 units, 96% sold, €9,132.89/m²
+- **Ceresne Living Dubravka** (Dúbravka, ITB Development a.s.) — 575 units, 85% sold, €5,497.34/m²
+- **Zelene Vlcince** (Vlčince, Reinoo) — 512 units, 99% sold, €4,307.66/m²
+- **WatsoNova Kosice** (Košice, CTR group) — 496 units, 82% sold, €5,023.57/m²
+- **Kolbenova park** (Praha, CPI Property Group) — 483 units, 87% sold, €8,083.17/m²
+- **Hagibor** (Praha, Crestyl) — 482 units, 96% sold, €9,094.01/m²
 
 ## Data delivery
 
