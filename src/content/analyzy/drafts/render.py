@@ -193,20 +193,20 @@ def build_vars(rep: dict) -> dict:
         return head + "\n" + "\n".join(rows)
 
     def series_table(lang: str) -> str:
-        head = (("| Štvrťrok | Ponuka | Projekty | Predaj | Priemerná cena €/m² s DPH |"
-                 "\n|---|---:|---:|---:|---:|") if lang == "sk" else
-                ("| Quarter | Supply | Projects | Sales | Average €/m² incl. VAT |"
-                 "\n|---|---:|---:|---:|---:|"))
+        head = (("| Štvrťrok | Ponuka | Predaj | Priemerná cena €/m² s DPH |"
+                 "\n|---|---:|---:|---:|") if lang == "sk" else
+                ("| Quarter | Supply | Sales | Average €/m² incl. VAT |"
+                 "\n|---|---:|---:|---:|"))
         rows = []
         for r in pub["quarters"]:
-            rows.append(f"| {r['q']} | {sk_int(r['supply'])} | {r['projects'] or '—'} | "
+            rows.append(f"| {r['q']} | {sk_int(r['supply'])} | "
                         f"{sk_int(r['sales'])} | {sk_int(r['meanM2Rebased'])} |")
         # Our row says what it is: a quarter-to-date while the quarter is open.
         label = ours["q"] if ours["complete"] else (
             f"{ours['q']}*" )
         sales = sk_int(ours["sales"]) if ours["complete"] else (
             f"{sk_int(ours['sales'])}*")
-        rows.append(f"| **{label}** | **{sk_int(ours['supply'])}** | **{ours['projects']}** | "
+        rows.append(f"| **{label}** | **{sk_int(ours['supply'])}** | "
                     f"**{sales}** | **{sk_int(ours['meanM2'])}** |")
         return head + "\n" + "\n".join(rows)
     p1, p2 = br["sales"]["p1"], br["sales"]["p2"]
@@ -372,15 +372,20 @@ def build_vars(rep: dict) -> dict:
         "qThenDateEn": en_date(br["thenDate"]),
         "qTopSeller": br["topSeller"]["name"],
         "qTopSellerN": sk_int(br["topSeller"]["n"]),
+        "qD1Sold": sk_int(br["districts"][0]["sold"]),
+        "qD1Share": sk_dec(br["districts"][0]["sharePct"]),
+        "qD1ShareEn": en_dec(br["districts"][0]["sharePct"]),
+        "qD1M2": sk_int(br["districts"][0]["meanM2"]),
+        "qD2Sold": sk_int(br["districts"][1]["sold"]) if len(br["districts"]) > 1 else "",
+        "qD2Share": sk_dec(br["districts"][1]["sharePct"]) if len(br["districts"]) > 1 else "",
+        "qD2ShareEn": en_dec(br["districts"][1]["sharePct"]) if len(br["districts"]) > 1 else "",
+        "qD2M2": sk_int(br["districts"][1]["meanM2"]) if len(br["districts"]) > 1 else "",
+        "qCityM2": sk_int(br["districts"][0]["cityM2"]),
         "qD1": br["districts"][0]["district"],
         "qD1Loc": locative(br["districts"][0]["district"]),
         "qD2Loc": (locative(br["districts"][1]["district"])
                    if len(br["districts"]) > 1 else ""),
-        "qD1Then": sk_int(br["districts"][0]["soldThen"]),
-        "qD1Now": sk_int(br["districts"][0]["soldNow"]),
         "qD2": br["districts"][1]["district"] if len(br["districts"]) > 1 else "",
-        "qD2Then": sk_int(br["districts"][1]["soldThen"]) if len(br["districts"]) > 1 else "",
-        "qD2Now": sk_int(br["districts"][1]["soldNow"]) if len(br["districts"]) > 1 else "",
         "rpChanges": sk_int(br["repricing"]["changes"]),
         "rpUnits": sk_int(br["repricing"]["units"]),
         "rpProjects": br["repricing"]["projects"],

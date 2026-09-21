@@ -2,13 +2,13 @@
 Predaj v Q3 2026 dosiahol 735 bytov oproti 652 z predchádzajúceho štvrťroka. Cenová úroveň ostala nezmenená, medziročne stúpla o 0,1 %, a ponuka bytov na predaj sa zvýšila na 4 305 bytov.
 -->
 <!--METHOD
-Údaje pochádzajú z verejne zverejnených cenníkov bratislavských developerov, ktoré Residata číta denne, byt po byte. Ponuku tvoria voľné a rezervované byty; počítajú sa výlučne byty, nie parkovanie, pivnice ani nebytové priestory. Priemerná cena za m² je priemer jednotkových cien jednotlivých bytov z obytnej plochy vrátane DPH; ide o ponukové ceny z cenníkov, nie o realizačné ceny z katastra. Polovičné dispozície sú zaokrúhlené nadol: byt s izbou a pol je vedený ako jednoizbový. Predaj sa určuje zo zmien stavu v cenníku developera. Predaj za Q3 2026 je predbežný: odmeraných máme 72 z 92 dní štvrťroka, počas ktorých sa predalo 575 bytov, a celý štvrťrok je dopočítaný pri rovnakom dennom tempe. Ponuka, ceny aj výmery sú namerané hodnoty, nie odhad.
+Údaje pochádzajú z verejne zverejnených cenníkov bratislavských developerov, ktoré Residata číta denne, byt po byte. Ponuku tvoria voľné a rezervované byty; počítajú sa výlučne byty, nie parkovanie, pivnice ani nebytové priestory. Priemerná cena za m² je priemer jednotkových cien jednotlivých bytov z obytnej plochy vrátane DPH; ide o ponukové ceny z cenníkov, nie o realizačné ceny z katastra. Polovičné dispozície sú zaokrúhlené nadol: byt s izbou a pol je vedený ako jednoizbový. Predaj sa určuje zo zmien stavu v cenníku developera. Zmena ceny porovnáva ten istý byt s jeho vlastnou skoršou cenou, pri jednom čítaní na byt a deň a pri zmene aspoň o dvesto eur. Predaj za Q3 2026 je predbežný: odmeraných máme 72 z 92 dní štvrťroka, počas ktorých sa predalo 575 bytov, a celý štvrťrok je dopočítaný pri rovnakom dennom tempe. Ponuka, ceny aj výmery sú namerané hodnoty, nie odhad.
 -->
 1. októbra 2026 | KVARTÁLNA ANALÝZA TRHU S BRATISLAVSKÝMI NOVOSTAVBAMI
 
 # Ponuka bratislavských novostavieb ďalej rastie, ceny stoja na mieste
 
-Tretí štvrťrok 2026 na bratislavskom trhu s novostavbami znamená silnejší dopyt, cenovú stagnáciu a ďalšie zvýšenie počtu bytov na predaj. Predaj dosiahol 735 bytov oproti 652 z predchádzajúceho štvrťroka. Cenová úroveň ostala nezmenená a v medziročnom porovnaní stúpla o 0,1 %. Ponuka bytov na predaj sa zvýšila na 4 305 bytov.
+Tretí štvrťrok 2026 na bratislavskom trhu s novostavbami znamenal silnejší dopyt, cenovú stagnáciu a ďalšie zvýšenie počtu bytov na predaj. Predaj dosiahol 735 bytov oproti 652 z predchádzajúceho štvrťroka. Cenová úroveň ostala nezmenená a v medziročnom porovnaní stúpla o 0,1 %. Ponuka bytov na predaj sa zvýšila na 4 305 bytov.
 
 Ponuku bytov na trhu s novostavbami tvorilo ku dňu 1. októbra 2026 podľa údajov Residaty 4 305 bytov v rámci 97 projektov. Oproti druhému štvrťroku ponuka bytov vzrástla o 74 bytov resp. 1,7 %, zatiaľ čo v medziročnom porovnaní sa zvýšila o 336 bytov resp. 8,5 %.
 
@@ -19,14 +19,14 @@ Priemerná absolútna cena ponúkaných bytov bola na úrovni 387 873 € s DPH
 ![Ponuka, predaj a cena po štvrťrokoch](/analyzy/kvartalka-ba-2026-q3-1-kvartaly.svg)
 *Stĺpce: ponuka bytov ku koncu štvrťroka, v stĺpci počet predaných. Čiara: priemerná cena €/m² s DPH.*
 
-| Štvrťrok | Ponuka | Projekty | Predaj | Priemerná cena €/m² s DPH |
-|---|---:|---:|---:|---:|
-| Q2 2025 | 3 393 | 94 | 645 | 5 606 |
-| Q3 2025 | 3 969 | — | 638 | 5 732 |
-| Q4 2025 | 3 874 | 99 | 634 | 5 659 |
-| Q1 2026 | 3 922 | 96 | 742 | 5 747 |
-| Q2 2026 | 4 231 | 105 | 652 | 5 701 |
-| **Q3 2026** | **4 305** | **97** | **735** | **5 736** |
+| Štvrťrok | Ponuka | Predaj | Priemerná cena €/m² s DPH |
+|---|---:|---:|---:|
+| Q2 2025 | 3 393 | 645 | 5 606 |
+| Q3 2025 | 3 969 | 638 | 5 732 |
+| Q4 2025 | 3 874 | 634 | 5 659 |
+| Q1 2026 | 3 922 | 742 | 5 747 |
+| Q2 2026 | 4 231 | 652 | 5 701 |
+| **Q3 2026** | **4 305** | **735** | **5 736** |
 
 *Poznámka: predaj za Q3 2026 je predbežný odhad — podrobnosti v metodike.*
 
@@ -50,11 +50,11 @@ V absolútnej cene, ktorá rozhoduje o hypotéke, vyzerá trh inak než v cene z
 
 ## Vývoj ponuky a predaja na bratislavskom trhu novostavieb
 
-Ponuka bytov rástla a spolu s ňou aj dopyt. Predalo sa 735 bytov oproti 652 z druhého štvrťroka a 638 spred roka. Predaj sa pritom nerozdelil v pomere ponuky. Dvojizbové byty tvoria 41,9 % ponuky, ale 50,5 % predaja; trojizbové naopak 31,4 % ponuky a len 23,3 % predaja. Predaj pritom nebol skreslený mimoriadne vysokým predajom v jednom z veľkých projektov — na najsilnejší z nich pripadlo 46 bytov. Dopyt tak oproti predchádzajúcemu štvrťroku vzrástol o 12,7 %.
+Predalo sa 735 bytov oproti 652 z druhého štvrťroka a 638 spred roka, teda o 12,7 % viac než v predchádzajúcom štvrťroku. Nešlo pritom o výkyv spôsobený jedným veľkým projektom: na najsilnejší z nich pripadlo 63 bytov, teda necelá desatina predaja. Predaj sa nerozdelil v pomere ponuky. Dvojizbové byty tvoria 41,9 % ponuky, ale 50,5 % predaja; trojizbové naopak 31,4 % ponuky a len 23,3 % predaja.
 
-Priemerná predajná cena predaných bytov mierne vzrástla na 5 745 €/m² s DPH, čím sa vyrovnala priemernej ponukovej cene. Za rastom ceny predaných bytov je najmä zvýšený dopyt v mestských častiach Ružinov a Staré Mesto, ktoré sú drahšie ako priemer — v Ružinove sa predaj zvýšil z 130 na 174 bytov a v Starom Meste z 32 na 36. Priemerná absolútna cena predaných bytov bola 352 365 € s DPH pri priemernej rozlohe 61,0 m².
+Priemerná predajná cena predaných bytov dosiahla 5 745 €/m² s DPH, čím sa prakticky vyrovnala priemernej ponukovej cene 5 736 €/m² s DPH. Kupuje sa teda zhruba to, čo je v ponuke, nie výrazne lacnejší okraj trhu. Ťahá to najmä Ružinov, na ktorý pripadlo 41,9 % všetkých predaných bytov pri priemernej cene 6 247 €/m² s DPH, a Staré Mesto s 9,7 % a 7 335 €/m² s DPH — oba nad mestským priemerom 5 745 €/m² s DPH. Priemerná absolútna cena predaného bytu bola 352 365 € s DPH pri rozlohe 61,0 m².
 
-Stojaci priemer pritom neznamená, že developeri ceny nemenia. Za štvrťrok sa cena zmenila u 882 bytov v 36 projektoch, 84,0 % zmien smerovalo nahor a medián zmeny bol 2,3 %; týka sa to však len 13,4 % ponuky, takže priemer to posúva približne o 0,21 %. Proti tomu pôsobí nová ponuka — pribudlo 447 bytov s priemernou cenou 5 311 €/m² s DPH, teda o 7,4 % pod trhom, a obe sily sa takmer vyrušia.
+Stojaci priemer pritom neznamená, že developeri ceny nemenia. Za štvrťrok sa cena zmenila u 882 bytov v 36 projektoch, 84,0 % zmien smerovalo nahor a medián zmeny bol 2,3 %. Týka sa to však len 13,4 % ponuky, takže na celkový priemer to pôsobí zhruba 0,21 % nahor. Opačným smerom ťahá nová ponuka: pribudlo 534 bytov s priemernou cenou 5 514 €/m² s DPH, teda o 3,9 % pod úrovňou trhu. Výsledkom je priemer, ktorý sa prakticky nepohol.
 
 ## Pohľad na aktuálne smerovanie trhu novostavieb v Bratislave
 

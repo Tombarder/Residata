@@ -1,14 +1,14 @@
 <!--PEREX
-Sales in Q3 2026 reached 735 flats against 652 in Q2 2026. The price level was unchanged, up 0.1% year on year, and the supply of flats for sale rose to 4 305.
+Sales in Q3 2026 reached 735 flats against 652 in the previous quarter. The price level was unchanged, up 0.1% year on year, and the supply of flats for sale rose to 4 305.
 -->
 <!--METHOD
-Data come from the publicly published price lists of Bratislava developers, which Residata reads daily, flat by flat. Supply consists of available and reserved flats; homes only — no parking, storage or commercial units. The average price per m² is a mean of individual flats' unit prices on living area including VAT; these are asking prices from price lists, not achieved prices from the land registry. Half dispositions are rounded down: a flat with a room and a half is counted as one-room. A sale is identified from a change of status in the developer's own price list. Sales for Q3 2026 are preliminary: we have measured 72 of the quarter's 92 days, during which 575 flats were sold, and the full quarter is extrapolated at the same daily pace. Supply, prices and floor areas are measured values, not estimates.
+Data come from the publicly published price lists of Bratislava developers, which Residata reads daily, flat by flat. Supply consists of available and reserved flats; homes only — no parking, storage or commercial units. The average price per m² is a mean of individual flats' unit prices on living area including VAT; these are asking prices from price lists, not achieved prices from the land registry. Half dispositions are rounded down: a flat with a room and a half is counted as one-room. A sale is identified from a change of status in the developer's own price list. A price change compares the same flat with its own earlier price, at one reading per flat per day and a change of at least two hundred euros. Sales for Q3 2026 are preliminary: we have measured 72 of the quarter's 92 days, during which 575 flats were sold, and the full quarter is extrapolated at the same daily pace. Supply, prices and floor areas are measured values, not estimates.
 -->
 1 October 2026 | QUARTERLY ANALYSIS OF THE BRATISLAVA NEW-BUILD MARKET
 
 # The supply of Bratislava new-builds keeps growing, prices are standing still
 
-The third quarter of 2026 on the Bratislava new-build market means stronger demand, price stagnation and a further increase in the number of flats for sale. Sales reached 735 flats against 652 in the previous quarter. The price level was unchanged and rose by 0.1% year on year. The supply of flats for sale rose to 4 305.
+The third quarter of 2026 on the Bratislava new-build market brought stronger demand, price stagnation and a further increase in the number of flats for sale. Sales reached 735 flats against 652 in the previous quarter. The price level was unchanged and rose by 0.1% year on year. The supply of flats for sale rose to 4 305.
 
 As of 1 October 2026 the supply on the new-build market consisted, according to Residata's data, of 4 305 flats across 97 projects. Against the previous quarter supply rose by 74 flats or 1.7%, while year on year it rose by 336 flats or 8.5%.
 
@@ -19,14 +19,14 @@ The average absolute price of flats on offer stood at 387 873 € incl. VAT at 
 ![Supply, sales and price by quarter](/analyzy/kvartalka-ba-2026-q3-1-kvartaly-en.svg)
 *Bars: flats on offer at quarter end, with sales inside the bar. Line: average €/m² incl. VAT.*
 
-| Quarter | Supply | Projects | Sales | Average €/m² incl. VAT |
-|---|---:|---:|---:|---:|
-| Q2 2025 | 3 393 | 94 | 645 | 5 606 |
-| Q3 2025 | 3 969 | — | 638 | 5 732 |
-| Q4 2025 | 3 874 | 99 | 634 | 5 659 |
-| Q1 2026 | 3 922 | 96 | 742 | 5 747 |
-| Q2 2026 | 4 231 | 105 | 652 | 5 701 |
-| **Q3 2026** | **4 305** | **97** | **735** | **5 736** |
+| Quarter | Supply | Sales | Average €/m² incl. VAT |
+|---|---:|---:|---:|
+| Q2 2025 | 3 393 | 645 | 5 606 |
+| Q3 2025 | 3 969 | 638 | 5 732 |
+| Q4 2025 | 3 874 | 634 | 5 659 |
+| Q1 2026 | 3 922 | 742 | 5 747 |
+| Q2 2026 | 4 231 | 652 | 5 701 |
+| **Q3 2026** | **4 305** | **735** | **5 736** |
 
 *Note: sales for Q3 2026 are a preliminary estimate — see the method note.*
 
@@ -50,11 +50,11 @@ In absolute price, which is what a mortgage is granted against, the market looks
 
 ## The development of supply and sales on the Bratislava new-build market
 
-Supply grew and demand grew with it. 735 flats were sold against 652 in the previous quarter and 638 a year ago. Sales did not split in the proportions of supply: two-room flats are 41.9% of the offer but 50.5% of sales, while three-room are 31.4% of the offer and only 23.3% of sales. Sales were not distorted by an exceptionally high figure in one of the large projects — the strongest of them accounted for 46 flats. Demand therefore rose by 12.7% against the previous quarter.
+In all, 735 flats were sold against 652 in the previous quarter and 638 a year ago, that is 12.7% more than in the preceding quarter. This was not a spike caused by one large project: the strongest of them accounted for 63 flats, under a tenth of sales. Sales also did not split in the proportions of supply: two-room flats are 41.9% of the offer but 50.5% of sales, while three-room are 31.4% of the offer and only 23.3% of sales.
 
-The average achieved price of sold flats rose slightly to 5 745 €/m² incl. VAT, matching the average asking price. Behind the rise in the price of sold flats is above all increased demand in Ružinov and Staré Mesto, which are dearer than the average — in Ružinov sales rose from 130 to 174 flats and in Staré Mesto from 32 to 36. The average absolute price of sold flats was 352 365 € incl. VAT at an average floor area of 61.0 m².
+The average achieved price of sold flats reached 5 745 €/m² incl. VAT, practically matching the average asking price of 5 736 €/m² incl. VAT. What sells is therefore roughly what is on offer, not a markedly cheaper edge of the market. It is led by Ružinov, which took 41.9% of all flats sold at an average of 6 247 €/m² incl. VAT, and Staré Mesto with 9.7% at 7 335 €/m² incl. VAT — both above the city average of 5 745 €/m² incl. VAT. The average absolute price of a flat sold was 352 365 € incl. VAT at 61.0 m².
 
-A standing average does not mean developers leave prices alone. Over the quarter the price of 882 flats changed across 36 projects, 84.0% of the changes upward at a median of 2.3%; it touched only 13.4% of the offer, however, so it shifts the average by about 0.21%. Working against it is new supply — 447 flats arrived at an average of 5 311 €/m² incl. VAT, 7.4% below the market, and the two forces very nearly cancel.
+A standing average does not mean developers leave prices alone. Over the quarter the price of 882 flats changed across 36 projects, 84.0% of the changes upward at a median of 2.3%. It touched only 13.4% of the offer, however, so on the overall average it works out at roughly 0.21% upward. Pulling the other way is new supply: 534 flats arrived at an average of 5 514 €/m² incl. VAT, 3.9% below the market level. The result is an average that has barely moved.
 
 ## A view on where the Bratislava new-build market is heading
 

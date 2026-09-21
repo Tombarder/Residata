@@ -1,6 +1,6 @@
 {
   "asOf": "2026-10-01",
-  "generatedAt": "2026-09-21T13:42:07+00:00",
+  "generatedAt": "2026-09-21T14:09:32+00:00",
   "bratislavaReport": {
     "thenDate": "2026-07-18",
     "nowDate": "2026-09-21",
@@ -40,21 +40,23 @@
     },
     "salesChangePct": 11.9,
     "topSeller": {
-      "name": "Slnecna strana",
-      "n": 46
+      "name": "Milrose",
+      "n": 63
     },
     "districts": [
       {
         "district": "Ružinov",
-        "soldThen": 130,
-        "soldNow": 174,
-        "meanM2": 6198
+        "sold": 241,
+        "meanM2": 6247,
+        "sharePct": 41.9,
+        "cityM2": 5745
       },
       {
         "district": "Staré Mesto",
-        "soldThen": 32,
-        "soldNow": 36,
-        "meanM2": 7389
+        "sold": 56,
+        "meanM2": 7335,
+        "sharePct": 9.7,
+        "cityM2": 5745
       }
     ],
     "repricing": {
@@ -69,9 +71,9 @@
       "effectOnAverage": 0.21
     },
     "newSupply": {
-      "units": 447,
-      "meanM2": 5311,
-      "medianM2": 4979
+      "units": 534,
+      "meanM2": 5514,
+      "medianM2": 4877
     }
   },
   "quarterly": {
