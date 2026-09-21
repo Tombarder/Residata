@@ -1,6 +1,6 @@
 {
   "asOf": "2026-10-01",
-  "generatedAt": "2026-09-21T12:37:37+00:00",
+  "generatedAt": "2026-09-21T13:19:15+00:00",
   "bratislavaReport": {
     "thenDate": "2026-07-18",
     "nowDate": "2026-09-21",
@@ -57,6 +57,17 @@
         "meanM2": 7389
       }
     ],
+    "repricing": {
+      "changes": 1153,
+      "units": 882,
+      "projects": 36,
+      "unitsTracked": 6560,
+      "pctOfOfferMoved": 13.4,
+      "pctUp": 84.0,
+      "medianStep": 2.3,
+      "meanMove": 1.53,
+      "effectOnAverage": 0.21
+    },
     "newSupply": {
       "units": 447,
       "meanM2": 5311,

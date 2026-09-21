@@ -313,6 +313,22 @@ def build_vars(rep: dict) -> dict:
         "qD2": br["districts"][1]["district"] if len(br["districts"]) > 1 else "",
         "qD2Then": sk_int(br["districts"][1]["soldThen"]) if len(br["districts"]) > 1 else "",
         "qD2Now": sk_int(br["districts"][1]["soldNow"]) if len(br["districts"]) > 1 else "",
+        "rpChanges": sk_int(br["repricing"]["changes"]),
+        "rpUnits": sk_int(br["repricing"]["units"]),
+        "rpProjects": br["repricing"]["projects"],
+        "rpTracked": sk_int(br["repricing"]["unitsTracked"]),
+        "rpShare": sk_dec(br["repricing"]["pctOfOfferMoved"]),
+        "rpShareEn": en_dec(br["repricing"]["pctOfOfferMoved"]),
+        "rpUp": sk_dec(br["repricing"]["pctUp"]),
+        "rpUpEn": en_dec(br["repricing"]["pctUp"]),
+        "rpStep": sk_dec(br["repricing"]["medianStep"]),
+        "rpStepEn": en_dec(br["repricing"]["medianStep"]),
+        "rpEffect": sk_dec(br["repricing"]["effectOnAverage"], 2),
+        "rpEffectEn": en_dec(br["repricing"]["effectOnAverage"], 2),
+        "newBelowPct": sk_dec(
+            100 * (1 - br["newSupply"]["meanM2"] / br["meanM2"]), 1),
+        "newBelowPctEn": en_dec(
+            100 * (1 - br["newSupply"]["meanM2"] / br["meanM2"]), 1),
         "qNewUnits": sk_int(br["newSupply"]["units"]),
         "qNewMeanM2": sk_int(br["newSupply"]["meanM2"]),
         # ── the quarterly series ────────────────────────────────────────────

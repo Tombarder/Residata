@@ -12,7 +12,11 @@ Tretí štvrťrok 2026 na bratislavskom trhu s novostavbami znamená silnejší 
 
 Ponuku bytov na trhu s novostavbami tvorilo ku dňu 1. októbra 2026 podľa údajov Residaty 4 305 bytov v rámci 97 projektov. Oproti Q2 2026 ponuka bytov vzrástla o 74 bytov resp. 1,7 %, zatiaľ čo v medziročnom porovnaní sa zvýšila o 336 bytov resp. 8,5 %.
 
-Priemerná cena týchto ponúkaných bytov dosiahla 5 736 €/m² s DPH, čo v medziročnom porovnaní predstavuje nárast len o 0,1 %. Dá sa povedať, že ceny novostavieb posledné roky rastú tempom blízkym nule — pred rokom bola priemerná cena 5 732 €/m² s DPH a pred štvrťrokom 5 701 €/m² s DPH. Rozdiely v priemernej cene sú spôsobené skôr zložením ponuky než pohybom cenníkov.
+Priemerná cena týchto ponúkaných bytov dosiahla 5 736 €/m² s DPH, čo v medziročnom porovnaní predstavuje nárast len o 0,1 %. Pred rokom bola priemerná cena 5 732 €/m² s DPH a pred štvrťrokom 5 701 €/m² s DPH.
+
+Stojaci priemer pritom neznamená, že developeri ceny nemenia. Za štvrťrok sa cena zmenila u 882 bratislavských bytov v 36 projektoch, spolu 1 153-krát; 84,0 % zmien smerovalo nahor a medián zmeny bol 2,3 %. Týka sa to však len 13,4 % sledovanej ponuky, takže na úrovni celej ponuky to posúva priemer približne o 0,21 %.
+
+Proti tomu pôsobí zloženie ponuky. Za rovnaké obdobie pribudlo do predaja 447 bytov s priemernou cenou 5 311 €/m² s DPH, teda o 7,4 % pod úrovňou trhu. Zdražovanie existujúcich bytov a lacnejšia nová ponuka sa tak navzájom takmer vyrušia — a priemer, ktorý sa nehýbe, je výsledkom týchto dvoch protichodných pohybov, nie nehybného trhu.
 
 Priemerná absolútna cena ponúkaných bytov bola na úrovni 387 873 € s DPH, zatiaľ čo priemerná výmera týchto bytov dosahovala 66,2 m².
 
@@ -42,7 +46,7 @@ Priemerná predajná cena predaných bytov mierne vzrástla na 5 745 €/m² s 
 
 Tomáš Kamhal, zakladateľ Residaty: „Za posledný rok sa predaj drží na úrovni okolo 666 bytov za štvrťrok, zatiaľ čo ponuka za ten istý čas vzrástla o 8,5 %. Na trh teda pribúda viac bytov, než z neho odchádza, a rozdiel sa kumuluje.
 
-Prvým faktorom je ponuka. Dosiahla 4 305 bytov v 97 projektoch a naďalej rastie. Kým developeri cítia vzájomnú konkurenciu a zároveň im predaj drží krok, výsledkom je stagnácia cien — za posledný rok sa priemerná cena pohla o 0,1 %.
+Prvým faktorom je ponuka. Dosiahla 4 305 bytov v 97 projektoch a naďalej rastie. Stagnujúci priemer pritom nikoho nemá uspať: developeri ceny menia, za štvrťrok prehodnotili cenník u 882 bytov a 84,0 % z tých zmien išlo nahor. Priemer drží na mieste to, že súbežne prichádza nová, lacnejšia ponuka. Kupujúci teda nečaká na zlacnenie existujúceho bytu — čaká na to, čo developer uvedie ako ďalšie.
 
 Druhým faktorom je dopyt, obmedzený najmä úrokovými sadzbami a kúpnou silou domácností. Priemerný predaný byt stál 352 365 € pri výmere 61,0 m², čo je hranica, na ktorú dosiahne obmedzený počet domácností.
 

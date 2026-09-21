@@ -12,7 +12,11 @@ The third quarter of 2026 on the Bratislava new-build market means stronger dema
 
 As of 1 October 2026 the supply on the new-build market consisted, according to Residata's data, of 4 305 flats across 97 projects. Against Q2 2026 supply rose by 74 flats or 1.7%, while year on year it rose by 336 flats or 8.5%.
 
-The average price of these flats on offer reached 5 736 €/m² incl. VAT, which year on year is an increase of only 0.1%. It can be said that new-build prices have for some years been rising at a pace close to zero — a year ago the average price was 5 732 €/m² incl. VAT and a quarter ago 5 701 €/m² incl. VAT. Differences in the average price are caused by the composition of supply rather than by movements in price lists.
+The average price of these flats on offer reached 5 736 €/m² incl. VAT, which year on year is an increase of only 0.1%. A year ago the average price was 5 732 €/m² incl. VAT and a quarter ago 5 701 €/m² incl. VAT.
+
+A standing average does not mean developers leave prices alone. Over the quarter the price of 882 Bratislava flats changed across 36 projects, 1 153 times in all; 84.0% of the changes were increases and the median change was 2.3%. It touched only 13.4% of the tracked offer, however, so across the offer as a whole it shifts the average by roughly 0.21%.
+
+Working against it is the composition of supply. Over the same period 447 flats came onto the market at an average of 5 311 €/m² incl. VAT, that is 7.4% below the market level. Existing flats getting dearer and newly listed ones arriving cheaper very nearly cancel out — and an average that does not move is the result of those two opposing forces, not of a market standing still.
 
 The average absolute price of flats on offer stood at 387 873 € incl. VAT, while their average floor area reached 66.2 m².
 
@@ -42,7 +46,7 @@ The average achieved price of sold flats rose slightly to 5 745 €/m² incl. V
 
 Tomáš Kamhal, founder of Residata: "Over the past year sales have held at around 666 flats a quarter, while supply over the same period rose by 8.5%. More flats are therefore coming onto the market than are leaving it, and the difference is accumulating.
 
-The first factor is supply. It has reached 4 305 flats across 97 projects and keeps growing. As long as developers feel each other's competition and sales keep pace, the result is price stagnation — over the past year the average price moved by 0.1%.
+The first factor is supply. It has reached 4 305 flats across 97 projects and keeps growing. A stagnant average should not lull anyone: developers do change prices, repricing 882 flats over the quarter with 84.0% of those changes upward. What holds the average still is that cheaper new supply arrives alongside. A buyer is therefore not waiting for an existing flat to get cheaper — they are waiting for whatever the developer launches next.
 
 The second factor is demand, constrained above all by interest rates and household purchasing power. The average flat sold cost 352 365 € at 61.0 m², which is a threshold a limited number of households can reach.
 
