@@ -1,37 +1,41 @@
 <!--PEREX
-Sales rose from {qSalesThen} to {qSalesNow} flats against the previous period. The price level was unchanged and the supply of flats for sale rose to {qSupply}.
+Sales in {cq} are heading for {cqRunRate} flats against {pqSales} in {pqLabel}. The price level was unchanged and the supply of flats for sale rose to {cqSupply}.
 -->
 <!--METHOD
-Data come from the publicly published price lists of Bratislava developers, recorded daily by Residata since {windowFromEn}. Supply consists of available and reserved flats, excluding sold ones; homes only — no parking, storage or commercial units. The average price per m² is a mean of individual flats' unit prices, computed on living area including VAT; these are asking prices from price lists, not achieved prices from the land registry. A sale is identified from a change of status in the developer's own price list. The comparison against the previous period is computed on the {qPanelProjects} projects we track at both dates, so that the change in supply does not include projects added to our coverage in the meantime. The two sales periods are of equal length, {qDays} days each.
+The {cq} figures come from the publicly published price lists of Bratislava developers, recorded daily by Residata; as of {asOfEn} we cover {cqDaysObs} of the quarter's {cqDaysTot} days, so sales are given as recorded to date and extrapolated to the full quarter at the same daily pace. Supply consists of available and reserved flats; homes only — no parking, storage or commercial units. The average price per m² is a mean of individual flats' unit prices on living area including VAT; these are asking prices. The earlier quarters ({yqLabel} to {pqLabel}) are taken from the published quarterly analyses of {srcName} and are labelled as such in the table. Their average price has been converted by a factor of {rebaseFactor} onto living area so that it is comparable with our measurement; the factor is the ratio of our own reading on {rebaseAnchorDateEn} ({rebaseOurs} €/m²) to their figure for {pqLabel} ({rebaseTheirs} €/m²). Supply and sales are not adjusted — those definitions agree to within two per cent.
 -->
-{asOfEn} | ANALYSIS OF THE BRATISLAVA NEW-BUILD MARKET
+{asOfEn} | QUARTERLY ANALYSIS OF THE BRATISLAVA NEW-BUILD MARKET
 
-# The Bratislava new-build market is growing in supply and in sales, prices are standing still
+# The supply of Bratislava new-builds keeps growing, prices are standing still
 
-The last two months on the Bratislava new-build market brought stronger demand, price stagnation and an increase in the number of flats for sale. Sales rose from {qSalesThen} to {qSalesNow} flats against the previous period. The price level was unchanged and moved by {qPanelM2ChangePctEn}% on a comparable sample of projects. The supply of flats for sale rose to {qSupply}.
+{cqNameEn} of {cqYear} on the Bratislava new-build market means stronger demand, price stagnation and a further increase in the number of flats for sale. At the current pace sales are heading for {cqRunRate} flats against {pqSales} in {pqLabel}. The price level was unchanged and rose by {yqM2PctEn}% year on year. The supply of flats for sale rose to {cqSupply}.
 
-As of {asOfEn} the supply on the new-build market consisted, according to Residata's analysts, of {qSupply} flats across {qProjects} projects. Against the position {qPanelDays} days earlier, supply rose by {qPanelSupplyChange} flats or {qPanelSupplyChangePctEn}%, the comparison being computed on the sample of {qPanelProjects} projects we track at both dates.
+As of {asOfEn} the supply on the new-build market consisted, according to Residata's data, of {cqSupply} flats across {cqProjects} projects. Against {pqLabel} supply rose by {pqSupply} flats or {pqSupplyPctEn}%, while year on year it rose by {yqSupply} flats or {yqSupplyPctEn}%.
 
-The average price of these flats on offer reached {qMeanM2} €/m² incl. VAT, which on the comparable sample of projects is a change of only {qPanelM2ChangePctEn}%. It can be said that new-build prices are currently moving at a pace close to zero, and that differences in the average price are caused by the composition of supply rather than by movements in price lists. Over the last two months {qNewUnits} flats were added to the offer at an average price of {qNewMeanM2} €/m² incl. VAT, that is below the market level, which slightly lowers the average price.
+The average price of these flats on offer reached {cqM2} €/m² incl. VAT, which year on year is an increase of only {yqM2PctEn}%. It can be said that new-build prices have for some years been rising at a pace close to zero — a year ago the average price was {yqM2} €/m² incl. VAT and a quarter ago {pqM2} €/m² incl. VAT. Differences in the average price are caused by the composition of supply rather than by movements in price lists.
 
-The average absolute price of flats on offer stood at {qMeanPrice} € incl. VAT, while their average floor area reached {qMeanAreaEn} m².
+The average absolute price of flats on offer stood at {cqPrice} € incl. VAT, while their average floor area reached {cqAreaEn} m².
 
 **In this issue:** The development of supply and sales on the Bratislava new-build market · A view on where the Bratislava new-build market is heading
 
 ## The development of supply and sales on the Bratislava new-build market
 
-Supply grew and demand rose against the previous period. {qSalesNow} flats were sold against {qSalesThen} in the preceding {qDays} days. Sales were not distorted by an exceptionally high figure in one of the large projects — the strongest of them accounted for {qTopSellerN} flats. Taking that into account, demand genuinely rose against the previous period.
+Supply grew and demand grew with it. Over {cqDaysObs} of the quarter's {cqDaysTot} days {cqSales} flats were sold, which at the same daily pace means {cqRunRate} flats for the full quarter, against {pqSales} in {pqLabel} and {yqSales} a year ago. Sales were not distorted by an exceptionally high figure in one of the large projects — the strongest of them accounted for {qTopSellerN} flats. Demand therefore rose by {pqSalesPctEn}% against the previous quarter.
 
-The average achieved price of sold flats rose slightly to {qSoldM2} €/m² incl. VAT, matching the average asking price. Behind the rise in the price of sold flats is above all increased demand in {qD1} and {qD2}, which are dearer than the average — in {qD1} sales rose from {qD1Then} to {qD1Now} flats and in {qD2} from {qD2Then} to {qD2Now}. The average absolute price of sold flats was {qSoldPrice} € incl. VAT at an average floor area of {qSoldAreaEn} m².
+{seriesTableEn}
+
+\* {cq} is the position as of {asOfEn}: {cqDaysObs} of {cqDaysTot} days. The earlier quarters are from the published analyses of {srcName}, with the average price converted onto living area — see the method note.
+
+The average achieved price of sold flats rose slightly to {cqSoldM2} €/m² incl. VAT, matching the average asking price. Behind the rise in the price of sold flats is above all increased demand in {qD1} and {qD2}, which are dearer than the average — in {qD1} sales rose from {qD1Then} to {qD1Now} flats and in {qD2} from {qD2Then} to {qD2Now}. The average absolute price of sold flats was {cqSoldPrice} € incl. VAT at an average floor area of {cqSoldAreaEn} m².
 
 ## A view on where the Bratislava new-build market is heading
 
-Tomáš Kamhal, founder of Residata: "The Bratislava market is in a state where supply and sales are both rising and prices are standing still. Over the last two months {qNewUnits} flats were added to the offer and sales rose by {qSalesChangePctEn}% at the same time. So the market is absorbing the new supply for now.
+Tomáš Kamhal, founder of Residata: "Over the past year sales have held at around {avgQuarterSales} flats a quarter, while supply over the same period rose by {yqSupplyPctEn}%. More flats are therefore coming onto the market than are leaving it, and the difference is accumulating.
 
-The first factor is supply itself. There are {qSupply} flats for sale today across {qProjects} projects, and the number is rising. As long as the pace of sales keeps up, developers have no reason to cut prices — and the data bears that out: the average price moved by {qPanelM2ChangePctEn}% on a comparable sample of projects.
+The first factor is supply. It has reached {cqSupply} flats across {cqProjects} projects and keeps growing. As long as developers feel each other's competition and sales keep pace, the result is price stagnation — over the past year the average price moved by {yqM2PctEn}%.
 
-The second factor is demand, still constrained by interest rates and household purchasing power. The average flat sold cost {qSoldPrice} € and its average floor area rose to {qSoldAreaEn} m², so the buyers entering the market were going for larger flats.
+The second factor is demand, constrained above all by interest rates and household purchasing power. The average flat sold cost {cqSoldPrice} € at {cqSoldAreaEn} m², which is a threshold a limited number of households can reach.
 
-Unless interest rates and household purchasing power change materially, we expect the current state to continue: supply will keep growing and prices will stay roughly where they are. What will be interesting to watch is the development of supply — further growth could in time start to push prices down."
+Unless interest rates and purchasing power change materially, the new-build market will go on marking time, demand will stay bounded and prices will stagnate. What will be interesting to watch is the development of supply — further growth could already cause a degree of nervousness."
 
 **Author:** Tomáš Kamhal, founder of Residata · tomas@residata.eu

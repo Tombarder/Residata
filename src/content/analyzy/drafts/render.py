@@ -116,6 +116,31 @@ def build_vars(rep: dict) -> dict:
     bb = towns["Banská Bystrica"]
     scope = rep["nationalMap"]["scope"]
     br = rep["bratislavaReport"]
+    qt = rep["quarterly"]
+    ours, pub, vp, vy = qt["ours"], qt["published"], qt["vsPrev"], qt["vsYearAgo"]
+
+    QUARTER_SK = {1: "Prvý štvrťrok", 2: "Druhý štvrťrok",
+                  3: "Tretí štvrťrok", 4: "Štvrtý štvrťrok"}
+    QUARTER_EN = {1: "The first quarter", 2: "The second quarter",
+                  3: "The third quarter", 4: "The fourth quarter"}
+
+    def series_table(lang: str) -> str:
+        head = (("| Štvrťrok | Ponuka | Projekty | Predaj | Priemerná cena €/m² s DPH | Zdroj |"
+                 "\n|---|---:|---:|---:|---:|---|") if lang == "sk" else
+                ("| Quarter | Supply | Projects | Sales | Average €/m² incl. VAT | Source |"
+                 "\n|---|---:|---:|---:|---:|---|"))
+        rows = []
+        for r in pub["quarters"]:
+            rows.append(f"| {r['q']} | {sk_int(r['supply'])} | {r['projects'] or '—'} | "
+                        f"{sk_int(r['sales'])} | {sk_int(r['meanM2Rebased'])} | {pub['source']} |")
+        # Our row says what it is: a quarter-to-date while the quarter is open.
+        label = ours["q"] if ours["complete"] else (
+            f"{ours['q']}*" )
+        sales = sk_int(ours["sales"]) if ours["complete"] else (
+            f"{sk_int(ours['sales'])}*")
+        rows.append(f"| **{label}** | **{sk_int(ours['supply'])}** | **{ours['projects']}** | "
+                    f"**{sales}** | **{sk_int(ours['meanM2'])}** | **Residata** |")
+        return head + "\n" + "\n".join(rows)
     p1, p2 = br["sales"]["p1"], br["sales"]["p2"]
 
     # Every town the prose names, keyed by its own initials, so a town that
@@ -290,6 +315,43 @@ def build_vars(rep: dict) -> dict:
         "qD2Now": sk_int(br["districts"][1]["soldNow"]) if len(br["districts"]) > 1 else "",
         "qNewUnits": sk_int(br["newSupply"]["units"]),
         "qNewMeanM2": sk_int(br["newSupply"]["meanM2"]),
+        # ── the quarterly series ────────────────────────────────────────────
+        "cq": ours["q"],
+        "cqName": QUARTER_SK[int(ours["q"][1])],
+        "cqNameEn": QUARTER_EN[int(ours["q"][1])],
+        "cqYear": ours["q"].split()[1],
+        # The run of quarters the quote calls "around N a quarter" — averaged, not
+        # eyeballed, and it moves with the series.
+        "avgQuarterSales": sk_int(
+            sum(r["sales"] for r in pub["quarters"][-4:] ) / 4),
+        "cqSupply": sk_int(ours["supply"]), "cqProjects": ours["projects"],
+        "cqM2": sk_int(ours["meanM2"]), "cqPrice": sk_int(ours["meanPrice"]),
+        "cqArea": sk_dec(ours["meanArea"]), "cqAreaEn": en_dec(ours["meanArea"]),
+        "cqSales": sk_int(ours["sales"]), "cqRunRate": sk_int(ours["salesRunRate"]),
+        "cqDaysObs": ours["daysObserved"], "cqDaysTot": ours["daysTotal"],
+        "cqSoldM2": sk_int(ours["soldM2"]), "cqSoldPrice": sk_int(ours["soldPrice"]),
+        "cqSoldArea": sk_dec(ours["soldArea"]), "cqSoldAreaEn": en_dec(ours["soldArea"]),
+        "pqLabel": vp["q"], "yqLabel": vy["q"],
+        "pqSupply": sk_int(abs(vp["supply"])), "pqSupplyPct": sk_dec(abs(vp["supplyPct"])),
+        "pqSupplyPctEn": en_dec(abs(vp["supplyPct"])),
+        "pqM2Pct": sk_dec(abs(vp["m2Pct"])), "pqM2PctEn": en_dec(abs(vp["m2Pct"])),
+        "pqSalesPct": sk_dec(abs(vp["salesPct"])), "pqSalesPctEn": en_dec(abs(vp["salesPct"])),
+        "yqSupply": sk_int(abs(vy["supply"])), "yqSupplyPct": sk_dec(abs(vy["supplyPct"])),
+        "yqSupplyPctEn": en_dec(abs(vy["supplyPct"])),
+        "yqM2Pct": sk_dec(abs(vy["m2Pct"])), "yqM2PctEn": en_dec(abs(vy["m2Pct"])),
+        "yqSalesPct": sk_dec(abs(vy["salesPct"])), "yqSalesPctEn": en_dec(abs(vy["salesPct"])),
+        "pqSales": sk_int(pub["quarters"][-1]["sales"]),
+        "yqSales": sk_int(pub["quarters"][-4]["sales"]),
+        "pqM2": sk_int(pub["quarters"][-1]["meanM2Rebased"]),
+        "yqM2": sk_int(pub["quarters"][-4]["meanM2Rebased"]),
+        "srcName": pub["source"],
+        "rebaseFactor": sk_dec(qt["rebase"]["factor"], 4),
+        "rebaseAnchorDate": sk_date(qt["rebase"]["anchorDate"]),
+        "rebaseAnchorDateEn": en_date(qt["rebase"]["anchorDate"]),
+        "rebaseOurs": sk_int(qt["rebase"]["anchorOurs"]),
+        "rebaseTheirs": sk_int(qt["rebase"]["anchorTheirs"]),
+        "seriesTable": series_table("sk"),
+        "seriesTableEn": series_table("en"),
         "townTable": town_table(rep, "sk"),
         "townTableEn": town_table(rep, "en"),
         "asOfEn": en_date(rep["asOf"]),
