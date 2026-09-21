@@ -1,17 +1,21 @@
 {
   "asOf": "2026-09-21",
-  "generatedAt": "2026-09-21T10:35:38+00:00",
+  "generatedAt": "2026-09-21T11:00:02+00:00",
   "nationalMap": {
     "scope": {
       "bratislava": {
         "available": 3115,
         "projects": 85,
-        "medianM2": 5314
+        "medianM2": 5314,
+        "medianPrice": 317400,
+        "medianArea": 58.6
       },
       "rest": {
         "available": 3064,
         "projects": 113,
-        "medianM2": 3676
+        "medianM2": 3676,
+        "medianPrice": 219900,
+        "medianArea": 61.0
       }
     },
     "towns": [

@@ -125,6 +125,22 @@ def build_vars(rep: dict) -> dict:
         "asOf": sk_date(rep["asOf"]),
         "rankThreshold": RANK_MIN_STOCK,
         "restMedian": sk_int(scope["rest"]["medianM2"]),
+        "restPrice": sk_int(scope["rest"]["medianPrice"]),
+        "restArea": sk_dec(scope["rest"]["medianArea"]),
+        "restAreaEn": en_dec(scope["rest"]["medianArea"]),
+        "baScopeArea": sk_dec(scope["bratislava"]["medianArea"]),
+        "baScopeAreaEn": en_dec(scope["bratislava"]["medianArea"]),
+        "baScopePrice": sk_int(scope["bratislava"]["medianPrice"]),
+        "restBelowBaPct": sk_dec(
+            100 * (1 - scope["rest"]["medianM2"] / scope["bratislava"]["medianM2"]), 0),
+        "restBelowBaPctEn": en_dec(
+            100 * (1 - scope["rest"]["medianM2"] / scope["bratislava"]["medianM2"]), 0),
+        # The sum of the two scopes, never mixSk.totalSold — that one filters to
+        # 1-5 rooms and printed 1 315 above a 762 + 586 that makes 1 348.
+        "soldTotal": sk_int(rep["monthsToClear"]["byScope"]["bratislava"]["sold"]
+                            + rep["monthsToClear"]["byScope"]["rest"]["sold"]),
+        "baSold": sk_int(rep["monthsToClear"]["byScope"]["bratislava"]["sold"]),
+        "restSold": sk_int(rep["monthsToClear"]["byScope"]["rest"]["sold"]),
         "baScopeMedian": sk_int(scope["bratislava"]["medianM2"]),
         "towns": tot["towns"],
         "oneProject": tot["oneProjectTowns"],
