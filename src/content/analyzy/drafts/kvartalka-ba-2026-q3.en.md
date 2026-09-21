@@ -21,12 +21,14 @@ In absolute price, which is what a mortgage is granted against, the market looks
 ![Price per metre and flat price by disposition](/analyzy/kvartalka-ba-2026-q3-1-dispozicie-en.svg)
 *Bars: average €/m² incl. VAT, with the number on offer inside. Line: average flat price.*
 
-| Disposition | On offer | Average €/m² incl. VAT | Average flat price | Average floor area | Sold |
+| Disposition | On offer | €/m² | Flat price | Area | Sold |
 |---|---:|---:|---:|---:|---:|
 | One-room | 450 | 6 398 € | 231 611 € | 37.1 m² | 70 |
 | Two-room | 1 456 | 5 508 € | 287 261 € | 52.0 m² | 230 |
 | Three-room | 1 091 | 5 494 € | 422 517 € | 76.0 m² | 106 |
 | Four-room and larger | 482 | 6 238 € | 729 093 € | 111.2 m² | 49 |
+
+*Averages for flats on offer, incl. VAT; the Sold column is flats sold in Q3 2026.*
 
 **In this issue:** The development of supply and sales on the Bratislava new-build market · A view on where the Bratislava new-build market is heading
 

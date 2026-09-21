@@ -166,11 +166,12 @@ def build_vars(rep: dict) -> dict:
 
     def rooms_table(lang: str) -> str:
         names = ROOM_SK if lang == "sk" else ROOM_EN
-        head = (("| Dispozícia | V ponuke | Priemerná cena €/m² s DPH | "
-                 "Priemerná cena bytu | Priemerná výmera | Predaných |"
+        # Short headers on purpose: the table sits in the article column and the
+        # cells never wrap, so six long ones pushed the last two off the edge
+        # behind a horizontal scroll. What each column means is in the caption.
+        head = (("| Dispozícia | V ponuke | €/m² s DPH | Cena bytu | Výmera | Predaných |"
                  "\n|---|---:|---:|---:|---:|---:|") if lang == "sk" else
-                ("| Disposition | On offer | Average €/m² incl. VAT | "
-                 "Average flat price | Average floor area | Sold |"
+                ("| Disposition | On offer | €/m² | Flat price | Area | Sold |"
                  "\n|---|---:|---:|---:|---:|---:|"))
         rows = []
         for key in ("1", "2", "3", "4+"):

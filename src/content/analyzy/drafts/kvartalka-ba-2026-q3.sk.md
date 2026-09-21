@@ -21,12 +21,14 @@ V absolútnej cene, ktorá rozhoduje o hypotéke, vyzerá trh inak. Jednoizbový
 ![Cena za meter a cena bytu podľa dispozície](/analyzy/kvartalka-ba-2026-q3-1-dispozicie.svg)
 *Stĺpce: priemerná cena €/m² s DPH, v stĺpci počet bytov v ponuke. Čiara: priemerná cena bytu.*
 
-| Dispozícia | V ponuke | Priemerná cena €/m² s DPH | Priemerná cena bytu | Priemerná výmera | Predaných |
+| Dispozícia | V ponuke | €/m² s DPH | Cena bytu | Výmera | Predaných |
 |---|---:|---:|---:|---:|---:|
 | Jednoizbové | 450 | 6 398 € | 231 611 € | 37,1 m² | 70 |
 | Dvojizbové | 1 456 | 5 508 € | 287 261 € | 52,0 m² | 230 |
 | Trojizbové | 1 091 | 5 494 € | 422 517 € | 76,0 m² | 106 |
 | Štvor- a viacizbové | 482 | 6 238 € | 729 093 € | 111,2 m² | 49 |
+
+*Priemerné hodnoty ponúkaných bytov s DPH; stĺpec Predaných je počet predaných bytov za Q3 2026.*
 
 **V tomto čísle:** Vývoj ponuky a predaja na bratislavskom trhu novostavieb · Pohľad na aktuálne smerovanie trhu novostavieb v Bratislave
 
