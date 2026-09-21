@@ -20,7 +20,7 @@ Medián absolútnej ceny ponúkaného bytu bol v Bratislave 317 400 € s DPH p
 
 ## Ponuka a tempo predaja v slovenských mestách
 
-Od 16. mája 2026, odkedy ponuku sledujeme denne, sme zaznamenali 1 348 predaných bytov, z toho 762 v Bratislave a 586 v ostatných mestách. Pri tomto tempe by sa bratislavská ponuka vypredala za 20 mesiacov a ponuka vo zvyšku krajiny za 28 mesiacov. Z údajov, ktoré za Q2 2026 zverejnil Bencont Investments — ponuka 4 231 bytov a 652 predaných — vychádza pre Bratislavu 19 mesiacov.
+Od 16. mája 2026, odkedy ponuku sledujeme denne, sme zaznamenali 1 348 predaných bytov, z toho 762 v Bratislave a 586 v ostatných mestách. Pri tomto tempe by sa bratislavská ponuka vypredala za 20 mesiacov a ponuka vo zvyšku krajiny za 28 mesiacov.
 
 Ceny v cenníkoch sa za posledných 90 dní zmenili 1 855-krát v 73 projektoch. Nahor smerovalo 87,4 % zmien a medián zmeny bol 2,0 %.
 
@@ -77,5 +77,3 @@ Residata číta cenníky slovenských developerov každý deň, byt po byte. Ten
 
 <!--CMS-SKIP-END-->
 **Tomáš Kamhal** · zakladateľ, Residata · tomas@residata.eu
-
-Residata sleduje cenníky novostavieb na Slovensku a v Česku denne, byt po byte. Ďalšie číslo vychádza v októbri.

@@ -20,7 +20,7 @@ The median absolute price of a flat on offer was 317 400 € incl. VAT in Brati
 
 ## Supply and the pace of sales in Slovak towns
 
-Since 16 May 2026, from when we have recorded the supply daily, we have registered 1 348 flats sold, 762 of them in Bratislava and 586 in the other towns. At that pace Bratislava's supply would clear in 20 months and the supply in the rest of the country in 28 months. The figures Bencont Investments published for Q2 2026 — a supply of 4 231 flats and 652 sales — imply 19 months for Bratislava.
+Since 16 May 2026, from when we have recorded the supply daily, we have registered 1 348 flats sold, 762 of them in Bratislava and 586 in the other towns. At that pace Bratislava's supply would clear in 20 months and the supply in the rest of the country in 28 months.
 
 Price lists changed 1 855 times over the last 90 days across 73 projects. 87.4% of the changes were increases and the median change was 2.0%.
 
@@ -77,5 +77,3 @@ Residata reads Slovak developers' price lists every day, flat by flat. This over
 
 <!--CMS-SKIP-END-->
 **Tomáš Kamhal** · founder, Residata · tomas@residata.eu
-
-Residata reads new-build price lists in Slovakia and Czechia every day, flat by flat. The next issue is published in October.
