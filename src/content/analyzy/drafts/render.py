@@ -386,6 +386,17 @@ def build_vars(rep: dict) -> dict:
         "qD2Loc": (locative(br["districts"][1]["district"])
                    if len(br["districts"]) > 1 else ""),
         "qD2": br["districts"][1]["district"] if len(br["districts"]) > 1 else "",
+        # the decomposition — the two parts always sum to the observed move
+        "pdKeptPct": sk_dec(abs(br["priceDecomposition"]["keptPct"]), 2),
+        "pdKeptPctEn": en_dec(abs(br["priceDecomposition"]["keptPct"]), 2),
+        "pdRepricePct": sk_dec(abs(br["priceDecomposition"]["repricingPct"]), 2),
+        "pdRepricePctEn": en_dec(abs(br["priceDecomposition"]["repricingPct"]), 2),
+        "pdMixPct": sk_dec(abs(br["priceDecomposition"]["mixPct"]), 2),
+        "pdMixPctEn": en_dec(abs(br["priceDecomposition"]["mixPct"]), 2),
+        "pdTotalPct": sk_dec(abs(br["priceDecomposition"]["totalPct"]), 2),
+        "pdTotalPctEn": en_dec(abs(br["priceDecomposition"]["totalPct"]), 2),
+        "pdThen": sk_int(br["priceDecomposition"]["meanThen"]),
+        "pdNow": sk_int(br["priceDecomposition"]["meanNow"]),
         "rpChanges": sk_int(br["repricing"]["changes"]),
         "rpUnits": sk_int(br["repricing"]["units"]),
         "rpProjects": br["repricing"]["projects"],

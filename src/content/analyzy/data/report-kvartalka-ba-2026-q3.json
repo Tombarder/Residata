@@ -1,6 +1,6 @@
 {
   "asOf": "2026-10-01",
-  "generatedAt": "2026-09-21T14:09:32+00:00",
+  "generatedAt": "2026-09-21T16:29:59+00:00",
   "bratislavaReport": {
     "thenDate": "2026-07-18",
     "nowDate": "2026-09-21",
@@ -59,6 +59,25 @@
         "cityM2": 5745
       }
     ],
+    "priceDecomposition": {
+      "from": "2026-07-01",
+      "to": "2026-09-21",
+      "meanThen": 5733,
+      "meanNow": 5736,
+      "totalPct": 0.04,
+      "keptUnits": 1748,
+      "keptThen": 5747,
+      "keptNow": 5769,
+      "keptPct": 0.38,
+      "repricingEur": 12,
+      "repricingPct": 0.22,
+      "mixEur": -10,
+      "mixPct": -0.18,
+      "leftUnits": 433,
+      "leftM2": 5680,
+      "arrivedUnits": 1367,
+      "arrivedM2": 5693
+    },
     "repricing": {
       "changes": 1153,
       "units": 882,
@@ -89,15 +108,18 @@
       "meanM2": 5736,
       "meanPrice": 387873,
       "meanArea": 66.2,
-      "sales": 735,
+      "lastSaleDate": "2026-09-21",
+      "sales": 637,
       "soldM2": 5745,
       "soldPrice": 352365,
       "soldArea": 61.0,
-      "salesRunRate": 735,
+      "calendarDaysCovered": 83,
+      "salesRunRate": 637,
       "preliminary": {
         "daysObserved": 72,
         "daysTotal": 92,
         "salesObserved": 575,
+        "calendarDaysCovered": 83,
         "extrapolated": [
           "sales"
         ],
@@ -281,14 +303,14 @@
       "supply": 74,
       "supplyPct": 1.7,
       "m2Pct": 0.6,
-      "salesPct": 12.7
+      "salesPct": -2.3
     },
     "vsYearAgo": {
       "q": "Q3 2025",
       "supply": 336,
       "supplyPct": 8.5,
       "m2Pct": 0.1,
-      "salesPct": 15.2
+      "salesPct": -0.2
     }
   },
   "nationalMap": {
