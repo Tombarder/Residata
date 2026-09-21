@@ -1,20 +1,20 @@
 <!--PEREX
-Predaj v {cq} dosiahol {cqSales} bytov oproti {pqSales} z predchádzajúceho štvrťroka. Cenová úroveň ostala nezmenená, medziročne stúpla o {yqM2Pct} %, a ponuka bytov na predaj sa zvýšila na {cqSupply} bytov.
+Predaj v {cq} dosiahol {cqSales} bytov oproti {pqSales} z predchádzajúceho štvrťroka. Cenová úroveň ostala nezmenená, medziročne zaznamenala {yqM2Dir} o {yqM2Pct} %, a ponuka bytov na predaj sa zvýšila na {cqSupply} bytov.
 -->
 <!--METHOD
-Údaje pochádzajú z verejne zverejnených cenníkov bratislavských developerov, ktoré Residata číta denne, byt po byte. Ponuku tvoria voľné a rezervované byty; počítajú sa výlučne byty, nie parkovanie, pivnice ani nebytové priestory. Priemerná cena za m² je priemer jednotkových cien jednotlivých bytov z obytnej plochy vrátane DPH; ide o ponukové ceny z cenníkov, nie o realizačné ceny z katastra. Polovičné dispozície sú zaokrúhlené nadol: byt s izbou a pol je vedený ako jednoizbový. Predaj sa určuje zo zmien stavu v cenníku developera. Zmena ceny porovnáva ten istý byt s jeho vlastnou skoršou cenou, pri jednom čítaní na byt a deň a pri zmene aspoň o dvesto eur.
+Údaje pochádzajú z verejne zverejnených cenníkov bratislavských developerov, ktoré Residata číta denne, byt po byte. Ponuku tvoria voľné a rezervované byty; počítajú sa výlučne byty, nie parkovanie, pivnice ani nebytové priestory. Priemerná cena za m² je priemer jednotkových cien jednotlivých bytov z obytnej plochy vrátane DPH; ide o ponukové ceny z cenníkov, nie o realizačné ceny z katastra. Cenové úrovne a priemery podľa dispozície sú počítané ako priemer denných hodnôt za posledné dva týždne štvrťroka, aby ich neovplyvnil jeden deň, v ktorom niektorý projekt pridal alebo stiahol časť ponuky. Polovičné dispozície sú zaokrúhlené nadol: byt s izbou a pol je vedený ako jednoizbový. Predaj sa určuje zo zmien stavu v cenníku developera. Zmena ceny porovnáva ten istý byt s jeho vlastnou skoršou cenou, pri jednom čítaní na byt a deň a pri zmene aspoň o dvesto eur.
 -->
 {asOf} | KVARTÁLNA ANALÝZA TRHU S BRATISLAVSKÝMI NOVOSTAVBAMI
 
 # Ponuka bratislavských novostavieb rastie, predaj aj ceny stoja na mieste
 
-{cqName} {cqYear} na bratislavskom trhu s novostavbami znamenal stabilný dopyt, cenovú stagnáciu a ďalšie zvýšenie počtu bytov na predaj. Predaj dosiahol {cqSales} bytov oproti {pqSales} z predchádzajúceho štvrťroka. Cenová úroveň ostala nezmenená a v medziročnom porovnaní stúpla o {yqM2Pct} %. Ponuka bytov na predaj sa zvýšila na {cqSupply} bytov.
+{cqName} {cqYear} na bratislavskom trhu s novostavbami znamenal stabilný dopyt, cenovú stagnáciu a ďalšie zvýšenie počtu bytov na predaj. Predaj dosiahol {cqSales} bytov oproti {pqSales} z predchádzajúceho štvrťroka. Cenová úroveň ostala prakticky nezmenená, medziročne zaznamenala {yqM2Dir} o {yqM2Pct} %. Ponuka bytov na predaj sa zvýšila na {cqSupply} bytov.
 
 Ponuku bytov na trhu s novostavbami tvorilo ku dňu {asOf} podľa údajov Residaty {cqSupply} bytov v rámci {cqProjects} projektov. Oproti {pqName} ponuka bytov vzrástla o {pqSupply} bytov resp. {pqSupplyPct} %, zatiaľ čo v medziročnom porovnaní sa zvýšila o {yqSupply} bytov resp. {yqSupplyPct} %.
 
-Priemerná cena týchto ponúkaných bytov dosiahla {cqM2} €/m² s DPH, čo v medziročnom porovnaní predstavuje nárast len o {yqM2Pct} %. Za celé sledované obdobie ({seriesSpan}) sa priemerná cena pohybuje v pásme, ktoré sa dá opísať ako stagnácia — pred rokom bola priemerná cena {yqM2} €/m² s DPH a pred štvrťrokom {pqM2} €/m² s DPH. Cena je pritom počítaná z obytnej plochy, nie z celkovej vrátane balkónov a terás; pri tom istom byte to dáva vyššiu cenu za meter než prepočet z väčšieho základu.
+Priemerná cena týchto ponúkaných bytov dosiahla {cqM2} €/m² s DPH, čo v medziročnom porovnaní predstavuje {yqM2Dir} o {yqM2Pct} %. Za celé sledované obdobie ({seriesSpan}) sa priemerná cena pohybuje v pásme, ktoré sa dá opísať ako stagnácia — pred rokom bola priemerná cena {yqM2} €/m² s DPH a pred štvrťrokom {pqM2} €/m² s DPH. Cena je pritom počítaná z obytnej plochy, nie z celkovej vrátane balkónov a terás; pri tom istom byte to dáva vyššiu cenu za meter než prepočet z väčšieho základu.
 
-Priemerná absolútna cena ponúkaných bytov bola na úrovni {cqPrice} € s DPH pri priemernej výmere {cqArea} m². Samotný priemer však o konkrétnej ponuke hovorí málo: {dearestM2Room} byty stoja {r1M2} €/m² s DPH a {cheapestM2Room} {r3M2} €/m² s DPH, čo je rozdiel {roomSpreadPct} % — viac než akýkoľvek pohyb trhu za posledný rok. Najdrahšie na meter sú malé a veľké byty, najlacnejší je dvoj- a trojizbový stred.
+Priemerná absolútna cena ponúkaných bytov bola na úrovni {cqPrice} € s DPH pri priemernej výmere {cqArea} m². Samotný priemer však o konkrétnej ponuke hovorí málo: {dearestM2Room} byty stoja {dearestM2Value} €/m² s DPH a {cheapestM2Room} {cheapestM2Value} €/m² s DPH, čo je rozdiel {roomSpreadPct} % — viac než akýkoľvek pohyb trhu za posledný rok. Najdrahšie na meter sú malé a veľké byty, najlacnejší je dvoj- a trojizbový stred.
 
 ![Ponuka, predaj a cena po štvrťrokoch](/analyzy/{slug}-1-kvartaly.svg)
 *Stĺpce: ponuka bytov ku koncu štvrťroka, v stĺpci počet predaných. Čiara: priemerná cena €/m² s DPH.*
@@ -38,9 +38,9 @@ V absolútnej cene, ktorá rozhoduje o hypotéke, vyzerá trh inak než v cene z
 
 Predalo sa {cqSales} bytov oproti {pqSales} z {pqNameNom} a {yqSales} spred roka. Dopyt sa tak drží na úrovni, na ktorej je celý posledný rok. Nešlo pritom o výkyv spôsobený jedným veľkým projektom: na najsilnejší z nich pripadlo {qTopSellerN} bytov, teda necelá desatina predaja. Predaj sa nerozdelil v pomere ponuky. Dvojizbové byty tvoria {r2Share} % ponuky, ale {r2SoldShare} % predaja; trojizbové naopak {r3Share} % ponuky a len {r3SoldShare} % predaja.
 
-Priemerná predajná cena predaných bytov dosiahla {cqSoldM2} €/m² s DPH, čím sa prakticky vyrovnala priemernej ponukovej cene {cqM2} €/m² s DPH. Kupuje sa teda zhruba to, čo je v ponuke, nie výrazne lacnejší okraj trhu. Ťahá to najmä {qD1}, na ktorý pripadlo {qD1Share} % všetkých predaných bytov pri priemernej cene {qD1M2} €/m² s DPH, a {qD2} s {qD2Share} % a {qD2M2} €/m² s DPH — oba nad mestským priemerom {qCityM2} €/m² s DPH. Priemerná absolútna cena predaného bytu bola {cqSoldPrice} € s DPH pri rozlohe {cqSoldArea} m².
+Priemerná predajná cena predaných bytov dosiahla {cqSoldM2} €/m² s DPH, čím sa prakticky vyrovnala priemernej ponukovej cene {cqM2} €/m² s DPH. Kupuje sa teda zhruba to, čo je v ponuke, nie výrazne lacnejší okraj trhu. Ťahá to najmä {qD1}, na ktorý pripadlo {qD1Share} % všetkých predaných bytov pri priemernej cene {qD1M2} €/m² s DPH, a {qD2} s {qD2Share} % a {qD2M2} €/m² s DPH — oba nad celomestským priemerom predaných bytov. Priemerná absolútna cena predaného bytu bola {cqSoldPrice} € s DPH pri rozlohe {cqSoldArea} m².
 
-Stojaci priemer pritom neznamená, že developeri ceny nemenia. Byty, ktoré boli v ponuke celý štvrťrok, zdraželi v priemere o {pdKeptPct} %: developeri za ten čas prehodnotili cenník u {rpUnits} bytov v {rpProjects} projektoch a {rpUp} % zmien smerovalo nahor, s mediánom {rpStep} %. Mestský priemer to dvíha o {pdRepricePct} %. Opačným smerom pôsobí zmena zloženia ponuky, ktorá ho tlačí o {pdMixPct} % nadol. Obe sily sa takmer presne vyrušia a priemerná cena sa za celý štvrťrok pohla z {pdThen} na {pdNow} €/m² s DPH, teda o {pdTotalPct} %.
+Stojaci priemer pritom neznamená, že developeri ceny nemenia — práve naopak. Spomedzi {pdKeptUnits} bytov, ktoré boli v ponuke od začiatku štvrťroka do jeho konca, developeri prehodnotili cenník u {rpUnits}, teda u {rpShareOfPanel} %. Z týchto zmien {rpUp} % smerovalo nahor, s mediánom {rpStep} %. Naprieč celou touto skupinou to znamená priemerné zdraženie o {pdKeptPct} %, a mestský priemer to dvíha o {pdRepricePct} %. Opačným smerom pôsobí zloženie ponuky: byty, ktoré medzitým pribudli, sú lacnejšie ({pdArrivedM2} €/m² s DPH) než tie, ktoré z ponuky odišli ({pdLeftM2} €/m² s DPH), a priemer to tlačí o {pdMixPct} % nadol. Obe sily sa takmer presne vyrušia — a to je dôvod, prečo priemer vyzerá, akoby sa nedialo nič.
 
 ## Pohľad na aktuálne smerovanie trhu novostavieb v Bratislave
 
@@ -48,7 +48,7 @@ Tomáš Kamhal, zakladateľ Residaty: „Za posledný rok sa predaj drží na ú
 
 Prvým faktorom je ponuka. Dosiahla {cqSupply} bytov v {cqProjects} projektoch a naďalej rastie. Stagnujúci priemer pritom nikoho nemá uspať. Cenníky sa menia a menia sa nahor; to, že priemer stojí, je výsledkom toho, čo do ponuky pribúda, nie toho, že by developeri čakali.
 
-Druhým faktorom je dopyt, obmedzený najmä úrokovými sadzbami a kúpnou silou domácností. A tu je podstatné, že mestský priemer kupujúcemu nepovie nič o tom, čo bude platiť: rozdiel medzi jednoizbovým a trojizbovým bytom je na metri {roomSpreadPct} %, teda násobne viac, než o koľko sa trh za rok pohol.
+Druhým faktorom je dopyt, obmedzený najmä úrokovými sadzbami a kúpnou silou domácností. A tu je podstatné, že mestský priemer kupujúcemu nepovie nič o tom, čo bude platiť: rozdiel medzi najdrahšou a najlacnejšou dispozíciou je na metri {roomSpreadPct} %, teda násobne viac, než o koľko sa trh za rok pohol.
 
 Ak sa úrokové sadzby a kúpna sila výraznejšie nezmenia, trh s novostavbami bude naďalej prešľapovať na mieste, dopyt ostane ohraničený a ceny budú stagnovať. To, čo bude zaujímavé sledovať, je vývoj ponuky — jej ďalší rast by už mohol vyvolať istú nervozitu."
 

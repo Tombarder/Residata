@@ -395,6 +395,16 @@ def build_vars(rep: dict) -> dict:
         "pdMixPctEn": en_dec(abs(br["priceDecomposition"]["mixPct"]), 2),
         "pdTotalPct": sk_dec(abs(br["priceDecomposition"]["totalPct"]), 2),
         "pdTotalPctEn": en_dec(abs(br["priceDecomposition"]["totalPct"]), 2),
+        "pdKeptUnits": sk_int(br["priceDecomposition"]["keptUnits"]),
+        # Share of the SAME base the sentence names, so the reader can divide the
+        # two printed numbers and land on the printed percentage.
+        "rpShareOfPanel": sk_dec(round(
+            100.0 * br["repricing"]["units"] / br["priceDecomposition"]["keptUnits"], 1)),
+        "rpShareOfPanelEn": en_dec(round(
+            100.0 * br["repricing"]["units"] / br["priceDecomposition"]["keptUnits"], 1)),
+        "pdKeptUnitsEn": f'{br["priceDecomposition"]["keptUnits"]:,}'.replace(",", "\u00a0"),
+        "pdArrivedM2": sk_int(br["priceDecomposition"]["arrivedM2"]),
+        "pdLeftM2": sk_int(br["priceDecomposition"]["leftM2"]),
         "pdThen": sk_int(br["priceDecomposition"]["meanThen"]),
         "pdNow": sk_int(br["priceDecomposition"]["meanNow"]),
         "rpChanges": sk_int(br["repricing"]["changes"]),
@@ -435,6 +445,24 @@ def build_vars(rep: dict) -> dict:
         "cqDaysObs": ours["daysObserved"], "cqDaysTot": ours["daysTotal"],
         "cqSoldM2": sk_int(ours["soldM2"]), "cqSoldPrice": sk_int(ours["soldPrice"]),
         "cqSoldArea": sk_dec(ours["soldArea"]), "cqSoldAreaEn": en_dec(ours["soldArea"]),
+        # 🔴 DIRECTION IS NOT OPTIONAL. The template printed "nárast len o {pct}"
+        # over an absolute value, so the day the price fell the article said it
+        # rose. Aligning the price population to the supply definition did exactly
+        # that: +0,1 % became −0,3 %.
+        "yqM2Dir": "nárast" if vy["m2Pct"] > 0 else "pokles",
+        "yqM2DirEn": "an increase" if vy["m2Pct"] > 0 else "a decrease",
+        "pqM2Dir": "vzrástla" if vp["m2Pct"] > 0 else "klesla",
+        "pdDir": "znížila" if br["priceDecomposition"]["totalPct"] < 0 else "zvýšila",
+        "pdDirEn": "fell" if br["priceDecomposition"]["totalPct"] < 0 else "rose",
+        # Which of the two forces won, computed rather than assumed.
+        "pdWinner": ("zmena zloženia ponuky"
+                     if abs(br["priceDecomposition"]["mixPct"])
+                        > abs(br["priceDecomposition"]["repricingPct"])
+                     else "prehodnotenie cenníkov"),
+        "pdWinnerEn": ("the change in composition"
+                       if abs(br["priceDecomposition"]["mixPct"])
+                          > abs(br["priceDecomposition"]["repricingPct"])
+                       else "the repricing"),
         "pqLabel": vp["q"], "yqLabel": vy["q"],
         # "Q2 2026" is a table label. In Slovak prose it reads as machine output,
         # so the paragraphs get the ordinal the market actually says out loud.
@@ -486,6 +514,16 @@ def build_vars(rep: dict) -> dict:
         # the U-shape, computed
         "dearestM2Room": ROOM_SK[max(qt["byRooms"], key=lambda r: r["meanM2"])["disp"]].lower(),
         "cheapestM2Room": ROOM_SK[min(qt["byRooms"], key=lambda r: r["meanM2"])["disp"]].lower(),
+        # 🔴 The VALUE must come from the same computation as the LABEL. The
+        # template paired a computed "cheapest disposition" with a hardcoded
+        # three-room price, so the day the two-room became the cheapest the
+        # article printed the three-room figure under the two-room name.
+        "dearestM2Value": sk_int(max(qt["byRooms"], key=lambda r: r["meanM2"])["meanM2"]),
+        "cheapestM2Value": sk_int(min(qt["byRooms"], key=lambda r: r["meanM2"])["meanM2"]),
+        "dearestM2RoomEn": ROOM_EN[max(qt["byRooms"], key=lambda r: r["meanM2"])["disp"]],
+        "cheapestM2RoomEn": ROOM_EN[min(qt["byRooms"], key=lambda r: r["meanM2"])["disp"]],
+        "dearestM2ValueEn": f'{max(qt["byRooms"], key=lambda r: r["meanM2"])["meanM2"]:,}'.replace(",", "\u00a0"),
+        "cheapestM2ValueEn": f'{min(qt["byRooms"], key=lambda r: r["meanM2"])["meanM2"]:,}'.replace(",", "\u00a0"),
         "roomSpreadPct": sk_dec(
             100 * (max(r["meanM2"] for r in qt["byRooms"])
                    / min(r["meanM2"] for r in qt["byRooms"]) - 1)),

@@ -1,6 +1,6 @@
 {
   "asOf": "2026-10-01",
-  "generatedAt": "2026-09-21T16:29:59+00:00",
+  "generatedAt": "2026-09-21T19:26:06+00:00",
   "bratislavaReport": {
     "thenDate": "2026-07-18",
     "nowDate": "2026-09-21",
@@ -11,13 +11,18 @@
     "panelSupplyChange": 173,
     "panelSupplyChangePct": 5.5,
     "panelM2Then": 5732,
-    "panelM2Now": 5740,
-    "panelM2ChangePct": 0.1,
+    "panelM2Now": 5720,
+    "panelM2ChangePct": -0.2,
     "supply": 4305,
     "projects": 97,
-    "meanM2": 5736,
-    "meanPrice": 387873,
-    "meanArea": 66.2,
+    "meanM2": 5718,
+    "meanPrice": 381703,
+    "meanArea": 65.5,
+    "priceWindow": {
+      "days": 14,
+      "from": "2026-09-08",
+      "to": "2026-09-21"
+    },
     "sales": {
       "p1": {
         "n": 361,
@@ -62,37 +67,40 @@
     "priceDecomposition": {
       "from": "2026-07-01",
       "to": "2026-09-21",
-      "meanThen": 5733,
-      "meanNow": 5736,
-      "totalPct": 0.04,
-      "keptUnits": 1748,
-      "keptThen": 5747,
-      "keptNow": 5769,
-      "keptPct": 0.38,
-      "repricingEur": 12,
-      "repricingPct": 0.22,
-      "mixEur": -10,
-      "mixPct": -0.18,
-      "leftUnits": 433,
-      "leftM2": 5680,
-      "arrivedUnits": 1367,
-      "arrivedM2": 5693
+      "panelProjects": 65,
+      "projectsNowAll": 85,
+      "newProjectUnits": 714,
+      "meanThen": 5685,
+      "meanNow": 5685,
+      "totalPct": -0.01,
+      "keptUnits": 2361,
+      "keptThen": 5673,
+      "keptNow": 5700,
+      "keptPct": 0.48,
+      "repricingEur": 22,
+      "repricingPct": 0.39,
+      "mixEur": -22,
+      "mixPct": -0.39,
+      "leftUnits": 417,
+      "leftM2": 5754,
+      "arrivedUnits": 537,
+      "arrivedM2": 5618
     },
     "repricing": {
-      "changes": 1153,
-      "units": 882,
-      "projects": 36,
-      "unitsTracked": 6560,
-      "pctOfOfferMoved": 13.4,
-      "pctUp": 84.0,
-      "medianStep": 2.3,
-      "meanMove": 1.53,
-      "effectOnAverage": 0.21
+      "changes": 991,
+      "units": 723,
+      "projects": 28,
+      "unitsTracked": 2364,
+      "pctOfOfferMoved": 30.6,
+      "pctUp": 88.8,
+      "medianStep": 2.1,
+      "meanMove": 1.36,
+      "effectOnAverage": 0.42
     },
     "newSupply": {
-      "units": 534,
-      "meanM2": 5514,
-      "medianM2": 4877
+      "units": 558,
+      "meanM2": 5524,
+      "medianM2": 4932
     }
   },
   "quarterly": {
@@ -105,9 +113,9 @@
       "complete": true,
       "supply": 4305,
       "projects": 97,
-      "meanM2": 5736,
-      "meanPrice": 387873,
-      "meanArea": 66.2,
+      "meanM2": 5718,
+      "meanPrice": 381703,
+      "meanArea": 65.5,
       "lastSaleDate": "2026-09-21",
       "sales": 637,
       "soldM2": 5745,
@@ -137,31 +145,31 @@
     "byRooms": [
       {
         "disp": "1",
-        "n": 450,
-        "meanM2": 6398,
-        "meanPrice": 231611,
-        "meanArea": 37.1
+        "n": 409,
+        "meanM2": 6295,
+        "meanPrice": 234131,
+        "meanArea": 38.1
       },
       {
         "disp": "2",
-        "n": 1456,
+        "n": 1391,
         "meanM2": 5508,
-        "meanPrice": 287261,
-        "meanArea": 52.0
+        "meanPrice": 288466,
+        "meanArea": 52.3
       },
       {
         "disp": "3",
-        "n": 1091,
-        "meanM2": 5494,
-        "meanPrice": 422517,
-        "meanArea": 76.0
+        "n": 985,
+        "meanM2": 5576,
+        "meanPrice": 426507,
+        "meanArea": 75.8
       },
       {
         "disp": "4+",
-        "n": 482,
-        "meanM2": 6238,
-        "meanPrice": 729093,
-        "meanArea": 111.2
+        "n": 444,
+        "meanM2": 6239,
+        "meanPrice": 718955,
+        "meanArea": 110.4
       }
     ],
     "soldByRooms": [
@@ -199,7 +207,7 @@
         "month": "2026-05",
         "asOf": "2026-05-31",
         "supply": 3277,
-        "meanM2": 5742,
+        "meanM2": 5744,
         "projects": 70,
         "sold": 23
       },
@@ -207,7 +215,7 @@
         "month": "2026-06",
         "asOf": "2026-06-29",
         "supply": 3441,
-        "meanM2": 5701,
+        "meanM2": 5700,
         "projects": 70,
         "sold": 170
       },
@@ -215,7 +223,7 @@
         "month": "2026-07",
         "asOf": "2026-07-31",
         "supply": 3065,
-        "meanM2": 5708,
+        "meanM2": 5702,
         "projects": 70,
         "sold": 196
       },
@@ -223,7 +231,7 @@
         "month": "2026-08",
         "asOf": "2026-08-31",
         "supply": 3097,
-        "meanM2": 5694,
+        "meanM2": 5680,
         "projects": 70,
         "sold": 143
       },
@@ -231,7 +239,7 @@
         "month": "2026-09",
         "asOf": "2026-09-21",
         "supply": 3302,
-        "meanM2": 5712,
+        "meanM2": 5688,
         "projects": 70,
         "sold": 123
       }
@@ -242,9 +250,9 @@
     "panelSupplyFrom": 3277,
     "panelSupplyTo": 3302,
     "panelSupplyPct": 0.8,
-    "panelM2From": 5742,
-    "panelM2To": 5712,
-    "panelM2Pct": -0.5,
+    "panelM2From": 5744,
+    "panelM2To": 5688,
+    "panelM2Pct": -1.0,
     "panelMonthlySales": 158,
     "published": {
       "source": "Bencont Investments",
@@ -256,7 +264,7 @@
           "projects": 94,
           "sales": 645,
           "meanM2": 5251.54,
-          "meanM2Rebased": 5606
+          "meanM2Rebased": 5613
         },
         {
           "q": "Q3 2025",
@@ -264,7 +272,7 @@
           "projects": null,
           "sales": 638,
           "meanM2": 5369.94,
-          "meanM2Rebased": 5732
+          "meanM2Rebased": 5740
         },
         {
           "q": "Q4 2025",
@@ -272,7 +280,7 @@
           "projects": 99,
           "sales": 634,
           "meanM2": 5301.56,
-          "meanM2Rebased": 5659
+          "meanM2Rebased": 5667
         },
         {
           "q": "Q1 2026",
@@ -280,7 +288,7 @@
           "projects": 96,
           "sales": 742,
           "meanM2": 5384.32,
-          "meanM2Rebased": 5747
+          "meanM2Rebased": 5755
         },
         {
           "q": "Q2 2026",
@@ -288,28 +296,28 @@
           "projects": 105,
           "sales": 652,
           "meanM2": 5341.0,
-          "meanM2Rebased": 5701
+          "meanM2Rebased": 5709
         }
       ]
     },
     "rebase": {
-      "factor": 1.0674,
+      "factor": 1.0689,
       "anchorDate": "2026-06-29",
-      "anchorOurs": 5701,
+      "anchorOurs": 5709,
       "anchorTheirs": 5341.0
     },
     "vsPrev": {
       "q": "Q2 2026",
       "supply": 74,
       "supplyPct": 1.7,
-      "m2Pct": 0.6,
+      "m2Pct": 0.2,
       "salesPct": -2.3
     },
     "vsYearAgo": {
       "q": "Q3 2025",
       "supply": 336,
       "supplyPct": 8.5,
-      "m2Pct": 0.1,
+      "m2Pct": -0.4,
       "salesPct": -0.2
     }
   },
