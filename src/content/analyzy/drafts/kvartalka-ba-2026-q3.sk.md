@@ -1,16 +1,16 @@
 <!--PEREX
-Predaj v Q3 2026 dosiahol 637 bytov oproti 652 z predchádzajúceho štvrťroka. Cenová úroveň ostala nezmenená, medziročne zaznamenala pokles o 0,4 %, a ponuka bytov na predaj sa zvýšila na 4 305 bytov.
+Predaj v Q3 2026 dosiahol 637 bytov oproti 652 z predchádzajúceho štvrťroka. Cenová úroveň ostala nezmenená, medziročne zaznamenala pokles o 0,4 %. V projektoch, ktoré boli v predaji celý štvrťrok, sa počet voľných bytov znížil o 3,2 %.
 -->
 <!--METHOD
 Údaje pochádzajú z verejne zverejnených cenníkov bratislavských developerov, ktoré Residata číta denne, byt po byte. Ponuku tvoria voľné a rezervované byty; počítajú sa výlučne byty, nie parkovanie, pivnice ani nebytové priestory. Priemerná cena za m² je priemer jednotkových cien jednotlivých bytov z obytnej plochy vrátane DPH; ide o ponukové ceny z cenníkov, nie o realizačné ceny z katastra. Cenové úrovne a priemery podľa dispozície sú počítané ako priemer denných hodnôt za posledné dva týždne štvrťroka, aby ich neovplyvnil jeden deň, v ktorom niektorý projekt pridal alebo stiahol časť ponuky. Polovičné dispozície sú zaokrúhlené nadol: byt s izbou a pol je vedený ako jednoizbový. Predaj sa určuje zo zmien stavu v cenníku developera. Zmena ceny porovnáva ten istý byt s jeho vlastnou skoršou cenou, pri jednom čítaní na byt a deň a pri zmene aspoň o dvesto eur.
 -->
 1. októbra 2026 | KVARTÁLNA ANALÝZA TRHU S BRATISLAVSKÝMI NOVOSTAVBAMI
 
-# Ponuka bratislavských novostavieb rastie, predaj aj ceny stoja na mieste
+# Ponuka v rozbehnutých projektoch sa tenčí, predaj aj ceny stoja na mieste
 
-Tretí štvrťrok 2026 na bratislavskom trhu s novostavbami znamenal stabilný dopyt, cenovú stagnáciu a ďalšie zvýšenie počtu bytov na predaj. Predaj dosiahol 637 bytov oproti 652 z predchádzajúceho štvrťroka. Cenová úroveň ostala prakticky nezmenená, medziročne zaznamenala pokles o 0,4 %. Ponuka bytov na predaj sa zvýšila na 4 305 bytov.
+Tretí štvrťrok 2026 na bratislavskom trhu s novostavbami znamenal stabilný dopyt, cenovú stagnáciu a ubúdanie voľných bytov v projektoch, ktoré sú už v predaji. Predaj dosiahol 637 bytov oproti 652 z predchádzajúceho štvrťroka. Cenová úroveň ostala prakticky nezmenená, medziročne zaznamenala pokles o 0,4 %. V ponuke bolo 4 024 bytov.
 
-Ponuku bytov na trhu s novostavbami tvorilo ku dňu 1. októbra 2026 podľa údajov Residaty 4 305 bytov v rámci 97 projektov. Oproti druhému štvrťroku ponuka bytov vzrástla o 74 bytov resp. 1,7 %, zatiaľ čo v medziročnom porovnaní sa zvýšila o 336 bytov resp. 8,5 %.
+Ponuku bytov na trhu s novostavbami tvorilo v závere štvrťroka podľa údajov Residaty 4 024 bytov v rámci 97 projektov. V 75 projektoch, ktoré boli v predaji od začiatku štvrťroka do jeho konca, sa počet voľných bytov znížil z 3 321 na 3 215, teda o 3,2 %: z rozbehnutých projektov odišlo viac bytov, než koľko ich do nich pribudlo.
 
 Priemerná cena týchto ponúkaných bytov dosiahla 5 718 €/m² s DPH, čo v medziročnom porovnaní predstavuje pokles o 0,4 %. Za celé sledované obdobie (Q2 2025 – Q3 2026) sa priemerná cena pohybuje v pásme, ktoré sa dá opísať ako stagnácia — pred rokom bola priemerná cena 5 740 €/m² s DPH a pred štvrťrokom 5 709 €/m² s DPH. Cena je pritom počítaná z obytnej plochy, nie z celkovej vrátane balkónov a terás; pri tom istom byte to dáva vyššiu cenu za meter než prepočet z väčšieho základu.
 
@@ -26,7 +26,7 @@ Priemerná absolútna cena ponúkaných bytov bola na úrovni 381 703 € s DPH
 | Q4 2025 | 3 874 | 634 | 5 667 |
 | Q1 2026 | 3 922 | 742 | 5 755 |
 | Q2 2026 | 4 231 | 652 | 5 709 |
-| **Q3 2026** | **4 305** | **637** | **5 718** |
+| **Q3 2026** | **4 024** | **637** | **5 718** |
 
 **V tomto čísle:** Ceny a ponuka podľa dispozície · Vývoj ponuky a predaja · Pohľad na aktuálne smerovanie trhu
 
@@ -56,9 +56,9 @@ Stojaci priemer pritom neznamená, že developeri ceny nemenia — práve naopak
 
 ## Pohľad na aktuálne smerovanie trhu novostavieb v Bratislave
 
-Tomáš Kamhal, zakladateľ Residaty: „Za posledný rok sa predaj drží na úrovni okolo 666 bytov za štvrťrok, zatiaľ čo ponuka za ten istý čas vzrástla o 8,5 %. Na trh teda pribúda viac bytov, než z neho odchádza, a rozdiel sa kumuluje.
+Tomáš Kamhal, zakladateľ Residaty: „Za posledný rok sa predaj drží na úrovni okolo 666 bytov za štvrťrok. V projektoch, ktoré sú už v predaji, sa pritom ponuka tenčí — za tento štvrťrok o 3,2 %. O tom, či ponuka na trhu ako celku rastie, teda rozhodujú nové projekty, ktoré doň vstupujú.
 
-Prvým faktorom je ponuka. Dosiahla 4 305 bytov v 97 projektoch a naďalej rastie. Stagnujúci priemer pritom nikoho nemá uspať. Cenníky sa menia a menia sa nahor; to, že priemer stojí, je výsledkom toho, čo do ponuky pribúda, nie toho, že by developeri čakali.
+Prvým faktorom je ponuka. V predaji je 4 024 bytov v 97 projektoch. Stagnujúci priemer pritom nikoho nemá uspať. Cenníky sa menia a menia sa nahor; to, že priemer stojí, je výsledkom toho, čo do ponuky pribúda, nie toho, že by developeri čakali.
 
 Druhým faktorom je dopyt, obmedzený najmä úrokovými sadzbami a kúpnou silou domácností. A tu je podstatné, že mestský priemer kupujúcemu nepovie nič o tom, čo bude platiť: rozdiel medzi najdrahšou a najlacnejšou dispozíciou je na metri 14,3 %, teda násobne viac, než o koľko sa trh za rok pohol.
 

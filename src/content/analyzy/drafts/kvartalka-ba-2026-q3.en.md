@@ -1,16 +1,16 @@
 <!--PEREX
-Sales in Q3 2026 reached 637 flats against 652 in the previous quarter. The price level was unchanged, showing a decrease of 0.4% year on year, and the supply of flats for sale rose to 4 305.
+Sales in Q3 2026 reached 637 flats against 652 in the previous quarter. The price level was unchanged, showing a decrease of 0.4% year on year. In the projects on sale throughout the quarter the number of available flats fell by 3.2%.
 -->
 <!--METHOD
 Data come from the publicly published price lists of Bratislava developers, which Residata reads daily, flat by flat. Supply consists of available and reserved flats; homes only — no parking, storage or commercial units. The average price per m² is a mean of individual flats' unit prices on living area including VAT; these are asking prices from price lists, not achieved prices from the land registry. Price levels and the averages by layout are computed as the mean of daily values over the last two weeks of the quarter, so that no single day on which a project added or withdrew part of its offer can move them. Half dispositions are rounded down: a flat with a room and a half is counted as one-room. A sale is identified from a change of status in the developer's own price list. A price change compares the same flat with its own earlier price, at one reading per flat per day and a change of at least two hundred euros. 
 -->
 1 October 2026 | QUARTERLY ANALYSIS OF THE BRATISLAVA NEW-BUILD MARKET
 
-# The supply of Bratislava new-builds is growing, sales and prices are standing still
+# Supply in projects already selling is thinning, sales and prices are standing still
 
-The third quarter of 2026 on the Bratislava new-build market brought steady demand, price stagnation and a further increase in the number of flats for sale. Sales reached 637 flats against 652 in the previous quarter. The price level was practically unchanged, showing a decrease of 0.4% year on year. The supply of flats for sale rose to 4 305.
+The third quarter of 2026 on the Bratislava new-build market brought steady demand, price stagnation and a shrinking number of available flats in the projects already on sale. Sales reached 637 flats against 652 in the previous quarter. The price level was practically unchanged, showing a decrease of 0.4% year on year. There were 4 024 flats on offer.
 
-As of 1 October 2026 the supply on the new-build market consisted, according to Residata's data, of 4 305 flats across 97 projects. Against the previous quarter supply rose by 74 flats or 1.7%, while year on year it rose by 336 flats or 8.5%.
+At the close of the quarter the supply on the new-build market consisted, according to Residata's data, of 4 024 flats across 97 projects. In the 75 projects on sale from the start of the quarter to its end, the number of available flats fell from 3 321 to 3 215, that is by 3.2%: more flats left those projects than were added to them.
 
 The average price of these flats on offer reached 5 718 €/m² incl. VAT, which year on year is a decrease of 0.4%. Across the whole observed period (Q2 2025 – Q3 2026) the average price has moved within a band best described as stagnation — a year ago the average price was 5 740 €/m² incl. VAT and a quarter ago 5 709 €/m² incl. VAT. The price is computed on living area, not on total area including balconies and terraces; for the same flat that yields a higher price per metre than a calculation on the larger base.
 
@@ -26,7 +26,7 @@ The average absolute price of flats on offer stood at 381 703 € incl. VAT at 
 | Q4 2025 | 3 874 | 634 | 5 667 |
 | Q1 2026 | 3 922 | 742 | 5 755 |
 | Q2 2026 | 4 231 | 652 | 5 709 |
-| **Q3 2026** | **4 305** | **637** | **5 718** |
+| **Q3 2026** | **4 024** | **637** | **5 718** |
 
 **In this issue:** Prices and supply by disposition · The development of supply and sales · A view on where the market is heading
 
@@ -56,9 +56,9 @@ A standing average does not mean developers leave prices alone — quite the opp
 
 ## A view on where the Bratislava new-build market is heading
 
-Tomáš Kamhal, founder of Residata: "Over the past year sales have held at around 666 flats a quarter, while supply over the same period rose by 8.5%. More flats are therefore coming onto the market than are leaving it, and the difference is accumulating.
+Tomáš Kamhal, founder of Residata: "Over the past year sales have held at around 666 flats a quarter. In the projects already on sale, meanwhile, supply is thinning — by 3.2% this quarter. Whether supply across the market as a whole grows is therefore decided by the new projects entering it.
 
-The first factor is supply. It has reached 4 305 flats across 97 projects and keeps growing. A stagnant average should not lull anyone. Price lists do move, and they move upward; that the average stands still is a result of what is being added to the offer, not of developers waiting.
+The first factor is supply. There are 4 024 flats on offer across 97 projects. A stagnant average should not lull anyone. Price lists do move, and they move upward; that the average stands still is a result of what is being added to the offer, not of developers waiting.
 
 The second factor is demand, constrained above all by interest rates and household purchasing power. And what matters here is that a city average tells a buyer nothing about what they will pay: the gap between the dearest and the cheapest layout is 14.3% per metre, many times the market's own movement over the year.
 

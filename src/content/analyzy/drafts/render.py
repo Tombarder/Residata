@@ -206,6 +206,8 @@ def build_vars(rep: dict) -> dict:
             f"{ours['q']}*" )
         sales = sk_int(ours["sales"]) if ours["complete"] else (
             f"{sk_int(ours['sales'])}*")
+        # The same fortnight figure the prose uses, not the last scrape day —
+        # otherwise the table and the paragraph beside it print two supplies.
         rows.append(f"| **{label}** | **{sk_int(ours['supply'])}** | "
                     f"**{sales}** | **{sk_int(ours['meanM2'])}** |")
         return head + "\n" + "\n".join(rows)
@@ -436,7 +438,24 @@ def build_vars(rep: dict) -> dict:
         # printed "sales hold at around 666" two lines under "sales reached 735".
         "avgQuarterSales": sk_int(
             (sum(r["sales"] for r in pub["quarters"][-3:]) + ours["sales"]) / 4),
-        "cqSupply": sk_int(ours["supply"]), "cqProjects": ours["projects"],
+        # 🔴 NOT ours["supply"], which is the last scrape day. On 21 September that
+        # day read 4 305 against 3 920-4 013 on every other day of the preceding
+        # three weeks, because Nesto, Olivia Residence and Palais Esterházy all
+        # failed to scrape on the 20th and returned on the 21st. The level is the
+        # fortnight mean, like every other level in this issue.
+        "cqSupply": sk_int(ours["supply"]),
+        "cqSupplyEn": f'{ours["supply"]:,}'.replace(",", "\u00a0"),
+        "cqProjects": ours["projects"],
+        # The only supply CHANGE we can measure: the projects on sale at both ends.
+        "spThen": sk_int(br["supplyPanel"]["supplyThen"]),
+        "spNow": sk_int(br["supplyPanel"]["supplyNow"]),
+        "spThenEn": f'{br["supplyPanel"]["supplyThen"]:,}'.replace(",", "\u00a0"),
+        "spNowEn": f'{br["supplyPanel"]["supplyNow"]:,}'.replace(",", "\u00a0"),
+        "spPct": sk_dec(abs(br["supplyPanel"]["changePct"])),
+        "spPctEn": en_dec(abs(br["supplyPanel"]["changePct"])),
+        "spProjects": br["supplyPanel"]["panelProjects"],
+        "spDir": "znížil" if br["supplyPanel"]["changePct"] < 0 else "zvýšil",
+        "spDirEn": "fell" if br["supplyPanel"]["changePct"] < 0 else "rose",
         "cqM2": sk_int(ours["meanM2"]), "cqPrice": sk_int(ours["meanPrice"]),
         "cqArea": sk_dec(ours["meanArea"]), "cqAreaEn": en_dec(ours["meanArea"]),
         "cqSales": sk_int(ours["sales"]), "cqRunRate": sk_int(ours["salesRunRate"]),
