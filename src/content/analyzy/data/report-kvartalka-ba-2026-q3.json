@@ -1,6 +1,6 @@
 {
   "asOf": "2026-10-01",
-  "generatedAt": "2026-09-21T13:19:15+00:00",
+  "generatedAt": "2026-09-21T13:29:53+00:00",
   "bratislavaReport": {
     "thenDate": "2026-07-18",
     "nowDate": "2026-09-21",
@@ -110,6 +110,118 @@
         ]
       }
     },
+    "byRooms": [
+      {
+        "disp": "1",
+        "n": 450,
+        "meanM2": 6398,
+        "meanPrice": 231611,
+        "meanArea": 37.1
+      },
+      {
+        "disp": "2",
+        "n": 1456,
+        "meanM2": 5508,
+        "meanPrice": 287261,
+        "meanArea": 52.0
+      },
+      {
+        "disp": "3",
+        "n": 1091,
+        "meanM2": 5494,
+        "meanPrice": 422517,
+        "meanArea": 76.0
+      },
+      {
+        "disp": "4+",
+        "n": 482,
+        "meanM2": 6238,
+        "meanPrice": 729093,
+        "meanArea": 111.2
+      }
+    ],
+    "soldByRooms": [
+      {
+        "disp": "1",
+        "n": 70,
+        "meanM2": 6544,
+        "meanPrice": 237425,
+        "meanArea": 36.8
+      },
+      {
+        "disp": "2",
+        "n": 230,
+        "meanM2": 5546,
+        "meanPrice": 284877,
+        "meanArea": 51.3
+      },
+      {
+        "disp": "3",
+        "n": 106,
+        "meanM2": 5386,
+        "meanPrice": 408305,
+        "meanArea": 75.8
+      },
+      {
+        "disp": "4+",
+        "n": 49,
+        "meanM2": 6317,
+        "meanPrice": 720442,
+        "meanArea": 113.4
+      }
+    ],
+    "monthlyPanel": [
+      {
+        "month": "2026-05",
+        "asOf": "2026-05-31",
+        "supply": 3277,
+        "meanM2": 5742,
+        "projects": 70,
+        "sold": 23
+      },
+      {
+        "month": "2026-06",
+        "asOf": "2026-06-29",
+        "supply": 3441,
+        "meanM2": 5701,
+        "projects": 70,
+        "sold": 170
+      },
+      {
+        "month": "2026-07",
+        "asOf": "2026-07-31",
+        "supply": 3065,
+        "meanM2": 5708,
+        "projects": 70,
+        "sold": 196
+      },
+      {
+        "month": "2026-08",
+        "asOf": "2026-08-31",
+        "supply": 3097,
+        "meanM2": 5694,
+        "projects": 70,
+        "sold": 143
+      },
+      {
+        "month": "2026-09",
+        "asOf": "2026-09-21",
+        "supply": 3302,
+        "meanM2": 5712,
+        "projects": 70,
+        "sold": 123
+      }
+    ],
+    "panelProjects": 70,
+    "panelFrom": "2026-05",
+    "panelTo": "2026-09",
+    "panelSupplyFrom": 3277,
+    "panelSupplyTo": 3302,
+    "panelSupplyPct": 0.8,
+    "panelM2From": 5742,
+    "panelM2To": 5712,
+    "panelM2Pct": -0.5,
+    "panelMonthlySales": 158,
     "published": {
       "source": "Bencont Investments",
       "basis": "priemer, úžitková plocha, s DPH",

@@ -82,6 +82,39 @@ def locative(name: str) -> str:
     return LOCATIVE_SK[name]
 
 
+MONTHS_SK_NOM = ["január", "február", "marec", "apríl", "máj", "jún", "júl",
+                 "august", "september", "október", "november", "december"]
+
+
+def months_sk(n: int) -> str:
+    """päť mesiacov / dva mesiace / jeden mesiac — Slovak counts in three forms."""
+    words = {1: "jeden mesiac", 2: "dva mesiace", 3: "tri mesiace", 4: "štyri mesiace"}
+    return words.get(n, f"{n} mesiacov")
+
+
+def genitive_month_sk(ym: str) -> str:
+    """"od mája 2026" — a month after `od` takes the genitive."""
+    y, m = ym.split("-")
+    return f"{MONTHS_SK[int(m) - 1]} {y}"
+
+
+def direction_sk(pct: float, up: str, down: str, flat: str = "sa nezmenila") -> str:
+    """Say which way it went. A neutral "moved by" over a fall reads as evasion."""
+    if abs(pct) < 0.05:
+        return flat
+    return up if pct > 0 else down
+
+
+def sk_month(ym: str) -> str:
+    y, m = ym.split("-")
+    return f"{MONTHS_SK_NOM[int(m) - 1]} {y}"
+
+
+def en_month(ym: str) -> str:
+    y, m = ym.split("-")
+    return f"{MONTHS_EN[int(m) - 1]} {y}"
+
+
 def sk_int(n) -> str:
     """4 231 with a non-breaking space, the way Slovak prints thousands."""
     return f"{int(round(n)):,}".replace(",", NBSP)
@@ -123,6 +156,31 @@ def build_vars(rep: dict) -> dict:
                   3: "Tretí štvrťrok", 4: "Štvrtý štvrťrok"}
     QUARTER_EN = {1: "The first quarter", 2: "The second quarter",
                   3: "The third quarter", 4: "The fourth quarter"}
+
+    ROOM_SK = {"1": "Jednoizbové", "2": "Dvojizbové", "3": "Trojizbové",
+               "4+": "Štvor- a viacizbové"}
+    ROOM_EN = {"1": "One-room", "2": "Two-room", "3": "Three-room",
+               "4+": "Four-room and larger"}
+    rooms = {r["disp"]: r for r in qt["byRooms"]}
+    sold_rooms = {r["disp"]: r for r in qt["soldByRooms"]}
+
+    def rooms_table(lang: str) -> str:
+        names = ROOM_SK if lang == "sk" else ROOM_EN
+        head = (("| Dispozícia | V ponuke | Priemerná cena €/m² s DPH | "
+                 "Priemerná cena bytu | Priemerná výmera | Predaných |"
+                 "\n|---|---:|---:|---:|---:|---:|") if lang == "sk" else
+                ("| Disposition | On offer | Average €/m² incl. VAT | "
+                 "Average flat price | Average floor area | Sold |"
+                 "\n|---|---:|---:|---:|---:|---:|"))
+        rows = []
+        for key in ("1", "2", "3", "4+"):
+            r, sd = rooms[key], sold_rooms.get(key, {})
+            area = (f"{sk_dec(r['meanArea'])} m²" if lang == "sk"
+                    else f"{en_dec(r['meanArea'])} m²")
+            rows.append(f"| {names[key]} | {sk_int(r['n'])} | {sk_int(r['meanM2'])} € | "
+                        f"{sk_int(r['meanPrice'])} € | {area} | "
+                        f"{sk_int(sd.get('n', 0))} |")
+        return head + "\n" + "\n".join(rows)
 
     def series_table(lang: str) -> str:
         head = (("| Štvrťrok | Ponuka | Projekty | Predaj | Priemerná cena €/m² s DPH | Zdroj |"
@@ -368,6 +426,48 @@ def build_vars(rep: dict) -> dict:
         "rebaseAnchorDateEn": en_date(qt["rebase"]["anchorDate"]),
         "rebaseOurs": sk_int(qt["rebase"]["anchorOurs"]),
         "rebaseTheirs": sk_int(qt["rebase"]["anchorTheirs"]),
+        "roomsTable": rooms_table("sk"),
+        "roomsTableEn": rooms_table("en"),
+        "panelProjects": qt["panelProjects"],
+        "panelFrom": genitive_month_sk(qt["monthlyPanel"][0]["month"]),
+        "panelSpan": months_sk(len(qt["monthlyPanel"])),
+        "panelM2Dir": direction_sk(qt["panelM2Pct"], "stúpla", "klesla"),
+        "panelSupplyDir": direction_sk(qt["panelSupplyPct"], "vzrástla", "klesla"),
+        "panelM2DirEn": "rose" if qt["panelM2Pct"] > 0 else "fell",
+        "panelSupplyDirEn": "rose" if qt["panelSupplyPct"] > 0 else "fell",
+        "dearestM2RoomCap": ROOM_SK[max(qt["byRooms"], key=lambda r: r["meanM2"])["disp"]],
+        "panelFromEn": en_month(qt["monthlyPanel"][0]["month"]),
+        "panelSupplyFrom": sk_int(qt["panelSupplyFrom"]),
+        "panelSupplyTo": sk_int(qt["panelSupplyTo"]),
+        "panelSupplyPct": sk_dec(abs(qt["panelSupplyPct"])),
+        "panelSupplyPctEn": en_dec(abs(qt["panelSupplyPct"])),
+        "panelM2From": sk_int(qt["panelM2From"]),
+        "panelM2To": sk_int(qt["panelM2To"]),
+        "panelM2Pct": sk_dec(abs(qt["panelM2Pct"])),
+        "panelM2PctEn": en_dec(abs(qt["panelM2Pct"])),
+        "panelMonthlySales": sk_int(qt["panelMonthlySales"]),
+        "panelMonths": len(qt["monthlyPanel"]),
+        # the U-shape, computed
+        "dearestM2Room": ROOM_SK[max(qt["byRooms"], key=lambda r: r["meanM2"])["disp"]].lower(),
+        "cheapestM2Room": ROOM_SK[min(qt["byRooms"], key=lambda r: r["meanM2"])["disp"]].lower(),
+        "roomSpreadPct": sk_dec(
+            100 * (max(r["meanM2"] for r in qt["byRooms"])
+                   / min(r["meanM2"] for r in qt["byRooms"]) - 1)),
+        "roomSpreadPctEn": en_dec(
+            100 * (max(r["meanM2"] for r in qt["byRooms"])
+                   / min(r["meanM2"] for r in qt["byRooms"]) - 1)),
+        "r1M2": sk_int(rooms["1"]["meanM2"]), "r1Price": sk_int(rooms["1"]["meanPrice"]),
+        "r1Area": sk_dec(rooms["1"]["meanArea"]), "r1AreaEn": en_dec(rooms["1"]["meanArea"]),
+        "r1N": sk_int(rooms["1"]["n"]), "r1Sold": sk_int(sold_rooms["1"]["n"]),
+        "r2M2": sk_int(rooms["2"]["meanM2"]), "r2Price": sk_int(rooms["2"]["meanPrice"]),
+        "r2Area": sk_dec(rooms["2"]["meanArea"]), "r2AreaEn": en_dec(rooms["2"]["meanArea"]),
+        "r2N": sk_int(rooms["2"]["n"]), "r2Sold": sk_int(sold_rooms["2"]["n"]),
+        "r3M2": sk_int(rooms["3"]["meanM2"]), "r3Price": sk_int(rooms["3"]["meanPrice"]),
+        "r3Area": sk_dec(rooms["3"]["meanArea"]), "r3AreaEn": en_dec(rooms["3"]["meanArea"]),
+        "r3N": sk_int(rooms["3"]["n"]), "r3Sold": sk_int(sold_rooms["3"]["n"]),
+        "r4M2": sk_int(rooms["4+"]["meanM2"]), "r4Price": sk_int(rooms["4+"]["meanPrice"]),
+        "r4Area": sk_dec(rooms["4+"]["meanArea"]), "r4AreaEn": en_dec(rooms["4+"]["meanArea"]),
+        "r4N": sk_int(rooms["4+"]["n"]), "r4Sold": sk_int(sold_rooms["4+"]["n"]),
         "seriesTable": series_table("sk"),
         "seriesTableEn": series_table("en"),
         "townTable": town_table(rep, "sk"),
