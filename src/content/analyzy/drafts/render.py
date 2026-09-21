@@ -60,6 +60,28 @@ def en_dec(x, places: int = 1) -> str:
     return f"{x:.{places}f}"
 
 
+#: Slovak declines place names, and "v Staré Mesto" reads as machine output. The
+#: map is explicit rather than rule-based because the rules have too many
+#: exceptions; an unknown district fails the render instead of guessing.
+LOCATIVE_SK = {
+    "Ružinov": "Ružinove", "Staré Mesto": "Starom Meste", "Petržalka": "Petržalke",
+    "Nové Mesto": "Novom Meste", "Rača": "Rači", "Dúbravka": "Dúbravke",
+    "Lamač": "Lamači", "Devínska Nová Ves": "Devínskej Novej Vsi",
+    "Karlova Ves": "Karlovej Vsi", "Vrakuňa": "Vrakuni",
+    "Podunajské Biskupice": "Podunajských Biskupiciach",
+    "Záhorská Bystrica": "Záhorskej Bystrici", "Vajnory": "Vajnoroch",
+    "Devín": "Devíne", "Jarovce": "Jarovciach", "Rusovce": "Rusovciach",
+    "Čunovo": "Čunove",
+}
+
+
+def locative(name: str) -> str:
+    if name not in LOCATIVE_SK:
+        raise KeyError(f"no Slovak locative recorded for district {name!r} — add it "
+                       f"to LOCATIVE_SK rather than letting the article decline it wrong")
+    return LOCATIVE_SK[name]
+
+
 def sk_int(n) -> str:
     """4 231 with a non-breaking space, the way Slovak prints thousands."""
     return f"{int(round(n)):,}".replace(",", NBSP)
@@ -255,6 +277,19 @@ def build_vars(rep: dict) -> dict:
         "qSoldAreaEn": en_dec(p2["meanArea"]),
         "qThenDate": sk_date(br["thenDate"]),
         "qThenDateEn": en_date(br["thenDate"]),
+        "qTopSeller": br["topSeller"]["name"],
+        "qTopSellerN": sk_int(br["topSeller"]["n"]),
+        "qD1": br["districts"][0]["district"],
+        "qD1Loc": locative(br["districts"][0]["district"]),
+        "qD2Loc": (locative(br["districts"][1]["district"])
+                   if len(br["districts"]) > 1 else ""),
+        "qD1Then": sk_int(br["districts"][0]["soldThen"]),
+        "qD1Now": sk_int(br["districts"][0]["soldNow"]),
+        "qD2": br["districts"][1]["district"] if len(br["districts"]) > 1 else "",
+        "qD2Then": sk_int(br["districts"][1]["soldThen"]) if len(br["districts"]) > 1 else "",
+        "qD2Now": sk_int(br["districts"][1]["soldNow"]) if len(br["districts"]) > 1 else "",
+        "qNewUnits": sk_int(br["newSupply"]["units"]),
+        "qNewMeanM2": sk_int(br["newSupply"]["meanM2"]),
         "townTable": town_table(rep, "sk"),
         "townTableEn": town_table(rep, "en"),
         "asOfEn": en_date(rep["asOf"]),

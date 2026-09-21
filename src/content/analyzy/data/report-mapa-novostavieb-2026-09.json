@@ -1,6 +1,6 @@
 {
   "asOf": "2026-09-21",
-  "generatedAt": "2026-09-21T11:28:56+00:00",
+  "generatedAt": "2026-09-21T11:43:14+00:00",
   "bratislavaReport": {
     "thenDate": "2026-07-18",
     "nowDate": "2026-09-21",
@@ -38,7 +38,30 @@
         "meanArea": 62.3
       }
     },
-    "salesChangePct": 14.7
+    "salesChangePct": 14.7,
+    "topSeller": {
+      "name": "Slnecna strana",
+      "n": 46
+    },
+    "districts": [
+      {
+        "district": "Ružinov",
+        "soldThen": 130,
+        "soldNow": 167,
+        "meanM2": 6198
+      },
+      {
+        "district": "Staré Mesto",
+        "soldThen": 32,
+        "soldNow": 36,
+        "meanM2": 7389
+      }
+    ],
+    "newSupply": {
+      "units": 447,
+      "meanM2": 5311,
+      "medianM2": 4979
+    }
   },
   "nationalMap": {
     "scope": {
@@ -145,10 +168,10 @@
       },
       {
         "city": "Poprad",
-        "available": 242,
+        "available": 241,
         "projects": 11,
         "biggest": 46,
-        "biggestPct": 19.0,
+        "biggestPct": 19.1,
         "priced": 170,
         "pricedProjects": 8,
         "pricedBiggest": 45,
@@ -792,7 +815,7 @@
     ],
     "totals": {
       "towns": 43,
-      "available": 7328,
+      "available": 7327,
       "projects": 240,
       "oneProjectTowns": 18,
       "twoOrFewerTowns": 27,
@@ -927,7 +950,7 @@
       },
       {
         "izby": 4.0,
-        "available": 840,
+        "available": 839,
         "sold": 122,
         "stockPct": 11.5,
         "salesPct": 9.3
@@ -940,7 +963,7 @@
         "salesPct": 0.6
       }
     ],
-    "totalAvailable": 7283,
+    "totalAvailable": 7282,
     "totalSold": 1315
   },
   "mixCz": {
@@ -1046,7 +1069,7 @@
       },
       {
         "izby": 4.0,
-        "available": 840,
+        "available": 839,
         "sold": 113,
         "stockPct": 11.5,
         "salesPct": 9.0
@@ -1059,7 +1082,7 @@
         "salesPct": 0.6
       }
     ],
-    "totalAvailable": 7283,
+    "totalAvailable": 7282,
     "totalSold": 1253
   },
   "window": {
@@ -1154,9 +1177,9 @@
       },
       {
         "izby": 4.0,
-        "available": 840,
+        "available": 839,
         "sold": 122,
-        "months": 29.0,
+        "months": 28.9,
         "monthsDisplay": 29
       }
     ],
@@ -1256,7 +1279,7 @@
         "monthsDisplay": 20
       },
       "rest": {
-        "available": 3811,
+        "available": 3810,
         "sold": 586,
         "months": 27.3,
         "monthsDisplay": 27
@@ -1298,7 +1321,7 @@
     "sk": {
       "1": 8.9,
       "2": 44.4,
-      "3": 34.7,
+      "3": 34.8,
       "4": 12.0
     },
     "cz": {
