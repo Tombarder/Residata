@@ -184,21 +184,21 @@ def build_vars(rep: dict) -> dict:
         return head + "\n" + "\n".join(rows)
 
     def series_table(lang: str) -> str:
-        head = (("| Štvrťrok | Ponuka | Projekty | Predaj | Priemerná cena €/m² s DPH | Zdroj |"
-                 "\n|---|---:|---:|---:|---:|---|") if lang == "sk" else
-                ("| Quarter | Supply | Projects | Sales | Average €/m² incl. VAT | Source |"
-                 "\n|---|---:|---:|---:|---:|---|"))
+        head = (("| Štvrťrok | Ponuka | Projekty | Predaj | Priemerná cena €/m² s DPH |"
+                 "\n|---|---:|---:|---:|---:|") if lang == "sk" else
+                ("| Quarter | Supply | Projects | Sales | Average €/m² incl. VAT |"
+                 "\n|---|---:|---:|---:|---:|"))
         rows = []
         for r in pub["quarters"]:
             rows.append(f"| {r['q']} | {sk_int(r['supply'])} | {r['projects'] or '—'} | "
-                        f"{sk_int(r['sales'])} | {sk_int(r['meanM2Rebased'])} | {pub['source']} |")
+                        f"{sk_int(r['sales'])} | {sk_int(r['meanM2Rebased'])} |")
         # Our row says what it is: a quarter-to-date while the quarter is open.
         label = ours["q"] if ours["complete"] else (
             f"{ours['q']}*" )
         sales = sk_int(ours["sales"]) if ours["complete"] else (
             f"{sk_int(ours['sales'])}*")
         rows.append(f"| **{label}** | **{sk_int(ours['supply'])}** | **{ours['projects']}** | "
-                    f"**{sales}** | **{sk_int(ours['meanM2'])}** | **Residata** |")
+                    f"**{sales}** | **{sk_int(ours['meanM2'])}** |")
         return head + "\n" + "\n".join(rows)
     p1, p2 = br["sales"]["p1"], br["sales"]["p2"]
 
