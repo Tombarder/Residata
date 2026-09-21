@@ -1,59 +1,35 @@
 <!--PEREX
-Slovenskú ponuku novostavieb tvorí {totalAvailable} voľných bytov v {totalProjects} projektoch v {towns} mestách, polovica z nich v Bratislave. Medián ponukovej ceny je {baScopeMedian} €/m² s DPH v Bratislave a {restMedian} €/m² s DPH vo zvyšku krajiny.
+Predaj oproti predchádzajúcemu obdobiu vzrástol z {qSalesThen} na {qSalesNow} predaných bytov. Cenová úroveň ostala nezmenená a ponuka bytov na predaj sa zvýšila na {qSupply} bytov.
 -->
 <!--METHOD
-Dáta sú z verejne zverejnených cenníkov developerov, ktoré Residata zaznamenáva denne od {windowFrom} ({windowDays} dní). Voľné byty sú byty vedené developerom ako voľné, bez rezervovaných a predaných; počítajú sa výlučne byty, nie parkovanie, pivnice ani nebytové priestory. Cena za m² je počítaná z obytnej plochy vrátane DPH a uvádza sa ako medián, nie priemer; ide o ponukové ceny z cenníkov, nie o realizačné ceny z katastra. Mesiace do vypredania sú zásoba delená priemerným mesačným počtom predajov za sledované obdobie a uvádzajú sa len pre mestá s dostatočným počtom predajov; rezervované byty sa rátajú ako zásoba, nie ako predaj. Zmena ceny porovnáva ten istý byt s jeho vlastnou skoršou cenou, pri jednom čítaní na byt a deň a pri zmene aspoň o dvesto eur. Za Bratislavu sa naše čísla líšia od údajov {benchSource} za {benchPeriod} o {supplyDeltaPct} % v ponuke a o {meanPriceDeltaPct} % v priemernej ponukovej cene. Register rezido.sk vedie {covIndexProjects} slovenských projektov, z toho {covSoldOut} vypredaných; porovnanie s naším katalógom našlo {covMissingProjects} predávajúcich projektov mimo neho so {covMissingUnits} voľnými bytmi, teda {covMissingPct} % ponuky.
+Dáta pochádzajú z verejne zverejnených cenníkov bratislavských developerov, ktoré Residata zaznamenáva denne od {windowFrom}. Ponuku tvoria voľné a rezervované byty, bez predaných; počítajú sa výlučne byty, nie parkovanie, pivnice ani nebytové priestory. Cena za m² je priemer jednotkových cien jednotlivých bytov, počítaný z obytnej plochy vrátane DPH; ide o ponukové ceny z cenníkov, nie o realizačné ceny z katastra. Predaj sa určuje zo zmien stavu v cenníku developera. Porovnanie oproti predchádzajúcemu obdobiu je počítané na vzorke {qPanelProjects} projektov, ktoré sledujeme k obom dátumom, aby zmena ponuky nezahŕňala projekty, ktoré do nášho sledovania pribudli medzičasom. Obdobia predaja sú dve zhodné, po {qDays} dní.
 -->
-ANALÝZA TRHU · Mapa novostavieb · {asOf}
+ANALÝZA TRHU · Bratislavské novostavby · {asOf}
 
-# Polovica slovenskej ponuky novostavieb je v Bratislave, ceny mimo nej sú o tretinu nižšie
+# Ponuka bratislavských novostavieb rastie, ceny sa nehýbu
 
-Slovenský trh s novostavbami tvorí {totalAvailable} voľných bytov v {totalProjects} projektoch v {towns} mestách. Polovica ponuky stojí v Bratislave. Medián ponukovej ceny dosahuje {baScopeMedian} €/m² s DPH v Bratislave a {restMedian} €/m² s DPH vo zvyšku krajiny. Medián ceny bytu je {baScopePrice} € v Bratislave a {restPrice} € v ostatných mestách.
+Posledné dva mesiace na bratislavskom trhu s novostavbami znamenali silnejší predaj, cenovú stagnáciu a ďalšie zvýšenie počtu bytov na predaj. Predaj oproti predchádzajúcemu obdobiu vzrástol z {qSalesThen} na {qSalesNow} predaných bytov. Cenová úroveň ostala nezmenená a na porovnateľnej vzorke projektov sa zmenila o {qPanelM2ChangePct} %. Ponuka bytov na predaj sa zvýšila na {qSupply} bytov.
 
-Ponuku bytov na slovenskom trhu s novostavbami tvorilo ku dňu {asOf} {totalAvailable} voľných bytov v rámci {totalProjects} projektov v {towns} mestách. V Bratislave je z toho {baAvailable} bytov, teda {baSharePct} % celej ponuky, zvyšných {restAvailable} bytov je rozdelených medzi {restTowns} miest. Najväčšími regionálnymi trhmi sú Nitra s {nrAvailable} bytmi, Trnava s {ttAvailable}, Košice s {keAvailable}, Prešov s {poAvailable} a Poprad s {ppAvailable}.
+Ponuku bytov na trhu s novostavbami tvorilo ku dňu {asOf} podľa údajov Residaty {qSupply} bytov v rámci {qProjects} projektov. Na vzorke {qPanelProjects} projektov, ktoré sledujeme aj k {qThenDate}, ponuka bytov za posledných {qPanelDays} dní vzrástla z {qPanelSupplyThen} na {qPanelSupplyNow} bytov, teda o {qPanelSupplyChange} bytov resp. {qPanelSupplyChangePct} %.
 
-Medián ponukovej ceny týchto bytov dosiahol {baScopeMedian} €/m² s DPH v Bratislave a {restMedian} €/m² s DPH vo zvyšku krajiny, teda o {restBelowBaPct} % menej. Po Bratislave sú najdrahšie Košice s {keM2} €/m² s DPH, Žilina s {zaM2} a Banská Bystrica s {bbM2}; nasledujú Trnava ({ttM2}), Trenčín ({tnM2}) a Nitra ({nrM2}). Najnižšiu jednotkovú cenu má z miest s väčšou ponukou {cheapestM2Town} s {lcM2} €/m² s DPH.
+Priemerná cena týchto ponúkaných bytov dosiahla {qMeanM2} €/m² s DPH. Na porovnateľnej vzorke projektov sa za rovnaké obdobie posunula z {qPanelM2Then} na {qPanelM2Now} €/m² s DPH, čo predstavuje zmenu o {qPanelM2ChangePct} %. Dá sa povedať, že ceny bratislavských novostavieb sa aktuálne nehýbu a rozdiely v celkovom priemere spôsobuje skôr zloženie ponuky než pohyb cenníkov.
 
-Medián absolútnej ceny ponúkaného bytu bol v Bratislave {baScopePrice} € s DPH pri výmere {baScopeArea} m², v ostatných mestách {restPrice} € pri výmere {restArea} m².
+Priemerná absolútna cena ponúkaných bytov bola na úrovni {qMeanPrice} € s DPH, zatiaľ čo priemerná výmera týchto bytov dosahovala {qMeanArea} m².
 
-**V tomto čísle:** Ponuka a tempo predaja v slovenských mestách · Pohľad na aktuálne smerovanie trhu
+**V tomto čísle:** Vývoj ponuky a predaja na bratislavskom trhu novostavieb · Pohľad na aktuálne smerovanie trhu
 
-## Ponuka a tempo predaja v slovenských mestách
+## Vývoj ponuky a predaja na bratislavskom trhu novostavieb
 
-Od {windowFrom}, odkedy ponuku sledujeme denne, sme zaznamenali {soldTotal} predaných bytov, z toho {baSold} v Bratislave a {restSold} v ostatných mestách. Pri tomto tempe by sa bratislavská ponuka vypredala za {baMonths} mesiacov a ponuka vo zvyšku krajiny za {restMonths} mesiacov.
+Ponuka bytov rástla a spolu s ňou aj predaj. Za posledných {qDays} dní sa predalo {qSalesNow} bytov oproti {qSalesThen} v predchádzajúcich {qDays} dňoch, teda o {qSalesChangePct} % viac. Rast ponuky tak zatiaľ nesprevádza spomalenie predaja.
 
-Ceny v cenníkoch sa za posledných {stepDays} dní zmenili {moves90}-krát v {moveProjects} projektoch. Nahor smerovalo {movesUpPct} % zmien a medián zmeny bol {moveMedianPct} %.
-
-![Medián ceny bytu v novostavbe podľa miest](/analyzy/{slug}-1-cena-bytu.svg)
-*Medián ceny ponúkaného bytu s DPH, mestá s aspoň {chartMinStock} voľnými bytmi.*
-
-![Medián ceny za meter podľa miest](/analyzy/{slug}-2-cena-za-meter.svg)
-*Medián ceny za m² s DPH; poradie miest je rovnaké ako v predošlom grafe.*
-
-{townTable}
+Priemerná predajná cena predaných bytov dosiahla {qSoldM2} €/m² s DPH, čím sa prakticky vyrovnala priemernej ponukovej cene {qMeanM2} €/m² s DPH. Priemerná absolútna cena predaných bytov bola {qSoldPrice} € s DPH pri priemernej rozlohe {qSoldArea} m².
 
 ## Pohľad na aktuálne smerovanie trhu
 
-Tomáš Kamhal, zakladateľ Residaty: „Rozdiel medzi Bratislavou a zvyškom Slovenska je v jednotkovej cene približne o tretinu, v cene bytu je to necelých sto tisíc eur. Pre kupujúceho je podstatnejší ten druhý údaj, pretože hypotéku dostáva na celkovú cenu bytu, nie na cenu za meter.
+Tomáš Kamhal, zakladateľ Residaty: „Bratislavský trh je v stave, v ktorom ponuka aj predaj rastú súčasne a ceny stoja. Na porovnateľnej vzorke projektov sa priemerná cena za posledné dva mesiace pohla o {qPanelM2ChangePct} %, čo je v praxi nula. Developeri teda pri rastúcej ponuke neznižujú ceny, ale ani ich nedvíhajú.
 
-Ceny sa nateraz nehýbu nadol. Z {moves90} zmien cenníkov za posledné tri mesiace smerovalo {movesUpPct} % nahor. Keď je dopyt slabší, developeri predlžujú čas predaja namiesto toho, aby znižovali cenu — a to je aj dôvod, prečo je pri sledovaní tohto trhu tempo predaja vypovedajúcejšie než samotná cenová hladina.
+Priemerná predajná cena sa vyrovnala ponukovej, čo znamená, že sa nepredávajú výrazne lacnejšie byty, než aké sú v ponuke. Zároveň rastie priemerná výmera predaných bytov, takže kupujúci mierili v poslednom období po väčších bytoch.
 
-Ak sa úrokové sadzby a kúpna sila domácností výraznejšie nezmenia, očakávame, že ponuka bude naďalej narastať a ceny zostanú približne na dnešnej úrovni. Sledovať budeme najmä regionálne mestá, kde je tempo predaja pomalšie než v Bratislave."
+Ak sa úrokové sadzby a kúpna sila domácností výraznejšie nezmenia, očakávame pokračovanie tohto stavu: ponuka bude naďalej narastať a ceny zostanú približne na dnešnej úrovni. Zaujímavé bude sledovať, či rastúca ponuka začne po čase tlačiť na ceny nadol."
 
-<!--CMS-SKIP-START-->
-## Metodická poznámka
-
-Residata číta cenníky slovenských developerov každý deň, byt po byte. Tento prehľad stojí na {totalProjects} projektoch v {towns} mestách a na pozorovaniach od {windowFrom}, teda za {windowDays} dní.
-
-**Čo sa počíta.** Voľné byty sú byty vedené developerom ako voľné; rezervované a predané sa do nich nerátajú. Do prehľadu vstupujú len projekty, ktorých cenník čítame aktuálne, a mestá s aspoň {mapMinStock} voľnými bytmi; v tabuľke sú mestá s aspoň {tableMinStock} voľnými bytmi. Počítajú sa výlučne byty — garáže, parkovacie státia, pivnice a nebytové priestory sú z každého čísla vylúčené. Medián €/m² je počítaný z obytnej plochy vrátane DPH; ide o ponukové ceny. Bencont a BuiltMind publikujú priemer a pracujú s úžitkovou plochou, takže ich jednotková cena a naša sa neporovnávajú priamo.
-
-**Mesiace do vypredania** sú zásoba delená priemerným mesačným počtom predajov za sledované obdobie; predaj sa určuje zo zmien stavu v cenníku developera. Rezervované byty sa rátajú ako zásoba, nie ako predaj, a ich podiel je mimo Bratislavy vyšší.
-
-**Zmena ceny** porovnáva ten istý byt s jeho vlastnou skoršou cenou, pri jednom čítaní na byt a deň a pri zmene aspoň o dvesto eur.
-
-**Kontrola pokrytia.** Register rezido.sk vedie {covIndexProjects} slovenských projektov, z toho {covSoldOut} vypredaných. Porovnanie s naším katalógom k {asOf} našlo {covMissingProjects} predávajúcich projektov, ktoré nesledujeme, so {covMissingUnits} voľnými bytmi, teda {covMissingPct} % ponuky.
-
-**Kontrola voči publikovaným číslam.** {benchSource} uvádza za {benchPeriod} bratislavskú ponuku {benchSupply} bytov; nám na porovnateľnej definícii vychádza {ourSupplyComparable}, rozdiel {supplyDeltaPct} %. Priemerná ponuková cena bytu je u nich {benchMeanPrice} € a u nás {ourMeanPrice} €, rozdiel {meanPriceDeltaPct} %.
-
-<!--CMS-SKIP-END-->
-**Tomáš Kamhal** · zakladateľ, Residata · tomas@residata.eu
+**Autor:** Tomáš Kamhal, zakladateľ Residaty · tomas@residata.eu

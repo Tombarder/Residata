@@ -93,6 +93,8 @@ def build_vars(rep: dict) -> dict:
 
     bb = towns["Banská Bystrica"]
     scope = rep["nationalMap"]["scope"]
+    br = rep["bratislavaReport"]
+    p1, p2 = br["sales"]["p1"], br["sales"]["p2"]
 
     # Every town the prose names, keyed by its own initials, so a town that
     # leaves the map fails the render instead of quietly printing a placeholder.
@@ -224,6 +226,35 @@ def build_vars(rep: dict) -> dict:
         "tableTowns": len(table_set),
         "biggestAreaTown": max(table_set, key=lambda t: t["medianArea"])["city"],
         "cheapestM2Town": min(table_set, key=lambda t: t["medianM2"])["city"],
+        # ── the quarterly, on Bencont's own metrics ─────────────────────────
+        "qSupply": sk_int(br["supply"]),
+        "qProjects": br["projects"],
+        "qMeanM2": sk_int(br["meanM2"]),
+        "qMeanPrice": sk_int(br["meanPrice"]),
+        "qMeanArea": sk_dec(br["meanArea"]),
+        "qMeanAreaEn": en_dec(br["meanArea"]),
+        "qPanelDays": br["panelDays"],
+        "qPanelProjects": br["panelProjects"],
+        "qPanelSupplyThen": sk_int(br["panelSupplyThen"]),
+        "qPanelSupplyNow": sk_int(br["panelSupplyNow"]),
+        "qPanelSupplyChange": sk_int(abs(br["panelSupplyChange"])),
+        "qPanelSupplyChangePct": sk_dec(abs(br["panelSupplyChangePct"])),
+        "qPanelSupplyChangePctEn": en_dec(abs(br["panelSupplyChangePct"])),
+        "qPanelM2Then": sk_int(br["panelM2Then"]),
+        "qPanelM2Now": sk_int(br["panelM2Now"]),
+        "qPanelM2ChangePct": sk_dec(abs(br["panelM2ChangePct"])),
+        "qPanelM2ChangePctEn": en_dec(abs(br["panelM2ChangePct"])),
+        "qDays": p2["days"],
+        "qSalesNow": sk_int(p2["n"]),
+        "qSalesThen": sk_int(p1["n"]),
+        "qSalesChangePct": sk_dec(abs(br["salesChangePct"])),
+        "qSalesChangePctEn": en_dec(abs(br["salesChangePct"])),
+        "qSoldM2": sk_int(p2["meanM2"]),
+        "qSoldPrice": sk_int(p2["meanPrice"]),
+        "qSoldArea": sk_dec(p2["meanArea"]),
+        "qSoldAreaEn": en_dec(p2["meanArea"]),
+        "qThenDate": sk_date(br["thenDate"]),
+        "qThenDateEn": en_date(br["thenDate"]),
         "townTable": town_table(rep, "sk"),
         "townTableEn": town_table(rep, "en"),
         "asOfEn": en_date(rep["asOf"]),
