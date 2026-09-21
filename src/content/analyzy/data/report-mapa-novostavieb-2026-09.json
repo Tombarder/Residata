@@ -1,6 +1,6 @@
 {
   "asOf": "2026-09-21",
-  "generatedAt": "2026-09-21T09:45:45+00:00",
+  "generatedAt": "2026-09-21T10:35:38+00:00",
   "nationalMap": {
     "scope": {
       "bratislava": {
@@ -17,7 +17,7 @@
     "towns": [
       {
         "city": "Bratislava",
-        "available": 3633,
+        "available": 3635,
         "projects": 96,
         "biggest": 405,
         "biggestPct": 11.1,
@@ -749,7 +749,7 @@
     ],
     "totals": {
       "towns": 43,
-      "available": 7349,
+      "available": 7351,
       "projects": 240,
       "oneProjectTowns": 18,
       "twoOrFewerTowns": 27,
@@ -779,15 +779,12 @@
   "salesIntegrity": {
     "since": "2026-05-16",
     "ledgerSales": 1313,
-    "eventSales": 3644,
-    "gapPct": 177.5,
+    "eventSales": 1348,
+    "gapPct": 2.7,
     "ledgerMaxDayPct": 5.9,
-    "eventMaxDayPct": 61.7,
-    "agree": false,
-    "reasons": [
-      "analytics.sale_events holds 3644 durable Slovak sales against 1313 in reference.unit_ledger (178 % apart)",
-      "61.7 % of sale_events sales carry one date"
-    ]
+    "eventMaxDayPct": 5.8,
+    "agree": true,
+    "reasons": []
   },
   "coverage": {
     "skActiveProjects": 247,
@@ -803,6 +800,10 @@
     "available": 3157,
     "medianM2": 3679,
     "towns": 44
+  },
+  "sales90d": {
+    "bratislava": 608,
+    "restOfSk": 552
   },
   "topCities": [
     {
@@ -836,6 +837,188 @@
       "medianM2": 3502
     }
   ],
+  "mixSk": {
+    "since": "2026-05-16",
+    "rows": [
+      {
+        "izby": 1.0,
+        "available": 625,
+        "sold": 148,
+        "stockPct": 8.6,
+        "salesPct": 11.3
+      },
+      {
+        "izby": 1.5,
+        "available": 166,
+        "sold": 51,
+        "stockPct": 2.3,
+        "salesPct": 3.9
+      },
+      {
+        "izby": 2.0,
+        "available": 3113,
+        "sold": 662,
+        "stockPct": 42.6,
+        "salesPct": 50.3
+      },
+      {
+        "izby": 2.5,
+        "available": 32,
+        "sold": 6,
+        "stockPct": 0.4,
+        "salesPct": 0.5
+      },
+      {
+        "izby": 3.0,
+        "available": 2448,
+        "sold": 315,
+        "stockPct": 33.5,
+        "salesPct": 24.0
+      },
+      {
+        "izby": 3.5,
+        "available": 8,
+        "sold": 3,
+        "stockPct": 0.1,
+        "salesPct": 0.2
+      },
+      {
+        "izby": 4.0,
+        "available": 842,
+        "sold": 122,
+        "stockPct": 11.5,
+        "salesPct": 9.3
+      },
+      {
+        "izby": 5.0,
+        "available": 72,
+        "sold": 8,
+        "stockPct": 1.0,
+        "salesPct": 0.6
+      }
+    ],
+    "totalAvailable": 7306,
+    "totalSold": 1315
+  },
+  "mixCz": {
+    "since": "2026-06-09",
+    "rows": [
+      {
+        "izby": 1.0,
+        "available": 1002,
+        "sold": 358,
+        "stockPct": 19.4,
+        "salesPct": 27.4
+      },
+      {
+        "izby": 1.5,
+        "available": 62,
+        "sold": 18,
+        "stockPct": 1.2,
+        "salesPct": 1.4
+      },
+      {
+        "izby": 2.0,
+        "available": 2305,
+        "sold": 527,
+        "stockPct": 44.6,
+        "salesPct": 40.3
+      },
+      {
+        "izby": 2.5,
+        "available": 11,
+        "sold": 1,
+        "stockPct": 0.2,
+        "salesPct": 0.1
+      },
+      {
+        "izby": 3.0,
+        "available": 1302,
+        "sold": 287,
+        "stockPct": 25.2,
+        "salesPct": 21.9
+      },
+      {
+        "izby": 4.0,
+        "available": 452,
+        "sold": 97,
+        "stockPct": 8.7,
+        "salesPct": 7.4
+      },
+      {
+        "izby": 5.0,
+        "available": 33,
+        "sold": 20,
+        "stockPct": 0.6,
+        "salesPct": 1.5
+      }
+    ],
+    "totalAvailable": 5167,
+    "totalSold": 1308
+  },
+  "mixSkCommon": {
+    "since": "2026-06-09",
+    "rows": [
+      {
+        "izby": 1.0,
+        "available": 625,
+        "sold": 145,
+        "stockPct": 8.6,
+        "salesPct": 11.6
+      },
+      {
+        "izby": 1.5,
+        "available": 166,
+        "sold": 44,
+        "stockPct": 2.3,
+        "salesPct": 3.5
+      },
+      {
+        "izby": 2.0,
+        "available": 3113,
+        "sold": 628,
+        "stockPct": 42.6,
+        "salesPct": 50.1
+      },
+      {
+        "izby": 2.5,
+        "available": 32,
+        "sold": 6,
+        "stockPct": 0.4,
+        "salesPct": 0.5
+      },
+      {
+        "izby": 3.0,
+        "available": 2448,
+        "sold": 306,
+        "stockPct": 33.5,
+        "salesPct": 24.4
+      },
+      {
+        "izby": 3.5,
+        "available": 8,
+        "sold": 3,
+        "stockPct": 0.1,
+        "salesPct": 0.2
+      },
+      {
+        "izby": 4.0,
+        "available": 842,
+        "sold": 113,
+        "stockPct": 11.5,
+        "salesPct": 9.0
+      },
+      {
+        "izby": 5.0,
+        "available": 72,
+        "sold": 8,
+        "stockPct": 1.0,
+        "salesPct": 0.6
+      }
+    ],
+    "totalAvailable": 7306,
+    "totalSold": 1253
+  },
   "window": {
     "sk": {
       "from": "2026-05-16",
@@ -851,6 +1034,223 @@
       "from": "2026-06-09"
     }
   },
+  "quartiles": {
+    "since": "2026-05-16",
+    "rows": [
+      {
+        "quartile": 1,
+        "projects": 23,
+        "avgM2": 3165,
+        "available": 1001,
+        "sold": 124,
+        "medianStock": 34,
+        "monthsToClear": 33.9,
+        "monthsDisplay": 34
+      },
+      {
+        "quartile": 2,
+        "projects": 23,
+        "avgM2": 3893,
+        "available": 1615,
+        "sold": 158,
+        "medianStock": 59,
+        "monthsToClear": 43.0,
+        "monthsDisplay": 43
+      },
+      {
+        "quartile": 3,
+        "projects": 22,
+        "avgM2": 4921,
+        "available": 1682,
+        "sold": 352,
+        "medianStock": 43,
+        "monthsToClear": 20.1,
+        "monthsDisplay": 20
+      },
+      {
+        "quartile": 4,
+        "projects": 22,
+        "avgM2": 7047,
+        "available": 1063,
+        "sold": 315,
+        "medianStock": 35,
+        "monthsToClear": 14.2,
+        "monthsDisplay": 14
+      }
+    ]
+  },
+  "monthsToClear": {
+    "sk": [
+      {
+        "izby": 1.0,
+        "available": 625,
+        "sold": 148,
+        "months": 17.8,
+        "monthsDisplay": 18
+      },
+      {
+        "izby": 1.5,
+        "available": 166,
+        "sold": 51,
+        "months": 13.7,
+        "monthsDisplay": 14
+      },
+      {
+        "izby": 2.0,
+        "available": 3113,
+        "sold": 662,
+        "months": 19.8,
+        "monthsDisplay": 20
+      },
+      {
+        "izby": 3.0,
+        "available": 2448,
+        "sold": 315,
+        "months": 32.7,
+        "monthsDisplay": 33
+      },
+      {
+        "izby": 4.0,
+        "available": 842,
+        "sold": 122,
+        "months": 29.0,
+        "monthsDisplay": 29
+      }
+    ],
+    "cz": [
+      {
+        "izby": 1.0,
+        "available": 1002,
+        "sold": 358,
+        "months": 9.6,
+        "monthsDisplay": 10
+      },
+      {
+        "izby": 2.0,
+        "available": 2305,
+        "sold": 527,
+        "months": 14.9,
+        "monthsDisplay": 15
+      },
+      {
+        "izby": 3.0,
+        "available": 1302,
+        "sold": 287,
+        "months": 15.5,
+        "monthsDisplay": 16
+      },
+      {
+        "izby": 4.0,
+        "available": 452,
+        "sold": 97,
+        "months": 15.9,
+        "monthsDisplay": 16
+      }
+    ],
+    "byCity": [
+      {
+        "city": "Žilina",
+        "available": 139,
+        "sold": 46,
+        "months": 12.7,
+        "monthsDisplay": 13,
+        "medianM2": 4102
+      },
+      {
+        "city": "Košice",
+        "available": 390,
+        "sold": 123,
+        "months": 13.3,
+        "monthsDisplay": 13,
+        "medianM2": 4563
+      },
+      {
+        "city": "Prešov",
+        "available": 299,
+        "sold": 94,
+        "months": 13.4,
+        "monthsDisplay": 13,
+        "medianM2": 3613
+      },
+      {
+        "city": "Trenčín",
+        "available": 236,
+        "sold": 66,
+        "months": 15.0,
+        "monthsDisplay": 15,
+        "medianM2": 3827
+      },
+      {
+        "city": "Bratislava",
+        "available": 3635,
+        "sold": 762,
+        "months": 20.1,
+        "monthsDisplay": 20,
+        "medianM2": 5314
+      },
+      {
+        "city": "Trnava",
+        "available": 444,
+        "sold": 68,
+        "months": 27.5,
+        "monthsDisplay": 28,
+        "medianM2": 3833
+      },
+      {
+        "city": "Nitra",
+        "available": 455,
+        "sold": 53,
+        "months": 36.1,
+        "monthsDisplay": 36,
+        "medianM2": 3494
+      }
+    ],
+    "byScope": {
+      "bratislava": {
+        "available": 3635,
+        "sold": 762,
+        "months": 20.1,
+        "monthsDisplay": 20
+      },
+      "rest": {
+        "available": 3834,
+        "sold": 586,
+        "months": 27.5,
+        "monthsDisplay": 28
+      }
+    }
+  },
+  "closestPricedPair": {
+    "a": {
+      "city": "Prešov",
+      "medianM2": 3613,
+      "monthsDisplay": 13
+    },
+    "b": {
+      "city": "Nitra",
+      "medianM2": 3494,
+      "monthsDisplay": 36
+    },
+    "priceGap": 119,
+    "monthsGap": 23
+  },
+  "priceSignal": {
+    "fast": {
+      "projects": 26,
+      "pctChanged": 3.2,
+      "pctUp": 78.8
+    },
+    "mid": {
+      "projects": 10,
+      "pctChanged": 26.3,
+      "pctUp": 97.6
+    },
+    "slow": {
+      "projects": 55,
+      "pctChanged": 8.9,
+      "pctUp": 92.9
+    }
+  },
   "supplyMix": {
     "sk": {
       "1": 8.9,
@@ -860,7 +1260,7 @@
     },
     "cz": {
       "1": 19.8,
-      "2": 45.6,
+      "2": 45.5,
       "3": 25.7,
       "4": 8.9
     }
@@ -874,7 +1274,7 @@
     },
     "cz": {
       "1": 266648,
-      "2": 378696,
+      "2": 378715,
       "3": 523559,
       "4": 760194
     }
@@ -894,7 +1294,7 @@
     "medianPct": 2.0
   },
   "caveats": {
-    "leftCensoredPct": 92.5,
+    "leftCensoredPct": 90.2,
     "parkingCoveragePct": 28.3
   },
   "benchmark": {
@@ -904,10 +1304,11 @@
     "avgM2": 5341,
     "supply": 4231,
     "meanPrice": 380000,
+    "quarterSales": 652,
     "note": "priemerná ponuková cena novostavby, s DPH"
   },
   "reconciliation": {
-    "ourSupplyComparable": 4303,
+    "ourSupplyComparable": 4305,
     "ourMeanPrice": 387873,
     "supplyDeltaPct": 1.7,
     "meanPriceDeltaPct": 2.1,
@@ -920,22 +1321,6 @@
     "indexSoldOut": 192,
     "sellingProjectsNotTracked": 15,
     "freeUnitsNotTracked": 101
-  },
-  "salesWithheld": {
-    "keys": [
-      "closestPricedPair",
-      "mixCz",
-      "mixSk",
-      "mixSkCommon",
-      "monthsToClear",
-      "priceSignal",
-      "quartiles",
-      "sales90d"
-    ],
-    "why": [
-      "analytics.sale_events holds 3644 durable Slovak sales against 1313 in reference.unit_ledger (178 % apart)",
-      "61.7 % of sale_events sales carry one date"
-    ]
   },
   "slug": "mapa-novostavieb-2026-09"
 }

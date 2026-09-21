@@ -93,7 +93,35 @@ def build_vars(rep: dict) -> dict:
 
     bb = towns["Banská Bystrica"]
     scope = rep["nationalMap"]["scope"]
-    v = {
+
+    # Every town the prose names, keyed by its own initials, so a town that
+    # leaves the map fails the render instead of quietly printing a placeholder.
+    NAMED = {
+        "ba": "Bratislava", "nr": "Nitra", "tt": "Trnava", "ke": "Košice",
+        "po": "Prešov", "pp": "Poprad", "tn": "Trenčín", "za": "Žilina",
+        "bb": "Banská Bystrica", "mt": "Martin", "lc": "Lučenec", "ps": "Piešťany",
+    }
+    # 🔴 ORDINALS ARE COMPUTED, NEVER COUNTED BY HAND. The first draft called
+    # Piešťany "the third cheapest metre" by reading a sorted list on screen; it
+    # is the fifth. An ordinal is a figure like any other and decays the same way.
+    table_set = [t for t in towns.values()
+                 if t["available"] >= TABLE_MIN_STOCK and t["medianPrice"]]
+    KRAJ = ["Bratislava", "Trnava", "Trenčín", "Nitra", "Žilina",
+            "Banská Bystrica", "Prešov", "Košice"]
+
+    def _ord(city: str, field: str, pool: list, reverse: bool) -> int:
+        vals = sorted((t[field] for t in pool), reverse=reverse)
+        return vals.index(towns[city][field]) + 1
+
+    v: dict = {}
+    for key, name in NAMED.items():
+        t = towns[name]
+        v[f"{key}Available"] = sk_int(t["available"])
+        v[f"{key}M2"] = sk_int(t["medianM2"])
+        v[f"{key}Price"] = sk_int(t["medianPrice"])
+        v[f"{key}Area"] = sk_dec(t["medianArea"])
+        v[f"{key}AreaEn"] = en_dec(t["medianArea"])
+    v |= {
         "asOf": sk_date(rep["asOf"]),
         "rankThreshold": RANK_MIN_STOCK,
         "restMedian": sk_int(scope["rest"]["medianM2"]),
@@ -113,13 +141,10 @@ def build_vars(rep: dict) -> dict:
         "baBiggestPct": sk_dec(ba["biggestPct"], 0),
         "baSharePct": sk_dec(100 * ba["available"] / tot["available"], 0),
         "baMedian": sk_int(ba["medianM2"]),
-        "baPrice": sk_int(ba["medianPrice"]),
-        "baArea": sk_dec(ba["medianArea"]),
         "baShift": sk_int(abs(ba["shiftExBiggest"])),
         "baShiftPct": sk_dec(shift_pct("Bratislava")),
         "bbBiggestPct": sk_dec(bb["biggestPct"], 0),
         "bbProjects": bb["projects"],
-        "bbMedian": sk_int(bb["medianM2"]),
         "bbMedianEx": sk_int(bb["medianM2ExBiggest"]),
         "bbShift": sk_int(abs(bb["shiftExBiggest"])),
         "bbShiftPct": sk_dec(shift_pct("Banská Bystrica")),
@@ -134,9 +159,6 @@ def build_vars(rep: dict) -> dict:
         "keProjects": towns["Košice"]["projects"],
         "poBiggestPct": sk_dec(towns["Prešov"]["biggestPct"], 0),
         "poProjects": towns["Prešov"]["projects"],
-        "nrPrice": sk_int(towns["Nitra"]["medianPrice"]),
-        "poPrice": sk_int(towns["Prešov"]["medianPrice"]),
-        "bbPrice": sk_int(bb["medianPrice"]),
         "stepDays": step["days"],
         "baMoves": sk_int(step["bratislava"]["moves"]),
         "baMoveProjects": step["bratislava"]["projects"],
@@ -161,13 +183,37 @@ def build_vars(rep: dict) -> dict:
         "benchPeriod": rep["benchmark"]["period"],
         "benchSupply": sk_int(rep["benchmark"]["supply"]),
         "benchMeanPrice": sk_int(rep["benchmark"]["meanPrice"]),
+        "benchQuarterSales": sk_int(rep["benchmark"]["quarterSales"]),
         "ourSupplyComparable": sk_int(rep["reconciliation"]["ourSupplyComparable"]),
         "ourMeanPrice": sk_int(rep["reconciliation"]["ourMeanPrice"]),
         "supplyDeltaPct": sk_dec(abs(rep["reconciliation"]["supplyDeltaPct"])),
         "meanPriceDeltaPct": sk_dec(abs(rep["reconciliation"]["meanPriceDeltaPct"])),
+        "tableMinStock": TABLE_MIN_STOCK,
+        "chartMinStock": TABLE_MIN_STOCK,
+        "baMonths": rep["monthsToClear"]["byScope"]["bratislava"]["monthsDisplay"],
+        "restMonths": rep["monthsToClear"]["byScope"]["rest"]["monthsDisplay"],
+        # What Bencont's own published pair implies for Bratislava, computed from
+        # their two numbers rather than transcribed from an arithmetic we did once.
+        "benchMonths": sk_dec(
+            rep["benchmark"]["supply"] / (rep["benchmark"]["quarterSales"] / 3), 0),
+        "moves90": sk_int(rep["priceMoves90d"]["moves"]),
+        "moveProjects": rep["priceMoves90d"]["projects"],
+        "movesUpPct": sk_dec(rep["priceMoves90d"]["pctUp"]),
+        "moveMedianPct": sk_dec(rep["priceMoves90d"]["medianPct"]),
+        # Where each named town sits, worked out rather than eyeballed.
+        "psM2RankAsc": _ord("Piešťany", "medianM2", table_set, False),
+        "bbM2RankDesc": _ord("Banská Bystrica", "medianM2", table_set, True),
+        "bbKrajRankAsc": _ord("Banská Bystrica", "medianPrice",
+                              [towns[c] for c in KRAJ], False),
+        "tableTowns": len(table_set),
+        "biggestAreaTown": max(table_set, key=lambda t: t["medianArea"])["city"],
+        "cheapestM2Town": min(table_set, key=lambda t: t["medianM2"])["city"],
         "townTable": town_table(rep, "sk"),
         "townTableEn": town_table(rep, "en"),
         "asOfEn": en_date(rep["asOf"]),
+        "baSharePctEn": en_dec(100 * ba["available"] / tot["available"], 0),
+        "movesUpPctEn": en_dec(rep["priceMoves90d"]["pctUp"]),
+        "moveMedianPctEn": en_dec(rep["priceMoves90d"]["medianPct"]),
         "windowFromEn": en_date(rep["window"]["sk"]["from"]),
         "covMissingPctEn": en_dec(
             100 * rep["externalCoverageCheck"]["freeUnitsNotTracked"] / tot["available"]),
@@ -178,23 +224,34 @@ def build_vars(rep: dict) -> dict:
     return v
 
 
+#: A town is in the printed table from this many available homes. Below it the
+#: row is a handful of flats and a reader cannot do anything with it.
+TABLE_MIN_STOCK = 40
+
+
 def town_table(rep: dict, lang: str = "sk") -> str:
     """The map itself. Every town with a new-build on offer, so a reader can find
     their own and a journalist can lift one row. Sorted by stock, because that is
     the order in which the towns matter to the market rather than alphabetically."""
-    head = (("| Mesto | Voľné byty | Projekty | Podiel najväčšieho projektu | "
-             "Medián €/m² s DPH | Medián ceny bytu |") if lang == "sk" else
-            ("| Town | Available | Projects | Largest project's share | "
-             "Median €/m² incl. VAT | Median flat price |"))
+    head = (("| Mesto | Voľné byty | Medián ceny bytu | Medián €/m² s DPH | "
+             "Medián výmery | Mesiace do vypredania |") if lang == "sk" else
+            ("| Town | Available | Median flat price | Median €/m² incl. VAT | "
+             "Median floor area | Months to clear |"))
     head += "\n|---|---:|---:|---:|---:|---:|"
+    # Months to clear exists only for towns with enough observed sales for the
+    # denominator to mean anything; the rest of the column is honestly empty.
+    months = {r["city"]: r["monthsDisplay"]
+              for r in rep.get("monthsToClear", {}).get("byCity", [])}
     rows = []
     for t in rep["nationalMap"]["towns"]:
-        m2 = f"{sk_int(t['medianM2'])} €" if t["medianM2"] else "—"
-        pr = f"{sk_int(t['medianPrice'])} €" if t["medianPrice"] else "—"
-        share = (f"{sk_dec(t['biggestPct'], 0)} %" if lang == "sk"
-                 else f"{en_dec(t['biggestPct'], 0)}%")
-        rows.append(f"| {t['city']} | {sk_int(t['available'])} | {t['projects']} | "
-                    f"{share} | {m2} | {pr} |")
+        if t["available"] < TABLE_MIN_STOCK or not t["medianPrice"]:
+            continue
+        area = (f"{sk_dec(t['medianArea'], 0)} m²" if lang == "sk"
+                else f"{en_dec(t['medianArea'], 0)} m²")
+        mo = months.get(t["city"])
+        rows.append(f"| {t['city']} | {sk_int(t['available'])} | "
+                    f"{sk_int(t['medianPrice'])} € | {sk_int(t['medianM2'])} € | "
+                    f"{area} | {mo if mo else '—'} |")
     return head + "\n" + "\n".join(rows)
 
 

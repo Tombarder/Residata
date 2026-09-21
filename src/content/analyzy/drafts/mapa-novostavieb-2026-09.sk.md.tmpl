@@ -1,79 +1,57 @@
 <!--PEREX
-V {oneProject} zo {towns} slovenských miest s ponukou novostavieb je v predaji jediný projekt a v {twoOrFewer} nanajvýš dva. Vynechanie najväčšieho projektu posunie medián mesta o {bbShiftPct} % v Banskej Bystrici a o {baShiftPct} % v Bratislave.
+Medián ceny ponúkaného bytu v novostavbe je {baPrice} € v Bratislave, {nrPrice} € v Nitre a {mtPrice} € v Martine. Z {moves90} zmien cenníkov za posledných {stepDays} dní smerovalo {movesUpPct} % nahor.
 -->
 <!--METHOD
-Dáta sú z verejne zverejnených cenníkov developerov, ktoré Residata zaznamenáva denne od {windowFrom} ({windowDays} dní). Voľné byty sú byty vedené developerom ako voľné, bez rezervovaných a predaných; do prehľadu vstupujú len projekty, ktorých cenník čítame aktuálne, a len mestá s aspoň {mapMinStock} voľnými bytmi. Počítajú sa výlučne byty, nie parkovanie, pivnice ani nebytové priestory. Cena za m² je počítaná z obytnej plochy vrátane DPH a uvádza sa ako medián, nie priemer; ide o ponukové ceny z cenníkov. Posun mediánu je rozdiel oproti mediánu toho istého mesta bez jeho najväčšieho oceneného projektu a uvádza sa len tam, kde zostalo aspoň desať bytov s cenou. Zmena ceny porovnáva ten istý byt s jeho vlastnou skoršou cenou, pri jednom čítaní na byt a deň a zmene aspoň o dvesto eur. Pokrytie sme k {asOf} porovnali s registrom rezido.sk: {covMissingProjects} predávajúcich projektov mimo nášho katalógu so {covMissingUnits} voľnými bytmi, teda {covMissingPct} % ponuky. Za Bratislavu sa naše čísla líšia od údajov {benchSource} za {benchPeriod} o {supplyDeltaPct} % v ponuke a o {meanPriceDeltaPct} % v priemernej ponukovej cene. Všetky čísla sú naše vlastné.
+Dáta sú z verejne zverejnených cenníkov developerov, ktoré Residata zaznamenáva denne od {windowFrom} ({windowDays} dní). Voľné byty sú byty vedené developerom ako voľné, bez rezervovaných a predaných; počítajú sa výlučne byty, nie parkovanie, pivnice ani nebytové priestory. Cena za m² je počítaná z obytnej plochy vrátane DPH a uvádza sa ako medián, nie priemer; ide o ponukové ceny z cenníkov, nie o realizačné ceny z katastra. Mesiace do vypredania sú zásoba delená priemerným mesačným počtom predajov za sledované obdobie a uvádzajú sa len pre mestá s dostatočným počtom predajov; rezervované byty sa rátajú ako zásoba, nie ako predaj. Zmena ceny porovnáva ten istý byt s jeho vlastnou skoršou cenou, pri jednom čítaní na byt a deň a pri zmene aspoň o dvesto eur. Za Bratislavu sa naše čísla líšia od údajov {benchSource} za {benchPeriod} o {supplyDeltaPct} % v ponuke a o {meanPriceDeltaPct} % v priemernej ponukovej cene.
 -->
 ANALÝZA TRHU · Mapa novostavieb · {asOf}
 
-# V dvoch tretinách slovenských miest tvoria ponuku novostavieb nanajvýš dva projekty. Priemerná cena mesta je ich cenník
+# Za cenu bratislavskej novostavby sú v Martine dve. Ceny nikde neklesajú
 
-Slovenské mestá mimo Bratislavy majú za sebou desaťročie, v ktorom sa v nich stavalo viac než kedykoľvek predtým. O tom, ako sa v nich predáva, sa pritom nedá dočítať takmer nič: pravidelné analýzy trhu s novostavbami pokrývajú Bratislavu a za jej hranicami sa ceny zverejňujú ako krajské a mestské priemery. Priemer mlčky predpokladá, že pod ním leží trh, z ktorého sa dá priemerovať. Vo väčšine slovenských miest sú pod ním jeden alebo dva cenníky.
+Slovenskú ponuku novostavieb tvorí {totalAvailable} voľných bytov v {totalProjects} projektoch v {towns} mestách, z toho polovica v Bratislave. Medián ceny ponúkaného bytu je {baPrice} € v Bratislave, {nrPrice} € v Nitre a {mtPrice} € v Martine. Jednotková cena dosahuje {baScopeMedian} €/m² s DPH v Bratislave a {restMedian} €/m² s DPH vo zvyšku krajiny. Z {moves90} zmien cenníkov za posledných {stepDays} dní smerovalo {movesUpPct} % nahor.
 
-**V tomto čísle:** z koľkých projektov je zložená ponuka v každom zo {towns} slovenských miest, v ktorých sa dá dnes kúpiť byt v novostavbe · čo sa stane s cenou mesta, keď sa z nej vynechá jeden projekt · o koľko sa mimo Bratislavy hýbe cena toho istého bytu.
+Ponuku ku dňu {asOf} tvorilo {totalAvailable} voľných bytov v {totalProjects} projektoch v {towns} mestách. V Bratislave je {baAvailable} z nich, teda {baSharePct} % celej krajiny; zvyšných {restAvailable} bytov je rozdelených medzi {restTowns} miest. Najväčšie regionálne trhy sú Nitra s {nrAvailable} bytmi, Trnava s {ttAvailable}, Košice s {keAvailable}, Prešov s {poAvailable} a Poprad s {ppAvailable}.
 
----
+Medián jednotkovej ceny je v Bratislave {baScopeMedian} €/m² s DPH a vo zvyšku krajiny {restMedian} €/m² s DPH. Poradie miest za Bratislavou nekopíruje ich veľkosť: druhé sú Košice s {keM2} €/m² s DPH, tretia Žilina so {zaM2} a štvrtá Banská Bystrica s {bbM2}, teda vyššie než Trnava ({ttM2}), Trenčín ({tnM2}) aj Nitra ({nrM2}). Najnižšiu jednotkovú cenu z {tableTowns} miest s väčšou ponukou má {cheapestM2Town} s {lcM2} €/m² s DPH.
 
-Byty v novostavbách sa dnes predávajú v každom slovenskom krajskom meste a v desiatkach menších. Novostavba v Prešove, vo Zvolene alebo v Liptovskom Mikuláši je bežná ponuka a ceny, za ktoré sa v nich predáva, sa pravidelne objavujú v regionálnych štatistikách.
+Medián absolútnej ceny bytu je v Bratislave {baPrice} € pri výmere {baArea} m². Je to zhruba dvojnásobok mediánu v Martine ({mtPrice} €) a takmer trojnásobok v Lučenci ({lcPrice} €). Poradie podľa ceny bytu a poradie podľa ceny za meter sa pritom rozchádzajú. Piešťany sú {psM2RankAsc}. najlacnejšie na meter ({psM2} €/m² s DPH), no medián bytu majú {psPrice} €, teda vyšší než v Trnave aj v Nitre, pretože piešťanské byty sú s {psArea} m² najväčšie z celej tabuľky. Banská Bystrica je opačný prípad: {bbM2RankDesc}. najdrahšia na meter, no s výmerou {bbArea} m² a mediánom {bbPrice} € najlacnejšie z ôsmich krajských miest.
 
-Čo tie ceny znamenajú, sa však nikde nerozoberá. Pravidelné analýzy novostavieb sa venujú Bratislave, kde je z čoho počítať; mimo nej sa publikujú priemery za kraj alebo za krajské mesto a nikto neukazuje, z čoho sú zložené. Rozdiel medzi tým, čo taký priemer meria v Bratislave a čo meria v Trenčíne, pritom nie je akademický.
+**V tomto čísle:** Čo stojí byt v novostavbe v slovenských mestách · Pohľad na aktuálne smerovanie trhu
 
-Otázka teda neznie, aký je regionálny priemer vysoký. Znie, z koľkých cenníkov je zložený a čo sa s ním stane, keď sa jeden z nich pohne. Od odpovede závisí, či sa oň developer môže oprieť pri nacenení etapy a či z neho kupujúci vyčíta, čo je v jeho meste drahé.
+## Čo stojí byt v novostavbe v slovenských mestách
 
-Odpoveď je v každom meste iná a dá sa vyčísliť. V Bratislave drží najväčší projekt {baBiggestPct} % ponuky mesta. V Banskej Bystrici {bbBiggestPct} %. A v {oneProject} z {towns} miest drží najväčší projekt celú ponuku, pretože je jediný.
+![Medián ceny bytu v novostavbe podľa miest](/analyzy/{slug}-1-cena-bytu.svg)
+*Medián ceny ponúkaného bytu s DPH, mestá s aspoň {chartMinStock} voľnými bytmi.*
 
-Tie podiely vychádzajú z veľmi rôzne veľkých ponúk. Z {totalAvailable} voľných bytov, ktoré dnes tvoria celú slovenskú ponuku novostavieb, stojí {baSharePct} % v jedinom meste: {baAvailable} bytov v Bratislave, v {baProjects} projektoch, z ktorých ani jeden nepresahuje {baBiggestPct} % ponuky. Zvyšných {restAvailable} bytov je rozdelených medzi {restTowns} miest a {twoOrFewer} z nich má v ponuke nanajvýš dva projekty. Medián jednotkovej ceny je pritom v Bratislave {baScopeMedian} €/m² s DPH a vo zvyšku krajiny {restMedian} €/m² s DPH.
+Pri súčasnom tempe predaja by sa bratislavská ponuka vypredala za {baMonths} mesiacov a ponuka vo zvyšku krajiny za {restMonths} mesiacov. Bratislavský údaj sa dá overiť zvonka: z ponuky {benchSupply} bytov a {benchQuarterSales} predaných bytov, ktoré za {benchPeriod} zverejnil {benchSource}, vychádza {benchMonths} mesiacov. Pre ostatné mestá porovnanie neexistuje, pretože tieto čísla nikto nepublikuje.
 
-![Podiel najväčšieho projektu na ponuke mesta](/analyzy/{slug}-1-jeden-projekt.svg)
-*Podiel najväčšieho projektu na voľných bytoch, mestá s aspoň {rankThreshold} voľnými bytmi.*
-
-Čo to robí s cenou, najlepšie ukazuje Banská Bystrica. S mediánom {bbMedian} €/m² s DPH je to {bbRank}. najdrahšie z {bbRankedOf} miest, ktoré majú v ponuke aspoň {rankThreshold} voľných bytov — drahšie než Trnava, Trenčín aj Prešov. Keď sa z výpočtu vynechá jediný projekt, ten najväčší, medián mesta klesne na {bbMedianEx} €/m² s DPH a prepadne sa na {bbRankEx}. miesto. Rozdiel je {bbShift} €/m² s DPH, teda {bbShiftPct} % ceny, a nestojí za ním ani jedna zmena cenníka.
-
-Rovnaký výpočet v ostatných mestách vedie k rovnakému obrazu. V Trenčíne posunie vynechanie najväčšieho projektu medián mesta o {tnShiftPct} %, v Žiline o {zaShiftPct} % a v Košiciach o {keShiftPct} %. V Bratislave o {baShiftPct} %. A v {noOfferWithoutBiggest} mestách sa taký výpočet nedá spraviť vôbec: po vynechaní najväčšieho projektu v nich nezostane ani jedna zverejnená cena.
-
-Priemerná cena mesta je teda údajom o tom, čo je v ňom práve v ponuke. V meste s jedným alebo dvoma projektmi je to údaj o jednom cenníku. Keď sa taký projekt vypredá alebo keď developer uvedie ďalšiu etapu, priemer mesta sa pohne bez toho, aby sa zmenila čo i len jedna cena.
-
-Na tom, ako sa ceny hýbu, to vidno rovnako. Za posledných {stepDays} dní sme zaznamenali {baMoves} zmien ceny toho istého bytu v Bratislave a {restMoves} v ostatných mestách, pričom počet projektov, ktoré cenu pohli, bol takmer rovnaký ({baMoveProjects} a {restMoveProjects}). Smer sa nelíši: nahor smerovalo {baUp} % bratislavských zmien a {restUp} % ostatných. Líši sa veľkosť kroku. Bratislavský developer mení cenu bytu o {baStep} %, developer mimo Bratislavy o {restStep} %, teda {stepRatio}-násobne viac.
-
-![Medián zmeny ceny toho istého bytu](/analyzy/{slug}-2-krok-ceny.svg)
-*Medián zmeny ceny toho istého bytu, ak sa zmenila, za posledných {stepDays} dní.*
-
-„V Bratislave nacení developer byt oproti desiatkam susedných cenníkov a potom sa opravuje po malých krokoch. V Trenčíne alebo v Banskej Bystrici sa nemá oproti čomu naceniť, takže cenu nastaví a mení ju skokom, keď vidí, ako sa predáva,“ hovorí Tomáš Kamhal, zakladateľ Residaty. „Nie je za tým chamtivosť ani nekompetentnosť, je to dôsledok toho, že v tých mestách nie je s kým sa porovnať. A pokiaľ v regionálnych mestách nepribudnú ďalšie projekty, ostane to tak — regionálne priemery budú aj naďalej merať skôr rozhodnutia jednotlivých developerov než pohyb trhu.“
-
-Pre kupujúceho je to rozdiel, ktorý sa dá spočítať. Medián bytu v ponuke stojí v Bratislave {baPrice} €, v Nitre {nrPrice} €, v Prešove {poPrice} € a v Banskej Bystrici {bbPrice} €. Kupujúci v Bratislave si tú cenu môže porovnať s {baOtherProjects} ďalšími cenníkmi v tom istom meste. V {oneProject} mestách druhý cenník neexistuje.
-
-Pre kupujúceho v Bratislave to znamená, že priemer, ktorý číta v správach, zhruba zodpovedá tomu, čo uvidí v ponuke. Pre kupujúceho v Trenčíne alebo v Banskej Bystrici znamená ten istý typ čísla podstatne menej a jeho pohyb ešte menej. Pre developera, ktorý podľa regionálneho priemeru nastavuje cenu etapy, to znamená, že sa v {oneProject} z {towns} miest porovnáva výhradne sám so sebou.
-
-Ukazovateľom, ktorý bude v najbližších mesiacoch vypovedať viac než samotná úroveň cien, je počet miest, ktoré prejdú z jedného projektu na dva. Dnes je takých miest {oneProject} z {towns}.
-
----
-
-## Mapa: slovenské mestá s ponukou novostavieb
+![Medián ceny za meter podľa miest](/analyzy/{slug}-2-cena-za-meter.svg)
+*Medián ceny za m² s DPH; poradie miest je rovnaké ako v predošlom grafe.*
 
 {townTable}
 
----
+## Pohľad na aktuálne smerovanie trhu
+
+„Cena za meter sama o sebe nestačí ani kupujúcemu, ani developerovi. Rozdiel medzi Piešťanmi a Banskou Bystricou je presne o tom: na metri sú Piešťany lacnejšie, na byte drahšie, lebo sa tam stavia väčšie. Kto porovnáva mestá cez cenu za meter, porovnáva iný tovar," hovorí Tomáš Kamhal, zakladateľ Residaty.
+
+„Druhá vec, ktorú v dátach vidno každý deň, je, že developeri ceny neznižujú. Z {moves90} zmien cenníkov za tri mesiace išlo {movesUpPct} % nahor a medián zmeny bol {moveMedianPct} %. Keď sa byt nepredáva, zostane v ponuke dlhšie a cenník sa nehýbe nadol. Preto o tomto trhu vypovedá viac to, ako dlho sa ponuka predáva, než to, o koľko percent sa pohla cena."
 
 <!--CMS-SKIP-START-->
 ## Metodická poznámka
 
-Residata číta cenníky slovenských developerov každý deň, byt po byte. Tento prehľad stojí na {totalProjects} projektoch, ktoré tvoria ponuku v {towns} mestách, a na pozorovaniach od {windowFrom}, teda za {windowDays} dní.
+Residata číta cenníky slovenských developerov každý deň, byt po byte. Tento prehľad stojí na {totalProjects} projektoch v {towns} mestách a na pozorovaniach od {windowFrom}, teda za {windowDays} dní.
 
-**Čo sa počíta.** *Voľné byty* sú byty vedené developerom ako voľné; rezervované a predané sa do nich nerátajú. Do prehľadu vstupujú výlučne projekty, ktorých cenník čítame aktuálne — projekt, ktorý sme prestali čítať, z mapy vypadáva aj s poslednou známou ponukou. Mesto je v mape, ak má v ponuke aspoň {mapMinStock} voľných bytov; pod touto hranicou ide o jednotlivé zostatkové byty, nie o ponuku mesta. Počítajú sa len byty — garáže, parkovacie státia, pivnice a nebytové priestory sú z každého čísla vylúčené. *Medián €/m²* je medián jednotkových cien jednotlivých bytov, počítaný z obytnej plochy a vrátane DPH; ide o ponukové ceny z cenníkov, nie o realizačné ceny z katastra. Bencont a BuiltMind publikujú priemer a pracujú s úžitkovou plochou, takže ich jednotková cena a naša sa porovnávať nedajú priamo.
+**Čo sa počíta.** Voľné byty sú byty vedené developerom ako voľné; rezervované a predané sa do nich nerátajú. Do prehľadu vstupujú len projekty, ktorých cenník čítame aktuálne, a mestá s aspoň {mapMinStock} voľnými bytmi; v tabuľke sú mestá s aspoň {tableMinStock} voľnými bytmi. Počítajú sa výlučne byty — garáže, parkovacie státia, pivnice a nebytové priestory sú z každého čísla vylúčené. Medián €/m² je počítaný z obytnej plochy vrátane DPH; ide o ponukové ceny. Bencont a BuiltMind publikujú priemer a pracujú s úžitkovou plochou, takže ich jednotková cena a naša sa neporovnávajú priamo.
 
-**Ako sa počíta podiel najväčšieho projektu a posun mediánu.** Podiel najväčšieho projektu je jeho počet voľných bytov delený počtom voľných bytov v meste. Posun mediánu je rozdiel medzi mediánom mesta a mediánom toho istého mesta po vynechaní jeho najväčšieho projektu s uvedenými cenami; posun sa uvádza len tam, kde po vynechaní zostalo aspoň desať bytov s cenou.
+**Mesiace do vypredania** sú zásoba delená priemerným mesačným počtom predajov za sledované obdobie; predaj sa určuje zo zmien stavu v cenníku developera. Rezervované byty sa rátajú ako zásoba, nie ako predaj, a ich podiel je mimo Bratislavy vyšší, takže regionálne čísla sú v tomto smere skôr opatrné.
 
-**Ako sa počíta zmena ceny.** Porovnáva sa cena toho istého bytu v tom istom projekte oproti jeho vlastnej skoršej cene, pri jednom čítaní na byt a deň a pri zmene aspoň o dvesto eur. Ide teda o zmenu na jednotke, nie o pohyb priemeru.
+**Zmena ceny** porovnáva ten istý byt s jeho vlastnou skoršou cenou, pri jednom čítaní na byt a deň a pri zmene aspoň o dvesto eur.
 
-**Kontrola pokrytia.** Register rezido.sk vedie {covIndexProjects} slovenských projektov, z toho {covSoldOut} vypredaných. Porovnanie s naším katalógom k {asOf} našlo {covMissingProjects} predávajúcich projektov, ktoré nesledujeme, spolu s {covMissingUnits} voľnými bytmi — {covMissingPct} % celoslovenskej ponuky.
+**Kontrola pokrytia.** Register rezido.sk vedie {covIndexProjects} slovenských projektov, z toho {covSoldOut} vypredaných. Porovnanie s naším katalógom k {asOf} našlo {covMissingProjects} predávajúcich projektov, ktoré nesledujeme, so {covMissingUnits} voľnými bytmi, teda {covMissingPct} % ponuky.
 
-**Kontrola voči publikovaným číslam.** Za Bratislavu, kde je s čím porovnávať, sedia naše údaje s tým, čo publikujú etablované domy: {benchSource} uvádza za {benchPeriod} ponuku {benchSupply} bytov, nám na porovnateľnej definícii vychádza {ourSupplyComparable} — rozdiel {supplyDeltaPct} %. Priemerná ponuková cena bytu je u nich {benchMeanPrice} € a u nás {ourMeanPrice} €, rozdiel {meanPriceDeltaPct} %.
-
-**Rozsah tohto čísla.** Pracuje výhradne s ponukou a s cenami.
-
----
+**Kontrola voči publikovaným číslam.** {benchSource} uvádza za {benchPeriod} bratislavskú ponuku {benchSupply} bytov; nám na porovnateľnej definícii vychádza {ourSupplyComparable}, rozdiel {supplyDeltaPct} %. Priemerná ponuková cena bytu je u nich {benchMeanPrice} € a u nás {ourMeanPrice} €, rozdiel {meanPriceDeltaPct} %.
 
 <!--CMS-SKIP-END-->
 **Tomáš Kamhal** · zakladateľ, Residata · tomas@residata.eu
 
-Residata sleduje cenníky novostavieb na Slovensku a v Česku denne, byt po byte. Ďalšie číslo vychádza v októbri. Ak chcete dostávať analýzy e-mailom, napíšte nám na info@residata.eu.
+Residata sleduje cenníky novostavieb na Slovensku a v Česku denne, byt po byte. Ďalšie číslo vychádza v októbri.
