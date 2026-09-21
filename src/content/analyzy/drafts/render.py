@@ -328,6 +328,8 @@ def build_vars(rep: dict) -> dict:
         "cqM2": sk_int(ours["meanM2"]), "cqPrice": sk_int(ours["meanPrice"]),
         "cqArea": sk_dec(ours["meanArea"]), "cqAreaEn": en_dec(ours["meanArea"]),
         "cqSales": sk_int(ours["sales"]), "cqRunRate": sk_int(ours["salesRunRate"]),
+        # What was actually observed before the quarter was closed on the pace.
+        "cqSalesObserved": sk_int(ours.get("preliminary", {}).get("salesObserved", ours["sales"])),
         "cqDaysObs": ours["daysObserved"], "cqDaysTot": ours["daysTotal"],
         "cqSoldM2": sk_int(ours["soldM2"]), "cqSoldPrice": sk_int(ours["soldPrice"]),
         "cqSoldArea": sk_dec(ours["soldArea"]), "cqSoldAreaEn": en_dec(ours["soldArea"]),
