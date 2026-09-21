@@ -6,8 +6,6 @@
 -- partitions, and tables defined in the scraper repo. SIX WERE NOT DEFINED
 -- ANYWHERE AT ALL:
 --
---   public.user_dashboards      every user's saved dashboard layout — the app
---                               reads and writes it on every /app visit
 --   public.premium_domains      which e-mail domain gets which tier; read by
 --                               src/lib/capabilities.js
 --   public.rls_auto_enable()    the event-trigger function that turns RLS ON for
@@ -19,7 +17,11 @@
 --   public.notify_admin_on_profile_complete()
 --
 -- They were referenced in application code and in a security review document, and
--- created by hand in the Supabase console. Had the database been rebuilt from the
+-- created by hand in the Supabase console. (A sixth, public.user_dashboards, turned
+-- out to HAVE a migration — written 2026-07-07, marked "applied live", committed to
+-- a branch nobody ever merged. That original is now on main in the scraper repo as
+-- v2/migrations/2026-07-07_user_dashboards.sql, which is its author's chosen home;
+-- defining it here as well would be the same drift in a new place.) Had the database been rebuilt from the
 -- repositories, all six would simply have been absent. This file is the record;
 -- it is written so that running it against the live database changes nothing.
 --
@@ -72,48 +74,7 @@ BEGIN
 END $$;
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 2. user_dashboards — the personalised /app landing page
--- ─────────────────────────────────────────────────────────────────────────────
-
-CREATE TABLE IF NOT EXISTS public.user_dashboards (
-    user_id    uuid        NOT NULL PRIMARY KEY
-                           REFERENCES auth.users(id) ON DELETE CASCADE,
-    config     jsonb       NOT NULL DEFAULT '{}'::jsonb,
-    created_at timestamptz NOT NULL DEFAULT now(),
-    updated_at timestamptz NOT NULL DEFAULT now()
-);
-
-ALTER TABLE public.user_dashboards ENABLE ROW LEVEL SECURITY;
-
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public'
-                   AND tablename='user_dashboards' AND policyname='dashboard_select_own') THEN
-    CREATE POLICY dashboard_select_own ON public.user_dashboards
-      FOR SELECT TO authenticated USING (user_id = auth.uid());
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public'
-                   AND tablename='user_dashboards' AND policyname='dashboard_insert_own') THEN
-    CREATE POLICY dashboard_insert_own ON public.user_dashboards
-      FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid());
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public'
-                   AND tablename='user_dashboards' AND policyname='dashboard_update_own') THEN
-    CREATE POLICY dashboard_update_own ON public.user_dashboards
-      FOR UPDATE TO authenticated USING (user_id = auth.uid())
-                               WITH CHECK (user_id = auth.uid());
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public'
-                   AND tablename='user_dashboards' AND policyname='dashboard_delete_own') THEN
-    CREATE POLICY dashboard_delete_own ON public.user_dashboards
-      FOR DELETE TO authenticated USING (user_id = auth.uid());
-  END IF;
-END $$;
-
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.user_dashboards TO authenticated;
-
--- ─────────────────────────────────────────────────────────────────────────────
--- 3. premium_domains — which e-mail domain gets which tier
+-- 2. premium_domains — which e-mail domain gets which tier
 -- ─────────────────────────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS public.premium_domains (
@@ -145,7 +106,7 @@ END $$;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.premium_domains TO authenticated;
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 4. the user_profiles triggers
+-- 3. the user_profiles triggers
 -- ─────────────────────────────────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION public.auto_approve_on_profile_complete()
