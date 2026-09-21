@@ -163,6 +163,15 @@ def build_vars(rep: dict) -> dict:
                "4+": "Four-room and larger"}
     rooms = {r["disp"]: r for r in qt["byRooms"]}
     sold_rooms = {r["disp"]: r for r in qt["soldByRooms"]}
+    # 🔴 THE ROOM GROUPS DO NOT SUM TO THE HEADLINE TOTALS AND MUST NOT BE SET
+    # AGAINST THEM. They cover flats with a published price AND a floor area AND
+    # a room count — 3 479 of the 4 305 on offer, and 455 of the 575 sales
+    # measured. The draft wrote "1 456 z 4 305" and "735 sold" over groups adding
+    # to 455; a reader with a calculator finds the gap before we do. So the prose
+    # uses SHARES of the classified set, which cannot be subtracted into nonsense,
+    # and the table caption states the base.
+    rooms_total = sum(r["n"] for r in qt["byRooms"])
+    sold_total = sum(r["n"] for r in qt["soldByRooms"])
 
     def rooms_table(lang: str) -> str:
         names = ROOM_SK if lang == "sk" else ROOM_EN
@@ -397,8 +406,10 @@ def build_vars(rep: dict) -> dict:
         "cqYear": ours["q"].split()[1],
         # The run of quarters the quote calls "around N a quarter" — averaged, not
         # eyeballed, and it moves with the series.
+        # The last four quarters INCLUDING ours. Averaging only the earlier ones
+        # printed "sales hold at around 666" two lines under "sales reached 735".
         "avgQuarterSales": sk_int(
-            sum(r["sales"] for r in pub["quarters"][-4:] ) / 4),
+            (sum(r["sales"] for r in pub["quarters"][-3:]) + ours["sales"]) / 4),
         "cqSupply": sk_int(ours["supply"]), "cqProjects": ours["projects"],
         "cqM2": sk_int(ours["meanM2"]), "cqPrice": sk_int(ours["meanPrice"]),
         "cqArea": sk_dec(ours["meanArea"]), "cqAreaEn": en_dec(ours["meanArea"]),
@@ -409,6 +420,14 @@ def build_vars(rep: dict) -> dict:
         "cqSoldM2": sk_int(ours["soldM2"]), "cqSoldPrice": sk_int(ours["soldPrice"]),
         "cqSoldArea": sk_dec(ours["soldArea"]), "cqSoldAreaEn": en_dec(ours["soldArea"]),
         "pqLabel": vp["q"], "yqLabel": vy["q"],
+        # "Q2 2026" is a table label. In Slovak prose it reads as machine output,
+        # so the paragraphs get the ordinal the market actually says out loud.
+        # "oproti" takes the dative: oproti druhému štvrťroku.
+        "pqName": {1: "prvému", 2: "druhému", 3: "tretiemu",
+                   4: "štvrtému"}[int(vp["q"][1])] + " štvrťroku",
+        "pqNameNom": {1: "prvého", 2: "druhého", 3: "tretieho",
+                      4: "štvrtého"}[int(vp["q"][1])] + " štvrťroka",
+        "seriesSpan": f"{pub['quarters'][0]['q']} – {ours['q']}",
         "pqSupply": sk_int(abs(vp["supply"])), "pqSupplyPct": sk_dec(abs(vp["supplyPct"])),
         "pqSupplyPctEn": en_dec(abs(vp["supplyPct"])),
         "pqM2Pct": sk_dec(abs(vp["m2Pct"])), "pqM2PctEn": en_dec(abs(vp["m2Pct"])),
@@ -459,7 +478,24 @@ def build_vars(rep: dict) -> dict:
                    / min(r["meanM2"] for r in qt["byRooms"]) - 1)),
         "r1M2": sk_int(rooms["1"]["meanM2"]), "r1Price": sk_int(rooms["1"]["meanPrice"]),
         "r1Area": sk_dec(rooms["1"]["meanArea"]), "r1AreaEn": en_dec(rooms["1"]["meanArea"]),
+        "roomsTotal": sk_int(rooms_total), "soldTotalRooms": sk_int(sold_total),
         "r1N": sk_int(rooms["1"]["n"]), "r1Sold": sk_int(sold_rooms["1"]["n"]),
+        "r1Share": sk_dec(100 * rooms["1"]["n"] / rooms_total),
+        "r2Share": sk_dec(100 * rooms["2"]["n"] / rooms_total),
+        "r3Share": sk_dec(100 * rooms["3"]["n"] / rooms_total),
+        "r4Share": sk_dec(100 * rooms["4+"]["n"] / rooms_total),
+        "r1ShareEn": en_dec(100 * rooms["1"]["n"] / rooms_total),
+        "r2ShareEn": en_dec(100 * rooms["2"]["n"] / rooms_total),
+        "r3ShareEn": en_dec(100 * rooms["3"]["n"] / rooms_total),
+        "r4ShareEn": en_dec(100 * rooms["4+"]["n"] / rooms_total),
+        "r1SoldShare": sk_dec(100 * sold_rooms["1"]["n"] / sold_total),
+        "r2SoldShare": sk_dec(100 * sold_rooms["2"]["n"] / sold_total),
+        "r3SoldShare": sk_dec(100 * sold_rooms["3"]["n"] / sold_total),
+        "r4SoldShare": sk_dec(100 * sold_rooms["4+"]["n"] / sold_total),
+        "r1SoldShareEn": en_dec(100 * sold_rooms["1"]["n"] / sold_total),
+        "r2SoldShareEn": en_dec(100 * sold_rooms["2"]["n"] / sold_total),
+        "r3SoldShareEn": en_dec(100 * sold_rooms["3"]["n"] / sold_total),
+        "r4SoldShareEn": en_dec(100 * sold_rooms["4+"]["n"] / sold_total),
         "r2M2": sk_int(rooms["2"]["meanM2"]), "r2Price": sk_int(rooms["2"]["meanPrice"]),
         "r2Area": sk_dec(rooms["2"]["meanArea"]), "r2AreaEn": en_dec(rooms["2"]["meanArea"]),
         "r2N": sk_int(rooms["2"]["n"]), "r2Sold": sk_int(sold_rooms["2"]["n"]),
