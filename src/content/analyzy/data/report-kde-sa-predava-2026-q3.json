@@ -1,6 +1,6 @@
 {
   "asOf": "2026-10-01",
-  "generatedAt": "2026-09-22T11:43:42+00:00",
+  "generatedAt": "2026-09-22T11:47:49+00:00",
   "bratislavaReport": {
     "thenDate": "2026-07-19",
     "nowDate": "2026-09-22",
@@ -2232,5 +2232,5 @@
     "sellingProjectsNotTracked": 15,
     "freeUnitsNotTracked": 101
   },
-  "slug": "kvartalka-ba-2026-q3"
+  "slug": "kde-sa-predava-2026-q3"
 }

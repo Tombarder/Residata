@@ -1,0 +1,27 @@
+<!--PEREX
+Ponuku novostavieb na Slovensku tvorí {natStock} bytov v {natTowns} mestách. Rýchlosť predaja sa medzi mestami líši {natSpread}-násobne: v meste {natFastest} by sa súčasná ponuka vypredala za {natFastestMo} mesiaca, v meste {natSlowest} za {natSlowestMo}.
+-->
+<!--METHOD
+Údaje pochádzajú z verejne zverejnených cenníkov slovenských developerov, ktoré Residata číta denne, byt po byte. Ponuku tvoria voľné a rezervované byty v aktívnych projektoch; počítajú sa výlučne byty, nie parkovanie, pivnice ani nebytové priestory. Ceny a výmery sú priemerom za byty, pri ktorých developer cenu zverejňuje — tie tvoria {natPricedShare} % ponuky. Cenové úrovne sú počítané ako priemer denných hodnôt za posledné dva týždne štvrťroka, aby ich neovplyvnil jeden deň, v ktorom niektorý projekt pridal alebo stiahol časť ponuky. Mesiace do vypredania sú podiel aktuálnej ponuky a mesačného tempa predaja v danom štvrťroku; uvádzame ich len pri mestách s aspoň {natMinSales} predanými bytmi, pretože pri menšom počte ide o rozhodnutie jedného projektu, nie o tempo mesta.
+-->
+{asOf} | KVARTÁLNY PREHĽAD TRHU S NOVOSTAVBAMI NA SLOVENSKU
+
+# V jednom meste sa ponuka vypredá za {natFastestMo} mesiaca, v druhom za {natSlowestMo}
+
+Ponuku novostavieb na Slovensku tvorilo v závere štvrťroka {natStock} bytov v {natTowns} mestách. Priemerná cena aj veľkosť ponuky sa medzi mestami líšia, no najväčší rozdiel nie je v cene — je v tom, ako rýchlo sa tá ponuka predáva.
+
+Pri súčasnom tempe predaja by sa ponuka v meste {natFastest} vypredala za {natFastestMo} mesiaca. V meste {natSlowest} by to trvalo {natSlowestMo} mesiaca, teda {natSpread}-násobne dlhšie. Pritom {natFastest} má priemernú cenu {natFastestM2} €/m² s DPH a {natSlowest} {natSlowestM2} €/m² s DPH.
+
+{natTable}
+
+\* Mesiace do vypredania uvádzame pri {natWithClearing} mestách, ktoré majú v tomto štvrťroku aspoň {natMinSales} predaných bytov. Pri ostatných je vzorka primalá na to, aby tempo mesta odlíšila od rozhodnutia jedného projektu.
+
+## Pohľad na to, čo tabuľka hovorí
+
+Tomáš Kamhal, zakladateľ Residaty: „Rýchlosť vypredania je pre developera aj pre kupujúceho užitočnejšia než samotná cena. Hovorí, koľko času má trh na to, aby súčasnú ponuku vstrebal — a či je priestor pridávať ďalšiu.
+
+Z tabuľky je zrejmé, že cena a rýchlosť spolu nesúvisia tak priamo, ako by sa čakalo. Mestá s podobnou cenovou úrovňou sa vypredávajú rôznym tempom a najpomalšie mestá nie sú tie najdrahšie.
+
+Pre kupujúceho to znamená, že tlak na rýchle rozhodnutie je v každom meste iný. Tam, kde by sa ponuka vypredala za rok, má zmysel konať; tam, kde by to trvalo štyri, je čas na výber."
+
+**Autor:** Tomáš Kamhal, zakladateľ Residaty · tomas@residata.eu
