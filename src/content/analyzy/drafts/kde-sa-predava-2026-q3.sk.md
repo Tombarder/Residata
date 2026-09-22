@@ -1,16 +1,20 @@
 <!--PEREX
-Ponuku novostavieb na Slovensku tvorí 9 234 bytov v 45 mestách. Rýchlosť predaja sa medzi mestami líši 4,2-násobne: v meste Trenčín by sa súčasná ponuka vypredala za 12,6 mesiaca, v meste Banská Bystrica za 53,5.
+Kvartálny prehľad trhu s novostavbami na celom Slovensku. Ponuku tvorí 9 380 bytov v 45 mestách. Rýchlosť predaja sa medzi mestami líši 4,2-násobne: v meste Trenčín by sa súčasná ponuka vypredala za 12,6 mesiaca, v meste Banská Bystrica za 53,5.
 -->
 <!--METHOD
-Údaje pochádzajú z verejne zverejnených cenníkov slovenských developerov, ktoré Residata číta denne, byt po byte. Ponuku tvoria voľné a rezervované byty v aktívnych projektoch; počítajú sa výlučne byty, nie parkovanie, pivnice ani nebytové priestory. Ceny a výmery sú priemerom za byty, pri ktorých developer cenu zverejňuje — tie tvoria 72,9 % ponuky. Cenové úrovne sú počítané ako priemer denných hodnôt za posledné dva týždne štvrťroka, aby ich neovplyvnil jeden deň, v ktorom niektorý projekt pridal alebo stiahol časť ponuky. Mesiace do vypredania sú podiel aktuálnej ponuky a mesačného tempa predaja v danom štvrťroku; uvádzame ich len pri mestách s aspoň 10 predanými bytmi, pretože pri menšom počte ide o rozhodnutie jedného projektu, nie o tempo mesta.
+Údaje pochádzajú z verejne zverejnených cenníkov slovenských developerov, ktoré Residata číta denne, byt po byte. Ponuku tvoria voľné a rezervované byty v aktívnych projektoch; počítajú sa výlučne byty, nie parkovanie, pivnice ani nebytové priestory. Ceny a výmery sú priemerom za byty, pri ktorých developer cenu zverejňuje — tie tvoria 72,5 % ponuky. Cenové úrovne sú počítané ako priemer denných hodnôt za posledné dva týždne štvrťroka, aby ich neovplyvnil jeden deň, v ktorom niektorý projekt pridal alebo stiahol časť ponuky. Mesiace do vypredania sú podiel aktuálnej ponuky a mesačného tempa predaja v danom štvrťroku; uvádzame ich len pri mestách s aspoň 10 predanými bytmi, pretože pri menšom počte ide o rozhodnutie jedného projektu, nie o tempo mesta.
 -->
 1. októbra 2026 | KVARTÁLNY PREHĽAD TRHU S NOVOSTAVBAMI NA SLOVENSKU
 
-# V jednom meste sa ponuka vypredá za 12,6 mesiaca, v druhom za 53,5
+# Slovensko: v jednom meste sa ponuka vypredá za 12,6 mesiaca, v druhom za 53,5
 
-Ponuku novostavieb na Slovensku tvorilo v závere štvrťroka 9 234 bytov v 45 mestách. Priemerná cena aj veľkosť ponuky sa medzi mestami líšia, no najväčší rozdiel nie je v cene — je v tom, ako rýchlo sa tá ponuka predáva.
+Ponuku novostavieb na Slovensku tvorilo v závere štvrťroka 9 380 bytov v 45 mestách. Priemerná cena aj veľkosť ponuky sa medzi mestami líšia, no najväčší rozdiel nie je v cene — je v tom, ako rýchlo sa tá ponuka predáva.
 
-Pri súčasnom tempe predaja by sa ponuka v meste Trenčín vypredala za 12,6 mesiaca. V meste Banská Bystrica by to trvalo 53,5 mesiaca, teda 4,2-násobne dlhšie. Pritom Trenčín má priemernú cenu 4 005 €/m² s DPH a Banská Bystrica 3 884 €/m² s DPH.
+Na Bratislavu pripadá 43,1 % celej ponuky a 51,9 % predaja — zvyšných 44 miest si delí 5 338 bytov. Cenovo je rozptyl 2,5-násobný: Bratislava 5 722 €/m² s DPH, Lučenec 2 320 €/m² s DPH.
+
+Rýchlosť predaja sa však s cenou neprekrýva. Pri súčasnom tempe by sa ponuka v meste Trenčín vypredala za 12,6 mesiaca, v meste Banská Bystrica za 53,5 — 4,2-násobne dlhšie. Pritom Trenčín má priemernú cenu 4 005 €/m² s DPH a Banská Bystrica 3 884 €/m² s DPH, teda nižšiu. Naprieč 11 mestami, pri ktorých vieme tempo spočítať, je súvislosť medzi cenou a rýchlosťou vypredania prakticky nulová (korelácia 0,07). Cena mesta o jeho tempe nehovorí nič.
+
+Rozdiel medzi mestami je pritom lepšie vidieť na ploche než na percentách. Za cenu priemerného bratislavského bytu — 382 814 € s DPH — kúpite v Bratislave 67 m². Inde za tie isté peniaze: Lučenec 165 m², Lužianky 156 m², Spišská Nová Ves 150 m².
 
 | Mesto | Ponuka | €/m² s DPH | Priemerný byt | Výmera | Predané | Mesiacov do vypredania |
 |---|---:|---:|---:|---:|---:|---:|
@@ -19,11 +23,11 @@ Pri súčasnom tempe predaja by sa ponuka v meste Trenčín vypredala za 12,6 me
 | Trnava | 584 | 4 077 € | 231 043 € | 58,7 m² | 64 | 27,4 |
 | Nitra | 525 | 3 498 € | 216 209 € | 63,0 m² | 43 | 36,6 |
 | Prešov | 501 | 3 720 € | 253 025 € | 69,4 m² | 91 | 16,5 |
+| Zvolen | 374 | 3 573 € | 232 383 € | 65,9 m² | 2 | — |
 | Poprad | 362 | 3 666 € | 232 257 € | 63,2 m² | 21 | 51,7 |
 | Trenčín | 273 | 4 005 € | 278 754 € | 69,2 m² | 65 | 12,6 |
 | Banská Bystrica | 232 | 3 884 € | 222 089 € | 59,8 m² | 13 | 53,5 |
 | Liptovský Mikuláš | 228 | 3 975 € | 253 051 € | 63,9 m² | 6 | — |
-| Zvolen | 228 | 3 454 € | 239 560 € | 70,5 m² | 2 | — |
 | Žilina | 214 | 4 219 € | 266 411 € | 64,1 m² | 39 | 16,5 |
 | Piešťany | 128 | 3 162 € | 236 004 € | 74,0 m² | 7 | — |
 | Martin | 105 | 3 048 € | 184 912 € | 60,9 m² | 22 | 14,3 |

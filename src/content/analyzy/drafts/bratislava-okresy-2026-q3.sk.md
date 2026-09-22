@@ -6,7 +6,7 @@ Ponuku bratislavských novostavieb tvorí 4 042 bytov. Polovica z nej je sústr
 -->
 1. októbra 2026 | BRATISLAVSKÉ NOVOSTAVBY PODĽA OKRESOV
 
-# Polovica bratislavskej ponuky stojí v dvoch okresoch
+# Bratislava: polovica ponuky novostavieb stojí v dvoch okresoch
 
 Ponuku bytov na bratislavskom trhu s novostavbami tvorilo v závere štvrťroka 4 042 bytov. Polovica celej ponuky je sústredená v okresoch Bratislava II (28,6 %) a Bratislava IV (22,2 %), teda spolu 50,8 %.
 

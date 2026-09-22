@@ -6,7 +6,7 @@ The data comes from the publicly published price lists of Bratislava developers,
 -->
 1 October 2026 | BRATISLAVA NEW-BUILDS BY DISTRICT
 
-# Half of Bratislava's offer stands in two districts
+# Bratislava: half of the new-build offer stands in two districts
 
 At the close of the quarter the supply on the Bratislava new-build market stood at 4 042 flats. Half of the whole offer is concentrated in the Bratislava II (28.6%) and Bratislava IV (22.2%) districts, 50.8% together.
 

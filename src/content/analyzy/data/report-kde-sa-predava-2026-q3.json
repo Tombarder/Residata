@@ -1,6 +1,6 @@
 {
   "asOf": "2026-10-01",
-  "generatedAt": "2026-09-22T11:47:49+00:00",
+  "generatedAt": "2026-09-22T12:18:14+00:00",
   "bratislavaReport": {
     "thenDate": "2026-07-19",
     "nowDate": "2026-09-22",
@@ -346,11 +346,11 @@
         "medianArea": 58.6
       },
       "rest": {
-        "available": 3037,
-        "projects": 113,
-        "medianM2": 3679,
-        "medianPrice": 219900,
-        "medianArea": 61.0
+        "available": 3120,
+        "projects": 114,
+        "medianM2": 3682,
+        "medianPrice": 218410,
+        "medianArea": 60.7
       }
     },
     "towns": [
@@ -474,6 +474,23 @@
         "pricedExBiggest": 117
       },
       {
+        "city": "Zvolen",
+        "available": 201,
+        "projects": 3,
+        "biggest": 100,
+        "biggestPct": 49.8,
+        "priced": 201,
+        "pricedProjects": 3,
+        "pricedBiggest": 100,
+        "pricedBiggestPct": 49.8,
+        "medianM2": 3502,
+        "medianPrice": 207600,
+        "medianArea": 59.1,
+        "medianM2ExBiggest": 3679,
+        "shiftExBiggest": 177,
+        "pricedExBiggest": 101
+      },
+      {
         "city": "Banská Bystrica",
         "available": 178,
         "projects": 8,
@@ -523,23 +540,6 @@
         "medianM2ExBiggest": 3664,
         "shiftExBiggest": -191,
         "pricedExBiggest": 63
-      },
-      {
-        "city": "Zvolen",
-        "available": 118,
-        "projects": 2,
-        "biggest": 100,
-        "biggestPct": 84.7,
-        "priced": 118,
-        "pricedProjects": 2,
-        "pricedBiggest": 100,
-        "pricedBiggestPct": 84.7,
-        "medianM2": 3495,
-        "medianPrice": 210000,
-        "medianArea": 61.5,
-        "medianM2ExBiggest": 3536,
-        "shiftExBiggest": 41,
-        "pricedExBiggest": 18
       },
       {
         "city": "Piešťany",
@@ -1088,10 +1088,10 @@
     ],
     "totals": {
       "towns": 43,
-      "available": 7302,
-      "projects": 240,
+      "available": 7385,
+      "projects": 241,
       "oneProjectTowns": 18,
-      "twoOrFewerTowns": 27,
+      "twoOrFewerTowns": 26,
       "fiveOrMoreTowns": 10,
       "noOfferWithoutBiggest": 28
     }
@@ -1149,6 +1149,16 @@
         "monthsToClear": 16.5
       },
       {
+        "city": "Zvolen",
+        "stock": 374,
+        "priced": 195,
+        "meanM2": 3573,
+        "meanPrice": 232383,
+        "meanArea": 65.9,
+        "sold": 2,
+        "monthsToClear": null
+      },
+      {
         "city": "Poprad",
         "stock": 362,
         "priced": 209,
@@ -1186,16 +1196,6 @@
         "meanPrice": 253051,
         "meanArea": 63.9,
         "sold": 6,
-        "monthsToClear": null
-      },
-      {
-        "city": "Zvolen",
-        "stock": 228,
-        "priced": 124,
-        "meanM2": 3454,
-        "meanPrice": 239560,
-        "meanArea": 70.5,
-        "sold": 2,
         "monthsToClear": null
       },
       {
@@ -1550,7 +1550,7 @@
       }
     ],
     "townCount": 45,
-    "totalStock": 9234,
+    "totalStock": 9380,
     "withClearing": 11,
     "minSalesForClearing": 10,
     "fastest": {
@@ -1572,7 +1572,49 @@
       "meanArea": 59.8,
       "sold": 13,
       "monthsToClear": 53.5
-    }
+    },
+    "baShareStockPct": 43.1,
+    "baShareSoldPct": 51.9,
+    "restTowns": 44,
+    "restStock": 5338,
+    "dearest": {
+      "city": "Bratislava",
+      "stock": 4042,
+      "priced": 3280,
+      "meanM2": 5722,
+      "meanPrice": 382814,
+      "meanArea": 65.6,
+      "sold": 583,
+      "monthsToClear": 20.8
+    },
+    "cheapest": {
+      "city": "Lučenec",
+      "stock": 57,
+      "priced": 15,
+      "meanM2": 2320,
+      "meanPrice": 117967,
+      "meanArea": 51.1,
+      "sold": 2,
+      "monthsToClear": null
+    },
+    "priceSpread": 2.5,
+    "priceVsSpeedR": -0.07,
+    "sameMoneyBuys": [
+      {
+        "city": "Lučenec",
+        "sqm": 165
+      },
+      {
+        "city": "Lužianky",
+        "sqm": 156
+      },
+      {
+        "city": "Spišská Nová Ves",
+        "sqm": 150
+      }
+    ],
+    "yardstickPrice": 382814,
+    "yardstickSqm": 67
   },
   "baByOkres": {
     "rows": [
@@ -1689,7 +1731,7 @@
     "reasons": []
   },
   "coverage": {
-    "skActiveProjects": 247,
+    "skActiveProjects": 248,
     "czActiveProjects": 154
   },
   "bratislava": {
@@ -2205,7 +2247,7 @@
   },
   "caveats": {
     "leftCensoredPct": 90.3,
-    "parkingCoveragePct": 28.3
+    "parkingCoveragePct": 28.6
   },
   "benchmark": {
     "source": "Bencont Investments",

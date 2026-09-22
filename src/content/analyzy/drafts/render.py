@@ -209,6 +209,102 @@ def okres_sales_table(rep: dict, lang: str) -> str:
 
 
 
+def _issue_specific_vars(rep: dict) -> dict:
+    """Variables that only exist for the issues whose data the report carries.
+
+    🔴 build_vars() used to compute every variable for every article, so adding a
+    block for one issue broke the render of another whose report JSON predated it
+    — a KeyError inside a dict literal, on an article that does not use the
+    variable at all. A missing section must not be a crash somewhere else; a
+    template that actually ASKS for a missing variable still gets the explicit
+    "the report does not provide it" refusal, which is the failure we want.
+    """
+    out: dict = {}
+    # Keyed on a field the block actually needs, not on the section: a report
+    # generated before these figures existed still HAS a nationalQuarterly
+    # section, just without them.
+    if "baShareStockPct" in (rep.get("nationalQuarterly") or {}):
+        nq = rep["nationalQuarterly"]
+        out.update({
+            # ── the national table ──────────────────────────────────────────
+            "natTable": national_table(rep, "sk"),
+            "natTableEn": national_table(rep, "en"),
+            "natTowns": rep["nationalQuarterly"]["townCount"],
+            "natStock": sk_int(rep["nationalQuarterly"]["totalStock"]),
+            "natStockEn": f'{rep["nationalQuarterly"]["totalStock"]:,}'.replace(",", "\u00a0"),
+            "natWithClearing": rep["nationalQuarterly"]["withClearing"],
+            "natBaShare": sk_dec(rep["nationalQuarterly"]["baShareStockPct"]),
+            "natBaShareEn": en_dec(rep["nationalQuarterly"]["baShareStockPct"]),
+            "natBaSoldShare": sk_dec(rep["nationalQuarterly"]["baShareSoldPct"]),
+            "natBaSoldShareEn": en_dec(rep["nationalQuarterly"]["baShareSoldPct"]),
+            "natRestTowns": rep["nationalQuarterly"]["restTowns"],
+            "natRestStock": sk_int(rep["nationalQuarterly"]["restStock"]),
+            "natRestStockEn": f'{rep["nationalQuarterly"]["restStock"]:,}'.replace(",", "\u00a0"),
+            "natDearest": rep["nationalQuarterly"]["dearest"]["city"],
+            "natDearestM2": sk_int(rep["nationalQuarterly"]["dearest"]["meanM2"]),
+            "natCheapest": rep["nationalQuarterly"]["cheapest"]["city"],
+            "natCheapestM2": sk_int(rep["nationalQuarterly"]["cheapest"]["meanM2"]),
+            "natPriceSpread": sk_dec(rep["nationalQuarterly"]["priceSpread"]),
+            "natPriceSpreadEn": en_dec(rep["nationalQuarterly"]["priceSpread"]),
+            # The correlation, stated as a number instead of hedged in prose.
+            "natCorr": sk_dec(abs(rep["nationalQuarterly"]["priceVsSpeedR"]), 2),
+            "natCorrEn": en_dec(abs(rep["nationalQuarterly"]["priceVsSpeedR"]), 2),
+            "natYardstick": sk_int(rep["nationalQuarterly"]["yardstickPrice"]),
+            "natYardstickEn": f'{rep["nationalQuarterly"]["yardstickPrice"]:,}'.replace(",", "\u00a0"),
+            "natYardstickSqm": rep["nationalQuarterly"]["yardstickSqm"],
+            "natBuy1": rep["nationalQuarterly"]["sameMoneyBuys"][0]["city"],
+            "natBuy1Sqm": rep["nationalQuarterly"]["sameMoneyBuys"][0]["sqm"],
+            "natBuy2": rep["nationalQuarterly"]["sameMoneyBuys"][1]["city"],
+            "natBuy2Sqm": rep["nationalQuarterly"]["sameMoneyBuys"][1]["sqm"],
+            "natBuy3": rep["nationalQuarterly"]["sameMoneyBuys"][2]["city"],
+            "natBuy3Sqm": rep["nationalQuarterly"]["sameMoneyBuys"][2]["sqm"],
+            # What share of the offer carries a published price — stated because the
+            # price columns are computed on it and the stock column is not.
+            "natPricedShare": sk_dec(round(
+                100.0 * sum(t["priced"] for t in rep["nationalQuarterly"]["towns"])
+                / max(rep["nationalQuarterly"]["totalStock"], 1), 1)),
+            "natPricedShareEn": en_dec(round(
+                100.0 * sum(t["priced"] for t in rep["nationalQuarterly"]["towns"])
+                / max(rep["nationalQuarterly"]["totalStock"], 1), 1)),
+            "natMinSales": rep["nationalQuarterly"]["minSalesForClearing"],
+            "natFastest": rep["nationalQuarterly"]["fastest"]["city"],
+            "natFastestMo": sk_dec(rep["nationalQuarterly"]["fastest"]["monthsToClear"]),
+            "natFastestMoEn": en_dec(rep["nationalQuarterly"]["fastest"]["monthsToClear"]),
+            "natSlowest": rep["nationalQuarterly"]["slowest"]["city"],
+            "natSlowestMo": sk_dec(rep["nationalQuarterly"]["slowest"]["monthsToClear"]),
+            "natSlowestMoEn": en_dec(rep["nationalQuarterly"]["slowest"]["monthsToClear"]),
+            # The spread is the finding, so it is computed rather than described.
+            "natSpread": sk_dec(rep["nationalQuarterly"]["slowest"]["monthsToClear"]
+                                / rep["nationalQuarterly"]["fastest"]["monthsToClear"]),
+            "natSpreadEn": en_dec(rep["nationalQuarterly"]["slowest"]["monthsToClear"]
+                                  / rep["nationalQuarterly"]["fastest"]["monthsToClear"]),
+            "natFastestM2": sk_int(rep["nationalQuarterly"]["fastest"]["meanM2"]),
+            "natSlowestM2": sk_int(rep["nationalQuarterly"]["slowest"]["meanM2"]),
+        })
+    if "rows" in (rep.get("baByOkres") or {}):
+        out.update({
+            # ── Bratislava by okres ─────────────────────────────────────────
+            "okresSupplyTable": okres_supply_table(rep, "sk"),
+            "okresSupplyTableEn": okres_supply_table(rep, "en"),
+            "okresSalesTable": okres_sales_table(rep, "sk"),
+            "okresSalesTableEn": okres_sales_table(rep, "en"),
+            "okresTop": rep["baByOkres"]["rows"][0]["okres"],
+            "okresTopShare": sk_dec(rep["baByOkres"]["rows"][0]["sharePct"]),
+            "okresTopShareEn": en_dec(rep["baByOkres"]["rows"][0]["sharePct"]),
+            "okresSecond": rep["baByOkres"]["rows"][1]["okres"],
+            "okresSecondShare": sk_dec(rep["baByOkres"]["rows"][1]["sharePct"]),
+            "okresSecondShareEn": en_dec(rep["baByOkres"]["rows"][1]["sharePct"]),
+            "okresTwoShare": sk_dec(rep["baByOkres"]["rows"][0]["sharePct"]
+                                    + rep["baByOkres"]["rows"][1]["sharePct"]),
+            "okresTwoShareEn": en_dec(rep["baByOkres"]["rows"][0]["sharePct"]
+                                      + rep["baByOkres"]["rows"][1]["sharePct"]),
+            "okresUnmapped": sk_int(rep["baByOkres"]["unmappedStock"]),
+            "okresSold": sk_int(rep["baByOkres"]["totalSold"]),
+        })
+    return out
+
+
+
 def build_vars(rep: dict) -> dict:
     towns = {t["city"]: t for t in rep["nationalMap"]["towns"]}
     tot = rep["nationalMap"]["totals"]
@@ -653,52 +749,6 @@ def build_vars(rep: dict) -> dict:
         # Live margins are 0,9 % and 1,2 %; either selection flips on a normal month.
         "uShapeSk": _u_shape(qt, "sk"),
         "uShapeEn": _u_shape(qt, "en"),
-        # ── the national table ──────────────────────────────────────────
-        "natTable": national_table(rep, "sk"),
-        "natTableEn": national_table(rep, "en"),
-        "natTowns": rep["nationalQuarterly"]["townCount"],
-        "natStock": sk_int(rep["nationalQuarterly"]["totalStock"]),
-        "natStockEn": f'{rep["nationalQuarterly"]["totalStock"]:,}'.replace(",", "\u00a0"),
-        "natWithClearing": rep["nationalQuarterly"]["withClearing"],
-        # What share of the offer carries a published price — stated because the
-        # price columns are computed on it and the stock column is not.
-        "natPricedShare": sk_dec(round(
-            100.0 * sum(t["priced"] for t in rep["nationalQuarterly"]["towns"])
-            / max(rep["nationalQuarterly"]["totalStock"], 1), 1)),
-        "natPricedShareEn": en_dec(round(
-            100.0 * sum(t["priced"] for t in rep["nationalQuarterly"]["towns"])
-            / max(rep["nationalQuarterly"]["totalStock"], 1), 1)),
-        "natMinSales": rep["nationalQuarterly"]["minSalesForClearing"],
-        "natFastest": rep["nationalQuarterly"]["fastest"]["city"],
-        "natFastestMo": sk_dec(rep["nationalQuarterly"]["fastest"]["monthsToClear"]),
-        "natFastestMoEn": en_dec(rep["nationalQuarterly"]["fastest"]["monthsToClear"]),
-        "natSlowest": rep["nationalQuarterly"]["slowest"]["city"],
-        "natSlowestMo": sk_dec(rep["nationalQuarterly"]["slowest"]["monthsToClear"]),
-        "natSlowestMoEn": en_dec(rep["nationalQuarterly"]["slowest"]["monthsToClear"]),
-        # The spread is the finding, so it is computed rather than described.
-        "natSpread": sk_dec(rep["nationalQuarterly"]["slowest"]["monthsToClear"]
-                            / rep["nationalQuarterly"]["fastest"]["monthsToClear"]),
-        "natSpreadEn": en_dec(rep["nationalQuarterly"]["slowest"]["monthsToClear"]
-                              / rep["nationalQuarterly"]["fastest"]["monthsToClear"]),
-        "natFastestM2": sk_int(rep["nationalQuarterly"]["fastest"]["meanM2"]),
-        "natSlowestM2": sk_int(rep["nationalQuarterly"]["slowest"]["meanM2"]),
-        # ── Bratislava by okres ─────────────────────────────────────────
-        "okresSupplyTable": okres_supply_table(rep, "sk"),
-        "okresSupplyTableEn": okres_supply_table(rep, "en"),
-        "okresSalesTable": okres_sales_table(rep, "sk"),
-        "okresSalesTableEn": okres_sales_table(rep, "en"),
-        "okresTop": rep["baByOkres"]["rows"][0]["okres"],
-        "okresTopShare": sk_dec(rep["baByOkres"]["rows"][0]["sharePct"]),
-        "okresTopShareEn": en_dec(rep["baByOkres"]["rows"][0]["sharePct"]),
-        "okresSecond": rep["baByOkres"]["rows"][1]["okres"],
-        "okresSecondShare": sk_dec(rep["baByOkres"]["rows"][1]["sharePct"]),
-        "okresSecondShareEn": en_dec(rep["baByOkres"]["rows"][1]["sharePct"]),
-        "okresTwoShare": sk_dec(rep["baByOkres"]["rows"][0]["sharePct"]
-                                + rep["baByOkres"]["rows"][1]["sharePct"]),
-        "okresTwoShareEn": en_dec(rep["baByOkres"]["rows"][0]["sharePct"]
-                                  + rep["baByOkres"]["rows"][1]["sharePct"]),
-        "okresUnmapped": sk_int(rep["baByOkres"]["unmappedStock"]),
-        "okresSold": sk_int(rep["baByOkres"]["totalSold"]),
         # the U-shape, computed
         "dearestM2Room": ROOM_SK[max(qt["byRooms"], key=lambda r: r["meanM2"])["disp"]].lower(),
         "cheapestM2Room": ROOM_SK[min(qt["byRooms"], key=lambda r: r["meanM2"])["disp"]].lower(),
@@ -762,6 +812,7 @@ def build_vars(rep: dict) -> dict:
         "meanPriceDeltaPctEn": en_dec(abs(rep["reconciliation"]["meanPriceDeltaPct"])),
         "slug": rep["slug"],
     }
+    v.update(_issue_specific_vars(rep))
     return v
 
 

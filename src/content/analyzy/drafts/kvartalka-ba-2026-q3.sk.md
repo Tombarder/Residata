@@ -1,12 +1,12 @@
 <!--PEREX
-Predaj v Q3 2026 dosiahol 639 bytov oproti 652 z predchádzajúceho štvrťroka. Cenová úroveň ostala nezmenená, medziročne zaznamenala pokles o 0,3 %. V projektoch, ktoré boli v predaji celý štvrťrok, sa počet voľných bytov znížil o 2,6 %.
+Kvartálna analýza trhu s novostavbami v Bratislave. Predaj v Q3 2026 dosiahol 639 bytov oproti 652 z predchádzajúceho štvrťroka. Cenová úroveň ostala nezmenená, medziročne zaznamenala pokles o 0,3 %. V projektoch, ktoré boli v predaji celý štvrťrok, sa počet voľných bytov znížil o 2,6 %.
 -->
 <!--METHOD
 Údaje pochádzajú z verejne zverejnených cenníkov bratislavských developerov, ktoré Residata číta denne, byt po byte. Ponuku tvoria voľné a rezervované byty; počítajú sa výlučne byty, nie parkovanie, pivnice ani nebytové priestory. Priemerná cena za m² je priemer jednotkových cien jednotlivých bytov z obytnej plochy vrátane DPH; ide o ponukové ceny z cenníkov, nie o realizačné ceny z katastra. Cenové úrovne a priemery podľa dispozície sú počítané ako priemer denných hodnôt za posledné dva týždne štvrťroka, aby ich neovplyvnil jeden deň, v ktorom niektorý projekt pridal alebo stiahol časť ponuky. Polovičné dispozície sú zaokrúhlené nadol: byt s izbou a pol je vedený ako jednoizbový. Predaj sa určuje zo zmien stavu v cenníku developera. Zmena ceny porovnáva ten istý byt s jeho vlastnou skoršou cenou, pri jednom čítaní na byt a deň a pri zmene aspoň o dvesto eur.
 -->
 1. októbra 2026 | KVARTÁLNA ANALÝZA TRHU S BRATISLAVSKÝMI NOVOSTAVBAMI
 
-# Ponuka v rozbehnutých projektoch sa tenčí, predaj aj ceny stoja na mieste
+# Bratislava: ponuka v rozbehnutých projektoch sa tenčí, predaj aj ceny stoja na mieste
 
 Tretí štvrťrok 2026 na bratislavskom trhu s novostavbami znamenal stabilný dopyt, cenovú stagnáciu a ubúdanie voľných bytov v projektoch, ktoré sú už v predaji. Predaj dosiahol 639 bytov oproti 652 z predchádzajúceho štvrťroka. Cenová úroveň ostala prakticky nezmenená, medziročne zaznamenala pokles o 0,3 %. V ponuke bolo 4 042 bytov.
 
