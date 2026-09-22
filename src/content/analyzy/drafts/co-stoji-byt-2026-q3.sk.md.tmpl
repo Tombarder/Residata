@@ -1,0 +1,43 @@
+<!--PEREX
+Koľko stojí jedno-, dvoj-, troj- a štvorizbová novostavba v {cdTowns} slovenských mestách. Jednoizbový byt v Bratislave za {cdBa1Price} € je drahší než dvojizbový v {cdBa1Beats} z {cdBa1OutOf} ostatných miest.
+-->
+<!--METHOD
+Údaje pochádzajú z verejne zverejnených cenníkov slovenských developerov, ktoré Residata číta denne, byt po byte. Ide o novostavby — voľné a rezervované byty v aktívnych projektoch, nie starší bytový fond a nie inzeráty. Uvádzame medián, nie priemer: jeden drahý byt posunie priemer a medián neposunie, a niektoré bunky tabuľky obsahujú len desiatky bytov. Mesto sa v tabuľke objaví, ak má aspoň {cdMinCell} bytov v aspoň troch dispozíciách. Polovičné dispozície sú zaokrúhlené nadol: byt s izbou a pol je vedený ako jednoizbový. Zmena ceny je počítaná na tých istých bytoch, ktoré boli v ponuke na začiatku aj na konci štvrťroka — porovnanie medián s mediánom by sa hýbalo aj vtedy, keď sa nezmení ani jedna cena, stačí, aby sa zmenilo zloženie ponuky.
+-->
+{asOf} | CENY NOVOSTAVIEB PODĽA DISPOZÍCIE A MESTA
+
+# Slovensko: jednoizbový byt v Bratislave stojí viac než dvojizbový v {cdBa1Beats} z {cdBa1OutOf} miest
+
+Koľko stojí novostavba, závisí od dispozície aspoň tak ako od mesta. Mediánová cena jednoizbového bytu v Bratislave je {cdBa1Price} € s DPH. Za tie isté peniaze kúpite dvojizbový byt v {cdBa1Beats} z {cdBa1OutOf} ostatných miest, ktoré sledujeme — najlacnejší z nich je {cdCheapest2} s {cdCheapest2Price} €.
+
+{cdPriceTable}
+
+\* Mediánová cena bytu s DPH. Mesto je v tabuľke, ak má aspoň {cdMinCell} bytov v aspoň troch dispozíciách.
+
+## Koľko stojí jedna izba navyše
+
+Rozdiel medzi dvojizbovým a trojizbovým bytom nie je všade rovnaký. Najväčší je v meste {cdStepDear}, kde trojizbový byt stojí o {cdStepDearPct} % viac než dvojizbový; najmenší v meste {cdStepCheap} s rozdielom {cdStepCheapPct} %. V Bratislave je to {cdStepBa} %.
+
+Pre kupujúceho je to praktická informácia: v jednom meste znamená izba navyše polovicu ceny bytu, v druhom osminu. Prepočet na meter štvorcový ukazuje, prečo. V {cdM2Down} z {cdM2Total} miest je väčší byt na meter lacnejší — za priestor sa platí menej, čím viac ho je. Výnimkou sú {cdM2Up}, kde je to naopak.
+
+{cdM2Table}
+
+\* Mediánová cena za m² s DPH.
+
+## Čo sa za štvrťrok naozaj zmenilo
+
+Tabuľky vyššie hovoria, koľko byty stoja dnes. Na otázku, či zdraželi, sa nedá odpovedať porovnaním dvoch mediánov — medián sa pohne aj vtedy, keď sa nezmení ani jedna cena, stačí, aby sa zmenilo zloženie ponuky. Preto porovnávame tie isté byty, ktoré boli v ponuke na začiatku aj na konci štvrťroka.
+
+{cdChangeTable}
+
+\* Zmena mediánovej ceny za m² pri bytoch, ktoré boli v ponuke celý štvrťrok. Prázdna bunka znamená, že takých bytov bolo priveľa málo na spoľahlivý výpočet.
+
+## Pohľad na to, čo tabuľky hovoria
+
+Tomáš Kamhal, zakladateľ Residaty: „Prvé, čo z tabuliek vyplýva, je, že celoslovenský priemer ceny bytu nedáva zmysel. Rozdiel medzi dispozíciami v jednom meste býva väčší než rozdiel medzi mestami pri tej istej dispozícii.
+
+Druhé je tempo. Keď sa porovnávajú tie isté byty, pohyby sú rádovo menšie, než aké vidieť v medziročných porovnaniach mediánov. To neznamená, že ceny nerastú — znamená to, že väčšinu pohybu, ktorý býva zverejnený, spôsobuje zmena zloženia ponuky, nie prehodnotenie cenníkov.
+
+Pre kupujúceho z toho plynie jednoduchý záver: porovnávať treba konkrétnu dispozíciu v konkrétnom meste. Všetko ostatné je priemer, v ktorom sa jeho byt nenachádza."
+
+**Autor:** Tomáš Kamhal, zakladateľ Residaty · tomas@residata.eu

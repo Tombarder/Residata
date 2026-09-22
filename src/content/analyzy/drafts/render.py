@@ -209,6 +209,52 @@ def okres_sales_table(rep: dict, lang: str) -> str:
 
 
 
+ROOM_COL_SK = {"1": "1-izbový", "2": "2-izbový", "3": "3-izbový", "4+": "4- a viacizbový"}
+ROOM_COL_EN = {"1": "1-room", "2": "2-room", "3": "3-room", "4+": "4-room and larger"}
+
+
+def city_disposition_table(rep: dict, lang: str, field: str) -> str:
+    """What each layout costs, town by town. `field` is medPrice or medM2."""
+    cd = rep["cityByDisposition"]
+    names = ROOM_COL_SK if lang == "sk" else ROOM_COL_EN
+    first = "Mesto" if lang == "sk" else "Town"
+    head = ("| " + first + " | " + " | ".join(names[d] for d in cd["dispositions"]) + " |"
+            + "\n|---" + "|---:" * len(cd["dispositions"]) + "|")
+    rows = []
+    for r in cd["rows"]:
+        cells = []
+        for d in cd["dispositions"]:
+            c = r["cells"].get(d)
+            cells.append(f"{sk_int(c[field])} €" if c else "—")
+        rows.append(f"| {r['city']} | " + " | ".join(cells) + " |")
+    return head + "\n" + "\n".join(rows)
+
+
+def city_change_table(rep: dict, lang: str) -> str:
+    """And what the SAME flats did over the quarter. A cell with too small a
+    panel prints nothing rather than a number built on a handful of flats."""
+    cd = rep["cityByDisposition"]
+    names = ROOM_COL_SK if lang == "sk" else ROOM_COL_EN
+    first = "Mesto" if lang == "sk" else "Town"
+    head = ("| " + first + " | " + " | ".join(names[d] for d in cd["dispositions"]) + " |"
+            + "\n|---" + "|---:" * len(cd["dispositions"]) + "|")
+    dec = sk_dec if lang == "sk" else en_dec
+    rows = []
+    for r in cd["rows"]:
+        cells = []
+        for d in cd["dispositions"]:
+            c = r["cells"].get(d) or {}
+            if c.get("changePct") is None:
+                cells.append("—")
+            else:
+                sign = "+" if c["changePct"] >= 0 else "−"
+                cells.append(f"{sign}{dec(abs(c['changePct']), 2)} %")
+            
+        rows.append(f"| {r['city']} | " + " | ".join(cells) + " |")
+    return head + "\n" + "\n".join(rows)
+
+
+
 def _issue_specific_vars(rep: dict) -> dict:
     """Variables that only exist for the issues whose data the report carries.
 
@@ -280,6 +326,37 @@ def _issue_specific_vars(rep: dict) -> dict:
                                   / rep["nationalQuarterly"]["fastest"]["monthsToClear"]),
             "natFastestM2": sk_int(rep["nationalQuarterly"]["fastest"]["meanM2"]),
             "natSlowestM2": sk_int(rep["nationalQuarterly"]["slowest"]["meanM2"]),
+        })
+    if "rows" in (rep.get("cityByDisposition") or {}):
+        cd = rep["cityByDisposition"]
+        dec = lambda v, n=1: sk_dec(v, n)
+        out.update({
+            "cdPriceTable": city_disposition_table(rep, "sk", "medPrice"),
+            "cdPriceTableEn": city_disposition_table(rep, "en", "medPrice"),
+            "cdM2Table": city_disposition_table(rep, "sk", "medM2"),
+            "cdM2TableEn": city_disposition_table(rep, "en", "medM2"),
+            "cdChangeTable": city_change_table(rep, "sk"),
+            "cdChangeTableEn": city_change_table(rep, "en"),
+            "cdTowns": cd["townCount"],
+            "cdMinCell": cd["minCell"],
+            "cdBa1Price": sk_int(cd["ba1RoomPrice"]),
+            "cdBa1PriceEn": f'{cd["ba1RoomPrice"]:,}'.replace(",", "\u00a0"),
+            "cdBa1Beats": cd["ba1RoomBeats"],
+            "cdBa1OutOf": cd["ba1RoomOutOf"],
+            "cdCheapest2": cd["cheapest2Room"]["city"],
+            "cdCheapest2Price": sk_int(cd["cheapest2Room"]["price"]),
+            "cdStepDear": cd["stepDearest"]["city"],
+            "cdStepDearPct": sk_dec(cd["stepDearest"]["pct"]),
+            "cdStepDearPctEn": en_dec(cd["stepDearest"]["pct"]),
+            "cdStepCheap": cd["stepCheapest"]["city"],
+            "cdStepCheapPct": sk_dec(cd["stepCheapest"]["pct"]),
+            "cdStepCheapPctEn": en_dec(cd["stepCheapest"]["pct"]),
+            "cdStepBa": sk_dec(cd["stepBratislava"]),
+            "cdM2Down": len(cd["perM2FallsWithSize"]),
+            "cdM2Total": len(cd["perM2FallsWithSize"]) + len(cd["perM2RisesWithSize"]),
+            "cdM2Up": ", ".join(cd["perM2RisesWithSize"]),
+            "cdM2UpN": len(cd["perM2RisesWithSize"]),
+            "cdStepBaEn": en_dec(cd["stepBratislava"]),
         })
     if "rows" in (rep.get("baByOkres") or {}):
         out.update({
