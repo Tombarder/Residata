@@ -357,7 +357,14 @@ try {
   const rows = await fetchView('articles', { select: 'slug', published: 'eq.true' });
   articleUrls = rows.map((r) => ({ loc: `/analyzy/${r.slug}`, priority: '0.7', changefreq: 'yearly' }));
 } catch (e) {
-  console.warn('[gen-static] could not read articles for the sitemap:', e.message);
+  // 🔴 KEEP THE EXISTING FILES, exactly as the main fetch above does on failure.
+  // Warning and carrying on wrote a sitemap with every published analysis
+  // silently missing from it — a worse file than the one already on disk, and
+  // nothing downstream would have said so. A deploy that does not happen is
+  // cheaper than a sitemap that quietly drops the content it exists to list.
+  console.warn('[gen-static] could not read articles for the sitemap — keeping '
+    + 'existing files rather than publishing one without them. Error:', e.message);
+  process.exit(0);
 }
 const ALL_SITEMAP_URLS = [...SITEMAP_URLS, ...articleUrls];
 

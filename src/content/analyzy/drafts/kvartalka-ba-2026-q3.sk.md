@@ -12,7 +12,7 @@ Tretí štvrťrok 2026 na bratislavskom trhu s novostavbami znamenal stabilný d
 
 Ponuku bytov na trhu s novostavbami tvorilo v závere štvrťroka podľa údajov Residaty 4 042 bytov v rámci 97 projektov. V 75 projektoch, ktoré boli v predaji od začiatku štvrťroka do jeho konca, sa počet voľných bytov znížil z 3 321 na 3 234, teda o 2,6 %: z rozbehnutých projektov odišlo viac bytov, než koľko ich do nich pribudlo.
 
-Priemerná cena týchto ponúkaných bytov dosiahla 5 722 €/m² s DPH, čo v medziročnom porovnaní predstavuje pokles o 0,3 %. Za celé sledované obdobie (Q2 2025 – Q3 2026) sa priemerná cena pohybuje v pásme, ktoré sa dá opísať ako stagnácia — pred rokom bola priemerná cena 5 740 €/m² s DPH a pred štvrťrokom 5 709 €/m² s DPH. Cena je pritom počítaná z obytnej plochy, nie z celkovej vrátane balkónov a terás; pri tom istom byte to dáva vyššiu cenu za meter než prepočet z väčšieho základu.
+Priemerná cena týchto ponúkaných bytov dosiahla 5 722 €/m² s DPH, čo v medziročnom porovnaní predstavuje pokles o 0,3 %. Za celý rad (Q2 2025 – Q3 2026) sa priemerná cena pohybuje v pásme, ktoré sa dá opísať ako stagnácia — pred rokom bola priemerná cena 5 740 €/m² s DPH a pred štvrťrokom 5 709 €/m² s DPH. Cena je pritom počítaná z obytnej plochy, nie z celkovej vrátane balkónov a terás; pri tom istom byte to dáva vyššiu cenu za meter než prepočet z väčšieho základu.
 
 Priemerná absolútna cena ponúkaných bytov bola na úrovni 382 814 € s DPH pri priemernej výmere 65,6 m². Samotný priemer však o konkrétnej ponuke hovorí málo: jednoizbové byty stoja 6 303 €/m² s DPH a dvojizbové 5 510 €/m² s DPH, čo je rozdiel 14,4 % — viac než akýkoľvek pohyb trhu za posledný rok. Najdrahšie na meter sú malé a veľké byty, najlacnejší je dvoj- a trojizbový stred.
 
