@@ -126,6 +126,37 @@ def sk_dec(x, places: int = 1) -> str:
     return f"{x:.{places}f}".replace(".", ",")
 
 
+def _u_shape(qt: dict, lang: str) -> str:
+    """Describe the actual ordering of price-per-metre by layout."""
+    rows = sorted(qt["byRooms"], key=lambda r: r["meanM2"])
+    dear = {r["disp"] for r in rows[-2:]}
+    cheap = {r["disp"] for r in rows[:2]}
+    if dear == {"1", "4+"} and cheap == {"2", "3"}:
+        return ("Najdrahšie na meter sú malé a veľké byty, najlacnejší je dvoj- a "
+                "trojizbový stred." if lang == "sk" else
+                "The dearest metre is in small and large flats, the cheapest in the "
+                "two- and three-room middle.")
+    names_sk = {"1": "jednoizbové", "2": "dvojizbové", "3": "trojizbové",
+                "4+": "štvor- a viacizbové"}
+    names_en = {"1": "one-room", "2": "two-room", "3": "three-room",
+                "4+": "four-room and larger"}
+    n = names_sk if lang == "sk" else names_en
+    hi, lo = rows[-1]["disp"], rows[0]["disp"]
+    return (f"Najdrahšie na meter sú {n[hi]} byty, najlacnejšie {n[lo]}."
+            if lang == "sk" else
+            f"The dearest metre is in {n[hi]} flats, the cheapest in {n[lo]} ones.")
+
+
+def _series_shape(qt: dict, lang: str) -> str:
+    """Stagnation is a claim about a range, so it is measured as one."""
+    vals = [q["meanM2Rebased"] for q in qt["published"]["quarters"]] + [qt["ours"]["meanM2"]]
+    spread = (max(vals) / min(vals) - 1) * 100
+    if spread < 5:
+        return "stagnácia" if lang == "sk" else "stagnation"
+    return "mierny rast" if lang == "sk" else "a mild rise"
+
+
+
 def build_vars(rep: dict) -> dict:
     towns = {t["city"]: t for t in rep["nationalMap"]["towns"]}
     tot = rep["nationalMap"]["totals"]
@@ -438,7 +469,8 @@ def build_vars(rep: dict) -> dict:
         # printed "sales hold at around 666" two lines under "sales reached 735".
         "avgQuarterSales": sk_int(
             (sum(r["sales"] for r in pub["quarters"][-3:]) + ours["sales"]) / 4),
-        # 🔴 NOT ours["supply"], which is the last scrape day. On 21 September that
+        # The fortnight figure: market_report now pins ours["supply"] to it and keeps
+        # the raw closing day as supplyLastDay. On 21 September that
         # day read 4 305 against 3 920-4 013 on every other day of the preceding
         # three weeks, because Nesto, Olivia Residence and Palais Esterházy all
         # failed to scrape on the 20th and returned on the 21st. The level is the
@@ -530,6 +562,45 @@ def build_vars(rep: dict) -> dict:
         "panelM2PctEn": en_dec(abs(qt["panelM2Pct"])),
         "panelMonthlySales": sk_int(qt["panelMonthlySales"]),
         "panelMonths": len(qt["monthlyPanel"]),
+        # 🔴 EVERY DIRECTION AND EVERY SHAPE BELOW IS COMPUTED. Each one of these
+        # was a word typed by hand beside a number that could contradict it, and
+        # one of them ("necelá desatina") was already false in the published text.
+        # A fraction-word is a typed number wearing a coat.
+        "qTopSellerShare": sk_dec(br["topSeller"]["sharePct"]),
+        "qTopSellerShareEn": en_dec(br["topSeller"]["sharePct"]),
+        # C1 — "zdraženie" printed over a fall, because the value was abs()
+        "pdKeptDir": ("zdraženie" if br["priceDecomposition"]["keptPct"] >= 0
+                      else "zlacnenie"),
+        "pdKeptDirEn": ("increase" if br["priceDecomposition"]["keptPct"] >= 0
+                        else "decrease"),
+        # C2 — "dvíha"/"tlačí nadol" survived having their signs swapped
+        "pdRepriceVerb": ("dvíha" if br["priceDecomposition"]["repricingPct"] >= 0
+                          else "znižuje"),
+        "pdRepriceVerbEn": ("lifts" if br["priceDecomposition"]["repricingPct"] >= 0
+                            else "lowers"),
+        "pdMixWay": "nadol" if br["priceDecomposition"]["mixPct"] < 0 else "nahor",
+        "pdMixWayEn": "down" if br["priceDecomposition"]["mixPct"] < 0 else "up",
+        # C3 — the clause explaining the panel move asserted one direction
+        "spWhySk": ("z rozbehnutých projektov odišlo viac bytov, než koľko ich do "
+                    "nich pribudlo" if br["supplyPanel"]["changePct"] < 0 else
+                    "do rozbehnutých projektov pribudlo viac bytov, než koľko ich "
+                    "z nich odišlo"),
+        "spWhyEn": ("more flats left those projects than were added to them"
+                    if br["supplyPanel"]["changePct"] < 0 else
+                    "more flats were added to those projects than left them"),
+        "spThinSk": "tenčí" if br["supplyPanel"]["changePct"] < 0 else "rozširuje",
+        "spThinEn": "thinning" if br["supplyPanel"]["changePct"] < 0 else "growing",
+        # C5 — "nezmenená" / "stagnácia" held over a 9 % move in testing
+        "yqStableSk": ("ostala prakticky nezmenená" if abs(qt["vsYearAgo"]["m2Pct"]) < 1.5
+                       else "sa posunula"),
+        "yqStableEn": ("was practically unchanged" if abs(qt["vsYearAgo"]["m2Pct"]) < 1.5
+                       else "moved"),
+        "seriesShapeSk": _series_shape(qt, "sk"),
+        "seriesShapeEn": _series_shape(qt, "en"),
+        # B1 — the U-shape was re-asserted by hand one sentence after being computed.
+        # Live margins are 0,9 % and 1,2 %; either selection flips on a normal month.
+        "uShapeSk": _u_shape(qt, "sk"),
+        "uShapeEn": _u_shape(qt, "en"),
         # the U-shape, computed
         "dearestM2Room": ROOM_SK[max(qt["byRooms"], key=lambda r: r["meanM2"])["disp"]].lower(),
         "cheapestM2Room": ROOM_SK[min(qt["byRooms"], key=lambda r: r["meanM2"])["disp"]].lower(),
@@ -539,8 +610,8 @@ def build_vars(rep: dict) -> dict:
         # article printed the three-room figure under the two-room name.
         "dearestM2Value": sk_int(max(qt["byRooms"], key=lambda r: r["meanM2"])["meanM2"]),
         "cheapestM2Value": sk_int(min(qt["byRooms"], key=lambda r: r["meanM2"])["meanM2"]),
-        "dearestM2RoomEn": ROOM_EN[max(qt["byRooms"], key=lambda r: r["meanM2"])["disp"]],
-        "cheapestM2RoomEn": ROOM_EN[min(qt["byRooms"], key=lambda r: r["meanM2"])["disp"]],
+        "dearestM2RoomEn": ROOM_EN[max(qt["byRooms"], key=lambda r: r["meanM2"])["disp"]].lower(),
+        "cheapestM2RoomEn": ROOM_EN[min(qt["byRooms"], key=lambda r: r["meanM2"])["disp"]].lower(),
         "dearestM2ValueEn": f'{max(qt["byRooms"], key=lambda r: r["meanM2"])["meanM2"]:,}'.replace(",", "\u00a0"),
         "cheapestM2ValueEn": f'{min(qt["byRooms"], key=lambda r: r["meanM2"])["meanM2"]:,}'.replace(",", "\u00a0"),
         "roomSpreadPct": sk_dec(
@@ -627,7 +698,16 @@ def town_table(rep: dict, lang: str = "sk") -> str:
     return head + "\n" + "\n".join(rows)
 
 
-BARE_NUMBER = re.compile(r"(?<![\w{/.\-])\d[\d .,]{2,}(?![\w}])")
+# 🔴 ANY digit a human typed, not just long ones. The old pattern needed three
+# characters, so `97 projektov`, `30 %` and `9 projektov` all sailed through — and
+# this issue carries FOUR two-digit figures (97 projects, 75 panel projects, 63
+# flats, 28 projects), every one retypeable without a sound. Its character class
+# also held a NON-BREAKING space and not an ordinary one, so whether a figure was
+# caught depended on which space key the writer happened to hit.
+BARE_NUMBER = re.compile(r"(?<![\w{/.\-])\d[\d  .,]*(?![\w}])")
+# A year is prose, not a figure — matched by SHAPE so it cannot expire. The old
+# allowlist was the three literals 2024/2025/2026 and would refuse "2027".
+LOOKS_LIKE_A_YEAR = re.compile(r"^(?:19|20)\d\d$")
 
 
 def main() -> int:
@@ -638,24 +718,28 @@ def main() -> int:
     rep = json.loads((DATA / f"report-{slug}.json").read_text(encoding="utf-8"))
     vars_ = build_vars(rep)
 
+    # 🔴 CHECK BOTH, FORMAT BOTH, THEN WRITE BOTH. The refusal used to sit inside
+    # the loop, after Slovak had already been written — so a fault in the English
+    # template left a FRESH Slovak file beside a STALE English one, and to_cms.py
+    # pairs them by block count and type without ever comparing a figure.
+    rendered = {}
     for lang in ("sk", "en"):
         src = HERE / f"{slug}.{lang}.md.tmpl"
         if not src.exists():
             continue
         tmpl = src.read_text(encoding="utf-8")
-        # A typed figure looks like a bare number. Catch it here rather than in print.
-        stray = [m.group(0) for m in BARE_NUMBER.finditer(tmpl)
-                 if m.group(0) not in {"2026", "2025", "2024"}]
+        stray = [t for t in (m.group(0).strip() for m in BARE_NUMBER.finditer(tmpl))
+                 if t and not LOOKS_LIKE_A_YEAR.match(t)]
         if stray:
             print(f"REFUSING: {src.name} contains typed numbers: {stray}", file=sys.stderr)
             return 1
         try:
-            out = tmpl.format(**vars_)
+            rendered[lang] = (HERE / f"{slug}.{lang}.md", tmpl.format(**vars_))
         except KeyError as e:
             print(f"REFUSING: {src.name} asks for {e}, which the report does not provide",
                   file=sys.stderr)
             return 1
-        path = HERE / f"{slug}.{lang}.md"
+    for path, out in rendered.values():
         path.write_text(out, encoding="utf-8")
         print(f"wrote {path}")
     return 0
