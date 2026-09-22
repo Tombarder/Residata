@@ -342,18 +342,27 @@ export function useMetrics() {
 // useTotals(level, id) — MMR Phase 8 (2026-06-02): generic granularity hook
 // =============================================================================
 // One hook to read aggregate totals at any granularity, backed by the
-// 6 view-per-granularity surfaces Phase 4 added in the v2 DB:
+// view-per-granularity surfaces Phase 4 added in the v2 DB:
 //
 //   level='global'              → public.totals_global              (1 row)
 //   level='country'             → public.totals_by_country          (N rows, filter by `id`)
 //   level='country_group'       → public.totals_by_country_group    (N rows, filter by `id`)
-//   level='market'              → public.totals_by_market           (N rows, filter by `id`)
 //   level='region'              → public.totals_by_region           (N rows, filter by `id`)
 //   level='city'                → public.totals_by_city             (N rows, filter by `id`)
+//   level='district'            → public.totals_by_district         (N rows, filter by `id`)
+//
+// 🔴 THERE IS NO level='market'. public.totals_by_market was dropped from the
+// database; this list offered it, and so did the map below and the usage example
+// further down — all three pointing at a view that is not there, with 'sk-ba' as
+// the sample id, a market key retired in the 2026-06-08 unification. Nothing calls
+// the hook that way, so nothing broke; a map that lies is a trap for whoever reads
+// it next, which is the only reason a map exists. Market-level figures live in
+// public.market_totals, keyed on `country` rather than a market key — a different
+// shape, not a rename, so it does not slot into this table.
 //
 // The `id` arg is the filter value for the level (e.g. 'SK' for country,
-// 'sk-ba' for market, 'eu' for country_group, 'bratislavsky' for region,
-// etc.). Omit `id` only for level='global'.
+// 'eu' for country_group, 'bratislavsky' for region, 'praha' for city).
+// Omit `id` only for level='global'.
 //
 // Return shape matches useMarketTotals() exactly so consumers can swap
 // hook calls without rewiring their UI.
@@ -407,7 +416,6 @@ const _viewForLevel = {
   global:         'totals_global',
   country:        'totals_by_country',
   country_group:  'totals_by_country_group',
-  market:         'totals_by_market',
   region:         'totals_by_region',
   city:           'totals_by_city',
   district:       'totals_by_district',
@@ -417,7 +425,6 @@ const _filterColForLevel = {
   global:         null,           // single row, no filter
   country:        'country_code',
   country_group:  'group_id',
-  market:         'market_key',
   region:         'region_id',
   city:           'city_id',
   district:       'district',
@@ -462,8 +469,12 @@ async function _readPublicWithRetry(run, { retries = 1, delayMs = 300 } = {}) {
  * Examples:
  *   const sk     = useTotals('country', 'SK');         // SK national
  *   const v4     = useTotals('country_group', 'v4');   // V4 bloc
- *   const skba   = useTotals('market', 'sk-ba');       // BA market only
+ *   const praha  = useTotals('city', 'praha');         // one city
  *   const all    = useTotals('global');                // everything active
+ *
+ * (The example here used to read useTotals('market', 'sk-ba') — a view that has
+ * been dropped and a market key retired in the 2026-06-08 unification. Copying it
+ * would have failed twice over.)
  *
  * Returns the same flat object shape as useMarketTotals(), so callers
  * can choose either. The `loading` flag, the snapshotMonth, and all
