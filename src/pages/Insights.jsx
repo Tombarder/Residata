@@ -65,13 +65,24 @@ function useScrollToTop(key) {
 
 /* ─────────────────────────── block renderers ─────────────────────────── */
 
-function Figure({ src, srcEn, alt, caption, lang }) {
+function Figure({ src, srcEn, srcM, alt, caption, lang }) {
   const source = lang === "en" && srcEn ? srcEn : src;
+  // 🔴 ONE CHART IS TWO DRAWINGS, AND THE PHONE DOWNLOADS ONLY ITS OWN.
+  // Measured here at a 375px viewport, this column renders a figure at 285px
+  // — 28% of the 1000px canvas the wide charts are drawn on, which put 179
+  // strings across the eight published charts below 9px. The generator now
+  // also writes a "-m" drawing authored at phone width, with its own type
+  // scale, its own row heights, fewer ticks and labels collapsed into a
+  // legend. <picture> picks; <source media> is evaluated before the fetch, so
+  // a phone never downloads the desktop file.
+  // srcM is written by to_cms.py only when the file really exists. An article
+  // published before phone drawings has none, and falls back to the one
+  // drawing it has rather than to a broken image.
   return (
-    <figure style={{ margin: "2.4rem 0" }}>
+    <figure className="rd-fig" style={{ margin: "2.4rem 0" }}>
       {/* Light card on a dark page. The chart is generated light once and reused
           for the page, LinkedIn and print — see the file header. */}
-      <div style={{
+      <div className="rd-fig-card" style={{
         background: "#fff",
         borderRadius: 12,
         padding: "0.75rem",
@@ -80,15 +91,17 @@ function Figure({ src, srcEn, alt, caption, lang }) {
         border: "1px solid rgba(255,255,255,0.10)",
         boxShadow: "0 2px 10px rgba(0,0,0,0.35)",
       }}>
-        {/* A chart authored for a 760px column is ~47% of that on a phone, so
-            its 11pt source note lands at about 5px. Nothing in a static SVG can
-            reflow, so the honest fix is to let the reader open it at full size:
-            the SVG is its own document and zooms losslessly. */}
+        {/* The zoom link stays: a reader who wants to read a single value off
+            a long series still wants the figure full size. It is no longer
+            carrying the job of making the chart legible at all. */}
         <a href={source} target="_blank" rel="noreferrer"
            aria-label={t(alt, lang)}
            style={{ display: "block", cursor: "zoom-in" }}>
-          <img src={source} alt={t(alt, lang)} loading="lazy"
-               style={{ width: "100%", height: "auto", display: "block", borderRadius: 6 }} />
+          <picture>
+            {srcM && <source media="(max-width: 640px)" srcSet={srcM} />}
+            <img src={source} alt={t(alt, lang)} loading="lazy"
+                 style={{ width: "100%", height: "auto", display: "block", borderRadius: 6 }} />
+          </picture>
         </a>
       </div>
       {caption && (

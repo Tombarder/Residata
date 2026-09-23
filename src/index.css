@@ -238,6 +238,16 @@ body {
    hidden (the CTA opens the same login modal, which handles returning users
    too), leaving logo + language toggle + one clear CTA. */
 @media (max-width: 560px) {
+  /* A figure takes the whole phone, not the text measure. The article pads
+     2rem a side and the figure card another 0.75rem, which left a 1000px
+     chart 285px to live in. Breaking the figure out of the text column and
+     thinning the card gives back 74px — 26 % more canvas — and a full-bleed
+     graphic is what every publication does on a phone anyway. The text
+     column is untouched: prose still wants its measure. */
+  .rd-fig { margin-left: -2rem !important; margin-right: -2rem !important; }
+  .rd-fig-card { border-radius: 0 !important; padding: 0.5rem !important;
+                 border-left: none !important; border-right: none !important; }
+  .rd-fig figcaption { padding: 0 2rem; }
   .nav-right { gap: 0.45rem !important; }
   .nav-signin-btn { display: none !important; }
   .nav-cta-btn {

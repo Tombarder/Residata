@@ -39,6 +39,20 @@ LANGS = ("sk", "en")
 SK_ONLY = [False]
 
 
+#: where market_report writes the figures, so their existence is a fact we
+#: can check rather than a convention we hope holds
+_PUBLIC = Path(__file__).resolve().parents[4] / "public"
+
+
+def _phone(src: str) -> str | None:
+    """The phone drawing for a figure, if one was actually generated."""
+    web = src.replace("-en.svg", ".svg")
+    if not web.endswith(".svg"):
+        return None
+    cand = web[:-4] + "-m.svg"
+    return cand if (_PUBLIC / cand.lstrip("/")).exists() else None
+
+
 def _plain(text: str) -> str:
     r"""Strip the markdown the draft carries for a human reader.
 
@@ -112,6 +126,15 @@ def _blocks(text: str) -> list[dict]:
                 "src": src.replace("-en.svg", ".svg"),
                 "srcEn": (src.replace("-en.svg", ".svg") if SK_ONLY[0]
                           else src.replace(".svg", "-en.svg").replace("-en-en", "-en")),
+                # 🔴 THE BLOCK RECORDS WHETHER A PHONE DRAWING EXISTS; THE
+                # PAGE DOES NOT GUESS. <picture><source> has no error
+                # fallback — if the file 404s the reader gets a broken image,
+                # not the desktop one — so deriving "-m.svg" from the name in
+                # the renderer would have silently broken every figure in
+                # every article published before phone drawings existed. This
+                # is written by the thing that generated them, and an article
+                # without them simply has no srcM.
+                **({"srcM": _phone(src)} if _phone(src) else {}),
             })
             i += 1
             continue
@@ -182,7 +205,13 @@ def main() -> int:
                   file=sys.stderr)
             return 1
         if bs["type"] == "figure":
-            blocks.append({"type": "figure", "src": bs["src"], "srcEn": bs["srcEn"],
+            # 🔴 CARRY THE BLOCK, OVERRIDE THE PAIRED FIELDS — do not rebuild
+            # it from a list of keys. Written the other way round, this
+            # dropped `srcM` the day it was added upstream: the parser set it,
+            # this stage never mentioned it, and every figure silently lost
+            # its phone drawing with nothing failing. Any key the parser
+            # learns next travels for free.
+            blocks.append({**bs,
                            "alt": _pair(bs["alt"], be["alt"]),
                            "caption": _pair(bs["caption"], be["caption"])})
         elif bs["type"] == "table":
