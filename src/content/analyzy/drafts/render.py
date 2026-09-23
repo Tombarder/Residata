@@ -266,7 +266,7 @@ def overview_supply_table(rep: dict, lang: str) -> str:
     hide the only thing in this table a buyer cannot find elsewhere.
     """
     ov = rep["overview"]
-    head = (("| Okres | Voľné byty | Podiel | Dokončené | Rozostavané | Termín nezverejnený | Projekty | €/m² s DPH |"
+    head = (("| Okres | Byty v ponuke | Podiel | Dokončené | Rozostavané | Termín nezverejnený | Projekty | €/m² s DPH |"
              "\n|---|---:|---:|---:|---:|---:|---:|---:|") if lang == "sk" else
             ("| District | Flats on offer | Share | Finished | Under construction | No date published | Projects | €/m² incl. VAT |"
              "\n|---|---:|---:|---:|---:|---:|---:|---:|"))
@@ -289,8 +289,8 @@ def overview_supply_table(rep: dict, lang: str) -> str:
 def overview_sales_table(rep: dict, lang: str) -> str:
     """What sold in each okres, and at what last listed price."""
     ov = rep["overview"]
-    head = (("| Okres | Predané byty | Podiel na predaji | Podiel na ponuke | Posledná cenníková cena €/m² s DPH |"
-             "\n|---|---:|---:|---:|---:|") if lang == "sk" else
+    head = (("| Okres | Predané byty | Podiel na predaji | Podiel na ponuke | Posledná cenníková cena €/m² s DPH | Z toho s cenou |"
+             "\n|---|---:|---:|---:|---:|---:|") if lang == "sk" else
             ("| District | Flats sold | Share of sales | Share of supply | Last listed €/m² incl. VAT |"
              "\n|---|---:|---:|---:|---:|"))
     dec = sk_dec if lang == "sk" else en_dec
@@ -300,27 +300,84 @@ def overview_sales_table(rep: dict, lang: str) -> str:
     for o, a in ov["okres_sales"].items():
         m2 = f"{sk_int(a['m2'])} €" if a["m2"] else "—"
         sup = ov["okres_supply"].get(o, {}).get("n", 0)
+        _np = a.get("n_priced")
         rows.append(f"| {o} | {sk_int(a['n'])} | {dec(100 * a['n'] / sold_tot)} % | "
-                    f"{dec(100 * sup / sup_tot)} % | {m2} |")
+                    f"{dec(100 * sup / sup_tot)} % | {m2} | "
+                    f"{sk_int(_np) if _np is not None else '—'} |")
     total = "Bratislava"
-    rows.append(f"| **{total}** | **{sk_int(sold_tot)}** | **100,0 %** | **100,0 %** | |")
+    _npt = sum(a.get("n_priced") or 0 for a in ov["okres_sales"].values())
+    rows.append(f"| **{total}** | **{sk_int(sold_tot)}** | **100,0 %** | **100,0 %** | | "
+                f"**{sk_int(_npt)}** |")
     return head + "\n" + "\n".join(rows)
 
 
 def overview_price_table(rep: dict, lang: str) -> str:
     """€/m² this quarter against last, on the SAME projects in both."""
     ov = rep["overview"]
-    head = (("| Okres | Predchádzajúci štvrťrok | Aktuálny štvrťrok | Zmena |"
-             "\n|---|---:|---:|---:|") if lang == "sk" else
-            ("| District | Previous quarter | Current quarter | Change |"
-             "\n|---|---:|---:|---:|"))
+    # The flats the change rests on, because they differ a lot between okresy:
+    # the comparison covers 92 % of one okres and 27 % of another, and a reader
+    # judging a +4,6 % needs to know which they are looking at.
+    head = (("| Okres | Predchádzajúci štvrťrok | Aktuálny štvrťrok | Zmena | Byty v porovnaní |"
+             "\n|---|---:|---:|---:|---:|") if lang == "sk" else
+            ("| District | Previous quarter | Current quarter | Change | Flats compared |"
+             "\n|---|---:|---:|---:|---:|"))
     dec = sk_dec if lang == "sk" else en_dec
     rows = []
     for o, a in ov["okres_price"].items():
         sign = "+" if a["chg_pct"] >= 0 else "−"
         rows.append(f"| {o} | {sk_int(a['m2_prev'])} € | {sk_int(a['m2_cur'])} € | "
-                    f"{sign}{dec(abs(a['chg_pct']))} % |")
+                    f"{sign}{dec(abs(a['chg_pct']))} % | "
+                    f"{sk_int(a.get('units') or round((a.get('unit_days') or a.get('n', 0)) / 14))} |")
     return head + "\n" + "\n".join(rows)
+
+
+def _sales_vs_prev(ov: dict, sold: int) -> str:
+    """Sales against the same number of days of the previous quarter.
+
+    🔴 A DIRECTION IS A FIGURE. The verb comes from the two numbers.
+    """
+    prev = ov.get("prev_period_sales")
+    if not prev:
+        return ""
+    pct = (sold / prev - 1) * 100
+    if abs(pct) < 1:
+        return "prakticky rovnako ako"
+    return ("viac" if pct > 0 else "menej") + f" o {sk_dec(abs(pct))} % než"
+
+
+def _supply_clause(ov: dict) -> str:
+    """Whether the offer grew or shrank, on the same projects at both ends.
+
+    🔴 A DIRECTION IS A FIGURE. "ubudlo" printed over a rise is the mistake this
+    series has already made, so the verb is derived from the numbers.
+    """
+    a, b = ov.get("panel_supply_prev"), ov.get("panel_supply_cur")
+    if not a or not b:
+        return ""
+    pct = (b / a - 1) * 100
+    if abs(pct) < 0.5:
+        return "zostal prakticky rovnaký"
+    verb = "narástol" if pct > 0 else "klesol"
+    return f"{verb} o {sk_dec(abs(pct))} %"
+
+
+def _fraction_sk(pct: float) -> str:
+    """A share as a Slovak fraction phrase, computed.
+
+    🔴 A FRACTION IN WORDS IS A FIGURE. "necelá desatina predaja" was published
+    while it was false (63 of 575 is 11,0 %), and "viac než polovici" typed over
+    53,4 % is the same mistake waiting for the number to move. The phrase is
+    derived from the number it describes, so it cannot contradict it.
+    """
+    bands = [(90, "takmer celej"), (66, "viac než dvom tretinám"),
+             (55, "viac než polovici"), (45, "približne polovici"),
+             (30, "viac než tretine"), (20, "približne štvrtine"),
+             (12, "približne pätine"), (8, "približne desatine"),
+             (3, "niekoľkým percentám"), (0, "necelým trom percentám")]
+    for lo, phrase in bands:
+        if pct >= lo:
+            return phrase
+    return "žiadnemu"
 
 
 def _overview_vars(rep: dict) -> dict:
@@ -346,19 +403,40 @@ def _overview_vars(rep: dict) -> dict:
     city_m2 = ov["own_quarters"].get(_qkey)
 
     # the q/q move for the city, on the panel — computed, never the mean of means
-    pnum = sum(a["m2_cur"] * a["n"] for a in pr.values())
-    pden = sum(a["m2_prev"] * a["n"] for a in pr.values())
+    _w = lambda a: a.get("units") or a.get("unit_days") or a.get("n", 0)
+    pnum = sum(a["m2_cur"] * _w(a) for a in pr.values())
+    pden = sum(a["m2_prev"] * _w(a) for a in pr.values())
     qoq = (pnum / pden - 1) * 100 if pden else 0.0
 
     lay = {r["k"]: int(float(r["n"])) for r in ov["layout_supply"]}
     lay_tot = sum(v for k, v in lay.items() if k != "(neuvedené)")
     two_three = lay.get("2-izb", 0) + lay.get("3-izb", 0)
 
+    # 🔴 A SHARE MUST CARRY ITS BASE. "72,7 % ponuky" is computed on the flats
+    # whose room count is stated (4 019), not on the whole offer (4 053, where
+    # it is 72,1 %) — and the sentence did not say so, which is the reader
+    # arriving at a different number from the same words.
+    _layout_base = sk_int(lay_tot)
+
+    # The completion split's widest okres. The table shows it and the prose
+    # ignored it: in one okres more than half the offer has no published
+    # completion date at all, in another none of it.
+    _unk = sorted(((o, a["unknown"] / a["n"], a["unknown"])
+                   for o, a in sup.items() if a["n"]), key=lambda t: -t[1])
+
     # Read from the SUPPLY table, which is the one this sentence sits beside.
     # The q/q table is restricted to the projects present in both quarters, so
     # its levels differ by design — taking the spread from there put two
     # different measurements in one paragraph.
     _priced = {o: a["m2"] for o, a in sup.items() if a["m2"]}
+    # The okres whose share of sales most exceeds its share of supply, and the
+    # one where it is most the other way. Both computed: "sells fastest" is a
+    # superlative, and a superlative is a figure.
+    _tot_s = sum(a["n"] for a in sal.values()) or 1
+    _tot_p = sum(a["n"] for a in sup.values()) or 1
+    _rel = sorted(((o, 100 * a["n"] / _tot_s - 100 * sup.get(o, {}).get("n", 0) / _tot_p)
+                   for o, a in sal.items()), key=lambda t: -t[1])
+
     dear = max(_priced.items(), key=lambda kv: kv[1])
     cheap = min(_priced.items(), key=lambda kv: kv[1])
 
@@ -366,7 +444,11 @@ def _overview_vars(rep: dict) -> dict:
         return {name: value_sk, name + "En": value_en if value_en is not None else value_sk}
 
     out = {
-        "supplyTotal": sk_int(tot), "supplyProjects": sum(a["projects"] for a in sup.values()),
+        "supplyTotal": sk_int(tot),
+        # The city figure, not the sum of five independently-rounded okres means.
+        "supplyProjects": sum(a["projects"] for a in sup.values()),
+        "meanFlatPrice": sk_int(ov["mean_price"]) if ov.get("mean_price") else "—",
+        "meanFlatArea": sk_dec(ov["mean_area"]) if ov.get("mean_area") else "—",
         "salesTotal": sk_int(sold),
         "m2Total": sk_int(city_m2) if city_m2 else "—",
         "supplyDone": sk_int(done),
@@ -383,6 +465,15 @@ def _overview_vars(rep: dict) -> dict:
         "twoThreeShare": sk_dec(100 * two_three / lay_tot),
         "twoThreeShareEn": en_dec(100 * two_three / lay_tot),
         "panelProjects": ov["panel_projects"],
+        "panelUnits": sk_int(ov["panel_units"]) if ov.get("panel_units") else "—",
+        "periodDays": ov.get("period_days"),
+        "settlingDays": ov.get("sale_settling_days"),
+        # Did the offer grow or shrink? Same-panel, because our raw count moves
+        # when WE onboard a project — it went 3 399 -> 4 052 between Q2 and Q3
+        # while the projects we track went 70 -> 93.
+        "panelSupplyPrev": sk_int(ov["panel_supply_prev"]) if ov.get("panel_supply_prev") else "—",
+        "panelSupplyCur": sk_int(ov["panel_supply_cur"]) if ov.get("panel_supply_cur") else "—",
+        "panelSupplyClause": _supply_clause(ov),
         # The whole clause, not just the figure: "+0,0 %" is honest and reads
         # like a rounding accident, and a bare percentage cannot be slotted into
         # a sentence that also has to work when there is no movement to report.
@@ -399,6 +490,24 @@ def _overview_vars(rep: dict) -> dict:
         "overviewSupplyTableEn": overview_supply_table(rep, "en"),
         "overviewSalesTable": overview_sales_table(rep, "sk"),
         "overviewSalesTableEn": overview_sales_table(rep, "en"),
+        "layoutBase": _layout_base,
+        "noDateOkres": _unk[0][0],
+        "noDateOkresPct": sk_dec(100 * _unk[0][1]),
+        "noDateOkresN": sk_int(_unk[0][2]),
+        "noDateOkresFraction": _fraction_sk(100 * _unk[0][1]),
+        "noDateLowClause": ("pri žiadnom byte" if _unk[-1][2] == 0
+                            else f"pri {sk_dec(100 * _unk[-1][1])} % ponuky"),
+        "noDateLowOkres": _unk[-1][0],
+        # "0,0 %" is honest and reads like a printing fault. A share that
+        # rounds to nothing is said in words.
+        "noDateLowPct": ("ani jeden byt" if _unk[-1][2] == 0
+                         else sk_dec(100 * _unk[-1][1]) + " % ponuky"),
+        "fastestOkres": _rel[0][0],
+        "fastestSalesShare": sk_dec(100 * sal[_rel[0][0]]["n"] / _tot_s),
+        "fastestSupplyShare": sk_dec(100 * sup[_rel[0][0]]["n"] / _tot_p),
+        "slowestOkres": _rel[-1][0],
+        "slowestSalesShare": sk_dec(100 * sal[_rel[-1][0]]["n"] / _tot_s),
+        "slowestSupplyShare": sk_dec(100 * sup[_rel[-1][0]]["n"] / _tot_p),
         "overviewPriceTable": overview_price_table(rep, "sk"),
         "overviewPriceTableEn": overview_price_table(rep, "en"),
     }
@@ -427,6 +536,17 @@ def _overview_vars(rep: dict) -> dict:
             f"{en_dec(abs(_gap))} % {'more' if _gap >= 0 else 'less'}")
     first = ov["first_published"]
     out["longRunFirstYear"] = first[:4]
+
+    # 🔴 "ZDVOJNÁSOBILA SA" IS A FIGURE. The chart shows the whole span and the
+    # prose said only "o koľko sa posunul", which is not a statement. The change
+    # is computed on the REBASED first point — comparing a raw Bencont figure
+    # with ours would count the denominator difference as a price move.
+    _hist = ov.get("published_rebased") or {}
+    _f, _l = _hist.get(first), city_m2
+    if _f and _l:
+        _chg = (_l / _f - 1) * 100
+        out["longRunChangePct"] = sk_dec(_chg)
+        out["longRunFirstM2"] = sk_int(round(_f))
     span = int(ov["quarter_start"][:4]) - int(first[:4])
     _SK_YEARS = {1: "rok", 2: "dva roky", 3: "tri roky", 4: "štyri roky",
                  5: "päť rokov", 6: "šesť rokov", 7: "sedem rokov",
