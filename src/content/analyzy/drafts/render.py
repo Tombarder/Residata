@@ -126,6 +126,55 @@ def sk_dec(x, places: int = 1) -> str:
     return f"{x:.{places}f}".replace(".", ",")
 
 
+def sk_list(items) -> str:
+    """Bratislava a Liptovský Mikuláš — a list, not a CSV dump.
+
+    🔴 `", ".join(...)` produced *"Výnimkou sú Bratislava, Liptovský Mikuláš"*
+    in a published draft: two items, a plural verb and no conjunction, which is
+    a renderer showing through the prose exactly the way `v meste {city}` does.
+    A Slovak list separates with commas and joins the LAST pair with "a".
+    """
+    items = list(items)
+    if not items:
+        return ""
+    if len(items) == 1:
+        return items[0]
+    return f"{', '.join(items[:-1])} a {items[-1]}"
+
+
+def en_list(items) -> str:
+    items = list(items)
+    if not items:
+        return ""
+    if len(items) == 1:
+        return items[0]
+    return f"{', '.join(items[:-1])} and {items[-1]}"
+
+
+def _exceptions_clause_sk(towns) -> str:
+    """The towns where the three-room metre is DEARER than the two-room metre.
+
+    Generated whole because the sentence changes shape with the data: none, one
+    (singular verb) or several (plural verb plus a conjunction). A template
+    cannot carry all three, and the draft that tried printed the plural over a
+    comma-joined pair.
+    """
+    towns = sorted(towns)
+    if not towns:
+        return ("Neplatí to bez výnimky — v žiadnom z nich nie je meter "
+                "v trojizbovom byte drahší než v dvojizbovom.")
+    verb = "je" if len(towns) == 1 else "sú"
+    return (f"Výnimkou {verb} {sk_list(towns)}, kde je to naopak.")
+
+
+def _exceptions_clause_en(towns) -> str:
+    towns = sorted(towns)
+    if not towns:
+        return "There is no exception — it holds in every one of them."
+    verb = "is" if len(towns) == 1 else "are"
+    return f"The exception{'' if len(towns) == 1 else 's'} {verb} {en_list(towns)}, where it is the other way round."
+
+
 def _u_shape(qt: dict, lang: str) -> str:
     """Describe the actual ordering of price-per-metre by layout."""
     rows = sorted(qt["byRooms"], key=lambda r: r["meanM2"])
@@ -547,6 +596,19 @@ def _overview_vars(rep: dict) -> dict:
         _chg = (_l / _f - 1) * 100
         out["longRunChangePct"] = sk_dec(_chg)
         out["longRunFirstM2"] = sk_int(round(_f))
+        # 🔴 AND SO IS THE VERB THAT CARRIES IT. The template said "zvýšila sa
+        # o {longRunChangePct} %", which prints "zvýšila sa o −4,1 %" the first
+        # quarter the decade turns down — the same defect as doneVsBuildingSk
+        # above, in a sentence nobody re-read. The direction is computed with
+        # the magnitude it describes.
+        # All three variants are NON-reflexive, so the template does not carry a
+        # stray "sa" that only fits one of them: "sa ... stúpla" is not Slovak.
+        out["longRunChangeClause"] = direction_sk(
+            _chg, f"stúpla o {sk_dec(abs(_chg))} %",
+            f"klesla o {sk_dec(abs(_chg))} %", "ostala nezmenená")
+        out["longRunChangeClauseEn"] = direction_sk(
+            _chg, f"rose by {en_dec(abs(_chg))} %",
+            f"fell by {en_dec(abs(_chg))} %", "did not move")
     span = int(ov["quarter_start"][:4]) - int(first[:4])
     _SK_YEARS = {1: "rok", 2: "dva roky", 3: "tri roky", 4: "štyri roky",
                  5: "päť rokov", 6: "šesť rokov", 7: "sedem rokov",
@@ -684,9 +746,17 @@ def _issue_specific_vars(rep: dict) -> dict:
             "cdStepBa": sk_dec(cd["stepBratislava"]),
             "cdM2Down": len(cd["perM2FallsWithSize"]),
             "cdM2Total": len(cd["perM2FallsWithSize"]) + len(cd["perM2RisesWithSize"]),
-            "cdM2Up": ", ".join(cd["perM2RisesWithSize"]),
+            "cdM2Up": sk_list(cd["perM2RisesWithSize"]),
+            "cdM2UpEn": en_list(cd["perM2RisesWithSize"]),
             "cdM2UpN": len(cd["perM2RisesWithSize"]),
             "cdStepBaEn": en_dec(cd["stepBratislava"]),
+            # 🔴 THE WHOLE SENTENCE, because its SHAPE is a figure too. The
+            # template said "Výnimkou sú {cdM2Up}" — which prints a plural verb
+            # over one town, an empty subject when there is no exception at all,
+            # and a comma-joined list in between. Three faults the writer cannot
+            # see, because the draft in front of them happened to have two.
+            "cdM2UpClause": _exceptions_clause_sk(cd["perM2RisesWithSize"]),
+            "cdM2UpClauseEn": _exceptions_clause_en(cd["perM2RisesWithSize"]),
         })
     if "rows" in (rep.get("baByOkres") or {}):
         out.update({

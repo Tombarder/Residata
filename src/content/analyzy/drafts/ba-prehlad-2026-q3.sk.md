@@ -63,7 +63,7 @@ Rozdelenie predaja nekopíruje rozdelenie ponuky. Okres, ktorý drží väčší
 
 ## Ceny
 
-Mestský priemer 5 722 €/m² je jedno číslo pre päť veľmi odlišných trhov. Medzi najdrahším okresom (Bratislava I) a najlacnejším (Bratislava IV) je rozdiel 3 730 €/m².
+Mestský priemer 5 722 €/m² s DPH je jedno číslo pre päť veľmi odlišných trhov. Medzi najdrahším okresom (Bratislava I) a najlacnejším (Bratislava IV) je rozdiel 3 730 €/m² s DPH.
 
 Nasledujúca tabuľka porovnáva dva štvrťroky na tých istých 2 197 bytoch — na tých, ktoré boli v ponuke v oboch obdobiach. Jej úrovne sa preto mierne líšia od tabuľky vyššie, ktorá zahŕňa celú ponuku.
 
@@ -83,20 +83,10 @@ Na bytoch, ktoré boli v ponuke po celé obdobie, stojí meter v už skolaudovan
 ![Vývoj ponukovej ceny](/analyzy/ba-prehlad-2026-q3-ceny-vyvoj.svg)
 *Priemerná cena za meter, týždenne, na tých istých bytoch po celé obdobie — graf sa teda pohne len vtedy, keď sa pohne cena.*
 
-Za osem rokov sa cena za meter v Bratislave zvýšila o 99,0 % — z 2 876 €/m² na 5 722 €/m².
+Dlhý rad v grafe nižšie spája dva zdroje: staršie hodnoty zverejnil Bencont Investments, novšie sú naše. Za osem rokov cena za meter v Bratislave stúpla o 99,0 % — z 2 876 €/m² s DPH na 5 722 €/m² s DPH. Východisková hodnota je Bencontova, prepočítaná na našu plochovú základňu.
 
 ![Cena nových bytov v Bratislave od roku 2018](/analyzy/ba-prehlad-2026-q3-ceny-dlhodobo.svg)
 *Hodnoty do 2Q 2026 sú z kvartálnych analýz Bencont Investments, novšie sú naše; obe zostávajú samostatnými radmi. Bencontove hodnoty sú prepočítané na našu plochovú základňu, inak by prechod medzi radmi vyzeral ako pohyb cien.*
 
-Posledný graf porovnáva, za koľko sa byty ponúkajú a za koľko sa skutočne predávajú.
-
 ![Ponuková a dosiahnutá cena](/analyzy/ba-prehlad-2026-q3-ponuka-vs-predaj.svg)
-*Kĺzavý 28-dňový priemer. Dosiahnutá cena je posledná cenníková cena bytu pred tým, než z ponuky zmizol.*
-
-## Pohľad na aktuálne smerovanie trhu
-
-Tomáš Kamhal, zakladateľ Residaty: „Bratislavský trh s novostavbami je v skutočnosti päť trhov, ktoré sa správajú odlišne a ktoré mestský priemer zakrýva.
-
-Za pozornosť stojí, ako málo z ponuky je hotové bývanie. Kupujúci, ktorý sa chce nasťahovať hneď, vyberá z podstatne menšej časti trhu, než akú vidí v cenníkoch.
-
-A ten podiel je v meste veľmi nerovnomerný. V Bratislava I nevie kupujúci termín pri približne polovici ponuky, v Bratislava V pri žiadnom byte. Je to informácia, ktorú kupujúci potrebuje skôr než cenu — a v prehľadoch trhu ju obvykle nenájde."
+*Za koľko sa byty ponúkajú a za koľko napokon odchádzajú z ponuky. Kĺzavý 28-dňový priemer; dosiahnutá cena je posledná cenníková cena bytu pred tým, než z ponuky zmizol.*

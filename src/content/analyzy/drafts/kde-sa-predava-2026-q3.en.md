@@ -66,12 +66,4 @@ The difference between towns is easier to see in floor area than in percentages.
 
 \* Months to clear is shown for the 11 towns with at least 10 sales this quarter. Below that the sample is too small to tell a town's pace from one project's decision.
 
-## A view on what the table says
-
-Tomáš Kamhal, founder of Residata: "How fast an offer clears is more useful to a developer and to a buyer than the price itself. It says how much time the market has to absorb what is on sale — and whether there is room to add more.
-
-The table makes it clear that price and speed are not related as directly as one would expect. Towns at similar price levels clear at different speeds, and the slowest towns are not the dearest.
-
-For a buyer it means the pressure to decide quickly is different in every town. Where the offer would clear within a year it is worth acting; where it would take four, there is time to choose."
-
 **Author:** Tomáš Kamhal, founder of Residata · tomas@residata.eu

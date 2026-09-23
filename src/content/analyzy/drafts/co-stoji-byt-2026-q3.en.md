@@ -2,7 +2,7 @@
 What a one-, two-, three- and four-room new-build costs in 12 Slovak towns. A one-room flat in Bratislava at 210 361 € is dearer than a two-room in 7 of the 11 other towns.
 -->
 <!--METHOD
-The data comes from the publicly published price lists of Slovak developers, which Residata reads daily, flat by flat. These are new-builds — available and reserved flats in active projects, not the secondary market and not listings. We publish the median rather than the mean: one expensive flat moves a mean and does not move a median, and some cells hold only tens of flats. A town appears when it has at least 10 flats in at least three layouts. Half layouts are rounded down: a flat with a room and a half is counted as one-room. The price change is computed on the same flats that were on offer at both the start and the end of the quarter — comparing one median with another would move even if not a single price changed, as long as the composition of the offer did.
+The data comes from the publicly published price lists of Slovak developers, which Residata reads daily, flat by flat. These are new-builds — available and reserved flats in active projects, not the secondary market and not listings. We publish the median rather than the mean: one expensive flat moves a mean and does not move a median, and some cells hold only tens of flats. A town appears when it has at least 10 flats in at least three layouts. Half layouts are rounded down: a flat with a room and a half is counted as one-room.
 -->
 1 October 2026 | NEW-BUILD PRICES BY LAYOUT AND TOWN
 
@@ -31,7 +31,7 @@ What a new-build costs depends on its layout at least as much as on the town. Th
 
 The step from a two-room to a three-room flat is not the same everywhere. It is largest in Liptovský Mikuláš, where a three-room costs 53.3% more than a two-room, and smallest in Bernolákovo at 12.0%. In Bratislava it is 42.4%.
 
-For a buyer that is practical information: in one town an extra room means half the price of the flat again, in another an eighth. The per-square-metre view shows why. In 10 of the 12 towns a larger flat is cheaper per metre — space costs less the more of it you buy. The exceptions are Bratislava, Liptovský Mikuláš, where it works the other way.
+The same step looks different per square metre. In 10 of the 12 towns a metre in a three-room flat is cheaper than a metre in a two-room. The exceptions are Bratislava and Liptovský Mikuláš, where it is the other way round.
 
 | Town | 1-room | 2-room | 3-room | 4-room and larger |
 |---|---:|---:|---:|---:|
@@ -49,34 +49,5 @@ For a buyer that is practical information: in one town an extra room means half 
 | Bernolákovo | — | 3 817 € | 3 659 € | 3 427 € |
 
 \* Median price per m² incl. VAT.
-
-## What actually changed over the quarter
-
-The tables above say what flats cost today. Whether they grew dearer cannot be answered by comparing two medians — a median moves even when not a single price changes, as long as the composition of the offer does. So we compare the same flats, the ones on offer at both the start and the end of the quarter.
-
-| Town | 1-room | 2-room | 3-room | 4-room and larger |
-|---|---:|---:|---:|---:|
-| Bratislava | +0.60 % | +0.74 % | +0.26 % | +0.05 % |
-| Košice | −1.02 % | +0.06 % | −0.51 % | +0.26 % |
-| Trnava | +0.05 % | +0.22 % | +0.27 % | — |
-| Nitra | +0.98 % | +0.59 % | +0.21 % | +0.47 % |
-| Prešov | — | +0.08 % | +0.00 % | −0.09 % |
-| Trenčín | — | −0.01 % | +0.01 % | +0.04 % |
-| Poprad | — | +0.28 % | — | — |
-| Banská Bystrica | +0.03 % | −0.50 % | +0.99 % | — |
-| Žilina | — | +0.00 % | +0.23 % | +0.00 % |
-| Zvolen | — | +0.00 % | +0.00 % | — |
-| Liptovský Mikuláš | — | −0.27 % | −0.89 % | — |
-| Bernolákovo | — | — | — | — |
-
-\* Change in the median price per m² among flats on offer throughout the quarter. An empty cell means too few such flats for a reliable figure.
-
-## A view on what the tables say
-
-Tomáš Kamhal, founder of Residata: "The first thing the tables show is that a national average flat price makes no sense. The difference between layouts within one town is usually larger than the difference between towns for the same layout.
-
-The second is the pace. Compared on the same flats, the movements are an order of magnitude smaller than those seen in year-on-year comparisons of medians. That does not mean prices are not rising — it means most of the movement that gets published comes from a change in the composition of the offer rather than from developers repricing.
-
-For a buyer the conclusion is simple: compare a specific layout in a specific town. Everything else is an average their flat is not in."
 
 **Author:** Tomáš Kamhal, founder of Residata · tomas@residata.eu

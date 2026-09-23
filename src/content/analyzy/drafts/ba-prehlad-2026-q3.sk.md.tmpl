@@ -49,7 +49,7 @@ Rozdelenie predaja nekopíruje rozdelenie ponuky. Okres, ktorý drží väčší
 
 ## Ceny
 
-Mestský priemer {m2Total} €/m² je jedno číslo pre päť veľmi odlišných trhov. Medzi najdrahším okresom ({dearestOkres}) a najlacnejším ({cheapestOkres}) je rozdiel {okresSpread}.
+Mestský priemer {m2Total} €/m² s DPH je jedno číslo pre päť veľmi odlišných trhov. Medzi najdrahším okresom ({dearestOkres}) a najlacnejším ({cheapestOkres}) je rozdiel {okresSpread} s DPH.
 
 Nasledujúca tabuľka porovnáva dva štvrťroky na tých istých {panelUnits} bytoch — na tých, ktoré boli v ponuke v oboch obdobiach. Jej úrovne sa preto mierne líšia od tabuľky vyššie, ktorá zahŕňa celú ponuku.
 
@@ -63,20 +63,10 @@ Na bytoch, ktoré boli v ponuke po celé obdobie, stojí meter v už skolaudovan
 ![Vývoj ponukovej ceny](/analyzy/ba-prehlad-2026-q3-ceny-vyvoj.svg)
 *Priemerná cena za meter, týždenne, na tých istých bytoch po celé obdobie — graf sa teda pohne len vtedy, keď sa pohne cena.*
 
-Za {longRunSpanSk} sa cena za meter v Bratislave zvýšila o {longRunChangePct} % — z {longRunFirstM2} €/m² na {m2Total} €/m².
+Dlhý rad v grafe nižšie spája dva zdroje: staršie hodnoty zverejnil Bencont Investments, novšie sú naše. Za {longRunSpanSk} cena za meter v Bratislave {longRunChangeClause} — z {longRunFirstM2} €/m² s DPH na {m2Total} €/m² s DPH. Východisková hodnota je Bencontova, prepočítaná na našu plochovú základňu.
 
 ![Cena nových bytov v Bratislave od roku {longRunFirstYear}](/analyzy/ba-prehlad-2026-q3-ceny-dlhodobo.svg)
 *Hodnoty do {lastPublishedSk} sú z kvartálnych analýz Bencont Investments, novšie sú naše; obe zostávajú samostatnými radmi. Bencontove hodnoty sú prepočítané na našu plochovú základňu, inak by prechod medzi radmi vyzeral ako pohyb cien.*
 
-Posledný graf porovnáva, za koľko sa byty ponúkajú a za koľko sa skutočne predávajú.
-
 ![Ponuková a dosiahnutá cena](/analyzy/ba-prehlad-2026-q3-ponuka-vs-predaj.svg)
-*Kĺzavý {rollingDays}-dňový priemer. Dosiahnutá cena je posledná cenníková cena bytu pred tým, než z ponuky zmizol.*
-
-## Pohľad na aktuálne smerovanie trhu
-
-Tomáš Kamhal, zakladateľ Residaty: „Bratislavský trh s novostavbami je v skutočnosti päť trhov, ktoré sa správajú odlišne a ktoré mestský priemer zakrýva.
-
-Za pozornosť stojí, ako málo z ponuky je hotové bývanie. Kupujúci, ktorý sa chce nasťahovať hneď, vyberá z podstatne menšej časti trhu, než akú vidí v cenníkoch.
-
-A ten podiel je v meste veľmi nerovnomerný. V {noDateOkres} nevie kupujúci termín pri {noDateOkresFraction} ponuky, v {noDateLowOkres} {noDateLowClause}. Je to informácia, ktorú kupujúci potrebuje skôr než cenu — a v prehľadoch trhu ju obvykle nenájde."
+*Za koľko sa byty ponúkajú a za koľko napokon odchádzajú z ponuky. Kĺzavý {rollingDays}-dňový priemer; dosiahnutá cena je posledná cenníková cena bytu pred tým, než z ponuky zmizol.*

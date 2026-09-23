@@ -1,5 +1,5 @@
 <!--PEREX
-Kvartálny prehľad trhu s novostavbami na celom Slovensku. Ponuku tvorí 9 380 bytov v 45 mestách. Rýchlosť predaja sa medzi mestami líši 4,2-násobne: v meste Trenčín by sa súčasná ponuka vypredala za 12,6 mesiaca, v meste Banská Bystrica za 53,5.
+Kvartálny prehľad trhu s novostavbami na celom Slovensku. Ponuku tvorí 9 380 bytov v 45 mestách. Rýchlosť predaja sa medzi mestami líši 4,2-násobne: Trenčín má ponuku na 12,6 mesiaca, Banská Bystrica na 53,5.
 -->
 <!--METHOD
 Údaje pochádzajú z verejne zverejnených cenníkov slovenských developerov, ktoré Residata číta denne, byt po byte. Ponuku tvoria voľné a rezervované byty v aktívnych projektoch; počítajú sa výlučne byty, nie parkovanie, pivnice ani nebytové priestory. Ceny a výmery sú priemerom za byty, pri ktorých developer cenu zverejňuje — tie tvoria 72,5 % ponuky. Cenové úrovne sú počítané ako priemer denných hodnôt za posledné dva týždne štvrťroka, aby ich neovplyvnil jeden deň, v ktorom niektorý projekt pridal alebo stiahol časť ponuky. Mesiace do vypredania sú podiel aktuálnej ponuky a mesačného tempa predaja v danom štvrťroku; uvádzame ich len pri mestách s aspoň 10 predanými bytmi, pretože pri menšom počte ide o rozhodnutie jedného projektu, nie o tempo mesta.
@@ -12,7 +12,7 @@ Ponuku novostavieb na Slovensku tvorilo v závere štvrťroka 9 380 bytov v 45 
 
 Na Bratislavu pripadá 43,1 % celej ponuky a 51,9 % predaja — zvyšných 44 miest si delí 5 338 bytov. Cenovo je rozptyl 2,5-násobný: Bratislava 5 722 €/m² s DPH, Lučenec 2 320 €/m² s DPH.
 
-Rýchlosť predaja sa však s cenou neprekrýva. Pri súčasnom tempe by sa ponuka v meste Trenčín vypredala za 12,6 mesiaca, v meste Banská Bystrica za 53,5 — 4,2-násobne dlhšie. Pritom Trenčín má priemernú cenu 4 005 €/m² s DPH a Banská Bystrica 3 884 €/m² s DPH, teda nižšiu. Naprieč 11 mestami, pri ktorých vieme tempo spočítať, je súvislosť medzi cenou a rýchlosťou vypredania prakticky nulová (korelácia 0,07). Cena mesta o jeho tempe nehovorí nič.
+Rýchlosť predaja sa však s cenou neprekrýva. Pri súčasnom tempe má Trenčín ponuku na 12,6 mesiaca, Banská Bystrica na 53,5 — 4,2-násobne dlhšie. Pritom Trenčín má priemernú cenu 4 005 €/m² s DPH a Banská Bystrica 3 884 €/m² s DPH, teda nižšiu. Naprieč 11 mestami, pri ktorých vieme tempo spočítať, je súvislosť medzi cenou a rýchlosťou vypredania prakticky nulová (korelácia 0,07). Cena mesta o jeho tempe nehovorí nič.
 
 Rozdiel medzi mestami je pritom lepšie vidieť na ploche než na percentách. Za cenu priemerného bratislavského bytu — 382 814 € s DPH — kúpite v Bratislave 67 m². Inde za tie isté peniaze: Lučenec 165 m², Lužianky 156 m², Spišská Nová Ves 150 m².
 
@@ -65,13 +65,5 @@ Rozdiel medzi mestami je pritom lepšie vidieť na ploche než na percentách. Z
 | Oľdza | 5 | 2 182 € | 274 300 € | 125,6 m² | 3 | — |
 
 \* Mesiace do vypredania uvádzame pri 11 mestách, ktoré majú v tomto štvrťroku aspoň 10 predaných bytov. Pri ostatných je vzorka primalá na to, aby tempo mesta odlíšila od rozhodnutia jedného projektu.
-
-## Pohľad na to, čo tabuľka hovorí
-
-Tomáš Kamhal, zakladateľ Residaty: „Rýchlosť vypredania je pre developera aj pre kupujúceho užitočnejšia než samotná cena. Hovorí, koľko času má trh na to, aby súčasnú ponuku vstrebal — a či je priestor pridávať ďalšiu.
-
-Z tabuľky je zrejmé, že cena a rýchlosť spolu nesúvisia tak priamo, ako by sa čakalo. Mestá s podobnou cenovou úrovňou sa vypredávajú rôznym tempom a najpomalšie mestá nie sú tie najdrahšie.
-
-Pre kupujúceho to znamená, že tlak na rýchle rozhodnutie je v každom meste iný. Tam, kde by sa ponuka vypredala za rok, má zmysel konať; tam, kde by to trvalo štyri, je čas na výber."
 
 **Autor:** Tomáš Kamhal, zakladateľ Residaty · tomas@residata.eu
