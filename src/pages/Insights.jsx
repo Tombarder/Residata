@@ -120,7 +120,7 @@ function Table({ head, rows, caption, lang }) {
                     borderBottom: "1px solid rgba(255,255,255,0.07)",
                     color: ci === 0 ? "#e8e8ee" : "#c5c5cc",
                     fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap",
-                  }}>{cell}</td>
+                  }}>{t(cell, lang)}</td>
                 ))}
               </tr>
             ))}

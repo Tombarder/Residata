@@ -110,6 +110,17 @@ def _blocks(text: str) -> list[dict]:
             })
             i += 1
             continue
+        # A run of "- " lines is ONE bullets block, not N paragraphs each
+        # starting with a stray dash. Insights.jsx has rendered `bullets` all
+        # along; this file simply never emitted one, so a summary list came out
+        # as literal markdown on the page.
+        if line.startswith("- ") and seen_title:
+            items = []
+            while i < len(lines) and lines[i].rstrip().startswith("- "):
+                items.append(_plain(lines[i].rstrip()[2:]))
+                i += 1
+            out.append({"type": "bullets", "items": items})
+            continue
         # The eyebrow line above the headline is furniture the page draws itself.
         if not seen_title:
             i += 1
@@ -160,9 +171,32 @@ def main() -> int:
                            "alt": _pair(bs["alt"], be["alt"]),
                            "caption": _pair(bs["caption"], be["caption"])})
         elif bs["type"] == "table":
+            # 🔴 ROW CELLS DIFFER BY LANGUAGE AND USED NOT TO TRAVEL. Only the
+            # Slovak rows were kept, so every English table on the site printed
+            # Slovak decimal commas — "28,6 %" where an English reader expects
+            # "28.6 %". A cell that is the same in both stays a plain string, so
+            # a table of pure numbers does not double in size; only the cells
+            # that genuinely differ become a {sk, en} pair, which t() resolves.
+            if len(bs["rows"]) != len(be["rows"]):
+                print(f"REFUSING: a table has {len(bs['rows'])} rows in sk and "
+                      f"{len(be['rows'])} in en", file=sys.stderr)
+                return 1
+            rows = [[x if x == y else _pair(x, y) for x, y in zip(rs, re_)]
+                    for rs, re_ in zip(bs["rows"], be["rows"])]
             blocks.append({"type": "table",
                            "head": _pair(bs["head"], be["head"]),
-                           "rows": bs["rows"]})
+                           "rows": rows})
+        elif bs["type"] == "bullets":
+            # A bullets block carries `items`, not `text`, and the two languages
+            # must line up item for item — otherwise the English reader gets the
+            # Slovak list's fourth point under their third.
+            if len(bs["items"]) != len(be["items"]):
+                print(f"REFUSING: a bullets block has {len(bs['items'])} items in "
+                      f"sk and {len(be['items'])} in en", file=sys.stderr)
+                return 1
+            blocks.append({"type": "bullets",
+                           "items": [_pair(x, y)
+                                     for x, y in zip(bs["items"], be["items"])]})
         else:
             blocks.append({"type": bs["type"], "text": _pair(bs["text"], be["text"])})
 

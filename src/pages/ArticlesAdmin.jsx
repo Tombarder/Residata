@@ -666,7 +666,13 @@ function ArticleEditor({ slug, lang, onBack, onChanged }) {
                       fontFamily: MONO, fontSize: "0.66rem", letterSpacing: "0.09em",
                       textTransform: "uppercase", color: "var(--text-dim)", marginBottom: "0.45rem",
                     }}>{t.tableRows}</div>
-                    <textarea rows={5} value={(b.rows || []).map((r) => r.join(" | ")).join("\n")}
+                    {/* A cell may be a {sk, en} pair — the decimal mark differs
+                        by language, so a generated table carries both. Render the
+                        Slovak side here; editing a generated table by hand would
+                        flatten it, which is why tables come from the generator. */}
+                    <textarea rows={5} value={(b.rows || []).map(
+                      (r) => r.map((c) => (c && typeof c === "object" ? (c.sk ?? "") : c)).join(" | ")
+                    ).join("\n")}
                               onChange={(e) => setBlock(i, {
                                 rows: e.target.value.split("\n").filter((l) => l.trim()).map(splitCells),
                               })}
