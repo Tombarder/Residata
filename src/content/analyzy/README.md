@@ -70,6 +70,32 @@ that runs on every visit should not sit in a folder that says it does not run.
 5. **Verify against the live row, not the draft on disk.** Read
    `public.articles` back, check the figures, and open the page.
 
+
+## The Bratislava quarterly overview
+
+`ba-prehlad-<year>-q<n>` is the reference issue: supply and sales by okres and
+by layout, prices by okres against the previous quarter, and the price per
+metre since the first quarter anyone published. It reproduces the shape the
+incumbent houses use, so it is a DATA article — a table someone looks things up
+in, with interpretation only where it is mechanical.
+
+Its panels come from `v2/lib/ba_overview.py` and its eight charts from
+`v2/lib/charts_ba_overview.py::draw_all`, both called by `market_report.py`, so
+re-running the issue redraws the figures. A page carrying this quarter's prose
+over last quarter's charts is what that avoids.
+
+Four things that module gets right only because they were wrong first, all in
+its docstring: a day is not a snapshot (thirteen days hold more than one); our
+own supply count is not the market's, because it moves when WE onboard a
+project; a district is read from `reference.projects` and not from the
+denormalised copy in `analytics.unit_facts`; and Rovinka is not Bratislava.
+
+History before our own measurements begins lives in
+`v2/lib/published_market_history.py`, with each series named for the house that
+published it. It is never spliced onto ours — their "sold" is not our "sold"
+(Herrys count reserved flats as sold and say so), and a gap in the public
+record is drawn as a gap rather than interpolated.
+
 ## Re-publishing an issue whose quarter has closed
 
 An issue previewed before its period ended carries a projected figure and must
