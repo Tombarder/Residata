@@ -1,0 +1,143 @@
+{
+  "id": "8c70068c-12b0-44a6-a897-c31aa3cea6b5",
+  "slug": "trh-novostavieb-2026-09",
+  "article_date": "2026-09-08",
+  "published": false,
+  "title": {
+    "en": "A three-room flat in Slovakia takes a year longer to sell than a two-room one",
+    "sk": "Trojizbový byt sa na Slovensku predáva o rok dlhšie než dvojizbový"
+  },
+  "perex": {
+    "en": "At the current pace, three-room supply would take 32 months to clear and two-room supply 19 months. In Czechia a three-room flat costs 71 % more and clears in half the time.",
+    "sk": "Ponuka trojizbových bytov by sa pri súčasnom tempe vypredávala 32 mesiacov, dvojizbových 19 mesiacov. V Česku stojí trojizbový byt o 71 % viac a vypredá sa za polovičný čas."
+  },
+  "blocks": [
+    {
+      "text": {
+        "en": "At the current pace of sales, Slovakia's three-room supply would take 32 months to clear and its two-room supply 19 months. In Czechia, where we track 154 projects the same way, three-room flats clear in 16 months — and cost 71 % more.",
+        "sk": "Ponuka trojizbových bytov na Slovensku by sa pri súčasnom tempe predaja vypredávala 32 mesiacov, dvojizbových 19 mesiacov. V Česku, kde sledujeme 154 projektov rovnakým spôsobom, sa trojizbové byty vypredajú za 16 mesiacov — a stoja pritom o 71 % viac."
+      },
+      "type": "lead"
+    },
+    {
+      "alt": {
+        "en": "Months to clear supply by flat size, Slovakia and Czechia",
+        "sk": "Mesiace do vypredania ponuky podľa dispozície, Slovensko a Česko"
+      },
+      "src": "/analyzy/trh-novostavieb-2026-09-1-mesiace-do-vypredania.svg",
+      "type": "figure",
+      "srcEn": "/analyzy/trh-novostavieb-2026-09-1-mesiace-do-vypredania-en.svg",
+      "caption": {
+        "en": "Stock divided by the monthly pace of sales, both countries on the same method.",
+        "sk": "Zásoba delená mesačným tempom predaja, obe krajiny rovnakou metódou."
+      }
+    },
+    {
+      "text": {
+        "en": "It is not the price, and not the flat",
+        "sk": "Nie je to cenou ani samotným bytom"
+      },
+      "type": "h2"
+    },
+    {
+      "text": {
+        "en": "The median three-room flat costs 307 100 € in Slovakia and 523 613 € in Czechia. A Czech buyer pays 71 % more for a comparable flat — and those flats still clear twice as fast. The explanation that three-room flats are expensive and therefore sit does not survive that.",
+        "sk": "Medián ceny trojizbového bytu je na Slovensku 307 100 €, v Česku 523 613 €. Český kupujúci zaplatí za porovnateľný byt o 71 % viac — a napriek tomu sa tam takéto byty vypredajú dvakrát rýchlejšie. Vysvetlenie, že trojizbové byty sú drahé, a preto ležia, tým padá."
+      },
+      "type": "p"
+    },
+    {
+      "text": {
+        "en": "The difference is how many of them stand where. Three-room flats are 34.8% of all Slovak new-build supply and 26.0% of Czech. The smallest flats run the other way: 8.6% of supply in Slovakia against 19.4% in Czechia. The Slovak market's centre of gravity sits higher — and that is where the stock accumulates.",
+        "sk": "Rozdiel je v tom, koľko ich kde stojí. Na Slovensku tvoria trojizbové byty 34,8 % celej ponuky novostavieb, v Česku 26,0 %. Pri najmenších bytoch je to opačne: na Slovensku 8,6 % ponuky, v Česku 19,4 %. Slovenský trh má ťažisko vyššie — a práve tam sa zásoba hromadí."
+      },
+      "type": "p"
+    },
+    {
+      "text": {
+        "en": "So the selling time of a three-room flat is not a property of the flat but the condition of the market it is built into. The same flat behaves differently across the border.",
+        "sk": "Dĺžka predaja trojizbového bytu teda nie je vlastnosť toho bytu, ale stav trhu, do ktorého ho developer postaví. Ten istý byt sa za hranicou správa inak."
+      },
+      "type": "p"
+    },
+    {
+      "text": {
+        "en": "A competitor's price list is not a signal",
+        "sk": "Cenník konkurencie nie je signál"
+      },
+      "type": "h2"
+    },
+    {
+      "text": {
+        "en": "Projects on track to clear within 18 months changed a price in 2.9% of observations, and 78.4% of those changes were increases. Projects needing more than 30 months changed a price in 9.1% of observations, with 93.3% of them increases. The projects that are not selling raise prices both more often and more readily than the ones that are.",
+        "sk": "Projekty, ktoré by sa pri súčasnom tempe vypredali do 18 mesiacov, zmenili cenu v 2,9 % pozorovaní a 78,4 % tých zmien smerovalo nahor. Projekty, ktoré na to potrebujú viac než 30 mesiacov, menili cenu v 9,1 % pozorovaní a nahor ich smerovalo 93,3 %. Projekty, ktoré sa nepredávajú, teda zdražujú častejšie aj ochotnejšie než tie, ktoré sa predávajú."
+      },
+      "type": "p"
+    },
+    {
+      "alt": {
+        "en": "Share of price-list changes that were increases, by project sales speed",
+        "sk": "Podiel zmien cenníka smerujúcich nahor podľa rýchlosti predaja projektu"
+      },
+      "src": "/analyzy/trh-novostavieb-2026-09-3-cennik-signal.svg",
+      "type": "figure",
+      "srcEn": "/analyzy/trh-novostavieb-2026-09-3-cennik-signal-en.svg",
+      "caption": {
+        "en": "Slovak projects with 20 or more available flats: 25 fast, 56 slow.",
+        "sk": "Slovenské projekty s 20 a viac voľnými bytmi: 25 rýchlych, 56 pomalých."
+      }
+    },
+    {
+      "text": {
+        "en": "The usual way a developer sanity-checks their own price is to look at what the competition is asking. These figures say the price list reveals nothing about how the competition is doing — it moves independently of sales and, if it signals anything, points the wrong way. The comparison worth making is how fast the neighbours are selling, not what their price list says.",
+        "sk": "Bežný spôsob, ako si developer overí vlastnú cenu, je pozrieť sa, za koľko ponúka konkurencia. Tieto čísla hovoria, že z cenníka sa o konkurencii nedá zistiť, ako sa jej darí — pohybuje sa nezávisle od predaja, a ak už niečo naznačuje, tak opačne. Porovnávať sa treba s tým, ako rýchlo sa v okolí predáva, nie s tým, čo je napísané v susedovom cenníku."
+      },
+      "type": "p"
+    },
+    {
+      "text": {
+        "en": "Same price, twice the time",
+        "sk": "Rovnaká cena, dvojnásobný čas"
+      },
+      "type": "h2"
+    },
+    {
+      "text": {
+        "en": "Trenčín and Trnava have practically the same median price — 3 826 €/m² and 3 833 €/m², 7 € per metre apart. Their clearing times are 17 months and 32 months. Across the towns tracked the figure runs from 12 months (Prešov) to 32 months (Trnava), and the order does not follow price.",
+        "sk": "Trenčín a Trnava majú prakticky rovnaký medián ceny — 3 826 €/m² a 3 833 €/m², rozdiel 7 € na meter. Čas do vypredania je pritom 17 mesiacov a 32 mesiacov. Naprieč sledovanými mestami sa pohybuje od 12 mesiacov (Prešov) po 32 mesiacov (Trnava) a poradie nekopíruje cenu."
+      },
+      "type": "p"
+    },
+    {
+      "alt": {
+        "en": "Median price against months to clear, Slovak towns",
+        "sk": "Medián ceny a mesiace do vypredania v slovenských mestách"
+      },
+      "src": "/analyzy/trh-novostavieb-2026-09-2-mesta.svg",
+      "type": "figure",
+      "srcEn": "/analyzy/trh-novostavieb-2026-09-2-mesta-en.svg",
+      "caption": {
+        "en": "Towns with 100 or more available flats and at least 25 sales in the observed period.",
+        "sk": "Mestá so 100 a viac voľnými bytmi a aspoň 25 predajmi za sledované obdobie."
+      }
+    },
+    {
+      "text": {
+        "en": "The same project therefore sells over one year or over two depending on the town, and the town's price level will not tell you which in advance. When buying land that difference is measured in years of financing.",
+        "sk": "Ten istý projekt sa teda podľa mesta predáva rok alebo dva a z cenovej hladiny mesta sa vopred nedá povedať, ktoré z toho. Pri kúpe pozemku je to rozdiel, ktorý sa počíta v rokoch financovania."
+      },
+      "type": "p"
+    }
+  ],
+  "method": {
+    "en": "Data come from developers' publicly published price lists, recorded daily by Residata since 16 May 2026 (Czechia from 9 June). Months to clear = current supply divided by the average monthly number of sales over the observed period; the figure assumes the pace stays the same. Sales are identified from changes of status in the developer's own price list; flats only — no parking spaces, storage or commercial units. Price per m² is calculated on living area including VAT; figures are medians. The town chart includes towns with 100 or more available flats and at least 25 sales. Czech prices are converted at the rate on the day of collection. All figures are our own.",
+    "sk": "Dáta pochádzajú z verejne publikovaných cenníkov developerov, ktoré Residata zaznamenáva denne od 16. mája 2026 (Česko od 9. júna). Mesiace do vypredania = aktuálna ponuka delená priemerným mesačným počtom predajov za sledované obdobie; údaj predpokladá, že tempo zostane rovnaké. Predaje sa identifikujú zo zmien stavu bytu v cenníku developera; zahrnuté sú len byty, nie parkovacie státia, pivnice ani nebytové priestory. Cena za m² sa počíta z obytnej plochy vrátane DPH; uvádzame mediány. V grafe miest sú mestá so 100 a viac voľnými bytmi a aspoň 25 predajmi. České ceny sú prepočítané kurzom ku dňu zberu. Všetky čísla sú z vlastných dát."
+  },
+  "og_image": "/analyzy/og-2026-09.png",
+  "seo_title": null,
+  "seo_keywords": null,
+  "created_at": "2026-09-08T08:49:01.239222+00:00",
+  "updated_at": "2026-09-22T09:26:13.75517+00:00",
+  "updated_by": "8acc7a3d-a122-4f0d-8f32-f9c650836070",
+  "figures_measured_through": "2026-09-08"
+}

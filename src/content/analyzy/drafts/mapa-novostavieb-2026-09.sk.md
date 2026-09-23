@@ -1,48 +1,123 @@
 <!--PEREX
-Predaj v Q3 2026 smeruje k 735 bytom oproti 652 z Q2 2026. Cenová úroveň ostala nezmenená a ponuka bytov na predaj sa zvýšila na 4 305 bytov.
+V 18 zo 43 slovenských miest s ponukou novostavieb je v predaji jediný projekt a v 27 nanajvýš dva. Vynechanie najväčšieho projektu posunie medián mesta o 11,8 % v Banskej Bystrici a o 2,0 % v Bratislave.
 -->
 <!--METHOD
-Údaje za Q3 2026 pochádzajú z verejne zverejnených cenníkov bratislavských developerov, ktoré Residata zaznamenáva denne; k 21. septembra 2026 máme pokryté 72 z 92 dní štvrťroka, preto je predaj uvedený ako doterajší a prepočítaný na celý štvrťrok pri rovnakom dennom tempe. Ponuku tvoria voľné a rezervované byty; počítajú sa výlučne byty, nie parkovanie, pivnice ani nebytové priestory. Priemerná cena za m² je priemer jednotkových cien jednotlivých bytov z obytnej plochy vrátane DPH; ide o ponukové ceny. Staršie štvrťroky (Q3 2025 až Q2 2026) sú prevzaté zo zverejnených kvartálnych analýz spoločnosti Bencont Investments a sú takto označené aj v tabuľke. Ich priemernú cenu sme prepočítali koeficientom 1,0674 na obytnú plochu, aby bola porovnateľná s naším meraním; koeficient je pomer nášho vlastného čítania k 29. júna 2026 (5 701 €/m²) a ich údaja za Q2 2026 (5 341 €/m²). Ponuku a predaj sme neupravovali — tie definície sa zhodujú v rámci dvoch percent.
+Dáta sú z verejne zverejnených cenníkov developerov, ktoré Residata zaznamenáva denne od 16. mája 2026 (128 dní). Voľné byty sú byty vedené developerom ako voľné, bez rezervovaných a predaných; do prehľadu vstupujú len projekty, ktorých cenník čítame aktuálne, a len mestá s aspoň 5 voľnými bytmi. Počítajú sa výlučne byty, nie parkovanie, pivnice ani nebytové priestory. Cena za m² je počítaná z obytnej plochy vrátane DPH a uvádza sa ako medián, nie priemer; ide o ponukové ceny z cenníkov. Posun mediánu je rozdiel oproti mediánu toho istého mesta bez jeho najväčšieho oceneného projektu a uvádza sa len tam, kde zostalo aspoň desať bytov s cenou. Zmena ceny porovnáva ten istý byt s jeho vlastnou skoršou cenou, pri jednom čítaní na byt a deň a zmene aspoň o dvesto eur. Pokrytie sme k 21. septembra 2026 porovnali s registrom rezido.sk: 15 predávajúcich projektov mimo nášho katalógu so 101 voľnými bytmi, teda 1,4 % ponuky. Za Bratislavu sa naše čísla líšia od údajov Bencont Investments za Q2 2026 o 1,7 % v ponuke a o 2,1 % v priemernej ponukovej cene. Všetky čísla sú naše vlastné.
 -->
-21. septembra 2026 | KVARTÁLNA ANALÝZA TRHU S BRATISLAVSKÝMI NOVOSTAVBAMI
+ANALÝZA TRHU · Mapa novostavieb · 21. septembra 2026
 
-# Ponuka bratislavských novostavieb ďalej rastie, ceny stoja na mieste
+# V dvoch tretinách slovenských miest tvoria ponuku novostavieb nanajvýš dva projekty. Priemerná cena mesta je ich cenník
 
-Tretí štvrťrok 2026 na bratislavskom trhu s novostavbami znamená silnejší dopyt, cenovú stagnáciu a ďalšie zvýšenie počtu bytov na predaj. Predaj smeruje pri súčasnom tempe k 735 bytom oproti 652 z Q2 2026. Cenová úroveň ostala nezmenená a v medziročnom porovnaní stúpla o 0,1 %. Ponuka bytov na predaj sa zvýšila na 4 305 bytov.
+Slovenské mestá mimo Bratislavy majú za sebou desaťročie, v ktorom sa v nich stavalo viac než kedykoľvek predtým. O tom, ako sa v nich predáva, sa pritom nedá dočítať takmer nič: pravidelné analýzy trhu s novostavbami pokrývajú Bratislavu a za jej hranicami sa ceny zverejňujú ako krajské a mestské priemery. Priemer mlčky predpokladá, že pod ním leží trh, z ktorého sa dá priemerovať. Vo väčšine slovenských miest sú pod ním jeden alebo dva cenníky.
 
-Ponuku bytov na trhu s novostavbami tvorilo ku dňu 21. septembra 2026 podľa údajov Residaty 4 305 bytov v rámci 97 projektov. Oproti Q2 2026 ponuka bytov vzrástla o 74 bytov resp. 1,7 %, zatiaľ čo v medziročnom porovnaní sa zvýšila o 336 bytov resp. 8,5 %.
+**V tomto čísle:** z koľkých projektov je zložená ponuka v každom zo 43 slovenských miest, v ktorých sa dá dnes kúpiť byt v novostavbe · čo sa stane s cenou mesta, keď sa z nej vynechá jeden projekt · o koľko sa mimo Bratislavy hýbe cena toho istého bytu.
 
-Priemerná cena týchto ponúkaných bytov dosiahla 5 736 €/m² s DPH, čo v medziročnom porovnaní predstavuje nárast len o 0,1 %. Dá sa povedať, že ceny novostavieb posledné roky rastú tempom blízkym nule — pred rokom bola priemerná cena 5 732 €/m² s DPH a pred štvrťrokom 5 701 €/m² s DPH. Rozdiely v priemernej cene sú spôsobené skôr zložením ponuky než pohybom cenníkov.
+---
 
-Priemerná absolútna cena ponúkaných bytov bola na úrovni 387 873 € s DPH, zatiaľ čo priemerná výmera týchto bytov dosahovala 66,2 m².
+Byty v novostavbách sa dnes predávajú v každom slovenskom krajskom meste a v desiatkach menších. Novostavba v Prešove, vo Zvolene alebo v Liptovskom Mikuláši je bežná ponuka a ceny, za ktoré sa v nich predáva, sa pravidelne objavujú v regionálnych štatistikách.
 
-**V tomto čísle:** Vývoj ponuky a predaja na bratislavskom trhu novostavieb · Pohľad na aktuálne smerovanie trhu novostavieb v Bratislave
+Čo tie ceny znamenajú, sa však nikde nerozoberá. Pravidelné analýzy novostavieb sa venujú Bratislave, kde je z čoho počítať; mimo nej sa publikujú priemery za kraj alebo za krajské mesto a nikto neukazuje, z čoho sú zložené. Rozdiel medzi tým, čo taký priemer meria v Bratislave a čo meria v Trenčíne, pritom nie je akademický.
 
-## Vývoj ponuky a predaja na bratislavskom trhu novostavieb
+Otázka teda neznie, aký je regionálny priemer vysoký. Znie, z koľkých cenníkov je zložený a čo sa s ním stane, keď sa jeden z nich pohne. Od odpovede závisí, či sa oň developer môže oprieť pri nacenení etapy a či z neho kupujúci vyčíta, čo je v jeho meste drahé.
 
-Ponuka bytov rástla a spolu s ňou aj dopyt. Za 72 z 92 dní štvrťroka sa predalo 575 bytov, čo pri rovnakom dennom tempe znamená 735 bytov za celý štvrťrok oproti 652 z Q2 2026 a 638 spred roka. Predaj pritom nebol skreslený mimoriadne vysokým predajom v jednom z veľkých projektov — na najsilnejší z nich pripadlo 46 bytov. Dopyt tak oproti predchádzajúcemu štvrťroku vzrástol o 12,7 %.
+Odpoveď je v každom meste iná a dá sa vyčísliť. V Bratislave drží najväčší projekt 11 % ponuky mesta. V Banskej Bystrici 60 %. A v 18 z 43 miest drží najväčší projekt celú ponuku, pretože je jediný.
 
-| Štvrťrok | Ponuka | Projekty | Predaj | Priemerná cena €/m² s DPH | Zdroj |
-|---|---:|---:|---:|---:|---|
-| Q2 2025 | 3 393 | 94 | 645 | 5 606 | Bencont Investments |
-| Q3 2025 | 3 969 | — | 638 | 5 732 | Bencont Investments |
-| Q4 2025 | 3 874 | 99 | 634 | 5 659 | Bencont Investments |
-| Q1 2026 | 3 922 | 96 | 742 | 5 747 | Bencont Investments |
-| Q2 2026 | 4 231 | 105 | 652 | 5 701 | Bencont Investments |
-| **Q3 2026*** | **4 305** | **97** | **575*** | **5 736** | **Residata** |
+Tie podiely vychádzajú z veľmi rôzne veľkých ponúk. Z 7 349 voľných bytov, ktoré dnes tvoria celú slovenskú ponuku novostavieb, stojí 49 % v jedinom meste: 3 633 bytov v Bratislave, v 96 projektoch, z ktorých ani jeden nepresahuje 11 % ponuky. Zvyšných 3 716 bytov je rozdelených medzi 42 miest a 27 z nich má v ponuke nanajvýš dva projekty. Medián jednotkovej ceny je pritom v Bratislave 5 314 €/m² s DPH a vo zvyšku krajiny 3 676 €/m² s DPH.
 
-\* Q3 2026 je doterajší stav ku dňu 21. septembra 2026: 72 z 92 dní. Staršie štvrťroky sú zo zverejnených analýz Bencont Investments, priemerná cena je prepočítaná na obytnú plochu — podrobnosti v metodike.
+![Podiel najväčšieho projektu na ponuke mesta](/analyzy/mapa-novostavieb-2026-09-1-jeden-projekt.svg)
+*Podiel najväčšieho projektu na voľných bytoch, mestá s aspoň 90 voľnými bytmi.*
 
-Priemerná predajná cena predaných bytov mierne vzrástla na 5 745 €/m² s DPH, čím sa vyrovnala priemernej ponukovej cene. Za rastom ceny predaných bytov je najmä zvýšený dopyt v mestských častiach Ružinov a Staré Mesto, ktoré sú drahšie ako priemer — v Ružinove sa predaj zvýšil z 130 na 174 bytov a v Starom Meste z 32 na 36. Priemerná absolútna cena predaných bytov bola 352 365 € s DPH pri priemernej rozlohe 61,0 m².
+Čo to robí s cenou, najlepšie ukazuje Banská Bystrica. S mediánom 3 928 €/m² s DPH je to 4. najdrahšie z 15 miest, ktoré majú v ponuke aspoň 90 voľných bytov — drahšie než Trnava, Trenčín aj Prešov. Keď sa z výpočtu vynechá jediný projekt, ten najväčší, medián mesta klesne na 3 465 €/m² s DPH a prepadne sa na 12. miesto. Rozdiel je 463 €/m² s DPH, teda 11,8 % ceny, a nestojí za ním ani jedna zmena cenníka.
 
-## Pohľad na aktuálne smerovanie trhu novostavieb v Bratislave
+Rovnaký výpočet v ostatných mestách vedie k rovnakému obrazu. V Trenčíne posunie vynechanie najväčšieho projektu medián mesta o 13,8 %, v Žiline o 10,1 % a v Košiciach o 6,4 %. V Bratislave o 2,0 %. A v 28 mestách sa taký výpočet nedá spraviť vôbec: po vynechaní najväčšieho projektu v nich nezostane ani jedna zverejnená cena.
 
-Tomáš Kamhal, zakladateľ Residaty: „Za posledný rok sa predaj drží na úrovni okolo 666 bytov za štvrťrok, zatiaľ čo ponuka za ten istý čas vzrástla o 8,5 %. Na trh teda pribúda viac bytov, než z neho odchádza, a rozdiel sa kumuluje.
+Priemerná cena mesta je teda údajom o tom, čo je v ňom práve v ponuke. V meste s jedným alebo dvoma projektmi je to údaj o jednom cenníku. Keď sa taký projekt vypredá alebo keď developer uvedie ďalšiu etapu, priemer mesta sa pohne bez toho, aby sa zmenila čo i len jedna cena.
 
-Prvým faktorom je ponuka. Dosiahla 4 305 bytov v 97 projektoch a naďalej rastie. Kým developeri cítia vzájomnú konkurenciu a zároveň im predaj drží krok, výsledkom je stagnácia cien — za posledný rok sa priemerná cena pohla o 0,1 %.
+Na tom, ako sa ceny hýbu, to vidno rovnako. Za posledných 90 dní sme zaznamenali 1 477 zmien ceny toho istého bytu v Bratislave a 378 v ostatných mestách, pričom počet projektov, ktoré cenu pohli, bol takmer rovnaký (37 a 36). Smer sa nelíši: nahor smerovalo 87,1 % bratislavských zmien a 88,6 % ostatných. Líši sa veľkosť kroku. Bratislavský developer mení cenu bytu o 2,0 %, developer mimo Bratislavy o 5,0 %, teda 2,5-násobne viac.
 
-Druhým faktorom je dopyt, obmedzený najmä úrokovými sadzbami a kúpnou silou domácností. Priemerný predaný byt stál 352 365 € pri výmere 61,0 m², čo je hranica, na ktorú dosiahne obmedzený počet domácností.
+![Medián zmeny ceny toho istého bytu](/analyzy/mapa-novostavieb-2026-09-2-krok-ceny.svg)
+*Medián zmeny ceny toho istého bytu, ak sa zmenila, za posledných 90 dní.*
 
-Ak sa úrokové sadzby a kúpna sila výraznejšie nezmenia, trh s novostavbami bude naďalej prešľapovať na mieste, dopyt ostane ohraničený a ceny budú stagnovať. To, čo bude zaujímavé sledovať, je vývoj ponuky — jej ďalší rast by už mohol vyvolať istú nervozitu."
+„V Bratislave nacení developer byt oproti desiatkam susedných cenníkov a potom sa opravuje po malých krokoch. V Trenčíne alebo v Banskej Bystrici sa nemá oproti čomu naceniť, takže cenu nastaví a mení ju skokom, keď vidí, ako sa predáva,“ hovorí Tomáš Kamhal, zakladateľ Residaty. „Nie je za tým chamtivosť ani nekompetentnosť, je to dôsledok toho, že v tých mestách nie je s kým sa porovnať. A pokiaľ v regionálnych mestách nepribudnú ďalšie projekty, ostane to tak — regionálne priemery budú aj naďalej merať skôr rozhodnutia jednotlivých developerov než pohyb trhu.“
 
-**Autor:** Tomáš Kamhal, zakladateľ Residaty · tomas@residata.eu
+Pre kupujúceho je to rozdiel, ktorý sa dá spočítať. Medián bytu v ponuke stojí v Bratislave 317 400 €, v Nitre 216 800 €, v Prešove 214 000 € a v Banskej Bystrici 199 990 €. Kupujúci v Bratislave si tú cenu môže porovnať s 95 ďalšími cenníkmi v tom istom meste. V 18 mestách druhý cenník neexistuje.
+
+Pre kupujúceho v Bratislave to znamená, že priemer, ktorý číta v správach, zhruba zodpovedá tomu, čo uvidí v ponuke. Pre kupujúceho v Trenčíne alebo v Banskej Bystrici znamená ten istý typ čísla podstatne menej a jeho pohyb ešte menej. Pre developera, ktorý podľa regionálneho priemeru nastavuje cenu etapy, to znamená, že sa v 18 z 43 miest porovnáva výhradne sám so sebou.
+
+Ukazovateľom, ktorý bude v najbližších mesiacoch vypovedať viac než samotná úroveň cien, je počet miest, ktoré prejdú z jedného projektu na dva. Dnes je takých miest 18 z 43.
+
+---
+
+## Mapa: slovenské mestá s ponukou novostavieb
+
+| Mesto | Voľné byty | Projekty | Podiel najväčšieho projektu | Medián €/m² s DPH | Medián ceny bytu |
+|---|---:|---:|---:|---:|---:|
+| Bratislava | 3 633 | 96 | 11 % | 5 314 € | 317 400 € |
+| Nitra | 455 | 9 | 27 % | 3 494 € | 216 800 € |
+| Trnava | 444 | 10 | 31 % | 3 833 € | 217 099 € |
+| Košice | 390 | 24 | 23 % | 4 563 € | 299 362 € |
+| Prešov | 299 | 6 | 49 % | 3 613 € | 214 000 € |
+| Poprad | 265 | 11 | 18 % | 3 611 € | 215 783 € |
+| Trenčín | 236 | 5 | 48 % | 3 827 € | 255 482 € |
+| Banská Bystrica | 178 | 8 | 60 % | 3 928 € | 199 990 € |
+| Žilina | 139 | 10 | 34 % | 4 102 € | 246 900 € |
+| Liptovský Mikuláš | 139 | 6 | 40 % | 3 832 € | 222 808 € |
+| Zvolen | 118 | 2 | 85 % | 3 495 € | 210 000 € |
+| Piešťany | 110 | 4 | 56 % | 3 086 € | 239 900 € |
+| Slovenský Grob | 99 | 1 | 100 % | 3 824 € | 205 000 € |
+| Martin | 99 | 3 | 52 % | 3 063 € | 163 600 € |
+| Dunajská Streda | 92 | 3 | 44 % | 2 722 € | 182 900 € |
+| Ružomberok | 60 | 2 | 88 % | 3 427 € | 180 323 € |
+| Lučenec | 56 | 3 | 70 % | 2 308 € | 114 500 € |
+| Bernolákovo | 47 | 2 | 77 % | 3 634 € | 242 944 € |
+| Nové Mesto nad Váhom | 45 | 2 | 56 % | 2 935 € | 152 561 € |
+| Banská Štiavnica | 43 | 3 | 56 % | — | — |
+| Partizánske | 39 | 1 | 100 % | 2 584 € | 164 900 € |
+| Senec | 35 | 1 | 100 % | 2 749 € | 229 900 € |
+| Hlohovec | 25 | 2 | 96 % | 3 200 € | 172 096 € |
+| Bánovce nad Bebravou | 24 | 1 | 100 % | 2 118 € | 131 900 € |
+| Sekule | 24 | 1 | 100 % | 2 177 € | 144 000 € |
+| Štôla | 24 | 1 | 100 % | 5 351 € | 286 530 € |
+| Modra | 22 | 1 | 100 % | 3 206 € | 217 200 € |
+| Spišská Nová Ves | 22 | 3 | 73 % | 2 459 € | 194 000 € |
+| Malacky | 19 | 1 | 100 % | 3 846 € | 207 650 € |
+| Dolný Kubín | 19 | 2 | 74 % | — | — |
+| Stupava | 18 | 1 | 100 % | 3 622 € | 262 990 € |
+| Bardejov | 16 | 1 | 100 % | — | — |
+| Komárno | 16 | 2 | 50 % | 3 024 € | 254 985 € |
+| Ivanka pri Dunaji | 14 | 1 | 100 % | 3 901 € | 276 679 € |
+| Brezno | 13 | 1 | 100 % | 2 419 € | 168 900 € |
+| Lužianky | 13 | 1 | 100 % | 2 604 € | 229 500 € |
+| Levice | 12 | 1 | 100 % | 2 400 € | 172 824 € |
+| Humenné | 11 | 1 | 100 % | 2 296 € | 199 900 € |
+| Svätý Jur | 9 | 1 | 100 % | 4 484 € | 235 490 € |
+| Sereď | 9 | 1 | 100 % | 2 062 € | 177 990 € |
+| Zlaté Moravce | 8 | 2 | 75 % | 2 360 € | 138 490 € |
+| Oľdza | 5 | 1 | 100 % | 2 180 € | 279 500 € |
+| Nové Zámky | 5 | 2 | 60 % | 2 634 € | 187 500 € |
+
+---
+
+<!--CMS-SKIP-START-->
+## Metodická poznámka
+
+Residata číta cenníky slovenských developerov každý deň, byt po byte. Tento prehľad stojí na 240 projektoch, ktoré tvoria ponuku v 43 mestách, a na pozorovaniach od 16. mája 2026, teda za 128 dní.
+
+**Čo sa počíta.** *Voľné byty* sú byty vedené developerom ako voľné; rezervované a predané sa do nich nerátajú. Do prehľadu vstupujú výlučne projekty, ktorých cenník čítame aktuálne — projekt, ktorý sme prestali čítať, z mapy vypadáva aj s poslednou známou ponukou. Mesto je v mape, ak má v ponuke aspoň 5 voľných bytov; pod touto hranicou ide o jednotlivé zostatkové byty, nie o ponuku mesta. Počítajú sa len byty — garáže, parkovacie státia, pivnice a nebytové priestory sú z každého čísla vylúčené. *Medián €/m²* je medián jednotkových cien jednotlivých bytov, počítaný z obytnej plochy a vrátane DPH; ide o ponukové ceny z cenníkov, nie o realizačné ceny z katastra. Bencont a BuiltMind publikujú priemer a pracujú s úžitkovou plochou, takže ich jednotková cena a naša sa porovnávať nedajú priamo.
+
+**Ako sa počíta podiel najväčšieho projektu a posun mediánu.** Podiel najväčšieho projektu je jeho počet voľných bytov delený počtom voľných bytov v meste. Posun mediánu je rozdiel medzi mediánom mesta a mediánom toho istého mesta po vynechaní jeho najväčšieho projektu s uvedenými cenami; posun sa uvádza len tam, kde po vynechaní zostalo aspoň desať bytov s cenou.
+
+**Ako sa počíta zmena ceny.** Porovnáva sa cena toho istého bytu v tom istom projekte oproti jeho vlastnej skoršej cene, pri jednom čítaní na byt a deň a pri zmene aspoň o dvesto eur. Ide teda o zmenu na jednotke, nie o pohyb priemeru.
+
+**Kontrola pokrytia.** Register rezido.sk vedie 512 slovenských projektov, z toho 192 vypredaných. Porovnanie s naším katalógom k 21. septembra 2026 našlo 15 predávajúcich projektov, ktoré nesledujeme, spolu s 101 voľnými bytmi — 1,4 % celoslovenskej ponuky.
+
+**Kontrola voči publikovaným číslam.** Za Bratislavu, kde je s čím porovnávať, sedia naše údaje s tým, čo publikujú etablované domy: Bencont Investments uvádza za Q2 2026 ponuku 4 231 bytov, nám na porovnateľnej definícii vychádza 4 303 — rozdiel 1,7 %. Priemerná ponuková cena bytu je u nich 380 000 € a u nás 387 873 €, rozdiel 2,1 %.
+
+**Rozsah tohto čísla.** Pracuje výhradne s ponukou a s cenami.
+
+---
+
+<!--CMS-SKIP-END-->
+**Tomáš Kamhal** · zakladateľ, Residata · tomas@residata.eu
+
+Residata sleduje cenníky novostavieb na Slovensku a v Česku denne, byt po byte. Ďalšie číslo vychádza v októbri. Ak chcete dostávať analýzy e-mailom, napíšte nám na info@residata.eu.

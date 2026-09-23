@@ -1,41 +1,79 @@
 <!--PEREX
-Sales in {cq} are heading for {cqRunRate} flats against {pqSales} in {pqLabel}. The price level was unchanged and the supply of flats for sale rose to {cqSupply}.
+In {oneProject} of the {towns} Slovak towns with a new-build supply a single project is on sale, and in {twoOrFewer} at most two. Removing the largest project moves the town median by {bbShiftPct}% in Banská Bystrica and by {baShiftPct}% in Bratislava.
 -->
 <!--METHOD
-The {cq} figures come from the publicly published price lists of Bratislava developers, recorded daily by Residata; as of {asOfEn} we cover {cqDaysObs} of the quarter's {cqDaysTot} days, so sales are given as recorded to date and extrapolated to the full quarter at the same daily pace. Supply consists of available and reserved flats; homes only — no parking, storage or commercial units. The average price per m² is a mean of individual flats' unit prices on living area including VAT; these are asking prices. The earlier quarters ({yqLabel} to {pqLabel}) are taken from the published quarterly analyses of {srcName} and are labelled as such in the table. Their average price has been converted by a factor of {rebaseFactor} onto living area so that it is comparable with our measurement; the factor is the ratio of our own reading on {rebaseAnchorDateEn} ({rebaseOurs} €/m²) to their figure for {pqLabel} ({rebaseTheirs} €/m²). Supply and sales are not adjusted — those definitions agree to within two per cent.
+Data come from developers' publicly published price lists, recorded daily by Residata since {windowFromEn} ({windowDays} days). Available flats are those the developer lists as available, excluding reserved and sold; only projects whose price list we currently read are included, and only towns with at least {mapMinStock} available flats. Homes only — no parking, storage or commercial units. Price per m² is computed on living area including VAT and reported as a median rather than a mean; these are asking prices from price lists. The median shift is the difference against the same town's median without its largest priced project, and is reported only where at least ten priced flats remain. A price change compares the same flat with its own earlier price, at one reading per flat per day and a change of at least two hundred euros. Coverage was checked against the rezido.sk register on {asOfEn}: {covMissingProjects} selling projects outside our catalogue holding {covMissingUnits} available flats, or {covMissingPctEn}% of supply. For Bratislava our figures differ from {benchSource}'s for {benchPeriod} by {supplyDeltaPctEn}% on supply and {meanPriceDeltaPctEn}% on the average asking price. All figures are our own.
 -->
-{asOfEn} | QUARTERLY ANALYSIS OF THE BRATISLAVA NEW-BUILD MARKET
+MARKET ANALYSIS · The new-build map · {asOfEn}
 
-# The supply of Bratislava new-builds keeps growing, prices are standing still
+# In two thirds of Slovak towns the whole new-build supply is at most two projects. The town's average price is their price list
 
-{cqNameEn} of {cqYear} on the Bratislava new-build market means stronger demand, price stagnation and a further increase in the number of flats for sale. At the current pace sales are heading for {cqRunRate} flats against {pqSales} in {pqLabel}. The price level was unchanged and rose by {yqM2PctEn}% year on year. The supply of flats for sale rose to {cqSupply}.
+Slovak towns outside Bratislava have spent a decade building more than ever before. Almost nothing is published about how they sell: the regular new-build analysis covers Bratislava, and beyond it prices appear as regional and city averages. An average quietly assumes that there is a market underneath it to average. In most Slovak towns what lies underneath is one or two price lists.
 
-As of {asOfEn} the supply on the new-build market consisted, according to Residata's data, of {cqSupply} flats across {cqProjects} projects. Against {pqLabel} supply rose by {pqSupply} flats or {pqSupplyPctEn}%, while year on year it rose by {yqSupply} flats or {yqSupplyPctEn}%.
+**In this issue:** how many projects make up the supply in each of the {towns} Slovak towns where a new-build flat can be bought today · what happens to a town's price when one project is taken out of it · how far a price moves outside Bratislava.
 
-The average price of these flats on offer reached {cqM2} €/m² incl. VAT, which year on year is an increase of only {yqM2PctEn}%. It can be said that new-build prices have for some years been rising at a pace close to zero — a year ago the average price was {yqM2} €/m² incl. VAT and a quarter ago {pqM2} €/m² incl. VAT. Differences in the average price are caused by the composition of supply rather than by movements in price lists.
+---
 
-The average absolute price of flats on offer stood at {cqPrice} € incl. VAT, while their average floor area reached {cqAreaEn} m².
+New-build flats are sold today in every Slovak regional capital and in dozens of smaller towns. A new development in Prešov, Zvolen or Liptovský Mikuláš is an ordinary offer, and the prices they sell at appear regularly in regional statistics.
 
-**In this issue:** The development of supply and sales on the Bratislava new-build market · A view on where the Bratislava new-build market is heading
+What those prices mean is nowhere examined. The regular new-build analyses cover Bratislava, where there is enough to count; outside it, averages are published by region or by regional capital and nobody shows what they are made of. The difference between what such an average measures in Bratislava and what it measures in Trenčín is not academic.
 
-## The development of supply and sales on the Bratislava new-build market
+So the question is not how high a regional average is. It is how many price lists it is made of, and what happens to it when one of them moves. The answer decides whether a developer can lean on it when pricing a phase, and whether a buyer can read from it what counts as expensive in their town.
 
-Supply grew and demand grew with it. Over {cqDaysObs} of the quarter's {cqDaysTot} days {cqSales} flats were sold, which at the same daily pace means {cqRunRate} flats for the full quarter, against {pqSales} in {pqLabel} and {yqSales} a year ago. Sales were not distorted by an exceptionally high figure in one of the large projects — the strongest of them accounted for {qTopSellerN} flats. Demand therefore rose by {pqSalesPctEn}% against the previous quarter.
+The answer differs in every town and can be quantified. In Bratislava the largest project holds {baBiggestPct} % of the town's supply. In Banská Bystrica, {bbBiggestPct} %. And in {oneProject} of {towns} towns the largest project holds all of it, because it is the only one.
 
-{seriesTableEn}
+Those shares come from very differently sized offers. Of the {totalAvailable} available flats that make up the entire Slovak new-build supply, {baSharePct} % stand in a single city: {baAvailable} flats in Bratislava, across {baProjects} projects, not one of which exceeds {baBiggestPct} % of the supply. The remaining {restAvailable} flats are spread across {restTowns} towns, and {twoOrFewer} of those have at most two projects on offer. The median unit price is {baScopeMedian} €/m² incl. VAT in Bratislava and {restMedian} €/m² incl. VAT in the rest of the country.
 
-\* {cq} is the position as of {asOfEn}: {cqDaysObs} of {cqDaysTot} days. The earlier quarters are from the published analyses of {srcName}, with the average price converted onto living area — see the method note.
+![Largest project's share of a town's supply](/analyzy/{slug}-1-jeden-projekt-en.svg)
+*Largest project's share of available flats, towns with at least {rankThreshold} available.*
 
-The average achieved price of sold flats rose slightly to {cqSoldM2} €/m² incl. VAT, matching the average asking price. Behind the rise in the price of sold flats is above all increased demand in {qD1} and {qD2}, which are dearer than the average — in {qD1} sales rose from {qD1Then} to {qD1Now} flats and in {qD2} from {qD2Then} to {qD2Now}. The average absolute price of sold flats was {cqSoldPrice} € incl. VAT at an average floor area of {cqSoldAreaEn} m².
+What this does to a price is clearest in Banská Bystrica. At a median of {bbMedian} €/m² incl. VAT it is the {bbRank}th dearest of the {bbRankedOf} towns holding at least {rankThreshold} available flats — dearer than Trnava, Trenčín and Prešov. Take one project out of the calculation, the largest, and the town's median falls to {bbMedianEx} €/m² incl. VAT and drops to {bbRankEx}th place. The difference is {bbShift} €/m² incl. VAT, or {bbShiftPct} % of the price, and not one price-list change lies behind it.
 
-## A view on where the Bratislava new-build market is heading
+The same calculation in other towns gives the same picture. In Trenčín, removing the largest project moves the town median by {tnShiftPct} %, in Žilina by {zaShiftPct} % and in Košice by {keShiftPct} %. In Bratislava, by {baShiftPct} %. And in {noOfferWithoutBiggest} towns the calculation cannot be made at all: once the largest project is removed, no published price is left.
 
-Tomáš Kamhal, founder of Residata: "Over the past year sales have held at around {avgQuarterSales} flats a quarter, while supply over the same period rose by {yqSupplyPctEn}%. More flats are therefore coming onto the market than are leaving it, and the difference is accumulating.
+A town's average price is therefore a statement about what happens to be on offer there. In a town with one or two projects it is a statement about one price list. When such a project sells out, or when the developer launches another phase, the town's average moves without a single price having changed.
 
-The first factor is supply. It has reached {cqSupply} flats across {cqProjects} projects and keeps growing. As long as developers feel each other's competition and sales keep pace, the result is price stagnation — over the past year the average price moved by {yqM2PctEn}%.
+The same thing shows in how prices move. Over the last {stepDays} days we recorded {baMoves} changes to the price of the same flat in Bratislava and {restMoves} in the other towns, with almost the same number of projects moving a price ({baMoveProjects} and {restMoveProjects}). The direction does not differ: {baUp}% of Bratislava changes were increases, against {restUp}% elsewhere. The size of the step does. A Bratislava developer changes a flat's price by {baStep}%, a developer outside Bratislava by {restStep}% — {stepRatio} times as much.
 
-The second factor is demand, constrained above all by interest rates and household purchasing power. The average flat sold cost {cqSoldPrice} € at {cqSoldAreaEn} m², which is a threshold a limited number of households can reach.
+![Median change in the same flat's price](/analyzy/{slug}-2-krok-ceny-en.svg)
+*Median change in the same flat's price when it changed, over the last {stepDays} days.*
 
-Unless interest rates and purchasing power change materially, the new-build market will go on marking time, demand will stay bounded and prices will stagnate. What will be interesting to watch is the development of supply — further growth could already cause a degree of nervousness."
+"In Bratislava a developer prices a flat against dozens of neighbouring price lists and then corrects in small steps. In Trenčín or Banská Bystrica there is nothing to price against, so the price is set and then moved in a jump, once the developer sees how it is selling," says Tomáš Kamhal, founder of Residata. "There is no greed or incompetence behind it; it follows from there being nobody to compare with in those towns. And unless more projects appear in the regional cities, it will stay that way — regional averages will go on measuring individual developers' decisions rather than the movement of a market."
 
-**Author:** Tomáš Kamhal, founder of Residata · tomas@residata.eu
+For a buyer the difference is one that can be counted. The median flat on offer costs {baPrice} € in Bratislava, {nrPrice} € in Nitra, {poPrice} € in Prešov and {bbPrice} € in Banská Bystrica. A buyer in Bratislava can set that price against {baOtherProjects} other price lists in the same city. In {oneProject} towns there is no second price list.
+
+For a buyer in Bratislava this means that the average they read in the news roughly matches what they will see on offer. For a buyer in Trenčín or Banská Bystrica the same kind of figure means considerably less, and its movement less still. For a developer setting a phase price from a regional average, it means that in {oneProject} of {towns} towns they are comparing themselves with themselves.
+
+The indicator that will say more over the coming months than the price level itself is the number of towns that move from one project to two. Today there are {oneProject} of {towns}.
+
+---
+
+## The map: Slovak towns with a new-build supply
+
+{townTableEn}
+
+---
+
+<!--CMS-SKIP-START-->
+## Method
+
+Residata reads Slovak developers' price lists every day, flat by flat. This overview rests on {totalProjects} projects making up the supply in {towns} towns, and on observations since {windowFromEn}, that is {windowDays} days.
+
+**What is counted.** *Available flats* are flats the developer lists as available; reserved and sold are excluded. Only projects whose price list we currently read enter the overview — a project we have stopped reading drops off the map along with its last known offer. A town is on the map if it has at least {mapMinStock} available flats; below that line these are individual leftover flats rather than a town's supply. Only homes are counted — garages, parking spaces, cellars and commercial units are excluded from every figure. The *median €/m²* is the median of individual flats' unit prices, computed on living area and including VAT; these are asking prices from price lists, not achieved prices from the land registry. Bencont and BuiltMind publish a mean and work with usable area, so their unit price and ours cannot be compared directly.
+
+**How the largest project's share and the median shift are computed.** The largest project's share is its number of available flats divided by the town's available flats. The median shift is the difference between the town's median and the median of the same town once its largest priced project is removed; the shift is reported only where at least ten priced flats remain.
+
+**How a price change is computed.** The price of the same flat in the same project is compared against its own earlier price, at one reading per flat per day and a change of at least two hundred euros. It is therefore a change on a unit, not a movement of an average.
+
+**Coverage check.** The rezido.sk register lists {covIndexProjects} Slovak projects, {covSoldOut} of them sold out. A comparison against our catalogue on {asOfEn} found {covMissingProjects} selling projects we do not track, holding {covMissingUnits} available flats — {covMissingPctEn}% of the national supply.
+
+**Check against published figures.** For Bratislava, where there is something to compare with, our data agrees with what the established houses publish: {benchSource} reports a supply of {benchSupply} flats for {benchPeriod}; on a comparable definition we get {ourSupplyComparable}, a difference of {supplyDeltaPctEn}%. Their average asking price per flat is {benchMeanPrice} € and ours {ourMeanPrice} €, a difference of {meanPriceDeltaPctEn}%.
+
+**Scope of this issue.** It works with supply and prices only.
+
+---
+
+<!--CMS-SKIP-END-->
+**Tomáš Kamhal** · founder, Residata · tomas@residata.eu
+
+Residata reads new-build price lists in Slovakia and Czechia every day, flat by flat. The next issue is published in October. To receive the analyses by e-mail, write to info@residata.eu.
