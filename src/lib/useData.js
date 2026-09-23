@@ -33,6 +33,33 @@ function sbRead(builder) {
   return Promise.race([settled, cap]).finally(() => { if (capTimer) clearTimeout(capTimer); });
 }
 
+/**
+ * sbReadAll — sbRead, but it keeps asking until the server stops giving.
+ *
+ * 🔴 PostgREST caps an unbounded select at `db-max-rows` (1000 here) and returns
+ * the truncated page with NO error, so a read that outgrows the cap starts
+ * silently lying and nothing on the page looks wrong. Measured 2026-09-23:
+ * `project_snapshots` is 1 434 rows, and Slnečnice alone has 4 624 current
+ * units — its flat list was showing 1 000 of them.
+ *
+ * Use this for ANY read whose row count is not structurally bounded below 1 000.
+ * `makeBuilder(from, to)` must return a fresh builder each call — a PostgREST
+ * builder is single-use — and must carry a deterministic sort, or page
+ * boundaries can drop or repeat a row.
+ */
+const SB_PAGE = 1000;
+async function sbReadAll(makeBuilder, { pageSize = SB_PAGE, maxRows = 200000 } = {}) {
+  const out = [];
+  for (let from = 0; from < maxRows; from += pageSize) {
+    const { data, error } = await sbRead(makeBuilder(from, from + pageSize - 1));
+    if (error) return { data: out.length ? out : null, error };
+    const page = data || [];
+    out.push(...page);
+    if (page.length < pageSize) return { data: out, error: null };
+  }
+  return { data: out, error: null };
+}
+
 // Cross-market "All" view helpers: drop the country filter on table reads and
 // pass NULL to RPCs (every RPC treats p_country NULL as "all markets"). All
 // stored money is EUR, so the combined view is inherently EUR.
@@ -1011,10 +1038,13 @@ export function useProjectFlats(projectId) {
       // Reading from here guarantees the per-project flat list shows
       // the same data as the Pivot's "Latest month" mode and the
       // homepage ticker — single source of truth.
-      return await sbRead(supabaseData.from("flats_current")
+      // Slnečnice alone is 4 624 current units — a single page showed 1 000.
+      return await sbReadAll((from, to) => supabaseData.from("flats_current")
         .select("*")
         .eq("project_id", projectId)
-        .order("poschodie", { ascending: true }));
+        .order("poschodie", { ascending: true })
+        .order("unit_id", { ascending: true })          // stable page boundaries
+        .range(from, to));
     };
 
     // Fallback for manual projects (Altum, Bory) — they're updated
@@ -1040,12 +1070,15 @@ export function useProjectFlats(projectId) {
       }
       const latestBatch = probe.data[0].batch_timestamp;
       if (latestBatch == null) return { data: [], error: null };
-      // Then fetch all flats from that one scrape run
-      return await sbRead(supabaseData.from("flats_archive")
+      // Then fetch all flats from that one scrape run — paginated for the same
+      // reason as fetchCurrent: one project can hold several thousand units.
+      return await sbReadAll((from, to) => supabaseData.from("flats_archive")
         .select("*")
         .eq("project_id", projectId)
         .eq("batch_timestamp", latestBatch)
-        .order("poschodie", { ascending: true }));
+        .order("poschodie", { ascending: true })
+        .order("unit_id", { ascending: true })
+        .range(from, to));
     };
 
     (async () => {
@@ -1113,7 +1146,10 @@ export function useProjectSnapshots() {
     if (!isSupabaseReady() || !user) { setSnapshots([]); setLoading(false); return; }  // anon/free → RLS gives [] anyway
     if (_snapshotsCache.key === key && _snapshotsCache.rows) { setSnapshots(_snapshotsCache.rows); setLoading(false); return; }
     let cancelled = false;
-    sbRead(supabaseData.from("project_snapshots").select("*").order("snapshot_month", { ascending: false }))
+    sbReadAll((from, to) => supabaseData.from("project_snapshots").select("*")
+        .order("snapshot_month", { ascending: false })
+        .order("project_id", { ascending: true })      // stable page boundaries
+        .range(from, to))
       .then(({ data, error }) => {
         if (cancelled) return;
         if (error) { console.error("[useProjectSnapshots]", error); setLoading(false); return; }
