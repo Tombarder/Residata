@@ -23,8 +23,8 @@ V projektoch, ktoré boli v ponuke v tomto aj v predchádzajúcom štvrťroku, p
 
 Ponuka nie je v meste rozložená rovnomerne. Dva najväčšie okresy držia 50,3 % celej ponuky.
 
-![Ponuka bytov podľa okresu](/analyzy/ba-prehlad-2026-q3-ponuka-okres.svg)
-*Rozdelenie ponuky medzi bratislavské okresy.*
+![Z čoho sa ponuka v okresoch skladá](/analyzy/ba-prehlad-2026-q3-ponuka-okres.svg)
+*Koľko z ponuky každého okresu je v hotových budovách, koľko rozostavaných a pri koľkých developer termín nezverejnil.*
 
 | Okres | Byty v ponuke | Podiel | Dokončené | Rozostavané | Termín nezverejnený | Projekty | €/m² s DPH |
 |---|---:|---:|---:|---:|---:|---:|---:|
@@ -40,7 +40,7 @@ Okresy sa líšia aj v tom, koľko toho developer o termíne dokončenia povie. 
 Podľa veľkosti bytu je trh úzky: z 4 112 bytov, pri ktorých je uvedený počet izieb, tvoria dvojizbové a trojizbové spolu 72,5 %.
 
 ![Ponuka bytov podľa kategórie](/analyzy/ba-prehlad-2026-q3-ponuka-kategoria.svg)
-*Rozdelenie ponuky podľa počtu izieb.*
+*Ponuka podľa počtu izieb, v poradí od najmenších bytov.*
 
 ## Dopyt
 
@@ -59,7 +59,7 @@ Podľa veľkosti bytu je trh úzky: z 4 112 bytov, pri ktorých je uvedený po�
 Rozdelenie predaja nekopíruje rozdelenie ponuky. Okres, ktorý drží väčší podiel na predaji než na ponuke, sa vypredáva rýchlejšie než mestský priemer; okres s opačným pomerom zostáva na trhu dlhšie. Najvýraznejší je rozdiel v okrese Bratislava II: 38,5 % predaja oproti 28,7 % ponuky. Opačný pomer má Bratislava I — 11,0 % predaja pri 18,3 % ponuky.
 
 ![Predané byty podľa kategórie](/analyzy/ba-prehlad-2026-q3-predaj-kategoria.svg)
-*Rozdelenie predaja podľa počtu izieb.*
+*Predaj podľa počtu izieb, v rovnakom poradí ako ponuka vyššie.*
 
 ## Ceny
 
