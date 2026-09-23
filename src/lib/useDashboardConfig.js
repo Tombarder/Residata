@@ -24,6 +24,10 @@ import { supabase, supabaseData } from "./supabase";
 
 export const DASHBOARD_VERSION = 2;
 
+// Comparison periods the Market Overview offers, in months. Kept beside the
+// normalizer because that is the code which has to recognise a stored value.
+export const OVERVIEW_MOM_BACK = [1, 3, 6, 12];
+
 // A fresh id for a widget instance. crypto.randomUUID is available in every
 // browser we support; the fallback keeps it from throwing in exotic contexts.
 export function newWidgetId() {
@@ -66,10 +70,17 @@ function normalize(raw) {
     // Persist the Market-Overview filter conditions. Re-id each on load with an
     // "f…" prefix so they can never collide with the shared MapFilterBuilder's
     // per-session "cN" counter ids (which reset to c1 every page load).
+    // 🔴 EVERY overview key has to be listed here. This object is REBUILT, not
+    // merged, so a key that is not named below is silently dropped on load and
+    // the setting appears not to save — which is exactly what happened to
+    // `momBack` (the comparison period) when it was added on 2026-09-23.
     overview: {
       filters: Array.isArray(raw.overview?.filters)
         ? raw.overview.filters.map(c => ({ ...c, id: "f" + Math.random().toString(36).slice(2, 9) }))
         : [],
+      // which comparison period the Market Overview arrows use, in months
+      ...(OVERVIEW_MOM_BACK.includes(Number(raw.overview?.momBack))
+        ? { momBack: Number(raw.overview.momBack) } : {}),
     },
     widgets: migrateV1Widgets(raw)
       .filter(w => w && typeof w === "object" && typeof w.type === "string")

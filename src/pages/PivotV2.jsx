@@ -2350,6 +2350,7 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
         />
         <RightPanel
           usedKeys={usedKeys}
+          onAddToZone={(fieldKey, zone) => addToZone(fieldKey, zone)}
           search={search} setSearch={setSearch}
           drag={drag} setDrag={setDrag}
           hoverZone={hoverZone} setHoverZone={setHoverZone}
@@ -3119,7 +3120,12 @@ function ChipInZone({ label, type, agg, filter, level, isDragged, onDragStart, o
 }
 
 /* ─── RIGHT PANEL (palette) ─────────────────────────────────── */
-function RightPanel({ usedKeys, search, setSearch, drag, setDrag, hoverZone, setHoverZone, onDropBack, lang }) {
+function RightPanel({ usedKeys, onAddToZone, search, setSearch, drag, setDrag, hoverZone, setHoverZone, onDropBack, lang }) {
+  // Which palette row has its destination buttons open. Drag-and-drop is still
+  // the fast path for a mouse; this is the one that also works on a trackpad,
+  // on touch (where there is no hover and HTML5 drag does not fire at all) and
+  // from the keyboard.
+  const [openKey, setOpenKey] = useState(null);
   // Wire drag events from chips via a DOM-level custom event (chips live
   // in siblings, easier than prop-drilling a setDrag everywhere).
   // Also listen for the native HTML5 `dragend` so we clear drag state
@@ -3209,6 +3215,9 @@ function RightPanel({ usedKeys, search, setSearch, drag, setDrag, hoverZone, set
                 field={f}
                 lang={lang}
                 used={usedKeys.has(f.key)}
+                open={openKey === f.key}
+                onToggle={() => setOpenKey(k => (k === f.key ? null : f.key))}
+                onAddToZone={(zone) => { onAddToZone(f.key, zone); setOpenKey(null); }}
                 onDragStart={() => {
                   const payload = { fromZone: "palette", fieldKey: f.key };
                   window.__pivotv2_drag = payload;
@@ -3230,7 +3239,16 @@ function RightPanel({ usedKeys, search, setSearch, drag, setDrag, hoverZone, set
 
 /* (useEffect for the drag-event listener is inlined in RightPanel now.) */
 
-function PaletteField({ field, used, onDragStart, lang }) {
+// The four destinations a field can go to, in the order the zones appear on the
+// left. Icons match the DropZone headings so the two halves read as one thing.
+const PALETTE_ZONES = [
+  { zone: "rows",    icon: "↓", sk: "Riadky",  en: "Rows" },
+  { zone: "cols",    icon: "→", sk: "Stĺpce",  en: "Columns" },
+  { zone: "values",  icon: "Σ", sk: "Hodnoty", en: "Values" },
+  { zone: "filters", icon: "⚑", sk: "Filtre",  en: "Filters" },
+];
+
+function PaletteField({ field, used, open, onToggle, onAddToZone, onDragStart, lang }) {
   const typeBadge = field.type === "number" ? "#" : (field.type === "date" ? "📅" : "T");
   const typeColor = field.type === "number" ? orange : green;
   // Palette fields are ALWAYS draggable now — even when the field is
@@ -3241,28 +3259,40 @@ function PaletteField({ field, used, onDragStart, lang }) {
   // exclude outliers. The mutex logic in addToZone still prevents
   // duplicates in Rows / Cols / Values themselves.
   return (
+    <>
     <div
       draggable
+      role="button"
+      tabIndex={0}
+      aria-expanded={!!open}
+      onClick={onToggle}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggle(); }
+        if (e.key === "Escape" && open) onToggle();
+      }}
       onDragStart={(e) => {
         e.dataTransfer.effectAllowed = "move";
         e.dataTransfer.setData("text/plain", field.key);
         onDragStart();
       }}
-      title={used
-        ? "Už v niektorej zóne · potiahni do Filtrov pre coexistenciu"
-        : "Potiahni do Riadky / Stĺpce / Hodnoty / Filtre"}
+      title={lang === "sk"
+        ? "Klikni a vyber zónu — alebo potiahni do Riadky / Stĺpce / Hodnoty / Filtre"
+        : "Click and pick a zone — or drag into Rows / Columns / Values / Filters"}
       style={{
         display: "flex", alignItems: "center", gap: "0.45rem",
         padding: "0.32rem 0.55rem", borderRadius: 4,
         color: used ? "var(--text-dim)" : text, fontSize: "0.78rem",
         cursor: "grab", userSelect: "none",
-        borderLeft: "2px solid transparent", transition: "background 0.1s, border-color 0.1s",
+        background: open ? panelHi : "transparent",
+        borderLeft: `2px solid ${open ? green : "transparent"}`,
+        transition: "background 0.1s, border-color 0.1s",
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.background = panelHi;
         e.currentTarget.style.borderLeftColor = green;
       }}
       onMouseLeave={(e) => {
+        if (open) return;
         e.currentTarget.style.background = "transparent";
         e.currentTarget.style.borderLeftColor = "transparent";
       }}
@@ -3272,7 +3302,31 @@ function PaletteField({ field, used, onDragStart, lang }) {
       </span>
       <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fieldLabel(field.key, lang)}</span>
       {used && <span style={{ fontFamily: mono, fontSize: "0.58rem", color: accentInk, opacity: 0.65 }} title="Už použité inde">✓</span>}
+      <span aria-hidden style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, opacity: open ? 1 : 0.45 }}>{open ? "▾" : "⋯"}</span>
     </div>
+
+    {open && (
+      <div role="group"
+           aria-label={lang === "sk" ? `Pridať ${fieldLabel(field.key, lang)} do zóny` : `Add ${fieldLabel(field.key, lang)} to a zone`}
+           style={{ display: "flex", gap: 4, padding: "0.3rem 0.55rem 0.45rem 2.05rem", flexWrap: "wrap" }}>
+        {PALETTE_ZONES.map((z) => (
+          <button key={z.zone} type="button"
+            onClick={(e) => { e.stopPropagation(); onAddToZone(z.zone); }}
+            title={lang === "sk" ? `Pridať do ${z.sk}` : `Add to ${z.en}`}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 4,
+              background: "transparent", border: `1px solid ${border}`, borderRadius: 999,
+              color: dim, fontFamily: mono, fontSize: "0.64rem", padding: "2px 8px",
+              cursor: "pointer", transition: "background .12s, color .12s, border-color .12s",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = green; e.currentTarget.style.color = accentInk; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = border; e.currentTarget.style.color = dim; }}>
+            <span aria-hidden>{z.icon}</span>{lang === "sk" ? z.sk : z.en}
+          </button>
+        ))}
+      </div>
+    )}
+    </>
   );
 }
 

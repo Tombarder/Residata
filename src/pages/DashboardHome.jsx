@@ -38,7 +38,7 @@ import { useActivateTrial } from "../lib/useActivateTrial";
 import {
   accent as green, accentInk, orange, blue, dim, faint, text as textLight, border,
   surface as bg, surfaceDark as bg2, surfacePanel, mono, orangeInk, infoInk, dangerInk } from "../lib/theme";
-import { useDashboardConfig, newWidgetId } from "../lib/useDashboardConfig";
+import { useDashboardConfig, newWidgetId, OVERVIEW_MOM_BACK } from "../lib/useDashboardConfig";
 import MapFilterBuilder from "../components/MapFilterBuilder";
 import Picker from "../components/Picker";
 import InfoTip from "../components/InfoTip";
@@ -211,7 +211,8 @@ function scopeHistory(scope, snapshots, countryIds) {
   for (const r of rows) {
     const m = r.snapshot_month; if (!m) continue;
     let a = byMonth.get(m);
-    if (!a) { a = { available: 0, sold: 0, reserved: 0, wSum: 0, wTot: 0, projects: new Set(), developers: new Set() }; byMonth.set(m, a); }
+    if (!a) { a = { available: 0, sold: 0, reserved: 0, wSum: 0, wTot: 0, projects: new Set(), developers: new Set(), seen: new Set() }; byMonth.set(m, a); }
+    a.seen.add(r.project_id);
     a.available += r.available_units || 0;
     a.sold += r.sold_units || 0;
     a.reserved += (r.reserved_units || 0) + (r.prereserved_units || 0);
@@ -223,11 +224,11 @@ function scopeHistory(scope, snapshots, countryIds) {
   return [...byMonth.keys()].sort().map(m => {
     const a = byMonth.get(m), den = a.sold + a.available + a.reserved;
     return { month: m, available: a.available, sold: a.sold, reserved: a.reserved,
-             projects: a.projects.size, developers: a.developers.size,
+             projects: a.projects.size, developers: a.developers.size, ids: a.seen,
              avg_m2: a.wTot ? a.wSum / a.wTot : null, sold_through: den ? (a.sold / den) * 100 : null };
   });
 }
-function momDelta(metric, scope, ctx) {
+function momDelta(metric, scope, ctx, back = 1) {
   const key = { available: "available", avg_m2: "avg_m2", reserved: "reserved", sold_total: "sold",
                 sold_through: "sold_through", projects: "projects", developers: "developers" }[metric];
   if (!key) return null;
@@ -235,15 +236,21 @@ function momDelta(metric, scope, ctx) {
   // the current market (mirrors the KPI strip's aggMomDelta(overviewIds,…)).
   const countryIds = new Set((ctx.projects || []).map(p => p.id));
   const h = scopeHistory(scope, ctx.snapshots, countryIds);
-  if (h.length < 2) return null;
-  const cur = h[h.length - 1][key], prev = h[h.length - 2][key];
-  if (cur == null || prev == null) return null;
-  const abs = cur - prev;
-  if (Math.abs(abs) < 1e-9) return null;
-  return { abs, metric };
+  // Same rule as the KPI strip: the panel is held constant, or the arrow is
+  // reporting our onboarding. `key` is scopeHistory's field name for `metric`.
+  const d = constantPanelDelta(key, back, h, (ids) =>
+    scopeHistory(scope, (ctx.snapshots || []).filter(r => ids.has(r.project_id)), countryIds));
+  return d ? { ...d, metric } : null;
 }
 // A compact "▲ 320" / "▼ 1 200 €" / "▲ 2 pp" chip. Direction only — deliberately
 // no green/red good-bad colouring (a price rise or more supply isn't "bad").
+const MOM_PERIOD_LABEL = (back, lang) => ({
+  1:  L(lang, "vs. minulý mesiac",    "vs last month"),
+  3:  L(lang, "vs. pred 3 mesiacmi",  "vs 3 months ago"),
+  6:  L(lang, "vs. pred 6 mesiacmi",  "vs 6 months ago"),
+  12: L(lang, "vs. pred rokom",       "vs a year ago"),
+}[back] || L(lang, "vs. minulý mesiac", "vs last month"));
+
 function DeltaChip({ delta, lang }) {
   if (!delta) return null;
   const up = delta.abs > 0;
@@ -263,7 +270,7 @@ function DeltaChip({ delta, lang }) {
   return (
     <span style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, lineHeight: 1.3, overflowWrap: "anywhere" }}>
       <span style={{ color: up ? green : dangerInk }}>{up ? "▲" : "▼"}</span> {txt}
-      <span style={{ color: faint }}> {L(lang, "vs. minulý mesiac", "vs last month")}</span>
+      <span style={{ color: faint }}> {MOM_PERIOD_LABEL(delta.back || 1, lang)}</span>
     </span>
   );
 }
@@ -312,7 +319,7 @@ function aggHistory(idSet, snapshots) {
   }
   return [...byMonth.keys()].sort().map(m => {
     const a = byMonth.get(m), den = a.sold + a.available + a.reserved;
-    return { available: a.available, sold_total: a.sold, reserved: a.reserved,
+    return { month: m, available: a.available, sold_total: a.sold, reserved: a.reserved,
              projects: a.projects.size, developers: a.developers.size,
              // every project that reported in this month — what aggMomDelta needs to
              // hold the population constant. Not `projects`, which counts only the
@@ -322,47 +329,69 @@ function aggHistory(idSet, snapshots) {
   });
 }
 
-// 🔴 METRICS WHOSE VALUE DEPENDS ON *WHICH* PROJECTS ARE IN THE BUCKET.
+// 🔴 A CHANGE IS ALWAYS MEASURED OVER THE SAME PROJECTS IN BOTH MONTHS.
 //
-// A count grows because we onboarded projects, and saying so is correct — 12 242
-// → 12 311 available units IS more inventory. An AVERAGE and a RATIO are not
-// like that: add eleven cheaper projects and the average falls without a single
-// price moving.
+// This used to hold the panel constant for averages and ratios only, on the
+// argument that a count is different — "12 242 → 12 311 available units IS more
+// inventory". That is true of the LEVEL, which the card shows, and false of the
+// ARROW, which says "vs. minulý mesiac" and is therefore a claim about a period.
 //
-// Measured 2026-08 → 2026-09, the two buckets this compares (2026-09-15):
-//     avg €/m²      all projects  5 924 → 5 913   ▼ 11
-//                   like-for-like 5 920 → 5 942   ▲ 22
-//     sold-through  all projects  62,15 → 62,02   ▼ 0,13 pp
-//                   like-for-like 61,49 → 62,19   ▲ 0,70 pp
+// Measured on SK, 2026-08 → 2026-09 (11 projects onboarded, 5 dropped out):
 //
-// Both arrows pointed the WRONG WAY — on the first card of the first page. The
-// eleven projects that joined in September are cheaper than the book, so the
-// average fell while prices rose. This is the board's caveat d5532b ("the ONLY
-// valid price time series is the same-unit comparison") arriving on a surface.
+//     voľné byty      all projects  +273     same panel   +62     4.4x overstated
+//     rezervované     all projects   −42     same panel  −136     3.2x understated
+//     predané         all projects  +217     same panel  +407     understated
 //
-// So these two are compared over the projects present in BOTH months, and the
-// counts are left alone.
-const COMPOSITION_SENSITIVE = new Set(["avg_m2", "sold_through"]);
-function aggMomDelta(metric, idSet, snapshots) {
-  if (!MOM_METRICS.has(metric)) return null;
-  const h = aggHistory(idSet, snapshots);
-  if (h.length < 2) return null;
-  let cur = h[h.length - 1][metric], prev = h[h.length - 2][metric];
-  if (COMPOSITION_SENSITIVE.has(metric)) {
-    // Hold the population constant: only the projects that reported in BOTH of
-    // the two months being compared. Anything else measures our onboarding.
-    const a = h[h.length - 1].ids, b = h[h.length - 2].ids;
-    const both = new Set([...a].filter((id) => b.has(id)));
-    if (both.size === 0) return null;
-    const hl = aggHistory(both, snapshots);
-    if (hl.length < 2) return null;
-    cur = hl[hl.length - 1][metric];
-    prev = hl[hl.length - 2][metric];
-  }
-  if (cur == null || prev == null) return null;
-  const abs = cur - prev;
+// The distortion has no consistent sign — it depends on whether the projects
+// that joined are bigger or smaller than the ones that left — so a reader cannot
+// mentally correct for it. Our own catalogue growth is reported separately, as a
+// coverage line under the strip, where it is information instead of noise.
+// Rule: memory `rules_our_catalogue_growth_is_not_the_market`.
+//
+// How many months back the comparison reaches is the user's choice
+// (MOM_PERIODS); only periods the history can actually serve are offered.
+const MOM_PERIODS = OVERVIEW_MOM_BACK;   // one list — the normalizer must recognise what the UI offers
+export function availableMomPeriods(history) {
+  const n = (history || []).length;
+  return MOM_PERIODS.filter((b) => n >= b + 1);
+}
+
+// Compare two month buckets over the projects that reported in BOTH of them.
+// Buckets are looked up BY MONTH, never by array position: restricting the
+// history to a subset can drop an intermediate month and silently shift indices.
+function constantPanelDelta(metric, back, history, rebuild) {
+  if (!history || history.length < back + 1) return null;
+  const cur = history[history.length - 1];
+  const prev = history[history.length - 1 - back];
+  if (!cur || !prev) return null;
+  const both = new Set([...(cur.ids || [])].filter((id) => (prev.ids || new Set()).has(id)));
+  if (both.size === 0) return null;
+  const byMonth = new Map((rebuild(both) || []).map((x) => [x.month, x]));
+  const c = byMonth.get(cur.month)?.[metric];
+  const pv = byMonth.get(prev.month)?.[metric];
+  if (c == null || pv == null) return null;
+  const abs = c - pv;
   if (Math.abs(abs) < 1e-9) return null;
-  return { abs, metric };
+  return { abs, metric, back, panel: both.size,
+           added: (cur.ids?.size || 0) - both.size, dropped: (prev.ids?.size || 0) - both.size };
+}
+
+function aggMomDelta(metric, idSet, snapshots, back = 1) {
+  if (!MOM_METRICS.has(metric)) return null;
+  return constantPanelDelta(metric, back, aggHistory(idSet, snapshots),
+                            (ids) => aggHistory(ids, snapshots));
+}
+
+// How our own coverage changed between the two months being compared — the part
+// deliberately kept OUT of the arrows above.
+export function coverageShift(idSet, snapshots, back = 1) {
+  const h = aggHistory(idSet, snapshots);
+  if (h.length < back + 1) return null;
+  const cur = h[h.length - 1].ids || new Set();
+  const prev = h[h.length - 1 - back].ids || new Set();
+  const added = [...cur].filter((id) => !prev.has(id)).length;
+  const dropped = [...prev].filter((id) => !cur.has(id)).length;
+  return added || dropped ? { added, dropped } : null;
 }
 
 const scopeLabel = (scope, lang) => {
@@ -477,15 +506,33 @@ function useProjectHistory() {
     if (!user) { setRows([]); return; }
     if (_historyCache.key === key && _historyCache.rows) { setRows(_historyCache.rows); return; }
     let cancelled = false;
-    supabaseData.from("project_snapshots")
-      .select("project_id,snapshot_month,available_units,sold_units,reserved_units,prereserved_units,avg_price_eur_m2,district,developer")
-      .order("snapshot_month", { ascending: true })
-      .then(({ data, error }) => {
+    // 🔴 PAGINATED ON PURPOSE. PostgREST caps an unbounded select (db-max-rows,
+    // 1000 here) and returns the truncated page with NO error — so this used to
+    // compute every arrow on the dashboard from 1 000 of 1 434 rows, and the
+    // shortfall was spread across all five month buckets (measured 2026-09-23:
+    // it received 05:51 06:193 07:195 08:280 09:281 against a true
+    // 05:73 06:275 07:277 08:403 09:406). A silent 70 % sample is worse than an
+    // error, because nothing on the page looks wrong.
+    (async () => {
+      const PAGE = 1000;
+      const cols = "project_id,snapshot_month,available_units,sold_units,reserved_units,prereserved_units,avg_price_eur_m2,district,developer";
+      const all = [];
+      for (let from = 0; ; from += PAGE) {
+        const { data, error } = await supabaseData
+          .from("project_snapshots").select(cols)
+          .order("snapshot_month", { ascending: true })
+          .order("project_id", { ascending: true })   // stable page boundaries
+          .range(from, from + PAGE - 1);
         if (cancelled) return;
         if (error) { console.error("[useProjectHistory]", error); return; }
-        _historyCache = { key, rows: data || [] };
-        setRows(_historyCache.rows);
-      });
+        all.push(...(data || []));
+        if (!data || data.length < PAGE) break;
+        if (from > 200000) break;                     // belt and braces
+      }
+      if (cancelled) return;
+      _historyCache = { key, rows: all };
+      setRows(all);
+    })();
     return () => { cancelled = true; };
   }, [user?.id]);
   return rows;
@@ -581,6 +628,22 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
   const overviewAgg = useMemo(() => aggregateProjects(overviewProjects), [overviewProjects]);
   const overviewIds = useMemo(() => new Set(overviewProjects.map(p => p.id)), [overviewProjects]);
 
+  // ── comparison period for every delta in Zone A (persisted, like the filters).
+  // Only periods the history can actually serve are offered — a "vs a year ago"
+  // chip on five months of data would be a lie the UI told for us.
+  const momOptions = useMemo(
+    () => availableMomPeriods(aggHistory(overviewIds, snapshots)),
+    [overviewIds, snapshots]);
+  const storedBack = Number(config?.overview?.momBack) || 1;
+  const momBack = momOptions.includes(storedBack) ? storedBack : (momOptions[0] || 1);
+  const setMomBack = (n) => setConfig(c => ({ ...c, overview: { ...(c.overview || {}), momBack: n } }));
+  const coverage = useMemo(
+    () => coverageShift(overviewIds, snapshots, momBack),
+    [overviewIds, snapshots, momBack]);
+  // widgets compare over the same period the strip does — two different
+  // "vs last month"s on one screen would be a bug the user has to discover
+  const wctx = useMemo(() => ({ ...ctx, momBack }), [ctx, momBack]);
+
   // ── the sales pace a month ago ────────────────────────────────────────
   // Units sold/30 days and Inventory are the two cards whose history is NOT in
   // project_snapshots. Its only sales column is a cumulative count of flats the
@@ -665,12 +728,48 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
           {activeConds.length > 0 && (
             <button onClick={() => setConditions([])} style={{ background: "none", border: "none", color: dim, cursor: "pointer", fontSize: "0.72rem", fontFamily: mono }}>{L(lang, "vyčistiť", "clear")}</button>
           )}
+
+          {/* Comparison period. Only periods the history can serve are rendered,
+              so the control can never promise a year of data we do not have. */}
+          {momOptions.length > 1 && (
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
+              <span style={{ fontFamily: mono, fontSize: "0.66rem", color: faint, letterSpacing: "0.06em" }}>
+                {L(lang, "POROVNAŤ", "COMPARE")}
+              </span>
+              {/* The platform's segmented control (.rd-seg, styles/ui.css) — the
+                  same switcher the Map and Reports use, so this reads as one app. */}
+              <div className="rd-seg">
+                {momOptions.map((n) => (
+                  <button key={n} type="button" className="rd-seg__btn"
+                    aria-pressed={momBack === n} title={MOM_PERIOD_LABEL(n, lang)}
+                    onClick={() => setMomBack(n)}>
+                    {n === 12 ? L(lang, "1 rok", "1 yr") : L(lang, `${n} mes.`, `${n} mo`)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {filterOpen && (
           <MapFilterBuilder asModal conditions={conditions} setConditions={setConditions}
             projects={(projects || [])} matchCount={overviewProjects.length} totalCount={overviewBase.length}
             sk={lang === "sk"} onClose={() => setFilterOpen(false)} triggerRef={filterBtnRef} />
+        )}
+
+        {coverage && (
+          <div style={{ fontFamily: mono, fontSize: "0.66rem", color: faint, marginBottom: "0.6rem", lineHeight: 1.5 }}>
+            {L(lang, "Zmeny sú počítané na rovnakých projektoch v oboch obdobiach.",
+                     "Changes are measured over the same projects in both periods.")}{" "}
+            {coverage.added > 0 && L(lang,
+              `Za toto obdobie pribudlo do databázy ${fmtCount(coverage.added, lang)} projektov`,
+              `${fmtCount(coverage.added, lang)} projects were added to the database in this period`)}
+            {coverage.added > 0 && coverage.dropped > 0 && L(lang, " a ", " and ")}
+            {coverage.dropped > 0 && L(lang,
+              `${coverage.added > 0 ? "" : "Za toto obdobie "}${fmtCount(coverage.dropped, lang)} projektov prestalo byť v ponuke`,
+              `${coverage.dropped} projects left the offer`)}
+            {L(lang, " — do zmien vyššie sa nerátajú.", " — they are not counted in the changes above.")}
+          </div>
         )}
 
         <div className="dash-kpi-grid" style={{ display: "grid", gap: "0.7rem" }}>
@@ -689,11 +788,11 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
               : mk === "sold30" ? (raw == null ? "—" : fmtCount(raw, lang))
               : mk === "avg_m2" ? (raw != null ? `${Math.round(moneyFromEur(raw)).toLocaleString(localeTag(lang))} ${moneySymbol()}` : "—")
               : fmtMetric(mk, raw, lang);
-            let delta = (!locked && !gateVelocity && MOM_METRICS.has(mk)) ? aggMomDelta(mk, overviewIds, snapshots) : null;
+            let delta = (!locked && !gateVelocity && MOM_METRICS.has(mk)) ? aggMomDelta(mk, overviewIds, snapshots, momBack) : null;
             // sold30 / inventory: their previous value needs the real sales pace, which
             // only analytics.sale_events has. Both sides of each comparison use the same
             // definition, so the arrow is honest.
-            if (!locked && !gateVelocity && Number.isFinite(prevSold) && prevSold > 0) {
+            if (momBack === 1 && !locked && !gateVelocity && Number.isFinite(prevSold) && prevSold > 0) {
               if (mk === "sold30" && raw != null) {
                 const abs = raw - prevSold;
                 if (Math.abs(abs) >= 1) delta = { abs, metric: "sold30" };
@@ -778,7 +877,7 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
                 style={{ gridColumn: w.w === 2 ? "span 2" : "span 1", minWidth: 0 }}
                 className="dash-cell">
                 <WidgetCard
-                  widget={w} ctx={ctx} lang={lang}
+                  widget={w} ctx={wctx} lang={lang}
                   first={i === 0} last={i === widgets.length - 1}
                   dragProps={{ draggable: true, onDragStart: () => { dragId.current = w.id; }, onDragEnd: () => { dragId.current = null; } }}
                   onConfigure={() => setEditor({ mode: "edit", widget: w })}
@@ -1017,7 +1116,8 @@ function MetricBody({ cfg, ctx, lang }) {
   const locked = def.requires && !can(def.requires);
   const raw = metricValue(cfg.metric, cfg.scope, ctx);
   const scopeKind = cfg.scope?.kind || "market";
-  const delta = (!locked && MOM_METRICS.has(cfg.metric) && scopeKind !== "district") ? momDelta(cfg.metric, cfg.scope, ctx) : null;
+  const delta = (!locked && MOM_METRICS.has(cfg.metric) && scopeKind !== "district")
+    ? momDelta(cfg.metric, cfg.scope, ctx, ctx.momBack || 1) : null;
   return (
     <div>
       <div style={{ display: "flex", alignItems: "baseline", gap: "0.6rem", flexWrap: "wrap" }}>
