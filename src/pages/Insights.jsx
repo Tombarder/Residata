@@ -80,8 +80,16 @@ function Figure({ src, srcEn, alt, caption, lang }) {
         border: "1px solid rgba(255,255,255,0.10)",
         boxShadow: "0 2px 10px rgba(0,0,0,0.35)",
       }}>
-        <img src={source} alt={t(alt, lang)} loading="lazy"
-             style={{ width: "100%", height: "auto", display: "block", borderRadius: 6 }} />
+        {/* A chart authored for a 760px column is ~47% of that on a phone, so
+            its 11pt source note lands at about 5px. Nothing in a static SVG can
+            reflow, so the honest fix is to let the reader open it at full size:
+            the SVG is its own document and zooms losslessly. */}
+        <a href={source} target="_blank" rel="noreferrer"
+           aria-label={t(alt, lang)}
+           style={{ display: "block", cursor: "zoom-in" }}>
+          <img src={source} alt={t(alt, lang)} loading="lazy"
+               style={{ width: "100%", height: "auto", display: "block", borderRadius: 6 }} />
+        </a>
       </div>
       {caption && (
         <figcaption style={{

@@ -1,0 +1,78 @@
+<!--PEREX
+Prehľad trhu s novými bytmi v Bratislave za {quarterSkAcc}. Ponuka, predaj a ceny podľa okresov a podľa veľkosti bytu — a cena za meter od roku {longRunFirstYear}.
+-->
+<!--METHOD
+Údaje pochádzajú z verejne zverejnených cenníkov bratislavských developerov, ktoré Residata číta denne, byt po byte. Ponuku tvoria voľné a rezervované byty v aktívnych projektoch; počítajú sa výlučne byty, nie parkovanie, pivnice ani nebytové priestory. Ceny sú s DPH a sú priemerom za byty, pri ktorých developer cenu zverejňuje. Úrovne ponuky a cien sú priemerom denných hodnôt za posledné dva týždne obdobia, aby jeden deň neurčoval celé číslo. Projekty sme do okresov zaradili podľa mestskej časti, v ktorej stoja. Medzikvartálne zmeny počítame na rovnakej vzorke projektov v oboch obdobiach — inak by rast nášho vlastného pokrytia vyzeral ako pohyb trhu. Predaj je byt, ktorý zmizol z cenníka a už sa naň nevrátil; rezervácie za predaj nepovažujeme. Historické hodnoty do {lastPublishedSk} pochádzajú z kvartálnych analýz Bencont Investments a sú označené ich menom — nespájame ich s našimi do jedného radu.
+-->
+{asOf} | TRH NOVÝCH BYTOV V BRATISLAVE
+
+# Bratislava: trh nových bytov v {quarterSk}
+
+Ponuku bratislavských novostavieb tvorilo v závere obdobia {supplyTotal} bytov v {supplyProjects} projektoch. Predalo sa {salesTotal} bytov {periodSk}. Priemerná ponuková cena dosiahla {m2Total} €/m² s DPH.
+
+## Zhrnutie
+
+- **Ponuka: {supplyTotal} voľných bytov.** Najväčšia je v okrese {topSupplyOkres} — {topSupplyN} bytov, teda {topSupplyShare} % celej mestskej ponuky.
+- **Predaj: {salesTotal} bytov {periodSk}.** Najviac v okrese {topSalesOkres} ({topSalesN} bytov).
+- **Cena: {m2Total} €/m² s DPH.** Na rovnakej vzorke {panelProjects} projektov sa medzikvartálne {qoqPct}.
+- **Dokončené bývanie je menšina ponuky.** V hotových budovách je {supplyDone} bytov, teda {supplyDoneShare} % ponuky; {supplyBuildingShare} % je rozostavaných a pri {supplyUnknownShare} % developer termín dokončenia nezverejňuje.
+
+## Ponuka
+
+Ponuka nie je v meste rozložená rovnomerne. Dva najväčšie okresy držia {twoOkresShare} % všetkých voľných bytov.
+
+![Ponuka bytov podľa okresu](/analyzy/ba-prehlad-2026-q3-ponuka-okres.svg)
+*Rozdelenie ponuky medzi bratislavské okresy.*
+
+{overviewSupplyTable}
+
+Podľa veľkosti bytu je trh úzky: dvojizbové a trojizbové byty tvoria spolu {twoThreeShare} % ponuky.
+
+![Ponuka bytov podľa kategórie](/analyzy/ba-prehlad-2026-q3-ponuka-kategoria.svg)
+*Rozdelenie ponuky podľa počtu izieb.*
+
+## Dopyt
+
+![Predané byty podľa okresu](/analyzy/ba-prehlad-2026-q3-predaj-okres.svg)
+*Počet predaných bytov {periodSk}, podľa okresu.*
+
+{overviewSalesTable}
+
+Rozdelenie predaja nekopíruje rozdelenie ponuky. Okres, ktorý drží väčší podiel na predaji než na ponuke, sa vypredáva rýchlejšie než mestský priemer; okres s opačným pomerom zostáva na trhu dlhšie.
+
+![Predané byty podľa kategórie](/analyzy/ba-prehlad-2026-q3-predaj-kategoria.svg)
+*Rozdelenie predaja podľa počtu izieb.*
+
+## Ceny
+
+Mestský priemer {m2Total} €/m² je jedno číslo pre päť veľmi odlišných trhov. Medzi najdrahším okresom ({dearestOkres}) a najlacnejším ({cheapestOkres}) je rozdiel {okresSpread}.
+
+Nasledujúca tabuľka porovnáva dva štvrťroky na rovnakej vzorke {panelProjects} projektov — na tých, ktoré boli v ponuke v oboch obdobiach. Jej úrovne sa preto mierne líšia od tabuľky vyššie, ktorá zahŕňa celú ponuku.
+
+{overviewPriceTable}
+
+![Cena za meter podľa okresu](/analyzy/ba-prehlad-2026-q3-ceny-okres.svg)
+*Priemerná ponuková cena na rovnakej vzorke projektov v oboch štvrťrokoch.*
+
+Rozdiel medzi hotovým a rozostavaným bývaním nie je v cene taký, aký by sa dal čakať. Na bytoch, ktoré boli v ponuke po celé obdobie, stojí meter v už skolaudovanej budove {doneVsBuildingSk} než meter v rozostavanom projekte.
+
+![Vývoj ponukovej ceny](/analyzy/ba-prehlad-2026-q3-ceny-vyvoj.svg)
+*Priemerná cena za meter, týždenne, na tých istých bytoch po celé obdobie — graf sa teda pohne len vtedy, keď sa pohne cena.*
+
+Dlhší pohľad ukazuje, o koľko sa bratislavský meter posunul za {longRunSpanSk}.
+
+![Cena nových bytov v Bratislave od roku {longRunFirstYear}](/analyzy/ba-prehlad-2026-q3-ceny-dlhodobo.svg)
+*Hodnoty do {lastPublishedSk} sú z kvartálnych analýz Bencont Investments, novšie sú naše. Nespájame ich do jedného radu — meral ich niekto iný a inou metódou.*
+
+Posledný graf porovnáva, za koľko sa byty ponúkajú a za koľko sa skutočne predávajú.
+
+![Ponuková a dosiahnutá cena](/analyzy/ba-prehlad-2026-q3-ponuka-vs-predaj.svg)
+*Kĺzavý {rollingDays}-dňový priemer. Dosiahnutá cena je posledná cenníková cena bytu pred tým, než z ponuky zmizol.*
+
+## Pohľad na aktuálne smerovanie trhu
+
+Tomáš Kamhal, zakladateľ Residaty: „Bratislavský trh s novostavbami je v skutočnosti päť trhov, ktoré sa správajú odlišne a ktoré mestský priemer zakrýva.
+
+Za pozornosť stojí, ako málo z ponuky je hotové bývanie. Kupujúci, ktorý sa chce nasťahovať hneď, vyberá z podstatne menšej časti trhu, než akú vidí v cenníkoch.
+
+A stĺpec, ktorý v takýchto prehľadoch obvykle nenájdete: pri {supplyUnknownShare} % ponuky developer termín dokončenia nezverejňuje vôbec. To je informácia, ktorú kupujúci potrebuje skôr než cenu."

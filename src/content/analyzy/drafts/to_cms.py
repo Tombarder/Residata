@@ -212,6 +212,12 @@ def main() -> int:
         "title": title,
         "perex": {lang: _plain(_section(texts[lang], "PEREX")) for lang in LANGS},
         "method": {lang: _plain(_section(texts[lang], "METHOD")) for lang in LANGS},
+        # How far the data actually goes. NULL here is a failure in the nightly
+        # integrity_check, not a blank: an issue previewed before its period
+        # closed carries a projection, and the check exists so the regeneration
+        # that turns it into a measurement cannot be quietly forgotten.
+        "figures_measured_through": json.loads(
+            (HERE.parent / "data" / f"report-{slug}.json").read_text(encoding="utf-8"))["asOf"],
         "og_image": f"/analyzy/og-{slug}.png",
         "blocks": blocks,
     }
