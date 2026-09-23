@@ -130,7 +130,7 @@ L 474.498407 251.494161
 L 512.921898 252.581486 
 L 551.34539 251.494161 
 L 589.768881 251.494161 
-" clip-path="url(#p6ceca64694)" style="fill: none; stroke: #186b66; stroke-width: 2; stroke-linecap: round"/>
+" clip-path="url(#p6ceca64694)" style="fill: none; stroke: #0e4b47; stroke-width: 2; stroke-linecap: round"/>
    </g>
    <g id="line2d_14">
     <path d="M 51.84 154.722265 
@@ -148,7 +148,7 @@ L 474.498407 116.665901
 L 512.921898 119.927875 
 L 551.34539 118.840551 
 L 589.768881 113.403927 
-" clip-path="url(#p6ceca64694)" style="fill: none; stroke: #a9c7c4; stroke-width: 2; stroke-linecap: round"/>
+" clip-path="url(#p6ceca64694)" style="fill: none; stroke: #689e9a; stroke-width: 2; stroke-linecap: round"/>
    </g>
    <g id="text_4">
     <g id="patch_4">
@@ -195,13 +195,13 @@ z
     <text style="font-size: 13px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #6b7480" x="51.84" y="146.377745" transform="rotate(-0 51.84 146.377745)">5 700</text>
    </g>
    <g id="text_8">
-    <text style="font-weight: 600; font-size: 12px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #186b66" x="597.164721" y="255.004161" transform="rotate(-0 597.164721 255.004161)">dokončené</text>
+    <text style="font-weight: 600; font-size: 12px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #0e4b47" x="597.164721" y="255.004161" transform="rotate(-0 597.164721 255.004161)">dokončené</text>
    </g>
    <g id="text_9">
     <text style="font-weight: 600; font-size: 12px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #c2410c" x="597.164721" y="144.097044" transform="rotate(-0 597.164721 144.097044)">celá ponuka</text>
    </g>
    <g id="text_10">
-    <text style="font-weight: 600; font-size: 12px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #627472" x="597.164721" y="116.913927" transform="rotate(-0 597.164721 116.913927)">rozostavané</text>
+    <text style="font-weight: 600; font-size: 12px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #4a726f" x="597.164721" y="116.913927" transform="rotate(-0 597.164721 116.913927)">rozostavané</text>
    </g>
   </g>
   <g id="text_11">
