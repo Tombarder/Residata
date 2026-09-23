@@ -197,9 +197,9 @@ def okres_supply_table(rep: dict, lang: str) -> str:
 
 def okres_sales_table(rep: dict, lang: str) -> str:
     """And what actually sold in each of them."""
-    head = (("| Okres | Predané | Podiel na predaji | Dosiahnutá cena €/m² s DPH |"
+    head = (("| Okres | Predané | Podiel na predaji | Posledná cenníková cena €/m² s DPH |"
              "\n|---|---:|---:|---:|") if lang == "sk" else
-            ("| District | Sold | Share of sales | Achieved €/m² incl. VAT |"
+            ("| District | Sold | Share of sales | Last listed €/m² incl. VAT |"
              "\n|---|---:|---:|---:|"))
     dec = sk_dec if lang == "sk" else en_dec
     rows = [f"| {o['okres']} | {sk_int(o['sold'])} | {dec(o['soldSharePct'])} % | "

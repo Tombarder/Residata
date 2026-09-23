@@ -23,9 +23,9 @@ Ponuku bytov na bratislavskom trhu s novostavbami tvorilo v závere štvrťroka 
 
 ## Predaj podľa okresov
 
-Za štvrťrok sa v Bratislave predalo 583 bytov. Rozdelenie predaja nekopíruje rozdelenie ponuky — okres s najväčšou ponukou nemusí byť okresom s najväčším predajom, a dosiahnutá cena sa medzi okresmi líši viac než ktorýkoľvek iný ukazovateľ na tomto trhu.
+Za štvrťrok sa v Bratislave predalo 583 bytov. Rozdelenie predaja nekopíruje rozdelenie ponuky — okres s najväčšou ponukou nemusí byť okresom s najväčším predajom, a posledná cenníková cena predaných bytov sa medzi okresmi líši viac než ktorýkoľvek iný ukazovateľ na tomto trhu.
 
-| Okres | Predané | Podiel na predaji | Dosiahnutá cena €/m² s DPH |
+| Okres | Predané | Podiel na predaji | Posledná cenníková cena €/m² s DPH |
 |---|---:|---:|---:|
 | Bratislava II | 252 | 43,2 % | 6 162 € |
 | Bratislava IV | 89 | 15,3 % | 4 773 € |

@@ -25,7 +25,7 @@ At the close of the quarter the supply on the Bratislava new-build market stood 
 
 583 flats sold in Bratislava over the quarter. Sales are not distributed the way supply is — the district with the largest offer need not be the one with the largest sales, and the achieved price differs between districts by more than any other measure on this market.
 
-| District | Sold | Share of sales | Achieved €/m² incl. VAT |
+| District | Sold | Share of sales | Last listed €/m² incl. VAT |
 |---|---:|---:|---:|
 | Bratislava II | 252 | 43.2 % | 6 162 € |
 | Bratislava IV | 89 | 15.3 % | 4 773 € |
