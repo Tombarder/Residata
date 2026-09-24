@@ -1,118 +1,118 @@
 {
-  "asOf": "2026-09-23",
-  "generatedAt": "2026-09-23T12:31:37+00:00",
+  "asOf": "2026-09-24",
+  "generatedAt": "2026-09-24T08:25:39+00:00",
   "bratislavaReport": {
-    "thenDate": "2026-07-20",
-    "nowDate": "2026-09-23",
+    "thenDate": "2026-07-21",
+    "nowDate": "2026-09-24",
     "panelDays": 65,
     "panelProjects": 71,
-    "panelSupplyThen": 3133,
-    "panelSupplyNow": 3305,
-    "panelSupplyChange": 172,
-    "panelSupplyChangePct": 5.5,
-    "panelM2Then": 5686,
-    "panelM2Now": 5686,
-    "panelM2ChangePct": 0.0,
-    "supply": 4268,
+    "panelSupplyThen": 3131,
+    "panelSupplyNow": 3299,
+    "panelSupplyChange": 168,
+    "panelSupplyChangePct": 5.4,
+    "panelM2Then": 5684,
+    "panelM2Now": 5691,
+    "panelM2ChangePct": 0.1,
+    "supply": 4260,
     "projects": 94,
-    "meanM2": 5722,
-    "meanPrice": 382878,
+    "meanM2": 5720,
+    "meanPrice": 382594,
     "meanArea": 65.6,
     "priceWindow": {
       "days": 14,
-      "from": "2026-09-10",
-      "to": "2026-09-23"
+      "from": "2026-09-11",
+      "to": "2026-09-24"
     },
     "sales": {
       "p1": {
-        "n": 359,
+        "n": 341,
         "days": 59,
-        "from": "2026-05-29",
+        "from": "2026-05-30",
         "to": "2026-07-25",
-        "meanM2": 5670,
-        "meanPrice": 320810,
-        "meanArea": 57.5
+        "meanM2": 5651,
+        "meanPrice": 321917,
+        "meanArea": 57.8
       },
       "p2": {
-        "n": 417,
+        "n": 425,
         "days": 59,
         "from": "2026-07-28",
-        "to": "2026-09-23",
-        "meanM2": 5726,
-        "meanPrice": 358585,
-        "meanArea": 62.0
+        "to": "2026-09-24",
+        "meanM2": 5714,
+        "meanPrice": 357469,
+        "meanArea": 61.8
       }
     },
-    "salesChangePct": 16.2,
+    "salesChangePct": 24.6,
     "topSeller": {
       "name": "Milrose",
-      "n": 61,
-      "sharePct": 10.4
+      "n": 62,
+      "sharePct": 10.5
     },
     "districts": [
       {
         "district": "Ružinov",
-        "sold": 243,
-        "meanM2": 6233,
-        "sharePct": 41.5,
-        "cityM2": 5739
+        "sold": 246,
+        "meanM2": 6223,
+        "sharePct": 41.6,
+        "cityM2": 5741
       },
       {
         "district": "Staré Mesto",
-        "sold": 57,
-        "meanM2": 7414,
-        "sharePct": 9.7,
-        "cityM2": 5739
+        "sold": 59,
+        "meanM2": 7505,
+        "sharePct": 10.0,
+        "cityM2": 5741
       }
     ],
     "supplyPanel": {
       "from": "2026-07-01",
-      "to": "2026-09-23",
+      "to": "2026-09-24",
       "panelProjects": 73,
       "projectsNow": 95,
       "supplyThen": 3311,
-      "supplyNow": 3246,
-      "changePct": -2.0,
-      "outsidePanelUnits": 872,
-      "trackedNow": 4052
+      "supplyNow": 3264,
+      "changePct": -1.4,
+      "outsidePanelUnits": 871,
+      "trackedNow": 4069
     },
     "priceDecomposition": {
       "from": "2026-07-01",
-      "to": "2026-09-23",
+      "to": "2026-09-24",
       "panelProjects": 63,
       "projectsNowAll": 83,
-      "newProjectUnits": 693,
+      "newProjectUnits": 682,
       "meanThen": 5688,
-      "meanNow": 5692,
-      "totalPct": 0.07,
-      "keptUnits": 2350,
-      "keptThen": 5673,
-      "keptNow": 5701,
+      "meanNow": 5694,
+      "totalPct": 0.11,
+      "keptUnits": 2346,
+      "keptThen": 5675,
+      "keptNow": 5703,
       "keptPct": 0.49,
-      "repricingEur": 22,
-      "repricingPct": 0.39,
-      "mixEur": -18,
-      "mixPct": -0.32,
-      "leftUnits": 423,
-      "leftM2": 5770,
-      "arrivedUnits": 547,
-      "arrivedM2": 5656
+      "repricingEur": 23,
+      "repricingPct": 0.4,
+      "mixEur": -16,
+      "mixPct": -0.29,
+      "leftUnits": 427,
+      "leftM2": 5761,
+      "arrivedUnits": 550,
+      "arrivedM2": 5659
     },
     "repricing": {
-      "changes": 990,
-      "units": 722,
+      "changes": 1010,
+      "units": 742,
       "projects": 28,
-      "unitsTracked": 2353,
-      "pctOfOfferMoved": 30.7,
-      "pctUp": 88.8,
-      "medianStep": 2.1,
-      "meanMove": 1.36,
-      "effectOnAverage": 0.42
+      "unitsTracked": 2349,
+      "pctOfOfferMoved": 31.6,
+      "pctUp": 89.0,
+      "medianStep": 2.2,
+      "meanMove": 1.53,
+      "effectOnAverage": 0.48
     },
     "newSupply": {
-      "units": 555,
-      "meanM2": 5529,
-      "medianM2": 4932
+      "units": 554,
+      "meanM2": 5533,
+      "medianM2": 4934
     }
   },
   "quarterly": {
@@ -120,81 +120,81 @@
       "q": "Q3 2026",
       "from": "2026-07-01",
       "to": "2026-09-30",
-      "daysObserved": 74,
+      "daysObserved": 75,
       "daysTotal": 92,
       "complete": false,
-      "supply": 4052,
-      "supplyLastDay": 4268,
+      "supply": 4069,
+      "supplyLastDay": 4260,
       "projects": 95,
-      "meanM2": 5722,
-      "meanPrice": 382878,
+      "meanM2": 5720,
+      "meanPrice": 382594,
       "meanArea": 65.6,
-      "lastSaleDate": "2026-09-23",
-      "sales": 586,
-      "soldM2": 5739,
-      "soldPrice": 351308,
+      "lastSaleDate": "2026-09-24",
+      "sales": 591,
+      "soldM2": 5741,
+      "soldPrice": 351432,
       "soldArea": 60.9,
-      "calendarDaysCovered": 85,
-      "salesRunRate": 634
+      "calendarDaysCovered": 86,
+      "salesRunRate": 632
     },
     "byRooms": [
       {
         "disp": "1",
-        "n": 415,
-        "meanM2": 6309,
-        "meanPrice": 233752,
-        "meanArea": 37.9
+        "n": 417,
+        "meanM2": 6314,
+        "meanPrice": 233474,
+        "meanArea": 37.8
       },
       {
         "disp": "2",
-        "n": 1394,
+        "n": 1397,
         "meanM2": 5511,
-        "meanPrice": 288470,
+        "meanPrice": 288344,
         "meanArea": 52.2
       },
       {
         "disp": "3",
-        "n": 999,
-        "meanM2": 5565,
-        "meanPrice": 425873,
+        "n": 1005,
+        "meanM2": 5557,
+        "meanPrice": 425273,
         "meanArea": 75.8
       },
       {
         "disp": "4+",
-        "n": 452,
-        "meanM2": 6266,
-        "meanPrice": 725102,
+        "n": 454,
+        "meanM2": 6260,
+        "meanPrice": 724318,
         "meanArea": 110.6
       }
     ],
     "soldByRooms": [
       {
         "disp": "1",
-        "n": 72,
-        "meanM2": 6480,
-        "meanPrice": 236251,
+        "n": 73,
+        "meanM2": 6466,
+        "meanPrice": 236057,
         "meanArea": 37.2
       },
       {
         "disp": "2",
         "n": 237,
-        "meanM2": 5543,
-        "meanPrice": 284824,
-        "meanArea": 51.3
+        "meanM2": 5547,
+        "meanPrice": 284332,
+        "meanArea": 51.2
       },
       {
         "disp": "3",
-        "n": 108,
-        "meanM2": 5415,
-        "meanPrice": 410072,
-        "meanArea": 75.7
+        "n": 110,
+        "meanM2": 5411,
+        "meanPrice": 408633,
+        "meanArea": 75.5
       },
       {
         "disp": "4+",
-        "n": 49,
-        "meanM2": 6317,
-        "meanPrice": 720442,
-        "meanArea": 113.4
+        "n": 50,
+        "meanM2": 6329,
+        "meanPrice": 719969,
+        "meanArea": 113.2
       }
     ],
     "monthlyPanel": [
@@ -232,23 +232,23 @@
       },
       {
         "month": "2026-09",
-        "asOf": "2026-09-23",
-        "supply": 3270,
-        "meanM2": 5654,
+        "asOf": "2026-09-24",
+        "supply": 3264,
+        "meanM2": 5659,
         "projects": 67,
-        "sold": 130
+        "sold": 137
       }
     ],
     "panelProjects": 67,
     "panelFrom": "2026-05",
     "panelTo": "2026-09",
     "panelSupplyFrom": 3244,
-    "panelSupplyTo": 3270,
-    "panelSupplyPct": 0.8,
+    "panelSupplyTo": 3264,
+    "panelSupplyPct": 0.6,
     "panelM2From": 5706,
-    "panelM2To": 5654,
-    "panelM2Pct": -0.9,
-    "panelMonthlySales": 158,
+    "panelM2To": 5659,
+    "panelM2Pct": -0.8,
+    "panelMonthlySales": 160,
     "published": {
       "source": "Bencont Investments",
       "basis": "priemer, úžitková plocha, s DPH",
@@ -305,104 +305,104 @@
     },
     "vsPrev": {
       "q": "Q2 2026",
-      "supply": -179,
-      "supplyPct": -4.2,
+      "supply": -162,
+      "supplyPct": -3.8,
       "m2Pct": 0.1,
-      "salesPct": -2.8
+      "salesPct": -3.1
     },
     "vsYearAgo": {
       "q": "Q3 2025",
-      "supply": 83,
-      "supplyPct": 2.1,
+      "supply": 100,
+      "supplyPct": 2.5,
       "m2Pct": -0.4,
-      "salesPct": -0.6
+      "salesPct": -0.9
     }
   },
   "nationalMap": {
     "scope": {
       "bratislava": {
-        "available": 3101,
+        "available": 3094,
         "projects": 83,
-        "medianM2": 5328,
-        "medianPrice": 318264,
+        "medianM2": 5341,
+        "medianPrice": 318859,
         "medianArea": 58.7
       },
       "rest": {
-        "available": 3118,
+        "available": 3112,
         "projects": 116,
-        "medianM2": 3683,
-        "medianPrice": 218470,
+        "medianM2": 3678,
+        "medianPrice": 217860,
         "medianArea": 60.7
       }
     },
     "towns": [
       {
         "city": "Bratislava",
-        "available": 3608,
+        "available": 3600,
         "projects": 94,
-        "biggest": 404,
-        "biggestPct": 11.2,
-        "priced": 3101,
+        "biggest": 400,
+        "biggestPct": 11.1,
+        "priced": 3094,
         "pricedProjects": 83,
-        "pricedBiggest": 404,
-        "pricedBiggestPct": 13.0,
-        "medianM2": 5328,
-        "medianPrice": 318264,
+        "pricedBiggest": 400,
+        "pricedBiggestPct": 12.9,
+        "medianM2": 5341,
+        "medianPrice": 318859,
         "medianArea": 58.7,
-        "medianM2ExBiggest": 5439,
+        "medianM2ExBiggest": 5452,
         "shiftExBiggest": 111,
-        "pricedExBiggest": 2697
+        "pricedExBiggest": 2694
       },
       {
         "city": "Nitra",
-        "available": 453,
+        "available": 452,
         "projects": 9,
         "biggest": 122,
-        "biggestPct": 26.9,
-        "priced": 376,
+        "biggestPct": 27.0,
+        "priced": 375,
         "pricedProjects": 7,
         "pricedBiggest": 88,
-        "pricedBiggestPct": 23.4,
+        "pricedBiggestPct": 23.5,
         "medianM2": 3494,
         "medianPrice": 216800,
         "medianArea": 60.1,
         "medianM2ExBiggest": 3564,
         "shiftExBiggest": 70,
-        "pricedExBiggest": 288
+        "pricedExBiggest": 287
       },
       {
         "city": "Trnava",
-        "available": 446,
+        "available": 443,
         "projects": 10,
-        "biggest": 140,
-        "biggestPct": 31.4,
-        "priced": 389,
+        "biggest": 138,
+        "biggestPct": 31.2,
+        "priced": 386,
         "pricedProjects": 8,
-        "pricedBiggest": 140,
-        "pricedBiggestPct": 36.0,
+        "pricedBiggest": 138,
+        "pricedBiggestPct": 35.8,
         "medianM2": 3833,
-        "medianPrice": 217560,
-        "medianArea": 54.0,
-        "medianM2ExBiggest": 3760,
-        "shiftExBiggest": -73,
-        "pricedExBiggest": 249
+        "medianPrice": 217479,
+        "medianArea": 54.1,
+        "medianM2ExBiggest": 3759,
+        "shiftExBiggest": -74,
+        "pricedExBiggest": 248
       },
       {
         "city": "Košice",
-        "available": 392,
+        "available": 391,
         "projects": 24,
         "biggest": 88,
-        "biggestPct": 22.4,
-        "priced": 376,
+        "biggestPct": 22.5,
+        "priced": 375,
         "pricedProjects": 23,
         "pricedBiggest": 88,
-        "pricedBiggestPct": 23.4,
-        "medianM2": 4559,
-        "medianPrice": 297745,
+        "pricedBiggestPct": 23.5,
+        "medianM2": 4554,
+        "medianPrice": 297500,
         "medianArea": 67.5,
-        "medianM2ExBiggest": 4280,
-        "shiftExBiggest": -279,
-        "pricedExBiggest": 288
+        "medianM2ExBiggest": 4263,
+        "shiftExBiggest": -291,
+        "pricedExBiggest": 287
       },
       {
         "city": "Prešov",
@@ -478,16 +478,16 @@
         "projects": 8,
         "biggest": 107,
         "biggestPct": 61.5,
-        "priced": 158,
+        "priced": 159,
         "pricedProjects": 6,
         "pricedBiggest": 107,
-        "pricedBiggestPct": 67.7,
-        "medianM2": 3940,
+        "pricedBiggestPct": 67.3,
+        "medianM2": 3951,
         "medianPrice": 199990,
         "medianArea": 52.8,
         "medianM2ExBiggest": 3465,
-        "shiftExBiggest": -475,
-        "pricedExBiggest": 51
+        "shiftExBiggest": -486,
+        "pricedExBiggest": 52
       },
       {
         "city": "Žilina",
@@ -558,23 +558,6 @@
         "pricedExBiggest": 0
       },
       {
-        "city": "Martin",
-        "available": 92,
-        "projects": 3,
-        "biggest": 46,
-        "biggestPct": 50.0,
-        "priced": 46,
-        "pricedProjects": 2,
-        "pricedBiggest": 41,
-        "pricedBiggestPct": 89.1,
-        "medianM2": 3059,
-        "medianPrice": 162250,
-        "medianArea": 55.9,
-        "medianM2ExBiggest": null,
-        "shiftExBiggest": null,
-        "pricedExBiggest": 5
-      },
-      {
         "city": "Dunajská Streda",
         "available": 92,
         "projects": 3,
@@ -590,6 +573,23 @@
         "medianM2ExBiggest": null,
         "shiftExBiggest": null,
         "pricedExBiggest": 0
+      },
+      {
+        "city": "Martin",
+        "available": 92,
+        "projects": 3,
+        "biggest": 46,
+        "biggestPct": 50.0,
+        "priced": 46,
+        "pricedProjects": 2,
+        "pricedBiggest": 41,
+        "pricedBiggestPct": 89.1,
+        "medianM2": 3059,
+        "medianPrice": 162250,
+        "medianArea": 55.9,
+        "medianM2ExBiggest": null,
+        "shiftExBiggest": null,
+        "pricedExBiggest": 5
       },
       {
         "city": "Ružomberok",
@@ -643,23 +643,6 @@
         "pricedExBiggest": 0
       },
       {
-        "city": "Nové Mesto nad Váhom",
-        "available": 44,
-        "projects": 2,
-        "biggest": 24,
-        "biggestPct": 54.5,
-        "priced": 22,
-        "pricedProjects": 1,
-        "pricedBiggest": 22,
-        "pricedBiggestPct": 100.0,
-        "medianM2": 2948,
-        "medianPrice": 151182,
-        "medianArea": 51.0,
-        "medianM2ExBiggest": null,
-        "shiftExBiggest": null,
-        "pricedExBiggest": 0
-      },
-      {
         "city": "Banská Štiavnica",
         "available": 43,
         "projects": 3,
@@ -672,6 +655,23 @@
         "medianM2": null,
         "medianPrice": null,
         "medianArea": null,
+        "medianM2ExBiggest": null,
+        "shiftExBiggest": null,
+        "pricedExBiggest": 0
+      },
+      {
+        "city": "Nové Mesto nad Váhom",
+        "available": 42,
+        "projects": 2,
+        "biggest": 22,
+        "biggestPct": 52.4,
+        "priced": 20,
+        "pricedProjects": 1,
+        "pricedBiggest": 20,
+        "pricedBiggestPct": 100.0,
+        "medianM2": 2935,
+        "medianPrice": 152829,
+        "medianArea": 51.0,
         "medianM2ExBiggest": null,
         "shiftExBiggest": null,
         "pricedExBiggest": 0
@@ -857,8 +857,8 @@
         "pricedBiggest": 18,
         "pricedBiggestPct": 100.0,
         "medianM2": 3622,
-        "medianPrice": 262990,
-        "medianArea": 77.7,
+        "medianPrice": 270490,
+        "medianArea": 79.4,
         "medianM2ExBiggest": null,
         "shiftExBiggest": null,
         "pricedExBiggest": 0
@@ -975,9 +975,9 @@
         "pricedProjects": 1,
         "pricedBiggest": 11,
         "pricedBiggestPct": 100.0,
-        "medianM2": 2296,
+        "medianM2": 2290,
         "medianPrice": 199900,
-        "medianArea": 84.5,
+        "medianArea": 84.3,
         "medianM2ExBiggest": null,
         "shiftExBiggest": null,
         "pricedExBiggest": 0
@@ -1087,7 +1087,7 @@
     ],
     "totals": {
       "towns": 44,
-      "available": 7372,
+      "available": 7357,
       "projects": 241,
       "oneProjectTowns": 18,
       "twoOrFewerTowns": 27,
@@ -1099,50 +1099,50 @@
     "towns": [
       {
         "city": "Bratislava",
-        "stock": 4052,
-        "priced": 3291,
-        "meanM2": 5722,
-        "meanPrice": 382878,
+        "stock": 4069,
+        "priced": 3307,
+        "meanM2": 5720,
+        "meanPrice": 382594,
         "meanArea": 65.6,
-        "sold": 586,
+        "sold": 591,
         "monthsToClear": 20.7
       },
       {
         "city": "Košice",
-        "stock": 695,
-        "priced": 471,
-        "meanM2": 4594,
-        "meanPrice": 319585,
-        "meanArea": 70.1,
+        "stock": 689,
+        "priced": 470,
+        "meanM2": 4592,
+        "meanPrice": 319056,
+        "meanArea": 70.0,
         "sold": 135,
-        "monthsToClear": 15.4
+        "monthsToClear": 15.3
       },
       {
         "city": "Trnava",
         "stock": 583,
-        "priced": 425,
-        "meanM2": 4079,
-        "meanPrice": 230913,
+        "priced": 424,
+        "meanM2": 4082,
+        "meanPrice": 230804,
         "meanArea": 58.7,
-        "sold": 66,
-        "monthsToClear": 26.5
+        "sold": 73,
+        "monthsToClear": 24.0
       },
       {
         "city": "Nitra",
-        "stock": 525,
-        "priced": 394,
-        "meanM2": 3498,
-        "meanPrice": 216108,
+        "stock": 526,
+        "priced": 396,
+        "meanM2": 3499,
+        "meanPrice": 216013,
         "meanArea": 62.9,
-        "sold": 43,
-        "monthsToClear": 36.6
+        "sold": 44,
+        "monthsToClear": 35.9
       },
       {
         "city": "Prešov",
         "stock": 501,
         "priced": 333,
         "meanM2": 3720,
-        "meanPrice": 253051,
+        "meanPrice": 253077,
         "meanArea": 69.4,
         "sold": 92,
         "monthsToClear": 16.3
@@ -1159,21 +1159,21 @@
       },
       {
         "city": "Poprad",
-        "stock": 359,
-        "priced": 207,
+        "stock": 357,
+        "priced": 206,
         "meanM2": 3666,
-        "meanPrice": 232140,
+        "meanPrice": 232022,
         "meanArea": 63.2,
         "sold": 21,
-        "monthsToClear": 51.3
+        "monthsToClear": 51.0
       },
       {
         "city": "Trenčín",
         "stock": 273,
         "priced": 251,
-        "meanM2": 4004,
-        "meanPrice": 278466,
-        "meanArea": 69.2,
+        "meanM2": 4002,
+        "meanPrice": 278126,
+        "meanArea": 69.1,
         "sold": 65,
         "monthsToClear": 12.6
       },
@@ -1181,11 +1181,11 @@
         "city": "Banská Bystrica",
         "stock": 232,
         "priced": 181,
-        "meanM2": 3878,
-        "meanPrice": 222156,
-        "meanArea": 59.9,
-        "sold": 13,
-        "monthsToClear": 53.5
+        "meanM2": 3871,
+        "meanPrice": 222259,
+        "meanArea": 60.0,
+        "sold": 17,
+        "monthsToClear": 40.9
       },
       {
         "city": "Liptovský Mikuláš",
@@ -1199,20 +1199,20 @@
       },
       {
         "city": "Žilina",
-        "stock": 214,
-        "priced": 156,
-        "meanM2": 4223,
-        "meanPrice": 266720,
+        "stock": 213,
+        "priced": 155,
+        "meanM2": 4227,
+        "meanPrice": 267046,
         "meanArea": 64.1,
-        "sold": 39,
-        "monthsToClear": 16.5
+        "sold": 40,
+        "monthsToClear": 16.0
       },
       {
         "city": "Piešťany",
         "stock": 128,
         "priced": 59,
-        "meanM2": 3162,
-        "meanPrice": 236059,
+        "meanM2": 3161,
+        "meanPrice": 236115,
         "meanArea": 74.1,
         "sold": 7,
         "monthsToClear": null
@@ -1222,7 +1222,7 @@
         "stock": 104,
         "priced": 53,
         "meanM2": 3048,
-        "meanPrice": 184819,
+        "meanPrice": 184726,
         "meanArea": 60.8,
         "sold": 23,
         "monthsToClear": 13.6
@@ -1231,8 +1231,8 @@
         "city": "Dunajská Streda",
         "stock": 102,
         "priced": 50,
-        "meanM2": 2745,
-        "meanPrice": 170779,
+        "meanM2": 2744,
+        "meanPrice": 170794,
         "meanArea": 62.5,
         "sold": 4,
         "monthsToClear": null
@@ -1248,6 +1248,16 @@
         "monthsToClear": null
       },
       {
+        "city": "Slovenský Grob",
+        "stock": 71,
+        "priced": 71,
+        "meanM2": 3833,
+        "meanPrice": 224650,
+        "meanArea": 59.6,
+        "sold": 0,
+        "monthsToClear": null
+      },
+      {
         "city": "Spišská Nová Ves",
         "stock": 69,
         "priced": 60,
@@ -1258,21 +1268,11 @@
         "monthsToClear": null
       },
       {
-        "city": "Slovenský Grob",
-        "stock": 68,
-        "priced": 68,
-        "meanM2": 3829,
-        "meanPrice": 226261,
-        "meanArea": 60.1,
-        "sold": 0,
-        "monthsToClear": null
-      },
-      {
         "city": "Ružomberok",
         "stock": 63,
         "priced": 54,
-        "meanM2": 3459,
-        "meanPrice": 186076,
+        "meanM2": 3460,
+        "meanPrice": 186106,
         "meanArea": 54.3,
         "sold": 4,
         "monthsToClear": null
@@ -1282,7 +1282,7 @@
         "stock": 60,
         "priced": 42,
         "meanM2": 3636,
-        "meanPrice": 245425,
+        "meanPrice": 245586,
         "meanArea": 68.0,
         "sold": 3,
         "monthsToClear": null
@@ -1321,9 +1321,9 @@
         "city": "Nové Mesto nad Váhom",
         "stock": 56,
         "priced": 29,
-        "meanM2": 2975,
-        "meanPrice": 171123,
-        "meanArea": 57.9,
+        "meanM2": 2974,
+        "meanPrice": 171235,
+        "meanArea": 58.0,
         "sold": 12,
         "monthsToClear": 14.0
       },
@@ -1339,22 +1339,22 @@
       },
       {
         "city": "Sekule",
-        "stock": 38,
+        "stock": 37,
         "priced": 13,
         "meanM2": 2219,
         "meanPrice": 137992,
         "meanArea": 63.8,
-        "sold": 1,
+        "sold": 4,
         "monthsToClear": null
       },
       {
         "city": "Modra",
-        "stock": 33,
+        "stock": 32,
         "priced": 16,
-        "meanM2": 3362,
-        "meanPrice": 222299,
+        "meanM2": 3360,
+        "meanPrice": 222227,
         "meanArea": 66.8,
-        "sold": 3,
+        "sold": 5,
         "monthsToClear": null
       },
       {
@@ -1372,7 +1372,7 @@
         "stock": 27,
         "priced": 24,
         "meanM2": 5478,
-        "meanPrice": 285274,
+        "meanPrice": 285258,
         "meanArea": 52.5,
         "sold": 0,
         "monthsToClear": null
@@ -1411,8 +1411,8 @@
         "city": "Ivanka pri Dunaji",
         "stock": 24,
         "priced": 14,
-        "meanM2": 3909,
-        "meanPrice": 276001,
+        "meanM2": 3910,
+        "meanPrice": 276044,
         "meanArea": 71.1,
         "sold": 1,
         "monthsToClear": null
@@ -1431,10 +1431,10 @@
         "city": "Stupava",
         "stock": 22,
         "priced": 17,
-        "meanM2": 3605,
-        "meanPrice": 270331,
-        "meanArea": 76.0,
-        "sold": 2,
+        "meanM2": 3623,
+        "meanPrice": 268266,
+        "meanArea": 75.2,
+        "sold": 3,
         "monthsToClear": null
       },
       {
@@ -1482,7 +1482,7 @@
         "stock": 16,
         "priced": 13,
         "meanM2": 2428,
-        "meanPrice": 169851,
+        "meanPrice": 169845,
         "meanArea": 70.2,
         "sold": 0,
         "monthsToClear": null
@@ -1491,9 +1491,9 @@
         "city": "Zlaté Moravce",
         "stock": 12,
         "priced": 10,
-        "meanM2": 2366,
-        "meanPrice": 134134,
-        "meanArea": 57.7,
+        "meanM2": 2367,
+        "meanPrice": 133899,
+        "meanArea": 57.5,
         "sold": 7,
         "monthsToClear": null
       },
@@ -1501,9 +1501,9 @@
         "city": "Humenné",
         "stock": 11,
         "priced": 11,
-        "meanM2": 2371,
+        "meanM2": 2373,
         "meanPrice": 203909,
-        "meanArea": 85.2,
+        "meanArea": 85.1,
         "sold": 0,
         "monthsToClear": null
       },
@@ -1521,10 +1521,10 @@
         "city": "Rovinka",
         "stock": 7,
         "priced": 3,
-        "meanM2": 4019,
-        "meanPrice": 218273,
+        "meanM2": 4024,
+        "meanPrice": 218511,
         "meanArea": 55.4,
-        "sold": 0,
+        "sold": 4,
         "monthsToClear": null
       },
       {
@@ -1541,9 +1541,9 @@
         "city": "Nové Zámky",
         "stock": 5,
         "priced": 3,
-        "meanM2": 2599,
-        "meanPrice": 190601,
-        "meanArea": 73.5,
+        "meanM2": 2590,
+        "meanPrice": 190499,
+        "meanArea": 73.7,
         "sold": 1,
         "monthsToClear": null
       },
@@ -1559,41 +1559,41 @@
       }
     ],
     "townCount": 46,
-    "totalStock": 9401,
+    "totalStock": 9411,
     "withClearing": 11,
     "minSalesForClearing": 10,
     "fastest": {
       "city": "Trenčín",
       "stock": 273,
       "priced": 251,
-      "meanM2": 4004,
-      "meanPrice": 278466,
-      "meanArea": 69.2,
+      "meanM2": 4002,
+      "meanPrice": 278126,
+      "meanArea": 69.1,
       "sold": 65,
       "monthsToClear": 12.6
     },
     "slowest": {
-      "city": "Banská Bystrica",
-      "stock": 232,
-      "priced": 181,
-      "meanM2": 3878,
-      "meanPrice": 222156,
-      "meanArea": 59.9,
-      "sold": 13,
-      "monthsToClear": 53.5
+      "city": "Poprad",
+      "stock": 357,
+      "priced": 206,
+      "meanM2": 3666,
+      "meanPrice": 232022,
+      "meanArea": 63.2,
+      "sold": 21,
+      "monthsToClear": 51.0
     },
-    "baShareStockPct": 43.1,
-    "baShareSoldPct": 50.9,
+    "baShareStockPct": 43.2,
+    "baShareSoldPct": 50.1,
     "restTowns": 45,
-    "restStock": 5349,
+    "restStock": 5342,
     "dearest": {
       "city": "Bratislava",
-      "stock": 4052,
-      "priced": 3291,
-      "meanM2": 5722,
-      "meanPrice": 382878,
+      "stock": 4069,
+      "priced": 3307,
+      "meanM2": 5720,
+      "meanPrice": 382594,
       "meanArea": 65.6,
-      "sold": 586,
+      "sold": 591,
       "monthsToClear": 20.7
     },
     "cheapest": {
@@ -1607,7 +1607,7 @@
       "monthsToClear": null
     },
     "priceSpread": 2.5,
-    "priceVsSpeedR": -0.07,
+    "priceVsSpeedR": -0.08,
     "sameMoneyBuys": [
       {
         "city": "Lučenec",
@@ -1622,79 +1622,79 @@
         "sqm": 150
       }
     ],
-    "yardstickPrice": 382878,
+    "yardstickPrice": 382594,
     "yardstickSqm": 67
   },
   "baByOkres": {
     "rows": [
       {
         "okres": "Bratislava II",
-        "stock": 1161,
+        "stock": 1163,
         "priced": 940,
-        "meanM2": 5892,
-        "meanPrice": 387698,
+        "meanM2": 5893,
+        "meanPrice": 387947,
         "meanArea": 66.3,
         "projects": 27,
-        "sold": 252,
-        "soldM2": 6146,
-        "sharePct": 28.7,
-        "soldSharePct": 43.4
+        "sold": 256,
+        "soldM2": 6127,
+        "sharePct": 28.6,
+        "soldSharePct": 43.3
       },
       {
         "okres": "Bratislava IV",
-        "stock": 898,
-        "priced": 857,
+        "stock": 897,
+        "priced": 856,
         "meanM2": 4763,
-        "meanPrice": 291027,
+        "meanPrice": 291150,
         "meanArea": 61.7,
         "projects": 20,
-        "sold": 90,
-        "soldM2": 4770,
-        "sharePct": 22.2,
-        "soldSharePct": 15.5
+        "sold": 92,
+        "soldM2": 4750,
+        "sharePct": 22.0,
+        "soldSharePct": 15.6
       },
       {
         "okres": "Bratislava I",
-        "stock": 741,
+        "stock": 740,
         "priced": 365,
         "meanM2": 8492,
-        "meanPrice": 699883,
+        "meanPrice": 700058,
         "meanArea": 78.8,
         "projects": 22,
-        "sold": 57,
-        "soldM2": 7414,
-        "sharePct": 18.3,
-        "soldSharePct": 9.8
+        "sold": 59,
+        "soldM2": 7505,
+        "sharePct": 18.2,
+        "soldSharePct": 10.0
       },
       {
         "okres": "Bratislava V",
-        "stock": 682,
-        "priced": 651,
-        "meanM2": 5189,
-        "meanPrice": 319914,
+        "stock": 700,
+        "priced": 668,
+        "meanM2": 5185,
+        "meanPrice": 319269,
         "meanArea": 62.4,
         "projects": 6,
-        "sold": 89,
-        "soldM2": 5025,
-        "sharePct": 16.8,
-        "soldSharePct": 15.3
+        "sold": 90,
+        "soldM2": 5032,
+        "sharePct": 17.2,
+        "soldSharePct": 15.2
       },
       {
         "okres": "Bratislava III",
-        "stock": 570,
-        "priced": 479,
-        "meanM2": 5723,
-        "meanPrice": 381822,
+        "stock": 569,
+        "priced": 478,
+        "meanM2": 5726,
+        "meanPrice": 382039,
         "meanArea": 65.8,
         "projects": 18,
-        "sold": 92,
-        "soldM2": 5329,
-        "sharePct": 14.1,
+        "sold": 94,
+        "soldM2": 5330,
+        "sharePct": 14.0,
         "soldSharePct": 15.9
       }
     ],
-    "totalStock": 4052,
-    "totalSold": 580,
+    "totalStock": 4069,
+    "totalSold": 591,
     "unmappedStock": 0
   },
   "cityByDisposition": {
@@ -1725,62 +1725,62 @@
         "city": "Bratislava",
         "cells": {
           "1": {
-            "n": 415,
-            "medPrice": 210024,
-            "medM2": 6019,
-            "meanArea": 37.9,
+            "n": 417,
+            "medPrice": 209660,
+            "medM2": 6028,
+            "meanArea": 37.8,
             "keptUnits": 252,
-            "changePct": 0.6
+            "changePct": 0.61
           },
           "2": {
-            "n": 1394,
-            "medPrice": 269724,
-            "medM2": 5205,
+            "n": 1397,
+            "medPrice": 269583,
+            "medM2": 5206,
             "meanArea": 52.2,
-            "keptUnits": 947,
+            "keptUnits": 944,
             "changePct": 0.75
           },
           "3": {
-            "n": 999,
-            "medPrice": 383095,
-            "medM2": 5249,
+            "n": 1005,
+            "medPrice": 381899,
+            "medM2": 5241,
             "meanArea": 75.8,
             "keptUnits": 768,
-            "changePct": 0.26
+            "changePct": 0.27
           },
           "4+": {
-            "n": 452,
-            "medPrice": 588777,
-            "medM2": 5440,
+            "n": 454,
+            "medPrice": 588710,
+            "medM2": 5436,
             "meanArea": 110.6,
-            "keptUnits": 356,
-            "changePct": 0.06
+            "keptUnits": 355,
+            "changePct": 0.07
           }
         },
-        "total": 3260
+        "total": 3273
       },
       {
         "city": "Košice",
         "cells": {
           "1": {
-            "n": 44,
-            "medPrice": 150460,
-            "medM2": 5273,
+            "n": 45,
+            "medPrice": 149900,
+            "medM2": 5264,
             "meanArea": 31.2,
             "keptUnits": 31,
-            "changePct": -1.15
+            "changePct": -1.24
           },
           "2": {
             "n": 192,
             "medPrice": 259762,
-            "medM2": 4675,
+            "medM2": 4674,
             "meanArea": 56.8,
             "keptUnits": 72,
             "changePct": 0.06
           },
           "3": {
-            "n": 182,
-            "medPrice": 332337,
+            "n": 181,
+            "medPrice": 332335,
             "medM2": 4298,
             "meanArea": 79.5,
             "keptUnits": 71,
@@ -1789,7 +1789,7 @@
           "4+": {
             "n": 52,
             "medPrice": 539900,
-            "medM2": 4839,
+            "medM2": 4837,
             "meanArea": 119.5,
             "keptUnits": 23,
             "changePct": 0.26
@@ -1801,28 +1801,28 @@
         "city": "Trnava",
         "cells": {
           "1": {
-            "n": 55,
-            "medPrice": 159529,
-            "medM2": 5495,
+            "n": 56,
+            "medPrice": 159500,
+            "medM2": 5487,
             "meanArea": 30.2,
             "keptUnits": 30,
             "changePct": 0.05
           },
           "2": {
-            "n": 201,
-            "medPrice": 199128,
+            "n": 200,
+            "medPrice": 199260,
             "medM2": 4036,
             "meanArea": 50.5,
             "keptUnits": 121,
-            "changePct": 0.24
+            "changePct": 0.26
           },
           "3": {
             "n": 129,
-            "medPrice": 249381,
+            "medPrice": 249326,
             "medM2": 3587,
             "meanArea": 71.6,
             "keptUnits": 93,
-            "changePct": 0.28
+            "changePct": 0.29
           },
           "4+": {
             "n": 37,
@@ -1838,24 +1838,24 @@
         "cells": {
           "1": {
             "n": 34,
-            "medPrice": 149471,
-            "medM2": 3892,
-            "meanArea": 38.8,
+            "medPrice": 149729,
+            "medM2": 3910,
+            "meanArea": 38.7,
             "keptUnits": 33,
             "changePct": 0.98
           },
           "2": {
-            "n": 188,
-            "medPrice": 196164,
-            "medM2": 3622,
+            "n": 190,
+            "medPrice": 196042,
+            "medM2": 3621,
             "meanArea": 54.6,
             "keptUnits": 162,
             "changePct": 0.59
           },
           "3": {
             "n": 154,
-            "medPrice": 231062,
-            "medM2": 3248,
+            "medPrice": 231244,
+            "medM2": 3250,
             "meanArea": 74.8,
             "keptUnits": 127,
             "changePct": 0.21
@@ -1869,7 +1869,7 @@
             "changePct": 0.47
           }
         },
-        "total": 393
+        "total": 395
       },
       {
         "city": "Prešov",
@@ -1877,7 +1877,7 @@
           "1": {
             "n": 26,
             "medPrice": 129980,
-            "medM2": 4388,
+            "medM2": 4391,
             "meanArea": 29.8
           },
           "2": {
@@ -1890,7 +1890,7 @@
           },
           "3": {
             "n": 123,
-            "medPrice": 291071,
+            "medPrice": 291143,
             "medM2": 3581,
             "meanArea": 76.7,
             "keptUnits": 79,
@@ -1917,17 +1917,17 @@
             "meanArea": 38.5
           },
           "2": {
-            "n": 107,
-            "medPrice": 205690,
-            "medM2": 3837,
+            "n": 108,
+            "medPrice": 204751,
+            "medM2": 3835,
             "meanArea": 55.2,
             "keptUnits": 47,
             "changePct": -0.01
           },
           "3": {
             "n": 87,
-            "medPrice": 296487,
-            "medM2": 3721,
+            "medPrice": 296412,
+            "medM2": 3720,
             "meanArea": 75.7,
             "keptUnits": 43,
             "changePct": 0.01
@@ -1936,12 +1936,12 @@
             "n": 41,
             "medPrice": 404081,
             "medM2": 3867,
-            "meanArea": 102.8,
+            "meanArea": 102.7,
             "keptUnits": 15,
             "changePct": 0.05
           }
         },
-        "total": 250
+        "total": 251
       },
       {
         "city": "Poprad",
@@ -1950,24 +1950,24 @@
             "n": 12,
             "medPrice": 163000,
             "medM2": 3584,
-            "meanArea": 45.0
+            "meanArea": 45.1
           },
           "2": {
-            "n": 123,
-            "medPrice": 207385,
-            "medM2": 3621,
+            "n": 122,
+            "medPrice": 207367,
+            "medM2": 3620,
             "meanArea": 56.7,
             "keptUnits": 32,
             "changePct": 0.28
           },
           "3": {
-            "n": 49,
-            "medPrice": 268919,
-            "medM2": 3545,
+            "n": 48,
+            "medPrice": 268561,
+            "medM2": 3544,
             "meanArea": 77.1
           }
         },
-        "total": 184
+        "total": 182
       },
       {
         "city": "Banská Bystrica",
@@ -1975,26 +1975,26 @@
           "1": {
             "n": 49,
             "medPrice": 151990,
-            "medM2": 4346,
+            "medM2": 4349,
             "meanArea": 40.8,
-            "keptUnits": 33,
+            "keptUnits": 32,
             "changePct": 0.03
           },
           "2": {
             "n": 84,
             "medPrice": 199990,
-            "medM2": 3967,
-            "meanArea": 54.4,
+            "medM2": 3966,
+            "meanArea": 54.5,
             "keptUnits": 67,
-            "changePct": -0.79
+            "changePct": -1.08
           },
           "3": {
             "n": 31,
-            "medPrice": 255097,
+            "medPrice": 255204,
             "medM2": 3750,
-            "meanArea": 77.3,
+            "meanArea": 77.4,
             "keptUnits": 24,
-            "changePct": 0.77
+            "changePct": 0.54
           },
           "4+": {
             "n": 17,
@@ -2006,64 +2006,64 @@
         "total": 181
       },
       {
+        "city": "Zvolen",
+        "cells": {
+          "1": {
+            "n": 15,
+            "medPrice": 145929,
+            "medM2": 3599,
+            "meanArea": 42.3
+          },
+          "2": {
+            "n": 100,
+            "medPrice": 198571,
+            "medM2": 3574,
+            "meanArea": 53.5,
+            "keptUnits": 69,
+            "changePct": 0.0
+          },
+          "3": {
+            "n": 46,
+            "medPrice": 291464,
+            "medM2": 3520,
+            "meanArea": 84.4,
+            "keptUnits": 30,
+            "changePct": 0.0
+          }
+        },
+        "total": 161
+      },
+      {
         "city": "Žilina",
         "cells": {
           "1": {
             "n": 20,
-            "medPrice": 155400,
-            "medM2": 4577,
+            "medPrice": 155650,
+            "medM2": 4573,
             "meanArea": 34.3
           },
           "2": {
-            "n": 62,
-            "medPrice": 221686,
-            "medM2": 4234,
+            "n": 61,
+            "medPrice": 223257,
+            "medM2": 4241,
             "meanArea": 50.4,
-            "keptUnits": 40,
+            "keptUnits": 38,
             "changePct": 0.0
           },
           "3": {
             "n": 47,
-            "medPrice": 281189,
-            "medM2": 3885,
+            "medPrice": 282299,
+            "medM2": 3891,
             "meanArea": 72.9,
             "keptUnits": 23,
             "changePct": 0.23
           },
           "4+": {
             "n": 26,
-            "medPrice": 398362,
+            "medPrice": 397434,
             "medM2": 4000,
             "meanArea": 103.2,
             "keptUnits": 23,
-            "changePct": 0.0
-          }
-        },
-        "total": 155
-      },
-      {
-        "city": "Zvolen",
-        "cells": {
-          "1": {
-            "n": 14,
-            "medPrice": 147714,
-            "medM2": 3620,
-            "meanArea": 42.1
-          },
-          "2": {
-            "n": 96,
-            "medPrice": 196886,
-            "medM2": 3587,
-            "meanArea": 53.2,
-            "keptUnits": 69,
-            "changePct": 0.0
-          },
-          "3": {
-            "n": 44,
-            "medPrice": 291657,
-            "medM2": 3524,
-            "meanArea": 84.1,
-            "keptUnits": 30,
             "changePct": 0.0
           }
         },
@@ -2102,7 +2102,7 @@
         "cells": {
           "2": {
             "n": 14,
-            "medPrice": 217026,
+            "medPrice": 217167,
             "medM2": 3817,
             "meanArea": 56.0
           },
@@ -2124,12 +2124,12 @@
     ],
     "townCount": 12,
     "minCell": 10,
-    "ba1RoomPrice": 210024,
+    "ba1RoomPrice": 209660,
     "ba1RoomBeats": 7,
     "ba1RoomOutOf": 11,
     "cheapest2Room": {
       "city": "Nitra",
-      "price": 196164
+      "price": 196042
     },
     "stepDearest": {
       "city": "Liptovský Mikuláš",
@@ -2139,34 +2139,34 @@
       "city": "Bernolákovo",
       "pct": 11.9
     },
-    "stepBratislava": 42.0
+    "stepBratislava": 41.7
   },
   "priceStepByScope": {
     "bratislava": {
-      "moves": 1482,
+      "moves": 1491,
       "projects": 38,
-      "up": 1291,
-      "down": 191,
-      "pctUp": 87.1,
+      "up": 1301,
+      "down": 190,
+      "pctUp": 87.3,
       "medianPct": 2.0
     },
     "rest": {
-      "moves": 387,
+      "moves": 409,
       "projects": 38,
-      "up": 333,
-      "down": 54,
-      "pctUp": 86.0,
+      "up": 335,
+      "down": 74,
+      "pctUp": 81.9,
       "medianPct": 5.0
     },
     "days": 90
   },
   "salesIntegrity": {
     "since": "2026-05-16",
-    "ledgerSales": 1363,
-    "eventSales": 1409,
-    "gapPct": 3.4,
-    "ledgerMaxDayPct": 5.7,
-    "eventMaxDayPct": 5.5,
+    "ledgerSales": 1389,
+    "eventSales": 1437,
+    "gapPct": 3.5,
+    "ledgerMaxDayPct": 5.6,
+    "eventMaxDayPct": 5.4,
     "agree": true,
     "reasons": []
   },
@@ -2176,33 +2176,33 @@
   },
   "bratislava": {
     "projects": 83,
-    "available": 3101,
-    "medianM2": 5328
+    "available": 3094,
+    "medianM2": 5341
   },
   "restOfSk": {
     "projects": 122,
-    "available": 3128,
-    "medianM2": 3682,
+    "available": 3122,
+    "medianM2": 3676,
     "towns": 45
   },
   "sales90d": {
-    "bratislava": 606,
-    "restOfSk": 590
+    "bratislava": 604,
+    "restOfSk": 610
   },
   "topCities": [
     {
       "city": "Trnava",
-      "available": 389,
+      "available": 386,
       "medianM2": 3833
     },
     {
       "city": "Košice",
-      "available": 376,
-      "medianM2": 4559
+      "available": 375,
+      "medianM2": 4554
     },
     {
       "city": "Nitra",
-      "available": 376,
+      "available": 375,
       "medianM2": 3494
     },
     {
@@ -2226,156 +2226,37 @@
     "rows": [
       {
         "izby": 1.0,
-        "available": 624,
+        "available": 627,
         "sold": 154,
-        "stockPct": 8.6,
-        "salesPct": 11.3
+        "stockPct": 8.7,
+        "salesPct": 11.1
       },
       {
         "izby": 1.5,
-        "available": 166,
-        "sold": 51,
+        "available": 163,
+        "sold": 52,
         "stockPct": 2.3,
         "salesPct": 3.7
       },
       {
         "izby": 2.0,
-        "available": 3087,
-        "sold": 686,
-        "stockPct": 42.6,
-        "salesPct": 50.3
-      },
-      {
-        "izby": 2.5,
-        "available": 30,
-        "sold": 7,
-        "stockPct": 0.4,
-        "salesPct": 0.5
-      },
-      {
-        "izby": 3.0,
-        "available": 2421,
-        "sold": 333,
-        "stockPct": 33.4,
-        "salesPct": 24.4
-      },
-      {
-        "izby": 3.5,
-        "available": 8,
-        "sold": 3,
-        "stockPct": 0.1,
-        "salesPct": 0.2
-      },
-      {
-        "izby": 4.0,
-        "available": 836,
-        "sold": 123,
-        "stockPct": 11.5,
-        "salesPct": 9.0
-      },
-      {
-        "izby": 5.0,
-        "available": 72,
-        "sold": 8,
-        "stockPct": 1.0,
-        "salesPct": 0.6
-      }
-    ],
-    "totalAvailable": 7244,
-    "totalSold": 1365
-  },
-  "mixCz": {
-    "since": "2026-06-09",
-    "rows": [
-      {
-        "izby": 1.0,
-        "available": 996,
-        "sold": 358,
-        "stockPct": 19.4,
-        "salesPct": 27.4
-      },
-      {
-        "izby": 1.5,
-        "available": 59,
-        "sold": 18,
-        "stockPct": 1.1,
-        "salesPct": 1.4
-      },
-      {
-        "izby": 2.0,
-        "available": 2286,
-        "sold": 527,
-        "stockPct": 44.5,
-        "salesPct": 40.3
-      },
-      {
-        "izby": 2.5,
-        "available": 12,
-        "sold": 1,
-        "stockPct": 0.2,
-        "salesPct": 0.1
-      },
-      {
-        "izby": 3.0,
-        "available": 1300,
-        "sold": 288,
-        "stockPct": 25.3,
-        "salesPct": 22.0
-      },
-      {
-        "izby": 4.0,
-        "available": 454,
-        "sold": 95,
-        "stockPct": 8.8,
-        "salesPct": 7.3
-      },
-      {
-        "izby": 5.0,
-        "available": 34,
-        "sold": 20,
-        "stockPct": 0.7,
-        "salesPct": 1.5
-      }
-    ],
-    "totalAvailable": 5141,
-    "totalSold": 1307
-  },
-  "mixSkCommon": {
-    "since": "2026-06-09",
-    "rows": [
-      {
-        "izby": 1.0,
-        "available": 624,
-        "sold": 151,
-        "stockPct": 8.6,
-        "salesPct": 11.6
-      },
-      {
-        "izby": 1.5,
-        "available": 166,
-        "sold": 44,
-        "stockPct": 2.3,
-        "salesPct": 3.4
-      },
-      {
-        "izby": 2.0,
-        "available": 3087,
-        "sold": 652,
-        "stockPct": 42.6,
+        "available": 3073,
+        "sold": 696,
+        "stockPct": 42.5,
         "salesPct": 50.0
       },
       {
         "izby": 2.5,
-        "available": 30,
+        "available": 29,
         "sold": 7,
         "stockPct": 0.4,
         "salesPct": 0.5
       },
       {
         "izby": 3.0,
-        "available": 2421,
-        "sold": 324,
-        "stockPct": 33.4,
+        "available": 2420,
+        "sold": 347,
+        "stockPct": 33.5,
         "salesPct": 24.9
       },
       {
@@ -2387,9 +2268,128 @@
       },
       {
         "izby": 4.0,
-        "available": 836,
-        "sold": 114,
-        "stockPct": 11.5,
+        "available": 837,
+        "sold": 124,
+        "stockPct": 11.6,
+        "salesPct": 8.9
+      },
+      {
+        "izby": 5.0,
+        "available": 72,
+        "sold": 8,
+        "stockPct": 1.0,
+        "salesPct": 0.6
+      }
+    ],
+    "totalAvailable": 7229,
+    "totalSold": 1391
+  },
+  "mixCz": {
+    "since": "2026-06-09",
+    "rows": [
+      {
+        "izby": 1.0,
+        "available": 998,
+        "sold": 364,
+        "stockPct": 19.4,
+        "salesPct": 27.0
+      },
+      {
+        "izby": 1.5,
+        "available": 55,
+        "sold": 22,
+        "stockPct": 1.1,
+        "salesPct": 1.6
+      },
+      {
+        "izby": 2.0,
+        "available": 2291,
+        "sold": 542,
+        "stockPct": 44.5,
+        "salesPct": 40.3
+      },
+      {
+        "izby": 2.5,
+        "available": 12,
+        "sold": 2,
+        "stockPct": 0.2,
+        "salesPct": 0.1
+      },
+      {
+        "izby": 3.0,
+        "available": 1302,
+        "sold": 298,
+        "stockPct": 25.3,
+        "salesPct": 22.1
+      },
+      {
+        "izby": 4.0,
+        "available": 458,
+        "sold": 97,
+        "stockPct": 8.9,
+        "salesPct": 7.2
+      },
+      {
+        "izby": 5.0,
+        "available": 34,
+        "sold": 21,
+        "stockPct": 0.7,
+        "salesPct": 1.6
+      }
+    ],
+    "totalAvailable": 5150,
+    "totalSold": 1346
+  },
+  "mixSkCommon": {
+    "since": "2026-06-09",
+    "rows": [
+      {
+        "izby": 1.0,
+        "available": 627,
+        "sold": 151,
+        "stockPct": 8.7,
+        "salesPct": 11.4
+      },
+      {
+        "izby": 1.5,
+        "available": 163,
+        "sold": 45,
+        "stockPct": 2.3,
+        "salesPct": 3.4
+      },
+      {
+        "izby": 2.0,
+        "available": 3073,
+        "sold": 662,
+        "stockPct": 42.5,
+        "salesPct": 49.8
+      },
+      {
+        "izby": 2.5,
+        "available": 29,
+        "sold": 7,
+        "stockPct": 0.4,
+        "salesPct": 0.5
+      },
+      {
+        "izby": 3.0,
+        "available": 2420,
+        "sold": 338,
+        "stockPct": 33.5,
+        "salesPct": 25.4
+      },
+      {
+        "izby": 3.5,
+        "available": 8,
+        "sold": 3,
+        "stockPct": 0.1,
+        "salesPct": 0.2
+      },
+      {
+        "izby": 4.0,
+        "available": 837,
+        "sold": 115,
+        "stockPct": 11.6,
         "salesPct": 8.7
       },
       {
@@ -2400,19 +2400,19 @@
         "salesPct": 0.6
       }
     ],
-    "totalAvailable": 7244,
-    "totalSold": 1303
+    "totalAvailable": 7229,
+    "totalSold": 1329
   },
   "window": {
     "sk": {
       "from": "2026-05-16",
-      "to": "2026-09-23",
-      "days": 130
+      "to": "2026-09-24",
+      "days": 131
     },
     "cz": {
       "from": "2026-06-09",
-      "to": "2026-09-22",
-      "days": 105
+      "to": "2026-09-24",
+      "days": 107
     },
     "common": {
       "from": "2026-06-09"
@@ -2425,39 +2425,39 @@
         "quartile": 1,
         "projects": 23,
         "avgM2": 3166,
-        "available": 988,
+        "available": 985,
         "sold": 131,
-        "medianStock": 33,
-        "monthsToClear": 32.2,
+        "medianStock": 32,
+        "monthsToClear": 32.4,
         "monthsDisplay": 32
       },
       {
         "quartile": 2,
         "projects": 23,
-        "avgM2": 3894,
-        "available": 1589,
-        "sold": 165,
+        "avgM2": 3892,
+        "available": 1585,
+        "sold": 177,
         "medianStock": 57,
-        "monthsToClear": 41.1,
-        "monthsDisplay": 41
+        "monthsToClear": 38.5,
+        "monthsDisplay": 39
       },
       {
         "quartile": 3,
         "projects": 23,
-        "avgM2": 4941,
-        "available": 1692,
-        "sold": 376,
+        "avgM2": 4950,
+        "available": 1687,
+        "sold": 381,
         "medianStock": 32,
-        "monthsToClear": 19.2,
+        "monthsToClear": 19.1,
         "monthsDisplay": 19
       },
       {
         "quartile": 4,
         "projects": 22,
-        "avgM2": 7078,
-        "available": 1066,
-        "sold": 330,
-        "medianStock": 35,
+        "avgM2": 7079,
+        "available": 1064,
+        "sold": 332,
+        "medianStock": 34,
         "monthsToClear": 13.8,
         "monthsDisplay": 14
       }
@@ -2467,84 +2467,91 @@
     "sk": [
       {
         "izby": 1.0,
-        "available": 624,
+        "available": 627,
         "sold": 154,
-        "months": 17.3,
-        "monthsDisplay": 17
+        "months": 17.5,
+        "monthsDisplay": 18
       },
       {
         "izby": 1.5,
-        "available": 166,
-        "sold": 51,
-        "months": 13.9,
+        "available": 163,
+        "sold": 52,
+        "months": 13.5,
         "monthsDisplay": 14
       },
       {
         "izby": 2.0,
-        "available": 3087,
-        "sold": 686,
-        "months": 19.2,
+        "available": 3073,
+        "sold": 696,
+        "months": 19.0,
         "monthsDisplay": 19
       },
       {
         "izby": 3.0,
-        "available": 2421,
-        "sold": 333,
-        "months": 31.1,
-        "monthsDisplay": 31
+        "available": 2420,
+        "sold": 347,
+        "months": 30.0,
+        "monthsDisplay": 30
       },
       {
         "izby": 4.0,
-        "available": 836,
-        "sold": 123,
-        "months": 29.0,
+        "available": 837,
+        "sold": 124,
+        "months": 29.1,
         "monthsDisplay": 29
       }
     ],
     "cz": [
       {
         "izby": 1.0,
-        "available": 996,
-        "sold": 358,
+        "available": 998,
+        "sold": 364,
         "months": 9.6,
         "monthsDisplay": 10
       },
       {
+        "izby": 1.5,
+        "available": 55,
+        "sold": 22,
+        "months": 8.8,
+        "monthsDisplay": 9
+      },
+      {
         "izby": 2.0,
-        "available": 2286,
-        "sold": 527,
-        "months": 15.0,
+        "available": 2291,
+        "sold": 542,
+        "months": 14.9,
         "monthsDisplay": 15
       },
       {
         "izby": 3.0,
-        "available": 1300,
-        "sold": 288,
-        "months": 15.6,
-        "monthsDisplay": 16
+        "available": 1302,
+        "sold": 298,
+        "months": 15.4,
+        "monthsDisplay": 15
       },
       {
         "izby": 4.0,
-        "available": 454,
-        "sold": 95,
-        "months": 16.5,
+        "available": 458,
+        "sold": 97,
+        "months": 16.6,
         "monthsDisplay": 17
       }
     ],
     "byCity": [
       {
         "city": "Košice",
-        "available": 392,
+        "available": 391,
         "sold": 143,
-        "months": 11.7,
+        "months": 11.8,
         "monthsDisplay": 12,
-        "medianM2": 4559
+        "medianM2": 4554
       },
       {
         "city": "Žilina",
         "available": 141,
-        "sold": 46,
-        "months": 13.1,
+        "sold": 47,
+        "months": 12.9,
         "monthsDisplay": 13,
         "medianM2": 4133
       },
@@ -2552,63 +2559,63 @@
         "city": "Prešov",
         "available": 298,
         "sold": 95,
-        "months": 13.4,
-        "monthsDisplay": 13,
+        "months": 13.5,
+        "monthsDisplay": 14,
         "medianM2": 3614
       },
       {
         "city": "Trenčín",
         "available": 234,
         "sold": 67,
-        "months": 14.9,
+        "months": 15.0,
         "monthsDisplay": 15,
         "medianM2": 3829
       },
       {
         "city": "Bratislava",
-        "available": 3608,
-        "sold": 780,
-        "months": 19.8,
+        "available": 3600,
+        "sold": 785,
+        "months": 19.7,
         "monthsDisplay": 20,
-        "medianM2": 5328
+        "medianM2": 5341
       },
       {
         "city": "Trnava",
-        "available": 446,
-        "sold": 71,
-        "months": 26.8,
-        "monthsDisplay": 27,
+        "available": 443,
+        "sold": 78,
+        "months": 24.4,
+        "monthsDisplay": 24,
         "medianM2": 3833
       },
       {
         "city": "Nitra",
-        "available": 453,
-        "sold": 53,
-        "months": 36.5,
-        "monthsDisplay": 37,
+        "available": 452,
+        "sold": 54,
+        "months": 36.0,
+        "monthsDisplay": 36,
         "medianM2": 3494
       },
       {
         "city": "Poprad",
         "available": 237,
         "sold": 25,
-        "months": 40.5,
+        "months": 40.8,
         "monthsDisplay": 41,
         "medianM2": 3611
       }
     ],
     "byScope": {
       "bratislava": {
-        "available": 3608,
-        "sold": 780,
-        "months": 19.8,
+        "available": 3600,
+        "sold": 785,
+        "months": 19.7,
         "monthsDisplay": 20
       },
       "rest": {
-        "available": 3799,
-        "sold": 629,
-        "months": 25.8,
-        "monthsDisplay": 26
+        "available": 3792,
+        "sold": 652,
+        "months": 25.0,
+        "monthsDisplay": 25
       }
     }
   },
@@ -2616,7 +2623,7 @@
     "a": {
       "city": "Prešov",
       "medianM2": 3614,
-      "monthsDisplay": 13
+      "monthsDisplay": 14
     },
     "b": {
       "city": "Poprad",
@@ -2624,69 +2631,69 @@
       "monthsDisplay": 41
     },
     "priceGap": 3,
-    "monthsGap": 28
+    "monthsGap": 27
   },
   "priceSignal": {
     "fast": {
       "projects": 28,
-      "pctChanged": 3.3,
-      "pctUp": 77.3
+      "pctChanged": 3.5,
+      "pctUp": 78.4
     },
     "mid": {
-      "projects": 10,
-      "pctChanged": 26.3,
-      "pctUp": 97.6
+      "projects": 14,
+      "pctChanged": 25.2,
+      "pctUp": 97.7
     },
     "slow": {
-      "projects": 54,
-      "pctChanged": 9.1,
+      "projects": 50,
+      "pctChanged": 9.3,
       "pctUp": 92.9
     }
   },
   "supplyMix": {
     "sk": {
       "1": 9.0,
-      "2": 44.3,
-      "3": 34.7,
+      "2": 44.2,
+      "3": 34.8,
       "4": 12.0
     },
     "cz": {
       "1": 19.8,
       "2": 45.4,
       "3": 25.8,
-      "4": 9.0
+      "4": 9.1
     }
   },
   "medianPriceBySize": {
     "sk": {
-      "1": 169990,
-      "2": 229200,
-      "3": 308467,
-      "4": 467536
+      "1": 169218,
+      "2": 229131,
+      "3": 308661,
+      "4": 467522
     },
     "cz": {
-      "1": 266505,
-      "2": 377686,
-      "3": 523229,
-      "4": 759314
+      "1": 266490,
+      "2": 378233,
+      "3": 523631,
+      "4": 759296
     }
   },
   "priceBehaviour": {
-    "tracked": 31243,
-    "changed": 2754,
-    "pctChanged": 8.8,
-    "pctOfChangesUp": 86.5
+    "tracked": 31245,
+    "changed": 2778,
+    "pctChanged": 8.9,
+    "pctOfChangesUp": 86.6
   },
   "priceMoves90d": {
-    "moves": 1869,
+    "moves": 1900,
     "projects": 76,
-    "up": 1624,
-    "down": 245,
-    "pctUp": 86.9,
-    "medianPct": 2.1
+    "up": 1636,
+    "down": 264,
+    "pctUp": 86.1,
+    "medianPct": 2.2
   },
   "caveats": {
-    "leftCensoredPct": 90.1,
+    "leftCensoredPct": 89.9,
     "parkingCoveragePct": 28.6
   },
   "benchmark": {
@@ -2700,10 +2707,10 @@
     "note": "priemerná ponuková cena novostavby, s DPH"
   },
   "reconciliation": {
-    "ourSupplyComparable": 4291,
-    "ourMeanPrice": 390028,
-    "supplyDeltaPct": 1.4,
-    "meanPriceDeltaPct": 2.6,
+    "ourSupplyComparable": 4283,
+    "ourMeanPrice": 390602,
+    "supplyDeltaPct": 1.2,
+    "meanPriceDeltaPct": 2.8,
     "basis": "Bratislava · voľné a rezervované · priemerná ponuková cena"
   },
   "externalCoverageCheck": {
@@ -2717,14 +2724,14 @@
   "overview": {
     "quarter_start": "2026-07-01",
     "quarter_end": "2026-09-30",
-    "as_of": "2026-09-23",
+    "as_of": "2026-09-24",
     "smooth_days": 14,
     "excluded_obce": [
       "Rovinka"
     ],
     "sale_settling_days": 7,
     "prev_period_sales": 166,
-    "period_days": 84,
+    "period_days": 85,
     "last_published": "2026Q2",
     "first_published": "2018Q1",
     "published_rebased": {
@@ -2767,39 +2774,39 @@
         "building": 225,
         "unknown": 395,
         "projects": 23,
-        "m2": 8493
+        "m2": 8494
       },
       "Bratislava II": {
-        "n": 1189,
+        "n": 1187,
         "done": 213,
-        "building": 758,
+        "building": 756,
         "unknown": 218,
         "projects": 28,
-        "m2": 5895
+        "m2": 5897
       },
       "Bratislava III": {
-        "n": 571,
-        "done": 79,
-        "building": 457,
-        "unknown": 35,
+        "n": 570,
+        "done": 80,
+        "building": 459,
+        "unknown": 31,
         "projects": 18,
-        "m2": 5819
+        "m2": 5821
       },
       "Bratislava IV": {
         "n": 898,
         "done": 120,
-        "building": 672,
-        "unknown": 106,
+        "building": 675,
+        "unknown": 103,
         "projects": 20,
-        "m2": 4763
+        "m2": 4764
       },
       "Bratislava V": {
-        "n": 729,
-        "done": 19,
-        "building": 710,
+        "n": 746,
+        "done": 18,
+        "building": 728,
         "unknown": 0,
         "projects": 6,
-        "m2": 5174
+        "m2": 5169
       }
     },
     "okres_sales": {
@@ -2809,106 +2816,106 @@
         "m2": 7505
       },
       "Bratislava II": {
-        "n": 207,
-        "n_priced": 189,
-        "m2": 6163
+        "n": 211,
+        "n_priced": 193,
+        "m2": 6143
       },
       "Bratislava III": {
-        "n": 92,
-        "n_priced": 87,
-        "m2": 5365
+        "n": 94,
+        "n_priced": 88,
+        "m2": 5371
       },
       "Bratislava IV": {
-        "n": 90,
-        "n_priced": 72,
-        "m2": 4764
+        "n": 92,
+        "n_priced": 74,
+        "m2": 4745
       },
       "Bratislava V": {
-        "n": 89,
-        "n_priced": 58,
-        "m2": 5025
+        "n": 90,
+        "n_priced": 59,
+        "m2": 5032
       }
     },
     "okres_price": {
       "Bratislava I": {
-        "m2_cur": 8219,
+        "m2_cur": 8220,
         "m2_prev": 8608,
         "chg_pct": -4.5,
         "unit_days": 1964,
         "units": 140
       },
       "Bratislava II": {
-        "m2_cur": 6105,
+        "m2_cur": 6106,
         "m2_prev": 6097,
         "chg_pct": 0.1,
-        "unit_days": 8635,
-        "units": 617
+        "unit_days": 8613,
+        "units": 615
       },
       "Bratislava III": {
-        "m2_cur": 6101,
-        "m2_prev": 6027,
+        "m2_cur": 6102,
+        "m2_prev": 6030,
         "chg_pct": 1.2,
-        "unit_days": 4426,
+        "unit_days": 4428,
         "units": 316
       },
       "Bratislava IV": {
         "m2_cur": 4894,
         "m2_prev": 4894,
-        "chg_pct": 0.0,
-        "unit_days": 7938,
-        "units": 567
+        "chg_pct": -0.0,
+        "unit_days": 7925,
+        "units": 566
       },
       "Bratislava V": {
         "m2_cur": 5185,
-        "m2_prev": 5101,
+        "m2_prev": 5102,
         "chg_pct": 1.6,
-        "unit_days": 7081,
-        "units": 506
+        "unit_days": 7075,
+        "units": 505
       }
     },
     "projects": 93,
-    "mean_price": 382204,
+    "mean_price": 381920,
     "mean_area": 65.7,
     "panel_projects": 57,
-    "panel_units": 2197,
+    "panel_units": 2193,
     "panel_supply_prev": 3398,
-    "panel_supply_cur": 3132,
+    "panel_supply_cur": 3149,
     "layout_supply": [
       {
         "k": "2-izb",
-        "n": "1785",
-        "m2": "5509",
+        "n": "1789",
+        "m2": "5508",
         "area": "52.2"
       },
       {
         "k": "3-izb",
-        "n": "1197",
-        "m2": "5542",
+        "n": "1204",
+        "m2": "5534",
         "area": "75.8"
       },
       {
         "k": "4-izb",
-        "n": "539",
-        "m2": "6191",
+        "n": "541",
+        "m2": "6186",
         "area": "104.9"
       },
       {
         "k": "1-izb",
-        "n": "354",
-        "m2": "6660",
+        "n": "355",
+        "m2": "6664",
         "area": "38.5"
       },
       {
         "k": "1,5-izb",
-        "n": "162",
-        "m2": "5749",
-        "area": "36.4"
+        "n": "163",
+        "m2": "5757",
+        "area": "36.3"
       },
       {
         "k": "5 a viac",
         "n": "75",
-        "m2": "6648",
-        "area": "159.6"
+        "m2": "6642",
+        "area": "159.5"
       },
       {
         "k": "(neuvedené)",
@@ -2920,21 +2927,21 @@
     "layout_sales": [
       {
         "k": "2-izb",
-        "n": 272,
-        "m2": "5544",
-        "area": "51.2"
+        "n": 276,
+        "m2": "5530",
+        "area": "51.0"
       },
       {
         "k": "3-izb",
-        "n": 125,
-        "m2": "5434",
-        "area": "75.8"
+        "n": 128,
+        "m2": "5411",
+        "area": "75.5"
       },
       {
         "k": "4-izb",
-        "n": 59,
-        "m2": "6333",
-        "area": "109.6"
+        "n": 60,
+        "m2": "6344",
+        "area": "109.4"
       },
       {
         "k": "1-izb",
@@ -2944,8 +2951,8 @@
       },
       {
         "k": "1,5-izb",
-        "n": 21,
-        "m2": "6444",
+        "n": 22,
+        "m2": "6399",
         "area": "39.8"
       },
       {
@@ -2963,7 +2970,7 @@
     ],
     "own_quarters": {
       "2026Q2": 5714,
-      "2026Q3": 5722
+      "2026Q3": 5720
     },
     "price_series": [
       {
@@ -2971,105 +2978,105 @@
         "m2_done": "5588",
         "m2_building": "5683",
         "m2_all": "5664",
-        "n_all": 7588
+        "n_all": 7576
       },
       {
         "wk": "2026-06-22",
         "m2_done": "5602",
         "m2_building": "5683",
         "m2_all": "5667",
-        "n_all": 7591
+        "n_all": 7579
       },
       {
         "wk": "2026-06-29",
         "m2_done": "5597",
-        "m2_building": "5694",
+        "m2_building": "5693",
         "m2_all": "5674",
-        "n_all": 7586
+        "n_all": 7574
       },
       {
         "wk": "2026-07-06",
         "m2_done": "5578",
         "m2_building": "5692",
         "m2_all": "5670",
-        "n_all": 11397
+        "n_all": 11379
       },
       {
         "wk": "2026-07-13",
         "m2_done": "5576",
         "m2_building": "5703",
         "m2_all": "5678",
-        "n_all": 9506
+        "n_all": 9491
       },
       {
         "wk": "2026-07-20",
         "m2_done": "5563",
         "m2_building": "5708",
         "m2_all": "5680",
-        "n_all": 13279
+        "n_all": 13258
       },
       {
         "wk": "2026-07-27",
         "m2_done": "5557",
-        "m2_building": "5710",
+        "m2_building": "5709",
         "m2_all": "5680",
-        "n_all": 11357
+        "n_all": 11339
       },
       {
         "wk": "2026-08-03",
         "m2_done": "5555",
         "m2_building": "5711",
         "m2_all": "5681",
-        "n_all": 13221
+        "n_all": 13200
       },
       {
         "wk": "2026-08-10",
         "m2_done": "5553",
         "m2_building": "5713",
         "m2_all": "5683",
-        "n_all": 9414
+        "n_all": 9399
       },
       {
         "wk": "2026-08-17",
         "m2_done": "5561",
         "m2_building": "5716",
         "m2_all": "5686",
-        "n_all": 11291
+        "n_all": 11273
       },
       {
         "wk": "2026-08-24",
         "m2_done": "5593",
         "m2_building": "5717",
         "m2_all": "5693",
-        "n_all": 13125
+        "n_all": 13104
       },
       {
         "wk": "2026-08-31",
         "m2_done": "5594",
-        "m2_building": "5718",
+        "m2_building": "5717",
         "m2_all": "5694",
-        "n_all": 9347
+        "n_all": 9332
       },
       {
         "wk": "2026-09-07",
         "m2_done": "5593",
         "m2_building": "5715",
         "m2_all": "5692",
-        "n_all": 13114
+        "n_all": 13093
       },
       {
         "wk": "2026-09-14",
         "m2_done": "5594",
         "m2_building": "5716",
         "m2_all": "5692",
-        "n_all": 13137
+        "n_all": 13116
       },
       {
         "wk": "2026-09-21",
         "m2_done": "5594",
-        "m2_building": "5721",
-        "m2_all": "5696",
-        "n_all": 5630
+        "m2_building": "5718",
+        "m2_all": "5699",
+        "n_all": 7499
       }
     ],
     "offer_vs_sold": [
@@ -3188,7 +3195,7 @@
     ],
     "own_quarters_independent": {
       "2026Q2": 5714,
-      "2026Q3": 5722
+      "2026Q3": 5720
     }
   },
   "slug": "ba-prehlad-2026-q3"
