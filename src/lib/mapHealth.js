@@ -29,6 +29,31 @@ const CONFIRM_EVERY_MS = 5000;
 /** After a verdict — keep looking, so we can hand the map back if it recovers. */
 const RECHECK_EVERY_MS = 20000;
 /**
+ * After a HEALTHY reading — keep looking, slowly, for ever.
+ *
+ * 🔴 This used to be "never look again". `sample()` returned outright on its first
+ * good reading, and the comment justified it: "a context that dies later announces
+ * itself through the webglcontextlost event below."
+ *
+ * It does not. `webglcontextlost` fires when the BROWSER loses the context. It does
+ * not fire when the browser believes it drew and the picture never reaches the
+ * screen — which is the failure this whole file exists for, reported on 2026-08-24
+ * and again on 2026-09-24: the map draws for about a second and is then a black
+ * rectangle with NO TEXT ON IT. No text is the tell. Every verdict here puts words
+ * on the screen, so a silent black rectangle means no verdict was ever reached —
+ * and none could be, because the one good reading had already switched the watcher
+ * off for the life of the page.
+ *
+ * Slow on purpose: a healthy map should cost almost nothing to keep an eye on.
+ */
+const HEALTHY_EVERY_MS = 30000;
+/**
+ * How many pixels to sample across the canvas when asking whether anything was
+ * actually painted. A coarse grid is enough to tell "a map" from "one flat colour"
+ * and keeps the read cheap on the weak integrated GPUs this check is aimed at.
+ */
+const PAINT_GRID = 12;
+/**
  * How long a VISIBLE, sized map may go without its style finishing before that is
  * itself the failure. Counted in eligible time only, so a tab left in the
  * background for an hour is not accused the moment it is looked at.
@@ -51,6 +76,56 @@ const NEVER_LOADED_AFTER_MS = 25000;
  * @param onOk       () => void                   — an earlier verdict proved wrong
  * @param isCurrent  () => boolean                — false once the component moved on
  */
+/**
+ * Did this canvas actually get painted? Counts DISTINCT colours over a coarse grid.
+ *
+ * 🔴 THE CHECK ABOVE THIS ONE NEVER LOOKED AT THE CANVAS. `queryRenderedFeatures()`
+ * asks maplibre what it *would* draw — it reads the style and the loaded tile data,
+ * not a single pixel — so a machine painting nothing at all still answers with
+ * hundreds of features. This file is called mapHealth and its opening line promises
+ * to catch "the graphics stack never paints"; until now nothing here could see that.
+ * `readPixels` appeared nowhere in the frontend.
+ *
+ * Distinct colours, not brightness, and that is deliberate: the dark basemap is
+ * legitimately almost all near-black (dark-matter measured 84 % one colour), so
+ * "too dark" would accuse a healthy map every night. A drawn map has roads, labels
+ * and pins — many colours. A canvas that reached the screen as a black rectangle
+ * has exactly one. The bar is therefore the lowest possible: MORE THAN ONE colour
+ * anywhere on the grid is enough to call it painted.
+ *
+ * `map.redraw()` first because maplibre does not preserve its drawing buffer —
+ * reading after the frame has been composited returns a cleared buffer and would
+ * fail every healthy map. redraw() is public and renders synchronously.
+ *
+ * Returns true (painted), false (one flat colour), or null (could not tell — which
+ * is never evidence of anything).
+ */
+export function canvasWasPainted(map, grid = PAINT_GRID) {
+  try {
+    const canvas = map.getCanvas();
+    if (!canvas || !canvas.width || !canvas.height) return null;
+    if (typeof map.redraw === "function") map.redraw();
+    const gl = canvas.getContext("webgl2") || canvas.getContext("webgl");
+    if (!gl || (typeof gl.isContextLost === "function" && gl.isContextLost())) return null;
+
+    const px = new Uint8Array(4);
+    let first = null;
+    for (let i = 0; i < grid; i++) {
+      for (let j = 0; j < grid; j++) {
+        const x = Math.floor(((i + 0.5) / grid) * canvas.width);
+        const y = Math.floor(((j + 0.5) / grid) * canvas.height);
+        gl.readPixels(x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+        const key = (px[0] << 16) | (px[1] << 8) | px[2];
+        if (first === null) first = key;
+        else if (key !== first) return true;      // two different colours: it is drawing
+      }
+    }
+    return false;                                  // every sampled pixel identical
+  } catch {
+    return null;                                   // a read that throws is not a verdict
+  }
+}
+
 export function watchMapHealth(map, { onFail, onOk, isCurrent = () => true }) {
   let blanks = 0;
   let accused = false;
@@ -81,12 +156,38 @@ export function watchMapHealth(map, { onFail, onOk, isCurrent = () => true }) {
     let drawn;
     try { drawn = map.queryRenderedFeatures().length; } catch { return schedule(CONFIRM_EVERY_MS); }
 
-    if (drawn > 0) {
+    // TWO QUESTIONS, AND THEY ARE NOT THE SAME ONE.
+    //   `drawn`  — is there anything maplibre INTENDS to draw here? (style + data)
+    //   painted  — did anything actually reach the canvas? (pixels)
+    // Asking only the first is how a black rectangle passed for a working map: a
+    // machine that paints nothing still reports hundreds of features. Asking only
+    // the second would accuse an empty view — a filter that matches no projects
+    // over open sea is legitimately one flat colour.
+    //
+    // So the accusation needs BOTH: the map means to draw something, and nothing
+    // came out. Anything else — no features to draw, or a pixel read that could
+    // not answer — is not evidence and clears the count.
+    const painted = canvasWasPainted(map);
+
+    if (drawn === 0 || painted === null) {
+      // Nothing to conclude from this reading. An empty view is not a failure, and
+      // a read that could not run is not a verdict.
       blanks = 0;
       if (accused) { accused = false; onOk && onOk(); }
-      // A drawing map needs no further polling — a context that dies later
-      // announces itself through the webglcontextlost event below.
-      return;
+      return schedule(accused ? RECHECK_EVERY_MS : HEALTHY_EVERY_MS);
+    }
+
+    if (painted) {
+      blanks = 0;
+      if (accused) { accused = false; onOk && onOk(); }
+      // 🔴 KEEP LOOKING. This used to `return` and never run again, on the belief
+      // that a context dying later would announce itself via webglcontextlost.
+      // That event does not fire when the browser thinks it drew and the picture
+      // never reaches the screen — the exact failure reported on 2026-08-24 and
+      // again on 2026-09-24 (draws for a second, then a black rectangle with no
+      // text on it). No text means no verdict was ever reached, and none could be,
+      // because the first good reading had switched this off for the whole page.
+      return schedule(HEALTHY_EVERY_MS);
     }
 
     blanks += 1;
@@ -94,7 +195,7 @@ export function watchMapHealth(map, { onFail, onOk, isCurrent = () => true }) {
       accused = true;
       onFail && onFail({
         reason: "gpu",
-        detail: `The map style and its tiles loaded, but nothing was rendered in ${CONFIRM_BLANKS} checks over ${(CONFIRM_BLANKS * CONFIRM_EVERY_MS) / 1000}s — the browser's graphics layer is not drawing.`,
+        detail: `The map style and its tiles loaded and maplibre reports ${drawn} features to draw, but the canvas came back a single flat colour in ${CONFIRM_BLANKS} checks over ${(CONFIRM_BLANKS * CONFIRM_EVERY_MS) / 1000}s — the browser's graphics layer is not putting it on screen.`,
       });
     }
     schedule(accused ? RECHECK_EVERY_MS : CONFIRM_EVERY_MS);

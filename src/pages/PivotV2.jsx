@@ -2487,7 +2487,7 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
             <div style={{ display: "flex", alignItems: "baseline", gap: "0.6rem", minWidth: 0 }}>
               <span style={{ fontFamily: mono, fontSize: "0.62rem", letterSpacing: "0.12em",
                              textTransform: "uppercase", color: accentInk }}>
-                {lang === "sk" ? "Tabuľka na celú plochu" : "Table in focus"}
+                {lang === "sk" ? "Tabuľka cez celé okno" : "Table in focus"}
               </span>
               <span style={{ fontSize: "0.72rem", color: "var(--text-2)", overflow: "hidden",
                              textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -3763,9 +3763,9 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
          Power BI, Grafana and Metabase all put it — never buried in a menu. */
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.4rem" }}>
         <button type="button" className="btn-s" onClick={onToggleExpand}
-                title={lang === "sk" ? "Roztiahnuť tabuľku na celú plochu" : "Expand the table to fill the workspace"}>
+                title={lang === "sk" ? "Roztiahnuť tabuľku cez celé okno" : "Expand the table to fill the workspace"}>
           <span aria-hidden="true" style={{ marginRight: "0.4rem" }}>⤢</span>
-          {lang === "sk" ? "Na celú plochu" : "Expand"}
+          {lang === "sk" ? "Zväčšiť" : "Expand"}
         </button>
       </div>
     )}

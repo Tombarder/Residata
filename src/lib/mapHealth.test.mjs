@@ -23,20 +23,47 @@ const advance = (t, totalMs, stepMs = 1000) => {
   for (let elapsed = 0; elapsed < totalMs; elapsed += stepMs) t.mock.timers.tick(stepMs);
 };
 
-/** Minimal stand-in for a maplibre Map + its canvas. */
-function fakeMap({ drawn = 0, styleLoaded = true, size = [800, 600] } = {}) {
+/** Minimal stand-in for a maplibre Map + its canvas.
+ *
+ * `painted` is the pixel side of the world and it is SEPARATE from `drawn` on
+ * purpose: the failure this module exists for is a map that reports plenty of
+ * features to draw while the canvas reaches the screen as one flat colour.
+ *   painted: true   — the grid reads back varied colours (a real map)
+ *   painted: false  — every pixel identical (the black rectangle)
+ *   painted: null   — no WebGL context to read (cannot tell, never a verdict)
+ */
+function fakeMap({ drawn = 0, styleLoaded = true, size = [800, 600], painted = true } = {}) {
   const listeners = {};
   const canvasHandlers = {};
+  const self = {
+    _drawn: drawn,
+    _painted: painted,
+    _redraws: 0,
+  };
   const canvas = {
     width: size[0], height: size[1],
+    getContext: (kind) => {
+      if (self._painted === null) return null;
+      if (kind !== "webgl2" && kind !== "webgl") return null;
+      let n = 0;
+      return {
+        isContextLost: () => false,
+        RGBA: 1, UNSIGNED_BYTE: 1,
+        readPixels: (x, y, w, h, fmt, type, out) => {
+          // Uniform grey when nothing is painted; a varying value otherwise.
+          const v = self._painted ? (n++ * 37) % 255 : 9;
+          out[0] = v; out[1] = v; out[2] = v; out[3] = 255;
+        },
+      };
+    },
     addEventListener: (t, fn) => { (canvasHandlers[t] ||= []).push(fn); },
     removeEventListener: (t, fn) => { canvasHandlers[t] = (canvasHandlers[t] || []).filter((f) => f !== fn); },
   };
-  return {
-    _drawn: drawn,
+  return Object.assign(self, {
     canvasHandlers,
     getCanvas: () => canvas,
     _styleLoaded: styleLoaded,
+    redraw() { this._redraws += 1; },
     isStyleLoaded() { return this._styleLoaded; },
     queryRenderedFeatures() { return new Array(this._drawn).fill({}); },
     resize() {}, triggerRepaint() {},
@@ -44,7 +71,7 @@ function fakeMap({ drawn = 0, styleLoaded = true, size = [800, 600] } = {}) {
     on: (evt, fn) => { (listeners[evt] ||= []).push(fn); },
     fire: (evt) => (listeners[evt] || []).forEach((fn) => fn()),
     fireCanvas: (evt, e) => (canvasHandlers[evt] || []).forEach((fn) => fn(e)),
-  };
+  });
 }
 
 const withVisibleDocument = (fn) => {
@@ -74,7 +101,10 @@ test("a drawing map is never accused, and polling stops after one good reading",
 test("one blank reading is not a verdict — three in a row are", (t) => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
   withVisibleDocument(() => {
-    const map = fakeMap({ drawn: 0 });
+    // The real failure: maplibre HAS features to draw and the canvas comes back
+    // one flat colour. `drawn: 0` used to stand in for this and it is a different
+    // thing entirely — an empty view is not a broken machine.
+    const map = fakeMap({ drawn: 412, painted: false });
     const [calls, cbs] = collect();
     watchMapHealth(map, cbs);
     map.fire("idle");
@@ -90,13 +120,13 @@ test("one blank reading is not a verdict — three in a row are", (t) => {
 test("a verdict takes itself back the moment the map is seen drawing", (t) => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
   withVisibleDocument(() => {
-    const map = fakeMap({ drawn: 0 });
+    const map = fakeMap({ drawn: 412, painted: false });
     const [calls, cbs] = collect();
     watchMapHealth(map, cbs);
     map.fire("idle");
     advance(t, 15000);
     assert.equal(calls.fail.length, 1);
-    map._drawn = 300;                       // the machine started painting after all
+    map._painted = true;                    // the machine started painting after all
     advance(t, 20000);                      // recovery re-check
     assert.equal(calls.ok, 1, "the map must be handed back without a page reload");
   });
@@ -253,5 +283,91 @@ test("a component that has moved on is never spoken for (isCurrent false)", (t) 
     advance(t, 300000);
     map.fireCanvas("webglcontextlost", { preventDefault() {} });
     assert.equal(calls.fail.length, 0);
+  });
+});
+
+/* ── 2026-09-24: the two reasons a black map stayed silent for months ──────────
+ *
+ * Boss, on his Windows laptop: both maps show for about a second and are then a
+ * black rectangle with NO TEXT on it, for months, while the sidebar, top bar and
+ * filters stay put. No text is the whole tell — every verdict in this file puts
+ * words on screen, so a silent black rectangle means no verdict was ever reached.
+ *
+ * Two independent reasons it could not be reached, both fixed together: the
+ * watcher switched itself off after one good reading, and its "is it drawing"
+ * test never looked at a pixel.
+ */
+
+test("a map that goes black AFTER it was drawing is still caught", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  withVisibleDocument(() => {
+    const map = fakeMap({ drawn: 412, painted: true });
+    const [calls, cbs] = collect();
+    watchMapHealth(map, cbs);
+    map.fire("idle");
+    advance(t, 20000);
+    assert.equal(calls.fail.length, 0, "a healthy map must not be accused");
+
+    // The canvas stops reaching the screen — and crucially NO webglcontextlost
+    // fires, because the browser believes it drew. This is the reported failure.
+    map._painted = false;
+    advance(t, 240000);
+    assert.equal(calls.fail.length, 1,
+      "the map went black after drawing and nothing said so — the months-long silence");
+    assert.equal(calls.fail[0].reason, "gpu");
+  });
+});
+
+test("the paint check reads the canvas, not maplibre's opinion of it", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  withVisibleDocument(() => {
+    // queryRenderedFeatures reports plenty to draw — it reads the style and the
+    // loaded tiles, never a pixel — while the canvas is one flat colour.
+    const map = fakeMap({ drawn: 900, painted: false });
+    const [calls, cbs] = collect();
+    watchMapHealth(map, cbs);
+    map.fire("idle");
+    advance(t, 20000);
+    assert.equal(calls.fail.length, 1, "features-to-draw must not pass for pixels-drawn");
+    assert.match(calls.fail[0].detail, /single flat colour/);
+  });
+});
+
+test("an empty view is not a broken machine", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  withVisibleDocument(() => {
+    // A filter that matches nothing over open sea is legitimately one flat colour.
+    // Accusing the user's graphics for it would be the 2026-08-19 mistake again.
+    const map = fakeMap({ drawn: 0, painted: false });
+    const [calls, cbs] = collect();
+    watchMapHealth(map, cbs);
+    map.fire("idle");
+    advance(t, 240000);
+    assert.equal(calls.fail.length, 0);
+  });
+});
+
+test("a canvas that cannot be read is never a verdict", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  withVisibleDocument(() => {
+    const map = fakeMap({ drawn: 412, painted: null });   // no WebGL context to read
+    const [calls, cbs] = collect();
+    watchMapHealth(map, cbs);
+    map.fire("idle");
+    advance(t, 240000);
+    assert.equal(calls.fail.length, 0, "\"could not look\" must never become \"it is broken\"");
+  });
+});
+
+test("the paint check renders before reading — maplibre keeps no drawing buffer", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  withVisibleDocument(() => {
+    const map = fakeMap({ drawn: 412, painted: true });
+    const [calls, cbs] = collect();
+    watchMapHealth(map, cbs);
+    map.fire("idle");
+    advance(t, 20000);
+    assert.ok(map._redraws > 0,
+      "without redraw() the buffer is already cleared and every healthy map reads blank");
   });
 });
