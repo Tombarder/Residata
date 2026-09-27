@@ -220,7 +220,7 @@ z
    </g>
    <g id="line2d_21">
     <path d="M 619.501031 155.368545 
-L 636.295736 155.180617 
+L 636.295736 155.305903 
 " clip-path="url(#pebcdff6823)" style="fill: none; stroke: #c2410c; stroke-width: 2.6; stroke-linecap: round"/>
     <defs>
      <path id="m40e161e3e8" d="M 0 2.5 
@@ -237,7 +237,7 @@ z
     </defs>
     <g clip-path="url(#pebcdff6823)">
      <use xlink:href="#m40e161e3e8" x="619.501031" y="155.368545" style="fill: #ffffff; stroke: #c2410c; stroke-width: 2"/>
-     <use xlink:href="#m40e161e3e8" x="636.295736" y="155.180617" style="fill: #ffffff; stroke: #c2410c; stroke-width: 2"/>
+     <use xlink:href="#m40e161e3e8" x="636.295736" y="155.305903" style="fill: #ffffff; stroke: #c2410c; stroke-width: 2"/>
     </g>
    </g>
    <g id="line2d_22">
@@ -317,11 +317,11 @@ z
     <text style="font-weight: 600; font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #0e4b47" x="619.501031" y="175.368545" transform="rotate(-0 619.501031 175.368545)">5 714</text>
    </g>
    <g id="text_16">
-    <text style="font-weight: 600; font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #c2410c" x="636.295736" y="142.180617" transform="rotate(-0 636.295736 142.180617)">5 720</text>
+    <text style="font-weight: 600; font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #c2410c" x="636.295736" y="142.305903" transform="rotate(-0 636.295736 142.305903)">5 716</text>
    </g>
   </g>
   <g id="text_17">
-   <text style="font-weight: 600; font-size: 25px; font-family: 'Outfit'; text-anchor: start; fill: #0f1419" x="51.84" y="36.369719" transform="rotate(-0 51.84 36.369719)">Cena nových bytov v Bratislave od roku 2018</text>
+   <text style="font-weight: 600; font-size: 25px; font-family: 'Outfit'; text-anchor: start; fill: #0f1419" x="51.84" y="36.369719" transform="rotate(-0 51.84 36.369719)">Ceny nových bytov v Bratislave v Q3/2026</text>
   </g>
   <g id="text_18">
    <text style="font-size: 19px; font-family: 'Outfit'; text-anchor: start; fill: #6b7480" x="51.84" y="69.8519" transform="rotate(-0 51.84 69.8519)">Priemerná ponuková cena, ku koncu každého štvrťroka</text>

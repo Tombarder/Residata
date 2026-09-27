@@ -642,6 +642,179 @@ def _overview_vars(rep: dict) -> dict:
     if lp:
         out["lastPublishedSk"] = f"{lp[5]}Q {lp[:4]}"
         out["lastPublishedEn"] = f"Q{lp[5]} {lp[:4]}"
+    out.update(_herrys_vars(rep, out))
+    return out
+
+
+# ── the Herrys Q1 2025 format, copied ─────────────────────────────────────
+# 🔴 Boss, 2026-09-24: "zober a doslova skopiruj clanok co je ako hlavny
+# priklad len tam zmen cisla a grafy podla nasich cisiel — totalna kopia."
+# The main example is the Herrys Q1 2025 report. Its sentences are kept and
+# its figures are ours; every figure below is computed, including the words
+# that are figures in disguise (a direction, a fraction, a superlative).
+_LAYOUT_ORDER = ["1-izb", "1,5-izb", "2-izb", "3-izb", "4-izb", "5 a viac"]
+
+
+def herrys_supply_table(rep: dict) -> str:
+    """Okres | Voľné | z toho voľné dokončené — their table 1, our numbers."""
+    ov = rep["overview"]
+    head = "| Okres | Voľné | z toho voľné dokončené |\n|---|---:|---:|"
+    rows = [f"| {o} | {sk_int(a['n'])} | {sk_int(a['done'])} |"
+            for o, a in ov["okres_supply"].items()]
+    T = {k: sum(a[k] for a in ov["okres_supply"].values()) for k in ("n", "done")}
+    rows.append(f"| **celkom** | **{sk_int(T['n'])}** | **{sk_int(T['done'])}** |")
+    return head + "\n" + "\n".join(rows)
+
+
+def herrys_sales_table(rep: dict) -> str:
+    """Okres | Počet predaných bytov — their table 2."""
+    ov = rep["overview"]
+    head = "| Okres | Počet predaných bytov |\n|---|---:|"
+    rows = [f"| {o} | {sk_int(a['n'])} |" for o, a in ov["okres_sales"].items()]
+    rows.append(f"| **celkom** | **{sk_int(sum(a['n'] for a in ov['okres_sales'].values()))}** |")
+    return head + "\n" + "\n".join(rows)
+
+
+def herrys_price_table(rep: dict) -> str:
+    """Okres | €/m² previous quarter | €/m² current quarter | change.
+
+    🔴 QUARTER-ON-QUARTER, NOT YEAR-ON-YEAR. Their table compares Q1 2024 with
+    Q1 2025; we began measuring in May 2026, so ours compares the previous
+    quarter with this one and the header says so. On the same flats in both.
+    """
+    ov = rep["overview"]
+    head = ("| Okres | €/m² s DPH, predchádzajúci štvrťrok | €/m² s DPH, aktuálny štvrťrok | Zmena medzikvartálne |"
+            "\n|---|---:|---:|---:|")
+    rows = []
+    for o, a in ov["okres_price"].items():
+        sign = "+" if a["chg_pct"] >= 0 else "−"
+        rows.append(f"| {o} | {sk_int(a['m2_prev'])} € | {sk_int(a['m2_cur'])} € | "
+                    f"{sign}{sk_dec(abs(a['chg_pct']))} % |")
+    return head + "\n" + "\n".join(rows)
+
+
+def _herrys_vars(rep: dict, base: dict) -> dict:
+    """The figures the Herrys sentences need and the overview never computed."""
+    ov = rep["overview"]
+    sup, sal = ov["okres_supply"], ov["okres_sales"]
+    tot = sum(a["n"] for a in sup.values())
+    sold = sum(a["n"] for a in sal.values())
+    done = sum(a["done"] for a in sup.values())
+    out: dict = {}
+
+    # "27 % projektov obsahuje 80 % ponuky" and "101 projektov má menej ako 20
+    # bytov" — both read off the per-project offer, largest first.
+    ps = sorted((int(p["n"]) for p in ov.get("project_supply") or []), reverse=True)
+    if not ps:
+        raise SystemExit("REFUSING: the report carries no overview.project_supply — "
+                         "regenerate it with market_report before rendering the "
+                         "Herrys-format issue")
+    # 🔴 THE THRESHOLDS ARE METHOD, AND METHOD IS NOT TYPED INTO PROSE EITHER.
+    # "80 % ponuky" and "menej ako 20 bytov" are Herrys' cut-offs; they live
+    # here once and the sentence reads them, so the words can never disagree
+    # with the arithmetic.
+    CONC_SHARE, SMALL_MAX = 80, 20
+    psum = sum(ps)
+    cum = k = 0
+    for v in ps:
+        cum += v
+        k += 1
+        if cum >= CONC_SHARE / 100 * psum:
+            break
+    small = [v for v in ps if v < SMALL_MAX]
+    out["concThresholdPct"] = CONC_SHARE
+    out["smallProjectMax"] = SMALL_MAX
+    out["concProjectsN"] = k
+    out["concProjectsPct"] = sk_int(round(100 * k / len(ps)))
+    out["concUnitsN"] = sk_int(cum)
+    out["smallProjectsN"] = len(small)
+    out["smallProjectsSharePct"] = sk_int(round(100 * sum(small) / psum))
+
+    # finished share, as a fraction in words AND as the number
+    out["supplyDoneFraction"] = _fraction_sk(100 * done / tot) if tot else "—"
+    top_done = sorted(sup.items(), key=lambda kv: -kv[1]["done"])[:2]
+    out["topDoneOkres1"] = top_done[0][0]
+    out["topDoneOkres2"] = top_done[1][0] if len(top_done) > 1 else "—"
+
+    # the biggest category on offer, and the biggest among what sold
+    lay = {r["k"]: int(float(r["n"] or 0)) for r in ov["layout_supply"]
+           if r["k"] != "(neuvedené)"}
+    lays = {r["k"]: int(float(r["n"] or 0)) for r in ov["layout_sales"]
+            if r["k"] != "(neuvedené)"}
+    lay_tot, lays_tot = sum(lay.values()) or 1, sum(lays.values()) or 1
+    top_lay = max(lay, key=lay.get)
+    top_sal = max(lays, key=lays.get)
+    out["topLayout"] = top_lay
+    out["topLayoutShare"] = sk_dec(100 * lay[top_lay] / lay_tot)
+    out["topLayoutSalesShare"] = sk_dec(100 * lays.get(top_lay, 0) / lays_tot)
+    out["topSalesLayout"] = top_sal
+    out["topSalesLayoutShare"] = sk_dec(100 * lays[top_sal] / lays_tot)
+    over = [k for k in _LAYOUT_ORDER
+            if k in lay and 100 * lays.get(k, 0) / lays_tot > 100 * lay[k] / lay_tot]
+    out["overSellingLayouts"] = sk_list(over) if over else "žiadnej"
+
+    # demand against the same days of the previous quarter
+    # 🔴 ONLY WHEN WE WATCHED THOSE DAYS. prev_period_sales counts the same
+    # number of days back from the previous quarter's end, on the same
+    # projects — but we began reading Bratislava on 2026-05-16, so for Q3
+    # 2026 that window (5 April – 30 June) holds five weeks of our
+    # observations, not thirteen, and "166 sold" is our start date, not the
+    # market. Rendered as "o 248 % viac" it was false. The comparison exists
+    # only when the whole previous window was observed; otherwise the
+    # sentence carries no comparison and the optional bullet is absent.
+    import datetime as _dt
+    prev = ov.get("prev_period_sales")
+    days = ov.get("period_days") or 0
+    seen_from = min((_dt.date.fromisoformat(r["observed_from"])
+                     for r in ov.get("own_quarter_sales") or []), default=None)
+    q_start = _dt.date.fromisoformat(ov["quarter_start"])
+    prev_window_start = q_start - _dt.timedelta(days=days)
+    settling = int(ov.get("sale_settling_days") or 0)
+    prev_ok = bool(prev) and seen_from is not None and (
+        seen_from + _dt.timedelta(days=settling) <= prev_window_start)
+    out["prevPeriodSales"] = sk_int(prev) if prev_ok else "—"
+    out["salesVsPrevClause"] = _sales_vs_prev(ov, sold) if prev_ok else ""
+    if prev_ok:
+        pct = (sold / prev - 1) * 100
+        short = ("prakticky rovnako" if abs(pct) < 1 else
+                 f"o {sk_dec(abs(pct))} % {'viac' if pct > 0 else 'menej'}")
+        out["salesVsPrevShort"] = short
+        out["salesVsPrevTail"] = f", {short} než v rovnakom počte dní predchádzajúceho štvrťroka"
+        out["salesVsPrevBullet"] = (f"- V rovnakom počte dní predchádzajúceho štvrťroka sa na tých istých "
+                                    f"projektoch predalo {sk_int(prev)} bytov; teraz {short}.")
+    else:
+        out["salesVsPrevShort"] = ""
+        out["salesVsPrevTail"] = ""
+        out["salesVsPrevBullet"] = ""
+    out["absorptionPct"] = sk_dec(100 * sold / tot) if tot else "—"
+
+    # asking against what sold — a direction is a figure
+    qt = rep.get("quarterly", {}).get("ours", {})
+    ask, sold_m2 = qt.get("meanM2"), qt.get("soldM2")
+    if ask and sold_m2:
+        gap = (ask / sold_m2 - 1) * 100
+        out["askM2"], out["soldM2"] = sk_int(ask), sk_int(sold_m2)
+        # the conjunction travels with the adjective: "rovnaká AKO", "vyššia NEŽ"
+        out["askVsSoldClause"] = ("prakticky rovnaká ako" if abs(gap) < 0.5 else
+                                  f"{'vyššia' if gap > 0 else 'nižšia'} o {sk_dec(abs(gap))} % než")
+    # finished against under construction, as an adjective this time
+    _ps = [r for r in ov["price_series"] if r["m2_done"] and r["m2_building"]]
+    if _ps:
+        _gap = (float(_ps[-1]["m2_done"]) / float(_ps[-1]["m2_building"]) - 1) * 100
+        out["doneVsBuildingAdjSk"] = ("prakticky rovnaká ako" if abs(_gap) < 0.5 else
+                                      f"o {sk_dec(abs(_gap))} % {'vyššia' if _gap > 0 else 'nižšia'} než")
+
+    # the outlook, mechanical: at this pace, how long the offer lasts
+    days = ov.get("period_days") or 0
+    per_month = sold / days * 30.44 if days else 0
+    out["salesPerMonth"] = sk_int(round(per_month)) if per_month else "—"
+    out["monthsToClear"] = sk_dec(tot / per_month) if per_month else "—"
+
+    p = base.get("periodSk", "")
+    out["periodSkCap"] = p[:1].upper() + p[1:]
+    out["herrysSupplyTable"] = herrys_supply_table(rep)
+    out["herrysSalesTable"] = herrys_sales_table(rep)
+    out["herrysPriceTable"] = herrys_price_table(rep)
     return out
 
 

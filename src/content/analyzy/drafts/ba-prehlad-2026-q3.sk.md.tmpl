@@ -1,72 +1,71 @@
 <!--PEREX
-Prehľad trhu s novými bytmi v Bratislave za {quarterSkAcc}. Ponuka, predaj a ceny podľa okresov a podľa veľkosti bytu — a cena za meter od roku {longRunFirstYear}.
+Prehľad trhu s novými bytmi v Bratislave za {quarterSkAcc}: ponuka, dopyt a ceny podľa okresov a podľa veľkosti bytu.
 -->
 <!--METHOD
-Údaje pochádzajú z verejne zverejnených cenníkov bratislavských developerov, ktoré Residata číta denne, byt po byte. Ponuku tvoria voľné, rezervované a predrezervované byty v aktívnych projektoch; samotných voľných je menej; počítajú sa výlučne byty, nie parkovanie, pivnice ani nebytové priestory. Ceny sú s DPH a sú priemerom za byty, pri ktorých developer cenu zverejňuje. Cenu za meter počítame na obytnú plochu. Úrovne ponuky a cien sú priemerom denných hodnôt za posledné dva týždne obdobia, aby jeden deň neurčoval celé číslo. Polovičné dispozície zaokrúhľujeme nadol — byt s dvoma a pol izbami je vedený ako dvojizbový, jeden a pol izby má vlastnú kategóriu. Projekty sme do okresov zaradili podľa mestskej časti, v ktorej stoja. Medzikvartálne zmeny počítame na rovnakej vzorke projektov v oboch obdobiach — inak by rast nášho vlastného pokrytia vyzeral ako pohyb trhu. Predaj je byt, ktorý zmizol z cenníka a už sa naň nevrátil; rezervácie za predaj nepovažujeme. Prvých {settlingDays} dní po tom, čo projekt začneme sledovať, predaje nepočítame — cenník sa v tom čase ešte ustaľuje a zmiznutý byt je skôr opravou prvého čítania než predajom. Historické hodnoty do {lastPublishedSk} pochádzajú z kvartálnych analýz Bencont Investments a sú označené ich menom — nespájame ich s našimi do jedného radu. Bencont počíta cenu na úžitkovú plochu, ktorá je väčšia než obytná, takže ich cena za meter je z definície nižšia než naša; ich rad preto v grafe prepočítavame jedným koeficientom, ktorý meriame na štvrťroku, kde sa oba rady prekrývajú. Predpokladáme pritom, že pomer medzi obytnou a úžitkovou plochou sa v čase výrazne nemení.
+Údaje pochádzajú z verejne zverejnených cenníkov bratislavských developerov, ktoré Residata číta denne, byt po byte. Ponuku tvoria voľné, rezervované a predrezervované byty v aktívnych projektoch; samotných voľných je menej; počítajú sa výlučne byty, nie parkovanie, pivnice ani nebytové priestory. Ceny sú s DPH a sú priemerom za byty, pri ktorých developer cenu zverejňuje. Cenu za meter počítame na obytnú plochu. Úrovne ponuky a cien sú priemerom denných hodnôt za posledné dva týždne obdobia, aby jeden deň neurčoval celé číslo. Polovičné dispozície zaokrúhľujeme nadol — byt s dvoma a pol izbami je vedený ako dvojizbový, jeden a pol izby má vlastnú kategóriu. Projekty sme do okresov zaradili podľa mestskej časti, v ktorej stoja. Medzikvartálne zmeny počítame na rovnakej vzorke projektov, resp. bytov v oboch obdobiach — inak by rast nášho vlastného pokrytia vyzeral ako pohyb trhu. Predaj je byt, ktorý zmizol z cenníka a už sa naň nevrátil; rezervácie za predaj nepovažujeme. Prvých {settlingDays} dní po tom, čo projekt začneme sledovať, predaje nepočítame — cenník sa v tom čase ešte ustaľuje a zmiznutý byt je skôr opravou prvého čítania než predajom. Absorpcia je počet predaných bytov za obdobie k počtu bytov v ponuke ku koncu obdobia. Cena predaných bytov je posledná cenníková cena bytu pred tým, než z ponuky zmizol — nie cena z kúpnej zmluvy. Historické hodnoty do {lastPublishedSk} pochádzajú z kvartálnych analýz Bencont Investments a sú označené ich menom — nespájame ich s našimi do jedného radu. Bencont počíta cenu na úžitkovú plochu, ktorá je väčšia než obytná, takže ich cena za meter je z definície nižšia než naša; ich rad preto v grafe prepočítavame jedným koeficientom, ktorý meriame na štvrťroku, kde sa oba rady prekrývajú. Predpokladáme pritom, že pomer medzi obytnou a úžitkovou plochou sa v čase výrazne nemení. Tabuľka cien podľa obvodov porovnáva aktuálny štvrťrok s predchádzajúcim na tých istých bytoch; medziročné porovnanie doplníme, keď budeme mať rok vlastných meraní.
 -->
 {asOf} | TRH NOVÝCH BYTOV V BRATISLAVE
 
 # Bratislava: trh nových bytov v {quarterSk}
 
-Ponuku bratislavských novostavieb tvorilo {supplyTotal} bytov v {supplyProjects} projektoch (dvojtýždňový priemer ku koncu obdobia). Predalo sa {salesTotal} bytov {periodSk}. Priemerná ponuková cena dosiahla {m2Total} €/m² s DPH; priemerný ponúkaný byt má {meanFlatArea} m² a stojí {meanFlatPrice} €.
+## Úvod
 
-## Zhrnutie
-
-- **Ponuka: {supplyTotal} bytov.** Najväčšia je v okrese {topSupplyOkres} — {topSupplyN} bytov, teda {topSupplyShare} % celej mestskej ponuky.
-- **Predaj: {salesTotal} bytov {periodSk}.** Najviac v okrese {topSalesOkres} ({topSalesN} bytov).
-- **Cena: {m2Total} €/m² s DPH.** Na tých istých {panelUnits} bytoch sa medzikvartálne {qoqPct}.
-- **Dokončené bývanie je menšina ponuky.** V hotových budovách je {supplyDone} bytov, teda {supplyDoneShare} % ponuky; {supplyBuildingShare} % je rozostavaných a pri {supplyUnknownShare} % developer termín dokončenia nezverejňuje.
+- **Počet bytov v ponuke v projektoch, ktoré predávali aj v predchádzajúcom štvrťroku, {panelSupplyClause}** — z {panelSupplyPrev} na {panelSupplyCur}.
+- Dopyt: {periodSk} sa predalo {salesTotal} bytov{salesVsPrevTail}.
+- Priemerná cena v projektoch sa pohybuje na úrovni {m2Total} €/m² s DPH.
+- Cena dokončených bytov je {doneVsBuildingAdjSk} cena rozostavaných.
 
 ## Ponuka
 
-V projektoch, ktoré boli v ponuke v tomto aj v predchádzajúcom štvrťroku, počet bytov v ponuke {panelSupplyClause} — z {panelSupplyPrev} na {panelSupplyCur}.
+- Ku koncu obdobia bolo v ponuke {supplyTotal} bytov v {supplyProjects} projektoch.
+- {concProjectsPct} % projektov obsahuje {concThresholdPct} % ponuky ({concProjectsN} projektov s {concUnitsN} bytmi).
+- {smallProjectsN} projektov má v ponuke menej ako {smallProjectMax} bytov ({smallProjectsSharePct} % ponuky).
+- Ponuka dokončených bytov tvorí {supplyDoneShare} % všetkých nepredaných bytov ({supplyDone} bytov).
+- Najviac dokončených voľných bytov je v okresoch {topDoneOkres1} a {topDoneOkres2}.
+- Najväčšiu časť ponuky tvorí kategória {topLayout} — {topLayoutShare} % bytov s uvedeným počtom izieb.
 
-Ponuka nie je v meste rozložená rovnomerne. Dva najväčšie okresy držia {twoOkresShare} % celej ponuky.
+**Podiel voľných bytov v {quarterSk} podľa obvodu**
 
-![Z čoho sa ponuka v okresoch skladá](/analyzy/ba-prehlad-2026-q3-ponuka-okres.svg)
-*Koľko z ponuky každého okresu je v hotových budovách, koľko rozostavaných a pri koľkých developer termín nezverejnil.*
+{herrysSupplyTable}
 
-{overviewSupplyTable}
-
-Okresy sa líšia aj v tom, koľko toho developer o termíne dokončenia povie. V okrese {noDateOkres} nemá zverejnený termín {noDateOkresPct} % ponuky ({noDateOkresN} bytov), v okrese {noDateLowOkres} {noDateLowPct}.
-
-Podľa veľkosti bytu je trh úzky: z {layoutBase} bytov, pri ktorých je uvedený počet izieb, tvoria dvojizbové a trojizbové spolu {twoThreeShare} %.
-
-![Ponuka bytov podľa kategórie](/analyzy/ba-prehlad-2026-q3-ponuka-kategoria.svg)
-*Ponuka podľa počtu izieb, v poradí od najmenších bytov.*
+![Podiel voľných bytov podľa kategórie](/analyzy/ba-prehlad-2026-q3-podiel-ponuka.svg)
+*Podiel voľných bytov v {quarterSk} podľa kategórie.*
 
 ## Dopyt
 
-![Predané byty podľa okresu](/analyzy/ba-prehlad-2026-q3-predaj-okres.svg)
-*Počet predaných bytov {periodSk}, podľa okresu.*
+- {periodSkCap} sa predalo v Bratislave {salesTotal} bytov.
+- Absorpcia trhu je {absorptionPct} % — predané byty za obdobie k bytom v ponuke.
+- Najväčší záujem je o kategóriu {topSalesLayout}: {topSalesLayoutShare} % predaných bytov.
+- Podiel na predaji prevyšuje podiel na ponuke v kategóriách {overSellingLayouts}.
+- V okrese {fastestOkres} je podiel na predaji ({fastestSalesShare} %) najvýraznejšie nad podielom na ponuke ({fastestSupplyShare} %); opačný pomer má {slowestOkres} — {slowestSalesShare} % predaja pri {slowestSupplyShare} % ponuky.
+{salesVsPrevBullet}
+![Dopyt po bytoch](/analyzy/ba-prehlad-2026-q3-dopyt-stvrtroky.svg)
+*Počet predaných bytov za štvrťrok. Hodnoty do {lastPublishedSk} sú z kvartálnych analýz Bencont Investments, novšie sú naše; obe zostávajú samostatnými radmi.*
 
-{overviewSalesTable}
+**Počet predaných bytov {periodSk}**
 
-Rozdelenie predaja nekopíruje rozdelenie ponuky. Okres, ktorý drží väčší podiel na predaji než na ponuke, sa vypredáva rýchlejšie než mestský priemer; okres s opačným pomerom zostáva na trhu dlhšie. Najvýraznejší je rozdiel v okrese {fastestOkres}: {fastestSalesShare} % predaja oproti {fastestSupplyShare} % ponuky. Opačný pomer má {slowestOkres} — {slowestSalesShare} % predaja pri {slowestSupplyShare} % ponuky.
+{herrysSalesTable}
 
-![Predané byty podľa kategórie](/analyzy/ba-prehlad-2026-q3-predaj-kategoria.svg)
-*Predaj podľa počtu izieb, v rovnakom poradí ako ponuka vyššie.*
+![Počet predaných bytov podľa kategórie](/analyzy/ba-prehlad-2026-q3-podiel-predaj.svg)
+*Počet predaných bytov v {quarterSk} podľa kategórie.*
 
-## Ceny
+## Cena
 
-Mestský priemer {m2Total} €/m² s DPH je jedno číslo pre päť veľmi odlišných trhov. Medzi najdrahším okresom ({dearestOkres}) a najlacnejším ({cheapestOkres}) je rozdiel {okresSpread} s DPH.
+- Celková priemerná cena projektov v Bratislave je {m2Total} €/m² s DPH.
+- Na tých istých {panelUnits} bytoch sa priemerná cena medzikvartálne {qoqPct}.
+- Cena dokončených bytov je {doneVsBuildingAdjSk} cena rozostavaných.
+- Cena nepredaných bytov v ponuke ({askM2} €/m² s DPH) je {askVsSoldClause} cena bytov predaných za to isté obdobie ({soldM2} €/m² s DPH).
 
-Nasledujúca tabuľka porovnáva dva štvrťroky na tých istých {panelUnits} bytoch — na tých, ktoré boli v ponuke v oboch obdobiach. Jej úrovne sa preto mierne líšia od tabuľky vyššie, ktorá zahŕňa celú ponuku.
+![Ceny nových bytov v Bratislave](/analyzy/ba-prehlad-2026-q3-ceny-dlhodobo.svg)
+*Priemerná ponuková cena ku koncu štvrťroka. Hodnoty do {lastPublishedSk} sú z kvartálnych analýz Bencont Investments, prepočítané na našu plochovú základňu; novšie sú naše.*
 
-{overviewPriceTable}
+**Ceny nových bytov v Bratislave v {quarterSk} podľa obvodov**
 
-![Cena za meter podľa okresu](/analyzy/ba-prehlad-2026-q3-ceny-okres.svg)
-*Priemerná ponuková cena na tých istých bytoch v oboch štvrťrokoch.*
+{herrysPriceTable}
 
-Na bytoch, ktoré boli v ponuke po celé obdobie, stojí meter v už skolaudovanej budove {doneVsBuildingSk} než meter v rozostavanom projekte. Nie je to cena za dokončenie: hotové a rozostavané byty ležia v iných okresoch, takže rozdiel z veľkej časti hovorí o polohe.
+![Vývoj cien voľných a predaných bytov](/analyzy/ba-prehlad-2026-q3-ponuka-vs-predaj-mesiace.svg)
+*Priemerná ponuková cena, cena predaných bytov a rozdiel medzi nimi, po mesiacoch.*
 
-![Vývoj ponukovej ceny](/analyzy/ba-prehlad-2026-q3-ceny-vyvoj.svg)
-*Priemerná cena za meter, týždenne, na tých istých bytoch po celé obdobie — graf sa teda pohne len vtedy, keď sa pohne cena.*
+## Výhľad
 
-Dlhý rad v grafe nižšie spája dva zdroje: staršie hodnoty zverejnil Bencont Investments, novšie sú naše. Za {longRunSpanSk} cena za meter v Bratislave {longRunChangeClause} — z {longRunFirstM2} €/m² s DPH na {m2Total} €/m² s DPH. Východisková hodnota je Bencontova, prepočítaná na našu plochovú základňu.
-
-![Cena nových bytov v Bratislave od roku {longRunFirstYear}](/analyzy/ba-prehlad-2026-q3-ceny-dlhodobo.svg)
-*Hodnoty do {lastPublishedSk} sú z kvartálnych analýz Bencont Investments, novšie sú naše; obe zostávajú samostatnými radmi. Bencontove hodnoty sú prepočítané na našu plochovú základňu, inak by prechod medzi radmi vyzeral ako pohyb cien.*
-
-![Ponuková a dosiahnutá cena](/analyzy/ba-prehlad-2026-q3-ponuka-vs-predaj.svg)
-*Za koľko sa byty ponúkajú a za koľko napokon odchádzajú z ponuky. Kĺzavý {rollingDays}-dňový priemer; dosiahnutá cena je posledná cenníková cena bytu pred tým, než z ponuky zmizol.*
+Pri tempe predaja {periodSk} — {salesPerMonth} bytov mesačne — by sa súčasná ponuka {supplyTotal} bytov vypredala za {monthsToClear} mesiacov. Dokončené voľné byty ({supplyDone}) tvoria {supplyDoneShare} % tejto ponuky; kategória {topLayout} tvorí {topLayoutShare} % ponuky a {topLayoutSalesShare} % predaja.

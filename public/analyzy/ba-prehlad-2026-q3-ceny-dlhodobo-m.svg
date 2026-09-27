@@ -166,7 +166,7 @@ z
    </g>
    <g id="line2d_10">
     <path d="M 224.801713 153.48509 
-L 231.053882 153.362588 
+L 231.053882 153.444256 
 " clip-path="url(#p847dbda5c5)" style="fill: none; stroke: #c2410c; stroke-width: 2.6; stroke-linecap: round"/>
     <defs>
      <path id="m40e161e3e8" d="M 0 2.5 
@@ -183,7 +183,7 @@ z
     </defs>
     <g clip-path="url(#p847dbda5c5)">
      <use xlink:href="#m40e161e3e8" x="224.801713" y="153.48509" style="fill: #ffffff; stroke: #c2410c; stroke-width: 2"/>
-     <use xlink:href="#m40e161e3e8" x="231.053882" y="153.362588" style="fill: #ffffff; stroke: #c2410c; stroke-width: 2"/>
+     <use xlink:href="#m40e161e3e8" x="231.053882" y="153.444256" style="fill: #ffffff; stroke: #c2410c; stroke-width: 2"/>
     </g>
    </g>
    <g id="line2d_11">
@@ -230,12 +230,12 @@ z
     <text style="font-weight: 600; font-size: 11.8px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #0e4b47" x="224.801713" y="173.48509" transform="rotate(-0 224.801713 173.48509)">5 714</text>
    </g>
    <g id="text_8">
-    <text style="font-weight: 600; font-size: 11.8px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #c2410c" x="231.053882" y="140.362588" transform="rotate(-0 231.053882 140.362588)">5 720</text>
+    <text style="font-weight: 600; font-size: 11.8px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #c2410c" x="231.053882" y="140.444256" transform="rotate(-0 231.053882 140.444256)">5 716</text>
    </g>
   </g>
   <g id="text_9">
-   <text style="font-weight: 600; font-size: 17px; font-family: 'Outfit'; fill: #0f1419" transform="translate(13.4784 28.894449)">Cena nových bytov v</text>
-   <text style="font-weight: 600; font-size: 17px; font-family: 'Outfit'; fill: #0f1419" transform="translate(13.4784 49.885146)">Bratislave od roku 2018</text>
+   <text style="font-weight: 600; font-size: 17px; font-family: 'Outfit'; fill: #0f1419" transform="translate(13.4784 28.894449)">Ceny nových bytov v</text>
+   <text style="font-weight: 600; font-size: 17px; font-family: 'Outfit'; fill: #0f1419" transform="translate(13.4784 49.748349)">Bratislave v Q3/2026</text>
   </g>
   <g id="text_10">
    <text style="font-size: 12.9px; font-family: 'Outfit'; fill: #6b7480" transform="translate(13.4784 74.081269)">Priemerná ponuková cena, ku koncu</text>

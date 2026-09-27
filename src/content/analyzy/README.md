@@ -79,7 +79,13 @@ metre since the first quarter anyone published. It reproduces the shape the
 incumbent houses use, so it is a DATA article — a table someone looks things up
 in, with interpretation only where it is mechanical.
 
-Its panels come from `v2/lib/ba_overview.py` and its eight charts from
+Since 2026-09-27 it is a **literal copy of the Herrys Q1 2025 report** — Boss's
+instruction, verbatim: *"totalna kopia, len zmen cisla"* — five figures, three
+tables and five text blocks in their order (Úvod · Ponuka · Dopyt · Cena ·
+Výhľad). The source PDF is in the scraper repo at
+`v2/docs/research/market_content/corpus/herrys-q1-2025-report.pdf`.
+
+Its panels come from `v2/lib/ba_overview.py` and its five charts from
 `v2/lib/charts_ba_overview.py::draw_all`, both called by `market_report.py`, so
 re-running the issue redraws the figures. A page carrying this quarter's prose
 over last quarter's charts is what that avoids.
