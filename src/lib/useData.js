@@ -1890,6 +1890,11 @@ export function useUnitSummaries({ projectId = null, all = false } = {}) {
 }
 
 let _unitHistCache = new Map();
+/* A history already on its way. Byt v čase compares up to 20 flats and a person picks
+   them in quick succession (or twenty at once with "compare the units shown"); each pick
+   re-runs the effect below, and without this a key still in flight looked uncached and
+   was requested again — up to n(n+1)/2 calls for n rapid picks. One request per key. */
+let _unitHistInflight = new Map();
 /** Lazily fetch full per-unit histories for a set of `${project_id}::${unit_id}`
  *  keys. Returns a Map<key, rows[]> covering whichever keys have loaded, plus a
  *  loading flag while any are still in flight. Each key is fetched once and
@@ -1917,13 +1922,19 @@ export function useUnitHistories(keys) {
     if (need.length === 0) { setHistoryByKey(assemble()); setLoading(false); return; }
     setLoading(true);
     (async () => {
-      await Promise.all(need.map(async (k) => {
+      await Promise.all(need.map((k) => {
+        const ck = `${idPrefix}::${k}`;
+        if (_unitHistInflight.has(ck)) return _unitHistInflight.get(ck);
         const sep = k.indexOf("::");
         const pid = k.slice(0, sep);
         const uid = k.slice(sep + 2);
-        const { data, error } = await sbRead(supabaseData.rpc("unit_history", { p_project_id: pid, p_unit_id: uid }));
-        if (error) { console.error("[useUnitHistories]", k, error); _unitHistCache.set(`${idPrefix}::${k}`, []); return; }
-        _unitHistCache.set(`${idPrefix}::${k}`, _toEurDisplay(data || []));
+        const p = (async () => {
+          const { data, error } = await sbRead(supabaseData.rpc("unit_history", { p_project_id: pid, p_unit_id: uid }));
+          if (error) { console.error("[useUnitHistories]", k, error); _unitHistCache.set(ck, []); return; }
+          _unitHistCache.set(ck, _toEurDisplay(data || []));
+        })().finally(() => _unitHistInflight.delete(ck));
+        _unitHistInflight.set(ck, p);
+        return p;
       }));
       if (cancelled) return;
       setHistoryByKey(assemble());

@@ -13,7 +13,8 @@
  */
 import { Component, useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
 import { useAuth } from "../lib/useAuth";
-import { useAccountUiPref } from "../lib/useAccountUiPref";
+import { useAccountUiPref, useAccountPrefState } from "../lib/useAccountUiPref";
+import { inProjectsSection, sidebarTarget, sidebarActive, PROJECTS_LIST } from "../lib/sectionMemory";
 import { useCapabilities } from "../lib/useCapabilities";
 import PendingGate from "../components/PendingGate";
 import Picker from "../components/Picker";
@@ -194,6 +195,24 @@ export default function PlatformShell({ page, projectId, lang = "en", setLang, s
     return () => applyTheme("dark");
   }, []);
 
+  /* "Projekty" reopens the page you were last on inside it — the list or a project's
+     detail — remembered per account like every other page's settings (see
+     lib/sectionMemory). A value saved on another device is adopted only until this
+     session has been inside the section itself: landing straight on a project must not
+     be overwritten by an older project when the account's preferences arrive a beat
+     later. */
+  const [lastProjectsPage, setLastProjectsPage] = useState(PROJECTS_LIST);
+  const visitedProjects = useRef(false);
+  useAccountPrefState("projectsNav", { last: lastProjectsPage }, (s) => {
+    if (!visitedProjects.current && inProjectsSection(s.last)) setLastProjectsPage(s.last);
+  });
+  useEffect(() => {
+    if (!inProjectsSection(page)) return;
+    visitedProjects.current = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLastProjectsPage(page);
+  }, [page]);
+
   // If somehow anon ended up on /app/*, kick them to home + open login modal.
   // setCurrent is handleNav (App.jsx) which already pushes the route —
   // no need to double-push here.
@@ -252,6 +271,7 @@ export default function PlatformShell({ page, projectId, lang = "en", setLang, s
     <div style={{ minHeight: "100vh", display: "flex", background: "var(--bg)" }}>
       <Sidebar
         page={page}
+        lastProjectsPage={lastProjectsPage}
         lang={lang}
         can={can}
         tier={displayTier}
@@ -383,7 +403,7 @@ export default function PlatformShell({ page, projectId, lang = "en", setLang, s
 }
 
 // ─── Sidebar ────────────────────────────────────────────────────
-function Sidebar({ page, lang, can, tier, email, onNavigate, onSignOut, mobileOpen, onCloseMobile }) {
+function Sidebar({ page, lastProjectsPage, lang, can, tier, email, onNavigate, onSignOut, mobileOpen, onCloseMobile }) {
   return (
     <>
       {/* Mobile backdrop */}
@@ -431,12 +451,12 @@ function Sidebar({ page, lang, can, tier, email, onNavigate, onSignOut, mobileOp
               <div key={group.group} style={{ marginBottom: gi < NAV.length - 1 ? "0.85rem" : 0 }}>
                 {gi > 0 && <div style={{ height: 1, background: "var(--sidebar-border)", margin: "0.35rem 0.75rem 0.65rem" }} />}
                 {visibleItems.map(item => {
-                  const active = page === item.page;
+                  const active = sidebarActive(item.page, page);
                   const locked = item.requires && !can(item.requires);
                   return (
                     <button
                       key={item.page}
-                      onClick={() => onNavigate(item.page)}
+                      onClick={() => onNavigate(sidebarTarget(item.page, page, lastProjectsPage))}
                       style={{
                         display: "flex", alignItems: "center", gap: "0.7rem",
                         width: "100%", padding: "0.6rem 0.85rem",

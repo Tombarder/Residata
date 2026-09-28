@@ -181,6 +181,63 @@ export function filtersToSpec(filters, { isMoneyKey = () => false, isDateKey = (
 }
 
 /**
+ * Does one in-memory row pass these filters? The ENGINE's rules, applied in the browser.
+ *
+ * Some pages already hold every row they show — a project's flats, the Byt-v-čase grid —
+ * and filter them on the client. A filter has to mean the same thing there as it does in
+ * public.analytics_units behind Databáza bytov, or one saved filter gives two answers.
+ * So this mirrors the engine clause for clause:
+ *   · text compares case-insensitively (`lower(col::text)`);
+ *   · "is X" never matches a blank value unless "(empty)" is listed with it;
+ *   · "is not X" KEEPS blank values unless "(empty)" is listed (`col IS NULL OR …`);
+ *   · a range never matches a blank value; a money bound is typed in the DISPLAY
+ *     currency and converted to EUR before comparing, because rows hold EUR;
+ *   · a date range compares ISO dates as text — Number("2026-01-01") is NaN.
+ *
+ * @param row
+ * @param filters   the filter list (inactive ones are ignored, as filtersToSpec does)
+ * @param opts.valueOf    (row, key) => the raw value (money in EUR)
+ * @param opts.isMoneyKey (key) => bounds are money
+ * @param opts.isDateKey  (key) => bounds are dates
+ * @param opts.toEur      display-currency number → EUR
+ */
+export function matchesFilters(row, filters, { valueOf, isMoneyKey = () => false, isDateKey = () => false, toEur = (v) => v } = {}) {
+  for (const f of filters || []) {
+    if (!isFilterActive(f)) continue;
+    const raw = valueOf(row, f.key);
+    const blank = raw === null || raw === undefined || raw === "" || (typeof raw === "number" && !Number.isFinite(raw));
+    if (f.mode === "empty") { if (!blank) return false; continue; }
+    if (f.mode === "not_empty") { if (blank) return false; continue; }
+    if (f.mode === "between") {
+      if (blank) return false;
+      if (isDateKey(f.key)) {
+        const v = String(raw).slice(0, 10);
+        if (f.min && v < String(f.min).slice(0, 10)) return false;
+        if (f.max && v > String(f.max).slice(0, 10)) return false;
+        continue;
+      }
+      const n = parseNumeric(raw);
+      if (n === null) return false;
+      const money = isMoneyKey(f.key);
+      const lo = parseNumeric(f.min);
+      const hi = parseNumeric(f.max);
+      if (lo !== null && n < (money ? toEur(lo) : lo)) return false;
+      if (hi !== null && n > (money ? toEur(hi) : hi)) return false;
+      continue;
+    }
+    const vals = (f.values || []).filter((v) => v !== EMPTY_SENTINEL).map((v) => String(v).toLowerCase());
+    const wantsEmpty = (f.values || []).includes(EMPTY_SENTINEL);
+    const hit = !blank && vals.includes(String(raw).toLowerCase());
+    if (f.mode === "not_in") {
+      if (blank ? wantsEmpty : hit) return false;
+    } else if (!(hit || (blank && wantsEmpty))) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
  * Old Unit-database preferences → the new filter list.
  *
  * The previous page kept its filters as nine named fields plus an `xf` array. Those are

@@ -1,7 +1,7 @@
 /**
  * UnitTracker — "Byt v čase"
  *
- * Per-unit lifecycle view. User picks a project + unit (or up to 4
+ * Per-unit lifecycle view. User picks a project + unit (or up to 20
  * for compare mode), sees the unit's price evolution, status changes,
  * and key events (first listing, sold date) over the batches we have
  * snapshots for.
@@ -29,7 +29,7 @@
  *   4. Comparable units overlay — same project, similar room count +
  *      area, drawn as faint background lines so user sees their
  *      pick in context
- *   5. Multi-unit compare — pick up to 4 units, plotted together
+ *   5. Multi-unit compare — pick up to 20 units, plotted together
  *   6. Mini-grid — when project picked but no unit yet, show all
  *      units in project as rows with sparkline; click → expand
  *   7. Searchable picker — "type unit ID", finds across all projects
@@ -37,7 +37,7 @@
  *      who paste comparables into their own reports
  */
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
-import { statusLabel } from "../lib/unitStatus";
+import { statusLabel, listingStatus, OFF_LIST } from "../lib/unitStatus";
 import Picker from "../components/Picker";
 import { useProjects, useUnitSummaries, useUnitHistories, useUnitSearch, useProjectUnitsSeries, useArchiveMonths } from "../lib/useData";
 import { useAccountPrefState } from "../lib/useAccountUiPref";
@@ -47,6 +47,10 @@ import { localeTag, formatDimNumber } from "../lib/locale";
 import { moneyFromEur, moneySymbol, formatMoney, formatPerM2 as formatPerM2Money } from "../lib/money";
 import { useCurrency } from "../lib/useCurrency";
 import { useSpecifics, UnitPriceMarks } from "../lib/projectSpecifics";
+import FieldPanel from "../components/FieldPanel";
+import { FilterChips } from "../components/FlatWorkbench";
+import { useFlatFilters } from "../lib/useFlatFilters";
+import { FLAT_FIELD_BY_KEY, FLAT_CAT_ORDER, FLAT_CAT_LABEL, flatValue } from "../lib/flatFields";
 
 const mono   = "'JetBrains Mono', monospace";
 import { accent as green, accentInk, orange, dim, text, border, bg, surfaceDark as bg2, surfacePanel as panel , orangeInk} from "../lib/theme";
@@ -63,19 +67,33 @@ const STAV_COLOR = {
   P:  red,
   "Ešte nie v ponuke": dim,
   ERROR: "#ff6b6b88",
+  [OFF_LIST]: "#8a8f98",
 };
-const STAV_LABEL = {
-  V:  "Voľný",
-  R:  "Rezervovaný",
-  PR: "Predrezervovaný",
-  P:  "Predaný",
-  "Ešte nie v ponuke": "Ešte nie v ponuke",
-  ERROR: "Chyba",
-};
-// Compare-mode line colors — distinct hues, accessible on dark bg.
-const COMPARE_PALETTE = [green, orange, blue, "#e84393"];
+/* Compare-mode line styles. The limit used to be 4 "so the chart stays readable" — a
+   design choice, not a technical one: a flat's history is one small cached call, and
+   nothing downstream counts the lines. Boss asked for ~20 on 2026-09-28, so the chart
+   carries the readability instead: ten hues (the platform's own chart colours), then
+   the same ten DASHED — past ten, colour alone cannot keep lines apart and a dash can —
+   plus a legend that lifts one line and fades the rest, and a tooltip sorted by value. */
+const COMPARE_HUES = [green, orange, blue, "#e84393", "#9b59b6", "#00bcd4", "#c0ca33", red, "#a1887f", "#90a4ae"];
+const MAX_COMPARE = COMPARE_HUES.length * 2;
+function seriesStyle(i) {
+  return { color: COMPARE_HUES[i % COMPARE_HUES.length], dash: i >= COMPARE_HUES.length ? "7 4" : undefined };
+}
+/* A translucent wash of a colour. `${color}1a` works only for a hex: for the accent,
+   which is a CSS variable, it made "var(--accent)1a" — invalid, silently dropped — so
+   the first series' chip and every "Voľný" pill drew with no background at all. */
+const tint = (color, pct) => `color-mix(in srgb, ${color} ${pct}%, transparent)`;
 
-const MAX_COMPARE = 4;
+/** The line a series is drawn with — colour AND dash — so every key matches the chart. */
+function SeriesSwatch({ i, width = 20 }) {
+  const { color, dash } = seriesStyle(i);
+  return (
+    <svg width={width} height="6" aria-hidden="true" style={{ flexShrink: 0, display: "inline-block", verticalAlign: "middle" }}>
+      <line x1="2" y1="3" x2={width - 2} y2="3" stroke={color} strokeWidth="3" strokeLinecap="round" strokeDasharray={dash} />
+    </svg>
+  );
+}
 
 // ── Helpers ─────────────────────────────────────────────────────
 
@@ -193,18 +211,6 @@ export default function UnitTracker({ lang = "sk", setCurrent }) {
   const [search, setSearch] = useState("");           // unit / project search text
   const [yMode, setYMode] = useState("total");        // chart Y-axis: total price vs €/m²
 
-  // Remember the Unit-timeline selection + filters per-account, across devices.
-  useAccountPrefState(
-    "unitTimeline",
-    { pickedKeys, projFilter, search, yMode },
-    (s) => {
-      if (Array.isArray(s.pickedKeys)) setPickedKeys(s.pickedKeys);
-      if (s.projFilter !== undefined) setProjFilter(s.projFilter);
-      if (s.search !== undefined) setSearch(s.search);
-      if (s.yMode !== undefined) setYMode(s.yMode);
-    },
-  );
-
   const togglePick = (key) => {
     setPickedKeys(prev => {
       if (prev.includes(key)) return prev.filter(k => k !== key);
@@ -212,6 +218,16 @@ export default function UnitTracker({ lang = "sk", setCurrent }) {
       return [...prev, key];
     });
   };
+  /* Add several at once — what a filter is FOR on this page: narrow the grid to the
+     flats you want side by side, then take them. Stops at the limit, keeps grid order. */
+  const addPicks = (keys) => setPickedKeys(prev => {
+    const next = [...prev];
+    for (const k of keys) {
+      if (next.length >= MAX_COMPARE) break;
+      if (!next.includes(k)) next.push(k);
+    }
+    return next;
+  });
 
   const keyProject = (k) => k.slice(0, k.indexOf("::"));
 
@@ -260,10 +276,42 @@ export default function UnitTracker({ lang = "sk", setCurrent }) {
     useUnitSearch({ query: search, projectIds: matchingProjectIds, enabled: globalEnabled });
   const globalResults = useMemo(() => searchHits.map(toTile).slice(0, 25), [searchHits, toTile]);
 
-  // Latest-state tiles for search results / mini-grid.
-  const allUnits = useMemo(
-    () => (searchSummaries || []).map(toTile),
+  /* The grid's rows: every flat of the chosen project with its own details, taken from
+     its LAST OBSERVED row — so a flat that has left the price list keeps its building
+     and floor and a "building A" filter still finds it — and the status a reader should
+     see (listingStatus: a sold flat that vanished is "Predaný", not the "Voľný" it was
+     last seen with). */
+  const gridRows = useMemo(
+    () => (searchSummaries || []).map((u) => ({
+      ...u,
+      ...toTile(u),
+      id: `${u.project_id}::${u.unit_id}`,
+      stav: listingStatus(u),
+      /* The grid names a flat by its unit_id everywhere — tile, chip, chart legend — so
+         its filter must too, not by the display label the project page prefers. */
+      unit_detail: null,
+    })),
     [searchSummaries, toTile]
+  );
+  const gridRowByKey = useMemo(() => new Map(gridRows.map((r) => [r.key, r])), [gridRows]);
+
+  /* The grid's filters: the same panel, fields and rules as Databáza bytov
+     (useFlatFilters → filterModel.matchesFilters), over this project's flats. */
+  const ff = useFlatFilters(gridRows, { lang });
+
+  // Remember the Unit-timeline selection + filters per-account, across devices.
+  useAccountPrefState(
+    "unitTimeline",
+    { pickedKeys, projFilter, search, yMode, gridFilters: ff.filters },
+    (s) => {
+      if (Array.isArray(s.pickedKeys)) {
+        setPickedKeys(s.pickedKeys.filter((k) => typeof k === "string" && k.includes("::")).slice(0, MAX_COMPARE));
+      }
+      if (s.projFilter !== undefined) setProjFilter(s.projFilter);
+      if (s.search !== undefined) setSearch(s.search);
+      if (s.yMode !== undefined) setYMode(s.yMode);
+      if (Array.isArray(s.gridFilters)) ff.restoreFilters(s.gridFilters);
+    },
   );
 
   // Enrich raw history rows (from unit_history) with project metadata the UI reads.
@@ -318,8 +366,8 @@ export default function UnitTracker({ lang = "sk", setCurrent }) {
       <div style={{ position: "relative", overflow: "hidden", borderRadius: 16, border: "1px solid var(--border)", padding: "1.25rem 1.6rem", marginBottom: "1.5rem", background: "radial-gradient(120% 140% at 2% -20%, rgba(18,185,129,0.13) 0%, transparent 46%), linear-gradient(135deg, color-mix(in srgb, var(--accent) 5%, var(--surface)) 0%, var(--bg) 75%)" }}>
         <p style={{ color: dim, fontSize: "0.88rem", lineHeight: 1.55, margin: 0, maxWidth: 720 }}>
           {L(
-            "Vyber projekt → klikni na byt a uvidíš jeho cenu, stav a kľúčové udalosti v čase. Chceš porovnať? Klikni na ďalšie byty (max 4 naraz, nech graf zostane čitateľný). Dáta pribúdajú každý deň — graf rastie sám.",
-            "Pick a project → click a unit to see its price, status and key events over time. Want to compare? Click more units (up to 4 at once, so the chart stays readable). Data grows every day."
+            `Vyber projekt → klikni na byt a uvidíš jeho cenu, stav a kľúčové udalosti v čase. Chceš porovnať? Klikni na ďalšie byty (max ${MAX_COMPARE} naraz), alebo ich vyfiltruj vpravo a pridaj všetky zobrazené. Dáta pribúdajú každý deň — graf rastie sám.`,
+            `Pick a project → click a unit to see its price, status and key events over time. Want to compare? Click more units (up to ${MAX_COMPARE} at once), or filter them on the right and add every one shown. Data grows every day.`
           )}
         </p>
       </div>
@@ -353,6 +401,7 @@ export default function UnitTracker({ lang = "sk", setCurrent }) {
           {pickedKeys.length > 0 && (
             <DetailView
               pickedHistories={pickedHistories}
+              listingOf={(k) => gridRowByKey.get(k) || null}
               comparables={comparables}
               loadingDetail={loadingDetail}
               yMode={yMode}
@@ -364,18 +413,20 @@ export default function UnitTracker({ lang = "sk", setCurrent }) {
           )}
 
           {/* ONE unit grid — always shown once a project is chosen. Click a tile
-              to select it (chart appears above); click more tiles to compare up
-              to 4. Selected tiles are highlighted; this is the same list whether
-              you're picking your first unit or adding a comparison — no second
-              grid, no separate "compare" mode (that was the confusing duplicate). */}
+              to select it (chart appears above); click more tiles to compare, up
+              to MAX_COMPARE. Selected tiles are highlighted; this is the same list
+              whether you're picking your first unit or adding a comparison — no
+              second grid, no separate "compare" mode (that was the confusing
+              duplicate). The filter panel beside it is Databáza bytov's own. */}
           {projFilter && (
             <UnitGrid
               project={projectById[projFilter]}
-              units={allUnits}
+              ff={ff}
               loadingScope={loadingScope}
               search={search}
               pickedKeys={pickedKeys}
               togglePick={togglePick}
+              addPicks={addPicks}
               lang={lang}
             />
           )}
@@ -492,13 +543,13 @@ function PickerRow({ projects, globalResults, projectById, loadingGlobal, picked
           {pickedKeys.map((k, i) => {
             const sep = k.indexOf("::");
             const r = { unit_id: k.slice(sep + 2), project_name: projectById[k.slice(0, sep)]?.name };
-            const color = COMPARE_PALETTE[i % COMPARE_PALETTE.length];
+            const { color } = seriesStyle(i);
             return (
               <button
                 key={k}
                 onClick={() => togglePick(k)}
                 style={{
-                  background: `${color}1a`,
+                  background: tint(color, 10),
                   border: `1px solid ${color}`,
                   color: text, padding: "0.35rem 0.65rem",
                   borderRadius: 6, fontSize: "0.78rem", cursor: "pointer", fontFamily: "inherit",
@@ -506,7 +557,7 @@ function PickerRow({ projects, globalResults, projectById, loadingGlobal, picked
                 }}
                 title={lang === "sk" ? "Klikni na odstránenie" : "Click to remove"}
               >
-                <span style={{ width: 9, height: 9, borderRadius: "50%", background: color, display: "inline-block" }}></span>
+                <SeriesSwatch i={i} width={16} />
                 <strong style={{ color: text }}>{r?.unit_id}</strong>
                 <span style={{ color: dim, fontSize: "0.7rem" }}>· {r?.project_name?.slice(0, 22)}</span>
                 <span style={{ color: dim, marginLeft: "0.15rem" }}>✕</span>
@@ -575,7 +626,7 @@ const selectStyle = { ...fieldBlock };
 
 // ── Detail view (KPIs + chart + status timeline) ────────────────
 
-function DetailView({ pickedHistories, comparables, loadingDetail, yMode, setYMode, lang, onProjectClick, onBackToList }) {
+function DetailView({ pickedHistories, listingOf, comparables, loadingDetail, yMode, setYMode, lang, onProjectClick, onBackToList }) {
   // Single-unit mode for KPIs: take first picked. Multi-unit overlays
   // chart but keeps single KPI strip for the FIRST picked unit (the
   // "primary" focus). Comparables (same project, similar size) are computed
@@ -617,7 +668,8 @@ function DetailView({ pickedHistories, comparables, loadingDetail, yMode, setYMo
 
       {/* KPI strip — only meaningful in single-unit mode */}
       {pickedHistories.length === 1 && lifecycle && (
-        <KpiStrip lifecycle={lifecycle} primary={r0} onProjectClick={onProjectClick} lang={lang} />
+        <KpiStrip lifecycle={lifecycle} primary={r0} listing={listingOf ? listingOf(primary?.key) : null}
+          onProjectClick={onProjectClick} lang={lang} />
       )}
       {pickedHistories.length > 1 && (
         <div style={{ background: bg2, border: `1px solid ${border}`, borderRadius: 10, padding: "0.85rem 1.1rem", marginBottom: "1rem", fontSize: "0.82rem", color: text }}>
@@ -630,6 +682,7 @@ function DetailView({ pickedHistories, comparables, loadingDetail, yMode, setYMo
       {/* Chart */}
       <ChartCard
         pickedHistories={pickedHistories}
+        listingOf={listingOf}
         comparables={comparables}
         yMode={yMode}
         setYMode={setYMode}
@@ -644,11 +697,19 @@ function DetailView({ pickedHistories, comparables, loadingDetail, yMode, setYMo
 
 // ── KPI strip ───────────────────────────────────────────────────
 
-function KpiStrip({ lifecycle, primary, onProjectClick, lang }) {
+function KpiStrip({ lifecycle, primary, listing, onProjectClick, lang }) {
   // What THIS flat's price assumes — its own fit-out level, and the project's
   // payment schedule if it has one.
   const spec = useSpecifics(lang);
   const pk = lifecycle?.last?.project_id || lifecycle?.last?.project_name;
+  /* A flat that has LEFT the price list: the status it was last seen with is history,
+     not its state (a project that deletes sold flats freezes every one at "Voľný"). Say
+     what we do know — when it was last listed, and the ledger's verdict. `listing` is
+     the grid's row for this flat; without one (a flat picked from another project's
+     search) the strip reads as it always did. */
+  const offList = listing?.on_price_list === false;
+  const shownStav = offList ? listingStatus(listing) : lifecycle.last.stav;
+  const soldByLedger = offList && !lifecycle.sold && listing?.ledger_status === "SOLD";
   const items = [
     {
       label: lang === "sk" ? "Prvýkrát videný" : "First seen",
@@ -673,9 +734,11 @@ function KpiStrip({ lifecycle, primary, onProjectClick, lang }) {
     },
     {
       label: lang === "sk" ? "Aktuálny stav" : "Current status",
-      value: STAV_LABEL[lifecycle.last.stav] || lifecycle.last.stav,
-      sub: formatTs(tsOf(lifecycle.last), lang),
-      color: STAV_COLOR[lifecycle.last.stav] || text,
+      value: statusLabel(shownStav, lang, "one"),
+      sub: offList
+        ? `${lang === "sk" ? "naposledy v cenníku" : "last listed"} ${formatTs(listing.last_seen, lang)}`
+        : formatTs(tsOf(lifecycle.last), lang),
+      color: STAV_COLOR[shownStav] || text,
     },
     lifecycle.sold ? {
       label: lang === "sk" ? "Predaný" : "Sold",
@@ -686,6 +749,11 @@ function KpiStrip({ lifecycle, primary, onProjectClick, lang }) {
           <UnitPriceMarks items={spec.unit(lifecycle.sold, pk)} lang={lang} />
         </>
       ),
+      color: red,
+    } : soldByLedger ? {
+      label: lang === "sk" ? "Predaný" : "Sold",
+      value: `${lang === "sk" ? "po" : "after"} ${formatTs(listing.last_seen, lang)}`,
+      sub: lang === "sk" ? "zmizol z cenníka — počítame ho ako predaný" : "left the price list — counted as sold",
       color: red,
     } : {
       label: lang === "sk" ? "Predaný" : "Sold",
@@ -767,7 +835,11 @@ function KpiStrip({ lifecycle, primary, onProjectClick, lang }) {
 
 // ── Chart card ──────────────────────────────────────────────────
 
-function ChartCard({ pickedHistories, comparables, yMode, setYMode, lang }) {
+function ChartCard({ pickedHistories, listingOf, comparables, yMode, setYMode, lang }) {
+  /* The line being looked at — set by hovering its legend entry or the line itself. It
+     is drawn on top in full colour and the rest fade, which is what keeps twenty lines
+     readable: "against grey elements, coloured ones stick out" (Datawrapper). */
+  const [focusKey, setFocusKey] = useState(null);
   // Y-axis value extractor based on yMode
   const yOf = (row) => {
     if (yMode === "perm2") {
@@ -851,6 +923,8 @@ function ChartCard({ pickedHistories, comparables, yMode, setYMode, lang }) {
       <LineChartSVG
         pickedHistories={pickedHistories}
         comparables={comparables}
+        focusKey={focusKey}
+        setFocusKey={setFocusKey}
         allMonths={allMonths}
         yOf={yOf}
         fmtY={fmtY}
@@ -861,19 +935,28 @@ function ChartCard({ pickedHistories, comparables, yMode, setYMode, lang }) {
           what the status dots along each line mean. Replaces the old separate
           status-timeline strip: the line already carries the status over time. */}
       <div style={{ marginTop: "0.95rem", paddingTop: "0.85rem", borderTop: `1px solid ${border}`, display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-        <div style={{ display: "flex", gap: "1.1rem", flexWrap: "wrap", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: "0.5rem 1.1rem", flexWrap: "wrap", alignItems: "center" }}>
           {pickedHistories.map((h, hi) => {
-            const color = COMPARE_PALETTE[hi % COMPARE_PALETTE.length];
             const last = h.rows[h.rows.length - 1];
-            const scol = STAV_COLOR[last?.stav] || dim;
+            // The status the grid shows — a flat that left the price list is not "Voľný".
+            const listing = listingOf ? listingOf(h.key) : null;
+            const stav = listing ? listingStatus(listing) : last?.stav;
+            const scol = STAV_COLOR[stav] || dim;
+            const faded = focusKey && focusKey !== h.key;
             return (
-              <span key={h.key} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem", fontSize: "0.78rem" }}>
-                <span style={{ width: 20, height: 3, borderRadius: 2, background: color, display: "inline-block", flexShrink: 0 }}/>
+              <span key={h.key} onMouseEnter={() => setFocusKey(h.key)} onMouseLeave={() => setFocusKey(null)}
+                style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem", fontSize: "0.78rem", cursor: "default", opacity: faded ? 0.35 : 1, transition: "opacity 0.12s" }}>
+                <SeriesSwatch i={hi} />
                 <span style={{ color: text, fontWeight: 600, fontFamily: mono }}>{h.rows[0]?.unit_id}</span>
-                {last?.stav && <span style={{ color: scol, fontSize: "0.66rem", fontWeight: 700, padding: "0.05rem 0.4rem", background: `${scol}1a`, borderRadius: 3 }}>{stavLbl(last.stav)}</span>}
+                {stav && <span style={{ color: scol, fontSize: "0.66rem", fontWeight: 700, padding: "0.05rem 0.4rem", background: tint(scol, 10), borderRadius: 3 }}>{stavLbl(stav)}</span>}
               </span>
             );
           })}
+          {pickedHistories.length > 1 && (
+            <span style={{ fontSize: "0.7rem", color: dim, fontStyle: "italic" }}>
+              {lang === "sk" ? "prejdi myšou na byt — zvýrazní sa jeho čiara" : "hover a unit to highlight its line"}
+            </span>
+          )}
         </div>
         {presentStavs.length > 0 && (
           <div style={{ display: "flex", gap: "0.85rem", flexWrap: "wrap", alignItems: "center", fontSize: "0.7rem", color: dim }}>
@@ -1005,11 +1088,18 @@ function pickXTicks(allMonths, maxTicks = 6) {
   return [...out].sort((a, b) => a - b);
 }
 
-function LineChartSVG({ pickedHistories, comparables, allMonths, yOf, fmtY, lang }) {
-  const W = 880, H = 420;
-  const padL = 76, padR = 60, padT = 28, padB = 56;
+function LineChartSVG({ pickedHistories, comparables, focusKey = null, setFocusKey = () => {}, allMonths, yOf, fmtY, lang }) {
+  const W = 880;
+  const padL = 76, padR = 60, padT = 28;
   const innerW = W - padL - padR;
-  const innerH = H - padT - padB;
+  /* Past a dozen scrapes the date ticks are set at -35°, and a rotated "05. 8. 2026"
+     reaches ~45px below the axis — straight through the axis title, which sat 36px
+     down. The bottom margin makes room for the rotated labels it asks for, and the
+     drawing grows by the same amount so the plot itself keeps its height. */
+  const rotate = allMonths.length > 12 || (allMonths.length > 5 && innerW < 600);
+  const padB = rotate ? 84 : 56;
+  const innerH = 336;
+  const H = padT + innerH + padB;
   const isSinglePoint = allMonths.length === 1;
   const svgRef = useRef(null);
 
@@ -1145,29 +1235,42 @@ function LineChartSVG({ pickedHistories, comparables, allMonths, yOf, fmtY, lang
 
   // X-axis ticks (adaptive density)
   const xTickIndices = pickXTicks(allMonths, 6);
-  const rotate = allMonths.length > 12 || (allMonths.length > 5 && innerW < 600);
 
   // Pre-compute picked points (used by both render + hover lookup)
   const pickedPointSets = pickedHistories.map((h, hi) => {
-    const color = COMPARE_PALETTE[hi % COMPARE_PALETTE.length];
+    const { color, dash } = seriesStyle(hi);
     const pts = h.rows.map(r => {
       const x = xPos(tsOf(r));
       const y = yOf(r);
       if (x == null || !Number.isFinite(y)) return null;
       return { x, y: yScale(y), r, rawY: y };
     }).filter(Boolean);
-    return { color, pts, key: h.key };
+    return { color, dash, pts, key: h.key, hi };
   });
+  /* Past six lines a dot on every scrape is noise, not information: keep the ones that
+     SAY something — a status change, the latest point, the point under the cursor. The
+     focused line (legend or line hover) is drawn last, on top, and carries the endpoint
+     labels; with nothing focused they stay on the first flat, as before. */
+  const many = pickedPointSets.length > 6;
+  const focusIdx = focusKey ? pickedPointSets.findIndex(ps => ps.key === focusKey) : -1;
+  const labelIdx = focusIdx >= 0 ? focusIdx : 0;
+  const drawOrder = focusIdx >= 0
+    ? [...pickedPointSets.filter((_, i) => i !== focusIdx), pickedPointSets[focusIdx]]
+    : pickedPointSets;
 
   // Hovered timestamp (for crosshair)
   const hoveredTs = hoverIdx != null ? allMonths[hoverIdx] : null;
   const hoverX = hoveredTs ? xPos(hoveredTs) : null;
 
-  // Find rows aligned with hovered timestamp across all picked units
+  // Rows aligned with the hovered timestamp across all picked units — highest first,
+  // so with twenty flats the tooltip reads as a ranking rather than a pick order.
   const hoverPicked = hoveredTs ? pickedHistories.map((h, hi) => {
     const r = h.rows.find(row => tsOf(row) === hoveredTs);
-    return r ? { row: r, color: COMPARE_PALETTE[hi % COMPARE_PALETTE.length] } : null;
-  }).filter(Boolean) : [];
+    return r ? { row: r, hi, key: h.key } : null;
+  }).filter(Boolean).sort((a, b) => {
+    const av = yOf(a.row), bv = yOf(b.row);
+    return (Number.isFinite(bv) ? bv : -Infinity) - (Number.isFinite(av) ? av : -Infinity);
+  }) : [];
 
   return (
     <div style={{ position: "relative" }}>
@@ -1258,22 +1361,27 @@ function LineChartSVG({ pickedHistories, comparables, allMonths, yOf, fmtY, lang
             changes get a colored ring. Hover is handled by the
             chart-wide overlay below, not per-dot, so labels never
             collide regardless of how many batches accumulate. */}
-        {pickedPointSets.map(({ color, pts, key }, hi) => {
+        {drawOrder.map(({ color, dash, pts, key, hi }) => {
           if (pts.length === 0) return null;
           const path = pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
+          const focused = hi === focusIdx;
+          const faded = focusIdx >= 0 && !focused;
           return (
-            <g key={`pick-${key || hi}`}>
-              <path d={path} stroke={color} strokeWidth="2.5" fill="none"/>
+            <g key={`pick-${key || hi}`} opacity={faded ? 0.16 : 1}>
+              <path d={path} stroke={color} strokeWidth={focused ? 3.5 : (many ? 2 : 2.5)} strokeDasharray={dash} fill="none"/>
+              {/* A wide invisible twin, so the line itself can be hovered to focus it. */}
+              <path d={path} stroke="transparent" strokeWidth="12" fill="none" style={{ pointerEvents: "stroke" }}
+                    onMouseEnter={() => setFocusKey(key)} onMouseLeave={() => setFocusKey(null)}/>
               {pts.map((p, i) => {
                 const stavCol = STAV_COLOR[p.r.stav] || color;
                 const isStavChange = i > 0 && pts[i - 1].r.stav !== p.r.stav;
                 const isFirst = i === 0;
                 const isLatest = i === pts.length - 1;
                 const isHovered = hoveredTs && tsOf(p.r) === hoveredTs;
-                const showEndpointLabel = (isFirst || isLatest) && !isSinglePoint && hi === 0;
-                // Endpoint labels only on the FIRST picked unit to avoid
-                // label clutter when comparing 4 units. Other picked
-                // units rely on tooltip.
+                // Endpoint values on ONE line only — the focused one, else the first —
+                // so labels never pile up; every other value is in the tooltip.
+                const showEndpointLabel = (isFirst || isLatest) && !isSinglePoint && hi === labelIdx;
+                if (many && !focused && !isLatest && !isStavChange && !isHovered && !showEndpointLabel) return null;
                 const baseRadius = isLatest ? 5 : (isStavChange ? 5 : 3);
                 const radius = isHovered ? baseRadius + 3 : baseRadius;
                 return (
@@ -1359,14 +1467,18 @@ function LineChartSVG({ pickedHistories, comparables, allMonths, yOf, fmtY, lang
       {hoveredTs && hoverPicked.length > 0 && typeof document !== "undefined" && (() => {
         const winW = typeof window !== "undefined" ? window.innerWidth : 1024;
         const winH = typeof window !== "undefined" ? window.innerHeight : 768;
-        const flipLeft = tooltipPos.x > winW - 280;
-        const flipUp   = tooltipPos.y > winH - 140;
+        const flipLeft = tooltipPos.x > winW - 300;
+        // Placed by its real height: twenty rows are ~490px, which a fixed "flip when
+        // within 140px of the bottom" pushed off the screen.
+        const estH = 52 + hoverPicked.length * 22;
+        let top = tooltipPos.y + 14;
+        if (top + estH > winH - 8) top = Math.max(8, tooltipPos.y - 14 - estH);
         return (
         <div style={{
           position: "fixed",
           left: flipLeft ? tooltipPos.x - 14 : tooltipPos.x + 14,
-          top:  flipUp   ? tooltipPos.y - 14 : tooltipPos.y + 14,
-          transform: `${flipLeft ? "translateX(-100%) " : ""}${flipUp ? "translateY(-100%)" : ""}`.trim() || undefined,
+          top,
+          transform: flipLeft ? "translateX(-100%)" : undefined,
           background: "rgba(14, 14, 18, 0.97)",
           border: `1px solid ${border}`,
           borderRadius: 6, padding: "0.55rem 0.8rem",
@@ -1379,10 +1491,10 @@ function LineChartSVG({ pickedHistories, comparables, allMonths, yOf, fmtY, lang
           <div style={{ fontWeight: 700, color: text, marginBottom: "0.4rem", borderBottom: `1px solid ${border}`, paddingBottom: "0.3rem" }}>
             {formatTs(hoveredTs, lang)}
           </div>
-          {hoverPicked.map(({ row, color: c }, idx) => (
-            <div key={idx} style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginTop: idx > 0 ? "0.25rem" : 0 }}>
-              <span style={{ width: 8, height: 8, borderRadius: "50%", background: c, flexShrink: 0 }}/>
-              <span style={{ color: dim, fontSize: "0.72rem" }}>{row.unit_id}</span>
+          {hoverPicked.map(({ row, hi, key }, idx) => (
+            <div key={key || idx} style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginTop: idx > 0 ? "0.25rem" : 0, opacity: focusIdx >= 0 && hi !== focusIdx ? 0.45 : 1 }}>
+              <SeriesSwatch i={hi} width={14} />
+              <span style={{ color: key === focusKey ? text : dim, fontSize: "0.72rem", fontWeight: key === focusKey ? 700 : 400 }}>{row.unit_id}</span>
               <span style={{ marginLeft: "auto", fontWeight: 700 }}>{fmtY(yOf(row))}</span>
               <span style={{ color: STAV_COLOR[row.stav] || dim, fontSize: "0.68rem",
                              padding: "0.05rem 0.3rem", border: `1px solid ${STAV_COLOR[row.stav] || dim}`, borderRadius: 3 }}>
@@ -1417,31 +1529,54 @@ function MiniSparkline({ series }) {
   );
 }
 
-function UnitGrid({ project, units: scopeUnits, loadingScope, search, pickedKeys, togglePick, lang }) {
-  // Units in this project, from project_units_series: one row per unit = latest
-  // state + a compact EUR price series (for the sparkline) in a single small
-  // jsonb call — NOT a full per-project history download. useMemo MUST come
-  // before any early return — React enforces hook-call order.
-  const units = useMemo(() => {
-    if (!project) return [];
-    return (scopeUnits || [])
-      .filter(u => u.project_id === project.id)
-      .slice()
-      .sort((a, b) => String(a.unit_id).localeCompare(String(b.unit_id), undefined, { numeric: true }));
-  }, [scopeUnits, project]);
+const byUnitId = (a, b) => String(a.unit_id).localeCompare(String(b.unit_id), undefined, { numeric: true });
 
-  // Apply in-place search filter — same search box that lives in the
-  // picker row above filters the grid here, so the user sees ONE list
-  // (this grid, narrowed) instead of a dropdown PLUS a grid.
+function UnitGrid({ project, ff, loadingScope, search, pickedKeys, togglePick, addPicks, lang }) {
+  const t = (sk, en) => (lang === "sk" ? sk : en);
+  const [panelTab, setPanelTab] = useState("filters");
+  const [adding, setAdding] = useState(false);
+  const [fieldSearch, setFieldSearch] = useState("");
+
+  /* This project's flats, in unit order. Filtered by project as well as by the hook: on a
+     project switch the series hook keeps the PREVIOUS project's rows until the new ones
+     arrive, and a tile from the wrong project must never be clickable. useMemo MUST come
+     before any early return — React enforces hook-call order. */
+  const projRows = useMemo(
+    () => (project ? ff.rows.filter(u => u.project_id === project.id) : []),
+    [ff.rows, project]
+  );
+  const units = useMemo(
+    () => (project ? ff.filtered.filter(u => u.project_id === project.id).sort(byUnitId) : []),
+    [ff.filtered, project]
+  );
+
+  // The search box in the picker row above narrows the same grid in place — ONE list.
   const filtered = useMemo(() => {
     if (!search?.trim()) return units;
     const q = search.trim().toLowerCase();
     return units.filter(u => String(u.unit_id).toLowerCase().includes(q));
   }, [units, search]);
 
+  /* The panel offers only fields this project actually carries (a project that
+     publishes no orientation should not offer an orientation filter that can only ever
+     match nothing), plus any field a saved filter already names, so its card keeps a
+     readable label. */
+  const panelFields = useMemo(() => {
+    const has = new Set(ff.filters.map((f) => f.key));
+    for (const f of ff.panelFields) {
+      if (has.has(f.key)) continue;
+      if (projRows.some((r) => { const v = flatValue(r, f.key); return v !== null && v !== undefined && v !== ""; })) has.add(f.key);
+    }
+    return ff.panelFields.filter((f) => has.has(f.key));
+  }, [ff.panelFields, ff.filters, projRows]);
+
   if (!project) return null;
-  const isLoading = loadingScope && units.length === 0;
+  const isLoading = loadingScope && projRows.length === 0;
   const pickedCount = pickedKeys.length;
+  const narrowed = ff.activeCount > 0 || !!search?.trim();
+  const addable = filtered.filter(u => !pickedKeys.includes(u.key));
+  const room = MAX_COMPARE - pickedCount;
+  const openPanel = (add) => { setPanelTab("filters"); setAdding(!!add); };
 
   return (
     <div style={{
@@ -1449,98 +1584,137 @@ function UnitGrid({ project, units: scopeUnits, loadingScope, search, pickedKeys
       border: `1px solid ${border}`, borderRadius: 12,
       padding: "1.1rem 1.25rem",
     }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.85rem", flexWrap: "wrap", gap: "0.5rem" }}>
         <div>
           <h3 style={{ fontSize: "1.05rem", fontWeight: 600, color: text, margin: 0, letterSpacing: "-0.01em" }}>
             {project.name}
           </h3>
           <div style={{ fontSize: "0.78rem", color: dim, marginTop: "0.25rem" }}>
             {isLoading
-              ? (lang === "sk" ? "Načítavam byty…" : "Loading units…")
+              ? t("Načítavam byty…", "Loading units…")
               : pickedCount > 0
-              ? (lang === "sk"
-                  ? `Vybrané ${pickedCount}/${MAX_COMPARE} · klikni na ďalší byt na porovnanie, alebo na vybraný na odobratie`
-                  : `Selected ${pickedCount}/${MAX_COMPARE} · click another unit to compare, or a selected one to remove`)
-              : filtered.length === units.length
-              ? (lang === "sk" ? `${units.length} bytov · klikni na byt a uvidíš jeho cenu v čase` : `${units.length} units · click one to see its price over time`)
-              : (lang === "sk" ? `${filtered.length} z ${units.length} bytov · filtrované` : `${filtered.length} of ${units.length} units · filtered`)}
+              ? t(`Vybrané ${pickedCount}/${MAX_COMPARE} · klikni na ďalší byt na porovnanie, alebo na vybraný na odobratie`,
+                  `Selected ${pickedCount}/${MAX_COMPARE} · click another unit to compare, or a selected one to remove`)
+              : t(`${projRows.length} bytov · klikni na byt a uvidíš jeho cenu v čase`, `${projRows.length} units · click one to see its price over time`)}
           </div>
         </div>
+        {/* What a filter is for on this page: narrow the grid, then take what is left. */}
+        {narrowed && addable.length > 0 && room > 0 && (
+          <button onClick={() => addPicks(addable.map(u => u.key))}
+            title={addable.length > room
+              ? t(`Pridá prvých ${room} — porovnať sa dá najviac ${MAX_COMPARE} bytov naraz`, `Adds the first ${room} — at most ${MAX_COMPARE} units compare at once`)
+              : t("Pridá všetky zobrazené byty do grafu", "Adds every unit shown to the chart")}
+            style={{ ...fieldBlock, width: "auto", cursor: "pointer", color: accentInk, borderColor: green, fontFamily: mono, fontSize: "0.74rem", fontWeight: 600, whiteSpace: "nowrap" }}>
+            + {t("Porovnať zobrazené", "Compare the units shown")} ({Math.min(addable.length, room)}{addable.length > room ? ` ${t("z", "of")} ${addable.length}` : ""})
+          </button>
+        )}
       </div>
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
-        gap: "0.55rem",
-        maxHeight: 640, overflowY: "auto",
-      }}>
-        {isLoading ? (
-          <div style={{ gridColumn: "1 / -1", padding: "1.2rem", color: dim, fontFamily: mono, fontSize: "0.85rem", textAlign: "center" }}>
-            {lang === "sk" ? "Načítavam byty…" : "Loading units…"}
-          </div>
-        ) : filtered.length === 0 ? (
-          <div style={{ gridColumn: "1 / -1", padding: "1.2rem", color: dim, fontSize: "0.85rem", fontStyle: "italic", textAlign: "center" }}>
-            {lang === "sk" ? "Žiadne byty zodpovedajúce filtru." : "No units match the filter."}
-          </div>
-        ) : filtered.map(u => {
-          const stavCol = STAV_COLOR[u.latest_stav] || dim;
-          const pickIdx = pickedKeys.indexOf(u.key);
-          const selected = pickIdx >= 0;
-          const selColor = selected ? COMPARE_PALETTE[pickIdx % COMPARE_PALETTE.length] : green;
-          const atMax = !selected && pickedKeys.length >= MAX_COMPARE;
-          return (
-            <button
-              key={u.key}
-              onClick={() => togglePick(u.key)}
-              disabled={atMax}
-              title={atMax
-                ? (lang === "sk" ? `Naraz sa dá porovnať max ${MAX_COMPARE} bytov — odober jeden na pridanie ďalšieho` : `You can compare at most ${MAX_COMPARE} units — remove one to add another`)
-                : (selected ? (lang === "sk" ? "Klikni na odobratie z výberu" : "Click to remove from selection") : (lang === "sk" ? "Klikni na výber" : "Click to select"))}
-              style={{
-                background: selected ? `${selColor}1f` : bg2,
-                border: `1px solid ${selected ? selColor : border}`,
-                color: text, cursor: atMax ? "not-allowed" : "pointer",
-                opacity: atMax ? 0.4 : 1,
-                padding: "0.75rem 0.9rem", borderRadius: 8,
-                fontSize: "0.82rem", fontFamily: "inherit", textAlign: "left",
-                transition: "border-color 0.15s, background 0.15s, transform 0.12s",
-              }}
-              onMouseEnter={e => {
-                if (atMax || selected) return;
-                e.currentTarget.style.borderColor = green;
-                e.currentTarget.style.background = "color-mix(in srgb, var(--accent) 5%, transparent)";
-                e.currentTarget.style.transform = "translateY(-1px)";
-              }}
-              onMouseLeave={e => {
-                if (selected) return;
-                e.currentTarget.style.borderColor = border;
-                e.currentTarget.style.background = bg2;
-                e.currentTarget.style.transform = "translateY(0)";
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "0.5rem", marginBottom: "0.25rem" }}>
-                <strong style={{ color: selected ? selColor : text, fontSize: "0.92rem", letterSpacing: "-0.01em" }}>
-                  {selected ? "✓ " : ""}{u.unit_id}
-                </strong>
-                <span style={{ color: stavCol, fontSize: "0.7rem", fontWeight: 700, padding: "0.1rem 0.4rem", background: `${stavCol}1a`, borderRadius: 3 }}>
-                  {statusLabel(u.latest_stav, lang, "one")}
-                </span>
+
+      <div className="rd-workbench">
+        <div className="rd-workbench__main">
+          <FilterChips ff={ff} lang={lang} onOpenPanel={openPanel}
+            shown={filtered.length} total={projRows.length} noun={t("bytov", "units")} />
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))",
+            gap: "0.55rem",
+            /* Same height as the panel beside it, so the two columns end together. */
+            maxHeight: "calc(100vh - 206px)", minHeight: 280, overflowY: "auto", alignContent: "start",
+          }}>
+            {isLoading ? (
+              <div style={{ gridColumn: "1 / -1", padding: "1.2rem", color: dim, fontFamily: mono, fontSize: "0.85rem", textAlign: "center" }}>
+                {t("Načítavam byty…", "Loading units…")}
               </div>
-              <div style={{ fontSize: "0.74rem", color: dim, lineHeight: 1.45 }}>
-                {u.izby ? `${formatDimNumber(u.izby)}-izb` : ""}
-                {u.izby && u.obytna_plocha ? " · " : ""}
-                {u.obytna_plocha ? `${Number(u.obytna_plocha).toLocaleString(localeTag(lang), { maximumFractionDigits: 1 })} m²` : ""}
-                {(u.izby || u.obytna_plocha) && u.latest_price ? <br/> : ""}
-                {u.latest_price && (
-                  <span style={{ color: text, fontWeight: 600, fontFamily: mono, fontSize: "0.8rem" }}>{formatPrice(u.latest_price)}</span>
-                )}
-                {u.latest_price && u.obytna_plocha && (
-                  <span style={{ color: dim, marginLeft: "0.35rem", fontSize: "0.7rem" }}>· {formatPerM2(u.latest_price / u.obytna_plocha)}</span>
-                )}
+            ) : filtered.length === 0 ? (
+              <div style={{ gridColumn: "1 / -1", padding: "1.2rem", color: dim, fontSize: "0.85rem", fontStyle: "italic", textAlign: "center" }}>
+                {t("Žiadne byty zodpovedajúce filtru.", "No units match the filter.")}
               </div>
-              {u.series && u.series.length >= 2 && <MiniSparkline series={u.series} />}
-            </button>
-          );
-        })}
+            ) : filtered.map(u => {
+              const stavCol = STAV_COLOR[u.stav] || dim;
+              const pickIdx = pickedKeys.indexOf(u.key);
+              const selected = pickIdx >= 0;
+              const selColor = selected ? seriesStyle(pickIdx).color : green;
+              const atMax = !selected && pickedCount >= MAX_COMPARE;
+              return (
+                <button
+                  key={u.key}
+                  onClick={() => togglePick(u.key)}
+                  disabled={atMax}
+                  title={atMax
+                    ? t(`Naraz sa dá porovnať max ${MAX_COMPARE} bytov — odober jeden na pridanie ďalšieho`, `You can compare at most ${MAX_COMPARE} units — remove one to add another`)
+                    : (selected ? t("Klikni na odobratie z výberu", "Click to remove from selection") : t("Klikni na výber", "Click to select"))}
+                  style={{
+                    background: selected ? tint(selColor, 12) : bg2,
+                    border: `1px solid ${selected ? selColor : border}`,
+                    color: text, cursor: atMax ? "not-allowed" : "pointer",
+                    opacity: atMax ? 0.4 : 1,
+                    padding: "0.75rem 0.9rem", borderRadius: 8,
+                    fontSize: "0.82rem", fontFamily: "inherit", textAlign: "left",
+                    transition: "border-color 0.15s, background 0.15s, transform 0.12s",
+                  }}
+                  onMouseEnter={e => {
+                    if (atMax || selected) return;
+                    e.currentTarget.style.borderColor = green;
+                    e.currentTarget.style.background = "color-mix(in srgb, var(--accent) 5%, transparent)";
+                    e.currentTarget.style.transform = "translateY(-1px)";
+                  }}
+                  onMouseLeave={e => {
+                    if (selected) return;
+                    e.currentTarget.style.borderColor = border;
+                    e.currentTarget.style.background = bg2;
+                    e.currentTarget.style.transform = "translateY(0)";
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.5rem", marginBottom: "0.25rem" }}>
+                    <strong style={{ color: selected ? selColor : text, fontSize: "0.92rem", letterSpacing: "-0.01em", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
+                      {selected && <SeriesSwatch i={pickIdx} width={14} />}{u.unit_id}
+                    </strong>
+                    <span style={{ color: stavCol, fontSize: "0.7rem", fontWeight: 700, padding: "0.1rem 0.4rem", background: tint(stavCol, 10), borderRadius: 3, whiteSpace: "nowrap" }}>
+                      {statusLabel(u.stav, lang, "one")}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: "0.74rem", color: dim, lineHeight: 1.45 }}>
+                    {u.izby ? `${formatDimNumber(u.izby)}-izb` : ""}
+                    {u.izby && u.obytna_plocha ? " · " : ""}
+                    {u.obytna_plocha ? `${Number(u.obytna_plocha).toLocaleString(localeTag(lang), { maximumFractionDigits: 1 })} m²` : ""}
+                    {u.budova ? ` · ${t("bud.", "bldg")} ${u.budova}` : ""}
+                    {u.poschodie != null && u.poschodie !== "" ? ` · ${t("posch.", "fl.")} ${formatDimNumber(u.poschodie)}` : ""}
+                    {(u.izby || u.obytna_plocha) && u.latest_price ? <br/> : ""}
+                    {u.latest_price && (
+                      <span style={{ color: text, fontWeight: 600, fontFamily: mono, fontSize: "0.8rem" }}>{formatPrice(u.latest_price)}</span>
+                    )}
+                    {u.latest_price && u.obytna_plocha && (
+                      <span style={{ color: dim, marginLeft: "0.35rem", fontSize: "0.7rem" }}>· {formatPerM2(u.latest_price / u.obytna_plocha)}</span>
+                    )}
+                    {/* A flat that has left the price list says so, and since when — its
+                        price above is the last one it was listed at, not a current offer. */}
+                    {u.on_price_list === false && u.last_seen && (
+                      <div style={{ fontSize: "0.68rem", color: dim, fontStyle: "italic", marginTop: "0.15rem" }}>
+                        {t("naposledy v cenníku", "last listed")} {formatTs(u.last_seen, lang)}
+                      </div>
+                    )}
+                  </div>
+                  {u.series && u.series.length >= 2 && <MiniSparkline series={u.series} />}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <FieldPanel
+          lang={lang}
+          tab={panelTab} setTab={setPanelTab}
+          adding={adding} setAdding={setAdding}
+          search={fieldSearch} setSearch={setFieldSearch}
+          fields={panelFields}
+          catOf={(k) => FLAT_FIELD_BY_KEY[k]?.cat || "other"} catOrder={FLAT_CAT_ORDER} catLabel={FLAT_CAT_LABEL}
+          capsOf={ff.capsOf} unitOf={ff.unitOf}
+          useValues={ff.useValues}
+          filters={ff.filters} onAdd={ff.addFilter} onPatch={ff.patchFilter} onRemove={ff.removeFilter}
+          showColumns={false}
+          emptyHint={t("Mriežka ukazuje všetky byty projektu — vyfiltruj tie, ktoré chceš porovnať, a pridaj ich tlačidlom hore.",
+                       "The grid shows every unit in the project — filter the ones you want to compare and add them with the button above.")}
+        />
       </div>
     </div>
   );
@@ -1558,8 +1732,8 @@ function EmptyState({ lang, canFull, archiveMonths }) {
       </div>
       <div style={{ fontSize: "0.85rem", color: dim, maxWidth: 540, margin: "0 auto", lineHeight: 1.55 }}>
         {lang === "sk"
-          ? "Potom klikni na byt a uvidíš vývoj jeho ceny, zmeny stavu, kedy sa prvýkrát objavil a kedy sa predal. Klikni na ďalšie byty (max 4) na porovnanie."
-          : "Then click a unit to see its price evolution, status changes, when it first appeared and when it sold. Click more units (up to 4) to compare."}
+          ? `Potom klikni na byt a uvidíš vývoj jeho ceny, zmeny stavu, kedy sa prvýkrát objavil a kedy sa predal. Klikni na ďalšie byty (max ${MAX_COMPARE}) na porovnanie.`
+          : `Then click a unit to see its price evolution, status changes, when it first appeared and when it sold. Click more units (up to ${MAX_COMPARE}) to compare.`}
       </div>
       {months <= 1 && (
         <div style={{ marginTop: "1rem", fontSize: "0.78rem", color: orangeInk, fontStyle: "italic", maxWidth: 540, margin: "1rem auto 0" }}>

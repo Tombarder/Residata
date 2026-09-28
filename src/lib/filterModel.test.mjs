@@ -201,3 +201,61 @@ test("converting money returns the SAME array when nothing changes", () => {
   const cats = [{ key: "city", mode: "in", values: ["Nitra"] }];
   assert.equal(convertMoneyBounds(cats, 25, () => true), cats, "nothing to convert, same array");
 });
+
+// ── matchesFilters: the engine's rules, applied to rows already in the browser ──────
+// A project's flats and the Byt-v-čase grid filter on the client. The same saved filter
+// must give the answer public.analytics_units would, clause for clause.
+import { matchesFilters } from "./filterModel.js";
+
+const rowsM = [
+  { id: 1, stav: "V", izby: 2, cena: 200000, datum: "2026-09-01", budova: "A" },
+  { id: 2, stav: "P", izby: 3, cena: 300000, datum: "2026-09-15", budova: null },
+  { id: 3, stav: "R", izby: 3, cena: null,   datum: null,          budova: "b" },
+];
+const keep = (filters, opts = {}) =>
+  rowsM.filter((r) => matchesFilters(r, filters, { valueOf: (row, k) => row[k], ...opts })).map((r) => r.id);
+const F = (key, mode, extra = {}) => ({ id: 1, key, mode, values: [], min: "", max: "", ...extra });
+
+test("an inactive filter narrows nothing (an empty value list, an empty range)", () => {
+  assert.deepEqual(keep([F("stav", "in"), F("cena", "between")]), [1, 2, 3]);
+});
+
+test("'is' matches listed values and never a blank unless (empty) is listed", () => {
+  assert.deepEqual(keep([F("izby", "in", { values: ["3"] })]), [2, 3]);
+  assert.deepEqual(keep([F("budova", "in", { values: ["A"] })]), [1]);
+  assert.deepEqual(keep([F("budova", "in", { values: ["A", EMPTY_SENTINEL] })]), [1, 2]);
+});
+
+test("text compares case-insensitively, as lower(col::text) does in the engine", () => {
+  assert.deepEqual(keep([F("budova", "in", { values: ["B"] })]), [3]);
+});
+
+test("'is not' KEEPS blank rows unless (empty) is listed — the engine's col IS NULL OR …", () => {
+  assert.deepEqual(keep([F("budova", "not_in", { values: ["A"] })]), [2, 3]);
+  assert.deepEqual(keep([F("budova", "not_in", { values: ["A", EMPTY_SENTINEL] })]), [3]);
+  assert.deepEqual(keep([F("budova", "not_in", { values: [EMPTY_SENTINEL] })]), [1, 3]);
+});
+
+test("a range never matches a blank value, and both bounds are inclusive", () => {
+  assert.deepEqual(keep([F("cena", "between", { min: "200000", max: "300000" })]), [1, 2]);
+  assert.deepEqual(keep([F("cena", "between", { min: "250 000" })]), [2]);   // typed with a space
+});
+
+test("a money bound typed in the display currency is converted to EUR before comparing", () => {
+  const czk = { isMoneyKey: (k) => k === "cena", toEur: (v) => v / 25 };
+  assert.deepEqual(keep([F("cena", "between", { max: "6000000" })], czk), [1]);   // 6 M Kč = 240 000 €
+});
+
+test("a date range compares ISO dates as text, not as numbers", () => {
+  const d = { isDateKey: (k) => k === "datum" };
+  assert.deepEqual(keep([F("datum", "between", { min: "2026-09-10" })], d), [2]);
+});
+
+test("empty / not-empty test presence only", () => {
+  assert.deepEqual(keep([F("cena", "empty")]), [3]);
+  assert.deepEqual(keep([F("cena", "not_empty")]), [1, 2]);
+});
+
+test("filters AND together", () => {
+  assert.deepEqual(keep([F("izby", "in", { values: ["3"] }), F("stav", "not_in", { values: ["P"] })]), [3]);
+});
