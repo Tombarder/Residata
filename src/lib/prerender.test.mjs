@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 import {
   headHtml, replaceHead, fillRoot, siteNodes, pageProblems, rssFeed, HEAD_ONLY_PATHS, scriptJson,
 } from "../../scripts/lib/prerenderCore.mjs";
+import { EMBEDDED_LIST_FIELDS, toArticle } from "./articleModel.js";
 import {
   articleHead, articleSeoChecks, seoLang, clip, placeOf, periodOf, relatedArticles,
   livePageState, manualStepsReady, LIVE_STUCK_MINUTES,
@@ -184,4 +185,19 @@ test("the manual steps open only when the live page is the saved version", () =>
   assert.equal(manualStepsReady(livePageState({ published: true, onLiveSite: false })), true);
   assert.equal(manualStepsReady(state({ html: null })), true);
   assert.equal(livePageState({ published: false, onLiveSite: true }).status, "draft");
+});
+
+test("the index embeds every field its cards read, so the app's first render is the same list", () => {
+  // insightsView.jsx ArticleCard is what the index draws per article. If it
+  // reads a field the embedded list lacks, the app's first render differs from
+  // the pre-built page until the refresh lands — the jump this embed removed.
+  const view = readFileSync(join(HERE, "..", "pages", "insightsView.jsx"), "utf8");
+  const card = view.slice(view.indexOf("function ArticleCard"), view.indexOf("\n}\n", view.indexOf("function ArticleCard")));
+  const read = [...new Set([...card.matchAll(/article\.([a-zA-Z]+)/g)].map((m) => m[1]))];
+  assert.ok(read.length >= 3, `parsed too few fields from ArticleCard: ${read}`);
+  const row = Object.fromEntries(EMBEDDED_LIST_FIELDS.map((k) => [k, `x-${k}`]));
+  const shaped = toArticle(row);
+  const missing = read.filter((f) => shaped[f] === undefined || shaped[f] === null
+    || (typeof shaped[f] === "object" && !Object.keys(shaped[f]).length));
+  assert.deepEqual(missing, [], "ArticleCard reads fields the embedded index list does not carry (articleModel EMBEDDED_LIST_FIELDS)");
 });

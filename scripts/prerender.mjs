@@ -99,7 +99,7 @@ async function main() {
     const { ArticleView, IndexView } = await load("/src/pages/insightsView.jsx");
     const { articleHead, articleSeoChecks, relatedArticles, headline, seoLang, perex, canonicalUrl, SECTION_SK } =
       await load("/src/lib/articleSeo.js");
-    const { toArticle, EMBEDDED_ARTICLE_ID } = await load("/src/lib/articleModel.js");
+    const { toArticle, EMBEDDED_ARTICLE_ID, EMBEDDED_LIST_ID, EMBEDDED_LIST_FIELDS } = await load("/src/lib/articleModel.js");
     const { orderArticles, seriesRank } = await load("/src/lib/articleOrder.js");
     const { seoMetaFor, DEFAULT_OG_IMAGE, DEFAULT_OG_ALT } = await load("/src/lib/seo.js");
     const { pathToPage } = await load("/src/lib/routing.js");
@@ -196,7 +196,10 @@ async function main() {
           og, twitter, jsonLd: graph, extra: [feedLink, preload].filter(Boolean),
         }),
       });
-      html = fillRoot(html, markup);
+      // The list the app's first render of the index starts from
+      // (lib/useArticles embeddedList) — only what a card shows.
+      const listRows = rows.map((r) => Object.fromEntries(EMBEDDED_LIST_FIELDS.map((k) => [k, r[k]])));
+      html = fillRoot(html, markup, { embed: listRows, embedId: EMBEDDED_LIST_ID });
       const problems = pageProblems(html, {
         title: meta.title, canonical: url, lang: "sk", index: true,
         jsonLdType: ["CollectionPage"], noFaq: true, hreflang: ["sk", "x-default"],

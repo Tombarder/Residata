@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabaseData, supabase } from "./supabase";
 import { orderArticles } from "./articleOrder.js";
-import { PUBLIC_COLS, LIST_COLS, toArticle, EMBEDDED_ARTICLE_ID } from "./articleModel.js";
+import { PUBLIC_COLS, LIST_COLS, toArticle, EMBEDDED_ARTICLE_ID, EMBEDDED_LIST_ID } from "./articleModel.js";
 
 /**
  * The row the build embedded in this page, if the page is the static copy of
@@ -37,17 +37,38 @@ function embeddedRow(slug) {
 }
 
 /**
+ * The list the pre-built /analyzy index embeds (scripts/prerender.mjs), so the
+ * app's first render of the index IS that list. Without it the app threw the
+ * list away on mount, showed "Načítavam…" and drew it again — the page
+ * collapsed and re-grew (Lighthouse measured a layout shift of 0.47).
+ */
+function embeddedList() {
+  if (typeof document === "undefined") return null;
+  const el = document.getElementById(EMBEDDED_LIST_ID);
+  if (!el) return null;
+  try {
+    const rows = JSON.parse(el.textContent || "null");
+    return Array.isArray(rows) && rows.length ? rows : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Published analyses, newest first — the public index.
  * `admin` also returns drafts, for the management screen.
  */
 export function useArticles({ admin = false } = {}) {
-  const [articles, setArticles] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [seeded] = useState(() => (admin ? null : embeddedList()));
+  const [articles, setArticles] = useState(() => (seeded ? orderArticles(seeded.map(toArticle)) : []));
+  const [loading, setLoading] = useState(!seeded);
   const [error, setError] = useState(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async ({ quiet = false } = {}) => {
     if (!supabaseData) { setLoading(false); return; }
-    setLoading(true);
+    // Refreshing a list already on screen from the page's embedded copy: no
+    // "loading" state — that would blank a list the reader is looking at.
+    if (!quiet) setLoading(true);
     // Always supabaseData, never the auth client: reading data through the auth
     // client is what makes a logged-in page hang on "Loading", and it is not
     // needed here — supabaseData attaches the session token, so RLS already sees
@@ -61,7 +82,7 @@ export function useArticles({ admin = false } = {}) {
     setLoading(false);
   }, [admin]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load({ quiet: !!seeded }); }, [load, seeded]);
   return { articles, loading, error, reload: load };
 }
 

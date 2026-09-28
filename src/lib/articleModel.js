@@ -36,3 +36,7 @@ export function toArticle(row) {
 
 /** The id of the <script type="application/json"> the build embeds a page's row in. */
 export const EMBEDDED_ARTICLE_ID = "rd-article";
+
+/** …and the one the /analyzy index embeds its list in: just what a card shows. */
+export const EMBEDDED_LIST_ID = "rd-articles";
+export const EMBEDDED_LIST_FIELDS = ["slug", "article_date", "published", "title", "perex", "og_image", "updated_at"];
