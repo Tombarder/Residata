@@ -88,8 +88,10 @@ async function checkPage(url, lastmod) {
   if (isArticle) {
     const srcs = new Set([...html.matchAll(/<(?:img|source)[^>]+(?:src|srcSet|srcset)="(\/analyzy\/[^"]+)"/g)].map((m) => m[1]));
     for (const s of srcs) {
+      // The site answers a path it does not have with the app's own page
+      // (200 text/html), so a figure must answer as an IMAGE, not just 200.
       const rf = await get(SITE + s, { method: "HEAD" });
-      if (rf.status !== 200) problems.push(`figure ${s} answers ${rf.status}`);
+      if (rf.status !== 200 || !/^image\//.test(rf.type)) problems.push(`figure ${s} answers ${rf.status} ${rf.type}`);
     }
   }
   return problems;
