@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { statusLabel } from "../lib/unitStatus";
+import { statusLabel, withSoldOffList } from "../lib/unitStatus";
 import { isHomeUnit } from "../lib/unitKinds";
 import { SortableTh } from "../components/SortableTable";
 import { useAuth } from "../lib/useAuth";
@@ -701,10 +701,7 @@ export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en
      34 (Boss 2026-09-28: a flat's status must be correct everywhere). The charts keep
      the price list alone — they are about what is on offer and at what price. */
   const soldOffList = useProjectSoldOffList(projectId);
-  const ledgerFlats = useMemo(
-    () => (soldOffList.length ? [...flats, ...soldOffList] : flats),
-    [flats, soldOffList],
-  );
+  const ledgerFlats = useMemo(() => withSoldOffList(flats, soldOffList, projectId), [flats, soldOffList, projectId]);
   const { projects } = useProjects();
   // Snapshots drive the MoM time-series charts (timeline, takeup). Cached
   // at module level so nav-ing between projects doesn't refetch.
@@ -880,7 +877,22 @@ export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en
               (Boss, 2026-09-28), over this project's flats. Its columns and filters are
               remembered per account, like every other analytical view. */}
           <ProtectedData lang={lang} style={{ marginTop: "1.25rem" }}>
-            <FlatWorkbench rows={ledgerFlats} lang={lang} prefKey="projectFlatsView" highlightId={highlightedFlatId} />
+            <FlatWorkbench rows={ledgerFlats} lang={lang} prefKey="projectFlatsView" scopeKey={projectId} highlightId={highlightedFlatId} />
+            {/* The header can know more flats than we ever saw: a Boss-set building size
+                counts flats that sold before we began watching, and no list can show those.
+                Say so, rather than let "X z Y" and the header quietly disagree. */}
+            {(() => {
+              const homes = ledgerFlats.filter((f) => isHomeUnit(f.typ)).length;
+              const total = Number(project?.total_units) || 0;
+              if (loading || !homes || total <= homes) return null;
+              return (
+                <div style={{ marginTop: "0.5rem", fontSize: "0.72rem", lineHeight: 1.45, color: dim }}>
+                  {lang === "sk"
+                    ? `Projekt má podľa developera ${total} bytov; v zozname je ${homes}, ktoré sme videli v cenníku. Zvyšných ${total - homes} v ňom nikdy neboli, odkedy projekt sledujeme.`
+                    : `The developer gives ${total} homes for this project; the list holds the ${homes} we have seen on its price list. The other ${total - homes} were never on it while we have tracked the project.`}
+                </div>
+              );
+            })()}
           </ProtectedData>
         </>}
     </main>

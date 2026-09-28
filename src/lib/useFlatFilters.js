@@ -16,6 +16,7 @@ import { statusLabel } from "./unitStatus";
 import { unitKindLabel } from "./unitKinds";
 import {
   EMPTY_SENTINEL, newFilter, sanitizeFilter, isFilterActive, convertMoneyBounds, matchesFilters,
+  togglePillValue, setRangeFilter, rescaleSavedMoney,
 } from "./filterModel";
 import {
   FLAT_FIELDS, FLAT_FIELD_BY_KEY, flatValue, isMoneyField, isDateField, capsSetsFor, flatCapsOf,
@@ -26,6 +27,10 @@ import {
    filter compares; this is only its face ("2", not "2.0"; "Voľný", not "V"). */
 export function flatValueLabel(key, v, lang) {
   if (v === null || v === undefined || v === "") return "—";
+  if (key === "is_home" || key === "has_price") {
+    if (String(v) === "true") return lang === "sk" ? "Áno" : "Yes";
+    if (String(v) === "false") return lang === "sk" ? "Nie" : "No";
+  }
   if (key === "stav") return statusLabel(v, lang, "one");
   if (key === "typ") return unitKindLabel(v, lang);
   if (FLAT_FIELD_BY_KEY[key]?.type === "numeric") return String(formatDimNumber(v));
@@ -60,13 +65,27 @@ export function useFlatFilters(rows, { lang = "sk" } = {}) {
   }));
   const removeFilter = (id) => setFilters((a) => a.filter((f) => f.id !== id));
   /* Restore a saved list (from any page's preferences). User-writable, so sanitised, and
-     a filter on a field this list does not know is dropped rather than shown dead. */
-  const restoreFilters = useCallback((saved) => {
+     a filter on a field this list does not know is dropped rather than shown dead.
+     `savedRate` is what 1 EUR was worth in the display currency when the list was SAVED:
+     a "do 5 000 000" typed in Kč and restored in € would otherwise ask for flats under
+     five million euro — every flat — without a word. */
+  const restoreFilters = useCallback((saved, savedRate) => {
     if (!Array.isArray(saved)) return;
-    const clean = saved.map((f, i) => sanitizeFilter(f, i + 1)).filter((f) => f && FLAT_FIELD_BY_KEY[f.key]);
+    const clean = rescaleSavedMoney(
+      saved.map((f, i) => sanitizeFilter(f, i + 1)).filter((f) => f && FLAT_FIELD_BY_KEY[f.key]),
+      savedRate, moneyFromEur(1) || 1, isMoneyField);
     setFilters(clean);
     fId.current = clean.reduce((m, f) => Math.max(m, Number(f.id) || 0), 0);
   }, []);
+
+  /* One-click filtering (the pills above a list) and the price from/to boxes — the SAME
+     filters the panel shows as cards, so the two can never disagree (filterModel). */
+  const makeFilter = (key) => {
+    const caps = capsOf(key);
+    return caps.modes.length ? newFilter(key, caps, ++fId.current) : null;
+  };
+  const toggleValue = (key, value) => setFilters((a) => togglePillValue(a, key, value, (k) => (capsOf(k).modes.includes("in") ? makeFilter(k) : null)));
+  const setRange = (key, min, max) => setFilters((a) => setRangeFilter(a, key, min, max, (k) => (capsOf(k).modes.includes("between") ? makeFilter(k) : null)));
 
   /* A typed "300 000" is a PRICE. Switch € → Kč and the bound converts with every other
      money figure, or the same filter silently asks a different question. */
@@ -125,7 +144,8 @@ export function useFlatFilters(rows, { lang = "sk" } = {}) {
 
   return {
     rows: rows || [],
-    filters, setFilters, restoreFilters, addFilter, patchFilter, removeFilter,
+    filters, setFilters, restoreFilters, addFilter, patchFilter, removeFilter, toggleValue, setRange,
+    rate: money1,
     capsOf, useValues, filtered, panelFields, unitOf,
     lbl: (k) => labelFor(k, lang === "sk" ? "sk" : "en"),
     valueLabel: (k, v) => flatValueLabel(k, v, lang),

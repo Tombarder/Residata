@@ -72,7 +72,11 @@ const STAV_COLOR = {
    carries the readability instead: ten hues (the platform's own chart colours), then
    the same ten DASHED — past ten, colour alone cannot keep lines apart and a dash can —
    plus a legend that lifts one line and fades the rest, and a tooltip sorted by value. */
-const COMPARE_HUES = [green, orange, blue, "#e84393", "#9b59b6", "#00bcd4", "#c0ca33", red, "#a1887f", "#90a4ae"];
+/* No hue a STATUS already uses: the dots on every line are coloured by status (Voľný
+   green, Rezervovaný yellow, Predrezervovaný orange, Predaný red), and a red line would
+   carry its "sold" dots invisibly. Green stays first — the product's own colour — as
+   the chart had it before twenty lines were possible. */
+const COMPARE_HUES = [green, blue, "#e84393", "#9b59b6", "#00bcd4", "#c0ca33", "#a1887f", "#3f51b5", "#00897b", "#90a4ae"];
 const MAX_COMPARE = COMPARE_HUES.length * 2;
 function seriesStyle(i) {
   return { color: COMPARE_HUES[i % COMPARE_HUES.length], dash: i >= COMPARE_HUES.length ? "7 4" : undefined };
@@ -756,6 +760,13 @@ function KpiStrip({ lifecycle, primary, listing, onProjectClick, lang }) {
       value: `${lang === "sk" ? "po" : "after"} ${formatTs(listing.last_seen, lang)}`,
       sub: lang === "sk" ? "zmizol z cenníka — počítame ho ako predaný" : "left the price list — counted as sold",
       color: red,
+    } : offList ? {
+      /* Off the list and NOT counted as sold (withdrawn, renamed, or a sale the ledger has
+         not confirmed): "not sold yet" would be a claim we cannot make. */
+      label: lang === "sk" ? "Predaný" : "Sold",
+      value: "—",
+      sub: lang === "sk" ? "stiahnutý z cenníka — predaj nepotvrdený" : "taken off the list — sale not confirmed",
+      color: dim,
     } : {
       label: lang === "sk" ? "Predaný" : "Sold",
       value: "—",
@@ -1595,6 +1606,7 @@ function ProjectFlatList({ project, rows, loadingScope, search, pickedKeys, togg
           rows={shownRows}
           lang={lang}
           prefKey="unitTimelineFlats"
+          scopeKey={project.id}
           rowKey={(r) => r.key}
           defaultCols={BVC_DEFAULT_COLS}
           select={{ keys: pickedKeys, onToggle: togglePick, max: MAX_COMPARE, Swatch: PickSwatch, colorOf: (i) => seriesStyle(i).color }}

@@ -12,6 +12,7 @@ import assert from "node:assert/strict";
 import {
   EMPTY_SENTINEL, capabilitiesOf, newFilter, sanitizeFilter, isFilterActive,
   summariseFilter, filtersToSpec, migrateLegacyFilters, parseNumeric, convertMoneyBounds,
+  togglePillValue, setRangeFilter, rescaleSavedMoney, cleanFilterScopes,
 } from "./filterModel.js";
 
 const REG = {
@@ -258,4 +259,69 @@ test("empty / not-empty test presence only", () => {
 
 test("filters AND together", () => {
   assert.deepEqual(keep([F("izby", "in", { values: ["3"] }), F("stav", "not_in", { values: ["P"] })]), [3]);
+});
+
+// ── the quick-filter pills, the price boxes, currency-safe restore, per-project memory ──
+let _id = 100;
+const mk = (key) => ({ id: ++_id, key, mode: "in", values: [], min: "", max: "" });
+
+test("a pill click adds the value, a second click drops it, an empty pill filter goes away", () => {
+  let f = togglePillValue([], "stav", "V", mk);
+  assert.equal(f.length, 1);
+  assert.deepEqual(f[0].values, ["V"]);
+  f = togglePillValue(f, "stav", "R", mk);
+  assert.deepEqual(f[0].values, ["V", "R"]);
+  f = togglePillValue(f, "stav", "V", mk);
+  assert.deepEqual(f[0].values, ["R"]);
+  f = togglePillValue(f, "stav", "R", mk);
+  assert.deepEqual(f, []);
+});
+
+test("a pill REPLACES an 'is not' on the same field instead of editing it", () => {
+  const panel = [{ id: 1, key: "stav", mode: "not_in", values: ["P"], min: "", max: "" },
+                 { id: 2, key: "izby", mode: "in", values: ["2"], min: "", max: "" }];
+  const f = togglePillValue(panel, "stav", "V", mk);
+  assert.equal(f.filter((x) => x.key === "stav").length, 1);
+  assert.deepEqual(f.find((x) => x.key === "stav"), { ...f.find((x) => x.key === "stav"), mode: "in", values: ["V"] });
+  assert.ok(f.some((x) => x.key === "izby"));                 // other fields untouched
+});
+
+test("a field that cannot take an 'is' is left alone", () => {
+  assert.deepEqual(togglePillValue([], "cena_s_dph", "1", () => null), []);
+});
+
+test("the price boxes keep ONE between-filter and drop it when both are empty", () => {
+  let f = setRangeFilter([], "cena_s_dph", "200000", "", mk);
+  assert.equal(f.length, 1);
+  assert.equal(f[0].mode, "between");
+  assert.equal(f[0].min, "200000");
+  f = setRangeFilter(f, "cena_s_dph", "200000", "300000", mk);
+  assert.equal(f.length, 1);
+  assert.equal(f[0].max, "300000");
+  f = setRangeFilter(f, "cena_s_dph", "", "", mk);
+  assert.deepEqual(f, []);
+});
+
+test("saved money bounds follow the currency they were typed in", () => {
+  const saved = [{ id: 1, key: "cena_s_dph", mode: "between", min: "", max: "5000000", values: [] },
+                 { id: 2, key: "izby", mode: "between", min: "2", max: "3", values: [] }];
+  const isMoney = (k) => k === "cena_s_dph";
+  // typed in Kč (1 € = 24.35 Kč), read back in € → ~205 339 €, not five million euro
+  const inEur = rescaleSavedMoney(saved, 24.35, 1, isMoney);
+  assert.equal(inEur[0].max, "205339");
+  assert.equal(inEur[1].max, "3");                            // rooms are not money
+  assert.equal(rescaleSavedMoney(saved, 1, 1, isMoney), saved);        // same currency: untouched
+  assert.equal(rescaleSavedMoney(saved, null, 1, isMoney), saved);     // no record: untouched
+});
+
+test("the per-project filter memory keeps the most recent projects and drops junk", () => {
+  const raw = {};
+  for (let i = 0; i < 35; i++) raw[`p${i}`] = { filters: [], rate: 1, at: i };
+  raw.bad = "x";
+  raw.alsoBad = { filters: "no" };
+  const out = cleanFilterScopes(raw, 30);
+  assert.equal(Object.keys(out).length, 30);
+  assert.ok(out.p34 && !out.p0 && !out.p4);                   // the five oldest went
+  assert.ok(!out.bad && !out.alsoBad);
+  assert.deepEqual(cleanFilterScopes([1, 2]), {});
 });

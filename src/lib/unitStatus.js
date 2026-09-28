@@ -75,3 +75,19 @@ export function listingStatus(unit) {
   if (!unit) return null;
   return unit.stav ?? unit.latest_stav ?? null;
 }
+
+/**
+ * withSoldOffList(current, soldOff, projectId) — a project's flats AS ITS HEADER COUNTS
+ * THEM: the current price list plus the sold flats the developer took off it
+ * (public.project_units_sold_off_list). Only THIS project's, and never a flat the price
+ * list still shows — the two lists come from different serving layers, so for a moment
+ * after a scrape a flat can be in both, and a project switch can hand over the previous
+ * project's rows before the new ones land. Returns `current` itself when nothing is added.
+ */
+export function withSoldOffList(current, soldOff, projectId) {
+  const base = Array.isArray(current) ? current : [];
+  if (!Array.isArray(soldOff) || soldOff.length === 0) return base;
+  const listed = new Set(base.map((f) => `${f.project_id}::${f.unit_id}`));
+  const extra = soldOff.filter((f) => f && f.project_id === projectId && !listed.has(`${f.project_id}::${f.unit_id}`));
+  return extra.length ? [...base, ...extra] : base;
+}

@@ -20,6 +20,7 @@
  * applied only when a value is drawn.
  */
 import { EMPTY_SENTINEL, capabilitiesOf } from "./filterModel.js";
+import { isHomeUnit } from "./unitKinds.js";
 
 const num = (v) => {
   if (v === null || v === undefined || v === "") return null;
@@ -34,6 +35,11 @@ const txt = (v) => (v === null || v === undefined || v === "" ? null : String(v)
 export const FLAT_FIELDS = [
   { key: "unit_id",         cat: "unit",  type: "text",    dim: true,  measure: false, label_sk: "ID bytu",                   label_en: "Unit ID",                      get: (r) => txt(r.unit_detail) || txt(r.unit_id) },
   { key: "typ",             cat: "unit",  type: "text",    dim: true,  measure: false, label_sk: "Typ",                       label_en: "Type",                         get: (r) => txt(r.typ) },
+  /* The two yes/no fields Databáza bytov filters on, computed the way the engine computes
+     them (PivotV2: is_home = isHomeUnit(typ); has_price = the price scope), valued
+     "true"/"false" like the registry so a filter reads the same on both pages. */
+  { key: "is_home",         cat: "unit",  type: "text",    dim: true,  measure: false, label_sk: "Byt alebo dom",             label_en: "Home unit",
+    get: (r) => (r.typ == null || r.typ === "" ? null : (isHomeUnit(r.typ) ? "true" : "false")) },
   { key: "etapa",           cat: "unit",  type: "text",    dim: true,  measure: false, label_sk: "Etapa",                     label_en: "Phase",                        get: (r) => txt(r.etapa) },
   { key: "budova",          cat: "unit",  type: "text",    dim: true,  measure: false, label_sk: "Budova",                    label_en: "Building",                     get: (r) => txt(r.budova) },
   { key: "poschodie",       cat: "unit",  type: "numeric", dim: true,  measure: true,  label_sk: "Poschodie",                 label_en: "Floor",                        get: (r) => num(r.poschodie) },
@@ -45,6 +51,8 @@ export const FLAT_FIELDS = [
   { key: "price_per_m2",    cat: "price", type: "numeric", dim: false, measure: true,  fmt: "per_m2", label_sk: "€/m² (obytná)",       label_en: "€/m² (living)",
     get: (r) => { const p = num(r.cena_s_dph), a = num(r.obytna_plocha); return p !== null && a !== null && a > 0 ? p / a : null; } },
   { key: "fitout_level",    cat: "price", type: "text",    dim: true,  measure: false, label_sk: "Štandard (čo cena zahŕňa)", label_en: "Fit-out (what the price buys)", get: (r) => txt(r.fitout_level) },
+  { key: "has_price",       cat: "price", type: "text",    dim: true,  measure: false, label_sk: "Má cenu",                   label_en: "Has a price",
+    get: (r) => { const p = num(r.cena_s_dph); return p !== null && p > 0 ? "true" : "false"; } },
   { key: "obytna_plocha",   cat: "area",  type: "numeric", dim: false, measure: true,  fmt: "area", label_sk: "Obytná plocha (m²)",   label_en: "Living area (m²)",       get: (r) => num(r.obytna_plocha) },
   { key: "exterier",        cat: "area",  type: "numeric", dim: false, measure: true,  fmt: "area", label_sk: "Exteriér (m²)",        label_en: "Exterior (m²)",          get: (r) => num(r.exterier_plocha) },
   { key: "celkova_plocha",  cat: "area",  type: "numeric", dim: false, measure: true,  fmt: "area", label_sk: "Celková plocha (m²)",  label_en: "Total area (m²)",        get: (r) => num(r.celkova_plocha) },

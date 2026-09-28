@@ -11,7 +11,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { statusLabel, statusOptions, STATUS_ORDER, listingStatus, OFF_LIST } from "./unitStatus.js";
+import { statusLabel, statusOptions, STATUS_ORDER, listingStatus, OFF_LIST, withSoldOffList } from "./unitStatus.js";
 
 test("the SINGULAR form is what UnitTracker showed for one flat", () => {
   const sk = (c) => statusLabel(c, "sk", "one");
@@ -96,4 +96,18 @@ test("no page reads a flat's last-seen status except through listingStatus", asy
   };
   walk(root);
   assert.deepEqual(hits, []);
+});
+
+test("the sold-off list is appended for this project only, and never twice", () => {
+  const cur = [{ project_id: "a", unit_id: "1", stav: "V" }, { project_id: "a", unit_id: "2", stav: "R" }];
+  const gone = [
+    { project_id: "a", unit_id: "3", stav: "P", on_price_list: false },
+    { project_id: "a", unit_id: "2", stav: "P", on_price_list: false },   // still listed: a refresh gap
+    { project_id: "b", unit_id: "9", stav: "P", on_price_list: false },   // the previous project's
+  ];
+  const out = withSoldOffList(cur, gone, "a");
+  assert.deepEqual(out.map((f) => f.unit_id), ["1", "2", "3"]);
+  assert.equal(out.find((f) => f.unit_id === "2").stav, "R");   // the price list's row wins
+  assert.equal(withSoldOffList(cur, [], "a"), cur);              // nothing added → same array
+  assert.deepEqual(withSoldOffList(undefined, gone, "a").map((f) => f.unit_id), ["3", "2"]);
 });

@@ -81,3 +81,12 @@ test("every default column is a real field, and keys are unique", () => {
   for (const k of DEFAULT_FLAT_COLS) assert.ok(FLAT_FIELD_BY_KEY[k], k);
   assert.equal(new Set(FLAT_FIELDS.map((f) => f.key)).size, FLAT_FIELDS.length);
 });
+
+test("the two yes/no fields Databáza bytov offers are here, computed like the engine", () => {
+  assert.equal(flatValue({ typ: "flat" }, "is_home"), "true");
+  assert.equal(flatValue({ typ: "parking_garage" }, "is_home"), "false");
+  assert.equal(flatValue({}, "is_home"), null);                 // no type, no answer
+  assert.equal(flatValue({ cena_s_dph: 250000 }, "has_price"), "true");
+  assert.equal(flatValue({ cena_s_dph: null, cena_s_dph_text: "Na vyžiadanie" }, "has_price"), "false");
+  assert.equal(flatValue({ cena_s_dph: 0 }, "has_price"), "false");
+});

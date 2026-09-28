@@ -299,3 +299,71 @@ export function convertMoneyBounds(filters, factor, isMoneyKey = () => false) {
   });
   return touched ? out : filters;
 }
+
+/**
+ * togglePillValue — one click on a quick-filter pill: add or drop ONE value of the "is"
+ * filter on `key`. Creates it on the first click (via makeFilter(key) → a fresh filter or
+ * null when the field cannot take an "is"), removes it when it empties. A pill means
+ * "show me these", so any OTHER kind of filter on the same field (an "is not" from the
+ * panel) is replaced, never quietly edited — one card per field.
+ */
+export function togglePillValue(filters, key, value, makeFilter) {
+  const v = String(value);
+  const list = filters || [];
+  const f = list.find((x) => x.key === key && x.mode === "in");
+  if (!f) {
+    const fresh = makeFilter(key);
+    if (!fresh) return list;
+    return [...list.filter((x) => x.key !== key), { ...fresh, mode: "in", values: [v], min: "", max: "" }];
+  }
+  const has = (f.values || []).includes(v);
+  const values = has ? f.values.filter((x) => x !== v) : [...(f.values || []), v];
+  if (values.length === 0) return list.filter((x) => x.id !== f.id);
+  return list.map((x) => (x.id === f.id ? { ...x, values } : x));
+}
+
+/**
+ * setRangeFilter — the price from / to boxes: ONE "between" filter on `key`, created on
+ * the first bound, dropped when both are empty again.
+ */
+export function setRangeFilter(filters, key, min, max, makeFilter) {
+  const list = filters || [];
+  const f = list.find((x) => x.key === key && x.mode === "between");
+  const blank = (x) => x === "" || x === null || x === undefined;
+  if (blank(min) && blank(max)) return f ? list.filter((x) => x.id !== f.id) : list;
+  if (!f) {
+    const fresh = makeFilter(key);
+    if (!fresh) return list;
+    return [...list, { ...fresh, mode: "between", values: [], min: min ?? "", max: max ?? "" }];
+  }
+  return list.map((x) => (x.id === f.id ? { ...x, min: min ?? "", max: max ?? "" } : x));
+}
+
+/**
+ * rescaleSavedMoney — saved money bounds were typed in the display currency OF THE DAY
+ * THEY WERE SAVED. `savedRate` / `nowRate` are what 1 EUR was / is worth in that display
+ * currency. Restored in another currency without this, "do 5 000 000" typed in Kč reads
+ * as five million euro and silently matches every flat.
+ */
+export function rescaleSavedMoney(filters, savedRate, nowRate, isMoneyKey) {
+  const was = Number(savedRate), now = Number(nowRate);
+  if (!Number.isFinite(was) || was <= 0 || !Number.isFinite(now) || now <= 0) return filters;
+  if (Math.abs(was - now) < 1e-9) return filters;
+  return convertMoneyBounds(filters, now / was, isMoneyKey);
+}
+
+/**
+ * cleanFilterScopes — the per-project filter memory as read back from preferences
+ * (user-writable, so checked): { [scope]: { filters, rate, at } }, the `max` most
+ * recently used kept — it is a preference, not an archive.
+ */
+export function cleanFilterScopes(raw, max = 30) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const out = {};
+  for (const [k, v] of Object.entries(raw)) {
+    if (!v || typeof v !== "object" || !Array.isArray(v.filters)) continue;
+    out[String(k).slice(0, 200)] = { filters: v.filters, rate: Number(v.rate) || null, at: Number(v.at) || 0 };
+  }
+  for (const k of Object.keys(out).sort((a, b) => out[b].at - out[a].at).slice(max)) delete out[k];
+  return out;
+}

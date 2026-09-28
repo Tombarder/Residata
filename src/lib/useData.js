@@ -1998,6 +1998,9 @@ export function useProjectSoldOffList(projectId) {
   useEffect(() => {
     if (!idKey || !isSupabaseReady() || authLoading) { setUnits([]); return; }   // eslint-disable-line react-hooks/set-state-in-effect
     if (_soldOffListCache.has(idKey)) { setUnits(_soldOffListCache.get(idKey)); return; }
+    /* Drop the previous project's rows NOW, not when this fetch lands: until then the page
+       would append another project's sold flats to this one's list. */
+    setUnits([]);
     let cancelled = false;
     (async () => {
       const { data, error } = await sbRead(supabaseData.rpc("project_units_sold_off_list", { p_project_id: projectId }));

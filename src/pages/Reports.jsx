@@ -31,6 +31,7 @@ import { useSpecifics, useProjectSpecificsData, SpecificsMark, SpecificsPanel,
          UnitPriceMarks } from "../lib/projectSpecifics";
 import { useProjects, useProjectSnapshots, useReportHistogram, fetchReportBinUnits, useReportProjectUnits, useReportComparables, useScopeRoomPrices, useProjectSoldOffList } from "../lib/useData";
 import { isHomeUnit, unitKindLabel } from "../lib/unitKinds";
+import { withSoldOffList } from "../lib/unitStatus";
 import LoadError from "../components/LoadError";
 import Picker from "../components/Picker";
 import InfoTip from "../components/InfoTip";
@@ -735,10 +736,7 @@ function ProjectReport({ project, siblings, lang }) {
      all three tables while the project was a third gone (Boss 2026-09-28). The price
      figures beside them read for-sale flats only, so the added rows never touch those. */
   const soldOffList = useProjectSoldOffList(project?.id);
-  const ledgerFlats = useMemo(
-    () => (soldOffList.length ? [...(flats || []), ...soldOffList] : flats),
-    [flats, soldOffList],
-  );
+  const ledgerFlats = useMemo(() => withSoldOffList(flats, soldOffList, project?.id), [flats, soldOffList, project?.id]);
   const byTyp = useMemo(() => groupAggregatesFromFlats(ledgerFlats, "typ"), [ledgerFlats]);
   const byIzby = useMemo(() => groupAggregatesFromFlats(ledgerFlats, "izby"), [ledgerFlats]);
   const byPoschodie = useMemo(() => groupAggregatesFromFlats(ledgerFlats, "poschodie"), [ledgerFlats]);
