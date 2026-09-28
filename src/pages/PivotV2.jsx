@@ -134,8 +134,11 @@ const FIELDS = {
   // ambiguous (e.g. "Staré Mesto" exists in Bratislava AND Košice), so the
   // city dimension is what makes a national pivot/export legible.
   // Krajina (country) — top of the location hierarchy, above Mesto. Sourced
-  // from flats_archive.country (SK/CZ); shown as readable "Slovensko"/"Česko"
-  // so the client accessor and the server grain (pivot_grain CASE) agree.
+  // from flats_archive.country (SK/CZ); the record path shows it as readable
+  // "Slovensko"/"Česko". The server grain does NOT: analytics_pivot returns the
+  // raw code (analytics.dim_registry country = f.country_code), so a table
+  // rendered from the grain, and a Krajina filter's value list, read SK/CZ. The
+  // two agreed only while pivot_grain (retired 2026-09-28) carried the same CASE.
   // Podčasť (sub_district) — finer than district (a project's micro-location,
   // e.g. "Nový downtown"); backed by analytics.dim_registry.sub_district.
   country:           { label: "Krajina",                     group: "location", type: "text",   accessor: (r) => r.country === "SK" ? "Slovensko" : r.country === "CZ" ? "Česko" : (r.country || null) },
@@ -937,14 +940,16 @@ function buildTree(records, rowFields, colFields, valueDefs) {
 }
 
 /* ═══ Server-side aggregation (forever perf fix) ════════════════════════════
-   pivot_grain returns one row per group with DECOMPOSABLE measure components,
+   analytics_pivot returns one row per group with DECOMPOSABLE measure components,
    so we rebuild the SAME tree shape buildTree produces — but by summing
    components up the hierarchy instead of holding 152k records. Identical math
    for count/sum/avg/min/max + the 4 measures. A config is "server-able" only
-   when every value uses those aggs on a supported field, every dim is
-   whitelisted, and the only active filters are time (datum / snapshot_month).
-   Anything else (median, count_distinct, rare fields, ad-hoc filters) → the
-   caller keeps the existing record path. */
+   when every value uses those aggs on a supported field, every dim is in
+   SERVERABLE_DIMS, and every active filter is on such a dim or on a range-able
+   numeric field (isServerable). Anything else (median, count_distinct, rare
+   fields, filters the engine cannot map) → the caller keeps the existing record
+   path. (Its predecessor pivot_grain served this until 2026-06-17 and was
+   dropped from the database on 2026-09-28.) */
 // Server-able dimensions. CONTRACT: every key here MUST be an enabled key in
 // analytics.dim_registry (the DB single-source-of-truth that the engine resolves
 // against). This set is therefore a curated SUBSET of the registry — registry dims
@@ -1039,7 +1044,7 @@ function buildPivotSpec({ dims, filters, country, isCurrent }) {
 }
 
 /* A filter field whose distinct values can be fetched server-side via ONE fast
-   pivot_grain(p_dims=[field]) call, instead of pulling all ~30k records just to
+   analytics_pivot(dims=[field]) call, instead of pulling all ~30k records just to
    list a handful of values. Eligible = a server-able dimension that is categorical
    (NOT a numeric range — those need min/max/median stats computed from records) and
    NOT a time field (datum/snapshot_month synthesize options from the light
@@ -1307,10 +1312,10 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   const [rows,    setRows]    = useState(persisted?.rows   ?? DEFAULT_ROWS);
   const [cols,    setCols]    = useState(persisted?.cols   ?? DEFAULT_COLS);
   const [values,  setValues]  = useState(persisted?.values ?? DEFAULT_VALUES);
-  // Forever perf fix (2026-06-11): server-able configs render from the pivot_grain
+  // Forever perf fix (2026-06-11): server-able configs render from the analytics_pivot
   // RPC (instant), and we fetch raw rows ONLY when a config can't be aggregated
-  // server-side (median / count_distinct / rare field / ad-hoc filter) or the user
-  // drills into a cell. forceRaw flips us onto that record path.
+  // server-side (median / count_distinct / rare field / unmappable filter) or the
+  // user drills into a cell. forceRaw flips us onto that record path.
   const [forceRaw, setForceRaw] = useState(false);
   const { months: archiveMonths } = useArchiveMonths();
   const { days: archiveDays } = useArchiveDays();
@@ -1768,11 +1773,12 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   );
 
   // ── Server-side aggregation gate (forever perf fix) ───────────────
-  // configServerable = the current config can be answered by pivot_grain
-  // (whitelisted dims, decomposable aggs, time-only filters). When true the
-  // table renders from the grain — no 152k-row archive pull. forceRaw is
-  // independent: it pulls records for a drill-down (table stays on the grain)
-  // or to back a non-server-able config (median / ad-hoc filter / rare field).
+  // configServerable = the current config can be answered by analytics_pivot
+  // (SERVERABLE_DIMS dims, decomposable aggs, filters the engine can map — see
+  // isServerable). When true the table renders from the grain — no 152k-row
+  // archive pull. forceRaw is independent: it pulls records for a drill-down
+  // (table stays on the grain) or to back a non-server-able config (median /
+  // unmappable filter / rare field).
   const configServerable = useMemo(
     () => canViewAnalytics && isServerable(rows, cols, effectiveValues, effectiveFilters),
     [canViewAnalytics, rows, cols, effectiveValues, effectiveFilters]
@@ -1821,7 +1827,7 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   }, [canViewAnalytics, forceRaw, filterPopup]);
 
   // Server-side distinct values for the OPEN filter popover, when the field is a
-  // server-able categorical dim — one pivot_grain(p_dims=[field]) call instead of a
+  // server-able categorical dim — one analytics_pivot(dims=[field]) call instead of a
   // ~30k-row pull. Scope mirrors the table (month/date); narrowed by the stav filter
   // for OTHER fields, but a field's own value list is never narrowed by itself.
   const popupField = filterPopup?.key || null;
@@ -2615,7 +2621,7 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
       {filterPopup && (() => {
         const current = filters.find(f => f.key === filterPopup.key);
         // FAST PATH — server-able categorical field: its distinct values come from
-        // the grain (one pivot_grain(p_dims=[field]) RPC via usePivotDistinct), so we
+        // the grain (one analytics_pivot(dims=[field]) RPC via usePivotDistinct), so we
         // skip BOTH the ~30k-row records pull and the contextual record-filtering.
         // This is the forever-fix for "opening a filter dragged the whole dataset".
         if (popupUsesGrain) {

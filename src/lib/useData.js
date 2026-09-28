@@ -1588,8 +1588,10 @@ export function useArchiveMonths() {
  * The pivot pulled the whole latest month (152k rows, ~60s) to show one day.
  * useArchiveDays gives the scrape-day list (seed + datum popover) without records;
  * usePivotGrain returns server-aggregated grain rows for "server-able" configs
- * (decomposable aggs + whitelisted dims + time-only filters). The client rebuilds
- * the tree from the grain; non-server-able configs fall back to the raw path. */
+ * (decomposable aggs + registered dims + any filter the engine can map). The name
+ * predates the engine: it calls rpc("analytics_pivot"), not the retired pivot_grain.
+ * The client rebuilds the tree from the grain; non-server-able configs fall back to
+ * the raw path. */
 let _archiveDaysCache = new Map();
 /** Distinct scrape days (YYYY-MM-DD, DESC) for the current country. Light + cached.
  *  archive_days is RLS-gated (anon → none; free → only their chosen project's days;
@@ -1720,14 +1722,16 @@ export function useSales({ enabled = false, spec = null } = {}) {
   return { data, loading, error };
 }
 
-// Cache for server-side distinct filter values — one fast pivot_grain(p_dims=[field])
+// Cache for server-side distinct filter values — one fast analytics_pivot(dims=[field])
 // call instead of pulling the whole archive (~30k rows) just to populate a dropdown.
 const _pivotDistinctCache = new Map();
 
 /* usePivotDistinct — distinct values of ONE categorical field, server-side.
-   Calls pivot_grain grouped by [field]: each grain row is {d:[value], m:{n}}, so the
-   row keys ARE the field's distinct values, computed by the SAME server CASE the
-   client accessor mirrors (so they match what records-side filtering compares).
+   Calls analytics_pivot grouped by [field]: each grain row is {d:[value], m:{…}}, so the
+   row keys ARE the field's distinct values as the engine resolves them
+   (analytics.dim_registry). They equal what records-side filtering compares wherever
+   the client accessor returns the stored value unchanged; country does not (engine
+   SK/CZ, accessor Slovensko/Česko — see FIELDS.country in PivotV2.jsx).
    Returns the same {values, hasEmpty} shape distinctValuesForField() yields for a
    TEXT field, so FilterPopover can consume it interchangeably — WITHOUT a records pull. */
 export function usePivotDistinct({ enabled = false, field = null, months = null, dates = null, stav = null, mode = null, city = null } = {}) {
