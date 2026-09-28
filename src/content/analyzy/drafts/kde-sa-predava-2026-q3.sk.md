@@ -16,28 +16,48 @@ Ponuka, ceny a predaj nových bytov v slovenských obciach od 1. júla do 27. se
 - Pri tempe predaja od 1. júla do 27. septembra 2026 by sa ponuka najrýchlejšie vypredala v lokalite Prešov (za 12,3 mesiaca), najpomalšie v lokalite Banská Bystrica (za 45,2 mesiaca).
 - Najvyššiu priemernú cenu za meter štvorcový má lokalita Bratislava (5 705 €/m²), najnižšiu lokalita Piešťany (3 158 €/m²).
 
-## Obce
+## Ponuka a predaj
 
-**Ponuka, ceny a predaj nových bytov podľa obcí v 3. štvrťroku 2026**
+**Ponuka, predaj a mesiace do vypredania podľa obcí v 3. štvrťroku 2026**
 
-| Obec | V ponuke | €/m² s DPH | Priemerná cena | Predané | Mesiace do vypredania |
-|---|---:|---:|---:|---:|---:|
-| Bratislava | 4 204 | 5 705 € | 381 207 € | 578 | 21,3 |
-| Košice | 668 | 4 586 € | 318 941 € | 124 | 15,8 |
-| Trnava | 578 | 4 082 € | 231 186 € | 75 | 22,5 |
-| Nitra | 535 | 3 498 € | 215 648 € | 45 | 34,8 |
-| Prešov | 500 | 3 720 € | 253 103 € | 119 | 12,3 |
-| Zvolen | 398 | 3 583 € | 231 785 € | 2 | — |
-| Poprad | 353 | 3 660 € | 231 511 € | 15 | — |
-| Trenčín | 273 | 3 998 € | 277 540 € | 64 | 12,5 |
-| Banská Bystrica | 232 | 3 853 € | 222 357 € | 15 | 45,2 |
-| Liptovský Mikuláš | 227 | 3 975 € | 253 051 € | 7 | — |
-| Žilina | 212 | 4 237 € | 267 904 € | 39 | 15,9 |
-| Piešťany | 128 | 3 158 € | 236 282 € | 6 | — |
-| Dunajská Streda | 102 | — | — | 4 | — |
-| Martin | 102 | — | — | 23 | — |
-| Spišská Nová Ves | 69 | — | — | 1 | — |
-| Lučenec | 57 | — | — | 1 | — |
-| Banská Štiavnica | 56 | — | — | 0 | — |
-| Ostatné obce (33) | 859 | — | — | 64 | — |
-| **Slovensko spolu** | **9 553** | **4 709 €** | **309 550 €** | **1 182** | **23,6** |
+| Obec | Ponuka | Predané | Mesiace |
+|---|---:|---:|---:|
+| Bratislava | 4 204 | 578 | 21,3 |
+| Košice | 668 | 124 | 15,8 |
+| Trnava | 578 | 75 | 22,5 |
+| Nitra | 535 | 45 | 34,8 |
+| Prešov | 500 | 119 | 12,3 |
+| Zvolen | 398 | 2 | — |
+| Poprad | 353 | 15 | — |
+| Trenčín | 273 | 64 | 12,5 |
+| Banská Bystrica | 232 | 15 | 45,2 |
+| Liptovský Mikuláš | 227 | 7 | — |
+| Žilina | 212 | 39 | 15,9 |
+| Piešťany | 128 | 6 | — |
+| Dunajská Streda | 102 | 4 | — |
+| Martin | 102 | 23 | — |
+| Spišská Nová Ves | 69 | 1 | — |
+| Lučenec | 57 | 1 | — |
+| Banská Štiavnica | 56 | 0 | — |
+| Ostatné obce (33) | 859 | 64 | — |
+| **Slovensko spolu** | **9 553** | **1 182** | **23,6** |
+
+## Ceny
+
+**Priemerné ceny nových bytov podľa obcí v 3. štvrťroku 2026 (s DPH)**
+
+| Obec | Cena bytu | Cena za m² |
+|---|---:|---:|
+| Bratislava | 381 207 € | 5 705 € |
+| Košice | 318 941 € | 4 586 € |
+| Trnava | 231 186 € | 4 082 € |
+| Nitra | 215 648 € | 3 498 € |
+| Prešov | 253 103 € | 3 720 € |
+| Zvolen | 231 785 € | 3 583 € |
+| Poprad | 231 511 € | 3 660 € |
+| Trenčín | 277 540 € | 3 998 € |
+| Banská Bystrica | 222 357 € | 3 853 € |
+| Liptovský Mikuláš | 253 051 € | 3 975 € |
+| Žilina | 267 904 € | 4 237 € |
+| Piešťany | 236 282 € | 3 158 € |
+| **Slovensko spolu** | **309 550 €** | **4 709 €** |

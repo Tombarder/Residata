@@ -1,8 +1,8 @@
 <!--PEREX
-Mediánové ceny nových bytov podľa počtu izieb v 10 slovenských mestách: cena celého bytu a cena za meter štvorcový.
+Mediánové ceny nových bytov podľa počtu izieb v 11 slovenských mestách: cena celého bytu a cena za meter štvorcový.
 -->
 <!--METHOD
-Údaje pochádzajú z verejne zverejnených cenníkov developerov, ktoré Residata číta denne, byt po byte. Ide o novostavby — voľné, rezervované a predrezervované byty v aktívnych projektoch, nie starší bytový fond a nie inzeráty; počítajú sa výlučne byty, nie parkovanie, pivnice ani nebytové priestory. Ceny sú s DPH a pochádzajú z bytov, pri ktorých developer cenu zverejňuje. Uvádzame medián, nie priemer: jeden drahý byt posunie priemer, medián nie. Medián je priemerom denných mediánov za posledné dva týždne obdobia, aby jeden deň neurčoval celé číslo. Cenu za meter počítame na obytnú plochu. Polovičné dispozície zaokrúhľujeme nadol — byt s jednou a pol izbou je vedený ako jednoizbový, s dvoma a pol izbami ako dvojizbový. Projekt je zaradený do mesta, v ktorom stojí. Bunka tabuľky je vyplnená pri aspoň 10 bytoch z aspoň 3 projektov a mesto je v tabuľke, ak má takto vyplnené aspoň 3 kategórie.
+Údaje pochádzajú z verejne zverejnených cenníkov developerov, ktoré Residata číta denne, byt po byte. Ide o novostavby — voľné, rezervované a predrezervované byty v aktívnych projektoch, nie starší bytový fond a nie inzeráty; počítajú sa výlučne byty, nie parkovanie, pivnice ani nebytové priestory. Ceny sú s DPH a pochádzajú z bytov, pri ktorých developer cenu zverejňuje. Uvádzame medián, nie priemer: jeden drahý byt posunie priemer, medián nie. Medián je priemerom denných mediánov za posledné dva týždne obdobia, aby jeden deň neurčoval celé číslo. Cenu za meter počítame na obytnú plochu. Polovičné dispozície zaokrúhľujeme nadol — byt s jednou a pol izbou je vedený ako jednoizbový, s dvoma a pol izbami ako dvojizbový. Projekt je zaradený do mesta, v ktorom stojí. Mesto je v tabuľke danej kategórie pri aspoň 10 bytoch z aspoň 3 projektov.
 -->
 27. septembra 2026 | CENY NOVÝCH BYTOV PODĽA POČTU IZIEB — Slovensko
 
@@ -14,41 +14,71 @@ Mediánové ceny nových bytov podľa počtu izieb v 10 slovenských mestách: c
 - Mediánová cena dvojizbového bytu: najvyššia Bratislava (268 784 €), najnižšia Nitra (195 242 €).
 - Mediánová cena trojizbového bytu: najvyššia Bratislava (376 225 €), najnižšia Nitra (232 451 €).
 - Mediánová cena štvor- a viacizbového bytu: najvyššia Bratislava (587 567 €), najnižšia Nitra (297 009 €).
-
-## Cena bytu
-
-**Mediánová cena nového bytu podľa počtu izieb (€ s DPH)**
-
-| Mesto | 1-izbový | 2-izbový | 3-izbový | 4- a viacizbový |
-|---|---:|---:|---:|---:|
-| Bratislava | 207 991 € | 268 784 € | 376 225 € | 587 567 € |
-| Košice | 149 900 € | 259 822 € | 332 045 € | 539 900 € |
-| Trnava | 159 500 € | 199 599 € | 249 429 € | 348 750 € |
-| Nitra | 151 014 € | 195 242 € | 232 451 € | 297 009 € |
-| Prešov | — | 204 000 € | 291 357 € | 375 000 € |
-| Trenčín | — | 203 842 € | 296 286 € | 404 081 € |
-| Zvolen | 140 571 € | 203 629 € | 290 886 € | — |
-| Banská Bystrica | 151 990 € | 199 990 € | 255 526 € | 419 000 € |
-| Žilina | 156 400 € | 228 092 € | 284 624 € | 394 647 € |
-| Liptovský Mikuláš | 151 642 € | 217 854 € | 334 018 € | — |
-
 - Mediánový trojizbový byt je drahší než dvojizbový najviac v lokalite Liptovský Mikuláš (o 53,3 %), najmenej v lokalite Nitra (o 19,1 %); v Bratislave o 40,0 %.
+- V 10 z 11 miest je meter v trojizbovom byte lacnejší než v dvojizbovom. Výnimkou je Liptovský Mikuláš, kde je to naopak.
 
-## Cena za meter štvorcový
+## Jednoizbové byty
 
-**Mediánová cena nového bytu za meter štvorcový podľa počtu izieb (€/m² s DPH)**
+**Mediánová cena nového jednoizbového bytu podľa mesta v 3. štvrťroku 2026 (s DPH)**
 
-| Mesto | 1-izbový | 2-izbový | 3-izbový | 4- a viacizbový |
-|---|---:|---:|---:|---:|
-| Bratislava | 6 067 € | 5 208 € | 5 202 € | 5 402 € |
-| Košice | 5 281 € | 4 672 € | 4 292 € | 4 831 € |
-| Trnava | 5 495 € | 4 037 € | 3 587 € | 3 543 € |
-| Nitra | 4 031 € | 3 615 € | 3 268 € | 3 317 € |
-| Prešov | — | 3 871 € | 3 581 € | 3 502 € |
-| Trenčín | — | 3 833 € | 3 718 € | 3 867 € |
-| Zvolen | 3 537 € | 3 535 € | 3 508 € | — |
-| Banská Bystrica | 4 340 € | 3 963 € | 3 750 € | 3 638 € |
-| Žilina | 4 561 € | 4 264 € | 3 901 € | 4 000 € |
-| Liptovský Mikuláš | 3 858 € | 3 864 € | 3 890 € | — |
+| Mesto | Cena bytu | Cena za m² |
+|---|---:|---:|
+| Bratislava | 207 991 € | 6 067 € |
+| Košice | 149 900 € | 5 281 € |
+| Trnava | 159 500 € | 5 495 € |
+| Nitra | 151 014 € | 4 031 € |
+| Zvolen | 140 571 € | 3 537 € |
+| Banská Bystrica | 151 990 € | 4 340 € |
+| Žilina | 156 400 € | 4 561 € |
+| Liptovský Mikuláš | 151 642 € | 3 858 € |
 
-- V 9 z 10 miest je meter v trojizbovom byte lacnejší než v dvojizbovom. Výnimkou je Liptovský Mikuláš, kde je to naopak.
+## Dvojizbové byty
+
+**Mediánová cena nového dvojizbového bytu podľa mesta v 3. štvrťroku 2026 (s DPH)**
+
+| Mesto | Cena bytu | Cena za m² |
+|---|---:|---:|
+| Bratislava | 268 784 € | 5 208 € |
+| Košice | 259 822 € | 4 672 € |
+| Trnava | 199 599 € | 4 037 € |
+| Nitra | 195 242 € | 3 615 € |
+| Prešov | 204 000 € | 3 871 € |
+| Trenčín | 203 842 € | 3 833 € |
+| Zvolen | 203 629 € | 3 535 € |
+| Banská Bystrica | 199 990 € | 3 963 € |
+| Poprad | 207 312 € | 3 616 € |
+| Žilina | 228 092 € | 4 264 € |
+| Liptovský Mikuláš | 217 854 € | 3 864 € |
+
+## Trojizbové byty
+
+**Mediánová cena nového trojizbového bytu podľa mesta v 3. štvrťroku 2026 (s DPH)**
+
+| Mesto | Cena bytu | Cena za m² |
+|---|---:|---:|
+| Bratislava | 376 225 € | 5 202 € |
+| Košice | 332 045 € | 4 292 € |
+| Trnava | 249 429 € | 3 587 € |
+| Nitra | 232 451 € | 3 268 € |
+| Prešov | 291 357 € | 3 581 € |
+| Trenčín | 296 286 € | 3 718 € |
+| Zvolen | 290 886 € | 3 508 € |
+| Banská Bystrica | 255 526 € | 3 750 € |
+| Poprad | 267 490 € | 3 536 € |
+| Žilina | 284 624 € | 3 901 € |
+| Liptovský Mikuláš | 334 018 € | 3 890 € |
+
+## Štvor- a viacizbové byty
+
+**Mediánová cena nového štvor- a viacizbového bytu podľa mesta v 3. štvrťroku 2026 (s DPH)**
+
+| Mesto | Cena bytu | Cena za m² |
+|---|---:|---:|
+| Bratislava | 587 567 € | 5 402 € |
+| Košice | 539 900 € | 4 831 € |
+| Trnava | 348 750 € | 3 543 € |
+| Nitra | 297 009 € | 3 317 € |
+| Prešov | 375 000 € | 3 502 € |
+| Trenčín | 404 081 € | 3 867 € |
+| Banská Bystrica | 419 000 € | 3 638 € |
+| Žilina | 394 647 € | 4 000 € |

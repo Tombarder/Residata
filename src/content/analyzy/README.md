@@ -159,15 +159,24 @@ price and the days the pace is divided by.
 Both are DATA issues: the table is the article, and every sentence is an
 extreme or a count of it, generated whole in `render.py`.
 
-- **`kde-sa-predava-<q>`** — supply, price, sales and months to sell out, one
-  row per obec. Built by the same code as every town's issue
-  (`issue_report --scope sk:obce --json-only`), so a town's row IS that
-  issue's figure. The template is its own (`kde-sa-predava-<q>.sk.md.tmpl`);
-  the share card is `issue_report._share_card(..., name="Slovensko podľa obcí")`.
-- **`co-stoji-byt-<q>`** — median price and €/m² by town and number of rooms,
-  from `market_report --json-only` (`cityByDisposition`). No cell rests on
-  fewer than 3 projects or 10 flats; a town needs three filled layouts. The
-  share card is `issue_report.city_disposition_card`.
+- **`kde-sa-predava-<q>`** — one row per obec in two tables: supply, sales
+  and months to sell out; then flat price and €/m². Built by the same code as
+  every town's issue (`issue_report --scope sk:obce --json-only`), so a town's
+  row IS that issue's figure. The template is its own
+  (`kde-sa-predava-<q>.sk.md.tmpl`); the share card is
+  `issue_report._share_card(..., name="Slovensko podľa obcí")`.
+- **`co-stoji-byt-<q>`** — one table per flat size: median flat price and
+  median €/m² by town, from `market_report --json-only` (`cityByDisposition`).
+  No cell rests on fewer than 3 projects or 10 flats; a town is in a size's
+  table when that cell clears them. The share card is
+  `issue_report.city_disposition_card`.
+
+🔴 **An article table has at most four short columns.** The page gives a table
+311px on a 375px phone (measured 2026-09-28): six columns needed 563px and a
+town × size matrix 424px, so the last columns sat behind a sideways scroll
+with a cut number showing. Four columns with short headers need 289px, three
+need 258px. A long header ("Mesiace do vypredania") alone pushes a
+four-column table to 385px — put the words in the table's title instead.
 
 ## Re-publishing an issue whose quarter has closed
 

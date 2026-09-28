@@ -1,6 +1,6 @@
 {
   "asOf": "2026-09-27",
-  "generatedAt": "2026-09-28T11:20:38+00:00",
+  "generatedAt": "2026-09-28T11:41:53+00:00",
   "bratislavaReport": {
     "thenDate": "2026-07-24",
     "nowDate": "2026-09-27",
@@ -1165,6 +1165,7 @@
       "Bratislava",
       "Košice",
       "Nitra",
+      "Poprad",
       "Prešov",
       "Trenčín",
       "Trnava",
@@ -1476,6 +1477,28 @@
         "total": 181
       },
       {
+        "city": "Poprad",
+        "cells": {
+          "2": {
+            "n": 122,
+            "projects": 6,
+            "medPrice": 207312,
+            "medM2": 3616,
+            "meanArea": 56.9,
+            "keptUnits": 32,
+            "changePct": 0.28
+          },
+          "3": {
+            "n": 46,
+            "projects": 6,
+            "medPrice": 267490,
+            "medM2": 3536,
+            "meanArea": 77.0
+          }
+        },
+        "total": 168
+      },
+      {
         "city": "Žilina",
         "cells": {
           "1": {
@@ -1547,10 +1570,9 @@
         "total": 112
       }
     ],
-    "townCount": 10,
+    "townCount": 11,
     "minCell": 10,
     "minProjects": 3,
-    "minLayouts": 3,
     "stepDearest": {
       "city": "Liptovský Mikuláš",
       "pct": 53.3

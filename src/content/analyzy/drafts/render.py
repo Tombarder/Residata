@@ -269,54 +269,8 @@ def okres_sales_table(rep: dict, lang: str) -> str:
 
 
 
-ROOM_COL_SK = {"1": "1-izbový", "2": "2-izbový", "3": "3-izbový", "4+": "4- a viacizbový"}
-ROOM_COL_EN = {"1": "1-room", "2": "2-room", "3": "3-room", "4+": "4-room and larger"}
 
 
-def city_disposition_table(rep: dict, lang: str, field: str) -> str:
-    """What each layout costs, town by town. `field` is medPrice or medM2."""
-    cd = rep["cityByDisposition"]
-    names = ROOM_COL_SK if lang == "sk" else ROOM_COL_EN
-    first = "Mesto" if lang == "sk" else "Town"
-    head = ("| " + first + " | " + " | ".join(names[d] for d in cd["dispositions"]) + " |"
-            + "\n|---" + "|---:" * len(cd["dispositions"]) + "|")
-    rows = []
-    for r in cd["rows"]:
-        cells = []
-        for d in cd["dispositions"]:
-            c = r["cells"].get(d)
-            cells.append(f"{sk_int(c[field])} €" if c else "—")
-        rows.append(f"| {r['city']} | " + " | ".join(cells) + " |")
-    return head + "\n" + "\n".join(rows)
-
-
-def city_change_table(rep: dict, lang: str) -> str:
-    """And what the SAME flats did over the quarter. A cell with too small a
-    panel prints nothing rather than a number built on a handful of flats."""
-    cd = rep["cityByDisposition"]
-    names = ROOM_COL_SK if lang == "sk" else ROOM_COL_EN
-    first = "Mesto" if lang == "sk" else "Town"
-    head = ("| " + first + " | " + " | ".join(names[d] for d in cd["dispositions"]) + " |"
-            + "\n|---" + "|---:" * len(cd["dispositions"]) + "|")
-    dec = sk_dec if lang == "sk" else en_dec
-    rows = []
-    for r in cd["rows"]:
-        cells = []
-        for d in cd["dispositions"]:
-            c = r["cells"].get(d) or {}
-            if c.get("changePct") is None:
-                cells.append("—")
-            else:
-                sign = "+" if c["changePct"] >= 0 else "−"
-                cells.append(f"{sign}{dec(abs(c['changePct']), 2)} %")
-            
-        rows.append(f"| {r['city']} | " + " | ".join(cells) + " |")
-    return head + "\n" + "\n".join(rows)
-
-
-
-
-# ── the Bratislava quarterly overview ────────────────────────────────────
 def overview_supply_table(rep: dict, lang: str) -> str:
     """Supply by okres, with what a buyer can actually move into.
 
@@ -1049,6 +1003,33 @@ _CD_GEN = {"1": "jednoizbového", "2": "dvojizbového", "3": "trojizbového",
            "4+": "štvor- a viacizbového"}
 
 
+_CD_SECTION = {"1": "Jednoizbové byty", "2": "Dvojizbové byty", "3": "Trojizbové byty",
+               "4+": "Štvor- a viacizbové byty"}
+
+
+def _cd_sections(cd: dict, quarter_sk: str) -> str:
+    """One section per layout: town, median flat price, median €/m².
+
+    🔴 A FIVE-COLUMN MATRIX DOES NOT FIT A PHONE. Measured on the live page at
+    375px: the town × layout matrix needed 424px in a 311px column, so the last
+    layouts sat behind a sideways scroll with a cut number showing. Three
+    columns need 258px. It is also the shape of the format this issue follows
+    (Nehnutelnosti.sk print one table per layout). Towns keep the same order in
+    every table — by the size of their offer — so a reader can go across."""
+    out = []
+    for d in cd["dispositions"]:
+        rows = [r for r in cd["rows"] if d in r["cells"]]
+        if not rows:
+            continue
+        out += [f"## {_CD_SECTION.get(d, d)}", "",
+                f"**Mediánová cena nového {_CD_GEN.get(d, d)} bytu podľa mesta v {quarter_sk} (s DPH)**",
+                "", "| Mesto | Cena bytu | Cena za m² |", "|---|---:|---:|"]
+        out += [f"| {r['city']} | {sk_int(r['cells'][d]['medPrice'])} € | "
+                f"{sk_int(r['cells'][d]['medM2'])} € |" for r in rows]
+        out.append("")
+    return "\n".join(out).rstrip()
+
+
 def _cd_range_bullets(cd: dict) -> str:
     """One bullet per layout: the dearest and the cheapest town's median.
 
@@ -1143,23 +1124,30 @@ def _obce_vars(rep: dict, period_sk: str) -> dict:
 
     shown = sorted((t for t in sup if shows(t)), key=lambda t: (-sup[t]["n"], t))
     rest = [t for t in set(sup) | set(sal) if t not in shown]
-    lines = ["| Obec | V ponuke | €/m² s DPH | Priemerná cena | Predané | Mesiace do vypredania |",
-             "|---|---:|---:|---:|---:|---:|"]
+    # 🔴 TWO TABLES OF THREE AND FOUR COLUMNS, NOT ONE OF SIX. Measured on the
+    # live page at 375px: six columns needed 563px in a 311px column, so on a
+    # phone the prices, sales and pace sat behind a sideways scroll with a cut
+    # "38…" showing. Four columns with the header "Ponuka" need 289px, three
+    # need 258px. Both tables list the towns in the same order.
+    lines = ["| Obec | Ponuka | Predané | Mesiace |", "|---|---:|---:|---:|"]
     for t in shown:
-        a, mo = sup[t], pace(t)
-        price = (f"{sk_int(a['m2'])} € | {sk_int(a['price'])} €" if priced(a) else "— | —")
-        lines.append(f"| {t} | {sk_int(a['n'])} | {price} | {sk_int((sal.get(t) or {}).get('n', 0))} | "
+        mo = pace(t)
+        lines.append(f"| {t} | {sk_int(sup[t]['n'])} | {sk_int((sal.get(t) or {}).get('n', 0))} | "
                      f"{sk_dec(mo) if mo is not None else '—'} |")
     r_n = sum(sup[t]["n"] for t in rest if t in sup)
     r_s = sum(sal[t]["n"] for t in rest if t in sal)
     r_k = sum(1 for t in rest if t != "(neuvedené)")
     if r_n or r_s:
-        lines.append(f"| Ostatné obce ({sk_int(r_k)}) | {sk_int(r_n)} | — | — | {sk_int(r_s)} | — |")
+        lines.append(f"| Ostatné obce ({sk_int(r_k)}) | {sk_int(r_n)} | {sk_int(r_s)} | — |")
     mo_all = _months_to_clear(tot, sold, days)
-    lines.append(f"| **Slovensko spolu** | **{sk_int(tot)}** | "
-                 f"**{sk_int(city_m2) + ' €' if city_m2 else '—'}** | "
-                 f"**{sk_int(ov['mean_price']) + ' €' if ov.get('mean_price') else '—'}** | "
-                 f"**{sk_int(sold)}** | **{sk_dec(mo_all) if mo_all is not None else '—'}** |")
+    lines.append(f"| **Slovensko spolu** | **{sk_int(tot)}** | **{sk_int(sold)}** | "
+                 f"**{sk_dec(mo_all) if mo_all is not None else '—'}** |")
+    prices = ["| Obec | Cena bytu | Cena za m² |", "|---|---:|---:|"]
+    prices += [f"| {t} | {sk_int(sup[t]['price'])} € | {sk_int(sup[t]['m2'])} € |"
+               for t in shown if priced(sup[t])]
+    prices.append(f"| **Slovensko spolu** | "
+                  f"**{sk_int(ov['mean_price']) + ' €' if ov.get('mean_price') else '—'}** | "
+                  f"**{sk_int(city_m2) + ' €' if city_m2 else '—'}** |")
 
     towns_with = sum(1 for t, a in sup.items() if a["n"] >= 1 and t != "(neuvedené)")
     top = shown[:3]
@@ -1183,7 +1171,8 @@ def _obce_vars(rep: dict, period_sk: str) -> dict:
         price_bullet = (f"- Najvyššiu priemernú cenu za meter štvorcový má lokalita {d_} "
                         f"({sk_int(dm)} €/m²), najnižšiu lokalita {c_} ({sk_int(cm)} €/m²).")
     return {
-        "obceTable": "\n".join(lines),
+        "obceSupplyTable": "\n".join(lines),
+        "obcePriceTable": "\n".join(prices),
         "obceTowns": (f"v {sk_int(towns_with)} obci" if towns_with == 1
                       else f"v {sk_int(towns_with)} obciach"),
         "obceShown": sk_int(len(shown)),
@@ -1215,17 +1204,10 @@ def _issue_specific_vars(rep: dict) -> dict:
         cd = rep["cityByDisposition"]
         dec = lambda v, n=1: sk_dec(v, n)
         out.update({
-            "cdPriceTable": city_disposition_table(rep, "sk", "medPrice"),
-            "cdPriceTableEn": city_disposition_table(rep, "en", "medPrice"),
-            "cdM2Table": city_disposition_table(rep, "sk", "medM2"),
-            "cdM2TableEn": city_disposition_table(rep, "en", "medM2"),
-            "cdChangeTable": city_change_table(rep, "sk"),
-            "cdChangeTableEn": city_change_table(rep, "en"),
+            "cdDispositionSections": _cd_sections(cd, out.get("quarterSk", "")),
             "cdTowns": cd["townCount"],
             "cdMinCell": cd["minCell"],
             "cdMinProjects": cd.get("minProjects", 3),
-            "cdMinLayoutsPhrase": sk_count(int(cd.get("minLayouts", 3)),
-                                           "kategóriu", "kategórie", "kategórií"),
             "cdRangeBullets": _cd_range_bullets(cd),
             "cdStepSentence": _cd_step_sentence(cd),
             "cdM2Sentence": _cd_m2_sentence(cd),
