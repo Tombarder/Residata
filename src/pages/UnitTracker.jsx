@@ -36,10 +36,10 @@
  *   8. CSV export — one row per (unit, month) for valuers/banks
  *      who paste comparables into their own reports
  */
-import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback, Fragment } from "react";
 import { statusLabel, listingStatus, OFF_LIST } from "../lib/unitStatus";
 import Picker from "../components/Picker";
-import { useProjects, useUnitSummaries, useUnitHistories, useUnitSearch, useProjectUnitsSeries, useArchiveMonths } from "../lib/useData";
+import { useProjects, useUnitSummaries, useUnitHistories, useUnitSearch, useProjectUnitsSeries, useArchiveMonths, useUnitListing } from "../lib/useData";
 import { useAccountPrefState } from "../lib/useAccountUiPref";
 import { useCapabilities } from "../lib/useCapabilities";
 import { track } from "../lib/track";
@@ -47,10 +47,7 @@ import { localeTag, formatDimNumber } from "../lib/locale";
 import { moneyFromEur, moneySymbol, formatMoney, formatPerM2 as formatPerM2Money } from "../lib/money";
 import { useCurrency } from "../lib/useCurrency";
 import { useSpecifics, UnitPriceMarks } from "../lib/projectSpecifics";
-import FieldPanel from "../components/FieldPanel";
-import { FilterChips } from "../components/FlatWorkbench";
-import { useFlatFilters } from "../lib/useFlatFilters";
-import { FLAT_FIELD_BY_KEY, FLAT_CAT_ORDER, FLAT_CAT_LABEL, flatValue } from "../lib/flatFields";
+import FlatWorkbench from "../components/FlatWorkbench";
 
 const mono   = "'JetBrains Mono', monospace";
 import { accent as green, accentInk, orange, dim, text, border, bg, surfaceDark as bg2, surfacePanel as panel , orangeInk} from "../lib/theme";
@@ -241,7 +238,7 @@ export default function UnitTracker({ lang = "sk", setCurrent }) {
       unit_id: u.unit_id,
       izby: u.izby,
       obytna_plocha: u.obytna_plocha,
-      latest_stav: u.latest_stav,
+      stav: listingStatus(u),            // the database's verdict — a sold flat that vanished is "P"
       latest_price: u.cena_s_dph,        // already EUR-overlaid by the hook
       series: u.series || null,          // compact EUR price series (grid sparkline); null for search/compare tiles
     };
@@ -286,8 +283,7 @@ export default function UnitTracker({ lang = "sk", setCurrent }) {
       ...u,
       ...toTile(u),
       id: `${u.project_id}::${u.unit_id}`,
-      stav: listingStatus(u),
-      /* The grid names a flat by its unit_id everywhere — tile, chip, chart legend — so
+      /* The grid names a flat by its unit_id everywhere — row, chip, chart legend — so
          its filter must too, not by the display label the project page prefers. */
       unit_detail: null,
     })),
@@ -295,14 +291,20 @@ export default function UnitTracker({ lang = "sk", setCurrent }) {
   );
   const gridRowByKey = useMemo(() => new Map(gridRows.map((r) => [r.key, r])), [gridRows]);
 
-  /* The grid's filters: the same panel, fields and rules as Databáza bytov
-     (useFlatFilters → filterModel.matchesFilters), over this project's flats. */
-  const ff = useFlatFilters(gridRows, { lang });
+  /* The true status of EVERY picked flat, whichever project it is in — so the chart
+     legend and the status card never say "Voľný" about a flat the grid (or the ledger)
+     knows is sold. The grid's own rows are the fallback while it loads. */
+  const listingByKey = useUnitListing(pickedKeys);
+  const listingOf = useCallback(
+    (k) => listingByKey.get(k) || gridRowByKey.get(k) || null,
+    [listingByKey, gridRowByKey],
+  );
 
-  // Remember the Unit-timeline selection + filters per-account, across devices.
+  // Remember the Unit-timeline selection per-account, across devices. The flat list's
+  // own filters, columns and sort are remembered by the workbench ("unitTimelineFlats").
   useAccountPrefState(
     "unitTimeline",
-    { pickedKeys, projFilter, search, yMode, gridFilters: ff.filters },
+    { pickedKeys, projFilter, search, yMode },
     (s) => {
       if (Array.isArray(s.pickedKeys)) {
         setPickedKeys(s.pickedKeys.filter((k) => typeof k === "string" && k.includes("::")).slice(0, MAX_COMPARE));
@@ -310,7 +312,6 @@ export default function UnitTracker({ lang = "sk", setCurrent }) {
       if (s.projFilter !== undefined) setProjFilter(s.projFilter);
       if (s.search !== undefined) setSearch(s.search);
       if (s.yMode !== undefined) setYMode(s.yMode);
-      if (Array.isArray(s.gridFilters)) ff.restoreFilters(s.gridFilters);
     },
   );
 
@@ -401,7 +402,7 @@ export default function UnitTracker({ lang = "sk", setCurrent }) {
           {pickedKeys.length > 0 && (
             <DetailView
               pickedHistories={pickedHistories}
-              listingOf={(k) => gridRowByKey.get(k) || null}
+              listingOf={listingOf}
               comparables={comparables}
               loadingDetail={loadingDetail}
               yMode={yMode}
@@ -419,9 +420,9 @@ export default function UnitTracker({ lang = "sk", setCurrent }) {
               second grid, no separate "compare" mode (that was the confusing
               duplicate). The filter panel beside it is Databáza bytov's own. */}
           {projFilter && (
-            <UnitGrid
+            <ProjectFlatList
               project={projectById[projFilter]}
-              ff={ff}
+              rows={gridRows}
               loadingScope={loadingScope}
               search={search}
               pickedKeys={pickedKeys}
@@ -582,7 +583,7 @@ function PickerRow({ projects, globalResults, projectById, loadingGlobal, picked
 // Reusable unit tile used in global-search results, mini-grid, and
 // compare-mode sub-search. Same visual language across surfaces.
 function UnitTile({ unit, isPicked, disabled, onClick, lang, compact = false }) {
-  const stavCol = STAV_COLOR[unit.latest_stav] || dim;
+  const stavCol = STAV_COLOR[unit.stav] || dim;
   return (
     <button
       onClick={onClick}
@@ -601,7 +602,7 @@ function UnitTile({ unit, isPicked, disabled, onClick, lang, compact = false }) 
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "0.5rem", marginBottom: "0.2rem" }}>
         <strong style={{ color: isPicked ? green : text, fontSize: "0.86rem" }}>{unit.unit_id}</strong>
-        <span style={{ color: stavCol, fontSize: "0.7rem", fontWeight: 700 }}>{statusLabel(unit.latest_stav, lang, "one")}</span>
+        <span style={{ color: stavCol, fontSize: "0.7rem", fontWeight: 700 }}>{statusLabel(unit.stav, lang, "one")}</span>
       </div>
       <div style={{ fontSize: "0.7rem", color: dim, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
         {unit.project_name}
@@ -1513,9 +1514,9 @@ function LineChartSVG({ pickedHistories, comparables, focusKey = null, setFocusK
 
 // Compact price-trend sparkline for a grid tile. Takes the unit's EUR price
 // `series` (from project_units_series) directly — no full-history download.
-function MiniSparkline({ series }) {
+function MiniSparkline({ series, compact = false }) {
   const values = (series || []).filter(v => Number.isFinite(v));
-  if (values.length < 2) return null;
+  if (values.length < 2) return compact ? <span style={{ color: dim }}>—</span> : null;
   const min = Math.min(...values);
   const max = Math.max(...values);
   const range = max - min || 1;
@@ -1523,60 +1524,47 @@ function MiniSparkline({ series }) {
   const denom = Math.max(1, values.length - 1);
   const path = values.map((v, i) => `${i === 0 ? "M" : "L"} ${(i / denom) * W} ${H - ((v - min) / range) * H}`).join(" ");
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: 22, marginTop: "0.4rem", display: "block" }}>
-      <path d={path} stroke={green} strokeWidth="1.5" fill="none" opacity="0.8"/>
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none"
+      style={{ width: "100%", height: compact ? 18 : 22, marginTop: compact ? 0 : "0.4rem", display: "block" }}>
+      <path d={path} stroke={green} strokeWidth="1.5" fill="none" opacity="0.8" vectorEffect="non-scaling-stroke"/>
     </svg>
   );
 }
 
-const byUnitId = (a, b) => String(a.unit_id).localeCompare(String(b.unit_id), undefined, { numeric: true });
+/* The picked flat's swatch in the list's leading column — the chart's own line. */
+const PickSwatch = ({ index }) => <SeriesSwatch i={index} width={16} />;
 
-function UnitGrid({ project, ff, loadingScope, search, pickedKeys, togglePick, addPicks, lang }) {
+/* What the list shows before anyone chooses — the tiles' old content, as columns. */
+const BVC_DEFAULT_COLS = ["unit_id", "izby", "obytna_plocha", "budova", "poschodie", "cena_s_dph", "price_per_m2", "stav"];
+
+/**
+ * Byt v čase's list of a project's flats — THE SAME workbench as the project page and
+ * Databáza bytov (filters on every attribute, a column chooser, sort, all remembered per
+ * account), plus a column to pick flats for the chart and one with each flat's price
+ * trend. Boss, 2026-09-28: "why doesn't Byt v čase have all its attributes but only a
+ * few?" — the rows now carry every attribute of the flat's last observation, including
+ * flats that have left the price list, with the status the ledger decided for them.
+ * The tiles it used to be are one click away and show the columns you chose.
+ */
+function ProjectFlatList({ project, rows, loadingScope, search, pickedKeys, togglePick, addPicks, lang }) {
   const t = (sk, en) => (lang === "sk" ? sk : en);
-  const [panelTab, setPanelTab] = useState("filters");
-  const [adding, setAdding] = useState(false);
-  const [fieldSearch, setFieldSearch] = useState("");
-
-  /* This project's flats, in unit order. Filtered by project as well as by the hook: on a
-     project switch the series hook keeps the PREVIOUS project's rows until the new ones
-     arrive, and a tile from the wrong project must never be clickable. useMemo MUST come
-     before any early return — React enforces hook-call order. */
+  /* Filtered by project as well as by the hook: on a project switch the series hook keeps
+     the PREVIOUS project's rows until the new ones arrive, and a row from the wrong
+     project must never be pickable. Hooks before any early return. */
   const projRows = useMemo(
-    () => (project ? ff.rows.filter(u => u.project_id === project.id) : []),
-    [ff.rows, project]
+    () => (project ? (rows || []).filter(u => u.project_id === project.id) : []),
+    [rows, project]
   );
-  const units = useMemo(
-    () => (project ? ff.filtered.filter(u => u.project_id === project.id).sort(byUnitId) : []),
-    [ff.filtered, project]
-  );
-
-  // The search box in the picker row above narrows the same grid in place — ONE list.
-  const filtered = useMemo(() => {
-    if (!search?.trim()) return units;
-    const q = search.trim().toLowerCase();
-    return units.filter(u => String(u.unit_id).toLowerCase().includes(q));
-  }, [units, search]);
-
-  /* The panel offers only fields this project actually carries (a project that
-     publishes no orientation should not offer an orientation filter that can only ever
-     match nothing), plus any field a saved filter already names, so its card keeps a
-     readable label. */
-  const panelFields = useMemo(() => {
-    const has = new Set(ff.filters.map((f) => f.key));
-    for (const f of ff.panelFields) {
-      if (has.has(f.key)) continue;
-      if (projRows.some((r) => { const v = flatValue(r, f.key); return v !== null && v !== undefined && v !== ""; })) has.add(f.key);
-    }
-    return ff.panelFields.filter((f) => has.has(f.key));
-  }, [ff.panelFields, ff.filters, projRows]);
+  // The search box in the picker row above narrows the same list in place — ONE list.
+  const shownRows = useMemo(() => {
+    const q = (search || "").trim().toLowerCase();
+    return q ? projRows.filter(u => String(u.unit_id).toLowerCase().includes(q)) : projRows;
+  }, [projRows, search]);
 
   if (!project) return null;
   const isLoading = loadingScope && projRows.length === 0;
   const pickedCount = pickedKeys.length;
-  const narrowed = ff.activeCount > 0 || !!search?.trim();
-  const addable = filtered.filter(u => !pickedKeys.includes(u.key));
   const room = MAX_COMPARE - pickedCount;
-  const openPanel = (add) => { setPanelTab("filters"); setAdding(!!add); };
 
   return (
     <div style={{
@@ -1584,139 +1572,110 @@ function UnitGrid({ project, ff, loadingScope, search, pickedKeys, togglePick, a
       border: `1px solid ${border}`, borderRadius: 12,
       padding: "1.1rem 1.25rem",
     }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.85rem", flexWrap: "wrap", gap: "0.5rem" }}>
-        <div>
-          <h3 style={{ fontSize: "1.05rem", fontWeight: 600, color: text, margin: 0, letterSpacing: "-0.01em" }}>
-            {project.name}
-          </h3>
-          <div style={{ fontSize: "0.78rem", color: dim, marginTop: "0.25rem" }}>
-            {isLoading
-              ? t("Načítavam byty…", "Loading units…")
-              : pickedCount > 0
-              ? t(`Vybrané ${pickedCount}/${MAX_COMPARE} · klikni na ďalší byt na porovnanie, alebo na vybraný na odobratie`,
-                  `Selected ${pickedCount}/${MAX_COMPARE} · click another unit to compare, or a selected one to remove`)
-              : t(`${projRows.length} bytov · klikni na byt a uvidíš jeho cenu v čase`, `${projRows.length} units · click one to see its price over time`)}
-          </div>
+      <div style={{ marginBottom: "0.85rem" }}>
+        <h3 style={{ fontSize: "1.05rem", fontWeight: 600, color: text, margin: 0, letterSpacing: "-0.01em" }}>
+          {project.name}
+        </h3>
+        <div style={{ fontSize: "0.78rem", color: dim, marginTop: "0.25rem" }}>
+          {isLoading
+            ? t("Načítavam byty…", "Loading units…")
+            : pickedCount > 0
+            ? t(`Vybrané ${pickedCount}/${MAX_COMPARE} · klikni na ďalší byt na porovnanie, alebo na vybraný na odobratie`,
+                `Selected ${pickedCount}/${MAX_COMPARE} · click another unit to compare, or a selected one to remove`)
+            : t(`${projRows.length} bytov · klikni na byt a uvidíš jeho cenu v čase`, `${projRows.length} units · click one to see its price over time`)}
         </div>
-        {/* What a filter is for on this page: narrow the grid, then take what is left. */}
-        {narrowed && addable.length > 0 && room > 0 && (
-          <button onClick={() => addPicks(addable.map(u => u.key))}
-            title={addable.length > room
-              ? t(`Pridá prvých ${room} — porovnať sa dá najviac ${MAX_COMPARE} bytov naraz`, `Adds the first ${room} — at most ${MAX_COMPARE} units compare at once`)
-              : t("Pridá všetky zobrazené byty do grafu", "Adds every unit shown to the chart")}
-            style={{ ...fieldBlock, width: "auto", cursor: "pointer", color: accentInk, borderColor: green, fontFamily: mono, fontSize: "0.74rem", fontWeight: 600, whiteSpace: "nowrap" }}>
-            + {t("Porovnať zobrazené", "Compare the units shown")} ({Math.min(addable.length, room)}{addable.length > room ? ` ${t("z", "of")} ${addable.length}` : ""})
-          </button>
-        )}
       </div>
 
-      <div className="rd-workbench">
-        <div className="rd-workbench__main">
-          <FilterChips ff={ff} lang={lang} onOpenPanel={openPanel}
-            shown={filtered.length} total={projRows.length} noun={t("bytov", "units")} />
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))",
-            gap: "0.55rem",
-            /* Same height as the panel beside it, so the two columns end together. */
-            maxHeight: "calc(100vh - 206px)", minHeight: 280, overflowY: "auto", alignContent: "start",
-          }}>
-            {isLoading ? (
-              <div style={{ gridColumn: "1 / -1", padding: "1.2rem", color: dim, fontFamily: mono, fontSize: "0.85rem", textAlign: "center" }}>
-                {t("Načítavam byty…", "Loading units…")}
-              </div>
-            ) : filtered.length === 0 ? (
-              <div style={{ gridColumn: "1 / -1", padding: "1.2rem", color: dim, fontSize: "0.85rem", fontStyle: "italic", textAlign: "center" }}>
-                {t("Žiadne byty zodpovedajúce filtru.", "No units match the filter.")}
-              </div>
-            ) : filtered.map(u => {
-              const stavCol = STAV_COLOR[u.stav] || dim;
-              const pickIdx = pickedKeys.indexOf(u.key);
-              const selected = pickIdx >= 0;
-              const selColor = selected ? seriesStyle(pickIdx).color : green;
-              const atMax = !selected && pickedCount >= MAX_COMPARE;
-              return (
-                <button
-                  key={u.key}
-                  onClick={() => togglePick(u.key)}
-                  disabled={atMax}
-                  title={atMax
-                    ? t(`Naraz sa dá porovnať max ${MAX_COMPARE} bytov — odober jeden na pridanie ďalšieho`, `You can compare at most ${MAX_COMPARE} units — remove one to add another`)
-                    : (selected ? t("Klikni na odobratie z výberu", "Click to remove from selection") : t("Klikni na výber", "Click to select"))}
-                  style={{
-                    background: selected ? tint(selColor, 12) : bg2,
-                    border: `1px solid ${selected ? selColor : border}`,
-                    color: text, cursor: atMax ? "not-allowed" : "pointer",
-                    opacity: atMax ? 0.4 : 1,
-                    padding: "0.75rem 0.9rem", borderRadius: 8,
-                    fontSize: "0.82rem", fontFamily: "inherit", textAlign: "left",
-                    transition: "border-color 0.15s, background 0.15s, transform 0.12s",
-                  }}
-                  onMouseEnter={e => {
-                    if (atMax || selected) return;
-                    e.currentTarget.style.borderColor = green;
-                    e.currentTarget.style.background = "color-mix(in srgb, var(--accent) 5%, transparent)";
-                    e.currentTarget.style.transform = "translateY(-1px)";
-                  }}
-                  onMouseLeave={e => {
-                    if (selected) return;
-                    e.currentTarget.style.borderColor = border;
-                    e.currentTarget.style.background = bg2;
-                    e.currentTarget.style.transform = "translateY(0)";
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.5rem", marginBottom: "0.25rem" }}>
-                    <strong style={{ color: selected ? selColor : text, fontSize: "0.92rem", letterSpacing: "-0.01em", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
-                      {selected && <SeriesSwatch i={pickIdx} width={14} />}{u.unit_id}
-                    </strong>
-                    <span style={{ color: stavCol, fontSize: "0.7rem", fontWeight: 700, padding: "0.1rem 0.4rem", background: tint(stavCol, 10), borderRadius: 3, whiteSpace: "nowrap" }}>
-                      {statusLabel(u.stav, lang, "one")}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: "0.74rem", color: dim, lineHeight: 1.45 }}>
-                    {u.izby ? `${formatDimNumber(u.izby)}-izb` : ""}
-                    {u.izby && u.obytna_plocha ? " · " : ""}
-                    {u.obytna_plocha ? `${Number(u.obytna_plocha).toLocaleString(localeTag(lang), { maximumFractionDigits: 1 })} m²` : ""}
-                    {u.budova ? ` · ${t("bud.", "bldg")} ${u.budova}` : ""}
-                    {u.poschodie != null && u.poschodie !== "" ? ` · ${t("posch.", "fl.")} ${formatDimNumber(u.poschodie)}` : ""}
-                    {(u.izby || u.obytna_plocha) && u.latest_price ? <br/> : ""}
-                    {u.latest_price && (
-                      <span style={{ color: text, fontWeight: 600, fontFamily: mono, fontSize: "0.8rem" }}>{formatPrice(u.latest_price)}</span>
-                    )}
-                    {u.latest_price && u.obytna_plocha && (
-                      <span style={{ color: dim, marginLeft: "0.35rem", fontSize: "0.7rem" }}>· {formatPerM2(u.latest_price / u.obytna_plocha)}</span>
-                    )}
-                    {/* A flat that has left the price list says so, and since when — its
-                        price above is the last one it was listed at, not a current offer. */}
-                    {u.on_price_list === false && u.last_seen && (
-                      <div style={{ fontSize: "0.68rem", color: dim, fontStyle: "italic", marginTop: "0.15rem" }}>
-                        {t("naposledy v cenníku", "last listed")} {formatTs(u.last_seen, lang)}
-                      </div>
-                    )}
-                  </div>
-                  {u.series && u.series.length >= 2 && <MiniSparkline series={u.series} />}
-                </button>
-              );
-            })}
-          </div>
+      {isLoading ? (
+        <div style={{ padding: "1.2rem", color: dim, fontFamily: mono, fontSize: "0.85rem", textAlign: "center" }}>
+          {t("Načítavam byty…", "Loading units…")}
         </div>
-
-        <FieldPanel
+      ) : (
+        <FlatWorkbench
+          rows={shownRows}
           lang={lang}
-          tab={panelTab} setTab={setPanelTab}
-          adding={adding} setAdding={setAdding}
-          search={fieldSearch} setSearch={setFieldSearch}
-          fields={panelFields}
-          catOf={(k) => FLAT_FIELD_BY_KEY[k]?.cat || "other"} catOrder={FLAT_CAT_ORDER} catLabel={FLAT_CAT_LABEL}
-          capsOf={ff.capsOf} unitOf={ff.unitOf}
-          useValues={ff.useValues}
-          filters={ff.filters} onAdd={ff.addFilter} onPatch={ff.patchFilter} onRemove={ff.removeFilter}
-          showColumns={false}
-          emptyHint={t("Mriežka ukazuje všetky byty projektu — vyfiltruj tie, ktoré chceš porovnať, a pridaj ich tlačidlom hore.",
-                       "The grid shows every unit in the project — filter the ones you want to compare and add them with the button above.")}
+          prefKey="unitTimelineFlats"
+          rowKey={(r) => r.key}
+          defaultCols={BVC_DEFAULT_COLS}
+          select={{ keys: pickedKeys, onToggle: togglePick, max: MAX_COMPARE, Swatch: PickSwatch, colorOf: (i) => seriesStyle(i).color }}
+          extraCols={[{ key: "__trend", label: t("Vývoj ceny", "Price trend"), width: 110, after: "unit_id", render: (r) => <MiniSparkline series={r.series} compact /> }]}
+          renderTile={(r, ctx) => <FlatTile unit={r} ctx={ctx} onToggle={togglePick} lang={lang} />}
+          toolbar={(shown) => {
+            /* What a filter is for on this page: narrow the list, then take what is left. */
+            const addable = shown.filter(u => !pickedKeys.includes(u.key));
+            if (shown.length >= projRows.length || addable.length === 0 || room <= 0) return null;
+            return (
+              <button onClick={() => addPicks(addable.map(u => u.key))}
+                title={addable.length > room
+                  ? t(`Pridá prvých ${room} — porovnať sa dá najviac ${MAX_COMPARE} bytov naraz`, `Adds the first ${room} — at most ${MAX_COMPARE} units compare at once`)
+                  : t("Pridá všetky zobrazené byty do grafu", "Adds every unit shown to the chart")}
+                style={{ ...fieldBlock, width: "auto", cursor: "pointer", color: accentInk, borderColor: green, fontFamily: mono, fontSize: "0.72rem", fontWeight: 600, whiteSpace: "nowrap", padding: "0.3rem 0.7rem" }}>
+                + {t("Porovnať zobrazené", "Compare the units shown")} ({Math.min(addable.length, room)}{addable.length > room ? ` ${t("z", "of")} ${addable.length}` : ""})
+              </button>
+            );
+          }}
+          emptyHint={t("Zoznam ukazuje všetky byty projektu — vyfiltruj tie, ktoré chceš porovnať, a pridaj ich tlačidlom hore.",
+                       "The list shows every unit in the project — filter the ones you want to compare and add them with the button above.")}
         />
-      </div>
+      )}
     </div>
+  );
+}
+
+/* One flat as a tile: its id, status and trend, and the columns chosen in the panel —
+   one choice of columns drives both views. */
+function FlatTile({ unit: u, ctx, onToggle, lang }) {
+  const t = (sk, en) => (lang === "sk" ? sk : en);
+  const { cols, cell, lbl, pickIndex, disabled } = ctx;
+  const selected = pickIndex >= 0;
+  const selColor = selected ? seriesStyle(pickIndex).color : green;
+  const stavCol = STAV_COLOR[u.stav] || dim;
+  const attrs = cols.filter((k) => k !== "unit_id" && k !== "stav");
+  return (
+    <button
+      onClick={() => { if (!disabled) onToggle(u.key); }}
+      disabled={disabled}
+      title={disabled
+        ? t(`Naraz sa dá porovnať max ${MAX_COMPARE} bytov — odober jeden na pridanie ďalšieho`, `You can compare at most ${MAX_COMPARE} units — remove one to add another`)
+        : (selected ? t("Klikni na odobratie z výberu", "Click to remove from selection") : t("Klikni na výber", "Click to select"))}
+      style={{
+        width: "100%", height: "100%",
+        background: selected ? tint(selColor, 12) : bg2,
+        border: `1px solid ${selected ? selColor : border}`,
+        color: text, cursor: disabled ? "not-allowed" : "pointer",
+        opacity: disabled ? 0.4 : 1,
+        padding: "0.7rem 0.85rem", borderRadius: 8,
+        fontSize: "0.8rem", fontFamily: "inherit", textAlign: "left",
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.5rem", marginBottom: "0.35rem" }}>
+        <strong style={{ color: selected ? selColor : text, fontSize: "0.92rem", letterSpacing: "-0.01em", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
+          {selected && <SeriesSwatch i={pickIndex} width={14} />}{u.unit_id}
+        </strong>
+        <span style={{ color: stavCol, fontSize: "0.7rem", fontWeight: 700, padding: "0.1rem 0.4rem", background: tint(stavCol, 10), borderRadius: 3, whiteSpace: "nowrap",
+                       border: `1px ${u.on_price_list === false ? "dashed" : "solid"} ${u.on_price_list === false ? stavCol : "transparent"}` }}>
+          {statusLabel(u.stav, lang, "one")}
+        </span>
+      </div>
+      {attrs.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: "0.08rem 0.6rem", fontSize: "0.72rem", lineHeight: 1.45 }}>
+          {attrs.map((k) => (
+            <Fragment key={k}>
+              <span style={{ color: dim, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lbl(k)}</span>
+              <span style={{ color: text, fontFamily: mono, textAlign: "right", whiteSpace: "nowrap" }}>{cell(k, u)}</span>
+            </Fragment>
+          ))}
+        </div>
+      )}
+      {/* A flat that has left the price list says so, and since when — its price above is
+          the last one it was listed at, not a current offer. */}
+      {u.on_price_list === false && u.last_seen && (
+        <div style={{ fontSize: "0.68rem", color: dim, fontStyle: "italic", marginTop: "0.25rem" }}>
+          {t("naposledy v cenníku", "last listed")} {formatTs(u.last_seen, lang)}
+        </div>
+      )}
+      {u.series && u.series.length >= 2 && <MiniSparkline series={u.series} />}
+    </button>
   );
 }
 

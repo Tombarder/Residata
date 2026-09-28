@@ -4,7 +4,7 @@ import { isHomeUnit } from "../lib/unitKinds";
 import { SortableTh } from "../components/SortableTable";
 import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
-import { useProjects, useProjectFlats, useProjectSnapshots, useMarketTotals, useTotalsList, useSales } from "../lib/useData";
+import { useProjects, useProjectFlats, useProjectSnapshots, useMarketTotals, useTotalsList, useProjectSoldOffList } from "../lib/useData";
 import { useAccountPrefState } from "../lib/useAccountUiPref";
 import { moneyFromEur, moneySymbol } from "../lib/money";
 import { localeTag, formatPercent } from "../lib/locale";
@@ -694,6 +694,17 @@ export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en
   const { user, profile, loading: authLoading, reloadProfile } = useAuth();
   const { can } = useCapabilities();
   const { flats, loading, error } = useProjectFlats(projectId);
+  /* The project's flats AS ITS HEADER COUNTS THEM: the current price list plus every flat
+     the developer took off it that our sales tracking counts as sold. A developer who
+     deletes a flat when it sells otherwise leaves a list, a "sold" filter and a
+     room-type breakdown that know of none of its sales while the header above says
+     34 (Boss 2026-09-28: a flat's status must be correct everywhere). The charts keep
+     the price list alone — they are about what is on offer and at what price. */
+  const soldOffList = useProjectSoldOffList(projectId);
+  const ledgerFlats = useMemo(
+    () => (soldOffList.length ? [...flats, ...soldOffList] : flats),
+    [flats, soldOffList],
+  );
   const { projects } = useProjects();
   // Snapshots drive the MoM time-series charts (timeline, takeup). Cached
   // at module level so nav-ing between projects doesn't refetch.
@@ -862,14 +873,14 @@ export function LiveProjectDetail({ projectId, setCurrent, openLogin, lang = "en
               because it answers a question the charts never can: what does the
               bay cost, and do you have to buy one. */}
           {project && <ParkingCard projectId={projectId} reviewed={project.parking_reviewed} lang={lang} />}
-          {project && <ProjectInsights project={project} flats={flats} snapshots={snapshots} lang={lang}
+          {project && <ProjectInsights project={project} flats={flats} ledgerFlats={ledgerFlats} snapshots={snapshots} lang={lang}
                                      coverageMode={spec.data[projectId]?.coverage_mode ?? project.coverage_mode}
                                      onSelectFlat={onSelectFlat} />}
           {/* The flat list is the same filters-and-columns workbench as Databáza bytov
               (Boss, 2026-09-28), over this project's flats. Its columns and filters are
               remembered per account, like every other analytical view. */}
           <ProtectedData lang={lang} style={{ marginTop: "1.25rem" }}>
-            <FlatWorkbench rows={flats} lang={lang} prefKey="projectFlatsView" highlightId={highlightedFlatId} />
+            <FlatWorkbench rows={ledgerFlats} lang={lang} prefKey="projectFlatsView" highlightId={highlightedFlatId} />
           </ProtectedData>
         </>}
     </main>
@@ -958,7 +969,7 @@ function ProjectAggregateOnly({ project, lang, t, canVelocity }) {
    client-side from whatever flats / snapshots we already load — no
    extra backend work. Every chart is self-contained (no deps, just
    React + SVG) so bundle stays small. */
-function ProjectInsights({ project, flats: allRows, snapshots, lang, coverageMode, onSelectFlat }) {
+function ProjectInsights({ project, flats: allRows, ledgerFlats: ledgerRows, snapshots, lang, coverageMode, onSelectFlat }) {
   /* Every analysis below is about the RESIDENTIAL product — the room-type breakdown, the
      price coverage, the availability, and the detector for whether this developer marks
      sold flats at all. useProjectFlats selects * from flats_current, so it hands over the
@@ -968,6 +979,9 @@ function ProjectInsights({ project, flats: allRows, snapshots, lang, coverageMod
      moving room type" was shops. The line is drawn ONCE, here, the way Reports and the
      Pivot draw it. See src/lib/unitKinds.js. */
   const flats = useMemo(() => (allRows || []).filter(f => isHomeUnit(f.typ)), [allRows]);
+  // The same homes plus the sold ones the price list no longer shows — what "how much of
+  // this room type has sold" has to be measured over.
+  const ledgerHomes = useMemo(() => (ledgerRows || allRows || []).filter(f => isHomeUnit(f.typ)), [ledgerRows, allRows]);
   const locale = localeTag(lang);
   const fmtEur = (v) => v == null || !Number.isFinite(v) ? "—" : `${Math.round(moneyFromEur(v)).toLocaleString("en-US").replace(/,/g, " ")} ${moneySymbol()}`;
   const fmtPct = (v) => formatPercent(v, lang);
@@ -1013,7 +1027,7 @@ function ProjectInsights({ project, flats: allRows, snapshots, lang, coverageMod
   // Room-type breakdown — group by izby, compute sold % per group.
   // "Fastest-moving" = highest sold/total ratio (signals market validation).
   const byRoom = {};
-  for (const f of flats) {
+  for (const f of ledgerHomes) {
     const k = f.izby == null ? "?" : String(f.izby);
     byRoom[k] = byRoom[k] || { room: k, total: 0, sold: 0, avail: 0, reserved: 0 };
     byRoom[k].total += 1;
@@ -1026,45 +1040,20 @@ function ProjectInsights({ project, flats: allRows, snapshots, lang, coverageMod
     .sort((a, b) => Number(a.room) - Number(b.room));
 
   // ── Fastest moving ────────────────────────────────────────────────────────
-  // `flats` is the developer's CURRENT price list. Where they label their sales it
-  // contains the sold flats and the sold-share per room type is right. Where they
-  // DELETE a flat when it sells it cannot: every room type reads 0 sold, and the card
-  // said "1-room · 0.0% sold" about a project that had sold 17 flats. For those we ask
-  // the sale fact instead (analytics.sale_events, grouped by room count), which knows
-  // the flats the price list no longer mentions. No double counting: the branch is on
-  // whether the listing publishes sold rows at all.
-  const publishesSold = flats.some(f => f.stav === "P");
-  const roomSalesSpec = useMemo(
-    () => (publishesSold || !project?.id ? null : {
-      mode: "breakdown", group_by: "izby", status: "sold", durable_only: true,
-      projects: [project.id],
-      // the whole tracked history, not the RPC's default recent window — this KPI is
-      // "how much of this room type has gone", not "how fast is it going right now"
-      date_from: "2000-01-01", date_to: "2999-12-31",
-    }),
-    [publishesSold, project?.id],
-  );
-  const roomSales = useSales({ enabled: !!roomSalesSpec, spec: roomSalesSpec });
-  const soldByRoom = useMemo(() => {
-    const m = {};
-    for (const r of (roomSales.data?.rows || [])) {
-      if (r.group == null) continue;
-      m[String(Number(r.group))] = Number(r.sold) || 0;
-    }
-    return m;
-  }, [roomSales.data]);
-
+  // Measured over `ledgerHomes`: the price list PLUS the sold flats the developer took
+  // off it. Over the price list alone, a developer who deletes a flat when it sells reads
+  // 0 sold in every room type ("1-room · 0.0% sold" about a project that had sold 17).
+  // Until 2026-09-28 that case asked analytics.sale_events instead — but only when the
+  // list published no sold rows AT ALL, so a project that labels some sales and deletes
+  // others (the time-segmented kind) still lost the deleted ones. Both halves come from
+  // the ledger now, in one set, with no branch.
   const fastestRoom = useMemo(() => {
-    const rows = roomRows.map(r => {
-      const extraSold = publishesSold ? 0 : (soldByRoom[r.room] || 0);
-      const sold = r.sold + extraSold;
-      return { ...r, sold, total: r.total + extraSold };
-    }).filter(r => r.total >= 3);
-    // Nothing has sold anywhere yet, or we are not entitled to the sale fact — then
-    // "fastest moving" has no answer, and "0.0% sold" is not one.
+    const rows = roomRows.filter(r => r.total >= 3);
+    // Nothing has sold anywhere yet — then "fastest moving" has no answer, and
+    // "0.0% sold" is not one.
     if (!rows.some(r => r.sold > 0)) return null;
     return [...rows].sort((a, b) => (b.sold / b.total) - (a.sold / a.total))[0];
-  }, [roomRows, soldByRoom, publishesSold]);
+  }, [roomRows]);
 
   // ── KPI strip ─────────────────────────────────────────────────
   // Cards tagged isPriceKpi=true are filtered out when the developer

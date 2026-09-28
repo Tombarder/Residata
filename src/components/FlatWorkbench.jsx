@@ -16,7 +16,7 @@ import FieldPanel from "./FieldPanel";
 import { useAccountPrefState } from "../lib/useAccountUiPref";
 import { moneyFromEur, moneySymbol } from "../lib/money";
 import { localeTag } from "../lib/locale";
-import { statusLabel } from "../lib/unitStatus";
+import { statusLabel, OFF_LIST } from "../lib/unitStatus";
 import { useSpecifics, UnitPriceMarks, specificsLegend } from "../lib/projectSpecifics";
 import { field as sharedField } from "../lib/controls";
 import { accent as green, accentInk, orangeInk, dim, border, bg, text } from "../lib/theme";
@@ -33,7 +33,11 @@ const STAV_STYLE = {
   P: { color: orangeInk, bg: "rgba(245,166,35,0.08)" },
   R: { color: "#888", bg: "rgba(136,136,136,0.08)" },
   PR: { color: "#aaa", bg: "rgba(170,170,170,0.08)" },
+  [OFF_LIST]: { color: "#8a8f98", bg: "rgba(138,143,152,0.10)" },
 };
+
+/* A translucent wash of any colour, a CSS variable included. */
+const tint = (color, pct) => `color-mix(in srgb, ${color} ${pct}%, transparent)`;
 
 /** The chip bar above a filtered list: what is filtered, at a glance, each chip removable. */
 export function FilterChips({ ff, lang, onOpenPanel, shown, total, noun }) {
@@ -82,16 +86,27 @@ export function FilterChips({ ff, lang, onOpenPanel, shown, total, noun }) {
 }
 
 /**
- * The whole workbench: chip bar, sortable table, and the filters / columns panel.
+ * The whole workbench: chip bar, sortable table (or tiles), and the filters / columns panel.
  *
  * @param rows        flats_current-shaped rows (money in EUR)
  * @param prefKey     the account-preference key its view is remembered under
  * @param rowKey      row → stable id
  * @param highlightId a row to scroll to and flash (the project page's scatter click)
+ * @param select      rows can be PICKED (Byt v čase): { keys, onToggle(key), max, Swatch({ index }) }.
+ *                    Adds a leading column; clicking a row picks or drops it.
+ * @param extraCols   fixed columns beside the chosen ones: [{ key, label, render(row), width, after }] —
+ *                    `after` = the chosen column it follows (else it goes last), so a narrow
+ *                    screen does not push it off the right edge.
+ * @param renderTile  a tile view beside the table: (row, ctx) → node, ctx = { cols, cell, lbl,
+ *                    pickIndex, disabled }. Adds a Tabuľka / Dlaždice switch; the tiles show
+ *                    the SAME chosen columns, so one choice drives both views.
+ * @param toolbar     (shownRows) → node, top right — e.g. "compare the flats shown"
+ * @param emptyHint   the panel's line when no filter is set
  */
 export default function FlatWorkbench({
   rows, lang = "sk", prefKey, rowKey = (r) => r.id, highlightId = null,
   defaultCols = DEFAULT_FLAT_COLS, defaultSort = { key: "unit_id", dir: "asc" },
+  select = null, extraCols = [], renderTile = null, toolbar = null, emptyHint = null,
 }) {
   const t = (sk, en) => (lang === "sk" ? sk : en);
   const locale = localeTag(lang);
@@ -101,18 +116,21 @@ export default function FlatWorkbench({
   const [cols, setCols] = useState(defaultCols);
   const [sort, setSort] = useState(defaultSort);
   const [panelTab, setPanelTab] = useState("filters");
+  const [view, setView] = useState("table");
   const [adding, setAdding] = useState(false);
   const [search, setSearch] = useState("");
 
   /* Remembered per account, across devices and across projects: the columns you chose
      and the filters you built describe how you read a flat list, not one project. The
      search box is left out on purpose — see UnitExplorer: a stale word hid most fields. */
-  useAccountPrefState(prefKey, { cols, filters: ff.filters, sort, panelTab }, (s) => {
+  useAccountPrefState(prefKey, { cols, filters: ff.filters, sort, panelTab, view }, (s) => {
     if (Array.isArray(s.cols)) setCols(s.cols.filter((k) => FLAT_FIELD_BY_KEY[k]));
     if (s.panelTab === "filters" || s.panelTab === "cols") setPanelTab(s.panelTab);
     if (Array.isArray(s.filters)) ff.restoreFilters(s.filters);
     if (s.sort && typeof s.sort === "object" && FLAT_FIELD_BY_KEY[s.sort.key]) setSort(s.sort);
+    if (s.view === "table" || s.view === "tiles") setView(s.view);
   });
+  const showTiles = !!renderTile && view === "tiles";
 
   /* Never order by a column that is not on screen — the rows would keep an order nothing
      on the page explains. The sort follows the first column still showing. */
@@ -153,6 +171,10 @@ export default function FlatWorkbench({
     return () => cancelAnimationFrame(id);
   }, [highlightId, sorted]);   // eslint-disable-line react-hooks/exhaustive-deps
 
+  /* A flat the developer took off the price list shows the status our sales tracking
+     decided for it (the database's rule), in a DASHED pill — so a sold flat reads as sold
+     and the reader can still tell it is not one the page lists today. */
+  const lastListed = (r) => (r.last_seen ? new Date(r.last_seen).toLocaleDateString(locale) : "");
   const cell = (k, r) => {
     const v = flatValue(r, k);
     const fmt = FLAT_FIELD_BY_KEY[k]?.fmt;
@@ -172,25 +194,72 @@ export default function FlatWorkbench({
     if (fmt === "area") return Number(v).toLocaleString(locale, { maximumFractionDigits: 1 });
     if (k === "stav") {
       const s = STAV_STYLE[v];
+      const gone = r.on_price_list === false;
+      const title = gone
+        ? (v === "P"
+          ? t(`Z cenníka zmizol po ${lastListed(r)} — naše sledovanie predajov ho počíta ako predaný.`,
+              `Left the price list after ${lastListed(r)} — our sales tracking counts it as sold.`)
+          : t(`Z cenníka zmizol po ${lastListed(r)} a nepočítame ho ako predaný.`,
+              `Left the price list after ${lastListed(r)} and is not counted as sold.`))
+        : undefined;
       return s
-        ? <span style={{ padding: "2px 6px", borderRadius: 4, fontFamily: mono, fontSize: "0.64rem", fontWeight: 600, color: s.color, background: s.bg }}>{statusLabel(v, lang, "one")}</span>
-        : statusLabel(v, lang, "one");
+        ? <span title={title} style={{ padding: "1px 6px", borderRadius: 4, fontFamily: mono, fontSize: "0.64rem", fontWeight: 600, color: s.color, background: s.bg, border: `1px ${gone ? "dashed" : "solid"} ${gone ? s.color : "transparent"}` }}>{statusLabel(v, lang, "one")}</span>
+        : <span title={title}>{statusLabel(v, lang, "one")}</span>;
     }
     if (k === "unit_id") return <strong>{v}</strong>;
     return flatValueLabel(k, v, lang);
   };
 
-  const legend = useMemo(
-    () => (cols.includes("cena_s_dph") ? specificsLegend(sorted.map((r) => spec.unit(r, r.project_id || r.project_name)), lang) : ""),
-    [sorted, spec, cols, lang],
-  );
+  const legend = useMemo(() => {
+    const lines = [];
+    if (cols.includes("cena_s_dph")) {
+      const l = specificsLegend(sorted.map((r) => spec.unit(r, r.project_id || r.project_name)), lang);
+      if (l) lines.push(l);
+    }
+    if (cols.includes("stav") && sorted.some((r) => r.on_price_list === false)) {
+      lines.push(t("Stav v prerušovanom rámčeku = byt, ktorý developer stiahol z cenníka. Predaný je, ak ho tak počíta naše sledovanie predajov; cena pri ňom je posledná, za ktorú ho ponúkal.",
+                   "A status in a dashed frame = a flat the developer took off the price list. It is sold when our sales tracking counts it so; its price is the last one it was offered at."));
+    }
+    return lines;
+  }, [sorted, spec, cols, lang]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const openPanel = (add) => { setPanelTab("filters"); setAdding(!!add); };
   const numericCol = (k) => FLAT_FIELD_BY_KEY[k]?.type === "numeric";
 
+  /* Picking (Byt v čase): the index a row holds in the pick, or -1. */
+  const pickIndexOf = (id) => (select ? select.keys.indexOf(id) : -1);
+  const pickDisabled = (id) => !!select && pickIndexOf(id) < 0 && select.keys.length >= (select.max ?? Infinity);
+  const Swatch = select?.Swatch;
+  const colCount = cols.length + (select ? 1 : 0) + extraCols.length;
+  /* The table's column order: the chosen columns, each followed by any fixed column that
+     asked to sit after it; fixed columns whose anchor is not showing go last. */
+  const layout = useMemo(() => {
+    const out = [];
+    for (const k of cols) {
+      out.push({ field: k });
+      for (const c of extraCols) if (c.after === k) out.push({ extra: c });
+    }
+    for (const c of extraCols) if (!c.after || !cols.includes(c.after)) out.push({ extra: c });
+    return out;
+  }, [cols, extraCols]);
+
+  const segBtn = (on) => ({ ...sharedField, width: "auto", cursor: "pointer", fontFamily: mono, fontSize: "0.7rem", padding: "0.3rem 0.65rem",
+    color: on ? accentInk : dim, borderColor: on ? green : border, background: on ? tint("var(--accent)", 10) : "transparent" });
+
   return (
     <div className="rd-workbench">
       <div className="rd-workbench__main">
+        {(renderTile || toolbar) && (
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem", flexWrap: "wrap" }}>
+            {renderTile && (
+              <div style={{ display: "inline-flex", gap: "0.25rem" }} role="group" aria-label={t("Zobrazenie", "View")}>
+                <button onClick={() => setView("table")} style={segBtn(!showTiles)}>▤ {t("Tabuľka", "Table")}</button>
+                <button onClick={() => setView("tiles")} style={segBtn(showTiles)}>▦ {t("Dlaždice", "Tiles")}</button>
+              </div>
+            )}
+            <div style={{ marginLeft: "auto" }}>{toolbar ? toolbar(sorted) : null}</div>
+          </div>
+        )}
         <FilterChips ff={ff} lang={lang} onOpenPanel={openPanel}
           shown={sorted.length} total={(rows || []).length} noun={t("bytov", "units")} />
 
@@ -202,38 +271,69 @@ export default function FlatWorkbench({
               ↺ {t("Obnoviť predvolené stĺpce", "Restore the default columns")}
             </button>
           </div>
+        ) : showTiles ? (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: "0.55rem",
+                        maxHeight: "calc(100vh - 240px)", minHeight: 280, overflowY: "auto", alignContent: "start" }}>
+            {sorted.length === 0
+              ? <div style={{ gridColumn: "1 / -1", padding: "1.2rem", color: dim, fontStyle: "italic", textAlign: "center" }}>{t("Žiadne byty neprešli filtrami.", "No flats match the filters.")}</div>
+              : sorted.map((r) => {
+                const id = rowKey(r);
+                return <div key={id}>{renderTile(r, { cols, cell, lbl: ff.lbl, pickIndex: pickIndexOf(id), disabled: pickDisabled(id) })}</div>;
+              })}
+          </div>
         ) : (
           /* Same height as the panel beside it, so the two columns end together. */
           <div ref={scrollRef} style={{ overflow: "auto", maxHeight: "calc(100vh - 206px)", minHeight: 280, border: `1px solid ${border}`, borderRadius: 8, background: panel }}>
-            <table style={{ borderCollapse: "separate", borderSpacing: 0, tableLayout: "fixed", width: "100%", minWidth: Math.max(1, cols.length) * 96, fontSize: "0.78rem" }}>
+            <table style={{ borderCollapse: "separate", borderSpacing: 0, tableLayout: "fixed", width: "100%", minWidth: Math.max(1, cols.length) * 96 + (select ? 34 : 0) + extraCols.reduce((a, c) => a + (c.width || 96), 0), fontSize: "0.78rem" }}>
               <thead style={{ background: "var(--surface-2)", position: "sticky", top: 0, zIndex: 1 }}>
                 <tr>
-                  {cols.map((k) => (
+                  {select && <th style={{ width: 34, borderBottom: `1px solid ${border}` }} aria-label={t("Výber", "Pick")} />}
+                  {layout.map(({ field: k, extra: c }) => (c ? (
+                    <th key={c.key} style={{ width: c.width || 96, padding: "0.55rem 0.6rem", textAlign: "left", verticalAlign: "bottom", borderBottom: `1px solid ${border}`, color: "var(--text-2)", fontFamily: mono, fontSize: "0.64rem", letterSpacing: "0.04em", textTransform: "uppercase", fontWeight: 700 }}>
+                      {c.label}
+                    </th>
+                  ) : (
                     /* Headers WRAP rather than clip: beside the panel a column is ~96px, and
                        "OBYTNÁ PLO…" / "EXTERIÉR (…" told the reader nothing. */
                     <th key={k} onClick={() => toggleSort(k)} title={`${ff.lbl(k)} — ${t("klikni pre zoradenie", "click to sort")}`}
                       style={{ padding: "0.55rem 0.6rem", textAlign: numericCol(k) ? "right" : "left", verticalAlign: "bottom", whiteSpace: "normal", lineHeight: 1.3, cursor: "pointer", borderBottom: `1px solid ${border}`, color: effSort.key === k ? green : "var(--text-2)", userSelect: "none", fontFamily: mono, fontSize: "0.64rem", letterSpacing: "0.04em", textTransform: "uppercase", fontWeight: 700 }}>
                       {ff.lbl(k)}{effSort.key === k ? (effSort.dir === "asc" ? " ▲" : " ▼") : ""}
                     </th>
-                  ))}
+                  )))}
                 </tr>
               </thead>
               <tbody>
                 {sorted.length === 0 && (
-                  <tr><td colSpan={cols.length} style={{ padding: "1.4rem", textAlign: "center", color: dim, fontStyle: "italic" }}>
+                  <tr><td colSpan={colCount} style={{ padding: "1.4rem", textAlign: "center", color: dim, fontStyle: "italic" }}>
                     {t("Žiadne byty neprešli filtrami.", "No flats match the filters.")}
                   </td></tr>
                 )}
                 {sorted.map((r, i) => {
                   const id = rowKey(r);
+                  const pi = pickIndexOf(id);
+                  const disabled = pickDisabled(id);
                   return (
                     <tr key={id} id={`flat-row-${id}`} className={id === highlightId ? "flat-row-flash" : ""}
-                      style={{ background: i % 2 ? "var(--surface-2)" : "transparent" }}>
-                      {cols.map((k) => (
+                      onClick={select && !disabled ? () => select.onToggle(id) : undefined}
+                      title={select ? (disabled
+                        ? t(`Naraz sa dá porovnať najviac ${select.max} bytov — odober jeden`, `At most ${select.max} units compare at once — remove one`)
+                        : (pi >= 0 ? t("Klikni na odobratie z grafu", "Click to remove from the chart") : t("Klikni na pridanie do grafu", "Click to add to the chart"))) : undefined}
+                      style={{ background: pi >= 0 && select?.colorOf ? tint(select.colorOf(pi), 12) : (i % 2 ? "var(--surface-2)" : "transparent"),
+                               cursor: select ? (disabled ? "not-allowed" : "pointer") : "default", opacity: disabled ? 0.5 : 1 }}>
+                      {select && (
+                        <td style={{ padding: "0.42rem 0 0.42rem 0.55rem", borderTop: "1px solid var(--surface)" }}>
+                          {pi >= 0 && Swatch
+                            ? <Swatch index={pi} />
+                            : <span style={{ display: "inline-block", width: 12, height: 12, borderRadius: 3, border: `1px solid ${border}`, verticalAlign: "middle" }} />}
+                        </td>
+                      )}
+                      {layout.map(({ field: k, extra: c }) => (c ? (
+                        <td key={c.key} style={{ padding: "0.3rem 0.6rem", borderTop: "1px solid var(--surface)" }}>{c.render(r)}</td>
+                      ) : (
                         <td key={k} style={{ padding: "0.42rem 0.6rem", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: numericCol(k) ? "right" : "left", borderTop: "1px solid var(--surface)", color: k === effSort.key ? text : "var(--text-2)", fontFamily: numericCol(k) ? mono : "inherit", fontVariantNumeric: "tabular-nums" }}>
                           {cell(k, r)}
                         </td>
-                      ))}
+                      )))}
                     </tr>
                   );
                 })}
@@ -241,7 +341,7 @@ export default function FlatWorkbench({
             </table>
           </div>
         )}
-        {legend && <div style={{ marginTop: "0.5rem", fontSize: "0.72rem", lineHeight: 1.45, color: dim }}>{legend}</div>}
+        {legend.map((l, i) => <div key={i} style={{ marginTop: "0.5rem", fontSize: "0.72rem", lineHeight: 1.45, color: dim }}>{l}</div>)}
         <style>{`
           @keyframes flatRowFlash {
             0%   { background-color: color-mix(in srgb, var(--accent) 35%, transparent); box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 60%, transparent); }
@@ -263,8 +363,8 @@ export default function FlatWorkbench({
         useValues={ff.useValues}
         filters={ff.filters} onAdd={ff.addFilter} onPatch={ff.patchFilter} onRemove={ff.removeFilter}
         cols={cols} onToggleCol={toggleCol} onSetCols={setCols} defaultCols={defaultCols}
-        emptyHint={t("Tabuľka ukazuje všetky byty projektu — pridaj filter tlačidlom vyššie.",
-                     "The table shows every flat in the project — add a filter with the button above.")}
+        emptyHint={emptyHint || t("Tabuľka ukazuje všetky byty projektu — pridaj filter tlačidlom vyššie.",
+                                  "The table shows every flat in the project — add a filter with the button above.")}
       />
     </div>
   );

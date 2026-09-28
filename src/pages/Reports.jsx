@@ -29,7 +29,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useSpecifics, useProjectSpecificsData, SpecificsMark, SpecificsPanel,
          UnitPriceMarks } from "../lib/projectSpecifics";
-import { useProjects, useProjectSnapshots, useReportHistogram, fetchReportBinUnits, useReportProjectUnits, useReportComparables, useScopeRoomPrices } from "../lib/useData";
+import { useProjects, useProjectSnapshots, useReportHistogram, fetchReportBinUnits, useReportProjectUnits, useReportComparables, useScopeRoomPrices, useProjectSoldOffList } from "../lib/useData";
 import { isHomeUnit, unitKindLabel } from "../lib/unitKinds";
 import LoadError from "../components/LoadError";
 import Picker from "../components/Picker";
@@ -728,9 +728,20 @@ function ProjectReport({ project, siblings, lang }) {
   );
   // District benchmark from sibling projects' rollups (projects_live honest) — no flats.
   const districtSummary = useMemo(() => summariseProjects(districtSiblings), [districtSiblings]);
-  const byTyp = useMemo(() => groupAggregatesFromFlats(flats, "typ"), [flats]);
-  const byIzby = useMemo(() => groupAggregatesFromFlats(flats, "izby"), [flats]);
-  const byPoschodie = useMemo(() => groupAggregatesFromFlats(flats, "poschodie"), [flats]);
+  /* The breakdowns by type / rooms / floor report a SOLD share, so they are measured over
+     the project's flats as its header counts them: the price list plus the flats the
+     developer took off it that our sales tracking counts as sold. Over the price list
+     alone, a developer who deletes a flat when it sells read ~0 % sold in every row of
+     all three tables while the project was a third gone (Boss 2026-09-28). The price
+     figures beside them read for-sale flats only, so the added rows never touch those. */
+  const soldOffList = useProjectSoldOffList(project?.id);
+  const ledgerFlats = useMemo(
+    () => (soldOffList.length ? [...(flats || []), ...soldOffList] : flats),
+    [flats, soldOffList],
+  );
+  const byTyp = useMemo(() => groupAggregatesFromFlats(ledgerFlats, "typ"), [ledgerFlats]);
+  const byIzby = useMemo(() => groupAggregatesFromFlats(ledgerFlats, "izby"), [ledgerFlats]);
+  const byPoschodie = useMemo(() => groupAggregatesFromFlats(ledgerFlats, "poschodie"), [ledgerFlats]);
   const priceSeries = useMemo(() => priceDistribution(flats, 10), [flats]);
   // Drilldown filters this project's in-memory units to the clicked €/m² band
   // (EUR basis — useReportProjectUnits overlays price_s_dph_eur onto cena_s_dph).
@@ -1288,51 +1299,18 @@ function BenchmarkCard({ local, global, scopeLabel, lang }) {
  * for available/reserved/etc.; sold may be inflated for manual_total
  * projects but at least the table doesn't lead with a 4000-row Slnečnice).
  */
-function ProjectTable({ projects, flats, lang, onProjectClick }) {
+function ProjectTable({ projects, lang, onProjectClick }) {
   // Everything unusual about each of these projects — the mark goes on the
   // NAME, the same place and the same shape as on the Projects list, so the
   // reader learns one symbol for the whole platform.
   const spec = useSpecifics(lang);
-  const haveFlats = Array.isArray(flats);
-  // Pre-bucket flats by project once so per-row enrich is O(1).
-  const byProject = useMemo(() => {
-    if (!haveFlats) return null;
-    const m = new Map();
-    // Homes only, so a per-project count here can never contradict projects_live
-    // (which reads final.home_units). Currently no caller passes `flats`, so this
-    // branch is dormant — the filter is here so reviving it cannot quietly count
-    // parking bays as units. See src/lib/unitKinds.js.
-    for (const f of flats.filter(x => isHomeUnit(x.typ))) {
-      let r = m.get(f.project_id);
-      if (!r) { r = { total: 0, V: 0, P: 0, R: 0, PR: 0, future: 0, err: 0 }; m.set(f.project_id, r); }
-      r.total++;
-      if (f.stav === "V") r.V++;
-      else if (f.stav === "P") r.P++;
-      else if (f.stav === "R") r.R++;
-      else if (f.stav === "PR") r.PR++;
-      else if (f.stav === "Ešte nie v ponuke") r.future++;
-      else if (f.stav === "ERROR") r.err++;
-    }
-    return m;
-  }, [flats, haveFlats]);
-
+  /* Every figure here is the project row's own (projects_live), whose sold count comes from
+     the ledger. There used to be a second branch that recounted from a flat list when one
+     was passed — counting the price list's "P" labels as the sold share. No caller passed
+     one, so it was dormant; it was also exactly the count that reads 0 % for a developer
+     who deletes flats when they sell, one prop away from coming back. Removed 2026-09-28
+     (Boss: a flat's status must be correct everywhere). */
   const enriched = projects.map(p => {
-    if (haveFlats) {
-      const r = byProject.get(p.id);
-      const total       = r ? r.total : 0;
-      const available   = r ? r.V : 0;
-      const sold        = r ? r.P : 0;
-      const reserved    = r ? r.R + r.PR : 0;
-      const future      = r ? r.future : 0;
-      const errored     = r ? r.err : 0;
-      const activeTotal = total - future - errored;
-      const hasSoldData = sold > 0 || reserved > 0;
-      const soldPct = activeTotal > 0 && hasSoldData
-        ? ((sold + reserved) / activeTotal) * 100
-        : null;
-      return { ...p, _realTotal: total, _realAvail: available, _realSoldPct: soldPct };
-    }
-    // Fallback: sum stav buckets from the project row itself.
     const total = (p.available_units || 0) + (p.sold_units || 0) + (p.reserved_units || 0) +
                   (p.prereserved_units || 0) + (p.future_units || 0) + (p.error_units || 0);
     return { ...p, _realTotal: total, _realAvail: p.available_units || 0, _realSoldPct: p.sold_percentage };

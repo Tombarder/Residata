@@ -51,26 +51,49 @@ test("display order puts available first and sold last", () => {
     [{ value: "V", label: "Voľné" }, { value: "P", label: "Predané" }]);
 });
 
-test("a flat still on the price list shows what the page says today", () => {
-  assert.equal(listingStatus({ on_price_list: true, latest_stav: "V", ledger_status: "AVAILABLE" }), "V");
-  assert.equal(listingStatus({ on_price_list: true, latest_stav: "R", ledger_status: "RESERVED" }), "R");
+test("the status shown is the one the database decided — stav, never re-derived here", () => {
+  // project_units_series for Tesla Hloubětín, 2026-09-28: gone from the list, last seen
+  // "Voľný", ledger SOLD → the server answers stav "P" and keeps the old one beside it.
+  assert.equal(listingStatus({ stav: "P", last_seen_stav: "V", on_price_list: false, ledger_status: "SOLD" }), "P");
+  assert.equal(listingStatus({ stav: OFF_LIST, last_seen_stav: "R", on_price_list: false }), OFF_LIST);
+  assert.equal(listingStatus({ stav: "V", last_seen_stav: "V", on_price_list: true }), "V");
 });
 
-test("a flat that LEFT the list takes the ledger's verdict, never its frozen last status", () => {
-  // Tesla Hloubětín, 2026-09-28: last seen "Voľný", deleted when it sold, ledger SOLD.
-  assert.equal(listingStatus({ on_price_list: false, latest_stav: "V", ledger_status: "SOLD" }), "P");
-  assert.equal(listingStatus({ on_price_list: false, latest_stav: "R", ledger_status: "OFFWEB" }), OFF_LIST);
-  assert.equal(listingStatus({ on_price_list: false, latest_stav: "V", ledger_status: null }), OFF_LIST);
-});
-
-test("a row that does not say whether it is listed keeps its last status", () => {
-  assert.equal(listingStatus({ latest_stav: "V" }), "V");
-  assert.equal(listingStatus({ stav: "PR" }), "PR");
+test("a row straight from the current price list falls back to latest_stav", () => {
+  // unit_search reads flats_current: every row is listed, so its status IS today's
+  assert.equal(listingStatus({ latest_stav: "R" }), "R");
+  assert.equal(listingStatus({ stav: "PR", latest_stav: "V" }), "PR");   // stav wins
   assert.equal(listingStatus(null), null);
+  assert.equal(listingStatus({}), null);
 });
 
-test("the off-list state has a label, and is not a scraper status", () => {
+test("the off-list code is the database's own, and it has a label", () => {
+  // reference.listing_stav returns exactly 'OFF_LIST' — a different spelling here would
+  // show the raw code to the reader instead of the words
+  assert.equal(OFF_LIST, "OFF_LIST");
   assert.equal(statusLabel(OFF_LIST, "sk", "one"), "Mimo cenníka");
   assert.equal(statusLabel(OFF_LIST, "en", "one"), "Off the price list");
   assert.ok(!STATUS_ORDER.includes(OFF_LIST));
+});
+
+test("no page reads a flat's last-seen status except through listingStatus", async () => {
+  // latest_stav from the history cache is the stale one for a flat that left the list.
+  // The only place allowed to read it is listingStatus (the fallback for current-list
+  // rows); anything else displaying it would show a sold flat as available again.
+  const { readdirSync, readFileSync, statSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const root = new URL("..", import.meta.url).pathname;
+  const hits = [];
+  const walk = (dir) => {
+    for (const name of readdirSync(dir)) {
+      const p = join(dir, name);
+      if (statSync(p).isDirectory()) { walk(p); continue; }
+      if (!/\.(jsx?|mjs)$/.test(name) || /\.test\.mjs$/.test(name)) continue;
+      if (p.endsWith("lib/unitStatus.js") || p.endsWith("lib/useData.js")) continue;
+      const src = readFileSync(p, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+      if (/\blatest_stav\b/.test(src)) hits.push(p.slice(root.length));
+    }
+  };
+  walk(root);
+  assert.deepEqual(hits, []);
 });
