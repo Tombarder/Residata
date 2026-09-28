@@ -38,6 +38,10 @@ export const PUBLIC_LANGS = ["en", "sk"];
 /** Fallback language for anything not in PUBLIC_LANGS. */
 export const DEFAULT_LANG = "en";
 
+/** Where the visitor's language pick is kept (lib/langChoice reads it, App.jsx
+ *  writes it; the before-paint script in index.html reads it — lib/trialBannerState). */
+export const LANG_STORAGE_KEY = "residata-lang";
+
 /** Short label shown on switcher pills per language code. */
 export const LANG_LABELS = { en: "EN", sk: "SK", cs: "CZ" };
 

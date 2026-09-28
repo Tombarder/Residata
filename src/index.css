@@ -257,3 +257,18 @@ body {
     white-space: nowrap;
   }
 }
+
+/* ── Pre-built pages (scripts/prerender.mjs) ─────────────────────────────────
+   They carry the trial banner in both languages; the <head> script
+   (lib/trialBannerState firstPaintScript) shows the one the app will show. At
+   ≤900px the app pads the page by the banner's measured height (App.jsx), so here
+   the banner sits in the flow and pushes the text down by exactly its own height;
+   wider, it overlays as in the app. Either way the text is drawn where the app
+   will draw it, and starting the app moves nothing. (The 900px must match
+   App.jsx — src/lib/headerStack.test.mjs holds them together.) */
+.rd-static-banner { display: none; }
+html[data-rd-banner="sk"] .rd-static-banner[data-lang="sk"],
+html[data-rd-banner="en"] .rd-static-banner[data-lang="en"] { display: block; }
+@media (max-width: 900px) {
+  .rd-static-banner .rd-trial-banner { position: relative !important; }
+}

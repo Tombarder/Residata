@@ -7,6 +7,7 @@ import path from 'node:path'
 // the Imprint. Never retype a company detail into the HTML.
 import { COMPANY, addressOneLine } from './src/lib/company.js'
 import { FALLBACK_MONTHLY_CENTS } from './src/lib/pricingDefaults.js'
+import { firstPaintScript } from './src/lib/trialBannerState.js'
 
 /**
  * residataIndexHtmlContent
@@ -49,6 +50,9 @@ function residataIndexHtmlContent() {
         // (scraper repo, 2026-09-28_price_and_market_figures_rebuild_the_site.sql).
         // Fallback = current launch price if build-data is absent.
         __SCHEMA_MONTHLY_PRICE_NUM__:      data.monthly_price_num      || (FALLBACK_MONTHLY_CENTS / 100).toFixed(2),
+        // The before-paint banner decision (index.html <head>): the same answer
+        // TrialBanner reaches, so a pre-built page shows the banner the app will.
+        __FIRST_PAINT_SCRIPT__:            firstPaintScript(),
         // PERF Step 2: the FULL build-time snapshot, injected as JSON into an
         // inline <script> so window.__RESIDATA_SNAPSHOT__ exists before any app
         // JS runs. src/lib/useData.js seeds useMarketTotals from it → the hero

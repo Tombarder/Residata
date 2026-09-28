@@ -30,6 +30,7 @@ import { useAuth } from "../lib/useAuth";
 import { track } from "../lib/track";
 
 import { KEY_BANNER_DISMISSED, KEY_OFFER_REMEMBERED, firstPaintBanner } from "../lib/trialBannerState.js";
+import { TrialBannerView } from "./TrialBannerView.jsx";
 
 
 // Both promo surfaces gate on the SAME predicate — useCapabilities().showTrialOffer
@@ -40,17 +41,29 @@ import { KEY_BANNER_DISMISSED, KEY_OFFER_REMEMBERED, firstPaintBanner } from "..
 // ────────────────────────────────────────────────────────────
 // Top banner
 // ────────────────────────────────────────────────────────────
-export function TrialBanner({ lang = "sk", onCta }) {
+export function TrialBanner({ lang = "sk", onCta, routeKey }) {
   // Decided in the first render (firstPaintBanner), not in an effect after it:
   // waiting for an effect drew every page without the banner and then pushed the
   // fixed nav down by the banner's height — a layout shift on every marketing
   // page, on every load (Lighthouse, 2026-09-28: 0.07 on each page measured).
-  const [first] = useState(() => firstPaintBanner());
+  const [first] = useState(() => {
+    const fp = firstPaintBanner();
+    // The <head> script (lib/trialBannerState firstPaintScript) already decided
+    // what the page was first drawn with; that answer stands. Re-reading storage
+    // here can disagree: by the time the app runs, the login library may have
+    // thrown away a stored session that had expired.
+    const head = typeof document !== "undefined" ? document.documentElement.getAttribute("data-rd-banner") : null;
+    return { dismissed: fp.dismissed, eligible: head ? head !== "none" : fp.eligible && !fp.dismissed };
+  });
   const [hidden, setHidden] = useState(first.dismissed);
   const { showTrialOffer } = useCapabilities();
   const { loading: authLoading, user } = useAuth();
-  const eligible = authLoading ? first.eligible : showTrialOffer;
-  const L = (sk, en) => lang === "sk" ? sk : en;
+  // A page first drawn WITHOUT the banner keeps it out until the visitor moves to
+  // another page: popping it in mid-view pushes the page down (it happens when a
+  // stored login turns out to have expired, so the visitor is anonymous after all).
+  const [quietOn] = useState(() => (first.eligible ? null : routeKey));
+  const quiet = quietOn !== null && routeKey === quietOn;
+  const eligible = (authLoading ? first.eligible : showTrialOffer) && !quiet;
   const bannerRef = useRef(null);
 
   // Remember a logged-in account's answer for its next first paint.
@@ -85,7 +98,10 @@ export function TrialBanner({ lang = "sk", onCta }) {
     if (!show) { root.style.removeProperty("--trial-banner-h"); return; }
     const el = bannerRef.current;
     if (!el) return;
-    const apply = () => root.style.setProperty("--trial-banner-h", el.offsetHeight + "px");
+    // The exact (fractional) height: a pre-built page lets the banner push its
+    // text down by its natural height, and a rounded offsetHeight put the app's
+    // text 1px off it — a visible nudge when the app starts.
+    const apply = () => root.style.setProperty("--trial-banner-h", el.getBoundingClientRect().height + "px");
     apply();
     const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(apply) : null;
     ro?.observe(el);
@@ -109,60 +125,7 @@ export function TrialBanner({ lang = "sk", onCta }) {
     if (onCta) onCta();
   };
 
-  return (
-    <div ref={bannerRef} role="region" aria-label={L("Akcia", "Promotion")} style={{
-      position: "fixed",
-      top: 0, left: 0, right: 0,
-      zIndex: "var(--z-banner)",
-      background: "linear-gradient(90deg, color-mix(in srgb, var(--accent) 18%, transparent), color-mix(in srgb, var(--accent) 8%, transparent) 60%, color-mix(in srgb, var(--accent) 4%, transparent))",
-      borderBottom: "1px solid color-mix(in srgb, var(--accent) 35%, transparent)",
-      color: "var(--text)",
-      fontSize: "0.78rem",
-      // top inset clears the notch/status bar; side insets clear landscape cutouts
-      padding: "calc(0.5rem + var(--safe-top)) max(1rem, var(--safe-right)) 0.5rem max(1rem, var(--safe-left))",
-      // wrap so the Activate/✕ buttons drop below the text on a ~320px phone
-      // instead of clipping past the edge.
-      display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem 0.75rem", flexWrap: "wrap",
-      backdropFilter: "blur(10px)",
-      WebkitBackdropFilter: "blur(10px)",
-    }}>
-      <span style={{ fontSize: "0.95rem" }}>🎁</span>
-      <span style={{ flex: "0 1 auto", textAlign: "center", lineHeight: 1.4 }}>
-        <strong style={{ color: "var(--accent)", fontWeight: 700 }}>
-          {L("7 dní zadarmo", "7 days free")}
-        </strong>{" "}
-        {/* full copy on wider screens, punchy short copy on phones (see responsive.css) */}
-        <span className="trial-banner-long">— {L(
-          "prístup k Residata Premium: pokročilá analytika, reporty, mapy, AI asistent. Bez potreby vyplniť platobné údaje.",
-          "access to Residata Premium: advanced analytics, reports, maps, AI assistant. No payment details needed.",
-        )}</span>
-        <span className="trial-banner-short">— {L("plný prístup, bez karty.", "full access, no card.")}</span>
-      </span>
-      <button onClick={click}
-        style={{
-          background: "var(--accent)", color: "var(--bg)",
-          border: "none", borderRadius: 6,
-          padding: "0.3rem 0.85rem",
-          fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", fontSize: "0.7rem",
-          cursor: "pointer",
-          letterSpacing: "0.02em",
-        }}>
-        {L("Aktivovať", "Activate")}
-      </button>
-      <button onClick={dismiss}
-        aria-label={L("Zavrieť banner", "Dismiss banner")}
-        title={L("Skryť na týždeň", "Hide for a week")}
-        style={{
-          background: "transparent", border: "none",
-          color: "rgba(232,232,237,0.55)", cursor: "pointer",
-          fontSize: "0.95rem", lineHeight: 1, padding: "0 0.25rem",
-          fontFamily: "inherit",
-        }}
-        onMouseEnter={e => e.currentTarget.style.color = "var(--text)"}
-        onMouseLeave={e => e.currentTarget.style.color = "rgba(232,232,237,0.55)"}
-      >✕</button>
-    </div>
-  );
+  return <TrialBannerView lang={lang} bannerRef={bannerRef} onCta={click} onDismiss={dismiss} />;
 }
 
 // ────────────────────────────────────────────────────────────

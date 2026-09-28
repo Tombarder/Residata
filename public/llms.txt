@@ -46,27 +46,30 @@ Full details: https://residata.eu/imprint
 - Live dashboard (every active project): https://residata.eu/live
 - What the data looks like, with live figures: https://residata.eu/sample
 - Published market analyses (Slovak, quarterly): https://residata.eu/analyzy
+- The site in Slovak: https://residata.eu/sk (pricing https://residata.eu/sk/cennik, use cases https://residata.eu/sk/vyuzitie, sample https://residata.eu/sk/ukazka, live dashboard https://residata.eu/sk/live)
 
 ## Published analyses (19, newest first; Slovak)
 
-- [Žilinský kraj: trh nových bytov v 3. štvrťroku 2026](https://residata.eu/analyzy/kraj-za-prehlad-2026-q3): Prehľad trhu s novými bytmi v Žilinskom kraji za 3. štvrťrok 2026: ponuka, dopyt a ceny podľa obce a podľa veľkosti bytu.
-- [Bratislavský kraj: trh nových bytov v 3. štvrťroku 2026](https://residata.eu/analyzy/kraj-ba-prehlad-2026-q3): Prehľad trhu s novými bytmi v Bratislavskom kraji za 3. štvrťrok 2026: ponuka, dopyt a ceny podľa obce a podľa veľkosti bytu.
-- [Prešovský kraj: trh nových bytov v 3. štvrťroku 2026](https://residata.eu/analyzy/kraj-po-prehlad-2026-q3): Prehľad trhu s novými bytmi v Prešovskom kraji za 3. štvrťrok 2026: ponuka, dopyt a ceny podľa obce a podľa veľkosti bytu.
+Their figures, tables and charts are published under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/): quote and reuse them freely, commercially too, crediting "Residata" with a link to the analysis. Suggested citation: "Residata. <title>. <date>. <url>".
+
+- [Bratislava: trh nových bytov v 3. štvrťroku 2026](https://residata.eu/analyzy/ba-prehlad-2026-q3): Prehľad trhu s novými bytmi v Bratislave za 3. štvrťrok 2026: ponuka, dopyt a ceny podľa okresov a podľa veľkosti bytu.
 - [Banská Bystrica: trh nových bytov v 3. štvrťroku 2026](https://residata.eu/analyzy/bb-prehlad-2026-q3): Prehľad trhu s novými bytmi v Banskej Bystrici za 3. štvrťrok 2026: ponuka, dopyt a ceny podľa veľkosti bytu.
 - [Slovensko: ceny nových bytov podľa počtu izieb v 3. štvrťroku 2026](https://residata.eu/analyzy/co-stoji-byt-2026-q3): Mediánové ceny nových bytov podľa počtu izieb v 11 slovenských mestách: cena celého bytu a cena za meter štvorcový.
-- [Trenčiansky kraj: trh nových bytov v 3. štvrťroku 2026](https://residata.eu/analyzy/kraj-tn-prehlad-2026-q3): Prehľad trhu s novými bytmi v Trenčianskom kraji za 3. štvrťrok 2026: ponuka, dopyt a ceny podľa obce a podľa veľkosti bytu.
-- [Banskobystrický kraj: trh nových bytov v 3. štvrťroku 2026](https://residata.eu/analyzy/kraj-bb-prehlad-2026-q3): Prehľad trhu s novými bytmi v Banskobystrickom kraji za 3. štvrťrok 2026: ponuka, dopyt a ceny podľa obce a podľa veľkosti bytu.
-- [Bratislava: trh nových bytov v 3. štvrťroku 2026](https://residata.eu/analyzy/ba-prehlad-2026-q3): Prehľad trhu s novými bytmi v Bratislave za 3. štvrťrok 2026: ponuka, dopyt a ceny podľa okresov a podľa veľkosti bytu.
 - [Slovensko: ponuka a predaj nových bytov podľa obcí v 3. štvrťroku 2026](https://residata.eu/analyzy/kde-sa-predava-2026-q3): Ponuka, ceny a predaj nových bytov v slovenských obciach od 1. júla do 27. septembra 2026: koľko bytov je v ponuke, za koľko sa predávajú a za aký čas by sa pri súčasnom tempe predaja vypredali.
+- [Košice: trh nových bytov v 3. štvrťroku 2026](https://residata.eu/analyzy/ke-prehlad-2026-q3): Prehľad trhu s novými bytmi v Košiciach za 3. štvrťrok 2026: ponuka, dopyt a ceny podľa veľkosti bytu.
+- [Bratislavský kraj: trh nových bytov v 3. štvrťroku 2026](https://residata.eu/analyzy/kraj-ba-prehlad-2026-q3): Prehľad trhu s novými bytmi v Bratislavskom kraji za 3. štvrťrok 2026: ponuka, dopyt a ceny podľa obce a podľa veľkosti bytu.
+- [Banskobystrický kraj: trh nových bytov v 3. štvrťroku 2026](https://residata.eu/analyzy/kraj-bb-prehlad-2026-q3): Prehľad trhu s novými bytmi v Banskobystrickom kraji za 3. štvrťrok 2026: ponuka, dopyt a ceny podľa obce a podľa veľkosti bytu.
 - [Košický kraj: trh nových bytov v 3. štvrťroku 2026](https://residata.eu/analyzy/kraj-ke-prehlad-2026-q3): Prehľad trhu s novými bytmi v Košickom kraji za 3. štvrťrok 2026: ponuka, dopyt a ceny podľa obce a podľa veľkosti bytu.
 - [Nitriansky kraj: trh nových bytov v 3. štvrťroku 2026](https://residata.eu/analyzy/kraj-nr-prehlad-2026-q3): Prehľad trhu s novými bytmi v Nitrianskom kraji za 3. štvrťrok 2026: ponuka, dopyt a ceny podľa obce a podľa veľkosti bytu.
+- [Prešovský kraj: trh nových bytov v 3. štvrťroku 2026](https://residata.eu/analyzy/kraj-po-prehlad-2026-q3): Prehľad trhu s novými bytmi v Prešovskom kraji za 3. štvrťrok 2026: ponuka, dopyt a ceny podľa obce a podľa veľkosti bytu.
+- [Trenčiansky kraj: trh nových bytov v 3. štvrťroku 2026](https://residata.eu/analyzy/kraj-tn-prehlad-2026-q3): Prehľad trhu s novými bytmi v Trenčianskom kraji za 3. štvrťrok 2026: ponuka, dopyt a ceny podľa obce a podľa veľkosti bytu.
 - [Trnavský kraj: trh nových bytov v 3. štvrťroku 2026](https://residata.eu/analyzy/kraj-tt-prehlad-2026-q3): Prehľad trhu s novými bytmi v Trnavskom kraji za 3. štvrťrok 2026: ponuka, dopyt a ceny podľa obce a podľa veľkosti bytu.
-- [Prešov: trh nových bytov v 3. štvrťroku 2026](https://residata.eu/analyzy/po-prehlad-2026-q3): Prehľad trhu s novými bytmi v Prešove za 3. štvrťrok 2026: ponuka, dopyt a ceny podľa veľkosti bytu.
-- [Trenčín: trh nových bytov v 3. štvrťroku 2026](https://residata.eu/analyzy/tn-prehlad-2026-q3): Prehľad trhu s novými bytmi v Trenčíne za 3. štvrťrok 2026: ponuka, dopyt a ceny podľa veľkosti bytu.
-- [Žilina: trh nových bytov v 3. štvrťroku 2026](https://residata.eu/analyzy/za-prehlad-2026-q3): Prehľad trhu s novými bytmi v Žiline za 3. štvrťrok 2026: ponuka, dopyt a ceny podľa veľkosti bytu.
+- [Žilinský kraj: trh nových bytov v 3. štvrťroku 2026](https://residata.eu/analyzy/kraj-za-prehlad-2026-q3): Prehľad trhu s novými bytmi v Žilinskom kraji za 3. štvrťrok 2026: ponuka, dopyt a ceny podľa obce a podľa veľkosti bytu.
 - [Nitra: trh nových bytov v 3. štvrťroku 2026](https://residata.eu/analyzy/nr-prehlad-2026-q3): Prehľad trhu s novými bytmi v Nitre za 3. štvrťrok 2026: ponuka, dopyt a ceny podľa veľkosti bytu.
+- [Prešov: trh nových bytov v 3. štvrťroku 2026](https://residata.eu/analyzy/po-prehlad-2026-q3): Prehľad trhu s novými bytmi v Prešove za 3. štvrťrok 2026: ponuka, dopyt a ceny podľa veľkosti bytu.
 - [Slovensko: trh nových bytov v 3. štvrťroku 2026](https://residata.eu/analyzy/sk-prehlad-2026-q3): Prehľad trhu s novými bytmi na Slovensku za 3. štvrťrok 2026: ponuka, dopyt a ceny podľa kraja a podľa veľkosti bytu.
+- [Trenčín: trh nových bytov v 3. štvrťroku 2026](https://residata.eu/analyzy/tn-prehlad-2026-q3): Prehľad trhu s novými bytmi v Trenčíne za 3. štvrťrok 2026: ponuka, dopyt a ceny podľa veľkosti bytu.
 - [Trnava: trh nových bytov v 3. štvrťroku 2026](https://residata.eu/analyzy/tt-prehlad-2026-q3): Prehľad trhu s novými bytmi v Trnave za 3. štvrťrok 2026: ponuka, dopyt a ceny podľa veľkosti bytu.
-- [Košice: trh nových bytov v 3. štvrťroku 2026](https://residata.eu/analyzy/ke-prehlad-2026-q3): Prehľad trhu s novými bytmi v Košiciach za 3. štvrťrok 2026: ponuka, dopyt a ceny podľa veľkosti bytu.
+- [Žilina: trh nových bytov v 3. štvrťroku 2026](https://residata.eu/analyzy/za-prehlad-2026-q3): Prehľad trhu s novými bytmi v Žiline za 3. štvrťrok 2026: ponuka, dopyt a ceny podľa veľkosti bytu.
 
 Numbers above are regenerated from the live database on every deploy.

@@ -1,4 +1,4 @@
-import { Fragment, useState, useEffect, useLayoutEffect, useRef, lazy, Suspense } from "react";
+import { Fragment, useState, useEffect, useLayoutEffect, useRef, lazy, Suspense, createContext, useContext } from "react";
 import { useNavCollapsed } from "./lib/breakpoints";
 import { t } from "./lib/marketingCopy";
 import { usePricing } from "./lib/pricing";
@@ -48,7 +48,9 @@ import { useMarketTotals, useDataSample, useHomeProjects, useTotalsList } from "
 import { fmtSelloutValue } from "./lib/absorption";
 import { pushRoute, pathToPage, isAppPage, isInsightsPage, pageToPath } from "./lib/routing";
 import { applySeo, historySincePhrase } from "./lib/seo";
-import { localeTag, PUBLIC_LANGS, DEFAULT_LANG, LANG_LABELS, isPublicLang, coercePublicLang } from "./lib/locale";
+import { localeTag, PUBLIC_LANGS, DEFAULT_LANG, LANG_LABELS, coercePublicLang, LANG_STORAGE_KEY } from "./lib/locale";
+import { addressLang, storedPick, initialPick, shownLang } from "./lib/langChoice";
+import { APP_ROOT_STYLE, TICKER_SPACER_PX } from "./lib/pageFrame.js";
 import { startPageEngagement, stopPageEngagement } from "./lib/engagement";
 // PERF Step 5: code-split — the platform shell pulls in the heaviest modules
 // (Reports, PivotV2, UnitTracker, admin) which a marketing/first-time visitor
@@ -330,14 +332,18 @@ function NavBtn({ style, children, ...rest }) {
    No style reset is needed — an <a> inherits font + has no control chrome, and
    every call-site already sets text-decoration:none + its colour via class or
    inline style, so the rendering is byte-identical to the old button. */
+// The language the marketing links point into (routing.SK_PATHS): App provides it.
+const RouteLangContext = createContext(DEFAULT_LANG);
+
 function NavLink({ to, onNavigate, onClick, style, children, ...rest }) {
+  const routeLang = useContext(RouteLangContext);
   const handleClick = (e) => {
     if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
     e.preventDefault();
     onClick?.(e);
     onNavigate?.(to);
   };
-  return <a href={pageToPath(to)} onClick={handleClick} style={style} {...rest}>{children}</a>;
+  return <a href={pageToPath(to, routeLang)} onClick={handleClick} style={style} {...rest}>{children}</a>;
 }
 
 /* Logged-in account control for the desktop nav. A fixed-size avatar button that
@@ -838,7 +844,7 @@ function Footer({ lang = "en", setCurrent }) {
             <a href="/imprint" onClick={handleNav("Imprint")} style={linkStyle} onMouseEnter={hoverOn} onMouseLeave={hoverOff}>
               {isSK ? "Impressum" : "Imprint"}
             </a>
-            <a href="/status" onClick={handleNav("Status")} style={linkStyle} onMouseEnter={hoverOn} onMouseLeave={hoverOff}>
+            <a href={pageToPath("Status", lang)} onClick={handleNav("Status")} style={linkStyle} onMouseEnter={hoverOn} onMouseLeave={hoverOff}>
               {isSK ? "Stav služby" : "Service status"}
             </a>
             <a href="#" onClick={reopenCookies} style={linkStyle} onMouseEnter={hoverOn} onMouseLeave={hoverOff}>
@@ -2147,42 +2153,51 @@ function AuthLoadingSpinner() {
 // lose their choice every time they navigated. localStorage keeps the pick
 // durable.
 //
-// Boss 2026-08-15: a FIRST-TIME visitor always lands in English. The old
-// browser-language sniff sent a Slovak browser to SK, which contradicted the
-// intended default (EN / All markets / EUR) and made the landing experience
-// depend on the visitor's OS settings. Only an explicit pick changes the
-// language now, and that pick still sticks across sessions and devices.
-const LANG_STORAGE_KEY = "residata-lang";
-function readInitialLang() {
-  if (typeof window === "undefined") return DEFAULT_LANG;
-  try {
-    const stored = window.localStorage.getItem(LANG_STORAGE_KEY);
-    // Only honour a stored pick that is still public (a returning visitor's stale
-    // 'cs' falls through to the default rather than sticking).
-    if (isPublicLang(stored)) return stored;
-  } catch (_) { /* private mode etc. */ }
-  return DEFAULT_LANG;
-}
+// Boss 2026-08-15: a FIRST-TIME visitor on an ordinary address lands in English.
+// The old browser-language sniff sent a Slovak browser to SK, which contradicted
+// the intended default (EN / All markets / EUR) and made the landing experience
+// depend on the visitor's OS settings. The pick changes only when the visitor
+// picks, and it sticks across sessions and devices. What is SHOWN is the pick,
+// except on an address with a language of its own (/sk/…) — lib/langChoice.
 
 export default function App() {
   // Init page from current URL (so direct link / refresh works)
   const [current, setCurrent] = useState(() =>
     typeof window !== "undefined" ? pathToPage(window.location.pathname) : "Home"
   );
-  // F-024 fix — initialize from localStorage + browser-lang detection.
-  const [langRaw, setLangRaw] = useState(readInitialLang);
-  const lang = coercePublicLang(langRaw);
+  // The visitor's PICK, and the language of the address on screen (null for an
+  // address without one). What is shown follows from the two — lib/langChoice.
+  const [pickRaw, setPickRaw] = useState(() =>
+    typeof window !== "undefined" ? initialPick(window.location.pathname) : DEFAULT_LANG
+  );
+  const [addrLang, setAddrLang] = useState(() =>
+    typeof window !== "undefined" ? addressLang(window.location.pathname) : null
+  );
+  const pick = coercePublicLang(pickRaw);
+  const lang = shownLang(addrLang, pick);
   // Re-render when the Boss's live copy edits load/refresh (overlay over the dicts).
   useCopyVersion();
-  // setLang persists the choice. Wrap setLangRaw so call-sites are unchanged.
-  const setLang = (newLang) => {
-    setLangRaw(newLang);
+  // A pick is kept in this browser; useAccountUiPref below carries it to the account.
+  const choose = (newLang) => {
+    setPickRaw(newLang);
     try { window.localStorage.setItem(LANG_STORAGE_KEY, newLang); } catch (_) {}
   };
+  // The switch: a pick, shown at once. Clearing the address's language lets the
+  // pick show; the effect further down then moves the page to its address in
+  // that language.
+  const setLang = (newLang) => { choose(newLang); setAddrLang(null); };
+  // A first visit that arrived on a language's own address has picked it — keep
+  // it, so the next visit (to any address) continues in that language. Declared
+  // before the account hook so an explicit pick found there still wins.
+  useEffect(() => {
+    if (storedPick() === null && addrLang) choose(addrLang);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // Language follows the ACCOUNT across devices too (logged-in users). localStorage stays
-  // the per-browser cache; the account is the cross-device source of truth. Anon visitors
-  // keep browser-detected language (the hook never writes for them).
-  useAccountUiPref("language", lang, setLang);
+  // the per-browser cache; the account is the cross-device source of truth. Only the
+  // PICK travels: opening a /sk/… link neither shows nor saves the account's language
+  // over the address's (the hook never writes for anon visitors).
+  useAccountUiPref("language", pick, choose);
   const [loginOpen, setLoginOpen] = useState(false);
   // The bottom-left dock steps aside when the footer arrives, so it never sits on
   // top of the footer's own content and the page needs no padding to make room.
@@ -2227,6 +2242,9 @@ export default function App() {
   useEffect(() => {
     const onPop = () => {
       setCurrent(pathToPage(window.location.pathname));
+      // Back to a /sk/… address is back to Slovak (the address says so); back to
+      // any other address shows the pick.
+      setAddrLang(addressLang(window.location.pathname));
       window.scrollTo({ top: 0, behavior: "instant" });
     };
     window.addEventListener("popstate", onPop);
@@ -2279,6 +2297,21 @@ export default function App() {
     applySeo(current, lang, country);
   }, [current, lang, country, seoPrice]);
 
+  // The address follows the page AND its language (routing.SK_PATHS): a switch of
+  // language, a returning visitor's stored pick on an English address, or the
+  // account's language arriving after login all move the page to that language's
+  // own address — replaced, not pushed, since it is the same page. Only the
+  // language form of the page on screen is rewritten, never another page.
+  useEffect(() => {
+    if (typeof window === "undefined" || isAppPage(current)) return;
+    const want = pageToPath(current, lang);
+    const here = window.location.pathname.replace(/\/+$/, "") || "/";
+    if (here !== want && pathToPage(here) === current) {
+      window.history.replaceState({ page: current }, "", want + window.location.search + window.location.hash);
+      setAddrLang(addressLang(want));
+    }
+  }, [current, lang]);
+
   // Redeem a trial that was asked for before the account existed, if the attempt
   // at sign-up didn't get through. CompleteProfile tries once and now KEEPS the
   // intent when the failure was transient, so this is where that retry lands:
@@ -2301,7 +2334,8 @@ export default function App() {
       : (pageMap[page] || page);
     if (resolved === current) return;
     setCurrent(resolved);
-    pushRoute(resolved);
+    pushRoute(resolved, false, lang);
+    setAddrLang(addressLang(window.location.pathname));
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -2346,9 +2380,16 @@ export default function App() {
   const pageOwnsMain = current === "Live" || current === "HeroLab" ||
     (typeof current === "string" && current.startsWith("Project:"));
   const PageWrap = pageOwnsMain ? "div" : "main";
+  // A page the build pre-rendered (scripts/prerender.mjs — the analyses) is on
+  // screen before the app starts. Fading the app's identical copy in from nothing
+  // would blink it, so that first page appears as it is; later pages keep the fade.
+  const [prerenderedPage] = useState(() =>
+    (typeof document !== "undefined" && document.getElementById("root")?.dataset.prerendered ? current : null));
+  const pageStyle = current === prerenderedPage ? { animation: "none" } : undefined;
 
   return (
-    <div style={{ background: "var(--bg)", color: "var(--text)", fontFamily: "'Outfit', -apple-system, sans-serif", minHeight: "100vh", WebkitFontSmoothing: "antialiased", position: "relative" }}>
+    <RouteLangContext.Provider value={lang}>
+    <div style={APP_ROOT_STYLE}>
       <style>{`
         .sec-title { font-size: clamp(1.8rem, 3.5vw, 2.6rem); font-weight: 700; letter-spacing: -0.03em; margin-bottom: 1rem; line-height: 1.15; }
         .sec-desc { font-size: 1.05rem; color: var(--text-dim); max-width: 600px; font-weight: 300; line-height: 1.7; }
@@ -2470,7 +2511,12 @@ export default function App() {
            The ticker then sits a nav-height (72px) below that. */
         body.residata-has-trial-banner .marketing-nav { top: var(--trial-banner-h, 44px) !important; }
         body.residata-has-trial-banner .marketing-nav > div { padding-top: 1rem !important; }
-        body.residata-has-trial-banner [aria-label="Live market ticker"] { top: calc(var(--trial-banner-h, 44px) + var(--nav-h, 72px)) !important; }
+        /* By class, not by an a11y attribute: this rule used to match the
+           ticker's aria-label, and when an accessibility pass
+           (2026-06-30) rightly swapped that label for aria-hidden, the ticker
+           stayed at the nav's old position — hidden BEHIND the pushed-down nav for
+           every visitor shown the banner, for three months. */
+        body.residata-has-trial-banner .residata-ticker { top: calc(var(--trial-banner-h, 44px) + var(--nav-h, 72px)) !important; }
 
         .card-hover { transition: border-color 0.3s, transform 0.3s, box-shadow 0.3s; }
         .card-hover:hover { border-color: #333 !important; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.2); }
@@ -2541,11 +2587,13 @@ export default function App() {
           <TrialBanner
             lang={lang}
             onCta={handleTrialCta}
+            routeKey={current}
           />
           <Nav current={current} setCurrent={handleNav} lang={lang} setLang={setLang} auth={auth} onLogin={() => setLoginOpen(true)} caps={caps} />
           <Ticker lang={lang} />
-          {/* Spacer for fixed Nav (72px) + Ticker (36px) */}
-          <div style={{ height: 36 }} />
+          {/* Room for the fixed Ticker below the fixed Nav (lib/pageFrame — the
+              pre-built pages keep the same room, so text lands in the same place). */}
+          <div style={{ height: TICKER_SPACER_PX }} />
         </>
       )}
 
@@ -2582,7 +2630,7 @@ export default function App() {
           />
         </Suspense>
       ) : (
-        <PageWrap key={current} className="page-transition">
+        <PageWrap key={current} className="page-transition" style={pageStyle}>
           <>
             {current === "Home" && <HomePage setCurrent={handleNav} l={l} lang={lang} onLogin={() => setLoginOpen(true)} />}
 
@@ -2716,5 +2764,6 @@ export default function App() {
       )}
       </div>
     </div>
+    </RouteLangContext.Provider>
   );
 }

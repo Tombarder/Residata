@@ -40,6 +40,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { COMPANY, addressOneLine, registrationLine } from '../src/lib/company.js';
 import { PUBLIC_LANGS } from '../src/lib/locale.js';
+import { SK_PATHS, pathToPage } from '../src/lib/routing.js';
 import { FALLBACK_MONTHLY_CENTS, FALLBACK_MONTHLY_DISPLAY, FALLBACK_ANCHOR_DISPLAY } from '../src/lib/pricingDefaults.js';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
@@ -99,7 +100,9 @@ const ARTICLE_COLS =
 let articles = null;
 try {
   articles = await fetchView('articles', {
-    select: ARTICLE_COLS, published: 'eq.true', order: 'article_date.desc',
+    // slug breaks the tie: most issues share a date, and without it every build
+    // listed them in whatever order the database returned them that time.
+    select: ARTICLE_COLS, published: 'eq.true', order: 'article_date.desc,slug.asc',
   });
   fs.writeFileSync(ARTICLES_FILE, JSON.stringify(articles));
   console.log(`[gen-static] scripts/.articles.json — ${articles.length} published articles`);
@@ -238,6 +241,7 @@ Full details: https://residata.eu/imprint
 - Live dashboard (every active project): ${HOME}/live
 - What the data looks like, with live figures: ${HOME}/sample
 - Published market analyses (Slovak, quarterly): ${HOME}/analyzy
+- The site in Slovak: ${HOME}/sk (pricing ${HOME}/sk/cennik, use cases ${HOME}/sk/vyuzitie, sample ${HOME}/sk/ukazka, live dashboard ${HOME}/sk/live)
 ${articlesSection()}
 Numbers above are regenerated from the live database on every deploy.
 `;
@@ -404,8 +408,20 @@ const SITEMAP_URLS = [
   // two disagree, which is what stops this list rotting the way /about did.
   // changefreq yearly on an article: its figures are a dated snapshot and are
   // deliberately never rewritten — a new month is a new URL, not an edit.
-  { loc: '/analyzy', priority: '0.8', changefreq: 'monthly' },
+  // Slovak only, like every analysis (lib/articleSeo SECTION_LANG).
+  { loc: '/analyzy', priority: '0.8', changefreq: 'monthly', langs: ['sk'] },
 ];
+
+// Every marketing page exists once per language at its own address
+// (src/lib/routing.js SK_PATHS): the English entry above and its Slovak twin
+// are both listed, and each names the other as its alternate — until 2026-09-28
+// both languages shared one URL, so there was no Slovak page to list.
+const MARKETING_URLS = SITEMAP_URLS.flatMap((e) => {
+  const twin = SK_PATHS[pathToPage(e.loc)];
+  if (!twin) return [e];
+  const alt = { en: e.loc, sk: twin };
+  return [{ ...e, alt }, { ...e, loc: twin, alt }];
+});
 
 // Published analyses, straight from the table that renders them, so a piece
 // published from /app/articles reaches Google on the next deploy without anyone
@@ -432,7 +448,7 @@ const articleUrls = articles.map((r) => ({
   lastmod: String(r.updated_at || r.article_date || today).slice(0, 10),
   langs: [(r.title && r.title.sk) ? 'sk' : 'en'],
 }));
-const ALL_SITEMAP_URLS = [...SITEMAP_URLS, ...articleUrls];
+const ALL_SITEMAP_URLS = [...MARKETING_URLS, ...articleUrls];
 
 const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <!--
@@ -444,13 +460,16 @@ const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
         xmlns:xhtml="http://www.w3.org/1999/xhtml">
-${ALL_SITEMAP_URLS.map(({ loc, priority, changefreq, lastmod, langs = PUBLIC_LANGS }) => `
+${ALL_SITEMAP_URLS.map(({ loc, priority, changefreq, lastmod, langs = PUBLIC_LANGS, alt }) => `
   <url>
     <loc>${HOME}${loc}</loc>
     <lastmod>${lastmod || today}</lastmod>
     <changefreq>${changefreq}</changefreq>
     <priority>${priority}</priority>
-${[...langs, 'x-default'].map((l) => `    <xhtml:link rel="alternate" hreflang="${l}" href="${HOME}${loc}" />`).join('\n')}
+${(alt
+    ? [['en', alt.en], ['sk', alt.sk], ['x-default', alt.en]]
+    : [...langs, 'x-default'].map((l) => [l, loc])
+  ).map(([l, href]) => `    <xhtml:link rel="alternate" hreflang="${l}" href="${HOME}${href}" />`).join('\n')}
   </url>`).join('')}
 </urlset>
 `;

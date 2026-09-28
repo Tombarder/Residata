@@ -49,7 +49,7 @@ import { createServer } from "vite";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
-  headHtml, replaceHead, fillRoot, siteNodes, rssFeed, pageProblems, HEAD_ONLY_PATHS, duplicateJsonKeys,
+  headHtml, replaceHead, fillRoot, siteNodes, rssFeed, pageProblems, HEAD_ONLY_PATHS, duplicateJsonKeys, deferAppStart,
 } from "./lib/prerenderCore.mjs";
 
 const ROOT = process.cwd();
@@ -97,12 +97,23 @@ async function main() {
   try {
     const load = (m) => vite.ssrLoadModule(m);
     const { ArticleView, IndexView } = await load("/src/pages/insightsView.jsx");
+    const { TrialBannerView } = await load("/src/components/TrialBannerView.jsx");
+    const { APP_ROOT_STYLE, TICKER_SPACER_PX } = await load("/src/lib/pageFrame.js");
+    // The app's own frame around a pre-built page — its root, the trial banner in
+    // both languages (the <head> script shows the one the app will show), the
+    // ticker's room and the page wrapper — so the text is drawn where the app
+    // will put it, and the hand-over moves nothing (lib/pageFrame).
+    const framed = (page) => createElement("div", { style: APP_ROOT_STYLE },
+      ...["sk", "en"].map((l) => createElement("div", { key: l, className: "rd-static-banner", "data-lang": l },
+        createElement(TrialBannerView, { lang: l }))),
+      createElement("div", { style: { height: TICKER_SPACER_PX } }),
+      createElement("main", { className: "page-transition" }, page));
     const { articleHead, articleSeoChecks, relatedArticles, headline, seoLang, perex, canonicalUrl, SECTION_SK, SECTION_LANG, DATA_LICENSE } =
       await load("/src/lib/articleSeo.js");
     const { toArticle, EMBEDDED_ARTICLE_ID, EMBEDDED_LIST_ID, EMBEDDED_LIST_FIELDS } = await load("/src/lib/articleModel.js");
     const { orderArticles, seriesRank } = await load("/src/lib/articleOrder.js");
     const { seoMetaFor, DEFAULT_OG_IMAGE, DEFAULT_OG_ALT } = await load("/src/lib/seo.js");
-    const { pathToPage } = await load("/src/lib/routing.js");
+    const { pathToPage, SK_PATHS } = await load("/src/lib/routing.js");
 
     const site = siteNodes(template);
     if (!site.some((n) => n["@type"] === "Organization")) die("no Organization in index.html's structured data");
@@ -137,15 +148,15 @@ async function main() {
       const page = shareImageExists === false ? { ...a, ogImage: null } : a;
       const head = articleHead(page, { siteBase: HOME });
       const related = relatedArticles(page, articles, { rank: seriesRank });
-      const markup = renderToStaticMarkup(createElement(ArticleView, {
+      const markup = renderToStaticMarkup(framed(createElement(ArticleView, {
         article: page, related, lang: head.lang, navigate: () => {},
-      }));
+      })));
       const graph = { "@context": "https://schema.org", "@graph": [...site, ...head.jsonLd["@graph"]] };
       let html = replaceHead(template, {
         lang: head.lang, dropJsonLd: true,
         head: headHtml({ ...head, jsonLd: graph, jsonLdId: "ld-article", extra: [feedLink, preload].filter(Boolean) }),
       });
-      html = fillRoot(html, markup, { embed: rows.find((r) => r.slug === a.slug), embedId: EMBEDDED_ARTICLE_ID });
+      html = deferAppStart(fillRoot(html, markup, { embed: rows.find((r) => r.slug === a.slug), embedId: EMBEDDED_ARTICLE_ID }));
       const problems = pageProblems(html, {
         title: head.title, canonical: head.canonical, lang: head.lang, index: true,
         ogImage: head.og["og:image"], h1: headline(page),
@@ -163,7 +174,7 @@ async function main() {
     // ── the index ─────────────────────────────────────────────────────────
     {
       const meta = seoMetaFor("Insights", SECTION_LANG, { siteBase: HOME, price: build.monthly_price, anchor: build.anchor_price, snapshot: build });
-      const markup = renderToStaticMarkup(createElement(IndexView, { articles, lang: SECTION_LANG, navigate: () => {} }));
+      const markup = renderToStaticMarkup(framed(createElement(IndexView, { articles, lang: SECTION_LANG, navigate: () => {} })));
       const url = meta.url;
       const graph = {
         "@context": "https://schema.org",
@@ -208,7 +219,7 @@ async function main() {
       // The list the app's first render of the index starts from
       // (lib/useArticles embeddedList) — only what a card shows.
       const listRows = rows.map((r) => Object.fromEntries(EMBEDDED_LIST_FIELDS.map((k) => [k, r[k]])));
-      html = fillRoot(html, markup, { embed: listRows, embedId: EMBEDDED_LIST_ID });
+      html = deferAppStart(fillRoot(html, markup, { embed: listRows, embedId: EMBEDDED_LIST_ID }));
       const problems = pageProblems(html, {
         title: meta.title, canonical: url, lang: SECTION_LANG, index: true,
         jsonLdType: ["CollectionPage"], noFaq: true, hreflang: [SECTION_LANG, "x-default"],
@@ -219,11 +230,13 @@ async function main() {
       written.push("/analyzy");
     }
 
-    // ── every other public route: its own head ───────────────────────────
-    for (const p of HEAD_ONLY_PATHS) {
-      const pageKey = pathToPage(p);
-      const meta = seoMetaFor(pageKey, "en", { siteBase: HOME, price: build.monthly_price, anchor: build.anchor_price, snapshot: build });
-      if (!meta) die(`${p} → ${pageKey} has no entry in src/lib/seo.js`);
+    // ── every other public route: its own head, per language ─────────────
+    // A marketing page exists once per language at its own address
+    // (routing.SK_PATHS): the English one at the unprefixed path, the Slovak
+    // twin under /sk — each with its own title, lang, canonical and alternates.
+    const writeHead = (addr, pageKey, lang) => {
+      const meta = seoMetaFor(pageKey, lang, { siteBase: HOME, price: build.monthly_price, anchor: build.anchor_price, snapshot: build });
+      if (!meta) die(`${addr} → ${pageKey} has no entry in src/lib/seo.js`);
       const og = {
         "og:type": meta.ogType || "website", "og:site_name": "Residata", "og:title": meta.title,
         "og:description": meta.description, "og:url": meta.url,
@@ -235,22 +248,30 @@ async function main() {
         "twitter:card": "summary_large_image", "twitter:title": meta.title,
         "twitter:description": meta.description, "twitter:image": og["og:image"], "twitter:image:alt": og["og:image:alt"],
       };
-      const alternates = ["en", "sk", "x-default"].map((hreflang) => ({ hreflang, href: meta.url }));
+      const alternates = meta.alternates || ["en", "sk", "x-default"].map((hreflang) => ({ hreflang, href: meta.url }));
       const html = replaceHead(template, {
-        lang: "en",
+        lang,
         head: headHtml({
           title: meta.title, description: meta.description, keywords: meta.keywords, robots: meta.robots,
           canonical: meta.url, alternates, og, twitter,
         }),
       });
       const problems = pageProblems(html, {
-        title: meta.title, canonical: meta.url, lang: "en", index: !meta.noindex, noFaq: true,
-        jsonLdType: [], hreflang: ["en", "sk", "x-default"],
+        title: meta.title, canonical: meta.url, lang, index: !meta.noindex, noFaq: true,
+        jsonLdType: [], hreflang: alternates.map((a) => a.hreflang), alternates,
       });
-      if (problems.length) die(`${p}: ${problems.join("; ")}`);
-      write(`${p.slice(1)}/index.html`, html);
-      written.push(p);
+      if (problems.length) die(`${addr}: ${problems.join("; ")}`);
+      write(`${addr.slice(1)}/index.html`, html);
+      written.push(addr);
+    };
+    for (const p of HEAD_ONLY_PATHS) {
+      const pageKey = pathToPage(p);
+      writeHead(p, pageKey, "en");
+      const twin = SK_PATHS[pageKey];
+      if (twin && !written.includes(twin)) writeHead(twin, pageKey, "sk");
     }
+    // The English homepage IS the template (dist/index.html); its Slovak twin is not.
+    if (!written.includes(SK_PATHS.Home)) writeHead(SK_PATHS.Home, "Home", "sk");
 
     // ── the feed ──────────────────────────────────────────────────────────
     const feedItems = articles.slice()
@@ -264,8 +285,12 @@ async function main() {
       buildDate: new Date().toISOString(),
     }));
 
-    if (written.length !== articles.length + 1 + HEAD_ONLY_PATHS.length) die("wrote an unexpected number of pages");
-    console.log(`[prerender] ${articles.length} articles, the index, ${HEAD_ONLY_PATHS.length} routes and the feed — `
+    // Articles, the index, every public route, and every route's Slovak twin
+    // (routing.SK_PATHS — each written once, the Slovak homepage included).
+    const expected = articles.length + 1 + HEAD_ONLY_PATHS.length + Object.keys(SK_PATHS).length;
+    if (written.length !== expected) die(`wrote ${written.length} pages, expected ${expected}`);
+    console.log(`[prerender] ${articles.length} articles, the index, ${HEAD_ONLY_PATHS.length} routes `
+      + `(+${Object.keys(SK_PATHS).length} Slovak) and the feed — `
       + `${warnings.length} warning(s)`);
   } finally {
     await vite.close();

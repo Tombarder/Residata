@@ -14,7 +14,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   headHtml, replaceHead, fillRoot, siteNodes, pageProblems, rssFeed, HEAD_ONLY_PATHS, scriptJson,
-  duplicateJsonKeys,
+  duplicateJsonKeys, deferAppStart,
 } from "../../scripts/lib/prerenderCore.mjs";
 import { EMBEDDED_LIST_FIELDS, toArticle } from "./articleModel.js";
 import {
@@ -269,4 +269,15 @@ test("a citation and an embed code name the public page and credit Residata", ()
   assert.ok(code.includes("Zdroj: ") && code.includes("Residata — Košice") && code.includes(DATA_LICENSE.name));
   assert.ok(code.includes("Graf &quot;A&quot; &lt;b&gt;") && !code.includes('"A"'), "alt text must be escaped");
   assert.ok(embedCode(fig, ARTICLE, "en").startsWith('<figure style="margin:0">') && embedCode(fig, ARTICLE, "en").includes("Source: "));
+});
+
+test("a pre-built page starts the app after it has been drawn — and says so loudly if it cannot", () => {
+  const head = `<head>\n    <script type="module" crossorigin src="/assets/index-Ab12.js"></script>\n    <link rel="modulepreload" crossorigin href="/assets/x.js">\n</head>`;
+  const out = deferAppStart(head);
+  assert.ok(out.includes('<link rel="modulepreload" crossorigin href="/assets/index-Ab12.js">'), "the entry must still download at once");
+  assert.ok(!out.includes('<script type="module" crossorigin src='), "the entry must no longer run before the first paint");
+  assert.match(out, /requestAnimationFrame\(\(\)=>setTimeout\(start,0\)\);setTimeout\(start,400\);/);
+  assert.ok(out.includes('import("/assets/index-Ab12.js")'));
+  assert.throws(() => deferAppStart("<head></head>"), /expected one entry/);
+  assert.throws(() => deferAppStart(head + head), /found 2/);
 });

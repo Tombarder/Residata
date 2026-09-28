@@ -126,6 +126,26 @@ export function fillRoot(html, markup, { embed, embedId = "rd-article" } = {}) {
   return out;
 }
 
+/**
+ * On a page that is already drawn (pre-built text in #root), start the app AFTER
+ * the browser has painted it: the entry module keeps downloading at once (a
+ * modulepreload), but runs one frame later — or after 400 ms where frames do not
+ * come (a hidden tab). Run first, as a plain module script, the app's code kept a
+ * slow phone's screen blank for seconds with the text already in the page.
+ * Throws unless Vite's entry script appears exactly once, so a change in the
+ * build's output fails the build instead of silently skipping this.
+ */
+export function deferAppStart(html) {
+  const re = /<script type="module" crossorigin src="(\/assets\/index-[^"]+\.js)"><\/script>/g;
+  const found = [...html.matchAll(re)];
+  if (found.length !== 1) throw new Error(`expected one entry <script type="module"> in index.html, found ${found.length}`);
+  const src = found[0][1];
+  const starter = `<link rel="modulepreload" crossorigin href="${src}">\n    <script type="module">`
+    + `let started=false;const start=()=>{if(!started){started=true;import(${JSON.stringify(src)});}};`
+    + `requestAnimationFrame(()=>setTimeout(start,0));setTimeout(start,400);</script>`;
+  return html.replace(found[0][0], starter);
+}
+
 /** RFC-822 date for RSS, from YYYY-MM-DD or an ISO timestamp. */
 export function rfc822(d) {
   const x = new Date(String(d).length === 10 ? `${d}T08:00:00Z` : d);
@@ -236,6 +256,14 @@ export function pageProblems(html, want) {
     const got = [...html.matchAll(/hreflang="([^"]*)"/g)].map((m) => m[1]).sort().join(",");
     const exp = [...want.hreflang].sort().join(",");
     if (got !== exp) p.push(`hreflang ${got || "none"}, not ${exp}`);
+  }
+  // The language pairs themselves: each language's address, exactly. A page that
+  // names the wrong twin sends Google's Slovak searchers to the English page.
+  if (want.alternates) {
+    const got = [...html.matchAll(/<link rel="alternate" hreflang="([^"]*)" href="([^"]*)"/g)]
+      .map((m) => `${m[1]}=${m[2]}`).sort().join(" ");
+    const exp = want.alternates.map((a) => `${a.hreflang}=${a.href}`).sort().join(" ");
+    if (got !== exp) p.push(`language links ${got || "none"}, not ${exp}`);
   }
   return p;
 }

@@ -3,6 +3,8 @@
  * paint from what this browser already knows. Pure (storage is passed in), so it
  * is tested without a DOM (trialBannerState.test.mjs); TrialBanner.jsx renders it.
  */
+import { LANG_STORAGE_KEY, PUBLIC_LANGS, DEFAULT_LANG } from "./locale.js";
+import { ADDRESS_LANGS } from "./routing.js";
 
 export const KEY_BANNER_DISMISSED = "residata_trial_banner_until";   // unix ms — banner hidden until this time
 // "1" / "0": whether a LOGGED-IN account was offered the trial on its last visit —
@@ -33,4 +35,28 @@ export function firstPaintBanner(storage = globalThis.localStorage, now = Date.n
     remembered = storage.getItem(KEY_OFFER_REMEMBERED) === "1";
   } catch { /* storage blocked: an anonymous visitor as far as we can tell */ }
   return { dismissed, eligible: hasStoredSession(storage) ? remembered : true };
+}
+
+/**
+ * firstPaintBanner — plus the language the app will render in — as a tiny script
+ * for <head> (index.html, filled in by vite.config.js). It runs before the first
+ * paint and sets html[data-rd-banner] to "sk" / "en" / "none", so a pre-built
+ * page shows the very banner the app is about to show, and the text sits below
+ * its real height. The language follows lib/langChoice: the address's own
+ * (/sk/…) first, then the kept pick, then the default. Built from the same keys
+ * and lists, and held to the same answers by trialBannerState.test.mjs.
+ */
+export function firstPaintScript() {
+  const J = JSON.stringify;
+  return "(function(){var h=document.documentElement,P=" + J(PUBLIC_LANGS) + ",a=null;"
+    + "try{var p=(window.location.pathname||\"/\").toLowerCase().replace(/\\/+$/,\"\"),A=" + J(ADDRESS_LANGS) + ";"
+    + "for(var j=0;j<A.length;j++){if(p===\"/\"+A[j]||p.indexOf(\"/\"+A[j]+\"/\")===0){a=A[j];break}}"
+    + "if(P.indexOf(a)<0)a=null}catch(t){}"
+    + "try{var s=window.localStorage,"
+    + "d=Date.now()<Number(s.getItem(" + J(KEY_BANNER_DISMISSED) + ")||0),x=false;"
+    + "for(var i=0;i<s.length;i++){if(/^sb-.+-auth-token$/.test(s.key(i)||\"\")){x=true;break}}"
+    + "var e=x?s.getItem(" + J(KEY_OFFER_REMEMBERED) + ")===\"1\":true,l=a||s.getItem(" + J(LANG_STORAGE_KEY) + ");"
+    + "if(P.indexOf(l)<0)l=" + J(DEFAULT_LANG) + ";"
+    + "h.setAttribute(\"data-rd-banner\",e&&!d?l:\"none\")"
+    + "}catch(t){h.setAttribute(\"data-rd-banner\",a||" + J(DEFAULT_LANG) + ")}})();";
 }

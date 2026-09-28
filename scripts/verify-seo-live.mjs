@@ -17,12 +17,15 @@
  * WHAT. Every url in the live sitemap: the right title, ONE canonical naming
  * itself, the right language, index/noindex as intended, a share image that
  * really answers 200 image/*, the structured data, the headline in the HTML,
- * and every figure's file. Plus: every analysis in the feed and in llms.txt.
+ * every figure's file, and — for a page with a Slovak twin — both language
+ * addresses exactly as routing.SK_PATHS has them. Plus: every analysis in the
+ * feed and in llms.txt.
  * Same rules as the build (scripts/lib/prerenderCore.mjs pageProblems).
  *
  * Node built-ins only, so CI needs no install.
  */
 import { pageProblems } from "./lib/prerenderCore.mjs";
+import { pathToPage, pageToPath, pathLang, SK_PATHS } from "../src/lib/routing.js";
 
 const SITE = (process.env.SITE || "https://residata.eu").replace(/\/$/, "");
 // Canonicals name the production domain on every host — on a preview too, which
@@ -65,6 +68,13 @@ async function checkPage(url, lastmod) {
   if (isArticle || isIndex) {
     want.lang = "sk";
     want.hreflang = ["sk", "x-default"];
+  } else if (SK_PATHS[pathToPage(path)]) {
+    // A marketing page exists once per language (routing.SK_PATHS): each copy
+    // says its own language and names both addresses, English as the default.
+    const page = pathToPage(path);
+    const en = PROD + pageToPath(page, "en"), sk = PROD + SK_PATHS[page];
+    want.lang = pathLang(path) || "en";
+    want.alternates = [{ hreflang: "en", href: en }, { hreflang: "sk", href: sk }, { hreflang: "x-default", href: en }];
   }
   const problems = pageProblems(html, want);
   const title = decode((/<title>([\s\S]*?)<\/title>/.exec(html) || [])[1] || "");

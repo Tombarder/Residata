@@ -149,6 +149,11 @@ test("every residata url in llms.txt is a route the app actually has", () => {
 
   const realPaths = new Set([...map[1].matchAll(/"([^"]+)":/g)].map((m) => m[1]));
   realPaths.add("/");                       // Home, handled before the map
+  // The Slovak addresses (routing.SK_PATHS) are routes too — read from their own
+  // table, so a mistyped /sk/… address in llms.txt still fails here.
+  const sk = routing.match(/export const SK_PATHS = \{([\s\S]*?)\n\};/);
+  assert.ok(sk, "could not find routing.js's SK_PATHS table");
+  for (const m of sk[1].matchAll(/:\s*"(\/sk[^"]*)"/g)) realPaths.add(m[1]);
   const prefixes = ["/analyzy/", "/project/", "/app"];   // handled by prefix, not the map
 
   // The template, not the built file — the built one is regenerated and a stale

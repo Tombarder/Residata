@@ -42,7 +42,41 @@ const APP_PATH_TO_PAGE = Object.fromEntries(
   Object.entries(APP_PAGE_TO_PATH).map(([k, v]) => [v, k])
 );
 
-export function pageToPath(page) {
+/**
+ * The marketing pages' SLOVAK addresses. Each such page exists once per language
+ * at its own address, so the address alone says which language a page is in and
+ * Google can show a Slovak searcher the Slovak page (hreflang) — until
+ * 2026-09-28 both languages shared one URL and the language was app state, so
+ * there was no Slovak page to show. English keeps the unprefixed addresses. The
+ * analyses (/analyzy) are Slovak already; the legal pages are not indexed and
+ * keep one address with both languages on it.
+ */
+export const SK_PATHS = {
+  Home: "/sk",
+  Live: "/sk/live",
+  "Use Cases": "/sk/vyuzitie",
+  Pricing: "/sk/cennik",
+  Contact: "/sk/kontakt",
+  Data: "/sk/ukazka",
+  Status: "/sk/stav",
+};
+const SK_PATH_TO_PAGE = Object.fromEntries(Object.entries(SK_PATHS).map(([k, v]) => [v, k]));
+
+/** The languages that have addresses of their own, each under /<code>. The
+ *  before-paint script (lib/trialBannerState) reads this list too. */
+export const ADDRESS_LANGS = ["sk"];
+
+/** The language an address is in: "sk" for /sk and /sk/…, otherwise null — an
+ *  unprefixed address has no language of its own and shows the visitor's pick
+ *  (lib/langChoice), moving to that language's own address when it has one. */
+export function pathLang(pathname) {
+  const clean = (pathname || "/").toLowerCase().replace(/\/+$/, "");
+  return ADDRESS_LANGS.find((l) => clean === `/${l}` || clean.startsWith(`/${l}/`)) || null;
+}
+
+/** A page's address in a language — its Slovak one when it has one. */
+export function pageToPath(page, lang) {
+  if (lang === "sk" && SK_PATHS[page]) return SK_PATHS[page];
   if (!page || page === "Home") return "/";
   if (typeof page === "string" && page.startsWith("App:ProjectDetail:")) {
     return "/app/projects/" + page.slice("App:ProjectDetail:".length);
@@ -68,6 +102,9 @@ export function pageToPath(page) {
 export function pathToPage(pathname) {
   const clean = (pathname || "/").toLowerCase().replace(/\/+$/, "");
   if (!clean || clean === "/") return "Home";
+  if (SK_PATH_TO_PAGE[clean]) return SK_PATH_TO_PAGE[clean];
+  // An unknown Slovak address lands on the Slovak home, not the English one.
+  if (clean.startsWith("/sk/")) return "Home";
 
   // Platform project detail — /app/projects/<id>
   if (clean.startsWith("/app/projects/")) {
@@ -131,8 +168,8 @@ export function isAppPage(page) {
   return typeof page === "string" && page.startsWith("App:");
 }
 
-export function pushRoute(page, replace = false) {
-  const path = pageToPath(page);
+export function pushRoute(page, replace = false, lang) {
+  const path = pageToPath(page, lang);
   const state = { page };
   if (replace) window.history.replaceState(state, "", path);
   else window.history.pushState(state, "", path);
