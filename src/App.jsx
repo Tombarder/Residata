@@ -2268,6 +2268,14 @@ export default function App() {
   // instead of sticking at the first-paint fallback.
   const seoPrice = usePricing(lang).priceDisplay;
   useEffect(() => {
+    // An analysis page owns its head (Insights.jsx: the placeholder while its
+    // row loads, the article's own once it has, the index's when there is no
+    // such article). Writing it here as well made two writers race: this effect
+    // runs AFTER the page's own on mount and again whenever the price loads, so
+    // a live article often ended marked "noindex, nofollow" — reproduced on
+    // 2026-09-28 by Lighthouse with the article refresh blocked, and seen once
+    // without. Google reads the rendered head.
+    if (typeof current === "string" && current.startsWith("Analyza:")) return;
     applySeo(current, lang, country);
   }, [current, lang, country, seoPrice]);
 

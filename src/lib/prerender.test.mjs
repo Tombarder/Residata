@@ -225,3 +225,19 @@ test("no structured-data object says the same thing twice", () => {
   const bad = html.replace('"@type":"Article",', '"@type":"Article","headline":"x",');
   assert.ok(pageProblems(bad, { jsonLdType: ["Article"] }).some((x) => /repeats "headline"/.test(x)), "a repeated key in a page went unseen");
 });
+
+test("an analysis page is the only writer of its head — the app's generic update skips it", () => {
+  // Two writers raced: App's applySeo effect ran AFTER the article page's own on
+  // mount, set the loading placeholder (noindex), and re-ran when the price
+  // loaded — a live article ended "noindex, nofollow" whenever the article's
+  // refresh lost the race or failed (Lighthouse, 2026-09-28). Structural, as
+  // there is no DOM here: both halves of the ownership must stay in place.
+  const app = readFileSync(join(HERE, "..", "App.jsx"), "utf8");
+  const at = app.indexOf("applySeo(current, lang, country)");
+  assert.ok(at > 0, "App.jsx no longer calls applySeo(current, lang, country) — re-check who owns the head");
+  assert.match(app.slice(Math.max(0, at - 900), at), /current\.startsWith\("Analyza:"\)\) return;/,
+    "App's applySeo effect must skip analysis routes");
+  const page = readFileSync(join(HERE, "..", "pages", "Insights.jsx"), "utf8");
+  assert.match(page, /if \(article\) applyArticleSeo\(article\);\s*else if \(loading\) applySeo\(`Analyza:\$\{slug\}`, lang\);/,
+    "the article page must write its own placeholder and its own head");
+});

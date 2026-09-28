@@ -88,7 +88,14 @@ export function InsightsArticle({ slug, navigate, lang }) {
   // Content is no longer in the bundle, so the page must set its own <title>,
   // description, canonical and og:image once the row arrives — applySeo ran on
   // navigation with nothing to go on.
-  useEffect(() => { if (article) applyArticleSeo(article); }, [article, lang]);
+  // This page is the ONLY writer of its head (App.jsx skips "Analyza:" routes):
+  // while the row loads, the section's placeholder marked noindex, so a crawler
+  // that gives up early never indexes a placeholder; the article's own head the
+  // moment it is here. No article at all → InsightsIndex below sets the index's.
+  useEffect(() => {
+    if (article) applyArticleSeo(article);
+    else if (loading) applySeo(`Analyza:${slug}`, lang);
+  }, [article, loading, slug, lang]);
 
   if (loading) {
     return (
