@@ -49,7 +49,7 @@ import { createServer } from "vite";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
-  headHtml, replaceHead, fillRoot, siteNodes, rssFeed, pageProblems, HEAD_ONLY_PATHS,
+  headHtml, replaceHead, fillRoot, siteNodes, rssFeed, pageProblems, HEAD_ONLY_PATHS, duplicateJsonKeys,
 } from "./lib/prerenderCore.mjs";
 
 const ROOT = process.cwd();
@@ -106,6 +106,11 @@ async function main() {
 
     const site = siteNodes(template);
     if (!site.some((n) => n["@type"] === "Organization")) die("no Organization in index.html's structured data");
+    // The homepage IS this template, and no step below checks it as a page.
+    for (const m of template.matchAll(/<script type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/g)) {
+      const dup = duplicateJsonKeys(m[1]);
+      if (dup.length) die(`index.html's structured data repeats ${dup.join(", ")} within one object`);
+    }
 
     // The app's code for the analyses pages, fetched alongside the page so the
     // hand-over from this static copy to the app is not a spinner.

@@ -14,6 +14,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   headHtml, replaceHead, fillRoot, siteNodes, pageProblems, rssFeed, HEAD_ONLY_PATHS, scriptJson,
+  duplicateJsonKeys,
 } from "../../scripts/lib/prerenderCore.mjs";
 import { EMBEDDED_LIST_FIELDS, toArticle } from "./articleModel.js";
 import {
@@ -200,4 +201,27 @@ test("the index embeds every field its cards read, so the app's first render is 
   const missing = read.filter((f) => shaped[f] === undefined || shaped[f] === null
     || (typeof shaped[f] === "object" && !Object.keys(shaped[f]).length));
   assert.deepEqual(missing, [], "ArticleCard reads fields the embedded index list does not carry (articleModel EMBEDDED_LIST_FIELDS)");
+});
+
+test("the breadcrumb hangs on the page, where schema.org defines it — not on the Article", () => {
+  const graph = articleHead(ARTICLE, { siteBase: SITE }).jsonLd["@graph"];
+  const article = graph.find((n) => n["@type"] === "Article");
+  assert.equal(article.breadcrumb, undefined, "Article.breadcrumb is not a schema.org property");
+  assert.deepEqual(article.mainEntityOfPage.breadcrumb, { "@id": `${SITE}/analyzy/ke-prehlad-2026-q3#breadcrumb` });
+  assert.ok(graph.some((n) => n["@type"] === "BreadcrumbList" && n["@id"] === article.mainEntityOfPage.breadcrumb["@id"]));
+});
+
+test("no structured-data object says the same thing twice", () => {
+  // JSON.parse keeps the last of two equal keys without a word: index.html
+  // carried "foundingDate" twice — the exact date and a bare "2026" after it —
+  // and every check parsed it happily. The Schema.org validator calls it severe.
+  assert.deepEqual(duplicateJsonKeys('{"a":1,"b":{"c":1,"c":2},"s":"x\\"a\\":1","a":3}'), ["c", "a"]);
+  assert.deepEqual(duplicateJsonKeys('[{"k":1},{"k":2}]'), [], "the same key in two objects is fine");
+  const blocks = [...TEMPLATE.matchAll(/<script type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+  assert.ok(blocks.length >= 1, "index.html has no structured data at all");
+  for (const b of blocks) assert.deepEqual(duplicateJsonKeys(b), [], "index.html repeats a key in one structured-data object");
+  const { html } = articlePage();
+  assert.deepEqual(pageProblems(html, { jsonLdType: ["Article"] }).filter((x) => /repeats/.test(x)), []);
+  const bad = html.replace('"@type":"Article",', '"@type":"Article","headline":"x",');
+  assert.ok(pageProblems(bad, { jsonLdType: ["Article"] }).some((x) => /repeats "headline"/.test(x)), "a repeated key in a page went unseen");
 });

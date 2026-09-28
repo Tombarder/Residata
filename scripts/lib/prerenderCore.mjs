@@ -160,6 +160,39 @@ ${it}
 }
 
 /**
+ * Keys that appear twice in one object of a JSON text. JSON.parse keeps the
+ * last one silently — that is how the homepage told search engines its
+ * founding date was "2026" beside the exact one for weeks, while every check
+ * here parsed it happily. The Schema.org validator calls it a severe error.
+ * `text` must already be valid JSON.
+ */
+export function duplicateJsonKeys(text) {
+  const dups = [];
+  const stack = [];
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c === '"') {
+      let j = i + 1;
+      while (j < text.length && text[j] !== '"') j += text[j] === "\\" ? 2 : 1;
+      const top = stack[stack.length - 1];
+      if (top && top.keys && top.expectKey) {
+        const key = text.slice(i + 1, j);
+        if (top.keys.has(key)) dups.push(key); else top.keys.add(key);
+        top.expectKey = false;
+      }
+      i = j;
+    } else if (c === "{") stack.push({ keys: new Set(), expectKey: true });
+    else if (c === "[") stack.push({ keys: null });
+    else if (c === "}" || c === "]") stack.pop();
+    else if (c === ",") {
+      const top = stack[stack.length - 1];
+      if (top && top.keys) top.expectKey = true;
+    }
+  }
+  return dups;
+}
+
+/**
  * Checks a written page against what it must say. Returns problems as strings;
  * an empty list means the page is right. Used on every page the build writes
  * AND by the live check against the deployed site (scripts/verify-seo-live.mjs),
@@ -192,6 +225,8 @@ export function pageProblems(html, want) {
       try {
         const j = JSON.parse(m[1]);
         for (const n of j["@graph"] || [j]) types.push(n["@type"]);
+        const dup = duplicateJsonKeys(m[1]);
+        if (dup.length) p.push(`structured data repeats ${dup.map((k) => `"${k}"`).join(", ")} within one object`);
       } catch { p.push("a structured-data block is not valid JSON"); }
     }
     for (const t of [].concat(want.jsonLdType)) if (!types.includes(t)) p.push(`no ${t} structured data`);

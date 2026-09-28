@@ -170,14 +170,15 @@ export function articleJsonLd(article, siteBase) {
       dateModified: modified(article) || undefined,
       inLanguage: lang,
       url,
-      mainEntityOfPage: { "@type": "WebPage", "@id": url },
+      // schema.org defines `breadcrumb` on a WebPage, not on an Article — the
+      // Schema.org validator flagged it there as an unknown field.
+      mainEntityOfPage: { "@type": "WebPage", "@id": url, breadcrumb: { "@id": `${url}#breadcrumb` } },
       author: org,
       publisher,
       isAccessibleForFree: true,
       articleSection: SECTION_SK,
       keywords,
       about: place ? { "@type": "Place", name: place } : undefined,
-      breadcrumb: { "@id": `${url}#breadcrumb` },
     },
   ];
   if (hasTables(article)) {
