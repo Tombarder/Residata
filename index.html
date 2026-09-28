@@ -185,64 +185,6 @@
     }
     </script>
 
-    <!-- FAQ structured data — helps LLMs quote Residata when users ask about it.
-         Questions are real ones buyers ask; answers are factual and citable. -->
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "FAQPage",
-      "mainEntity": [
-        {
-          "@type": "Question",
-          "name": "What is Residata?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "Residata is a market intelligence platform that tracks every new residential development across Slovakia and Czechia. It delivers structured data on pricing, availability, absorption rate, and sales velocity — refreshed daily — to developers, banks, valuers, and investors."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "What data does Residata cover?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "Every active new-build residential project across Slovakia and Czechia: unit counts, prices and price per square meter, availability, sold and reserved status, floor, orientation, handover date, developer, district. __SCHEMA_TOTAL_PROJECTS_TRACKED__ projects in dataset (__SCHEMA_TOTAL_PROJECTS__ currently active in the market), roughly __SCHEMA_TOTAL_UNITS__ units across active projects as of __SCHEMA_MONTH_LABEL__. Sold-out projects stay in the dataset as historical comparable transactions for valuers and banks."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "How often is the data updated?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "Daily. A full synchronization runs every day, refreshing prices, availability, and project status across all tracked developments."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "Who uses Residata?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "Residential developers (pricing, positioning, absorption benchmarks), banks and valuers (comparable transactions), real estate investors (pipeline and deal discovery), consultants and analysts (market reports)."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "Where is Residata's data sourced from?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "Every developer's public listing site across Slovakia and Czechia. Residata normalizes and validates the data centrally, so buyers get a single consistent schema instead of hundreds of different formats."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "How much does Residata cost?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "__SCHEMA_MONTHLY_PRICE__ per month for full ongoing access with fresh data every day — an early-access price (regular __SCHEMA_ANCHOR_PRICE__). A 7-day free trial is available."
-          }
-        }
-      ]
-    }
-    </script>
   </head>
   <body>
     <!-- Noscript fallback — for crawlers that don't run JS and for

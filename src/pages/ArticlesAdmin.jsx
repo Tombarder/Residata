@@ -293,7 +293,7 @@ function ArticleList({ lang, onEdit }) {
               {openManualSteps(a) > 0 && (
                 <span style={{
                   fontSize: "0.66rem", padding: "0.12rem 0.45rem", borderRadius: 999,
-                  border: "1px solid rgba(242,196,109,0.5)", color: "#f2c46d",
+                  border: "1px solid color-mix(in srgb, var(--warning) 50%, transparent)", color: "var(--warning)",
                 }}>{openManualSteps(a)} {t.manualSteps}</span>
               )}
               <span style={{ fontFamily: MONO, fontSize: "0.7rem", color: "var(--text-faint)" }}>
@@ -466,8 +466,9 @@ function ArticleEditor({ slug, lang, onBack, onChanged }) {
     if (!next && !window.confirm(t.confirmUnpublish)) return;
     setBusyPub(true); setErr(null);
     try {
-      await setArticlePublished(draft.id, next);
+      const stamp = await setArticlePublished(draft.id, next);
       setPublished(next);
+      if (stamp) setVersion(stamp);
       onChanged?.();
     } catch (e) { setErr(e.message); }
     finally { setBusyPub(false); }

@@ -178,6 +178,8 @@ input[type="checkbox"], input[type="radio"] { width: 15px; height: 15px; cursor:
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
+  /* a link styled as a button (<a class="rd-btn">) must not keep the link underline */
+  text-decoration: none;
   transition: background 0.14s var(--ease), border-color 0.14s var(--ease), color 0.14s var(--ease);
 }
 .rd-btn:hover { background: var(--surface-3); color: var(--text); border-color: var(--border-soft); }

@@ -6,7 +6,7 @@ import path from 'node:path'
 // (src/lib/company.js), so index.html's structured data can never disagree with
 // the Imprint. Never retype a company detail into the HTML.
 import { COMPANY, addressOneLine } from './src/lib/company.js'
-import { FALLBACK_MONTHLY_CENTS, FALLBACK_MONTHLY_DISPLAY, FALLBACK_ANCHOR_DISPLAY } from './src/lib/pricingDefaults.js'
+import { FALLBACK_MONTHLY_CENTS } from './src/lib/pricingDefaults.js'
 
 /**
  * residataIndexHtmlContent
@@ -19,13 +19,14 @@ import { FALLBACK_MONTHLY_CENTS, FALLBACK_MONTHLY_DISPLAY, FALLBACK_ANCHOR_DISPL
  * and substitutes tokens.
  *
  * Tokens used in index.html:
- *   __SCHEMA_TOTAL_UNITS__            — current total units tracked
- *   __SCHEMA_TOTAL_PROJECTS__         — currently active project count
- *   __SCHEMA_TOTAL_PROJECTS_TRACKED__ — projects with archive data (active +
- *                                       sold-out under tracking, monotonically
- *                                       growing)
- *   __SCHEMA_MONTH_LABEL__            — e.g. "April 2026"
+ *   __SCHEMA_MONTHLY_PRICE_NUM__      — the subscription price in the Offer
+ *   __BUILD_SNAPSHOT_JSON__           — the build-time market snapshot
  *   __COMPANY_*__                     — legal identity from src/lib/company.js
+ *
+ * (Until 2026-09-28 index.html also carried a FAQPage block with the market
+ * counts and the prices. Google requires FAQ markup to match a FAQ VISIBLE on
+ * the page, and the homepage shows none, so it went; everything it said is in
+ * llms.txt, the file written for AI assistants.)
  *
  * If the JSON is missing (script didn't run / no env vars), placeholders
  * keep their default values written in the HTML — graceful fallback.
@@ -42,17 +43,12 @@ function residataIndexHtmlContent() {
         console.warn('[vite] build-data.json read failed, using defaults:', e.message);
       }
       const tokens = {
-        __SCHEMA_TOTAL_UNITS__:            data.total_units            != null ? Number(data.total_units).toLocaleString('en-US')            : '5,500+',
-        __SCHEMA_TOTAL_PROJECTS__:         data.total_projects         != null ? Number(data.total_projects).toLocaleString('en-US')         : '60+',
-        __SCHEMA_TOTAL_PROJECTS_TRACKED__: data.total_projects_tracked != null ? Number(data.total_projects_tracked).toLocaleString('en-US') : (data.total_projects != null ? Number(data.total_projects).toLocaleString('en-US') : '60+'),
-        __SCHEMA_MONTH_LABEL__:            data.month_label            || 'the latest snapshot',
         // Subscription price from public.pricing_config (single source of truth,
         // edited in the admin Pricing editor). Injected at build so index.html's
-        // JSON-LD Offer + FAQ follow the editor per deploy. Fallback = current
-        // launch price if build-data is absent.
-        __SCHEMA_MONTHLY_PRICE__:          data.monthly_price          || FALLBACK_MONTHLY_DISPLAY,
+        // JSON-LD Offer follows the editor — and a price change rebuilds the site
+        // (scraper repo, 2026-09-28_price_and_market_figures_rebuild_the_site.sql).
+        // Fallback = current launch price if build-data is absent.
         __SCHEMA_MONTHLY_PRICE_NUM__:      data.monthly_price_num      || (FALLBACK_MONTHLY_CENTS / 100).toFixed(2),
-        __SCHEMA_ANCHOR_PRICE__:           data.anchor_price           || FALLBACK_ANCHOR_DISPLAY,
         // PERF Step 2: the FULL build-time snapshot, injected as JSON into an
         // inline <script> so window.__RESIDATA_SNAPSHOT__ exists before any app
         // JS runs. src/lib/useData.js seeds useMarketTotals from it → the hero

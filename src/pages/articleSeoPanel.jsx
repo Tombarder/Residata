@@ -12,14 +12,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   articleSeoChecks, seoTitle, headline, perex, clip, canonicalUrl, shareImage,
-  MANUAL_STEPS, TITLE_IDEAL_MAX, DESCRIPTION_MAX,
+  MANUAL_STEPS, TITLE_IDEAL_MAX, DESCRIPTION_MAX, livePageState, manualStepsReady,
 } from "../lib/articleSeo";
 import { setPromoStep } from "../lib/useArticles";
 
 /** The address Google and LinkedIn see — also when editing on a preview. */
 const PUBLIC_BASE = (import.meta.env && import.meta.env.VITE_SITE_BASE) || "https://residata.eu";
 const MONO = "ui-monospace, SFMono-Regular, Menlo, monospace";
-const LEVEL_COLOR = { error: "#ff8f8f", warn: "#f2c46d", info: "var(--text-faint)" };
+// Theme tokens (index.css), so a warning stays readable on the light theme too.
+const LEVEL_COLOR = { error: "var(--danger)", warn: "var(--warning)", info: "var(--text-faint)" };
 const LEVEL_MARK = { error: "✕", warn: "!", info: "i" };
 
 const label = {
@@ -31,36 +32,35 @@ const panel = {
   marginBottom: "0.9rem", background: "rgba(255,255,255,0.015)",
 };
 
+/** Is this file on the site? It must answer as an IMAGE: the site answers a
+ *  path it does not have with the app's own page (200 text/html), so `r.ok`
+ *  alone called every missing chart present. */
 async function exists(path) {
   if (!path || !path.startsWith("/")) return undefined;
   try {
     const r = await fetch(path, { method: "HEAD", cache: "no-store" });
-    return r.ok;
+    return r.ok && /^image\//.test(r.headers.get("content-type") || "");
   } catch {
     return undefined;
   }
 }
 
-/** Is the static page on the site the version that was saved? */
+/** Is the static page on the site the version that was saved? (lib/articleSeo livePageState) */
 function useLiveState(article, published) {
   const [state, setState] = useState({ status: "unknown" });
   const check = useCallback(async () => {
-    if (!published) { setState({ status: "draft" }); return; }
-    if (typeof window === "undefined" || !/residata\.eu$/.test(window.location.hostname)) {
-      setState({ status: "not-here" });
-      return;
-    }
+    // Only residata.eu serves the page Google and LinkedIn read; on a preview
+    // or a local build there is nothing to compare with.
+    const onLiveSite = typeof window !== "undefined" && /(^|\.)residata\.eu$/.test(window.location.hostname);
+    if (!published || !onLiveSite) { setState(livePageState({ published, onLiveSite })); return; }
     setState((s) => ({ ...s, checking: true }));
+    let html = null;
     try {
-      const r = await fetch(`/analyzy/${article.slug}`, { cache: "no-store" });
-      const html = await r.text();
-      const mod = (/<meta property="article:modified_time" content="([^"]*)"/.exec(html) || [])[1];
-      const age = (Date.now() - new Date(article.updatedAt || 0).getTime()) / 60000;
-      if (mod && mod === article.updatedAt) setState({ status: "current" });
-      else setState({ status: age > 10 ? "stuck" : "rebuilding", minutes: Math.round(age) });
+      html = await (await fetch(`/analyzy/${article.slug}`, { cache: "no-store" })).text();
     } catch {
-      setState({ status: "unknown" });
+      html = null;
     }
+    setState(livePageState({ published, onLiveSite, html, updatedAt: article.updatedAt }));
   }, [article.slug, article.updatedAt, published]);
   useEffect(() => { check(); }, [check]);
   // While the site rebuilds, look again every 30 s until it has caught up.
@@ -108,13 +108,14 @@ export default function ArticleSeoPanel({ draft, published, updatedAt, onSeoTitl
   }
 
   const liveLine = {
-    draft: ["var(--text-faint)", "○ Koncept — na webe nie je a vyhľadávače ho nevidia. Po zverejnení sa web prebuduje sám (do ~3 minút)."],
+    draft: ["var(--text-faint)", "○ Koncept — na webe nie je a vyhľadávače ho nevidia. Po zverejnení sa web prebuduje sám (do ~5 minút)."],
     current: ["var(--accent)", "✓ Na webe aktuálne — stránka, ktorú čítajú Google a LinkedIn, zodpovedá uloženej verzii."],
-    rebuilding: ["#f2c46d", "⏳ Web sa prebudováva — zmeny sa na stránke pre Google a LinkedIn objavia do ~3 minút po uložení."],
-    stuck: ["#ff8f8f", `⚠ Stránka na webe sa neaktualizovala ani po ${live.minutes} minútach. Niečo nie je v poriadku — dajte vedieť.`],
+    rebuilding: ["var(--warning)", "⏳ Web sa prebudováva — zmeny sa na stránke pre Google a LinkedIn objavia do ~5 minút po uložení."],
+    stuck: ["var(--danger)", `⚠ Stránka na webe sa neaktualizovala ani po ${live.minutes} minútach. Niečo nie je v poriadku — dajte vedieť.`],
     "not-here": ["var(--text-faint)", "Stav stránky na webe sa dá overiť len na residata.eu."],
     unknown: ["var(--text-faint)", "Stav stránky na webe sa nepodarilo overiť."],
   }[live.status] || ["var(--text-faint)", ""];
+  const pageReady = manualStepsReady(live);
 
   return (
     <div style={{ marginTop: "2rem", paddingTop: "1rem", borderTop: "1px solid var(--border-soft)" }}>
@@ -130,7 +131,7 @@ export default function ArticleSeoPanel({ draft, published, updatedAt, onSeoTitl
                  border: "1px solid var(--border-soft)", borderRadius: 7,
                  padding: "0.6rem 0.7rem", fontSize: "0.88rem",
                }} />
-        <div style={{ fontSize: "0.72rem", marginTop: "0.35rem", color: title.length > TITLE_IDEAL_MAX ? "#f2c46d" : "var(--text-faint)" }}>
+        <div style={{ fontSize: "0.72rem", marginTop: "0.35rem", color: title.length > TITLE_IDEAL_MAX ? "var(--warning)" : "var(--text-faint)" }}>
           {title.length} / {TITLE_IDEAL_MAX} znakov · prázdne pole = nadpis článku s „ · Residata“.
           Nadpis na stránke sa tým nemení.
         </div>
@@ -183,6 +184,12 @@ export default function ArticleSeoPanel({ draft, published, updatedAt, onSeoTitl
           <div style={{ fontSize: "0.76rem", color: "var(--text-faint)", marginBottom: "0.7rem" }}>
             Všetko ostatné je automatické: stránka pre vyhľadávače, mapa webu, RSS, štruktúrované dáta aj oznámenie pre Bing.
           </div>
+          {!pageReady && (
+            <div style={{ fontSize: "0.78rem", color: "var(--warning)", marginBottom: "0.6rem" }}>
+              ⏳ Počkajte, kým bude stránka na webe aktuálna (✓ v Kontrole vyššie). Google aj LinkedIn by si inak
+              zapamätali starú verziu — LinkedIn približne na týždeň.
+            </div>
+          )}
           {MANUAL_STEPS.map((s) => {
             const done = draft.promoChecklist?.[s.key];
             return (
@@ -198,11 +205,13 @@ export default function ArticleSeoPanel({ draft, published, updatedAt, onSeoTitl
                     {done ? `hotovo ${String(done.done_at).slice(0, 10)}` : s.hint}
                   </div>
                 </div>
-                <a className="rd-btn rd-btn--sm rd-btn--ghost" href={s.href(url)} target="_blank" rel="noreferrer">Otvoriť ↗</a>
+                {pageReady
+                  ? <a className="rd-btn rd-btn--sm rd-btn--ghost" href={s.href(url)} target="_blank" rel="noreferrer">Otvoriť ↗</a>
+                  : <button className="rd-btn rd-btn--sm rd-btn--ghost" disabled title="Až keď bude stránka na webe aktuálna">Otvoriť ↗</button>}
               </div>
             );
           })}
-          {stepErr && <div style={{ color: "#ffb3b3", fontSize: "0.76rem", marginTop: "0.5rem" }}>{stepErr}</div>}
+          {stepErr && <div style={{ color: "var(--danger)", fontSize: "0.76rem", marginTop: "0.5rem" }}>{stepErr}</div>}
         </div>
       )}
       <div style={{ fontSize: "0.7rem", color: "var(--text-faint)" }}>

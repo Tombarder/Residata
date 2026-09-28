@@ -122,8 +122,13 @@ export function useArticle(slug) {
 
 /** Publish or withdraw. One call, because that is what the button does. */
 export async function setArticlePublished(id, published) {
-  const { error } = await supabase.from("articles").update({ published }).eq("id", id);
+  const { data, error } = await supabase.from("articles").update({ published }).eq("id", id).select("updated_at");
   if (error) throw new Error(error.message);
+  // Publishing is a change the database stamps (updated_at moves). The editor
+  // bases its next save and its live-page check on that stamp, so it gets the
+  // new one: holding the old one made the first save after publishing fail as
+  // a conflict with itself, and the page never read as caught up.
+  return data?.[0]?.updated_at ?? null;
 }
 
 /**

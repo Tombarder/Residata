@@ -17,6 +17,7 @@ import {
 } from "../../scripts/lib/prerenderCore.mjs";
 import {
   articleHead, articleSeoChecks, seoLang, clip, placeOf, periodOf, relatedArticles,
+  livePageState, manualStepsReady, LIVE_STUCK_MINUTES,
 } from "./articleSeo.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -73,6 +74,14 @@ test("the homepage FAQ markup never rides along — FAQ markup must match a visi
   const marketing = replaceHead(TEMPLATE, { lang: "en", head: headHtml({ title: "t", description: "d", robots: "index", canonical: `${SITE}/live`, og: { "og:image": `${SITE}/og-image.png`, "og:url": `${SITE}/live` } }) });
   assert.ok(!marketing.includes('"FAQPage"'), "a marketing route kept the FAQ");
   assert.ok(marketing.includes('"SoftwareApplication"'), "a marketing route lost the product graph");
+});
+
+test("the homepage declares no FAQ it does not show", () => {
+  // Google: FAQ markup must match a FAQ visible on the same page. The homepage
+  // shows none (the visible FAQ is on /pricing), and until 2026-09-28 it
+  // declared six questions anyway. What those answers said is in llms.txt.
+  const raw = readFileSync(join(HERE, "..", "..", "index.html"), "utf8");
+  assert.ok(!raw.includes('"FAQPage"'), "index.html carries FAQPage markup, and no FAQ is visible on the homepage");
 });
 
 test("a Slovak article is a Slovak page whatever the database's 'en' copy says", () => {
@@ -151,4 +160,28 @@ test("the feed is valid RSS with one item per analysis", () => {
   assert.match(xml, /<rss version="2.0"/);
   assert.equal((xml.match(/<item>/g) || []).length, 1);
   assert.ok(xml.includes("A &amp; B") && xml.includes("Sun, 27 Sep 2026"));
+});
+
+test("the manual steps open only when the live page is the saved version", () => {
+  const saved = "2026-09-28T14:07:05.107041+00:00";
+  const page = (mod) => `<head><meta property="article:modified_time" content="${mod}" /></head>`;
+  const at = (min) => Date.parse(saved) + min * 60000;
+  const state = (o) => livePageState({ published: true, onLiveSite: true, updatedAt: saved, ...o });
+
+  assert.equal(state({ html: page(saved), now: at(4) }).status, "current");
+  // the same instant written another way is the same version
+  assert.equal(state({ html: page("2026-09-28T14:07:05.107Z"), now: at(4) }).status, "current");
+  // an older page shortly after a save is a rebuild in flight; later it is stuck
+  assert.equal(state({ html: page("2026-09-28T11:00:00+00:00"), now: at(3) }).status, "rebuilding");
+  assert.equal(state({ html: page("2026-09-28T11:00:00+00:00"), now: at(LIVE_STUCK_MINUTES + 1) }).status, "stuck");
+  // the app's shell (no page for it yet) is not current either
+  assert.equal(state({ html: "<head></head>", now: at(2) }).status, "rebuilding");
+
+  assert.equal(manualStepsReady(state({ html: page(saved) })), true);
+  assert.equal(manualStepsReady(state({ html: page("2026-09-28T11:00:00+00:00"), now: at(3) })), false);
+  assert.equal(manualStepsReady(state({ html: page("2026-09-28T11:00:00+00:00"), now: at(60) })), false);
+  // what cannot be checked from here never blocks
+  assert.equal(manualStepsReady(livePageState({ published: true, onLiveSite: false })), true);
+  assert.equal(manualStepsReady(state({ html: null })), true);
+  assert.equal(livePageState({ published: false, onLiveSite: true }).status, "draft");
 });

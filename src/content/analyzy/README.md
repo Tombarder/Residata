@@ -50,26 +50,90 @@ that runs on every visit should not sit in a folder that says it does not run.
    it will one day contradict it. One of them, "necelá desatina predaja", was
    published while it was false.
 
-3. **Render, then build the row:**
+3. **Render, build the row and write it** — one command in the scraper repo,
+   which runs `render.py` and `to_cms.py` itself:
 
    ```
-   python3 src/content/analyzy/drafts/render.py <slug>
-   python3 src/content/analyzy/drafts/to_cms.py <slug> > /tmp/row.json
+   cd ~/novostavby && source .env && unset SUPABASE_DB_URL SUPABASE_DB_PASSWORD
+   python3 -m v2.scripts.publish_issue <slug>            # dry run: what would change, field by field
+   python3 -m v2.scripts.publish_issue <slug> --apply    # UPDATE by slug, or INSERT as a draft
    ```
 
-   `render.py` writes the two `.md` files and refuses on a typed number or a
-   placeholder the report cannot fill. `to_cms.py` turns the pair into the row
-   `public.articles` expects — it prints JSON and writes nothing itself.
+   `render.py` refuses a typed number or a placeholder the report cannot fill;
+   `to_cms.py` turns the pair into the row. `publish_issue` then carries EVERY
+   field of that row — a field the table has no column for is refused, never
+   dropped — and never `published`, which only `--publish` changes. It refuses
+   on any error from the build's own checks (`scripts/article-check.mjs`).
 
-4. **Publish.** For a NEW issue, paste the row in `/app/articles` → *Nový
-   článok*. For an issue that already exists, UPDATE the existing row keyed on
-   slug — never insert, or the site grows a duplicate — and do not carry the
-   `published` field from the row file: `to_cms.py` emits `published: false`, so
-   applying it wholesale takes the live article off the site.
+   🔴 **Do not paste a row into `/app/articles`.** Its *+ Nový článok* creates
+   an empty stub for an article written by hand; it cannot take a generated row.
+   Until 2026-09-28 this step said to, and the issues went in through a scratch
+   script that silently dropped their search title and keywords.
 
-5. **Verify against the live row, not the draft on disk.** Read
-   `public.articles` back, check the figures, and open the page.
+4. **Publish:**
 
+   ```
+   python3 -m v2.scripts.publish_issue <slug> --publish
+   ```
+
+   It refuses until every chart and the share card answer from residata.eu **as
+   images** — so commit and push them first. (The site answers a path it does
+   not have with the app's own page, 200 text/html, which is why "answers 200"
+   is not the test.) Then it flips the row and waits until the site, which
+   rebuilds itself, serves the new page: `LIVE ✓`.
+
+5. **The two steps no system can take**, listed on every article in
+   `/app/articles` with a badge until they are ticked:
+   - ask Google to index the URL — Search Console → URL inspection → *Request
+     indexing* (Google has no API for articles);
+   - share it on LinkedIn.
+
+   When an article that was already shared changes its title or share card,
+   also refresh LinkedIn's cached preview with Post Inspector (optional).
+
+6. **Verify against the live row and the live page**, not the draft on disk.
+   Read `public.articles` back, check the figures, and open the page.
+
+## Every article is a page of its own — and what does that by itself
+
+A search engine, an AI crawler and a LinkedIn preview read the HTML the
+server sends, before any JavaScript runs. Until 2026-09-28 that HTML was the
+homepage's for every article — its title, its share card, and a canonical
+link saying "I am the homepage". Now:
+
+- **The build writes a page per published article** (`scripts/prerender.mjs`,
+  after `vite build`): its own title (the SEO title, else the headline with
+  the site name), description, canonical, `sk` + `x-default` hreflang, Open
+  Graph and article tags, the share card, structured data (BreadcrumbList,
+  Article, and a Dataset for an issue built of tables) and the article's text
+  with links to related issues. The same model (`src/lib/articleSeo.js`) sets
+  the tags when the app takes over, so the two never disagree. It also writes
+  `/analyzy`, the RSS feed (`/analyzy/feed.xml`), the sitemap and llms.txt from
+  the same read of the database, and refuses a Vercel build that could not
+  read the articles — the previous deployment stays live.
+- **Publishing rebuilds the site.** A trigger on `public.articles` queues a
+  rebuild whenever something a visitor could see changes on a published (or
+  just-withdrawn) article; `pg_cron` fires the Vercel deploy hook once changes
+  have stopped for 60 s. A price change and a daily 09:30 UTC refresh use the
+  same queue (scraper repo, `v2/migrations/2026-09-28_*rebuild*.sql`). Ticking
+  a manual step is not a change and rebuilds nothing.
+- **Search engines are told.** After every production deploy
+  `.github/workflows/seo-live-check.yml` reads the live site the way a crawler
+  does — every page in the sitemap, its title, canonical, language, share
+  image, structured data, text and charts — and pings IndexNow (Bing, Seznam).
+  Google reads the sitemap on its own schedule; the indexing request in step 5
+  is how a new article gets there the same day.
+- **It is watched.** The same check runs every morning (GitHub emails when it
+  fails), and the scraper's nightly `integrity_check.articles_are_live`
+  compares the database with the site: every published article live at its
+  latest version, nothing withdrawn still live, the rebuild queue moving.
+
+A new issue therefore needs nothing SEO-specific from a person beyond step 5.
+The template carries the rest: `<!--SEOTITLE …-->` and `<!--KEYWORDS …-->` at
+the top of every `.tmpl` (the master template fills them per place), which
+`to_cms.py` turns into `seo_title` and `seo_keywords`. Without them the
+headline is used, and `/app/articles` and the build both say when a title is
+too long for Google (65 characters).
 
 ## The Bratislava quarterly overview
 

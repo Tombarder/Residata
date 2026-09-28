@@ -352,6 +352,39 @@ export const MANUAL_STEPS = [
   },
 ];
 
+/** Minutes after a save beyond which a page that has not caught up is stuck,
+ *  not rebuilding. A save is normally live in ~5: 60 s for a burst to settle,
+ *  at most 3 min after the previous rebuild, and a ~1.5 min build. */
+export const LIVE_STUCK_MINUTES = 10;
+
+/**
+ * Is the page residata.eu serves for this article the version last saved?
+ * `html` is that page as fetched (null when the fetch failed). Returns
+ * { status } — 'draft' (not published) · 'not-here' (the editor is not on
+ * residata.eu, so there is no live page to compare) · 'unknown' (the fetch
+ * failed) · 'current' · 'rebuilding' / 'stuck' (an older version, with
+ * `minutes` since the save).
+ */
+export function livePageState({ published, onLiveSite, html = null, updatedAt, now = Date.now() }) {
+  if (!published) return { status: "draft" };
+  if (!onLiveSite) return { status: "not-here" };
+  if (html == null) return { status: "unknown" };
+  const mod = (/<meta property="article:modified_time" content="([^"]*)"/.exec(html) || [])[1];
+  if (mod && updatedAt && Date.parse(mod) === Date.parse(updatedAt)) return { status: "current" };
+  const minutes = Math.max(0, Math.round((now - Date.parse(updatedAt || 0)) / 60000));
+  return { status: minutes > LIVE_STUCK_MINUTES ? "stuck" : "rebuilding", minutes };
+}
+
+/**
+ * The manual steps send Google and LinkedIn to the page, which read it as it
+ * is at that moment — and LinkedIn keeps the preview about a week. So they open
+ * only when the page is the saved version, or when that cannot be checked from
+ * here; never during a rebuild, never when it is stuck.
+ */
+export function manualStepsReady(state) {
+  return ["current", "not-here", "unknown"].includes(state?.status);
+}
+
 /** How many required manual steps a published article still has open. */
 export function openManualSteps(article) {
   if (!article?.published) return 0;

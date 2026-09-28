@@ -92,7 +92,9 @@ export function siteNodes(template) {
  * page's, and `<html lang>` set. `dropJsonLd` removes the template's
  * structured-data blocks (the page supplies its own graph, which re-includes
  * the site nodes); left false, they stay (marketing routes keep the product
- * graph) but the homepage FAQ goes, since only /pricing shows a FAQ.
+ * graph). Any FAQPage block is dropped either way: FAQ markup must match a FAQ
+ * visible on the same page, which is why index.html no longer carries one at
+ * all (src/lib/prerender.test.mjs holds it to that).
  */
 export function replaceHead(template, { lang, head, dropJsonLd = false }) {
   let html = template;
