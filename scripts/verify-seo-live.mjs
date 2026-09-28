@@ -25,6 +25,9 @@
 import { pageProblems } from "./lib/prerenderCore.mjs";
 
 const SITE = (process.env.SITE || "https://residata.eu").replace(/\/$/, "");
+// Canonicals name the production domain on every host — on a preview too, which
+// is what keeps a preview from competing with the real site in search.
+const PROD = "https://residata.eu";
 const UA = "Mozilla/5.0 (compatible; LinkedInBot/1.0; +https://residata.eu/verify-seo-live)";
 const INDEXNOW = process.argv.includes("--indexnow");
 const HOMEPAGE_TITLE = "Residata — New-Build Market Intelligence for Slovakia & Czechia";
@@ -54,7 +57,7 @@ async function checkPage(url, lastmod) {
   const isArticle = /^\/analyzy\/[a-z0-9-]+$/.test(path);
   const isIndex = path === "/analyzy";
   const want = {
-    canonical: url.replace(/\/$/, "") === SITE ? `${SITE}/` : url,
+    canonical: path === "/" ? `${PROD}/` : PROD + path,
     index: true,
     noFaq: isArticle || isIndex,
     jsonLdType: isArticle ? ["Article", "BreadcrumbList"] : isIndex ? ["CollectionPage"] : [],
@@ -96,7 +99,7 @@ async function main() {
   const sm = await get(`${SITE}/sitemap.xml`);
   if (sm.status !== 200) throw new Error(`sitemap answers ${sm.status}`);
   const entries = [...sm.body.matchAll(/<url>\s*<loc>([^<]+)<\/loc>\s*<lastmod>([^<]+)<\/lastmod>/g)]
-    .map((m) => ({ url: m[1].replace("https://residata.eu", SITE), lastmod: m[2] }));
+    .map((m) => ({ url: m[1].replace(PROD, SITE), lastmod: m[2] }));
   if (entries.length < 5) throw new Error(`the sitemap lists only ${entries.length} urls`);
 
   const failures = [];
@@ -116,10 +119,10 @@ async function main() {
   const feed = await get(`${SITE}/analyzy/feed.xml`);
   const llms = await get(`${SITE}/llms.txt`);
   for (const a of articles) {
-    if (!feed.body.includes(`<link>${a.url.replace(SITE, "https://residata.eu")}</link>`)) {
+    if (!feed.body.includes(`<link>${a.url.replace(SITE, PROD)}</link>`)) {
       console.log(`FAIL ${a.url} — missing from /analyzy/feed.xml`); failures.push(`${a.url} (feed)`);
     }
-    if (!llms.body.includes(a.url.replace(SITE, "https://residata.eu"))) {
+    if (!llms.body.includes(a.url.replace(SITE, PROD))) {
       console.log(`FAIL ${a.url} — missing from /llms.txt`); failures.push(`${a.url} (llms.txt)`);
     }
   }

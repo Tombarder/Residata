@@ -29,10 +29,12 @@
  *   rows already exposed publicly. RLS gates everything sensitive.
  *
  * Failure mode:
- *   If env vars are missing or Supabase is unreachable, we DO NOT fail
- *   the build. The existing files in public/ stay (as a fallback) and
- *   the build continues. This way a temporary DB hiccup doesn't break
- *   deploys.
+ *   If env vars are missing or Supabase is unreachable, THIS script does not
+ *   fail the build: the existing files in public/ stay (as a fallback) and
+ *   the build continues. The one exception is downstream — the published
+ *   articles (scripts/.articles.json) are this build's read or nothing, and
+ *   prerender.mjs refuses a Vercel build without them, which keeps the
+ *   previous deployment and its correct article pages live.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -42,6 +44,11 @@ import { FALLBACK_MONTHLY_CENTS, FALLBACK_MONTHLY_DISPLAY, FALLBACK_ANCHOR_DISPL
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+// Deleted before anything can fail: a list left behind by an earlier build must
+// never stand in for the one this build could not read.
+const ARTICLES_FILE = path.resolve('scripts/.articles.json');
+fs.rmSync(ARTICLES_FILE, { force: true });
 
 if (!SUPABASE_URL || !SUPABASE_KEY) {
   console.warn('[gen-static] Missing VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY — skipping. Existing public/ files will be used.');
@@ -94,7 +101,7 @@ try {
   articles = await fetchView('articles', {
     select: ARTICLE_COLS, published: 'eq.true', order: 'article_date.desc',
   });
-  fs.writeFileSync(path.resolve('scripts/.articles.json'), JSON.stringify(articles));
+  fs.writeFileSync(ARTICLES_FILE, JSON.stringify(articles));
   console.log(`[gen-static] scripts/.articles.json — ${articles.length} published articles`);
 } catch (e) {
   // prerender.mjs fails the build on Vercel when this file is missing, which
