@@ -71,14 +71,14 @@ Prehľad trhu s novými bytmi v Nitre za 3. štvrťrok 2026: ponuka, dopyt a cen
 ![Vývoj cien nových bytov](/analyzy/nr-prehlad-2026-q3-ceny-vyvoj.svg)
 *Zmena priemernej ponukovej ceny za meter od začiatku štvrťroka, týždenne, na tých istých bytoch — graf sa pohne len vtedy, keď sa pohne cena.*
 
-**Ceny nových bytov v Nitre v 3. štvrťroku 2026 podľa kategórií**
+**Ceny nových bytov v Nitre v 3. štvrťroku 2026 podľa kategórií (€/m² s DPH)**
 
-| Kategória | €/m² s DPH, predchádzajúci štvrťrok | €/m² s DPH, aktuálny štvrťrok | Zmena medzikvartálne |
+| Kategória | Q2/2026 | Q3/2026 | Zmena |
 |---|---:|---:|---:|
-| 1-izb | 3 870 € | 3 958 € | +2,3 % |
-| 2-izb | 3 535 € | 3 603 € | +1,9 % |
-| 3-izb | 3 127 € | 3 181 € | +1,7 % |
-| 4-izb | 3 185 € | 3 289 € | +3,3 % |
+| 1-izb | 3 870 | 3 958 | +2,3 % |
+| 2-izb | 3 535 | 3 603 | +1,9 % |
+| 3-izb | 3 127 | 3 181 | +1,7 % |
+| 4-izb | 3 185 | 3 289 | +3,3 % |
 
 ![Vývoj cien voľných a predaných bytov](/analyzy/nr-prehlad-2026-q3-ponuka-vs-predaj-mesiace.svg)
 *Cena predaných bytov a ponuková cena v tých istých projektoch za štvrťrok.*

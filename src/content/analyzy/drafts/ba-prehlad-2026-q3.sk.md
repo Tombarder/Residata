@@ -73,15 +73,15 @@ Prehľad trhu s novými bytmi v Bratislave za 3. štvrťrok 2026: ponuka, dopyt 
 ![Ceny nových bytov v Bratislave](/analyzy/ba-prehlad-2026-q3-ceny-dlhodobo.svg)
 *Priemerná ponuková cena ku koncu štvrťroka. Hodnoty do 2Q 2026 sú z kvartálnych analýz Bencont Investments, prepočítané na našu plochovú základňu; novšie sú naše.*
 
-**Ceny nových bytov v Bratislave v 3. štvrťroku 2026 podľa obvodov**
+**Ceny nových bytov v Bratislave v 3. štvrťroku 2026 podľa obvodov (€/m² s DPH)**
 
-| Okres | €/m² s DPH, predchádzajúci štvrťrok | €/m² s DPH, aktuálny štvrťrok | Zmena medzikvartálne |
+| Okres | Q2/2026 | Q3/2026 | Zmena |
 |---|---:|---:|---:|
-| Bratislava I | 8 608 € | 8 222 € | −4,5 % |
-| Bratislava II | 6 093 € | 6 107 € | +0,2 % |
-| Bratislava III | 6 030 € | 6 106 € | +1,3 % |
-| Bratislava IV | 4 894 € | 4 893 € | 0,0 % |
-| Bratislava V | 5 101 € | 5 183 € | +1,6 % |
+| Bratislava I | 8 608 | 8 222 | −4,5 % |
+| Bratislava II | 6 093 | 6 107 | +0,2 % |
+| Bratislava III | 6 030 | 6 106 | +1,3 % |
+| Bratislava IV | 4 894 | 4 893 | 0,0 % |
+| Bratislava V | 5 101 | 5 183 | +1,6 % |
 
 ![Vývoj cien voľných a predaných bytov](/analyzy/ba-prehlad-2026-q3-ponuka-vs-predaj-mesiace.svg)
 *Cena predaných bytov a ponuková cena v tých istých projektoch, po mesiacoch.*

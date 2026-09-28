@@ -79,18 +79,18 @@ Prehľad trhu s novými bytmi na Slovensku za 3. štvrťrok 2026: ponuka, dopyt 
 ![Vývoj cien nových bytov](/analyzy/sk-prehlad-2026-q3-ceny-vyvoj.svg)
 *Zmena priemernej ponukovej ceny za meter od začiatku štvrťroka, týždenne, na tých istých bytoch — graf sa pohne len vtedy, keď sa pohne cena.*
 
-**Ceny nových bytov na Slovensku v 3. štvrťroku 2026 podľa krajov**
+**Ceny nových bytov na Slovensku v 3. štvrťroku 2026 podľa krajov (€/m² s DPH)**
 
-| Kraj | €/m² s DPH, predchádzajúci štvrťrok | €/m² s DPH, aktuálny štvrťrok | Zmena medzikvartálne |
+| Kraj | Q2/2026 | Q3/2026 | Zmena |
 |---|---:|---:|---:|
-| Bratislavský kraj | 5 694 € | 5 701 € | +0,1 % |
-| Trnavský kraj | 3 512 € | 3 509 € | −0,1 % |
-| Trenčiansky kraj | 3 982 € | 3 993 € | +0,3 % |
-| Nitriansky kraj | 3 398 € | 3 467 € | +2,0 % |
-| Žilinský kraj | 3 789 € | 3 785 € | −0,1 % |
-| Banskobystrický kraj | 3 885 € | 3 880 € | −0,1 % |
-| Prešovský kraj | 3 701 € | 3 705 € | +0,1 % |
-| Košický kraj | 4 813 € | 4 796 € | −0,4 % |
+| Bratislavský kraj | 5 694 | 5 701 | +0,1 % |
+| Trnavský kraj | 3 512 | 3 509 | −0,1 % |
+| Trenčiansky kraj | 3 982 | 3 993 | +0,3 % |
+| Nitriansky kraj | 3 398 | 3 467 | +2,0 % |
+| Žilinský kraj | 3 789 | 3 785 | −0,1 % |
+| Banskobystrický kraj | 3 885 | 3 880 | −0,1 % |
+| Prešovský kraj | 3 701 | 3 705 | +0,1 % |
+| Košický kraj | 4 813 | 4 796 | −0,4 % |
 
 ![Vývoj cien voľných a predaných bytov](/analyzy/sk-prehlad-2026-q3-ponuka-vs-predaj-mesiace.svg)
 *Cena predaných bytov a ponuková cena v tých istých projektoch, po mesiacoch.*

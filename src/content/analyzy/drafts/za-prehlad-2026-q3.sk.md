@@ -73,14 +73,14 @@ Prehľad trhu s novými bytmi v Žiline za 3. štvrťrok 2026: ponuka, dopyt a c
 ![Vývoj cien nových bytov](/analyzy/za-prehlad-2026-q3-ceny-vyvoj.svg)
 *Zmena priemernej ponukovej ceny za meter od začiatku štvrťroka, týždenne, na tých istých bytoch — graf sa pohne len vtedy, keď sa pohne cena.*
 
-**Ceny nových bytov v Žiline v 3. štvrťroku 2026 podľa kategórií**
+**Ceny nových bytov v Žiline v 3. štvrťroku 2026 podľa kategórií (€/m² s DPH)**
 
-| Kategória | €/m² s DPH, predchádzajúci štvrťrok | €/m² s DPH, aktuálny štvrťrok | Zmena medzikvartálne |
+| Kategória | Q2/2026 | Q3/2026 | Zmena |
 |---|---:|---:|---:|
-| 1-izb | 4 340 € | 4 239 € | −2,3 % |
-| 2-izb | 4 283 € | 4 211 € | −1,7 % |
-| 3-izb | 3 979 € | 3 954 € | −0,6 % |
-| 4-izb | 4 205 € | 4 185 € | −0,5 % |
+| 1-izb | 4 340 | 4 239 | −2,3 % |
+| 2-izb | 4 283 | 4 211 | −1,7 % |
+| 3-izb | 3 979 | 3 954 | −0,6 % |
+| 4-izb | 4 205 | 4 185 | −0,5 % |
 
 *Riadky s menej ako 10 bytmi alebo menej ako 3 projektmi porovnateľnými v oboch štvrťrokoch nie sú uvedené.*
 

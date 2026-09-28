@@ -77,11 +77,11 @@ Prehľad trhu s novými bytmi v Trnavskom kraji za 3. štvrťrok 2026: ponuka, d
 ![Vývoj cien nových bytov](/analyzy/kraj-tt-prehlad-2026-q3-ceny-vyvoj.svg)
 *Zmena priemernej ponukovej ceny za meter od začiatku štvrťroka, týždenne, na tých istých bytoch — graf sa pohne len vtedy, keď sa pohne cena.*
 
-**Ceny nových bytov v Trnavskom kraji v 3. štvrťroku 2026 podľa obcí**
+**Ceny nových bytov v Trnavskom kraji v 3. štvrťroku 2026 podľa obcí (€/m² s DPH)**
 
-| Obec | €/m² s DPH, predchádzajúci štvrťrok | €/m² s DPH, aktuálny štvrťrok | Zmena medzikvartálne |
+| Obec | Q2/2026 | Q3/2026 | Zmena |
 |---|---:|---:|---:|
-| Trnava | 3 901 € | 3 923 € | +0,6 % |
+| Trnava | 3 901 | 3 923 | +0,6 % |
 
 *Riadky s menej ako 10 bytmi alebo menej ako 3 projektmi porovnateľnými v oboch štvrťrokoch nie sú uvedené.*
 

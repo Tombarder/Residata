@@ -67,9 +67,9 @@ Prehľad trhu s novými bytmi v Trenčianskom kraji za 3. štvrťrok 2026: ponuk
 ![Vývoj cien nových bytov](/analyzy/kraj-tn-prehlad-2026-q3-ceny-vyvoj.svg)
 *Zmena priemernej ponukovej ceny za meter od začiatku štvrťroka, týždenne, na tých istých bytoch — graf sa pohne len vtedy, keď sa pohne cena.*
 
-**Ceny nových bytov v Trenčianskom kraji v 3. štvrťroku 2026 podľa obcí**
+**Ceny nových bytov v Trenčianskom kraji v 3. štvrťroku 2026 podľa obcí (€/m² s DPH)**
 
-| Obec | €/m² s DPH, predchádzajúci štvrťrok | €/m² s DPH, aktuálny štvrťrok | Zmena medzikvartálne |
+| Obec | Q2/2026 | Q3/2026 | Zmena |
 |---|---:|---:|---:|
 
 *Riadky s menej ako 10 bytmi alebo menej ako 3 projektmi porovnateľnými v oboch štvrťrokoch nie sú uvedené.*

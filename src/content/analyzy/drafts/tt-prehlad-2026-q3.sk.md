@@ -71,12 +71,12 @@ Prehľad trhu s novými bytmi v Trnave za 3. štvrťrok 2026: ponuka, dopyt a ce
 ![Vývoj cien nových bytov](/analyzy/tt-prehlad-2026-q3-ceny-vyvoj.svg)
 *Zmena priemernej ponukovej ceny za meter od začiatku štvrťroka, týždenne, na tých istých bytoch — graf sa pohne len vtedy, keď sa pohne cena.*
 
-**Ceny nových bytov v Trnave v 3. štvrťroku 2026 podľa kategórií**
+**Ceny nových bytov v Trnave v 3. štvrťroku 2026 podľa kategórií (€/m² s DPH)**
 
-| Kategória | €/m² s DPH, predchádzajúci štvrťrok | €/m² s DPH, aktuálny štvrťrok | Zmena medzikvartálne |
+| Kategória | Q2/2026 | Q3/2026 | Zmena |
 |---|---:|---:|---:|
-| 2-izb | 3 878 € | 3 887 € | +0,2 % |
-| 3-izb | 3 501 € | 3 514 € | +0,4 % |
+| 2-izb | 3 878 | 3 887 | +0,2 % |
+| 3-izb | 3 501 | 3 514 | +0,4 % |
 
 *Riadky s menej ako 10 bytmi alebo menej ako 3 projektmi porovnateľnými v oboch štvrťrokoch nie sú uvedené.*
 

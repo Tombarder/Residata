@@ -752,7 +752,13 @@ def herrys_price_table(rep: dict) -> str:
     quarter with this one and the header says so. On the same flats in both.
     """
     ov = rep["overview"]
-    head = (f"| {_sub_header(rep)} | €/m² s DPH, predchádzajúci štvrťrok | €/m² s DPH, aktuálny štvrťrok | Zmena medzikvartálne |"
+    # 🔴 A TABLE A PHONE CAN HOLD. "€/m² s DPH, predchádzajúci štvrťrok" made
+    # every header wider than its numbers and pushed the table past a 375px
+    # screen; the unit now sits once in the table's title and the columns
+    # name their quarters the way the charts do.
+    _qs = ov["quarter_start"]; _q = (int(_qs[5:7]) - 1) // 3 + 1; _y = int(_qs[:4])
+    _pq, _py = (4, _y - 1) if _q == 1 else (_q - 1, _y)
+    head = (f"| {_sub_header(rep)} | Q{_pq}/{_py} | Q{_q}/{_y} | Zmena |"
             "\n|---|---:|---:|---:|")
     rows, dropped = [], 0
     for o, a in ov["okres_price"].items():
@@ -764,7 +770,7 @@ def herrys_price_table(rep: dict) -> str:
             dropped += 1
             continue
         sign = "+" if a["chg_pct"] > 0 else ("−" if a["chg_pct"] < 0 else "")
-        rows.append(f"| {o} | {sk_int(a['m2_prev'])} € | {sk_int(a['m2_cur'])} € | "
+        rows.append(f"| {o} | {sk_int(a['m2_prev'])} | {sk_int(a['m2_cur'])} | "
                     f"{sign}{sk_dec(abs(a['chg_pct']))} % |")
     note = (f"\n\n*Riadky s menej ako {MIN_ROW_FLATS} bytmi alebo menej ako 3 projektmi "
             f"porovnateľnými v oboch štvrťrokoch nie sú uvedené.*" if dropped else "")

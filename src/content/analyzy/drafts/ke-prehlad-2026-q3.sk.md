@@ -72,14 +72,14 @@ Prehľad trhu s novými bytmi v Košiciach za 3. štvrťrok 2026: ponuka, dopyt 
 ![Vývoj cien nových bytov](/analyzy/ke-prehlad-2026-q3-ceny-vyvoj.svg)
 *Zmena priemernej ponukovej ceny za meter od začiatku štvrťroka, týždenne, na tých istých bytoch — graf sa pohne len vtedy, keď sa pohne cena.*
 
-**Ceny nových bytov v Košiciach v 3. štvrťroku 2026 podľa kategórií**
+**Ceny nových bytov v Košiciach v 3. štvrťroku 2026 podľa kategórií (€/m² s DPH)**
 
-| Kategória | €/m² s DPH, predchádzajúci štvrťrok | €/m² s DPH, aktuálny štvrťrok | Zmena medzikvartálne |
+| Kategória | Q2/2026 | Q3/2026 | Zmena |
 |---|---:|---:|---:|
-| 1-izb | 5 672 € | 5 627 € | −0,8 % |
-| 2-izb | 4 864 € | 4 857 € | −0,1 % |
-| 3-izb | 4 788 € | 4 772 € | −0,3 % |
-| 4-izb | 4 746 € | 4 799 € | +1,1 % |
+| 1-izb | 5 672 | 5 627 | −0,8 % |
+| 2-izb | 4 864 | 4 857 | −0,1 % |
+| 3-izb | 4 788 | 4 772 | −0,3 % |
+| 4-izb | 4 746 | 4 799 | +1,1 % |
 
 *Riadky s menej ako 10 bytmi alebo menej ako 3 projektmi porovnateľnými v oboch štvrťrokoch nie sú uvedené.*
 

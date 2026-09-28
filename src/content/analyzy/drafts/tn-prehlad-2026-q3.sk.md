@@ -62,9 +62,9 @@ Prehľad trhu s novými bytmi v Trenčíne za 3. štvrťrok 2026: ponuka, dopyt 
 
 - Celková priemerná cena projektov v Trenčíne je 4 001 €/m² s DPH.
 
-**Ceny nových bytov v Trenčíne v 3. štvrťroku 2026 podľa kategórií**
+**Ceny nových bytov v Trenčíne v 3. štvrťroku 2026 podľa kategórií (€/m² s DPH)**
 
-| Kategória | €/m² s DPH, predchádzajúci štvrťrok | €/m² s DPH, aktuálny štvrťrok | Zmena medzikvartálne |
+| Kategória | Q2/2026 | Q3/2026 | Zmena |
 |---|---:|---:|---:|
 
 *Riadky s menej ako 10 bytmi alebo menej ako 3 projektmi porovnateľnými v oboch štvrťrokoch nie sú uvedené.*
