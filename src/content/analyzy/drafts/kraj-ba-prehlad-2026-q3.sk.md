@@ -26,7 +26,7 @@ Prehľad trhu s novými bytmi v Bratislavskom kraji za 3. štvrťrok 2026: ponuk
 
 **Podiel voľných bytov v 3. štvrťroku 2026 podľa obce**
 
-| Obec | Voľné | z toho voľné dokončené |
+| Obec | Voľné | z toho dokončené |
 |---|---:|---:|
 | Bratislava | 4 203 | 569 |
 | Slovenský Grob | 84 | 0 |

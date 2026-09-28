@@ -24,7 +24,7 @@ Prehľad trhu s novými bytmi v Prešove za 3. štvrťrok 2026: ponuka, dopyt a 
 
 **Podiel voľných bytov v 3. štvrťroku 2026 podľa kategórie**
 
-| Kategória | Voľné | z toho voľné dokončené |
+| Kategória | Voľné | z toho dokončené |
 |---|---:|---:|
 | 1-izb | 44 | 0 |
 | 1,5-izb | 3 | 0 |

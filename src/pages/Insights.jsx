@@ -117,14 +117,18 @@ function Table({ head, rows, caption, lang }) {
   const heads = t(head, lang) || head;
   return (
     <figure style={{ margin: "2.4rem 0" }}>
+      {/* On a phone the padding and type step down (clamp on the viewport width)
+          so a four-column table fits a 375px screen; on a desktop both clamps
+          sit at their maximum and nothing changes. It still scrolls sideways
+          if a table is wider than the screen — nothing is ever cut off. */}
       <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.9rem" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "clamp(0.8rem, 3.4vw, 0.9rem)" }}>
           <thead>
             <tr>
               {heads.map((h, i) => (
                 <th key={h} style={{
                   textAlign: i === 0 ? "left" : "right",
-                  padding: "0.6rem 0.75rem",
+                  padding: "0.6rem clamp(0.35rem, 1.6vw, 0.75rem)",
                   borderBottom: "1px solid rgba(255,255,255,0.18)",
                   color: "#e8e8ee", fontWeight: 600, whiteSpace: "nowrap",
                 }}>{h}</th>
@@ -137,7 +141,7 @@ function Table({ head, rows, caption, lang }) {
                 {r.map((cell, ci) => (
                   <td key={ci} style={{
                     textAlign: ci === 0 ? "left" : "right",
-                    padding: "0.55rem 0.75rem",
+                    padding: "0.55rem clamp(0.35rem, 1.6vw, 0.75rem)",
                     borderBottom: "1px solid rgba(255,255,255,0.07)",
                     color: ci === 0 ? "#e8e8ee" : "#c5c5cc",
                     fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap",

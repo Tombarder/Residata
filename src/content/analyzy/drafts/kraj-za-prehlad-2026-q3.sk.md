@@ -26,7 +26,7 @@ Prehľad trhu s novými bytmi v Žilinskom kraji za 3. štvrťrok 2026: ponuka, 
 
 **Podiel voľných bytov v 3. štvrťroku 2026 podľa obce**
 
-| Obec | Voľné | z toho voľné dokončené |
+| Obec | Voľné | z toho dokončené |
 |---|---:|---:|
 | Liptovský Mikuláš | 227 | 33 |
 | Žilina | 212 | 34 |

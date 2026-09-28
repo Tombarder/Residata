@@ -26,16 +26,16 @@ Prehľad trhu s novými bytmi na Slovensku za 3. štvrťrok 2026: ponuka, dopyt 
 
 **Podiel voľných bytov v 3. štvrťroku 2026 podľa kraja**
 
-| Kraj | Voľné | z toho voľné dokončené |
+| Kraj | Voľné | z toho dokončené |
 |---|---:|---:|
-| Bratislavský kraj | 4 520 | 576 |
-| Trnavský kraj | 941 | 141 |
-| Trenčiansky kraj | 400 | 0 |
-| Nitriansky kraj | 656 | 60 |
-| Žilinský kraj | 628 | 97 |
-| Banskobystrický kraj | 760 | 182 |
-| Prešovský kraj | 896 | 12 |
-| Košický kraj | 751 | 58 |
+| Bratislavský | 4 520 | 576 |
+| Trnavský | 941 | 141 |
+| Trenčiansky | 400 | 0 |
+| Nitriansky | 656 | 60 |
+| Žilinský | 628 | 97 |
+| Banskobystrický | 760 | 182 |
+| Prešovský | 896 | 12 |
+| Košický | 751 | 58 |
 | **celkom** | **9 552** | **1 126** |
 
 ![Podiel voľných bytov podľa kategórie](/analyzy/sk-prehlad-2026-q3-podiel-ponuka.svg)
@@ -56,14 +56,14 @@ Prehľad trhu s novými bytmi na Slovensku za 3. štvrťrok 2026: ponuka, dopyt 
 
 | Kraj | Počet predaných bytov |
 |---|---:|
-| Bratislavský kraj | 598 |
-| Trnavský kraj | 103 |
-| Trenčiansky kraj | 65 |
-| Nitriansky kraj | 55 |
-| Žilinský kraj | 74 |
-| Banskobystrický kraj | 25 |
-| Prešovský kraj | 134 |
-| Košický kraj | 128 |
+| Bratislavský | 598 |
+| Trnavský | 103 |
+| Trenčiansky | 65 |
+| Nitriansky | 55 |
+| Žilinský | 74 |
+| Banskobystrický | 25 |
+| Prešovský | 134 |
+| Košický | 128 |
 | **celkom** | **1 182** |
 
 ![Počet predaných bytov podľa kategórie](/analyzy/sk-prehlad-2026-q3-podiel-predaj.svg)
@@ -83,14 +83,14 @@ Prehľad trhu s novými bytmi na Slovensku za 3. štvrťrok 2026: ponuka, dopyt 
 
 | Kraj | Q2/2026 | Q3/2026 | Zmena |
 |---|---:|---:|---:|
-| Bratislavský kraj | 5 694 | 5 701 | +0,1 % |
-| Trnavský kraj | 3 512 | 3 509 | −0,1 % |
-| Trenčiansky kraj | 3 982 | 3 993 | +0,3 % |
-| Nitriansky kraj | 3 398 | 3 467 | +2,0 % |
-| Žilinský kraj | 3 789 | 3 785 | −0,1 % |
-| Banskobystrický kraj | 3 885 | 3 880 | −0,1 % |
-| Prešovský kraj | 3 701 | 3 705 | +0,1 % |
-| Košický kraj | 4 813 | 4 796 | −0,4 % |
+| Bratislavský | 5 694 | 5 701 | +0,1 % |
+| Trnavský | 3 512 | 3 509 | −0,1 % |
+| Trenčiansky | 3 982 | 3 993 | +0,3 % |
+| Nitriansky | 3 398 | 3 467 | +2,0 % |
+| Žilinský | 3 789 | 3 785 | −0,1 % |
+| Banskobystrický | 3 885 | 3 880 | −0,1 % |
+| Prešovský | 3 701 | 3 705 | +0,1 % |
+| Košický | 4 813 | 4 796 | −0,4 % |
 
 ![Vývoj cien voľných a predaných bytov](/analyzy/sk-prehlad-2026-q3-ponuka-vs-predaj-mesiace.svg)
 *Cena predaných bytov a ponuková cena v tých istých projektoch, po mesiacoch.*

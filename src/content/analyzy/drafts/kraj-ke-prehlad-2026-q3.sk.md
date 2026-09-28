@@ -26,7 +26,7 @@ Prehľad trhu s novými bytmi v Košickom kraji za 3. štvrťrok 2026: ponuka, d
 
 **Podiel voľných bytov v 3. štvrťroku 2026 podľa obce**
 
-| Obec | Voľné | z toho voľné dokončené |
+| Obec | Voľné | z toho dokončené |
 |---|---:|---:|
 | Košice | 668 | 43 |
 | Spišská Nová Ves | 69 | 1 |

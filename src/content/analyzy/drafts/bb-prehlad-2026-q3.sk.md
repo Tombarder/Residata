@@ -24,7 +24,7 @@ Prehľad trhu s novými bytmi v Banskej Bystrici za 3. štvrťrok 2026: ponuka, 
 
 **Podiel voľných bytov v 3. štvrťroku 2026 podľa kategórie**
 
-| Kategória | Voľné | z toho voľné dokončené |
+| Kategória | Voľné | z toho dokončené |
 |---|---:|---:|
 | 1-izb | 58 | 1 |
 | 1,5-izb | 2 | 0 |

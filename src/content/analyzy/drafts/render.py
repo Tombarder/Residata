@@ -714,6 +714,15 @@ def _finish_overview_vars(rep: dict, out: dict) -> dict:
 _LAYOUT_ORDER = ["1-izb", "1,5-izb", "2-izb", "3-izb", "4-izb", "5 a viac"]
 
 
+def _row_label(rep: dict, name: str) -> str:
+    """A table row's name. Under a "Kraj" header the word "kraj" in every row
+    is the header said eight times, and it is what pushed the table past a
+    phone's width ("Banskobystrický kraj")."""
+    if _sub_header(rep) == "Kraj" and name.endswith(" kraj"):
+        return name[:-len(" kraj")]
+    return name
+
+
 def _sub_header(rep: dict) -> str:
     """What the first column of the by-sub-unit tables is called: Okres for
     Bratislava, Kraj for Slovakia, Mesto for a kraj, Kategória for a town."""
@@ -723,8 +732,8 @@ def _sub_header(rep: dict) -> str:
 def herrys_supply_table(rep: dict) -> str:
     """Okres | Voľné | z toho voľné dokončené — their table 1, our numbers."""
     ov = rep["overview"]
-    head = f"| {_sub_header(rep)} | Voľné | z toho voľné dokončené |\n|---|---:|---:|"
-    rows = [f"| {o} | {sk_int(a['n'])} | {sk_int(a['done'])} |"
+    head = f"| {_sub_header(rep)} | Voľné | z toho dokončené |\n|---|---:|---:|"
+    rows = [f"| {_row_label(rep, o)} | {sk_int(a['n'])} | {sk_int(a['done'])} |"
             for o, a in ov["okres_supply"].items()]
     T = {k: sum(a[k] for a in ov["okres_supply"].values()) for k in ("n", "done")}
     rows.append(f"| **celkom** | **{sk_int(T['n'])}** | **{sk_int(T['done'])}** |")
@@ -735,7 +744,7 @@ def herrys_sales_table(rep: dict) -> str:
     """Okres | Počet predaných bytov — their table 2."""
     ov = rep["overview"]
     head = f"| {_sub_header(rep)} | Počet predaných bytov |\n|---|---:|"
-    rows = [f"| {o} | {sk_int(a['n'])} |" for o, a in ov["okres_sales"].items()]
+    rows = [f"| {_row_label(rep, o)} | {sk_int(a['n'])} |" for o, a in ov["okres_sales"].items()]
     rows.append(f"| **celkom** | **{sk_int(sum(a['n'] for a in ov['okres_sales'].values()))}** |")
     return head + "\n" + "\n".join(rows)
 
@@ -770,7 +779,7 @@ def herrys_price_table(rep: dict) -> str:
             dropped += 1
             continue
         sign = "+" if a["chg_pct"] > 0 else ("−" if a["chg_pct"] < 0 else "")
-        rows.append(f"| {o} | {sk_int(a['m2_prev'])} | {sk_int(a['m2_cur'])} | "
+        rows.append(f"| {_row_label(rep, o)} | {sk_int(a['m2_prev'])} | {sk_int(a['m2_cur'])} | "
                     f"{sign}{sk_dec(abs(a['chg_pct']))} % |")
     note = (f"\n\n*Riadky s menej ako {MIN_ROW_FLATS} bytmi alebo menej ako 3 projektmi "
             f"porovnateľnými v oboch štvrťrokoch nie sú uvedené.*" if dropped else "")

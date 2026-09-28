@@ -26,7 +26,7 @@ Prehľad trhu s novými bytmi v Bratislave za 3. štvrťrok 2026: ponuka, dopyt 
 
 **Podiel voľných bytov v 3. štvrťroku 2026 podľa obvodu**
 
-| Okres | Voľné | z toho voľné dokončené |
+| Okres | Voľné | z toho dokončené |
 |---|---:|---:|
 | Bratislava I | 757 | 140 |
 | Bratislava II | 1 184 | 212 |

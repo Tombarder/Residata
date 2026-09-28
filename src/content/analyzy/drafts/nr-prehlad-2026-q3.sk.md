@@ -25,7 +25,7 @@ Prehľad trhu s novými bytmi v Nitre za 3. štvrťrok 2026: ponuka, dopyt a cen
 
 **Podiel voľných bytov v 3. štvrťroku 2026 podľa kategórie**
 
-| Kategória | Voľné | z toho voľné dokončené |
+| Kategória | Voľné | z toho dokončené |
 |---|---:|---:|
 | 1-izb | 57 | 0 |
 | 1,5-izb | 6 | 0 |

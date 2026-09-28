@@ -25,7 +25,7 @@ Prehľad trhu s novými bytmi v Košiciach za 3. štvrťrok 2026: ponuka, dopyt 
 
 **Podiel voľných bytov v 3. štvrťroku 2026 podľa kategórie**
 
-| Kategória | Voľné | z toho voľné dokončené |
+| Kategória | Voľné | z toho dokončené |
 |---|---:|---:|
 | 1-izb | 70 | 33 |
 | 2-izb | 283 | 3 |
