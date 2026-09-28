@@ -56,22 +56,22 @@ export function statusOptions(lang = "sk", form = "many", codes = STATUS_ORDER) 
 }
 
 /**
- * listingStatus(unit) — the status to SHOW for a flat whose history we hold, including a
- * flat that has since left the price list.
+ * listingStatus(unit) — the status to SHOW for a flat, including one that has left the
+ * price list. Boss, 2026-09-28: "if flat is marked as sold … it must be correct
+ * everywhere".
  *
- * `latest_stav` is the last status the flat was SEEN with. For a flat still on the list
- * that is exactly right: it is what the developer's page says today. For a flat that has
- * vanished it is stale — a project that deletes a flat when it sells leaves every sold
- * flat frozen at "Voľný", and on 2026-09-28 the Byt-v-čase grid showed 88 of Tesla
- * Hloubětín's sold flats as available that way. The ledger (reference.unit_ledger) is
- * the platform's single answer to "was it sold" (memory rules_sold_from_the_ledger), so a
- * vanished flat takes ITS verdict: sold → "P", anything else → OFF_LIST.
+ * The RULE lives in one place, the database's reference.listing_stav: still on the list →
+ * what the developer's page says today; left the list → the ledger's verdict (sold → "P",
+ * anything else → OFF_LIST). Every function that serves flats with a history
+ * (project_units_series, unit_list_json, unit_listing, project_units_sold_off_list)
+ * returns that answer in `stav`, and keeps what the page last said beside it as
+ * `last_seen_stav`. This only READS it. `latest_stav` is the fallback for rows straight
+ * from the current price list (unit_search), where the two are the same thing.
  *
- * A row that does not say whether it is still listed (`on_price_list` absent — an older
- * server, or a surface that never asks) keeps its last seen status, as before.
+ * It used to re-derive the rule here as well — two copies of one rule is how the four
+ * copies of the unit-kind list drifted apart (CLAUDE.md, unit_kinds). One copy now.
  */
 export function listingStatus(unit) {
   if (!unit) return null;
-  if (unit.on_price_list === false) return unit.ledger_status === "SOLD" ? "P" : OFF_LIST;
-  return unit.latest_stav ?? unit.stav ?? null;
+  return unit.stav ?? unit.latest_stav ?? null;
 }

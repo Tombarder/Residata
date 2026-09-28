@@ -1946,6 +1946,72 @@ export function useUnitHistories(keys) {
   return { historyByKey, loading };
 }
 
+let _unitListingCache = new Map();
+/** The TRUE status of picked flats — any project, any number up to 40 — from
+ *  public.unit_listing: `stav` is the database's verdict (still listed → the page's own
+ *  status; left the list → the ledger's: sold → "P", otherwise "OFF_LIST"), beside
+ *  `last_seen_stav`, `on_price_list` and `last_seen`. Byt v čase's chart legend and
+ *  status card read it, so a flat picked from ANOTHER project than the grid shows says
+ *  the same thing the grid would. Returns Map<key, listing|null>; logged-in only. */
+export function useUnitListing(keys) {
+  const { loading: authLoading, user, profile } = useAuth();
+  const idPrefix = `${user?.id || "anon"}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}`;
+  const want = (Array.isArray(keys) ? keys : []).filter((k) => typeof k === "string" && k.includes("::"));
+  const sig = want.slice().sort().join(",");
+  const [byKey, setByKey] = useState(() => new Map());
+  useEffect(() => {
+    const assemble = () => new Map(want
+      .filter((k) => _unitListingCache.has(`${idPrefix}::${k}`))
+      .map((k) => [k, _unitListingCache.get(`${idPrefix}::${k}`)]));
+    if (!user || !isSupabaseReady() || authLoading || want.length === 0) {
+      setByKey(new Map());   // eslint-disable-line react-hooks/set-state-in-effect
+      return;
+    }
+    const need = want.filter((k) => !_unitListingCache.has(`${idPrefix}::${k}`));
+    if (need.length === 0) { setByKey(assemble()); return; }
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await sbRead(supabaseData.rpc("unit_listing", { p_keys: need.slice(0, 40) }));
+      if (cancelled) return;
+      if (error) { console.error("[useUnitListing]", error); return; }
+      for (const k of need) _unitListingCache.set(`${idPrefix}::${k}`, (data && data[k]) || null);
+      setByKey(assemble());
+    })();
+    return () => { cancelled = true; };
+  }, [authLoading, idPrefix, sig]);   // eslint-disable-line react-hooks/exhaustive-deps
+  return byKey;
+}
+
+let _soldOffListCache = new Map();
+/** A project's flats that LEFT its price list and that the ledger counts as sold — each
+ *  as its last observed row, `stav` "P", `on_price_list` false, `last_seen` the last day
+ *  it was listed (public.project_units_sold_off_list). A page that lists a project's
+ *  flats from the current price list appends these, so its list and its "sold" filter
+ *  agree with the project's own header — which counts them — instead of silently missing
+ *  every flat a developer deletes when it sells. EUR-overlaid; logged-in only. */
+export function useProjectSoldOffList(projectId) {
+  const { loading: authLoading, user, profile } = useAuth();
+  const idKey = projectId && user
+    ? `${user.id}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}::${projectId}`
+    : null;
+  const [units, setUnits] = useState(() => (idKey && _soldOffListCache.get(idKey)) || []);
+  useEffect(() => {
+    if (!idKey || !isSupabaseReady() || authLoading) { setUnits([]); return; }   // eslint-disable-line react-hooks/set-state-in-effect
+    if (_soldOffListCache.has(idKey)) { setUnits(_soldOffListCache.get(idKey)); return; }
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await sbRead(supabaseData.rpc("project_units_sold_off_list", { p_project_id: projectId }));
+      if (cancelled) return;
+      if (error) { console.error("[useProjectSoldOffList]", error); setUnits([]); return; }
+      const arr = _toEurDisplay(Array.isArray(data) ? data : []);
+      _soldOffListCache.set(idKey, arr);
+      setUnits(arr);
+    })();
+    return () => { cancelled = true; };
+  }, [authLoading, idKey, projectId]);
+  return units;
+}
+
 /** Server-side global unit search (debounced). Calls unit_search(country, q,
  *  project_ids) which reads RLS-gated flats_current and returns ≤40 matches —
  *  instead of loading every unit's summary to filter client-side. `query`
