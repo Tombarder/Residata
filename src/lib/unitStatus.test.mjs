@@ -11,7 +11,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { statusLabel, statusOptions, STATUS_ORDER, listingStatus, OFF_LIST, withSoldOffList } from "./unitStatus.js";
+import { statusLabel, statusOptions, STATUS_ORDER, listingStatus, OFF_LIST, withSoldOffList, offListTitle, offListLegend } from "./unitStatus.js";
 
 test("the SINGULAR form is what UnitTracker showed for one flat", () => {
   const sk = (c) => statusLabel(c, "sk", "one");
@@ -110,4 +110,32 @@ test("the sold-off list is appended for this project only, and never twice", () 
   assert.equal(out.find((f) => f.unit_id === "2").stav, "R");   // the price list's row wins
   assert.equal(withSoldOffList(cur, [], "a"), cur);              // nothing added → same array
   assert.deepEqual(withSoldOffList(undefined, gone, "a").map((f) => f.unit_id), ["3", "2"]);
+});
+
+test("a flat that left its price list reads the same on every page", () => {
+  // the project page (FlatWorkbench) and Databáza bytov both hover this sentence
+  assert.equal(offListTitle("P", "2026-09-20T05:41:00Z", "sk"),
+    "Z cenníka zmizol po 20. 9. 2026 — naše sledovanie predajov ho počíta ako predaný.");
+  assert.equal(offListTitle("OFF_LIST", "2026-09-20", "sk"),
+    "Z cenníka zmizol po 20. 9. 2026 a nepočítame ho ako predaný.");
+  assert.equal(offListTitle("P", "2026-09-20", "en"),
+    "Left the price list after 9/20/2026 — our sales tracking counts it as sold.");
+});
+
+test("the day is Bratislava's, not the viewer's clock", () => {
+  // 23:30 UTC on the 19th is already the 20th in Bratislava
+  assert.match(offListTitle("P", "2026-09-19T23:30:00Z", "sk"), /po 20\. 9\. 2026/);
+});
+
+test("no date or a broken one never prints a hole", () => {
+  for (const v of [null, undefined, "", "not a date"]) {
+    const t = offListTitle("P", v, "sk");
+    assert.equal(t, "Z cenníka zmizol — naše sledovanie predajov ho počíta ako predaný.");
+    assert.ok(!/po\s+—|undefined|Invalid/.test(t));
+  }
+});
+
+test("the dashed-frame legend is one sentence in each language", () => {
+  assert.match(offListLegend("sk"), /^Stav v prerušovanom rámčeku = byt, ktorý developer stiahol z cenníka\./);
+  assert.match(offListLegend("en"), /^A status in a dashed frame = a flat the developer took off the price list\./);
 });

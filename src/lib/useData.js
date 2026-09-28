@@ -107,11 +107,13 @@ function _toEurDisplay(rows) {
 /* Targeted flats fetch for the Analytika drill-down — ONLY the given projects'
    units, not the whole dataset, so opening the records modal is instant instead
    of pulling every flat. Capped to a few pages (the modal shows a 1000-row
-   sample). Same EUR overlay as the main reads. */
+   sample). Same EUR overlay as the main reads.
+   "Aktuálne" is flats_live — today's market with the sold flats a developer took off
+   the price list, as analytics_pivot counts it — so a cell and its drill-down agree. */
 export async function fetchFlatsForProjects(country, projectIds, opts = {}) {
   if (!isSupabaseReady() || !Array.isArray(projectIds) || projectIds.length === 0) return [];
   const { isCurrent = true, months } = opts;
-  const table = isCurrent ? "flats_current" : "flats_archive";
+  const table = isCurrent ? "flats_live" : "flats_archive";
   const ids = projectIds.slice(0, 400);   // URL-length / sanity cap
   const all = [];
   for (let page = 0; page < 3; page++) {   // up to ~3000 rows; modal caps at 1000
@@ -1163,10 +1165,13 @@ export function useProjectSnapshots() {
   return { snapshots, loading };
 }
 
-/** All flats from the LATEST month across every project — i.e. "current
- *  state" of the unit-level dataset. Reads from the `flats_current` view
- *  which is a live filter on flats_archive (no separate table). Use this
- *  whenever a page wants "what does the market look like right now."
+/** Every flat of TODAY'S MARKET across every active project — the Pivot's "Aktuálne"
+ *  when it has to compute in the browser (a median, a distinct count, a drill-down).
+ *  Reads `flats_live`: the current price lists PLUS the flats a developer took off the
+ *  list that our sales tracking counts as sold, with stav 'P' and on_price_list false
+ *  (Boss 2026-09-28: "it has to reflect actual reality"). It is exactly the set the
+ *  server engine (analytics_pivot 'latest') counts — read flats_current here and the
+ *  Pivot gives two answers to one question depending on how it was asked.
  *
  *  For time-series / cross-month rezy, use `useFlatsArchive` instead.
  *
@@ -1227,7 +1232,7 @@ export function useFlatsCurrent(enabled = true) {
       // never had more than ~5.5k rows in flats_current; this is a guardrail.
       const MAX_TOTAL = 200_000;
       while (offset < MAX_TOTAL) {
-        const { data, error } = await sbRead(_eqCountry(supabaseData.from("flats_current").select("*"), country)
+        const { data, error } = await sbRead(_eqCountry(supabaseData.from("flats_live").select("*"), country)
           .range(offset, offset + PAGE - 1)
           .order("id", { ascending: true }));
         if (cancelled) return;

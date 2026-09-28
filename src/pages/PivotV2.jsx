@@ -156,21 +156,21 @@ const FIELDS = {
      These aren't per-record values but group-level calculations.
      `type: "measure"` → only valid in Values zone, single fixed agg.
      `measureCompute(records)` runs on the group's record set. */
-  /* ── WHAT "SOLD" MEANS HERE, AND WHY IT IS LABELLED ──────────────────────
-     The Pivot is a cube of what the developers' price lists SAY, flat by flat.
-     117 active projects delete a flat from their list when it sells, so those
-     flats have no row here at all and never will — "sold" in this tool can only
-     ever mean "currently carries a Predané label". That is a legitimate thing to
-     count, and it is not the same thing as a sale.
+  /* ── WHAT "SOLD" MEANS HERE ──────────────────────────────────────────────
+     "Aktuálne" (no time in the layout) is TODAY'S MARKET, flat by flat: every flat on
+     a price list today plus every flat a developer took off the list that our sales
+     tracking counts as sold — as sold (analytics.unit_facts_live, and flats_live on the
+     browser path). So "Predaných" here is the same number as each project's own page
+     (Boss 2026-09-28: "it has to reflect actual reality not technical details"). Until
+     that day it counted only the flats a list still labelled Predané, and said so with
+     "(v cenníku)" on both measures — the qualifier is gone because the gap is.
 
-     Actual sales — including every flat that simply vanished — live on
-     Analytics → Predaje, which reads the durable sale fact (analytics.sale_events).
-     So both measures below say ON THE LABEL that they count the price list, and
-     the two tools stop looking like they disagree with each other.
-     (integrity_check._LISTING_SOLD_IS_INTENDED records the same reasoning for the
-     views underneath.) */
+     History (a date, a month or a time dimension) is still every day AS ITS PRICE LIST
+     SHOWED IT: a flat seen as Voľný on a day stays Voľný on that day, and a sold flat a
+     developer deleted is simply absent from the days after. The summary line above the
+     table says so in that mode; sales over time are Analytics → Predaje. */
   abs_rate: {
-    label: "Miera absorpcie (v cenníku)", label_en: "Absorption rate (on the price list)",
+    label: "Miera absorpcie", label_en: "Absorption rate",
     group: "measure", type: "measure", unit: "%", derived: true,
     // Accessor unused for measure types but kept for parity
     accessor: () => null,
@@ -210,7 +210,7 @@ const FIELDS = {
     },
   },
   sold_count: {
-    label: "Predaných (v cenníku)", label_en: "Sold (on the price list)",
+    label: "Predaných", label_en: "Sold",
     group: "measure", type: "measure", unit: "", derived: true,
     accessor: () => null,
     measureCompute: (records) => {
@@ -250,7 +250,7 @@ const FIELD_LABEL_EN = {
   stav: "Status", kolaudacia: "Handover", orientacia: "Orientation",
   country: "Country", city: "City", cast: "District", sub_district: "Sub-district",
   import_status: "Project status",
-  sold_count: "Sold (on the price list)", available_count: "Available",
+  sold_count: "Sold", available_count: "Available",
 };
 
 /* THE REGISTRY NAMES THE FIELD; FIELDS DESCRIBES HOW IT BEHAVES.
@@ -2288,10 +2288,18 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
             <span style={{ marginLeft: "0.5rem" }}>
               · <strong style={{ color: "var(--accent)" }}>{stavSplit.offer.toLocaleString("en-US").replace(/,/g, " ")}</strong> {lang === "sk" ? "v ponuke" : "on offer"}
               {" · "}<strong style={{ color: "var(--text-dim)" }}>{stavSplit.sold.toLocaleString("en-US").replace(/,/g, " ")}</strong>{" "}
-              <span title={lang === "sk"
-                ? "Byty, ktoré developer v cenníku označuje ako Predané. Developeri, čo predaný byt z cenníka zmažú, tu nie sú — skutočné predaje sú v Analytika → Predaje."
-                : "Flats a developer currently labels sold on their price list. Developers who delete a sold flat are not here — actual sales are in Analytics → Sales."}>
-                {lang === "sk" ? "predaných (v cenníku)" : "sold (on the price list)"}
+              {/* Aktuálne counts sold the way every project page does; history counts
+                  each day as that day's price lists showed it — see FIELDS.abs_rate. */}
+              <span title={isCurrent
+                ? (lang === "sk"
+                    ? "Vrátane bytov, ktoré developer po predaji stiahol z cenníka — rovnako ako na stránke projektu."
+                    : "Including flats a developer took off the price list after selling them — as on each project's page.")
+                : (lang === "sk"
+                    ? "V histórii je každý deň taký, ako ho ukazovali cenníky: predaný byt, ktorý developer z cenníka stiahol, v ďalších dňoch chýba. Predaje v čase sú v Analytika → Predaje."
+                    : "In history every day is as the price lists showed it: a sold flat a developer took off the list is missing from the days after. Sales over time are in Analytics → Sales.")}>
+                {isCurrent
+                  ? (lang === "sk" ? "predaných" : "sold")
+                  : (lang === "sk" ? "predaných (v cenníku daného dňa)" : "sold (on that day's price list)")}
               </span>
             </span>
           )}

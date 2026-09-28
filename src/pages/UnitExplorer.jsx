@@ -10,7 +10,7 @@ import { useCountry, isAllCountries } from "../lib/useCountry";
 import { useCurrency } from "../lib/useCurrency";
 import { moneyFromEur, moneySymbol, formatMoney, formatPerM2 } from "../lib/money";
 import { formatDimNumber } from "../lib/locale";
-import { statusLabel } from "../lib/unitStatus";
+import { statusLabel, offListTitle, offListLegend } from "../lib/unitStatus";
 import { unitKindLabel } from "../lib/unitKinds";
 import { useUnitsInfinite, useAnalyticsRegistry, usePivotDistinct, fetchUnitsForExport } from "../lib/useData";
 import { useAccountPrefState } from "../lib/useAccountUiPref";
@@ -329,6 +329,11 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
     // under the table by the same module that draws the marks.
     return specificsLegend(visible.map((r) => marksFor.unit(r, r.project_id || r.project_name)), lang);
   }, [visible, marksFor, cols, lang]);
+  // …and the dashed status frame, in the project page's words, when one is on screen
+  const offListNote = useMemo(
+    () => (cols.includes("stav") && visible.some((r) => r.on_price_list === false) ? offListLegend(lang) : ""),
+    [visible, cols, lang],
+  );
   const padTop = startIdx * ROW_H;
   const padBottom = Math.max(0, (total - endIdx) * ROW_H);
 
@@ -452,7 +457,8 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
         <div style={{ display: "inline-flex", border: `1px solid ${border}`, borderRadius: 7, overflow: "hidden", background: panel, flexShrink: 0 }}>
           {[["latest", t("Aktuálne", "Current")], ["archive", t("História", "All history")]].map(([m, label]) => (
             <button key={m} onClick={() => setMode(m)}
-              title={m === "latest" ? t("Iba aktuálny stav trhu", "Only the current state of the market")
+              title={m === "latest" ? t("Trh dnes: každý byt v ponuke aj predaný — aj ten, ktorý developer po predaji stiahol z cenníka",
+                                        "The market today: every flat on offer or sold — including those a developer took off the price list after selling")
                                     : t("Všetky pozorovania v čase — byt sa objaví raz za deň, keď bol v ponuke", "Every observation over time — a unit appears once per day it was listed")}
               style={{ border: "none", padding: "0.45rem 0.9rem", cursor: "pointer", fontFamily: mono, fontSize: "0.72rem", letterSpacing: "0.03em", background: mode === m ? green : "transparent", color: mode === m ? "#04130d" : dim, fontWeight: mode === m ? 700 : 500 }}>{label}</button>
           ))}
@@ -581,7 +587,15 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
                         // Nová Myslivna sells one Shell&Core unit inside an
                         // otherwise standard project.
                         const marks = k === "cena_s_dph" ? marksFor.unit(r, r.project_id || r.project_name) : null;
-                        return <td key={k} style={{ height: ROW_H, boxSizing: "border-box", padding: "0 0.7rem", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: numeric ? "right" : "left", borderTop: `1px solid var(--surface)`, color: k === effSort.key ? text : "var(--text-2)", fontFamily: numeric ? mono : "inherit", fontVariantNumeric: "tabular-nums" }}>{fmtVal(k, r[k], fmtByKey, numeric, lang)}<UnitPriceMarks items={marks} lang={lang} compact /></td>;
+                        /* A flat the developer took off the price list after selling it is part
+                           of the market today as SOLD — the ledger's verdict, the same one its
+                           project page shows. Its status sits in a dashed frame, as on the
+                           project page, so it still reads as not being on any list today. */
+                        const offList = k === "stav" && r.on_price_list === false;
+                        const shown = fmtVal(k, r[k], fmtByKey, numeric, lang);
+                        return <td key={k} style={{ height: ROW_H, boxSizing: "border-box", padding: "0 0.7rem", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: numeric ? "right" : "left", borderTop: `1px solid var(--surface)`, color: k === effSort.key ? text : "var(--text-2)", fontFamily: numeric ? mono : "inherit", fontVariantNumeric: "tabular-nums" }}>{offList
+                          ? <span title={offListTitle(r[k], r.last_seen_on, lang)} style={{ padding: "0 5px", borderRadius: 4, border: `1px dashed ${dim}` }}>{shown}</span>
+                          : shown}<UnitPriceMarks items={marks} lang={lang} compact /></td>;
                       })}
                     </tr>
                   );
@@ -602,6 +616,11 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
           {legendNote && (
             <div style={{ marginTop: "0.5rem", fontSize: "0.72rem", lineHeight: 1.45, color: dim }}>
               {legendNote}
+            </div>
+          )}
+          {offListNote && (
+            <div style={{ marginTop: legendNote ? "0.25rem" : "0.5rem", fontSize: "0.72rem", lineHeight: 1.45, color: dim }}>
+              {offListNote}
             </div>
           )}
         </div>

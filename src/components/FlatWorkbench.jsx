@@ -22,7 +22,7 @@ import FieldPanel from "./FieldPanel";
 import { useAccountPrefState } from "../lib/useAccountUiPref";
 import { moneyFromEur, moneySymbol } from "../lib/money";
 import { localeTag, formatDimNumber } from "../lib/locale";
-import { statusLabel, OFF_LIST, STATUS_ORDER } from "../lib/unitStatus";
+import { statusLabel, OFF_LIST, STATUS_ORDER, offListTitle, offListLegend } from "../lib/unitStatus";
 import { useSpecifics, UnitPriceMarks, specificsLegend } from "../lib/projectSpecifics";
 import { field as sharedField } from "../lib/controls";
 import { accent as green, accentInk, orangeInk, dim, border, bg, text } from "../lib/theme";
@@ -296,10 +296,8 @@ export default function FlatWorkbench({
 
   /* A flat the developer took off the price list shows the status our sales tracking
      decided for it (the database's rule), in a DASHED pill — so a sold flat reads as sold
-     and the reader can still tell it is not one the page lists today. Dates are
-     Bratislava's, like every other date on the platform, not the viewer's clock. */
-  const lastListed = (r) => (r.last_seen
-    ? new Date(r.last_seen).toLocaleDateString(locale, { timeZone: "Europe/Bratislava" }) : "");
+     and the reader can still tell it is not one the page lists today. The sentence on
+     hover and the legend line are unitStatus's, shared with Databáza bytov. */
   const cell = (k, r) => {
     const v = flatValue(r, k);
     const fmt = FLAT_FIELD_BY_KEY[k]?.fmt;
@@ -320,13 +318,7 @@ export default function FlatWorkbench({
     if (k === "stav") {
       const s = STAV_STYLE[v];
       const gone = r.on_price_list === false;
-      const title = gone
-        ? (v === "P"
-          ? t(`Z cenníka zmizol po ${lastListed(r)} — naše sledovanie predajov ho počíta ako predaný.`,
-              `Left the price list after ${lastListed(r)} — our sales tracking counts it as sold.`)
-          : t(`Z cenníka zmizol po ${lastListed(r)} a nepočítame ho ako predaný.`,
-              `Left the price list after ${lastListed(r)} and is not counted as sold.`))
-        : undefined;
+      const title = gone ? offListTitle(v, r.last_seen, lang) : undefined;
       return s
         ? <span title={title} style={{ padding: "1px 6px", borderRadius: 4, fontFamily: mono, fontSize: "0.64rem", fontWeight: 600, color: s.color, background: s.bg, border: `1px ${gone ? "dashed" : "solid"} ${gone ? s.color : "transparent"}` }}>{statusLabel(v, lang, "one")}</span>
         : <span title={title}>{statusLabel(v, lang, "one")}</span>;
@@ -342,8 +334,7 @@ export default function FlatWorkbench({
       if (l) lines.push(l);
     }
     if (cols.includes("stav") && sorted.some((r) => r.on_price_list === false)) {
-      lines.push(t("Stav v prerušovanom rámčeku = byt, ktorý developer stiahol z cenníka. Predaný je, ak ho tak počíta naše sledovanie predajov; cena pri ňom je posledná, za ktorú ho ponúkal.",
-                   "A status in a dashed frame = a flat the developer took off the price list. It is sold when our sales tracking counts it so; its price is the last one it was offered at."));
+      lines.push(offListLegend(lang));
     }
     return lines;
   }, [sorted, spec, cols, lang]);   // eslint-disable-line react-hooks/exhaustive-deps

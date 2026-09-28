@@ -18,6 +18,8 @@
  * different palettes, and that is a design choice, not a fact about the status.
  */
 
+import { localeTag } from "./locale.js";
+
 /** The code a page uses for a flat that is no longer on its project's price list and is
  *  not counted as sold — see listingStatus. */
 export const OFF_LIST = "OFF_LIST";
@@ -74,6 +76,36 @@ export function statusOptions(lang = "sk", form = "many", codes = STATUS_ORDER) 
 export function listingStatus(unit) {
   if (!unit) return null;
   return unit.stav ?? unit.latest_stav ?? null;
+}
+
+/**
+ * A flat that LEFT the developer's price list, the way every flat list shows it — the
+ * project page, Byt v čase's grid and Databáza bytov: its status is the one our sales
+ * tracking decided (sold, or off the list), drawn in a DASHED frame, with offListTitle on
+ * hover and offListLegend once under the table. One wording, so the same flat never reads
+ * two ways on two pages.
+ *
+ * `lastSeen` is the last day the developer's page carried it — a timestamp or a plain
+ * YYYY-MM-DD — shown as Bratislava's date, like every date on the platform.
+ */
+export function offListTitle(stav, lastSeen, lang = "sk") {
+  const sk = lang === "sk";
+  const d = lastSeen ? new Date(lastSeen) : null;
+  const day = d && !Number.isNaN(d.getTime())
+    ? d.toLocaleDateString(localeTag(lang), { timeZone: "Europe/Bratislava" }) : null;
+  const left = day
+    ? (sk ? `Z cenníka zmizol po ${day}` : `Left the price list after ${day}`)
+    : (sk ? "Z cenníka zmizol" : "Left the price list");
+  return stav === "P"
+    ? left + (sk ? " — naše sledovanie predajov ho počíta ako predaný." : " — our sales tracking counts it as sold.")
+    : left + (sk ? " a nepočítame ho ako predaný." : " and is not counted as sold.");
+}
+
+/** The line under a table that shows at least one flat in a dashed frame. */
+export function offListLegend(lang = "sk") {
+  return lang === "sk"
+    ? "Stav v prerušovanom rámčeku = byt, ktorý developer stiahol z cenníka. Predaný je, ak ho tak počíta naše sledovanie predajov; cena pri ňom je posledná, za ktorú ho ponúkal."
+    : "A status in a dashed frame = a flat the developer took off the price list. It is sold when our sales tracking counts it so; its price is the last one it was offered at.";
 }
 
 /**
