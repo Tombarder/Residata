@@ -12,12 +12,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   articleSeoChecks, seoTitle, headline, perex, clip, canonicalUrl, shareImage,
-  MANUAL_STEPS, TITLE_IDEAL_MAX, DESCRIPTION_MAX, livePageState, manualStepsReady,
+  MANUAL_STEPS, TITLE_IDEAL_MAX, DESCRIPTION_MAX, livePageState, manualStepsReady, PUBLIC_SITE,
 } from "../lib/articleSeo";
 import { setPromoStep } from "../lib/useArticles";
 
 /** The address Google and LinkedIn see — also when editing on a preview. */
-const PUBLIC_BASE = (import.meta.env && import.meta.env.VITE_SITE_BASE) || "https://residata.eu";
+const PUBLIC_BASE = PUBLIC_SITE;
 const MONO = "ui-monospace, SFMono-Regular, Menlo, monospace";
 // Theme tokens (index.css), so a warning stays readable on the light theme too.
 const LEVEL_COLOR = { error: "var(--danger)", warn: "var(--warning)", info: "var(--text-faint)" };

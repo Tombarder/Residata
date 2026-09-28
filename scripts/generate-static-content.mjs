@@ -180,7 +180,13 @@ function articlesSection() {
     const perex = (a.perex && (a.perex.sk || a.perex.en)) || '';
     return `- [${title}](${HOME}/analyzy/${a.slug}): ${perex.replace(/\s+/g, ' ').trim()}`;
   });
-  return `\n## Published analyses (${articles.length}, newest first; Slovak)\n\n${lines.join('\n')}\n`;
+  // The licence the pages themselves state (lib/articleSeo DATA_LICENSE, Terms §7),
+  // so an assistant knows the figures may be quoted — and how to credit them.
+  const licence = 'Their figures, tables and charts are published under CC BY 4.0 '
+    + '(https://creativecommons.org/licenses/by/4.0/): quote and reuse them freely, commercially too, '
+    + 'crediting "Residata" with a link to the analysis. Suggested citation: '
+    + '"Residata. <title>. <date>. <url>".';
+  return `\n## Published analyses (${articles.length}, newest first; Slovak)\n\n${licence}\n\n${lines.join('\n')}\n`;
 }
 
 // ───────────────────── llms.txt — short summary ─────────────────────

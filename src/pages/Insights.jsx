@@ -23,7 +23,7 @@
 import { useEffect } from "react";
 import { useArticles, useArticle, useArticleList } from "../lib/useArticles";
 import { SITE_BASE, applySeo, applyArticleSeo } from "../lib/seo";
-import { articleJsonLd, relatedArticles } from "../lib/articleSeo";
+import { articleJsonLd, relatedArticles, seoLang, SECTION_LANG } from "../lib/articleSeo";
 import { seriesRank } from "../lib/articleOrder.js";
 import { Shell, IndexView, ArticleView } from "./insightsView";
 import { EYEBROW } from "./insightsStyle.js";
@@ -68,19 +68,24 @@ function useArticleSchema(article) {
 
 /* ────────────────────────────── the pages ────────────────────────────── */
 
-export function InsightsIndex({ navigate, lang }) {
+// The section speaks its content's language (SECTION_LANG), not the language
+// the visitor picked for the rest of the site: the analyses exist only in
+// Slovak, and English buttons around Slovak text — or an English head over a
+// page the build wrote in Slovak — is two pages where there should be one.
+export function InsightsIndex({ navigate }) {
   const { articles, loading, error } = useArticles();
   useScrollToTop("index");
   // Reached either directly or as the fallback for a withdrawn article, and in
   // that second case the head still carries the dead article's canonical and its
   // noindex. Re-assert the section's own metadata so the page never advertises
-  // a url that no longer exists.
-  useEffect(() => { applySeo("Insights", lang); }, [lang]);
-  return <IndexView articles={articles} loading={loading} error={error} navigate={navigate} lang={lang} />;
+  // a url that no longer exists. (App.jsx leaves this section's head to it.)
+  useEffect(() => { applySeo("Insights", SECTION_LANG); }, []);
+  return <IndexView articles={articles} loading={loading} error={error} navigate={navigate} lang={SECTION_LANG} />;
 }
 
-export function InsightsArticle({ slug, navigate, lang }) {
+export function InsightsArticle({ slug, navigate }) {
   const { article, loading } = useArticle(slug);
+  const lang = article ? seoLang(article) : SECTION_LANG;
   const { articles: all } = useArticleList();
   useArticleSchema(article);
   useScrollToTop(slug);
@@ -94,8 +99,8 @@ export function InsightsArticle({ slug, navigate, lang }) {
   // moment it is here. No article at all → InsightsIndex below sets the index's.
   useEffect(() => {
     if (article) applyArticleSeo(article);
-    else if (loading) applySeo(`Analyza:${slug}`, lang);
-  }, [article, loading, slug, lang]);
+    else if (loading) applySeo(`Analyza:${slug}`, SECTION_LANG);
+  }, [article, loading, slug]);
 
   if (loading) {
     return (
@@ -109,7 +114,7 @@ export function InsightsArticle({ slug, navigate, lang }) {
   // Unknown or unpublished slug: land on the index rather than a dead end. A
   // stale link stays inside the section it pointed at, which is what a visitor
   // from a shared URL or an old newsletter actually wants.
-  if (!article) return <InsightsIndex navigate={navigate} lang={lang} />;
+  if (!article) return <InsightsIndex navigate={navigate} />;
 
   const related = relatedArticles(article, all, { rank: seriesRank });
   return <ArticleView article={article} related={related} navigate={navigate} lang={lang} />;

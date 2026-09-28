@@ -11,6 +11,7 @@
 import { useState } from "react";
 import { t, dateLong, monthLong } from "../lib/articleFormat";
 import { COMPANY } from "../lib/company";
+import { DATA_LICENSE, publicUrl, citationText, embedCode } from "../lib/articleSeo.js";
 import { MEASURE, EYEBROW } from "./insightsStyle.js";
 
 export function Shell({ children }) {
@@ -25,7 +26,24 @@ export function Shell({ children }) {
 
 /* ─────────────────────────── block renderers ─────────────────────────── */
 
-function Figure({ src, srcEn, srcM, w, h, wM, hM, alt, caption, lang }) {
+/** A button that copies text; without a clipboard the text stays selectable. */
+function CopyButton({ text, label, done }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button type="button" className="rd-btn rd-btn--sm"
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(text);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              } catch { /* no clipboard access: the text itself is selectable */ }
+            }}>
+      {copied ? done : label}
+    </button>
+  );
+}
+
+function Figure({ src, srcEn, srcM, w, h, wM, hM, alt, caption, lang, article }) {
   const source = lang === "en" && srcEn ? srcEn : src;
   // 🔴 ONE CHART IS TWO DRAWINGS, AND THE PHONE DOWNLOADS ONLY ITS OWN.
   // Measured here at a 375px viewport, this column renders a figure at 285px
@@ -72,6 +90,25 @@ function Figure({ src, srcEn, srcM, w, h, wM, hM, alt, caption, lang }) {
         <figcaption style={{
           fontSize: "0.8rem", color: "#8b8b95", marginTop: "0.7rem", lineHeight: 1.5,
         }}>{t(caption, lang)}</figcaption>
+      )}
+      {/* <details> opens without JavaScript, so the code is there on the
+          pre-built page too; only the copy button waits for the app. */}
+      {article && src && src.startsWith("/") && (
+        <details style={{ marginTop: "0.55rem" }}>
+          <summary style={{ fontSize: "0.74rem", color: "#8b8b95", cursor: "pointer" }}>
+            {lang === "en" ? "Embed this chart on your site" : "Vložiť graf na vlastný web"}
+          </summary>
+          <pre style={{
+            margin: "0.55rem 0", padding: "0.7rem 0.8rem", borderRadius: 8,
+            background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)",
+            fontSize: "0.72rem", lineHeight: 1.55, color: "#a5a5b0",
+            fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
+            whiteSpace: "pre-wrap", wordBreak: "break-all",
+          }}>{embedCode({ src, w, h, alt }, article, lang)}</pre>
+          <CopyButton text={embedCode({ src, w, h, alt }, article, lang)}
+                      label={lang === "en" ? "Copy code" : "Kopírovať kód"}
+                      done={lang === "en" ? "Copied ✓" : "Skopírované ✓"} />
+        </details>
       )}
     </figure>
   );
@@ -125,7 +162,7 @@ function Table({ head, rows, caption, lang }) {
   );
 }
 
-export function Block({ block, lang }) {
+export function Block({ block, lang, article }) {
   // Clearing a paragraph in the editor left an empty <p> holding its margin, so
   // the page grew a gap where the text had been. Nothing to say, nothing to lay out.
   if (["lead", "h2", "p"].includes(block.type) && !t(block.text, lang).trim()) return null;
@@ -156,7 +193,7 @@ export function Block({ block, lang }) {
         </ul>
       );
     case "figure":
-      return <Figure {...block} lang={lang} />;
+      return <Figure {...block} lang={lang} article={article} />;
     case "table":
       return <Table {...block} lang={lang} />;
     default:
@@ -283,6 +320,12 @@ export function IndexView({ articles, loading = false, error = null, navigate, l
 /** One article, with the analyses a reader of it is most likely to want next. */
 export function ArticleView({ article, related = [], navigate, lang }) {
   const [backHover, setBackHover] = useState(false);
+  const en = lang === "en";
+  // Citations, share links and embed codes name the public page — never the
+  // preview or local address this happens to be rendered on.
+  const url = publicUrl(article);
+  const title = t(article.title, lang);
+  const citation = citationText(article, lang);
   return (
     <Shell>
       <a
@@ -319,7 +362,7 @@ export function ArticleView({ article, related = [], navigate, lang }) {
       </div>
 
       <div style={{ fontSize: "0.97rem", lineHeight: 1.78, color: "#c5c5cc" }}>
-        {article.blocks.map((b, i) => <Block key={i} block={b} lang={lang} />)}
+        {article.blocks.map((b, i) => <Block key={i} block={b} lang={lang} article={article} />)}
 
         {/* Methodology is a required field on every article — the table refuses one without it.
             It is what makes the piece quotable instead of promotional, so it is
@@ -337,12 +380,44 @@ export function ArticleView({ article, related = [], navigate, lang }) {
           </p>
         </div>
 
-        <p style={{ marginTop: "2rem", fontSize: "0.87rem", color: "#8b8b95", lineHeight: 1.7 }}>
-          {lang === "en"
-            ? "You are welcome to quote this analysis, citing Residata and linking to this page. For the figures on a specific town or district, write to "
-            : "Analýzu môžete voľne citovať s uvedením zdroja (Residata) a odkazom na túto stránku. Ak chcete čísla za konkrétne mesto alebo mestskú časť, napíšte na "}
-          <a href={`mailto:${COMPANY.email}`} style={{ color: "var(--accent)" }}>{COMPANY.email}</a>.
-        </p>
+        {/* How to reuse, cite and share it — the licence in words (Terms §7,
+            lib/articleSeo DATA_LICENSE), a citation to copy, and share links. A
+            page that says plainly it may be reused is the page that gets cited,
+            and a citation with a link is how an analysis earns its links. */}
+        <div id={DATA_LICENSE.anchor} style={{
+          marginTop: "1.2rem", padding: "1.4rem 1.5rem",
+          border: "1px solid rgba(255,255,255,0.14)", borderRadius: 10,
+          background: "rgba(255,255,255,0.025)",
+        }}>
+          <div style={{ ...EYEBROW, marginBottom: "0.6rem" }}>
+            {en ? "Using the data" : "Použitie údajov"}
+          </div>
+          <p style={{ margin: "0 0 1.1rem", fontSize: "0.87rem", lineHeight: 1.7, color: "#a5a5b0" }}>
+            {en
+              ? <>You may reuse the figures, tables and charts in this analysis, commercially too, as long as you credit Residata and link to this page — licence <a href={DATA_LICENSE.deed.en} target="_blank" rel="license noreferrer" style={{ color: "var(--accent)" }}>{DATA_LICENSE.name}</a>. For figures on a specific town or district, write to </>
+              : <>Údaje, tabuľky a grafy z tejto analýzy môžete voľne použiť aj komerčne, ak uvediete zdroj Residata a odkaz na túto stránku — licencia <a href={DATA_LICENSE.deed.sk} target="_blank" rel="license noreferrer" style={{ color: "var(--accent)" }}>{DATA_LICENSE.name}</a>. Ak chcete čísla za konkrétne mesto alebo mestskú časť, napíšte na </>}
+            <a href={`mailto:${COMPANY.email}`} style={{ color: "var(--accent)" }}>{COMPANY.email}</a>.
+          </p>
+          <div style={{ fontSize: "0.72rem", color: "#8b8b95", marginBottom: "0.4rem" }}>
+            {en ? "Citation" : "Citácia"}
+          </div>
+          <div style={{ display: "flex", gap: "0.6rem", alignItems: "center", flexWrap: "wrap" }}>
+            <div style={{
+              flex: "1 1 260px", fontSize: "0.84rem", lineHeight: 1.55, color: "#c5c5cc",
+              padding: "0.55rem 0.75rem", borderRadius: 8, background: "rgba(255,255,255,0.04)",
+              border: "1px solid rgba(255,255,255,0.10)", wordBreak: "break-word",
+            }}>{citation}</div>
+            <CopyButton text={citation} label={en ? "Copy" : "Kopírovať"} done={en ? "Copied ✓" : "Skopírované ✓"} />
+          </div>
+          <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", flexWrap: "wrap", marginTop: "1rem" }}>
+            <span style={{ fontSize: "0.72rem", color: "#8b8b95", marginRight: "0.2rem" }}>{en ? "Share" : "Zdieľať"}</span>
+            <a className="rd-btn rd-btn--sm" target="_blank" rel="noreferrer"
+               href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`}>LinkedIn</a>
+            <a className="rd-btn rd-btn--sm"
+               href={`mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(url)}`}>E-mail</a>
+            <CopyButton text={url} label={en ? "Copy link" : "Kopírovať odkaz"} done={en ? "Copied ✓" : "Skopírované ✓"} />
+          </div>
+        </div>
       </div>
 
       {/* The analyses a reader of this one most likely wants next — its town's

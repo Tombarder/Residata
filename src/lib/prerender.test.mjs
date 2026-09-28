@@ -20,6 +20,7 @@ import { EMBEDDED_LIST_FIELDS, toArticle } from "./articleModel.js";
 import {
   articleHead, articleSeoChecks, seoLang, clip, placeOf, periodOf, relatedArticles,
   livePageState, manualStepsReady, LIVE_STUCK_MINUTES,
+  DATA_LICENSE, citationText, embedCode, publicUrl,
 } from "./articleSeo.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -235,9 +236,37 @@ test("an analysis page is the only writer of its head — the app's generic upda
   const app = readFileSync(join(HERE, "..", "App.jsx"), "utf8");
   const at = app.indexOf("applySeo(current, lang, country)");
   assert.ok(at > 0, "App.jsx no longer calls applySeo(current, lang, country) — re-check who owns the head");
-  assert.match(app.slice(Math.max(0, at - 900), at), /current\.startsWith\("Analyza:"\)\) return;/,
-    "App's applySeo effect must skip analysis routes");
+  assert.match(app.slice(Math.max(0, at - 900), at), /current === "Insights" \|\| \(typeof current === "string" && current\.startsWith\("Analyza:"\)\)\) return;/,
+    "App's applySeo effect must skip the whole analyses section — the index and every article");
   const page = readFileSync(join(HERE, "..", "pages", "Insights.jsx"), "utf8");
-  assert.match(page, /if \(article\) applyArticleSeo\(article\);\s*else if \(loading\) applySeo\(`Analyza:\$\{slug\}`, lang\);/,
-    "the article page must write its own placeholder and its own head");
+  assert.match(page, /if \(article\) applyArticleSeo\(article\);\s*else if \(loading\) applySeo\(`Analyza:\$\{slug\}`, SECTION_LANG\);/,
+    "the article page must write its own placeholder and its own head, in the section's language");
+  assert.match(page, /applySeo\("Insights", SECTION_LANG\)/, "the index must write its own head, in the section's language");
+  assert.doesNotMatch(page, /applySeo\([^)]*,\s*lang\)/, "an analyses page must not write its head in the visitor's language");
+});
+
+test("the published data carries its licence — the dataset, and every chart", () => {
+  const withChart = { ...ARTICLE, blocks: [...ARTICLE.blocks,
+    { type: "figure", src: "/analyzy/ke-prehlad-2026-q3-podiel-ponuka.svg", caption: { sk: "Podiel", en: "Share" } }] };
+  const graph = articleHead(withChart, { siteBase: SITE }).jsonLd["@graph"];
+  assert.equal(graph.find((n) => n["@type"] === "Dataset").license, DATA_LICENSE.url);
+  const images = graph.filter((n) => n["@type"] === "ImageObject");
+  assert.equal(images.length, 1);
+  assert.equal(images[0].contentUrl, `${SITE}/analyzy/ke-prehlad-2026-q3-podiel-ponuka.svg`);
+  assert.equal(images[0].license, DATA_LICENSE.url);
+  assert.equal(images[0].acquireLicensePage, `${SITE}/analyzy/ke-prehlad-2026-q3#${DATA_LICENSE.anchor}`);
+  assert.equal(images[0].creditText, "Residata");
+});
+
+test("a citation and an embed code name the public page and credit Residata", () => {
+  assert.equal(citationText(ARTICLE),
+    "Residata. Košice: trh nových bytov v 3. štvrťroku 2026. 27. septembra 2026. https://residata.eu/analyzy/ke-prehlad-2026-q3");
+  const fig = { src: "/analyzy/x.svg", w: 720, h: 418, alt: { sk: 'Graf "A" <b>', en: "Chart" } };
+  const code = embedCode(fig, ARTICLE);
+  assert.ok(code.includes(`<a href="${publicUrl(ARTICLE)}">`), "the chart must link back to the article");
+  assert.ok(code.includes('src="https://residata.eu/analyzy/x.svg"'));
+  assert.ok(code.includes('width="720" height="418"'));
+  assert.ok(code.includes("Zdroj: ") && code.includes("Residata — Košice") && code.includes(DATA_LICENSE.name));
+  assert.ok(code.includes("Graf &quot;A&quot; &lt;b&gt;") && !code.includes('"A"'), "alt text must be escaped");
+  assert.ok(embedCode(fig, ARTICLE, "en").startsWith('<figure style="margin:0">') && embedCode(fig, ARTICLE, "en").includes("Source: "));
 });

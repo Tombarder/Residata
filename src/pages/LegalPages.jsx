@@ -402,7 +402,7 @@ export function PrivacyPage({ lang }) {
 
 export function TermsPage({ lang }) {
   const isSK = lang === "sk";
-  const lastUpdated = isSK ? "Účinné od: 3. september 2026" : "Effective: 3 September 2026";
+  const lastUpdated = isSK ? "Účinné od: 28. september 2026" : "Effective: 28 September 2026";
   // DB-driven price (public.pricing_config) so a price change in the admin
   // editor propagates here too; falls back to the launch price if not loaded.
   const pricing = usePricing(lang);
@@ -471,6 +471,9 @@ export function TermsPage({ lang }) {
         <p>{isSK
           ? "Platforma, jej softvér, dizajn a spôsob usporiadania a prezentácie dát (databázová štruktúra a kompilácia) sú chránené a patria prevádzkovateľovi. Jednotlivé faktické údaje pochádzajú z ich pôvodných zdrojov. Poskytujeme vám nevýhradné, neprevoditeľné právo používať Službu na vlastné obchodné účely počas trvania predplatného."
           : "The platform, its software, design, and the way data is organized and presented (the database structure and compilation) are protected and belong to the operator. Individual factual data originates from its original sources. We grant you a non-exclusive, non-transferable right to use the Service for your own business purposes for the duration of your subscription."}</p>
+        <p>{isSK
+          ? <>Výnimkou sú verejne publikované analýzy na <a href="/analyzy" style={{ color: "var(--accent)" }}>residata.eu/analyzy</a>: ich údaje, tabuľky a grafy môže ktokoľvek voľne použiť a ďalej šíriť, aj komerčne, pod licenciou <a href="https://creativecommons.org/licenses/by/4.0/deed.sk" target="_blank" rel="license noreferrer" style={{ color: "var(--accent)" }}>Creative Commons Uveďte pôvod 4.0 Medzinárodná (CC BY 4.0)</a>, ak uvedie zdroj Residata a odkaz na príslušnú analýzu. Licencia sa nevzťahuje na dáta v platforme, na ktoré sa naďalej uplatňujú články 6 a 7.</>
+          : <>The exception is the market analyses published at <a href="/analyzy" style={{ color: "var(--accent)" }}>residata.eu/analyzy</a>: anyone may freely reuse and redistribute their figures, tables and charts, commercially too, under the <a href="https://creativecommons.org/licenses/by/4.0/deed.en" target="_blank" rel="license noreferrer" style={{ color: "var(--accent)" }}>Creative Commons Attribution 4.0 International licence (CC BY 4.0)</a>, provided they credit Residata and link to the analysis concerned. The licence does not extend to data in the platform, to which clauses 6 and 7 continue to apply.</>}</p>
       </Section>
 
       <Section title={isSK ? "8. Dostupnosť a beta funkcie" : "8. Availability and beta features"}>

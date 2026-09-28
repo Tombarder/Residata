@@ -2268,14 +2268,14 @@ export default function App() {
   // instead of sticking at the first-paint fallback.
   const seoPrice = usePricing(lang).priceDisplay;
   useEffect(() => {
-    // An analysis page owns its head (Insights.jsx: the placeholder while its
-    // row loads, the article's own once it has, the index's when there is no
-    // such article). Writing it here as well made two writers race: this effect
+    // The analyses section owns its head (Insights.jsx: the index's, the
+    // placeholder while an article's row loads, the article's own once it has,
+    // the index's when there is no such article — all in the section's language). Writing it here as well made two writers race: this effect
     // runs AFTER the page's own on mount and again whenever the price loads, so
     // a live article often ended marked "noindex, nofollow" — reproduced on
     // 2026-09-28 by Lighthouse with the article refresh blocked, and seen once
     // without. Google reads the rendered head.
-    if (typeof current === "string" && current.startsWith("Analyza:")) return;
+    if (current === "Insights" || (typeof current === "string" && current.startsWith("Analyza:"))) return;
     applySeo(current, lang, country);
   }, [current, lang, country, seoPrice]);
 
@@ -2610,9 +2610,10 @@ export default function App() {
             {current === "Status" && <StatusPage lang={lang} />}
             {current === "Terms" && <TermsPage lang={lang} />}
             {/* Analýzy — /analyzy index and /analyzy/<slug> articles */}
+            {/* No `lang`: the section speaks its content's language (articleSeo SECTION_LANG). */}
             {current === "Insights" && (
               <Suspense fallback={<AuthLoadingSpinner />}>
-                <InsightsIndexPage navigate={handleNav} lang={lang} />
+                <InsightsIndexPage navigate={handleNav} />
               </Suspense>
             )}
             {typeof current === "string" && current.startsWith("Analyza:") && (
@@ -2620,7 +2621,6 @@ export default function App() {
                 <InsightsArticlePage
                   slug={current.slice("Analyza:".length)}
                   navigate={handleNav}
-                  lang={lang}
                 />
               </Suspense>
             )}

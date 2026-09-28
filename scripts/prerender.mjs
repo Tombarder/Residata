@@ -97,7 +97,7 @@ async function main() {
   try {
     const load = (m) => vite.ssrLoadModule(m);
     const { ArticleView, IndexView } = await load("/src/pages/insightsView.jsx");
-    const { articleHead, articleSeoChecks, relatedArticles, headline, seoLang, perex, canonicalUrl, SECTION_SK } =
+    const { articleHead, articleSeoChecks, relatedArticles, headline, seoLang, perex, canonicalUrl, SECTION_SK, SECTION_LANG, DATA_LICENSE } =
       await load("/src/lib/articleSeo.js");
     const { toArticle, EMBEDDED_ARTICLE_ID, EMBEDDED_LIST_ID, EMBEDDED_LIST_FIELDS } = await load("/src/lib/articleModel.js");
     const { orderArticles, seriesRank } = await load("/src/lib/articleOrder.js");
@@ -151,6 +151,10 @@ async function main() {
         ogImage: head.og["og:image"], h1: headline(page),
         jsonLdType: ["Article", "BreadcrumbList"], noFaq: true, hreflang: head.alternates.map((x) => x.hreflang),
       });
+      // Reuse is only invited where the licence is stated (Terms §7).
+      if (!html.includes(`id="${DATA_LICENSE.anchor}"`) || !html.includes(DATA_LICENSE.deed[head.lang === "en" ? "en" : "sk"])) {
+        problems.push("the page does not state the licence its data is published under");
+      }
       if (problems.length) die(`${a.slug}: ${problems.join("; ")}`);
       write(`analyzy/${a.slug}/index.html`, html);
       written.push(`/analyzy/${a.slug}`);
@@ -158,8 +162,8 @@ async function main() {
 
     // ── the index ─────────────────────────────────────────────────────────
     {
-      const meta = seoMetaFor("Insights", "sk", { siteBase: HOME, price: build.monthly_price, anchor: build.anchor_price, snapshot: build });
-      const markup = renderToStaticMarkup(createElement(IndexView, { articles, lang: "sk", navigate: () => {} }));
+      const meta = seoMetaFor("Insights", SECTION_LANG, { siteBase: HOME, price: build.monthly_price, anchor: build.anchor_price, snapshot: build });
+      const markup = renderToStaticMarkup(createElement(IndexView, { articles, lang: SECTION_LANG, navigate: () => {} }));
       const url = meta.url;
       const graph = {
         "@context": "https://schema.org",
@@ -167,7 +171,7 @@ async function main() {
           ...site,
           {
             "@type": "CollectionPage", "@id": `${url}#page`, url, name: meta.title, description: meta.description,
-            inLanguage: "sk", isPartOf: { "@id": `${HOME}/#website` },
+            inLanguage: SECTION_LANG, isPartOf: { "@id": `${HOME}/#website` },
             breadcrumb: {
               "@type": "BreadcrumbList",
               itemListElement: [
@@ -194,10 +198,10 @@ async function main() {
         "twitter:description": meta.description, "twitter:image": HOME + DEFAULT_OG_IMAGE, "twitter:image:alt": DEFAULT_OG_ALT,
       };
       let html = replaceHead(template, {
-        lang: "sk", dropJsonLd: true,
+        lang: SECTION_LANG, dropJsonLd: true,
         head: headHtml({
           title: meta.title, description: meta.description, keywords: meta.keywords, robots: meta.robots,
-          canonical: url, alternates: [{ hreflang: "sk", href: url }, { hreflang: "x-default", href: url }],
+          canonical: url, alternates: [{ hreflang: SECTION_LANG, href: url }, { hreflang: "x-default", href: url }],
           og, twitter, jsonLd: graph, extra: [feedLink, preload].filter(Boolean),
         }),
       });
@@ -206,8 +210,8 @@ async function main() {
       const listRows = rows.map((r) => Object.fromEntries(EMBEDDED_LIST_FIELDS.map((k) => [k, r[k]])));
       html = fillRoot(html, markup, { embed: listRows, embedId: EMBEDDED_LIST_ID });
       const problems = pageProblems(html, {
-        title: meta.title, canonical: url, lang: "sk", index: true,
-        jsonLdType: ["CollectionPage"], noFaq: true, hreflang: ["sk", "x-default"],
+        title: meta.title, canonical: url, lang: SECTION_LANG, index: true,
+        jsonLdType: ["CollectionPage"], noFaq: true, hreflang: [SECTION_LANG, "x-default"],
       });
       for (const x of articles) if (!html.includes(`href="/analyzy/${x.slug}"`)) problems.push(`no link to ${x.slug}`);
       if (problems.length) die(`/analyzy: ${problems.join("; ")}`);

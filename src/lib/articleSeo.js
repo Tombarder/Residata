@@ -20,9 +20,18 @@
  * PURE: no DOM, no network, no React. Runs in Node at build and in the browser.
  */
 import { COMPANY } from "./company.js";
+import { t as pick, dateLong } from "./articleFormat.js";
 
 export const SITE_NAME = "Residata";
 export const SECTION_SK = "Analýzy";
+
+/**
+ * The language the analyses section speaks: every published issue is Slovak
+ * (Boss 2026-09-23). The section's own words — headings, buttons, the index —
+ * follow it whatever language the visitor picked for the rest of the site, so
+ * the page an app renders is the page the build wrote and Google indexed.
+ */
+export const SECTION_LANG = "sk";
 
 /** Share cards are drawn at 1200 × 630 by the article pipeline (and the default). */
 export const OG_W = 1200;
@@ -31,6 +40,54 @@ export const OG_H = 630;
 /** Where Google cuts a title in results (≈600px) and a description in a snippet. */
 export const TITLE_IDEAL_MAX = 65;
 export const DESCRIPTION_MAX = 160;
+
+/**
+ * The public address of the site — what a citation, an embed code or a share
+ * link must name, on a preview or a local build as much as on residata.eu.
+ */
+export const PUBLIC_SITE =
+  (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_SITE_BASE) || "https://residata.eu";
+
+/**
+ * What the published analyses' FIGURES, TABLES AND CHARTS may be reused under —
+ * with attribution, commercially too (Terms §7). It does not cover the article
+ * text as such, nor any data in the platform. The anchor is the page's own
+ * "Použitie údajov" block, which says the same thing in words.
+ */
+export const DATA_LICENSE = {
+  url: "https://creativecommons.org/licenses/by/4.0/",
+  deed: { sk: "https://creativecommons.org/licenses/by/4.0/deed.sk", en: "https://creativecommons.org/licenses/by/4.0/deed.en" },
+  name: "CC BY 4.0",
+  anchor: "pouzitie-udajov",
+};
+
+/** The public address of one analysis. */
+export function publicUrl(article) {
+  return `${PUBLIC_SITE}/analyzy/${article.slug}`;
+}
+
+/** "Residata. <title>. <date>. <url>" — the citation the page offers to copy. */
+export function citationText(article, lang = "sk") {
+  return `Residata. ${pick(article.title, lang)}. ${dateLong(article.date, lang)}. ${publicUrl(article)}`;
+}
+
+const escapeAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/**
+ * The HTML another site pastes to show one of our charts: the chart links to the
+ * article, and the credit line names Residata and the licence. This is how a
+ * data publisher gets linked to — every embed is a link back.
+ */
+export function embedCode(figure, article, lang = "sk") {
+  const en = lang === "en";
+  const url = publicUrl(article);
+  const { src, w, h } = figure;
+  const img = `<img src="${escapeAttr(PUBLIC_SITE + src)}" alt="${escapeAttr(pick(figure.alt, lang))}"`
+    + (w && h ? ` width="${w}" height="${h}"` : "") + ` style="max-width:100%;height:auto">`;
+  return `<figure style="margin:0"><a href="${escapeAttr(url)}">${img}</a>`
+    + `<figcaption>${en ? "Source" : "Zdroj"}: <a href="${escapeAttr(url)}">Residata — ${escapeAttr(pick(article.title, lang))}</a>`
+    + ` (${DATA_LICENSE.name})</figcaption></figure>`;
+}
 
 const text = (v, lang) => {
   if (v == null) return "";
@@ -181,6 +238,22 @@ export function articleJsonLd(article, siteBase) {
       about: place ? { "@type": "Place", name: place } : undefined,
     },
   ];
+  // Every chart carries its licence, so image search can credit Residata and
+  // send a person who wants to reuse it to the terms on the article itself.
+  for (const b of article?.blocks || []) {
+    if (b?.type !== "figure" || !b.src || !b.src.startsWith("/")) continue;
+    graph.push({
+      "@type": "ImageObject",
+      contentUrl: siteBase + b.src.split("?")[0],
+      caption: text(b.caption, lang) || text(b.alt, lang) || undefined,
+      license: DATA_LICENSE.url,
+      acquireLicensePage: `${url}#${DATA_LICENSE.anchor}`,
+      creditText: SITE_NAME,
+      creator: org,
+      copyrightNotice: SITE_NAME,
+      isPartOf: { "@id": `${url}#article` },
+    });
+  }
   if (hasTables(article)) {
     // Google wants 50–5000 characters here; the method note is what makes the
     // figures reusable, so it is part of the description rather than dropped.
@@ -199,6 +272,8 @@ export function articleJsonLd(article, siteBase) {
       spatialCoverage: place ? { "@type": "Place", name: place } : undefined,
       temporalCoverage: periodOf(article) || undefined,
       keywords,
+      license: DATA_LICENSE.url,
+      creditText: SITE_NAME,
       isPartOf: { "@id": `${url}#article` },
     });
   }
