@@ -10,38 +10,38 @@ Prehľad trhu s novými bytmi v Trenčianskom kraji za 3. štvrťrok 2026: ponuk
 
 ## Úvod
 
-- **Počet bytov v ponuke v projektoch, ktoré predávali aj v predchádzajúcom štvrťroku, klesol o 11,7 %** — z 223 na 197.
-- Dopyt: od 1. júla do 27. septembra 2026 sa predalo 65 bytov.
-- Priemerná cena v projektoch sa pohybuje na úrovni 3 679 €/m² s DPH.
+- **Počet bytov v ponuke v projektoch, ktoré predávali aj v predchádzajúcom štvrťroku, klesol o 3,8 %** — z 237 na 228.
+- Dopyt: od 1. júla do 27. septembra 2026 sa predalo 77 bytov.
+- Priemerná cena v projektoch sa pohybuje na úrovni 3 677 €/m² s DPH.
 
 ## Ponuka
 
-- Ku koncu obdobia bolo v ponuke 400 bytov v 10 projektoch.
-- 50 % projektov obsahuje 80 % ponuky (5 projektov s 343 bytmi).
-- 5 projektov má v ponuke menej ako 20 bytov (14 % ponuky).
+- Ku koncu obdobia bolo v ponuke 438 bytov v 11 projektoch.
+- 55 % projektov obsahuje 80 % ponuky (6 projektov s 375 bytmi).
+- 4 projekty majú v ponuke menej ako 20 bytov (9 % ponuky).
 - Dokončené byty v ponuke nie sú.
-- Najväčšiu časť ponuky tvorí kategória 2-izb — 48,0 % bytov s uvedeným počtom izieb.
+- Najväčšiu časť ponuky tvorí kategória 2-izb — 46,8 % bytov s uvedeným počtom izieb.
 
 **Podiel voľných bytov v 3. štvrťroku 2026 podľa obce**
 
 | Obec | Voľné | z toho dokončené |
 |---|---:|---:|
-| Trenčín | 274 | 0 |
+| Trenčín | 273 | 0 |
 | Partizánske | 76 | 0 |
+| Nové Mesto nad Váhom | 56 | 0 |
 | Bánovce nad Bebravou | 24 | 0 |
-| Levice | 17 | 0 |
 | Považská Bystrica | 6 | 0 |
 | Púchov | 3 | 0 |
-| **celkom** | **400** | **0** |
+| **celkom** | **438** | **0** |
 
 ![Podiel voľných bytov podľa kategórie](/analyzy/kraj-tn-prehlad-2026-q3-podiel-ponuka.svg)
 *Podiel voľných bytov v 3. štvrťroku 2026 podľa kategórie.*
 
 ## Dopyt
 
-- Od 1. júla do 27. septembra 2026 sa predalo v Trenčianskom kraji 65 bytov.
-- Absorpcia trhu je 16,2 % — predané byty za obdobie k bytom v ponuke.
-- Najväčší záujem je o kategóriu 2-izb: 42,2 % predaných bytov.
+- Od 1. júla do 27. septembra 2026 sa predalo v Trenčianskom kraji 77 bytov.
+- Absorpcia trhu je 17,6 % — predané byty za obdobie k bytom v ponuke.
+- Najväčší záujem je o kategóriu 2-izb: 44,7 % predaných bytov.
 - Podiel na predaji prevyšuje podiel na ponuke v kategóriách 1-izb, 4-izb a 5 a viac izieb.
 
 ![Dopyt po bytoch](/analyzy/kraj-tn-prehlad-2026-q3-dopyt-mesiace.svg)
@@ -52,17 +52,18 @@ Prehľad trhu s novými bytmi v Trenčianskom kraji za 3. štvrťrok 2026: ponuk
 | Obec | Počet predaných bytov |
 |---|---:|
 | Trenčín | 64 |
+| Nové Mesto nad Váhom | 12 |
 | Bánovce nad Bebravou | 1 |
-| **celkom** | **65** |
+| **celkom** | **77** |
 
 ![Počet predaných bytov podľa kategórie](/analyzy/kraj-tn-prehlad-2026-q3-podiel-predaj.svg)
 *Počet predaných bytov v 3. štvrťroku 2026 podľa kategórie.*
 
 ## Cena
 
-- Celková priemerná cena projektov v Trenčianskom kraji je 3 679 €/m² s DPH.
-- Na tých istých 139 bytoch priemerná cena medzikvartálne stúpla o 0,4 %.
-- Predané byty mali priemernú cenníkovú cenu 4 109 €/m² s DPH, o 2,7 % nižšiu než byty, ktoré v tých istých projektoch zostali v ponuke (4 223 €/m² s DPH).
+- Celková priemerná cena projektov v Trenčianskom kraji je 3 677 €/m² s DPH.
+- Na tých istých 141 bytoch priemerná cena medzikvartálne stúpla o 0,4 %.
+- Predané byty mali priemernú cenníkovú cenu 3 764 €/m² s DPH, o 1,3 % nižšiu než byty, ktoré v tých istých projektoch zostali v ponuke (3 814 €/m² s DPH).
 
 ![Vývoj cien nových bytov](/analyzy/kraj-tn-prehlad-2026-q3-ceny-vyvoj.svg)
 *Zmena priemernej ponukovej ceny za meter od začiatku štvrťroka, týždenne, na tých istých bytoch — graf sa pohne len vtedy, keď sa pohne cena.*
@@ -79,4 +80,4 @@ Prehľad trhu s novými bytmi v Trenčianskom kraji za 3. štvrťrok 2026: ponuk
 
 ## Výhľad
 
-Pri tempe predaja od 1. júla do 27. septembra 2026 — 22 bytov mesačne — by sa súčasná ponuka 400 bytov vypredala za 17,8 mesiaca. Dokončené byty v ponuke nie sú; kategória 2-izb tvorí 48,0 % ponuky a 42,2 % predaja.
+Pri tempe predaja od 1. júla do 27. septembra 2026 — 26 bytov mesačne — by sa súčasná ponuka 438 bytov vypredala za 16,6 mesiaca. Dokončené byty v ponuke nie sú; kategória 2-izb tvorí 46,8 % ponuky a 44,7 % predaja.

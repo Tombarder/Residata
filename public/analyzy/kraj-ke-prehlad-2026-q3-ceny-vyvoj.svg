@@ -41,35 +41,35 @@ z
     <g id="xtick_1">
      <g id="line2d_1"/>
      <g id="text_1">
-      <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #6b7480" x="121.990102" y="376.556" transform="rotate(-0 121.990102 376.556)">júl 2026</text>
+      <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #6b7480" x="108.635816" y="376.556" transform="rotate(-0 108.635816 376.556)">júl 2026</text>
      </g>
     </g>
     <g id="xtick_2">
      <g id="line2d_2"/>
      <g id="text_2">
-      <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #6b7480" x="291.716678" y="376.556" transform="rotate(-0 291.716678 376.556)">aug 2026</text>
+      <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #6b7480" x="283.410964" y="376.556" transform="rotate(-0 283.410964 376.556)">aug 2026</text>
      </g>
     </g>
     <g id="xtick_3">
      <g id="line2d_3"/>
      <g id="text_3">
-      <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #6b7480" x="461.443255" y="376.556" transform="rotate(-0 461.443255 376.556)">sep 2026</text>
+      <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #6b7480" x="458.186112" y="376.556" transform="rotate(-0 458.186112 376.556)">sep 2026</text>
      </g>
     </g>
    </g>
    <g id="matplotlib.axis_2">
     <g id="ytick_1">
      <g id="line2d_4">
-      <path d="M 51.84 313.754818 
-L 668.16 313.754818 
+      <path d="M 51.84 321.602326 
+L 668.16 321.602326 
 " clip-path="url(#pb2a8d058d8)" style="fill: none; stroke: #e3e7eb; stroke-linecap: square"/>
      </g>
      <g id="line2d_5"/>
     </g>
     <g id="ytick_2">
      <g id="line2d_6">
-      <path d="M 51.84 229.112454 
-L 668.16 229.112454 
+      <path d="M 51.84 183.707631 
+L 668.16 183.707631 
 " clip-path="url(#pb2a8d058d8)" style="fill: none; stroke: #e3e7eb; stroke-linecap: square"/>
      </g>
      <g id="line2d_7"/>
@@ -81,88 +81,93 @@ L 668.16 356.076
 " style="fill: none; stroke: #e3e7eb; stroke-linejoin: miter; stroke-linecap: square"/>
    </g>
    <g id="line2d_8">
-    <path d="M 111.04 313.754818 
-L 149.365356 294.794929 
-L 187.690712 294.794929 
-L 226.016068 304.613443 
-L 264.341424 304.613443 
-L 302.66678 304.613443 
-L 340.992136 304.613443 
-L 379.317492 304.613443 
-L 417.642848 303.936304 
-L 455.968204 305.967721 
-L 494.29356 282.944998 
-L 532.618916 282.944998 
-L 570.944272 282.267859 
+    <path d="M 97.36 321.602326 
+L 136.825356 305.606541 
+L 176.290712 305.606541 
+L 215.756068 313.604434 
+L 255.221424 313.604434 
+L 294.68678 313.604434 
+L 334.152136 313.604434 
+L 373.617492 313.604434 
+L 413.082848 313.052855 
+L 452.548204 314.707591 
+L 492.01356 297.33286 
+L 531.478916 297.33286 
+L 570.944272 296.781281 
 " clip-path="url(#pb2a8d058d8)" style="fill: none; stroke: #c2410c; stroke-width: 2.6; stroke-linecap: round"/>
    </g>
    <g id="line2d_9">
-    <path d="M 111.04 313.754818 
-L 149.365356 153.272896 
-L 187.690712 153.272896 
-L 226.016068 234.190996 
-L 264.341424 234.190996 
-L 302.66678 234.190996 
-L 340.992136 234.190996 
-L 379.317492 234.190996 
-L 417.642848 234.190996 
-L 455.968204 265.677955 
-L 494.29356 265.677955 
-L 532.618916 265.677955 
-L 570.944272 261.953691 
+    <path d="M 97.36 321.602326 
+L 136.825356 153.646587 
+L 176.290712 153.646587 
+L 215.756068 225.351829 
+L 255.221424 225.351829 
+L 294.68678 225.351829 
+L 334.152136 225.351829 
+L 373.617492 225.351829 
+L 413.082848 225.351829 
+L 452.548204 253.206557 
+L 492.01356 253.206557 
+L 531.478916 253.206557 
+L 570.944272 290.162336 
 " clip-path="url(#pb2a8d058d8)" style="fill: none; stroke: #0e4b47; stroke-width: 2; stroke-linecap: round"/>
    </g>
    <g id="line2d_10">
-    <path d="M 111.04 313.754818 
-L 149.365356 313.754818 
-L 187.690712 313.754818 
-L 226.016068 313.754818 
-L 264.341424 313.754818 
-L 302.66678 313.754818 
-L 340.992136 313.754818 
-L 379.317492 313.754818 
-L 417.642848 312.40054 
-L 455.968204 311.046262 
-L 494.29356 284.299275 
-L 532.618916 284.299275 
-L 570.944272 284.299275 
+    <path d="M 97.36 321.602326 
+L 136.825356 321.602326 
+L 176.290712 321.602326 
+L 215.756068 321.602326 
+L 255.221424 321.602326 
+L 294.68678 321.602326 
+L 334.152136 321.602326 
+L 373.617492 321.602326 
+L 413.082848 320.499169 
+L 452.548204 319.396011 
+L 492.01356 297.608649 
+L 531.478916 297.608649 
+L 570.944272 297.608649 
 " clip-path="url(#pb2a8d058d8)" style="fill: none; stroke: #689e9a; stroke-width: 2; stroke-linecap: round"/>
    </g>
    <g id="text_4">
     <g id="patch_4">
-     <path d="M 49.6 315.994818 
-L 82.2875 315.994818 
-L 82.2875 295.514818 
-L 49.6 295.514818 
+     <path d="M 49.6 323.842326 
+L 82.2875 323.842326 
+L 82.2875 303.362326 
+L 49.6 303.362326 
 z
 " style="fill: #ffffff"/>
     </g>
-    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #6b7480" x="51.84" y="310.234818" transform="rotate(-0 51.84 310.234818)">0 %</text>
+    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #6b7480" x="51.84" y="318.082326" transform="rotate(-0 51.84 318.082326)">0 %</text>
    </g>
    <g id="text_5">
     <g id="patch_5">
-     <path d="M 49.6 231.352454 
-L 105.84 231.352454 
-L 105.84 210.872454 
-L 49.6 210.872454 
+     <path d="M 49.6 185.947631 
+L 91.8875 185.947631 
+L 91.8875 165.467631 
+L 49.6 165.467631 
 z
 " style="fill: #ffffff"/>
     </g>
-    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #6b7480" x="51.84" y="225.592454" transform="rotate(-0 51.84 225.592454)">+2,5 %</text>
+    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #6b7480" x="51.84" y="180.187631" transform="rotate(-0 51.84 180.187631)">+5 %</text>
    </g>
    <g id="line2d_11">
-    <path d="M 570.944272 284.299275 
-L 576.491152 298.358266 
+    <path d="M 570.944272 297.608649 
+L 576.491152 317.03534 
 " style="fill: none; stroke: #689e9a; stroke-opacity: 0.8; stroke-width: 0.9; stroke-linecap: square"/>
    </g>
+   <g id="line2d_12">
+    <path d="M 570.944272 290.162336 
+L 576.491152 272.653447 
+" style="fill: none; stroke: #0e4b47; stroke-opacity: 0.8; stroke-width: 0.9; stroke-linecap: square"/>
+   </g>
    <g id="text_6">
-    <text style="font-weight: 600; font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #4a726f" x="578.340112" y="303.038266" transform="rotate(-0 578.340112 303.038266)">rozostavané</text>
+    <text style="font-weight: 600; font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #4a726f" x="578.340112" y="321.71534" transform="rotate(-0 578.340112 321.71534)">rozostavané</text>
    </g>
    <g id="text_7">
-    <text style="font-weight: 600; font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #c2410c" x="578.340112" y="280.866204" transform="rotate(-0 578.340112 280.866204)">celá ponuka</text>
+    <text style="font-weight: 600; font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #c2410c" x="578.340112" y="299.543478" transform="rotate(-0 578.340112 299.543478)">celá ponuka</text>
    </g>
    <g id="text_8">
-    <text style="font-weight: 600; font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #0e4b47" x="578.340112" y="258.656355" transform="rotate(-0 578.340112 258.656355)">dokončené</text>
+    <text style="font-weight: 600; font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #0e4b47" x="578.340112" y="277.333447" transform="rotate(-0 578.340112 277.333447)">dokončené</text>
    </g>
   </g>
   <g id="text_9">

@@ -16,7 +16,7 @@ Prehľad trhu s novými bytmi v Trnave za 3. štvrťrok 2026: ponuka, dopyt a ce
 
 ## Ponuka
 
-- Ku koncu obdobia bolo v ponuke 579 bytov v 10 projektoch.
+- Ku koncu obdobia bolo v ponuke 578 bytov v 10 projektoch.
 - 50 % projektov obsahuje 80 % ponuky (5 projektov s 487 bytmi).
 - 4 projekty majú v ponuke menej ako 20 bytov (10 % ponuky).
 - Ponuka dokončených bytov tvorí 6,9 % všetkých nepredaných bytov (40 bytov).
@@ -30,10 +30,10 @@ Prehľad trhu s novými bytmi v Trnave za 3. štvrťrok 2026: ponuka, dopyt a ce
 | 1-izb | 54 | 7 |
 | 1,5-izb | 25 | 0 |
 | 2-izb | 279 | 21 |
-| 3-izb | 165 | 9 |
+| 3-izb | 164 | 9 |
 | 4-izb | 54 | 3 |
 | (neuvedené) | 2 | 0 |
-| **celkom** | **579** | **40** |
+| **celkom** | **578** | **40** |
 
 ![Podiel voľných bytov podľa kategórie](/analyzy/tt-prehlad-2026-q3-podiel-ponuka.svg)
 *Podiel voľných bytov v 3. štvrťroku 2026 podľa kategórie.*
@@ -85,4 +85,4 @@ Prehľad trhu s novými bytmi v Trnave za 3. štvrťrok 2026: ponuka, dopyt a ce
 
 ## Výhľad
 
-Pri tempe predaja od 1. júla do 27. septembra 2026 — 26 bytov mesačne — by sa súčasná ponuka 579 bytov vypredala za 22,3 mesiaca. Dokončené voľné byty (40) tvoria 6,9 % tejto ponuky; kategória 2-izb tvorí 48,4 % ponuky a 49,3 % predaja.
+Pri tempe predaja od 1. júla do 27. septembra 2026 — 26 bytov mesačne — by sa súčasná ponuka 578 bytov vypredala za 22,5 mesiaca. Dokončené voľné byty (40) tvoria 6,9 % tejto ponuky; kategória 2-izb tvorí 48,4 % ponuky a 49,3 % predaja.

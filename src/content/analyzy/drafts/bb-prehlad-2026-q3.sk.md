@@ -79,4 +79,4 @@ Prehľad trhu s novými bytmi v Banskej Bystrici za 3. štvrťrok 2026: ponuka, 
 
 ## Výhľad
 
-Pri tempe predaja od 1. júla do 27. septembra 2026 — 5 bytov mesačne — by sa súčasná ponuka 232 bytov vypredala za 44,7 mesiaca. Dokončené voľné byty (5) tvoria 2,2 % tejto ponuky; kategória 2-izb tvorí 44,0 % ponuky a 46,7 % predaja.
+Pri tempe predaja od 1. júla do 27. septembra 2026 — 5 bytov mesačne — by sa súčasná ponuka 232 bytov vypredala za 45,2 mesiaca. Dokončené voľné byty (5) tvoria 2,2 % tejto ponuky; kategória 2-izb tvorí 44,0 % ponuky a 46,7 % predaja.

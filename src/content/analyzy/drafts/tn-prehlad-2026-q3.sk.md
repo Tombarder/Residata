@@ -11,11 +11,11 @@ Prehľad trhu s novými bytmi v Trenčíne za 3. štvrťrok 2026: ponuka, dopyt 
 ## Úvod
 
 - Dopyt: od 1. júla do 27. septembra 2026 sa predalo 64 bytov.
-- Priemerná cena v projektoch sa pohybuje na úrovni 4 001 €/m² s DPH.
+- Priemerná cena v projektoch sa pohybuje na úrovni 3 998 €/m² s DPH.
 
 ## Ponuka
 
-- Ku koncu obdobia bolo v ponuke 275 bytov v 5 projektoch.
+- Ku koncu obdobia bolo v ponuke 273 bytov v 5 projektoch.
 - 60 % projektov obsahuje 80 % ponuky (3 projekty s 243 bytmi).
 - 2 projekty majú v ponuke menej ako 20 bytov (11 % ponuky).
 - Dokončené byty v ponuke nie sú.
@@ -26,12 +26,12 @@ Prehľad trhu s novými bytmi v Trenčíne za 3. štvrťrok 2026: ponuka, dopyt 
 | Kategória | Voľné | z toho dokončené |
 |---|---:|---:|
 | 1-izb | 19 | 0 |
-| 2-izb | 118 | 0 |
+| 2-izb | 117 | 0 |
 | 3-izb | 91 | 0 |
-| 4-izb | 44 | 0 |
+| 4-izb | 43 | 0 |
 | 5 a viac | 3 | 0 |
 | (neuvedené) | 0 | 0 |
-| **celkom** | **275** | **0** |
+| **celkom** | **273** | **0** |
 
 ![Podiel voľných bytov podľa kategórie](/analyzy/tn-prehlad-2026-q3-podiel-ponuka.svg)
 *Podiel voľných bytov v 3. štvrťroku 2026 podľa kategórie.*
@@ -39,7 +39,7 @@ Prehľad trhu s novými bytmi v Trenčíne za 3. štvrťrok 2026: ponuka, dopyt 
 ## Dopyt
 
 - Od 1. júla do 27. septembra 2026 sa predalo v Trenčíne 64 bytov.
-- Absorpcia trhu je 23,3 % — predané byty za obdobie k bytom v ponuke.
+- Absorpcia trhu je 23,4 % — predané byty za obdobie k bytom v ponuke.
 - Najväčší záujem je o kategóriu 2-izb: 41,3 % predaných bytov.
 - Podiel na predaji prevyšuje podiel na ponuke v kategóriách 1-izb, 4-izb a 5 a viac izieb.
 
@@ -60,7 +60,7 @@ Prehľad trhu s novými bytmi v Trenčíne za 3. štvrťrok 2026: ponuka, dopyt 
 
 ## Cena
 
-- Celková priemerná cena projektov v Trenčíne je 4 001 €/m² s DPH.
+- Celková priemerná cena projektov v Trenčíne je 3 998 €/m² s DPH.
 
 **Ceny nových bytov v Trenčíne v 3. štvrťroku 2026 podľa kategórií (€/m² s DPH)**
 
@@ -71,4 +71,4 @@ Prehľad trhu s novými bytmi v Trenčíne za 3. štvrťrok 2026: ponuka, dopyt 
 
 ## Výhľad
 
-Pri tempe predaja od 1. júla do 27. septembra 2026 — 22 bytov mesačne — by sa súčasná ponuka 275 bytov vypredala za 12,4 mesiaca. Dokončené byty v ponuke nie sú; kategória 2-izb tvorí 42,9 % ponuky a 41,3 % predaja.
+Pri tempe predaja od 1. júla do 27. septembra 2026 — 22 bytov mesačne — by sa súčasná ponuka 273 bytov vypredala za 12,5 mesiaca. Dokončené byty v ponuke nie sú; kategória 2-izb tvorí 42,9 % ponuky a 41,3 % predaja.

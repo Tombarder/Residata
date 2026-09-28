@@ -1,6 +1,6 @@
 {
  "asOf": "2026-09-27",
- "generatedAt": "2026-09-28T08:26:04",
+ "generatedAt": "2026-09-28T13:14:28",
  "slug": "kraj-tn-prehlad-2026-q3",
  "overview": {
   "scope": {
@@ -29,16 +29,20 @@
   "smooth_days": 14,
   "sale_settling_days": 7,
   "rolling_days": 28,
-  "prev_period_sales": 2,
-  "period_days": 88,
+  "prev_period_sales": 3,
+  "period_days": 89,
   "okres_supply": {
    "Trenčín": {
-    "n": 274,
+    "n": 273,
     "done": 0,
     "building": 77,
-    "unknown": 197,
+    "unknown": 196,
     "projects": 5,
-    "m2": 3998
+    "m2": 3998,
+    "area": 69.0,
+    "price": 277540,
+    "n_priced": 253,
+    "p_priced": 5
    },
    "Partizánske": {
     "n": 76,
@@ -46,7 +50,23 @@
     "building": 0,
     "unknown": 76,
     "projects": 1,
-    "m2": 2628
+    "m2": 2628,
+    "area": 64.1,
+    "price": 168325,
+    "n_priced": 24,
+    "p_priced": 1
+   },
+   "Nové Mesto nad Váhom": {
+    "n": 56,
+    "done": 0,
+    "building": 31,
+    "unknown": 25,
+    "projects": 2,
+    "m2": 2974,
+    "area": 58.1,
+    "price": 171573,
+    "n_priced": 29,
+    "p_priced": 1
    },
    "Bánovce nad Bebravou": {
     "n": 24,
@@ -54,15 +74,11 @@
     "building": 0,
     "unknown": 24,
     "projects": 1,
-    "m2": 2217
-   },
-   "Levice": {
-    "n": 17,
-    "done": 0,
-    "building": 0,
-    "unknown": 17,
-    "projects": 1,
-    "m2": 2521
+    "m2": 2217,
+    "area": 58.4,
+    "price": 127942,
+    "n_priced": 24,
+    "p_priced": 1
    },
    "Považská Bystrica": {
     "n": 6,
@@ -70,7 +86,11 @@
     "building": 0,
     "unknown": 6,
     "projects": 1,
-    "m2": 2398
+    "m2": 2398,
+    "area": 77.8,
+    "price": 186500,
+    "n_priced": 1,
+    "p_priced": 1
    },
    "Púchov": {
     "n": 3,
@@ -78,22 +98,42 @@
     "building": 0,
     "unknown": 3,
     "projects": 1,
-    "m2": 3841
+    "m2": 3841,
+    "area": 56.3,
+    "price": 205745,
+    "n_priced": 3,
+    "p_priced": 1
    }
   },
   "okres_sales": {
    "Trenčín": {
     "n": 64,
     "n_priced": 30,
-    "m2": 4050
+    "m2": 4050,
+    "projects": 4
+   },
+   "Nové Mesto nad Váhom": {
+    "n": 12,
+    "n_priced": 12,
+    "m2": 2987,
+    "projects": 1
    },
    "Bánovce nad Bebravou": {
     "n": 1,
     "n_priced": 1,
-    "m2": 2342
+    "m2": 2342,
+    "projects": 1
    }
   },
   "okres_price": {
+   "Nové Mesto nad Váhom": {
+    "m2_cur": 3015,
+    "m2_prev": 3015,
+    "chg_pct": 0.0,
+    "unit_days": 28,
+    "units": 2,
+    "projects": 1
+   },
    "Partizánske": {
     "m2_cur": 2628,
     "m2_prev": 2628,
@@ -111,68 +151,68 @@
     "projects": 2
    }
   },
-  "projects": 10,
-  "mean_price": 251990,
-  "mean_area": 67.9,
-  "panel_projects": 3,
-  "panel_units": 139,
-  "panel_unit_projects": 3,
+  "projects": 11,
+  "mean_price": 248897,
+  "mean_area": 66.9,
+  "panel_projects": 4,
+  "panel_units": 141,
+  "panel_unit_projects": 4,
   "rules": {
    "min_contributors": 3,
    "min_mean_n": 10
   },
-  "panel_supply_prev": 223,
-  "panel_supply_cur": 197,
+  "panel_supply_prev": 237,
+  "panel_supply_cur": 228,
   "layout_supply": [
    {
     "k": "2-izb",
-    "n": "192",
-    "m2": "3601",
-    "area": "57.1"
+    "n": 203,
+    "m2": 3652,
+    "area": 54.7
    },
    {
     "k": "3-izb",
-    "n": "118",
-    "m2": "3622",
-    "area": "75.8"
+    "n": 126,
+    "m2": 3569,
+    "area": 75.1
    },
    {
     "k": "4-izb",
-    "n": "48",
-    "m2": "3976",
-    "area": "100.3"
+    "n": 54,
+    "m2": 3891,
+    "area": 99.2
    },
    {
     "k": "1-izb",
-    "n": "39",
-    "m2": "3781",
-    "area": "38.5"
-   },
-   {
-    "k": "5 a viac",
-    "n": "3",
-    "m2": "5482",
-    "area": "165.9"
+    "n": 48,
+    "m2": 3827,
+    "area": 37.1
    },
    {
     "k": "(neuvedené)",
-    "n": "0",
+    "n": 4,
     "m2": null,
     "area": null
+   },
+   {
+    "k": "5 a viac",
+    "n": 3,
+    "m2": 5482,
+    "area": 165.9
    }
   ],
   "layout_sales": [
    {
     "k": "2-izb",
-    "n": 27,
-    "m2": "4075",
-    "area": "53.7"
+    "n": 34,
+    "m2": "3744",
+    "area": "52.7"
    },
    {
     "k": "3-izb",
-    "n": 15,
-    "m2": "3796",
-    "area": "75.2"
+    "n": 19,
+    "m2": "3544",
+    "area": "72.9"
    },
    {
     "k": "4-izb",
@@ -182,9 +222,9 @@
    },
    {
     "k": "1-izb",
-    "n": 8,
-    "m2": "4451",
-    "area": "32.6"
+    "n": 9,
+    "m2": "4074",
+    "area": "31.9"
    },
    {
     "k": "5 a viac",
@@ -200,192 +240,192 @@
    }
   ],
   "own_quarters": {
-   "2026Q2": 4024,
-   "2026Q3": 3679
+   "2026Q2": 3942,
+   "2026Q3": 3677
   },
-  "quarter_sales": 65,
-  "quarter_sold_m2": 3995,
-  "quarter_ask_m2": 3679,
+  "quarter_sales": 77,
+  "quarter_sold_m2": 3713,
+  "quarter_ask_m2": 3677,
   "price_series": [
    {
     "wk": "2026-06-15",
     "m2_done": null,
-    "m2_building": "4371",
-    "m2_all": "4045",
-    "n_all": 128,
+    "m2_building": "4346",
+    "m2_all": "4029",
+    "n_all": 130,
     "u_done": 0,
-    "u_building": 104,
-    "p_all": 3,
+    "u_building": 106,
+    "p_all": 4,
     "p_done": 0,
-    "p_building": 2
+    "p_building": 3
    },
    {
     "wk": "2026-06-22",
     "m2_done": null,
-    "m2_building": "4371",
-    "m2_all": "4045",
-    "n_all": 128,
+    "m2_building": "4346",
+    "m2_all": "4029",
+    "n_all": 130,
     "u_done": 0,
-    "u_building": 104,
-    "p_all": 3,
+    "u_building": 106,
+    "p_all": 4,
     "p_done": 0,
-    "p_building": 2
+    "p_building": 3
    },
    {
     "wk": "2026-06-29",
     "m2_done": null,
-    "m2_building": "4371",
-    "m2_all": "4045",
-    "n_all": 128,
+    "m2_building": "4346",
+    "m2_all": "4029",
+    "n_all": 130,
     "u_done": 0,
-    "u_building": 104,
-    "p_all": 3,
+    "u_building": 106,
+    "p_all": 4,
     "p_done": 0,
-    "p_building": 2
+    "p_building": 3
    },
    {
     "wk": "2026-07-06",
     "m2_done": null,
-    "m2_building": "4371",
-    "m2_all": "4045",
-    "n_all": 128,
+    "m2_building": "4346",
+    "m2_all": "4029",
+    "n_all": 130,
     "u_done": 0,
-    "u_building": 104,
-    "p_all": 3,
+    "u_building": 106,
+    "p_all": 4,
     "p_done": 0,
-    "p_building": 2
+    "p_building": 3
    },
    {
     "wk": "2026-07-13",
     "m2_done": null,
-    "m2_building": "4371",
-    "m2_all": "4044",
-    "n_all": 128,
+    "m2_building": "4345",
+    "m2_all": "4028",
+    "n_all": 130,
     "u_done": 0,
-    "u_building": 104,
-    "p_all": 3,
+    "u_building": 106,
+    "p_all": 4,
     "p_done": 0,
-    "p_building": 2
+    "p_building": 3
    },
    {
     "wk": "2026-07-20",
     "m2_done": null,
-    "m2_building": "4371",
-    "m2_all": "4044",
-    "n_all": 128,
+    "m2_building": "4345",
+    "m2_all": "4028",
+    "n_all": 130,
     "u_done": 0,
-    "u_building": 104,
-    "p_all": 3,
+    "u_building": 106,
+    "p_all": 4,
     "p_done": 0,
-    "p_building": 2
+    "p_building": 3
    },
    {
     "wk": "2026-07-27",
     "m2_done": null,
-    "m2_building": "4371",
-    "m2_all": "4044",
-    "n_all": 128,
+    "m2_building": "4346",
+    "m2_all": "4029",
+    "n_all": 130,
     "u_done": 0,
-    "u_building": 104,
-    "p_all": 3,
+    "u_building": 106,
+    "p_all": 4,
     "p_done": 0,
-    "p_building": 2
+    "p_building": 3
    },
    {
     "wk": "2026-08-03",
     "m2_done": null,
-    "m2_building": "4371",
-    "m2_all": "4044",
-    "n_all": 128,
+    "m2_building": "4346",
+    "m2_all": "4029",
+    "n_all": 130,
     "u_done": 0,
-    "u_building": 104,
-    "p_all": 3,
+    "u_building": 106,
+    "p_all": 4,
     "p_done": 0,
-    "p_building": 2
+    "p_building": 3
    },
    {
     "wk": "2026-08-10",
     "m2_done": null,
-    "m2_building": "4371",
-    "m2_all": "4044",
-    "n_all": 128,
+    "m2_building": "4346",
+    "m2_all": "4029",
+    "n_all": 130,
     "u_done": 0,
-    "u_building": 104,
-    "p_all": 3,
+    "u_building": 106,
+    "p_all": 4,
     "p_done": 0,
-    "p_building": 2
+    "p_building": 3
    },
    {
     "wk": "2026-08-17",
     "m2_done": null,
-    "m2_building": "4371",
-    "m2_all": "4044",
-    "n_all": 128,
+    "m2_building": "4346",
+    "m2_all": "4029",
+    "n_all": 130,
     "u_done": 0,
-    "u_building": 104,
-    "p_all": 3,
+    "u_building": 106,
+    "p_all": 4,
     "p_done": 0,
-    "p_building": 2
+    "p_building": 3
    },
    {
     "wk": "2026-08-24",
     "m2_done": null,
-    "m2_building": "4371",
-    "m2_all": "4044",
-    "n_all": 128,
+    "m2_building": "4346",
+    "m2_all": "4029",
+    "n_all": 130,
     "u_done": 0,
-    "u_building": 104,
-    "p_all": 3,
+    "u_building": 106,
+    "p_all": 4,
     "p_done": 0,
-    "p_building": 2
+    "p_building": 3
    },
    {
     "wk": "2026-08-31",
     "m2_done": null,
-    "m2_building": "4371",
-    "m2_all": "4044",
-    "n_all": 128,
+    "m2_building": "4346",
+    "m2_all": "4029",
+    "n_all": 130,
     "u_done": 0,
-    "u_building": 104,
-    "p_all": 3,
+    "u_building": 106,
+    "p_all": 4,
     "p_done": 0,
-    "p_building": 2
+    "p_building": 3
    },
    {
     "wk": "2026-09-07",
     "m2_done": null,
-    "m2_building": "4371",
-    "m2_all": "4044",
-    "n_all": 128,
+    "m2_building": "4346",
+    "m2_all": "4029",
+    "n_all": 130,
     "u_done": 0,
-    "u_building": 104,
-    "p_all": 3,
+    "u_building": 106,
+    "p_all": 4,
     "p_done": 0,
-    "p_building": 2
+    "p_building": 3
    },
    {
     "wk": "2026-09-14",
     "m2_done": null,
-    "m2_building": "4824",
-    "m2_all": "4045",
-    "n_all": 128,
+    "m2_building": "4777",
+    "m2_all": "4029",
+    "n_all": 130,
     "u_done": 0,
-    "u_building": 74,
-    "p_all": 3,
+    "u_building": 76,
+    "p_all": 4,
     "p_done": 0,
-    "p_building": 1
+    "p_building": 2
    },
    {
     "wk": "2026-09-21",
     "m2_done": null,
-    "m2_building": "4824",
-    "m2_all": "4053",
-    "n_all": 127,
+    "m2_building": "4777",
+    "m2_all": "4037",
+    "n_all": 129,
     "u_done": 0,
-    "u_building": 74,
-    "p_all": 3,
+    "u_building": 76,
+    "p_all": 4,
     "p_done": 0,
-    "p_building": 1
+    "p_building": 2
    }
   ],
   "project_supply": [
@@ -406,12 +446,16 @@
     "n": 47
    },
    {
-    "project_id": "rezidencia-slnecna",
-    "n": 24
+    "project_id": "rezidencia-kamenna",
+    "n": 31
    },
    {
-    "project_id": "rezidencia-sladkovicova",
-    "n": 17
+    "project_id": "byty-kasarne",
+    "n": 25
+   },
+   {
+    "project_id": "rezidencia-slnecna",
+    "n": 24
    },
    {
     "project_id": "pod-brezinou",
@@ -433,14 +477,14 @@
   "own_quarter_sales": [
    {
     "qkey": "2026Q2",
-    "n": 2,
+    "n": 3,
     "first_sale": "2026-06-18",
     "last_sale": "2026-06-25",
     "observed_from": "2026-05-16"
    },
    {
     "qkey": "2026Q3",
-    "n": 65,
+    "n": 77,
     "first_sale": "2026-07-02",
     "last_sale": "2026-09-26",
     "observed_from": "2026-05-16"
@@ -449,50 +493,50 @@
   "own_month_sales": [
    {
     "m": "2026-06-01",
-    "n": 2,
+    "n": 3,
     "observed_from": "2026-05-16"
    },
    {
     "m": "2026-07-01",
-    "n": 7,
+    "n": 8,
     "observed_from": "2026-05-16"
    },
    {
     "m": "2026-08-01",
-    "n": 12,
+    "n": 19,
     "observed_from": "2026-05-16"
    },
    {
     "m": "2026-09-01",
-    "n": 46,
+    "n": 50,
     "observed_from": "2026-05-16"
    }
   ],
   "offer_vs_sold_monthly": [
    {
     "m": "2026-07-01",
-    "m2_offer": 3262,
-    "m2_sold": 3266,
-    "n_sold": 2,
-    "gap_pct": 0.1,
+    "m2_offer": 3123,
+    "m2_sold": 2952,
+    "n_sold": 3,
+    "gap_pct": -5.5,
     "full_from_start": true,
     "current_month": false
    },
    {
     "m": "2026-08-01",
-    "m2_offer": 3251,
-    "m2_sold": 3417,
-    "n_sold": 1,
-    "gap_pct": 5.1,
+    "m2_offer": 2908,
+    "m2_sold": 3075,
+    "n_sold": 8,
+    "gap_pct": 5.7,
     "full_from_start": true,
     "current_month": false
    },
    {
     "m": "2026-09-01",
-    "m2_offer": 4364,
-    "m2_sold": 4208,
-    "n_sold": 24,
-    "gap_pct": -3.6,
+    "m2_offer": 4166,
+    "m2_sold": 4048,
+    "n_sold": 28,
+    "gap_pct": -2.8,
     "full_from_start": true,
     "current_month": true
    }
@@ -500,32 +544,32 @@
   "panel_month_sales": [
    {
     "m": "2026-07-01",
-    "n": 7
+    "n": 8
    },
    {
     "m": "2026-08-01",
-    "n": 2
+    "n": 9
    },
    {
     "m": "2026-09-01",
-    "n": 31
+    "n": 35
    }
   ],
-  "panel_month_projects": 3,
+  "panel_month_projects": 4,
   "panel_quarter": {
-   "ask_m2": 4223,
-   "sold_m2": 4109,
-   "n_sold": 27,
+   "ask_m2": 3814,
+   "sold_m2": 3764,
+   "n_sold": 39,
    "n_sold_no_offer": 0,
-   "projects": 3
+   "projects": 4
   },
   "completion_m2": {
    "m2_done": null,
-   "m2_building": 4789,
+   "m2_building": 4289,
    "n_done": 0,
-   "n_building": 76,
+   "n_building": 105,
    "p_done": 0,
-   "p_building": 1
+   "p_building": 2
   },
   "figures": {
    "podiel-ponuka": true,

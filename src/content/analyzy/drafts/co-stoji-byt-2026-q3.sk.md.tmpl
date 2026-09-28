@@ -1,27 +1,29 @@
 <!--PEREX
-Koľko stojí jedno-, dvoj-, troj- a štvorizbová novostavba v {cdTowns} slovenských mestách. Jednoizbový byt v Bratislave za {cdBa1Price} € je drahší než dvojizbový v {cdBa1Beats} z {cdBa1OutOf} ostatných miest.
+Mediánové ceny nových bytov podľa počtu izieb v {cdTowns} slovenských mestách: cena celého bytu a cena za meter štvorcový.
 -->
 <!--METHOD
-Údaje pochádzajú z verejne zverejnených cenníkov slovenských developerov, ktoré Residata číta denne, byt po byte. Ide o novostavby — voľné a rezervované byty v aktívnych projektoch, nie starší bytový fond a nie inzeráty. Uvádzame medián, nie priemer: jeden drahý byt posunie priemer a medián neposunie, a niektoré bunky tabuľky obsahujú len desiatky bytov. Mesto sa v tabuľke objaví, ak má aspoň {cdMinCell} bytov v aspoň troch dispozíciách. Polovičné dispozície sú zaokrúhlené nadol: byt s izbou a pol je vedený ako jednoizbový.
+Údaje pochádzajú z verejne zverejnených cenníkov developerov, ktoré Residata číta denne, byt po byte. Ide o novostavby — voľné, rezervované a predrezervované byty v aktívnych projektoch, nie starší bytový fond a nie inzeráty; počítajú sa výlučne byty, nie parkovanie, pivnice ani nebytové priestory. Ceny sú s DPH a pochádzajú z bytov, pri ktorých developer cenu zverejňuje. Uvádzame medián, nie priemer: jeden drahý byt posunie priemer, medián nie. Medián je priemerom denných mediánov za posledné dva týždne obdobia, aby jeden deň neurčoval celé číslo. Cenu za meter počítame na obytnú plochu. Polovičné dispozície zaokrúhľujeme nadol — byt s jednou a pol izbou je vedený ako jednoizbový, s dvoma a pol izbami ako dvojizbový. Projekt je zaradený do mesta, v ktorom stojí. Bunka tabuľky je vyplnená pri aspoň {cdMinCell} bytoch z aspoň {cdMinProjects} projektov a mesto je v tabuľke, ak má takto vyplnené aspoň {cdMinLayoutsPhrase}.
 -->
-{asOf} | CENY NOVOSTAVIEB PODĽA DISPOZÍCIE A MESTA
+{asOf} | CENY NOVÝCH BYTOV PODĽA POČTU IZIEB — Slovensko
 
-# Slovensko: jednoizbový byt v Bratislave stojí viac než dvojizbový v {cdBa1Beats} z {cdBa1OutOf} miest
+# Slovensko: ceny nových bytov podľa počtu izieb v {quarterSk}
 
-Koľko stojí novostavba, závisí od dispozície aspoň tak ako od mesta. Mediánová cena jednoizbového bytu v Bratislave je {cdBa1Price} € s DPH. Za tie isté peniaze kúpite dvojizbový byt v {cdBa1Beats} z {cdBa1OutOf} ostatných miest, ktoré sledujeme — najlacnejší z nich je {cdCheapest2} s {cdCheapest2Price} €.
+## Úvod
+
+{cdRangeBullets}
+
+## Cena bytu
+
+**Mediánová cena nového bytu podľa počtu izieb (€ s DPH)**
 
 {cdPriceTable}
 
-\* Mediánová cena bytu s DPH. Mesto je v tabuľke, ak má aspoň {cdMinCell} bytov v aspoň troch dispozíciách.
+{cdStepSentence}
 
-## Koľko stojí jedna izba navyše
+## Cena za meter štvorcový
 
-Rozdiel medzi dvojizbovým a trojizbovým bytom nie je všade rovnaký. Najväčší má {cdStepDear}, kde trojizbový byt stojí o {cdStepDearPct} % viac než dvojizbový; najmenší {cdStepCheap} s rozdielom {cdStepCheapPct} %. V Bratislave je to {cdStepBa} %.
-
-Ten istý rozdiel vyzerá inak v prepočte na meter štvorcový. V {cdM2Down} z {cdM2Total} miest je meter v trojizbovom byte lacnejší než meter v dvojizbovom. {cdM2UpClause}
+**Mediánová cena nového bytu za meter štvorcový podľa počtu izieb (€/m² s DPH)**
 
 {cdM2Table}
 
-\* Mediánová cena za m² s DPH.
-
-**Autor:** Tomáš Kamhal, zakladateľ Residaty · tomas@residata.eu
+{cdM2Sentence}

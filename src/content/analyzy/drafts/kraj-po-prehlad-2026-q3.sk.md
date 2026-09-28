@@ -10,18 +10,18 @@ Prehľad trhu s novými bytmi v Prešovskom kraji za 3. štvrťrok 2026: ponuka,
 
 ## Úvod
 
-- **Počet bytov v ponuke v projektoch, ktoré predávali aj v predchádzajúcom štvrťroku, klesol o 26,8 %** — zo 437 na 320.
+- **Počet bytov v ponuke v projektoch, ktoré predávali aj v predchádzajúcom štvrťroku, klesol o 24,8 %** — zo 440 na 331.
 - Dopyt: od 1. júla do 27. septembra 2026 sa predalo 134 bytov.
-- Priemerná cena v projektoch sa pohybuje na úrovni 3 768 €/m² s DPH.
+- Priemerná cena v projektoch sa pohybuje na úrovni 3 741 €/m² s DPH.
 
 ## Ponuka
 
-- Ku koncu obdobia bolo v ponuke 896 bytov v 19 projektoch.
-- 53 % projektov obsahuje 80 % ponuky (10 projektov s 727 bytmi).
-- 5 projektov má v ponuke menej ako 20 bytov (7 % ponuky).
-- Ponuka dokončených bytov tvorí 1,3 % všetkých nepredaných bytov (12 bytov).
-- Dokončené voľné byty sú len v lokalite Poprad.
-- Najväčšiu časť ponuky tvorí kategória 2-izb — 49,0 % bytov s uvedeným počtom izieb.
+- Ku koncu obdobia bolo v ponuke 907 bytov v 20 projektoch.
+- 50 % projektov obsahuje 80 % ponuky (10 projektov s 727 bytmi).
+- 6 projektov má v ponuke menej ako 20 bytov (8 % ponuky).
+- Ponuka dokončených bytov tvorí 2,5 % všetkých nepredaných bytov (23 bytov).
+- Najviac dokončených voľných bytov je v lokalitách Poprad a Humenné.
+- Najväčšiu časť ponuky tvorí kategória 2-izb — 48,6 % bytov s uvedeným počtom izieb.
 
 **Podiel voľných bytov v 3. štvrťroku 2026 podľa obce**
 
@@ -31,7 +31,8 @@ Prehľad trhu s novými bytmi v Prešovskom kraji za 3. štvrťrok 2026: ponuka,
 | Poprad | 353 | 12 |
 | Štôla | 27 | 0 |
 | Bardejov | 16 | 0 |
-| **celkom** | **896** | **12** |
+| Humenné | 11 | 11 |
+| **celkom** | **907** | **23** |
 
 ![Podiel voľných bytov podľa kategórie](/analyzy/kraj-po-prehlad-2026-q3-podiel-ponuka.svg)
 *Podiel voľných bytov v 3. štvrťroku 2026 podľa kategórie.*
@@ -39,10 +40,10 @@ Prehľad trhu s novými bytmi v Prešovskom kraji za 3. štvrťrok 2026: ponuka,
 ## Dopyt
 
 - Od 1. júla do 27. septembra 2026 sa predalo v Prešovskom kraji 134 bytov.
-- Absorpcia trhu je 15,0 % — predané byty za obdobie k bytom v ponuke.
+- Absorpcia trhu je 14,8 % — predané byty za obdobie k bytom v ponuke.
 - Najväčší záujem je o kategóriu 2-izb: 68,6 % predaných bytov.
 - Podiel na predaji prevyšuje podiel na ponuke v kategóriách 2-izb a 4-izb.
-- V lokalite Prešov je podiel na predaji (88,8 %) najvýraznejšie nad podielom na ponuke (55,8 %); opačný pomer má Poprad — 11,2 % predaja pri 39,4 % ponuky.
+- V lokalite Prešov je podiel na predaji (88,8 %) najvýraznejšie nad podielom na ponuke (55,1 %); opačný pomer má Poprad — 11,2 % predaja pri 38,9 % ponuky.
 
 ![Dopyt po bytoch](/analyzy/kraj-po-prehlad-2026-q3-dopyt-mesiace.svg)
 *Počet predaných bytov v Prešovskom kraji za mesiac v projektoch, ktoré sledujeme od začiatku štvrťroka.*
@@ -60,8 +61,8 @@ Prehľad trhu s novými bytmi v Prešovskom kraji za 3. štvrťrok 2026: ponuka,
 
 ## Cena
 
-- Celková priemerná cena projektov v Prešovskom kraji je 3 768 €/m² s DPH.
-- Na tých istých 247 bytoch priemerná cena medzikvartálne stúpla o 0,1 %.
+- Celková priemerná cena projektov v Prešovskom kraji je 3 741 €/m² s DPH.
+- Na tých istých 250 bytoch priemerná cena medzikvartálne stúpla o 0,1 %.
 - Predané byty mali priemernú cenníkovú cenu 3 574 €/m² s DPH, o 1,0 % nižšiu než byty, ktoré v tých istých projektoch zostali v ponuke (3 610 €/m² s DPH).
 
 ![Vývoj cien nových bytov](/analyzy/kraj-po-prehlad-2026-q3-ceny-vyvoj.svg)
@@ -80,4 +81,4 @@ Prehľad trhu s novými bytmi v Prešovskom kraji za 3. štvrťrok 2026: ponuka,
 
 ## Výhľad
 
-Pri tempe predaja od 1. júla do 27. septembra 2026 — 46 bytov mesačne — by sa súčasná ponuka 896 bytov vypredala za 19,3 mesiaca. Dokončené voľné byty (12) tvoria 1,3 % tejto ponuky; kategória 2-izb tvorí 49,0 % ponuky a 68,6 % predaja.
+Pri tempe predaja od 1. júla do 27. septembra 2026 — 46 bytov mesačne — by sa súčasná ponuka 907 bytov vypredala za 19,8 mesiaca. Dokončené voľné byty (23) tvoria 2,5 % tejto ponuky; kategória 2-izb tvorí 48,6 % ponuky a 68,6 % predaja.

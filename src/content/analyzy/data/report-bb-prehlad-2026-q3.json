@@ -1,6 +1,6 @@
 {
  "asOf": "2026-09-27",
- "generatedAt": "2026-09-28T08:24:52",
+ "generatedAt": "2026-09-28T13:13:20",
  "slug": "bb-prehlad-2026-q3",
  "overview": {
   "scope": {
@@ -31,7 +31,7 @@
   "sale_settling_days": 7,
   "rolling_days": 28,
   "prev_period_sales": 0,
-  "period_days": 88,
+  "period_days": 89,
   "okres_supply": {
    "1-izb": {
     "n": 58,
@@ -39,7 +39,11 @@
     "building": 40,
     "unknown": 17,
     "projects": 4,
-    "m2": 3970
+    "m2": 3970,
+    "area": 40.9,
+    "price": 153538,
+    "n_priced": 49,
+    "p_priced": 3
    },
    "1,5-izb": {
     "n": 2,
@@ -47,7 +51,9 @@
     "building": 0,
     "unknown": 2,
     "projects": 1,
-    "m2": null
+    "m2": null,
+    "area": null,
+    "price": null
    },
    "2-izb": {
     "n": 102,
@@ -55,7 +61,11 @@
     "building": 80,
     "unknown": 19,
     "projects": 6,
-    "m2": 3878
+    "m2": 3878,
+    "area": 54.8,
+    "price": 205343,
+    "n_priced": 84,
+    "p_priced": 4
    },
    "3-izb": {
     "n": 45,
@@ -63,7 +73,11 @@
     "building": 33,
     "unknown": 11,
     "projects": 8,
-    "m2": 3691
+    "m2": 3691,
+    "area": 77.8,
+    "price": 276730,
+    "n_priced": 31,
+    "p_priced": 6
    },
    "4-izb": {
     "n": 24,
@@ -71,7 +85,11 @@
     "building": 11,
     "unknown": 13,
     "projects": 5,
-    "m2": 3685
+    "m2": 3685,
+    "area": 109.1,
+    "price": 399809,
+    "n_priced": 16,
+    "p_priced": 3
    },
    "5 a viac": {
     "n": 1,
@@ -79,29 +97,37 @@
     "building": 0,
     "unknown": 1,
     "projects": 1,
-    "m2": 3638
+    "m2": 3638,
+    "area": 134.4,
+    "price": 489000,
+    "n_priced": 1,
+    "p_priced": 1
    }
   },
   "okres_sales": {
    "1-izb": {
     "n": 2,
     "n_priced": 0,
-    "m2": null
+    "m2": null,
+    "projects": 1
    },
    "2-izb": {
     "n": 7,
     "n_priced": 4,
-    "m2": 4106
+    "m2": 4106,
+    "projects": 3
    },
    "3-izb": {
     "n": 5,
     "n_priced": 4,
-    "m2": 4272
+    "m2": 4272,
+    "projects": 3
    },
    "4-izb": {
     "n": 1,
     "n_priced": 0,
-    "m2": null
+    "m2": null,
+    "projects": 1
    }
   },
   "okres_price": {
@@ -154,26 +180,26 @@
    {
     "k": "2-izb",
     "n": 102,
-    "m2": "3878",
-    "area": "54.8"
+    "m2": 3878,
+    "area": 54.8
    },
    {
     "k": "1-izb",
     "n": 58,
-    "m2": "3970",
-    "area": "40.9"
+    "m2": 3970,
+    "area": 40.9
    },
    {
     "k": "3-izb",
     "n": 45,
-    "m2": "3691",
-    "area": "77.8"
+    "m2": 3691,
+    "area": 77.8
    },
    {
     "k": "4-izb",
     "n": 24,
-    "m2": "3685",
-    "area": "109.1"
+    "m2": 3685,
+    "area": 109.1
    },
    {
     "k": "1,5-izb",
@@ -184,8 +210,8 @@
    {
     "k": "5 a viac",
     "n": 1,
-    "m2": "3638",
-    "area": "134.4"
+    "m2": 3638,
+    "area": 134.4
    }
   ],
   "layout_sales": [
@@ -417,11 +443,11 @@
     "n": 12
    },
    {
-    "project_id": "neohaus",
+    "project_id": "rezidencia-suchy-vrch",
     "n": 10
    },
    {
-    "project_id": "rezidencia-suchy-vrch",
+    "project_id": "neohaus",
     "n": 10
    },
    {

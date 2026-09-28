@@ -1,6 +1,6 @@
 {
  "asOf": "2026-09-27",
- "generatedAt": "2026-09-28T08:23:40",
+ "generatedAt": "2026-09-28T13:11:56",
  "slug": "ke-prehlad-2026-q3",
  "overview": {
   "scope": {
@@ -31,31 +31,43 @@
   "sale_settling_days": 7,
   "rolling_days": 28,
   "prev_period_sales": 5,
-  "period_days": 88,
+  "period_days": 89,
   "okres_supply": {
    "1-izb": {
-    "n": 70,
+    "n": 69,
     "done": 33,
     "building": 13,
-    "unknown": 24,
+    "unknown": 23,
     "projects": 12,
-    "m2": 5039
+    "m2": 5040,
+    "area": 31.1,
+    "price": 150350,
+    "n_priced": 45,
+    "p_priced": 8
    },
    "2-izb": {
-    "n": 283,
+    "n": 284,
     "done": 3,
     "building": 83,
-    "unknown": 197,
+    "unknown": 198,
     "projects": 21,
-    "m2": 4618
+    "m2": 4618,
+    "area": 56.9,
+    "price": 261179,
+    "n_priced": 190,
+    "p_priced": 19
    },
    "3-izb": {
     "n": 246,
     "done": 7,
     "building": 90,
     "unknown": 149,
-    "projects": 22,
-    "m2": 4371
+    "projects": 21,
+    "m2": 4371,
+    "area": 79.5,
+    "price": 345359,
+    "n_priced": 181,
+    "p_priced": 19
    },
    "4-izb": {
     "n": 54,
@@ -63,7 +75,11 @@
     "building": 28,
     "unknown": 26,
     "projects": 14,
-    "m2": 4752
+    "m2": 4752,
+    "area": 112.7,
+    "price": 540655,
+    "n_priced": 44,
+    "p_priced": 11
    },
    "5 a viac": {
     "n": 8,
@@ -71,7 +87,11 @@
     "building": 8,
     "unknown": 0,
     "projects": 1,
-    "m2": 5241
+    "m2": 5241,
+    "area": 156.2,
+    "price": 826025,
+    "n_priced": 8,
+    "p_priced": 1
    },
    "(neuvedené)": {
     "n": 7,
@@ -79,39 +99,47 @@
     "building": 0,
     "unknown": 7,
     "projects": 1,
-    "m2": null
+    "m2": null,
+    "area": null,
+    "price": null
    }
   },
   "okres_sales": {
    "1-izb": {
     "n": 45,
     "n_priced": 41,
-    "m2": 5009
+    "m2": 5009,
+    "projects": 4
    },
    "2-izb": {
     "n": 41,
     "n_priced": 26,
-    "m2": 4828
+    "m2": 4828,
+    "projects": 4
    },
    "3-izb": {
     "n": 28,
     "n_priced": 14,
-    "m2": 4448
+    "m2": 4448,
+    "projects": 7
    },
    "4-izb": {
     "n": 5,
     "n_priced": 3,
-    "m2": 4830
+    "m2": 4830,
+    "projects": 3
    },
    "5 a viac": {
     "n": 1,
     "n_priced": 1,
-    "m2": 5001
+    "m2": 5001,
+    "projects": 1
    },
    "(neuvedené)": {
     "n": 4,
     "n_priced": 0,
-    "m2": null
+    "m2": null,
+    "projects": 1
    }
   },
   "okres_price": {
@@ -171,33 +199,33 @@
   "layout_supply": [
    {
     "k": "2-izb",
-    "n": 283,
-    "m2": "4618",
-    "area": "56.9"
+    "n": 284,
+    "m2": 4618,
+    "area": 56.9
    },
    {
     "k": "3-izb",
     "n": 246,
-    "m2": "4371",
-    "area": "79.5"
+    "m2": 4371,
+    "area": 79.5
    },
    {
     "k": "1-izb",
-    "n": 70,
-    "m2": "5039",
-    "area": "31.1"
+    "n": 69,
+    "m2": 5039,
+    "area": 31.1
    },
    {
     "k": "4-izb",
     "n": 54,
-    "m2": "4752",
-    "area": "112.7"
+    "m2": 4752,
+    "area": 112.7
    },
    {
     "k": "5 a viac",
     "n": 8,
-    "m2": "5241",
-    "area": "156.2"
+    "m2": 5241,
+    "area": 156.2
    },
    {
     "k": "(neuvedené)",
@@ -471,11 +499,11 @@
     "n": 27
    },
    {
-    "project_id": "na-baranku",
+    "project_id": "rezidencia-best-home",
     "n": 24
    },
    {
-    "project_id": "rezidencia-best-home",
+    "project_id": "na-baranku",
     "n": 24
    },
    {

@@ -12,15 +12,15 @@ Prehľad trhu s novými bytmi v Bratislavskom kraji za 3. štvrťrok 2026: ponuk
 
 - **Počet bytov v ponuke v projektoch, ktoré predávali aj v predchádzajúcom štvrťroku, klesol o 5,8 %** — z 3 428 na 3 228.
 - Dopyt: od 1. júla do 27. septembra 2026 sa predalo 598 bytov.
-- Priemerná cena v projektoch sa pohybuje na úrovni 5 586 €/m² s DPH.
+- Priemerná cena v projektoch sa pohybuje na úrovni 5 571 €/m² s DPH.
 - Cena dokončených bytov je o 1,6 % vyššia než cena rozostavaných.
 
 ## Ponuka
 
-- Ku koncu obdobia bolo v ponuke 4 521 bytov v 107 projektoch.
+- Ku koncu obdobia bolo v ponuke 4 522 bytov v 107 projektoch.
 - 37 % projektov obsahuje 80 % ponuky (40 projektov s 3 645 bytmi).
 - 52 projektov má v ponuke menej ako 20 bytov (11 % ponuky).
-- Ponuka dokončených bytov tvorí 12,7 % všetkých nepredaných bytov (576 bytov).
+- Ponuka dokončených bytov tvorí 12,8 % všetkých nepredaných bytov (577 bytov).
 - Najviac dokončených voľných bytov je v lokalitách Bratislava a Rovinka.
 - Najväčšiu časť ponuky tvorí kategória 2-izb — 42,8 % bytov s uvedeným počtom izieb.
 
@@ -28,7 +28,7 @@ Prehľad trhu s novými bytmi v Bratislavskom kraji za 3. štvrťrok 2026: ponuk
 
 | Obec | Voľné | z toho dokončené |
 |---|---:|---:|
-| Bratislava | 4 203 | 569 |
+| Bratislava | 4 204 | 570 |
 | Slovenský Grob | 84 | 0 |
 | Bernolákovo | 60 | 0 |
 | Senec | 43 | 0 |
@@ -39,7 +39,7 @@ Prehľad trhu s novými bytmi v Bratislavskom kraji za 3. štvrťrok 2026: ponuk
 | Svätý Jur | 19 | 0 |
 | Rovinka | 7 | 7 |
 | Pezinok | 2 | 0 |
-| **celkom** | **4 521** | **576** |
+| **celkom** | **4 522** | **577** |
 
 ![Podiel voľných bytov podľa kategórie](/analyzy/kraj-ba-prehlad-2026-q3-podiel-ponuka.svg)
 *Podiel voľných bytov v 3. štvrťroku 2026 podľa kategórie.*
@@ -73,7 +73,7 @@ Prehľad trhu s novými bytmi v Bratislavskom kraji za 3. štvrťrok 2026: ponuk
 
 ## Cena
 
-- Celková priemerná cena projektov v Bratislavskom kraji je 5 586 €/m² s DPH.
+- Celková priemerná cena projektov v Bratislavskom kraji je 5 571 €/m² s DPH.
 - Na tých istých 2 203 bytoch priemerná cena medzikvartálne stúpla o 0,1 %.
 - Cena dokončených bytov je o 1,6 % vyššia než cena rozostavaných.
 - Predané byty mali priemernú cenníkovú cenu 5 793 €/m² s DPH, o 1,8 % nižšiu než byty, ktoré v tých istých projektoch zostali v ponuke (5 902 €/m² s DPH).
@@ -94,4 +94,4 @@ Prehľad trhu s novými bytmi v Bratislavskom kraji za 3. štvrťrok 2026: ponuk
 
 ## Výhľad
 
-Pri tempe predaja od 1. júla do 27. septembra 2026 — 207 bytov mesačne — by sa súčasná ponuka 4 521 bytov vypredala za 21,9 mesiaca. Dokončené voľné byty (576) tvoria 12,7 % tejto ponuky; kategória 2-izb tvorí 42,8 % ponuky a 49,3 % predaja.
+Pri tempe predaja od 1. júla do 27. septembra 2026 — 205 bytov mesačne — by sa súčasná ponuka 4 522 bytov vypredala za 22,1 mesiaca. Dokončené voľné byty (577) tvoria 12,8 % tejto ponuky; kategória 2-izb tvorí 42,8 % ponuky a 49,3 % predaja.

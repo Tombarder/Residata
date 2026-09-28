@@ -30,45 +30,45 @@ z
   </g>
   <g id="axes_1">
    <g id="wedge-1-izb">
-    <path d="M 294.192017 158.568182 
-C 288.95065 156.138252 283.460784 154.284888 277.819103 153.040729 
-C 272.177421 151.796571 266.417239 151.168966 260.64 151.168966 
+    <path d="M 294.422011 158.675253 
+C 289.149981 156.210707 283.624046 154.330471 277.942952 153.068145 
+C 272.261859 151.805819 266.459647 151.168966 260.64 151.168966 
 L 260.64 230.94 
 z
 " style="fill: #1d635e; stroke: #ffffff; stroke-width: 1.6; stroke-linejoin: miter"/>
    </g>
    <g id="wedge-2-izb">
-    <path d="M 261.551282 310.705829 
-C 279.640219 310.499173 297.131746 304.145346 311.136058 292.694077 
-C 325.140371 281.242808 334.841295 265.361476 338.636126 247.673865 
-C 342.430957 229.986254 340.098531 211.523199 332.024191 195.335012 
-C 323.949852 179.146826 310.604173 166.176958 294.192017 158.568182 
+    <path d="M 261.557958 310.705753 
+C 279.624577 310.497839 297.095403 304.157945 311.090822 292.731039 
+C 325.086241 281.304133 334.792624 265.454523 338.610124 247.794607 
+C 342.427624 230.134691 340.134309 211.691136 332.108173 195.503885 
+C 324.082037 179.316635 310.789683 166.326741 294.422011 158.675253 
 L 260.64 230.94 
 z
 " style="fill: #154a46; stroke: #ffffff; stroke-width: 1.6; stroke-linejoin: miter"/>
    </g>
    <g id="wedge-3-izb">
-    <path d="M 190.51774 192.909926 
-C 183.89165 205.127531 180.572256 218.867335 180.889786 232.762446 
-C 181.207316 246.657557 185.150879 260.231388 192.328152 272.13356 
-C 199.505425 284.035731 209.670237 293.858011 221.81135 300.62324 
-C 233.952463 307.388468 247.653451 310.864605 261.551282 310.705829 
+    <path d="M 191.101853 191.852099 
+C 184.241004 204.057684 180.713124 217.857186 180.874247 231.857958 
+C 181.035371 245.85873 184.879888 259.573389 192.019811 271.617851 
+C 199.159734 283.662314 209.346513 293.617298 221.552099 300.478147 
+C 233.757684 307.338996 247.557186 310.866876 261.557958 310.705753 
 L 260.64 230.94 
 z
 " style="fill: #4da19a; stroke: #ffffff; stroke-width: 1.6; stroke-linejoin: miter"/>
    </g>
    <g id="wedge-4-izb">
-    <path d="M 255.176468 151.356285 
-C 241.772299 152.276499 228.815368 156.568438 217.512523 163.832335 
-C 206.209677 171.096233 196.923089 181.099336 190.51774 192.909926 
+    <path d="M 255.136505 151.359038 
+C 241.943576 152.271407 229.182273 156.450302 218.005108 163.518313 
+C 206.827944 170.586323 197.581844 180.324067 191.101853 191.852099 
 L 260.64 230.94 
 z
 " style="fill: #498a84; stroke: #ffffff; stroke-width: 1.6; stroke-linejoin: miter"/>
    </g>
    <g id="wedge-5-a-viac">
     <path d="M 260.64 151.168966 
-C 259.728676 151.168966 258.817418 151.184582 257.906629 151.215809 
-C 256.995839 151.247036 256.085652 151.293868 255.176468 151.356285 
+C 259.721999 151.168966 258.804066 151.184812 257.886612 151.216498 
+C 256.969158 151.248184 256.052319 151.295704 255.136505 151.359038 
 L 260.64 230.94 
 z
 " style="fill: #5e8e8a; stroke: #ffffff; stroke-width: 1.6; stroke-linejoin: miter"/>
@@ -76,8 +76,8 @@ z
    <g id="matplotlib.axis_1"/>
    <g id="matplotlib.axis_2"/>
    <g id="patch_2">
-    <path d="M 371.913762 139.829726 
-Q 325.768712 146.67807 279.623662 153.526414 
+    <path d="M 371.914564 139.837664 
+Q 325.832015 146.694981 279.749466 153.552298 
 " style="fill: none; stroke: #6b7480; stroke-width: 0.9; stroke-linecap: round"/>
    </g>
    <g id="text_1">
@@ -85,31 +85,31 @@ Q 325.768712 146.67807 279.623662 153.526414
     <text style="font-size: 16px; font-family: 'IBM Plex Sans'; fill: #36414b" transform="translate(373.914869 152.793929)">7 %</text>
    </g>
    <g id="patch_3">
-    <path d="M 371.915845 250.513771 
-Q 355.881768 249.098068 339.847692 247.682365 
+    <path d="M 371.912767 250.6556 
+Q 355.868021 249.229402 339.823274 247.803203 
 " style="fill: none; stroke: #6b7480; stroke-width: 0.9; stroke-linecap: round"/>
    </g>
    <g id="text_2">
-    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; fill: #36414b" transform="translate(373.914869 247.783097)">2-izb</text>
-    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; fill: #36414b" transform="translate(373.914869 268.343097)">43 %</text>
+    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; fill: #36414b" transform="translate(373.914869 247.937647)">2-izb</text>
+    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; fill: #36414b" transform="translate(373.914869 268.497647)">43 %</text>
    </g>
    <g id="patch_4">
-    <path d="M 149.362087 279.7997 
-Q 170.202281 275.942843 191.042475 272.085986 
+    <path d="M 149.365198 279.169298 
+Q 170.052871 275.370635 190.740545 271.571971 
 " style="fill: none; stroke: #6b7480; stroke-width: 0.9; stroke-linecap: round"/>
    </g>
    <g id="text_3">
-    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; fill: #36414b" transform="translate(110.675131 279.091506)">3-izb</text>
-    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; fill: #36414b" transform="translate(109.557631 299.651506)">33 %</text>
+    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; fill: #36414b" transform="translate(110.675131 278.4314)">3-izb</text>
+    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; fill: #36414b" transform="translate(109.557631 298.9914)">33 %</text>
    </g>
    <g id="patch_5">
-    <path d="M 149.365553 149.588566 
-Q 182.677318 156.833427 215.989083 164.078288 
+    <path d="M 149.364158 149.18283 
+Q 182.921911 156.475598 216.479665 163.768366 
 " style="fill: none; stroke: #6b7480; stroke-width: 0.9; stroke-linecap: round"/>
    </g>
    <g id="text_4">
-    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; fill: #36414b" transform="translate(110.675131 140.465939)">4-izb</text>
-    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; fill: #36414b" transform="translate(109.557631 161.025939)">16 %</text>
+    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; fill: #36414b" transform="translate(110.675131 140.06399)">4-izb</text>
+    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; fill: #36414b" transform="translate(109.557631 160.62399)">16 %</text>
    </g>
   </g>
   <g id="text_5">

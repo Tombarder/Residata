@@ -138,6 +138,37 @@ What changes from Bratislava, and why:
 - A price row resting on fewer than ten comparable flats is left out of the
   table, and the table says so.
 
+🔴 **One place, one number, in every issue.** A supply level is a fortnight
+mean, so it is fractional; each PROJECT is rounded once
+(`ba_overview.project_levels`) and every row and total is a sum of those whole
+numbers. Before 2026-09-28 each table rounded its own rows, and a town printed
+one figure in its own issue and another as a row of its kraj's (Prešov 499 vs
+500). After building, and before publishing, run
+
+```
+python3 -m v2.scripts.issue_consistency          # exit 1 = two issues disagree
+```
+
+It holds every kraj to its row in the Slovakia issue, every town to its row in
+its kraj's, Bratislava's issue to its row in the Bratislavský kraj issue, and
+the national town table to all of them — supply, projects, sales, €/m², flat
+price and the days the pace is divided by.
+
+## The two national comparison tables
+
+Both are DATA issues: the table is the article, and every sentence is an
+extreme or a count of it, generated whole in `render.py`.
+
+- **`kde-sa-predava-<q>`** — supply, price, sales and months to sell out, one
+  row per obec. Built by the same code as every town's issue
+  (`issue_report --scope sk:obce --json-only`), so a town's row IS that
+  issue's figure. The template is its own (`kde-sa-predava-<q>.sk.md.tmpl`);
+  the share card is `issue_report._share_card(..., name="Slovensko podľa obcí")`.
+- **`co-stoji-byt-<q>`** — median price and €/m² by town and number of rooms,
+  from `market_report --json-only` (`cityByDisposition`). No cell rests on
+  fewer than 3 projects or 10 flats; a town needs three filled layouts. The
+  share card is `issue_report.city_disposition_card`.
+
 ## Re-publishing an issue whose quarter has closed
 
 An issue previewed before its period ended carries a projected figure and must

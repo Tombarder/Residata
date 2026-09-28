@@ -95,12 +95,12 @@ L 176.290712 236.710863
 L 215.756068 228.136294 
 L 255.221424 230.279936 
 L 294.68678 246.714526 
-L 334.152136 246.714526 
+L 334.152136 248.858168 
 L 373.617492 244.570884 
 L 413.082848 244.570884 
 L 452.548204 244.570884 
 L 492.01356 242.427242 
-L 531.478916 248.858168 
+L 531.478916 251.00181 
 L 570.944272 248.858168 
 " clip-path="url(#pb2a8d058d8)" style="fill: none; stroke: #c2410c; stroke-width: 2.6; stroke-linecap: round"/>
    </g>
@@ -122,18 +122,18 @@ L 570.944272 349.609346
    </g>
    <g id="line2d_12">
     <path d="M 97.36 234.567221 
-L 136.825356 225.278105 
-L 176.290712 225.278105 
+L 136.825356 223.134463 
+L 176.290712 223.134463 
 L 215.756068 234.567221 
 L 255.221424 249.572715 
 L 294.68678 249.572715 
 L 334.152136 249.572715 
 L 373.617492 249.572715 
 L 413.082848 249.572715 
-L 452.548204 248.143621 
-L 492.01356 248.143621 
-L 531.478916 240.2836 
-L 570.944272 225.278105 
+L 452.548204 245.999978 
+L 492.01356 245.999978 
+L 531.478916 238.139957 
+L 570.944272 223.134463 
 " clip-path="url(#pb2a8d058d8)" style="fill: none; stroke: #689e9a; stroke-width: 2; stroke-linecap: round"/>
    </g>
    <g id="text_4">
@@ -176,7 +176,7 @@ z
     <text style="font-weight: 600; font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #c2410c" x="578.340112" y="253.538168" transform="rotate(-0 578.340112 253.538168)">celá ponuka</text>
    </g>
    <g id="text_9">
-    <text style="font-weight: 600; font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #4a726f" x="578.340112" y="229.958105" transform="rotate(-0 578.340112 229.958105)">rozostavané</text>
+    <text style="font-weight: 600; font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #4a726f" x="578.340112" y="227.814463" transform="rotate(-0 578.340112 227.814463)">rozostavané</text>
    </g>
   </g>
   <g id="text_10">

@@ -1,6 +1,6 @@
 {
  "asOf": "2026-09-27",
- "generatedAt": "2026-09-28T08:26:55",
+ "generatedAt": "2026-09-28T13:15:54",
  "slug": "kraj-bb-prehlad-2026-q3",
  "overview": {
   "scope": {
@@ -30,7 +30,7 @@
   "sale_settling_days": 7,
   "rolling_days": 28,
   "prev_period_sales": 0,
-  "period_days": 88,
+  "period_days": 89,
   "okres_supply": {
    "Zvolen": {
     "n": 398,
@@ -38,7 +38,11 @@
     "building": 27,
     "unknown": 196,
     "projects": 3,
-    "m2": 3587
+    "m2": 3583,
+    "area": 65.5,
+    "price": 231785,
+    "n_priced": 201,
+    "p_priced": 3
    },
    "Banská Bystrica": {
     "n": 232,
@@ -46,7 +50,11 @@
     "building": 164,
     "unknown": 63,
     "projects": 8,
-    "m2": 3853
+    "m2": 3853,
+    "area": 60.2,
+    "price": 222357,
+    "n_priced": 180,
+    "p_priced": 6
    },
    "Lučenec": {
     "n": 57,
@@ -54,7 +62,11 @@
     "building": 0,
     "unknown": 57,
     "projects": 3,
-    "m2": 2320
+    "m2": 2320,
+    "area": 51.1,
+    "price": 117967,
+    "n_priced": 15,
+    "p_priced": 1
    },
    "Banská Štiavnica": {
     "n": 56,
@@ -62,7 +74,9 @@
     "building": 0,
     "unknown": 56,
     "projects": 3,
-    "m2": null
+    "m2": null,
+    "area": null,
+    "price": null
    },
    "Brezno": {
     "n": 16,
@@ -70,7 +84,11 @@
     "building": 0,
     "unknown": 16,
     "projects": 1,
-    "m2": 2427
+    "m2": 2427,
+    "area": 70.3,
+    "price": 169874,
+    "n_priced": 13,
+    "p_priced": 1
    },
    "Rimavská Sobota": {
     "n": 2,
@@ -78,34 +96,41 @@
     "building": 0,
     "unknown": 0,
     "projects": 1,
-    "m2": null
+    "m2": null,
+    "area": null,
+    "price": null
    }
   },
   "okres_sales": {
    "Banská Bystrica": {
     "n": 15,
     "n_priced": 8,
-    "m2": 4189
+    "m2": 4189,
+    "projects": 4
    },
    "Rimavská Sobota": {
     "n": 4,
     "n_priced": 0,
-    "m2": null
+    "m2": null,
+    "projects": 1
    },
    "Brezno": {
     "n": 3,
     "n_priced": 1,
-    "m2": 2312
+    "m2": 2312,
+    "projects": 1
    },
    "Zvolen": {
     "n": 2,
     "n_priced": 2,
-    "m2": 3436
+    "m2": 3436,
+    "projects": 1
    },
    "Lučenec": {
     "n": 1,
     "n_priced": 1,
-    "m2": 2393
+    "m2": 2393,
+    "projects": 1
    }
   },
   "okres_price": {
@@ -149,45 +174,45 @@
   "layout_supply": [
    {
     "k": "2-izb",
-    "n": "363",
-    "m2": "3654",
-    "area": "54.4"
+    "n": 363,
+    "m2": 3654,
+    "area": 54.4
    },
    {
     "k": "3-izb",
-    "n": "149",
-    "m2": "3514",
-    "area": "81.2"
+    "n": 149,
+    "m2": 3514,
+    "area": 81.2
    },
    {
     "k": "1-izb",
-    "n": "131",
-    "m2": "3790",
-    "area": "41.2"
+    "n": 131,
+    "m2": 3790,
+    "area": 41.2
    },
    {
     "k": "(neuvedené)",
-    "n": "63",
-    "m2": "3401",
-    "area": "69.7"
+    "n": 63,
+    "m2": 3401,
+    "area": 69.7
    },
    {
     "k": "4-izb",
-    "n": "36",
-    "m2": "3399",
-    "area": "105.7"
+    "n": 36,
+    "m2": 3399,
+    "area": 105.7
    },
    {
     "k": "5 a viac",
-    "n": "10",
-    "m2": "3100",
-    "area": "167.2"
+    "n": 10,
+    "m2": 3100,
+    "area": 167.2
    },
    {
     "k": "1,5-izb",
-    "n": "9",
-    "m2": "4302",
-    "area": "42.8"
+    "n": 9,
+    "m2": 4302,
+    "area": 42.8
    }
   ],
   "layout_sales": [

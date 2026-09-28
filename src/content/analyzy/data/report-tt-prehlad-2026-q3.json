@@ -1,6 +1,6 @@
 {
  "asOf": "2026-09-27",
- "generatedAt": "2026-09-28T08:24:58",
+ "generatedAt": "2026-09-28T13:13:26",
  "slug": "tt-prehlad-2026-q3",
  "overview": {
   "scope": {
@@ -31,7 +31,7 @@
   "sale_settling_days": 7,
   "rolling_days": 28,
   "prev_period_sales": 5,
-  "period_days": 88,
+  "period_days": 89,
   "okres_supply": {
    "1-izb": {
     "n": 54,
@@ -39,7 +39,11 @@
     "building": 23,
     "unknown": 24,
     "projects": 8,
-    "m2": 5584
+    "m2": 5585,
+    "area": 27.6,
+    "price": 153963,
+    "n_priced": 34,
+    "p_priced": 4
    },
    "1,5-izb": {
     "n": 25,
@@ -47,7 +51,11 @@
     "building": 6,
     "unknown": 19,
     "projects": 5,
-    "m2": 5265
+    "m2": 5265,
+    "area": 34.3,
+    "price": 180429,
+    "n_priced": 21,
+    "p_priced": 4
    },
    "2-izb": {
     "n": 279,
@@ -55,15 +63,23 @@
     "building": 86,
     "unknown": 172,
     "projects": 10,
-    "m2": 4064
+    "m2": 4064,
+    "area": 50.5,
+    "price": 203801,
+    "n_priced": 197,
+    "p_priced": 8
    },
    "3-izb": {
-    "n": 165,
+    "n": 164,
     "done": 9,
-    "building": 65,
+    "building": 64,
     "unknown": 91,
     "projects": 8,
-    "m2": 3581
+    "m2": 3581,
+    "area": 71.6,
+    "price": 256072,
+    "n_priced": 128,
+    "p_priced": 6
    },
    "4-izb": {
     "n": 54,
@@ -71,7 +87,11 @@
     "building": 9,
     "unknown": 42,
     "projects": 6,
-    "m2": 3921
+    "m2": 3921,
+    "area": 99.8,
+    "price": 391485,
+    "n_priced": 37,
+    "p_priced": 4
    },
    "(neuvedené)": {
     "n": 2,
@@ -79,34 +99,43 @@
     "building": 0,
     "unknown": 2,
     "projects": 1,
-    "m2": 2729
+    "m2": 2729,
+    "area": 78.2,
+    "price": 212500,
+    "n_priced": 2,
+    "p_priced": 1
    }
   },
   "okres_sales": {
    "1-izb": {
     "n": 1,
     "n_priced": 0,
-    "m2": null
+    "m2": null,
+    "projects": 1
    },
    "1,5-izb": {
     "n": 3,
     "n_priced": 3,
-    "m2": 5128
+    "m2": 5128,
+    "projects": 1
    },
    "2-izb": {
     "n": 37,
     "n_priced": 28,
-    "m2": 4161
+    "m2": 4161,
+    "projects": 6
    },
    "3-izb": {
     "n": 30,
     "n_priced": 24,
-    "m2": 3899
+    "m2": 3899,
+    "projects": 4
    },
    "4-izb": {
     "n": 4,
     "n_priced": 3,
-    "m2": 3383
+    "m2": 3383,
+    "projects": 2
    }
   },
   "okres_price": {
@@ -167,38 +196,38 @@
    {
     "k": "2-izb",
     "n": 279,
-    "m2": "4064",
-    "area": "50.5"
+    "m2": 4064,
+    "area": 50.5
    },
    {
     "k": "3-izb",
-    "n": 165,
-    "m2": "3581",
-    "area": "71.6"
+    "n": 164,
+    "m2": 3581,
+    "area": 71.6
    },
    {
     "k": "1-izb",
     "n": 54,
-    "m2": "5584",
-    "area": "27.6"
+    "m2": 5584,
+    "area": 27.6
    },
    {
     "k": "4-izb",
     "n": 54,
-    "m2": "3921",
-    "area": "99.8"
+    "m2": 3921,
+    "area": 99.8
    },
    {
     "k": "1,5-izb",
     "n": 25,
-    "m2": "5265",
-    "area": "34.3"
+    "m2": 5265,
+    "area": 34.3
    },
    {
     "k": "(neuvedené)",
     "n": 2,
-    "m2": "2729",
-    "area": "78.2"
+    "m2": 2729,
+    "area": 78.2
    }
   ],
   "layout_sales": [

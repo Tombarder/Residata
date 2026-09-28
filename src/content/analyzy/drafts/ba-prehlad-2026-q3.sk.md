@@ -12,7 +12,7 @@ Prehľad trhu s novými bytmi v Bratislave za 3. štvrťrok 2026: ponuka, dopyt 
 
 - **Počet bytov v ponuke v projektoch, ktoré predávali aj v predchádzajúcom štvrťroku, klesol o 5,8 %** — z 3 398 na 3 202.
 - Dopyt: od 1. júla do 27. septembra 2026 sa predalo 578 bytov.
-- Priemerná cena v projektoch sa pohybuje na úrovni 5 714 €/m² s DPH.
+- Priemerná cena v projektoch sa pohybuje na úrovni 5 705 €/m² s DPH.
 - Cena dokončených bytov je o 1,8 % vyššia než cena rozostavaných.
 
 ## Ponuka
@@ -30,8 +30,8 @@ Prehľad trhu s novými bytmi v Bratislave za 3. štvrťrok 2026: ponuka, dopyt 
 |---|---:|---:|
 | Bratislava I | 757 | 140 |
 | Bratislava II | 1 184 | 212 |
-| Bratislava III | 568 | 82 |
-| Bratislava IV | 896 | 118 |
+| Bratislava III | 569 | 82 |
+| Bratislava IV | 895 | 118 |
 | Bratislava V | 799 | 18 |
 | **celkom** | **4 204** | **570** |
 
@@ -65,7 +65,7 @@ Prehľad trhu s novými bytmi v Bratislave za 3. štvrťrok 2026: ponuka, dopyt 
 
 ## Cena
 
-- Celková priemerná cena projektov v Bratislave je 5 714 €/m² s DPH.
+- Celková priemerná cena projektov v Bratislave je 5 705 €/m² s DPH.
 - Na tých istých 2 191 bytoch priemerná cena medzikvartálne stúpla o 0,2 %.
 - Cena dokončených bytov je o 1,8 % vyššia než cena rozostavaných.
 - Predané byty mali priemernú cenníkovú cenu 5 812 €/m² s DPH, o 1,8 % nižšiu než byty, ktoré v tých istých projektoch zostali v ponuke (5 921 €/m² s DPH).
@@ -88,4 +88,4 @@ Prehľad trhu s novými bytmi v Bratislave za 3. štvrťrok 2026: ponuka, dopyt 
 
 ## Výhľad
 
-Pri tempe predaja od 1. júla do 27. septembra 2026 — 200 bytov mesačne — by sa súčasná ponuka 4 204 bytov vypredala za 21,0 mesiaca. Dokončené voľné byty (570) tvoria 13,6 % tejto ponuky; kategória 2-izb tvorí 43,2 % ponuky a 49,7 % predaja.
+Pri tempe predaja od 1. júla do 27. septembra 2026 — 198 bytov mesačne — by sa súčasná ponuka 4 204 bytov vypredala za 21,3 mesiaca. Dokončené voľné byty (570) tvoria 13,6 % tejto ponuky; kategória 2-izb tvorí 43,2 % ponuky a 49,7 % predaja.

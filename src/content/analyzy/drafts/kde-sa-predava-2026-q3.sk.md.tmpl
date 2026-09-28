@@ -1,23 +1,23 @@
 <!--PEREX
-Kvartálny prehľad trhu s novostavbami na celom Slovensku. Ponuku tvorí {natStock} bytov v {natTowns} mestách. Rýchlosť predaja sa medzi mestami líši {natSpread}-násobne: {natFastest} má ponuku na {natFastestMo} mesiaca, {natSlowest} na {natSlowestMo}.
+Ponuka, ceny a predaj nových bytov v slovenských obciach {periodSk}: koľko bytov je v ponuke, za koľko sa predávajú a za aký čas by sa pri súčasnom tempe predaja vypredali.
 -->
 <!--METHOD
-Údaje pochádzajú z verejne zverejnených cenníkov slovenských developerov, ktoré Residata číta denne, byt po byte. Ponuku tvoria voľné a rezervované byty v aktívnych projektoch; počítajú sa výlučne byty, nie parkovanie, pivnice ani nebytové priestory. Ceny a výmery sú priemerom za byty, pri ktorých developer cenu zverejňuje — tie tvoria {natPricedShare} % ponuky. Cenové úrovne sú počítané ako priemer denných hodnôt za posledné dva týždne štvrťroka, aby ich neovplyvnil jeden deň, v ktorom niektorý projekt pridal alebo stiahol časť ponuky. Mesiace do vypredania sú podiel aktuálnej ponuky a mesačného tempa predaja v danom štvrťroku; uvádzame ich len pri mestách s aspoň {natMinSales} predanými bytmi, pretože pri menšom počte ide o rozhodnutie jedného projektu, nie o tempo mesta.
+Údaje pochádzajú z verejne zverejnených cenníkov developerov, ktoré Residata číta denne, byt po byte. Ponuku tvoria voľné, rezervované a predrezervované byty v aktívnych projektoch na Slovensku; počítajú sa výlučne byty, nie parkovanie, pivnice ani nebytové priestory. Projekt je zaradený do obce, v ktorej stojí. Počet bytov v ponuke a ceny sú priemerom denných hodnôt za posledné dva týždne obdobia, aby jeden deň neurčoval celé číslo. Ceny sú s DPH a sú priemerom za byty, pri ktorých developer cenu zverejňuje; cenu za meter počítame na obytnú plochu. Predaj je byt, ktorý developer v cenníku označil ako predaný, alebo ktorý z cenníka zmizol a už sa naň nevrátil; rezervácie za predaj nepovažujeme. Prvých {settlingDays} dní po tom, čo projekt začneme sledovať, predaje nepočítame — cenník sa v tom čase ešte ustaľuje. Čas do vypredania je podiel ponuky ku koncu obdobia a priemerného mesačného predaja za obdobie. Obec má v tabuľke vlastný riadok pri aspoň {obceMinN} bytoch v ponuke z aspoň {obceMinProjects} projektov; cenu uvádzame pri aspoň {obceMinN} bytoch so zverejnenou cenou z aspoň {obceMinProjects} projektov a čas do vypredania pri aspoň {obceMinN} predaných bytoch z aspoň {obceMinProjects} projektov. Ostatné obce sú spolu v jednom riadku. Údaje za jednotlivé obce sú tie isté, aké uvádzajú naše prehľady trhu za tieto obce a kraje.
 -->
-{asOf} | KVARTÁLNY PREHĽAD TRHU S NOVOSTAVBAMI NA SLOVENSKU
+{asOf} | TRH NOVÝCH BYTOV PODĽA OBCÍ — Slovensko
 
-# Slovensko: v jednom meste sa ponuka vypredá za {natFastestMo} mesiaca, v druhom za {natSlowestMo}
+# Slovensko: ponuka a predaj nových bytov podľa obcí v {quarterSk}
 
-Ponuku novostavieb na Slovensku tvorilo v závere štvrťroka {natStock} bytov v {natTowns} mestách. Priemerná cena aj veľkosť ponuky sa medzi mestami líšia, no najväčší rozdiel nie je v cene — je v tom, ako rýchlo sa tá ponuka predáva.
+## Úvod
 
-Na Bratislavu pripadá {natBaShare} % celej ponuky a {natBaSoldShare} % predaja — zvyšných {natRestTowns} miest si delí {natRestStock} bytov. Cenovo je rozptyl {natPriceSpread}-násobný: {natDearest} {natDearestM2} €/m² s DPH, {natCheapest} {natCheapestM2} €/m² s DPH.
+- Ku koncu obdobia bolo na Slovensku v ponuke {supplyTotal} bytov v {supplyProjects} projektoch {obceTowns}.
+- {periodSkCap} sa predalo {salesTotal} bytov.
+{obceTopBullet}
+{obceClearBullet}
+{obcePriceBullet}
 
-Rýchlosť predaja sa však s cenou neprekrýva. Pri súčasnom tempe má {natFastest} ponuku na {natFastestMo} mesiaca, {natSlowest} na {natSlowestMo} — {natSpread}-násobne dlhšie. Pritom {natFastest} má priemernú cenu {natFastestM2} €/m² s DPH a {natSlowest} {natSlowestM2} €/m² s DPH, teda nižšiu. Naprieč {natWithClearing} mestami, pri ktorých vieme tempo spočítať, je súvislosť medzi cenou a rýchlosťou vypredania prakticky nulová (korelácia {natCorr}). Cena mesta o jeho tempe nehovorí nič.
+## Obce
 
-Rozdiel medzi mestami je pritom lepšie vidieť na ploche než na percentách. Za cenu priemerného bratislavského bytu — {natYardstick} € s DPH — kúpite v Bratislave {natYardstickSqm} m². Inde za tie isté peniaze: {natBuy1} {natBuy1Sqm} m², {natBuy2} {natBuy2Sqm} m², {natBuy3} {natBuy3Sqm} m².
+**Ponuka, ceny a predaj nových bytov podľa obcí v {quarterSk}**
 
-{natTable}
-
-\* Mesiace do vypredania uvádzame pri {natWithClearing} mestách, ktoré majú v tomto štvrťroku aspoň {natMinSales} predaných bytov. Pri ostatných je vzorka primalá na to, aby tempo mesta odlíšila od rozhodnutia jedného projektu.
-
-**Autor:** Tomáš Kamhal, zakladateľ Residaty · tomas@residata.eu
+{obceTable}

@@ -30,53 +30,53 @@ z
   </g>
   <g id="axes_1">
    <g id="wedge-1-izb">
-    <path d="M 175.901322 148.885316 
-C 168.933026 144.728057 161.436462 141.528165 153.613995 139.372019 
-C 145.791528 137.215873 137.714183 136.12305 129.6 136.12305 
+    <path d="M 175.774341 148.809701 
+C 168.820524 144.676484 161.343118 141.495606 153.542749 139.352412 
+C 145.742379 137.209219 137.68944 136.12305 129.6 136.12305 
 L 129.6 226.494456 
 z
 " style="fill: #1d635e; stroke: #ffffff; stroke-width: 1.6; stroke-linejoin: miter"/>
    </g>
    <g id="wedge-1-5-izb">
-    <path d="M 193.766469 162.857555 
-C 191.096777 160.165646 188.260332 157.644401 185.273953 155.30877 
-C 182.287575 152.973139 179.157177 150.827747 175.901322 148.885316 
+    <path d="M 193.658468 162.74884 
+C 190.984857 160.062106 188.144861 157.546237 185.155314 155.216142 
+C 182.165767 152.886047 179.032586 150.74634 175.774341 148.809701 
 L 129.6 226.494456 
 z
 " style="fill: #467874; stroke: #ffffff; stroke-width: 1.6; stroke-linejoin: miter"/>
    </g>
    <g id="wedge-2-izb">
-    <path d="M 97.499999 310.972742 
-C 116.796002 318.304825 138.033627 318.808919 157.655772 312.400595 
-C 177.277916 305.99227 194.124293 293.050461 205.373292 275.742798 
-C 216.622291 258.435135 221.608743 237.785047 219.497462 217.251229 
-C 217.386182 196.717411 208.302013 177.514059 193.766469 162.857555 
+    <path d="M 97.698328 311.047837 
+C 117.006768 318.332839 138.240002 318.788705 157.843317 312.339118 
+C 177.446631 305.889531 194.261421 292.915678 205.472677 275.589546 
+C 216.683933 258.263415 221.629042 237.609022 219.480129 217.084176 
+C 217.331217 196.559331 208.215289 177.377102 193.658468 162.74884 
 L 129.6 226.494456 
 z
 " style="fill: #154a46; stroke: #ffffff; stroke-width: 1.6; stroke-linejoin: miter"/>
    </g>
    <g id="wedge-3-izb">
-    <path d="M 56.930709 172.771415 
-C 48.637653 183.989144 43.053599 196.976264 40.617347 210.712235 
-C 38.181096 224.448205 38.958177 238.563554 42.887528 251.949084 
-C 46.816878 265.334615 53.792805 277.630279 63.267135 287.869874 
-C 72.741464 298.109469 84.459353 306.017567 97.499999 310.972742 
+    <path d="M 56.861873 172.864653 
+C 48.578391 184.099543 43.0094 197.102317 40.593016 210.850042 
+C 38.176631 224.597766 38.977925 238.72022 42.933859 252.106386 
+C 46.889793 265.492551 53.893835 277.781944 63.394976 288.007753 
+C 72.896116 298.233562 84.638493 306.120411 97.698328 311.047837 
 L 129.6 226.494456 
 z
 " style="fill: #4da19a; stroke: #ffffff; stroke-width: 1.6; stroke-linejoin: miter"/>
    </g>
    <g id="wedge-4-izb">
-    <path d="M 119.409128 136.699483 
-C 107.076432 138.099127 95.163287 142.024591 84.414297 148.230523 
-C 73.665307 154.436455 64.309183 162.790809 56.930709 172.771415 
+    <path d="M 119.411561 136.699207 
+C 107.059023 138.100763 95.127529 142.036246 84.365182 148.2589 
+C 73.602835 154.481554 64.239369 162.85855 56.861873 172.864653 
 L 129.6 226.494456 
 z
 " style="fill: #498a84; stroke: #ffffff; stroke-width: 1.6; stroke-linejoin: miter"/>
    </g>
    <g id="wedge-5-a-viac">
     <path d="M 129.6 136.12305 
-C 127.897788 136.12305 126.195915 136.171144 124.496419 136.267274 
-C 122.796923 136.363403 121.100483 136.507531 119.409128 136.699483 
+C 127.898196 136.12305 126.196731 136.171121 124.497641 136.267205 
+C 122.798552 136.363288 121.102515 136.507347 119.411561 136.699207 
 L 129.6 226.494456 
 z
 " style="fill: #5e8e8a; stroke: #ffffff; stroke-width: 1.6; stroke-linejoin: miter"/>
@@ -84,13 +84,13 @@ z
    <g id="matplotlib.axis_1"/>
    <g id="matplotlib.axis_2"/>
    <g id="text_1">
-    <text style="font-weight: 600; font-size: 11.8px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #ffffff" x="178.094907" y="261.317395" transform="rotate(-0 178.094907 261.317395)">43 %</text>
+    <text style="font-weight: 600; font-size: 11.8px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #ffffff" x="178.158513" y="261.219314" transform="rotate(-0 178.158513 261.219314)">43 %</text>
    </g>
    <g id="text_2">
-    <text style="font-weight: 600; font-size: 11.8px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #ffffff" x="74.104018" y="246.089418" transform="rotate(-0 74.104018 246.089418)">29 %</text>
+    <text style="font-weight: 600; font-size: 11.8px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #ffffff" x="74.13367" y="246.190091" transform="rotate(-0 74.13367 246.190091)">29 %</text>
    </g>
    <g id="text_3">
-    <text style="font-weight: 600; font-size: 11.8px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #ffffff" x="100.68115" y="179.709539" transform="rotate(-0 100.68115 179.709539)">13 %</text>
+    <text style="font-weight: 600; font-size: 11.8px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #ffffff" x="100.649717" y="179.7277" transform="rotate(-0 100.649717 179.7277)">13 %</text>
    </g>
   </g>
   <g id="text_4">
@@ -107,7 +107,7 @@ z
    <text style="font-size: 11.8px; font-family: 'IBM Plex Sans'; fill: #6b7480" transform="translate(13.4784 493.864796)">Dáta k 27. 9. 2026.</text>
   </g>
   <g id="text_7">
-   <text style="font-size: 11.8px; font-family: 'IBM Plex Sans'; fill: #6b7480" transform="translate(13.4784 413.105781)">Pozn.: 34 bytov bez uvedeného počtu izieb</text>
+   <text style="font-size: 11.8px; font-family: 'IBM Plex Sans'; fill: #6b7480" transform="translate(13.4784 413.105781)">Pozn.: 33 bytov bez uvedeného počtu izieb</text>
    <text style="font-size: 11.8px; font-family: 'IBM Plex Sans'; fill: #6b7480" transform="translate(13.4784 430.504328)">nie je v grafe.</text>
   </g>
   <g id="text_8">

@@ -12,15 +12,15 @@ Prehľad trhu s novými bytmi na Slovensku za 3. štvrťrok 2026: ponuka, dopyt 
 
 - **Počet bytov v ponuke v projektoch, ktoré predávali aj v predchádzajúcom štvrťroku, klesol o 4,9 %** — zo 6 305 na 5 994.
 - Dopyt: od 1. júla do 27. septembra 2026 sa predalo 1 182 bytov.
-- Priemerná cena v projektoch sa pohybuje na úrovni 4 711 €/m² s DPH.
+- Priemerná cena v projektoch sa pohybuje na úrovni 4 709 €/m² s DPH.
 - Cena dokončených bytov je o 1,5 % nižšia než cena rozostavaných.
 
 ## Ponuka
 
-- Ku koncu obdobia bolo v ponuke 9 552 bytov v 248 projektoch.
+- Ku koncu obdobia bolo v ponuke 9 553 bytov v 248 projektoch.
 - 40 % projektov obsahuje 80 % ponuky (99 projektov s 7 655 bytmi).
 - 117 projektov má v ponuke menej ako 20 bytov (12 % ponuky).
-- Ponuka dokončených bytov tvorí 11,8 % všetkých nepredaných bytov (1 126 bytov).
+- Ponuka dokončených bytov tvorí 11,8 % všetkých nepredaných bytov (1 128 bytov).
 - Najviac dokončených voľných bytov je v Bratislavskom kraji a v Banskobystrickom kraji.
 - Najväčšiu časť ponuky tvorí kategória 2-izb — 44,9 % bytov s uvedeným počtom izieb.
 
@@ -28,15 +28,15 @@ Prehľad trhu s novými bytmi na Slovensku za 3. štvrťrok 2026: ponuka, dopyt 
 
 | Kraj | Voľné | z toho dokončené |
 |---|---:|---:|
-| Bratislavský | 4 520 | 576 |
-| Trnavský | 941 | 141 |
-| Trenčiansky | 400 | 0 |
-| Nitriansky | 656 | 60 |
+| Bratislavský | 4 522 | 577 |
+| Trnavský | 886 | 142 |
+| Trenčiansky | 438 | 0 |
+| Nitriansky | 671 | 60 |
 | Žilinský | 628 | 97 |
-| Banskobystrický | 760 | 182 |
-| Prešovský | 896 | 12 |
-| Košický | 751 | 58 |
-| **celkom** | **9 552** | **1 126** |
+| Banskobystrický | 761 | 182 |
+| Prešovský | 907 | 23 |
+| Košický | 740 | 47 |
+| **celkom** | **9 553** | **1 128** |
 
 ![Podiel voľných bytov podľa kategórie](/analyzy/sk-prehlad-2026-q3-podiel-ponuka.svg)
 *Podiel voľných bytov v 3. štvrťroku 2026 podľa kategórie.*
@@ -57,8 +57,8 @@ Prehľad trhu s novými bytmi na Slovensku za 3. štvrťrok 2026: ponuka, dopyt 
 | Kraj | Počet predaných bytov |
 |---|---:|
 | Bratislavský | 598 |
-| Trnavský | 103 |
-| Trenčiansky | 65 |
+| Trnavský | 91 |
+| Trenčiansky | 77 |
 | Nitriansky | 55 |
 | Žilinský | 74 |
 | Banskobystrický | 25 |
@@ -71,7 +71,7 @@ Prehľad trhu s novými bytmi na Slovensku za 3. štvrťrok 2026: ponuka, dopyt 
 
 ## Cena
 
-- Celková priemerná cena projektov na Slovensku je 4 711 €/m² s DPH.
+- Celková priemerná cena projektov na Slovensku je 4 709 €/m² s DPH.
 - Na tých istých 3 909 bytoch priemerná cena medzikvartálne stúpla o 0,2 %.
 - Cena dokončených bytov je o 1,5 % nižšia než cena rozostavaných.
 - Predané byty mali priemernú cenníkovú cenu 5 038 €/m² s DPH, o 1,4 % nižšiu než byty, ktoré v tých istých projektoch zostali v ponuke (5 111 €/m² s DPH).
@@ -84,17 +84,17 @@ Prehľad trhu s novými bytmi na Slovensku za 3. štvrťrok 2026: ponuka, dopyt 
 | Kraj | Q2/2026 | Q3/2026 | Zmena |
 |---|---:|---:|---:|
 | Bratislavský | 5 694 | 5 701 | +0,1 % |
-| Trnavský | 3 512 | 3 509 | −0,1 % |
-| Trenčiansky | 3 982 | 3 993 | +0,3 % |
+| Trnavský | 3 516 | 3 513 | −0,1 % |
+| Trenčiansky | 3 969 | 3 979 | +0,3 % |
 | Nitriansky | 3 398 | 3 467 | +2,0 % |
 | Žilinský | 3 789 | 3 785 | −0,1 % |
 | Banskobystrický | 3 885 | 3 880 | −0,1 % |
-| Prešovský | 3 701 | 3 705 | +0,1 % |
-| Košický | 4 813 | 4 796 | −0,4 % |
+| Prešovský | 3 682 | 3 686 | +0,1 % |
+| Košický | 4 858 | 4 842 | −0,3 % |
 
 ![Vývoj cien voľných a predaných bytov](/analyzy/sk-prehlad-2026-q3-ponuka-vs-predaj-mesiace.svg)
 *Cena predaných bytov a ponuková cena v tých istých projektoch, po mesiacoch.*
 
 ## Výhľad
 
-Pri tempe predaja od 1. júla do 27. septembra 2026 — 409 bytov mesačne — by sa súčasná ponuka 9 552 bytov vypredala za 23,4 mesiaca. Dokončené voľné byty (1 126) tvoria 11,8 % tejto ponuky; kategória 2-izb tvorí 44,9 % ponuky a 48,7 % predaja.
+Pri tempe predaja od 1. júla do 27. septembra 2026 — 404 bytov mesačne — by sa súčasná ponuka 9 553 bytov vypredala za 23,6 mesiaca. Dokončené voľné byty (1 128) tvoria 11,8 % tejto ponuky; kategória 2-izb tvorí 44,9 % ponuky a 48,7 % predaja.

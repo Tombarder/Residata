@@ -1,6 +1,6 @@
 {
  "asOf": "2026-09-27",
- "generatedAt": "2026-09-28T08:24:14",
+ "generatedAt": "2026-09-28T13:12:40",
  "slug": "za-prehlad-2026-q3",
  "overview": {
   "scope": {
@@ -31,7 +31,7 @@
   "sale_settling_days": 7,
   "rolling_days": 28,
   "prev_period_sales": 6,
-  "period_days": 88,
+  "period_days": 89,
   "okres_supply": {
    "1-izb": {
     "n": 23,
@@ -39,15 +39,23 @@
     "building": 10,
     "unknown": 11,
     "projects": 6,
-    "m2": 4666
+    "m2": 4666,
+    "area": 34.4,
+    "price": 155949,
+    "n_priced": 21,
+    "p_priced": 6
    },
    "2-izb": {
-    "n": 87,
+    "n": 88,
     "done": 14,
     "building": 45,
-    "unknown": 28,
+    "unknown": 29,
     "projects": 8,
-    "m2": 4432
+    "m2": 4434,
+    "area": 50.5,
+    "price": 224627,
+    "n_priced": 59,
+    "p_priced": 7
    },
    "3-izb": {
     "n": 59,
@@ -55,7 +63,11 @@
     "building": 43,
     "unknown": 14,
     "projects": 7,
-    "m2": 3868
+    "m2": 3868,
+    "area": 72.9,
+    "price": 285378,
+    "n_priced": 46,
+    "p_priced": 5
    },
    "4-izb": {
     "n": 38,
@@ -63,7 +75,11 @@
     "building": 20,
     "unknown": 4,
     "projects": 9,
-    "m2": 4062
+    "m2": 4062,
+    "area": 99.2,
+    "price": 400417,
+    "n_priced": 24,
+    "p_priced": 8
    },
    "5 a viac": {
     "n": 2,
@@ -71,42 +87,55 @@
     "building": 0,
     "unknown": 0,
     "projects": 1,
-    "m2": 4693
+    "m2": 4693,
+    "area": 151.0,
+    "price": 706108,
+    "n_priced": 2,
+    "p_priced": 1
    },
    "(neuvedené)": {
-    "n": 3,
+    "n": 2,
     "done": 0,
     "building": 0,
-    "unknown": 3,
+    "unknown": 2,
     "projects": 1,
-    "m2": 3784
+    "m2": 3784,
+    "area": 76.4,
+    "price": 278950,
+    "n_priced": 2,
+    "p_priced": 1
    }
   },
   "okres_sales": {
    "1-izb": {
     "n": 2,
     "n_priced": 2,
-    "m2": 4871
+    "m2": 4871,
+    "projects": 2
    },
    "2-izb": {
     "n": 13,
     "n_priced": 12,
-    "m2": 4136
+    "m2": 4136,
+    "projects": 5
    },
    "3-izb": {
     "n": 15,
     "n_priced": 8,
-    "m2": 3848
+    "m2": 3848,
+    "projects": 6
    },
    "4-izb": {
     "n": 8,
     "n_priced": 3,
-    "m2": 3509
+    "m2": 3509,
+    "projects": 5
    },
    "5 a viac": {
     "n": 1,
     "n_priced": 1,
-    "m2": 3433
+    "m2": 3433,
+    "projects": 1
    }
   },
   "okres_price": {
@@ -166,39 +195,39 @@
   "layout_supply": [
    {
     "k": "2-izb",
-    "n": 87,
-    "m2": "4432",
-    "area": "50.5"
+    "n": 88,
+    "m2": 4432,
+    "area": 50.5
    },
    {
     "k": "3-izb",
     "n": 59,
-    "m2": "3868",
-    "area": "72.9"
+    "m2": 3868,
+    "area": 72.9
    },
    {
     "k": "4-izb",
     "n": 38,
-    "m2": "4062",
-    "area": "99.2"
+    "m2": 4062,
+    "area": 99.2
    },
    {
     "k": "1-izb",
     "n": 23,
-    "m2": "4666",
-    "area": "34.4"
+    "m2": 4666,
+    "area": 34.4
    },
    {
     "k": "(neuvedené)",
-    "n": 3,
-    "m2": "3784",
-    "area": "76.4"
+    "n": 2,
+    "m2": 3784,
+    "area": 76.4
    },
    {
     "k": "5 a viac",
     "n": 2,
-    "m2": "4693",
-    "area": "151.0"
+    "m2": 4693,
+    "area": 151.0
    }
   ],
   "layout_sales": [
@@ -448,11 +477,11 @@
     "n": 10
    },
    {
-    "project_id": "basehaus",
+    "project_id": "zelene-vlcince",
     "n": 7
    },
    {
-    "project_id": "zelene-vlcince",
+    "project_id": "basehaus",
     "n": 7
    },
    {

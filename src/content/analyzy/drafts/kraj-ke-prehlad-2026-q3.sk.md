@@ -10,19 +10,19 @@ Prehľad trhu s novými bytmi v Košickom kraji za 3. štvrťrok 2026: ponuka, d
 
 ## Úvod
 
-- **Počet bytov v ponuke v projektoch, ktoré predávali aj v predchádzajúcom štvrťroku, narástol o 2,9 %** — z 350 na 360.
+- **Počet bytov v ponuke v projektoch, ktoré predávali aj v predchádzajúcom štvrťroku, narástol o 0,6 %** — z 347 na 349.
 - Dopyt: od 1. júla do 27. septembra 2026 sa predalo 128 bytov.
-- Priemerná cena v projektoch sa pohybuje na úrovni 4 312 €/m² s DPH.
-- Cena dokončených bytov je o 4,8 % vyššia než cena rozostavaných.
+- Priemerná cena v projektoch sa pohybuje na úrovni 4 352 €/m² s DPH.
+- Cena dokončených bytov je o 28,0 % vyššia než cena rozostavaných.
 
 ## Ponuka
 
-- Ku koncu obdobia bolo v ponuke 751 bytov v 29 projektoch.
-- 48 % projektov obsahuje 80 % ponuky (14 projektov s 614 bytmi).
-- 14 projektov má v ponuke menej ako 20 bytov (15 % ponuky).
-- Ponuka dokončených bytov tvorí 7,7 % všetkých nepredaných bytov (58 bytov).
-- Najviac dokončených voľných bytov je v lokalitách Košice a Humenné.
-- Najväčšiu časť ponuky tvorí kategória 2-izb — 43,3 % bytov s uvedeným počtom izieb.
+- Ku koncu obdobia bolo v ponuke 740 bytov v 28 projektoch.
+- 46 % projektov obsahuje 80 % ponuky (13 projektov s 593 bytmi).
+- 13 projektov má v ponuke menej ako 20 bytov (14 % ponuky).
+- Ponuka dokončených bytov tvorí 6,4 % všetkých nepredaných bytov (47 bytov).
+- Najviac dokončených voľných bytov je v lokalitách Košice a Michalovce.
+- Najväčšiu časť ponuky tvorí kategória 2-izb — 43,7 % bytov s uvedeným počtom izieb.
 
 **Podiel voľných bytov v 3. štvrťroku 2026 podľa obce**
 
@@ -30,9 +30,8 @@ Prehľad trhu s novými bytmi v Košickom kraji za 3. štvrťrok 2026: ponuka, d
 |---|---:|---:|
 | Košice | 668 | 43 |
 | Spišská Nová Ves | 69 | 1 |
-| Humenné | 11 | 11 |
 | Michalovce | 3 | 3 |
-| **celkom** | **751** | **58** |
+| **celkom** | **740** | **47** |
 
 ![Podiel voľných bytov podľa kategórie](/analyzy/kraj-ke-prehlad-2026-q3-podiel-ponuka.svg)
 *Podiel voľných bytov v 3. štvrťroku 2026 podľa kategórie.*
@@ -40,10 +39,10 @@ Prehľad trhu s novými bytmi v Košickom kraji za 3. štvrťrok 2026: ponuka, d
 ## Dopyt
 
 - Od 1. júla do 27. septembra 2026 sa predalo v Košickom kraji 128 bytov.
-- Absorpcia trhu je 17,0 % — predané byty za obdobie k bytom v ponuke.
+- Absorpcia trhu je 17,3 % — predané byty za obdobie k bytom v ponuke.
 - Najväčší záujem je o kategóriu 1-izb: 36,3 % predaných bytov.
 - Podiel na predaji prevyšuje podiel na ponuke v kategórii 1-izb.
-- V lokalite Košice je podiel na predaji (96,9 %) najvýraznejšie nad podielom na ponuke (88,9 %); opačný pomer má Spišská Nová Ves — 0,8 % predaja pri 9,2 % ponuky.
+- V lokalite Košice je podiel na predaji (96,9 %) najvýraznejšie nad podielom na ponuke (90,3 %); opačný pomer má Spišská Nová Ves — 0,8 % predaja pri 9,3 % ponuky.
 
 ![Dopyt po bytoch](/analyzy/kraj-ke-prehlad-2026-q3-dopyt-mesiace.svg)
 *Počet predaných bytov v Košickom kraji za mesiac v projektoch, ktoré sledujeme od začiatku štvrťroka.*
@@ -62,9 +61,9 @@ Prehľad trhu s novými bytmi v Košickom kraji za 3. štvrťrok 2026: ponuka, d
 
 ## Cena
 
-- Celková priemerná cena projektov v Košickom kraji je 4 312 €/m² s DPH.
-- Na tých istých 184 bytoch priemerná cena medzikvartálne klesla o 0,3 %.
-- Cena dokončených bytov je o 4,8 % vyššia než cena rozostavaných.
+- Celková priemerná cena projektov v Košickom kraji je 4 352 €/m² s DPH.
+- Na tých istých 181 bytoch priemerná cena medzikvartálne klesla o 0,3 %.
+- Cena dokončených bytov je o 28,0 % vyššia než cena rozostavaných.
 - Predané byty mali priemernú cenníkovú cenu 5 011 €/m² s DPH, prakticky rovnakú ako byty, ktoré v tých istých projektoch zostali v ponuke (4 992 €/m² s DPH).
 
 ![Vývoj cien nových bytov](/analyzy/kraj-ke-prehlad-2026-q3-ceny-vyvoj.svg)
@@ -83,4 +82,4 @@ Prehľad trhu s novými bytmi v Košickom kraji za 3. štvrťrok 2026: ponuka, d
 
 ## Výhľad
 
-Pri tempe predaja od 1. júla do 27. septembra 2026 — 44 bytov mesačne — by sa súčasná ponuka 751 bytov vypredala za 17,0 mesiaca. Dokončené voľné byty (58) tvoria 7,7 % tejto ponuky; kategória 2-izb tvorí 43,3 % ponuky a 33,9 % predaja.
+Pri tempe predaja od 1. júla do 27. septembra 2026 — 44 bytov mesačne — by sa súčasná ponuka 740 bytov vypredala za 16,9 mesiaca. Dokončené voľné byty (47) tvoria 6,4 % tejto ponuky; kategória 2-izb tvorí 43,7 % ponuky a 33,9 % predaja.

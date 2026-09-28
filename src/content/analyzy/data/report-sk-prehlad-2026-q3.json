@@ -1,6 +1,6 @@
 {
  "asOf": "2026-09-27",
- "generatedAt": "2026-09-28T08:24:54",
+ "generatedAt": "2026-09-28T13:13:27",
  "slug": "sk-prehlad-2026-q3",
  "overview": {
   "scope": {
@@ -39,39 +39,55 @@
   "sale_settling_days": 7,
   "rolling_days": 28,
   "prev_period_sales": 207,
-  "period_days": 88,
+  "period_days": 89,
   "okres_supply": {
    "Bratislavský kraj": {
-    "n": 4520,
-    "done": 576,
+    "n": 4522,
+    "done": 577,
     "building": 2924,
-    "unknown": 1020,
+    "unknown": 1021,
     "projects": 107,
-    "m2": 5570
+    "m2": 5571,
+    "area": 65.6,
+    "price": 371398,
+    "n_priced": 3624,
+    "p_priced": 92
    },
    "Trnavský kraj": {
-    "n": 941,
-    "done": 141,
-    "building": 274,
-    "unknown": 526,
-    "projects": 24,
-    "m2": 3711
+    "n": 886,
+    "done": 142,
+    "building": 243,
+    "unknown": 501,
+    "projects": 22,
+    "m2": 3747,
+    "area": 61.5,
+    "price": 221297,
+    "n_priced": 580,
+    "p_priced": 17
    },
    "Trenčiansky kraj": {
-    "n": 400,
+    "n": 438,
     "done": 0,
-    "building": 77,
-    "unknown": 323,
-    "projects": 10,
-    "m2": 3678
+    "building": 108,
+    "unknown": 330,
+    "projects": 11,
+    "m2": 3677,
+    "area": 66.9,
+    "price": 248897,
+    "n_priced": 334,
+    "p_priced": 10
    },
    "Nitriansky kraj": {
-    "n": 656,
+    "n": 671,
     "done": 60,
-    "building": 437,
-    "unknown": 159,
-    "projects": 17,
-    "m2": 3342
+    "building": 436,
+    "unknown": 175,
+    "projects": 18,
+    "m2": 3313,
+    "area": 66.2,
+    "price": 213279,
+    "n_priced": 511,
+    "p_priced": 15
    },
    "Žilinský kraj": {
     "n": 628,
@@ -79,73 +95,97 @@
     "building": 319,
     "unknown": 212,
     "projects": 23,
-    "m2": 3882
+    "m2": 3882,
+    "area": 62.3,
+    "price": 240414,
+    "n_priced": 389,
+    "p_priced": 16
    },
    "Banskobystrický kraj": {
-    "n": 760,
+    "n": 761,
     "done": 182,
     "building": 191,
-    "unknown": 387,
+    "unknown": 388,
     "projects": 19,
-    "m2": 3621
+    "m2": 3621,
+    "area": 62.8,
+    "price": 221417,
+    "n_priced": 409,
+    "p_priced": 11
    },
    "Prešovský kraj": {
-    "n": 896,
-    "done": 12,
+    "n": 907,
+    "done": 23,
     "building": 308,
     "unknown": 576,
-    "projects": 19,
-    "m2": 3768
+    "projects": 20,
+    "m2": 3741,
+    "area": 66.8,
+    "price": 245729,
+    "n_priced": 569,
+    "p_priced": 15
    },
    "Košický kraj": {
-    "n": 751,
-    "done": 58,
+    "n": 740,
+    "done": 47,
     "building": 281,
     "unknown": 412,
-    "projects": 29,
-    "m2": 4312
+    "projects": 28,
+    "m2": 4352,
+    "area": 69.8,
+    "price": 302079,
+    "n_priced": 529,
+    "p_priced": 26
    }
   },
   "okres_sales": {
    "Bratislavský kraj": {
     "n": 598,
     "n_priced": 481,
-    "m2": 5671
+    "m2": 5671,
+    "projects": 79
    },
    "Trnavský kraj": {
-    "n": 103,
-    "n_priced": 83,
-    "m2": 3695
+    "n": 91,
+    "n_priced": 71,
+    "m2": 3814,
+    "projects": 11
    },
    "Trenčiansky kraj": {
-    "n": 65,
-    "n_priced": 31,
-    "m2": 3995
+    "n": 77,
+    "n_priced": 43,
+    "m2": 3713,
+    "projects": 6
    },
    "Nitriansky kraj": {
     "n": 55,
     "n_priced": 41,
-    "m2": 3393
+    "m2": 3393,
+    "projects": 12
    },
    "Žilinský kraj": {
     "n": 74,
     "n_priced": 49,
-    "m2": 3611
+    "m2": 3611,
+    "projects": 16
    },
    "Banskobystrický kraj": {
     "n": 25,
     "n_priced": 12,
-    "m2": 3757
+    "m2": 3757,
+    "projects": 8
    },
    "Prešovský kraj": {
     "n": 134,
     "n_priced": 41,
-    "m2": 3570
+    "m2": 3570,
+    "projects": 6
    },
    "Košický kraj": {
     "n": 128,
     "n_priced": 87,
-    "m2": 4802
+    "m2": 4802,
+    "projects": 14
    }
   },
   "okres_price": {
@@ -158,20 +198,20 @@
     "projects": 60
    },
    "Trnavský kraj": {
-    "m2_cur": 3509,
-    "m2_prev": 3512,
+    "m2_cur": 3513,
+    "m2_prev": 3516,
     "chg_pct": -0.1,
-    "unit_days": 3588,
-    "units": 256,
-    "projects": 10
+    "unit_days": 3560,
+    "units": 254,
+    "projects": 9
    },
    "Trenčiansky kraj": {
-    "m2_cur": 3993,
-    "m2_prev": 3982,
+    "m2_cur": 3979,
+    "m2_prev": 3969,
     "chg_pct": 0.3,
-    "unit_days": 1918,
-    "units": 137,
-    "projects": 3
+    "unit_days": 1946,
+    "units": 139,
+    "projects": 4
    },
    "Nitriansky kraj": {
     "m2_cur": 3467,
@@ -198,23 +238,23 @@
     "projects": 6
    },
    "Prešovský kraj": {
-    "m2_cur": 3705,
-    "m2_prev": 3701,
+    "m2_cur": 3686,
+    "m2_prev": 3682,
     "chg_pct": 0.1,
-    "unit_days": 3441,
-    "units": 246,
-    "projects": 5
+    "unit_days": 3483,
+    "units": 249,
+    "projects": 6
    },
    "Košický kraj": {
-    "m2_cur": 4796,
-    "m2_prev": 4813,
-    "chg_pct": -0.4,
-    "unit_days": 2476,
-    "units": 177,
-    "projects": 13
+    "m2_cur": 4842,
+    "m2_prev": 4858,
+    "chg_pct": -0.3,
+    "unit_days": 2434,
+    "units": 174,
+    "projects": 12
    }
   },
-  "projects": 246,
+  "projects": 248,
   "mean_price": 309550,
   "mean_area": 65.4,
   "panel_projects": 142,
@@ -229,45 +269,45 @@
   "layout_supply": [
    {
     "k": "2-izb",
-    "n": "4166",
-    "m2": "4633",
-    "area": "53.0"
+    "n": 4167,
+    "m2": 4633,
+    "area": 53.0
    },
    {
     "k": "3-izb",
-    "n": "2929",
-    "m2": "4473",
-    "area": "75.7"
+    "n": 2931,
+    "m2": 4473,
+    "area": 75.7
    },
    {
     "k": "4-izb",
-    "n": "977",
-    "m2": "5189",
-    "area": "104.0"
+    "n": 976,
+    "m2": 5189,
+    "area": 104.0
    },
    {
     "k": "1-izb",
-    "n": "887",
-    "m2": "5407",
-    "area": "37.0"
+    "n": 887,
+    "m2": 5407,
+    "area": 37.0
    },
    {
     "k": "(neuvedené)",
-    "n": "270",
-    "m2": "3313",
-    "area": "75.9"
+    "n": 270,
+    "m2": 3313,
+    "area": 75.9
    },
    {
     "k": "1,5-izb",
-    "n": "219",
-    "m2": "5679",
-    "area": "36.2"
+    "n": 220,
+    "m2": 5679,
+    "area": 36.2
    },
    {
     "k": "5 a viac",
-    "n": "102",
-    "m2": "6009",
-    "area": "157.3"
+    "n": 102,
+    "m2": 6009,
+    "area": 157.3
    }
   ],
   "layout_sales": [
@@ -316,11 +356,11 @@
   ],
   "own_quarters": {
    "2026Q2": 4905,
-   "2026Q3": 4711
+   "2026Q3": 4709
   },
   "quarter_sales": 1182,
   "quarter_sold_m2": 4950,
-  "quarter_ask_m2": 4711,
+  "quarter_ask_m2": 4709,
   "price_series": [
    {
     "wk": "2026-06-15",

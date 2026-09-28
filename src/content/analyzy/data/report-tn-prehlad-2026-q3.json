@@ -1,6 +1,6 @@
 {
  "asOf": "2026-09-27",
- "generatedAt": "2026-09-28T08:25:31",
+ "generatedAt": "2026-09-28T13:14:00",
  "slug": "tn-prehlad-2026-q3",
  "overview": {
   "scope": {
@@ -31,7 +31,7 @@
   "sale_settling_days": 7,
   "rolling_days": 28,
   "prev_period_sales": 2,
-  "period_days": 88,
+  "period_days": 89,
   "okres_supply": {
    "1-izb": {
     "n": 19,
@@ -39,15 +39,23 @@
     "building": 10,
     "unknown": 9,
     "projects": 2,
-    "m2": 4555
+    "m2": 4555,
+    "area": 38.5,
+    "price": 174969,
+    "n_priced": 15,
+    "p_priced": 2
    },
    "2-izb": {
-    "n": 118,
+    "n": 117,
     "done": 0,
     "building": 32,
-    "unknown": 86,
+    "unknown": 85,
     "projects": 5,
-    "m2": 3991
+    "m2": 3991,
+    "area": 55.2,
+    "price": 220659,
+    "n_priced": 109,
+    "p_priced": 5
    },
    "3-izb": {
     "n": 91,
@@ -55,63 +63,83 @@
     "building": 25,
     "unknown": 66,
     "projects": 5,
-    "m2": 3863
+    "m2": 3863,
+    "area": 75.6,
+    "price": 295539,
+    "n_priced": 88,
+    "p_priced": 5
    },
    "4-izb": {
-    "n": 44,
+    "n": 43,
     "done": 0,
     "building": 9,
-    "unknown": 35,
+    "unknown": 34,
     "projects": 5,
-    "m2": 4062
+    "m2": 4062,
+    "area": 101.0,
+    "price": 413443,
+    "n_priced": 40,
+    "p_priced": 5
    },
    "5 a viac": {
     "n": 3,
     "done": 0,
     "building": 1,
     "unknown": 2,
-    "projects": 3,
-    "m2": 5482
+    "projects": 2,
+    "m2": 5557,
+    "area": 167.4,
+    "price": 934442,
+    "n_priced": 1,
+    "p_priced": 1
    },
    "(neuvedené)": {
     "n": 0,
     "done": 0,
     "building": 0,
     "unknown": 0,
-    "projects": 1,
-    "m2": null
+    "projects": 0,
+    "m2": null,
+    "area": null,
+    "price": null
    }
   },
   "okres_sales": {
    "1-izb": {
     "n": 8,
     "n_priced": 1,
-    "m2": 4451
+    "m2": 4451,
+    "projects": 2
    },
    "2-izb": {
     "n": 26,
     "n_priced": 14,
-    "m2": 4198
+    "m2": 4198,
+    "projects": 3
    },
    "3-izb": {
     "n": 15,
     "n_priced": 13,
-    "m2": 3796
+    "m2": 3796,
+    "projects": 4
    },
    "4-izb": {
     "n": 12,
     "n_priced": 0,
-    "m2": null
+    "m2": null,
+    "projects": 1
    },
    "5 a viac": {
     "n": 2,
     "n_priced": 2,
-    "m2": 4458
+    "m2": 4458,
+    "projects": 2
    },
    "(neuvedené)": {
     "n": 1,
     "n_priced": 0,
-    "m2": null
+    "m2": null,
+    "projects": 1
    }
   },
   "okres_price": {
@@ -171,33 +199,33 @@
   "layout_supply": [
    {
     "k": "2-izb",
-    "n": 118,
-    "m2": "3991",
-    "area": "55.2"
+    "n": 117,
+    "m2": 3991,
+    "area": 55.2
    },
    {
     "k": "3-izb",
     "n": 91,
-    "m2": "3863",
-    "area": "75.6"
+    "m2": 3863,
+    "area": 75.6
    },
    {
     "k": "4-izb",
-    "n": 44,
-    "m2": "4062",
-    "area": "101.0"
+    "n": 43,
+    "m2": 4062,
+    "area": 101.0
    },
    {
     "k": "1-izb",
     "n": 19,
-    "m2": "4555",
-    "area": "38.5"
+    "m2": 4555,
+    "area": 38.5
    },
    {
     "k": "5 a viac",
     "n": 3,
-    "m2": "5482",
-    "area": "165.9"
+    "m2": 5482,
+    "area": 165.9
    },
    {
     "k": "(neuvedené)",
@@ -246,11 +274,11 @@
   ],
   "own_quarters": {
    "2026Q2": 4275,
-   "2026Q3": 4001
+   "2026Q3": 3998
   },
   "quarter_sales": 64,
   "quarter_sold_m2": 4050,
-  "quarter_ask_m2": 4001,
+  "quarter_ask_m2": 3998,
   "price_series": [
    {
     "wk": "2026-06-15",

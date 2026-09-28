@@ -10,19 +10,19 @@ Prehľad trhu s novými bytmi v Trnavskom kraji za 3. štvrťrok 2026: ponuka, d
 
 ## Úvod
 
-- **Počet bytov v ponuke v projektoch, ktoré predávali aj v predchádzajúcom štvrťroku, narástol o 25,1 %** — zo 406 na 508.
-- Dopyt: od 1. júla do 27. septembra 2026 sa predalo 103 bytov.
-- Priemerná cena v projektoch sa pohybuje na úrovni 3 711 €/m² s DPH.
-- Cena dokončených bytov je o 23,0 % nižšia než cena rozostavaných.
+- **Počet bytov v ponuke v projektoch, ktoré predávali aj v predchádzajúcom štvrťroku, narástol o 21,7 %** — z 392 na 477.
+- Dopyt: od 1. júla do 27. septembra 2026 sa predalo 91 bytov.
+- Priemerná cena v projektoch sa pohybuje na úrovni 3 747 €/m² s DPH.
+- Cena dokončených bytov je o 25,4 % nižšia než cena rozostavaných.
 
 ## Ponuka
 
-- Ku koncu obdobia bolo v ponuke 942 bytov v 24 projektoch.
-- 50 % projektov obsahuje 80 % ponuky (12 projektov s 771 bytmi).
-- 10 projektov má v ponuke menej ako 20 bytov (13 % ponuky).
-- Ponuka dokončených bytov tvorí 15,1 % všetkých nepredaných bytov (142 bytov).
+- Ku koncu obdobia bolo v ponuke 886 bytov v 22 projektoch.
+- 45 % projektov obsahuje 80 % ponuky (10 projektov s 710 bytmi).
+- 10 projektov má v ponuke menej ako 20 bytov (14 % ponuky).
+- Ponuka dokončených bytov tvorí 16,0 % všetkých nepredaných bytov (142 bytov).
 - Najviac dokončených voľných bytov je v lokalitách Dunajská Streda a Trnava.
-- Najväčšiu časť ponuky tvorí kategória 2-izb — 44,1 % bytov s uvedeným počtom izieb.
+- Najväčšiu časť ponuky tvorí kategória 2-izb — 43,6 % bytov s uvedeným počtom izieb.
 
 **Podiel voľných bytov v 3. štvrťroku 2026 podľa obce**
 
@@ -31,23 +31,22 @@ Prehľad trhu s novými bytmi v Trnavskom kraji za 3. štvrťrok 2026: ponuka, d
 | Trnava | 578 | 40 |
 | Piešťany | 128 | 14 |
 | Dunajská Streda | 102 | 86 |
-| Nové Mesto nad Váhom | 56 | 0 |
 | Sekule | 37 | 0 |
 | Hlohovec | 27 | 2 |
 | Sereď | 9 | 0 |
 | Oľdza | 5 | 0 |
-| **celkom** | **942** | **142** |
+| **celkom** | **886** | **142** |
 
 ![Podiel voľných bytov podľa kategórie](/analyzy/kraj-tt-prehlad-2026-q3-podiel-ponuka.svg)
 *Podiel voľných bytov v 3. štvrťroku 2026 podľa kategórie.*
 
 ## Dopyt
 
-- Od 1. júla do 27. septembra 2026 sa predalo v Trnavskom kraji 103 bytov.
-- Absorpcia trhu je 10,9 % — predané byty za obdobie k bytom v ponuke.
-- Najväčší záujem je o kategóriu 2-izb: 47,6 % predaných bytov.
+- Od 1. júla do 27. septembra 2026 sa predalo v Trnavskom kraji 91 bytov.
+- Absorpcia trhu je 10,3 % — predané byty za obdobie k bytom v ponuke.
+- Najväčší záujem je o kategóriu 2-izb: 46,2 % predaných bytov.
 - Podiel na predaji prevyšuje podiel na ponuke v kategóriách 1,5-izb, 2-izb a 3-izb.
-- V lokalite Trnava je podiel na predaji (72,8 %) najvýraznejšie nad podielom na ponuke (61,4 %); opačný pomer má Piešťany — 5,8 % predaja pri 13,6 % ponuky.
+- V lokalite Trnava je podiel na predaji (82,4 %) najvýraznejšie nad podielom na ponuke (65,2 %); opačný pomer má Piešťany — 6,6 % predaja pri 14,4 % ponuky.
 
 ![Dopyt po bytoch](/analyzy/kraj-tt-prehlad-2026-q3-dopyt-mesiace.svg)
 *Počet predaných bytov v Trnavskom kraji za mesiac v projektoch, ktoré sledujeme od začiatku štvrťroka.*
@@ -57,22 +56,21 @@ Prehľad trhu s novými bytmi v Trnavskom kraji za 3. štvrťrok 2026: ponuka, d
 | Obec | Počet predaných bytov |
 |---|---:|
 | Trnava | 75 |
-| Nové Mesto nad Váhom | 12 |
 | Piešťany | 6 |
 | Dunajská Streda | 4 |
 | Sekule | 4 |
 | Oľdza | 2 |
-| **celkom** | **103** |
+| **celkom** | **91** |
 
 ![Počet predaných bytov podľa kategórie](/analyzy/kraj-tt-prehlad-2026-q3-podiel-predaj.svg)
 *Počet predaných bytov v 3. štvrťroku 2026 podľa kategórie.*
 
 ## Cena
 
-- Celková priemerná cena projektov v Trnavskom kraji je 3 711 €/m² s DPH.
-- Na tých istých 262 bytoch priemerná cena medzikvartálne stúpla o 0,5 %.
-- Cena dokončených bytov je o 23,0 % nižšia než cena rozostavaných.
-- Predané byty mali priemernú cenníkovú cenu 3 789 €/m² s DPH, o 2,2 % nižšiu než byty, ktoré v tých istých projektoch zostali v ponuke (3 873 €/m² s DPH).
+- Celková priemerná cena projektov v Trnavskom kraji je 3 747 €/m² s DPH.
+- Na tých istých 260 bytoch priemerná cena medzikvartálne stúpla o 0,5 %.
+- Cena dokončených bytov je o 25,4 % nižšia než cena rozostavaných.
+- Predané byty mali priemernú cenníkovú cenu 3 942 €/m² s DPH, o 2,9 % nižšiu než byty, ktoré v tých istých projektoch zostali v ponuke (4 060 €/m² s DPH).
 
 ![Vývoj cien nových bytov](/analyzy/kraj-tt-prehlad-2026-q3-ceny-vyvoj.svg)
 *Zmena priemernej ponukovej ceny za meter od začiatku štvrťroka, týždenne, na tých istých bytoch — graf sa pohne len vtedy, keď sa pohne cena.*
@@ -90,4 +88,4 @@ Prehľad trhu s novými bytmi v Trnavskom kraji za 3. štvrťrok 2026: ponuka, d
 
 ## Výhľad
 
-Pri tempe predaja od 1. júla do 27. septembra 2026 — 36 bytov mesačne — by sa súčasná ponuka 942 bytov vypredala za 26,4 mesiaca. Dokončené voľné byty (142) tvoria 15,1 % tejto ponuky; kategória 2-izb tvorí 44,1 % ponuky a 47,6 % predaja.
+Pri tempe predaja od 1. júla do 27. septembra 2026 — 31 bytov mesačne — by sa súčasná ponuka 886 bytov vypredala za 28,5 mesiaca. Dokončené voľné byty (142) tvoria 16,0 % tejto ponuky; kategória 2-izb tvorí 43,6 % ponuky a 46,2 % predaja.

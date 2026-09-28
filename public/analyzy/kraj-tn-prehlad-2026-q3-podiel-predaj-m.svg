@@ -30,43 +30,43 @@ z
   </g>
   <g id="axes_1">
    <g id="wedge-1-izb">
-    <path d="M 192.078969 166.128927 
-C 183.874306 157.924264 174.133283 151.41552 163.413375 146.975189 
-C 152.693466 142.534857 141.203146 140.24929 129.6 140.24929 
+    <path d="M 189.443655 163.600357 
+C 181.358881 156.157798 171.95619 150.288348 161.719057 146.293806 
+C 151.481925 142.299265 140.58887 140.24929 129.6 140.24929 
 L 129.6 228.607896 
 z
 " style="fill: #1d635e; stroke: #ffffff; stroke-width: 1.6; stroke-linejoin: miter"/>
    </g>
    <g id="wedge-2-izb">
-    <path d="M 103.950851 313.16181 
-C 122.79738 318.878842 143.02493 318.133817 161.399824 311.045839 
-C 179.774717 303.95786 195.262671 290.925895 205.387704 274.033298 
-C 215.512737 257.1407 219.704934 237.338318 217.294108 217.791859 
-C 214.883282 198.2454 206.005134 180.055092 192.078969 166.128927 
+    <path d="M 94.106752 309.52435 
+C 113.253506 317.922895 134.773355 319.258949 154.811911 313.293212 
+C 174.850467 307.327475 192.135411 294.438735 203.570863 276.935473 
+C 215.006315 259.432211 219.866197 238.425772 217.280063 217.678588 
+C 214.693929 196.931403 204.825982 177.760786 189.443655 163.600357 
 L 129.6 228.607896 
 z
 " style="fill: #154a46; stroke: #ffffff; stroke-width: 1.6; stroke-linejoin: miter"/>
    </g>
    <g id="wedge-3-izb">
-    <path d="M 42.93918 211.369987 
-C 38.661181 232.876943 42.538895 255.224765 53.812296 274.033298 
-C 65.085696 292.84183 82.966774 306.79636 103.950851 313.16181 
+    <path d="M 48.683546 193.114648 
+C 39.273761 214.566796 38.770674 238.904272 47.28591 260.726953 
+C 55.801147 282.549635 72.654605 300.114566 94.106752 309.52435 
 L 129.6 228.607896 
 z
 " style="fill: #4da19a; stroke: #ffffff; stroke-width: 1.6; stroke-linejoin: miter"/>
    </g>
    <g id="wedge-4-izb">
-    <path d="M 112.362091 141.947076 
-C 95.224252 145.356004 79.476724 153.773233 67.121031 166.128927 
-C 54.765337 178.48462 46.348108 194.232148 42.93918 211.369987 
+    <path d="M 115.056651 141.454387 
+C 100.572621 143.871344 86.917001 149.861254 75.329021 158.880541 
+C 63.741041 167.899828 54.582164 179.667153 48.683546 193.114648 
 L 129.6 228.607896 
 z
 " style="fill: #498a84; stroke: #ffffff; stroke-width: 1.6; stroke-linejoin: miter"/>
    </g>
    <g id="wedge-5-a-viac">
     <path d="M 129.6 140.24929 
-C 126.707891 140.24929 123.817525 140.391285 120.939342 140.674761 
-C 118.061159 140.958237 115.198629 141.382854 112.362091 141.947076 
+C 127.164682 140.24929 124.730404 140.349973 122.303404 140.55108 
+C 119.876404 140.752187 117.458755 141.053546 115.056651 141.454387 
 L 129.6 228.607896 
 z
 " style="fill: #5e8e8a; stroke: #ffffff; stroke-width: 1.6; stroke-linejoin: miter"/>
@@ -74,16 +74,16 @@ z
    <g id="matplotlib.axis_1"/>
    <g id="matplotlib.axis_2"/>
    <g id="text_1">
-    <text style="font-weight: 600; font-size: 11.8px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #ffffff" x="151.24056" y="179.666963" transform="rotate(-0 151.24056 179.666963)">12 %</text>
+    <text style="font-weight: 600; font-size: 11.8px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #ffffff" x="150.156197" y="179.230879" transform="rotate(-0 150.156197 179.230879)">12 %</text>
    </g>
    <g id="text_2">
-    <text style="font-weight: 600; font-size: 11.8px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #ffffff" x="178.104131" y="260.984153" transform="rotate(-0 178.104131 260.984153)">42 %</text>
+    <text style="font-weight: 600; font-size: 11.8px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #ffffff" x="176.941352" y="262.841545" transform="rotate(-0 176.941352 262.841545)">45 %</text>
    </g>
    <g id="text_3">
-    <text style="font-weight: 600; font-size: 11.8px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #ffffff" x="81.095869" y="260.984153" transform="rotate(-0 81.095869 260.984153)">23 %</text>
+    <text style="font-weight: 600; font-size: 11.8px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #ffffff" x="76.918983" y="252.468093" transform="rotate(-0 76.918983 252.468093)">25 %</text>
    </g>
    <g id="text_4">
-    <text style="font-weight: 600; font-size: 11.8px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #ffffff" x="89.61346" y="191.925356" transform="rotate(-0 89.61346 191.925356)">19 %</text>
+    <text style="font-weight: 600; font-size: 11.8px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #ffffff" x="94.866574" y="187.286389" transform="rotate(-0 94.866574 187.286389)">16 %</text>
    </g>
   </g>
   <g id="text_5">
@@ -93,7 +93,7 @@ z
   <g id="text_6">
    <text style="font-size: 12.9px; font-family: 'Outfit'; fill: #6b7480" transform="translate(13.4784 79.511809)">Byty predané v Trenčianskom kraji</text>
    <text style="font-size: 12.9px; font-family: 'Outfit'; fill: #6b7480" transform="translate(13.4784 95.765809)">v období od 1. júla do 27. septembra</text>
-   <text style="font-size: 12.9px; font-family: 'Outfit'; fill: #6b7480" transform="translate(13.4784 111.865614)">2026 — spolu 65 bytov</text>
+   <text style="font-size: 12.9px; font-family: 'Outfit'; fill: #6b7480" transform="translate(13.4784 111.865614)">2026 — spolu 77 bytov</text>
   </g>
   <g id="text_7">
    <text style="font-size: 11.8px; font-family: 'IBM Plex Sans'; fill: #6b7480" transform="translate(13.4784 457.355781)">Zdroj: Residata — denné čítanie</text>
@@ -108,13 +108,13 @@ z
    <text style="font-size: 11.8px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #6b7480" x="28.8184" y="344.553312" transform="rotate(-0 28.8184 344.553312)">1-izb · 12 %</text>
   </g>
   <g id="text_10">
-   <text style="font-size: 11.8px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #6b7480" x="125.2184" y="344.553312" transform="rotate(-0 125.2184 344.553312)">2-izb · 42 %</text>
+   <text style="font-size: 11.8px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #6b7480" x="125.2184" y="344.553312" transform="rotate(-0 125.2184 344.553312)">2-izb · 45 %</text>
   </g>
   <g id="text_11">
-   <text style="font-size: 11.8px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #6b7480" x="28.8184" y="366.973312" transform="rotate(-0 28.8184 366.973312)">3-izb · 23 %</text>
+   <text style="font-size: 11.8px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #6b7480" x="28.8184" y="366.973312" transform="rotate(-0 28.8184 366.973312)">3-izb · 25 %</text>
   </g>
   <g id="text_12">
-   <text style="font-size: 11.8px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #6b7480" x="125.2184" y="366.973312" transform="rotate(-0 125.2184 366.973312)">4-izb · 19 %</text>
+   <text style="font-size: 11.8px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #6b7480" x="125.2184" y="366.973312" transform="rotate(-0 125.2184 366.973312)">4-izb · 16 %</text>
   </g>
   <g id="text_13">
    <text style="font-size: 11.8px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #6b7480" x="28.8184" y="389.393312" transform="rotate(-0 28.8184 389.393312)">5 a viac · 3 %</text>

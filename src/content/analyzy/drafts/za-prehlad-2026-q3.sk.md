@@ -22,18 +22,18 @@ Prehľad trhu s novými bytmi v Žiline za 3. štvrťrok 2026: ponuka, dopyt a c
 - 6 projektov má v ponuke menej ako 20 bytov (23 % ponuky).
 - Ponuka dokončených bytov tvorí 16,0 % všetkých nepredaných bytov (34 bytov).
 - Najviac dokončených voľných bytov je v kategóriách 2-izb a 4-izb.
-- Najväčšiu časť ponuky tvorí kategória 2-izb — 41,6 % bytov s uvedeným počtom izieb.
+- Najväčšiu časť ponuky tvorí kategória 2-izb — 41,9 % bytov s uvedeným počtom izieb.
 
 **Podiel voľných bytov v 3. štvrťroku 2026 podľa kategórie**
 
 | Kategória | Voľné | z toho dokončené |
 |---|---:|---:|
 | 1-izb | 23 | 2 |
-| 2-izb | 87 | 14 |
+| 2-izb | 88 | 14 |
 | 3-izb | 59 | 2 |
 | 4-izb | 38 | 14 |
 | 5 a viac | 2 | 2 |
-| (neuvedené) | 3 | 0 |
+| (neuvedené) | 2 | 0 |
 | **celkom** | **212** | **34** |
 
 ![Podiel voľných bytov podľa kategórie](/analyzy/za-prehlad-2026-q3-podiel-ponuka.svg)
@@ -89,4 +89,4 @@ Prehľad trhu s novými bytmi v Žiline za 3. štvrťrok 2026: ponuka, dopyt a c
 
 ## Výhľad
 
-Pri tempe predaja od 1. júla do 27. septembra 2026 — 13 bytov mesačne — by sa súčasná ponuka 212 bytov vypredala za 15,7 mesiaca. Dokončené voľné byty (34) tvoria 16,0 % tejto ponuky; kategória 2-izb tvorí 41,6 % ponuky a 33,3 % predaja.
+Pri tempe predaja od 1. júla do 27. septembra 2026 — 13 bytov mesačne — by sa súčasná ponuka 212 bytov vypredala za 15,9 mesiaca. Dokončené voľné byty (34) tvoria 16,0 % tejto ponuky; kategória 2-izb tvorí 41,9 % ponuky a 33,3 % predaja.

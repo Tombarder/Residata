@@ -16,11 +16,11 @@ Prehľad trhu s novými bytmi v Prešove za 3. štvrťrok 2026: ponuka, dopyt a 
 
 ## Ponuka
 
-- Ku koncu obdobia bolo v ponuke 499 bytov v 6 projektoch.
+- Ku koncu obdobia bolo v ponuke 500 bytov v 6 projektoch.
 - 67 % projektov obsahuje 80 % ponuky (4 projekty s 441 bytmi).
 - 1 projekt má v ponuke menej ako 20 bytov (3 % ponuky).
 - Dokončené byty v ponuke nie sú.
-- Najväčšiu časť ponuky tvorí kategória 2-izb — 45,1 % bytov s uvedeným počtom izieb.
+- Najväčšiu časť ponuky tvorí kategória 2-izb — 45,0 % bytov s uvedeným počtom izieb.
 
 **Podiel voľných bytov v 3. štvrťroku 2026 podľa kategórie**
 
@@ -29,10 +29,10 @@ Prehľad trhu s novými bytmi v Prešove za 3. štvrťrok 2026: ponuka, dopyt a 
 | 1-izb | 44 | 0 |
 | 1,5-izb | 3 | 0 |
 | 2-izb | 223 | 0 |
-| 3-izb | 167 | 0 |
+| 3-izb | 168 | 0 |
 | 4-izb | 58 | 0 |
 | (neuvedené) | 4 | 0 |
-| **celkom** | **499** | **0** |
+| **celkom** | **500** | **0** |
 
 ![Podiel voľných bytov podľa kategórie](/analyzy/po-prehlad-2026-q3-podiel-ponuka.svg)
 *Podiel voľných bytov v 3. štvrťroku 2026 podľa kategórie.*
@@ -82,4 +82,4 @@ Prehľad trhu s novými bytmi v Prešove za 3. štvrťrok 2026: ponuka, dopyt a 
 
 ## Výhľad
 
-Pri tempe predaja od 1. júla do 27. septembra 2026 — 41 bytov mesačne — by sa súčasná ponuka 499 bytov vypredala za 12,1 mesiaca. Dokončené byty v ponuke nie sú; kategória 2-izb tvorí 45,1 % ponuky a 69,8 % predaja.
+Pri tempe predaja od 1. júla do 27. septembra 2026 — 41 bytov mesačne — by sa súčasná ponuka 500 bytov vypredala za 12,3 mesiaca. Dokončené byty v ponuke nie sú; kategória 2-izb tvorí 45,0 % ponuky a 69,8 % predaja.

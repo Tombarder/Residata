@@ -12,28 +12,29 @@ Prehľad trhu s novými bytmi v Nitrianskom kraji za 3. štvrťrok 2026: ponuka,
 
 - **Počet bytov v ponuke v projektoch, ktoré predávali aj v predchádzajúcom štvrťroku, klesol o 8,4 %** — z 595 na 545.
 - Dopyt: od 1. júla do 27. septembra 2026 sa predalo 55 bytov.
-- Priemerná cena v projektoch sa pohybuje na úrovni 3 337 €/m² s DPH.
+- Priemerná cena v projektoch sa pohybuje na úrovni 3 313 €/m² s DPH.
 
 ## Ponuka
 
-- Ku koncu obdobia bolo v ponuke 656 bytov v 17 projektoch.
-- 47 % projektov obsahuje 80 % ponuky (8 projektov s 548 bytmi).
-- 7 projektov má v ponuke menej ako 20 bytov (7 % ponuky).
-- Ponuka dokončených bytov tvorí 9,1 % všetkých nepredaných bytov (60 bytov).
+- Ku koncu obdobia bolo v ponuke 671 bytov v 18 projektoch.
+- 44 % projektov obsahuje 80 % ponuky (8 projektov s 548 bytmi).
+- 8 projektov má v ponuke menej ako 20 bytov (10 % ponuky).
+- Ponuka dokončených bytov tvorí 8,9 % všetkých nepredaných bytov (60 bytov).
 - Najviac dokončených voľných bytov je v lokalitách Nitra a Komárno.
-- Najväčšiu časť ponuky tvorí kategória 2-izb — 45,6 % bytov s uvedeným počtom izieb.
+- Najväčšiu časť ponuky tvorí kategória 2-izb — 46,7 % bytov s uvedeným počtom izieb.
 
 **Podiel voľných bytov v 3. štvrťroku 2026 podľa obce**
 
 | Obec | Voľné | z toho dokončené |
 |---|---:|---:|
-| Nitra | 537 | 52 |
+| Nitra | 535 | 52 |
 | Lužianky | 56 | 0 |
 | Šaľa | 31 | 0 |
+| Levice | 17 | 0 |
 | Komárno | 16 | 8 |
 | Zlaté Moravce | 11 | 0 |
 | Nové Zámky | 5 | 0 |
-| **celkom** | **656** | **60** |
+| **celkom** | **671** | **60** |
 
 ![Podiel voľných bytov podľa kategórie](/analyzy/kraj-nr-prehlad-2026-q3-podiel-ponuka.svg)
 *Podiel voľných bytov v 3. štvrťroku 2026 podľa kategórie.*
@@ -41,7 +42,7 @@ Prehľad trhu s novými bytmi v Nitrianskom kraji za 3. štvrťrok 2026: ponuka,
 ## Dopyt
 
 - Od 1. júla do 27. septembra 2026 sa predalo v Nitrianskom kraji 55 bytov.
-- Absorpcia trhu je 8,4 % — predané byty za obdobie k bytom v ponuke.
+- Absorpcia trhu je 8,2 % — predané byty za obdobie k bytom v ponuke.
 - Najväčší záujem je o kategóriu 2-izb: 50,9 % predaných bytov.
 - Podiel na predaji prevyšuje podiel na ponuke v kategóriách 1-izb, 1,5-izb a 2-izb.
 
@@ -63,7 +64,7 @@ Prehľad trhu s novými bytmi v Nitrianskom kraji za 3. štvrťrok 2026: ponuka,
 
 ## Cena
 
-- Celková priemerná cena projektov v Nitrianskom kraji je 3 337 €/m² s DPH.
+- Celková priemerná cena projektov v Nitrianskom kraji je 3 313 €/m² s DPH.
 - Na tých istých 346 bytoch priemerná cena medzikvartálne stúpla o 2,0 %.
 - Predané byty mali priemernú cenníkovú cenu 3 631 €/m² s DPH, o 5,4 % vyššiu než byty, ktoré v tých istých projektoch zostali v ponuke (3 446 €/m² s DPH).
 
@@ -81,4 +82,4 @@ Prehľad trhu s novými bytmi v Nitrianskom kraji za 3. štvrťrok 2026: ponuka,
 
 ## Výhľad
 
-Pri tempe predaja od 1. júla do 27. septembra 2026 — 19 bytov mesačne — by sa súčasná ponuka 656 bytov vypredala za 34,5 mesiaca. Dokončené voľné byty (60) tvoria 9,1 % tejto ponuky; kategória 2-izb tvorí 45,6 % ponuky a 50,9 % predaja.
+Pri tempe predaja od 1. júla do 27. septembra 2026 — 19 bytov mesačne — by sa súčasná ponuka 671 bytov vypredala za 35,7 mesiaca. Dokončené voľné byty (60) tvoria 8,9 % tejto ponuky; kategória 2-izb tvorí 46,7 % ponuky a 50,9 % predaja.

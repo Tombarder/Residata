@@ -1,6 +1,6 @@
 {
  "asOf": "2026-09-27",
- "generatedAt": "2026-09-28T08:26:53",
+ "generatedAt": "2026-09-28T13:15:12",
  "slug": "kraj-za-prehlad-2026-q3",
  "overview": {
   "scope": {
@@ -30,7 +30,7 @@
   "sale_settling_days": 7,
   "rolling_days": 28,
   "prev_period_sales": 11,
-  "period_days": 88,
+  "period_days": 89,
   "okres_supply": {
    "Liptovský Mikuláš": {
     "n": 227,
@@ -38,7 +38,11 @@
     "building": 94,
     "unknown": 100,
     "projects": 6,
-    "m2": 3975
+    "m2": 3975,
+    "area": 63.9,
+    "price": 253051,
+    "n_priced": 130,
+    "p_priced": 4
    },
    "Žilina": {
     "n": 212,
@@ -46,7 +50,11 @@
     "building": 118,
     "unknown": 60,
     "projects": 10,
-    "m2": 4236
+    "m2": 4237,
+    "area": 64.2,
+    "price": 267904,
+    "n_priced": 153,
+    "p_priced": 9
    },
    "Martin": {
     "n": 102,
@@ -54,7 +62,11 @@
     "building": 45,
     "unknown": 52,
     "projects": 3,
-    "m2": 3049
+    "m2": 3049,
+    "area": 60.7,
+    "price": 184448,
+    "n_priced": 53,
+    "p_priced": 2
    },
    "Ružomberok": {
     "n": 62,
@@ -62,7 +74,11 @@
     "building": 62,
     "unknown": 0,
     "projects": 2,
-    "m2": 3460
+    "m2": 3460,
+    "area": 54.3,
+    "price": 186195,
+    "n_priced": 53,
+    "p_priced": 1
    },
    "Dolný Kubín": {
     "n": 25,
@@ -70,34 +86,41 @@
     "building": 0,
     "unknown": 0,
     "projects": 2,
-    "m2": null
+    "m2": null,
+    "area": null,
+    "price": null
    }
   },
   "okres_sales": {
    "Žilina": {
     "n": 39,
     "n_priced": 26,
-    "m2": 4005
+    "m2": 4005,
+    "projects": 8
    },
    "Martin": {
     "n": 23,
     "n_priced": 17,
-    "m2": 3093
+    "m2": 3093,
+    "projects": 2
    },
    "Liptovský Mikuláš": {
     "n": 7,
     "n_priced": 2,
-    "m2": 3590
+    "m2": 3590,
+    "projects": 4
    },
    "Ružomberok": {
     "n": 4,
     "n_priced": 4,
-    "m2": 3269
+    "m2": 3269,
+    "projects": 1
    },
    "Dolný Kubín": {
     "n": 1,
     "n_priced": 0,
-    "m2": null
+    "m2": null,
+    "projects": 1
    }
   },
   "okres_price": {
@@ -149,39 +172,39 @@
   "layout_supply": [
    {
     "k": "2-izb",
-    "n": "283",
-    "m2": "3943",
-    "area": "52.0"
+    "n": 284,
+    "m2": 3943,
+    "area": 52.0
    },
    {
     "k": "3-izb",
-    "n": "191",
-    "m2": "3685",
-    "area": "73.7"
+    "n": 191,
+    "m2": 3685,
+    "area": 73.7
    },
    {
     "k": "4-izb",
-    "n": "67",
-    "m2": "3911",
-    "area": "99.9"
+    "n": 67,
+    "m2": 3911,
+    "area": 99.9
    },
    {
     "k": "1-izb",
-    "n": "64",
-    "m2": "4191",
-    "area": "35.8"
+    "n": 64,
+    "m2": 4191,
+    "area": 35.8
    },
    {
     "k": "(neuvedené)",
-    "n": "18",
-    "m2": "3652",
-    "area": "45.7"
+    "n": 17,
+    "m2": 3652,
+    "area": 45.7
    },
    {
     "k": "5 a viac",
-    "n": "5",
-    "m2": "3675",
-    "area": "132.4"
+    "n": 5,
+    "m2": 3675,
+    "area": 132.4
    }
   ],
   "layout_sales": [

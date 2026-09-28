@@ -30,19 +30,19 @@ z
   </g>
   <g id="axes_1">
    <g id="wedge-1-izb">
-    <path d="M 301.363689 159.027236 
-C 295.595716 154.500657 289.113182 150.967286 282.183151 148.57269 
-C 275.253119 146.178093 267.972082 144.955614 260.64 144.955614 
+    <path d="M 300.868593 158.642484 
+C 295.141237 154.235102 288.728317 150.798748 281.886589 148.471004 
+C 275.044861 146.143261 267.866869 144.955614 260.64 144.955614 
 L 260.64 210.9192 
 z
 " style="fill: #1d635e; stroke: #ffffff; stroke-width: 1.6; stroke-linejoin: miter"/>
    </g>
    <g id="wedge-2-izb">
     <path d="M 246.639319 275.379852 
-C 261.2244 278.547692 276.461553 276.673538 289.844234 270.065691 
-C 303.226916 263.457844 313.978728 252.49966 320.330976 238.993782 
-C 326.683224 225.487903 328.267381 210.217877 324.82285 195.695652 
-C 321.37832 181.173427 313.104937 168.241513 301.363689 159.027236 
+C 261.276884 278.559092 276.569666 276.659647 289.984707 269.996123 
+C 303.399748 263.3326 314.15312 252.294392 320.463734 238.709767 
+C 326.774347 225.125142 328.27343 209.787939 324.712689 195.238471 
+C 321.151948 180.689004 312.73946 167.777494 300.868593 158.642484 
 L 260.64 210.9192 
 z
 " style="fill: #154a46; stroke: #ffffff; stroke-width: 1.6; stroke-linejoin: miter"/>
@@ -76,22 +76,22 @@ z
    <g id="matplotlib.axis_1"/>
    <g id="matplotlib.axis_2"/>
    <g id="patch_2">
-    <path d="M 352.308382 136.773809 
-Q 318.123352 142.810975 283.938322 148.848141 
+    <path d="M 352.308165 136.739018 
+Q 317.976244 142.744922 283.644323 148.750826 
 " style="fill: none; stroke: #6b7480; stroke-width: 0.9; stroke-linecap: round"/>
    </g>
    <g id="text_1">
     <text style="font-size: 16px; font-family: 'IBM Plex Sans'; fill: #36414b" transform="translate(354.308292 128.505918)">1-izb</text>
-    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; fill: #36414b" transform="translate(354.308292 149.065918)">11 %</text>
+    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; fill: #36414b" transform="translate(354.308292 149.065918)">10 %</text>
    </g>
    <g id="patch_3">
-    <path d="M 352.305888 243.671856 
-Q 337.008026 241.342869 321.710164 239.013882 
+    <path d="M 352.305171 243.332646 
+Q 337.073334 241.031514 321.841497 238.730383 
 " style="fill: none; stroke: #6b7480; stroke-width: 0.9; stroke-linecap: round"/>
    </g>
    <g id="text_2">
-    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; fill: #36414b" transform="translate(354.308292 242.278414)">2-izb</text>
-    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; fill: #36414b" transform="translate(354.308292 262.838414)">43 %</text>
+    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; fill: #36414b" transform="translate(354.308292 241.914876)">2-izb</text>
+    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; fill: #36414b" transform="translate(354.308292 262.474876)">43 %</text>
    </g>
    <g id="patch_4">
     <path d="M 168.969017 225.1361 
@@ -113,7 +113,7 @@ Q 203.15614 142.771543 237.34165 148.845992
    </g>
   </g>
   <g id="text_5">
-   <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #36414b" x="550" y="126.8368" transform="rotate(-0 550 126.8368)">1-izb · 11 %</text>
+   <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #36414b" x="550" y="126.8368" transform="rotate(-0 550 126.8368)">1-izb · 10 %</text>
   </g>
   <g id="text_6">
    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #36414b" x="550" y="158.1568" transform="rotate(-0 550 158.1568)">2-izb · 43 %</text>

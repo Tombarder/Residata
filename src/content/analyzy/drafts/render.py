@@ -238,27 +238,6 @@ def _series_shape(qt: dict, lang: str) -> str:
 
 
 
-def national_table(rep: dict, lang: str) -> str:
-    """Every town we track: what is on offer, what it costs, how fast it clears."""
-    n = rep["nationalQuarterly"]
-    head = (("| Mesto | Ponuka | €/m² s DPH | Priemerný byt | Výmera | Predané | "
-             "Mesiacov do vypredania |\n|---|---:|---:|---:|---:|---:|---:|")
-            if lang == "sk" else
-            ("| Town | On offer | €/m² incl. VAT | Average flat | Floor area | Sold | "
-             "Months to clear |\n|---|---:|---:|---:|---:|---:|---:|"))
-    rows = []
-    for t in n["towns"]:
-        m2 = f"{sk_int(t['meanM2'])} €" if t["meanM2"] else "—"
-        pr = f"{sk_int(t['meanPrice'])} €" if t["meanPrice"] else "—"
-        ar = (f"{sk_dec(t['meanArea'])} m²" if lang == "sk"
-              else f"{en_dec(t['meanArea'])} m²") if t["meanArea"] else "—"
-        mo = (sk_dec(t["monthsToClear"]) if lang == "sk" else en_dec(t["monthsToClear"])) \
-             if t["monthsToClear"] is not None else "—"
-        rows.append(f"| {t['city']} | {sk_int(t['stock'])} | {m2} | {pr} | {ar} | "
-                    f"{sk_int(t['sold'])} | {mo} |")
-    return head + "\n" + "\n".join(rows)
-
-
 def okres_supply_table(rep: dict, lang: str) -> str:
     """Bratislava's offer by okres — the table Bencont prints, on our numbers."""
     head = (("| Okres | Ponuka | Podiel | Projekty | €/m² s DPH | Priemerný byt | Výmera |"
@@ -1058,6 +1037,163 @@ def _herrys_vars(rep: dict, base: dict) -> dict:
     return out
 
 
+# ── what a flat costs, town by town (co-stoji-byt) ──────────────────────
+# 🔴 A DATA TABLE MAKES NO ARGUMENT. Until 2026-09-28 this issue led on a
+# finding — "a one-room flat in Bratislava costs more than a two-room in N of M
+# towns" — and a paragraph claiming the price of one more room "varies". Boss
+# (2026-09-23): a piece is data OR story, never both. What remains are the
+# extremes and counts of the table the reader is looking at, each generated
+# whole, because its shape (which towns, how many, singular or plural) is a
+# figure too.
+_CD_GEN = {"1": "jednoizbového", "2": "dvojizbového", "3": "trojizbového",
+           "4+": "štvor- a viacizbového"}
+
+
+def _cd_range_bullets(cd: dict) -> str:
+    """One bullet per layout: the dearest and the cheapest town's median.
+
+    Nominative and verbless ("najvyššia Bratislava (…)") so no town name has
+    to be declined — "v Košiciach" is not derivable from "Košice"."""
+    out = []
+    for d in cd["dispositions"]:
+        cells = sorted(((r["city"], r["cells"][d]["medPrice"]) for r in cd["rows"]
+                        if d in r["cells"]), key=lambda t: (-t[1], t[0]))
+        if len(cells) < 2:
+            continue
+        (hi, hp), (lo, lp) = cells[0], cells[-1]
+        out.append(f"- Mediánová cena {_CD_GEN.get(d, d)} bytu: najvyššia {hi} "
+                   f"({sk_int(hp)} €), najnižšia {lo} ({sk_int(lp)} €).")
+    return "\n".join(out)
+
+
+def _cd_step_sentence(cd: dict) -> str:
+    """How much dearer a three-room median is than a two-room one, at the two
+    ends of the table and in Bratislava. Empty when fewer than two towns carry
+    both cells — the bullet is then absent, not blank."""
+    hi, lo, ba = cd.get("stepDearest"), cd.get("stepCheapest"), cd.get("stepBratislava")
+    if not (hi and lo) or hi["city"] == lo["city"]:
+        return ""
+    tail = (f"; v Bratislave o {sk_dec(ba)} %" if ba is not None
+            and "Bratislava" not in (hi["city"], lo["city"]) else "")
+    return (f"- Mediánový trojizbový byt je drahší než dvojizbový najviac v lokalite "
+            f"{hi['city']} (o {sk_dec(hi['pct'])} %), najmenej v lokalite {lo['city']} "
+            f"(o {sk_dec(lo['pct'])} %){tail}.")
+
+
+def _cd_m2_sentence(cd: dict) -> str:
+    """In how many of the table's towns a three-room metre is cheaper than a
+    two-room metre, and the exceptions by name."""
+    down, up = cd["perM2FallsWithSize"], cd["perM2RisesWithSize"]
+    tot = len(down) + len(up)
+    if not tot:
+        return ""
+    if not up:
+        return (f"- Vo všetkých {sk_int(tot)} mestách je meter v trojizbovom byte "
+                f"lacnejší než v dvojizbovom.")
+    if not down:
+        return (f"- Vo všetkých {sk_int(tot)} mestách je meter v trojizbovom byte "
+                f"drahší než v dvojizbovom.")
+    return (f"- V {sk_int(len(down))} {sk_z(tot)} {sk_int(tot)} miest je meter v trojizbovom "
+            f"byte lacnejší než v dvojizbovom. " + _exceptions_clause_sk(up))
+
+
+# ── the national town table (kde-sa-predava) ────────────────────────────
+# 🔴 ONE GENERATOR FOR EVERY TOWN FIGURE. This table was market_report's own
+# query with its own definition of a sale — no settling period, garages
+# counted, the whole calendar quarter dividing a partial one — so its Košice
+# row could not agree with the Košice issue. It is now the Slovakia overview
+# broken down by obec (issue_overview scope sk:obce): the same per-project
+# levels, sales and price definition as every town's and kraj's own issue, so
+# a town's row here is that issue's figure to the flat and the euro.
+def _months_to_clear(n: int, sold: int, days: int):
+    """How long the offer lasts at the period's pace — the issues' formula."""
+    if not (n and sold and days):
+        return None
+    return n / (sold / days * 30.44)
+
+
+def _obce_vars(rep: dict, period_sk: str) -> dict:
+    ov = rep["overview"]
+    rules = ov.get("rules") or {}
+    min_p = int(rules.get("min_contributors") or 3)
+    min_n = int(rules.get("min_mean_n") or 10)
+    sup, sal = ov["okres_supply"], ov["okres_sales"]
+    days = int(ov.get("period_days") or 0)
+    tot = sum(a["n"] for a in sup.values())
+    sold = sum(a["n"] for a in sal.values())
+    _qkey = f"{ov['quarter_start'][:4]}Q{(int(ov['quarter_start'][5:7]) - 1) // 3 + 1}"
+    city_m2 = ov["own_quarters"].get(_qkey)
+
+    # 🔴 THE FLOORS ARE THE ISSUES' FLOORS (issue_overview.MIN_CONTRIBUTORS,
+    # MIN_MEAN_N): a row needs 3 projects and 10 flats; a price, 3 projects
+    # publishing one on 10 flats; a pace, 10 sales from 3 projects.
+    def shows(town):
+        a = sup[town]
+        return town != "(neuvedené)" and a["projects"] >= min_p and a["n"] >= min_n
+
+    def priced(a):
+        return (a.get("m2") is not None and a.get("price") is not None
+                and (a.get("p_priced") or 0) >= min_p and (a.get("n_priced") or 0) >= min_n)
+
+    def pace(town):
+        a, s_ = sup[town], sal.get(town) or {}
+        if s_.get("n", 0) >= min_n and s_.get("projects", 0) >= min_p:
+            return _months_to_clear(a["n"], s_["n"], days)
+        return None
+
+    shown = sorted((t for t in sup if shows(t)), key=lambda t: (-sup[t]["n"], t))
+    rest = [t for t in set(sup) | set(sal) if t not in shown]
+    lines = ["| Obec | V ponuke | €/m² s DPH | Priemerná cena | Predané | Mesiace do vypredania |",
+             "|---|---:|---:|---:|---:|---:|"]
+    for t in shown:
+        a, mo = sup[t], pace(t)
+        price = (f"{sk_int(a['m2'])} € | {sk_int(a['price'])} €" if priced(a) else "— | —")
+        lines.append(f"| {t} | {sk_int(a['n'])} | {price} | {sk_int((sal.get(t) or {}).get('n', 0))} | "
+                     f"{sk_dec(mo) if mo is not None else '—'} |")
+    r_n = sum(sup[t]["n"] for t in rest if t in sup)
+    r_s = sum(sal[t]["n"] for t in rest if t in sal)
+    r_k = sum(1 for t in rest if t != "(neuvedené)")
+    if r_n or r_s:
+        lines.append(f"| Ostatné obce ({sk_int(r_k)}) | {sk_int(r_n)} | — | — | {sk_int(r_s)} | — |")
+    mo_all = _months_to_clear(tot, sold, days)
+    lines.append(f"| **Slovensko spolu** | **{sk_int(tot)}** | "
+                 f"**{sk_int(city_m2) + ' €' if city_m2 else '—'}** | "
+                 f"**{sk_int(ov['mean_price']) + ' €' if ov.get('mean_price') else '—'}** | "
+                 f"**{sk_int(sold)}** | **{sk_dec(mo_all) if mo_all is not None else '—'}** |")
+
+    towns_with = sum(1 for t, a in sup.items() if a["n"] >= 1 and t != "(neuvedené)")
+    top = shown[:3]
+    top_bullet = ""
+    if len(top) == 3:
+        a0 = sup[top[0]]["n"]
+        top_bullet = (f"- Najviac bytov je v ponuke v týchto obciach: {top[0]} "
+                      f"({sk_count(a0, 'byt', 'byty', 'bytov')}, {sk_dec(100 * a0 / tot)} % ponuky), "
+                      f"{top[1]} ({sk_int(sup[top[1]]['n'])}) a {top[2]} ({sk_int(sup[top[2]]['n'])}).")
+    paced = sorted(((t, pace(t)) for t in shown if pace(t) is not None), key=lambda x: (x[1], x[0]))
+    clear_bullet = ""
+    if len(paced) >= 2:
+        (f_, fm), (s_, sm) = paced[0], paced[-1]
+        clear_bullet = (f"- Pri tempe predaja {period_sk} by sa ponuka najrýchlejšie vypredala "
+                        f"v lokalite {f_} (za {sk_dec(fm)} mesiaca), najpomalšie v lokalite "
+                        f"{s_} (za {sk_dec(sm)} mesiaca).")
+    by_m2 = sorted(((t, sup[t]["m2"]) for t in shown if priced(sup[t])), key=lambda x: (-x[1], x[0]))
+    price_bullet = ""
+    if len(by_m2) >= 2:
+        (d_, dm), (c_, cm) = by_m2[0], by_m2[-1]
+        price_bullet = (f"- Najvyššiu priemernú cenu za meter štvorcový má lokalita {d_} "
+                        f"({sk_int(dm)} €/m²), najnižšiu lokalita {c_} ({sk_int(cm)} €/m²).")
+    return {
+        "obceTable": "\n".join(lines),
+        "obceTowns": (f"v {sk_int(towns_with)} obci" if towns_with == 1
+                      else f"v {sk_int(towns_with)} obciach"),
+        "obceShown": sk_int(len(shown)),
+        "obceTopBullet": top_bullet,
+        "obceClearBullet": clear_bullet,
+        "obcePriceBullet": price_bullet,
+        "obceMinProjects": min_p, "obceMinN": min_n,
+    }
+
+
 def _issue_specific_vars(rep: dict) -> dict:
     """Variables that only exist for the issues whose data the report carries.
 
@@ -1071,67 +1207,10 @@ def _issue_specific_vars(rep: dict) -> dict:
     out: dict = {}
     if "overview" in rep:
         out.update(_overview_vars(rep))
-    # Keyed on a field the block actually needs, not on the section: a report
-    # generated before these figures existed still HAS a nationalQuarterly
-    # section, just without them.
-    if "baShareStockPct" in (rep.get("nationalQuarterly") or {}):
-        nq = rep["nationalQuarterly"]
-        out.update({
-            # ── the national table ──────────────────────────────────────────
-            "natTable": national_table(rep, "sk"),
-            "natTableEn": national_table(rep, "en"),
-            "natTowns": rep["nationalQuarterly"]["townCount"],
-            "natStock": sk_int(rep["nationalQuarterly"]["totalStock"]),
-            "natStockEn": f'{rep["nationalQuarterly"]["totalStock"]:,}'.replace(",", "\u00a0"),
-            "natWithClearing": rep["nationalQuarterly"]["withClearing"],
-            "natBaShare": sk_dec(rep["nationalQuarterly"]["baShareStockPct"]),
-            "natBaShareEn": en_dec(rep["nationalQuarterly"]["baShareStockPct"]),
-            "natBaSoldShare": sk_dec(rep["nationalQuarterly"]["baShareSoldPct"]),
-            "natBaSoldShareEn": en_dec(rep["nationalQuarterly"]["baShareSoldPct"]),
-            "natRestTowns": rep["nationalQuarterly"]["restTowns"],
-            "natRestStock": sk_int(rep["nationalQuarterly"]["restStock"]),
-            "natRestStockEn": f'{rep["nationalQuarterly"]["restStock"]:,}'.replace(",", "\u00a0"),
-            "natDearest": rep["nationalQuarterly"]["dearest"]["city"],
-            "natDearestM2": sk_int(rep["nationalQuarterly"]["dearest"]["meanM2"]),
-            "natCheapest": rep["nationalQuarterly"]["cheapest"]["city"],
-            "natCheapestM2": sk_int(rep["nationalQuarterly"]["cheapest"]["meanM2"]),
-            "natPriceSpread": sk_dec(rep["nationalQuarterly"]["priceSpread"]),
-            "natPriceSpreadEn": en_dec(rep["nationalQuarterly"]["priceSpread"]),
-            # The correlation, stated as a number instead of hedged in prose.
-            "natCorr": sk_dec(abs(rep["nationalQuarterly"]["priceVsSpeedR"]), 2),
-            "natCorrEn": en_dec(abs(rep["nationalQuarterly"]["priceVsSpeedR"]), 2),
-            "natYardstick": sk_int(rep["nationalQuarterly"]["yardstickPrice"]),
-            "natYardstickEn": f'{rep["nationalQuarterly"]["yardstickPrice"]:,}'.replace(",", "\u00a0"),
-            "natYardstickSqm": rep["nationalQuarterly"]["yardstickSqm"],
-            "natBuy1": rep["nationalQuarterly"]["sameMoneyBuys"][0]["city"],
-            "natBuy1Sqm": rep["nationalQuarterly"]["sameMoneyBuys"][0]["sqm"],
-            "natBuy2": rep["nationalQuarterly"]["sameMoneyBuys"][1]["city"],
-            "natBuy2Sqm": rep["nationalQuarterly"]["sameMoneyBuys"][1]["sqm"],
-            "natBuy3": rep["nationalQuarterly"]["sameMoneyBuys"][2]["city"],
-            "natBuy3Sqm": rep["nationalQuarterly"]["sameMoneyBuys"][2]["sqm"],
-            # What share of the offer carries a published price — stated because the
-            # price columns are computed on it and the stock column is not.
-            "natPricedShare": sk_dec(round(
-                100.0 * sum(t["priced"] for t in rep["nationalQuarterly"]["towns"])
-                / max(rep["nationalQuarterly"]["totalStock"], 1), 1)),
-            "natPricedShareEn": en_dec(round(
-                100.0 * sum(t["priced"] for t in rep["nationalQuarterly"]["towns"])
-                / max(rep["nationalQuarterly"]["totalStock"], 1), 1)),
-            "natMinSales": rep["nationalQuarterly"]["minSalesForClearing"],
-            "natFastest": rep["nationalQuarterly"]["fastest"]["city"],
-            "natFastestMo": sk_dec(rep["nationalQuarterly"]["fastest"]["monthsToClear"]),
-            "natFastestMoEn": en_dec(rep["nationalQuarterly"]["fastest"]["monthsToClear"]),
-            "natSlowest": rep["nationalQuarterly"]["slowest"]["city"],
-            "natSlowestMo": sk_dec(rep["nationalQuarterly"]["slowest"]["monthsToClear"]),
-            "natSlowestMoEn": en_dec(rep["nationalQuarterly"]["slowest"]["monthsToClear"]),
-            # The spread is the finding, so it is computed rather than described.
-            "natSpread": sk_dec(rep["nationalQuarterly"]["slowest"]["monthsToClear"]
-                                / rep["nationalQuarterly"]["fastest"]["monthsToClear"]),
-            "natSpreadEn": en_dec(rep["nationalQuarterly"]["slowest"]["monthsToClear"]
-                                  / rep["nationalQuarterly"]["fastest"]["monthsToClear"]),
-            "natFastestM2": sk_int(rep["nationalQuarterly"]["fastest"]["meanM2"]),
-            "natSlowestM2": sk_int(rep["nationalQuarterly"]["slowest"]["meanM2"]),
-        })
+    # The national town table is the Slovakia overview broken down by obec
+    # (issue_overview scope sk:obce) — see _obce_vars.
+    if (rep.get("overview") or {}).get("scope", {}).get("code") == "sk-obce":
+        out.update(_obce_vars(rep, out.get("periodSk", "")))
     if "rows" in (rep.get("cityByDisposition") or {}):
         cd = rep["cityByDisposition"]
         dec = lambda v, n=1: sk_dec(v, n)
@@ -1144,12 +1223,12 @@ def _issue_specific_vars(rep: dict) -> dict:
             "cdChangeTableEn": city_change_table(rep, "en"),
             "cdTowns": cd["townCount"],
             "cdMinCell": cd["minCell"],
-            "cdBa1Price": sk_int(cd["ba1RoomPrice"]),
-            "cdBa1PriceEn": f'{cd["ba1RoomPrice"]:,}'.replace(",", "\u00a0"),
-            "cdBa1Beats": cd["ba1RoomBeats"],
-            "cdBa1OutOf": cd["ba1RoomOutOf"],
-            "cdCheapest2": cd["cheapest2Room"]["city"],
-            "cdCheapest2Price": sk_int(cd["cheapest2Room"]["price"]),
+            "cdMinProjects": cd.get("minProjects", 3),
+            "cdMinLayoutsPhrase": sk_count(int(cd.get("minLayouts", 3)),
+                                           "kategóriu", "kategórie", "kategórií"),
+            "cdRangeBullets": _cd_range_bullets(cd),
+            "cdStepSentence": _cd_step_sentence(cd),
+            "cdM2Sentence": _cd_m2_sentence(cd),
             "cdStepDear": cd["stepDearest"]["city"],
             "cdStepDearPct": sk_dec(cd["stepDearest"]["pct"]),
             "cdStepDearPctEn": en_dec(cd["stepDearest"]["pct"]),

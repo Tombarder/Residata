@@ -1,53 +1,54 @@
 <!--PEREX
-Koľko stojí jedno-, dvoj-, troj- a štvorizbová novostavba v 12 slovenských mestách. Jednoizbový byt v Bratislave za 210 361 € je drahší než dvojizbový v 7 z 11 ostatných miest.
+Mediánové ceny nových bytov podľa počtu izieb v 10 slovenských mestách: cena celého bytu a cena za meter štvorcový.
 -->
 <!--METHOD
-Údaje pochádzajú z verejne zverejnených cenníkov slovenských developerov, ktoré Residata číta denne, byt po byte. Ide o novostavby — voľné a rezervované byty v aktívnych projektoch, nie starší bytový fond a nie inzeráty. Uvádzame medián, nie priemer: jeden drahý byt posunie priemer a medián neposunie, a niektoré bunky tabuľky obsahujú len desiatky bytov. Mesto sa v tabuľke objaví, ak má aspoň 10 bytov v aspoň troch dispozíciách. Polovičné dispozície sú zaokrúhlené nadol: byt s izbou a pol je vedený ako jednoizbový.
+Údaje pochádzajú z verejne zverejnených cenníkov developerov, ktoré Residata číta denne, byt po byte. Ide o novostavby — voľné, rezervované a predrezervované byty v aktívnych projektoch, nie starší bytový fond a nie inzeráty; počítajú sa výlučne byty, nie parkovanie, pivnice ani nebytové priestory. Ceny sú s DPH a pochádzajú z bytov, pri ktorých developer cenu zverejňuje. Uvádzame medián, nie priemer: jeden drahý byt posunie priemer, medián nie. Medián je priemerom denných mediánov za posledné dva týždne obdobia, aby jeden deň neurčoval celé číslo. Cenu za meter počítame na obytnú plochu. Polovičné dispozície zaokrúhľujeme nadol — byt s jednou a pol izbou je vedený ako jednoizbový, s dvoma a pol izbami ako dvojizbový. Projekt je zaradený do mesta, v ktorom stojí. Bunka tabuľky je vyplnená pri aspoň 10 bytoch z aspoň 3 projektov a mesto je v tabuľke, ak má takto vyplnené aspoň 3 kategórie.
 -->
-1. októbra 2026 | CENY NOVOSTAVIEB PODĽA DISPOZÍCIE A MESTA
+27. septembra 2026 | CENY NOVÝCH BYTOV PODĽA POČTU IZIEB — Slovensko
 
-# Slovensko: jednoizbový byt v Bratislave stojí viac než dvojizbový v 7 z 11 miest
+# Slovensko: ceny nových bytov podľa počtu izieb v 3. štvrťroku 2026
 
-Koľko stojí novostavba, závisí od dispozície aspoň tak ako od mesta. Mediánová cena jednoizbového bytu v Bratislave je 210 361 € s DPH. Za tie isté peniaze kúpite dvojizbový byt v 7 z 11 ostatných miest, ktoré sledujeme — najlacnejší z nich je Zvolen s 195 200 €.
+## Úvod
+
+- Mediánová cena jednoizbového bytu: najvyššia Bratislava (207 991 €), najnižšia Zvolen (140 571 €).
+- Mediánová cena dvojizbového bytu: najvyššia Bratislava (268 784 €), najnižšia Nitra (195 242 €).
+- Mediánová cena trojizbového bytu: najvyššia Bratislava (376 225 €), najnižšia Nitra (232 451 €).
+- Mediánová cena štvor- a viacizbového bytu: najvyššia Bratislava (587 567 €), najnižšia Nitra (297 009 €).
+
+## Cena bytu
+
+**Mediánová cena nového bytu podľa počtu izieb (€ s DPH)**
 
 | Mesto | 1-izbový | 2-izbový | 3-izbový | 4- a viacizbový |
 |---|---:|---:|---:|---:|
-| Bratislava | 210 361 € | 269 796 € | 384 088 € | 588 789 € |
-| Košice | 150 460 € | 259 726 € | 332 437 € | 539 900 € |
-| Trnava | 159 557 € | 199 026 € | 249 443 € | 348 750 € |
-| Nitra | 149 214 € | 196 285 € | 230 919 € | 297 076 € |
-| Prešov | 129 980 € | 204 000 € | 291 000 € | 375 000 € |
-| Trenčín | 179 205 € | 206 164 € | 296 562 € | 404 081 € |
-| Poprad | 163 000 € | 207 403 € | 269 276 € | — |
-| Banská Bystrica | 151 990 € | 199 990 € | 254 990 € | 419 000 € |
-| Žilina | 155 150 € | 220 221 € | 280 078 € | 399 291 € |
-| Zvolen | 149 500 € | 195 200 € | 291 850 € | — |
+| Bratislava | 207 991 € | 268 784 € | 376 225 € | 587 567 € |
+| Košice | 149 900 € | 259 822 € | 332 045 € | 539 900 € |
+| Trnava | 159 500 € | 199 599 € | 249 429 € | 348 750 € |
+| Nitra | 151 014 € | 195 242 € | 232 451 € | 297 009 € |
+| Prešov | — | 204 000 € | 291 357 € | 375 000 € |
+| Trenčín | — | 203 842 € | 296 286 € | 404 081 € |
+| Zvolen | 140 571 € | 203 629 € | 290 886 € | — |
+| Banská Bystrica | 151 990 € | 199 990 € | 255 526 € | 419 000 € |
+| Žilina | 156 400 € | 228 092 € | 284 624 € | 394 647 € |
 | Liptovský Mikuláš | 151 642 € | 217 854 € | 334 018 € | — |
-| Bernolákovo | — | 216 885 € | 242 944 € | 300 900 € |
 
-\* Mediánová cena bytu s DPH. Mesto je v tabuľke, ak má aspoň 10 bytov v aspoň troch dispozíciách.
+- Mediánový trojizbový byt je drahší než dvojizbový najviac v lokalite Liptovský Mikuláš (o 53,3 %), najmenej v lokalite Nitra (o 19,1 %); v Bratislave o 40,0 %.
 
-## Koľko stojí jedna izba navyše
+## Cena za meter štvorcový
 
-Rozdiel medzi dvojizbovým a trojizbovým bytom nie je všade rovnaký. Najväčší má Liptovský Mikuláš, kde trojizbový byt stojí o 53,3 % viac než dvojizbový; najmenší Bernolákovo s rozdielom 12,0 %. V Bratislave je to 42,4 %.
-
-Ten istý rozdiel vyzerá inak v prepočte na meter štvorcový. V 10 z 12 miest je meter v trojizbovom byte lacnejší než meter v dvojizbovom. Výnimkou sú Bratislava a Liptovský Mikuláš, kde je to naopak.
+**Mediánová cena nového bytu za meter štvorcový podľa počtu izieb (€/m² s DPH)**
 
 | Mesto | 1-izbový | 2-izbový | 3-izbový | 4- a viacizbový |
 |---|---:|---:|---:|---:|
-| Bratislava | 6 011 € | 5 203 € | 5 257 € | 5 443 € |
-| Košice | 5 253 € | 4 674 € | 4 300 € | 4 842 € |
-| Trnava | 5 504 € | 4 037 € | 3 587 € | 3 543 € |
-| Nitra | 3 873 € | 3 622 € | 3 247 € | 3 275 € |
-| Prešov | 4 385 € | 3 871 € | 3 581 € | 3 502 € |
-| Trenčín | 4 410 € | 3 837 € | 3 722 € | 3 867 € |
-| Poprad | 3 584 € | 3 621 € | 3 547 € | — |
-| Banská Bystrica | 4 342 € | 3 967 € | 3 750 € | 3 638 € |
-| Žilina | 4 581 € | 4 226 € | 3 880 € | 4 000 € |
-| Zvolen | 3 641 € | 3 599 € | 3 528 € | — |
+| Bratislava | 6 067 € | 5 208 € | 5 202 € | 5 402 € |
+| Košice | 5 281 € | 4 672 € | 4 292 € | 4 831 € |
+| Trnava | 5 495 € | 4 037 € | 3 587 € | 3 543 € |
+| Nitra | 4 031 € | 3 615 € | 3 268 € | 3 317 € |
+| Prešov | — | 3 871 € | 3 581 € | 3 502 € |
+| Trenčín | — | 3 833 € | 3 718 € | 3 867 € |
+| Zvolen | 3 537 € | 3 535 € | 3 508 € | — |
+| Banská Bystrica | 4 340 € | 3 963 € | 3 750 € | 3 638 € |
+| Žilina | 4 561 € | 4 264 € | 3 901 € | 4 000 € |
 | Liptovský Mikuláš | 3 858 € | 3 864 € | 3 890 € | — |
-| Bernolákovo | — | 3 817 € | 3 659 € | 3 427 € |
 
-\* Mediánová cena za m² s DPH.
-
-**Autor:** Tomáš Kamhal, zakladateľ Residaty · tomas@residata.eu
+- V 9 z 10 miest je meter v trojizbovom byte lacnejší než v dvojizbovom. Výnimkou je Liptovský Mikuláš, kde je to naopak.

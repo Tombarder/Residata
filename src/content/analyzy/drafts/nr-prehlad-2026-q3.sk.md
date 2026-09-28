@@ -12,28 +12,28 @@ Prehľad trhu s novými bytmi v Nitre za 3. štvrťrok 2026: ponuka, dopyt a cen
 
 - **Počet bytov v ponuke v projektoch, ktoré predávali aj v predchádzajúcom štvrťroku, klesol o 8,0 %** — z 584 na 537.
 - Dopyt: od 1. júla do 27. septembra 2026 sa predalo 45 bytov.
-- Priemerná cena v projektoch sa pohybuje na úrovni 3 499 €/m² s DPH.
+- Priemerná cena v projektoch sa pohybuje na úrovni 3 498 €/m² s DPH.
 
 ## Ponuka
 
-- Ku koncu obdobia bolo v ponuke 538 bytov v 9 projektoch.
+- Ku koncu obdobia bolo v ponuke 535 bytov v 9 projektoch.
 - 56 % projektov obsahuje 80 % ponuky (5 projektov s 428 bytmi).
 - 1 projekt má v ponuke menej ako 20 bytov (3 % ponuky).
 - Ponuka dokončených bytov tvorí 9,7 % všetkých nepredaných bytov (52 bytov).
 - Najviac dokončených voľných bytov je v kategórii 3-izb.
-- Najväčšiu časť ponuky tvorí kategória 2-izb — 45,8 % bytov s uvedeným počtom izieb.
+- Najväčšiu časť ponuky tvorí kategória 2-izb — 45,7 % bytov s uvedeným počtom izieb.
 
 **Podiel voľných bytov v 3. štvrťroku 2026 podľa kategórie**
 
 | Kategória | Voľné | z toho dokončené |
 |---|---:|---:|
-| 1-izb | 57 | 0 |
+| 1-izb | 56 | 0 |
 | 1,5-izb | 6 | 0 |
-| 2-izb | 245 | 14 |
+| 2-izb | 243 | 14 |
 | 3-izb | 205 | 24 |
 | 4-izb | 22 | 14 |
 | (neuvedené) | 3 | 0 |
-| **celkom** | **538** | **52** |
+| **celkom** | **535** | **52** |
 
 ![Podiel voľných bytov podľa kategórie](/analyzy/nr-prehlad-2026-q3-podiel-ponuka.svg)
 *Podiel voľných bytov v 3. štvrťroku 2026 podľa kategórie.*
@@ -64,7 +64,7 @@ Prehľad trhu s novými bytmi v Nitre za 3. štvrťrok 2026: ponuka, dopyt a cen
 
 ## Cena
 
-- Celková priemerná cena projektov v Nitre je 3 499 €/m² s DPH.
+- Celková priemerná cena projektov v Nitre je 3 498 €/m² s DPH.
 - Na tých istých 346 bytoch priemerná cena medzikvartálne stúpla o 2,0 %.
 - Predané byty mali priemernú cenníkovú cenu 3 631 €/m² s DPH, o 5,4 % vyššiu než byty, ktoré v tých istých projektoch zostali v ponuke (3 446 €/m² s DPH).
 
@@ -85,4 +85,4 @@ Prehľad trhu s novými bytmi v Nitre za 3. štvrťrok 2026: ponuka, dopyt a cen
 
 ## Výhľad
 
-Pri tempe predaja od 1. júla do 27. septembra 2026 — 16 bytov mesačne — by sa súčasná ponuka 538 bytov vypredala za 34,6 mesiaca. Dokončené voľné byty (52) tvoria 9,7 % tejto ponuky; kategória 2-izb tvorí 45,8 % ponuky a 51,1 % predaja.
+Pri tempe predaja od 1. júla do 27. septembra 2026 — 15 bytov mesačne — by sa súčasná ponuka 535 bytov vypredala za 34,8 mesiaca. Dokončené voľné byty (52) tvoria 9,7 % tejto ponuky; kategória 2-izb tvorí 45,7 % ponuky a 51,1 % predaja.

@@ -22,7 +22,7 @@ Prehľad trhu s novými bytmi v Žilinskom kraji za 3. štvrťrok 2026: ponuka, 
 - 12 projektov má v ponuke menej ako 20 bytov (17 % ponuky).
 - Ponuka dokončených bytov tvorí 15,4 % všetkých nepredaných bytov (97 bytov).
 - Najviac dokončených voľných bytov je v lokalitách Žilina a Liptovský Mikuláš.
-- Najväčšiu časť ponuky tvorí kategória 2-izb — 46,4 % bytov s uvedeným počtom izieb.
+- Najväčšiu časť ponuky tvorí kategória 2-izb — 46,5 % bytov s uvedeným počtom izieb.
 
 **Podiel voľných bytov v 3. štvrťroku 2026 podľa obce**
 
@@ -86,4 +86,4 @@ Prehľad trhu s novými bytmi v Žilinskom kraji za 3. štvrťrok 2026: ponuka, 
 
 ## Výhľad
 
-Pri tempe predaja od 1. júla do 27. septembra 2026 — 26 bytov mesačne — by sa súčasná ponuka 628 bytov vypredala za 24,5 mesiaca. Dokončené voľné byty (97) tvoria 15,4 % tejto ponuky; kategória 2-izb tvorí 46,4 % ponuky a 48,6 % predaja.
+Pri tempe predaja od 1. júla do 27. septembra 2026 — 25 bytov mesačne — by sa súčasná ponuka 628 bytov vypredala za 24,8 mesiaca. Dokončené voľné byty (97) tvoria 15,4 % tejto ponuky; kategória 2-izb tvorí 46,5 % ponuky a 48,6 % predaja.

@@ -51,103 +51,70 @@ L 182.79125 132.6144
     </g>
     <g id="xtick_2">
      <g id="line2d_3">
-      <path d="M 246.697007 224.0736 
-L 246.697007 132.6144 
+      <path d="M 295.995733 224.0736 
+L 295.995733 132.6144 
 " clip-path="url(#p71fc11c1b2)" style="fill: none; stroke: #e3e7eb; stroke-linecap: square"/>
      </g>
      <g id="line2d_4"/>
      <g id="text_2">
-      <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #6b7480" x="246.697007" y="244.5536" transform="rotate(-0 246.697007 244.5536)">5</text>
+      <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #6b7480" x="295.995733" y="244.5536" transform="rotate(-0 295.995733 244.5536)">10</text>
      </g>
     </g>
     <g id="xtick_3">
      <g id="line2d_5">
-      <path d="M 310.602763 224.0736 
-L 310.602763 132.6144 
+      <path d="M 409.200216 224.0736 
+L 409.200216 132.6144 
 " clip-path="url(#p71fc11c1b2)" style="fill: none; stroke: #e3e7eb; stroke-linecap: square"/>
      </g>
      <g id="line2d_6"/>
      <g id="text_3">
-      <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #6b7480" x="310.602763" y="244.5536" transform="rotate(-0 310.602763 244.5536)">10</text>
+      <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #6b7480" x="409.200216" y="244.5536" transform="rotate(-0 409.200216 244.5536)">20</text>
      </g>
     </g>
     <g id="xtick_4">
      <g id="line2d_7">
-      <path d="M 374.50852 224.0736 
-L 374.50852 132.6144 
+      <path d="M 522.404699 224.0736 
+L 522.404699 132.6144 
 " clip-path="url(#p71fc11c1b2)" style="fill: none; stroke: #e3e7eb; stroke-linecap: square"/>
      </g>
      <g id="line2d_8"/>
      <g id="text_4">
-      <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #6b7480" x="374.50852" y="244.5536" transform="rotate(-0 374.50852 244.5536)">15</text>
-     </g>
-    </g>
-    <g id="xtick_5">
-     <g id="line2d_9">
-      <path d="M 438.414276 224.0736 
-L 438.414276 132.6144 
-" clip-path="url(#p71fc11c1b2)" style="fill: none; stroke: #e3e7eb; stroke-linecap: square"/>
-     </g>
-     <g id="line2d_10"/>
-     <g id="text_5">
-      <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #6b7480" x="438.414276" y="244.5536" transform="rotate(-0 438.414276 244.5536)">20</text>
-     </g>
-    </g>
-    <g id="xtick_6">
-     <g id="line2d_11">
-      <path d="M 502.320033 224.0736 
-L 502.320033 132.6144 
-" clip-path="url(#p71fc11c1b2)" style="fill: none; stroke: #e3e7eb; stroke-linecap: square"/>
-     </g>
-     <g id="line2d_12"/>
-     <g id="text_6">
-      <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #6b7480" x="502.320033" y="244.5536" transform="rotate(-0 502.320033 244.5536)">25</text>
-     </g>
-    </g>
-    <g id="xtick_7">
-     <g id="line2d_13">
-      <path d="M 566.22579 224.0736 
-L 566.22579 132.6144 
-" clip-path="url(#p71fc11c1b2)" style="fill: none; stroke: #e3e7eb; stroke-linecap: square"/>
-     </g>
-     <g id="line2d_14"/>
-     <g id="text_7">
-      <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #6b7480" x="566.22579" y="244.5536" transform="rotate(-0 566.22579 244.5536)">30</text>
+      <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #6b7480" x="522.404699" y="244.5536" transform="rotate(-0 522.404699 244.5536)">30</text>
      </g>
     </g>
    </g>
    <g id="matplotlib.axis_2">
     <g id="ytick_1">
-     <g id="line2d_15"/>
-     <g id="text_8">
+     <g id="line2d_9"/>
+     <g id="text_5">
       <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: end; fill: #6b7480" x="174.79125" y="152.849371" transform="rotate(-0 174.79125 152.849371)">júl 2026</text>
      </g>
     </g>
     <g id="ytick_2">
-     <g id="line2d_16"/>
-     <g id="text_9">
+     <g id="line2d_10"/>
+     <g id="text_6">
       <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: end; fill: #6b7480" x="174.79125" y="184.584" transform="rotate(-0 174.79125 184.584)">august 2026</text>
      </g>
     </g>
     <g id="ytick_3">
-     <g id="line2d_17"/>
-     <g id="text_10">
+     <g id="line2d_11"/>
+     <g id="text_7">
       <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: end; fill: #6b7480" x="174.79125" y="216.318629" transform="rotate(-0 174.79125 216.318629)">september 2026</text>
      </g>
     </g>
    </g>
    <g id="patch_3">
     <path d="M 182.79125 156.447106 
-L 272.259309 156.447106 
-L 272.259309 136.771636 
+L 273.354837 156.447106 
+L 273.354837 136.771636 
 L 182.79125 136.771636 
 z
 " clip-path="url(#p71fc11c1b2)" style="fill: #0e4b47"/>
    </g>
    <g id="patch_4">
     <path d="M 182.79125 188.181735 
-L 208.353553 188.181735 
-L 208.353553 168.506265 
+L 284.675285 188.181735 
+L 284.675285 168.506265 
 L 182.79125 168.506265 
 z
 " clip-path="url(#p71fc11c1b2)" style="fill: #0e4b47"/>
@@ -165,32 +132,32 @@ z
 L 182.79125 132.6144 
 " style="fill: none; stroke: #e3e7eb; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
    </g>
-   <g id="text_11">
-    <text style="font-weight: 500; font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #0f1419" x="280.183623" y="151.089371" transform="rotate(-0 280.183623 151.089371)">7</text>
+   <g id="text_8">
+    <text style="font-weight: 500; font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #0f1419" x="281.27915" y="151.089371" transform="rotate(-0 281.27915 151.089371)">8</text>
    </g>
-   <g id="text_12">
-    <text style="font-weight: 500; font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #0f1419" x="216.277866" y="182.824" transform="rotate(-0 216.277866 182.824)">2</text>
+   <g id="text_9">
+    <text style="font-weight: 500; font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #0f1419" x="292.599599" y="182.824" transform="rotate(-0 292.599599 182.824)">9</text>
    </g>
-   <g id="text_13">
-    <text style="font-weight: 500; font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #0f1419" x="586.931255" y="214.558629" transform="rotate(-0 586.931255 214.558629)">31</text>
+   <g id="text_10">
+    <text style="font-weight: 500; font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #0f1419" x="586.931255" y="214.558629" transform="rotate(-0 586.931255 214.558629)">35</text>
    </g>
   </g>
-  <g id="text_14">
+  <g id="text_11">
    <text style="font-weight: 600; font-size: 25px; font-family: 'Outfit'; text-anchor: start; fill: #0f1419" x="51.84" y="34.418219" transform="rotate(-0 51.84 34.418219)">Dopyt po bytoch v Q3/2026</text>
   </g>
-  <g id="text_15">
+  <g id="text_12">
    <text style="font-size: 19px; font-family: 'Outfit'; fill: #6b7480" transform="translate(51.84 66.932809)">Počet predaných bytov v Trenčianskom kraji za mesiac, v projektoch</text>
    <text style="font-size: 19px; font-family: 'Outfit'; fill: #6b7480" transform="translate(51.84 91.1207)">sledovaných od začiatku štvrťroka</text>
   </g>
-  <g id="text_16">
+  <g id="text_13">
    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #6b7480" x="51.84" y="119.1552" transform="rotate(-0 51.84 119.1552)">predaných bytov</text>
   </g>
-  <g id="text_17">
+  <g id="text_14">
    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; fill: #6b7480" transform="translate(51.84 333.2981)">Zdroj: Residata — denné čítanie cenníkov novostavieb v Trenčianskom kraji.</text>
    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; fill: #6b7480" transform="translate(51.84 358.80185)">Dáta k 27. 9. 2026.</text>
   </g>
-  <g id="text_18">
-   <text style="font-size: 16px; font-family: 'IBM Plex Sans'; fill: #6b7480" transform="translate(51.84 273.2981)">September 2026 je do 27. 9. 2026. Graf zahŕňa 3 projekty a 40 zo 65 predaných</text>
+  <g id="text_15">
+   <text style="font-size: 16px; font-family: 'IBM Plex Sans'; fill: #6b7480" transform="translate(51.84 273.2981)">September 2026 je do 27. 9. 2026. Graf zahŕňa 4 projekty a 52 zo 77 predaných</text>
    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; fill: #6b7480" transform="translate(51.84 297.24935)">bytov štvrťroka.</text>
   </g>
  </g>

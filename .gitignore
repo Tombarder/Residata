@@ -38,3 +38,8 @@ public/_sess.json
 
 # Supabase CLI — dočasné údaje o pripojení k projektu (netreba a nemá byť v gite)
 supabase/.temp
+
+# Python bytecode: drafts/render.py and to_cms.py are loaded by the scraper
+# repo's tests, which would otherwise leave __pycache__ in this public repo
+__pycache__/
+*.pyc

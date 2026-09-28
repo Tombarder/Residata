@@ -21,14 +21,14 @@ Prehľad trhu s novými bytmi v Košiciach za 3. štvrťrok 2026: ponuka, dopyt 
 - 10 projektov má v ponuke menej ako 20 bytov (14 % ponuky).
 - Ponuka dokončených bytov tvorí 6,4 % všetkých nepredaných bytov (43 bytov).
 - Najviac dokončených voľných bytov je v kategóriách 1-izb a 3-izb.
-- Najväčšiu časť ponuky tvorí kategória 2-izb — 42,8 % bytov s uvedeným počtom izieb.
+- Najväčšiu časť ponuky tvorí kategória 2-izb — 43,0 % bytov s uvedeným počtom izieb.
 
 **Podiel voľných bytov v 3. štvrťroku 2026 podľa kategórie**
 
 | Kategória | Voľné | z toho dokončené |
 |---|---:|---:|
-| 1-izb | 70 | 33 |
-| 2-izb | 283 | 3 |
+| 1-izb | 69 | 33 |
+| 2-izb | 284 | 3 |
 | 3-izb | 246 | 7 |
 | 4-izb | 54 | 0 |
 | 5 a viac | 8 | 0 |
@@ -88,4 +88,4 @@ Prehľad trhu s novými bytmi v Košiciach za 3. štvrťrok 2026: ponuka, dopyt 
 
 ## Výhľad
 
-Pri tempe predaja od 1. júla do 27. septembra 2026 — 43 bytov mesačne — by sa súčasná ponuka 668 bytov vypredala za 15,6 mesiaca. Dokončené voľné byty (43) tvoria 6,4 % tejto ponuky; kategória 2-izb tvorí 42,8 % ponuky a 34,2 % predaja.
+Pri tempe predaja od 1. júla do 27. septembra 2026 — 42 bytov mesačne — by sa súčasná ponuka 668 bytov vypredala za 15,8 mesiaca. Dokončené voľné byty (43) tvoria 6,4 % tejto ponuky; kategória 2-izb tvorí 43,0 % ponuky a 34,2 % predaja.

@@ -1,6 +1,6 @@
 {
  "asOf": "2026-09-27",
- "generatedAt": "2026-09-28T08:23:32",
+ "generatedAt": "2026-09-28T13:11:52",
  "slug": "po-prehlad-2026-q3",
  "overview": {
   "scope": {
@@ -31,7 +31,7 @@
   "sale_settling_days": 7,
   "rolling_days": 28,
   "prev_period_sales": 3,
-  "period_days": 88,
+  "period_days": 89,
   "okres_supply": {
    "1-izb": {
     "n": 44,
@@ -39,7 +39,11 @@
     "building": 0,
     "unknown": 44,
     "projects": 2,
-    "m2": 4369
+    "m2": 4369,
+    "area": 29.8,
+    "price": 129442,
+    "n_priced": 26,
+    "p_priced": 1
    },
    "1,5-izb": {
     "n": 3,
@@ -47,7 +51,9 @@
     "building": 0,
     "unknown": 3,
     "projects": 1,
-    "m2": null
+    "m2": null,
+    "area": null,
+    "price": null
    },
    "2-izb": {
     "n": 223,
@@ -55,15 +61,23 @@
     "building": 140,
     "unknown": 83,
     "projects": 6,
-    "m2": 3826
+    "m2": 3826,
+    "area": 51.7,
+    "price": 197579,
+    "n_priced": 129,
+    "p_priced": 5
    },
    "3-izb": {
-    "n": 167,
+    "n": 168,
     "done": 0,
-    "building": 85,
+    "building": 86,
     "unknown": 82,
     "projects": 6,
-    "m2": 3542
+    "m2": 3542,
+    "area": 76.7,
+    "price": 273129,
+    "n_priced": 123,
+    "p_priced": 4
    },
    "4-izb": {
     "n": 58,
@@ -71,7 +85,11 @@
     "building": 39,
     "unknown": 19,
     "projects": 4,
-    "m2": 3591
+    "m2": 3591,
+    "area": 105.6,
+    "price": 379088,
+    "n_priced": 53,
+    "p_priced": 4
    },
    "(neuvedené)": {
     "n": 4,
@@ -79,29 +97,37 @@
     "building": 4,
     "unknown": 0,
     "projects": 1,
-    "m2": 2706
+    "m2": 2706,
+    "area": 323.5,
+    "price": 875438,
+    "n_priced": 2,
+    "p_priced": 1
    }
   },
   "okres_sales": {
    "2-izb": {
     "n": 74,
     "n_priced": 13,
-    "m2": 3806
+    "m2": 3806,
+    "projects": 3
    },
    "3-izb": {
     "n": 19,
     "n_priced": 5,
-    "m2": 3697
+    "m2": 3697,
+    "projects": 2
    },
    "4-izb": {
     "n": 13,
     "n_priced": 6,
-    "m2": 3619
+    "m2": 3619,
+    "projects": 3
    },
    "(neuvedené)": {
     "n": 13,
     "n_priced": 3,
-    "m2": 2706
+    "m2": 2706,
+    "projects": 1
    }
   },
   "okres_price": {
@@ -154,32 +180,32 @@
    {
     "k": "2-izb",
     "n": 223,
-    "m2": "3826",
-    "area": "51.7"
+    "m2": 3826,
+    "area": 51.7
    },
    {
     "k": "3-izb",
-    "n": 167,
-    "m2": "3542",
-    "area": "76.7"
+    "n": 168,
+    "m2": 3542,
+    "area": 76.7
    },
    {
     "k": "4-izb",
     "n": 58,
-    "m2": "3591",
-    "area": "105.6"
+    "m2": 3591,
+    "area": 105.6
    },
    {
     "k": "1-izb",
     "n": 44,
-    "m2": "4369",
-    "area": "29.8"
+    "m2": 4369,
+    "area": 29.8
    },
    {
     "k": "(neuvedené)",
     "n": 4,
-    "m2": "2706",
-    "area": "323.5"
+    "m2": 2706,
+    "area": 323.5
    },
    {
     "k": "1,5-izb",
@@ -417,11 +443,11 @@
     "n": 52
    },
    {
-    "project_id": "byty-duo",
+    "project_id": "prazska-presov",
     "n": 44
    },
    {
-    "project_id": "prazska-presov",
+    "project_id": "byty-duo",
     "n": 44
    },
    {
