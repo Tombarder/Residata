@@ -26,9 +26,11 @@ import { useEffect, useLayoutEffect, useState, useRef } from "react";
 // is how this component knows whether it would be talking over it.
 import { readConsent } from "../lib/consent";
 import { useCapabilities } from "../lib/useCapabilities";
+import { useAuth } from "../lib/useAuth";
 import { track } from "../lib/track";
 
-const KEY_BANNER_DISMISSED = "residata_trial_banner_until";   // unix ms — banner hidden until this time
+import { KEY_BANNER_DISMISSED, KEY_OFFER_REMEMBERED, firstPaintBanner } from "../lib/trialBannerState.js";
+
 
 // Both promo surfaces gate on the SAME predicate — useCapabilities().showTrialOffer
 // (anon visitor OR logged-in free user who can still start the trial). That single
@@ -39,18 +41,23 @@ const KEY_BANNER_DISMISSED = "residata_trial_banner_until";   // unix ms — ban
 // Top banner
 // ────────────────────────────────────────────────────────────
 export function TrialBanner({ lang = "sk", onCta }) {
-  const [hidden, setHidden] = useState(true);
-  const { showTrialOffer: eligible } = useCapabilities();
+  // Decided in the first render (firstPaintBanner), not in an effect after it:
+  // waiting for an effect drew every page without the banner and then pushed the
+  // fixed nav down by the banner's height — a layout shift on every marketing
+  // page, on every load (Lighthouse, 2026-09-28: 0.07 on each page measured).
+  const [first] = useState(() => firstPaintBanner());
+  const [hidden, setHidden] = useState(first.dismissed);
+  const { showTrialOffer } = useCapabilities();
+  const { loading: authLoading, user } = useAuth();
+  const eligible = authLoading ? first.eligible : showTrialOffer;
   const L = (sk, en) => lang === "sk" ? sk : en;
   const bannerRef = useRef(null);
 
+  // Remember a logged-in account's answer for its next first paint.
   useEffect(() => {
-    if (!eligible) { setHidden(true); return; }
-    try {
-      const dismissedUntil = Number(localStorage.getItem(KEY_BANNER_DISMISSED) || 0);
-      setHidden(Date.now() < dismissedUntil);
-    } catch { setHidden(false); }
-  }, [eligible]);
+    if (authLoading || !user) return;
+    try { localStorage.setItem(KEY_OFFER_REMEMBERED, showTrialOffer ? "1" : "0"); } catch { /* storage blocked */ }
+  }, [authLoading, user, showTrialOffer]);
 
   // Side-effect: when the banner is visible, add a body class that
   // pushes the existing fixed Nav down by 36px so the two don't

@@ -2350,7 +2350,6 @@ export default function App() {
   return (
     <div style={{ background: "var(--bg)", color: "var(--text)", fontFamily: "'Outfit', -apple-system, sans-serif", minHeight: "100vh", WebkitFontSmoothing: "antialiased", position: "relative" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@300;400;500;600;700&display=swap');
         .sec-title { font-size: clamp(1.8rem, 3.5vw, 2.6rem); font-weight: 700; letter-spacing: -0.03em; margin-bottom: 1rem; line-height: 1.15; }
         .sec-desc { font-size: 1.05rem; color: var(--text-dim); max-width: 600px; font-weight: 300; line-height: 1.7; }
         .btn-p { display: inline-block; padding: 0.75rem 2rem; background: var(--accent); color: var(--bg); font-weight: 600; font-size: 0.9rem; font-family: inherit; border: none; border-radius: var(--r-md); cursor: pointer; text-decoration: none; transition: all 0.2s; -webkit-appearance: none; appearance: none; }

@@ -53,13 +53,16 @@ function writeConsent(consent) {
 
 export default function CookieBanner({ lang = "en" }) {
   const isSK = lang === "sk";
-  const [visible, setVisible] = useState(false);
+  // Decided in the first render (the stored consent is a synchronous read), so
+  // the layout effect below lifts the floating pills in the SAME frame the banner
+  // first appears. Deciding in an effect drew the page, then the banner, then
+  // moved the pills up — a layout shift on every first visit on a phone.
+  const [visible, setVisible] = useState(() => !readConsent());
   const [expanded, setExpanded] = useState(false);
   const [analytics, setAnalytics] = useState(false);
 
-  // Show on first visit; expose a global to re-open from Footer link.
+  // Expose a global to re-open from the Footer link.
   useEffect(() => {
-    if (!readConsent()) setVisible(true);
     window.residataReopenCookieBanner = () => {
       const existing = readConsent();
       if (existing) setAnalytics(!!existing.analytics);

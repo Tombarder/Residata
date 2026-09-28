@@ -7,6 +7,7 @@
 /* Responsive foundation — breakpoint scale, safe-area tokens, fluid primitives,
    mobile nav menu, iOS correctness. Imported first so its :root tokens are
    available everywhere. (@import must precede normal rules.) */
+@import "./styles/fonts.css";
 @import "./styles/responsive.css";
 /* Shared UI kit: global native-control polish + the `.rd-*` component classes
    (card / table / field / button / segment / tab / chip / KPI / menu). Imported
