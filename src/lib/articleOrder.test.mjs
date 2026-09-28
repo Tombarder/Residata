@@ -29,8 +29,19 @@ test("a newer date still comes first, whatever the series", () => {
   assert.deepEqual(got, ["trh-novostavieb-2026-10", "sk-prehlad-2026-q3"]);
 });
 
+test("the two national comparison tables close the series, always in one order", () => {
+  const got = orderArticles([
+    { slug: "co-stoji-byt-2026-q3", date: "2026-09-27" },
+    { slug: "kraj-ke-prehlad-2026-q3", date: "2026-09-27" },
+    { slug: "kde-sa-predava-2026-q3", date: "2026-09-27" },
+    { slug: "sk-prehlad-2026-q3", date: "2026-09-27" },
+  ]).map((a) => a.slug);
+  assert.deepEqual(got, ["sk-prehlad-2026-q3", "kraj-ke-prehlad-2026-q3",
+                         "kde-sa-predava-2026-q3", "co-stoji-byt-2026-q3"]);
+});
+
 test("an article outside the series keeps its place among its date", () => {
-  assert.equal(seriesRank("co-stoji-byt-2026-q3"), 100);
+  assert.equal(seriesRank("trh-novostavieb-2026-09"), 100);
   const got = orderArticles([
     { slug: "b-story", date: "2026-09-27" },
     { slug: "a-story", date: "2026-09-27" },

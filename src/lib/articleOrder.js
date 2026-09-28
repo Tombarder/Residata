@@ -7,7 +7,9 @@
  * no particular order: sixteen near-identical cards would shuffle between page
  * loads. Within a date, an issue series reads from the whole to its parts:
  * Slovakia, then Bratislava, then the towns by size, then the kraje in the
- * Statistical Office's order. Anything else keeps the position it came in.
+ * Statistical Office's order, and the two national comparison tables close
+ * it — by obec, then by number of rooms. Anything else keeps the position it
+ * came in.
  */
 
 const TOWNS = ["ke", "po", "za", "nr", "bb", "tt", "tn"];            // by population
@@ -21,6 +23,10 @@ export function seriesRank(slug = "") {
   if (town && TOWNS.includes(town[1])) return 10 + TOWNS.indexOf(town[1]);
   const kraj = /^kraj-([a-z]{2})-prehlad-/.exec(slug);
   if (kraj && KRAJE.includes(kraj[1])) return 30 + KRAJE.indexOf(kraj[1]);
+  // the national comparison tables: the same day as the series, so they get
+  // fixed places too, or the two of them trade places between page loads
+  if (/^kde-sa-predava-/.test(slug)) return 50;
+  if (/^co-stoji-byt-/.test(slug)) return 51;
   return 100;
 }
 
