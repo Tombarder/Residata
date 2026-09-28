@@ -126,6 +126,38 @@ def sk_dec(x, places: int = 1) -> str:
     return f"{x:.{places}f}".replace(".", ",")
 
 
+def sk_z(n) -> str:
+    """'z' or 'zo' before a number, decided by how the number is SPOKEN.
+
+    🔴 A PREPOSITION IS A FIGURE IN DISGUISE. Slovak writes "zo" before a word
+    beginning with s, z, š or ž — and a numeral is a word: "zo 124" (sto…),
+    "zo 4 053" (štyritisíc…), "zo 17", but "z 336" (tristo…), "z 50". A
+    template that types "z" is right for some numbers and wrong for others,
+    and nothing flags it."""
+    def lead(k: int) -> str:
+        if k >= 1000:
+            return "tisíc" if k // 1000 == 1 else lead(k // 1000)
+        if k >= 100:
+            return "sto" if k // 100 == 1 else lead(k // 100)
+        if k >= 20:
+            return lead(k // 10)
+        return ["nula", "jeden", "dva", "tri", "štyri", "päť", "šesť", "sedem", "osem", "deväť",
+                "desať", "jedenásť", "dvanásť", "trinásť", "štrnásť", "pätnásť", "šestnásť",
+                "sedemnásť", "osemnásť", "devätnásť"][k]
+    return "zo" if lead(abs(int(n)))[0] in "szšž" else "z"
+
+
+def sk_count(n: int, one: str, few: str, many: str) -> str:
+    """'1 projekt' · '3 projekty' · '12 projektov' — Slovak numeral agreement.
+
+    🔴 A NOUN AFTER A NUMBER IS A FIGURE TOO. The Bratislava template typed
+    "projektov" and "bytov" after every count because Bratislava's counts are
+    never below five; Prešov's are. 1 takes the singular, 2–4 the nominative
+    plural, everything else (0, 5+) the genitive plural."""
+    form = one if n == 1 else few if n in (2, 3, 4) else many
+    return f"{sk_int(n)} {form}"
+
+
 def sk_list(items) -> str:
     """Bratislava a Liptovský Mikuláš — a list, not a CSV dump.
 
@@ -373,7 +405,7 @@ def overview_price_table(rep: dict, lang: str) -> str:
     dec = sk_dec if lang == "sk" else en_dec
     rows = []
     for o, a in ov["okres_price"].items():
-        sign = "+" if a["chg_pct"] >= 0 else "−"
+        sign = "+" if a["chg_pct"] > 0 else ("−" if a["chg_pct"] < 0 else "")
         rows.append(f"| {o} | {sk_int(a['m2_prev'])} € | {sk_int(a['m2_cur'])} € | "
                     f"{sign}{dec(abs(a['chg_pct']))} % | "
                     f"{sk_int(a.get('units') or round((a.get('unit_days') or a.get('n', 0)) / 14))} |")
@@ -483,8 +515,9 @@ def _overview_vars(rep: dict) -> dict:
     # superlative, and a superlative is a figure.
     _tot_s = sum(a["n"] for a in sal.values()) or 1
     _tot_p = sum(a["n"] for a in sup.values()) or 1
+    # the not-stated bucket is a residue, never a place: it is not ranked
     _rel = sorted(((o, 100 * a["n"] / _tot_s - 100 * sup.get(o, {}).get("n", 0) / _tot_p)
-                   for o, a in sal.items()), key=lambda t: -t[1])
+                   for o, a in sal.items() if o != "(neuvedené)"), key=lambda t: -t[1])
 
     dear = max(_priced.items(), key=lambda kv: kv[1])
     cheap = min(_priced.items(), key=lambda kv: kv[1])
@@ -495,7 +528,13 @@ def _overview_vars(rep: dict) -> dict:
     out = {
         "supplyTotal": sk_int(tot),
         # The city figure, not the sum of five independently-rounded okres means.
-        "supplyProjects": sum(a["projects"] for a in sup.values()),
+        # 🔴 ONE PROJECT, ONE COUNT. Summing the per-row project counts is
+        # right only when a project sits in exactly one row — an okres. Broken
+        # into flat-size categories, a project sits in every category it sells,
+        # and Košice's 24 projects printed as "v 71 projektoch". The count is
+        # the same set the concentration bullets read.
+        "supplyProjects": (len(ov["project_supply"]) if ov.get("project_supply")
+                           else sum(a["projects"] for a in sup.values())),
         "meanFlatPrice": sk_int(ov["mean_price"]) if ov.get("mean_price") else "—",
         "meanFlatArea": sk_dec(ov["mean_area"]) if ov.get("mean_area") else "—",
         "salesTotal": sk_int(sold),
@@ -521,11 +560,17 @@ def _overview_vars(rep: dict) -> dict:
         # when WE onboard a project — it went 3 399 -> 4 052 between Q2 and Q3
         # while the projects we track went 70 -> 93.
         "panelSupplyPrev": sk_int(ov["panel_supply_prev"]) if ov.get("panel_supply_prev") else "—",
+        "panelSupplyFrom": sk_z(ov["panel_supply_prev"]) if ov.get("panel_supply_prev") else "z",
         "panelSupplyCur": sk_int(ov["panel_supply_cur"]) if ov.get("panel_supply_cur") else "—",
         "panelSupplyClause": _supply_clause(ov),
         # The whole clause, not just the figure: "+0,0 %" is honest and reads
         # like a rounding accident, and a bare percentage cannot be slotted into
         # a sentence that also has to work when there is no movement to report.
+        # 🔴 THE VERB DECIDES WHERE "sa" GOES. "sa priemerná cena zmenila o
+        # −0,2 %" is a sign in prose; "klesla" is not reflexive, so the clause
+        # carries the subject and the particle itself.
+        "qoqClause": ("sa priemerná cena medzikvartálne prakticky nezmenila" if abs(qoq) < 0.05
+                      else f"priemerná cena medzikvartálne {'stúpla' if qoq > 0 else 'klesla'} o {sk_dec(abs(qoq))} %"),
         "qoqPct": ("prakticky nezmenila" if abs(qoq) < 0.05
                    else "zmenila o " + ("+" if qoq >= 0 else "−")
                         + sk_dec(abs(qoq)) + " %"),
@@ -575,7 +620,11 @@ def _overview_vars(rep: dict) -> dict:
     # 🔴 A DIRECTION IS A FIGURE. "dearer" printed over a cheaper number is the
     # mistake this series has already made once; the comparison is computed from
     # the last week of the series, with its own magnitude.
-    _ps = [r for r in ov["price_series"] if r["m2_done"] and r["m2_building"]]
+    _cm = ov.get("completion_m2") or {}
+    if _cm.get("m2_done") and _cm.get("m2_building"):
+        _ps = [{"m2_done": _cm["m2_done"], "m2_building": _cm["m2_building"]}]
+    else:
+        _ps = [r for r in ov["price_series"] if r["m2_done"] and r["m2_building"]]
     if _ps:
         _d, _b = float(_ps[-1]["m2_done"]), float(_ps[-1]["m2_building"])
         _gap = (_d / _b - 1) * 100
@@ -583,7 +632,9 @@ def _overview_vars(rep: dict) -> dict:
             f"o {sk_dec(abs(_gap))} % {'viac' if _gap >= 0 else 'menej'}")
         out["doneVsBuildingEn"] = (
             f"{en_dec(abs(_gap))} % {'more' if _gap >= 0 else 'less'}")
-    first = ov["first_published"]
+    first = ov.get("first_published")
+    if not first:                       # a scope with no published history
+        return _finish_overview_vars(rep, out)
     out["longRunFirstYear"] = first[:4]
 
     # 🔴 "ZDVOJNÁSOBILA SA" IS A FIGURE. The chart shows the whole span and the
@@ -616,6 +667,14 @@ def _overview_vars(rep: dict) -> dict:
     out["longRunSpanSk"] = _SK_YEARS.get(span, f"{span} rokov")
     out["longRunSpanEn"] = "a year" if span == 1 else f"{span} years"
 
+    return _finish_overview_vars(rep, out)
+
+
+def _finish_overview_vars(rep: dict, out: dict) -> dict:
+    """The tail every overview issue shares: the period phrase, the published
+    history's label where there is one, and the Herrys-format figures."""
+    ov = rep["overview"]
+    y, q = ov["quarter_start"][:4], (int(ov["quarter_start"][5:7]) - 1) // 3 + 1
     # 🔴 A QUARTER THAT HAS NOT CLOSED IS NOT A QUARTER. Published on 23
     # September, "za 3. štvrťrok" claims a week of sales that has not happened
     # yet. The phrase is computed from as_of against the quarter end, so the
@@ -655,10 +714,16 @@ def _overview_vars(rep: dict) -> dict:
 _LAYOUT_ORDER = ["1-izb", "1,5-izb", "2-izb", "3-izb", "4-izb", "5 a viac"]
 
 
+def _sub_header(rep: dict) -> str:
+    """What the first column of the by-sub-unit tables is called: Okres for
+    Bratislava, Kraj for Slovakia, Mesto for a kraj, Kategória for a town."""
+    return (rep["overview"].get("scope") or {}).get("sub", {}).get("header", "Okres")
+
+
 def herrys_supply_table(rep: dict) -> str:
     """Okres | Voľné | z toho voľné dokončené — their table 1, our numbers."""
     ov = rep["overview"]
-    head = "| Okres | Voľné | z toho voľné dokončené |\n|---|---:|---:|"
+    head = f"| {_sub_header(rep)} | Voľné | z toho voľné dokončené |\n|---|---:|---:|"
     rows = [f"| {o} | {sk_int(a['n'])} | {sk_int(a['done'])} |"
             for o, a in ov["okres_supply"].items()]
     T = {k: sum(a[k] for a in ov["okres_supply"].values()) for k in ("n", "done")}
@@ -669,10 +734,14 @@ def herrys_supply_table(rep: dict) -> str:
 def herrys_sales_table(rep: dict) -> str:
     """Okres | Počet predaných bytov — their table 2."""
     ov = rep["overview"]
-    head = "| Okres | Počet predaných bytov |\n|---|---:|"
+    head = f"| {_sub_header(rep)} | Počet predaných bytov |\n|---|---:|"
     rows = [f"| {o} | {sk_int(a['n'])} |" for o, a in ov["okres_sales"].items()]
     rows.append(f"| **celkom** | **{sk_int(sum(a['n'] for a in ov['okres_sales'].values()))}** |")
     return head + "\n" + "\n".join(rows)
+
+
+#: a row of the price table stands on at least this many comparable flats
+MIN_ROW_FLATS = 10
 
 
 def herrys_price_table(rep: dict) -> str:
@@ -683,19 +752,37 @@ def herrys_price_table(rep: dict) -> str:
     quarter with this one and the header says so. On the same flats in both.
     """
     ov = rep["overview"]
-    head = ("| Okres | €/m² s DPH, predchádzajúci štvrťrok | €/m² s DPH, aktuálny štvrťrok | Zmena medzikvartálne |"
+    head = (f"| {_sub_header(rep)} | €/m² s DPH, predchádzajúci štvrťrok | €/m² s DPH, aktuálny štvrťrok | Zmena medzikvartálne |"
             "\n|---|---:|---:|---:|")
-    rows = []
+    rows, dropped = [], 0
     for o, a in ov["okres_price"].items():
-        sign = "+" if a["chg_pct"] >= 0 else "−"
+        # 🔴 A MEAN ON A HANDFUL OF FLATS IS ONE FLAT'S REPRICING. A row whose
+        # comparison rests on fewer than MIN_ROW_FLATS flats is left out and
+        # the table says so — the same floor every other mean in the issue has.
+        units = a.get("units") or round((a.get("unit_days") or 0) / 14)
+        if units < MIN_ROW_FLATS or a.get("projects", 3) < 3:
+            dropped += 1
+            continue
+        sign = "+" if a["chg_pct"] > 0 else ("−" if a["chg_pct"] < 0 else "")
         rows.append(f"| {o} | {sk_int(a['m2_prev'])} € | {sk_int(a['m2_cur'])} € | "
                     f"{sign}{sk_dec(abs(a['chg_pct']))} % |")
-    return head + "\n" + "\n".join(rows)
+    note = (f"\n\n*Riadky s menej ako {MIN_ROW_FLATS} bytmi alebo menej ako 3 projektmi "
+            f"porovnateľnými v oboch štvrťrokoch nie sú uvedené.*" if dropped else "")
+    return head + "\n" + "\n".join(rows) + note
+
+
+def _rules(ov: dict) -> tuple[int, int]:
+    """(min_contributors, min_mean_n) — the issue's floors, from the report
+    (issue_overview.MIN_CONTRIBUTORS / MIN_MEAN_N). A report without them is
+    Bratislava's, whose every figure stands on hundreds of projects."""
+    r = ov.get("rules") or {}
+    return int(r.get("min_contributors", 3)), int(r.get("min_mean_n", 10))
 
 
 def _herrys_vars(rep: dict, base: dict) -> dict:
     """The figures the Herrys sentences need and the overview never computed."""
     ov = rep["overview"]
+    MC, MN = _rules(ov)
     sup, sal = ov["okres_supply"], ov["okres_sales"]
     tot = sum(a["n"] for a in sup.values())
     sold = sum(a["n"] for a in sal.values())
@@ -735,6 +822,50 @@ def _herrys_vars(rep: dict, base: dict) -> dict:
     top_done = sorted(sup.items(), key=lambda kv: -kv[1]["done"])[:2]
     out["topDoneOkres1"] = top_done[0][0]
     out["topDoneOkres2"] = top_done[1][0] if len(top_done) > 1 else "—"
+    # 🔴 THE SENTENCE THAT NAMES A SUB-UNIT IS BUILT WHOLE, per breakdown
+    # (issue_report.SUBUNIT_WORDS): Slovak declines the name, so "je v
+    # okresoch X a Y" cannot be reused for kraje or towns. And only sub-units
+    # that HAVE finished flats are named — "najviac … v A a B" with B at zero
+    # is a false superlative.
+    sub = (ov.get("scope") or {}).get("sub") or {}
+    loc = sub.get("loc") or {}
+    L = lambda n: loc.get(n, n)
+    # "5 a viac" is a table label; in a sentence it reads as part of the list
+    # around it ("2-izb, 4-izb a 5 a viac"), so prose names it in full
+    P = lambda n: "5 a viac izieb" if n == "5 a viac" else n
+    # 🔴 A SUPERLATIVE NEEDS A WINNER. Only rows with finished flats are ranked;
+    # a tie at the cut names fewer rows rather than picking one at random
+    # ("najviac … v kategóriách 3-izb a 2-izb" while 4-izb held as many as
+    # 2-izb); and under MN finished flats in all there is nothing to rank.
+    ranked = [(k, a["done"]) for k, a in sorted(sup.items(), key=lambda kv: -kv[1]["done"])
+              if a["done"] > 0 and k != "(neuvedené)"]
+    out["topDoneBullet"] = ""
+    if sum(d for _, d in ranked) >= MN and ranked:
+        nxt = lambda i: ranked[i][1] if i < len(ranked) else -1
+        if len(ranked) == 1 and sub.get("done1"):
+            out["topDoneBullet"] = "- " + sub["done1"].format(a=P(ranked[0][0]), aL=L(ranked[0][0]))
+        elif nxt(1) > nxt(2) and sub.get("done2"):
+            out["topDoneBullet"] = "- " + sub["done2"].format(
+                a=P(ranked[0][0]), b=P(ranked[1][0]), aL=L(ranked[0][0]), bL=L(ranked[1][0]))
+        elif nxt(0) > nxt(1) and sub.get("top1"):
+            out["topDoneBullet"] = "- " + sub["top1"].format(a=P(ranked[0][0]), aL=L(ranked[0][0]))
+    rel_t = sub.get("rel", "")
+    # ranked only among rows that stand on MC projects or more — a town with
+    # one project "outselling its share" is one developer's month
+    _ts, _tp = sum(a["n"] for a in sal.values()), tot
+    _rank = sorted(((o, 100 * a["n"] / _ts - 100 * sup.get(o, {}).get("n", 0) / _tp)
+                    for o, a in sal.items()
+                    if o != "(neuvedené)" and sup.get(o, {}).get("projects", MC) >= MC),
+                   key=lambda t: -t[1]) if _ts and _tp else []
+    if rel_t and len(_rank) >= 2 and _rank[-1][1] < 0 < _rank[0][1]:
+        f_, s_ = _rank[0][0], _rank[-1][0]
+        sh = lambda o, d, T: sk_dec(100 * d.get(o, {}).get("n", 0) / T)
+        out["relBullet"] = "- " + rel_t.format(
+            f=f_, fL=L(f_), fLc=L(f_)[:1].upper() + L(f_)[1:],
+            fs=sh(f_, sal, _ts), fp=sh(f_, sup, _tp),
+            s=s_, ss=sh(s_, sal, _ts), sp=sh(s_, sup, _tp))
+    else:
+        out["relBullet"] = ""
 
     # the biggest category on offer, and the biggest among what sold
     lay = {r["k"]: int(float(r["n"] or 0)) for r in ov["layout_supply"]
@@ -744,14 +875,34 @@ def _herrys_vars(rep: dict, base: dict) -> dict:
     lay_tot, lays_tot = sum(lay.values()) or 1, sum(lays.values()) or 1
     top_lay = max(lay, key=lay.get)
     top_sal = max(lays, key=lays.get)
-    out["topLayout"] = top_lay
+    out["topLayout"] = P(top_lay)
     out["topLayoutShare"] = sk_dec(100 * lay[top_lay] / lay_tot)
     out["topLayoutSalesShare"] = sk_dec(100 * lays.get(top_lay, 0) / lays_tot)
-    out["topSalesLayout"] = top_sal
+    out["topSalesLayout"] = P(top_sal)
     out["topSalesLayoutShare"] = sk_dec(100 * lays[top_sal] / lays_tot)
     over = [k for k in _LAYOUT_ORDER
             if k in lay and 100 * lays.get(k, 0) / lays_tot > 100 * lay[k] / lay_tot]
     out["overSellingLayouts"] = sk_list(over) if over else "žiadnej"
+    # one category is "v kategórii", several "v kategóriách"; none, no sentence
+    out["overSellingBullet"] = (
+        "" if not over else
+        f"- Podiel na predaji prevyšuje podiel na ponuke v kategórii {P(over[0])}." if len(over) == 1 else
+        f"- Podiel na predaji prevyšuje podiel na ponuke v kategóriách {sk_list([P(k) for k in over])}.")
+
+    # counts that carry a noun, and the sentences that change with zero
+    out["concProjectsPhrase"] = sk_count(k, "projekt", "projekty", "projektov")
+    n_small = len(small)
+    out["smallProjectsBullet"] = (
+        f"- Žiadny projekt nemá v ponuke menej ako {SMALL_MAX} bytov." if n_small == 0 else
+        f"- {sk_count(n_small, 'projekt má', 'projekty majú', 'projektov má')} v ponuke menej ako "
+        f"{SMALL_MAX} bytov ({out['smallProjectsSharePct']} % ponuky).")
+    out["supplyDoneBullet"] = (
+        "- Dokončené byty v ponuke nie sú." if done == 0 else
+        f"- Ponuka dokončených bytov tvorí {sk_dec(100 * done / tot)} % všetkých nepredaných bytov "
+        f"({sk_count(done, 'byt', 'byty', 'bytov')}).")
+    out["outlookDoneClause"] = (
+        "Dokončené byty v ponuke nie sú" if done == 0 else
+        f"Dokončené voľné byty ({sk_int(done)}) tvoria {sk_dec(100 * done / tot)} % tejto ponuky")
 
     # demand against the same days of the previous quarter
     # 🔴 ONLY WHEN WE WATCHED THOSE DAYS. prev_period_sales counts the same
@@ -788,26 +939,100 @@ def _herrys_vars(rep: dict, base: dict) -> dict:
         out["salesVsPrevBullet"] = ""
     out["absorptionPct"] = sk_dec(100 * sold / tot) if tot else "—"
 
-    # asking against what sold — a direction is a figure
-    qt = rep.get("quarterly", {}).get("ours", {})
-    ask, sold_m2 = qt.get("meanM2"), qt.get("soldM2")
+    # asking against what sold — a direction is a figure. The overview carries
+    # its own quarter figures; market_report's `quarterly` section is the same
+    # measurement for Bratislava and is used when present.
+    # the Úvod's headline bullet: a change on the projects present in both
+    # quarters — only when those are a market, not one or two developers
+    _pp = ov.get("panel_projects")
+    out["panelSupplyBullet"] = (
+        "" if (_pp is not None and _pp < MC) or not ov.get("panel_supply_prev") else
+        f"- **Počet bytov v ponuke v projektoch, ktoré predávali aj v predchádzajúcom štvrťroku, "
+        f"{base['panelSupplyClause']}** — {base['panelSupplyFrom']} {base['panelSupplyPrev']} "
+        f"na {base['panelSupplyCur']}.")
+    _pu, _pup = ov.get("panel_units") or 0, ov.get("panel_unit_projects")
+    out["qoqBullet"] = ("" if _pu < MN or (_pup is not None and _pup < MC) else
+                        f"- Na tých istých {sk_int(_pu)} bytoch {base['qoqClause']}.")
+    # the three own-history figures, each only if the plan drew it
+    plan = ov.get("figures") or {}
+    where = (ov.get("scope") or {}).get("in_sk", "")
+    slug = rep["slug"]
+    out["demandFigure"] = (
+        f"![Dopyt po bytoch](/analyzy/{slug}-dopyt-mesiace.svg)\n"
+        f"*Počet predaných bytov {where} za mesiac v projektoch, ktoré sledujeme od začiatku štvrťroka.*"
+        if plan.get("dopyt-mesiace") else "")
+    out["weeklyFigure"] = (
+        f"![Vývoj cien nových bytov](/analyzy/{slug}-ceny-vyvoj.svg)\n"
+        f"*Zmena priemernej ponukovej ceny za meter od začiatku štvrťroka, týždenne, na tých istých "
+        f"bytoch — graf sa pohne len vtedy, keď sa pohne cena.*"
+        if plan.get("ceny-vyvoj") else "")
+    out["offerSoldFigure"] = (
+        f"![Vývoj cien voľných a predaných bytov](/analyzy/{slug}-ponuka-vs-predaj-mesiace.svg)\n"
+        f"*Cena predaných bytov a ponuková cena v tých istých projektoch"
+        f"{', po mesiacoch' if plan.get('ponuka-vs-predaj-mesiace') == 'monthly' else ' za štvrťrok'}.*"
+        if plan.get("ponuka-vs-predaj-mesiace") else "")
+
+    # 🔴 BOTH SIDES ON THE SAME PROJECTS, OVER THE SAME DAYS (overview
+    # `panel_quarter`, the basis the monthly figure draws). A report built
+    # before that measurement existed falls back to the old pair.
+    pq = ov.get("panel_quarter") or {}
+    if pq:
+        # the panel is the basis; below the floors there is no sentence at all
+        _enough = int(pq.get("projects") or 0) >= MC and int(pq.get("n_sold") or 0) >= MN
+        ask, sold_m2 = (pq.get("ask_m2"), pq.get("sold_m2")) if _enough else (None, None)
+    else:
+        qt = rep.get("quarterly", {}).get("ours", {})
+        ask = qt.get("meanM2") or ov.get("quarter_ask_m2")
+        sold_m2 = qt.get("soldM2") or ov.get("quarter_sold_m2")
+    out["askVsSoldBullet"] = ""
     if ask and sold_m2:
         gap = (ask / sold_m2 - 1) * 100
         out["askM2"], out["soldM2"] = sk_int(ask), sk_int(sold_m2)
         # the conjunction travels with the adjective: "rovnaká AKO", "vyššia NEŽ"
         out["askVsSoldClause"] = ("prakticky rovnaká ako" if abs(gap) < 0.5 else
-                                  f"{'vyššia' if gap > 0 else 'nižšia'} o {sk_dec(abs(gap))} % než")
+                                  f"o {sk_dec(abs(gap))} % {'vyššia' if gap > 0 else 'nižšia'} než")
+        # the sold side is the subject: "predané byty mali cenu o X % vyššiu
+        # než byty, ktoré v tých istých projektoch zostali v ponuke"
+        _g = (float(sold_m2) / float(ask) - 1) * 100
+        _cl = ("prakticky rovnakú ako" if abs(_g) < 0.5 else
+               f"o {sk_dec(abs(_g))} % {'vyššiu' if _g > 0 else 'nižšiu'} než")
+        out["askVsSoldBullet"] = (
+            f"- Predané byty mali priemernú cenníkovú cenu {out['soldM2']} €/m² s DPH, {_cl} "
+            f"byty, ktoré v tých istých projektoch zostali v ponuke ({out['askM2']} €/m² s DPH).")
     # finished against under construction, as an adjective this time
-    _ps = [r for r in ov["price_series"] if r["m2_done"] and r["m2_building"]]
+    # 🔴 A LEVEL OF THE WHOLE OFFER (overview `completion_m2`, the fortnight
+    # window over every project), and only when each side has enough flats to
+    # carry a mean. The last week of the same-flats series is a survivor panel.
+    _cm = ov.get("completion_m2") or {}
+    _MIN_SIDE = 10
+    if _cm:
+        _ok = (_cm.get("m2_done") and _cm.get("m2_building")
+               and (_cm.get("n_done") or 0) >= _MIN_SIDE and (_cm.get("n_building") or 0) >= _MIN_SIDE
+               and (_cm.get("p_done") if _cm.get("p_done") is not None else MC) >= MC
+               and (_cm.get("p_building") if _cm.get("p_building") is not None else MC) >= MC)
+        _pair = (float(_cm["m2_done"]), float(_cm["m2_building"])) if _ok else None
+    else:
+        _ps_ = [r for r in ov["price_series"] if r["m2_done"] and r["m2_building"]]
+        _pair = (float(_ps_[-1]["m2_done"]), float(_ps_[-1]["m2_building"])) if _ps_ else None
+    _ps = [_pair] if _pair else []
     if _ps:
-        _gap = (float(_ps[-1]["m2_done"]) / float(_ps[-1]["m2_building"]) - 1) * 100
+        _gap = (_pair[0] / _pair[1] - 1) * 100
         out["doneVsBuildingAdjSk"] = ("prakticky rovnaká ako" if abs(_gap) < 0.5 else
                                       f"o {sk_dec(abs(_gap))} % {'vyššia' if _gap > 0 else 'nižšia'} než")
+        out["doneVsBuildingBullet"] = (f"- Cena dokončených bytov je {out['doneVsBuildingAdjSk']} "
+                                       f"cena rozostavaných.")
+    else:
+        # a scope with no finished flats on offer (or none under construction)
+        # has no such comparison; the bullet is absent rather than blank
+        out["doneVsBuildingAdjSk"] = ""
+        out["doneVsBuildingBullet"] = ""
 
     # the outlook, mechanical: at this pace, how long the offer lasts
     days = ov.get("period_days") or 0
     per_month = sold / days * 30.44 if days else 0
     out["salesPerMonth"] = sk_int(round(per_month)) if per_month else "—"
+    out["salesPerMonthPhrase"] = (sk_count(int(round(per_month)), "byt", "byty", "bytov")
+                                  if per_month else "—")
     out["monthsToClear"] = sk_dec(tot / per_month) if per_month else "—"
 
     p = base.get("periodSk", "")
@@ -956,6 +1181,13 @@ def _issue_specific_vars(rep: dict) -> dict:
 
 
 def build_vars(rep: dict) -> dict:
+    # 🔴 AN ISSUE FROM issue_report.py CARRIES ONLY ITS OVERVIEW. The national
+    # panels below belong to market_report's full run; a Košice or kraj issue
+    # has no nationalMap and needs none. Everything the Herrys skeleton prints
+    # comes from the overview.
+    if "nationalMap" not in rep:
+        return {"asOf": sk_date(rep["asOf"]), "asOfEn": en_date(rep["asOf"]),
+                "slug": rep["slug"], **_issue_specific_vars(rep)}
     towns = {t["city"]: t for t in rep["nationalMap"]["towns"]}
     tot = rep["nationalMap"]["totals"]
     step = rep["priceStepByScope"]
@@ -1509,6 +1741,26 @@ BARE_NUMBER = re.compile(r"(?<![\w{/.\-])\d[\d  .,]*(?![\w}])")
 LOOKS_LIKE_A_YEAR = re.compile(r"^(?:19|20)\d\d$")
 
 
+def _tidy(md: str) -> str:
+    """An optional bullet that renders empty leaves a blank line; inside a list
+    it would split the list in two. A blank line between two bullets goes, and
+    runs of blank lines collapse to one."""
+    lines = md.split("\n")
+    out: list[str] = []
+    for i, ln in enumerate(lines):
+        if ln.strip() == "":
+            if out and out[-1].strip() == "":
+                continue
+            if out and out[-1].startswith("- "):
+                j = i + 1
+                while j < len(lines) and lines[j].strip() == "":
+                    j += 1
+                if j < len(lines) and lines[j].startswith("- "):
+                    continue
+        out.append(ln)
+    return "\n".join(out)
+
+
 def main() -> int:
     if len(sys.argv) != 2:
         print(__doc__)
@@ -1539,7 +1791,7 @@ def main() -> int:
                   file=sys.stderr)
             return 1
     for path, out in rendered.values():
-        path.write_text(out, encoding="utf-8")
+        path.write_text(_tidy(out), encoding="utf-8")
         print(f"wrote {path}")
     return 0
 

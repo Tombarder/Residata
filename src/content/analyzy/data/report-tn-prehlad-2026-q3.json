@@ -1,0 +1,563 @@
+{
+ "asOf": "2026-09-27",
+ "generatedAt": "2026-09-28T08:25:31",
+ "slug": "tn-prehlad-2026-q3",
+ "overview": {
+  "scope": {
+   "kind": "city",
+   "name": "Trenčín",
+   "city_id": "trencin",
+   "kraj": "Trenčiansky kraj",
+   "subunit": "layout",
+   "code": "tn",
+   "in_sk": "v Trenčíne",
+   "gen_sk": "v Trenčíne",
+   "adj_sk": "trenčianskych",
+   "sub": {
+    "header": "Kategória",
+    "by_sg": "podľa kategórie",
+    "by_pl": "podľa kategórií",
+    "done2": "Najviac dokončených voľných bytov je v kategóriách {a} a {b}.",
+    "done1": "Dokončené voľné byty sú len v kategórii {a}.",
+    "top1": "Najviac dokončených voľných bytov je v kategórii {a}.",
+    "rel": ""
+   }
+  },
+  "history": "own",
+  "quarter_start": "2026-07-01",
+  "quarter_end": "2026-09-30",
+  "as_of": "2026-09-27",
+  "smooth_days": 14,
+  "sale_settling_days": 7,
+  "rolling_days": 28,
+  "prev_period_sales": 2,
+  "period_days": 88,
+  "okres_supply": {
+   "1-izb": {
+    "n": 19,
+    "done": 0,
+    "building": 10,
+    "unknown": 9,
+    "projects": 2,
+    "m2": 4555
+   },
+   "2-izb": {
+    "n": 118,
+    "done": 0,
+    "building": 32,
+    "unknown": 86,
+    "projects": 5,
+    "m2": 3991
+   },
+   "3-izb": {
+    "n": 91,
+    "done": 0,
+    "building": 25,
+    "unknown": 66,
+    "projects": 5,
+    "m2": 3863
+   },
+   "4-izb": {
+    "n": 44,
+    "done": 0,
+    "building": 9,
+    "unknown": 35,
+    "projects": 5,
+    "m2": 4062
+   },
+   "5 a viac": {
+    "n": 3,
+    "done": 0,
+    "building": 1,
+    "unknown": 2,
+    "projects": 3,
+    "m2": 5482
+   },
+   "(neuvedené)": {
+    "n": 0,
+    "done": 0,
+    "building": 0,
+    "unknown": 0,
+    "projects": 1,
+    "m2": null
+   }
+  },
+  "okres_sales": {
+   "1-izb": {
+    "n": 8,
+    "n_priced": 1,
+    "m2": 4451
+   },
+   "2-izb": {
+    "n": 26,
+    "n_priced": 14,
+    "m2": 4198
+   },
+   "3-izb": {
+    "n": 15,
+    "n_priced": 13,
+    "m2": 3796
+   },
+   "4-izb": {
+    "n": 12,
+    "n_priced": 0,
+    "m2": null
+   },
+   "5 a viac": {
+    "n": 2,
+    "n_priced": 2,
+    "m2": 4458
+   },
+   "(neuvedené)": {
+    "n": 1,
+    "n_priced": 0,
+    "m2": null
+   }
+  },
+  "okres_price": {
+   "1-izb": {
+    "m2_cur": 4484,
+    "m2_prev": 4484,
+    "chg_pct": 0.0,
+    "unit_days": 140,
+    "units": 10,
+    "projects": 1
+   },
+   "2-izb": {
+    "m2_cur": 4260,
+    "m2_prev": 4236,
+    "chg_pct": 0.6,
+    "unit_days": 644,
+    "units": 46,
+    "projects": 2
+   },
+   "3-izb": {
+    "m2_cur": 4108,
+    "m2_prev": 4091,
+    "chg_pct": 0.4,
+    "unit_days": 588,
+    "units": 42,
+    "projects": 2
+   },
+   "4-izb": {
+    "m2_cur": 4647,
+    "m2_prev": 4643,
+    "chg_pct": 0.1,
+    "unit_days": 196,
+    "units": 14,
+    "projects": 2
+   },
+   "5 a viac": {
+    "m2_cur": 5642,
+    "m2_prev": 5641,
+    "chg_pct": 0.0,
+    "unit_days": 14,
+    "units": 1,
+    "projects": 1
+   }
+  },
+  "projects": 5,
+  "mean_price": 277540,
+  "mean_area": 69.0,
+  "panel_projects": 2,
+  "panel_units": 115,
+  "panel_unit_projects": 2,
+  "rules": {
+   "min_contributors": 3,
+   "min_mean_n": 10
+  },
+  "panel_supply_prev": 147,
+  "panel_supply_cur": 121,
+  "layout_supply": [
+   {
+    "k": "2-izb",
+    "n": 118,
+    "m2": "3991",
+    "area": "55.2"
+   },
+   {
+    "k": "3-izb",
+    "n": 91,
+    "m2": "3863",
+    "area": "75.6"
+   },
+   {
+    "k": "4-izb",
+    "n": 44,
+    "m2": "4062",
+    "area": "101.0"
+   },
+   {
+    "k": "1-izb",
+    "n": 19,
+    "m2": "4555",
+    "area": "38.5"
+   },
+   {
+    "k": "5 a viac",
+    "n": 3,
+    "m2": "5482",
+    "area": "165.9"
+   },
+   {
+    "k": "(neuvedené)",
+    "n": 0,
+    "m2": null,
+    "area": null
+   }
+  ],
+  "layout_sales": [
+   {
+    "k": "2-izb",
+    "n": 26,
+    "m2": "4198",
+    "area": "53.6"
+   },
+   {
+    "k": "3-izb",
+    "n": 15,
+    "m2": "3796",
+    "area": "75.2"
+   },
+   {
+    "k": "4-izb",
+    "n": 12,
+    "m2": null,
+    "area": null
+   },
+   {
+    "k": "1-izb",
+    "n": 8,
+    "m2": "4451",
+    "area": "32.6"
+   },
+   {
+    "k": "5 a viac",
+    "n": 2,
+    "m2": "4458",
+    "area": "134.2"
+   },
+   {
+    "k": "(neuvedené)",
+    "n": 1,
+    "m2": null,
+    "area": "67.6"
+   }
+  ],
+  "own_quarters": {
+   "2026Q2": 4275,
+   "2026Q3": 4001
+  },
+  "quarter_sales": 64,
+  "quarter_sold_m2": 4050,
+  "quarter_ask_m2": 4001,
+  "price_series": [
+   {
+    "wk": "2026-06-15",
+    "m2_done": null,
+    "m2_building": "4371",
+    "m2_all": "4371",
+    "n_all": 104,
+    "u_done": 0,
+    "u_building": 104,
+    "p_all": 2,
+    "p_done": 0,
+    "p_building": 2
+   },
+   {
+    "wk": "2026-06-22",
+    "m2_done": null,
+    "m2_building": "4371",
+    "m2_all": "4371",
+    "n_all": 104,
+    "u_done": 0,
+    "u_building": 104,
+    "p_all": 2,
+    "p_done": 0,
+    "p_building": 2
+   },
+   {
+    "wk": "2026-06-29",
+    "m2_done": null,
+    "m2_building": "4371",
+    "m2_all": "4371",
+    "n_all": 104,
+    "u_done": 0,
+    "u_building": 104,
+    "p_all": 2,
+    "p_done": 0,
+    "p_building": 2
+   },
+   {
+    "wk": "2026-07-06",
+    "m2_done": null,
+    "m2_building": "4371",
+    "m2_all": "4371",
+    "n_all": 104,
+    "u_done": 0,
+    "u_building": 104,
+    "p_all": 2,
+    "p_done": 0,
+    "p_building": 2
+   },
+   {
+    "wk": "2026-07-13",
+    "m2_done": null,
+    "m2_building": "4371",
+    "m2_all": "4371",
+    "n_all": 104,
+    "u_done": 0,
+    "u_building": 104,
+    "p_all": 2,
+    "p_done": 0,
+    "p_building": 2
+   },
+   {
+    "wk": "2026-07-20",
+    "m2_done": null,
+    "m2_building": "4371",
+    "m2_all": "4371",
+    "n_all": 104,
+    "u_done": 0,
+    "u_building": 104,
+    "p_all": 2,
+    "p_done": 0,
+    "p_building": 2
+   },
+   {
+    "wk": "2026-07-27",
+    "m2_done": null,
+    "m2_building": "4371",
+    "m2_all": "4371",
+    "n_all": 104,
+    "u_done": 0,
+    "u_building": 104,
+    "p_all": 2,
+    "p_done": 0,
+    "p_building": 2
+   },
+   {
+    "wk": "2026-08-03",
+    "m2_done": null,
+    "m2_building": "4371",
+    "m2_all": "4371",
+    "n_all": 104,
+    "u_done": 0,
+    "u_building": 104,
+    "p_all": 2,
+    "p_done": 0,
+    "p_building": 2
+   },
+   {
+    "wk": "2026-08-10",
+    "m2_done": null,
+    "m2_building": "4371",
+    "m2_all": "4371",
+    "n_all": 104,
+    "u_done": 0,
+    "u_building": 104,
+    "p_all": 2,
+    "p_done": 0,
+    "p_building": 2
+   },
+   {
+    "wk": "2026-08-17",
+    "m2_done": null,
+    "m2_building": "4371",
+    "m2_all": "4371",
+    "n_all": 104,
+    "u_done": 0,
+    "u_building": 104,
+    "p_all": 2,
+    "p_done": 0,
+    "p_building": 2
+   },
+   {
+    "wk": "2026-08-24",
+    "m2_done": null,
+    "m2_building": "4371",
+    "m2_all": "4371",
+    "n_all": 104,
+    "u_done": 0,
+    "u_building": 104,
+    "p_all": 2,
+    "p_done": 0,
+    "p_building": 2
+   },
+   {
+    "wk": "2026-08-31",
+    "m2_done": null,
+    "m2_building": "4371",
+    "m2_all": "4371",
+    "n_all": 104,
+    "u_done": 0,
+    "u_building": 104,
+    "p_all": 2,
+    "p_done": 0,
+    "p_building": 2
+   },
+   {
+    "wk": "2026-09-07",
+    "m2_done": null,
+    "m2_building": "4371",
+    "m2_all": "4371",
+    "n_all": 104,
+    "u_done": 0,
+    "u_building": 104,
+    "p_all": 2,
+    "p_done": 0,
+    "p_building": 2
+   },
+   {
+    "wk": "2026-09-14",
+    "m2_done": null,
+    "m2_building": "4824",
+    "m2_all": "4372",
+    "n_all": 104,
+    "u_done": 0,
+    "u_building": 74,
+    "p_all": 2,
+    "p_done": 0,
+    "p_building": 1
+   },
+   {
+    "wk": "2026-09-21",
+    "m2_done": null,
+    "m2_building": "4824",
+    "m2_all": "4385",
+    "n_all": 103,
+    "u_done": 0,
+    "u_building": 74,
+    "p_all": 2,
+    "p_done": 0,
+    "p_building": 1
+   }
+  ],
+  "project_supply": [
+   {
+    "project_id": "nova-merina",
+    "n": 122
+   },
+   {
+    "project_id": "karpatska-trencin",
+    "n": 74
+   },
+   {
+    "project_id": "rezidencia-vinohrady",
+    "n": 47
+   },
+   {
+    "project_id": "pod-brezinou",
+    "n": 16
+   },
+   {
+    "project_id": "villadomy-hrdlicky",
+    "n": 14
+   }
+  ],
+  "own_quarter_sales": [
+   {
+    "qkey": "2026Q2",
+    "n": 2,
+    "first_sale": "2026-06-18",
+    "last_sale": "2026-06-25",
+    "observed_from": "2026-05-16"
+   },
+   {
+    "qkey": "2026Q3",
+    "n": 64,
+    "first_sale": "2026-07-02",
+    "last_sale": "2026-09-26",
+    "observed_from": "2026-05-16"
+   }
+  ],
+  "own_month_sales": [
+   {
+    "m": "2026-06-01",
+    "n": 2,
+    "observed_from": "2026-05-16"
+   },
+   {
+    "m": "2026-07-01",
+    "n": 7,
+    "observed_from": "2026-05-16"
+   },
+   {
+    "m": "2026-08-01",
+    "n": 12,
+    "observed_from": "2026-05-16"
+   },
+   {
+    "m": "2026-09-01",
+    "n": 45,
+    "observed_from": "2026-05-16"
+   }
+  ],
+  "offer_vs_sold_monthly": [
+   {
+    "m": "2026-07-01",
+    "m2_offer": 3262,
+    "m2_sold": 3266,
+    "n_sold": 2,
+    "gap_pct": 0.1,
+    "full_from_start": true,
+    "current_month": false
+   },
+   {
+    "m": "2026-08-01",
+    "m2_offer": 3251,
+    "m2_sold": 3417,
+    "n_sold": 1,
+    "gap_pct": 5.1,
+    "full_from_start": true,
+    "current_month": false
+   },
+   {
+    "m": "2026-09-01",
+    "m2_offer": 4364,
+    "m2_sold": 4208,
+    "n_sold": 24,
+    "gap_pct": -3.6,
+    "full_from_start": true,
+    "current_month": true
+   }
+  ],
+  "panel_month_sales": [
+   {
+    "m": "2026-07-01",
+    "n": 7
+   },
+   {
+    "m": "2026-08-01",
+    "n": 2
+   },
+   {
+    "m": "2026-09-01",
+    "n": 31
+   }
+  ],
+  "panel_month_projects": 2,
+  "panel_quarter": {
+   "ask_m2": 4223,
+   "sold_m2": 4109,
+   "n_sold": 27,
+   "n_sold_no_offer": 0,
+   "projects": 2
+  },
+  "completion_m2": {
+   "m2_done": null,
+   "m2_building": 4789,
+   "n_done": 0,
+   "n_building": 76,
+   "p_done": 0,
+   "p_building": 1
+  },
+  "figures": {
+   "podiel-ponuka": true,
+   "podiel-predaj": true,
+   "dopyt-mesiace": false,
+   "ceny-vyvoj": false,
+   "ponuka-vs-predaj-mesiace": null
+  }
+ }
+}

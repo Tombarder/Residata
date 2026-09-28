@@ -1,0 +1,654 @@
+{
+ "asOf": "2026-09-27",
+ "generatedAt": "2026-09-28T08:25:38",
+ "slug": "kraj-tt-prehlad-2026-q3",
+ "overview": {
+  "scope": {
+   "kind": "kraj",
+   "name": "Trnavský kraj",
+   "region_id": "sk-trnavsky",
+   "subunit": "town",
+   "code": "kraj-tt",
+   "in_sk": "v Trnavskom kraji",
+   "gen_sk": "v Trnavskom kraji",
+   "adj_sk": "trnavského kraja",
+   "sub": {
+    "header": "Obec",
+    "by_sg": "podľa obce",
+    "by_pl": "podľa obcí",
+    "done2": "Najviac dokončených voľných bytov je v lokalitách {a} a {b}.",
+    "done1": "Dokončené voľné byty sú len v lokalite {a}.",
+    "top1": "Najviac dokončených voľných bytov je v lokalite {a}.",
+    "rel": "V lokalite {f} je podiel na predaji ({fs} %) najvýraznejšie nad podielom na ponuke ({fp} %); opačný pomer má {s} — {ss} % predaja pri {sp} % ponuky."
+   }
+  },
+  "history": "own",
+  "quarter_start": "2026-07-01",
+  "quarter_end": "2026-09-30",
+  "as_of": "2026-09-27",
+  "smooth_days": 14,
+  "sale_settling_days": 7,
+  "rolling_days": 28,
+  "prev_period_sales": 9,
+  "period_days": 88,
+  "okres_supply": {
+   "Trnava": {
+    "n": 578,
+    "done": 40,
+    "building": 188,
+    "unknown": 350,
+    "projects": 10,
+    "m2": 4082
+   },
+   "Piešťany": {
+    "n": 128,
+    "done": 14,
+    "building": 30,
+    "unknown": 84,
+    "projects": 4,
+    "m2": 3158
+   },
+   "Dunajská Streda": {
+    "n": 102,
+    "done": 86,
+    "building": 0,
+    "unknown": 16,
+    "projects": 3,
+    "m2": 2744
+   },
+   "Nové Mesto nad Váhom": {
+    "n": 56,
+    "done": 0,
+    "building": 31,
+    "unknown": 25,
+    "projects": 2,
+    "m2": 2974
+   },
+   "Sekule": {
+    "n": 37,
+    "done": 0,
+    "building": 0,
+    "unknown": 37,
+    "projects": 1,
+    "m2": 2219
+   },
+   "Hlohovec": {
+    "n": 27,
+    "done": 2,
+    "building": 25,
+    "unknown": 0,
+    "projects": 2,
+    "m2": 3278
+   },
+   "Sereď": {
+    "n": 9,
+    "done": 0,
+    "building": 0,
+    "unknown": 9,
+    "projects": 1,
+    "m2": 2068
+   },
+   "Oľdza": {
+    "n": 5,
+    "done": 0,
+    "building": 0,
+    "unknown": 5,
+    "projects": 1,
+    "m2": 2182
+   }
+  },
+  "okres_sales": {
+   "Trnava": {
+    "n": 75,
+    "n_priced": 58,
+    "m2": 4062
+   },
+   "Nové Mesto nad Váhom": {
+    "n": 12,
+    "n_priced": 12,
+    "m2": 2987
+   },
+   "Piešťany": {
+    "n": 6,
+    "n_priced": 5,
+    "m2": 3209
+   },
+   "Dunajská Streda": {
+    "n": 4,
+    "n_priced": 3,
+    "m2": 2818
+   },
+   "Sekule": {
+    "n": 4,
+    "n_priced": 3,
+    "m2": 2113
+   },
+   "Oľdza": {
+    "n": 2,
+    "n_priced": 2,
+    "m2": 2187
+   }
+  },
+  "okres_price": {
+   "Dunajská Streda": {
+    "m2_cur": 2744,
+    "m2_prev": 2744,
+    "chg_pct": 0.0,
+    "unit_days": 700,
+    "units": 50,
+    "projects": 1
+   },
+   "Hlohovec": {
+    "m2_cur": 3278,
+    "m2_prev": 3280,
+    "chg_pct": -0.1,
+    "unit_days": 364,
+    "units": 26,
+    "projects": 2
+   },
+   "Nové Mesto nad Váhom": {
+    "m2_cur": 3015,
+    "m2_prev": 3015,
+    "chg_pct": 0.0,
+    "unit_days": 28,
+    "units": 2,
+    "projects": 1
+   },
+   "Piešťany": {
+    "m2_cur": 3260,
+    "m2_prev": 3220,
+    "chg_pct": 1.2,
+    "unit_days": 602,
+    "units": 43,
+    "projects": 2
+   },
+   "Trnava": {
+    "m2_cur": 3923,
+    "m2_prev": 3901,
+    "chg_pct": 0.6,
+    "unit_days": 1894,
+    "units": 135,
+    "projects": 4
+   }
+  },
+  "projects": 24,
+  "mean_price": 218956,
+  "mean_area": 61.3,
+  "panel_projects": 12,
+  "panel_units": 262,
+  "panel_unit_projects": 10,
+  "rules": {
+   "min_contributors": 3,
+   "min_mean_n": 10
+  },
+  "panel_supply_prev": 406,
+  "panel_supply_cur": 508,
+  "layout_supply": [
+   {
+    "k": "2-izb",
+    "n": "406",
+    "m2": "3836",
+    "area": "50.6"
+   },
+   {
+    "k": "3-izb",
+    "n": "320",
+    "m2": "3256",
+    "area": "72.3"
+   },
+   {
+    "k": "4-izb",
+    "n": "92",
+    "m2": "3542",
+    "area": "101.6"
+   },
+   {
+    "k": "1-izb",
+    "n": "76",
+    "m2": "5167",
+    "area": "29.3"
+   },
+   {
+    "k": "1,5-izb",
+    "n": "25",
+    "m2": "5265",
+    "area": "34.3"
+   },
+   {
+    "k": "(neuvedené)",
+    "n": "21",
+    "m2": "2827",
+    "area": "53.9"
+   },
+   {
+    "k": "5 a viac",
+    "n": "1",
+    "m2": "4404",
+    "area": "132.3"
+   }
+  ],
+  "layout_sales": [
+   {
+    "k": "2-izb",
+    "n": 49,
+    "m2": "3852",
+    "area": "48.9"
+   },
+   {
+    "k": "3-izb",
+    "n": 43,
+    "m2": "3510",
+    "area": "71.4"
+   },
+   {
+    "k": "4-izb",
+    "n": 6,
+    "m2": "2905",
+    "area": "110.3"
+   },
+   {
+    "k": "1,5-izb",
+    "n": 3,
+    "m2": "5128",
+    "area": "33.0"
+   },
+   {
+    "k": "1-izb",
+    "n": 2,
+    "m2": "3697",
+    "area": "32.7"
+   }
+  ],
+  "own_quarters": {
+   "2026Q2": 3545,
+   "2026Q3": 3711
+  },
+  "quarter_sales": 103,
+  "quarter_sold_m2": 3695,
+  "quarter_ask_m2": 3711,
+  "price_series": [
+   {
+    "wk": "2026-06-15",
+    "m2_done": "3025",
+    "m2_building": "3774",
+    "m2_all": "3512",
+    "n_all": 264,
+    "u_done": 83,
+    "u_building": 108,
+    "p_all": 10,
+    "p_done": 5,
+    "p_building": 5
+   },
+   {
+    "wk": "2026-06-22",
+    "m2_done": "3025",
+    "m2_building": "3774",
+    "m2_all": "3510",
+    "n_all": 262,
+    "u_done": 83,
+    "u_building": 108,
+    "p_all": 10,
+    "p_done": 5,
+    "p_building": 5
+   },
+   {
+    "wk": "2026-06-29",
+    "m2_done": "3051",
+    "m2_building": "3774",
+    "m2_all": "3509",
+    "n_all": 262,
+    "u_done": 84,
+    "u_building": 108,
+    "p_all": 10,
+    "p_done": 5,
+    "p_building": 5
+   },
+   {
+    "wk": "2026-07-06",
+    "m2_done": "3027",
+    "m2_building": "3779",
+    "m2_all": "3510",
+    "n_all": 260,
+    "u_done": 82,
+    "u_building": 109,
+    "p_all": 10,
+    "p_done": 4,
+    "p_building": 5
+   },
+   {
+    "wk": "2026-07-13",
+    "m2_done": "3015",
+    "m2_building": "3779",
+    "m2_all": "3508",
+    "n_all": 259,
+    "u_done": 81,
+    "u_building": 109,
+    "p_all": 10,
+    "p_done": 4,
+    "p_building": 5
+   },
+   {
+    "wk": "2026-07-20",
+    "m2_done": "3057",
+    "m2_building": "3774",
+    "m2_all": "3512",
+    "n_all": 261,
+    "u_done": 84,
+    "u_building": 108,
+    "p_all": 10,
+    "p_done": 5,
+    "p_building": 5
+   },
+   {
+    "wk": "2026-07-27",
+    "m2_done": "3050",
+    "m2_building": "3766",
+    "m2_all": "3511",
+    "n_all": 261,
+    "u_done": 83,
+    "u_building": 107,
+    "p_all": 10,
+    "p_done": 5,
+    "p_building": 5
+   },
+   {
+    "wk": "2026-08-03",
+    "m2_done": "3005",
+    "m2_building": "3766",
+    "m2_all": "3503",
+    "n_all": 258,
+    "u_done": 80,
+    "u_building": 107,
+    "p_all": 10,
+    "p_done": 5,
+    "p_building": 5
+   },
+   {
+    "wk": "2026-08-10",
+    "m2_done": "3005",
+    "m2_building": "3766",
+    "m2_all": "3503",
+    "n_all": 256,
+    "u_done": 80,
+    "u_building": 107,
+    "p_all": 10,
+    "p_done": 5,
+    "p_building": 5
+   },
+   {
+    "wk": "2026-08-17",
+    "m2_done": "3005",
+    "m2_building": "3766",
+    "m2_all": "3504",
+    "n_all": 255,
+    "u_done": 80,
+    "u_building": 107,
+    "p_all": 10,
+    "p_done": 5,
+    "p_building": 5
+   },
+   {
+    "wk": "2026-08-24",
+    "m2_done": "3005",
+    "m2_building": "3766",
+    "m2_all": "3504",
+    "n_all": 255,
+    "u_done": 80,
+    "u_building": 107,
+    "p_all": 10,
+    "p_done": 5,
+    "p_building": 5
+   },
+   {
+    "wk": "2026-08-31",
+    "m2_done": "3005",
+    "m2_building": "3767",
+    "m2_all": "3504",
+    "n_all": 255,
+    "u_done": 80,
+    "u_building": 107,
+    "p_all": 10,
+    "p_done": 5,
+    "p_building": 5
+   },
+   {
+    "wk": "2026-09-07",
+    "m2_done": "3002",
+    "m2_building": "3767",
+    "m2_all": "3505",
+    "n_all": 256,
+    "u_done": 80,
+    "u_building": 107,
+    "p_all": 10,
+    "p_done": 5,
+    "p_building": 5
+   },
+   {
+    "wk": "2026-09-14",
+    "m2_done": "3002",
+    "m2_building": "3771",
+    "m2_all": "3502",
+    "n_all": 254,
+    "u_done": 80,
+    "u_building": 105,
+    "p_all": 10,
+    "p_done": 5,
+    "p_building": 5
+   },
+   {
+    "wk": "2026-09-21",
+    "m2_done": "3002",
+    "m2_building": "3779",
+    "m2_all": "3502",
+    "n_all": 251,
+    "u_done": 80,
+    "u_building": 105,
+    "p_all": 10,
+    "p_done": 5,
+    "p_building": 5
+   }
+  ],
+  "project_supply": [
+   {
+    "project_id": "cukrovar-trnava",
+    "n": 159
+   },
+   {
+    "project_id": "arboria",
+    "n": 120
+   },
+   {
+    "project_id": "byty-kamenac",
+    "n": 93
+   },
+   {
+    "project_id": "prudy-trnava",
+    "n": 70
+   },
+   {
+    "project_id": "na-lodenici",
+    "n": 69
+   },
+   {
+    "project_id": "dbds",
+    "n": 50
+   },
+   {
+    "project_id": "rezidencia-orolska-zahrada",
+    "n": 45
+   },
+   {
+    "project_id": "panske-byvanie",
+    "n": 37
+   },
+   {
+    "project_id": "harmony-residence",
+    "n": 36
+   },
+   {
+    "project_id": "greentirna",
+    "n": 31
+   },
+   {
+    "project_id": "rezidencia-kamenna",
+    "n": 31
+   },
+   {
+    "project_id": "zahradky-piestany",
+    "n": 30
+   },
+   {
+    "project_id": "paradajs",
+    "n": 25
+   },
+   {
+    "project_id": "byty-kasarne",
+    "n": 25
+   },
+   {
+    "project_id": "rezidencia-levan",
+    "n": 19
+   },
+   {
+    "project_id": "pupavy-pri-aleji",
+    "n": 19
+   },
+   {
+    "project_id": "riva-park",
+    "n": 16
+   },
+   {
+    "project_id": "swanhouse",
+    "n": 15
+   },
+   {
+    "project_id": "byty-vrbina",
+    "n": 14
+   },
+   {
+    "project_id": "rezidencia-timravy",
+    "n": 13
+   },
+   {
+    "project_id": "cisarky",
+    "n": 9
+   },
+   {
+    "project_id": "zicherhouse",
+    "n": 9
+   },
+   {
+    "project_id": "maly-chotar",
+    "n": 5
+   },
+   {
+    "project_id": "bytovy-dom-vivien",
+    "n": 2
+   }
+  ],
+  "own_quarter_sales": [
+   {
+    "qkey": "2026Q2",
+    "n": 9,
+    "first_sale": "2026-06-17",
+    "last_sale": "2026-06-25",
+    "observed_from": "2026-05-16"
+   },
+   {
+    "qkey": "2026Q3",
+    "n": 103,
+    "first_sale": "2026-07-01",
+    "last_sale": "2026-09-26",
+    "observed_from": "2026-05-16"
+   }
+  ],
+  "own_month_sales": [
+   {
+    "m": "2026-06-01",
+    "n": 9,
+    "observed_from": "2026-05-16"
+   },
+   {
+    "m": "2026-07-01",
+    "n": 26,
+    "observed_from": "2026-05-16"
+   },
+   {
+    "m": "2026-08-01",
+    "n": 31,
+    "observed_from": "2026-05-16"
+   },
+   {
+    "m": "2026-09-01",
+    "n": 46,
+    "observed_from": "2026-05-16"
+   }
+  ],
+  "offer_vs_sold_monthly": [
+   {
+    "m": "2026-07-01",
+    "m2_offer": 4120,
+    "m2_sold": 4106,
+    "n_sold": 24,
+    "gap_pct": -0.3,
+    "full_from_start": true,
+    "current_month": false
+   },
+   {
+    "m": "2026-08-01",
+    "m2_offer": 3623,
+    "m2_sold": 3480,
+    "n_sold": 23,
+    "gap_pct": -3.9,
+    "full_from_start": true,
+    "current_month": false
+   },
+   {
+    "m": "2026-09-01",
+    "m2_offer": 3871,
+    "m2_sold": 3772,
+    "n_sold": 28,
+    "gap_pct": -2.6,
+    "full_from_start": true,
+    "current_month": true
+   }
+  ],
+  "panel_month_sales": [
+   {
+    "m": "2026-07-01",
+    "n": 26
+   },
+   {
+    "m": "2026-08-01",
+    "n": 24
+   },
+   {
+    "m": "2026-09-01",
+    "n": 28
+   }
+  ],
+  "panel_month_projects": 13,
+  "panel_quarter": {
+   "ask_m2": 3873,
+   "sold_m2": 3789,
+   "n_sold": 75,
+   "n_sold_no_offer": 0,
+   "projects": 13
+  },
+  "completion_m2": {
+   "m2_done": 3014,
+   "m2_building": 3916,
+   "n_done": 81,
+   "n_building": 247,
+   "p_done": 5,
+   "p_building": 5
+  },
+  "figures": {
+   "podiel-ponuka": true,
+   "podiel-predaj": true,
+   "dopyt-mesiace": true,
+   "ceny-vyvoj": true,
+   "ponuka-vs-predaj-mesiace": "quarter"
+  }
+ }
+}

@@ -15,6 +15,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { supabaseData, supabase } from "./supabase";
+import { orderArticles } from "./articleOrder.js";
 
 /** Columns the public page needs. Kept in one place so a rename cannot half-land. */
 const PUBLIC_COLS =
@@ -60,7 +61,7 @@ export function useArticles({ admin = false } = {}) {
     if (!admin) q = q.eq("published", true);
     const { data, error: err } = await q;
     if (err) setError(err.message);
-    else { setArticles((data || []).map(toArticle)); setError(null); }
+    else { setArticles(orderArticles((data || []).map(toArticle))); setError(null); }
     setLoading(false);
   }, [admin]);
 

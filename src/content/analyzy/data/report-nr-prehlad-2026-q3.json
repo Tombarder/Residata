@@ -1,0 +1,560 @@
+{
+ "asOf": "2026-09-27",
+ "generatedAt": "2026-09-28T08:24:19",
+ "slug": "nr-prehlad-2026-q3",
+ "overview": {
+  "scope": {
+   "kind": "city",
+   "name": "Nitra",
+   "city_id": "nitra",
+   "kraj": "Nitriansky kraj",
+   "subunit": "layout",
+   "code": "nr",
+   "in_sk": "v Nitre",
+   "gen_sk": "v Nitre",
+   "adj_sk": "nitrianskych",
+   "sub": {
+    "header": "Kategória",
+    "by_sg": "podľa kategórie",
+    "by_pl": "podľa kategórií",
+    "done2": "Najviac dokončených voľných bytov je v kategóriách {a} a {b}.",
+    "done1": "Dokončené voľné byty sú len v kategórii {a}.",
+    "top1": "Najviac dokončených voľných bytov je v kategórii {a}.",
+    "rel": ""
+   }
+  },
+  "history": "own",
+  "quarter_start": "2026-07-01",
+  "quarter_end": "2026-09-30",
+  "as_of": "2026-09-27",
+  "smooth_days": 14,
+  "sale_settling_days": 7,
+  "rolling_days": 28,
+  "prev_period_sales": 7,
+  "period_days": 88,
+  "okres_supply": {
+   "1-izb": {
+    "n": 57,
+    "done": 0,
+    "building": 57,
+    "unknown": 0,
+    "projects": 5,
+    "m2": 3976
+   },
+   "1,5-izb": {
+    "n": 6,
+    "done": 0,
+    "building": 5,
+    "unknown": 1,
+    "projects": 2,
+    "m2": null
+   },
+   "2-izb": {
+    "n": 245,
+    "done": 14,
+    "building": 205,
+    "unknown": 26,
+    "projects": 9,
+    "m2": 3612
+   },
+   "3-izb": {
+    "n": 205,
+    "done": 24,
+    "building": 164,
+    "unknown": 17,
+    "projects": 9,
+    "m2": 3273
+   },
+   "4-izb": {
+    "n": 22,
+    "done": 14,
+    "building": 5,
+    "unknown": 3,
+    "projects": 6,
+    "m2": 3373
+   },
+   "(neuvedené)": {
+    "n": 3,
+    "done": 0,
+    "building": 2,
+    "unknown": 1,
+    "projects": 2,
+    "m2": 2316
+   }
+  },
+  "okres_sales": {
+   "1-izb": {
+    "n": 10,
+    "n_priced": 8,
+    "m2": 3768
+   },
+   "1,5-izb": {
+    "n": 3,
+    "n_priced": 0,
+    "m2": null
+   },
+   "2-izb": {
+    "n": 23,
+    "n_priced": 19,
+    "m2": 3611
+   },
+   "3-izb": {
+    "n": 8,
+    "n_priced": 4,
+    "m2": 3344
+   },
+   "4-izb": {
+    "n": 1,
+    "n_priced": 1,
+    "m2": 4064
+   }
+  },
+  "okres_price": {
+   "1-izb": {
+    "m2_cur": 3958,
+    "m2_prev": 3870,
+    "chg_pct": 2.3,
+    "unit_days": 458,
+    "units": 33,
+    "projects": 5
+   },
+   "2-izb": {
+    "m2_cur": 3603,
+    "m2_prev": 3535,
+    "chg_pct": 1.9,
+    "unit_days": 2326,
+    "units": 166,
+    "projects": 7
+   },
+   "3-izb": {
+    "m2_cur": 3181,
+    "m2_prev": 3127,
+    "chg_pct": 1.7,
+    "unit_days": 1743,
+    "units": 124,
+    "projects": 6
+   },
+   "4-izb": {
+    "m2_cur": 3289,
+    "m2_prev": 3185,
+    "chg_pct": 3.3,
+    "unit_days": 224,
+    "units": 16,
+    "projects": 3
+   }
+  },
+  "projects": 9,
+  "mean_price": 215648,
+  "mean_area": 62.8,
+  "panel_projects": 9,
+  "panel_units": 346,
+  "panel_unit_projects": 7,
+  "rules": {
+   "min_contributors": 3,
+   "min_mean_n": 10
+  },
+  "panel_supply_prev": 584,
+  "panel_supply_cur": 537,
+  "layout_supply": [
+   {
+    "k": "2-izb",
+    "n": 245,
+    "m2": "3612",
+    "area": "54.5"
+   },
+   {
+    "k": "3-izb",
+    "n": 205,
+    "m2": "3273",
+    "area": "74.6"
+   },
+   {
+    "k": "1-izb",
+    "n": 57,
+    "m2": "3976",
+    "area": "38.7"
+   },
+   {
+    "k": "4-izb",
+    "n": 22,
+    "m2": "3373",
+    "area": "93.2"
+   },
+   {
+    "k": "1,5-izb",
+    "n": 6,
+    "m2": null,
+    "area": null
+   },
+   {
+    "k": "(neuvedené)",
+    "n": 3,
+    "m2": "2316",
+    "area": "140.6"
+   }
+  ],
+  "layout_sales": [
+   {
+    "k": "2-izb",
+    "n": 23,
+    "m2": "3611",
+    "area": "49.1"
+   },
+   {
+    "k": "1-izb",
+    "n": 10,
+    "m2": "3768",
+    "area": "35.6"
+   },
+   {
+    "k": "3-izb",
+    "n": 8,
+    "m2": "3344",
+    "area": "72.6"
+   },
+   {
+    "k": "1,5-izb",
+    "n": 3,
+    "m2": null,
+    "area": "39.7"
+   },
+   {
+    "k": "4-izb",
+    "n": 1,
+    "m2": "4064",
+    "area": "102.7"
+   }
+  ],
+  "own_quarters": {
+   "2026Q2": 3426,
+   "2026Q3": 3499
+  },
+  "quarter_sales": 45,
+  "quarter_sold_m2": 3631,
+  "quarter_ask_m2": 3499,
+  "price_series": [
+   {
+    "wk": "2026-06-15",
+    "m2_done": "3316",
+    "m2_building": "3422",
+    "m2_all": "3407",
+    "n_all": 349,
+    "u_done": 51,
+    "u_building": 298,
+    "p_all": 7,
+    "p_done": 2,
+    "p_building": 6
+   },
+   {
+    "wk": "2026-06-22",
+    "m2_done": "3316",
+    "m2_building": "3422",
+    "m2_all": "3407",
+    "n_all": 349,
+    "u_done": 51,
+    "u_building": 298,
+    "p_all": 7,
+    "p_done": 2,
+    "p_building": 6
+   },
+   {
+    "wk": "2026-06-29",
+    "m2_done": "3314",
+    "m2_building": "3485",
+    "m2_all": "3460",
+    "n_all": 349,
+    "u_done": 51,
+    "u_building": 298,
+    "p_all": 7,
+    "p_done": 2,
+    "p_building": 6
+   },
+   {
+    "wk": "2026-07-06",
+    "m2_done": "3314",
+    "m2_building": "3481",
+    "m2_all": "3456",
+    "n_all": 347,
+    "u_done": 51,
+    "u_building": 296,
+    "p_all": 7,
+    "p_done": 2,
+    "p_building": 6
+   },
+   {
+    "wk": "2026-07-13",
+    "m2_done": "3300",
+    "m2_building": "3479",
+    "m2_all": "3456",
+    "n_all": 338,
+    "u_done": 43,
+    "u_building": 295,
+    "p_all": 7,
+    "p_done": 2,
+    "p_building": 6
+   },
+   {
+    "wk": "2026-07-20",
+    "m2_done": "3300",
+    "m2_building": "3479",
+    "m2_all": "3456",
+    "n_all": 337,
+    "u_done": 42,
+    "u_building": 295,
+    "p_all": 7,
+    "p_done": 2,
+    "p_building": 6
+   },
+   {
+    "wk": "2026-07-27",
+    "m2_done": "3300",
+    "m2_building": "3476",
+    "m2_all": "3454",
+    "n_all": 335,
+    "u_done": 42,
+    "u_building": 293,
+    "p_all": 7,
+    "p_done": 2,
+    "p_building": 6
+   },
+   {
+    "wk": "2026-08-03",
+    "m2_done": "3300",
+    "m2_building": "3480",
+    "m2_all": "3457",
+    "n_all": 336,
+    "u_done": 42,
+    "u_building": 294,
+    "p_all": 7,
+    "p_done": 2,
+    "p_building": 6
+   },
+   {
+    "wk": "2026-08-10",
+    "m2_done": "3300",
+    "m2_building": "3488",
+    "m2_all": "3465",
+    "n_all": 335,
+    "u_done": 41,
+    "u_building": 294,
+    "p_all": 7,
+    "p_done": 2,
+    "p_building": 6
+   },
+   {
+    "wk": "2026-08-17",
+    "m2_done": "3300",
+    "m2_building": "3486",
+    "m2_all": "3464",
+    "n_all": 334,
+    "u_done": 41,
+    "u_building": 293,
+    "p_all": 7,
+    "p_done": 2,
+    "p_building": 6
+   },
+   {
+    "wk": "2026-08-24",
+    "m2_done": "3300",
+    "m2_building": "3486",
+    "m2_all": "3464",
+    "n_all": 334,
+    "u_done": 41,
+    "u_building": 293,
+    "p_all": 7,
+    "p_done": 2,
+    "p_building": 6
+   },
+   {
+    "wk": "2026-08-31",
+    "m2_done": "3300",
+    "m2_building": "3481",
+    "m2_all": "3459",
+    "n_all": 332,
+    "u_done": 41,
+    "u_building": 291,
+    "p_all": 7,
+    "p_done": 2,
+    "p_building": 6
+   },
+   {
+    "wk": "2026-09-07",
+    "m2_done": "3300",
+    "m2_building": "3476",
+    "m2_all": "3454",
+    "n_all": 328,
+    "u_done": 41,
+    "u_building": 287,
+    "p_all": 7,
+    "p_done": 2,
+    "p_building": 6
+   },
+   {
+    "wk": "2026-09-14",
+    "m2_done": "3302",
+    "m2_building": "3481",
+    "m2_all": "3461",
+    "n_all": 354,
+    "u_done": 40,
+    "u_building": 314,
+    "p_all": 7,
+    "p_done": 2,
+    "p_building": 6
+   },
+   {
+    "wk": "2026-09-21",
+    "m2_done": "3294",
+    "m2_building": "3481",
+    "m2_all": "3460",
+    "n_all": 354,
+    "u_done": 40,
+    "u_building": 314,
+    "p_all": 7,
+    "p_done": 2,
+    "p_building": 6
+   }
+  ],
+  "project_supply": [
+   {
+    "project_id": "sindolka-residence",
+    "n": 129
+   },
+   {
+    "project_id": "dostupne-byvanie-nitra",
+    "n": 100
+   },
+   {
+    "project_id": "nove-mlynarce",
+    "n": 82
+   },
+   {
+    "project_id": "pupavy-hviezdoslav",
+    "n": 69
+   },
+   {
+    "project_id": "slnecna-plan",
+    "n": 48
+   },
+   {
+    "project_id": "nova-nitra",
+    "n": 33
+   },
+   {
+    "project_id": "jelenecka-2",
+    "n": 30
+   },
+   {
+    "project_id": "bd-jurkovicova",
+    "n": 28
+   },
+   {
+    "project_id": "brezovy-haj",
+    "n": 16
+   }
+  ],
+  "own_quarter_sales": [
+   {
+    "qkey": "2026Q2",
+    "n": 7,
+    "first_sale": "2026-06-17",
+    "last_sale": "2026-06-29",
+    "observed_from": "2026-05-16"
+   },
+   {
+    "qkey": "2026Q3",
+    "n": 45,
+    "first_sale": "2026-07-02",
+    "last_sale": "2026-09-25",
+    "observed_from": "2026-05-16"
+   }
+  ],
+  "own_month_sales": [
+   {
+    "m": "2026-06-01",
+    "n": 7,
+    "observed_from": "2026-05-16"
+   },
+   {
+    "m": "2026-07-01",
+    "n": 17,
+    "observed_from": "2026-05-16"
+   },
+   {
+    "m": "2026-08-01",
+    "n": 11,
+    "observed_from": "2026-05-16"
+   },
+   {
+    "m": "2026-09-01",
+    "n": 17,
+    "observed_from": "2026-05-16"
+   }
+  ],
+  "offer_vs_sold_monthly": [
+   {
+    "m": "2026-07-01",
+    "m2_offer": 3369,
+    "m2_sold": 3473,
+    "n_sold": 13,
+    "gap_pct": 3.1,
+    "full_from_start": true,
+    "current_month": false
+   },
+   {
+    "m": "2026-08-01",
+    "m2_offer": 3549,
+    "m2_sold": 3735,
+    "n_sold": 11,
+    "gap_pct": 5.2,
+    "full_from_start": true,
+    "current_month": false
+   },
+   {
+    "m": "2026-09-01",
+    "m2_offer": 3424,
+    "m2_sold": 3746,
+    "n_sold": 8,
+    "gap_pct": 9.4,
+    "full_from_start": true,
+    "current_month": true
+   }
+  ],
+  "panel_month_sales": [
+   {
+    "m": "2026-07-01",
+    "n": 17
+   },
+   {
+    "m": "2026-08-01",
+    "n": 11
+   },
+   {
+    "m": "2026-09-01",
+    "n": 17
+   }
+  ],
+  "panel_month_projects": 9,
+  "panel_quarter": {
+   "ask_m2": 3446,
+   "sold_m2": 3631,
+   "n_sold": 32,
+   "n_sold_no_offer": 0,
+   "projects": 9
+  },
+  "completion_m2": {
+   "m2_done": 3300,
+   "m2_building": 3519,
+   "n_done": 40,
+   "n_building": 374,
+   "p_done": 2,
+   "p_building": 6
+  },
+  "figures": {
+   "podiel-ponuka": true,
+   "podiel-predaj": true,
+   "dopyt-mesiace": true,
+   "ceny-vyvoj": true,
+   "ponuka-vs-predaj-mesiace": "quarter"
+  }
+ }
+}

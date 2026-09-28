@@ -1,0 +1,562 @@
+{
+ "asOf": "2026-09-27",
+ "generatedAt": "2026-09-28T08:26:15",
+ "slug": "kraj-nr-prehlad-2026-q3",
+ "overview": {
+  "scope": {
+   "kind": "kraj",
+   "name": "Nitriansky kraj",
+   "region_id": "sk-nitriansky",
+   "subunit": "town",
+   "code": "kraj-nr",
+   "in_sk": "v Nitrianskom kraji",
+   "gen_sk": "v Nitrianskom kraji",
+   "adj_sk": "nitrianskeho kraja",
+   "sub": {
+    "header": "Obec",
+    "by_sg": "podľa obce",
+    "by_pl": "podľa obcí",
+    "done2": "Najviac dokončených voľných bytov je v lokalitách {a} a {b}.",
+    "done1": "Dokončené voľné byty sú len v lokalite {a}.",
+    "top1": "Najviac dokončených voľných bytov je v lokalite {a}.",
+    "rel": "V lokalite {f} je podiel na predaji ({fs} %) najvýraznejšie nad podielom na ponuke ({fp} %); opačný pomer má {s} — {ss} % predaja pri {sp} % ponuky."
+   }
+  },
+  "history": "own",
+  "quarter_start": "2026-07-01",
+  "quarter_end": "2026-09-30",
+  "as_of": "2026-09-27",
+  "smooth_days": 14,
+  "sale_settling_days": 7,
+  "rolling_days": 28,
+  "prev_period_sales": 7,
+  "period_days": 88,
+  "okres_supply": {
+   "Nitra": {
+    "n": 537,
+    "done": 52,
+    "building": 437,
+    "unknown": 48,
+    "projects": 9,
+    "m2": 3499
+   },
+   "Lužianky": {
+    "n": 56,
+    "done": 0,
+    "building": 0,
+    "unknown": 56,
+    "projects": 1,
+    "m2": 2460
+   },
+   "Šaľa": {
+    "n": 31,
+    "done": 0,
+    "building": 0,
+    "unknown": 31,
+    "projects": 1,
+    "m2": 2871
+   },
+   "Komárno": {
+    "n": 16,
+    "done": 8,
+    "building": 0,
+    "unknown": 8,
+    "projects": 2,
+    "m2": 3010
+   },
+   "Zlaté Moravce": {
+    "n": 11,
+    "done": 0,
+    "building": 0,
+    "unknown": 11,
+    "projects": 2,
+    "m2": 2371
+   },
+   "Nové Zámky": {
+    "n": 5,
+    "done": 0,
+    "building": 0,
+    "unknown": 5,
+    "projects": 2,
+    "m2": 2579
+   }
+  },
+  "okres_sales": {
+   "Nitra": {
+    "n": 45,
+    "n_priced": 32,
+    "m2": 3631
+   },
+   "Zlaté Moravce": {
+    "n": 6,
+    "n_priced": 5,
+    "m2": 2326
+   },
+   "Komárno": {
+    "n": 3,
+    "n_priced": 3,
+    "m2": 2830
+   },
+   "Nové Zámky": {
+    "n": 1,
+    "n_priced": 1,
+    "m2": 2800
+   }
+  },
+  "okres_price": {
+   "Nitra": {
+    "m2_cur": 3467,
+    "m2_prev": 3398,
+    "chg_pct": 2.0,
+    "unit_days": 4751,
+    "units": 339,
+    "projects": 7
+   }
+  },
+  "projects": 17,
+  "mean_price": 214531,
+  "mean_area": 66.1,
+  "panel_projects": 10,
+  "panel_units": 346,
+  "panel_unit_projects": 7,
+  "rules": {
+   "min_contributors": 3,
+   "min_mean_n": 10
+  },
+  "panel_supply_prev": 595,
+  "panel_supply_cur": 545,
+  "layout_supply": [
+   {
+    "k": "2-izb",
+    "n": "272",
+    "m2": "3588",
+    "area": "54.6"
+   },
+   {
+    "k": "3-izb",
+    "n": "230",
+    "m2": "3227",
+    "area": "74.8"
+   },
+   {
+    "k": "1-izb",
+    "n": "64",
+    "m2": "3842",
+    "area": "38.6"
+   },
+   {
+    "k": "(neuvedené)",
+    "n": "58",
+    "m2": "2456",
+    "area": "90.2"
+   },
+   {
+    "k": "4-izb",
+    "n": "25",
+    "m2": "3336",
+    "area": "94.5"
+   },
+   {
+    "k": "1,5-izb",
+    "n": "6",
+    "m2": null,
+    "area": null
+   }
+  ],
+  "layout_sales": [
+   {
+    "k": "2-izb",
+    "n": 28,
+    "m2": "3383",
+    "area": "50.1"
+   },
+   {
+    "k": "1-izb",
+    "n": 12,
+    "m2": "3638",
+    "area": "36.6"
+   },
+   {
+    "k": "3-izb",
+    "n": 10,
+    "m2": "2932",
+    "area": "73.2"
+   },
+   {
+    "k": "1,5-izb",
+    "n": 3,
+    "m2": null,
+    "area": "39.7"
+   },
+   {
+    "k": "4-izb",
+    "n": 2,
+    "m2": "3799",
+    "area": "115.1"
+   }
+  ],
+  "own_quarters": {
+   "2026Q2": 3423,
+   "2026Q3": 3337
+  },
+  "quarter_sales": 55,
+  "quarter_sold_m2": 3393,
+  "quarter_ask_m2": 3337,
+  "price_series": [
+   {
+    "wk": "2026-06-15",
+    "m2_done": "3316",
+    "m2_building": "3422",
+    "m2_all": "3407",
+    "n_all": 349,
+    "u_done": 51,
+    "u_building": 298,
+    "p_all": 7,
+    "p_done": 2,
+    "p_building": 6
+   },
+   {
+    "wk": "2026-06-22",
+    "m2_done": "3316",
+    "m2_building": "3422",
+    "m2_all": "3407",
+    "n_all": 349,
+    "u_done": 51,
+    "u_building": 298,
+    "p_all": 7,
+    "p_done": 2,
+    "p_building": 6
+   },
+   {
+    "wk": "2026-06-29",
+    "m2_done": "3314",
+    "m2_building": "3485",
+    "m2_all": "3460",
+    "n_all": 349,
+    "u_done": 51,
+    "u_building": 298,
+    "p_all": 7,
+    "p_done": 2,
+    "p_building": 6
+   },
+   {
+    "wk": "2026-07-06",
+    "m2_done": "3314",
+    "m2_building": "3481",
+    "m2_all": "3456",
+    "n_all": 347,
+    "u_done": 51,
+    "u_building": 296,
+    "p_all": 7,
+    "p_done": 2,
+    "p_building": 6
+   },
+   {
+    "wk": "2026-07-13",
+    "m2_done": "3300",
+    "m2_building": "3479",
+    "m2_all": "3456",
+    "n_all": 338,
+    "u_done": 43,
+    "u_building": 295,
+    "p_all": 7,
+    "p_done": 2,
+    "p_building": 6
+   },
+   {
+    "wk": "2026-07-20",
+    "m2_done": "3300",
+    "m2_building": "3479",
+    "m2_all": "3456",
+    "n_all": 337,
+    "u_done": 42,
+    "u_building": 295,
+    "p_all": 7,
+    "p_done": 2,
+    "p_building": 6
+   },
+   {
+    "wk": "2026-07-27",
+    "m2_done": "3300",
+    "m2_building": "3476",
+    "m2_all": "3454",
+    "n_all": 335,
+    "u_done": 42,
+    "u_building": 293,
+    "p_all": 7,
+    "p_done": 2,
+    "p_building": 6
+   },
+   {
+    "wk": "2026-08-03",
+    "m2_done": "3300",
+    "m2_building": "3480",
+    "m2_all": "3457",
+    "n_all": 336,
+    "u_done": 42,
+    "u_building": 294,
+    "p_all": 7,
+    "p_done": 2,
+    "p_building": 6
+   },
+   {
+    "wk": "2026-08-10",
+    "m2_done": "3300",
+    "m2_building": "3488",
+    "m2_all": "3465",
+    "n_all": 335,
+    "u_done": 41,
+    "u_building": 294,
+    "p_all": 7,
+    "p_done": 2,
+    "p_building": 6
+   },
+   {
+    "wk": "2026-08-17",
+    "m2_done": "3300",
+    "m2_building": "3486",
+    "m2_all": "3464",
+    "n_all": 334,
+    "u_done": 41,
+    "u_building": 293,
+    "p_all": 7,
+    "p_done": 2,
+    "p_building": 6
+   },
+   {
+    "wk": "2026-08-24",
+    "m2_done": "3300",
+    "m2_building": "3486",
+    "m2_all": "3464",
+    "n_all": 334,
+    "u_done": 41,
+    "u_building": 293,
+    "p_all": 7,
+    "p_done": 2,
+    "p_building": 6
+   },
+   {
+    "wk": "2026-08-31",
+    "m2_done": "3300",
+    "m2_building": "3481",
+    "m2_all": "3459",
+    "n_all": 332,
+    "u_done": 41,
+    "u_building": 291,
+    "p_all": 7,
+    "p_done": 2,
+    "p_building": 6
+   },
+   {
+    "wk": "2026-09-07",
+    "m2_done": "3300",
+    "m2_building": "3476",
+    "m2_all": "3454",
+    "n_all": 328,
+    "u_done": 41,
+    "u_building": 287,
+    "p_all": 7,
+    "p_done": 2,
+    "p_building": 6
+   },
+   {
+    "wk": "2026-09-14",
+    "m2_done": "3302",
+    "m2_building": "3481",
+    "m2_all": "3461",
+    "n_all": 354,
+    "u_done": 40,
+    "u_building": 314,
+    "p_all": 7,
+    "p_done": 2,
+    "p_building": 6
+   },
+   {
+    "wk": "2026-09-21",
+    "m2_done": "3294",
+    "m2_building": "3481",
+    "m2_all": "3460",
+    "n_all": 354,
+    "u_done": 40,
+    "u_building": 314,
+    "p_all": 7,
+    "p_done": 2,
+    "p_building": 6
+   }
+  ],
+  "project_supply": [
+   {
+    "project_id": "sindolka-residence",
+    "n": 129
+   },
+   {
+    "project_id": "dostupne-byvanie-nitra",
+    "n": 100
+   },
+   {
+    "project_id": "nove-mlynarce",
+    "n": 82
+   },
+   {
+    "project_id": "pupavy-hviezdoslav",
+    "n": 69
+   },
+   {
+    "project_id": "panorama-golf",
+    "n": 56
+   },
+   {
+    "project_id": "slnecna-plan",
+    "n": 48
+   },
+   {
+    "project_id": "nova-nitra",
+    "n": 33
+   },
+   {
+    "project_id": "salis-park",
+    "n": 31
+   },
+   {
+    "project_id": "jelenecka-2",
+    "n": 30
+   },
+   {
+    "project_id": "bd-jurkovicova",
+    "n": 28
+   },
+   {
+    "project_id": "brezovy-haj",
+    "n": 16
+   },
+   {
+    "project_id": "rezidencia-taura",
+    "n": 9
+   },
+   {
+    "project_id": "white-square",
+    "n": 8
+   },
+   {
+    "project_id": "viva-park",
+    "n": 8
+   },
+   {
+    "project_id": "byty-detvianska",
+    "n": 3
+   },
+   {
+    "project_id": "kalinciakova",
+    "n": 2
+   },
+   {
+    "project_id": "green-residence-nz",
+    "n": 2
+   }
+  ],
+  "own_quarter_sales": [
+   {
+    "qkey": "2026Q2",
+    "n": 7,
+    "first_sale": "2026-06-17",
+    "last_sale": "2026-06-29",
+    "observed_from": "2026-05-16"
+   },
+   {
+    "qkey": "2026Q3",
+    "n": 55,
+    "first_sale": "2026-07-02",
+    "last_sale": "2026-09-25",
+    "observed_from": "2026-05-16"
+   }
+  ],
+  "own_month_sales": [
+   {
+    "m": "2026-06-01",
+    "n": 7,
+    "observed_from": "2026-05-16"
+   },
+   {
+    "m": "2026-07-01",
+    "n": 17,
+    "observed_from": "2026-05-16"
+   },
+   {
+    "m": "2026-08-01",
+    "n": 14,
+    "observed_from": "2026-05-16"
+   },
+   {
+    "m": "2026-09-01",
+    "n": 24,
+    "observed_from": "2026-05-16"
+   }
+  ],
+  "offer_vs_sold_monthly": [
+   {
+    "m": "2026-07-01",
+    "m2_offer": 3369,
+    "m2_sold": 3473,
+    "n_sold": 13,
+    "gap_pct": 3.1,
+    "full_from_start": true,
+    "current_month": false
+   },
+   {
+    "m": "2026-08-01",
+    "m2_offer": 3549,
+    "m2_sold": 3735,
+    "n_sold": 11,
+    "gap_pct": 5.2,
+    "full_from_start": true,
+    "current_month": false
+   },
+   {
+    "m": "2026-09-01",
+    "m2_offer": 3424,
+    "m2_sold": 3746,
+    "n_sold": 8,
+    "gap_pct": 9.4,
+    "full_from_start": true,
+    "current_month": true
+   }
+  ],
+  "panel_month_sales": [
+   {
+    "m": "2026-07-01",
+    "n": 17
+   },
+   {
+    "m": "2026-08-01",
+    "n": 14
+   },
+   {
+    "m": "2026-09-01",
+    "n": 17
+   }
+  ],
+  "panel_month_projects": 11,
+  "panel_quarter": {
+   "ask_m2": 3446,
+   "sold_m2": 3631,
+   "n_sold": 32,
+   "n_sold_no_offer": 3,
+   "projects": 11
+  },
+  "completion_m2": {
+   "m2_done": 3300,
+   "m2_building": 3519,
+   "n_done": 40,
+   "n_building": 374,
+   "p_done": 2,
+   "p_building": 6
+  },
+  "figures": {
+   "podiel-ponuka": true,
+   "podiel-predaj": true,
+   "dopyt-mesiace": true,
+   "ceny-vyvoj": true,
+   "ponuka-vs-predaj-mesiace": "quarter"
+  }
+ }
+}

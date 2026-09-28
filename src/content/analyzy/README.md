@@ -102,6 +102,42 @@ published it. It is never spliced onto ours — their "sold" is not our "sold"
 (Herrys count reserved flats as sold and say so), and a gap in the public
 record is drawn as a gap rather than interpolated.
 
+## The same issue for every other geography
+
+Slovakia, its largest towns and its eight kraje get the Bratislava issue with
+the numbers changed — Boss, 2026-09-22: *"vsetko templates rovnake iba budeme
+aktualizovat a menit cisla"*. One command builds one issue:
+
+```
+python3 -m v2.scripts.issue_report --scope sk --slug sk-prehlad-2026-q3 --as-of 2026-09-27
+python3 -m v2.scripts.issue_report --scope "city:Košice" --slug ke-prehlad-2026-q3 --as-of 2026-09-27
+python3 -m v2.scripts.issue_report --scope kraj:sk-kosicky --slug kraj-ke-prehlad-2026-q3 --as-of 2026-09-27
+```
+
+It measures the panels with `v2/lib/issue_overview.py`, draws the five figures on
+both frames with `charts_ba_overview.draw_issue`, lints them, writes the share
+card, and writes `drafts/<slug>.sk.md.tmpl` from **`drafts/_prehlad.master.sk.md.tmpl`**
+— the Bratislava skeleton with the scope's words (`__SCOPE_IN__`, `__SUB_BY_PL__` …)
+substituted. Then render → to_cms → the row, as for any issue. A geography under
+five projects or ten sales in the quarter gets no issue; it is left out and
+named, never padded.
+
+What changes from Bratislava, and why:
+
+- **The rows of the three tables.** Slovakia breaks into kraje, a kraj into its
+  towns, a town into flat sizes — outside Bratislava the price lists do not name
+  the mestská časť. The sentences that name a row are built whole per breakdown
+  (`issue_report.SUBUNIT_WORDS`), because Slovak declines the name.
+- **Figures 2 and 4 use our own history.** Nobody publishes one for these places.
+  Demand is drawn by month and the price as a weekly **change** on the same flats.
+- 🔴 **Every monthly figure is same-panel**: only projects we were already
+  watching on the quarter's first day. Counted over all projects, Košice showed
+  demand jumping to 89 in September and asking prices falling 5 % — both were
+  new projects entering our coverage. The asking-vs-sold sentence uses the same
+  panel, so it and its chart agree.
+- A price row resting on fewer than ten comparable flats is left out of the
+  table, and the table says so.
+
 ## Re-publishing an issue whose quarter has closed
 
 An issue previewed before its period ended carries a projected figure and must
