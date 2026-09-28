@@ -4,6 +4,12 @@ Mediánové ceny nových bytov podľa počtu izieb v 11 slovenských mestách: c
 <!--METHOD
 Údaje pochádzajú z verejne zverejnených cenníkov developerov, ktoré Residata číta denne, byt po byte. Ide o novostavby — voľné, rezervované a predrezervované byty v aktívnych projektoch, nie starší bytový fond a nie inzeráty; počítajú sa výlučne byty, nie parkovanie, pivnice ani nebytové priestory. Ceny sú s DPH a pochádzajú z bytov, pri ktorých developer cenu zverejňuje. Uvádzame medián, nie priemer: jeden drahý byt posunie priemer, medián nie. Medián je priemerom denných mediánov za posledné dva týždne obdobia, aby jeden deň neurčoval celé číslo. Cenu za meter počítame na obytnú plochu. Polovičné dispozície zaokrúhľujeme nadol — byt s jednou a pol izbou je vedený ako jednoizbový, s dvoma a pol izbami ako dvojizbový. Projekt je zaradený do mesta, v ktorom stojí. Mesto je v tabuľke danej kategórie pri aspoň 10 bytoch z aspoň 3 projektov.
 -->
+<!--SEOTITLE
+Ceny novostavieb podľa počtu izieb Q3/2026 – Slovensko
+-->
+<!--KEYWORDS
+ceny novostavieb, cena dvojizbového bytu, cena trojizbového bytu, novostavby ceny, nové byty ceny
+-->
 27. septembra 2026 | CENY NOVÝCH BYTOV PODĽA POČTU IZIEB — Slovensko
 
 # Slovensko: ceny nových bytov podľa počtu izieb v 3. štvrťroku 2026

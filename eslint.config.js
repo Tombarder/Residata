@@ -24,7 +24,10 @@ import { defineConfig, globalIgnores } from 'eslint/config'
 // that actually catch live bugs.
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  // Worktrees other sessions create INSIDE this folder are separate checkouts:
+  // linting them from here scanned the whole project twice and failed a local
+  // build on another session's unfinished work (2026-09-28).
+  globalIgnores(['dist', '.git-worktrees', '.claude/worktrees']),
 
   // Frontend source — browser globals.
   {

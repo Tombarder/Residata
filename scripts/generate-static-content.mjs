@@ -37,6 +37,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { COMPANY, addressOneLine, registrationLine } from '../src/lib/company.js';
+import { PUBLIC_LANGS } from '../src/lib/locale.js';
 import { FALLBACK_MONTHLY_CENTS, FALLBACK_MONTHLY_DISPLAY, FALLBACK_ANCHOR_DISPLAY } from '../src/lib/pricingDefaults.js';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
@@ -61,11 +62,44 @@ const HOME = process.env.VITE_SITE_BASE || process.env.SITE_BASE || 'https://res
 async function fetchView(table, params = {}) {
   const qs = new URLSearchParams(params).toString();
   const url = `${SUPABASE_URL}/rest/v1/${table}${qs ? '?' + qs : ''}`;
-  const r = await fetch(url, {
-    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+  // Three tries: a deploy that fails on one dropped connection is a deploy
+  // somebody has to notice and re-run, and prerender.mjs now REFUSES to build
+  // without the articles this reads (see below).
+  let last;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const r = await fetch(url, {
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+      });
+      if (r.ok) return r.json();
+      last = new Error(`${table}: HTTP ${r.status} ${await r.text()}`);
+      if (r.status < 500) break;
+    } catch (e) {
+      last = e;
+    }
+    await new Promise((res) => setTimeout(res, 1500 * attempt));
+  }
+  throw last;
+}
+
+// ── The published analyses, read FIRST and written for prerender.mjs ──────
+// One read, one snapshot: the sitemap, the feed, llms.txt and the static page
+// of every article are built from this same list, so they cannot disagree about
+// what is published. Read before anything else, so a failure in the market
+// views below cannot leave the build without it.
+const ARTICLE_COLS =
+  'id,slug,article_date,published,title,perex,blocks,method,og_image,seo_title,seo_keywords,updated_at,figures_measured_through';
+let articles = null;
+try {
+  articles = await fetchView('articles', {
+    select: ARTICLE_COLS, published: 'eq.true', order: 'article_date.desc',
   });
-  if (!r.ok) throw new Error(`${table}: HTTP ${r.status} ${await r.text()}`);
-  return r.json();
+  fs.writeFileSync(path.resolve('scripts/.articles.json'), JSON.stringify(articles));
+  console.log(`[gen-static] scripts/.articles.json — ${articles.length} published articles`);
+} catch (e) {
+  // prerender.mjs fails the build on Vercel when this file is missing, which
+  // keeps the previous deployment — with its correct article pages — live.
+  console.warn('[gen-static] could not read the published articles:', e.message);
 }
 
 // `market` uses public.totals_global (SK + CZ combined) so the static/LLM surfaces
@@ -129,6 +163,19 @@ const monthLabel = (() => {
   return dt.toLocaleString('en-US', { month: 'long', year: 'numeric' });
 })();
 
+// Every published analysis, one line each, for the AI readers robots.txt invites
+// (they fetch llms.txt and rarely run JavaScript). Empty when the list could
+// not be read — this file never states something it could not see.
+function articlesSection() {
+  if (!articles || !articles.length) return '';
+  const lines = articles.map((a) => {
+    const title = (a.title && (a.title.sk || a.title.en)) || a.slug;
+    const perex = (a.perex && (a.perex.sk || a.perex.en)) || '';
+    return `- [${title}](${HOME}/analyzy/${a.slug}): ${perex.replace(/\s+/g, ' ').trim()}`;
+  });
+  return `\n## Published analyses (${articles.length}, newest first; Slovak)\n\n${lines.join('\n')}\n`;
+}
+
 // ───────────────────── llms.txt — short summary ─────────────────────
 const llms = `# Residata
 
@@ -177,8 +224,8 @@ Full details: https://residata.eu/imprint
 - Marketing site: ${HOME}/
 - Live dashboard (every active project): ${HOME}/live
 - What the data looks like, with live figures: ${HOME}/sample
-- Published market analyses (Slovak, monthly): ${HOME}/analyzy
-
+- Published market analyses (Slovak, quarterly): ${HOME}/analyzy
+${articlesSection()}
 Numbers above are regenerated from the live database on every deploy.
 `;
 
@@ -352,41 +399,45 @@ const SITEMAP_URLS = [
 // editing this file. Deliberately appended AFTER the literal above rather than
 // into it: sitemapRoutes.test.mjs validates that literal against seo.js's static
 // SEO table, and article meta is applied at runtime from the row instead.
-let articleUrls = [];
-try {
-  const rows = await fetchView('articles', { select: 'slug', published: 'eq.true' });
-  articleUrls = rows.map((r) => ({ loc: `/analyzy/${r.slug}`, priority: '0.7', changefreq: 'yearly' }));
-} catch (e) {
-  // 🔴 KEEP THE EXISTING FILES, exactly as the main fetch above does on failure.
-  // Warning and carrying on wrote a sitemap with every published analysis
-  // silently missing from it — a worse file than the one already on disk, and
-  // nothing downstream would have said so. A deploy that does not happen is
-  // cheaper than a sitemap that quietly drops the content it exists to list.
-  console.warn('[gen-static] could not read articles for the sitemap — keeping '
-    + 'existing files rather than publishing one without them. Error:', e.message);
+// 🔴 KEEP THE EXISTING FILES when the articles could not be read. Warning and
+// carrying on wrote a sitemap with every published analysis silently missing
+// from it — a worse file than the one already on disk, and nothing downstream
+// would have said so. A deploy that does not happen is cheaper than a sitemap
+// that quietly drops the content it exists to list.
+if (!articles) {
+  console.warn('[gen-static] no article list — keeping the existing sitemap.');
   process.exit(0);
 }
+// lastmod is the article's OWN last change. The build date on every url told
+// Google that everything changed on every deploy, which is how a crawler learns
+// to ignore lastmod altogether.
+// hreflang: ONE language lives at an article's address — the one it is written
+// in. The site-wide en+sk pair told Google a Slovak analysis had an English
+// version (lib/articleSeo.js seoLang, the same rule the page itself follows).
+const articleUrls = articles.map((r) => ({
+  loc: `/analyzy/${r.slug}`, priority: '0.7', changefreq: 'yearly',
+  lastmod: String(r.updated_at || r.article_date || today).slice(0, 10),
+  langs: [(r.title && r.title.sk) ? 'sk' : 'en'],
+}));
 const ALL_SITEMAP_URLS = [...SITEMAP_URLS, ...articleUrls];
 
 const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <!--
   Residata sitemap. Regenerated on every Vercel build via
-  scripts/generate-static-content.mjs. lastmod follows the actual
-  build date so Google sees a fresh signal after each deploy.
+  scripts/generate-static-content.mjs. An analysis carries its own last
+  change as lastmod; the marketing pages carry the build date.
   /app/* (authenticated platform) and /project/<id> (login-gated
   detail pages) are intentionally NOT here — they're noindex.
 -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
         xmlns:xhtml="http://www.w3.org/1999/xhtml">
-${ALL_SITEMAP_URLS.map(({ loc, priority, changefreq }) => `
+${ALL_SITEMAP_URLS.map(({ loc, priority, changefreq, lastmod, langs = PUBLIC_LANGS }) => `
   <url>
     <loc>${HOME}${loc}</loc>
-    <lastmod>${today}</lastmod>
+    <lastmod>${lastmod || today}</lastmod>
     <changefreq>${changefreq}</changefreq>
     <priority>${priority}</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="${HOME}${loc}" />
-    <xhtml:link rel="alternate" hreflang="sk" href="${HOME}${loc}" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="${HOME}${loc}" />
+${[...langs, 'x-default'].map((l) => `    <xhtml:link rel="alternate" hreflang="${l}" href="${HOME}${loc}" />`).join('\n')}
   </url>`).join('')}
 </urlset>
 `;

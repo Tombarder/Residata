@@ -16,28 +16,24 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabaseData, supabase } from "./supabase";
 import { orderArticles } from "./articleOrder.js";
+import { PUBLIC_COLS, LIST_COLS, toArticle, EMBEDDED_ARTICLE_ID } from "./articleModel.js";
 
-/** Columns the public page needs. Kept in one place so a rename cannot half-land. */
-const PUBLIC_COLS =
-  "id,slug,article_date,published,title,perex,blocks,method,og_image,seo_title,seo_keywords,updated_at";
-
-/** Shape a database row into what the renderer expects. */
-function toArticle(row) {
-  if (!row) return null;
-  return {
-    id: row.id,
-    slug: row.slug,
-    date: row.article_date,
-    published: row.published,
-    title: row.title || {},
-    perex: row.perex || {},
-    blocks: Array.isArray(row.blocks) ? row.blocks : [],
-    method: row.method || {},
-    ogImage: row.og_image || null,
-    seoTitle: row.seo_title || null,
-    seoKeywords: row.seo_keywords || null,
-    updatedAt: row.updated_at,
-  };
+/**
+ * The row the build embedded in this page, if the page is the static copy of
+ * this very article (scripts/prerender.mjs). Starting from it means a reader
+ * who lands on an article sees it at once instead of "Načítavam…" — and sees
+ * exactly the text the static page, and every crawler, had.
+ */
+function embeddedRow(slug) {
+  if (typeof document === "undefined") return null;
+  const el = document.getElementById(EMBEDDED_ARTICLE_ID);
+  if (!el) return null;
+  try {
+    const row = JSON.parse(el.textContent || "null");
+    return row && row.slug === slug ? row : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -69,21 +65,52 @@ export function useArticles({ admin = false } = {}) {
   return { articles, loading, error, reload: load };
 }
 
+/**
+ * Every published analysis, without its blocks — for links between articles.
+ * Read once per visit: the list changes when something is published, not while
+ * a reader moves between pages.
+ */
+let listCache = null;
+export function useArticleList() {
+  const [articles, setArticles] = useState(listCache || []);
+  useEffect(() => {
+    if (listCache || !supabaseData) return undefined;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabaseData.from("articles").select(LIST_COLS)
+        .eq("published", true).order("article_date", { ascending: false });
+      listCache = (data || []).map(toArticle);
+      if (!cancelled) setArticles(listCache);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+  return { articles };
+}
+
 /** One analysis by slug. Returns null once loaded if there is no such row. */
 export function useArticle(slug) {
-  const [article, setArticle] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const seed = embeddedRow(slug);
+  const [article, setArticle] = useState(() => (seed ? toArticle(seed) : null));
+  const [loading, setLoading] = useState(!seed);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       if (!supabaseData || !slug) { setLoading(false); return; }
-      setLoading(true);
+      // Already showing this article from the page's embedded copy: refresh it
+      // quietly — flipping to "Načítavam…" would blank a page the reader is
+      // already reading. The fresh row still wins (an edit, or a withdrawal
+      // since the build).
+      const seeded = embeddedRow(slug);
+      if (!seeded) setLoading(true);
       // Same reasoning as useArticles: one client for reads. An admin sees a
       // draft because RLS lets them, not because of a different client.
-      const { data } = await supabaseData
+      const { data, error } = await supabaseData
         .from("articles").select(PUBLIC_COLS).eq("slug", slug).maybeSingle();
-      if (!cancelled) { setArticle(toArticle(data)); setLoading(false); }
+      if (cancelled) return;
+      // A failed refresh keeps the embedded copy rather than blanking the page.
+      if (!(error && seeded)) setArticle(toArticle(data));
+      setLoading(false);
     })();
     return () => { cancelled = true; };
   }, [slug]);
@@ -145,6 +172,8 @@ export async function saveArticle(id, patch, { expectUpdatedAt } = {}) {
   if (patch.method) body.method = patch.method;
   if (patch.date) body.article_date = patch.date;
   if ("ogImage" in patch) body.og_image = patch.ogImage || null;
+  // The search title is optional: empty means "use the headline" (lib/articleSeo).
+  if ("seoTitle" in patch) body.seo_title = patch.seoTitle && (patch.seoTitle.sk || patch.seoTitle.en) ? patch.seoTitle : null;
   const { data: session } = await supabase.auth.getUser();
   if (session?.user?.id) body.updated_by = session.user.id;
 
@@ -174,6 +203,20 @@ export async function saveArticle(id, patch, { expectUpdatedAt } = {}) {
     throw err;
   }
   return rows?.[0]?.updated_at || null;
+}
+
+/**
+ * Tick or untick one manual promotion step (lib/articleSeo MANUAL_STEPS). Only
+ * the checklist is written, and the database does not count it as an edit
+ * (updated_at stays, no site rebuild), so it never collides with a Save.
+ */
+export async function setPromoStep(id, checklist, step, done) {
+  const next = { ...(checklist || {}) };
+  if (done) next[step] = { done_at: new Date().toISOString() };
+  else delete next[step];
+  const { error } = await supabase.from("articles").update({ promo_checklist: next }).eq("id", id);
+  if (error) throw new Error(error.message);
+  return next;
 }
 
 /**

@@ -47,6 +47,11 @@
 // scripts/generate-static-content.mjs, which reads the same SITE_BASE env.
 import { PUBLIC_LANGS } from "./locale";
 import { currentPriceStrings } from "./pricing";
+import { articleHead } from "./articleSeo.js";
+
+/** The site-wide share card and its alt text — the same pair index.html carries. */
+export const DEFAULT_OG_IMAGE = "/og-image.png";
+export const DEFAULT_OG_ALT = "Residata — Slovak & Czech new-build market intelligence dashboard";
 
 export const SITE_BASE =
   (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_SITE_BASE) ||
@@ -190,17 +195,20 @@ const SEO_BY_PAGE = {
   // ever disagree, which is what keeps this from rotting.
   Insights: {
     path: "/analyzy",
+    // QUARTERLY, not monthly: since 2026-09-27 the section is the quarterly
+    // issue set (Slovakia, its kraje and largest towns, two national tables).
+    // "Monthly analysis" promised Google a cadence the section does not keep.
     en: {
       title: "New-build market analyses · Residata",
       description:
-        "Monthly analysis of the Slovak and Czech new-build market, built from developer price lists read every night. The whole country, not just the capital.",
-      keywords: "analýza trhu novostavieb, ceny novostavieb, realitný trh Slovensko",
+        "Quarterly reports on the Slovak new-build market — supply, sales and prices for the whole country, every kraj and the largest towns — built from developer price lists read every night.",
+      keywords: "analýza trhu novostavieb, ceny novostavieb, novostavby Slovensko, realitný trh Slovensko",
     },
     sk: {
       title: "Analýzy trhu novostavieb · Residata",
       description:
-        "Pravidelná analýza trhu novostavieb na Slovensku a v Česku, postavená na cenníkoch developerov čítaných každú noc. Celé Slovensko, nielen Bratislava.",
-      keywords: "analýza trhu novostavieb, ceny novostavieb, ponuka bytov, realitný trh Slovensko",
+        "Štvrťročné prehľady trhu novostavieb na Slovensku — ponuka, predaj a ceny za celé Slovensko, každý kraj a najväčšie mestá, z cenníkov developerov, ktoré čítame každú noc.",
+      keywords: "analýza trhu novostavieb, ceny novostavieb, novostavby Slovensko, ponuka bytov, realitný trh Slovensko",
     },
   },
   // /status was added on 2026-09-03 and had NO entry here. applySeo returns
@@ -525,10 +533,21 @@ export function coveragePhrase(lang, snapshot) {
     : "Every active new-build residential project across Slovakia and Czechia";
 }
 
-export function applySeo(page, lang, country) {
-  if (typeof document === "undefined") return;
+/**
+ * The resolved head of one page, with every token filled — and no DOM.
+ *
+ * applySeo below writes it into the document on each navigation; the build
+ * (scripts/prerender.mjs) writes the SAME values into a static page per route,
+ * which is what a crawler or a link preview receives before any JavaScript
+ * runs. Until 2026-09-28 only the first existed, so every route's raw HTML
+ * carried the homepage's title and a canonical pointing at the homepage.
+ *
+ * `price`, `anchor` and `snapshot` default to what the browser has; the build
+ * passes the values it fetched.
+ */
+export function seoMetaFor(page, lang, { country, price, anchor, snapshot, siteBase = SITE_BASE } = {}) {
   const resolved = resolvePageSeo(page, lang);
-  if (!resolved) return;
+  if (!resolved) return null;
   // Shallow copy so the __PRICE__/__ANCHOR__ substitution below never mutates the
   // shared SEO_DATA source (which would bake a one-time price into the tokens).
   const meta = { ...localizeSeoForCountry(resolved, lang, country) };
@@ -537,20 +556,33 @@ export function applySeo(page, lang, country) {
   // editor). Substitute the live value into any tokens so SEO meta follows the
   // editor automatically — never hardcode a price string in this file.
   {
-    const { price, anchor } = currentPriceStrings();
-    const coverage = coveragePhrase(lang);
+    const live = (price == null || anchor == null) ? currentPriceStrings() : null;
+    const p = price ?? live.price;
+    const a = anchor ?? live.anchor;
+    const coverage = coveragePhrase(lang, snapshot);
     for (const k of ["title", "description", "keywords"]) {
       if (typeof meta[k] === "string") {
         meta[k] = meta[k]
-          .split("__PRICE__").join(price)
-          .split("__ANCHOR__").join(anchor)
+          .split("__PRICE__").join(p)
+          .split("__ANCHOR__").join(a)
           .split("__COVERAGE__").join(coverage);
       }
     }
   }
+  meta.url = siteBase + meta.path;
+  meta.locale = { sk: "sk_SK", cs: "cs_CZ" }[lang] || "en_US";
+  meta.robots = meta.noindex
+    ? "noindex, nofollow"
+    : "index, follow, max-image-preview:large, max-snippet:-1";
+  return meta;
+}
 
-  const url = SITE_BASE + meta.path;
-  const locale = { sk: "sk_SK", cs: "cs_CZ" }[lang] || "en_US";
+export function applySeo(page, lang, country) {
+  if (typeof document === "undefined") return;
+  const meta = seoMetaFor(page, lang, { country });
+  if (!meta) return;
+  const url = meta.url;
+  const locale = meta.locale;
 
   // <html lang> — important for accessibility + hreflang signals. Reflects the
   // SELECTED language (en|sk|cs), even though untranslated copy falls back to
@@ -563,9 +595,7 @@ export function applySeo(page, lang, country) {
   if (meta.keywords) setMeta("name", "keywords", meta.keywords);
 
   // Robots control — private pages are noindex
-  setMeta("name", "robots", meta.noindex
-    ? "noindex, nofollow"
-    : "index, follow, max-image-preview:large, max-snippet:-1");
+  setMeta("name", "robots", meta.robots);
 
   // Canonical URL
   setLink("canonical", url);
@@ -574,8 +604,8 @@ export function applySeo(page, lang, country) {
   // (we don't have /sk prefix — language is state-driven). Driven by PUBLIC_LANGS
   // so we never advertise a language the switcher hides (e.g. Czech pre-launch).
   // The x-default points to the primary (English).
-  PUBLIC_LANGS.forEach((code) => setLink("alternate", url, code));
-  setLink("alternate", url, "x-default");
+  // An article leaves only its own language behind; restore the full set.
+  syncAlternates([...PUBLIC_LANGS, "x-default"].map((hreflang) => ({ hreflang, href: url })));
 
   // Open Graph
   setMeta("property", "og:title", meta.title);
@@ -590,11 +620,16 @@ export function applySeo(page, lang, country) {
   // the whole point of publishing one is that people share the link, and a card
   // showing the finding travels further than a card showing the product.
   // Only overridden when an entry asks for it, so nothing else changes behaviour.
-  if (meta.ogImage) {
-    const img = meta.ogImage.startsWith("http") ? meta.ogImage : SITE_BASE + meta.ogImage;
+  // ALWAYS written: after an article, the next page used to keep that
+  // article's chart as its share card, and its article:* tags.
+  {
+    const own = meta.ogImage || DEFAULT_OG_IMAGE;
+    const img = own.startsWith("http") ? own : SITE_BASE + own;
     setMeta("property", "og:image", img);
-    setMeta("property", "og:image:alt", meta.title);
+    setMeta("property", "og:image:alt", meta.ogImage ? meta.title : DEFAULT_OG_ALT);
     setMeta("name", "twitter:image", img);
+    setMeta("name", "twitter:image:alt", meta.ogImage ? meta.title : DEFAULT_OG_ALT);
+    dropMeta("property", "article:");
   }
 
   // Twitter / X
@@ -604,56 +639,46 @@ export function applySeo(page, lang, country) {
 }
 
 /**
+ * Replace every hreflang alternate with exactly `list`. setLink only ever
+ * updates or adds, so an alternate the next page does not have outlived the
+ * page that had it — an article inherited the site's "en" alternate and told
+ * Google a Slovak-only analysis existed in English.
+ */
+function syncAlternates(list) {
+  document.head.querySelectorAll('link[rel="alternate"][hreflang]').forEach((el) => el.remove());
+  for (const { hreflang, href } of list) setLink("alternate", href, hreflang);
+}
+
+/** Remove a meta tag the next page does not have (article:* on a marketing page). */
+function dropMeta(attr, prefix) {
+  document.head.querySelectorAll(`meta[${attr}^="${prefix}"]`).forEach((el) => el.remove());
+}
+
+/**
  * Apply an article's own metadata after its row loads.
  *
- * The analyses moved into the database so they can be edited without a deploy,
- * which means their titles and descriptions are no longer in the bundle for
- * applySeo to find. This runs from the article page with the loaded row and
- * sets everything applySeo would have: title, description, canonical, robots,
- * og:* and the share image. Google executes JS, so this does reach the index.
+ * The values come from lib/articleSeo.js — the same model the build writes into
+ * each article's static page (scripts/prerender.mjs) — so the page a crawler
+ * reads before JavaScript and the page the app renders say the same thing.
  */
-export function applyArticleSeo(article, lang) {
+export function applyArticleSeo(article) {
   if (typeof document === "undefined" || !article) return;
-  const L = (v) => (v && (lang === "en" ? v.en : v.sk)) || v?.sk || v?.en || "";
-  const title = L(article.seoTitle) || `${L(article.title)} · Residata`;
-  const description = L(article.perex);
-  const url = `${SITE_BASE}/analyzy/${article.slug}`;
-
-  document.title = title;
-  setMeta("name", "description", description);
+  const head = articleHead(article, { siteBase: SITE_BASE });
+  document.title = head.title;
+  setMeta("name", "description", head.description);
   // Always WRITE keywords, never conditionally: leaving the tag alone kept the
   // previous page's keywords on the article.
-  setMeta("name", "keywords", L(article.seoKeywords) || (lang === "en"
-    ? "Slovak new-build market analysis, ceny novostavieb, absorption"
-    : "analýza trhu novostavieb, ceny novostavieb, predaj novostavieb"));
-  // A draft is reachable by direct link on purpose — that is how it gets
-  // reviewed — but it must never be indexed.
-  setMeta("name", "robots", article.published
-    ? "index, follow, max-image-preview:large, max-snippet:-1"
-    : "noindex, nofollow");
-  setLink("canonical", url);
-  setMeta("property", "og:title", title);
-  setMeta("property", "og:description", description);
-  setMeta("property", "og:url", url);
-  setMeta("property", "og:type", "article");
-  setMeta("name", "twitter:title", title);
-  setMeta("name", "twitter:description", description);
-  // ALWAYS write og:image, never conditionally: an article without its own share
-  // card used to keep the previous article's, so a link preview showed the wrong
-  // chart. Falling back to the site card is correct; inheriting is not.
-  const share = article.ogImage || "/og-image.png";
-  const img = share.startsWith("http") ? share : SITE_BASE + share;
-  setMeta("property", "og:image", img);
-  setMeta("property", "og:image:alt", title);
-  setMeta("name", "twitter:image", img);
-
-  // The rest of what applySeo owns. Without these an article kept the locale,
-  // site name and hreflang of whatever page the visitor arrived from.
-  const locale = { sk: "sk_SK", cs: "cs_CZ" }[lang] || "en_US";
-  setMeta("property", "og:locale", locale);
-  setMeta("property", "og:site_name", "Residata");
-  setMeta("name", "twitter:card", "summary_large_image");
-  document.documentElement.setAttribute("lang", { sk: "sk", cs: "cs" }[lang] || "en");
-  PUBLIC_LANGS.forEach((code) => setLink("alternate", url, code));
-  setLink("alternate", url, "x-default");
+  setMeta("name", "keywords", head.keywords);
+  setMeta("name", "robots", head.robots);
+  setLink("canonical", head.canonical);
+  syncAlternates(head.alternates);
+  // ALWAYS write every og:/twitter: tag, never conditionally: an article without
+  // its own share card used to keep the previous article's, so a link preview
+  // showed the wrong chart. Falling back to the site card is correct; inheriting
+  // is not.
+  for (const [k, v] of Object.entries(head.og)) setMeta("property", k, v);
+  for (const [k, v] of Object.entries(head.twitter)) setMeta("name", k, v);
+  // The language the article is written in, whatever the interface language:
+  // an English interface around a Slovak analysis is still a Slovak page.
+  document.documentElement.setAttribute("lang", head.lang);
 }

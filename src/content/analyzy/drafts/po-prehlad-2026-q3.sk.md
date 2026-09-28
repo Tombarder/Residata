@@ -4,6 +4,12 @@ Prehľad trhu s novými bytmi v Prešove za 3. štvrťrok 2026: ponuka, dopyt a 
 <!--METHOD
 Údaje pochádzajú z verejne zverejnených cenníkov developerov, ktoré Residata číta denne, byt po byte. Ponuku tvoria voľné, rezervované a predrezervované byty v aktívnych projektoch v Prešove; samotných voľných je menej; počítajú sa výlučne byty, nie parkovanie, pivnice ani nebytové priestory. Ceny sú s DPH a sú priemerom za byty, pri ktorých developer cenu zverejňuje. Cenu za meter počítame na obytnú plochu. Úrovne ponuky a cien sú priemerom denných hodnôt za posledné dva týždne obdobia, aby jeden deň neurčoval celé číslo. Polovičné dispozície zaokrúhľujeme nadol — byt s dvoma a pol izbami je vedený ako dvojizbový, jeden a pol izby má vlastnú kategóriu. Mestské časti mimo Bratislavy developeri v cenníkoch neuvádzajú, preto je členenie podľa veľkosti bytu. Medzikvartálne zmeny počítame na rovnakej vzorke projektov, resp. bytov v oboch obdobiach — inak by rast nášho vlastného pokrytia vyzeral ako pohyb trhu. Predaj je byt, ktorý developer v cenníku označil ako predaný, alebo ktorý z cenníka zmizol a už sa naň nevrátil; rezervácie za predaj nepovažujeme. Prvých 7 dní po tom, čo projekt začneme sledovať, predaje nepočítame — cenník sa v tom čase ešte ustaľuje a zmiznutý byt je skôr opravou prvého čítania než predajom. Absorpcia je počet predaných bytov za obdobie k počtu bytov v ponuke ku koncu obdobia. Cena predaných bytov je posledná cenníková cena bytu pred tým, než z ponuky zmizol — nie cena z kúpnej zmluvy. S ponukovou cenou ju porovnávame vnútri tých istých projektov a projekty vážime počtom predajov — inak by rozdiel porovnával rôzne lokality, nie ceny. Mesačné a týždenné rady sú naše vlastné merania od mája 2026; staršiu históriu pre Prešov nikto nezverejňuje, preto ju nedokresľujeme. Mesačné rady počítame len na projektoch, ktoré sledujeme od začiatku štvrťroka, aby rast nášho pokrytia nevyzeral ako pohyb trhu; týždenný rad cien počítame na tých istých bytoch po celé obdobie. Tabuľka cien podľa kategórií porovnáva aktuálny štvrťrok s predchádzajúcim na tých istých bytoch; medziročné porovnanie doplníme, keď budeme mať rok vlastných meraní.
 -->
+<!--SEOTITLE
+Novostavby Prešov Q3/2026: ceny, ponuka a predaj
+-->
+<!--KEYWORDS
+novostavby Prešov, ceny novostavieb Prešov, nové byty Prešov, predaj bytov Prešov, analýza trhu novostavieb
+-->
 27. septembra 2026 | TRH NOVÝCH BYTOV — Prešov
 
 # Prešov: trh nových bytov v 3. štvrťroku 2026

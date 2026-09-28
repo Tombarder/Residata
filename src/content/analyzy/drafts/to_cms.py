@@ -17,6 +17,9 @@ WHAT IT MAPS
     `# …`                 → title
     <!--PEREX …-->        → perex (index card + SEO description)
     <!--METHOD …-->       → method (the boxed "Metodika" the page always renders)
+    <!--SEOTITLE …-->     → seo_title — the <title> and LinkedIn title; the
+                            headline on the page stays as it is (optional)
+    <!--KEYWORDS …-->     → seo_keywords (optional)
     first paragraph       → a `lead` block
     `## …`                → an `h2` block
     `![alt](src)` + `*…*` → a `figure` block, with the -en.svg as `srcEn`
@@ -265,6 +268,13 @@ def main() -> int:
         "og_image": f"/analyzy/og-{slug}.png",
         "blocks": blocks,
     }
+    # The search title: what Google and a LinkedIn card show (lib/articleSeo.js
+    # seoTitle). Written by the template so it can carry the words people search
+    # for ("novostavby Košice") without touching the issue's headline.
+    for key, name in (("seo_title", "SEOTITLE"), ("seo_keywords", "KEYWORDS")):
+        vals = {lang: _plain(_section(texts[lang], name)) for lang in LANGS}
+        if any(vals.values()):
+            row[key] = vals
     json.dump(row, sys.stdout, ensure_ascii=False, indent=1)
     print()
     return 0

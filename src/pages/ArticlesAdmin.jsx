@@ -26,6 +26,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useArticles, useArticle, setArticlePublished, saveArticle, createArticle, deleteArticle } from "../lib/useArticles";
 import { SITE_BASE } from "../lib/seo";
+import { openManualSteps } from "../lib/articleSeo";
+import ArticleSeoPanel from "./articleSeoPanel";
 
 /**
  * Edit history for the editor.
@@ -110,6 +112,7 @@ const LABEL = {
   sk: {
     heading: "Analýzy", sub: "Správa článkov na /analyzy",
     published: "Publikované", draft: "Koncept", edit: "Upraviť", back: "← Späť na zoznam",
+    manualSteps: "ručné kroky",
     publish: "Publikovať", unpublish: "Stiahnuť", view: "Zobraziť na webe",
     save: "Uložiť zmeny", saving: "Ukladám…", saved: "Uložené", noChanges: "Žiadne zmeny",
     title: "Titulok", perex: "Perex", method: "Metodika", blocks: "Obsah",
@@ -143,6 +146,7 @@ const LABEL = {
   en: {
     heading: "Analyses", sub: "Manage the articles at /analyzy",
     published: "Published", draft: "Draft", edit: "Edit", back: "← Back to list",
+    manualSteps: "manual steps",
     publish: "Publish", unpublish: "Withdraw", view: "View on the site",
     save: "Save changes", saving: "Saving…", saved: "Saved", noChanges: "No changes",
     title: "Title", perex: "Standfirst", method: "Method note", blocks: "Body",
@@ -284,6 +288,14 @@ function ArticleList({ lang, onEdit }) {
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: "flex", gap: "0.6rem", alignItems: "center", marginBottom: "0.4rem" }}>
               <Pill on={a.published}>{a.published ? t.published : t.draft}</Pill>
+              {/* The steps no system can take (lib/articleSeo MANUAL_STEPS) —
+                  counted here so an article is not left half-promoted. */}
+              {openManualSteps(a) > 0 && (
+                <span style={{
+                  fontSize: "0.66rem", padding: "0.12rem 0.45rem", borderRadius: 999,
+                  border: "1px solid rgba(242,196,109,0.5)", color: "#f2c46d",
+                }}>{openManualSteps(a)} {t.manualSteps}</span>
+              )}
               <span style={{ fontFamily: MONO, fontSize: "0.7rem", color: "var(--text-faint)" }}>
                 {a.date}
               </span>
@@ -332,6 +344,9 @@ function ArticleEditor({ slug, lang, onBack, onChanged }) {
   // while the database said published.
   const [published, setPublished] = useState(false);
   const [version, setVersion] = useState(null);   // updated_at we based this edit on
+  // Saved on each tick and not an edit (the database keeps updated_at), so it
+  // lives outside the undo history and never makes the draft "unsaved".
+  const [checklist, setChecklist] = useState({});
   const [conflict, setConflict] = useState(false);
   const hist = useHistory();
   const draft = hist.value;
@@ -344,6 +359,7 @@ function ArticleEditor({ slug, lang, onBack, onChanged }) {
     setSaved(content);
     setPublished(pub);
     setVersion(article.updatedAt || null);
+    setChecklist(article.promoChecklist || {});
   }, [article]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const setDraft = useCallback((updater) => {
@@ -711,6 +727,16 @@ function ArticleEditor({ slug, lang, onBack, onChanged }) {
         <BiField label={t.method} rows={6} value={draft.method}
                  onChange={(v) => setDraft((d) => ({ ...d, method: v }))} />
       </div>
+
+      {/* What Google and LinkedIn will show, whether the live page has caught
+          up with the last save, and the steps that stay manual. */}
+      <ArticleSeoPanel
+        draft={{ ...draft, promoChecklist: checklist }}
+        published={published}
+        updatedAt={version}
+        onSeoTitle={(v) => setDraft((d) => ({ ...d, seoTitle: v }))}
+        onChecklist={setChecklist}
+      />
     </div>
   );
 }

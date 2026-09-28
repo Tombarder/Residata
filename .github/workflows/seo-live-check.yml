@@ -1,0 +1,45 @@
+# SEO live check — reads residata.eu the way LinkedIn's preview and the AI
+# crawlers do (no JavaScript) and fails if any page stopped naming itself:
+# title, canonical, language, share image, structured data, the text itself,
+# every figure, the feed and llms.txt. scripts/verify-seo-live.mjs.
+#
+# · after every PRODUCTION deploy (Vercel reports each one to GitHub) — then
+#   also tells Bing/Seznam which pages changed (IndexNow);
+# · once a day, which is the run GitHub emails about when it fails — a failure
+#   here means a live page is wrong for search or for a shared link;
+# · by hand, from the Actions tab.
+#
+# This repository is public, so Actions minutes here cost nothing.
+name: SEO live check
+
+on:
+  deployment_status:
+  schedule:
+    - cron: "40 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    if: >-
+      github.event_name != 'deployment_status' ||
+      (github.event.deployment_status.state == 'success' &&
+       github.event.deployment.environment == 'Production')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # A deploy that has just finished can take a minute to reach every edge.
+      - if: github.event_name == 'deployment_status'
+        run: sleep 60
+      - name: Check every page in the live sitemap
+        env:
+          # Public by design: IndexNow proves ownership with this key served at
+          # https://residata.eu/49a15b14407bbc786f2330614d08e747.txt (public/49a15b14407bbc786f2330614d08e747.txt).
+          INDEXNOW_KEY: 49a15b14407bbc786f2330614d08e747
+        run: node scripts/verify-seo-live.mjs ${{ github.event_name == 'deployment_status' && '--indexnow' || '' }}
