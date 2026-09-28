@@ -542,6 +542,7 @@ def _overview_vars(rep: dict) -> dict:
     # closed quarter has to rename itself everywhere it appears.
     y, q = ov["quarter_start"][:4], (int(ov["quarter_start"][5:7]) - 1) // 3 + 1
     out["quarterSk"] = f"{q}. štvrťroku {y}"        # locative: "v 3. štvrťroku"
+    out["quarterShort"] = f"Q{q}/{y}"               # the search title's form: "Q3/2026"
     out["quarterSkAcc"] = f"{q}. štvrťrok {y}"       # accusative: "za 3. štvrťrok"
     out["quarterEn"] = f"Q{q} {y}"
     # 🔴 A WORD CAN BE A FIGURE IN DISGUISE. "od roku 2018" and "za osem rokov"

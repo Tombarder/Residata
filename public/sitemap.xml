@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
   Residata sitemap. Regenerated on every Vercel build via
-  scripts/generate-static-content.mjs. lastmod follows the actual
-  build date so Google sees a fresh signal after each deploy.
+  scripts/generate-static-content.mjs. An analysis carries its own last
+  change as lastmod; the marketing pages carry the build date.
   /app/* (authenticated platform) and /project/<id> (login-gated
   detail pages) are intentionally NOT here — they're noindex.
 -->
@@ -11,7 +11,7 @@
 
   <url>
     <loc>https://residata.eu/</loc>
-    <lastmod>2026-09-03</lastmod>
+    <lastmod>2026-09-28</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://residata.eu/" />
@@ -20,7 +20,7 @@
   </url>
   <url>
     <loc>https://residata.eu/live</loc>
-    <lastmod>2026-09-03</lastmod>
+    <lastmod>2026-09-28</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://residata.eu/live" />
@@ -29,7 +29,7 @@
   </url>
   <url>
     <loc>https://residata.eu/pricing</loc>
-    <lastmod>2026-09-03</lastmod>
+    <lastmod>2026-09-28</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://residata.eu/pricing" />
@@ -38,7 +38,7 @@
   </url>
   <url>
     <loc>https://residata.eu/use-cases</loc>
-    <lastmod>2026-09-03</lastmod>
+    <lastmod>2026-09-28</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://residata.eu/use-cases" />
@@ -47,7 +47,7 @@
   </url>
   <url>
     <loc>https://residata.eu/sample</loc>
-    <lastmod>2026-09-03</lastmod>
+    <lastmod>2026-09-28</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://residata.eu/sample" />
@@ -56,11 +56,172 @@
   </url>
   <url>
     <loc>https://residata.eu/status</loc>
-    <lastmod>2026-09-03</lastmod>
+    <lastmod>2026-09-28</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.4</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://residata.eu/status" />
     <xhtml:link rel="alternate" hreflang="sk" href="https://residata.eu/status" />
     <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/status" />
+  </url>
+  <url>
+    <loc>https://residata.eu/analyzy</loc>
+    <lastmod>2026-09-28</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://residata.eu/analyzy" />
+    <xhtml:link rel="alternate" hreflang="sk" href="https://residata.eu/analyzy" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/analyzy" />
+  </url>
+  <url>
+    <loc>https://residata.eu/analyzy/kraj-po-prehlad-2026-q3</loc>
+    <lastmod>2026-09-28</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="sk" href="https://residata.eu/analyzy/kraj-po-prehlad-2026-q3" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/analyzy/kraj-po-prehlad-2026-q3" />
+  </url>
+  <url>
+    <loc>https://residata.eu/analyzy/kraj-ba-prehlad-2026-q3</loc>
+    <lastmod>2026-09-28</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="sk" href="https://residata.eu/analyzy/kraj-ba-prehlad-2026-q3" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/analyzy/kraj-ba-prehlad-2026-q3" />
+  </url>
+  <url>
+    <loc>https://residata.eu/analyzy/kraj-tn-prehlad-2026-q3</loc>
+    <lastmod>2026-09-28</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="sk" href="https://residata.eu/analyzy/kraj-tn-prehlad-2026-q3" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/analyzy/kraj-tn-prehlad-2026-q3" />
+  </url>
+  <url>
+    <loc>https://residata.eu/analyzy/kraj-za-prehlad-2026-q3</loc>
+    <lastmod>2026-09-28</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="sk" href="https://residata.eu/analyzy/kraj-za-prehlad-2026-q3" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/analyzy/kraj-za-prehlad-2026-q3" />
+  </url>
+  <url>
+    <loc>https://residata.eu/analyzy/co-stoji-byt-2026-q3</loc>
+    <lastmod>2026-09-28</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="sk" href="https://residata.eu/analyzy/co-stoji-byt-2026-q3" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/analyzy/co-stoji-byt-2026-q3" />
+  </url>
+  <url>
+    <loc>https://residata.eu/analyzy/bb-prehlad-2026-q3</loc>
+    <lastmod>2026-09-28</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="sk" href="https://residata.eu/analyzy/bb-prehlad-2026-q3" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/analyzy/bb-prehlad-2026-q3" />
+  </url>
+  <url>
+    <loc>https://residata.eu/analyzy/kde-sa-predava-2026-q3</loc>
+    <lastmod>2026-09-28</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="sk" href="https://residata.eu/analyzy/kde-sa-predava-2026-q3" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/analyzy/kde-sa-predava-2026-q3" />
+  </url>
+  <url>
+    <loc>https://residata.eu/analyzy/ba-prehlad-2026-q3</loc>
+    <lastmod>2026-09-28</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="sk" href="https://residata.eu/analyzy/ba-prehlad-2026-q3" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/analyzy/ba-prehlad-2026-q3" />
+  </url>
+  <url>
+    <loc>https://residata.eu/analyzy/kraj-tt-prehlad-2026-q3</loc>
+    <lastmod>2026-09-28</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="sk" href="https://residata.eu/analyzy/kraj-tt-prehlad-2026-q3" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/analyzy/kraj-tt-prehlad-2026-q3" />
+  </url>
+  <url>
+    <loc>https://residata.eu/analyzy/kraj-nr-prehlad-2026-q3</loc>
+    <lastmod>2026-09-28</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="sk" href="https://residata.eu/analyzy/kraj-nr-prehlad-2026-q3" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/analyzy/kraj-nr-prehlad-2026-q3" />
+  </url>
+  <url>
+    <loc>https://residata.eu/analyzy/kraj-bb-prehlad-2026-q3</loc>
+    <lastmod>2026-09-28</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="sk" href="https://residata.eu/analyzy/kraj-bb-prehlad-2026-q3" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/analyzy/kraj-bb-prehlad-2026-q3" />
+  </url>
+  <url>
+    <loc>https://residata.eu/analyzy/kraj-ke-prehlad-2026-q3</loc>
+    <lastmod>2026-09-28</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="sk" href="https://residata.eu/analyzy/kraj-ke-prehlad-2026-q3" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/analyzy/kraj-ke-prehlad-2026-q3" />
+  </url>
+  <url>
+    <loc>https://residata.eu/analyzy/po-prehlad-2026-q3</loc>
+    <lastmod>2026-09-28</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="sk" href="https://residata.eu/analyzy/po-prehlad-2026-q3" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/analyzy/po-prehlad-2026-q3" />
+  </url>
+  <url>
+    <loc>https://residata.eu/analyzy/za-prehlad-2026-q3</loc>
+    <lastmod>2026-09-28</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="sk" href="https://residata.eu/analyzy/za-prehlad-2026-q3" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/analyzy/za-prehlad-2026-q3" />
+  </url>
+  <url>
+    <loc>https://residata.eu/analyzy/nr-prehlad-2026-q3</loc>
+    <lastmod>2026-09-28</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="sk" href="https://residata.eu/analyzy/nr-prehlad-2026-q3" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/analyzy/nr-prehlad-2026-q3" />
+  </url>
+  <url>
+    <loc>https://residata.eu/analyzy/tt-prehlad-2026-q3</loc>
+    <lastmod>2026-09-28</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="sk" href="https://residata.eu/analyzy/tt-prehlad-2026-q3" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/analyzy/tt-prehlad-2026-q3" />
+  </url>
+  <url>
+    <loc>https://residata.eu/analyzy/sk-prehlad-2026-q3</loc>
+    <lastmod>2026-09-28</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="sk" href="https://residata.eu/analyzy/sk-prehlad-2026-q3" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/analyzy/sk-prehlad-2026-q3" />
+  </url>
+  <url>
+    <loc>https://residata.eu/analyzy/tn-prehlad-2026-q3</loc>
+    <lastmod>2026-09-28</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="sk" href="https://residata.eu/analyzy/tn-prehlad-2026-q3" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/analyzy/tn-prehlad-2026-q3" />
+  </url>
+  <url>
+    <loc>https://residata.eu/analyzy/ke-prehlad-2026-q3</loc>
+    <lastmod>2026-09-28</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="sk" href="https://residata.eu/analyzy/ke-prehlad-2026-q3" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://residata.eu/analyzy/ke-prehlad-2026-q3" />
   </url>
 </urlset>

@@ -73,7 +73,9 @@ test("coverage degrades to a sentence with NO number when data is missing", () =
   // that inserting any helper between the two silently re-pointed this test at
   // the new function's fallback instead of coveragePhrase's — which is exactly
   // what happened when historySincePhrase was added on 2026-09-11.
-  const body = fn.slice(0, fn.indexOf("\nexport ", 1));
+  // …and end at the function's own closing brace: a doc comment on whatever
+  // follows (seoMetaFor's names a date) must not count as the fallback's text.
+  const body = fn.slice(0, fn.indexOf("\n}\n") + 2);
   const fallback = body.slice(body.lastIndexOf("return sk"));
   assert.ok(!/\d/.test(fallback), "the no-data fallback must contain no digits");
   assert.ok(/Slovensku a v Česku/.test(fallback) && /Slovakia and Czechia/.test(fallback),
@@ -152,9 +154,15 @@ test("index.html advertises exactly the languages locale.js exposes", () => {
 });
 
 test("the sitemap generator advertises the same languages", () => {
-  const want = [...publicLangs(), "x-default"].sort();
-  const got = [...new Set(hreflangsIn(GEN))].sort();
-  assert.deepEqual(got, want, "sitemap hreflang set drifted from PUBLIC_LANGS");
+  // The generator no longer types the list: marketing routes take PUBLIC_LANGS
+  // itself, and an analysis only its own language (lib/articleSeo.seoLang).
+  // So the check is that nothing is typed — a literal list is how "cs" once
+  // outlived its removal from the switcher.
+  assert.ok(/import \{ PUBLIC_LANGS \} from '\.\.\/src\/lib\/locale\.js'/.test(GEN),
+    "the sitemap generator must read the languages from locale.js");
+  assert.ok(/langs = PUBLIC_LANGS/.test(GEN), "the marketing routes must default to PUBLIC_LANGS");
+  const typed = [...new Set(hreflangsIn(GEN))];
+  assert.deepEqual(typed, [], `the sitemap generator types hreflang values: ${typed}`);
 });
 
 test("no og:locale:alternate names a language that is not public", () => {

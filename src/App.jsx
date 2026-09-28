@@ -34,8 +34,11 @@ import { PrivacyPage, ImprintPage, TermsPage } from "./pages/LegalPages";
 import StatusPage from "./pages/StatusPage";
 // Analýzy — published market analyses. Code-split: the section carries article
 // content and is never part of the marketing first paint.
-const InsightsIndexPage = lazy(() => import("./pages/Insights").then((m) => ({ default: m.InsightsIndex })));
-const InsightsArticlePage = lazy(() => import("./pages/Insights").then((m) => ({ default: m.InsightsArticle })));
+// On a page the build pre-rendered, main.jsx waits for this code before mounting,
+// and insightsLazy then resolves without suspending (pages/insightsLoader.js).
+const InsightsIndexPage = lazy(insightsLazy((m) => m.InsightsIndex));
+const InsightsArticlePage = lazy(insightsLazy((m) => m.InsightsArticle));
+import { insightsLazy } from "./pages/insightsLoader";
 import CookieBanner from "./components/CookieBanner";
 import { useAuth } from "./lib/useAuth";
 import { useCapabilities } from "./lib/useCapabilities";

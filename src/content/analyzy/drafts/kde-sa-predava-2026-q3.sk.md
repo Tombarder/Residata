@@ -4,6 +4,12 @@ Ponuka, ceny a predaj nových bytov v slovenských obciach od 1. júla do 27. se
 <!--METHOD
 Údaje pochádzajú z verejne zverejnených cenníkov developerov, ktoré Residata číta denne, byt po byte. Ponuku tvoria voľné, rezervované a predrezervované byty v aktívnych projektoch na Slovensku; počítajú sa výlučne byty, nie parkovanie, pivnice ani nebytové priestory. Projekt je zaradený do obce, v ktorej stojí. Počet bytov v ponuke a ceny sú priemerom denných hodnôt za posledné dva týždne obdobia, aby jeden deň neurčoval celé číslo. Ceny sú s DPH a sú priemerom za byty, pri ktorých developer cenu zverejňuje; cenu za meter počítame na obytnú plochu. Predaj je byt, ktorý developer v cenníku označil ako predaný, alebo ktorý z cenníka zmizol a už sa naň nevrátil; rezervácie za predaj nepovažujeme. Prvých 7 dní po tom, čo projekt začneme sledovať, predaje nepočítame — cenník sa v tom čase ešte ustaľuje. Čas do vypredania je podiel ponuky ku koncu obdobia a priemerného mesačného predaja za obdobie. Obec má v tabuľke vlastný riadok pri aspoň 10 bytoch v ponuke z aspoň 3 projektov; cenu uvádzame pri aspoň 10 bytoch so zverejnenou cenou z aspoň 3 projektov a čas do vypredania pri aspoň 10 predaných bytoch z aspoň 3 projektov. Ostatné obce sú spolu v jednom riadku. Údaje za jednotlivé obce sú tie isté, aké uvádzajú naše prehľady trhu za tieto obce a kraje.
 -->
+<!--SEOTITLE
+Novostavby Slovensko podľa obcí Q3/2026: ponuka, predaj, ceny
+-->
+<!--KEYWORDS
+novostavby Slovensko, novostavby podľa miest, ceny novostavieb, predaj nových bytov, ponuka bytov
+-->
 27. septembra 2026 | TRH NOVÝCH BYTOV PODĽA OBCÍ — Slovensko
 
 # Slovensko: ponuka a predaj nových bytov podľa obcí v 3. štvrťroku 2026
