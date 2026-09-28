@@ -872,6 +872,19 @@ def _herrys_vars(rep: dict, base: dict) -> dict:
     settling = int(ov.get("sale_settling_days") or 0)
     prev_ok = bool(prev) and seen_from is not None and (
         seen_from + _dt.timedelta(days=settling) <= prev_window_start)
+    # "naše vlastné merania od mája 2026" — the month our reading of THIS market
+    # began. It was typed into the master: true for Slovakia (16 May), and it
+    # would have been false for Czechia, read since June. A report that cannot
+    # say leaves it out, and a template asking for it is refused by main().
+    if seen_from is not None:
+        out["ownSeriesFrom"] = genitive_month_sk(seen_from.isoformat()[:7])
+    # a market priced in another currency: the one rate the whole issue used
+    # (issue_overview._fx), so a move of the koruna never reads as a price move
+    fx = ov.get("fx")
+    out["fxNote"] = "" if not fx else (
+        f" Developeri uvádzajú ceny v českých korunách. Na eurá ich prepočítavame jedným kurzom "
+        f"pre celé obdobie, {sk_dec(fx['per_eur'], 3)} Kč za euro (referenčný kurz ECB platný "
+        f"k {sk_date(fx['date'])}), aby pohyb kurzu nevyzeral ako pohyb cien.")
     out["prevPeriodSales"] = sk_int(prev) if prev_ok else "—"
     out["salesVsPrevClause"] = _sales_vs_prev(ov, sold) if prev_ok else ""
     if prev_ok:
