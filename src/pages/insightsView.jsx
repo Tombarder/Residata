@@ -25,7 +25,7 @@ export function Shell({ children }) {
 
 /* ─────────────────────────── block renderers ─────────────────────────── */
 
-function Figure({ src, srcEn, srcM, alt, caption, lang }) {
+function Figure({ src, srcEn, srcM, w, h, wM, hM, alt, caption, lang }) {
   const source = lang === "en" && srcEn ? srcEn : src;
   // 🔴 ONE CHART IS TWO DRAWINGS, AND THE PHONE DOWNLOADS ONLY ITS OWN.
   // Measured here at a 375px viewport, this column renders a figure at 285px
@@ -57,9 +57,13 @@ function Figure({ src, srcEn, srcM, alt, caption, lang }) {
         <a href={source} target="_blank" rel="noreferrer"
            aria-label={t(alt, lang)}
            style={{ display: "block", cursor: "zoom-in" }}>
+          {/* width/height are the drawing's own size (to_cms.py reads it from
+              the file): CSS keeps the chart fluid, and the browser reserves the
+              right height before the image arrives instead of pushing the text
+              below it down when it does. */}
           <picture>
-            {srcM && <source media="(max-width: 640px)" srcSet={srcM} />}
-            <img src={source} alt={t(alt, lang)} loading="lazy"
+            {srcM && <source media="(max-width: 640px)" srcSet={srcM} width={wM} height={hM} />}
+            <img src={source} alt={t(alt, lang)} loading="lazy" width={w} height={h}
                  style={{ width: "100%", height: "auto", display: "block", borderRadius: 6 }} />
           </picture>
         </a>

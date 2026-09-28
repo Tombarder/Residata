@@ -56,6 +56,39 @@ def _phone(src: str) -> str | None:
     return cand if (_PUBLIC / cand.lstrip("/")).exists() else None
 
 
+def _dims(src: str | None, suffix: str = "") -> dict:
+    """A drawing's intrinsic size, as {"w", "h"} (or {"wM", "hM"} for the phone
+    drawing), read from the file the page will load.
+
+    Without it the page could not reserve a chart's space before the image
+    arrived, and every chart that loaded pushed the text below it down —
+    Lighthouse: "media element lacking an explicit size", ~780 px per chart on
+    a phone. The renderer puts these on <img>/<source> as width/height; CSS
+    keeps the width fluid, so only the RATIO is used and rounding costs <1 px.
+    A file that is not there, or says no size, gives nothing — never a guess.
+    """
+    if not src or not src.endswith(".svg"):
+        return {}
+    path = _PUBLIC / src.lstrip("/")
+    if not path.exists():
+        return {}
+    tag = re.search(r"<svg\b[^>]*>", path.read_text(encoding="utf-8", errors="replace")[:4000])
+    if not tag:
+        return {}
+    box = re.search(r'viewBox="\s*[-\d.]+[\s,]+[-\d.]+[\s,]+([\d.]+)[\s,]+([\d.]+)\s*"', tag.group(0))
+    if box:
+        w, h = float(box.group(1)), float(box.group(2))
+    else:
+        wm = re.search(r'\bwidth="([\d.]+)', tag.group(0))
+        hm = re.search(r'\bheight="([\d.]+)', tag.group(0))
+        if not (wm and hm):
+            return {}
+        w, h = float(wm.group(1)), float(hm.group(1))
+    if w <= 0 or h <= 0:
+        return {}
+    return {f"w{suffix}": round(w), f"h{suffix}": round(h)}
+
+
 def _plain(text: str) -> str:
     r"""Strip the markdown the draft carries for a human reader.
 
@@ -138,6 +171,9 @@ def _blocks(text: str) -> list[dict]:
                 # is written by the thing that generated them, and an article
                 # without them simply has no srcM.
                 **({"srcM": _phone(src)} if _phone(src) else {}),
+                # …and how big each drawing is, so the page reserves its space.
+                **_dims(src.replace("-en.svg", ".svg")),
+                **_dims(_phone(src), "M"),
             })
             i += 1
             continue

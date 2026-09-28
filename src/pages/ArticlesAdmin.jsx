@@ -658,7 +658,12 @@ function ArticleEditor({ slug, lang, onBack, onChanged }) {
                         {label}
                       </div>
                       <input value={b[field] || ""} placeholder="/analyzy/…svg"
-                             onChange={(e) => setBlock(i, { [field]: e.target.value })}
+                             onChange={(e) => setBlock(i, field === "src"
+                               // A new chart: what the generator recorded about the
+                               // OLD one (its phone drawing, its sizes) no longer
+                               // applies — keeping srcM would show phones a different chart.
+                               ? { src: e.target.value, srcM: undefined, w: undefined, h: undefined, wM: undefined, hM: undefined }
+                               : { [field]: e.target.value })}
                              style={{
                                width: "100%", background: "var(--bg)", color: "var(--text)",
                                border: "1px solid var(--border-soft)", borderRadius: 7,
