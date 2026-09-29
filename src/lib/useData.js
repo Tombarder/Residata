@@ -1730,8 +1730,9 @@ const _pivotDistinctCache = new Map();
    Calls analytics_pivot grouped by [field]: each grain row is {d:[value], m:{…}}, so the
    row keys ARE the field's distinct values as the engine resolves them
    (analytics.dim_registry). They equal what records-side filtering compares wherever
-   the client accessor returns the stored value unchanged; country does not (engine
-   SK/CZ, accessor Slovensko/Česko — see FIELDS.country in PivotV2.jsx).
+   the client accessor returns the stored value unchanged — as country's does since
+   2026-09-29 (SK/CZ on both paths; "Slovensko" is added at display time only, by
+   dimValueLabel in PivotV2.jsx).
    Returns the same {values, hasEmpty} shape distinctValuesForField() yields for a
    TEXT field, so FilterPopover can consume it interchangeably — WITHOUT a records pull. */
 export function usePivotDistinct({ enabled = false, field = null, months = null, dates = null, stav = null, mode = null, city = null } = {}) {

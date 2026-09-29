@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef, useLayoutEffect, Fragment } from 
 import { createPortal } from "react-dom";
 import { useSpecifics, SpecificsMark } from "../lib/projectSpecifics";
 import { useAnalyticsRegistry, useProjects, useFlatsArchive, useFlatsCurrent, useArchiveMonths, useArchiveDays, usePivotGrain, usePivotDistinct, usePivotFieldStats, fetchFlatsForProjects } from "../lib/useData";
-import { useCountry, isAllCountries } from "../lib/useCountry";
+import { useCountry, isAllCountries, countryName } from "../lib/useCountry";
 import { useCapabilities } from "../lib/useCapabilities";
 import { useAuth } from "../lib/useAuth";
 import { useAccountPrefState } from "../lib/useAccountUiPref";
@@ -133,15 +133,21 @@ const FIELDS = {
   // every market). Essential once Slovakia is unified: district alone is
   // ambiguous (e.g. "Staré Mesto" exists in Bratislava AND Košice), so the
   // city dimension is what makes a national pivot/export legible.
-  // Krajina (country) — top of the location hierarchy, above Mesto. Sourced
-  // from flats_archive.country (SK/CZ); the record path shows it as readable
-  // "Slovensko"/"Česko". The server grain does NOT: analytics_pivot returns the
-  // raw code (analytics.dim_registry country = f.country_code), so a table
-  // rendered from the grain, and a Krajina filter's value list, read SK/CZ. The
-  // two agreed only while pivot_grain (retired 2026-09-28) carried the same CASE.
+  // Krajina (country) — top of the location hierarchy, above Mesto. The VALUE is
+  // the stored code (SK/CZ) on every path: the record accessor below, the server
+  // grain (analytics_pivot reads analytics.dim_registry country = f.country_code)
+  // and a Krajina filter's value list all say SK/CZ, so a filter set on one path
+  // matches on the other. "Slovensko"/"Česko" is DISPLAY only — dimValueLabel,
+  // the same one place that turns a status code into "Voľný".
+  //   Until 2026-09-29 this accessor returned the name while the grain returned the
+  //   code: a Krajina row read SK on the grain and Slovensko once the config fell
+  //   back to the records (a median does that), and a Krajina filter (values SK/CZ,
+  //   from the grain) matched nothing on the record path, so a drill-down under it
+  //   came back empty. pivot_grain had turned the code into the name on the server;
+  //   analytics_pivot does not, and should not have to.
   // Podčasť (sub_district) — finer than district (a project's micro-location,
   // e.g. "Nový downtown"); backed by analytics.dim_registry.sub_district.
-  country:           { label: "Krajina",                     group: "location", type: "text",   accessor: (r) => r.country === "SK" ? "Slovensko" : r.country === "CZ" ? "Česko" : (r.country || null) },
+  country:           { label: "Krajina",                     group: "location", type: "text",   accessor: (r) => r.country || null },
   city:              { label: "Mesto",                       group: "location", type: "text",   accessor: (r) => r.city || null },
   cast:              { label: "Mestská časť",                group: "location", type: "text",   accessor: (r) => r.district },
   sub_district:      { label: "Podčasť",                     group: "location", type: "text",   accessor: (r) => r.sub_district },
@@ -294,6 +300,7 @@ function dimValueLabel(fieldKey, value, lang) {
   if (value == null || value === "") return value;
   if (fieldKey === "stav") return statusLabel(value, lang, "one");
   if (fieldKey === "typ") return unitKindLabel(value, lang);
+  if (fieldKey === "country") return countryName(value, lang === "sk" ? "sk" : "en");
   if (FIELDS[fieldKey]?.type === "number") return String(formatDimNumber(value));
   return String(value);
 }
