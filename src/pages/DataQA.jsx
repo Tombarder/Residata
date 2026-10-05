@@ -31,6 +31,7 @@ import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useSta
 import { statusLabel } from "../lib/unitStatus";
 import { formatDimNumber } from "../lib/locale";
 import ProjectsEditor from "../components/ProjectsEditor";
+import ScrapeCadenceEditor from "../components/ScrapeCadenceEditor";
 import Picker from "../components/Picker";
 import { fieldBlock } from "../lib/controls";
 
@@ -201,7 +202,7 @@ export default function DataQA({ lang = "sk" }) {
   }[code] || code);
 
   const [projects, setProjects] = useState(null);
-  const [view, setView] = useState("snapshots");   // "snapshots" | "edit"
+  const [view, setView] = useState("snapshots");   // "snapshots" | "edit" | "cadence"
   const [err, setErr] = useState(null);
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -431,10 +432,11 @@ export default function DataQA({ lang = "sk" }) {
         </p>
       </div>
 
-      {/* Tab: browse data snapshots (default) vs edit project config */}
+      {/* Tab: browse data snapshots (default) vs edit project config vs how often data is collected */}
       <div style={{ display: "flex", gap: 8, marginBottom: 16, borderBottom: `1px solid ${border}` }}>
-        {[["snapshots", t("Data snapshots", "Snímky dát")], ["edit", t("Edit projects", "Upraviť projekty")]].map(([k, label]) => (
-          <button key={k} onClick={() => setView(k)}
+        {[["snapshots", t("Data snapshots", "Snímky dát")], ["edit", t("Edit projects", "Upraviť projekty")],
+          ["cadence", t("Data collection", "Zber dát")]].map(([k, label]) => (
+          <button key={k} onClick={() => setView(k)} data-testid={`dataqa-tab-${k}`}
             style={{
               background: "transparent", border: "none",
               borderBottom: `2px solid ${view === k ? green : "transparent"}`,
@@ -445,6 +447,7 @@ export default function DataQA({ lang = "sk" }) {
       </div>
 
       {view === "edit" && <ProjectsEditor lang={lang} />}
+      {view === "cadence" && <ScrapeCadenceEditor lang={lang} />}
 
       {err && view === "snapshots" && <div style={{ ...card, borderColor: amber, color: amber, marginBottom: 14 }}>{mapErr(err)}</div>}
       {view === "snapshots" && !projects && !err && <div style={{ color: dim, fontFamily: mono, fontSize: 13 }}>{t("Loading projects…", "Načítavam projekty…")}</div>}

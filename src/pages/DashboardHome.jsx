@@ -654,13 +654,23 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
   //
   // If this read fails or the user is not entitled to it, useSales returns null and
   // these two cards simply have no arrow. It cannot affect the other six.
+  //
+  // The two windows are the same shape. The card's 30 days end on the last day with
+  // data (each project's latest reading), so the previous 30 days end 30 days before
+  // that day — anchored on today they would overlap the card's window whenever the
+  // latest reading is not today's. Both count each sale spread over the days its
+  // reading covers (sold_durable_prorated; the plain count on a server that predates
+  // it, which is the same number when the market is read every day).
   const prevPaceSpec = useMemo(() => {
     if (!overviewIds.size) return null;
-    const d = (daysAgo) => new Date(Date.now() - daysAgo * 86400000).toISOString().slice(0, 10);
-    return { mode: "summary", date_from: d(60), date_to: d(30), projects: [...overviewIds] };
-  }, [overviewIds]);
+    const anchor = freshness ? Date.parse(`${freshness}T12:00:00Z`) : NaN;
+    const d = (daysAgo) => new Date((Number.isFinite(anchor) ? anchor : Date.now()) - daysAgo * 86400000)
+      .toISOString().slice(0, 10);
+    return { mode: "summary", date_from: d(59), date_to: d(30), projects: [...overviewIds] };
+  }, [overviewIds, freshness]);
   const prevPace = useSales({ enabled: !!prevPaceSpec, spec: prevPaceSpec });
-  const prevSold = Number(prevPace?.data?.sold_durable);
+  const prevSoldRaw = Number(prevPace?.data?.sold_durable_prorated ?? prevPace?.data?.sold_durable);
+  const prevSold = Number.isFinite(prevSoldRaw) ? Math.round(prevSoldRaw) : NaN;
 
   const kpiMetrics = ["available", "avg_m2", "sold30", "sold_through", "reserved", "inventory", "projects", "developers"];
 
