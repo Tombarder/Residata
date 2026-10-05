@@ -319,3 +319,25 @@ test("it still says the probe is independent and the history public", () => {
   assert.match(STATUS_PAGE, /nezávislá sonda mimo nášho hostingu/, "SK claim lost");
   assert.match(STATUS_PAGE, /uptime\.yml/, "the link to the public history is gone");
 });
+
+// ── the status page measures availability only (owner's decision, 2026-10) ──
+//
+// The age of the data is watched internally and deliberately not published on
+// /status. These guards fail if a per-market age, a freshness heading or a data
+// timestamp comes back onto the page.
+test("the status page shows no data age", () => {
+  const copy = STATUS_PAGE.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  assert.doesNotMatch(copy, /last_seen_at|scraped_at|last_data_date|last_updated/,
+    "the status page reads a data timestamp again");
+  assert.doesNotMatch(copy, /Aktuálnosť dát|Data freshness|Posledný zber|Last collected/,
+    "the data-freshness section is back on the public status page");
+  assert.doesNotMatch(copy, /pred \$\{h\} h|dňami`|d ago/,
+    "the status page prints how old the data is");
+});
+
+test("the headline is driven by availability only", () => {
+  const m = /const worst = \[([^\]]*)\]/.exec(STATUS_PAGE);
+  assert.ok(m, "could not find the headline's inputs");
+  assert.equal(m[1].replace(/\s+/g, ""), "web.state,api.state",
+    "something other than web + data-layer availability now colours the headline");
+});

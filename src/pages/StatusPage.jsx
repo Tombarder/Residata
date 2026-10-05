@@ -11,14 +11,14 @@
  * outage — that is the failure mode of most status pages and it is worse than
  * having none.
  *
- * Two things are deliberately shown that a generic status page would not:
+ * It measures availability — the thing clause 8 is about: does the website
+ * answer, and does the data layer answer. And it says WHERE THE EVIDENCE IS:
+ * the independent probe runs outside our hosting, in a public repository —
+ * linked rather than summarised, because a number we compute about ourselves
+ * is not evidence.
  *
- *   · DATA FRESHNESS. Our customers do not really care whether the web server
- *     answered; they care whether last night's prices are in. That is the
- *     outage that matters here and it is invisible to an uptime checker.
- *   · WHERE THE EVIDENCE IS. The independent probe runs outside our hosting,
- *     in a public repository — linked rather than summarised,
- *     because a number we compute about ourselves is not evidence.
+ * 🔴 The age of the data is deliberately NOT shown on this public page (owner's
+ * decision, October 2026). It is watched internally. Do not add it back.
  */
 import { useEffect, useState } from "react";
 import { supabasePublic, isSupabaseReady } from "../lib/supabase";
@@ -57,8 +57,6 @@ export default function StatusPage({ lang = "sk" }) {
 
   const [web, setWeb] = useState({ state: null });
   const [api, setApi] = useState({ state: null });
-  const [data, setData] = useState({ state: null, rows: [] });
-
 
   // The website itself. A static file, so this times the edge and not a query.
   useEffect(() => {
@@ -74,64 +72,29 @@ export default function StatusPage({ lang = "sk" }) {
     return () => { cancelled = true; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // The data layer, and how current it is. One query answers both.
+  // The data layer: one small public query, timed.
   useEffect(() => {
     let cancelled = false;
     if (!isSupabaseReady()) { setApi({ state: "bad", detail: t("nenakonfigurované", "not configured") }); return; }
     const t0 = performance.now();
-    // projects_live carries a real per-project timestamp. The first version of
-    // this page used market_totals.snapshot_month instead — which is a MONTH,
-    // so a dataset 25 days stale still read as current, while the text beside it
-    // promised "whether last night's prices are in". The claim and the
-    // measurement have to be the same thing.
     supabasePublic
       .from("projects_live")
-      .select("country, last_seen_at")
+      .select("country")
       .eq("status", "active")
-      .order("last_seen_at", { ascending: false })
-      .limit(1000)
+      .limit(1)
       .then(({ data: rows, error }) => {
         if (cancelled) return;
         const ms = Math.round(performance.now() - t0);
         if (error || !rows?.length) {
           setApi({ state: "bad", detail: t("chyba", "error") });
-          setData({ state: "bad", rows: [] });
           return;
         }
         setApi({ state: ms > 3000 ? "warn" : "ok", detail: `${ms} ms` });
-
-        // Newest refresh per market, and how many projects that market holds.
-        const by = new Map();
-        for (const r of rows) {
-          const c = r.country || "?";
-          const g = by.get(c) || { country: c, newest: null, count: 0 };
-          g.count += 1;
-          if (r.last_seen_at && (!g.newest || r.last_seen_at > g.newest)) g.newest = r.last_seen_at;
-          by.set(c, g);
-        }
-
-        // The scrape runs nightly, so under ~26 hours old is a run that landed.
-        // Past ~50 hours two nights have been missed and that is worth saying
-        // out loud rather than colouring green.
-        const now = Date.now();
-        setData({
-          state: "ok",
-          rows: [...by.values()]
-            .sort((a, b) => a.country.localeCompare(b.country))
-            .map((g) => {
-              const hours = g.newest ? (now - new Date(g.newest).getTime()) / 3600000 : Infinity;
-              return {
-                ...g,
-                hours,
-                state: hours < 26 ? "ok" : hours < 50 ? "warn" : "bad",
-              };
-            }),
-        });
       });
     return () => { cancelled = true; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const worst = [web.state, api.state, ...data.rows.map((r) => r.state)];
+  const worst = [web.state, api.state];
   const overall = worst.includes("bad") ? "bad" : worst.includes("warn") ? "warn" : worst.includes(null) ? null : "ok";
   const headline = overall === null
     ? t("Kontrolujeme…", "Checking…")
@@ -160,33 +123,6 @@ export default function StatusPage({ lang = "sk" }) {
                      "Response time for a static file from the network that serves the site.")} />
         <Row label={t("Dátové rozhranie", "Data layer")} state={api.state} detail={api.detail}
              note={t("Odozva databázy na verejný dopyt.", "Database response to a public query.")} />
-
-        <h2 style={{ fontSize: "1.05rem", fontWeight: 600, margin: "2.5rem 0 0.3rem" }}>
-          {t("Aktuálnosť dát", "Data freshness")}
-        </h2>
-        <p style={{ color: "var(--text-dim)", fontSize: "0.85rem", margin: "0 0 0.5rem", lineHeight: 1.55 }}>
-          {t("Dôležitejšie než dostupnosť webu: či sú v systéme včerajšie ceny. Zber beží každú noc.",
-             "More important than the website being up: whether last night's prices are in. Collection runs nightly.")}
-        </p>
-        {data.rows.length === 0 && <Row label={t("Trhy", "Markets")} state={data.state} detail="" />}
-        {data.rows.map((r) => {
-          const h = Math.floor(r.hours);
-          const age = !Number.isFinite(r.hours)
-            ? t("neznáme", "unknown")
-            : h < 1 ? t("pred chvíľou", "just now")
-            : h < 48 ? t(`pred ${h} h`, `${h}h ago`)
-            : t(`pred ${Math.floor(h / 24)} dňami`, `${Math.floor(h / 24)}d ago`);
-          return (
-            <Row
-              key={r.country}
-              label={r.country === "SK" ? t("Slovensko", "Slovakia") : r.country === "CZ" ? t("Česko", "Czechia") : r.country}
-              state={r.state}
-              detail={age}
-              note={t(`Posledný zber · ${r.count.toLocaleString("sk-SK")} aktívnych projektov`,
-                      `Last collected · ${r.count.toLocaleString("en-GB")} active projects`)}
-            />
-          );
-        })}
 
         <h2 style={{ fontSize: "1.05rem", fontWeight: 600, margin: "2.5rem 0 0.6rem" }}>
           {t("Náš záväzok", "Our commitment")}
