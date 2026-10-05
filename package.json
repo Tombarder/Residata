@@ -16,7 +16,7 @@
     "@supabase/supabase-js": "^2.45.4",
     "html2canvas": "^1.4.1",
     "maplibre-gl": "^6.9.0",
-    "nodemailer": "^9.0.1",
+    "nodemailer": "^10.0.15",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "stripe": "^22.3.0",
