@@ -25,6 +25,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useArticles, useArticle, setArticlePublished, saveArticle, createArticle, deleteArticle } from "../lib/useArticles";
+import { filesNotLive } from "../lib/articleFiles";
 import { SITE_BASE } from "../lib/seo";
 import { openManualSteps } from "../lib/articleSeo";
 import ArticleSeoPanel from "./articleSeoPanel";
@@ -138,6 +139,7 @@ const LABEL = {
     deleteArticle: "Zmazať článok",
     confirmDeleteArticle: "Nenávratne zmazať tento článok? Publikovaný článok najprv stiahnite.",
     cannotDeletePublished: "Publikovaný článok sa nedá zmazať — najprv ho stiahnite z webu.",
+    filesNotLive: "Článok sa zatiaľ nedá publikovať: tieto grafy alebo obrázok na zdieľanie ešte nie sú na webe. Najprv ich treba nahrať do repozitára a počkať na nasadenie:",
     loadFailed: "Články sa nepodarilo načítať.",
     conflict: "Článok medzitým zmenil niekto iný. Načítajte ho znova, inak prepíšete jeho zmeny.",
     reloadArticle: "Načítať znova",
@@ -172,6 +174,7 @@ const LABEL = {
     deleteArticle: "Delete article",
     confirmDeleteArticle: "Permanently delete this article? Withdraw it from the site first.",
     cannotDeletePublished: "A published article cannot be deleted — withdraw it from the site first.",
+    filesNotLive: "This article cannot be published yet: these charts or the share image are not on the site. Commit them and wait for the deploy first:",
     loadFailed: "The articles could not be loaded.",
     conflict: "Someone else changed this article in the meantime. Reload it, or you will overwrite their changes.",
     reloadArticle: "Reload",
@@ -260,7 +263,15 @@ function ArticleList({ lang, onEdit }) {
 
   async function toggle(a) {
     setBusy(a.id);
-    try { await setArticlePublished(a.id, !a.published); await reload(); }
+    try {
+      // A chart is a file the deploy ships, not part of the row (board 693ea7):
+      // publishing before it is on the site would put a broken image in the article.
+      if (!a.published) {
+        const missing = await filesNotLive(a);
+        if (missing.length) { alert(`${t.filesNotLive}\n\n${missing.map((m) => `${m.path} (${m.why})`).join("\n")}`); return; }
+      }
+      await setArticlePublished(a.id, !a.published); await reload();
+    }
     catch (e) { alert(e.message); }
     finally { setBusy(null); }
   }
@@ -466,6 +477,11 @@ function ArticleEditor({ slug, lang, onBack, onChanged }) {
     if (!next && !window.confirm(t.confirmUnpublish)) return;
     setBusyPub(true); setErr(null);
     try {
+      // Same refusal as the list's button: the charts must already be on the site.
+      if (next) {
+        const missing = await filesNotLive(draft);
+        if (missing.length) { setErr(`${t.filesNotLive} ${missing.map((m) => m.path).join(", ")}`); return; }
+      }
       const stamp = await setArticlePublished(draft.id, next);
       setPublished(next);
       if (stamp) setVersion(stamp);

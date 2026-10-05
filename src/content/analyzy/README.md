@@ -82,6 +82,12 @@ that runs on every visit should not sit in a folder that says it does not run.
    is not the test.) Then it flips the row and waits until the site, which
    rebuilds itself, serves the new page: `LIVE ✓`.
 
+   The **Publikovať** buttons in `/app/articles` refuse the same way
+   (`src/lib/articleFiles.js`, since 2026-10-05): the text is in the database,
+   but the charts are files only a commit and a deploy put on the site, so a
+   draft whose charts were never pushed is answered with the missing files
+   instead of going live with broken images.
+
 5. **The two steps no system can take**, listed on every article in
    `/app/articles` with a badge until they are ticked:
    - ask Google to index the URL — Search Console → URL inspection → *Request
