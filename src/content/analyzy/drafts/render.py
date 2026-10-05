@@ -416,11 +416,17 @@ def _overview_vars(rep: dict) -> dict:
     _qkey = f"{ov['quarter_start'][:4]}Q{(int(ov['quarter_start'][5:7]) - 1) // 3 + 1}"
     city_m2 = ov["own_quarters"].get(_qkey)
 
-    # the q/q move for the city, on the panel — computed, never the mean of means
-    _w = lambda a: a.get("units") or a.get("unit_days") or a.get("n", 0)
-    pnum = sum(a["m2_cur"] * _w(a) for a in pr.values())
-    pden = sum(a["m2_prev"] * _w(a) for a in pr.values())
-    qoq = (pnum / pden - 1) * 100 if pden else 0.0
+    # the q/q move on the same flats, computed ONCE by the generator over the
+    # whole panel (ba_overview.same_flat_prices). Rebuilding it here from the
+    # rounded per-group rows printed the same 345 Nitra flats as +1,9 % in one
+    # issue and +2,0 % in another. Reports written before 2026-10-06 lack it.
+    if ov.get("panel_change_pct") is not None:
+        qoq = float(ov["panel_change_pct"])
+    else:
+        _w = lambda a: a.get("units") or a.get("unit_days") or a.get("n", 0)
+        pnum = sum(a["m2_cur"] * _w(a) for a in pr.values())
+        pden = sum(a["m2_prev"] * _w(a) for a in pr.values())
+        qoq = (pnum / pden - 1) * 100 if pden else 0.0
 
     lay = {r["k"]: int(float(r["n"])) for r in ov["layout_supply"]}
     lay_tot = sum(v for k, v in lay.items() if k != "(neuvedené)")

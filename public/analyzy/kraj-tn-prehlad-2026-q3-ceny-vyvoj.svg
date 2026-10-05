@@ -41,19 +41,19 @@ z
     <g id="xtick_1">
      <g id="line2d_1"/>
      <g id="text_1">
-      <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #6b7480" x="110.950476" y="376.556" transform="rotate(-0 110.950476 376.556)">júl 2026</text>
+      <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #6b7480" x="109.905055" y="376.556" transform="rotate(-0 109.905055 376.556)">júl 2026</text>
      </g>
     </g>
     <g id="xtick_2">
      <g id="line2d_2"/>
      <g id="text_2">
-      <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #6b7480" x="321.602857" y="376.556" transform="rotate(-0 321.602857 376.556)">aug 2026</text>
+      <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #6b7480" x="304.353407" y="376.556" transform="rotate(-0 304.353407 376.556)">aug 2026</text>
      </g>
     </g>
     <g id="xtick_3">
      <g id="line2d_3"/>
      <g id="text_3">
-      <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #6b7480" x="532.255238" y="376.556" transform="rotate(-0 532.255238 376.556)">sep 2026</text>
+      <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #6b7480" x="498.801758" y="376.556" transform="rotate(-0 498.801758 376.556)">sep 2026</text>
      </g>
     </g>
    </g>
@@ -90,18 +90,19 @@ L 668.16 356.076
    </g>
    <g id="line2d_10">
     <path d="M 97.36 265.6624 
-L 144.926667 265.6624 
-L 192.493333 267.109018 
-L 240.06 267.109018 
-L 287.626667 265.6624 
-L 335.193333 265.6624 
-L 382.76 265.6624 
-L 430.326667 265.6624 
-L 477.893333 265.6624 
-L 525.46 265.6624 
-L 573.026667 265.6624 
-L 620.593333 265.6624 
-L 668.16 251.196224 
+L 141.267692 265.6624 
+L 185.175385 265.6624 
+L 229.083077 265.6624 
+L 272.990769 264.215782 
+L 316.898462 264.215782 
+L 360.806154 264.215782 
+L 404.713846 264.215782 
+L 448.621538 264.215782 
+L 492.529231 264.215782 
+L 536.436923 264.215782 
+L 580.344615 264.215782 
+L 624.252308 249.749606 
+L 668.16 249.749606 
 " clip-path="url(#p8db743f5e8)" style="fill: none; stroke: #c2410c; stroke-width: 2.6; stroke-linecap: round"/>
    </g>
    <g id="text_4">
@@ -148,7 +149,7 @@ z
   </g>
   <g id="text_9">
    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; fill: #6b7480" transform="translate(51.84 410.4389)">Zdroj: Residata — denné čítanie cenníkov novostavieb v Trenčianskom kraji.</text>
-   <text style="font-size: 16px; font-family: 'IBM Plex Sans'; fill: #6b7480" transform="translate(51.84 435.94265)">Dáta k 27. 9. 2026.</text>
+   <text style="font-size: 16px; font-family: 'IBM Plex Sans'; fill: #6b7480" transform="translate(51.84 435.94265)">Dáta k 30. 9. 2026.</text>
   </g>
   <g id="text_10">
    <text style="font-weight: 500; font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #6b7480" x="51.84" y="165.3784" transform="rotate(-0 51.84 165.3784)">zmena, %</text>

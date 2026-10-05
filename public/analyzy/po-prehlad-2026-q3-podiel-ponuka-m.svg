@@ -30,45 +30,45 @@ z
   </g>
   <g id="axes_1">
    <g id="wedge-1-izb">
-    <path d="M 180.766719 155.308512 
-C 173.128578 150.547623 164.863202 146.876001 156.210063 144.400025 
-C 147.556924 141.924049 138.600404 140.667863 129.6 140.667863 
+    <path d="M 181.231828 155.600254 
+C 173.543074 150.747005 165.208292 147.001988 156.473881 144.475918 
+C 147.73947 141.949848 138.692358 140.667863 129.6 140.667863 
 L 129.6 237.39792 
 z
 " style="fill: #1d635e; stroke: #ffffff; stroke-width: 1.6; stroke-linejoin: miter"/>
    </g>
    <g id="wedge-1-5-izb">
-    <path d="M 183.848679 157.311811 
-C 183.341421 156.968206 182.830911 156.629427 182.317216 156.295521 
-C 181.803521 155.961615 181.286665 155.632598 180.766719 155.308512 
+    <path d="M 184.333238 157.642189 
+C 183.822928 157.291983 183.309269 156.946684 182.792332 156.606338 
+C 182.275395 156.265992 181.755203 155.930615 181.231828 155.600254 
 L 129.6 237.39792 
 z
 " style="fill: #467874; stroke: #ffffff; stroke-width: 1.6; stroke-linejoin: miter"/>
    </g>
    <g id="wedge-2-izb">
-    <path d="M 102.989937 330.395815 
-C 125.107253 336.724379 148.772848 334.95986 169.707106 325.421349 
-C 190.641364 315.882837 207.501442 299.182187 217.238413 278.339495 
-C 226.975383 257.496804 228.964661 233.849041 222.846511 211.672598 
-C 216.728361 189.496155 202.895236 170.213557 183.848679 157.311811 
+    <path d="M 103.321213 330.489967 
+C 125.383992 336.71803 148.958176 334.904432 169.808706 325.374985 
+C 190.659237 315.845537 207.457995 299.207237 217.187114 278.449124 
+C 226.916234 257.691012 228.955998 234.135319 222.939968 212.013783 
+C 216.923937 189.892247 203.235315 170.613945 184.333238 157.642189 
 L 129.6 237.39792 
 z
 " style="fill: #154a46; stroke: #ffffff; stroke-width: 1.6; stroke-linejoin: miter"/>
    </g>
    <g id="wedge-3-izb">
-    <path d="M 64.753636 165.622903 
-C 51.949896 177.190661 42.471685 191.976455 37.306055 208.440508 
-C 32.140425 224.904561 31.47314 242.454801 35.373689 259.263563 
-C 39.274239 276.072325 47.602354 291.535141 59.490752 304.041729 
-C 71.379151 316.548317 86.400309 325.648922 102.989937 330.395815 
+    <path d="M 64.218439 166.110085 
+C 51.52531 177.751575 42.16879 192.574631 37.119739 209.04117 
+C 32.070688 225.507709 31.509999 243.027786 35.495849 259.783466 
+C 39.481699 276.539145 47.871288 291.930125 59.794088 304.359391 
+C 71.716888 316.788657 86.745743 325.810908 103.321213 330.489967 
 L 129.6 237.39792 
 z
 " style="fill: #4da19a; stroke: #ffffff; stroke-width: 1.6; stroke-linejoin: miter"/>
    </g>
    <g id="wedge-4-izb">
     <path d="M 129.6 140.667863 
-C 117.721761 140.667863 105.944489 142.855795 94.858796 147.121939 
-C 83.773103 151.388083 73.567451 157.659912 64.753636 165.622903 
+C 117.600117 140.667863 105.704339 142.900838 94.52132 147.252537 
+C 83.338301 151.604235 73.062078 157.999151 64.218439 166.110085 
 L 129.6 237.39792 
 z
 " style="fill: #498a84; stroke: #ffffff; stroke-width: 1.6; stroke-linejoin: miter"/>
@@ -76,13 +76,13 @@ z
    <g id="matplotlib.axis_1"/>
    <g id="matplotlib.axis_2"/>
    <g id="text_1">
-    <text style="font-weight: 600; font-size: 11.8px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #ffffff" x="185.688584" y="266.904528" transform="rotate(-0 185.688584 266.904528)">45 %</text>
+    <text style="font-weight: 600; font-size: 11.8px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #ffffff" x="185.655753" y="266.974691" transform="rotate(-0 185.655753 266.974691)">45 %</text>
    </g>
    <g id="text_2">
-    <text style="font-weight: 600; font-size: 11.8px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #ffffff" x="69.295161" y="254.695931" transform="rotate(-0 69.295161 254.695931)">34 %</text>
+    <text style="font-weight: 600; font-size: 11.8px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #ffffff" x="69.373343" y="255.028669" transform="rotate(-0 69.373343 255.028669)">34 %</text>
    </g>
    <g id="text_3">
-    <text style="font-weight: 600; font-size: 11.8px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #ffffff" x="107.365629" y="182.925292" transform="rotate(-0 107.365629 182.925292)">12 %</text>
+    <text style="font-weight: 600; font-size: 11.8px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #ffffff" x="107.149645" y="183.008875" transform="rotate(-0 107.149645 183.008875)">12 %</text>
    </g>
   </g>
   <g id="text_4">
@@ -92,14 +92,14 @@ z
   <g id="text_5">
    <text style="font-size: 12.9px; font-family: 'Outfit'; fill: #6b7480" transform="translate(13.4784 79.524911)">Byty v ponuke v Prešove podľa počtu</text>
    <text style="font-size: 12.9px; font-family: 'Outfit'; fill: #6b7480" transform="translate(13.4784 95.830309)">izieb — priemer za 14 dní</text>
-   <text style="font-size: 12.9px; font-family: 'Outfit'; fill: #6b7480" transform="translate(13.4784 113.085067)">do 27. 9. 2026</text>
+   <text style="font-size: 12.9px; font-family: 'Outfit'; fill: #6b7480" transform="translate(13.4784 113.085067)">do 30. 9. 2026</text>
   </g>
   <g id="text_6">
    <text style="font-size: 11.8px; font-family: 'IBM Plex Sans'; fill: #6b7480" transform="translate(13.4784 475.055781)">Zdroj: Residata — denné čítanie cenníkov</text>
-   <text style="font-size: 11.8px; font-family: 'IBM Plex Sans'; fill: #6b7480" transform="translate(13.4784 493.864796)">novostavieb v Prešove. Dáta k 27. 9. 2026.</text>
+   <text style="font-size: 11.8px; font-family: 'IBM Plex Sans'; fill: #6b7480" transform="translate(13.4784 493.864796)">novostavieb v Prešove. Dáta k 30. 9. 2026.</text>
   </g>
   <g id="text_7">
-   <text style="font-size: 11.8px; font-family: 'IBM Plex Sans'; fill: #6b7480" transform="translate(13.4784 430.805781)">Pozn.: 4 byty bez uvedeného počtu izieb nie</text>
+   <text style="font-size: 11.8px; font-family: 'IBM Plex Sans'; fill: #6b7480" transform="translate(13.4784 430.805781)">Pozn.: 3 byty bez uvedeného počtu izieb nie</text>
    <text style="font-size: 11.8px; font-family: 'IBM Plex Sans'; fill: #6b7480" transform="translate(13.4784 448.434796)">sú v grafe.</text>
   </g>
   <g id="text_8">

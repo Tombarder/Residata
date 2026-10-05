@@ -1,6 +1,6 @@
 {
- "asOf": "2026-09-27",
- "generatedAt": "2026-09-28T13:14:28",
+ "asOf": "2026-09-30",
+ "generatedAt": "2026-10-06T00:48:14",
  "slug": "kraj-tn-prehlad-2026-q3",
  "overview": {
   "scope": {
@@ -9,9 +9,11 @@
    "region_id": "sk-trenciansky",
    "subunit": "town",
    "code": "kraj-tn",
+   "market": "sk",
    "in_sk": "v Trenčianskom kraji",
    "gen_sk": "v Trenčianskom kraji",
    "adj_sk": "trenčianskeho kraja",
+   "acc_sk": "Trenčiansky kraj",
    "sub": {
     "header": "Obec",
     "by_sg": "podľa obce",
@@ -22,25 +24,26 @@
     "rel": "V lokalite {f} je podiel na predaji ({fs} %) najvýraznejšie nad podielom na ponuke ({fp} %); opačný pomer má {s} — {ss} % predaja pri {sp} % ponuky."
    }
   },
+  "fx": null,
   "history": "own",
   "quarter_start": "2026-07-01",
   "quarter_end": "2026-09-30",
-  "as_of": "2026-09-27",
+  "as_of": "2026-09-30",
   "smooth_days": 14,
   "sale_settling_days": 7,
   "rolling_days": 28,
   "prev_period_sales": 3,
-  "period_days": 89,
+  "period_days": 92,
   "okres_supply": {
    "Trenčín": {
     "n": 273,
     "done": 0,
-    "building": 77,
-    "unknown": 196,
+    "building": 74,
+    "unknown": 199,
     "projects": 5,
-    "m2": 3998,
+    "m2": 3997,
     "area": 69.0,
-    "price": 277540,
+    "price": 277522,
     "n_priced": 253,
     "p_priced": 5
    },
@@ -57,15 +60,15 @@
     "p_priced": 1
    },
    "Nové Mesto nad Váhom": {
-    "n": 56,
+    "n": 55,
     "done": 0,
-    "building": 31,
+    "building": 30,
     "unknown": 25,
     "projects": 2,
-    "m2": 2974,
-    "area": 58.1,
-    "price": 171573,
-    "n_priced": 29,
+    "m2": 2973,
+    "area": 58.3,
+    "price": 172030,
+    "n_priced": 28,
     "p_priced": 1
    },
    "Bánovce nad Bebravou": {
@@ -107,15 +110,15 @@
   },
   "okres_sales": {
    "Trenčín": {
-    "n": 64,
-    "n_priced": 30,
-    "m2": 4050,
+    "n": 68,
+    "n_priced": 33,
+    "m2": 3987,
     "projects": 4
    },
    "Nové Mesto nad Váhom": {
-    "n": 12,
-    "n_priced": 12,
-    "m2": 2987,
+    "n": 13,
+    "n_priced": 13,
+    "m2": 2998,
     "projects": 1
    },
    "Bánovce nad Bebravou": {
@@ -126,11 +129,17 @@
    }
   },
   "okres_price": {
+   "Trenčín": {
+    "m2_cur": 4265,
+    "m2_prev": 4265,
+    "chg_pct": 0.0,
+    "units": 115,
+    "projects": 2
+   },
    "Nové Mesto nad Váhom": {
     "m2_cur": 3015,
     "m2_prev": 3015,
     "chg_pct": 0.0,
-    "unit_days": 28,
     "units": 2,
     "projects": 1
    },
@@ -138,25 +147,17 @@
     "m2_cur": 2628,
     "m2_prev": 2628,
     "chg_pct": 0.0,
-    "unit_days": 336,
     "units": 24,
     "projects": 1
-   },
-   "Trenčín": {
-    "m2_cur": 4283,
-    "m2_prev": 4265,
-    "chg_pct": 0.4,
-    "unit_days": 1582,
-    "units": 113,
-    "projects": 2
    }
   },
   "projects": 11,
-  "mean_price": 248897,
+  "mean_price": 248954,
   "mean_area": 66.9,
   "panel_projects": 4,
   "panel_units": 141,
   "panel_unit_projects": 4,
+  "panel_change_pct": 0.0,
   "rules": {
    "min_contributors": 3,
    "min_mean_n": 10
@@ -166,7 +167,7 @@
   "layout_supply": [
    {
     "k": "2-izb",
-    "n": 203,
+    "n": 204,
     "m2": 3652,
     "area": 54.7
    },
@@ -174,45 +175,39 @@
     "k": "3-izb",
     "n": 126,
     "m2": 3569,
-    "area": 75.1
+    "area": 75.2
    },
    {
     "k": "4-izb",
-    "n": 54,
-    "m2": 3891,
+    "n": 55,
+    "m2": 3887,
     "area": 99.2
    },
    {
     "k": "1-izb",
-    "n": 48,
+    "n": 49,
     "m2": 3827,
     "area": 37.1
    },
    {
-    "k": "(neuvedené)",
-    "n": 4,
-    "m2": null,
-    "area": null
-   },
-   {
     "k": "5 a viac",
     "n": 3,
-    "m2": 5482,
-    "area": 165.9
+    "m2": 5642,
+    "area": 169.2
    }
   ],
   "layout_sales": [
    {
     "k": "2-izb",
-    "n": 34,
-    "m2": "3744",
-    "area": "52.7"
+    "n": 37,
+    "m2": "3700",
+    "area": "52.4"
    },
    {
     "k": "3-izb",
-    "n": 19,
-    "m2": "3544",
-    "area": "72.9"
+    "n": 21,
+    "m2": "3528",
+    "area": "72.1"
    },
    {
     "k": "4-izb",
@@ -241,17 +236,17 @@
   ],
   "own_quarters": {
    "2026Q2": 3942,
-   "2026Q3": 3677
+   "2026Q3": 3676
   },
-  "quarter_sales": 77,
-  "quarter_sold_m2": 3713,
-  "quarter_ask_m2": 3677,
+  "quarter_sales": 82,
+  "quarter_sold_m2": 3678,
+  "quarter_ask_m2": 3676,
   "price_series": [
    {
     "wk": "2026-06-15",
     "m2_done": null,
     "m2_building": "4346",
-    "m2_all": "4029",
+    "m2_all": "4028",
     "n_all": 130,
     "u_done": 0,
     "u_building": 106,
@@ -263,7 +258,7 @@
     "wk": "2026-06-22",
     "m2_done": null,
     "m2_building": "4346",
-    "m2_all": "4029",
+    "m2_all": "4028",
     "n_all": 130,
     "u_done": 0,
     "u_building": 106,
@@ -275,7 +270,7 @@
     "wk": "2026-06-29",
     "m2_done": null,
     "m2_building": "4346",
-    "m2_all": "4029",
+    "m2_all": "4028",
     "n_all": 130,
     "u_done": 0,
     "u_building": 106,
@@ -287,7 +282,7 @@
     "wk": "2026-07-06",
     "m2_done": null,
     "m2_building": "4346",
-    "m2_all": "4029",
+    "m2_all": "4028",
     "n_all": 130,
     "u_done": 0,
     "u_building": 106,
@@ -298,7 +293,7 @@
    {
     "wk": "2026-07-13",
     "m2_done": null,
-    "m2_building": "4345",
+    "m2_building": "4346",
     "m2_all": "4028",
     "n_all": 130,
     "u_done": 0,
@@ -310,7 +305,7 @@
    {
     "wk": "2026-07-20",
     "m2_done": null,
-    "m2_building": "4345",
+    "m2_building": "4346",
     "m2_all": "4028",
     "n_all": 130,
     "u_done": 0,
@@ -426,6 +421,18 @@
     "p_all": 4,
     "p_done": 0,
     "p_building": 2
+   },
+   {
+    "wk": "2026-09-28",
+    "m2_done": null,
+    "m2_building": "4777",
+    "m2_all": "4037",
+    "n_all": 129,
+    "u_done": 0,
+    "u_building": 76,
+    "p_all": 4,
+    "p_done": 0,
+    "p_building": 2
    }
   ],
   "project_supply": [
@@ -447,7 +454,7 @@
    },
    {
     "project_id": "rezidencia-kamenna",
-    "n": 31
+    "n": 30
    },
    {
     "project_id": "byty-kasarne",
@@ -484,9 +491,9 @@
    },
    {
     "qkey": "2026Q3",
-    "n": 77,
+    "n": 82,
     "first_sale": "2026-07-02",
-    "last_sale": "2026-09-26",
+    "last_sale": "2026-09-30",
     "observed_from": "2026-05-16"
    }
   ],
@@ -508,7 +515,7 @@
    },
    {
     "m": "2026-09-01",
-    "n": 50,
+    "n": 55,
     "observed_from": "2026-05-16"
    }
   ],
@@ -533,10 +540,10 @@
    },
    {
     "m": "2026-09-01",
-    "m2_offer": 4166,
-    "m2_sold": 4048,
-    "n_sold": 28,
-    "gap_pct": -2.8,
+    "m2_offer": 4043,
+    "m2_sold": 3954,
+    "n_sold": 32,
+    "gap_pct": -2.2,
     "full_from_start": true,
     "current_month": true
    }
@@ -552,22 +559,22 @@
    },
    {
     "m": "2026-09-01",
-    "n": 35
+    "n": 39
    }
   ],
   "panel_month_projects": 4,
   "panel_quarter": {
-   "ask_m2": 3814,
-   "sold_m2": 3764,
-   "n_sold": 39,
+   "ask_m2": 3755,
+   "sold_m2": 3721,
+   "n_sold": 43,
    "n_sold_no_offer": 0,
    "projects": 4
   },
   "completion_m2": {
    "m2_done": null,
-   "m2_building": 4289,
+   "m2_building": 4311,
    "n_done": 0,
-   "n_building": 105,
+   "n_building": 102,
    "p_done": 0,
    "p_building": 2
   },

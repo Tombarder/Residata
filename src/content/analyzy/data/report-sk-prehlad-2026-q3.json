@@ -1,6 +1,6 @@
 {
- "asOf": "2026-09-27",
- "generatedAt": "2026-09-28T13:13:27",
+ "asOf": "2026-09-30",
+ "generatedAt": "2026-10-06T00:40:48",
  "slug": "sk-prehlad-2026-q3",
  "overview": {
   "scope": {
@@ -8,9 +8,11 @@
    "name": "Slovensko",
    "subunit": "kraj",
    "code": "sk",
+   "market": "sk",
    "in_sk": "na Slovensku",
    "gen_sk": "na Slovensku",
    "adj_sk": "slovenských",
+   "acc_sk": "Slovensko",
    "sub": {
     "header": "Kraj",
     "by_sg": "podľa kraja",
@@ -31,130 +33,131 @@
     }
    }
   },
+  "fx": null,
   "history": "own",
   "quarter_start": "2026-07-01",
   "quarter_end": "2026-09-30",
-  "as_of": "2026-09-27",
+  "as_of": "2026-09-30",
   "smooth_days": 14,
   "sale_settling_days": 7,
   "rolling_days": 28,
   "prev_period_sales": 207,
-  "period_days": 89,
+  "period_days": 92,
   "okres_supply": {
    "Bratislavský kraj": {
-    "n": 4522,
-    "done": 577,
-    "building": 2924,
-    "unknown": 1021,
+    "n": 4574,
+    "done": 586,
+    "building": 2976,
+    "unknown": 1012,
     "projects": 107,
-    "m2": 5571,
+    "m2": 5564,
     "area": 65.6,
-    "price": 371398,
-    "n_priced": 3624,
+    "price": 370518,
+    "n_priced": 3657,
     "p_priced": 92
    },
    "Trnavský kraj": {
-    "n": 886,
-    "done": 142,
-    "building": 243,
-    "unknown": 501,
+    "n": 878,
+    "done": 140,
+    "building": 240,
+    "unknown": 498,
     "projects": 22,
-    "m2": 3747,
-    "area": 61.5,
-    "price": 221297,
-    "n_priced": 580,
+    "m2": 3744,
+    "area": 61.6,
+    "price": 221548,
+    "n_priced": 574,
     "p_priced": 17
    },
    "Trenčiansky kraj": {
-    "n": 438,
+    "n": 437,
     "done": 0,
-    "building": 108,
-    "unknown": 330,
+    "building": 104,
+    "unknown": 333,
     "projects": 11,
-    "m2": 3677,
+    "m2": 3676,
     "area": 66.9,
-    "price": 248897,
-    "n_priced": 334,
+    "price": 248954,
+    "n_priced": 333,
     "p_priced": 10
    },
    "Nitriansky kraj": {
-    "n": 671,
-    "done": 60,
-    "building": 436,
-    "unknown": 175,
+    "n": 673,
+    "done": 82,
+    "building": 417,
+    "unknown": 174,
     "projects": 18,
-    "m2": 3313,
-    "area": 66.2,
-    "price": 213279,
-    "n_priced": 511,
+    "m2": 3316,
+    "area": 66.1,
+    "price": 213086,
+    "n_priced": 518,
     "p_priced": 15
    },
    "Žilinský kraj": {
-    "n": 628,
-    "done": 97,
-    "building": 319,
-    "unknown": 212,
+    "n": 625,
+    "done": 117,
+    "building": 298,
+    "unknown": 210,
     "projects": 23,
-    "m2": 3882,
+    "m2": 3885,
     "area": 62.3,
-    "price": 240414,
-    "n_priced": 389,
+    "price": 240692,
+    "n_priced": 386,
     "p_priced": 16
    },
    "Banskobystrický kraj": {
-    "n": 761,
-    "done": 182,
-    "building": 191,
-    "unknown": 388,
+    "n": 760,
+    "done": 192,
+    "building": 181,
+    "unknown": 387,
     "projects": 19,
-    "m2": 3621,
+    "m2": 3614,
     "area": 62.8,
-    "price": 221417,
+    "price": 221443,
     "n_priced": 409,
     "p_priced": 11
    },
    "Prešovský kraj": {
-    "n": 907,
+    "n": 894,
     "done": 23,
-    "building": 308,
-    "unknown": 576,
+    "building": 302,
+    "unknown": 569,
     "projects": 20,
-    "m2": 3741,
+    "m2": 3747,
     "area": 66.8,
-    "price": 245729,
-    "n_priced": 569,
+    "price": 245843,
+    "n_priced": 565,
     "p_priced": 15
    },
    "Košický kraj": {
-    "n": 740,
+    "n": 723,
     "done": 47,
-    "building": 281,
-    "unknown": 412,
+    "building": 279,
+    "unknown": 397,
     "projects": 28,
-    "m2": 4352,
+    "m2": 4349,
     "area": 69.8,
-    "price": 302079,
-    "n_priced": 529,
+    "price": 302005,
+    "n_priced": 525,
     "p_priced": 26
    }
   },
   "okres_sales": {
    "Bratislavský kraj": {
-    "n": 598,
-    "n_priced": 481,
-    "m2": 5671,
-    "projects": 79
+    "n": 626,
+    "n_priced": 508,
+    "m2": 5612,
+    "projects": 80
    },
    "Trnavský kraj": {
-    "n": 91,
-    "n_priced": 71,
-    "m2": 3814,
+    "n": 100,
+    "n_priced": 77,
+    "m2": 3823,
     "projects": 11
    },
    "Trenčiansky kraj": {
-    "n": 77,
-    "n_priced": 43,
-    "m2": 3713,
+    "n": 82,
+    "n_priced": 47,
+    "m2": 3678,
     "projects": 6
    },
    "Nitriansky kraj": {
@@ -164,7 +167,7 @@
     "projects": 12
    },
    "Žilinský kraj": {
-    "n": 74,
+    "n": 76,
     "n_priced": 49,
     "m2": 3611,
     "projects": 16
@@ -176,164 +179,157 @@
     "projects": 8
    },
    "Prešovský kraj": {
-    "n": 134,
-    "n_priced": 41,
-    "m2": 3570,
+    "n": 136,
+    "n_priced": 43,
+    "m2": 3585,
     "projects": 6
    },
    "Košický kraj": {
-    "n": 128,
-    "n_priced": 87,
-    "m2": 4802,
-    "projects": 14
+    "n": 131,
+    "n_priced": 89,
+    "m2": 4797,
+    "projects": 15
    }
   },
   "okres_price": {
    "Bratislavský kraj": {
-    "m2_cur": 5701,
-    "m2_prev": 5694,
-    "chg_pct": 0.1,
-    "unit_days": 30000,
-    "units": 2143,
+    "m2_cur": 5755,
+    "m2_prev": 5716,
+    "chg_pct": 0.7,
+    "units": 2150,
     "projects": 60
    },
    "Trnavský kraj": {
-    "m2_cur": 3513,
-    "m2_prev": 3516,
-    "chg_pct": -0.1,
-    "unit_days": 3560,
-    "units": 254,
+    "m2_cur": 3518,
+    "m2_prev": 3512,
+    "chg_pct": 0.2,
+    "units": 256,
     "projects": 9
    },
    "Trenčiansky kraj": {
-    "m2_cur": 3979,
-    "m2_prev": 3969,
-    "chg_pct": 0.3,
-    "unit_days": 1946,
-    "units": 139,
+    "m2_cur": 3969,
+    "m2_prev": 3968,
+    "chg_pct": 0.0,
+    "units": 141,
     "projects": 4
    },
    "Nitriansky kraj": {
-    "m2_cur": 3467,
-    "m2_prev": 3398,
-    "chg_pct": 2.0,
-    "unit_days": 4751,
-    "units": 339,
+    "m2_cur": 3473,
+    "m2_prev": 3408,
+    "chg_pct": 1.9,
+    "units": 345,
     "projects": 7
    },
    "Žilinský kraj": {
-    "m2_cur": 3785,
-    "m2_prev": 3789,
-    "chg_pct": -0.1,
-    "unit_days": 3870,
-    "units": 276,
+    "m2_cur": 3782,
+    "m2_prev": 3778,
+    "chg_pct": 0.1,
+    "units": 279,
     "projects": 11
    },
    "Banskobystrický kraj": {
-    "m2_cur": 3880,
-    "m2_prev": 3885,
-    "chg_pct": -0.1,
-    "unit_days": 3364,
-    "units": 240,
+    "m2_cur": 3870,
+    "m2_prev": 3825,
+    "chg_pct": 1.2,
+    "units": 247,
     "projects": 6
    },
    "Prešovský kraj": {
-    "m2_cur": 3686,
+    "m2_cur": 3685,
     "m2_prev": 3682,
     "chg_pct": 0.1,
-    "unit_days": 3483,
-    "units": 249,
+    "units": 250,
     "projects": 6
    },
    "Košický kraj": {
-    "m2_cur": 4842,
-    "m2_prev": 4858,
-    "chg_pct": -0.3,
-    "unit_days": 2434,
-    "units": 174,
+    "m2_cur": 4851,
+    "m2_prev": 4859,
+    "chg_pct": -0.2,
+    "units": 176,
     "projects": 12
    }
   },
   "projects": 248,
-  "mean_price": 309550,
+  "mean_price": 309492,
   "mean_area": 65.4,
   "panel_projects": 142,
-  "panel_units": 3909,
+  "panel_units": 3844,
   "panel_unit_projects": 115,
+  "panel_change_pct": 0.6,
   "rules": {
    "min_contributors": 3,
    "min_mean_n": 10
   },
   "panel_supply_prev": 6305,
-  "panel_supply_cur": 5994,
+  "panel_supply_cur": 6035,
   "layout_supply": [
    {
     "k": "2-izb",
-    "n": 4167,
-    "m2": 4633,
+    "n": 4194,
+    "m2": 4629,
     "area": 53.0
    },
    {
     "k": "3-izb",
-    "n": 2931,
-    "m2": 4473,
+    "n": 2946,
+    "m2": 4470,
     "area": 75.7
    },
    {
     "k": "4-izb",
-    "n": 976,
-    "m2": 5189,
-    "area": 104.0
+    "n": 979,
+    "m2": 5190,
+    "area": 104.1
    },
    {
     "k": "1-izb",
-    "n": 887,
-    "m2": 5407,
-    "area": 37.0
+    "n": 893,
+    "m2": 5412,
+    "area": 36.9
    },
    {
     "k": "(neuvedené)",
-    "n": 270,
-    "m2": 3313,
-    "area": 75.9
+    "n": 226,
+    "m2": 3303,
+    "area": 76.6
    },
    {
     "k": "1,5-izb",
-    "n": 220,
-    "m2": 5679,
+    "n": 222,
+    "m2": 5684,
     "area": 36.2
    },
    {
     "k": "5 a viac",
-    "n": 102,
-    "m2": 6009,
-    "area": 157.3
+    "n": 104,
+    "m2": 5990,
+    "area": 157.5
    }
   ],
   "layout_sales": [
    {
     "k": "2-izb",
-    "n": 565,
-    "m2": "4850",
+    "n": 590,
+    "m2": "4831",
     "area": "51.0"
    },
    {
     "k": "3-izb",
-    "n": 306,
-    "m2": "4598",
-    "area": "74.3"
+    "n": 322,
+    "m2": "4555",
+    "area": "74.1"
    },
    {
     "k": "1-izb",
-    "n": 138,
-    "m2": "5522",
-    "area": "31.4"
+    "n": 143,
+    "m2": "5492",
+    "area": "31.5"
    },
    {
     "k": "4-izb",
-    "n": 112,
-    "m2": "5477",
-    "area": "106.8"
+    "n": 115,
+    "m2": "5457",
+    "area": "106.3"
    },
    {
     "k": "1,5-izb",
@@ -356,205 +352,217 @@
   ],
   "own_quarters": {
    "2026Q2": 4905,
-   "2026Q3": 4709
+   "2026Q3": 4710
   },
-  "quarter_sales": 1182,
-  "quarter_sold_m2": 4950,
-  "quarter_ask_m2": 4709,
+  "quarter_sales": 1231,
+  "quarter_sold_m2": 4920,
+  "quarter_ask_m2": 4710,
   "price_series": [
    {
     "wk": "2026-06-15",
-    "m2_done": "4632",
-    "m2_building": "4857",
-    "m2_all": "4804",
-    "n_all": 3730,
-    "u_done": 646,
-    "u_building": 2801,
-    "p_all": 112,
-    "p_done": 48,
-    "p_building": 65
+    "m2_done": "4574",
+    "m2_building": "4865",
+    "m2_all": "4795",
+    "n_all": 3667,
+    "u_done": 699,
+    "u_building": 2686,
+    "p_all": 110,
+    "p_done": 51,
+    "p_building": 61
    },
    {
     "wk": "2026-06-22",
-    "m2_done": "4651",
-    "m2_building": "4859",
-    "m2_all": "4809",
-    "n_all": 3721,
-    "u_done": 647,
-    "u_building": 2793,
-    "p_all": 112,
-    "p_done": 48,
-    "p_building": 65
+    "m2_done": "4594",
+    "m2_building": "4867",
+    "m2_all": "4801",
+    "n_all": 3661,
+    "u_done": 703,
+    "u_building": 2678,
+    "p_all": 110,
+    "p_done": 51,
+    "p_building": 61
    },
    {
     "wk": "2026-06-29",
-    "m2_done": "4602",
-    "m2_building": "4875",
-    "m2_all": "4814",
-    "n_all": 3703,
-    "u_done": 634,
-    "u_building": 2789,
-    "p_all": 112,
-    "p_done": 48,
-    "p_building": 65
+    "m2_done": "4547",
+    "m2_building": "4884",
+    "m2_all": "4806",
+    "n_all": 3643,
+    "u_done": 690,
+    "u_building": 2674,
+    "p_all": 110,
+    "p_done": 51,
+    "p_building": 61
    },
    {
     "wk": "2026-07-06",
-    "m2_done": "4608",
-    "m2_building": "4872",
-    "m2_all": "4814",
-    "n_all": 3703,
-    "u_done": 629,
-    "u_building": 2793,
-    "p_all": 112,
-    "p_done": 47,
-    "p_building": 65
+    "m2_done": "4549",
+    "m2_building": "4886",
+    "m2_all": "4808",
+    "n_all": 3645,
+    "u_done": 686,
+    "u_building": 2679,
+    "p_all": 110,
+    "p_done": 50,
+    "p_building": 61
    },
    {
     "wk": "2026-07-13",
-    "m2_done": "4616",
-    "m2_building": "4882",
-    "m2_all": "4824",
-    "n_all": 3690,
-    "u_done": 619,
-    "u_building": 2790,
-    "p_all": 112,
-    "p_done": 47,
-    "p_building": 65
+    "m2_done": "4553",
+    "m2_building": "4897",
+    "m2_all": "4818",
+    "n_all": 3631,
+    "u_done": 675,
+    "u_building": 2676,
+    "p_all": 110,
+    "p_done": 50,
+    "p_building": 61
    },
    {
     "wk": "2026-07-20",
-    "m2_done": "4612",
-    "m2_building": "4878",
-    "m2_all": "4820",
-    "n_all": 3687,
-    "u_done": 620,
-    "u_building": 2787,
-    "p_all": 112,
-    "p_done": 48,
-    "p_building": 65
+    "m2_done": "4549",
+    "m2_building": "4892",
+    "m2_all": "4813",
+    "n_all": 3631,
+    "u_done": 676,
+    "u_building": 2676,
+    "p_all": 110,
+    "p_done": 51,
+    "p_building": 61
    },
    {
     "wk": "2026-07-27",
-    "m2_done": "4608",
-    "m2_building": "4879",
-    "m2_all": "4820",
-    "n_all": 3683,
-    "u_done": 618,
-    "u_building": 2782,
-    "p_all": 112,
-    "p_done": 48,
-    "p_building": 65
+    "m2_done": "4545",
+    "m2_building": "4893",
+    "m2_all": "4814",
+    "n_all": 3628,
+    "u_done": 674,
+    "u_building": 2672,
+    "p_all": 110,
+    "p_done": 51,
+    "p_building": 61
    },
    {
     "wk": "2026-08-03",
-    "m2_done": "4612",
-    "m2_building": "4878",
-    "m2_all": "4820",
-    "n_all": 3676,
-    "u_done": 612,
-    "u_building": 2781,
-    "p_all": 112,
-    "p_done": 48,
-    "p_building": 65
+    "m2_done": "4547",
+    "m2_building": "4892",
+    "m2_all": "4813",
+    "n_all": 3623,
+    "u_done": 670,
+    "u_building": 2671,
+    "p_all": 110,
+    "p_done": 51,
+    "p_building": 61
    },
    {
     "wk": "2026-08-10",
-    "m2_done": "4612",
-    "m2_building": "4878",
-    "m2_all": "4821",
-    "n_all": 3664,
-    "u_done": 610,
-    "u_building": 2773,
-    "p_all": 112,
-    "p_done": 48,
-    "p_building": 65
+    "m2_done": "4546",
+    "m2_building": "4894",
+    "m2_all": "4815",
+    "n_all": 3612,
+    "u_done": 668,
+    "u_building": 2664,
+    "p_all": 110,
+    "p_done": 51,
+    "p_building": 61
    },
    {
     "wk": "2026-08-17",
-    "m2_done": "4637",
-    "m2_building": "4883",
-    "m2_all": "4829",
-    "n_all": 3657,
-    "u_done": 610,
-    "u_building": 2767,
-    "p_all": 112,
-    "p_done": 48,
-    "p_building": 65
+    "m2_done": "4570",
+    "m2_building": "4899",
+    "m2_all": "4823",
+    "n_all": 3605,
+    "u_done": 668,
+    "u_building": 2658,
+    "p_all": 110,
+    "p_done": 51,
+    "p_building": 61
    },
    {
     "wk": "2026-08-24",
-    "m2_done": "4633",
-    "m2_building": "4885",
-    "m2_all": "4829",
-    "n_all": 3645,
-    "u_done": 610,
-    "u_building": 2761,
-    "p_all": 111,
-    "p_done": 48,
-    "p_building": 65
+    "m2_done": "4566",
+    "m2_building": "4901",
+    "m2_all": "4823",
+    "n_all": 3593,
+    "u_done": 668,
+    "u_building": 2652,
+    "p_all": 109,
+    "p_done": 51,
+    "p_building": 61
    },
    {
     "wk": "2026-08-31",
-    "m2_done": "4632",
-    "m2_building": "4889",
-    "m2_all": "4832",
-    "n_all": 3630,
-    "u_done": 609,
-    "u_building": 2747,
-    "p_all": 111,
-    "p_done": 48,
-    "p_building": 65
+    "m2_done": "4565",
+    "m2_building": "4904",
+    "m2_all": "4826",
+    "n_all": 3578,
+    "u_done": 666,
+    "u_building": 2639,
+    "p_all": 109,
+    "p_done": 51,
+    "p_building": 61
    },
    {
     "wk": "2026-09-07",
-    "m2_done": "4632",
-    "m2_building": "4893",
-    "m2_all": "4834",
-    "n_all": 3644,
-    "u_done": 611,
-    "u_building": 2758,
-    "p_all": 111,
-    "p_done": 48,
-    "p_building": 65
+    "m2_done": "4567",
+    "m2_building": "4908",
+    "m2_all": "4829",
+    "n_all": 3591,
+    "u_done": 666,
+    "u_building": 2651,
+    "p_all": 109,
+    "p_done": 51,
+    "p_building": 61
    },
    {
     "wk": "2026-09-14",
-    "m2_done": "4634",
-    "m2_building": "4895",
-    "m2_all": "4824",
-    "n_all": 3667,
-    "u_done": 610,
-    "u_building": 2749,
-    "p_all": 112,
-    "p_done": 48,
-    "p_building": 64
+    "m2_done": "4569",
+    "m2_building": "4916",
+    "m2_all": "4822",
+    "n_all": 3615,
+    "u_done": 665,
+    "u_building": 2643,
+    "p_all": 110,
+    "p_done": 51,
+    "p_building": 60
    },
    {
     "wk": "2026-09-21",
-    "m2_done": "4635",
-    "m2_building": "4900",
-    "m2_all": "4831",
-    "n_all": 3641,
-    "u_done": 613,
-    "u_building": 2756,
-    "p_all": 112,
-    "p_done": 48,
-    "p_building": 64
+    "m2_done": "4571",
+    "m2_building": "4921",
+    "m2_all": "4829",
+    "n_all": 3589,
+    "u_done": 667,
+    "u_building": 2650,
+    "p_all": 110,
+    "p_done": 51,
+    "p_building": 60
+   },
+   {
+    "wk": "2026-09-28",
+    "m2_done": "4571",
+    "m2_building": "4919",
+    "m2_all": "4829",
+    "n_all": 3586,
+    "u_done": 666,
+    "u_building": 2651,
+    "p_all": 111,
+    "p_done": 51,
+    "p_building": 61
    }
   ],
   "project_supply": [
    {
     "project_id": "slnecnice",
-    "n": 455
+    "n": 453
+   },
+   {
+    "project_id": "nesto",
+    "n": 291
    },
    {
     "project_id": "portum-towers",
     "n": 239
-   },
-   {
-    "project_id": "nesto",
-    "n": 236
    },
    {
     "project_id": "nadvorna-residence",
@@ -562,7 +570,7 @@
    },
    {
     "project_id": "rezidencia-rusinska",
-    "n": 173
+    "n": 172
    },
    {
     "project_id": "zahradne-sady-presov",
@@ -574,15 +582,15 @@
    },
    {
     "project_id": "rakyta",
-    "n": 164
+    "n": 163
    },
    {
     "project_id": "cukrovar-trnava",
-    "n": 159
+    "n": 155
    },
    {
     "project_id": "downtown-yards",
-    "n": 153
+    "n": 152
    },
    {
     "project_id": "istrica",
@@ -610,11 +618,11 @@
    },
    {
     "project_id": "arboria",
-    "n": 120
+    "n": 118
    },
    {
     "project_id": "watsonova-kosice",
-    "n": 117
+    "n": 115
    },
    {
     "project_id": "novy-ruzinov",
@@ -626,43 +634,43 @@
    },
    {
     "project_id": "ister-tower",
-    "n": 109
+    "n": 108
    },
    {
     "project_id": "q-by-cresco",
-    "n": 103
+    "n": 102
+   },
+   {
+    "project_id": "ceresne-living-dubravka",
+    "n": 101
    },
    {
     "project_id": "dostupne-byvanie-nitra",
     "n": 100
    },
    {
-    "project_id": "ceresne-living-dubravka",
-    "n": 99
-   },
-   {
     "project_id": "zwirn",
-    "n": 99
+    "n": 98
    },
    {
     "project_id": "tatra-city-residence",
     "n": 94
    },
    {
-    "project_id": "byty-kamenac",
-    "n": 93
-   },
-   {
     "project_id": "stockerka",
     "n": 93
    },
    {
-    "project_id": "milrose",
-    "n": 89
+    "project_id": "byty-kamenac",
+    "n": 92
    },
    {
     "project_id": "maly-raj-residence",
-    "n": 84
+    "n": 91
+   },
+   {
+    "project_id": "milrose",
+    "n": 88
    },
    {
     "project_id": "kamence",
@@ -670,7 +678,7 @@
    },
    {
     "project_id": "nove-mlynarce",
-    "n": 82
+    "n": 83
    },
    {
     "project_id": "river-star",
@@ -709,6 +717,10 @@
     "n": 65
    },
    {
+    "project_id": "saratovska-22",
+    "n": 62
+   },
+   {
     "project_id": "istropolis",
     "n": 61
    },
@@ -725,10 +737,6 @@
     "n": 59
    },
    {
-    "project_id": "saratovska-22",
-    "n": 58
-   },
-   {
     "project_id": "alvy",
     "n": 58
    },
@@ -737,19 +745,19 @@
     "n": 56
    },
    {
-    "project_id": "sky-park-tower",
-    "n": 55
-   },
-   {
     "project_id": "byty-hriby",
     "n": 55
    },
    {
-    "project_id": "nuppu",
-    "n": 54
+    "project_id": "sky-park-tower",
+    "n": 55
    },
    {
     "project_id": "pri-mlynoch",
+    "n": 54
+   },
+   {
+    "project_id": "nuppu",
     "n": 54
    },
    {
@@ -769,19 +777,7 @@
     "n": 50
    },
    {
-    "project_id": "ipelska",
-    "n": 50
-   },
-   {
     "project_id": "tatrypark-residence",
-    "n": 49
-   },
-   {
-    "project_id": "galvania",
-    "n": 49
-   },
-   {
-    "project_id": "kastiel-revay",
     "n": 49
    },
    {
@@ -789,15 +785,19 @@
     "n": 48
    },
    {
-    "project_id": "novy-martin",
+    "project_id": "galvania",
     "n": 48
    },
    {
-    "project_id": "rezidencia-vinohrady",
+    "project_id": "kastiel-revay",
+    "n": 48
+   },
+   {
+    "project_id": "novy-martin",
     "n": 47
    },
    {
-    "project_id": "pano-poprad",
+    "project_id": "rezidencia-vinohrady",
     "n": 47
    },
    {
@@ -813,15 +813,15 @@
     "n": 44
    },
    {
-    "project_id": "prazska-presov",
-    "n": 44
-   },
-   {
-    "project_id": "parq-zatisie",
+    "project_id": "kralovske-domy",
     "n": 43
    },
    {
-    "project_id": "kralovske-domy",
+    "project_id": "ipelska",
+    "n": 43
+   },
+   {
+    "project_id": "parq-zatisie",
     "n": 43
    },
    {
@@ -830,30 +830,14 @@
    },
    {
     "project_id": "pupavy-bernolak",
-    "n": 42
+    "n": 41
    },
    {
-    "project_id": "fialkova-residence",
-    "n": 42
-   },
-   {
-    "project_id": "predmestie",
+    "project_id": "pano-poprad",
     "n": 40
    },
    {
-    "project_id": "rezidencia-lucenec",
-    "n": 39
-   },
-   {
-    "project_id": "greb-park",
-    "n": 39
-   },
-   {
-    "project_id": "nove-nabrezie",
-    "n": 39
-   },
-   {
-    "project_id": "u-vanysu",
+    "project_id": "prazska-presov",
     "n": 39
    },
    {
@@ -861,19 +845,35 @@
     "n": 39
    },
    {
-    "project_id": "tisiny",
-    "n": 38
+    "project_id": "greb-park",
+    "n": 39
    },
    {
-    "project_id": "panske-byvanie",
-    "n": 37
+    "project_id": "u-vanysu",
+    "n": 39
+   },
+   {
+    "project_id": "rezidencia-lucenec",
+    "n": 39
+   },
+   {
+    "project_id": "nove-nabrezie",
+    "n": 39
+   },
+   {
+    "project_id": "predmestie",
+    "n": 39
+   },
+   {
+    "project_id": "tisiny",
+    "n": 38
    },
    {
     "project_id": "drevny-trh",
     "n": 37
    },
    {
-    "project_id": "g62",
+    "project_id": "panske-byvanie",
     "n": 37
    },
    {
@@ -881,11 +881,27 @@
     "n": 36
    },
    {
+    "project_id": "slnecna-strana",
+    "n": 35
+   },
+   {
+    "project_id": "nova-nitra",
+    "n": 35
+   },
+   {
     "project_id": "rezidencia-pleta",
     "n": 35
    },
    {
+    "project_id": "g62",
+    "n": 34
+   },
+   {
     "project_id": "na-studnickach",
+    "n": 34
+   },
+   {
+    "project_id": "fialkova-residence",
     "n": 34
    },
    {
@@ -897,10 +913,6 @@
     "n": 34
    },
    {
-    "project_id": "slnecna-strana",
-    "n": 34
-   },
-   {
     "project_id": "zelka",
     "n": 34
    },
@@ -909,23 +921,7 @@
     "n": 33
    },
    {
-    "project_id": "nova-nitra",
-    "n": 33
-   },
-   {
     "project_id": "pekna-cesta",
-    "n": 33
-   },
-   {
-    "project_id": "bk-straze",
-    "n": 32
-   },
-   {
-    "project_id": "stara-trznica-lm",
-    "n": 32
-   },
-   {
-    "project_id": "male-hliny-modra",
     "n": 32
    },
    {
@@ -933,7 +929,15 @@
     "n": 32
    },
    {
+    "project_id": "bk-straze",
+    "n": 32
+   },
+   {
     "project_id": "mytna-37",
+    "n": 32
+   },
+   {
+    "project_id": "stara-trznica-lm",
     "n": 32
    },
    {
@@ -941,19 +945,23 @@
     "n": 31
    },
    {
-    "project_id": "greentirna",
-    "n": 31
-   },
-   {
     "project_id": "rezidencia-podhradova",
     "n": 31
    },
    {
-    "project_id": "rezidencia-kamenna",
+    "project_id": "greentirna",
+    "n": 31
+   },
+   {
+    "project_id": "male-hliny-modra",
     "n": 31
    },
    {
     "project_id": "zahradky-piestany",
+    "n": 30
+   },
+   {
+    "project_id": "rezidencia-kamenna",
     "n": 30
    },
    {
@@ -965,14 +973,6 @@
     "n": 28
    },
    {
-    "project_id": "stoly-residence",
-    "n": 27
-   },
-   {
-    "project_id": "rezidencia-mierova",
-    "n": 27
-   },
-   {
     "project_id": "atrium-living-kosice",
     "n": 27
    },
@@ -981,20 +981,20 @@
     "n": 27
    },
    {
-    "project_id": "matuskova-residence-winehills",
-    "n": 26
+    "project_id": "rezidencia-mierova",
+    "n": 27
+   },
+   {
+    "project_id": "stoly-residence",
+    "n": 27
    },
    {
     "project_id": "tri-haje",
     "n": 26
    },
    {
-    "project_id": "paradajs",
-    "n": 25
-   },
-   {
-    "project_id": "byty-kasarne",
-    "n": 25
+    "project_id": "matuskova-residence-winehills",
+    "n": 26
    },
    {
     "project_id": "rezidencia-kolecko",
@@ -1009,6 +1009,14 @@
     "n": 25
    },
    {
+    "project_id": "byty-kasarne",
+    "n": 25
+   },
+   {
+    "project_id": "paradajs",
+    "n": 25
+   },
+   {
     "project_id": "rezidencia-best-home",
     "n": 24
    },
@@ -1017,12 +1025,16 @@
     "n": 24
    },
    {
+    "project_id": "aurora-residence",
+    "n": 24
+   },
+   {
     "project_id": "na-baranku",
     "n": 24
    },
    {
-    "project_id": "aurora-residence",
-    "n": 24
+    "project_id": "ceravia",
+    "n": 23
    },
    {
     "project_id": "palais-esterhazy",
@@ -1033,27 +1045,19 @@
     "n": 23
    },
    {
-    "project_id": "diamant-vajnory",
-    "n": 22
-   },
-   {
     "project_id": "city-tower-kosice",
     "n": 22
    },
    {
-    "project_id": "ceravia",
+    "project_id": "diamant-vajnory",
     "n": 22
    },
    {
     "project_id": "vydrica",
-    "n": 22
-   },
-   {
-    "project_id": "zion-residence",
     "n": 21
    },
    {
-    "project_id": "byty-cizik",
+    "project_id": "zion-residence",
     "n": 21
    },
    {
@@ -1061,24 +1065,16 @@
     "n": 21
    },
    {
-    "project_id": "sceneria-zilina",
-    "n": 20
+    "project_id": "byty-cizik",
+    "n": 21
    },
    {
     "project_id": "rendez",
     "n": 20
    },
    {
-    "project_id": "pupavy-pri-aleji",
-    "n": 19
-   },
-   {
-    "project_id": "veze-brezovec",
-    "n": 19
-   },
-   {
-    "project_id": "rezidencia-levan",
-    "n": 19
+    "project_id": "sceneria-zilina",
+    "n": 20
    },
    {
     "project_id": "krajinska",
@@ -1089,11 +1085,23 @@
     "n": 19
    },
    {
-    "project_id": "kvp-grunt",
-    "n": 18
+    "project_id": "veze-brezovec",
+    "n": 19
+   },
+   {
+    "project_id": "pupavy-pri-aleji",
+    "n": 19
+   },
+   {
+    "project_id": "rezidencia-levan",
+    "n": 19
    },
    {
     "project_id": "zelene-zaluhy",
+    "n": 18
+   },
+   {
+    "project_id": "kvp-grunt",
     "n": 18
    },
    {
@@ -1105,15 +1113,15 @@
     "n": 18
    },
    {
+    "project_id": "rezidencia-sladkovicova",
+    "n": 17
+   },
+   {
     "project_id": "green-atrium",
     "n": 17
    },
    {
     "project_id": "lofty-kominarska",
-    "n": 17
-   },
-   {
-    "project_id": "rezidencia-sladkovicova",
     "n": 17
    },
    {
@@ -1126,10 +1134,6 @@
    },
    {
     "project_id": "brezovy-haj",
-    "n": 16
-   },
-   {
-    "project_id": "kasarne-brezno",
     "n": 16
    },
    {
@@ -1153,15 +1157,7 @@
     "n": 16
    },
    {
-    "project_id": "majakovskeho-residence",
-    "n": 15
-   },
-   {
     "project_id": "pri-hati-rezidencia",
-    "n": 15
-   },
-   {
-    "project_id": "swanhouse",
     "n": 15
    },
    {
@@ -1169,11 +1165,19 @@
     "n": 15
    },
    {
+    "project_id": "swanhouse",
+    "n": 15
+   },
+   {
+    "project_id": "kasarne-brezno",
+    "n": 15
+   },
+   {
     "project_id": "rezidencia-mukacevska",
     "n": 15
    },
    {
-    "project_id": "bohunka",
+    "project_id": "majakovskeho-residence",
     "n": 15
    },
    {
@@ -1181,11 +1185,7 @@
     "n": 14
    },
    {
-    "project_id": "projekt-kerling",
-    "n": 14
-   },
-   {
-    "project_id": "villadomy-hrdlicky",
+    "project_id": "sykorky",
     "n": 14
    },
    {
@@ -1193,7 +1193,7 @@
     "n": 14
    },
    {
-    "project_id": "byty-vrbina",
+    "project_id": "projekt-kerling",
     "n": 14
    },
    {
@@ -1201,19 +1201,15 @@
     "n": 14
    },
    {
-    "project_id": "sykorky",
+    "project_id": "bohunka",
+    "n": 14
+   },
+   {
+    "project_id": "villadomy-hrdlicky",
     "n": 14
    },
    {
     "project_id": "millhaus",
-    "n": 13
-   },
-   {
-    "project_id": "vila-magurska",
-    "n": 13
-   },
-   {
-    "project_id": "aura-slavicie-udolie",
     "n": 13
    },
    {
@@ -1225,7 +1221,19 @@
     "n": 13
    },
    {
-    "project_id": "pri-studnicke",
+    "project_id": "aura-slavicie-udolie",
+    "n": 13
+   },
+   {
+    "project_id": "vila-magurska",
+    "n": 13
+   },
+   {
+    "project_id": "byty-vrbina",
+    "n": 13
+   },
+   {
+    "project_id": "botanica-living",
     "n": 12
    },
    {
@@ -1237,19 +1245,11 @@
     "n": 12
    },
    {
-    "project_id": "liget",
+    "project_id": "pri-studnicke",
     "n": 12
    },
    {
-    "project_id": "botanica-living",
-    "n": 12
-   },
-   {
-    "project_id": "central-point",
-    "n": 11
-   },
-   {
-    "project_id": "novanta-prievoz",
+    "project_id": "rezidencia-alzbetina",
     "n": 11
    },
    {
@@ -1261,12 +1261,24 @@
     "n": 11
    },
    {
-    "project_id": "rezidencia-alzbetina",
+    "project_id": "heuhaus",
     "n": 11
    },
    {
-    "project_id": "heuhaus",
+    "project_id": "liget",
     "n": 11
+   },
+   {
+    "project_id": "novanta-prievoz",
+    "n": 11
+   },
+   {
+    "project_id": "central-point",
+    "n": 11
+   },
+   {
+    "project_id": "rezidencia-suchy-vrch",
+    "n": 10
    },
    {
     "project_id": "neohaus",
@@ -1281,10 +1293,6 @@
     "n": 10
    },
    {
-    "project_id": "rezidencia-suchy-vrch",
-    "n": 10
-   },
-   {
     "project_id": "egidius-residence",
     "n": 10
    },
@@ -1293,15 +1301,7 @@
     "n": 10
    },
    {
-    "project_id": "rezidencia-taura",
-    "n": 9
-   },
-   {
-    "project_id": "letna-33",
-    "n": 9
-   },
-   {
-    "project_id": "bytovy-dom-premium",
+    "project_id": "zicherhouse",
     "n": 9
    },
    {
@@ -1309,11 +1309,19 @@
     "n": 9
    },
    {
-    "project_id": "zicherhouse",
+    "project_id": "bytovy-dom-premium",
+    "n": 9
+   },
+   {
+    "project_id": "letna-33",
     "n": 9
    },
    {
     "project_id": "viva-park",
+    "n": 8
+   },
+   {
+    "project_id": "rezidencia-taura",
     "n": 8
    },
    {
@@ -1333,11 +1341,7 @@
     "n": 8
    },
    {
-    "project_id": "zelene-vlcince",
-    "n": 7
-   },
-   {
-    "project_id": "rezidencia-stepelshof",
+    "project_id": "basehaus",
     "n": 7
    },
    {
@@ -1345,15 +1349,11 @@
     "n": 7
    },
    {
-    "project_id": "vila-sandberg",
-    "n": 7
-   },
-   {
-    "project_id": "pristavna-1",
-    "n": 7
-   },
-   {
     "project_id": "byty-nina",
+    "n": 7
+   },
+   {
+    "project_id": "rezidencia-stepelshof",
     "n": 7
    },
    {
@@ -1361,7 +1361,11 @@
     "n": 7
    },
    {
-    "project_id": "basehaus",
+    "project_id": "pristavna-1",
+    "n": 7
+   },
+   {
+    "project_id": "vila-sandberg",
     "n": 7
    },
    {
@@ -1369,19 +1373,11 @@
     "n": 7
    },
    {
-    "project_id": "stare-grunty",
-    "n": 6
+    "project_id": "zelene-vlcince",
+    "n": 7
    },
    {
-    "project_id": "rezidencia-kubin",
-    "n": 6
-   },
-   {
-    "project_id": "zeleny-dvor",
-    "n": 6
-   },
-   {
-    "project_id": "karpatska-residence",
+    "project_id": "bytovy-dom-helenky",
     "n": 6
    },
    {
@@ -1389,11 +1385,35 @@
     "n": 6
    },
    {
-    "project_id": "bytovy-dom-helenky",
+    "project_id": "rezidencia-kubin",
     "n": 6
    },
    {
-    "project_id": "vratna-residence",
+    "project_id": "karpatska-residence",
+    "n": 6
+   },
+   {
+    "project_id": "stare-grunty",
+    "n": 6
+   },
+   {
+    "project_id": "zeleny-dvor",
+    "n": 6
+   },
+   {
+    "project_id": "pri-hrone",
+    "n": 5
+   },
+   {
+    "project_id": "bytovy-komplet-ruppeldtova",
+    "n": 5
+   },
+   {
+    "project_id": "maly-chotar",
+    "n": 5
+   },
+   {
+    "project_id": "uno-postova",
     "n": 5
    },
    {
@@ -1405,27 +1425,15 @@
     "n": 5
    },
    {
-    "project_id": "floret",
-    "n": 5
-   },
-   {
-    "project_id": "bytovy-komplet-ruppeldtova",
-    "n": 5
-   },
-   {
-    "project_id": "uno-postova",
-    "n": 5
-   },
-   {
     "project_id": "rezidencia-liptovska",
     "n": 5
    },
    {
-    "project_id": "maly-chotar",
+    "project_id": "floret",
     "n": 5
    },
    {
-    "project_id": "pri-hrone",
+    "project_id": "vratna-residence",
     "n": 5
    },
    {
@@ -1453,18 +1461,6 @@
     "n": 4
    },
    {
-    "project_id": "masarykova-51",
-    "n": 3
-   },
-   {
-    "project_id": "nova-zahorska",
-    "n": 3
-   },
-   {
-    "project_id": "rezidencia-srncek",
-    "n": 3
-   },
-   {
     "project_id": "byty-detvianska",
     "n": 3
    },
@@ -1473,43 +1469,23 @@
     "n": 3
    },
    {
+    "project_id": "nova-zahorska",
+    "n": 3
+   },
+   {
     "project_id": "zahradnicka-ba",
     "n": 3
    },
    {
-    "project_id": "kalinciakova",
-    "n": 2
+    "project_id": "rezidencia-srncek",
+    "n": 3
    },
    {
-    "project_id": "panorama-kosice",
-    "n": 2
+    "project_id": "masarykova-51",
+    "n": 3
    },
    {
-    "project_id": "hausberg",
-    "n": 2
-   },
-   {
-    "project_id": "rozalka-village",
-    "n": 2
-   },
-   {
-    "project_id": "rowink",
-    "n": 2
-   },
-   {
-    "project_id": "livana",
-    "n": 2
-   },
-   {
-    "project_id": "viladomy-jurska",
-    "n": 2
-   },
-   {
-    "project_id": "bytovy-dom-vivien",
-    "n": 2
-   },
-   {
-    "project_id": "rezidencia-murgasova",
+    "project_id": "slnecne-prsany",
     "n": 2
    },
    {
@@ -1517,11 +1493,43 @@
     "n": 2
    },
    {
-    "project_id": "slnecne-prsany",
+    "project_id": "green-residence-nz",
     "n": 2
    },
    {
-    "project_id": "green-residence-nz",
+    "project_id": "hausberg",
+    "n": 2
+   },
+   {
+    "project_id": "viladomy-jurska",
+    "n": 2
+   },
+   {
+    "project_id": "kalinciakova",
+    "n": 2
+   },
+   {
+    "project_id": "livana",
+    "n": 2
+   },
+   {
+    "project_id": "rezidencia-murgasova",
+    "n": 2
+   },
+   {
+    "project_id": "bytovy-dom-vivien",
+    "n": 2
+   },
+   {
+    "project_id": "rozalka-village",
+    "n": 2
+   },
+   {
+    "project_id": "panorama-kosice",
+    "n": 2
+   },
+   {
+    "project_id": "rowink",
     "n": 2
    },
    {
@@ -1529,11 +1537,11 @@
     "n": 1
    },
    {
-    "project_id": "drotarska-15",
+    "project_id": "byty-fabiniho",
     "n": 1
    },
    {
-    "project_id": "byty-fabiniho",
+    "project_id": "drotarska-15",
     "n": 1
    }
   ],
@@ -1547,9 +1555,9 @@
    },
    {
     "qkey": "2026Q3",
-    "n": 1182,
+    "n": 1231,
     "first_sale": "2026-07-01",
-    "last_sale": "2026-09-27",
+    "last_sale": "2026-09-30",
     "observed_from": "2026-05-16"
    }
   ],
@@ -1576,7 +1584,7 @@
    },
    {
     "m": "2026-09-01",
-    "n": 510,
+    "n": 559,
     "observed_from": "2026-05-16"
    }
   ],
@@ -1601,10 +1609,10 @@
    },
    {
     "m": "2026-09-01",
-    "m2_offer": 5078,
-    "m2_sold": 5007,
-    "n_sold": 227,
-    "gap_pct": -1.4,
+    "m2_offer": 5052,
+    "m2_sold": 4972,
+    "n_sold": 249,
+    "gap_pct": -1.6,
     "full_from_start": true,
     "current_month": true
    }
@@ -1620,24 +1628,24 @@
    },
    {
     "m": "2026-09-01",
-    "n": 311
+    "n": 337
    }
   ],
   "panel_month_projects": 146,
   "panel_quarter": {
-   "ask_m2": 5111,
-   "sold_m2": 5038,
-   "n_sold": 694,
+   "ask_m2": 5100,
+   "sold_m2": 5025,
+   "n_sold": 716,
    "n_sold_no_offer": 5,
    "projects": 146
   },
   "completion_m2": {
-   "m2_done": 4861,
-   "m2_building": 4935,
-   "n_done": 765,
-   "n_building": 4098,
-   "p_done": 48,
-   "p_building": 83
+   "m2_done": 4792,
+   "m2_building": 4951,
+   "n_done": 823,
+   "n_building": 4074,
+   "p_done": 52,
+   "p_building": 80
   },
   "figures": {
    "podiel-ponuka": true,

@@ -48,24 +48,24 @@ z
    <g id="matplotlib.axis_2">
     <g id="ytick_1">
      <g id="line2d_2">
-      <path d="M 51.84 343.601095 
-L 668.16 343.601095 
+      <path d="M 51.84 342.924891 
+L 668.16 342.924891 
 " clip-path="url(#p1da876ef1c)" style="fill: none; stroke: #e3e7eb; stroke-linecap: square"/>
      </g>
      <g id="line2d_3"/>
     </g>
     <g id="ytick_2">
      <g id="line2d_4">
-      <path d="M 51.84 300.56475 
-L 668.16 300.56475 
+      <path d="M 51.84 299.212343 
+L 668.16 299.212343 
 " clip-path="url(#p1da876ef1c)" style="fill: none; stroke: #e3e7eb; stroke-linecap: square"/>
      </g>
      <g id="line2d_5"/>
     </g>
     <g id="ytick_3">
      <g id="line2d_6">
-      <path d="M 51.84 257.528405 
-L 668.16 257.528405 
+      <path d="M 51.84 255.499794 
+L 668.16 255.499794 
 " clip-path="url(#p1da876ef1c)" style="fill: none; stroke: #e3e7eb; stroke-linecap: square"/>
      </g>
      <g id="line2d_7"/>
@@ -82,8 +82,8 @@ z
    <g id="patch_4">
     <path d="M 311.031304 386.63744 
 L 495.753043 386.63744 
-L 495.753043 224.648638 
-L 311.031304 224.648638 
+L 495.753043 223.983047 
+L 311.031304 223.983047 
 z
 " clip-path="url(#p1da876ef1c)" style="fill: #0e4b47"/>
    </g>
@@ -93,46 +93,46 @@ L 668.16 386.63744
 " style="fill: none; stroke: #e3e7eb; stroke-linejoin: miter; stroke-linecap: square"/>
    </g>
    <g id="text_2">
-    <text style="font-weight: 600; font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #4a726f" x="194.04087" y="214.97682" transform="rotate(-0 194.04087 214.97682)">3 814</text>
+    <text style="font-weight: 600; font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #4a726f" x="194.04087" y="214.97682" transform="rotate(-0 194.04087 214.97682)">3 755</text>
    </g>
    <g id="text_3">
-    <text style="font-weight: 600; font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #0e4b47" x="403.392174" y="217.128638" transform="rotate(-0 403.392174 217.128638)">3 764</text>
+    <text style="font-weight: 600; font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #0e4b47" x="403.392174" y="216.463047" transform="rotate(-0 403.392174 216.463047)">3 721</text>
    </g>
    <g id="text_4">
     <g id="patch_6">
-     <path d="M 49.6 345.841095 
-L 96.255 345.841095 
-L 96.255 325.361095 
-L 49.6 325.361095 
+     <path d="M 49.6 345.164891 
+L 96.255 345.164891 
+L 96.255 324.684891 
+L 49.6 324.684891 
 z
 " style="fill: #ffffff"/>
     </g>
-    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #6b7480" x="51.84" y="340.081095" transform="rotate(-0 51.84 340.081095)">1 000</text>
+    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #6b7480" x="51.84" y="339.404891" transform="rotate(-0 51.84 339.404891)">1 000</text>
    </g>
    <g id="text_5">
     <g id="patch_7">
-     <path d="M 49.6 302.80475 
-L 96.255 302.80475 
-L 96.255 282.32475 
-L 49.6 282.32475 
+     <path d="M 49.6 301.452343 
+L 96.255 301.452343 
+L 96.255 280.972343 
+L 49.6 280.972343 
 z
 " style="fill: #ffffff"/>
     </g>
-    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #6b7480" x="51.84" y="297.04475" transform="rotate(-0 51.84 297.04475)">2 000</text>
+    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #6b7480" x="51.84" y="295.692343" transform="rotate(-0 51.84 295.692343)">2 000</text>
    </g>
    <g id="text_6">
     <g id="patch_8">
-     <path d="M 49.6 259.768405 
-L 96.255 259.768405 
-L 96.255 239.288405 
-L 49.6 239.288405 
+     <path d="M 49.6 257.739794 
+L 96.255 257.739794 
+L 96.255 237.259794 
+L 49.6 237.259794 
 z
 " style="fill: #ffffff"/>
     </g>
-    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #6b7480" x="51.84" y="254.008405" transform="rotate(-0 51.84 254.008405)">3 000</text>
+    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #6b7480" x="51.84" y="251.979794" transform="rotate(-0 51.84 251.979794)">3 000</text>
    </g>
    <g id="text_7">
-    <text style="font-weight: 600; font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #0f1419" x="298.716522" y="167.77682" transform="rotate(-0 298.716522 167.77682)">rozdiel −1,3 %</text>
+    <text style="font-weight: 600; font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #0f1419" x="298.716522" y="167.77682" transform="rotate(-0 298.716522 167.77682)">rozdiel −0,9 %</text>
    </g>
   </g>
   <g id="axes_2">
@@ -150,11 +150,11 @@ z
   </g>
   <g id="text_11">
    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; fill: #6b7480" transform="translate(51.84 535.26674)">Zdroj: Residata — denné čítanie cenníkov novostavieb v Trenčianskom kraji.</text>
-   <text style="font-size: 16px; font-family: 'IBM Plex Sans'; fill: #6b7480" transform="translate(51.84 560.77049)">Dáta k 27. 9. 2026.</text>
+   <text style="font-size: 16px; font-family: 'IBM Plex Sans'; fill: #6b7480" transform="translate(51.84 560.77049)">Dáta k 30. 9. 2026.</text>
   </g>
   <g id="text_12">
-   <text style="font-size: 16px; font-family: 'IBM Plex Sans'; fill: #6b7480" transform="translate(51.84 475.26674)">Q3/2026 je do 27. 9. 2026. Cena predaných bytov je posledná cenníková cena bytu</text>
-   <text style="font-size: 16px; font-family: 'IBM Plex Sans'; fill: #6b7480" transform="translate(51.84 499.26674)">predtým, než z ponuky zmizol — nie cena z kúpnej zmluvy.</text>
+   <text style="font-size: 16px; font-family: 'IBM Plex Sans'; fill: #6b7480" transform="translate(51.84 475.26674)">Cena predaných bytov je posledná cenníková cena bytu predtým, než z ponuky</text>
+   <text style="font-size: 16px; font-family: 'IBM Plex Sans'; fill: #6b7480" transform="translate(51.84 499.26674)">zmizol — nie cena z kúpnej zmluvy.</text>
   </g>
   <g id="text_13">
    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #6b7480" x="72.64" y="443.11424" transform="rotate(-0 72.64 443.11424)">ponuková cena</text>

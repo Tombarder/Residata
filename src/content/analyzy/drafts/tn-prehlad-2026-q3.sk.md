@@ -2,7 +2,7 @@
 Prehľad trhu s novými bytmi v Trenčíne za 3. štvrťrok 2026: ponuka, dopyt a ceny podľa veľkosti bytu.
 -->
 <!--METHOD
-Údaje pochádzajú z verejne zverejnených cenníkov developerov, ktoré Residata číta denne, byt po byte. Ponuku tvoria voľné, rezervované a predrezervované byty v aktívnych projektoch v Trenčíne; samotných voľných je menej; počítajú sa výlučne byty, nie parkovanie, pivnice ani nebytové priestory. Ceny sú s DPH a sú priemerom za byty, pri ktorých developer cenu zverejňuje. Cenu za meter počítame na obytnú plochu. Úrovne ponuky a cien sú priemerom denných hodnôt za posledné dva týždne obdobia, aby jeden deň neurčoval celé číslo. Polovičné dispozície zaokrúhľujeme nadol — byt s dvoma a pol izbami je vedený ako dvojizbový, jeden a pol izby má vlastnú kategóriu. Mestské časti mimo Bratislavy developeri v cenníkoch neuvádzajú, preto je členenie podľa veľkosti bytu. Medzikvartálne zmeny počítame na rovnakej vzorke projektov, resp. bytov v oboch obdobiach — inak by rast nášho vlastného pokrytia vyzeral ako pohyb trhu. Predaj je byt, ktorý developer v cenníku označil ako predaný, alebo ktorý z cenníka zmizol a už sa naň nevrátil; rezervácie za predaj nepovažujeme. Prvých 7 dní po tom, čo projekt začneme sledovať, predaje nepočítame — cenník sa v tom čase ešte ustaľuje a zmiznutý byt je skôr opravou prvého čítania než predajom. Absorpcia je počet predaných bytov za obdobie k počtu bytov v ponuke ku koncu obdobia. Cena predaných bytov je posledná cenníková cena bytu pred tým, než z ponuky zmizol — nie cena z kúpnej zmluvy. S ponukovou cenou ju porovnávame vnútri tých istých projektov a projekty vážime počtom predajov — inak by rozdiel porovnával rôzne lokality, nie ceny. Mesačné a týždenné rady sú naše vlastné merania od mája 2026; staršiu históriu pre Trenčín nikto nezverejňuje, preto ju nedokresľujeme. Mesačné rady počítame len na projektoch, ktoré sledujeme od začiatku štvrťroka, aby rast nášho pokrytia nevyzeral ako pohyb trhu; týždenný rad cien počítame na tých istých bytoch po celé obdobie. Tabuľka cien podľa kategórií porovnáva aktuálny štvrťrok s predchádzajúcim na tých istých bytoch; medziročné porovnanie doplníme, keď budeme mať rok vlastných meraní.
+Údaje pochádzajú z verejne zverejnených cenníkov developerov, ktoré Residata číta denne, byt po byte. Ponuku tvoria voľné, rezervované a predrezervované byty v aktívnych projektoch v Trenčíne; samotných voľných je menej; počítajú sa výlučne byty, nie parkovanie, pivnice ani nebytové priestory. Za dokončené považujeme byty v projektoch, ktoré developer označuje za dokončené, alebo ktorých developerom uvedený termín kolaudácie už nastal; ak developer uvádza len štvrťrok, berieme jeho posledný deň. Ceny sú s DPH a sú priemerom za byty, pri ktorých developer cenu zverejňuje. Cenu za meter počítame na obytnú plochu. Úrovne ponuky a cien sú priemerom denných hodnôt za posledné dva týždne obdobia, aby jeden deň neurčoval celé číslo. Polovičné dispozície zaokrúhľujeme nadol — byt s dvoma a pol izbami je vedený ako dvojizbový, jeden a pol izby má vlastnú kategóriu. Mestské časti mimo Bratislavy developeri v cenníkoch neuvádzajú, preto je členenie podľa veľkosti bytu. Medzikvartálne zmeny počítame na rovnakej vzorke projektov, resp. bytov v oboch obdobiach — inak by rast nášho vlastného pokrytia vyzeral ako pohyb trhu. Predaj je byt, ktorý developer v cenníku označil ako predaný, alebo ktorý z cenníka zmizol a už sa naň nevrátil; rezervácie za predaj nepovažujeme. Prvých 7 dní po tom, čo projekt začneme sledovať, predaje nepočítame — cenník sa v tom čase ešte ustaľuje a zmiznutý byt je skôr opravou prvého čítania než predajom. Absorpcia je počet predaných bytov za obdobie k počtu bytov v ponuke ku koncu obdobia. Cena predaných bytov je posledná cenníková cena bytu pred tým, než z ponuky zmizol — nie cena z kúpnej zmluvy. S ponukovou cenou ju porovnávame vnútri tých istých projektov a projekty vážime počtom predajov — inak by rozdiel porovnával rôzne lokality, nie ceny. Mesačné a týždenné rady sú naše vlastné merania od mája 2026; staršiu históriu pre Trenčín nikto nezverejňuje, preto ju nedokresľujeme. Mesačné rady počítame len na projektoch, ktoré sledujeme od začiatku štvrťroka, aby rast nášho pokrytia nevyzeral ako pohyb trhu; týždenný rad cien počítame na tých istých bytoch po celé obdobie. Tabuľka cien podľa kategórií porovnáva aktuálny štvrťrok s predchádzajúcim na tých istých bytoch; medziročné porovnanie doplníme, keď budeme mať rok vlastných meraní.
 -->
 <!--SEOTITLE
 Novostavby Trenčín Q3/2026: ceny, ponuka a predaj
@@ -10,14 +10,14 @@ Novostavby Trenčín Q3/2026: ceny, ponuka a predaj
 <!--KEYWORDS
 novostavby Trenčín, ceny novostavieb Trenčín, nové byty Trenčín, predaj bytov Trenčín, analýza trhu novostavieb
 -->
-27. septembra 2026 | TRH NOVÝCH BYTOV — Trenčín
+30. septembra 2026 | TRH NOVÝCH BYTOV — Trenčín
 
 # Trenčín: trh nových bytov v 3. štvrťroku 2026
 
 ## Úvod
 
-- Dopyt: od 1. júla do 27. septembra 2026 sa predalo 64 bytov.
-- Priemerná cena v projektoch sa pohybuje na úrovni 3 998 €/m² s DPH.
+- Dopyt: za 3. štvrťrok 2026 sa predalo 68 bytov.
+- Priemerná cena v projektoch sa pohybuje na úrovni 3 997 €/m² s DPH.
 
 ## Ponuka
 
@@ -31,12 +31,11 @@ novostavby Trenčín, ceny novostavieb Trenčín, nové byty Trenčín, predaj b
 
 | Kategória | Voľné | z toho dokončené |
 |---|---:|---:|
-| 1-izb | 19 | 0 |
+| 1-izb | 18 | 0 |
 | 2-izb | 117 | 0 |
 | 3-izb | 91 | 0 |
-| 4-izb | 43 | 0 |
+| 4-izb | 44 | 0 |
 | 5 a viac | 3 | 0 |
-| (neuvedené) | 0 | 0 |
 | **celkom** | **273** | **0** |
 
 ![Podiel voľných bytov podľa kategórie](/analyzy/tn-prehlad-2026-q3-podiel-ponuka.svg)
@@ -44,29 +43,29 @@ novostavby Trenčín, ceny novostavieb Trenčín, nové byty Trenčín, predaj b
 
 ## Dopyt
 
-- Od 1. júla do 27. septembra 2026 sa predalo v Trenčíne 64 bytov.
-- Absorpcia trhu je 23,4 % — predané byty za obdobie k bytom v ponuke.
-- Najväčší záujem je o kategóriu 2-izb: 41,3 % predaných bytov.
+- Za 3. štvrťrok 2026 sa predalo v Trenčíne 68 bytov.
+- Absorpcia trhu je 24,9 % — predané byty za obdobie k bytom v ponuke.
+- Najväčší záujem je o kategóriu 2-izb: 41,8 % predaných bytov.
 - Podiel na predaji prevyšuje podiel na ponuke v kategóriách 1-izb, 4-izb a 5 a viac izieb.
 
-**Počet predaných bytov od 1. júla do 27. septembra 2026**
+**Počet predaných bytov za 3. štvrťrok 2026**
 
 | Kategória | Počet predaných bytov |
 |---|---:|
 | 1-izb | 8 |
-| 2-izb | 26 |
-| 3-izb | 15 |
+| 2-izb | 28 |
+| 3-izb | 17 |
 | 4-izb | 12 |
 | 5 a viac | 2 |
 | (neuvedené) | 1 |
-| **celkom** | **64** |
+| **celkom** | **68** |
 
 ![Počet predaných bytov podľa kategórie](/analyzy/tn-prehlad-2026-q3-podiel-predaj.svg)
 *Počet predaných bytov v 3. štvrťroku 2026 podľa kategórie.*
 
 ## Cena
 
-- Celková priemerná cena projektov v Trenčíne je 3 998 €/m² s DPH.
+- Celková priemerná cena projektov v Trenčíne je 3 997 €/m² s DPH.
 
 **Ceny nových bytov v Trenčíne v 3. štvrťroku 2026 podľa kategórií (€/m² s DPH)**
 
@@ -77,4 +76,4 @@ novostavby Trenčín, ceny novostavieb Trenčín, nové byty Trenčín, predaj b
 
 ## Výhľad
 
-Pri tempe predaja od 1. júla do 27. septembra 2026 — 22 bytov mesačne — by sa súčasná ponuka 273 bytov vypredala za 12,5 mesiaca. Dokončené byty v ponuke nie sú; kategória 2-izb tvorí 42,9 % ponuky a 41,3 % predaja.
+Pri tempe predaja za 3. štvrťrok 2026 — 22 bytov mesačne — by sa súčasná ponuka 273 bytov vypredala za 12,1 mesiaca. Dokončené byty v ponuke nie sú; kategória 2-izb tvorí 42,9 % ponuky a 41,8 % predaja.

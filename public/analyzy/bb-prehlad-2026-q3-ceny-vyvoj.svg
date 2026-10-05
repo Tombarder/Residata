@@ -41,43 +41,43 @@ z
     <g id="xtick_1">
      <g id="line2d_1"/>
      <g id="text_1">
-      <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #6b7480" x="110.950476" y="376.556" transform="rotate(-0 110.950476 376.556)">júl 2026</text>
+      <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #6b7480" x="109.905055" y="376.556" transform="rotate(-0 109.905055 376.556)">júl 2026</text>
      </g>
     </g>
     <g id="xtick_2">
      <g id="line2d_2"/>
      <g id="text_2">
-      <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #6b7480" x="321.602857" y="376.556" transform="rotate(-0 321.602857 376.556)">aug 2026</text>
+      <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #6b7480" x="304.353407" y="376.556" transform="rotate(-0 304.353407 376.556)">aug 2026</text>
      </g>
     </g>
     <g id="xtick_3">
      <g id="line2d_3"/>
      <g id="text_3">
-      <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #6b7480" x="532.255238" y="376.556" transform="rotate(-0 532.255238 376.556)">sep 2026</text>
+      <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #6b7480" x="498.801758" y="376.556" transform="rotate(-0 498.801758 376.556)">sep 2026</text>
      </g>
     </g>
    </g>
    <g id="matplotlib.axis_2">
     <g id="ytick_1">
      <g id="line2d_4">
-      <path d="M 51.84 333.670549 
-L 668.16 333.670549 
+      <path d="M 51.84 337.9294 
+L 668.16 337.9294 
 " clip-path="url(#pb2a8d058d8)" style="fill: none; stroke: #e3e7eb; stroke-linecap: square"/>
      </g>
      <g id="line2d_5"/>
     </g>
     <g id="ytick_2">
      <g id="line2d_6">
-      <path d="M 51.84 266.184249 
-L 668.16 266.184249 
+      <path d="M 51.84 265.342999 
+L 668.16 265.342999 
 " clip-path="url(#pb2a8d058d8)" style="fill: none; stroke: #e3e7eb; stroke-linecap: square"/>
      </g>
      <g id="line2d_7"/>
     </g>
     <g id="ytick_3">
      <g id="line2d_8">
-      <path d="M 51.84 198.697949 
-L 668.16 198.697949 
+      <path d="M 51.84 192.756599 
+L 668.16 192.756599 
 " clip-path="url(#pb2a8d058d8)" style="fill: none; stroke: #e3e7eb; stroke-linecap: square"/>
      </g>
      <g id="line2d_9"/>
@@ -89,53 +89,54 @@ L 668.16 356.076
 " style="fill: none; stroke: #e3e7eb; stroke-linejoin: miter; stroke-linecap: square"/>
    </g>
    <g id="line2d_10">
-    <path d="M 97.36 266.184249 
-L 144.926667 267.533975 
-L 192.493333 274.282605 
-L 240.06 270.90829 
-L 287.626667 277.65692 
-L 335.193333 277.65692 
-L 382.76 267.533975 
-L 430.326667 267.533975 
-L 477.893333 267.533975 
-L 525.46 156.856444 
-L 573.026667 154.831855 
-L 620.593333 341.768904 
-L 668.16 346.492945 
+    <path d="M 97.36 265.342999 
+L 141.267692 265.342999 
+L 185.175385 274.053368 
+L 229.083077 265.342999 
+L 272.990769 272.60164 
+L 316.898462 272.60164 
+L 360.806154 266.794727 
+L 404.713846 266.794727 
+L 448.621538 266.794727 
+L 492.529231 151.382351 
+L 536.436923 151.382351 
+L 580.344615 151.382351 
+L 624.252308 156.463399 
+L 668.16 192.030735 
 " clip-path="url(#pb2a8d058d8)" style="fill: none; stroke: #c2410c; stroke-width: 2.6; stroke-linecap: round"/>
    </g>
    <g id="text_4">
     <g id="patch_4">
-     <path d="M 49.6 335.910549 
-L 91.8875 335.910549 
-L 91.8875 315.430549 
-L 49.6 315.430549 
+     <path d="M 49.6 340.1694 
+L 91.8875 340.1694 
+L 91.8875 319.6894 
+L 49.6 319.6894 
 z
 " style="fill: #ffffff"/>
     </g>
-    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #6b7480" x="51.84" y="330.150549" transform="rotate(-0 51.84 330.150549)">−1 %</text>
+    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #6b7480" x="51.84" y="334.4094" transform="rotate(-0 51.84 334.4094)">−1 %</text>
    </g>
    <g id="text_5">
     <g id="patch_5">
-     <path d="M 49.6 268.424249 
-L 82.2875 268.424249 
-L 82.2875 247.944249 
-L 49.6 247.944249 
+     <path d="M 49.6 267.582999 
+L 82.2875 267.582999 
+L 82.2875 247.102999 
+L 49.6 247.102999 
 z
 " style="fill: #ffffff"/>
     </g>
-    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #6b7480" x="51.84" y="262.664249" transform="rotate(-0 51.84 262.664249)">0 %</text>
+    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #6b7480" x="51.84" y="261.822999" transform="rotate(-0 51.84 261.822999)">0 %</text>
    </g>
    <g id="text_6">
     <g id="patch_6">
-     <path d="M 49.6 200.937949 
-L 91.8875 200.937949 
-L 91.8875 180.457949 
-L 49.6 180.457949 
+     <path d="M 49.6 194.996599 
+L 91.8875 194.996599 
+L 91.8875 174.516599 
+L 49.6 174.516599 
 z
 " style="fill: #ffffff"/>
     </g>
-    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #6b7480" x="51.84" y="195.177949" transform="rotate(-0 51.84 195.177949)">+1 %</text>
+    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #6b7480" x="51.84" y="189.236599" transform="rotate(-0 51.84 189.236599)">+1 %</text>
    </g>
   </g>
   <g id="text_7">
@@ -147,7 +148,7 @@ z
   </g>
   <g id="text_9">
    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; fill: #6b7480" transform="translate(51.84 410.4389)">Zdroj: Residata — denné čítanie cenníkov novostavieb v Banskej Bystrici.</text>
-   <text style="font-size: 16px; font-family: 'IBM Plex Sans'; fill: #6b7480" transform="translate(51.84 435.94265)">Dáta k 27. 9. 2026.</text>
+   <text style="font-size: 16px; font-family: 'IBM Plex Sans'; fill: #6b7480" transform="translate(51.84 435.94265)">Dáta k 30. 9. 2026.</text>
   </g>
   <g id="text_10">
    <text style="font-weight: 500; font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #6b7480" x="51.84" y="135.3784" transform="rotate(-0 51.84 135.3784)">zmena, %</text>

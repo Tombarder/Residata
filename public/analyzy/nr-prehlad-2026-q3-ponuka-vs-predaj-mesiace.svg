@@ -74,8 +74,8 @@ L 668.16 261.057136
    <g id="patch_3">
     <path d="M 101.68 410.63744 
 L 286.401739 410.63744 
-L 286.401739 238.819531 
-L 101.68 238.819531 
+L 286.401739 238.869391 
+L 101.68 238.869391 
 z
 " clip-path="url(#paa519956a0)" style="fill: #689e9a"/>
    </g>
@@ -93,7 +93,7 @@ L 668.16 410.63744
 " style="fill: none; stroke: #e3e7eb; stroke-linejoin: miter; stroke-linecap: square"/>
    </g>
    <g id="text_2">
-    <text style="font-weight: 600; font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #4a726f" x="194.04087" y="231.299531" transform="rotate(-0 194.04087 231.299531)">3 446</text>
+    <text style="font-weight: 600; font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #4a726f" x="194.04087" y="231.349391" transform="rotate(-0 194.04087 231.349391)">3 445</text>
    </g>
    <g id="text_3">
     <text style="font-weight: 600; font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #0e4b47" x="403.392174" y="222.075412" transform="rotate(-0 403.392174 222.075412)">3 631</text>
@@ -149,11 +149,11 @@ z
    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #6b7480" x="51.84" y="136.36608" transform="rotate(-0 51.84 136.36608)">€/m² s DPH</text>
   </g>
   <g id="text_11">
-   <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #6b7480" x="51.84" y="559.26674" transform="rotate(-0 51.84 559.26674)">Zdroj: Residata — denné čítanie cenníkov novostavieb v Nitre. Dáta k 27. 9. 2026.</text>
+   <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #6b7480" x="51.84" y="559.26674" transform="rotate(-0 51.84 559.26674)">Zdroj: Residata — denné čítanie cenníkov novostavieb v Nitre. Dáta k 30. 9. 2026.</text>
   </g>
   <g id="text_12">
-   <text style="font-size: 16px; font-family: 'IBM Plex Sans'; fill: #6b7480" transform="translate(51.84 499.26674)">Q3/2026 je do 27. 9. 2026. Cena predaných bytov je posledná cenníková cena bytu</text>
-   <text style="font-size: 16px; font-family: 'IBM Plex Sans'; fill: #6b7480" transform="translate(51.84 523.26674)">predtým, než z ponuky zmizol — nie cena z kúpnej zmluvy.</text>
+   <text style="font-size: 16px; font-family: 'IBM Plex Sans'; fill: #6b7480" transform="translate(51.84 499.26674)">Cena predaných bytov je posledná cenníková cena bytu predtým, než z ponuky</text>
+   <text style="font-size: 16px; font-family: 'IBM Plex Sans'; fill: #6b7480" transform="translate(51.84 523.26674)">zmizol — nie cena z kúpnej zmluvy.</text>
   </g>
   <g id="text_13">
    <text style="font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #6b7480" x="72.64" y="467.11424" transform="rotate(-0 72.64 467.11424)">ponuková cena</text>

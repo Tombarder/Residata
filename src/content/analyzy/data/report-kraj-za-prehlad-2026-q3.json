@@ -1,6 +1,6 @@
 {
- "asOf": "2026-09-27",
- "generatedAt": "2026-09-28T13:15:12",
+ "asOf": "2026-09-30",
+ "generatedAt": "2026-10-06T00:49:38",
  "slug": "kraj-za-prehlad-2026-q3",
  "overview": {
   "scope": {
@@ -9,9 +9,11 @@
    "region_id": "sk-zilinsky",
    "subunit": "town",
    "code": "kraj-za",
+   "market": "sk",
    "in_sk": "v Žilinskom kraji",
    "gen_sk": "v Žilinskom kraji",
    "adj_sk": "žilinského kraja",
+   "acc_sk": "Žilinský kraj",
    "sub": {
     "header": "Obec",
     "by_sg": "podľa obce",
@@ -22,50 +24,51 @@
     "rel": "V lokalite {f} je podiel na predaji ({fs} %) najvýraznejšie nad podielom na ponuke ({fp} %); opačný pomer má {s} — {ss} % predaja pri {sp} % ponuky."
    }
   },
+  "fx": null,
   "history": "own",
   "quarter_start": "2026-07-01",
   "quarter_end": "2026-09-30",
-  "as_of": "2026-09-27",
+  "as_of": "2026-09-30",
   "smooth_days": 14,
   "sale_settling_days": 7,
   "rolling_days": 28,
   "prev_period_sales": 11,
-  "period_days": 89,
+  "period_days": 92,
   "okres_supply": {
    "Liptovský Mikuláš": {
-    "n": 227,
+    "n": 226,
     "done": 33,
     "building": 94,
-    "unknown": 100,
+    "unknown": 99,
     "projects": 6,
     "m2": 3975,
     "area": 63.9,
-    "price": 253051,
+    "price": 253107,
     "n_priced": 130,
     "p_priced": 4
    },
    "Žilina": {
     "n": 212,
-    "done": 34,
-    "building": 118,
+    "done": 54,
+    "building": 98,
     "unknown": 60,
     "projects": 10,
-    "m2": 4237,
+    "m2": 4246,
     "area": 64.2,
-    "price": 267904,
-    "n_priced": 153,
+    "price": 268695,
+    "n_priced": 151,
     "p_priced": 9
    },
    "Martin": {
-    "n": 102,
+    "n": 100,
     "done": 5,
-    "building": 45,
-    "unknown": 52,
+    "building": 44,
+    "unknown": 51,
     "projects": 3,
-    "m2": 3049,
+    "m2": 3050,
     "area": 60.7,
-    "price": 184448,
-    "n_priced": 53,
+    "price": 184510,
+    "n_priced": 52,
     "p_priced": 2
    },
    "Ružomberok": {
@@ -75,8 +78,8 @@
     "unknown": 0,
     "projects": 2,
     "m2": 3460,
-    "area": 54.3,
-    "price": 186195,
+    "area": 54.4,
+    "price": 186285,
     "n_priced": 53,
     "p_priced": 1
    },
@@ -105,7 +108,7 @@
     "projects": 2
    },
    "Liptovský Mikuláš": {
-    "n": 7,
+    "n": 8,
     "n_priced": 2,
     "m2": 3590,
     "projects": 4
@@ -117,88 +120,85 @@
     "projects": 1
    },
    "Dolný Kubín": {
-    "n": 1,
+    "n": 2,
     "n_priced": 0,
     "m2": null,
     "projects": 1
    }
   },
   "okres_price": {
-   "Liptovský Mikuláš": {
-    "m2_cur": 4053,
-    "m2_prev": 4089,
-    "chg_pct": -0.9,
-    "unit_days": 1092,
-    "units": 78,
-    "projects": 2
-   },
    "Martin": {
-    "m2_cur": 3048,
+    "m2_cur": 3052,
     "m2_prev": 3050,
-    "chg_pct": -0.1,
-    "unit_days": 724,
-    "units": 52,
+    "chg_pct": 0.1,
+    "units": 53,
     "projects": 2
    },
    "Ružomberok": {
-    "m2_cur": 3460,
+    "m2_cur": 3459,
     "m2_prev": 3459,
     "chg_pct": 0.0,
-    "unit_days": 747,
-    "units": 53,
+    "units": 54,
     "projects": 1
    },
    "Žilina": {
-    "m2_cur": 4155,
-    "m2_prev": 4201,
-    "chg_pct": -1.1,
-    "unit_days": 1307,
-    "units": 93,
+    "m2_cur": 4154,
+    "m2_prev": 4151,
+    "chg_pct": 0.1,
+    "units": 94,
     "projects": 6
+   },
+   "Liptovský Mikuláš": {
+    "m2_cur": 4053,
+    "m2_prev": 4043,
+    "chg_pct": 0.2,
+    "units": 78,
+    "projects": 2
    }
   },
   "projects": 23,
-  "mean_price": 240414,
+  "mean_price": 240692,
   "mean_area": 62.3,
   "panel_projects": 16,
-  "panel_units": 281,
+  "panel_units": 279,
   "panel_unit_projects": 11,
+  "panel_change_pct": 0.1,
   "rules": {
    "min_contributors": 3,
    "min_mean_n": 10
   },
   "panel_supply_prev": 426,
-  "panel_supply_cur": 420,
+  "panel_supply_cur": 418,
   "layout_supply": [
    {
     "k": "2-izb",
-    "n": 284,
-    "m2": 3943,
+    "n": 285,
+    "m2": 3947,
     "area": 52.0
    },
    {
     "k": "3-izb",
     "n": 191,
-    "m2": 3685,
+    "m2": 3688,
     "area": 73.7
    },
    {
     "k": "4-izb",
     "n": 67,
     "m2": 3911,
-    "area": 99.9
+    "area": 99.8
    },
    {
     "k": "1-izb",
     "n": 64,
-    "m2": 4191,
+    "m2": 4193,
     "area": 35.8
    },
    {
     "k": "(neuvedené)",
-    "n": 17,
-    "m2": 3652,
-    "area": 45.7
+    "n": 13,
+    "m2": 3648,
+    "area": 44.7
    },
    {
     "k": "5 a viac",
@@ -210,13 +210,13 @@
   "layout_sales": [
    {
     "k": "2-izb",
-    "n": 36,
+    "n": 37,
     "m2": "3572",
-    "area": "47.7"
+    "area": "47.8"
    },
    {
     "k": "3-izb",
-    "n": 25,
+    "n": 26,
     "m2": "3584",
     "area": "74.2"
    },
@@ -241,191 +241,203 @@
   ],
   "own_quarters": {
    "2026Q2": 3777,
-   "2026Q3": 3882
+   "2026Q3": 3885
   },
-  "quarter_sales": 74,
+  "quarter_sales": 76,
   "quarter_sold_m2": 3611,
-  "quarter_ask_m2": 3882,
+  "quarter_ask_m2": 3885,
   "price_series": [
    {
     "wk": "2026-06-15",
-    "m2_done": "4100",
-    "m2_building": "3713",
-    "m2_all": "3793",
-    "n_all": 288,
-    "u_done": 65,
-    "u_building": 220,
+    "m2_done": "4087",
+    "m2_building": "3654",
+    "m2_all": "3776",
+    "n_all": 285,
+    "u_done": 85,
+    "u_building": 197,
     "p_all": 11,
-    "p_done": 5,
-    "p_building": 6
+    "p_done": 6,
+    "p_building": 5
    },
    {
     "wk": "2026-06-22",
-    "m2_done": "4100",
-    "m2_building": "3713",
-    "m2_all": "3793",
-    "n_all": 288,
-    "u_done": 65,
-    "u_building": 220,
+    "m2_done": "4087",
+    "m2_building": "3654",
+    "m2_all": "3776",
+    "n_all": 285,
+    "u_done": 85,
+    "u_building": 197,
     "p_all": 11,
-    "p_done": 5,
-    "p_building": 6
+    "p_done": 6,
+    "p_building": 5
    },
    {
     "wk": "2026-06-29",
-    "m2_done": "4100",
-    "m2_building": "3715",
-    "m2_all": "3796",
-    "n_all": 285,
-    "u_done": 65,
-    "u_building": 217,
+    "m2_done": "4087",
+    "m2_building": "3656",
+    "m2_all": "3779",
+    "n_all": 282,
+    "u_done": 85,
+    "u_building": 194,
     "p_all": 11,
-    "p_done": 5,
-    "p_building": 6
+    "p_done": 6,
+    "p_building": 5
    },
    {
     "wk": "2026-07-06",
-    "m2_done": "4100",
-    "m2_building": "3715",
-    "m2_all": "3796",
-    "n_all": 285,
-    "u_done": 65,
-    "u_building": 217,
+    "m2_done": "4087",
+    "m2_building": "3656",
+    "m2_all": "3779",
+    "n_all": 282,
+    "u_done": 85,
+    "u_building": 194,
     "p_all": 11,
-    "p_done": 5,
-    "p_building": 6
+    "p_done": 6,
+    "p_building": 5
    },
    {
     "wk": "2026-07-13",
-    "m2_done": "4100",
-    "m2_building": "3717",
-    "m2_all": "3796",
-    "n_all": 285,
-    "u_done": 65,
-    "u_building": 217,
+    "m2_done": "4087",
+    "m2_building": "3657",
+    "m2_all": "3780",
+    "n_all": 282,
+    "u_done": 85,
+    "u_building": 194,
     "p_all": 11,
-    "p_done": 5,
-    "p_building": 6
+    "p_done": 6,
+    "p_building": 5
    },
    {
     "wk": "2026-07-20",
-    "m2_done": "4100",
-    "m2_building": "3709",
-    "m2_all": "3791",
+    "m2_done": "4087",
+    "m2_building": "3658",
+    "m2_all": "3780",
     "n_all": 283,
-    "u_done": 65,
-    "u_building": 215,
+    "u_done": 85,
+    "u_building": 195,
     "p_all": 11,
-    "p_done": 5,
-    "p_building": 6
+    "p_done": 6,
+    "p_building": 5
    },
    {
     "wk": "2026-07-27",
-    "m2_done": "4100",
-    "m2_building": "3709",
-    "m2_all": "3791",
+    "m2_done": "4087",
+    "m2_building": "3658",
+    "m2_all": "3780",
     "n_all": 283,
-    "u_done": 65,
-    "u_building": 215,
+    "u_done": 85,
+    "u_building": 195,
     "p_all": 11,
-    "p_done": 5,
-    "p_building": 6
+    "p_done": 6,
+    "p_building": 5
    },
    {
     "wk": "2026-08-03",
-    "m2_done": "4121",
-    "m2_building": "3703",
-    "m2_all": "3789",
+    "m2_done": "4103",
+    "m2_building": "3652",
+    "m2_all": "3778",
     "n_all": 283,
-    "u_done": 63,
-    "u_building": 217,
+    "u_done": 83,
+    "u_building": 197,
     "p_all": 11,
-    "p_done": 5,
-    "p_building": 6
+    "p_done": 6,
+    "p_building": 5
    },
    {
     "wk": "2026-08-10",
-    "m2_done": "4121",
-    "m2_building": "3692",
+    "m2_done": "4103",
+    "m2_building": "3656",
     "m2_all": "3780",
     "n_all": 283,
-    "u_done": 63,
-    "u_building": 217,
+    "u_done": 83,
+    "u_building": 197,
     "p_all": 11,
-    "p_done": 5,
-    "p_building": 6
+    "p_done": 6,
+    "p_building": 5
    },
    {
     "wk": "2026-08-17",
-    "m2_done": "4121",
-    "m2_building": "3697",
+    "m2_done": "4103",
+    "m2_building": "3661",
     "m2_all": "3784",
     "n_all": 281,
-    "u_done": 63,
-    "u_building": 215,
+    "u_done": 83,
+    "u_building": 195,
     "p_all": 11,
-    "p_done": 5,
-    "p_building": 6
+    "p_done": 6,
+    "p_building": 5
    },
    {
     "wk": "2026-08-24",
-    "m2_done": "4121",
-    "m2_building": "3697",
+    "m2_done": "4103",
+    "m2_building": "3661",
     "m2_all": "3784",
     "n_all": 281,
-    "u_done": 63,
-    "u_building": 215,
+    "u_done": 83,
+    "u_building": 195,
     "p_all": 11,
-    "p_done": 5,
-    "p_building": 6
+    "p_done": 6,
+    "p_building": 5
    },
    {
     "wk": "2026-08-31",
-    "m2_done": "4126",
-    "m2_building": "3699",
+    "m2_done": "4106",
+    "m2_building": "3663",
     "m2_all": "3786",
     "n_all": 279,
-    "u_done": 62,
-    "u_building": 214,
+    "u_done": 82,
+    "u_building": 194,
     "p_all": 11,
-    "p_done": 5,
-    "p_building": 6
+    "p_done": 6,
+    "p_building": 5
    },
    {
     "wk": "2026-09-07",
-    "m2_done": "4126",
-    "m2_building": "3699",
+    "m2_done": "4106",
+    "m2_building": "3663",
     "m2_all": "3786",
     "n_all": 279,
-    "u_done": 62,
-    "u_building": 214,
+    "u_done": 82,
+    "u_building": 194,
     "p_all": 11,
-    "p_done": 5,
-    "p_building": 6
+    "p_done": 6,
+    "p_building": 5
    },
    {
     "wk": "2026-09-14",
-    "m2_done": "4126",
-    "m2_building": "3699",
+    "m2_done": "4106",
+    "m2_building": "3663",
     "m2_all": "3787",
     "n_all": 277,
-    "u_done": 62,
-    "u_building": 212,
+    "u_done": 82,
+    "u_building": 192,
     "p_all": 11,
-    "p_done": 5,
-    "p_building": 6
+    "p_done": 6,
+    "p_building": 5
    },
    {
     "wk": "2026-09-21",
-    "m2_done": "4126",
-    "m2_building": "3698",
+    "m2_done": "4108",
+    "m2_building": "3663",
     "m2_all": "3787",
     "n_all": 276,
-    "u_done": 62,
-    "u_building": 211,
+    "u_done": 81,
+    "u_building": 192,
     "p_all": 11,
-    "p_done": 5,
-    "p_building": 6
+    "p_done": 6,
+    "p_building": 5
+   },
+   {
+    "wk": "2026-09-28",
+    "m2_done": "4114",
+    "m2_building": "3663",
+    "m2_all": "3787",
+    "n_all": 275,
+    "u_done": 80,
+    "u_building": 192,
+    "p_all": 11,
+    "p_done": 6,
+    "p_building": 5
    }
   ],
   "project_supply": [
@@ -447,11 +459,11 @@
    },
    {
     "project_id": "kastiel-revay",
-    "n": 49
+    "n": 48
    },
    {
     "project_id": "novy-martin",
-    "n": 48
+    "n": 47
    },
    {
     "project_id": "na-studnickach",
@@ -483,7 +495,7 @@
    },
    {
     "project_id": "bohunka",
-    "n": 15
+    "n": 14
    },
    {
     "project_id": "kvetnica",
@@ -532,9 +544,9 @@
    },
    {
     "qkey": "2026Q3",
-    "n": 74,
+    "n": 76,
     "first_sale": "2026-07-06",
-    "last_sale": "2026-09-24",
+    "last_sale": "2026-09-30",
     "observed_from": "2026-05-16"
    }
   ],
@@ -556,7 +568,7 @@
    },
    {
     "m": "2026-09-01",
-    "n": 29,
+    "n": 31,
     "observed_from": "2026-05-16"
    }
   ],
@@ -600,7 +612,7 @@
    },
    {
     "m": "2026-09-01",
-    "n": 20
+    "n": 21
    }
   ],
   "panel_month_projects": 17,
@@ -612,12 +624,12 @@
    "projects": 17
   },
   "completion_m2": {
-   "m2_done": 4124,
-   "m2_building": 3645,
-   "n_done": 62,
-   "n_building": 233,
-   "p_done": 5,
-   "p_building": 6
+   "m2_done": 4107,
+   "m2_building": 3611,
+   "n_done": 82,
+   "n_building": 211,
+   "p_done": 6,
+   "p_building": 5
   },
   "figures": {
    "podiel-ponuka": true,

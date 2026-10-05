@@ -220,7 +220,7 @@ z
    </g>
    <g id="line2d_21">
     <path d="M 619.618494 151.700896 
-L 635.3136 151.957238 
+L 635.3136 152.128133 
 " clip-path="url(#p9ca6752579)" style="fill: none; stroke: #c2410c; stroke-width: 2.6; stroke-linecap: round"/>
     <defs>
      <path id="m40e161e3e8" d="M 0 2.5 
@@ -237,7 +237,7 @@ z
     </defs>
     <g clip-path="url(#p9ca6752579)">
      <use xlink:href="#m40e161e3e8" x="619.618494" y="151.700896" style="fill: #ffffff; stroke: #c2410c; stroke-width: 2"/>
-     <use xlink:href="#m40e161e3e8" x="635.3136" y="151.957238" style="fill: #ffffff; stroke: #c2410c; stroke-width: 2"/>
+     <use xlink:href="#m40e161e3e8" x="635.3136" y="152.128133" style="fill: #ffffff; stroke: #c2410c; stroke-width: 2"/>
     </g>
    </g>
    <g id="line2d_22">
@@ -315,14 +315,14 @@ z
    </g>
    <g id="text_15">
     <g id="patch_9">
-     <path d="M 612.3061 144.397238 
-L 658.3211 144.397238 
-L 658.3211 124.557238 
-L 612.3061 124.557238 
+     <path d="M 612.3061 144.568133 
+L 658.3211 144.568133 
+L 658.3211 124.728133 
+L 612.3061 124.728133 
 z
 " style="fill: #ffffff"/>
     </g>
-    <text style="font-weight: 600; font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #c2410c" x="635.3136" y="138.957238" transform="rotate(-0 635.3136 138.957238)">5 705</text>
+    <text style="font-weight: 600; font-size: 16px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #c2410c" x="635.3136" y="139.128133" transform="rotate(-0 635.3136 139.128133)">5 699</text>
    </g>
    <g id="line2d_23">
     <defs>

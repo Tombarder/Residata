@@ -41,19 +41,19 @@ z
     <g id="xtick_1">
      <g id="line2d_1"/>
      <g id="text_1">
-      <text style="font-size: 11.8px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #6b7480" x="52.86599" y="261.55104" transform="rotate(-0 52.86599 261.55104)">júl</text>
+      <text style="font-size: 11.8px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #6b7480" x="52.495407" y="261.55104" transform="rotate(-0 52.495407 261.55104)">júl</text>
      </g>
     </g>
     <g id="xtick_2">
      <g id="line2d_2"/>
      <g id="text_2">
-      <text style="font-size: 11.8px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #6b7480" x="127.538643" y="261.55104" transform="rotate(-0 127.538643 261.55104)">aug</text>
+      <text style="font-size: 11.8px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #6b7480" x="121.424009" y="261.55104" transform="rotate(-0 121.424009 261.55104)">aug</text>
      </g>
     </g>
     <g id="xtick_3">
      <g id="line2d_3"/>
      <g id="text_3">
-      <text style="font-size: 11.8px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #6b7480" x="202.211295" y="261.55104" transform="rotate(-0 202.211295 261.55104)">sep</text>
+      <text style="font-size: 11.8px; font-family: 'IBM Plex Sans'; text-anchor: middle; fill: #6b7480" x="190.352611" y="261.55104" transform="rotate(-0 190.352611 261.55104)">sep</text>
      </g>
     </g>
    </g>
@@ -90,50 +90,53 @@ L 250.3872 244.34704
    </g>
    <g id="line2d_10">
     <path d="M 48.0484 193.37016 
-L 64.909967 193.37016 
-L 81.771533 184.806044 
-L 98.6331 188.47638 
-L 115.494667 188.47638 
-L 132.356233 188.47638 
-L 149.2178 187.252934 
-L 166.079367 180.727894 
-L 182.940933 180.727894 
-L 199.8025 178.281004 
-L 216.664067 176.241928 
-L 233.525633 184.806044 
-L 250.3872 179.096634 
+L 63.612923 191.7389 
+L 79.177446 183.174784 
+L 94.741969 187.252934 
+L 110.306492 186.437304 
+L 125.871015 187.252934 
+L 141.435538 185.621674 
+L 157.000062 179.096634 
+L 172.564585 179.096634 
+L 188.129108 176.241928 
+L 203.693631 173.795038 
+L 219.258154 179.912264 
+L 234.822677 173.795038 
+L 250.3872 173.795038 
 " clip-path="url(#pf542137153)" style="fill: none; stroke: #c2410c; stroke-width: 2.6; stroke-linecap: round"/>
    </g>
    <g id="line2d_11">
     <path d="M 48.0484 193.37016 
-L 64.909967 188.068564 
-L 81.771533 181.135709 
-L 98.6331 184.398229 
-L 115.494667 188.068564 
-L 132.356233 184.398229 
-L 149.2178 184.398229 
-L 166.079367 162.376217 
-L 182.940933 166.046552 
-L 199.8025 166.862182 
-L 216.664067 166.862182 
-L 233.525633 164.823107 
-L 250.3872 164.007477 
+L 63.612923 191.7389 
+L 79.177446 188.068564 
+L 94.741969 191.7389 
+L 110.306492 195.00142 
+L 125.871015 193.37016 
+L 141.435538 194.18579 
+L 157.000062 172.571593 
+L 172.564585 176.241928 
+L 188.129108 177.057558 
+L 203.693631 175.426298 
+L 219.258154 173.795038 
+L 234.822677 171.755963 
+L 250.3872 171.755963 
 " clip-path="url(#pf542137153)" style="fill: none; stroke: #0e4b47; stroke-width: 2; stroke-linecap: round"/>
    </g>
    <g id="line2d_12">
     <path d="M 48.0484 193.37016 
-L 64.909967 195.81705 
-L 81.771533 187.660749 
-L 98.6331 190.92327 
-L 115.494667 190.10764 
-L 132.356233 190.92327 
-L 149.2178 190.92327 
-L 166.079367 186.845119 
-L 182.940933 184.806044 
-L 199.8025 181.543524 
-L 216.664067 178.281004 
-L 233.525633 176.649743 
-L 250.3872 172.571593 
+L 63.612923 191.7389 
+L 79.177446 182.359154 
+L 94.741969 186.845119 
+L 110.306492 186.029489 
+L 125.871015 186.845119 
+L 141.435538 185.213859 
+L 157.000062 180.727894 
+L 172.564585 179.096634 
+L 188.129108 176.649743 
+L 203.693631 173.387223 
+L 219.258154 166.454367 
+L 234.822677 162.376217 
+L 250.3872 164.007477 
 " clip-path="url(#pf542137153)" style="fill: none; stroke: #689e9a; stroke-width: 2; stroke-linecap: round"/>
    </g>
    <g id="text_4">
@@ -182,7 +185,7 @@ z
   <g id="text_9">
    <text style="font-size: 11.8px; font-family: 'IBM Plex Sans'; fill: #6b7480" transform="translate(13.4784 329.442309)">Zdroj: Residata — denné čítanie</text>
    <text style="font-size: 11.8px; font-family: 'IBM Plex Sans'; fill: #6b7480" transform="translate(13.4784 348.251324)">cenníkov novostavieb na Slovensku.</text>
-   <text style="font-size: 11.8px; font-family: 'IBM Plex Sans'; fill: #6b7480" transform="translate(13.4784 365.951324)">Dáta k 27. 9. 2026.</text>
+   <text style="font-size: 11.8px; font-family: 'IBM Plex Sans'; fill: #6b7480" transform="translate(13.4784 365.951324)">Dáta k 30. 9. 2026.</text>
   </g>
   <g id="text_10">
    <text style="font-size: 11.8px; font-family: 'IBM Plex Sans'; text-anchor: start; fill: #6b7480" x="35.3084" y="283.30984" transform="rotate(-0 35.3084 283.30984)">celá ponuka</text>
