@@ -703,7 +703,13 @@ function readingsWorld(st) {
     },
     from: () => {
       const b = { select() { return b; }, order() { return b; },
-        range() { st.dayReads += 1; const d = st.days; st.afterDays?.(); return Promise.resolve({ data: d, error: null }); } };
+        range() {
+          st.dayReads += 1;
+          if (st.daysFail?.(st.dayReads)) return Promise.resolve({ data: null, error: { message: "timeout" } });
+          const d = st.days;
+          st.afterDays?.();
+          return Promise.resolve({ data: d, error: null });
+        } };
       return b;
     },
   };
@@ -773,6 +779,34 @@ test("a partial snapshot as big as a reading has the days read again once, not a
   reads = st.dayReads;
   for (let k = 0; k < 3; k += 1) { w.advance(16 * MIN); await w.load(); }
   assert.equal(st.dayReads - reads, 4);
+});
+
+test("a check that cannot read the days again for a reading the facts hold checks again within a minute", async () => {
+  const st = { days: [{ day: "2026-10-02", country: "SK", readings: 1 }], facts: [["SK", "2026-10-02", 7500]], cube: [["SK", "2026-10", 7500]] };
+  const w = readingsWorld(st);
+  await w.load();
+  w.advance(16 * MIN);
+  let failFrom = null;
+  st.afterDays = () => {                                                    // the 6th approved between the reads
+    st.afterDays = null;
+    st.days = [{ day: "2026-10-06", country: "SK", readings: 1 }, ...st.days];
+    st.facts = [...st.facts, ["SK", "2026-10-06", 7500]];
+    st.cube = [["SK", "2026-10", 15000]];                                   // and refreshed: no lag
+    failFrom = st.dayReads + 1;
+  };
+  st.daysFail = (n) => failFrom != null && n >= failFrom && n < failFrom + 2;   // and the days' second read fails
+  const e = await w.load();
+  assert.ok(!e.days.SK.has("2026-10-06") && e.holding.facts.get("SK").has("2026-10-06"), "the days lack what the facts hold");
+  st.daysFail = null;
+  w.advance(61 * 1000);
+  const next = await w.load();
+  assert.ok(next.days.SK.has("2026-10-06"), "a minute on, read again");
+  assert.equal(e.aheadOpen, true);
+  assert.ok(!next.aheadOpen);
+  w.advance(5 * MIN);
+  const reads = st.dayReads;
+  await w.load();
+  assert.equal(st.dayReads, reads, "then kept as long as ever");
 });
 
 test("records read while a reading lands between the two reads of the check after them are not divided without it", async () => {

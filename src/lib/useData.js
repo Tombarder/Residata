@@ -1683,6 +1683,8 @@ const ARCHIVE_READINGS_LAG_WINDOW_MS = 15 * 60 * 1000;
 const ARCHIVE_READINGS_CHECK_MS = 60 * 1000;   // each check a no-op while the kept answer is current
 const _backoff = (n) => Math.min(ARCHIVE_READINGS_TTL_MS, ARCHIVE_READINGS_LAG_TTL_MS * 2 ** Math.max(0, n));
 const _readingsTtl = (entry) => {
+  // a day the facts hold as a reading that the days lack, not read again: a minute
+  if (entry.aheadOpen) return ARCHIVE_READINGS_LAG_TTL_MS;
   if (entry.holdingFailed) return _backoff((entry.failures || 1) - 1);
   if (entry.lagging) return entry.lagLate ? _backoff(entry.lagLate) : ARCHIVE_READINGS_LAG_TTL_MS;
   return ARCHIVE_READINGS_TTL_MS;
@@ -1758,15 +1760,17 @@ function _loadArchiveReadings(key, force = false, within = 0) {
       // The facts holding a day of a newest month as big as a reading that the days do not:
       // one approved between the two reads. The days are read again and, if they moved, the
       // check starts over with them — not divided by days that lack a reading the facts hold.
+      let aheadOpen = false;                       // days ahead the days could not be read for
       const daysBehind = async (h) => {
-        if (attempt > 0 || !h?.factsAhead?.size) return false;
+        if (!h?.factsAhead?.size) return false;
         // the same days ahead, with the same rows, that a read of the days found no reading
         // of: not read again (a partial snapshot of the projects a reading missed may stay)
         const ahead = `${daysSig}|${[...h.factsAhead].sort().map(([c, ds]) =>
           `${c}:${ds.map((d) => `${d}=${h.factsRows?.get(c)?.get(d) ?? ""}`).join(";")}`).join(",")}`;
         if (_archiveReadingsAheadSeen.get(key) === ahead) return false;
+        if (attempt > 0) { aheadOpen = true; return false; }
         const again = await readDays();
-        if (again.error) return false;
+        if (again.error) { aheadOpen = true; return false; }
         if (readingsSignature(readingDaysByCountry(again.data)) === daysSig) {
           _archiveReadingsAheadSeen.set(key, ahead);
           return false;
@@ -1841,7 +1845,7 @@ function _loadArchiveReadings(key, force = false, within = 0) {
       const failures = failed ? (entry.failures || 0) + (force ? 0 : 1) : 0;
       const at = failed && force ? entry.at : now;
       if (entry.holdingKnown && !cubeMoved) {        // nothing moved: the same entry, kept longer
-        Object.assign(entry, { holdingFailed: failed, failures, lagging, ...lag, at, factsAt: now });
+        Object.assign(entry, { holdingFailed: failed, failures, lagging, ...lag, at, factsAt: now, aheadOpen });
         return entry;
       }
       if (cubeMoved || (kept && !sameDays)) _dropArchiveGrains();
@@ -1854,7 +1858,7 @@ function _loadArchiveReadings(key, force = false, within = 0) {
         ...entry, holding, holdingSig, holdingKnown: true, holdingFailed: failed, failures,
         lagging, ...lag, cubeGen, version: `${daysSig}/${cubeGen}`, at, ...prev,
         // the facts' side, and when it was last read: what a forced read compares
-        factsSig, factsAt: failed && !factsOnly ? 0 : now,
+        factsSig, factsAt: failed && !factsOnly ? 0 : now, aheadOpen,
       };
       _archiveReadingsCache.set(key, entry);
       _publishReadings(key);
