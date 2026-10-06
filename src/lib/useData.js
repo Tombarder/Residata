@@ -1796,12 +1796,22 @@ function _loadArchiveReadings(key, force = false, within = 0) {
           sbRead(supabaseData.rpc("analytics_pivot", { p_spec: specs.cube })),
           factsRead || sbRead(supabaseData.rpc("analytics_pivot", { p_spec: specs.facts })),
         ]);
-        if (cube.error || facts.error) { console.error("[archive readings] what the cube holds", cube.error || facts.error); failed = true; }
-        else holding = archiveHolding(specs.from, cube.data, facts.data, days);
+        if (cube.error || facts.error) {
+          console.error("[archive readings] what the cube holds", cube.error || facts.error);
+          failed = true;
+          // A forced read that found the facts moved, the cube unreadable: the facts as read,
+          // the cube as last held. The records are the facts; kept with a holding that lacks
+          // a day they hold, they counted it against a reading too few until the cube was back.
+          if (factsRead && !facts.error && entry.holdingKnown && entry.holding) {
+            const cubeRows = [...(entry.holding.cubeTotals || [])].map(([k, n]) => ({ d: k.split("|"), m: { n } }));
+            holding = archiveHolding(specs.from, cubeRows, facts.data, days);
+          }
+        } else holding = archiveHolding(specs.from, cube.data, facts.data, days);
       }
       if (await daysBehind(holding)) continue;
       const now = startedAt;
-      if (failed && entry.holdingKnown) {
+      const factsOnly = failed && !!holding;       // the facts read, the cube as last held
+      if (failed && !factsOnly && entry.holdingKnown) {
         entry.holdingFailed = true;
         if (!force) {                                // a forced read is no step of the backoff
           entry.failures = (entry.failures || 0) + 1;
@@ -1811,13 +1821,15 @@ function _loadArchiveReadings(key, force = false, within = 0) {
       }
       const holdingSig = holdingSignature(holding);
       const factsSig = holdingFactsSignature(holding, days);
-      const cubeMoved = entry.holdingKnown && !failed && (entry.holdingSig !== holdingSig || entry.factsSig !== factsSig);
+      const cubeMoved = entry.holdingKnown && (!failed || factsOnly) && (entry.holdingSig !== holdingSig || entry.factsSig !== factsSig);
       const lagging = holdingLags(days, holding);
       // a forced read (the archive's records asking) is no step of a long lag's spacing
       const lag = force && lagging && entry.lagging ? { lagSince: entry.lagSince, lagLate: entry.lagLate } : _lagState(lagging, entry, now);
-      const failures = failed ? (entry.failures || 0) + 1 : 0;
+      // a forced read is no step of the backoff, nor dates the cube's check
+      const failures = failed ? (entry.failures || 0) + (force ? 0 : 1) : 0;
+      const at = failed && force ? entry.at : now;
       if (entry.holdingKnown && !cubeMoved) {        // nothing moved: the same entry, kept longer
-        Object.assign(entry, { holdingFailed: false, failures, lagging, ...lag, at: now, factsAt: now });
+        Object.assign(entry, { holdingFailed: failed, failures, lagging, ...lag, at, factsAt: now });
         return entry;
       }
       if (cubeMoved || (kept && !sameDays)) _dropArchiveGrains();
@@ -1828,9 +1840,9 @@ function _loadArchiveReadings(key, force = false, within = 0) {
         ? { prevVersion: kept.version, prevHolding: kept.holding } : { prevVersion: entry.prevVersion, prevHolding: entry.prevHolding };
       entry = {
         ...entry, holding, holdingSig, holdingKnown: true, holdingFailed: failed, failures,
-        lagging, ...lag, cubeGen, version: `${daysSig}/${cubeGen}`, at: now, ...prev,
+        lagging, ...lag, cubeGen, version: `${daysSig}/${cubeGen}`, at, ...prev,
         // the facts' side, and when it was last read: what a forced read compares
-        factsSig, factsAt: failed ? 0 : now,
+        factsSig, factsAt: failed && !factsOnly ? 0 : now,
       };
       _archiveReadingsCache.set(key, entry);
       _publishReadings(key);

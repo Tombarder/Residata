@@ -695,6 +695,7 @@ function readingsWorld(st) {
     rpc: async (_n, { p_spec }) => {
       if (p_spec.dims[1] === "snapshot_month") {
         st.cubeAsks += 1;
+        if (st.cubeFails) return { data: null, error: { message: "timeout" } };
         return { data: st.cube.map(([c, m, n]) => ({ d: [c, m], m: { n } })), error: null };
       }
       st.factsAsks += 1;
@@ -933,6 +934,48 @@ test("a retry approved while the records are paged asks for them again, not kept
   assert.equal(ids.length - new Set(ids).size, 0, "no row twice");
   assert.equal(got.flats.filter((r) => r.id.startsWith("r")).length, 100, "the retry's rows");
   assert.equal(projectFlats(got, "P"), 100);
+});
+
+// ── the facts catch up with a reading while the cube cannot be read ──
+// A forced read (the records asking) found the facts moved and the cube's question
+// failing: it kept the old holding, which lacks the day, so the records holding that
+// day's rows were divided without it — 15 000 for 7 500 — until the cube was back.
+test("records read while the cube cannot be read are divided by the facts as read", async () => {
+  const octRowsOf = (day, n) => Array.from({ length: n }, (_, i) => ({ id: `${day}-${i}`, country: "SK", batch_timestamp: `${day}T05:00:00+00:00`, snapshot_month: "2026-10" }));
+  const st = { days: [{ day: "2026-10-02", country: "SK", readings: 1 }, { day: "2026-10-05", country: "SK", readings: 1 }],
+    facts: [["SK", "2026-10-02", 7500]], cube: [["SK", "2026-10", 7500]] };      // the 5th's sync failed
+  const w = readingsWorld(st);
+  const db = { rows: octRowsOf("2026-10-02", 7500) };
+  const render = flatsHarness(db, "SK");
+  const before = await w.load();
+  // 09:05 the resync drains the 5th into the facts; the cube's question fails for a while
+  w.advance(5 * MIN);
+  st.facts.push(["SK", "2026-10-05", 7500]);
+  db.rows = [...octRowsOf("2026-10-05", 7500), ...db.rows];
+  st.cubeFails = true;
+  const shown = (g) => Math.round(weightedCount(g.flats, archiveRecordCells(heldReadingDays(g.stamp.days, g.stamp.holding, false),
+    archiveReadingScope([{ key: "snapshot_month", mode: "in", values: ["2026-10"] }]), ["project_name"])));
+  let got = null;
+  for (let k = 0; k < 3; k += 1) {
+    render(["2026-10"], null, true, w.stampOf(w.latest()));
+    await settle();
+    got = render(["2026-10"], null, true, w.stampOf(w.latest()));
+  }
+  assert.equal(got.flats.length, 15000);
+  assert.equal(shown(got), 7500, "the 5th's rows divided by the 5th's reading");
+  const e = w.latest();
+  assert.equal(e.holdingFailed, true, "the cube still to be read");
+  assert.ok(e.holding.facts.get("SK").has("2026-10-05"));
+  assert.equal(e.holding.cubeTotals.get("SK|2026-10"), 7500, "the cube as last held");
+  assert.equal(e.failures, before.failures, "no step of the backoff");
+  assert.equal(e.at, before.at, "the cube's check keeps its time");
+  // the cube back: the next check reads it
+  st.cubeFails = false;
+  st.cube = [["SK", "2026-10", 15000]];
+  w.advance(MIN);
+  const after = await w.load();
+  assert.equal(after.holdingFailed, false);
+  assert.equal(after.holding.cubeTotals.get("SK|2026-10"), 15000);
 });
 
 // ── W3: a records load costs one read of the days and the facts, not two of everything ──
