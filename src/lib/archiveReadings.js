@@ -242,9 +242,15 @@ export function weightedCount(recs, recordCell, pred) {
  * What the cube holds is read from what already answers: analytics_pivot over the cube by
  * market and month, and over the facts by market and day, for each market's newest month
  * (holdingSpecs). The cube is the facts at its last refresh, and readings arrive in day
- * order, so the cube holds a market's days up to the longest run of them whose facts add
- * up to no more than its month total (archiveHolding). A day the facts do not hold either
- * — its sync failed — is held by neither. Older months are held by both.
+ * order, so the cube holds a market's days in order for as long as its month total covers
+ * at least HALF of each next day's rows (archiveHolding). Not all of them: the facts can
+ * grow by a few rows without a refresh — a resync drained on a morning without one, a
+ * refresh that failed (the cube was 26 rows behind on 2026-08-26) — and requiring every
+ * row dropped the month's last reading while the cube held it: SK November, read on the
+ * 2nd and the 6th with 26 rows resynced into the 2nd, read 15 000 for 7 500. Half a
+ * reading's rows tell a reading the cube holds from one it does not; a retry of a few
+ * projects or a late sibling moves neither. A day the facts do not hold either — its sync
+ * failed — is held by neither. Older months are held by both.
  */
 
 // analytics.dim_registry's cube dimensions, for when the registry has not been read yet.
@@ -317,7 +323,7 @@ export function archiveHolding(from, cubeRows, factRows) {
       let acc = 0;
       let through = "";
       for (const d of ds) {
-        if (acc + byDay.get(d) > total) break;
+        if (acc + byDay.get(d) / 2 > total) break;     // held while the cube covers half of its rows
         acc += byDay.get(d);
         through = d;
       }

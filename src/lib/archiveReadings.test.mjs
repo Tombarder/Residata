@@ -472,3 +472,40 @@ test("the Pivot divides each grain and the records by the readings their source 
   assert.match(DATA, /holding = archiveHolding\(specs\.from, cube\.data, facts\.data\);/);
   assert.match(DATA, /const version = `\$\{readingsSignature\(days\)\}\/\$\{holdingSignature\(holding\)\}`;/);
 });
+
+// ── what the cube holds survives a few rows of drift ──
+// The facts can grow without a cube refresh (a resync drained on a morning without one, a
+// refresh that failed). A day is held while the cube covers at least half of its rows.
+const throughOf = (total, rowsByDay) => {
+  const days = readingDaysByCountry(rowsByDay.filter(([, , reading]) => reading !== false)
+    .map(([day]) => ({ day: `2026-11-${day}`, country: "SK", readings: 1 })));
+  const specs = holdingSpecs(days);
+  const h = archiveHolding(specs.from, [{ d: ["SK", "2026-11"], m: { n: total } }],
+    rowsByDay.map(([day, n]) => ({ d: ["SK", `2026-11-${day}`], m: { n } })));
+  return { through: h.cubeThrough.get("SK|2026-11"), cube: monthReadings(heldReadingDays(days, h, true))["SK|2026-11"] || 0 };
+};
+for (const [name, total, rows, through, readings] of [
+  ["steady", 15000, [["02", 7500], ["06", 7500]], "2026-11-06", 2],
+  ["the cube lags the 6th", 7500, [["02", 7500], ["06", 7500]], "2026-11-02", 1],
+  ["26 rows resynced into the 2nd, no refresh", 15000, [["02", 7526], ["06", 7500]], "2026-11-06", 2],
+  ["drift, and the 6th lagging", 7500, [["02", 7526], ["06", 7500]], "2026-11-02", 1],
+  ["a retry on the 3rd held, the 6th lagging", 7800, [["02", 7500], ["03", 300, false], ["06", 7500]], "2026-11-03", 1],
+  ["a retry on the 7th not in the cube yet", 15000, [["02", 7500], ["06", 7500], ["07", 300, false]], "2026-11-06", 2],
+  ["a sibling of the 6th approved late", 15000, [["02", 7500], ["06", 7800]], "2026-11-06", 2],
+  ["the 2nd withdrawn, the cube not refreshed", 15000, [["06", 7500]], "2026-11-06", 1],
+]) {
+  test(`what the cube holds — ${name}`, () => {
+    assert.deepEqual(throughOf(total, rows), { through, cube: readings });
+  });
+}
+
+test("drift does not double the month: November with 26 rows resynced into the 2nd reads 7 500", () => {
+  const days = readingDaysByCountry([{ day: "2026-11-02", country: "SK" }, { day: "2026-11-06", country: "SK" }]);
+  const specs = holdingSpecs(days);
+  const h = archiveHolding(specs.from, [{ d: ["SK", "2026-11"], m: { n: 15000 } }],
+    [{ d: ["SK", "2026-11-02"], m: { n: 7526 } }, { d: ["SK", "2026-11-06"], m: { n: 7500 } }]);
+  const scope = archiveReadingScope([{ key: "snapshot_month", mode: "in", values: ["2026-11"] }]);
+  const dims = archiveGrainDims(["snapshot_month"], scope);
+  const out = normaliseArchiveGrain([{ d: ["2026-11", "SK"], m: { n: 15000 } }], dims, heldReadingDays(days, h, true), scope);
+  assert.equal(out[0].m.n, 7500);
+});
