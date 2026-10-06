@@ -389,7 +389,7 @@ export function PipelineFlow({ lang = "en" }) {
     z3Foot: "pre vaše rozhodnutia podložené dátami",
     z3Chips: ["CSV", "Excel"],
     z3ChartLabel: "PRIEMER TRHU €/m²",
-    z3Cap1: "DENNÁ AKTUALIZÁCIA",
+    z3Cap1: `AKTUALIZÁCIA ${everyPhrase("sk").toUpperCase()}`,
     z3Cap2: "vždy aktuálny stav trhu",
 
     // 3 KPI karty pod SVG-scénou. 4. karta "bytov v datasete" sme pustili
@@ -415,7 +415,7 @@ export function PipelineFlow({ lang = "en" }) {
     z3Foot: "for your data-driven decisions",
     z3Chips: ["CSV", "Excel"],
     z3ChartLabel: "MARKET AVG €/m²",
-    z3Cap1: "DAILY AUTO-REFRESH",
+    z3Cap1: `AUTO-REFRESH ${everyPhrase("en").toUpperCase()}`,
     z3Cap2: "always the current market",
 
     // See Slovak comment above for why this is 3 cards, not 4.
