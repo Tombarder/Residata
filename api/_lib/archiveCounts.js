@@ -136,7 +136,7 @@ export async function fetchMarketReadings(admin) {
       const [cube, facts] = await Promise.all([
         admin.rpc("analytics_pivot", { p_spec: specs.cube }), admin.rpc("analytics_pivot", { p_spec: specs.facts })]);
       if (cube.error || facts.error) throw new Error((cube.error || facts.error).message);
-      holding = archiveHolding(specs.from, cube.data, facts.data);
+      holding = archiveHolding(specs.from, cube.data, facts.data, days);
     } catch (e) {
       console.error("[archive readings] what the cube holds", e?.message || e);
     }

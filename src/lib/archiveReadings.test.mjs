@@ -419,7 +419,7 @@ test("the record path's tree, header and the drill-down all count this way", () 
 });
 
 // ── the cube lags an approval until its refresh ──
-const { specUsesCube, holdingSpecs, archiveHolding, heldReadingDays, monthReadings } = await import("./archiveReadings.js");
+const { specUsesCube, holdingSpecs, archiveHolding, heldReadingDays, monthReadings, holdingLags, holdingSignature } = await import("./archiveReadings.js");
 // November SK, read on 2 and 6 November (and a retry of a few projects on the 4th); the
 // cube was last refreshed before the 6th was approved.
 const NOV_DAYS = readingDaysByCountry([{ day: "2026-10-29", country: "SK" },
@@ -471,7 +471,7 @@ test("the Pivot divides each grain and the records by the readings their source 
   assert.match(PIVOT, /\(\{ \.\.\.grainMeta, viaCube: specUsesCube\(pivotSpecUnscoped, cubeDims\) \}\)/);
   assert.match(PIVOT, /return normaliseArchiveGrain\(raw, meta\.dims, heldReadingDays\(meta\.days, holding, meta\.viaCube\), meta\.scope\);/);
   assert.match(PIVOT, /archiveRecordCells\(heldReadingDays\(readingDays, holdingNow, false\), readingScope, gDims\)/);
-  assert.match(DATA, /holding = archiveHolding\(specs\.from, cube\.data, facts\.data\);/);
+  assert.match(DATA, /holding = archiveHolding\(specs\.from, cube\.data, facts\.data, days\);/);
   assert.match(DATA, /version: `\$\{daysSig\}\/\$\{cubeGen\}`/);
 });
 
@@ -553,4 +553,45 @@ test("record path and grain path give the same Počet, Σ and average plocha ove
   assert.ok(Math.abs(compute(area, "avg", recs, cell) - g.s_ob / g.n_ob) < 1e-9);
   assert.equal(Math.round(compute(area, "sum", recs, cell)), Math.round((99 * 60 + 119 * 50) / 2), "not 36 readings' worth of area");
   assert.equal(compute(area, "sum", recs, null), 30 * 99 * 60 + 6 * 119 * 50, "today's market: plain sum");
+});
+
+// ── a day read twice is counted against one reading's rows ──
+// Nov 6 holds two readings (archive_days.readings = 2): the first approved before the
+// cube's refresh, the second after it. Counted against the whole day's rows, half of it
+// read as held; the second reading then sat in the divisor and November read 5 000.
+const RERUN = readingDaysByCountry([{ day: "2026-11-02", country: "SK", readings: 1 }, { day: "2026-11-06", country: "SK", readings: 2 }]);
+const RERUN_FACTS = [{ d: ["SK", "2026-11-02"], m: { n: 7500 } }, { d: ["SK", "2026-11-06"], m: { n: 7500 + 7490 } }];
+const rerunHolding = (cubeN) => archiveHolding(holdingSpecs(RERUN).from, [{ d: ["SK", "2026-11"], m: { n: cubeN } }], RERUN_FACTS, RERUN);
+
+test("a day read twice whose second reading the cube lacks is half held, and the cube lags", () => {
+  const h = rerunHolding(7500 + 7500);
+  assert.equal(h.cubeThrough.get("SK|2026-11"), "2026-11-02");
+  assert.deepEqual(h.cubePartial.get("SK|2026-11"), { day: "2026-11-06", readings: 1 });
+  assert.equal(holdingLags(RERUN, h), true);
+  assert.deepEqual(monthReadings(heldReadingDays(RERUN, h, true)), { "SK|2026-11": 2 });
+  assert.deepEqual(monthReadings(heldReadingDays(RERUN, h, false)), { "SK|2026-11": 3 });
+  // a cube grain asked then holds two readings' rows: 7 500, not 5 000
+  const scope = archiveReadingScope([{ key: "snapshot_month", mode: "in", values: ["2026-11"] }]);
+  const dims = archiveGrainDims(["country"], scope);
+  const shown = grainViewOfPage([{ d: ["SK"], m: { n: 15000 } }], { archive: true, dims, scope, days: RERUN, viaCube: true }, dims, h);
+  assert.equal(Math.round(nodeOf(shown).n), 7500);
+});
+
+test("refreshed, the day read twice is held whole, and the holding's signature moves", () => {
+  const lag = rerunHolding(15000);
+  const ok = rerunHolding(7500 + 7500 + 7490);
+  assert.equal(ok.cubeThrough.get("SK|2026-11"), "2026-11-06");
+  assert.equal(ok.cubePartial.size, 0);
+  assert.equal(holdingLags(RERUN, ok), false);
+  assert.deepEqual(monthReadings(heldReadingDays(RERUN, ok, true)), { "SK|2026-11": 3 });
+  assert.notEqual(holdingSignature(ok), holdingSignature(lag));
+});
+
+test("any refresh of the cube moves the holding's signature, even one that holds the same days", () => {
+  const days = readingDaysByCountry([{ day: "2026-11-02", country: "SK" }]);
+  const sp = holdingSpecs(days);
+  const a = archiveHolding(sp.from, [{ d: ["SK", "2026-11"], m: { n: 7500 } }], [{ d: ["SK", "2026-11-02"], m: { n: 7526 } }], days);
+  const b = archiveHolding(sp.from, [{ d: ["SK", "2026-11"], m: { n: 7526 } }], [{ d: ["SK", "2026-11-02"], m: { n: 7526 } }], days);
+  assert.equal(a.cubeThrough.get("SK|2026-11"), b.cubeThrough.get("SK|2026-11"));
+  assert.notEqual(holdingSignature(a), holdingSignature(b));
 });

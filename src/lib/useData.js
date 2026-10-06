@@ -1697,7 +1697,7 @@ function _loadArchiveReadings(key) {
         sbRead(supabaseData.rpc("analytics_pivot", { p_spec: specs.facts })),
       ]);
       if (cube.error || facts.error) { console.error("[archive readings] what the cube holds", cube.error || facts.error); failed = true; }
-      else holding = archiveHolding(specs.from, cube.data, facts.data);
+      else holding = archiveHolding(specs.from, cube.data, facts.data, days);
     }
     if (failed && entry.holdingKnown) {
       entry.holdingFailed = true;

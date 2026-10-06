@@ -295,8 +295,17 @@ export function holdingSpecs(days) {
 }
 
 /** From the answers to holdingSpecs: { from, facts: Map(market → Set(days with rows)),
- *  cubeThrough: Map('SK|2026-11' → the last day the cube holds, '' for none) }. */
-export function archiveHolding(from, cubeRows, factRows) {
+ *  cubeThrough: Map('SK|2026-11' → the last day the cube holds whole, '' for none),
+ *  cubePartial: Map('SK|2026-11' → { day, readings }) — the next day, of which the cube
+ *  holds only some readings (a day read twice, the second approved after the refresh) —
+ *  cubeTotals: Map('SK|2026-11' → the cube's rows) }. `days` (readingDaysByCountry) says
+ *  how many readings each day holds; a day not among them (a retry) is one.
+ *
+ *  A day's readings are counted against ONE reading's rows: the cube holds j of a day's k
+ *  readings when its total covers the days before plus j readings' rows, less half of
+ *  one — so a few rows of drift, a retry or a late sibling move nothing, and a day read
+ *  twice whose second reading the cube lacks is seen as half held, not as held. */
+export function archiveHolding(from, cubeRows, factRows, days) {
   const factsN = new Map();
   for (const g of factRows || []) {
     const c = g?.d?.[0];
@@ -306,13 +315,14 @@ export function archiveHolding(from, cubeRows, factRows) {
     if (!factsN.has(c)) factsN.set(c, new Map());
     factsN.get(c).set(day, (factsN.get(c).get(day) || 0) + n);
   }
-  const cubeN = new Map();
+  const cubeTotals = new Map();
   for (const g of cubeRows || []) {
     const k = `${g?.d?.[0]}|${g?.d?.[1]}`;
-    cubeN.set(k, (cubeN.get(k) || 0) + (Number(g?.m?.n) || 0));
+    cubeTotals.set(k, (cubeTotals.get(k) || 0) + (Number(g?.m?.n) || 0));
   }
   const facts = new Map();
   const cubeThrough = new Map();
+  const cubePartial = new Map();
   for (const [c, byDay] of factsN) {
     facts.set(c, new Set(byDay.keys()));
     const byMonth = new Map();
@@ -322,18 +332,25 @@ export function archiveHolding(from, cubeRows, factRows) {
       byMonth.get(mo).push(d);
     }
     for (const [mo, ds] of byMonth) {
-      const total = cubeN.get(`${c}|${mo}`) || 0;
+      const total = cubeTotals.get(`${c}|${mo}`) || 0;
       let acc = 0;
       let through = "";
       for (const d of ds) {
-        if (acc + byDay.get(d) / 2 > total) break;     // held while the cube covers half of its rows
-        acc += byDay.get(d);
+        const rows = byDay.get(d);
+        const k = days?.[c]?.get(d) || 1;
+        const one = rows / k;                          // one reading's rows
+        const held = Math.max(0, Math.min(k, Math.floor((total - acc) / one + 0.5)));
+        if (held < k) {
+          if (held > 0) cubePartial.set(`${c}|${mo}`, { day: d, readings: held });
+          break;
+        }
+        acc += rows;
         through = d;
       }
       cubeThrough.set(`${c}|${mo}`, through);
     }
   }
-  return { from, facts, cubeThrough };
+  return { from, facts, cubeThrough, cubePartial, cubeTotals };
 }
 
 /** `days` (readingDaysByCountry) without the readings a grain's source does not hold yet:
@@ -350,7 +367,11 @@ export function heldReadingDays(days, holding, viaCube) {
         if (!holding.facts.get(c)?.has(d)) continue;
         if (viaCube) {
           const through = holding.cubeThrough.get(`${c}|${d.slice(0, 7)}`);
-          if (!through || d > through) continue;
+          if (!through || d > through) {
+            const part = holding.cubePartial?.get(`${c}|${d.slice(0, 7)}`);
+            if (part && part.day === d) kept.set(d, Math.min(n, part.readings));
+            continue;
+          }
         }
       }
       kept.set(d, n);
@@ -365,6 +386,9 @@ export function holdingSignature(holding) {
   if (!holding) return "-";
   const parts = [];
   for (const [k, t] of [...holding.cubeThrough].sort()) parts.push(`${k}:${t}`);
+  for (const [k, p] of [...(holding.cubePartial || [])].sort()) parts.push(`${k}~${p.day}:${p.readings}`);
+  // the cube's own totals: any refresh of it moves them, whatever the days it holds
+  for (const [k, n] of [...(holding.cubeTotals || [])].sort()) parts.push(`${k}=${n}`);
   for (const [c, s] of [...holding.facts].sort()) parts.push(`${c}:${[...s].sort().pop() || ""}:${s.size}`);
   return parts.join(",");
 }
@@ -414,7 +438,7 @@ export function holdingLags(days, holding) {
     for (const d of m.keys()) {
       if (d < from || !holding.facts.get(c)?.has(d)) continue;
       const through = holding.cubeThrough.get(`${c}|${d.slice(0, 7)}`);
-      if (!through || d > through) return true;
+      if (!through || d > through) return true;     // a day the cube holds none or only some of
     }
   }
   return false;

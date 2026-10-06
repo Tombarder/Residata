@@ -258,3 +258,29 @@ test("the Pivot waits for what the cube holds before dividing, and the record pa
   assert.match(PIVOT, /\|\| \(!useGrain && canViewAnalytics && !isCurrent && !!readingsError\);/);
   assert.match(SRC, /holdingKnown: !!entry\?\.holdingKnown/);
 });
+
+test("a day read twice approved while the cube lags: lagging, then a new version after the refresh", async () => {
+  let now = Date.UTC(2026, 10, 6, 9, 0);
+  const world = { days: [{ day: "2026-11-02", country: "SK", readings: 1 }, { day: "2026-11-06", country: "SK", readings: 2 }],
+    cube: 15000, facts: [["2026-11-02", 7500], ["2026-11-06", 14990]] };
+  const supabaseData = {
+    rpc: (_n, { p_spec }) => Promise.resolve({ error: null, data: p_spec.dims[1] === "snapshot_month"
+      ? [{ d: ["SK", "2026-11"], m: { n: world.cube } }] : world.facts.map(([d, n]) => ({ d: ["SK", d], m: { n } })) }),
+    from: () => { const b = { select() { return b; }, order() { return b; }, range() { return Promise.resolve({ data: world.days, error: null }); } }; return b; },
+  };
+  const grains = new Map([['u::{"mode":"archive"}::x', { grain: [] }]]);
+  const { _loadArchiveReadings } = new Function(
+    "sbReadAll", "sbRead", "supabaseData", "readingDaysByCountry", "readingsSignature",
+    "holdingSpecs", "archiveHolding", "holdingSignature", "holdingLags", "_pivotGrainCache", "Date", "console",
+    `${BLOCK}\nreturn { _loadArchiveReadings };`,
+  )(async (make) => make(0, 999), (b) => b, supabaseData, readingDaysByCountry, readingsSignature,
+    holdingSpecs, archiveHolding, holdingSignature, holdingLags, grains, { now: () => now }, { error() {} });
+  const lag = await _loadArchiveReadings("u");
+  assert.equal(lag.lagging, true, "the cube holds one of the 6th's two readings");
+  world.cube = 22490;
+  now += 2 * MIN;
+  const after = await _loadArchiveReadings("u");
+  assert.equal(after.lagging, false);
+  assert.notEqual(after.version, lag.version, "a grain asked during the lag is asked again");
+  assert.equal(grains.size, 0);
+});
