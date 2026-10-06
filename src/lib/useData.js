@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { supabaseData, supabasePublic, isSupabaseReady } from "./supabase";
 import { useAuth } from "./useAuth";
 import { useCountry, isAllCountries } from "./useCountry";
-import { readingDaysByCountry, readingsSignature, holdingSpecs, archiveHolding, holdingSignature, holdingLags } from "./archiveReadings";
+import { readingDaysByCountry, readingsSignature, holdingSpecs, archiveHolding, holdingSignature, holdingLags, holdingFactsSignature } from "./archiveReadings";
 
 /**
  * sbRead — the single settle-guarantee wrapper every RLS-gated read goes through.
@@ -1305,7 +1305,12 @@ let _archiveCacheStamp = null;
  *  readings in force when it asks (days and holding). They are handed back with the
  *  records they were asked with (and cached with them), so a reading that lands later
  *  does not divide records loaded before it: October loaded with one reading, then the
- *  5th approved, read 7 500 as 3 750 for the rest of the session. */
+ *  5th approved, read 7 500 as 3 750 for the rest of the session. Its `version` is part
+ *  of the records' identity, so a new or withdrawn reading asks for them again (the old
+ *  ones stay, with their own readings, until the new land), and its `refresh` is awaited
+ *  before they are read, so the readings they are kept with are no older than they are:
+ *  kept readings 10 minutes old missed the reading the records held, and October read
+ *  15 000 for 7 500. */
 export function useFlatsArchive(months, dates, enabled = true, stamp = null) {
   const { loading: authLoading, user, profile } = useAuth();
   const { country } = useCountry();
@@ -1318,7 +1323,7 @@ export function useFlatsArchive(months, dates, enabled = true, stamp = null) {
   // rows mixed in the Pivot.
   const identityKey = (user
     ? `${user.id}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}`
-    : "anon") + `::${monthsKey}::${datesKey}::${country}::${enabled ? "1" : "0"}`;
+    : "anon") + `::${monthsKey}::${datesKey}::${country}::${enabled ? "1" : "0"}::${stamp?.version || ""}`;
   const [flats, setFlats] = useState(_archiveCacheKey === identityKey ? (_archiveCache || []) : []);
   const [flatsStamp, setFlatsStamp] = useState(_archiveCacheKey === identityKey ? _archiveCacheStamp : null);
   const [loading, setLoading] = useState(_archiveCacheKey !== identityKey);
@@ -1352,7 +1357,18 @@ export function useFlatsArchive(months, dates, enabled = true, stamp = null) {
     setLoading(true);
     setProgress(0);
     setError(null); setTruncated(false); setTooLarge(null);
+    // Whether the readings, read now, are no longer those this request is kept with (or
+    // this request was dropped meanwhile). A read that fails leaves them as they were.
+    const readingsMoved = async () => {
+      if (!stamp?.refresh) return cancelled;
+      let now = null;
+      try { now = await stamp.refresh(); } catch { /* the readings' own state says so */ }
+      return cancelled || (!!now && (now.recordsVersion ?? "") !== (stamp.version || ""));
+    };
     (async () => {
+      // The readings first, fresh: if they moved on, the caller asks again under the new
+      // version and this request is dropped (see `stamp`).
+      if (await readingsMoved()) return;
       const all = [];
       let hadError = false;
       let lastError = null;
@@ -1492,6 +1508,9 @@ export function useFlatsArchive(months, dates, enabled = true, stamp = null) {
         console.warn("[useFlatsArchive] reached safety cap of", MAX_TOTAL, "rows");
       }
       if (cancelled) return;
+      // And again after: a reading approved while the pages were read is in some of them
+      // and not in the readings they would be kept with — asked again under the new version.
+      if (await readingsMoved()) return;
       // F-313 (DP-096): don't poison the module cache with a partial/empty
       // result when the fetch errored. A transient Supabase hiccup during
       // the analytics Pivot's heavy archive read would otherwise leave the
@@ -1688,10 +1707,16 @@ function _dropArchiveGrains() {
    withdrawn reading changes the first; a refresh of the cube (what it holds moved while
    the days did not) the second. A holding that could not be read keeps the last good one
    and changes neither, so a passing error does not send every grain to be asked again. */
-function _loadArchiveReadings(key) {
+function _loadArchiveReadings(key, force = false) {
   const kept = _archiveReadingsCache.get(key);
-  if (kept && kept.holdingKnown && Date.now() - kept.at < _readingsTtl(kept)) return Promise.resolve(kept);
-  if (_archiveReadingsInflight.has(key)) return _archiveReadingsInflight.get(key);
+  if (!force && kept && kept.holdingKnown && Date.now() - kept.at < _readingsTtl(kept)) return Promise.resolve(kept);
+  if (_archiveReadingsInflight.has(key)) {
+    const running = _archiveReadingsInflight.get(key);
+    if (!force) return running;
+    // a forced read is one that STARTS now: one in flight may have read the days already
+    const again = () => _loadArchiveReadings(key, true);
+    return running.then(again, again);
+  }
   const p = (async () => {
     // The check is dated when it STARTS: the next one is due a TTL after this moment, so a
     // check that took a few seconds is not skipped at the next minute's tick (dated at its
@@ -1743,7 +1768,8 @@ function _loadArchiveReadings(key) {
     const holdingSig = holdingSignature(holding);
     const cubeMoved = entry.holdingKnown && !failed && entry.holdingSig !== holdingSig;
     const lagging = holdingLags(days, holding);
-    const lag = _lagState(lagging, entry, now);
+    // a forced read (the archive's records asking) is no step of a long lag's spacing
+    const lag = force && lagging && entry.lagging ? { lagSince: entry.lagSince, lagLate: entry.lagLate } : _lagState(lagging, entry, now);
     const failures = failed ? (entry.failures || 0) + 1 : 0;
     if (entry.holdingKnown && !cubeMoved) {        // nothing moved: the same entry, kept longer
       Object.assign(entry, { holdingFailed: false, failures, lagging, ...lag, at: now });
@@ -1758,6 +1784,9 @@ function _loadArchiveReadings(key) {
     entry = {
       ...entry, holding, holdingSig, holdingKnown: true, holdingFailed: failed, failures,
       lagging, ...lag, cubeGen, version: `${daysSig}/${cubeGen}`, at: now, ...prev,
+      // what the archive's records (the facts) are asked with: a new or withdrawn reading,
+      // or the facts catching up with one, is a new question for them
+      recordsVersion: `${daysSig}/${holdingFactsSignature(holding)}`,
     };
     _archiveReadingsCache.set(key, entry);
     _publishReadings(key);
@@ -1822,12 +1851,16 @@ export function useArchiveReadingDays({ enabled = false } = {}) {
       clearInterval(timer);
     };
   }, [enabled, key, authLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Read the readings again now, whatever their age — before the archive's records are
+  // asked, so the readings they are kept with are no older than they are.
+  const refresh = useCallback(() => _loadArchiveReadings(key, true), [key]);
   const entry = enabled ? rendered : null;
   const days = entry ? entry.days : null;
   const error = !!enabled && !days && failedKey === key;
   return {
     days, holding: entry ? entry.holding : null, holdingKnown: !!entry?.holdingKnown,
     version: entry ? entry.version : "", prevVersion: entry?.prevVersion ?? null, prevHolding: entry?.prevHolding ?? null,
+    recordsVersion: entry?.recordsVersion ?? "", refresh: enabled ? refresh : null,
     loading: !!enabled && !days && !error, error,
   };
 }

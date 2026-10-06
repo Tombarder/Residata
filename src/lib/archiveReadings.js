@@ -424,6 +424,14 @@ export function holdingSignature(holding) {
   return parts.join(",");
 }
 
+/** The facts' side of a holding — which days of each market's newest month the facts
+ *  hold — as a fingerprint: the archive's records (flats_archive, the facts) change with
+ *  it, whatever the cube does. */
+export function holdingFactsSignature(holding) {
+  if (!holding) return "-";
+  return [...holding.facts].sort().map(([c, s]) => `${c}:${[...s].sort().join(";")}`).join(",");
+}
+
 /** Readings per market-month ({ 'SK|2026-10': 8 }) from readingDaysByCountry(). */
 export function monthReadings(days) {
   const out = {};
