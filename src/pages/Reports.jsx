@@ -44,6 +44,7 @@ import { SoldShareNote } from "../lib/soldShareNote";
 import { soldSharePct, soldShareText } from "../lib/soldShare.js";
 import { supabaseData } from "../lib/supabase";
 import { getSignedInUser } from "../lib/authToken";
+import { useCapabilities } from "../lib/useCapabilities";
 
 // ── Visual language (mirrors Platform.jsx) ───────────────────────
 const mono = "'JetBrains Mono', monospace";
@@ -419,6 +420,7 @@ function ReportHeader({ projects, lang, scope, scopeLabel }) {
         </div>
         <div className="no-print" style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
           <SubscribeButton scope={scope} scopeLabel={scopeLabel} lang={lang} />
+          <CsvGate lang={lang}>
           <button onClick={() => downloadScopeCSV(projects, lang, specData)}
             style={{
               background: "transparent", color: accentInk, border: `1px solid color-mix(in srgb, var(--accent) 33%, transparent)`,
@@ -427,6 +429,7 @@ function ReportHeader({ projects, lang, scope, scopeLabel }) {
             }}>
             ⬇ CSV
           </button>
+          </CsvGate>
           <button onClick={() => window.print()} className="btn-p" style={{ fontSize: "0.78rem", padding: "0.5rem 0.9rem" }}>
             🖨 {lang === "sk" ? "Uložiť ako PDF" : "Save as PDF"}
           </button>
@@ -1495,9 +1498,11 @@ function CompetitiveProfile({ projects, scopeType, scopeValue, lang }) {
               : "A blank parking cell means the developer publishes no price — not that the "
               + "project has none. Every project has been reviewed by hand."}
         </div>
+        <CsvGate lang={lang}>
         <button className="rd-btn rd-btn--sm" onClick={csv} style={{ whiteSpace: "nowrap" }}>
           ⬇ CSV
         </button>
+        </CsvGate>
       </div>
       <div className="rep-table-wrap" style={{ background: bg2, border: `1px solid ${border}`,
                                                borderRadius: 8, overflowX: "auto" }}>
@@ -1947,6 +1952,7 @@ function ForecastHistogram({ rows, lang }) {
    relax this — flats from sold-out-under-tracking projects are
    genuine historical comps.) */
 function ComparableTransactionsReport({ projects, lang }) {
+  const canCsv = useCapabilities().can("export_data");
   const spec = useSpecifics(lang);
   // Sold-with-price comparables fetched server-side (report_comparables, ~3k
   // rows) only when this tab opens — not from the old 32k global pull.
@@ -2085,11 +2091,15 @@ function ComparableTransactionsReport({ projects, lang }) {
             options={[{ value: "__all__", label: lang === "sk" ? "Všetky časti" : "All districts" }, ...districts.map((d) => ({ value: d, label: d }))]} />
           <Picker value={roomPick} onChange={setRoomPick} width={160} sk={lang === "sk"} ariaLabel={lang === "sk" ? "Izbovosť" : "Room count"}
             options={[{ value: "__all__", label: lang === "sk" ? "Všetky izbovosti" : "All room counts" }, ...[1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: `${n}${lang === "sk" ? "-izb." : "-room"}` }))]} />
+          <span style={{ marginLeft: "auto" }}>
+          <CsvGate lang={lang}>
           <button onClick={downloadCsv} style={{
-            marginLeft: "auto", background: "transparent", color: accentInk,
+            background: "transparent", color: accentInk,
             border: `1px solid color-mix(in srgb, var(--accent) 33%, transparent)`, borderRadius: 4, padding: "0.4rem 0.8rem",
             fontSize: "0.78rem", cursor: "pointer", fontFamily: "inherit",
           }}>⬇ CSV ({count})</button>
+          </CsvGate>
+          </span>
         </div>
 
         {/* KPIs */}
@@ -2153,7 +2163,7 @@ function ComparableTransactionsReport({ projects, lang }) {
             </table>
             {sorted.length > 200 && (
               <div style={{ padding: "0.6rem", color: dim, fontSize: "0.75rem", textAlign: "center", fontFamily: mono }}>
-                {lang === "sk" ? `Zobrazených prvých 200 z ${sorted.length}. CSV obsahuje všetky.` : `Showing top 200 of ${sorted.length}. CSV has the full set.`}
+                {lang === "sk" ? `Zobrazených prvých 200 z ${sorted.length}.${canCsv ? " CSV obsahuje všetky." : ""}` : `Showing top 200 of ${sorted.length}.${canCsv ? " CSV has the full set." : ""}`}
               </div>
             )}
           </div>
@@ -2771,6 +2781,26 @@ function priceDistribution(flats, nBins) {
   }
   return bins;
 }
+/**
+ * Downloading data (CSV) is for paying customers and admins only — the same
+ * rule as the Exports page (useCapabilities "export_data"). Reports is open to a
+ * 7-day trial, and its three CSV buttons handed a trial user the full set,
+ * including every recorded sale with its price. A trial sees the button locked,
+ * with the reason.
+ */
+function CsvGate({ lang, children }) {
+  const { can } = useCapabilities();
+  if (can("export_data")) return children;
+  return (
+    <button type="button" disabled
+      title={lang === "sk" ? "Sťahovanie dát je pre platiacich (Premium) — počas trialu sa dá všetko prezerať." : "Downloading data is for paying subscribers (Premium) — during the trial you can browse everything."}
+      style={{ background: "transparent", color: "var(--text-faint)", border: `1px dashed ${border}`, borderRadius: 4,
+        padding: "0.45rem 0.8rem", fontSize: "0.78rem", fontFamily: "inherit", cursor: "not-allowed", whiteSpace: "nowrap" }}>
+      🔒 CSV · Premium
+    </button>
+  );
+}
+
 /* CSV download for the current scope — project-level. */
 function downloadScopeCSV(projects, lang, specData) {
   const headers = [

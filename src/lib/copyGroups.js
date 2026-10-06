@@ -114,7 +114,7 @@ export const PAGES = [
   },
   {
     ns: "lv", group: "Platform & app", id: "lv-pending",
-    label: "Pending approval", blurb: "Waiting-for-approval screen",
+    label: "No access", blurb: "Screen for an account set to No access",
     sections: [
       { label: "Pending screen", keys: ["pending_title", "pending_body", "pending_meanwhile", "pending_explore"] },
     ],
@@ -123,7 +123,7 @@ export const PAGES = [
     ns: "lv", group: "Platform & app", id: "lv-admin",
     label: "Admin screens", blurb: "Internal admin tool labels",
     sections: [
-      { label: "User management", keys: ["admin_label", "admin_title", "admin_email", "admin_tier", "admin_project", "admin_created", "admin_actions", "admin_403_title", "admin_403_body", "admin_pending_section", "admin_new_section", "admin_approve", "admin_events_section", "admin_no_pending"] },
+      { label: "User management", keys: ["admin_label", "admin_title", "admin_email", "admin_tier", "admin_project", "admin_created", "admin_actions", "admin_403_title", "admin_403_body"] },
     ],
   },
 ];

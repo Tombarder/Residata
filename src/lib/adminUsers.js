@@ -122,6 +122,9 @@ export const ERRORS = {
   personal_email_setup:["Účet s osobným e-mailom (gmail, azet, …) sa zatiaľ nedá vytvoriť — databáza ešte nemá povolenie, ktoré ho pustí cez filter firemných e-mailov.", "An account with a personal e-mail (gmail, …) cannot be created yet — the database does not yet have the permission that lets it past the business-e-mail filter."],
   nothing_to_change:   ["Nič sa nezmenilo.", "Nothing to change."],
   invite_no_access:    ["Účet bez prístupu nemá čo oznámiť — najprv mu nastav Free alebo Premium.", "An account with no access has nothing to announce — give it Free or Premium first."],
+  bad_linkedin:        ["LinkedIn odkaz nie je platná adresa (napr. linkedin.com/in/meno).", "The LinkedIn link is not a valid address (e.g. linkedin.com/in/name)."],
+  card_subscription:   ["Platí kartou — dátumy Premium riadi Stripe. Ukončiť sa dá prepnutím na Free alebo Bez prístupu (tým sa zruší aj predplatné).", "Pays by card — Stripe owns the Premium dates. To end it, switch to Free or No access (that also cancels the subscription)."],
+  card_cancel_failed:  ["Predplatné v Stripe sa nepodarilo zrušiť, preto sa nič nezmenilo. Skús znova alebo ho zruš v Stripe.", "The Stripe subscription could not be cancelled, so nothing was changed. Try again or cancel it in Stripe."],
 };
 
 /** A server error object → one sentence in the panel's language. */
@@ -177,6 +180,10 @@ function cleanProfileFields(body) {
   return out;
 }
 
+/** A LinkedIn value was typed but is not a link — said, never silently stored as empty. */
+const badLinkedIn = (body) =>
+  typeof body?.linkedin_url === "string" && body.linkedin_url.trim() !== "" && !cleanUrl(body.linkedin_url);
+
 /** The internal note keeps its line breaks (it is read in a text box, not a cell). */
 function cleanNote(v) {
   if (typeof v !== "string") return null;
@@ -201,6 +208,7 @@ export function planProfileUpdate(current, body, { now = Date.now(), isSelf = fa
   const nowMs = now instanceof Date ? now.getTime() : now;
   const nowIso = new Date(nowMs).toISOString();
   if (!current) return fail("not_found", "target user not found");
+  if (badLinkedIn(body)) return fail("bad_linkedin");
   const patch = cleanProfileFields(body || {});
   if ("full_name" in patch && !patch.full_name && current.full_name) return fail("name_required");
 
@@ -268,6 +276,35 @@ export function planProfileUpdate(current, body, { now = Date.now(), isSelf = fa
   return { patch };
 }
 
+// ── Someone paying by card ─────────────────────────────────────────────────
+
+/**
+ * What an admin change means for a person with a live card subscription.
+ *
+ * Stripe re-applies its own period every night (api/stripe.js reconcile), so
+ * until 2026-10-06 an admin who blocked a card payer, shortened their Premium or
+ * gave them "no end" saw it undone by 04:00 — and the card kept being charged
+ * after the admin had "ended" Premium. So, for a card payer:
+ *   "ok"     — the change does not touch access (name, note, …);
+ *   "cancel" — the change ends their Premium (Free, No access, an end date
+ *              already past): the request
+ *              cancels the card subscription at Stripe first, then applies;
+ *   "refuse" — any other access change (dates, no end, admin): the card owns
+ *              the period, so the admin is told how to end it instead.
+ * No card subscription → always "ok".
+ */
+export function cardSubscriptionVerdict(current, patch, now = Date.now()) {
+  if (!current?.stripe_subscription_id) return "ok";
+  const ACCESS = ["tier", "paid_until", "paid_started_at", "trial_until", "paid_pause_started"];
+  if (!ACCESS.some((k) => k in (patch || {}))) return "ok";
+  const next = { ...current, ...patch };
+  const nowMs = now instanceof Date ? now.getTime() : now;
+  if (next.tier === "admin") return "refuse";
+  // Ends their Premium — by type (Free / No access) or by an end date already past.
+  if (next.tier === "pending" || !resolveAccess(next.tier || "pending", next, nowMs).paidActive) return "cancel";
+  return "refuse";
+}
+
 // ── Creating an account ────────────────────────────────────────────────────
 
 /**
@@ -286,6 +323,7 @@ export function planNewUser(body, { now = Date.now() } = {}) {
   if (!email) return fail("email_invalid");
   const tier = b.tier || "free";
   if (!CREATE_TYPES.includes(tier)) return fail("bad_tier");
+  if (badLinkedIn(b)) return fail("bad_linkedin");
 
   const profile = cleanProfileFields({
     full_name: b.full_name ?? "", company: b.company ?? "", position: b.position ?? "",

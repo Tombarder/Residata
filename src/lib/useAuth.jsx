@@ -154,7 +154,7 @@ function useAuthInternal() {
     return () => window.removeEventListener("focus", onFocus);
   }, [loadProfile]);
 
-  const signIn = async (email, { lang } = {}) => {
+  const signIn = async (email, { lang, trialIntentAt } = {}) => {
     if (!isSupabaseReady()) return { error: "Supabase offline" };
     return supabase.auth.signInWithOtp({
       email,
@@ -168,7 +168,12 @@ function useAuthInternal() {
         // user's metadata ONLY when this request creates the account (an
         // existing user's sign-in ignores it), and the welcome e-mail reads it
         // to greet them in their language (api/webhooks/welcome-user.js).
-        ...(lang ? { data: { lang } } : {}),
+        //
+        // trial_intent_at: they clicked "Activate 7-day trial" before signing
+        // up. Stored with the NEW account only, like lang, so the welcome
+        // webhook can start the trial on the server — and say so in the
+        // welcome e-mail — instead of the browser racing the e-mail.
+        data: { ...(lang ? { lang } : {}), ...(trialIntentAt ? { trial_intent_at: trialIntentAt } : {}) },
       },
     });
   };

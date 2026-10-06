@@ -9,7 +9,7 @@
 
 import { useState } from "react";
 import { activateTrial, clearTrialIntent } from "./trial";
-import { authErrorMessage } from "./sessionGuard";
+import { authErrorMessage, isAuthError } from "./sessionGuard";
 
 export function useActivateTrial({ lang = "en", onConsumed, reloadOnSuccess = true } = {}) {
   const [busy, setBusy] = useState(false);
@@ -28,12 +28,19 @@ export function useActivateTrial({ lang = "en", onConsumed, reloadOnSuccess = tr
         // 409 — already used / already on a paid tier. Not an error to alarm
         // the user; let the caller route them to Billing for the full picture.
         if (onConsumed) onConsumed(res);
-        else setMsg({ kind: "err", text: res.data?.error || (lang === "sk" ? "Trial už bol využitý." : "Trial already used.") });
+        // The server's reason, said in words — never its raw English code.
+        else setMsg({ kind: "err", text: res.data?.error === "already on a paid tier"
+          ? (lang === "sk" ? "Premium už máš — trial nepotrebuješ." : "You already have Premium — no trial needed.")
+          : (lang === "sk" ? "Trial si už využil — dá sa len raz." : "You have already used your trial — it is one per account.") });
       }
       return res;
     } catch (e) {
-      // SESSION_EXPIRED or any HTTP/network error → clean human message.
-      setMsg({ kind: "err", text: authErrorMessage(e, lang) });
+      // An expired session says how to fix it; anything else is a plain "try
+      // again" — this button is on customer pages, and the shared helper's
+      // "Action failed: HTTP 500" is for the admin panel.
+      setMsg({ kind: "err", text: isAuthError(e)
+        ? authErrorMessage(e, lang)
+        : (lang === "sk" ? "Trial sa nepodarilo spustiť — skús to znova o chvíľu." : "The trial could not be started — try again in a moment.") });
       return null;
     } finally {
       setBusy(false);

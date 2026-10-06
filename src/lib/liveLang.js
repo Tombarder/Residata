@@ -14,8 +14,8 @@ export const liveT = {
     live_title: "Current market snapshot",
     live_desc_base: "Data refreshed __EVERY__. Filter, explore, compare.",
     live_desc_anon: "Sign in for full detail on any single project (free).",
-    live_desc_free: "Upgrade to paid for access to all {n} projects.",
-    upgrade_to_paid: "Upgrade to paid",
+    live_desc_free: "Upgrade to Premium for access to all {n} projects.",
+    upgrade_to_paid: "Upgrade to Premium",
 
     card_projects: "Projects",
     card_projects_sub: "currently on market",
@@ -41,7 +41,7 @@ export const liveT = {
     tbl_eur_m2: "€/m²",
     tbl_sold_30d: "Sold 30d",
     tbl_sold_30d_tooltip_paid: "Units sold in the last 30 days — key sales velocity metric",
-    tbl_sold_30d_tooltip_locked: "Sales velocity — available in paid tier",
+    tbl_sold_30d_tooltip_locked: "Sales velocity — available in Premium",
     tbl_sold_30d_no_data_yet: "Fills in with tomorrow's update",
     tbl_detail: "Detail →",
     hidden_projects: "Hidden {n} more projects.",
@@ -50,8 +50,8 @@ export const liveT = {
 
     // Project detail
     back_to_projects: "← Back to projects",
-    snapshot_notice: "ⓘ Showing current snapshot. History and analytics are part of the",
-    paid_tier: "paid tier",
+    snapshot_notice: "ⓘ Showing current snapshot. History and analytics are part of",
+    paid_tier: "Premium",
     no_data: "No data available.",
 
     tbl_flat: "Flat",
@@ -87,7 +87,7 @@ export const liveT = {
     analytics_gate_title: "Sign in for analytics",
     analytics_gate_body: "Analytics and trends are part of the paid account.",
     analytics_paid_title: "Analytics is a paid feature",
-    analytics_paid_body: "Price trends over time, district heat maps, top developers, absorption rate, monthly PDF reports — all in paid tier.",
+    analytics_paid_body: "Price trends over time, district heat maps, top developers, absorption rate, monthly PDF reports — all in Premium.",
     analytics_see_pricing: "See pricing",
     analytics_label: "Analytics",
     analytics_title: "Trends & insights",
@@ -153,12 +153,6 @@ export const liveT = {
     pending_body: "Your account currently has no access to the platform's data. If you think this is a mistake, or you would like access, write to us at info@residata.eu.",
     pending_meanwhile: "Meanwhile you can browse the public pages and pricing. This page unlocks by itself as soon as access is given.",
     pending_explore: "Go to the homepage",
-
-    // Admin — pending section
-    admin_pending_section: "Pending approvals",
-    admin_new_section: "All users",
-    admin_approve: "Approve → free",
-    admin_no_pending: "No pending approvals 🎉",
   },
   sk: {
     ticker_loading: "Načítavam dáta…",
@@ -169,8 +163,8 @@ export const liveT = {
     live_title: "Aktuálny stav trhu",
     live_desc_base: "Dáta aktualizované __EVERY__. Filtruj, preklikni, porovnaj.",
     live_desc_anon: "Registrácia odomkne plný detail 1 projektu (zadarmo).",
-    live_desc_free: "Upgrade na paid pre prístup ku všetkým {n} projektom.",
-    upgrade_to_paid: "Upgrade na paid",
+    live_desc_free: "Prejdi na Premium pre prístup ku všetkým {n} projektom.",
+    upgrade_to_paid: "Prejsť na Premium",
 
     card_projects: "Projektov",
     card_projects_sub: "aktívne na trhu",
@@ -197,7 +191,7 @@ export const liveT = {
     tbl_eur_m2: "€/m²",
     tbl_sold_30d: "Predané 30d",
     tbl_sold_30d_tooltip_paid: "Predané byty za posledných 30 dní — kľúčový ukazovateľ rýchlosti predaja",
-    tbl_sold_30d_tooltip_locked: "Rýchlosť predaja — dostupná v paid tier-e",
+    tbl_sold_30d_tooltip_locked: "Rýchlosť predaja — dostupná v Premium",
     tbl_sold_30d_no_data_yet: "Prvé dáta pri zajtrajšej aktualizácii",
     tbl_detail: "Detail →",
     hidden_projects: "Skrytých {n} projektov.",
@@ -206,7 +200,7 @@ export const liveT = {
 
     back_to_projects: "← Späť na projekty",
     snapshot_notice: "ⓘ Zobrazujeme aktuálny snapshot. História a analytika sú súčasťou",
-    paid_tier: "paid tier-u",
+    paid_tier: "Premium",
     no_data: "Žiadne dáta.",
 
     tbl_flat: "Byt",
@@ -239,8 +233,8 @@ export const liveT = {
 
     analytics_gate_title: "Prihlás sa pre analytiku",
     analytics_gate_body: "Analytika a trendy sú súčasťou paid účtu.",
-    analytics_paid_title: "Analytika je pre paid tier",
-    analytics_paid_body: "Cenové trendy v čase, heat mapy okresov, top developers, absorption rate, mesačné PDF reporty — všetko v paid tier-e.",
+    analytics_paid_title: "Analytika je v Premium",
+    analytics_paid_body: "Cenové trendy v čase, heat mapy okresov, rebríček developerov, rýchlosť predaja, mesačné PDF reporty — všetko v Premium.",
     analytics_see_pricing: "Zobraziť cenník",
     analytics_label: "Analytics",
     analytics_title: "Trendy a insights",
@@ -302,11 +296,6 @@ export const liveT = {
     pending_body: "Tvoj účet teraz nemá prístup k dátam platformy. Ak ide podľa teba o omyl alebo by si prístup chcel, napíš nám na info@residata.eu.",
     pending_meanwhile: "Medzitým si môžeš pozrieť verejné stránky a cenník. Táto stránka sa odomkne sama, hneď ako ti prístup dáme.",
     pending_explore: "Na úvodnú stránku",
-
-    admin_pending_section: "Čakajúce schválenia",
-    admin_new_section: "Všetci užívatelia",
-    admin_approve: "Schváliť → free",
-    admin_no_pending: "Žiadne čakajúce schválenia 🎉",
   },
 };
 

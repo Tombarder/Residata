@@ -5,6 +5,8 @@
 // endpoints; routing is by ?action=:
 //   POST /api/stripe?action=checkout   (authed)  → Checkout Session { url }
 //   POST /api/stripe?action=portal     (authed)  → Billing Portal  { url }
+//   POST /api/stripe?action=subscription (authed) → the caller's card subscription
+//        as Stripe has it now: { subscription: { status, ends_at } | null }
 //   POST /api/stripe?action=webhook    (Stripe)  → writes paid_until
 //
 // The webhook keeps its public URL /api/webhooks/stripe via a single rewrite in
@@ -20,6 +22,9 @@ import { FALLBACK_MONTHLY_CENTS } from "../src/lib/pricingDefaults.js";
 import { invoiceSellerFooter } from "../src/lib/company.js";
 
 export const config = { api: { bodyParser: false } };
+
+/** Subscription statuses after which Stripe charges nothing again. */
+const CARD_DONE = ["canceled", "unpaid", "incomplete_expired"];
 export const maxDuration = 15;
 
 // The resilient FALLBACK price. The live price is read from public.pricing_config
@@ -91,7 +96,7 @@ async function handleCheckout(req, res) {
       quantity: 1,
       price_data: {
         currency: "eur",
-        product_data: { name: "Residata — Full access" },
+        product_data: { name: "Residata Premium" },
         unit_amount: priceCents,
         recurring: { interval: "month" },
       },
@@ -136,8 +141,11 @@ async function handleCheckout(req, res) {
     // checkout to the price's own currency (eur) everywhere. In code, so it's
     // not a dashboard setting that can silently drift back.
     adaptive_pricing: { enabled: false },
-    success_url: `${origin}/app?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${origin}/app?checkout=cancelled`,
+    // Back to Billing, the one page that reads ?checkout= — /app (the Dashboard)
+    // never showed "payment received", and before the webhook landed it showed a
+    // free account with a trial offer to someone who had just paid.
+    success_url: `${origin}/app/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${origin}/app/billing?checkout=cancelled`,
   };
   // Returning subscriber → reuse their Stripe customer. New user → let Checkout
   // create the customer from their email (skips a separate customers.create call
@@ -175,11 +183,25 @@ async function handleCheckout(req, res) {
   //      than any double-click and shorter than a genuine change of mind; by
   //      the time it rotates, the webhook has normally landed and guard 1
   //      catches the repeat instead.
-  if (profile?.stripe_subscription_id && profile?.paid_until && new Date(profile.paid_until) > new Date()) {
-    return res.status(409).json({
-      error: "already subscribed",
-      detail: "This account already has an active subscription. Manage it under Billing.",
-    });
+  //
+  //   Guard 1 asks STRIPE whether the subscription is still alive, not our
+  //   dates: while a renewal is failing (past_due) Stripe keeps retrying the old
+  //   invoice after paid_until has passed, so a date check let the person
+  //   "Resubscribe" — and when the retry succeeded they paid twice.
+  //   Guard 1b: Premium with no end date, or admin — there is nothing to buy.
+  if (profile?.stripe_subscription_id) {
+    let live = null;
+    try { live = await stripe.subscriptions.retrieve(profile.stripe_subscription_id); }
+    catch (e) { if (e?.code !== "resource_missing") throw e; }
+    if (live && !CARD_DONE.includes(live.status)) {
+      return res.status(409).json({
+        error: "already subscribed",
+        detail: "This account already has a subscription. Manage it under Billing.",
+      });
+    }
+  }
+  if (profile?.tier === "admin" || (profile?.tier === "paid" && !profile?.paid_until && !profile?.paid_pause_started)) {
+    return res.status(409).json({ error: "already_premium", detail: "This account already has Premium with no end date." });
   }
   // NOTE: in the Node SDK the idempotency key is a REQUEST OPTION (second
   // argument), not a body parameter. Putting it in `params` would send Stripe an
@@ -456,9 +478,34 @@ async function handlePortal(req, res) {
   const stripe = getStripe();
   const portal = await stripe.billingPortal.sessions.create({
     customer: profile.stripe_customer_id,
-    return_url: `${requestOrigin(req)}/app`,
+    return_url: `${requestOrigin(req)}/app/billing`,
   });
   return res.status(200).json({ url: portal.url });
+}
+
+// ─── subscription (authed) ───────────────────────────────────────────────
+// What the caller's card subscription is doing right now, from Stripe itself.
+// The Billing page needs it to stop promising "Renews" for a subscription the
+// customer cancelled in the portal (Stripe keeps it `active` until the period
+// ends) and to say "your payment failed" instead of "Premium ended — resubscribe"
+// while Stripe is still retrying a renewal.
+async function handleSubscriptionStatus(req, res) {
+  if (!isTrustedRequest(req)) return res.status(403).json({ error: "untrusted origin" });
+  const admin = getSupabaseAdmin();
+  const { profile, error, status } = await getUserFromRequest(req, admin);
+  if (error) return res.status(status).json({ error });
+  if (!profile?.stripe_subscription_id) return res.status(200).json({ subscription: null });
+  let sub;
+  try { sub = await getStripe().subscriptions.retrieve(profile.stripe_subscription_id); }
+  catch (e) {
+    if (e?.code === "resource_missing") return res.status(200).json({ subscription: null });
+    throw e;
+  }
+  const periodEnd = sub.items?.data?.[0]?.current_period_end ?? sub.current_period_end ?? null;
+  const endsUnix = sub.cancel_at || (sub.cancel_at_period_end ? periodEnd : null);
+  return res.status(200).json({
+    subscription: { status: sub.status, ends_at: endsUnix ? new Date(endsUnix * 1000).toISOString() : null },
+  });
 }
 
 // ─── set-price (admin) ─────────────────────────────────────────────────────
@@ -555,6 +602,15 @@ async function applySubscription(admin, stripe, sub, { deleted = false } = {}) {
   const { data: current } = await admin
     .from("user_profiles").select("tier, paid_started_at, paid_until").eq("id", userId).maybeSingle();
 
+  // An account the admin BLOCKED ("No access") is never handed Premium back by a
+  // payment event or the nightly reconcile. Blocking a card payer cancels the
+  // subscription in the same request (api/admin/set-subscription.js), so this
+  // should not happen — if it does, it is said loudly instead of undone silently.
+  if (current?.tier === "pending" && !terminal) {
+    console.error(`[stripe webhook] ${sub.id} is ${status} for user ${userId}, whom the admin blocked — access NOT restored; cancel the subscription in Stripe`);
+    return;
+  }
+
   const patch = { stripe_subscription_id: deleted ? null : sub.id };
   if (customerId) patch.stripe_customer_id = customerId;
 
@@ -568,7 +624,14 @@ async function applySubscription(admin, stripe, sub, { deleted = false } = {}) {
     patch.paid_until = new Date(periodEnd).getTime() > curMs ? periodEnd : current.paid_until;
     patch.paid_pause_started = null;
     if (current?.tier !== "admin") patch.tier = "paid";
-    if (!current?.paid_started_at) patch.paid_started_at = new Date().toISOString();
+    // "Premium from" is the start of THIS stretch of Premium: kept while it runs
+    // on, reset when the person comes back after it had ended — otherwise a
+    // January gift followed by an October subscription read "Premium since
+    // 1 January", ten months that never happened.
+    const running = current?.paid_until
+      ? new Date(current.paid_until).getTime() > Date.now()
+      : current?.tier === "paid";                     // no end date = Premium with no end
+    if (!current?.paid_started_at || !running) patch.paid_started_at = new Date().toISOString();
   }
   // GRACE (past_due / incomplete / paused): touch neither paid_until nor tier.
 
@@ -789,6 +852,7 @@ async function handleWebhook(req, res) {
 const METHODS = {
   checkout: ["POST"],
   portal: ["POST"],
+  subscription: ["POST"],
   "set-price": ["POST"],
   webhook: ["POST"],              // Stripe POSTs its events
   reconcile: ["GET", "POST"],     // Vercel cron GETs; POST stays for a manual run with the secret
@@ -805,6 +869,7 @@ export default async function handler(req, res) {
   try {
     if (action === "checkout") return await handleCheckout(req, res);
     if (action === "portal") return await handlePortal(req, res);
+    if (action === "subscription") return await handleSubscriptionStatus(req, res);
     if (action === "set-price") return await handleSetPrice(req, res);
     if (action === "webhook") return await handleWebhook(req, res);
     if (action === "reconcile") return await handleReconcile(req, res);

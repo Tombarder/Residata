@@ -21,11 +21,10 @@ import { getDataAccessToken, forceTokenRefresh } from "./authToken";
 import { useAuth } from "./useAuth";
 import { useCapabilities } from "./useCapabilities";
 import { track } from "./track";
+import { AI_DAILY_LIMITS } from "./aiLimits";
 
-// Mirror of server-side DAILY_LIMITS. If these get out of sync the
-// UI will briefly show a stale quota label until the server's 429
-// corrects it — still safe because the server is authoritative.
-const DAILY_LIMIT_BY_TIER = { anon: 1, free: 3, paid: 15, admin: 100 };
+// The server's own list (src/lib/aiLimits.js) — the quota shown here is the one enforced.
+const DAILY_LIMIT_BY_TIER = AI_DAILY_LIMITS;
 
 function storageKey(userId)  { return `residata_chat_${userId || "anon"}`; }
 function sessionKey(userId)  { return `residata_chat_session_${userId || "anon"}`; }
@@ -254,7 +253,7 @@ export function useChat({ lang = "sk" } = {}) {
         return;
       }
       if (r.status === 403) {
-        setError({ kind: "auth", text: L("Prístup odmietnutý. Ak máš tier 'pending', počkaj na schválenie.", "Access denied. If your tier is 'pending', wait for approval.") });
+        setError({ kind: "auth", text: L("Tvoj účet momentálne nemá prístup k AI asistentovi. Ak je to chyba, napíš nám na info@residata.eu.", "Your account has no access to the AI assistant right now. If this is a mistake, write to info@residata.eu.") });
         setMessages(prev => prev.slice(0, -1));
         return;
       }
@@ -318,9 +317,14 @@ export function useChat({ lang = "sk" } = {}) {
       track("chat_answer", { tier: j.tier, remaining: j.remaining?.today ?? null });
     } catch (e) {
       const aborted = e?.name === "AbortError";
+      // Never "HTTP 500: {json…}" in the chat bubble — the raw text goes to
+      // the activity log, the person gets a sentence.
+      if (!aborted) track("chat_error", { message: String(e?.message || e).slice(0, 200) });
       const text = aborted
         ? L("Otázka trvala príliš dlho — skús to znova.", "That took too long — please try again.")
-        : String(e?.message || e);
+        : /Failed to fetch|NetworkError|Load failed/i.test(String(e?.message))
+        ? L("Spojenie sa prerušilo — skontroluj internet a skús to znova.", "The connection dropped — check your internet and try again.")
+        : L("Odpoveď sa nepodarilo pripraviť — skús to znova o chvíľu.", "The answer could not be prepared — try again in a moment.");
       setError({ kind: "err", text });
       setMessages(prev => [...prev.slice(0, -1), { role: "user", content: q, error: text }]);
     } finally {

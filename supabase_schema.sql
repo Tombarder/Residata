@@ -150,16 +150,10 @@ create policy "flats_read_gated" on public.flats
     )
   );
 
--- Events: paid/admin only (history = paid feature)
-create policy "events_read_paid" on public.events
-  for select to authenticated using (
-    exists (
-      select 1 from public.user_profiles up
-      where up.id = auth.uid()
-        and up.tier in ('paid', 'admin')
-        and (up.expires_at is null or up.expires_at > now())
-    )
-  );
+-- Events: admin only. Each row is a sign-up with the person's e-mail address, so
+-- no customer may read it (the old "history = paid feature" policy exposed every
+-- sign-up to every trial user — supabase_migration_2026_10_signup_records_admin_only.sql).
+-- Read access is the admin policy (events_read_admin).
 
 -- User profiles: user sees their own; admin sees all
 create policy "profile_read_own" on public.user_profiles

@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   planProfileUpdate, planNewUser, accountStatus, statusCounts, readDateField,
-  startOfDayIso, endOfDayIso, dayKey, parseDay, errorText,
+  startOfDayIso, endOfDayIso, dayKey, parseDay, errorText, cardSubscriptionVerdict,
 } from "./adminUsers.js";
 import { resolveAccess } from "./access.js";
 
@@ -199,13 +199,47 @@ test("re-saving the same values writes nothing", () => {
 
 test("profile fields are cleaned; a name cannot be blanked; the note keeps its lines", () => {
   const row = { tier: "free", full_name: "Old", company: null };
-  const out = apply(row, { full_name: "<b>Eva</b>  Malá", company: "=HYPERLINK(1)", linkedin_url: "javascript:alert(1)", phone: "+421 900 (123) abc", subscription_note: "line one\nline two<script>" });
+  const out = apply(row, { full_name: "<b>Eva</b>  Malá", company: "=HYPERLINK(1)", phone: "+421 900 (123) abc", subscription_note: "line one\nline two<script>" });
   assert.equal(out._patch.full_name, "bEva/b Malá");
   assert.equal(out._patch.company, "HYPERLINK(1)");
-  assert.equal(out._patch.linkedin_url, undefined, "an unsafe URL that was null stays null — no change written");
   assert.equal(out._patch.phone, "+421 900 (123)");
   assert.equal(out._patch.subscription_note, "line one\nline twoscript");
   assert.equal(planProfileUpdate(row, { full_name: "   " }, { now: NOW }).error, "name_required");
+});
+
+test("a LinkedIn value is a link or it is refused — never silently stored as empty", () => {
+  const row = { tier: "free", full_name: "Eva" };
+  // How people paste it: no scheme. It is a link.
+  assert.equal(apply(row, { linkedin_url: "linkedin.com/in/eva" })._patch.linkedin_url, "https://linkedin.com/in/eva");
+  assert.equal(apply(row, { linkedin_url: "www.linkedin.com/in/eva" })._patch.linkedin_url, "https://www.linkedin.com/in/eva");
+  // Not a link, or a dangerous scheme: said, not dropped.
+  for (const bad of ["javascript:alert(1)", "data:text/html,x", "eva malá"]) {
+    assert.equal(planProfileUpdate(row, { linkedin_url: bad }, { now: NOW }).error, "bad_linkedin", bad);
+    assert.equal(planNewUser({ email: "eva@firma.sk", full_name: "Eva", linkedin_url: bad }, { now: NOW }).error, "bad_linkedin", bad);
+  }
+  // Emptying it is allowed.
+  assert.equal(apply({ ...row, linkedin_url: "https://x.sk" }, { linkedin_url: "" })._patch.linkedin_url, null);
+});
+
+// ── Someone paying by card ──────────────────────────────────────────────
+
+test("a card payer: ending Premium cancels the card, other access changes are refused", () => {
+  const payer = { tier: "paid", full_name: "Eva", stripe_subscription_id: "sub_1",
+    paid_started_at: "2026-09-01T10:00:00Z", paid_until: "2026-11-01T10:00:00Z" };
+  const verdict = (body) => {
+    const plan = planProfileUpdate(payer, body, { now: NOW });
+    return plan.error || cardSubscriptionVerdict(payer, plan.patch, NOW);
+  };
+  assert.equal(verdict({ tier: "free" }), "cancel", "Free ends Premium — the card must stop too");
+  assert.equal(verdict({ tier: "pending" }), "cancel", "No access — blocked but still charged is the bug");
+  assert.equal(verdict({ paid_until: "2026-09-02" }), "cancel", "an end date already past ends it too");
+  assert.equal(verdict({ paid_until: "2026-12-31" }), "refuse", "Stripe re-applies its period every night");
+  assert.equal(verdict({ paid_until: null }), "refuse", "no end on top of a card subscription");
+  assert.equal(verdict({ tier: "admin" }), "refuse");
+  assert.equal(verdict({ subscription_note: "VIP" }), "ok", "a note does not touch access");
+  assert.equal(verdict({ full_name: "Eva Malá" }), "ok");
+  // Nobody paying by card → never in the way.
+  assert.equal(cardSubscriptionVerdict({ ...payer, stripe_subscription_id: null }, { tier: "free" }, NOW), "ok");
 });
 
 // ── Creating an account ─────────────────────────────────────────────────

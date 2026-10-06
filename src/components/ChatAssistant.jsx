@@ -7,6 +7,7 @@
  */
 import { useEffect, useRef } from "react";
 import { useChat, GENERAL_KNOWLEDGE_RE } from "../lib/useChat";
+import { useCapabilities } from "../lib/useCapabilities";
 import { LimitBanner } from "./FloatingChat";
 import AiBetaBanner from "./AiBetaBanner";
 import PageHero from "./PageHero";
@@ -70,6 +71,11 @@ export function ChatProgress({ steps = [], showProgress, setShowProgress, lang =
 
 export default function ChatAssistant({ lang = "sk", setCurrent }) {
   const chat = useChat({ lang });
+  // The plan by the name the rest of the platform uses — the raw tier said
+  // "paid" to someone on a trial.
+  const { displayTier } = useCapabilities();
+  const planName = ({ paid: "Premium", trial: "Trial Premium", free: "Free", admin: "Admin",
+    pending: lang === "sk" ? "Bez prístupu" : "No access" })[displayTier] || "—";
   const L = (sk, en) => lang === "sk" ? sk : en;
 
   // SPA-nav helper. If parent passed setCurrent (Platform.jsx does), use it
@@ -139,7 +145,7 @@ export default function ChatAssistant({ lang = "sk", setCurrent }) {
             {chat.remaining == null ? `${chat.dailyLimit}` : `${chat.remaining.today} / ${chat.dailyLimit}`}
           </div>
           <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, marginTop: "0.1rem" }}>
-            tier: <span style={{ color: text }}>{chat.tier}</span>
+            {lang === "sk" ? "plán" : "plan"}: <span style={{ color: text }}>{planName}</span>
           </div>
         </div>
         )}

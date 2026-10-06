@@ -28,6 +28,7 @@ import { useTableSort, SortableTh } from "../components/SortableTable";
 import { getFreshAccessToken, authErrorMessage } from "../lib/sessionGuard";
 import { isPersonalEmail } from "../lib/emailValidation";
 import { localeTag } from "../lib/locale";
+import { resolveAccess } from "../lib/access";
 import {
   TZ, dayKey, accountStatus, statusCounts, filterKey, errorText,
   STATUS_LABELS, TYPE_LABELS, label,
@@ -108,19 +109,21 @@ export default function AdminUsers({ users, setUsers, selfId, lang = "sk", premi
   };
 
   /**
-   * A change that touches access on a Stripe subscriber is said out loud first.
+   * A change that touches access on a card payer is said out loud first — what
+   * the server will do with it (lib/adminUsers.js#cardSubscriptionVerdict):
+   * ending Premium cancels the card subscription, other date changes are refused.
    * Resolves to the change's own result, or false when the admin backs out.
    */
   const guardStripe = (u, run) => {
     if (!u.stripe_subscription_id) return run();
     return new Promise((resolve) => setConfirm({
       onCancel: () => resolve(false),
-      title: t("Užívateľ platí cez Stripe", "This user pays through Stripe"),
+      title: t("Užívateľ platí kartou", "This user pays by card"),
       body: t(
-        `${u.email} má aktívne predplatné v Stripe. Zmena tu ho v Stripe nezruší ani nezmení — pri ďalšej platbe Stripe Premium opäť predĺži. Zrušiť sa dá v Stripe.`,
-        `${u.email} has an active Stripe subscription. A change here does not cancel or alter it — the next payment extends Premium again. Cancel it in Stripe.`,
+        `${u.email} má predplatné kartou v Stripe. Ak mu Premium ukončíš (Free, Bez prístupu), predplatné sa hneď zruší a kartu mu už nestrhneme. Dátumy Premium mu meniť nejde — riadi ich Stripe.`,
+        `${u.email} has a card subscription in Stripe. Ending their Premium (Free, No access) cancels the subscription at once and the card is not charged again. Their Premium dates cannot be changed — Stripe owns them.`,
       ),
-      okLabel: t("Aj tak zmeniť", "Change anyway"),
+      okLabel: t("Pokračovať", "Continue"),
       run: async () => resolve(await run()),
     }));
   };
@@ -143,6 +146,24 @@ export default function AdminUsers({ users, setUsers, selfId, lang = "sk", premi
         t(`${u.email} sa síce prihlási, ale neuvidí žiadne dáta. Bežiace Premium sa ukončí dnes.`, `${u.email} can still sign in but will see no data. Running Premium ends today.`),
         t("Zablokovať", "Block"), true);
     }
+    // Free ↔ Premium moves a person's access today, so it is confirmed too —
+    // one mis-click in the row's picker used to end someone's Premium at once,
+    // overwriting the end date with no way back but the audit log.
+    const a = resolveAccess(u.tier || "pending", u);
+    const until = a.paidWindowActive ? fmtDay(u.paid_until, lang) : null;
+    if (tier === "free" && (a.paidActive || a.trialActive)) {
+      return ask(t("Ukončiť Premium dnes?", "End Premium today?"),
+        t(`${u.email} má ${a.paidActive ? `Premium ${until ? `do ${until}` : "bez konca"}` : "bežiaci trial"}. Prepnutím na Free sa skončí dnes; pôvodný dátum sa nevráti.`,
+          `${u.email} has ${a.paidActive ? `Premium ${until ? `until ${until}` : "with no end"}` : "a running trial"}. Switching to Free ends it today; the old date does not come back.`),
+        t("Ukončiť Premium", "End Premium"), true);
+    }
+    if (tier === "paid") {
+      return ask(t("Dať Premium?", "Give Premium?"),
+        a.paidWindowActive
+          ? t(`${u.email} má Premium do ${until} — zostane.`, `${u.email} keeps Premium until ${until}.`)
+          : t(`${u.email} dostane Premium od dnes bez konca. Dátum konca nastavíš v Upraviť.`, `${u.email} gets Premium from today with no end. Set an end date in Edit.`),
+        t("Dať Premium", "Give Premium"));
+    }
     return guardStripe(u, go);
   };
 
@@ -163,11 +184,11 @@ export default function AdminUsers({ users, setUsers, selfId, lang = "sk", premi
   const askDelete = (u) => setConfirm({
     title: t("Vymazať užívateľa natrvalo?", "Delete this user permanently?"),
     body: t(
-      `${u.email}${u.full_name ? ` (${u.full_name})` : ""} — účet aj všetky jeho dáta (nastavenia, uložené filtre, história) zmiznú a nedá sa to vrátiť.`,
-      `${u.email}${u.full_name ? ` (${u.full_name})` : ""} — the account and all its data (settings, saved filters, history) go, and this cannot be undone.`,
+      `${u.email}${u.full_name ? ` (${u.full_name})` : ""} — účet, nastavenia, uložené oblasti, otázky AI, história používania aj jeho správy zmiznú a nedá sa to vrátiť. Ostanú len faktúry a záznam o zmazaní.`,
+      `${u.email}${u.full_name ? ` (${u.full_name})` : ""} — the account, settings, saved areas, AI questions, usage history and their messages go, and this cannot be undone. Only invoices and a record of the deletion stay.`,
     ) + (u.stripe_subscription_id ? t(
-      " POZOR: platí cez Stripe — vymazaním účtu sa predplatné NEZRUŠÍ a Stripe mu bude ďalej účtovať. Najprv ho zruš v Stripe.",
-      " WARNING: pays through Stripe — deleting the account does NOT cancel the subscription and Stripe keeps charging. Cancel it in Stripe first.",
+      " Platí kartou — predplatné v Stripe sa zruší hneď spolu s účtom.",
+      " Pays by card — the Stripe subscription is cancelled together with the account.",
     ) : ""),
     okLabel: t("Vymazať natrvalo", "Delete permanently"),
     danger: true,
@@ -669,8 +690,8 @@ function UserForm({ mode, user, isSelf, lang, now, onClose, onSaved }) {
           )}
         {!creating && user?.stripe_subscription_id && (
           <div className="rd-form__full rd-alert rd-alert--warn" style={{ fontSize: "0.74rem" }}>
-            {t("Platí cez Stripe. Zmena typu alebo dátumov tu predplatné v Stripe nezruší ani nezmení — pri ďalšej platbe ho Stripe opäť predĺži.",
-               "Pays through Stripe. Changing the type or dates here does not cancel or alter the Stripe subscription — the next payment extends it again.")}
+            {t("Platí kartou (Stripe). Dátumy Premium riadi Stripe a meniť sa nedajú. Prepnutím na Free alebo Bez prístupu sa predplatné hneď zruší.",
+               "Pays by card (Stripe). Stripe owns the Premium dates; they cannot be changed. Switching to Free or No access cancels the subscription at once.")}
           </div>
         )}
         {personal && (

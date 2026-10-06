@@ -50,7 +50,9 @@ export default function PendingGate({ setCurrent, lang = "en" }) {
           width: 6, height: 6, borderRadius: "50%", background: "var(--accent)",
           animation: "pg-pulse 1.4s ease-in-out infinite",
         }} />
-        {lang === "sk" ? "Čakáme na prístup · live" : "Waiting for access · live"}
+        {/* No approval is pending — "pending" is an account set to No access.
+            What is live is the check: if access is given, this page opens by itself. */}
+        {lang === "sk" ? "Bez prístupu · obnoví sa samo" : "No access · updates by itself"}
       </div>
 
       <div>

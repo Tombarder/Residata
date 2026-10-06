@@ -36,7 +36,7 @@ test("admin note: everything the person typed is escaped, a non-http link is dro
 test("admin note: no dead one-click upgrade, one way to the admin panel", () => {
   const html = adminDigestHtml({ ...nasty, full_name: "Ján" }, WEB);
   assert.ok(!html.includes("approve-user"), "the approve-user link is back — it only acts on pending accounts");
-  assert.ok(html.includes(`${WEB}/app/admin`));
+  assert.ok(html.includes(`${WEB}/app/admin?tab=users`), "the button opens the Users tab");
   assert.ok(html.includes("2026-10-06 15:26"), "the sign-up time is Bratislava time");
 });
 

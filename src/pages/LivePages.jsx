@@ -2725,13 +2725,23 @@ function ChooseProjectGate({ projectId, projectName, profile, reloadProfile, set
       // state-flow is still used everywhere else in the app; this one
       // commit boundary is the right place to reset and reload.
       clearTimeout(fallback);
-      if (import.meta.env.DEV) console.log(`[ChooseProject] hard-navigating to /project/${projectId}`);
-      window.location.href = `/project/${projectId}`;
+      // Stay where the person is: picked inside the platform → the platform's
+      // project page. It always went to the public /project/<id> (marketing nav,
+      // ticker, trial popup), throwing a signed-in user out of the app.
+      const dest = window.location.pathname.startsWith("/app")
+        ? `/app/projects/${encodeURIComponent(projectId)}`
+        : `/project/${encodeURIComponent(projectId)}`;
+      if (import.meta.env.DEV) console.log(`[ChooseProject] hard-navigating to ${dest}`);
+      window.location.href = dest;
       return;  // prevent finally setBusy(false) — component is unmounting via navigation
     } catch (e) {
       if (import.meta.env.DEV) console.error("[ChooseProject] exception", e);
       clearTimeout(fallback);
-      setErr(e.message || String(e));
+      // The database's own sentence (English, technical) is for the log.
+      track("choose_project_error", { message: String(e?.message || e).slice(0, 200) });
+      setErr(/once|already|locked/i.test(String(e?.message))
+        ? (lang === "sk" ? "Projekt si už vybral — výber sa nedá zmeniť. Obnov stránku." : "You have already chosen a project — the choice cannot be changed. Reload the page.")
+        : (lang === "sk" ? "Výber sa neuložil — skús to znova o chvíľu." : "Your choice was not saved — try again in a moment."));
     } finally {
       setBusy(false);
     }
@@ -2752,8 +2762,8 @@ function ChooseProjectGate({ projectId, projectName, profile, reloadProfile, set
         </p>
         <p style={{ color: dim, fontSize: "0.85rem", marginBottom: "1.5rem" }}>
           {lang === "sk"
-            ? <>Pre prístup ku všetkým {trackedProjCount} projektom potrebuješ <button onClick={() => setCurrent("Pricing")} style={linkBtn}>paid tier</button>.</>
-            : <>For access to all {trackedProjCount} projects, <button onClick={() => setCurrent("Pricing")} style={linkBtn}>upgrade to paid</button>.</>}
+            ? <>Pre prístup ku všetkým {trackedProjCount} projektom potrebuješ <button onClick={() => setCurrent("Pricing")} style={linkBtn}>Premium</button>.</>
+            : <>For access to all {trackedProjCount} projects, <button onClick={() => setCurrent("Pricing")} style={linkBtn}>upgrade to Premium</button>.</>}
         </p>
         <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center" }}>
           <button className="btn-p" onClick={() => setCurrent(`Project:${profile.chosen_project_id}`)}>
@@ -2794,8 +2804,8 @@ function ChooseProjectGate({ projectId, projectName, profile, reloadProfile, set
       <div style={{ padding: "1rem 1.25rem", background: "rgba(245,166,35,0.08)", border: "1px solid rgba(245,166,35,0.3)", borderRadius: 8, marginBottom: "1.25rem", fontSize: "0.85rem", color: "var(--text)" }}>
         <strong style={{ color: orangeInk }}>⚠ {lang === "sk" ? "Pozor" : "Heads up"}:</strong>{" "}
         {lang === "sk"
-          ? "výber je po potvrdení uzamknutý. Budeš vidieť len tento jeden projekt. Pre viac projektov je potrebný paid tier."
-          : "this choice is locked once confirmed. You'll only see this one project. More projects require paid tier."}
+          ? "výber je po potvrdení uzamknutý. Budeš vidieť len tento jeden projekt. Pre viac projektov je potrebné Premium."
+          : "this choice is locked once confirmed. You'll only see this one project. More projects require Premium."}
       </div>
       <div style={{ display: "flex", gap: "0.75rem" }}>
         <button className="btn-p" onClick={assign} disabled={busy}>
@@ -3287,7 +3297,14 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
   const [premiumDomains, setPremiumDomains] = useState([]);
   const [err, setErr] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState("overview");
+  // ?tab=users opens that tab — the "new sign-up" e-mail links straight to
+  // the Users list; it used to land on Overview.
+  const [tab, setTab] = useState(() => {
+    try {
+      const want = new URLSearchParams(window.location.search).get("tab");
+      return ["overview", "users", "activity", "domains", "ai_chat"].includes(want) ? want : "overview";
+    } catch { return "overview"; }
+  });
   // One clock for the strip and the table (lib/useAdminClock.js).
   const [clockNow, bumpClock] = useAdminClock();
 

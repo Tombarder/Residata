@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../lib/useAuth";
 import { getLiveT } from "../lib/liveLang";
-import { validateBusinessEmail, signupEmailAllowed } from "../lib/emailValidation";
+import { validateBusinessEmail, signupEmailAllowed, personalEmailMessage } from "../lib/emailValidation";
 import { track } from "../lib/track";
+import { trialIntentAt } from "../lib/trial";
 import { loginErrorMessage } from "../lib/loginErrors";
 import { useBreakpointDown, BP } from "../lib/breakpoints";
 import { useEscape } from "../lib/useDismiss";
@@ -36,48 +37,64 @@ export default function LoginModal({ open, onClose, onSignedIn, lang = "en" }) {
   const [resent, setResent] = useState(false);
   const { signIn, verifyCode } = useAuth();
 
-  // Instant local verdict — no round-trip while typing.
-  const localEmailError = email ? validateBusinessEmail(email, lang) : null;
+  // The address as it will be sent: no stray spaces from a paste.
+  const addr = email.trim();
+  // Instant local verdict — no round-trip while typing. Only a first guess: the
+  // DATABASE decides who may sign up (its list of personal providers plus the
+  // addresses an admin let in), so every well-formed address is also put to the
+  // server, and its answer wins either way.
+  const localEmailError = addr ? validateBusinessEmail(addr, lang) : null;
+  const wellFormed = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(addr);
 
-  // …but exemptions live in the database, so when the local rule WOULD block a
-  // syntactically valid address we ask the server whether this one is exempt.
-  // Without this the submit button stays disabled for an exempt address and the
-  // person simply cannot sign up, however permissive the server is.
   // `verdict` is the server's answer and the address it was for; an answer for
-  // another address counts for nothing. Until the one on screen is answered the
-  // field says nothing alarming: a person the admin let in on a gmail address
-  // used to see "personal providers are not accepted" in red for the moment the
-  // check took — exactly when they are least sure they are in the right place.
-  const [verdict, setVerdict] = useState({ email: null, ok: false });
+  // another address counts for nothing. Until the one on screen is answered a
+  // locally-personal address shows a calm "checking" line rather than a red
+  // refusal: a person the admin let in on a gmail address used to see "personal
+  // providers are not accepted" for the moment the check took.
+  const [verdict, setVerdict] = useState({ email: null, ok: null });   // ok: true | false | null = could not check
   useEffect(() => {
-    if (!email || !email.includes("@") || !localEmailError) return;
+    if (!wellFormed) return;
     let cancelled = false;
     const t = setTimeout(async () => {
-      const ok = await signupEmailAllowed(email);
-      if (!cancelled) setVerdict({ email, ok });
+      const ok = await signupEmailAllowed(addr);
+      if (!cancelled) setVerdict({ email: addr, ok });
     }, 400);
     return () => { cancelled = true; clearTimeout(t); };
-  }, [email, localEmailError]);
+  }, [addr, wellFormed]);
 
-  const asked = !!localEmailError && email.includes("@");
-  const exempt = asked && verdict.email === email && verdict.ok;
-  const pending = asked && verdict.email !== email;
-  const emailError = exempt || pending ? null : localEmailError;
+  const checked = wellFormed && verdict.email === addr;
+  const refused = checked && verdict.ok === false;
+  const exempt = checked && verdict.ok === true && !!localEmailError;
+  const unknown = checked && verdict.ok === null;     // offline / server error — submit asks again
+  const pending = wellFormed && !!localEmailError && !checked;
+  // Red only for a real refusal. A half-typed address is not an error — the
+  // button simply waits (it used to say "Enter a valid email" from the first
+  // keystroke).
+  const emailError = refused ? personalEmailMessage(lang) : null;
 
   if (!open) return null;
 
 
   const submit = async (e) => {
     e.preventDefault();
-    const err = validateBusinessEmail(email, lang);
-    if (err && !(await signupEmailAllowed(email))) {
-      setError(err);
-      track("login_rejected_personal_email", { domain: email.split("@")[1] });
+    if (!wellFormed) { setError(lang === "sk" ? "Zadaj platný e-mail." : "Enter a valid email."); return; }
+    setError(null); setBusy(true);
+    // Always asked, whatever the form guessed: the database's list is the rule,
+    // and a "no" here is cleaner than a code request the database then refuses
+    // with a raw "Database error saving new user".
+    const allowed = await signupEmailAllowed(addr);
+    if (allowed !== true) {
+      setBusy(false);
+      if (allowed === false) {
+        setError(personalEmailMessage(lang));
+        track("login_rejected_personal_email", { domain: addr.split("@")[1] });
+      } else {
+        setError(lang === "sk" ? "Nepodarilo sa overiť adresu — skontroluj pripojenie a skús to znova." : "Couldn't check the address — check your connection and try again.");
+      }
       return;
     }
-    setError(null); setBusy(true);
-    track("login_code_requested", { domain: email.split("@")[1] });
-    const { error } = await signIn(email, { lang });
+    track("login_code_requested", { domain: addr.split("@")[1] });
+    const { error } = await signIn(addr, { lang, trialIntentAt: trialIntentAt() });
     setBusy(false);
     if (error) {
       setError(loginErrorMessage(error, lang));
@@ -93,7 +110,7 @@ export default function LoginModal({ open, onClose, onSignedIn, lang = "en" }) {
     if (!clean) return;
     setVerifyError(null); setBusyVerify(true);
     track("login_code_submitted", {});
-    const { error } = await verifyCode(email, clean);
+    const { error } = await verifyCode(addr, clean);
     setBusyVerify(false);
     if (error) {
       setVerifyError(t.login_code_invalid);
@@ -123,7 +140,7 @@ export default function LoginModal({ open, onClose, onSignedIn, lang = "en" }) {
   const resend = async () => {
     setVerifyError(null); setResent(false); setBusyResend(true);
     setCode("");
-    const { error } = await signIn(email, { lang });
+    const { error } = await signIn(addr, { lang, trialIntentAt: trialIntentAt() });
     setBusyResend(false);
     if (error) {
       setVerifyError(loginErrorMessage(error, lang));
@@ -180,7 +197,7 @@ export default function LoginModal({ open, onClose, onSignedIn, lang = "en" }) {
             <form onSubmit={submit}>
               <input
                 type="email" required autoFocus
-                value={email} onChange={e => setEmail(e.target.value)}
+                value={email} onChange={e => { setEmail(e.target.value); setError(null); }}
                 aria-label={t.login_placeholder}
                 placeholder={t.login_placeholder}
                 style={{
@@ -195,14 +212,15 @@ export default function LoginModal({ open, onClose, onSignedIn, lang = "en" }) {
                   // A personal address that IS let in (an admin made the account)
                   // must not read "work email required" under it.
                   : exempt ? (lang === "sk" ? "Na túto adresu ti pošleme kód." : "We'll send the code to this address.")
+                  : unknown ? (lang === "sk" ? "Adresu sa nepodarilo overiť — skús to znova." : "Couldn't check the address — try again.")
                   : t.login_biz_email_hint)}
               </div>
               {error && <div style={{ color: dangerInk, fontSize: "0.8rem", marginBottom: "0.75rem" }}>{error}</div>}
-              <button type="submit" disabled={busy || !email || !!emailError || pending} style={{
+              <button type="submit" disabled={busy || !wellFormed || !!emailError || pending} style={{
                 width: "100%", padding: "0.75rem", background: "var(--accent)", color: "var(--bg)",
                 fontWeight: 600, borderRadius: 8, border: "none",
-                cursor: (busy || emailError || pending) ? "not-allowed" : "pointer",
-                fontSize: "0.9rem", opacity: (busy || emailError || pending) ? 0.4 : 1,
+                cursor: (busy || !wellFormed || emailError || pending) ? "not-allowed" : "pointer",
+                fontSize: "0.9rem", opacity: (busy || !wellFormed || emailError || pending) ? 0.4 : 1,
               }}>{busy ? t.login_sending : t.login_send}</button>
             </form>
             <p style={{ fontSize: "0.7rem", color: "var(--text-faint)", marginTop: "1rem", textAlign: "center", lineHeight: 1.55 }}>
@@ -218,7 +236,7 @@ export default function LoginModal({ open, onClose, onSignedIn, lang = "en" }) {
             <div style={{ fontSize: "2rem", textAlign: "center", marginBottom: "0.5rem" }}>🔑</div>
             <h2 style={{ fontSize: "1.3rem", fontWeight: 700, textAlign: "center", marginBottom: "0.5rem" }}>{t.login_check_title}</h2>
             <p style={{ fontSize: "0.85rem", color: "var(--text-dim)", textAlign: "center", lineHeight: 1.6, marginBottom: "0.25rem" }}>
-              {t.login_check_body_prefix} <strong style={{ color: "var(--text)" }}>{email}</strong>{t.login_check_body_suffix}
+              {t.login_check_body_prefix} <strong style={{ color: "var(--text)" }}>{addr}</strong>{t.login_check_body_suffix}
             </p>
             <p style={{ fontSize: "0.7rem", color: "var(--text-faint)", textAlign: "center", marginBottom: "1rem" }}>
               {t.login_code_hint}
@@ -251,6 +269,13 @@ export default function LoginModal({ open, onClose, onSignedIn, lang = "en" }) {
                 fontSize: "0.78rem", cursor: busyResend ? "default" : "pointer", padding: 0,
                 fontFamily: "inherit",
               }}>{resent ? t.login_resent : t.login_resend}</button>
+              {/* A mistyped address used to be a dead end: the code step kept
+                  it through close and reopen, and "send a new code" went to the
+                  same wrong address — only a page reload got out. */}
+              <button type="button" onClick={() => { setSent(false); setCode(""); setVerifyError(null); setResent(false); setError(null); }} style={{
+                background: "none", border: "none", color: "var(--text-dim)",
+                fontSize: "0.78rem", cursor: "pointer", padding: 0, fontFamily: "inherit",
+              }}>{lang === "sk" ? "Iný e-mail" : "Different e-mail"}</button>
               <button onClick={onClose} style={{
                 background: "none", border: "none", color: "var(--text-faint)",
                 fontSize: "0.78rem", cursor: "pointer", padding: 0, fontFamily: "inherit",

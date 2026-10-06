@@ -379,7 +379,7 @@ export function LimitBanner({ error, lang, compact, onSignIn, onBilling }) {
         )}
         {(action === "sign_in" || action === "billing") && onBilling && (
           <button onClick={onBilling} style={ctaBtn("var(--bg)", green, "var(--bg)")}>
-            {L("Upgrade na paid", "Upgrade to paid")}
+            {L("Prejsť na Premium", "Upgrade to Premium")}
           </button>
         )}
         {action === "contact" && (

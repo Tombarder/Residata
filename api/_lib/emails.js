@@ -165,7 +165,7 @@ export function adminDigestHtml(user, webUrl) {
       <div style="${S.emailLine}">${escHtml(user.email)}${badge}</div>
       ${rows.join("")}
     </div>
-    <a href="${webUrl}/app/admin" style="${S.btnGreen}">Open admin → Users</a>`;
+    <a href="${webUrl}/app/admin?tab=users" style="${S.btnGreen}">Open admin → Users</a>`;
 
   return shell({
     title: "New Residata signup",

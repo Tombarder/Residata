@@ -12,7 +12,13 @@ test("the per-address wait says how long", () => {
   assert.match(loginErrorMessage(e, "sk"), /o 42 s/);
   assert.match(loginErrorMessage(e, "en"), /in 42 s/);
 });
-test("anything else passes through, and no error means no message", () => {
-  assert.equal(loginErrorMessage({ message: "Signups not allowed" }, "en"), "Signups not allowed");
+test("nothing technical reaches the screen, and no error means no message", () => {
+  // The database's business-e-mail gate, as Supabase reports it.
+  assert.match(loginErrorMessage({ message: "Database error saving new user" }, "sk"), /pracovný e-mail/);
+  assert.match(loginErrorMessage({ message: "Signups not allowed for otp" }, "en"), /work email/);
+  assert.match(loginErrorMessage({ message: "Failed to fetch" }, "sk"), /pripojenie/);
+  const other = loginErrorMessage({ message: "unexpected_failure: some internal thing" }, "sk");
+  assert.doesNotMatch(other, /unexpected_failure|internal/);
+  assert.match(other, /info@residata\.eu/);
   assert.equal(loginErrorMessage(null, "en"), null);
 });

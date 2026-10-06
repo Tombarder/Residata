@@ -140,6 +140,7 @@ export function TrialPopup({ lang = "sk", onCta }) {
   // miss. The moment the trial is active / used / the user is paid|admin,
   // showTrialOffer flips false and it never shows again.
   const { showTrialOffer: eligible } = useCapabilities();
+  const signedIn = Boolean(useAuth()?.user);
   const L = (sk, en) => lang === "sk" ? sk : en;
 
   useEffect(() => {
@@ -205,7 +206,12 @@ export function TrialPopup({ lang = "sk", onCta }) {
         // a sign-up/login modal must always win over a marketing nudge, so if the
         // login modal is open this promo can never paint over it.
         zIndex: "var(--z-popup)",
-        display: "flex", alignItems: "center", justifyContent: "center",
+        // Scrolls instead of clipping: centred in a short landscape phone the
+        // ~450 px card lost its top and bottom with no way to reach them. Same
+        // pattern as LoginModal — flex-start + the card's margin:auto centres it
+        // when it fits and lets it scroll when it does not.
+        display: "flex", alignItems: "flex-start", justifyContent: "center",
+        overflowY: "auto",
         // safe-area padding keeps the card + close button clear of the notch
         padding: "max(1rem, var(--safe-top)) max(1rem, var(--safe-right)) max(1rem, var(--safe-bottom)) max(1rem, var(--safe-left))",
         animation: "trialPopupBg 0.25s ease-out",
@@ -224,7 +230,7 @@ export function TrialPopup({ lang = "sk", onCta }) {
         maxWidth: 460, width: "100%",
         boxShadow: "0 30px 80px rgba(0,0,0,0.7), 0 0 60px color-mix(in srgb, var(--accent) 10%, transparent)",
         animation: "trialPopupCard 0.3s ease-out",
-        position: "relative",
+        position: "relative", margin: "auto 0",
       }}>
         <button
           onClick={() => close("close_x")}
@@ -288,7 +294,10 @@ export function TrialPopup({ lang = "sk", onCta }) {
           textAlign: "center", marginTop: "0.6rem",
           fontFamily: "'JetBrains Mono', monospace", fontSize: "0.72rem", color: "var(--text-dim)",
         }}>
-          {L("30s signup", "30s signup")}
+          {/* Said only to someone who has not signed up yet — a signed-in
+              free user gets this popup too, and was told about a 30-second
+              sign-up they had already done. */}
+          {signedIn ? L("jedným klikom · bez karty", "one click · no card") : L("registrácia za 30 s · bez karty", "30-second sign-up · no card")}
         </div>
 
         <button onClick={() => close("maybe_later")}

@@ -141,6 +141,13 @@ export default function CompleteProfile({ lang = "en" }) {
           : "Name, company and position cannot be empty or only special characters.");
         return;
       }
+      if (form.linkedin_url.trim() && !cleanedLinkedIn) {
+        setState("form");
+        setErr(lang === "sk"
+          ? "LinkedIn odkaz nie je platná adresa — napr. linkedin.com/in/meno, alebo pole nechaj prázdne."
+          : "The LinkedIn link is not a valid address — e.g. linkedin.com/in/name, or leave it empty.");
+        return;
+      }
 
       const { data, error } = await supabaseData.from("user_profiles").update({
         full_name: cleanedName,
@@ -163,11 +170,12 @@ export default function CompleteProfile({ lang = "en" }) {
         // whose profile IS complete back to fill the same form again.
         if (await profileAlreadyComplete(user.id)) { await enterApp(); return; }
         setState("error");
-        setErr(error
-          ? `${error.message}${error.details ? " — " + error.details : ""}`
-          : (lang === "sk"
-              ? "Údaje sa neuložili. Skús to prosím znova — nič si nemusíš prepisovať."
-              : "Your details weren't saved. Please try again — nothing you typed was lost."));
+        // The database's own words ("These fields are managed by Residata…",
+        // "JWT expired") are for the log, not for someone signing up.
+        if (error) track("profile_save_error", { message: String(error.message || "").slice(0, 200) });
+        setErr(lang === "sk"
+          ? "Údaje sa neuložili. Skús to prosím znova — nič si nemusíš prepisovať."
+          : "Your details weren't saved. Please try again — nothing you typed was lost.");
         return;
       }
 
@@ -191,7 +199,10 @@ export default function CompleteProfile({ lang = "en" }) {
       // socket) says nothing about whether the row was written.
       if (await profileAlreadyComplete(user.id)) { await enterApp(); return; }
       setState("error");
-      setErr(e.message || String(e));
+      track("profile_save_error", { message: String(e?.message || e).slice(0, 200) });
+      setErr(lang === "sk"
+        ? "Údaje sa neuložili — skontroluj pripojenie a skús to znova. Nič si nemusíš prepisovať."
+        : "Your details weren't saved — check your connection and try again. Nothing you typed was lost.");
     }
   };
 
@@ -272,7 +283,7 @@ export default function CompleteProfile({ lang = "en" }) {
                 />
               </Field>
               <Field label={t.cp_linkedin}>
-                <input type="url" value={form.linkedin_url} maxLength={500} autoComplete="url" onChange={e => setForm({...form, linkedin_url: e.target.value})} placeholder={t.cp_linkedin_ph} style={fieldStyle} />
+                <input type="text" inputMode="url" value={form.linkedin_url} maxLength={500} autoComplete="url" onChange={e => setForm({...form, linkedin_url: e.target.value})} placeholder={t.cp_linkedin_ph} style={fieldStyle} />
               </Field>
               <Field label={t.cp_phone}>
                 <input type="tel" value={form.phone} maxLength={32} autoComplete="tel" onChange={e => setForm({...form, phone: e.target.value})} placeholder={t.cp_phone_ph} style={fieldStyle} />

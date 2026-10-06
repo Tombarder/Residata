@@ -23,6 +23,12 @@
 // NOW, a day means a Bratislava calendar day, "from" is never in the future, "to"
 // never before "from". A bad request is refused with a code the panel says in words.
 //
+// A CARD PAYER (live Stripe subscription) is the exception: Stripe owns their
+// period and re-applies it nightly, so ending their Premium (Free / No access /
+// a past end date) cancels the subscription at Stripe first — 502
+// card_cancel_failed and no change if that fails — and any other access change
+// is refused, 409 card_subscription (lib/adminUsers.js#cardSubscriptionVerdict).
+//
 // The one-click shortcuts this endpoint used to carry (+N trial days, +N paid days,
 // pause / unpause) are gone with the buttons that sent them (Boss, 2026-10-06) —
 // the period is now edited directly.
@@ -34,7 +40,11 @@
 import { createClient } from "@supabase/supabase-js";
 import { isTrustedRequest as isTrustedOrigin } from "../_lib/origin.js";
 import { accountCreatedHtml, inviteSubject, sendEmail } from "../_lib/emails.js";
-import { planProfileUpdate } from "../../src/lib/adminUsers.js";
+import { planProfileUpdate, cardSubscriptionVerdict } from "../../src/lib/adminUsers.js";
+import { getStripe } from "../_lib/stripe.js";
+
+/** Stripe subscription statuses after which nothing is charged again. */
+const CARD_DONE = ["canceled", "incomplete_expired", "unpaid"];
 
 export const maxDuration = 20;   // an optional e-mail rides on the same request
 
@@ -81,6 +91,36 @@ export default async function handler(req, res) {
     // "Nothing changed" is fine when the point of the request is the e-mail.
     if (plan.error && !(sendInvite && plan.error === "nothing_to_change")) return res.status(400).json(plan);
     const patch = plan.patch || {};
+
+    // Someone paying by card: Stripe owns their period (see cardSubscriptionVerdict).
+    // Ending their Premium cancels the card subscription FIRST, so the person is
+    // never left blocked-but-charged; any other access change is refused.
+    const verdict = cardSubscriptionVerdict(target, patch, now);
+    if (verdict !== "ok") {
+      let sub = null;
+      try {
+        sub = await getStripe().subscriptions.retrieve(target.stripe_subscription_id);
+      } catch (e) {
+        if (e?.code !== "resource_missing") {
+          console.error("[set-subscription] stripe lookup failed", e?.message);
+          return res.status(502).json({ error: "card_cancel_failed", detail: String(e?.message || e).slice(0, 200) });
+        }
+      }
+      const live = sub && !CARD_DONE.includes(sub.status);
+      if (live && verdict === "refuse") {
+        return res.status(409).json({ error: "card_subscription", message: "Stripe owns the Premium period of a card subscriber" });
+      }
+      if (live) {
+        try {
+          await getStripe().subscriptions.cancel(target.stripe_subscription_id);
+        } catch (e) {
+          console.error("[set-subscription] stripe cancel failed", e?.message);
+          return res.status(502).json({ error: "card_cancel_failed", detail: String(e?.message || e).slice(0, 200) });
+        }
+      }
+      // Cancelled now, or already over at Stripe: either way no card pays any more.
+      patch.stripe_subscription_id = null;
+    }
     const nextTier = patch.tier ?? target.tier;
     if (sendInvite && nextTier === "pending") {
       return res.status(400).json({ error: "invite_no_access", message: "the account has no access to announce" });

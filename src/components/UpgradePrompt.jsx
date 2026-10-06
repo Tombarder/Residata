@@ -4,8 +4,8 @@ import { useCapabilities } from "../lib/useCapabilities";
  * Zjednotený upgrade-message komponent. Auto-vyberie tón podľa tier-u.
  *
  * - anon → "Sign up for free"
- * - pending → "Waiting for approval"
- * - free → "Upgrade to paid"
+ * - pending → "No access" (an account the admin set to No access)
+ * - free → "Upgrade to Premium"
  * - paid/admin → null (upgrade im netreba ukazovať)
  *
  * Props:
@@ -96,11 +96,11 @@ const translations = {
     anon_body: (f) => `Create a free account to access ${f} and more. Takes 30 seconds.`,
     anon_body_generic: "Create a free account to unlock full data. Takes 30 seconds.",
     anon_cta: "Get Access",
-    pending_title: "Waiting for approval",
-    pending_body: "Your account is under review. You'll get an email once approved (usually within a few hours).",
-    free_title: "Paid feature",
-    free_body: (f) => `${f} is part of the paid tier. Upgrade to unlock this and more.`,
-    free_body_generic: "This is a paid feature. Upgrade to unlock it.",
+    pending_title: "No access",
+    pending_body: "Your account has no access to the data right now. If you think this is a mistake, write to info@residata.eu.",
+    free_title: "Premium feature",
+    free_body: (f) => `${f} is part of Premium. Upgrade to unlock this and more.`,
+    free_body_generic: "This is a Premium feature. Upgrade to unlock it.",
     free_cta: "See pricing",
   },
   sk: {
@@ -108,11 +108,11 @@ const translations = {
     anon_body: (f) => `Vytvor si free účet pre prístup k ${f} a ďalším. Trvá 30 sekúnd.`,
     anon_body_generic: "Vytvor si free účet pre prístup k plným dátam. Trvá 30 sekúnd.",
     anon_cta: "Získať prístup",
-    pending_title: "Čakáš na schválenie",
-    pending_body: "Tvoj účet je v procese schválenia. Dostaneš email po schválení (zvyčajne do pár hodín).",
-    free_title: "Platená funkcia",
-    free_body: (f) => `${f} je súčasťou paid tieru. Upgradni pre odomknutie.`,
-    free_body_generic: "Toto je platená funkcia. Upgradni pre odomknutie.",
+    pending_title: "Bez prístupu",
+    pending_body: "Tvoj účet momentálne nemá prístup k dátam. Ak si myslíš, že ide o chybu, napíš nám na info@residata.eu.",
+    free_title: "Funkcia Premium",
+    free_body: (f) => `${f} je súčasťou Premium. Prejdi na Premium a odomkni ju.`,
+    free_body_generic: "Toto je funkcia Premium. Prejdi na Premium a odomkni ju.",
     free_cta: "Zobraziť cenník",
   },
 };

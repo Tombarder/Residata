@@ -55,8 +55,13 @@ export function cleanText(raw, { max = 200 } = {}) {
  */
 export function cleanUrl(raw, { max = 500 } = {}) {
   if (typeof raw !== "string") return "";
-  const s = raw.trim().slice(0, max);
+  let s = raw.trim().slice(0, max);
   if (!s) return "";
+  // "linkedin.com/in/jan" / "www.linkedin.com/in/jan" is how people paste a
+  // profile; it has no scheme, so it was rejected (the browser blocked the form,
+  // the admin form stored nothing). No scheme at all → https. Anything WITH a
+  // scheme still has to be http(s) below, so javascript: / data: stay out.
+  if (!/^[a-z][a-z0-9+.-]*:/i.test(s) && /^[^\s/]+\.[^\s/]+/.test(s)) s = `https://${s}`;
   try {
     const u = new URL(s);
     if (u.protocol !== "http:" && u.protocol !== "https:") return "";

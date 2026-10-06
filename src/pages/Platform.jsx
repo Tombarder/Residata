@@ -31,9 +31,10 @@ import { supabaseData, SUPABASE_URL, SUPABASE_ANON_KEY } from "../lib/supabase";
 import { getFreshAccessToken } from "../lib/sessionGuard";
 import { useActivateTrial } from "../lib/useActivateTrial";
 import { daysLeftText } from "../lib/dates";
-import { startCheckout, openBillingPortal } from "../lib/billing";
+import { startCheckout, openBillingPortal, getCardSubscription } from "../lib/billing";
 import { pushRoute } from "../lib/routing";
 import { track } from "../lib/track";
+import { AI_DAILY_LIMITS } from "../lib/aiLimits";
 import { cleanText, cleanUrl, cleanPhone } from "../lib/sanitize";
 import {
   LiveDashboard, LiveProjectDetail, LiveAnalytics, LiveAdmin,
@@ -169,7 +170,7 @@ const NAV = [
     { page: "App:Exports",   label: { en: "Exports",    sk: "Exporty"   }, Icon: IconDownload, requires: "view_exports_page" },
   ]},
   { group: "account", items: [
-    { page: "App:Billing",  label: { en: "Billing & tier", sk: "Platba a tier" }, Icon: IconCard },
+    { page: "App:Billing",  label: { en: "Plan & billing", sk: "Predplatné" }, Icon: IconCard },
     { page: "App:Settings", label: { en: "Settings",       sk: "Nastavenia"   }, Icon: IconSettings },
   ]},
   { group: "admin", items: [
@@ -536,8 +537,10 @@ function Sidebar({ page, lastProjectsPage, lang, can, tier, email, onNavigate, o
 // database value); the product is called Premium everywhere a user sees it —
 // the pricing page, the trial, the e-mails, the admin panel.
 function tierName(tier, lang = "sk") {
+  // "pending" is an account the admin set to No access — nothing is waiting for
+  // an approval any more (sign-ups are approved the moment the profile is saved).
   return ({ paid: "Premium", trial: "Trial", free: "Free", admin: "Admin",
-            pending: lang === "sk" ? "Čaká" : "Pending" })[tier] || tier;
+            pending: lang === "sk" ? "Bez prístupu" : "No access" })[tier] || tier;
 }
 
 function TierBadgeSmall({ tier, lang }) {
@@ -574,7 +577,7 @@ function TopBar({ page, lang, setLang, tier }) {
     "App:Reports":      { en: "Reports",       sk: "Reporty"      },
     "App:Assistant": { en: "AI Assistant",    sk: "AI asistent"  },
     "App:Exports":   { en: "Exports",         sk: "Exporty"      },
-    "App:Billing":   { en: "Billing & tier",  sk: "Platba a tier"},
+    "App:Billing":   { en: "Plan & billing",  sk: "Predplatné"},
     "App:Settings":  { en: "Settings",        sk: "Nastavenia"   },
     "App:Admin":     { en: "Admin",           sk: "Admin"        },
     "App:Locations": { en: "Locations",       sk: "Polohy"       },
@@ -886,8 +889,8 @@ function UpgradeOverlay({ lang, requiredFor, currentTier, setCurrent }) {
     view_analytics: {
       title:  lang === "sk" ? "Analytika a trendy" : "Analytics & trends",
       sub:    lang === "sk"
-        ? "Toto je ukážka paid sekcie. Pivot cez všetky byty, rebríčky okresov a developerov, rýchlosť predaja za posledný mesiac — odomkni reálne čísla upgradom."
-        : "This is a preview of the paid section. Pivot across every unit, district & developer leaderboards, 30-day sales velocity — upgrade to see the real numbers.",
+        ? "Toto je ukážka sekcie Premium. Pivot cez všetky byty, rebríčky okresov a developerov, rýchlosť predaja za posledný mesiac — odomkni reálne čísla upgradom."
+        : "This is a preview of a Premium section. Pivot across every unit, district & developer leaderboards, 30-day sales velocity — upgrade to see the real numbers.",
     },
     market_radar: {
       title:  lang === "sk" ? "Market Radar — analytická mapa" : "Market Radar — analytics map",
@@ -898,8 +901,8 @@ function UpgradeOverlay({ lang, requiredFor, currentTier, setCurrent }) {
     view_monthly_reports: {
       title:  lang === "sk" ? "Mesačné reporty" : "Monthly reports",
       sub:    lang === "sk"
-        ? "Toto je ukážka paid reportov. PDF / CSV na každý scope — trh, mesto, časť mesta, projekt, developer — s historickým trendom. Upgrade-ni pre plný prístup."
-        : "Preview of the paid reports. PDF / CSV for every scope — market, city, district, project, developer — with historical trend. Upgrade for full access.",
+        ? "Toto je ukážka reportov Premium. PDF / CSV na každý scope — trh, mesto, časť mesta, projekt, developer — s historickým trendom. Upgrade-ni pre plný prístup."
+        : "Preview of the Premium reports. PDF / CSV for every scope — market, city, district, project, developer — with historical trend. Upgrade for full access.",
     },
     export_data: {
       title:  lang === "sk" ? "Exporty CSV / API" : "CSV / API exports",
@@ -968,7 +971,7 @@ function UpgradeOverlay({ lang, requiredFor, currentTier, setCurrent }) {
         onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 6px 18px color-mix(in srgb, var(--accent) 30%, transparent)"; }}
         onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = "none"; }}
       >
-        {lang === "sk" ? "Upgrade → paid" : "Upgrade → paid"}
+        {lang === "sk" ? "Prejsť na Premium →" : "Upgrade to Premium →"}
       </button>
     </div>
   );
@@ -990,7 +993,7 @@ function PlatformProjects({ lang, setCurrent, openLogin }) {
 // ─── Billing page ───────────────────────────────────────────────
 function PlatformBilling({ lang, setCurrent }) {
   const caps = useCapabilities();
-  const { tier, baseTier, trialActive, trialDaysLeft, trialUntil, canStartTrial,
+  const { displayTier, baseTier, trialActive, trialDaysLeft, trialUntil, canStartTrial,
           paidActive, paidPaused, paidWindowActive, paidDaysLeft, paidUntil, paidStartedAt } = caps;
   const { profile } = useAuth();
   const pricing = usePricing(lang);   // DB-driven price (falls back to defaults below)
@@ -999,16 +1002,19 @@ function PlatformBilling({ lang, setCurrent }) {
   // "regular price" showed the same number as the price it was discounting.
   const anchorDisplay = pricing.ready ? pricing.anchorDisplay : FALLBACK_ANCHOR_DISPLAY;
 
-  // Display logic — the "effective" tier (badge shown) and the
-  // "base" tier (raw column) can disagree:
-  //   · base=free + trial active   → effective=paid, baseTier=free
-  //   · base=paid + paid expired   → effective=free, baseTier=paid
-  //   · base=paid + paused         → effective=free, baseTier=paid
-  // We branch on the actual scenario, not just one of the labels.
-  const isFree  = baseTier === "free";
-  const isPaid  = baseTier === "paid";
+  // What the person HAS, never the raw tier column — the two disagree, and the
+  // page used to branch on the column: a 'free' row with Premium dates (granted
+  // by date) was told "Free" and offered Subscribe for access it already had; a
+  // paused row read "Premium — full access" beside a FREE badge; a subscriber
+  // who paid during the trial kept the trial countdown.
+  //   premium      — real Premium now (card, granted dates, or no-end), any base tier
+  //   onTrial      — a running trial and no Premium
+  //   premiumEnded — had Premium, it ended (date passed) or was paused
   const isAdmin = baseTier === "admin";
-  const paidExpired = isPaid && !paidActive && !paidPaused && paidUntil != null;
+  const premium = !isAdmin && paidActive;
+  const onTrial = !isAdmin && !premium && trialActive;
+  const premiumEnded = !isAdmin && !premium && (paidPaused || (paidUntil != null && paidUntil <= Date.now()));
+  const isFree = !isAdmin && !premium;
 
   // fmtDate first (TDZ — const, not hoisted) so approvedAt can use it.
   const fmtDate = (ts) => ts ? new Date(ts).toLocaleDateString(localeTag(lang), { day: "numeric", month: "long", year: "numeric" }) : "—";
@@ -1023,6 +1029,18 @@ function PlatformBilling({ lang, setCurrent }) {
   const [payBusy, setPayBusy] = useState(false);
   const [payErr, setPayErr] = useState("");
   const [checkoutMsg, setCheckoutMsg] = useState(null); // "success" | "cancelled"
+
+  // A card subscription as Stripe has it now: cancelled-but-running (ends_at)
+  // or a renewal Stripe is still retrying (past_due) — neither is in our row.
+  const subId = profile?.stripe_subscription_id || null;
+  const [cardStatus, setCardStatus] = useState(null);
+  useEffect(() => {
+    if (!subId) return undefined;
+    let live = true;
+    getCardSubscription().then((sub) => { if (live) setCardStatus(sub); });
+    return () => { live = false; };
+  }, [subId]);
+  const cardRetrying = Boolean(subId && cardStatus && ["past_due", "incomplete"].includes(cardStatus.status));
 
   // Detect return from Stripe Checkout (?checkout=success|cancelled) and strip
   // the query params so a reload doesn't re-trigger the banner.
@@ -1044,6 +1062,10 @@ function PlatformBilling({ lang, setCurrent }) {
     } catch (e) {
       setPayErr(e?.message === "SESSION_EXPIRED"
         ? (lang === "sk" ? "Relácia vypršala — prihlás sa znova." : "Session expired — please sign in again.")
+        : e?.code === "already subscribed"
+        ? (lang === "sk" ? "Predplatné už máš — kartu a platby spravuješ cez „Spravovať platbu“." : "You already have a subscription — manage your card and payments with “Manage billing”.")
+        : e?.code === "already_premium"
+        ? (lang === "sk" ? "Premium už máš, bez dátumu konca — nie je čo platiť." : "You already have Premium with no end date — there is nothing to pay.")
         : (lang === "sk" ? "Nepodarilo sa spustiť platbu. Skús znova." : "Couldn't start checkout. Please try again."));
     } finally {
       setPayBusy(false);
@@ -1094,19 +1116,16 @@ function PlatformBilling({ lang, setCurrent }) {
       {/* Current tier card */}
       <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 12, padding: "1.75rem 2rem", marginBottom: "1.25rem" }}>
         <div style={{ fontFamily: mono, fontSize: "0.65rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.4rem" }}>
-          {lang === "sk" ? "Tvoj aktuálny tier" : "Your current tier"}
+          {lang === "sk" ? "Tvoj aktuálny plán" : "Your current plan"}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.75rem", flexWrap: "wrap" }}>
           {/* During a trial the effective tier is "paid", but the user isn't paying —
               show a TRIAL badge, not PAID, so it isn't misleading. */}
-          <TierBadgeSmall tier={trialActive && !paidActive ? "trial" : tier} lang={lang} />
+          <TierBadgeSmall tier={displayTier} lang={lang} />
           <span style={{ fontSize: "1.35rem", fontWeight: 700, color: textLight, letterSpacing: "-0.02em" }}>
-            {isFree && (trialActive ? (lang === "sk" ? "Free · trial Premium" : "Free · Premium trial") : "Free")}
-            {isPaid && !paidExpired && "Premium"}
-            {paidExpired && "Free"}
-            {isAdmin && "Admin"}
+            {isAdmin ? "Admin" : premium ? "Premium" : onTrial ? (lang === "sk" ? "Free · trial Premium" : "Free · Premium trial") : "Free"}
           </span>
-          {trialActive && (
+          {onTrial && (
             <span style={{ fontSize: "0.75rem", color: accentInk, fontFamily: mono, background: "color-mix(in srgb, var(--accent) 12%, transparent)", border: `1px solid ${green}`, borderRadius: 100, padding: "2px 10px" }}>
               🎁 {trialDaysLeft <= 0
                 ? (lang === "sk" ? "Trial · posledný deň" : "Trial · last day")
@@ -1118,18 +1137,18 @@ function PlatformBilling({ lang, setCurrent }) {
           </span>}
         </div>
         <p style={{ color: "var(--text-2)", fontSize: "0.9rem", lineHeight: 1.65, margin: 0 }}>
-          {trialActive && isFree && (lang === "sk"
-            ? <>Máš počas trial-u prístup Premium — všetky projekty, analytika, história a reporty (sťahovanie dát cez Exporty je len v platenom pláne). Trial končí <strong style={{ color: textLight }}>{fmtDate(trialUntil)}</strong>. Bez karty — po skončení trial-u jednoducho padneš späť na free tier, nič ti nestrhneme.</>
+          {onTrial && (lang === "sk"
+            ? <>Máš počas trial-u prístup Premium — všetky projekty, analytika, história a reporty (sťahovanie dát cez Exporty je len v platenom pláne). Trial končí <strong style={{ color: textLight }}>{fmtDate(trialUntil)}</strong>. Bez karty — po skončení trial-u jednoducho prejdeš späť na Free, nič ti nestrhneme.</>
             : <>You have Premium access during the trial — every project, analytics, history and reports (downloading data in Exports is in the paid plan only). Trial ends <strong style={{ color: textLight }}>{fmtDate(trialUntil)}</strong>. No card required — when the trial ends you simply drop back to free, nothing is charged.</>)}
-          {((!trialActive && isFree) || paidExpired) && (lang === "sk"
+          {isFree && !onTrial && (lang === "sk"
             ? "Ako free user vidíš zoznam všetkých projektov a plný detail 1 projektu podľa tvojho výberu. Analytika, reporty a exporty sú v Premium."
             : "As a free user you see the full project list and full detail of 1 project of your choice. Analytics, reports and exports are in Premium.")}
-          {isPaid && !paidExpired && (lang === "sk"
+          {premium && (lang === "sk"
             ? "Máš plný prístup — všetky projekty, historické dáta, analytika, exporty, mesačné reporty."
             : "You have full access — every project, historical data, analytics, exports, monthly reports.")}
           {isAdmin && (lang === "sk"
-            ? "Admin tier — plný prístup plus admin panel pre správu užívateľov."
-            : "Admin tier — full access plus the admin panel for user management.")}
+            ? "Admin — plný prístup plus admin panel pre správu užívateľov."
+            : "Admin — full access plus the admin panel for user management.")}
         </p>
       </div>
 
@@ -1172,7 +1191,7 @@ function PlatformBilling({ lang, setCurrent }) {
           Pricing messaging highlights the welcome 50%-off-3-months
           gift to stay on-brand (founder offering value, not desperate
           for a sale). */}
-      {isFree && (
+      {isFree && !premiumEnded && (
         <div style={{
           background: "linear-gradient(135deg, color-mix(in srgb, var(--accent) 8%, transparent), color-mix(in srgb, var(--accent) 2%, transparent))",
           border: "1px solid color-mix(in srgb, var(--accent) 30%, transparent)", borderRadius: 12, padding: "1.75rem 2rem", marginBottom: "1.25rem",
@@ -1188,7 +1207,7 @@ function PlatformBilling({ lang, setCurrent }) {
             <li>{lang === "sk" ? "Analytika, trendy, heat mapy" : "Analytics, trends, district heat maps"}</li>
             <li>{lang === "sk" ? "Mesačné PDF reporty" : "Monthly PDF reports"}</li>
             <li>{lang === "sk" ? "CSV exporty + REST API" : "CSV exports + REST API"}</li>
-            <li>{lang === "sk" ? "AI asistent · 30 otázok / deň" : "AI assistant · 30 questions / day"}</li>
+            <li>{lang === "sk" ? `AI asistent · ${AI_DAILY_LIMITS.paid} otázok / deň` : `AI assistant · ${AI_DAILY_LIMITS.paid} questions / day`}</li>
           </ul>
           <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center" }}>
             <button type="button" onClick={handleSubscribe} disabled={payBusy} className="btn-p" style={{ fontSize: "0.9rem" }}>
@@ -1213,10 +1232,10 @@ function PlatformBilling({ lang, setCurrent }) {
       )}
 
       {/* Paid subscription card — countdown + manage */}
-      {isPaid && (paidActive || paidPaused) && (
+      {premium && (
         <SubscriptionCard
           lang={lang}
-          paused={paidPaused}
+          paused={false}
           paidWindowActive={paidWindowActive}
           paidUntil={paidUntil}
           paidStartedAt={paidStartedAt}
@@ -1226,7 +1245,11 @@ function PlatformBilling({ lang, setCurrent }) {
           manageBusy={payBusy}
           manageErr={payErr}
           billing={{
-            byCard: Boolean(profile?.stripe_customer_id),
+            // A live card subscription — not merely a Stripe customer id, which
+            // stays on the profile for ever once someone has paid by card, so a
+            // later gift would read "Card — billed monthly" with a Manage button.
+            byCard: Boolean(profile?.stripe_subscription_id),
+            endsAt: cardStatus?.ends_at || null,
             companyName: profile?.billing_company_name || null,
             companyId: profile?.billing_company_id || null,
             vatId: profile?.billing_vat_id || null,
@@ -1236,21 +1259,45 @@ function PlatformBilling({ lang, setCurrent }) {
       )}
 
       {/* Paid expired — show resubscribe CTA prominently. */}
-      {isPaid && paidExpired && (
+      {premiumEnded && cardRetrying && (
         <div style={{
           background: "linear-gradient(135deg, rgba(245,166,35,0.1), rgba(245,166,35,0.02))",
           border: "1px solid rgba(245,166,35,0.4)", borderRadius: 12, padding: "1.75rem 2rem", marginBottom: "1.25rem",
         }}>
           <div style={{ fontFamily: mono, fontSize: "0.65rem", color: orangeInk, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.5rem", fontWeight: 700 }}>
-            ⚠ {lang === "sk" ? "Premium skončilo" : "Premium ended"}
+            ⚠ {lang === "sk" ? "Platba kartou sa nepodarila" : "Card payment failed"}
           </div>
-          <h3 style={{ fontSize: "1.2rem", fontWeight: 700, color: textLight, margin: "0 0 0.5rem" }}>
-            {lang === "sk" ? `Skončilo ${fmtDate(paidUntil)}` : `Ended on ${fmtDate(paidUntil)}`}
-          </h3>
           <p style={{ color: "var(--text-2)", fontSize: "0.9rem", lineHeight: 1.6, margin: "0 0 1rem" }}>
             {lang === "sk"
-              ? "Tvoj prístup teraz funguje na free úrovni. Premium môžeš obnoviť tlačidlom nižšie alebo nám napíš."
-              : "Your access is now at the free tier. You can renew Premium with the button below, or write to us."}
+              ? "Obnovenie predplatného neprešlo a Stripe platbu skúša znova. Aktualizuj kartu — po úspešnej platbe sa Premium vráti samo. Nové predplatné nezakladaj, platil by si dvakrát."
+              : "Your renewal did not go through and Stripe is retrying it. Update your card — Premium comes back by itself once the payment succeeds. Do not start a new subscription, you would pay twice."}
+          </p>
+          <button type="button" onClick={handleManage} disabled={payBusy} className="btn-p" style={{ fontSize: "0.88rem" }}>
+            {payBusy ? "…" : (lang === "sk" ? "Aktualizovať kartu" : "Update card")}
+          </button>
+          {payErr && (
+            <div style={{ marginTop: "0.6rem", fontSize: "0.82rem", color: dangerInk, fontFamily: mono }}>{payErr}</div>
+          )}
+        </div>
+      )}
+
+      {premiumEnded && !cardRetrying && (
+        <div style={{
+          background: "linear-gradient(135deg, rgba(245,166,35,0.1), rgba(245,166,35,0.02))",
+          border: "1px solid rgba(245,166,35,0.4)", borderRadius: 12, padding: "1.75rem 2rem", marginBottom: "1.25rem",
+        }}>
+          <div style={{ fontFamily: mono, fontSize: "0.65rem", color: orangeInk, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.5rem", fontWeight: 700 }}>
+            ⚠ {paidPaused ? (lang === "sk" ? "Premium je pozastavené" : "Premium is paused") : (lang === "sk" ? "Premium skončilo" : "Premium ended")}
+          </div>
+          {!paidPaused && paidUntil != null && (
+            <h3 style={{ fontSize: "1.2rem", fontWeight: 700, color: textLight, margin: "0 0 0.5rem" }}>
+              {lang === "sk" ? `Skončilo ${fmtDate(paidUntil)}` : `Ended on ${fmtDate(paidUntil)}`}
+            </h3>
+          )}
+          <p style={{ color: "var(--text-2)", fontSize: "0.9rem", lineHeight: 1.6, margin: "0 0 1rem" }}>
+            {lang === "sk"
+              ? "Tvoj prístup je teraz Free. Premium môžeš obnoviť tlačidlom nižšie alebo nám napíš."
+              : "Your access is now Free. You can renew Premium with the button below, or write to us."}
           </p>
           <div style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap", alignItems: "center" }}>
             <button type="button" onClick={handleSubscribe} disabled={payBusy} className="btn-p" style={{ fontSize: "0.88rem" }}>
@@ -1342,11 +1389,12 @@ function SubscriptionCard({ lang, paused, paidWindowActive, paidUntil, paidStart
                   ENDS then — calling it "Renews" promised something that would
                   not happen. */}
               {paused ? (lang === "sk" ? "Bolo do" : "Was until")
-                : billing.byCard ? (lang === "sk" ? "Obnovenie" : "Renews")
+                : billing.byCard && !billing.endsAt ? (lang === "sk" ? "Obnovenie" : "Renews")
+                : billing.endsAt ? (lang === "sk" ? "Končí" : "Ends")
                 : (lang === "sk" ? "Platí do" : "Valid until")}
             </div>
             <div style={{ color: textLight, fontSize: "0.92rem", fontWeight: 600 }}>
-              {fmtDate(paidUntil)}
+              {fmtDate(billing.endsAt || paidUntil)}
             </div>
           </div>
         )}
@@ -1360,7 +1408,9 @@ function SubscriptionCard({ lang, paused, paidWindowActive, paidUntil, paidStart
             {/* Not "Invoice by bank transfer": Premium the team set up is often a
                 gift or a pilot, and telling that person an invoice is coming is
                 worse than saying nothing. This is true for every such account. */}
-            {billing.byCard
+            {billing.byCard && billing.endsAt
+              ? (lang === "sk" ? "Karta — zrušené, už sa neobnoví" : "Card — cancelled, will not renew")
+              : billing.byCard
               ? (lang === "sk" ? "Karta — automaticky mesačne" : "Card — billed monthly")
               : (lang === "sk" ? "Dohodou s Residata (bez karty)" : "Arranged with Residata (no card)")}
           </div>
@@ -1423,25 +1473,41 @@ function SubscriptionCard({ lang, paused, paidWindowActive, paidUntil, paidStart
 // ─── Settings page ──────────────────────────────────────────────
 function PlatformSettings({ lang }) {
   const { user, profile, setProfile, signOut } = useAuth();
+  const { displayTier } = useCapabilities();
   // GDPR self-service (DSAR): export own data + delete own account.
   const [danger, setDanger] = useState(false);
   const [dbusy, setDbusy] = useState(false);
   const [dmsg, setDmsg] = useState(null);
 
-  const exportMyData = () => {
+  // Everything about this person that their own session may read: the whole
+  // profile (access dates, billing details, choices), their e-mail report
+  // subscriptions, dashboards, saved map areas and the questions they asked the
+  // AI assistant. It used to be nine profile fields.
+  const exportMyData = async () => {
     setDmsg(null);
     try {
+      const PROFILE_FIELDS = ["email", "full_name", "company", "position", "phone", "linkedin_url",
+        "tier", "created_at", "approved_at", "trial_started_at", "trial_until", "paid_started_at", "paid_until",
+        "chosen_project_id", "project_locked_at", "billing_company_name", "billing_company_id", "billing_vat_id",
+        "billing_address", "billing_country", "ui_prefs", "pivot_prefs"];
+      const own = async (table, select, col = "user_id") => {
+        const { data, error } = await supabaseData.from(table).select(select).eq(col, user.id);
+        return error ? { not_available: true } : data;
+      };
+      const [reports, dashboards, areas, aiQuestions] = await Promise.all([
+        own("report_subscriptions", "*"),
+        own("user_dashboards", "*"),
+        own("user_map_areas", "*"),
+        own("ai_chat_log", "sent_at, role, content, lang, page_url"),
+      ]);
       const payload = {
         exported_at: new Date().toISOString(),
-        account: {
-          id: user?.id, email: user?.email,
-          full_name: profile?.full_name ?? null, company: profile?.company ?? null,
-          position: profile?.position ?? null, phone: profile?.phone ?? null,
-          linkedin_url: profile?.linkedin_url ?? null,
-          tier: profile?.tier ?? null, created_at: profile?.created_at ?? null,
-          paid_until: profile?.paid_until ?? null, trial_until: profile?.trial_until ?? null,
-        },
-        note: "This export contains the personal data held in your Residata account profile. For any additional processing records (e.g. usage logs) or questions, contact info@residata.eu.",
+        account: { id: user?.id, ...Object.fromEntries(PROFILE_FIELDS.map((k) => [k, profile?.[k] ?? null])) },
+        report_subscriptions: reports,
+        dashboards,
+        saved_map_areas: areas,
+        ai_assistant_conversations: aiQuestions,
+        note: "Everything your own account can read. We also keep usage statistics, your messages to us and invoices; for a copy of those, or any question, write to info@residata.eu.",
       };
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
@@ -1472,7 +1538,13 @@ function PlatformSettings({ lang }) {
         body: JSON.stringify({ user_id: user.id }),
       });
       const j = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+      if (!res.ok) {
+        throw new Error(j.error === "card_cancel_failed"
+          ? (lang === "sk" ? "Predplatné sa nepodarilo zrušiť, preto sme účet nezmazali. Skús to o chvíľu znova alebo napíš na info@residata.eu."
+                           : "Your subscription could not be cancelled, so the account was not deleted. Try again shortly or write to info@residata.eu.")
+          : (lang === "sk" ? "Účet sa nepodarilo zmazať. Skús to znova alebo napíš na info@residata.eu."
+                           : "The account could not be deleted. Try again or write to info@residata.eu."));
+      }
       track("account_deleted");
       // Account (auth user + profile) is gone — tear down the session + hard reload.
       if (signOut) await signOut(); else window.location.assign("/");
@@ -1519,6 +1591,17 @@ function PlatformSettings({ lang }) {
       setMsg({ type: "err", text: lang === "sk" ? "Profil sa ešte načítava — skús o chvíľu." : "Profile still loading — try again in a moment." });
       return;
     }
+    // The same rule as sign-up: name, company and position are required (admin
+    // lists and e-mails are built on them), and a LinkedIn value must be a link.
+    const required = [form.full_name, form.company, form.position].map((v) => cleanText(v, { max: 120 }));
+    if (required.some((v) => !v)) {
+      setMsg({ type: "err", text: lang === "sk" ? "Meno, spoločnosť a pozícia sú povinné." : "Name, company and position are required." });
+      return;
+    }
+    if (form.linkedin_url.trim() && !cleanUrl(form.linkedin_url, { max: 500 })) {
+      setMsg({ type: "err", text: lang === "sk" ? "LinkedIn odkaz nie je platná adresa — napr. linkedin.com/in/meno." : "The LinkedIn link is not a valid address — e.g. linkedin.com/in/name." });
+      return;
+    }
     setSaving(true);
     setMsg(null);
     // F-106: route through sanitize layer the same way CompleteProfile does.
@@ -1534,11 +1617,12 @@ function PlatformSettings({ lang }) {
       phone: cleanPhone(form.phone, { max: 32 }) || null,
     }).eq("id", user.id).select();
     setSaving(false);
-    if (error) {
-      setMsg({ type: "err", text: error.message });
+    if (error || !data?.[0]) {
+      track("settings_save_error", { message: String(error?.message || "no row").slice(0, 200) });
+      setMsg({ type: "err", text: lang === "sk" ? "Neuložilo sa — skús to znova o chvíľu." : "Not saved — try again in a moment." });
       return;
     }
-    if (data?.[0]) setProfile(data[0]);
+    setProfile(data[0]);
     track("settings_saved");
     setMsg({ type: "ok", text: lang === "sk" ? "Uložené ✓" : "Saved ✓" });
     setTimeout(() => setMsg(null), 2500);
@@ -1594,7 +1678,7 @@ function PlatformSettings({ lang }) {
             />
           </SettingsField>
           <SettingsField label="LinkedIn URL">
-            <input type="url" value={form.linkedin_url} onChange={e => setForm({ ...form, linkedin_url: e.target.value })}
+            <input type="text" inputMode="url" value={form.linkedin_url} onChange={e => setForm({ ...form, linkedin_url: e.target.value })}
               style={inputStyle} placeholder="https://linkedin.com/in/you" />
           </SettingsField>
           <SettingsField label={lang === "sk" ? "Telefón" : "Phone"}>
@@ -1621,7 +1705,7 @@ function PlatformSettings({ lang }) {
       <div style={{ marginTop: "1.25rem", padding: "1rem 1.25rem", background: bg2, border: `1px solid ${border}`, borderRadius: 10, fontSize: "0.78rem", color: dim, fontFamily: mono, lineHeight: 1.7 }}>
         <div>{lang === "sk" ? "ID účtu" : "Account ID"}: {user?.id}</div>
         {profile?.created_at && <div>{lang === "sk" ? "Účet vytvorený" : "Member since"}: {new Date(profile.created_at).toLocaleString(localeTag(lang), { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Bratislava" })}</div>}
-        <div>{lang === "sk" ? "Plán" : "Plan"}: {profile?.tier || "—"}</div>
+        <div>{lang === "sk" ? "Plán" : "Plan"}: {profile ? tierName(displayTier, lang) : "—"}</div>
         {profile?.position && <div>{lang === "sk" ? "Pozícia" : "Position"}: {profile.position}</div>}
       </div>
 
@@ -1647,8 +1731,10 @@ function PlatformSettings({ lang }) {
             </button>
           ) : (
             <span style={{ display: "inline-flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
-              <span style={{ fontSize: "0.78rem", color: dangerInk }}>
-                {lang === "sk" ? "Naozaj? Toto je nevratné." : "Are you sure? This is irreversible."}
+              <span style={{ fontSize: "0.78rem", color: dangerInk, flexBasis: "100%", lineHeight: 1.5 }}>
+                {lang === "sk"
+                  ? `Naozaj? Zmažeme účet, nastavenia, uložené oblasti, otázky AI asistentovi, históriu používania a správy, ktoré si nám poslal.${profile?.stripe_subscription_id ? " Predplatné kartou sa zruší hneď." : ""} Ponecháme len faktúry (vyžaduje to zákon) a záznam, že účet bol zmazaný. Toto je nevratné.`
+                  : `Are you sure? We delete the account, settings, saved areas, AI assistant questions, usage history and the messages you sent us.${profile?.stripe_subscription_id ? " Your card subscription is cancelled at once." : ""} We keep only invoices (required by law) and a record that the account was deleted. This cannot be undone.`}
               </span>
               <button type="button" disabled={dbusy} onClick={deleteMyAccount}
                 style={{ background: "#ff6b6b", color: "#1a0b0b", border: "none", borderRadius: 6, padding: "0.5rem 1rem", fontSize: "0.82rem", fontWeight: 600, cursor: dbusy ? "default" : "pointer", opacity: dbusy ? 0.6 : 1 }}>

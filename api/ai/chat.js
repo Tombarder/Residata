@@ -56,6 +56,7 @@ import { createClient } from "@supabase/supabase-js";
 import { isTrustedRequest as isTrustedOrigin } from "../_lib/origin.js";
 import { archiveGroups, fetchMarketReadings } from "../_lib/archiveCounts.js";
 import { specUsesCube } from "../../src/lib/archiveReadings.js";
+import { AI_DAILY_LIMITS } from "../../src/lib/aiLimits.js";
 
 export const maxDuration = 60; // tool loop = a few model round-trips
 
@@ -75,7 +76,7 @@ const MAX_HISTORY     = 10;
 const MAX_MSG_LEN     = 2000;
 
 // Per-day caps by tier. pending is refused earlier. Active trial uses the paid cap.
-const DAILY_LIMITS = { anon: 1, free: 3, paid: 15, admin: 100 };
+const DAILY_LIMITS = AI_DAILY_LIMITS;   // one list, shared with the chat window and Billing
 
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -578,11 +579,11 @@ async function handleInner(req, res, ctx) {
     };
     const up = upgrades[tier] || upgrades.anon;
     const msg = lang === "sk"
-      ? (tier === "anon" ? `Vyčerpal si denný limit ${dayLimit} otázky pre neprihlásených. Prihlás sa (free) pre ${up.daily}/deň, alebo zaplať tier pre ${DAILY_LIMITS.paid}/deň.`
-        : tier === "free" ? `Vyčerpal si denný limit ${dayLimit} otázok pre free tier. Upgrade na paid (${DAILY_LIMITS.paid}/deň).`
+      ? (tier === "anon" ? `Vyčerpal si denný limit ${dayLimit} otázky pre neprihlásených. Prihlás sa (free) pre ${up.daily}/deň, alebo prejdi na Premium pre ${DAILY_LIMITS.paid}/deň.`
+        : tier === "free" ? `Vyčerpal si denný limit ${dayLimit} otázok vo verzii Free. Prejdi na Premium (${DAILY_LIMITS.paid}/deň).`
         : `Vyčerpal si denný limit ${dayLimit} otázok. Kontaktuj Residata pre vyšší limit.`)
-      : (tier === "anon" ? `You've used your daily ${dayLimit} question as an anonymous user. Sign in (free) for ${up.daily}/day, or go paid for ${DAILY_LIMITS.paid}/day.`
-        : tier === "free" ? `You've used your daily ${dayLimit} questions on the free tier. Upgrade to paid for ${DAILY_LIMITS.paid}/day.`
+      : (tier === "anon" ? `You've used your daily ${dayLimit} question as an anonymous user. Sign in (free) for ${up.daily}/day, or go Premium for ${DAILY_LIMITS.paid}/day.`
+        : tier === "free" ? `You've used your daily ${dayLimit} questions on Free. Upgrade to Premium for ${DAILY_LIMITS.paid}/day.`
         : `You've used your daily ${dayLimit} questions. Contact Residata for a higher limit.`);
     // Real seconds until the cap actually resets (next 00:00 UTC), not a fixed
     // hour — so the client's "try again in N" is honest.

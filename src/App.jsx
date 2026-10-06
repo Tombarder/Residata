@@ -397,12 +397,17 @@ function AccountMenu({ user, caps, auth, setCurrent, lang }) {
   // fetch error, persistently) mislabeled "Free plan", and the label ("Free")
   // would contradict the action button ("Billing", since isFree is strict).
   const tierKnown = tier !== "anon";
-  const isFree = tier === "free";
+  // The same names the platform uses (sidebar, Billing): a trial is "Trial",
+  // not "Paid plan"; an account the admin set to No access is "No access",
+  // not "Pending approval" — nothing is waiting for an approval any more.
+  const shown = caps.displayTier;
+  const isFree = tier === "free" || shown === "trial";
   const planLabel = !tierKnown ? "…"
-    : tier === "admin" ? "Admin"
-    : tier === "paid" ? (lang === "sk" ? "Platený plán" : "Paid plan")
-    : tier === "pending" ? (lang === "sk" ? "Čaká na schválenie" : "Pending approval")
-    : (lang === "sk" ? "Free plán" : "Free plan");
+    : shown === "admin" ? "Admin"
+    : shown === "trial" ? "Trial Premium"
+    : shown === "paid" ? "Premium"
+    : shown === "pending" ? (lang === "sk" ? "Bez prístupu" : "No access")
+    : "Free";
   const planColor = !tierKnown ? "#8a8a96"
     : (tier === "paid" || tier === "admin") ? "var(--accent)"
     : tier === "pending" ? "#f5a623" : "#8a8a96";
@@ -438,11 +443,11 @@ function AccountMenu({ user, caps, auth, setCurrent, lang }) {
           <div style={{ height: 1, background: "#222228", margin: "0.25rem 0.2rem 0.4rem" }} />
           {isFree ? (
             <button role="menuitem" onClick={() => go("App:Billing")} style={{ ...item, color: "var(--accent)", fontWeight: 600 }} onMouseEnter={hov("color-mix(in srgb, var(--accent) 8%, transparent)")} onMouseLeave={hov("none")}>
-              {lang === "sk" ? "Upgradovať na platený" : "Upgrade to paid"}
+              {lang === "sk" ? "Prejsť na Premium" : "Upgrade to Premium"}
             </button>
           ) : (
             <button role="menuitem" onClick={() => go("App:Billing")} style={item} onMouseEnter={hov("#1d1d22")} onMouseLeave={hov("none")}>
-              {lang === "sk" ? "Fakturácia" : "Billing"}
+              {lang === "sk" ? "Predplatné" : "Plan & billing"}
             </button>
           )}
           <button role="menuitem" onClick={() => go("App:Settings")} style={item} onMouseEnter={hov("#1d1d22")} onMouseLeave={hov("none")}>
@@ -927,7 +932,7 @@ function HomePage({ setCurrent, l, lang, onLogin }) {
     heroButtons = (
       <>
         <button type="button" onClick={() => setCurrent("App:Dashboard")} className="btn-p">{lang === "sk" ? "Otvoriť platformu" : "Open platform"}</button>
-        <button type="button" onClick={() => setCurrent("App:Billing")} className="btn-s">{lang === "sk" ? "Upgrade na paid" : "Upgrade to paid"}</button>
+        <button type="button" onClick={() => setCurrent("App:Billing")} className="btn-s">{lang === "sk" ? "Prejsť na Premium" : "Upgrade to Premium"}</button>
       </>
     );
   } else {
@@ -1852,9 +1857,14 @@ function PricingPage({ setCurrent, l, lang, onLogin, scrollToContact = false }) 
       })
     : l.tiers;
   const faqs = l.faqs;
-  const { can, showTrialOffer } = useCapabilities();
+  const { can, showTrialOffer, isRealPaid, displayTier, trialActive } = useCapabilities();
   const auth = useAuth();
-  const isAlreadyPaid = can("has_paid_access");
+  // Real Premium or admin — NOT a running trial. can("has_paid_access") is true
+  // during the trial too, so a 7-day trial user was told "You're subscribed" and
+  // given no way to subscribe from the pricing page.
+  const isAdminViewer = displayTier === "admin";
+  const isAlreadyPaid = isRealPaid || isAdminViewer;
+  const onTrial = displayTier === "trial" && trialActive;
   // Trial CTA routing (mirrors App.handleTrialCta):
   //   · anon            → remember trial intent + open sign-up; the trial
   //                       auto-starts after profile completion.
@@ -1896,7 +1906,20 @@ function PricingPage({ setCurrent, l, lang, onLogin, scrollToContact = false }) 
             fontFamily: "'JetBrains Mono', monospace", fontSize: "0.7rem", color: "var(--accent)", fontWeight: 600,
           }}>
             <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--accent)" }}></span>
-            {lang === "sk" ? "Máš aktívny paid prístup" : "You have active paid access"}
+            {isAdminViewer
+              ? (lang === "sk" ? "Admin — plný prístup" : "Admin — full access")
+              : (lang === "sk" ? "Máš aktívne Premium" : "You have active Premium")}
+          </div>
+        )}
+        {onTrial && (
+          <div style={{ marginBottom: "1rem",
+            display: "inline-flex", alignItems: "center", gap: "0.5rem",
+            padding: "0.4rem 0.9rem", background: "color-mix(in srgb, var(--accent) 10%, transparent)",
+            border: "1px solid color-mix(in srgb, var(--accent) 30%, transparent)", borderRadius: 999,
+            fontFamily: "'JetBrains Mono', monospace", fontSize: "0.7rem", color: "var(--accent)", fontWeight: 600,
+          }}>
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--accent)" }}></span>
+            {lang === "sk" ? "Beží ti trial Premium — predplatiť ho môžeš v sekcii Predplatné" : "Your Premium trial is running — you can subscribe under Plan & billing"}
           </div>
         )}
         <Label>{l.pricingLabel}</Label>
@@ -1987,7 +2010,9 @@ function PricingPage({ setCurrent, l, lang, onLogin, scrollToContact = false }) 
                   fontFamily: "'JetBrains Mono', monospace",
                   letterSpacing: "0.03em",
                 }}>
-                  {lang === "sk" ? "Už máš prístup" : "You're subscribed"}
+                  {isAdminViewer
+                    ? (lang === "sk" ? "Admin — plný prístup" : "Admin — full access")
+                    : (lang === "sk" ? "Už máš Premium" : "You have Premium")}
                 </div>
               ) : (
                 <button
@@ -2327,7 +2352,9 @@ export default function App() {
     if (!auth.user || !auth.profile?.profile_completed) return;
     trialRetried.current = true;
     settleTrialIntent()
-      .then((r) => { if (r?.started) window.location.reload(); })   // unlock the paid capabilities
+      // Unlock the paid capabilities — unless profile completion started this
+      // same request (shared): it is already taking the person to /app.
+      .then((r) => { if (r?.started && !r.shared) window.location.reload(); })
       .catch(() => {});
   }, [auth.user, auth.profile?.profile_completed]);
 

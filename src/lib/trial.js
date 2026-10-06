@@ -17,15 +17,33 @@
 import { getFreshAccessToken } from "./sessionGuard";
 import { forceTokenRefresh } from "./authToken";
 
-// localStorage flag — set when an anon visitor clicks a trial CTA, read +
-// cleared right after profile completion to auto-start the trial.
+// localStorage — WHEN an anon visitor clicked a trial CTA, read + cleared right
+// after profile completion to auto-start the trial.
+//
+// It used to be a bare "1" that never expired and belonged to no one: a visitor
+// who clicked "Activate trial" and walked away left it in the browser for good,
+// and weeks later whoever signed in on that computer — a colleague on the office
+// PC — had their one-time trial started without asking. Now it is a moment, and
+// it counts for TRIAL_INTENT_BROWSER_TTL_MS (a sign-up, including waiting for the
+// code e-mail, takes minutes). The old "1" has no moment, so it counts for nothing.
 const TRIAL_INTENT_KEY = "residata_trial_intent";
+const TRIAL_INTENT_BROWSER_TTL_MS = 2 * 60 * 60 * 1000;
 
 export function setTrialIntent() {
-  try { localStorage.setItem(TRIAL_INTENT_KEY, "1"); } catch (_) {}
+  try { localStorage.setItem(TRIAL_INTENT_KEY, new Date().toISOString()); } catch (_) {}
+}
+/** The moment the trial was asked for (ISO), while it still counts; else null. */
+export function trialIntentAt() {
+  try {
+    const v = localStorage.getItem(TRIAL_INTENT_KEY);
+    const t = v ? Date.parse(v) : NaN;
+    if (Number.isFinite(t) && Date.now() - t < TRIAL_INTENT_BROWSER_TTL_MS) return new Date(t).toISOString();
+    if (v) localStorage.removeItem(TRIAL_INTENT_KEY);   // expired or the old bare "1"
+  } catch (_) { /* storage blocked */ }
+  return null;
 }
 export function hasTrialIntent() {
-  try { return localStorage.getItem(TRIAL_INTENT_KEY) === "1"; } catch (_) { return false; }
+  return trialIntentAt() !== null;
 }
 export function clearTrialIntent() {
   try { localStorage.removeItem(TRIAL_INTENT_KEY); } catch (_) {}
@@ -96,14 +114,26 @@ export async function activateTrial() {
  *
  * Safe to call on every load: it does nothing unless the flag is actually set.
  */
-export async function settleTrialIntent() {
-  if (!hasTrialIntent()) return { settled: false };
-  try {
-    const res = await activateTrial();
-    clearTrialIntent();                       // started, or 409 = can never start
-    return { settled: true, started: !!res.ok, reason: res.reason };
-  } catch (e) {
-    // Keep the intent: this is a "not right now", not a "never".
-    return { settled: false, error: e };
-  }
+//
+// ONE request at a time. Profile completion calls this and so does App's
+// effect that sees profile_completed flip — both used to POST, and then one
+// reloaded the page while the other navigated to /app, so whichever came last
+// decided where a brand-new user landed. A caller that joins a request already
+// in flight gets the same answer marked `shared: true`, and leaves navigating
+// to the caller that started it.
+let inflight = null;
+export function settleTrialIntent() {
+  if (inflight) return inflight.then((r) => ({ ...r, shared: true }));
+  if (!hasTrialIntent()) return Promise.resolve({ settled: false });
+  inflight = (async () => {
+    try {
+      const res = await activateTrial();
+      clearTrialIntent();                       // started, or 409 = can never start
+      return { settled: true, started: !!res.ok, reason: res.reason };
+    } catch (e) {
+      // Keep the intent: this is a "not right now", not a "never".
+      return { settled: false, error: e };
+    }
+  })().finally(() => { inflight = null; });
+  return inflight;
 }

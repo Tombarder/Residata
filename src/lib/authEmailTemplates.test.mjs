@@ -19,6 +19,13 @@
  * files. So the two claims that matter are asserted here, and the files were
  * re-synced from the live config rather than hand-edited, so the repo is a
  * record of what is deployed instead of a second opinion about it.
+ *
+ * Until 2026-10-06 both were English only, while everything else a Slovak
+ * customer reads from us is Slovak. They are now Slovak first with English
+ * below, in ONE e-mail — deliberately not a {{ if .Data.lang }} switch: Supabase
+ * only knows a person's language if they signed up after that date, and a
+ * template that fails to render sends no code at all, so nobody can sign in.
+ * subjects.json records the two subject lines that go with them.
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -28,6 +35,14 @@ import { fileURLToPath } from "node:url";
 
 const DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "supabase_email_templates");
 const FILES = readdirSync(DIR).filter((f) => f.endsWith(".html"));
+const SUBJECTS = JSON.parse(readFileSync(join(DIR, "subjects.json"), "utf8"));
+
+test("the subject lines speak both languages", () => {
+  for (const [key, subject] of Object.entries(SUBJECTS)) {
+    assert.match(subject, /prihlásenie/, `${key} has no Slovak`);
+    assert.match(subject, /sign-in code/, `${key} has no English`);
+  }
+});
 
 test("the templates are actually there — otherwise the rest asserts nothing", () => {
   assert.ok(FILES.length >= 2, `expected the auth email templates, found: ${FILES}`);
@@ -58,5 +73,18 @@ for (const file of FILES) {
     // in it, and the customer simply cannot log in.
     assert.ok(/\{\{\s*\.Token\s*\}\}/.test(html),
       "the one-time code placeholder is gone — the email would arrive with no code");
+  });
+
+  test(`${file} reads in Slovak AND English`, () => {
+    assert.match(html, /Tvoj kód na prihlásenie/, "the Slovak half is gone");
+    assert.match(html, /Your sign-in code/, "the English half is gone");
+    assert.match(html, /<html lang="sk">/, "mail clients would read the Slovak text with English rules");
+  });
+
+  test(`${file} has no template logic that could fail to render`, () => {
+    // The code is the only thing GoTrue fills in. Any other tag ({{ if }},
+    // {{ .Data.x }}) can fail for a user whose metadata lacks the key, and a
+    // template that fails sends nothing — that person can never sign in.
+    assert.deepEqual(html.match(/\{\{.*?\}\}/gs), ["{{ .Token }}"]);
   });
 }

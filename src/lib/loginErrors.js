@@ -7,7 +7,13 @@
  * form's "Send a new code" answered "New code sent ✓" whatever the server said —
  * so a refused request looked exactly like a lost e-mail. A refusal is now said
  * as one, in the visitor's language, with what to do about it.
+ *
+ * Nothing raw reaches the screen: until 2026-10-06 any other refusal was shown
+ * verbatim ("Database error saving new user", "Failed to fetch") to a Slovak
+ * visitor at the very moment they were signing up.
  */
+import { personalEmailMessage } from "./emailValidation.js";
+
 export function loginErrorMessage(error, lang = "en") {
   if (!error) return null;
   const sk = lang === "sk";
@@ -25,5 +31,21 @@ export function loginErrorMessage(error, lang = "en") {
       ? "Práve odchádza priveľa prihlasovacích kódov. Skús to o pár minút znova — ak to nepomôže, napíš nám na info@residata.eu."
       : "Too many sign-in codes are going out right now. Try again in a few minutes — if that doesn't help, write to info@residata.eu.";
   }
-  return msg || (sk ? "Kód sa nepodarilo odoslať." : "The code could not be sent.");
+  // The database refusing a NEW account: its business-e-mail gate (a trigger on
+  // auth.users) surfaces through Supabase as "Database error saving new user".
+  // The form asks the same gate first, so this is only reached when the two
+  // answers raced — but if it is, it says the rule, not the plumbing.
+  if (/saving new user|signup_requires_business_email|Signups not allowed/i.test(msg)) {
+    return personalEmailMessage(lang);
+  }
+  if (/Failed to fetch|NetworkError|Load failed|network/i.test(msg)) {
+    return sk
+      ? "Nepodarilo sa spojiť so serverom — skontroluj pripojenie a skús to znova."
+      : "Couldn't reach the server — check your connection and try again.";
+  }
+  // Anything else: a sentence the visitor can act on. The raw text (English,
+  // technical) goes to the activity log by the caller, never onto the screen.
+  return sk
+    ? "Kód sa nepodarilo odoslať. Skús to znova o chvíľu — ak to nepomôže, napíš nám na info@residata.eu."
+    : "The code could not be sent. Try again in a moment — if that doesn't help, write to info@residata.eu.";
 }

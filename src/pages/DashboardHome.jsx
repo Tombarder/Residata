@@ -549,7 +549,7 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
   useCurrency(); // re-render prices when the display currency toggles
   const { profile } = useAuth();
   const caps = useCapabilities();
-  const { can, trialActive, trialDaysLeft, canStartTrial } = caps;
+  const { can, trialActive, trialDaysLeft, canStartTrial, paidActive } = caps;
   const { country } = useCountry();
 
   const { projects } = useProjects();
@@ -738,7 +738,9 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
       </p>
 
       {showTrialOffer && <TrialOfferBanner lang={lang} onActivate={trialOffer.start} busy={trialOffer.busy} msg={trialOffer.msg} />}
-      {trialActive && <TrialRunningBanner lang={lang} daysLeft={trialDaysLeft} onOpenBilling={() => setCurrent("App:Billing")} />}
+      {/* Not for someone who subscribed during the trial — they pay, and the
+          countdown with "upgrade" read as if they did not. */}
+      {trialActive && !paidActive && <TrialRunningBanner lang={lang} daysLeft={trialDaysLeft} onOpenBilling={() => setCurrent("App:Billing")} />}
 
       {/* ═══ ZONE A · Market overview ═══ */}
       <section style={{ marginBottom: "2.25rem", position: "relative" }}>
@@ -988,7 +990,7 @@ function TrialOfferBanner({ lang, onActivate, busy, msg }) {
       <div style={{ flexShrink: 0, width: 34, height: 34, borderRadius: 8, background: "color-mix(in srgb, var(--accent) 18%, transparent)", color: accentInk, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.05rem" }}>🎁</div>
       <div style={{ flex: 1, minWidth: 200 }}>
         <div style={{ color: textLight, fontWeight: 700, fontSize: "0.95rem" }}>{L(lang, "Prístup k Residata Premium na 7 dní zadarmo", "7 days of Residata Premium — free")}</div>
-        <div style={{ color: dim, fontSize: "0.8rem", marginTop: "0.15rem", lineHeight: 1.45 }}>{L(lang, "Všetky projekty, analytika, reporty, exporty. Bez karty. Jedným klikom.", "Every project, analytics, reports, exports. No card required. One-click.")}</div>
+        <div style={{ color: dim, fontSize: "0.8rem", marginTop: "0.15rem", lineHeight: 1.45 }}>{L(lang, "Všetky projekty, analytika a reporty (sťahovanie dát je pre platiacich). Bez karty. Jedným klikom.", "Every project, analytics and reports (downloading data is for paying subscribers). No card required. One-click.")}</div>
       </div>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "0.3rem" }}>
         <button onClick={onActivate} disabled={busy} className="btn-p" style={{ fontSize: "0.82rem", cursor: busy ? "wait" : "pointer", opacity: busy ? 0.7 : 1 }}>{busy ? "…" : L(lang, "Aktivovať trial", "Activate trial")}</button>

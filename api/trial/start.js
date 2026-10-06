@@ -21,14 +21,19 @@
 //   200 { trial_until, trial_started_at }
 //   401 — unauthenticated
 //   403 — untrusted origin / sign-up not finished (profile_incomplete)
-//   409 — trial already used, or already on a paid / admin tier
+//   409 — trial already used, or already on Premium / admin
+//   200 also when the trial was started moments ago (the welcome webhook
+//        honoured the trial asked for at sign-up, or a second tab) — the
+//        person asked for a running trial and has one.
+//
+// Who may start, and the atomic write, live in src/lib/trialRules.js, shared
+// with the welcome webhook.
 
 import { createClient } from "@supabase/supabase-js";
 import { isTrustedRequest as isTrustedOrigin } from "../_lib/origin.js";
+import { TRIAL_DAYS, trialRefusal, trialJustStarted, startTrialRow } from "../../src/lib/trialRules.js";
 
 export const maxDuration = 10;
-
-const TRIAL_DAYS = 7;
 
 export default async function handler(req, res) {
   try {
@@ -52,49 +57,38 @@ export default async function handler(req, res) {
     // Check current state — trial is one-shot per user (self-service).
     const { data: prof } = await admin
       .from("user_profiles")
-      .select("tier, profile_completed, trial_until, trial_started_at")
+      .select("tier, profile_completed, trial_until, trial_started_at, paid_until")
       .eq("id", user.id)
       .maybeSingle();
-    if (!prof) return res.status(404).json({ error: "profile not found" });
-    // Not before the sign-up is finished. A pending account has no access at all
-    // (resolveAccess), so a week started now would tick away unused — and the
-    // database gate (current_user_is_paid) WOULD count it, giving data to an
-    // account the app itself still shows as locked. 403, not 409: the trial
-    // intent kept from the marketing page must survive this and be redeemed
-    // once the profile is complete (settleTrialIntent drops it only on 2xx/409).
-    if (prof.tier === "pending" || !prof.profile_completed) {
-      return res.status(403).json({ error: "profile_incomplete" });
+    if (trialJustStarted(prof)) {
+      return res.status(200).json({ trial_started_at: prof.trial_started_at, trial_until: prof.trial_until, days: TRIAL_DAYS, already_running: true });
     }
-    if (prof.tier === "paid" || prof.tier === "admin") {
-      return res.status(409).json({ error: "already on a paid tier", tier: prof.tier });
-    }
-    if (prof.trial_started_at) {
-      return res.status(409).json({
-        error: "trial already used",
-        trial_started_at: prof.trial_started_at,
-        trial_until: prof.trial_until,
+    const refusal = trialRefusal(prof);
+    // Not before the sign-up is finished — 403, not 409: the trial intent kept
+    // from the marketing page must survive this and be redeemed once the profile
+    // is complete (settleTrialIntent drops it only on 2xx/409).
+    if (refusal) {
+      return res.status(refusal.status).json({
+        error: refusal.error,
+        ...(prof?.trial_started_at ? { trial_started_at: prof.trial_started_at, trial_until: prof.trial_until } : {}),
       });
     }
 
-    const now = new Date();
-    const end = new Date(now.getTime() + TRIAL_DAYS * 86400 * 1000);
-    const { data: updRows, error: updateErr } = await admin
-      .from("user_profiles")
-      .update({
-        trial_started_at: now.toISOString(),
-        trial_until:      end.toISOString(),
-      })
-      .eq("id", user.id)
-      .select("id");
-    if (updateErr) return res.status(500).json({ error: "update failed", detail: updateErr.message });
-    // Service-role write should always hit exactly the one row; 0 = misconfig.
-    if (!updRows || updRows.length === 0) {
-      return res.status(500).json({ error: "trial write did not land — no row updated (key/RLS misconfig?)" });
+    // Atomic: only while trial_started_at is empty, so two requests at once
+    // cannot both write (the second read the same empty row and overwrote it).
+    const row = await startTrialRow(admin, user.id);
+    if (!row) {
+      const { data: again } = await admin.from("user_profiles")
+        .select("trial_started_at, trial_until").eq("id", user.id).maybeSingle();
+      if (trialJustStarted(again)) {
+        return res.status(200).json({ trial_started_at: again.trial_started_at, trial_until: again.trial_until, days: TRIAL_DAYS, already_running: true });
+      }
+      return res.status(409).json({ error: "trial already used" });
     }
 
     return res.status(200).json({
-      trial_started_at: now.toISOString(),
-      trial_until:      end.toISOString(),
+      trial_started_at: row.trial_started_at,
+      trial_until:      row.trial_until,
       days: TRIAL_DAYS,
     });
   } catch (e) {

@@ -31,6 +31,7 @@ async function postAuthed(path) {
   if (!r.ok || !data?.url) {
     const e = new Error(data?.error || `HTTP ${r.status}`);
     e.status = r.status;
+    e.code = data?.error || null;   // "already subscribed" | "already_premium" | …
     throw e;
   }
   return data.url;
@@ -68,4 +69,24 @@ export async function startCheckout() {
 // Open the self-serve billing portal (manage card / cancel / invoices).
 export async function openBillingPortal() {
   await openStripe("/api/stripe?action=portal");
+}
+
+// The caller's card subscription as Stripe has it NOW — { status, ends_at } or
+// null (none, or it could not be read). ends_at is set when it was cancelled and
+// runs to that day: Stripe keeps such a subscription "active" until then, so
+// without asking, the page promised "Renews" for one that will not.
+export async function getCardSubscription() {
+  try {
+    const call = (token) => fetch("/api/stripe?action=subscription", { method: "POST", headers: authHeaders(token), body: "{}" });
+    let r = await call(await getFreshAccessToken());
+    if (r.status === 401) {
+      const token = await forceTokenRefresh();
+      if (token) r = await call(token);
+    }
+    if (!r.ok) return null;
+    const data = await r.json().catch(() => null);
+    return data?.subscription || null;
+  } catch {
+    return null;
+  }
 }

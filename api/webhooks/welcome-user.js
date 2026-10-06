@@ -14,7 +14,9 @@
 // Accounts an admin creates are stamped notified at creation (they get the
 // optional "your account is ready" invitation instead), so this skips them.
 
+import { createClient } from "@supabase/supabase-js";
 import { approvedUserHtml, welcomeSubject, sendEmail } from "../_lib/emails.js";
+import { trialRefusal, trialIntentValid, startTrialRow } from "../../src/lib/trialRules.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -57,7 +59,7 @@ export default async function handler(req, res) {
   if (!users.length) {
     return res.status(404).json({ error: "user not found" });
   }
-  const user = users[0];
+  let user = users[0];
 
   // Guards
   if (!["free", "paid", "admin"].includes(user.tier)) {
@@ -75,14 +77,37 @@ export default async function handler(req, res) {
   // Anything else — an older account, a lookup that fails — gets Slovak, the
   // site's home language. Never blocks the e-mail.
   let lang = "sk";
+  let meta = {};
   try {
     const au = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${userId}`,
       { headers: { apikey: SUPABASE_SECRET_KEY, Authorization: `Bearer ${SUPABASE_SECRET_KEY}` } });
     if (au.ok) {
       const j = await au.json();
-      if ((j?.user_metadata?.lang || j?.user?.user_metadata?.lang) === "en") lang = "en";
+      meta = j?.user_metadata || j?.user?.user_metadata || {};
+      if (meta.lang === "en") lang = "en";
     }
   } catch { /* keep Slovak */ }
+
+  // They clicked "Activate 7-day trial" before signing up (user_metadata.
+  // trial_intent_at, written with the new account). Start it HERE, before the
+  // e-mail is written: the browser starts it too, after the profile is saved —
+  // the same moment this e-mail goes out — and this e-mail used to read the row
+  // first and offer a trial that was already running. The write is atomic, so
+  // whichever of the two comes second simply finds it started.
+  if (trialIntentValid(meta.trial_intent_at) && !trialRefusal(user)) {
+    try {
+      const admin = createClient(SUPABASE_URL, SUPABASE_SECRET_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+      const started = await startTrialRow(admin, userId);
+      if (started) user = started;
+      else {
+        const { data } = await admin.from("user_profiles").select("*").eq("id", userId).maybeSingle();
+        if (data) user = data;   // the browser got there first — mail what is true now
+      }
+    } catch (e) {
+      // The e-mail still goes; the browser still redeems the intent.
+      console.error("welcome-user: trial from sign-up not started", e?.message || e);
+    }
+  }
 
   try {
     await sendEmail({
