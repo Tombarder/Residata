@@ -42,11 +42,13 @@ test("tokens are filled through strings, arrays and objects", () => {
 // daily", "Daily refresh", "Daily-refreshed", "re-scraped every day", "Daily
 // snapshot", "aktualizovaný/é každý deň", "aktualizované denne", "Denne
 // aktualizované", "obnovovaný každý deň", "obnovujú … každý deň", and the bare
-// stat "Denne"/"Daily".
-const TYPED = /refreshe[sd] daily|updated daily|daily refresh|daily-(refreshed|updated)|re-scraped every day|daily snapshot|aktualizovan\w* (každý deň|denne)|denne aktualizovan|obnovovan\w* každý deň|obnovujú[^\n]{0,60}každý deň|"Denne"|"Daily"/i;
+// stat "Denne"/"Daily", and the capitals "DENNÁ AKTUALIZÁCIA" / "DAILY AUTO-REFRESH"
+// that the first version of this test let through (2026-10-06).
+const TYPED = /refreshe[sd] daily|updated daily|daily refresh|daily-(refreshed|updated)|re-scraped every day|daily snapshot|aktualizovan\w* (každý deň|denne)|denne aktualizovan|obnovovan\w* každý deň|obnovujú[^\n]{0,60}každý deň|denn[áa] aktualiz|daily auto-refresh|"Denne"|"Daily"/i;
 
 const NOT_A_CLAIM_ABOUT_THE_MARKET = {
   "src/pages/HeroVariants.jsx": "/hero-lab: a hidden design lab (robots.txt Disallow, not in the nav), sketches of hero variants",
+  "src/pages/LegalPages.jsx": "the Terms — legal text, changed only with Boss; it states a GOAL, not a promise (raised with him 2026-10-06)",
   "src/components/ScrapeCadenceEditor.jsx": "the admin control that SETS the interval; its button labels name the choices",
 };
 
