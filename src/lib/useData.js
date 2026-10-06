@@ -1632,15 +1632,20 @@ export function useArchiveDays() {
 // the first made November read twice the flats. When an answer differs from the kept one
 // (a reading landed or was withdrawn), every archive grain divided by the old readings
 // leaves the grain cache, and the new version makes a mounted Pivot ask again.
-// While the cube lags an approval (holdingLags) the answer is kept only a minute: the lag
-// lasts until the cube's refresh, minutes later, and a holding read during it — "the
-// cube lacks the 6th" — would otherwise divide every new grain wrongly for 15 minutes.
+// While the cube lags an approval (holdingLags), or what it holds could not be read, the
+// answer is kept a minute, then 2, 4 and 8, then 15 again: a lag lasts until the cube's
+// refresh, minutes after the approval, and a holding read during it — "the cube lacks
+// the 6th" — would otherwise divide every new grain wrongly for 15 minutes; a lag that
+// lasts (a refresh that keeps failing) then costs no more reads than a settled cube.
+// Settled again, the count starts over.
 const ARCHIVE_READINGS_TTL_MS = 15 * 60 * 1000;
 const ARCHIVE_READINGS_LAG_TTL_MS = 60 * 1000;
 const ARCHIVE_READINGS_CHECK_MS = 60 * 1000;   // each check a no-op while the kept answer is current
-// A minute, too, after what the cube holds could not be read.
-const _readingsTtl = (entry) => (entry.lagging || entry.holdingFailed ? ARCHIVE_READINGS_LAG_TTL_MS : ARCHIVE_READINGS_TTL_MS);
-// identity → { days, daysSig, holding, holdingSig, holdingKnown, holdingFailed, lagging, cubeGen, version, at }
+const _readingsTtl = (entry) => (entry.lagging || entry.holdingFailed
+  ? Math.min(ARCHIVE_READINGS_TTL_MS, ARCHIVE_READINGS_LAG_TTL_MS * 2 ** Math.max(0, (entry.unsettled || 1) - 1))
+  : ARCHIVE_READINGS_TTL_MS);
+// identity → { days, daysSig, holding, holdingSig, holdingKnown, holdingFailed, lagging,
+//              unsettled (checks in a row that found it lagging or unreadable), cubeGen, version, at }
 let _archiveReadingsCache = new Map();
 const _archiveReadingsInflight = new Map();
 const _archiveReadingsListeners = new Map();   // identity → Set(callback): a new entry landed
@@ -1650,10 +1655,13 @@ function _publishReadings(key) {
 function _dropArchiveGrains() {
   for (const k of [..._pivotGrainCache.keys()]) if (k.includes('"mode":"archive"')) _pivotGrainCache.delete(k);
 }
-/* Two steps, and the first is published at once: the days (public.archive_days), with
-   which a grain can already be asked, then what the cube and the facts hold of them —
-   asked in parallel with the grain rather than before it, so the first paint waits for
-   the slower of the two, not for both one after the other. The version — what an archive
+/* Two steps: the days (public.archive_days), then what the cube and the facts hold of
+   them. On the first read the days are published at once, so the grain is asked in
+   parallel with the holding rather than after it and the first paint waits for the
+   slower of the two, not for both one after the other. When the days CHANGE (a reading
+   landed or was withdrawn) the kept entry stays until the new holding is in, and the two
+   are published together: the grain and records on screen stay divided by their own
+   days and holding instead of the page dropping to its skeleton. The version — what an archive
    grain's request carries — is the days' signature and the cube's generation: a new or
    withdrawn reading changes the first; a refresh of the cube (what it holds moved while
    the days did not) the second. A holding that could not be read keeps the last good one
@@ -1678,10 +1686,10 @@ function _loadArchiveReadings(key) {
     const days = sameDays ? kept.days : fresh;
     let entry = sameDays ? kept : {
       days, daysSig, holding: null, holdingSig: null, holdingKnown: false, holdingFailed: false,
-      lagging: false, cubeGen: kept ? kept.cubeGen : 0, version: `${daysSig}/${kept ? kept.cubeGen : 0}`, at: 0,
+      lagging: false, unsettled: kept ? kept.unsettled || 0 : 0,
+      cubeGen: kept ? kept.cubeGen : 0, version: `${daysSig}/${kept ? kept.cubeGen : 0}`, at: 0,
     };
-    if (!sameDays) {
-      if (kept) _dropArchiveGrains();
+    if (!kept) {                                   // the first read: the days at once
       _archiveReadingsCache.set(key, entry);
       _publishReadings(key);
     }
@@ -1701,22 +1709,26 @@ function _loadArchiveReadings(key) {
     }
     if (failed && entry.holdingKnown) {
       entry.holdingFailed = true;
+      entry.unsettled = (entry.unsettled || 0) + 1;
       entry.at = Date.now();
       return entry;
     }
     const holdingSig = holdingSignature(holding);
     const cubeMoved = entry.holdingKnown && !failed && entry.holdingSig !== holdingSig;
+    const lagging = holdingLags(days, holding);
+    const unsettled = lagging || failed ? (entry.unsettled || 0) + 1 : 0;
     if (entry.holdingKnown && !cubeMoved) {        // nothing moved: the same entry, kept longer
       entry.holdingFailed = false;
-      entry.lagging = holdingLags(days, holding);
+      entry.lagging = lagging;
+      entry.unsettled = unsettled;
       entry.at = Date.now();
       return entry;
     }
-    if (cubeMoved) _dropArchiveGrains();
+    if (cubeMoved || (kept && !sameDays)) _dropArchiveGrains();
     const cubeGen = entry.cubeGen + (cubeMoved ? 1 : 0);
     entry = {
       ...entry, holding, holdingSig, holdingKnown: true, holdingFailed: failed,
-      lagging: holdingLags(days, holding), cubeGen, version: `${daysSig}/${cubeGen}`, at: Date.now(),
+      lagging, unsettled, cubeGen, version: `${daysSig}/${cubeGen}`, at: Date.now(),
     };
     _archiveReadingsCache.set(key, entry);
     _publishReadings(key);
@@ -1747,7 +1759,15 @@ export function useArchiveReadingDays({ enabled = false } = {}) {
     if (!enabled) return;
     if (!isSupabaseReady() || authLoading) return; // wait for the session so RLS returns the caller's real rows
     let cancelled = false;
-    const landed = () => { if (!cancelled) setLanded((n) => n + 1); };
+    // Re-render only when the entry itself changed — a check that kept it (every minute
+    // while the tab is open) is no reason to render the Pivot again.
+    let seen = _archiveReadingsCache.get(key);
+    const landed = () => {
+      const now = _archiveReadingsCache.get(key);
+      if (cancelled || now === seen) return;
+      seen = now;
+      setLanded((n) => n + 1);
+    };
     if (!_archiveReadingsListeners.has(key)) _archiveReadingsListeners.set(key, new Set());
     _archiveReadingsListeners.get(key).add(landed);
     const ask = () => _loadArchiveReadings(key).then(

@@ -175,7 +175,7 @@ test("a holding read during the cube's lag is kept a minute, then 15 minutes onc
 
 test("the hook checks every minute, and the assistant keeps lagging readings a minute", () => {
   assert.match(SRC, /const ARCHIVE_READINGS_CHECK_MS = 60 \* 1000;/);
-  assert.match(SRC, /const _readingsTtl = \(entry\) => \(entry\.lagging \|\| entry\.holdingFailed \? ARCHIVE_READINGS_LAG_TTL_MS : ARCHIVE_READINGS_TTL_MS\);/);
+  assert.match(SRC, /const _readingsTtl = \(entry\) => \(entry\.lagging \|\| entry\.holdingFailed\s*\? Math\.min\(ARCHIVE_READINGS_TTL_MS, ARCHIVE_READINGS_LAG_TTL_MS \* 2 \*\* /);
   const CHAT = readFileSync(new URL("../../api/ai/chat.js", import.meta.url), "utf8");
   assert.match(CHAT, /const keep = _readings\?\.lagging \? 60 \* 1000 : 10 \* 60 \* 1000;/);
 });
@@ -183,16 +183,16 @@ test("the hook checks every minute, and the assistant keeps lagging readings a m
 // ── what the cube holds is read in parallel with the grain, and a passing error keeps it ──
 function stagedHarness() {
   let now = Date.UTC(2026, 10, 6, 9, 0);
-  const days = [{ day: "2026-11-02", country: "SK", readings: 1 }, { day: "2026-11-06", country: "SK", readings: 1 }];
-  const facts = [{ d: ["SK", "2026-11-02"], m: { n: 7500 } }, { d: ["SK", "2026-11-06"], m: { n: 7500 } }];
-  const st = { cube: [{ d: ["SK", "2026-11"], m: { n: 15000 } }], rpcFails: false, gate: null };
+  const facts = [{ d: ["SK", "2026-11-02"], m: { n: 7500 } }, { d: ["SK", "2026-11-06"], m: { n: 7500 } }, { d: ["SK", "2026-11-09"], m: { n: 7500 } }];
+  const st = { cube: [{ d: ["SK", "2026-11"], m: { n: 15000 } }], rpcFails: false, gate: null, reads: 0,
+    days: [{ day: "2026-11-02", country: "SK", readings: 1 }, { day: "2026-11-06", country: "SK", readings: 1 }] };
   const supabaseData = {
     rpc: async (_n, { p_spec }) => {
       if (st.gate) await st.gate;
       if (st.rpcFails) return { data: null, error: { message: "timeout" } };
       return { data: p_spec.dims[1] === "snapshot_month" ? st.cube : facts, error: null };
     },
-    from: () => { const b = { select() { return b; }, order() { return b; }, range() { return Promise.resolve({ data: days, error: null }); } }; return b; },
+    from: () => { const b = { select() { return b; }, order() { return b; }, range() { st.reads += 1; return Promise.resolve({ data: st.days, error: null }); } }; return b; },
   };
   const grains = new Map([['u::{"mode":"archive"}::x', { grain: [] }], ['u::{"mode":"latest"}::', { grain: [] }]]);
   const api = new Function(
@@ -283,4 +283,56 @@ test("a day read twice approved while the cube lags: lagging, then a new version
   assert.equal(after.lagging, false);
   assert.notEqual(after.version, lag.version, "a grain asked during the lag is asked again");
   assert.equal(grains.size, 0);
+});
+
+// ── a new reading keeps the page on its own days until the new holding is in ──
+test("when the days change, the kept entry stays until the new holding is in, then both land together", async () => {
+  const h = stagedHarness();
+  h.st.cube = [{ d: ["SK", "2026-11"], m: { n: 15000 } }];
+  const a = await h._loadArchiveReadings("u");
+  // a reading lands on the 9th; the holding question is slow
+  let release;
+  h.st.gate = new Promise((r) => { release = r; });
+  const heard = [];
+  h._archiveReadingsListeners.set("u", new Set([() => heard.push(h._archiveReadingsCache.get("u"))]));
+  h.st.days = [...h.st.days, { day: "2026-11-09", country: "SK", readings: 1 }];
+  h.advance(20 * MIN);
+  const p = h._loadArchiveReadings("u");
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(h._archiveReadingsCache.get("u"), a, "the page keeps its own days and holding meanwhile");
+  assert.equal(h.grains.size, 2, "and its grains");
+  release();
+  const b = await p;
+  assert.equal(b.holdingKnown, true);
+  assert.equal(b.days.SK.get("2026-11-09"), 1);
+  assert.notEqual(b.version, a.version);
+  assert.deepEqual(heard, [b], "published once, complete");
+  assert.deepEqual([...h.grains.keys()], ['u::{"mode":"latest"}::']);
+});
+
+// ── a lag that lasts backs off ──
+test("a cube that keeps lagging is asked 1, 2, 4, 8, then every 15 minutes; settled, the count starts over", async () => {
+  const h = stagedHarness();
+  h.st.cube = [{ d: ["SK", "2026-11"], m: { n: 7500 } }];      // the refresh keeps failing
+  await h._loadArchiveReadings("u");
+  let reads = 0;
+  const minutes = [];
+  for (let m = 1; m <= 60; m += 1) {
+    h.advance(MIN);
+    const before = h.st.reads;
+    await h._loadArchiveReadings("u");
+    if (h.st.reads > before) { reads += 1; minutes.push(m); }
+  }
+  assert.deepEqual(minutes.slice(0, 5), [1, 3, 7, 15, 30], "1, 2, 4, 8, then 15 minutes apart");
+  assert.ok(reads <= 7, `${reads} reads in an hour`);
+  h.st.cube = [{ d: ["SK", "2026-11"], m: { n: 15000 } }];      // refreshed at last
+  h.advance(15 * MIN);
+  const ok = await h._loadArchiveReadings("u");
+  assert.equal(ok.lagging, false);
+  assert.equal(ok.unsettled, 0);
+});
+
+test("a check that keeps the entry renders nothing again", () => {
+  const hook = SRC.match(/export function useArchiveReadingDays[\s\S]*?\n\}\n/)[0];
+  assert.match(hook, /if \(cancelled \|\| now === seen\) return;/);
 });
