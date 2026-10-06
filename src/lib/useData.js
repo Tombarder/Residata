@@ -1625,7 +1625,7 @@ export function useArchiveDays() {
 }
 
 let _archiveReadingsCache = new Map();
-/** Full readings of every market ({ SK: Set(days), CZ: … }) from public.archive_days, for
+/** Full readings of every market ({ SK: Map(day → readings), CZ: … }) from public.archive_days, for
  *  turning the Pivot's archive grain — flat-READINGS — into flats (src/lib/archiveReadings.js).
  *  All markets, whatever the country selector says: the "All" view divides each market by
  *  its own readings. Every page of it — a day per market per reading outgrows PostgREST's
@@ -1645,8 +1645,11 @@ export function useArchiveReadingDays({ enabled = false } = {}) {
     if (!isSupabaseReady() || authLoading) return; // wait for the session so RLS returns the caller's real rows
     let cancelled = false;
     (async () => {
-      const { data, error } = await sbReadAll((from, to) => supabaseData.from("archive_days")
-        .select("day,country").order("day", { ascending: false }).order("country").range(from, to));
+      const read = (cols) => sbReadAll((from, to) => supabaseData.from("archive_days")
+        .select(cols).order("day", { ascending: false }).order("country").range(from, to));
+      // A view that does not carry `readings` yet: each day one reading, as before.
+      let { data, error } = await read("day,country,readings");
+      if (error) ({ data, error } = await read("day,country"));
       if (cancelled) return;
       if (error) { console.error("[useArchiveReadingDays]", error); setFailedKey(key); return; }
       _archiveReadingsCache.set(key, readingDaysByCountry(data));

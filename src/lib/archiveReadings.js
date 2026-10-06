@@ -10,12 +10,15 @@
  * sawtooth under a flat market.
  *
  * normaliseArchiveGrain() turns the grain into flats at an average reading:
- *   · grouped by Datum, each day bucket is one reading. A day that is a full reading of
- *     its market (public.archive_days) is kept as it is; any other day is dropped.
- *   · otherwise each (market, month) cell is divided by the number of full readings of
- *     that market in that month that the Datum filter lets through — one when a single
- *     day is picked, every reading of the month when none is. A cell with no full reading
- *     in scope is dropped.
+ *   · grouped by Datum, each day bucket is divided by the full readings that day holds
+ *     (public.archive_days.readings — one, or two on a day with a re-run such as SK
+ *     2026-08-31); a day that holds no full reading of its market is dropped.
+ *   · otherwise each (market, month) cell is divided by the full readings of that market
+ *     in that month on the days the Datum filter lets through — the sum of those days'
+ *     readings, so a re-run day counts twice there as its rows do. A cell with no full
+ *     reading in scope is dropped.
+ *   The assistant divides by the same readings (api/_lib/archiveCounts.js), so the two
+ *   give the same month.
  *   · grouped by Batch (presný čas), each bucket is one snapshot already: unchanged, and
  *     the same when the Batch filter picks snapshots.
  * Every additive component is divided — the counts and the sums and counts behind
@@ -44,12 +47,18 @@ export function archiveGrainDims(dims) {
   return out;
 }
 
-/** public.archive_days rows { day, country } → { SK: Set('2026-10-05', …), CZ: … }. */
+/** public.archive_days rows { day, country, readings } → { SK: Map('2026-10-05' → 1, …),
+ *  CZ: … }: the full readings each market's day holds. A row without `readings` (the view
+ *  before it carried them) is one reading; a day of none is left out. */
 export function readingDaysByCountry(rows) {
   const out = {};
   for (const r of rows || []) {
     if (!r || !r.country || !r.day) continue;
-    (out[r.country] ||= new Set()).add(String(r.day).slice(0, 10));
+    const n = r.readings == null ? 1 : Number(r.readings);
+    if (!(n > 0)) continue;
+    const day = String(r.day).slice(0, 10);
+    const m = (out[r.country] ||= new Map());
+    m.set(day, (m.get(day) || 0) + n);
   }
   return out;
 }
@@ -95,11 +104,11 @@ export function normaliseArchiveGrain(grain, dims, days, scope = {}) {
   const iD = dims.indexOf("datum");
   const inScope = (d) => !scope.none && (!scope.only || scope.only.has(d)) && !(scope.except && scope.except.has(d));
   const perMonth = new Map();
-  for (const [country, set] of Object.entries(days || {})) {
-    for (const d of set) {
+  for (const [country, byDay] of Object.entries(days || {})) {
+    for (const [d, n] of byDay) {
       if (!inScope(d)) continue;
       const k = `${country}|${d.slice(0, 7)}`;
-      perMonth.set(k, (perMonth.get(k) || 0) + 1);
+      perMonth.set(k, (perMonth.get(k) || 0) + n);
     }
   }
   const out = [];
@@ -108,7 +117,7 @@ export function normaliseArchiveGrain(grain, dims, days, scope = {}) {
     let r;
     if (iD >= 0) {
       const d = g.d[iD] == null ? null : String(g.d[iD]).slice(0, 10);
-      r = d && days?.[country]?.has(d) ? 1 : 0;
+      r = (d && days?.[country]?.get(d)) || 0;
     } else {
       r = perMonth.get(`${country}|${g?.d?.[iM]}`) || 0;
     }

@@ -104,11 +104,49 @@ test("Batch buckets are one snapshot each and stay as they are", () => {
     archiveReadingScope([{ key: "batch_timestamp", mode: "in", values: ["2026-10-09T05:00:00+00:00"] }])), picked);
 });
 
-test("archive_days rows become each market's set of full-reading days", () => {
-  const d = readingDaysByCountry([{ day: "2026-10-05", country: "SK" }, { day: "2026-10-05", country: "CZ" },
-    { day: "2026-10-09", country: "SK" }, { day: null, country: "SK" }, { day: "2026-10-01" }]);
-  assert.deepEqual(Object.fromEntries(Object.entries(d).map(([k, v]) => [k, [...v].sort()])),
-    { SK: ["2026-10-05", "2026-10-09"], CZ: ["2026-10-05"] });
+test("archive_days rows become each market's full readings by day", () => {
+  const d = readingDaysByCountry([{ day: "2026-10-05", country: "SK", readings: 1 }, { day: "2026-10-05", country: "CZ" },
+    { day: "2026-08-31", country: "SK", readings: 2 }, { day: "2026-10-07", country: "SK", readings: 0 },
+    { day: null, country: "SK" }, { day: "2026-10-01" }]);
+  assert.deepEqual(Object.fromEntries(Object.entries(d).map(([k, v]) => [k, Object.fromEntries([...v].sort())])),
+    { SK: { "2026-08-31": 2, "2026-10-05": 1 }, CZ: { "2026-10-05": 1 } });
+});
+
+// ── a day can hold two readings ──
+// 2026-08-31 SK holds two complete markets three hours apart (07:56 and 10:58, a manual
+// re-run), and the archive holds every row of both. archive_days says so (readings 2).
+const AUG = readingDaysByCountry(Array.from({ length: 31 }, (_, i) => ({
+  day: `2026-08-${String(i + 1).padStart(2, "0")}`, country: "SK", readings: i === 30 ? 2 : 1,
+})));
+
+test("a month with a re-run day reads the market's flats, not one reading more", () => {
+  const out = normaliseArchiveGrain([{ d: ["2026-08", "SK"], m: { n: 7500 * 32 } }],
+    archiveGrainDims(["snapshot_month"]), AUG, archiveReadingScope([]));
+  assert.equal(out[0].m.n, 7500, "counted as days, August read 7 742");
+});
+
+test("the re-run day's Datum bucket is the market's flats, not twice them", () => {
+  const out = normaliseArchiveGrain([
+    { d: ["2026-08-30", "SK", "2026-08"], m: { n: 7500 } },
+    { d: ["2026-08-31", "SK", "2026-08"], m: { n: 7500 * 2 } },
+  ], archiveGrainDims(["datum"]), AUG, archiveReadingScope([]));
+  assert.deepEqual(out.map((g) => g.m.n), [7500, 7500]);
+});
+
+test("a Datum filter on the re-run day divides by its two readings", () => {
+  const out = normaliseArchiveGrain([{ d: ["Ružinov", "SK", "2026-08"], m: { n: 1200 * 2 } }],
+    archiveGrainDims(["cast"]), AUG, archiveReadingScope([{ key: "datum", mode: "in", values: ["2026-08-31"] }]));
+  assert.equal(out[0].m.n, 1200);
+});
+
+test("the Pivot and the assistant divide the same month by the same readings", async () => {
+  const { readingsPerMonth } = await import("../../api/_lib/archiveCounts.js");
+  const rows = Array.from({ length: 31 }, (_, i) => ({
+    day: `2026-08-${String(i + 1).padStart(2, "0")}`, country: "SK", readings: i === 30 ? 2 : 1,
+  }));
+  const pivot = normaliseArchiveGrain([{ d: ["2026-08", "SK"], m: { n: 32 } }],
+    archiveGrainDims(["snapshot_month"]), readingDaysByCountry(rows), archiveReadingScope([]));
+  assert.equal(32 / pivot[0].m.n, readingsPerMonth(rows)["SK|2026-08"]);
 });
 
 // ── the page uses it ──
@@ -141,6 +179,7 @@ test("the readings come from archive_days for every market, every page of it", (
   const m = DATA.match(/export function useArchiveReadingDays[\s\S]*?\n\}\n/);
   assert.ok(m, "useArchiveReadingDays not found");
   assert.match(m[0], /sbReadAll\(/);
-  assert.match(m[0], /from\("archive_days"\)\s*\.select\("day,country"\)/);
+  assert.match(m[0], /from\("archive_days"\)\s*\.select\(cols\)/);
+  assert.match(m[0], /read\("day,country,readings"\)/, "each day's readings are what a month is divided by");
   assert.doesNotMatch(m[0], /_eqCountry/, "the All view divides each market by its own readings");
 });
