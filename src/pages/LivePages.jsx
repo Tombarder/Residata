@@ -24,6 +24,7 @@ import PageHero from "../components/PageHero";
 import InfoTip from "../components/InfoTip";
 import { useSpecifics, SpecificsMark, SpecificsPanel, UnitPriceMarks } from "../lib/projectSpecifics";
 import ParkingCard from "../lib/parkingPrices";
+import { SoldShareNote } from "../lib/soldShareNote";
 import PivotV2 from "./PivotV2";
 import MapFilterBuilder from "../components/MapFilterBuilder";
 import FlatWorkbench from "../components/FlatWorkbench";
@@ -350,7 +351,7 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
                     <SortableTh style={th} sortKey="available_units"  align="right" current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t.tbl_available}</SortableTh>
                     <SortableTh style={th} sortKey="sold_units"       align="right" current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t.tbl_sold}<HeaderInfo lang={lang} sk="Počet bytov, ktoré sme zaznamenali ako PREDANÉ odkedy projekt sledujeme. Pri projektoch, ktoré sme začali sledovať neskôr, býva nižší než stĺpec „% obsadené“ — ten ráta aj rezervácie a aj to, čo bolo obsadené pred naším sledovaním." en="Flats we have recorded as SOLD since we began tracking this project. For projects we started tracking later it is usually lower than the “Taken %” column — that one also counts reservations, and what was taken before we tracked it." /></SortableTh>
                     <SortableTh style={th} sortKey="sold_percentage"  align="right" current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t.tbl_sold_pct}<HeaderInfo lang={lang} sk="Podiel bytov, ktoré už NIE SÚ v ponuke — predané + rezervované + predrezervované, z celku. Nie sú to len predané: rezervácia sa môže zrušiť. Skutočné predaje ukazuje stĺpec „Predané“. Zahŕňa aj obsadenosť spred nášho sledovania, preto môže byť vysoká, aj keď „Predané“ je nízke." en="Share of flats that are no longer on offer — sold + reserved + pre-reserved, out of the total. Not sold alone: a reservation can fall through. Actual sales are the “Sold” column. It includes what was taken before we began tracking, which is why it can be high while “Sold” is low." /></SortableTh>
-                    <SortableTh style={th} sortKey="avg_price_eur_m2" align="right" current={sort} onClick={onHeaderClick} arrow={sortArrow}>{moneySymbol() + "/m²"}<HeaderInfo lang={lang} sk="Priemerná ponuková cena za m² voľných bytov v projekte. Ráta sa len z bytov, ktoré majú zverejnenú cenu aj plochu. Byty bez ceny (veľká časť ponuky) do priemeru nevstupujú, takže priemer pokrýva menej bytov než počty vedľa neho." en="Average asking price per m² of the project's available units. Computed only from units with a published price and area. Units without a price — a large share of the offer — are not in the average, so it covers fewer units than the counts beside it." /></SortableTh>
+                    <SortableTh style={th} sortKey="avg_price_eur_m2" align="right" current={sort} onClick={onHeaderClick} arrow={sortArrow}>{moneySymbol() + "/m²"}<HeaderInfo lang={lang} sk="Priemerná ponuková cena za m² voľných bytov v projekte. Ráta sa len z bytov, ktoré majú zverejnenú cenu aj plochu. Byty bez ceny (veľká časť ponuky) do priemeru nevstupujú, takže priemer pokrýva menej bytov než počty vedľa neho. Pod cenou je podiel bytov projektu, ktoré sú už predané: ich ceny developeri zvyčajne stiahnu, takže priemer opisuje zvyšok ponuky, nie celý projekt." en="Average asking price per m² of the project's available units. Computed only from units with a published price and area. Units without a price — a large share of the offer — are not in the average, so it covers fewer units than the counts beside it. Under the price is the share of the project already sold: developers usually remove those prices, so the average describes the remaining offer, not the whole project." /></SortableTh>
                     {/* Sold velocity — header viditeľný vždy, obsah blurred pre non-paid */}
                     <SortableTh style={th} sortKey="sold_last_month"  align="right" current={sort} onClick={onHeaderClick} arrow={sortArrow} title={can("view_sold_velocity") ? t.tbl_sold_30d_tooltip_paid : t.tbl_sold_30d_tooltip_locked}>
                       {t.tbl_sold_30d}
@@ -507,7 +508,7 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
                           </td>
                           <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{p.total_units ? num(lang, p.total_units) : "—"}</td>
                           <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{formatPercent(p.sold_percentage, lang)}</td>
-                          <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{p.avg_price_eur_m2 ? num(lang, Math.round(moneyFromEur(p.avg_price_eur_m2))) : "—"}</td>
+                          <td style={{ ...td, textAlign: "right", fontFamily: mono }}>{p.avg_price_eur_m2 ? <>{num(lang, Math.round(moneyFromEur(p.avg_price_eur_m2)))}<SoldShareNote project={p} lang={lang} block /></> : "—"}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -628,7 +629,9 @@ function ProjectRow({ p, t, lang, setCurrent, canVelocity, specifics = [] }) {
       </td>
       <td style={{ ...td, textAlign: "right", fontFamily: mono }}>
         {p.avg_price_eur_m2
-          ? Math.round(moneyFromEur(p.avg_price_eur_m2)).toLocaleString(localeTag(lang))
+          ? <>{Math.round(moneyFromEur(p.avg_price_eur_m2)).toLocaleString(localeTag(lang))}
+              {/* what the average leaves out — the sold flats (soldShare.js) */}
+              {!soldDataUnavailable && <SoldShareNote project={p} lang={lang} block />}</>
           : (() => {
               // Three reasons why €/m² could be null in projects_live:
               //   a) developer doesn't publish prices at all → min/max also null
@@ -923,8 +926,10 @@ function ProjectAggregateOnly({ project, lang, t, canVelocity }) {
     { label: lang === "sk" ? "Bytov spolu" : "Total units",  value: fmt(project.total_units), accent: "var(--text)" },
     { label: lang === "sk" ? "Voľné" : "Available",          value: fmt(project.available_units), accent: green },
     { label: lang === "sk" ? "Predané" : "Sold",             value: soldDataMissing ? "—" : fmt(project.sold_units), accent: "#f5a623", sub: soldDataMissing ? (lang === "sk" ? "developer nezverejňuje" : "developer doesn't publish") : null },
-    { label: lang === "sk" ? "Predaných %" : "Sold %",       value: soldPct || "—", accent: "#f5a623" },
-    { label: `${moneySymbol()}/m²`,                          value: eurM2 ? fmt(eurM2) : "—", accent: eurM2 ? "var(--text)" : dim, sub: eurM2 ? null : (lang === "sk" ? "developer nezverejňuje ceny" : "developer doesn't publish prices") },
+    // sold_percentage is (sold + reserved + pre-reserved) / total — TAKEN, as the
+    // project table's column says; the sold share sits under the price it qualifies
+    { label: t.tbl_sold_pct,                                  value: soldPct || "—", accent: "#f5a623" },
+    { label: `${moneySymbol()}/m²`,                          value: eurM2 ? fmt(eurM2) : "—", accent: eurM2 ? "var(--text)" : dim, sub: eurM2 ? (soldDataMissing ? null : <SoldShareNote project={project} lang={lang} block style={{ fontSize: "1em" }} />) : (lang === "sk" ? "developer nezverejňuje ceny" : "developer doesn't publish prices") },
     ...(canVelocity && project.sold_last_month != null ? [{
       label: lang === "sk" ? "Predané (30d)" : "Sold (30d)",
       value: project.sold_last_month > 0 ? `+${project.sold_last_month}` : "0",
@@ -1095,13 +1100,17 @@ function ProjectInsights({ project, flats: allRows, ledgerFlats: ledgerRows, sna
     {
       label: L(`Priem. ${moneySymbol()}/m²`, `Avg ${moneySymbol()}/m²`),
       value: project.avg_price_eur_m2 ? Math.round(moneyFromEur(project.avg_price_eur_m2)).toLocaleString("en-US").replace(/,/g, " ") : "—",
-      sub: pricemomDelta != null
-        ? (pricemomDelta > 0
-            ? <span style={{ color: orangeInk }}>+{Math.round(moneyFromEur(pricemomDelta))} {moneySymbol()}/m² {L("MoM", "MoM")}</span>
-            : pricemomDelta < 0
-              ? <span style={{ color: greenInk }}>{Math.round(moneyFromEur(pricemomDelta))} {moneySymbol()}/m² {L("MoM", "MoM")}</span>
-              : <span style={{ color: dim }}>{L("bez zmeny", "no change")} MoM</span>)
-        : L("žiadna história", "no history yet"),
+      sub: <>
+        {pricemomDelta != null
+          ? (pricemomDelta > 0
+              ? <span style={{ color: orangeInk }}>+{Math.round(moneyFromEur(pricemomDelta))} {moneySymbol()}/m² {L("MoM", "MoM")}</span>
+              : pricemomDelta < 0
+                ? <span style={{ color: greenInk }}>{Math.round(moneyFromEur(pricemomDelta))} {moneySymbol()}/m² {L("MoM", "MoM")}</span>
+                : <span style={{ color: dim }}>{L("bez zmeny", "no change")} MoM</span>)
+          : L("žiadna história", "no history yet")}
+        {/* the average is over the flats still on offer — say how much is already sold */}
+        {project.avg_price_eur_m2 ? <SoldShareNote project={project} lang={lang} block style={{ fontSize: "1em" }} /> : null}
+      </>,
       tint: "var(--text)",
       color: "#3b74e8",
       isPriceKpi: true,

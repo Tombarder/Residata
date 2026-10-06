@@ -40,6 +40,8 @@ import { localeTag, formatPercent } from "../lib/locale";
 import { useAccountPrefState } from "../lib/useAccountUiPref";
 import { useCurrency } from "../lib/useCurrency";
 import { useCountry, isAllCountries } from "../lib/useCountry";
+import { SoldShareNote } from "../lib/soldShareNote";
+import { soldSharePct, soldShareText } from "../lib/soldShare.js";
 import { supabase, supabaseData } from "../lib/supabase";
 
 // ── Visual language (mirrors Platform.jsx) ───────────────────────
@@ -1347,7 +1349,7 @@ function ProjectTable({ projects, lang, onProjectClick }) {
               <td style={tdcR}>{p._realTotal.toLocaleString("en-US").replace(/,/g, " ")}</td>
               <td style={{ ...tdcR, color: accentInk }}>{p._realAvail.toLocaleString("en-US").replace(/,/g, " ")}</td>
               <td style={{ ...tdcR, color: orangeInk }}>{formatPercent(p._realSoldPct, lang, 0)}</td>
-              <td style={tdcR}>{p.avg_price_eur_m2 ? Math.round(moneyFromEur(p.avg_price_eur_m2)).toLocaleString("en-US").replace(/,/g, " ") : "—"}</td>
+              <td style={tdcR}>{p.avg_price_eur_m2 ? <>{Math.round(moneyFromEur(p.avg_price_eur_m2)).toLocaleString("en-US").replace(/,/g, " ")}<SoldShareNote project={p} lang={lang} block /></> : "—"}</td>
             </tr>
           ))}
         </tbody>
@@ -1541,7 +1543,7 @@ function CompetitiveProfile({ projects, scopeType, scopeValue, lang }) {
                   <td style={{ ...tdcR, color: accentInk }}>{p.available_units ?? "—"}</td>
                   <td style={{ ...tdcR, color: orangeInk }}>
                     {p.sold_percentage != null ? Math.round(p.sold_percentage) + "%" : "—"}</td>
-                  <td style={tdcR}>{perM2(p.avg_price_eur_m2)}</td>
+                  <td style={tdcR}>{perM2(p.avg_price_eur_m2)}{p.avg_price_eur_m2 ? <SoldShareNote project={p} lang={lang} block /> : null}</td>
                   {rooms.map(r => (
                     <td key={r} style={tdcR}
                         title={rp[r] ? `${rp[r].units} ${sk ? "bytov" : "units"} · ${money(rp[r].price)}` : ""}>
@@ -1667,7 +1669,7 @@ function TopSellerList({ projects, lang }) {
       {tops.map(p => (
         <li key={p.id}>
           <strong style={{ color: text }}>{p.name}</strong><SpecificsMark items={spec.project(p)} lang={lang} /> ({p.district || "—"}) — <span style={{ color: accentInk, fontFamily: mono, fontWeight: 700 }}>+{p.sold_last_month}</span> {lang === "sk" ? "predaných" : "sold"}
-          {p.avg_price_eur_m2 && <span style={{ color: dim, fontFamily: mono }}> · {Math.round(moneyFromEur(p.avg_price_eur_m2)).toLocaleString("en-US").replace(/,/g, " ")} {moneySymbol()}/m²</span>}
+          {p.avg_price_eur_m2 && <span style={{ color: dim, fontFamily: mono }}> · {Math.round(moneyFromEur(p.avg_price_eur_m2)).toLocaleString("en-US").replace(/,/g, " ")} {moneySymbol()}/m²<SoldShareNote project={p} lang={lang} style={{ fontSize: "1em" }} /></span>}
         </li>
       ))}
     </ol>
@@ -2301,7 +2303,7 @@ function PricingTensionReport({ projects, lang, onOpenProject }) {
                   >
                     <td style={tdc}><strong style={{ color: text }}>{p.name}</strong><SpecificsMark items={spec.project(p)} lang={lang} /></td>
                     <td style={tdc}>{p.district || "—"}</td>
-                    <td style={tdcR}>{Math.round(moneyFromEur(p.avg_price_eur_m2)).toLocaleString("en-US").replace(/,/g, " ")}</td>
+                    <td style={tdcR}>{Math.round(moneyFromEur(p.avg_price_eur_m2)).toLocaleString("en-US").replace(/,/g, " ")}<SoldShareNote project={p} lang={lang} block /></td>
                     <td style={{ ...tdcR, color: p.premiumPct >= 0 ? orange : green, fontWeight: 700 }}>
                       {p.premiumPct >= 0 ? "+" : ""}{formatPercent(p.premiumPct, lang)}
                     </td>
@@ -2404,7 +2406,7 @@ function PricingTensionScatter({ dots, lang, onOpenProject }) {
             <g key={d.id || i} style={{ cursor: onClick ? "pointer" : "default" }} onClick={onClick}>
               <circle cx={cx} cy={cy} r={Math.min(12, 4 + Math.sqrt(d.available_units || 0) * 0.5)}
                       fill={fill} opacity="0.65" stroke={fill} strokeWidth="1.2">
-                <title>{`${d.name} (${d.district || "?"})\n${moneySymbol()}/m²: ${Math.round(moneyFromEur(d.avg_price_eur_m2)).toLocaleString("sk-SK")} (${d.premiumPct >= 0 ? "+" : ""}${formatPercent(d.premiumPct, lang)} vs ${lang === "sk" ? "medián" : "median"})\nVelocity: ${formatPercent(d.velocityPct, lang)}/mes.\nVoľných: ${d.available_units}`}</title>
+                <title>{`${d.name} (${d.district || "?"})\n${moneySymbol()}/m²: ${Math.round(moneyFromEur(d.avg_price_eur_m2)).toLocaleString("sk-SK")} (${d.premiumPct >= 0 ? "+" : ""}${formatPercent(d.premiumPct, lang)} vs ${lang === "sk" ? "medián" : "median"})\nVelocity: ${formatPercent(d.velocityPct, lang)}/mes.\nVoľných: ${d.available_units}${soldShareText(soldSharePct(d), lang) ? `\n${soldShareText(soldSharePct(d), lang)}` : ""}`}</title>
               </circle>
             </g>
           );
