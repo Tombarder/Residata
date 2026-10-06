@@ -82,6 +82,19 @@ export function readingDaysByCountry(rows) {
   return out;
 }
 
+/** A short fingerprint of readingDaysByCountry(): it changes when a reading lands or is
+ *  withdrawn, so whatever was divided by the old readings can be asked again. */
+export function readingsSignature(days) {
+  const parts = [];
+  for (const c of Object.keys(days || {}).sort()) {
+    for (const [d, n] of [...days[c]].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) parts.push(`${c}${d}${n}`);
+  }
+  let h = 5381;
+  const s = parts.join(",");
+  for (let i = 0; i < s.length; i += 1) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+  return `${parts.length}.${h.toString(36)}`;
+}
+
 const active = (f) => !!f && (f.mode === "empty" || f.mode === "not_empty"
   || ((f.mode == null || f.mode === "in" || f.mode === "not_in") && Array.isArray(f.values) && f.values.length > 0));
 const EMPTY = "__EMPTY__";   // the Pivot's "(prázdne)" value

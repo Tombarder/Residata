@@ -1845,7 +1845,8 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   // readings it was asked with — and if they cannot be read, the table is not shown: a
   // flat-reading count is the number this replaces.
   const archiveGrain = configServerable && !isCurrent;
-  const { days: readingDays, loading: readingsLoading, error: readingsError } = useArchiveReadingDays({ enabled: archiveGrain });
+  const { days: readingDays, version: readingsVersion, loading: readingsLoading, error: readingsError } = useArchiveReadingDays({ enabled: archiveGrain });
+  const grainVersion = isCurrent ? "" : readingsVersion;
   // What a grain answers, handed back with it: a grain still on screen while the next
   // loads is read as the question IT answers (grainView), not the one now being asked.
   const grainMeta = useMemo(
@@ -1853,7 +1854,7 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
     [isCurrent, specDims, readingScope, readingDays]
   );
   const grainEnabled = configServerable && (isCurrent || !!readingDays);
-  const { grain: grainRaw, meta: grainRawMeta, loading: grainRawLoading, error: grainRawError } = usePivotGrain({ enabled: grainEnabled, spec: pivotSpec, meta: grainMeta });
+  const { grain: grainRaw, meta: grainRawMeta, loading: grainRawLoading, error: grainRawError } = usePivotGrain({ enabled: grainEnabled, spec: pivotSpec, meta: grainMeta, version: grainVersion });
   // Denominator for the price-scope note: the SAME grouping without the price
   // scope, so the note can say "27 of 141" concretely instead of hand-waving.
   // Fired concurrently with the scoped call (both effects run in one render), so
@@ -1862,7 +1863,7 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
     () => (priceScope ? buildPivotSpec({ dims: specDims, filters, country, isCurrent }) : null),
     [priceScope, specDims, filters, country, isCurrent]
   );
-  const { grain: grainUnscopedRaw, meta: grainUnscopedMeta } = usePivotGrain({ enabled: grainEnabled && priceScope, spec: pivotSpecUnscoped, meta: grainMeta });
+  const { grain: grainUnscopedRaw, meta: grainUnscopedMeta } = usePivotGrain({ enabled: grainEnabled && priceScope, spec: pivotSpecUnscoped, meta: grainMeta, version: grainVersion });
   const grain = useMemo(() => grainView(grainRaw, grainRawMeta, specDims), [grainRaw, grainRawMeta, specDims]);
   const grainUnscoped = useMemo(() => grainView(grainUnscopedRaw, grainUnscopedMeta, specDims), [grainUnscopedRaw, grainUnscopedMeta, specDims]);
   const grainLoading = grainRawLoading || (archiveGrain && readingsLoading);

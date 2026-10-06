@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { supabaseData, supabasePublic, isSupabaseReady } from "./supabase";
 import { useAuth } from "./useAuth";
 import { useCountry, isAllCountries } from "./useCountry";
-import { readingDaysByCountry } from "./archiveReadings";
+import { readingDaysByCountry, readingsSignature } from "./archiveReadings";
 
 /**
  * sbRead — the single settle-guarantee wrapper every RLS-gated read goes through.
@@ -1624,42 +1624,84 @@ export function useArchiveDays() {
   return { days, loading };
 }
 
-let _archiveReadingsCache = new Map();
+// The readings are kept for ARCHIVE_READINGS_TTL_MS and asked again on mount, when the tab
+// comes back into view and every ARCHIVE_READINGS_CHECK_MS — each a no-op while the kept
+// answer is current — like the last-data-day cache (FRESHNESS_TTL_MS), but for minutes,
+// not hours: a stale date only shows yesterday, a stale reading count divides a month's
+// rows by one reading too few — November's second reading landing in a tab opened after
+// the first made November read twice the flats. When an answer differs from the kept one
+// (a reading landed or was withdrawn), every archive grain divided by the old readings
+// leaves the grain cache, and the new version makes a mounted Pivot ask again.
+const ARCHIVE_READINGS_TTL_MS = 15 * 60 * 1000;
+const ARCHIVE_READINGS_CHECK_MS = 15 * 60 * 1000;
+let _archiveReadingsCache = new Map();     // identity → { days, version, at }
+const _archiveReadingsInflight = new Map();
+function _dropArchiveGrains() {
+  for (const k of [..._pivotGrainCache.keys()]) if (k.includes('"mode":"archive"')) _pivotGrainCache.delete(k);
+}
+function _loadArchiveReadings(key) {
+  const kept = _archiveReadingsCache.get(key);
+  if (kept && Date.now() - kept.at < ARCHIVE_READINGS_TTL_MS) return Promise.resolve(kept);
+  if (_archiveReadingsInflight.has(key)) return _archiveReadingsInflight.get(key);
+  const p = (async () => {
+    const read = (cols) => sbReadAll((from, to) => supabaseData.from("archive_days")
+      .select(cols).order("day", { ascending: false }).order("country").range(from, to));
+    // A view that does not carry `readings` yet: each day one reading, as before.
+    let { data, error } = await read("day,country,readings");
+    if (error) ({ data, error } = await read("day,country"));
+    if (error) {
+      if (kept) return kept;                       // the last good answer stands
+      throw error;
+    }
+    const days = readingDaysByCountry(data);
+    const version = readingsSignature(days);
+    if (kept && kept.version === version) { kept.at = Date.now(); return kept; }
+    if (kept) _dropArchiveGrains();
+    const entry = { days, version, at: Date.now() };
+    _archiveReadingsCache.set(key, entry);
+    return entry;
+  })().finally(() => _archiveReadingsInflight.delete(key));
+  _archiveReadingsInflight.set(key, p);
+  return p;
+}
 /** Full readings of every market ({ SK: Map(day → readings), CZ: … }) from public.archive_days, for
  *  turning the Pivot's archive grain — flat-READINGS — into flats (src/lib/archiveReadings.js).
  *  All markets, whatever the country selector says: the "All" view divides each market by
  *  its own readings. Every page of it — a day per market per reading outgrows PostgREST's
  *  1 000-row cap within the year. Keyed and gated by identity like useArchiveDays.
- *  `days` is null while loading, when not enabled, and when it could not be read. */
+ *  `days` is null while loading, when not enabled, and when it could not be read;
+ *  `version` changes whenever they do. */
 export function useArchiveReadingDays({ enabled = false } = {}) {
   const { loading: authLoading, user, profile } = useAuth();
   const key = `${user?.id || "anon"}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}`;
   // The list lives in the cache and is read by THIS identity's key on every render, and
   // "loading" is derived from it — so neither can be another identity's, or a stale
   // "not loading" for the render in which the page switched to the archive. The state
-  // only re-renders once the list lands, or says it failed.
-  const [, setLanded] = useState(0);
+  // only re-renders when the list lands or changes, or says it failed.
+  const [, setLanded] = useState(null);
   const [failedKey, setFailedKey] = useState(null);
   useEffect(() => {
-    if (!enabled || _archiveReadingsCache.has(key)) return;
+    if (!enabled) return;
     if (!isSupabaseReady() || authLoading) return; // wait for the session so RLS returns the caller's real rows
     let cancelled = false;
-    (async () => {
-      const read = (cols) => sbReadAll((from, to) => supabaseData.from("archive_days")
-        .select(cols).order("day", { ascending: false }).order("country").range(from, to));
-      // A view that does not carry `readings` yet: each day one reading, as before.
-      let { data, error } = await read("day,country,readings");
-      if (error) ({ data, error } = await read("day,country"));
-      if (cancelled) return;
-      if (error) { console.error("[useArchiveReadingDays]", error); setFailedKey(key); return; }
-      _archiveReadingsCache.set(key, readingDaysByCountry(data));
-      setFailedKey(null); setLanded((n) => n + 1);
-    })();
-    return () => { cancelled = true; };
+    const ask = () => _loadArchiveReadings(key).then(
+      (entry) => { if (!cancelled) { setFailedKey(null); setLanded(entry.version); } },
+      (e) => { console.error("[useArchiveReadingDays]", e); if (!cancelled) setFailedKey(key); },
+    );
+    ask();
+    const onVisible = () => { if (typeof document === "undefined" || document.visibilityState === "visible") ask(); };
+    if (typeof document !== "undefined") document.addEventListener("visibilitychange", onVisible);
+    const timer = setInterval(ask, ARCHIVE_READINGS_CHECK_MS);
+    return () => {
+      cancelled = true;
+      if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onVisible);
+      clearInterval(timer);
+    };
   }, [enabled, key, authLoading]);
-  const days = enabled ? (_archiveReadingsCache.get(key) || null) : null;
+  const entry = enabled ? _archiveReadingsCache.get(key) : null;
+  const days = entry ? entry.days : null;
   const error = !!enabled && !days && failedKey === key;
-  return { days, loading: !!enabled && !days && !error, error };
+  return { days, version: entry ? entry.version : "", loading: !!enabled && !days && !error, error };
 }
 
 let _pivotGrainCache = new Map();
@@ -1685,11 +1727,13 @@ const GRAIN_IDLE = Object.freeze({ key: null, grain: null, meta: null, error: fa
  *  no fetch (returns null). RLS-gated (mode 'archive' is paid/chosen-project gated in the
  *  RPC, mirroring flats_archive). Cached by user+tier+chosen+spec. `meta` is the caller's
  *  own description of the request, returned with the grain that answers it (_grainView). */
-export function usePivotGrain({ enabled = false, spec = null, meta = null } = {}) {
+export function usePivotGrain({ enabled = false, spec = null, meta = null, version = "" } = {}) {
   const { loading: authLoading, user, profile } = useAuth();
   const specKey = spec ? JSON.stringify(spec) : "";
+  // `version` — the archive readings' (useArchiveReadingDays): a new reading is a new
+  // question for an archive grain, asked again rather than served from the cache.
   const key = enabled && spec
-    ? `${user?.id || "anon"}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}::${specKey}`
+    ? `${user?.id || "anon"}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}::${specKey}::${version}`
     : null;
   const [state, setState] = useState(GRAIN_IDLE);
   useEffect(() => {

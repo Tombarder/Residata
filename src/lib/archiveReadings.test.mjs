@@ -301,8 +301,8 @@ test("counts become whole flats where they become numbers on the page", () => {
 });
 
 test("the readings come from archive_days for every market, every page of it", () => {
-  const m = DATA.match(/export function useArchiveReadingDays[\s\S]*?\n\}\n/);
-  assert.ok(m, "useArchiveReadingDays not found");
+  const m = DATA.match(/function _loadArchiveReadings[\s\S]*?\n\}\n/);
+  assert.ok(m, "_loadArchiveReadings not found");
   assert.match(m[0], /sbReadAll\(/);
   assert.match(m[0], /from\("archive_days"\)\s*\.select\(cols\)/);
   assert.match(m[0], /read\("day,country,readings"\)/, "each day's readings are what a month is divided by");
@@ -356,7 +356,7 @@ test("a grain for another layout is not shown under this one", () => {
 
 test("the page asks for the archive grain once the readings are known, and passes what it asks", () => {
   assert.match(PIVOT, /const grainEnabled = configServerable && \(isCurrent \|\| !!readingDays\);/);
-  assert.match(PIVOT, /usePivotGrain\(\{ enabled: grainEnabled, spec: pivotSpec, meta: grainMeta \}\)/);
-  assert.match(PIVOT, /usePivotGrain\(\{ enabled: grainEnabled && priceScope, spec: pivotSpecUnscoped, meta: grainMeta \}\)/);
+  assert.match(PIVOT, /usePivotGrain\(\{ enabled: grainEnabled, spec: pivotSpec, meta: grainMeta,/);
+  assert.match(PIVOT, /usePivotGrain\(\{ enabled: grainEnabled && priceScope, spec: pivotSpecUnscoped, meta: grainMeta,/);
   assert.match(PIVOT, /\(\{ archive: !isCurrent, dims: specDims, scope: readingScope, days: readingDays \}\)/);
 });
