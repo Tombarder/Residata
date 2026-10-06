@@ -286,7 +286,7 @@ async function toolMarketOverview(admin) {
   return { markets, top_sellers_30d, top_developers };
 }
 
-// Full readings per market-month (the full snapshots), for turning the archive's
+// Full readings per market-month (public.archive_days), for turning the archive's
 // flat-reading counts into flats — see api/_lib/archiveCounts.js. Ten minutes is far
 // shorter than the time between two readings.
 let _readings = null;
@@ -304,15 +304,13 @@ async function toolMarketStats(admin, a, allowHistorical) {
   const gkey = GROUP_KEY[a.group_by || "none"];
   if (mode === "archive") {
     // History: one row per flat per reading — counted per market-month and turned into
-    // flats, so a month read less often does not read as a market that shrank. The
-    // readings are counted per market when the snapshots can be read (the cell is then
-    // the `market` dimension), per country from the archive's days otherwise.
-    const readings = await marketReadings(admin);
-    const dims = [...new Set([gkey, readings.by, "snapshot_month"].filter(Boolean))];
+    // flats, so a month read less often does not read as a market that shrank.
+    const dims = [...new Set([gkey, "country", "snapshot_month"].filter(Boolean))];
     const spec = { dims, filters: buildFilters(a), ranges: buildRanges(a), mode };
-    const { data, error } = await admin.rpc("analytics_pivot", { p_spec: spec });
+    const [{ data, error }, readings] = await Promise.all([
+      admin.rpc("analytics_pivot", { p_spec: spec }), marketReadings(admin)]);
     if (error) throw new Error(error.message);
-    const groups = archiveGroups(data, dims, gkey, readings.counts, readings.by);
+    const groups = archiveGroups(data, dims, gkey, readings);
     groups.sort((x, y) => y.units - x.units);
     return { mode, group_by: a.group_by || "none", groups: groups.slice(0, 60) };
   }

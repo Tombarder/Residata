@@ -6,7 +6,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { archiveGroups, readingsPerMonth, readingsFromSnapshots, fetchMarketReadings } from "../../api/_lib/archiveCounts.js";
+import { archiveGroups, readingsPerMonth, fetchMarketReadings } from "../../api/_lib/archiveCounts.js";
 
 const dims = ["snapshot_month", "country"];
 const row = (month, country, n, extra = {}) => ({ d: [month, country], m: { n, avail: n, sold: 0, res: 0, ...extra } });
@@ -121,89 +121,67 @@ test("two markets in one month weigh by their flats, not by how often each was r
   assert.equal(g.avg_price_eur, 180000);            // (400·200 000 + 100·100 000) / 500
 });
 
-// ── W3a: one reading is one full snapshot, not one day ──
+// ── W3a: a day can hold two readings ──
 // 2026-08-31 SK holds two complete markets three hours apart (07:56 and 10:58, a manual
-// re-run). Both are in the archive, so August's flat-readings hold 32 readings of the
-// market; counted as distinct days August had 31, and its stock read 7 742 for 7 500.
-const snap = (id, market, at, extra = {}) => ({ id, market_key: market, scraped_at: at, status: "approved", is_partial: false, ...extra });
-const august = () => {
-  const out = [];
-  for (let d = 1; d <= 31; d += 1) {
-    const day = `2026-08-${String(d).padStart(2, "0")}`;
-    out.push(snap(`sk-${d}`, "sk-ba", `${day}T07:56:00+00:00`));
-  }
-  out.push(snap("sk-31b", "sk-ba", "2026-08-31T10:58:00+00:00"));              // the re-run
-  out.push(snap("sk-31q", "sk-ba", "2026-08-31T10:58:00+00:00", { is_partial: true })); // its held-back sibling
-  out.push(snap("sk-17r", "sk-ba", "2026-08-17T20:50:00+00:00", { is_partial: true })); // a one-project repair
-  out.push(snap("cz-1", "cz-praha", "2026-08-01T06:10:00+00:00"));
-  out.push(snap("cz-2", "cz-praha", "2026-08-02T06:10:00+00:00"));
-  return out;
-};
+// re-run), and the archive holds every row of both: August carries 32 readings' rows.
+// Counted as days it had 31 readings, and its stock read 7 742 for 7 500.
+// public.archive_days says how many full readings each day holds.
+const AUGUST = Array.from({ length: 31 }, (_, i) => ({
+  day: `2026-08-${String(i + 1).padStart(2, "0")}`, country: "SK", readings: i === 30 ? 2 : 1,
+}));
 
-test("two complete readings on one day are two readings; a sibling, a repair and a withdrawn one are none", () => {
-  const snaps = [...august(), snap("sk-x", "sk-ba", "2026-08-20T12:00:00+00:00")];
-  assert.deepEqual(readingsFromSnapshots(snaps, ["sk-x"]), { "sk-ba|2026-08": 32, "cz-praha|2026-08": 2 });
+test("two readings on one day are two readings, so a re-run day does not inflate the month", () => {
+  const readings = readingsPerMonth(AUGUST);
+  assert.deepEqual(readings, { "SK|2026-08": 32 });
+  const [g] = archiveGroups([row("2026-08", "SK", 7500 * 32)], dims, "snapshot_month", readings);
+  assert.equal(g.units, 7500, "the re-run day counted the market twice");
+  const asDays = readingsPerMonth(AUGUST.map(({ day, country }) => ({ day, country })));
+  assert.equal(archiveGroups([row("2026-08", "SK", 7500 * 32)], dims, "snapshot_month", asDays)[0].units, 7742);
 });
 
-test("a month with a re-run day reads the market's stock, not one reading more", () => {
-  const readings = readingsFromSnapshots(august(), []);
-  const rows = [{ d: ["2026-08", "sk-ba"], m: { n: 7500 * 32, avail: 3000 * 32 } }];
-  const [g] = archiveGroups(rows, ["snapshot_month", "market"], "snapshot_month", readings, "market");
-  assert.equal(g.units, 7500);
-  assert.equal(g.available, 3000);
-  // what the distinct days gave
-  const days = [...new Set(august().filter((x) => !x.is_partial && x.market_key === "sk-ba").map((x) => x.scraped_at.slice(0, 10)))]
-    .map((day) => ({ day, country: "SK" }));
-  const [old] = archiveGroups([{ d: ["2026-08", "SK"], m: { n: 7500 * 32 } }], dims, "snapshot_month", readingsPerMonth(days));
-  assert.equal(old.units, 7742);
+test("a day without a readings column is one reading; a day of none is none", () => {
+  assert.deepEqual(readingsPerMonth([
+    { day: "2026-10-05", country: "SK" }, { day: "2026-10-09", country: "SK", readings: null },
+    { day: "2026-10-13", country: "SK", readings: 0 }, { day: "2026-10-17", country: "CZ", readings: 2 },
+  ]), { "SK|2026-10": 2, "CZ|2026-10": 2 });
 });
 
-test("a reading is dated by its UTC month, as the archive dates it", () => {
-  // 23:30 on 31 August UTC is 1 September in Bratislava — the archive files it in August.
-  assert.deepEqual(readingsFromSnapshots([snap("a", "sk-ba", "2026-08-31T23:30:00+00:00")], []), { "sk-ba|2026-08": 1 });
-  assert.deepEqual(readingsFromSnapshots([snap("b", "sk-ba", "2026-09-01T01:30:00+02:00")], []), { "sk-ba|2026-08": 1 });
-});
-
-// A stand-in for the service-key client: final.snapshots, final.withdrawn_snapshots and
-// public.archive_days, paged the way PostgREST pages (1 000 rows at most).
-function fakeAdmin({ snapshots = [], withdrawn = [], days = [], finalFails = false } = {}) {
+// A stand-in for the service-key client's public.archive_days, paged the way PostgREST
+// pages (1 000 rows at most), optionally as the view was before it carried `readings`.
+function fakeAdmin({ days = [], withoutReadings = false } = {}) {
   const calls = [];
-  const table = (schema, name) => {
-    const rows = schema === "final" ? (name === "snapshots" ? snapshots : withdrawn) : days;
-    const q = { filters: [], range: null };
+  const from = (name) => {
+    let cols = "";
     const b = {
-      select() { return b; },
-      eq(col, v) { q.filters.push([col, v]); return b; },
+      select(c) { cols = c; return b; },
       order() { return b; },
-      range(from, to) {
-        calls.push(`${schema}.${name} ${from}-${to}`);
-        if (schema === "final" && finalFails) return Promise.resolve({ data: null, error: { message: "permission denied" } });
-        const hit = rows.filter((r) => q.filters.every(([c, v]) => r[c] === v)).slice(from, Math.min(to + 1, from + 1000));
-        return Promise.resolve({ data: hit, error: null });
+      range(lo, hi) {
+        calls.push(`${name} ${cols} ${lo}-${hi}`);
+        if (withoutReadings && cols.includes("readings")) {
+          return Promise.resolve({ data: null, error: { message: "column archive_days.readings does not exist" } });
+        }
+        const pick = (r) => Object.fromEntries(cols.split(",").filter((k) => k in r).map((k) => [k, r[k]]));
+        return Promise.resolve({ data: days.slice(lo, Math.min(hi + 1, lo + 1000)).map(pick), error: null });
       },
     };
     return b;
   };
-  return {
-    calls,
-    schema: (s) => ({ from: (n) => table(s, n) }),
-    from: (n) => table("public", n),
-  };
+  return { calls, from };
 }
 
-test("readings come from the full snapshots, every page of them", async () => {
-  const many = [];
-  for (let i = 0; i < 1500; i += 1) many.push(snap(`s${i}`, "sk-ba", new Date(Date.UTC(2022, 0, 1) + i * 86400000).toISOString()));
-  const admin = fakeAdmin({ snapshots: [...many, snap("p", "sk-ba", "2026-01-01T05:00:00Z", { is_partial: true })],
-    withdrawn: [{ snapshot_id: "s0" }] });
-  const r = await fetchMarketReadings(admin);
-  assert.equal(r.by, "market");
-  assert.equal(Object.values(r.counts).reduce((a, b) => a + b, 0), 1499);
-  assert.ok(admin.calls.includes("final.snapshots 1000-1999"), "the second page was not read");
+test("the assistant reads every page of archive_days, with its readings", async () => {
+  const many = Array.from({ length: 1500 }, (_, i) => ({
+    day: new Date(Date.UTC(2022, 0, 1) + i * 86400000).toISOString().slice(0, 10), country: "SK", readings: 1,
+  }));
+  many[1499].readings = 2;
+  const admin = fakeAdmin({ days: many });
+  const counts = await fetchMarketReadings(admin);
+  assert.equal(Object.values(counts).reduce((a, b) => a + b, 0), 1501);
+  assert.ok(admin.calls.includes("archive_days day,country,readings 1000-1999"), "the second page was not read");
 });
 
-test("without access to the snapshots it falls back to the archive's days", async () => {
-  const admin = fakeAdmin({ finalFails: true, days: [{ day: "2026-10-05", country: "SK" }, { day: "2026-10-09", country: "SK" }] });
-  const r = await fetchMarketReadings(admin);
-  assert.deepEqual(r, { by: "country", counts: { "SK|2026-10": 2 } });
+test("before archive_days carries readings, each day is one reading", async () => {
+  const admin = fakeAdmin({ withoutReadings: true, days: [
+    { day: "2026-10-05", country: "SK", readings: 2 }, { day: "2026-10-09", country: "SK", readings: 1 }] });
+  assert.deepEqual(await fetchMarketReadings(admin), { "SK|2026-10": 2 });
 });
