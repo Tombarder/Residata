@@ -1698,6 +1698,9 @@ function _lagState(lagging, prev, now) {
 //              lagging, lagSince, lagLate, cubeGen, version, at }
 let _archiveReadingsCache = new Map();
 const _archiveReadingsInflight = new Map();
+// identity → the days and the days ahead of them (with their rows) that a second read of
+// the days found no reading of: a partial snapshot as big as a reading, read once
+const _archiveReadingsAheadSeen = new Map();
 const _archiveReadingsListeners = new Map();   // identity → Set(callback): a new entry landed
 function _publishReadings(key) {
   for (const fn of _archiveReadingsListeners.get(key) || []) fn();
@@ -1757,8 +1760,17 @@ function _loadArchiveReadings(key, force = false, within = 0) {
       // check starts over with them — not divided by days that lack a reading the facts hold.
       const daysBehind = async (h) => {
         if (attempt > 0 || !h?.factsAhead?.size) return false;
+        // the same days ahead, with the same rows, that a read of the days found no reading
+        // of: not read again (a partial snapshot of the projects a reading missed may stay)
+        const ahead = `${daysSig}|${[...h.factsAhead].sort().map(([c, ds]) =>
+          `${c}:${ds.map((d) => `${d}=${h.factsRows?.get(c)?.get(d) ?? ""}`).join(";")}`).join(",")}`;
+        if (_archiveReadingsAheadSeen.get(key) === ahead) return false;
         const again = await readDays();
-        if (again.error || readingsSignature(readingDaysByCountry(again.data)) === daysSig) return false;
+        if (again.error) return false;
+        if (readingsSignature(readingDaysByCountry(again.data)) === daysSig) {
+          _archiveReadingsAheadSeen.set(key, ahead);
+          return false;
+        }
         data = again.data;
         return true;
       };

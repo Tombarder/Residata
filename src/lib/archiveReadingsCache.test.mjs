@@ -747,6 +747,34 @@ test("a check whose facts hold a reading its days lack reads the days again; a r
   assert.equal(st.dayReads, r + 1);
 });
 
+// A facts-only day as big as half a reading that never reaches the days — a partial
+// snapshot of the big projects a reading missed — sent every check, and every forced read
+// twice, to read the days again.
+test("a partial snapshot as big as a reading has the days read again once, not at every check", async () => {
+  const st = { days: [{ day: "2026-10-02", country: "SK", readings: 1 }, { day: "2026-10-06", country: "SK", readings: 1 }],
+    facts: [["SK", "2026-10-02", 7500], ["SK", "2026-10-06", 3500]],         // the 6th missed big projects
+    cube: [["SK", "2026-10", 11000]] };
+  const w = readingsWorld(st);
+  await w.load();
+  st.facts.push(["SK", "2026-10-07", 4000]);                               // the 7th's partial snapshot of them
+  st.cube = [["SK", "2026-10", 15000]];
+  let reads = st.dayReads;
+  for (let k = 0; k < 4; k += 1) { w.advance(16 * MIN); await w.load(); }
+  assert.deepEqual([...w.latest().holding.factsAhead], [["SK", ["2026-10-07"]]]);
+  assert.equal(st.dayReads - reads, 5, "four checks, the days read again once");
+  reads = st.dayReads;
+  const facts = st.factsAsks;
+  const force = (within) => w.stampOf(w.latest()).refresh(within);
+  for (let k = 0; k < 5; k += 1) { w.advance(20 * 1000); await force(0); }
+  assert.equal(st.dayReads - reads, 5, "five forced reads, the days read once each");
+  assert.equal(st.factsAsks - facts, 5);
+  // a second partial snapshot the same morning: read again, once
+  st.facts = st.facts.map(([c, d, n]) => (d === "2026-10-07" ? [c, d, 4100] : [c, d, n]));
+  reads = st.dayReads;
+  for (let k = 0; k < 3; k += 1) { w.advance(16 * MIN); await w.load(); }
+  assert.equal(st.dayReads - reads, 4);
+});
+
 test("records read while a reading lands between the two reads of the check after them are not divided without it", async () => {
   const octRowsOf = (day, n) => Array.from({ length: n }, (_, i) => ({ id: `${day}-${i}`, country: "SK", batch_timestamp: `${day}T05:00:00+00:00`, snapshot_month: "2026-10" }));
   const st = { days: [{ day: "2026-10-02", country: "SK", readings: 1 }], facts: [["SK", "2026-10-02", 7500]], cube: [["SK", "2026-10", 7500]] };
