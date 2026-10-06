@@ -121,6 +121,7 @@ export const ERRORS = {
   email_exists:        ["Užívateľ s týmto e-mailom už existuje.", "A user with this e-mail already exists."],
   personal_email_setup:["Účet s osobným e-mailom (gmail, azet, …) sa zatiaľ nedá vytvoriť — databáza ešte nemá povolenie, ktoré ho pustí cez filter firemných e-mailov.", "An account with a personal e-mail (gmail, …) cannot be created yet — the database does not yet have the permission that lets it past the business-e-mail filter."],
   nothing_to_change:   ["Nič sa nezmenilo.", "Nothing to change."],
+  invite_no_access:    ["Účet bez prístupu nemá čo oznámiť — najprv mu nastav Free alebo Premium.", "An account with no access has nothing to announce — give it Free or Premium first."],
 };
 
 /** A server error object → one sentence in the panel's language. */

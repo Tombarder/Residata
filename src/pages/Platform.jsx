@@ -30,6 +30,7 @@ import { localeTag, PUBLIC_LANGS } from "../lib/locale";
 import { supabaseData, SUPABASE_URL, SUPABASE_ANON_KEY } from "../lib/supabase";
 import { getFreshAccessToken } from "../lib/sessionGuard";
 import { useActivateTrial } from "../lib/useActivateTrial";
+import { daysLeftText } from "../lib/dates";
 import { startCheckout, openBillingPortal } from "../lib/billing";
 import { pushRoute } from "../lib/routing";
 import { track } from "../lib/track";
@@ -500,7 +501,7 @@ function Sidebar({ page, lastProjectsPage, lang, can, tier, email, onNavigate, o
               {email}
             </div>
             <div style={{ marginTop: "0.35rem", display: "flex", alignItems: "center", gap: "0.4rem" }}>
-              <TierBadgeSmall tier={tier} />
+              <TierBadgeSmall tier={tier} lang={lang} />
               <a href="/" onClick={e => { e.preventDefault(); window.location.assign("/"); }}
                 style={{ marginLeft: "auto", fontSize: "0.68rem", color: "var(--sidebar-text-dim)", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "0.2rem" }}
                 title="Back to marketing site">
@@ -531,7 +532,15 @@ function Sidebar({ page, lastProjectsPage, lang, can, tier, email, onNavigate, o
   );
 }
 
-function TierBadgeSmall({ tier }) {
+// What the person READS for their access. The keys are internal ('paid' is a
+// database value); the product is called Premium everywhere a user sees it —
+// the pricing page, the trial, the e-mails, the admin panel.
+function tierName(tier, lang = "sk") {
+  return ({ paid: "Premium", trial: "Trial", free: "Free", admin: "Admin",
+            pending: lang === "sk" ? "Čaká" : "Pending" })[tier] || tier;
+}
+
+function TierBadgeSmall({ tier, lang }) {
   const palette = {
     free:    { c: "var(--text-2)", bg: "rgba(192,192,200,0.1)"  },
     paid:    { c: green,     bg: "color-mix(in srgb, var(--accent) 12%, transparent)"    },
@@ -546,7 +555,7 @@ function TierBadgeSmall({ tier }) {
       fontFamily: mono, fontSize: "0.6rem", color: p.c, background: p.bg,
       border: `1px solid ${p.c}40`, padding: "1px 6px", borderRadius: 10,
       textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.08em",
-    }}>{tier}</span>
+    }}>{tierName(tier, lang)}</span>
   );
 }
 
@@ -590,7 +599,7 @@ function TopBar({ page, lang, setLang, tier }) {
     }} className="platform-topbar">
       <div style={{ paddingLeft: "2.5rem" /* leave room for mobile hamburger */ }} className="platform-topbar-inner">
         <div style={{ fontFamily: mono, fontSize: "0.65rem", color: accentInk, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.2rem" }}>
-          {lang === "sk" ? "Platforma · " : "Platform · "}{tier.toUpperCase()}
+          {lang === "sk" ? "Platforma · " : "Platform · "}{tierName(tier, lang).toUpperCase()}
         </div>
         <h1 style={{ margin: 0, fontSize: "1.4rem", fontWeight: 700, letterSpacing: "-0.02em", color: textLight }}>
           {title}
@@ -1069,8 +1078,8 @@ function PlatformBilling({ lang, setCurrent }) {
           padding: "1rem 1.25rem", marginBottom: "1.25rem", color: textLight, fontSize: "0.9rem", lineHeight: 1.55,
         }}>
           ✓ {lang === "sk"
-            ? "Platba prijatá — tvoj paid prístup sa práve aktivuje. Môže to trvať pár sekúnd; ak sa tier nezmení, obnov stránku."
-            : "Payment received — your paid access is activating now. This can take a few seconds; refresh the page if your tier doesn't update."}
+            ? "Platba prijatá — tvoj prístup Premium sa práve aktivuje. Môže to trvať pár sekúnd; ak sa tier nezmení, obnov stránku."
+            : "Payment received — your Premium access is activating now. This can take a few seconds; refresh the page if your tier doesn't update."}
         </div>
       )}
       {checkoutMsg === "cancelled" && (
@@ -1090,18 +1099,18 @@ function PlatformBilling({ lang, setCurrent }) {
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.75rem", flexWrap: "wrap" }}>
           {/* During a trial the effective tier is "paid", but the user isn't paying —
               show a TRIAL badge, not PAID, so it isn't misleading. */}
-          <TierBadgeSmall tier={trialActive && !paidActive ? "trial" : tier} />
+          <TierBadgeSmall tier={trialActive && !paidActive ? "trial" : tier} lang={lang} />
           <span style={{ fontSize: "1.35rem", fontWeight: 700, color: textLight, letterSpacing: "-0.02em" }}>
-            {isFree && (trialActive ? (lang === "sk" ? "Free (trial: paid prístup)" : "Free (trial: paid access)") : (lang === "sk" ? "Free" : "Free"))}
-            {isPaid && !paidExpired && (lang === "sk" ? "Paid" : "Paid")}
-            {paidExpired && (lang === "sk" ? "Free" : "Free")}
+            {isFree && (trialActive ? (lang === "sk" ? "Free · trial Premium" : "Free · Premium trial") : "Free")}
+            {isPaid && !paidExpired && "Premium"}
+            {paidExpired && "Free"}
             {isAdmin && "Admin"}
           </span>
           {trialActive && (
             <span style={{ fontSize: "0.75rem", color: accentInk, fontFamily: mono, background: "color-mix(in srgb, var(--accent) 12%, transparent)", border: `1px solid ${green}`, borderRadius: 100, padding: "2px 10px" }}>
               🎁 {trialDaysLeft <= 0
                 ? (lang === "sk" ? "Trial · posledný deň" : "Trial · last day")
-                : (lang === "sk" ? `Trial · ${trialDaysLeft} dní zostáva` : `Trial · ${trialDaysLeft} day${trialDaysLeft === 1 ? "" : "s"} left`)}
+                : `Trial · ${daysLeftText(trialDaysLeft, lang)}`}
             </span>
           )}
           {approvedAt && <span style={{ fontSize: "0.75rem", color: dim, fontFamily: mono }}>
@@ -1110,13 +1119,13 @@ function PlatformBilling({ lang, setCurrent }) {
         </div>
         <p style={{ color: "var(--text-2)", fontSize: "0.9rem", lineHeight: 1.65, margin: 0 }}>
           {trialActive && isFree && (lang === "sk"
-            ? <>Máš počas trial-u plný paid prístup (analytika, reporty, exporty). Trial končí <strong style={{ color: textLight }}>{fmtDate(trialUntil)}</strong>. Bez karty — po skončení trial-u jednoducho padneš späť na free tier, nič ti nestrhneme.</>
-            : <>You have full paid access during the trial (analytics, reports, exports). Trial ends <strong style={{ color: textLight }}>{fmtDate(trialUntil)}</strong>. No card required — when the trial ends you simply drop back to free, nothing is charged.</>)}
+            ? <>Máš počas trial-u prístup Premium — všetky projekty, analytika, história a reporty (sťahovanie dát cez Exporty je len v platenom pláne). Trial končí <strong style={{ color: textLight }}>{fmtDate(trialUntil)}</strong>. Bez karty — po skončení trial-u jednoducho padneš späť na free tier, nič ti nestrhneme.</>
+            : <>You have Premium access during the trial — every project, analytics, history and reports (downloading data in Exports is in the paid plan only). Trial ends <strong style={{ color: textLight }}>{fmtDate(trialUntil)}</strong>. No card required — when the trial ends you simply drop back to free, nothing is charged.</>)}
           {((!trialActive && isFree) || paidExpired) && (lang === "sk"
-            ? "Ako free user vidíš zoznam všetkých projektov a plný detail 1 projektu podľa tvojho výberu. Analytika, reporty a exporty sú v paid tieri."
-            : "As a free user you see the full project list and full detail of 1 project of your choice. Analytics, reports and exports are in the paid tier.")}
+            ? "Ako free user vidíš zoznam všetkých projektov a plný detail 1 projektu podľa tvojho výberu. Analytika, reporty a exporty sú v Premium."
+            : "As a free user you see the full project list and full detail of 1 project of your choice. Analytics, reports and exports are in Premium.")}
           {isPaid && !paidExpired && (lang === "sk"
-            ? "Máš plný prístup — všetky projekty, historická data, analytika, exporty, mesačné reporty."
+            ? "Máš plný prístup — všetky projekty, historické dáta, analytika, exporty, mesačné reporty."
             : "You have full access — every project, historical data, analytics, exports, monthly reports.")}
           {isAdmin && (lang === "sk"
             ? "Admin tier — plný prístup plus admin panel pre správu užívateľov."
@@ -1140,8 +1149,8 @@ function PlatformBilling({ lang, setCurrent }) {
           </h3>
           <p style={{ color: "var(--text-2)", fontSize: "0.9rem", lineHeight: 1.6, margin: "0 0 1rem" }}>
             {lang === "sk"
-              ? <>Vyskúšaj Residata naplno týždeň. Všetky projekty, analytika, pivot, reporty, CSV + API exporty. <strong style={{ color: textLight }}>Bez karty, bez platby</strong> — kartu pýtame až keby si sa rozhodol pokračovať po trial-e.</>
-              : <>Try the full Residata for a week. Every project, analytics, pivot, reports, CSV + API exports. <strong style={{ color: textLight }}>No card, no payment</strong> — we only ask for a card if you decide to continue after the trial.</>}
+              ? <>Vyskúšaj Residata naplno týždeň. Všetky projekty, analytika, pivot, história a reporty (sťahovanie dát je v platenom pláne). <strong style={{ color: textLight }}>Bez karty, bez platby</strong> — kartu pýtame až keby si sa rozhodol pokračovať po trial-e.</>
+              : <>Try the full Residata for a week. Every project, analytics, pivot, history and reports (downloading data is in the paid plan). <strong style={{ color: textLight }}>No card, no payment</strong> — we only ask for a card if you decide to continue after the trial.</>}
           </p>
           <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center" }}>
             <button onClick={startTrial} disabled={trialBusy} className="btn-p" style={{ fontSize: "0.88rem" }}>
@@ -1169,10 +1178,10 @@ function PlatformBilling({ lang, setCurrent }) {
           border: "1px solid color-mix(in srgb, var(--accent) 30%, transparent)", borderRadius: 12, padding: "1.75rem 2rem", marginBottom: "1.25rem",
         }}>
           <div style={{ fontFamily: mono, fontSize: "0.65rem", color: accentInk, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.5rem" }}>
-            {lang === "sk" ? "Upgrade na paid" : "Upgrade to paid"}
+            {lang === "sk" ? "Prejsť na Premium" : "Upgrade to Premium"}
           </div>
           <h3 style={{ fontSize: "1.4rem", fontWeight: 700, color: textLight, margin: 0, marginBottom: "0.85rem", letterSpacing: "-0.01em" }}>
-            Paid tier · {anchorDisplay && <span style={{ color: dim, fontWeight: 400, textDecoration: "line-through", marginRight: "0.35rem" }}>{anchorDisplay}</span>}{priceDisplay} <span style={{ fontSize: "0.9rem", fontWeight: 400, color: dim }}>{lang === "sk" ? "/ mesiac" : "/ month"}</span>
+            Premium · {anchorDisplay && <span style={{ color: dim, fontWeight: 400, textDecoration: "line-through", marginRight: "0.35rem" }}>{anchorDisplay}</span>}{priceDisplay} <span style={{ fontSize: "0.9rem", fontWeight: 400, color: dim }}>{lang === "sk" ? "/ mesiac" : "/ month"}</span>
           </h3>
           <ul style={{ color: "var(--text-2)", fontSize: "0.88rem", lineHeight: 1.7, paddingLeft: "1.1rem", margin: "0.2rem 0 1.25rem" }}>
             <li>{lang === "sk" ? "Plný detail každého aktívneho projektu" : "Full detail of every active project"}</li>
@@ -1233,15 +1242,15 @@ function PlatformBilling({ lang, setCurrent }) {
           border: "1px solid rgba(245,166,35,0.4)", borderRadius: 12, padding: "1.75rem 2rem", marginBottom: "1.25rem",
         }}>
           <div style={{ fontFamily: mono, fontSize: "0.65rem", color: orangeInk, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.5rem", fontWeight: 700 }}>
-            ⚠ {lang === "sk" ? "Predplatné vypršalo" : "Subscription expired"}
+            ⚠ {lang === "sk" ? "Premium skončilo" : "Premium ended"}
           </div>
           <h3 style={{ fontSize: "1.2rem", fontWeight: 700, color: textLight, margin: "0 0 0.5rem" }}>
             {lang === "sk" ? `Skončilo ${fmtDate(paidUntil)}` : `Ended on ${fmtDate(paidUntil)}`}
           </h3>
           <p style={{ color: "var(--text-2)", fontSize: "0.9rem", lineHeight: 1.6, margin: "0 0 1rem" }}>
             {lang === "sk"
-              ? "Tvoj prístup teraz funguje na free úrovni. Môžeš pokračovať v paid prístupe — kontaktuj nás a obnovíme ti predplatné."
-              : "Your access is now at the free tier. You can resume paid access — contact us and we'll renew immediately."}
+              ? "Tvoj prístup teraz funguje na free úrovni. Premium môžeš obnoviť tlačidlom nižšie alebo nám napíš."
+              : "Your access is now at the free tier. You can renew Premium with the button below, or write to us."}
           </p>
           <div style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap", alignItems: "center" }}>
             <button type="button" onClick={handleSubscribe} disabled={payBusy} className="btn-p" style={{ fontSize: "0.88rem" }}>
@@ -1298,16 +1307,22 @@ function SubscriptionCard({ lang, paused, paidWindowActive, paidUntil, paidStart
               <span style={{ color: textLight, fontWeight: 700, fontSize: "1rem", letterSpacing: "-0.01em" }}>
                 {paidDaysLeft <= 0
                   ? (lang === "sk" ? "Posledný deň" : "Last day")
-                  : (lang === "sk" ? `${paidDaysLeft} dní zostáva` : `${paidDaysLeft} day${paidDaysLeft === 1 ? "" : "s"} remaining`)}
+                  : daysLeftText(paidDaysLeft, lang)}
               </span>
             )}
           </div>
         </div>
-        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-          <button type="button" onClick={onManage} disabled={manageBusy} className="btn-s" style={{ fontSize: "0.78rem" }}>
-            {manageBusy ? "…" : (lang === "sk" ? "Spravovať platbu" : "Manage billing")}
-          </button>
-        </div>
+        {/* Only a card subscription has anything to manage online (the Stripe
+            portal). For Premium the team set up — a gift, a pilot, an invoice
+            by agreement — the button could only ever answer "not available for
+            this account", so it is not offered. */}
+        {billing.byCard && (
+          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+            <button type="button" onClick={onManage} disabled={manageBusy} className="btn-s" style={{ fontSize: "0.78rem" }}>
+              {manageBusy ? "…" : (lang === "sk" ? "Spravovať platbu" : "Manage billing")}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Meta row — started + renewal dates, like a Stripe receipt. */}
@@ -1323,7 +1338,12 @@ function SubscriptionCard({ lang, paused, paidWindowActive, paidUntil, paidStart
         {paidUntil && (
           <div>
             <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.25rem" }}>
-              {paused ? (lang === "sk" ? "Bolo do" : "Was until") : (lang === "sk" ? "Obnovenie" : "Renews")}
+              {/* A card subscription renews on that day; any other Premium simply
+                  ENDS then — calling it "Renews" promised something that would
+                  not happen. */}
+              {paused ? (lang === "sk" ? "Bolo do" : "Was until")
+                : billing.byCard ? (lang === "sk" ? "Obnovenie" : "Renews")
+                : (lang === "sk" ? "Platí do" : "Valid until")}
             </div>
             <div style={{ color: textLight, fontSize: "0.92rem", fontWeight: 600 }}>
               {fmtDate(paidUntil)}
@@ -1337,9 +1357,12 @@ function SubscriptionCard({ lang, paused, paidWindowActive, paidUntil, paidStart
           <div style={{ color: "var(--text-2)", fontSize: "0.86rem" }}>
             {/* This said "Manual invoicing" for everyone, including subscribers
                 paying by card through Stripe. Say what is actually true. */}
+            {/* Not "Invoice by bank transfer": Premium the team set up is often a
+                gift or a pilot, and telling that person an invoice is coming is
+                worse than saying nothing. This is true for every such account. */}
             {billing.byCard
               ? (lang === "sk" ? "Karta — automaticky mesačne" : "Card — billed monthly")
-              : (lang === "sk" ? "Faktúra na prevod (dohodou)" : "Invoice by bank transfer (agreed)")}
+              : (lang === "sk" ? "Dohodou s Residata (bez karty)" : "Arranged with Residata (no card)")}
           </div>
         </div>
       </div>
@@ -1385,9 +1408,13 @@ function SubscriptionCard({ lang, paused, paidWindowActive, paidUntil, paidStart
       )}
 
       <p style={{ color: dim, fontSize: "0.78rem", lineHeight: 1.55, margin: "1rem 0 0", fontFamily: mono }}>
-        {lang === "sk"
-          ? <>Faktúry, zmena obdobia, zrušenie — spravuj cez <strong style={{ color: "var(--text-2)" }}>Spravovať platbu</strong> alebo napíš na <a href="mailto:info@residata.eu" style={{ color: accentInk }}>info@residata.eu</a>.</>
-          : <>Invoices, period changes, cancellation — use <strong style={{ color: "var(--text-2)" }}>Manage billing</strong> above, or email <a href="mailto:info@residata.eu" style={{ color: accentInk }}>info@residata.eu</a>.</>}
+        {billing.byCard
+          ? (lang === "sk"
+            ? <>Faktúry, zmena obdobia, zrušenie — spravuj cez <strong style={{ color: "var(--text-2)" }}>Spravovať platbu</strong> alebo napíš na <a href="mailto:info@residata.eu" style={{ color: accentInk }}>info@residata.eu</a>.</>
+            : <>Invoices, period changes, cancellation — use <strong style={{ color: "var(--text-2)" }}>Manage billing</strong> above, or email <a href="mailto:info@residata.eu" style={{ color: accentInk }}>info@residata.eu</a>.</>)
+          : (lang === "sk"
+            ? <>Predĺženie, zmena obdobia alebo otázky — napíš na <a href="mailto:info@residata.eu" style={{ color: accentInk }}>info@residata.eu</a>.</>
+            : <>To extend or change the period, or with any question — email <a href="mailto:info@residata.eu" style={{ color: accentInk }}>info@residata.eu</a>.</>)}
       </p>
     </div>
   );

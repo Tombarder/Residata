@@ -149,16 +149,15 @@ export const liveT = {
     cp_signout: "Sign out",
 
     // Pending approval gate
-    pending_title: "Application received",
-    pending_body: "Thanks — your profile is complete. We manually approve new accounts to keep data quality high. You'll get an email once approved (usually within a few hours).",
-    pending_meanwhile: "Meanwhile, you can browse the public dashboard and pricing.",
-    pending_explore: "Explore dashboard",
+    pending_title: "No access right now",
+    pending_body: "Your account currently has no access to the platform's data. If you think this is a mistake, or you would like access, write to us at info@residata.eu.",
+    pending_meanwhile: "Meanwhile you can browse the public pages and pricing. This page unlocks by itself as soon as access is given.",
+    pending_explore: "Go to the homepage",
 
     // Admin — pending section
     admin_pending_section: "Pending approvals",
     admin_new_section: "All users",
     admin_approve: "Approve → free",
-    admin_events_section: "Recent signup events",
     admin_no_pending: "No pending approvals 🎉",
   },
   sk: {
@@ -276,7 +275,7 @@ export const liveT = {
     login_resend: "Poslať nový kód",
     login_resent: "Nový kód odoslaný ✓",
     login_code_hint: "Skontroluj doručené (aj spam). Platí 1 hodinu.",
-    login_biz_email_hint: "Business email povinný",
+    login_biz_email_hint: "Vyžaduje sa pracovný e-mail",
 
     cp_title: "Dokonči profil",
     cp_desc: "Pár údajov pred prístupom. Prijímame len business maily. Info používame len pre interné CRM.",
@@ -299,15 +298,14 @@ export const liveT = {
     cp_submitting: "Ukladám…",
     cp_signout: "Odhlásiť",
 
-    pending_title: "Žiadosť prijatá",
-    pending_body: "Ďakujeme — profil je kompletný. Nové účty schvaľujeme manuálne aby sme udržali kvalitu. Dostaneš email po schválení (zvyčajne do pár hodín).",
-    pending_meanwhile: "Medzitým si môžeš pozrieť verejný dashboard a cenník.",
-    pending_explore: "Ísť na dashboard",
+    pending_title: "Účet momentálne nemá prístup",
+    pending_body: "Tvoj účet teraz nemá prístup k dátam platformy. Ak ide podľa teba o omyl alebo by si prístup chcel, napíš nám na info@residata.eu.",
+    pending_meanwhile: "Medzitým si môžeš pozrieť verejné stránky a cenník. Táto stránka sa odomkne sama, hneď ako ti prístup dáme.",
+    pending_explore: "Na úvodnú stránku",
 
     admin_pending_section: "Čakajúce schválenia",
     admin_new_section: "Všetci užívatelia",
     admin_approve: "Schváliť → free",
-    admin_events_section: "Nedávne signup udalosti",
     admin_no_pending: "Žiadne čakajúce schválenia 🎉",
   },
 };

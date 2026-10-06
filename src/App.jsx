@@ -649,7 +649,7 @@ function Nav({ current, setCurrent, lang, setLang, auth, onLogin, caps }) {
               }}
               onMouseEnter={e => { e.currentTarget.style.filter = "brightness(1.07)"; }}
               onMouseLeave={e => { e.currentTarget.style.filter = ""; }}
-              title={lang === "sk" ? "Nový tu? Zaregistruj sa za 30s a dostaneš 7-dňový paid trial zadarmo." : "New here? 30s sign-up → 7-day paid trial free."}
+              title={lang === "sk" ? "Nový tu? Zaregistruj sa za 30s a dostaneš 7 dní Premium zadarmo." : "New here? 30s sign-up → 7 days of Premium, free."}
               >{lang === "sk" ? "Začať zadarmo →" : "Get started free →"}</NavBtn>
             </div>
           )}

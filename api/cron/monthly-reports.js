@@ -25,6 +25,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { sendEmail } from "../_lib/emails.js";
 import { rejectIfNotCron } from "../_lib/cronAuth.js";
+import { resolveAccess } from "../../src/lib/access.js";
 
 // Gmail SMTP sends are sequential and can take ~2-5s each. With 20+
 // subscribers plus the retention prune, default 10s timeout is tight.
@@ -89,12 +90,32 @@ export default async function handler(req, res) {
     new Date().getUTCFullYear(), new Date().getUTCMonth(), 1
   )).toISOString();
 
-  const { data: subs, error: subErr } = await admin
+  const { data: subsRaw, error: subErr } = await admin
     .from("report_subscriptions")
     .select("*")
     .eq("enabled", true)
     .or(`last_sent_at.is.null,last_sent_at.lt.${monthStartUtc}`);
   if (subErr) return res.status(500).json({ error: `subs query: ${subErr.message}` });
+
+  // The report is part of Premium, so it goes only to people who have Premium
+  // TODAY — by the same rule the app uses (resolveAccess: dates, not the tier
+  // label). A subscription switched on during a trial or a paid month used to
+  // keep arriving for ever after the access ended. The row is left as it is:
+  // when they come back to Premium the report resumes by itself.
+  const ids = [...new Set((subsRaw || []).map((x) => x.user_id).filter(Boolean))];
+  const { data: profs, error: profErr } = ids.length
+    ? await admin.from("user_profiles").select("id, tier, trial_until, paid_until, paid_pause_started").in("id", ids)
+    : { data: [], error: null };
+  if (profErr) return res.status(500).json({ error: `profiles query: ${profErr.message}` });
+  const byId = new Map((profs || []).map((pr) => [pr.id, pr]));
+  const nowMs = Date.now();
+  const subs = [], notEntitled = [];
+  for (const sub of subsRaw || []) {
+    const pr = byId.get(sub.user_id);
+    const eff = pr ? resolveAccess(pr.tier || "pending", pr, nowMs).effectiveTier : "none";
+    if (eff === "paid" || eff === "admin") subs.push(sub);
+    else notEntitled.push(sub.email);
+  }
 
   // ── Load project data once (shared across all subscriptions) ──
   // Read from projects_live VIEW so per-project totals reflect real
@@ -191,7 +212,7 @@ export default async function handler(req, res) {
     await admin.rpc("record_cron_heartbeat", {
       p_job: "residata_monthly_reports",
       p_ok: sentFail === 0,
-      p_detail: `month=${responseMonth} subscribers=${subs?.length || 0} sent_ok=${sentOk} sent_fail=${sentFail}`,
+      p_detail: `month=${responseMonth} subscribers=${subs?.length || 0} skipped_no_premium=${notEntitled.length} sent_ok=${sentOk} sent_fail=${sentFail}`,
     });
   } catch (e) {
     console.error("[monthly-reports] heartbeat not recorded", String(e?.message || e));
@@ -200,6 +221,7 @@ export default async function handler(req, res) {
   return res.status(200).json({
     month: responseMonth,
     subscribers: subs?.length || 0,
+    skipped_no_premium: notEntitled.length,
     sent_ok:   sentOk,
     sent_fail: sentFail,
     pruned_usage_rows: pruned,

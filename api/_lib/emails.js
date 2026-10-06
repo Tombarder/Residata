@@ -97,22 +97,11 @@ function shell({ title, preheader = "", inner, footer, lang = "sk" }) {
 </html>`;
 }
 
-const PERSONAL_DOMAINS = new Set([
-  "gmail.com", "googlemail.com", "outlook.com", "hotmail.com", "live.com",
-  "live.sk", "hotmail.sk", "yahoo.com", "yahoo.sk", "icloud.com", "me.com",
-  "mac.com", "proton.me", "protonmail.com", "pm.me",
-  "seznam.cz", "centrum.sk", "zoznam.sk", "azet.sk", "atlas.sk", "post.sk",
-  "pobox.sk",
-]);
+// The personal-domain list is the sign-up form's (lib/emailValidation) — one list,
+// so the badge in Boss's note can never disagree with what the form told the person.
+import { isPersonalEmail } from "../../src/lib/emailValidation.js";
 
-function emailDomain(email) {
-  return (email?.split("@")[1] || "").toLowerCase().trim();
-}
 
-// ──────────────────────────────────────────────────────────
-// HMAC-signed approve URL (mirrors notify_auth_events.py)
-// ──────────────────────────────────────────────────────────
-import { createHmac } from "crypto";
 import { COMPANY, addressOneLine, registrationLine } from "../../src/lib/company.js";
 
 /**
@@ -137,94 +126,152 @@ function legalFooterHtml(lang = "sk") {
   ].join("<br>");
 }
 
-export function approveUrl(userId, tier, supabaseUrl, hmacSecret, ttlSec = 7 * 86400) {
-  const exp = Math.floor(Date.now() / 1000) + ttlSec;
-  const payload = `${userId}|${tier}|${exp}`;
-  const sig = createHmac("sha256", hmacSecret).update(payload).digest();
-  // base64url encode
-  const sigB64 = sig.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-  const token = `${payload}|${sigB64}`;
-  return `${supabaseUrl.replace(/\/$/, "")}/functions/v1/approve-user?token=${token}`;
-}
-
 // ──────────────────────────────────────────────────────────
 // Admin FYI email — new free signup (freemium model, no approval gate)
 // ──────────────────────────────────────────────────────────
-export function adminDigestHtml(user, webUrl, supabaseUrl, hmacSecret) {
-  const domain = emailDomain(user.email);
-  const isPersonal = PERSONAL_DOMAINS.has(domain);
-  const badge = isPersonal
+
+/**
+ * Boss's "someone signed up" note. Every value in it was typed by the person
+ * signing up — name, company, LinkedIn — and the API accepts them as typed (the
+ * form's own cleaning runs in their browser), so each is escaped here: this
+ * lands in the admin's inbox, and an unescaped name is a way to put a link or
+ * a fake button in front of him.
+ *
+ * It used to carry a one-click "⭐ Upgrade to paid" link (approve-user). That
+ * function only acts on PENDING accounts and every account reaching this mail
+ * is already approved, so the button answered "Already approved" every time.
+ * Premium is given in admin → Users, which is where the button now goes.
+ */
+export function adminDigestHtml(user, webUrl) {
+  const badge = isPersonalEmail(user.email)
     ? `<span style="${S.badgeWarn}">⚠ personal</span>`
     : `<span style="${S.badgeOk}">✓ business</span>`;
 
-  // Only surface "Upgrade to paid" as an action — they're already free.
-  // Makes sense for users the admin recognises and wants to bump.
-  const upgradeUrl = approveUrl(user.id, "paid", supabaseUrl, hmacSecret);
-
+  const row = (label, value) => `<div style="${S.row}"><span style="${S.rowLabel}">${label}</span><span style="color:${TEXT_HI}">${value}</span></div>`;
   const rows = [];
-  if (user.full_name)
-    rows.push(`<div style="${S.row}"><span style="${S.rowLabel}">Name</span><span style="color:${TEXT_HI}">${user.full_name}</span></div>`);
-  if (user.company)
-    rows.push(`<div style="${S.row}"><span style="${S.rowLabel}">Company</span><span style="color:${TEXT_HI}">${user.company}</span></div>`);
-  if (user.position)
-    rows.push(`<div style="${S.row}"><span style="${S.rowLabel}">Position</span>${user.position}</div>`);
-  if (user.linkedin_url)
-    rows.push(`<div style="${S.row}"><span style="${S.rowLabel}">LinkedIn</span><a href="${user.linkedin_url}" style="color:${GREEN};text-decoration:none">${user.linkedin_url}</a></div>`);
-  if (user.phone)
-    rows.push(`<div style="${S.row}"><span style="${S.rowLabel}">Phone</span>${user.phone}</div>`);
-  if (user.created_at)
-    rows.push(`<div style="${S.row}"><span style="${S.rowLabel}">Registered</span>${user.created_at.slice(0, 16).replace("T", " ")}</div>`);
+  if (user.full_name) rows.push(row("Name", escHtml(user.full_name)));
+  if (user.company)   rows.push(row("Company", escHtml(user.company)));
+  if (user.position)  rows.push(row("Position", escHtml(user.position)));
+  const li = safeHttpUrl(user.linkedin_url);
+  if (li) rows.push(row("LinkedIn", `<a href="${escHtml(li)}" style="color:${GREEN};text-decoration:none">${escHtml(li)}</a>`));
+  if (user.phone)     rows.push(row("Phone", escHtml(user.phone)));
+  if (user.created_at) rows.push(row("Registered", escHtml(fmtStamp(user.created_at))));
 
   const inner = `
-    <div style="${S.eyebrow}">New free signup · FYI</div>
+    <div style="${S.eyebrow}">New sign-up · FYI</div>
     <h1 style="${S.h1}">Someone just signed up</h1>
-    <p style="${S.p}">Auto-approved as <strong style="color:${GREEN}">free</strong>. No action needed — they already have access to the free tier.</p>
+    <p style="${S.p}">Approved automatically with a <strong style="color:${GREEN}">free</strong> account — nothing to do. To give them Premium, open them in admin → Users.</p>
     <div style="${S.userBox}">
-      <div style="${S.emailLine}">${user.email}${badge}</div>
+      <div style="${S.emailLine}">${escHtml(user.email)}${badge}</div>
       ${rows.join("")}
-      <div style="${S.actions}">
-        <div style="font-size:11px;color:${TEXT_DIM};font-family:'JetBrains Mono',Consolas,monospace;letter-spacing:0.05em;text-transform:uppercase;margin-bottom:10px">Optional · only if you know them</div>
-        <a href="${upgradeUrl}" style="${S.btnGreen}">⭐ Upgrade to paid</a>
-      </div>
     </div>
-    <p style="${S.p};font-size:13px;color:${TEXT_DIM}">Full user list + manual controls:</p>
-    <a href="${webUrl}/app/admin" style="${S.btnOutline}">Open admin panel →</a>`;
+    <a href="${webUrl}/app/admin" style="${S.btnGreen}">Open admin → Users</a>`;
 
   return shell({
     title: "New Residata signup",
     preheader: `New signup: ${user.email}`,
     inner,
-    footer: "Residata · real-time FYI · sign-ups are auto-approved as free",
+    footer: "Residata · real-time FYI · sign-ups are approved automatically as free",
+    lang: "en",
   });
 }
 
+/** An http(s) URL, or null — so a stored value can never become a javascript: link. */
+function safeHttpUrl(v) {
+  try {
+    const u = new URL(String(v || ""));
+    return u.protocol === "https:" || u.protocol === "http:" ? u.toString() : null;
+  } catch { return null; }
+}
+
+/** "2026-10-06 15:26" in Bratislava time — a timestamp read by a person in Slovakia. */
+function fmtStamp(ts) {
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return String(ts);
+  return d.toLocaleString("sv-SE", { timeZone: "Europe/Bratislava", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
+
+const fmtLongDay = (ts, lang) => new Date(ts).toLocaleDateString(lang === "sk" ? "sk-SK" : "en-GB",
+  { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Bratislava" });
+
 // ──────────────────────────────────────────────────────────
-// Welcome email (to the approved user)
+// Welcome email (to a person who has just signed up on the web)
 // ──────────────────────────────────────────────────────────
-export function approvedUserHtml(user, webUrl) {
-  const tier = user.tier || "free";
-  const tierDescr = tier === "paid"
-    ? "As a paid member you have access to all projects, analytics, history, and CSV exports."
-    : "As a free member you can view the summary dashboard plus full detail of one project of your choice.";
-  const name = user.full_name || "there";
+
+/**
+ * The first thing a new user gets from us, sent when they finish the sign-up
+ * form. In their language (the one the site was in when they signed up — see
+ * welcome-user.js), saying what they actually have: a free account is the
+ * market overview + one project of their choice, and the 7-day Premium trial
+ * is one click away (or already running, if they asked for it on the way in).
+ *
+ * It used to be English only, announce "You're approved 🎉 … active as free"
+ * (the raw tier word), say nothing of the trial, and print the name unescaped.
+ */
+export function welcomeSubject(lang = "sk") {
+  return lang === "sk" ? "Vitajte v Residata — váš účet je aktívny" : "Welcome to Residata — your account is active";
+}
+
+export function approvedUserHtml(user, webUrl, lang = "sk", now = Date.now()) {
+  const sk = lang === "sk";
+  const t = (a, b) => (sk ? a : b);
+  const name = escHtml(user.full_name || "");
+  const trialUntil = user.trial_until ? new Date(user.trial_until).getTime() : null;
+  const trialRunning = trialUntil && trialUntil > now;
+  const paidUntil = user.paid_until ? new Date(user.paid_until).getTime() : null;
+
+  let access;
+  if (user.tier === "admin") {
+    access = t("Máte administrátorský prístup.", "You have administrator access.");
+  } else if (user.tier === "paid" && !(paidUntil && paidUntil <= now)) {
+    access = paidUntil
+      ? t(`Máte prístup <strong style="color:${GREEN}">Premium</strong> do ${fmtLongDay(paidUntil, lang)} — všetky projekty, analytiku, históriu a exporty.`,
+          `You have <strong style="color:${GREEN}">Premium</strong> access until ${fmtLongDay(paidUntil, lang)} — every project, analytics, history and exports.`)
+      : t(`Máte prístup <strong style="color:${GREEN}">Premium</strong> — všetky projekty, analytiku, históriu a exporty.`,
+          `You have <strong style="color:${GREEN}">Premium</strong> access — every project, analytics, history and exports.`);
+  } else {
+    access = t("Máte bezplatný účet: prehľad trhu novostavieb na Slovensku a v Česku a plný detail jedného projektu podľa vlastného výberu.",
+               "You have a free account: the overview of the Slovak and Czech new-build market, and the full detail of one project of your choice.");
+  }
+
+  let trialBox = "";
+  if (user.tier === "free" && trialRunning) {
+    trialBox = `
+    <div style="${S.userBox}">
+      <div style="${S.rowLabel}">${t("Premium na 7 dní", "7 days of Premium")}</div>
+      <p style="${S.p};margin:8px 0 0">${t(
+        `Váš bezplatný trial Premium beží do <strong style="color:${TEXT_HI}">${fmtLongDay(trialUntil, lang)}</strong> — všetky projekty, analytika a história. Potom sa účet sám vráti na bezplatný; nič sa nestrháva.`,
+        `Your free Premium trial runs until <strong style="color:${TEXT_HI}">${fmtLongDay(trialUntil, lang)}</strong> — every project, analytics and history. After that the account simply returns to free; nothing is charged.`,
+      )}</p>
+    </div>`;
+  } else if (user.tier === "free" && !user.trial_started_at) {
+    trialBox = `
+    <div style="${S.userBox}">
+      <div style="${S.rowLabel}">${t("Vyskúšajte Premium", "Try Premium")}</div>
+      <p style="${S.p};margin:8px 0 0">${t(
+        "Premium si môžete vyskúšať 7 dní zadarmo — všetky projekty, analytika a história, bez karty a bez platby. Spustíte ho jedným klikom v aplikácii.",
+        "You can try Premium free for 7 days — every project, analytics and history, no card and no payment. Start it with one click in the app.",
+      )}</p>
+    </div>`;
+  }
+
   const inner = `
-    <div style="${S.eyebrow}">Welcome</div>
-    <h1 style="${S.h1}">You're approved 🎉</h1>
-    <p style="${S.p}">Hi ${name},</p>
-    <p style="${S.p}">Your Residata account is now active as <strong style="color:${GREEN}">${tier}</strong>. You can sign in and start exploring the Slovak and Czech new-build market.</p>
-    <!-- /app, NOT /live. This button said "Open dashboard" and sent brand-new users to
-         the PUBLIC marketing page (Boss, 2026-08-19: "the link that i got after signing
-         up linked me to the live view … should link me to the PLATFORM dashboard").
-         Every other email in this file already points into /app; this one was the
-         outlier. It also claimed we cover "the Bratislava residential market" — we
-         track both countries, so that read as a much smaller product than it is. -->
-    <a href="${webUrl}/app" style="${S.btnGreen}">Open dashboard →</a>
-    <p style="${S.p};font-size:13px;color:${TEXT_DIM};margin-top:20px">${tierDescr}</p>`;
+    <div style="${S.eyebrow}">${t("Vitajte", "Welcome")}</div>
+    <h1 style="${S.h1}">${t("Váš účet na Residata je aktívny", "Your Residata account is active")}</h1>
+    <p style="${S.p}">${name ? t(`Dobrý deň, ${name},`, `Hello ${name},`) : t("Dobrý deň,", "Hello,")}</p>
+    <p style="${S.p}">${t("ďakujeme za registráciu. ", "thank you for signing up. ")}${access}</p>
+    ${trialBox}
+    <a href="${webUrl}/app" style="${S.btnGreen}">${t("Otvoriť Residata", "Open Residata")} →</a>
+    <p style="${S.p};font-size:13px;color:${TEXT_DIM};margin-top:20px">${t(
+      "Nabudúce sa prihlásite rovnako: zadáte svoj e-mail a my vám pošleme jednorazový kód — heslo nepotrebujete.",
+      "Next time you sign in the same way: enter your e-mail and we send you a one-time code — there is no password.",
+    )}</p>`;
   return shell({
-    title: "Welcome to Residata",
-    preheader: `You're approved as ${tier}. Open the dashboard.`,
+    title: t("Vitajte v Residata", "Welcome to Residata"),
+    preheader: t("Váš účet je aktívny. Otvorte Residata.", "Your account is active. Open Residata."),
     inner,
-    footer: `Residata · <a href="${webUrl}" style="color:${TEXT_DIM};text-decoration:none">${webUrl}</a>`,
+    footer: `Residata · <a href="${webUrl}" style="color:${TEXT_DIM};text-decoration:none">${webUrl.replace(/^https?:\/\//, "")}</a>`,
+    lang: sk ? "sk" : "en",
   });
 }
 
@@ -242,15 +289,21 @@ export function approvedUserHtml(user, webUrl) {
  *
  * `user` is the new profile row (full_name, email, tier, paid_until).
  */
-export function accountCreatedHtml(user, webUrl, lang = "sk") {
+export function inviteSubject(lang = "sk") {
+  return lang === "sk" ? "Váš účet na Residata je pripravený" : "Your Residata account is ready";
+}
+
+export function accountCreatedHtml(user, webUrl, lang = "sk", now = Date.now()) {
   const sk = lang === "sk";
   const t = (a, b) => (sk ? a : b);
   const name = escHtml(user.full_name || "");
   const email = escHtml(user.email || "");
-  const until = user.paid_until
-    ? new Date(user.paid_until).toLocaleDateString(sk ? "sk-SK" : "en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Bratislava" })
-    : null;
-  const access = user.tier === "paid"
+  const untilMs = user.paid_until ? new Date(user.paid_until).getTime() : null;
+  const until = untilMs ? fmtLongDay(untilMs, lang) : null;
+  // Re-sent later (admin → edit → "send again"), the period may have ended: then
+  // it is a free account and must not read "Premium until <a past date>".
+  const premiumNow = user.tier === "paid" && !(untilMs && untilMs <= now);
+  const access = premiumNow
     ? (until
         ? t(`Máte prístup <strong style="color:${GREEN}">Premium</strong> do ${until} — všetky projekty, analytiku, históriu a exporty.`,
             `You have <strong style="color:${GREEN}">Premium</strong> access until ${until} — every project, analytics, history and exports.`)

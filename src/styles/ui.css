@@ -356,6 +356,19 @@ input[type="checkbox"], input[type="radio"] { width: 15px; height: 15px; cursor:
 /* ══ §8  TABLES ══════════════════════════════════════════════════════════ */
 
 .rd-scroll { overflow: auto; border-radius: 10px; }
+/* a sideways-scrolling table shades its right edge while columns hide there
+   (the left is the sticky first column) */
+.rd-edge-scroll { position: relative; }
+/* positioned, so absolute bits inside the table (screen-reader labels) stay inside the
+   scroll box instead of widening the whole page on a phone */
+.rd-edge-scroll > .rd-scroll { position: relative; }
+.rd-edge-scroll::after {
+  content: ""; position: absolute; top: 0; bottom: 0; width: 26px; z-index: 4;
+  pointer-events: none; opacity: 0; transition: opacity 0.15s var(--ease);
+}
+.rd-edge-scroll::after { right: 0; border-radius: 0 10px 10px 0; background: linear-gradient(to left, rgba(0, 0, 0, 0.32), transparent); }
+.rd-edge-scroll[data-more-right]::after { opacity: 1; }
+:root[data-theme="light"] .rd-edge-scroll::after { background: linear-gradient(to left, rgba(15, 23, 42, 0.12), transparent); }
 
 .rd-table {
   width: 100%;
@@ -428,7 +441,7 @@ input[type="checkbox"], input[type="radio"] { width: 15px; height: 15px; cursor:
 .rd-bar__fill { position: absolute; inset: 0 auto 0 0; border-radius: 3px; background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 55%, transparent), var(--accent)); }
 
 /* a dense table (many columns, e.g. admin Users): tighter cell padding */
-.rd-table--compact th, .rd-table--compact td { padding-left: 0.55rem; padding-right: 0.55rem; }
+.rd-table--compact th, .rd-table--compact td { padding-left: 0.5rem; padding-right: 0.5rem; }
 /* the first column stays put when a wide table scrolls sideways */
 .rd-table--stick1 th:first-child, .rd-table--stick1 td:first-child {
   position: sticky; left: 0; z-index: 1;
@@ -660,10 +673,16 @@ textarea.rd-field { height: auto; min-height: 4.2rem; padding-top: 0.5rem; paddi
 .rd-alert--ok { border-color: color-mix(in srgb, var(--accent) 38%, transparent); background: color-mix(in srgb, var(--accent) 9%, var(--surface)); color: var(--text); }
 .rd-alert--err { border-color: color-mix(in srgb, var(--danger) 45%, transparent); background: color-mix(in srgb, var(--danger) 9%, var(--surface)); color: var(--text); }
 .rd-alert--warn { border-color: color-mix(in srgb, var(--accent-2) 45%, transparent); background: color-mix(in srgb, var(--accent-2) 9%, var(--surface)); color: var(--text); }
+/* bottom-CENTRE: the bottom-right corner belongs to the feedback / chat launchers */
 .rd-toast {
-  position: fixed; right: 1.2rem; bottom: 1.2rem; z-index: var(--z-tooltip);
-  max-width: min(460px, calc(100vw - 2rem));
+  position: fixed; left: 50%; bottom: 1.2rem; z-index: var(--z-tooltip);
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: min(520px, calc(100vw - 2rem));
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
-  animation: rd-rise 0.16s var(--ease);
+  animation: rd-toast-in 0.16s var(--ease);
 }
+@keyframes rd-toast-in { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+/* on a phone the toast spans the width — lift it over the floating feedback button */
+@media (max-width: 640px) { .rd-toast { bottom: 4.2rem; } }
 .rd-toast .rd-alert__x { margin-left: auto; border: none; background: none; color: var(--text-dim); cursor: pointer; font-size: 1rem; line-height: 1; padding: 0 0 0 0.4rem; }
