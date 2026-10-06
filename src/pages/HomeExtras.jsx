@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { everyPhrase, EveryPhrase } from "../lib/refreshCadence";
 import { useSpecifics, SpecificsMark } from "../lib/projectSpecifics";
 import { useMarketTotals, useHomeProjects, useTotalsList, useVelocityMature } from "../lib/useData";
 import { useCountry, countryName } from "../lib/useCountry";
@@ -580,7 +581,7 @@ export function PipelineFlow({ lang = "en" }) {
           { n: fmt(projTrackedCount, localeTag(lang)), label: T.statsLabel[1] },
           // 3. karta = cadence, slovný stat. "Mesačne" / "Monthly" hovorí
           // čo kupujúcemu zaujíma: ako často dostane fresh dáta.
-          { n: lang === "sk" ? "Denne" : "Daily",                       label: T.statsLabel[2] },
+          { n: EveryPhrase(lang),                                         label: T.statsLabel[2] },
         ].map((s, i) => (
           <div key={i} style={{
             textAlign: "center",
@@ -1099,8 +1100,8 @@ export function DistrictPulse({ lang = "en", setCurrent }) {  // eslint-disable-
       : (lang === "sk" ? "mestských častí" : "districts");
   const title = lang === "sk" ? `Priemerná cena ${moneySymbol()}/m² ${levelWord}` : `Average ${moneySymbol()}/m² ${levelWord}`;
   const desc = lang === "sk"
-    ? "Skutočné dáta z aktívnych projektov. Klikni na riadok pre rozpad nižšie. Updatuje sa každý deň."
-    : "Real data from active projects. Click a row to drill down. Refreshes daily.";
+    ? "Skutočné dáta z aktívnych projektov. Klikni na riadok pre rozpad nižšie. Aktualizuje sa " + everyPhrase("sk") + "."
+    : "Real data from active projects. Click a row to drill down. Refreshes " + everyPhrase("en") + ".";
 
   // Breadcrumb trail (clickable parents).
   const crumbs = [{ label: cName, go: () => setDrill(_emptyDrill) }];

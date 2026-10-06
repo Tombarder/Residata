@@ -246,7 +246,7 @@ export function LiveDashboard({ setCurrent, openLogin, lang = "en" }) {
       {/* Landing page už má marketing copy a summary metriky (MarketPulse).
           Live stránka je čistý dátový pohľad. Necháme len prípadný tier-
           špecifický upsell (anonymous → register, free → upgrade); bez
-          generickej "Data refreshed daily…" vety a bez SummaryCards
+          generickej „Data refreshed …" vety a bez SummaryCards
           (total_units strip bol nafúknutý o Bory/Slnečnice manual_totals,
           cca 10k vs reálnych ~5,1k). */}
       {(showSignupPrompt || showUpgradeToPaid) && (

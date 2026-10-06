@@ -13,6 +13,7 @@ import "./lib/diagnostics";   // installs the error/network collector at startup
 import { TrialBanner, TrialPopup } from "./components/TrialBanner";
 import { setTrialIntent, activateTrial, settleTrialIntent } from "./lib/trial";
 import { applyOverrides, useCopyVersion } from "./lib/copyOverrides";
+import { everyPhrase, fillEvery } from "./lib/refreshCadence";
 import PendingGate from "./components/PendingGate";
 import Feature from "./components/Feature";
 import UpgradePrompt from "./components/UpgradePrompt";
@@ -166,12 +167,12 @@ const COUNTRY_LOCALIZE = {
       en: {
         heroTitle1: "Slovak & Czech residential market,",
         heroSub: "We monitor every new residential development across Slovakia and Czechia and turn scattered listings into actionable market intelligence — so you can make pricing, investment, and portfolio decisions based on data.",
-        valueDesc: "A complete picture of the Slovak & Czech new-build market, refreshed daily — unit-level data across every active project, plus the insights you need to act on it.",
+        valueDesc: "A complete picture of the Slovak & Czech new-build market, refreshed __EVERY__ — unit-level data across every active project, plus the insights you need to act on it.",
         dataContext: "Slovak & Czech New-Build Market",
       },
       sk: {
         heroTitle1: "Novostavby na Slovensku a v Česku.",
-        valueDesc: "Kompletný prehľad trhu novostavieb na Slovensku a v Česku, aktualizovaný každý deň — každý byt, každý projekt. A to aj s insightmi, na základe ktorých viete hneď konať.",
+        valueDesc: "Kompletný prehľad trhu novostavieb na Slovensku a v Česku, aktualizovaný __EVERY__ — každý byt, každý projekt. A to aj s insightmi, na základe ktorých viete hneď konať.",
         dataContext: "Trh novostavieb Slovensko a Česko",
       },
     },
@@ -209,12 +210,14 @@ function localizedCopy(lang, country) {
   // the country find→replace + overrides then apply on top of the edited base.
   const base = applyOverrides(lang, t[lang] || t.en, "mk");
   const spec = COUNTRY_LOCALIZE[country];
-  if (!spec) return base;
+  // How often the market is read is the setting's, not the copy's: __EVERY__
+  // is filled last, so Boss's edits and the country overrides carry it too.
+  if (!spec) return fillEvery(base, lang === "sk" ? "sk" : "en");
   const lk = lang === "sk" ? "sk" : "en";
   const rules = spec.rules?.[lk];
   const copy = rules && rules.length ? deepLocalize(base, rules) : { ...base };
   const ov = spec.overrides?.[lk];
-  return ov ? { ...copy, ...ov } : copy;
+  return fillEvery(ov ? { ...copy, ...ov } : copy, lk);
 }
 
 /* ─── Animation hooks ─── */
@@ -814,8 +817,8 @@ function Footer({ lang = "en", setCurrent }) {
           </div>
           <p style={{ fontSize: "0.8rem", color: "#8a8a96", lineHeight: 1.6, margin: 0, maxWidth: 320 }}>
             {isSK
-              ? "Denne aktualizované dáta o novostavbách na Slovensku a v Česku."
-              : "Daily-updated new-build market data for Slovakia and Czechia."}
+              ? `Dáta o novostavbách na Slovensku a v Česku, aktualizované ${everyPhrase("sk")}.`
+              : `New-build market data for Slovakia and Czechia, updated ${everyPhrase("en")}.`}
           </p>
         </div>
 

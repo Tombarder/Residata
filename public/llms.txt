@@ -1,7 +1,7 @@
 # Residata
 
 > New-build residential market intelligence for Slovakia and Czechia.
-> Every active development, structured and refreshed daily. Pricing,
+> Every active development, structured and refreshed every 4 days. Pricing,
 > availability, absorption rate, and trends — delivered to developers,
 > banks, valuers, and investors.
 
@@ -11,14 +11,14 @@ capitals. It normalizes
 data from developer websites into a single consistent schema, refreshes
 it daily, and delivers it as CSV and XLSX.
 
-## Scope (updated daily; snapshot September 2026)
+## Scope (updated every 4 days; snapshot October 2026)
 
 - Markets: Slovakia and Czechia — 53 towns and cities with actively sold new-build projects
-- Total projects in dataset: 524 new-build residential projects (current + sold-out under tracking)
-- Currently active (in market): 401 projects, 42,680 units
-- Currently for sale: 12,540 units · reserved: 3,307 · sold: 26,113
-- Average price across available inventory: €5,895/m² (priced units only — roughly one available home in nine carries no published price, so it is an average over what developers actually publish)
-- Distinct active developers: 244
+- Total projects in dataset: 525 new-build residential projects (current + sold-out under tracking)
+- Currently active (in market): 401 projects, 42,765 units
+- Currently for sale: 12,546 units · reserved: 3,322 · sold: 26,197
+- Average price across available inventory: €5,879/m² (priced units only — roughly one available home in nine carries no published price, so it is an average over what developers actually publish)
+- Distinct active developers: 243
 - Data refresh: daily
 - Languages: Slovak and English
 
@@ -55,7 +55,7 @@ Their figures, tables and charts are published under CC BY 4.0 (https://creative
 - [Bratislava: trh nových bytov v 3. štvrťroku 2026](https://residata.eu/analyzy/ba-prehlad-2026-q3): Prehľad trhu s novými bytmi v Bratislave za 3. štvrťrok 2026: ponuka, dopyt a ceny podľa okresov a podľa veľkosti bytu.
 - [Banská Bystrica: trh nových bytov v 3. štvrťroku 2026](https://residata.eu/analyzy/bb-prehlad-2026-q3): Prehľad trhu s novými bytmi v Banskej Bystrici za 3. štvrťrok 2026: ponuka, dopyt a ceny podľa veľkosti bytu.
 - [Slovensko: ceny nových bytov podľa počtu izieb v 3. štvrťroku 2026](https://residata.eu/analyzy/co-stoji-byt-2026-q3): Mediánové ceny nových bytov podľa počtu izieb v 11 slovenských mestách: cena celého bytu a cena za meter štvorcový.
-- [Slovensko: ponuka a predaj nových bytov podľa obcí v 3. štvrťroku 2026](https://residata.eu/analyzy/kde-sa-predava-2026-q3): Ponuka, ceny a predaj nových bytov v slovenských obciach od 1. júla do 27. septembra 2026: koľko bytov je v ponuke, za koľko sa predávajú a za aký čas by sa pri súčasnom tempe predaja vypredali.
+- [Slovensko: ponuka a predaj nových bytov podľa obcí v 3. štvrťroku 2026](https://residata.eu/analyzy/kde-sa-predava-2026-q3): Ponuka, ceny a predaj nových bytov v slovenských obciach za 3. štvrťrok 2026: koľko bytov je v ponuke, za koľko sa predávajú a za aký čas by sa pri súčasnom tempe predaja vypredali.
 - [Košice: trh nových bytov v 3. štvrťroku 2026](https://residata.eu/analyzy/ke-prehlad-2026-q3): Prehľad trhu s novými bytmi v Košiciach za 3. štvrťrok 2026: ponuka, dopyt a ceny podľa veľkosti bytu.
 - [Bratislavský kraj: trh nových bytov v 3. štvrťroku 2026](https://residata.eu/analyzy/kraj-ba-prehlad-2026-q3): Prehľad trhu s novými bytmi v Bratislavskom kraji za 3. štvrťrok 2026: ponuka, dopyt a ceny podľa obce a podľa veľkosti bytu.
 - [Banskobystrický kraj: trh nových bytov v 3. štvrťroku 2026](https://residata.eu/analyzy/kraj-bb-prehlad-2026-q3): Prehľad trhu s novými bytmi v Banskobystrickom kraji za 3. štvrťrok 2026: ponuka, dopyt a ceny podľa obce a podľa veľkosti bytu.

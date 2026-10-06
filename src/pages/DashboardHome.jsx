@@ -22,6 +22,7 @@
  * render in the user's selected display currency; velocity/analytics widgets
  * are capability-gated (blurred + upgrade nudge for free users).
  */
+import { everyPhrase } from "../lib/refreshCadence";
 import { useState, useMemo, useRef, useEffect, useId } from "react";
 import { useSpecifics, SpecificsMark } from "../lib/projectSpecifics";
 import { createPortal } from "react-dom";
@@ -555,7 +556,7 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
   const velocityMature = useVelocityMature();
   const { districts } = useDistrictTotals();
   const snapshots = useProjectHistory();
-  const freshness = useFreshness(); // last data date (YYYY-MM-DD) — data refreshes daily
+  const freshness = useFreshness(); // last data date (YYYY-MM-DD) — data refreshes at the collection interval
   const fmtDate = (d) => { try { return new Date(d).toLocaleDateString(localeTag(lang), { day: "numeric", month: "short", year: "numeric" }); } catch { return d; } };
 
   const { config, loading: cfgLoading, saveState, setConfig, resetToDefault } = useDashboardConfig();
@@ -709,8 +710,8 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
       <h2 style={{ fontSize: "1.5rem", fontWeight: 600, color: textLight, margin: "0 0 0.2rem" }}>{greeting}</h2>
       <p style={{ color: dim, fontSize: "0.9rem", lineHeight: 1.55, margin: "0 0 1.4rem" }}>
         {lang === "sk"
-          ? <>Tvoj osobný prehľad trhu novostavieb. Dáta sa obnovujú <strong style={{ color: textLight }}>každý deň</strong>{freshness ? <> — naposledy aktualizované <strong style={{ color: textLight }}>{fmtDate(freshness)}</strong></> : null}.</>
-          : <>Your personal new-build market overview. Data refreshes <strong style={{ color: textLight }}>daily</strong>{freshness ? <> — last updated <strong style={{ color: textLight }}>{fmtDate(freshness)}</strong></> : null}.</>}
+          ? <>Tvoj osobný prehľad trhu novostavieb. Dáta sa obnovujú <strong style={{ color: textLight }}>{everyPhrase("sk")}</strong>{freshness ? <> — naposledy aktualizované <strong style={{ color: textLight }}>{fmtDate(freshness)}</strong></> : null}.</>
+          : <>Your personal new-build market overview. Data refreshes <strong style={{ color: textLight }}>{everyPhrase("en")}</strong>{freshness ? <> — last updated <strong style={{ color: textLight }}>{fmtDate(freshness)}</strong></> : null}.</>}
       </p>
 
       {showTrialOffer && <TrialOfferBanner lang={lang} onActivate={trialOffer.start} busy={trialOffer.busy} msg={trialOffer.msg} />}
