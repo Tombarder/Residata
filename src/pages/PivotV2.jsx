@@ -1108,6 +1108,17 @@ function compOfGrain(rows) {
   rows.forEach((g, i) => addComp(c, f[i] === 1 ? g.m : scaleComponents(g.m, f[i])));
   return c;
 }
+// The grain a table is built from: the answer `raw` read as the request it answers
+// (`meta`, from usePivotGrain) — an archive grain divided by the readings and the Datum
+// scope IT was asked with, so a grain still on screen while the next loads shows its own
+// question's numbers, not the new filters applied to old rows. An answer for another
+// layout (other dims) has nothing to show until its own arrives.
+function grainView(raw, meta, specDims) {
+  if (raw == null || !meta) return null;
+  if (meta.dims.join("\u0001") !== specDims.join("\u0001")) return null;
+  if (!meta.archive) return raw;
+  return meta.days ? normaliseArchiveGrain(raw, meta.dims, meta.days, meta.scope) : null;
+}
 // Counts are whole flats. An archive grain's components are flats at an average reading
 // (src/lib/archiveReadings.js), so a count can come out as 7 512.4 — rounded here, where
 // it becomes a number on the page, and never in the components, which averages share.
@@ -1829,7 +1840,20 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
     () => buildPivotSpec({ dims: specDims, filters: effectiveFilters, country, isCurrent }),
     [specDims, effectiveFilters, country, isCurrent]
   );
-  const { grain: grainRaw, loading: grainRawLoading, error: grainRawError } = usePivotGrain({ enabled: configServerable, spec: pivotSpec });
+  // The full readings of each market (public.archive_days) the archive grain is divided
+  // by. The archive grain is asked for once they are known — it is shown divided by the
+  // readings it was asked with — and if they cannot be read, the table is not shown: a
+  // flat-reading count is the number this replaces.
+  const archiveGrain = configServerable && !isCurrent;
+  const { days: readingDays, loading: readingsLoading, error: readingsError } = useArchiveReadingDays({ enabled: archiveGrain });
+  // What a grain answers, handed back with it: a grain still on screen while the next
+  // loads is read as the question IT answers (grainView), not the one now being asked.
+  const grainMeta = useMemo(
+    () => ({ archive: !isCurrent, dims: specDims, scope: readingScope, days: readingDays }),
+    [isCurrent, specDims, readingScope, readingDays]
+  );
+  const grainEnabled = configServerable && (isCurrent || !!readingDays);
+  const { grain: grainRaw, meta: grainRawMeta, loading: grainRawLoading, error: grainRawError } = usePivotGrain({ enabled: grainEnabled, spec: pivotSpec, meta: grainMeta });
   // Denominator for the price-scope note: the SAME grouping without the price
   // scope, so the note can say "27 of 141" concretely instead of hand-waving.
   // Fired concurrently with the scoped call (both effects run in one render), so
@@ -1838,20 +1862,9 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
     () => (priceScope ? buildPivotSpec({ dims: specDims, filters, country, isCurrent }) : null),
     [priceScope, specDims, filters, country, isCurrent]
   );
-  const { grain: grainUnscopedRaw } = usePivotGrain({ enabled: configServerable && priceScope, spec: pivotSpecUnscoped });
-  // The full readings of each market (public.archive_days) the archive grain is divided
-  // by. Until they are known the archive grain is not shown — a flat-reading count is
-  // the number this replaces — and if they cannot be read, neither is the table.
-  const archiveGrain = configServerable && !isCurrent;
-  const { days: readingDays, loading: readingsLoading, error: readingsError } = useArchiveReadingDays({ enabled: archiveGrain });
-  const grain = useMemo(() => {
-    if (!archiveGrain || grainRaw == null) return grainRaw;
-    return readingDays ? normaliseArchiveGrain(grainRaw, specDims, readingDays, readingScope) : null;
-  }, [archiveGrain, grainRaw, readingDays, specDims, readingScope]);
-  const grainUnscoped = useMemo(() => {
-    if (!archiveGrain || grainUnscopedRaw == null) return grainUnscopedRaw;
-    return readingDays ? normaliseArchiveGrain(grainUnscopedRaw, specDims, readingDays, readingScope) : null;
-  }, [archiveGrain, grainUnscopedRaw, readingDays, specDims, readingScope]);
+  const { grain: grainUnscopedRaw, meta: grainUnscopedMeta } = usePivotGrain({ enabled: grainEnabled && priceScope, spec: pivotSpecUnscoped, meta: grainMeta });
+  const grain = useMemo(() => grainView(grainRaw, grainRawMeta, specDims), [grainRaw, grainRawMeta, specDims]);
+  const grainUnscoped = useMemo(() => grainView(grainUnscopedRaw, grainUnscopedMeta, specDims), [grainUnscopedRaw, grainUnscopedMeta, specDims]);
   const grainLoading = grainRawLoading || (archiveGrain && readingsLoading);
   const grainError = grainRawError || (archiveGrain && readingsError);
   // A non-server-able config needs records — pull them (sticky once needed).

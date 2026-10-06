@@ -1663,39 +1663,51 @@ export function useArchiveReadingDays({ enabled = false } = {}) {
 }
 
 let _pivotGrainCache = new Map();
+/* What a usePivotGrain caller sees for the request `key` (null = disabled), from the
+   hook's state { key, grain, meta, error } — `key` and `meta` being the request the held
+   grain answers — and `cached`, the cache's answer to THIS request if it has one (current
+   even before the effect copies it in). The previous answer stays while the next loads,
+   handed back with ITS meta and read as LOADING: read as settled it was normalised with
+   the new filters — narrowing Datum from 1–5 October to 5 October showed a 100-flat
+   project as 500 for as long as the new grain took. */
+function _grainView(state, key, meta, cached) {
+  if (!key) return { grain: null, meta: null, loading: false, error: false };
+  if (state.key !== key && cached !== undefined) return { grain: cached, meta, loading: false, error: false };
+  const current = state.key === key;
+  return { grain: state.grain, meta: state.meta, loading: !current, error: current && state.error };
+}
+const GRAIN_IDLE = Object.freeze({ key: null, grain: null, meta: null, error: false });
+
 /** Server-aggregated pivot grain rows [{d:[dimVals], m:{components}}] for a full
  *  analytics_pivot spec ({dims, filters, filters_not, ranges, nulls, mode, …}).
  *  The spec is built in PivotV2 (buildPivotSpec) — ALL filters are applied server-side
  *  now, so any-dimension filtering is instant (no browser record pull). enabled=false →
  *  no fetch (returns null). RLS-gated (mode 'archive' is paid/chosen-project gated in the
- *  RPC, mirroring flats_archive). Cached by user+tier+chosen+spec. */
-export function usePivotGrain({ enabled = false, spec = null } = {}) {
+ *  RPC, mirroring flats_archive). Cached by user+tier+chosen+spec. `meta` is the caller's
+ *  own description of the request, returned with the grain that answers it (_grainView). */
+export function usePivotGrain({ enabled = false, spec = null, meta = null } = {}) {
   const { loading: authLoading, user, profile } = useAuth();
   const specKey = spec ? JSON.stringify(spec) : "";
   const key = enabled && spec
     ? `${user?.id || "anon"}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}::${specKey}`
     : null;
-  const [grain, setGrain] = useState(key && _pivotGrainCache.has(key) ? _pivotGrainCache.get(key) : null);
-  const [loading, setLoading] = useState(!!enabled && !(key && _pivotGrainCache.has(key)));
-  const [error, setError] = useState(false);
+  const [state, setState] = useState(GRAIN_IDLE);
   useEffect(() => {
-    if (!enabled || !spec) { setGrain(null); setLoading(false); setError(false); return; }
+    if (!key) { setState(GRAIN_IDLE); return; }
     if (!isSupabaseReady() || authLoading) return;
-    if (_pivotGrainCache.has(key)) { setGrain(_pivotGrainCache.get(key)); setLoading(false); setError(false); return; }
+    if (_pivotGrainCache.has(key)) { setState({ key, grain: _pivotGrainCache.get(key), meta, error: false }); return; }
     let cancelled = false;
-    setLoading(true); setError(false);
     (async () => {
       const { data, error } = await sbRead(supabaseData.rpc("analytics_pivot", { p_spec: spec }));
       if (cancelled) return;
-      if (error) { console.error("[usePivotGrain]", error); setGrain([]); setLoading(false); setError(true); return; }
+      if (error) { console.error("[usePivotGrain]", error); setState({ key, grain: [], meta, error: true }); return; }
       const arr = Array.isArray(data) ? data : [];
       _pivotGrainCache.set(key, arr);
-      setGrain(arr);
-      setLoading(false);
+      setState({ key, grain: arr, meta, error: false });
     })();
     return () => { cancelled = true; };
-  }, [enabled, key, authLoading]); // eslint-disable-line react-hooks/exhaustive-deps
-  return { grain, loading, error };
+  }, [key, authLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+  return _grainView(state, key, meta, key && _pivotGrainCache.has(key) ? _pivotGrainCache.get(key) : undefined);
 }
 
 /* useSales — the Analytics → Predaje/Sales engine (public.analytics_sales).

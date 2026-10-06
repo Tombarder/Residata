@@ -284,8 +284,9 @@ test("the Pivot asks the archive for the market and month of every row", () => {
 });
 
 test("everything the Pivot reads from the archive grain is in flats", () => {
-  assert.match(PIVOT, /normaliseArchiveGrain\(grainRaw, specDims, readingDays, readingScope\)/);
-  assert.match(PIVOT, /normaliseArchiveGrain\(grainUnscopedRaw, specDims, readingDays, readingScope\)/);
+  assert.match(PIVOT, /const grain = useMemo\(\(\) => grainView\(grainRaw, grainRawMeta, specDims\)/);
+  assert.match(PIVOT, /const grainUnscoped = useMemo\(\(\) => grainView\(grainUnscopedRaw, grainUnscopedMeta, specDims\)/);
+  assert.match(PIVOT, /return meta\.days \? normaliseArchiveGrain\(raw, meta\.dims, meta\.days, meta\.scope\) : null;/);
   // past the point where the flats are made, nothing reads the flat-readings
   const after = PIVOT.slice(PIVOT.indexOf("const grainLoading = "));
   assert.doesNotMatch(after, /\bgrainRaw\b|\bgrainUnscopedRaw\b/);
@@ -306,4 +307,56 @@ test("the readings come from archive_days for every market, every page of it", (
   assert.match(m[0], /from\("archive_days"\)\s*\.select\(cols\)/);
   assert.match(m[0], /read\("day,country,readings"\)/, "each day's readings are what a month is divided by");
   assert.doesNotMatch(m[0], /_eqCountry/, "the All view divides each market by its own readings");
+});
+
+// ── a grain still on screen while the next loads is read as its own question ──
+const DATA_SRC = readFileSync(new URL("./useData.js", import.meta.url), "utf8");
+const grainViewOfHook = new Function(`${DATA_SRC.match(/function _grainView\([\s\S]*?\n\}/)[0]}\nreturn _grainView;`)();
+const grainViewOfPage = new Function("normaliseArchiveGrain",
+  `${PIVOT.match(/function grainView\(raw, meta, specDims\)[\s\S]*?\n\}/)[0]}\nreturn grainView;`)(normaliseArchiveGrain);
+
+test("the hook hands back the held grain with the request it answers, as loading", () => {
+  const held = { key: "k1", grain: [{ d: [], m: { n: 1 } }], meta: { tag: "old" }, error: false };
+  const v = grainViewOfHook(held, "k2", { tag: "new" }, undefined);
+  assert.equal(v.loading, true);
+  assert.equal(v.grain, held.grain);
+  assert.deepEqual(v.meta, { tag: "old" }, "the held grain must come with ITS request");
+  assert.deepEqual(grainViewOfHook(held, "k1", { tag: "old" }, undefined), { grain: held.grain, meta: { tag: "old" }, loading: false, error: false });
+  const cached = [{ d: [], m: { n: 2 } }];
+  assert.deepEqual(grainViewOfHook(held, "k2", { tag: "new" }, cached), { grain: cached, meta: { tag: "new" }, loading: false, error: false });
+  assert.deepEqual(grainViewOfHook(held, null, null, undefined), { grain: null, meta: null, loading: false, error: false });
+  assert.equal(grainViewOfHook({ ...held, error: true }, "k2", null, undefined).error, false, "an error belongs to its request");
+});
+
+test("narrowing Datum from 1–5 October to 5 October shows 100 while the new grain loads, not 500", () => {
+  const days = readingDaysByCountry(["01", "02", "03", "04", "05"].map((d) => ({ day: `2026-10-${d}`, country: "SK" })));
+  const oldScope = archiveReadingScope([{ key: "datum", mode: "in", values: ["2026-10-01", "2026-10-02", "2026-10-03", "2026-10-04", "2026-10-05"] }]);
+  const newScope = archiveReadingScope([{ key: "datum", mode: "in", values: ["2026-10-05"] }]);
+  const dimsOld = archiveGrainDims(["project_name"], oldScope);
+  const dimsNew = archiveGrainDims(["project_name"], newScope);
+  const held = [{ d: ["Projekt X", "SK"], m: { n: 500 } }];
+  const shown = grainViewOfPage(held, { archive: true, dims: dimsOld, scope: oldScope, days }, dimsNew);
+  assert.equal(Math.round(nodeOf(shown).n), 100);
+});
+
+test("an archive grain held while Aktuálne loads is still divided by its readings", () => {
+  const days = readingDaysByCountry(OCT.map((day) => ({ day, country: "SK" })));
+  const scope = archiveReadingScope([{ key: "snapshot_month", mode: "in", values: ["2026-10"] }]);
+  const dims = archiveGrainDims(["country"], scope);            // [country]: the same as Aktuálne's
+  const held = [{ d: ["SK"], m: { n: 7500 * 8 } }];
+  const shown = grainViewOfPage(held, { archive: true, dims, scope, days }, ["country"]);
+  assert.equal(Math.round(nodeOf(shown).n), 7500, "it showed the flat-readings, ×8");
+});
+
+test("a grain for another layout is not shown under this one", () => {
+  assert.equal(grainViewOfPage([{ d: ["A", "SK"], m: { n: 1 } }], { archive: false, dims: ["cast"], scope: {}, days: null }, ["developer"]), null);
+  const today = [{ d: ["A"], m: { n: 1 } }];
+  assert.equal(grainViewOfPage(today, { archive: false, dims: ["cast"], scope: {}, days: null }, ["cast"]), today);
+});
+
+test("the page asks for the archive grain once the readings are known, and passes what it asks", () => {
+  assert.match(PIVOT, /const grainEnabled = configServerable && \(isCurrent \|\| !!readingDays\);/);
+  assert.match(PIVOT, /usePivotGrain\(\{ enabled: grainEnabled, spec: pivotSpec, meta: grainMeta \}\)/);
+  assert.match(PIVOT, /usePivotGrain\(\{ enabled: grainEnabled && priceScope, spec: pivotSpecUnscoped, meta: grainMeta \}\)/);
+  assert.match(PIVOT, /\(\{ archive: !isCurrent, dims: specDims, scope: readingScope, days: readingDays \}\)/);
 });
