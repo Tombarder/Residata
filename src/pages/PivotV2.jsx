@@ -1817,7 +1817,10 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   // month (after the Rows and the Column, where the tree builder sums over them) and is
   // turned into flats at an average reading before anything reads it — see
   // src/lib/archiveReadings.js. Today's market is one reading and needs neither.
-  const specDims = useMemo(() => (isCurrent ? gDims : archiveGrainDims(gDims)), [gDims, isCurrent]);
+  // The month only when the scope spans more than one — 500 projects over 12 months is
+  // 6 000 rows — so the Datum/Mesiac scope is read first.
+  const readingScope = useMemo(() => archiveReadingScope(effectiveFilters), [effectiveFilters]);
+  const specDims = useMemo(() => (isCurrent ? gDims : archiveGrainDims(gDims, readingScope)), [gDims, isCurrent, readingScope]);
   // Full server-side spec — ALL active filters (any dim, any mode) go to the engine,
   // so a city/developer/price filter is instant instead of pulling the archive.
   // (`isCurrent` already accounts for a time group-by — see its definition — so a
@@ -1841,7 +1844,6 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   // the number this replaces — and if they cannot be read, neither is the table.
   const archiveGrain = configServerable && !isCurrent;
   const { days: readingDays, loading: readingsLoading, error: readingsError } = useArchiveReadingDays({ enabled: archiveGrain });
-  const readingScope = useMemo(() => archiveReadingScope(effectiveFilters), [effectiveFilters]);
   const grain = useMemo(() => {
     if (!archiveGrain || grainRaw == null) return grainRaw;
     return readingDays ? normaliseArchiveGrain(grainRaw, specDims, readingDays, readingScope) : null;

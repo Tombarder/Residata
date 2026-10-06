@@ -28,7 +28,7 @@ const sum = (rows, k = "n") => rows.reduce((a, g) => a + (+g.m[k] || 0), 0);
 test("the grain carries each row's market and month after the page's own dims", () => {
   assert.deepEqual(archiveGrainDims(["snapshot_month"]), ["snapshot_month", "country"]);
   assert.deepEqual(archiveGrainDims(["cast", "izby"]), ["cast", "izby", "country", "snapshot_month"]);
-  assert.deepEqual(archiveGrainDims(["country", "datum"]), ["country", "datum", "snapshot_month"]);
+  assert.deepEqual(archiveGrainDims(["country", "datum"]), ["country", "datum"], "a day names its month");
 });
 
 test("Počet by Mesiac: a month read daily and a month read every four days hold the same 7 500 flats", () => {
@@ -152,6 +152,30 @@ test("the Pivot and the assistant divide the same month by the same readings", a
   assert.equal(32 / pivot[0].m.n, readingsPerMonth(rows)["SK|2026-08"]);
 });
 
+// ── the month is asked for only when the scope spans more than one ──
+test("the grain carries the month only when the scope spans more than one", () => {
+  const dimsFor = (filters, dims = ["project_name"]) => archiveGrainDims(dims, archiveReadingScope(filters));
+  assert.deepEqual(dimsFor([{ key: "datum", mode: "in", values: ["2026-10-05"] }]), ["project_name", "country"]);
+  assert.deepEqual(dimsFor([{ key: "datum", mode: "in", values: ["2026-10-01", "2026-10-05"] }]), ["project_name", "country"]);
+  assert.deepEqual(dimsFor([{ key: "datum", mode: "in", values: ["2026-09-30", "2026-10-01"] }]), ["project_name", "country", "snapshot_month"]);
+  assert.deepEqual(dimsFor([{ key: "snapshot_month", mode: "in", values: ["2026-09"] }]), ["project_name", "country"]);
+  assert.deepEqual(dimsFor([{ key: "snapshot_month", mode: "in", values: ["2026-09", "2026-10"] }]), ["project_name", "country", "snapshot_month"]);
+  assert.deepEqual(dimsFor([{ key: "snapshot_month", mode: "in", values: ["2026-09", "2026-10"] },
+    { key: "datum", mode: "in", values: ["2026-10-02"] }]), ["project_name", "country"]);
+  assert.deepEqual(dimsFor([{ key: "datum", mode: "not_in", values: ["2026-10-02"] }]), ["project_name", "country", "snapshot_month"]);
+  assert.deepEqual(dimsFor([]), ["project_name", "country", "snapshot_month"]);
+  assert.deepEqual(dimsFor([], ["datum"]), ["datum", "country"]);
+  assert.deepEqual(dimsFor([], ["batch_timestamp"]), ["batch_timestamp", "country"]);
+});
+
+test("a single month's grain without its month is divided by that month's readings", () => {
+  const scope = archiveReadingScope([{ key: "datum", mode: "in", values: ["2026-10-01", "2026-10-02", "2026-10-05"] }]);
+  const dims = archiveGrainDims(["project_name"], scope);
+  const out = normaliseArchiveGrain([{ d: ["Projekt X", "SK"], m: { n: 300 } }], dims, DAYS, scope);
+  assert.equal(out[0].m.n, 100);
+  assert.deepEqual(out[0].cell, { r: 3, mk: "SK", month: "2026-10", day: null });
+});
+
 // ── a table node averages over the periods it spans ──
 // The Pivot's own node arithmetic (emptyComp / addComp / compOfGrain), run as written.
 const PIVOT = readFileSync(new URL("../pages/PivotV2.jsx", import.meta.url), "utf8");
@@ -252,7 +276,9 @@ test("every number the Pivot builds from the grain is a node average", () => {
 const DATA = readFileSync(new URL("./useData.js", import.meta.url), "utf8");
 
 test("the Pivot asks the archive for the market and month of every row", () => {
-  assert.match(PIVOT, /const specDims = useMemo\(\(\) => \(isCurrent \? gDims : archiveGrainDims\(gDims\)\)/);
+  assert.match(PIVOT, /const specDims = useMemo\(\(\) => \(isCurrent \? gDims : archiveGrainDims\(gDims, readingScope\)\)/);
+  assert.ok(PIVOT.indexOf("const readingScope = useMemo") < PIVOT.indexOf("const specDims = useMemo"),
+    "the scope decides the dims, so it is read first");
   assert.match(PIVOT, /buildPivotSpec\(\{ dims: specDims, filters: effectiveFilters, country, isCurrent \}\)/);
   assert.match(PIVOT, /buildPivotSpec\(\{ dims: specDims, filters, country, isCurrent \}\)/);
 });

@@ -34,11 +34,12 @@
  *   1 October showed a 100-flat project as 200 — one month-average each — where the
  *   assistant says 100. A node of one month in one market is unchanged.
  *
- * The grain must carry the market and the month of every row, so archive-mode requests
- * add `country` and `snapshot_month` to the dims they do not already hold
- * (archiveGrainDims). Both are cube dimensions, so the request stays on the cube; they go
- * LAST, after the Rows and the Column, so the tree builder — which reads d[0..] for the
- * Rows and d[rows.length] for the Column — groups over them.
+ * The grain must carry the market of every row, and its month when the scope spans more
+ * than one (archiveGrainDims): `country`, and `snapshot_month` unless the rows are days,
+ * batches, or a single month the filters name. Both are cube dimensions, so the request
+ * stays on the cube; they go LAST, after the Rows and the Column, so the tree builder —
+ * which reads d[0..] for the Rows and d[rows.length] for the Column — groups over them.
+ * The month is asked only when needed: 500 projects over 12 months is 6 000 rows.
  */
 
 // The grain's additive components (analytics_pivot's m object). mn_*/mx_* are not.
@@ -53,11 +54,15 @@ export function scaleComponents(m, f) {
   return out;
 }
 
-/** The dims an archive-mode grain is asked for: the page's own, then the market and the
- *  month of every row when they are not among them. */
-export function archiveGrainDims(dims) {
+/** The dims an archive-mode grain is asked for: the page's own, then the market of every
+ *  row, then its month — only when the rows are not days or batches already and the scope
+ *  (archiveReadingScope) does not name a single month. */
+export function archiveGrainDims(dims, scope = {}) {
   const out = [...(dims || [])];
-  for (const k of ["country", "snapshot_month"]) if (!out.includes(k)) out.push(k);
+  if (!out.includes("country")) out.push("country");
+  const monthKnown = out.includes("snapshot_month") || out.includes("datum")
+    || out.includes("batch_timestamp") || scope.perBatch || !!scope.month;
+  if (!monthKnown) out.push("snapshot_month");
   return out;
 }
 
@@ -83,28 +88,36 @@ const EMPTY = "__EMPTY__";   // the Pivot's "(prázdne)" value
 
 /** Which readings a Pivot's filters let into the grain: the Datum filter as the engine
  *  applies it (in / not_in / empty / not_empty — buildPivotSpec sends nothing else for a
- *  date), and whether a Batch filter has picked snapshots. */
+ *  date), whether a Batch filter has picked snapshots, and the single month the Datum and
+ *  Mesiac filters confine it to (`month`), when they do. */
 export function archiveReadingScope(filters) {
-  const scope = { only: null, except: null, none: false, perBatch: false };
+  const scope = { only: null, except: null, none: false, perBatch: false, month: null };
+  let dayMonths = null;
+  let monthsIn = null;
   for (const f of filters || []) {
     if (!active(f)) continue;
     if (f.key === "batch_timestamp" && (f.mode == null || f.mode === "in")) scope.perBatch = true;
+    if (f.key === "snapshot_month" && (f.mode == null || f.mode === "in")) {
+      monthsIn = new Set(f.values.filter((v) => v !== EMPTY).map((v) => String(v).slice(0, 7)));
+    }
     if (f.key !== "datum") continue;
     if (f.mode === "empty") scope.none = true;          // every row has a day
     else if (f.mode === "not_empty") continue;
     else {
       const days = new Set(f.values.filter((v) => v !== EMPTY).map((v) => String(v).slice(0, 10)));
       if (f.mode === "not_in") scope.except = days;
-      else scope.only = days;
+      else { scope.only = days; dayMonths = new Set([...days].map((d) => d.slice(0, 7))); }
     }
   }
+  const months = dayMonths && monthsIn ? new Set([...dayMonths].filter((m) => monthsIn.has(m))) : (dayMonths || monthsIn);
+  if (months && months.size === 1) scope.month = [...months][0];
   return scope;
 }
 
 /** cell(country, day, month) → { r, mk, month, day } — the readings `r` a grain row or a
  *  record of that market and day/month is divided by, and the period it belongs to — or
  *  null when no full reading of it is in scope. By Datum (`dims` holds 'datum') the period
- *  is the day; otherwise the month. */
+ *  is the day; otherwise the month, the scope's single month when the row carries none. */
 export function archiveCells(days, scope, dims) {
   const byDay = (dims || []).includes("datum");
   const inScope = (d) => !scope.none && (!scope.only || scope.only.has(d)) && !(scope.except && scope.except.has(d));
@@ -123,7 +136,7 @@ export function archiveCells(days, scope, dims) {
       const r = (d && inScope(d) && days?.[country]?.get(d)) || 0;
       return r ? { r, mk: String(country), month: d.slice(0, 7), day: d } : null;
     }
-    const mo = month != null ? String(month).slice(0, 7) : null;
+    const mo = month != null ? String(month).slice(0, 7) : scope.month;
     const r = (mo && perMonth.get(`${country}|${mo}`)) || 0;
     return r ? { r, mk: String(country), month: mo, day: null } : null;
   };
