@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { supabase } from "../lib/supabase";
+import { supabaseData } from "../lib/supabase";
 import Picker from "./Picker";
 import { useAuth } from "../lib/useAuth";
 import { getLiveT } from "../lib/liveLang";
@@ -24,7 +24,7 @@ async function profileAlreadyComplete(userId) {
     // ever needs; if it has not answered by then, treat it as "don't know" and
     // show the error, which keeps everything they typed either way.
     const answer = await Promise.race([
-      supabase.from("user_profiles").select("profile_completed").eq("id", userId).maybeSingle(),
+      supabaseData.from("user_profiles").select("profile_completed").eq("id", userId).maybeSingle(),
       new Promise((resolve) => setTimeout(() => resolve({ data: null, timedOut: true }), 8000)),
     ]);
     return !!answer?.data?.profile_completed;
@@ -142,7 +142,7 @@ export default function CompleteProfile({ lang = "en" }) {
         return;
       }
 
-      const { data, error } = await supabase.from("user_profiles").update({
+      const { data, error } = await supabaseData.from("user_profiles").update({
         full_name: cleanedName,
         company: cleanedCompany,
         position: cleanedPosition,

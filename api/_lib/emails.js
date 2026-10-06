@@ -229,6 +229,63 @@ export function approvedUserHtml(user, webUrl) {
 }
 
 // ──────────────────────────────────────────────────────────
+// Account created by an admin (admin → Users → "Add user")
+// ──────────────────────────────────────────────────────────
+
+/**
+ * The invitation an admin may send with a new account. The person never asked
+ * for it — Boss made the account for them (a journalist, a partner) — so it says
+ * who they are to us, what they have, and the one thing they need to know: there
+ * is no password, they sign in with this address and get a one-time code. Sent
+ * only when the admin ticks it; otherwise the account is created silently and
+ * the admin tells the person himself.
+ *
+ * `user` is the new profile row (full_name, email, tier, paid_until).
+ */
+export function accountCreatedHtml(user, webUrl, lang = "sk") {
+  const sk = lang === "sk";
+  const t = (a, b) => (sk ? a : b);
+  const name = escHtml(user.full_name || "");
+  const email = escHtml(user.email || "");
+  const until = user.paid_until
+    ? new Date(user.paid_until).toLocaleDateString(sk ? "sk-SK" : "en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Bratislava" })
+    : null;
+  const access = user.tier === "paid"
+    ? (until
+        ? t(`Máte prístup <strong style="color:${GREEN}">Premium</strong> do ${until} — všetky projekty, analytiku, históriu a exporty.`,
+            `You have <strong style="color:${GREEN}">Premium</strong> access until ${until} — every project, analytics, history and exports.`)
+        : t(`Máte prístup <strong style="color:${GREEN}">Premium</strong> — všetky projekty, analytiku, históriu a exporty.`,
+            `You have <strong style="color:${GREEN}">Premium</strong> access — every project, analytics, history and exports.`))
+    : user.tier === "admin"
+      ? t("Máte administrátorský prístup.", "You have administrator access.")
+      : t("Máte bezplatný prístup: prehľad trhu a detail jedného projektu podľa vlastného výberu.",
+          "You have free access: the market overview and the full detail of one project of your choice.");
+  const inner = `
+    <div style="${S.eyebrow}">${t("Váš účet", "Your account")}</div>
+    <h1 style="${S.h1}">${t("Váš účet na Residata je pripravený", "Your Residata account is ready")}</h1>
+    <p style="${S.p}">${name ? t(`Dobrý deň, ${name},`, `Hello ${name},`) : t("Dobrý deň,", "Hello,")}</p>
+    <p style="${S.p}">${t(
+      `vytvorili sme vám účet na Residata — dáta o predaji novostavieb na Slovensku a v Česku. ${access}`,
+      `we have created a Residata account for you — sales data on new-build housing in Slovakia and Czechia. ${access}`,
+    )}</p>
+    <div style="${S.userBox}">
+      <div style="${S.rowLabel}">${t("Ako sa prihlásiť", "How to sign in")}</div>
+      <p style="${S.p};margin:8px 0 0">${t(
+        `Otvorte Residata, kliknite na <strong style="color:${TEXT_HI}">Prihlásiť sa</strong> a zadajte <strong style="color:${TEXT_HI}">${email}</strong>. Pošleme vám jednorazový kód — heslo nepotrebujete.`,
+        `Open Residata, click <strong style="color:${TEXT_HI}">Sign in</strong> and enter <strong style="color:${TEXT_HI}">${email}</strong>. We will e-mail you a one-time code — there is no password.`,
+      )}</p>
+    </div>
+    <a href="${webUrl}/app" style="${S.btnGreen}">${t("Otvoriť Residata", "Open Residata")} →</a>`;
+  return shell({
+    lang,
+    title: t("Váš účet na Residata", "Your Residata account"),
+    preheader: t("Účet je pripravený — prihlásite sa svojím e-mailom a jednorazovým kódom.", "Your account is ready — sign in with your e-mail and a one-time code."),
+    inner,
+    footer: `Residata · <a href="${webUrl}" style="color:${TEXT_DIM};text-decoration:none">${webUrl.replace(/^https?:\/\//, "")}</a>`,
+  });
+}
+
+// ──────────────────────────────────────────────────────────
 // User feedback / problem-report notification
 // ──────────────────────────────────────────────────────────
 

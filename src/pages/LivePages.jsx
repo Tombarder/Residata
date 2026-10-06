@@ -8,19 +8,19 @@ import { useProjects, useProjectFlats, useProjectSnapshots, useMarketTotals, use
 import { useAccountPrefState } from "../lib/useAccountUiPref";
 import { moneyFromEur, moneySymbol } from "../lib/money";
 import { localeTag, formatPercent } from "../lib/locale";
-import { daysUntil } from "../lib/dates";
 import { fmtSelloutValue } from "../lib/absorption";
 import { useCurrency } from "../lib/useCurrency";
 import { useCountry } from "../lib/useCountry";
-import { supabase, supabaseData } from "../lib/supabase";
+import { supabaseData } from "../lib/supabase";
 import { getFreshAccessToken, authErrorMessage } from "../lib/sessionGuard";
 import { getLiveT, ll } from "../lib/liveLang";
 import { goBack } from "../lib/routing";
 import { track } from "../lib/track";
-import { isPersonalEmail } from "../lib/emailValidation";
 import UpgradePrompt from "../components/UpgradePrompt";
 import Picker from "../components/Picker";
 import PageHero from "../components/PageHero";
+import AdminUsers, { UserStats } from "./AdminUsers";
+import { useAdminClock } from "../lib/useAdminClock";
 import InfoTip from "../components/InfoTip";
 import { useSpecifics, SpecificsMark, SpecificsPanel, UnitPriceMarks } from "../lib/projectSpecifics";
 import ParkingCard from "../lib/parkingPrices";
@@ -2693,7 +2693,7 @@ function ChooseProjectGate({ projectId, projectName, profile, reloadProfile, set
 
     try {
       // Step 1: UPDATE chosen_project_id — source of truth is the DB row.
-      const { error: updErr } = await supabase.from("user_profiles")
+      const { error: updErr } = await supabaseData.from("user_profiles")
         .update({ chosen_project_id: projectId })
         .eq("id", profile.id);
       if (import.meta.env.DEV) console.log(`[ChooseProject] UPDATE returned after ${Math.round(performance.now() - t0)}ms`, { updErr });
@@ -3273,14 +3273,10 @@ function RankBarList({ rows, setCurrent, suffix = "", color = green, getChildren
 }
 
 /* ───────────────────── ADMIN (guarded v App.jsx cez Feature) ─────────────────────
-   Freemium-era admin panel. Signups auto-approve to 'free' so the old
-   "approve pending" workflow is mostly vestigial. This panel focuses on
-   day-to-day ops:
-     - Stats strip (total / free / paid / admin / pending)
-     - Search (email / company / name / position)
-     - Full user table with inline tier change + delete
-     - Self-protection (can't tier-change or delete yourself from UI)
-     - Premium domains + activity tabs unchanged from before
+   The admin panel: the strip of who has what, then tabs —
+     - Users: AdminUsers.jsx (add a user, type, Premium from/to, edit, delete)
+     - Overview / Activity: usage from user_activity
+     - Premium domains, AI chat logs
 */
 export function LiveAdmin({ setCurrent, lang = "en" }) {
   const t = getLiveT(lang);
@@ -3292,7 +3288,8 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
   const [err, setErr] = useState(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("overview");
-  const [search, setSearch] = useState("");
+  // One clock for the strip and the table (lib/useAdminClock.js).
+  const [clockNow, bumpClock] = useAdminClock();
 
   // Session-robust admin data load. THE long-term fix for "admin sees no users":
   // a stale admin tab (access token expired / mid-refresh) was sending the
@@ -3356,163 +3353,18 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
 
   const premiumSet = new Set(premiumDomains.map(d => d.domain.toLowerCase()));
 
-  const setTier = async (id, tier) => {
-    if (id === self?.id) {
-      alert(lang === "sk" ? "Nemôžeš meniť svoj vlastný tier odtiaľto." : "Can't change your own tier from here.");
-      return;
-    }
-    const patch = { tier };
-    if (tier !== "pending") patch.approved_at = new Date().toISOString();
-    // Refresh the session first so the update never goes out with a dead token
-    // (an expired admin session would otherwise hit "permission denied").
-    try { await getFreshAccessToken(); }
-    catch (e) { alert(authErrorMessage(e, lang)); return; }
-    // .select() so we KNOW the row actually changed. Without it a 0-row update
-    // (lost session / missing admin rights) returns no error, and we'd falsely
-    // show success that reverts on the next refresh ("I changed the tier and it
-    // didn't stick"). Confirm-after-write + a clear message instead.
-    const { data, error } = await supabase.from("user_profiles").update(patch).eq("id", id).select();
-    if (error) { alert(authErrorMessage(error, lang)); return; }
-    if (!data || data.length === 0) {
-      alert(lang === "sk"
-        ? "Zmena sa neuložila (0 riadkov) — pravdepodobne vypršala prihlasovacia relácia alebo chýbajú admin práva. Obnov stránku a skús znova."
-        : "Change didn't save (0 rows) — your session likely expired or admin rights are missing. Reload and try again.");
-      return;
-    }
-    setUsers(u => u.map(x => x.id === id ? { ...x, ...data[0] } : x));
-  };
-
-  // Grant or revoke a 7-day trial for a user. Routes through the
-  // admin-gated /api/trial/grant endpoint (service-role write,
-  // audit-logged, overrides the one-shot self-service guard).
-  const trialAction = async (u, action) => {
-    if (u.id === self?.id) {
-      alert(lang === "sk" ? "Nemôžeš riešiť trial na sebe." : "Can't manage trial on yourself.");
-      return;
-    }
-    let token;
-    try { token = await getFreshAccessToken(); }
-    catch (e) { alert(authErrorMessage(e, lang)); return; }
-    try {
-      const r = await fetch("/api/trial/grant", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ user_id: u.id, action, days: 7 }),
-      });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok) {
-        alert(r.status === 401 ? authErrorMessage({ status: 401 }, lang) : `Trial ${action} failed: ${j.error || r.status}`);
-        return;
-      }
-      setUsers(us => us.map(x => x.id === u.id
-        ? { ...x, trial_until: j.trial_until || null, trial_started_at: j.trial_started_at || null }
-        : x));
-    } catch (e) {
-      alert(`Trial ${action} failed: ${String(e.message || e)}`);
-    }
-  };
-
-  // Generic subscription patch via /api/admin/set-subscription. Used
-  // for paid_until extends, pause / unpause, manual date sets and
-  // notes. Server validates admin tier + audit-logs every patch.
-  const subAction = async (u, payload) => {
-    if (u.id === self?.id) {
-      alert(lang === "sk" ? "Nemôžeš riešiť predplatné na sebe." : "Can't manage your own subscription here.");
-      return;
-    }
-    let token;
-    try { token = await getFreshAccessToken(); }
-    catch (e) { alert(authErrorMessage(e, lang)); return; }
-    try {
-      const r = await fetch("/api/admin/set-subscription", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ user_id: u.id, ...payload }),
-      });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok) {
-        alert(r.status === 401 ? authErrorMessage({ status: 401 }, lang) : `Subscription update failed: ${j.error || r.status}`);
-        return;
-      }
-      setUsers(us => us.map(x => x.id === u.id ? { ...x, ...(j.patch || {}) } : x));
-    } catch (e) {
-      alert(`Subscription update failed: ${String(e.message || e)}`);
-    }
-  };
-
-  const deleteUser = async (u) => {
-    if (u.id === self?.id) {
-      alert(lang === "sk" ? "Nemôžeš vymazať sám seba." : "Can't delete yourself.");
-      return;
-    }
-    const confirmText = lang === "sk"
-      ? `Vymazať ${u.email} natrvalo? Táto akcia je nezvratná — stratí účet aj všetky dáta.`
-      : `Delete ${u.email} permanently? This can't be undone — the account and all their data go.`;
-    if (!confirm(confirmText)) return;
-
-    // Needs service-role on backend — calls /api/admin/delete-user with caller's bearer token
-    let token;
-    try { token = await getFreshAccessToken(); }
-    catch (e) { alert(authErrorMessage(e, lang)); return; }
-    try {
-      const resp = await fetch("/api/admin/delete-user", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
-        body: JSON.stringify({ user_id: u.id }),
-      });
-      const json = await resp.json();
-      if (!resp.ok) {
-        alert(resp.status === 401 ? authErrorMessage({ status: 401 }, lang) : `Delete failed: ${json.error || resp.status}`);
-        return;
-      }
-      setUsers(us => us.filter(x => x.id !== u.id));
-    } catch (e) {
-      alert(`Delete failed: ${String(e.message || e)}`);
-    }
-  };
-
-  // Filter + stats (memoised via plain consts — small N)
-  const q = search.trim().toLowerCase();
-  const visibleUsers = !q ? users : users.filter(u => (
-    (u.email || "").toLowerCase().includes(q) ||
-    (u.full_name || "").toLowerCase().includes(q) ||
-    (u.company || "").toLowerCase().includes(q) ||
-    (u.position || "").toLowerCase().includes(q)
-  ));
-  const tierCount = users.reduce((a, u) => { a[u.tier] = (a[u.tier] || 0) + 1; return a; }, {});
+  // Every change to an account — create, type, Premium period, profile, delete —
+  // lives in AdminUsers.jsx and goes through /api/admin/* (server, admin-checked,
+  // audit-logged), on rules shared with the server (lib/adminUsers.js).
 
   return (
-    <main style={{ padding: "5rem 2rem 4rem", maxWidth: 1200, margin: "0 auto" }}>
+    <main style={{ padding: "5rem 2rem 4rem", maxWidth: tab === "users" ? 1480 : 1200, margin: "0 auto" }}>
       <PageHero eyebrow={t.admin_label} title={t.admin_title} />
-      {err && <div style={{ color: redInk }}>{err}</div>}
+      {err && tab !== "users" && <div style={{ color: redInk }}>{err}</div>}
 
-      {/* Tier stats strip */}
-      <div style={{
-        display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-        gap: "0.75rem", marginTop: "1.5rem", marginBottom: "1rem",
-      }}>
-        {[
-          { k: "total",   label: lang === "sk" ? "Celkom" : "Total",   n: users.length,             color: "var(--text)", bar: "#64748b" },
-          { k: "free",    label: "Free",                               n: tierCount.free    || 0,    color: "var(--text-2)", bar: "#64748b" },
-          { k: "paid",    label: "Paid",                               n: tierCount.paid    || 0,    color: greenInk, bar: "#10b981" },
-          { k: "admin",   label: "Admin",                              n: tierCount.admin   || 0,    color: orangeInk, bar: "#e0940f" },
-          { k: "pending", label: "Pending",                            n: tierCount.pending || 0,    color: "#888", bar: "#3b74e8" },
-        ].map(s => (
-          <div key={s.k} style={{
-            position: "relative", overflow: "hidden",
-            background: `linear-gradient(180deg, color-mix(in srgb, ${s.bar} 9%, var(--surface)) 0%, var(--surface) 46%)`,
-            border: `1px solid ${border}`, borderRadius: 10,
-            padding: "0.9rem 1.1rem",
-          }}>
-            <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: s.bar, opacity: 0.85 }} />
-            <div style={{ fontFamily: mono, fontSize: "0.65rem", color: dim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.3rem" }}>{s.label}</div>
-            <div style={{ fontFamily: mono, fontSize: "1.6rem", fontWeight: 700, color: s.color, lineHeight: 1 }}>{s.n}</div>
-          </div>
-        ))}
-      </div>
+      {/* What people actually HAVE (Premium / Trial / Free / Admin / No access), not
+          the raw type column — dates drive access (lib/access.js). */}
+      <UserStats users={users} lang={lang} now={clockNow} />
 
       {/* Tabs */}
       <div style={{ display: "flex", gap: "0.5rem", marginTop: "1.5rem", borderBottom: `1px solid ${border}`, marginBottom: "1.5rem", flexWrap: "wrap" }}>
@@ -3529,66 +3381,18 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
 
       {tab === "users" && (
         <>
-          {/* Search */}
-          <div style={{ marginBottom: "1rem", display: "flex", gap: "0.75rem", alignItems: "center" }}>
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder={lang === "sk" ? "🔍 Hľadať podľa emailu, mena, firmy, pozície…" : "🔍 Search by email, name, company, position…"}
-              style={{
-                flex: 1, padding: "0.6rem 0.9rem", background: "var(--surface-2)",
-                border: `1px solid ${border}`, borderRadius: 8, color: "var(--text)",
-                fontSize: "0.85rem", fontFamily: "inherit", outline: "none",
-              }}
-            />
-            {search && (
-              <button onClick={() => setSearch("")} style={{
-                background: "transparent", color: dim, border: `1px solid ${border}`,
-                borderRadius: 6, padding: "0.5rem 0.85rem", fontSize: "0.75rem",
-                cursor: "pointer", fontFamily: "inherit",
-              }}>
-                {lang === "sk" ? "Zrušiť" : "Clear"}
-              </button>
-            )}
-            <div style={{ fontSize: "0.75rem", color: dim, fontFamily: mono, whiteSpace: "nowrap" }}>
-              {visibleUsers.length} / {users.length}
-            </div>
-          </div>
-
-          {loading ? (
-            <div style={{ color: dim, padding: "1.5rem", fontSize: "0.9rem", textAlign: "center", border: `1px solid ${border}`, borderRadius: 12 }}>
-              {lang === "sk" ? "Načítavam užívateľov…" : "Loading users…"}
-            </div>
-          ) : (err || users.length === 0) ? (
-            // err = the load failed outright. users.length === 0 with no error =
-            // the query ran unauthenticated (stale session) — an admin always sees
-            // at least themselves, so 0 rows is never a genuine empty table.
-            <div style={{ color: "#ffb3b3", padding: "1.5rem", fontSize: "0.9rem", textAlign: "center", border: "1px solid rgba(255,107,107,0.4)", borderRadius: 12, background: "rgba(255,107,107,0.06)" }}>
-              <div style={{ marginBottom: "0.85rem", lineHeight: 1.5 }}>
-                {err || (lang === "sk"
-                  ? "Nepodarilo sa načítať užívateľov — pravdepodobne vypršala tvoja prihlasovacia relácia."
-                  : "Couldn't load users — your session has likely expired.")}
-              </div>
-              <button onClick={loadAll} style={{
-                background: green, color: "var(--bg)", border: "none", borderRadius: 6,
-                padding: "0.5rem 1.1rem", fontSize: "0.8rem", fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
-              }}>
-                {lang === "sk" ? "Načítať znova" : "Reload"}
-              </button>
-            </div>
-          ) : visibleUsers.length === 0 ? (
-            <div style={{ color: dim, padding: "1.5rem", fontSize: "0.9rem", textAlign: "center", border: `1px solid ${border}`, borderRadius: 12 }}>
-              {lang === "sk" ? `Nikto nevyhovuje hľadaniu "${search}".` : `No users match "${search}".`}
-            </div>
-          ) : (
-            <UserTable users={visibleUsers} setTier={setTier} deleteUser={deleteUser} trialAction={trialAction} subAction={subAction} selfId={self?.id} t={t} lang={lang} premiumSet={premiumSet} />
-          )}
-
-          <p style={{ color: dim, fontSize: "0.78rem", marginTop: "1.25rem", lineHeight: 1.5, fontStyle: "italic" }}>
-            {lang === "sk"
-              ? "Freemium: noví užívatelia sa automaticky stanú free hneď po vyplnení profilu. Tento panel je hlavne na: bump free → paid, občasné vymazanie testovacích účtov, downgrade do pending (efektívny ban)."
-              : "Freemium: new sign-ups auto-approve to free. This panel is mostly for: bumping free → paid, occasional test-account deletion, downgrading to pending (de-facto ban)."}
-          </p>
+          <AdminUsers
+            users={users}
+            setUsers={setUsers}
+            selfId={self?.id}
+            lang={lang}
+            premiumSet={premiumSet}
+            loading={loading}
+            err={err}
+            reload={loadAll}
+            now={clockNow}
+            bumpClock={bumpClock}
+          />
 
           {events.length > 0 && (
             <>
@@ -3627,7 +3431,7 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
       {tab === "domains" && (
         <PremiumDomainsPanel
           domains={premiumDomains}
-          reload={() => supabase.from("premium_domains").select("*").order("domain").then(({ data }) => setPremiumDomains(data || []))}
+          reload={() => supabaseData.from("premium_domains").select("*").order("domain").then(({ data }) => setPremiumDomains(data || []))}
         />
       )}
       {tab === "ai_chat" && <AiChatLogsPanel users={users} lang={lang} />}
@@ -4436,7 +4240,7 @@ function PremiumDomainsPanel({ domains, reload }) {
   const add = async () => {
     if (!newDomain.trim()) return;
     setBusy(true); setErr(null);
-    const { error } = await supabase.from("premium_domains").insert({
+    const { error } = await supabaseData.from("premium_domains").insert({
       domain: newDomain.trim().toLowerCase(),
       default_tier: newTier,
       note: newNote.trim() || null,
@@ -4448,7 +4252,7 @@ function PremiumDomainsPanel({ domains, reload }) {
 
   const remove = async (domain) => {
     if (!confirm(`Remove ${domain}?`)) return;
-    const { error } = await supabase.from("premium_domains").delete().eq("domain", domain);
+    const { error } = await supabaseData.from("premium_domains").delete().eq("domain", domain);
     if (error) alert(error.message); else reload();
   };
 
@@ -4509,185 +4313,6 @@ function PremiumDomainsPanel({ domains, reload }) {
   );
 }
 
-function UserTable({ users, setTier, deleteUser, trialAction, subAction, selfId, t, lang, premiumSet = new Set() }) {
-  return (
-    <div style={{ border: `1px solid ${border}`, borderRadius: 12, overflow: "hidden", marginBottom: "2rem" }}>
-      <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
-          <thead style={{ background: "var(--surface-2)" }}>
-            <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-              <th style={th}>{t.admin_email}</th>
-              <th style={th}>Name</th>
-              <th style={th}>Company</th>
-              <th style={th}>Position</th>
-              <th style={th}>{t.admin_tier}</th>
-              <th style={th}>{t.admin_created}</th>
-              <th style={{ ...th, textAlign: "right" }}>{t.admin_actions}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map(u => {
-              const domain = (u.email_domain || "").toLowerCase();
-              const isPersonal = domain && isPersonalEmail(`x@${domain}`);
-              const isPremium = premiumSet.has(domain);
-              const isSelf = u.id === selfId;
-              const rowBg = isSelf
-                ? "rgba(245,166,35,0.08)"
-                : isPremium ? "color-mix(in srgb, var(--accent) 5%, transparent)"
-                : isPersonal ? "rgba(245,166,35,0.04)" : "transparent";
-              return (
-                <tr key={u.id} style={{ borderTop: `1px solid ${border}`, background: rowBg }}>
-                  <td style={td}>
-                    {u.email}{" "}
-                    {isSelf && <span title="That's you" style={{ color: orangeInk, fontSize: "0.7rem", marginLeft: 4, fontFamily: mono }}>YOU</span>}
-                    {isPremium && !isSelf && <span title="Premium domain" style={{ color: greenInk, fontSize: "0.7rem", marginLeft: 4 }}>⭐</span>}
-                    {isPersonal && !isSelf && <span title="Personal email" style={{ color: orangeInk, fontSize: "0.7rem", marginLeft: 4 }}>⚠</span>}
-                  </td>
-                  <td style={{ ...td, color: dim }}>{u.full_name || "—"}</td>
-                  <td style={{ ...td, color: dim }}>{u.company || "—"}</td>
-                  <td style={{ ...td, color: dim, fontFamily: mono, fontSize: "0.75rem" }}>{u.position || "—"}</td>
-                  <td style={td}><TierBadge tier={u.tier} /></td>
-                  <td style={{ ...td, color: dim, fontFamily: mono, fontSize: "0.75rem" }}>{u.created_at?.slice(0, 10)}</td>
-                  <td style={{ ...td, textAlign: "right", whiteSpace: "nowrap" }}>
-                    <span
-                      title={isSelf ? "Can't change your own tier" : ""}
-                      style={{
-                        display: "inline-block", marginRight: "0.4rem", verticalAlign: "middle",
-                        opacity: isSelf ? 0.4 : 1,
-                        pointerEvents: isSelf ? "none" : "auto",
-                        cursor: isSelf ? "not-allowed" : "pointer",
-                      }}>
-                      <Picker
-                        value={u.tier}
-                        onChange={v => setTier(u.id, v)}
-                        width={130}
-                        ariaLabel="Tier"
-                        sk={lang === "sk"}
-                        options={[
-                          { value: "pending", label: "pending" },
-                          { value: "free", label: "free" },
-                          { value: "paid", label: "paid" },
-                          { value: "admin", label: "admin" },
-                        ]}
-                      />
-                    </span>
-                    {(() => {
-                      const trialActive = u.trial_until && new Date(u.trial_until).getTime() > Date.now();
-                      const hasTrial = Boolean(u.trial_started_at || u.trial_until);
-                      const trialDays = trialActive ? daysUntil(u.trial_until) : null;
-                      const paidActive = u.paid_until && new Date(u.paid_until).getTime() > Date.now() && !u.paid_pause_started;
-                      const paidPaused = Boolean(u.paid_pause_started);
-                      const paidDays = paidActive ? daysUntil(u.paid_until) : null;
-                      const subBtnStyle = (active, accent = green) => ({
-                        background: active ? `color-mix(in srgb, var(--accent) 12%, transparent)` : "transparent",
-                        color: isSelf ? "var(--text-faint)" : (active ? accent : "var(--text-2)"),
-                        border: `1px solid ${active ? accent : border}`,
-                        padding: "0.3rem 0.6rem", borderRadius: 4,
-                        fontSize: "0.7rem", fontFamily: "inherit",
-                        cursor: isSelf ? "not-allowed" : "pointer",
-                        opacity: isSelf ? 0.4 : 1,
-                        marginRight: "0.35rem",
-                      });
-                      return (
-                        <>
-                          {/* Main trial button ALWAYS grants a fresh 7-day trial. The
-                              /api/trial/grant endpoint overwrites, so this is a true
-                              (re)start: on a user with no trial it grants; on one who
-                              already has an active/expired trial it RESTARTS the clock to
-                              a fresh 7 days from now. It NEVER revokes — removing a trial
-                              is a separate, explicit, confirm-gated action below (that
-                              silent grant↔revoke toggle was the "+7 removed my trial" bug). */}
-                          <button
-                            onClick={() => trialAction && trialAction(u, "grant")}
-                            disabled={isSelf}
-                            title={isSelf
-                              ? "Can't manage trial on yourself"
-                              : (trialActive
-                                  ? `Trial active — ${trialDays} day(s) left. Click to RESTART a fresh 7 days.`
-                                  : (hasTrial ? "Restart a fresh 7-day paid trial" : "Grant a 7-day paid trial"))}
-                            style={subBtnStyle(trialActive, green)}>
-                            {trialActive ? `🎁 ${trialDays}d · ↻ 7d` : (hasTrial ? "🎁 Restart 7d" : "🎁 Trial +7d")}
-                          </button>
-                          {/* Revoke trial — clears trial_started_at + trial_until. Removes
-                              trial access AND resets the account to "never used the trial"
-                              so it can self-service-start again (also how we re-test the
-                              Activate buttons). Confirm-gated so it can't be hit by accident.
-                              Shown only when there's a trial to clear. */}
-                          {hasTrial && (
-                            <button
-                              onClick={() => {
-                                if (isSelf) return;
-                                const ok = confirm(lang === "sk"
-                                  ? `Zrušiť trial pre ${u.email}? Vymaže začiatok aj koniec trial-u (užívateľ stratí prístup a bude môcť trial spustiť znova).`
-                                  : `Revoke trial for ${u.email}? Clears trial start + expiry (they lose access and can start a fresh trial again).`);
-                                if (!ok) return;
-                                trialAction && trialAction(u, "revoke");
-                              }}
-                              disabled={isSelf}
-                              title={isSelf
-                                ? "Can't revoke trial on yourself"
-                                : "Revoke trial — clears trial start + expiry (removes access, lets them start a fresh trial again)"}
-                              style={subBtnStyle(false, "#ff6b6b")}>
-                              ✕ {lang === "sk" ? "Zrušiť trial" : "Revoke"}
-                            </button>
-                          )}
-                          <button
-                            onClick={() => subAction && subAction(u, { extend_paid_days: 30 })}
-                            disabled={isSelf}
-                            title={isSelf ? "Can't manage your own subscription" : (paidActive ? `Bumps paid_until by 30 days (currently ${paidDays}d remaining)` : "Set paid_until = now + 30 days")}
-                            style={subBtnStyle(paidActive, "#4a90e2")}>
-                            {paidActive ? `💳 ${paidDays}d` : "💳 +30d"}
-                          </button>
-                          {(paidActive || paidPaused) && (
-                            <button
-                              onClick={() => subAction && subAction(u, paidPaused ? { unpause: true } : { pause: true })}
-                              disabled={isSelf}
-                              title={paidPaused ? "Unpause + extend paid_until by paused duration" : "Pause subscription (suspends paid access)"}
-                              style={subBtnStyle(paidPaused, "#f5a623")}>
-                              {paidPaused ? "▶ Unpause" : "⏸ Pause"}
-                            </button>
-                          )}
-                          {(u.paid_until || u.paid_pause_started) && (
-                            <button
-                              onClick={() => {
-                                if (!confirm(lang === "sk" ? `Vymazať paid window pre ${u.email}?` : `Clear paid window for ${u.email}?`)) return;
-                                subAction && subAction(u, { paid_until: null, paid_started_at: null, paid_pause_started: null });
-                              }}
-                              disabled={isSelf}
-                              title="Clear paid_until + paid_started_at + paused"
-                              style={subBtnStyle(false, "#ff6b6b")}>
-                              🗑
-                            </button>
-                          )}
-                        </>
-                      );
-                    })()}
-                    <button
-                      onClick={() => deleteUser && deleteUser(u)}
-                      disabled={isSelf}
-                      title={isSelf ? "Can't delete yourself" : "Delete user (permanent)"}
-                      style={{
-                        background: "transparent",
-                        color: isSelf ? "var(--text-faint)" : redInk,
-                        border: `1px solid ${isSelf ? border : "rgba(255,107,107,0.4)"}`,
-                        padding: "0.3rem 0.65rem", borderRadius: 4,
-                        fontSize: "0.75rem",
-                        cursor: isSelf ? "not-allowed" : "pointer",
-                        opacity: isSelf ? 0.4 : 1, fontFamily: "inherit",
-                      }}>
-                      {lang === "sk" ? "Vymazať" : "Delete"}
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
 function SectionHeader({ children }) {
   return <h2 style={{ fontSize: "1rem", fontWeight: 600, color: "var(--text-dim)", letterSpacing: "0.04em", textTransform: "uppercase", marginTop: "2.5rem", marginBottom: "1rem", fontFamily: mono, display: "flex", alignItems: "center", gap: "0.6rem" }}>{children}</h2>;
 }
@@ -4712,6 +4337,8 @@ function EventBadge({ type }) {
     new_signup: { color: "var(--accent)", label: "NEW" },
     new_signup_personal_email: { color: orangeInk, label: "PERSONAL EMAIL" },
     new_signup_suspicious_org: { color: redInk, label: "SUSPICIOUS ORG" },
+    // made in admin → Users → "Add user" (api/admin/create-user.js), not a sign-up
+    new_signup_admin_created: { color: greenInk, label: "ADDED BY ADMIN" },
   };
   const x = m[type] || { color: dim, label: type };
   return <span style={{ fontFamily: mono, fontSize: "0.65rem", color: x.color, border: `1px solid ${x.color}`, padding: "1px 6px", borderRadius: 3, fontWeight: 700, letterSpacing: "0.05em" }}>{x.label}</span>;

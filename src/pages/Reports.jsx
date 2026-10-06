@@ -42,7 +42,8 @@ import { useCurrency } from "../lib/useCurrency";
 import { useCountry, isAllCountries } from "../lib/useCountry";
 import { SoldShareNote } from "../lib/soldShareNote";
 import { soldSharePct, soldShareText } from "../lib/soldShare.js";
-import { supabase, supabaseData } from "../lib/supabase";
+import { supabaseData } from "../lib/supabase";
+import { getSignedInUser } from "../lib/authToken";
 
 // ── Visual language (mirrors Platform.jsx) ───────────────────────
 const mono = "'JetBrains Mono', monospace";
@@ -454,13 +455,13 @@ function SubscribeButton({ scope, scopeLabel, lang }) {
     let cancelled = false;
     (async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const user = getSignedInUser();
         if (!user) { if (!cancelled) setState("off"); return; }
         if (!cancelled) setEmail(user.email);
         // RLS-gated read via supabaseData (auth-lock-free token) — NOT the auth
         // `supabase` client, whose lock can stall this read on a stuck/refreshing
-        // session (the documented "logged-in page hangs on Loading" class). The
-        // write below stays on the auth client. (2026-07-11 fix.)
+        // session (the documented "logged-in page hangs on Loading" class). Since
+        // 2026-10-06 the write below is lock-free too (authStateHandler.js).
         const { data } = await supabaseData.from("report_subscriptions")
           .select("enabled, scope, scope_label").eq("user_id", user.id).maybeSingle();
         if (cancelled) return;
@@ -478,10 +479,10 @@ function SubscribeButton({ scope, scopeLabel, lang }) {
   const toggle = async () => {
     setState("saving");
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getSignedInUser();
       if (!user) { setState("off"); return; }
       const want = state !== "on";
-      const { error } = await supabase.from("report_subscriptions").upsert({
+      const { error } = await supabaseData.from("report_subscriptions").upsert({
         user_id: user.id,
         email:   user.email,
         scope,

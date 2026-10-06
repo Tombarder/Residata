@@ -1,39 +1,34 @@
 // POST /api/admin/set-subscription
 //
-// Admin-only endpoint to write any subscription field on a user's
-// profile in one round-trip. Same security model as the other
-// /api/admin endpoints: caller must be tier='admin' (verified
-// server-side via Supabase auth).
+// Admin-only: change one existing user from the admin Users panel — the account
+// type, the Premium period, the profile fields and the internal note — in one
+// round-trip. Same security model as the other /api/admin endpoints: the caller
+// must be tier='admin' (verified server-side via Supabase auth).
 //
-// Body: any subset of:
-//   { user_id:           string,           required
-//     trial_until:       ISO string | null,
-//     trial_started_at:  ISO string | null,
-//     paid_until:        ISO string | null,
-//     paid_started_at:   ISO string | null,
-//     paid_pause_started ISO string | null,
-//     subscription_note: string | null,
-//     extend_trial_days: number,           shortcut: bumps trial_until forward
-//     extend_paid_days:  number,           shortcut: bumps paid_until forward
-//     pause:             boolean,          shortcut: paused_at = now
-//     unpause:           boolean }         shortcut: paused_at = null + push paid_until forward by paused-duration
+// Body: { user_id: string (required), and any of:
+//   tier:              'pending' | 'free' | 'paid' | 'admin'   (not your own)
+//   paid_started_at:   'YYYY-MM-DD' | ISO | null    "Premium from" (Premium only)
+//   paid_until:        'YYYY-MM-DD' | ISO | null    "Premium to"; null = no end
+//   full_name, company, position, phone, linkedin_url, subscription_note }
 //
-// Response 200 { ok, patch } where patch is the actual field set
-// applied (so the client can echo it back into local state).
+// WHAT A CHANGE DOES is decided in ONE place, lib/adminUsers.js#planProfileUpdate,
+// shared with the panel and tested there: → Premium starts a period today (or
+// keeps one still running), → Free / No access ends every running premium access
+// NOW, a day means a Bratislava calendar day, "from" is never in the future, "to"
+// never before "from". A bad request is refused with a code the panel says in words.
+//
+// The one-click shortcuts this endpoint used to carry (+N trial days, +N paid days,
+// pause / unpause) are gone with the buttons that sent them (Boss, 2026-10-06) —
+// the period is now edited directly.
+//
+// Response 200 { ok, patch, user } — `user` is the full row as the database now
+// holds it, so the panel shows what was stored, not what it hoped to store.
 
 import { createClient } from "@supabase/supabase-js";
 import { isTrustedRequest as isTrustedOrigin } from "../_lib/origin.js";
+import { planProfileUpdate } from "../../src/lib/adminUsers.js";
 
 export const maxDuration = 10;
-
-function isoOrNull(v) {
-  if (v === null) return null;
-  if (typeof v === "string") {
-    const d = new Date(v);
-    return Number.isFinite(d.getTime()) ? d.toISOString() : undefined;
-  }
-  return undefined;
-}
 
 export default async function handler(req, res) {
   try {
@@ -67,79 +62,20 @@ export default async function handler(req, res) {
     const userId = String(body.user_id || "").trim();
     if (!userId) return res.status(400).json({ error: "user_id required" });
 
-    // Read current row so shortcut actions (extend / unpause) can
-    // do their relative math without race. We ignore stale-read
-    // risk because admin actions are sequential, not concurrent.
     const { data: target } = await admin
-      .from("user_profiles")
-      .select("paid_until, paid_started_at, paid_pause_started, trial_until")
-      .eq("id", userId)
-      .maybeSingle();
+      .from("user_profiles").select("*").eq("id", userId).maybeSingle();
     if (!target) return res.status(404).json({ error: "target user not found" });
 
-    const patch = {};
-
-    // Direct date / null setters
-    for (const key of ["trial_until", "trial_started_at", "paid_until", "paid_started_at", "paid_pause_started"]) {
-      if (key in body) {
-        const v = isoOrNull(body[key]);
-        if (v === undefined) return res.status(400).json({ error: `bad ${key}` });
-        patch[key] = v;
-      }
-    }
-    if ("subscription_note" in body) {
-      patch.subscription_note = typeof body.subscription_note === "string"
-        ? body.subscription_note.slice(0, 500)
-        : null;
-    }
-
-    // Shortcut: extend_trial_days
-    // · Active trial  → true extension: add days onto the existing end and
-    //   KEEP the original trial_started_at (the "day X of N" origin).
-    // · No/expired trial → fresh restart from now, so trial_started_at MUST
-    //   reset too. The old `!trial_until` guard left an EXPIRED trial's stale
-    //   start date in place, which broke "day X of 7".
-    if (Number.isFinite(Number(body.extend_trial_days))) {
-      const days = Math.max(1, Math.min(365, Number(body.extend_trial_days)));
-      const trialActive = target.trial_until && new Date(target.trial_until) > new Date();
-      const base = trialActive ? new Date(target.trial_until) : new Date();
-      patch.trial_until = new Date(base.getTime() + days * 86400 * 1000).toISOString();
-      if (!trialActive) patch.trial_started_at = new Date().toISOString();
-    }
-
-    // Shortcut: extend_paid_days
-    if (Number.isFinite(Number(body.extend_paid_days))) {
-      const days = Math.max(1, Math.min(3650, Number(body.extend_paid_days)));
-      const base = target.paid_until && new Date(target.paid_until) > new Date()
-        ? new Date(target.paid_until) : new Date();
-      patch.paid_until = new Date(base.getTime() + days * 86400 * 1000).toISOString();
-      if (!target.paid_started_at) patch.paid_started_at = new Date().toISOString();
-    }
-
-    // Shortcut: pause
-    if (body.pause === true) {
-      patch.paid_pause_started = new Date().toISOString();
-    }
-
-    // Shortcut: unpause — push paid_until forward by the paused duration
-    // so the user gets back the time they lost while paused.
-    if (body.unpause === true && target.paid_pause_started) {
-      const pausedMs = Date.now() - new Date(target.paid_pause_started).getTime();
-      patch.paid_pause_started = null;
-      if (target.paid_until) {
-        patch.paid_until = new Date(new Date(target.paid_until).getTime() + pausedMs).toISOString();
-      }
-    }
-
-    if (Object.keys(patch).length === 0) {
-      return res.status(400).json({ error: "no fields to update" });
-    }
+    const now = Date.now();
+    const plan = planProfileUpdate(target, body, { now, isSelf: userId === user.id });
+    if (plan.error) return res.status(400).json(plan);
+    const patch = plan.patch;
 
     // .select() + row-count check: the service-role key bypasses RLS, so a
     // 0-row result here means a real misconfig (wrong key / RLS regression) —
     // surface it LOUDLY instead of returning a misleading 200 that never landed.
     const { data: updRows, error: updErr } = await admin
-      .from("user_profiles").update(patch).eq("id", userId).select("id");
+      .from("user_profiles").update(patch).eq("id", userId).select("*");
     if (updErr) return res.status(500).json({ error: "update failed", detail: updErr.message });
     if (!updRows || updRows.length === 0) {
       return res.status(500).json({ error: "write did not land — no row updated (key/RLS misconfig?)" });
@@ -163,7 +99,9 @@ export default async function handler(req, res) {
         actor_email: user.email || null,
         action:      "subscription_update",
         target_id:   userId,
-        payload:     patch,
+        // What changed AND what it was before — "Premium do 31. 12." alone does
+        // not say whether it was an extension or a cut.
+        payload:     { ...patch, before: Object.fromEntries(Object.keys(patch).map((k) => [k, target[k] ?? null])) },
         ip:          clientIp,
         user_agent:  userAgent,
         success:     true,
@@ -175,7 +113,9 @@ export default async function handler(req, res) {
       console.warn("[set-subscription] audit insert failed", auditErr?.message || auditErr);
     }
 
-    return res.status(200).json({ ok: true, patch });
+    // `now` = the moment the rules were applied (e.g. when "→ Free" ended
+    // Premium); the panel adopts it so it judges the row by the same clock.
+    return res.status(200).json({ ok: true, patch, user: updRows[0], now: new Date(now).toISOString() });
   } catch (e) {
     console.error("[set-subscription] crash", e);
     return res.status(500).json({ error: "internal error", detail: String(e?.message || e).slice(0, 200) });

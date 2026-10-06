@@ -14,7 +14,7 @@
  */
 import { useRef, useState, useEffect } from "react";
 import { useAuth } from "../lib/useAuth";
-import { supabase } from "../lib/supabase";
+import { supabaseData } from "../lib/supabase";
 import { cleanText, cleanEmail } from "../lib/sanitize";
 import { getDiagnostics, capturePageScreenshot } from "../lib/diagnostics";
 import { useEscape } from "../lib/useDismiss";
@@ -148,9 +148,9 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
 
   // Recompute the pill's unread-reply badge from the user's conversations.
   async function refreshUnread() {
-    if (!user || !supabase) { setUnread(0); return; }
+    if (!user || !supabaseData) { setUnread(0); return; }
     try {
-      const { data } = await supabase.rpc("my_feedback");
+      const { data } = await supabaseData.rpc("my_feedback");
       setUnread(countUnread(data));
     } catch { /* non-fatal — badge just stays as-is */ }
   }
@@ -257,15 +257,15 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
 
   async function loadMine() {
     setView("mine"); setMine(null); setMineErr("");
-    if (!supabase) { setMineErr(L("Nedostupné.", "Unavailable.")); return; }
-    const { data, error } = await supabase.rpc("my_feedback");
+    if (!supabaseData) { setMineErr(L("Nedostupné.", "Unavailable.")); return; }
+    const { data, error } = await supabaseData.rpc("my_feedback");
     if (error) { setMineErr(error.message); setMine([]); } else setMine(Array.isArray(data) ? data : []);
   }
   async function openThread(id) {
     setActiveConv(id); setView("thread"); setThread(null); setThreadLoading(true); setContinueMsg(""); setContinueErr(""); setContinuePhase("idle");
     markConvSeen(id); setUnread((n) => Math.max(0, n - 1));   // opening it clears its unread state
-    if (!supabase) { setThreadLoading(false); return; }
-    const { data, error } = await supabase.rpc("my_conversation", { p_id: id });
+    if (!supabaseData) { setThreadLoading(false); return; }
+    const { data, error } = await supabaseData.rpc("my_conversation", { p_id: id });
     setThreadLoading(false);
     if (error) setContinueErr(error.message); else { setThread(data); refreshUnread(); }
   }
@@ -286,7 +286,7 @@ export default function FeedbackWidget({ lang = "sk", raised = false }) {
       });
       if (!r.ok) { setContinuePhase("error"); setContinueErr(L("Nepodarilo sa odoslať.", "Couldn't send.")); return; }
       setContinueMsg(""); setContinuePhase("idle");
-      const { data } = await supabase.rpc("my_conversation", { p_id: activeConv });
+      const { data } = await supabaseData.rpc("my_conversation", { p_id: activeConv });
       setThread(data);
     } catch { setContinuePhase("error"); setContinueErr(L("Nepodarilo sa odoslať.", "Couldn't send.")); }
   }

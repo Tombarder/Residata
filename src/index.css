@@ -164,6 +164,10 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
+  /* The same face App.jsx sets on its root (lib/pageFrame.js). Without it here,
+     everything rendered in a PORTAL straight under <body> — every Picker menu,
+     every dialog — fell back to the browser default serif (Times). */
+  font-family: 'Outfit', -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

@@ -49,6 +49,7 @@ let _authClient = null;      // the AUTH client (set via initAuthTokenSync)
 let _accessToken = null;     // current user access token, or null when logged out
 let _expiresAt = 0;          // unix seconds; 0 = unknown
 let _refreshInFlight = null; // dedupe concurrent boundary refreshes
+let _user = null;            // { id, email } of the signed-in user, or null
 
 /** Synchronously read the persisted Supabase session token from localStorage.
  *  No network, no lock — instant. Tolerant of gotrue's storage-shape variants
@@ -73,11 +74,17 @@ function _readStoredSession() {
   return null;
 }
 
+function _userOf(session) {
+  const u = session?.user;
+  return u?.id ? { id: u.id, email: u.email || null } : null;
+}
+
 function _seedFromStorage() {
   const s = _readStoredSession();
   if (s?.access_token) {
     _accessToken = s.access_token;
     _expiresAt = Number(s.expires_at) || 0;
+    _user = _userOf(s);
   }
 }
 _seedFromStorage();
@@ -93,6 +100,7 @@ export function initAuthTokenSync(authClient) {
     _authClient.auth.onAuthStateChange((_event, session) => {
       _accessToken = session?.access_token || null;
       _expiresAt = Number(session?.expires_at) || 0;
+      _user = _userOf(session);
     });
   } catch { /* non-fatal: we still have the localStorage seed + fallback */ }
 }
@@ -164,6 +172,24 @@ export async function getDataAccessToken() {
 export async function forceTokenRefresh() {
   await _boundedRefresh();
   return _accessToken || null;
+}
+
+/**
+ * Who is signed in — { id, email } or null — answered from memory, instantly.
+ * For code that needs the user's id to write a row (tracking, an article's
+ * updated_by, a report subscription): asking the AUTH client instead
+ * (getSession / getUser) goes through gotrue's lock, and a write that waits on
+ * that lock is a save that silently never happens (authStateHandler.js). The id
+ * is the one in the session the token store already follows; the database
+ * checks it against the token on every write (RLS), so nothing is trusted here
+ * that the server does not verify.
+ */
+export function getSignedInUser() {
+  if (!_user) {
+    const s = _readStoredSession();
+    if (s?.access_token) _user = _userOf(s);
+  }
+  return _user;
 }
 
 /** Test/diagnostic peek at the current token state (not used in the render path). */

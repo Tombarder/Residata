@@ -6,7 +6,8 @@
  *
  * Session ID is stable for the browser tab (sessionStorage).
  */
-import { supabase, isSupabaseReady } from "./supabase";
+import { supabaseData, isSupabaseReady } from "./supabase";
+import { getSignedInUser } from "./authToken";
 import { hasAnalyticsConsent } from "./consent";
 
 let _sessionId = null;
@@ -32,17 +33,14 @@ export async function track(eventType, data = {}) {
   // which was previously cosmetic). Essential/session behavior is elsewhere.
   if (!hasAnalyticsConsent()) return;
   try {
-    // F-116: getSession() reads from local storage (no network call);
-    // getUser() would round-trip to /auth/v1/user on every track()
-    // invocation, adding ~50-200ms latency and extra load on Supabase
-    // Auth for what is supposed to be a fire-and-forget analytics
-    // event. The JWT in localStorage is signed by Supabase so we can
-    // trust the user.id off it without re-validating — and if the
-    // token has been tampered with, the subsequent insert fails via
-    // RLS anyway.
-    const { data: { session } } = await supabase.auth.getSession();
-    await supabase.from("user_activity").insert({
-      user_id: session?.user?.id || null,
+    // F-116: no getUser() round-trip per event. And (2026-10-06) no
+    // getSession() either: that waits on gotrue's auth lock, and a write
+    // queued behind that lock is one that silently never happens
+    // (authStateHandler.js). The signed-in user comes from the lock-free
+    // token store; the insert goes through the lock-free data client.
+    const me = getSignedInUser();
+    await supabaseData.from("user_activity").insert({
+      user_id: me?.id || null,
       session_id: sessionId(),
       event_type: eventType,
       event_data: data && Object.keys(data).length ? data : null,

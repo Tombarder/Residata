@@ -96,7 +96,7 @@ export const liveT = {
 
     // Admin
     admin_label: "Admin",
-    admin_title: "User tier management",
+    admin_title: "Users & access",
     admin_email: "Email",
     admin_tier: "Tier",
     admin_project: "Project",
@@ -249,7 +249,7 @@ export const liveT = {
     analytics_placeholder: "Detailné grafy a trend analytika — otázky? napíš na info@residata.eu",
 
     admin_label: "Admin",
-    admin_title: "Správa tier-ov užívateľov",
+    admin_title: "Užívatelia a prístupy",
     admin_email: "Email",
     admin_tier: "Tier",
     admin_project: "Projekt",

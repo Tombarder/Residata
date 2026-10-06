@@ -14,7 +14,8 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { supabaseData, supabase } from "./supabase";
+import { supabaseData } from "./supabase";
+import { getSignedInUser } from "./authToken";
 import { orderArticles } from "./articleOrder.js";
 import { PUBLIC_COLS, LIST_COLS, toArticle, EMBEDDED_ARTICLE_ID, EMBEDDED_LIST_ID } from "./articleModel.js";
 
@@ -143,7 +144,7 @@ export function useArticle(slug) {
 
 /** Publish or withdraw. One call, because that is what the button does. */
 export async function setArticlePublished(id, published) {
-  const { data, error } = await supabase.from("articles").update({ published }).eq("id", id).select("updated_at");
+  const { data, error } = await supabaseData.from("articles").update({ published }).eq("id", id).select("updated_at");
   if (error) throw new Error(error.message);
   // Publishing is a change the database stamps (updated_at moves). The editor
   // bases its next save and its live-page check on that stamp, so it gets the
@@ -158,7 +159,7 @@ export async function setArticlePublished(id, published) {
  */
 export async function createArticle({ slug, date }) {
   const stub = (sk, en) => ({ sk, en });
-  const { data, error } = await supabase.from("articles").insert({
+  const { data, error } = await supabaseData.from("articles").insert({
     slug,
     article_date: date,
     published: false,
@@ -200,10 +201,10 @@ export async function saveArticle(id, patch, { expectUpdatedAt } = {}) {
   if ("ogImage" in patch) body.og_image = patch.ogImage || null;
   // The search title is optional: empty means "use the headline" (lib/articleSeo).
   if ("seoTitle" in patch) body.seo_title = patch.seoTitle && (patch.seoTitle.sk || patch.seoTitle.en) ? patch.seoTitle : null;
-  const { data: session } = await supabase.auth.getUser();
-  if (session?.user?.id) body.updated_by = session.user.id;
+  const me = getSignedInUser();
+  if (me?.id) body.updated_by = me.id;
 
-  let q = supabase.from("articles").update(body).eq("id", id);
+  let q = supabaseData.from("articles").update(body).eq("id", id);
   if (expectUpdatedAt) q = q.eq("updated_at", expectUpdatedAt);
   const { data: rows, error } = await q.select("updated_at");
   // The method-note CHECK constraint is deliberate: an analysis that does not
@@ -240,7 +241,7 @@ export async function setPromoStep(id, checklist, step, done) {
   const next = { ...(checklist || {}) };
   if (done) next[step] = { done_at: new Date().toISOString() };
   else delete next[step];
-  const { error } = await supabase.from("articles").update({ promo_checklist: next }).eq("id", id);
+  const { error } = await supabaseData.from("articles").update({ promo_checklist: next }).eq("id", id);
   if (error) throw new Error(error.message);
   return next;
 }
@@ -260,6 +261,6 @@ export async function deleteArticle(id) {
     err.code = "PUBLISHED";
     throw err;
   }
-  const { error } = await supabase.from("articles").delete().eq("id", id);
+  const { error } = await supabaseData.from("articles").delete().eq("id", id);
   if (error) throw new Error(error.message);
 }

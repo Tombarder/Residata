@@ -32,7 +32,7 @@ import { useAccountPrefState, useAccountHydrated } from "../lib/useAccountUiPref
 import { useCountry } from "../lib/useCountry";
 import { useCurrency } from "../lib/useCurrency";
 import { moneyFromEur, moneySymbol, formatMoney, formatPerM2 } from "../lib/money";
-import { supabase, supabaseData, supabasePublic, isSupabaseReady } from "../lib/supabase";
+import { supabaseData, supabasePublic, isSupabaseReady } from "../lib/supabase";
 import {
   LENSES, COMPLETION, NO_DATA, ppm2Of, metricValue, completionBucket,
   tertiles, colorFor, circlePolygon, computeCompetitiveSet, computePolygonSet, computeCorridorSet,
@@ -395,8 +395,8 @@ export default function MapView2({ lang = "en", setCurrent }) {
     setAreas([localItem, ...savedAreas.filter((a) => a.name !== nm)].slice(0, 60));
     if (!isSupabaseReady()) return;
     try {
-      await supabase.from("user_map_areas").delete().eq("name", nm); // keep names unique per user
-      const { data, error } = await supabase.from("user_map_areas")
+      await supabaseData.from("user_map_areas").delete().eq("name", nm); // keep names unique per user
+      const { data, error } = await supabaseData.from("user_map_areas")
         .insert({ name: nm, shape, country }).select("id, name, shape, country").single();
       if (error) throw error;
       setSavedAreas((prev) => { const next = prev.map((a) => (a.id === localItem.id ? { id: data.id, name: data.name, shape: data.shape, country: data.country } : a)); persistSavedAreas(next); return next; });
@@ -405,7 +405,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
   const loadArea = (a) => { setSaving(false); setDrawTool(null); setPts([]); setAnalysisCenter(null); setAnchorId(null); if (a.shape.kind === "corridor") setCorridorKm(a.shape.widthKm); setShape(a.shape); };
   const deleteArea = async (id) => {
     setSavedAreas((prev) => { const next = prev.filter((a) => a.id !== id); persistSavedAreas(next); return next; });
-    if (isSupabaseReady() && !String(id).startsWith("ls-")) { try { await supabase.from("user_map_areas").delete().eq("id", id); } catch (_) {} }
+    if (isSupabaseReady() && !String(id).startsWith("ls-")) { try { await supabaseData.from("user_map_areas").delete().eq("id", id); } catch (_) {} }
   };
   // On mount: pull the user's saved areas from the DB (source of truth, follows them
   // across devices). The localStorage cache seeds the initial state for an instant paint.
@@ -425,7 +425,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
         const toMigrate = loadSavedAreas().filter((a) => a && a.shape && a.name && !dbNames.has(a.name));
         let merged = dbAreas;
         if (toMigrate.length) {
-          const { data: ins } = await supabase.from("user_map_areas")
+          const { data: ins } = await supabaseData.from("user_map_areas")
             .insert(toMigrate.map((a) => ({ name: a.name, shape: a.shape, country: a.country })))
             .select("id, name, shape, country");
           if (Array.isArray(ins)) merged = [...ins.map((r) => ({ id: r.id, name: r.name, shape: r.shape, country: r.country })), ...dbAreas];
