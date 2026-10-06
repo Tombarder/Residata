@@ -225,3 +225,9 @@ test("the assistant knows when the cube lags, so it keeps those readings only a 
   assert.equal((await fetchMarketReadings(fakeAdmin({ days: NOV, cubeRows: NOV_CUBE, factRows: NOV_FACTS }))).lagging, true);
   assert.equal((await fetchMarketReadings(fakeAdmin({ days: NOV, cubeRows: [{ d: ["SK", "2026-11"], m: { n: 15040 } }], factRows: NOV_FACTS }))).lagging, false);
 });
+
+test("when what the cube holds cannot be read, the assistant keeps the readings only as briefly as a lag", async () => {
+  const r = await fetchMarketReadings(fakeAdmin({ days: NOV }));        // analytics_pivot unreadable
+  assert.equal(r.lagging, true);
+  assert.deepEqual(r.cube, { "SK|2026-10": 1, "SK|2026-11": 2 });
+});

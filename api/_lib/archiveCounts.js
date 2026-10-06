@@ -115,8 +115,8 @@ async function readAll(page) {
  *  maps: { cube, facts } — the readings the cube holds yet and those the facts hold
  *  (src/lib/archiveReadings.js, THE CUBE LAGS): an answer read from the cube is divided by
  *  `cube`, one read from the facts (a range filter) by `facts`; `lagging` while the cube
- *  lacks a reading the facts hold. If what they hold cannot be read, both are every
- *  reading. A view that does not carry `readings` yet is read without
+ *  lacks a reading the facts hold, or what they hold could not be read — then both are
+ *  every reading, kept only as briefly. A view that does not carry `readings` yet is read without
  *  it — each day then one reading, as before. */
 export async function fetchMarketReadings(admin) {
   const read = (cols) => readAll((from, to) => admin.from("archive_days")
@@ -131,6 +131,7 @@ export async function fetchMarketReadings(admin) {
   const days = readingDaysByCountry(rows);
   const specs = holdingSpecs(days);
   let holding = null;
+  let unknown = false;
   if (specs) {
     try {
       const [cube, facts] = await Promise.all([
@@ -139,11 +140,13 @@ export async function fetchMarketReadings(admin) {
       holding = archiveHolding(specs.from, cube.data, facts.data, days);
     } catch (e) {
       console.error("[archive readings] what the cube holds", e?.message || e);
+      unknown = true;
     }
   }
   return {
     cube: monthReadings(heldReadingDays(days, holding, true)),
     facts: monthReadings(heldReadingDays(days, holding, false)),
-    lagging: holdingLags(days, holding),
+    // not known is kept as briefly as a lag: the next question asks again
+    lagging: unknown || holdingLags(days, holding),
   };
 }
