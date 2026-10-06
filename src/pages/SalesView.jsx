@@ -19,7 +19,7 @@ import { useCurrency } from "../lib/useCurrency";
 import { moneyFromEur, moneySymbol, moneyToEur, formatMoney, formatPerM2 } from "../lib/money";
 import { formatDimNumber } from "../lib/locale";
 import { unitKindLabel } from "../lib/unitKinds";
-import { useSales, fetchSalesForExport } from "../lib/useData";
+import { useSales, fetchSalesForExport, useFreshness } from "../lib/useData";
 import { useCountry, isAllCountries } from "../lib/useCountry";
 import { useAccountPrefState } from "../lib/useAccountUiPref";
 import { localeTag } from "../lib/locale";
@@ -265,7 +265,14 @@ export default function SalesView({ lang = "sk" }) {
      June: a range running backwards, which the engine answers honestly with zero and the
      page reported as "no sales for this selection". The chosen preset is a LENGTH, so an
      open "from" is measured back from whatever "to" is. */
-  const date_to = customTo || isoToday();
+  /* …and a preset ends on the last day with data, not on today. The engine counts each
+     sale on one of the days its reading covers, and nothing after the latest reading is
+     known yet — so a window ending today held fewer days of sales than it said whenever
+     today was not a reading day. The market's last data day (the oldest market's in the
+     "All" view, like the freshness line) makes "45 days" 45 days of sales. Today only
+     until that date is known. */
+  const freshness = useFreshness();
+  const date_to = customTo || (freshness && freshness < isoToday() ? freshness : isoToday());
   const date_from = customFrom || isoDaysBefore(date_to, days);
   // An explicitly inverted pair (both typed, from after to) is still possible and is the
   // user's own doing — but it is said out loud rather than answered with an empty table.

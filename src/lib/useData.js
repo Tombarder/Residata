@@ -2424,6 +2424,20 @@ function _freshnessForView(country, m) {
   return m[country] || null;
 }
 
+/** Latest data date per market ({ SK: 'YYYY-MM-DD', CZ: … }), or null while loading
+ *  or when it could not be read — for figures that must be anchored on EACH market's
+ *  own last reading, which the "All" view's single (oldest) date is not. */
+export function useFreshnessByCountry() {
+  const [map, setMap] = useState(() => (_freshness && Object.keys(_freshness).length ? _freshness : null));
+  useEffect(() => {
+    let cancelled = false;
+    if (!isSupabaseReady()) return;
+    _loadFreshness().then((m) => { if (!cancelled) setMap(m && Object.keys(m).length ? m : null); });
+    return () => { cancelled = true; };
+  }, []);
+  return map;
+}
+
 /** Latest data date ('YYYY-MM-DD') for the selected country (the oldest market
  *  for the "All" view), or null while loading. Drives the freshness indicator. */
 export function useFreshness() {
