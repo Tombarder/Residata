@@ -685,6 +685,7 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
     const part = (spec, res) => {
       if (spec === null) return 0;                              // no projects of that market
       if (!spec) return NaN;                                    // its last reading not known
+      if (!res || res.loading) return NaN;                      // its answer not in yet: the held one is the previous scope's
       const v = Number(res?.data?.sold_durable_prorated ?? res?.data?.sold_durable);
       return Number.isFinite(v) ? v : NaN;
     };

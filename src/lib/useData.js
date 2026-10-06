@@ -1731,6 +1731,19 @@ export async function fetchSalesForExport(spec, { onProgress } = {}) {
   return { rows: out, capped: out.length >= SALES_EXPORT_MAX_ROWS, failed: false };
 }
 
+/* What a useSales caller sees for the request `reqKey` (null = disabled), from the hook's
+   state { key, data, loading, error }, where `key` is the request the data answers. The
+   previous answer stays on screen while the next loads, but it is LOADING until the answer
+   for this request is in: on the render in which the spec changes the effect has not run
+   yet, and the old state read as settled — the dashboard's month-ago pace showed the whole
+   market's figure against Ružinov's (a "−560") for the second the new answer took. */
+function _salesView(state, reqKey) {
+  if (!reqKey) return { data: null, loading: false, error: false };
+  const current = state.key === reqKey;
+  return { data: state.data, loading: state.loading || !current, error: current && state.error };
+}
+const SALES_IDLE = Object.freeze({ key: null, data: null, loading: false, error: false });
+
 export function useSales({ enabled = false, spec = null } = {}) {
   const { loading: authLoading, user, profile } = useAuth();
   // analytics_sales is RLS-gated by identity (paid/tier/chosen project), so a tier
@@ -1738,24 +1751,22 @@ export function useSales({ enabled = false, spec = null } = {}) {
   // — include identity in the effect key like every other RLS hook (usePivotGrain etc.).
   const identity = `${user?.id || "anon"}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}`;
   const specKey = spec ? JSON.stringify(spec) : "";
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(!!enabled);
-  const [error, setError] = useState(false);
+  const reqKey = enabled && spec ? `${identity}::${specKey}` : null;
+  const [state, setState] = useState(SALES_IDLE);
   useEffect(() => {
-    if (!enabled || !spec) { setData(null); setLoading(false); setError(false); return; }
+    if (!reqKey) { setState(SALES_IDLE); return; }
     if (!isSupabaseReady() || authLoading) return;
     let cancelled = false;
-    setLoading(true); setError(false);
+    setState((s) => ({ ...s, loading: true, error: false }));
     (async () => {
       const { data: d, error: e } = await sbRead(supabaseData.rpc("analytics_sales", { p_spec: spec }));
       if (cancelled) return;
-      if (e) { console.error("[useSales]", e); setData(null); setLoading(false); setError(true); return; }
-      setData(d || null);
-      setLoading(false);
+      if (e) { console.error("[useSales]", e); setState({ key: reqKey, data: null, loading: false, error: true }); return; }
+      setState({ key: reqKey, data: d || null, loading: false, error: false });
     })();
     return () => { cancelled = true; };
-  }, [enabled, specKey, authLoading, identity]); // eslint-disable-line react-hooks/exhaustive-deps
-  return { data, loading, error };
+  }, [reqKey, authLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+  return _salesView(state, reqKey);
 }
 
 // Cache for server-side distinct filter values — one fast analytics_pivot(dims=[field])

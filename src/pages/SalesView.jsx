@@ -19,7 +19,7 @@ import { useCurrency } from "../lib/useCurrency";
 import { moneyFromEur, moneySymbol, moneyToEur, formatMoney, formatPerM2 } from "../lib/money";
 import { formatDimNumber } from "../lib/locale";
 import { unitKindLabel } from "../lib/unitKinds";
-import { useSales, fetchSalesForExport, useFreshness } from "../lib/useData";
+import { useSales, fetchSalesForExport, useFreshnessStatus } from "../lib/useData";
 import { useCountry, isAllCountries } from "../lib/useCountry";
 import { useAccountPrefState } from "../lib/useAccountUiPref";
 import { localeTag } from "../lib/locale";
@@ -132,6 +132,11 @@ function isoDaysAgo(n) {
   return isoLocal(d);
 }
 const isoToday = () => isoLocal(new Date());
+// How long the page waits for the market's last data day before ending its window on
+// today instead (market_freshness is one small read; this only covers a read that hangs).
+const FRESHNESS_WAIT_MS = 2500;
+// A query that has not been sent because its window is not known yet.
+const SALES_WAITING = Object.freeze({ data: null, loading: true, error: false });
 /** n days before a given YYYY-MM-DD (local calendar), so a window keeps its LENGTH when
  *  its end is moved rather than silently re-anchoring to today. */
 function isoDaysBefore(iso, n) {
@@ -275,7 +280,19 @@ export default function SalesView({ lang = "sk" }) {
      preset of N days starts N − 1 days before its end. It started N days before, and "30
      dní" held 31 days of sales and "45 dní" 46, beside a dashboard card whose 30 days
      are 30. */
-  const freshness = useFreshness();
+  /* Nothing is asked until that day is known. Starting from today and correcting it sent
+     a today-anchored query first, and showed its window and its numbers for as long as the
+     date took — a different period from the one the page then settled on. If the date
+     cannot be had (or takes longer than FRESHNESS_WAIT_MS) the window ends today, as
+     before. A typed "do" needs no date at all. */
+  const { date: freshness, settled: freshnessSettled } = useFreshnessStatus();
+  const [freshnessGaveUp, setFreshnessGaveUp] = useState(false);
+  useEffect(() => {
+    if (freshnessSettled) return undefined;
+    const timer = setTimeout(() => setFreshnessGaveUp(true), FRESHNESS_WAIT_MS);
+    return () => clearTimeout(timer);
+  }, [freshnessSettled]);
+  const windowKnown = !!customTo || freshnessSettled || freshnessGaveUp;
   const date_to = customTo || (freshness && freshness < isoToday() ? freshness : isoToday());
   const date_from = customFrom || isoDaysBefore(date_to, days - 1);
   // An explicitly inverted pair (both typed, from after to) is still possible and is the
@@ -399,10 +416,15 @@ export default function SalesView({ lang = "sk" }) {
     return [...new Set([...BASE_FACETS, ...cat])];
   }, [liveFilters]);
   const baseFacetSpec = useMemo(() => ({ ...common, mode: "facets", facet_scope: "base", facets: facetKeys }), [JSON.stringify(common), JSON.stringify(facetKeys)]); // eslint-disable-line
-  const sum = useSales({ enabled: true, spec: summarySpec });
-  const brk = useSales({ enabled: true, spec: breakdownSpec });
-  const det = useSales({ enabled: true, spec: detailSpec });
-  const fac = useSales({ enabled: true, spec: baseFacetSpec });
+  // Each reads as loading until the window is known (see windowKnown).
+  const sumQ = useSales({ enabled: windowKnown, spec: summarySpec });
+  const brkQ = useSales({ enabled: windowKnown, spec: breakdownSpec });
+  const detQ = useSales({ enabled: windowKnown, spec: detailSpec });
+  const facQ = useSales({ enabled: windowKnown, spec: baseFacetSpec });
+  const sum = windowKnown ? sumQ : SALES_WAITING;
+  const brk = windowKnown ? brkQ : SALES_WAITING;
+  const det = windowKnown ? detQ : SALES_WAITING;
+  const fac = windowKnown ? facQ : SALES_WAITING;
 
   const S = sum.data || {};
   const brkRows = brk.data?.rows || [];
@@ -579,7 +601,7 @@ export default function SalesView({ lang = "sk" }) {
              "How many and WHICH units sold — and stayed sold — in the chosen period, for the projects you pick.")}
         </p>
         {!isPipe && (
-          <span className="rd-label" style={{ fontSize: "0.66rem", color: rangeInverted ? "var(--accent-2)" : "var(--accent-ink)", letterSpacing: "0.04em", textTransform: "none" }}>
+          <span className="rd-label" style={{ fontSize: "0.66rem", color: rangeInverted ? "var(--accent-2)" : "var(--accent-ink)", letterSpacing: "0.04em", textTransform: "none", visibility: windowKnown ? undefined : "hidden" }}>
             {rangeLabel}{rangeInverted ? ` — ${t("obdobie beží pozadu", "the period runs backwards")}` : ""}
           </span>
         )}
