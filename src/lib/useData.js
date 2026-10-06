@@ -1740,84 +1740,102 @@ function _loadArchiveReadings(key, force = false, within = 0) {
     const read = (cols) => sbReadAll((from, to) => supabaseData.from("archive_days")
       .select(cols).order("day", { ascending: false }).order("country").range(from, to));
     // A view that does not carry `readings` yet: each day one reading, as before.
-    let { data, error } = await read("day,country,readings");
-    if (error) ({ data, error } = await read("day,country"));
+    const readDays = async () => {
+      const r = await read("day,country,readings");
+      return r.error ? read("day,country") : r;
+    };
+    let { data, error } = await readDays();
     if (error) {
       if (kept) return kept;                       // the last good answer stands
       throw error;
     }
-    const fresh = readingDaysByCountry(data);
-    const daysSig = readingsSignature(fresh);
-    const sameDays = !!kept && kept.daysSig === daysSig;
-    const days = sameDays ? kept.days : fresh;
-    const specs = holdingSpecs(days);
-    let factsRead = null;
-    if (force && sameDays && kept.holdingKnown && kept.holding && specs) {
-      factsRead = await sbRead(supabaseData.rpc("analytics_pivot", { p_spec: specs.facts }));
-      if (factsRead.error) return kept;            // as it was; the cube's check says more
-      const factsSig = holdingFactsSignature({ facts: archiveHolding(specs.from, [], factsRead.data, days).facts });
-      if (factsSig === kept.factsSig) {
-        kept.factsAt = startedAt;
-        return kept;
+    for (let attempt = 0; ; attempt += 1) {
+      const fresh = readingDaysByCountry(data);
+      const daysSig = readingsSignature(fresh);
+      // The facts holding a day of a newest month as big as a reading that the days do not:
+      // one approved between the two reads. The days are read again and, if they moved, the
+      // check starts over with them — not divided by days that lack a reading the facts hold.
+      const daysBehind = async (h) => {
+        if (attempt > 0 || !h?.factsAhead?.size) return false;
+        const again = await readDays();
+        if (again.error || readingsSignature(readingDaysByCountry(again.data)) === daysSig) return false;
+        data = again.data;
+        return true;
+      };
+      const sameDays = !!kept && kept.daysSig === daysSig;
+      const days = sameDays ? kept.days : fresh;
+      const specs = holdingSpecs(days);
+      let factsRead = null;
+      if (force && sameDays && kept.holdingKnown && kept.holding && specs) {
+        factsRead = await sbRead(supabaseData.rpc("analytics_pivot", { p_spec: specs.facts }));
+        if (factsRead.error) return kept;            // as it was; the cube's check says more
+        const seen = archiveHolding(specs.from, [], factsRead.data, days);
+        if (await daysBehind(seen)) continue;
+        const factsSig = holdingFactsSignature(seen);
+        if (factsSig === kept.factsSig) {
+          kept.factsAt = startedAt;
+          return kept;
+        }
       }
-    }
-    let entry = sameDays ? kept : {
-      days, daysSig, holding: null, holdingSig: null, holdingKnown: false, holdingFailed: false,
-      failures: 0, lagging: false, lagSince: null, lagLate: 0,     // a new reading's lag counts afresh
-      cubeGen: kept ? kept.cubeGen : 0, version: `${daysSig}/${kept ? kept.cubeGen : 0}`, at: 0,
-    };
-    if (!kept) {                                   // the first read: the days at once
+      let entry = sameDays ? kept : {
+        days, daysSig, holding: null, holdingSig: null, holdingKnown: false, holdingFailed: false,
+        failures: 0, lagging: false, lagSince: null, lagLate: 0,     // a new reading's lag counts afresh
+        cubeGen: kept ? kept.cubeGen : 0, version: `${daysSig}/${kept ? kept.cubeGen : 0}`, at: 0,
+      };
+      if (!kept) {                                   // the first read: the days at once
+        _archiveReadingsCache.set(key, entry);
+        _publishReadings(key);
+      }
+      // What the cube and the facts hold of each market's newest month (archiveReadings.js,
+      // THE CUBE LAGS). Unreadable: the last good holding for these days, else none — the
+      // readings as they are.
+      let holding = null;
+      let failed = false;
+      if (specs) {
+        const [cube, facts] = await Promise.all([
+          sbRead(supabaseData.rpc("analytics_pivot", { p_spec: specs.cube })),
+          factsRead || sbRead(supabaseData.rpc("analytics_pivot", { p_spec: specs.facts })),
+        ]);
+        if (cube.error || facts.error) { console.error("[archive readings] what the cube holds", cube.error || facts.error); failed = true; }
+        else holding = archiveHolding(specs.from, cube.data, facts.data, days);
+      }
+      if (await daysBehind(holding)) continue;
+      const now = startedAt;
+      if (failed && entry.holdingKnown) {
+        entry.holdingFailed = true;
+        if (!force) {                                // a forced read is no step of the backoff
+          entry.failures = (entry.failures || 0) + 1;
+          entry.at = now;
+        }
+        return entry;
+      }
+      const holdingSig = holdingSignature(holding);
+      const factsSig = holdingFactsSignature(holding);
+      const cubeMoved = entry.holdingKnown && !failed && (entry.holdingSig !== holdingSig || entry.factsSig !== factsSig);
+      const lagging = holdingLags(days, holding);
+      // a forced read (the archive's records asking) is no step of a long lag's spacing
+      const lag = force && lagging && entry.lagging ? { lagSince: entry.lagSince, lagLate: entry.lagLate } : _lagState(lagging, entry, now);
+      const failures = failed ? (entry.failures || 0) + 1 : 0;
+      if (entry.holdingKnown && !cubeMoved) {        // nothing moved: the same entry, kept longer
+        Object.assign(entry, { holdingFailed: false, failures, lagging, ...lag, at: now, factsAt: now });
+        return entry;
+      }
+      if (cubeMoved || (kept && !sameDays)) _dropArchiveGrains();
+      const cubeGen = entry.cubeGen + (cubeMoved ? 1 : 0);
+      // the version this one replaces, with the holding that went with it: a grain asked
+      // under it before its holding was known is divided by that (PivotV2 grainView)
+      const prev = kept && kept.version !== `${daysSig}/${cubeGen}` && kept.holdingKnown
+        ? { prevVersion: kept.version, prevHolding: kept.holding } : { prevVersion: entry.prevVersion, prevHolding: entry.prevHolding };
+      entry = {
+        ...entry, holding, holdingSig, holdingKnown: true, holdingFailed: failed, failures,
+        lagging, ...lag, cubeGen, version: `${daysSig}/${cubeGen}`, at: now, ...prev,
+        // the facts' side, and when it was last read: what a forced read compares
+        factsSig, factsAt: failed ? 0 : now,
+      };
       _archiveReadingsCache.set(key, entry);
       _publishReadings(key);
-    }
-    // What the cube and the facts hold of each market's newest month (archiveReadings.js,
-    // THE CUBE LAGS). Unreadable: the last good holding for these days, else none — the
-    // readings as they are.
-    let holding = null;
-    let failed = false;
-    if (specs) {
-      const [cube, facts] = await Promise.all([
-        sbRead(supabaseData.rpc("analytics_pivot", { p_spec: specs.cube })),
-        factsRead || sbRead(supabaseData.rpc("analytics_pivot", { p_spec: specs.facts })),
-      ]);
-      if (cube.error || facts.error) { console.error("[archive readings] what the cube holds", cube.error || facts.error); failed = true; }
-      else holding = archiveHolding(specs.from, cube.data, facts.data, days);
-    }
-    const now = startedAt;
-    if (failed && entry.holdingKnown) {
-      entry.holdingFailed = true;
-      if (!force) {                                // a forced read is no step of the backoff
-        entry.failures = (entry.failures || 0) + 1;
-        entry.at = now;
-      }
       return entry;
     }
-    const holdingSig = holdingSignature(holding);
-    const factsSig = holdingFactsSignature(holding);
-    const cubeMoved = entry.holdingKnown && !failed && (entry.holdingSig !== holdingSig || entry.factsSig !== factsSig);
-    const lagging = holdingLags(days, holding);
-    // a forced read (the archive's records asking) is no step of a long lag's spacing
-    const lag = force && lagging && entry.lagging ? { lagSince: entry.lagSince, lagLate: entry.lagLate } : _lagState(lagging, entry, now);
-    const failures = failed ? (entry.failures || 0) + 1 : 0;
-    if (entry.holdingKnown && !cubeMoved) {        // nothing moved: the same entry, kept longer
-      Object.assign(entry, { holdingFailed: false, failures, lagging, ...lag, at: now, factsAt: now });
-      return entry;
-    }
-    if (cubeMoved || (kept && !sameDays)) _dropArchiveGrains();
-    const cubeGen = entry.cubeGen + (cubeMoved ? 1 : 0);
-    // the version this one replaces, with the holding that went with it: a grain asked
-    // under it before its holding was known is divided by that (PivotV2 grainView)
-    const prev = kept && kept.version !== `${daysSig}/${cubeGen}` && kept.holdingKnown
-      ? { prevVersion: kept.version, prevHolding: kept.holding } : { prevVersion: entry.prevVersion, prevHolding: entry.prevHolding };
-    entry = {
-      ...entry, holding, holdingSig, holdingKnown: true, holdingFailed: failed, failures,
-      lagging, ...lag, cubeGen, version: `${daysSig}/${cubeGen}`, at: now, ...prev,
-      // the facts' side, and when it was last read: what a forced read compares
-      factsSig, factsAt: failed ? 0 : now,
-    };
-    _archiveReadingsCache.set(key, entry);
-    _publishReadings(key);
-    return entry;
   })().finally(() => _archiveReadingsInflight.delete(key));
   _archiveReadingsInflight.set(key, p);
   return p;

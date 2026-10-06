@@ -184,7 +184,8 @@ test("the hook checks every minute, and the assistant keeps lagging readings a m
 // ── what the cube holds is read in parallel with the grain, and a passing error keeps it ──
 function stagedHarness() {
   let now = Date.UTC(2026, 10, 6, 9, 0);
-  const facts = [{ d: ["SK", "2026-11-02"], m: { n: 7500 } }, { d: ["SK", "2026-11-06"], m: { n: 7500 } }, { d: ["SK", "2026-11-09"], m: { n: 7500 } }];
+  const facts = [{ d: ["SK", "2026-11-02"], m: { n: 7500 } }, { d: ["SK", "2026-11-06"], m: { n: 7500 } }];
+  const NOV9 = { d: ["SK", "2026-11-09"], m: { n: 7500 } };                // the 9th's reading, once approved
   const st = { cube: [{ d: ["SK", "2026-11"], m: { n: 15000 } }], facts, rpcFails: false, gate: null, reads: 0, cubeAsks: 0, factsAsks: 0,
     days: [{ day: "2026-11-02", country: "SK", readings: 1 }, { day: "2026-11-06", country: "SK", readings: 1 }] };
   const supabaseData = {
@@ -204,7 +205,9 @@ function stagedHarness() {
     `${BLOCK}\nreturn { _loadArchiveReadings, _archiveReadingsCache, _archiveReadingsListeners };`,
   )(async (make) => make(0, 999), (b) => b, supabaseData, readingDaysByCountry, readingsSignature,
     holdingSpecs, archiveHolding, holdingSignature, holdingLags, holdingFactsSignature, grains, { now: () => now }, { error() {} });
-  return { ...api, st, grains, advance: (ms) => { now += ms; } };
+  // a reading on the 9th approved: in the days and the facts at once (one transaction)
+  const approve9th = () => { st.days = [...st.days, { day: "2026-11-09", country: "SK", readings: 1 }]; st.facts = [...st.facts, NOV9]; };
+  return { ...api, st, grains, approve9th, advance: (ms) => { now += ms; } };
 }
 
 test("the days are published before what the cube holds is in, so a grain can be asked meanwhile", async () => {
@@ -298,7 +301,7 @@ test("when the days change, the kept entry stays until the new holding is in, th
   h.st.gate = new Promise((r) => { release = r; });
   const heard = [];
   h._archiveReadingsListeners.set("u", new Set([() => heard.push(h._archiveReadingsCache.get("u"))]));
-  h.st.days = [...h.st.days, { day: "2026-11-09", country: "SK", readings: 1 }];
+  h.approve9th();
   h.advance(20 * MIN);
   const p = h._loadArchiveReadings("u");
   await new Promise((r) => setTimeout(r, 0));
@@ -372,7 +375,7 @@ test("a new reading during a lag starts its lag's count afresh", async () => {
   await h._loadArchiveReadings("u");
   for (let m = 1; m <= 20; m += 1) { h.advance(MIN); await h._loadArchiveReadings("u"); }
   assert.ok(h._archiveReadingsCache.get("u").lagLate > 0, "past the window");
-  h.st.days = [...h.st.days, { day: "2026-11-09", country: "SK", readings: 1 }];
+  h.approve9th();
   h.advance(15 * MIN);
   const e = await h._loadArchiveReadings("u");
   assert.equal(e.days.SK.get("2026-11-09"), 1);
@@ -453,7 +456,7 @@ test("forced, the readings are read again whatever their age, and a read in flig
   h.st.gate = new Promise((r) => { release = r; });
   const tick = h._loadArchiveReadings("u");
   await new Promise((r) => setTimeout(r, 0));
-  h.st.days = [...h.st.days, { day: "2026-11-09", country: "SK", readings: 1 }];
+  h.approve9th();
   const forced = h._loadArchiveReadings("u", true);
   release();
   h.st.gate = null;
@@ -697,19 +700,80 @@ function readingsWorld(st) {
       st.factsAsks += 1;
       return { data: st.facts.map(([c, d, n]) => ({ d: [c, d], m: { n } })), error: null };
     },
-    from: () => { const b = { select() { return b; }, order() { return b; }, range() { st.dayReads += 1; return Promise.resolve({ data: st.days, error: null }); } }; return b; },
+    from: () => {
+      const b = { select() { return b; }, order() { return b; },
+        range() { st.dayReads += 1; const d = st.days; st.afterDays?.(); return Promise.resolve({ data: d, error: null }); } };
+      return b;
+    },
   };
-  const { _loadArchiveReadings } = new Function(
+  const { _loadArchiveReadings, _archiveReadingsCache } = new Function(
     "sbReadAll", "sbRead", "supabaseData", "readingDaysByCountry", "readingsSignature",
     "holdingSpecs", "archiveHolding", "holdingSignature", "holdingLags", "holdingFactsSignature", "_pivotGrainCache", "Date", "console",
-    `${BLOCK}\nreturn { _loadArchiveReadings };`,
+    `${BLOCK}\nreturn { _loadArchiveReadings, _archiveReadingsCache };`,
   )(async (make) => make(0, 999), (b) => b, supabaseData, readingDaysByCountry, readingsSignature,
     holdingSpecs, archiveHolding, holdingSignature, holdingLags, holdingFactsSignature, new Map(), { now: () => now }, { error() {} });
   // the Pivot's stamp of what the readings hook renders
   const stampOf = (e) => ({ days: e.days, holding: e.holding, refresh: (within) => _loadArchiveReadings("u", true, within) });
-  return { load: () => _loadArchiveReadings("u"), stampOf, advance: (ms) => { now += ms; } };
+  return { load: () => _loadArchiveReadings("u"), latest: () => _archiveReadingsCache.get("u"), stampOf, advance: (ms) => { now += ms; } };
 }
 const fewRows = (n) => Array.from({ length: n }, (_, i) => ({ id: i, country: "SK", batch_timestamp: "2026-09-04T05:00:00+00:00", snapshot_month: "2026-09" }));
+
+// ── a reading approved between a check's read of the days and its read of the facts ──
+// The facts then hold a whole reading the days do not, and whatever is divided by those
+// days — a grain from the facts, the records — counts it against a reading too few until
+// the next check, up to a quarter of an hour later.
+test("a check whose facts hold a reading its days lack reads the days again; a retry does not", async () => {
+  const st = { days: [{ day: "2026-10-02", country: "SK", readings: 1 }], facts: [["SK", "2026-10-02", 7500]], cube: [["SK", "2026-10", 7500]] };
+  const w = readingsWorld(st);
+  await w.load();
+  w.advance(16 * MIN);
+  st.afterDays = () => {                                                    // the 6th approved right after the days are read
+    st.afterDays = null;
+    st.days = [{ day: "2026-10-06", country: "SK", readings: 1 }, ...st.days];
+    st.facts = [...st.facts, ["SK", "2026-10-06", 7500]];
+  };
+  const reads = st.dayReads;
+  const e = await w.load();
+  assert.ok(e.days.SK.has("2026-10-06"), "the days read again hold it");
+  assert.ok(e.holding.facts.get("SK").has("2026-10-06"));
+  assert.ok(!e.holding.factsAhead.size);
+  assert.equal(st.dayReads, reads + 2);
+  // a not-due morning's retry of a few projects: no reading, the days read once
+  w.advance(16 * MIN);
+  st.facts = [...st.facts, ["SK", "2026-10-07", 60]];
+  const r = st.dayReads;
+  await w.load();
+  assert.equal(st.dayReads, r + 1);
+});
+
+test("records read while a reading lands between the two reads of the check after them are not divided without it", async () => {
+  const octRowsOf = (day, n) => Array.from({ length: n }, (_, i) => ({ id: `${day}-${i}`, country: "SK", batch_timestamp: `${day}T05:00:00+00:00`, snapshot_month: "2026-10" }));
+  const st = { days: [{ day: "2026-10-02", country: "SK", readings: 1 }], facts: [["SK", "2026-10-02", 7500]], cube: [["SK", "2026-10", 7500]] };
+  const w = readingsWorld(st);
+  const db = { rows: octRowsOf("2026-10-02", 7500) };
+  const render = flatsHarness(db, "SK");
+  await w.load();
+  w.advance(MIN);
+  db.onPage = (n) => {                                                      // the 6th lands as the check after the pages reads the days
+    if (n !== 1) return;
+    st.afterDays = () => {
+      st.afterDays = null;
+      st.days = [{ day: "2026-10-06", country: "SK", readings: 1 }, ...st.days];
+      st.facts = [...st.facts, ["SK", "2026-10-06", 7500]];
+      db.rows = [...octRowsOf("2026-10-06", 7500), ...db.rows];
+    };
+  };
+  let got = null;
+  for (let k = 0; k < 4; k += 1) {                                          // whatever the readings publish renders
+    render(["2026-10"], null, true, w.stampOf(w.latest()));
+    await settle();
+    got = render(["2026-10"], null, true, w.stampOf(w.latest()));
+  }
+  const shown = Math.round(weightedCount(got.flats, archiveRecordCells(heldReadingDays(got.stamp.days, got.stamp.holding, false),
+    archiveReadingScope([{ key: "snapshot_month", mode: "in", values: ["2026-10"] }]), ["project_name"])));
+  assert.equal(got.loading, false);
+  assert.equal(shown, 7500, `records ${got.flats.length}, their days ${[...got.stamp.days.SK.keys()]}`);
+});
 
 // ── W2: the records are asked again for a reading of THEIR market and months only ──
 test("an SK user's September records stay for a CZ reading, a retry and a cube refresh, and go for a withdrawn September reading", async () => {

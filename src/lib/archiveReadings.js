@@ -300,7 +300,9 @@ export function holdingSpecs(days) {
  *  holds only some readings (a day read twice, the second approved after the refresh) —
  *  cubeExtra: Map('SK|2026-11' → readings) — readings the cube still holds that the facts
  *  no longer do (a withdrawal whose cube refresh failed) —
- *  cubeTotals: Map('SK|2026-11' → the cube's rows) }. `days` (readingDaysByCountry) says
+ *  cubeTotals: Map('SK|2026-11' → the cube's rows),
+ *  factsAhead: Map(market → days of its newest month the facts hold as a reading and
+ *  `days` do not) }. `days` (readingDaysByCountry) says
  *  how many readings each day holds; a day not among them (a retry) is one.
  *
  *  A day's readings are counted against ONE reading's rows: the cube holds j of a day's k
@@ -316,6 +318,22 @@ export function archiveHolding(from, cubeRows, factRows, days) {
     if (!c || !day || !(n > 0)) continue;
     if (!factsN.has(c)) factsN.set(c, new Map());
     factsN.get(c).set(day, (factsN.get(c).get(day) || 0) + n);
+  }
+  // Days of a market's newest month that the facts hold and the days do not, as big as
+  // half a reading or more: a reading approved between the read of the days and that of
+  // the facts (a not-due morning's retry of a few projects is far smaller).
+  const factsAhead = new Map();
+  if (days) {
+    for (const [c, byDay] of factsN) {
+      const f = from?.get(c);
+      let one = 0;
+      for (const [d, n] of byDay) {
+        const k = days[c]?.get(d);
+        if (k && (!f || d >= f)) one = Math.max(one, n / k);
+      }
+      const ahead = [...byDay.keys()].filter((d) => (!f || d >= f) && !days[c]?.has(d) && one > 0 && byDay.get(d) >= one / 2);
+      if (ahead.length) factsAhead.set(c, ahead.sort());
+    }
   }
   const cubeTotals = new Map();
   for (const g of cubeRows || []) {
@@ -368,7 +386,7 @@ export function archiveHolding(from, cubeRows, factRows, days) {
       }
     }
   }
-  return { from, facts, cubeThrough, cubePartial, cubeExtra, cubeTotals };
+  return { from, facts, factsAhead, cubeThrough, cubePartial, cubeExtra, cubeTotals };
 }
 
 /** `days` (readingDaysByCountry) without the readings a grain's source does not hold yet:
