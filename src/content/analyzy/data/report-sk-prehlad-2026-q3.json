@@ -1,6 +1,6 @@
 {
  "asOf": "2026-09-30",
- "generatedAt": "2026-10-06T09:34:03",
+ "generatedAt": "2026-10-06T10:35:52",
  "slug": "sk-prehlad-2026-q3",
  "overview": {
   "scope": {
@@ -43,6 +43,9 @@
   "rolling_days": 28,
   "prev_period_sales": 207,
   "period_days": 92,
+  "reading_every_days": [
+   1
+  ],
   "okres_supply": {
    "Bratislavský kraj": {
     "n": 4574,

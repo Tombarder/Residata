@@ -1,6 +1,6 @@
 {
  "asOf": "2026-09-30",
- "generatedAt": "2026-10-06T09:37:00",
+ "generatedAt": "2026-10-06T10:44:04",
  "slug": "kraj-ba-prehlad-2026-q3",
  "overview": {
   "scope": {
@@ -34,6 +34,9 @@
   "rolling_days": 28,
   "prev_period_sales": 166,
   "period_days": 92,
+  "reading_every_days": [
+   1
+  ],
   "okres_supply": {
    "Bratislava": {
     "n": 4250,
