@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef, useLayoutEffect, Fragment } from 
 import { createPortal } from "react-dom";
 import { useSpecifics, SpecificsMark } from "../lib/projectSpecifics";
 import { useAnalyticsRegistry, useProjects, useFlatsArchive, useFlatsCurrent, useArchiveMonths, useArchiveDays, useArchiveReadingDays, usePivotGrain, usePivotDistinct, usePivotFieldStats, fetchFlatsForProjects } from "../lib/useData";
-import { archiveGrainDims, archiveReadingScope, normaliseArchiveGrain, periodFactors, scaleComponents, archiveRecordCells, weightedCount, specUsesCube, heldReadingDays } from "../lib/archiveReadings";
+import { archiveGrainDims, archiveReadingScope, normaliseArchiveGrain, periodFactors, scaleComponents, archiveRecordCells, weightedCount, weightedSum, specUsesCube, heldReadingDays } from "../lib/archiveReadings";
 import { useCountry, isAllCountries, countryName } from "../lib/useCountry";
 import { useCapabilities } from "../lib/useCapabilities";
 import { useAuth } from "../lib/useAuth";
@@ -839,6 +839,15 @@ function compute(field, agg, records, recordCell = null) {
       if (v != null && v !== "") s.add(String(v).trim());
     }
     return s.size;
+  }
+
+  // A sum and an average over the archive's records weigh each record as recordCount
+  // counts it — the grain path's s_* and n_* — or Σ obytná plocha read six readings'
+  // worth of area (36 000 m² for a project of 6 000) once a median column was added.
+  if (recordCell && (agg === "sum" || agg === "avg")) {
+    const { sum, weight } = weightedSum(records, recordCell, acc);
+    if (!(weight > 0)) return null;
+    return agg === "sum" ? sum : sum / weight;
   }
 
   const nums = [];

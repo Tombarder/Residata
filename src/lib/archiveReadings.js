@@ -380,3 +380,25 @@ export function monthReadings(days) {
   }
   return out;
 }
+
+/** Σ value × weight and Σ weight over the records with a numeric value, each record
+ *  weighing as weightedCount counts it — the record path's sum and average on the grain
+ *  path's basis (s_* and n_* divided by the readings, averaged over the periods). */
+export function weightedSum(recs, recordCell, valueOf) {
+  const cells = recs.map(recordCell);
+  const f = periodFactors(cells, (c) => c);
+  let sum = 0;
+  let weight = 0;
+  for (let i = 0; i < recs.length; i += 1) {
+    const c = cells[i];
+    if (!c) continue;
+    const v = valueOf(recs[i]);
+    if (v == null || v === "") continue;
+    const n = Number(v);
+    if (!Number.isFinite(n)) continue;
+    const w = f[i] / c.r;
+    sum += n * w;
+    weight += w;
+  }
+  return { sum, weight };
+}

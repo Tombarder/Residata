@@ -515,3 +515,40 @@ test("kolaudacia is answered from the facts, so it is divided by the facts' read
   assert.equal(specUsesCube({ dims: ["cast", "country"], filters: { kolaudacia: ["2027"] } }, new Set()), false);
   assert.equal(specUsesCube({ dims: ["orientacia", "country", "snapshot_month"] }, new Set()), true);
 });
+
+// ── the record path's sum and average are on the grain path's basis ──
+const { weightedSum } = await import("./archiveReadings.js");
+const computeOf = new Function("weightedCount", "weightedSum", `
+  const FIELDS = {};
+  ${PIVOT.match(/const _STAV = [^\n]*/)[0]}
+  ${PIVOT.match(/function recordCount\(records, recordCell, pred\)[\s\S]*?\n\}/)[0]}
+  ${PIVOT.match(/function compute\(field, agg, records, recordCell = null\)[\s\S]*?\n\}/)[0]}
+  return compute;
+`)(weightedCount, weightedSum);
+
+test("record path and grain path give the same Počet, Σ and average plocha over two months", () => {
+  // Projekt X: 100 flats of 60 m² read 30 times in September, 120 flats of 50 m² read 6
+  // times in October; one flat of each reading has no area.
+  const sepDays = SEP, octDays = ["2026-10-01", "2026-10-02", "2026-10-03", "2026-10-04", "2026-10-05", "2026-10-09"];
+  const recs = [];
+  for (const day of sepDays) for (let i = 0; i < 100; i += 1) recs.push({ country: "SK", batch_timestamp: `${day}T05:00:00+00:00`, snapshot_month: "2026-09", obytna_plocha: i === 0 ? null : 60, stav: "V" });
+  for (const day of octDays) for (let i = 0; i < 120; i += 1) recs.push({ country: "SK", batch_timestamp: `${day}T05:00:00+00:00`, snapshot_month: "2026-10", obytna_plocha: i === 0 ? null : 50, stav: "V" });
+  const filters = [{ key: "snapshot_month", mode: "in", values: ["2026-09", "2026-10"] }];
+  const scope = archiveReadingScope(filters);
+  const cell = archiveRecordCells(SK_DAYS, scope, ["project_name"]);
+  const area = { accessor: (r) => r.obytna_plocha, type: "number" };
+  // the grain the engine returns for the same flats, per (project, country, month)
+  const dims = archiveGrainDims(["project_name"], scope);
+  const grain = ["2026-09", "2026-10"].map((m) => {
+    const rs = recs.filter((r) => r.snapshot_month === m);
+    const withArea = rs.filter((r) => r.obytna_plocha != null);
+    return { d: ["Projekt X", "SK", m], m: { n: rs.length, s_ob: withArea.reduce((a, r) => a + r.obytna_plocha, 0), n_ob: withArea.length } };
+  });
+  const g = nodeOf(normaliseArchiveGrain(grain, dims, SK_DAYS, scope));
+  const compute = computeOf;
+  assert.equal(compute(null, "count", recs, cell), Math.round(g.n));
+  assert.ok(Math.abs(compute(area, "sum", recs, cell) - g.s_ob) < 1e-6, `sum ${compute(area, "sum", recs, cell)} vs ${g.s_ob}`);
+  assert.ok(Math.abs(compute(area, "avg", recs, cell) - g.s_ob / g.n_ob) < 1e-9);
+  assert.equal(Math.round(compute(area, "sum", recs, cell)), Math.round((99 * 60 + 119 * 50) / 2), "not 36 readings' worth of area");
+  assert.equal(compute(area, "sum", recs, null), 30 * 99 * 60 + 6 * 119 * 50, "today's market: plain sum");
+});
