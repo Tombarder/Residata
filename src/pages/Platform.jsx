@@ -22,6 +22,7 @@ import { useProjectSpecificsData } from "../lib/projectSpecifics";
 import PageHero from "../components/PageHero";
 import { usePricing } from "../lib/pricing";
 import { reportError } from "../lib/errorReport";
+import { reloadingFor, RELOAD_WAIT_MS } from "../lib/staleChunkReload";
 import { FALLBACK_MONTHLY_DISPLAY, FALLBACK_ANCHOR_DISPLAY } from "../lib/pricingDefaults";
 import { useProjects } from "../lib/useData";
 import DashboardHome from "./DashboardHome";
@@ -738,8 +739,21 @@ function TopBar({ page, lang, setLang, tier }) {
  */
 class PlatformErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { err: null }; }
-  static getDerivedStateFromError(err) { return { err }; }
+  // A chunk of a build replaced by a deploy: the page reloads into the current
+  // build (lib/staleChunkReload), and nothing is shown or reported meanwhile.
+  static getDerivedStateFromError(err) { return { err, reloading: reloadingFor(err) }; }
   componentDidCatch(err, info) {
+    if (this.state.reloading) {
+      // The reload did not happen (e.g. a "leave site?" prompt answered "stay"):
+      // the panel and the report, as for any other error.
+      clearTimeout(this.reloadTimer);
+      this.reloadTimer = setTimeout(() => { this.setState({ reloading: false }); this.report(err, info); }, RELOAD_WAIT_MS);
+      return;
+    }
+    this.report(err, info);
+  }
+  componentWillUnmount() { clearTimeout(this.reloadTimer); }
+  report(err, info) {
     console.error("[PlatformErrorBoundary]", err, info);
     try { track && track("platform_crash", { message: String(err?.message || err).slice(0, 200) }); } catch (_) {}
     // The platform is behind the paywall, so this is the boundary our own
@@ -748,6 +762,7 @@ class PlatformErrorBoundary extends Component {
   }
   render() {
     if (!this.state.err) return this.props.children;
+    if (this.state.reloading) return null;
     const msg = String(this.state.err?.message || this.state.err || "Unknown error");
     return (
       <div style={{ padding: "3rem 2rem", maxWidth: 680, margin: "0 auto", color: "var(--text)" }}>

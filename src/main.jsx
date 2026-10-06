@@ -7,7 +7,12 @@ import { CountryProvider } from './lib/useCountry'
 import { CurrencyProvider } from './lib/useCurrency'
 import AccountPrefsSync from './lib/AccountPrefsSync'
 import { loadInsights } from './pages/insightsLoader'
+import { installStaleChunkReload } from './lib/staleChunkReload'
 import './index.css'
+
+// A tab open across a deploy reloads into the new build when it next opens a
+// lazily loaded page, instead of failing on a chunk the deploy removed.
+installStaleChunkReload()
 
 const container = document.getElementById('root')
 const mount = () => ReactDOM.createRoot(container).render(

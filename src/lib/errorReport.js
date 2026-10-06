@@ -25,6 +25,7 @@
  * than none.
  */
 import { supabaseData } from "./supabase";
+import { reloadPending } from "./staleChunkReload";
 
 const MAX_PER_SESSION = 8;      // a crash loop must not become a write loop
 const MAX_MESSAGE = 2000;       // matches the column's CHECK constraint
@@ -71,6 +72,9 @@ function buildId() {
 export function reportError(kind, message, stack) {
   try {
     if (sent >= MAX_PER_SESSION) return;
+    // The page is reloading into the current build (lib/staleChunkReload): what
+    // the replaced build throws on its way out is not a defect.
+    if (reloadPending()) return;
     const msg = clip(String(message ?? "").trim(), MAX_MESSAGE);
     if (!msg) return;
     const key = `${kind}:${msg}`;
