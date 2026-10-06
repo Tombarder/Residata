@@ -1300,7 +1300,13 @@ export function useFlatsCurrent(enabled = true) {
  */
 let _archiveCache = null;
 let _archiveCacheKey = null;
-export function useFlatsArchive(months, dates, enabled = true) {
+let _archiveCacheStamp = null;
+/*  `stamp` — what the caller wants kept WITH the records: the Pivot passes the archive
+ *  readings in force when it asks (days and holding). They are handed back with the
+ *  records they were asked with (and cached with them), so a reading that lands later
+ *  does not divide records loaded before it: October loaded with one reading, then the
+ *  5th approved, read 7 500 as 3 750 for the rest of the session. */
+export function useFlatsArchive(months, dates, enabled = true, stamp = null) {
   const { loading: authLoading, user, profile } = useAuth();
   const { country } = useCountry();
   const datesArr = Array.isArray(dates) && dates.length ? dates.slice().sort() : null;
@@ -1314,6 +1320,7 @@ export function useFlatsArchive(months, dates, enabled = true) {
     ? `${user.id}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}`
     : "anon") + `::${monthsKey}::${datesKey}::${country}::${enabled ? "1" : "0"}`;
   const [flats, setFlats] = useState(_archiveCacheKey === identityKey ? (_archiveCache || []) : []);
+  const [flatsStamp, setFlatsStamp] = useState(_archiveCacheKey === identityKey ? _archiveCacheStamp : null);
   const [loading, setLoading] = useState(_archiveCacheKey !== identityKey);
   const [progress, setProgress] = useState(0);
   // Everything this hook knows about the QUALITY of what it returned. Only a
@@ -1333,6 +1340,7 @@ export function useFlatsArchive(months, dates, enabled = true) {
 
     if (_archiveCacheKey === identityKey && _archiveCache) {
       setFlats(_archiveCache);
+      setFlatsStamp(_archiveCacheStamp);
       setLoading(false);
       // The cache is only ever written for a clean, complete read (see below),
       // so a cache hit is proof of completeness rather than a gap in reporting.
@@ -1498,19 +1506,21 @@ export function useFlatsArchive(months, dates, enabled = true) {
       if (!hadError && !hitCap) {
         _archiveCache = all_eur;
         _archiveCacheKey = identityKey;
+        _archiveCacheStamp = stamp;
       }
       setFlats(all_eur);
+      setFlatsStamp(stamp);                        // the stamp of THIS request (its render)
       setTruncated(hitCap);
       setError(hadError ? (lastError || { message: "archive read failed" }) : null);
       setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [authLoading, identityKey, monthsKey, datesKey, country, enabled]);
+  }, [authLoading, identityKey, monthsKey, datesKey, country, enabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 🔴 `flats` alone does not tell you whether it is the whole answer. A caller
   // that aggregates (the Pivot medians, any count) MUST look at truncated /
   // tooLarge / error before presenting a number as the market's.
-  return { flats, loading, progress, error, truncated, tooLarge };
+  return { flats, stamp: flatsStamp, loading, progress, error, truncated, tooLarge };
 }
 
 /** Distinct snapshot months available in the archive — small fast call

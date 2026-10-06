@@ -1444,15 +1444,28 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   // Records are fetched ONLY when forceRaw (non-server-able config or drill-down).
   // Current view pulls flats_current (cross-market current); time-travel pulls the
   // day/month-scoped archive.
+  // The archive's full readings (public.archive_days) and what the cube and the facts hold
+  // of them, by which the archive's grain and records are divided (archiveReadings.js).
+  // The record path (median, distinct counts) counts its flats by the same readings.
+  const { days: readingDays, holding: readingHolding, holdingKnown: readingHoldingKnown, version: readingsVersion,
+    prevVersion: readingsPrevVersion, prevHolding: readingsPrevHolding,
+    loading: readingsLoading, error: readingsError } = useArchiveReadingDays({ enabled: canViewAnalytics && !isCurrent });
+  // What the cube and the facts hold is read in parallel with the grain; until it is in,
+  // an archive grain or record set cannot be divided and reads as loading.
+  const holdingNow = readingHoldingKnown ? readingHolding : undefined;
+  // The archive's records are asked once the readings are known, and kept with them: a
+  // reading that lands later divides the next records, not these (useFlatsArchive stamp).
+  const recordsStampNow = useMemo(() => ({ days: readingDays, holding: holdingNow }), [readingDays, holdingNow]);
   const {
-    flats: archiveFlats, loading: loadingArchive, progress: flatsProgress,
+    flats: archiveFlats, stamp: archiveStamp, loading: loadingArchive, progress: flatsProgress,
     // Whether the archive we just drew conclusions from was the whole archive.
     // Measured 2026-09-15: SK 2026-08 is 854 269 rows and the unfiltered SK
     // archive is 2 174 864, both past the hook's 500 000 safety cap — so a
     // median grouped by Mesiac was being computed over a fraction of the data
     // and presented as the market's. These three are that fraction, made loud.
     truncated: archiveTruncated, tooLarge: archiveTooLarge, error: archiveError,
-  } = useFlatsArchive(fetchMonths, fetchDates, forceRaw && !isCurrent);
+  } = useFlatsArchive(fetchMonths, fetchDates,
+    forceRaw && !isCurrent && (!canViewAnalytics || (!!readingDays && holdingNow !== undefined)), recordsStampNow);
   const { flats: currentFlatsRaw, loading: loadingCurrent } = useFlatsCurrent(forceRaw && isCurrent);
   const realFlats = isCurrent ? currentFlatsRaw : archiveFlats;
   const loadingFlats = isCurrent ? loadingCurrent : loadingArchive;
@@ -1895,13 +1908,6 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   // readings it was asked with — and if they cannot be read, the table is not shown: a
   // flat-reading count is the number this replaces.
   const archiveGrain = configServerable && !isCurrent;
-  // The record path (median, distinct counts) counts its flats by the same readings.
-  const { days: readingDays, holding: readingHolding, holdingKnown: readingHoldingKnown, version: readingsVersion,
-    prevVersion: readingsPrevVersion, prevHolding: readingsPrevHolding,
-    loading: readingsLoading, error: readingsError } = useArchiveReadingDays({ enabled: canViewAnalytics && !isCurrent });
-  // What the cube and the facts hold is read in parallel with the grain; until it is in,
-  // an archive grain or record set cannot be divided and reads as loading.
-  const holdingNow = readingHoldingKnown ? readingHolding : undefined;
   // A grain is divided only by the readings its source holds yet: the cube lags the
   // approvals until its refresh (heldReadingDays, src/lib/archiveReadings.js).
   const cubeDims = useMemo(
@@ -1999,10 +2005,11 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   // (table unchanged) or a non-server-able config (where useGrain is false anyway).
   const useGrain = configServerable;
   // In the archive a record is a flat at one reading; this weighs it (recordCount).
+  // Divided by the readings the records were asked with (useFlatsArchive's stamp).
   const recordCell = useMemo(
-    () => (canViewAnalytics && !isCurrent && readingDays && holdingNow !== undefined
-      ? archiveRecordCells(heldReadingDays(readingDays, holdingNow, false), readingScope, gDims) : null),
-    [canViewAnalytics, isCurrent, readingDays, holdingNow, readingScope, gDims]
+    () => (canViewAnalytics && !isCurrent && archiveStamp?.days && archiveStamp.holding !== undefined
+      ? archiveRecordCells(heldReadingDays(archiveStamp.days, archiveStamp.holding, false), readingScope, gDims) : null),
+    [canViewAnalytics, isCurrent, archiveStamp, readingScope, gDims]
   );
   const rawTree = useMemo(
     () => useGrain

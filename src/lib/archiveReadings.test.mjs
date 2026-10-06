@@ -412,7 +412,7 @@ test("the record path's tree, header and the drill-down all count this way", () 
   assert.equal((tree.match(/count: recordCount\((records|items), recordCell\)/g) || []).length, 3);
   assert.match(tree, /compute\(FIELDS\[v\.field\], v\.agg, recs, recordCell\)/);
   assert.match(PIVOT, /buildTree\(filteredRecords, rows, cols, effectiveValues, recordCell\)/);
-  assert.match(PIVOT, /archiveRecordCells\(heldReadingDays\(readingDays, holdingNow, false\), readingScope, gDims\)/);
+  assert.match(PIVOT, /archiveRecordCells\(heldReadingDays\(archiveStamp\.days, archiveStamp\.holding, false\), readingScope, gDims\)/);
   assert.match(PIVOT, /const displayCount = useGrain \? \(rawTree\?\.count \|\| 0\) : recordsCount;/);
   assert.match(PIVOT, /configServerable \? displayCount : \(rawTree\?\.count \|\| 0\)/);
   assert.match(PIVOT, /configServerable \? displayCount : recordsCount/);
@@ -473,7 +473,7 @@ test("which grains read the cube follows the engine's routing", () => {
 test("the Pivot divides each grain and the records by the readings their source holds", () => {
   assert.match(PIVOT, /\(\{ \.\.\.grainMeta, viaCube: specUsesCube\(pivotSpecUnscoped, cubeDims\) \}\)/);
   assert.match(PIVOT, /return normaliseArchiveGrain\(raw, meta\.dims, heldReadingDays\(meta\.days, held, meta\.viaCube\), meta\.scope\);/);
-  assert.match(PIVOT, /archiveRecordCells\(heldReadingDays\(readingDays, holdingNow, false\), readingScope, gDims\)/);
+  assert.match(PIVOT, /archiveRecordCells\(heldReadingDays\(archiveStamp\.days, archiveStamp\.holding, false\), readingScope, gDims\)/);
   assert.match(DATA, /holding = archiveHolding\(specs\.from, cube\.data, facts\.data, days\);/);
   assert.match(DATA, /version: `\$\{daysSig\}\/\$\{cubeGen\}`/);
 });
@@ -712,4 +712,24 @@ test("a grain asked before its holding was known is divided by its own version's
 test("the readings carry the version they replaced, with its holding", () => {
   assert.match(DATA, /\{ prevVersion: kept\.version, prevHolding: kept\.holding \}/);
   assert.match(PIVOT, /\(\{ version: readingsVersion, holding: holdingNow, prevVersion: readingsPrevVersion, prevHolding: readingsPrevHolding \}\)/);
+});
+
+// ── archive records stay divided by the readings they were loaded with ──
+test("records loaded with one October reading stay 7 500 after the 5th is approved, not 3 750", () => {
+  const recs = [];
+  for (let i = 0; i < 7500; i += 1) recs.push({ country: "SK", batch_timestamp: "2026-10-01T05:00:00+00:00", snapshot_month: "2026-10", stav: i < 1500 ? "P" : "V" });
+  const scope = archiveReadingScope([{ key: "snapshot_month", mode: "in", values: ["2026-10"] }]);
+  const holdingOf = (days) => { const sp = holdingSpecs(days); return archiveHolding(sp.from, [], [...days.SK.keys()].map((d) => ({ d: ["SK", d], m: { n: 7500 } })), days); };
+  const loadedWith = readingDaysByCountry([{ day: "2026-10-01", country: "SK", readings: 1 }]);
+  const now = readingDaysByCountry([{ day: "2026-10-01", country: "SK", readings: 1 }, { day: "2026-10-05", country: "SK", readings: 1 }]);
+  const count = (days) => Math.round(weightedCount(recs, archiveRecordCells(heldReadingDays(days, holdingOf(days), false), scope, ["project_name"])));
+  assert.equal(count(loadedWith), 7500, "with the readings the records were loaded with");
+  assert.equal(count(now), 3750, "what the new readings made of the old records");
+  // the page divides the records by their own stamp
+  assert.match(PIVOT, /archiveRecordCells\(heldReadingDays\(archiveStamp\.days, archiveStamp\.holding, false\), readingScope, gDims\)/);
+  assert.match(PIVOT, /useFlatsArchive\(fetchMonths, fetchDates,\s*forceRaw && !isCurrent && \(!canViewAnalytics \|\| \(!!readingDays && holdingNow !== undefined\)\), recordsStampNow\)/);
+  const hook = DATA.match(/export function useFlatsArchive[\s\S]*?\n\}\n/)[0];
+  assert.match(hook, /_archiveCacheStamp = stamp;/);
+  assert.match(hook, /setFlatsStamp\(_archiveCacheStamp\);/);
+  assert.match(hook, /return \{ flats, stamp: flatsStamp,/);
 });
