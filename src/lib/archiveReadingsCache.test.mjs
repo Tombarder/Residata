@@ -185,12 +185,13 @@ test("the hook checks every minute, and the assistant keeps lagging readings a m
 function stagedHarness() {
   let now = Date.UTC(2026, 10, 6, 9, 0);
   const facts = [{ d: ["SK", "2026-11-02"], m: { n: 7500 } }, { d: ["SK", "2026-11-06"], m: { n: 7500 } }, { d: ["SK", "2026-11-09"], m: { n: 7500 } }];
-  const st = { cube: [{ d: ["SK", "2026-11"], m: { n: 15000 } }], facts, rpcFails: false, gate: null, reads: 0,
+  const st = { cube: [{ d: ["SK", "2026-11"], m: { n: 15000 } }], facts, rpcFails: false, gate: null, reads: 0, cubeAsks: 0, factsAsks: 0,
     days: [{ day: "2026-11-02", country: "SK", readings: 1 }, { day: "2026-11-06", country: "SK", readings: 1 }] };
   const supabaseData = {
     rpc: async (_n, { p_spec }) => {
       if (st.gate) await st.gate;
       if (st.latency) now += st.latency;
+      if (p_spec.dims[1] === "snapshot_month") st.cubeAsks += 1; else st.factsAsks += 1;
       if (st.rpcFails) return { data: null, error: { message: "timeout" } };
       return { data: p_spec.dims[1] === "snapshot_month" ? st.cube : st.facts, error: null };
     },
@@ -473,6 +474,39 @@ test("a forced read is no step of a long lag's spacing", async () => {
   const forced = await h._loadArchiveReadings("u", true);
   assert.equal(forced.lagLate, 1, "the next check stays 2 minutes out, not 4");
   assert.equal(forced.lagSince, late.lagSince);
+});
+
+// ── W1: forced reads during a holding outage are no step of the backoff ──
+// The holding RPC failing from 09:00, three records loads (a forced read before and after
+// each) at 09:01:10, 09:01:40 and 09:02:10, the RPC back and the cube refreshed at 09:03:
+// counted, the forced reads pushed the next check to 09:18 and new cube grains read the
+// newest month as 15 000 instead of 7 500 for a quarter of an hour.
+test("records loads during a holding outage do not push the next check out", async () => {
+  const run = async (forcedLoads) => {
+    const h = stagedHarness();
+    h.st.facts = h.st.facts.slice(0, 2);
+    h.st.cube = [{ d: ["SK", "2026-11"], m: { n: 7500 } }];                 // the 6th approved, the cube lags it
+    await h._loadArchiveReadings("u");
+    h.st.rpcFails = true;
+    const log = [];
+    for (let sec = 1; sec <= 20 * 60; sec += 1) {
+      h.advance(1000);
+      if (sec === 3 * 60) { h.st.rpcFails = false; h.st.cube = [{ d: ["SK", "2026-11"], m: { n: 15000 } }]; }
+      if (forcedLoads && [70, 100, 130].includes(sec)) {
+        await h._loadArchiveReadings("u", true, 10 * 1000);
+        await h._loadArchiveReadings("u", true);
+      }
+      if (sec % 60 === 0) {                                                  // the hook's minute tick
+        const before = h.st.cubeAsks;
+        const e = await h._loadArchiveReadings("u");
+        if (h.st.cubeAsks > before) log.push(`${sec / 60}:${e.holdingFailed ? "fail" : e.lagging ? "lag" : "ok"}/${e.failures}`);
+      }
+    }
+    return log;
+  };
+  const quiet = await run(false);
+  assert.deepEqual(quiet, ["1:fail/1", "2:fail/2", "4:ok/0", "19:ok/0"]);
+  assert.deepEqual(await run(true), quiet, "the same checks with the records loads");
 });
 
 test("the records' version follows the days and the facts, not a refresh of the cube", async () => {

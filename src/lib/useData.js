@@ -1761,8 +1761,10 @@ function _loadArchiveReadings(key, force = false) {
     const now = startedAt;
     if (failed && entry.holdingKnown) {
       entry.holdingFailed = true;
-      entry.failures = (entry.failures || 0) + 1;
-      entry.at = now;
+      if (!force) {                                // a forced read is no step of the backoff
+        entry.failures = (entry.failures || 0) + 1;
+        entry.at = now;
+      }
       return entry;
     }
     const holdingSig = holdingSignature(holding);
