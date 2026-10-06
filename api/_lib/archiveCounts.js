@@ -12,7 +12,13 @@
 // answer instead, a project launched in September read 100 by project (its 400
 // flat-months over the four months July–October) and 200 as a filter on the same
 // project; a market read since September was diluted by the other market's summer.
-// Prices are ratios of sums and need nothing.
+//
+// Prices are ratios of sums — of the same per-reading cells. Left as flat-readings, a
+// month read daily weighed ~4x a month read every four days, so a history's average
+// price leaned toward the months read most often: 200 000 € for July–September and
+// 240 000 € in October averaged 203 200 €, not the average month's 210 000 €. The sums
+// behind them are divided by the readings too, so every month weighs by its flats.
+// Minimum and maximum are a flat's own price and need nothing.
 //
 // rows:      analytics_pivot rows { d: [dim values…], m: { n, avail, sold, res, s_cs,
 //            n_cs, mn_cs, mx_cs, s_pw, s_lw } } over dims that include 'country' and
@@ -35,10 +41,10 @@ export function archiveGroups(rows, dims, groupKey, readings) {
     g.avail += (Number(m.avail) || 0) / r;
     g.sold += (Number(m.sold) || 0) / r;
     g.res += (Number(m.res) || 0) / r;
-    g.s_cs += Number(m.s_cs) || 0;
-    g.n_cs += Number(m.n_cs) || 0;
-    g.s_pw += Number(m.s_pw) || 0;
-    g.s_lw += Number(m.s_lw) || 0;
+    g.s_cs += (Number(m.s_cs) || 0) / r;
+    g.n_cs += (Number(m.n_cs) || 0) / r;
+    g.s_pw += (Number(m.s_pw) || 0) / r;
+    g.s_lw += (Number(m.s_lw) || 0) / r;
     if (m.mn_cs != null) g.mn_cs = g.mn_cs == null ? Number(m.mn_cs) : Math.min(g.mn_cs, Number(m.mn_cs));
     if (m.mx_cs != null) g.mx_cs = g.mx_cs == null ? Number(m.mx_cs) : Math.max(g.mx_cs, Number(m.mx_cs));
     groups.set(key, g);

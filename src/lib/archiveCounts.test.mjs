@@ -36,7 +36,7 @@ test("another grouping over the history is the average month", () => {
   assert.equal(g.group, "Ružinov");
   assert.equal(g.units, 110);
   assert.equal(g.available, 85);
-  assert.equal(g.avg_price_eur, 300);              // a ratio of sums, untouched
+  assert.equal(g.avg_price_eur, 300);              // 300 in both months, so 300 over both
 });
 
 test("a month with no full reading of its market (a repair alone) is left out", () => {
@@ -89,4 +89,34 @@ test("a market read since September is averaged over its own months, not the oth
   const by = Object.fromEntries(archiveGroups(rows, ["country", "snapshot_month"], "country", readings)
     .map((g) => [g.group, g.units]));
   assert.deepEqual(by, { SK: 400, CZ: 150 });
+});
+
+// ── W3c: every month weighs by its flats, not by how often it was read ──
+// 100 flats at 200 000 € in July, August and September (read daily), at 240 000 € in
+// October (read every four days). The average month is 210 000 €. A ratio of the raw
+// sums weighed each daily month ~4x the October one and gave 203 200 €.
+test("an average price over the history weighs each month by its flats, not its readings", () => {
+  const rows = Object.entries(R_SK).map(([k, r]) => {
+    const m = k.slice(3);
+    const price = m === "2026-10" ? 240000 : 200000;
+    return { d: ["SK", m], m: { n: 100 * r, avail: 100 * r, s_cs: price * 100 * r, n_cs: 100 * r,
+      s_pw: price * 100 * r, s_lw: 50 * 100 * r, mn_cs: price, mx_cs: price } };
+  });
+  const [g] = archiveGroups(rows, ["country", "snapshot_month"], null, R_SK);
+  assert.equal(g.avg_price_eur, 210000);
+  assert.equal(g.avg_eur_per_m2, 4200);             // 210 000 € over 50 m²
+  assert.equal(g.min_price, 200000);
+  assert.equal(g.max_price, 240000);
+});
+
+test("two markets in one month weigh by their flats, not by how often each was read", () => {
+  // SK 400 flats at 200 000 € read 8 times; CZ 100 flats at 100 000 € read 30 times.
+  const readings = { "SK|2026-11": 8, "CZ|2026-11": 30 };
+  const rows = [
+    { d: ["2026-11", "SK"], m: { n: 400 * 8, s_cs: 200000 * 400 * 8, n_cs: 400 * 8 } },
+    { d: ["2026-11", "CZ"], m: { n: 100 * 30, s_cs: 100000 * 100 * 30, n_cs: 100 * 30 } },
+  ];
+  const [g] = archiveGroups(rows, dims, "snapshot_month", readings);
+  assert.equal(g.units, 500);
+  assert.equal(g.avg_price_eur, 180000);            // (400·200 000 + 100·100 000) / 500
 });
