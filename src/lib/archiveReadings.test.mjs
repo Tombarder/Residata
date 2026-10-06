@@ -494,7 +494,8 @@ for (const [name, total, rows, through, readings] of [
   ["a retry on the 3rd held, the 6th lagging", 7800, [["02", 7500], ["03", 300, false], ["06", 7500]], "2026-11-03", 1],
   ["a retry on the 7th not in the cube yet", 15000, [["02", 7500], ["06", 7500], ["07", 300, false]], "2026-11-06", 2],
   ["a sibling of the 6th approved late", 15000, [["02", 7500], ["06", 7800]], "2026-11-06", 2],
-  ["the 2nd withdrawn, the cube not refreshed", 15000, [["06", 7500]], "2026-11-06", 1],
+  // the cube still holds the withdrawn 2nd: two readings of rows in it (see cubeExtra)
+  ["the 2nd withdrawn, the cube not refreshed", 15000, [["06", 7500]], "2026-11-06", 2],
 ]) {
   test(`what the cube holds — ${name}`, () => {
     assert.deepEqual(throughOf(total, rows), { through, cube: readings });
@@ -663,4 +664,24 @@ test("the holding rides in the grain's meta, which no fetch depends on", () => {
   const hook = DATA.match(/export function usePivotGrain[\s\S]*?\n\}\n/)[0];
   assert.match(hook, /\}, \[key, authLoading, recheck\]\); \/\/ eslint-disable-line react-hooks\/exhaustive-deps/,
     "the grain is asked by its key alone — the meta riding with it never asks again");
+});
+
+// ── a reading the cube still holds after the facts lost it ──
+test("a withdrawn reading whose cube refresh failed counts in the cube's divisor, and is a lag", () => {
+  // Nov 2 withdrawn: the facts lost its 7 500 rows, the cube (refresh failed) still has them.
+  const D6 = readingDaysByCountry([{ day: "2026-11-06", country: "SK", readings: 1 }]);
+  const sp = holdingSpecs(D6);
+  const h = archiveHolding(sp.from, [{ d: ["SK", "2026-11"], m: { n: 15000 } }], [{ d: ["SK", "2026-11-06"], m: { n: 7500 } }], D6);
+  assert.equal(h.cubeExtra.get("SK|2026-11"), 1);
+  assert.deepEqual(monthReadings(heldReadingDays(D6, h, true)), { "SK|2026-11": 2 });
+  assert.deepEqual(monthReadings(heldReadingDays(D6, h, false)), { "SK|2026-11": 1 }, "the facts hold one");
+  assert.equal(holdingLags(D6, h), true, "so it is asked again until the cube is refreshed");
+  const scope = archiveReadingScope([{ key: "snapshot_month", mode: "in", values: ["2026-11"] }]);
+  const dims = archiveGrainDims(["country"], scope);
+  const shown = grainViewOfPage([{ d: ["SK"], m: { n: 15000 } }], { archive: true, dims, scope, days: D6, holding: h, viaCube: true }, dims, h);
+  assert.equal(Math.round(nodeOf(shown).n), 7500, "it read 15 000");
+  // drift of a few rows is no reading
+  const drift = archiveHolding(sp.from, [{ d: ["SK", "2026-11"], m: { n: 7526 } }], [{ d: ["SK", "2026-11-06"], m: { n: 7500 } }], D6);
+  assert.equal(drift.cubeExtra.size, 0);
+  assert.equal(holdingLags(D6, drift), false);
 });

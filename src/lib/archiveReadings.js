@@ -298,6 +298,8 @@ export function holdingSpecs(days) {
  *  cubeThrough: Map('SK|2026-11' → the last day the cube holds whole, '' for none),
  *  cubePartial: Map('SK|2026-11' → { day, readings }) — the next day, of which the cube
  *  holds only some readings (a day read twice, the second approved after the refresh) —
+ *  cubeExtra: Map('SK|2026-11' → readings) — readings the cube still holds that the facts
+ *  no longer do (a withdrawal whose cube refresh failed) —
  *  cubeTotals: Map('SK|2026-11' → the cube's rows) }. `days` (readingDaysByCountry) says
  *  how many readings each day holds; a day not among them (a retry) is one.
  *
@@ -323,6 +325,7 @@ export function archiveHolding(from, cubeRows, factRows, days) {
   const facts = new Map();
   const cubeThrough = new Map();
   const cubePartial = new Map();
+  const cubeExtra = new Map();
   for (const [c, byDay] of factsN) {
     facts.set(c, new Set(byDay.keys()));
     const byMonth = new Map();
@@ -335,22 +338,33 @@ export function archiveHolding(from, cubeRows, factRows, days) {
       const total = cubeTotals.get(`${c}|${mo}`) || 0;
       let acc = 0;
       let through = "";
+      let one = 0;
+      let whole = true;
       for (const d of ds) {
         const rows = byDay.get(d);
         const k = days?.[c]?.get(d) || 1;
-        const one = rows / k;                          // one reading's rows
+        one = rows / k;                                // one reading's rows
         const held = Math.max(0, Math.min(k, Math.floor((total - acc) / one + 0.5)));
         if (held < k) {
           if (held > 0) cubePartial.set(`${c}|${mo}`, { day: d, readings: held });
+          whole = false;
           break;
         }
         acc += rows;
         through = d;
       }
       cubeThrough.set(`${c}|${mo}`, through);
+      // The cube holding MORE than the facts by half a reading or more: a reading withdrawn
+      // from the facts whose cube refresh failed (withdraw_snapshot carries on without it).
+      // Its rows are still in the cube's answers, so they count in the cube's divisor —
+      // or a cube grain read 15 000 for 7 500 until the next refresh — and it is a lag.
+      if (whole && one > 0) {
+        const extra = Math.floor((total - acc) / one + 0.5);
+        if (extra > 0) cubeExtra.set(`${c}|${mo}`, extra);
+      }
     }
   }
-  return { from, facts, cubeThrough, cubePartial, cubeTotals };
+  return { from, facts, cubeThrough, cubePartial, cubeExtra, cubeTotals };
 }
 
 /** `days` (readingDaysByCountry) without the readings a grain's source does not hold yet:
@@ -376,6 +390,14 @@ export function heldReadingDays(days, holding, viaCube) {
       }
       kept.set(d, n);
     }
+    if (viaCube) {
+      // readings the cube still holds and the facts no longer do count on the month's last
+      // day the cube holds (a cube answer is by month; a day is asked of the facts)
+      for (const [k, extra] of holding.cubeExtra || []) {
+        const through = holding.cubeThrough.get(k);
+        if (k.startsWith(`${c}|`) && through && kept.has(through)) kept.set(through, kept.get(through) + extra);
+      }
+    }
     if (kept.size) out[c] = kept;
   }
   return out;
@@ -387,6 +409,7 @@ export function holdingSignature(holding) {
   const parts = [];
   for (const [k, t] of [...holding.cubeThrough].sort()) parts.push(`${k}:${t}`);
   for (const [k, p] of [...(holding.cubePartial || [])].sort()) parts.push(`${k}~${p.day}:${p.readings}`);
+  for (const [k, n] of [...(holding.cubeExtra || [])].sort()) parts.push(`${k}+${n}`);
   // the cube's own totals: any refresh of it moves them, whatever the days it holds
   for (const [k, n] of [...(holding.cubeTotals || [])].sort()) parts.push(`${k}=${n}`);
   for (const [c, s] of [...holding.facts].sort()) parts.push(`${c}:${[...s].sort().pop() || ""}:${s.size}`);
@@ -432,6 +455,7 @@ export function weightedSum(recs, recordCell, valueOf) {
  *  approval, so whoever keeps a holding asks again soon while this is true. */
 export function holdingLags(days, holding) {
   if (!holding) return false;
+  if (holding.cubeExtra && holding.cubeExtra.size) return true;   // the cube awaits a refresh
   for (const [c, m] of Object.entries(days || {})) {
     const from = holding.from.get(c);
     if (!from) continue;
