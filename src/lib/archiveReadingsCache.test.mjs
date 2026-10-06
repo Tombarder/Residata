@@ -11,7 +11,7 @@
 import { strict as assert } from "node:assert";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { readingDaysByCountry, readingsSignature, holdingSpecs, archiveHolding, holdingSignature } from "./archiveReadings.js";
+import { readingDaysByCountry, readingsSignature, holdingSpecs, archiveHolding, holdingSignature, holdingLags } from "./archiveReadings.js";
 
 const SRC = readFileSync(new URL("./useData.js", import.meta.url), "utf8");
 const BLOCK = SRC.slice(SRC.indexOf("const ARCHIVE_READINGS_TTL_MS"), SRC.indexOf("/** Full readings of every market ("));
@@ -47,10 +47,10 @@ function harness(answers) {
   const clock = { now: () => now };
   const { _loadArchiveReadings } = new Function(
     "sbReadAll", "sbRead", "supabaseData", "readingDaysByCountry", "readingsSignature",
-    "holdingSpecs", "archiveHolding", "holdingSignature", "_pivotGrainCache", "Date", "console",
+    "holdingSpecs", "archiveHolding", "holdingSignature", "holdingLags", "_pivotGrainCache", "Date", "console",
     `${BLOCK}\nreturn { _loadArchiveReadings };`,
   )(sbReadAll, sbRead, supabaseData, readingDaysByCountry, readingsSignature,
-    holdingSpecs, archiveHolding, holdingSignature, grains, clock, { error() {} });
+    holdingSpecs, archiveHolding, holdingSignature, holdingLags, grains, clock, { error() {} });
   return { load: () => _loadArchiveReadings("u"), asked, grains, advance: (ms) => { now += ms; } };
 }
 const NOV1 = { rows: [{ day: "2026-11-02", country: "SK", readings: 1 }] };
@@ -141,4 +141,41 @@ test("the grain hook asks again while the page is open, and keeps the kept grain
   assert.match(hook, /if \(kept\) setState\(\{ key, grain: kept\.grain, meta, error: false \}\);\s*\n\s*if \(_grainCurrent\(key, kept, Date\.now\(\)\)\) return;/);
   assert.match(hook, /\}, \[key, authLoading, recheck\]\)/);
   assert.match(hook, /if \(!kept\) setState\(\{ key, grain: \[\], meta, error: true \}\);/);
+});
+
+// ── while the cube lags an approval, the readings are asked again within a minute ──
+test("a holding read during the cube's lag is kept a minute, then 15 minutes once it agrees", async () => {
+  const days = [{ day: "2026-11-02", country: "SK", readings: 1 }, { day: "2026-11-06", country: "SK", readings: 1 }];
+  const facts = [{ d: ["SK", "2026-11-02"], m: { n: 7500 } }, { d: ["SK", "2026-11-06"], m: { n: 7500 } }];
+  let cube = [{ d: ["SK", "2026-11"], m: { n: 7500 } }];               // refreshed before the 6th
+  let now = Date.UTC(2026, 10, 6, 5, 30);
+  let asked = 0;
+  const supabaseData = {
+    rpc: (_n, { p_spec }) => Promise.resolve({ data: p_spec.dims[1] === "snapshot_month" ? cube : facts, error: null }),
+    from: () => { const b = { select() { return b; }, order() { return b; }, range() { asked += 1; return Promise.resolve({ data: days, error: null }); } }; return b; },
+  };
+  const { _loadArchiveReadings } = new Function(
+    "sbReadAll", "sbRead", "supabaseData", "readingDaysByCountry", "readingsSignature",
+    "holdingSpecs", "archiveHolding", "holdingSignature", "holdingLags", "_pivotGrainCache", "Date", "console",
+    `${BLOCK}\nreturn { _loadArchiveReadings };`,
+  )(async (make) => make(0, 999), (b) => b, supabaseData, readingDaysByCountry, readingsSignature,
+    holdingSpecs, archiveHolding, holdingSignature, holdingLags, new Map(), { now: () => now }, { error() {} });
+  const lagged = await _loadArchiveReadings("u");
+  assert.equal(lagged.lagging, true);
+  cube = [{ d: ["SK", "2026-11"], m: { n: 15000 } }];                    // 05:32 the cube is refreshed
+  now += 2 * MIN;
+  const after = await _loadArchiveReadings("u");
+  assert.equal(asked, 2, "asked again within the lag's minute");
+  assert.equal(after.lagging, false);
+  assert.notEqual(after.version, lagged.version, "the grains divided by the lagging cube are asked again");
+  now += 5 * MIN;
+  assert.equal(await _loadArchiveReadings("u"), after);
+  assert.equal(asked, 2, "agreeing again, kept for 15 minutes");
+});
+
+test("the hook checks every minute, and the assistant keeps lagging readings a minute", () => {
+  assert.match(SRC, /const ARCHIVE_READINGS_CHECK_MS = 60 \* 1000;/);
+  assert.match(SRC, /const _readingsTtl = \(entry\) => \(entry\.lagging \? ARCHIVE_READINGS_LAG_TTL_MS : ARCHIVE_READINGS_TTL_MS\);/);
+  const CHAT = readFileSync(new URL("../../api/ai/chat.js", import.meta.url), "utf8");
+  assert.match(CHAT, /const keep = _readings\?\.lagging \? 60 \* 1000 : 10 \* 60 \* 1000;/);
 });

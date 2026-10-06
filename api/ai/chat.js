@@ -289,11 +289,14 @@ async function toolMarketOverview(admin) {
 
 // Full readings per market-month (public.archive_days), for turning the archive's
 // flat-reading counts into flats — see api/_lib/archiveCounts.js. Ten minutes is far
-// shorter than the time between two readings.
+// shorter than the time between two readings — but while the cube lags an approval
+// (until its refresh, minutes later) they are kept a minute, or every answer in those ten
+// minutes would be divided by what the cube held during the lag.
 let _readings = null;
 let _readingsAt = 0;
 async function marketReadings(admin) {
-  if (_readings && Date.now() - _readingsAt < 10 * 60 * 1000) return _readings;
+  const keep = _readings?.lagging ? 60 * 1000 : 10 * 60 * 1000;
+  if (_readings && Date.now() - _readingsAt < keep) return _readings;
   _readings = await fetchMarketReadings(admin);
   _readingsAt = Date.now();
   return _readings;

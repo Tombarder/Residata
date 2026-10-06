@@ -402,3 +402,20 @@ export function weightedSum(recs, recordCell, valueOf) {
   }
   return { sum, weight };
 }
+
+/** Whether the cube lags: a reading of a market's newest month the facts hold and the
+ *  cube does not yet. Such a lag lasts until the cube's refresh, minutes after the
+ *  approval, so whoever keeps a holding asks again soon while this is true. */
+export function holdingLags(days, holding) {
+  if (!holding) return false;
+  for (const [c, m] of Object.entries(days || {})) {
+    const from = holding.from.get(c);
+    if (!from) continue;
+    for (const d of m.keys()) {
+      if (d < from || !holding.facts.get(c)?.has(d)) continue;
+      const through = holding.cubeThrough.get(`${c}|${d.slice(0, 7)}`);
+      if (!through || d > through) return true;
+    }
+  }
+  return false;
+}

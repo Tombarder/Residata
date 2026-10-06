@@ -24,7 +24,7 @@
 // Minimum and maximum are a flat's own price and need nothing.
 
 import {
-  readingDaysByCountry, holdingSpecs, archiveHolding, heldReadingDays, monthReadings,
+  readingDaysByCountry, holdingSpecs, archiveHolding, heldReadingDays, monthReadings, holdingLags,
 } from "../../src/lib/archiveReadings.js";
 
 // rows:      analytics_pivot rows { d: [dim values…], m: { n, avail, sold, res, s_cs,
@@ -114,8 +114,9 @@ async function readAll(page) {
 /** Full readings per market-month from public.archive_days, every page of it, as two
  *  maps: { cube, facts } — the readings the cube holds yet and those the facts hold
  *  (src/lib/archiveReadings.js, THE CUBE LAGS): an answer read from the cube is divided by
- *  `cube`, one read from the facts (a range filter) by `facts`. If what they hold cannot be
- *  read, both are every reading. A view that does not carry `readings` yet is read without
+ *  `cube`, one read from the facts (a range filter) by `facts`; `lagging` while the cube
+ *  lacks a reading the facts hold. If what they hold cannot be read, both are every
+ *  reading. A view that does not carry `readings` yet is read without
  *  it — each day then one reading, as before. */
 export async function fetchMarketReadings(admin) {
   const read = (cols) => readAll((from, to) => admin.from("archive_days")
@@ -143,5 +144,6 @@ export async function fetchMarketReadings(admin) {
   return {
     cube: monthReadings(heldReadingDays(days, holding, true)),
     facts: monthReadings(heldReadingDays(days, holding, false)),
+    lagging: holdingLags(days, holding),
   };
 }

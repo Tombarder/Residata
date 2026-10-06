@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { supabaseData, supabasePublic, isSupabaseReady } from "./supabase";
 import { useAuth } from "./useAuth";
 import { useCountry, isAllCountries } from "./useCountry";
-import { readingDaysByCountry, readingsSignature, holdingSpecs, archiveHolding, holdingSignature } from "./archiveReadings";
+import { readingDaysByCountry, readingsSignature, holdingSpecs, archiveHolding, holdingSignature, holdingLags } from "./archiveReadings";
 
 /**
  * sbRead — the single settle-guarantee wrapper every RLS-gated read goes through.
@@ -1632,16 +1632,21 @@ export function useArchiveDays() {
 // the first made November read twice the flats. When an answer differs from the kept one
 // (a reading landed or was withdrawn), every archive grain divided by the old readings
 // leaves the grain cache, and the new version makes a mounted Pivot ask again.
+// While the cube lags an approval (holdingLags) the answer is kept only a minute: the lag
+// lasts until the cube's refresh, minutes later, and a holding read during it — "the
+// cube lacks the 6th" — would otherwise divide every new grain wrongly for 15 minutes.
 const ARCHIVE_READINGS_TTL_MS = 15 * 60 * 1000;
-const ARCHIVE_READINGS_CHECK_MS = 15 * 60 * 1000;
-let _archiveReadingsCache = new Map();     // identity → { days, version, at }
+const ARCHIVE_READINGS_LAG_TTL_MS = 60 * 1000;
+const ARCHIVE_READINGS_CHECK_MS = 60 * 1000;   // each check a no-op while the kept answer is current
+const _readingsTtl = (entry) => (entry.lagging ? ARCHIVE_READINGS_LAG_TTL_MS : ARCHIVE_READINGS_TTL_MS);
+let _archiveReadingsCache = new Map();     // identity → { days, holding, lagging, version, at }
 const _archiveReadingsInflight = new Map();
 function _dropArchiveGrains() {
   for (const k of [..._pivotGrainCache.keys()]) if (k.includes('"mode":"archive"')) _pivotGrainCache.delete(k);
 }
 function _loadArchiveReadings(key) {
   const kept = _archiveReadingsCache.get(key);
-  if (kept && Date.now() - kept.at < ARCHIVE_READINGS_TTL_MS) return Promise.resolve(kept);
+  if (kept && Date.now() - kept.at < _readingsTtl(kept)) return Promise.resolve(kept);
   if (_archiveReadingsInflight.has(key)) return _archiveReadingsInflight.get(key);
   const p = (async () => {
     const read = (cols) => sbReadAll((from, to) => supabaseData.from("archive_days")
@@ -1669,7 +1674,7 @@ function _loadArchiveReadings(key) {
     const version = `${readingsSignature(days)}/${holdingSignature(holding)}`;
     if (kept && kept.version === version) { kept.at = Date.now(); return kept; }
     if (kept) _dropArchiveGrains();
-    const entry = { days, holding, version, at: Date.now() };
+    const entry = { days, holding, lagging: holdingLags(days, holding), version, at: Date.now() };
     _archiveReadingsCache.set(key, entry);
     return entry;
   })().finally(() => _archiveReadingsInflight.delete(key));

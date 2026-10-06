@@ -220,3 +220,8 @@ test("the assistant divides a cube answer by the cube's readings and a range ans
   const SRC = readFileSync(new URL("../../api/ai/chat.js", import.meta.url), "utf8");
   assert.match(SRC, /archiveGroups\(data, dims, gkey, specUsesCube\(spec\) \? readings\.cube : readings\.facts\)/);
 });
+
+test("the assistant knows when the cube lags, so it keeps those readings only a minute", async () => {
+  assert.equal((await fetchMarketReadings(fakeAdmin({ days: NOV, cubeRows: NOV_CUBE, factRows: NOV_FACTS }))).lagging, true);
+  assert.equal((await fetchMarketReadings(fakeAdmin({ days: NOV, cubeRows: [{ d: ["SK", "2026-11"], m: { n: 15040 } }], factRows: NOV_FACTS }))).lagging, false);
+});
