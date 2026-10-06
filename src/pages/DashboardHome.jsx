@@ -29,7 +29,7 @@ import { createPortal } from "react-dom";
 import { useAuth } from "../lib/useAuth";
 import { useCapabilities } from "../lib/useCapabilities";
 import {
-  useProjects, useMarketTotals, useVelocityMature, useDistrictTotals, useFreshness, useSales } from "../lib/useData";
+  useProjects, useMarketTotals, useVelocityMature, useDistrictTotals, useFreshness, useFreshnessByCountry, useSales } from "../lib/useData";
 import { supabaseData } from "../lib/supabase";
 import { useCountry, isAllCountries, countryName } from "../lib/useCountry";
 import { useCurrency } from "../lib/useCurrency";
@@ -662,19 +662,41 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
   // The two windows are the same shape. The card's 30 days end on the last day with
   // data (each project's latest reading), so the previous 30 days end 30 days before
   // that day — anchored on today they would overlap the card's window whenever the
-  // latest reading is not today's. Both count each sale spread over the days its
-  // reading covers (sold_durable_prorated; the plain count on a server that predates
-  // it, which is the same number when the market is read every day).
-  const prevPaceSpec = useMemo(() => {
-    if (!overviewIds.size) return null;
-    const anchor = freshness ? Date.parse(`${freshness}T12:00:00Z`) : NaN;
-    const d = (daysAgo) => new Date((Number.isFinite(anchor) ? anchor : Date.now()) - daysAgo * 86400000)
-      .toISOString().slice(0, 10);
-    return { mode: "summary", date_from: d(59), date_to: d(30), projects: [...overviewIds] };
-  }, [overviewIds, freshness]);
-  const prevPace = useSales({ enabled: !!prevPaceSpec, spec: prevPaceSpec });
-  const prevSoldRaw = Number(prevPace?.data?.sold_durable_prorated ?? prevPace?.data?.sold_durable);
-  const prevSold = Number.isFinite(prevSoldRaw) ? Math.round(prevSoldRaw) : NaN;
+  // latest reading is not today's. So each MARKET's previous window is anchored on that
+  // market's own last reading (the "All" view's single date is the older market's, and
+  // the markets can be read on different days), and nothing is asked until those dates
+  // are known — falling back to today would bring the overlap back. Both count each sale
+  // spread over the days its reading covers (sold_durable_prorated; the plain count on a
+  // server that predates it, which is the same number when the market is read every day).
+  const freshnessBy = useFreshnessByCountry();
+  const prevPaceSpecs = useMemo(() => {
+    const byCountry = {};
+    for (const p of overviewProjects) (byCountry[p.country] ||= []).push(p.id);
+    const spec = (cc) => {
+      const ids = byCountry[cc];
+      if (!ids || !ids.length) return null;
+      const anchor = freshnessBy && freshnessBy[cc] ? Date.parse(`${freshnessBy[cc]}T12:00:00Z`) : NaN;
+      if (!Number.isFinite(anchor)) return undefined;          // not known (yet): no arrow
+      const d = (daysAgo) => new Date(anchor - daysAgo * 86400000).toISOString().slice(0, 10);
+      return { mode: "summary", date_from: d(59), date_to: d(30), projects: ids };
+    };
+    const other = Object.keys(byCountry).some(cc => cc !== "SK" && cc !== "CZ");
+    return { SK: spec("SK"), CZ: spec("CZ"), complete: !other };
+  }, [overviewProjects, freshnessBy]);
+  const prevPaceSK = useSales({ enabled: !!prevPaceSpecs.SK, spec: prevPaceSpecs.SK || null });
+  const prevPaceCZ = useSales({ enabled: !!prevPaceSpecs.CZ, spec: prevPaceSpecs.CZ || null });
+  const prevSold = useMemo(() => {
+    const part = (spec, res) => {
+      if (spec === null) return 0;                              // no projects of that market
+      if (!spec) return NaN;                                    // its last reading not known
+      if (!res || res.loading) return NaN;                      // its answer not in yet: the held one is the previous scope's
+      const v = Number(res?.data?.sold_durable_prorated ?? res?.data?.sold_durable);
+      return Number.isFinite(v) ? v : NaN;
+    };
+    if (!overviewIds.size || !prevPaceSpecs.complete) return NaN;
+    const total = part(prevPaceSpecs.SK, prevPaceSK) + part(prevPaceSpecs.CZ, prevPaceCZ);
+    return Number.isFinite(total) ? Math.round(total) : NaN;
+  }, [overviewIds, prevPaceSpecs, prevPaceSK, prevPaceCZ]);
 
   const kpiMetrics = ["available", "avg_m2", "sold30", "sold_through", "reserved", "inventory", "projects", "developers"];
 

@@ -70,7 +70,7 @@ test("a scope bigger than the cap is refused BEFORE fetching it", () => {
 
 test("a truncated read is never cached", () => {
   const body = archiveHook();
-  assert.match(body, /if\s*\(\s*!hadError\s*&&\s*!hitCap\s*\)/,
+  assert.match(body, /if\s*\(\s*!hadError\s*&&\s*!hitCap\s*(\)|&&)/,
     "the module cache must reject a capped read for the same reason it rejects " +
     "an errored one — a cached truncation is wrong for the rest of the session, " +
     "and re-reading at least has a chance of being right");

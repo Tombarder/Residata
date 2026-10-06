@@ -2,6 +2,8 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { supabaseData, supabasePublic, isSupabaseReady } from "./supabase";
 import { useAuth } from "./useAuth";
 import { useCountry, isAllCountries } from "./useCountry";
+import { readingDaysByCountry, readingsSignature, holdingSpecs, archiveHolding, holdingSignature, holdingLags, holdingFactsSignature,
+  recordReadingsSignature } from "./archiveReadings";
 
 /**
  * sbRead — the single settle-guarantee wrapper every RLS-gated read goes through.
@@ -1299,20 +1301,39 @@ export function useFlatsCurrent(enabled = true) {
  */
 let _archiveCache = null;
 let _archiveCacheKey = null;
-export function useFlatsArchive(months, dates, enabled = true) {
+let _archiveCacheStamp = null;
+// Readings read this recently are not read again before a read of the records (the
+// check after it still is): on a first load they were read a moment before.
+const ARCHIVE_RECORDS_READINGS_FRESH_MS = 10 * 1000;
+/*  `stamp` — what the caller wants kept WITH the records: the Pivot passes the archive
+ *  readings in force when it asks (days and holding). They are handed back with the
+ *  records they were asked with (and cached with them), so a reading that lands later
+ *  does not divide records loaded before it: October loaded with one reading, then the
+ *  5th approved, read 7 500 as 3 750 for the rest of the session. What of them divides
+ *  THESE records (recordReadingsSignature: their market and months) is part of the
+ *  records' identity, so a new or withdrawn reading there asks for them again (the old
+ *  ones stay, with their own readings, until the new land) and one elsewhere does not;
+ *  and its `refresh` is awaited around the read, so the readings they are kept with are
+ *  no older than they are: kept readings 10 minutes old missed the reading the records
+ *  held, and October read 15 000 for 7 500. */
+export function useFlatsArchive(months, dates, enabled = true, stamp = null) {
   const { loading: authLoading, user, profile } = useAuth();
   const { country } = useCountry();
   const datesArr = Array.isArray(dates) && dates.length ? dates.slice().sort() : null;
   const monthsKey = Array.isArray(months) ? months.slice().sort().join(",") : "all";
   const datesKey = datesArr ? datesArr.join(",") : "all";
+  const readingsOf = (r) => (r ? recordReadingsSignature(r.days, r.holding,
+    { country: isAllCountries(country) ? null : country, months, dates: datesArr }) : "");
+  const readingsKey = readingsOf(stamp);
   // country is part of the identity signature so switching country refetches
   // instead of serving a stale other-country cache. flats_archive carries a
   // `country` column ('SK'/'CZ'); without this filter SK paid users saw SK+CZ
   // rows mixed in the Pivot.
   const identityKey = (user
     ? `${user.id}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}`
-    : "anon") + `::${monthsKey}::${datesKey}::${country}::${enabled ? "1" : "0"}`;
+    : "anon") + `::${monthsKey}::${datesKey}::${country}::${enabled ? "1" : "0"}::${readingsKey}`;
   const [flats, setFlats] = useState(_archiveCacheKey === identityKey ? (_archiveCache || []) : []);
+  const [flatsStamp, setFlatsStamp] = useState(_archiveCacheKey === identityKey ? _archiveCacheStamp : null);
   const [loading, setLoading] = useState(_archiveCacheKey !== identityKey);
   const [progress, setProgress] = useState(0);
   // Everything this hook knows about the QUALITY of what it returned. Only a
@@ -1332,6 +1353,7 @@ export function useFlatsArchive(months, dates, enabled = true) {
 
     if (_archiveCacheKey === identityKey && _archiveCache) {
       setFlats(_archiveCache);
+      setFlatsStamp(_archiveCacheStamp);
       setLoading(false);
       // The cache is only ever written for a clean, complete read (see below),
       // so a cache hit is proof of completeness rather than a gap in reporting.
@@ -1343,7 +1365,21 @@ export function useFlatsArchive(months, dates, enabled = true) {
     setLoading(true);
     setProgress(0);
     setError(null); setTruncated(false); setTooLarge(null);
+    // What the readings, read now (or `within` ms ago), say of these records: "moved" —
+    // they no longer divide them as those they are kept with do (or this request was
+    // dropped meanwhile); "unread" — they could not be read; "same".
+    const readingsNow = async (within = 0) => {
+      if (!stamp?.refresh) return cancelled ? "moved" : "same";
+      let now = null;
+      try { now = await stamp.refresh(within); } catch { /* unread */ }
+      if (cancelled) return "moved";
+      if (!now) return "unread";
+      return readingsOf(now) !== readingsKey ? "moved" : "same";
+    };
     (async () => {
+      // The readings first, fresh: if they moved on, the caller asks again under the new
+      // ones and this request is dropped (see `stamp`).
+      if (await readingsNow(ARCHIVE_RECORDS_READINGS_FRESH_MS) === "moved") return;
       const all = [];
       let hadError = false;
       let lastError = null;
@@ -1436,53 +1472,73 @@ export function useFlatsArchive(months, dates, enabled = true) {
         return;
       }
 
-      while (offset < MAX_TOTAL) {
-        let q = _eqCountry(supabaseData.from("flats_archive").select("*"), country)
-          .range(offset, offset + REQUESTED_PAGE - 1)
-          .order("batch_timestamp", { ascending: false, nullsFirst: false })
-          .order("id", { ascending: true });
-        if (Array.isArray(months) && months.length > 0) {
-          q = q.in("snapshot_month", months);
+      // The pages are read twice at most: see the check after them.
+      let readingsAfter = "same";
+      for (let pass = 0; ; pass += 1) {
+        if (pass > 0) {
+          all.length = 0;
+          hadError = false;
+          lastError = null;
+          offset = 0;
+          lastPageSize = REQUESTED_PAGE;
+          setProgress(0);
         }
-        if (datesArr) {
-          // Day-scope: batch_timestamp range [min, max+1) — index-friendly; the
-          // exact datum filter refines in filteredRecords. Cuts the default
-          // fetch from the whole month (~152k) to the shown day (~19k).
-          const hi = new Date(datesArr[datesArr.length - 1] + "T00:00:00Z");
-          hi.setUTCDate(hi.getUTCDate() + 1);
-          q = q.gte("batch_timestamp", datesArr[0]).lt("batch_timestamp", hi.toISOString().slice(0, 10));
+        while (offset < MAX_TOTAL) {
+          let q = _eqCountry(supabaseData.from("flats_archive").select("*"), country)
+            .range(offset, offset + REQUESTED_PAGE - 1)
+            .order("batch_timestamp", { ascending: false, nullsFirst: false })
+            .order("id", { ascending: true });
+          if (Array.isArray(months) && months.length > 0) {
+            q = q.in("snapshot_month", months);
+          }
+          if (datesArr) {
+            // Day-scope: batch_timestamp range [min, max+1) — index-friendly; the
+            // exact datum filter refines in filteredRecords. Cuts the default
+            // fetch from the whole month (~152k) to the shown day (~19k).
+            const hi = new Date(datesArr[datesArr.length - 1] + "T00:00:00Z");
+            hi.setUTCDate(hi.getUTCDate() + 1);
+            q = q.gte("batch_timestamp", datesArr[0]).lt("batch_timestamp", hi.toISOString().slice(0, 10));
+          }
+          const { data, error } = await sbRead(q);
+          if (cancelled) return;
+          if (error) {
+            console.error("[useFlatsArchive]", error);
+            hadError = true;
+            lastError = error;
+            break;
+          }
+          const got = data?.length || 0;
+          if (got === 0) break;                       // truly out of rows
+          all.push(...data);
+          setProgress(all.length);
+          offset += got;                              // advance by ACTUAL rows
+          // If we got fewer rows than the previous page's size, we've likely
+          // hit the dataset end. We track lastPageSize so we don't break
+          // prematurely on a server-imposed page cap (which would otherwise
+          // happen on EVERY page).
+          if (lastPageSize !== REQUESTED_PAGE && got < lastPageSize) break;
+          if (got < REQUESTED_PAGE && lastPageSize === REQUESTED_PAGE) {
+            // First time getting less than REQUESTED — could be server cap
+            // OR end of data. Adjust expected page size to what we got and
+            // keep paginating. The next iteration's same/larger page size
+            // means more data; smaller means done.
+            lastPageSize = got;
+          }
         }
-        const { data, error } = await sbRead(q);
         if (cancelled) return;
-        if (error) {
-          console.error("[useFlatsArchive]", error);
-          hadError = true;
-          lastError = error;
-          break;
-        }
-        const got = data?.length || 0;
-        if (got === 0) break;                       // truly out of rows
-        all.push(...data);
-        setProgress(all.length);
-        offset += got;                              // advance by ACTUAL rows
-        // If we got fewer rows than the previous page's size, we've likely
-        // hit the dataset end. We track lastPageSize so we don't break
-        // prematurely on a server-imposed page cap (which would otherwise
-        // happen on EVERY page).
-        if (lastPageSize !== REQUESTED_PAGE && got < lastPageSize) break;
-        if (got < REQUESTED_PAGE && lastPageSize === REQUESTED_PAGE) {
-          // First time getting less than REQUESTED — could be server cap
-          // OR end of data. Adjust expected page size to what we got and
-          // keep paginating. The next iteration's same/larger page size
-          // means more data; smaller means done.
-          lastPageSize = got;
-        }
+        // And again after: a reading or a retry approved while the pages were read is in
+        // some of them, and the pages after it shifted — asked again under the new readings.
+        readingsAfter = await readingsNow();
+        if (readingsAfter === "moved") return;
+        // The readings could not be read: such an approval cannot be ruled out, so the pages
+        // are read once more; still unread, they are shown but not cached.
+        if (readingsAfter === "unread" && pass === 0 && !hadError) continue;
+        break;
       }
       const hitCap = offset >= MAX_TOTAL;
       if (hitCap) {
         console.warn("[useFlatsArchive] reached safety cap of", MAX_TOTAL, "rows");
       }
-      if (cancelled) return;
       // F-313 (DP-096): don't poison the module cache with a partial/empty
       // result when the fetch errored. A transient Supabase hiccup during
       // the analytics Pivot's heavy archive read would otherwise leave the
@@ -1494,22 +1550,24 @@ export function useFlatsArchive(months, dates, enabled = true) {
       // of the session, and re-reading it would at least have had a chance of
       // being right.
       const all_eur = _toEurDisplay(all);
-      if (!hadError && !hitCap) {
+      if (!hadError && !hitCap && readingsAfter !== "unread") {
         _archiveCache = all_eur;
         _archiveCacheKey = identityKey;
+        _archiveCacheStamp = stamp;
       }
       setFlats(all_eur);
+      setFlatsStamp(stamp);                        // the stamp of THIS request (its render)
       setTruncated(hitCap);
       setError(hadError ? (lastError || { message: "archive read failed" }) : null);
       setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [authLoading, identityKey, monthsKey, datesKey, country, enabled]);
+  }, [authLoading, identityKey, monthsKey, datesKey, country, enabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 🔴 `flats` alone does not tell you whether it is the whole answer. A caller
   // that aggregates (the Pivot medians, any count) MUST look at truncated /
   // tooLarge / error before presenting a number as the market's.
-  return { flats, loading, progress, error, truncated, tooLarge };
+  return { flats, stamp: flatsStamp, loading, progress, error, truncated, tooLarge };
 }
 
 /** Distinct snapshot months available in the archive — small fast call
@@ -1623,40 +1681,367 @@ export function useArchiveDays() {
   return { days, loading };
 }
 
+// The readings are kept for ARCHIVE_READINGS_TTL_MS and asked again on mount, when the tab
+// comes back into view and every ARCHIVE_READINGS_CHECK_MS — each a no-op while the kept
+// answer is current — like the last-data-day cache (FRESHNESS_TTL_MS), but for minutes,
+// not hours: a stale date only shows yesterday, a stale reading count divides a month's
+// rows by one reading too few — November's second reading landing in a tab opened after
+// the first made November read twice the flats. When an answer differs from the kept one
+// (a reading landed or was withdrawn), every archive grain divided by the old readings
+// leaves the grain cache, and the new version makes a mounted Pivot ask again.
+// While the cube lags an approval (holdingLags) the answer is kept a minute for the
+// first ARCHIVE_READINGS_LAG_WINDOW_MS of the lag: it lasts until the cube's refresh,
+// minutes after the approval, and a holding read during it — "the cube lacks the 6th" —
+// divides every grain asked after the refresh by a reading too few until it is read
+// again. A lag that outlasts the window (a refresh that keeps failing) is then asked 2,
+// 4 and 8 minutes apart, then every 15; so is a holding that could not be read, from its
+// first failure. A new reading starts its lag's count afresh; settled, the count ends.
+const ARCHIVE_READINGS_TTL_MS = 15 * 60 * 1000;
+const ARCHIVE_READINGS_LAG_TTL_MS = 60 * 1000;
+const ARCHIVE_READINGS_LAG_WINDOW_MS = 15 * 60 * 1000;
+const ARCHIVE_READINGS_CHECK_MS = 60 * 1000;   // each check a no-op while the kept answer is current
+const _backoff = (n) => Math.min(ARCHIVE_READINGS_TTL_MS, ARCHIVE_READINGS_LAG_TTL_MS * 2 ** Math.max(0, n));
+const _readingsTtl = (entry) => {
+  // a day the facts hold as a reading that the days lack, not read again: a minute
+  if (entry.aheadOpen) return ARCHIVE_READINGS_LAG_TTL_MS;
+  if (entry.holdingFailed) return _backoff((entry.failures || 1) - 1);
+  if (entry.lagging) return entry.lagLate ? _backoff(entry.lagLate) : ARCHIVE_READINGS_LAG_TTL_MS;
+  return ARCHIVE_READINGS_TTL_MS;
+};
+// The lag's state after a check that found it `lagging`: since when, and how many checks
+// past the window (0 within it).
+function _lagState(lagging, prev, now) {
+  if (!lagging) return { lagSince: null, lagLate: 0 };
+  const lagSince = prev && prev.lagSince != null ? prev.lagSince : now;
+  return { lagSince, lagLate: now - lagSince >= ARCHIVE_READINGS_LAG_WINDOW_MS ? (prev?.lagLate || 0) + 1 : 0 };
+}
+// identity → { days, daysSig, holding, holdingSig, holdingKnown, holdingFailed, failures,
+//              lagging, lagSince, lagLate, cubeGen, version, at }
+let _archiveReadingsCache = new Map();
+const _archiveReadingsInflight = new Map();
+// identity → the days and the days ahead of them (with their rows) that a second read of
+// the days found no reading of: a partial snapshot as big as a reading, read once
+const _archiveReadingsAheadSeen = new Map();
+const _archiveReadingsListeners = new Map();   // identity → Set(callback): a new entry landed
+function _publishReadings(key) {
+  for (const fn of _archiveReadingsListeners.get(key) || []) fn();
+}
+function _dropArchiveGrains() {
+  for (const k of [..._pivotGrainCache.keys()]) if (k.includes('"mode":"archive"')) _pivotGrainCache.delete(k);
+}
+/* Two steps: the days (public.archive_days), then what the cube and the facts hold of
+   them. On the first read the days are published at once, so the grain is asked in
+   parallel with the holding rather than after it and the first paint waits for the
+   slower of the two, not for both one after the other. When the days CHANGE (a reading
+   landed or was withdrawn) the kept entry stays until the new holding is in, and the two
+   are published together: the grain and records on screen stay divided by their own
+   days and holding instead of the page dropping to its skeleton. The version — what an archive
+   grain's request carries — is the days' signature and the cube's generation: a new or
+   withdrawn reading changes the first; a refresh of the cube (what it holds moved while
+   the days did not) the second. A holding that could not be read keeps the last good one
+   and changes neither, so a passing error does not send every grain to be asked again. */
+/* Forced (`force`, the archive's records asking): the days and the facts are read now,
+   whatever the entry's age — or, given `within`, unless they were read that recently. While
+   neither moved, the cube is not asked and the entry stands as it is: the cube's own check
+   keeps its time, its lag's spacing and its failures' count. If either moved, it is a
+   whole check (the cube included), as any other. */
+function _loadArchiveReadings(key, force = false, within = 0) {
+  const kept = _archiveReadingsCache.get(key);
+  if (!force && kept && kept.holdingKnown && Date.now() - kept.at < _readingsTtl(kept)) return Promise.resolve(kept);
+  if (force && within && kept && kept.holdingKnown && Date.now() - (kept.factsAt || 0) < within) return Promise.resolve(kept);
+  if (_archiveReadingsInflight.has(key)) {
+    const running = _archiveReadingsInflight.get(key);
+    if (!force) return running;
+    // a forced read is one that STARTS now: one in flight may have read the days already
+    const again = () => _loadArchiveReadings(key, true, within);
+    return running.then(again, again);
+  }
+  const p = (async () => {
+    // The check is dated when it STARTS: the next one is due a TTL after this moment, so a
+    // check that took a few seconds is not skipped at the next minute's tick (dated at its
+    // end, a minute's TTL fell just short at every tick and lag checks ran 2, 3, 5 … apart).
+    const startedAt = Date.now();
+    const read = (cols) => sbReadAll((from, to) => supabaseData.from("archive_days")
+      .select(cols).order("day", { ascending: false }).order("country").range(from, to));
+    // A view that does not carry `readings` yet: each day one reading, as before.
+    const readDays = async () => {
+      const r = await read("day,country,readings");
+      return r.error ? read("day,country") : r;
+    };
+    let { data, error } = await readDays();
+    if (error) {
+      if (kept && !force) return kept;             // the last good answer stands (forced: says so)
+      throw error;
+    }
+    for (let attempt = 0; ; attempt += 1) {
+      const fresh = readingDaysByCountry(data);
+      const daysSig = readingsSignature(fresh);
+      // The facts holding a day of a newest month as big as a reading that the days do not:
+      // one approved between the two reads. The days are read again and, if they moved, the
+      // check starts over with them — not divided by days that lack a reading the facts hold.
+      let aheadOpen = false;                       // days ahead the days could not be read for
+      const daysBehind = async (h) => {
+        if (!h?.factsAhead?.size) return false;
+        // the same days ahead, with the same rows, that a read of the days found no reading
+        // of: not read again (a partial snapshot of the projects a reading missed may stay)
+        const ahead = `${daysSig}|${[...h.factsAhead].sort().map(([c, ds]) =>
+          `${c}:${ds.map((d) => `${d}=${h.factsRows?.get(c)?.get(d) ?? ""}`).join(";")}`).join(",")}`;
+        if (_archiveReadingsAheadSeen.get(key) === ahead) return false;
+        if (attempt > 0) { aheadOpen = true; return false; }
+        const again = await readDays();
+        if (again.error) { aheadOpen = true; return false; }
+        if (readingsSignature(readingDaysByCountry(again.data)) === daysSig) {
+          _archiveReadingsAheadSeen.set(key, ahead);
+          return false;
+        }
+        data = again.data;
+        return true;
+      };
+      const sameDays = !!kept && kept.daysSig === daysSig;
+      const days = sameDays ? kept.days : fresh;
+      const specs = holdingSpecs(days);
+      let factsRead = null;
+      if (force && sameDays && kept.holdingKnown && kept.holding && specs) {
+        factsRead = await sbRead(supabaseData.rpc("analytics_pivot", { p_spec: specs.facts }));
+        if (factsRead.error) throw factsRead.error;  // the entry as it was; the caller is told
+        const seen = archiveHolding(specs.from, [], factsRead.data, days);
+        if (await daysBehind(seen)) continue;
+        const factsSig = holdingFactsSignature(seen, days);
+        if (factsSig === kept.factsSig) {
+          kept.factsAt = startedAt;
+          return kept;
+        }
+      }
+      let entry = sameDays ? kept : {
+        days, daysSig, holding: null, holdingSig: null, holdingKnown: false, holdingFailed: false,
+        failures: 0, lagging: false, lagSince: null, lagLate: 0,     // a new reading's lag counts afresh
+        cubeGen: kept ? kept.cubeGen : 0, version: `${daysSig}/${kept ? kept.cubeGen : 0}`, at: 0,
+      };
+      if (!kept) {                                   // the first read: the days at once
+        _archiveReadingsCache.set(key, entry);
+        _publishReadings(key);
+      }
+      // What the cube and the facts hold of each market's newest month (archiveReadings.js,
+      // THE CUBE LAGS). Unreadable: the last good holding for these days, else none — the
+      // readings as they are.
+      let holding = null;
+      let failed = false;
+      if (specs) {
+        const [cube, facts] = await Promise.all([
+          sbRead(supabaseData.rpc("analytics_pivot", { p_spec: specs.cube })),
+          factsRead || sbRead(supabaseData.rpc("analytics_pivot", { p_spec: specs.facts })),
+        ]);
+        if (cube.error || facts.error) {
+          console.error("[archive readings] what the cube holds", cube.error || facts.error);
+          failed = true;
+          // The facts read, the cube not: the facts as read, the cube as last held. A grain
+          // from the facts, and the records (the facts), divided by a holding that lacks a
+          // day the facts hold counted it against a reading too few until the cube was back.
+          const lastHeld = entry.holding || kept?.holding;
+          if (!facts.error && lastHeld) {
+            const cubeRows = [...(lastHeld.cubeTotals || [])].map(([k, n]) => ({ d: k.split("|"), m: { n } }));
+            holding = archiveHolding(specs.from, cubeRows, facts.data, days);
+          }
+        } else holding = archiveHolding(specs.from, cube.data, facts.data, days);
+      }
+      if (await daysBehind(holding)) continue;
+      const now = startedAt;
+      const factsOnly = failed && !!holding;       // the facts read, the cube as last held
+      if (failed && !factsOnly && entry.holdingKnown) {
+        entry.holdingFailed = true;
+        if (!force) {                                // a forced read is no step of the backoff
+          entry.failures = (entry.failures || 0) + 1;
+          entry.at = now;
+        }
+        return entry;
+      }
+      const holdingSig = holdingSignature(holding);
+      const factsSig = holdingFactsSignature(holding, days);
+      const cubeMoved = entry.holdingKnown && (!failed || factsOnly) && (entry.holdingSig !== holdingSig || entry.factsSig !== factsSig);
+      const lagging = holdingLags(days, holding);
+      // a forced read (the archive's records asking) is no step of a long lag's spacing
+      const lag = force && lagging && entry.lagging ? { lagSince: entry.lagSince, lagLate: entry.lagLate } : _lagState(lagging, entry, now);
+      // a forced read is no step of the backoff, nor dates the cube's check
+      const failures = failed ? (entry.failures || 0) + (force ? 0 : 1) : 0;
+      const at = failed && force ? entry.at : now;
+      if (entry.holdingKnown && !cubeMoved) {        // nothing moved: the same entry, kept longer
+        Object.assign(entry, { holdingFailed: failed, failures, lagging, ...lag, at, factsAt: now, aheadOpen });
+        return entry;
+      }
+      if (cubeMoved || (kept && !sameDays)) _dropArchiveGrains();
+      const cubeGen = entry.cubeGen + (cubeMoved ? 1 : 0);
+      // the version this one replaces, with the holding that went with it: a grain asked
+      // under it before its holding was known is divided by that (PivotV2 grainView)
+      const prev = kept && kept.version !== `${daysSig}/${cubeGen}` && kept.holdingKnown
+        ? { prevVersion: kept.version, prevHolding: kept.holding } : { prevVersion: entry.prevVersion, prevHolding: entry.prevHolding };
+      entry = {
+        ...entry, holding, holdingSig, holdingKnown: true, holdingFailed: failed, failures,
+        lagging, ...lag, cubeGen, version: `${daysSig}/${cubeGen}`, at, ...prev,
+        // the facts' side, and when it was last read: what a forced read compares
+        factsSig, factsAt: failed && !factsOnly ? 0 : now, aheadOpen,
+      };
+      _archiveReadingsCache.set(key, entry);
+      _publishReadings(key);
+      return entry;
+    }
+  })().finally(() => _archiveReadingsInflight.delete(key));
+  _archiveReadingsInflight.set(key, p);
+  return p;
+}
+/** Full readings of every market ({ SK: Map(day → readings), CZ: … }) from public.archive_days, for
+ *  turning the Pivot's archive grain — flat-READINGS — into flats (src/lib/archiveReadings.js).
+ *  All markets, whatever the country selector says: the "All" view divides each market by
+ *  its own readings. Every page of it — a day per market per reading outgrows PostgREST's
+ *  1 000-row cap within the year. Keyed and gated by identity like useArchiveDays.
+ *  `days` is null while loading, when not enabled, and when it could not be read;
+ *  `holding` says which of them the cube and the facts hold yet (heldReadingDays) once
+ *  `holdingKnown` — it follows the days, read in parallel with the grain; `version`
+ *  changes with a new reading and with a refresh of the cube; `prevVersion` and
+ *  `prevHolding` are the version it replaced and that version's holding. */
+export function useArchiveReadingDays({ enabled = false } = {}) {
+  const { loading: authLoading, user, profile } = useAuth();
+  const key = `${user?.id || "anon"}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}`;
+  // The list lives in the cache and is read by THIS identity's key on every render, and
+  // "loading" is derived from it — so neither can be another identity's, or a stale
+  // "not loading" for the render in which the page switched to the archive. The state
+  // only re-renders when the list lands or changes, or says it failed.
+  const [, setLanded] = useState(0);
+  const [failedKey, setFailedKey] = useState(null);
+  // The entry this render shows — what the effect below compares the cache with.
+  const rendered = _archiveReadingsCache.get(key);
+  useEffect(() => {
+    if (!enabled) return;
+    if (!isSupabaseReady() || authLoading) return; // wait for the session so RLS returns the caller's real rows
+    let cancelled = false;
+    // Re-render only when the entry itself changed — a check that kept it (every minute
+    // while the tab is open) is no reason to render the Pivot again. Compared with the
+    // entry the RENDER showed, not the one in the cache when this effect runs: one
+    // published in between was otherwise taken as seen and never shown — the holding
+    // stayed unknown and the table on its skeleton.
+    let seen = rendered;
+    const landed = () => {
+      const now = _archiveReadingsCache.get(key);
+      if (cancelled || now === seen) return;
+      seen = now;
+      setLanded((n) => n + 1);
+    };
+    if (!_archiveReadingsListeners.has(key)) _archiveReadingsListeners.set(key, new Set());
+    _archiveReadingsListeners.get(key).add(landed);
+    landed();                                      // published between the render and now
+    const ask = () => _loadArchiveReadings(key).then(
+      () => { if (!cancelled) { setFailedKey(null); landed(); } },
+      (e) => { console.error("[useArchiveReadingDays]", e); if (!cancelled) setFailedKey(key); },
+    );
+    ask();
+    const hidden = () => typeof document !== "undefined" && document.visibilityState === "hidden";
+    const onVisible = () => { if (!hidden()) ask(); };
+    if (typeof document !== "undefined") document.addEventListener("visibilitychange", onVisible);
+    const timer = setInterval(() => { if (!hidden()) ask(); }, ARCHIVE_READINGS_CHECK_MS);
+    return () => {
+      cancelled = true;
+      _archiveReadingsListeners.get(key)?.delete(landed);
+      if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onVisible);
+      clearInterval(timer);
+    };
+  }, [enabled, key, authLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Read the days and the facts again now (or unless read `within` ms ago) — around a read
+  // of the archive's records, so the readings they are kept with are no older than they are.
+  const refresh = useCallback((within = 0) => _loadArchiveReadings(key, true, within), [key]);
+  const entry = enabled ? rendered : null;
+  const days = entry ? entry.days : null;
+  const error = !!enabled && !days && failedKey === key;
+  return {
+    days, holding: entry ? entry.holding : null, holdingKnown: !!entry?.holdingKnown,
+    version: entry ? entry.version : "", prevVersion: entry?.prevVersion ?? null, prevHolding: entry?.prevHolding ?? null,
+    refresh: enabled ? refresh : null,
+    loading: !!enabled && !days && !error, error,
+  };
+}
+
 let _pivotGrainCache = new Map();
+/* What a usePivotGrain caller sees for the request `key` (null = disabled), from the
+   hook's state { key, grain, meta, error } — `key` and `meta` being the request the held
+   grain answers — and `cached`, the cache's answer to THIS request if it has one (current
+   even before the effect copies it in). The previous answer stays while the next loads,
+   handed back with ITS meta and read as LOADING: read as settled it was normalised with
+   the new filters — narrowing Datum from 1–5 October to 5 October showed a 100-flat
+   project as 500 for as long as the new grain took. */
+function _grainView(state, key, meta, cached) {
+  if (!key) return { grain: null, meta: null, loading: false, error: false };
+  if (state.key !== key && cached !== undefined) return { grain: cached, meta, loading: false, error: false };
+  const current = state.key === key;
+  return { grain: state.grain, meta: state.meta, loading: !current, error: current && state.error };
+}
+const GRAIN_IDLE = Object.freeze({ key: null, grain: null, meta: null, error: false });
+
+// Today's market (mode 'latest') changes with every approval and serving refresh, and
+// nothing tells this cache: a latest grain was kept for the whole session, so a tab left
+// open showed the morning's market in the evening. It is now kept PIVOT_GRAIN_TTL_MS, as
+// the archive readings are, and asked again after that — on the next ask, when the tab
+// comes back into view, and at every PIVOT_GRAIN_CHECK_MS — with the kept one on screen
+// meanwhile. An archive grain changes only with the readings, whose version is in its key.
+const PIVOT_GRAIN_TTL_MS = 15 * 60 * 1000;
+const PIVOT_GRAIN_CHECK_MS = 15 * 60 * 1000;
+const _isArchiveGrainKey = (key) => key.includes('"mode":"archive"');
+/** Whether the cache entry { grain, at } for `key` can be served without asking again. */
+function _grainCurrent(key, entry, now) {
+  return !!entry && (_isArchiveGrainKey(key) || now - entry.at < PIVOT_GRAIN_TTL_MS);
+}
+
 /** Server-aggregated pivot grain rows [{d:[dimVals], m:{components}}] for a full
  *  analytics_pivot spec ({dims, filters, filters_not, ranges, nulls, mode, …}).
  *  The spec is built in PivotV2 (buildPivotSpec) — ALL filters are applied server-side
  *  now, so any-dimension filtering is instant (no browser record pull). enabled=false →
  *  no fetch (returns null). RLS-gated (mode 'archive' is paid/chosen-project gated in the
- *  RPC, mirroring flats_archive). Cached by user+tier+chosen+spec. */
-export function usePivotGrain({ enabled = false, spec = null } = {}) {
+ *  RPC, mirroring flats_archive). Cached by user+tier+chosen+spec. `meta` is the caller's
+ *  own description of the request, returned with the grain that answers it (_grainView). */
+export function usePivotGrain({ enabled = false, spec = null, meta = null, version = "" } = {}) {
   const { loading: authLoading, user, profile } = useAuth();
   const specKey = spec ? JSON.stringify(spec) : "";
+  // `version` — the archive readings' (useArchiveReadingDays): a new reading is a new
+  // question for an archive grain, asked again rather than served from the cache.
   const key = enabled && spec
-    ? `${user?.id || "anon"}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}::${specKey}`
+    ? `${user?.id || "anon"}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}::${specKey}::${version}`
     : null;
-  const [grain, setGrain] = useState(key && _pivotGrainCache.has(key) ? _pivotGrainCache.get(key) : null);
-  const [loading, setLoading] = useState(!!enabled && !(key && _pivotGrainCache.has(key)));
-  const [error, setError] = useState(false);
+  const [state, setState] = useState(GRAIN_IDLE);
+  // A kept latest grain past its time asks again (see PIVOT_GRAIN_TTL_MS).
+  const [recheck, setRecheck] = useState(0);
   useEffect(() => {
-    if (!enabled || !spec) { setGrain(null); setLoading(false); setError(false); return; }
+    if (!key || _isArchiveGrainKey(key)) return;
+    const ask = () => {
+      const e = _pivotGrainCache.get(key);
+      if (e && !_grainCurrent(key, e, Date.now())) setRecheck((n) => n + 1);
+    };
+    const onVisible = () => { if (typeof document === "undefined" || document.visibilityState === "visible") ask(); };
+    if (typeof document !== "undefined") document.addEventListener("visibilitychange", onVisible);
+    const timer = setInterval(() => { if (typeof document === "undefined" || document.visibilityState !== "hidden") ask(); }, PIVOT_GRAIN_CHECK_MS);
+    return () => {
+      if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onVisible);
+      clearInterval(timer);
+    };
+  }, [key]);
+  useEffect(() => {
+    if (!key) { setState(GRAIN_IDLE); return; }
     if (!isSupabaseReady() || authLoading) return;
-    if (_pivotGrainCache.has(key)) { setGrain(_pivotGrainCache.get(key)); setLoading(false); setError(false); return; }
+    const kept = _pivotGrainCache.get(key);
+    if (kept) setState({ key, grain: kept.grain, meta, error: false });
+    if (_grainCurrent(key, kept, Date.now())) return;
     let cancelled = false;
-    setLoading(true); setError(false);
     (async () => {
       const { data, error } = await sbRead(supabaseData.rpc("analytics_pivot", { p_spec: spec }));
       if (cancelled) return;
-      if (error) { console.error("[usePivotGrain]", error); setGrain([]); setLoading(false); setError(true); return; }
+      if (error) {
+        console.error("[usePivotGrain]", error);
+        if (!kept) setState({ key, grain: [], meta, error: true });   // a kept grain stays
+        return;
+      }
       const arr = Array.isArray(data) ? data : [];
-      _pivotGrainCache.set(key, arr);
-      setGrain(arr);
-      setLoading(false);
+      _pivotGrainCache.set(key, { grain: arr, at: Date.now() });
+      setState({ key, grain: arr, meta, error: false });
     })();
     return () => { cancelled = true; };
-  }, [enabled, key, authLoading]); // eslint-disable-line react-hooks/exhaustive-deps
-  return { grain, loading, error };
+  }, [key, authLoading, recheck]); // eslint-disable-line react-hooks/exhaustive-deps
+  return _grainView(state, key, meta, key ? _pivotGrainCache.get(key)?.grain : undefined);
 }
 
 /* useSales — the Analytics → Predaje/Sales engine (public.analytics_sales).
@@ -1695,6 +2080,19 @@ export async function fetchSalesForExport(spec, { onProgress } = {}) {
   return { rows: out, capped: out.length >= SALES_EXPORT_MAX_ROWS, failed: false };
 }
 
+/* What a useSales caller sees for the request `reqKey` (null = disabled), from the hook's
+   state { key, data, loading, error }, where `key` is the request the data answers. The
+   previous answer stays on screen while the next loads, but it is LOADING until the answer
+   for this request is in: on the render in which the spec changes the effect has not run
+   yet, and the old state read as settled — the dashboard's month-ago pace showed the whole
+   market's figure against Ružinov's (a "−560") for the second the new answer took. */
+function _salesView(state, reqKey) {
+  if (!reqKey) return { data: null, loading: false, error: false };
+  const current = state.key === reqKey;
+  return { data: state.data, loading: state.loading || !current, error: current && state.error };
+}
+const SALES_IDLE = Object.freeze({ key: null, data: null, loading: false, error: false });
+
 export function useSales({ enabled = false, spec = null } = {}) {
   const { loading: authLoading, user, profile } = useAuth();
   // analytics_sales is RLS-gated by identity (paid/tier/chosen project), so a tier
@@ -1702,24 +2100,22 @@ export function useSales({ enabled = false, spec = null } = {}) {
   // — include identity in the effect key like every other RLS hook (usePivotGrain etc.).
   const identity = `${user?.id || "anon"}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}`;
   const specKey = spec ? JSON.stringify(spec) : "";
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(!!enabled);
-  const [error, setError] = useState(false);
+  const reqKey = enabled && spec ? `${identity}::${specKey}` : null;
+  const [state, setState] = useState(SALES_IDLE);
   useEffect(() => {
-    if (!enabled || !spec) { setData(null); setLoading(false); setError(false); return; }
+    if (!reqKey) { setState(SALES_IDLE); return; }
     if (!isSupabaseReady() || authLoading) return;
     let cancelled = false;
-    setLoading(true); setError(false);
+    setState((s) => ({ ...s, loading: true, error: false }));
     (async () => {
       const { data: d, error: e } = await sbRead(supabaseData.rpc("analytics_sales", { p_spec: spec }));
       if (cancelled) return;
-      if (e) { console.error("[useSales]", e); setData(null); setLoading(false); setError(true); return; }
-      setData(d || null);
-      setLoading(false);
+      if (e) { console.error("[useSales]", e); setState({ key: reqKey, data: null, loading: false, error: true }); return; }
+      setState({ key: reqKey, data: d || null, loading: false, error: false });
     })();
     return () => { cancelled = true; };
-  }, [enabled, specKey, authLoading, identity]); // eslint-disable-line react-hooks/exhaustive-deps
-  return { data, loading, error };
+  }, [reqKey, authLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+  return _salesView(state, reqKey);
 }
 
 // Cache for server-side distinct filter values — one fast analytics_pivot(dims=[field])
@@ -2400,19 +2796,38 @@ export function useAnalyticsRegistry() {
 // market — the visible "this batch needs fixing" signal, never silently mixing
 // fresh + stale data. The "All" view shows the OLDEST market date (the combined
 // view is only as fresh as its stalest market).
-let _freshness = null;            // { SK: 'YYYY-MM-DD', CZ: '…' }
+// The answer is kept for FRESHNESS_TTL_MS and only when it is one. It used to be kept
+// for the whole session whatever it was: a failed or empty read cached {} — the
+// dashboard's month-ago arrows vanished and Sales fell back to today until a reload —
+// and a tab left open overnight kept yesterday's date after the morning's reading.
+// A failed or empty read now keeps the last good answer (or none) and is tried again on
+// the next ask; a good one is asked again after a few hours. The hooks ask on mount, when
+// the tab comes back into view, and every FRESHNESS_CHECK_MS — each a no-op while the
+// kept answer is current.
+const FRESHNESS_TTL_MS = 3 * 60 * 60 * 1000;
+const FRESHNESS_CHECK_MS = 15 * 60 * 1000;
+let _freshness = null;            // { SK: 'YYYY-MM-DD', CZ: '…' } — the last good answer
+let _freshnessAt = 0;             // when it was read
 let _freshnessPromise = null;
+function _freshnessCurrent() {
+  return _freshness && Date.now() - _freshnessAt < FRESHNESS_TTL_MS ? _freshness : null;
+}
 function _loadFreshness() {
-  if (_freshness) return Promise.resolve(_freshness);
+  const current = _freshnessCurrent();
+  if (current) return Promise.resolve(current);
   if (_freshnessPromise) return _freshnessPromise;
-  _freshnessPromise = supabasePublic.from("market_freshness").select("country,last_data_date")
-    .then(({ data }) => {
+  _freshnessPromise = Promise.resolve()
+    .then(() => supabasePublic.from("market_freshness").select("country,last_data_date"))
+    .then(({ data, error }) => {
       const m = {};
       (data || []).forEach((r) => { if (r.country) m[r.country] = r.last_data_date; });
+      if (error || !Object.keys(m).length) return _freshness || {};
       _freshness = m;
+      _freshnessAt = Date.now();
       return m;
     })
-    .catch(() => ({}));
+    .catch(() => _freshness || {})
+    .finally(() => { _freshnessPromise = null; });
   return _freshnessPromise;
 }
 function _freshnessForView(country, m) {
@@ -2424,16 +2839,53 @@ function _freshnessForView(country, m) {
   return m[country] || null;
 }
 
+/* The per-market map behind every freshness hook, kept current (see FRESHNESS_TTL_MS).
+   `settled` is true once this mount has an answer to go on — a current one from the
+   cache, or the outcome of its own read, good or not — so a page can wait for the date
+   rather than start from today and be corrected. */
+function useFreshnessMap() {
+  const [state, setState] = useState(() => ({ map: _freshness, settled: !!_freshnessCurrent() }));
+  useEffect(() => {
+    if (!isSupabaseReady()) return;
+    let cancelled = false;
+    const ask = () => _loadFreshness().then((m) => {
+      if (cancelled) return;
+      const map = m && Object.keys(m).length ? m : null;
+      setState((s) => (s.map === map && s.settled ? s : { map, settled: true }));
+    });
+    ask();
+    const onVisible = () => { if (typeof document === "undefined" || document.visibilityState === "visible") ask(); };
+    if (typeof document !== "undefined") document.addEventListener("visibilitychange", onVisible);
+    const timer = setInterval(() => { if (typeof document === "undefined" || document.visibilityState !== "hidden") ask(); }, FRESHNESS_CHECK_MS);
+    return () => {
+      cancelled = true;
+      if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onVisible);
+      clearInterval(timer);
+    };
+  }, []);
+  // Without a database there is nothing to wait for.
+  return isSupabaseReady() || state.settled ? state : { ...state, settled: true };
+}
+
+/** Latest data date per market ({ SK: 'YYYY-MM-DD', CZ: … }), or null while loading
+ *  or when it could not be read — for figures that must be anchored on EACH market's
+ *  own last reading, which the "All" view's single (oldest) date is not. */
+export function useFreshnessByCountry() {
+  const { map } = useFreshnessMap();
+  return map && Object.keys(map).length ? map : null;
+}
+
+/** Latest data date ('YYYY-MM-DD') for the selected country (the oldest market for the
+ *  "All" view) and whether it is settled: { date: null, settled: false } while it is
+ *  being read, { date: null, settled: true } when it could not be. */
+export function useFreshnessStatus() {
+  const { country } = useCountry();
+  const { map, settled } = useFreshnessMap();
+  return { date: _freshnessForView(country, map), settled };
+}
+
 /** Latest data date ('YYYY-MM-DD') for the selected country (the oldest market
  *  for the "All" view), or null while loading. Drives the freshness indicator. */
 export function useFreshness() {
-  const { country } = useCountry();
-  const [date, setDate] = useState(() => _freshnessForView(country, _freshness));
-  useEffect(() => {
-    let cancelled = false;
-    if (!isSupabaseReady()) return;
-    _loadFreshness().then((m) => { if (!cancelled) setDate(_freshnessForView(country, m)); });
-    return () => { cancelled = true; };
-  }, [country]);
-  return date;
+  return useFreshnessStatus().date;
 }

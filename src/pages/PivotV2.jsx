@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect, useRef, useLayoutEffect, Fragment } from "react";
 import { createPortal } from "react-dom";
 import { useSpecifics, SpecificsMark } from "../lib/projectSpecifics";
-import { useAnalyticsRegistry, useProjects, useFlatsArchive, useFlatsCurrent, useArchiveMonths, useArchiveDays, usePivotGrain, usePivotDistinct, usePivotFieldStats, fetchFlatsForProjects } from "../lib/useData";
+import { useAnalyticsRegistry, useProjects, useFlatsArchive, useFlatsCurrent, useArchiveMonths, useArchiveDays, useArchiveReadingDays, usePivotGrain, usePivotDistinct, usePivotFieldStats, fetchFlatsForProjects } from "../lib/useData";
+import { archiveGrainDims, archiveReadingScope, normaliseArchiveGrain, periodFactors, scaleComponents, archiveRecordCells, weightedCount, weightedSum, specUsesCube, heldReadingDays } from "../lib/archiveReadings";
 import { useCountry, isAllCountries, countryName } from "../lib/useCountry";
 import { useCapabilities } from "../lib/useCapabilities";
 import { useAuth } from "../lib/useAuth";
@@ -802,13 +803,42 @@ function summariseFilter(filter, _fieldType, lang) {
   return `${prefix} ${n} hodnôt`;
 }
 
-function compute(field, agg, records) {
+// The record path's count of flats. In the archive a record is one flat at one READING,
+// so `recordCell` (archiveRecordCells, src/lib/archiveReadings.js) weighs each by its
+// readings and averages over the periods the records span, as the grain path counts —
+// adding a median column used to turn Počet 100 into 700. Today's market: one record, one
+// flat.
+const _STAV = (r) => (r.stav || "").trim().toUpperCase();
+function recordCount(records, recordCell, pred) {
+  if (!recordCell) return pred ? records.filter(pred).length : records.length;
+  return Math.round(weightedCount(records, recordCell, pred));
+}
+
+function compute(field, agg, records, recordCell = null) {
   // count doesn't need a field — it's just the record count. This path
   // also serves the default "__count__" measure (values.length===0) where
   // field is null. Used to return null here, which made the default
   // Count column render as "—" on first drop.
-  if (agg === "count") return records.length;
+  if (agg === "count") return recordCount(records, recordCell);
   if (!field) return null;
+  // The two count measures are counts of flats too (see recordCount).
+  if (recordCell && field === FIELDS.sold_count) return recordCount(records, recordCell, (r) => _STAV(r) === "P");
+  if (recordCell && field === FIELDS.available_count) return recordCount(records, recordCell, (r) => _STAV(r) === "V");
+  // So are the two ratio measures, on the grain path's basis: absorption of the weighted
+  // sold and available, €/m² of the weighted Σ price over Σ area of priced flats. Over the
+  // records as they are, a month read 30 times outweighed one read 6 times — absorption
+  // 13.3 % for 20 %, €/m² 3 050 for 3 150.
+  if (recordCell && field === FIELDS.abs_rate) {
+    const sold = weightedCount(records, recordCell, (r) => _STAV(r) === "P");
+    const denom = sold + weightedCount(records, recordCell, (r) => _STAV(r) === "V");
+    return denom > 0 ? (sold / denom) * 100 : null;
+  }
+  if (recordCell && field === FIELDS.wavg_m2_price) {
+    const priced = (r) => { const p = num(r.cena_s_dph), m = num(r.obytna_plocha); return p != null && p > 0 && m != null && m > 0; };
+    const price = weightedSum(records, recordCell, (r) => (priced(r) ? r.cena_s_dph : null)).sum;
+    const area = weightedSum(records, recordCell, (r) => (priced(r) ? r.obytna_plocha : null)).sum;
+    return area > 0 ? price / area : null;
+  }
   // Measure fields carry their own single calculation
   if (field.type === "measure" && typeof field.measureCompute === "function") {
     return field.measureCompute(records);
@@ -824,6 +854,15 @@ function compute(field, agg, records) {
       if (v != null && v !== "") s.add(String(v).trim());
     }
     return s.size;
+  }
+
+  // A sum and an average over the archive's records weigh each record as recordCount
+  // counts it — the grain path's s_* and n_* — or Σ obytná plocha read six readings'
+  // worth of area (36 000 m² for a project of 6 000) once a median column was added.
+  if (recordCell && (agg === "sum" || agg === "avg")) {
+    const { sum, weight } = weightedSum(records, recordCell, acc);
+    if (!(weight > 0)) return null;
+    return agg === "sum" ? sum : sum / weight;
   }
 
   const nums = [];
@@ -873,7 +912,7 @@ function distinctColValues(records, colField) {
      `colKeys` is attached to the root so the header can enumerate
      columns consistently (including the "Σ" grand-col).
 */
-function buildTree(records, rowFields, colFields, valueDefs) {
+function buildTree(records, rowFields, colFields, valueDefs, recordCell = null) {
   // Enumerate distinct column values globally — same axis across all rows.
   const colKeys = colFields.length
     ? distinctColValues(records, colFields[0])
@@ -881,7 +920,7 @@ function buildTree(records, rowFields, colFields, valueDefs) {
   const colAcc = colFields.length ? FIELDS[colFields[0]]?.accessor : null;
 
   const rollupsFor = (recs) =>
-    valueDefs.map((v) => compute(FIELDS[v.field], v.agg, recs));
+    valueDefs.map((v) => compute(FIELDS[v.field], v.agg, recs, recordCell));
 
   // Per-column rollups: partition `recs` by col key, compute values for each.
   const colRollupsFor = (recs) => {
@@ -903,7 +942,7 @@ function buildTree(records, rowFields, colFields, valueDefs) {
     return {
       label: "Total", path: [], pathKey: "",
       level: -1, colKeys,
-      records, count: records.length,
+      records, count: recordCount(records, recordCell),
       rollups: rollupsFor(records),
       colRollups: colRollupsFor(records),
       children: [],
@@ -929,7 +968,7 @@ function buildTree(records, rowFields, colFields, valueDefs) {
         pathKey: path.join(SEP),
         level: depth,
         records: items,
-        count: items.length,
+        count: recordCount(items, recordCell),
         rollups: rollupsFor(items),
         colRollups: colRollupsFor(items),
         children: isDeepest ? [] : rec(items, depth + 1, path),
@@ -942,7 +981,7 @@ function buildTree(records, rowFields, colFields, valueDefs) {
   return {
     label: "Total", path: [], pathKey: "",
     level: -1, colKeys,
-    records, count: records.length,
+    records, count: recordCount(records, recordCell),
     rollups: rollupsFor(records),
     colRollups: colRollupsFor(records),
     children: rec(records, 0, []),
@@ -1095,16 +1134,54 @@ function addComp(acc, m) {
     if (mx != null) acc["mx_" + p] = acc["mx_" + p] == null ? +mx : Math.max(acc["mx_" + p], +mx);
   }
 }
+// A table node's components from its grain rows. An archive row carries its `cell` (its
+// market and month — or day — src/lib/archiveReadings.js), and the node is the AVERAGE
+// over the periods it spans: each market over its own months among the node's rows, the
+// markets added. Summed instead, a 100-flat project over 30 September and 1 October read
+// 200 (one month-average each) where the assistant says 100. Today's rows carry no cell
+// and are summed as before.
+function compOfGrain(rows) {
+  const c = emptyComp();
+  const f = periodFactors(rows, (g) => g.cell);
+  rows.forEach((g, i) => addComp(c, f[i] === 1 ? g.m : scaleComponents(g.m, f[i])));
+  return c;
+}
+// The grain a table is built from: the answer `raw` read as the request it answers
+// (`meta`, from usePivotGrain) — an archive grain divided by the readings and the Datum
+// scope IT was asked with, so a grain still on screen while the next loads shows its own
+// question's numbers, not the new filters applied to old rows. An answer for another
+// layout (other dims) has nothing to show until its own arrives.
+function grainView(raw, meta, specDims, now) {
+  if (raw == null || !meta) return null;
+  if (meta.dims.join("\u0001") !== specDims.join("\u0001")) return null;
+  if (!meta.archive) return raw;
+  // divided by the readings of its request that its source held then (heldReadingDays):
+  // the request's own holding — during a cube refresh the grain on screen was asked
+  // before it, and the new holding showed November's 7 500 as 3 750 until the new grain
+  // came. A request that went out before its holding was in (the page's first grain)
+  // takes the holding of its own version: the current one while the version is the
+  // same, the replaced one just after a refresh — never a later version's.
+  let held = meta.holding;
+  if (held === undefined && now) {
+    if (meta.version === now.version) held = now.holding;
+    else if (meta.version === now.prevVersion) held = now.prevHolding ?? undefined;
+  }
+  if (!meta.days || held === undefined) return null;
+  return normaliseArchiveGrain(raw, meta.dims, heldReadingDays(meta.days, held, meta.viaCube), meta.scope);
+}
+// Counts are whole flats. An archive grain's components are flats at an average reading
+// (src/lib/archiveReadings.js), so a count can come out as 7 512.4 — rounded here, where
+// it becomes a number on the page, and never in the components, which averages share.
 function computeFromComp(v, c) {
   if (!c) return null;
-  if (v.field == null || v.field === "__count__" || v.agg === "count") return c.n;
+  if (v.field == null || v.field === "__count__" || v.agg === "count") return Math.round(c.n);
   const f = FIELDS[v.field];
   if (f && f.type === "measure") {
     switch (v.field) {
       case "abs_rate":      { const d = c.sold + c.avail; return d > 0 ? (c.sold / d) * 100 : null; }
       case "wavg_m2_price": return c.s_lw > 0 ? c.s_pw / c.s_lw : null;
-      case "sold_count":    return c.sold;
-      case "available_count": return c.avail;
+      case "sold_count":    return Math.round(c.sold);
+      case "available_count": return Math.round(c.avail);
       default: return null;
     }
   }
@@ -1121,7 +1198,9 @@ function computeFromComp(v, c) {
 }
 
 /* Build the same tree buildTree produces, from grain rows [{d:[dimVals], m:{components}}].
-   d holds the row dims then the (optional) col dim, in the order they were sent. */
+   d holds the row dims then the (optional) col dim, in the order they were sent — and,
+   in archive mode, the market and month of the row after them (archiveGrainDims), which
+   each node averages over (compOfGrain). */
 function buildTreeFromGrain(grain, rowFields, colFields, valueDefs) {
   const safe = Array.isArray(grain) ? grain : [];
   const hasCol = colFields.length > 0;
@@ -1134,11 +1213,11 @@ function buildTreeFromGrain(grain, rowFields, colFields, valueDefs) {
     colKeys = orderCappedColKeys(counts.entries(), colFields[0]);
     colOverflow = Math.max(0, counts.size - colKeys.length);
   }
-  const rollupsFor = (rows) => { const c = emptyComp(); for (const g of rows) addComp(c, g.m); return valueDefs.map(v => computeFromComp(v, c)); };
+  const rollupsFor = (rows) => { const c = compOfGrain(rows); return valueDefs.map(v => computeFromComp(v, c)); };
   // Per-node stav components (grain rows carry no records) so the table can show
   // the on-offer / sold split on every row, not just the header total.
-  const compFor = (rows) => { const c = emptyComp(); for (const g of rows) addComp(c, g.m); return c; };
-  const countFor = (rows) => rows.reduce((a, g) => a + (+g.m.n || 0), 0);
+  const compFor = (rows) => compOfGrain(rows);
+  const countFor = (rows) => Math.round(compOfGrain(rows).n);
   const colRollupsFor = (rows) => {
     if (!colKeys) return null;
     const byKey = {}; for (const ck of colKeys) byKey[ck] = [];
@@ -1365,15 +1444,33 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   // Records are fetched ONLY when forceRaw (non-server-able config or drill-down).
   // Current view pulls flats_current (cross-market current); time-travel pulls the
   // day/month-scoped archive.
+  // The archive's full readings (public.archive_days) and what the cube and the facts hold
+  // of them, by which the archive's grain and records are divided (archiveReadings.js).
+  // The record path (median, distinct counts) counts its flats by the same readings.
+  const { days: readingDays, holding: readingHolding, holdingKnown: readingHoldingKnown, version: readingsVersion,
+    prevVersion: readingsPrevVersion, prevHolding: readingsPrevHolding,
+    refresh: refreshReadings,
+    loading: readingsLoading, error: readingsError } = useArchiveReadingDays({ enabled: canViewAnalytics && !isCurrent });
+  // What the cube and the facts hold is read in parallel with the grain; until it is in,
+  // an archive grain or record set cannot be divided and reads as loading.
+  const holdingNow = readingHoldingKnown ? readingHolding : undefined;
+  // The archive's records are asked once the readings are known — read afresh first — and
+  // kept with them: a reading that lands later asks for new records and divides those,
+  // not these (useFlatsArchive stamp).
+  const recordsStampNow = useMemo(
+    () => ({ days: readingDays, holding: holdingNow, refresh: refreshReadings }),
+    [readingDays, holdingNow, refreshReadings]
+  );
   const {
-    flats: archiveFlats, loading: loadingArchive, progress: flatsProgress,
+    flats: archiveFlats, stamp: archiveStamp, loading: loadingArchive, progress: flatsProgress,
     // Whether the archive we just drew conclusions from was the whole archive.
     // Measured 2026-09-15: SK 2026-08 is 854 269 rows and the unfiltered SK
     // archive is 2 174 864, both past the hook's 500 000 safety cap — so a
     // median grouped by Mesiac was being computed over a fraction of the data
     // and presented as the market's. These three are that fraction, made loud.
     truncated: archiveTruncated, tooLarge: archiveTooLarge, error: archiveError,
-  } = useFlatsArchive(fetchMonths, fetchDates, forceRaw && !isCurrent);
+  } = useFlatsArchive(fetchMonths, fetchDates,
+    forceRaw && !isCurrent && (!canViewAnalytics || (!!readingDays && holdingNow !== undefined)), recordsStampNow);
   const { flats: currentFlatsRaw, loading: loadingCurrent } = useFlatsCurrent(forceRaw && isCurrent);
   const realFlats = isCurrent ? currentFlatsRaw : archiveFlats;
   const loadingFlats = isCurrent ? loadingCurrent : loadingArchive;
@@ -1795,24 +1892,70 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
     [canViewAnalytics, rows, cols, effectiveValues, effectiveFilters]
   );
   const gDims = useMemo(() => [...rows, ...cols], [rows, cols]);
+  // The archive counts flat-READINGS, so its grain also carries each row's market and
+  // month (after the Rows and the Column, where the tree builder sums over them) and is
+  // turned into flats at an average reading before anything reads it — see
+  // src/lib/archiveReadings.js. Today's market is one reading and needs neither.
+  // The month only when the scope spans more than one — 500 projects over 12 months is
+  // 6 000 rows — so the Datum/Mesiac scope is read first.
+  const readingScope = useMemo(() => archiveReadingScope(effectiveFilters), [effectiveFilters]);
+  const specDims = useMemo(() => (isCurrent ? gDims : archiveGrainDims(gDims, readingScope)), [gDims, isCurrent, readingScope]);
   // Full server-side spec — ALL active filters (any dim, any mode) go to the engine,
   // so a city/developer/price filter is instant instead of pulling the archive.
   // (`isCurrent` already accounts for a time group-by — see its definition — so a
   // Datum/Mesiac dimension in Rows correctly switches the engine into archive mode.)
   const pivotSpec = useMemo(
-    () => buildPivotSpec({ dims: gDims, filters: effectiveFilters, country, isCurrent }),
-    [gDims, effectiveFilters, country, isCurrent]
+    () => buildPivotSpec({ dims: specDims, filters: effectiveFilters, country, isCurrent }),
+    [specDims, effectiveFilters, country, isCurrent]
   );
-  const { grain, loading: grainLoading, error: grainError } = usePivotGrain({ enabled: configServerable, spec: pivotSpec });
+  // The full readings of each market (public.archive_days) the archive grain is divided
+  // by. The archive grain is asked for once they are known — it is shown divided by the
+  // readings it was asked with — and if they cannot be read, the table is not shown: a
+  // flat-reading count is the number this replaces.
+  const archiveGrain = configServerable && !isCurrent;
+  // A grain is divided only by the readings its source holds yet: the cube lags the
+  // approvals until its refresh (heldReadingDays, src/lib/archiveReadings.js).
+  const cubeDims = useMemo(
+    () => new Set((registry.dimensions || []).filter((d) => d.is_cube_dim).map((d) => d.key)),
+    [registry.dimensions]
+  );
+  const grainVersion = isCurrent ? "" : readingsVersion;
+  // What a grain answers, handed back with it: a grain still on screen while the next
+  // loads is read as the question IT answers (grainView), not the one now being asked.
+  // Its days AND what the cube and the facts held of them when it was asked: a grain
+  // still on screen across a cube refresh is divided by the holding of its own request,
+  // not the new one (holdingNow is undefined when the request went out before the holding
+  // was in; grainView then takes the current one).
+  const grainMeta = useMemo(
+    () => ({ archive: !isCurrent, dims: specDims, scope: readingScope, days: readingDays,
+      holding: holdingNow, version: readingsVersion, viaCube: specUsesCube(pivotSpec, cubeDims) }),
+    [isCurrent, specDims, readingScope, readingDays, holdingNow, readingsVersion, pivotSpec, cubeDims]
+  );
+  // The holding a grain asked before its own was known is divided by: the current one
+  // for the current version, the replaced one for the version before (grainView).
+  const readingsNow = useMemo(
+    () => ({ version: readingsVersion, holding: holdingNow, prevVersion: readingsPrevVersion, prevHolding: readingsPrevHolding }),
+    [readingsVersion, holdingNow, readingsPrevVersion, readingsPrevHolding]
+  );
+  const grainEnabled = configServerable && (isCurrent || !!readingDays);
+  const { grain: grainRaw, meta: grainRawMeta, loading: grainRawLoading, error: grainRawError } = usePivotGrain({ enabled: grainEnabled, spec: pivotSpec, meta: grainMeta, version: grainVersion });
   // Denominator for the price-scope note: the SAME grouping without the price
   // scope, so the note can say "27 of 141" concretely instead of hand-waving.
   // Fired concurrently with the scoped call (both effects run in one render), so
   // it costs a connection rather than wall-clock, and only while the scope is on.
   const pivotSpecUnscoped = useMemo(
-    () => (priceScope ? buildPivotSpec({ dims: gDims, filters, country, isCurrent }) : null),
-    [priceScope, gDims, filters, country, isCurrent]
+    () => (priceScope ? buildPivotSpec({ dims: specDims, filters, country, isCurrent }) : null),
+    [priceScope, specDims, filters, country, isCurrent]
   );
-  const { grain: grainUnscoped } = usePivotGrain({ enabled: configServerable && priceScope, spec: pivotSpecUnscoped });
+  const grainUnscopedMetaNow = useMemo(
+    () => ({ ...grainMeta, viaCube: specUsesCube(pivotSpecUnscoped, cubeDims) }),
+    [grainMeta, pivotSpecUnscoped, cubeDims]
+  );
+  const { grain: grainUnscopedRaw, meta: grainUnscopedMeta } = usePivotGrain({ enabled: grainEnabled && priceScope, spec: pivotSpecUnscoped, meta: grainUnscopedMetaNow, version: grainVersion });
+  const grain = useMemo(() => grainView(grainRaw, grainRawMeta, specDims, readingsNow), [grainRaw, grainRawMeta, specDims, readingsNow]);
+  const grainUnscoped = useMemo(() => grainView(grainUnscopedRaw, grainUnscopedMeta, specDims, readingsNow), [grainUnscopedRaw, grainUnscopedMeta, specDims, readingsNow]);
+  const grainLoading = grainRawLoading || (archiveGrain && (readingsLoading || holdingNow === undefined));
+  const grainError = grainRawError || (archiveGrain && readingsError);
   // A non-server-able config needs records — pull them (sticky once needed).
   useEffect(() => {
     if (canViewAnalytics && !configServerable && !forceRaw) setForceRaw(true);
@@ -1866,15 +2009,24 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   // instant. forceRaw loads records in the background to back a drill-down modal
   // (table unchanged) or a non-server-able config (where useGrain is false anyway).
   const useGrain = configServerable;
+  // In the archive a record is a flat at one reading; this weighs it (recordCount).
+  // Divided by the readings the records were asked with (useFlatsArchive's stamp).
+  const recordCell = useMemo(
+    () => (canViewAnalytics && !isCurrent && archiveStamp?.days && archiveStamp.holding !== undefined
+      ? archiveRecordCells(heldReadingDays(archiveStamp.days, archiveStamp.holding, false), readingScope, gDims) : null),
+    [canViewAnalytics, isCurrent, archiveStamp, readingScope, gDims]
+  );
   const rawTree = useMemo(
     () => useGrain
       ? buildTreeFromGrain(grain, rows, cols, effectiveValues)
-      : buildTree(filteredRecords, rows, cols, effectiveValues),
-    [useGrain, grain, filteredRecords, rows, cols, effectiveValues]
+      : buildTree(filteredRecords, rows, cols, effectiveValues, recordCell),
+    [useGrain, grain, filteredRecords, rows, cols, effectiveValues, recordCell]
   );
+  // The record path's "of all" count, on the same basis as its table.
+  const recordsCount = useMemo(() => recordCount(records, recordCell), [records, recordCell]);
 
   // Header unit count + loading skeleton, source-aware.
-  const displayCount = useGrain ? (rawTree?.count || 0) : records.length;
+  const displayCount = useGrain ? (rawTree?.count || 0) : recordsCount;
 
   // How many flats the price scope kept and how many it set aside — the concrete
   // "27 of 141" that makes the note land instead of sounding like a disclaimer.
@@ -1886,8 +2038,8 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
     let included, total;
     if (useGrain) {
       if (!grain || !grainUnscoped) return null;
-      included = grain.reduce((acc, g) => acc + (+g?.m?.n || 0), 0);
-      total    = grainUnscoped.reduce((acc, g) => acc + (+g?.m?.n || 0), 0);
+      included = Math.round(compOfGrain(grain).n);
+      total    = Math.round(compOfGrain(grainUnscoped).n);
     } else {
       included = filteredRecords.length;
       total    = unscopedRecords.length;
@@ -1923,7 +2075,8 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
     let offer = 0, sold = 0;
     if (useGrain) {
       // grain rows are { d: [dimVals], m: {components} } — components are under .m
-      for (const g of (grain || [])) { const m = g.m || {}; offer += (+m.avail || 0) + (+m.res || 0) + (+m.prer || 0); sold += (+m.sold || 0); }
+      const m = compOfGrain(grain || []);   // flats at an average reading in archive mode
+      offer = Math.round(m.avail + m.res + m.prer); sold = Math.round(m.sold);
     } else {
       for (const r of filteredRecords) {
         const s = (r.stav || "").trim().toUpperCase();
@@ -1936,12 +2089,17 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   const isInitialLoading = canViewAnalytics && (
     useGrain
       ? (grainLoading && (grain == null || grain.length === 0))
-      : ((forceRaw || !configServerable) && loadingFlats && (realFlats?.length || 0) === 0)
+      : (((forceRaw || !configServerable) && loadingFlats && (realFlats?.length || 0) === 0)
+        // archive records are counted by the readings: wait for them (recordCount)
+        || (!configServerable && !isCurrent && (readingsLoading || (!readingsError && holdingNow === undefined))))
   );
   // The server pivot (analytics_pivot RPC) can fail (cold statement_timeout, RLS,
   // bad spec). Without this the empty grain rendered as a benign "0 units" — a
   // silent failure indistinguishable from "filters matched nothing". Surface it.
-  const grainErrored = useGrain && !!grainError && !grainLoading && (grain == null || grain.length === 0);
+  const grainErrored = (useGrain && !!grainError && !grainLoading && (grain == null || grain.length === 0))
+    // the record path in the archive cannot count flats without the readings either: the
+    // same error, never the flat-readings in silence
+    || (!useGrain && canViewAnalytics && !isCurrent && !!readingsError);
 
   // Records for the open drill-down. In grain mode the clicked node carries no
   // records, so resolve them from filteredRecords by matching the row-dim path
@@ -2545,8 +2703,11 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
         onDrillDown={async (node) => {
           const title = node.path.length ? node.path.join(" › ") : (lang === "sk" ? "Všetky záznamy" : "All records");
           // Record-mode node already carries its records (non-serverable config).
+          // In the archive the modal lists every reading's row, and states the cell's count
+          // of flats (node.count) rather than the rows' — the two used to read 100 and 3 000.
+          const count = isCurrent ? undefined : node.count;
           if (node.records && node.records.length) {
-            setDrillDown({ title, pathKey: node.pathKey, records: node.records });
+            setDrillDown({ title, pathKey: node.pathKey, records: node.records, count });
             return;
           }
           // Resolve the clicked group's project ids from its project-level path
@@ -2565,10 +2726,10 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
           // client pull so it still works.
           if (candIds == null || candIds.length === 0) {
             if (configServerable) setForceRaw(true);
-            setDrillDown({ title, pathKey: node.pathKey, records: null });
+            setDrillDown({ title, pathKey: node.pathKey, records: null, count });
             return;
           }
-          setDrillDown({ title, pathKey: node.pathKey, records: null, loading: true });
+          setDrillDown({ title, pathKey: node.pathKey, records: null, loading: true, count });
           const raw = await fetchFlatsForProjects(country, candIds, { isCurrent, months: fetchMonths });
           const enriched = raw.map((f) => {
             const p = projectById[f.project_id];
@@ -2619,6 +2780,7 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
         <DrillDownModal
           title={drillDown.title}
           records={drillRecords}
+          count={drillDown.count}
           loading={drillLoading}
           onClose={() => { setDrillDown(null); }}
           lang={lang}
@@ -2738,8 +2900,8 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
           fontSize: "0.75rem",
         }}>
           <span style={{ color: dim }}>
-            Filtrovaných <strong style={{ color: text }}>{(configServerable ? displayCount : filteredRecords.length).toLocaleString("en-US").replace(/,/g, " ")}</strong>
-            {" "}z {(configServerable ? displayCount : records.length).toLocaleString("en-US").replace(/,/g, " ")}
+            Filtrovaných <strong style={{ color: text }}>{(configServerable ? displayCount : (rawTree?.count || 0)).toLocaleString("en-US").replace(/,/g, " ")}</strong>
+            {" "}z {(configServerable ? displayCount : recordsCount).toLocaleString("en-US").replace(/,/g, " ")}
           </span>
           {filters.filter(isFilterActive).map(f => (
             <span key={f.key} style={{ color: text }}>
@@ -5750,7 +5912,7 @@ function CheckboxRow({ checked, onChange, label }) {
 /* ─── DRILL-DOWN MODAL ────────────────────────────────────────────
    Click a count or subtotal to see the underlying flat records that
    contributed to that cell. Showing 12 cols by default, scrollable. */
-function DrillDownModal({ title, records, loading, onClose, lang }) {
+function DrillDownModal({ title, records, count, loading, onClose, lang }) {
   useEffect(() => {
     const onKey = (e) => { if (e.key === "Escape") onClose(); };
     document.addEventListener("keydown", onKey);
@@ -5840,7 +6002,7 @@ function DrillDownModal({ title, records, loading, onClose, lang }) {
           </span>
           <strong style={{ color: text, fontSize: "0.9rem" }}>{title}</strong>
           <span style={{ color: dim, fontFamily: mono, fontSize: "0.72rem", marginLeft: "auto" }}>
-            {records.length.toLocaleString("en-US").replace(/,/g, " ")}
+            {(count ?? records.length).toLocaleString("en-US").replace(/,/g, " ")}
           </span>
           <button onClick={downloadCSV} style={{
             background: "transparent", border: `1px solid color-mix(in srgb, var(--accent) 33%, transparent)`, color: accentInk,
