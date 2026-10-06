@@ -4,7 +4,7 @@
    in the same toolbar row are the same height, radius and colour in both themes.
    The native calendar popup + picker icon follow the page `color-scheme` (set on
    :root / :root[data-theme="light"] in index.css), so only the box needs styling. */
-export default function DateField({ value, onChange, title, width = 140, ariaLabel, small = false, style }) {
+export default function DateField({ value, onChange, title, width = 140, ariaLabel, small = false, style, min, max }) {
   const cls = ["rd-field", small ? "rd-field--sm" : null, value ? null : "rd-field--unset"].filter(Boolean).join(" ");
   return (
     <input
@@ -14,6 +14,8 @@ export default function DateField({ value, onChange, title, width = 140, ariaLab
       onChange={onChange}
       title={title}
       aria-label={ariaLabel || title}
+      min={min || undefined}
+      max={max || undefined}
       style={{ width, ...style }}
     />
   );

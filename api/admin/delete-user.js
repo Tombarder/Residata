@@ -114,5 +114,19 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: `delete failed: ${delErr.message}` });
   }
 
+  // An admin-created account on a personal e-mail (gmail, …) put that address on
+  // the business-e-mail gate's exemption list (api/admin/create-user.js). With the
+  // account gone, the exemption is personal data kept for nothing — it goes too.
+  // Best-effort: the account IS deleted; a leftover exemption only lets the address
+  // sign up again, so it is logged, not failed on. Before the migration
+  // (supabase_migration_2026_10_admin_creates_accounts.sql) the function does not
+  // exist — and nothing could have been exempted by create-user either.
+  if (targetProfile?.email) {
+    const { error: exErr } = await sb.rpc("admin_set_signup_email_exempt", { p_email: targetProfile.email, p_exempt: false });
+    if (exErr && exErr.code !== "PGRST202") {
+      console.warn("[delete-user] could not remove the sign-up exemption", exErr.message);
+    }
+  }
+
   return res.status(200).json({ ok: true, deletedUserId: targetId });
 }

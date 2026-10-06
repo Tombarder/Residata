@@ -2,8 +2,9 @@
 //
 // Self-service endpoint: authenticated user starts their 7-day free
 // trial. Idempotent-ish — if the user already has a trial (active OR
-// expired) we refuse to re-grant. Admin has a separate endpoint
-// (/api/trial/grant) that CAN override for support / comped access.
+// expired) we refuse to re-grant. Support / comped access is not a trial:
+// the admin gives Premium with a period in admin → Users
+// (/api/admin/set-subscription, /api/admin/create-user).
 //
 // Security:
 //   · Origin allowlist (same as chat endpoint)
