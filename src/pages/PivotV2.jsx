@@ -824,6 +824,21 @@ function compute(field, agg, records, recordCell = null) {
   // The two count measures are counts of flats too (see recordCount).
   if (recordCell && field === FIELDS.sold_count) return recordCount(records, recordCell, (r) => _STAV(r) === "P");
   if (recordCell && field === FIELDS.available_count) return recordCount(records, recordCell, (r) => _STAV(r) === "V");
+  // So are the two ratio measures, on the grain path's basis: absorption of the weighted
+  // sold and available, €/m² of the weighted Σ price over Σ area of priced flats. Over the
+  // records as they are, a month read 30 times outweighed one read 6 times — absorption
+  // 13.3 % for 20 %, €/m² 3 050 for 3 150.
+  if (recordCell && field === FIELDS.abs_rate) {
+    const sold = weightedCount(records, recordCell, (r) => _STAV(r) === "P");
+    const denom = sold + weightedCount(records, recordCell, (r) => _STAV(r) === "V");
+    return denom > 0 ? (sold / denom) * 100 : null;
+  }
+  if (recordCell && field === FIELDS.wavg_m2_price) {
+    const priced = (r) => { const p = num(r.cena_s_dph), m = num(r.obytna_plocha); return p != null && p > 0 && m != null && m > 0; };
+    const price = weightedSum(records, recordCell, (r) => (priced(r) ? r.cena_s_dph : null)).sum;
+    const area = weightedSum(records, recordCell, (r) => (priced(r) ? r.obytna_plocha : null)).sum;
+    return area > 0 ? price / area : null;
+  }
   // Measure fields carry their own single calculation
   if (field.type === "measure" && typeof field.measureCompute === "function") {
     return field.measureCompute(records);

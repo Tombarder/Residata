@@ -595,3 +595,46 @@ test("any refresh of the cube moves the holding's signature, even one that holds
   assert.equal(a.cubeThrough.get("SK|2026-11"), b.cubeThrough.get("SK|2026-11"));
   assert.notEqual(holdingSignature(a), holdingSignature(b));
 });
+
+// ── the record path's absorption and weighted €/m² are on the grain path's basis ──
+const computeWithMeasures = (() => {
+  const grab = (re) => { const m = PIVOT.match(re); assert.ok(m, `not found: ${re}`); return m[0]; };
+  return new Function("weightedCount", "weightedSum", `
+    const FIELDS = { abs_rate: { type: "measure" }, wavg_m2_price: { type: "measure" }, sold_count: { type: "measure" }, available_count: { type: "measure" } };
+    ${grab(/function num\(v\)[\s\S]*?\n\}/)}
+    ${grab(/const _STAV = [^\n]*/)}
+    ${grab(/function recordCount\(records, recordCell, pred\)[\s\S]*?\n\}/)}
+    ${grab(/function compute\(field, agg, records, recordCell = null\)[\s\S]*?\n\}/)}
+    return { compute, FIELDS };
+  `)(weightedCount, weightedSum);
+})();
+
+test("record path and grain path give the same Miera absorpcie and Priem. (vážené)", () => {
+  // 100 flats of 100 m²: September read 30 times, 10 sold at 300 000 €; October read 6
+  // times, 30 sold at 330 000 €.
+  const dayList = [...SEP.map((day) => [day, 10, 300000]),
+    ...["2026-10-01", "2026-10-02", "2026-10-03", "2026-10-04", "2026-10-05", "2026-10-09"].map((day) => [day, 30, 330000])];
+  const recs = [];
+  for (const [day, sold, price] of dayList) for (let i = 0; i < 100; i += 1) {
+    recs.push({ country: "SK", batch_timestamp: `${day}T05:00:00+00:00`, snapshot_month: day.slice(0, 7),
+      stav: i < sold ? "P" : "V", cena_s_dph: price, obytna_plocha: 100 });
+  }
+  const scope = archiveReadingScope([]);
+  const cell = archiveRecordCells(SK_DAYS, scope, ["project_name"]);
+  const { compute, FIELDS } = computeWithMeasures;
+  const abs = compute(FIELDS.abs_rate, "measure", recs, cell);
+  const wavg = compute(FIELDS.wavg_m2_price, "measure", recs, cell);
+  // the grain the engine returns for the same flats
+  const dims = ["project_name", "country", "snapshot_month"];
+  const grain = ["2026-09", "2026-10"].map((m) => {
+    const rs = recs.filter((r) => r.snapshot_month === m);
+    const sold = rs.filter((r) => r.stav === "P").length;
+    return { d: ["X", "SK", m], m: { n: rs.length, sold, avail: rs.length - sold,
+      s_pw: rs.reduce((a, r) => a + r.cena_s_dph, 0), s_lw: rs.reduce((a, r) => a + r.obytna_plocha, 0) } };
+  });
+  const g = nodeOf(normaliseArchiveGrain(grain, dims, SK_DAYS, scope));
+  assert.ok(Math.abs(abs - (g.sold / (g.sold + g.avail)) * 100) < 1e-9);
+  assert.ok(Math.abs(abs - 20) < 1e-9, `absorption ${abs}`);
+  assert.ok(Math.abs(wavg - g.s_pw / g.s_lw) < 1e-9);
+  assert.ok(Math.abs(wavg - 3150) < 1e-9, `€/m² ${wavg}`);
+});
